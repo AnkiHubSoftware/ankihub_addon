@@ -21,8 +21,8 @@ def get_note_types_in_deck(did: int) -> List[int]:
                           "WHERE did in {0} or odid in {0}".format(ids2str(dids)))
 
 
-def add_id_fields_to_deck(did: int):
-    "Adds AnkiHub ID field to all notes in deck, *excluding* children decks."
+def add_id_fields(did: int):
+    "Adds AnkiHub ID field to all notes in deck, *including* children decks."
     deck_name = mw.col.decks.name(did)
     nids = mw.col.find_notes(f'"deck:{deck_name}"')
     for nid in nids:
@@ -30,14 +30,6 @@ def add_id_fields_to_deck(did: int):
         if not note[FIELD_NAME]:
             note[FIELD_NAME] = str(nid)
         note.flush()
-
-
-def add_id_fields(did: int):
-    "Adds AnkiHub ID field to all notes in deck, *including* children decks."
-    dids = [did]
-    dids += [child[1] for child in mw.col.decks.children(did)]
-    for did in dids:
-        add_id_fields_to_deck(did)
 
 
 def has_ankihub_field(note_type: NoteType) -> bool:
