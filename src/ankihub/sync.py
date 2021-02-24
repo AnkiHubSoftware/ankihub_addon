@@ -1,8 +1,10 @@
 from typing import List, Dict
 
 import anki
-from aqt import mw
 from anki.utils import ids2str
+from aqt import mw
+from aqt.utils import tooltip
+
 
 from .consts import *
 
@@ -56,3 +58,5 @@ def upload_deck(did: int):
 
     for mid in mids:
         prepare_note_type(mid)
+
+    tooltip("Deck Uploaded to AnkiHub")
