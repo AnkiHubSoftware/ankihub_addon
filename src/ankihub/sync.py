@@ -1,9 +1,10 @@
 from typing import List, Dict
 
 import anki
+from anki.models import NoteType
 from anki.utils import ids2str
 from aqt import mw
-from aqt.utils import tooltip
+from aqt.utils import askUser, tooltip
 
 
 from .consts import *
@@ -37,20 +38,34 @@ def add_id_fields(did: int):
         add_id_fields_to_deck(did)
 
 
-def prepare_note_type(mid: int):
-    "Adds ankihub field if it doesn't exist in note type. Modifies template."
-    mm = mw.col.models
-    note_type: anki.models.NoteType = mm.get(mid)
+def has_ankihub_field(note_type: NoteType) -> bool:
     fields: List[Dict] = note_type["flds"]
-
     for field in fields:
         if field["name"] == FIELD_NAME:
-            return
+            return True
+    return False
 
-    ankihub_field = mm.new_field(FIELD_NAME)
-    mm.add_field(note_type, ankihub_field)
-    modify_teplate(note_type)
-    mm.save(note_type)
+
+def get_unprepared_note_types(mids: int) -> List[NoteType]:
+    "Returns list of note types that doesn't have ankihub field."
+    mm = mw.col.models
+    note_types_to_prepare = []
+    for mid in mids:
+        note_type = mm.get(mid)
+        if not has_ankihub_field(note_type):
+            note_types_to_prepare.append(note_type)
+
+    return note_types_to_prepare
+
+
+def prepare_note_types(note_types_to_prepare: List[NoteType]):
+    "Adds ankihub field. Adds link to ankihub in card template."
+    mm = mw.col.models
+    for note_type in note_types_to_prepare:
+        ankihub_field = mm.new_field(FIELD_NAME)
+        mm.add_field(note_type, ankihub_field)
+        modify_teplate(note_type)
+        mm.save(note_type)
 
 
 def modify_teplate(note_type: anki.models.NoteType):
@@ -70,8 +85,14 @@ def upload_deck(did: int):
     mids = get_note_types_in_deck(did)
     assert len(mids) == 1  # Currently only supports having one note type
 
-    for mid in mids:
-        prepare_note_type(mid)
-
+    note_types_to_prepare = get_unprepared_note_types(mids)
+    if len(note_types_to_prepare):
+        res = askUser("Uploading the deck to AnkiHub will modify your note type,"
+                      "and will require a full sync afterwards. Continue?",
+                      title="AnkiHub")
+        if not res:
+            tooltip("Cancelled Upload to AnkiHub")
+            return
+        prepare_note_types(note_types_to_prepare)
     add_id_fields(did)
     tooltip("Deck Uploaded to AnkiHub")
