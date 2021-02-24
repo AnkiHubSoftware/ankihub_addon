@@ -35,12 +35,19 @@ def prepare_note_type(mid: int):
 
 def modify_teplate(mid: int):
     "Adds Ankihub link to card template"
+    link_html = ''.join(("\n{{#%s}}\n" % FIELD_NAME,
+                         "<a class='ankihub' href='%s'>" % (
+                             URL_VIEW_NOTE + "{{%s}}" % FIELD_NAME),
+                         "\nView Note on AnkiHub\n",
+                         "</a>",
+                         "\n{{/%s}}\n" % FIELD_NAME))
+
     mm = mw.col.models
     model = mm.get(mid)
     templates: List[Dict] = model["tmpls"]
     for template in templates:
-        template['qfmt'] += LINK_HTML
-        template['afmt'] += LINK_HTML
+        template['qfmt'] += link_html
+        template['afmt'] += link_html
     mm.save(model)
 
 
