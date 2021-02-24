@@ -9,7 +9,9 @@ from .sync import prepare_to_upload_deck
 
 
 def on_upload():
-    deck_name = StudyDeck(mw, title="AnkiHub", accept="Upload").name
+    # This is a hack using the behaviour bool(iter([])) == True to remove 'add' button.
+    diag = StudyDeck(mw, title="AnkiHub", accept="Upload", buttons=iter([]))
+    deck_name = diag.name
     if not deck_name:
         return
     did = mw.col.decks.id(deck_name)
