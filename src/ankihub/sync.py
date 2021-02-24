@@ -24,7 +24,8 @@ def add_id_fields_to_deck(did: int):
     nids = mw.col.find_notes("did:" + str(did))
     for nid in nids:
         note = mw.col.getNote(id=nid)
-        note[FIELD_NAME] = str(nid)
+        if not note[FIELD_NAME]:
+            note[FIELD_NAME] = str(nid)
         note.flush()
 
 
