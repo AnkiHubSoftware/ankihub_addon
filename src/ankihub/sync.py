@@ -46,7 +46,6 @@ def modify_teplate(mid: int):
     model = mm.get(mid)
     templates: List[Dict] = model["tmpls"]
     for template in templates:
-        template['qfmt'] += link_html
         template['afmt'] += link_html
     mm.save(model)
 
