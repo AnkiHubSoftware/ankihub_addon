@@ -23,7 +23,8 @@ def get_note_types_in_deck(did: int) -> List[int]:
 
 def add_id_fields_to_deck(did: int):
     "Adds AnkiHub ID field to all notes in deck, *excluding* children decks."
-    nids = mw.col.find_notes("did:" + str(did))
+    deck_name = mw.col.decks.name(did)
+    nids = mw.col.find_notes(f'"deck:{deck_name}"')
     for nid in nids:
         note = mw.col.getNote(id=nid)
         if not note[FIELD_NAME]:
