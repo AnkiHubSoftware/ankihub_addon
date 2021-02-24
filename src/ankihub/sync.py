@@ -31,11 +31,11 @@ def prepare_note_type(mid: int):
 
     ankihub_field = mm.new_field(FIELD_NAME)
     mm.add_field(note_type, ankihub_field)
+    modify_teplate(note_type)
     mm.save(note_type)
-    modify_teplate(mid)
 
 
-def modify_teplate(mid: int):
+def modify_teplate(note_type: anki.models.NoteType):
     "Adds Ankihub link to card template"
     link_html = ''.join(("\n{{#%s}}\n" % FIELD_NAME,
                          "<a class='ankihub' href='%s'>" % (
@@ -43,13 +43,9 @@ def modify_teplate(mid: int):
                          "\nView Note on AnkiHub\n",
                          "</a>",
                          "\n{{/%s}}\n" % FIELD_NAME))
-
-    mm = mw.col.models
-    model = mm.get(mid)
-    templates: List[Dict] = model["tmpls"]
+    templates: List[Dict] = note_type["tmpls"]
     for template in templates:
         template['afmt'] += link_html
-    mm.save(model)
 
 
 def upload_deck(did: int):
