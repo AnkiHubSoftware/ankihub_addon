@@ -85,7 +85,9 @@ def modify_teplate(note_type: anki.models.NoteType):
 
 def prepare_to_upload_deck(did: int):
     mids = get_note_types_in_deck(did)
-    assert len(mids) == 1  # Currently only supports having one note type
+    # Currently only supports having a single cloze note type in deck
+    assert len(mids) == 1
+    assert mw.col.models.get(mids[0])["type"] == anki.consts.MODEL_CLOZE
 
     note_types_to_prepare = get_unprepared_note_types(mids)
     if len(note_types_to_prepare):
