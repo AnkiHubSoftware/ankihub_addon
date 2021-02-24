@@ -6,7 +6,7 @@ from .sync import upload_deck
 
 
 def on_upload():
-    deck_name = StudyDeck(mw, title="ankihub").name
+    deck_name = StudyDeck(mw, title="AnkiHub", accept="Upload").name
     if not deck_name:
         return
     did = mw.col.decks.id(deck_name)
