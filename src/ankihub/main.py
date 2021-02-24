@@ -1,7 +1,10 @@
-from aqt import mw
+import anki
+import aqt
+from aqt import gui_hooks, mw
 from aqt.qt import *
 from aqt.studydeck import StudyDeck
 
+from .consts import *
 from .sync import prepare_to_upload_deck
 
 
@@ -22,4 +25,18 @@ def add_menu():
     ah_menu.addAction(upload_deck_action)
 
 
+def hide_ankihub_field_in_editor(js: str, note: anki.notes.Note, editor: aqt.editor.Editor) -> str:
+    if not FIELD_NAME in note:
+        return js
+    ord = note._fieldOrd(FIELD_NAME)
+    print(ord)
+    id_templs = ("f{}", "name{}")
+    for id_templ in id_templs:
+        id = id_templ.format(ord)
+        print(id)
+        js += "\ndocument.getElementById('{}').style.display = 'none';".format(id)
+    return js
+
+
+gui_hooks.editor_will_load_note.append(hide_ankihub_field_in_editor)
 add_menu()
