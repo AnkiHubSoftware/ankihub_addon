@@ -20,7 +20,7 @@ def get_note_types_in_deck(did: int) -> List[int]:
 
 
 def prepare_note_type(mid: int):
-    "Add ankihub field if it doesn't exist in note type. Modify template."
+    "Adds ankihub field if it doesn't exist in note type. Modifies template."
     mm = mw.col.models
     note_type: anki.models.NoteType = mm.get(mid)
     fields: List[Dict] = note_type["flds"]
