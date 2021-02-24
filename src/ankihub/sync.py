@@ -19,6 +19,23 @@ def get_note_types_in_deck(did: int) -> List[int]:
                           "WHERE did in {0} or odid in {0}".format(ids2str(dids)))
 
 
+def add_id_fields_to_deck(did: int):
+    "Adds AnkiHub ID field to all notes in deck, *excluding* children decks."
+    nids = mw.col.find_notes("did:" + str(did))
+    for nid in nids:
+        note = mw.col.getNote(id=nid)
+        note[FIELD_NAME] = str(nid)
+        note.flush()
+
+
+def add_id_fields(did: int):
+    "Adds AnkiHub ID field to all notes in deck, *including* children decks."
+    dids = [did]
+    dids += [child[1] for child in mw.col.decks.children(did)]
+    for did in dids:
+        add_id_fields_to_deck(did)
+
+
 def prepare_note_type(mid: int):
     "Adds ankihub field if it doesn't exist in note type. Modifies template."
     mm = mw.col.models
@@ -55,4 +72,5 @@ def upload_deck(did: int):
     for mid in mids:
         prepare_note_type(mid)
 
+    add_id_fields(did)
     tooltip("Deck Uploaded to AnkiHub")
