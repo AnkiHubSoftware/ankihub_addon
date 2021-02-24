@@ -1,3 +1,4 @@
+from concurrent.futures import Future
 from typing import List, Dict
 
 import anki
@@ -81,7 +82,7 @@ def modify_teplate(note_type: anki.models.NoteType):
         template['afmt'] += link_html
 
 
-def upload_deck(did: int):
+def prepare_to_upload_deck(did: int):
     mids = get_note_types_in_deck(did)
     assert len(mids) == 1  # Currently only supports having one note type
 
@@ -94,5 +95,12 @@ def upload_deck(did: int):
             tooltip("Cancelled Upload to AnkiHub")
             return
         prepare_note_types(note_types_to_prepare)
-    add_id_fields(did)
+
+    def on_done(fut: Future):
+        upload_deck(did)
+
+    mw.taskman.with_progress(lambda: add_id_fields(did), on_done)
+
+
+def upload_deck(did: int):
     tooltip("Deck Uploaded to AnkiHub")

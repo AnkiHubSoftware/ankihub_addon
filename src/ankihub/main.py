@@ -2,7 +2,7 @@ from aqt import mw
 from aqt.qt import *
 from aqt.studydeck import StudyDeck
 
-from .sync import upload_deck
+from .sync import prepare_to_upload_deck
 
 
 def on_upload():
@@ -10,7 +10,7 @@ def on_upload():
     if not deck_name:
         return
     did = mw.col.decks.id(deck_name)
-    upload_deck(did)
+    prepare_to_upload_deck(did)
 
 
 def add_menu():
