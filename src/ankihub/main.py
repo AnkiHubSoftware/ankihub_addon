@@ -31,11 +31,9 @@ def hide_ankihub_field_in_editor(js: str, note: anki.notes.Note, editor: aqt.edi
     if not FIELD_NAME in note:
         return js
     ord = note._fieldOrd(FIELD_NAME)
-    print(ord)
     id_templs = ("f{}", "name{}")
     for id_templ in id_templs:
         id = id_templ.format(ord)
-        print(id)
         js += "\ndocument.getElementById('{}').style.display = 'none';".format(id)
     return js
 

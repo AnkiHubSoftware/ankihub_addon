@@ -65,6 +65,7 @@ def prepare_note_types(note_types_to_prepare: List[NoteType]):
     mm = mw.col.models
     for note_type in note_types_to_prepare:
         ankihub_field = mm.new_field(FIELD_NAME)
+        # potential way to hide the field:
         # ankihub_field["size"] = 0
         mm.add_field(note_type, ankihub_field)
         modify_teplate(note_type)
