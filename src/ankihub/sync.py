@@ -42,7 +42,7 @@ def has_ankihub_field(note_type: NoteType) -> bool:
     return False
 
 
-def get_unprepared_note_types(mids: int) -> List[NoteType]:
+def get_unprepared_note_types(mids: List[int]) -> List[NoteType]:
     "Returns list of note types that doesn't have ankihub field."
     mm = mw.col.models
     note_types_to_prepare = []
