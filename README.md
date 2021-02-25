@@ -3,6 +3,9 @@
 
 ### Formatting, Type check, and Tests
 ```
-black .
-mypy src/ankihub --no-strict-optional
+python -m pip install git+https://github.com/BlueGreenMagick/pytest-anki.git
+
+python -m black .
+python -m mypy --no-strict-optional .
+python -m pytest --verbose
 ```
