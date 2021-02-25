@@ -16,9 +16,11 @@ def get_note_types_in_deck(did: int) -> List[int]:
     dids = [did]
     dids += [child[1] for child in mw.col.decks.children(did)]
     # odid is the original did for cards in filtered decks
-    return mw.col.db.list("SELECT DISTINCT mid FROM cards "
-                          "INNER JOIN notes ON cards.nid = notes.id "
-                          "WHERE did in {0} or odid in {0}".format(ids2str(dids)))
+    return mw.col.db.list(
+        "SELECT DISTINCT mid FROM cards "
+        "INNER JOIN notes ON cards.nid = notes.id "
+        "WHERE did in {0} or odid in {0}".format(ids2str(dids))
+    )
 
 
 def add_id_fields(did: int):
@@ -66,15 +68,18 @@ def prepare_note_types(note_types_to_prepare: List[NoteType]):
 
 def modify_teplate(note_type: anki.models.NoteType):
     "Adds Ankihub link to card template"
-    link_html = ''.join(("\n{{#%s}}\n" % FIELD_NAME,
-                         "<a class='ankihub' href='%s'>" % (
-                             URL_VIEW_NOTE + "{{%s}}" % FIELD_NAME),
-                         "\nView Note on AnkiHub\n",
-                         "</a>",
-                         "\n{{/%s}}\n" % FIELD_NAME))
+    link_html = "".join(
+        (
+            "\n{{#%s}}\n" % FIELD_NAME,
+            "<a class='ankihub' href='%s'>" % (URL_VIEW_NOTE + "{{%s}}" % FIELD_NAME),
+            "\nView Note on AnkiHub\n",
+            "</a>",
+            "\n{{/%s}}\n" % FIELD_NAME,
+        )
+    )
     templates: List[Dict] = note_type["tmpls"]
     for template in templates:
-        template['afmt'] += link_html
+        template["afmt"] += link_html
 
 
 def prepare_to_upload_deck(did: int):
@@ -85,9 +90,11 @@ def prepare_to_upload_deck(did: int):
 
     note_types_to_prepare = get_unprepared_note_types(mids)
     if len(note_types_to_prepare):
-        res = askUser("Uploading the deck to AnkiHub will modify your note type,"
-                      "and will require a full sync afterwards. Continue?",
-                      title="AnkiHub")
+        res = askUser(
+            "Uploading the deck to AnkiHub will modify your note type,"
+            "and will require a full sync afterwards. Continue?",
+            title="AnkiHub",
+        )
         if not res:
             tooltip("Cancelled Upload to AnkiHub")
             return
