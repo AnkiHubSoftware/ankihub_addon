@@ -1,3 +1,4 @@
+import copy
 from contextlib import contextmanager
 from typing import Generator, List
 
@@ -44,7 +45,9 @@ def add_note_type(col: Collection, name="AnkiHub") -> Generator[int, None, None]
         col.models.rem(ah_note_type)
 
 
-def add_cloze_notes(col: Collection, mid: int, did: int, card_count: int = 10) -> List[Note]:
+def add_cloze_notes(
+    col: Collection, mid: int, did: int, card_count: int = 10
+) -> List[Note]:
     "This function assumes note type is cloze type, and has field 'Text' and 'Extra'."
 
     def create_note(text, extra):
@@ -64,6 +67,7 @@ def add_cloze_notes(col: Collection, mid: int, did: int, card_count: int = 10) -
 
 def test_get_note_types_in_deck(col: Collection):
     from ankihub.sync import get_note_types_in_deck
+
     with add_deck(col) as did:
         with add_note_type(col, "AnkiHub1") as mid1:
             with add_note_type(col, "AnkiHub2") as mid2:
@@ -84,3 +88,43 @@ def test_get_note_types_in_deck(col: Collection):
                         assert mid1 in mids
                         assert mid2 in mids
                         assert len(mids) == 2
+
+
+def test_note_type_preparations(col: Collection):
+    from ankihub.sync import has_ankihub_field, prepare_note_types
+    from ankihub.consts import FIELD_NAME
+
+    with add_note_type(col, "AnkiHub1") as mid:
+        note_type = col.models.get(mid)
+        assert has_ankihub_field(note_type) == False
+
+        prev_templs = copy.deepcopy(note_type["tmpls"])
+        prepare_note_types([note_type])
+
+        # prepare_note_types added the field
+        note_type = col.models.get(mid)
+        assert has_ankihub_field(note_type) == True
+        assert any(field["name"] == FIELD_NAME for field in note_type["flds"])
+
+        # prepare_note_types modified the template
+        templs = note_type["tmpls"]
+        assert len(prev_templs) == len(templs)
+        for i, templ in enumerate(templs):
+            assert templ != prev_templs[i]["afmt"]
+
+
+def test_get_unprepared_note_types(col: Collection):
+    from ankihub.sync import get_unprepared_note_types, prepare_note_types
+
+    with add_note_type(col, "AnkiHub1") as mid1:
+        with add_note_type(col, "AnkiHub2") as mid2:
+            note_types = get_unprepared_note_types([mid1, mid2])
+            assert len(note_types) == 2
+            assert note_types[0]["id"] == mid1
+            assert note_types[1]["id"] == mid2
+
+            # It shouldn't return mid1 note type after preparing
+            prepare_note_types([note_types[0]])
+            note_types = get_unprepared_note_types([mid1, mid2])
+            assert len(note_types) == 1
+            assert note_types[0]["id"] == mid2
