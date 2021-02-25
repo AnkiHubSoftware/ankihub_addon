@@ -1,17 +1,8 @@
 import pytest
-from typing import Iterator
 
 from aqt.main import AnkiQt
 
-from pytest_anki import anki_running, profile_loaded, AnkiSession
-
-
-@pytest.fixture(scope="session")
-def anki_session(request) -> Iterator[AnkiSession]:
-    param = getattr(request, "param", None)
-
-    with anki_running() if not param else anki_running(**param) as session:
-        yield session
+from pytest_anki import profile_loaded, AnkiSession
 
 
 @pytest.fixture(scope="session")
