@@ -2,11 +2,9 @@ name: Checks
 
 on:
   push:
-    branches: [ "**" ]
+    branches: ["**"]
   pull_request:
-    branches: [ "**" ]
-    
-  workflow_dispatch:
+    branches: ["**"]
 
 jobs:
   check:
@@ -14,29 +12,26 @@ jobs:
     steps:
       - name: Checkout Code Repository
         uses: actions/checkout@v2
-        
+
       - name: Setup Python
         uses: actions/setup-python@v2.2.1
         with:
           python-version: 3.8
-          
+
       - name: upgrade pip
         run: python -m pip install --upgrade pip
-        
+
       - name: Install various dependencies
         run: python -m pip install pytest black mypy wheel
-        
+
       - name: Install anki aqt
         run: python -m pip install anki aqt
-      
+
       - name: Install pytest-anki
         run: python -m pip install git+https://github.com/BlueGreenMagick/pytest-anki.git
-        
+
       - name: Run black
         run: python -m black --check --diff .
-        
+
       - name: Run mypy
         run: python -m mypy --no-strict-optional .
-      
-      - name: Run pytest
-        run: python -m pytest --verbose
