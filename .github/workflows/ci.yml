@@ -26,6 +26,9 @@ jobs:
           # addressed by my patch are sorted out.
           pip install git+https://github.com/andrewsanchez/pytest-anki.git
 
+      - name: Run flake8
+        run: flake8 ./src
+
       - name: Run black
         run: black --check --diff .
 
