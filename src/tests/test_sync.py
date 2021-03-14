@@ -124,14 +124,14 @@ def test_note_type_preparations(
 
     mid = add_cloze_note_types(["AnkiHub1"]).pop()
     note_type = col.models.get(mid)
-    assert has_ankihub_field(note_type) == False
+    assert not has_ankihub_field(note_type)
 
     prev_templs = copy.deepcopy(note_type["tmpls"])
     prepare_note_types([note_type])
 
     # prepare_note_types added the field
     note_type = col.models.get(mid)
-    assert has_ankihub_field(note_type) == True
+    assert has_ankihub_field(note_type)
     assert any(field["name"] == FIELD_NAME for field in note_type["flds"])
 
     # prepare_note_types modified the template
