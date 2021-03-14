@@ -27,7 +27,7 @@ jobs:
           pip install git+https://github.com/andrewsanchez/pytest-anki.git
 
       - name: Run flake8
-        run: flake8 ./src
+        run: flake8 --ignore=F403,F405 ./src
 
       - name: Run black
         run: black --check --diff .
