@@ -23,7 +23,7 @@ def get_note_types_in_deck(did: int) -> List[int]:
     )
 
 
-def add_id_fields(did: int):
+def add_id_fields(did: int) -> None:
     "Adds AnkiHub ID field to all notes in deck, *including* children decks."
     deck_name = mw.col.decks.name(did)
     nids = mw.col.find_notes(f'"deck:{deck_name}"')
@@ -54,7 +54,7 @@ def get_unprepared_note_types(mids: List[int]) -> List[NoteType]:
     return note_types_to_prepare
 
 
-def prepare_note_types(note_types_to_prepare: List[NoteType]):
+def prepare_note_types(note_types_to_prepare: List[NoteType]) -> None:
     "Adds ankihub field. Adds link to ankihub in card template."
     mm = mw.col.models
     for note_type in note_types_to_prepare:
@@ -66,7 +66,7 @@ def prepare_note_types(note_types_to_prepare: List[NoteType]):
         mm.save(note_type)
 
 
-def modify_teplate(note_type: anki.models.NoteType):
+def modify_teplate(note_type: anki.models.NoteType) -> None:
     "Adds Ankihub link to card template"
     link_html = "".join(
         (
@@ -82,7 +82,7 @@ def modify_teplate(note_type: anki.models.NoteType):
         template["afmt"] += link_html
 
 
-def prepare_to_upload_deck(did: int):
+def prepare_to_upload_deck(did: int) -> None:
     mids = get_note_types_in_deck(did)
     # Currently only supports having a single cloze note type in deck
     assert len(mids) == 1
@@ -100,11 +100,11 @@ def prepare_to_upload_deck(did: int):
             return
         prepare_note_types(note_types_to_prepare)
 
-    def on_done(fut: Future):
+    def on_done(fut: Future) -> None:
         upload_deck(did)
 
     mw.taskman.with_progress(lambda: add_id_fields(did), on_done)
 
 
-def upload_deck(did: int):
+def upload_deck(did: int) -> None:
     tooltip("Deck Uploaded to AnkiHub")

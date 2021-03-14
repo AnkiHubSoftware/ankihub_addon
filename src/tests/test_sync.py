@@ -1,6 +1,6 @@
 import copy
 from contextlib import contextmanager
-from typing import Generator, List, Iterable
+from typing import Callable, Generator, List, Iterable
 
 import pytest
 
@@ -31,13 +31,13 @@ def add_filtered_deck(col: Collection, search: str) -> Generator[int, None, None
 
 
 @pytest.fixture
-def add_note_types():
+def add_note_types() -> Generator[Callable, None, None]:
     """The note type with all its cards are removed afterwards."""
 
     notes = []
     col_ = None
 
-    def _add_note_types(col: Collection, names: Iterable[str]):
+    def _add_note_types(col: Collection, names: Iterable[str]) -> List[int]:
         nonlocal col_
         col_ = col
         mids = []
@@ -64,7 +64,7 @@ def add_cloze_notes(
 ) -> List[Note]:
     "This function assumes note type is cloze type, and has field 'Text' and 'Extra'."
 
-    def create_note(text, extra):
+    def create_note(text: str, extra: str) -> Note:
         note_type = col.models.get(mid)
         note = Note(col, note_type)
         note["Text"] = text
@@ -79,7 +79,7 @@ def add_cloze_notes(
     return notes
 
 
-def test_get_note_types_in_deck(col: Collection, add_note_types):
+def test_get_note_types_in_deck(col: Collection, add_note_types: Callable) -> None:
     from ankihub.sync import get_note_types_in_deck
 
     with add_deck(col) as did:
@@ -103,7 +103,7 @@ def test_get_note_types_in_deck(col: Collection, add_note_types):
             assert len(mids) == 2
 
 
-def test_note_type_preparations(col: Collection, add_note_types):
+def test_note_type_preparations(col: Collection, add_note_types: Callable) -> None:
     from ankihub.sync import has_ankihub_field, prepare_note_types
     from ankihub.consts import FIELD_NAME
 
@@ -126,7 +126,7 @@ def test_note_type_preparations(col: Collection, add_note_types):
         assert templ != prev_templs[i]["afmt"]
 
 
-def test_get_unprepared_note_types(col: Collection, add_note_types):
+def test_get_unprepared_note_types(col: Collection, add_note_types: Callable) -> None:
     from ankihub.sync import get_unprepared_note_types, prepare_note_types
 
     names = ["AnkiHub1", "AnkiHub2"]

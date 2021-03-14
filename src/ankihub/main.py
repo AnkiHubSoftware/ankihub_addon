@@ -8,9 +8,9 @@ from .consts import *
 from .sync import prepare_to_upload_deck
 
 
-def on_upload():
+def on_upload() -> None:
     # This is a hack using the behaviour bool(iter([])) == True to remove 'add' button.
-    diag = StudyDeck(mw, title="AnkiHub", accept="Upload", buttons=iter([]))
+    diag = StudyDeck(mw, title="AnkiHub", accept="Upload", buttons=iter([]))  # type: ignore
     deck_name = diag.name
     if not deck_name:
         return
@@ -18,7 +18,7 @@ def on_upload():
     prepare_to_upload_deck(did)
 
 
-def add_menu():
+def add_menu() -> None:
     ah_menu = QMenu("&AnkiHub", parent=mw)
     mw.form.menubar.addMenu(ah_menu)
 
