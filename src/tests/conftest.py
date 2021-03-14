@@ -1,4 +1,4 @@
-from typing import Iterator, Generator
+from typing import Generator
 
 import pytest
 

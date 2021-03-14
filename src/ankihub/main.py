@@ -30,7 +30,7 @@ def add_menu() -> None:
 def hide_ankihub_field_in_editor(
     js: str, note: anki.notes.Note, editor: aqt.editor.Editor
 ) -> str:
-    if not FIELD_NAME in note:
+    if FIELD_NAME not in note:
         return js
     ord = note._fieldOrd(FIELD_NAME)
     id_templs = ("f{}", "name{}")
