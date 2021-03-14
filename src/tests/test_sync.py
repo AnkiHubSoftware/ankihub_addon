@@ -1,5 +1,4 @@
 import copy
-from contextlib import contextmanager
 from typing import Callable, Generator, List, Iterable
 
 import pytest
@@ -8,35 +7,47 @@ from anki.collection import Collection
 from anki.notes import Note
 
 
-@contextmanager
-def add_deck(col: Collection) -> Generator[int, None, None]:
-    "The deck with all its cards are removed afterwards"
-    did = col.decks.id("AnkiHub Deck")
-    try:
-        yield did
-    finally:
-        col.decks.rem(did)
+@pytest.fixture
+def add_deck(col: Collection) -> Generator[Callable, None, None]:
+    """The deck with all its cards are removed afterwards"""
+    dids = []
 
+    def add_deck() -> int:
+        did = col.decks.id("AnkiHub Deck")
+        dids.append(did)
+        return did
 
-@contextmanager
-def add_filtered_deck(col: Collection, search: str) -> Generator[int, None, None]:
-    did = col.decks.new_filtered("AnkiHub Filtered")
-    deck = col.decks.get(did)
-    deck["terms"] = [[search, 100, 1]]
-    col.decks.save(deck)
-    try:
-        yield did
-    finally:
+    yield add_deck
+
+    for did in dids:
         col.decks.rem(did)
 
 
 @pytest.fixture
-def add_note_types(col: Collection) -> Generator[Callable, None, None]:
+def add_filtered_deck(col: Collection) -> Generator[Callable, None, None]:
+    dids = []
+
+    def _add_filtered_deck(search: str) -> int:
+        did = col.decks.new_filtered("AnkiHub Filtered")
+        dids.append(did)
+        deck = col.decks.get(did)
+        deck["terms"] = [[search, 100, 1]]
+        col.decks.save(deck)
+        return did
+
+    yield _add_filtered_deck
+
+    for did in dids:
+        col.decks.rem(did)
+
+
+@pytest.fixture
+def add_cloze_note_types(col: Collection) -> Generator[Callable, None, None]:
     """The note type with all its cards are removed afterwards."""
 
     notes = []
 
-    def _add_note_types(names: Iterable[str]) -> List[int]:
+    def _add_cloze_note_types(names: Iterable[str]) -> List[int]:
         mids = []
         for name in names:
             cloze_note_type = col.models.byName("Cloze")
@@ -50,7 +61,7 @@ def add_note_types(col: Collection) -> Generator[Callable, None, None]:
             notes.append(ah_note_type)
         return mids
 
-    yield _add_note_types
+    yield _add_cloze_note_types
 
     for note in notes:
         col.models.rem(note)
@@ -76,35 +87,42 @@ def add_cloze_notes(
     return notes
 
 
-def test_get_note_types_in_deck(col: Collection, add_note_types: Callable) -> None:
+def test_get_note_types_in_deck(
+    col: Collection,
+    add_deck: Callable,
+    add_cloze_note_types: Callable,
+    add_filtered_deck: Callable,
+) -> None:
     from ankihub.sync import get_note_types_in_deck
 
-    with add_deck(col) as did:
-        names = ["AnkiHub1", "AnkiHub2", "AnkiHub3"]
-        mid1, mid2, mid3 = add_note_types(names)
-        notes1 = add_cloze_notes(col, mid1, did, card_count=1)
-        add_cloze_notes(col, mid2, did)
-        add_cloze_notes(col, mid3, 1)  # default deck
+    did = add_deck()
+    names = ["AnkiHub1", "AnkiHub2", "AnkiHub3"]
+    mid1, mid2, mid3 = add_cloze_note_types(names)
+    notes1 = add_cloze_notes(col, mid1, did, card_count=1)
+    add_cloze_notes(col, mid2, did)
+    add_cloze_notes(col, mid3, 1)  # default deck
 
-        mids = get_note_types_in_deck(did)
-        assert mid1 in mids
-        assert mid2 in mids
-        assert len(mids) == 2
+    mids = get_note_types_in_deck(did)
+    assert mid1 in mids
+    assert mid2 in mids
+    assert len(mids) == 2
 
-        # Test for notes in filtered deck
-        nid = notes1[0].id
-        with add_filtered_deck(col, f"nid:{nid}") as fdid:
-            mids = get_note_types_in_deck(did)
-            assert mid1 in mids
-            assert mid2 in mids
-            assert len(mids) == 2
+    # Test for notes in filtered deck
+    nid = notes1[0].id
+    add_filtered_deck(f"nid:{nid}")
+    mids = get_note_types_in_deck(did)
+    assert mid1 in mids
+    assert mid2 in mids
+    assert len(mids) == 2
 
 
-def test_note_type_preparations(col: Collection, add_note_types: Callable) -> None:
+def test_note_type_preparations(
+    col: Collection, add_cloze_note_types: Callable
+) -> None:
     from ankihub.sync import has_ankihub_field, prepare_note_types
     from ankihub.consts import FIELD_NAME
 
-    mid = add_note_types(["AnkiHub1"]).pop()
+    mid = add_cloze_note_types(["AnkiHub1"]).pop()
     note_type = col.models.get(mid)
     assert has_ankihub_field(note_type) == False
 
@@ -123,11 +141,13 @@ def test_note_type_preparations(col: Collection, add_note_types: Callable) -> No
         assert templ != prev_templs[i]["afmt"]
 
 
-def test_get_unprepared_note_types(col: Collection, add_note_types: Callable) -> None:
+def test_get_unprepared_note_types(
+    col: Collection, add_cloze_note_types: Callable
+) -> None:
     from ankihub.sync import get_unprepared_note_types, prepare_note_types
 
     names = ["AnkiHub1", "AnkiHub2"]
-    mid1, mid2 = add_note_types(names)
+    mid1, mid2 = add_cloze_note_types(names)
     note_types = get_unprepared_note_types([mid1, mid2])
     assert len(note_types) == 2
     assert note_types[0]["id"] == mid1
