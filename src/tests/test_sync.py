@@ -31,15 +31,12 @@ def add_filtered_deck(col: Collection, search: str) -> Generator[int, None, None
 
 
 @pytest.fixture
-def add_note_types() -> Generator[Callable, None, None]:
+def add_note_types(col: Collection) -> Generator[Callable, None, None]:
     """The note type with all its cards are removed afterwards."""
 
     notes = []
-    col_ = None
 
-    def _add_note_types(col: Collection, names: Iterable[str]) -> List[int]:
-        nonlocal col_
-        col_ = col
+    def _add_note_types(names: Iterable[str]) -> List[int]:
         mids = []
         for name in names:
             cloze_note_type = col.models.byName("Cloze")
@@ -56,7 +53,7 @@ def add_note_types() -> Generator[Callable, None, None]:
     yield _add_note_types
 
     for note in notes:
-        col_.models.rem(note)
+        col.models.rem(note)
 
 
 def add_cloze_notes(
@@ -84,7 +81,7 @@ def test_get_note_types_in_deck(col: Collection, add_note_types: Callable) -> No
 
     with add_deck(col) as did:
         names = ["AnkiHub1", "AnkiHub2", "AnkiHub3"]
-        mid1, mid2, mid3 = add_note_types(col, names)
+        mid1, mid2, mid3 = add_note_types(names)
         notes1 = add_cloze_notes(col, mid1, did, card_count=1)
         add_cloze_notes(col, mid2, did)
         add_cloze_notes(col, mid3, 1)  # default deck
@@ -107,7 +104,7 @@ def test_note_type_preparations(col: Collection, add_note_types: Callable) -> No
     from ankihub.sync import has_ankihub_field, prepare_note_types
     from ankihub.consts import FIELD_NAME
 
-    mid = add_note_types(col, ["AnkiHub1"]).pop()
+    mid = add_note_types(["AnkiHub1"]).pop()
     note_type = col.models.get(mid)
     assert has_ankihub_field(note_type) == False
 
@@ -130,7 +127,7 @@ def test_get_unprepared_note_types(col: Collection, add_note_types: Callable) ->
     from ankihub.sync import get_unprepared_note_types, prepare_note_types
 
     names = ["AnkiHub1", "AnkiHub2"]
-    mid1, mid2 = add_note_types(col, names)
+    mid1, mid2 = add_note_types(names)
     note_types = get_unprepared_note_types([mid1, mid2])
     assert len(note_types) == 2
     assert note_types[0]["id"] == mid1
