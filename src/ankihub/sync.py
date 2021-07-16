@@ -3,13 +3,16 @@ from typing import List, Dict
 
 import anki
 from anki.models import NoteType
+from anki.exporting import AnkiPackageExporter
 from anki.utils import ids2str
 from aqt import mw
 from aqt.utils import askUser, tooltip
-
+import os
 
 from .consts import *
 from .service import ServiceApi
+
+DIR_PATH = os.path.dirname(os.path.abspath(__file__))
 
 
 def get_note_types_in_deck(did: int) -> List[int]:
@@ -86,8 +89,8 @@ def modify_teplate(note_type: anki.models.NoteType) -> None:
 def prepare_to_upload_deck(did: int) -> None:
     mids = get_note_types_in_deck(did)
     # Currently only supports having a single cloze note type in deck
-    assert len(mids) == 1
-    assert mw.col.models.get(mids[0])["type"] == anki.consts.MODEL_CLOZE
+    # assert len(mids) == 1
+    # assert mw.col.models.get(mids[0])["type"] == anki.consts.MODEL_CLOZE
 
     note_types_to_prepare = get_unprepared_note_types(mids)
     if len(note_types_to_prepare):
@@ -112,5 +115,22 @@ def upload_deck(did: int) -> None:
     ServiceApi.post("api/deck_upload/",{
         data
     })
-    """"
+    """
+    # deck_name = request.POST["deck"]
+    deck_name = mw.col.decks.name(did)
+
+    e = AnkiPackageExporter(mw.col)
+    e.did = did
+    e.includeMedia = 0
+    e.includeSched = 1
+    e.includeTags = 1
+    e.exportInto(DIR_PATH + '/upload_apkg.apkg')
+
+    ServiceApi().post_apkg(
+        "api/deck_upload/",
+        {
+                "filename": deck_name
+        },
+        DIR_PATH + '/upload_apkg.apkg'
+        )
     tooltip("Deck Uploaded to AnkiHub")

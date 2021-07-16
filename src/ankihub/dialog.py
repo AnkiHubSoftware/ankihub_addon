@@ -130,6 +130,3 @@ class AnkiHubLogin(QWidget):
         else:
             self.label_results.setText("There seems to have been an error!")
 
-        # token = response['token']
-        # setLocalLastToken(token)
-        # self.label_results.setText("We've connected securely!")

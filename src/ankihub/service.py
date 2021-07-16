@@ -15,10 +15,19 @@ class Config:
         config = self.get()
         return True if config['user']['token'] else False
 
+    def getToken(self):
+        token = self.get()['user']['token']
+        return token if token else None
+
+    def signout(self):
+        default = mw.addonManager.addonConfigDefaults(self.addon)
+        mw.addonManager.writeConfig(__name__, default)
+
     def writeToken(self, token: str) -> None:
         config = self.get()
         showInfo("token"+token)
         config['user']['token'] = token
+        self.token = token
         mw.addonManager.writeConfig(__name__, config)
 
 
@@ -29,7 +38,7 @@ class ServiceApi:
         if self.config.isAuthenticated():
             self.headers = {
                 "Content-Type": "application/json",
-                "Authorization": "Token " + self.token
+                "Authorization": "Token " + self.config.getToken()
             }
         else:
             self.headers = {
@@ -57,6 +66,19 @@ class ServiceApi:
             return token
         else:
             return None
+
+    def post_apkg(self, url, data, file):
+        headers = {
+                "Authorization": "Token " + self.config.getToken()
+            }
+        return requests.post(
+            self.base_url + url,
+            headers=headers,
+            files={
+                "file": open(file, 'rb'),
+            },
+            data=data,
+            )
 
     def post(self, url, data):
         return requests.post(

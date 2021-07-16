@@ -24,6 +24,9 @@ def show_sign_in_screen() -> None:
     global __window
     __window = AnkiHubLogin()
 
+def signout() -> None:
+    Config().signout()
+
 def add_menu() -> None:
     ah_menu = QMenu("&AnkiHub", parent=mw)
     mw.form.menubar.addMenu(ah_menu)
@@ -31,6 +34,9 @@ def add_menu() -> None:
         upload_deck_action = QAction("Upload Deck", parent=ah_menu)
         qconnect(upload_deck_action.triggered, on_upload)
         ah_menu.addAction(upload_deck_action)
+        sign_out_button = QAction("Sign out", mw)
+        sign_out_button.triggered.connect(signout)
+        ah_menu.addAction(sign_out_button)
     else:
         sign_in_button = QAction("Sign in", mw)
         sign_in_button.triggered.connect(show_sign_in_screen)
