@@ -1,119 +1,20 @@
 import copy
-from typing import Callable, Generator, List, Iterable
-
-import pytest
+import pathlib
+from typing import Callable
 
 from anki.collection import Collection
-from anki.notes import Note
 
 
-@pytest.fixture
-def add_deck(col: Collection) -> Generator[Callable, None, None]:
-    """The deck with all its cards are removed afterwards"""
-    dids = []
-
-    def add_deck() -> int:
-        did = col.decks.id("AnkiHub Deck")
-        dids.append(did)
-        return did
-
-    yield add_deck
-
-    for did in dids:
-        col.decks.rem(did)
+sample_deck = pathlib.Path(__file__).parent / "data" / "sample_deck.apkg"
 
 
-@pytest.fixture
-def add_filtered_deck(col: Collection) -> Generator[Callable, None, None]:
-    dids = []
-
-    def _add_filtered_deck(search: str) -> int:
-        did = col.decks.new_filtered("AnkiHub Filtered")
-        dids.append(did)
-        deck = col.decks.get(did)
-        deck["terms"] = [[search, 100, 1]]
-        col.decks.save(deck)
-        return did
-
-    yield _add_filtered_deck
-
-    for did in dids:
-        col.decks.rem(did)
-
-
-@pytest.fixture
-def add_cloze_note_types(col: Collection) -> Generator[Callable, None, None]:
-    """The note type with all its cards are removed afterwards."""
-
-    notes = []
-
-    def _add_cloze_note_types(names: Iterable[str]) -> List[int]:
-        mids = []
-        for name in names:
-            cloze_note_type = col.models.byName("Cloze")
-            ah_note_type = col.models.copy(cloze_note_type)
-            ah_note_type["name"] = name
-            extra_field = col.models.new_field("Extra")
-            col.models.add_field(ah_note_type, extra_field)
-            col.models.add(ah_note_type)
-            mid = col.models.id_for_name(name)
-            mids.append(mid)
-            notes.append(ah_note_type)
-        return mids
-
-    yield _add_cloze_note_types
-
-    for note in notes:
-        col.models.rem(note)
-
-
-def add_cloze_notes(
-    col: Collection, mid: int, did: int, card_count: int = 10
-) -> List[Note]:
-    "This function assumes note type is cloze type, and has field 'Text' and 'Extra'."
-
-    def create_note(text: str, extra: str) -> Note:
-        note_type = col.models.get(mid)
-        note = Note(col, note_type)
-        note["Text"] = text
-        note["Extra"] = extra
-        return note
-
-    notes = []
-    for i in range(card_count):
-        note = create_note("cloze {{c1::abc}}" + str(i), "extra text")
-        col.add_note(note, did)
-        notes.append(note)
-    return notes
-
-
-def test_get_note_types_in_deck(
-    col: Collection,
-    add_deck: Callable,
-    add_cloze_note_types: Callable,
-    add_filtered_deck: Callable,
-) -> None:
+def test_get_note_types_in_deck(anki_session) -> None:
     from ankihub.sync import get_note_types_in_deck
-
-    did = add_deck()
-    names = ["AnkiHub1", "AnkiHub2", "AnkiHub3"]
-    mid1, mid2, mid3 = add_cloze_note_types(names)
-    notes1 = add_cloze_notes(col, mid1, did, card_count=1)
-    add_cloze_notes(col, mid2, did)
-    add_cloze_notes(col, mid3, 1)  # default deck
-
-    mids = get_note_types_in_deck(did)
-    assert mid1 in mids
-    assert mid2 in mids
-    assert len(mids) == 2
-
-    # Test for notes in filtered deck
-    nid = notes1[0].id
-    add_filtered_deck(f"nid:{nid}")
-    mids = get_note_types_in_deck(did)
-    assert mid1 in mids
-    assert mid2 in mids
-    assert len(mids) == 2
+    with anki_session.profile_loaded():
+        with anki_session.deck_installed(str(sample_deck)) as deck_id:
+            mids = get_note_types_in_deck(deck_id)
+            assert len(mids) == 1
+            assert mids == [1623659872805]
 
 
 def test_note_type_preparations(
