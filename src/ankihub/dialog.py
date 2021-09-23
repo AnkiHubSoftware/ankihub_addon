@@ -103,9 +103,7 @@ class AnkiHubLogin(QWidget):
     def uploadBut(self):
         self.label_results.setText(
             """We've started uploading your collection.
-            You will be notified on completion. \nRemember:
-            we will upload your collection automatically after
-            5 minutes of inactivity."""
+            You will be notified on completion. \n"""
             )
         # uploadToMFC()
 

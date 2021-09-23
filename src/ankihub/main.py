@@ -24,8 +24,10 @@ def show_sign_in_screen() -> None:
     global __window
     __window = AnkiHubLogin()
 
+
 def signout() -> None:
     Config().signout()
+
 
 def add_menu() -> None:
     ah_menu = QMenu("&AnkiHub", parent=mw)
