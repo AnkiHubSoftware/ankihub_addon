@@ -1,10 +1,10 @@
 import anki
 import aqt
 from aqt import gui_hooks, mw
-from aqt.qt import *
+from aqt.qt import QMenu, QAction, qconnect
 from aqt.studydeck import StudyDeck
 
-from .consts import *
+from . import consts
 from .sync import prepare_to_upload_deck
 
 
@@ -30,9 +30,9 @@ def add_menu() -> None:
 def hide_ankihub_field_in_editor(
     js: str, note: anki.notes.Note, editor: aqt.editor.Editor
 ) -> str:
-    if FIELD_NAME not in note:
+    if consts.FIELD_NAME not in note:
         return js
-    ord = note._fieldOrd(FIELD_NAME)
+    ord = note._fieldOrd(consts.FIELD_NAME)
     id_templs = ("f{}", "name{}")
     for id_templ in id_templs:
         id = id_templ.format(ord)

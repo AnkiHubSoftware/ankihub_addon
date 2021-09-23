@@ -8,19 +8,21 @@ from aqt import mw
 from aqt.utils import askUser, tooltip
 
 
-from .consts import *
+from . import consts
 
 
 def get_note_types_in_deck(did: int) -> List[int]:
-    "Returns list of note_type ids in deck."
+    """Returns list of note_type ids in deck."""
     dids = [did]
     dids += [child[1] for child in mw.col.decks.children(did)]
+    dids = ids2str(dids)
     # odid is the original did for cards in filtered decks
-    return mw.col.db.list(
+    query = (
         "SELECT DISTINCT mid FROM cards "
         "INNER JOIN notes ON cards.nid = notes.id "
-        "WHERE did in {0} or odid in {0}".format(ids2str(dids))
+        f"WHERE did in {dids} or odid in {dids}"
     )
+    return mw.col.db.list(query)
 
 
 def add_id_fields(did: int) -> None:
@@ -29,15 +31,15 @@ def add_id_fields(did: int) -> None:
     nids = mw.col.find_notes(f'"deck:{deck_name}"')
     for nid in nids:
         note = mw.col.getNote(id=nid)
-        if not note[FIELD_NAME]:
-            note[FIELD_NAME] = str(nid)
+        if not note[consts.FIELD_NAME]:
+            note[consts.FIELD_NAME] = str(nid)
         note.flush()
 
 
 def has_ankihub_field(note_type: NoteType) -> bool:
     fields: List[Dict] = note_type["flds"]
     for field in fields:
-        if field["name"] == FIELD_NAME:
+        if field["name"] == consts.FIELD_NAME:
             return True
     return False
 
@@ -58,7 +60,7 @@ def prepare_note_types(note_types_to_prepare: List[NoteType]) -> None:
     "Adds ankihub field. Adds link to ankihub in card template."
     mm = mw.col.models
     for note_type in note_types_to_prepare:
-        ankihub_field = mm.new_field(FIELD_NAME)
+        ankihub_field = mm.new_field(consts.FIELD_NAME)
         # potential way to hide the field:
         # ankihub_field["size"] = 0
         mm.add_field(note_type, ankihub_field)
@@ -70,11 +72,12 @@ def modify_teplate(note_type: anki.models.NoteType) -> None:
     "Adds Ankihub link to card template"
     link_html = "".join(
         (
-            "\n{{#%s}}\n" % FIELD_NAME,
-            "<a class='ankihub' href='%s'>" % (URL_VIEW_NOTE + "{{%s}}" % FIELD_NAME),
+            "\n{{#%s}}\n" % consts.FIELD_NAME,
+            "<a class='ankihub' href='%s'>"
+            % (consts.URL_VIEW_NOTE + "{{%s}}" % consts.FIELD_NAME),
             "\nView Note on AnkiHub\n",
             "</a>",
-            "\n{{/%s}}\n" % FIELD_NAME,
+            "\n{{/%s}}\n" % consts.FIELD_NAME,
         )
     )
     templates: List[Dict] = note_type["tmpls"]

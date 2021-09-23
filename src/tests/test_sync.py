@@ -10,6 +10,7 @@ sample_deck = pathlib.Path(__file__).parent / "data" / "sample_deck.apkg"
 
 def test_get_note_types_in_deck(anki_session) -> None:
     from ankihub.sync import get_note_types_in_deck
+
     with anki_session.profile_loaded():
         with anki_session.deck_installed(str(sample_deck)) as deck_id:
             mids = get_note_types_in_deck(deck_id)
