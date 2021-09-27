@@ -31,17 +31,15 @@ def add_id_fields(did: int) -> None:
     nids = mw.col.find_notes(f'"deck:{deck_name}"')
     for nid in nids:
         note = mw.col.getNote(id=nid)
-        if not note[consts.FIELD_NAME]:
-            note[consts.FIELD_NAME] = str(nid)
+        if not note[consts.ANKIHUB_NOTE_TYPE_FIELD_NAME]:
+            note[consts.ANKIHUB_NOTE_TYPE_FIELD_NAME] = str(nid)
         note.flush()
 
 
 def has_ankihub_field(note_type: NoteType) -> bool:
     fields: List[Dict] = note_type["flds"]
-    for field in fields:
-        if field["name"] == consts.FIELD_NAME:
-            return True
-    return False
+    field_names = [field["name"] for field in fields]
+    return True if consts.ANKIHUB_NOTE_TYPE_FIELD_NAME in field_names else False
 
 
 def get_unprepared_note_types(mids: List[int]) -> List[NoteType]:
@@ -56,33 +54,27 @@ def get_unprepared_note_types(mids: List[int]) -> List[NoteType]:
     return note_types_to_prepare
 
 
-def prepare_note_types(note_types_to_prepare: List[NoteType]) -> None:
+def prepare_note_type(note_type: NoteType) -> None:
     "Adds ankihub field. Adds link to ankihub in card template."
     mm = mw.col.models
-    for note_type in note_types_to_prepare:
-        ankihub_field = mm.new_field(consts.FIELD_NAME)
-        # potential way to hide the field:
-        # ankihub_field["size"] = 0
-        mm.add_field(note_type, ankihub_field)
-        modify_teplate(note_type)
-        mm.save(note_type)
-
-
-def modify_teplate(note_type: anki.models.NoteType) -> None:
-    "Adds Ankihub link to card template"
+    ankihub_field = mm.new_field(consts.ANKIHUB_NOTE_TYPE_FIELD_NAME)
+    # potential way to hide the field:
+    # ankihub_field["size"] = 0
+    mm.add_field(note_type, ankihub_field)
     link_html = "".join(
         (
-            "\n{{#%s}}\n" % consts.FIELD_NAME,
+            "\n{{#%s}}\n" % consts.ANKIHUB_NOTE_TYPE_FIELD_NAME,
             "<a class='ankihub' href='%s'>"
-            % (consts.URL_VIEW_NOTE + "{{%s}}" % consts.FIELD_NAME),
+            % (consts.URL_VIEW_NOTE + "{{%s}}" % consts.ANKIHUB_NOTE_TYPE_FIELD_NAME),
             "\nView Note on AnkiHub\n",
             "</a>",
-            "\n{{/%s}}\n" % consts.FIELD_NAME,
+            "\n{{/%s}}\n" % consts.ANKIHUB_NOTE_TYPE_FIELD_NAME,
         )
     )
     templates: List[Dict] = note_type["tmpls"]
     for template in templates:
         template["afmt"] += link_html
+    mm.save(note_type)
 
 
 def prepare_to_upload_deck(did: int) -> None:
