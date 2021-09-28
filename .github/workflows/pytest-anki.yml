@@ -31,27 +31,6 @@ jobs:
         content="{ \"include\": [ ${content} ] }"
         echo "::set-output name=matrix::$content"
 
-        # TODO Pretty sure we don't need this at all
-  check-current-anki:
-    needs: read-current-anki-matrix
-    runs-on: ubuntu-18.04
-
-    strategy:
-      matrix: ${{ fromJSON(needs.read-current-anki-matrix.outputs.matrix) }}
-
-    steps:
-      - name: Checkout pytest-anki
-        uses: actions/checkout@v2
-
-      - name: Set up test environment
-        uses: ./.github/actions/setup
-        with:
-          python: ${{ matrix.python }}
-          chrome: ${{ matrix.chrome }}
-          anki: ${{ matrix.anki }}
-          pyqt: ${{ matrix.pyqt }}
-          pyqtwebengine: ${{ matrix.pyqtwebengine }}
-
   test-current-anki:
     needs: read-current-anki-matrix
     runs-on: ubuntu-18.04
