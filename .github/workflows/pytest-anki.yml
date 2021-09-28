@@ -77,3 +77,4 @@ jobs:
 
       - name: Run tests
         run: pytest src/tests
+        working-directory: ankihub_addon
