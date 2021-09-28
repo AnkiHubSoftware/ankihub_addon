@@ -31,6 +31,7 @@ jobs:
         content="{ \"include\": [ ${content} ] }"
         echo "::set-output name=matrix::$content"
 
+        # TODO Pretty sure we don't need this at all
   check-current-anki:
     needs: read-current-anki-matrix
     runs-on: ubuntu-18.04
@@ -61,9 +62,6 @@ jobs:
     steps:
       - name: Checkout pytest-anki
         uses: actions/checkout@v2
-        with:
-          repository: glutanimate/pytest-anki
-          path: pytest-anki
 
       - name: Set up test environment
         uses: ./.github/actions/setup
@@ -73,9 +71,6 @@ jobs:
           anki: ${{ matrix.anki }}
           pyqt: ${{ matrix.pyqt }}
           pyqtwebengine: ${{ matrix.pyqtwebengine }}
-
-      - name: Checkout pytest-anki
-        uses: actions/checkout@v2
 
       - name: Install deps
         run: pip install -r ./requirements/dev.txt
