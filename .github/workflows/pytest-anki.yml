@@ -41,7 +41,7 @@ jobs:
           path: ankihub_addon
 
       - name: Set up test environment
-        uses: ./.github/actions/setup
+        uses: ankihub_addon/.github/actions/setup
         with:
           python: ${{ matrix.python }}
           chrome: ${{ matrix.chrome }}
@@ -51,7 +51,9 @@ jobs:
 
       - name: Install deps
         run: pip install -r ./requirements/dev.txt
+        working-directory: ankihub_addon
 
       - name: Run tests
         working-directory: ankihub_addon
         run: pytest src/tests
+        working-directory: ankihub_addon
