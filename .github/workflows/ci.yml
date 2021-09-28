@@ -23,7 +23,7 @@ jobs:
           pip install -r ./requirements/dev.txt
 
       - name: Run tests
-        run: python -m pytest src/tests/
+        run: ./run_tests.sh
 
       - name: Run flake8
         run: flake8

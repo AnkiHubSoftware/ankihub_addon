@@ -42,19 +42,7 @@ def has_ankihub_field(note_type: NoteType) -> bool:
     return True if consts.ANKIHUB_NOTE_TYPE_FIELD_NAME in field_names else False
 
 
-def get_unprepared_note_types(mids: List[int]) -> List[NoteType]:
-    "Returns list of note types that doesn't have ankihub field."
-    mm = mw.col.models
-    note_types_to_prepare = []
-    for mid in mids:
-        note_type = mm.get(mid)
-        if not has_ankihub_field(note_type):
-            note_types_to_prepare.append(note_type)
-
-    return note_types_to_prepare
-
-
-def prepare_note_type(note_type: NoteType) -> None:
+def modify_note_type(note_type: NoteType) -> None:
     "Adds ankihub field. Adds link to ankihub in card template."
     mm = mw.col.models
     ankihub_field = mm.new_field(consts.ANKIHUB_NOTE_TYPE_FIELD_NAME)
@@ -83,17 +71,16 @@ def prepare_to_upload_deck(did: int) -> None:
     assert len(mids) == 1
     assert mw.col.models.get(mids[0])["type"] == anki.consts.MODEL_CLOZE
 
-    note_types_to_prepare = get_unprepared_note_types(mids)
-    if len(note_types_to_prepare):
-        res = askUser(
-            "Uploading the deck to AnkiHub will modify your note type,"
-            "and will require a full sync afterwards. Continue?",
-            title="AnkiHub",
-        )
-        if not res:
-            tooltip("Cancelled Upload to AnkiHub")
-            return
-        prepare_note_types(note_types_to_prepare)
+    response = askUser(
+        "Uploading the deck to AnkiHub will modify your note type,"
+        "and will require a full sync afterwards. Continue?",
+        title="AnkiHub",
+    )
+    if not response:
+        tooltip("Cancelled Upload to AnkiHub")
+        return
+    # TODO Get and pass in Anking Note Type
+    # modify_note_type(1)
 
     def on_done(fut: Future) -> None:
         upload_deck(did)
