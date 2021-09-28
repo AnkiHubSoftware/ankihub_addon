@@ -53,7 +53,7 @@ jobs:
         run: |
           pwd
           find .
-          pip install -r ./ankihub_addon/requirements/dev.txt
+          pip install -r ./requirements/dev.txt
 
       - name: Run tests
         run: pytest src/tests
