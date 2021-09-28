@@ -50,10 +50,7 @@ jobs:
           pyqtwebengine: ${{ matrix.pyqtwebengine }}
 
       - name: Install deps
-        run: |
-          pwd
-          find .
-          pip install -r ./requirements/dev.txt
+        run: pip install -r ./requirements/dev.txt
 
       - name: Run tests
-        run: pytest src/tests
+        run: pytest --forked src/tests
