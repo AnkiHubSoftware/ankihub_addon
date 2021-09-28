@@ -30,9 +30,6 @@ runs:
         python: ${{ inputs.python }}
         chrome: ${{ inputs.chrome }}
 
-    - name: Set up project
-      uses: ./.github/actions/setup_project
-
     - name: Set up Anki
       uses: ./.github/actions/setup_anki
       with:

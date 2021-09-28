@@ -84,7 +84,11 @@ jobs:
           pyqt: ${{ matrix.pyqt }}
           pyqtwebengine: ${{ matrix.pyqtwebengine }}
 
-      - name: Run tests for Anki ${{ matrix.anki }}
-        shell: bash
-        run: |
-          make test
+      - name: Checkout pytest-anki
+        uses: actions/checkout@v2
+
+      - name: Install deps
+        run: pip install -r ./requirements/dev.txt
+
+      - name: Run tests
+        run: pytest src/tests
