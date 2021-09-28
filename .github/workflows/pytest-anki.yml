@@ -25,7 +25,6 @@ jobs:
         content="${content//$'\r'/'%0D'}"
         content="{ \"include\": [ ${content} ] }"
         echo "::set-output name=matrix::$content"
-      working-directory: pytest-anki
 
   test-current-anki:
     needs: read-current-anki-matrix
