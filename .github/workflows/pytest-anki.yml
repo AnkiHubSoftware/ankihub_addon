@@ -41,12 +41,9 @@ jobs:
     steps:
       - name: Checkout pytest-anki
         uses: actions/checkout@v2
-        with:
-          repository: glutanimate/pytest-anki
-          path: pytest-anki
 
       - name: Set up test environment
-        uses: ./pytest-anki/.github/actions/setup
+        uses: ./.github/actions/setup
         with:
           python: ${{ matrix.python }}
           chrome: ${{ matrix.chrome }}

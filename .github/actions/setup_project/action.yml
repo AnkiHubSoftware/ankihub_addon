@@ -1,6 +1,12 @@
 name: "Set up project"
 description: "Set up project"
 
+defaults:
+  run:
+    shell: bash
+    working-directory: pytest-anki
+
+
 runs:
   using: "composite"
   steps:
