@@ -19,4 +19,4 @@ runs:
     - name: Set up pytest-anki
       shell: bash
       run: |
-        make install
+        poetry install
