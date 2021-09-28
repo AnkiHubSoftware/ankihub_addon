@@ -5,31 +5,47 @@ on:
     branches: ["main"]
 
 jobs:
-  tests:
-    # Use macos-latest to avoid complex system dependencies needed on ubuntu.
-    runs-on: macos-latest
-    steps:
-      - name: Setup Python
-        uses: actions/setup-python@v2.2.1
-        with:
-          python-version: 3.8
+  read-current-anki-matrix:
+    # Reads current Anki set-up from anki-current.json
+    runs-on: ubuntu-latest
 
-      - name: Checkout ankihub-addon
+    outputs:
+      matrix: ${{ steps.set-matrix.outputs.matrix }}
+
+    steps:
+    - name: Checkout ankihub_addon
+      uses: actions/checkout@v2
+    - id: set-matrix
+      run: |
+        content=$(cat ./anki-current.json)
+        content="${content//'%'/'%25'}"
+        content="${content//$'\n'/'%0A'}"
+        content="${content//$'\r'/'%0D'}"
+        content="{ \"include\": [ ${content} ] }"
+        echo "::set-output name=matrix::$content"
+
+  test-current-anki:
+    needs: read-current-anki-matrix
+    runs-on: ubuntu-18.04
+
+    strategy:
+      matrix: ${{ fromJSON(needs.read-current-anki-matrix.outputs.matrix) }}
+
+    steps:
+      - name: Checkout ankihub_addon
         uses: actions/checkout@v2
 
+      - name: Set up test environment
+        uses: ./.github/actions/setup
+        with:
+          python: ${{ matrix.python }}
+          chrome: ${{ matrix.chrome }}
+          anki: ${{ matrix.anki }}
+          pyqt: ${{ matrix.pyqt }}
+          pyqtwebengine: ${{ matrix.pyqtwebengine }}
+
       - name: Install deps
-        run: |
-          python -m pip install --upgrade pip
-          pip install -r ./requirements/dev.txt
+        run: pip install -r ./requirements/dev.txt
 
       - name: Run tests
-        run: ./run_tests.sh
-
-      - name: Run flake8
-        run: flake8
-
-      - name: Run black
-        run: black --check --diff .
-
-      - name: Run mypy
-        run: mypy .
+        run: pytest --forked src/tests
