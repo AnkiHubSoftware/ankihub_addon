@@ -41,7 +41,7 @@ jobs:
           path: ankihub_addon
 
       - name: Set up test environment
-        uses: ankihub_addon/.github/actions/setup
+        uses: ./ankihub_addon/.github/actions/setup
         with:
           python: ${{ matrix.python }}
           chrome: ${{ matrix.chrome }}
