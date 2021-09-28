@@ -16,6 +16,12 @@ runs:
         version: 1.1.8
         virtualenvs-create: false
 
+    - name: Checkout pytest-anki
+      uses: actions/checkout@v2
+      with:
+        repository: glutanimate/pytest-anki
+        path: pytest-anki
+
     - name: Set up pytest-anki
       shell: bash
       run: |
