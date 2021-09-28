@@ -51,8 +51,8 @@ jobs:
 
       - name: Install deps
         run: pip install -r ./requirements/dev.txt
-        working-directory: ankihub_addon
+        working-directory: ./ankihub_addon
 
       - name: Run tests
         run: pytest src/tests
-        working-directory: ankihub_addon
+        working-directory: ./ankihub_addon
