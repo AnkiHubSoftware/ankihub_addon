@@ -41,8 +41,6 @@ jobs:
     steps:
       - name: Checkout ankihub_addon
         uses: actions/checkout@v2
-        with:
-          path: ankihub_addon
 
       - name: Set up test environment
         uses: ./.github/actions/setup
