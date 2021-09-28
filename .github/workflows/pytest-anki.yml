@@ -46,7 +46,7 @@ jobs:
           path: pytest-anki
 
       - name: Set up test environment
-        uses: ./.github/actions/setup
+        uses: pytest-anki/.github/actions/setup
         with:
           python: ${{ matrix.python }}
           chrome: ${{ matrix.chrome }}
