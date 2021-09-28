@@ -52,7 +52,6 @@ jobs:
           pyqtwebengine: ${{ matrix.pyqtwebengine }}
 
       - name: Install deps
-        working-directory: ankihub_addon
         run: pip install -r ./requirements/dev.txt
 
       - name: Run tests
