@@ -12,11 +12,8 @@ jobs:
       matrix: ${{ steps.set-matrix.outputs.matrix }}
     
     steps:
-    - name: Checkout pytest-anki
+    - name: Checkout ankihub_addon
       uses: actions/checkout@v2
-      with:
-        repository: glutanimate/pytest-anki
-        path: pytest-anki
     - id: set-matrix
       run: |
         content=$(cat ./anki-current.json)
@@ -25,7 +22,6 @@ jobs:
         content="${content//$'\r'/'%0D'}"
         content="{ \"include\": [ ${content} ] }"
         echo "::set-output name=matrix::$content"
-      working-directory: pytest-anki
 
   test-current-anki:
     needs: read-current-anki-matrix
@@ -37,11 +33,9 @@ jobs:
     steps:
       - name: Checkout ankihub_addon
         uses: actions/checkout@v2
-        with:
-          path: ankihub_addon
 
       - name: Set up test environment
-        uses: ./ankihub_addon/.github/actions/setup
+        uses: ./.github/actions/setup
         with:
           python: ${{ matrix.python }}
           chrome: ${{ matrix.chrome }}
