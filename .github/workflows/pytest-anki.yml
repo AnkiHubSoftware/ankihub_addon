@@ -39,8 +39,9 @@ jobs:
       matrix: ${{ fromJSON(needs.read-current-anki-matrix.outputs.matrix) }}
 
     steps:
-      - name: Checkout pytest-anki
+      - name: Checkout ankihub_addon
         uses: actions/checkout@v2
+        path: ankihub_addon
 
       - name: Set up test environment
         uses: ./.github/actions/setup
