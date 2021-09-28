@@ -45,7 +45,18 @@ jobs:
           pyqtwebengine: ${{ matrix.pyqtwebengine }}
 
       - name: Install deps
-        run: pip install -r ./requirements/dev.txt
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r ./requirements/dev.txt
+
+      - name: Run flake8
+        run: flake8
+
+      - name: Run black
+        run: black --check --diff .
+
+      - name: Run mypy
+        run: mypy .
 
       - name: Run tests
         run: pytest --forked src/tests
