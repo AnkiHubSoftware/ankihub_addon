@@ -50,7 +50,10 @@ jobs:
           pyqtwebengine: ${{ matrix.pyqtwebengine }}
 
       - name: Install deps
-        run: pip install -r ./ankihub_addon/requirements/dev.txt
+        run: |
+          pwd
+          find .
+          pip install -r ./ankihub_addon/requirements/dev.txt
 
       - name: Run tests
         run: pytest src/tests
