@@ -54,6 +54,5 @@ jobs:
         working-directory: ankihub_addon
 
       - name: Run tests
-        working-directory: ankihub_addon
         run: pytest src/tests
         working-directory: ankihub_addon
