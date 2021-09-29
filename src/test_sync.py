@@ -7,7 +7,7 @@ from anki.collection import Collection
 
 ANKING_MODEL_ID = 1566160514431
 
-anking_deck = str(pathlib.Path(__file__).parent / "data" / "anking.apkg")
+anking_deck = str(pathlib.Path(__file__).parent / "test_data" / "anking.apkg")
 
 
 def test_get_note_types_in_deck(anki_session: AnkiSession) -> None:
