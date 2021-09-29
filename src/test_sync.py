@@ -1,9 +1,6 @@
 import copy
 import pathlib
-from typing import Callable
 from pytest_anki import AnkiSession
-
-from anki.collection import Collection
 
 ANKING_MODEL_ID = 1566160514431
 
@@ -26,7 +23,7 @@ def test_note_type_preparations(anki_session: AnkiSession) -> None:
 
     with anki_session.profile_loaded():
         mid = ANKING_MODEL_ID
-        with anki_session.deck_installed(anking_deck) as deck_id:
+        with anki_session.deck_installed(anking_deck):
             note_type = anki_session.mw.col.models.get(mid)
             assert not has_ankihub_field(note_type)
             previous_note_template = copy.deepcopy(note_type["tmpls"])
