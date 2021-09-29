@@ -24,5 +24,5 @@ feature you are working on. Here is an example to run a specific test: `pytest t
 
 In order to accommodate some strange side effects of using `pytest-anki` along with the directory structure required by 
 [Anki Add-on Builder](https://github.com/glutanimate/anki-addon-builder), we've opted to write test files alongside the modules. 
-The main reason for this is that PyCharm doesn't understand where things are being imported from, breaking it's navigation 
+The main reason for this is so that IDEs like PyCharm can understand the namespace so that devs can leverage things like navigation
 functionality.
