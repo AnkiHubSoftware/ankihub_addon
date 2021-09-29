@@ -49,6 +49,9 @@ jobs:
           python -m pip install --upgrade pip
           pip install -r ./requirements/dev.txt
 
+      - name: Run tests
+        run: pytest --forked src/
+
       - name: Run flake8
         run: flake8
 
@@ -57,6 +60,3 @@ jobs:
 
       - name: Run mypy
         run: mypy .
-
-      - name: Run tests
-        run: pytest --forked src/
