@@ -4,3 +4,5 @@ pytest-anki==1.0.0b2
 black
 flake8
 mypy
+coverage
+pytest-cov

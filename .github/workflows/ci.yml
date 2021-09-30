@@ -1,8 +1,6 @@
 name: tests
 
-on:
-  pull_request:
-    branches: ["main"]
+on: ["pull_request"]
 
 jobs:
   read-current-anki-matrix:
@@ -50,7 +48,14 @@ jobs:
           pip install -r ./requirements/dev.txt
 
       - name: Run tests
-        run: pytest --forked src/
+        run: pytest --forked --cov --cov-report=xml src/
+
+      - name: Upload coverage to Codecov
+        env:
+         CODECOV_TOKEN: "${{ secrets.CODECOV_TOKEN }}"
+        uses: codecov/codecov-action@v1
+        with:
+          fail_ci_if_error: true
 
       - name: Run flake8
         run: flake8
