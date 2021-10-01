@@ -80,8 +80,7 @@ def prepare_to_upload_deck(did: int) -> None:
     if not response:
         tooltip("Cancelled Upload to AnkiHub")
         return
-    # TODO Get and pass in Anking Note Type
-    # modify_note_type(1)
+    modify_note_type(anki.consts.MODEL_CLOZE)
 
     def on_done(fut: Future) -> None:
         upload_deck(did)
