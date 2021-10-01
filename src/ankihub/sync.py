@@ -61,6 +61,7 @@ def modify_note_type(note_type: NoteType) -> None:
         )
     )
     templates: List[Dict] = note_type["tmpls"]
+    # Can we always expect len(templates) == 1?
     for template in templates:
         template["afmt"] += link_html
     mm.save(note_type)
