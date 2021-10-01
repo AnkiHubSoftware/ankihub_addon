@@ -18,7 +18,7 @@ def test_get_note_types_in_deck(anki_session: AnkiSession) -> None:
             assert mids == [ANKING_MODEL_ID]
 
 
-def test_note_type_preparations(anki_session: AnkiSession) -> None:
+def test_modify_note_type(anki_session: AnkiSession) -> None:
     from ankihub.sync import has_ankihub_field, modify_note_type
 
     with anki_session.profile_loaded():
