@@ -60,7 +60,7 @@ def modify_note_type(note_type: NoteType) -> None:
             "\n{{/%s}}\n" % consts.ANKIHUB_NOTE_TYPE_FIELD_NAME,
         )
     )
-    templates: List[Dict] = note_type["tmpls"]
+    templates = note_type["tmpls"]
     # Can we always expect len(templates) == 1?
     for template in templates:
         template["afmt"] += link_html
