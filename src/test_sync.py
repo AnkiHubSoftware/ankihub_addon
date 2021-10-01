@@ -34,3 +34,14 @@ def test_modify_note_type(anki_session: AnkiSession) -> None:
             assert len(previous_note_template) == len(modified_template)
             # TODO Make an assertion about the actual diff
             assert previous_note_template != modified_template
+
+
+def test_prepare_to_upload_deck(anki_session: AnkiSession):
+    from ankihub.sync import prepare_to_upload_deck
+    with anki_session.profile_loaded():
+        with anki_session.deck_installed(anking_deck) as deck_id:
+            prepare_to_upload_deck(deck_id)
+
+
+def test_add_id_fields():
+    pass
