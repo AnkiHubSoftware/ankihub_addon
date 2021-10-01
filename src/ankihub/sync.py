@@ -71,10 +71,9 @@ def prepare_to_upload_deck(did: int) -> None:
     # Currently only supports having a single cloze note type in deck
     assert len(mids) == 1
     assert mw.col.models.get(mids[0])["type"] == anki.consts.MODEL_CLOZE
-
     response = askUser(
-        "Uploading the deck to AnkiHub will modify your note type,"
-        "and will require a full sync afterwards. Continue?",
+        "Uploading the deck to AnkiHub will modify your note type, "
+        "and will require a full sync afterwards.  Continue?",
         title="AnkiHub",
     )
     if not response:
