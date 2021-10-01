@@ -49,6 +49,7 @@ def modify_note_type(note_type: NoteType) -> None:
     # potential way to hide the field:
     # ankihub_field["size"] = 0
     mm.add_field(note_type, ankihub_field)
+    # TODO Use jinja template.
     link_html = "".join(
         (
             "\n{{#%s}}\n" % consts.ANKIHUB_NOTE_TYPE_FIELD_NAME,
