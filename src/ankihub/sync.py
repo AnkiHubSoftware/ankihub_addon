@@ -69,7 +69,7 @@ def modify_note_type(note_type: NoteType) -> None:
 
 def prepare_to_upload_deck(did: int) -> None:
     mids = get_note_types_in_deck(did)
-    # Currently only supports having a single cloze note type in deck
+    # Currently only supports collaborating on a single note type in the deck
     assert len(mids) == 1
     assert mw.col.models.get(mids[0])["type"] == anki.consts.MODEL_CLOZE
     response = askUser(
