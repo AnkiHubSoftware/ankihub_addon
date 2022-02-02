@@ -50,7 +50,7 @@ jobs:
       - name: Run tests
         run: pytest --forked --cov --cov-report=xml src/
         env:
-          SKIP_INIT=1
+          SKIP_INIT: 1
 
       - name: Upload coverage to Codecov
         env:
