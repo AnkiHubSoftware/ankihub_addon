@@ -78,7 +78,7 @@ def prepare_to_upload_deck(did: int) -> None:
         #  Make sure we come back to this.
         tooltip("AnkiHub only supports collaborating on decks with a single "
                 "note type.")
-    note_type = model_ids.pop()
+    note_type = mw.col.models.get(model_ids.pop())
     response = askUser(
         "Uploading the deck to AnkiHub will modify your note type, "
         "and will require a full sync afterwards.  Continue?",
