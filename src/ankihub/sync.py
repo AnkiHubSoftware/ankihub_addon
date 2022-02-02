@@ -1,5 +1,5 @@
 from concurrent.futures import Future
-from typing import List, Dict
+from typing import List
 
 import anki
 from anki.models import NoteType
@@ -34,12 +34,6 @@ def add_id_fields(did: int) -> None:
         if not note[consts.ANKIHUB_NOTE_TYPE_FIELD_NAME]:
             note[consts.ANKIHUB_NOTE_TYPE_FIELD_NAME] = str(nid)
         note.flush()
-
-
-def has_ankihub_field(note_type: NoteType) -> bool:
-    fields: List[Dict] = note_type["flds"]
-    field_names = [field["name"] for field in fields]
-    return True if consts.ANKIHUB_NOTE_TYPE_FIELD_NAME in field_names else False
 
 
 def modify_note_type(note_type: NoteType) -> None:
