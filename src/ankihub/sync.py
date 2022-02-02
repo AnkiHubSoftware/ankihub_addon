@@ -3,7 +3,7 @@ from typing import List, Dict
 
 import anki
 from anki.models import NoteType
-from anki.utils import ids2str
+import anki.utils
 from aqt import mw
 from aqt.utils import askUser, tooltip
 
@@ -12,10 +12,10 @@ from . import consts
 
 
 def get_note_types_in_deck(did: int) -> List[int]:
-    """Returns list of note_type ids in deck."""
+    """Returns list of note model ids in the given deck."""
     dids = [did]
     dids += [child[1] for child in mw.col.decks.children(did)]
-    dids = ids2str(dids)
+    dids = anki.utils.ids2str(dids)
     # odid is the original did for cards in filtered decks
     query = (
         "SELECT DISTINCT mid FROM cards "
