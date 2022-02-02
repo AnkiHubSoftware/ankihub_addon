@@ -1,6 +1,8 @@
 import copy
 import pathlib
 
+import pytest
+
 from ankihub_addon.src.ankihub import consts
 from pytest_anki import AnkiSession
 
@@ -51,7 +53,8 @@ def test_prepare_to_upload_deck(anki_session: AnkiSession):
             prepare_to_upload_deck(deck_id)
 
 
-def test_add_id_fields(anki_session: AnkiSession):
+@pytest.mark.skip(reason="See if this is causing GitHub Actions to hang.")
+def test_populate_id_fields(anki_session: AnkiSession):
     from ankihub_addon.src.ankihub.sync import populate_ankihub_id_fields, modify_note_type
     with anki_session.profile_loaded():
         with anki_session.deck_installed(anking_deck) as deck_id:
