@@ -8,14 +8,14 @@ anking_deck = str(pathlib.Path(__file__).parent / "test_data" / "anking.apkg")
 
 
 def test_get_note_types_in_deck(anki_session: AnkiSession) -> None:
+    """Check that get_note_types_in_deck returns the expected model id."""
     from ankihub.sync import get_note_types_in_deck
-
     with anki_session.profile_loaded():
         with anki_session.deck_installed(anking_deck) as deck_id:
-            mids = get_note_types_in_deck(deck_id)
-            # TODO test for multiple mids in deck
-            assert len(mids) == 1
-            assert mids == [ANKING_MODEL_ID]
+            note_mode_ids = get_note_types_in_deck(deck_id)
+            # TODO test on a deck that has more than one note type.
+            assert len(note_mode_ids) == 1
+            assert note_mode_ids == [ANKING_MODEL_ID]
 
 
 def test_modify_note_type(anki_session: AnkiSession) -> None:
