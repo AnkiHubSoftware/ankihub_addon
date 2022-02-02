@@ -37,13 +37,16 @@ def add_id_fields(did: int) -> None:
 
 
 def modify_note_type(note_type: NoteType) -> None:
+    """Adds the AnkiHub Field to the Note Type and modifies the template to
+    display the field.
+    """
     "Adds ankihub field. Adds link to ankihub in card template."
     mm = mw.col.models
     ankihub_field = mm.new_field(consts.ANKIHUB_NOTE_TYPE_FIELD_NAME)
     # potential way to hide the field:
     # ankihub_field["size"] = 0
     mm.add_field(note_type, ankihub_field)
-    # TODO Use jinja template.
+    # TODO Use cleaner templating strategy.
     link_html = "".join(
         (
             "\n{{#%s}}\n" % consts.ANKIHUB_NOTE_TYPE_FIELD_NAME,

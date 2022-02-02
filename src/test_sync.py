@@ -34,14 +34,14 @@ def test_modify_note_type(anki_session: AnkiSession) -> None:
     from ankihub_addon.src.ankihub.sync import modify_note_type
     with anki_session.profile_loaded():
         with anki_session.deck_installed(anking_deck):
-            previous_note_template = copy.deepcopy(note_type["tmpls"])
-            modify_note_type(note_type)
             note_type = anki_session.mw.col.models.get(ANKING_MODEL_ID)
-            assert note_type_contains_field(note_type, ANKING_MODEL_ID)
-            modified_template = note_type["tmpls"]
-            assert len(previous_note_template) == len(modified_template)
-            # TODO Make an assertion about the actual diff
-            assert previous_note_template != modified_template
+            original_note_type = copy.deepcopy(note_type)
+            original_note_template = original_note_type["tmpls"].pop()["afmt"]
+            modify_note_type(note_type)
+            modified_template = note_type["tmpls"].pop()["afmt"]
+            # TODO Make more precise assertions.
+            assert original_note_template != modified_template
+            assert "AnkiHub ID" in modified_template
 
 
 def test_prepare_to_upload_deck(anki_session: AnkiSession):
