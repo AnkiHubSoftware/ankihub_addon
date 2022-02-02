@@ -51,5 +51,12 @@ def test_prepare_to_upload_deck(anki_session: AnkiSession):
             prepare_to_upload_deck(deck_id)
 
 
-def test_add_id_fields():
-    pass
+def test_add_id_fields(anki_session: AnkiSession):
+    from ankihub_addon.src.ankihub.sync import populate_ankihub_id_fields, modify_note_type
+    with anki_session.profile_loaded():
+        with anki_session.deck_installed(anking_deck) as deck_id:
+            note_type = anki_session.mw.col.models.get(ANKING_MODEL_ID)
+            modify_note_type(note_type)
+            populate_ankihub_id_fields(deck_id)
+            # TODO
+            assert False

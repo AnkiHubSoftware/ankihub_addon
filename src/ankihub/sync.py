@@ -25,14 +25,18 @@ def get_note_types_in_deck(did: int) -> List[int]:
     return mw.col.db.list(query)
 
 
-def add_id_fields(did: int) -> None:
-    "Adds AnkiHub ID field to all notes in deck, *including* children decks."
+def populate_ankihub_id_fields(did: int) -> None:
+    """Populate the AnkiHub ID field that was added to the Note Type by
+    modify_note_type."""
+    # TODO Get the lest of AnkiHub IDs from AnkiHub.
+    # TODO This should operate on a mapping between AnkiHub IDs and Anki Note IDs.
     deck_name = mw.col.decks.name(did)
-    nids = mw.col.find_notes(f'"deck:{deck_name}"')
-    for nid in nids:
+    note_ids = mw.col.find_notes(f'"deck:{deck_name}"')
+    for nid in note_ids:
         note = mw.col.getNote(id=nid)
-        if not note[consts.ANKIHUB_NOTE_TYPE_FIELD_NAME]:
-            note[consts.ANKIHUB_NOTE_TYPE_FIELD_NAME] = str(nid)
+        if consts.ANKIHUB_NOTE_TYPE_FIELD_NAME not in note.fields:
+            # Log error
+            continue
         note.flush()
 
 
@@ -65,10 +69,16 @@ def modify_note_type(note_type: NoteType) -> None:
 
 
 def prepare_to_upload_deck(did: int) -> None:
-    mids = get_note_types_in_deck(did)
-    # Currently only supports collaborating on a single note type in the deck
-    assert len(mids) == 1
-    assert mw.col.models.get(mids[0])["type"] == anki.consts.MODEL_CLOZE
+    model_ids = get_note_types_in_deck(did)
+    try:
+        assert len(model_ids) == 1
+        assert mw.col.models.get(model_ids[0])["type"] == anki.consts.MODEL_CLOZE
+    except AssertionError:
+        # TODO Is this even true?  I can't remember if what the reason for this would be.
+        #  Make sure we come back to this.
+        tooltip("AnkiHub only supports collaborating on decks with a single "
+                "note type.")
+    note_type = model_ids.pop()
     response = askUser(
         "Uploading the deck to AnkiHub will modify your note type, "
         "and will require a full sync afterwards.  Continue?",
@@ -76,13 +86,13 @@ def prepare_to_upload_deck(did: int) -> None:
     )
     if not response:
         tooltip("Cancelled Upload to AnkiHub")
-        return
-    modify_note_type(anki.consts.MODEL_CLOZE)
+    modify_note_type(note_type)
+    # TODO Run add_id_fields
 
     def on_done(fut: Future) -> None:
         upload_deck(did)
 
-    mw.taskman.with_progress(lambda: add_id_fields(did), on_done)
+    mw.taskman.with_progress(lambda: populate_ankihub_id_fields(did), on_done)
 
 
 def upload_deck(did: int) -> None:
