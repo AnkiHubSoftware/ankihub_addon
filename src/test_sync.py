@@ -11,7 +11,7 @@ anking_deck = str(pathlib.Path(__file__).parent / "test_data" / "anking.apkg")
 
 def test_get_note_types_in_deck(anki_session: AnkiSession) -> None:
     """Check that get_note_types_in_deck returns the expected model id."""
-    from ankihub.sync import get_note_types_in_deck
+    from ankihub_addon.src.ankihub.sync import get_note_types_in_deck
     with anki_session.profile_loaded():
         with anki_session.deck_installed(anking_deck) as deck_id:
             note_mode_ids = get_note_types_in_deck(deck_id)
@@ -45,7 +45,7 @@ def test_modify_note_type(anki_session: AnkiSession) -> None:
 
 
 def test_prepare_to_upload_deck(anki_session: AnkiSession):
-    from ankihub.sync import prepare_to_upload_deck
+    from ankihub_addon.src.ankihub.sync import prepare_to_upload_deck
     with anki_session.profile_loaded():
         with anki_session.deck_installed(anking_deck) as deck_id:
             prepare_to_upload_deck(deck_id)
