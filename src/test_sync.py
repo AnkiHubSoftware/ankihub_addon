@@ -1,7 +1,6 @@
 import copy
 import pathlib
-
-import pytest
+from unittest.mock import Mock
 
 from ankihub_addon.src.ankihub import consts
 from pytest_anki import AnkiSession
@@ -46,14 +45,14 @@ def test_modify_note_type(anki_session: AnkiSession) -> None:
             assert "AnkiHub ID" in modified_template
 
 
-def test_prepare_to_upload_deck(anki_session: AnkiSession):
+def test_prepare_to_upload_deck(anki_session: AnkiSession, monkeypatch):
     from ankihub_addon.src.ankihub.sync import prepare_to_upload_deck
+    monkeypatch.setattr("ankihub_addon.src.ankihub.sync.askUser", Mock(return_value=True))
     with anki_session.profile_loaded():
         with anki_session.deck_installed(anking_deck) as deck_id:
             prepare_to_upload_deck(deck_id)
 
 
-@pytest.mark.skip(reason="See if this is causing GitHub Actions to hang.")
 def test_populate_id_fields(anki_session: AnkiSession):
     from ankihub_addon.src.ankihub.sync import populate_ankihub_id_fields, modify_note_type
     with anki_session.profile_loaded():
