@@ -14,7 +14,7 @@ def on_upload() -> None:
         title="AnkiHub",
         accept="Upload",
         # Removes the "Add" button
-        buttons=[]
+        buttons=[],
     )
     deck_name = diag.name
     if not deck_name:

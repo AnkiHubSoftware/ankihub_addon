@@ -13,6 +13,7 @@ anking_deck = str(pathlib.Path(__file__).parent / "test_data" / "anking.apkg")
 def test_get_note_types_in_deck(anki_session: AnkiSession) -> None:
     """Check that get_note_types_in_deck returns the expected model id."""
     from ankihub_addon.src.ankihub.utils import get_note_types_in_deck
+
     with anki_session.profile_loaded():
         with anki_session.deck_installed(anking_deck) as deck_id:
             note_mode_ids = get_note_types_in_deck(deck_id)
@@ -23,6 +24,7 @@ def test_get_note_types_in_deck(anki_session: AnkiSession) -> None:
 
 def test_note_type_contains_field(anki_session: AnkiSession) -> None:
     from ankihub_addon.src.ankihub.utils import note_type_contains_field
+
     with anki_session.profile_loaded():
         with anki_session.deck_installed(anking_deck):
             note_type = anki_session.mw.col.models.get(ANKING_MODEL_ID)
@@ -33,6 +35,7 @@ def test_note_type_contains_field(anki_session: AnkiSession) -> None:
 
 def test_modify_note_type(anki_session: AnkiSession) -> None:
     from ankihub_addon.src.ankihub.sync import modify_note_type
+
     with anki_session.profile_loaded():
         with anki_session.deck_installed(anking_deck):
             note_type = anki_session.mw.col.models.get(ANKING_MODEL_ID)
@@ -47,14 +50,21 @@ def test_modify_note_type(anki_session: AnkiSession) -> None:
 
 def test_prepare_to_upload_deck(anki_session: AnkiSession, monkeypatch):
     from ankihub_addon.src.ankihub.sync import upload_deck
-    monkeypatch.setattr("ankihub_addon.src.ankihub.sync.askUser", Mock(return_value=True))
+
+    monkeypatch.setattr(
+        "ankihub_addon.src.ankihub.sync.askUser", Mock(return_value=True)
+    )
     with anki_session.profile_loaded():
         with anki_session.deck_installed(anking_deck) as deck_id:
             upload_deck(deck_id)
 
 
 def test_populate_id_fields(anki_session: AnkiSession):
-    from ankihub_addon.src.ankihub.sync import populate_ankihub_id_fields, modify_note_type
+    from ankihub_addon.src.ankihub.sync import (
+        populate_ankihub_id_fields,
+        modify_note_type,
+    )
+
     with anki_session.profile_loaded():
         with anki_session.deck_installed(anking_deck) as deck_id:
             note_type = anki_session.mw.col.models.get(ANKING_MODEL_ID)

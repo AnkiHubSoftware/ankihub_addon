@@ -38,7 +38,10 @@ def modify_note_type(note_type: NoteType) -> None:
         (
             "\n{{#%s}}\n" % constants.ANKIHUB_NOTE_TYPE_FIELD_NAME,
             "<a class='ankihub' href='%s'>"
-            % (constants.URL_VIEW_NOTE + "{{%s}}" % constants.ANKIHUB_NOTE_TYPE_FIELD_NAME),
+            % (
+                constants.URL_VIEW_NOTE
+                + "{{%s}}" % constants.ANKIHUB_NOTE_TYPE_FIELD_NAME
+            ),
             "\nView Note on AnkiHub\n",
             "</a>",
             "\n{{/%s}}\n" % constants.ANKIHUB_NOTE_TYPE_FIELD_NAME,
@@ -71,4 +74,5 @@ def upload_deck(did: int) -> None:
         return
     mw.taskman.with_progress(
         task=lambda: modify_notes(note_types),
-        on_done=lambda future: tooltip("Deck Uploaded to AnkiHub"))
+        on_done=lambda future: tooltip("Deck Uploaded to AnkiHub"),
+    )
