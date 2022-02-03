@@ -30,13 +30,16 @@ def add_menu() -> None:
 def hide_ankihub_field_in_editor(
     js: str, note: anki.notes.Note, editor: aqt.editor.Editor
 ) -> str:
+    # TODO Henrik said this would have broke in 2.1.41:
+    #  https://github.com/ankipalace/ankihub_addon/pull/1#pullrequestreview-597642485
+    #  reevaluate and test.
     if consts.ANKIHUB_NOTE_TYPE_FIELD_NAME not in note:
         return js
-    ord = note._fieldOrd(consts.ANKIHUB_NOTE_TYPE_FIELD_NAME)
+    ord_ = note._fieldOrd(consts.ANKIHUB_NOTE_TYPE_FIELD_NAME)
     id_templs = ("f{}", "name{}")
     for id_templ in id_templs:
-        id = id_templ.format(ord)
-        js += "\ndocument.getElementById('{}').style.display = 'none';".format(id)
+        id_ = id_templ.format(ord_)
+        js += "\ndocument.getElementById('{}').style.display = 'none';".format(id_)
     return js
 
 
