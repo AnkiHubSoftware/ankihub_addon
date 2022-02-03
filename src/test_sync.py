@@ -70,5 +70,4 @@ def test_populate_id_fields(anki_session: AnkiSession):
             note_type = anki_session.mw.col.models.get(ANKING_MODEL_ID)
             modify_note_type(note_type)
             populate_ankihub_id_fields(deck_id)
-            # TODO
-            assert False
+            # TODO add assertions once populate_ankihub_id_fields is complete.
