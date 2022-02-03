@@ -63,7 +63,7 @@ def modify_notes(note_types):
     # TODO Run add_id_fields
 
 
-def upload_deck(did: int) -> None:
+def create_shared_deck(did: int) -> None:
     model_ids = get_note_types_in_deck(did)
     note_types = [mw.col.models.get(model_id) for model_id in model_ids]
     names = ", ".join([note["name"] for note in note_types])
