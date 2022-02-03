@@ -2,7 +2,7 @@ import copy
 import pathlib
 from unittest.mock import Mock
 
-from ankihub_addon.src.ankihub import consts
+from ankihub_addon.src.ankihub import constants
 from pytest_anki import AnkiSession
 
 ANKING_MODEL_ID = 1566160514431
@@ -12,7 +12,7 @@ anking_deck = str(pathlib.Path(__file__).parent / "test_data" / "anking.apkg")
 
 def test_get_note_types_in_deck(anki_session: AnkiSession) -> None:
     """Check that get_note_types_in_deck returns the expected model id."""
-    from ankihub_addon.src.ankihub.sync import get_note_types_in_deck
+    from ankihub_addon.src.ankihub.utils import get_note_types_in_deck
     with anki_session.profile_loaded():
         with anki_session.deck_installed(anking_deck) as deck_id:
             note_mode_ids = get_note_types_in_deck(deck_id)
@@ -27,7 +27,7 @@ def test_note_type_contains_field(anki_session: AnkiSession) -> None:
         with anki_session.deck_installed(anking_deck):
             note_type = anki_session.mw.col.models.get(ANKING_MODEL_ID)
             assert note_type_contains_field(note_type, ANKING_MODEL_ID) is False
-            note_type["flds"].append({"name": consts.ANKIHUB_NOTE_TYPE_FIELD_NAME})
+            note_type["flds"].append({"name": constants.ANKIHUB_NOTE_TYPE_FIELD_NAME})
             assert note_type_contains_field(note_type, ANKING_MODEL_ID) is True
 
 

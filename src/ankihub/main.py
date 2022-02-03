@@ -4,7 +4,7 @@ from aqt import gui_hooks, mw
 from aqt.qt import QMenu, QAction, qconnect
 from aqt.studydeck import StudyDeck
 
-from . import consts
+from . import constants
 from .sync import upload_deck
 
 
@@ -38,9 +38,9 @@ def hide_ankihub_field_in_editor(
     # TODO Henrik said this would have broke in 2.1.41:
     #  https://github.com/ankipalace/ankihub_addon/pull/1#pullrequestreview-597642485
     #  reevaluate and test.
-    if consts.ANKIHUB_NOTE_TYPE_FIELD_NAME not in note:
+    if constants.ANKIHUB_NOTE_TYPE_FIELD_NAME not in note:
         return js
-    ord_ = note._fieldOrd(consts.ANKIHUB_NOTE_TYPE_FIELD_NAME)
+    ord_ = note._fieldOrd(constants.ANKIHUB_NOTE_TYPE_FIELD_NAME)
     id_templs = ("f{}", "name{}")
     for id_templ in id_templs:
         id_ = id_templ.format(ord_)
