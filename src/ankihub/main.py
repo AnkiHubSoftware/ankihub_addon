@@ -5,26 +5,31 @@ from aqt.qt import QMenu, QAction, qconnect
 from aqt.studydeck import StudyDeck
 
 from . import consts
-from .sync import prepare_to_upload_deck
+from .sync import upload_deck
 
 
 def on_upload() -> None:
-    # This is a hack using the behaviour bool(iter([])) == True to remove 'add' button.
-    diag = StudyDeck(mw, title="AnkiHub", accept="Upload", buttons=iter([]))  # type: ignore
+    diag = StudyDeck(
+        mw,
+        title="AnkiHub",
+        accept="Upload",
+        # Removes the "Add" button
+        buttons=[]
+    )
     deck_name = diag.name
     if not deck_name:
         return
     did = mw.col.decks.id(deck_name)
-    prepare_to_upload_deck(did)
+    upload_deck(did)
 
 
-def add_menu() -> None:
-    ah_menu = QMenu("&AnkiHub", parent=mw)
-    mw.form.menubar.addMenu(ah_menu)
-
-    upload_deck_action = QAction("Upload Deck", parent=ah_menu)
+def add_ankihub_menu() -> None:
+    """Add top-level AnkiHub menu."""
+    ankihub_menu = QMenu("&AnkiHub", parent=mw)
+    mw.form.menubar.addMenu(ankihub_menu)
+    upload_deck_action = QAction("Upload Deck", parent=ankihub_menu)
     qconnect(upload_deck_action.triggered, on_upload)
-    ah_menu.addAction(upload_deck_action)
+    ankihub_menu.addAction(upload_deck_action)
 
 
 def hide_ankihub_field_in_editor(
@@ -44,4 +49,4 @@ def hide_ankihub_field_in_editor(
 
 
 gui_hooks.editor_will_load_note.append(hide_ankihub_field_in_editor)
-add_menu()
+add_ankihub_menu()

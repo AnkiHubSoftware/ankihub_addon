@@ -50,7 +50,8 @@ def modify_note_type(note_type: NoteType) -> None:
     # potential way to hide the field:
     # ankihub_field["size"] = 0
     mm.add_field(note_type, ankihub_field)
-    # TODO Use cleaner templating strategy.
+    # TODO Genericize this by creating a function that takes a template and
+    #  returns a new template.
     link_html = "".join(
         (
             "\n{{#%s}}\n" % consts.ANKIHUB_NOTE_TYPE_FIELD_NAME,
@@ -68,32 +69,24 @@ def modify_note_type(note_type: NoteType) -> None:
     mm.save(note_type)
 
 
-def prepare_to_upload_deck(did: int) -> None:
+def modify_notes(note_types):
+    for note_type in note_types:
+        modify_note_type(note_type)
+    # TODO Run add_id_fields
+
+
+def upload_deck(did: int) -> None:
     model_ids = get_note_types_in_deck(did)
-    try:
-        assert len(model_ids) == 1
-        assert mw.col.models.get(model_ids[0])["type"] == anki.consts.MODEL_CLOZE
-    except AssertionError:
-        # TODO Is this even true?  I can't remember if what the reason for this would be.
-        #  Make sure we come back to this.
-        tooltip("AnkiHub only supports collaborating on decks with a single "
-                "note type.")
-    note_type = mw.col.models.get(model_ids.pop())
+    note_types = [mw.col.models.get(model_id) for model_id in model_ids]
+    names = ", ".join([note["name"] for note in note_types])
     response = askUser(
-        "Uploading the deck to AnkiHub will modify your note type, "
-        "and will require a full sync afterwards.  Continue?",
+        "Uploading the deck to AnkiHub will modify the following note types, "
+        f"and will require a full sync afterwards: {names}.  Continue?",
         title="AnkiHub",
     )
     if not response:
         tooltip("Cancelled Upload to AnkiHub")
-    modify_note_type(note_type)
-    # TODO Run add_id_fields
-
-    def on_done(fut: Future) -> None:
-        upload_deck(did)
-
-    mw.taskman.with_progress(lambda: populate_ankihub_id_fields(did), on_done)
-
-
-def upload_deck(did: int) -> None:
-    tooltip("Deck Uploaded to AnkiHub")
+        return
+    mw.taskman.with_progress(
+        task=lambda: modify_notes(note_types),
+        on_done=lambda future: tooltip("Deck Uploaded to AnkiHub"))
