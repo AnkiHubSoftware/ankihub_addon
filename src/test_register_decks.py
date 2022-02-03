@@ -34,7 +34,7 @@ def test_note_type_contains_field(anki_session: AnkiSession) -> None:
 
 
 def test_modify_note_type(anki_session: AnkiSession) -> None:
-    from ankihub_addon.src.ankihub.sync import modify_note_type
+    from ankihub_addon.src.ankihub.register_decks import modify_note_type
 
     with anki_session.profile_loaded():
         with anki_session.deck_installed(anking_deck):
@@ -49,10 +49,10 @@ def test_modify_note_type(anki_session: AnkiSession) -> None:
 
 
 def test_prepare_to_upload_deck(anki_session: AnkiSession, monkeypatch):
-    from ankihub_addon.src.ankihub.sync import upload_deck
+    from ankihub_addon.src.ankihub.register_decks import upload_deck
 
     monkeypatch.setattr(
-        "ankihub_addon.src.ankihub.sync.askUser", Mock(return_value=True)
+        "ankihub_addon.src.ankihub.register_decks.askUser", Mock(return_value=True)
     )
     with anki_session.profile_loaded():
         with anki_session.deck_installed(anking_deck) as deck_id:
@@ -60,7 +60,7 @@ def test_prepare_to_upload_deck(anki_session: AnkiSession, monkeypatch):
 
 
 def test_populate_id_fields(anki_session: AnkiSession):
-    from ankihub_addon.src.ankihub.sync import (
+    from ankihub_addon.src.ankihub.register_decks import (
         populate_ankihub_id_fields,
         modify_note_type,
     )

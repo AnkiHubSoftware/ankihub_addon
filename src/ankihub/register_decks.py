@@ -1,3 +1,6 @@
+"""Logic for the initial steps of registering local decks with collaborative
+decks for both deck creators and deck users.
+"""
 from anki.models import NoteType
 from aqt import mw
 from aqt.utils import askUser, tooltip

@@ -5,7 +5,7 @@ from aqt.qt import QMenu, QAction, qconnect
 from aqt.studydeck import StudyDeck
 
 from . import constants
-from .sync import upload_deck
+from .register_decks import upload_deck
 
 
 def on_upload() -> None:
