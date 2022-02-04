@@ -1,3 +1,9 @@
+# Anki related
+src/meta.json
+src/user_files/*
+*.ankiaddon
+
+
 # Byte-compiled / optimized / DLL files
 __pycache__/
 *.py[cod]
