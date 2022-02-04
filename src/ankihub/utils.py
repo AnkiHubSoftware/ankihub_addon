@@ -5,7 +5,8 @@ import aqt
 from anki.models import NoteType
 from aqt import mw
 
-import constants
+from . import constants
+
 
 
 def note_type_contains_field(
