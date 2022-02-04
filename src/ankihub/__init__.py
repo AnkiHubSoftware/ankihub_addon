@@ -4,4 +4,6 @@ __all__ = ["gui"]
 
 SKIP_INIT = os.getenv("SKIP_INIT", False)
 if not SKIP_INIT:
-    from . import gui
+    # Explicit is better than implicit. (⌐⊙_⊙)
+    import entry_point
+    entry_point.run()
