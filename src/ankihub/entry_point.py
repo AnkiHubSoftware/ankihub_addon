@@ -1,7 +1,7 @@
 """Code to be run on Anki start up."""
 from aqt import gui_hooks
-from gui import add_ankihub_menu
-from utils import hide_ankihub_field_in_editor
+from .gui import add_ankihub_menu
+from .utils import hide_ankihub_field_in_editor
 
 
 def run():

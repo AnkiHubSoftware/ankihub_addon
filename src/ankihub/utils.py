@@ -5,7 +5,7 @@ import aqt
 from anki.models import NoteType
 from aqt import mw
 
-from ankihub_addon.src.ankihub import constants
+import constants
 
 
 def note_type_contains_field(
