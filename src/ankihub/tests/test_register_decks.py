@@ -52,7 +52,7 @@ def test_prepare_to_upload_deck(anki_session: AnkiSession, monkeypatch):
     from src.ankihub.register_decks import create_shared_deck
 
     monkeypatch.setattr(
-        "ankihub_addon.src.ankihub.register_decks.askUser", Mock(return_value=True)
+        "src.ankihub.register_decks.askUser", Mock(return_value=True)
     )
     with anki_session.profile_loaded():
         with anki_session.deck_installed(anking_deck) as deck_id:
