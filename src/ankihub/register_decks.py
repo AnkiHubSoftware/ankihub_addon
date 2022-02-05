@@ -2,6 +2,9 @@
 decks for both deck creators and deck users.
 """
 import os
+import pathlib
+import tempfile
+import uuid
 
 from anki.exporting import AnkiPackageExporter
 from anki.models import NoteType
@@ -73,19 +76,21 @@ def upload_deck(did: int) -> None:
     """Upload the deck to AnkiHub.
     """
     deck_name = mw.col.decks.name(did)
-
-    e = AnkiPackageExporter(mw.col)
-    e.did = did
-    e.includeMedia = 0
-    e.includeSched = 1
-    e.includeTags = 1
-    e.exportInto(DIR_PATH + "/upload_apkg.apkg")
-
-    # TODO Generate a uuid for the deck and include that in the POST
+    exporter = AnkiPackageExporter(mw.col)
+    exporter.did = did
+    exporter.includeMedia = False
+    exporter.includeTags = True
+    deck_uuid = uuid.uuid4()
+    out_dir = pathlib.Path(tempfile.mkdtemp())
+    out_file = str(out_dir / f"export-{deck_uuid}.apkg")
+    exporter.exportInto(out_file)
     ServiceApi().post_apkg(
-        "api/deck_upload/", {"filename": deck_name}, DIR_PATH + "/upload_apkg.apkg"
+        "api/deck_upload/",
+        {"filename": deck_name},
+        out_file,
     )
     tooltip("Deck Uploaded to AnkiHub")
+    return out_file
 
 
 def _create_shared_deck(note_types, did):
