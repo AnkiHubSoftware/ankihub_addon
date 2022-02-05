@@ -1,12 +1,19 @@
 """Logic for the initial steps of registering local decks with collaborative
 decks for both deck creators and deck users.
 """
+import os
+
+from anki.exporting import AnkiPackageExporter
 from anki.models import NoteType
 from aqt import mw
 from aqt.utils import askUser, tooltip
 
 from . import constants
+from .service import ServiceApi
 from .utils import get_note_types_in_deck
+
+
+DIR_PATH = os.path.dirname(os.path.abspath(__file__))
 
 
 def populate_ankihub_id_fields(did: int) -> None:
@@ -62,6 +69,33 @@ def modify_notes(note_types):
     # TODO Run add_id_fields
 
 
+def upload_deck(did: int) -> None:
+    """Upload the deck to AnkiHub.
+    """
+    deck_name = mw.col.decks.name(did)
+
+    e = AnkiPackageExporter(mw.col)
+    e.did = did
+    e.includeMedia = 0
+    e.includeSched = 1
+    e.includeTags = 1
+    e.exportInto(DIR_PATH + '/upload_apkg.apkg')
+
+    ServiceApi().post_apkg(
+        "api/deck_upload/",
+        {
+            "filename": deck_name
+        },
+        DIR_PATH + '/upload_apkg.apkg'
+    )
+    tooltip("Deck Uploaded to AnkiHub")
+
+
+def _create_shared_deck(note_types, did):
+    modify_notes(note_types)
+    upload_deck(did)
+
+
 def create_shared_deck(did: int) -> None:
     model_ids = get_note_types_in_deck(did)
     note_types = [mw.col.models.get(model_id) for model_id in model_ids]
@@ -75,6 +109,6 @@ def create_shared_deck(did: int) -> None:
         tooltip("Cancelled Upload to AnkiHub")
         return
     mw.taskman.with_progress(
-        task=lambda: modify_notes(note_types),
+        task=lambda: _create_shared_deck(note_types, did),
         on_done=lambda future: tooltip("Deck Uploaded to AnkiHub"),
     )
