@@ -1,11 +1,17 @@
-from aqt.qt import (QHBoxLayout, QLabel, QLineEdit, QPushButton, QSizePolicy,
-                    QVBoxLayout, QWidget)
+from aqt.qt import (
+    QHBoxLayout,
+    QLabel,
+    QLineEdit,
+    QPushButton,
+    QSizePolicy,
+    QVBoxLayout,
+    QWidget,
+)
 
 from .service import ServiceApi
 
 
 class AnkiHubLogin(QWidget):
-
     def __init__(self):
         super(AnkiHubLogin, self).__init__()
         self.results = None
@@ -86,7 +92,7 @@ class AnkiHubLogin(QWidget):
             \r\n<i>Use the same username and password
             from AnkiHub to be able to sync</i>
             """
-            )
+        )
 
         # add all widgets to top layout
         self.box_top.addLayout(self.box_upper)
@@ -100,12 +106,11 @@ class AnkiHubLogin(QWidget):
         self.setWindowTitle("AnkiHub connection setup")
         self.show()
 
-
     def uploadBut(self):
         self.label_results.setText(
             """We've started uploading your collection.
             You will be notified on completion. \n"""
-            )
+        )
         # uploadToMFC()
 
     def onClickConnnect(self):
@@ -114,18 +119,15 @@ class AnkiHubLogin(QWidget):
         username = self.username_box_text.text()
         password = self.password_box_text.text()
         if username == "" or password == "":
-            self.label_results.setText("Oops! You forgot to put in a username or password!")
+            self.label_results.setText(
+                "Oops! You forgot to put in a username or password!"
+            )
 
         token = ServiceApi().authenitcateUserGetToken(
-            url="auth-token/",
-            data={
-                "username": username,
-                "password": password,
-            }
+            url="auth-token/", data={"username": username, "password": password}
         )
 
         if token:
             self.label_results.setText("We've connected securely!: " + token)
         else:
             self.label_results.setText("There seems to have been an error!")
-

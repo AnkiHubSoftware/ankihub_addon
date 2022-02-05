@@ -79,14 +79,11 @@ def upload_deck(did: int) -> None:
     e.includeMedia = 0
     e.includeSched = 1
     e.includeTags = 1
-    e.exportInto(DIR_PATH + '/upload_apkg.apkg')
+    e.exportInto(DIR_PATH + "/upload_apkg.apkg")
 
+    # TODO Generate a uuid for the deck and include that in the POST
     ServiceApi().post_apkg(
-        "api/deck_upload/",
-        {
-            "filename": deck_name
-        },
-        DIR_PATH + '/upload_apkg.apkg'
+        "api/deck_upload/", {"filename": deck_name}, DIR_PATH + "/upload_apkg.apkg"
     )
     tooltip("Deck Uploaded to AnkiHub")
 
