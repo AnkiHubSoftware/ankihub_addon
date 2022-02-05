@@ -76,7 +76,7 @@ class AnkiHubLogin(QWidget):
             )
 
         ankihub_client = AnkiHubClient()
-        token = ankihub_client.authenitcateUserGetToken(
+        token = ankihub_client.authenticate_user(
             url="auth-token/", data={"username": username, "password": password}
         )
         if token:

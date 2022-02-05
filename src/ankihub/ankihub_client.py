@@ -20,9 +20,9 @@ class AnkiHubClient:
         else:
             self.headers = {"Content-Type": "application/json"}
 
-    def authenitcateUserGetToken(self, url: str, data: dict):
-        if not url or not data:
-            return None
+    def authenticate_user(self, url: str, data: dict) -> str:
+        """Authenticate the user and return their token."""
+        token = ""
         response = requests.post(
             self.base_url + url,
             headers={"Content-Type": "application/json"},
@@ -30,11 +30,8 @@ class AnkiHubClient:
         )
         if response.status_code == 200:
             token = json.loads(response.content)["token"]
-            showInfo("token: " + token)
             self.config.write_token(token)
-            return token
-        else:
-            return None
+        return token
 
     def post_apkg(self, url, data, file):
         headers = {"Authorization": "Token " + self.config.token}
