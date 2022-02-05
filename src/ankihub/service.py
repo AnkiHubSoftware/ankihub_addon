@@ -10,7 +10,7 @@ class Config:
         self.addon = __name__.split(".")[0]
 
     def get(self):
-        return mw.addonManager.getConfig(self.addon)
+        return mw.addonManager.getConfig("ankihub")
 
     def isAuthenticated(self) -> bool:
         config = self.get()
