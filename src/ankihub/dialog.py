@@ -8,7 +8,7 @@ from aqt.qt import (
     QWidget,
 )
 
-from .service import ServiceApi
+from .ankihub_client import AnkiHubClient
 
 
 class AnkiHubLogin(QWidget):
@@ -123,7 +123,8 @@ class AnkiHubLogin(QWidget):
                 "Oops! You forgot to put in a username or password!"
             )
 
-        token = ServiceApi().authenitcateUserGetToken(
+        ankihub_client = AnkiHubClient()
+        token = ankihub_client.authenitcateUserGetToken(
             url="auth-token/", data={"username": username, "password": password}
         )
 

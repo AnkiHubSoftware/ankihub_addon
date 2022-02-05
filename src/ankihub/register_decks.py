@@ -12,7 +12,7 @@ from aqt import mw
 from aqt.utils import askUser, tooltip
 
 from . import constants
-from .service import ServiceApi
+from .ankihub_client import AnkiHubClient
 from .utils import get_note_types_in_deck
 
 
@@ -84,13 +84,14 @@ def upload_deck(did: int) -> None:
     out_dir = pathlib.Path(tempfile.mkdtemp())
     out_file = str(out_dir / f"export-{deck_uuid}.apkg")
     exporter.exportInto(out_file)
-    ServiceApi().post_apkg(
+    ankihub_client = AnkiHubClient()
+    response = ankihub_client.post_apkg(
         "api/deck_upload/",
         {"filename": deck_name},
         out_file,
     )
     tooltip("Deck Uploaded to AnkiHub")
-    return out_file
+    return response
 
 
 def _create_shared_deck(note_types, did):

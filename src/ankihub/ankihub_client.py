@@ -6,11 +6,12 @@ from aqt.utils import showInfo
 from src.ankihub.config import Config
 
 
-
-class ServiceApi:
+class AnkiHubClient:
+    """Client for interacting with the AnkiHub API.
+    """
     def __init__(self):
-        self.config = Config()
         self.base_url = "http://localhost:8000/"
+        self.config = Config()
         if self.config.is_authenticated():
             self.headers = {
                 "Content-Type": "application/json",
