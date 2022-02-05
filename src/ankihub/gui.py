@@ -1,10 +1,10 @@
 from aqt import mw
-from aqt.qt import QMenu, QAction, qconnect
+from aqt.qt import QAction, QMenu, qconnect
 from aqt.studydeck import StudyDeck
 
+from .dialog import AnkiHubLogin
 from .register_decks import create_shared_deck
 from .service import Config
-from .dialog import AnkiHubLogin
 
 
 def create_shared_deck_action() -> None:

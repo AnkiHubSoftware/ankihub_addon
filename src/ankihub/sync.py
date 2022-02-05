@@ -1,13 +1,13 @@
+import os
 from concurrent.futures import Future
-from typing import List, Dict
+from typing import Dict, List
 
 import anki
-from anki.models import NoteType
 from anki.exporting import AnkiPackageExporter
+from anki.models import NoteType
 from anki.utils import ids2str
 from aqt import mw
 from aqt.utils import askUser, tooltip
-import os
 
 from .consts import *
 from .service import ServiceApi

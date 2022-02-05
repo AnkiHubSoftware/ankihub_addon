@@ -1,6 +1,8 @@
-import requests
-import json
 import io
+import json
+
+import requests
+
 FILE_LOCATION = "/Users/johnpincock/Library/Application Support/Anki2/addons21/ankihub/upload_apkg.apkg"
 
 def read_apkg(apkg):

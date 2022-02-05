@@ -1,5 +1,6 @@
-from aqt.qt import QWidget, QVBoxLayout, QHBoxLayout, QLineEdit, QLabel,\
-    QPushButton, QSizePolicy
+from aqt.qt import (QHBoxLayout, QLabel, QLineEdit, QPushButton, QSizePolicy,
+                    QVBoxLayout, QWidget)
+
 from .service import ServiceApi
 
 

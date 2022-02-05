@@ -1,4 +1,4 @@
-from typing import List, Dict
+from typing import Dict, List
 
 import anki
 import aqt
@@ -6,7 +6,6 @@ from anki.models import NoteType
 from aqt import mw
 
 from . import constants
-
 
 
 def note_type_contains_field(

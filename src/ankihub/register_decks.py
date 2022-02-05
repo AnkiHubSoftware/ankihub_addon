@@ -5,7 +5,6 @@ from anki.models import NoteType
 from aqt import mw
 from aqt.utils import askUser, tooltip
 
-
 from . import constants
 from .utils import get_note_types_in_deck
 

@@ -1,7 +1,8 @@
+import json
+
+import requests
 from aqt import mw
 from aqt.utils import showInfo
-import requests
-import json
 
 
 class Config:
