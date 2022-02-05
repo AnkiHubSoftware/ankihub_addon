@@ -4,7 +4,6 @@ from aqt.studydeck import StudyDeck
 
 from .dialog import AnkiHubLogin
 from .register_decks import create_shared_deck
-from .service import Config
 
 
 def create_shared_deck_action() -> None:
@@ -35,5 +34,6 @@ def add_ankihub_menu() -> None:
 
 
 def show_sign_in_screen() -> None:
+    # TODO Figure out if this is necessary
     global __window
     __window = AnkiHubLogin()

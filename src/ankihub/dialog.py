@@ -16,10 +16,10 @@ class AnkiHubLogin(QWidget):
         super(AnkiHubLogin, self).__init__()
         self.results = None
         self.thread = None
-        self.initGUI()
+        self.init_gui()
 
     # create GUI skeleton
-    def initGUI(self):
+    def init_gui(self):
 
         self.box_top = QVBoxLayout()
         self.box_upper = QHBoxLayout()
