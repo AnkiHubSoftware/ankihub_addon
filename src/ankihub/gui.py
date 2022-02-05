@@ -1,7 +1,8 @@
-from PyQt5.QtWidgets import QWidget, QVBoxLayout, QHBoxLayout, QLabel, QLineEdit, QPushButton, QSizePolicy
 from aqt import mw
 from aqt.qt import QAction, QMenu, qconnect
 from aqt.studydeck import StudyDeck
+from PyQt5.QtWidgets import (QHBoxLayout, QLabel, QLineEdit, QPushButton,
+                             QSizePolicy, QVBoxLayout, QWidget)
 
 from .ankihub_client import AnkiHubClient
 from .register_decks import create_shared_deck
@@ -85,7 +86,7 @@ class AnkiHubLogin(QWidget):
             self.label_results.setText(
                 "AnkiHub login failed.  Please make sure your username and "
                 "password are correct for AnkiHub."
-                )
+            )
 
     @classmethod
     def display_login(cls):

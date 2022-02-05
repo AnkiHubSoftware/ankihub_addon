@@ -15,7 +15,6 @@ from . import constants
 from .ankihub_client import AnkiHubClient
 from .utils import get_note_types_in_deck
 
-
 DIR_PATH = os.path.dirname(os.path.abspath(__file__))
 
 
@@ -73,8 +72,7 @@ def modify_notes(note_types):
 
 
 def upload_deck(did: int) -> None:
-    """Upload the deck to AnkiHub.
-    """
+    """Upload the deck to AnkiHub."""
     deck_name = mw.col.decks.name(did)
     exporter = AnkiPackageExporter(mw.col)
     exporter.did = did

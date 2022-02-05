@@ -3,7 +3,6 @@ import pathlib
 import shutil
 
 import pytest
-
 from pytest_anki import AnkiSession
 
 ROOT = pathlib.Path(__file__).absolute().parent.parent
@@ -26,8 +25,6 @@ def anki_session_with_config(anki_session: AnkiSession):
     with open(meta) as f:
         meta_dict = json.load(f)
     anki_session.create_addon_config(
-        package_name="ankihub",
-        default_config=config_dict,
-        user_config=meta_dict
+        package_name="ankihub", default_config=config_dict, user_config=meta_dict
     )
     yield anki_session

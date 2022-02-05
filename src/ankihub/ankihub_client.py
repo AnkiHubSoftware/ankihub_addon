@@ -7,8 +7,8 @@ from src.ankihub.config import Config
 
 
 class AnkiHubClient:
-    """Client for interacting with the AnkiHub API.
-    """
+    """Client for interacting with the AnkiHub API."""
+
     def __init__(self):
         self.base_url = "http://localhost:8000/"
         self.config = Config()
