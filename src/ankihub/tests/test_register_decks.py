@@ -72,9 +72,10 @@ def test_populate_id_fields(anki_session: AnkiSession):
             # TODO add assertions once populate_ankihub_id_fields is complete.
 
 
-def test_upload_deck(anki_session_with_config: AnkiSession):
+def test_upload_deck(anki_session_with_config: AnkiSession, monkeypatch):
     from src.ankihub.register_decks import upload_deck
     anki_session = anki_session_with_config
+    monkeypatch.setattr("src.ankihub.service.requests", Mock())
     with anki_session.profile_loaded():
         with anki_session.deck_installed(anking_deck) as deck_id:
             upload_deck(deck_id)
