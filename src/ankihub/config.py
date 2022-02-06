@@ -3,8 +3,7 @@ from aqt import mw
 
 class Config:
     def __init__(self):
-        self.addon = "ankihub"
-        self.config = mw.addonManager.getConfig(self.addon)
+        self.config = mw.addonManager.getConfig(__name__)
         self.user = self.config.get("user")
         self.token = self.user.get("token")
 
@@ -12,7 +11,7 @@ class Config:
         return True if self.token else False
 
     def signout(self):
-        default = mw.addonManager.addonConfigDefaults(self.addon)
+        default = mw.addonManager.addonConfigDefaults(__name__)
         mw.addonManager.writeConfig(__name__, default)
 
     def write_token(self, token: str) -> None:
