@@ -21,7 +21,7 @@ inputs:
 runs:
   using: "composite"
   steps:
-    - name: Checkout pytest-anki
+    - name: Checkout ankihub_addon
       uses: actions/checkout@v2
 
     - name: Set up environment
