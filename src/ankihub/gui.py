@@ -78,7 +78,7 @@ class AnkiHubLogin(QWidget):
         # grab input
         username = self.username_box_text.text()
         password = self.password_box_text.text()
-        if username == "" or password == "":
+        if not all([username, password]):
             self.label_results.setText(
                 "Oops! You forgot to put in a username or password!"
             )
