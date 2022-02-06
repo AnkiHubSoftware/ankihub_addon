@@ -1,7 +1,6 @@
 import json
 
 import requests
-from aqt.utils import showInfo
 
 from src.ankihub.config import Config
 
