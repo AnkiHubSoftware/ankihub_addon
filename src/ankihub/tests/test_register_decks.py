@@ -58,8 +58,7 @@ def test_prepare_to_upload_deck(anki_session: AnkiSession, monkeypatch):
 
 
 def test_populate_id_fields(anki_session: AnkiSession):
-    from src.ankihub.register_decks import (modify_note_type,
-                                            populate_ankihub_id_fields)
+    from src.ankihub.register_decks import modify_note_type, populate_ankihub_id_fields
 
     with anki_session.profile_loaded():
         with anki_session.deck_installed(anking_deck) as deck_id:
