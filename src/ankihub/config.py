@@ -3,7 +3,7 @@ from aqt import mw
 
 class Config:
     def __init__(self):
-        self.config = mw.addonManager.getConfig(__name__)
+        self.config = mw.addonManager.getConfig("ankihub")
         self.user = self.config.get("user")
         self.token = self.user.get("token")
 
