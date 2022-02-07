@@ -1,22 +1,58 @@
-from ..config import config
+from anki.hooks import addHook, wrap
+
+from ..config import Config
 from ..constants import ICONS_PATH
 from aqt.editor import Editor
 
 
+config = Config().config
 HOTKEY = config["hotkey"]
 
 
-def ankihub_request():
+def ankihub_request(editor):
     pass
+
+
+select_elm = ("""<select onchange='pycmd("ankihub:" +"""
+              """ this.selectedOptions[0].text)' """
+              """style='vertical-align: top;'>{}</select>""")
 
 
 def setup_editor_buttons(buttons, editor: Editor):
     """Add buttons to Editor."""
-    # no need for a lambda since onBridgeCmd passes current editor instance
-    # to method anyway (cf. "self._links[cmd](self)")
-    icon_path = ICONS_PATH / "ankihub_button.png"
-    button = editor.addButton(icon_path, "CH", ankihub_request,
-                              tip="Send your request to AnkiHub ({})".format(HOTKEY),
-                              keys=HOTKEY)
+    img = str(ICONS_PATH / "ankihub_button.png")
+    button = editor.addButton(
+        img,
+        "CH",
+        ankihub_request,
+        tip="Send your request to AnkiHub ({})".format(HOTKEY),
+        keys=HOTKEY
+    )
     buttons.append(button)
+
+    options = []
+    commands = ["Suggest a change", "Suggest a new note"]
+    for cmd in commands:
+        options.append(f"<option>{cmd}</option>")
+    options = select_elm.format("".join(options))
+    buttons.append(options)
     return buttons
+
+
+def on_bridge_command(ed, cmd, _old):
+    print(cmd)
+    if not cmd.startswith("ankihub"):
+        return _old(ed, cmd)
+    (type, cmd) = cmd.split(":")
+    on_select_command(ed, cmd)
+
+
+def on_select_command(editor, cmd):
+    """Keep track of the currently selected command."""
+    pass
+
+
+def setup():
+    addHook("setupEditorButtons", setup_editor_buttons)
+    Editor.onBridgeCmd = wrap(Editor.onBridgeCmd, on_bridge_command, "around")
+    # Editor.__init__ = wrap(Editor.__init__, init_highlighter)
