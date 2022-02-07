@@ -2,7 +2,7 @@ import json
 
 import requests
 
-from src.ankihub.config import Config
+from ankihub.config import Config
 
 
 class AnkiHubClient:
