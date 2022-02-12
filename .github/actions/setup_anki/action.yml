@@ -18,11 +18,11 @@ runs:
     - name: Set up Anki ${{ inputs.anki }}
       shell: bash
       run: |
-        pip install --upgrade setuptools pip
-        pip install --upgrade PyQt6==${{ inputs.pyqt }} PyQtWebEngine==${{ inputs.pyqtwebengine }}
+        pip3 install --upgrade setuptools pip
+        pip3 install --upgrade PyQt6==${{ inputs.pyqt }} PyQtWebEngine==${{ inputs.pyqtwebengine }}
 
         if [[ "${{ inputs.anki }}" == "prerelease" ]]; then
-          pip install --upgrade --pre anki aqt
+          pip3 install --upgrade --pre anki aqt
         else:
-          pip install --upgrade anki==${{ inputs.anki }} aqt==${{ inputs.anki }}
+          pip3 install --upgrade anki==${{ inputs.anki }} aqt==${{ inputs.anki }}
         fi
