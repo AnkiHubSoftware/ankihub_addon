@@ -48,3 +48,9 @@ class AnkiHubClient:
 
     def get(self, url):
         return requests.get(self.base_url + url, headers=self.headers)
+
+    def submit_change(self):
+        print("Submit change")
+
+    def submit_new_note(self):
+        print("Submit change")

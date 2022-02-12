@@ -2,6 +2,7 @@ from anki.hooks import addHook, wrap
 
 from ..config import Config
 from ..constants import ICONS_PATH, CommandList
+from ..ankihub_client import AnkiHubClient
 from aqt.editor import Editor
 
 
@@ -9,12 +10,17 @@ config = Config().config
 HOTKEY = config["hotkey"]
 
 
-def ankihub_request(editor):
+def on_ankihub_button_press(editor: Editor):
     """
     Action to be performed when the AnkiHub icon button is clicked or when
     the hotkey is pressed.
     """
-    pass
+    command = editor.ankihub_command
+    client = AnkiHubClient()
+    if command == CommandList.CHANGE.value:
+        client.submit_change()
+    elif command == CommandList.NEW.value:
+        client.submit_new_note()
 
 
 def setup_editor_buttons(buttons, editor: Editor):
@@ -23,7 +29,7 @@ def setup_editor_buttons(buttons, editor: Editor):
     button = editor.addButton(
         img,
         "CH",
-        ankihub_request,
+        on_ankihub_button_press,
         tip="Send your request to AnkiHub ({})".format(HOTKEY),
         keys=HOTKEY,
     )
