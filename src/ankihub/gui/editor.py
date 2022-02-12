@@ -13,11 +13,6 @@ def ankihub_request(editor):
     pass
 
 
-select_elm = ("""<select onchange='pycmd("ankihub:" +"""
-              """ this.selectedOptions[0].text)' """
-              """style='vertical-align: top;'>{}</select>""")
-
-
 def setup_editor_buttons(buttons, editor: Editor):
     """Add buttons to Editor."""
     img = str(ICONS_PATH / "ankihub_button.png")
@@ -26,14 +21,18 @@ def setup_editor_buttons(buttons, editor: Editor):
         "CH",
         ankihub_request,
         tip="Send your request to AnkiHub ({})".format(HOTKEY),
-        keys=HOTKEY
+        keys=HOTKEY,
     )
     buttons.append(button)
 
     options = []
-    commands = ["Suggest a change", "Suggest a new note"]
-    for cmd in commands:
-        options.append(f"<option>{cmd}</option>")
+    select_elm = (
+        "<select "
+        """onchange='pycmd("ankihub:" + this.selectedOptions[0].text)'"""
+        "style='vertical-align: top;'>"
+        "{}"
+        "</select>"
+    )
     for cmd in CommandList:
         options.append(f"<option>{cmd.value}</option>")
     options = select_elm.format("".join(options))
