@@ -44,20 +44,19 @@ def setup_editor_buttons(buttons, editor: Editor):
     return buttons
 
 
-def on_bridge_command(ed, cmd, _old):
-    print(cmd)
+def on_bridge_command(editor: Editor, cmd, _old):
     if not cmd.startswith("ankihub"):
-        return _old(ed, cmd)
-    (type, cmd) = cmd.split(":")
-    on_select_command(ed, cmd)
+        return _old(editor, cmd)
+    _, command_value = cmd.split(":")
+    on_select_command(editor, command_value)
 
 
 def on_select_command(editor, cmd):
     """
     Action to perform when the user selects a command from the options drop
-    down menu.
+    down menu.  This currently just sets an instance attribute on the Editor.
     """
-    pass
+    editor.ankihub_command = cmd
 
 
 def setup():
