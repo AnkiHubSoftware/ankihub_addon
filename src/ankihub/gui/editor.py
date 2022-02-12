@@ -1,10 +1,9 @@
 from anki.hooks import addHook, wrap
-
-from ..config import Config
-from ..constants import ICONS_PATH, CommandList
-from ..ankihub_client import AnkiHubClient
 from aqt.editor import Editor
 
+from ..ankihub_client import AnkiHubClient
+from ..config import Config
+from ..constants import ICONS_PATH, CommandList
 
 config = Config().config
 HOTKEY = config["hotkey"]
@@ -74,4 +73,3 @@ def setup():
     # Editor.__init__ = wrap(Editor.__init__, init_editor)
     # See Syntax Highlighting add-on code for an example. For now, just setting
     # an instance attribute above will suffice.
-
