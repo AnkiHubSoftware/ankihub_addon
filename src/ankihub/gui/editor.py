@@ -63,5 +63,10 @@ def on_select_command(editor, cmd):
 def setup():
     addHook("setupEditorButtons", setup_editor_buttons)
     Editor.onBridgeCmd = wrap(Editor.onBridgeCmd, on_bridge_command, "around")
-    # Editor.__init__ = wrap(Editor.__init__, init_highlighter)
     Editor.ankihub_command = CommandList.CHANGE.value
+    # We can wrap Editor.__init__ if more complicated logic is needed, such as
+    # pulling a default command from a config option.  E.g.,
+    # Editor.__init__ = wrap(Editor.__init__, init_editor)
+    # See Syntax Highlighting add-on code for an example. For now, just setting
+    # an instance attribute above will suffice.
+
