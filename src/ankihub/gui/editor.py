@@ -1,7 +1,7 @@
 from anki.hooks import addHook, wrap
 
 from ..config import Config
-from ..constants import ICONS_PATH
+from ..constants import ICONS_PATH, CommandList
 from aqt.editor import Editor
 
 
@@ -34,6 +34,8 @@ def setup_editor_buttons(buttons, editor: Editor):
     commands = ["Suggest a change", "Suggest a new note"]
     for cmd in commands:
         options.append(f"<option>{cmd}</option>")
+    for cmd in CommandList:
+        options.append(f"<option>{cmd.value}</option>")
     options = select_elm.format("".join(options))
     buttons.append(options)
     return buttons
