@@ -19,7 +19,7 @@ runs:
       shell: bash
       run: |
         pip install --upgrade setuptools pip
-        pip install --upgrade PyQt5==${{ inputs.pyqt }} PyQtWebEngine==${{ inputs.pyqtwebengine }}
+        pip install --upgrade PyQt6==${{ inputs.pyqt }} PyQtWebEngine==${{ inputs.pyqtwebengine }}
 
         if [[ "${{ inputs.anki }}" == "prerelease" ]]; then
           pip install --upgrade --pre anki aqt
