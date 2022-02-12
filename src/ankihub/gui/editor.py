@@ -10,6 +10,10 @@ HOTKEY = config["hotkey"]
 
 
 def ankihub_request(editor):
+    """
+    Action to be performed when the AnkiHub icon button is clicked or when
+    the hotkey is pressed.
+    """
     pass
 
 
@@ -49,7 +53,10 @@ def on_bridge_command(ed, cmd, _old):
 
 
 def on_select_command(editor, cmd):
-    """Keep track of the currently selected command."""
+    """
+    Action to perform when the user selects a command from the options drop
+    down menu.
+    """
     pass
 
 
