@@ -19,7 +19,7 @@ runs:
       shell: bash
       run: |
         pip3 install --upgrade setuptools pip
-        pip3 install --upgrade PyQt6==${{ inputs.pyqt }} PyQtWebEngine==${{ inputs.pyqtwebengine }}
+        pip3 install --upgrade pyqt6==6.2.3 pyqt6-qt6==6.2.3 pyqt6-webengine==6.2.1 pyqt6-webengine-qt6==6.2.2 pyqt6_sip==13.2.1
 
         if [[ "${{ inputs.anki }}" == "prerelease" ]]; then
           pip3 install --upgrade --pre anki aqt
