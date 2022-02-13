@@ -1,9 +1,15 @@
 -r base.txt
 
 pytest-anki==https://github.com/andrewsanchez/pytest-anki/tree/anki-2.1.50b3
+git+https://github.com/andrewsanchez/pytest-anki.git@anki-2.1.50b3
 black
 flake8
 mypy
 coverage
 pytest-cov
 pre-commit
+pyqt6==6.2.3
+pyqt6-qt6==6.2.3
+pyqt6-webengine==6.2.1
+pyqt6-webengine-qt6==6.2.2
+pyqt6_sip==13.2.1
