@@ -1,6 +1,5 @@
 -r base.txt
 
-pytest-anki==https://github.com/andrewsanchez/pytest-anki/tree/anki-2.1.50b3
 git+https://github.com/andrewsanchez/pytest-anki.git@anki-2.1.50b3
 black
 flake8
