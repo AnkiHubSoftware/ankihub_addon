@@ -1,6 +1,6 @@
 -r base.txt
 
-pytest-anki==1.0.0b2
+pytest-anki==https://github.com/andrewsanchez/pytest-anki/tree/anki-2.1.50b3
 black
 flake8
 mypy
