@@ -2,7 +2,7 @@
 from aqt import gui_hooks, mw
 
 from .gui import editor
-from .gui.gui import add_ankihub_menu
+from .gui.menu import add_ankihub_menu
 from .utils import hide_ankihub_field_in_editor
 
 
