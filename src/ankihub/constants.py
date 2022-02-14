@@ -8,6 +8,6 @@ ADDON_PATH = pathlib.Path(__file__).parent.absolute()
 ICONS_PATH = ADDON_PATH / "icons"
 
 
-class CommandList(Enum):
+class AnkiHubCommands(Enum):
     CHANGE = "Suggest a change"
     NEW = "Suggest a new note"

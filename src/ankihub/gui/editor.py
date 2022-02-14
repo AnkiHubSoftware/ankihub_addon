@@ -3,7 +3,7 @@ from aqt.editor import Editor
 
 from ..ankihub_client import AnkiHubClient
 from ..config import Config
-from ..constants import ICONS_PATH, CommandList
+from ..constants import ICONS_PATH, AnkiHubCommands
 
 config = Config().config
 HOTKEY = config["hotkey"]
@@ -16,9 +16,9 @@ def on_ankihub_button_press(editor: Editor):
     """
     command = editor.ankihub_command
     client = AnkiHubClient()
-    if command == CommandList.CHANGE.value:
+    if command == AnkiHubCommands.CHANGE.value:
         client.submit_change()
-    elif command == CommandList.NEW.value:
+    elif command == AnkiHubCommands.NEW.value:
         client.submit_new_note()
 
 
@@ -42,7 +42,7 @@ def setup_editor_buttons(buttons, editor: Editor):
         "{}"
         "</select>"
     )
-    for cmd in CommandList:
+    for cmd in AnkiHubCommands:
         options.append(f"<option>{cmd.value}</option>")
     options = select_elm.format("".join(options))
     buttons.append(options)
@@ -67,7 +67,7 @@ def on_select_command(editor, cmd):
 def setup():
     addHook("setupEditorButtons", setup_editor_buttons)
     Editor.onBridgeCmd = wrap(Editor.onBridgeCmd, on_bridge_command, "around")
-    Editor.ankihub_command = CommandList.CHANGE.value
+    Editor.ankihub_command = AnkiHubCommands.CHANGE.value
     # We can wrap Editor.__init__ if more complicated logic is needed, such as
     # pulling a default command from a config option.  E.g.,
     # Editor.__init__ = wrap(Editor.__init__, init_editor)
