@@ -5,25 +5,28 @@ from ..ankihub_client import AnkiHubClient
 from ..config import Config
 from ..constants import ICONS_PATH, AnkiHubCommands
 
-config = Config().config
-HOTKEY = config["hotkey"]
-
 
 def on_ankihub_button_press(editor: Editor):
     """
     Action to be performed when the AnkiHub icon button is clicked or when
     the hotkey is pressed.
     """
+    # The command is expected to have been set at this point already, either by
+    # fetching the default or by selecting a command from the dropdown menu.
     command = editor.ankihub_command
     client = AnkiHubClient()
     if command == AnkiHubCommands.CHANGE.value:
-        client.submit_change()
+        response = client.submit_change()
     elif command == AnkiHubCommands.NEW.value:
-        client.submit_new_note()
+        response = client.submit_new_note()
+    return response
 
 
 def setup_editor_buttons(buttons, editor: Editor):
     """Add buttons to Editor."""
+    # TODO Figure out how to test this
+    config = Config().config
+    HOTKEY = config["hotkey"]
     img = str(ICONS_PATH / "ankihub_button.png")
     button = editor.addButton(
         img,
@@ -68,6 +71,7 @@ def setup():
     addHook("setupEditorButtons", setup_editor_buttons)
     Editor.onBridgeCmd = wrap(Editor.onBridgeCmd, on_bridge_command, "around")
     Editor.ankihub_command = AnkiHubCommands.CHANGE.value
+    return Editor
     # We can wrap Editor.__init__ if more complicated logic is needed, such as
     # pulling a default command from a config option.  E.g.,
     # Editor.__init__ = wrap(Editor.__init__, init_editor)
