@@ -4,7 +4,7 @@ from unittest.mock import Mock
 
 from pytest_anki import AnkiSession
 
-from src.ankihub import constants
+from ankihub import constants
 
 ANKING_MODEL_ID = 1566160514431
 anking_deck = str(pathlib.Path(__file__).parent / "test_data" / "anking.apkg")
@@ -12,7 +12,7 @@ anking_deck = str(pathlib.Path(__file__).parent / "test_data" / "anking.apkg")
 
 def test_get_note_types_in_deck(anki_session: AnkiSession) -> None:
     """Check that get_note_types_in_deck returns the expected model id."""
-    from src.ankihub.utils import get_note_types_in_deck
+    from ankihub.utils import get_note_types_in_deck
 
     with anki_session.profile_loaded():
         with anki_session.deck_installed(anking_deck) as deck_id:
@@ -23,7 +23,7 @@ def test_get_note_types_in_deck(anki_session: AnkiSession) -> None:
 
 
 def test_note_type_contains_field(anki_session: AnkiSession) -> None:
-    from src.ankihub.utils import note_type_contains_field
+    from ankihub.utils import note_type_contains_field
 
     with anki_session.profile_loaded():
         with anki_session.deck_installed(anking_deck):
@@ -34,7 +34,7 @@ def test_note_type_contains_field(anki_session: AnkiSession) -> None:
 
 
 def test_modify_note_type(anki_session: AnkiSession) -> None:
-    from src.ankihub.register_decks import modify_note_type
+    from ankihub.register_decks import modify_note_type
 
     with anki_session.profile_loaded():
         with anki_session.deck_installed(anking_deck):
@@ -49,16 +49,16 @@ def test_modify_note_type(anki_session: AnkiSession) -> None:
 
 
 def test_prepare_to_upload_deck(anki_session: AnkiSession, monkeypatch):
-    from src.ankihub.register_decks import create_shared_deck
+    from ankihub.register_decks import create_shared_deck
 
-    monkeypatch.setattr("src.ankihub.register_decks.askUser", Mock(return_value=True))
+    monkeypatch.setattr("ankihub.register_decks.askUser", Mock(return_value=True))
     with anki_session.profile_loaded():
         with anki_session.deck_installed(anking_deck) as deck_id:
             create_shared_deck(deck_id)
 
 
 def test_populate_id_fields(anki_session: AnkiSession):
-    from src.ankihub.register_decks import modify_note_type, populate_ankihub_id_fields
+    from ankihub.register_decks import modify_note_type, populate_ankihub_id_fields
 
     with anki_session.profile_loaded():
         with anki_session.deck_installed(anking_deck) as deck_id:
@@ -69,10 +69,10 @@ def test_populate_id_fields(anki_session: AnkiSession):
 
 
 def test_upload_deck(anki_session_with_config: AnkiSession, monkeypatch):
-    from src.ankihub.register_decks import upload_deck
+    from ankihub.register_decks import upload_deck
 
     anki_session = anki_session_with_config
-    monkeypatch.setattr("src.ankihub.ankihub_client.requests", Mock())
+    monkeypatch.setattr("ankihub.ankihub_client.requests", Mock())
     with anki_session.profile_loaded():
         with anki_session.deck_installed(anking_deck) as deck_id:
             upload_deck(deck_id)

@@ -11,8 +11,8 @@ from PyQt5.QtWidgets import (
     QWidget,
 )
 
-from .ankihub_client import AnkiHubClient
-from .register_decks import create_shared_deck
+from ankihub.ankihub_client import AnkiHubClient
+from ankihub.register_decks import create_shared_deck
 
 
 class AnkiHubLogin(QWidget):

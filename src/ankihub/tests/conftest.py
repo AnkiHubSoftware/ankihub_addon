@@ -10,8 +10,8 @@ ROOT = pathlib.Path(__file__).absolute().parent.parent
 
 @pytest.fixture(scope="function")
 def anki_session_with_addon(anki_session: AnkiSession):
-    dest = anki_session.mw.addonManager.addonsFolder()
-    shutil.copytree(ROOT, dest)
+    dest = pathlib.Path(anki_session.mw.addonManager.addonsFolder())
+    shutil.copytree(ROOT, dest / "ankihub")
     yield anki_session
 
 
