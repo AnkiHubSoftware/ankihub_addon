@@ -19,6 +19,8 @@ brew install xquartz
 
 ### Development workflow
 
+#### Symlinking the add-on source
+
 To see your changes to this repo reflected in Anki, you can symlink this repo to
 the Anki add-on directory. To find the path to Anki's add-on directory, [see
 this section of the
@@ -39,6 +41,15 @@ ln -s /Users/andrewsanchez/anki/ankihub_addon/ankihub
 
 You will need to restart Anki in order for Anki to reload the add-on source
 code.
+
+#### A better development experience
+
+https://github.com/watchexec/watchexec
+
+```
+brew install watchex
+```
+
 
 ### Miscellaneous Recommendations
 
