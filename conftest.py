@@ -5,7 +5,7 @@ import shutil
 import pytest
 from pytest_anki import AnkiSession
 
-ROOT = pathlib.Path(__file__).absolute().parent.parent
+ROOT = pathlib.Path(__file__).absolute().parent
 
 
 @pytest.fixture(scope="function")
