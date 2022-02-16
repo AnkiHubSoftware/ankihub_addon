@@ -11,6 +11,12 @@ install the dependencies:
 pip install -r ./requirements/dev.txt
 ```
 
+In order to run the tests locally you will also need to install an X Server for X11 forwarding.  On macos:
+
+```
+brew install xquartz
+```
+
 ### Development workflow
 
 To see your changes to this repo reflected in Anki, you can symlink this repo to
@@ -26,8 +32,10 @@ documentation](https://addon-docs.ankiweb.net/addon-folders.html#add-on-folders)
 
 For example:
 
-`ln -s /Users/andrewsanchez/anki/ankihub_addon/ankihub
-/Users/andrewsanchez/Library/Application\ Support/Anki2/addons21/ `
+```
+ln -s /Users/andrewsanchez/anki/ankihub_addon/ankihub
+/Users/andrewsanchez/Library/Application\ Support/Anki2/addons21/
+```
 
 You will need to restart Anki in order for Anki to reload the add-on source
 code.
@@ -37,10 +45,11 @@ code.
 I recommend setting the following environment variables to help make Anki add-on
 development a little smoother:
 
-`
+```
 # See __init__.py for what this does.
 export SKIP_INIT=1 export ADDONS_DIR=/Users/andrewsanchez/Library/Application\
-Support/Anki2/addons21/ `
+Support/Anki2/addons21/ 
+```
 
 Defining a `.envrc` with [`direnv`](https://direnv.net/) is great for this.
 
