@@ -2,12 +2,47 @@
 
 ## Development
 
+### Creating a development environment
+
 To create a development environment, create a python virtual environment and
 install the dependencies:
 
 ```
 pip install -r ./requirements/dev.txt
 ```
+
+### Development workflow
+
+To see your changes to this repo reflected in Anki, you can symlink this repo to
+the Anki add-on directory. To find the path to Anki's add-on directory, [see
+this section of the
+documentation](https://addon-docs.ankiweb.net/addon-folders.html#add-on-folders).
+
+> You can access the top level add-ons folder by going to the Tools>Add-ons menu
+> item in the main Anki window. Click on the View Files button, and a folder
+> will pop up. If you had no add-ons installed, the top level add-ons folder
+> will be shown. If you had an add-on selected, the add-on’s module folder will
+> be shown, and you will need to go up one level.
+
+For example:
+
+`ln -s /Users/andrewsanchez/anki/ankihub_addon/ankihub
+/Users/andrewsanchez/Library/Application\ Support/Anki2/addons21/ `
+
+You will need to restart Anki in order for Anki to reload the add-on source
+code.
+
+### Miscellaneous Recommendations
+
+I recommend setting the following environment variables to help make Anki add-on
+development a little smoother:
+
+`
+# See __init__.py for what this does.
+export SKIP_INIT=1 export ADDONS_DIR=/Users/andrewsanchez/Library/Application\
+Support/Anki2/addons21/ `
+
+Defining a `.envrc` with [`direnv`](https://direnv.net/) is great for this.
 
 ## Tests and static checks
 
