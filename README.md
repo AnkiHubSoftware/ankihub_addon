@@ -44,7 +44,15 @@ code.
 
 #### A better development experience
 
-https://github.com/watchexec/watchexec
+For a much better experience, follow the instructions below for automatically
+restarting Anki when add-on source files are modified, and to see both add-on
+and Anki source-code output in the console.
+
+1. Clone Anki: `git clone https://github.com/ankitects/anki`
+2. Follow the instructions [here](https://github.com/ankitects/anki/blob/main/docs/development.md) to build Anki from source.
+3. Install [watchexec](https://github.com/watchexec/watchexec)
+4. From the root of the anki repo you cloned in step one, run watchec. E.g.,
+   `watchexec -r -e py -w ~/Projects/anki_addons/ankihub_addon -- ./run`
 
 ```
 brew install watchex
