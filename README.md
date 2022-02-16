@@ -28,13 +28,3 @@ of pytest's docs for details.
 ### A note on importing objects for testing
 
 To-do
-
-
-## A note on the repo structure
-
-In order to accommodate some strange side effects of using `pytest-anki` along
-with the directory structure required by [Anki Add-on
-Builder](https://github.com/glutanimate/anki-addon-builder), we've opted to
-write test files alongside the modules. The main reason for this is so that IDEs
-like PyCharm can understand the namespace so that devs can leverage things like
-navigation functionality.
