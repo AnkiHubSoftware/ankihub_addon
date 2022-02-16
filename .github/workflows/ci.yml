@@ -54,7 +54,7 @@ jobs:
           pip install -r ./requirements/dev.txt
 
       - name: Run tests
-        run: pytest --forked --cov --cov-report=xml ankihub/tests
+        run: pytest --forked --cov --cov-report=xml
         env:
           SKIP_INIT: 1
 
