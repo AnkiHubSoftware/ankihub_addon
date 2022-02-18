@@ -1,7 +1,7 @@
 from aqt import mw
 from aqt.qt import QAction, QMenu, qconnect
 from aqt.studydeck import StudyDeck
-from PyQt5.QtWidgets import (
+from PyQt6.QtWidgets import (
     QHBoxLayout,
     QLabel,
     QLineEdit,
@@ -94,6 +94,7 @@ class AnkiHubLogin(QWidget):
                 "AnkiHub login failed.  Please make sure your username and "
                 "password are correct for AnkiHub."
             )
+        # TODO write the token to disk to persist credentials.
 
     @classmethod
     def display_login(cls):

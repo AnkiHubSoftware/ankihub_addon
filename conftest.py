@@ -5,7 +5,7 @@ import shutil
 import pytest
 from pytest_anki import AnkiSession
 
-ROOT = pathlib.Path(__file__).absolute().parent.parent
+ROOT = pathlib.Path(__file__).absolute().parent
 
 
 @pytest.fixture(scope="function")
@@ -17,8 +17,8 @@ def anki_session_with_addon(anki_session: AnkiSession):
 
 @pytest.fixture(scope="function")
 def anki_session_with_config(anki_session: AnkiSession):
-    config = ROOT / "config.json"
-    meta = ROOT / "meta.json"
+    config = ROOT / "ankihub" / "config.json"
+    meta = ROOT / "ankihub" / "meta.json"
     with open(config) as f:
         config_dict = json.load(f)
         config_dict["user"]["token"] = "token"
