@@ -35,8 +35,8 @@ documentation](https://addon-docs.ankiweb.net/addon-folders.html#add-on-folders)
 For example:
 
 ```
-ln -s /Users/andrewsanchez/anki/ankihub_addon/ankihub
-/Users/andrewsanchez/Library/Application\ Support/Anki2/addons21/
+ln -s /Users/username/anki/ankihub_addon/ankihub
+/Users/username/Library/Application\ Support/Anki2/addons21/
 ```
 
 You will need to restart Anki in order for Anki to reload the add-on source
@@ -50,13 +50,14 @@ and Anki source-code output in the console.
 
 1. Clone Anki: `git clone https://github.com/ankitects/anki`
 2. Follow the instructions [here](https://github.com/ankitects/anki/blob/main/docs/development.md) to build Anki from source.
-3. Install [watchexec](https://github.com/watchexec/watchexec)
-4. From the root of the anki repo you cloned in step one, run watchec. E.g.,
-   `watchexec -r -e py -w ~/Projects/anki_addons/ankihub_addon -- ./run`
+3. Install [watchexec](https://github.com/watchexec/watchexec), e.g.
 
-```
-brew install watchex
-```
+    ```
+    brew install watchex
+    ```
+
+4. From the root of the *anki* repo (not the add-on repo) you cloned in step one, run watchec. E.g.,
+   `watchexec -r -e py -w ~/Projects/anki_addons/ankihub_addon -- ./run`
 
 
 ### Miscellaneous Recommendations
@@ -65,9 +66,9 @@ I recommend setting the following environment variables to help make Anki add-on
 development a little smoother:
 
 ```
-# See __init__.py for what this does.
-export SKIP_INIT=1 export ADDONS_DIR=/Users/andrewsanchez/Library/Application\
-Support/Anki2/addons21/
+# See `./ankihub_addon/ankihub/__init__.py` for what this does.
+export SKIP_INIT=1
+export ADDONS_DIR=/Users/username/Library/Application\ Support/Anki2/addons21/
 ```
 
 Defining a `.envrc` with [`direnv`](https://direnv.net/) is great for this.
