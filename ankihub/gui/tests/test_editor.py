@@ -3,8 +3,7 @@ from pytest_anki import AnkiSession
 
 def test_editor(anki_session_with_addon: AnkiSession):
     from ankihub.constants import AnkiHubCommands
-    from ankihub.gui.editor import (
-        # on_ankihub_button_press,
+    from ankihub.gui.editor import (  # on_ankihub_button_press,
         on_bridge_command,
         on_select_command,
         setup,

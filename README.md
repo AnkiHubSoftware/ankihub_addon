@@ -67,7 +67,7 @@ development a little smoother:
 ```
 # See __init__.py for what this does.
 export SKIP_INIT=1 export ADDONS_DIR=/Users/andrewsanchez/Library/Application\
-Support/Anki2/addons21/ 
+Support/Anki2/addons21/
 ```
 
 Defining a `.envrc` with [`direnv`](https://direnv.net/) is great for this.

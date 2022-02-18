@@ -82,6 +82,9 @@ def upload_deck(did: int) -> None:
     out_dir = pathlib.Path(tempfile.mkdtemp())
     out_file = str(out_dir / f"export-{deck_uuid}.apkg")
     exporter.exportInto(out_file)
+    # TODO First we need to send a request to upload the apkg to s3
+    #  The ankihub request just needs to post the name of the apkg
+    #  ("export-{deck_uuid}.apkg")
     ankihub_client = AnkiHubClient()
     response = ankihub_client.post_apkg(
         "api/deck_upload/",

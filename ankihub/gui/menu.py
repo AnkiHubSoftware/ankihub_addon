@@ -94,6 +94,7 @@ class AnkiHubLogin(QWidget):
                 "AnkiHub login failed.  Please make sure your username and "
                 "password are correct for AnkiHub."
             )
+        # TODO write the token to disk to persist credentials.
 
     @classmethod
     def display_login(cls):
