@@ -14,6 +14,8 @@ def on_ankihub_button_press(editor: Editor):
     # The command is expected to have been set at this point already, either by
     # fetching the default or by selecting a command from the dropdown menu.
     command = editor.ankihub_command
+    # Get the current Note ID for passing into the request below.
+    _ = editor.note.id
     client = AnkiHubClient()
     if command == AnkiHubCommands.CHANGE.value:
         response = client.submit_change()
