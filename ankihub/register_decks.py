@@ -95,12 +95,12 @@ def upload_deck(did: int) -> None:
     return response
 
 
-def _create_shared_deck(note_types, did):
+def _create_collaborative_deck(note_types, did):
     modify_notes(note_types)
     upload_deck(did)
 
 
-def create_shared_deck(did: int) -> None:
+def create_collaborative_deck(did: int) -> None:
     model_ids = get_note_types_in_deck(did)
     note_types = [mw.col.models.get(model_id) for model_id in model_ids]
     names = ", ".join([note["name"] for note in note_types])
@@ -113,6 +113,6 @@ def create_shared_deck(did: int) -> None:
         tooltip("Cancelled Upload to AnkiHub")
         return
     mw.taskman.with_progress(
-        task=lambda: _create_shared_deck(note_types, did),
+        task=lambda: _create_collaborative_deck(note_types, did),
         on_done=lambda future: tooltip("Deck Uploaded to AnkiHub"),
     )

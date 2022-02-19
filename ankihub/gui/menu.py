@@ -12,7 +12,7 @@ from PyQt6.QtWidgets import (
 )
 
 from ankihub.ankihub_client import AnkiHubClient
-from ankihub.register_decks import create_shared_deck
+from ankihub.register_decks import create_collaborative_deck
 
 
 class AnkiHubLogin(QWidget):
@@ -103,7 +103,13 @@ class AnkiHubLogin(QWidget):
         return __window
 
 
-def create_shared_deck_action() -> None:
+def ankihub_login_setup(parent):
+    sign_in_button = QAction("Sign into AnkiHub", mw)
+    sign_in_button.triggered.connect(AnkiHubLogin.display_login)
+    parent.addAction(sign_in_button)
+
+
+def create_collaborative_deck_action() -> None:
     diag = StudyDeck(
         mw,
         title="AnkiHub",
@@ -115,20 +121,23 @@ def create_shared_deck_action() -> None:
     if not deck_name:
         return
     did = mw.col.decks.id(deck_name)
-    create_shared_deck(did)
+    create_collaborative_deck(did)
 
 
-def create_shared_deck_setup(parent):
-    q_action = QAction("Create shared deck", parent=parent)
-    qconnect(q_action.triggered, create_shared_deck_action)
+def create_collaborative_deck_setup(parent):
+    q_action = QAction("Create collaborative deck", parent=parent)
+    qconnect(q_action.triggered, create_collaborative_deck_action)
     parent.addAction(q_action)
+
+
+def main_menu_setup():
+    ankihub_menu = QMenu("&AnkiHub", parent=mw)
+    mw.form.menubar.addMenu(ankihub_menu)
+    return ankihub_menu
 
 
 def setup_ankihub_menu() -> None:
     """Add top-level AnkiHub menu."""
-    ankihub_menu = QMenu("&AnkiHub", parent=mw)
-    mw.form.menubar.addMenu(ankihub_menu)
-    create_shared_deck_setup(parent=ankihub_menu)
-    sign_in_button = QAction("Sign in", mw)
-    sign_in_button.triggered.connect(AnkiHubLogin.display_login)
-    ankihub_menu.addAction(sign_in_button)
+    ankihub_menu = main_menu_setup()
+    ankihub_login_setup(parent=ankihub_menu)
+    create_collaborative_deck_setup(parent=ankihub_menu)
