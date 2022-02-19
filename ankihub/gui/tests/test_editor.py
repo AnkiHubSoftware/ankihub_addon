@@ -4,14 +4,16 @@ from pytest_anki import AnkiSession
 
 
 def test_editor(anki_session_with_addon: AnkiSession, monkeypatch):
-    from ankihub.constants import AnkiHubCommands
     import ankihub.gui.editor as editor
+    from ankihub.constants import AnkiHubCommands
 
     anki_editor = editor.setup()
     assert anki_editor.ankihub_command == "Suggest a change"
     editor.on_select_command(anki_editor, AnkiHubCommands.NEW.value)
     assert anki_editor.ankihub_command == "Suggest a new note"
-    editor.on_bridge_command(anki_editor, f"ankihub:{AnkiHubCommands.CHANGE.value}", lambda: None)
+    editor.on_bridge_command(
+        anki_editor, f"ankihub:{AnkiHubCommands.CHANGE.value}", lambda: None
+    )
     assert anki_editor.ankihub_command == "Suggest a change"
     # Patch the editor so that it has the note attribute, which it will have when
     # the editor is actually instantiated during an Anki Desktop session.
