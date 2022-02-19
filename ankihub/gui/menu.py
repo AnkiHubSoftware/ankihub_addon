@@ -118,13 +118,17 @@ def create_shared_deck_action() -> None:
     create_shared_deck(did)
 
 
-def add_ankihub_menu() -> None:
+def create_shared_deck_setup(parent):
+    q_action = QAction("Create shared deck", parent=parent)
+    qconnect(q_action.triggered, create_shared_deck_action)
+    parent.addAction(q_action)
+
+
+def setup_ankihub_menu() -> None:
     """Add top-level AnkiHub menu."""
     ankihub_menu = QMenu("&AnkiHub", parent=mw)
     mw.form.menubar.addMenu(ankihub_menu)
-    _create_shared_deck_action = QAction("Upload Deck", parent=ankihub_menu)
-    qconnect(_create_shared_deck_action.triggered, create_shared_deck_action)
-    ankihub_menu.addAction(_create_shared_deck_action)
+    create_shared_deck_setup(parent=ankihub_menu)
     sign_in_button = QAction("Sign in", mw)
     sign_in_button.triggered.connect(AnkiHubLogin.display_login)
     ankihub_menu.addAction(sign_in_button)
