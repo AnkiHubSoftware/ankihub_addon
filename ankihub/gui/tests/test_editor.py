@@ -1,7 +1,9 @@
+from unittest.mock import MagicMock
+
 from pytest_anki import AnkiSession
 
 
-def test_editor(anki_session_with_addon: AnkiSession):
+def test_editor(anki_session_with_addon: AnkiSession, monkeypatch):
     from ankihub.constants import AnkiHubCommands
     import ankihub.gui.editor as editor
 
@@ -11,5 +13,10 @@ def test_editor(anki_session_with_addon: AnkiSession):
     assert anki_editor.ankihub_command == "Suggest a new note"
     editor.on_bridge_command(anki_editor, f"ankihub:{AnkiHubCommands.CHANGE.value}", lambda: None)
     assert anki_editor.ankihub_command == "Suggest a change"
+    # Patch the editor so that it has the note attribute, which it will have when
+    # the editor is actually instantiated during an Anki Desktop session.
+    mock = MagicMock()
+    anki_editor.note = mock
+    mock.id = 123
     response = editor.on_ankihub_button_press(anki_editor)
     # TODO assert response
