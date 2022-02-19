@@ -15,7 +15,7 @@ def on_ankihub_button_press(editor: Editor):
     # fetching the default or by selecting a command from the dropdown menu.
     command = editor.ankihub_command
     # Get the current Note ID for passing into the request below.
-    note_id = editor.note.id
+    _ = editor.note.id
     client = AnkiHubClient()
     if command == AnkiHubCommands.CHANGE.value:
         response = client.submit_change()

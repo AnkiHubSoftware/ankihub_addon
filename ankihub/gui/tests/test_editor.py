@@ -20,5 +20,5 @@ def test_editor(anki_session_with_addon: AnkiSession, monkeypatch):
     mock = MagicMock()
     anki_editor.note = mock
     mock.id = 123
-    response = editor.on_ankihub_button_press(anki_editor)
+    _ = editor.on_ankihub_button_press(anki_editor)
     # TODO assert response
