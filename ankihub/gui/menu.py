@@ -136,8 +136,24 @@ def main_menu_setup():
     return ankihub_menu
 
 
+def upload_suggestions_action():
+    """Action for uploading suggestions in bulk."""
+    # TODO Instantiate AnkiHubClient
+    # TODO Query the local collection for modified notes that differ from what's
+    #  on AnkiHub (we need to implement tracking of modified local notes)
+    # TODO Send a request to AnkiHub with the list of modified notes.
+
+
+def upload_suggestions_setup(parent):
+    """Set up the menu item for uploading suggestions in bulk."""
+    q_action = QAction("Upload suggestions to AnkiHub", parent=parent)
+    qconnect(q_action.triggered, upload_suggestions_action)
+    parent.addAction(q_action)
+
+
 def setup_ankihub_menu() -> None:
     """Add top-level AnkiHub menu."""
     ankihub_menu = main_menu_setup()
     ankihub_login_setup(parent=ankihub_menu)
     create_collaborative_deck_setup(parent=ankihub_menu)
+    upload_suggestions_setup(parent=ankihub_menu)
