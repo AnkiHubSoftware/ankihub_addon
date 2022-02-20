@@ -15,6 +15,12 @@ from ankihub.ankihub_client import AnkiHubClient
 from ankihub.register_decks import create_collaborative_deck
 
 
+def main_menu_setup():
+    ankihub_menu = QMenu("&AnkiHub", parent=mw)
+    mw.form.menubar.addMenu(ankihub_menu)
+    return ankihub_menu
+
+
 class AnkiHubLogin(QWidget):
     def __init__(self):
         super(AnkiHubLogin, self).__init__()
@@ -128,12 +134,6 @@ def create_collaborative_deck_setup(parent):
     q_action = QAction("Create collaborative deck", parent=parent)
     qconnect(q_action.triggered, create_collaborative_deck_action)
     parent.addAction(q_action)
-
-
-def main_menu_setup():
-    ankihub_menu = QMenu("&AnkiHub", parent=mw)
-    mw.form.menubar.addMenu(ankihub_menu)
-    return ankihub_menu
 
 
 def upload_suggestions_action():
