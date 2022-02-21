@@ -12,7 +12,7 @@ def test_editor(anki_session_with_addon: AnkiSession, monkeypatch):
     editor.on_select_command(anki_editor, AnkiHubCommands.NEW.value)
     assert anki_editor.ankihub_command == "Suggest a new note"
     editor.ankihub_message_handler(
-        tuple(),
+        (False, None),
         f"ankihub:{AnkiHubCommands.CHANGE.value}",
         anki_editor,
     )
