@@ -18,7 +18,7 @@ runs:
     - name: Install xvfb / qt dependencies
       shell: bash
       run: |
-        sudo apt-get update && sudo apt-get install libqt5gui5
+        sudo apt-get install libqt5gui5
 
     - name: Set up chromedriver
       shell: bash
