@@ -12,7 +12,9 @@ def test_editor(anki_session_with_addon: AnkiSession, monkeypatch):
     editor.on_select_command(anki_editor, AnkiHubCommands.NEW.value)
     assert anki_editor.ankihub_command == "Suggest a new note"
     editor.ankihub_message_handler(
-        anki_editor, f"ankihub:{AnkiHubCommands.CHANGE.value}", lambda: None
+        tuple(),
+        f"ankihub:{AnkiHubCommands.CHANGE.value}",
+        anki_editor,
     )
     assert anki_editor.ankihub_command == "Suggest a change"
     # Patch the editor so that it has the note attribute, which it will have when
