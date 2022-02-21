@@ -138,9 +138,9 @@ def create_collaborative_deck_setup(parent):
 
 def upload_suggestions_action():
     """Action for uploading suggestions in bulk."""
-    # TODO Instantiate AnkiHubClient
-    # TODO Query the local collection for modified notes that differ from what's
-    #  on AnkiHub (we need to implement tracking of modified local notes)
+    # TODO Instantiate AnkiHubClient.
+    # TODO Query the the note table for mod times that are later than the time
+    #  the last sync.
     # TODO Send a request to AnkiHub with the list of modified notes.
 
 
