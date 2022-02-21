@@ -1,4 +1,4 @@
-from anki.hooks import addHook, wrap
+from anki.hooks import addHook
 from aqt import gui_hooks
 from aqt.editor import Editor
 
