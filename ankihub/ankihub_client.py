@@ -1,7 +1,6 @@
 import json
 
 import requests
-
 from ankihub.config import Config
 
 
@@ -50,7 +49,7 @@ class AnkiHubClient:
         return requests.get(self.base_url + url, headers=self.headers)
 
     def submit_change(self):
-        print("Submit change")
+        print("Submitting change")
 
     def submit_new_note(self):
-        print("Submit change")
+        print("Submitting new note")

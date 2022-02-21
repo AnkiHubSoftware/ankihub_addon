@@ -49,12 +49,12 @@ def test_modify_note_type(anki_session: AnkiSession) -> None:
 
 
 def test_prepare_to_upload_deck(anki_session: AnkiSession, monkeypatch):
-    from ankihub.register_decks import create_shared_deck
+    from ankihub.register_decks import create_collaborative_deck
 
     monkeypatch.setattr("ankihub.register_decks.askUser", Mock(return_value=True))
     with anki_session.profile_loaded():
         with anki_session.deck_installed(anking_deck) as deck_id:
-            create_shared_deck(deck_id)
+            create_collaborative_deck(deck_id)
 
 
 def test_populate_id_fields(anki_session: AnkiSession):

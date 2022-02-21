@@ -1,7 +1,9 @@
+from ankihub.ankihub_client import AnkiHubClient
+from ankihub.register_decks import create_collaborative_deck
 from aqt import mw
 from aqt.qt import QAction, QMenu, qconnect
 from aqt.studydeck import StudyDeck
-from PyQt6.QtWidgets import (
+from PyQt5.QtWidgets import (
     QHBoxLayout,
     QLabel,
     QLineEdit,
@@ -11,8 +13,11 @@ from PyQt6.QtWidgets import (
     QWidget,
 )
 
-from ankihub.ankihub_client import AnkiHubClient
-from ankihub.register_decks import create_shared_deck
+
+def main_menu_setup():
+    ankihub_menu = QMenu("&AnkiHub", parent=mw)
+    mw.form.menubar.addMenu(ankihub_menu)
+    return ankihub_menu
 
 
 class AnkiHubLogin(QWidget):
@@ -103,7 +108,13 @@ class AnkiHubLogin(QWidget):
         return __window
 
 
-def create_shared_deck_action() -> None:
+def ankihub_login_setup(parent):
+    sign_in_button = QAction("Sign into AnkiHub", mw)
+    sign_in_button.triggered.connect(AnkiHubLogin.display_login)
+    parent.addAction(sign_in_button)
+
+
+def create_collaborative_deck_action() -> None:
     diag = StudyDeck(
         mw,
         title="AnkiHub",
@@ -115,16 +126,33 @@ def create_shared_deck_action() -> None:
     if not deck_name:
         return
     did = mw.col.decks.id(deck_name)
-    create_shared_deck(did)
+    create_collaborative_deck(did)
 
 
-def add_ankihub_menu() -> None:
+def create_collaborative_deck_setup(parent):
+    q_action = QAction("Create collaborative deck", parent=parent)
+    qconnect(q_action.triggered, create_collaborative_deck_action)
+    parent.addAction(q_action)
+
+
+def upload_suggestions_action():
+    """Action for uploading suggestions in bulk."""
+    # TODO Instantiate AnkiHubClient.
+    # TODO Query the the note table for mod times that are later than the time
+    #  the last sync.
+    # TODO Send a request to AnkiHub with the list of modified notes.
+
+
+def upload_suggestions_setup(parent):
+    """Set up the menu item for uploading suggestions in bulk."""
+    q_action = QAction("Upload suggestions to AnkiHub", parent=parent)
+    qconnect(q_action.triggered, upload_suggestions_action)
+    parent.addAction(q_action)
+
+
+def setup_ankihub_menu() -> None:
     """Add top-level AnkiHub menu."""
-    ankihub_menu = QMenu("&AnkiHub", parent=mw)
-    mw.form.menubar.addMenu(ankihub_menu)
-    _create_shared_deck_action = QAction("Upload Deck", parent=ankihub_menu)
-    qconnect(_create_shared_deck_action.triggered, create_shared_deck_action)
-    ankihub_menu.addAction(_create_shared_deck_action)
-    sign_in_button = QAction("Sign in", mw)
-    sign_in_button.triggered.connect(AnkiHubLogin.display_login)
-    ankihub_menu.addAction(sign_in_button)
+    ankihub_menu = main_menu_setup()
+    ankihub_login_setup(parent=ankihub_menu)
+    create_collaborative_deck_setup(parent=ankihub_menu)
+    upload_suggestions_setup(parent=ankihub_menu)

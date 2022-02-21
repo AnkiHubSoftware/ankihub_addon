@@ -1,4 +1,5 @@
-from anki.hooks import addHook, wrap
+from anki.hooks import addHook
+from aqt import gui_hooks
 from aqt.editor import Editor
 
 from ..ankihub_client import AnkiHubClient
@@ -15,6 +16,7 @@ def on_ankihub_button_press(editor: Editor):
     # fetching the default or by selecting a command from the dropdown menu.
     command = editor.ankihub_command
     # Get the current Note ID for passing into the request below.
+    # TODO This should actually get the ankihub id from the notes first field.
     _ = editor.note.id
     client = AnkiHubClient()
     if command == AnkiHubCommands.CHANGE.value:
@@ -54,11 +56,16 @@ def setup_editor_buttons(buttons, editor: Editor):
     return buttons
 
 
-def on_bridge_command(editor: Editor, cmd, _old):
+def ankihub_message_handler(handled: tuple, cmd, editor: Editor):
+    """Call on_select_command when a message prefixed with 'ankihub' is received
+    from the front end.
+    """
     if not cmd.startswith("ankihub"):
-        return _old(editor, cmd)
+        return handled
     _, command_value = cmd.split(":")
     on_select_command(editor, command_value)
+    handled = (True, None)
+    return handled
 
 
 def on_select_command(editor, cmd):
@@ -71,7 +78,7 @@ def on_select_command(editor, cmd):
 
 def setup():
     addHook("setupEditorButtons", setup_editor_buttons)
-    Editor.onBridgeCmd = wrap(Editor.onBridgeCmd, on_bridge_command, "around")
+    gui_hooks.webview_did_receive_js_message.append(ankihub_message_handler)
     Editor.ankihub_command = AnkiHubCommands.CHANGE.value
     return Editor
     # We can wrap Editor.__init__ if more complicated logic is needed, such as
