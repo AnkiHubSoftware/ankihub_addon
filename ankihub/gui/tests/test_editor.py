@@ -11,7 +11,7 @@ def test_editor(anki_session_with_addon: AnkiSession, monkeypatch):
     assert anki_editor.ankihub_command == "Suggest a change"
     editor.on_select_command(anki_editor, AnkiHubCommands.NEW.value)
     assert anki_editor.ankihub_command == "Suggest a new note"
-    editor.on_bridge_command(
+    editor.ankihub_message_handler(
         anki_editor, f"ankihub:{AnkiHubCommands.CHANGE.value}", lambda: None
     )
     assert anki_editor.ankihub_command == "Suggest a change"
