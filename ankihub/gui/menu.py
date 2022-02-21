@@ -1,3 +1,5 @@
+from ankihub.ankihub_client import AnkiHubClient
+from ankihub.register_decks import create_collaborative_deck
 from aqt import mw
 from aqt.qt import QAction, QMenu, qconnect
 from aqt.studydeck import StudyDeck
@@ -10,9 +12,6 @@ from PyQt5.QtWidgets import (
     QVBoxLayout,
     QWidget,
 )
-
-from ankihub.ankihub_client import AnkiHubClient
-from ankihub.register_decks import create_collaborative_deck
 
 
 def main_menu_setup():

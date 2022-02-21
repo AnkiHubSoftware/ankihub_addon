@@ -59,7 +59,7 @@ def setup_editor_buttons(buttons, editor: Editor):
 def ankihub_message_handler(handled: tuple, cmd, editor: Editor):
     """Call on_select_command when a message prefixed with 'ankihub' is received
     from the front end.
-     """
+    """
     if not cmd.startswith("ankihub"):
         return handled
     _, command_value = cmd.split(":")
