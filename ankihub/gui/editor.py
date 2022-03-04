@@ -18,7 +18,8 @@ def on_ankihub_button_press(editor: Editor):
     # Get the current Note ID for passing into the request below.
     # TODO This should actually get the ankihub id from the notes first field.
     _ = editor.note.id
-    client = AnkiHubClient()
+    config = Config()
+    client = AnkiHubClient(config=config)
     if command == AnkiHubCommands.CHANGE.value:
         response = client.submit_change()
     elif command == AnkiHubCommands.NEW.value:
