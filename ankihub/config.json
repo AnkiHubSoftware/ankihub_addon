@@ -1,7 +1,4 @@
 {
-    "user":
-    {
-        "token": ""
-    },
+    "baseUrl": "",
     "hotkey": "Alt+u"
 }

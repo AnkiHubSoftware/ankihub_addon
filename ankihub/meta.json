@@ -1,1 +1,1 @@
-{"config": {"user": {"token": ""}}}
+{"config": {"baseUrl": "http://localhost:8000/api", "hotkey": "Alt+u", "token": "a6bd38c1c45d7f37f6e21c2edbc705fede5e9950"}}
