@@ -6,13 +6,13 @@ from ankihub.config import Config
 class AnkiHubClient:
     """Client for interacting with the AnkiHub API."""
 
-    def __init__(self, config: Config):
+    def __init__(self, config: Config = None):
         self._headers = {"Content-Type": "application/json"}
-        self._config = config
+        self._config = config if config else Config()
         self._base_url = self._config.get_base_url()
         if self._config.get_token():
             token = self._config.get_token()
-            self._headers["Authorization"] = f"Token {token}"
+            self._headers["Authorization"] = f'Token {token}'
 
     def _is_authenticated(self) -> bool:
         return "Authorization" in self._headers and self._headers != ""
