@@ -8,7 +8,7 @@ class AnkiHubClient:
 
     def __init__(self, config: Config = None):
         self._headers = {"Content-Type": "application/json"}
-        self._config = Config() if config else config
+        self._config = config if config else Config()
         self._base_url = self._config.get_base_url()
         if self._config.get_token():
             token = self._config.get_token()
