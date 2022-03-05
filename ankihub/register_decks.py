@@ -12,7 +12,6 @@ from aqt import mw
 from aqt.utils import askUser, tooltip
 
 from . import constants
-from .ankihub_client import AnkiHubClient
 from .utils import get_note_types_in_deck
 
 DIR_PATH = os.path.dirname(os.path.abspath(__file__))
@@ -73,7 +72,7 @@ def modify_notes(note_types):
 
 def upload_deck(did: int) -> None:
     """Upload the deck to AnkiHub."""
-    deck_name = mw.col.decks.name(did)
+    # deck_name = mw.col.decks.name(did)
     exporter = AnkiPackageExporter(mw.col)
     exporter.did = did
     exporter.includeMedia = False
@@ -85,7 +84,7 @@ def upload_deck(did: int) -> None:
     # TODO First we need to send a request to upload the apkg to s3
     #  The ankihub request just needs to post the name of the apkg
     #  ("export-{deck_uuid}.apkg")
-    
+
     # TODO Need to be refactored
     # ankihub_client = AnkiHubClient()
     # response = ankihub_client.post_apkg(

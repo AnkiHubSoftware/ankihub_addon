@@ -6,16 +6,13 @@ from ankihub.config import Config
 class AnkiHubClient:
     """Client for interacting with the AnkiHub API."""
 
-    def __init__(self):
+    def __init__(self, config: Config = None):
         self._headers = {"Content-Type": "application/json"}
-        # if config:
-        #     self.config = config
-        # else:
-        self.config = Config()
-        self._base_url = self.config.get_base_url()
-        if self.config.get_token():
-            token = self.config.get_token()
-            self._headers["Authorization"] = f'Token {token}'
+        self._config = Config() if config else config
+        self._base_url = self._config.get_base_url()
+        if self._config.get_token():
+            token = self._config.get_token()
+            self._headers["Authorization"] = f"Token {token}"
 
     def _is_authenticated(self) -> bool:
         return "Authorization" in self._headers and self._headers != ""
@@ -40,12 +37,12 @@ class AnkiHubClient:
     def login(self, credentials: dict):
         response = self._call_api("POST", "/login/", credentials)
         token = response.json()["token"]
-        if self.config:
-            self.config.save_token(token)
+        if self._config:
+            self._config.save_token(token)
         self._headers["Authorization"] = f"Token {token}"
 
     def signout(self):
-        self.config.save_token("")
+        self._config.save_token("")
         self._headers["Authorization"] = ""
 
     def upload_deck(self, key: str):
@@ -56,9 +53,9 @@ class AnkiHubClient:
         response = self._call_api_authenticated(
             "GET",
             f"/decks/{deck_id}/updates",
-            params={"since": f"{self.config.get_last_sync()}"},
+            params={"since": f"{self._config.get_last_sync()}"},
         )
-        self.config.save_last_sync()
+        self._config.save_last_sync()
         return response.json()
 
     def get_note_by_anki_id(self, anki_id: str) -> dict:
