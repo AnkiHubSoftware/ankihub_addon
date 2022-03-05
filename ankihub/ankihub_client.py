@@ -6,12 +6,12 @@ from ankihub.config import Config
 class AnkiHubClient:
     """Client for interacting with the AnkiHub API."""
 
-    def __init__(self, config: Config = None):
+    def __init__(self):
         self._headers = {"Content-Type": "application/json"}
-        if config:
-            self._config = config
-        else:
-            self._config = Config()
+        # if config:
+        #     self._config = config
+        # else:
+        self._config = Config()
         self._base_url = self._config.get_base_url()
         if self._config.get_token():
             token = self._config.get_token()
