@@ -86,11 +86,7 @@ def upload_deck(did: int) -> None:
     #  The ankihub request just needs to post the name of the apkg
     #  ("export-{deck_uuid}.apkg")
     ankihub_client = AnkiHubClient()
-    response = ankihub_client.post_apkg(
-        "api/deck_upload/",
-        {"filename": deck_name},
-        out_file,
-    )
+    response = ankihub_client.upload_deck(f"{deck_name}.apkg")
     tooltip("Deck Uploaded to AnkiHub")
     return response
 

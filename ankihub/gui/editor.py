@@ -17,19 +17,26 @@ def on_ankihub_button_press(editor: Editor):
     command = editor.ankihub_command
     # Get the current Note ID for passing into the request below.
     # TODO This should actually get the ankihub id from the notes first field.
-    _ = editor.note.id
+    note_id = editor.note.id
+    # TODO parse this value to json
+    suggestion = editor.note.data
     client = AnkiHubClient()
+    # TODO: Constants should change
     if command == AnkiHubCommands.CHANGE.value:
-        response = client.submit_change()
+        response = client.create_note_suggestion(
+            note_id=note_id, note_suggestion=suggestion
+        )
     elif command == AnkiHubCommands.NEW.value:
-        response = client.submit_new_note()
+        response = client.create_note_suggestion(
+            note_id=note_id, note_suggestion=suggestion
+        )
     return response
 
 
 def setup_editor_buttons(buttons, editor: Editor):
     """Add buttons to Editor."""
     # TODO Figure out how to test this
-    config = Config().config
+    config = Config()._config
     HOTKEY = config["hotkey"]
     img = str(ICONS_PATH / "ankihub_button.png")
     button = editor.addButton(

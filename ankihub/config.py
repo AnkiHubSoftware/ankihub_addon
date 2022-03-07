@@ -1,20 +1,37 @@
+import json
+import os
+from datetime import datetime, timezone
+
 from aqt import mw
 
 
 class Config:
     def __init__(self):
-        self.config = mw.addonManager.getConfig("ankihub")
-        self.user = self.config.get("user")
-        self.token = self.user.get("token")
+        self._config = mw.addonManager.getConfig("ankihub")
+        user_files_path = os.path.join(
+            mw.addonManager.addonsFolder("ankihub"), "user_files"
+        )
+        self._user_config_file_path = os.path.join(user_files_path, "userConfig.json")
+        with open(self._user_config_file_path) as user_config_file:
+            self.user_config = json.load(user_config_file)
 
-    def is_authenticated(self) -> bool:
-        return True if self.token else False
+    def _update_user_config(self, config_data: dict):
+        with open(self._user_config_file_path, "w") as user_config_file:
+            user_config_file.write(json.dumps(config_data))
 
-    def signout(self):
-        default = mw.addonManager.addonConfigDefaults(__name__)
-        mw.addonManager.writeConfig(__name__, default)
-
-    def write_token(self, token: str) -> None:
-        # TODO needs test
+    def save_token(self, token: str):
         self.token = token
-        mw.addonManager.writeConfig(__name__, self.config)
+        self.user_config["token"] = token
+        self._update_user_config(self.user_config)
+
+    def get_token(self) -> str:
+        return self.user_config["token"]
+
+    def save_last_sync(self):
+        date_object = datetime.now(tz=timezone.utc)
+        date_time_str = datetime.strftime(date_object, "%Y-%m-%dT%H:%M:%S.%f%z")
+        self.user_config["lastSync"] = date_time_str
+        self._update_user_config(self.user_config)
+
+    def get_last_sync(self) -> str:
+        return self.user_config["lastSync"]

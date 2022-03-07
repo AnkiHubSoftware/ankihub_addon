@@ -1,6 +1,6 @@
 import copy
 import pathlib
-from unittest.mock import Mock
+from unittest.mock import Mock, patch
 
 from pytest_anki import AnkiSession
 
@@ -71,8 +71,9 @@ def test_populate_id_fields(anki_session: AnkiSession):
 def test_upload_deck(anki_session_with_config: AnkiSession, monkeypatch):
     from ankihub.register_decks import upload_deck
 
-    anki_session = anki_session_with_config
-    monkeypatch.setattr("ankihub.ankihub_client.requests", Mock())
-    with anki_session.profile_loaded():
-        with anki_session.deck_installed(anking_deck) as deck_id:
-            upload_deck(deck_id)
+    with patch("ankihub.ankihub_client.Config"):
+        anki_session = anki_session_with_config
+        monkeypatch.setattr("ankihub.ankihub_client.requests", Mock())
+        with anki_session.profile_loaded():
+            with anki_session.deck_installed(anking_deck) as deck_id:
+                upload_deck(deck_id)

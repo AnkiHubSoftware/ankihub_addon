@@ -21,7 +21,6 @@ def anki_session_with_config(anki_session: AnkiSession):
     meta = ROOT / "ankihub" / "meta.json"
     with open(config) as f:
         config_dict = json.load(f)
-        config_dict["user"]["token"] = "token"
     with open(meta) as f:
         meta_dict = json.load(f)
     anki_session.create_addon_config(

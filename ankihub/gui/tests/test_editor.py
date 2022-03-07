@@ -2,8 +2,10 @@ from unittest.mock import MagicMock
 
 from pytest_anki import AnkiSession
 
+from ankihub.constants import API_URL_BASE
 
-def test_editor(anki_session_with_addon: AnkiSession, monkeypatch):
+
+def test_editor(anki_session_with_addon: AnkiSession, monkeypatch, requests_mock):
     import ankihub.gui.editor as editor
     from ankihub.constants import AnkiHubCommands
 
@@ -22,5 +24,11 @@ def test_editor(anki_session_with_addon: AnkiSession, monkeypatch):
     mock = MagicMock()
     anki_editor.note = mock
     mock.id = 123
-    _ = editor.on_ankihub_button_press(anki_editor)
-    # TODO assert response
+    mock.data = {
+        "tags": ["test"],
+        "fields": [{"name": "abc", "order": 0, "value": "abc changed"}],
+    }
+
+    requests_mock.post(f"{API_URL_BASE}/notes/{mock.id}/suggestion/", status_code=201)
+    response = editor.on_ankihub_button_press(anki_editor)
+    assert response.status_code == 201

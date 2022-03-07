@@ -1,5 +1,3 @@
-from ankihub.ankihub_client import AnkiHubClient
-from ankihub.register_decks import create_collaborative_deck
 from aqt import mw
 from aqt.qt import QAction, QMenu, qconnect
 from aqt.studydeck import StudyDeck
@@ -12,6 +10,10 @@ from PyQt5.QtWidgets import (
     QVBoxLayout,
     QWidget,
 )
+from requests.exceptions import HTTPError
+
+from ankihub.ankihub_client import AnkiHubClient
+from ankihub.register_decks import create_collaborative_deck
 
 
 def main_menu_setup():
@@ -89,17 +91,16 @@ class AnkiHubLogin(QWidget):
             )
 
         ankihub_client = AnkiHubClient()
-        token = ankihub_client.authenticate_user(
-            url="auth-token/", data={"username": username, "password": password}
-        )
-        if token:
+        try:
+            ankihub_client.login(
+                credentials={"username": username, "password": password}
+            )
             self.label_results.setText("You are now logged into AnkiHub.")
-        else:
+        except HTTPError:
             self.label_results.setText(
                 "AnkiHub login failed.  Please make sure your username and "
                 "password are correct for AnkiHub."
             )
-        # TODO write the token to disk to persist credentials.
 
     @classmethod
     def display_login(cls):
