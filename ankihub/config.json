@@ -3,5 +3,7 @@
     {
         "token": ""
     },
-    "hotkey": "Alt+u"
+    "hotkey": "Alt+u",
+    "baseUrl": "http://localhost:8000/api",
+    "token": ""
 }
