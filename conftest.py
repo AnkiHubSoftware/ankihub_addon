@@ -7,6 +7,7 @@ from pytest_anki import AnkiSession
 
 ROOT = pathlib.Path(__file__).absolute().parent
 
+##commented just for test purposes
 
 @pytest.fixture(scope="function")
 def anki_session_with_addon(anki_session: AnkiSession):
