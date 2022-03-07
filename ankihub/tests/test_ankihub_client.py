@@ -1,12 +1,12 @@
 from datetime import datetime, timezone, timedelta
 from unittest.mock import patch
 
-from ankihub.ankihub_client import AnkiHubClient
 
 FAKE_BASE_URL = "http://fakeurl.com/api"
 
 @patch("ankihub.config.Config")
 def test_login(mocked_config, requests_mock):
+    from ankihub.ankihub_client import AnkiHubClient
     credentials_data = {'username': 'test', 'password': 'testpassword'}
     mocked_config.get_base_url.return_value = FAKE_BASE_URL
     
@@ -19,6 +19,7 @@ def test_login(mocked_config, requests_mock):
 
 @patch("ankihub.config.Config")
 def test_signout(mocked_config):
+    from ankihub.ankihub_client import AnkiHubClient
     client = AnkiHubClient(mocked_config)
     client.signout()
     mocked_config.save_token.assert_called_with("")
@@ -26,6 +27,7 @@ def test_signout(mocked_config):
     
 @patch("ankihub.config.Config")
 def test_upload_deck(mocked_config, requests_mock):
+    from ankihub.ankihub_client import AnkiHubClient
     mocked_config.get_base_url.return_value = FAKE_BASE_URL
     requests_mock.post(f"{FAKE_BASE_URL}/decks/", status_code=201)
     client = AnkiHubClient(mocked_config)
@@ -34,6 +36,7 @@ def test_upload_deck(mocked_config, requests_mock):
 
 @patch("ankihub.config.Config")
 def test_get_deck_updates(mocked_config, requests_mock):
+    from ankihub.ankihub_client import AnkiHubClient
     deck_id = 1
     date_object = datetime.now(tz=timezone.utc) - timedelta(days=30)
     date_time_str = datetime.strftime(date_object, "%Y-%m-%dT%H:%M:%S.%f%z")
@@ -69,6 +72,7 @@ def test_get_deck_updates(mocked_config, requests_mock):
     
 @patch("ankihub.config.Config")
 def test_get_note_by_anki_id(mocked_config, requests_mock):
+    from ankihub.ankihub_client import AnkiHubClient
     note_anki_id = 1
     expected_data = {
         "deck_id": 1,
@@ -93,6 +97,7 @@ def test_get_note_by_anki_id(mocked_config, requests_mock):
     
 @patch("ankihub.config.Config")
 def test_create_note_suggestion(mocked_config, requests_mock):
+    from ankihub.ankihub_client import AnkiHubClient
     mocked_config.get_base_url.return_value = FAKE_BASE_URL
     note_id = 1
     expected_data = {
