@@ -96,6 +96,43 @@ def test_get_deck_updates_unauthenticated(mocked_config, requests_mock):
         client.get_deck_updates(deck_id=deck_id)
 
 
+def test_get_deck_by_id(requests_mock):
+    from ankihub.ankihub_client import AnkiHubClient
+
+    with patch("ankihub.ankihub_client.Config"):
+        deck_id = 1
+        date_time_str = datetime.now(tz=timezone.utc).strftime("%Y-%m-%dT%H:%M:%S.%f%z")
+
+        expected_data = {
+            "id": deck_id,
+            "name": "test",
+            "owner": 1,
+            "anki_id": 1,
+            "csv_last_upload": date_time_str,
+            "csv_notes_url": "http://fake-csv-url.com/test.csv",
+        }
+
+        requests_mock.get(f"{API_URL_BASE}/decks/{deck_id}/", json=expected_data)
+        client = AnkiHubClient()
+        response = client.get_deck_by_id(deck_id=deck_id)
+    assert response == expected_data
+
+
+@patch("ankihub.ankihub_client.Config")
+def test_get_deck_by_id_unauthenticated(mocked_config, requests_mock):
+    from ankihub.ankihub_client import AnkiHubClient
+
+    deck_id = 1
+
+    mocked_config.get_token.return_value = ""
+
+    requests_mock.get(f"{API_URL_BASE}/decks/{deck_id}/", status_code=403)
+
+    with pytest.raises(HTTPError):
+        client = AnkiHubClient()
+        client.get_deck_by_id(deck_id=deck_id)
+
+
 def test_get_note_by_anki_id(requests_mock):
     from ankihub.ankihub_client import AnkiHubClient
 

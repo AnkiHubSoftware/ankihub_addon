@@ -49,6 +49,13 @@ class AnkiHubClient:
         self._config.save_last_sync()
         return response.json()
 
+    def get_deck_by_id(self, deck_id: str) -> dict:
+        response = self._call_api(
+            "GET",
+            f"/decks/{deck_id}/",
+        )
+        return response.json()
+
     def get_note_by_anki_id(self, anki_id: str) -> dict:
         return self._call_api("GET", f"/notes/{anki_id}").json()
 
