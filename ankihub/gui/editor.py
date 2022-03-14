@@ -21,7 +21,7 @@ def on_ankihub_button_press(editor: Editor):
     # TODO parse this value to json
     suggestion = editor.note.data
     client = AnkiHubClient()
-    deck_id = 1 # TODO: Should get a way to get the deck id from the editor
+    deck_id = 1  # TODO: Should get a way to get the deck id from the editor
     if command == AnkiHubCommands.CHANGE.value:
         response = client.create_change_note_suggestion(
             note_id=note_id, change_note_suggestion=suggestion
