@@ -164,7 +164,7 @@ def test_get_note_by_anki_id_unauthenticated(mocked_config, requests_mock):
         client.get_note_by_anki_id(anki_id=note_anki_id)
 
 
-def test_create_note_suggestion(requests_mock):
+def test_create_change_note_suggestion(requests_mock):
     from ankihub.ankihub_client import AnkiHubClient
 
     with patch("ankihub.ankihub_client.Config"):
@@ -173,7 +173,7 @@ def test_create_note_suggestion(requests_mock):
             f"{API_URL_BASE}/notes/{note_id}/suggestion/", status_code=201
         )
         client = AnkiHubClient()
-        response = client.create_note_suggestion(
+        response = client.create_change_note_suggestion(
             {
                 "tags": ["test"],
                 "fields": [{"name": "abc", "order": 0, "value": "abc changed"}],
@@ -184,7 +184,7 @@ def test_create_note_suggestion(requests_mock):
 
 
 @patch("ankihub.ankihub_client.Config")
-def test_create_note_suggestion_unauthenticated(mocked_config, requests_mock):
+def test_create_change_note_suggestion_unauthenticated(mocked_config, requests_mock):
     from ankihub.ankihub_client import AnkiHubClient
 
     note_id = 1
@@ -193,10 +193,50 @@ def test_create_note_suggestion_unauthenticated(mocked_config, requests_mock):
     requests_mock.post(f"{API_URL_BASE}/notes/{note_id}/suggestion/", status_code=403)
     with pytest.raises(HTTPError):
         client = AnkiHubClient()
-        client.create_note_suggestion(
+        client.create_change_note_suggestion(
             {
                 "tags": ["test"],
                 "fields": [{"name": "abc", "order": 0, "value": "abc changed"}],
             },
             note_id=note_id,
+        )
+
+
+def test_create_new_note_suggestion(requests_mock):
+    from ankihub.ankihub_client import AnkiHubClient
+
+    with patch("ankihub.ankihub_client.Config"):
+        deck_id = 1
+        requests_mock.post(
+            f"{API_URL_BASE}/decks/{deck_id}/note-suggestion/", status_code=201
+        )
+        client = AnkiHubClient()
+        response = client.create_new_note_suggestion(
+            {
+                "tags": ["test"],
+                "fields": [{"name": "abc", "order": 0, "value": "abc changed"}],
+            },
+            deck_id=deck_id,
+        )
+    assert response.status_code == 201
+
+
+@patch("ankihub.ankihub_client.Config")
+def test_create_new_note_suggestion_unauthenticated(mocked_config, requests_mock):
+    from ankihub.ankihub_client import AnkiHubClient
+
+    deck_id = 1
+    mocked_config.get_token.return_value = ""
+
+    requests_mock.post(
+        f"{API_URL_BASE}/decks/{deck_id}/note-suggestion/", status_code=403
+    )
+    with pytest.raises(HTTPError):
+        client = AnkiHubClient()
+        client.create_new_note_suggestion(
+            {
+                "tags": ["test"],
+                "fields": [{"name": "abc", "order": 0, "value": "abc changed"}],
+            },
+            deck_id=deck_id,
         )
