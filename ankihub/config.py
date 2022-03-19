@@ -16,8 +16,13 @@ class Config:
             mw.addonManager.addonsFolder("ankihub"), "user_files"
         )
         self._private_config_file_path = os.path.join(user_files_path, "private_config.json")
-        with open(self._private_config_file_path) as f:
-            self.private_config = json.load(f)
+        if not os.path.exists(self._private_config_file_path):
+            self.private_config = {}
+            with open(self._private_config_file_path, "w") as f:
+                f.write(json.dumps(self.private_config))
+        else:
+            with open(self._private_config_file_path) as f:
+                self.private_config = json.load(f)
 
     def _update_private_config(self, config_data: dict):
         with open(self._private_config_file_path, "w") as f:
@@ -28,7 +33,7 @@ class Config:
         self._update_private_config(self.private_config)
 
     def get_token(self) -> str:
-        return self.private_config["token"]
+        return self.private_config.get("token")
 
     def save_last_sync(self):
         date_object = datetime.now(tz=timezone.utc)
