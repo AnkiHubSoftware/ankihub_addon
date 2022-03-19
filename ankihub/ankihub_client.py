@@ -1,4 +1,5 @@
 import requests
+from requests import Response
 
 from ankihub.config import Config
 from ankihub.constants import API_URL_BASE
@@ -61,14 +62,14 @@ class AnkiHubClient:
 
     def create_change_note_suggestion(
         self, change_note_suggestion: dict, note_id: int
-    ) -> dict:
+    ) -> Response:
         return self._call_api(
             "POST", f"/notes/{note_id}/suggestion/", change_note_suggestion
         )
 
     def create_new_note_suggestion(
         self, new_note_suggestion: dict, deck_id: int
-    ) -> dict:
+    ) -> Response:
         return self._call_api(
             "POST", f"/decks/{deck_id}/note-suggestion/", new_note_suggestion
         )
