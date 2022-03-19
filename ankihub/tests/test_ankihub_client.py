@@ -2,6 +2,7 @@ from datetime import datetime, timedelta, timezone
 from unittest.mock import patch
 
 import pytest
+from pytest_anki import AnkiSession
 from requests.exceptions import HTTPError
 
 from ankihub.constants import API_URL_BASE
