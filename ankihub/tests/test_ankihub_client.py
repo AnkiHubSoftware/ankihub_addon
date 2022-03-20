@@ -68,7 +68,6 @@ def test_get_deck_updates(anki_session_with_addon: AnkiSession, requests_mock):
         ],
     }
 
-    mocked_config.get_last_sync.return_value = date_time_str
     requests_mock.get(f"{API_URL_BASE}/decks/{deck_id}/updates", json=expected_data)
 
     client = AnkiHubClient()
@@ -76,15 +75,12 @@ def test_get_deck_updates(anki_session_with_addon: AnkiSession, requests_mock):
     assert response == expected_data
 
 
-def test_get_deck_updates_unauthenticated(mocked_config, requests_mock):
+def test_get_deck_updates_unauthenticated(requests_mock):
     from ankihub.ankihub_client import AnkiHubClient
 
     deck_id = 1
     date_object = datetime.now(tz=timezone.utc) - timedelta(days=30)
     date_time_str = datetime.strftime(date_object, "%Y-%m-%dT%H:%M:%S.%f%z")
-
-    mocked_config.get_token.return_value = ""
-    mocked_config.get_last_sync.return_value = date_time_str
 
     requests_mock.get(f"{API_URL_BASE}/decks/{deck_id}/updates", status_code=403)
 
@@ -114,12 +110,10 @@ def test_get_deck_by_id(anki_session_with_addon: AnkiSession, requests_mock):
     assert response == expected_data
 
 
-def test_get_deck_by_id_unauthenticated(mocked_config, requests_mock):
+def test_get_deck_by_id_unauthenticated(requests_mock):
     from ankihub.ankihub_client import AnkiHubClient
 
     deck_id = 1
-
-    mocked_config.get_token.return_value = ""
 
     requests_mock.get(f"{API_URL_BASE}/decks/{deck_id}/", status_code=403)
 
@@ -145,7 +139,7 @@ def test_get_note_by_anki_id(anki_session_with_addon: AnkiSession, requests_mock
     assert response == expected_data
 
 
-def test_get_note_by_anki_id_unauthenticated(mocked_config, requests_mock):
+def test_get_note_by_anki_id_unauthenticated(requests_mock):
     from ankihub.ankihub_client import AnkiHubClient
 
     note_anki_id = 1
@@ -181,8 +175,6 @@ def test_create_change_note_suggestion_unauthenticated(
     from ankihub.ankihub_client import AnkiHubClient
 
     note_id = 1
-    mocked_config.get_token.return_value = ""
-
     requests_mock.post(f"{API_URL_BASE}/notes/{note_id}/suggestion/", status_code=403)
     with pytest.raises(HTTPError):
         client = AnkiHubClient()
