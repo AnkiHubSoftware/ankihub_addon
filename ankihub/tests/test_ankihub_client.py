@@ -1,7 +1,7 @@
 from datetime import datetime, timedelta, timezone
 
 import pytest
-from ankihub.constants import API_URL_BASE
+from ankihub.constants import API_URL_BASE, LAST_SYNC_SLUG
 from pytest_anki import AnkiSession
 from requests.exceptions import HTTPError
 
@@ -23,6 +23,7 @@ def test_signout(anki_session_with_addon: AnkiSession):
     client = AnkiHubClient()
     client.signout()
     assert client._headers["Authorization"] == ""
+    assert client._config.private_config["token"] == ""
 
 
 def test_upload_deck(anki_session_with_addon: AnkiSession, requests_mock):
@@ -51,8 +52,9 @@ def test_get_deck_updates(anki_session_with_addon: AnkiSession, requests_mock):
     deck_id = 1
     date_object = datetime.now(tz=timezone.utc) - timedelta(days=30)
 
+    timestamp = date_object.timestamp()
     expected_data = {
-        "since": date_object.timestamp(),
+        "since": timestamp,
         "notes": [
             {
                 "deck_id": deck_id,
@@ -67,8 +69,10 @@ def test_get_deck_updates(anki_session_with_addon: AnkiSession, requests_mock):
     requests_mock.get(f"{API_URL_BASE}/decks/{deck_id}/updates", json=expected_data)
 
     client = AnkiHubClient()
+    conf = client._config.private_config
     response = client.get_deck_updates(deck_id=deck_id)
     assert response == expected_data
+    assert conf[LAST_SYNC_SLUG]
 
 
 def test_get_deck_updates_unauthenticated(
