@@ -4,6 +4,8 @@ from datetime import datetime, timezone
 
 from aqt import mw
 
+from .constants import TOKEN_SLUG, LAST_SYNC_SLUG
+
 
 class Config:
     def __init__(self):
@@ -31,17 +33,17 @@ class Config:
             f.write(json.dumps(config_data))
 
     def save_token(self, token: str):
-        self.private_config["token"] = token
+        self.private_config[TOKEN_SLUG] = token
         self._update_private_config(self.private_config)
 
     def get_token(self) -> str:
-        return self.private_config.get("token")
+        return self.private_config.get(TOKEN_SLUG)
 
     def save_last_sync(self):
         date_object = datetime.now(tz=timezone.utc)
         date_time_str = datetime.strftime(date_object, "%Y-%m-%dT%H:%M:%S.%f%z")
-        self.private_config["lastSync"] = date_time_str
+        self.private_config[LAST_SYNC_SLUG] = date_time_str
         self._update_private_config(self.private_config)
 
     def get_last_sync(self) -> str:
-        return self.private_config.get("lastSync")
+        return self.private_config.get(LAST_SYNC_SLUG)
