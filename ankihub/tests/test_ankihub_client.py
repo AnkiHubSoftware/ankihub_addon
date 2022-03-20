@@ -75,7 +75,7 @@ def test_get_deck_updates(anki_session_with_addon: AnkiSession, requests_mock):
     assert response == expected_data
 
 
-def test_get_deck_updates_unauthenticated(requests_mock):
+def test_get_deck_updates_unauthenticated(anki_session_with_addon: AnkiSession, requests_mock):
     from ankihub.ankihub_client import AnkiHubClient
 
     deck_id = 1
@@ -110,7 +110,7 @@ def test_get_deck_by_id(anki_session_with_addon: AnkiSession, requests_mock):
     assert response == expected_data
 
 
-def test_get_deck_by_id_unauthenticated(requests_mock):
+def test_get_deck_by_id_unauthenticated(anki_session_with_addon: AnkiSession, requests_mock):
     from ankihub.ankihub_client import AnkiHubClient
 
     deck_id = 1
@@ -139,7 +139,7 @@ def test_get_note_by_anki_id(anki_session_with_addon: AnkiSession, requests_mock
     assert response == expected_data
 
 
-def test_get_note_by_anki_id_unauthenticated(requests_mock):
+def test_get_note_by_anki_id_unauthenticated(anki_session_with_addon: AnkiSession, requests_mock):
     from ankihub.ankihub_client import AnkiHubClient
 
     note_anki_id = 1
