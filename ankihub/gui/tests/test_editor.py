@@ -1,8 +1,7 @@
 from unittest.mock import MagicMock
 
-from pytest_anki import AnkiSession
-
 from ankihub.constants import API_URL_BASE
+from pytest_anki import AnkiSession
 
 
 def test_editor(anki_session_with_addon: AnkiSession, monkeypatch, requests_mock):

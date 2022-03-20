@@ -36,7 +36,7 @@ def on_ankihub_button_press(editor: Editor):
 def setup_editor_buttons(buttons, editor: Editor):
     """Add buttons to Editor."""
     # TODO Figure out how to test this
-    config = Config()._config
+    config = Config().public_config
     HOTKEY = config["hotkey"]
     img = str(ICONS_PATH / "ankihub_button.png")
     button = editor.addButton(
