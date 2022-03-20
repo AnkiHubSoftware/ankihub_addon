@@ -42,4 +42,4 @@ class Config:
         self._update_private_config(self.private_config)
 
     def get_last_sync(self) -> str:
-        return self.private_config["lastSync"]
+        return self.private_config.get("lastSync")
