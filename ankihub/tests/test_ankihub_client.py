@@ -1,11 +1,9 @@
 from datetime import datetime, timedelta, timezone
-from unittest.mock import patch
 
 import pytest
+from ankihub.constants import API_URL_BASE
 from pytest_anki import AnkiSession
 from requests.exceptions import HTTPError
-
-from ankihub.constants import API_URL_BASE
 
 
 def test_login(anki_session_with_addon, requests_mock):
@@ -37,8 +35,7 @@ def test_upload_deck(anki_session_with_addon: AnkiSession, requests_mock):
 
 
 def test_upload_deck_unauthenticated(
-        anki_session_with_addon: AnkiSession,
-        requests_mock
+    anki_session_with_addon: AnkiSession, requests_mock
 ):
     from ankihub.ankihub_client import AnkiHubClient
 
@@ -53,7 +50,6 @@ def test_get_deck_updates(anki_session_with_addon: AnkiSession, requests_mock):
 
     deck_id = 1
     date_object = datetime.now(tz=timezone.utc) - timedelta(days=30)
-    date_time_str = datetime.strftime(date_object, "%Y-%m-%dT%H:%M:%S.%f%z")
 
     expected_data = {
         "since": date_object.timestamp(),
@@ -75,12 +71,12 @@ def test_get_deck_updates(anki_session_with_addon: AnkiSession, requests_mock):
     assert response == expected_data
 
 
-def test_get_deck_updates_unauthenticated(anki_session_with_addon: AnkiSession, requests_mock):
+def test_get_deck_updates_unauthenticated(
+    anki_session_with_addon: AnkiSession, requests_mock
+):
     from ankihub.ankihub_client import AnkiHubClient
 
     deck_id = 1
-    date_object = datetime.now(tz=timezone.utc) - timedelta(days=30)
-    date_time_str = datetime.strftime(date_object, "%Y-%m-%dT%H:%M:%S.%f%z")
 
     requests_mock.get(f"{API_URL_BASE}/decks/{deck_id}/updates", status_code=403)
 
@@ -110,7 +106,9 @@ def test_get_deck_by_id(anki_session_with_addon: AnkiSession, requests_mock):
     assert response == expected_data
 
 
-def test_get_deck_by_id_unauthenticated(anki_session_with_addon: AnkiSession, requests_mock):
+def test_get_deck_by_id_unauthenticated(
+    anki_session_with_addon: AnkiSession, requests_mock
+):
     from ankihub.ankihub_client import AnkiHubClient
 
     deck_id = 1
@@ -139,7 +137,9 @@ def test_get_note_by_anki_id(anki_session_with_addon: AnkiSession, requests_mock
     assert response == expected_data
 
 
-def test_get_note_by_anki_id_unauthenticated(anki_session_with_addon: AnkiSession, requests_mock):
+def test_get_note_by_anki_id_unauthenticated(
+    anki_session_with_addon: AnkiSession, requests_mock
+):
     from ankihub.ankihub_client import AnkiHubClient
 
     note_anki_id = 1
@@ -150,13 +150,13 @@ def test_get_note_by_anki_id_unauthenticated(anki_session_with_addon: AnkiSessio
         client.get_note_by_anki_id(anki_id=note_anki_id)
 
 
-def test_create_change_note_suggestion(anki_session_with_addon: AnkiSession, requests_mock):
+def test_create_change_note_suggestion(
+    anki_session_with_addon: AnkiSession, requests_mock
+):
     from ankihub.ankihub_client import AnkiHubClient
 
     note_id = 1
-    requests_mock.post(
-        f"{API_URL_BASE}/notes/{note_id}/suggestion/", status_code=201
-    )
+    requests_mock.post(f"{API_URL_BASE}/notes/{note_id}/suggestion/", status_code=201)
     client = AnkiHubClient()
     response = client.create_change_note_suggestion(
         {
@@ -169,8 +169,7 @@ def test_create_change_note_suggestion(anki_session_with_addon: AnkiSession, req
 
 
 def test_create_change_note_suggestion_unauthenticated(
-        anki_session_with_addon: AnkiSession,
-        requests_mock
+    anki_session_with_addon: AnkiSession, requests_mock
 ):
     from ankihub.ankihub_client import AnkiHubClient
 
@@ -187,7 +186,9 @@ def test_create_change_note_suggestion_unauthenticated(
         )
 
 
-def test_create_new_note_suggestion(anki_session_with_addon: AnkiSession, requests_mock):
+def test_create_new_note_suggestion(
+    anki_session_with_addon: AnkiSession, requests_mock
+):
     from ankihub.ankihub_client import AnkiHubClient
 
     deck_id = 1
@@ -206,8 +207,7 @@ def test_create_new_note_suggestion(anki_session_with_addon: AnkiSession, reques
 
 
 def test_create_new_note_suggestion_unauthenticated(
-        anki_session_with_addon: AnkiSession,
-        requests_mock
+    anki_session_with_addon: AnkiSession, requests_mock
 ):
     from ankihub.ankihub_client import AnkiHubClient
 

@@ -1,8 +1,7 @@
 import requests
-from requests import Response
-
 from ankihub.config import Config
 from ankihub.constants import API_URL_BASE
+from requests import Response
 
 
 class AnkiHubClient:
