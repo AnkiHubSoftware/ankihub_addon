@@ -23,6 +23,6 @@ repos:
     -   id: flake8
 
 -   repo: https://github.com/hadialqattan/pycln
-    rev: v1.2.0
+    rev: v1.2.5
     hooks:
     -   id: pycln
