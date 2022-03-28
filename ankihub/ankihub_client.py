@@ -1,3 +1,5 @@
+from typing import Union
+
 import requests
 from ankihub.config import Config
 from ankihub.constants import API_URL_BASE
@@ -42,39 +44,52 @@ class AnkiHubClient:
         self._config.save_token("")
         self._headers["Authorization"] = ""
 
-    def upload_deck(self, key: str):
+    def upload_deck(self, key: str) -> Response:
         response = self._call_api("POST", "/decks/", data={"key": key})
         return response
 
-    def get_deck_updates(self, deck_id: str) -> dict:
+    def get_deck_updates(self, deck_id: str) -> Union[Response, dict]:
         response = self._call_api(
             "GET",
             f"/decks/{deck_id}/updates",
             params={"since": f"{self._config.get_last_sync()}"},
         )
-        self._config.save_last_sync()
-        return response.json()
+        if response.status_code == 200:
+            self._config.save_last_sync()
+            return response.json()
+        else:
+            return response
 
-    def get_deck_by_id(self, deck_id: str) -> dict:
+    def get_deck_by_id(self, deck_id: str) -> Union[Response, dict]:
         response = self._call_api(
             "GET",
             f"/decks/{deck_id}/",
         )
-        return response.json()
+        if response.status_code == 200:
+            return response.json()
+        else:
+            return response
 
-    def get_note_by_anki_id(self, anki_id: str) -> dict:
-        return self._call_api("GET", f"/notes/{anki_id}").json()
+    def get_note_by_anki_id(self, anki_id: str) -> Union[Response, dict]:
+        response = self._call_api("GET", f"/notes/{anki_id}")
+        if response.status_code == 200:
+            return response.json()
+        else:
+            return response
+
 
     def create_change_note_suggestion(
         self, change_note_suggestion: dict, note_id: int
     ) -> Response:
-        return self._call_api(
+        response = self._call_api(
             "POST", f"/notes/{note_id}/suggestion/", change_note_suggestion
         )
+        return response
 
     def create_new_note_suggestion(
         self, new_note_suggestion: dict, deck_id: int
     ) -> Response:
-        return self._call_api(
+        response = self._call_api(
             "POST", f"/decks/{deck_id}/note-suggestion/", new_note_suggestion
         )
+        return response

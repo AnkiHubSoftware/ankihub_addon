@@ -8,11 +8,6 @@ from requests.exceptions import HTTPError
 from unittest.mock import Mock, patch
 
 
-@pytest.fixture(autouse=True)
-def mock_show_text(monkeypatch):
-    monkeypatch.setattr("ankihub.ankihub_client.showText", Mock())
-
-
 def test_login(anki_session_with_addon, requests_mock):
     from ankihub.ankihub_client import AnkiHubClient
 
@@ -43,17 +38,21 @@ def test_upload_deck(anki_session_with_addon: AnkiSession, requests_mock):
 
 
 def test_upload_deck_unauthenticated(
-    anki_session_with_addon: AnkiSession, requests_mock
+    anki_session_with_addon: AnkiSession, requests_mock, monkeypatch
 ):
     from ankihub.ankihub_client import AnkiHubClient
 
+    monkeypatch.setattr("ankihub.ankihub_client.showText", Mock())
     requests_mock.post(f"{API_URL_BASE}/decks/", status_code=403)
     client = AnkiHubClient()
     response = client.upload_deck("test.apkg")
     assert response.status_code == 403
 
 
-def test_get_deck_updates(anki_session_with_addon: AnkiSession, requests_mock):
+def test_get_deck_updates(
+        anki_session_with_addon: AnkiSession,
+        requests_mock,
+):
     from ankihub.ankihub_client import AnkiHubClient
 
     deck_id = 1
@@ -74,7 +73,6 @@ def test_get_deck_updates(anki_session_with_addon: AnkiSession, requests_mock):
     }
 
     requests_mock.get(f"{API_URL_BASE}/decks/{deck_id}/updates", json=expected_data)
-
     client = AnkiHubClient()
     conf = client._config.private_config
     response = client.get_deck_updates(deck_id=deck_id)
@@ -83,17 +81,17 @@ def test_get_deck_updates(anki_session_with_addon: AnkiSession, requests_mock):
 
 
 def test_get_deck_updates_unauthenticated(
-    anki_session_with_addon: AnkiSession, requests_mock
+    anki_session_with_addon: AnkiSession, requests_mock, monkeypatch
 ):
     from ankihub.ankihub_client import AnkiHubClient
 
     deck_id = 1
 
+    monkeypatch.setattr("ankihub.ankihub_client.showText", Mock())
     requests_mock.get(f"{API_URL_BASE}/decks/{deck_id}/updates", status_code=403)
-
-    with pytest.raises(HTTPError):
-        client = AnkiHubClient()
-        client.get_deck_updates(deck_id=deck_id)
+    client = AnkiHubClient()
+    response = client.get_deck_updates(deck_id=deck_id)
+    assert response.status_code == 403
 
 
 def test_get_deck_by_id(anki_session_with_addon: AnkiSession, requests_mock):
@@ -118,17 +116,17 @@ def test_get_deck_by_id(anki_session_with_addon: AnkiSession, requests_mock):
 
 
 def test_get_deck_by_id_unauthenticated(
-    anki_session_with_addon: AnkiSession, requests_mock
+    anki_session_with_addon: AnkiSession, requests_mock, monkeypatch
 ):
     from ankihub.ankihub_client import AnkiHubClient
 
     deck_id = 1
 
     requests_mock.get(f"{API_URL_BASE}/decks/{deck_id}/", status_code=403)
-
-    with pytest.raises(HTTPError):
-        client = AnkiHubClient()
-        client.get_deck_by_id(deck_id=deck_id)
+    monkeypatch.setattr("ankihub.ankihub_client.showText", Mock())
+    client = AnkiHubClient()
+    response = client.get_deck_by_id(deck_id=deck_id)
+    assert response.status_code == 403
 
 
 def test_get_note_by_anki_id(anki_session_with_addon: AnkiSession, requests_mock):
@@ -149,16 +147,17 @@ def test_get_note_by_anki_id(anki_session_with_addon: AnkiSession, requests_mock
 
 
 def test_get_note_by_anki_id_unauthenticated(
-    anki_session_with_addon: AnkiSession, requests_mock
+    anki_session_with_addon: AnkiSession, requests_mock, monkeypatch
 ):
     from ankihub.ankihub_client import AnkiHubClient
 
     note_anki_id = 1
 
     requests_mock.get(f"{API_URL_BASE}/notes/{note_anki_id}", status_code=403)
-    with pytest.raises(HTTPError):
-        client = AnkiHubClient()
-        client.get_note_by_anki_id(anki_id=note_anki_id)
+    monkeypatch.setattr("ankihub.ankihub_client.showText", Mock())
+    client = AnkiHubClient()
+    response = client.get_note_by_anki_id(anki_id=note_anki_id)
+    assert response.status_code == 403
 
 
 def test_create_change_note_suggestion(
@@ -180,21 +179,22 @@ def test_create_change_note_suggestion(
 
 
 def test_create_change_note_suggestion_unauthenticated(
-    anki_session_with_addon: AnkiSession, requests_mock
+    anki_session_with_addon: AnkiSession, requests_mock, monkeypatch
 ):
     from ankihub.ankihub_client import AnkiHubClient
 
     note_id = 1
     requests_mock.post(f"{API_URL_BASE}/notes/{note_id}/suggestion/", status_code=403)
-    with pytest.raises(HTTPError):
-        client = AnkiHubClient()
-        client.create_change_note_suggestion(
-            {
-                "tags": ["test"],
-                "fields": [{"name": "abc", "order": 0, "value": "abc changed"}],
-            },
-            note_id=note_id,
-        )
+    monkeypatch.setattr("ankihub.ankihub_client.showText", Mock())
+    client = AnkiHubClient()
+    response = client.create_change_note_suggestion(
+        {
+            "tags": ["test"],
+            "fields": [{"name": "abc", "order": 0, "value": "abc changed"}],
+        },
+        note_id=note_id,
+    )
+    assert response.status_code == 403
 
 
 def test_create_new_note_suggestion(
@@ -218,7 +218,7 @@ def test_create_new_note_suggestion(
 
 
 def test_create_new_note_suggestion_unauthenticated(
-    anki_session_with_addon: AnkiSession, requests_mock
+    anki_session_with_addon: AnkiSession, requests_mock, monkeypatch
 ):
     from ankihub.ankihub_client import AnkiHubClient
 
@@ -227,12 +227,13 @@ def test_create_new_note_suggestion_unauthenticated(
     requests_mock.post(
         f"{API_URL_BASE}/decks/{deck_id}/note-suggestion/", status_code=403
     )
-    with pytest.raises(HTTPError):
-        client = AnkiHubClient()
-        client.create_new_note_suggestion(
-            {
-                "tags": ["test"],
-                "fields": [{"name": "abc", "order": 0, "value": "abc changed"}],
-            },
-            deck_id=deck_id,
-        )
+    monkeypatch.setattr("ankihub.ankihub_client.showText", Mock())
+    client = AnkiHubClient()
+    response = client.create_new_note_suggestion(
+        {
+            "tags": ["test"],
+            "fields": [{"name": "abc", "order": 0, "value": "abc changed"}],
+        },
+        deck_id=deck_id,
+    )
+    assert response.status_code == 403
