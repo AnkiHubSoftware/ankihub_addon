@@ -11,8 +11,8 @@ class AnkiHubClient:
         self._headers = {"Content-Type": "application/json"}
         self._config = Config()
         self._base_url = API_URL_BASE
-        if self._config.get_token():
-            token = self._config.get_token()
+        token = self._config.get_token()
+        if token:
             self._headers["Authorization"] = f"Token {token}"
 
     def _call_api(self, method, endpoint, data=None, params=None):
