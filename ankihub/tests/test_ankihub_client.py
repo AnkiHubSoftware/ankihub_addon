@@ -1,11 +1,9 @@
 from datetime import datetime, timedelta, timezone
 
-import pytest
 from ankihub.constants import API_URL_BASE, LAST_SYNC_SLUG
 from pytest_anki import AnkiSession
-from requests.exceptions import HTTPError
 
-from unittest.mock import Mock, patch
+from unittest.mock import Mock
 
 
 def test_login(anki_session_with_addon, requests_mock):
@@ -50,8 +48,8 @@ def test_upload_deck_unauthenticated(
 
 
 def test_get_deck_updates(
-        anki_session_with_addon: AnkiSession,
-        requests_mock,
+    anki_session_with_addon: AnkiSession,
+    requests_mock,
 ):
     from ankihub.ankihub_client import AnkiHubClient
 

@@ -7,7 +7,6 @@ from aqt.utils import showText
 from requests import Response, HTTPError
 
 
-
 class AnkiHubClient:
     """Client for interacting with the AnkiHub API."""
 
@@ -76,7 +75,6 @@ class AnkiHubClient:
             return response.json()
         else:
             return response
-
 
     def create_change_note_suggestion(
         self, change_note_suggestion: dict, note_id: int
