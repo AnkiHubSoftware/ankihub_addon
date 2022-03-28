@@ -1,7 +1,9 @@
 import requests
 from ankihub.config import Config
 from ankihub.constants import API_URL_BASE
-from requests import Response
+from aqt.utils import showText
+from requests import Response, HTTPError
+
 
 
 class AnkiHubClient:
@@ -23,7 +25,11 @@ class AnkiHubClient:
             json=data,
             params=params,
         )
-        response.raise_for_status()
+        try:
+            response.raise_for_status()
+        except HTTPError:
+            # TODO Add retry logic and log to Sentry.
+            showText("There was an issue with your request. Please try again.")
         return response
 
     def login(self, credentials: dict):

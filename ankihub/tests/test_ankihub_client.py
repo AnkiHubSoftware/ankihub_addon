@@ -5,6 +5,13 @@ from ankihub.constants import API_URL_BASE, LAST_SYNC_SLUG
 from pytest_anki import AnkiSession
 from requests.exceptions import HTTPError
 
+from unittest.mock import Mock, patch
+
+
+@pytest.fixture(autouse=True)
+def mock_show_text(monkeypatch):
+    monkeypatch.setattr("ankihub.ankihub_client.showText", Mock())
+
 
 def test_login(anki_session_with_addon, requests_mock):
     from ankihub.ankihub_client import AnkiHubClient
@@ -41,9 +48,9 @@ def test_upload_deck_unauthenticated(
     from ankihub.ankihub_client import AnkiHubClient
 
     requests_mock.post(f"{API_URL_BASE}/decks/", status_code=403)
-    with pytest.raises(HTTPError):
-        client = AnkiHubClient()
-        client.upload_deck("test.apkg")
+    client = AnkiHubClient()
+    response = client.upload_deck("test.apkg")
+    assert response.status_code == 403
 
 
 def test_get_deck_updates(anki_session_with_addon: AnkiSession, requests_mock):
