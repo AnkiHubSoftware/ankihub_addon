@@ -1,3 +1,5 @@
+import uuid
+
 from anki.hooks import addHook
 from aqt import gui_hooks
 from aqt.editor import Editor
@@ -19,16 +21,31 @@ def on_ankihub_button_press(editor: Editor):
     # TODO This should actually get the ankihub id from the notes first field.
     note_id = editor.note.id
     # TODO parse this value to json
-    suggestion = editor.note.data
+    fields = editor.note.fields
+    tags = editor.note.tags
     client = AnkiHubClient()
+    config = Config()
+    author = config.private_config.get("user_email")
     deck_id = editor.mw.col.decks.get_current_id()
     if command == AnkiHubCommands.CHANGE.value:
+        ankihub_id = fields[-1]
         response = client.create_change_note_suggestion(
-            note_id=note_id, change_note_suggestion=suggestion
+            deck_id=deck_id,
+            ankihub_id=ankihub_id,
+            author=author,
+            fields=fields,
+            tags=tags,
         )
     elif command == AnkiHubCommands.NEW.value:
+        ankihub_id = str(uuid.uuid4())
+        editor.note["AnkiHub ID"] = ankihub_id
+        editor.mw.col.update_note(editor.note)
         response = client.create_new_note_suggestion(
-            deck_id=deck_id, new_note_suggestion=suggestion
+            deck_id=deck_id,
+            ankihub_id=ankihub_id,
+            author=author,
+            fields=fields,
+            tags=tags,
         )
     return response
 

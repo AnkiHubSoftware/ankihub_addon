@@ -1,4 +1,4 @@
-from typing import Union
+from typing import Union, Dict, List
 
 import requests
 from ankihub.config import Config
@@ -80,17 +80,44 @@ class AnkiHubClient:
             return response
 
     def create_change_note_suggestion(
-        self, change_note_suggestion: dict, note_id: int
+            self,
+            deck_id: int,
+            ankihub_id: str,
+            author: str,
+            fields: Dict[str, str],
+            tags: List[str],
+
     ) -> Response:
+        suggestion = {
+            "related_deck": deck_id,
+            "ankihub_id": ankihub_id,
+            "author": author,
+            "fields": fields,
+            "tags": tags,
+
+        }
         response = self._call_api(
-            "POST", f"/notes/{note_id}/suggestion/", change_note_suggestion
+            "POST", f"/notes/{ankihub_id}/suggestion/", suggestion
         )
         return response
 
     def create_new_note_suggestion(
-        self, new_note_suggestion: dict, deck_id: int
+            self,
+            deck_id: int,
+            ankihub_id: str,
+            author: str,
+            fields: Dict[str, str],
+            tags: List[str],
     ) -> Response:
+        suggestion = {
+            "related_deck": deck_id,
+            "ankihub_id": ankihub_id,
+            "author": author,
+            "fields": fields,
+            "tags": tags,
+
+        }
         response = self._call_api(
-            "POST", f"/decks/{deck_id}/note-suggestion/", new_note_suggestion
+            "POST", f"/decks/{deck_id}/note-suggestion/", suggestion
         )
         return response
