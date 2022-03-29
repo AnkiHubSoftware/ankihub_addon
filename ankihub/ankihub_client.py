@@ -35,9 +35,11 @@ class AnkiHubClient:
 
     def login(self, credentials: dict):
         response = self._call_api("POST", "/login/", credentials)
-        token = response.json()["token"]
-        self._config.save_token(token)
-        self._headers["Authorization"] = f"Token {token}"
+        token = response.json().get("token")
+        if token:
+            self._config.save_token(token)
+            self._headers["Authorization"] = f"Token {token}"
+        return response
 
     def signout(self):
         self._config.save_token("")
