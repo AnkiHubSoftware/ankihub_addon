@@ -4,7 +4,7 @@ from datetime import datetime, timezone
 
 from aqt import mw
 
-from .constants import TOKEN_SLUG, LAST_SYNC_SLUG
+from .constants import TOKEN_SLUG, LAST_SYNC_SLUG, USER_EMAIL_SLUG
 
 
 class Config:
@@ -34,6 +34,10 @@ class Config:
 
     def save_token(self, token: str):
         self.private_config[TOKEN_SLUG] = token
+        self._update_private_config(self.private_config)
+
+    def save_user_email(self, user_emai: str):
+        self.private_config[USER_EMAIL_SLUG] = user_email
         self._update_private_config(self.private_config)
 
     def get_token(self) -> str:

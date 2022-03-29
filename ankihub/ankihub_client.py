@@ -39,6 +39,7 @@ class AnkiHubClient:
         if token:
             self._config.save_token(token)
             self._headers["Authorization"] = f"Token {token}"
+        self._config.save_user_email(credentials["username"])
         return response
 
     def signout(self):

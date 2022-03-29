@@ -10,6 +10,7 @@ ICONS_PATH = ADDON_PATH / "icons"
 
 LAST_SYNC_SLUG = "last_sync"
 TOKEN_SLUG = "token"
+USER_EMAIL_SLUG = "user_email"
 
 
 class AnkiHubCommands(Enum):
