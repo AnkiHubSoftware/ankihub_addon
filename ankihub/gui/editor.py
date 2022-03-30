@@ -24,15 +24,12 @@ def on_ankihub_button_press(editor: Editor):
     fields = editor.note.fields
     tags = editor.note.tags
     client = AnkiHubClient()
-    config = Config()
-    author = config.private_config.get("user_email")
     deck_id = editor.mw.col.decks.get_current_id()
     if command == AnkiHubCommands.CHANGE.value:
         ankihub_id = fields[-1]
         response = client.create_change_note_suggestion(
             deck_id=deck_id,
             ankihub_id=ankihub_id,
-            author=author,
             fields=fields,
             tags=tags,
         )
@@ -43,7 +40,6 @@ def on_ankihub_button_press(editor: Editor):
         response = client.create_new_note_suggestion(
             deck_id=deck_id,
             ankihub_id=ankihub_id,
-            author=author,
             fields=fields,
             tags=tags,
         )

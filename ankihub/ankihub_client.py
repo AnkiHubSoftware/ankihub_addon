@@ -83,7 +83,6 @@ class AnkiHubClient:
             self,
             deck_id: int,
             ankihub_id: str,
-            author: str,
             fields: Dict[str, str],
             tags: List[str],
 
@@ -91,7 +90,6 @@ class AnkiHubClient:
         suggestion = {
             "related_deck": deck_id,
             "ankihub_id": ankihub_id,
-            "author": author,
             "fields": fields,
             "tags": tags,
 
@@ -105,14 +103,12 @@ class AnkiHubClient:
             self,
             deck_id: int,
             ankihub_id: str,
-            author: str,
             fields: Dict[str, str],
             tags: List[str],
     ) -> Response:
         suggestion = {
             "related_deck": deck_id,
             "ankihub_id": ankihub_id,
-            "author": author,
             "fields": fields,
             "tags": tags,
 
