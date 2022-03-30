@@ -28,7 +28,6 @@ def on_ankihub_button_press(editor: Editor):
     if command == AnkiHubCommands.CHANGE.value:
         ankihub_id = fields[-1]
         response = client.create_change_note_suggestion(
-            deck_id=deck_id,
             ankihub_id=ankihub_id,
             fields=fields,
             tags=tags,
