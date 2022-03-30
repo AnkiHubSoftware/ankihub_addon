@@ -28,9 +28,14 @@ class AnkiHubClient:
         )
         try:
             response.raise_for_status()
-        except HTTPError:
+        except HTTPError as e:
             # TODO Add retry logic and log to Sentry.
-            showText("There was an issue with your request. Please try again.")
+            showText(
+                "There was an issue with your request. Please try again.\n\n"
+                "You can share the following details when reporting the error:"
+                "to user support:\n\n"
+                f"{e}"
+            )
         return response
 
     def login(self, credentials: dict):
