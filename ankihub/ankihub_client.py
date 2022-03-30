@@ -87,7 +87,6 @@ class AnkiHubClient:
 
     ) -> Response:
         suggestion = {
-            "related_deck": deck_id,
             "ankihub_id": ankihub_id,
             "fields": fields,
             "tags": tags,
