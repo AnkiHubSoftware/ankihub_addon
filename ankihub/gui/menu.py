@@ -12,6 +12,7 @@ from PyQt5.QtWidgets import (
     QVBoxLayout,
     QWidget,
 )
+from requests.exceptions import HTTPError
 
 
 def main_menu_setup():
@@ -44,6 +45,7 @@ class AnkiHubLogin(QWidget):
         self.password_box = QHBoxLayout()
         self.password_box_label = QLabel("Password:")
         self.password_box_text = QLineEdit("", self)
+        self.password_box_text.setEchoMode(QLineEdit.Password)
         self.password_box_text.setMinimumWidth(300)
         self.password_box.addWidget(self.password_box_label)
         self.password_box.addWidget(self.password_box_text)
@@ -89,17 +91,16 @@ class AnkiHubLogin(QWidget):
             )
 
         ankihub_client = AnkiHubClient()
-        token = ankihub_client.authenticate_user(
-            url="auth-token/", data={"username": username, "password": password}
-        )
-        if token:
+        try:
+            ankihub_client.login(
+                credentials={"username": username, "password": password}
+            )
             self.label_results.setText("You are now logged into AnkiHub.")
-        else:
+        except HTTPError:
             self.label_results.setText(
                 "AnkiHub login failed.  Please make sure your username and "
                 "password are correct for AnkiHub."
             )
-        # TODO write the token to disk to persist credentials.
 
     @classmethod
     def display_login(cls):

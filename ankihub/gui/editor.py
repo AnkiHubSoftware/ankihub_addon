@@ -1,3 +1,5 @@
+import uuid
+
 from anki.hooks import addHook
 from aqt import gui_hooks
 from aqt.editor import Editor
@@ -15,21 +17,34 @@ def on_ankihub_button_press(editor: Editor):
     # The command is expected to have been set at this point already, either by
     # fetching the default or by selecting a command from the dropdown menu.
     command = editor.ankihub_command
-    # Get the current Note ID for passing into the request below.
-    # TODO This should actually get the ankihub id from the notes first field.
-    _ = editor.note.id
+    fields = editor.note.fields
+    tags = editor.note.tags
     client = AnkiHubClient()
+    deck_id = editor.mw.col.decks.get_current_id()
     if command == AnkiHubCommands.CHANGE.value:
-        response = client.submit_change()
+        ankihub_id = fields[-1]
+        response = client.create_change_note_suggestion(
+            ankihub_id=ankihub_id,
+            fields=fields,
+            tags=tags,
+        )
     elif command == AnkiHubCommands.NEW.value:
-        response = client.submit_new_note()
+        ankihub_id = str(uuid.uuid4())
+        editor.note["AnkiHub ID"] = ankihub_id
+        editor.mw.col.update_note(editor.note)
+        response = client.create_new_note_suggestion(
+            deck_id=deck_id,
+            ankihub_id=ankihub_id,
+            fields=fields,
+            tags=tags,
+        )
     return response
 
 
 def setup_editor_buttons(buttons, editor: Editor):
     """Add buttons to Editor."""
     # TODO Figure out how to test this
-    config = Config().config
+    config = Config().public_config
     HOTKEY = config["hotkey"]
     img = str(ICONS_PATH / "ankihub_button.png")
     button = editor.addButton(
