@@ -80,17 +80,15 @@ class AnkiHubClient:
             return response
 
     def create_change_note_suggestion(
-            self,
-            ankihub_id: str,
-            fields: List[Dict],
-            tags: List[str],
-
+        self,
+        ankihub_id: str,
+        fields: List[Dict],
+        tags: List[str],
     ) -> Response:
         suggestion = {
             "ankihub_id": ankihub_id,
             "fields": fields,
             "tags": tags,
-
         }
         response = self._call_api(
             "POST", f"/notes/{ankihub_id}/suggestion/", suggestion
@@ -98,18 +96,17 @@ class AnkiHubClient:
         return response
 
     def create_new_note_suggestion(
-            self,
-            deck_id: int,
-            ankihub_id: str,
-            fields: Dict[str, str],
-            tags: List[str],
+        self,
+        deck_id: int,
+        ankihub_id: str,
+        fields: Dict[str, str],
+        tags: List[str],
     ) -> Response:
         suggestion = {
             "related_deck": deck_id,
             "ankihub_id": ankihub_id,
             "fields": fields,
             "tags": tags,
-
         }
         response = self._call_api(
             "POST", f"/decks/{deck_id}/note-suggestion/", suggestion
