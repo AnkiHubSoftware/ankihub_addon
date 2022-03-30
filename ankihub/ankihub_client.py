@@ -81,9 +81,8 @@ class AnkiHubClient:
 
     def create_change_note_suggestion(
             self,
-            deck_id: int,
             ankihub_id: str,
-            fields: Dict[str, str],
+            fields: List[Dict],
             tags: List[str],
 
     ) -> Response:

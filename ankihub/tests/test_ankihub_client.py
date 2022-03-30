@@ -167,11 +167,9 @@ def test_create_change_note_suggestion(
     requests_mock.post(f"{API_URL_BASE}/notes/{note_id}/suggestion/", status_code=201)
     client = AnkiHubClient()
     response = client.create_change_note_suggestion(
-        {
-            "tags": ["test"],
-            "fields": [{"name": "abc", "order": 0, "value": "abc changed"}],
-        },
-        note_id=note_id,
+        ankihub_id=1,
+        fields=[{"name": "abc", "order": 0, "value": "abc changed"}],
+        tags=["test"],
     )
     assert response.status_code == 201
 
@@ -186,11 +184,9 @@ def test_create_change_note_suggestion_unauthenticated(
     monkeypatch.setattr("ankihub.ankihub_client.showText", Mock())
     client = AnkiHubClient()
     response = client.create_change_note_suggestion(
-        {
-            "tags": ["test"],
-            "fields": [{"name": "abc", "order": 0, "value": "abc changed"}],
-        },
-        note_id=note_id,
+        ankihub_id=1,
+        fields=[{"name": "abc", "order": 0, "value": "abc changed"}],
+        tags=["test"],
     )
     assert response.status_code == 403
 
@@ -206,11 +202,10 @@ def test_create_new_note_suggestion(
     )
     client = AnkiHubClient()
     response = client.create_new_note_suggestion(
-        {
-            "tags": ["test"],
-            "fields": [{"name": "abc", "order": 0, "value": "abc changed"}],
-        },
         deck_id=deck_id,
+        ankihub_id=1,
+        fields=[{"name": "abc", "order": 0, "value": "abc changed"}],
+        tags=["test"],
     )
     assert response.status_code == 201
 
@@ -228,10 +223,9 @@ def test_create_new_note_suggestion_unauthenticated(
     monkeypatch.setattr("ankihub.ankihub_client.showText", Mock())
     client = AnkiHubClient()
     response = client.create_new_note_suggestion(
-        {
-            "tags": ["test"],
-            "fields": [{"name": "abc", "order": 0, "value": "abc changed"}],
-        },
         deck_id=deck_id,
+        ankihub_id=1,
+        fields=[{"name": "abc", "order": 0, "value": "abc changed"}],
+        tags=["test"],
     )
     assert response.status_code == 403
