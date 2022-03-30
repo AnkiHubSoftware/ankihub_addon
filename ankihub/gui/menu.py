@@ -3,6 +3,7 @@ from ankihub.register_decks import create_collaborative_deck
 from aqt import mw
 from aqt.qt import QAction, QMenu, qconnect
 from aqt.studydeck import StudyDeck
+from aqt.utils import showText
 from PyQt5.QtWidgets import (
     QHBoxLayout,
     QLabel,
@@ -65,7 +66,7 @@ class AnkiHubLogin(QWidget):
 
         self.label_results = QLabel(
             """
-            \r\n<i>Use your AnkiHub username and password to log in.</i>
+            \r\n<center><i>Use your AnkiHub username and password to log in.</i></center>
             """
         )
 
@@ -86,9 +87,7 @@ class AnkiHubLogin(QWidget):
         username = self.username_box_text.text()
         password = self.password_box_text.text()
         if not all([username, password]):
-            self.label_results.setText(
-                "Oops! You forgot to put in a username or password!"
-            )
+            showText("Oops! You forgot to put in a username or password!")
 
         ankihub_client = AnkiHubClient()
         try:
@@ -97,13 +96,84 @@ class AnkiHubLogin(QWidget):
             )
             self.label_results.setText("You are now logged into AnkiHub.")
         except HTTPError:
-            self.label_results.setText(
+            showText(
                 "AnkiHub login failed.  Please make sure your username and "
                 "password are correct for AnkiHub."
             )
 
     @classmethod
     def display_login(cls):
+        global __window
+        __window = cls()
+        return __window
+
+
+class SubscribeToDeck(QWidget):
+    def __init__(self):
+        super(SubscribeToDeck, self).__init__()
+        self.results = None
+        self.thread = None
+        self.box_top = QVBoxLayout()
+        self.box_upper = QHBoxLayout()
+        self.box_left = QVBoxLayout()
+        self.box_right = QVBoxLayout()
+        self.bottom_box_section = QHBoxLayout()
+
+        self.deck_id_box = QHBoxLayout()
+        self.deck_id_box_label = QLabel("AnkiHub Deck ID:")
+        self.deck_id_box_text = QLineEdit("", self)
+        self.deck_id_box_text.setMinimumWidth(300)
+        self.deck_id_box.addWidget(self.deck_id_box_label)
+        self.deck_id_box.addWidget(self.deck_id_box_text)
+        self.box_left.addLayout(self.deck_id_box)
+
+        self.subscribe_button = QPushButton("Subscribe to Deck", self)
+        self.bottom_box_section.addWidget(self.subscribe_button)
+        self.subscribe_button.clicked.connect(self.subscribe)
+        self.box_left.addLayout(self.bottom_box_section)
+
+        self.box_upper.addLayout(self.box_left)
+        self.box_upper.addSpacing(20)
+        self.box_upper.addLayout(self.box_right)
+
+        self.label_results = QLabel(
+            """
+            \r\n<center>Copy/Paste a Deck ID from AnkiHub.net/decks to subscribe.</center>
+            """
+        )
+
+        # Add all widgets to top layout.
+        self.box_top.addLayout(self.box_upper)
+        self.box_top.addWidget(self.label_results)
+        self.box_top.addStretch(1)
+        self.setLayout(self.box_top)
+
+        self.setMinimumWidth(500)
+        self.setSizePolicy(QSizePolicy.Minimum, QSizePolicy.Minimum)
+        self.setWindowTitle("Subscribe to Collaborative Deck")
+        self.show()
+
+    def subscribe(self):
+        self.label_results.setText("Waiting...")
+        deck_id = self.deck_id_box_text.text()
+        try:
+            deck_id = int(deck_id)
+        except ValueError:
+            showText(
+                "Oops! Please copy/paste a Deck ID from AnkiHub.net/browse (numbers only)!"
+            )
+        client = AnkiHubClient()
+        if not client.token:
+            showText("Oops! Please make sure you are logged into AnkiHub!")
+        response = client.get_deck_by_id(deck_id)
+        if response.status_code == 200:
+            data = response.json()
+            csv_url = data["csv_notes_url"]
+        # TODO make sure the user the subscription relation between the user and the
+        #  deck is created.
+
+    @classmethod
+    def display_subscribe_window(cls):
         global __window
         __window = cls()
         return __window
@@ -151,9 +221,17 @@ def upload_suggestions_setup(parent):
     parent.addAction(q_action)
 
 
+def subscribe_to_deck_setup(parent):
+    """Set up the menu item for uploading suggestions in bulk."""
+    q_action = QAction("Subscribe to collaborative deck", parent=parent)
+    qconnect(q_action.triggered, SubscribeToDeck.display_subscribe_window)
+    parent.addAction(q_action)
+
+
 def setup_ankihub_menu() -> None:
     """Add top-level AnkiHub menu."""
     ankihub_menu = main_menu_setup()
     ankihub_login_setup(parent=ankihub_menu)
     create_collaborative_deck_setup(parent=ankihub_menu)
+    subscribe_to_deck_setup(parent=ankihub_menu)
     upload_suggestions_setup(parent=ankihub_menu)
