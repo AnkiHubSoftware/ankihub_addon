@@ -17,10 +17,6 @@ def on_ankihub_button_press(editor: Editor):
     # The command is expected to have been set at this point already, either by
     # fetching the default or by selecting a command from the dropdown menu.
     command = editor.ankihub_command
-    # Get the current Note ID for passing into the request below.
-    # TODO This should actually get the ankihub id from the notes first field.
-    note_id = editor.note.id
-    # TODO parse this value to json
     fields = editor.note.fields
     tags = editor.note.tags
     client = AnkiHubClient()
