@@ -63,26 +63,18 @@ class AnkiHubClient:
         )
         if response.status_code == 200:
             self._config.save_last_sync()
-            return response.json()
-        else:
-            return response
+        return response
 
     def get_deck_by_id(self, deck_id: str) -> Union[Response, dict]:
         response = self._call_api(
             "GET",
             f"/decks/{deck_id}/",
         )
-        if response.status_code == 200:
-            return response.json()
-        else:
-            return response
+        return response
 
     def get_note_by_anki_id(self, anki_id: str) -> Union[Response, dict]:
         response = self._call_api("GET", f"/notes/{anki_id}")
-        if response.status_code == 200:
-            return response.json()
-        else:
-            return response
+        return response
 
     def create_change_note_suggestion(
         self,
