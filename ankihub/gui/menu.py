@@ -1,3 +1,8 @@
+import tempfile
+from pathlib import Path
+
+import requests
+
 from ankihub.ankihub_client import AnkiHubClient
 from ankihub.register_decks import create_collaborative_deck
 from aqt import mw
