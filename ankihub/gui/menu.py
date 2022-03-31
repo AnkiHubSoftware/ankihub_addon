@@ -82,24 +82,23 @@ class AnkiHubLogin(QWidget):
         self.show()
 
     def login(self):
-        self.label_results.setText("Waiting...")
-        # grab input
         username = self.username_box_text.text()
         password = self.password_box_text.text()
         if not all([username, password]):
             showText("Oops! You forgot to put in a username or password!")
-
+            return
         ankihub_client = AnkiHubClient()
         try:
             ankihub_client.login(
                 credentials={"username": username, "password": password}
             )
-            self.label_results.setText("You are now logged into AnkiHub.")
-        except HTTPError:
+        except HTTPError as e:
             showText(
                 "AnkiHub login failed.  Please make sure your username and "
                 "password are correct for AnkiHub."
             )
+            return
+        self.label_results.setText("You are now logged into AnkiHub.")
 
     @classmethod
     def display_login(cls):
