@@ -229,3 +229,13 @@ def test_create_new_note_suggestion_unauthenticated(
         tags=["test"],
     )
     assert response.status_code == 403
+
+
+def test_subscribe(anki_session_with_addon: AnkiSession, requests_mock):
+    from ankihub.ankihub_client import AnkiHubClient
+
+    deck_id = 1
+    requests_mock.post(f"{API_URL_BASE}/decks/{deck_id}/subscribe/", status_code=200)
+    client = AnkiHubClient()
+    response = client.subscribe(deck_id=deck_id)
+    assert response.status_code == 200

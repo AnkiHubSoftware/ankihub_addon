@@ -3,8 +3,7 @@ from typing import Union, Dict, List
 import requests
 from ankihub.config import Config
 from ankihub.constants import API_URL_BASE
-from aqt.utils import showText
-from requests import Response, HTTPError
+from requests import Response
 
 
 class AnkiHubClient:
@@ -97,5 +96,12 @@ class AnkiHubClient:
         }
         response = self._call_api(
             "POST", f"/decks/{deck_id}/note-suggestion/", suggestion
+        )
+        return response
+
+    def subscribe(self, deck_id: int):
+        response = self._call_api(
+            "POST",
+            f"/decks/{deck_id}/subscribe",
         )
         return response
