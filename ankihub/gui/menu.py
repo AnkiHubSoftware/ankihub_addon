@@ -8,7 +8,7 @@ from ankihub.register_decks import create_collaborative_deck
 from aqt import mw
 from aqt.qt import QAction, QMenu, qconnect
 from aqt.studydeck import StudyDeck
-from aqt.utils import showText
+from aqt.utils import showText, tooltip
 from PyQt5.QtWidgets import (
     QHBoxLayout,
     QLabel,
@@ -140,12 +140,10 @@ class SubscribeToDeck(QWidget):
         self.box_upper.addSpacing(20)
         self.box_upper.addLayout(self.box_right)
 
-        self.label_results = QLabel(
-            """
-            \r\n<center>Copy/Paste a Deck ID from AnkiHub.net/decks to subscribe.</center>
-            """
-        )
-
+        self.instructions_label = """
+        \r\n<center>Copy/Paste a Deck ID from AnkiHub.net/decks to subscribe.</center>
+        """
+        self.label_results = QLabel(self.instructions_label)
         # Add all widgets to top layout.
         self.box_top.addLayout(self.box_upper)
         self.box_top.addWidget(self.label_results)
@@ -158,7 +156,6 @@ class SubscribeToDeck(QWidget):
         self.show()
 
     def subscribe(self):
-        self.label_results.setText("Waiting...")
         deck_id = self.deck_id_box_text.text()
         try:
             deck_id = int(deck_id)
@@ -166,15 +163,35 @@ class SubscribeToDeck(QWidget):
             showText(
                 "Oops! Please copy/paste a Deck ID from AnkiHub.net/browse (numbers only)!"
             )
+            return
         client = AnkiHubClient()
         if not client.token:
             showText("Oops! Please make sure you are logged into AnkiHub!")
+            return
+        # TODO use mw.taskman
+        self.label_results.setText("Downloading deck...")
         response = client.get_deck_by_id(deck_id)
-        if response.status_code == 200:
+        if response.status_code == 404:
+            showText(
+                f"Deck {deck_id} doesn't exist. Please make sure you copy/paste "
+                f"the correct ID."
+            )
+            self.label_results.setText(self.instructions_label)
+            return
+        elif response.status_code == 200:
             data = response.json()
             csv_url = data["csv_notes_url"]
-        # TODO make sure the user the subscription relation between the user and the
-        #  deck is created.
+            s3_response = requests.get(
+                csv_url,
+            )
+            csv_file = Path(tempfile.mkdtemp()) / f"{deck_id}.csv"
+            with csv_file.open("wb") as f:
+                f.write(s3_response.content)
+            self.label_results.setText("Success!")
+            subscribe_response = client.subscribe(deck_id)
+            if subscribe_response == 200:
+                tooltip("Subscription confirmed!")
+            self.close()
 
     @classmethod
     def display_subscribe_window(cls):
