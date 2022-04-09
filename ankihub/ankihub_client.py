@@ -25,6 +25,18 @@ class AnkiHubClient:
             json=data,
             params=params,
         )
+        qDebug(f"{method} {url} {data} {params} {self._headers}")
+        qDebug(f"{response.content}")
+        qDebug(f"{response.status_code}")
+        if response.status_code != 200:
+            showText(
+                "If you haven't already signed in using the AnkiHub menu in Anki "
+                "desktop please do so. Make sure your username and password are correct "
+                "and that you have confirmed your AnkiHub account through "
+                "email verification. "
+                "If you believe this is an error, please reach "
+                "out to user support at help@ankipalace.com."
+            )
         return response
 
     def login(self, credentials: dict):
