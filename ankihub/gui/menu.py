@@ -153,7 +153,10 @@ class SubscribeToDeck(QWidget):
         self.setMinimumWidth(500)
         self.setSizePolicy(QSizePolicy.Minimum, QSizePolicy.Minimum)
         self.setWindowTitle("Subscribe to Collaborative Deck")
-        self.show()
+        self.client = AnkiHubClient()
+        if not self.client.token:
+            showText("Oops! Please make sure you are logged into AnkiHub!")
+            self.close()
 
     def subscribe(self):
         deck_id = self.deck_id_box_text.text()
@@ -163,10 +166,6 @@ class SubscribeToDeck(QWidget):
             showText(
                 "Oops! Please copy/paste a Deck ID from AnkiHub.net/browse (numbers only)!"
             )
-            return
-        client = AnkiHubClient()
-        if not client.token:
-            showText("Oops! Please make sure you are logged into AnkiHub!")
             return
         # TODO use mw.taskman
         self.label_results.setText("Downloading deck...")
