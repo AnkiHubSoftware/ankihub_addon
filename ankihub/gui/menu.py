@@ -173,17 +173,29 @@ class SubscribeToDeck(QWidget):
         #     qDebug(f"Subscribed to {deck_id}")
         #     tooltip("Subscription confirmed!")
         # TODO use mw.taskman
+        download_result = self.download_deck(deck_id)
+        if download_result:
+            confirmed = askUser(
+                f"The AnkiHub deck {deck_id} has been downloaded. Would you like to "
+                f"proceed with modifying your personal collection in order to subscribe "
+                f"to the collaborative deck? See https://ankihub.net/info/subscribe for "
+                f"details.",
+                title="Please confirm to proceed.",
+                defaultno=True,
+            )
+    def download_deck(self, deck_id):
         self.label_results.setText("Downloading deck...")
-        response = client.get_deck_by_id(deck_id)
-        if response.status_code == 404:
+        deck_response = self.client.get_deck_by_id(deck_id)
+        if deck_response.status_code == 404:
             showText(
                 f"Deck {deck_id} doesn't exist. Please make sure you copy/paste "
-                f"the correct ID."
+                f"the correct ID. If you believe this is an error, please reach "
+                f"out to user support at help@ankipalace.com."
             )
             self.label_results.setText(self.instructions_label)
             return
-        elif response.status_code == 200:
-            data = response.json()
+        elif deck_response.status_code == 200:
+            data = deck_response.json()
             csv_url = data["csv_notes_url"]
             s3_response = requests.get(
                 csv_url,
