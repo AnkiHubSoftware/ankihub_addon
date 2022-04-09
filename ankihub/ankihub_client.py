@@ -62,7 +62,7 @@ class AnkiHubClient:
         response = self._call_api("POST", "/decks/", data={"key": key})
         return response
 
-    def get_deck_updates(self, deck_id: str) -> Union[Response, dict]:
+    def get_deck_updates(self, deck_id: str) -> Response:
         response = self._call_api(
             "GET",
             f"/decks/{deck_id}/updates",
@@ -72,14 +72,14 @@ class AnkiHubClient:
             self._config.save_last_sync()
         return response
 
-    def get_deck_by_id(self, deck_id: str) -> Union[Response, dict]:
+    def get_deck_by_id(self, deck_id: str) -> Response:
         response = self._call_api(
             "GET",
             f"/decks/{deck_id}/",
         )
         return response
 
-    def get_note_by_anki_id(self, anki_id: str) -> Union[Response, dict]:
+    def get_note_by_anki_id(self, anki_id: str) -> Response:
         response = self._call_api("GET", f"/notes/{anki_id}")
         return response
 
