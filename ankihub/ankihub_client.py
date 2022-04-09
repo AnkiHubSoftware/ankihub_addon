@@ -5,7 +5,7 @@ from PyQt6.QtCore import qDebug
 from aqt.utils import showText
 
 from ankihub.config import Config
-from ankihub.constants import API_URL_BASE
+from ankihub.constants import API_URL_BASE, USER_SUPPORT_EMAIL_SLUG
 from requests import Response
 
 
@@ -39,7 +39,7 @@ class AnkiHubClient:
                 "and that you have confirmed your AnkiHub account through "
                 "email verification. "
                 "If you believe this is an error, please reach "
-                "out to user support at help@ankipalace.com."
+                f"out to user support at {USER_SUPPORT_EMAIL_SLUG}."
             )
         return response
 

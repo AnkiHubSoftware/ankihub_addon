@@ -12,6 +12,10 @@ LAST_SYNC_SLUG = "last_sync"
 TOKEN_SLUG = "token"
 USER_EMAIL_SLUG = "user_email"
 
+CSV_DELIMITER = ";"
+
+USER_SUPPORT_EMAIL_SLUG = "help@ankipalace.com"
+
 
 class AnkiHubCommands(Enum):
     CHANGE = "Suggest a change"
