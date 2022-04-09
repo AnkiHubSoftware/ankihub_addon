@@ -77,12 +77,6 @@ class AnkiHubClient:
             "GET",
             f"/decks/{deck_id}/",
         )
-        if response.status_code == 404:
-            showText(
-                f"Deck {deck_id} doesn't exist. Please make sure you copy/paste "
-                f"the correct ID. If you believe this is an error, please reach "
-                f"out to user support at help@ankipalace.com."
-            )
         return response
 
     def get_note_by_anki_id(self, anki_id: str) -> Union[Response, dict]:
