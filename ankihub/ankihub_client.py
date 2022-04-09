@@ -1,4 +1,4 @@
-from typing import Union, Dict, List
+from typing import Dict, List
 
 import requests
 from PyQt6.QtCore import qDebug

@@ -101,6 +101,7 @@ class AnkiHubLogin(QWidget):
                 credentials={"username": username, "password": password}
             )
         except HTTPError as e:
+            qDebug(f"{e}")
             showText(
                 "AnkiHub login failed.  Please make sure your username and "
                 "password are correct for AnkiHub."
@@ -220,7 +221,7 @@ class SubscribeToDeck(QWidget):
         :param csv_file:
         """
         with csv_file.open() as f:
-            reader = csv.reader(f, delimiter=CSV_DELIMITER)
+            csv.reader(f, delimiter=CSV_DELIMITER)
 
     @classmethod
     def display_subscribe_window(cls):

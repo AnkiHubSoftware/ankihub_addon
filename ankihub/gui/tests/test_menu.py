@@ -11,4 +11,5 @@ def test_subscribe_to_deck(anki_session_with_addon, monkeypatch):
     window = SubscribeToDeck()
     window.show()
     session.qtbot.addWidget(window)
+    session.qtbot.keyClicks()
     session.qtbot.mouseClick(window.subscribe_button, QtCore.Qt.LeftButton)
