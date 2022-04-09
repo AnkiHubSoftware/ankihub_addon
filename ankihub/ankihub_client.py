@@ -28,6 +28,7 @@ class AnkiHubClient:
         return response
 
     def login(self, credentials: dict):
+        self.signout()
         response = self._call_api("POST", "/login/", credentials)
         token = response.json().get("token")
         if token:
@@ -39,6 +40,7 @@ class AnkiHubClient:
     def signout(self):
         self._config.save_token("")
         self._headers["Authorization"] = ""
+        qDebug("Token cleared from config.")
 
     def upload_deck(self, key: str) -> Response:
         response = self._call_api("POST", "/decks/", data={"key": key})
