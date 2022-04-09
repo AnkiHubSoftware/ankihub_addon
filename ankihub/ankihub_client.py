@@ -1,6 +1,9 @@
 from typing import Union, Dict, List
 
 import requests
+from PyQt6.QtCore import qDebug
+from aqt.utils import showText
+
 from ankihub.config import Config
 from ankihub.constants import API_URL_BASE
 from requests import Response
@@ -18,10 +21,11 @@ class AnkiHubClient:
             self._headers["Authorization"] = f"Token {self.token}"
 
     def _call_api(self, method, endpoint, data=None, params=None):
+        url = f"{self._base_url}{endpoint}"
         response = requests.request(
             method=method,
             headers=self._headers,
-            url=f"{self._base_url}{endpoint}",
+            url=url,
             json=data,
             params=params,
         )
@@ -114,8 +118,9 @@ class AnkiHubClient:
         return response
 
     def subscribe(self, deck_id: int):
+        qDebug(f"Requesting subscription to {deck_id}")
         response = self._call_api(
             "POST",
-            f"/decks/{deck_id}/subscribe",
+            f"/decks/{deck_id}/subscribe/",
         )
         return response
