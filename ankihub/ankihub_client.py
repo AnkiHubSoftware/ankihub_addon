@@ -117,10 +117,9 @@ class AnkiHubClient:
         )
         return response
 
-    def subscribe(self, deck_id: int):
-        qDebug(f"Requesting subscription to {deck_id}")
+    def confirm_subscription(self, deck_id: int):
         response = self._call_api(
             "POST",
-            f"/decks/{deck_id}/subscribe/",
+            f"/decks/{deck_id}/confirm_subscription/",
         )
         return response

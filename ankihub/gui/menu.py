@@ -167,6 +167,11 @@ class SubscribeToDeck(QWidget):
                 "Oops! Please copy/paste a Deck ID from AnkiHub.net/browse (numbers only)!"
             )
             return
+        # TODO Complete once the endpoint is available.
+        # subscribe_response = self.client.confirm_subscription(deck_id)
+        # if subscribe_response == 200:
+        #     qDebug(f"Subscribed to {deck_id}")
+        #     tooltip("Subscription confirmed!")
         # TODO use mw.taskman
         self.label_results.setText("Downloading deck...")
         response = client.get_deck_by_id(deck_id)
