@@ -183,6 +183,11 @@ class SubscribeToDeck(QWidget):
                 title="Please confirm to proceed.",
                 defaultno=True,
             )
+            if confirmed:
+                tooltip("Installing the collaborative deck.")
+                self.install_deck(download_result)
+        self.close()
+
     def download_deck(self, deck_id):
         self.label_results.setText("Downloading deck...")
         deck_response = self.client.get_deck_by_id(deck_id)
@@ -204,10 +209,15 @@ class SubscribeToDeck(QWidget):
             with csv_file.open("wb") as f:
                 f.write(s3_response.content)
             self.label_results.setText("Success!")
-            subscribe_response = client.subscribe(deck_id)
-            if subscribe_response == 200:
-                tooltip("Subscription confirmed!")
-            self.close()
+            if deck_response == 200 and s3_response == 200:
+                return csv_file
+
+    def install_deck(self, csv_file: Path):
+        """
+        :param csv_file:
+        """
+        with csv_file.open() as f:
+            reader = csv.reader(f, delimiter=CSV_DELIMITER)
 
     @classmethod
     def display_subscribe_window(cls):
