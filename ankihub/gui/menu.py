@@ -179,7 +179,7 @@ class SubscribeToDeck(QWidget):
         #     tooltip("Subscription confirmed!")
         # TODO use mw.taskman
         download_result = self.download_deck(deck_id)
-        if download_result:
+        if download_result.exists():
             confirmed = askUser(
                 f"The AnkiHub deck {deck_id} has been downloaded. Would you like to "
                 f"proceed with modifying your personal collection in order to subscribe "
