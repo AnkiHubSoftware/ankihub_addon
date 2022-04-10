@@ -117,7 +117,7 @@ class AnkiHubClient:
         )
         return response
 
-    def confirm_subscription(self, deck_id: int):
+    def confirm_subscription(self, deck_id: int) -> Response:
         response = self._call_api(
             "POST",
             f"/decks/{deck_id}/confirm_subscription/",

@@ -54,7 +54,7 @@ class AnkiHubLogin(QWidget):
         self.password_box = QHBoxLayout()
         self.password_box_label = QLabel("Password:")
         self.password_box_text = QLineEdit("", self)
-        self.password_box_text.setEchoMode(QLineEdit.Password)
+        self.password_box_text.setEchoMode(QLineEdit.EchoMode.Password)
         self.password_box_text.setMinimumWidth(300)
         self.password_box.addWidget(self.password_box_label)
         self.password_box.addWidget(self.password_box_text)
@@ -85,7 +85,7 @@ class AnkiHubLogin(QWidget):
         self.setLayout(self.box_top)
 
         self.setMinimumWidth(500)
-        self.setSizePolicy(QSizePolicy.Minimum, QSizePolicy.Minimum)
+        self.setSizePolicy(QSizePolicy.Policy.Minimum, QSizePolicy.Policy.Minimum)
         self.setWindowTitle("Login to AnkiHub.")
         self.show()
 
@@ -155,7 +155,7 @@ class SubscribeToDeck(QWidget):
         self.setLayout(self.box_top)
 
         self.setMinimumWidth(500)
-        self.setSizePolicy(QSizePolicy.Minimum, QSizePolicy.Minimum)
+        self.setSizePolicy(QSizePolicy.Policy.Minimum, QSizePolicy.Policy.Minimum)
         self.setWindowTitle("Subscribe to Collaborative Deck")
         self.client = AnkiHubClient()
         if not self.client.token:
@@ -174,7 +174,6 @@ class SubscribeToDeck(QWidget):
         # TODO Complete once the endpoint is available.
         # subscribe_response = self.client.confirm_subscription(deck_id)
         # if subscribe_response == 200:
-        #     qDebug(f"Subscribed to {deck_id}")
         #     tooltip("Subscription confirmed!")
         # TODO use mw.taskman
         download_result = self.download_deck(deck_id)
@@ -188,12 +187,10 @@ class SubscribeToDeck(QWidget):
                 defaultno=True,
             )
             if confirmed:
-                tooltip("Installing the collaborative deck.")
                 self.install_deck(download_result)
         self.close()
 
     def download_deck(self, deck_id):
-        self.label_results.setText("Downloading deck...")
         deck_response = self.client.get_deck_by_id(deck_id)
         if deck_response.status_code == 404:
             showText(
@@ -205,6 +202,10 @@ class SubscribeToDeck(QWidget):
             return
         elif deck_response.status_code == 200:
             data = deck_response.json()
+            deck_installed = askUser(
+                f"Is this your first time installing the {deck_id} deck? "
+                f"Answer 'yes' if you have not yet downloaded and opened the {deck_id} in Anki. "
+                f"Answer 'no' if you have already downloaded and opened the {deck_id} in Anki."
             )
             csv_file = Path(tempfile.mkdtemp()) / f"{deck_id}.csv"
             with csv_file.open("wb") as f:
