@@ -161,6 +161,8 @@ class SubscribeToDeck(QWidget):
         if not self.client.token:
             showText("Oops! Please make sure you are logged into AnkiHub!")
             self.close()
+        else:
+            self.show()
 
     def subscribe(self):
         deck_id = self.deck_id_box_text.text()
