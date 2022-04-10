@@ -212,7 +212,9 @@ class SubscribeToDeck(QWidget):
             # deck_file_name = data["csv_name"] if deck_installed else data["apkg_name"]
             # TODO Remove hard coded value once api is updated
             deck_file_name = "deck_77_notes.csv"
-            presigned_url_response = self.client.get_presigned_url(key=deck_file_name, action="download")
+            presigned_url_response = self.client.get_presigned_url(
+                key=deck_file_name, action="download"
+            )
             s3_url = presigned_url_response.json()["pre_signed_url"]
             s3_response = requests.get(s3_url)
             qDebug(f"{s3_response.url}")
@@ -234,7 +236,6 @@ class SubscribeToDeck(QWidget):
             reader = csv.DictReader(f, delimiter=CSV_DELIMITER)
             note_types = {row["note_type"] for row in reader}
         modify_note_types(note_types)
-
 
     @classmethod
     def display_subscribe_window(cls):
