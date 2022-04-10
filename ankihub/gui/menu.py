@@ -205,12 +205,14 @@ class SubscribeToDeck(QWidget):
             return
         elif deck_response.status_code == 200:
             data = deck_response.json()
-            csv_url = data["csv_notes_url"]
-            s3_response = requests.get(
-                csv_url,
             )
             csv_file = Path(tempfile.mkdtemp()) / f"{deck_id}.csv"
             with csv_file.open("wb") as f:
+            presigned_url_response = self.client.get_presigned_url(key=deck_file_name, action="download")
+            s3_url = presigned_url_response.json()["pre_signed_url"]
+            s3_response = requests.get(s3_url)
+            qDebug(f"{s3_response.url}")
+            qDebug(f"{s3_response.status_code}")
                 f.write(s3_response.content)
             self.label_results.setText("Success!")
             if deck_response == 200 and s3_response == 200:

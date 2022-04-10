@@ -123,3 +123,16 @@ class AnkiHubClient:
             f"/decks/{deck_id}/confirm_subscription/",
         )
         return response
+
+    def get_presigned_url(self, key: str, action: str) -> Response:
+        """
+        Get URL for s3.
+        :param key: deck name
+        :param action: upload or download
+        :return:
+        """
+        method = "GET"
+        endpoint = "/decks/pre-signed-url"
+        data = {"key": key, "type": action}
+        response = self._call_api(method, endpoint, params=data)
+        return response
