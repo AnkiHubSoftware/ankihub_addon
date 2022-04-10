@@ -7,7 +7,7 @@ from PyQt6.QtCore import qDebug
 
 from ankihub.ankihub_client import AnkiHubClient
 from ankihub.constants import CSV_DELIMITER
-from ankihub.register_decks import create_collaborative_deck
+from ankihub.register_decks import create_collaborative_deck, modify_note_types
 from aqt import mw
 from aqt.qt import QAction, QMenu, qconnect
 from aqt.studydeck import StudyDeck
@@ -209,24 +209,32 @@ class SubscribeToDeck(QWidget):
                 f"Answer 'yes' if you have not yet downloaded and opened the {deck_id} in Anki. "
                 f"Answer 'no' if you have already downloaded and opened the {deck_id} in Anki."
             )
-            csv_file = Path(tempfile.mkdtemp()) / f"{deck_id}.csv"
-            with csv_file.open("wb") as f:
+            # deck_file_name = data["csv_name"] if deck_installed else data["apkg_name"]
+            # TODO Remove hard coded value once api is updated
+            deck_file_name = "deck_77_notes.csv"
             presigned_url_response = self.client.get_presigned_url(key=deck_file_name, action="download")
             s3_url = presigned_url_response.json()["pre_signed_url"]
             s3_response = requests.get(s3_url)
             qDebug(f"{s3_response.url}")
             qDebug(f"{s3_response.status_code}")
+            out_file = Path(tempfile.mkdtemp()) / f"{deck_id}.csv"
+            with out_file.open("wb") as f:
                 f.write(s3_response.content)
-            self.label_results.setText("Success!")
-            if deck_response == 200 and s3_response == 200:
-                return csv_file
+                qDebug(f"Wrote {deck_file_name} to {out_file}")
+                # TODO Validate .csv
+            self.label_results.setText("Deck download successful!")
+            return out_file
 
     def install_deck(self, csv_file: Path):
         """
         :param csv_file:
         """
+        tooltip("Configuring the collaborative deck.")
         with csv_file.open() as f:
-            csv.reader(f, delimiter=CSV_DELIMITER)
+            reader = csv.DictReader(f, delimiter=CSV_DELIMITER)
+            note_types = {row["note_type"] for row in reader}
+        modify_note_types(note_types)
+
 
     @classmethod
     def display_subscribe_window(cls):

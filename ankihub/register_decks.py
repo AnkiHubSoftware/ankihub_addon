@@ -65,8 +65,9 @@ def modify_note_type(note_type: NoteType) -> None:
     mm.save(note_type)
 
 
-def modify_notes(note_types):
+def modify_note_types(note_types: Iterable[str]):
     for note_type in note_types:
+        note_type = mw.col.models.by_name(note_type)
         modify_note_type(note_type)
     # TODO Run add_id_fields
 
@@ -89,7 +90,7 @@ def upload_deck(did: int) -> None:
 
 
 def _create_collaborative_deck(note_types, did):
-    modify_notes(note_types)
+    modify_note_types(note_types)
     upload_deck(did)
 
 
