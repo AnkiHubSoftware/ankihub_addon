@@ -315,7 +315,6 @@ def subscribe_to_deck_setup(parent):
     """Set up the menu item for uploading suggestions in bulk."""
     q_action = QAction("Subscribe to collaborative deck", mw)
     q_action.triggered.connect(SubscribeToDeck.display_subscribe_window)
-    # qconnect(q_action.triggered, SubscribeToDeck.display_subscribe_window)
     parent.addAction(q_action)
 
 
