@@ -7,7 +7,11 @@ from PyQt6.QtCore import qDebug
 
 from ankihub.ankihub_client import AnkiHubClient
 from ankihub.constants import CSV_DELIMITER
-from ankihub.register_decks import create_collaborative_deck, modify_note_types
+from ankihub.register_decks import (
+    create_collaborative_deck,
+    modify_note_types,
+    populate_ankihub_id_fields,
+)
 from aqt import mw
 from aqt.qt import QAction, QMenu, qconnect
 from aqt.studydeck import StudyDeck

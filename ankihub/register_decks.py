@@ -5,7 +5,9 @@ import os
 import pathlib
 import tempfile
 import uuid
+from typing import Iterable
 
+from PyQt6.QtCore import qDebug
 from anki.exporting import AnkiPackageExporter
 from anki.models import NoteType
 from aqt import mw
@@ -26,7 +28,7 @@ def populate_ankihub_id_fields(note_ids: Iterable[tuple[str, str]]) -> None:
     updated_notes = []
     for anki_id, ankihub_id in note_ids:
         note = mw.col.get_note(id=int(anki_id))
-        note['AnkiHub ID'] = ankihub_id
+        note["AnkiHub ID"] = ankihub_id
         updated_notes.append(note)
     mw.col.update_notes(updated_notes)
 
