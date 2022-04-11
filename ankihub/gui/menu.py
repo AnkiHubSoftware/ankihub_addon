@@ -232,10 +232,17 @@ class SubscribeToDeck(QWidget):
         :param csv_file:
         """
         tooltip("Configuring the collaborative deck.")
+        note_types = set()
+        anki_ids, ankihub_ids = [], []
         with csv_file.open() as f:
             reader = csv.DictReader(f, delimiter=CSV_DELIMITER)
-            note_types = {row["note_type"] for row in reader}
+            for row in reader:
+                note_types.add(row["note_type"])
+                anki_ids.append(row["anki_id"])
+                ankihub_ids.append(row["id"])
+        note_ids = zip(anki_ids, ankihub_ids)
         modify_note_types(note_types)
+        populate_ankihub_id_fields(note_ids)
 
     @classmethod
     def display_subscribe_window(cls):

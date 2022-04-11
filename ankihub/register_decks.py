@@ -18,19 +18,17 @@ from .utils import get_note_types_in_deck
 DIR_PATH = os.path.dirname(os.path.abspath(__file__))
 
 
-def populate_ankihub_id_fields(did: int) -> None:
+def populate_ankihub_id_fields(note_ids: Iterable[tuple[str, str]]) -> None:
     """Populate the AnkiHub ID field that was added to the Note Type by
     modify_note_type."""
     # TODO Get the lest of AnkiHub IDs from AnkiHub.
     # TODO This should operate on a mapping between AnkiHub IDs and Anki Note IDs.
-    deck_name = mw.col.decks.name(did)
-    note_ids = mw.col.find_notes(f'"deck:{deck_name}"')
-    for nid in note_ids:
-        note = mw.col.getNote(id=nid)
-        if constants.ANKIHUB_NOTE_TYPE_FIELD_NAME not in note.fields:
-            # Log error
-            continue
-        note.flush()
+    updated_notes = []
+    for anki_id, ankihub_id in note_ids:
+        note = mw.col.get_note(id=int(anki_id))
+        note['AnkiHub ID'] = ankihub_id
+        updated_notes.append(note)
+    mw.col.update_notes(updated_notes)
 
 
 def modify_note_type(note_type: NoteType) -> None:
