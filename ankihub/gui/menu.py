@@ -177,10 +177,6 @@ class SubscribeToDeck(QWidget):
                 "Oops! Please copy/paste a Deck ID from AnkiHub.net/browse (numbers only)!"
             )
             return
-        # TODO Complete once the endpoint is available.
-        # subscribe_response = self.client.confirm_subscription(deck_id)
-        # if subscribe_response == 200:
-        #     tooltip("Subscription confirmed!")
         # TODO use mw.taskman
         download_result = self.download_deck(deck_id)
         if download_result.exists():
@@ -195,6 +191,10 @@ class SubscribeToDeck(QWidget):
             if confirmed:
                 self.install_deck(download_result)
         tooltip(f"The {deck_id} deck has successfully been installed!")
+        # TODO Complete once the endpoint is available.
+        # subscribe_response = self.client.confirm_subscription(deck_id)
+        # if subscribe_response == 200:
+        #     tooltip("Subscription confirmed!")
         self.close()
 
     def download_deck(self, deck_id):
