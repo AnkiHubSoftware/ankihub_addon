@@ -198,6 +198,14 @@ class SubscribeToDeck(QWidget):
         self.close()
 
     def download_deck(self, deck_id):
+        """
+        Take the AnkiHub deck id, copyied/pasted by the user and
+        1) Download the deck .csv or .apkg, depending on if the user already has
+        the deck.
+
+        :param deck_id: the deck's ankihub id
+        :return:
+        """
         deck_response = self.client.get_deck_by_id(deck_id)
         if deck_response.status_code == 404:
             showText(
@@ -209,6 +217,8 @@ class SubscribeToDeck(QWidget):
             return
         elif deck_response.status_code == 200:
             data = deck_response.json()
+            # TODO We can actually just check for the deck id in the user's local collection
+            #   rather than asking them.
             deck_installed = askUser(
                 f"Is this your first time installing the {deck_id} deck? "
                 f"Answer 'yes' if you have not yet downloaded and opened the {deck_id} in Anki. "
@@ -233,14 +243,16 @@ class SubscribeToDeck(QWidget):
             self.label_results.setText("Deck download successful!")
             return out_file
 
-    def install_deck(self, csv_file: Path):
+    def install_deck(self, deck_file: Path):
+        """If we have a .csv, read data from the file and modify the user's note types
+        and notes.
+        :param: path to the .csv or .apkg file
         """
-        :param csv_file:
-        """
+        # TODO Handle .apkg as well
         tooltip("Configuring the collaborative deck.")
         note_types = set()
         anki_ids, ankihub_ids = [], []
-        with csv_file.open() as f:
+        with deck_file.open() as f:
             reader = csv.DictReader(f, delimiter=CSV_DELIMITER)
             for row in reader:
                 note_types.add(row["note_type"])
