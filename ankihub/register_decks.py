@@ -39,6 +39,11 @@ def modify_note_type(note_type: NoteType) -> None:
     """
     "Adds ankihub field. Adds link to ankihub in card template."
     mm = mw.col.models
+    fields = note_type["flds"]
+    field_names = [field["name"] for field in fields]
+    if constants.ANKIHUB_NOTE_TYPE_FIELD_NAME in field_names:
+        qDebug(f"{constants.ANKIHUB_NOTE_TYPE_FIELD_NAME} already exists.")
+        return
     ankihub_field = mm.new_field(constants.ANKIHUB_NOTE_TYPE_FIELD_NAME)
     # Put our field last.
     ankihub_field["ord"] = len(fields)
