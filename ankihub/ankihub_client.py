@@ -1,10 +1,12 @@
-from typing import Union, Dict, List
+from typing import Dict, List
 
 import requests
-from ankihub.config import Config
-from ankihub.constants import API_URL_BASE
+from PyQt6.QtCore import qDebug
 from aqt.utils import showText
-from requests import Response, HTTPError
+
+from ankihub.config import Config
+from ankihub.constants import API_URL_BASE, USER_SUPPORT_EMAIL_SLUG
+from requests import Response
 
 
 class AnkiHubClient:
@@ -19,26 +21,30 @@ class AnkiHubClient:
             self._headers["Authorization"] = f"Token {self.token}"
 
     def _call_api(self, method, endpoint, data=None, params=None):
+        url = f"{self._base_url}{endpoint}"
         response = requests.request(
             method=method,
             headers=self._headers,
-            url=f"{self._base_url}{endpoint}",
+            url=url,
             json=data,
             params=params,
         )
-        try:
-            response.raise_for_status()
-        except HTTPError as e:
-            # TODO Add retry logic and log to Sentry.
+        qDebug(f"{method} {url} {data} {params} {self._headers}")
+        qDebug(f"{response.content}")
+        qDebug(f"{response.status_code}")
+        if response.status_code != 200:
             showText(
-                "There was an issue with your request. Please try again.\n\n"
-                "You can share the following details when reporting the error:"
-                "to user support:\n\n"
-                f"{e}"
+                "If you haven't already signed in using the AnkiHub menu in Anki "
+                "desktop please do so. Make sure your username and password are correct "
+                "and that you have confirmed your AnkiHub account through "
+                "email verification. "
+                "If you believe this is an error, please reach "
+                f"out to user support at {USER_SUPPORT_EMAIL_SLUG}."
             )
         return response
 
     def login(self, credentials: dict):
+        self.signout()
         response = self._call_api("POST", "/login/", credentials)
         token = response.json().get("token")
         if token:
@@ -50,12 +56,13 @@ class AnkiHubClient:
     def signout(self):
         self._config.save_token("")
         self._headers["Authorization"] = ""
+        qDebug("Token cleared from config.")
 
     def upload_deck(self, key: str) -> Response:
         response = self._call_api("POST", "/decks/", data={"key": key})
         return response
 
-    def get_deck_updates(self, deck_id: str) -> Union[Response, dict]:
+    def get_deck_updates(self, deck_id: str) -> Response:
         response = self._call_api(
             "GET",
             f"/decks/{deck_id}/updates",
@@ -65,14 +72,14 @@ class AnkiHubClient:
             self._config.save_last_sync()
         return response
 
-    def get_deck_by_id(self, deck_id: str) -> Union[Response, dict]:
+    def get_deck_by_id(self, deck_id: str) -> Response:
         response = self._call_api(
             "GET",
             f"/decks/{deck_id}/",
         )
         return response
 
-    def get_note_by_anki_id(self, anki_id: str) -> Union[Response, dict]:
+    def get_note_by_anki_id(self, anki_id: str) -> Response:
         response = self._call_api("GET", f"/notes/{anki_id}")
         return response
 
@@ -108,4 +115,24 @@ class AnkiHubClient:
         response = self._call_api(
             "POST", f"/decks/{deck_id}/note-suggestion/", suggestion
         )
+        return response
+
+    def confirm_subscription(self, deck_id: int) -> Response:
+        response = self._call_api(
+            "POST",
+            f"/decks/{deck_id}/confirm_subscription/",
+        )
+        return response
+
+    def get_presigned_url(self, key: str, action: str) -> Response:
+        """
+        Get URL for s3.
+        :param key: deck name
+        :param action: upload or download
+        :return:
+        """
+        method = "GET"
+        endpoint = "/decks/pre-signed-url"
+        data = {"key": key, "type": action}
+        response = self._call_api(method, endpoint, params=data)
         return response

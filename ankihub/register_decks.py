@@ -5,7 +5,9 @@ import os
 import pathlib
 import tempfile
 import uuid
+from typing import Iterable
 
+from PyQt6.QtCore import qDebug
 from anki.exporting import AnkiPackageExporter
 from anki.models import NoteType
 from aqt import mw
@@ -18,19 +20,17 @@ from .utils import get_note_types_in_deck
 DIR_PATH = os.path.dirname(os.path.abspath(__file__))
 
 
-def populate_ankihub_id_fields(did: int) -> None:
+def populate_ankihub_id_fields(note_ids: Iterable[tuple[str, str]]) -> None:
     """Populate the AnkiHub ID field that was added to the Note Type by
     modify_note_type."""
     # TODO Get the lest of AnkiHub IDs from AnkiHub.
     # TODO This should operate on a mapping between AnkiHub IDs and Anki Note IDs.
-    deck_name = mw.col.decks.name(did)
-    note_ids = mw.col.find_notes(f'"deck:{deck_name}"')
-    for nid in note_ids:
-        note = mw.col.getNote(id=nid)
-        if constants.ANKIHUB_NOTE_TYPE_FIELD_NAME not in note.fields:
-            # Log error
-            continue
-        note.flush()
+    updated_notes = []
+    for anki_id, ankihub_id in note_ids:
+        note = mw.col.get_note(id=int(anki_id))
+        note["AnkiHub ID"] = ankihub_id
+        updated_notes.append(note)
+    mw.col.update_notes(updated_notes)
 
 
 def modify_note_type(note_type: NoteType) -> None:
@@ -39,9 +39,15 @@ def modify_note_type(note_type: NoteType) -> None:
     """
     "Adds ankihub field. Adds link to ankihub in card template."
     mm = mw.col.models
+    fields = note_type["flds"]
+    field_names = [field["name"] for field in fields]
+    if constants.ANKIHUB_NOTE_TYPE_FIELD_NAME in field_names:
+        qDebug(f"{constants.ANKIHUB_NOTE_TYPE_FIELD_NAME} already exists.")
+        return
     ankihub_field = mm.new_field(constants.ANKIHUB_NOTE_TYPE_FIELD_NAME)
-    # potential way to hide the field:
-    # ankihub_field["size"] = 0
+    # Put our field last.
+    ankihub_field["ord"] = len(fields)
+    ankihub_field["size"] = 0
     mm.add_field(note_type, ankihub_field)
     # TODO Genericize this by creating a function that takes a template and
     #  returns a new template.
@@ -59,14 +65,14 @@ def modify_note_type(note_type: NoteType) -> None:
         )
     )
     templates = note_type["tmpls"]
-    # Can we always expect len(templates) == 1?
     for template in templates:
         template["afmt"] += link_html
     mm.save(note_type)
 
 
-def modify_notes(note_types):
+def modify_note_types(note_types: Iterable[str]):
     for note_type in note_types:
+        note_type = mw.col.models.by_name(note_type)
         modify_note_type(note_type)
     # TODO Run add_id_fields
 
@@ -89,7 +95,7 @@ def upload_deck(did: int) -> None:
 
 
 def _create_collaborative_deck(note_types, did):
-    modify_notes(note_types)
+    modify_note_types(note_types)
     upload_deck(did)
 
 
