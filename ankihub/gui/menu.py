@@ -190,6 +190,7 @@ class SubscribeToDeck(QWidget):
             )
             if confirmed:
                 self.install_deck(download_result)
+        tooltip(f"The {deck_id} deck has successfully been installed!")
         self.close()
 
     def download_deck(self, deck_id):
@@ -219,6 +220,7 @@ class SubscribeToDeck(QWidget):
             s3_response = requests.get(s3_url)
             qDebug(f"{s3_response.url}")
             qDebug(f"{s3_response.status_code}")
+            # TODO Use io.BytesIO
             out_file = Path(tempfile.mkdtemp()) / f"{deck_id}.csv"
             with out_file.open("wb") as f:
                 f.write(s3_response.content)
