@@ -139,7 +139,7 @@ class SubscribeToDeck(QWidget):
         self.deck_id_box.addWidget(self.deck_id_box_text)
         self.box_left.addLayout(self.deck_id_box)
 
-        self.subscribe_button = QPushButton("Subscribe to Deck", self)
+        self.subscribe_button = QPushButton("Sync with Deck", self)
         self.bottom_box_section.addWidget(self.subscribe_button)
         self.subscribe_button.clicked.connect(self.subscribe)
         self.box_left.addLayout(self.bottom_box_section)
@@ -179,7 +179,7 @@ class SubscribeToDeck(QWidget):
             return
         # TODO use mw.taskman
         download_result = self.download_deck(deck_id)
-        if download_result.exists():
+        if download_result and download_result.exists():
             confirmed = askUser(
                 f"The AnkiHub deck {deck_id} has been downloaded. Would you like to "
                 f"proceed with modifying your personal collection in order to subscribe "
@@ -190,7 +190,6 @@ class SubscribeToDeck(QWidget):
             )
             if confirmed:
                 self.install_deck(download_result)
-        tooltip(f"The {deck_id} deck has successfully been installed!")
         # TODO Complete once the endpoint is available.
         # subscribe_response = self.client.confirm_subscription(deck_id)
         # if subscribe_response == 200:
@@ -219,7 +218,7 @@ class SubscribeToDeck(QWidget):
             data = deck_response.json()
             # TODO We can actually just check for the deck id in the user's local collection
             #   rather than asking them.
-            deck_installed = askUser(
+            first_time_install = askUser(
                 f"Is this your first time installing the {deck_id} deck? "
                 f"Answer 'yes' if you have not yet downloaded and opened the {deck_id} in Anki. "
                 f"Answer 'no' if you have already downloaded and opened the {deck_id} in Anki."
@@ -261,6 +260,7 @@ class SubscribeToDeck(QWidget):
         note_ids = zip(anki_ids, ankihub_ids)
         modify_note_types(note_types)
         populate_ankihub_id_fields(note_ids)
+        tooltip(f"The deck has successfully been installed!")
 
     @classmethod
     def display_subscribe_window(cls):
@@ -313,7 +313,7 @@ def upload_suggestions_setup(parent):
 
 def subscribe_to_deck_setup(parent):
     """Set up the menu item for uploading suggestions in bulk."""
-    q_action = QAction("Subscribe to collaborative deck", mw)
+    q_action = QAction("Sync with collaborative deck", mw)
     q_action.triggered.connect(SubscribeToDeck.display_subscribe_window)
     parent.addAction(q_action)
 
