@@ -3,6 +3,7 @@ import uuid
 from anki.hooks import addHook
 from aqt import gui_hooks
 from aqt.editor import Editor
+from aqt.utils import chooseList
 
 from ..ankihub_client import AnkiHubClient
 from ..config import Config
@@ -29,6 +30,14 @@ def on_ankihub_button_press(editor: Editor):
             tags=tags,
         )
     elif command == AnkiHubCommands.NEW.value:
+        subscribed_decks = client._config.private_config.decks
+        if len(subscribed_decks) == 1:
+            deck_id = subscribed_decks[0]
+        else:
+            deck_id = chooseList(
+                "Which AnKiHub deck would you like to add this note to?",
+                choices=subscribed_decks
+            )
         ankihub_id = str(uuid.uuid4())
         editor.note["AnkiHub ID"] = ankihub_id
         editor.mw.col.update_note(editor.note)
