@@ -26,7 +26,7 @@ class Config:
             mw.addonManager.addonsFolder("ankihub"), "user_files"
         )
         self._private_config_file_path = os.path.join(
-            user_files_path, "private_config.json"
+            user_files_path, ".private_config.json"
         )
         if not os.path.exists(self._private_config_file_path):
             self.private_config = PrivateConfig()
