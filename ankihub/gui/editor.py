@@ -39,8 +39,6 @@ def on_ankihub_button_press(editor: Editor):
                 choices=subscribed_decks
             )
         ankihub_id = str(uuid.uuid4())
-        editor.note["AnkiHub ID"] = ankihub_id
-        editor.mw.col.update_note(editor.note)
         response = client.create_new_note_suggestion(
             deck_id=deck_id,
             anki_id=editor.note.id,
@@ -48,7 +46,9 @@ def on_ankihub_button_press(editor: Editor):
             fields=fields,
             tags=tags,
         )
-    return response
+        if response.status_code == 200:
+            editor.note["AnkiHub ID"] = ankihub_id
+            editor.mw.col.update_note(editor.note)
 
 
 def setup_editor_buttons(buttons, editor: Editor):
