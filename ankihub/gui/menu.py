@@ -6,6 +6,7 @@ import requests
 from PyQt6.QtCore import qDebug
 
 from ankihub.ankihub_client import AnkiHubClient
+from ankihub.config import Config
 from ankihub.constants import CSV_DELIMITER
 from ankihub.register_decks import (
     create_collaborative_deck,
@@ -161,6 +162,8 @@ class SubscribeToDeck(QWidget):
         self.setMinimumWidth(500)
         self.setSizePolicy(QSizePolicy.Policy.Minimum, QSizePolicy.Policy.Minimum)
         self.setWindowTitle("Subscribe to Collaborative Deck")
+
+        self.config = Config()
         self.client = AnkiHubClient()
         if not self.client.token:
             showText("Oops! Please make sure you are logged into AnkiHub!")
@@ -249,7 +252,7 @@ class SubscribeToDeck(QWidget):
         """
         # TODO Handle .apkg as well
         tooltip("Configuring the collaborative deck.")
-        note_types = set()
+        note_types, ankihub_deck_ids = set(), set()
         anki_ids, ankihub_ids = [], []
         with deck_file.open() as f:
             reader = csv.DictReader(f, delimiter=CSV_DELIMITER)
@@ -257,9 +260,12 @@ class SubscribeToDeck(QWidget):
                 note_types.add(row["note_type"])
                 anki_ids.append(row["anki_id"])
                 ankihub_ids.append(row["id"])
+                ankihub_deck_ids.add(row["deck"])
         note_ids = zip(anki_ids, ankihub_ids)
         modify_note_types(note_types)
         populate_ankihub_id_fields(note_ids)
+        # TODO Also update fields
+        self.config.save_subscription(list(ankihub_deck_ids))
         tooltip(f"The deck has successfully been installed!")
 
     @classmethod

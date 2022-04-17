@@ -59,4 +59,5 @@ class Config:
     def save_subscription(self, deck_ids: typing.List[int]):
         decks = self.private_config.decks
         decks += list(deck_ids)
+        self.save_last_sync()
         self._update_private_config()
