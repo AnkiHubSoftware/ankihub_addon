@@ -16,7 +16,7 @@ class AnkiHubClient:
         self._headers = {"Content-Type": "application/json"}
         self._config = Config()
         self._base_url = API_URL_BASE
-        self.token = self._config.get_token()
+        self.token = self._config.private_config.token
         if self.token:
             self._headers["Authorization"] = f"Token {self.token}"
 
@@ -66,7 +66,7 @@ class AnkiHubClient:
         response = self._call_api(
             "GET",
             f"/decks/{deck_id}/updates",
-            params={"since": f"{self._config.get_last_sync()}"},
+            params={"since": f"{self._config.private_config.last_sync}"},
         )
         if response.status_code == 200:
             self._config.save_last_sync()
