@@ -226,9 +226,7 @@ class SubscribeToDeck(QWidget):
                 f"Answer 'yes' if you have not yet downloaded and opened the {deck_id} in Anki. "
                 f"Answer 'no' if you have already downloaded and opened the {deck_id} in Anki."
             )
-            # deck_file_name = data["csv_name"] if deck_installed else data["apkg_name"]
-            # TODO Remove hard coded value once api is updated
-            deck_file_name = "deck_77_notes.csv"
+            deck_file_name = data["csv_notes_filename"] if first_time_install else data["apkg_filename"]
             presigned_url_response = self.client.get_presigned_url(
                 key=deck_file_name, action="download"
             )
