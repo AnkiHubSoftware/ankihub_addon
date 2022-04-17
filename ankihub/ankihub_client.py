@@ -29,10 +29,9 @@ class AnkiHubClient:
             json=data,
             params=params,
         )
-        qDebug(f"{method} {url} {data} {params} {self._headers}")
-        qDebug(f"{response.content}")
-        qDebug(f"{response.status_code}")
-        if response.status_code != 200:
+        qDebug(f"request: {method} {url} {data} {params} {self._headers}")
+        qDebug(f"response status: {response.status_code}")
+        qDebug(f"response content: {response.content}")
         if response.status_code > 299:
             showText(
                 "Uh oh! There was a problem with your request.\n\n"
