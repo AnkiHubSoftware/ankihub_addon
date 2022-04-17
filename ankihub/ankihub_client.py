@@ -100,20 +100,22 @@ class AnkiHubClient:
         return response
 
     def create_new_note_suggestion(
-        self,
-        deck_id: int,
-        ankihub_id: str,
-        fields: Dict[str, str],
-        tags: List[str],
+            self,
+            deck_id: int,
+            anki_id: int,
+            ankihub_id: str,
+            fields: Dict[str, str],
+            tags: List[str],
     ) -> Response:
         suggestion = {
             "related_deck": deck_id,
+            "anki_id": anki_id,
             "ankihub_id": ankihub_id,
             "fields": fields,
             "tags": tags,
         }
         response = self._call_api(
-            "POST", f"/decks/{deck_id}/note-suggestion/", suggestion
+            "POST", f"/decks/{deck_id}/note-suggestion/", data=suggestion
         )
         return response
 

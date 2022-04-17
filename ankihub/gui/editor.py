@@ -34,6 +34,7 @@ def on_ankihub_button_press(editor: Editor):
         editor.mw.col.update_note(editor.note)
         response = client.create_new_note_suggestion(
             deck_id=deck_id,
+            anki_id=editor.note.id,
             ankihub_id=ankihub_id,
             fields=fields,
             tags=tags,
