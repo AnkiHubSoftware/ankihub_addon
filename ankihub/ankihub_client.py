@@ -33,13 +33,14 @@ class AnkiHubClient:
         qDebug(f"{response.content}")
         qDebug(f"{response.status_code}")
         if response.status_code != 200:
+        if response.status_code > 299:
             showText(
-                "If you haven't already signed in using the AnkiHub menu in Anki "
-                "desktop please do so. Make sure your username and password are correct "
-                "and that you have confirmed your AnkiHub account through "
-                "email verification. "
-                "If you believe this is an error, please reach "
-                f"out to user support at {USER_SUPPORT_EMAIL_SLUG}."
+                "Uh oh! There was a problem with your request.\n\n"
+                "If you haven't already signed in using the AnkiHub menu please do so. "
+                "Make sure your username and password are correct and that you have "
+                "confirmed your AnkiHub account through email verification. If you "
+                "believe this is an error, please reach out to user support at "
+                f"{USER_SUPPORT_EMAIL_SLUG}. This error will be automatically reported."
             )
         return response
 
