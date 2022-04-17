@@ -95,7 +95,7 @@ class AnkiHubClient:
             "tags": tags,
         }
         response = self._call_api(
-            "POST", f"/notes/{ankihub_id}/suggestion/", suggestion
+            "POST", f"/notes/{ankihub_id}/suggestion/", data=suggestion
         )
         return response
 
