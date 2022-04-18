@@ -189,14 +189,9 @@ class SubscribeToDeck(QWidget):
                 f"to the collaborative deck? See https://ankihub.net/info/subscribe for "
                 f"details.",
                 title="Please confirm to proceed.",
-                defaultno=True,
             )
             if confirmed:
                 self.install_deck(download_result)
-        # TODO Complete once the endpoint is available.
-        # subscribe_response = self.client.confirm_subscription(deck_id)
-        # if subscribe_response == 200:
-        #     tooltip("Subscription confirmed!")
         self.close()
 
     def download_deck(self, deck_id):
@@ -222,11 +217,12 @@ class SubscribeToDeck(QWidget):
             # TODO We can actually just check for the deck id in the user's local collection
             #   rather than asking them.
             first_time_install = askUser(
-                f"Is this your first time installing the {deck_id} deck? "
-                f"Answer 'yes' if you have not yet downloaded and opened the {deck_id} in Anki. "
-                f"Answer 'no' if you have already downloaded and opened the {deck_id} in Anki."
+                f"Is this your first time installing the {deck_id} deck?\n\n"
+                f"Answer No if you have already downloaded and opened the {deck_id} in Anki.\n\n"
+                f"Answer Yes if you have *not* yet downloaded and opened the {deck_id} in Anki. ",
+                defaultno=True,
             )
-            deck_file_name = data["csv_notes_filename"] if first_time_install else data["apkg_filename"]
+            deck_file_name = data["apkg_filename"] if first_time_install else data["csv_notes_filename"]
             presigned_url_response = self.client.get_presigned_url(
                 key=deck_file_name, action="download"
             )
