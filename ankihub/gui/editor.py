@@ -29,6 +29,8 @@ def on_ankihub_button_press(editor: Editor):
             fields=fields,
             tags=tags,
         )
+        if response.status_code == 201:
+            pass
     elif command == AnkiHubCommands.NEW.value:
         subscribed_decks = client._config.private_config.decks
         if len(subscribed_decks) == 1:
@@ -46,7 +48,7 @@ def on_ankihub_button_press(editor: Editor):
             fields=fields,
             tags=tags,
         )
-        if response.status_code == 200:
+        if response.status_code == 201:
             editor.note["AnkiHub ID"] = ankihub_id
             editor.mw.col.update_note(editor.note)
 
