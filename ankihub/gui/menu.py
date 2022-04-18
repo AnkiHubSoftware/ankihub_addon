@@ -250,17 +250,17 @@ class SubscribeToDeck(QWidget):
         """
         # TODO Handle .apkg as well
         tooltip("Configuring the collaborative deck.")
-        note_types, ankihub_deck_ids = set(), set()
-        anki_ids, ankihub_ids = [], []
+        ankihub_deck_ids = set()
+        anki_ids, ankihub_ids, note_type_ids = [], [], []
         with deck_file.open() as f:
             reader = csv.DictReader(f, delimiter=CSV_DELIMITER)
             for row in reader:
-                note_types.add(row["note_type"])
+                note_type_ids.append(row["note_type"])
                 anki_ids.append(row["anki_id"])
                 ankihub_ids.append(row["id"])
                 ankihub_deck_ids.add(row["deck"])
-        note_ids = zip(anki_ids, ankihub_ids)
-        modify_note_types(note_types)
+        note_ids = zip(anki_ids, ankihub_ids, note_type_ids)
+        modify_note_types(set(note_type_ids))
         populate_ankihub_id_fields(note_ids)
         # TODO Also update fields
         self.config.save_subscription(list(ankihub_deck_ids))

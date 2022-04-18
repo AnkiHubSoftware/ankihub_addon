@@ -7,9 +7,12 @@ import tempfile
 import uuid
 from typing import Iterable
 
+import aqt
 from PyQt6.QtCore import qDebug
+from anki.errors import NotFoundError
 from anki.exporting import AnkiPackageExporter
 from anki.models import NoteType
+from anki.notes import Note
 from aqt import mw
 from aqt.utils import askUser, tooltip
 
@@ -23,13 +26,15 @@ DIR_PATH = os.path.dirname(os.path.abspath(__file__))
 def populate_ankihub_id_fields(note_ids: Iterable[tuple[str, str]]) -> None:
     """Populate the AnkiHub ID field that was added to the Note Type by
     modify_note_type."""
-    # TODO Get the lest of AnkiHub IDs from AnkiHub.
-    # TODO This should operate on a mapping between AnkiHub IDs and Anki Note IDs.
     updated_notes = []
-    for anki_id, ankihub_id in note_ids:
-        note = mw.col.get_note(id=int(anki_id))
-        note["AnkiHub ID"] = ankihub_id
-        updated_notes.append(note)
+    for anki_id, ankihub_id, note_type_id in note_ids:
+        try:
+            note = mw.col.get_note(id=int(anki_id))
+            note["AnkiHub ID"] = ankihub_id
+            updated_notes.append(note)
+        except NotFoundError:
+            import aqt;aqt.debug()()
+            note = Note(col=mw.col, model=note_type_id)
     mw.col.update_notes(updated_notes)
 
 
