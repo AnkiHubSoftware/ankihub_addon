@@ -3,6 +3,7 @@ import uuid
 from anki.hooks import addHook
 from aqt import gui_hooks
 from aqt.editor import Editor
+from PyQt6.QtCore import qDebug
 from aqt.utils import chooseList
 
 from ..ankihub_client import AnkiHubClient
@@ -21,7 +22,6 @@ def on_ankihub_button_press(editor: Editor):
     fields = editor.note.fields
     tags = editor.note.tags
     client = AnkiHubClient()
-    deck_id = editor.mw.col.decks.get_current_id()
     if command == AnkiHubCommands.CHANGE.value:
         ankihub_id = fields[-1]
         response = client.create_change_note_suggestion(
@@ -101,6 +101,7 @@ def on_select_command(editor, cmd):
     down menu.  This currently just sets an instance attribute on the Editor.
     """
     editor.ankihub_command = cmd
+    qDebug(f"AnkiHub command set to {cmd}")
 
 
 def setup():
