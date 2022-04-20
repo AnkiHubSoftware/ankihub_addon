@@ -4,6 +4,7 @@ from pathlib import Path
 
 import requests
 from PyQt6.QtCore import qDebug
+from aqt.dbcheck import check_db
 
 from ankihub.ankihub_client import AnkiHubClient
 from ankihub.config import Config
@@ -27,6 +28,8 @@ from PyQt5.QtWidgets import (
     QWidget,
 )
 from requests.exceptions import HTTPError
+
+from ankihub.utils import update_or_create_note
 
 
 def main_menu_setup():
@@ -305,6 +308,33 @@ def upload_suggestions_action():
     # TODO Send a request to AnkiHub with the list of modified notes.
 
 
+def sync_with_ankihub_action():
+    # TODO This should be reusable and not coupled with the menu item
+    client = AnkiHubClient()
+    config = Config()
+    decks = config.private_config.decks
+    for deck in decks:
+        response = client.get_deck_updates(deck)
+        if response.status_code == 200:
+            # Should last sync be tracked separately for each deck?
+            data = response.json()
+            notes = data["notes"]
+            for note in notes:
+                (
+                    deck_id,
+                    ankihub_id,
+                    tags,
+                    anki_id,
+                    fields,
+                    note_type,
+                    note_type_id,
+                ) = note.values()
+                update_or_create_note(anki_id, ankihub_id, fields, tags, note_type)
+            if notes:
+                check_db(mw)
+                config.save_last_sync(time=data["latest_update"])
+
+
 def upload_suggestions_setup(parent):
     """Set up the menu item for uploading suggestions in bulk."""
     q_action = QAction("⬆️ Upload suggestions to AnkiHub", parent=parent)
@@ -321,7 +351,7 @@ def subscribe_to_deck_setup(parent):
 
 def sync_with_ankihub_setup(parent):
     """Set up the menu item for uploading suggestions in bulk."""
-    q_action = QAction("⬇️ Sync with AnkiHub", mw)
+    q_action = QAction("🔃️ Sync with AnkiHub", mw)
     q_action.triggered.connect(sync_with_ankihub_action)
     parent.addAction(q_action)
 
