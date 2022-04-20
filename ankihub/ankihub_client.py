@@ -70,8 +70,6 @@ class AnkiHubClient:
             f"/decks/{deck_id}/updates",
             params=params,
         )
-        if response.status_code == 200:
-            self._config.save_last_sync()
         return response
 
     def get_deck_by_id(self, deck_id: str) -> Response:
