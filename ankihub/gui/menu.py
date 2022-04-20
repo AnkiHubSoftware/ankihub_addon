@@ -295,7 +295,7 @@ def create_collaborative_deck_action() -> None:
 
 
 def create_collaborative_deck_setup(parent):
-    q_action = QAction("🤲 Create collaborative deck", parent=parent)
+    q_action = QAction("🛠️ Create Collaborative Deck", parent=parent)
     qconnect(q_action.triggered, create_collaborative_deck_action)
     parent.addAction(q_action)
 
@@ -360,7 +360,7 @@ def setup_ankihub_menu() -> None:
     """Add top-level AnkiHub menu."""
     ankihub_menu = main_menu_setup()
     ankihub_login_setup(parent=ankihub_menu)
-    # create_collaborative_deck_setup(parent=ankihub_menu)
+    create_collaborative_deck_setup(parent=ankihub_menu)
     subscribe_to_deck_setup(parent=ankihub_menu)
     sync_with_ankihub_setup(parent=ankihub_menu)
     # upload_suggestions_setup(parent=ankihub_menu)
