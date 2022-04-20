@@ -2,9 +2,12 @@ from typing import Dict, List
 
 import anki
 import aqt
+from PyQt6.QtCore import qDebug
+from anki.errors import NotFoundError
 from anki.models import NoteType
 from aqt import mw
 
+from anki.notes import Note
 from . import constants
 
 
@@ -45,3 +48,30 @@ def hide_ankihub_field_in_editor(
         id_ = id_templ.format(ord_)
         js += "\ndocument.getElementById('{}').style.display = 'none';".format(id_)
     return js
+
+
+def update_or_create_note(anki_id, ankihub_id, fields, tags, note_type):
+    def create_note():
+        # TODO Add to an appropriate deck.
+        mw.col.add_note(note, 1)
+        # Swap out the note id that Anki assigns to the new note with our own id.
+        sql = (
+            f"UPDATE notes SET id={anki_id} WHERE id={note.id};"
+            f"UPDATE cards SET nid={anki_id} WHERE nid={note.id};"
+        )
+        mw.col.db.execute(sql)
+        qDebug(f"Created note: {note.anki_id}")
+
+    try:
+        note = mw.col.get_note(id=int(anki_id))
+    except NotFoundError:
+        note_type = mw.col.models.by_name(note_type)
+        note = Note(col=mw.col, model=note_type)
+        create_note()
+
+    note["AnkiHub ID"] = str(ankihub_id)
+    note.tags = [str(tag) for tag in tags]
+    for field in fields:
+        note[field["name"]] = field["value"]
+    mw.col.update_notes([note])
+    qDebug(f"Updated note {anki_id}")
