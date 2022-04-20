@@ -218,11 +218,15 @@ class SubscribeToDeck(QWidget):
             #   rather than asking them.
             first_time_install = askUser(
                 f"Is this your first time installing the {deck_id} deck?\n\n"
-                f"Answer No if you have already downloaded and opened the {deck_id} in Anki.\n\n"
-                f"Answer Yes if you have *not* yet downloaded and opened the {deck_id} in Anki. ",
+                f"Answer No if you have already imported the {deck_id} deck into Anki.\n\n"
+                f"Answer Yes if you have imported the {deck_id} deck into Anki.",
                 defaultno=True,
             )
-            deck_file_name = data["apkg_filename"] if first_time_install else data["csv_notes_filename"]
+            deck_file_name = (
+                data["apkg_filename"]
+                if first_time_install
+                else data["csv_notes_filename"]
+            )
             presigned_url_response = self.client.get_presigned_url(
                 key=deck_file_name, action="download"
             )
@@ -257,7 +261,7 @@ class SubscribeToDeck(QWidget):
         modify_note_types(note_type_names)
         populate_ankihub_id_fields(notes)
         self.config.save_subscription(list(ankihub_deck_ids))
-        tooltip(f"The deck has successfully been installed!")
+        tooltip("The deck has successfully been installed!")
 
     @classmethod
     def display_subscribe_window(cls):

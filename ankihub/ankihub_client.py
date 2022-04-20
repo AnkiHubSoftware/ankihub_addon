@@ -100,12 +100,12 @@ class AnkiHubClient:
         return response
 
     def create_new_note_suggestion(
-            self,
-            deck_id: int,
-            anki_id: int,
-            ankihub_id: str,
-            fields: Dict[str, str],
-            tags: List[str],
+        self,
+        deck_id: int,
+        anki_id: int,
+        ankihub_id: str,
+        fields: Dict[str, str],
+        tags: List[str],
     ) -> Response:
         suggestion = {
             "related_deck": deck_id,

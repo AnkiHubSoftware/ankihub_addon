@@ -1,19 +1,20 @@
 """Logic for the initial steps of registering local decks with collaborative
 decks for both deck creators and deck users.
 """
+import json
 import os
 import pathlib
 import tempfile
 import uuid
-from typing import Iterable
+import typing
 
-import aqt
 from PyQt6.QtCore import qDebug
 from anki.errors import NotFoundError
 from anki.exporting import AnkiPackageExporter
 from anki.models import NoteType
 from anki.notes import Note
 from aqt import mw
+from aqt.dbcheck import check_db
 from aqt.utils import askUser, tooltip
 
 from . import constants
@@ -69,6 +70,7 @@ def modify_note_type(note_type: NoteType) -> None:
     display the field.
     """
     "Adds ankihub field. Adds link to ankihub in card template."
+    qDebug(f"modifying note type {note_type}")
     mm = mw.col.models
     fields = note_type["flds"]
     field_names = [field["name"] for field in fields]
@@ -101,8 +103,9 @@ def modify_note_type(note_type: NoteType) -> None:
     mm.save(note_type)
 
 
-def modify_note_types(note_types: Iterable[str]):
+def modify_note_types(note_types: typing.Iterable[str]):
     for note_type in note_types:
+        qDebug(f"Getting note type {note_type}")
         note_type = mw.col.models.by_name(note_type)
         modify_note_type(note_type)
     # TODO Run add_id_fields
