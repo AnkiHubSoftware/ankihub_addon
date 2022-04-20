@@ -4,7 +4,7 @@ from anki.hooks import addHook
 from aqt import gui_hooks
 from aqt.editor import Editor
 from PyQt6.QtCore import qDebug
-from aqt.utils import chooseList
+from aqt.utils import chooseList, tooltip
 
 from ..ankihub_client import AnkiHubClient
 from ..config import Config
@@ -30,7 +30,7 @@ def on_ankihub_button_press(editor: Editor):
             tags=tags,
         )
         if response.status_code == 201:
-            pass
+            tooltip("Submitted change note suggestion to AnkiHub.")
     elif command == AnkiHubCommands.NEW.value:
         subscribed_decks = client._config.private_config.decks
         if len(subscribed_decks) == 1:
@@ -48,6 +48,7 @@ def on_ankihub_button_press(editor: Editor):
             tags=tags,
         )
         if response.status_code == 201:
+            tooltip("Submitted new note suggestion to AnkiHub.")
 
 
 def setup_editor_buttons(buttons, editor: Editor):
