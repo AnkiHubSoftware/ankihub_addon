@@ -140,7 +140,7 @@ class SubscribeToDeck(QWidget):
         self.deck_id_box.addWidget(self.deck_id_box_text)
         self.box_left.addLayout(self.deck_id_box)
 
-        self.subscribe_button = QPushButton("Sync with Deck", self)
+        self.subscribe_button = QPushButton("Subscribe to AnkiHub Deck", self)
         self.bottom_box_section.addWidget(self.subscribe_button)
         self.subscribe_button.clicked.connect(self.subscribe)
         self.box_left.addLayout(self.bottom_box_section)
@@ -271,7 +271,7 @@ class SubscribeToDeck(QWidget):
 
 
 def ankihub_login_setup(parent):
-    sign_in_button = QAction("Sign into AnkiHub", mw)
+    sign_in_button = QAction("🔑 Sign into AnkiHub", mw)
     sign_in_button.triggered.connect(AnkiHubLogin.display_login)
     parent.addAction(sign_in_button)
 
@@ -292,7 +292,7 @@ def create_collaborative_deck_action() -> None:
 
 
 def create_collaborative_deck_setup(parent):
-    q_action = QAction("Create collaborative deck", parent=parent)
+    q_action = QAction("🤲 Create collaborative deck", parent=parent)
     qconnect(q_action.triggered, create_collaborative_deck_action)
     parent.addAction(q_action)
 
@@ -307,15 +307,22 @@ def upload_suggestions_action():
 
 def upload_suggestions_setup(parent):
     """Set up the menu item for uploading suggestions in bulk."""
-    q_action = QAction("Upload suggestions to AnkiHub", parent=parent)
+    q_action = QAction("⬆️ Upload suggestions to AnkiHub", parent=parent)
     qconnect(q_action.triggered, upload_suggestions_action)
     parent.addAction(q_action)
 
 
 def subscribe_to_deck_setup(parent):
     """Set up the menu item for uploading suggestions in bulk."""
-    q_action = QAction("Sync with collaborative deck", mw)
+    q_action = QAction("📚 Subscribe to a Deck", mw)
     q_action.triggered.connect(SubscribeToDeck.display_subscribe_window)
+    parent.addAction(q_action)
+
+
+def sync_with_ankihub_setup(parent):
+    """Set up the menu item for uploading suggestions in bulk."""
+    q_action = QAction("⬇️ Sync with AnkiHub", mw)
+    q_action.triggered.connect(sync_with_ankihub_action)
     parent.addAction(q_action)
 
 
@@ -323,6 +330,7 @@ def setup_ankihub_menu() -> None:
     """Add top-level AnkiHub menu."""
     ankihub_menu = main_menu_setup()
     ankihub_login_setup(parent=ankihub_menu)
-    create_collaborative_deck_setup(parent=ankihub_menu)
+    # create_collaborative_deck_setup(parent=ankihub_menu)
     subscribe_to_deck_setup(parent=ankihub_menu)
-    upload_suggestions_setup(parent=ankihub_menu)
+    sync_with_ankihub_setup(parent=ankihub_menu)
+    # upload_suggestions_setup(parent=ankihub_menu)
