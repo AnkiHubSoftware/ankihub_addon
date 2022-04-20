@@ -63,10 +63,12 @@ class AnkiHubClient:
         return response
 
     def get_deck_updates(self, deck_id: str) -> Response:
+        since = self._config.private_config.last_sync
+        params = {"since": f"{self._config.private_config.last_sync}"} if since else {}
         response = self._call_api(
             "GET",
             f"/decks/{deck_id}/updates",
-            params={"since": f"{self._config.private_config.last_sync}"},
+            params=params,
         )
         if response.status_code == 200:
             self._config.save_last_sync()
