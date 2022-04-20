@@ -16,7 +16,7 @@ class AnkiHubClient:
         self._headers = {"Content-Type": "application/json"}
         self._config = Config()
         self._base_url = API_URL_BASE
-        self.token = self._config.get_token()
+        self.token = self._config.private_config.token
         if self.token:
             self._headers["Authorization"] = f"Token {self.token}"
 
@@ -29,17 +29,17 @@ class AnkiHubClient:
             json=data,
             params=params,
         )
-        qDebug(f"{method} {url} {data} {params} {self._headers}")
-        qDebug(f"{response.content}")
-        qDebug(f"{response.status_code}")
-        if response.status_code != 200:
+        qDebug(f"request: {method} {url} {data} {params} {self._headers}")
+        qDebug(f"response status: {response.status_code}")
+        qDebug(f"response content: {response.content}")
+        if response.status_code > 299:
             showText(
-                "If you haven't already signed in using the AnkiHub menu in Anki "
-                "desktop please do so. Make sure your username and password are correct "
-                "and that you have confirmed your AnkiHub account through "
-                "email verification. "
-                "If you believe this is an error, please reach "
-                f"out to user support at {USER_SUPPORT_EMAIL_SLUG}."
+                "Uh oh! There was a problem with your request.\n\n"
+                "If you haven't already signed in using the AnkiHub menu please do so. "
+                "Make sure your username and password are correct and that you have "
+                "confirmed your AnkiHub account through email verification. If you "
+                "believe this is an error, please reach out to user support at "
+                f"{USER_SUPPORT_EMAIL_SLUG}. This error will be automatically reported."
             )
         return response
 
@@ -66,7 +66,7 @@ class AnkiHubClient:
         response = self._call_api(
             "GET",
             f"/decks/{deck_id}/updates",
-            params={"since": f"{self._config.get_last_sync()}"},
+            params={"since": f"{self._config.private_config.last_sync}"},
         )
         if response.status_code == 200:
             self._config.save_last_sync()
@@ -95,25 +95,27 @@ class AnkiHubClient:
             "tags": tags,
         }
         response = self._call_api(
-            "POST", f"/notes/{ankihub_id}/suggestion/", suggestion
+            "POST", f"/notes/{ankihub_id}/suggestion/", data=suggestion
         )
         return response
 
     def create_new_note_suggestion(
         self,
         deck_id: int,
+        anki_id: int,
         ankihub_id: str,
         fields: Dict[str, str],
         tags: List[str],
     ) -> Response:
         suggestion = {
             "related_deck": deck_id,
+            "anki_id": anki_id,
             "ankihub_id": ankihub_id,
             "fields": fields,
             "tags": tags,
         }
         response = self._call_api(
-            "POST", f"/decks/{deck_id}/note-suggestion/", suggestion
+            "POST", f"/decks/{deck_id}/note-suggestion/", data=suggestion
         )
         return response
 

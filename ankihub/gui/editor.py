@@ -3,6 +3,8 @@ import uuid
 from anki.hooks import addHook
 from aqt import gui_hooks
 from aqt.editor import Editor
+from PyQt6.QtCore import qDebug
+from aqt.utils import chooseList
 
 from ..ankihub_client import AnkiHubClient
 from ..config import Config
@@ -20,7 +22,6 @@ def on_ankihub_button_press(editor: Editor):
     fields = editor.note.fields
     tags = editor.note.tags
     client = AnkiHubClient()
-    deck_id = editor.mw.col.decks.get_current_id()
     if command == AnkiHubCommands.CHANGE.value:
         ankihub_id = fields[-1]
         response = client.create_change_note_suggestion(
@@ -28,17 +29,29 @@ def on_ankihub_button_press(editor: Editor):
             fields=fields,
             tags=tags,
         )
+        if response.status_code == 201:
+            pass
     elif command == AnkiHubCommands.NEW.value:
+        subscribed_decks = client._config.private_config.decks
+        if len(subscribed_decks) == 1:
+            deck_id = subscribed_decks[0]
+        else:
+            choice = chooseList(
+                "Which AnKiHub deck would you like to add this note to?",
+                choices=subscribed_decks,
+            )
+            deck_id = subscribed_decks[choice]
         ankihub_id = str(uuid.uuid4())
-        editor.note["AnkiHub ID"] = ankihub_id
-        editor.mw.col.update_note(editor.note)
         response = client.create_new_note_suggestion(
             deck_id=deck_id,
+            anki_id=editor.note.id,
             ankihub_id=ankihub_id,
             fields=fields,
             tags=tags,
         )
-    return response
+        if response.status_code == 201:
+            editor.note["AnkiHub ID"] = ankihub_id
+            editor.mw.col.update_note(editor.note)
 
 
 def setup_editor_buttons(buttons, editor: Editor):
@@ -89,6 +102,7 @@ def on_select_command(editor, cmd):
     down menu.  This currently just sets an instance attribute on the Editor.
     """
     editor.ankihub_command = cmd
+    qDebug(f"AnkiHub command set to {cmd}")
 
 
 def setup():

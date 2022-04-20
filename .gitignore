@@ -136,3 +136,4 @@ dmypy.json
 
 # mac os
 .DS_Store
+/ankihub/user_files/.private_config.json

@@ -6,11 +6,12 @@ import requests
 from PyQt6.QtCore import qDebug
 
 from ankihub.ankihub_client import AnkiHubClient
+from ankihub.config import Config
 from ankihub.constants import CSV_DELIMITER
 from ankihub.register_decks import (
     create_collaborative_deck,
     modify_note_types,
-    populate_ankihub_id_fields,
+    process_csv,
 )
 from aqt import mw
 from aqt.qt import QAction, QMenu, qconnect
@@ -139,7 +140,7 @@ class SubscribeToDeck(QWidget):
         self.deck_id_box.addWidget(self.deck_id_box_text)
         self.box_left.addLayout(self.deck_id_box)
 
-        self.subscribe_button = QPushButton("Subscribe to Deck", self)
+        self.subscribe_button = QPushButton("Sync with Deck", self)
         self.bottom_box_section.addWidget(self.subscribe_button)
         self.subscribe_button.clicked.connect(self.subscribe)
         self.box_left.addLayout(self.bottom_box_section)
@@ -161,6 +162,8 @@ class SubscribeToDeck(QWidget):
         self.setMinimumWidth(500)
         self.setSizePolicy(QSizePolicy.Policy.Minimum, QSizePolicy.Policy.Minimum)
         self.setWindowTitle("Subscribe to Collaborative Deck")
+
+        self.config = Config()
         self.client = AnkiHubClient()
         if not self.client.token:
             showText("Oops! Please make sure you are logged into AnkiHub!")
@@ -179,22 +182,16 @@ class SubscribeToDeck(QWidget):
             return
         # TODO use mw.taskman
         download_result = self.download_deck(deck_id)
-        if download_result.exists():
+        if download_result and download_result.exists():
             confirmed = askUser(
                 f"The AnkiHub deck {deck_id} has been downloaded. Would you like to "
                 f"proceed with modifying your personal collection in order to subscribe "
                 f"to the collaborative deck? See https://ankihub.net/info/subscribe for "
                 f"details.",
                 title="Please confirm to proceed.",
-                defaultno=True,
             )
             if confirmed:
                 self.install_deck(download_result)
-        tooltip(f"The {deck_id} deck has successfully been installed!")
-        # TODO Complete once the endpoint is available.
-        # subscribe_response = self.client.confirm_subscription(deck_id)
-        # if subscribe_response == 200:
-        #     tooltip("Subscription confirmed!")
         self.close()
 
     def download_deck(self, deck_id):
@@ -219,14 +216,17 @@ class SubscribeToDeck(QWidget):
             data = deck_response.json()
             # TODO We can actually just check for the deck id in the user's local collection
             #   rather than asking them.
-            deck_installed = askUser(
-                f"Is this your first time installing the {deck_id} deck? "
-                f"Answer 'yes' if you have not yet downloaded and opened the {deck_id} in Anki. "
-                f"Answer 'no' if you have already downloaded and opened the {deck_id} in Anki."
+            first_time_install = askUser(
+                f"Is this your first time installing the {deck_id} deck?\n\n"
+                f"Answer No if you have already imported the {deck_id} deck into Anki.\n\n"
+                f"Answer Yes if you have imported the {deck_id} deck into Anki.",
+                defaultno=True,
             )
-            # deck_file_name = data["csv_name"] if deck_installed else data["apkg_name"]
-            # TODO Remove hard coded value once api is updated
-            deck_file_name = "deck_77_notes.csv"
+            deck_file_name = (
+                data["apkg_filename"]
+                if first_time_install
+                else data["csv_notes_filename"]
+            )
             presigned_url_response = self.client.get_presigned_url(
                 key=deck_file_name, action="download"
             )
@@ -250,17 +250,18 @@ class SubscribeToDeck(QWidget):
         """
         # TODO Handle .apkg as well
         tooltip("Configuring the collaborative deck.")
-        note_types = set()
-        anki_ids, ankihub_ids = [], []
+        ankihub_deck_ids, note_type_names = set(), set()
+        notes = []
         with deck_file.open() as f:
             reader = csv.DictReader(f, delimiter=CSV_DELIMITER)
             for row in reader:
-                note_types.add(row["note_type"])
-                anki_ids.append(row["anki_id"])
-                ankihub_ids.append(row["id"])
-        note_ids = zip(anki_ids, ankihub_ids)
-        modify_note_types(note_types)
-        populate_ankihub_id_fields(note_ids)
+                notes.append(row)
+                ankihub_deck_ids.add(row["deck"])
+                note_type_names.add(row["note_type"])
+        modify_note_types(note_type_names)
+        process_csv(notes)
+        self.config.save_subscription(list(ankihub_deck_ids))
+        tooltip("The deck has successfully been installed!")
 
     @classmethod
     def display_subscribe_window(cls):
@@ -313,7 +314,7 @@ def upload_suggestions_setup(parent):
 
 def subscribe_to_deck_setup(parent):
     """Set up the menu item for uploading suggestions in bulk."""
-    q_action = QAction("Subscribe to collaborative deck", mw)
+    q_action = QAction("Sync with collaborative deck", mw)
     q_action.triggered.connect(SubscribeToDeck.display_subscribe_window)
     parent.addAction(q_action)
 
