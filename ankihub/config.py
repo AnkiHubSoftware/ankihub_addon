@@ -57,7 +57,8 @@ class Config:
         self._update_private_config()
 
     def save_subscription(self, deck_ids: typing.List[int]):
-        decks = self.private_config.decks
-        decks += list(deck_ids)
+        self.private_config.decks += deck_ids
+        # remove duplicates
+        self.private_config.decks = list(set(self.private_config.decks))
         self.save_last_sync()
         self._update_private_config()
