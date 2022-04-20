@@ -1,5 +1,3 @@
-import uuid
-
 from anki.hooks import addHook
 from aqt import gui_hooks
 from aqt.editor import Editor
@@ -19,6 +17,8 @@ def on_ankihub_button_press(editor: Editor):
     # The command is expected to have been set at this point already, either by
     # fetching the default or by selecting a command from the dropdown menu.
     command = editor.ankihub_command
+    # TODO Make sure the field scheme is correct.
+    #  eg, List[dict]:  [{"name": "Front", "order": 0, "value": "fun"}, {"name": "Back", "order": 1, "value": "stuff"}]
     fields = editor.note.fields
     tags = editor.note.tags
     client = AnkiHubClient()
