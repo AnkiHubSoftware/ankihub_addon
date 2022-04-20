@@ -36,10 +36,11 @@ def on_ankihub_button_press(editor: Editor):
         if len(subscribed_decks) == 1:
             deck_id = subscribed_decks[0]
         else:
-            deck_id = chooseList(
+            choice = chooseList(
                 "Which AnKiHub deck would you like to add this note to?",
                 choices=subscribed_decks,
             )
+            deck_id = subscribed_decks[choice]
         ankihub_id = str(uuid.uuid4())
         response = client.create_new_note_suggestion(
             deck_id=deck_id,
