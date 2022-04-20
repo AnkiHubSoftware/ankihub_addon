@@ -24,7 +24,7 @@ from .utils import get_note_types_in_deck
 DIR_PATH = os.path.dirname(os.path.abspath(__file__))
 
 
-def populate_ankihub_id_fields(notes: typing.List[dict]) -> None:
+def process_csv(notes: typing.List[dict]) -> None:
     """Populate the AnkiHub ID field that was added to the Note Type by
     modify_note_type."""
     updated_notes, = []

@@ -11,7 +11,7 @@ from ankihub.constants import CSV_DELIMITER
 from ankihub.register_decks import (
     create_collaborative_deck,
     modify_note_types,
-    populate_ankihub_id_fields,
+    process_csv,
 )
 from aqt import mw
 from aqt.qt import QAction, QMenu, qconnect
@@ -259,7 +259,7 @@ class SubscribeToDeck(QWidget):
                 ankihub_deck_ids.add(row["deck"])
                 note_type_names.add(row["note_type"])
         modify_note_types(note_type_names)
-        populate_ankihub_id_fields(notes)
+        process_csv(notes)
         self.config.save_subscription(list(ankihub_deck_ids))
         tooltip("The deck has successfully been installed!")
 
