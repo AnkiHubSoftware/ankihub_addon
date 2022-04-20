@@ -27,7 +27,7 @@ DIR_PATH = os.path.dirname(os.path.abspath(__file__))
 def process_csv(notes: typing.List[dict]) -> None:
     """Populate the AnkiHub ID field that was added to the Note Type by
     modify_note_type."""
-    updated_notes, = []
+    updated_notes = []
     for note_data in notes:
         (
             ankihub_id,
