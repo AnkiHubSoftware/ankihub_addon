@@ -8,7 +8,6 @@ ANKIHUB_NOTE_TYPE_FIELD_NAME = "AnkiHub ID"
 ADDON_PATH = pathlib.Path(__file__).parent.absolute()
 ICONS_PATH = ADDON_PATH / "icons"
 
-LAST_SYNC_SLUG = "last_sync"
 TOKEN_SLUG = "token"
 USER_EMAIL_SLUG = "user_email"
 
