@@ -182,6 +182,13 @@ class SubscribeToDeck(QWidget):
                 "Oops! Please copy/paste a Deck ID from AnkiHub.net/browse (numbers only)!"
             )
             return
+        if deck_id in self.config.private_config.decks:
+            showText(
+                f"You've already subscribed to deck {deck_id}. "
+                "Syncing with AnkiHub will happen automatically everytime you "
+                "restart Anki. You can manually sync with AnkiHub from the AnkiHub "
+                f"menu. See {URL_HELP} for more details."
+            )
         # TODO use mw.taskman
         download_result = self.download_deck(deck_id)
         if download_result and download_result.exists():
