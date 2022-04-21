@@ -4,7 +4,6 @@ from pathlib import Path
 
 import requests
 from PyQt6.QtCore import qDebug
-from aqt.dbcheck import check_db
 
 from ankihub.ankihub_client import AnkiHubClient
 from ankihub.config import Config
@@ -29,7 +28,7 @@ from PyQt5.QtWidgets import (
 )
 from requests.exceptions import HTTPError
 
-from ankihub.utils import update_or_create_note, sync_with_ankihub
+from ankihub.utils import sync_with_ankihub
 
 
 def main_menu_setup():
@@ -311,6 +310,7 @@ def upload_suggestions_action():
 
 def sync_with_ankihub_action():
     sync_with_ankihub()
+
 
 def upload_suggestions_setup(parent):
     """Set up the menu item for uploading suggestions in bulk."""

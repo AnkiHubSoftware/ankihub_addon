@@ -44,7 +44,7 @@ def hide_ankihub_field_in_editor(
     if constants.ANKIHUB_NOTE_TYPE_FIELD_NAME not in note:
         return js
     extra = (
-        "require(\"svelte/internal\").tick().then(() => "
+        'require("svelte/internal").tick().then(() => '
         "{{ require('anki/NoteEditor').instances[0].fields[0].element.then((element) "
         "=> {{ element.hidden = true; }}); }});"
     )
