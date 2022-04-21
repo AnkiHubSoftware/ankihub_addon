@@ -70,6 +70,7 @@ def create_note_with_id(note_type, anki_id) -> Note:
 def update_note(note, anki_id, ankihub_id, fields, tags):
     note["AnkiHub ID"] = str(ankihub_id)
     note.tags = [str(tag) for tag in tags]
+    # TODO Make sure we don't update protected fields.
     for field in fields:
         note[field["name"]] = field["value"]
     mw.col.update_notes([note])
