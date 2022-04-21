@@ -261,6 +261,7 @@ class SubscribeToDeck(QWidget):
                 notes.append(row)
                 ankihub_deck_ids.add(row["deck"])
                 note_type_names.add(row["note_type"])
+        mw._create_backup_with_progress(user_initiated=False)
         modify_note_types(note_type_names)
         process_csv(notes)
         self.config.save_subscription(list(ankihub_deck_ids))
@@ -313,6 +314,7 @@ def sync_with_ankihub_action():
     client = AnkiHubClient()
     config = Config()
     decks = config.private_config.decks
+    mw._create_backup_with_progress(user_initiated=False)
     for deck in decks:
         response = client.get_deck_updates(deck)
         if response.status_code == 200:
