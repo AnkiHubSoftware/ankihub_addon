@@ -3,7 +3,9 @@ import os
 import dataclasses
 from datetime import datetime, timezone
 import typing
+from json import JSONDecodeError
 
+from PyQt6.QtCore import qDebug
 from aqt import mw
 
 
@@ -29,13 +31,22 @@ class Config:
             user_files_path, ".private_config.json"
         )
         if not os.path.exists(self._private_config_file_path):
-            self.private_config = PrivateConfig()
-            config_dict = dataclasses.asdict(self.private_config)
-            with open(self._private_config_file_path, "w") as f:
-                f.write(json.dumps(config_dict))
+            self.private_config = self.new_config()
         else:
             with open(self._private_config_file_path) as f:
-                self.private_config = PrivateConfig(**json.load(f))
+                try:
+                    self.private_config = PrivateConfig(**json.load(f))
+                except JSONDecodeError:
+                    # TODO Instead of overwriting, query AnkiHub for config values.
+                    self.private_config = self.new_config()
+        qDebug(f"Private config: {self.private_config}")
+
+    def new_config(self):
+        private_config = PrivateConfig()
+        config_dict = dataclasses.asdict(private_config)
+        with open(self._private_config_file_path, "w") as f:
+            f.write(json.dumps(config_dict))
+        return private_config
 
     def _update_private_config(self):
         with open(self._private_config_file_path, "w") as f:
