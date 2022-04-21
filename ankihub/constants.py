@@ -4,6 +4,7 @@ from enum import Enum
 URL_BASE = "https://ankihub.net/"
 API_URL_BASE = "http://localhost:8000/api"
 URL_VIEW_NOTE = URL_BASE + "notes/"
+URL_HELP = f"{URL_BASE}/help"
 ANKIHUB_NOTE_TYPE_FIELD_NAME = "AnkiHub ID"
 ADDON_PATH = pathlib.Path(__file__).parent.absolute()
 ICONS_PATH = ADDON_PATH / "icons"

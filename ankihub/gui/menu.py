@@ -7,7 +7,7 @@ from PyQt6.QtCore import qDebug
 
 from ankihub.ankihub_client import AnkiHubClient
 from ankihub.config import Config
-from ankihub.constants import CSV_DELIMITER
+from ankihub.constants import CSV_DELIMITER, URL_HELP
 from ankihub.register_decks import (
     create_collaborative_deck,
     modify_note_types,
@@ -195,7 +195,7 @@ class SubscribeToDeck(QWidget):
             confirmed = askUser(
                 f"The AnkiHub deck {deck_id} has been downloaded. Would you like to "
                 f"proceed with modifying your personal collection in order to subscribe "
-                f"to the collaborative deck? See https://ankihub.net/info/subscribe for "
+                f"to the collaborative deck? See {URL_HELP} for "
                 f"details.",
                 title="Please confirm to proceed.",
             )
