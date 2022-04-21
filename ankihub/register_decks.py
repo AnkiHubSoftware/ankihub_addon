@@ -17,6 +17,7 @@ from aqt.utils import askUser, tooltip
 
 from . import constants
 from .ankihub_client import AnkiHubClient
+from .constants import ANKIHUB_NOTE_TYPE_FIELD_NAME, URL_VIEW_NOTE
 from .utils import get_note_types_in_deck, update_or_create_note
 
 DIR_PATH = os.path.dirname(os.path.abspath(__file__))
@@ -56,27 +57,22 @@ def modify_note_type(note_type: NoteType) -> None:
         qDebug(f"{constants.ANKIHUB_NOTE_TYPE_FIELD_NAME} already exists.")
         return
     ankihub_field = mm.new_field(constants.ANKIHUB_NOTE_TYPE_FIELD_NAME)
-    # Put our field last.
-    ankihub_field["ord"] = len(fields)
-    mm.add_field(note_type, ankihub_field)
+    note_type["flds"].insert(0, ankihub_field)
     # TODO Genericize this by creating a function that takes a template and
     #  returns a new template.
-    link_html = "".join(
-        (
-            "\n{{#%s}}\n" % constants.ANKIHUB_NOTE_TYPE_FIELD_NAME,
-            "<a class='ankihub' href='%s'>"
-            % (
-                constants.URL_VIEW_NOTE
-                + "{{%s}}" % constants.ANKIHUB_NOTE_TYPE_FIELD_NAME
-            ),
-            "\nView Note on AnkiHub\n",
-            "</a>",
-            "\n{{/%s}}\n" % constants.ANKIHUB_NOTE_TYPE_FIELD_NAME,
-        )
+    template_snippet = (
+        "\n\n<br><br>"
+        f"\n{{{{#{ANKIHUB_NOTE_TYPE_FIELD_NAME}}}}}\n"
+        "<a class='ankihub' "
+        f"href='{URL_VIEW_NOTE}{{{{{ANKIHUB_NOTE_TYPE_FIELD_NAME}}}}}'>"
+        "\nView Note on AnkiHub\n"
+        "</a>"
+        f"\n{{{{/{ANKIHUB_NOTE_TYPE_FIELD_NAME}}}}}\n"
     )
+
     templates = note_type["tmpls"]
     for template in templates:
-        template["afmt"] += link_html
+        template["afmt"] += template_snippet
     mm.save(note_type)
 
 
