@@ -50,7 +50,11 @@ def hide_ankihub_field_in_editor(
     return js
 
 
-def create_note(note, anki_id):
+def create_note_with_id(note_type, anki_id) -> Note:
+    """Create a new note, add it to the appropriate deck and override the note id with
+    the note id of the original note creator."""
+    note_type = mw.col.models.by_name(note_type)
+    note = Note(col=mw.col, model=note_type)
     # TODO Add to an appropriate deck.
     mw.col.add_note(note, 1)
     # Swap out the note id that Anki assigns to the new note with our own id.
@@ -60,19 +64,22 @@ def create_note(note, anki_id):
     )
     mw.col.db.execute(sql)
     qDebug(f"Created note: {note.anki_id}")
+    return note
 
 
-def update_or_create_note(anki_id, ankihub_id, fields, tags, note_type):
-    try:
-        note = mw.col.get_note(id=int(anki_id))
-    except NotFoundError:
-        note_type = mw.col.models.by_name(note_type)
-        note = Note(col=mw.col, model=note_type)
-        create_note(note, anki_id)
-
+def update_note(note, anki_id, ankihub_id, fields, tags):
     note["AnkiHub ID"] = str(ankihub_id)
     note.tags = [str(tag) for tag in tags]
     for field in fields:
         note[field["name"]] = field["value"]
     mw.col.update_notes([note])
     qDebug(f"Updated note {anki_id}")
+
+
+def update_or_create_note(anki_id, ankihub_id, fields, tags, note_type) -> Note:
+    try:
+        note = mw.col.get_note(id=int(anki_id))
+    except NotFoundError:
+        note = create_note_with_id(note_type, anki_id)
+    update_note(note, anki_id, ankihub_id, fields, tags)
+    return note
