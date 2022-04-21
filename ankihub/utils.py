@@ -65,7 +65,7 @@ def create_note_with_id(note_type, anki_id) -> Note:
         f"UPDATE cards SET nid={anki_id} WHERE nid={note.id};"
     )
     mw.col.db.execute(sql)
-    qDebug(f"Created note: {note.anki_id}")
+    qDebug(f"Created note: {anki_id}")
     return note
 
 
