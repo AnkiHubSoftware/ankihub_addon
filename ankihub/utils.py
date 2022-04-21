@@ -113,3 +113,9 @@ def sync_with_ankihub():
             if notes:
                 check_db(mw)
                 config.save_last_sync(time=data["latest_update"])
+
+
+def sync_on_profile_open():
+    config = Config()
+    if config.private_config.token:
+        sync_with_ankihub()
