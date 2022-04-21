@@ -8,7 +8,11 @@ from anki.models import NoteType
 from aqt import mw
 
 from anki.notes import Note
+from aqt.dbcheck import check_db
+
 from . import constants
+from .ankihub_client import AnkiHubClient
+from .config import Config
 
 
 def note_type_contains_field(
@@ -84,3 +88,30 @@ def update_or_create_note(anki_id, ankihub_id, fields, tags, note_type) -> Note:
         note = create_note_with_id(note_type, anki_id)
     update_note(note, anki_id, ankihub_id, fields, tags)
     return note
+
+
+def sync_with_ankihub():
+    client = AnkiHubClient()
+    config = Config()
+    decks = config.private_config.decks
+    mw._create_backup_with_progress(user_initiated=False)
+    for deck in decks:
+        response = client.get_deck_updates(deck)
+        if response.status_code == 200:
+            # Should last sync be tracked separately for each deck?
+            data = response.json()
+            notes = data["notes"]
+            for note in notes:
+                (
+                    deck_id,
+                    ankihub_id,
+                    tags,
+                    anki_id,
+                    fields,
+                    note_type,
+                    note_type_id,
+                ) = note.values()
+                update_or_create_note(anki_id, ankihub_id, fields, tags, note_type)
+            if notes:
+                check_db(mw)
+                config.save_last_sync(time=data["latest_update"])

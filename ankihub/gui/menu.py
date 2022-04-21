@@ -29,7 +29,7 @@ from PyQt5.QtWidgets import (
 )
 from requests.exceptions import HTTPError
 
-from ankihub.utils import update_or_create_note
+from ankihub.utils import update_or_create_note, sync_with_ankihub
 
 
 def main_menu_setup():
@@ -310,32 +310,7 @@ def upload_suggestions_action():
 
 
 def sync_with_ankihub_action():
-    # TODO This should be reusable and not coupled with the menu item
-    client = AnkiHubClient()
-    config = Config()
-    decks = config.private_config.decks
-    mw._create_backup_with_progress(user_initiated=False)
-    for deck in decks:
-        response = client.get_deck_updates(deck)
-        if response.status_code == 200:
-            # Should last sync be tracked separately for each deck?
-            data = response.json()
-            notes = data["notes"]
-            for note in notes:
-                (
-                    deck_id,
-                    ankihub_id,
-                    tags,
-                    anki_id,
-                    fields,
-                    note_type,
-                    note_type_id,
-                ) = note.values()
-                update_or_create_note(anki_id, ankihub_id, fields, tags, note_type)
-            if notes:
-                check_db(mw)
-                config.save_last_sync(time=data["latest_update"])
-
+    sync_with_ankihub()
 
 def upload_suggestions_setup(parent):
     """Set up the menu item for uploading suggestions in bulk."""
