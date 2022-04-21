@@ -39,18 +39,16 @@ def get_note_types_in_deck(did: int) -> List[int]:
 
 
 def hide_ankihub_field_in_editor(
-    js: str, note: anki.notes.Note, editor: aqt.editor.Editor
+    js: str, note: anki.notes.Note, _: aqt.editor.Editor
 ) -> str:
-    # TODO Henrik said this would have broke in 2.1.41:
-    #  https://github.com/ankipalace/ankihub_addon/pull/1#pullrequestreview-597642485
-    #  reevaluate and test.
     if constants.ANKIHUB_NOTE_TYPE_FIELD_NAME not in note:
         return js
-    ord_ = note._fieldOrd(constants.ANKIHUB_NOTE_TYPE_FIELD_NAME)
-    id_templs = ("f{}", "name{}")
-    for id_templ in id_templs:
-        id_ = id_templ.format(ord_)
-        js += "\ndocument.getElementById('{}').style.display = 'none';".format(id_)
+    extra = (
+        "require(\"svelte/internal\").tick().then(() => "
+        "{{ require('anki/NoteEditor').instances[0].fields[0].element.then((element) "
+        "=> {{ element.hidden = true; }}); }});"
+    )
+    js += extra
     return js
 
 

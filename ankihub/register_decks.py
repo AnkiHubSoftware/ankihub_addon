@@ -58,7 +58,6 @@ def modify_note_type(note_type: NoteType) -> None:
     ankihub_field = mm.new_field(constants.ANKIHUB_NOTE_TYPE_FIELD_NAME)
     # Put our field last.
     ankihub_field["ord"] = len(fields)
-    ankihub_field["size"] = 0
     mm.add_field(note_type, ankihub_field)
     # TODO Genericize this by creating a function that takes a template and
     #  returns a new template.
