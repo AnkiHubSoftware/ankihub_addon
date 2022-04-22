@@ -11,7 +11,7 @@ on:
 jobs:
   read-current-anki-matrix:
     # Reads current Anki set-up from anki-current.json
-    runs-on: ubuntu-latest
+    runs-on: macos-latest
 
     outputs:
       matrix: ${{ steps.set-matrix.outputs.matrix }}
@@ -51,9 +51,14 @@ jobs:
       - name: Install deps
         run: |
           python -m pip install --upgrade pip
-          pip install -r ./requirements/dev.txt
+          python -m pip install -r ./requirements/dev.txt
 
       - name: Run tests
+        run: pytest --cov --cov-report=xml
+        env:
+          SKIP_INIT: 1
+
+      - name: Run tests forked
         run: pytest --forked --cov --cov-report=xml
         env:
           SKIP_INIT: 1
