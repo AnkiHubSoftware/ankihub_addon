@@ -33,13 +33,7 @@ jobs:
           python -m pip install -r ./requirements/dev.txt
 
       - name: Run tests forked
-        run: pytest --forked --cov --cov-report=xml
-        env:
-          SKIP_INIT: 1
-
-      - name: Run tests not forked
-        if: always()
-        run: pytest --cov --cov-report=xml
+        run: pytest -vvv --forked --cov --cov-report=xml
         env:
           SKIP_INIT: 1
 
