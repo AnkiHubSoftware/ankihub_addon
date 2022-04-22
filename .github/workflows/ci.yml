@@ -38,9 +38,15 @@ jobs:
         env:
           SKIP_INIT: 1
 
-      - name: Run tests
+      - name: Run tests not forked
         if: always()
         run: pytest --cov --cov-report=xml
+        env:
+          SKIP_INIT: 1
+
+      - name: Run single test
+        if: always()
+        run: pytest --cov --cov-report=xml ankihub/tests/test_entry_point.py
         env:
           SKIP_INIT: 1
 
