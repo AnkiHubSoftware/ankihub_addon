@@ -7,7 +7,7 @@ from PyQt6.QtCore import qDebug
 
 from ankihub.ankihub_client import AnkiHubClient
 from ankihub.config import Config
-from ankihub.constants import CSV_DELIMITER
+from ankihub.constants import CSV_DELIMITER, URL_HELP
 from ankihub.register_decks import (
     create_collaborative_deck,
     modify_note_types,
@@ -27,6 +27,8 @@ from PyQt5.QtWidgets import (
     QWidget,
 )
 from requests.exceptions import HTTPError
+
+from ankihub.utils import sync_with_ankihub
 
 
 def main_menu_setup():
@@ -140,7 +142,7 @@ class SubscribeToDeck(QWidget):
         self.deck_id_box.addWidget(self.deck_id_box_text)
         self.box_left.addLayout(self.deck_id_box)
 
-        self.subscribe_button = QPushButton("Sync with Deck", self)
+        self.subscribe_button = QPushButton("Subscribe to AnkiHub Deck", self)
         self.bottom_box_section.addWidget(self.subscribe_button)
         self.subscribe_button.clicked.connect(self.subscribe)
         self.box_left.addLayout(self.bottom_box_section)
@@ -180,13 +182,20 @@ class SubscribeToDeck(QWidget):
                 "Oops! Please copy/paste a Deck ID from AnkiHub.net/browse (numbers only)!"
             )
             return
+        if deck_id in self.config.private_config.decks:
+            showText(
+                f"You've already subscribed to deck {deck_id}. "
+                "Syncing with AnkiHub will happen automatically everytime you "
+                "restart Anki. You can manually sync with AnkiHub from the AnkiHub "
+                f"menu. See {URL_HELP} for more details."
+            )
         # TODO use mw.taskman
         download_result = self.download_deck(deck_id)
         if download_result and download_result.exists():
             confirmed = askUser(
                 f"The AnkiHub deck {deck_id} has been downloaded. Would you like to "
                 f"proceed with modifying your personal collection in order to subscribe "
-                f"to the collaborative deck? See https://ankihub.net/info/subscribe for "
+                f"to the collaborative deck? See {URL_HELP} for "
                 f"details.",
                 title="Please confirm to proceed.",
             )
@@ -258,6 +267,7 @@ class SubscribeToDeck(QWidget):
                 notes.append(row)
                 ankihub_deck_ids.add(row["deck"])
                 note_type_names.add(row["note_type"])
+        mw._create_backup_with_progress(user_initiated=False)
         modify_note_types(note_type_names)
         process_csv(notes)
         self.config.save_subscription(list(ankihub_deck_ids))
@@ -271,7 +281,7 @@ class SubscribeToDeck(QWidget):
 
 
 def ankihub_login_setup(parent):
-    sign_in_button = QAction("Sign into AnkiHub", mw)
+    sign_in_button = QAction("🔑 Sign into AnkiHub", mw)
     sign_in_button.triggered.connect(AnkiHubLogin.display_login)
     parent.addAction(sign_in_button)
 
@@ -292,7 +302,7 @@ def create_collaborative_deck_action() -> None:
 
 
 def create_collaborative_deck_setup(parent):
-    q_action = QAction("Create collaborative deck", parent=parent)
+    q_action = QAction("🛠️ Create Collaborative Deck", parent=parent)
     qconnect(q_action.triggered, create_collaborative_deck_action)
     parent.addAction(q_action)
 
@@ -305,17 +315,28 @@ def upload_suggestions_action():
     # TODO Send a request to AnkiHub with the list of modified notes.
 
 
+def sync_with_ankihub_action():
+    sync_with_ankihub()
+
+
 def upload_suggestions_setup(parent):
     """Set up the menu item for uploading suggestions in bulk."""
-    q_action = QAction("Upload suggestions to AnkiHub", parent=parent)
+    q_action = QAction("⬆️ Upload suggestions to AnkiHub", parent=parent)
     qconnect(q_action.triggered, upload_suggestions_action)
     parent.addAction(q_action)
 
 
 def subscribe_to_deck_setup(parent):
     """Set up the menu item for uploading suggestions in bulk."""
-    q_action = QAction("Sync with collaborative deck", mw)
+    q_action = QAction("📚 Subscribe to a Deck", mw)
     q_action.triggered.connect(SubscribeToDeck.display_subscribe_window)
+    parent.addAction(q_action)
+
+
+def sync_with_ankihub_setup(parent):
+    """Set up the menu item for uploading suggestions in bulk."""
+    q_action = QAction("🔃️ Sync with AnkiHub", mw)
+    q_action.triggered.connect(sync_with_ankihub_action)
     parent.addAction(q_action)
 
 
@@ -325,4 +346,5 @@ def setup_ankihub_menu() -> None:
     ankihub_login_setup(parent=ankihub_menu)
     create_collaborative_deck_setup(parent=ankihub_menu)
     subscribe_to_deck_setup(parent=ankihub_menu)
-    upload_suggestions_setup(parent=ankihub_menu)
+    sync_with_ankihub_setup(parent=ankihub_menu)
+    # upload_suggestions_setup(parent=ankihub_menu)

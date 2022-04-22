@@ -1,10 +1,8 @@
-import uuid
-
 from anki.hooks import addHook
 from aqt import gui_hooks
 from aqt.editor import Editor
 from PyQt6.QtCore import qDebug
-from aqt.utils import chooseList
+from aqt.utils import chooseList, tooltip
 
 from ..ankihub_client import AnkiHubClient
 from ..config import Config
@@ -19,6 +17,8 @@ def on_ankihub_button_press(editor: Editor):
     # The command is expected to have been set at this point already, either by
     # fetching the default or by selecting a command from the dropdown menu.
     command = editor.ankihub_command
+    # TODO Make sure the field scheme is correct.
+    #  eg, List[dict]:  [{"name": "Front", "order": 0, "value": "fun"}, {"name": "Back", "order": 1, "value": "stuff"}]
     fields = editor.note.fields
     tags = editor.note.tags
     client = AnkiHubClient()
@@ -30,7 +30,7 @@ def on_ankihub_button_press(editor: Editor):
             tags=tags,
         )
         if response.status_code == 201:
-            pass
+            tooltip("Submitted change note suggestion to AnkiHub.")
     elif command == AnkiHubCommands.NEW.value:
         subscribed_decks = client._config.private_config.decks
         if len(subscribed_decks) == 1:
@@ -41,17 +41,14 @@ def on_ankihub_button_press(editor: Editor):
                 choices=subscribed_decks,
             )
             deck_id = subscribed_decks[choice]
-        ankihub_id = str(uuid.uuid4())
         response = client.create_new_note_suggestion(
             deck_id=deck_id,
             anki_id=editor.note.id,
-            ankihub_id=ankihub_id,
             fields=fields,
             tags=tags,
         )
         if response.status_code == 201:
-            editor.note["AnkiHub ID"] = ankihub_id
-            editor.mw.col.update_note(editor.note)
+            tooltip("Submitted new note suggestion to AnkiHub.")
 
 
 def setup_editor_buttons(buttons, editor: Editor):
