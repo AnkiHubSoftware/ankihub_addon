@@ -1,6 +1,6 @@
 from datetime import datetime, timedelta, timezone
 
-from ankihub.constants import API_URL_BASE, LAST_SYNC_SLUG
+from ankihub.constants import API_URL_BASE
 from pytest_anki import AnkiSession
 
 from unittest.mock import Mock
