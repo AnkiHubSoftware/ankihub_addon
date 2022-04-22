@@ -33,13 +33,13 @@ jobs:
           python -m pip install -r ./requirements/dev.txt
 
       - name: Run tests forked
-        run: pytest -vvv --forked --cov --cov-report=xml
+        run: pytest -vvv --forked
         env:
           SKIP_INIT: 1
 
       - name: Run single test
         if: always()
-        run: pytest --cov --cov-report=xml ankihub/tests/test_entry_point.py
+        run: pytest ankihub/tests/test_entry_point.py
         env:
           SKIP_INIT: 1
 
