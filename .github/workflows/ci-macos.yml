@@ -1,0 +1,61 @@
+name: test macos
+
+on:
+  push:
+    branches:
+      - "main"
+  pull_request:
+    branches:
+      - "main"
+
+jobs:
+  test-current-anki:
+    runs-on: macos-latest
+
+    steps:
+      - name: Checkout ankihub_addon
+        uses: actions/checkout@v2
+
+      - uses: actions/checkout@v3
+      - uses: actions/setup-python@v3
+        with:
+          python-version: '3.9.7'
+          # architecture: 'x64' # optional x64 or x86. Defaults to x64 if not specified
+
+    - name: Install Qt
+      uses: jurplel/install-qt-action@v2
+      with:
+        version: "6.3.0"
+        setup-python: 'false'
+
+      - name: Install deps
+        run: |
+          python -m pip install --upgrade pip
+          python -m pip install -r ./requirements/dev.txt
+
+      - name: Run tests forked
+        run: pytest --forked --cov --cov-report=xml
+        env:
+          SKIP_INIT: 1
+
+      - name: Run tests not forked
+        if: always()
+        run: pytest --cov --cov-report=xml
+        env:
+          SKIP_INIT: 1
+
+      - name: Run single test
+        if: always()
+        run: pytest --cov --cov-report=xml ankihub/tests/test_entry_point.py
+        env:
+          SKIP_INIT: 1
+
+      - name: Upload coverage to Codecov
+        env:
+         CODECOV_TOKEN: "${{ secrets.CODECOV_TOKEN }}"
+        uses: codecov/codecov-action@v1
+        with:
+          fail_ci_if_error: true
+
+      - name: Run pre-commit
+        run: pre-commit run --all-files
