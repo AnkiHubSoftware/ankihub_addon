@@ -9,9 +9,8 @@ on:
       - "main"
 
 jobs:
-  test-current-anki:
+  test:
     runs-on: macos-latest
-
     steps:
       - name: Checkout ankihub_addon
         uses: actions/checkout@v2
@@ -22,11 +21,11 @@ jobs:
           python-version: '3.9.7'
           # architecture: 'x64' # optional x64 or x86. Defaults to x64 if not specified
 
-    - name: Install Qt
-      uses: jurplel/install-qt-action@v2
-      with:
-        version: "6.3.0"
-        setup-python: 'false'
+      - name: Install Qt
+        uses: jurplel/install-qt-action@v2
+        with:
+          version: "6.3.0"
+          setup-python: 'false'
 
       - name: Install deps
         run: |
