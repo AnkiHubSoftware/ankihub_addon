@@ -10,7 +10,6 @@ import typing
 
 from PyQt6.QtCore import qDebug
 from anki.exporting import AnkiPackageExporter
-from anki.models import NoteType
 from aqt import mw
 from aqt.dbcheck import check_db
 from aqt.utils import askUser, tooltip
