@@ -10,7 +10,7 @@ on:
 
 jobs:
   test-current-anki:
-    runs-on: ubuntu-latest
+    runs-on: macos-latest
 
     steps:
       - name: Checkout ankihub_addon
@@ -30,13 +30,14 @@ jobs:
           python -m pip install --upgrade pip
           python -m pip install -r ./requirements/dev.txt
 
-      - name: Run tests
-        run: pytest --cov --cov-report=xml
+      - name: Run tests forked
+        run: pytest --forked --cov --cov-report=xml
         env:
           SKIP_INIT: 1
 
-      - name: Run tests forked
-        run: pytest --forked --cov --cov-report=xml
+      - name: Run tests
+        if: always()
+        run: pytest --cov --cov-report=xml
         env:
           SKIP_INIT: 1
 
