@@ -10,6 +10,17 @@ ANKING_MODEL_ID = 1566160514431
 anking_deck = str(pathlib.Path(__file__).parent / "test_data" / "anking.apkg")
 
 
+def test_note_type_contains_field(anki_session: AnkiSession) -> None:
+    from ankihub.utils import note_type_contains_field
+
+    with anki_session.profile_loaded():
+        with anki_session.deck_installed(anking_deck):
+            note_type = anki_session.mw.col.models.get(ANKING_MODEL_ID)
+            assert note_type_contains_field(note_type, ANKING_MODEL_ID) is False
+            note_type["flds"].append({"name": constants.ANKIHUB_NOTE_TYPE_FIELD_NAME})
+            assert note_type_contains_field(note_type, ANKING_MODEL_ID) is True
+
+
 def test_get_note_types_in_deck(anki_session: AnkiSession) -> None:
     """Check that get_note_types_in_deck returns the expected model id."""
     from ankihub.utils import get_note_types_in_deck
@@ -20,17 +31,6 @@ def test_get_note_types_in_deck(anki_session: AnkiSession) -> None:
             # TODO test on a deck that has more than one note type.
             assert len(note_mode_ids) == 1
             assert note_mode_ids == [ANKING_MODEL_ID]
-
-
-def test_note_type_contains_field(anki_session: AnkiSession) -> None:
-    from ankihub.utils import note_type_contains_field
-
-    with anki_session.profile_loaded():
-        with anki_session.deck_installed(anking_deck):
-            note_type = anki_session.mw.col.models.get(ANKING_MODEL_ID)
-            assert note_type_contains_field(note_type, ANKING_MODEL_ID) is False
-            note_type["flds"].append({"name": constants.ANKIHUB_NOTE_TYPE_FIELD_NAME})
-            assert note_type_contains_field(note_type, ANKING_MODEL_ID) is True
 
 
 def test_modify_note_type(anki_session: AnkiSession) -> None:
