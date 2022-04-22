@@ -22,12 +22,12 @@ def test_get_note_types_in_deck(anki_session: AnkiSession) -> None:
             assert note_mode_ids == [ANKING_MODEL_ID]
 
 
-def test_note_type_contains_field(anki_session: AnkiSession) -> None:
+def test_note_type_contains_field(anki_session_with_addon: AnkiSession) -> None:
     from ankihub.utils import note_type_contains_field
 
-    with anki_session.profile_loaded():
-        with anki_session.deck_installed(anking_deck):
-            note_type = anki_session.mw.col.models.get(ANKING_MODEL_ID)
+    with anki_session_with_addon.profile_loaded():
+        with anki_session_with_addon.deck_installed(anking_deck):
+            note_type = anki_session_with_addon.mw.col.models.get(ANKING_MODEL_ID)
             assert note_type_contains_field(note_type, ANKING_MODEL_ID) is False
             note_type["flds"].append({"name": constants.ANKIHUB_NOTE_TYPE_FIELD_NAME})
             assert note_type_contains_field(note_type, ANKING_MODEL_ID) is True
