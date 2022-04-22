@@ -39,7 +39,7 @@ jobs:
 
       - name: Run single test
         if: always()
-        run: pytest ankihub/tests/test_entry_point.py
+        run: pytest ankihub/gui/tests/test_editor.py
         env:
           SKIP_INIT: 1
 
