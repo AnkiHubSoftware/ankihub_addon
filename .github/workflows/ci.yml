@@ -9,31 +9,8 @@ on:
       - "main"
 
 jobs:
-  read-current-anki-matrix:
-    # Reads current Anki set-up from anki-current.json
-    runs-on: macos-latest
-
-    outputs:
-      matrix: ${{ steps.set-matrix.outputs.matrix }}
-
-    steps:
-    - name: Checkout ankihub_addon
-      uses: actions/checkout@v2
-    - id: set-matrix
-      run: |
-        content=$(cat ./anki-current.json)
-        content="${content//'%'/'%25'}"
-        content="${content//$'\n'/'%0A'}"
-        content="${content//$'\r'/'%0D'}"
-        content="{ \"include\": [ ${content} ] }"
-        echo "::set-output name=matrix::$content"
-
   test-current-anki:
-    needs: read-current-anki-matrix
     runs-on: ubuntu-latest
-
-    strategy:
-      matrix: ${{ fromJSON(needs.read-current-anki-matrix.outputs.matrix) }}
 
     steps:
       - name: Checkout ankihub_addon
@@ -42,11 +19,11 @@ jobs:
       - name: Set up test environment
         uses: ./.github/actions/setup
         with:
-          python: ${{ matrix.python }}
-          chrome: ${{ matrix.chrome }}
-          anki: ${{ matrix.anki }}
-          pyqt: ${{ matrix.pyqt }}
-          pyqtwebengine: ${{ matrix.pyqtwebengine }}
+          python: 3.9
+          chrome: 77.0.3865.129
+          anki: 2.1.50
+          pyqt: 6.2.2
+          pyqtwebengine: 6.2.2
 
       - name: Install deps
         run: |
