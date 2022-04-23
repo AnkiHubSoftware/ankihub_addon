@@ -1,17 +1,20 @@
+from unittest.mock import MagicMock
+
+import requests_mock
 from pytest_anki import AnkiSession
+
+from ankihub.constants import API_URL_BASE
 
 
 def test_integration(anki_session_with_addon: AnkiSession, monkeypatch):
-
     session = anki_session_with_addon
     from aqt.main import AnkiQt
-
     from ankihub import entry_point
 
     # Test entry point
     mw = entry_point.run()
     assert isinstance(mw, AnkiQt)
-
+    # End test entry point
 
     # Test editor
     import ankihub.gui.editor as editor

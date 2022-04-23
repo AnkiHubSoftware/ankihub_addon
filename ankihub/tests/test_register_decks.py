@@ -4,8 +4,6 @@ from unittest.mock import Mock, patch
 
 from pytest_anki import AnkiSession
 
-from ankihub import constants
-
 ANKING_MODEL_ID = 1566160514431
 anking_deck = str(pathlib.Path(__file__).parent / "test_data" / "anking.apkg")
 
