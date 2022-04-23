@@ -1,3 +1,4 @@
+import copy
 import pathlib
 from datetime import datetime, timezone, timedelta
 from unittest.mock import MagicMock, Mock
@@ -8,6 +9,7 @@ from ankihub.constants import API_URL_BASE, ANKIHUB_NOTE_TYPE_FIELD_NAME
 
 ANKING_MODEL_ID = 1566160514431
 anking_deck = str(pathlib.Path(__file__).parent / "test_data" / "anking.apkg")
+sample_deck = str(pathlib.Path(__file__).parent / "test_data" / "sample_deck.apkg")
 
 
 def test_integration(anki_session_with_addon: AnkiSession, requests_mock, monkeypatch):
@@ -69,7 +71,7 @@ def test_integration(anki_session_with_addon: AnkiSession, requests_mock, monkey
     # Begin test register deck
     requests_mock.get(f"{API_URL_BASE}/decks/1/updates", json={"notes": []})
     with anki_session.profile_loaded():
-        with anki_session.deck_installed(anking_deck):
+        with anki_session.deck_installed(sample_deck) as deck_id:
 
             # test note type contains field
             from ankihub.utils import note_type_contains_field
@@ -77,6 +79,26 @@ def test_integration(anki_session_with_addon: AnkiSession, requests_mock, monkey
             assert note_type_contains_field(note_type, ANKING_MODEL_ID) is False
             note_type["flds"].append({"name": ANKIHUB_NOTE_TYPE_FIELD_NAME})
             assert note_type_contains_field(note_type, ANKING_MODEL_ID) is True
+
+            # test get note types in deck
+            from ankihub.utils import get_note_types_in_deck
+            note_mode_ids = get_note_types_in_deck(deck_id)
+            # TODO test on a deck that has more than one note type.
+            assert len(note_mode_ids) == 1
+            assert note_mode_ids == [ANKING_MODEL_ID]
+
+            from ankihub.register_decks import modify_note_type
+            # test modify note type
+            note_type = anki_session.mw.col.models.by_name("Basic")
+            original_note_type = copy.deepcopy(note_type)
+            original_note_template = original_note_type["tmpls"].pop()["afmt"]
+            modify_note_type("Basic")
+            modified_template = note_type["tmpls"].pop()["afmt"]
+            # TODO Make more precise assertions.
+            assert "AnkiHub ID" in modified_template
+            assert original_note_template != modified_template
+
+
 
     # End test register deck
 
