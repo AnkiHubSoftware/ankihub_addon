@@ -106,7 +106,6 @@ def test_integration(anki_session_with_addon: AnkiSession, requests_mock, monkey
     conf = client._config.private_config
     response = client.get_deck_updates(deck_id=deck_id)
     assert response.json() == expected_data
-    assert conf.last_sync
 
     # test get deck updates unauthenticated
     deck_id = 1
