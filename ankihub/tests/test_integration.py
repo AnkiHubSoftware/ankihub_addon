@@ -1,7 +1,7 @@
 import copy
 import pathlib
 from datetime import datetime, timezone, timedelta
-from unittest.mock import MagicMock, Mock, patch
+from unittest.mock import MagicMock, Mock
 
 from pytest_anki import AnkiSession
 
@@ -75,6 +75,7 @@ def test_integration(anki_session_with_addon: AnkiSession, requests_mock, monkey
 
             # test note type contains field
             from ankihub.utils import note_type_contains_field
+
             note_type = anki_session.mw.col.models.get(ANKING_MODEL_ID)
             assert note_type_contains_field(note_type, ANKING_MODEL_ID) is False
             note_type["flds"].append({"name": ANKIHUB_NOTE_TYPE_FIELD_NAME})
@@ -82,12 +83,14 @@ def test_integration(anki_session_with_addon: AnkiSession, requests_mock, monkey
 
             # test get note types in deck
             from ankihub.utils import get_note_types_in_deck
+
             note_model_ids = get_note_types_in_deck(deck_id)
             # TODO test on a deck that has more than one note type.
             assert len(note_model_ids) == 1
             assert note_model_ids == [1566160514431]
 
             from ankihub.register_decks import modify_note_type
+
             # test modify note type
             note_type = anki_session.mw.col.models.by_name("Basic")
             original_note_type = copy.deepcopy(note_type)
@@ -99,8 +102,11 @@ def test_integration(anki_session_with_addon: AnkiSession, requests_mock, monkey
             assert original_note_template != modified_template
 
             from ankihub.register_decks import create_collaborative_deck
+
             # test prepare to upload deck
-            monkeypatch.setattr("ankihub.register_decks.askUser", Mock(return_value=True))
+            monkeypatch.setattr(
+                "ankihub.register_decks.askUser", Mock(return_value=True)
+            )
             create_collaborative_deck(deck_id)
 
             # from ankihub.register_decks import upload_deck
