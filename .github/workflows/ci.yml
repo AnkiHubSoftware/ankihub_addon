@@ -32,14 +32,8 @@ jobs:
           python -m pip install --upgrade pip
           python -m pip install -r ./requirements/dev.txt
 
-      - name: Run tests forked
-        run: pytest -vvv --forked
-        env:
-          SKIP_INIT: 1
-
-      - name: Run single test
-        if: always()
-        run: pytest ankihub/gui/tests/test_editor.py
+      - name: Run integration tests
+        run: pytest -vvv --forked ./ankihub/tests/test_integration.py
         env:
           SKIP_INIT: 1
 
