@@ -1,7 +1,7 @@
 import copy
 import pathlib
 from datetime import datetime, timezone, timedelta
-from unittest.mock import MagicMock, Mock
+from unittest.mock import MagicMock, Mock, patch
 
 from pytest_anki import AnkiSession
 
@@ -82,10 +82,10 @@ def test_integration(anki_session_with_addon: AnkiSession, requests_mock, monkey
 
             # test get note types in deck
             from ankihub.utils import get_note_types_in_deck
-            note_mode_ids = get_note_types_in_deck(deck_id)
+            note_model_ids = get_note_types_in_deck(deck_id)
             # TODO test on a deck that has more than one note type.
-            assert len(note_mode_ids) == 1
-            assert note_mode_ids == [ANKING_MODEL_ID]
+            assert len(note_model_ids) == 1
+            assert note_model_ids == [1566160514431]
 
             from ankihub.register_decks import modify_note_type
             # test modify note type
@@ -98,7 +98,16 @@ def test_integration(anki_session_with_addon: AnkiSession, requests_mock, monkey
             assert "AnkiHub ID" in modified_template
             assert original_note_template != modified_template
 
+            from ankihub.register_decks import create_collaborative_deck
+            # test prepare to upload deck
+            monkeypatch.setattr("ankihub.register_decks.askUser", Mock(return_value=True))
+            create_collaborative_deck(deck_id)
 
+            # from ankihub.register_decks import upload_deck
+            # TODO test upload deck
+            # with patch("ankihub.ankihub_client.Config"):
+            #     monkeypatch.setattr("ankihub.ankihub_client.requests", Mock())
+            #     response = upload_deck(deck_id)
 
     # End test register deck
 
