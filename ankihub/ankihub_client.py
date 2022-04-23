@@ -120,13 +120,6 @@ class AnkiHubClient:
         )
         return response
 
-    def confirm_subscription(self, deck_id: int) -> Response:
-        response = self._call_api(
-            "POST",
-            f"/decks/{deck_id}/confirm_subscription/",
-        )
-        return response
-
     def get_presigned_url(self, key: str, action: str) -> Response:
         """
         Get URL for s3.
