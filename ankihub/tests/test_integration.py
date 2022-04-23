@@ -1,9 +1,13 @@
+import pathlib
 from datetime import datetime, timezone, timedelta
 from unittest.mock import MagicMock, Mock
 
 from pytest_anki import AnkiSession
 
-from ankihub.constants import API_URL_BASE
+from ankihub.constants import API_URL_BASE, ANKIHUB_NOTE_TYPE_FIELD_NAME
+
+ANKING_MODEL_ID = 1566160514431
+anking_deck = str(pathlib.Path(__file__).parent / "test_data" / "anking.apkg")
 
 
 def test_integration(anki_session_with_addon: AnkiSession, requests_mock, monkeypatch):
@@ -13,6 +17,7 @@ def test_integration(anki_session_with_addon: AnkiSession, requests_mock, monkey
     dependencies (ahem, Anki) and running a single integration test that relies on
     Anki is far more reliable than multiple tests that use an AnkiSession.
     """
+    anki_session = anki_session_with_addon
     from aqt.main import AnkiQt
     from ankihub import entry_point
 
@@ -60,6 +65,20 @@ def test_integration(anki_session_with_addon: AnkiSession, requests_mock, monkey
     response = on_ankihub_button_press(editor)
     assert response.status_code == 201
     # End test editor
+
+    # Begin test register deck
+    requests_mock.get(f"{API_URL_BASE}/decks/1/updates", json={"notes": []})
+    with anki_session.profile_loaded():
+        with anki_session.deck_installed(anking_deck):
+
+            # test note type contains field
+            from ankihub.utils import note_type_contains_field
+            note_type = anki_session.mw.col.models.get(ANKING_MODEL_ID)
+            assert note_type_contains_field(note_type, ANKING_MODEL_ID) is False
+            note_type["flds"].append({"name": ANKIHUB_NOTE_TYPE_FIELD_NAME})
+            assert note_type_contains_field(note_type, ANKING_MODEL_ID) is True
+
+    # End test register deck
 
     # Begin test client
     # test login
