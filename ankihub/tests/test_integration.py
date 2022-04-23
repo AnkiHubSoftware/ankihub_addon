@@ -13,7 +13,6 @@ def test_integration(anki_session_with_addon: AnkiSession, requests_mock, monkey
     dependencies (ahem, Anki) and running a single integration test that relies on
     Anki is far more reliable than multiple tests that use an AnkiSession.
     """
-    session = anki_session_with_addon
     from aqt.main import AnkiQt
     from ankihub import entry_point
 
@@ -23,7 +22,12 @@ def test_integration(anki_session_with_addon: AnkiSession, requests_mock, monkey
     # End test entry point
 
     # Begin test editor
-    from ankihub.gui.editor import setup, on_select_command, on_ankihub_button_press, ankihub_message_handler
+    from ankihub.gui.editor import (
+        setup,
+        on_select_command,
+        on_ankihub_button_press,
+        ankihub_message_handler,
+    )
     from ankihub.constants import AnkiHubCommands
 
     editor = setup()
@@ -48,7 +52,6 @@ def test_integration(anki_session_with_addon: AnkiSession, requests_mock, monkey
     requests_mock.post(
         f"{API_URL_BASE}/notes/{editor.note.id}/suggestion/",
         status_code=201,
-
     )
     # This test is quite limited since we don't know how to run this test with a
     # "real," editor, instead of the manually instantiated one above. So for
@@ -62,6 +65,7 @@ def test_integration(anki_session_with_addon: AnkiSession, requests_mock, monkey
     # test login
 
     from ankihub.ankihub_client import AnkiHubClient
+
     client = AnkiHubClient()
     credentials_data = {"username": "test", "password": "testpassword"}
     requests_mock.post(f"{API_URL_BASE}/login/", json={"token": "f4k3t0k3n"})
@@ -103,7 +107,6 @@ def test_integration(anki_session_with_addon: AnkiSession, requests_mock, monkey
     }
 
     requests_mock.get(f"{API_URL_BASE}/decks/{deck_id}/updates", json=expected_data)
-    conf = client._config.private_config
     response = client.get_deck_updates(deck_id=deck_id)
     assert response.json() == expected_data
 
