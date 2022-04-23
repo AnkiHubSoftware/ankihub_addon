@@ -10,7 +10,6 @@ import typing
 
 from PyQt6.QtCore import qDebug
 from anki.exporting import AnkiPackageExporter
-from anki.models import NoteType
 from aqt import mw
 from aqt.dbcheck import check_db
 from aqt.utils import askUser, tooltip
@@ -44,12 +43,13 @@ def process_csv(notes: typing.List[dict]) -> None:
     check_db(mw)
 
 
-def modify_note_type(note_type: NoteType) -> None:
+def modify_note_type(note_type) -> None:
     """Adds the AnkiHub Field to the Note Type and modifies the template to
     display the field.
     """
     "Adds ankihub field. Adds link to ankihub in card template."
-    qDebug(f"modifying note type {note_type}")
+    qDebug(f"Modifying note type {note_type}")
+    note_type = mw.col.models.by_name(note_type)
     mm = mw.col.models
     fields = note_type["flds"]
     field_names = [field["name"] for field in fields]
@@ -78,8 +78,6 @@ def modify_note_type(note_type: NoteType) -> None:
 
 def modify_note_types(note_types: typing.Iterable[str]):
     for note_type in note_types:
-        qDebug(f"Getting note type {note_type}")
-        note_type = mw.col.models.by_name(note_type)
         modify_note_type(note_type)
     # TODO Run add_id_fields
 

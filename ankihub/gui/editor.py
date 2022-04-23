@@ -23,7 +23,7 @@ def on_ankihub_button_press(editor: Editor):
     tags = editor.note.tags
     client = AnkiHubClient()
     if command == AnkiHubCommands.CHANGE.value:
-        ankihub_id = fields[-1]
+        ankihub_id = fields[0]
         response = client.create_change_note_suggestion(
             ankihub_id=ankihub_id,
             fields=fields,
@@ -31,6 +31,7 @@ def on_ankihub_button_press(editor: Editor):
         )
         if response.status_code == 201:
             tooltip("Submitted change note suggestion to AnkiHub.")
+            return response
     elif command == AnkiHubCommands.NEW.value:
         subscribed_decks = client._config.private_config.decks
         if len(subscribed_decks) == 1:
@@ -49,6 +50,7 @@ def on_ankihub_button_press(editor: Editor):
         )
         if response.status_code == 201:
             tooltip("Submitted new note suggestion to AnkiHub.")
+            return response
 
 
 def setup_editor_buttons(buttons, editor: Editor):

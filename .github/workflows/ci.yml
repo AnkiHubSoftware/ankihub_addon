@@ -9,61 +9,38 @@ on:
       - "main"
 
 jobs:
-  read-current-anki-matrix:
-    # Reads current Anki set-up from anki-current.json
+  test:
     runs-on: ubuntu-latest
-
-    outputs:
-      matrix: ${{ steps.set-matrix.outputs.matrix }}
-
-    steps:
-    - name: Checkout ankihub_addon
-      uses: actions/checkout@v2
-    - id: set-matrix
-      run: |
-        content=$(cat ./anki-current.json)
-        content="${content//'%'/'%25'}"
-        content="${content//$'\n'/'%0A'}"
-        content="${content//$'\r'/'%0D'}"
-        content="{ \"include\": [ ${content} ] }"
-        echo "::set-output name=matrix::$content"
-
-  test-current-anki:
-    needs: read-current-anki-matrix
-    runs-on: ubuntu-latest
-
-    strategy:
-      matrix: ${{ fromJSON(needs.read-current-anki-matrix.outputs.matrix) }}
-
     steps:
       - name: Checkout ankihub_addon
         uses: actions/checkout@v2
 
-      - name: Set up test environment
-        uses: ./.github/actions/setup
+      - uses: actions/checkout@v3
+      - uses: actions/setup-python@v3
         with:
-          python: ${{ matrix.python }}
-          chrome: ${{ matrix.chrome }}
-          anki: ${{ matrix.anki }}
-          pyqt: ${{ matrix.pyqt }}
-          pyqtwebengine: ${{ matrix.pyqtwebengine }}
+          python-version: '3.9.7'
+          # architecture: 'x64' # optional x64 or x86. Defaults to x64 if not specified
+
+      - name: Install Qt
+        uses: jurplel/install-qt-action@v2
+        with:
+          version: "6.3.0"
+          setup-python: 'false'
 
       - name: Install deps
         run: |
           python -m pip install --upgrade pip
-          pip install -r ./requirements/dev.txt
+          python -m pip install -r ./requirements/dev.txt
 
-      - name: Run tests
-        run: pytest --forked --cov --cov-report=xml
+      - name: Run integration tests
+        run: pytest -vvv --forked ./ankihub/tests/test_integration.py
         env:
           SKIP_INIT: 1
 
       - name: Upload coverage to Codecov
         env:
-         CODECOV_TOKEN: "${{ secrets.CODECOV_TOKEN }}"
+          CODECOV_TOKEN: "${{ secrets.CODECOV_TOKEN }}"
         uses: codecov/codecov-action@v1
-        with:
-          fail_ci_if_error: true
 
       - name: Run pre-commit
         run: pre-commit run --all-files

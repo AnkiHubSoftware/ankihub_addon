@@ -92,13 +92,14 @@ def sync_with_ankihub():
     client = AnkiHubClient()
     config = Config()
     decks = config.private_config.decks
-    mw._create_backup_with_progress(user_initiated=False)
     for deck in decks:
         response = client.get_deck_updates(deck)
         if response.status_code == 200:
             # Should last sync be tracked separately for each deck?
             data = response.json()
             notes = data["notes"]
+            if notes:
+                mw._create_backup_with_progress(user_initiated=False)
             for note in notes:
                 (
                     deck_id,
