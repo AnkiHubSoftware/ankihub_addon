@@ -33,7 +33,7 @@ jobs:
           python -m pip install -r ./requirements/dev.txt
 
       - name: Run integration tests
-        run: pytest -vvv --forked ./ankihub/tests/test_integration.py
+        run: pytest -vvv --cov --cov-report=xml --forked ./ankihub/tests/test_integration.py
         env:
           SKIP_INIT: 1
 
@@ -41,6 +41,8 @@ jobs:
         env:
           CODECOV_TOKEN: "${{ secrets.CODECOV_TOKEN }}"
         uses: codecov/codecov-action@v1
+        with:
+          fail_ci_if_error: true
 
       - name: Run pre-commit
         run: pre-commit run --all-files
