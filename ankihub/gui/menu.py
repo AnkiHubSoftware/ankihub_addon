@@ -247,7 +247,7 @@ class SubscribeToDeck(QWidget):
             qDebug(f"{s3_response.url}")
             qDebug(f"{s3_response.status_code}")
             # TODO Use io.BytesIO
-            out_file = Path(tempfile.mkdtemp()) / f"{deck_id}.csv"
+            out_file = Path(tempfile.mkdtemp()) / f"{deck_file_name}"
             with out_file.open("wb") as f:
                 f.write(s3_response.content)
                 qDebug(f"Wrote {deck_file_name} to {out_file}")
@@ -261,6 +261,16 @@ class SubscribeToDeck(QWidget):
         :param: path to the .csv or .apkg file
         """
         # TODO Handle .apkg as well
+        if deck_file.suffix == ".apkg":
+            self._install_deck_apkg(deck_file)
+        elif deck_file.suffix == ".csv":
+            self._install_deck_csv(deck_file)
+
+    def _install_deck_apkg(self, deck_file: Path):
+        from aqt import importing
+        importing.importFile(mw, str(deck_file.absolute()))
+
+    def _install_deck_csv(self, deck_file):
         tooltip("Configuring the collaborative deck.")
         ankihub_deck_ids, note_type_names = set(), set()
         notes = []
