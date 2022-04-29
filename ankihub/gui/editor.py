@@ -17,13 +17,22 @@ def on_ankihub_button_press(editor: Editor):
     # The command is expected to have been set at this point already, either by
     # fetching the default or by selecting a command from the dropdown menu.
     command = editor.ankihub_command
-    # TODO Make sure the field scheme is correct.
-    #  eg, List[dict]:  [{"name": "Front", "order": 0, "value": "fun"}, {"name": "Back", "order": 1, "value": "stuff"}]
-    fields = editor.note.fields
+    # See build_note_fields in ankihub
+    _field_vals = editor.note.fields
+    ankihub_id = _field_vals[0]
+    _fields_data = editor.note.note_type()["flds"]
+    fields = zip(_fields_data, _field_vals)
+    fields = [
+        {
+            "name": field["name"],
+            "order": field["ord"],
+            "value": val
+        }
+        for field, val in fields
+    ]
     tags = editor.note.tags
     client = AnkiHubClient()
     if command == AnkiHubCommands.CHANGE.value:
-        ankihub_id = fields[0]
         response = client.create_change_note_suggestion(
             ankihub_id=ankihub_id,
             fields=fields,
