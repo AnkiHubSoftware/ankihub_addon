@@ -58,10 +58,6 @@ class AnkiHubClient:
         self._headers["Authorization"] = ""
         qDebug("Token cleared from config.")
 
-    def upload_deck(self, key: str) -> Response:
-        response = self._call_api("POST", "/decks/", data={"key": key})
-        return response
-
     def get_deck_updates(self, deck_id: str) -> Response:
         since = self._config.private_config.last_sync
         params = {"since": f"{self._config.private_config.last_sync}"} if since else {}
