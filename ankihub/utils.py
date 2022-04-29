@@ -112,7 +112,9 @@ def sync_with_ankihub():
                 ) = note.values()
                 update_or_create_note(anki_id, ankihub_id, fields, tags, note_type)
             if notes:
-                check_db(mw)
+                # TODO Confirm that using mw.reset here is sufficient and that we don't
+                #  need check_db
+                mw.reset()
                 config.save_last_sync(time=data["latest_update"])
 
 

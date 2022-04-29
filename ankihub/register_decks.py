@@ -40,7 +40,7 @@ def process_csv(notes: typing.List[dict]) -> None:
         fields = json.loads(fields.replace("'", '"'))
         tags = json.loads(tags.replace("'", '"'))
         update_or_create_note(anki_id, ankihub_id, fields, tags, note_type)
-    check_db(mw)
+    mw.reset()
 
 
 def modify_note_type(note_type) -> None:
