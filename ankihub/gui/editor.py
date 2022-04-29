@@ -31,7 +31,7 @@ def on_ankihub_button_press(editor: Editor):
         )
         if response.status_code == 201:
             tooltip("Submitted change note suggestion to AnkiHub.")
-            return response
+            return response.json()
     elif command == AnkiHubCommands.NEW.value:
         subscribed_decks = client._config.private_config.decks
         if len(subscribed_decks) == 1:
@@ -50,7 +50,7 @@ def on_ankihub_button_press(editor: Editor):
         )
         if response.status_code == 201:
             tooltip("Submitted new note suggestion to AnkiHub.")
-            return response
+            return response.json()
 
 
 def setup_editor_buttons(buttons, editor: Editor):
