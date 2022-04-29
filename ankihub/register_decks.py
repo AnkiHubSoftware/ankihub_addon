@@ -84,6 +84,7 @@ def modify_note_types(note_types: typing.Iterable[str]):
 
 def upload_deck(did: int) -> None:
     """Upload the deck to AnkiHub."""
+    import requests
     deck_name = mw.col.decks.name(did)
     exporter = AnkiPackageExporter(mw.col)
     exporter.did = did
@@ -91,11 +92,20 @@ def upload_deck(did: int) -> None:
     exporter.includeTags = True
     deck_uuid = uuid.uuid4()
     out_dir = pathlib.Path(tempfile.mkdtemp())
-    out_file = str(out_dir / f"export-{deck_uuid}.apkg")
-    exporter.exportInto(out_file)
-    ankihub_client = AnkiHubClient()
-    response = ankihub_client.upload_deck(f"{deck_name}.apkg")
-    tooltip("Deck Uploaded to AnkiHub")
+    out_file = out_dir / f"export-{deck_uuid}.apkg"
+    exporter.exportInto(str(out_file))
+    qDebug(f"Deck {deck_name} exported to {out_file}")
+    client = AnkiHubClient()
+    presigned_url_response = client.get_presigned_url(
+        key=out_file.name, action="upload"
+    )
+    s3_url = presigned_url_response.json()["pre_signed_url"]
+    with open(out_file, "rb") as f:
+        deck_data = f.read()
+    response = requests.put(s3_url, data=deck_data)
+    qDebug(f"response status: {response.status_code}")
+    qDebug(f"response content: {response.content}")
+    tooltip("Upload to AnkiHub successful!")
     return response
 
 
@@ -120,3 +130,4 @@ def create_collaborative_deck(did: int) -> None:
         task=lambda: _create_collaborative_deck(note_types, did),
         on_done=lambda future: tooltip("Deck Uploaded to AnkiHub"),
     )
+    _create_collaborative_deck(note_type_names, did)
