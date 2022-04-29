@@ -203,7 +203,7 @@ class SubscribeToDeck(QWidget):
                 title="Please confirm to proceed.",
             )
             if confirmed:
-                self.install_deck(download_result)
+                self.install_deck(download_result, deck_id)
         self.close()
 
     def download_deck(self, deck_id):
@@ -255,20 +255,20 @@ class SubscribeToDeck(QWidget):
             self.label_results.setText("Deck download successful!")
             return out_file
 
-    def install_deck(self, deck_file: Path):
+    def install_deck(self, deck_file: Path, deck_id: int):
         """If we have a .csv, read data from the file and modify the user's note types
         and notes.
         :param: path to the .csv or .apkg file
         """
-        # TODO Handle .apkg as well
         if deck_file.suffix == ".apkg":
-            self._install_deck_apkg(deck_file)
+            self._install_deck_apkg(deck_file, deck_id)
         elif deck_file.suffix == ".csv":
             self._install_deck_csv(deck_file)
 
-    def _install_deck_apkg(self, deck_file: Path):
+    def _install_deck_apkg(self, deck_file: Path, deck_id: int):
         from aqt import importing
         importing.importFile(mw, str(deck_file.absolute()))
+        self.config.save_subscription([deck_id])
 
     def _install_deck_csv(self, deck_file):
         tooltip("Configuring the collaborative deck.")
