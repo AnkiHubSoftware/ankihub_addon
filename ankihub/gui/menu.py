@@ -300,6 +300,7 @@ def ankihub_login_setup(parent):
 
 
 def create_collaborative_deck_action() -> None:
+    # TODO Specify names kwarg when instantiating StudyDeck to get only top-level decks?
     diag = StudyDeck(
         mw,
         title="AnkiHub",

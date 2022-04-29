@@ -11,7 +11,6 @@ import typing
 from PyQt6.QtCore import qDebug
 from anki.exporting import AnkiPackageExporter
 from aqt import mw
-from aqt.dbcheck import check_db
 from aqt.utils import askUser, tooltip
 
 from . import constants
@@ -126,8 +125,9 @@ def create_collaborative_deck(did: int) -> None:
     if not response:
         tooltip("Cancelled Upload to AnkiHub")
         return
-    mw.taskman.with_progress(
-        task=lambda: _create_collaborative_deck(note_types, did),
-        on_done=lambda future: tooltip("Deck Uploaded to AnkiHub"),
-    )
     _create_collaborative_deck(note_type_names, did)
+    # see https://addon-docs.ankiweb.net/background-ops.html# background-operations
+    # mw.taskman.with_progress(
+    #     task=lambda: _create_collaborative_deck(note_type_names, did),
+    #     on_done=lambda future: tooltip("Deck Uploaded to AnkiHub"),
+    # )
