@@ -11,7 +11,9 @@ import typing
 from PyQt6.QtCore import qDebug
 from anki.exporting import AnkiPackageExporter
 from aqt import mw
-from aqt.utils import askUser, tooltip
+from aqt.operations import QueryOp
+from aqt.utils import askUser, tooltip, showInfo
+from requests import Response
 
 from . import constants
 from .ankihub_client import AnkiHubClient
@@ -81,7 +83,7 @@ def modify_note_types(note_types: typing.Iterable[str]):
     # TODO Run add_id_fields
 
 
-def upload_deck(did: int) -> None:
+def upload_deck(did: int) -> Response:
     """Upload the deck to AnkiHub."""
     import requests
     deck_name = mw.col.decks.name(did)
@@ -104,30 +106,34 @@ def upload_deck(did: int) -> None:
     response = requests.put(s3_url, data=deck_data)
     qDebug(f"response status: {response.status_code}")
     qDebug(f"response content: {response.content}")
-    tooltip("Upload to AnkiHub successful!")
     return response
-
-
-def _create_collaborative_deck(note_types, did):
-    modify_note_types(note_types)
-    upload_deck(did)
 
 
 def create_collaborative_deck(did: int) -> None:
     model_ids = get_note_types_in_deck(did)
     note_types = [mw.col.models.get(model_id) for model_id in model_ids]
     note_type_names = [note["name"] for note in note_types]
-    response = askUser(
+    answer = askUser(
         "Uploading the deck to AnkiHub will modify the following note types, "
         f"and will require a full sync afterwards: {', '.join(note_type_names)}.  Continue?",
         title="AnkiHub",
     )
-    if not response:
+    if not answer:
         tooltip("Cancelled Upload to AnkiHub")
         return
-    _create_collaborative_deck(note_type_names, did)
-    # see https://addon-docs.ankiweb.net/background-ops.html# background-operations
-    # mw.taskman.with_progress(
-    #     task=lambda: _create_collaborative_deck(note_type_names, did),
-    #     on_done=lambda future: tooltip("Deck Uploaded to AnkiHub"),
-    # )
+    modify_note_types(note_type_names)
+
+    def on_success(response: Response) -> None:
+        # TODO Update config
+        if response.status_code == 200:
+            msg = "🎉 Deck upload successful!"
+        else:
+            msg = f"😔 Deck upload failed: {response.text}"
+        showInfo(msg)
+
+    op = QueryOp(
+        parent=mw,
+        op=lambda col: upload_deck(did),
+        success=on_success,
+    )
+    op.with_progress().run_in_background()
