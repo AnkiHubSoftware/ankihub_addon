@@ -93,7 +93,7 @@ def upload_deck(did: int) -> Response:
     exporter.includeTags = True
     deck_uuid = uuid.uuid4()
     out_dir = pathlib.Path(tempfile.mkdtemp())
-    out_file = out_dir / f"export-{deck_uuid}.apkg"
+    out_file = out_dir / f"{deck_name}-{deck_uuid}.apkg"
     exporter.exportInto(str(out_file))
     qDebug(f"Deck {deck_name} exported to {out_file}")
     client = AnkiHubClient()
