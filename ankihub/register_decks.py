@@ -11,8 +11,7 @@ import typing
 from PyQt6.QtCore import qDebug
 from anki.exporting import AnkiPackageExporter
 from aqt import mw
-from aqt.operations import QueryOp
-from aqt.utils import askUser, tooltip, showInfo
+from aqt.utils import askUser, tooltip
 from requests import Response
 
 from . import constants
@@ -59,7 +58,7 @@ def modify_note_type(note_type) -> None:
         return
     ankihub_field = mm.new_field(constants.ANKIHUB_NOTE_TYPE_FIELD_NAME)
     note_type["flds"].insert(0, ankihub_field)
-    # TODO Genericize this by creating a function that takes a template and
+    # TODO Generalize this by creating a function that takes a template and
     #  returns a new template.
     template_snippet = (
         "\n\n<br><br>"
@@ -110,8 +109,9 @@ def upload_deck(did: int) -> Response:
     return response
 
 
-def create_collaborative_deck(did: int) -> None:
-    model_ids = get_note_types_in_deck(did)
+def create_collaborative_deck(deck_name: str) -> None:
+    deck_id = mw.col.decks.id(deck_name)
+    model_ids = get_note_types_in_deck(deck_id)
     note_types = [mw.col.models.get(model_id) for model_id in model_ids]
     note_type_names = [note["name"] for note in note_types]
     answer = askUser(
@@ -123,18 +123,15 @@ def create_collaborative_deck(did: int) -> None:
         tooltip("Cancelled Upload to AnkiHub")
         return
     modify_note_types(note_type_names)
+    note_ids = list(map(int, mw.col.find_notes(f"deck:{deck_name}")))
+    assign_ankihub_ids(note_ids)
+    upload_deck(deck_id)
 
-    def on_success(response: Response) -> None:
-        # TODO Update config
-        if response.status_code == 200:
-            msg = "🎉 Deck upload successful!"
-        else:
-            msg = f"😔 Deck upload failed: {response.text}"
-        showInfo(msg)
 
-    op = QueryOp(
-        parent=mw,
-        op=lambda col: upload_deck(did),
-        success=on_success,
-    )
-    op.with_progress().run_in_background()
+def assign_ankihub_ids(note_ids: typing.List[int]) -> None:
+    """Assign UUID to notes that have an AnkiHub ID field already."""
+    for note_id in note_ids:
+        note = mw.col.get_note(id=note_id)
+        note["AnkiHub ID"] = str(uuid.uuid4())
+        mw.col.update_notes([note])
+        qDebug(f"Updated note {note_id}")

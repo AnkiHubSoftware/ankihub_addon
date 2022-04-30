@@ -4,6 +4,8 @@ from pathlib import Path
 
 import requests
 from PyQt6.QtCore import qDebug
+from aqt.operations import QueryOp
+from requests import Response
 
 from ankihub.ankihub_client import AnkiHubClient
 from ankihub.config import Config
@@ -16,7 +18,7 @@ from ankihub.register_decks import (
 from aqt import mw
 from aqt.qt import QAction, QMenu, qconnect
 from aqt.studydeck import StudyDeck
-from aqt.utils import showText, tooltip, askUser
+from aqt.utils import showText, tooltip, askUser, showInfo
 from PyQt5.QtWidgets import (
     QHBoxLayout,
     QLabel,
@@ -301,6 +303,15 @@ def ankihub_login_setup(parent):
 
 def create_collaborative_deck_action() -> None:
     # TODO Specify names kwarg when instantiating StudyDeck to get only top-level decks?
+
+    def on_success(response: Response) -> None:
+        # TODO Update config
+        if response.status_code == 200:
+            msg = "🎉 Deck upload successful!"
+        else:
+            msg = f"😔 Deck upload failed: {response.text}"
+        showInfo(msg)
+
     diag = StudyDeck(
         mw,
         title="AnkiHub",
@@ -311,8 +322,12 @@ def create_collaborative_deck_action() -> None:
     deck_name = diag.name
     if not deck_name:
         return
-    did = mw.col.decks.id(deck_name)
-    create_collaborative_deck(did)
+    op = QueryOp(
+        parent=mw,
+        op=lambda col: create_collaborative_deck(deck_name),
+        success=on_success,
+    )
+    op.with_progress().run_in_background()
 
 
 def create_collaborative_deck_setup(parent):
