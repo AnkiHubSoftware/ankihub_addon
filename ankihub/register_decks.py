@@ -104,6 +104,7 @@ def upload_deck(did: int) -> Response:
     with open(out_file, "rb") as f:
         deck_data = f.read()
     response = requests.put(s3_url, data=deck_data)
+    qDebug(f"request url: {response.request.url}")
     qDebug(f"response status: {response.status_code}")
     qDebug(f"response content: {response.content}")
     return response
