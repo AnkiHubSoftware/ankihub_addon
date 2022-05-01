@@ -117,7 +117,8 @@ def create_collaborative_deck(deck_name: str) -> None:
     modify_note_types(note_type_names)
     note_ids = list(map(int, mw.col.find_notes(f"deck:{deck_name}")))
     assign_ankihub_ids(note_ids)
-    upload_deck(deck_id)
+    response = upload_deck(deck_id)
+    return response
 
 
 def assign_ankihub_ids(note_ids: typing.List[int]) -> None:
