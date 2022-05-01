@@ -114,14 +114,6 @@ def create_collaborative_deck(deck_name: str) -> None:
     model_ids = get_note_types_in_deck(deck_id)
     note_types = [mw.col.models.get(model_id) for model_id in model_ids]
     note_type_names = [note["name"] for note in note_types]
-    answer = askUser(
-        "Uploading the deck to AnkiHub will modify the following note types, "
-        f"and will require a full sync afterwards: {', '.join(note_type_names)}.  Continue?",
-        title="AnkiHub",
-    )
-    if not answer:
-        tooltip("Cancelled Upload to AnkiHub")
-        return
     modify_note_types(note_type_names)
     note_ids = list(map(int, mw.col.find_notes(f"deck:{deck_name}")))
     assign_ankihub_ids(note_ids)

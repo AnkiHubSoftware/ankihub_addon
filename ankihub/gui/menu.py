@@ -322,6 +322,14 @@ def create_collaborative_deck_action() -> None:
     deck_name = diag.name
     if not deck_name:
         return
+    confirm = askUser(
+        "Uploading the deck to AnkiHub requires modifying notes and note types in "
+        f"{deck_name} and will require a full sync afterwards.  Would you like to "
+        "continue?",
+    )
+    if not confirm:
+        tooltip("Cancelled Upload to AnkiHub")
+        return
     op = QueryOp(
         parent=mw,
         op=lambda col: create_collaborative_deck(deck_name),
