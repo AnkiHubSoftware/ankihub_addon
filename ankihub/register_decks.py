@@ -123,8 +123,11 @@ def create_collaborative_deck(deck_name: str) -> None:
 
 def assign_ankihub_ids(note_ids: typing.List[int]) -> None:
     """Assign UUID to notes that have an AnkiHub ID field already."""
+    updated_notes = []
+    qDebug(f"Assigning AnkiHub IDs to {', '.join(map(str, note_ids))}")
     for note_id in note_ids:
         note = mw.col.get_note(id=note_id)
         note["AnkiHub ID"] = str(uuid.uuid4())
-        mw.col.update_notes([note])
-        qDebug(f"Updated note {note_id}")
+        updated_notes.append(note)
+    mw.col.update_notes(updated_notes)
+    qDebug(f"Updated notes: {', '.join(map(str, note_ids))}")
