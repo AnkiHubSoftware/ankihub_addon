@@ -312,14 +312,14 @@ def create_collaborative_deck_action() -> None:
             msg = f"😔 Deck upload failed: {response.text}"
         showInfo(msg)
 
-    diag = StudyDeck(
+    deck_chooser = StudyDeck(
         mw,
         title="AnkiHub",
         accept="Upload",
         # Removes the "Add" button
         buttons=[],
     )
-    deck_name = diag.name
+    deck_name = deck_chooser.name
     if not deck_name:
         return
     confirm = askUser(
