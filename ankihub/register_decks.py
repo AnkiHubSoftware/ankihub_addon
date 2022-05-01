@@ -43,13 +43,13 @@ def process_csv(notes: typing.List[dict]) -> None:
     mw.reset()
 
 
-def modify_note_type(note_type) -> None:
+def modify_note_type(note_type_name: str) -> None:
     """Adds the AnkiHub Field to the Note Type and modifies the template to
     display the field.
     """
     "Adds ankihub field. Adds link to ankihub in card template."
     qDebug(f"Modifying note type {note_type}")
-    note_type = mw.col.models.by_name(note_type)
+    note_type = mw.col.models.by_name(note_type_name)
     mm = mw.col.models
     fields = note_type["flds"]
     field_names = [field["name"] for field in fields]
