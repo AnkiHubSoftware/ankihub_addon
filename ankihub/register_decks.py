@@ -11,7 +11,6 @@ import typing
 from PyQt6.QtCore import qDebug
 from anki.exporting import AnkiPackageExporter
 from aqt import mw
-from aqt.utils import askUser, tooltip
 from requests import Response
 
 from . import constants
@@ -48,7 +47,7 @@ def modify_note_type(note_type_name: str) -> None:
     display the field.
     """
     "Adds ankihub field. Adds link to ankihub in card template."
-    qDebug(f"Modifying note type {note_type}")
+    qDebug(f"Modifying note type {note_type_name}")
     note_type = mw.col.models.by_name(note_type_name)
     mm = mw.col.models
     fields = note_type["flds"]
@@ -74,6 +73,7 @@ def modify_note_type(note_type_name: str) -> None:
     for template in templates:
         template["afmt"] += template_snippet
     mm.save(note_type)
+    qDebug(f"Saved note type {note_type_name}")
 
 
 def modify_note_types(note_types: typing.Iterable[str]):
@@ -85,6 +85,7 @@ def modify_note_types(note_types: typing.Iterable[str]):
 def upload_deck(did: int) -> Response:
     """Upload the deck to AnkiHub."""
     import requests
+
     deck_name = mw.col.decks.name(did)
     exporter = AnkiPackageExporter(mw.col)
     exporter.did = did
@@ -110,11 +111,13 @@ def upload_deck(did: int) -> Response:
 
 
 def create_collaborative_deck(deck_name: str) -> None:
+    qDebug("Creating collaborative deck")
     deck_id = mw.col.decks.id(deck_name)
     model_ids = get_note_types_in_deck(deck_id)
     note_types = [mw.col.models.get(model_id) for model_id in model_ids]
     note_type_names = [note["name"] for note in note_types]
     modify_note_types(note_type_names)
+    qDebug(f"Finding notes in {deck_name}")
     note_ids = list(map(int, mw.col.find_notes(f"deck:{deck_name}")))
     assign_ankihub_ids(note_ids)
     response = upload_deck(deck_id)

@@ -8,7 +8,6 @@ from anki.models import NoteType
 from aqt import mw
 
 from anki.notes import Note
-from aqt.dbcheck import check_db
 
 from . import constants
 from .ankihub_client import AnkiHubClient

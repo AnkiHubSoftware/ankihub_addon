@@ -23,11 +23,7 @@ def on_ankihub_button_press(editor: Editor):
     _fields_data = editor.note.note_type()["flds"]
     fields = zip(_fields_data, _field_vals)
     fields = [
-        {
-            "name": field["name"],
-            "order": field["ord"],
-            "value": val
-        }
+        {"name": field["name"], "order": field["ord"], "value": val}
         for field, val in fields
     ]
     tags = editor.note.tags

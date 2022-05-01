@@ -269,6 +269,7 @@ class SubscribeToDeck(QWidget):
 
     def _install_deck_apkg(self, deck_file: Path, deck_id: int):
         from aqt import importing
+
         importing.importFile(mw, str(deck_file.absolute()))
         self.config.save_subscription([deck_id])
 
@@ -335,6 +336,7 @@ def create_collaborative_deck_action() -> None:
         op=lambda col: create_collaborative_deck(deck_name),
         success=on_success,
     )
+    qDebug("Instantiated QueryOp")
     op.with_progress().run_in_background()
 
 
