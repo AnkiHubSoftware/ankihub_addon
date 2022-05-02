@@ -39,6 +39,9 @@ def on_ankihub_button_press(editor: Editor):
             return response.json()
     elif command == AnkiHubCommands.NEW.value:
         subscribed_decks = client._config.private_config.decks
+        if len(subscribed_decks) == 0:
+            showText("You aren't currently subscribed to any AnkiHub decks. "
+                     "Please subscribe to an AnkiHub deck first.")
         if len(subscribed_decks) == 1:
             deck_id = subscribed_decks[0]
         else:
