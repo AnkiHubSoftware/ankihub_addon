@@ -2,7 +2,7 @@ from anki.hooks import addHook
 from aqt import gui_hooks
 from aqt.editor import Editor
 from PyQt6.QtCore import qDebug
-from aqt.utils import chooseList, tooltip
+from aqt.utils import chooseList, tooltip, showText
 
 from ..ankihub_client import AnkiHubClient
 from ..config import Config
@@ -19,7 +19,7 @@ def on_ankihub_button_press(editor: Editor):
     command = editor.ankihub_command
     # See build_note_fields in ankihub
     _field_vals = editor.note.fields
-    ankihub_id = _field_vals[0]
+    ankihub_id = _field_vals[-1]
     _fields_data = editor.note.note_type()["flds"]
     fields = zip(_fields_data, _field_vals)
     fields = [

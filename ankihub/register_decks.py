@@ -56,7 +56,7 @@ def modify_note_type(note_type_name: str) -> None:
         qDebug(f"{constants.ANKIHUB_NOTE_TYPE_FIELD_NAME} already exists.")
         return
     ankihub_field = mm.new_field(constants.ANKIHUB_NOTE_TYPE_FIELD_NAME)
-    note_type["flds"].insert(0, ankihub_field)
+    note_type["flds"].append(ankihub_field)
     # TODO Generalize this by creating a function that takes a template and
     #  returns a new template.
     template_snippet = (
