@@ -44,7 +44,9 @@ def hide_ankihub_field_in_editor(
         return js
     extra = (
         'require("svelte/internal").tick().then(() => '
-        "{{ require('anki/NoteEditor').instances[0].fields[0].element.then((element) "
+        "{{ require('anki/NoteEditor').instances[0].fields["
+        "require('anki/NoteEditor').instances[0].fields.length -1"
+        "].element.then((element) "
         "=> {{ element.hidden = true; }}); }});"
     )
     js += extra
