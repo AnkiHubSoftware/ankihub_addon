@@ -100,7 +100,7 @@ class AnkiHubClient:
         deck_id: int,
         anki_id: int,
         ankihub_id: str,
-        fields: Dict[str, str],
+        fields: List[dict],
         tags: List[str],
     ) -> Response:
         # TODO include the note model name
