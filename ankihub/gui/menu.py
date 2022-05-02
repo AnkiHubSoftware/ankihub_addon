@@ -307,7 +307,7 @@ def create_collaborative_deck_action() -> None:
 
     def on_success(response: Response) -> None:
         # TODO Update config
-        if response.status_code == 200:
+        if response.status_code == 201:
             msg = "🎉 Deck upload successful!"
         else:
             msg = f"😔 Deck upload failed: {response.text}"

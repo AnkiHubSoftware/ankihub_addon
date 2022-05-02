@@ -97,20 +97,11 @@ def upload_deck(did: int) -> Response:
     exporter.exportInto(str(out_file))
     qDebug(f"Deck {deck_name} exported to {out_file}")
     client = AnkiHubClient()
-    presigned_url_response = client.get_presigned_url(
-        key=out_file.name, action="upload"
-    )
-    s3_url = presigned_url_response.json()["pre_signed_url"]
-    with open(out_file, "rb") as f:
-        deck_data = f.read()
-    response = requests.put(s3_url, data=deck_data)
-    qDebug(f"request url: {response.request.url}")
-    qDebug(f"response status: {response.status_code}")
-    qDebug(f"response content: {response.content}")
+    response = client.upload_deck(file=out_file)
     return response
 
 
-def create_collaborative_deck(deck_name: str) -> None:
+def create_collaborative_deck(deck_name: str) -> Response:
     qDebug("Creating collaborative deck")
     deck_id = mw.col.decks.id(deck_name)
     model_ids = get_note_types_in_deck(deck_id)

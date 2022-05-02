@@ -1,3 +1,4 @@
+from pathlib import Path
 from typing import Dict, List
 
 import requests
@@ -58,7 +59,18 @@ class AnkiHubClient:
         self._headers["Authorization"] = ""
         qDebug("Token cleared from config.")
 
-    def upload_deck(self, key: str) -> Response:
+    def upload_deck(self, file: Path) -> Response:
+        key = file.name
+        presigned_url_response = self.get_presigned_url(
+            key=key, action="upload"
+        )
+        s3_url = presigned_url_response.json()["pre_signed_url"]
+        with open(file, "rb") as f:
+            deck_data = f.read()
+        s3_response = requests.put(s3_url, data=deck_data)
+        qDebug(f"request url: {s3_response.request.url}")
+        qDebug(f"response status: {s3_response.status_code}")
+        qDebug(f"response content: {s3_response.content}")
         response = self._call_api("POST", "/decks/", data={"key": key})
         return response
 
