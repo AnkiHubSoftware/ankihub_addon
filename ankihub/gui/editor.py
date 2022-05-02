@@ -19,8 +19,9 @@ def on_ankihub_button_press(editor: Editor):
     command = editor.ankihub_command
     # See build_note_fields in ankihub
     _field_vals = editor.note.fields
-    ankihub_id = _field_vals[-1]
-    _fields_data = editor.note.note_type()["flds"]
+    # Exclude the AnkiHub ID field
+    ankihub_id = _field_vals.pop()
+    _fields_data = editor.note.note_type()["flds"][:-1]
     fields = zip(_fields_data, _field_vals)
     fields = [
         {"name": field["name"], "order": field["ord"], "value": val}

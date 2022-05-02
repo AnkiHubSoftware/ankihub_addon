@@ -82,6 +82,13 @@ def update_note(note, anki_id, ankihub_id, fields, tags):
 def update_or_create_note(anki_id, ankihub_id, fields, tags, note_type) -> Note:
     try:
         note = mw.col.get_note(id=int(anki_id))
+        fields.update(
+            {"name": "AnkiHub ID",
+             # Put the AnkiHub field last
+             "order": len(fields),
+             "value": ankihub_id
+             }
+        )
         update_note(note, anki_id, ankihub_id, fields, tags)
         mw.col.update_notes([note])
     except NotFoundError:
