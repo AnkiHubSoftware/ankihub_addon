@@ -37,6 +37,16 @@ jobs:
         env:
           SKIP_INIT: 1
 
+      - name: Package .ankiaddon
+        run: zip -r ankihub.ankiaddon ankihub/ -x ankihub/tests\*
+
+      - name: Archive .ankiaddon
+        uses: actions/upload-artifact@v3
+        with:
+          name: anki-addon
+          path: |
+            ankihub.ankiaddon
+
       - name: Upload coverage to Codecov
         env:
           CODECOV_TOKEN: "${{ secrets.CODECOV_TOKEN }}"
