@@ -8,7 +8,7 @@ import tempfile
 import uuid
 import typing
 
-from PyQt6.QtCore import qDebug
+from aqt import qDebug
 from anki.exporting import AnkiPackageExporter
 from aqt import mw
 from requests import Response

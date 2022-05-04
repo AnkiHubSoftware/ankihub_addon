@@ -1,7 +1,7 @@
 from anki.hooks import addHook
 from aqt import gui_hooks
 from aqt.editor import Editor
-from PyQt6.QtCore import qDebug
+from aqt import qDebug
 from aqt.utils import chooseList, tooltip, showText
 
 from ..ankihub_client import AnkiHubClient

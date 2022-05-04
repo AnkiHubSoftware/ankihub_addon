@@ -3,7 +3,7 @@ import tempfile
 from pathlib import Path
 
 import requests
-from PyQt6.QtCore import qDebug
+from aqt import qDebug
 from aqt.operations import QueryOp
 from requests import Response
 
@@ -19,7 +19,7 @@ from aqt import mw
 from aqt.qt import QAction, QMenu, qconnect
 from aqt.studydeck import StudyDeck
 from aqt.utils import showText, tooltip, askUser, showInfo
-from PyQt5.QtWidgets import (
+from aqt import (
     QHBoxLayout,
     QLabel,
     QLineEdit,

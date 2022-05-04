@@ -2,7 +2,7 @@ from typing import Dict, List
 
 import anki
 import aqt
-from PyQt6.QtCore import qDebug
+from aqt import qDebug
 from anki.errors import NotFoundError
 from anki.models import NoteType
 from aqt import mw

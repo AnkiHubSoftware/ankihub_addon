@@ -2,7 +2,7 @@ from pathlib import Path
 from typing import Dict, List
 
 import requests
-from PyQt6.QtCore import qDebug
+from aqt import qDebug
 from aqt.utils import showText
 
 from ankihub.config import Config

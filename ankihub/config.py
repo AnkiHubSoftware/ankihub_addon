@@ -5,7 +5,7 @@ from datetime import datetime, timezone
 import typing
 from json import JSONDecodeError
 
-from PyQt6.QtCore import qDebug
+from aqt import qDebug
 from aqt import mw
 
 
