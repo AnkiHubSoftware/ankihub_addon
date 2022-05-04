@@ -105,9 +105,6 @@ def test_integration(anki_session_with_addon: AnkiSession, requests_mock, monkey
             from ankihub.register_decks import create_collaborative_deck
 
             # test prepare to upload deck
-            monkeypatch.setattr(
-                "ankihub.register_decks.askUser", Mock(return_value=True)
-            )
             create_collaborative_deck(deck_id)
 
             # from ankihub.register_decks import upload_deck
