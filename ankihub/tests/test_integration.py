@@ -54,7 +54,7 @@ def test_integration(anki_session_with_addon: AnkiSession, requests_mock, monkey
     editor.mw = MagicMock()
     editor.note = MagicMock()
     editor.note.id = 1
-    editor.note.fields = ["1", "a", "b"]
+    editor.note.fields = ["a", "b", "1"]
     editor.note.tags = ["test_tag"]
     requests_mock.post(
         f"{API_URL_BASE}/notes/{editor.note.id}/suggestion/",
