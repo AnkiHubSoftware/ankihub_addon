@@ -59,6 +59,7 @@ def test_integration(anki_session_with_addon: AnkiSession, requests_mock, monkey
     requests_mock.post(
         f"{API_URL_BASE}/notes/{editor.note.id}/suggestion/",
         status_code=201,
+        json={}
     )
     # This test is quite limited since we don't know how to run this test with a
     # "real," editor, instead of the manually instantiated one above. So for
