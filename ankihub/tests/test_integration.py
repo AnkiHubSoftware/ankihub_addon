@@ -55,17 +55,19 @@ def test_integration(anki_session_with_addon: AnkiSession, requests_mock, monkey
     editor.note.id = 1
     editor.note.fields = ["a", "b", "1"]
     editor.note.tags = ["test_tag"]
+    # TODO Mock what this is actually expected to return
+    expected_response = {}
     requests_mock.post(
         f"{API_URL_BASE}/notes/{editor.note.id}/suggestion/",
         status_code=201,
-        json={}
+        json=expected_response
     )
     # This test is quite limited since we don't know how to run this test with a
     # "real," editor, instead of the manually instantiated one above. So for
     # now, this test just checks that on_ankihub_button_press runs without
     # raising any errors.
     response = on_ankihub_button_press(editor)
-    assert response.status_code == 201
+    assert response == expected_response
     # End test editor
 
     # Begin test register deck
