@@ -7,9 +7,8 @@ from pytest_anki import AnkiSession
 
 from ankihub.constants import API_URL_BASE, ANKIHUB_NOTE_TYPE_FIELD_NAME
 
-ANKING_MODEL_ID = 1566160514431
-anking_deck = str(pathlib.Path(__file__).parent / "test_data" / "anking.apkg")
-sample_deck = str(pathlib.Path(__file__).parent / "test_data" / "sample_deck.apkg")
+sample_model_id = 1650564101852
+sample_deck = str(pathlib.Path(__file__).parent / "test_data" / "small.apkg")
 
 
 def test_integration(anki_session_with_addon: AnkiSession, requests_mock, monkeypatch):
@@ -77,10 +76,10 @@ def test_integration(anki_session_with_addon: AnkiSession, requests_mock, monkey
             # test note type contains field
             from ankihub.utils import note_type_contains_field
 
-            note_type = anki_session.mw.col.models.get(ANKING_MODEL_ID)
-            assert note_type_contains_field(note_type, ANKING_MODEL_ID) is False
+            note_type = anki_session.mw.col.models.get(sample_model_id)
+            assert note_type_contains_field(note_type, sample_model_id) is False
             note_type["flds"].append({"name": ANKIHUB_NOTE_TYPE_FIELD_NAME})
-            assert note_type_contains_field(note_type, ANKING_MODEL_ID) is True
+            assert note_type_contains_field(note_type, sample_model_id) is True
 
             # test get note types in deck
             from ankihub.utils import get_note_types_in_deck
