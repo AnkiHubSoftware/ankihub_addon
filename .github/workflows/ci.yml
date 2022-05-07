@@ -34,7 +34,7 @@ jobs:
 
           # TODO Move once tests are passing
       - name: Package .ankiaddon
-        run: zip -r ankihub.ankiaddon . -x ankihub/tests\*
+        run: zip -r ../ankihub.ankiaddon . -x ankihub/tests\*
         working-directory: ankihub
 
       - name: Archive .ankiaddon
