@@ -104,15 +104,18 @@ def test_integration(anki_session_with_addon: AnkiSession, requests_mock, monkey
             assert original_note_template != modified_template
 
             from ankihub.register_decks import create_collaborative_deck
+            from ankihub.register_decks import AnkiHubClient
 
             # test prepare to upload deck
-            create_collaborative_deck(deck_id)
+            deck_name = anki_session.mw.col.decks.name(deck_id)
+            with monkeypatch.context() as m:
+                m.setattr(AnkiHubClient, "upload_deck", Mock())
+                create_collaborative_deck(deck_name)
 
-            # from ankihub.register_decks import upload_deck
-            # TODO test upload deck
-            # with patch("ankihub.ankihub_client.Config"):
-            #     monkeypatch.setattr("ankihub.ankihub_client.requests", Mock())
-            #     response = upload_deck(deck_id)
+            from ankihub.register_decks import upload_deck
+            with patch("ankihub.ankihub_client.Config"):
+                monkeypatch.setattr("ankihub.ankihub_client.requests", Mock())
+                response = upload_deck(deck_id)
 
     # End test register deck
 
