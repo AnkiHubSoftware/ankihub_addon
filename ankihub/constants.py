@@ -1,8 +1,15 @@
+import os
 import pathlib
 from enum import Enum
+from aqt import qDebug
 
 URL_BASE = "https://ankihub.net/"
-API_URL_BASE = "http://localhost:8000/api"
+if os.getenv("DEVELOPMENT", False):
+    API_URL_BASE = "https://staging.ankihub.net/api"
+else:
+    API_URL_BASE = "https://app.ankihub.net/api"
+
+qDebug(f"Starting with URL_BASE {API_URL_BASE}")
 URL_VIEW_NOTE = URL_BASE + "notes/"
 URL_HELP = f"{URL_BASE}/help"
 ANKIHUB_NOTE_TYPE_FIELD_NAME = "AnkiHub ID"
