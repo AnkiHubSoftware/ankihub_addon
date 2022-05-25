@@ -18,11 +18,13 @@ def on_ankihub_button_press(editor: Editor):
     # fetching the default or by selecting a command from the dropdown menu.
     command = editor.ankihub_command
     # See build_note_fields in ankihub
+    # _field_vals is the actual contents of each note field.
     _field_vals = editor.note.fields
-    # Exclude the AnkiHub ID field
+    # Exclude the AnkiHub ID field since we don't want to expose this as an
+    # editable field in AnkiHub suggestion forms.
     ankihub_id = _field_vals.pop()
-    _fields_data = editor.note.note_type()["flds"][:-1]
-    fields = zip(_fields_data, _field_vals)
+    _fields_metadata = editor.note.note_type()["flds"][:-1]
+    fields = zip(_fields_metadata, _field_vals)
     fields = [
         {"name": field["name"], "order": field["ord"], "value": val}
         for field, val in fields
