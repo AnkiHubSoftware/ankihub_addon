@@ -318,6 +318,13 @@ def create_collaborative_deck_action() -> None:
         accept="Upload",
         # Removes the "Add" button
         buttons=[],
+        names=lambda: [
+            d.name
+            for d in mw.col.decks.all_names_and_ids(
+                include_filtered=True, skip_empty_default=True
+            )
+            if "::" not in d.name
+        ],
     )
     deck_name = deck_chooser.name
     if not deck_name:
