@@ -5,12 +5,13 @@ import json
 import os
 import pathlib
 import tempfile
-import uuid
 import typing
+import uuid
 
-from aqt import qDebug
+from anki.decks import DeckId
 from anki.exporting import AnkiPackageExporter
-from aqt import mw
+from anki.notes import NoteId
+from aqt import mw, qDebug
 from requests import Response
 
 from . import constants
@@ -84,9 +85,8 @@ def modify_note_types(note_types: typing.Iterable[str]):
     # TODO Run add_id_fields
 
 
-def upload_deck(did: int) -> Response:
+def upload_deck(did: DeckId) -> Response:
     """Upload the deck to AnkiHub."""
-    import requests
 
     deck_name = mw.col.decks.name(did)
     exporter = AnkiPackageExporter(mw.col)
@@ -111,13 +111,13 @@ def create_collaborative_deck(deck_name: str) -> Response:
     note_type_names = [note["name"] for note in note_types]
     modify_note_types(note_type_names)
     qDebug(f"Finding notes in {deck_name}")
-    note_ids = list(map(int, mw.col.find_notes(f"deck:{deck_name}")))
+    note_ids = list(map(NoteId, mw.col.find_notes(f"deck:{deck_name}")))
     assign_ankihub_ids(note_ids)
     response = upload_deck(deck_id)
     return response
 
 
-def assign_ankihub_ids(note_ids: typing.List[int]) -> None:
+def assign_ankihub_ids(note_ids: typing.List[NoteId]) -> None:
     """Assign UUID to notes that have an AnkiHub ID field already."""
     updated_notes = []
     qDebug(f"Assigning AnkiHub IDs to {', '.join(map(str, note_ids))}")

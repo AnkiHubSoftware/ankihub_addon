@@ -70,7 +70,7 @@ class AnkiHubClient:
         s3_response = requests.put(s3_url, data=deck_data)
         qDebug(f"request url: {s3_response.request.url}")
         qDebug(f"response status: {s3_response.status_code}")
-        qDebug(f"response content: {s3_response.content}")
+        qDebug(f"response content: {str(s3_response.content)}")
         response = self._call_api("POST", "/decks/", data={"key": key})
         return response
 
