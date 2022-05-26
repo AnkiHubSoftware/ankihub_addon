@@ -16,7 +16,7 @@ def on_ankihub_button_press(editor: Editor):
     """
     # The command is expected to have been set at this point already, either by
     # fetching the default or by selecting a command from the dropdown menu.
-    command = editor.ankihub_command
+    command = editor.ankihub_command  # type: ignore
     # See build_note_fields in ankihub
     # _field_vals is the actual contents of each note field.
     _field_vals = editor.note.fields
@@ -24,10 +24,9 @@ def on_ankihub_button_press(editor: Editor):
     # editable field in AnkiHub suggestion forms.
     ankihub_id = _field_vals.pop()
     _fields_metadata = editor.note.note_type()["flds"][:-1]
-    fields = zip(_fields_metadata, _field_vals)
     fields = [
         {"name": field["name"], "order": field["ord"], "value": val}
-        for field, val in fields
+        for field, val in zip(_fields_metadata, _field_vals)
     ]
     tags = editor.note.tags
     client = AnkiHubClient()
@@ -43,8 +42,10 @@ def on_ankihub_button_press(editor: Editor):
     elif command == AnkiHubCommands.NEW.value:
         subscribed_decks = client._config.private_config.decks
         if len(subscribed_decks) == 0:
-            showText("You aren't currently subscribed to any AnkiHub decks. "
-                     "Please subscribe to an AnkiHub deck first.")
+            showText(
+                "You aren't currently subscribed to any AnkiHub decks. "
+                "Please subscribe to an AnkiHub deck first."
+            )
         if len(subscribed_decks) == 1:
             deck_id = subscribed_decks[0]
         else:
@@ -90,8 +91,8 @@ def setup_editor_buttons(buttons, editor: Editor):
     )
     for cmd in AnkiHubCommands:
         options.append(f"<option>{cmd.value}</option>")
-    options = select_elm.format("".join(options))
-    buttons.append(options)
+    options_str = select_elm.format("".join(options))
+    buttons.append(options_str)
     return buttons
 
 
