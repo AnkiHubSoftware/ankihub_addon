@@ -20,7 +20,7 @@ def note_type_contains_field(
     """Check that a field is defined in the note type."""
     fields: List[Dict] = note_type["flds"]
     field_names = [field["name"] for field in fields]
-    return True if field in field_names else False
+    return field in field_names
 
 
 def get_note_types_in_deck(did: DeckId) -> List[NotetypeId]:
