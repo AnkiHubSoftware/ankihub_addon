@@ -71,7 +71,7 @@ def create_note_with_id(note_type, anki_id) -> Note:
 
 
 def update_note(note, anki_id, ankihub_id, fields, tags):
-    note["AnkiHub ID"] = str(ankihub_id)
+    note[constants.ANKIHUB_NOTE_TYPE_FIELD_NAME] = str(ankihub_id)
     note.tags = [str(tag) for tag in tags]
     # TODO Make sure we don't update protected fields.
     for field in fields:
@@ -84,7 +84,7 @@ def update_or_create_note(anki_id, ankihub_id, fields, tags, note_type) -> Note:
         note = mw.col.get_note(id=NoteId(anki_id))
         fields.update(
             {
-                "name": "AnkiHub ID",
+                "name": constants.ANKIHUB_NOTE_TYPE_FIELD_NAME,
                 # Put the AnkiHub field last
                 "order": len(fields),
                 "value": ankihub_id,

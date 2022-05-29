@@ -123,7 +123,7 @@ def assign_ankihub_ids(note_ids: typing.List[NoteId]) -> None:
     qDebug(f"Assigning AnkiHub IDs to {', '.join(map(str, note_ids))}")
     for note_id in note_ids:
         note = mw.col.get_note(id=note_id)
-        note["AnkiHub ID"] = str(uuid.uuid4())
+        note[ANKIHUB_NOTE_TYPE_FIELD_NAME] = str(uuid.uuid4())
         updated_notes.append(note)
     mw.col.update_notes(updated_notes)
     qDebug(f"Updated notes: {', '.join(map(str, note_ids))}")
