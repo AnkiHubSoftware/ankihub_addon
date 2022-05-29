@@ -4,10 +4,8 @@ from enum import Enum
 from aqt import qDebug
 
 ANKIHUB_SITE_URL = "https://ankihub.net/"
-if os.getenv("DEVELOPMENT", False):
-    API_URL_BASE = "https://ankihub.applikuapp.com/api"
-else:
-    API_URL_BASE = "https://app.ankihub.net/api"
+API_URL_BASE = os.getenv("API_URL_BASE")
+API_URL_BASE = API_URL_BASE if API_URL_BASE else "https://app.ankihub.net/api"
 
 qDebug(f"Starting with URL_BASE {API_URL_BASE}")
 URL_VIEW_NOTE = ANKIHUB_SITE_URL + "notes/"
