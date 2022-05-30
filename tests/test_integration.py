@@ -7,7 +7,6 @@ from anki.decks import DeckId
 from anki.models import NotetypeId
 from pytest_anki import AnkiSession
 
-from ankihub.constants import ANKIHUB_NOTE_TYPE_FIELD_NAME
 
 sample_model_id = NotetypeId(1650564101852)
 sample_deck = str(pathlib.Path(__file__).parent / "test_data" / "small.apkg")
@@ -100,6 +99,7 @@ def test_modify_note_type(anki_session_with_addon: AnkiSession):
     with anki_session.profile_loaded():
         with anki_session.deck_installed(sample_deck):
             from ankihub.register_decks import modify_note_type
+            from ankihub.constants import ANKIHUB_NOTE_TYPE_FIELD_NAME
 
             note_type = anki_session.mw.col.models.by_name("Basic")
             original_note_type = copy.deepcopy(note_type)
