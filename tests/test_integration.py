@@ -105,7 +105,7 @@ def test_modify_note_type(anki_session_with_addon: AnkiSession):
             modify_note_type("Basic")
             modified_template = note_type["tmpls"][0]["afmt"]
             # # TODO Make more precise assertions.
-            assert "AnkiHub ID" in modified_template
+            assert ANKIHUB_NOTE_TYPE_FIELD_NAME in modified_template
             assert original_note_template != modified_template
 
 
