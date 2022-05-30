@@ -2,13 +2,12 @@ from typing import Dict, List
 
 import anki
 import aqt
-from PyQt6.QtCore import qDebug
+from anki import utils
+from anki.decks import DeckId
 from anki.errors import NotFoundError
-from anki.models import NoteType
-from aqt import mw
-
-from anki.notes import Note
-from aqt.dbcheck import check_db
+from anki.models import NoteType, NotetypeId
+from anki.notes import Note, NoteId
+from aqt import mw, qDebug
 
 from . import constants
 from .ankihub_client import AnkiHubClient
@@ -21,19 +20,19 @@ def note_type_contains_field(
     """Check that a field is defined in the note type."""
     fields: List[Dict] = note_type["flds"]
     field_names = [field["name"] for field in fields]
-    return True if constants.ANKIHUB_NOTE_TYPE_FIELD_NAME in field_names else False
+    return field in field_names
 
 
-def get_note_types_in_deck(did: int) -> List[int]:
+def get_note_types_in_deck(did: DeckId) -> List[NotetypeId]:
     """Returns list of note model ids in the given deck."""
     dids = [did]
     dids += [child[1] for child in mw.col.decks.children(did)]
-    dids = anki.utils.ids2str(dids)
+    dids_str = utils.ids2str(dids)
     # odid is the original did for cards in filtered decks
     query = (
         "SELECT DISTINCT mid FROM cards "
         "INNER JOIN notes ON cards.nid = notes.id "
-        f"WHERE did in {dids} or odid in {dids}"
+        f"WHERE did in {dids_str} or odid in {dids_str}"
     )
     return mw.col.db.list(query)
 
@@ -45,7 +44,9 @@ def hide_ankihub_field_in_editor(
         return js
     extra = (
         'require("svelte/internal").tick().then(() => '
-        "{{ require('anki/NoteEditor').instances[0].fields[0].element.then((element) "
+        "{{ require('anki/NoteEditor').instances[0].fields["
+        "require('anki/NoteEditor').instances[0].fields.length -1"
+        "].element.then((element) "
         "=> {{ element.hidden = true; }}); }});"
     )
     js += extra
@@ -58,7 +59,7 @@ def create_note_with_id(note_type, anki_id) -> Note:
     note_type = mw.col.models.by_name(note_type)
     note = Note(col=mw.col, model=note_type)
     # TODO Add to an appropriate deck.
-    mw.col.add_note(note, 1)
+    mw.col.add_note(note, DeckId(1))
     # Swap out the note id that Anki assigns to the new note with our own id.
     sql = (
         f"UPDATE notes SET id={anki_id} WHERE id={note.id};"
@@ -70,7 +71,7 @@ def create_note_with_id(note_type, anki_id) -> Note:
 
 
 def update_note(note, anki_id, ankihub_id, fields, tags):
-    note["AnkiHub ID"] = str(ankihub_id)
+    note[constants.ANKIHUB_NOTE_TYPE_FIELD_NAME] = str(ankihub_id)
     note.tags = [str(tag) for tag in tags]
     # TODO Make sure we don't update protected fields.
     for field in fields:
@@ -80,11 +81,21 @@ def update_note(note, anki_id, ankihub_id, fields, tags):
 
 def update_or_create_note(anki_id, ankihub_id, fields, tags, note_type) -> Note:
     try:
-        note = mw.col.get_note(id=int(anki_id))
+        note = mw.col.get_note(id=NoteId(anki_id))
+        fields.update(
+            {
+                "name": constants.ANKIHUB_NOTE_TYPE_FIELD_NAME,
+                # Put the AnkiHub field last
+                "order": len(fields),
+                "value": ankihub_id,
+            }
+        )
         update_note(note, anki_id, ankihub_id, fields, tags)
         mw.col.update_notes([note])
     except NotFoundError:
         note = create_note_with_id(note_type, anki_id)
+        qDebug(f"Created note {anki_id}")
+        update_note(note, anki_id, ankihub_id, fields, tags)
     return note
 
 
@@ -112,7 +123,7 @@ def sync_with_ankihub():
                 ) = note.values()
                 update_or_create_note(anki_id, ankihub_id, fields, tags, note_type)
             if notes:
-                check_db(mw)
+                mw.reset()
                 config.save_last_sync(time=data["latest_update"])
 
 

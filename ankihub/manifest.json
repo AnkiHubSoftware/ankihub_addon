@@ -1,1 +1,10 @@
-{"package": "ankihub", "name": "AnkiHub"}
+{
+    "package": "ankihub",
+    "name": "AnkiHub",
+    "ankiweb_id": "",
+    "author": "AnkiHub, LLC",
+    "version": "0.0.1",
+    "homepage": "",
+    "conflicts": [],
+    "mod": 1651704648
+}

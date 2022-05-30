@@ -3,7 +3,9 @@ import tempfile
 from pathlib import Path
 
 import requests
-from PyQt6.QtCore import qDebug
+from aqt import qDebug
+from aqt.operations import QueryOp
+from requests import Response
 
 from ankihub.ankihub_client import AnkiHubClient
 from ankihub.config import Config
@@ -16,8 +18,8 @@ from ankihub.register_decks import (
 from aqt import mw
 from aqt.qt import QAction, QMenu, qconnect
 from aqt.studydeck import StudyDeck
-from aqt.utils import showText, tooltip, askUser
-from PyQt5.QtWidgets import (
+from aqt.utils import showText, tooltip, askUser, showInfo
+from aqt import (
     QHBoxLayout,
     QLabel,
     QLineEdit,
@@ -94,6 +96,9 @@ class AnkiHubLogin(QWidget):
         self.setMinimumWidth(500)
         self.setSizePolicy(QSizePolicy.Policy.Minimum, QSizePolicy.Policy.Minimum)
         self.setWindowTitle("Login to AnkiHub.")
+        config = Config()
+        if config.private_config.token:
+            self.label_results.setText("✨ You are logged into AnkiHub.")
         self.show()
 
     def login(self):
@@ -114,7 +119,7 @@ class AnkiHubLogin(QWidget):
                 "password are correct for AnkiHub."
             )
             return
-        self.label_results.setText("You are now logged into AnkiHub.")
+        self.label_results.setText("✨ You are now logged into AnkiHub.")
 
     @classmethod
     def display_login(cls):
@@ -200,7 +205,7 @@ class SubscribeToDeck(QWidget):
                 title="Please confirm to proceed.",
             )
             if confirmed:
-                self.install_deck(download_result)
+                self.install_deck(download_result, deck_id)
         self.close()
 
     def download_deck(self, deck_id):
@@ -244,7 +249,7 @@ class SubscribeToDeck(QWidget):
             qDebug(f"{s3_response.url}")
             qDebug(f"{s3_response.status_code}")
             # TODO Use io.BytesIO
-            out_file = Path(tempfile.mkdtemp()) / f"{deck_id}.csv"
+            out_file = Path(tempfile.mkdtemp()) / f"{deck_file_name}"
             with out_file.open("wb") as f:
                 f.write(s3_response.content)
                 qDebug(f"Wrote {deck_file_name} to {out_file}")
@@ -252,12 +257,23 @@ class SubscribeToDeck(QWidget):
             self.label_results.setText("Deck download successful!")
             return out_file
 
-    def install_deck(self, deck_file: Path):
+    def install_deck(self, deck_file: Path, deck_id: int):
         """If we have a .csv, read data from the file and modify the user's note types
         and notes.
         :param: path to the .csv or .apkg file
         """
-        # TODO Handle .apkg as well
+        if deck_file.suffix == ".apkg":
+            self._install_deck_apkg(deck_file, deck_id)
+        elif deck_file.suffix == ".csv":
+            self._install_deck_csv(deck_file)
+
+    def _install_deck_apkg(self, deck_file: Path, deck_id: int):
+        from aqt import importing
+
+        importing.importFile(mw, str(deck_file.absolute()))
+        self.config.save_subscription([deck_id])
+
+    def _install_deck_csv(self, deck_file):
         tooltip("Configuring the collaborative deck.")
         ankihub_deck_ids, note_type_names = set(), set()
         notes = []
@@ -287,18 +303,46 @@ def ankihub_login_setup(parent):
 
 
 def create_collaborative_deck_action() -> None:
-    diag = StudyDeck(
+    def on_success(response: Response) -> None:
+        # TODO Update config
+        if response.status_code == 201:
+            msg = "🎉 Deck upload successful!"
+        else:
+            msg = f"😔 Deck upload failed: {response.text}"
+        showInfo(msg)
+
+    deck_chooser = StudyDeck(
         mw,
         title="AnkiHub",
         accept="Upload",
         # Removes the "Add" button
         buttons=[],
+        names=lambda: [
+            d.name
+            for d in mw.col.decks.all_names_and_ids(
+                include_filtered=True, skip_empty_default=True
+            )
+            if "::" not in d.name
+        ],
     )
-    deck_name = diag.name
+    deck_name = deck_chooser.name
     if not deck_name:
         return
-    did = mw.col.decks.id(deck_name)
-    create_collaborative_deck(did)
+    confirm = askUser(
+        "Uploading the deck to AnkiHub requires modifying notes and note types in "
+        f"{deck_name} and will require a full sync afterwards.  Would you like to "
+        "continue?",
+    )
+    if not confirm:
+        tooltip("Cancelled Upload to AnkiHub")
+        return
+    op = QueryOp(
+        parent=mw,
+        op=lambda col: create_collaborative_deck(deck_name),
+        success=on_success,
+    )
+    qDebug("Instantiated QueryOp")
+    op.with_progress().run_in_background()
 
 
 def create_collaborative_deck_setup(parent):

@@ -5,14 +5,14 @@ import json
 import os
 import pathlib
 import tempfile
-import uuid
 import typing
+import uuid
 
-from PyQt6.QtCore import qDebug
+from anki.decks import DeckId
 from anki.exporting import AnkiPackageExporter
-from aqt import mw
-from aqt.dbcheck import check_db
-from aqt.utils import askUser, tooltip
+from anki.notes import NoteId
+from aqt import mw, qDebug
+from requests import Response
 
 from . import constants
 from .ankihub_client import AnkiHubClient
@@ -40,16 +40,16 @@ def process_csv(notes: typing.List[dict]) -> None:
         fields = json.loads(fields.replace("'", '"'))
         tags = json.loads(tags.replace("'", '"'))
         update_or_create_note(anki_id, ankihub_id, fields, tags, note_type)
-    check_db(mw)
+    mw.reset()
 
 
-def modify_note_type(note_type) -> None:
+def modify_note_type(note_type_name: str) -> None:
     """Adds the AnkiHub Field to the Note Type and modifies the template to
     display the field.
     """
     "Adds ankihub field. Adds link to ankihub in card template."
-    qDebug(f"Modifying note type {note_type}")
-    note_type = mw.col.models.by_name(note_type)
+    qDebug(f"Modifying note type {note_type_name}")
+    note_type = mw.col.models.by_name(note_type_name)
     mm = mw.col.models
     fields = note_type["flds"]
     field_names = [field["name"] for field in fields]
@@ -57,8 +57,10 @@ def modify_note_type(note_type) -> None:
         qDebug(f"{constants.ANKIHUB_NOTE_TYPE_FIELD_NAME} already exists.")
         return
     ankihub_field = mm.new_field(constants.ANKIHUB_NOTE_TYPE_FIELD_NAME)
-    note_type["flds"].insert(0, ankihub_field)
-    # TODO Genericize this by creating a function that takes a template and
+    # Put AnkiHub field last
+    ankihub_field["ord"] = len(fields)
+    note_type["flds"].append(ankihub_field)
+    # TODO Generalize this by creating a function that takes a template and
     #  returns a new template.
     template_snippet = (
         "\n\n<br><br>"
@@ -73,7 +75,8 @@ def modify_note_type(note_type) -> None:
     templates = note_type["tmpls"]
     for template in templates:
         template["afmt"] += template_snippet
-    mm.save(note_type)
+    mm.update_dict(note_type)
+    qDebug(f"Saved note type {note_type_name}")
 
 
 def modify_note_types(note_types: typing.Iterable[str]):
@@ -82,8 +85,9 @@ def modify_note_types(note_types: typing.Iterable[str]):
     # TODO Run add_id_fields
 
 
-def upload_deck(did: int) -> None:
+def upload_deck(did: DeckId) -> Response:
     """Upload the deck to AnkiHub."""
+
     deck_name = mw.col.decks.name(did)
     exporter = AnkiPackageExporter(mw.col)
     exporter.did = did
@@ -91,32 +95,35 @@ def upload_deck(did: int) -> None:
     exporter.includeTags = True
     deck_uuid = uuid.uuid4()
     out_dir = pathlib.Path(tempfile.mkdtemp())
-    out_file = str(out_dir / f"export-{deck_uuid}.apkg")
-    exporter.exportInto(out_file)
-    ankihub_client = AnkiHubClient()
-    response = ankihub_client.upload_deck(f"{deck_name}.apkg")
-    tooltip("Deck Uploaded to AnkiHub")
+    out_file = out_dir / f"{deck_name}-{deck_uuid}.apkg"
+    exporter.exportInto(str(out_file))
+    qDebug(f"Deck {deck_name} exported to {out_file}")
+    client = AnkiHubClient()
+    response = client.upload_deck(file=out_file)
     return response
 
 
-def _create_collaborative_deck(note_types, did):
-    modify_note_types(note_types)
-    upload_deck(did)
-
-
-def create_collaborative_deck(did: int) -> None:
-    model_ids = get_note_types_in_deck(did)
+def create_collaborative_deck(deck_name: str) -> Response:
+    qDebug("Creating collaborative deck")
+    deck_id = mw.col.decks.id(deck_name)
+    model_ids = get_note_types_in_deck(deck_id)
     note_types = [mw.col.models.get(model_id) for model_id in model_ids]
-    names = ", ".join([note["name"] for note in note_types])
-    response = askUser(
-        "Uploading the deck to AnkiHub will modify the following note types, "
-        f"and will require a full sync afterwards: {names}.  Continue?",
-        title="AnkiHub",
-    )
-    if not response:
-        tooltip("Cancelled Upload to AnkiHub")
-        return
-    mw.taskman.with_progress(
-        task=lambda: _create_collaborative_deck(note_types, did),
-        on_done=lambda future: tooltip("Deck Uploaded to AnkiHub"),
-    )
+    note_type_names = [note["name"] for note in note_types]
+    modify_note_types(note_type_names)
+    qDebug(f"Finding notes in {deck_name}")
+    note_ids = list(map(NoteId, mw.col.find_notes(f"deck:{deck_name}")))
+    assign_ankihub_ids(note_ids)
+    response = upload_deck(deck_id)
+    return response
+
+
+def assign_ankihub_ids(note_ids: typing.List[NoteId]) -> None:
+    """Assign UUID to notes that have an AnkiHub ID field already."""
+    updated_notes = []
+    qDebug(f"Assigning AnkiHub IDs to {', '.join(map(str, note_ids))}")
+    for note_id in note_ids:
+        note = mw.col.get_note(id=note_id)
+        note[ANKIHUB_NOTE_TYPE_FIELD_NAME] = str(uuid.uuid4())
+        updated_notes.append(note)
+    mw.col.update_notes(updated_notes)
+    qDebug(f"Updated notes: {', '.join(map(str, note_ids))}")

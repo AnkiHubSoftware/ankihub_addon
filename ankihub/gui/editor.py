@@ -1,8 +1,8 @@
 from anki.hooks import addHook
 from aqt import gui_hooks
 from aqt.editor import Editor
-from PyQt6.QtCore import qDebug
-from aqt.utils import chooseList, tooltip
+from aqt import qDebug
+from aqt.utils import chooseList, tooltip, showText
 
 from ..ankihub_client import AnkiHubClient
 from ..config import Config
@@ -16,14 +16,21 @@ def on_ankihub_button_press(editor: Editor):
     """
     # The command is expected to have been set at this point already, either by
     # fetching the default or by selecting a command from the dropdown menu.
-    command = editor.ankihub_command
-    # TODO Make sure the field scheme is correct.
-    #  eg, List[dict]:  [{"name": "Front", "order": 0, "value": "fun"}, {"name": "Back", "order": 1, "value": "stuff"}]
-    fields = editor.note.fields
+    command = editor.ankihub_command  # type: ignore
+    # See build_note_fields in ankihub
+    # _field_vals is the actual contents of each note field.
+    _field_vals = editor.note.fields
+    # Exclude the AnkiHub ID field since we don't want to expose this as an
+    # editable field in AnkiHub suggestion forms.
+    ankihub_id = _field_vals.pop()
+    _fields_metadata = editor.note.note_type()["flds"][:-1]
+    fields = [
+        {"name": field["name"], "order": field["ord"], "value": val}
+        for field, val in zip(_fields_metadata, _field_vals)
+    ]
     tags = editor.note.tags
     client = AnkiHubClient()
     if command == AnkiHubCommands.CHANGE.value:
-        ankihub_id = fields[0]
         response = client.create_change_note_suggestion(
             ankihub_id=ankihub_id,
             fields=fields,
@@ -31,9 +38,14 @@ def on_ankihub_button_press(editor: Editor):
         )
         if response.status_code == 201:
             tooltip("Submitted change note suggestion to AnkiHub.")
-            return response
+            return response.json()
     elif command == AnkiHubCommands.NEW.value:
         subscribed_decks = client._config.private_config.decks
+        if len(subscribed_decks) == 0:
+            showText(
+                "You aren't currently subscribed to any AnkiHub decks. "
+                "Please subscribe to an AnkiHub deck first."
+            )
         if len(subscribed_decks) == 1:
             deck_id = subscribed_decks[0]
         else:
@@ -45,12 +57,13 @@ def on_ankihub_button_press(editor: Editor):
         response = client.create_new_note_suggestion(
             deck_id=deck_id,
             anki_id=editor.note.id,
+            ankihub_id=ankihub_id,
             fields=fields,
             tags=tags,
         )
         if response.status_code == 201:
             tooltip("Submitted new note suggestion to AnkiHub.")
-            return response
+            return response.json()
 
 
 def setup_editor_buttons(buttons, editor: Editor):
@@ -78,8 +91,8 @@ def setup_editor_buttons(buttons, editor: Editor):
     )
     for cmd in AnkiHubCommands:
         options.append(f"<option>{cmd.value}</option>")
-    options = select_elm.format("".join(options))
-    buttons.append(options)
+    options_str = select_elm.format("".join(options))
+    buttons.append(options_str)
     return buttons
 
 

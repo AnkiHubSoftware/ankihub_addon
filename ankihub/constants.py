@@ -1,11 +1,16 @@
+import os
 import pathlib
 from enum import Enum
+from aqt import qDebug
 
-URL_BASE = "https://ankihub.net/"
-API_URL_BASE = "http://localhost:8000/api"
-URL_VIEW_NOTE = URL_BASE + "notes/"
-URL_HELP = f"{URL_BASE}/help"
-ANKIHUB_NOTE_TYPE_FIELD_NAME = "AnkiHub ID"
+ANKIHUB_SITE_URL = "https://ankihub.net/"
+API_URL_BASE = os.getenv("API_URL_BASE")
+API_URL_BASE = API_URL_BASE if API_URL_BASE else "https://app.ankihub.net/api"
+
+qDebug(f"Starting with URL_BASE {API_URL_BASE}")
+URL_VIEW_NOTE = ANKIHUB_SITE_URL + "notes/"
+URL_HELP = f"{ANKIHUB_SITE_URL}/help"
+ANKIHUB_NOTE_TYPE_FIELD_NAME = "ankihub_id"
 ADDON_PATH = pathlib.Path(__file__).parent.absolute()
 ICONS_PATH = ADDON_PATH / "icons"
 
