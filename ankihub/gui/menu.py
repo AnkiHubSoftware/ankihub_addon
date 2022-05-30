@@ -303,7 +303,6 @@ def ankihub_login_setup(parent):
 
 
 def create_collaborative_deck_action() -> None:
-
     def on_success(response: Response) -> None:
         # TODO Update config
         if response.status_code == 201:

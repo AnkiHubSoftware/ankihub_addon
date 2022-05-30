@@ -61,9 +61,7 @@ class AnkiHubClient:
 
     def upload_deck(self, file: Path) -> Response:
         key = file.name
-        presigned_url_response = self.get_presigned_url(
-            key=key, action="upload"
-        )
+        presigned_url_response = self.get_presigned_url(key=key, action="upload")
         s3_url = presigned_url_response.json()["pre_signed_url"]
         with open(file, "rb") as f:
             deck_data = f.read()
