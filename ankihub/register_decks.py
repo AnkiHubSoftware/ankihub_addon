@@ -75,7 +75,7 @@ def modify_note_type(note_type_name: str) -> None:
     templates = note_type["tmpls"]
     for template in templates:
         template["afmt"] += template_snippet
-    mm.save(note_type)
+    mm.update_dict(note_type)
     qDebug(f"Saved note type {note_type_name}")
 
 
