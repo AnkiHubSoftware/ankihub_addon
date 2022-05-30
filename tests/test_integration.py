@@ -7,6 +7,8 @@ from anki.decks import DeckId
 from anki.models import NotetypeId
 from pytest_anki import AnkiSession
 
+from ankihub.constants import ANKIHUB_NOTE_TYPE_FIELD_NAME
+
 sample_model_id = NotetypeId(1650564101852)
 sample_deck = str(pathlib.Path(__file__).parent / "test_data" / "small.apkg")
 
