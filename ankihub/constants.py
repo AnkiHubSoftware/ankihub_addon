@@ -25,3 +25,12 @@ USER_SUPPORT_EMAIL_SLUG = "help@ankipalace.com"
 class AnkiHubCommands(Enum):
     CHANGE = "Suggest a change"
     NEW = "Suggest a new note"
+
+
+class ChangeTypes(Enum):
+    NEW_UPDATE = "New Update (from FF 2019+)"
+    LANGUAGE_ERROR = "Spelling/Grammatical"
+    CONTENT_ERROR = "Content error"
+
+
+COMMENT_MAX_LENGTH = 256

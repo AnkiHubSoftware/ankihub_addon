@@ -1,12 +1,12 @@
 from anki.hooks import addHook
-from aqt import gui_hooks
+from aqt import gui_hooks, qDebug
 from aqt.editor import Editor
-from aqt import qDebug
-from aqt.utils import chooseList, tooltip, showText
+from aqt.utils import chooseList, showText, tooltip
 
 from ..ankihub_client import AnkiHubClient
 from ..config import Config
 from ..constants import ICONS_PATH, AnkiHubCommands
+from .suggestion_dialog import SuggestionDialog
 
 
 def on_ankihub_button_press(editor: Editor):
@@ -14,6 +14,11 @@ def on_ankihub_button_press(editor: Editor):
     Action to be performed when the AnkiHub icon button is clicked or when
     the hotkey is pressed.
     """
+
+    dialog = SuggestionDialog()
+    dialog.exec()
+    change_type, comment = dialog.change_type(), dialog.comment()
+
     # The command is expected to have been set at this point already, either by
     # fetching the default or by selecting a command from the dropdown menu.
     command = editor.ankihub_command  # type: ignore
@@ -35,6 +40,8 @@ def on_ankihub_button_press(editor: Editor):
             ankihub_id=ankihub_id,
             fields=fields,
             tags=tags,
+            change_type=change_type,
+            comment=comment,
         )
         if response.status_code == 201:
             tooltip("Submitted change note suggestion to AnkiHub.")
@@ -60,6 +67,8 @@ def on_ankihub_button_press(editor: Editor):
             ankihub_id=ankihub_id,
             fields=fields,
             tags=tags,
+            change_type=change_type,
+            comment=comment,
         )
         if response.status_code == 201:
             tooltip("Submitted new note suggestion to AnkiHub.")

@@ -4,10 +4,10 @@ from typing import Dict, List
 import requests
 from aqt import qDebug
 from aqt.utils import showText
+from requests import Response
 
 from ankihub.config import Config
-from ankihub.constants import API_URL_BASE, USER_SUPPORT_EMAIL_SLUG
-from requests import Response
+from ankihub.constants import API_URL_BASE, USER_SUPPORT_EMAIL_SLUG, ChangeTypes
 
 
 class AnkiHubClient:
@@ -98,11 +98,15 @@ class AnkiHubClient:
         ankihub_id: str,
         fields: List[Dict],
         tags: List[str],
+        change_type: ChangeTypes,
+        comment: str,
     ) -> Response:
         suggestion = {
             "ankihub_id": ankihub_id,
             "fields": fields,
             "tags": tags,
+            "change_type": change_type.value,
+            "comment": comment,
         }
         response = self._call_api(
             "POST", f"/notes/{ankihub_id}/suggestion/", data=suggestion
@@ -116,6 +120,8 @@ class AnkiHubClient:
         ankihub_id: str,
         fields: List[dict],
         tags: List[str],
+        change_type: ChangeTypes,
+        comment: str,
     ) -> Response:
         # TODO include the note model name
         suggestion = {
@@ -124,6 +130,8 @@ class AnkiHubClient:
             "ankihub_id": ankihub_id,
             "fields": fields,
             "tags": tags,
+            "change_type": change_type.value,
+            "comment": comment,
         }
         response = self._call_api(
             "POST", f"/decks/{deck_id}/note-suggestion/", data=suggestion
