@@ -86,9 +86,13 @@ class AnkiHubClient:
                 f"/decks/{deck_id}/updates",
                 params=params,
             )
-            params["page"] += 1
-            has_next_page = response.json()["has_next"]
-            yield response
+            if response.status_code == 200:
+                has_next_page = response.json()["has_next"]
+                params["page"] += 1
+                yield response
+            else:
+                has_next_page = False
+                yield response
 
     def get_deck_by_id(self, deck_id: str) -> Response:
         response = self._call_api(
