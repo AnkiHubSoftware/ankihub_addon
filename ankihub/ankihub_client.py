@@ -86,8 +86,6 @@ class AnkiHubClient:
                 f"/decks/{deck_id}/updates",
                 params=params,
             )
-            if response.status_code != 200:
-                return
             params["page"] += 1
             has_next_page = response.json()["has_next"]
             yield response
