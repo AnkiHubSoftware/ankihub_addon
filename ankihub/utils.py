@@ -104,8 +104,7 @@ def sync_with_ankihub():
     config = Config()
     decks = config.private_config.decks
     for deck in decks:
-        response = client.get_deck_updates(deck)
-        if response.status_code == 200:
+        for response in client.get_deck_updates(deck):
             # Should last sync be tracked separately for each deck?
             data = response.json()
             notes = data["notes"]

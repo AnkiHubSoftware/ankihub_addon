@@ -74,13 +74,23 @@ class AnkiHubClient:
 
     def get_deck_updates(self, deck_id: str) -> Response:
         since = self._config.private_config.last_sync
-        params = {"since": f"{self._config.private_config.last_sync}"} if since else {}
-        response = self._call_api(
-            "GET",
-            f"/decks/{deck_id}/updates",
-            params=params,
+        params = (
+            {"since": f"{self._config.private_config.last_sync}", "page": 1}
+            if since
+            else {"page": 1}
         )
-        return response
+        has_next_page = True
+        while has_next_page:
+            response = self._call_api(
+                "GET",
+                f"/decks/{deck_id}/updates",
+                params=params,
+            )
+            if response.status_code != 200:
+                return
+            params["page"] += 1
+            has_next_page = response.json()["has_next"]
+            yield response
 
     def get_deck_by_id(self, deck_id: str) -> Response:
         response = self._call_api(
