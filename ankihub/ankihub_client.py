@@ -36,7 +36,10 @@ class AnkiHubClient:
         )
         qDebug(f"response status: {response.status_code}")
         if response.status_code != 500:
-            qDebug(f"response content: {pformat(response.content)}")
+            if "application/json" in response.headers.get("Content-Type"):
+                qDebug(f"response content: {pformat(response.json())}")
+            else:
+                qDebug(f"response content: {response}")
         if response.status_code > 299:
             showText(
                 "Uh oh! There was a problem with your request.\n\n"

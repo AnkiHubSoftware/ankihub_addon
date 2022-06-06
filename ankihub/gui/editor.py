@@ -53,7 +53,8 @@ def on_ankihub_button_press(editor: Editor):
                 "You aren't currently subscribed to any AnkiHub decks. "
                 "Please subscribe to an AnkiHub deck first."
             )
-        if len(subscribed_decks) == 1:
+            return
+        elif len(subscribed_decks) == 1:
             deck_id = subscribed_decks[0]
         else:
             choice = chooseList(
@@ -61,6 +62,7 @@ def on_ankihub_button_press(editor: Editor):
                 choices=subscribed_decks,
             )
             deck_id = subscribed_decks[choice]
+
         response = client.create_new_note_suggestion(
             deck_id=deck_id,
             anki_id=editor.note.id,
