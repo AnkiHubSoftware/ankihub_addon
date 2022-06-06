@@ -27,7 +27,7 @@ def on_ankihub_button_press(editor: Editor):
     _field_vals = editor.note.fields
     # Exclude the AnkiHub ID field since we don't want to expose this as an
     # editable field in AnkiHub suggestion forms.
-    ankihub_id = _field_vals.pop()
+    ankihub_id = _field_vals[-1]
     _fields_metadata = editor.note.note_type()["flds"][:-1]
     fields = [
         {"name": field["name"], "order": field["ord"], "value": val}

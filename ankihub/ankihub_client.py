@@ -1,4 +1,5 @@
 from pathlib import Path
+from pprint import pformat
 from typing import Dict, List
 
 import requests
@@ -30,9 +31,12 @@ class AnkiHubClient:
             json=data,
             params=params,
         )
-        qDebug(f"request: {method} {url} {data} {params} {self._headers}")
+        qDebug(
+            f"request: {method} {url}\ndata={pformat(data)}\nparams={pformat(params)}\nheaders={self._headers}"
+        )
         qDebug(f"response status: {response.status_code}")
-        qDebug(f"response content: {response.content}")
+        if response.status_code != 500:
+            qDebug(f"response content: {pformat(response.content)}")
         if response.status_code > 299:
             showText(
                 "Uh oh! There was a problem with your request.\n\n"
@@ -68,7 +72,8 @@ class AnkiHubClient:
         s3_response = requests.put(s3_url, data=deck_data)
         qDebug(f"request url: {s3_response.request.url}")
         qDebug(f"response status: {s3_response.status_code}")
-        qDebug(f"response content: {str(s3_response.content)}")
+        if s3_response.status_code != 500:
+            qDebug(f"response content: {pformat(s3_response.content)}")
         response = self._call_api("POST", "/decks/", data={"key": key})
         return response
 
