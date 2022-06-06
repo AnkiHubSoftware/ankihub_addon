@@ -120,6 +120,8 @@ def test_create_collaborative_deck_and_upload(
     from ankihub.constants import API_URL_BASE
 
     requests_mock.get(f"{API_URL_BASE}/decks/1/updates", json={"notes": []})
+
+    monkeypatch.setattr("ankihub.utils.sync_with_ankihub", Mock())
     with anki_session.profile_loaded():
         with anki_session.deck_installed(sample_deck) as deck_id:
 

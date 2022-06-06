@@ -1,3 +1,4 @@
+from json import JSONDecodeError
 from pathlib import Path
 from pprint import pformat
 from typing import Dict, List
@@ -36,8 +37,10 @@ class AnkiHubClient:
         )
         qDebug(f"response status: {response.status_code}")
         if response.status_code != 500:
-            if "application/json" in response.headers.get("Content-Type"):
+            try:
                 qDebug(f"response content: {pformat(response.json())}")
+            except JSONDecodeError:
+                qDebug(f"response content: {str(response.content)}")
             else:
                 qDebug(f"response content: {response}")
         if response.status_code > 299:
