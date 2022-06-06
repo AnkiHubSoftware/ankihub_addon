@@ -1,3 +1,4 @@
+from asyncio import Future
 import csv
 import tempfile
 from pathlib import Path
@@ -187,6 +188,7 @@ class SubscribeToDeck(QWidget):
                 "Oops! Please copy/paste a Deck ID from AnkiHub.net/browse (numbers only)!"
             )
             return
+
         if deck_id in self.config.private_config.decks:
             showText(
                 f"You've already subscribed to deck {deck_id}. "
@@ -194,21 +196,12 @@ class SubscribeToDeck(QWidget):
                 "restart Anki. You can manually sync with AnkiHub from the AnkiHub "
                 f"menu. See {URL_HELP} for more details."
             )
-        # TODO use mw.taskman
-        download_result = self.download_deck(deck_id)
-        if download_result and download_result.exists():
-            confirmed = askUser(
-                f"The AnkiHub deck {deck_id} has been downloaded. Would you like to "
-                f"proceed with modifying your personal collection in order to subscribe "
-                f"to the collaborative deck? See {URL_HELP} for "
-                f"details.",
-                title="Please confirm to proceed.",
-            )
-            if confirmed:
-                self.install_deck(download_result, deck_id)
-        self.close()
+            self.close()
+            return
 
-    def download_deck(self, deck_id):
+        self.download_and_install_deck(deck_id)
+
+    def download_and_install_deck(self, deck_id):
         """
         Take the AnkiHub deck id, copyied/pasted by the user and
         1) Download the deck .csv or .apkg, depending on if the user already has
@@ -217,6 +210,7 @@ class SubscribeToDeck(QWidget):
         :param deck_id: the deck's ankihub id
         :return:
         """
+
         deck_response = self.client.get_deck_by_id(deck_id)
         if deck_response.status_code == 404:
             showText(
@@ -226,26 +220,29 @@ class SubscribeToDeck(QWidget):
             )
             self.label_results.setText(self.instructions_label)
             return
-        elif deck_response.status_code == 200:
-            data = deck_response.json()
-            # TODO We can actually just check for the deck id in the user's local collection
-            #   rather than asking them.
-            first_time_install = askUser(
-                f"Is this your first time installing the {deck_id} deck?\n\n"
-                f"Answer No if you have already imported the {deck_id} deck into Anki.\n\n"
-                f"Answer Yes if you have imported the {deck_id} deck into Anki.",
-                defaultno=True,
-            )
-            deck_file_name = (
-                data["apkg_filename"]
-                if first_time_install
-                else data["csv_notes_filename"]
-            )
-            presigned_url_response = self.client.get_presigned_url(
-                key=deck_file_name, action="download"
-            )
-            s3_url = presigned_url_response.json()["pre_signed_url"]
-            s3_response = requests.get(s3_url)
+        elif deck_response.status_code != 200:
+            return
+
+        data = deck_response.json()
+        # TODO We can actually just check for the deck id in the user's local collection
+        #   rather than asking them.
+        first_time_install = askUser(
+            f"Is this your first time installing the {deck_id} deck?\n\n"
+            f"Answer Yes if you have not imported the {deck_id} deck into Anki yet.\n\n"
+            f"Answer No if you have already imported the {deck_id} deck into Anki.",
+            defaultno=True,
+        )
+        deck_file_name = (
+            data["apkg_filename"] if first_time_install else data["csv_notes_filename"]
+        )
+
+        presigned_url_response = self.client.get_presigned_url(
+            key=deck_file_name, action="download"
+        )
+        s3_url = presigned_url_response.json()["pre_signed_url"]
+
+        def on_download_done(future: Future):
+            s3_response = future.result()
             qDebug(f"{s3_response.url}")
             qDebug(f"{s3_response.status_code}")
             # TODO Use io.BytesIO
@@ -255,7 +252,26 @@ class SubscribeToDeck(QWidget):
                 qDebug(f"Wrote {deck_file_name} to {out_file}")
                 # TODO Validate .csv
             self.label_results.setText("Deck download successful!")
-            return out_file
+
+            if out_file:
+                confirmed = askUser(
+                    f"The AnkiHub deck {deck_id} has been downloaded. Would you like to "
+                    f"proceed with modifying your personal collection in order to subscribe "
+                    f"to the collaborative deck? See {URL_HELP} for "
+                    f"details.",
+                    title="Please confirm to proceed.",
+                )
+                if confirmed:
+                    self.install_deck(out_file, deck_id)
+
+            self.close()
+
+        mw.taskman.with_progress(
+            lambda: requests.get(s3_url),
+            on_done=on_download_done,
+            parent=self,
+            label="Downloading deck",
+        )
 
     def install_deck(self, deck_file: Path, deck_id: int):
         """If we have a .csv, read data from the file and modify the user's note types
