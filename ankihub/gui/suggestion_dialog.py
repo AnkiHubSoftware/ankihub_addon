@@ -1,5 +1,13 @@
 from aqt.qt import *
+
 from ankihub.constants import COMMENT_MAX_LENGTH, ChangeTypes
+
+CHANGE_TYPE_TO_DISPLAY_NAME = {
+    ChangeTypes.NEW_UPDATE: "New Update (from FF 2019+)",
+    ChangeTypes.LANGUAGE_ERROR: "Spelling/Grammatical",
+    ChangeTypes.CONTENT_ERROR: "Content error",
+}
+assert set(CHANGE_TYPE_TO_DISPLAY_NAME.keys()) == set(list(ChangeTypes))
 
 
 class SuggestionDialog(QDialog):
@@ -18,7 +26,7 @@ class SuggestionDialog(QDialog):
         layout.addWidget(label)
 
         self.select = select = CustomListWidget()
-        select.addItems([x.value for x in ChangeTypes])
+        select.addItems([CHANGE_TYPE_TO_DISPLAY_NAME[x] for x in ChangeTypes])
         select.setCurrentRow(0)
         layout.addWidget(select)
 
@@ -48,7 +56,9 @@ class SuggestionDialog(QDialog):
 
     def change_type(self) -> ChangeTypes:
         return next(
-            x for x in ChangeTypes if x.value == self.select.currentItem().text()
+            x
+            for x in ChangeTypes
+            if CHANGE_TYPE_TO_DISPLAY_NAME[x] == self.select.currentItem().text()
         )
 
 

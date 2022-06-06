@@ -28,9 +28,9 @@ class AnkiHubCommands(Enum):
 
 
 class ChangeTypes(Enum):
-    NEW_UPDATE = "New Update (from FF 2019+)"
-    LANGUAGE_ERROR = "Spelling/Grammatical"
-    CONTENT_ERROR = "Content error"
+    NEW_UPDATE = "new_update"
+    LANGUAGE_ERROR = "spelling/grammatical"
+    CONTENT_ERROR = "content_error"
 
 
 COMMENT_MAX_LENGTH = 256
