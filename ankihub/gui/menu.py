@@ -224,14 +224,7 @@ class SubscribeToDeck(QWidget):
             return
 
         data = deck_response.json()
-        # TODO We can actually just check for the deck id in the user's local collection
-        #   rather than asking them.
-        first_time_install = askUser(
-            f"Is this your first time installing the {deck_id} deck?\n\n"
-            f"Answer Yes if you have not imported the {deck_id} deck into Anki yet.\n\n"
-            f"Answer No if you have already imported the {deck_id} deck into Anki.",
-            defaultno=True,
-        )
+        first_time_install = mw.col.decks.get(data["anki_id"]) is not None
         deck_file_name = (
             data["apkg_filename"] if first_time_install else data["csv_notes_filename"]
         )
