@@ -91,7 +91,7 @@ def update_or_create_note(anki_id, ankihub_id, fields, tags, note_type) -> Note:
             }
         )
         update_note(note, anki_id, ankihub_id, fields, tags)
-        mw.col.update_notes([note])
+        mw.col.update_note(note)
     except NotFoundError:
         note = create_note_with_id(note_type, anki_id)
         qDebug(f"Created note {anki_id}")
