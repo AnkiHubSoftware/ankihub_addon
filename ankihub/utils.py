@@ -102,9 +102,8 @@ def update_or_create_note(anki_id, ankihub_id, fields, tags, note_type) -> Note:
 def sync_with_ankihub():
     client = AnkiHubClient()
     config = Config()
-    decks = config.private_config.decks
-    for deck in decks:
-        response = client.get_deck_updates(deck)
+    for ankihub_deck_id in config.private_config.decks.keys():
+        response = client.get_deck_updates(ankihub_deck_id)
         if response.status_code == 200:
             # Should last sync be tracked separately for each deck?
             data = response.json()
