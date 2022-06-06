@@ -1,4 +1,14 @@
-from aqt.qt import *
+from aqt.qt import (
+    QDialog,
+    QDialogButtonBox,
+    QLabel,
+    QListWidget,
+    QPlainTextEdit,
+    QSize,
+    Qt,
+    QVBoxLayout,
+    qconnect,
+)
 
 from ankihub.constants import COMMENT_MAX_LENGTH, ChangeTypes
 
