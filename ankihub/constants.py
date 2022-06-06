@@ -11,6 +11,7 @@ qDebug(f"Starting with URL_BASE {API_URL_BASE}")
 URL_VIEW_NOTE = ANKIHUB_SITE_URL + "notes/"
 URL_HELP = f"{ANKIHUB_SITE_URL}/help"
 ANKIHUB_NOTE_TYPE_FIELD_NAME = "ankihub_id"
+ANKIHUB_NOTE_TYPE_MODIFICATION_STRING = "ANKIHUB MODFICATIONS"
 ADDON_PATH = pathlib.Path(__file__).parent.absolute()
 ICONS_PATH = ADDON_PATH / "icons"
 
