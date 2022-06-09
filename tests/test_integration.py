@@ -207,6 +207,9 @@ def test_get_deck_updates(
 
     timestamp = date_object.timestamp()
     expected_data = {
+        "total": 1,
+        "current_page": 1,
+        "has_next": False,
         "since": timestamp,
         "notes": [
             {
@@ -217,18 +220,20 @@ def test_get_deck_updates(
                 "fields": [{"name": "Text", "order": 0, "value": "Fake value"}],
             }
         ],
+        "protected_fields": {"Basic": ["Back"]},
+        "protected_tags": ["Test"],
     }
 
     requests_mock.get(f"{API_URL_BASE}/decks/{deck_id}/updates", json=expected_data)
-    response = client.get_deck_updates(deck_id=str(deck_id))
-    assert response.json() == expected_data
+    for response in client.get_deck_updates(deck_id=str(deck_id)):
+        assert response.json() == expected_data
 
     # test get deck updates unauthenticated
     deck_id = 1
     monkeypatch.setattr("ankihub.ankihub_client.showText", Mock())
     requests_mock.get(f"{API_URL_BASE}/decks/{deck_id}/updates", status_code=403)
-    response = client.get_deck_updates(deck_id=str(deck_id))
-    assert response.status_code == 403
+    for response in client.get_deck_updates(deck_id=str(deck_id)):
+        assert response.status_code == 403
 
 
 def test_get_deck_by_id(
