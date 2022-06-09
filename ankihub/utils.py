@@ -111,7 +111,7 @@ def sync_with_ankihub():
                 notes = data["notes"]
                 if notes:
                     collected_notes += notes
-        
+
         if collected_notes:
             mw._create_backup_with_progress(user_initiated=False)
             for note in collected_notes:
