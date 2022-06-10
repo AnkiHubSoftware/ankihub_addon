@@ -111,7 +111,7 @@ def create_collaborative_deck(deck_name: str) -> Response:
     note_type_names = [note["name"] for note in note_types]
     modify_note_types(note_type_names)
     qDebug(f"Finding notes in {deck_name}")
-    note_ids = list(map(NoteId, mw.col.find_notes(f"deck:{deck_name}")))
+    note_ids = list(map(NoteId, mw.col.find_notes(f'deck:"{deck_name}"')))
     assign_ankihub_ids(note_ids)
     response = upload_deck(deck_id)
     return response
