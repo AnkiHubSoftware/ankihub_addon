@@ -10,14 +10,13 @@ from aqt.qt import (
     qconnect,
 )
 
-from ankihub.constants import COMMENT_MAX_LENGTH, ChangeTypes
+from ankihub.constants import RATIONALE_FOR_CHANGE_MAX_LENGTH, ChangeTypes
 
-CHANGE_TYPE_TO_DISPLAY_NAME = {
-    ChangeTypes.NEW_UPDATE: "New Update (from FF 2019+)",
-    ChangeTypes.LANGUAGE_ERROR: "Spelling/Grammatical",
-    ChangeTypes.CONTENT_ERROR: "Content error",
+DISPLAY_NAME_TO_CHANGE_TYPE = {
+    "New Update (from FF 2019+)": ChangeTypes.NEW_UPDATE,
+    "Spelling/Grammatical": ChangeTypes.LANGUAGE_ERROR,
+    "Content error": ChangeTypes.CONTENT_ERROR,
 }
-assert set(CHANGE_TYPE_TO_DISPLAY_NAME.keys()) == set(list(ChangeTypes))
 
 
 class SuggestionDialog(QDialog):
@@ -36,7 +35,7 @@ class SuggestionDialog(QDialog):
         layout.addWidget(label)
 
         self.select = select = CustomListWidget()
-        select.addItems([CHANGE_TYPE_TO_DISPLAY_NAME[x] for x in ChangeTypes])
+        select.addItems(DISPLAY_NAME_TO_CHANGE_TYPE.keys())
         select.setCurrentRow(0)
         layout.addWidget(select)
 
@@ -47,7 +46,7 @@ class SuggestionDialog(QDialog):
         self.edit = edit = QPlainTextEdit()
 
         def limit_length():
-            while len(edit.toPlainText()) >= COMMENT_MAX_LENGTH:
+            while len(edit.toPlainText()) >= RATIONALE_FOR_CHANGE_MAX_LENGTH:
                 edit.textCursor().deletePreviousChar()
 
         edit.textChanged.connect(limit_length)  # type: ignore
@@ -58,6 +57,17 @@ class SuggestionDialog(QDialog):
         qconnect(button_box.accepted, self.accept)
         layout.addWidget(button_box)
 
+        # disable save button when rationale for change field is empty
+        button_box.setDisabled(True)
+
+        def toggle_save_button_disabled_state():
+            if len(edit.toPlainText().strip()) == 0:
+                button_box.setDisabled(True)
+            else:
+                button_box.setDisabled(False)
+
+        edit.textChanged.connect(toggle_save_button_disabled_state)  # type: ignore
+
     def accept(self) -> None:
         return super().accept()
 
@@ -65,11 +75,7 @@ class SuggestionDialog(QDialog):
         return self.edit.toPlainText()
 
     def change_type(self) -> ChangeTypes:
-        return next(
-            x
-            for x in ChangeTypes
-            if CHANGE_TYPE_TO_DISPLAY_NAME[x] == self.select.currentItem().text()
-        )
+        return DISPLAY_NAME_TO_CHANGE_TYPE[self.select.currentItem().text()]
 
 
 class CustomListWidget(QListWidget):

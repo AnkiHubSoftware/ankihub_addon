@@ -33,4 +33,4 @@ class ChangeTypes(Enum):
     CONTENT_ERROR = "content_error"
 
 
-COMMENT_MAX_LENGTH = 256
+RATIONALE_FOR_CHANGE_MAX_LENGTH = 1024
