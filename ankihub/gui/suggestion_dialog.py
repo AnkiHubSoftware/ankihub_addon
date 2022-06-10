@@ -41,7 +41,7 @@ class SuggestionDialog(QDialog):
         layout.addWidget(select)
 
         # comment field
-        label = QLabel("Additional comments")
+        label = QLabel("Rationale for Change (Required)")
         layout.addWidget(label)
 
         self.edit = edit = QPlainTextEdit()
