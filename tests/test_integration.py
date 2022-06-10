@@ -21,7 +21,7 @@ def test_entry_point(anki_session_with_addon: AnkiSession):
     assert isinstance(mw, AnkiQt)
 
 
-def test_editor(anki_session_with_addon: AnkiSession, requests_mock):
+def test_editor(anki_session_with_addon: AnkiSession, requests_mock, monkeypatch):
     from ankihub.constants import API_URL_BASE, AnkiHubCommands
     from ankihub.gui.editor import (
         ankihub_message_handler,
@@ -62,6 +62,7 @@ def test_editor(anki_session_with_addon: AnkiSession, requests_mock):
     # "real," editor, instead of the manually instantiated one above. So for
     # now, this test just checks that on_ankihub_button_press runs without
     # raising any errors.
+    monkeypatch.setattr("ankihub.gui.editor.SuggestionDialog.exec", Mock())
     response = on_ankihub_button_press(editor)
     assert response == {}
 
@@ -98,8 +99,8 @@ def test_modify_note_type(anki_session_with_addon: AnkiSession):
     anki_session = anki_session_with_addon
     with anki_session.profile_loaded():
         with anki_session.deck_installed(sample_deck):
-            from ankihub.register_decks import modify_note_type
             from ankihub.constants import ANKIHUB_NOTE_TYPE_FIELD_NAME
+            from ankihub.register_decks import modify_note_type
 
             note_type = anki_session.mw.col.models.by_name("Basic")
             original_note_type = copy.deepcopy(note_type)
@@ -119,6 +120,8 @@ def test_create_collaborative_deck_and_upload(
     from ankihub.constants import API_URL_BASE
 
     requests_mock.get(f"{API_URL_BASE}/decks/1/updates", json={"notes": []})
+
+    monkeypatch.setattr("ankihub.utils.sync_with_ankihub", Mock())
     with anki_session.profile_loaded():
         with anki_session.deck_installed(sample_deck) as deck_id:
 
@@ -301,7 +304,7 @@ def test_create_change_note_suggestion(
     anki_session_with_addon: AnkiSession, requests_mock, monkeypatch
 ):
     from ankihub.ankihub_client import AnkiHubClient
-    from ankihub.constants import API_URL_BASE
+    from ankihub.constants import API_URL_BASE, ChangeTypes
 
     client = AnkiHubClient()
     # test create change note suggestion
@@ -311,6 +314,8 @@ def test_create_change_note_suggestion(
         ankihub_id=str(1),
         fields=[{"name": "abc", "order": 0, "value": "abc changed"}],
         tags=["test"],
+        change_type=ChangeTypes.NEW_UPDATE,
+        comment="",
     )
     assert response.status_code == 201
 
@@ -322,6 +327,8 @@ def test_create_change_note_suggestion(
         ankihub_id=str(1),
         fields=[{"name": "abc", "order": 0, "value": "abc changed"}],
         tags=["test"],
+        change_type=ChangeTypes.NEW_UPDATE,
+        comment="",
     )
     assert response.status_code == 403
 
@@ -330,7 +337,7 @@ def test_create_new_note_suggestion(
     anki_session_with_addon: AnkiSession, requests_mock, monkeypatch
 ):
     from ankihub.ankihub_client import AnkiHubClient
-    from ankihub.constants import API_URL_BASE
+    from ankihub.constants import API_URL_BASE, ChangeTypes
 
     client = AnkiHubClient()
     # test create new note suggestion
@@ -344,6 +351,8 @@ def test_create_new_note_suggestion(
         ankihub_id=str(1),
         fields=[{"name": "abc", "order": 0, "value": "abc changed"}],
         tags=["test"],
+        change_type=ChangeTypes.NEW_UPDATE,
+        comment="",
     )
     assert response.status_code == 201
 
@@ -359,5 +368,7 @@ def test_create_new_note_suggestion(
         anki_id=1,
         fields=[{"name": "abc", "order": 0, "value": "abc changed"}],
         tags=["test"],
+        change_type=ChangeTypes.NEW_UPDATE,
+        comment="",
     )
     assert response.status_code == 403

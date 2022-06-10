@@ -1,13 +1,15 @@
+from json import JSONDecodeError
 from pathlib import Path
+from pprint import pformat
 from typing import Dict, List
 
 import requests
 from aqt import qDebug
 from aqt.utils import showText
+from requests import Response
 
 from ankihub.config import Config
-from ankihub.constants import API_URL_BASE, USER_SUPPORT_EMAIL_SLUG
-from requests import Response
+from ankihub.constants import API_URL_BASE, USER_SUPPORT_EMAIL_SLUG, ChangeTypes
 
 
 class AnkiHubClient:
@@ -30,9 +32,17 @@ class AnkiHubClient:
             json=data,
             params=params,
         )
-        qDebug(f"request: {method} {url} {data} {params} {self._headers}")
+        qDebug(
+            f"request: {method} {url}\ndata={pformat(data)}\nparams={pformat(params)}\nheaders={self._headers}"
+        )
         qDebug(f"response status: {response.status_code}")
-        qDebug(f"response content: {response.content}")
+        if response.status_code not in [500, 404]:
+            try:
+                qDebug(f"response content: {pformat(response.json())}")
+            except JSONDecodeError:
+                qDebug(f"response content: {str(response.content)}")
+            else:
+                qDebug(f"response content: {response}")
         if response.status_code > 299:
             showText(
                 "Uh oh! There was a problem with your request.\n\n"
@@ -68,7 +78,8 @@ class AnkiHubClient:
         s3_response = requests.put(s3_url, data=deck_data)
         qDebug(f"request url: {s3_response.request.url}")
         qDebug(f"response status: {s3_response.status_code}")
-        qDebug(f"response content: {str(s3_response.content)}")
+        if s3_response.status_code not in [500, 404]:
+            qDebug(f"response content: {pformat(s3_response.content)}")
         response = self._call_api("POST", "/decks/", data={"key": key})
         return response
 
@@ -110,11 +121,15 @@ class AnkiHubClient:
         ankihub_id: str,
         fields: List[Dict],
         tags: List[str],
+        change_type: ChangeTypes,
+        comment: str,
     ) -> Response:
         suggestion = {
             "ankihub_id": ankihub_id,
             "fields": fields,
             "tags": tags,
+            "change_type": change_type.value,
+            "comment": comment,
         }
         response = self._call_api(
             "POST", f"/notes/{ankihub_id}/suggestion/", data=suggestion
@@ -128,6 +143,8 @@ class AnkiHubClient:
         ankihub_id: str,
         fields: List[dict],
         tags: List[str],
+        change_type: ChangeTypes,
+        comment: str,
     ) -> Response:
         # TODO include the note model name
         suggestion = {
@@ -136,6 +153,8 @@ class AnkiHubClient:
             "ankihub_id": ankihub_id,
             "fields": fields,
             "tags": tags,
+            "change_type": change_type.value,
+            "comment": comment,
         }
         response = self._call_api(
             "POST", f"/decks/{deck_id}/note-suggestion/", data=suggestion
