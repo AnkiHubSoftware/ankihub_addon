@@ -32,7 +32,7 @@ class SuggestionDialog(QDialog):
         self.setLayout(layout)
 
         # change type select
-        label = QLabel("Type")
+        label = QLabel("Change Type")
         layout.addWidget(label)
 
         self.select = select = CustomListWidget()
