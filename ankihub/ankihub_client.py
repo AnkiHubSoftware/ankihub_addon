@@ -36,7 +36,7 @@ class AnkiHubClient:
             f"request: {method} {url}\ndata={pformat(data)}\nparams={pformat(params)}\nheaders={self._headers}"
         )
         qDebug(f"response status: {response.status_code}")
-        if response.status_code != 500:
+        if response.status_code not in [500, 404]:
             try:
                 qDebug(f"response content: {pformat(response.json())}")
             except JSONDecodeError:
@@ -78,7 +78,7 @@ class AnkiHubClient:
         s3_response = requests.put(s3_url, data=deck_data)
         qDebug(f"request url: {s3_response.request.url}")
         qDebug(f"response status: {s3_response.status_code}")
-        if s3_response.status_code != 500:
+        if s3_response.status_code not in [500, 404]:
             qDebug(f"response content: {pformat(s3_response.content)}")
         response = self._call_api("POST", "/decks/", data={"key": key})
         return response
