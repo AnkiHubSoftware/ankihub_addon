@@ -7,9 +7,10 @@ from anki.decks import DeckId
 from anki.errors import NotFoundError
 from anki.models import NoteType, NotetypeId
 from anki.notes import Note, NoteId
-from aqt import mw, qDebug
+from aqt import mw
 
 from . import constants
+from .constants import LOGGER
 from .ankihub_client import AnkiHubClient
 from .config import Config
 
@@ -66,7 +67,7 @@ def create_note_with_id(note_type, anki_id) -> Note:
         f"UPDATE cards SET nid={anki_id} WHERE nid={note.id};"
     )
     mw.col.db.execute(sql)
-    qDebug(f"Created note: {anki_id}")
+    LOGGER.debug(f"Created note: {anki_id}")
     return note
 
 
@@ -76,7 +77,7 @@ def update_note(note, anki_id, ankihub_id, fields, tags):
     # TODO Make sure we don't update protected fields.
     for field in fields:
         note[field["name"]] = field["value"]
-    qDebug(f"Updated note {anki_id}")
+    LOGGER.debug(f"Updated note {anki_id}")
 
 
 def update_or_create_note(anki_id, ankihub_id, fields, tags, note_type) -> Note:
@@ -94,7 +95,7 @@ def update_or_create_note(anki_id, ankihub_id, fields, tags, note_type) -> Note:
         mw.col.update_notes([note])
     except NotFoundError:
         note = create_note_with_id(note_type, anki_id)
-        qDebug(f"Created note {anki_id}")
+        LOGGER.debug(f"Created note {anki_id}")
         update_note(note, anki_id, ankihub_id, fields, tags)
     return note
 

@@ -1,11 +1,11 @@
 from anki.hooks import addHook
-from aqt import gui_hooks, qDebug
+from aqt import gui_hooks
 from aqt.editor import Editor
 from aqt.utils import chooseList, showText, tooltip
 
 from ..ankihub_client import AnkiHubClient
 from ..config import Config
-from ..constants import ICONS_PATH, AnkiHubCommands
+from ..constants import ICONS_PATH, AnkiHubCommands, LOGGER
 from .suggestion_dialog import SuggestionDialog
 
 
@@ -127,7 +127,7 @@ def on_select_command(editor, cmd):
     down menu.  This currently just sets an instance attribute on the Editor.
     """
     editor.ankihub_command = cmd
-    qDebug(f"AnkiHub command set to {cmd}")
+    LOGGER.debug(f"AnkiHub command set to {cmd}")
 
 
 def setup():

@@ -11,10 +11,11 @@ import uuid
 from anki.decks import DeckId
 from anki.exporting import AnkiPackageExporter
 from anki.notes import NoteId
-from aqt import mw, qDebug
+from aqt import mw
 from requests import Response
 
 from . import constants
+from .constants import LOGGER
 from .ankihub_client import AnkiHubClient
 from .constants import ANKIHUB_NOTE_TYPE_FIELD_NAME, URL_VIEW_NOTE
 from .utils import get_note_types_in_deck, update_or_create_note
@@ -48,13 +49,13 @@ def modify_note_type(note_type_name: str) -> None:
     display the field.
     """
     "Adds ankihub field. Adds link to ankihub in card template."
-    qDebug(f"Modifying note type {note_type_name}")
+    LOGGER.debug(f"Modifying note type {note_type_name}")
     note_type = mw.col.models.by_name(note_type_name)
     mm = mw.col.models
     fields = note_type["flds"]
     field_names = [field["name"] for field in fields]
     if constants.ANKIHUB_NOTE_TYPE_FIELD_NAME in field_names:
-        qDebug(f"{constants.ANKIHUB_NOTE_TYPE_FIELD_NAME} already exists.")
+        LOGGER.debug(f"{constants.ANKIHUB_NOTE_TYPE_FIELD_NAME} already exists.")
         return
     ankihub_field = mm.new_field(constants.ANKIHUB_NOTE_TYPE_FIELD_NAME)
     # Put AnkiHub field last
@@ -76,7 +77,7 @@ def modify_note_type(note_type_name: str) -> None:
     for template in templates:
         template["afmt"] += template_snippet
     mm.update_dict(note_type)
-    qDebug(f"Saved note type {note_type_name}")
+    LOGGER.debug(f"Saved note type {note_type_name}")
 
 
 def modify_note_types(note_types: typing.Iterable[str]):
@@ -97,20 +98,20 @@ def upload_deck(did: DeckId) -> Response:
     out_dir = pathlib.Path(tempfile.mkdtemp())
     out_file = out_dir / f"{deck_name}-{deck_uuid}.apkg"
     exporter.exportInto(str(out_file))
-    qDebug(f"Deck {deck_name} exported to {out_file}")
+    LOGGER.debug(f"Deck {deck_name} exported to {out_file}")
     client = AnkiHubClient()
     response = client.upload_deck(file=out_file)
     return response
 
 
 def create_collaborative_deck(deck_name: str) -> Response:
-    qDebug("Creating collaborative deck")
+    LOGGER.debug("Creating collaborative deck")
     deck_id = mw.col.decks.id(deck_name)
     model_ids = get_note_types_in_deck(deck_id)
     note_types = [mw.col.models.get(model_id) for model_id in model_ids]
     note_type_names = [note["name"] for note in note_types]
     modify_note_types(note_type_names)
-    qDebug(f"Finding notes in {deck_name}")
+    LOGGER.debug(f"Finding notes in {deck_name}")
     note_ids = list(map(NoteId, mw.col.find_notes(f'deck:"{deck_name}"')))
     assign_ankihub_ids(note_ids)
     response = upload_deck(deck_id)
@@ -120,10 +121,10 @@ def create_collaborative_deck(deck_name: str) -> Response:
 def assign_ankihub_ids(note_ids: typing.List[NoteId]) -> None:
     """Assign UUID to notes that have an AnkiHub ID field already."""
     updated_notes = []
-    qDebug(f"Assigning AnkiHub IDs to {', '.join(map(str, note_ids))}")
+    LOGGER.debug(f"Assigning AnkiHub IDs to {', '.join(map(str, note_ids))}")
     for note_id in note_ids:
         note = mw.col.get_note(id=note_id)
         note[ANKIHUB_NOTE_TYPE_FIELD_NAME] = str(uuid.uuid4())
         updated_notes.append(note)
     mw.col.update_notes(updated_notes)
-    qDebug(f"Updated notes: {', '.join(map(str, note_ids))}")
+    LOGGER.debug(f"Updated notes: {', '.join(map(str, note_ids))}")

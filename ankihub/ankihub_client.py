@@ -4,12 +4,11 @@ from pprint import pformat
 from typing import Dict, List
 
 import requests
-from aqt import qDebug
 from aqt.utils import showText
 from requests import Response
 
 from ankihub.config import Config
-from ankihub.constants import API_URL_BASE, USER_SUPPORT_EMAIL_SLUG, ChangeTypes
+from ankihub.constants import API_URL_BASE, USER_SUPPORT_EMAIL_SLUG, ChangeTypes, LOGGER
 
 
 class AnkiHubClient:
@@ -32,17 +31,17 @@ class AnkiHubClient:
             json=data,
             params=params,
         )
-        qDebug(
+        LOGGER.debug(
             f"request: {method} {url}\ndata={pformat(data)}\nparams={pformat(params)}\nheaders={self._headers}"
         )
-        qDebug(f"response status: {response.status_code}")
+        LOGGER.debug(f"response status: {response.status_code}")
         if response.status_code not in [500, 404]:
             try:
-                qDebug(f"response content: {pformat(response.json())}")
+                LOGGER.debug(f"response content: {pformat(response.json())}")
             except JSONDecodeError:
-                qDebug(f"response content: {str(response.content)}")
+                LOGGER.debug(f"response content: {str(response.content)}")
             else:
-                qDebug(f"response content: {response}")
+                LOGGER.debug(f"response content: {response}")
         if response.status_code > 299:
             showText(
                 "Uh oh! There was a problem with your request.\n\n"
@@ -67,7 +66,7 @@ class AnkiHubClient:
     def signout(self):
         self._config.save_token("")
         self._headers["Authorization"] = ""
-        qDebug("Token cleared from config.")
+        LOGGER.debug("Token cleared from config.")
 
     def upload_deck(self, file: Path) -> Response:
         key = file.name
@@ -76,10 +75,10 @@ class AnkiHubClient:
         with open(file, "rb") as f:
             deck_data = f.read()
         s3_response = requests.put(s3_url, data=deck_data)
-        qDebug(f"request url: {s3_response.request.url}")
-        qDebug(f"response status: {s3_response.status_code}")
+        LOGGER.debug(f"request url: {s3_response.request.url}")
+        LOGGER.debug(f"response status: {s3_response.status_code}")
         if s3_response.status_code not in [500, 404]:
-            qDebug(f"response content: {pformat(s3_response.content)}")
+            LOGGER.debug(f"response content: {pformat(s3_response.content)}")
         response = self._call_api("POST", "/decks/", data={"key": key})
         return response
 
