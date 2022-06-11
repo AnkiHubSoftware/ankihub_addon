@@ -1,5 +1,5 @@
 from anki.hooks import addHook
-from aqt import gui_hooks, qDebug
+from aqt import gui_hooks
 from aqt.editor import Editor
 from aqt.utils import chooseList, showText, tooltip
 
