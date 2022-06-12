@@ -11,11 +11,20 @@ install the dependencies:
 pip install -r ./requirements/dev.txt
 ```
 
-In order to run the tests locally you will also need to install an X Server for X11 forwarding.  On macos:
+## Environment variables
 
-```
-brew install xquartz
-```
+I recommend setting the following environment variables to help make Anki add-on
+development a little smoother:
+
+- `API_URL_BASE=https://ankihub.applikuapp.com/api`
+
+This is needed to point the add-on at our staging instance.
+
+- `SKIP_INIT=1`
+
+See ./ankihub_addon/ankihub/__init__.py for what this does.  You need to set this when running tests.
+
+Defining a `.envrc` with [`direnv`](https://direnv.net/) is great for managing env vars.
 
 ### Development workflow
 
@@ -53,25 +62,12 @@ and Anki source-code output in the console.
 3. Install [watchexec](https://github.com/watchexec/watchexec), e.g.
 
     ```
-    brew install watchex
+    brew install watchexec
     ```
 
-4. From the root of the *anki* repo (not the add-on repo) you cloned in step one, run watchec. E.g.,
+4. From the root of the *anki* repo (not the add-on repo) you cloned in step one, run watchexec. E.g.,
    `watchexec -r -e py -w ~/Projects/anki_addons/ankihub_addon -- ./run`
 
-
-### Miscellaneous Recommendations
-
-I recommend setting the following environment variables to help make Anki add-on
-development a little smoother:
-
-```
-# See `./ankihub_addon/ankihub/__init__.py` for what this does.
-export SKIP_INIT=1
-export ADDONS_DIR=/Users/username/Library/Application\ Support/Anki2/addons21/
-```
-
-Defining a `.envrc` with [`direnv`](https://direnv.net/) is great for this.
 
 ## Tests and static checks
 
@@ -80,6 +76,13 @@ GitHub actions when you open a PR on GitHub . See `/.github/workflows/ci.yml`
 for details.
 
 ### Running tests locally
+
+In order to run the tests locally you will also need to install an X Server for X11 forwarding.
+On macos:
+
+```
+brew install xquartz
+```
 
 The test suite relies on the `pytest-anki` plugin for pytest. Unfortunately,
 there is currently a limitation on macos that only allows for running tests one
