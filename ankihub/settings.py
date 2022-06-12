@@ -32,8 +32,7 @@ LOGGING = {
             "()": file_handler,
             "level": "DEBUG",
             "formatter": "verbose",
-        }
-
+        },
     },
     "root": {
         "level": "DEBUG",
