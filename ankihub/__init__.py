@@ -2,7 +2,7 @@ import logging
 import os
 import sys
 
-LOGGER = logging.getLogger(__name__)
+LOGGER = logging.getLogger("ankihub")
 LOGGER.setLevel(logging.DEBUG)
 stdout_handler = logging.StreamHandler(stream=sys.stdout)
 formatter = logging.Formatter("%(asctime)s - %(name)s - %(levelname)s - %(message)s")
