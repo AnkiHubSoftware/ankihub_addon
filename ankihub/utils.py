@@ -9,8 +9,7 @@ from anki.models import NoteType, NotetypeId
 from anki.notes import Note, NoteId
 from aqt import mw
 
-from . import constants
-from .constants import LOGGER
+from . import LOGGER, constants
 from .ankihub_client import AnkiHubClient
 from .config import Config
 

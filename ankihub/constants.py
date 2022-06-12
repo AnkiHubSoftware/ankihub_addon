@@ -1,16 +1,8 @@
 import os
 import pathlib
-import sys
 from enum import Enum
-import logging
 
-LOGGER = logging.getLogger(__name__)
-LOGGER.setLevel(logging.DEBUG)
-stdout_handler = logging.StreamHandler(stream=sys.stdout)
-stdout_handler.setLevel(logging.NOTSET)
-formatter = logging.Formatter("%(asctime)s - %(name)s - %(levelname)s - %(message)s")
-stdout_handler.setFormatter(formatter)
-LOGGER.addHandler(stdout_handler)
+from . import LOGGER
 
 ANKIHUB_SITE_URL = "https://ankihub.net/"
 API_URL_BASE = os.getenv("API_URL_BASE")

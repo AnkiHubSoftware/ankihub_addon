@@ -3,9 +3,10 @@ from aqt import gui_hooks
 from aqt.editor import Editor
 from aqt.utils import chooseList, showText, tooltip
 
+from .. import LOGGER
 from ..ankihub_client import AnkiHubClient
 from ..config import Config
-from ..constants import ICONS_PATH, AnkiHubCommands, LOGGER
+from ..constants import ICONS_PATH, AnkiHubCommands
 from .suggestion_dialog import SuggestionDialog
 
 

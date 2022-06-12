@@ -1,13 +1,13 @@
+import dataclasses
 import json
 import os
-import dataclasses
-from datetime import datetime, timezone
 import typing
+from datetime import datetime, timezone
 from json import JSONDecodeError
 
 from aqt import mw
 
-from .constants import LOGGER
+from . import LOGGER
 
 
 @dataclasses.dataclass

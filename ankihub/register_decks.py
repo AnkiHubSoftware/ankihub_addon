@@ -14,8 +14,7 @@ from anki.notes import NoteId
 from aqt import mw
 from requests import Response
 
-from . import constants
-from .constants import LOGGER
+from . import LOGGER, constants
 from .ankihub_client import AnkiHubClient
 from .constants import ANKIHUB_NOTE_TYPE_FIELD_NAME, URL_VIEW_NOTE
 from .utils import get_note_types_in_deck, update_or_create_note

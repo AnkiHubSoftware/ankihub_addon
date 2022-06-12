@@ -7,8 +7,9 @@ import requests
 from aqt.utils import showText
 from requests import Response
 
-from ankihub.config import Config
-from ankihub.constants import API_URL_BASE, USER_SUPPORT_EMAIL_SLUG, ChangeTypes, LOGGER
+from . import LOGGER
+from .config import Config
+from .constants import API_URL_BASE, USER_SUPPORT_EMAIL_SLUG, ChangeTypes
 
 
 class AnkiHubClient:

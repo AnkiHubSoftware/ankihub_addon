@@ -10,7 +10,7 @@ from aqt.qt import (
     qconnect,
 )
 
-from ankihub.constants import RATIONALE_FOR_CHANGE_MAX_LENGTH, ChangeTypes
+from ..constants import RATIONALE_FOR_CHANGE_MAX_LENGTH, ChangeTypes
 
 DISPLAY_NAME_TO_CHANGE_TYPE = {
     "New Update (from FF 2019+)": ChangeTypes.NEW_UPDATE,

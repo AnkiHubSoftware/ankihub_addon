@@ -3,21 +3,6 @@ import tempfile
 from pathlib import Path
 
 import requests
-from aqt.operations import QueryOp
-from requests import Response
-
-from ankihub.ankihub_client import AnkiHubClient
-from ankihub.config import Config
-from ankihub.constants import CSV_DELIMITER, URL_HELP, LOGGER
-from ankihub.register_decks import (
-    create_collaborative_deck,
-    modify_note_types,
-    process_csv,
-)
-from aqt import mw
-from aqt.qt import QAction, QMenu, qconnect
-from aqt.studydeck import StudyDeck
-from aqt.utils import showText, tooltip, askUser, showInfo
 from aqt import (
     QHBoxLayout,
     QLabel,
@@ -26,10 +11,21 @@ from aqt import (
     QSizePolicy,
     QVBoxLayout,
     QWidget,
+    mw,
 )
+from aqt.operations import QueryOp
+from aqt.qt import QAction, QMenu, qconnect
+from aqt.studydeck import StudyDeck
+from aqt.utils import askUser, showInfo, showText, tooltip
+from requests import Response
 from requests.exceptions import HTTPError
 
-from ankihub.utils import sync_with_ankihub
+from .. import LOGGER
+from ..ankihub_client import AnkiHubClient
+from ..config import Config
+from ..constants import CSV_DELIMITER, URL_HELP
+from ..register_decks import create_collaborative_deck, modify_note_types, process_csv
+from ..utils import sync_with_ankihub
 
 
 def main_menu_setup():
