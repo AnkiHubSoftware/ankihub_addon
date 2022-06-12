@@ -19,7 +19,7 @@ This is needed to point the add-on at our staging instance.
 
 - `SKIP_INIT=1`
 
-See ./ankihub_addon/ankihub/__init__.py for what this does.  You need to set this when running tests.
+See `./ankihub_addon/ankihub/__init__.py` for what this does.  You need to set this when running tests.
 
 Defining a `.envrc` with [`direnv`](https://direnv.net/) is great for managing env vars.
 
