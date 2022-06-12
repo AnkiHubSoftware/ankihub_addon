@@ -1,12 +1,26 @@
-from asyncio import Future
 import csv
 import tempfile
+from concurrent.futures import Future
 from pathlib import Path
 
 import requests
-from aqt import qDebug
+from aqt import (
+    QHBoxLayout,
+    QLabel,
+    QLineEdit,
+    QPushButton,
+    QSizePolicy,
+    QVBoxLayout,
+    QWidget,
+    mw,
+    qDebug,
+)
 from aqt.operations import QueryOp
+from aqt.qt import QAction, QMenu, qconnect
+from aqt.studydeck import StudyDeck
+from aqt.utils import askUser, showInfo, showText, tooltip
 from requests import Response
+from requests.exceptions import HTTPError
 
 from ankihub.ankihub_client import AnkiHubClient
 from ankihub.config import Config
@@ -16,21 +30,6 @@ from ankihub.register_decks import (
     modify_note_types,
     process_csv,
 )
-from aqt import mw
-from aqt.qt import QAction, QMenu, qconnect
-from aqt.studydeck import StudyDeck
-from aqt.utils import showText, tooltip, askUser, showInfo
-from aqt import (
-    QHBoxLayout,
-    QLabel,
-    QLineEdit,
-    QPushButton,
-    QSizePolicy,
-    QVBoxLayout,
-    QWidget,
-)
-from requests.exceptions import HTTPError
-
 from ankihub.utils import sync_with_ankihub
 
 
