@@ -3,22 +3,6 @@ import tempfile
 from pathlib import Path
 
 import requests
-from aqt import qDebug
-from aqt.operations import QueryOp
-from requests import Response
-
-from ankihub.ankihub_client import AnkiHubClient
-from ankihub.config import Config
-from ankihub.constants import CSV_DELIMITER, URL_HELP
-from ankihub.register_decks import (
-    create_collaborative_deck,
-    modify_note_types,
-    process_csv,
-)
-from aqt import mw
-from aqt.qt import QAction, QMenu, qconnect
-from aqt.studydeck import StudyDeck
-from aqt.utils import showText, tooltip, askUser, showInfo
 from aqt import (
     QHBoxLayout,
     QLabel,
@@ -27,10 +11,21 @@ from aqt import (
     QSizePolicy,
     QVBoxLayout,
     QWidget,
+    mw,
 )
+from aqt.operations import QueryOp
+from aqt.qt import QAction, QMenu, qconnect
+from aqt.studydeck import StudyDeck
+from aqt.utils import askUser, showInfo, showText, tooltip
+from requests import Response
 from requests.exceptions import HTTPError
 
-from ankihub.utils import sync_with_ankihub
+from .. import LOGGER
+from ..ankihub_client import AnkiHubClient
+from ..config import Config
+from ..constants import CSV_DELIMITER, URL_HELP
+from ..register_decks import create_collaborative_deck, modify_note_types, process_csv
+from ..utils import sync_with_ankihub
 
 
 def main_menu_setup():
@@ -113,7 +108,7 @@ class AnkiHubLogin(QWidget):
                 credentials={"username": username, "password": password}
             )
         except HTTPError as e:
-            qDebug(f"{e}")
+            LOGGER.debug(f"{e}")
             showText(
                 "AnkiHub login failed.  Please make sure your username and "
                 "password are correct for AnkiHub."
@@ -246,13 +241,13 @@ class SubscribeToDeck(QWidget):
             )
             s3_url = presigned_url_response.json()["pre_signed_url"]
             s3_response = requests.get(s3_url)
-            qDebug(f"{s3_response.url}")
-            qDebug(f"{s3_response.status_code}")
+            LOGGER.debug(f"{s3_response.url}")
+            LOGGER.debug(f"{s3_response.status_code}")
             # TODO Use io.BytesIO
             out_file = Path(tempfile.mkdtemp()) / f"{deck_file_name}"
             with out_file.open("wb") as f:
                 f.write(s3_response.content)
-                qDebug(f"Wrote {deck_file_name} to {out_file}")
+                LOGGER.debug(f"Wrote {deck_file_name} to {out_file}")
                 # TODO Validate .csv
             self.label_results.setText("Deck download successful!")
             return out_file
@@ -341,7 +336,7 @@ def create_collaborative_deck_action() -> None:
         op=lambda col: create_collaborative_deck(deck_name),
         success=on_success,
     )
-    qDebug("Instantiated QueryOp")
+    LOGGER.debug("Instantiated QueryOp")
     op.with_progress().run_in_background()
 
 
