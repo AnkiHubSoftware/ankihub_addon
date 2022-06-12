@@ -36,7 +36,7 @@ class AnkiHubClient:
             f"request: {method} {url}\ndata={pformat(data)}\nparams={pformat(params)}\nheaders={self._headers}"
         )
         qDebug(f"response status: {response.status_code}")
-        if response.status_code != 500:
+        if response.status_code not in [500, 404]:
             try:
                 qDebug(f"response content: {pformat(response.json())}")
             except JSONDecodeError:
@@ -78,20 +78,32 @@ class AnkiHubClient:
         s3_response = requests.put(s3_url, data=deck_data)
         qDebug(f"request url: {s3_response.request.url}")
         qDebug(f"response status: {s3_response.status_code}")
-        if s3_response.status_code != 500:
+        if s3_response.status_code not in [500, 404]:
             qDebug(f"response content: {pformat(s3_response.content)}")
         response = self._call_api("POST", "/decks/", data={"key": key})
         return response
 
     def get_deck_updates(self, deck_id: str) -> Response:
         since = self._config.private_config.last_sync
-        params = {"since": f"{self._config.private_config.last_sync}"} if since else {}
-        response = self._call_api(
-            "GET",
-            f"/decks/{deck_id}/updates",
-            params=params,
+        params = (
+            {"since": f"{self._config.private_config.last_sync}", "page": 1}
+            if since
+            else {"page": 1}
         )
-        return response
+        has_next_page = True
+        while has_next_page:
+            response = self._call_api(
+                "GET",
+                f"/decks/{deck_id}/updates",
+                params=params,
+            )
+            if response.status_code == 200:
+                has_next_page = response.json()["has_next"]
+                params["page"] += 1
+                yield response
+            else:
+                has_next_page = False
+                yield response
 
     def get_deck_by_id(self, deck_id: str) -> Response:
         response = self._call_api(

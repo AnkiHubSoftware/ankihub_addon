@@ -16,7 +16,9 @@ def on_ankihub_button_press(editor: Editor):
     """
 
     dialog = SuggestionDialog()
-    dialog.exec()
+    if not dialog.exec():
+        return
+
     change_type, comment = dialog.change_type(), dialog.comment()
 
     # The command is expected to have been set at this point already, either by
@@ -24,7 +26,7 @@ def on_ankihub_button_press(editor: Editor):
     command = editor.ankihub_command  # type: ignore
     # See build_note_fields in ankihub
     # _field_vals is the actual contents of each note field.
-    _field_vals = editor.note.fields
+    _field_vals = list(editor.note.fields)
     # Exclude the AnkiHub ID field since we don't want to expose this as an
     # editable field in AnkiHub suggestion forms.
     ankihub_id = _field_vals[-1]

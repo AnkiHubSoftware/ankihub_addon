@@ -102,15 +102,19 @@ def update_or_create_note(anki_id, ankihub_id, fields, tags, note_type) -> Note:
 def sync_with_ankihub():
     client = AnkiHubClient()
     config = Config()
-    for ankihub_deck_id in config.private_config.decks.keys():
-        response = client.get_deck_updates(ankihub_deck_id)
-        if response.status_code == 200:
-            # Should last sync be tracked separately for each deck?
-            data = response.json()
-            notes = data["notes"]
-            if notes:
-                mw._create_backup_with_progress(user_initiated=False)
-            for note in notes:
+    decks = config.private_config.decks
+    for deck in decks:
+        collected_notes = []
+        for response in client.get_deck_updates(deck):
+            if response.status_code == 200:
+                data = response.json()
+                notes = data["notes"]
+                if notes:
+                    collected_notes += notes
+
+        if collected_notes:
+            mw._create_backup_with_progress(user_initiated=False)
+            for note in collected_notes:
                 (
                     deck_id,
                     ankihub_id,
@@ -121,7 +125,7 @@ def sync_with_ankihub():
                     note_type_id,
                 ) = note.values()
                 update_or_create_note(anki_id, ankihub_id, fields, tags, note_type)
-            if notes:
+                # Should last sync be tracked separately for each deck?
                 mw.reset()
                 config.save_last_sync(time=data["latest_update"])
 
