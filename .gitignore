@@ -1,6 +1,6 @@
 # Anki related
-src/meta.json
-src/user_files/*
+ankihub/meta.json
+ankihub/user_files/*
 *.ankiaddon
 
 
