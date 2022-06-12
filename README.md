@@ -13,9 +13,6 @@ pip install -r ./requirements/dev.txt
 
 ## Environment variables
 
-I recommend setting the following environment variables to help make Anki add-on
-development a little smoother:
-
 - `API_URL_BASE=https://ankihub.applikuapp.com/api`
 
 This is needed to point the add-on at our staging instance.
