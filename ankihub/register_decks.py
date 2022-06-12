@@ -95,19 +95,19 @@ def modify_template(template: Dict):
 
     snippet_pattern = (
         f"<!-- BEGIN {ANKIHUB_NOTE_TYPE_MODIFICATION_STRING} -->"
-        "[\w\W]*"
+        r"[\w\W]*"
         f"<!-- END {ANKIHUB_NOTE_TYPE_MODIFICATION_STRING} -->"
     )
 
     if re.search(snippet_pattern, template["afmt"]):
-        qDebug(f"Template modifcation was already present, updated it")
+        qDebug("Template modifcation was already present, updated it")
         template["afmt"] = re.sub(
             snippet_pattern,
             ankihub_snippet,
             template["afmt"],
         )
     else:
-        qDebug(f"Modified template")
+        qDebug("Modified template")
         template["afmt"] += ankihub_snippet
 
 
