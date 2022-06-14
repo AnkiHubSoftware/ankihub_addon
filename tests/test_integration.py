@@ -196,7 +196,7 @@ def test_upload_deck(anki_session_with_addon: AnkiSession, requests_mock, monkey
     # test upload deck unauthenticated
     monkeypatch.setattr("ankihub.ankihub_client.showText", Mock())
     requests_mock.post(f"{API_URL_BASE}/decks/", status_code=403)
-    response = client.upload_deck(pathlib.Path(sample_deck))
+    response = client.upload_deck(pathlib.Path(sample_deck), anki_id=1)
     assert response.status_code == 403
 
 
