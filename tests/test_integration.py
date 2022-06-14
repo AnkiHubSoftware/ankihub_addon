@@ -186,7 +186,7 @@ def test_upload_deck(anki_session_with_addon: AnkiSession, requests_mock, monkey
     requests_mock.post(
         f"{API_URL_BASE}/decks/",
         status_code=201,
-        json={'anki_id': 1, 'key': 'small.apkg'}
+        json={"anki_id": 1, "key": "small.apkg"},
     )
 
     # test upload deck
