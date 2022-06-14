@@ -186,7 +186,7 @@ def test_upload_deck(anki_session_with_addon: AnkiSession, requests_mock, monkey
     requests_mock.post(f"{API_URL_BASE}/decks/", status_code=201)
 
     # test upload deck
-    response = client.upload_deck(pathlib.Path(sample_deck))
+    response = client.upload_deck(file=pathlib.Path(sample_deck), anki_id=1)
     assert response.status_code == 201
 
     # test upload deck unauthenticated
