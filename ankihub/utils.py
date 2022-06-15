@@ -8,6 +8,8 @@ from anki.errors import NotFoundError
 from anki.models import NoteType, NotetypeId
 from anki.notes import Note, NoteId
 from aqt import mw
+from aqt.operations import QueryOp
+from aqt.utils import showWarning, tr
 
 from . import LOGGER, constants
 from .ankihub_client import AnkiHubClient
@@ -113,7 +115,9 @@ def sync_with_ankihub():
                     collected_notes += notes
 
         if collected_notes:
-            mw._create_backup_with_progress(user_initiated=False)
+
+            create_backup_with_progress()
+
             for note in collected_notes:
                 (
                     deck_id,
@@ -133,4 +137,33 @@ def sync_with_ankihub():
 def sync_on_profile_open():
     config = Config()
     if config.private_config.token:
-        sync_with_ankihub()
+        mw.taskman.with_progress(sync_with_ankihub, label="Synchronizing with AnkiHub")
+
+
+def create_backup_with_progress():
+    # has to be called from a background thread
+
+    LOGGER.debug(f"Starting backup...")
+    mw.progress.start(label=tr.profiles_creating_backup())
+    mw.col.create_backup(
+        backup_folder=mw.pm.backupFolder(),
+        force=True,
+        wait_for_completion=False,
+    )
+    mw.progress.finish()
+
+    def on_success(val: None):
+        LOGGER.debug("Backup successful.")
+
+    def on_failure(exc: Exception):
+        showWarning(tr.profiles_backup_creation_failed(reason=str(exc)), parent=mw)
+        LOGGER.debug(f"Backup failed: {exc}")
+
+    # We await backup completion to confirm it was successful, but this step
+    # does not block collection access, so we don't need to show the progress
+    # window anymore.
+    QueryOp(
+        parent=mw,
+        op=lambda col: col.await_backup_completion(),
+        success=on_success,
+    ).failure(on_failure).run_in_background()

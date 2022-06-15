@@ -26,7 +26,10 @@ from ..ankihub_client import AnkiHubClient
 from ..config import Config
 from ..constants import CSV_DELIMITER, URL_HELP
 from ..register_decks import create_collaborative_deck, modify_note_types, process_csv
-from ..utils import sync_with_ankihub
+from ..utils import (
+    create_backup_with_progress,
+    sync_with_ankihub,
+)
 
 
 def main_menu_setup():
@@ -250,7 +253,12 @@ class SubscribeToDeck(QWidget):
                     title="Please confirm to proceed.",
                 )
                 if confirmed:
-                    self.install_deck(out_file, ankihub_did, data["anki_id"])
+                    mw.taskman.with_progress(
+                        lambda: self.install_deck(
+                            out_file, ankihub_did, data["anki_id"]
+                        ),
+                        label="Installing deck",
+                    )
 
             self.close()
 
@@ -261,11 +269,12 @@ class SubscribeToDeck(QWidget):
             label="Downloading deck",
         )
 
-    def install_deck(self, deck_file: Path, ankihub_did: int, anki_did: int):
+    def install_deck(self, deck_file: Path, ankihub_did: int, anki_did: int) -> None:
         """If we have a .csv, read data from the file and modify the user's note types
         and notes.
         :param: path to the .csv or .apkg file
         """
+        create_backup_with_progress()
         if deck_file.suffix == ".apkg":
             self._install_deck_apkg(deck_file)
         elif deck_file.suffix == ".csv":
@@ -290,7 +299,6 @@ class SubscribeToDeck(QWidget):
                 ankihub_deck_ids.add(row["deck"])
                 note_type_names.add(row["note_type"])
         assert len(ankihub_deck_ids) == 1
-        mw._create_backup_with_progress(user_initiated=False)
         modify_note_types(note_type_names)
         process_csv(notes)
 
