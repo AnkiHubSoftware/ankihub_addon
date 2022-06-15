@@ -99,7 +99,7 @@ def upload_deck(did: DeckId) -> Response:
     exporter.exportInto(str(out_file))
     LOGGER.debug(f"Deck {deck_name} exported to {out_file}")
     client = AnkiHubClient()
-    response = client.upload_deck(file=out_file)
+    response = client.upload_deck(file=out_file, anki_id=did)
     return response
 
 

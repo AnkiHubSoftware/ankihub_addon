@@ -69,7 +69,7 @@ class AnkiHubClient:
         self._headers["Authorization"] = ""
         LOGGER.debug("Token cleared from config.")
 
-    def upload_deck(self, file: Path) -> Response:
+    def upload_deck(self, file: Path, anki_id: int) -> Response:
         key = file.name
         presigned_url_response = self.get_presigned_url(key=key, action="upload")
         s3_url = presigned_url_response.json()["pre_signed_url"]
@@ -80,7 +80,9 @@ class AnkiHubClient:
         LOGGER.debug(f"response status: {s3_response.status_code}")
         if s3_response.status_code not in [500, 404]:
             LOGGER.debug(f"response content: {pformat(s3_response.content)}")
-        response = self._call_api("POST", "/decks/", data={"key": key})
+        response = self._call_api(
+            "POST", "/decks/", data={"key": key, "anki_id": anki_id}
+        )
         return response
 
     def get_deck_updates(self, deck_id: str) -> Response:
