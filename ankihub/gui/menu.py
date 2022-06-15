@@ -219,7 +219,7 @@ class SubscribeToDeck(QWidget):
             return
 
         data = deck_response.json()
-        first_time_install = mw.col.decks.get(data["anki_id"]) is not None
+        first_time_install = mw.col.decks.get(data["anki_id"]) is None
         deck_file_name = (
             data["apkg_filename"] if first_time_install else data["csv_notes_filename"]
         )
@@ -341,7 +341,7 @@ def create_collaborative_deck_action() -> None:
             config = Config()
             data = response.json()
             anki_did = mw.col.decks.id_for_name(deck_name)
-            config.save_subscription(data["ankihub_id"], anki_did, creator=True)
+            config.save_subscription(data["deck_id"], anki_did, creator=True)
         else:
             msg = f"😔 Deck upload failed: {response.text}"
         showInfo(msg)
