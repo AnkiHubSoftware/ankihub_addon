@@ -335,14 +335,13 @@ def create_collaborative_deck_action() -> None:
         return
 
     def on_success(response: Response) -> None:
-        # TODO save subscription to config
-        # currently the reponse does not contain the ankihub_did...
-        # config = Config()
-        # data = response.json()
-        # config.save_subscription((data["ankihub_id"], anki_id), creator=True)
-
         if response.status_code == 201:
             msg = "🎉 Deck upload successful!"
+
+            config = Config()
+            data = response.json()
+            anki_did = mw.col.decks.id_for_name(deck_name)
+            config.save_subscription(data["ankihub_id"], anki_did, creator=True)
         else:
             msg = f"😔 Deck upload failed: {response.text}"
         showInfo(msg)
