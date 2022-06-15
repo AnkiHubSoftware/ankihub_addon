@@ -79,10 +79,12 @@ def update_note(note, anki_id, ankihub_id, fields, tags):
     LOGGER.debug(f"Updated note {anki_id}")
 
 
-def update_or_create_note(anki_id, ankihub_id, fields, tags, note_type) -> Note:
+def update_or_create_note(
+    anki_id: int, ankihub_id: str, fields: List[Dict], tags: List[str], note_type: str
+) -> Note:
     try:
         note = mw.col.get_note(id=NoteId(anki_id))
-        fields.update(
+        fields.append(
             {
                 "name": constants.ANKIHUB_NOTE_TYPE_FIELD_NAME,
                 # Put the AnkiHub field last
