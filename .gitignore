@@ -1,7 +1,9 @@
 # Anki related
-src/meta.json
-src/user_files/*
+ankihub/meta.json
 *.ankiaddon
+# Ignore everything except the README.
+/ankihub/user_files/*
+!/ankihub/user_files/README.md
 
 
 # Byte-compiled / optimized / DLL files
@@ -136,4 +138,3 @@ dmypy.json
 
 # mac os
 .DS_Store
-/ankihub/user_files/.private_config.json

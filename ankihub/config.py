@@ -5,7 +5,9 @@ from datetime import datetime, timezone
 from json import JSONDecodeError
 from typing import Any, Dict
 
-from aqt import mw, qDebug
+from aqt import mw
+
+from . import LOGGER
 
 
 @dataclasses.dataclass
@@ -38,7 +40,7 @@ class Config:
                 except JSONDecodeError:
                     # TODO Instead of overwriting, query AnkiHub for config values.
                     self.private_config = self.new_config()
-        qDebug(f"Private config: {self.private_config}")
+        LOGGER.debug(f"Private config: {self.private_config}")
 
     def new_config(self):
         private_config = PrivateConfig()
