@@ -1,5 +1,4 @@
-from functools import wraps
-from typing import Callable, Dict, List, Optional
+from typing import Dict, List
 
 import anki
 import aqt
@@ -118,24 +117,21 @@ def sync_with_ankihub():
 
         if collected_notes:
 
-            @with_backup
-            def process_collected_notes():
-                for note in collected_notes:
-                    (
-                        deck_id,
-                        ankihub_id,
-                        tags,
-                        anki_id,
-                        fields,
-                        note_type,
-                        note_type_id,
-                    ) = note.values()
-                    update_or_create_note(anki_id, ankihub_id, fields, tags, note_type)
-                    # Should last sync be tracked separately for each deck?
-                    mw.reset()
-                    config.save_last_sync(time=data["latest_update"])
-
-            process_collected_notes()
+            create_backup_with_progress_in_background()
+            for note in collected_notes:
+                (
+                    deck_id,
+                    ankihub_id,
+                    tags,
+                    anki_id,
+                    fields,
+                    note_type,
+                    note_type_id,
+                ) = note.values()
+                update_or_create_note(anki_id, ankihub_id, fields, tags, note_type)
+                # Should last sync be tracked separately for each deck?
+                mw.reset()
+                config.save_last_sync(time=data["latest_update"])
 
 
 def sync_on_profile_open():
@@ -144,51 +140,32 @@ def sync_on_profile_open():
         sync_with_ankihub()
 
 
-def with_backup(func: Callable):
-    @wraps(func)
-    def wrapper(*args, **kwargs):
-        LOGGER.debug(f"Beginning backup...")
-
-        def on_backup_success():
-            LOGGER.debug(f"Backup was successful")
-            return func(*args, **kwargs)
-
-        def on_backup_failrure():
-            args_str = str(*args, **kwargs)
-            LOGGER.debug(f"Backup failed, not calling {func.__name__}({args_str})")
-
-        create_backup_with_progress(
-            on_success=on_backup_success, on_failrure=on_backup_failrure
-        )
-
-    return wrapper
-
-
-def create_backup_with_progress(
-    on_success: Optional[Callable] = None, on_failrure: Optional[Callable] = None
-) -> None:
+def create_backup_with_progress_in_background() -> None:
     # adapted from aqt.main.AnkiQt._create_backup_with_progress
 
     def backup(col: Collection) -> bool:
         return col.create_backup(
             backup_folder=mw.pm.backupFolder(),
             force=True,
-            wait_for_completion=True,
+            wait_for_completion=False,
         )
 
-    def _on_success(created: bool):
-        if on_success is not None:
-            on_success()
+    def on_success(created: bool):
+        LOGGER.debug("Backup successful")
 
-    def _on_failrure(exc: Exception) -> None:
-        def _show_warning():
-            showWarning(tr.profiles_backup_creation_failed(reason=str(exc)), parent=mw)
+    def on_failure(exc: Exception) -> None:
+        showWarning(tr.profiles_backup_creation_failed(reason=str(exc)), parent=mw)
+        LOGGER.debug(f"Backup failed: {exc}")
 
-        mw.taskman.run_on_main(_show_warning)
+    def after_backup_started(created: bool) -> None:
+        # Legacy checkpoint may have expired.
+        mw.update_undo_actions()
 
-        if on_failrure is not None:
-            on_failrure()
+        QueryOp(
+            parent=mw, op=lambda col: col.await_backup_completion(), success=on_success
+        ).failure(on_failure).run_in_background()
 
-    QueryOp(parent=mw, op=backup, success=_on_success).failure(
-        _on_failrure
+    LOGGER.debug(f"Starting backup in background...")
+    QueryOp(parent=mw, op=backup, success=after_backup_started).failure(
+        on_failure
     ).with_progress(tr.profiles_creating_backup()).run_in_background()

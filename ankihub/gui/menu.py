@@ -26,7 +26,10 @@ from ..ankihub_client import AnkiHubClient
 from ..config import Config
 from ..constants import CSV_DELIMITER, URL_HELP
 from ..register_decks import create_collaborative_deck, modify_note_types, process_csv
-from ..utils import sync_with_ankihub, with_backup
+from ..utils import (
+    create_backup_with_progress_in_background,
+    sync_with_ankihub,
+)
 
 
 def main_menu_setup():
@@ -261,12 +264,12 @@ class SubscribeToDeck(QWidget):
             label="Downloading deck",
         )
 
-    @with_backup
     def install_deck(self, deck_file: Path, ankihub_did: int, anki_did: int) -> None:
         """If we have a .csv, read data from the file and modify the user's note types
         and notes.
         :param: path to the .csv or .apkg file
         """
+        create_backup_with_progress_in_background()
         if deck_file.suffix == ".apkg":
             self._install_deck_apkg(deck_file)
         elif deck_file.suffix == ".csv":
