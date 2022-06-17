@@ -176,15 +176,7 @@ class SubscribeToDeck(QWidget):
 
     def subscribe(self):
         ankihub_did = self.deck_id_box_text.text()
-        try:
-            ankihub_did = int(ankihub_did)
-        except ValueError:
-            showText(
-                "Oops! Please copy/paste a Deck ID from AnkiHub.net/browse (numbers only)!"
-            )
-            return
-
-        if str(ankihub_did) in self.config.private_config.decks.keys():
+        if ankihub_did in self.config.private_config.decks.keys():
             showText(
                 f"You've already subscribed to deck {ankihub_did}. "
                 "Syncing with AnkiHub will happen automatically everytime you "
@@ -196,7 +188,7 @@ class SubscribeToDeck(QWidget):
 
         self.download_and_install_deck(ankihub_did)
 
-    def download_and_install_deck(self, ankihub_did: int):
+    def download_and_install_deck(self, ankihub_did: str):
         """
         Take the AnkiHub deck id, copyied/pasted by the user and
         1) Download the deck .csv or .apkg, depending on if the user already has
@@ -341,7 +333,7 @@ def create_collaborative_deck_action() -> None:
             config = Config()
             data = response.json()
             anki_did = mw.col.decks.id_for_name(deck_name)
-            ankihub_did = int(data["deck_id"])
+            ankihub_did = data["deck_id"]
             config.save_subscription(ankihub_did, anki_did, creator=True)
         else:
             msg = f"😔 Deck upload failed: {response.text}"
