@@ -12,12 +12,6 @@ from aqt.qt import (
 
 from ..constants import RATIONALE_FOR_CHANGE_MAX_LENGTH, ChangeTypes
 
-DISPLAY_NAME_TO_CHANGE_TYPE = {
-    "New Update (from FF 2019+)": ChangeTypes.NEW_UPDATE,
-    "Spelling/Grammatical": ChangeTypes.LANGUAGE_ERROR,
-    "Content error": ChangeTypes.CONTENT_ERROR,
-}
-
 
 class SuggestionDialog(QDialog):
     def __init__(self):
@@ -35,7 +29,7 @@ class SuggestionDialog(QDialog):
         layout.addWidget(label)
 
         self.select = select = CustomListWidget()
-        select.addItems(DISPLAY_NAME_TO_CHANGE_TYPE.keys())
+        select.addItems([x.value[1] for x in ChangeTypes])
         select.setCurrentRow(0)
         layout.addWidget(select)
 
@@ -75,7 +69,9 @@ class SuggestionDialog(QDialog):
         return self.edit.toPlainText()
 
     def change_type(self) -> ChangeTypes:
-        return DISPLAY_NAME_TO_CHANGE_TYPE[self.select.currentItem().text()]
+        return next(
+            x for x in ChangeTypes if x.value[1] == self.select.currentItem().text()
+        )
 
 
 class CustomListWidget(QListWidget):
