@@ -43,7 +43,7 @@ class AnkiHubClient:
                 LOGGER.debug(f"response content: {str(response.content)}")
             else:
                 LOGGER.debug(f"response content: {response}")
-        if response.status_code > 299:
+        if response.status_code > 299 and endpoint != "/logout/":
             showText(
                 "Uh oh! There was a problem with your request.\n\n"
                 "If you haven't already signed in using the AnkiHub menu please do so. "
