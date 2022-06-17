@@ -294,14 +294,14 @@ def test_get_note_by_anki_id(
         "fields": [{"name": "Text", "order": 0, "value": "Fake value"}],
     }
     requests_mock.get(f"{API_URL_BASE}/notes/{note_anki_id}", json=expected_data)
-    response = client.get_note_by_anki_id(anki_id=str(note_anki_id))
+    response = client.get_note_by_anki_id(anki_id=note_anki_id)
     assert response.json() == expected_data
 
     # test get note by anki id unauthenticated
     note_anki_id = 1
     requests_mock.get(f"{API_URL_BASE}/notes/{note_anki_id}", status_code=403)
     monkeypatch.setattr("ankihub.ankihub_client.showText", Mock())
-    response = client.get_note_by_anki_id(anki_id=str(note_anki_id))
+    response = client.get_note_by_anki_id(anki_id=note_anki_id)
     assert response.status_code == 403
 
 

@@ -71,7 +71,7 @@ class Config:
         self.private_config.last_sync = date_time_str
         self._update_private_config()
 
-    def save_subscription(self, ankihub_did: int, anki_did: int, creator: bool = False):
+    def save_subscription(self, ankihub_did: str, anki_did: int, creator: bool = False):
         self.private_config.decks[ankihub_did] = {
             "anki_id": anki_did,
             "creator": creator,

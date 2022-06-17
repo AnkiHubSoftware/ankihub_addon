@@ -254,7 +254,7 @@ class SubscribeToDeck(QWidget):
             label="Downloading deck",
         )
 
-    def install_deck(self, deck_file: Path, ankihub_did: int, anki_did: int):
+    def install_deck(self, deck_file: Path, ankihub_did: str, anki_did: int):
         """If we have a .csv, read data from the file and modify the user's note types
         and notes.
         :param: path to the .csv or .apkg file
