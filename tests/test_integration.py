@@ -316,7 +316,7 @@ def test_create_change_note_suggestion(
     note_id = 1
     requests_mock.post(f"{API_URL_BASE}/notes/{note_id}/suggestion/", status_code=201)
     response = client.create_change_note_suggestion(
-        ankihub_id=str(1),
+        ankihub_note_uuid=str(1),
         fields=[{"name": "abc", "order": 0, "value": "abc changed"}],
         tags=["test"],
         change_type=ChangeTypes.NEW_UPDATE,
@@ -329,7 +329,7 @@ def test_create_change_note_suggestion(
     requests_mock.post(f"{API_URL_BASE}/notes/{note_id}/suggestion/", status_code=403)
     monkeypatch.setattr("ankihub.ankihub_client.showText", Mock())
     response = client.create_change_note_suggestion(
-        ankihub_id=str(1),
+        ankihub_note_uuid=str(1),
         fields=[{"name": "abc", "order": 0, "value": "abc changed"}],
         tags=["test"],
         change_type=ChangeTypes.NEW_UPDATE,
@@ -351,7 +351,7 @@ def test_create_new_note_suggestion(
         f"{API_URL_BASE}/decks/{deck_id}/note-suggestion/", status_code=201
     )
     response = client.create_new_note_suggestion(
-        deck_id=deck_id,
+        ankihub_deck_uuid=deck_id,
         anki_id=1,
         ankihub_id=str(1),
         fields=[{"name": "abc", "order": 0, "value": "abc changed"}],
@@ -368,7 +368,7 @@ def test_create_new_note_suggestion(
     )
     monkeypatch.setattr("ankihub.ankihub_client.showText", Mock())
     response = client.create_new_note_suggestion(
-        deck_id=deck_id,
+        ankihub_deck_uuid=deck_id,
         ankihub_id=str(1),
         anki_id=1,
         fields=[{"name": "abc", "order": 0, "value": "abc changed"}],

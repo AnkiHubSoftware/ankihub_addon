@@ -29,8 +29,9 @@ class AnkiHubCommands(Enum):
     NEW = "Suggest a new note"
 
 
+# TODO Make sure these match up with SuggestionType.choices on AnkiHub
 class ChangeTypes(Enum):
-    NEW_UPDATE = "new_update"
+    NEW_UPDATE = "updated_content"
     LANGUAGE_ERROR = "spelling/grammatical"
     CONTENT_ERROR = "content_error"
 

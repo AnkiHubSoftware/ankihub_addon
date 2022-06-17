@@ -122,29 +122,29 @@ class AnkiHubClient:
 
     def create_change_note_suggestion(
         self,
-        ankihub_id: str,
+        ankihub_note_uuid: str,
         fields: List[Dict],
         tags: List[str],
         change_type: ChangeTypes,
         comment: str,
     ) -> Response:
         suggestion = {
-            "ankihub_id": ankihub_id,
+            "ankihub_id": ankihub_note_uuid,
             "fields": fields,
             "tags": tags,
             "change_type": change_type.value,
             "comment": comment,
         }
         response = self._call_api(
-            "POST", f"/notes/{ankihub_id}/suggestion/", data=suggestion
+            "POST", f"/notes/{ankihub_note_uuid}/suggestion/", data=suggestion
         )
         return response
 
     def create_new_note_suggestion(
         self,
-        deck_id: int,
+        ankihub_deck_uuid: str,
+        ankihub_note_uuid: str,
         anki_id: int,
-        ankihub_id: str,
         fields: List[dict],
         tags: List[str],
         change_type: ChangeTypes,
@@ -153,14 +153,14 @@ class AnkiHubClient:
         # TODO include the note model name
         suggestion = {
             "anki_id": anki_id,
-            "ankihub_id": ankihub_id,
+            "ankihub_id": ankihub_note_uuid,
             "fields": fields,
             "tags": tags,
             "change_type": change_type.value,
             "comment": comment,
         }
         response = self._call_api(
-            "POST", f"/decks/{deck_id}/note-suggestion/", data=suggestion
+            "POST", f"/decks/{ankihub_deck_uuid}/note-suggestion/", data=suggestion
         )
         return response
 
