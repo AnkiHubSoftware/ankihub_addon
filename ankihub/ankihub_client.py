@@ -1,7 +1,7 @@
 from json import JSONDecodeError
 from pathlib import Path
 from pprint import pformat
-from typing import Dict, List, Generator
+from typing import Dict, List, Iterator
 
 import requests
 from aqt.utils import showText
@@ -86,7 +86,7 @@ class AnkiHubClient:
         )
         return response
 
-    def get_deck_updates(self, deck_id: str) -> Generator[Response, None, None]:
+    def get_deck_updates(self, deck_id: str) -> Iterator[Response]:
         since = self._config.private_config.last_sync
         params = (
             {"since": f"{self._config.private_config.last_sync}", "page": 1}
