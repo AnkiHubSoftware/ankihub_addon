@@ -65,6 +65,7 @@ class AnkiHubClient:
         return response
 
     def signout(self):
+        self._call_api("POST", "/logout/")
         self._config.save_token("")
         self._headers["Authorization"] = ""
         LOGGER.debug("Token cleared from config.")
