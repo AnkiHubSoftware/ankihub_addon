@@ -211,7 +211,8 @@ class SubscribeToDeck(QWidget):
             return
 
         data = deck_response.json()
-        first_time_install = mw.col.decks.get(data["anki_id"]) is None
+        local_deck_ids = {deck.id for deck in mw.col.decks.all_names_and_ids()}
+        first_time_install = data["anki_id"] not in local_deck_ids
         deck_file_name = (
             data["apkg_filename"] if first_time_install else data["csv_notes_filename"]
         )
