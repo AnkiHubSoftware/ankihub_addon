@@ -58,7 +58,7 @@ def on_ankihub_button_press(editor: Editor):
             )
             return
         elif len(subscribed_decks) == 1:
-            decks, = subscribed_decks.items()
+            (decks,) = subscribed_decks.items()
             ankihub_id, deck = decks
             deck_id = deck["anki_id"]
         else:
