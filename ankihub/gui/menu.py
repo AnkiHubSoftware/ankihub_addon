@@ -207,8 +207,6 @@ class SubscribeToDeck(QWidget):
             )
             self.label_results.setText(self.instructions_label)
             return
-        elif deck_response.status_code != 200:
-            return
 
         data = deck_response.json()
         local_deck_ids = {deck.id for deck in mw.col.decks.all_names_and_ids()}
