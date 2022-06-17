@@ -58,7 +58,9 @@ def on_ankihub_button_press(editor: Editor):
             )
             return
         elif len(subscribed_decks) == 1:
-            deck_id = subscribed_decks[0]
+            decks, = subscribed_decks.items()
+            ankihub_id, deck = decks
+            deck_id = deck["anki_id"]
         else:
             choice = chooseList(
                 "Which AnKiHub deck would you like to add this note to?",
