@@ -108,7 +108,7 @@ class AnkiHubClient:
                 has_next_page = False
                 yield response
 
-    def get_deck_by_id(self, deck_id: int) -> Response:
+    def get_deck_by_id(self, deck_id: str) -> Response:
         response = self._call_api(
             "GET",
             f"/decks/{deck_id}/",
