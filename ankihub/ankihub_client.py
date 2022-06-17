@@ -1,7 +1,7 @@
 from json import JSONDecodeError
 from pathlib import Path
 from pprint import pformat
-from typing import Dict, List, Iterator
+from typing import Dict, List, Iterator, TypedDict
 
 import requests
 from aqt.utils import showText
@@ -88,7 +88,12 @@ class AnkiHubClient:
 
     def get_deck_updates(self, deck_id: str) -> Iterator[Response]:
         since = self._config.private_config.last_sync
-        params = (
+
+        class Params(TypedDict, total=False):
+            page: int
+            since: str
+
+        params: Params = (
             {"since": f"{self._config.private_config.last_sync}", "page": 1}
             if since
             else {"page": 1}
@@ -102,7 +107,7 @@ class AnkiHubClient:
             )
             if response.status_code == 200:
                 has_next_page = response.json()["has_next"]
-                assert type(params["page"]) == int
+                # assert type(params["page"]) == int
                 params["page"] += 1
                 yield response
             else:
