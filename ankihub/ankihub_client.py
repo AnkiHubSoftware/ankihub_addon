@@ -152,7 +152,6 @@ class AnkiHubClient:
     ) -> Response:
         # TODO include the note model name
         suggestion = {
-            "related_deck": deck_id,
             "anki_id": anki_id,
             "ankihub_id": ankihub_id,
             "fields": fields,
