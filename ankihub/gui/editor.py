@@ -65,7 +65,6 @@ def on_ankihub_button_press(editor: Editor):
             import aqt;aqt.debug()
             (decks,) = subscribed_decks.items()
             ankihub_deck_uuid, deck = decks
-            deck_id = deck["anki_id"]
         else:
             choice = chooseList(
                 "Which AnKiHub deck would you like to add this note to?",
