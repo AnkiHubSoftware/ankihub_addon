@@ -1,5 +1,6 @@
 import copy
 import pathlib
+import uuid
 from datetime import datetime, timedelta, timezone
 from unittest.mock import MagicMock, Mock, patch
 
@@ -346,14 +347,14 @@ def test_create_new_note_suggestion(
 
     client = AnkiHubClient()
     # test create new note suggestion
-    deck_id = 1
+    deck_id = str(uuid.uuid4())
     requests_mock.post(
         f"{API_URL_BASE}/decks/{deck_id}/note-suggestion/", status_code=201
     )
     response = client.create_new_note_suggestion(
         ankihub_deck_uuid=deck_id,
         anki_id=1,
-        ankihub_id=str(1),
+        ankihub_note_uuid=str(1),
         fields=[{"name": "abc", "order": 0, "value": "abc changed"}],
         tags=["test"],
         change_type=ChangeTypes.NEW_UPDATE,
@@ -362,14 +363,13 @@ def test_create_new_note_suggestion(
     assert response.status_code == 201
 
     # test create new note suggestion unauthenticated
-    deck_id = 1
     requests_mock.post(
         f"{API_URL_BASE}/decks/{deck_id}/note-suggestion/", status_code=403
     )
     monkeypatch.setattr("ankihub.ankihub_client.showText", Mock())
     response = client.create_new_note_suggestion(
         ankihub_deck_uuid=deck_id,
-        ankihub_id=str(1),
+        ankihub_note_uuid=str(1),
         anki_id=1,
         fields=[{"name": "abc", "order": 0, "value": "abc changed"}],
         tags=["test"],
