@@ -1,7 +1,7 @@
 from json import JSONDecodeError
 from pathlib import Path
 from pprint import pformat
-from typing import Dict, List
+from typing import Dict, List, Iterator, TypedDict
 
 import requests
 from aqt.utils import showText
@@ -43,7 +43,7 @@ class AnkiHubClient:
                 LOGGER.debug(f"response content: {str(response.content)}")
             else:
                 LOGGER.debug(f"response content: {response}")
-        if response.status_code > 299:
+        if response.status_code > 299 and endpoint != "/logout/":
             showText(
                 "Uh oh! There was a problem with your request.\n\n"
                 "If you haven't already signed in using the AnkiHub menu please do so. "
@@ -65,6 +65,7 @@ class AnkiHubClient:
         return response
 
     def signout(self):
+        self._call_api("POST", "/logout/")
         self._config.save_token("")
         self._headers["Authorization"] = ""
         LOGGER.debug("Token cleared from config.")
@@ -85,9 +86,14 @@ class AnkiHubClient:
         )
         return response
 
-    def get_deck_updates(self, deck_id: str) -> Response:
+    def get_deck_updates(self, deck_id: str) -> Iterator[Response]:
         since = self._config.private_config.last_sync
-        params = (
+
+        class Params(TypedDict, total=False):
+            page: int
+            since: str
+
+        params: Params = (
             {"since": f"{self._config.private_config.last_sync}", "page": 1}
             if since
             else {"page": 1}
@@ -101,6 +107,7 @@ class AnkiHubClient:
             )
             if response.status_code == 200:
                 has_next_page = response.json()["has_next"]
+                # assert type(params["page"]) == int
                 params["page"] += 1
                 yield response
             else:
@@ -114,35 +121,35 @@ class AnkiHubClient:
         )
         return response
 
-    def get_note_by_anki_id(self, anki_id: str) -> Response:
+    def get_note_by_anki_id(self, anki_id: int) -> Response:
         response = self._call_api("GET", f"/notes/{anki_id}")
         return response
 
     def create_change_note_suggestion(
         self,
-        ankihub_id: str,
+        ankihub_note_uuid: str,
         fields: List[Dict],
         tags: List[str],
         change_type: ChangeTypes,
         comment: str,
     ) -> Response:
         suggestion = {
-            "ankihub_id": ankihub_id,
+            "ankihub_id": ankihub_note_uuid,
             "fields": fields,
             "tags": tags,
             "change_type": change_type.value[0],
             "comment": comment,
         }
         response = self._call_api(
-            "POST", f"/notes/{ankihub_id}/suggestion/", data=suggestion
+            "POST", f"/notes/{ankihub_note_uuid}/suggestion/", data=suggestion
         )
         return response
 
     def create_new_note_suggestion(
         self,
-        deck_id: int,
+        ankihub_deck_uuid: str,
+        ankihub_note_uuid: str,
         anki_id: int,
-        ankihub_id: str,
         fields: List[dict],
         tags: List[str],
         change_type: ChangeTypes,
@@ -150,16 +157,15 @@ class AnkiHubClient:
     ) -> Response:
         # TODO include the note model name
         suggestion = {
-            "related_deck": deck_id,
             "anki_id": anki_id,
-            "ankihub_id": ankihub_id,
+            "ankihub_id": ankihub_note_uuid,
             "fields": fields,
             "tags": tags,
             "change_type": change_type.value[0],
             "comment": comment,
         }
         response = self._call_api(
-            "POST", f"/decks/{deck_id}/note-suggestion/", data=suggestion
+            "POST", f"/decks/{ankihub_deck_uuid}/note-suggestion/", data=suggestion
         )
         return response
 

@@ -1,3 +1,5 @@
+import uuid
+
 from anki.hooks import addHook
 from aqt import gui_hooks
 from aqt.editor import Editor
@@ -30,7 +32,9 @@ def on_ankihub_button_press(editor: Editor):
     _field_vals = list(editor.note.fields)
     # Exclude the AnkiHub ID field since we don't want to expose this as an
     # editable field in AnkiHub suggestion forms.
-    ankihub_id = _field_vals.pop()
+    ankihub_note_uuid = _field_vals.pop()
+    if not ankihub_note_uuid:
+        ankihub_note_uuid = str(uuid.uuid4())
     _fields_metadata = editor.note.note_type()["flds"][:-1]
     fields = [
         {"name": field["name"], "order": field["ord"], "value": val}
@@ -40,7 +44,7 @@ def on_ankihub_button_press(editor: Editor):
     client = AnkiHubClient()
     if command == AnkiHubCommands.CHANGE.value:
         response = client.create_change_note_suggestion(
-            ankihub_id=ankihub_id,
+            ankihub_note_uuid=ankihub_note_uuid,
             fields=fields,
             tags=tags,
             change_type=change_type,
@@ -58,18 +62,19 @@ def on_ankihub_button_press(editor: Editor):
             )
             return
         elif len(subscribed_decks) == 1:
-            deck_id = subscribed_decks[0]
+            (decks,) = subscribed_decks.items()
+            ankihub_deck_uuid, deck = decks
         else:
             choice = chooseList(
                 "Which AnKiHub deck would you like to add this note to?",
                 choices=subscribed_decks,
             )
-            deck_id = subscribed_decks[choice]
+            ankihub_deck_uuid = list(subscribed_decks.keys())[choice]
 
         response = client.create_new_note_suggestion(
-            deck_id=deck_id,
+            ankihub_deck_uuid=ankihub_deck_uuid,
+            ankihub_note_uuid=ankihub_note_uuid,
             anki_id=editor.note.id,
-            ankihub_id=ankihub_id,
             fields=fields,
             tags=tags,
             change_type=change_type,

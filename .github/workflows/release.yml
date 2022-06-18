@@ -1,0 +1,23 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - "**"
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v2
+
+      - name: Package .ankiaddon
+        run: bash ../release.sh
+        working-directory: ankihub
+
+      - name: Release
+        uses: softprops/action-gh-release@v1
+
+        with:
+          files: ankihub.ankiaddon
