@@ -1,9 +1,9 @@
 import dataclasses
 import json
 import os
-import typing
 from datetime import datetime, timezone
 from json import JSONDecodeError
+from typing import Any, Dict
 
 from aqt import mw
 
@@ -14,7 +14,7 @@ from . import LOGGER
 class PrivateConfig:
     token: str = ""
     user: str = ""
-    decks: typing.List[str] = dataclasses.field(default_factory=list)
+    decks: Dict[int, Dict[str, Any]] = dataclasses.field(default_factory=dict)
     last_sync: str = ""
 
 
@@ -71,9 +71,11 @@ class Config:
         self.private_config.last_sync = date_time_str
         self._update_private_config()
 
-    def save_subscription(self, deck_ids: typing.List[int]):
-        self.private_config.decks += deck_ids
+    def save_subscription(self, ankihub_did: str, anki_did: int, creator: bool = False):
+        self.private_config.decks[ankihub_did] = {
+            "anki_id": anki_did,
+            "creator": creator,
+        }
         # remove duplicates
-        self.private_config.decks = list(set(self.private_config.decks))
         self.save_last_sync()
         self._update_private_config()

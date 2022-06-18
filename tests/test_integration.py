@@ -1,5 +1,6 @@
 import copy
 import pathlib
+import uuid
 from datetime import datetime, timedelta, timezone
 from unittest.mock import MagicMock, Mock, patch
 
@@ -159,6 +160,7 @@ def test_client_login_and_signout(anki_session_with_addon: AnkiSession, requests
     client = AnkiHubClient()
     credentials_data = {"username": "test", "password": "testpassword"}
     requests_mock.post(f"{API_URL_BASE}/login/", json={"token": "f4k3t0k3n"})
+    requests_mock.post(f"{API_URL_BASE}/logout/", json={"token": "f4k3t0k3n"})
     client.login(credentials=credentials_data)
     assert client._headers["Authorization"] == "Token f4k3t0k3n"
 
@@ -293,14 +295,14 @@ def test_get_note_by_anki_id(
         "fields": [{"name": "Text", "order": 0, "value": "Fake value"}],
     }
     requests_mock.get(f"{API_URL_BASE}/notes/{note_anki_id}", json=expected_data)
-    response = client.get_note_by_anki_id(anki_id=str(note_anki_id))
+    response = client.get_note_by_anki_id(anki_id=note_anki_id)
     assert response.json() == expected_data
 
     # test get note by anki id unauthenticated
     note_anki_id = 1
     requests_mock.get(f"{API_URL_BASE}/notes/{note_anki_id}", status_code=403)
     monkeypatch.setattr("ankihub.ankihub_client.showText", Mock())
-    response = client.get_note_by_anki_id(anki_id=str(note_anki_id))
+    response = client.get_note_by_anki_id(anki_id=note_anki_id)
     assert response.status_code == 403
 
 
@@ -315,7 +317,7 @@ def test_create_change_note_suggestion(
     note_id = 1
     requests_mock.post(f"{API_URL_BASE}/notes/{note_id}/suggestion/", status_code=201)
     response = client.create_change_note_suggestion(
-        ankihub_id=str(1),
+        ankihub_note_uuid=str(1),
         fields=[{"name": "abc", "order": 0, "value": "abc changed"}],
         tags=["test"],
         change_type=ChangeTypes.NEW_UPDATE,
@@ -328,7 +330,7 @@ def test_create_change_note_suggestion(
     requests_mock.post(f"{API_URL_BASE}/notes/{note_id}/suggestion/", status_code=403)
     monkeypatch.setattr("ankihub.ankihub_client.showText", Mock())
     response = client.create_change_note_suggestion(
-        ankihub_id=str(1),
+        ankihub_note_uuid=str(1),
         fields=[{"name": "abc", "order": 0, "value": "abc changed"}],
         tags=["test"],
         change_type=ChangeTypes.NEW_UPDATE,
@@ -345,14 +347,14 @@ def test_create_new_note_suggestion(
 
     client = AnkiHubClient()
     # test create new note suggestion
-    deck_id = 1
+    deck_id = str(uuid.uuid4())
     requests_mock.post(
         f"{API_URL_BASE}/decks/{deck_id}/note-suggestion/", status_code=201
     )
     response = client.create_new_note_suggestion(
-        deck_id=deck_id,
+        ankihub_deck_uuid=deck_id,
         anki_id=1,
-        ankihub_id=str(1),
+        ankihub_note_uuid=str(1),
         fields=[{"name": "abc", "order": 0, "value": "abc changed"}],
         tags=["test"],
         change_type=ChangeTypes.NEW_UPDATE,
@@ -361,14 +363,13 @@ def test_create_new_note_suggestion(
     assert response.status_code == 201
 
     # test create new note suggestion unauthenticated
-    deck_id = 1
     requests_mock.post(
         f"{API_URL_BASE}/decks/{deck_id}/note-suggestion/", status_code=403
     )
     monkeypatch.setattr("ankihub.ankihub_client.showText", Mock())
     response = client.create_new_note_suggestion(
-        deck_id=deck_id,
-        ankihub_id=str(1),
+        ankihub_deck_uuid=deck_id,
+        ankihub_note_uuid=str(1),
         anki_id=1,
         fields=[{"name": "abc", "order": 0, "value": "abc changed"}],
         tags=["test"],

@@ -1,5 +1,6 @@
 import csv
 import tempfile
+from concurrent.futures import Future
 from pathlib import Path
 
 import requests
@@ -174,36 +175,20 @@ class SubscribeToDeck(QWidget):
             self.show()
 
     def subscribe(self):
-        deck_id = self.deck_id_box_text.text()
-        try:
-            deck_id = int(deck_id)
-        except ValueError:
+        ankihub_did = self.deck_id_box_text.text()
+        if ankihub_did in self.config.private_config.decks.keys():
             showText(
-                "Oops! Please copy/paste a Deck ID from AnkiHub.net/browse (numbers only)!"
-            )
-            return
-        if deck_id in self.config.private_config.decks:
-            showText(
-                f"You've already subscribed to deck {deck_id}. "
+                f"You've already subscribed to deck {ankihub_did}. "
                 "Syncing with AnkiHub will happen automatically everytime you "
                 "restart Anki. You can manually sync with AnkiHub from the AnkiHub "
                 f"menu. See {URL_HELP} for more details."
             )
-        # TODO use mw.taskman
-        download_result = self.download_deck(deck_id)
-        if download_result and download_result.exists():
-            confirmed = askUser(
-                f"The AnkiHub deck {deck_id} has been downloaded. Would you like to "
-                f"proceed with modifying your personal collection in order to subscribe "
-                f"to the collaborative deck? See {URL_HELP} for "
-                f"details.",
-                title="Please confirm to proceed.",
-            )
-            if confirmed:
-                self.install_deck(download_result, deck_id)
-        self.close()
+            self.close()
+            return
 
-    def download_deck(self, deck_id):
+        self.download_and_install_deck(ankihub_did)
+
+    def download_and_install_deck(self, ankihub_did: str):
         """
         Take the AnkiHub deck id, copyied/pasted by the user and
         1) Download the deck .csv or .apkg, depending on if the user already has
@@ -212,35 +197,31 @@ class SubscribeToDeck(QWidget):
         :param deck_id: the deck's ankihub id
         :return:
         """
-        deck_response = self.client.get_deck_by_id(deck_id)
+
+        deck_response = self.client.get_deck_by_id(ankihub_did)
         if deck_response.status_code == 404:
             showText(
-                f"Deck {deck_id} doesn't exist. Please make sure you copy/paste "
+                f"Deck {ankihub_did} doesn't exist. Please make sure you copy/paste "
                 f"the correct ID. If you believe this is an error, please reach "
                 f"out to user support at help@ankipalace.com."
             )
             self.label_results.setText(self.instructions_label)
             return
-        elif deck_response.status_code == 200:
-            data = deck_response.json()
-            # TODO We can actually just check for the deck id in the user's local collection
-            #   rather than asking them.
-            first_time_install = askUser(
-                f"Is this your first time installing the {deck_id} deck?\n\n"
-                f"Answer No if you have already imported the {deck_id} deck into Anki.\n\n"
-                f"Answer Yes if you have imported the {deck_id} deck into Anki.",
-                defaultno=True,
-            )
-            deck_file_name = (
-                data["apkg_filename"]
-                if first_time_install
-                else data["csv_notes_filename"]
-            )
-            presigned_url_response = self.client.get_presigned_url(
-                key=deck_file_name, action="download"
-            )
-            s3_url = presigned_url_response.json()["pre_signed_url"]
-            s3_response = requests.get(s3_url)
+
+        data = deck_response.json()
+        local_deck_ids = {deck.id for deck in mw.col.decks.all_names_and_ids()}
+        first_time_install = data["anki_id"] not in local_deck_ids
+        deck_file_name = (
+            data["apkg_filename"] if first_time_install else data["csv_notes_filename"]
+        )
+
+        presigned_url_response = self.client.get_presigned_url(
+            key=deck_file_name, action="download"
+        )
+        s3_url = presigned_url_response.json()["pre_signed_url"]
+
+        def on_download_done(future: Future):
+            s3_response = future.result()
             LOGGER.debug(f"{s3_response.url}")
             LOGGER.debug(f"{s3_response.status_code}")
             # TODO Use io.BytesIO
@@ -250,23 +231,44 @@ class SubscribeToDeck(QWidget):
                 LOGGER.debug(f"Wrote {deck_file_name} to {out_file}")
                 # TODO Validate .csv
             self.label_results.setText("Deck download successful!")
-            return out_file
 
-    def install_deck(self, deck_file: Path, deck_id: int):
+            if out_file:
+                confirmed = askUser(
+                    f"The AnkiHub deck {ankihub_did} has been downloaded. Would you like to "
+                    f"proceed with modifying your personal collection in order to subscribe "
+                    f"to the collaborative deck? See {URL_HELP} for "
+                    f"details.",
+                    title="Please confirm to proceed.",
+                )
+                if confirmed:
+                    self.install_deck(out_file, ankihub_did, data["anki_id"])
+
+            self.close()
+
+        mw.taskman.with_progress(
+            lambda: requests.get(s3_url),
+            on_done=on_download_done,
+            parent=self,
+            label="Downloading deck",
+        )
+
+    def install_deck(self, deck_file: Path, ankihub_did: str, anki_did: int):
         """If we have a .csv, read data from the file and modify the user's note types
         and notes.
         :param: path to the .csv or .apkg file
         """
         if deck_file.suffix == ".apkg":
-            self._install_deck_apkg(deck_file, deck_id)
+            self._install_deck_apkg(deck_file)
         elif deck_file.suffix == ".csv":
             self._install_deck_csv(deck_file)
 
-    def _install_deck_apkg(self, deck_file: Path, deck_id: int):
+        self.config.save_subscription(ankihub_did, anki_did)
+        tooltip("The deck has successfully been installed!")
+
+    def _install_deck_apkg(self, deck_file: Path):
         from aqt import importing
 
         importing.importFile(mw, str(deck_file.absolute()))
-        self.config.save_subscription([deck_id])
 
     def _install_deck_csv(self, deck_file):
         tooltip("Configuring the collaborative deck.")
@@ -278,11 +280,10 @@ class SubscribeToDeck(QWidget):
                 notes.append(row)
                 ankihub_deck_ids.add(row["deck"])
                 note_type_names.add(row["note_type"])
+        assert len(ankihub_deck_ids) == 1
         mw._create_backup_with_progress(user_initiated=False)
         modify_note_types(note_type_names)
         process_csv(notes)
-        self.config.save_subscription(list(ankihub_deck_ids))
-        tooltip("The deck has successfully been installed!")
 
     @classmethod
     def display_subscribe_window(cls):
@@ -298,14 +299,6 @@ def ankihub_login_setup(parent):
 
 
 def create_collaborative_deck_action() -> None:
-    def on_success(response: Response) -> None:
-        # TODO Update config
-        if response.status_code == 201:
-            msg = "🎉 Deck upload successful!"
-        else:
-            msg = f"😔 Deck upload failed: {response.text}"
-        showInfo(msg)
-
     deck_chooser = StudyDeck(
         mw,
         title="AnkiHub",
@@ -331,6 +324,20 @@ def create_collaborative_deck_action() -> None:
     if not confirm:
         tooltip("Cancelled Upload to AnkiHub")
         return
+
+    def on_success(response: Response) -> None:
+        if response.status_code == 201:
+            msg = "🎉 Deck upload successful!"
+
+            config = Config()
+            data = response.json()
+            anki_did = mw.col.decks.id_for_name(deck_name)
+            ankihub_did = data["deck_id"]
+            config.save_subscription(ankihub_did, anki_did, creator=True)
+        else:
+            msg = f"😔 Deck upload failed: {response.text}"
+        showInfo(msg)
+
     op = QueryOp(
         parent=mw,
         op=lambda col: create_collaborative_deck(deck_name),

@@ -12,6 +12,7 @@ LOGGER.debug(f"Starting with URL_BASE {API_URL_BASE}")
 URL_VIEW_NOTE = ANKIHUB_SITE_URL + "notes/"
 URL_HELP = f"{ANKIHUB_SITE_URL}/help"
 ANKIHUB_NOTE_TYPE_FIELD_NAME = "ankihub_id"
+ANKIHUB_NOTE_TYPE_MODIFICATION_STRING = "ANKIHUB MODFICATIONS"
 ADDON_PATH = pathlib.Path(__file__).parent.absolute()
 ICONS_PATH = ADDON_PATH / "icons"
 
@@ -28,8 +29,9 @@ class AnkiHubCommands(Enum):
     NEW = "Suggest a new note"
 
 
+# TODO Make sure these match up with SuggestionType.choices on AnkiHub
 class ChangeTypes(Enum):
-    NEW_UPDATE = "new_update"
+    NEW_UPDATE = "updated_content"
     LANGUAGE_ERROR = "spelling/grammatical"
     CONTENT_ERROR = "content_error"
 
