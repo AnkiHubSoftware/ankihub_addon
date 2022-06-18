@@ -44,7 +44,7 @@ jobs:
         with:
           name: anki-addon
           path: |
-            ankihub.ankiaddon
+            "ankihub_${GITHUB_REF}.ankiaddon":
 
       - name: Upload coverage to Codecov
         env:
