@@ -11,7 +11,7 @@ def stdout_handler():
 def file_handler():
     LOG_FILENAME = Path(__file__).parent / "user_files/ankihub.log"
     return RotatingFileHandler(
-        LOG_FILENAME, maxBytes=20000, backupCount=5, encoding="utf-8"
+        LOG_FILENAME, maxBytes=1000000, backupCount=5, encoding="utf-8"
     )
 
 
