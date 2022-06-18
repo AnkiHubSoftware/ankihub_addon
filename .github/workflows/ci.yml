@@ -57,5 +57,5 @@ jobs:
 
       - name: Run mypy
         run: |
-          mypy --install-types
+          python -m pip install types-requests
           mypy ankihub
