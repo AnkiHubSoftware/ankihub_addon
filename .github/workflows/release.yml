@@ -2,9 +2,6 @@ name: Release
 
 on:
   push:
-    # TODO Change to main
-    branches:
-      - "**"
     tags:
       - "**"
 
