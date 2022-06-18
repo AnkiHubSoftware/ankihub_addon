@@ -42,7 +42,7 @@ jobs:
       - name: Archive .ankiaddon
         uses: actions/upload-artifact@v3
         with:
-          name: anki-addon ${{ github.sha }}
+          name: ankihub_addon_${{ github.sha }}
           path: ankihub_${{ github.sha }}.ankiaddon
 
       # - name: Upload coverage to Codecov
