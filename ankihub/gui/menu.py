@@ -275,7 +275,7 @@ class SubscribeToDeck(QWidget):
         ankihub_deck_ids, note_type_names = set(), set()
         notes = []
         with deck_file.open(encoding="utf-8") as f:
-            reader = csv.DictReader(f, delimiter=CSV_DELIMITER)
+            reader = csv.DictReader(f, delimiter=CSV_DELIMITER, quotechar="'")
             for row in reader:
                 notes.append(row)
                 ankihub_deck_ids.add(row["deck"])
