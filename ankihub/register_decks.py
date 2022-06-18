@@ -56,7 +56,6 @@ def modify_note_type(note_type_name: str) -> None:
     """
     "Adds ankihub field. Adds link to ankihub in card template."
     LOGGER.debug(f"Modifying note type {note_type_name}")
-    note_type = mw.col.models.by_name(note_type_name)
     mm = mw.col.models
     note_type = mm.by_name(note_type_name)
 
