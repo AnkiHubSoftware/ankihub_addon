@@ -36,15 +36,14 @@ jobs:
           SKIP_INIT: 1
 
       - name: Package .ankiaddon
-        run: zip -r ../ankihub.ankiaddon . -x ./tests\*
+        run: zip -r ../ankihub_$GITHUB_SHA.ankiaddon . -x ./tests\*
         working-directory: ankihub
 
       - name: Archive .ankiaddon
         uses: actions/upload-artifact@v3
         with:
           name: anki-addon
-          path: |
-            "ankihub_${GITHUB_REF}.ankiaddon":
+          path: ankihub_$GITHUB.ankiaddon
 
       - name: Upload coverage to Codecov
         env:
