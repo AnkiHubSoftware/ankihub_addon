@@ -4,9 +4,9 @@ on:
   push:
     # TODO Change to main
     branches:
-      - "*"
+      - "**"
     tags:
-      - "*"
+      - "**"
 
 jobs:
   build:
