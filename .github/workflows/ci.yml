@@ -30,7 +30,11 @@ jobs:
           python -m pip install --upgrade pip
           python -m pip install -r ./requirements/dev.txt
 
-          # TODO Move once tests are passing
+      - name: Run pytest
+        run: pytest -vvv --cov --cov-report=xml --forked ./tests
+        env:
+          SKIP_INIT: 1
+
       - name: Package .ankiaddon
         run: zip -r ../ankihub.ankiaddon . -x ./tests\*
         working-directory: ankihub
@@ -41,11 +45,6 @@ jobs:
           name: anki-addon
           path: |
             ankihub.ankiaddon
-
-      - name: Run integration tests
-        run: pytest -vvv --cov --cov-report=xml --forked ./tests
-        env:
-          SKIP_INIT: 1
 
       - name: Upload coverage to Codecov
         env:
