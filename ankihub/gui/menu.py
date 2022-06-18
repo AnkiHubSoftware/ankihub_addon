@@ -274,7 +274,7 @@ class SubscribeToDeck(QWidget):
         tooltip("Configuring the collaborative deck.")
         ankihub_deck_ids, note_type_names = set(), set()
         notes = []
-        with deck_file.open(encoding="utf-8", errors="ignore") as f:
+        with deck_file.open(encoding="utf-8") as f:
             reader = csv.DictReader(f, delimiter=CSV_DELIMITER)
             for row in reader:
                 notes.append(row)
