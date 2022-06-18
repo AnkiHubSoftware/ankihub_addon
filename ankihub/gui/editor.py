@@ -62,7 +62,6 @@ def on_ankihub_button_press(editor: Editor):
             )
             return
         elif len(subscribed_decks) == 1:
-            import aqt;aqt.debug()
             (decks,) = subscribed_decks.items()
             ankihub_deck_uuid, deck = decks
         else:
