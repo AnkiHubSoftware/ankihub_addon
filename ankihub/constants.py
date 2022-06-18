@@ -4,12 +4,12 @@ from enum import Enum
 
 from . import LOGGER
 
-ANKIHUB_SITE_URL = "https://ankihub.net/"
+ANKIHUB_SITE_URL = "https://ankihub.net"
 API_URL_BASE = os.getenv("API_URL_BASE")
 API_URL_BASE = API_URL_BASE if API_URL_BASE else "https://app.ankihub.net/api"
 
 LOGGER.debug(f"Starting with URL_BASE {API_URL_BASE}")
-URL_VIEW_NOTE = ANKIHUB_SITE_URL + "notes/"
+URL_VIEW_NOTE = f"{ANKIHUB_SITE_URL}/notes/"
 URL_HELP = f"{ANKIHUB_SITE_URL}/help"
 ANKIHUB_NOTE_TYPE_FIELD_NAME = "ankihub_id"
 ANKIHUB_NOTE_TYPE_MODIFICATION_STRING = "ANKIHUB MODFICATIONS"

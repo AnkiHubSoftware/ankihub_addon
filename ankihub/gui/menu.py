@@ -270,12 +270,12 @@ class SubscribeToDeck(QWidget):
 
         importing.importFile(mw, str(deck_file.absolute()))
 
-    def _install_deck_csv(self, deck_file):
+    def _install_deck_csv(self, deck_file: Path):
         tooltip("Configuring the collaborative deck.")
         ankihub_deck_ids, note_type_names = set(), set()
         notes = []
-        with deck_file.open() as f:
-            reader = csv.DictReader(f, delimiter=CSV_DELIMITER)
+        with deck_file.open(encoding="utf-8") as f:
+            reader = csv.DictReader(f, delimiter=CSV_DELIMITER, quotechar="'")
             for row in reader:
                 notes.append(row)
                 ankihub_deck_ids.add(row["deck"])
