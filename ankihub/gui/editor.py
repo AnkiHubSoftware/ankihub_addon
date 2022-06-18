@@ -6,9 +6,10 @@ from aqt.editor import Editor
 from aqt.utils import chooseList, showText, tooltip
 
 from .. import LOGGER
-from ..ankihub_client import AnkiHubClient
+from ..ankihub_client import AnkiHubClient, UnexpectedStatusCodeException
 from ..config import Config
 from ..constants import ICONS_PATH, AnkiHubCommands
+from ..utils import show_unexpected_response_warning
 from .suggestion_dialog import SuggestionDialog
 
 
@@ -43,13 +44,18 @@ def on_ankihub_button_press(editor: Editor):
     tags = editor.note.tags
     client = AnkiHubClient()
     if command == AnkiHubCommands.CHANGE.value:
-        response = client.create_change_note_suggestion(
-            ankihub_note_uuid=ankihub_note_uuid,
-            fields=fields,
-            tags=tags,
-            change_type=change_type,
-            comment=comment,
-        )
+        try:
+            response = client.create_change_note_suggestion(
+                ankihub_note_uuid=ankihub_note_uuid,
+                fields=fields,
+                tags=tags,
+                change_type=change_type,
+                comment=comment,
+            )
+        except UnexpectedStatusCodeException:
+            show_unexpected_response_warning()
+            return
+
         if response.status_code == 201:
             tooltip("Submitted change note suggestion to AnkiHub.")
             return response.json()
@@ -71,15 +77,20 @@ def on_ankihub_button_press(editor: Editor):
             )
             ankihub_deck_uuid = list(subscribed_decks.keys())[choice]
 
-        response = client.create_new_note_suggestion(
-            ankihub_deck_uuid=ankihub_deck_uuid,
-            ankihub_note_uuid=ankihub_note_uuid,
-            anki_id=editor.note.id,
-            fields=fields,
-            tags=tags,
-            change_type=change_type,
-            comment=comment,
-        )
+        try:
+            response = client.create_new_note_suggestion(
+                ankihub_deck_uuid=ankihub_deck_uuid,
+                ankihub_note_uuid=ankihub_note_uuid,
+                anki_id=editor.note.id,
+                fields=fields,
+                tags=tags,
+                change_type=change_type,
+                comment=comment,
+            )
+        except UnexpectedStatusCodeException:
+            show_unexpected_response_warning()
+            return
+
         if response.status_code == 201:
             tooltip("Submitted new note suggestion to AnkiHub.")
             return response.json()

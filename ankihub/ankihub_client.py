@@ -1,15 +1,19 @@
 from json import JSONDecodeError
 from pathlib import Path
 from pprint import pformat
-from typing import Dict, List, Iterator, TypedDict
+from typing import Dict, Iterator, List, TypedDict
 
 import requests
-from aqt.utils import showText
 from requests import Response
 
 from . import LOGGER
 from .config import Config
-from .constants import API_URL_BASE, USER_SUPPORT_EMAIL_SLUG, ChangeTypes
+from .constants import API_URL_BASE, ChangeTypes
+
+
+class UnexpectedStatusCodeException(Exception):
+    def __init__(self, response: Response):
+        self.response = response
 
 
 class AnkiHubClient:
@@ -44,17 +48,10 @@ class AnkiHubClient:
             else:
                 LOGGER.debug(f"response content: {response}")
         if response.status_code > 299 and endpoint != "/logout/":
-            showText(
-                "Uh oh! There was a problem with your request.\n\n"
-                "If you haven't already signed in using the AnkiHub menu please do so. "
-                "Make sure your username and password are correct and that you have "
-                "confirmed your AnkiHub account through email verification. If you "
-                "believe this is an error, please reach out to user support at "
-                f"{USER_SUPPORT_EMAIL_SLUG}. This error will be automatically reported."
-            )
+            raise UnexpectedStatusCodeException(response)
         return response
 
-    def login(self, credentials: dict):
+    def login(self, credentials: dict) -> Response:
         self.signout()
         response = self._call_api("POST", "/login/", credentials)
         token = response.json().get("token")
@@ -77,6 +74,8 @@ class AnkiHubClient:
         with open(file, "rb") as f:
             deck_data = f.read()
         s3_response = requests.put(s3_url, data=deck_data)
+        if s3_response.status_code != 200:
+            raise UnexpectedStatusCodeException(s3_response)
         LOGGER.debug(f"request url: {s3_response.request.url}")
         LOGGER.debug(f"response status: {s3_response.status_code}")
         if s3_response.status_code not in [500, 404]:
@@ -85,6 +84,18 @@ class AnkiHubClient:
             "POST", "/decks/", data={"key": key, "anki_id": anki_id}
         )
         return response
+
+    def download_deck(self, deck_file_name: str) -> Response:
+        presigned_url_response = self.get_presigned_url(
+            key=deck_file_name, action="download"
+        )
+        if presigned_url_response.status_code != 200:
+            raise UnexpectedStatusCodeException(presigned_url_response)
+        s3_url = presigned_url_response.json()["pre_signed_url"]
+        s3_response = requests.get(s3_url)
+        if s3_response.status_code != 200:
+            raise UnexpectedStatusCodeException(s3_response)
+        return s3_response
 
     def get_deck_updates(self, deck_id: str) -> Iterator[Response]:
         since = self._config.private_config.last_sync

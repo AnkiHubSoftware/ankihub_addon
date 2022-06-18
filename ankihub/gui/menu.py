@@ -19,14 +19,13 @@ from aqt.qt import QAction, QMenu, qconnect
 from aqt.studydeck import StudyDeck
 from aqt.utils import askUser, showInfo, showText, tooltip
 from requests import Response
-from requests.exceptions import HTTPError
 
 from .. import LOGGER
-from ..ankihub_client import AnkiHubClient
+from ..ankihub_client import AnkiHubClient, UnexpectedStatusCodeException
 from ..config import Config
 from ..constants import CSV_DELIMITER, URL_HELP
 from ..register_decks import create_collaborative_deck, modify_note_types, process_csv
-from ..utils import sync_with_ankihub
+from ..utils import show_unexpected_response_warning, sync_with_ankihub
 
 
 def main_menu_setup():
@@ -108,12 +107,8 @@ class AnkiHubLogin(QWidget):
             ankihub_client.login(
                 credentials={"username": username, "password": password}
             )
-        except HTTPError as e:
-            LOGGER.debug(f"{e}")
-            showText(
-                "AnkiHub login failed.  Please make sure your username and "
-                "password are correct for AnkiHub."
-            )
+        except UnexpectedStatusCodeException:
+            show_unexpected_response_warning()
             return
         self.label_results.setText("✨ You are now logged into AnkiHub.")
 
@@ -198,14 +193,19 @@ class SubscribeToDeck(QWidget):
         :return:
         """
 
-        deck_response = self.client.get_deck_by_id(ankihub_did)
-        if deck_response.status_code == 404:
-            showText(
-                f"Deck {ankihub_did} doesn't exist. Please make sure you copy/paste "
-                f"the correct ID. If you believe this is an error, please reach "
-                f"out to user support at help@ankipalace.com."
-            )
-            self.label_results.setText(self.instructions_label)
+        try:
+            deck_response = self.client.get_deck_by_id(ankihub_did)
+        except UnexpectedStatusCodeException as e:
+            if e.response.status_code == 404:
+                showText(
+                    f"Deck {ankihub_did} doesn't exist. Please make sure you copy/paste "
+                    f"the correct ID. If you believe this is an error, please reach "
+                    f"out to user support at help@ankipalace.com."
+                )
+                self.label_results.setText(self.instructions_label)
+            else:
+                show_unexpected_response_warning()
+            self.close()
             return
 
         data = deck_response.json()
@@ -215,19 +215,20 @@ class SubscribeToDeck(QWidget):
             data["apkg_filename"] if first_time_install else data["csv_notes_filename"]
         )
 
-        presigned_url_response = self.client.get_presigned_url(
-            key=deck_file_name, action="download"
-        )
-        s3_url = presigned_url_response.json()["pre_signed_url"]
-
         def on_download_done(future: Future):
-            s3_response = future.result()
-            LOGGER.debug(f"{s3_response.url}")
-            LOGGER.debug(f"{s3_response.status_code}")
+            try:
+                response = future.result()
+            except UnexpectedStatusCodeException:
+                show_unexpected_response_warning()
+                self.close()
+                return
+
+            LOGGER.debug(f"{response.url}")
+            LOGGER.debug(f"{response.status_code}")
             # TODO Use io.BytesIO
             out_file = Path(tempfile.mkdtemp()) / f"{deck_file_name}"
             with out_file.open("wb") as f:
-                f.write(s3_response.content)
+                f.write(response.content)
                 LOGGER.debug(f"Wrote {deck_file_name} to {out_file}")
                 # TODO Validate .csv
             self.label_results.setText("Deck download successful!")
@@ -246,7 +247,7 @@ class SubscribeToDeck(QWidget):
             self.close()
 
         mw.taskman.with_progress(
-            lambda: requests.get(s3_url),
+            lambda: self.client.download_deck(deck_file_name),
             on_done=on_download_done,
             parent=self,
             label="Downloading deck",
@@ -338,11 +339,17 @@ def create_collaborative_deck_action() -> None:
             msg = f"😔 Deck upload failed: {response.text}"
         showInfo(msg)
 
+    def on_failure(exc: Exception):
+        if type(exc) == UnexpectedStatusCodeException:
+            show_unexpected_response_warning()
+        else:
+            raise exc
+
     op = QueryOp(
         parent=mw,
         op=lambda col: create_collaborative_deck(deck_name),
         success=on_success,
-    )
+    ).failure(on_failure)
     LOGGER.debug("Instantiated QueryOp")
     op.with_progress().run_in_background()
 
