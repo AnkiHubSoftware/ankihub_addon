@@ -43,7 +43,7 @@ jobs:
             ankihub.ankiaddon
 
       - name: Run integration tests
-        run: pytest -vvv --cov --cov-report=xml --forked ./tests
+        run: pytest ./tests
         env:
           SKIP_INIT: 1
 
