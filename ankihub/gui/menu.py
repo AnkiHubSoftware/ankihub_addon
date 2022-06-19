@@ -92,8 +92,8 @@ class AnkiHubLogin(QWidget):
         self.setMinimumWidth(500)
         self.setSizePolicy(QSizePolicy.Policy.Minimum, QSizePolicy.Policy.Minimum)
         self.setWindowTitle("Login to AnkiHub.")
-        config = Config()
-        if config.private_config.token:
+        self.config = Config()
+        if self.config.private_config.token:
             self.label_results.setText("✨ You are logged into AnkiHub.")
         self.show()
 
