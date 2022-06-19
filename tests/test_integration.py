@@ -8,6 +8,7 @@ from anki.decks import DeckId
 from anki.models import NotetypeId
 from pytest_anki import AnkiSession
 
+from ankihub.ankihub_client import sign_in_hook
 
 sample_model_id = NotetypeId(1650564101852)
 sample_deck = str(pathlib.Path(__file__).parent / "test_data" / "small.apkg")
@@ -157,7 +158,7 @@ def test_client_login_and_signout(anki_session_with_addon: AnkiSession, requests
     from ankihub.ankihub_client import AnkiHubClient
     from ankihub.constants import API_URL_BASE
 
-    client = AnkiHubClient(hooks=[])
+    client = AnkiHubClient(hooks=[sign_in_hook])
     credentials_data = {"username": "test", "password": "testpassword"}
     requests_mock.post(f"{API_URL_BASE}/login/", json={"token": "f4k3t0k3n"})
     requests_mock.post(

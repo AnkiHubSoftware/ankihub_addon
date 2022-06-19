@@ -22,7 +22,7 @@ from requests import Response
 from requests.exceptions import HTTPError
 
 from .. import LOGGER
-from ..ankihub_client import AnkiHubClient, sign_in_hook
+from ..ankihub_client import AnkiHubClient, sign_in_hook, DEFAULT_RESPONSE_HOOKS
 from ..config import Config
 from ..constants import CSV_DELIMITER, URL_HELP
 from ..register_decks import create_collaborative_deck, modify_note_types, process_csv
@@ -103,7 +103,8 @@ class AnkiHubLogin(QWidget):
         if not all([username, password]):
             showText("Oops! You forgot to put in a username or password!")
             return
-        ankihub_client = AnkiHubClient()
+        hooks = DEFAULT_RESPONSE_HOOKS + [sign_in_hook]
+        ankihub_client = AnkiHubClient(hooks=hooks)
         try:
             response = ankihub_client.login(
                 credentials={"username": username, "password": password}
