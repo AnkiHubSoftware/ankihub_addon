@@ -1,15 +1,19 @@
 from json import JSONDecodeError
 from pathlib import Path
 from pprint import pformat
-from typing import Dict, List, Iterator, TypedDict
+from typing import Dict, List, Iterator, TypedDict, Union
 
 import requests
-from requests import Response
+from aqt.utils import showText
+from requests.exceptions import ConnectionError
+from requests import Request, Response, Session, PreparedRequest
+from urllib3.exceptions import HTTPError
 
 from . import LOGGER
 from .config import Config
-from .constants import API_URL_BASE, ChangeTypes
-def default_response_hook(response: Response):
+from .constants import API_URL_BASE, ChangeTypes, USER_SUPPORT_EMAIL_SLUG
+
+
 def show_anki_message_hook(response: Response, *args, **kwargs):
     endpoint = response.request.url
     if response.status_code > 299 and "/logout/" not in endpoint:
@@ -46,8 +50,9 @@ DEFAULT_RESPONSE_HOOKS = (show_anki_message_hook, logging_hook)
 class AnkiHubClient:
     """Client for interacting with the AnkiHub API."""
 
-    def __init__(self, hooks=DEFAULT_RESPONSE_HOOKS):
+    def __init__(self, send_request=True, hooks=DEFAULT_RESPONSE_HOOKS):
 
+        self.send_request = send_request
         self.session = Session()
         self.hooks = hooks
         self.session.hooks["response"] = self.hooks
@@ -57,17 +62,30 @@ class AnkiHubClient:
         if self.token:
             self.session.headers["Authorization"] = f"Token {self.token}"
 
-    def _call_api(self, method, endpoint, data=None, params=None):
-        url = f"{self._base_url}{endpoint}"
-        response = requests.request(
+    def _call_api(
+        self, method, endpoint, data=None, params=None
+    ) -> Union[PreparedRequest, Response]:
+        url = f"{API_URL_BASE}{endpoint}"
+        request = Request(
             method=method,
-            headers=self._headers,
             url=url,
             json=data,
             params=params,
+            headers=self.session.headers,
+            hooks=self.session.hooks,
         )
-        return response
+        prepped = request.prepare()
+        if self.send_request is False:
+            return prepped
+        else:
+            try:
+                response = self.session.send(prepped)
                 self.session.close()
+                return response
+            except (ConnectionError, HTTPError) as e:
+                LOGGER.debug(f"Connection error: {e}")
+                # TODO collect suggestion requests and retry later?
+                pass
 
     def login(self, credentials: dict):
         self.signout()
