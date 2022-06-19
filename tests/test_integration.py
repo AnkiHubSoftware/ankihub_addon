@@ -8,8 +8,6 @@ from anki.decks import DeckId
 from anki.models import NotetypeId
 from pytest_anki import AnkiSession
 
-from ankihub.ankihub_client import sign_in_hook
-
 sample_model_id = NotetypeId(1650564101852)
 sample_deck = str(pathlib.Path(__file__).parent / "test_data" / "small.apkg")
 
@@ -155,7 +153,7 @@ def test_create_collaborative_deck_and_upload(
 
 
 def test_client_login_and_signout(anki_session_with_addon: AnkiSession, requests_mock):
-    from ankihub.ankihub_client import AnkiHubClient
+    from ankihub.ankihub_client import AnkiHubClient, sign_in_hook
     from ankihub.constants import API_URL_BASE
 
     client = AnkiHubClient(hooks=[sign_in_hook])
