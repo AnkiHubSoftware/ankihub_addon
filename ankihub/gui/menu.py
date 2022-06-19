@@ -106,7 +106,7 @@ class AnkiHubLogin(QWidget):
         hooks = DEFAULT_RESPONSE_HOOKS + [sign_in_hook]
         ankihub_client = AnkiHubClient(hooks=hooks)
         try:
-            response = ankihub_client.login(
+            ankihub_client.login(
                 credentials={"username": username, "password": password}
             )
         except HTTPError as e:
