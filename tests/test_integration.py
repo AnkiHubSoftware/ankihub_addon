@@ -157,7 +157,7 @@ def test_client_login_and_signout(anki_session_with_addon: AnkiSession, requests
     from ankihub.ankihub_client import AnkiHubClient
     from ankihub.constants import API_URL_BASE
 
-    client = AnkiHubClient()
+    client = AnkiHubClient(hooks=None)
     credentials_data = {"username": "test", "password": "testpassword"}
     requests_mock.post(f"{API_URL_BASE}/login/", json={"token": "f4k3t0k3n"})
     requests_mock.post(f"{API_URL_BASE}/logout/", json={"token": "f4k3t0k3n"})
@@ -174,7 +174,7 @@ def test_upload_deck(anki_session_with_addon: AnkiSession, requests_mock, monkey
     from ankihub.ankihub_client import AnkiHubClient
     from ankihub.constants import API_URL_BASE
 
-    client = AnkiHubClient()
+    client = AnkiHubClient(hooks=None)
 
     requests_mock.get(
         f"{API_URL_BASE}/decks/pre-signed-url",
@@ -207,7 +207,7 @@ def test_get_deck_updates(
     from ankihub.ankihub_client import AnkiHubClient
     from ankihub.constants import API_URL_BASE
 
-    client = AnkiHubClient()
+    client = AnkiHubClient(hooks=None)
 
     # test get deck updates
     deck_id = 1
@@ -249,7 +249,7 @@ def test_get_deck_by_id(
     from ankihub.ankihub_client import AnkiHubClient
     from ankihub.constants import API_URL_BASE
 
-    client = AnkiHubClient()
+    client = AnkiHubClient(hooks=None)
 
     # test get deck by id
     deck_id = 1
@@ -280,7 +280,7 @@ def test_get_note_by_anki_id(
     from ankihub.ankihub_client import AnkiHubClient
     from ankihub.constants import API_URL_BASE
 
-    client = AnkiHubClient()
+    client = AnkiHubClient(hooks=None)
 
     # test get note by anki id
     note_anki_id = 1
@@ -308,7 +308,7 @@ def test_create_change_note_suggestion(
     from ankihub.ankihub_client import AnkiHubClient
     from ankihub.constants import API_URL_BASE, ChangeTypes
 
-    client = AnkiHubClient()
+    client = AnkiHubClient(hooks=None)
     # test create change note suggestion
     note_id = 1
     requests_mock.post(f"{API_URL_BASE}/notes/{note_id}/suggestion/", status_code=201)
@@ -340,7 +340,7 @@ def test_create_new_note_suggestion(
     from ankihub.ankihub_client import AnkiHubClient
     from ankihub.constants import API_URL_BASE, ChangeTypes
 
-    client = AnkiHubClient()
+    client = AnkiHubClient(hooks=None)
     # test create new note suggestion
     deck_id = str(uuid.uuid4())
     requests_mock.post(
