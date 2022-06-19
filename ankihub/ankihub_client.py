@@ -41,13 +41,16 @@ DEFAULT_RESPONSE_HOOKS = (default_response_hook,)
 class AnkiHubClient:
     """Client for interacting with the AnkiHub API."""
 
-    def __init__(self):
-        self._headers = {"Content-Type": "application/json"}
+    def __init__(self, hooks=DEFAULT_RESPONSE_HOOKS):
+
+        self.session = Session()
+        self.hooks = hooks
+        self.session.hooks["response"] = self.hooks
+        self.session.headers.update({"Content-Type": "application/json"})
         self._config = Config()
-        self._base_url = API_URL_BASE
         self.token = self._config.private_config.token
         if self.token:
-            self._headers["Authorization"] = f"Token {self.token}"
+            self.session.headers["Authorization"] = f"Token {self.token}"
 
     def _call_api(self, method, endpoint, data=None, params=None):
         url = f"{self._base_url}{endpoint}"
