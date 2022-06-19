@@ -8,13 +8,10 @@ from anki.errors import NotFoundError
 from anki.models import NoteType, NotetypeId
 from anki.notes import Note, NoteId
 from aqt import mw
-from aqt.utils import showText
-from requests import Response
 
 from . import LOGGER, constants
 from .ankihub_client import AnkiHubClient
 from .config import Config
-from .constants import USER_SUPPORT_EMAIL_SLUG
 
 
 def note_type_contains_field(
