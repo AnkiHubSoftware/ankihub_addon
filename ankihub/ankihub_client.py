@@ -44,17 +44,30 @@ def logging_hook(response: Response, *args, **kwargs):
         LOGGER.debug(f"response: {response}")
 
 
-DEFAULT_RESPONSE_HOOKS = (show_anki_message_hook, logging_hook)
+def sign_in_hook(response: Response, *args, **kwargs):
+    config = Config()
+    data = response.json()
+    token = data.get("token")
+    username = data["credentials"]["username"]
+    if token:
+        config.save_token(token)
+        config.save_user_email(username)
+
+
+DEFAULT_RESPONSE_HOOKS = [show_anki_message_hook, logging_hook]
 
 
 class AnkiHubClient:
     """Client for interacting with the AnkiHub API."""
 
-    def __init__(self, send_request=True, hooks=DEFAULT_RESPONSE_HOOKS):
+    def __init__(self, send_request=True, hooks=None):
+        if hooks is None:
+            self.hooks = DEFAULT_RESPONSE_HOOKS
+        else:
+            self.hooks = hooks
 
         self.send_request = send_request
         self.session = Session()
-        self.hooks = hooks
         self.session.hooks["response"] = self.hooks
         self.session.headers.update({"Content-Type": "application/json"})
         self._config = Config()
@@ -89,7 +102,11 @@ class AnkiHubClient:
 
     def login(self, credentials: dict):
         self.signout()
-        return self._call_api("POST", "/login/", credentials)
+        response = self._call_api("POST", "/login/", credentials)
+        token = response.json().get("token")
+        if token:
+            self.session.headers["Authorization"] = f"Token {token}"
+        return response
 
     def signout(self):
         result = self._call_api("POST", "/logout/")

@@ -22,7 +22,7 @@ from requests import Response
 from requests.exceptions import HTTPError
 
 from .. import LOGGER
-from ..ankihub_client import AnkiHubClient
+from ..ankihub_client import AnkiHubClient, sign_in_hook
 from ..config import Config
 from ..constants import CSV_DELIMITER, URL_HELP
 from ..register_decks import create_collaborative_deck, modify_note_types, process_csv
@@ -108,12 +108,6 @@ class AnkiHubLogin(QWidget):
             response = ankihub_client.login(
                 credentials={"username": username, "password": password}
             )
-            token = response.json().get("token")
-            if token:
-                self.config.save_token(token)
-                ankihub_client.session.headers["Authorization"] = f"Token {token}"
-            self.config.save_user_email(username)
-
         except HTTPError as e:
             LOGGER.debug(f"{e}")
             showText(
