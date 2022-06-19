@@ -4,7 +4,6 @@ from pprint import pformat
 from typing import Dict, List, Iterator, TypedDict
 
 import requests
-from aqt.utils import showText
 from requests import Response
 
 from . import LOGGER
@@ -36,22 +35,12 @@ class AnkiHubClient:
             f"request: {method} {url}\ndata={pformat(data)}\nparams={pformat(params)}\nheaders={self._headers}"
         )
         LOGGER.debug(f"response status: {response.status_code}")
-        if response.status_code not in [500, 404]:
-            try:
-                LOGGER.debug(f"response content: {pformat(response.json())}")
-            except JSONDecodeError:
-                LOGGER.debug(f"response content: {str(response.content)}")
-            else:
-                LOGGER.debug(f"response content: {response}")
-        if response.status_code > 299 and endpoint != "/logout/":
-            showText(
-                "Uh oh! There was a problem with your request.\n\n"
-                "If you haven't already signed in using the AnkiHub menu please do so. "
-                "Make sure your username and password are correct and that you have "
-                "confirmed your AnkiHub account through email verification. If you "
-                "believe this is an error, please reach out to user support at "
-                f"{USER_SUPPORT_EMAIL_SLUG}. This error will be automatically reported."
-            )
+        try:
+            LOGGER.debug(f"response content: {pformat(response.json())}")
+        except JSONDecodeError:
+            LOGGER.debug(f"response content: {str(response.content)}")
+        else:
+            LOGGER.debug(f"response: {response}")
         return response
 
     def login(self, credentials: dict):
