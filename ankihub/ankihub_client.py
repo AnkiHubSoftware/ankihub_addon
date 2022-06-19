@@ -10,21 +10,8 @@ from . import LOGGER
 from .config import Config
 from .constants import API_URL_BASE, ChangeTypes
 def default_response_hook(response: Response):
+def show_anki_message_hook(response: Response, *args, **kwargs):
     endpoint = response.request.url
-    method = response.request.method
-    data = response.request.data
-    params = response.request.params
-    headers = response.request.headers
-    LOGGER.debug(
-        f"request: {method} {endpoint}\ndata={pformat(data)}\nparams={pformat(params)}\nheaders={headers}"
-    )
-    LOGGER.debug(f"response status: {response.status_code}")
-    try:
-        LOGGER.debug(f"response content: {pformat(response.json())}")
-    except JSONDecodeError:
-        LOGGER.debug(f"response content: {str(response.content)}")
-    else:
-        LOGGER.debug(f"response: {response}")
     if response.status_code > 299 and "/logout/" not in endpoint:
         showText(
             "Uh oh! There was a problem with your request.\n\n"
@@ -35,7 +22,25 @@ def default_response_hook(response: Response):
             f"{USER_SUPPORT_EMAIL_SLUG}. This error will be automatically reported."
         )
 
-DEFAULT_RESPONSE_HOOKS = (default_response_hook,)
+
+def logging_hook(response: Response, *args, **kwargs):
+    endpoint = response.request.url
+    method = response.request.method
+    body = response.request.body
+    headers = response.request.headers
+    LOGGER.debug(
+        f"request: {method} {endpoint}\ndata={pformat(body)}\nheaders={headers}"
+    )
+    LOGGER.debug(f"response status: {response.status_code}")
+    try:
+        LOGGER.debug(f"response content: {pformat(response.json())}")
+    except JSONDecodeError:
+        LOGGER.debug(f"response content: {str(response.content)}")
+    else:
+        LOGGER.debug(f"response: {response}")
+
+
+DEFAULT_RESPONSE_HOOKS = (show_anki_message_hook, logging_hook)
 
 
 class AnkiHubClient:
