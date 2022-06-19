@@ -139,16 +139,3 @@ def sync_on_profile_open():
     config = Config()
     if config.private_config.token:
         sync_with_ankihub()
-
-
-def response_handler(response: Response):
-    endpoint = response.request.url
-    if response.status_code > 299 and "/logout/" not in endpoint:
-        showText(
-            "Uh oh! There was a problem with your request.\n\n"
-            "If you haven't already signed in using the AnkiHub menu please do so. "
-            "Make sure your username and password are correct and that you have "
-            "confirmed your AnkiHub account through email verification. If you "
-            "believe this is an error, please reach out to user support at "
-            f"{USER_SUPPORT_EMAIL_SLUG}. This error will be automatically reported."
-        )
