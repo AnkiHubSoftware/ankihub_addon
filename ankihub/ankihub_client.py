@@ -74,10 +74,11 @@ class AnkiHubClient:
         return self._call_api("POST", "/login/", credentials)
 
     def signout(self):
-        self._call_api("POST", "/logout/")
-        self._config.save_token("")
-        self._headers["Authorization"] = ""
-        LOGGER.debug("Token cleared from config.")
+        result = self._call_api("POST", "/logout/")
+        if isinstance(result, Response) and result.status_code == 204:
+            self._config.save_token("")
+            self.session.headers["Authorization"] = ""
+            LOGGER.debug("Token cleared from config.")
 
     def upload_deck(self, file: Path, anki_id: int) -> Response:
         key = file.name
