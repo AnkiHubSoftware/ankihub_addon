@@ -45,11 +45,6 @@ jobs:
           name: ankihub_addon_${{ github.sha }}
           path: ankihub_${{ github.sha }}.ankiaddon
 
-      - name: Run integration tests
-        run: pytest ./tests
-        env:
-          SKIP_INIT: 1
-
       - name: Upload coverage to Codecov
         env:
           CODECOV_TOKEN: "${{ secrets.CODECOV_TOKEN }}"
