@@ -105,9 +105,16 @@ class AnkiHubLogin(QWidget):
             return
         ankihub_client = AnkiHubClient()
         try:
-            ankihub_client.login(
+            response = ankihub_client.login(
                 credentials={"username": username, "password": password}
             )
+            token = response.json().get("token")
+            if token:
+                self.config.save_token(token)
+                ankihub_client.session.headers["Authorization"] = f"Token {token}"
+            self.config.save_user_email(username)
+            ankihub_client.session.close()
+
         except HTTPError as e:
             LOGGER.debug(f"{e}")
             showText(
