@@ -196,7 +196,6 @@ def test_upload_deck(anki_session_with_addon: AnkiSession, requests_mock, monkey
     assert response.status_code == 201
 
     # test upload deck unauthenticated
-    monkeypatch.setattr("ankihub.ankihub_client.showText", Mock())
     requests_mock.post(f"{API_URL_BASE}/decks/", status_code=403)
     response = client.upload_deck(pathlib.Path(sample_deck), anki_id=1)
     assert response.status_code == 403
@@ -239,7 +238,6 @@ def test_get_deck_updates(
 
     # test get deck updates unauthenticated
     deck_id = 1
-    monkeypatch.setattr("ankihub.ankihub_client.showText", Mock())
     requests_mock.get(f"{API_URL_BASE}/decks/{deck_id}/updates", status_code=403)
     for response in client.get_deck_updates(deck_id=str(deck_id)):
         assert response.status_code == 403
@@ -272,7 +270,6 @@ def test_get_deck_by_id(
     # test get deck by id unauthenticated
     deck_id = DeckId(1)
     requests_mock.get(f"{API_URL_BASE}/decks/{deck_id}/", status_code=403)
-    monkeypatch.setattr("ankihub.ankihub_client.showText", Mock())
     response = client.get_deck_by_id(deck_id=str(deck_id))
     assert response.status_code == 403
 
@@ -301,7 +298,6 @@ def test_get_note_by_anki_id(
     # test get note by anki id unauthenticated
     note_anki_id = 1
     requests_mock.get(f"{API_URL_BASE}/notes/{note_anki_id}", status_code=403)
-    monkeypatch.setattr("ankihub.ankihub_client.showText", Mock())
     response = client.get_note_by_anki_id(anki_id=note_anki_id)
     assert response.status_code == 403
 
@@ -328,7 +324,6 @@ def test_create_change_note_suggestion(
     # test create change note suggestion unauthenticated
     note_id = 1
     requests_mock.post(f"{API_URL_BASE}/notes/{note_id}/suggestion/", status_code=403)
-    monkeypatch.setattr("ankihub.ankihub_client.showText", Mock())
     response = client.create_change_note_suggestion(
         ankihub_note_uuid=str(1),
         fields=[{"name": "abc", "order": 0, "value": "abc changed"}],
@@ -366,7 +361,6 @@ def test_create_new_note_suggestion(
     requests_mock.post(
         f"{API_URL_BASE}/decks/{deck_id}/note-suggestion/", status_code=403
     )
-    monkeypatch.setattr("ankihub.ankihub_client.showText", Mock())
     response = client.create_new_note_suggestion(
         ankihub_deck_uuid=deck_id,
         ankihub_note_uuid=str(1),
