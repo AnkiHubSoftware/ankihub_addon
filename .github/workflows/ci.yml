@@ -31,7 +31,7 @@ jobs:
           python -m pip install -r ./requirements/dev.txt
 
       - name: Run pytest
-        run: pytest -vvv --cov --cov-report=xml --forked ./tests
+        run: pytest ./tests
         env:
           SKIP_INIT: 1
 
@@ -44,6 +44,11 @@ jobs:
         with:
           name: ankihub_addon_${{ github.sha }}
           path: ankihub_${{ github.sha }}.ankiaddon
+
+      - name: Run integration tests
+        run: pytest ./tests
+        env:
+          SKIP_INIT: 1
 
       - name: Upload coverage to Codecov
         env:
