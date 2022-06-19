@@ -148,7 +148,7 @@ class AnkiHubClient:
             "ankihub_id": ankihub_note_uuid,
             "fields": fields,
             "tags": tags,
-            "change_type": change_type.value,
+            "change_type": change_type.value[0],
             "comment": comment,
         }
         response = self._call_api(
@@ -172,7 +172,7 @@ class AnkiHubClient:
             "ankihub_id": ankihub_note_uuid,
             "fields": fields,
             "tags": tags,
-            "change_type": change_type.value,
+            "change_type": change_type.value[0],
             "comment": comment,
         }
         response = self._call_api(

@@ -19,15 +19,14 @@ def on_ankihub_button_press(editor: Editor):
     the hotkey is pressed.
     """
 
-    dialog = SuggestionDialog()
+    # The command is expected to have been set at this point already, either by
+    # fetching the default or by selecting a command from the dropdown menu.
+    command = editor.ankihub_command  # type: ignore
+    dialog = SuggestionDialog(command)
     if not dialog.exec():
         return
 
     change_type, comment = dialog.change_type(), dialog.comment()
-
-    # The command is expected to have been set at this point already, either by
-    # fetching the default or by selecting a command from the dropdown menu.
-    command = editor.ankihub_command  # type: ignore
     # See build_note_fields in ankihub
     # _field_vals is the actual contents of each note field.
     _field_vals = list(editor.note.fields)

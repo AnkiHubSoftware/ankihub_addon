@@ -22,7 +22,7 @@ jobs:
       - name: Install Qt
         uses: jurplel/install-qt-action@v2
         with:
-          version: "6.3.0"
+          version: "6.3.1"
           setup-python: 'false'
 
       - name: Install deps
@@ -30,17 +30,20 @@ jobs:
           python -m pip install --upgrade pip
           python -m pip install -r ./requirements/dev.txt
 
-          # TODO Move once tests are passing
+      - name: Run pytest
+        run: pytest ./tests
+        env:
+          SKIP_INIT: 1
+
       - name: Package .ankiaddon
-        run: zip -r ../ankihub.ankiaddon . -x ./tests\*
+        run: zip -r "../ankihub_${GITHUB_SHA}.ankiaddon" . -x ./tests\*
         working-directory: ankihub
 
       - name: Archive .ankiaddon
         uses: actions/upload-artifact@v3
         with:
-          name: anki-addon
-          path: |
-            ankihub.ankiaddon
+          name: ankihub_addon_${{ github.sha }}
+          path: ankihub_${{ github.sha }}.ankiaddon
 
       - name: Run integration tests
         run: pytest ./tests
