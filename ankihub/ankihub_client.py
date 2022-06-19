@@ -67,6 +67,7 @@ class AnkiHubClient:
             params=params,
         )
         return response
+                self.session.close()
 
     def login(self, credentials: dict):
         self.signout()

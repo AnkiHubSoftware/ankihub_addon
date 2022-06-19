@@ -113,7 +113,6 @@ class AnkiHubLogin(QWidget):
                 self.config.save_token(token)
                 ankihub_client.session.headers["Authorization"] = f"Token {token}"
             self.config.save_user_email(username)
-            ankihub_client.session.close()
 
         except HTTPError as e:
             LOGGER.debug(f"{e}")
