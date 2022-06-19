@@ -50,10 +50,10 @@ jobs:
         env:
           SKIP_INIT: 1
 
-      # - name: Upload coverage to Codecov
-      #   env:
-      #     CODECOV_TOKEN: "${{ secrets.CODECOV_TOKEN }}"
-      #   uses: codecov/codecov-action@v1
+      - name: Upload coverage to Codecov
+        env:
+          CODECOV_TOKEN: "${{ secrets.CODECOV_TOKEN }}"
+        uses: codecov/codecov-action@v1
 
       - name: Run pre-commit
         run: pre-commit run --all-files
