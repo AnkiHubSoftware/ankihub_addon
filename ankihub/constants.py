@@ -31,9 +31,12 @@ class AnkiHubCommands(Enum):
 
 # TODO Make sure these match up with SuggestionType.choices on AnkiHub
 class ChangeTypes(Enum):
-    NEW_UPDATE = "updated_content"
-    LANGUAGE_ERROR = "spelling/grammatical"
-    CONTENT_ERROR = "content_error"
+    UPDATED_CONTENT = "updated_content", "Updated content"
+    NEW_CONTENT = "new_content", "New content"
+    SPELLING_GRAMMATICAL = "spelling/grammatical", "Spelling/Grammatical"
+    CONTENT_ERROR = "content_error", "Content error"
+    NEW_CARD_TO_ADD = "new_card_to_add", "New card to add"
+    OTHER = "other", "Other"
 
 
 RATIONALE_FOR_CHANGE_MAX_LENGTH = 1024

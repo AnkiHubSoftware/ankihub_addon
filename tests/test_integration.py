@@ -320,7 +320,7 @@ def test_create_change_note_suggestion(
         ankihub_note_uuid=str(1),
         fields=[{"name": "abc", "order": 0, "value": "abc changed"}],
         tags=["test"],
-        change_type=ChangeTypes.NEW_UPDATE,
+        change_type=ChangeTypes.NEW_CONTENT,
         comment="",
     )
     assert response.status_code == 201
@@ -333,7 +333,7 @@ def test_create_change_note_suggestion(
         ankihub_note_uuid=str(1),
         fields=[{"name": "abc", "order": 0, "value": "abc changed"}],
         tags=["test"],
-        change_type=ChangeTypes.NEW_UPDATE,
+        change_type=ChangeTypes.NEW_CONTENT,
         comment="",
     )
     assert response.status_code == 403
@@ -357,7 +357,7 @@ def test_create_new_note_suggestion(
         ankihub_note_uuid=str(1),
         fields=[{"name": "abc", "order": 0, "value": "abc changed"}],
         tags=["test"],
-        change_type=ChangeTypes.NEW_UPDATE,
+        change_type=ChangeTypes.NEW_CARD_TO_ADD,
         comment="",
     )
     assert response.status_code == 201
@@ -373,7 +373,7 @@ def test_create_new_note_suggestion(
         anki_id=1,
         fields=[{"name": "abc", "order": 0, "value": "abc changed"}],
         tags=["test"],
-        change_type=ChangeTypes.NEW_UPDATE,
+        change_type=ChangeTypes.NEW_CARD_TO_ADD,
         comment="",
     )
     assert response.status_code == 403

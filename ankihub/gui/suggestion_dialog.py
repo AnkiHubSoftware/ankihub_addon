@@ -10,18 +10,13 @@ from aqt.qt import (
     qconnect,
 )
 
-from ..constants import RATIONALE_FOR_CHANGE_MAX_LENGTH, ChangeTypes
-
-DISPLAY_NAME_TO_CHANGE_TYPE = {
-    "New Update (from FF 2019+)": ChangeTypes.NEW_UPDATE,
-    "Spelling/Grammatical": ChangeTypes.LANGUAGE_ERROR,
-    "Content error": ChangeTypes.CONTENT_ERROR,
-}
+from ..constants import RATIONALE_FOR_CHANGE_MAX_LENGTH, ChangeTypes, AnkiHubCommands
 
 
 class SuggestionDialog(QDialog):
-    def __init__(self):
+    def __init__(self, command):
         super().__init__()
+        self.command = command
 
         self.setup_ui()
 
@@ -30,14 +25,15 @@ class SuggestionDialog(QDialog):
         layout = QVBoxLayout()
         self.setLayout(layout)
 
-        # change type select
-        label = QLabel("Change Type")
-        layout.addWidget(label)
-
         self.select = select = CustomListWidget()
-        select.addItems(DISPLAY_NAME_TO_CHANGE_TYPE.keys())
+        select.addItems([x.value[1] for x in ChangeTypes])
         select.setCurrentRow(0)
-        layout.addWidget(select)
+        # Hide the change type options if it's a new card.
+        if self.command != AnkiHubCommands.NEW.value:
+            # change type select
+            label = QLabel("Change Type")
+            layout.addWidget(label)
+            layout.addWidget(select)
 
         # comment field
         label = QLabel("Rationale for Change (Required)")
@@ -75,7 +71,12 @@ class SuggestionDialog(QDialog):
         return self.edit.toPlainText()
 
     def change_type(self) -> ChangeTypes:
-        return DISPLAY_NAME_TO_CHANGE_TYPE[self.select.currentItem().text()]
+        if self.command == AnkiHubCommands.NEW.value:
+            return ChangeTypes.NEW_CARD_TO_ADD
+        else:
+            return next(
+                x for x in ChangeTypes if x.value[1] == self.select.currentItem().text()
+            )
 
 
 class CustomListWidget(QListWidget):
