@@ -160,13 +160,17 @@ def test_client_login_and_signout(anki_session_with_addon: AnkiSession, requests
     client = AnkiHubClient(hooks=None)
     credentials_data = {"username": "test", "password": "testpassword"}
     requests_mock.post(f"{API_URL_BASE}/login/", json={"token": "f4k3t0k3n"})
-    requests_mock.post(f"{API_URL_BASE}/logout/", json={"token": "f4k3t0k3n"})
+    requests_mock.post(
+        f"{API_URL_BASE}/logout/", json={"token": "f4k3t0k3n"}, status_code=204
+    )
     client.login(credentials=credentials_data)
-    assert client._headers["Authorization"] == "Token f4k3t0k3n"
+    assert client.session.headers["Authorization"] == "Token f4k3t0k3n"
+    assert client._config.private_config.token == "Token f4k3t0k3n"
+
 
     # test signout
     client.signout()
-    assert client._headers["Authorization"] == ""
+    assert client.session.headers["Authorization"] == ""
     assert client._config.private_config.token == ""
 
 
