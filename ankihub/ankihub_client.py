@@ -8,7 +8,7 @@ from requests import Response
 
 from . import LOGGER
 from .config import Config
-from .constants import API_URL_BASE, USER_SUPPORT_EMAIL_SLUG, ChangeTypes
+from .constants import API_URL_BASE, ChangeTypes
 
 
 class AnkiHubClient:
