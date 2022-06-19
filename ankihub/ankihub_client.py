@@ -61,16 +61,6 @@ class AnkiHubClient:
             json=data,
             params=params,
         )
-        LOGGER.debug(
-            f"request: {method} {url}\ndata={pformat(data)}\nparams={pformat(params)}\nheaders={self._headers}"
-        )
-        LOGGER.debug(f"response status: {response.status_code}")
-        try:
-            LOGGER.debug(f"response content: {pformat(response.json())}")
-        except JSONDecodeError:
-            LOGGER.debug(f"response content: {str(response.content)}")
-        else:
-            LOGGER.debug(f"response: {response}")
         return response
 
     def login(self, credentials: dict):
