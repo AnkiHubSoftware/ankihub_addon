@@ -86,7 +86,7 @@ class AnkiHubClient:
 
     def upload_deck(self, file: Path, anki_id: int) -> Response:
         key = file.name
-        presigned_url_response = self.get_presigned_url(key=key, action="upload")
+        presigned_url_response = self._get_presigned_url(key=key, action="upload")
         if presigned_url_response.status_code != 200:
             return presigned_url_response
 
@@ -104,7 +104,7 @@ class AnkiHubClient:
         return response
 
     def download_deck(self, deck_file_name: str) -> Response:
-        presigned_url_response = self.get_presigned_url(
+        presigned_url_response = self._get_presigned_url(
             key=deck_file_name, action="download"
         )
         if presigned_url_response.status_code != 200:
@@ -240,7 +240,7 @@ class AnkiHubClient:
         )
         return response
 
-    def get_presigned_url(self, key: str, action: str) -> Response:
+    def _get_presigned_url(self, key: str, action: str) -> Response:
         """
         Get URL for s3.
         :param key: deck name
