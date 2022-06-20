@@ -47,7 +47,7 @@ class AnkiHubClient:
         prepped = request.prepare()
         return prepped
 
-    def _call_api(
+    def _send_request(
         self,
         method,
         endpoint,
@@ -66,14 +66,14 @@ class AnkiHubClient:
             )
 
     def login(self, credentials: dict) -> Response:
-        response = self._call_api("POST", "/login/", credentials)
+        response = self._send_request("POST", "/login/", credentials)
         token = response.json().get("token") if response else ""
         if token:
             self.session.headers["Authorization"] = f"Token {token}"
         return response
 
     def signout(self):
-        result = self._call_api("POST", "/logout/")
+        result = self._send_request("POST", "/logout/")
         if result and result.status_code == 204:
             self.session.headers["Authorization"] = ""
 
@@ -91,7 +91,7 @@ class AnkiHubClient:
         if s3_response.status_code != 200:
             return s3_response
 
-        response = self._call_api(
+        response = self._send_request(
             "POST", "/decks/", data={"key": key, "anki_id": anki_id}
         )
         return response
@@ -114,7 +114,7 @@ class AnkiHubClient:
         params: Params = {"since": str(since), "page": 1} if since else {"page": 1}
         has_next_page = True
         while has_next_page:
-            response = self._call_api(
+            response = self._send_request(
                 "GET",
                 f"/decks/{deck_id}/updates",
                 params=params,
@@ -128,14 +128,14 @@ class AnkiHubClient:
                 yield response
 
     def get_deck_by_id(self, deck_id: str) -> Response:
-        response = self._call_api(
+        response = self._send_request(
             "GET",
             f"/decks/{deck_id}/",
         )
         return response
 
     def get_note_by_anki_id(self, anki_id: int) -> Response:
-        response = self._call_api("GET", f"/notes/{anki_id}")
+        response = self._send_request("GET", f"/notes/{anki_id}")
         return response
 
     def create_change_note_suggestion(
@@ -153,7 +153,7 @@ class AnkiHubClient:
             "change_type": change_type.value[0],
             "comment": comment,
         }
-        response = self._call_api(
+        response = self._send_request(
             "POST",
             f"/notes/{ankihub_note_uuid}/suggestion/",
             data=suggestion,
@@ -179,7 +179,7 @@ class AnkiHubClient:
             "change_type": change_type.value[0],
             "comment": comment,
         }
-        response = self._call_api(
+        response = self._send_request(
             "POST",
             f"/decks/{ankihub_deck_uuid}/note-suggestion/",
             data=suggestion,
@@ -196,5 +196,5 @@ class AnkiHubClient:
         method = "GET"
         endpoint = "/decks/pre-signed-url"
         data = {"key": key, "type": action}
-        response = self._call_api(method, endpoint, params=data)
+        response = self._send_request(method, endpoint, params=data)
         return response
