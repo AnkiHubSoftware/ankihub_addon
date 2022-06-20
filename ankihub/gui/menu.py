@@ -103,9 +103,10 @@ class AnkiHubLogin(QWidget):
         if not all([username, password]):
             showText("Oops! You forgot to put in a username or password!")
             return
-        hooks = DEFAULT_RESPONSE_HOOKS + [sign_in_hook]
-        ankihub_client = AnkiHubClient(hooks=hooks)
+        ankihub_client = AnkiHubClient()
         try:
+            ankihub_client.signout()
+            ankihub_client.session.hooks["response"].append(sign_in_hook)
             ankihub_client.login(
                 credentials={"username": username, "password": password}
             )

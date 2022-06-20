@@ -1,3 +1,4 @@
+import json
 from json import JSONDecodeError
 from pathlib import Path
 from pprint import pformat
@@ -25,12 +26,14 @@ def show_anki_message_hook(response: Response, *args, **kwargs):
             "believe this is an error, please reach out to user support at "
             f"{USER_SUPPORT_EMAIL_SLUG}. This error will be automatically reported."
         )
+    return response
 
 
 def logging_hook(response: Response, *args, **kwargs):
     endpoint = response.request.url
     method = response.request.method
     body = response.request.body
+    body = json.loads(body) if body else body
     headers = response.request.headers
     LOGGER.debug(
         f"request: {method} {endpoint}\ndata={pformat(body)}\nheaders={headers}"
@@ -42,19 +45,22 @@ def logging_hook(response: Response, *args, **kwargs):
         LOGGER.debug(f"response content: {str(response.content)}")
     else:
         LOGGER.debug(f"response: {response}")
+    return response
 
 
 def sign_in_hook(response: Response, *args, **kwargs):
     config = Config()
     data = response.json()
     token = data.get("token")
-    username = data["credentials"]["username"]
+    body = response.request.body
+    body = json.loads(body) if body else body
+    username = body.get("username")
     if token:
         config.save_token(token)
         config.save_user_email(username)
 
 
-DEFAULT_RESPONSE_HOOKS = [show_anki_message_hook, logging_hook]
+DEFAULT_RESPONSE_HOOKS = [logging_hook, show_anki_message_hook]
 
 
 class AnkiHubClient:
@@ -101,7 +107,6 @@ class AnkiHubClient:
                 pass
 
     def login(self, credentials: dict):
-        self.signout()
         response = self._call_api("POST", "/login/", credentials)
         token = response.json().get("token")
         if token:
