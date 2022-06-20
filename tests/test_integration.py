@@ -144,6 +144,7 @@ def test_create_collaborative_deck_and_upload(
                 requests_mock.post(f"{API_URL_BASE}/decks/", status_code=201)
 
                 from ankihub.register_decks import upload_deck
+
                 upload_deck(DeckId(deck_id))
 
 
