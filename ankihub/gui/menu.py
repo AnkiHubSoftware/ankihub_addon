@@ -19,10 +19,9 @@ from aqt.qt import QAction, QMenu, qconnect
 from aqt.studydeck import StudyDeck
 from aqt.utils import askUser, showInfo, showText, tooltip
 from requests import Response
-from requests.exceptions import HTTPError
 
 from .. import LOGGER
-from ..ankihub_client import AnkiHubClient
+from ..addon_ankihub_client import AddonAnkiHubClient as AnkiHubClient
 from ..config import config
 from ..constants import CSV_DELIMITER, URL_HELP
 from ..register_decks import create_collaborative_deck, modify_note_types, process_csv
@@ -103,18 +102,14 @@ class AnkiHubLogin(QWidget):
             showText("Oops! You forgot to put in a username or password!")
             return
         ankihub_client = AnkiHubClient()
-        try:
-            ankihub_client.signout()
-            ankihub_client.login(
-                credentials={"username": username, "password": password}
-            )
-        except HTTPError as e:
-            LOGGER.debug(f"{e}")
-            showText(
-                "AnkiHub login failed.  Please make sure your username and "
-                "password are correct for AnkiHub."
-            )
+        ankihub_client.signout()
+
+        response = ankihub_client.login(
+            credentials={"username": username, "password": password}
+        )
+        if response.status_code != 200:
             return
+
         self.label_results.setText("✨ You are now logged into AnkiHub.")
 
     @classmethod

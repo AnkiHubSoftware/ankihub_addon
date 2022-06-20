@@ -10,7 +10,7 @@ from anki.notes import Note, NoteId
 from aqt import mw
 
 from . import LOGGER, constants
-from .ankihub_client import AnkiHubClient
+from .addon_ankihub_client import AddonAnkiHubClient as AnkiHubClient
 from .config import config
 
 
