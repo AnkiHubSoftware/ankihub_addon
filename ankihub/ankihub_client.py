@@ -28,14 +28,13 @@ class AnkiHubClient:
     def has_token(self) -> bool:
         return "Token" in self.session.headers.get("Authorization", "")
 
-    def _call_api_or_prep_request(
+    def _build_request(
         self,
         method,
         endpoint,
         data=None,
         params=None,
-        send_request=True,
-    ) -> Union[PreparedRequest, Response]:
+    ) -> PreparedRequest:
         url = f"{API_URL_BASE}{endpoint}"
         request = Request(
             method=method,
@@ -46,17 +45,7 @@ class AnkiHubClient:
             hooks=self.session.hooks,
         )
         prepped = request.prepare()
-        if send_request is False:
-            return prepped
-        else:
-            try:
-                response = self.session.send(prepped)
-                self.session.close()
-                return response
-            except (ConnectionError, HTTPError) as e:
-                LOGGER.debug(f"Connection error: {e}")
-                # TODO collect suggestion requests and retry later?
-                raise e
+        return prepped
 
     def _call_api(
         self,
@@ -65,11 +54,15 @@ class AnkiHubClient:
         data=None,
         params=None,
     ) -> Response:
-        result = self._call_api_or_prep_request(
-            method, endpoint, data, params, send_request=True
-        )
-        assert type(result) == Response
-        return result
+        request = self._build_request(method, endpoint, data, params)
+        try:
+            response = self.session.send(request)
+            self.session.close()
+            return response
+        except (ConnectionError, HTTPError) as e:
+            LOGGER.debug(f"Connection error: {e}")
+            # TODO collect suggestion requests and retry later?
+            raise e
 
     def login(self, credentials: dict) -> Response:
         response = self._call_api("POST", "/login/", credentials)
@@ -127,7 +120,6 @@ class AnkiHubClient:
             )
             if response.status_code == 200:
                 has_next_page = response.json()["has_next"]
-                # assert type(params["page"]) == int
                 params["page"] += 1
                 yield response
             else:
@@ -153,25 +145,6 @@ class AnkiHubClient:
         change_type: ChangeTypes,
         comment: str,
     ) -> Response:
-        result = self._create_change_note_suggestion(
-            ankihub_note_uuid=ankihub_note_uuid,
-            fields=fields,
-            tags=tags,
-            change_type=change_type,
-            comment=comment,
-        )
-        assert type(result) == Response
-        return result
-
-    def _create_change_note_suggestion(
-        self,
-        ankihub_note_uuid: str,
-        fields: List[Dict],
-        tags: List[str],
-        change_type: ChangeTypes,
-        comment: str,
-        send_request=True,
-    ) -> Union[Response, PreparedRequest]:
         suggestion = {
             "ankihub_id": ankihub_note_uuid,
             "fields": fields,
@@ -179,11 +152,10 @@ class AnkiHubClient:
             "change_type": change_type.value[0],
             "comment": comment,
         }
-        response = self._call_api_or_prep_request(
+        response = self._call_api(
             "POST",
             f"/notes/{ankihub_note_uuid}/suggestion/",
             data=suggestion,
-            send_request=send_request,
         )
         return response
 
@@ -196,32 +168,7 @@ class AnkiHubClient:
         tags: List[str],
         change_type: ChangeTypes,
         comment: str,
-        send_request=True,
     ) -> Response:
-        result = self._create_new_note_suggestion(
-            ankihub_deck_uuid=ankihub_deck_uuid,
-            ankihub_note_uuid=ankihub_note_uuid,
-            anki_id=anki_id,
-            fields=fields,
-            tags=tags,
-            change_type=change_type,
-            comment=comment,
-            send_request=True,
-        )
-        assert type(result) == Response
-        return result
-
-    def _create_new_note_suggestion(
-        self,
-        ankihub_deck_uuid: str,
-        ankihub_note_uuid: str,
-        anki_id: int,
-        fields: List[dict],
-        tags: List[str],
-        change_type: ChangeTypes,
-        comment: str,
-        send_request=True,
-    ) -> Union[Response, PreparedRequest]:
         # TODO include the note model name
         suggestion = {
             "anki_id": anki_id,
@@ -231,11 +178,10 @@ class AnkiHubClient:
             "change_type": change_type.value[0],
             "comment": comment,
         }
-        response = self._call_api_or_prep_request(
+        response = self._call_api(
             "POST",
             f"/decks/{ankihub_deck_uuid}/note-suggestion/",
             data=suggestion,
-            send_request=send_request,
         )
         return response
 
