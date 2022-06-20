@@ -11,7 +11,7 @@ from aqt import mw
 
 from . import LOGGER, constants
 from .ankihub_client import AnkiHubClient
-from .config import Config
+from .config import config
 
 
 def note_type_contains_field(
@@ -103,7 +103,6 @@ def update_or_create_note(
 
 def sync_with_ankihub():
     client = AnkiHubClient()
-    config = Config()
     decks = config.private_config.decks
     for deck in decks:
         collected_notes = []
@@ -133,6 +132,5 @@ def sync_with_ankihub():
 
 
 def sync_on_profile_open():
-    config = Config()
     if config.private_config.token:
         sync_with_ankihub()
