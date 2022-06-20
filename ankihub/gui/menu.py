@@ -209,11 +209,6 @@ class SubscribeToDeck(QWidget):
             data["apkg_filename"] if first_time_install else data["csv_notes_filename"]
         )
 
-        presigned_url_response = self.client.get_presigned_url(
-            key=deck_file_name, action="download"
-        )
-        s3_url = presigned_url_response.json()["pre_signed_url"]
-
         def on_download_done(future: Future):
             s3_response = future.result()
             LOGGER.debug(f"{s3_response.url}")
@@ -240,7 +235,7 @@ class SubscribeToDeck(QWidget):
             self.close()
 
         mw.taskman.with_progress(
-            lambda: requests.get(s3_url),
+            lambda: self.client.download_deck(deck_file_name),
             on_done=on_download_done,
             parent=self,
             label="Downloading deck",

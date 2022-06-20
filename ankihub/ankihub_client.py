@@ -100,6 +100,16 @@ class AnkiHubClient:
         )
         return response
 
+    def download_deck(self, deck_file_name: str) -> Response:
+        presigned_url_response = self.get_presigned_url(
+            key=deck_file_name, action="download"
+        )
+        if presigned_url_response.status_code != 200:
+            return presigned_url_response
+
+        s3_url = presigned_url_response.json()["pre_signed_url"]
+        return requests.get(s3_url)
+
     def get_deck_updates(self, deck_id: str, since: float) -> Iterator[Response]:
         class Params(TypedDict, total=False):
             page: int
