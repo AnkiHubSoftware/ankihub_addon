@@ -20,7 +20,7 @@ from ..ankihub_client import AnkiHubClient
 from ..config import Config
 from ..register_decks import create_collaborative_deck
 from ..utils import sync_with_ankihub
-from .decks import SubscribeToDeck
+from .decks import SubscribedDecksDialog
 
 
 def main_menu_setup():
@@ -200,8 +200,8 @@ def upload_suggestions_setup(parent):
 
 def subscribe_to_deck_setup(parent):
     """Set up the menu item for uploading suggestions in bulk."""
-    q_action = QAction("📚 Subscribe to a Deck", mw)
-    q_action.triggered.connect(SubscribeToDeck.display_subscribe_window)
+    q_action = QAction("📚 Subscribed Decks", mw)
+    q_action.triggered.connect(SubscribedDecksDialog.display_subscribe_window)
     parent.addAction(q_action)
 
 

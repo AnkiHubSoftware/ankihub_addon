@@ -79,3 +79,7 @@ class Config:
         # remove duplicates
         self.save_last_sync()
         self._update_private_config()
+
+    def unsubscribe_deck(self, ankihub_did: str) -> None:
+        self.private_config.decks.pop(ankihub_did)
+        self._update_private_config()

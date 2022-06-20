@@ -3,7 +3,7 @@ import tempfile
 import requests
 from concurrent.futures import Future
 from pathlib import Path
-from aqt import mw
+from aqt import QPushButton, mw
 from aqt.utils import askUser, showText, tooltip, openLink
 from aqt.qt import (
     QHBoxLayout,
@@ -13,18 +13,155 @@ from aqt.qt import (
     QVBoxLayout,
     QDialog,
     QDialogButtonBox,
+    QListWidget,
+    QListWidgetItem,
+    Qt,
 )
 
 from .. import LOGGER
 from ..ankihub_client import AnkiHubClient
 from ..config import Config
-from ..constants import CSV_DELIMITER, URL_HELP, URL_DECKS
+from ..constants import CSV_DELIMITER, URL_HELP, URL_DECKS, URL_DECK_BASE
 from ..register_decks import modify_note_types, process_csv
 
 
-class SubscribeToDeck(QDialog):
+class SubscribedDecksDialog(QDialog):
     def __init__(self):
-        super(SubscribeToDeck, self).__init__()
+        super(SubscribedDecksDialog, self).__init__()
+        self.config = Config()
+        self.client = AnkiHubClient()
+        self.setWindowTitle("Subscribed AnkiHub Decks")
+
+        self.setup_ui()
+        self.on_item_selection_changed()
+        self.refresh_decks_list()
+
+        if not self.client.token:
+            showText("Oops! Please make sure you are logged into AnkiHub!")
+            self.close()
+        else:
+            self.show()
+
+    def setup_ui(self):
+        self.box_top = QVBoxLayout()
+        self.box_above = QHBoxLayout()
+        self.box_right = QVBoxLayout()
+
+        self.decks_list = QListWidget()
+        self.decks_list.itemSelectionChanged.connect(self.on_item_selection_changed)
+
+        self.add_btn = QPushButton("Add")
+        self.unsubscrive_btn = QPushButton("Unsubscribe")
+        self.delete_btn = QPushButton("Delete")
+        self.open_web_btn = QPushButton("Open on AnkiHub")
+        self.add_btn.clicked.connect(self.on_add)
+        self.unsubscrive_btn.clicked.connect(self.on_unsubscribe)
+        self.delete_btn.clicked.connect(self.on_delete)
+        self.open_web_btn.clicked.connect(self.on_open_web)
+        self.box_right.addWidget(self.add_btn)
+        self.box_right.addWidget(self.unsubscrive_btn)
+        self.box_right.addWidget(self.delete_btn)
+        self.box_right.addWidget(self.open_web_btn)
+        self.box_right.addStretch(1)
+
+        self.setLayout(self.box_top)
+        self.box_top.addLayout(self.box_above)
+        self.box_above.addWidget(self.decks_list)
+        self.box_above.addLayout(self.box_right)
+
+    def refresh_decks_list(self) -> None:
+        self.decks_list.clear()
+        decks = self.config.private_config.decks
+        for ankihub_id in decks:
+            anki_id = decks[ankihub_id]["anki_id"]
+            deck = mw.col.decks.get(anki_id, default=False)
+            name = deck["name"] if deck is not None else ankihub_id
+            item = QListWidgetItem(name)
+            item.setData(Qt.ItemDataRole.UserRole, ankihub_id)
+            self.decks_list.addItem(item)
+
+    def on_add(self) -> None:
+        SubscribeDialog().exec()
+        # TODO: This needs to be called after import is completely finished
+        self.refresh_decks_list()
+
+    def on_unsubscribe(self) -> None:
+        items = self.decks_list.selectedItems()
+        if len(items) == 0:
+            return
+        deck_names = [item.text() for item in items]
+        deck_names_text = ", ".join(deck_names)
+        confirm = askUser(
+            f"Unsubscribe from deck {deck_names_text}?\n\n"
+            "The deck will remain in your collection, but it will no longer sync with AnkiHub.",
+            title="Unsubscribe AnkiHub Deck",
+        )
+        if not confirm:
+            return
+
+        for item in items:
+            ankihub_id = item.data(Qt.ItemDataRole.UserRole)
+            self.config.unsubscribe_deck(ankihub_id)
+
+        tooltip("Unsubscribed from AnkiHub Deck.")
+        self.refresh_decks_list()
+
+    def on_delete(self) -> None:
+        items = self.decks_list.selectedItems()
+        if len(items) == 0:
+            return
+        deck_names = [item.text() for item in items]
+        deck_names_text = ", ".join(deck_names)
+        confirm = askUser(
+            f"Delete AnkiHub deck {deck_names_text}?", title="Delete AnkiHub Deck"
+        )
+        if not confirm:
+            return
+
+        for item in items:
+            ankihub_id = item.data(Qt.ItemDataRole.UserRole)
+            anki_id = self.config.private_config.decks[ankihub_id]["anki_id"]
+            # This check can be removed if anki_id is made to exist always
+            if mw.col.decks.get(anki_id, default=False) is not None:
+                mw.col.decks.remove([anki_id])
+            self.config.unsubscribe_deck(ankihub_id)
+
+        tooltip("Deleted AnkiHub Deck.")
+        self.refresh_decks_list()
+
+    def on_open_web(self) -> None:
+        items = self.decks_list.selectedItems()
+        if len(items) == 0:
+            return
+        for item in items:
+            ankihub_id = item.data(Qt.ItemDataRole.UserRole)
+            openLink(f"{URL_DECK_BASE}/{ankihub_id}")
+
+    def on_item_selection_changed(self) -> None:
+        selection = self.decks_list.selectedItems()
+        isSelected: bool = len(selection) > 0
+        self.unsubscrive_btn.setEnabled(isSelected)
+        self.open_web_btn.setEnabled(isSelected)
+
+        enable_delete_btn = False
+        for item in selection:
+            ankihub_id = item.data(Qt.ItemDataRole.UserRole)
+            anki_id = self.config.private_config.decks[ankihub_id]["anki_id"]
+            if mw.col.decks.get(anki_id, default=False) is not None:
+                enable_delete_btn = True
+                break
+        self.delete_btn.setEnabled(enable_delete_btn)
+
+    @classmethod
+    def display_subscribe_window(cls):
+        global __window
+        __window = cls()
+        return __window
+
+
+class SubscribeDialog(QDialog):
+    def __init__(self):
+        super(SubscribeDialog, self).__init__()
         self.results = None
         self.thread = None
         self.box_top = QVBoxLayout()
@@ -190,9 +327,3 @@ class SubscribeToDeck(QDialog):
 
     def on_browse_deck(self) -> None:
         openLink(URL_DECKS)
-
-    @classmethod
-    def display_subscribe_window(cls):
-        global __window
-        __window = cls()
-        return __window
