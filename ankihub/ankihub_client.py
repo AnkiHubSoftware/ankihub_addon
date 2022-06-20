@@ -1,68 +1,15 @@
-import json
-from json import JSONDecodeError
 from pathlib import Path
 from pprint import pformat
 from typing import Dict, Iterator, List, TypedDict, Union
 
 import requests
-from aqt.utils import showText
 from requests import PreparedRequest, Request, Response, Session
 from requests.exceptions import ConnectionError
 from urllib3.exceptions import HTTPError
 
 from . import LOGGER
 from .config import config
-from .constants import API_URL_BASE, USER_SUPPORT_EMAIL_SLUG, ChangeTypes
-
-
-def show_anki_message_hook(response: Response, *args, **kwargs):
-    endpoint = response.request.url
-    if response.status_code > 299 and "/logout/" not in endpoint:
-        showText(
-            "Uh oh! There was a problem with your request.\n\n"
-            "If you haven't already signed in using the AnkiHub menu please do so. "
-            "Make sure your username and password are correct and that you have "
-            "confirmed your AnkiHub account through email verification. If you "
-            "believe this is an error, please reach out to user support at "
-            f"{USER_SUPPORT_EMAIL_SLUG}. This error will be automatically reported."
-        )
-    return response
-
-
-def logging_hook(response: Response, *args, **kwargs):
-    endpoint = response.request.url
-    method = response.request.method
-    body = response.request.body
-    body = json.loads(body) if body else body
-    headers = response.request.headers
-    LOGGER.debug(
-        f"request: {method} {endpoint}\ndata={pformat(body)}\nheaders={headers}"
-    )
-    LOGGER.debug(f"response status: {response.status_code}")
-    try:
-        LOGGER.debug(f"response content: {pformat(response.json())}")
-    except JSONDecodeError:
-        LOGGER.debug(f"response content: {str(response.content)}")
-    else:
-        LOGGER.debug(f"response: {response}")
-    return response
-
-
-def sign_in_hook(response: Response, *args, **kwargs):
-    if "/login/" not in response.url or response.status_code != 200:
-        return
-
-    data = response.json()
-    token = data.get("token")
-    body = response.request.body
-    body = json.loads(body) if body else body
-    username = body.get("username")
-    if token:
-        config.save_token(token)
-        config.save_user_email(username)
-
-
-DEFAULT_RESPONSE_HOOKS = [logging_hook, show_anki_message_hook, sign_in_hook]
+from .constants import API_URL_BASE, ChangeTypes
 
 
 class AnkiHubClient:
@@ -70,7 +17,7 @@ class AnkiHubClient:
 
     def __init__(self, send_request=True, hooks=None):
         if hooks is None:
-            self.hooks = DEFAULT_RESPONSE_HOOKS
+            self.hooks = []
         else:
             self.hooks = hooks
 
@@ -107,7 +54,7 @@ class AnkiHubClient:
                 # TODO collect suggestion requests and retry later?
                 pass
 
-    def login(self, credentials: dict):
+    def login(self, credentials: dict) -> Response:
         response = self._call_api("POST", "/login/", credentials)
         token = response.json().get("token")
         if token:

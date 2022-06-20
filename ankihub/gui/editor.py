@@ -6,7 +6,7 @@ from aqt.editor import Editor
 from aqt.utils import chooseList, showText, tooltip
 
 from .. import LOGGER
-from ..ankihub_client import AnkiHubClient
+from ..addon_ankihub_client import AddonAnkiHubClient as AnkiHubClient
 from ..config import config
 from ..constants import ICONS_PATH, AnkiHubCommands
 from .suggestion_dialog import SuggestionDialog
