@@ -1,5 +1,5 @@
 from pathlib import Path
-from typing import Dict, Iterator, List, TypedDict, Union
+from typing import Dict, Iterator, List, TypedDict
 
 import requests
 from requests import PreparedRequest, Request, Response, Session
