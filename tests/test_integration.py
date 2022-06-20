@@ -2,7 +2,7 @@ import copy
 import pathlib
 import uuid
 from datetime import datetime, timedelta, timezone
-from unittest.mock import MagicMock, Mock, patch
+from unittest.mock import MagicMock, Mock
 
 from anki.decks import DeckId
 from anki.models import NotetypeId
@@ -150,11 +150,8 @@ def test_create_collaborative_deck_and_upload(
 
 
 def test_client_login_and_signout(anki_session_with_addon: AnkiSession, requests_mock):
-    from ankihub.addon_ankihub_client import (
-        AddonAnkiHubClient as AnkiHubClient,
-        sign_in_hook,
-        sign_out_hook,
-    )
+    from ankihub.addon_ankihub_client import AddonAnkiHubClient as AnkiHubClient
+    from ankihub.addon_ankihub_client import sign_in_hook, sign_out_hook
     from ankihub.config import config
     from ankihub.constants import API_URL_BASE
 
