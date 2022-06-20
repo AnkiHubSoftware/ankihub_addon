@@ -150,11 +150,11 @@ def test_create_collaborative_deck_and_upload(
 
 
 def test_client_login_and_signout(anki_session_with_addon: AnkiSession, requests_mock):
-    from ankihub.ankihub_client import AnkiHubClient, sign_in_hook
+    from ankihub.ankihub_client import AnkiHubClient
     from ankihub.config import config
     from ankihub.constants import API_URL_BASE
 
-    client = AnkiHubClient(hooks=[sign_in_hook])
+    client = AnkiHubClient()
     credentials_data = {"username": "test", "password": "testpassword"}
     requests_mock.post(f"{API_URL_BASE}/login/", json={"token": "f4k3t0k3n"})
     requests_mock.post(
