@@ -58,8 +58,26 @@ def sign_in_hook(response: Response, *args, **kwargs):
         config.save_user_email(username)
 
 
+def sign_out_hook(response: Response, *args, **kwargs):
+    if "/logout/" not in response.url or response.status_code != 204:
+        return
+
+    config.save_token("")
+    LOGGER.debug("Token cleared from config.")
+
+
+DEFAULT_RESPONSE_HOOKS = [
+    logging_hook,
+    show_anki_message_hook,
+    sign_in_hook,
+    sign_out_hook,
+]
+
+
 class AddonAnkiHubClient(AnkiHubClient):
-    def __init__(self, send_request=True) -> None:
+    def __init__(self, send_request=True, hooks=None) -> None:
         super().__init__(
-            send_request, hooks=[logging_hook, show_anki_message_hook, sign_in_hook]
+            send_request,
+            hooks=hooks if hooks is not None else DEFAULT_RESPONSE_HOOKS,
+            token=config.private_config.token,
         )

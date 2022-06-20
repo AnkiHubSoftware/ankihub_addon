@@ -8,14 +8,13 @@ from requests.exceptions import ConnectionError
 from urllib3.exceptions import HTTPError
 
 from . import LOGGER
-from .config import config
 from .constants import API_URL_BASE, ChangeTypes
 
 
 class AnkiHubClient:
     """Client for interacting with the AnkiHub API."""
 
-    def __init__(self, send_request=True, hooks=None):
+    def __init__(self, send_request=True, hooks=None, token=None):
         if hooks is None:
             self.hooks = []
         else:
@@ -25,9 +24,8 @@ class AnkiHubClient:
         self.session = Session()
         self.session.hooks["response"] = self.hooks
         self.session.headers.update({"Content-Type": "application/json"})
-        self.token = config.private_config.token
-        if self.token:
-            self.session.headers["Authorization"] = f"Token {self.token}"
+        if token:
+            self.session.headers["Authorization"] = f"Token {token}"
 
     def _call_api(
         self, method, endpoint, data=None, params=None
@@ -64,9 +62,7 @@ class AnkiHubClient:
     def signout(self):
         result = self._call_api("POST", "/logout/")
         if isinstance(result, Response) and result.status_code == 204:
-            config.save_token("")
             self.session.headers["Authorization"] = ""
-            LOGGER.debug("Token cleared from config.")
 
     def upload_deck(self, file: Path, anki_id: int) -> Response:
         key = file.name
@@ -84,18 +80,12 @@ class AnkiHubClient:
         )
         return response
 
-    def get_deck_updates(self, deck_id: str) -> Iterator[Response]:
-        since = config.private_config.last_sync
-
+    def get_deck_updates(self, deck_id: str, since: float) -> Iterator[Response]:
         class Params(TypedDict, total=False):
             page: int
             since: str
 
-        params: Params = (
-            {"since": f"{config.private_config.last_sync}", "page": 1}
-            if since
-            else {"page": 1}
-        )
+        params: Params = {"since": str(since), "page": 1} if since else {"page": 1}
         has_next_page = True
         while has_next_page:
             response = self._call_api(
