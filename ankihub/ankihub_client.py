@@ -140,6 +140,24 @@ class AnkiHubClient:
         tags: List[str],
         change_type: ChangeTypes,
         comment: str,
+    ) -> Response:
+        result = self._create_change_note_suggestion(
+            ankihub_note_uuid=ankihub_note_uuid,
+            fields=fields,
+            tags=tags,
+            change_type=change_type,
+            comment=comment,
+        )
+        assert type(result) == Response
+        return result
+
+    def _create_change_note_suggestion(
+        self,
+        ankihub_note_uuid: str,
+        fields: List[Dict],
+        tags: List[str],
+        change_type: ChangeTypes,
+        comment: str,
         send_request=True,
     ) -> Union[Response, PreparedRequest]:
         suggestion = {
@@ -158,6 +176,30 @@ class AnkiHubClient:
         return response
 
     def create_new_note_suggestion(
+        self,
+        ankihub_deck_uuid: str,
+        ankihub_note_uuid: str,
+        anki_id: int,
+        fields: List[dict],
+        tags: List[str],
+        change_type: ChangeTypes,
+        comment: str,
+        send_request=True,
+    ) -> Response:
+        result = self._create_new_note_suggestion(
+            ankihub_deck_uuid=ankihub_deck_uuid,
+            ankihub_note_uuid=ankihub_note_uuid,
+            anki_id=anki_id,
+            fields=fields,
+            tags=tags,
+            change_type=change_type,
+            comment=comment,
+            send_request=True,
+        )
+        assert type(result) == Response
+        return result
+
+    def _create_new_note_suggestion(
         self,
         ankihub_deck_uuid: str,
         ankihub_note_uuid: str,
