@@ -22,8 +22,8 @@ from requests import Response
 from requests.exceptions import HTTPError
 
 from .. import LOGGER
-from ..ankihub_client import AnkiHubClient, sign_in_hook, DEFAULT_RESPONSE_HOOKS
-from ..config import Config
+from ..ankihub_client import DEFAULT_RESPONSE_HOOKS, AnkiHubClient, sign_in_hook
+from ..config import config
 from ..constants import CSV_DELIMITER, URL_HELP
 from ..register_decks import create_collaborative_deck, modify_note_types, process_csv
 from ..utils import sync_with_ankihub
@@ -92,8 +92,7 @@ class AnkiHubLogin(QWidget):
         self.setMinimumWidth(500)
         self.setSizePolicy(QSizePolicy.Policy.Minimum, QSizePolicy.Policy.Minimum)
         self.setWindowTitle("Login to AnkiHub.")
-        self.config = Config()
-        if self.config.private_config.token:
+        if config.private_config.token:
             self.label_results.setText("✨ You are logged into AnkiHub.")
         self.show()
 
@@ -168,7 +167,6 @@ class SubscribeToDeck(QWidget):
         self.setSizePolicy(QSizePolicy.Policy.Minimum, QSizePolicy.Policy.Minimum)
         self.setWindowTitle("Subscribe to Collaborative Deck")
 
-        self.config = Config()
         self.client = AnkiHubClient()
         if not self.client.token:
             showText("Oops! Please make sure you are logged into AnkiHub!")
@@ -178,7 +176,7 @@ class SubscribeToDeck(QWidget):
 
     def subscribe(self):
         ankihub_did = self.deck_id_box_text.text()
-        if ankihub_did in self.config.private_config.decks.keys():
+        if ankihub_did in config.private_config.decks.keys():
             showText(
                 f"You've already subscribed to deck {ankihub_did}. "
                 "Syncing with AnkiHub will happen automatically everytime you "
@@ -264,7 +262,7 @@ class SubscribeToDeck(QWidget):
         elif deck_file.suffix == ".csv":
             self._install_deck_csv(deck_file)
 
-        self.config.save_subscription(ankihub_did, anki_did)
+        config.save_subscription(ankihub_did, anki_did)
         tooltip("The deck has successfully been installed!")
 
     def _install_deck_apkg(self, deck_file: Path):
@@ -331,7 +329,6 @@ def create_collaborative_deck_action() -> None:
         if response.status_code == 201:
             msg = "🎉 Deck upload successful!"
 
-            config = Config()
             data = response.json()
             anki_did = mw.col.decks.id_for_name(deck_name)
             ankihub_did = data["deck_id"]

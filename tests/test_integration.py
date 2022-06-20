@@ -145,15 +145,13 @@ def test_create_collaborative_deck_and_upload(
 
                 from ankihub.register_decks import upload_deck
 
-                with patch("ankihub.ankihub_client.Config"):
-                    monkeypatch.setattr(
-                        "ankihub.ankihub_client.requests", requests_mock
-                    )
-                    upload_deck(DeckId(deck_id))
+                monkeypatch.setattr("ankihub.ankihub_client.requests", requests_mock)
+                upload_deck(DeckId(deck_id))
 
 
 def test_client_login_and_signout(anki_session_with_addon: AnkiSession, requests_mock):
     from ankihub.ankihub_client import AnkiHubClient, sign_in_hook
+    from ankihub.config import config
     from ankihub.constants import API_URL_BASE
 
     client = AnkiHubClient(hooks=[sign_in_hook])
@@ -164,12 +162,12 @@ def test_client_login_and_signout(anki_session_with_addon: AnkiSession, requests
     )
     client.login(credentials=credentials_data)
     assert client.session.headers["Authorization"] == "Token f4k3t0k3n"
-    assert client._config.private_config.token == "Token f4k3t0k3n"
+    assert config.private_config.token == "f4k3t0k3n"
 
     # test signout
     client.signout()
     assert client.session.headers["Authorization"] == ""
-    assert client._config.private_config.token == ""
+    assert config.private_config.token == ""
 
 
 def test_upload_deck(anki_session_with_addon: AnkiSession, requests_mock, monkeypatch):

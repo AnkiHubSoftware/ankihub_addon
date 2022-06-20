@@ -79,3 +79,6 @@ class Config:
         # remove duplicates
         self.save_last_sync()
         self._update_private_config()
+
+
+config = Config()

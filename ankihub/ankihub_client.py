@@ -2,17 +2,17 @@ import json
 from json import JSONDecodeError
 from pathlib import Path
 from pprint import pformat
-from typing import Dict, List, Iterator, TypedDict, Union
+from typing import Dict, Iterator, List, TypedDict, Union
 
 import requests
 from aqt.utils import showText
+from requests import PreparedRequest, Request, Response, Session
 from requests.exceptions import ConnectionError
-from requests import Request, Response, Session, PreparedRequest
 from urllib3.exceptions import HTTPError
 
 from . import LOGGER
-from .config import Config
-from .constants import API_URL_BASE, ChangeTypes, USER_SUPPORT_EMAIL_SLUG
+from .config import config
+from .constants import API_URL_BASE, USER_SUPPORT_EMAIL_SLUG, ChangeTypes
 
 
 def show_anki_message_hook(response: Response, *args, **kwargs):
@@ -49,7 +49,6 @@ def logging_hook(response: Response, *args, **kwargs):
 
 
 def sign_in_hook(response: Response, *args, **kwargs):
-    config = Config()
     data = response.json()
     token = data.get("token")
     body = response.request.body
@@ -76,8 +75,7 @@ class AnkiHubClient:
         self.session = Session()
         self.session.hooks["response"] = self.hooks
         self.session.headers.update({"Content-Type": "application/json"})
-        self._config = Config()
-        self.token = self._config.private_config.token
+        self.token = config.private_config.token
         if self.token:
             self.session.headers["Authorization"] = f"Token {self.token}"
 
@@ -116,7 +114,7 @@ class AnkiHubClient:
     def signout(self):
         result = self._call_api("POST", "/logout/")
         if isinstance(result, Response) and result.status_code == 204:
-            self._config.save_token("")
+            config.save_token("")
             self.session.headers["Authorization"] = ""
             LOGGER.debug("Token cleared from config.")
 
@@ -137,14 +135,14 @@ class AnkiHubClient:
         return response
 
     def get_deck_updates(self, deck_id: str) -> Iterator[Response]:
-        since = self._config.private_config.last_sync
+        since = config.private_config.last_sync
 
         class Params(TypedDict, total=False):
             page: int
             since: str
 
         params: Params = (
-            {"since": f"{self._config.private_config.last_sync}", "page": 1}
+            {"since": f"{config.private_config.last_sync}", "page": 1}
             if since
             else {"page": 1}
         )
