@@ -11,6 +11,7 @@ API_URL_BASE = API_URL_BASE if API_URL_BASE else "https://app.ankihub.net/api"
 LOGGER.debug(f"Starting with URL_BASE {API_URL_BASE}")
 URL_VIEW_NOTE = f"{ANKIHUB_SITE_URL}/notes/"
 URL_HELP = f"{ANKIHUB_SITE_URL}/help"
+URL_DECKS = f"{ANKIHUB_SITE_URL}/explore"
 ANKIHUB_NOTE_TYPE_FIELD_NAME = "ankihub_id"
 ANKIHUB_NOTE_TYPE_MODIFICATION_STRING = "ANKIHUB MODFICATIONS"
 ADDON_PATH = pathlib.Path(__file__).parent.absolute()
