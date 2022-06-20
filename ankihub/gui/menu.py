@@ -162,7 +162,7 @@ class SubscribeToDeck(QWidget):
         self.setWindowTitle("Subscribe to Collaborative Deck")
 
         self.client = AnkiHubClient()
-        if not self.client.token:
+        if not self.client.has_token():
             showText("Oops! Please make sure you are logged into AnkiHub!")
             self.close()
         else:

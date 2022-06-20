@@ -26,6 +26,9 @@ class AnkiHubClient:
         if token:
             self.session.headers["Authorization"] = f"Token {token}"
 
+    def has_token(self) -> bool:
+        return "Token" in self.session.headers.get("Authorization", "")
+
     def _call_api_or_prep_request(
         self,
         method,
