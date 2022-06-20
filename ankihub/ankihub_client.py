@@ -61,19 +61,20 @@ class AnkiHubClient:
             return response
         except (ConnectionError, HTTPError) as e:
             LOGGER.debug(f"Connection error: {e}")
-            # TODO collect suggestion requests and retry later?
-            raise e
+            raise ConnectionError(
+                "The AnkiHub add-on was unable to connect to the internet."
+            )
 
     def login(self, credentials: dict) -> Response:
         response = self._call_api("POST", "/login/", credentials)
-        token = response.json().get("token")
+        token = response.json().get("token") if response else ""
         if token:
             self.session.headers["Authorization"] = f"Token {token}"
         return response
 
     def signout(self):
         result = self._call_api("POST", "/logout/")
-        if result.status_code == 204:
+        if result and result.status_code == 204:
             self.session.headers["Authorization"] = ""
 
     def upload_deck(self, file: Path, anki_id: int) -> Response:

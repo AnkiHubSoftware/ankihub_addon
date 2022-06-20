@@ -106,7 +106,7 @@ class AnkiHubLogin(QWidget):
         response = ankihub_client.login(
             credentials={"username": username, "password": password}
         )
-        if response.status_code != 200:
+        if not response or response.status_code != 200:
             return
 
         self.label_results.setText("✨ You are now logged into AnkiHub.")

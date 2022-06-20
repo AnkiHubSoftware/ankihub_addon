@@ -1,4 +1,5 @@
 from typing import Dict, List
+from urllib.error import HTTPError
 
 import anki
 import aqt
@@ -8,6 +9,7 @@ from anki.errors import NotFoundError
 from anki.models import NoteType, NotetypeId
 from anki.notes import Note, NoteId
 from aqt import mw
+from requests.exceptions import ConnectionError
 
 from . import LOGGER, constants
 from .addon_ankihub_client import AddonAnkiHubClient as AnkiHubClient
@@ -137,4 +139,9 @@ def sync_with_ankihub():
 
 def sync_on_profile_open():
     if config.private_config.token:
-        sync_with_ankihub()
+        try:
+            # Don't raise exception when automatically attempting to sync with AnkiHub
+            # with no Internet connection.
+            sync_with_ankihub()
+        except (ConnectionError, HTTPError):
+            pass
