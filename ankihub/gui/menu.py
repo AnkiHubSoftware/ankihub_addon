@@ -3,7 +3,6 @@ import tempfile
 from concurrent.futures import Future
 from pathlib import Path
 
-import requests
 from aqt import (
     QHBoxLayout,
     QLabel,
@@ -19,11 +18,10 @@ from aqt.qt import QAction, QMenu, qconnect
 from aqt.studydeck import StudyDeck
 from aqt.utils import askUser, showInfo, showText, tooltip
 from requests import Response
-from requests.exceptions import HTTPError
 
 from .. import LOGGER
-from ..ankihub_client import AnkiHubClient
-from ..config import Config
+from ..addon_ankihub_client import AddonAnkiHubClient as AnkiHubClient
+from ..config import config
 from ..constants import CSV_DELIMITER, URL_HELP
 from ..register_decks import create_collaborative_deck, modify_note_types, process_csv
 from ..utils import sync_with_ankihub
@@ -92,7 +90,6 @@ class AnkiHubLogin(QWidget):
         self.setMinimumWidth(500)
         self.setSizePolicy(QSizePolicy.Policy.Minimum, QSizePolicy.Policy.Minimum)
         self.setWindowTitle("Login to AnkiHub.")
-        config = Config()
         if config.private_config.token:
             self.label_results.setText("✨ You are logged into AnkiHub.")
         self.show()
@@ -104,17 +101,14 @@ class AnkiHubLogin(QWidget):
             showText("Oops! You forgot to put in a username or password!")
             return
         ankihub_client = AnkiHubClient()
-        try:
-            ankihub_client.login(
-                credentials={"username": username, "password": password}
-            )
-        except HTTPError as e:
-            LOGGER.debug(f"{e}")
-            showText(
-                "AnkiHub login failed.  Please make sure your username and "
-                "password are correct for AnkiHub."
-            )
+        ankihub_client.signout()
+
+        response = ankihub_client.login(
+            credentials={"username": username, "password": password}
+        )
+        if not response or response.status_code != 200:
             return
+
         self.label_results.setText("✨ You are now logged into AnkiHub.")
 
     @classmethod
@@ -166,9 +160,8 @@ class SubscribeToDeck(QWidget):
         self.setSizePolicy(QSizePolicy.Policy.Minimum, QSizePolicy.Policy.Minimum)
         self.setWindowTitle("Subscribe to Collaborative Deck")
 
-        self.config = Config()
         self.client = AnkiHubClient()
-        if not self.client.token:
+        if not self.client.has_token():
             showText("Oops! Please make sure you are logged into AnkiHub!")
             self.close()
         else:
@@ -176,7 +169,7 @@ class SubscribeToDeck(QWidget):
 
     def subscribe(self):
         ankihub_did = self.deck_id_box_text.text()
-        if ankihub_did in self.config.private_config.decks.keys():
+        if ankihub_did in config.private_config.decks.keys():
             showText(
                 f"You've already subscribed to deck {ankihub_did}. "
                 "Syncing with AnkiHub will happen automatically everytime you "
@@ -208,6 +201,9 @@ class SubscribeToDeck(QWidget):
             self.label_results.setText(self.instructions_label)
             return
 
+        if deck_response.status_code != 200:
+            return
+
         data = deck_response.json()
         local_deck_ids = {deck.id for deck in mw.col.decks.all_names_and_ids()}
         first_time_install = data["anki_id"] not in local_deck_ids
@@ -215,19 +211,15 @@ class SubscribeToDeck(QWidget):
             data["apkg_filename"] if first_time_install else data["csv_notes_filename"]
         )
 
-        presigned_url_response = self.client.get_presigned_url(
-            key=deck_file_name, action="download"
-        )
-        s3_url = presigned_url_response.json()["pre_signed_url"]
-
         def on_download_done(future: Future):
-            s3_response = future.result()
-            LOGGER.debug(f"{s3_response.url}")
-            LOGGER.debug(f"{s3_response.status_code}")
+            response = future.result()
+            if response.status_code != 200:
+                return
+
             # TODO Use io.BytesIO
             out_file = Path(tempfile.mkdtemp()) / f"{deck_file_name}"
             with out_file.open("wb") as f:
-                f.write(s3_response.content)
+                f.write(response.content)
                 LOGGER.debug(f"Wrote {deck_file_name} to {out_file}")
                 # TODO Validate .csv
             self.label_results.setText("Deck download successful!")
@@ -246,7 +238,7 @@ class SubscribeToDeck(QWidget):
             self.close()
 
         mw.taskman.with_progress(
-            lambda: requests.get(s3_url),
+            lambda: self.client.download_deck(deck_file_name),
             on_done=on_download_done,
             parent=self,
             label="Downloading deck",
@@ -262,7 +254,7 @@ class SubscribeToDeck(QWidget):
         elif deck_file.suffix == ".csv":
             self._install_deck_csv(deck_file)
 
-        self.config.save_subscription(ankihub_did, anki_did)
+        config.save_subscription(ankihub_did, anki_did)
         tooltip("The deck has successfully been installed!")
 
     def _install_deck_apkg(self, deck_file: Path):
@@ -329,7 +321,6 @@ def create_collaborative_deck_action() -> None:
         if response.status_code == 201:
             msg = "🎉 Deck upload successful!"
 
-            config = Config()
             data = response.json()
             anki_did = mw.col.decks.id_for_name(deck_name)
             ankihub_did = data["deck_id"]

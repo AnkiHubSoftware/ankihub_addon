@@ -17,7 +17,7 @@ from aqt import mw
 from requests import Response
 
 from . import LOGGER, constants
-from .ankihub_client import AnkiHubClient
+from .addon_ankihub_client import AddonAnkiHubClient as AnkiHubClient
 from .constants import (
     ANKIHUB_NOTE_TYPE_FIELD_NAME,
     ANKIHUB_NOTE_TYPE_MODIFICATION_STRING,

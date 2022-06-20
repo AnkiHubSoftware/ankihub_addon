@@ -6,8 +6,8 @@ from aqt.editor import Editor
 from aqt.utils import chooseList, showText, tooltip
 
 from .. import LOGGER
-from ..ankihub_client import AnkiHubClient
-from ..config import Config
+from ..addon_ankihub_client import AddonAnkiHubClient as AnkiHubClient
+from ..config import config
 from ..constants import ICONS_PATH, AnkiHubCommands
 from .suggestion_dialog import SuggestionDialog
 
@@ -53,7 +53,7 @@ def on_ankihub_button_press(editor: Editor):
             tooltip("Submitted change note suggestion to AnkiHub.")
             return response.json()
     elif command == AnkiHubCommands.NEW.value:
-        subscribed_decks = client._config.private_config.decks
+        subscribed_decks = config.private_config.decks
         if len(subscribed_decks) == 0:
             showText(
                 "You aren't currently subscribed to any AnkiHub decks. "
@@ -87,8 +87,8 @@ def on_ankihub_button_press(editor: Editor):
 def setup_editor_buttons(buttons, editor: Editor):
     """Add buttons to Editor."""
     # TODO Figure out how to test this
-    config = Config().public_config
-    HOTKEY = config["hotkey"]
+    public_config = config.public_config
+    HOTKEY = public_config["hotkey"]
     img = str(ICONS_PATH / "ankihub_button.png")
     button = editor.addButton(
         img,
