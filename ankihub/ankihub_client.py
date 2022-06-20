@@ -80,8 +80,8 @@ class AnkiHubClient:
         return response
 
     def signout(self):
-        result = self._call_api_or_prep_request("POST", "/logout/")
-        if isinstance(result, Response) and result.status_code == 204:
+        result = self._call_api("POST", "/logout/")
+        if result.status_code == 204:
             self.session.headers["Authorization"] = ""
 
     def upload_deck(self, file: Path, anki_id: int) -> Response:
