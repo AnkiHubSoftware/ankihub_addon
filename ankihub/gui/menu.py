@@ -22,7 +22,7 @@ from requests import Response
 from requests.exceptions import HTTPError
 
 from .. import LOGGER
-from ..ankihub_client import DEFAULT_RESPONSE_HOOKS, AnkiHubClient, sign_in_hook
+from ..ankihub_client import AnkiHubClient
 from ..config import config
 from ..constants import CSV_DELIMITER, URL_HELP
 from ..register_decks import create_collaborative_deck, modify_note_types, process_csv
@@ -105,7 +105,6 @@ class AnkiHubLogin(QWidget):
         ankihub_client = AnkiHubClient()
         try:
             ankihub_client.signout()
-            ankihub_client.session.hooks["response"].append(sign_in_hook)
             ankihub_client.login(
                 credentials={"username": username, "password": password}
             )

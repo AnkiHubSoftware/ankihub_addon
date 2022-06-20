@@ -49,6 +49,9 @@ def logging_hook(response: Response, *args, **kwargs):
 
 
 def sign_in_hook(response: Response, *args, **kwargs):
+    if "/login/" not in response.url or response.status_code != 200:
+        return
+
     data = response.json()
     token = data.get("token")
     body = response.request.body
@@ -59,7 +62,7 @@ def sign_in_hook(response: Response, *args, **kwargs):
         config.save_user_email(username)
 
 
-DEFAULT_RESPONSE_HOOKS = [logging_hook, show_anki_message_hook]
+DEFAULT_RESPONSE_HOOKS = [logging_hook, show_anki_message_hook, sign_in_hook]
 
 
 class AnkiHubClient:
