@@ -106,7 +106,10 @@ def sync_with_ankihub():
     decks = config.private_config.decks
     for deck in decks:
         collected_notes = []
-        for response in client.get_deck_updates(deck):
+        for response in client.get_deck_updates(
+            deck, since=config.private_config.last_sync
+        ):
+
             if response.status_code == 200:
                 data = response.json()
                 notes = data["notes"]

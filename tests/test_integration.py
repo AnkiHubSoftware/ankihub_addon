@@ -150,11 +150,15 @@ def test_create_collaborative_deck_and_upload(
 
 
 def test_client_login_and_signout(anki_session_with_addon: AnkiSession, requests_mock):
-    from ankihub.ankihub_client import AnkiHubClient
+    from ankihub.addon_ankihub_client import (
+        AddonAnkiHubClient as AnkiHubClient,
+        sign_in_hook,
+        sign_out_hook,
+    )
     from ankihub.config import config
     from ankihub.constants import API_URL_BASE
 
-    client = AnkiHubClient()
+    client = AnkiHubClient(hooks=[sign_in_hook, sign_out_hook])
     credentials_data = {"username": "test", "password": "testpassword"}
     requests_mock.post(f"{API_URL_BASE}/login/", json={"token": "f4k3t0k3n"})
     requests_mock.post(
@@ -171,7 +175,7 @@ def test_client_login_and_signout(anki_session_with_addon: AnkiSession, requests
 
 
 def test_upload_deck(anki_session_with_addon: AnkiSession, requests_mock, monkeypatch):
-    from ankihub.ankihub_client import AnkiHubClient
+    from ankihub.addon_ankihub_client import AddonAnkiHubClient as AnkiHubClient
     from ankihub.constants import API_URL_BASE
 
     client = AnkiHubClient(hooks=[])
@@ -204,7 +208,7 @@ def test_upload_deck(anki_session_with_addon: AnkiSession, requests_mock, monkey
 def test_get_deck_updates(
     anki_session_with_addon: AnkiSession, requests_mock, monkeypatch
 ):
-    from ankihub.ankihub_client import AnkiHubClient
+    from ankihub.addon_ankihub_client import AddonAnkiHubClient as AnkiHubClient
     from ankihub.constants import API_URL_BASE
 
     client = AnkiHubClient(hooks=[])
@@ -233,20 +237,20 @@ def test_get_deck_updates(
     }
 
     requests_mock.get(f"{API_URL_BASE}/decks/{deck_id}/updates", json=expected_data)
-    for response in client.get_deck_updates(deck_id=str(deck_id)):
+    for response in client.get_deck_updates(deck_id=str(deck_id), since=timestamp):
         assert response.json() == expected_data
 
     # test get deck updates unauthenticated
     deck_id = 1
     requests_mock.get(f"{API_URL_BASE}/decks/{deck_id}/updates", status_code=403)
-    for response in client.get_deck_updates(deck_id=str(deck_id)):
+    for response in client.get_deck_updates(deck_id=str(deck_id), since=timestamp):
         assert response.status_code == 403
 
 
 def test_get_deck_by_id(
     anki_session_with_addon: AnkiSession, requests_mock, monkeypatch
 ):
-    from ankihub.ankihub_client import AnkiHubClient
+    from ankihub.addon_ankihub_client import AddonAnkiHubClient as AnkiHubClient
     from ankihub.constants import API_URL_BASE
 
     client = AnkiHubClient(hooks=[])
