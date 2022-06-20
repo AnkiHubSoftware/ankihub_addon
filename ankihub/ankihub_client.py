@@ -1,5 +1,4 @@
 from pathlib import Path
-from pprint import pformat
 from typing import Dict, Iterator, List, TypedDict, Union
 
 import requests

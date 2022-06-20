@@ -3,7 +3,6 @@ import tempfile
 from concurrent.futures import Future
 from pathlib import Path
 
-import requests
 from aqt import (
     QHBoxLayout,
     QLabel,
