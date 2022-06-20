@@ -8,3 +8,4 @@ coverage
 pytest-cov
 pre-commit
 requests-mock==1.9.3
+types-requests
