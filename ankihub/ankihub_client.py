@@ -91,10 +91,6 @@ class AnkiHubClient:
         with open(file, "rb") as f:
             deck_data = f.read()
         s3_response = requests.put(s3_url, data=deck_data)
-        LOGGER.debug(f"request url: {s3_response.request.url}")
-        LOGGER.debug(f"response status: {s3_response.status_code}")
-        if s3_response.status_code not in [500, 404]:
-            LOGGER.debug(f"response content: {pformat(s3_response.content)}")
         response = self._call_api(
             "POST", "/decks/", data={"key": key, "anki_id": anki_id}
         )

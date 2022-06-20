@@ -211,8 +211,6 @@ class SubscribeToDeck(QWidget):
 
         def on_download_done(future: Future):
             s3_response = future.result()
-            LOGGER.debug(f"{s3_response.url}")
-            LOGGER.debug(f"{s3_response.status_code}")
             # TODO Use io.BytesIO
             out_file = Path(tempfile.mkdtemp()) / f"{deck_file_name}"
             with out_file.open("wb") as f:
