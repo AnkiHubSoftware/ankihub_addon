@@ -14,21 +14,25 @@ from .constants import API_URL_BASE, ChangeTypes
 class AnkiHubClient:
     """Client for interacting with the AnkiHub API."""
 
-    def __init__(self, send_request=True, hooks=None, token=None):
+    def __init__(self, hooks=None, token=None):
         if hooks is None:
             self.hooks = []
         else:
             self.hooks = hooks
 
-        self.send_request = send_request
         self.session = Session()
         self.session.hooks["response"] = self.hooks
         self.session.headers.update({"Content-Type": "application/json"})
         if token:
             self.session.headers["Authorization"] = f"Token {token}"
 
-    def _call_api(
-        self, method, endpoint, data=None, params=None
+    def _call_api_or_prep_request(
+        self,
+        method,
+        endpoint,
+        data=None,
+        params=None,
+        send_request=True,
     ) -> Union[PreparedRequest, Response]:
         url = f"{API_URL_BASE}{endpoint}"
         request = Request(
@@ -40,7 +44,7 @@ class AnkiHubClient:
             hooks=self.session.hooks,
         )
         prepped = request.prepare()
-        if self.send_request is False:
+        if send_request is False:
             return prepped
         else:
             try:
@@ -50,7 +54,20 @@ class AnkiHubClient:
             except (ConnectionError, HTTPError) as e:
                 LOGGER.debug(f"Connection error: {e}")
                 # TODO collect suggestion requests and retry later?
-                pass
+                raise e
+
+    def _call_api(
+        self,
+        method,
+        endpoint,
+        data=None,
+        params=None,
+    ) -> Response:
+        result = self._call_api_or_prep_request(
+            method, endpoint, data, params, send_request=True
+        )
+        assert type(result) == Response
+        return result
 
     def login(self, credentials: dict) -> Response:
         response = self._call_api("POST", "/login/", credentials)
@@ -60,7 +77,7 @@ class AnkiHubClient:
         return response
 
     def signout(self):
-        result = self._call_api("POST", "/logout/")
+        result = self._call_api_or_prep_request("POST", "/logout/")
         if isinstance(result, Response) and result.status_code == 204:
             self.session.headers["Authorization"] = ""
 
@@ -120,7 +137,8 @@ class AnkiHubClient:
         tags: List[str],
         change_type: ChangeTypes,
         comment: str,
-    ) -> Response:
+        send_request=True,
+    ) -> Union[Response, PreparedRequest]:
         suggestion = {
             "ankihub_id": ankihub_note_uuid,
             "fields": fields,
@@ -128,8 +146,11 @@ class AnkiHubClient:
             "change_type": change_type.value[0],
             "comment": comment,
         }
-        response = self._call_api(
-            "POST", f"/notes/{ankihub_note_uuid}/suggestion/", data=suggestion
+        response = self._call_api_or_prep_request(
+            "POST",
+            f"/notes/{ankihub_note_uuid}/suggestion/",
+            data=suggestion,
+            send_request=send_request,
         )
         return response
 
@@ -142,7 +163,8 @@ class AnkiHubClient:
         tags: List[str],
         change_type: ChangeTypes,
         comment: str,
-    ) -> Response:
+        send_request=True,
+    ) -> Union[Response, PreparedRequest]:
         # TODO include the note model name
         suggestion = {
             "anki_id": anki_id,
@@ -152,8 +174,11 @@ class AnkiHubClient:
             "change_type": change_type.value[0],
             "comment": comment,
         }
-        response = self._call_api(
-            "POST", f"/decks/{ankihub_deck_uuid}/note-suggestion/", data=suggestion
+        response = self._call_api_or_prep_request(
+            "POST",
+            f"/decks/{ankihub_deck_uuid}/note-suggestion/",
+            data=suggestion,
+            send_request=send_request,
         )
         return response
 

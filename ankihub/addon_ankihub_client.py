@@ -76,9 +76,8 @@ DEFAULT_RESPONSE_HOOKS = [
 
 
 class AddonAnkiHubClient(AnkiHubClient):
-    def __init__(self, send_request=True, hooks=None) -> None:
+    def __init__(self, hooks=None) -> None:
         super().__init__(
-            send_request,
             hooks=hooks if hooks is not None else DEFAULT_RESPONSE_HOOKS,
             token=config.private_config.token,
         )
