@@ -1,6 +1,7 @@
 import json
 from json import JSONDecodeError
 from pprint import pformat
+from typing import Dict
 
 from aqt.utils import showText
 from requests import Response
@@ -51,8 +52,8 @@ def sign_in_hook(response: Response, *args, **kwargs):
     data = response.json()
     token = data.get("token")
     body = response.request.body
-    body = json.loads(body) if body else body
-    username = body.get("username")
+    body_dict: Dict = json.loads(body) if body else body
+    username = body_dict.get("username")
     if token:
         config.save_token(token)
         config.save_user_email(username)
