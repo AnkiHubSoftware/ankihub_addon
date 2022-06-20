@@ -109,12 +109,13 @@ def sync_with_ankihub():
         for response in client.get_deck_updates(
             deck, since=config.private_config.last_sync
         ):
+            if response.status_code != 200:
+                return
 
-            if response.status_code == 200:
-                data = response.json()
-                notes = data["notes"]
-                if notes:
-                    collected_notes += notes
+            data = response.json()
+            notes = data["notes"]
+            if notes:
+                collected_notes += notes
 
         if collected_notes:
             mw._create_backup_with_progress(user_initiated=False)

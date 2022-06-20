@@ -202,6 +202,9 @@ class SubscribeToDeck(QWidget):
             self.label_results.setText(self.instructions_label)
             return
 
+        if deck_response.status_code != 200:
+            return
+
         data = deck_response.json()
         local_deck_ids = {deck.id for deck in mw.col.decks.all_names_and_ids()}
         first_time_install = data["anki_id"] not in local_deck_ids
@@ -210,11 +213,14 @@ class SubscribeToDeck(QWidget):
         )
 
         def on_download_done(future: Future):
-            s3_response = future.result()
+            response = future.result()
+            if response.status_code != 200:
+                return
+
             # TODO Use io.BytesIO
             out_file = Path(tempfile.mkdtemp()) / f"{deck_file_name}"
             with out_file.open("wb") as f:
-                f.write(s3_response.content)
+                f.write(response.content)
                 LOGGER.debug(f"Wrote {deck_file_name} to {out_file}")
                 # TODO Validate .csv
             self.label_results.setText("Deck download successful!")
