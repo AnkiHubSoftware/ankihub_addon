@@ -51,15 +51,12 @@ class SubscribedDecksDialog(QDialog):
 
         self.add_btn = QPushButton("Add")
         self.unsubscrive_btn = QPushButton("Unsubscribe")
-        self.delete_btn = QPushButton("Delete")
         self.open_web_btn = QPushButton("Open on AnkiHub")
         self.add_btn.clicked.connect(self.on_add)
         self.unsubscrive_btn.clicked.connect(self.on_unsubscribe)
-        self.delete_btn.clicked.connect(self.on_delete)
         self.open_web_btn.clicked.connect(self.on_open_web)
         self.box_right.addWidget(self.add_btn)
         self.box_right.addWidget(self.unsubscrive_btn)
-        self.box_right.addWidget(self.delete_btn)
         self.box_right.addWidget(self.open_web_btn)
         self.box_right.addStretch(1)
 
@@ -107,29 +104,6 @@ class SubscribedDecksDialog(QDialog):
         tooltip("Unsubscribed from AnkiHub Deck.")
         self.refresh_decks_list()
 
-    def on_delete(self) -> None:
-        items = self.decks_list.selectedItems()
-        if len(items) == 0:
-            return
-        deck_names = [item.text() for item in items]
-        deck_names_text = ", ".join(deck_names)
-        confirm = askUser(
-            f"Delete AnkiHub deck {deck_names_text}?", title="Delete AnkiHub Deck"
-        )
-        if not confirm:
-            return
-
-        for item in items:
-            ankihub_id = item.data(Qt.ItemDataRole.UserRole)
-            anki_id = self.config.private_config.decks[ankihub_id]["anki_id"]
-            # This check can be removed if anki_id is made to exist always
-            if mw.col.decks.get(anki_id, default=False) is not None:
-                mw.col.decks.remove([anki_id])
-            self.config.unsubscribe_deck(ankihub_id)
-
-        tooltip("Deleted AnkiHub Deck.")
-        self.refresh_decks_list()
-
     def on_open_web(self) -> None:
         items = self.decks_list.selectedItems()
         if len(items) == 0:
@@ -143,15 +117,6 @@ class SubscribedDecksDialog(QDialog):
         isSelected: bool = len(selection) > 0
         self.unsubscrive_btn.setEnabled(isSelected)
         self.open_web_btn.setEnabled(isSelected)
-
-        enable_delete_btn = False
-        for item in selection:
-            ankihub_id = item.data(Qt.ItemDataRole.UserRole)
-            anki_id = self.config.private_config.decks[ankihub_id]["anki_id"]
-            if mw.col.decks.get(anki_id, default=False) is not None:
-                enable_delete_btn = True
-                break
-        self.delete_btn.setEnabled(enable_delete_btn)
 
     @classmethod
     def display_subscribe_window(cls):
