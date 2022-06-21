@@ -209,7 +209,7 @@ class SubscribeDialog(QDialog):
 
         self.config = Config()
         self.client = AnkiHubClient()
-        if not self.client.token:
+        if not self.client.has_token():
             showText("Oops! Please make sure you are logged into AnkiHub!")
             self.close()
         else:
