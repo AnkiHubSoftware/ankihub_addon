@@ -1,6 +1,5 @@
 import csv
 import tempfile
-import requests
 from concurrent.futures import Future
 from pathlib import Path
 from aqt import QPushButton, mw
@@ -102,6 +101,8 @@ class SubscribedDecksDialog(QDialog):
         for item in items:
             ankihub_id = item.data(Qt.ItemDataRole.UserRole)
             self.config.unsubscribe_deck(ankihub_id)
+            # TODO Run clean up when implemented:
+            #  https://github.com/ankipalace/ankihub_addon/issues/20
 
         tooltip("Unsubscribed from AnkiHub Deck.")
         self.refresh_decks_list()
