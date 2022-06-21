@@ -248,6 +248,9 @@ class SubscribeDialog(QDialog):
             )
             return
 
+        if deck_response.status_code != 200:
+            return
+
         data = deck_response.json()
         local_deck_ids = {deck.id for deck in mw.col.decks.all_names_and_ids()}
         first_time_install = data["anki_id"] not in local_deck_ids
@@ -255,19 +258,14 @@ class SubscribeDialog(QDialog):
             data["apkg_filename"] if first_time_install else data["csv_notes_filename"]
         )
 
-        presigned_url_response = self.client.get_presigned_url(
-            key=deck_file_name, action="download"
-        )
-        s3_url = presigned_url_response.json()["pre_signed_url"]
-
         def on_download_done(future: Future):
-            s3_response = future.result()
-            LOGGER.debug(f"{s3_response.url}")
-            LOGGER.debug(f"{s3_response.status_code}")
-            # TODO Use io.BytesIO
+            response = future.result()
+            if response.status_code != 200:
+                return
+
             out_file = Path(tempfile.mkdtemp()) / f"{deck_file_name}"
             with out_file.open("wb") as f:
-                f.write(s3_response.content)
+                f.write(response.content)
                 LOGGER.debug(f"Wrote {deck_file_name} to {out_file}")
                 # TODO Validate .csv
 
@@ -286,7 +284,7 @@ class SubscribeDialog(QDialog):
             self.accept()
 
         mw.taskman.with_progress(
-            lambda: requests.get(s3_url),
+            lambda: self.client.download_deck(deck_file_name),
             on_done=on_download_done,
             parent=self,
             label="Downloading deck",
