@@ -221,6 +221,7 @@ def change_note_types_of_notes_in_collection_if_necessary(
             old_notetype_id=note.mid,
             new_notetype_id=target_note_type_id,
             current_schema=current_schema,
+            # TODO check if this works / makes sense
             new_fields=list(range(0, len(fields))),
         )
         mw.col.models.change_notetype_of_notes(request)
