@@ -19,7 +19,7 @@ from aqt.qt import (
 )
 
 from .. import LOGGER
-from ..ankihub_client import AnkiHubClient
+from ..addon_ankihub_client import AddonAnkiHubClient as AnkiHubClient
 from ..config import Config
 from ..constants import CSV_DELIMITER, URL_HELP, URL_DECKS, URL_DECK_BASE
 from ..register_decks import modify_note_types, process_csv
@@ -36,7 +36,7 @@ class SubscribedDecksDialog(QDialog):
         self.on_item_selection_changed()
         self.refresh_decks_list()
 
-        if not self.client.token:
+        if not self.client.has_token():
             showText("Oops! Please make sure you are logged into AnkiHub!")
             self.close()
         else:
