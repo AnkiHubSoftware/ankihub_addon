@@ -47,27 +47,36 @@ def logging_hook(response: Response, *args, **kwargs):
 
 
 def sign_in_hook(response: Response, *args, **kwargs):
-    if "/login/" not in response.url or response.status_code != 200:
-        return
-
-    data = response.json()
-    token = data.get("token")
-    body = response.request.body
-    body_dict: Dict = json.loads(body) if body else body
-    username = body_dict.get("username")
-    if token:
     LOGGER.debug("Begin sign in hook.")
+    if response.status_code == 401 and response.json()["detail"] == "Invalid token.":
+        config.save_token("")
+        from .gui.menu import AnkiHubLogin
+        AnkiHubLogin.display_login()
+        return response
+    elif "/login/" in response.url and response.status_code != 200:
+        config.save_token("")
+        from .gui.menu import AnkiHubLogin
+        AnkiHubLogin.display_login()
+        return response
+    elif "/login/" in response.url and response.status_code == 200:
+        data = response.json()
+        token = data.get("token")
+        body = response.request.body
+        body_dict: Dict = json.loads(body) if body else body
+        username = body_dict.get("username")
         config.save_token(token)
         config.save_user_email(username)
-
+        return response
+    else:
+        return response
 
 def sign_out_hook(response: Response, *args, **kwargs):
     LOGGER.debug("Begin sign out hook.")
     if "/logout/" not in response.url or response.status_code != 204:
-        return
+        return response
 
     config.save_token("")
-    LOGGER.debug("Token cleared from config.")
+    return response
 
 
 DEFAULT_RESPONSE_HOOKS = [
