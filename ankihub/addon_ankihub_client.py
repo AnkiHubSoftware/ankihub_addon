@@ -13,6 +13,7 @@ from .constants import USER_SUPPORT_EMAIL_SLUG
 
 
 def show_anki_message_hook(response: Response, *args, **kwargs):
+    LOGGER.debug("Begin show anki message hook.")
     endpoint = response.request.url
     if response.status_code > 299 and "/logout/" not in endpoint:
         showText(
@@ -55,11 +56,13 @@ def sign_in_hook(response: Response, *args, **kwargs):
     body_dict: Dict = json.loads(body) if body else body
     username = body_dict.get("username")
     if token:
+    LOGGER.debug("Begin sign in hook.")
         config.save_token(token)
         config.save_user_email(username)
 
 
 def sign_out_hook(response: Response, *args, **kwargs):
+    LOGGER.debug("Begin sign out hook.")
     if "/logout/" not in response.url or response.status_code != 204:
         return
 

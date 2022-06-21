@@ -1,3 +1,4 @@
+from pprint import pformat
 from typing import Dict, List
 from urllib.error import HTTPError
 
@@ -58,6 +59,7 @@ def hide_ankihub_field_in_editor(
 def create_note_with_id(note_type, anki_id) -> Note:
     """Create a new note, add it to the appropriate deck and override the note id with
     the note id of the original note creator."""
+    LOGGER.debug(f"Trying to create note: {note_type} {anki_id}.")
     note_type = mw.col.models.by_name(note_type)
     note = Note(col=mw.col, model=note_type)
     # TODO Add to an appropriate deck.
@@ -104,6 +106,7 @@ def update_or_create_note(
 
 
 def sync_with_ankihub():
+    LOGGER.debug("Trying to sync with AnkiHub.")
     client = AnkiHubClient()
     decks = config.private_config.decks
     for deck in decks:
@@ -131,6 +134,7 @@ def sync_with_ankihub():
                     note_type,
                     note_type_id,
                 ) = note.values()
+                LOGGER.debug(f"Trying to update or create note:\n {pformat(note)}")
                 update_or_create_note(anki_id, ankihub_id, fields, tags, note_type)
                 # Should last sync be tracked separately for each deck?
                 mw.reset()
