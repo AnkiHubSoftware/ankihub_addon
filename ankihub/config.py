@@ -3,6 +3,7 @@ import json
 import os
 from datetime import datetime, timezone
 from json import JSONDecodeError
+from pprint import pformat
 from typing import Any, Dict
 
 from aqt import mw
@@ -41,7 +42,8 @@ class Config:
                 except JSONDecodeError:
                     # TODO Instead of overwriting, query AnkiHub for config values.
                     self.private_config = self.new_config()
-        LOGGER.debug(f"Private config: {self.private_config}")
+        config_dict = dataclasses.asdict(self.private_config)
+        LOGGER.debug(f"PrivateConfig init:\n {pformat(config_dict)}")
 
     def new_config(self):
         private_config = PrivateConfig()
@@ -54,6 +56,7 @@ class Config:
         with open(self._private_config_file_path, "w") as f:
             config_dict = dataclasses.asdict(self.private_config)
             f.write(json.dumps(config_dict))
+            LOGGER.debug(f"Updated PrivateConfig:\n {pformat(config_dict)}")
 
     def save_token(self, token: str):
         self.private_config.token = token
