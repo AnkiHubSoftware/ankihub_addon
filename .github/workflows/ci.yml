@@ -45,11 +45,6 @@ jobs:
           name: ankihub_addon_${{ github.sha }}
           path: ankihub_${{ github.sha }}.ankiaddon
 
-      - name: Upload coverage to Codecov
-        env:
-          CODECOV_TOKEN: "${{ secrets.CODECOV_TOKEN }}"
-        uses: codecov/codecov-action@v1
-
       - name: Run pre-commit
         run: pre-commit run --all-files
 
