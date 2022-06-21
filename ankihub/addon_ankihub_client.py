@@ -13,6 +13,7 @@ from .constants import USER_SUPPORT_EMAIL_SLUG
 
 
 def show_anki_message_hook(response: Response, *args, **kwargs):
+    LOGGER.debug("Begin show anki message hook.")
     endpoint = response.request.url
     if response.status_code > 299 and "/logout/" not in endpoint:
         showText(
@@ -46,31 +47,45 @@ def logging_hook(response: Response, *args, **kwargs):
 
 
 def sign_in_hook(response: Response, *args, **kwargs):
-    if "/login/" not in response.url or response.status_code != 200:
-        return
+    LOGGER.debug("Begin sign in hook.")
+    if response.status_code == 401 and response.json()["detail"] == "Invalid token.":
+        config.save_token("")
+        from .gui.menu import AnkiHubLogin
 
-    data = response.json()
-    token = data.get("token")
-    body = response.request.body
-    body_dict: Dict = json.loads(body) if body else body
-    username = body_dict.get("username")
-    if token:
+        AnkiHubLogin.display_login()
+        return response
+    elif "/login/" in response.url and response.status_code != 200:
+        config.save_token("")
+        from .gui.menu import AnkiHubLogin
+
+        AnkiHubLogin.display_login()
+        return response
+    elif "/login/" in response.url and response.status_code == 200:
+        data = response.json()
+        token = data.get("token")
+        body = response.request.body
+        body_dict: Dict = json.loads(body) if body else body
+        username = body_dict.get("username")
         config.save_token(token)
         config.save_user_email(username)
+        return response
+    else:
+        return response
 
 
 def sign_out_hook(response: Response, *args, **kwargs):
+    LOGGER.debug("Begin sign out hook.")
     if "/logout/" not in response.url or response.status_code != 204:
-        return
+        return response
 
     config.save_token("")
-    LOGGER.debug("Token cleared from config.")
+    return response
 
 
 DEFAULT_RESPONSE_HOOKS = [
     logging_hook,
-    show_anki_message_hook,
     sign_in_hook,
+    show_anki_message_hook,
     sign_out_hook,
 ]
 
