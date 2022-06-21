@@ -21,12 +21,13 @@ class PrivateConfig:
 class Config:
     def __init__(self):
         # self.public_config is editable by the user.
-        self.public_config = mw.addonManager.getConfig("ankihub")
+        self.public_config = mw.addonManager.getConfig(__name__)
         # This is the location for private config which is only managed by our code
         # and is not exposed to the user.
         # See https://addon-docs.ankiweb.net/addon-config.html#user-files
+        addon_dir_name = mw.addonManager.addonFromModule(__name__)
         user_files_path = os.path.join(
-            mw.addonManager.addonsFolder("ankihub"), "user_files"
+            mw.addonManager.addonsFolder(addon_dir_name), "user_files"
         )
         self._private_config_file_path = os.path.join(
             user_files_path, ".private_config.json"
@@ -83,3 +84,6 @@ class Config:
     def unsubscribe_deck(self, ankihub_did: str) -> None:
         self.private_config.decks.pop(ankihub_did)
         self._update_private_config()
+
+
+config = Config()

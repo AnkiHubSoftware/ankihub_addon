@@ -1,4 +1,5 @@
 from typing import Dict, List
+from urllib.error import HTTPError
 
 import anki
 import aqt
@@ -8,10 +9,11 @@ from anki.errors import NotFoundError
 from anki.models import NoteType, NotetypeId
 from anki.notes import Note, NoteId
 from aqt import mw
+from requests.exceptions import ConnectionError
 
 from . import LOGGER, constants
-from .ankihub_client import AnkiHubClient
-from .config import Config
+from .addon_ankihub_client import AddonAnkiHubClient as AnkiHubClient
+from .config import config
 
 
 def note_type_contains_field(
@@ -103,16 +105,19 @@ def update_or_create_note(
 
 def sync_with_ankihub():
     client = AnkiHubClient()
-    config = Config()
     decks = config.private_config.decks
     for deck in decks:
         collected_notes = []
-        for response in client.get_deck_updates(deck):
-            if response.status_code == 200:
-                data = response.json()
-                notes = data["notes"]
-                if notes:
-                    collected_notes += notes
+        for response in client.get_deck_updates(
+            deck, since=config.private_config.last_sync
+        ):
+            if response.status_code != 200:
+                return
+
+            data = response.json()
+            notes = data["notes"]
+            if notes:
+                collected_notes += notes
 
         if collected_notes:
             mw._create_backup_with_progress(user_initiated=False)
@@ -133,6 +138,10 @@ def sync_with_ankihub():
 
 
 def sync_on_profile_open():
-    config = Config()
     if config.private_config.token:
-        sync_with_ankihub()
+        try:
+            # Don't raise exception when automatically attempting to sync with AnkiHub
+            # with no Internet connection.
+            sync_with_ankihub()
+        except (ConnectionError, HTTPError):
+            pass
