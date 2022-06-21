@@ -2,32 +2,32 @@ import csv
 import tempfile
 from concurrent.futures import Future
 from pathlib import Path
+
 from aqt import QPushButton, mw
-from aqt.utils import askUser, showText, tooltip, openLink
 from aqt.qt import (
+    QDialog,
+    QDialogButtonBox,
     QHBoxLayout,
     QLabel,
     QLineEdit,
-    QSizePolicy,
-    QVBoxLayout,
-    QDialog,
-    QDialogButtonBox,
     QListWidget,
     QListWidgetItem,
+    QSizePolicy,
     Qt,
+    QVBoxLayout,
 )
+from aqt.utils import askUser, openLink, showText, tooltip
 
 from .. import LOGGER
 from ..addon_ankihub_client import AddonAnkiHubClient as AnkiHubClient
-from ..config import Config
-from ..constants import CSV_DELIMITER, URL_HELP, URL_DECKS, URL_DECK_BASE
+from ..config import config
+from ..constants import CSV_DELIMITER, URL_DECK_BASE, URL_DECKS, URL_HELP
 from ..register_decks import modify_note_types, process_csv
 
 
 class SubscribedDecksDialog(QDialog):
     def __init__(self):
         super(SubscribedDecksDialog, self).__init__()
-        self.config = Config()
         self.client = AnkiHubClient()
         self.setWindowTitle("Subscribed AnkiHub Decks")
 
@@ -67,7 +67,7 @@ class SubscribedDecksDialog(QDialog):
 
     def refresh_decks_list(self) -> None:
         self.decks_list.clear()
-        decks = self.config.private_config.decks
+        decks = config.private_config.decks
         for ankihub_id in decks:
             anki_id = decks[ankihub_id]["anki_id"]
             deck = mw.col.decks.get(anki_id, default=False)
@@ -97,7 +97,7 @@ class SubscribedDecksDialog(QDialog):
 
         for item in items:
             ankihub_id = item.data(Qt.ItemDataRole.UserRole)
-            self.config.unsubscribe_deck(ankihub_id)
+            config.unsubscribe_deck(ankihub_id)
             # TODO Run clean up when implemented:
             #  https://github.com/ankipalace/ankihub_addon/issues/20
 
@@ -173,7 +173,6 @@ class SubscribeDialog(QDialog):
         self.setSizePolicy(QSizePolicy.Policy.Minimum, QSizePolicy.Policy.Minimum)
         self.setWindowTitle("Subscribe to AnkiHub Deck")
 
-        self.config = Config()
         self.client = AnkiHubClient()
         if not self.client.has_token():
             showText("Oops! Please make sure you are logged into AnkiHub!")
@@ -183,7 +182,7 @@ class SubscribeDialog(QDialog):
 
     def subscribe(self):
         ankihub_did = self.deck_id_box_text.text()
-        if ankihub_did in self.config.private_config.decks.keys():
+        if ankihub_did in config.private_config.decks.keys():
             showText(
                 f"You've already subscribed to deck {ankihub_did}. "
                 "Syncing with AnkiHub will happen automatically everytime you "
@@ -266,7 +265,7 @@ class SubscribeDialog(QDialog):
         elif deck_file.suffix == ".csv":
             self._install_deck_csv(deck_file)
 
-        self.config.save_subscription(ankihub_did, anki_did)
+        config.save_subscription(ankihub_did, anki_did)
         tooltip("The deck has successfully been installed!")
 
     def _install_deck_apkg(self, deck_file: Path):
