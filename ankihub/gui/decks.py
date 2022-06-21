@@ -50,13 +50,13 @@ class SubscribedDecksDialog(QDialog):
         self.decks_list.itemSelectionChanged.connect(self.on_item_selection_changed)
 
         self.add_btn = QPushButton("Add")
-        self.unsubscrive_btn = QPushButton("Unsubscribe")
+        self.unsubscribe_btn = QPushButton("Unsubscribe")
         self.open_web_btn = QPushButton("Open on AnkiHub")
         self.add_btn.clicked.connect(self.on_add)
-        self.unsubscrive_btn.clicked.connect(self.on_unsubscribe)
+        self.unsubscribe_btn.clicked.connect(self.on_unsubscribe)
         self.open_web_btn.clicked.connect(self.on_open_web)
         self.box_right.addWidget(self.add_btn)
-        self.box_right.addWidget(self.unsubscrive_btn)
+        self.box_right.addWidget(self.unsubscribe_btn)
         self.box_right.addWidget(self.open_web_btn)
         self.box_right.addStretch(1)
 
@@ -115,7 +115,7 @@ class SubscribedDecksDialog(QDialog):
     def on_item_selection_changed(self) -> None:
         selection = self.decks_list.selectedItems()
         isSelected: bool = len(selection) > 0
-        self.unsubscrive_btn.setEnabled(isSelected)
+        self.unsubscribe_btn.setEnabled(isSelected)
         self.open_web_btn.setEnabled(isSelected)
 
     @classmethod
