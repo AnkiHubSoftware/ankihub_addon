@@ -72,8 +72,8 @@ def sign_out_hook(response: Response, *args, **kwargs):
 
 DEFAULT_RESPONSE_HOOKS = [
     logging_hook,
-    show_anki_message_hook,
     sign_in_hook,
+    show_anki_message_hook,
     sign_out_hook,
 ]
 
