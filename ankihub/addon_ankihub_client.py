@@ -51,11 +51,13 @@ def sign_in_hook(response: Response, *args, **kwargs):
     if response.status_code == 401 and response.json()["detail"] == "Invalid token.":
         config.save_token("")
         from .gui.menu import AnkiHubLogin
+
         AnkiHubLogin.display_login()
         return response
     elif "/login/" in response.url and response.status_code != 200:
         config.save_token("")
         from .gui.menu import AnkiHubLogin
+
         AnkiHubLogin.display_login()
         return response
     elif "/login/" in response.url and response.status_code == 200:
@@ -69,6 +71,7 @@ def sign_in_hook(response: Response, *args, **kwargs):
         return response
     else:
         return response
+
 
 def sign_out_hook(response: Response, *args, **kwargs):
     LOGGER.debug("Begin sign out hook.")
