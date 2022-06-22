@@ -79,8 +79,6 @@ class AnkiHubLogin(QWidget):
         self.setMinimumWidth(500)
         self.setSizePolicy(QSizePolicy.Policy.Minimum, QSizePolicy.Policy.Minimum)
         self.setWindowTitle("Login to AnkiHub.")
-        if config.private_config.token:
-            self.label_results.setText("✨ You are logged into AnkiHub.")
         self.show()
 
     def login(self):
@@ -98,7 +96,7 @@ class AnkiHubLogin(QWidget):
         if not response or response.status_code != 200:
             return
 
-        self.label_results.setText("✨ You are now logged into AnkiHub.")
+        self.close()
 
     @classmethod
     def display_login(cls):

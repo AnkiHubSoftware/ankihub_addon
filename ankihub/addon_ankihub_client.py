@@ -3,7 +3,8 @@ from json import JSONDecodeError
 from pprint import pformat
 from typing import Dict
 
-from aqt.utils import showText
+from aqt import mw
+from aqt.utils import showText, tooltip
 from requests import Response
 
 from . import LOGGER
@@ -74,6 +75,7 @@ def sign_in_hook(response: Response, *args, **kwargs):
         from .gui.menu import refresh_ankihub_menu
 
         refresh_ankihub_menu()
+        tooltip("Signed into AnkiHub!", parent=mw)
         return response
     else:
         return response
@@ -88,6 +90,7 @@ def sign_out_hook(response: Response, *args, **kwargs):
     from .gui.menu import refresh_ankihub_menu
 
     refresh_ankihub_menu()
+    tooltip("Signed out of AnkiHub!", parent=mw)
     return response
 
 
