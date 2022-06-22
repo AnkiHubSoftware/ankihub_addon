@@ -127,6 +127,7 @@ def upload_deck(did: DeckId) -> Response:
     exporter.includeTags = True
     deck_uuid = uuid.uuid4()
     out_dir = pathlib.Path(tempfile.mkdtemp())
+    deck_name = re.sub('[\\\\/?<>:*|"^]', "_", deck_name)
     out_file = out_dir / f"{deck_name}-{deck_uuid}.apkg"
     exporter.exportInto(str(out_file))
     LOGGER.debug(f"Deck {deck_name} exported to {out_file}")
