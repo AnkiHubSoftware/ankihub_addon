@@ -105,7 +105,7 @@ def test_modify_note_type(anki_session_with_addon: AnkiSession):
             note_type = anki_session.mw.col.models.by_name("Basic")
             original_note_type = copy.deepcopy(note_type)
             original_note_template = original_note_type["tmpls"][0]["afmt"]
-            modify_note_type("Basic")
+            modify_note_type(note_type)
             modified_template = note_type["tmpls"][0]["afmt"]
             # # TODO Make more precise assertions.
             assert ANKIHUB_NOTE_TYPE_FIELD_NAME in modified_template

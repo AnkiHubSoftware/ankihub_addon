@@ -40,7 +40,6 @@ def on_ankihub_button_press(editor: Editor):
         for field, val in zip(_fields_metadata, _field_vals)
     ]
     tags = editor.note.tags
-    note_type_id = editor.note.mid
     client = AnkiHubClient()
     if command == AnkiHubCommands.CHANGE.value:
         response = client.create_change_note_suggestion(
@@ -77,7 +76,6 @@ def on_ankihub_button_press(editor: Editor):
             anki_id=editor.note.id,
             fields=fields,
             tags=tags,
-            note_type_id=note_type_id,
             change_type=change_type,
             comment=comment,
         )

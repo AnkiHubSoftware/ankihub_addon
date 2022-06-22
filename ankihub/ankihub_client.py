@@ -167,7 +167,6 @@ class AnkiHubClient:
         anki_id: int,
         fields: List[dict],
         tags: List[str],
-        note_type_id: int,
         change_type: ChangeTypes,
         comment: str,
     ) -> Response:
@@ -176,7 +175,6 @@ class AnkiHubClient:
             "ankihub_id": ankihub_note_uuid,
             "fields": fields,
             "tags": tags,
-            "note_type_id": note_type_id,
             "change_type": change_type.value[0],
             "comment": comment,
         }
