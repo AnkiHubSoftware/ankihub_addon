@@ -199,3 +199,7 @@ class AnkiHubClient:
         data = {"key": key, "type": action}
         response = self._send_request(method, endpoint, params=data)
         return response
+
+    def get_note_type(self, anki_id: int) -> Response:
+        response = self._send_request("GET", f"/note-types/{anki_id}/")
+        return response
