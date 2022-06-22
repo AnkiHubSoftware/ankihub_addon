@@ -22,12 +22,6 @@ from ..utils import sync_with_ankihub
 from .decks import SubscribedDecksDialog
 
 
-def main_menu_setup():
-    ankihub_menu = QMenu("&AnkiHub", parent=mw)
-    mw.form.menubar.addMenu(ankihub_menu)
-    return ankihub_menu
-
-
 class AnkiHubLogin(QWidget):
     def __init__(self):
         super(AnkiHubLogin, self).__init__()
@@ -113,12 +107,6 @@ class AnkiHubLogin(QWidget):
         return __window
 
 
-def ankihub_login_setup(parent):
-    sign_in_button = QAction("🔑 Sign into AnkiHub", mw)
-    sign_in_button.triggered.connect(AnkiHubLogin.display_login)
-    parent.addAction(sign_in_button)
-
-
 def create_collaborative_deck_action() -> None:
     deck_chooser = StudyDeck(
         mw,
@@ -185,6 +173,12 @@ def sync_with_ankihub_action():
     sync_with_ankihub()
 
 
+def ankihub_login_setup(parent):
+    sign_in_button = QAction("🔑 Sign into AnkiHub", mw)
+    sign_in_button.triggered.connect(AnkiHubLogin.display_login)
+    parent.addAction(sign_in_button)
+
+
 def upload_suggestions_setup(parent):
     """Set up the menu item for uploading suggestions in bulk."""
     q_action = QAction("⬆️ Upload suggestions to AnkiHub", parent=parent)
@@ -206,11 +200,32 @@ def sync_with_ankihub_setup(parent):
     parent.addAction(q_action)
 
 
+def ankihub_logout_setup(parent):
+    q_action = QAction("🔑 Sign out", mw)
+    q_action.triggered.connect(lambda: AnkiHubClient().signout())
+    parent.addAction(q_action)
+
+
+ankihub_menu: QMenu
+
+
 def setup_ankihub_menu() -> None:
+    global ankihub_menu
+    ankihub_menu = QMenu("&AnkiHub", parent=mw)
+    mw.form.menubar.addMenu(ankihub_menu)
+    refresh_ankihub_menu()
+
+
+def refresh_ankihub_menu() -> None:
     """Add top-level AnkiHub menu."""
-    ankihub_menu = main_menu_setup()
-    ankihub_login_setup(parent=ankihub_menu)
-    create_collaborative_deck_setup(parent=ankihub_menu)
-    subscribe_to_deck_setup(parent=ankihub_menu)
-    sync_with_ankihub_setup(parent=ankihub_menu)
+    global ankihub_menu
+    ankihub_menu.clear()
+
+    if config.private_config.token:
+        create_collaborative_deck_setup(parent=ankihub_menu)
+        subscribe_to_deck_setup(parent=ankihub_menu)
+        sync_with_ankihub_setup(parent=ankihub_menu)
+        ankihub_logout_setup(parent=ankihub_menu)
+    else:
+        ankihub_login_setup(parent=ankihub_menu)
     # upload_suggestions_setup(parent=ankihub_menu)
