@@ -51,16 +51,14 @@ def sign_in_hook(response: Response, *args, **kwargs):
     LOGGER.debug("Begin sign in hook.")
     if response.status_code == 401 and response.json()["detail"] == "Invalid token.":
         config.save_token("")
-        from .gui.menu import AnkiHubLogin, refresh_ankihub_menu
+        from .gui.menu import AnkiHubLogin
 
-        refresh_ankihub_menu()
         AnkiHubLogin.display_login()
         return response
     elif "/login/" in response.url and response.status_code != 200:
         config.save_token("")
-        from .gui.menu import AnkiHubLogin, refresh_ankihub_menu
+        from .gui.menu import AnkiHubLogin
 
-        refresh_ankihub_menu()
         AnkiHubLogin.display_login()
         return response
     elif "/login/" in response.url and response.status_code == 200:
@@ -72,9 +70,6 @@ def sign_in_hook(response: Response, *args, **kwargs):
         config.save_token(token)
         config.save_user_email(username)
 
-        from .gui.menu import refresh_ankihub_menu
-
-        refresh_ankihub_menu()
         tooltip("Signed into AnkiHub!", parent=mw)
         return response
     else:
@@ -87,9 +82,6 @@ def sign_out_hook(response: Response, *args, **kwargs):
         return response
 
     config.save_token("")
-    from .gui.menu import refresh_ankihub_menu
-
-    refresh_ankihub_menu()
     tooltip("Signed out of AnkiHub!", parent=mw)
     return response
 

@@ -4,7 +4,7 @@ import os
 from datetime import datetime, timezone
 from json import JSONDecodeError
 from pprint import pformat
-from typing import Any, Dict
+from typing import Any, Callable, Dict, Optional
 
 from aqt import mw
 
@@ -44,6 +44,7 @@ class Config:
                     self.private_config = self.new_config()
         config_dict = dataclasses.asdict(self.private_config)
         LOGGER.debug(f"PrivateConfig init:\n {pformat(config_dict)}")
+        self.token_change_hook: Optional[Callable[[], None]] = None
 
     def new_config(self):
         private_config = PrivateConfig()
@@ -61,6 +62,8 @@ class Config:
     def save_token(self, token: str):
         self.private_config.token = token
         self._update_private_config()
+        if self.token_change_hook:
+            self.token_change_hook()
 
     def save_user_email(self, user_email: str):
         self.private_config.user = user_email

@@ -212,6 +212,7 @@ def setup_ankihub_menu() -> None:
     ankihub_menu = QMenu("&AnkiHub", parent=mw)
     mw.form.menubar.addMenu(ankihub_menu)
     refresh_ankihub_menu()
+    config.token_change_hook = refresh_ankihub_menu
 
 
 def refresh_ankihub_menu() -> None:
