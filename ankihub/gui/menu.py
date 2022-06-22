@@ -225,6 +225,6 @@ def refresh_ankihub_menu() -> None:
         subscribe_to_deck_setup(parent=ankihub_menu)
         sync_with_ankihub_setup(parent=ankihub_menu)
         ankihub_logout_setup(parent=ankihub_menu)
+        # upload_suggestions_setup(parent=ankihub_menu)
     else:
         ankihub_login_setup(parent=ankihub_menu)
-    # upload_suggestions_setup(parent=ankihub_menu)
