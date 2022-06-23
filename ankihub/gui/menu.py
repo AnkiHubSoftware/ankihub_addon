@@ -48,6 +48,7 @@ class AnkiHubLogin(QWidget):
         self.password_box_text = QLineEdit("", self)
         self.password_box_text.setEchoMode(QLineEdit.EchoMode.Password)
         self.password_box_text.setMinimumWidth(300)
+        self.password_box_text.returnPressed.connect(self.login)
         self.password_box.addWidget(self.password_box_label)
         self.password_box.addWidget(self.password_box_text)
         self.box_left.addLayout(self.password_box)
@@ -56,6 +57,7 @@ class AnkiHubLogin(QWidget):
         self.login_button = QPushButton("Login", self)
         self.bottom_box_section.addWidget(self.login_button)
         self.login_button.clicked.connect(self.login)
+        self.login_button.setDefault(True)
 
         self.box_left.addLayout(self.bottom_box_section)
 
