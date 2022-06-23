@@ -353,6 +353,8 @@ def test_create_new_note_suggestion(
         fields=[{"name": "abc", "order": 0, "value": "abc changed"}],
         tags=["test"],
         change_type=ChangeTypes.NEW_CARD_TO_ADD,
+        note_type="Basic",
+        note_type_id=1,
         comment="",
     )
     assert response.status_code == 201
@@ -368,6 +370,8 @@ def test_create_new_note_suggestion(
         fields=[{"name": "abc", "order": 0, "value": "abc changed"}],
         tags=["test"],
         change_type=ChangeTypes.NEW_CARD_TO_ADD,
+        note_type="Basic",
+        note_type_id=1,
         comment="",
     )
     assert response.status_code == 403
