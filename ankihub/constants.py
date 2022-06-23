@@ -1,12 +1,11 @@
-import os
 import pathlib
 from enum import Enum
 
 from . import LOGGER
+from .config import config
 
-API_URL_BASE = os.getenv("API_URL_BASE")
-API_URL_BASE = API_URL_BASE if API_URL_BASE else "https://app.ankihub.net/api"
-ANKIHUB_APP_URL = API_URL_BASE.strip("/api")
+ANKIHUB_APP_URL = config.public_config["ankihub_url"]
+API_URL_BASE = f"{ANKIHUB_APP_URL}/api"
 
 LOGGER.debug(f"Starting with URL_BASE {API_URL_BASE}")
 URL_VIEW_NOTE = f"{ANKIHUB_APP_URL}/notes/"
