@@ -168,15 +168,18 @@ class AnkiHubClient:
         fields: List[dict],
         tags: List[str],
         change_type: ChangeTypes,
+        note_type: str,
+        note_type_id: int,
         comment: str,
     ) -> Response:
-        # TODO include the note model name
         suggestion = {
             "anki_id": anki_id,
             "ankihub_id": ankihub_note_uuid,
             "fields": fields,
             "tags": tags,
             "change_type": change_type.value[0],
+            "note_type": note_type,
+            "note_type_id": note_type_id,
             "comment": comment,
         }
         response = self._send_request(
