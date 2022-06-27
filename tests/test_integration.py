@@ -63,8 +63,7 @@ def test_editor(anki_session_with_addon: AnkiSession, requests_mock, monkeypatch
     # now, this test just checks that on_ankihub_button_press runs without
     # raising any errors.
     monkeypatch.setattr("ankihub.gui.editor.SuggestionDialog.exec", Mock())
-    response = on_ankihub_button_press(editor)
-    assert response == {}
+    on_ankihub_button_press(editor)
 
 
 def test_get_note_types_in_deck(anki_session_with_addon: AnkiSession):

@@ -2,8 +2,8 @@ import uuid
 
 import anki
 from anki.hooks import addHook
-import aqt
 from aqt import gui_hooks
+from aqt.addcards import AddCards
 from aqt.editor import Editor
 from aqt.utils import chooseList, showText, tooltip
 
@@ -14,7 +14,7 @@ from ..constants import ICONS_PATH, AnkiHubCommands
 from .suggestion_dialog import SuggestionDialog
 
 
-def on_ankihub_button_press(editor: Editor):
+def on_ankihub_button_press(editor: Editor) -> None:
     """
     Action to be performed when the AnkiHub icon button is clicked or when
     the hotkey is pressed.
@@ -53,7 +53,7 @@ def on_ankihub_button_press(editor: Editor):
         )
         if response.status_code == 201:
             tooltip("Submitted change note suggestion to AnkiHub.")
-            return response.json()
+            return
     elif command == AnkiHubCommands.NEW.value:
         subscribed_decks = config.private_config.decks
         if len(subscribed_decks) == 0:
@@ -91,7 +91,7 @@ def on_ankihub_button_press(editor: Editor):
                 gui_hooks.add_cards_did_add_note.remove(on_add)
 
             gui_hooks.add_cards_did_add_note.append(on_add)
-            add_note_window: "aqt.addCards.AddCards" = editor.parentWindow  # type: ignore
+            add_note_window: AddCards = editor.parentWindow
             add_note_window.add_current_note()
         else:
             response = client.create_new_note_suggestion(
@@ -107,7 +107,6 @@ def on_ankihub_button_press(editor: Editor):
             )
             if response.status_code == 201:
                 tooltip("Submitted new note suggestion to AnkiHub.")
-                return response.json()
 
 
 def setup_editor_buttons(buttons, editor: Editor):
