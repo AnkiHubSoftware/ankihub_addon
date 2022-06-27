@@ -91,7 +91,7 @@ def on_ankihub_button_press(editor: Editor) -> None:
                 gui_hooks.add_cards_did_add_note.remove(on_add)
 
             gui_hooks.add_cards_did_add_note.append(on_add)
-            add_note_window: AddCards = editor.parentWindow
+            add_note_window: AddCards = editor.parentWindow  # type: ignore
             add_note_window.add_current_note()
         else:
             response = client.create_new_note_suggestion(
