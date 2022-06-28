@@ -153,7 +153,7 @@ def create_collaborative_deck_action() -> None:
             data = response.json()
             anki_did = mw.col.decks.id_for_name(deck_name)
             ankihub_did = data["deck_id"]
-            config.save_subscription(ankihub_did, anki_did, creator=True)
+            config.save_subscription(deck_name, ankihub_did, anki_did, creator=True)
         else:
             msg = f"😔 Deck upload failed: {response.text}"
         showInfo(msg)

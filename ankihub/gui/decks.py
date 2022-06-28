@@ -244,7 +244,9 @@ class SubscribeDialog(QDialog):
                     title="Please confirm to proceed.",
                 )
                 if confirmed:
-                    self.install_deck(out_file, ankihub_did, data["anki_id"])
+                    self.install_deck(
+                        out_file, data["name"], ankihub_did, data["anki_id"]
+                    )
 
         mw.taskman.with_progress(
             lambda: self.client.download_deck(deck_file_name),
@@ -253,7 +255,9 @@ class SubscribeDialog(QDialog):
             label="Downloading deck",
         )
 
-    def install_deck(self, deck_file: Path, ankihub_did: str, anki_did: int):
+    def install_deck(
+        self, deck_file: Path, deck_name: str, ankihub_did: str, anki_did: int
+    ) -> None:
         """If we have a .csv, read data from the file and modify the user's note types
         and notes.
         :param: path to the .csv or .apkg file
@@ -262,7 +266,7 @@ class SubscribeDialog(QDialog):
         def on_success():
             tooltip("The deck has successfully been installed!")
             self.accept()
-            config.save_subscription(ankihub_did, anki_did)
+            config.save_subscription(deck_name, ankihub_did, anki_did)
 
         def on_fail():
             tooltip("Failed to install deck!")
