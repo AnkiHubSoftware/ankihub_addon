@@ -11,11 +11,11 @@ install the dependencies:
 pip install -r ./requirements/dev.txt
 ```
 
-## Environment variables
+### Staging server
 
-- `API_URL_BASE=https://ankihub.applikuapp.com/api`
+To point the add-on to the staging server, modify add-on config to `"ankihub_url": "https://staging.ankihub.net"`
 
-This is needed to point the add-on at our staging instance.
+### Environment variables
 
 - `SKIP_INIT=1`
 
