@@ -25,5 +25,5 @@ jobs:
         run: |
           python scripts/upload_to_ankiweb.py ankihub.ankiaddon ankipalace ankihub_addon
         env:
-          ANKI_USERNAME: PLACEHOLDER
+          ANKI_USERNAME: hub@ankipalace.com
           ANKI_PASSWORD: ${{ secrets.ANKIWEB_PASSWORD }}
