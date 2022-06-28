@@ -37,7 +37,7 @@ def upload(
         web.go_to(f'https://ankiweb.net/shared/upload?id={manifest_dict["ankiweb_id"]}')
     else:
         # upload new addon
-        web.go_to(f"https://ankiweb.net/shared/upload")
+        web.go_to("https://ankiweb.net/shared/upload")
 
     web.type(manifest_dict["name"], into="title")
     web.type(
@@ -76,7 +76,7 @@ def upload(
         if "/shared/info/" in url:
             break
     else:
-        raise RuntimeError(f"Upload failed")
+        raise RuntimeError("Upload failed")
 
 
 if __name__ == "__main__":
