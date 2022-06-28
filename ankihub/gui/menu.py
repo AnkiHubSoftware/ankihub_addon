@@ -22,12 +22,6 @@ from ..utils import sync_with_ankihub
 from .decks import SubscribedDecksDialog
 
 
-def main_menu_setup():
-    ankihub_menu = QMenu("&AnkiHub", parent=mw)
-    mw.form.menubar.addMenu(ankihub_menu)
-    return ankihub_menu
-
-
 class AnkiHubLogin(QWidget):
     def __init__(self):
         super(AnkiHubLogin, self).__init__()
@@ -54,6 +48,7 @@ class AnkiHubLogin(QWidget):
         self.password_box_text = QLineEdit("", self)
         self.password_box_text.setEchoMode(QLineEdit.EchoMode.Password)
         self.password_box_text.setMinimumWidth(300)
+        self.password_box_text.returnPressed.connect(self.login)
         self.password_box.addWidget(self.password_box_label)
         self.password_box.addWidget(self.password_box_text)
         self.box_left.addLayout(self.password_box)
@@ -62,6 +57,7 @@ class AnkiHubLogin(QWidget):
         self.login_button = QPushButton("Login", self)
         self.bottom_box_section.addWidget(self.login_button)
         self.login_button.clicked.connect(self.login)
+        self.login_button.setDefault(True)
 
         self.box_left.addLayout(self.bottom_box_section)
 
@@ -85,8 +81,6 @@ class AnkiHubLogin(QWidget):
         self.setMinimumWidth(500)
         self.setSizePolicy(QSizePolicy.Policy.Minimum, QSizePolicy.Policy.Minimum)
         self.setWindowTitle("Login to AnkiHub.")
-        if config.private_config.token:
-            self.label_results.setText("✨ You are logged into AnkiHub.")
         self.show()
 
     def login(self):
@@ -104,19 +98,13 @@ class AnkiHubLogin(QWidget):
         if not response or response.status_code != 200:
             return
 
-        self.label_results.setText("✨ You are now logged into AnkiHub.")
+        self.close()
 
     @classmethod
     def display_login(cls):
         global __window
         __window = cls()
         return __window
-
-
-def ankihub_login_setup(parent):
-    sign_in_button = QAction("🔑 Sign into AnkiHub", mw)
-    sign_in_button.triggered.connect(AnkiHubLogin.display_login)
-    parent.addAction(sign_in_button)
 
 
 def create_collaborative_deck_action() -> None:
@@ -185,6 +173,12 @@ def sync_with_ankihub_action():
     sync_with_ankihub()
 
 
+def ankihub_login_setup(parent):
+    sign_in_button = QAction("🔑 Sign into AnkiHub", mw)
+    sign_in_button.triggered.connect(AnkiHubLogin.display_login)
+    parent.addAction(sign_in_button)
+
+
 def upload_suggestions_setup(parent):
     """Set up the menu item for uploading suggestions in bulk."""
     q_action = QAction("⬆️ Upload suggestions to AnkiHub", parent=parent)
@@ -206,11 +200,33 @@ def sync_with_ankihub_setup(parent):
     parent.addAction(q_action)
 
 
+def ankihub_logout_setup(parent):
+    q_action = QAction("🔑 Sign out", mw)
+    q_action.triggered.connect(lambda: AnkiHubClient().signout())
+    parent.addAction(q_action)
+
+
+ankihub_menu: QMenu
+
+
 def setup_ankihub_menu() -> None:
+    global ankihub_menu
+    ankihub_menu = QMenu("&AnkiHub", parent=mw)
+    mw.form.menubar.addMenu(ankihub_menu)
+    refresh_ankihub_menu()
+    config.token_change_hook = refresh_ankihub_menu
+
+
+def refresh_ankihub_menu() -> None:
     """Add top-level AnkiHub menu."""
-    ankihub_menu = main_menu_setup()
-    ankihub_login_setup(parent=ankihub_menu)
-    create_collaborative_deck_setup(parent=ankihub_menu)
-    subscribe_to_deck_setup(parent=ankihub_menu)
-    sync_with_ankihub_setup(parent=ankihub_menu)
-    # upload_suggestions_setup(parent=ankihub_menu)
+    global ankihub_menu
+    ankihub_menu.clear()
+
+    if config.private_config.token:
+        create_collaborative_deck_setup(parent=ankihub_menu)
+        subscribe_to_deck_setup(parent=ankihub_menu)
+        sync_with_ankihub_setup(parent=ankihub_menu)
+        ankihub_logout_setup(parent=ankihub_menu)
+        # upload_suggestions_setup(parent=ankihub_menu)
+    else:
+        ankihub_login_setup(parent=ankihub_menu)
