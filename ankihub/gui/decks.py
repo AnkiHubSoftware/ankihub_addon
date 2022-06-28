@@ -71,9 +71,7 @@ class SubscribedDecksDialog(QDialog):
         self.decks_list.clear()
         decks = config.private_config.decks
         for ankihub_id in decks:
-            anki_id = decks[ankihub_id]["anki_id"]
-            deck = mw.col.decks.get(anki_id, default=False)
-            name = deck["name"] if deck is not None else ankihub_id
+            name = decks[ankihub_id]["name"]
             item = QListWidgetItem(name)
             item.setData(Qt.ItemDataRole.UserRole, ankihub_id)
             self.decks_list.addItem(item)
