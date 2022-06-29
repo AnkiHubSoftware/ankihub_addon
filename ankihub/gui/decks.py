@@ -5,6 +5,7 @@ from pathlib import Path
 from typing import Callable
 
 from aqt import QPushButton, mw
+from aqt.importing import AnkiPackageImporter
 from aqt.qt import (
     QDialog,
     QDialogButtonBox,
@@ -18,13 +19,13 @@ from aqt.qt import (
     QVBoxLayout,
 )
 from aqt.utils import askUser, openLink, showText, tooltip
-from aqt.importing import AnkiPackageImporter
 
 from .. import LOGGER
 from ..addon_ankihub_client import AddonAnkiHubClient as AnkiHubClient
 from ..config import config
 from ..constants import CSV_DELIMITER, URL_DECK_BASE, URL_DECKS, URL_HELP
 from ..register_decks import modify_note_types, process_csv
+from ..utils import create_backup_with_progress
 
 
 class SubscribedDecksDialog(QDialog):
@@ -244,7 +245,12 @@ class SubscribeDialog(QDialog):
                     title="Please confirm to proceed.",
                 )
                 if confirmed:
-                    self.install_deck(out_file, ankihub_did, data["anki_id"])
+                    mw.taskman.with_progress(
+                        lambda: self.install_deck(
+                            out_file, ankihub_did, data["anki_id"]
+                        ),
+                        label="Installing deck",
+                    )
 
         mw.taskman.with_progress(
             lambda: self.client.download_deck(deck_file_name),
@@ -267,6 +273,8 @@ class SubscribeDialog(QDialog):
         def on_fail():
             tooltip("Failed to install deck!")
             self.reject()
+
+        create_backup_with_progress()
 
         if deck_file.suffix == ".apkg":
             self._install_deck_apkg(deck_file, on_success, on_fail)
@@ -312,7 +320,6 @@ class SubscribeDialog(QDialog):
                     ankihub_deck_ids.add(row["deck"])
                     note_type_names.add(row["note_type"])
             assert len(ankihub_deck_ids) == 1
-            mw._create_backup_with_progress(user_initiated=False)
             modify_note_types(note_type_names)
             process_csv(notes)
             on_success()

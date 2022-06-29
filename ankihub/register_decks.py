@@ -23,7 +23,11 @@ from .constants import (
     ANKIHUB_NOTE_TYPE_MODIFICATION_STRING,
     URL_VIEW_NOTE,
 )
-from .utils import get_note_types_in_deck, update_or_create_note
+from .utils import (
+    create_backup_with_progress,
+    get_note_types_in_deck,
+    update_or_create_note,
+)
 
 DIR_PATH = os.path.dirname(os.path.abspath(__file__))
 
