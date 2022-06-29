@@ -1,4 +1,7 @@
+from concurrent.futures import Future
+from pprint import pformat
 from typing import Dict, List
+from urllib.error import HTTPError
 
 import anki
 import aqt
@@ -10,10 +13,11 @@ from anki.notes import Note, NoteId
 from aqt import mw
 from aqt.operations import QueryOp
 from aqt.utils import showWarning, tr
+from requests.exceptions import ConnectionError
 
 from . import LOGGER, constants
-from .ankihub_client import AnkiHubClient
-from .config import Config
+from .addon_ankihub_client import AddonAnkiHubClient as AnkiHubClient
+from .config import config
 
 
 def note_type_contains_field(
@@ -58,6 +62,7 @@ def hide_ankihub_field_in_editor(
 def create_note_with_id(note_type, anki_id) -> Note:
     """Create a new note, add it to the appropriate deck and override the note id with
     the note id of the original note creator."""
+    LOGGER.debug(f"Trying to create note: {note_type} {anki_id}.")
     note_type = mw.col.models.by_name(note_type)
     note = Note(col=mw.col, model=note_type)
     # TODO Add to an appropriate deck.
@@ -81,10 +86,12 @@ def update_note(note, anki_id, ankihub_id, fields, tags):
     LOGGER.debug(f"Updated note {anki_id}")
 
 
-def update_or_create_note(anki_id, ankihub_id, fields, tags, note_type) -> Note:
+def update_or_create_note(
+    anki_id: int, ankihub_id: str, fields: List[Dict], tags: List[str], note_type: str
+) -> Note:
     try:
         note = mw.col.get_note(id=NoteId(anki_id))
-        fields.update(
+        fields.append(
             {
                 "name": constants.ANKIHUB_NOTE_TYPE_FIELD_NAME,
                 # Put the AnkiHub field last
@@ -102,17 +109,21 @@ def update_or_create_note(anki_id, ankihub_id, fields, tags, note_type) -> Note:
 
 
 def sync_with_ankihub():
+    LOGGER.debug("Trying to sync with AnkiHub.")
     client = AnkiHubClient()
-    config = Config()
     decks = config.private_config.decks
     for deck in decks:
         collected_notes = []
-        for response in client.get_deck_updates(deck):
-            if response.status_code == 200:
-                data = response.json()
-                notes = data["notes"]
-                if notes:
-                    collected_notes += notes
+        for response in client.get_deck_updates(
+            deck, since=config.private_config.last_sync
+        ):
+            if response.status_code != 200:
+                return
+
+            data = response.json()
+            notes = data["notes"]
+            if notes:
+                collected_notes += notes
 
         if collected_notes:
 
@@ -128,6 +139,7 @@ def sync_with_ankihub():
                     note_type,
                     note_type_id,
                 ) = note.values()
+                LOGGER.debug(f"Trying to update or create note:\n {pformat(note)}")
                 update_or_create_note(anki_id, ankihub_id, fields, tags, note_type)
                 # Should last sync be tracked separately for each deck?
                 mw.reset()
@@ -135,9 +147,18 @@ def sync_with_ankihub():
 
 
 def sync_on_profile_open():
-    config = Config()
+    def on_done(future: Future):
+
+        # Don't raise exception when automatically attempting to sync with AnkiHub
+        # with no Internet connection.
+        if exc := future.exception():
+            if not isinstance(exc, (ConnectionError, HTTPError)):
+                raise exc
+
     if config.private_config.token:
-        mw.taskman.with_progress(sync_with_ankihub, label="Synchronizing with AnkiHub")
+        mw.taskman.with_progress(
+            sync_with_ankihub, label="Synchronizing with AnkiHub", on_done=on_done
+        )
 
 
 def create_backup_with_progress():

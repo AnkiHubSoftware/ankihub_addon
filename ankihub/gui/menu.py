@@ -1,9 +1,3 @@
-import csv
-import tempfile
-from concurrent.futures import Future
-from pathlib import Path
-
-import requests
 from aqt import (
     QHBoxLayout,
     QLabel,
@@ -19,23 +13,13 @@ from aqt.qt import QAction, QMenu, qconnect
 from aqt.studydeck import StudyDeck
 from aqt.utils import askUser, showInfo, showText, tooltip
 from requests import Response
-from requests.exceptions import HTTPError
 
 from .. import LOGGER
-from ..ankihub_client import AnkiHubClient
-from ..config import Config
-from ..constants import CSV_DELIMITER, URL_HELP
-from ..register_decks import create_collaborative_deck, modify_note_types, process_csv
-from ..utils import (
-    create_backup_with_progress,
-    sync_with_ankihub,
-)
-
-
-def main_menu_setup():
-    ankihub_menu = QMenu("&AnkiHub", parent=mw)
-    mw.form.menubar.addMenu(ankihub_menu)
-    return ankihub_menu
+from ..addon_ankihub_client import AddonAnkiHubClient as AnkiHubClient
+from ..config import config
+from ..register_decks import create_collaborative_deck
+from ..utils import sync_with_ankihub
+from .decks import SubscribedDecksDialog
 
 
 class AnkiHubLogin(QWidget):
@@ -64,6 +48,7 @@ class AnkiHubLogin(QWidget):
         self.password_box_text = QLineEdit("", self)
         self.password_box_text.setEchoMode(QLineEdit.EchoMode.Password)
         self.password_box_text.setMinimumWidth(300)
+        self.password_box_text.returnPressed.connect(self.login)
         self.password_box.addWidget(self.password_box_label)
         self.password_box.addWidget(self.password_box_text)
         self.box_left.addLayout(self.password_box)
@@ -72,6 +57,7 @@ class AnkiHubLogin(QWidget):
         self.login_button = QPushButton("Login", self)
         self.bottom_box_section.addWidget(self.login_button)
         self.login_button.clicked.connect(self.login)
+        self.login_button.setDefault(True)
 
         self.box_left.addLayout(self.bottom_box_section)
 
@@ -95,9 +81,6 @@ class AnkiHubLogin(QWidget):
         self.setMinimumWidth(500)
         self.setSizePolicy(QSizePolicy.Policy.Minimum, QSizePolicy.Policy.Minimum)
         self.setWindowTitle("Login to AnkiHub.")
-        config = Config()
-        if config.private_config.token:
-            self.label_results.setText("✨ You are logged into AnkiHub.")
         self.show()
 
     def login(self):
@@ -107,212 +90,21 @@ class AnkiHubLogin(QWidget):
             showText("Oops! You forgot to put in a username or password!")
             return
         ankihub_client = AnkiHubClient()
-        try:
-            ankihub_client.login(
-                credentials={"username": username, "password": password}
-            )
-        except HTTPError as e:
-            LOGGER.debug(f"{e}")
-            showText(
-                "AnkiHub login failed.  Please make sure your username and "
-                "password are correct for AnkiHub."
-            )
+        ankihub_client.signout()
+
+        response = ankihub_client.login(
+            credentials={"username": username, "password": password}
+        )
+        if not response or response.status_code != 200:
             return
-        self.label_results.setText("✨ You are now logged into AnkiHub.")
+
+        self.close()
 
     @classmethod
     def display_login(cls):
         global __window
         __window = cls()
         return __window
-
-
-class SubscribeToDeck(QWidget):
-    def __init__(self):
-        super(SubscribeToDeck, self).__init__()
-        self.results = None
-        self.thread = None
-        self.box_top = QVBoxLayout()
-        self.box_upper = QHBoxLayout()
-        self.box_left = QVBoxLayout()
-        self.box_right = QVBoxLayout()
-        self.bottom_box_section = QHBoxLayout()
-
-        self.deck_id_box = QHBoxLayout()
-        self.deck_id_box_label = QLabel("AnkiHub Deck ID:")
-        self.deck_id_box_text = QLineEdit("", self)
-        self.deck_id_box_text.setMinimumWidth(300)
-        self.deck_id_box.addWidget(self.deck_id_box_label)
-        self.deck_id_box.addWidget(self.deck_id_box_text)
-        self.box_left.addLayout(self.deck_id_box)
-
-        self.subscribe_button = QPushButton("Subscribe to AnkiHub Deck", self)
-        self.bottom_box_section.addWidget(self.subscribe_button)
-        self.subscribe_button.clicked.connect(self.subscribe)
-        self.box_left.addLayout(self.bottom_box_section)
-
-        self.box_upper.addLayout(self.box_left)
-        self.box_upper.addSpacing(20)
-        self.box_upper.addLayout(self.box_right)
-
-        self.instructions_label = """
-        \r\n<center>Copy/Paste a Deck ID from AnkiHub.net/decks to subscribe.</center>
-        """
-        self.label_results = QLabel(self.instructions_label)
-        # Add all widgets to top layout.
-        self.box_top.addLayout(self.box_upper)
-        self.box_top.addWidget(self.label_results)
-        self.box_top.addStretch(1)
-        self.setLayout(self.box_top)
-
-        self.setMinimumWidth(500)
-        self.setSizePolicy(QSizePolicy.Policy.Minimum, QSizePolicy.Policy.Minimum)
-        self.setWindowTitle("Subscribe to Collaborative Deck")
-
-        self.config = Config()
-        self.client = AnkiHubClient()
-        if not self.client.token:
-            showText("Oops! Please make sure you are logged into AnkiHub!")
-            self.close()
-        else:
-            self.show()
-
-    def subscribe(self):
-        ankihub_did = self.deck_id_box_text.text()
-        try:
-            ankihub_did = int(ankihub_did)
-        except ValueError:
-            showText(
-                "Oops! Please copy/paste a Deck ID from AnkiHub.net/browse (numbers only)!"
-            )
-            return
-
-        if ankihub_did in self.config.private_config.decks.keys():
-            showText(
-                f"You've already subscribed to deck {ankihub_did}. "
-                "Syncing with AnkiHub will happen automatically everytime you "
-                "restart Anki. You can manually sync with AnkiHub from the AnkiHub "
-                f"menu. See {URL_HELP} for more details."
-            )
-            self.close()
-            return
-
-        self.download_and_install_deck(ankihub_did)
-
-    def download_and_install_deck(self, ankihub_did):
-        """
-        Take the AnkiHub deck id, copyied/pasted by the user and
-        1) Download the deck .csv or .apkg, depending on if the user already has
-        the deck.
-
-        :param deck_id: the deck's ankihub id
-        :return:
-        """
-
-        deck_response = self.client.get_deck_by_id(ankihub_did)
-        if deck_response.status_code == 404:
-            showText(
-                f"Deck {ankihub_did} doesn't exist. Please make sure you copy/paste "
-                f"the correct ID. If you believe this is an error, please reach "
-                f"out to user support at help@ankipalace.com."
-            )
-            self.label_results.setText(self.instructions_label)
-            return
-        elif deck_response.status_code != 200:
-            return
-
-        data = deck_response.json()
-        first_time_install = mw.col.decks.get(data["anki_id"]) is not None
-        deck_file_name = (
-            data["apkg_filename"] if first_time_install else data["csv_notes_filename"]
-        )
-
-        presigned_url_response = self.client.get_presigned_url(
-            key=deck_file_name, action="download"
-        )
-        s3_url = presigned_url_response.json()["pre_signed_url"]
-
-        def on_download_done(future: Future):
-            s3_response = future.result()
-            LOGGER.debug(f"{s3_response.url}")
-            LOGGER.debug(f"{s3_response.status_code}")
-            # TODO Use io.BytesIO
-            out_file = Path(tempfile.mkdtemp()) / f"{deck_file_name}"
-            with out_file.open("wb") as f:
-                f.write(s3_response.content)
-                LOGGER.debug(f"Wrote {deck_file_name} to {out_file}")
-                # TODO Validate .csv
-            self.label_results.setText("Deck download successful!")
-
-            if out_file:
-                confirmed = askUser(
-                    f"The AnkiHub deck {ankihub_did} has been downloaded. Would you like to "
-                    f"proceed with modifying your personal collection in order to subscribe "
-                    f"to the collaborative deck? See {URL_HELP} for "
-                    f"details.",
-                    title="Please confirm to proceed.",
-                )
-                if confirmed:
-                    mw.taskman.with_progress(
-                        lambda: self.install_deck(
-                            out_file, ankihub_did, data["anki_id"]
-                        ),
-                        label="Installing deck",
-                    )
-
-            self.close()
-
-        mw.taskman.with_progress(
-            lambda: requests.get(s3_url),
-            on_done=on_download_done,
-            parent=self,
-            label="Downloading deck",
-        )
-
-    def install_deck(self, deck_file: Path, ankihub_did: int, anki_did: int) -> None:
-        """If we have a .csv, read data from the file and modify the user's note types
-        and notes.
-        :param: path to the .csv or .apkg file
-        """
-        create_backup_with_progress()
-        if deck_file.suffix == ".apkg":
-            self._install_deck_apkg(deck_file)
-        elif deck_file.suffix == ".csv":
-            self._install_deck_csv(deck_file)
-
-        self.config.save_subscription(ankihub_did, anki_did)
-        tooltip("The deck has successfully been installed!")
-
-    def _install_deck_apkg(self, deck_file: Path):
-        from aqt import importing
-
-        importing.importFile(mw, str(deck_file.absolute()))
-
-    def _install_deck_csv(self, deck_file):
-        tooltip("Configuring the collaborative deck.")
-        ankihub_deck_ids, note_type_names = set(), set()
-        notes = []
-        with deck_file.open() as f:
-            reader = csv.DictReader(f, delimiter=CSV_DELIMITER)
-            for row in reader:
-                notes.append(row)
-                ankihub_deck_ids.add(row["deck"])
-                note_type_names.add(row["note_type"])
-        assert len(ankihub_deck_ids) == 1
-        modify_note_types(note_type_names)
-        process_csv(notes)
-
-    @classmethod
-    def display_subscribe_window(cls):
-        global __window
-        __window = cls()
-        return __window
-
-
-def ankihub_login_setup(parent):
-    sign_in_button = QAction("🔑 Sign into AnkiHub", mw)
-    sign_in_button.triggered.connect(AnkiHubLogin.display_login)
-    parent.addAction(sign_in_button)
 
 
 def create_collaborative_deck_action() -> None:
@@ -346,10 +138,10 @@ def create_collaborative_deck_action() -> None:
         if response.status_code == 201:
             msg = "🎉 Deck upload successful!"
 
-            config = Config()
             data = response.json()
             anki_did = mw.col.decks.id_for_name(deck_name)
-            config.save_subscription(data["ankihub_id"], anki_did, creator=True)
+            ankihub_did = data["deck_id"]
+            config.save_subscription(ankihub_did, anki_did, creator=True)
         else:
             msg = f"😔 Deck upload failed: {response.text}"
         showInfo(msg)
@@ -381,6 +173,12 @@ def sync_with_ankihub_action():
     sync_with_ankihub()
 
 
+def ankihub_login_setup(parent):
+    sign_in_button = QAction("🔑 Sign into AnkiHub", mw)
+    sign_in_button.triggered.connect(AnkiHubLogin.display_login)
+    parent.addAction(sign_in_button)
+
+
 def upload_suggestions_setup(parent):
     """Set up the menu item for uploading suggestions in bulk."""
     q_action = QAction("⬆️ Upload suggestions to AnkiHub", parent=parent)
@@ -390,8 +188,8 @@ def upload_suggestions_setup(parent):
 
 def subscribe_to_deck_setup(parent):
     """Set up the menu item for uploading suggestions in bulk."""
-    q_action = QAction("📚 Subscribe to a Deck", mw)
-    q_action.triggered.connect(SubscribeToDeck.display_subscribe_window)
+    q_action = QAction("📚 Subscribed Decks", mw)
+    q_action.triggered.connect(SubscribedDecksDialog.display_subscribe_window)
     parent.addAction(q_action)
 
 
@@ -402,11 +200,33 @@ def sync_with_ankihub_setup(parent):
     parent.addAction(q_action)
 
 
+def ankihub_logout_setup(parent):
+    q_action = QAction("🔑 Sign out", mw)
+    q_action.triggered.connect(lambda: AnkiHubClient().signout())
+    parent.addAction(q_action)
+
+
+ankihub_menu: QMenu
+
+
 def setup_ankihub_menu() -> None:
+    global ankihub_menu
+    ankihub_menu = QMenu("&AnkiHub", parent=mw)
+    mw.form.menubar.addMenu(ankihub_menu)
+    refresh_ankihub_menu()
+    config.token_change_hook = refresh_ankihub_menu
+
+
+def refresh_ankihub_menu() -> None:
     """Add top-level AnkiHub menu."""
-    ankihub_menu = main_menu_setup()
-    ankihub_login_setup(parent=ankihub_menu)
-    create_collaborative_deck_setup(parent=ankihub_menu)
-    subscribe_to_deck_setup(parent=ankihub_menu)
-    sync_with_ankihub_setup(parent=ankihub_menu)
-    # upload_suggestions_setup(parent=ankihub_menu)
+    global ankihub_menu
+    ankihub_menu.clear()
+
+    if config.private_config.token:
+        create_collaborative_deck_setup(parent=ankihub_menu)
+        subscribe_to_deck_setup(parent=ankihub_menu)
+        sync_with_ankihub_setup(parent=ankihub_menu)
+        ankihub_logout_setup(parent=ankihub_menu)
+        # upload_suggestions_setup(parent=ankihub_menu)
+    else:
+        ankihub_login_setup(parent=ankihub_menu)

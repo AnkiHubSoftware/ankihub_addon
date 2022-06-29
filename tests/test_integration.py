@@ -1,12 +1,12 @@
 import copy
 import pathlib
+import uuid
 from datetime import datetime, timedelta, timezone
-from unittest.mock import MagicMock, Mock, patch
+from unittest.mock import MagicMock, Mock
 
 from anki.decks import DeckId
 from anki.models import NotetypeId
 from pytest_anki import AnkiSession
-
 
 sample_model_id = NotetypeId(1650564101852)
 sample_deck = str(pathlib.Path(__file__).parent / "test_data" / "small.apkg")
@@ -63,8 +63,7 @@ def test_editor(anki_session_with_addon: AnkiSession, requests_mock, monkeypatch
     # now, this test just checks that on_ankihub_button_press runs without
     # raising any errors.
     monkeypatch.setattr("ankihub.gui.editor.SuggestionDialog.exec", Mock())
-    response = on_ankihub_button_press(editor)
-    assert response == {}
+    on_ankihub_button_press(editor)
 
 
 def test_get_note_types_in_deck(anki_session_with_addon: AnkiSession):
@@ -145,34 +144,36 @@ def test_create_collaborative_deck_and_upload(
 
                 from ankihub.register_decks import upload_deck
 
-                with patch("ankihub.ankihub_client.Config"):
-                    monkeypatch.setattr(
-                        "ankihub.ankihub_client.requests", requests_mock
-                    )
-                    upload_deck(DeckId(deck_id))
+                upload_deck(DeckId(deck_id))
 
 
 def test_client_login_and_signout(anki_session_with_addon: AnkiSession, requests_mock):
-    from ankihub.ankihub_client import AnkiHubClient
+    from ankihub.addon_ankihub_client import AddonAnkiHubClient as AnkiHubClient
+    from ankihub.addon_ankihub_client import sign_in_hook, sign_out_hook
+    from ankihub.config import config
     from ankihub.constants import API_URL_BASE
 
-    client = AnkiHubClient()
+    client = AnkiHubClient(hooks=[sign_in_hook, sign_out_hook])
     credentials_data = {"username": "test", "password": "testpassword"}
     requests_mock.post(f"{API_URL_BASE}/login/", json={"token": "f4k3t0k3n"})
+    requests_mock.post(
+        f"{API_URL_BASE}/logout/", json={"token": "f4k3t0k3n"}, status_code=204
+    )
     client.login(credentials=credentials_data)
-    assert client._headers["Authorization"] == "Token f4k3t0k3n"
+    assert client.session.headers["Authorization"] == "Token f4k3t0k3n"
+    assert config.private_config.token == "f4k3t0k3n"
 
     # test signout
     client.signout()
-    assert client._headers["Authorization"] == ""
-    assert client._config.private_config.token == ""
+    assert client.session.headers["Authorization"] == ""
+    assert config.private_config.token == ""
 
 
 def test_upload_deck(anki_session_with_addon: AnkiSession, requests_mock, monkeypatch):
-    from ankihub.ankihub_client import AnkiHubClient
+    from ankihub.addon_ankihub_client import AddonAnkiHubClient as AnkiHubClient
     from ankihub.constants import API_URL_BASE
 
-    client = AnkiHubClient()
+    client = AnkiHubClient(hooks=[])
 
     requests_mock.get(
         f"{API_URL_BASE}/decks/pre-signed-url",
@@ -194,7 +195,6 @@ def test_upload_deck(anki_session_with_addon: AnkiSession, requests_mock, monkey
     assert response.status_code == 201
 
     # test upload deck unauthenticated
-    monkeypatch.setattr("ankihub.ankihub_client.showText", Mock())
     requests_mock.post(f"{API_URL_BASE}/decks/", status_code=403)
     response = client.upload_deck(pathlib.Path(sample_deck), anki_id=1)
     assert response.status_code == 403
@@ -203,10 +203,10 @@ def test_upload_deck(anki_session_with_addon: AnkiSession, requests_mock, monkey
 def test_get_deck_updates(
     anki_session_with_addon: AnkiSession, requests_mock, monkeypatch
 ):
-    from ankihub.ankihub_client import AnkiHubClient
+    from ankihub.addon_ankihub_client import AddonAnkiHubClient as AnkiHubClient
     from ankihub.constants import API_URL_BASE
 
-    client = AnkiHubClient()
+    client = AnkiHubClient(hooks=[])
 
     # test get deck updates
     deck_id = 1
@@ -232,24 +232,23 @@ def test_get_deck_updates(
     }
 
     requests_mock.get(f"{API_URL_BASE}/decks/{deck_id}/updates", json=expected_data)
-    for response in client.get_deck_updates(deck_id=str(deck_id)):
+    for response in client.get_deck_updates(deck_id=str(deck_id), since=timestamp):
         assert response.json() == expected_data
 
     # test get deck updates unauthenticated
     deck_id = 1
-    monkeypatch.setattr("ankihub.ankihub_client.showText", Mock())
     requests_mock.get(f"{API_URL_BASE}/decks/{deck_id}/updates", status_code=403)
-    for response in client.get_deck_updates(deck_id=str(deck_id)):
+    for response in client.get_deck_updates(deck_id=str(deck_id), since=timestamp):
         assert response.status_code == 403
 
 
 def test_get_deck_by_id(
     anki_session_with_addon: AnkiSession, requests_mock, monkeypatch
 ):
-    from ankihub.ankihub_client import AnkiHubClient
+    from ankihub.addon_ankihub_client import AddonAnkiHubClient as AnkiHubClient
     from ankihub.constants import API_URL_BASE
 
-    client = AnkiHubClient()
+    client = AnkiHubClient(hooks=[])
 
     # test get deck by id
     deck_id = 1
@@ -270,7 +269,6 @@ def test_get_deck_by_id(
     # test get deck by id unauthenticated
     deck_id = DeckId(1)
     requests_mock.get(f"{API_URL_BASE}/decks/{deck_id}/", status_code=403)
-    monkeypatch.setattr("ankihub.ankihub_client.showText", Mock())
     response = client.get_deck_by_id(deck_id=str(deck_id))
     assert response.status_code == 403
 
@@ -281,7 +279,7 @@ def test_get_note_by_anki_id(
     from ankihub.ankihub_client import AnkiHubClient
     from ankihub.constants import API_URL_BASE
 
-    client = AnkiHubClient()
+    client = AnkiHubClient(hooks=[])
 
     # test get note by anki id
     note_anki_id = 1
@@ -293,14 +291,13 @@ def test_get_note_by_anki_id(
         "fields": [{"name": "Text", "order": 0, "value": "Fake value"}],
     }
     requests_mock.get(f"{API_URL_BASE}/notes/{note_anki_id}", json=expected_data)
-    response = client.get_note_by_anki_id(anki_id=str(note_anki_id))
+    response = client.get_note_by_anki_id(anki_id=note_anki_id)
     assert response.json() == expected_data
 
     # test get note by anki id unauthenticated
     note_anki_id = 1
     requests_mock.get(f"{API_URL_BASE}/notes/{note_anki_id}", status_code=403)
-    monkeypatch.setattr("ankihub.ankihub_client.showText", Mock())
-    response = client.get_note_by_anki_id(anki_id=str(note_anki_id))
+    response = client.get_note_by_anki_id(anki_id=note_anki_id)
     assert response.status_code == 403
 
 
@@ -310,15 +307,15 @@ def test_create_change_note_suggestion(
     from ankihub.ankihub_client import AnkiHubClient
     from ankihub.constants import API_URL_BASE, ChangeTypes
 
-    client = AnkiHubClient()
+    client = AnkiHubClient(hooks=[])
     # test create change note suggestion
     note_id = 1
     requests_mock.post(f"{API_URL_BASE}/notes/{note_id}/suggestion/", status_code=201)
     response = client.create_change_note_suggestion(
-        ankihub_id=str(1),
+        ankihub_note_uuid=str(1),
         fields=[{"name": "abc", "order": 0, "value": "abc changed"}],
         tags=["test"],
-        change_type=ChangeTypes.NEW_UPDATE,
+        change_type=ChangeTypes.NEW_CONTENT,
         comment="",
     )
     assert response.status_code == 201
@@ -326,12 +323,11 @@ def test_create_change_note_suggestion(
     # test create change note suggestion unauthenticated
     note_id = 1
     requests_mock.post(f"{API_URL_BASE}/notes/{note_id}/suggestion/", status_code=403)
-    monkeypatch.setattr("ankihub.ankihub_client.showText", Mock())
     response = client.create_change_note_suggestion(
-        ankihub_id=str(1),
+        ankihub_note_uuid=str(1),
         fields=[{"name": "abc", "order": 0, "value": "abc changed"}],
         tags=["test"],
-        change_type=ChangeTypes.NEW_UPDATE,
+        change_type=ChangeTypes.NEW_CONTENT,
         comment="",
     )
     assert response.status_code == 403
@@ -343,36 +339,38 @@ def test_create_new_note_suggestion(
     from ankihub.ankihub_client import AnkiHubClient
     from ankihub.constants import API_URL_BASE, ChangeTypes
 
-    client = AnkiHubClient()
+    client = AnkiHubClient(hooks=[])
     # test create new note suggestion
-    deck_id = 1
+    deck_id = str(uuid.uuid4())
     requests_mock.post(
         f"{API_URL_BASE}/decks/{deck_id}/note-suggestion/", status_code=201
     )
     response = client.create_new_note_suggestion(
-        deck_id=deck_id,
+        ankihub_deck_uuid=deck_id,
         anki_id=1,
-        ankihub_id=str(1),
+        ankihub_note_uuid=str(1),
         fields=[{"name": "abc", "order": 0, "value": "abc changed"}],
         tags=["test"],
-        change_type=ChangeTypes.NEW_UPDATE,
+        change_type=ChangeTypes.NEW_CARD_TO_ADD,
+        note_type="Basic",
+        note_type_id=1,
         comment="",
     )
     assert response.status_code == 201
 
     # test create new note suggestion unauthenticated
-    deck_id = 1
     requests_mock.post(
         f"{API_URL_BASE}/decks/{deck_id}/note-suggestion/", status_code=403
     )
-    monkeypatch.setattr("ankihub.ankihub_client.showText", Mock())
     response = client.create_new_note_suggestion(
-        deck_id=deck_id,
-        ankihub_id=str(1),
+        ankihub_deck_uuid=deck_id,
+        ankihub_note_uuid=str(1),
         anki_id=1,
         fields=[{"name": "abc", "order": 0, "value": "abc changed"}],
         tags=["test"],
-        change_type=ChangeTypes.NEW_UPDATE,
+        change_type=ChangeTypes.NEW_CARD_TO_ADD,
+        note_type="Basic",
+        note_type_id=1,
         comment="",
     )
     assert response.status_code == 403

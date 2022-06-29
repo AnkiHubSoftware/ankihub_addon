@@ -1,100 +1,120 @@
-from json import JSONDecodeError
 from pathlib import Path
-from pprint import pformat
-from typing import Dict, List, Generator
+from typing import Dict, Iterator, List, TypedDict
 
 import requests
-from aqt.utils import showText
-from requests import Response
+from requests import PreparedRequest, Request, Response, Session
+from requests.exceptions import ConnectionError
+from urllib3.exceptions import HTTPError
 
 from . import LOGGER
-from .config import Config
-from .constants import API_URL_BASE, USER_SUPPORT_EMAIL_SLUG, ChangeTypes
+from .constants import API_URL_BASE, ChangeTypes
 
 
 class AnkiHubClient:
     """Client for interacting with the AnkiHub API."""
 
-    def __init__(self):
-        self._headers = {"Content-Type": "application/json"}
-        self._config = Config()
-        self._base_url = API_URL_BASE
-        self.token = self._config.private_config.token
-        if self.token:
-            self._headers["Authorization"] = f"Token {self.token}"
+    def __init__(self, hooks=None, token=None):
+        if hooks is None:
+            self.hooks = []
+        else:
+            self.hooks = hooks
 
-    def _call_api(self, method, endpoint, data=None, params=None):
-        url = f"{self._base_url}{endpoint}"
-        response = requests.request(
+        self.session = Session()
+        self.session.hooks["response"] = self.hooks
+        self.session.headers.update({"Content-Type": "application/json"})
+        if token:
+            self.session.headers["Authorization"] = f"Token {token}"
+
+    def has_token(self) -> bool:
+        return "Token" in self.session.headers.get("Authorization", "")
+
+    def _build_request(
+        self,
+        method,
+        endpoint,
+        data=None,
+        params=None,
+    ) -> PreparedRequest:
+        url = f"{API_URL_BASE}{endpoint}"
+        request = Request(
             method=method,
-            headers=self._headers,
             url=url,
             json=data,
             params=params,
+            headers=self.session.headers,
+            hooks=self.session.hooks,
         )
-        LOGGER.debug(
-            f"request: {method} {url}\ndata={pformat(data)}\nparams={pformat(params)}\nheaders={self._headers}"
-        )
-        LOGGER.debug(f"response status: {response.status_code}")
-        if response.status_code not in [500, 404]:
-            try:
-                LOGGER.debug(f"response content: {pformat(response.json())}")
-            except JSONDecodeError:
-                LOGGER.debug(f"response content: {str(response.content)}")
-            else:
-                LOGGER.debug(f"response content: {response}")
-        if response.status_code > 299:
-            showText(
-                "Uh oh! There was a problem with your request.\n\n"
-                "If you haven't already signed in using the AnkiHub menu please do so. "
-                "Make sure your username and password are correct and that you have "
-                "confirmed your AnkiHub account through email verification. If you "
-                "believe this is an error, please reach out to user support at "
-                f"{USER_SUPPORT_EMAIL_SLUG}. This error will be automatically reported."
-            )
-        return response
+        prepped = request.prepare()
+        return prepped
 
-    def login(self, credentials: dict):
-        self.signout()
-        response = self._call_api("POST", "/login/", credentials)
-        token = response.json().get("token")
+    def _send_request(
+        self,
+        method,
+        endpoint,
+        data=None,
+        params=None,
+    ) -> Response:
+        request = self._build_request(method, endpoint, data, params)
+        try:
+            response = self.session.send(request)
+            self.session.close()
+            return response
+        except (ConnectionError, HTTPError) as e:
+            LOGGER.debug(f"Connection error: {e}")
+            raise ConnectionError(
+                "The AnkiHub add-on was unable to connect to the internet."
+            )
+
+    def login(self, credentials: dict) -> Response:
+        response = self._send_request("POST", "/login/", credentials)
+        token = response.json().get("token") if response else ""
         if token:
-            self._config.save_token(token)
-            self._headers["Authorization"] = f"Token {token}"
-        self._config.save_user_email(credentials["username"])
+            self.session.headers["Authorization"] = f"Token {token}"
         return response
 
     def signout(self):
-        self._config.save_token("")
-        self._headers["Authorization"] = ""
-        LOGGER.debug("Token cleared from config.")
+        result = self._send_request("POST", "/logout/")
+        if result and result.status_code == 204:
+            self.session.headers["Authorization"] = ""
 
     def upload_deck(self, file: Path, anki_id: int) -> Response:
         key = file.name
         presigned_url_response = self.get_presigned_url(key=key, action="upload")
+        if presigned_url_response.status_code != 200:
+            return presigned_url_response
+
         s3_url = presigned_url_response.json()["pre_signed_url"]
         with open(file, "rb") as f:
             deck_data = f.read()
+
         s3_response = requests.put(s3_url, data=deck_data)
-        LOGGER.debug(f"request url: {s3_response.request.url}")
-        LOGGER.debug(f"response status: {s3_response.status_code}")
-        if s3_response.status_code not in [500, 404]:
-            LOGGER.debug(f"response content: {pformat(s3_response.content)}")
-        response = self._call_api(
+        if s3_response.status_code != 200:
+            return s3_response
+
+        response = self._send_request(
             "POST", "/decks/", data={"key": key, "anki_id": anki_id}
         )
         return response
 
-    def get_deck_updates(self, deck_id: str) -> Generator[Response, None, None]:
-        since = self._config.private_config.last_sync
-        params = (
-            {"since": f"{self._config.private_config.last_sync}", "page": 1}
-            if since
-            else {"page": 1}
+    def download_deck(self, deck_file_name: str) -> Response:
+        presigned_url_response = self.get_presigned_url(
+            key=deck_file_name, action="download"
         )
+        if presigned_url_response.status_code != 200:
+            return presigned_url_response
+
+        s3_url = presigned_url_response.json()["pre_signed_url"]
+        return requests.get(s3_url)
+
+    def get_deck_updates(self, deck_id: str, since: float) -> Iterator[Response]:
+        class Params(TypedDict, total=False):
+            page: int
+            since: str
+
+        params: Params = {"since": str(since), "page": 1} if since else {"page": 1}
         has_next_page = True
         while has_next_page:
-            response = self._call_api(
+            response = self._send_request(
                 "GET",
                 f"/decks/{deck_id}/updates",
                 params=params,
@@ -109,58 +129,64 @@ class AnkiHubClient:
                 yield response
 
     def get_deck_by_id(self, deck_id: str) -> Response:
-        response = self._call_api(
+        response = self._send_request(
             "GET",
             f"/decks/{deck_id}/",
         )
         return response
 
-    def get_note_by_anki_id(self, anki_id: str) -> Response:
-        response = self._call_api("GET", f"/notes/{anki_id}")
+    def get_note_by_anki_id(self, anki_id: int) -> Response:
+        response = self._send_request("GET", f"/notes/{anki_id}")
         return response
 
     def create_change_note_suggestion(
         self,
-        ankihub_id: str,
+        ankihub_note_uuid: str,
         fields: List[Dict],
         tags: List[str],
         change_type: ChangeTypes,
         comment: str,
     ) -> Response:
         suggestion = {
-            "ankihub_id": ankihub_id,
+            "ankihub_id": ankihub_note_uuid,
             "fields": fields,
             "tags": tags,
-            "change_type": change_type.value,
+            "change_type": change_type.value[0],
             "comment": comment,
         }
-        response = self._call_api(
-            "POST", f"/notes/{ankihub_id}/suggestion/", data=suggestion
+        response = self._send_request(
+            "POST",
+            f"/notes/{ankihub_note_uuid}/suggestion/",
+            data=suggestion,
         )
         return response
 
     def create_new_note_suggestion(
         self,
-        deck_id: int,
+        ankihub_deck_uuid: str,
+        ankihub_note_uuid: str,
         anki_id: int,
-        ankihub_id: str,
         fields: List[dict],
         tags: List[str],
         change_type: ChangeTypes,
+        note_type: str,
+        note_type_id: int,
         comment: str,
     ) -> Response:
-        # TODO include the note model name
         suggestion = {
-            "related_deck": deck_id,
             "anki_id": anki_id,
-            "ankihub_id": ankihub_id,
+            "ankihub_id": ankihub_note_uuid,
             "fields": fields,
             "tags": tags,
-            "change_type": change_type.value,
+            "change_type": change_type.value[0],
+            "note_type": note_type,
+            "note_type_id": note_type_id,
             "comment": comment,
         }
-        response = self._call_api(
-            "POST", f"/decks/{deck_id}/note-suggestion/", data=suggestion
+        response = self._send_request(
+            "POST",
+            f"/decks/{ankihub_deck_uuid}/note-suggestion/",
+            data=suggestion,
         )
         return response
 
@@ -174,5 +200,5 @@ class AnkiHubClient:
         method = "GET"
         endpoint = "/decks/pre-signed-url"
         data = {"key": key, "type": action}
-        response = self._call_api(method, endpoint, params=data)
+        response = self._send_request(method, endpoint, params=data)
         return response

@@ -3,7 +3,8 @@ import json
 import os
 from datetime import datetime, timezone
 from json import JSONDecodeError
-from typing import Any, Dict
+from pprint import pformat
+from typing import Any, Callable, Dict, Optional
 
 from aqt import mw
 
@@ -21,12 +22,13 @@ class PrivateConfig:
 class Config:
     def __init__(self):
         # self.public_config is editable by the user.
-        self.public_config = mw.addonManager.getConfig("ankihub")
+        self.public_config = mw.addonManager.getConfig(__name__)
         # This is the location for private config which is only managed by our code
         # and is not exposed to the user.
         # See https://addon-docs.ankiweb.net/addon-config.html#user-files
+        addon_dir_name = mw.addonManager.addonFromModule(__name__)
         user_files_path = os.path.join(
-            mw.addonManager.addonsFolder("ankihub"), "user_files"
+            mw.addonManager.addonsFolder(addon_dir_name), "user_files"
         )
         self._private_config_file_path = os.path.join(
             user_files_path, ".private_config.json"
@@ -40,7 +42,9 @@ class Config:
                 except JSONDecodeError:
                     # TODO Instead of overwriting, query AnkiHub for config values.
                     self.private_config = self.new_config()
-        LOGGER.debug(f"Private config: {self.private_config}")
+        config_dict = dataclasses.asdict(self.private_config)
+        LOGGER.debug(f"PrivateConfig init:\n {pformat(config_dict)}")
+        self.token_change_hook: Optional[Callable[[], None]] = None
 
     def new_config(self):
         private_config = PrivateConfig()
@@ -53,10 +57,13 @@ class Config:
         with open(self._private_config_file_path, "w") as f:
             config_dict = dataclasses.asdict(self.private_config)
             f.write(json.dumps(config_dict))
+            LOGGER.debug(f"Updated PrivateConfig:\n {pformat(config_dict)}")
 
     def save_token(self, token: str):
         self.private_config.token = token
         self._update_private_config()
+        if self.token_change_hook:
+            self.token_change_hook()
 
     def save_user_email(self, user_email: str):
         self.private_config.user = user_email
@@ -71,7 +78,7 @@ class Config:
         self.private_config.last_sync = date_time_str
         self._update_private_config()
 
-    def save_subscription(self, ankihub_did: int, anki_did: int, creator: bool = False):
+    def save_subscription(self, ankihub_did: str, anki_did: int, creator: bool = False):
         self.private_config.decks[ankihub_did] = {
             "anki_id": anki_did,
             "creator": creator,
@@ -79,3 +86,10 @@ class Config:
         # remove duplicates
         self.save_last_sync()
         self._update_private_config()
+
+    def unsubscribe_deck(self, ankihub_did: str) -> None:
+        self.private_config.decks.pop(ankihub_did)
+        self._update_private_config()
+
+
+config = Config()

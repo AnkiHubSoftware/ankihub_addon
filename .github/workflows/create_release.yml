@@ -1,0 +1,43 @@
+name: Create Release
+
+on:
+  workflow_dispatch:
+
+jobs:
+  create-release:
+    name: Create Release
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v2
+
+      - name: Setup git config
+        run: |
+          git config user.name "GitHub Actions Bot"
+          git config user.email "<>"
+
+      - name: Declare version variable
+        id: vars
+        run: |
+          echo "::set-output name=version::$(scripts/calver.sh)"
+
+      - name: Commit version bump and create tag
+        run: |
+          git commit --allow-empty -m "Bump Version to ${{ steps.vars.outputs.version }}"
+          git push origin main
+          git tag ${{ steps.vars.outputs.version }}
+          git push origin ${{ steps.vars.outputs.version }}
+
+      - name: Create ankiaddon file
+        run: bash ../scripts/release.sh
+        working-directory: ankihub
+
+      - name: Create github release
+        uses: softprops/action-gh-release@v1
+        with:
+          tag_name: ${{ steps.vars.outputs.version }}
+          files: ankihub.ankiaddon
+
+  upload-to-ankiweb:
+    needs: create-release
+    uses: ./.github/workflows/upload_to_ankiweb.yml
