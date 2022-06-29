@@ -121,7 +121,6 @@ class AnkiHubClient:
             )
             if response.status_code == 200:
                 has_next_page = response.json()["has_next"]
-                assert type(params["page"]) == int
                 params["page"] += 1
                 yield response
             else:
