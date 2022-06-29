@@ -11,7 +11,7 @@ from aqt import (
 from aqt.operations import QueryOp
 from aqt.qt import QAction, QMenu, qconnect
 from aqt.studydeck import StudyDeck
-from aqt.utils import askUser, showInfo, showText, tooltip
+from aqt.utils import askUser, showInfo, showText, showWarning, tooltip
 from requests import Response
 
 from .. import LOGGER
@@ -146,13 +146,17 @@ def create_collaborative_deck_action() -> None:
             msg = f"😔 Deck upload failed: {response.text}"
         showInfo(msg)
 
+    def on_failure(exc: Exception):
+        mw.progress.finish()
+        raise exc
+
     op = QueryOp(
         parent=mw,
         op=lambda col: create_collaborative_deck(deck_name),
         success=on_success,
-    )
-    LOGGER.debug("Instantiated QueryOp")
-    op.with_progress().run_in_background()
+    ).failure(on_failure)
+    LOGGER.debug("Instantiated QueryOp for creating collaborative deck")
+    op.with_progress(label="Creating collaborative deck").run_in_background()
 
 
 def create_collaborative_deck_setup(parent):
