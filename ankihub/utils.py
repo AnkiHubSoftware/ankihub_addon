@@ -163,28 +163,20 @@ def sync_on_profile_open():
 
 def create_backup_with_progress():
     # has to be called from a background thread
+    # if there is already a progress bar present this will not create a new one / modify the existing one
 
     LOGGER.debug("Starting backup...")
-    mw.progress.start(label=tr.profiles_creating_backup())
-    mw.col.create_backup(
-        backup_folder=mw.pm.backupFolder(),
-        force=True,
-        wait_for_completion=False,
-    )
-    mw.progress.finish()
-
-    def on_success(val: None):
+    started_progress_bar = mw.progress.start(label=tr.profiles_creating_backup())
+    try:
+        mw.col.create_backup(
+            backup_folder=mw.pm.backupFolder(),
+            force=True,
+            wait_for_completion=True,
+        )
         LOGGER.debug("Backup successful.")
-
-    def on_failure(exc: Exception):
-        showWarning(tr.profiles_backup_creation_failed(reason=str(exc)), parent=mw)
-        LOGGER.debug(f"Backup failed: {exc}")
-
-    # We await backup completion to confirm it was successful, but this step
-    # does not block collection access, so we don't need to show the progress
-    # window anymore.
-    QueryOp(
-        parent=mw,
-        op=lambda col: col.await_backup_completion(),
-        success=on_success,
-    ).failure(on_failure).run_in_background()
+    except Exception as exc:
+        LOGGER.debug(f"Backup failed.")
+        raise exc
+    finally:
+        if started_progress_bar:
+            mw.progress.finish()
