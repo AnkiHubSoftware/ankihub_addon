@@ -11,8 +11,7 @@ from anki.errors import NotFoundError
 from anki.models import NoteType, NotetypeId
 from anki.notes import Note, NoteId
 from aqt import mw
-from aqt.operations import QueryOp
-from aqt.utils import showWarning, tr
+from aqt.utils import tr
 from requests.exceptions import ConnectionError
 
 from . import LOGGER, constants
@@ -175,7 +174,7 @@ def create_backup_with_progress():
         )
         LOGGER.debug("Backup successful.")
     except Exception as exc:
-        LOGGER.debug(f"Backup failed.")
+        LOGGER.debug("Backup failed.")
         raise exc
     finally:
         if started_progress_bar:
