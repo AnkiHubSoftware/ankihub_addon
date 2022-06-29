@@ -17,6 +17,10 @@ To point the add-on to the staging server, modify add-on config to `"ankihub_url
 
 ### Environment variables
 
+- `ANKIHUB_APP_URL=url`
+
+Overrides `ankihub_url` add-on config.
+
 - `SKIP_INIT=1`
 
 See `./ankihub_addon/ankihub/__init__.py` for what this does.  You need to set this when running tests.
