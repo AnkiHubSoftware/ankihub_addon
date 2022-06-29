@@ -164,7 +164,7 @@ def sync_on_profile_open():
 def create_backup_with_progress():
     # has to be called from a background thread
 
-    LOGGER.debug(f"Starting backup...")
+    LOGGER.debug("Starting backup...")
     mw.progress.start(label=tr.profiles_creating_backup())
     mw.col.create_backup(
         backup_folder=mw.pm.backupFolder(),

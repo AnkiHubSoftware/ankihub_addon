@@ -11,7 +11,7 @@ from aqt import (
 from aqt.operations import QueryOp
 from aqt.qt import QAction, QMenu, qconnect
 from aqt.studydeck import StudyDeck
-from aqt.utils import askUser, showInfo, showText, showWarning, tooltip
+from aqt.utils import askUser, showInfo, showText, tooltip
 from requests import Response
 
 from .. import LOGGER
