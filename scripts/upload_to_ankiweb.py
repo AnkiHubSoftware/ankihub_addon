@@ -35,6 +35,8 @@ def upload(
     web.type(ankiweb_password, into="password")
     web.press(web.Key.ENTER)
 
+    print("Url after login:", web.get_current_url())
+
     if manifest_dict["ankiweb_id"]:
         # update existing addon
         web.go_to(f'https://ankiweb.net/shared/upload?id={manifest_dict["ankiweb_id"]}')
@@ -78,6 +80,8 @@ def upload(
         if "/shared/info/" in url:
             break
     else:
+        print("Url after upload:", web.get_current_url())
+        print(web.get_page_source())
         raise RuntimeError("Upload failed")
 
 
