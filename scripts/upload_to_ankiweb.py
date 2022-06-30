@@ -60,6 +60,10 @@ def upload(
     #     description = f.read()
     # # ... this is slow (can take 5 seconds or more)
 
+    if not manifest_dict["ankiweb_id"]:
+        description = "placeholder"
+        web.type(description, id="desc")
+
     # optional values
     def enter_optional_value(dict_, key, into="", id=""):
         if dict_.get(key) is not None:
