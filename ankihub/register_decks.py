@@ -23,7 +23,11 @@ from .constants import (
     ANKIHUB_NOTE_TYPE_MODIFICATION_STRING,
     URL_VIEW_NOTE,
 )
-from .utils import get_note_types_in_deck, update_or_create_note
+from .utils import (
+    create_backup_with_progress,
+    get_note_types_in_deck,
+    update_or_create_note,
+)
 
 DIR_PATH = os.path.dirname(os.path.abspath(__file__))
 
@@ -139,6 +143,7 @@ def upload_deck(did: DeckId) -> Response:
 
 def create_collaborative_deck(deck_name: str) -> Response:
     LOGGER.debug("Creating collaborative deck")
+    create_backup_with_progress()
     mw.col.models._clear_cache()
     deck_id = mw.col.decks.id(deck_name)
     model_ids = get_note_types_in_deck(deck_id)

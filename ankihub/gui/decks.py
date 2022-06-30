@@ -2,9 +2,9 @@ import csv
 import tempfile
 from concurrent.futures import Future
 from pathlib import Path
-from typing import Callable
 
 from aqt import QPushButton, mw
+from aqt.importing import AnkiPackageImporter
 from aqt.qt import (
     QDialog,
     QDialogButtonBox,
@@ -18,13 +18,13 @@ from aqt.qt import (
     QVBoxLayout,
 )
 from aqt.utils import askUser, openLink, showText, tooltip
-from aqt.importing import AnkiPackageImporter
 
 from .. import LOGGER
 from ..addon_ankihub_client import AddonAnkiHubClient as AnkiHubClient
 from ..config import config
 from ..constants import CSV_DELIMITER, URL_DECK_BASE, URL_DECKS, URL_HELP
 from ..register_decks import modify_note_types, process_csv
+from ..utils import create_backup_with_progress
 
 
 class SubscribedDecksDialog(QDialog):
@@ -242,8 +242,11 @@ class SubscribeDialog(QDialog):
                     title="Please confirm to proceed.",
                 )
                 if confirmed:
-                    self.install_deck(
-                        out_file, data["name"], ankihub_did, data["anki_id"]
+                    mw.taskman.with_progress(
+                        lambda: self.install_deck(
+                            out_file, data["name"], ankihub_did, data["anki_id"]
+                        ),
+                        label="Installing deck",
                     )
 
         mw.taskman.with_progress(
@@ -261,66 +264,57 @@ class SubscribeDialog(QDialog):
         :param: path to the .csv or .apkg file
         """
 
-        def on_success():
-            tooltip("The deck has successfully been installed!")
-            self.accept()
+        create_backup_with_progress()
+
+        try:
+            if deck_file.suffix == ".apkg":
+                self._install_deck_apkg(deck_file)
+            elif deck_file.suffix == ".csv":
+                self._install_deck_csv(deck_file)
+        except Exception as e:  # noqa
+
+            def on_failure():
+                showText(f"Failed to import deck.\n\n{str(e)}")  # noqa
+                self.reject()
+
+            LOGGER.exception("Importing deck failed.")
+            mw.taskman.run_on_main(on_failure)
+        else:
+
+            def on_success():
+                tooltip("The deck has successfully been installed!")
+                self.accept()
+                mw.reset()  # without this you have to click on "Decks" for the deck to appear in the main window
+
+            LOGGER.debug("Importing deck was succesful.")
             config.save_subscription(deck_name, ankihub_did, anki_did)
-
-        def on_fail():
-            tooltip("Failed to install deck!")
-            self.reject()
-
-        if deck_file.suffix == ".apkg":
-            self._install_deck_apkg(deck_file, on_success, on_fail)
-        elif deck_file.suffix == ".csv":
-            self._install_deck_csv(deck_file, on_success, on_fail)
+            mw.taskman.run_on_main(on_success)
 
     def _install_deck_apkg(
         self,
         deck_file: Path,
-        on_success: Callable[[], None],
-        on_fail: Callable[[], None],
     ) -> None:
+        LOGGER.debug("Importing deck as apkg....")
         file = str(deck_file.absolute())
         importer = AnkiPackageImporter(mw.col, file)
-
-        def on_done(future: Future):
-            try:
-                future.result()
-                on_success()
-            except Exception as e:
-                showText(f"Failed to import deck.\n\n{str(e)}")
-                LOGGER.exception("Failed to import apkg.")
-                on_fail()
-
-        mw.taskman.with_progress(
-            importer.run, on_done=on_done, parent=self, label="Installing deck"
-        )
+        importer.run()
 
     def _install_deck_csv(
         self,
         deck_file: Path,
-        on_success: Callable[[], None],
-        on_fail: Callable[[], None],
     ) -> None:
-        try:
-            tooltip("Configuring the collaborative deck.")
-            ankihub_deck_ids, note_type_names = set(), set()
-            notes = []
-            with deck_file.open(encoding="utf-8") as f:
-                reader = csv.DictReader(f, delimiter=CSV_DELIMITER, quotechar="'")
-                for row in reader:
-                    notes.append(row)
-                    ankihub_deck_ids.add(row["deck"])
-                    note_type_names.add(row["note_type"])
-            assert len(ankihub_deck_ids) == 1
-            mw._create_backup_with_progress(user_initiated=False)
-            modify_note_types(note_type_names)
-            process_csv(notes)
-            on_success()
-        except Exception as e:
-            on_fail()
-            raise e
+        LOGGER.debug("Importing deck as csv....")
+        ankihub_deck_ids, note_type_names = set(), set()
+        notes = []
+        with deck_file.open(encoding="utf-8") as f:
+            reader = csv.DictReader(f, delimiter=CSV_DELIMITER, quotechar="'")
+            for row in reader:
+                notes.append(row)
+                ankihub_deck_ids.add(row["deck"])
+                note_type_names.add(row["note_type"])
+        assert len(ankihub_deck_ids) == 1
+        modify_note_types(note_type_names)
+        process_csv(notes)
 
     def on_browse_deck(self) -> None:
         openLink(URL_DECKS)

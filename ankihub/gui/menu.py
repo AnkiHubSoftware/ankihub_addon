@@ -146,13 +146,17 @@ def create_collaborative_deck_action() -> None:
             msg = f"😔 Deck upload failed: {response.text}"
         showInfo(msg)
 
+    def on_failure(exc: Exception):
+        mw.progress.finish()
+        raise exc
+
     op = QueryOp(
         parent=mw,
         op=lambda col: create_collaborative_deck(deck_name),
         success=on_success,
-    )
-    LOGGER.debug("Instantiated QueryOp")
-    op.with_progress().run_in_background()
+    ).failure(on_failure)
+    LOGGER.debug("Instantiated QueryOp for creating collaborative deck")
+    op.with_progress(label="Creating collaborative deck").run_in_background()
 
 
 def create_collaborative_deck_setup(parent):
@@ -214,7 +218,7 @@ def setup_ankihub_menu() -> None:
     ankihub_menu = QMenu("&AnkiHub", parent=mw)
     mw.form.menubar.addMenu(ankihub_menu)
     refresh_ankihub_menu()
-    config.token_change_hook = refresh_ankihub_menu
+    config.token_change_hook = lambda: mw.taskman.run_on_main(refresh_ankihub_menu)
 
 
 def refresh_ankihub_menu() -> None:

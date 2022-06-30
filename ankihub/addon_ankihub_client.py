@@ -17,13 +17,15 @@ def show_anki_message_hook(response: Response, *args, **kwargs):
     LOGGER.debug("Begin show anki message hook.")
     endpoint = response.request.url
     if response.status_code > 299 and "/logout/" not in endpoint:
-        showText(
-            "Uh oh! There was a problem with your request.\n\n"
-            "If you haven't already signed in using the AnkiHub menu please do so. "
-            "Make sure your username and password are correct and that you have "
-            "confirmed your AnkiHub account through email verification. If you "
-            "believe this is an error, please reach out to user support at "
-            f"{USER_SUPPORT_EMAIL_SLUG}. This error will be automatically reported."
+        mw.taskman.run_on_main(
+            lambda: showText(  # type: ignore
+                "Uh oh! There was a problem with your request.\n\n"
+                "If you haven't already signed in using the AnkiHub menu please do so. "
+                "Make sure your username and password are correct and that you have "
+                "confirmed your AnkiHub account through email verification. If you "
+                "believe this is an error, please reach out to user support at "
+                f"{USER_SUPPORT_EMAIL_SLUG}. This error will be automatically reported."
+            )
         )
     return response
 
@@ -53,13 +55,13 @@ def sign_in_hook(response: Response, *args, **kwargs):
         config.save_token("")
         from .gui.menu import AnkiHubLogin
 
-        AnkiHubLogin.display_login()
+        mw.taskman.run_on_main(AnkiHubLogin.display_login)
         return response
     elif "/login/" in response.url and response.status_code != 200:
         config.save_token("")
         from .gui.menu import AnkiHubLogin
 
-        AnkiHubLogin.display_login()
+        mw.taskman.run_on_main(AnkiHubLogin.display_login)
         return response
     elif "/login/" in response.url and response.status_code == 200:
         data = response.json()
@@ -70,7 +72,7 @@ def sign_in_hook(response: Response, *args, **kwargs):
         config.save_token(token)
         config.save_user_email(username)
 
-        tooltip("Signed into AnkiHub!", parent=mw)
+        mw.taskman.run_on_main(lambda: tooltip("Signed into AnkiHub!", parent=mw))
         return response
     else:
         return response
@@ -82,7 +84,7 @@ def sign_out_hook(response: Response, *args, **kwargs):
         return response
 
     config.save_token("")
-    tooltip("Signed out of AnkiHub!", parent=mw)
+    mw.taskman.run_on_main(lambda: tooltip("Signed out of AnkiHub!", parent=mw))
     return response
 
 
