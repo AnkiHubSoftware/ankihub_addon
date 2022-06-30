@@ -6,6 +6,9 @@ from pathlib import Path
 from zipfile import ZipFile
 
 from webbot import Browser
+from webdriver_manager.chrome import ChromeDriverManager, ChromeType
+
+webdriver_path = Path(ChromeDriverManager(chrome_type=ChromeType.CHROMIUM).install())
 
 
 def upload(
@@ -26,7 +29,7 @@ def upload(
     os.unlink("manifest.json")
 
     # use webbot to upload the add-on
-    web = Browser(showWindow=show_window)
+    web = Browser(showWindow=show_window, driverPath=webdriver_path)
     web.go_to("https://ankiweb.net/shared/upload")
     web.type(ankiweb_username, into="username")
     web.type(ankiweb_password, into="password")
@@ -54,7 +57,9 @@ def upload(
     # with open(Path(addon_dir) / "ankiweb_description.html") as f:
     #     description = f.read()
     # # ... this is slow (can take 5 seconds or more)
-    # web.type(description, id="desc")
+
+    description = "test"  # XXX
+    web.type(description, id="desc")
 
     # optional values
     def enter_optional_value(dict_, key, into="", id=""):
