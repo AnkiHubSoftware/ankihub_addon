@@ -275,7 +275,6 @@ class SubscribeDialog(QDialog):
 
             def on_failure():
                 showText(f"Failed to import deck.\n\n{str(e)}")  # noqa
-                mw.progress.finish()  # this needs to be called before self.reject or reject will not work
                 self.reject()
 
             LOGGER.exception("Importing deck failed.")
@@ -284,7 +283,6 @@ class SubscribeDialog(QDialog):
 
             def on_success():
                 tooltip("The deck has successfully been installed!")
-                mw.progress.finish()  # this needs to be called before self.accept or accept will not work
                 self.accept()
                 mw.reset()  # without this you have to click on "Decks" for the deck to appear in the main window
 

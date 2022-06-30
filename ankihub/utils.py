@@ -165,7 +165,7 @@ def create_backup_with_progress():
     # if there is already a progress bar present this will not create a new one / modify the existing one
 
     LOGGER.debug("Starting backup...")
-    started_progress_bar = mw.progress.start(label=tr.profiles_creating_backup())
+    mw.progress.start(label=tr.profiles_creating_backup())
     try:
         mw.col.create_backup(
             backup_folder=mw.pm.backupFolder(),
@@ -177,5 +177,4 @@ def create_backup_with_progress():
         LOGGER.debug("Backup failed.")
         raise exc
     finally:
-        if started_progress_bar:
-            mw.progress.finish()
+        mw.progress.finish()
