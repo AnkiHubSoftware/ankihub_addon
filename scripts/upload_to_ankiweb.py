@@ -83,8 +83,8 @@ def upload(
 if __name__ == "__main__":
     parser = ArgumentParser()
     parser.add_argument("build_file", type=str)
-    parser.add_argument("support_url", type=str)
     parser.add_argument("description_file", type=str)
+    parser.add_argument("support_url", type=str)
     args = parser.parse_args()
 
     upload(
