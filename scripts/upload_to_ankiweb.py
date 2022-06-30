@@ -35,6 +35,7 @@ def upload(
     web.type(ankiweb_password, into="password")
     web.press(web.Key.ENTER)
 
+    time.sleep(2)
     print("Url after login:", web.get_current_url())
 
     if manifest_dict["ankiweb_id"]:
