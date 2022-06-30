@@ -85,7 +85,7 @@ def upload(
         if "/shared/info/" in url:
             break
     else:
-        print("Url after upload:", web.get_current_url())
+        print("Url after failed upload attempt:", web.get_current_url())
         print(web.get_page_source())
         raise RuntimeError("Upload failed")
 
