@@ -8,7 +8,7 @@ from zipfile import ZipFile
 from webbot import Browser
 from webdriver_manager.chrome import ChromeDriverManager, ChromeType
 
-webdriver_path = ChromeDriverManager(chrome_type=ChromeType.CHROMIUM).install()
+webdriver_path = Path(ChromeDriverManager(chrome_type=ChromeType.CHROMIUM).install())
 
 
 def upload(
