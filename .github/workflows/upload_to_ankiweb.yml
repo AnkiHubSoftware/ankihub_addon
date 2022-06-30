@@ -3,6 +3,9 @@ name: Upload to AnkiWeb
 on:
   workflow_dispatch:
   workflow_call:
+    secrets:
+      ANKIWEB_PASSWORD:
+        required: true
 
 jobs:
   upload-to-ankiweb:

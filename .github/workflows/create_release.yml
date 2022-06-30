@@ -44,3 +44,4 @@ jobs:
   upload-to-ankiweb:
     needs: create-release
     uses: ./.github/workflows/upload_to_ankiweb.yml
+    secrets: inherit
