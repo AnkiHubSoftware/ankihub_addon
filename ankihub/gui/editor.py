@@ -68,7 +68,7 @@ def on_ankihub_button_press(editor: Editor) -> None:
         else:
             choice = chooseList(
                 "Which AnKiHub deck would you like to add this note to?",
-                choices=subscribed_decks,
+                choices=[subscribed_decks[id]["name"] for id in subscribed_decks],
             )
             ankihub_deck_uuid = list(subscribed_decks.keys())[choice]
 
