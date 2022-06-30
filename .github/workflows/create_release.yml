@@ -41,6 +41,6 @@ jobs:
           tag_name: ${{ steps.vars.outputs.version }}
           files: ankihub.ankiaddon
 
-  # upload-to-ankiweb:
-  #   needs: create-release
-  #   uses: ./.github/workflows/upload_to_ankiweb.yml
+  upload-to-ankiweb:
+    needs: create-release
+    uses: ./.github/workflows/upload_to_ankiweb.yml
