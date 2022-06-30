@@ -71,9 +71,7 @@ class SubscribedDecksDialog(QDialog):
         self.decks_list.clear()
         decks = config.private_config.decks
         for ankihub_id in decks:
-            anki_id = decks[ankihub_id]["anki_id"]
-            deck = mw.col.decks.get(anki_id, default=False)
-            name = deck["name"] if deck is not None else ankihub_id
+            name = decks[ankihub_id]["name"]
             item = QListWidgetItem(name)
             item.setData(Qt.ItemDataRole.UserRole, ankihub_id)
             self.decks_list.addItem(item)
@@ -246,7 +244,7 @@ class SubscribeDialog(QDialog):
                 if confirmed:
                     mw.taskman.with_progress(
                         lambda: self.install_deck(
-                            out_file, ankihub_did, data["anki_id"]
+                            out_file, data["name"], ankihub_did, data["anki_id"]
                         ),
                         label="Installing deck",
                     )
@@ -258,7 +256,9 @@ class SubscribeDialog(QDialog):
             label="Downloading deck",
         )
 
-    def install_deck(self, deck_file: Path, ankihub_did: str, anki_did: int):
+    def install_deck(
+        self, deck_file: Path, deck_name: str, ankihub_did: str, anki_did: int
+    ) -> None:
         """If we have a .csv, read data from the file and modify the user's note types
         and notes.
         :param: path to the .csv or .apkg file
@@ -289,7 +289,7 @@ class SubscribeDialog(QDialog):
                 mw.reset()  # without this you have to click on "Decks" for the deck to appear in the main window
 
             LOGGER.debug("Importing deck was succesful.")
-            config.save_subscription(ankihub_did, anki_did)
+            config.save_subscription(deck_name, ankihub_did, anki_did)
             mw.taskman.run_on_main(on_success)
 
     def _install_deck_apkg(

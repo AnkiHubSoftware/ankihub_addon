@@ -135,6 +135,7 @@ def upload_deck(did: DeckId) -> Response:
     out_file = out_dir / f"{deck_name}-{deck_uuid}.apkg"
     exporter.exportInto(str(out_file))
     LOGGER.debug(f"Deck {deck_name} exported to {out_file}")
+    mw.col.models._clear_cache()
     client = AnkiHubClient()
     response = client.upload_deck(file=out_file, anki_id=did)
     return response
@@ -143,6 +144,7 @@ def upload_deck(did: DeckId) -> Response:
 def create_collaborative_deck(deck_name: str) -> Response:
     LOGGER.debug("Creating collaborative deck")
     create_backup_with_progress()
+    mw.col.models._clear_cache()
     deck_id = mw.col.decks.id(deck_name)
     model_ids = get_note_types_in_deck(deck_id)
     note_types = [mw.col.models.get(model_id) for model_id in model_ids]
