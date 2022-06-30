@@ -33,7 +33,7 @@ jobs:
 
       - name: Run upload script
         run: |
-          python scripts/upload_to_ankiweb.py ankihub.ankiaddon ankipalace ankihub_addon
+          python scripts/upload_to_ankiweb.py ankihub.ankiaddon ankiweb_description.html https://ankihub.net
         env:
           ANKI_USERNAME: hub@ankipalace.com
           ANKI_PASSWORD: ${{ secrets.ANKIWEB_PASSWORD }}

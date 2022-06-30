@@ -8,19 +8,18 @@ from zipfile import ZipFile
 from webbot import Browser
 from webdriver_manager.chrome import ChromeDriverManager, ChromeType
 
-webdriver_path = Path(ChromeDriverManager(chrome_type=ChromeType.CHROMIUM).install())
+webdriver_path = ChromeDriverManager(chrome_type=ChromeType.CHROMIUM).install()
 
 
 def upload(
     ankiweb_username,
     ankiweb_password,
     build_file_path,
-    repo_owner,
-    repo_name,
+    description_file_path,
+    support_url,
     show_window=False,
 ):
 
-    # unzip and read in manifest.json
     with ZipFile(build_file_path) as zipf:
         zipf.extract("manifest.json")
 
@@ -46,24 +45,15 @@ def upload(
         web.go_to("https://ankiweb.net/shared/upload")
 
     web.type(manifest_dict["name"], into="title")
-    web.type(
-        f"https://github.com/{repo_owner}/{repo_name}/issues",
-        into="support url",
-    )
-
+    web.type(support_url, into="support url")
     web.type(
         str(Path(build_file_path).absolute()),
         id="v21file0",
     )
 
-    # # copy description from ankiweb_description.html
-    # with open(Path(addon_dir) / "ankiweb_description.html") as f:
-    #     description = f.read()
-    # # ... this is slow (can take 5 seconds or more)
-
-    if not manifest_dict["ankiweb_id"]:
-        description = "placeholder"
-        web.type(description, id="desc")
+    with open(description_file_path) as f:
+        description = f.read()
+    web.type(description, id="desc")
 
     # optional values
     def enter_optional_value(dict_, key, into="", id=""):
@@ -93,14 +83,14 @@ def upload(
 if __name__ == "__main__":
     parser = ArgumentParser()
     parser.add_argument("build_file", type=str)
-    parser.add_argument("repo_owner", type=str)
-    parser.add_argument("repo_name", type=str)
+    parser.add_argument("support_url", type=str)
+    parser.add_argument("description_file", type=str)
     args = parser.parse_args()
 
     upload(
         ankiweb_username=os.environ["ANKI_USERNAME"],
         ankiweb_password=os.environ["ANKI_PASSWORD"],
         build_file_path=args.build_file,
-        repo_owner=args.repo_owner,
-        repo_name=args.repo_name,
+        description_file_path=args.description_file,
+        support_url=args.support_url,
     )
