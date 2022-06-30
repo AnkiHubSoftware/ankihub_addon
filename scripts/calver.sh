@@ -1,5 +1,5 @@
 
-# use calvar and increment version number if necessary
+# use calver and increment version number if necessary
 version="$(date +%Y-%m-%d).1"
 versionSplit=(${version//./ })
 
