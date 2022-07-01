@@ -4,11 +4,9 @@ decks for both deck creators and deck users.
 import json
 import os
 import pathlib
-import re
 import tempfile
 import typing
 import uuid
-from typing import Dict
 
 from anki.decks import DeckId
 from anki.exporting import AnkiPackageExporter
@@ -16,16 +14,13 @@ from anki.notes import NoteId
 from aqt import mw
 from requests import Response
 
-from . import LOGGER, constants
+from . import LOGGER
 from .addon_ankihub_client import AddonAnkiHubClient as AnkiHubClient
-from .constants import (
-    ANKIHUB_NOTE_TYPE_FIELD_NAME,
-    ANKIHUB_NOTE_TYPE_MODIFICATION_STRING,
-    URL_VIEW_NOTE,
-)
+from .constants import ANKIHUB_NOTE_TYPE_FIELD_NAME
 from .utils import (
-    change_note_types_of_notes_in_collection_if_necessary,
+    adjust_note_types,
     get_note_types_in_deck,
+    modify_note_type,
     update_or_create_note,
 )
 
@@ -33,7 +28,7 @@ DIR_PATH = os.path.dirname(os.path.abspath(__file__))
 
 
 def process_csv(notes: typing.List[dict]) -> None:
-    change_note_types_of_notes_in_collection_if_necessary(notes)
+    adjust_note_types(notes)
     for note_data in notes:
         (
             anki_id,
@@ -53,71 +48,11 @@ def process_csv(notes: typing.List[dict]) -> None:
     mw.reset()
 
 
-def modify_note_type(note_type_name: str) -> None:
-    """Adds the AnkiHub Field to the Note Type and modifies the template to
-    display the field.
-    """
-    "Adds ankihub field. Adds link to ankihub in card template."
-    LOGGER.debug(f"Modifying note type {note_type_name}")
-    mm = mw.col.models
-    note_type = mm.by_name(note_type_name)
-
-    modify_fields(note_type)
-
-    templates = note_type["tmpls"]
-    for template in templates:
-        modify_template(template)
-
-    mm.update_dict(note_type)
-    LOGGER.debug(f"Saved note type {note_type_name}")
-
-
-def modify_fields(note_type: Dict) -> None:
-    fields = note_type["flds"]
-    field_names = [field["name"] for field in fields]
-    if constants.ANKIHUB_NOTE_TYPE_FIELD_NAME in field_names:
-        LOGGER.debug(f"{constants.ANKIHUB_NOTE_TYPE_FIELD_NAME} already exists.")
-        return
-    ankihub_field = mw.col.models.new_field(ANKIHUB_NOTE_TYPE_FIELD_NAME)
-    # Put AnkiHub field last
-    ankihub_field["ord"] = len(fields)
-    note_type["flds"].append(ankihub_field)
-
-
-def modify_template(template: Dict):
-    ankihub_snippet = (
-        f"<!-- BEGIN {ANKIHUB_NOTE_TYPE_MODIFICATION_STRING} -->"
-        "<br>"
-        f"\n{{{{#{ANKIHUB_NOTE_TYPE_FIELD_NAME}}}}}\n"
-        "<a class='ankihub' "
-        f"href='{URL_VIEW_NOTE}{{{{{ANKIHUB_NOTE_TYPE_FIELD_NAME}}}}}'>"
-        "\nView Note on AnkiHub\n"
-        "</a>"
-        f"\n{{{{/{ANKIHUB_NOTE_TYPE_FIELD_NAME}}}}}\n"
-        "<br>"
-        f"<!-- END {ANKIHUB_NOTE_TYPE_MODIFICATION_STRING} -->"
-    )
-
-    snippet_pattern = (
-        f"<!-- BEGIN {ANKIHUB_NOTE_TYPE_MODIFICATION_STRING} -->"
-        r"[\w\W]*"
-        f"<!-- END {ANKIHUB_NOTE_TYPE_MODIFICATION_STRING} -->"
-    )
-
-    if re.search(snippet_pattern, template["afmt"]):
-        LOGGER.debug("Template modifcation was already present, updated it")
-        template["afmt"] = re.sub(
-            snippet_pattern,
-            ankihub_snippet,
-            template["afmt"],
-        )
-    else:
-        template["afmt"] += ankihub_snippet
-
-
-def modify_note_types(note_types: typing.Iterable[str]):
-    for note_type in note_types:
+def modify_note_types(note_type_names: typing.Iterable[str]):
+    for note_type_name in note_type_names:
+        note_type = mw.col.models.by_name(note_type_name)
         modify_note_type(note_type)
+        mw.col.models.update_dict(note_type)
 
 
 def upload_deck(did: DeckId) -> Response:
