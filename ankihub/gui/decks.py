@@ -2,32 +2,34 @@ import csv
 import tempfile
 from concurrent.futures import Future
 from pathlib import Path
+
 from aqt import QPushButton, mw
-from aqt.utils import askUser, showText, tooltip, openLink
+from aqt.importing import AnkiPackageImporter
 from aqt.qt import (
+    QDialog,
+    QDialogButtonBox,
     QHBoxLayout,
     QLabel,
     QLineEdit,
-    QSizePolicy,
-    QVBoxLayout,
-    QDialog,
-    QDialogButtonBox,
     QListWidget,
     QListWidgetItem,
+    QSizePolicy,
     Qt,
+    QVBoxLayout,
 )
+from aqt.utils import askUser, openLink, showText, tooltip
 
 from .. import LOGGER
 from ..addon_ankihub_client import AddonAnkiHubClient as AnkiHubClient
-from ..config import Config
-from ..constants import CSV_DELIMITER, URL_HELP, URL_DECKS, URL_DECK_BASE
+from ..config import config
+from ..constants import CSV_DELIMITER, URL_DECK_BASE, URL_DECKS, URL_HELP
 from ..register_decks import modify_note_types, process_csv
+from ..utils import create_backup_with_progress
 
 
 class SubscribedDecksDialog(QDialog):
     def __init__(self):
         super(SubscribedDecksDialog, self).__init__()
-        self.config = Config()
         self.client = AnkiHubClient()
         self.setWindowTitle("Subscribed AnkiHub Decks")
 
@@ -67,18 +69,15 @@ class SubscribedDecksDialog(QDialog):
 
     def refresh_decks_list(self) -> None:
         self.decks_list.clear()
-        decks = self.config.private_config.decks
+        decks = config.private_config.decks
         for ankihub_id in decks:
-            anki_id = decks[ankihub_id]["anki_id"]
-            deck = mw.col.decks.get(anki_id, default=False)
-            name = deck["name"] if deck is not None else ankihub_id
+            name = decks[ankihub_id]["name"]
             item = QListWidgetItem(name)
             item.setData(Qt.ItemDataRole.UserRole, ankihub_id)
             self.decks_list.addItem(item)
 
     def on_add(self) -> None:
         SubscribeDialog().exec()
-        # TODO: This needs to be called after import is completely finished
         self.refresh_decks_list()
 
     def on_unsubscribe(self) -> None:
@@ -97,7 +96,7 @@ class SubscribedDecksDialog(QDialog):
 
         for item in items:
             ankihub_id = item.data(Qt.ItemDataRole.UserRole)
-            self.config.unsubscribe_deck(ankihub_id)
+            config.unsubscribe_deck(ankihub_id)
             # TODO Run clean up when implemented:
             #  https://github.com/ankipalace/ankihub_addon/issues/20
 
@@ -173,7 +172,6 @@ class SubscribeDialog(QDialog):
         self.setSizePolicy(QSizePolicy.Policy.Minimum, QSizePolicy.Policy.Minimum)
         self.setWindowTitle("Subscribe to AnkiHub Deck")
 
-        self.config = Config()
         self.client = AnkiHubClient()
         if not self.client.has_token():
             showText("Oops! Please make sure you are logged into AnkiHub!")
@@ -183,7 +181,7 @@ class SubscribeDialog(QDialog):
 
     def subscribe(self):
         ankihub_did = self.deck_id_box_text.text()
-        if ankihub_did in self.config.private_config.decks.keys():
+        if ankihub_did in config.private_config.decks.keys():
             showText(
                 f"You've already subscribed to deck {ankihub_did}. "
                 "Syncing with AnkiHub will happen automatically everytime you "
@@ -244,10 +242,12 @@ class SubscribeDialog(QDialog):
                     title="Please confirm to proceed.",
                 )
                 if confirmed:
-                    self.install_deck(out_file, ankihub_did, data["anki_id"])
-
-            tooltip("Successfully subscribed to deck!")
-            self.accept()
+                    mw.taskman.with_progress(
+                        lambda: self.install_deck(
+                            out_file, data["name"], ankihub_did, data["anki_id"]
+                        ),
+                        label="Installing deck",
+                    )
 
         mw.taskman.with_progress(
             lambda: self.client.download_deck(deck_file_name),
@@ -256,26 +256,54 @@ class SubscribeDialog(QDialog):
             label="Downloading deck",
         )
 
-    def install_deck(self, deck_file: Path, ankihub_did: str, anki_did: int):
+    def install_deck(
+        self, deck_file: Path, deck_name: str, ankihub_did: str, anki_did: int
+    ) -> None:
         """If we have a .csv, read data from the file and modify the user's note types
         and notes.
         :param: path to the .csv or .apkg file
         """
-        if deck_file.suffix == ".apkg":
-            self._install_deck_apkg(deck_file)
-        elif deck_file.suffix == ".csv":
-            self._install_deck_csv(deck_file)
 
-        self.config.save_subscription(ankihub_did, anki_did)
-        tooltip("The deck has successfully been installed!")
+        create_backup_with_progress()
 
-    def _install_deck_apkg(self, deck_file: Path):
-        from aqt import importing
+        try:
+            if deck_file.suffix == ".apkg":
+                self._install_deck_apkg(deck_file)
+            elif deck_file.suffix == ".csv":
+                self._install_deck_csv(deck_file)
+        except Exception as e:  # noqa
 
-        importing.importFile(mw, str(deck_file.absolute()))
+            def on_failure():
+                showText(f"Failed to import deck.\n\n{str(e)}")  # noqa
+                self.reject()
 
-    def _install_deck_csv(self, deck_file: Path):
-        tooltip("Configuring the collaborative deck.")
+            LOGGER.exception("Importing deck failed.")
+            mw.taskman.run_on_main(on_failure)
+        else:
+
+            def on_success():
+                tooltip("The deck has successfully been installed!")
+                self.accept()
+                mw.reset()  # without this you have to click on "Decks" for the deck to appear in the main window
+
+            LOGGER.debug("Importing deck was succesful.")
+            config.save_subscription(deck_name, ankihub_did, anki_did)
+            mw.taskman.run_on_main(on_success)
+
+    def _install_deck_apkg(
+        self,
+        deck_file: Path,
+    ) -> None:
+        LOGGER.debug("Importing deck as apkg....")
+        file = str(deck_file.absolute())
+        importer = AnkiPackageImporter(mw.col, file)
+        importer.run()
+
+    def _install_deck_csv(
+        self,
+        deck_file: Path,
+    ) -> None:
+        LOGGER.debug("Importing deck as csv....")
         ankihub_deck_ids, note_type_names = set(), set()
         notes = []
         with deck_file.open(encoding="utf-8") as f:
@@ -285,7 +313,6 @@ class SubscribeDialog(QDialog):
                 ankihub_deck_ids.add(row["deck"])
                 note_type_names.add(row["note_type"])
         assert len(ankihub_deck_ids) == 1
-        mw._create_backup_with_progress(user_initiated=False)
         modify_note_types(note_type_names)
         process_csv(notes)
 

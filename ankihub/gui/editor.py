@@ -1,7 +1,9 @@
 import uuid
 
+import anki
 from anki.hooks import addHook
 from aqt import gui_hooks
+from aqt.addcards import AddCards
 from aqt.editor import Editor
 from aqt.utils import chooseList, showText, tooltip
 
@@ -12,7 +14,7 @@ from ..constants import ICONS_PATH, AnkiHubCommands
 from .suggestion_dialog import SuggestionDialog
 
 
-def on_ankihub_button_press(editor: Editor):
+def on_ankihub_button_press(editor: Editor) -> None:
     """
     Action to be performed when the AnkiHub icon button is clicked or when
     the hotkey is pressed.
@@ -51,7 +53,7 @@ def on_ankihub_button_press(editor: Editor):
         )
         if response.status_code == 201:
             tooltip("Submitted change note suggestion to AnkiHub.")
-            return response.json()
+            return
     elif command == AnkiHubCommands.NEW.value:
         subscribed_decks = config.private_config.decks
         if len(subscribed_decks) == 0:
@@ -66,22 +68,45 @@ def on_ankihub_button_press(editor: Editor):
         else:
             choice = chooseList(
                 "Which AnKiHub deck would you like to add this note to?",
-                choices=subscribed_decks,
+                choices=[subscribed_decks[id]["name"] for id in subscribed_decks],
             )
             ankihub_deck_uuid = list(subscribed_decks.keys())[choice]
 
-        response = client.create_new_note_suggestion(
-            ankihub_deck_uuid=ankihub_deck_uuid,
-            ankihub_note_uuid=ankihub_note_uuid,
-            anki_id=editor.note.id,
-            fields=fields,
-            tags=tags,
-            change_type=change_type,
-            comment=comment,
-        )
-        if response.status_code == 201:
-            tooltip("Submitted new note suggestion to AnkiHub.")
-            return response.json()
+        if editor.addMode:
+
+            def on_add(note: anki.notes.Note) -> None:
+                response = client.create_new_note_suggestion(
+                    ankihub_deck_uuid=ankihub_deck_uuid,
+                    ankihub_note_uuid=ankihub_note_uuid,
+                    anki_id=note.id,
+                    fields=fields,
+                    tags=tags,
+                    change_type=change_type,
+                    note_type=note.note_type()["name"],
+                    note_type_id=note.note_type()["id"],
+                    comment=comment,
+                )
+                if response.status_code == 201:
+                    tooltip("Submitted new note suggestion to AnkiHub.")
+                gui_hooks.add_cards_did_add_note.remove(on_add)
+
+            gui_hooks.add_cards_did_add_note.append(on_add)
+            add_note_window: AddCards = editor.parentWindow  # type: ignore
+            add_note_window.add_current_note()
+        else:
+            response = client.create_new_note_suggestion(
+                ankihub_deck_uuid=ankihub_deck_uuid,
+                ankihub_note_uuid=ankihub_note_uuid,
+                anki_id=editor.note.id,
+                fields=fields,
+                tags=tags,
+                change_type=change_type,
+                note_type=editor.note.note_type()["name"],
+                note_type_id=editor.note.note_type()["id"],
+                comment=comment,
+            )
+            if response.status_code == 201:
+                tooltip("Submitted new note suggestion to AnkiHub.")
 
 
 def setup_editor_buttons(buttons, editor: Editor):

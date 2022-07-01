@@ -1,5 +1,6 @@
 import re
 import time
+from concurrent.futures import Future
 from pprint import pformat
 from typing import Dict, List, Set, Tuple
 from urllib.error import HTTPError
@@ -12,7 +13,7 @@ from anki.errors import NotFoundError
 from anki.models import NoteType, NotetypeDict, NotetypeId
 from anki.notes import Note, NoteId
 from aqt import mw
-from aqt.utils import askUser
+from aqt.utils import askUser, tr
 from requests.exceptions import ConnectionError
 
 from . import LOGGER, constants
@@ -145,8 +146,8 @@ def sync_with_ankihub():
 
         if collected_notes:
 
-            mw._create_backup_with_progress(user_initiated=False)
             adjust_note_types(collected_notes)
+            create_backup_with_progress()
 
             for note in collected_notes:
                 (
@@ -168,13 +169,18 @@ def sync_with_ankihub():
 
 
 def sync_on_profile_open():
+    def on_done(future: Future):
+
+        # Don't raise exception when automatically attempting to sync with AnkiHub
+        # with no Internet connection.
+        if exc := future.exception():
+            if not isinstance(exc, (ConnectionError, HTTPError)):
+                raise exc
+
     if config.private_config.token:
-        try:
-            # Don't raise exception when automatically attempting to sync with AnkiHub
-            # with no Internet connection.
-            sync_with_ankihub()
-        except (ConnectionError, HTTPError):
-            pass
+        mw.taskman.with_progress(
+            sync_with_ankihub, label="Synchronizing with AnkiHub", on_done=on_done
+        )
 
 
 def adjust_note_types(
@@ -378,3 +384,23 @@ def modify_template(template: Dict):
         )
     else:
         template["afmt"] += ankihub_snippet
+
+
+def create_backup_with_progress():
+    # has to be called from a background thread
+    # if there is already a progress bar present this will not create a new one / modify the existing one
+
+    LOGGER.debug("Starting backup...")
+    mw.progress.start(label=tr.profiles_creating_backup())
+    try:
+        mw.col.create_backup(
+            backup_folder=mw.pm.backupFolder(),
+            force=True,
+            wait_for_completion=True,
+        )
+        LOGGER.debug("Backup successful.")
+    except Exception as exc:
+        LOGGER.debug("Backup failed.")
+        raise exc
+    finally:
+        mw.progress.finish()

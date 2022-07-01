@@ -168,6 +168,8 @@ class AnkiHubClient:
         fields: List[dict],
         tags: List[str],
         change_type: ChangeTypes,
+        note_type: str,
+        note_type_id: int,
         comment: str,
     ) -> Response:
         suggestion = {
@@ -176,6 +178,8 @@ class AnkiHubClient:
             "fields": fields,
             "tags": tags,
             "change_type": change_type.value[0],
+            "note_type": note_type,
+            "note_type_id": note_type_id,
             "comment": comment,
         }
         response = self._send_request(

@@ -4,6 +4,7 @@ decks for both deck creators and deck users.
 import json
 import os
 import pathlib
+import re
 import tempfile
 import typing
 import uuid
@@ -19,6 +20,7 @@ from .addon_ankihub_client import AddonAnkiHubClient as AnkiHubClient
 from .constants import ANKIHUB_NOTE_TYPE_FIELD_NAME
 from .utils import (
     adjust_note_types,
+    create_backup_with_progress,
     get_note_types_in_deck,
     modify_note_type,
     update_or_create_note,
@@ -65,9 +67,11 @@ def upload_deck(did: DeckId) -> Response:
     exporter.includeTags = True
     deck_uuid = uuid.uuid4()
     out_dir = pathlib.Path(tempfile.mkdtemp())
+    deck_name = re.sub('[\\\\/?<>:*|"^]', "_", deck_name)
     out_file = out_dir / f"{deck_name}-{deck_uuid}.apkg"
     exporter.exportInto(str(out_file))
     LOGGER.debug(f"Deck {deck_name} exported to {out_file}")
+    mw.col.models._clear_cache()
     client = AnkiHubClient()
     response = client.upload_deck(file=out_file, anki_id=did)
     return response
@@ -75,6 +79,8 @@ def upload_deck(did: DeckId) -> Response:
 
 def create_collaborative_deck(deck_name: str) -> Response:
     LOGGER.debug("Creating collaborative deck")
+    create_backup_with_progress()
+    mw.col.models._clear_cache()
     deck_id = mw.col.decks.id(deck_name)
     model_ids = get_note_types_in_deck(deck_id)
     note_types = [mw.col.models.get(model_id) for model_id in model_ids]
