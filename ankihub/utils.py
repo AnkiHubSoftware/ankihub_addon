@@ -129,6 +129,9 @@ def update_or_create_note(
 
 def sync_with_ankihub():
     LOGGER.debug("Trying to sync with AnkiHub.")
+
+    create_backup_with_progress()
+
     client = AnkiHubClient()
     decks = config.private_config.decks
     for deck in decks:
@@ -147,7 +150,6 @@ def sync_with_ankihub():
         if collected_notes:
 
             adjust_note_types(collected_notes)
-            create_backup_with_progress()
 
             for note in collected_notes:
                 (
