@@ -185,7 +185,10 @@ def sync_on_profile_open():
 
     if config.private_config.token:
         mw.taskman.with_progress(
-            sync_with_ankihub, label="Synchronizing with AnkiHub", on_done=on_done
+            sync_with_ankihub,
+            label="Synchronizing with AnkiHub",
+            on_done=on_done,
+            parent=mw,
         )
 
 

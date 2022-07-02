@@ -27,7 +27,8 @@ class ExtendedTaskManger(TaskManager):
         with self._blocking_closures_lock:
             self._blocking_closures.append(closure)
         self._blocking_closures_pending.emit()  # type: ignore
-        if QSignalSpy(self._blocking_closures_done).wait(100000000):  # type: ignore
+        TIMEOUT_MS = 100000000  # ~30 minutes, should be enough
+        if QSignalSpy(self._blocking_closures_done).wait(TIMEOUT_MS):  # type: ignore
             return self._blocking_closure_results[closure]
         else:
             raise RuntimeError("Timeout waiting for closure to complete")
