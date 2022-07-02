@@ -218,6 +218,9 @@ def fetch_remote_note_types(notes_data) -> Dict[NotetypeId, NotetypeDict]:
 
         data = response.json()
         note_type = to_anki_note_type(data)
+        modify_note_type(
+            note_type
+        )  # needed because the note type returned from the api doesn't include the ankihub_id field. why? XXX
         result[mid] = note_type
     return result
 
@@ -226,6 +229,9 @@ def create_missing_note_types(remote_note_types: Dict[NotetypeId, NotetypeDict])
     missings_mids = set(
         [mid for mid in remote_note_types.keys() if mw.col.models.get(mid) is None]
     )
+    if not missings_mids:
+        return
+
     LOGGER.debug(f"Missing note types: {missings_mids}")
 
     for mid in missings_mids:
@@ -249,7 +255,7 @@ def ensure_local_and_remote_fields_are_same(
         if not field_tuples(local_note_type) == field_tuples(remote_note_type):
             LOGGER.debug(
                 f'Fields of local note type "{local_note_type["name"]}" differ from remote note_type. '
-                f"{field_tuples(local_note_type)=}, {field_tuples(remote_note_type)=}"
+                f"local:\n{pformat(field_tuples(local_note_type))}, remote:\n{pformat(field_tuples(remote_note_type))}"
             )
             note_types_with_field_conflicts.append((local_note_type, remote_note_type))
 
