@@ -191,6 +191,8 @@ def adjust_note_types(
     # can be called when installing a deck for the first time and to make sure that note types are the
     # same as on AnkiHub when synchronizing with AnkiHub.
 
+    LOGGER.debug("Beginning adjusting note types...")
+
     remote_note_types = fetch_remote_note_types(notes_data)
 
     create_missing_note_types(remote_note_types)
@@ -200,6 +202,8 @@ def adjust_note_types(
     modify_note_types(remote_note_types.keys())
 
     reset_note_types_of_notes(notes_data)
+
+    LOGGER.debug("Adjusted note types.")
 
 
 def fetch_remote_note_types(notes_data) -> Dict[NotetypeId, NotetypeDict]:
@@ -255,7 +259,7 @@ def ensure_local_and_remote_fields_are_same(
         if not field_tuples(local_note_type) == field_tuples(remote_note_type):
             LOGGER.debug(
                 f'Fields of local note type "{local_note_type["name"]}" differ from remote note_type. '
-                f"local:\n{pformat(field_tuples(local_note_type))}, remote:\n{pformat(field_tuples(remote_note_type))}"
+                f"local:\n{pformat(field_tuples(local_note_type))}\nremote:\n{pformat(field_tuples(remote_note_type))}"
             )
             note_types_with_field_conflicts.append((local_note_type, remote_note_type))
 
