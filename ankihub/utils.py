@@ -212,9 +212,9 @@ def adjust_note_types(
 
 def fetch_remote_note_types(notes_data) -> Dict[NotetypeId, NotetypeDict]:
     result = {}
-    remote_mids = [
-        NotetypeId(int(note_dict["note_type_id"])) for note_dict in notes_data
-    ]
+    remote_mids = set(
+        [NotetypeId(int(note_dict["note_type_id"])) for note_dict in notes_data]
+    )
 
     client = AnkiHubClient()
     for mid in remote_mids:
