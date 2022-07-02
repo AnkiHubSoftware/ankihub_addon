@@ -41,4 +41,4 @@ class ExtendedTaskManger(TaskManager):
 
         for closure in closures:
             self._blocking_closure_results[closure] = closure()
-            self._blocking_closures_done.emit()
+        self._blocking_closures_done.emit()
