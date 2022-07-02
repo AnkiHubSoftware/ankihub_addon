@@ -8,9 +8,12 @@ import re
 import tempfile
 import typing
 import uuid
+from copy import deepcopy
+from typing import Dict
 
 from anki.decks import DeckId
 from anki.exporting import AnkiPackageExporter
+from anki.models import NotetypeId
 from anki.notes import NoteId
 from aqt import mw
 from requests import Response
@@ -20,6 +23,7 @@ from .addon_ankihub_client import AddonAnkiHubClient as AnkiHubClient
 from .constants import ANKIHUB_NOTE_TYPE_FIELD_NAME
 from .utils import (
     adjust_note_types,
+    change_note_type_of_note,
     create_backup_with_progress,
     get_note_types_in_deck,
     modify_note_type,
@@ -29,9 +33,9 @@ from .utils import (
 DIR_PATH = os.path.dirname(os.path.abspath(__file__))
 
 
-def process_csv(notes: typing.List[dict]) -> None:
-    adjust_note_types(notes)
-    for note_data in notes:
+def load_notes_from_csv(notes_data: typing.List[dict]) -> None:
+    adjust_note_types(notes_data)
+    for note_data in notes_data:
         (
             anki_id,
             deck,
@@ -48,13 +52,6 @@ def process_csv(notes: typing.List[dict]) -> None:
         tags = json.loads(tags)
         update_or_create_note(int(anki_id), ankihub_id, fields, tags, note_type_id)
     mw.reset()
-
-
-def modify_note_types(note_type_names: typing.Iterable[str]):
-    for note_type_name in note_type_names:
-        note_type = mw.col.models.by_name(note_type_name)
-        modify_note_type(note_type)
-        mw.col.models.update_dict(note_type)
 
 
 def upload_deck(did: DeckId) -> Response:
@@ -79,18 +76,53 @@ def upload_deck(did: DeckId) -> Response:
 
 def create_collaborative_deck(deck_name: str) -> Response:
     LOGGER.debug("Creating collaborative deck")
+
     create_backup_with_progress()
+
     mw.col.models._clear_cache()
+
     deck_id = mw.col.decks.id(deck_name)
-    model_ids = get_note_types_in_deck(deck_id)
-    note_types = [mw.col.models.get(model_id) for model_id in model_ids]
-    note_type_names = [note["name"] for note in note_types]
-    modify_note_types(note_type_names)
-    LOGGER.debug(f"Finding notes in {deck_name}")
     note_ids = list(map(NoteId, mw.col.find_notes(f'deck:"{deck_name}"')))
+
+    note_type_mapping = create_note_types_for_deck(deck_id)
+    change_note_types_of_notes(note_ids, note_type_mapping)
+
     assign_ankihub_ids(note_ids)
+
     response = upload_deck(deck_id)
     return response
+
+
+def create_note_types_for_deck(deck_id: DeckId) -> Dict[NotetypeId, NotetypeId]:
+    result: Dict[NotetypeId, NotetypeId] = {}
+    model_ids = get_note_types_in_deck(deck_id)
+    for mid in model_ids:
+        new_model = deepcopy(mw.col.models.get(mid))
+
+        modify_note_type(new_model)
+
+        # TODO Add username to note type name
+        new_model["name"] = f"{new_model['name']} ({mw.col.decks.name(deck_id)})"
+        mw.col.models.ensure_name_unique(new_model)
+
+        new_model["id"] = 0
+        mw.col.models.add_dict(new_model)
+        result[mid] = mw.col.models.by_name(new_model["name"])["id"]
+
+    return result
+
+
+def change_note_types_of_notes(
+    note_ids: typing.List[NoteId], note_type_mapping: dict
+) -> None:
+    LOGGER.debug(
+        f"Changing note types of notes according to mapping: {note_type_mapping}"
+    )
+    for note_id in note_ids:
+        note = mw.col.get_note(id=note_id)
+        target_note_type_id = note_type_mapping[note.mid]
+        change_note_type_of_note(note_id, target_note_type_id)
+    LOGGER.debug("Changed note types of notes.")
 
 
 def assign_ankihub_ids(note_ids: typing.List[NoteId]) -> None:

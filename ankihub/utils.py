@@ -2,7 +2,7 @@ import re
 import time
 from concurrent.futures import Future
 from pprint import pformat
-from typing import Dict, List, Set, Tuple
+from typing import Dict, Iterable, List, Set, Tuple
 from urllib.error import HTTPError
 
 import anki
@@ -188,8 +188,15 @@ def sync_on_profile_open():
 def adjust_note_types(
     notes_data: List[Dict],
 ) -> None:
+    # can be called when installing a deck for the first time and to make sure that note types are the
+    # same as in AnkiHub when synchronizing with AnkiHub.
 
     fetch_missing_note_types(notes_data)
+
+    note_type_ids = list(
+        set(NotetypeId(int(note_dict["note_type_id"])) for note_dict in notes_data)
+    )
+    modify_note_types(note_type_ids)
 
     # TODO make sure all managed local note types have the same fields as the remote note types
 
@@ -329,6 +336,13 @@ def to_anki_note_type(note_type_data: Dict) -> NotetypeDict:
     del data["fields"]
 
     return data
+
+
+def modify_note_types(note_type_ids: Iterable[NotetypeId]):
+    for mid in note_type_ids:
+        note_type = mw.col.models.get(mid)
+        modify_note_type(note_type)
+        mw.col.models.update_dict(note_type)
 
 
 def modify_note_type(note_type: NotetypeDict) -> None:

@@ -23,7 +23,7 @@ from .. import LOGGER
 from ..addon_ankihub_client import AddonAnkiHubClient as AnkiHubClient
 from ..config import config
 from ..constants import CSV_DELIMITER, URL_DECK_BASE, URL_DECKS, URL_HELP
-from ..register_decks import modify_note_types, process_csv
+from ..register_decks import load_notes_from_csv
 from ..utils import create_backup_with_progress
 
 
@@ -304,17 +304,10 @@ class SubscribeDialog(QDialog):
         deck_file: Path,
     ) -> None:
         LOGGER.debug("Importing deck as csv....")
-        ankihub_deck_ids, note_type_names = set(), set()
-        notes = []
         with deck_file.open(encoding="utf-8") as f:
             reader = csv.DictReader(f, delimiter=CSV_DELIMITER, quotechar="'")
-            for row in reader:
-                notes.append(row)
-                ankihub_deck_ids.add(row["deck"])
-                note_type_names.add(row["note_type"])
-        assert len(ankihub_deck_ids) == 1
-        modify_note_types(note_type_names)
-        process_csv(notes)
+            notes_data = [row for row in reader]
+        load_notes_from_csv(notes_data)
 
     def on_browse_deck(self) -> None:
         openLink(URL_DECKS)
