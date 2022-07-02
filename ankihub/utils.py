@@ -263,15 +263,16 @@ def ensure_local_and_remote_fields_are_same(
             )
             note_types_with_field_conflicts.append((local_note_type, remote_note_type))
 
-    if not askUser(
-        "Some AnkiHub managed note types were changed. If you continue, they will be changed back.\n"
-        "When you press Yes, Anki will ask you to confirm a full sync with AnkiWeb on the next sync.\n"
-        "Continue?"
-    ):
-        return
+    # XXX commented out because gui functions cant be called from background threads
+    # if not askUser(
+    #     "Some AnkiHub managed note types were changed. If you continue, they will be changed back.\n"
+    #     "When you press Yes, Anki will ask you to confirm a full sync with AnkiWeb on the next sync.\n"
+    #     "Continue?"
+    # ):
+    #     return
 
-    if not mw.confirm_schema_modification():
-        return
+    # if not mw.confirm_schema_modification():
+    #     return
 
     for local_note_type, remote_note_type in note_types_with_field_conflicts:
         local_note_type["flds"] = remote_note_type["flds"]
@@ -302,15 +303,16 @@ def reset_note_types_of_notes(notes_data: List[Dict]):
         f"Note types of local notes differ from remote note types: {note_type_conflicts}",
     )
 
-    if not askUser(
-        "Note types of some AnkiHub managed notes were changed. If you continue, they will be changed back.\n"
-        "When you press Yes, Anki will ask you to confirm a full sync with AnkiWeb on the next sync.\n"
-        "Continue?"
-    ):
-        return
+    # XXX commented out because gui functions cant be called from background threads
+    # if not askUser(
+    #     "Note types of some AnkiHub managed notes were changed. If you continue, they will be changed back.\n"
+    #     "When you press Yes, Anki will ask you to confirm a full sync with AnkiWeb on the next sync.\n"
+    #     "Continue?"
+    # ):
+    #     return
 
-    if not mw.confirm_schema_modification():
-        return
+    # if not mw.confirm_schema_modification():
+    #     return
 
     for anki_nid, target_note_type_id, _ in note_type_conflicts:
         change_note_type_of_note(anki_nid, target_note_type_id)
