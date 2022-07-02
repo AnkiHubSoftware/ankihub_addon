@@ -191,16 +191,70 @@ def adjust_note_types(
     # can be called when installing a deck for the first time and to make sure that note types are the
     # same as in AnkiHub when synchronizing with AnkiHub.
 
-    fetch_missing_note_types(notes_data)
+    remote_note_types = fetch_remote_note_types(notes_data)
 
-    note_type_ids = list(
-        set(NotetypeId(int(note_dict["note_type_id"])) for note_dict in notes_data)
-    )
-    modify_note_types(note_type_ids)
+    create_missing_note_types(remote_note_types)
 
-    # TODO make sure all managed local note types have the same fields as the remote note types
+    ensure_local_and_remote_fields_are_same(remote_note_types)
+
+    modify_note_types(remote_note_types.keys())
 
     reset_note_types_of_notes(notes_data)
+
+
+def fetch_remote_note_types(notes_data) -> Dict[NotetypeId, NotetypeDict]:
+    result = {}
+    remote_mids = [
+        NotetypeId(int(note_dict["note_type_id"])) for note_dict in notes_data
+    ]
+
+    client = AnkiHubClient()
+    for mid in remote_mids:
+        response = client.get_note_type(mid)
+
+        if response.status_code != 200:
+            LOGGER.debug(f"Failed fetching note type with id {mid}.")
+            raise Exception(f"Failed fetching note type with id: {mid}.")
+
+        data = response.json()
+        note_type = to_anki_note_type(data)
+        result[mid] = note_type
+    return result
+
+
+def create_missing_note_types(remote_note_types: Dict[NotetypeId, NotetypeDict]):
+    missings_mids = set(
+        [mid for mid in remote_note_types.keys() if mw.col.models.get(mid) is None]
+    )
+    LOGGER.debug(f"Missing note types: {missings_mids}")
+
+    for mid in missings_mids:
+        new_note_type = remote_note_types[mid]
+        create_note_type_with_id(new_note_type, mid)
+
+    LOGGER.debug("Created missing note types.")
+
+
+def ensure_local_and_remote_fields_are_same(
+    remote_note_types: Dict[NotetypeId, NotetypeDict]
+):
+    for mid, remote_note_type in remote_note_types.items():
+        local_note_type = mw.col.models.get(mid)
+
+        def field_tuples(note_type: NotetypeDict) -> List[Tuple[int, str]]:
+            return [(field["ord"], field["name"]) for field in note_type["flds"]]
+
+        if not field_tuples(local_note_type) == field_tuples(remote_note_type):
+            LOGGER.debug(
+                f'Fields of local note type "{local_note_type["name"]}" differ from remote note_type. '
+                f"{field_tuples(local_note_type)=}, {field_tuples(remote_note_type)=}"
+            )
+
+            local_note_type["flds"] = remote_note_type["flds"]
+            mw.col.models.update_dict(local_note_type)
+            LOGGER.debug(
+                f'Updated fields of local note type: "{local_note_type["name"]}"'
+            )
 
 
 def reset_note_types_of_notes(notes_data: List[Dict]):
@@ -252,31 +306,6 @@ def change_note_type_of_note(nid: int, mid: int):
         new_fields=list(range(0, len(target_note_type["flds"]))),
     )
     mw.col.models.change_notetype_of_notes(request)
-
-
-def fetch_missing_note_types(notes_data: List[Dict]):
-    missing_note_types_ids = set(
-        [
-            mid
-            for note_dict in notes_data
-            if mw.col.models.get((mid := NotetypeId(int(note_dict["note_type_id"]))))
-            is None
-        ]
-    )
-    LOGGER.debug(f"Missing note types: {missing_note_types_ids}")
-
-    client = AnkiHubClient()
-    for mid in missing_note_types_ids:
-        response = client.get_note_type(mid)
-
-        if response.status_code != 200:
-            return
-
-        data = response.json()
-        note_type = to_anki_note_type(data)
-
-        modify_note_type(note_type)
-        create_note_type_with_id(note_type, mid)
 
 
 def create_note_type_with_id(mid, note_type):
