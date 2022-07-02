@@ -100,7 +100,7 @@ class SubscribedDecksDialog(QDialog):
             # TODO Run clean up when implemented:
             #  https://github.com/ankipalace/ankihub_addon/issues/20
 
-        tooltip("Unsubscribed from AnkiHub Deck.")
+        tooltip("Unsubscribed from AnkiHub Deck.", parent=mw)
         self.refresh_decks_list()
 
     def on_open_web(self) -> None:
@@ -282,7 +282,7 @@ class SubscribeDialog(QDialog):
         else:
 
             def on_success():
-                tooltip("The deck has successfully been installed!")
+                tooltip("The deck has successfully been installed!", parent=mw)
                 self.accept()
                 mw.reset()  # without this you have to click on "Decks" for the deck to appear in the main window
 
