@@ -276,7 +276,7 @@ def ensure_local_and_remote_fields_are_same(
     def ask_user_for_confirmation():
         if not askUser(
             "Some AnkiHub managed note types were changed. If you continue, they will be changed back.\n"
-            "When you press Yes, Anki will ask you to confirm a full sync with AnkiWeb on the next sync.\n"
+            "When you press Yes, Anki will possibly ask you to confirm a full sync with AnkiWeb on the next sync.\n"
             "Continue?",
             parent=mw.progress._win,
         ):
@@ -323,7 +323,7 @@ def reset_note_types_of_notes(notes_data: List[Dict]):
     def ask_user_for_confirmation():
         if not askUser(
             "Note types of some AnkiHub managed notes were changed. If you continue, they will be changed back.\n"
-            "When you press Yes, Anki will ask you to confirm a full sync with AnkiWeb on the next sync.\n"
+            "When you press Yes, Anki will possibly ask you to confirm a full sync with AnkiWeb on the next sync.\n"
             "Continue?",
             parent=mw.progress._win,
         ):
