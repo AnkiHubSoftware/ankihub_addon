@@ -189,7 +189,7 @@ def adjust_note_types(
     notes_data: List[Dict],
 ) -> None:
     # can be called when installing a deck for the first time and to make sure that note types are the
-    # same as in AnkiHub when synchronizing with AnkiHub.
+    # same as on AnkiHub when synchronizing with AnkiHub.
 
     remote_note_types = fetch_remote_note_types(notes_data)
 
