@@ -271,10 +271,10 @@ class SubscribeDialog(QDialog):
                 self._install_deck_apkg(deck_file)
             elif deck_file.suffix == ".csv":
                 self._install_deck_csv(deck_file)
-        except Exception as e:  # noqa
+        except Exception as e:
 
-            def on_failure():
-                showText(f"Failed to import deck.\n\n{str(e)}")  # noqa
+            def on_failure(e=e):
+                showText(f"Failed to import deck.\n\n{str(e)}")
                 self.reject()
 
             LOGGER.exception("Importing deck failed.")
