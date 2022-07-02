@@ -238,6 +238,8 @@ def create_missing_note_types(remote_note_types: Dict[NotetypeId, NotetypeDict])
 def ensure_local_and_remote_fields_are_same(
     remote_note_types: Dict[NotetypeId, NotetypeDict]
 ):
+
+    note_types_with_field_conflicts: List[Tuple[NotetypeDict, NotetypeDict]] = []
     for mid, remote_note_type in remote_note_types.items():
         local_note_type = mw.col.models.get(mid)
 
@@ -249,12 +251,22 @@ def ensure_local_and_remote_fields_are_same(
                 f'Fields of local note type "{local_note_type["name"]}" differ from remote note_type. '
                 f"{field_tuples(local_note_type)=}, {field_tuples(remote_note_type)=}"
             )
+            note_types_with_field_conflicts.append((local_note_type, remote_note_type))
 
-            local_note_type["flds"] = remote_note_type["flds"]
-            mw.col.models.update_dict(local_note_type)
-            LOGGER.debug(
-                f'Updated fields of local note type: "{local_note_type["name"]}"'
-            )
+    if not askUser(
+        "Some AnkiHub managed note types were changed. If you continue, they will be changed back.\n"
+        "When you press Yes, Anki will ask you to confirm a full sync with AnkiWeb on the next sync.\n"
+        "Continue?"
+    ):
+        return
+
+    if not mw.confirm_schema_modification():
+        return
+
+    for local_note_type, remote_note_type in note_types_with_field_conflicts:
+        local_note_type["flds"] = remote_note_type["flds"]
+        mw.col.models.update_dict(local_note_type)
+        LOGGER.debug(f'Updated fields of local note type: "{local_note_type["name"]}"')
 
 
 def reset_note_types_of_notes(notes_data: List[Dict]):
@@ -283,7 +295,7 @@ def reset_note_types_of_notes(notes_data: List[Dict]):
     if not askUser(
         "Note types of some AnkiHub managed notes were changed. If you continue, they will be changed back.\n"
         "When you press Yes, Anki will ask you to confirm a full sync with AnkiWeb on the next sync.\n"
-        "Continue synchronization with AnkiHub?"
+        "Continue?"
     ):
         return
 
