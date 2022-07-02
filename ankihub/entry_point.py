@@ -3,11 +3,13 @@ from aqt import gui_hooks, mw
 
 from .gui import editor
 from .gui.menu import setup_ankihub_menu
+from .taskman import ExtendedTaskManger
 from .utils import hide_ankihub_field_in_editor, sync_on_profile_open
 
 
 def run():
     """Call this function in __init__.py when Anki starts."""
+    mw.taskman = ExtendedTaskManger(mw)
     gui_hooks.editor_will_load_note.append(hide_ankihub_field_in_editor)
     gui_hooks.profile_did_open.append(sync_on_profile_open)
     setup_ankihub_menu()
