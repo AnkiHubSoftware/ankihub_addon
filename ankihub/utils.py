@@ -26,6 +26,10 @@ from .constants import (
 )
 
 
+class UserAbortedException(Exception):
+    pass
+
+
 def note_type_contains_field(
     note_type: NoteType, field=constants.ANKIHUB_NOTE_TYPE_FIELD_NAME
 ) -> bool:
@@ -173,9 +177,9 @@ def sync_with_ankihub():
 def sync_on_profile_open():
     def on_done(future: Future):
 
-        # Don't raise exception when automatically attempting to sync with AnkiHub
-        # with no Internet connection.
         if exc := future.exception():
+            # Don't raise exception when automatically attempting to sync with AnkiHub
+            # with no Internet connection.
             if not isinstance(exc, (ConnectionError, HTTPError)):
                 raise exc
 
@@ -190,7 +194,6 @@ def adjust_note_types(
 ) -> None:
     # can be called when installing a deck for the first time and to make sure that note types are the
     # same as on AnkiHub when synchronizing with AnkiHub.
-    # XXX if user doesnt confirm changes? what then?
 
     LOGGER.debug("Beginning adjusting note types...")
 
@@ -271,7 +274,8 @@ def ensure_local_and_remote_fields_are_same(
         if not askUser(
             "Some AnkiHub managed note types were changed. If you continue, they will be changed back.\n"
             "When you press Yes, Anki will ask you to confirm a full sync with AnkiWeb on the next sync.\n"
-            "Continue?"
+            "Continue?",
+            parent=mw.progress._win,
         ):
             return False
 
@@ -281,7 +285,7 @@ def ensure_local_and_remote_fields_are_same(
         return True
 
     if not mw.taskman.run_blocking_on_main(ask_user_for_confirmation):  # type: ignore
-        return
+        raise UserAbortedException()
 
     for local_note_type, remote_note_type in note_types_with_field_conflicts:
         local_note_type["flds"] = remote_note_type["flds"]
@@ -316,7 +320,8 @@ def reset_note_types_of_notes(notes_data: List[Dict]):
         if not askUser(
             "Note types of some AnkiHub managed notes were changed. If you continue, they will be changed back.\n"
             "When you press Yes, Anki will ask you to confirm a full sync with AnkiWeb on the next sync.\n"
-            "Continue?"
+            "Continue?",
+            parent=mw.progress._win,
         ):
             return False
 
@@ -326,7 +331,7 @@ def reset_note_types_of_notes(notes_data: List[Dict]):
         return True
 
     if not mw.taskman.run_blocking_on_main(ask_user_for_confirmation):  # type: ignore
-        return
+        raise UserAbortedException()
 
     for anki_nid, target_note_type_id, _ in note_type_conflicts:
         change_note_type_of_note(anki_nid, target_note_type_id)
