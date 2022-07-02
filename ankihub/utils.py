@@ -203,7 +203,7 @@ def adjust_note_types(
 
     ensure_local_and_remote_fields_are_same(remote_note_types)
 
-    modify_note_types(remote_note_types.keys())
+    modify_note_type_templates(remote_note_types.keys())
 
     reset_note_types_of_notes(notes_data)
 
@@ -213,7 +213,7 @@ def adjust_note_types(
 def fetch_remote_note_types(notes_data) -> Dict[NotetypeId, NotetypeDict]:
     result = {}
     remote_mids = set(
-        [NotetypeId(int(note_dict["note_type_id"])) for note_dict in notes_data]
+        NotetypeId(int(note_dict["note_type_id"])) for note_dict in notes_data
     )
 
     client = AnkiHubClient()
@@ -235,7 +235,7 @@ def fetch_remote_note_types(notes_data) -> Dict[NotetypeId, NotetypeDict]:
 
 def create_missing_note_types(remote_note_types: Dict[NotetypeId, NotetypeDict]):
     missings_mids = set(
-        [mid for mid in remote_note_types.keys() if mw.col.models.get(mid) is None]
+        mid for mid in remote_note_types.keys() if mw.col.models.get(mid) is None
     )
     if not missings_mids:
         return
@@ -304,6 +304,7 @@ def reset_note_types_of_notes(notes_data: List[Dict]):
         try:
             note = mw.col.get_note(anki_nid)
         except Exception:
+            # we don't care about missing notes here
             continue
 
         if note.mid != note_type_id:
@@ -408,6 +409,14 @@ def to_anki_note_type(note_type_data: Dict) -> NotetypeDict:
     del data["fields"]
 
     return data
+
+
+def modify_note_type_templates(note_type_ids: Iterable[NotetypeId]):
+    for mid in note_type_ids:
+        note_type = mw.col.models.get(mid)
+        for template in note_type["tmpls"]:
+            modify_template(template)
+        mw.col.models.update_dict(note_type)
 
 
 def modify_note_types(note_type_ids: Iterable[NotetypeId]):
