@@ -190,6 +190,7 @@ def adjust_note_types(
 ) -> None:
     # can be called when installing a deck for the first time and to make sure that note types are the
     # same as on AnkiHub when synchronizing with AnkiHub.
+    # XXX if user doesnt confirm changes? what then?
 
     LOGGER.debug("Beginning adjusting note types...")
 
@@ -263,16 +264,24 @@ def ensure_local_and_remote_fields_are_same(
             )
             note_types_with_field_conflicts.append((local_note_type, remote_note_type))
 
-    # XXX commented out because gui functions cant be called from background threads
-    # if not askUser(
-    #     "Some AnkiHub managed note types were changed. If you continue, they will be changed back.\n"
-    #     "When you press Yes, Anki will ask you to confirm a full sync with AnkiWeb on the next sync.\n"
-    #     "Continue?"
-    # ):
-    #     return
+    if not note_types_with_field_conflicts:
+        return
 
-    # if not mw.confirm_schema_modification():
-    #     return
+    def ask_user_for_confirmation():
+        if not askUser(
+            "Some AnkiHub managed note types were changed. If you continue, they will be changed back.\n"
+            "When you press Yes, Anki will ask you to confirm a full sync with AnkiWeb on the next sync.\n"
+            "Continue?"
+        ):
+            return False
+
+        if not mw.confirm_schema_modification():
+            return False
+
+        return True
+
+    if not mw.taskman.run_blocking_on_main(ask_user_for_confirmation):  # type: ignore
+        return
 
     for local_note_type, remote_note_type in note_types_with_field_conflicts:
         local_note_type["flds"] = remote_note_type["flds"]
@@ -303,16 +312,21 @@ def reset_note_types_of_notes(notes_data: List[Dict]):
         f"Note types of local notes differ from remote note types: {note_type_conflicts}",
     )
 
-    # XXX commented out because gui functions cant be called from background threads
-    # if not askUser(
-    #     "Note types of some AnkiHub managed notes were changed. If you continue, they will be changed back.\n"
-    #     "When you press Yes, Anki will ask you to confirm a full sync with AnkiWeb on the next sync.\n"
-    #     "Continue?"
-    # ):
-    #     return
+    def ask_user_for_confirmation():
+        if not askUser(
+            "Note types of some AnkiHub managed notes were changed. If you continue, they will be changed back.\n"
+            "When you press Yes, Anki will ask you to confirm a full sync with AnkiWeb on the next sync.\n"
+            "Continue?"
+        ):
+            return False
 
-    # if not mw.confirm_schema_modification():
-    #     return
+        if not mw.confirm_schema_modification():
+            return False
+
+        return True
+
+    if not mw.taskman.run_blocking_on_main(ask_user_for_confirmation):  # type: ignore
+        return
 
     for anki_nid, target_note_type_id, _ in note_type_conflicts:
         change_note_type_of_note(anki_nid, target_note_type_id)
