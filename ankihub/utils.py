@@ -181,7 +181,10 @@ def sync_on_profile_open():
 
     if config.private_config.token:
         mw.taskman.with_progress(
-            sync_with_ankihub, label="Synchronizing with AnkiHub", on_done=on_done
+            sync_with_ankihub,
+            label="Synchronizing with AnkiHub",
+            on_done=on_done,
+            parent=mw,
         )
 
 
@@ -189,18 +192,94 @@ def adjust_note_types(
     notes_data: List[Dict],
 ) -> None:
     # can be called when installing a deck for the first time and to make sure that note types are the
-    # same as in AnkiHub when synchronizing with AnkiHub.
+    # same as on AnkiHub when synchronizing with AnkiHub.
 
-    fetch_missing_note_types(notes_data)
+    LOGGER.debug("Beginning adjusting note types...")
 
-    note_type_ids = list(
-        set(NotetypeId(int(note_dict["note_type_id"])) for note_dict in notes_data)
-    )
-    modify_note_types(note_type_ids)
+    remote_note_types = fetch_remote_note_types(notes_data)
 
-    # TODO make sure all managed local note types have the same fields as the remote note types
+    create_missing_note_types(remote_note_types)
+
+    ensure_local_and_remote_fields_are_same(remote_note_types)
+
+    modify_note_type_templates(remote_note_types.keys())
 
     reset_note_types_of_notes(notes_data)
+
+    LOGGER.debug("Adjusted note types.")
+
+
+def fetch_remote_note_types(notes_data) -> Dict[NotetypeId, NotetypeDict]:
+    result = {}
+    remote_mids = set(
+        NotetypeId(int(note_dict["note_type_id"])) for note_dict in notes_data
+    )
+
+    client = AnkiHubClient()
+    for mid in remote_mids:
+        response = client.get_note_type(mid)
+
+        if response.status_code != 200:
+            LOGGER.debug(f"Failed fetching note type with id {mid}.")
+            raise Exception(f"Failed fetching note type with id: {mid}.")
+
+        data = response.json()
+        note_type = to_anki_note_type(data)
+        modify_note_type(
+            note_type
+        )  # needed because the note type returned from the api doesn't include the ankihub_id field. why? XXX
+        result[mid] = note_type
+    return result
+
+
+def create_missing_note_types(remote_note_types: Dict[NotetypeId, NotetypeDict]):
+    missings_mids = set(
+        mid for mid in remote_note_types.keys() if mw.col.models.get(mid) is None
+    )
+    if not missings_mids:
+        return
+
+    LOGGER.debug(f"Missing note types: {missings_mids}")
+
+    for mid in missings_mids:
+        new_note_type = remote_note_types[mid]
+        create_note_type_with_id(new_note_type, mid)
+
+    LOGGER.debug("Created missing note types.")
+
+
+def ensure_local_and_remote_fields_are_same(
+    remote_note_types: Dict[NotetypeId, NotetypeDict]
+):
+
+    note_types_with_field_conflicts: List[Tuple[NotetypeDict, NotetypeDict]] = []
+    for mid, remote_note_type in remote_note_types.items():
+        local_note_type = mw.col.models.get(mid)
+
+        def field_tuples(note_type: NotetypeDict) -> List[Tuple[int, str]]:
+            return [(field["ord"], field["name"]) for field in note_type["flds"]]
+
+        if not field_tuples(local_note_type) == field_tuples(remote_note_type):
+            LOGGER.debug(
+                f'Fields of local note type "{local_note_type["name"]}" differ from remote note_type. '
+                f"local:\n{pformat(field_tuples(local_note_type))}\nremote:\n{pformat(field_tuples(remote_note_type))}"
+            )
+            note_types_with_field_conflicts.append((local_note_type, remote_note_type))
+
+    if not askUser(
+        "Some AnkiHub managed note types were changed. If you continue, they will be changed back.\n"
+        "When you press Yes, Anki will ask you to confirm a full sync with AnkiWeb on the next sync.\n"
+        "Continue?"
+    ):
+        return
+
+    if not mw.confirm_schema_modification():
+        return
+
+    for local_note_type, remote_note_type in note_types_with_field_conflicts:
+        local_note_type["flds"] = remote_note_type["flds"]
+        mw.col.models.update_dict(local_note_type)
+        LOGGER.debug(f'Updated fields of local note type: "{local_note_type["name"]}"')
 
 
 def reset_note_types_of_notes(notes_data: List[Dict]):
@@ -214,6 +293,7 @@ def reset_note_types_of_notes(notes_data: List[Dict]):
         try:
             note = mw.col.get_note(anki_nid)
         except Exception:
+            # we don't care about missing notes here
             continue
 
         if note.mid != note_type_id:
@@ -229,7 +309,7 @@ def reset_note_types_of_notes(notes_data: List[Dict]):
     if not askUser(
         "Note types of some AnkiHub managed notes were changed. If you continue, they will be changed back.\n"
         "When you press Yes, Anki will ask you to confirm a full sync with AnkiWeb on the next sync.\n"
-        "Continue synchronization with AnkiHub?"
+        "Continue?"
     ):
         return
 
@@ -252,31 +332,6 @@ def change_note_type_of_note(nid: int, mid: int):
         new_fields=list(range(0, len(target_note_type["flds"]))),
     )
     mw.col.models.change_notetype_of_notes(request)
-
-
-def fetch_missing_note_types(notes_data: List[Dict]):
-    missing_note_types_ids = set(
-        [
-            mid
-            for note_dict in notes_data
-            if mw.col.models.get((mid := NotetypeId(int(note_dict["note_type_id"]))))
-            is None
-        ]
-    )
-    LOGGER.debug(f"Missing note types: {missing_note_types_ids}")
-
-    client = AnkiHubClient()
-    for mid in missing_note_types_ids:
-        response = client.get_note_type(mid)
-
-        if response.status_code != 200:
-            return
-
-        data = response.json()
-        note_type = to_anki_note_type(data)
-
-        modify_note_type(note_type)
-        create_note_type_with_id(note_type, mid)
 
 
 def create_note_type_with_id(mid, note_type):
@@ -336,6 +391,14 @@ def to_anki_note_type(note_type_data: Dict) -> NotetypeDict:
     del data["fields"]
 
     return data
+
+
+def modify_note_type_templates(note_type_ids: Iterable[NotetypeId]):
+    for mid in note_type_ids:
+        note_type = mw.col.models.get(mid)
+        for template in note_type["tmpls"]:
+            modify_template(template)
+        mw.col.models.update_dict(note_type)
 
 
 def modify_note_types(note_type_ids: Iterable[NotetypeId]):
