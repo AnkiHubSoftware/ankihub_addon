@@ -150,7 +150,7 @@ def sync_with_ankihub() -> None:
         if collected_notes:
 
             adjust_note_types_based_on_notes_data(collected_notes)
-            reset_note_types_of_notes(collected_notes)
+            reset_note_types_of_notes_based_on_notes_data(collected_notes)
 
             for note in collected_notes:
                 (
@@ -277,22 +277,26 @@ def ensure_local_and_remote_fields_are_same(
     LOGGER.debug("Updated fields of local note types.")
 
 
-def reset_note_types_of_notes(notes_data: List[Dict]) -> None:
+def reset_note_types_of_notes_based_on_notes_data(notes_data: List[Dict]) -> None:
     """Set the note type of notes back to the note type they have in the remote deck if they have a different one"""
+    nid_mid_pairs = [
+        (NoteId(int(note_dict["anki_id"])), NotetypeId(int(note_dict["note_type_id"])))
+        for note_dict in notes_data
+    ]
+    reset_note_types_of_notes(nid_mid_pairs)
 
+
+def reset_note_types_of_notes(nid_mid_pairs: List[Tuple[NoteId, NotetypeId]]) -> None:
     note_type_conflicts: Set[Tuple[NoteId, NotetypeId, NotetypeId]] = set()
-    for note_dict in notes_data:
-        anki_nid = NoteId(int(note_dict["anki_id"]))
-        note_type_id = NotetypeId(int(note_dict["note_type_id"]))
-
+    for nid, mid in nid_mid_pairs:
         try:
-            note = mw.col.get_note(anki_nid)
+            note = mw.col.get_note(nid)
         except Exception:
             # we don't care about missing notes here
             continue
 
-        if note.mid != note_type_id:
-            note_type_conflicts.add((note.id, note_type_id, note.mid))
+        if note.mid != mid:
+            note_type_conflicts.add((note.id, mid, note.mid))
 
     if not note_type_conflicts:
         return

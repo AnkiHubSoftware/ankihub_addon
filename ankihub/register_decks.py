@@ -27,8 +27,8 @@ from .utils import (
     create_backup_with_progress,
     get_note_types_in_deck,
     modify_note_type,
+    reset_note_types_of_notes_based_on_notes_data,
     update_or_create_note,
-    reset_note_types_of_notes,
 )
 
 DIR_PATH = os.path.dirname(os.path.abspath(__file__))
@@ -36,7 +36,7 @@ DIR_PATH = os.path.dirname(os.path.abspath(__file__))
 
 def load_notes_from_csv(notes_data: typing.List[dict]) -> None:
     adjust_note_types_based_on_notes_data(notes_data)
-    reset_note_types_of_notes(notes_data)
+    reset_note_types_of_notes_based_on_notes_data(notes_data)
     for note_data in notes_data:
         (
             anki_id,
