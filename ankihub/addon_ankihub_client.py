@@ -6,8 +6,9 @@ from typing import Dict
 from aqt import mw
 from aqt.utils import showText, tooltip
 from requests import Response
+from requests.models import HTTPError
 
-from . import LOGGER
+from . import LOGGER, report_exception
 from .ankihub_client import AnkiHubClient
 from .config import config
 from .constants import USER_SUPPORT_EMAIL_SLUG
@@ -47,6 +48,13 @@ def logging_hook(response: Response, *args, **kwargs):
     else:
         LOGGER.debug(f"response: {response}")
     return response
+
+
+def report_exception_hook(response: Response, *args, **kwargs):
+    try:
+        response.raise_for_status()
+    except HTTPError:
+        report_exception()
 
 
 def sign_in_hook(response: Response, *args, **kwargs):
@@ -90,6 +98,7 @@ def sign_out_hook(response: Response, *args, **kwargs):
 
 DEFAULT_RESPONSE_HOOKS = [
     logging_hook,
+    report_exception_hook,
     sign_in_hook,
     show_anki_message_hook,
     sign_out_hook,
