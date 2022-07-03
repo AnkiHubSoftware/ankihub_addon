@@ -17,8 +17,8 @@ LOGGER.debug(f"SKIP_INIT: {SKIP_INIT}")
 
 def report_exception():
     from .config import config
-    from .lib import sentry_sdk
-    from .lib.sentry_sdk import capture_exception, configure_scope
+    from .lib import sentry_sdk # type: ignore
+    from .lib.sentry_sdk import capture_exception, configure_scope # type: ignore
 
     if not config.public_config.get("report_errors"):
         return
