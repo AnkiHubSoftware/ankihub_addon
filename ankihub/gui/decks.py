@@ -235,7 +235,7 @@ class SubscribeDialog(QDialog):
 
             if out_file:
                 confirmed = askUser(
-                    f"The AnkiHub deck {ankihub_did} has been downloaded. Would you like to "
+                    f"The AnkiHub deck {data['name']} has been downloaded. Would you like to "
                     f"proceed with modifying your personal collection in order to subscribe "
                     f"to the collaborative deck? See {URL_HELP} for "
                     f"details.",
