@@ -6,27 +6,23 @@ from typing import Dict
 from aqt import mw
 from aqt.utils import showText, tooltip
 from requests import Response
+from requests.models import HTTPError
 
-from . import LOGGER
+from . import LOGGER, report_exception
 from .ankihub_client import AnkiHubClient
 from .config import config
-from .constants import USER_SUPPORT_EMAIL_SLUG
+from .messages import messages
 
 
 def show_anki_message_hook(response: Response, *args, **kwargs):
     LOGGER.debug("Begin show anki message hook.")
     endpoint = response.request.url
+
+    def message():
+        showText(messages.request_error(), type="html")
+
     if response.status_code > 299 and "/logout/" not in endpoint:
-        mw.taskman.run_on_main(
-            lambda: showText(  # type: ignore
-                "Uh oh! There was a problem with your request.\n\n"
-                "If you haven't already signed in using the AnkiHub menu please do so. "
-                "Make sure your username and password are correct and that you have "
-                "confirmed your AnkiHub account through email verification. If you "
-                "believe this is an error, please reach out to user support at "
-                f"{USER_SUPPORT_EMAIL_SLUG}. This error will be automatically reported."
-            )
-        )
+        mw.taskman.run_on_main(message)
     return response
 
 
@@ -47,6 +43,13 @@ def logging_hook(response: Response, *args, **kwargs):
     else:
         LOGGER.debug(f"response: {response}")
     return response
+
+
+def report_exception_hook(response: Response, *args, **kwargs):
+    try:
+        response.raise_for_status()
+    except HTTPError:
+        report_exception()
 
 
 def sign_in_hook(response: Response, *args, **kwargs):
@@ -90,6 +93,7 @@ def sign_out_hook(response: Response, *args, **kwargs):
 
 DEFAULT_RESPONSE_HOOKS = [
     logging_hook,
+    report_exception_hook,
     sign_in_hook,
     show_anki_message_hook,
     sign_out_hook,
