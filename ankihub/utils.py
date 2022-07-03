@@ -266,20 +266,14 @@ def ensure_local_and_remote_fields_are_same(
             )
             note_types_with_field_conflicts.append((local_note_type, remote_note_type))
 
-    if not askUser(
-        "Some AnkiHub managed note types were changed. If you continue, they will be changed back.\n"
-        "When you press Yes, Anki will ask you to confirm a full sync with AnkiWeb on the next sync.\n"
-        "Continue?"
-    ):
-        return
-
-    if not mw.confirm_schema_modification():
+    if not note_types_with_field_conflicts:
         return
 
     for local_note_type, remote_note_type in note_types_with_field_conflicts:
         local_note_type["flds"] = remote_note_type["flds"]
         mw.col.models.update_dict(local_note_type)
-        LOGGER.debug(f'Updated fields of local note type: "{local_note_type["name"]}"')
+
+    LOGGER.debug(f"Updated fields of local note types.")
 
 
 def reset_note_types_of_notes(notes_data: List[Dict]):
@@ -306,18 +300,10 @@ def reset_note_types_of_notes(notes_data: List[Dict]):
         f"Note types of local notes differ from remote note types: {note_type_conflicts}",
     )
 
-    if not askUser(
-        "Note types of some AnkiHub managed notes were changed. If you continue, they will be changed back.\n"
-        "When you press Yes, Anki will ask you to confirm a full sync with AnkiWeb on the next sync.\n"
-        "Continue?"
-    ):
-        return
-
-    if not mw.confirm_schema_modification():
-        return
-
     for anki_nid, target_note_type_id, _ in note_type_conflicts:
         change_note_type_of_note(anki_nid, target_note_type_id)
+
+    LOGGER.debug("Reset note types of local notes.")
 
 
 def change_note_type_of_note(nid: int, mid: int):
