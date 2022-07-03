@@ -134,6 +134,7 @@ def sync_with_ankihub() -> None:
 
     client = AnkiHubClient()
     decks = config.private_config.decks
+    data = None
     for deck in decks:
         collected_notes = []
         for response in client.get_deck_updates(
@@ -168,8 +169,8 @@ def sync_with_ankihub() -> None:
                 )
                 # Should last sync be tracked separately for each deck?
                 mw.reset()
-
-    config.save_last_sync(time=data["latest_update"])
+    if data:
+        config.save_last_sync(time=data["latest_update"])
 
 
 def sync_on_profile_open() -> None:
@@ -224,9 +225,8 @@ def fetch_remote_note_types(
 
         data = response.json()
         note_type = to_anki_note_type(data)
-        modify_note_type(
-            note_type
-        )  # needed because the note type returned from the api doesn't include the ankihub_id field. why? XXX
+        # TODO Remove if api is updated tot include the ankihub_id field for NoteType.
+        modify_note_type(note_type)
         result[mid] = note_type
     return result
 
@@ -430,7 +430,7 @@ def modify_fields(note_type: Dict) -> None:
 def modify_template(template: Dict) -> None:
     ankihub_snippet = (
         f"<!-- BEGIN {ANKIHUB_NOTE_TYPE_MODIFICATION_STRING} -->"
-        "<br>"
+        "<br><br>"
         f"\n{{{{#{ANKIHUB_NOTE_TYPE_FIELD_NAME}}}}}\n"
         "<a class='ankihub' "
         f"href='{URL_VIEW_NOTE}{{{{{ANKIHUB_NOTE_TYPE_FIELD_NAME}}}}}'>"
