@@ -149,7 +149,8 @@ def sync_with_ankihub() -> None:
 
         if collected_notes:
 
-            adjust_note_types(collected_notes)
+            adjust_note_types_based_on_notes_data(collected_notes)
+            reset_note_types_of_notes(collected_notes)
 
             for note in collected_notes:
                 (
@@ -189,34 +190,32 @@ def sync_on_profile_open() -> None:
         )
 
 
-def adjust_note_types(
-    notes_data: List[Dict],
-) -> None:
+def adjust_note_types_based_on_notes_data(notes_data: List[Dict]) -> None:
+    remote_mids = set(
+        NotetypeId(int(note_dict["note_type_id"])) for note_dict in notes_data
+    )
+    remote_note_types = fetch_remote_note_types(remote_mids)
+    adjust_note_types(remote_note_types)
+
+
+def adjust_note_types(remote_note_types: Dict[NotetypeId, NotetypeDict]) -> None:
     # can be called when installing a deck for the first time and when synchronizing with AnkiHub
 
     LOGGER.debug("Beginning adjusting note types...")
 
-    remote_note_types = fetch_remote_note_types(notes_data)
-
     create_missing_note_types(remote_note_types)
-
     ensure_local_and_remote_fields_are_same(remote_note_types)
-
     modify_note_type_templates(remote_note_types.keys())
-
-    reset_note_types_of_notes(notes_data)
 
     LOGGER.debug("Adjusted note types.")
 
 
-def fetch_remote_note_types(notes_data) -> Dict[NotetypeId, NotetypeDict]:
+def fetch_remote_note_types(
+    mids: Iterable[NotetypeId],
+) -> Dict[NotetypeId, NotetypeDict]:
     result = {}
-    remote_mids = set(
-        NotetypeId(int(note_dict["note_type_id"])) for note_dict in notes_data
-    )
-
     client = AnkiHubClient()
-    for mid in remote_mids:
+    for mid in mids:
         response = client.get_note_type(mid)
 
         if response.status_code != 200:
@@ -232,7 +231,9 @@ def fetch_remote_note_types(notes_data) -> Dict[NotetypeId, NotetypeDict]:
     return result
 
 
-def create_missing_note_types(remote_note_types: Dict[NotetypeId, NotetypeDict]) -> None:
+def create_missing_note_types(
+    remote_note_types: Dict[NotetypeId, NotetypeDict]
+) -> None:
     missings_mids = set(
         mid for mid in remote_note_types.keys() if mw.col.models.get(mid) is None
     )

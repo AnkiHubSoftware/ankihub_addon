@@ -22,19 +22,21 @@ from . import LOGGER
 from .addon_ankihub_client import AddonAnkiHubClient as AnkiHubClient
 from .constants import ANKIHUB_NOTE_TYPE_FIELD_NAME
 from .utils import (
-    adjust_note_types,
+    adjust_note_types_based_on_notes_data,
     change_note_type_of_note,
     create_backup_with_progress,
     get_note_types_in_deck,
     modify_note_type,
     update_or_create_note,
+    reset_note_types_of_notes,
 )
 
 DIR_PATH = os.path.dirname(os.path.abspath(__file__))
 
 
 def load_notes_from_csv(notes_data: typing.List[dict]) -> None:
-    adjust_note_types(notes_data)
+    adjust_note_types_based_on_notes_data(notes_data)
+    reset_note_types_of_notes(notes_data)
     for note_data in notes_data:
         (
             anki_id,
