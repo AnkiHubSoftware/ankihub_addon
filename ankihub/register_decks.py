@@ -20,6 +20,7 @@ from requests import Response
 
 from . import LOGGER
 from .addon_ankihub_client import AddonAnkiHubClient as AnkiHubClient
+from .config import config
 from .constants import ANKIHUB_NOTE_TYPE_FIELD_NAME
 from .utils import (
     adjust_note_types_based_on_notes_data,
@@ -103,8 +104,9 @@ def create_note_types_for_deck(deck_id: DeckId) -> Dict[NotetypeId, NotetypeId]:
 
         modify_note_type(new_model)
 
-        # TODO Add username to note type name
-        new_model["name"] = f"{new_model['name']} ({mw.col.decks.name(deck_id)})"
+        new_model[
+            "name"
+        ] = f"{new_model['name']} ({mw.col.decks.name(deck_id)} / {config.private_config.user})"
         mw.col.models.ensure_name_unique(new_model)
 
         new_model["id"] = 0
