@@ -20,6 +20,9 @@ def report_exception():
     from .lib import sentry_sdk
     from .lib.sentry_sdk import capture_exception, configure_scope
 
+    if not config.public_config.get("report_errors"):
+        return
+
     sentry_sdk.init(
         dsn="https://715325d30fa44ecd939d12edda720f91@o1184291.ingest.sentry.io/6546414",
         traces_sample_rate=1.0,
