@@ -11,7 +11,7 @@ from requests.models import HTTPError
 from . import LOGGER, report_exception
 from .ankihub_client import AnkiHubClient
 from .config import config
-from .constants import USER_SUPPORT_EMAIL_SLUG
+from .messages import messages
 
 
 def show_anki_message_hook(response: Response, *args, **kwargs):
@@ -20,12 +20,8 @@ def show_anki_message_hook(response: Response, *args, **kwargs):
     if response.status_code > 299 and "/logout/" not in endpoint:
         mw.taskman.run_on_main(
             lambda: showText(  # type: ignore
-                "Uh oh! There was a problem with your request.\n\n"
-                "If you haven't already signed in using the AnkiHub menu please do so. "
-                "Make sure your username and password are correct and that you have "
-                "confirmed your AnkiHub account through email verification. If you "
-                "believe this is an error, please reach out to user support at "
-                f"{USER_SUPPORT_EMAIL_SLUG}. This error will be automatically reported."
+                messages.request_error(),
+                type="html"
             )
         )
     return response
