@@ -13,7 +13,7 @@ from anki.errors import NotFoundError
 from anki.models import NoteType, NotetypeDict, NotetypeId
 from anki.notes import Note, NoteId
 from aqt import mw
-from aqt.utils import askUser, tr
+from aqt.utils import tr
 from requests.exceptions import ConnectionError
 
 from . import LOGGER, constants
@@ -273,7 +273,7 @@ def ensure_local_and_remote_fields_are_same(
         local_note_type["flds"] = remote_note_type["flds"]
         mw.col.models.update_dict(local_note_type)
 
-    LOGGER.debug(f"Updated fields of local note types.")
+    LOGGER.debug("Updated fields of local note types.")
 
 
 def reset_note_types_of_notes(notes_data: List[Dict]):
