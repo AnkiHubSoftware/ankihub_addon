@@ -87,7 +87,7 @@ def create_note_with_id(note_type_id: int, anki_id: int, anki_did: int) -> Note:
 
 def update_note(
     note: Note, anki_id: int, ankihub_id: int, fields: List[Dict], tags: List[str]
-):
+) -> None:
     note[constants.ANKIHUB_NOTE_TYPE_FIELD_NAME] = str(ankihub_id)
     note.tags = [str(tag) for tag in tags]
     # TODO Make sure we don't update protected fields.
@@ -127,7 +127,7 @@ def update_or_create_note(
     return note
 
 
-def sync_with_ankihub():
+def sync_with_ankihub() -> None:
     LOGGER.debug("Trying to sync with AnkiHub.")
 
     create_backup_with_progress()
@@ -171,7 +171,7 @@ def sync_with_ankihub():
     config.save_last_sync(time=data["latest_update"])
 
 
-def sync_on_profile_open():
+def sync_on_profile_open() -> None:
     def on_done(future: Future):
 
         # Don't raise exception when automatically attempting to sync with AnkiHub
@@ -232,7 +232,7 @@ def fetch_remote_note_types(notes_data) -> Dict[NotetypeId, NotetypeDict]:
     return result
 
 
-def create_missing_note_types(remote_note_types: Dict[NotetypeId, NotetypeDict]):
+def create_missing_note_types(remote_note_types: Dict[NotetypeId, NotetypeDict]) -> None:
     missings_mids = set(
         mid for mid in remote_note_types.keys() if mw.col.models.get(mid) is None
     )
@@ -250,7 +250,7 @@ def create_missing_note_types(remote_note_types: Dict[NotetypeId, NotetypeDict])
 
 def ensure_local_and_remote_fields_are_same(
     remote_note_types: Dict[NotetypeId, NotetypeDict]
-):
+) -> None:
 
     note_types_with_field_conflicts: List[Tuple[NotetypeDict, NotetypeDict]] = []
     for mid, remote_note_type in remote_note_types.items():
@@ -276,7 +276,7 @@ def ensure_local_and_remote_fields_are_same(
     LOGGER.debug("Updated fields of local note types.")
 
 
-def reset_note_types_of_notes(notes_data: List[Dict]):
+def reset_note_types_of_notes(notes_data: List[Dict]) -> None:
     """Set the note type of notes back to the note type they have in the remote deck if they have a different one"""
 
     note_type_conflicts: Set[Tuple[NoteId, NotetypeId, NotetypeId]] = set()
@@ -306,7 +306,7 @@ def reset_note_types_of_notes(notes_data: List[Dict]):
     LOGGER.debug("Reset note types of local notes.")
 
 
-def change_note_type_of_note(nid: int, mid: int):
+def change_note_type_of_note(nid: int, mid: int) -> None:
     current_schema: int = mw.col.db.scalar("select scm from col")
     note = mw.col.get_note(NoteId(nid))
     target_note_type = mw.col.models.get(NotetypeId(mid))
@@ -320,7 +320,7 @@ def change_note_type_of_note(nid: int, mid: int):
     mw.col.models.change_notetype_of_notes(request)
 
 
-def create_note_type_with_id(mid, note_type):
+def create_note_type_with_id(mid, note_type) -> None:
     changes = mw.col.models.add_dict(note_type)
 
     # Swap out the note type id that Anki assigns to the new note type with our own id.
@@ -379,7 +379,7 @@ def to_anki_note_type(note_type_data: Dict) -> NotetypeDict:
     return data
 
 
-def modify_note_type_templates(note_type_ids: Iterable[NotetypeId]):
+def modify_note_type_templates(note_type_ids: Iterable[NotetypeId]) -> None:
     for mid in note_type_ids:
         note_type = mw.col.models.get(mid)
         for template in note_type["tmpls"]:
@@ -387,7 +387,7 @@ def modify_note_type_templates(note_type_ids: Iterable[NotetypeId]):
         mw.col.models.update_dict(note_type)
 
 
-def modify_note_types(note_type_ids: Iterable[NotetypeId]):
+def modify_note_types(note_type_ids: Iterable[NotetypeId]) -> None:
     for mid in note_type_ids:
         note_type = mw.col.models.get(mid)
         modify_note_type(note_type)
@@ -420,7 +420,7 @@ def modify_fields(note_type: Dict) -> None:
     note_type["flds"].append(ankihub_field)
 
 
-def modify_template(template: Dict):
+def modify_template(template: Dict) -> None:
     ankihub_snippet = (
         f"<!-- BEGIN {ANKIHUB_NOTE_TYPE_MODIFICATION_STRING} -->"
         "<br>"
@@ -451,7 +451,7 @@ def modify_template(template: Dict):
         template["afmt"] += ankihub_snippet
 
 
-def create_backup_with_progress():
+def create_backup_with_progress() -> None:
     # has to be called from a background thread
     # if there is already a progress bar present this will not create a new one / modify the existing one
 
