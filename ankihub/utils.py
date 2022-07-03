@@ -350,8 +350,9 @@ def to_anki_note_type(note_type_data: Dict) -> NotetypeDict:
         "sortf": 0,
         "did": 0,
         "css": "",
-        "latexPre": "\\documentclass[12pt]{article}\n\\special{papersize=3in,5in}\n\\usepackage{amssymb,amsmath}"
-        + "\n\\pagestyle{empty}\n\\setlength{\\parindent}{0in}\n\\begin{document}\n",
+        "latexPre": "\\documentclass[12pt]{article}\n\\special{papersize=3in,5in}\n"
+                    "\\usepackage{amssymb,amsmath}\n\\pagestyle{empty}\n\\setlength"
+                    "{\\parindent}{0in}\n\\begin{document}\n",
         "latexPost": "\\end{document}",
         "latexsvg": False,
         "req": [0, "any", [0]],
