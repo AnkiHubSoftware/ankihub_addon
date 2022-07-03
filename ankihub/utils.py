@@ -321,7 +321,8 @@ def change_note_type_of_note(nid: int, mid: int) -> None:
     mw.col.models.change_notetype_of_notes(request)
 
 
-def create_note_type_with_id(mid, note_type) -> None:
+def create_note_type_with_id(note_type: NotetypeDict, mid: NotetypeId) -> None:
+    note_type["id"] = 0
     changes = mw.col.models.add_dict(note_type)
 
     # Swap out the note type id that Anki assigns to the new note type with our own id.
