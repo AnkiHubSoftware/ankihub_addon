@@ -192,8 +192,7 @@ def sync_on_profile_open():
 def adjust_note_types(
     notes_data: List[Dict],
 ) -> None:
-    # can be called when installing a deck for the first time and to make sure that note types are the
-    # same as on AnkiHub when synchronizing with AnkiHub.
+    # can be called when installing a deck for the first time and when synchronizing with AnkiHub
 
     LOGGER.debug("Beginning adjusting note types...")
 
