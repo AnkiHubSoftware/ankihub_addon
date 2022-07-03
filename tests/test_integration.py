@@ -6,6 +6,7 @@ from unittest.mock import MagicMock, Mock
 
 from anki.decks import DeckId
 from anki.models import NotetypeId
+from anki.notes import NoteId
 from aqt import gui_hooks
 from pytest_anki import AnkiSession
 
@@ -412,3 +413,29 @@ def test_adjust_note_types(anki_session_with_addon: AnkiSession):
 
         assert mw.col.models.by_name("AnkiHub Basic 1") is not None
         assert mw.col.models.get(ankihub_basic_2["id"])["flds"][3]["name"] == "foo"
+
+
+def test_reset_note_types_of_notes(anki_session_with_addon: AnkiSession):
+    from ankihub.utils import reset_note_types_of_notes, sync_on_profile_open
+
+    gui_hooks.profile_did_open.remove(sync_on_profile_open)
+    anki_session = anki_session_with_addon
+    with anki_session.profile_loaded():
+        mw = anki_session.mw
+
+        # create a note and save it
+        basic = mw.col.models.by_name("Basic")
+        note = mw.col.new_note(basic)
+        note["Front"] = "abc"
+        note["Back"] = "abc"
+        mw.col.add_note(note, mw.col.decks.active()[0])
+
+        cloze = mw.col.models.by_name("Cloze")
+
+        # change the note type of the note using reset_note_types_of_notes
+        nid_mid_pairs = [
+            (NoteId(note.id), NotetypeId(cloze["id"])),
+        ]
+        reset_note_types_of_notes(nid_mid_pairs)
+
+        assert mw.col.get_note(note.id).mid == cloze["id"]
