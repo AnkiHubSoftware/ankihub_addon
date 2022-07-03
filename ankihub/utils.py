@@ -167,7 +167,8 @@ def sync_with_ankihub():
                 )
                 # Should last sync be tracked separately for each deck?
                 mw.reset()
-                config.save_last_sync(time=data["latest_update"])
+
+    config.save_last_sync(time=data["latest_update"])
 
 
 def sync_on_profile_open():
