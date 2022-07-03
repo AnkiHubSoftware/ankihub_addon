@@ -1,2 +1,9 @@
 [tool.isort]
 profile = "black"
+
+[tool.black]
+extend-exclude = '''
+(
+  lib/
+)
+'''

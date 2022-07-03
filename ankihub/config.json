@@ -1,4 +1,5 @@
 {
     "ankihub_url": "https://app.ankihub.net",
-    "hotkey": "Alt+u"
+    "hotkey": "Alt+u",
+    "report_errors": true
 }
