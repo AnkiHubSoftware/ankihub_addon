@@ -17,13 +17,12 @@ from .messages import messages
 def show_anki_message_hook(response: Response, *args, **kwargs):
     LOGGER.debug("Begin show anki message hook.")
     endpoint = response.request.url
+
+    def message():
+        showText(messages.request_error(), type="html")
+
     if response.status_code > 299 and "/logout/" not in endpoint:
-        mw.taskman.run_on_main(
-            lambda: showText(  # type: ignore
-                messages.request_error(),
-                type="html"
-            )
-        )
+        mw.taskman.run_on_main(message)
     return response
 
 
