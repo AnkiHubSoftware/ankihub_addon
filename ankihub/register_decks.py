@@ -113,7 +113,7 @@ def modify_template(template: Dict):
             template["afmt"],
         )
     else:
-        template["afmt"] += ankihub_snippet
+        template["afmt"] += "\n\n" + ankihub_snippet
 
 
 def modify_note_types(note_types: typing.Iterable[str]):
