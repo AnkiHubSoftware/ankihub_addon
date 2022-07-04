@@ -223,8 +223,6 @@ def fetch_remote_note_types(
 
         data = response.json()
         note_type = to_anki_note_type(data)
-        # TODO Remove if api is updated tot include the ankihub_id field for NoteType.
-        modify_note_type(note_type)
         result[mid] = note_type
     return result
 
