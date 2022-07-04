@@ -333,6 +333,7 @@ def create_note_type_with_id(note_type: NotetypeDict, mid: NotetypeId) -> None:
     mw.col.models._clear_cache()  # TODO check if this is necessary
 
     LOGGER.debug(f"Created note type: {mid}")
+    LOGGER.debug(f"Note type:\n {pformat(note_type)}")
 
 
 def to_anki_note_type(note_type_data: Dict) -> NotetypeDict:
