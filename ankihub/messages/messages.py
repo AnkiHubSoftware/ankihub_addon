@@ -2,7 +2,7 @@ import pathlib
 
 from jinja2 import Environment, FileSystemLoader, select_autoescape
 
-from ankihub.constants import BUG_REPORT_FORM
+from ..constants import BUG_REPORT_FORM
 
 templates = (pathlib.Path(__file__).parent / "templates").absolute()
 env = Environment(loader=FileSystemLoader(templates), autoescape=select_autoescape())
