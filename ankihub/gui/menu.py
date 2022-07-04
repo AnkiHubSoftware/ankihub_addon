@@ -102,13 +102,11 @@ class AnkiHubLogin(QWidget):
 
     @classmethod
     def display_login(cls):
-        global __window
-        __window = cls()
-        return __window
-
-    @classmethod
-    def is_shown(cls):
-        return __window.isVisible()
+        if not hasattr(cls, "_window"):
+            cls._window = cls()
+        else:
+            cls._window.show()
+        return cls._window
 
 
 def create_collaborative_deck_action() -> None:
