@@ -106,6 +106,10 @@ class AnkiHubLogin(QWidget):
         __window = cls()
         return __window
 
+    @classmethod
+    def is_shown(cls):
+        return __window.isVisible()
+
 
 def create_collaborative_deck_action() -> None:
     deck_chooser = StudyDeck(

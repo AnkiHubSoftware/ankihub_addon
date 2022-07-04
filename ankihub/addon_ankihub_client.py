@@ -64,7 +64,12 @@ def sign_in_hook(response: Response, *args, **kwargs):
         config.save_token("")
         from .gui.menu import AnkiHubLogin
 
-        mw.taskman.run_on_main(AnkiHubLogin.display_login)
+        def open_login_dialog():
+            if not AnkiHubLogin.is_shown():
+                AnkiHubLogin.display_login()
+
+        mw.taskman.run_on_main(open_login_dialog)
+
         return response
     elif "/login/" in response.url and response.status_code == 200:
         data = response.json()
