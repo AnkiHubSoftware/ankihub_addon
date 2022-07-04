@@ -291,7 +291,7 @@ def reset_note_types_of_notes(nid_mid_pairs: List[Tuple[NoteId, NotetypeId]]) ->
     for nid, mid in nid_mid_pairs:
         try:
             note = mw.col.get_note(nid)
-        except Exception:
+        except NotFoundError:
             # we don't care about missing notes here
             continue
 
