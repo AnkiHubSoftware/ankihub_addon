@@ -77,8 +77,8 @@ def test_get_note_types_in_deck(anki_session_with_addon: AnkiSession):
 
             note_model_ids = get_note_types_in_deck(DeckId(deck_id))
             # TODO test on a deck that has more than one note type.
-            assert len(note_model_ids) == 1
-            assert note_model_ids == [1650564101852]
+            assert len(note_model_ids) == 2
+            assert note_model_ids == [1656968697414, 1656968697418]
 
 
 def test_note_type_contains_field(anki_session_with_addon: AnkiSession):
