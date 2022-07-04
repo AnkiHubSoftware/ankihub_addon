@@ -50,13 +50,13 @@ class Config:
         private_config = PrivateConfig()
         config_dict = dataclasses.asdict(private_config)
         with open(self._private_config_file_path, "w") as f:
-            f.write(json.dumps(config_dict))
+            f.write(json.dumps(config_dict, indent=4, sort_keys=True))
         return private_config
 
     def _update_private_config(self):
         with open(self._private_config_file_path, "w") as f:
             config_dict = dataclasses.asdict(self.private_config)
-            f.write(json.dumps(config_dict))
+            f.write(json.dumps(config_dict, indent=4, sort_keys=True))
             LOGGER.debug(f"Updated PrivateConfig:\n {pformat(config_dict)}")
 
     def save_token(self, token: str):
