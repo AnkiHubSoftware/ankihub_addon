@@ -10,7 +10,7 @@ from anki.notes import NoteId
 from aqt import gui_hooks
 from pytest_anki import AnkiSession
 
-sample_model_id = NotetypeId(1650564101852)
+sample_model_id = NotetypeId(1656968697414)
 sample_deck = str(pathlib.Path(__file__).parent / "test_data" / "small.apkg")
 
 
