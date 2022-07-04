@@ -6,11 +6,11 @@ from urllib.error import HTTPError
 
 import anki
 import aqt
-from anki import notetypes_pb2, utils
 from anki.decks import DeckId
 from anki.errors import NotFoundError
-from anki.models import NoteType, NotetypeDict, NotetypeId
+from anki.models import ChangeNotetypeRequest, NoteType, NotetypeDict, NotetypeId
 from anki.notes import Note, NoteId
+from anki.utils import ids2str
 from aqt import mw
 from aqt.utils import tr
 from requests.exceptions import ConnectionError
@@ -38,7 +38,7 @@ def get_note_types_in_deck(did: DeckId) -> List[NotetypeId]:
     """Returns list of note model ids in the given deck."""
     dids = [did]
     dids += [child[1] for child in mw.col.decks.children(did)]
-    dids_str = utils.ids2str(dids)
+    dids_str = ids2str(dids)
     # odid is the original did for cards in filtered decks
     query = (
         "SELECT DISTINCT mid FROM cards "
@@ -310,7 +310,7 @@ def change_note_type_of_note(nid: int, mid: int) -> None:
     current_schema: int = mw.col.db.scalar("select scm from col")
     note = mw.col.get_note(NoteId(nid))
     target_note_type = mw.col.models.get(NotetypeId(mid))
-    request = notetypes_pb2.ChangeNotetypeRequest(
+    request = ChangeNotetypeRequest(
         note_ids=[note.id],
         old_notetype_id=note.mid,
         new_notetype_id=NotetypeId(mid),
