@@ -121,8 +121,6 @@ def update_or_create_note(
             "anki_id", 1
         )  # XXX if the deck doesn't exist, use the default deck
         note = create_note_with_id(note_type_id, anki_id, anki_did)
-        LOGGER.debug(f"Created note {anki_id}")
-
         update_note(note, anki_id, ankihub_id, fields, tags)
     return note
 
