@@ -338,49 +338,11 @@ def create_note_type_with_id(note_type: NotetypeDict, mid: NotetypeId) -> None:
 
 
 def to_anki_note_type(note_type_data: Dict) -> NotetypeDict:
+    """Turn JSON response from AnkiHubClient.get_note_type into NotetypeDict."""
     data = note_type_data
     del data["anki_id"]
-    d = {
-        "id": 0,
-        "type": 0,  # XXX hardcoded
-        "mod": int(time.time()),
-        "usn": -1,
-        "sortf": 0,
-        "did": 0,
-        "css": "",
-        "latexPre": "\\documentclass[12pt]{article}\n\\special{papersize=3in,5in}\n"
-        "\\usepackage{amssymb,amsmath}\n\\pagestyle{empty}\n\\setlength"
-        "{\\parindent}{0in}\n\\begin{document}\n",
-        "latexPost": "\\end{document}",
-        "latexsvg": False,
-        "req": [0, "any", [0]],
-        "vers": [],
-        "tags": [],
-    }
-    data.update(d)
-
-    data["tmpls"] = []
-    for template in data["templates"]:
-        template["bfont"] = "Arial"
-        template["bsize"] = 12
-
-        data["tmpls"].append(template)
-    del data["templates"]
-
-    data["flds"] = []
-    for field in data["fields"]:
-        field["ord"] = field["order"]
-        del field["order"]
-
-        field["sticky"] = False
-        field["rtl"] = False
-        field["font"] = "Arial"
-        field["size"] = 18
-        field["media"] = []
-
-        data["flds"].append(field)
-    del data["fields"]
-
+    data["tmpls"] = data.pop("templates")
+    data["flds"] = data.pop("fields")
     return data
 
 
