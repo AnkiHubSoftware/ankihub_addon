@@ -1,5 +1,4 @@
 import re
-import time
 from concurrent.futures import Future
 from pprint import pformat
 from typing import Dict, Iterable, List, Set, Tuple
