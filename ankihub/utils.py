@@ -413,7 +413,7 @@ def modify_template(template: Dict) -> None:
             template["afmt"],
         )
     else:
-        template["afmt"] += ankihub_snippet
+        template["afmt"] += "\n\n" + ankihub_snippet
 
 
 def create_backup_with_progress() -> None:
