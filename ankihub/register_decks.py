@@ -44,7 +44,7 @@ def load_notes_from_csv(notes_data: typing.List[dict]) -> None:
             deck,
             fields,
             ankihub_id,
-            last_sync,
+            latest_update,
             note_type,
             note_type_id,
             tags,

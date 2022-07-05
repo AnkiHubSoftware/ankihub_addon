@@ -130,7 +130,9 @@ def sync_with_ankihub() -> None:
     decks = config.private_config.decks
     for ankihub_did, deck in decks.items():
         collected_notes = []
-        for response in client.get_deck_updates(ankihub_did, since=deck["last_sync"]):
+        for response in client.get_deck_updates(
+            ankihub_did, since=deck["latest_update"]
+        ):
             if response.status_code != 200:
                 return
 
@@ -164,7 +166,7 @@ def sync_with_ankihub() -> None:
                     deck_id,
                 )
 
-            config.save_last_sync(ankihub_did, data["latest_update"])
+            config.save_latest_update(ankihub_did, data["latest_update"])
 
     mw.reset()
 

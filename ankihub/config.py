@@ -68,13 +68,13 @@ class Config:
         self.private_config.user = user_email
         self._update_private_config()
 
-    def save_last_sync(self, ankihub_did: int, time=None):
+    def save_latest_update(self, ankihub_did: str, time=None):
         if time:
             date_object = datetime.strptime(time, "%Y-%m-%dT%H:%M:%S.%f%z")
         else:
             date_object = datetime.now(tz=timezone.utc)
         date_time_str = datetime.strftime(date_object, "%Y-%m-%dT%H:%M:%S.%f%z")
-        self.private_config.decks[ankihub_did]["last_sync"] = date_time_str
+        self.private_config.decks[ankihub_did]["latest_update"] = date_time_str
         self._update_private_config()
 
     def save_subscription(
@@ -86,7 +86,7 @@ class Config:
             "creator": creator,
         }
         # remove duplicates
-        self.save_last_sync()
+        self.save_latest_update(ankihub_did)
         self._update_private_config()
 
     def unsubscribe_deck(self, ankihub_did: str) -> None:
