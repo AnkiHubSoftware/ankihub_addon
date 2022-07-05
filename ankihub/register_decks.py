@@ -101,18 +101,13 @@ def create_note_types_for_deck(deck_id: DeckId) -> Dict[NotetypeId, NotetypeId]:
     model_ids = get_note_types_in_deck(deck_id)
     for mid in model_ids:
         new_model = deepcopy(mw.col.models.get(mid))
-
         modify_note_type(new_model)
-
-        new_model[
-            "name"
-        ] = f"{new_model['name']} ({mw.col.decks.name(deck_id)} / {config.private_config.user})"
+        name = f"{new_model['name']} ({mw.col.decks.name(deck_id)} / {config.private_config.user})"
+        new_model["name"] = name
         mw.col.models.ensure_name_unique(new_model)
-
         new_model["id"] = 0
         mw.col.models.add_dict(new_model)
         result[mid] = mw.col.models.by_name(new_model["name"])["id"]
-
     return result
 
 

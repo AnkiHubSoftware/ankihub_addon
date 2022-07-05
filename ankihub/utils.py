@@ -219,7 +219,7 @@ def fetch_remote_note_types(
 
         if response.status_code != 200:
             LOGGER.debug(f"Failed fetching note type with id {mid}.")
-            raise Exception(f"Failed fetching note type with id: {mid}.")
+            continue
 
         data = response.json()
         note_type = to_anki_note_type(data)
@@ -233,16 +233,11 @@ def create_missing_note_types(
     missings_mids = set(
         mid for mid in remote_note_types.keys() if mw.col.models.get(mid) is None
     )
-    if not missings_mids:
-        return
-
-    LOGGER.debug(f"Missing note types: {missings_mids}")
-
     for mid in missings_mids:
+        LOGGER.debug(f"Missing note type {mid}")
         new_note_type = remote_note_types[mid]
         create_note_type_with_id(new_note_type, mid)
-
-    LOGGER.debug("Created missing note types.")
+        LOGGER.debug(f"Created missing note type {mid}")
 
 
 def ensure_local_and_remote_fields_are_same(
@@ -263,14 +258,10 @@ def ensure_local_and_remote_fields_are_same(
             )
             note_types_with_field_conflicts.append((local_note_type, remote_note_type))
 
-    if not note_types_with_field_conflicts:
-        return
-
     for local_note_type, remote_note_type in note_types_with_field_conflicts:
         local_note_type["flds"] = remote_note_type["flds"]
         mw.col.models.update_dict(local_note_type)
-
-    LOGGER.debug("Updated fields of local note types.")
+        LOGGER.debug(f"Updated fields of note type {local_note_type}.")
 
 
 def reset_note_types_of_notes_based_on_notes_data(notes_data: List[Dict]) -> None:
@@ -294,17 +285,14 @@ def reset_note_types_of_notes(nid_mid_pairs: List[Tuple[NoteId, NotetypeId]]) ->
         if note.mid != mid:
             note_type_conflicts.add((note.id, mid, note.mid))
 
-    if not note_type_conflicts:
-        return
-
-    LOGGER.debug(
-        f"Note types of local notes differ from remote note types: {note_type_conflicts}",
-    )
-
     for anki_nid, target_note_type_id, _ in note_type_conflicts:
+        LOGGER.debug(
+            f"Note types differ: anki_nid: {anki_nid} target_note_type_id {target_note_type_id}",
+        )
         change_note_type_of_note(anki_nid, target_note_type_id)
-
-    LOGGER.debug("Reset note types of local notes.")
+        LOGGER.debug(
+            f"Changed note type: anki_nid {anki_nid} target_note_type_id {target_note_type_id}",
+        )
 
 
 def change_note_type_of_note(nid: int, mid: int) -> None:
@@ -338,11 +326,10 @@ def create_note_type_with_id(note_type: NotetypeDict, mid: NotetypeId) -> None:
 
 def to_anki_note_type(note_type_data: Dict) -> NotetypeDict:
     """Turn JSON response from AnkiHubClient.get_note_type into NotetypeDict."""
-    data = note_type_data
-    del data["anki_id"]
-    data["tmpls"] = data.pop("templates")
-    data["flds"] = data.pop("fields")
-    return data
+    del note_type_data["anki_id"]
+    note_type_data["tmpls"] = note_type_data.pop("templates")
+    note_type_data["flds"] = note_type_data.pop("fields")
+    return note_type_data
 
 
 def modify_note_type_templates(note_type_ids: Iterable[NotetypeId]) -> None:
@@ -407,7 +394,7 @@ def modify_template(template: Dict) -> None:
     )
 
     if re.search(snippet_pattern, template["afmt"]):
-        LOGGER.debug("Template modifcation was already present, updated it")
+        LOGGER.debug("Template modification was already present, updated it")
         template["afmt"] = re.sub(
             snippet_pattern,
             ankihub_snippet,
