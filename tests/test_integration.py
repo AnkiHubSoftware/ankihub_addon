@@ -6,9 +6,11 @@ from unittest.mock import MagicMock, Mock
 
 from anki.decks import DeckId
 from anki.models import NotetypeId
+from anki.notes import NoteId
+from aqt import gui_hooks
 from pytest_anki import AnkiSession
 
-sample_model_id = NotetypeId(1650564101852)
+sample_model_id = NotetypeId(1656968697414)
 sample_deck = str(pathlib.Path(__file__).parent / "test_data" / "small.apkg")
 
 
@@ -75,8 +77,8 @@ def test_get_note_types_in_deck(anki_session_with_addon: AnkiSession):
 
             note_model_ids = get_note_types_in_deck(DeckId(deck_id))
             # TODO test on a deck that has more than one note type.
-            assert len(note_model_ids) == 1
-            assert note_model_ids == [1650564101852]
+            assert len(note_model_ids) == 2
+            assert note_model_ids == [1656968697414, 1656968697418]
 
 
 def test_note_type_contains_field(anki_session_with_addon: AnkiSession):
@@ -104,7 +106,7 @@ def test_modify_note_type(anki_session_with_addon: AnkiSession):
             note_type = anki_session.mw.col.models.by_name("Basic")
             original_note_type = copy.deepcopy(note_type)
             original_note_template = original_note_type["tmpls"][0]["afmt"]
-            modify_note_type("Basic")
+            modify_note_type(note_type)
             modified_template = note_type["tmpls"][0]["afmt"]
             # # TODO Make more precise assertions.
             assert ANKIHUB_NOTE_TYPE_FIELD_NAME in modified_template
@@ -374,3 +376,66 @@ def test_create_new_note_suggestion(
         comment="",
     )
     assert response.status_code == 403
+
+
+def test_adjust_note_types(anki_session_with_addon: AnkiSession):
+    from ankihub.utils import adjust_note_types, modify_note_type, sync_on_profile_open
+
+    gui_hooks.profile_did_open.remove(sync_on_profile_open)
+    anki_session = anki_session_with_addon
+    with anki_session.profile_loaded():
+        mw = anki_session.mw
+
+        # for testing creating missing note type
+        ankihub_basic_1 = copy.deepcopy(mw.col.models.by_name("Basic"))
+        ankihub_basic_1["id"] = 1
+        ankihub_basic_1["name"] = "AnkiHub Basic 1"
+        modify_note_type(ankihub_basic_1)
+
+        # for testing updating existing note type
+        ankihub_basic_2 = copy.deepcopy(mw.col.models.by_name("Basic"))
+        ankihub_basic_2["name"] = "AnkiHub Basic 2"
+        modify_note_type(ankihub_basic_2)
+        # ... save the note type
+        ankihub_basic_2["id"] = 0
+        changes = mw.col.models.add_dict(ankihub_basic_2)
+        ankihub_basic_2["id"] = changes.id
+        # ... then add a field
+        new_field = mw.col.models.new_field("foo")
+        new_field["ord"] = 2
+        mw.col.models.add_field(ankihub_basic_2, new_field)
+
+        remote_note_types = {
+            ankihub_basic_1["id"]: ankihub_basic_1,
+            ankihub_basic_2["id"]: ankihub_basic_2,
+        }
+        adjust_note_types(remote_note_types)
+
+        assert mw.col.models.by_name("AnkiHub Basic 1") is not None
+        assert mw.col.models.get(ankihub_basic_2["id"])["flds"][3]["name"] == "foo"
+
+
+def test_reset_note_types_of_notes(anki_session_with_addon: AnkiSession):
+    from ankihub.utils import reset_note_types_of_notes, sync_on_profile_open
+
+    gui_hooks.profile_did_open.remove(sync_on_profile_open)
+    anki_session = anki_session_with_addon
+    with anki_session.profile_loaded():
+        mw = anki_session.mw
+
+        # create a note and save it
+        basic = mw.col.models.by_name("Basic")
+        note = mw.col.new_note(basic)
+        note["Front"] = "abc"
+        note["Back"] = "abc"
+        mw.col.add_note(note, mw.col.decks.active()[0])
+
+        cloze = mw.col.models.by_name("Cloze")
+
+        # change the note type of the note using reset_note_types_of_notes
+        nid_mid_pairs = [
+            (NoteId(note.id), NotetypeId(cloze["id"])),
+        ]
+        reset_note_types_of_notes(nid_mid_pairs)
+
+        assert mw.col.get_note(note.id).mid == cloze["id"]

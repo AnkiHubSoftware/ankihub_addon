@@ -1,3 +1,4 @@
+import dataclasses
 import logging.config
 import os
 import pathlib
@@ -31,6 +32,7 @@ def report_exception():
     with configure_scope() as scope:
         scope.level = "error"
         scope.user = {"id": config.private_config.user}
+        scope.set_context("add-on config", dataclasses.asdict(config.private_config))
 
     capture_exception()
     sentry_sdk.flush()

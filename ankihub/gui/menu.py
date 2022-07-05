@@ -1,3 +1,4 @@
+from typing import Optional
 from aqt import (
     QHBoxLayout,
     QLabel,
@@ -23,6 +24,8 @@ from .decks import SubscribedDecksDialog
 
 
 class AnkiHubLogin(QWidget):
+    _window: Optional["AnkiHubLogin"] = None
+
     def __init__(self):
         super(AnkiHubLogin, self).__init__()
         self.results = None
@@ -102,9 +105,11 @@ class AnkiHubLogin(QWidget):
 
     @classmethod
     def display_login(cls):
-        global __window
-        __window = cls()
-        return __window
+        if cls._window is None:
+            cls._window = cls()
+        else:
+            cls._window.show()
+        return cls._window
 
 
 def create_collaborative_deck_action() -> None:
@@ -201,6 +206,8 @@ def sync_with_ankihub_setup(parent):
     """Set up the menu item for uploading suggestions in bulk."""
     q_action = QAction("🔃️ Sync with AnkiHub", mw)
     q_action.triggered.connect(sync_with_ankihub_action)
+    if not config.private_config.decks:
+        q_action.setDisabled(True)
     parent.addAction(q_action)
 
 

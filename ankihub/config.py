@@ -16,7 +16,6 @@ class PrivateConfig:
     token: str = ""
     user: str = ""
     decks: Dict[int, Dict[str, Any]] = dataclasses.field(default_factory=dict)
-    last_sync: str = ""
 
 
 class Config:
@@ -50,13 +49,13 @@ class Config:
         private_config = PrivateConfig()
         config_dict = dataclasses.asdict(private_config)
         with open(self._private_config_file_path, "w") as f:
-            f.write(json.dumps(config_dict))
+            f.write(json.dumps(config_dict, indent=4, sort_keys=True))
         return private_config
 
     def _update_private_config(self):
         with open(self._private_config_file_path, "w") as f:
             config_dict = dataclasses.asdict(self.private_config)
-            f.write(json.dumps(config_dict))
+            f.write(json.dumps(config_dict, indent=4, sort_keys=True))
             LOGGER.debug(f"Updated PrivateConfig:\n {pformat(config_dict)}")
 
     def save_token(self, token: str):
@@ -69,13 +68,13 @@ class Config:
         self.private_config.user = user_email
         self._update_private_config()
 
-    def save_last_sync(self, time=None):
+    def save_latest_update(self, ankihub_did: str, time=None):
         if time:
             date_object = datetime.strptime(time, "%Y-%m-%dT%H:%M:%S.%f%z")
         else:
             date_object = datetime.now(tz=timezone.utc)
         date_time_str = datetime.strftime(date_object, "%Y-%m-%dT%H:%M:%S.%f%z")
-        self.private_config.last_sync = date_time_str
+        self.private_config.decks[ankihub_did]["latest_update"] = date_time_str
         self._update_private_config()
 
     def save_subscription(
@@ -87,7 +86,7 @@ class Config:
             "creator": creator,
         }
         # remove duplicates
-        self.save_last_sync()
+        self.save_latest_update(ankihub_did)
         self._update_private_config()
 
     def unsubscribe_deck(self, ankihub_did: str) -> None:

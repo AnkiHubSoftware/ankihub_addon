@@ -23,7 +23,7 @@ from .. import LOGGER
 from ..addon_ankihub_client import AddonAnkiHubClient as AnkiHubClient
 from ..config import config
 from ..constants import CSV_DELIMITER, URL_DECK_BASE, URL_DECKS, URL_HELP
-from ..register_decks import modify_note_types, process_csv
+from ..register_decks import load_notes_from_csv
 from ..utils import create_backup_with_progress
 
 
@@ -100,7 +100,7 @@ class SubscribedDecksDialog(QDialog):
             # TODO Run clean up when implemented:
             #  https://github.com/ankipalace/ankihub_addon/issues/20
 
-        tooltip("Unsubscribed from AnkiHub Deck.")
+        tooltip("Unsubscribed from AnkiHub Deck.", parent=mw)
         self.refresh_decks_list()
 
     def on_open_web(self) -> None:
@@ -235,7 +235,7 @@ class SubscribeDialog(QDialog):
 
             if out_file:
                 confirmed = askUser(
-                    f"The AnkiHub deck {ankihub_did} has been downloaded. Would you like to "
+                    f"The AnkiHub deck {data['name']} has been downloaded. Would you like to "
                     f"proceed with modifying your personal collection in order to subscribe "
                     f"to the collaborative deck? See {URL_HELP} for "
                     f"details.",
@@ -271,10 +271,10 @@ class SubscribeDialog(QDialog):
                 self._install_deck_apkg(deck_file)
             elif deck_file.suffix == ".csv":
                 self._install_deck_csv(deck_file)
-        except Exception as e:  # noqa
+        except Exception as e:
 
-            def on_failure():
-                showText(f"Failed to import deck.\n\n{str(e)}")  # noqa
+            def on_failure(e=e):
+                showText(f"Failed to import deck.\n\n{str(e)}")
                 self.reject()
 
             LOGGER.exception("Importing deck failed.")
@@ -282,7 +282,7 @@ class SubscribeDialog(QDialog):
         else:
 
             def on_success():
-                tooltip("The deck has successfully been installed!")
+                tooltip("The deck has successfully been installed!", parent=mw)
                 self.accept()
                 mw.reset()  # without this you have to click on "Decks" for the deck to appear in the main window
 
@@ -304,17 +304,10 @@ class SubscribeDialog(QDialog):
         deck_file: Path,
     ) -> None:
         LOGGER.debug("Importing deck as csv....")
-        ankihub_deck_ids, note_type_names = set(), set()
-        notes = []
         with deck_file.open(encoding="utf-8") as f:
             reader = csv.DictReader(f, delimiter=CSV_DELIMITER, quotechar="'")
-            for row in reader:
-                notes.append(row)
-                ankihub_deck_ids.add(row["deck"])
-                note_type_names.add(row["note_type"])
-        assert len(ankihub_deck_ids) == 1
-        modify_note_types(note_type_names)
-        process_csv(notes)
+            notes_data = [row for row in reader]
+        load_notes_from_csv(notes_data)
 
     def on_browse_deck(self) -> None:
         openLink(URL_DECKS)
