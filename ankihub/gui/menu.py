@@ -1,3 +1,4 @@
+from typing import Optional
 from aqt import (
     QHBoxLayout,
     QLabel,
@@ -23,6 +24,8 @@ from .decks import SubscribedDecksDialog
 
 
 class AnkiHubLogin(QWidget):
+    _window: Optional["AnkiHubLogin"] = None
+
     def __init__(self):
         super(AnkiHubLogin, self).__init__()
         self.results = None
@@ -102,7 +105,7 @@ class AnkiHubLogin(QWidget):
 
     @classmethod
     def display_login(cls):
-        if not hasattr(cls, "_window"):
+        if cls._window is None:
             cls._window = cls()
         else:
             cls._window.show()
