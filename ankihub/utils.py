@@ -64,35 +64,28 @@ def hide_ankihub_field_in_editor(
     return js
 
 
-def create_note_with_id(note_type_id: int, anki_id: int, anki_did: int) -> Note:
+def create_note_with_id(note: Note, anki_id: int, anki_did: int) -> Note:
     """Create a new note, add it to the appropriate deck and override the note id with
     the note id of the original note creator."""
-    LOGGER.debug(f"Trying to create note: {anki_id=} {note_type_id=}")
+    LOGGER.debug(f"Trying to create note: {anki_id=}")
 
-    note_type = mw.col.models.get(NotetypeId(note_type_id))
-    note = Note(col=mw.col, model=note_type)
     mw.col.add_note(note, DeckId(anki_did))
 
     # Swap out the note id that Anki assigns to the new note with our own id.
-    sql = (
-        f"UPDATE notes SET id={anki_id} WHERE id={note.id};"
-        f"UPDATE cards SET nid={anki_id} WHERE nid={note.id};"
-    )
-    mw.col.db.execute(sql)
+    mw.col.db.execute(f"UPDATE notes SET id={anki_id} WHERE id={note.id};")
+    mw.col.db.execute(f"UPDATE cards SET nid={anki_id} WHERE nid={note.id};")
 
-    LOGGER.debug(f"Created note: {anki_id}")
     return note
 
 
-def update_note(
-    note: Note, anki_id: int, ankihub_id: int, fields: List[Dict], tags: List[str]
+def prepare_note(
+    note: Note, ankihub_id: int, fields: List[Dict], tags: List[str]
 ) -> None:
     note[constants.ANKIHUB_NOTE_TYPE_FIELD_NAME] = str(ankihub_id)
     note.tags = [str(tag) for tag in tags]
     # TODO Make sure we don't update protected fields.
     for field in fields:
         note[field["name"]] = field["value"]
-    LOGGER.debug(f"Updated note {anki_id}")
 
 
 def update_or_create_note(
@@ -113,14 +106,18 @@ def update_or_create_note(
                 "value": ankihub_id,
             }
         )
-        update_note(note, anki_id, ankihub_id, fields, tags)
+        prepare_note(note, ankihub_id, fields, tags)
         mw.col.update_note(note)
+        LOGGER.debug(f"Updated note: {anki_id=}")
     except NotFoundError:
         anki_did = config.private_config.decks[ankihub_deck_id].get(
             "anki_id", 1
         )  # XXX if the deck doesn't exist, use the default deck
-        note = create_note_with_id(note_type_id, anki_id, anki_did)
-        update_note(note, anki_id, ankihub_id, fields, tags)
+        note_type = mw.col.models.get(NotetypeId(note_type_id))
+        note = mw.col.new_note(note_type)
+        prepare_note(note, ankihub_id, fields, tags)
+        note = create_note_with_id(note, anki_id, anki_did)
+        LOGGER.debug(f"Created note: {anki_id=}")
     return note
 
 
@@ -162,7 +159,12 @@ def sync_with_ankihub() -> None:
                 ) = note.values()
                 LOGGER.debug(f"Trying to update or create note:\n {pformat(note)}")
                 update_or_create_note(
-                    anki_id, ankihub_id, fields, tags, int(note_type_id), deck_id
+                    anki_id,
+                    ankihub_id,
+                    fields,
+                    tags,
+                    int(note_type_id),
+                    deck_id,
                 )
                 # Should last sync be tracked separately for each deck?
                 mw.reset()
