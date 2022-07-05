@@ -128,7 +128,6 @@ def sync_with_ankihub() -> None:
 
     client = AnkiHubClient()
     decks = config.private_config.decks
-    data = None
     for deck in decks:
         collected_notes = []
         for response in client.get_deck_updates(
@@ -166,10 +165,9 @@ def sync_with_ankihub() -> None:
                     int(note_type_id),
                     deck_id,
                 )
-                # Should last sync be tracked separately for each deck?
-                mw.reset()
-    if data:
-        config.save_last_sync(time=data["latest_update"])
+
+    config.save_last_sync()
+    mw.reset()
 
 
 def sync_on_profile_open() -> None:
