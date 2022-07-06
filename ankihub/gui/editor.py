@@ -1,6 +1,7 @@
 import uuid
 
 import anki
+from anki.models import NoteType
 from aqt import gui_hooks
 from aqt.addcards import AddCards
 from aqt.editor import Editor
@@ -151,9 +152,24 @@ def refresh_ankihub_button(editor: Editor) -> None:
         editor.ankihub_command = AnkiHubCommands.NEW.value
 
 
+editor: Editor
+
+
+def on_add_cards_init(add_cards: AddCards) -> None:
+    global editor
+    editor = add_cards.editor
+
+
+def on_add_cards_change_notetype(old: NoteType, new: NoteType) -> None:
+    global editor
+    refresh_ankihub_button(editor)
+
+
 def setup():
     gui_hooks.editor_did_init_buttons.append(setup_editor_buttons)
     gui_hooks.editor_did_load_note.append(refresh_ankihub_button)
+    gui_hooks.add_cards_did_init.append(on_add_cards_init)
+    gui_hooks.add_cards_did_change_note_type.append(on_add_cards_change_notetype)
     Editor.ankihub_command = AnkiHubCommands.CHANGE.value
     return Editor
     # We can wrap Editor.__init__ if more complicated logic is needed, such as
