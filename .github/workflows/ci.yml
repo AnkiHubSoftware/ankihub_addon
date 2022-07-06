@@ -37,7 +37,7 @@ jobs:
 
       - name: Create ankiaddon file
         run: |
-          echo ${{ github.ref }} > VERSION
+          echo ${{ github.sha }} > VERSION
           bash ../scripts/release.sh
         working-directory: ankihub
 
