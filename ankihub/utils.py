@@ -1,3 +1,4 @@
+import json
 import re
 from concurrent.futures import Future
 from pprint import pformat
@@ -94,7 +95,7 @@ def update_or_create_note(
     fields: List[Dict],
     tags: List[str],
     note_type_id: int,
-    ankihub_deck_id: str = None,
+    anki_did: DeckId,  # only relevant for newly created notes
 ) -> Note:
     try:
         note = mw.col.get_note(id=NoteId(anki_id))
@@ -110,9 +111,6 @@ def update_or_create_note(
         mw.col.update_note(note)
         LOGGER.debug(f"Updated note: {anki_id=}")
     except NotFoundError:
-        anki_did = config.private_config.decks[ankihub_deck_id].get(
-            "anki_id", 1
-        )  # XXX if the deck doesn't exist, use the default deck
         note_type = mw.col.models.get(NotetypeId(note_type_id))
         note = mw.col.new_note(note_type)
         prepare_note(note, ankihub_id, fields, tags)
@@ -129,7 +127,7 @@ def sync_with_ankihub() -> None:
     client = AnkiHubClient()
     decks = config.private_config.decks
     for ankihub_did, deck in decks.items():
-        collected_notes = []
+        notes_data = []
         for response in client.get_deck_updates(
             ankihub_did, since=deck["latest_update"]
         ):
@@ -139,33 +137,12 @@ def sync_with_ankihub() -> None:
             data = response.json()
             notes = data["notes"]
             if notes:
-                collected_notes += notes
+                notes_data += notes
 
-        if collected_notes:
-
-            adjust_note_types_based_on_notes_data(collected_notes)
-            reset_note_types_of_notes_based_on_notes_data(collected_notes)
-
-            for note in collected_notes:
-                (
-                    deck_id,
-                    ankihub_id,
-                    tags,
-                    anki_id,
-                    fields,
-                    note_type,
-                    note_type_id,
-                ) = note.values()
-                LOGGER.debug(f"Trying to update or create note:\n {pformat(note)}")
-                update_or_create_note(
-                    anki_id,
-                    ankihub_id,
-                    fields,
-                    tags,
-                    int(note_type_id),
-                    deck_id,
-                )
-
+        if notes_data:
+            import_ankihub_deck(
+                notes_data=notes_data, deck_name=deck["name"], anki_did=deck["anki_id"]
+            )
             config.save_latest_update(ankihub_did, data["latest_update"])
 
     mw.reset()
@@ -422,3 +399,76 @@ def create_backup_with_progress() -> None:
         raise exc
     finally:
         mw.progress.finish()
+
+
+def create_deck_with_id(deck_name: str, deck_id: DeckId) -> None:
+    source_did = mw.col.decks.add_normal_deck_with_name(deck_name).id
+    mw.col.db.execute(f"UPDATE decks SET id={deck_id} WHERE id={source_did};")
+    mw.col.db.execute(f"UPDATE cards SET did={deck_id} WHERE did={source_did};")
+
+    LOGGER.debug(f"Created deck {deck_name=} {deck_id=}")
+
+
+def highest_level_did(dids: Iterable[DeckId]) -> DeckId:
+    return min(dids, key=lambda did: mw.col.decks.name(did).count("::"))
+
+
+def import_ankihub_deck(
+    notes_data: List[dict],
+    deck_name: str,  # name that will be used for a deck if a new one gets created
+    anki_did: DeckId,  # id of deck that new notes should be imported into
+) -> List[DeckId]:
+    # Returns list of decks the notes were imported into
+
+    dids: Set[DeckId] = set()
+    notes: List[Note] = []
+
+    # create a deck (if it doesn't exist) that new notes will be assigned to,
+    # but delete it if it ends up empty (can happen if all notes were put into other decks)
+    if anki_did is None:
+        anki_did = highest_level_did(
+            set(DeckId(int(note_dict["deck_id"])) for note_dict in notes_data)
+        )
+    created_deck = False
+    if not mw.col.decks.get(anki_did):
+        create_deck_with_id(deck_name, anki_did)
+        created_deck = True
+
+    adjust_note_types_based_on_notes_data(notes_data)
+    reset_note_types_of_notes_based_on_notes_data(notes_data)
+    for note_data in notes_data:
+        (
+            anki_id,
+            deck,
+            fields,
+            ankihub_id,
+            latest_update,
+            note_type,
+            note_type_id,
+            tags,
+        ) = note_data.values()
+        fields = json.loads(fields)
+        tags = json.loads(tags)
+        LOGGER.debug(f"Trying to update or create note:\n {pformat(note_data)}")
+        note = update_or_create_note(
+            int(anki_id), ankihub_id, fields, tags, note_type_id, anki_did
+        )
+        notes.append(note)
+        dids = dids.union(set(c.did for c in note.cards()))
+
+    # if there is a single deck where all the existing notes were before the import,
+    # move the new notes there
+    # TODO take child decks in consideration
+    if created_deck and len(dids_wh_created := dids - set([anki_did])) == 1:
+        did = list(dids_wh_created)[0]
+        for note in notes:
+            for card in note.cards():
+                mw.col.card
+                card.did = did
+                card.flush()
+        dids = set([did])
+
+    if created_deck and not mw.col.find_cards(f"deck:{mw.col.decks.name(anki_did)}"):
+        mw.col.decks.remove([anki_did])
+
+    return list(dids)
