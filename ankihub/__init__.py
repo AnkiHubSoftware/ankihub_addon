@@ -17,7 +17,7 @@ LOGGER.debug(f"SKIP_INIT: {SKIP_INIT}")
 
 version_file = pathlib.Path(__file__).parent / "VERSION"
 with version_file.open() as f:
-    version = f.read()
+    version = f.read().strip()
 
 
 def report_exception():
