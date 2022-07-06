@@ -3,7 +3,8 @@ import tempfile
 from concurrent.futures import Future
 from pathlib import Path
 
-from aqt import QPushButton, mw
+from anki.collection import OpChanges
+from aqt import mw, gui_hooks
 from aqt.importing import AnkiPackageImporter
 from aqt.qt import (
     QDialog,
@@ -16,6 +17,7 @@ from aqt.qt import (
     QSizePolicy,
     Qt,
     QVBoxLayout,
+    QPushButton,
 )
 from aqt.utils import askUser, openLink, showText, tooltip
 
@@ -76,9 +78,18 @@ class SubscribedDecksDialog(QDialog):
             item.setData(Qt.ItemDataRole.UserRole, ankihub_id)
             self.decks_list.addItem(item)
 
+    def refresh_anki(self) -> None:
+        op = OpChanges()
+        op.deck = True
+        op.browser_table = True
+        op.browser_sidebar = True
+        op.study_queues = True
+        gui_hooks.operation_did_execute(op, handler=None)
+
     def on_add(self) -> None:
         SubscribeDialog().exec()
         self.refresh_decks_list()
+        self.refresh_anki()
 
     def on_unsubscribe(self) -> None:
         items = self.decks_list.selectedItems()
