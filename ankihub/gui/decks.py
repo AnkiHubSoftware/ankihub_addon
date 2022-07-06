@@ -247,6 +247,8 @@ class SubscribeDialog(QDialog):
                             out_file, data["name"], ankihub_did, data["anki_id"]
                         ),
                         label="Installing deck",
+                        # raises exception if task raised exception
+                        on_done=lambda future: future.result(),
                     )
 
         mw.taskman.with_progress(
