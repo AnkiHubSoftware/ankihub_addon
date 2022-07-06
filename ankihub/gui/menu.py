@@ -108,6 +108,8 @@ class AnkiHubLogin(QWidget):
         if cls._window is None:
             cls._window = cls()
         else:
+            cls._window.activateWindow()
+            cls._window.raise_()
             cls._window.show()
         return cls._window
 
