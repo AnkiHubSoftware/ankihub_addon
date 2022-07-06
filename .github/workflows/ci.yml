@@ -35,8 +35,10 @@ jobs:
         env:
           SKIP_INIT: 1
 
-      - name: Package .ankiaddon
-        run: zip -r "../ankihub_${GITHUB_SHA}.ankiaddon" . -x ./tests\*
+      - name: Create ankiaddon file
+        run: |
+          echo ${{ github.ref }} > VERSION
+          bash ../scripts/release.sh
         working-directory: ankihub
 
       - name: Archive .ankiaddon
