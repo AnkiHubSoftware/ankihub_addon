@@ -45,7 +45,7 @@ jobs:
         uses: actions/upload-artifact@v3
         with:
           name: ankihub_addon_${{ github.sha }}
-          path: ankihub_${{ github.sha }}.ankiaddon
+          path: ankihub.ankiaddon
 
       - name: Run pre-commit
         run: pre-commit run --all-files
