@@ -16,8 +16,13 @@ SKIP_INIT = os.getenv("SKIP_INIT", False)
 LOGGER.debug(f"SKIP_INIT: {SKIP_INIT}")
 
 version_file = pathlib.Path(__file__).parent / "VERSION"
+LOGGER.debug(f"VERSION file: {version_file}")
 with version_file.open() as f:
     version = f.read().strip()
+
+LOGGER.debug(f"version: {version}")
+
+os.environ["SENTRY_ENVIRONMENT"] = version
 
 
 def report_exception():
@@ -28,20 +33,25 @@ def report_exception():
     if not config.public_config.get("report_errors"):
         return
 
-    sentry_sdk.init(
-        dsn="https://715325d30fa44ecd939d12edda720f91@o1184291.ingest.sentry.io/6546414",
-        traces_sample_rate=1.0,
-        release=version,
-    )
+    try:
+        sentry_sdk.init(
+            dsn="https://715325d30fa44ecd939d12edda720f91@o1184291.ingest.sentry.io/6546414",
+            traces_sample_rate=1.0,
+            release=version,
+        )
 
-    with configure_scope() as scope:
-        scope.level = "error"
-        scope.user = {"id": config.private_config.user}
-        scope.set_context("add-on config", dataclasses.asdict(config.private_config))
+        with configure_scope() as scope:
+            scope.level = "error"
+            scope.user = {"id": config.private_config.user}
+            scope.set_context("add-on config", dataclasses.asdict(config.private_config))
 
-    capture_exception()
-    sentry_sdk.flush()
-    sentry_sdk.init("")
+        capture_exception()
+        sentry_sdk.flush()
+    except Exception as e:
+        LOGGER.debug(f"Reporting to sentry failed: {e}")
+        return False
+    finally:
+        sentry_sdk.init("")
 
 
 if not SKIP_INIT:
