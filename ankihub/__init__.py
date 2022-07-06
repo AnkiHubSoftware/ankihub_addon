@@ -44,5 +44,7 @@ if not SKIP_INIT:
         from . import entry_point
 
         mw = entry_point.run()
-    except:
+    except Exception as e:
+        # should we show exception to the user too?
+        LOGGER.exception(e)
         report_exception()
