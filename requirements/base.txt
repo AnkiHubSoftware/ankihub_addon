@@ -1,7 +1,7 @@
-anki==2.1.53
-aqt==2.1.53
-pyqt6==6.3.1
-pyqt6-qt6==6.3.1
-pyqt6-webengine==6.3.1
-pyqt6-webengine-qt6==6.3.1
-pyqt6-sip==13.4.0
+anki==2.1.54
+aqt==2.1.54
+pyqt5==5.15.5
+pyqt5-qt5==5.15.2
+pyqtwebengine==5.15.5
+pyqtwebengine-qt5==5.15.2
+pyqt5-sip==12.9.0

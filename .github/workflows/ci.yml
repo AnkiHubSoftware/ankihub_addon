@@ -22,7 +22,7 @@ jobs:
       - name: Install Qt
         uses: jurplel/install-qt-action@v2
         with:
-          version: "6.3.1"
+          version: "5.15.2"
           setup-python: 'false'
 
       - name: Install deps
@@ -35,15 +35,17 @@ jobs:
         env:
           SKIP_INIT: 1
 
-      - name: Package .ankiaddon
-        run: zip -r "../ankihub_${GITHUB_SHA}.ankiaddon" . -x ./tests\*
+      - name: Create ankiaddon file
+        run: |
+          echo ${{ github.sha }} > VERSION
+          bash ../scripts/release.sh
         working-directory: ankihub
 
       - name: Archive .ankiaddon
         uses: actions/upload-artifact@v3
         with:
           name: ankihub_addon_${{ github.sha }}
-          path: ankihub_${{ github.sha }}.ankiaddon
+          path: ankihub.ankiaddon
 
       - name: Run pre-commit
         run: pre-commit run --all-files

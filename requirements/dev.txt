@@ -1,6 +1,6 @@
 -r base.txt
 
-git+https://github.com/andrewsanchez/pytest-anki.git@anki-2.1.53
+git+https://github.com/andrewsanchez/pytest-anki.git@anki-2.1.54-qt5
 black
 flake8
 mypy

@@ -32,7 +32,9 @@ jobs:
           git push origin ${{ steps.vars.outputs.version }}
 
       - name: Create ankiaddon file
-        run: bash ../scripts/release.sh
+        run: |
+          echo ${{ steps.vars.outputs.version }} > VERSION
+          bash ../scripts/release.sh
         working-directory: ankihub
 
       - name: Create github release
