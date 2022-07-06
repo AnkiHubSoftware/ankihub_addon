@@ -15,6 +15,10 @@ LOGGER = logging.getLogger("ankihub")
 SKIP_INIT = os.getenv("SKIP_INIT", False)
 LOGGER.debug(f"SKIP_INIT: {SKIP_INIT}")
 
+version_file = pathlib.Path(__file__).parent / "VERSION"
+with version_file.open() as f:
+    version = f.read()
+
 
 def report_exception():
     from .config import config
@@ -27,6 +31,7 @@ def report_exception():
     sentry_sdk.init(
         dsn="https://715325d30fa44ecd939d12edda720f91@o1184291.ingest.sentry.io/6546414",
         traces_sample_rate=1.0,
+        release=version,
     )
 
     with configure_scope() as scope:
