@@ -130,8 +130,6 @@ def setup_editor_buttons(buttons: list[str], editor: Editor) -> None:
 #ankihub-btn[disabled] { opacity:.4; pointer-events: none; }</style>"""
     )
 
-    return buttons
-
 
 def refresh_ankihub_button(editor: Editor) -> None:
     """Set ankihub button label based on whether ankihub_id field is empty"""
@@ -146,10 +144,10 @@ def refresh_ankihub_button(editor: Editor) -> None:
     set_label_script = "document.getElementById('ankihub-btn-label').textContent='{}';"
     if note[ANKIHUB_NOTE_TYPE_FIELD_NAME]:
         editor.web.eval(set_label_script.format(AnkiHubCommands.CHANGE.value))
-        editor.ankihub_command = AnkiHubCommands.CHANGE.value
+        editor.ankihub_command = AnkiHubCommands.CHANGE.value  # type: ignore
     else:
         editor.web.eval(set_label_script.format(AnkiHubCommands.NEW.value))
-        editor.ankihub_command = AnkiHubCommands.NEW.value
+        editor.ankihub_command = AnkiHubCommands.NEW.value  # type: ignore
 
 
 editor: Editor
@@ -165,13 +163,12 @@ def on_add_cards_change_notetype(old: NoteType, new: NoteType) -> None:
     refresh_ankihub_button(editor)
 
 
-def setup():
+def setup() -> None:
     gui_hooks.editor_did_init_buttons.append(setup_editor_buttons)
     gui_hooks.editor_did_load_note.append(refresh_ankihub_button)
     gui_hooks.add_cards_did_init.append(on_add_cards_init)
     gui_hooks.add_cards_did_change_note_type.append(on_add_cards_change_notetype)
-    Editor.ankihub_command = AnkiHubCommands.CHANGE.value
-    return Editor
+    Editor.ankihub_command = AnkiHubCommands.CHANGE.value  # type: ignore
     # We can wrap Editor.__init__ if more complicated logic is needed, such as
     # pulling a default command from a config option.  E.g.,
     # Editor.__init__ = wrap(Editor.__init__, init_editor)
