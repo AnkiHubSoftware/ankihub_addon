@@ -22,8 +22,6 @@ with version_file.open() as f:
 
 LOGGER.debug(f"version: {version}")
 
-os.environ["SENTRY_ENVIRONMENT"] = version
-
 
 def report_exception():
     from .config import config
@@ -38,6 +36,7 @@ def report_exception():
             dsn="https://715325d30fa44ecd939d12edda720f91@o1184291.ingest.sentry.io/6546414",
             traces_sample_rate=1.0,
             release=version,
+            environment="anki_desktop",
         )
 
         with configure_scope() as scope:
