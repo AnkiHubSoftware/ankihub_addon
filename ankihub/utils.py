@@ -141,32 +141,34 @@ def sync_with_ankihub() -> None:
             if notes:
                 collected_notes += notes
 
-        if collected_notes:
+        if not collected_notes:
+            LOGGER.debug("No new updates to sync")
+            return
 
-            adjust_note_types_based_on_notes_data(collected_notes)
-            reset_note_types_of_notes_based_on_notes_data(collected_notes)
+        adjust_note_types_based_on_notes_data(collected_notes)
+        reset_note_types_of_notes_based_on_notes_data(collected_notes)
 
-            for note in collected_notes:
-                (
-                    deck_id,
-                    ankihub_id,
-                    tags,
-                    anki_id,
-                    fields,
-                    note_type,
-                    note_type_id,
-                ) = note.values()
-                LOGGER.debug(f"Trying to update or create note:\n {pformat(note)}")
-                update_or_create_note(
-                    anki_id,
-                    ankihub_id,
-                    fields,
-                    tags,
-                    int(note_type_id),
-                    deck_id,
-                )
+        for note in collected_notes:
+            (
+                deck_id,
+                ankihub_id,
+                tags,
+                anki_id,
+                fields,
+                note_type,
+                note_type_id,
+            ) = note.values()
+            LOGGER.debug(f"Trying to update or create note:\n {pformat(note)}")
+            update_or_create_note(
+                anki_id,
+                ankihub_id,
+                fields,
+                tags,
+                int(note_type_id),
+                deck_id,
+            )
 
-            config.save_latest_update(ankihub_did, data["latest_update"])
+        config.save_latest_update(ankihub_did, data["latest_update"])
 
     mw.reset()
 
@@ -177,6 +179,7 @@ def sync_on_profile_open() -> None:
         # Don't raise exception when automatically attempting to sync with AnkiHub
         # with no Internet connection.
         if exc := future.exception():
+            LOGGER.debug(f"Unable to sync on profile open:\n{exc}")
             if not isinstance(exc, (ConnectionError, HTTPError)):
                 raise exc
 
