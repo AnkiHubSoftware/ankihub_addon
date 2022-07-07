@@ -42,7 +42,9 @@ def report_exception(context: dict = None):
         with configure_scope() as scope:
             scope.level = "error"
             scope.user = {"id": config.private_config.user}
-            scope.set_context("add-on config", dataclasses.asdict(config.private_config))
+            scope.set_context(
+                "add-on config", dataclasses.asdict(config.private_config)
+            )
             for name, ctx in context.items():
                 scope.set_context(name, ctx)
 
