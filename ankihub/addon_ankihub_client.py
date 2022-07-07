@@ -49,7 +49,13 @@ def report_exception_hook(response: Response, *args, **kwargs):
     try:
         response.raise_for_status()
     except HTTPError:
-        report_exception()
+        ctx = {
+            "response": {
+                "reason": response.reason,
+                "content": response.text
+            }
+        }
+        report_exception(context=ctx)
 
 
 def sign_in_hook(response: Response, *args, **kwargs):
