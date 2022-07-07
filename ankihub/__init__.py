@@ -22,6 +22,9 @@ with version_file.open() as f:
 
 LOGGER.debug(f"version: {version}")
 
+sentry_env = "anki_desktop"
+os.environ["SENTRY_ENVIRONMENT"] = sentry_env
+
 
 def report_exception(context: dict = None):
     from .config import config
@@ -36,7 +39,7 @@ def report_exception(context: dict = None):
             dsn="https://715325d30fa44ecd939d12edda720f91@o1184291.ingest.sentry.io/6546414",
             traces_sample_rate=1.0,
             release=version,
-            environment="anki_desktop",
+            environment=sentry_env,
         )
         LOGGER.debug("Sentry initialized.")
 
