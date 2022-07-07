@@ -46,6 +46,7 @@ def logging_hook(response: Response, *args, **kwargs):
 
 
 def report_exception_hook(response: Response, *args, **kwargs):
+    LOGGER.debug("Begin report exception hook.")
     try:
         response.raise_for_status()
     except HTTPError:

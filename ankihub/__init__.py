@@ -38,6 +38,7 @@ def report_exception(context: dict = None):
             release=version,
             environment="anki_desktop",
         )
+        LOGGER.debug("Sentry initialized.")
 
         with configure_scope() as scope:
             scope.level = "error"
@@ -49,12 +50,14 @@ def report_exception(context: dict = None):
                 scope.set_context(name, ctx)
 
         capture_exception()
+        LOGGER.debug("Sentry captured exception.")
         sentry_sdk.flush()
     except Exception as e:
         LOGGER.debug(f"Reporting to sentry failed: {e}")
         return False
     finally:
         sentry_sdk.init("")
+        LOGGER.debug("Sentry disabled.")
 
 
 if not SKIP_INIT:
