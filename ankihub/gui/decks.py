@@ -5,7 +5,7 @@ from pathlib import Path
 
 from anki.collection import OpChanges
 from anki.decks import DeckId
-from aqt import QPushButton, gui_hooks, mw
+from aqt import gui_hooks, mw
 from aqt.qt import (
     QDialog,
     QDialogButtonBox,
