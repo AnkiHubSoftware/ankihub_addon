@@ -2,11 +2,9 @@ import csv
 import tempfile
 from concurrent.futures import Future
 from pathlib import Path
-from typing import Iterable, List
 
 from anki.decks import DeckId
 from aqt import QPushButton, mw
-from aqt.importing import AnkiPackageImporter
 from aqt.qt import (
     QDialog,
     QDialogButtonBox,
@@ -25,7 +23,7 @@ from .. import LOGGER
 from ..addon_ankihub_client import AddonAnkiHubClient as AnkiHubClient
 from ..config import config
 from ..constants import CSV_DELIMITER, URL_DECK_BASE, URL_DECKS, URL_HELP
-from ..utils import create_backup_with_progress, highest_level_did, import_ankihub_deck
+from ..utils import create_backup_with_progress, import_ankihub_deck, install_deck_apkg
 
 
 class SubscribedDecksDialog(QDialog):
@@ -218,7 +216,7 @@ class SubscribeDialog(QDialog):
 
         data = deck_response.json()
         local_deck_ids = {deck.id for deck in mw.col.decks.all_names_and_ids()}
-        # not reliable
+        # XXX not reliable
         first_time_install = data["anki_id"] not in local_deck_ids
         deck_file_name = (
             data["apkg_filename"] if first_time_install else data["csv_notes_filename"]
@@ -252,9 +250,7 @@ class SubscribeDialog(QDialog):
                         mw.reset()
 
                     mw.taskman.with_progress(
-                        lambda: self.install_deck(
-                            out_file, data["name"], ankihub_did, data["anki_id"]
-                        ),
+                        lambda: self.install_deck(out_file, data["name"], ankihub_did),
                         label="Installing deck",
                         on_done=on_done,
                     )
@@ -266,9 +262,7 @@ class SubscribeDialog(QDialog):
             label="Downloading deck",
         )
 
-    def install_deck(
-        self, deck_file: Path, deck_name: str, ankihub_did: str, anki_did: DeckId
-    ) -> None:
+    def install_deck(self, deck_file: Path, deck_name: str, ankihub_did: str) -> None:
         """If we have a .csv, read data from the file and modify the user's note types
         and notes.
         :param: path to the .csv or .apkg file
@@ -276,19 +270,14 @@ class SubscribeDialog(QDialog):
 
         create_backup_with_progress()
 
-        all_dids_before_import = [
-            DeckId(x.id) for x in mw.col.decks.all_names_and_ids()
-        ]
-        dids_cards_were_imported_into = None
+        local_did = None
         try:
             if deck_file.suffix == ".apkg":
                 # it's hard/costly to check in which deck cards end up
                 # so it's not done here
-                self._install_deck_apkg(deck_file)
+                local_did = install_deck_apkg(deck_file, deck_name)
             elif deck_file.suffix == ".csv":
-                dids_cards_were_imported_into = self._install_deck_csv(
-                    deck_file, deck_name, anki_did
-                )
+                local_did = self._install_deck_csv(deck_file, deck_name)
         except Exception as e:
 
             def on_failure(e=e):
@@ -301,11 +290,8 @@ class SubscribeDialog(QDialog):
 
         LOGGER.debug("Importing deck was succesful.")
 
-        self._save_subscription(
-            deck_name,
-            ankihub_did,
-            all_dids_before_import,
-            dids_cards_were_imported_into,
+        config.save_subscription(
+            name=deck_name, ankihub_did=ankihub_did, anki_did=local_did
         )
 
         def on_success():
@@ -315,63 +301,18 @@ class SubscribeDialog(QDialog):
 
         mw.taskman.run_on_main(on_success)
 
-    def _save_subscription(
-        self,
-        deck_name: str,
-        ankihub_did: str,
-        all_dids_before_import: Iterable[DeckId],
-        dids_cards_were_imported_into: Iterable[DeckId],
-    ) -> None:
-        if new_dids := (
-            set(DeckId(x.id) for x in mw.col.decks.all_names_and_ids()).difference(
-                set(all_dids_before_import)
-            )
-        ):
-            # there are only top-level decks on AnkiHub, so there always
-            # will be one top-level deck among the newly created ones
-            config.save_subscription(
-                deck_name, ankihub_did, highest_level_did(new_dids)
-            )
-        elif dids_cards_were_imported_into is not None:
-            # choose one of the highest level decks from the ones that cards were imported into
-            # there will be often just one such deck
-            config.save_subscription(
-                deck_name,
-                ankihub_did,
-                highest_level_did(dids_cards_were_imported_into),
-            )
-        else:
-            # choose the default deck XXX
-            # this is not a good solution but for apkg imports it's
-            # hard/costly to check where notes ended up and apkg imports
-            # will probably be removed
-            config.save_subscription(
-                deck_name,
-                ankihub_did,
-                1,
-            )
-
-    def _install_deck_apkg(
-        self,
-        deck_file: Path,
-    ):
-        LOGGER.debug("Importing deck as apkg....")
-        file = str(deck_file.absolute())
-        importer = AnkiPackageImporter(mw.col, file)
-        importer.run()
-
     def _install_deck_csv(
         self,
         deck_file: Path,
         deck_name: str,
-        anki_did: DeckId,
-    ) -> List[DeckId]:
+    ) -> DeckId:
         LOGGER.debug("Importing deck as csv....")
         with deck_file.open(encoding="utf-8") as f:
             reader = csv.DictReader(f, delimiter=CSV_DELIMITER, quotechar="'")
             notes_data = [row for row in reader]
         return import_ankihub_deck(
-            notes_data=notes_data, deck_name=deck_name, anki_did=anki_did
+            notes_data=notes_data,
+            deck_name=deck_name,
         )
 
     def on_browse_deck(self) -> None:
