@@ -284,8 +284,6 @@ class SubscribeDialog(QDialog):
         local_did = None
         try:
             if deck_file.suffix == ".apkg":
-                # it's hard/costly to check in which deck cards end up
-                # so it's not done here
                 local_did = install_deck_apkg(deck_file, deck_name)
             elif deck_file.suffix == ".csv":
                 local_did = self._install_deck_csv(deck_file, deck_name)

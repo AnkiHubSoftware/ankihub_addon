@@ -66,6 +66,6 @@ if not SKIP_INIT:
 
         mw = entry_point.run()
     except Exception as e:
-        # should we show exception to the user too?
+        # should we show exceptions to the user too?
         LOGGER.exception(e)
         report_exception()

@@ -478,7 +478,7 @@ def _cleanup_first_time_deck_import(
     dids = set(dids_cards_were_imported_to)
 
     # if there is a single deck where all the existing notes were before the import,
-    # move the new notes there (from the newly created deck)
+    # move the new notes there (from the newly created deck) and remove the created deck
     # takes subdecks into account
     if (dids_wh_created := dids - set([created_did])) and (
         (common_ancestor_did := lowest_level_common_ancestor_did(dids_wh_created))
