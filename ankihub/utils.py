@@ -142,8 +142,8 @@ def sync_with_ankihub() -> None:
                 collected_notes += notes
 
         if not collected_notes:
-            LOGGER.debug("No new updates to sync")
-            return
+            LOGGER.debug(f"No new updates to sync for deck {deck}")
+            continue
 
         adjust_note_types_based_on_notes_data(collected_notes)
         reset_note_types_of_notes_based_on_notes_data(collected_notes)
