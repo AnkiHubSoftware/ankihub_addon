@@ -436,13 +436,23 @@ def import_ankihub_deck(
     local_did = adjust_deck(deck_name, local_did)
     adjust_note_types_based_on_notes_data(notes_data)
     reset_note_types_of_notes_based_on_notes_data(notes_data)
+
+    # TODO fix differences between csv when installing for the first time vs. when updating
+    # on the AnkiHub side
+    # for example for one the fields name is "note_id" and for the other "id"
     for note_data in notes_data:
         LOGGER.debug(f"Trying to update or create note:\n {pformat(note_data)}")
         note = update_or_create_note(
             anki_id=NoteId(int((note_data["anki_id"]))),
-            ankihub_id=note_data["id"],
-            fields=json.loads(note_data["fields"]),
-            tags=json.loads(note_data["tags"]),
+            ankihub_id=note_data.get("id")
+            if note_data.get("id") is not None
+            else note_data.get("note_id"),
+            fields=json.loads(note_data["fields"])
+            if type(note_data["fields"]) == str
+            else note_data["fields"],
+            tags=json.loads(note_data["tags"])
+            if type(note_data["tags"]) == str
+            else note_data["tags"],
             note_type_id=NotetypeId(int(note_data["note_type_id"])),
             anki_did=local_did,
         )
