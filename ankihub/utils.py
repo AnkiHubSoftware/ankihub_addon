@@ -142,8 +142,8 @@ def sync_with_ankihub() -> None:
                 collected_notes += notes
 
         if not collected_notes:
-            LOGGER.debug("No new updates to sync")
-            return
+            LOGGER.debug(f"No new updates to sync for deck {deck}")
+            continue
 
         adjust_note_types_based_on_notes_data(collected_notes)
         reset_note_types_of_notes_based_on_notes_data(collected_notes)
@@ -170,8 +170,6 @@ def sync_with_ankihub() -> None:
 
         config.save_latest_update(ankihub_did, data["latest_update"])
 
-    mw.reset()
-
 
 def sync_on_profile_open() -> None:
     def on_done(future: Future):
@@ -182,6 +180,8 @@ def sync_on_profile_open() -> None:
             LOGGER.debug(f"Unable to sync on profile open:\n{exc}")
             if not isinstance(exc, (ConnectionError, HTTPError)):
                 raise exc
+
+        mw.reset()
 
     if config.private_config.token:
         mw.taskman.with_progress(
