@@ -170,8 +170,6 @@ def sync_with_ankihub() -> None:
 
         config.save_latest_update(ankihub_did, data["latest_update"])
 
-    mw.reset()
-
 
 def sync_on_profile_open() -> None:
     def on_done(future: Future):
@@ -183,8 +181,15 @@ def sync_on_profile_open() -> None:
             if not isinstance(exc, (ConnectionError, HTTPError)):
                 raise exc
 
+        mw.reset()
+
     if config.private_config.token:
-        mw.taskman.run_on_main(sync_with_ankihub)
+        mw.taskman.with_progress(
+            sync_with_ankihub,
+            label="Synchronizing with AnkiHub",
+            on_done=on_done,
+            parent=mw,
+        )
 
 
 def adjust_note_types_based_on_notes_data(notes_data: List[Dict]) -> None:
