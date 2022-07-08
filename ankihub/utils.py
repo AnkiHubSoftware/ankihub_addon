@@ -184,12 +184,7 @@ def sync_on_profile_open() -> None:
                 raise exc
 
     if config.private_config.token:
-        mw.taskman.with_progress(
-            sync_with_ankihub,
-            label="Synchronizing with AnkiHub",
-            on_done=on_done,
-            parent=mw,
-        )
+        mw.taskman.run_on_main(sync_with_ankihub)
 
 
 def adjust_note_types_based_on_notes_data(notes_data: List[Dict]) -> None:
