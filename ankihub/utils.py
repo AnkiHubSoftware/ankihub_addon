@@ -149,6 +149,8 @@ def sync_with_ankihub() -> None:
                 local_did=deck["anki_id"],
             )
             config.save_latest_update(ankihub_did, data["latest_update"])
+        else:
+            LOGGER.debug(f"No new updates to synch for {ankihub_did=}")
 
     mw.reset()
 
@@ -159,6 +161,7 @@ def sync_on_profile_open() -> None:
         # Don't raise exception when automatically attempting to sync with AnkiHub
         # with no Internet connection.
         if exc := future.exception():
+            LOGGER.debug(f"Unable to sync on profile open:\n{exc}")
             if not isinstance(exc, (ConnectionError, HTTPError)):
                 raise exc
 

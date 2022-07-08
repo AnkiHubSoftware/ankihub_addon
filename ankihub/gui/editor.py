@@ -1,16 +1,16 @@
 import uuid
 
 import anki
-from anki.hooks import addHook
+from anki.models import NoteType
 from aqt import gui_hooks
 from aqt.addcards import AddCards
 from aqt.editor import Editor
 from aqt.utils import chooseList, showText, tooltip
 
-from .. import LOGGER
+
 from ..addon_ankihub_client import AddonAnkiHubClient as AnkiHubClient
 from ..config import config
-from ..constants import ICONS_PATH, AnkiHubCommands
+from ..constants import ICONS_PATH, AnkiHubCommands, ANKIHUB_NOTE_TYPE_FIELD_NAME
 from .suggestion_dialog import SuggestionDialog
 
 
@@ -109,62 +109,66 @@ def on_ankihub_button_press(editor: Editor) -> None:
                 tooltip("Submitted new note suggestion to AnkiHub.")
 
 
-def setup_editor_buttons(buttons, editor: Editor):
+def setup_editor_buttons(buttons: list[str], editor: Editor) -> None:
     """Add buttons to Editor."""
     # TODO Figure out how to test this
     public_config = config.public_config
-    HOTKEY = public_config["hotkey"]
+    hotkey = public_config["hotkey"]
     img = str(ICONS_PATH / "ankihub_button.png")
     button = editor.addButton(
         img,
         "CH",
         on_ankihub_button_press,
-        tip="Send your request to AnkiHub ({})".format(HOTKEY),
-        keys=HOTKEY,
+        tip="Send your request to AnkiHub ({})".format(hotkey),
+        label='<span id="ankihub-btn-label" style="vertical-align: top;"></span>',
+        id="ankihub-btn",
+        keys=hotkey,
     )
     buttons.append(button)
-
-    options = []
-    select_elm = (
-        "<select "
-        """onchange='pycmd("ankihub:" + this.selectedOptions[0].text)'"""
-        "style='vertical-align: top;'>"
-        "{}"
-        "</select>"
+    buttons.append(
+        """<style> #ankihub-btn { width:auto; padding:1px; }
+#ankihub-btn[disabled] { opacity:.4; pointer-events: none; }</style>"""
     )
-    for cmd in AnkiHubCommands:
-        options.append(f"<option>{cmd.value}</option>")
-    options_str = select_elm.format("".join(options))
-    buttons.append(options_str)
-    return buttons
 
 
-def ankihub_message_handler(handled: tuple, cmd, editor: Editor):
-    """Call on_select_command when a message prefixed with 'ankihub' is received
-    from the front end.
-    """
-    if not cmd.startswith("ankihub"):
-        return handled
-    _, command_value = cmd.split(":")
-    on_select_command(editor, command_value)
-    handled = (True, None)
-    return handled
+def refresh_ankihub_button(editor: Editor) -> None:
+    """Set ankihub button label based on whether ankihub_id field is empty"""
+    note = editor.note
+    disable_btn_script = "document.getElementById('ankihub-btn').disabled={};"
+    if ANKIHUB_NOTE_TYPE_FIELD_NAME in note:
+        editor.web.eval(disable_btn_script.format("false"))
+    else:
+        editor.web.eval(disable_btn_script.format("true"))
+        return
+
+    set_label_script = "document.getElementById('ankihub-btn-label').textContent='{}';"
+    if note[ANKIHUB_NOTE_TYPE_FIELD_NAME]:
+        editor.web.eval(set_label_script.format(AnkiHubCommands.CHANGE.value))
+        editor.ankihub_command = AnkiHubCommands.CHANGE.value  # type: ignore
+    else:
+        editor.web.eval(set_label_script.format(AnkiHubCommands.NEW.value))
+        editor.ankihub_command = AnkiHubCommands.NEW.value  # type: ignore
 
 
-def on_select_command(editor, cmd):
-    """
-    Action to perform when the user selects a command from the options drop
-    down menu.  This currently just sets an instance attribute on the Editor.
-    """
-    editor.ankihub_command = cmd
-    LOGGER.debug(f"AnkiHub command set to {cmd}")
+editor: Editor
 
 
-def setup():
-    addHook("setupEditorButtons", setup_editor_buttons)
-    gui_hooks.webview_did_receive_js_message.append(ankihub_message_handler)
-    Editor.ankihub_command = AnkiHubCommands.CHANGE.value
-    return Editor
+def on_add_cards_init(add_cards: AddCards) -> None:
+    global editor
+    editor = add_cards.editor
+
+
+def on_add_cards_change_notetype(old: NoteType, new: NoteType) -> None:
+    global editor
+    refresh_ankihub_button(editor)
+
+
+def setup() -> None:
+    gui_hooks.editor_did_init_buttons.append(setup_editor_buttons)
+    gui_hooks.editor_did_load_note.append(refresh_ankihub_button)
+    gui_hooks.add_cards_did_init.append(on_add_cards_init)
+    gui_hooks.add_cards_did_change_note_type.append(on_add_cards_change_notetype)
+    Editor.ankihub_command = AnkiHubCommands.CHANGE.value  # type: ignore
     # We can wrap Editor.__init__ if more complicated logic is needed, such as
     # pulling a default command from a config option.  E.g.,
     # Editor.__init__ = wrap(Editor.__init__, init_editor)

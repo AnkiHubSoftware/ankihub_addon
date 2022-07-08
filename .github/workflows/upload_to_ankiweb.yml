@@ -16,7 +16,9 @@ jobs:
         uses: actions/checkout@v2
 
       - name: Create ankiaddon file
-        run: bash ../scripts/release.sh
+        run: |
+          echo ${{ steps.vars.outputs.version }} > VERSION
+          bash ../scripts/release.sh
         working-directory: ankihub
 
       - name: Setup Python

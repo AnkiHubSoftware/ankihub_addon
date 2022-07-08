@@ -30,34 +30,34 @@ def test_entry_point(anki_session_with_addon: AnkiSession):
 
 
 def test_editor(anki_session_with_addon: AnkiSession, requests_mock, monkeypatch):
-    from ankihub.constants import API_URL_BASE, AnkiHubCommands
+    from ankihub.constants import (
+        API_URL_BASE,
+        AnkiHubCommands,
+        ANKIHUB_NOTE_TYPE_FIELD_NAME,
+    )
     from ankihub.gui.editor import (
-        ankihub_message_handler,
         on_ankihub_button_press,
-        on_select_command,
         setup,
+        refresh_ankihub_button,
     )
 
-    editor = setup()
-    # Check the default command.
-    assert editor.ankihub_command == "Suggest a change"
-    on_select_command(editor, AnkiHubCommands.NEW.value)
-    # Check that the command was updated.
-    assert editor.ankihub_command == "Suggest a new note"
-    ankihub_message_handler(
-        (False, None),
-        f"ankihub:{AnkiHubCommands.CHANGE.value}",
-        editor,
-    )
-    assert editor.ankihub_command == "Suggest a change"
-
-    # Patch the editor so that it has the note attribute, which it will have when
-    # the editor is actually instantiated during an Anki Desktop session.
+    setup()
+    editor = MagicMock()
     editor.mw = MagicMock()
     editor.note = MagicMock()
+    editor.web = MagicMock()
     editor.note.id = 1
     editor.note.fields = ["a", "b", "1"]
     editor.note.tags = ["test_tag"]
+    field_value = {ANKIHUB_NOTE_TYPE_FIELD_NAME: ""}
+    editor.note.__contains__.return_value = True
+    editor.note.__getitem__.side_effect = lambda i: field_value[i]
+    refresh_ankihub_button(editor)
+    assert editor.ankihub_command == AnkiHubCommands.NEW.value
+
+    field_value[ANKIHUB_NOTE_TYPE_FIELD_NAME] = "6f28bc9e-f36d-4e1d-8720-5dd805f12dd0"
+    refresh_ankihub_button(editor)
+    assert editor.ankihub_command == AnkiHubCommands.CHANGE.value
 
     # TODO Mock what this is actually expected to return
     expected_response = {}  # type: ignore
@@ -299,13 +299,13 @@ def test_get_note_by_anki_id(
         "fields": [{"name": "Text", "order": 0, "value": "Fake value"}],
     }
     requests_mock.get(f"{API_URL_BASE}/notes/{note_anki_id}", json=expected_data)
-    response = client.get_note_by_anki_id(anki_id=note_anki_id)
+    response = client.get_note_by_ankihub_id(ankihub_id=note_anki_id)
     assert response.json() == expected_data
 
     # test get note by anki id unauthenticated
     note_anki_id = 1
     requests_mock.get(f"{API_URL_BASE}/notes/{note_anki_id}", status_code=403)
-    response = client.get_note_by_anki_id(anki_id=note_anki_id)
+    response = client.get_note_by_ankihub_id(ankihub_id=note_anki_id)
     assert response.status_code == 403
 
 

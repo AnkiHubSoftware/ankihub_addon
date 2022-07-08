@@ -1,3 +1,4 @@
+import uuid
 from pathlib import Path
 from typing import Dict, Iterator, List, TypedDict
 
@@ -134,8 +135,8 @@ class AnkiHubClient:
         )
         return response
 
-    def get_note_by_anki_id(self, anki_id: int) -> Response:
-        response = self._send_request("GET", f"/notes/{anki_id}")
+    def get_note_by_ankihub_id(self, ankihub_id: uuid.UUID) -> Response:
+        response = self._send_request("GET", f"/notes/{ankihub_id}")
         return response
 
     def create_change_note_suggestion(
