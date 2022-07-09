@@ -253,18 +253,21 @@ class SubscribeDialog(QDialog):
                         # raises exception if task raised exception
                         future.result()
 
+                        tooltip("The deck has successfully been installed!", parent=mw)
+                        self.accept()
                         mw.reset()
 
                     mw.taskman.with_progress(
                         lambda: self.install_deck(out_file, data["name"], ankihub_did),
-                        label="Installing deck",
                         on_done=on_done,
+                        parent=mw,
+                        label="Installing deck",
                     )
 
         mw.taskman.with_progress(
             lambda: self.client.download_deck(deck_file_name),
             on_done=on_download_done,
-            parent=self,
+            parent=mw,
             label="Downloading deck",
         )
 
@@ -294,13 +297,6 @@ class SubscribeDialog(QDialog):
         config.save_subscription(
             name=deck_name, ankihub_did=ankihub_did, anki_did=local_did
         )
-
-        def on_success():
-            tooltip("The deck has successfully been installed!", parent=mw)
-            self.accept()
-            mw.reset()  # without this you have to click on "Decks" for the deck to appear in the main window
-
-        mw.taskman.run_on_main(on_success)
 
     def _install_deck_csv(
         self,
