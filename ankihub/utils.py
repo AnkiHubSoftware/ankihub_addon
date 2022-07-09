@@ -277,6 +277,8 @@ def reset_note_types_of_notes(nid_mid_pairs: List[Tuple[NoteId, NotetypeId]]) ->
             f"Changed note type: anki_nid {anki_nid} target_note_type_id {target_note_type_id}",
         )
 
+    LOGGER.debug("Reset note types of notes.")
+
 
 def change_note_type_of_note(nid: int, mid: int) -> None:
     current_schema: int = mw.col.db.scalar("select scm from col")
