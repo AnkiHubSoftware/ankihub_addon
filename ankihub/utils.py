@@ -152,8 +152,6 @@ def sync_with_ankihub() -> None:
         else:
             LOGGER.debug(f"No new updates to synch for {ankihub_did=}")
 
-    mw.reset()
-
 
 def sync_on_profile_open() -> None:
     def on_done(future: Future):
@@ -164,6 +162,8 @@ def sync_on_profile_open() -> None:
             LOGGER.debug(f"Unable to sync on profile open:\n{exc}")
             if not isinstance(exc, (ConnectionError, HTTPError)):
                 raise exc
+
+        mw.reset()
 
     if config.private_config.token:
         mw.taskman.with_progress(
