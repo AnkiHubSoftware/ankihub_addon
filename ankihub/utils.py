@@ -1,7 +1,9 @@
+import json
 import re
+import time
 from concurrent.futures import Future
 from pprint import pformat
-from typing import Dict, Iterable, List, Set, Tuple
+from typing import Dict, Iterable, List, Optional, Set, Tuple
 from urllib.error import HTTPError
 
 import anki
@@ -10,7 +12,7 @@ from anki.decks import DeckId
 from anki.errors import NotFoundError
 from anki.models import ChangeNotetypeRequest, NoteType, NotetypeDict, NotetypeId
 from anki.notes import Note, NoteId
-from anki.utils import ids2str
+from anki.utils import checksum, ids2str
 from aqt import mw
 from aqt.utils import tr
 from requests.exceptions import ConnectionError
@@ -64,7 +66,7 @@ def hide_ankihub_field_in_editor(
     return js
 
 
-def create_note_with_id(note: Note, anki_id: int, anki_did: int) -> Note:
+def create_note_with_id(note: Note, anki_id: NoteId, anki_did: DeckId) -> Note:
     """Create a new note, add it to the appropriate deck and override the note id with
     the note id of the original note creator."""
     LOGGER.debug(f"Trying to create note: {anki_id=}")
@@ -75,11 +77,11 @@ def create_note_with_id(note: Note, anki_id: int, anki_did: int) -> Note:
     mw.col.db.execute(f"UPDATE notes SET id={anki_id} WHERE id={note.id};")
     mw.col.db.execute(f"UPDATE cards SET nid={anki_id} WHERE nid={note.id};")
 
-    return note
+    return mw.col.get_note(anki_id)
 
 
 def prepare_note(
-    note: Note, ankihub_id: int, fields: List[Dict], tags: List[str]
+    note: Note, ankihub_id: str, fields: List[Dict], tags: List[str]
 ) -> None:
     note[constants.ANKIHUB_NOTE_TYPE_FIELD_NAME] = str(ankihub_id)
     note.tags = [str(tag) for tag in tags]
@@ -89,15 +91,15 @@ def prepare_note(
 
 
 def update_or_create_note(
-    anki_id: int,
-    ankihub_id: int,
+    anki_id: NoteId,
+    ankihub_id: str,
     fields: List[Dict],
     tags: List[str],
-    note_type_id: int,
-    ankihub_deck_id: str = None,
+    note_type_id: NotetypeId,
+    anki_did: DeckId,  # only relevant for newly created notes
 ) -> Note:
     try:
-        note = mw.col.get_note(id=NoteId(anki_id))
+        note = mw.col.get_note(id=anki_id)
         fields.append(
             {
                 "name": constants.ANKIHUB_NOTE_TYPE_FIELD_NAME,
@@ -110,9 +112,6 @@ def update_or_create_note(
         mw.col.update_note(note)
         LOGGER.debug(f"Updated note: {anki_id=}")
     except NotFoundError:
-        anki_did = config.private_config.decks[ankihub_deck_id].get(
-            "anki_id", 1
-        )  # XXX if the deck doesn't exist, use the default deck
         note_type = mw.col.models.get(NotetypeId(note_type_id))
         note = mw.col.new_note(note_type)
         prepare_note(note, ankihub_id, fields, tags)
@@ -129,7 +128,7 @@ def sync_with_ankihub() -> None:
     client = AnkiHubClient()
     decks = config.private_config.decks
     for ankihub_did, deck in decks.items():
-        collected_notes = []
+        notes_data = []
         for response in client.get_deck_updates(
             ankihub_did, since=deck["latest_update"]
         ):
@@ -139,36 +138,17 @@ def sync_with_ankihub() -> None:
             data = response.json()
             notes = data["notes"]
             if notes:
-                collected_notes += notes
+                notes_data += notes
 
-        if not collected_notes:
-            LOGGER.debug(f"No new updates to sync for deck {deck}")
-            continue
-
-        adjust_note_types_based_on_notes_data(collected_notes)
-        reset_note_types_of_notes_based_on_notes_data(collected_notes)
-
-        for note in collected_notes:
-            (
-                deck_id,
-                ankihub_id,
-                tags,
-                anki_id,
-                fields,
-                note_type,
-                note_type_id,
-            ) = note.values()
-            LOGGER.debug(f"Trying to update or create note:\n {pformat(note)}")
-            update_or_create_note(
-                anki_id,
-                ankihub_id,
-                fields,
-                tags,
-                int(note_type_id),
-                deck_id,
+        if notes_data:
+            import_ankihub_deck(
+                notes_data=notes_data,
+                deck_name=deck["name"],
+                local_did=deck["anki_id"],
             )
-
-        config.save_latest_update(ankihub_did, data["latest_update"])
+            config.save_latest_update(ankihub_did, data["latest_update"])
+        else:
+            LOGGER.debug(f"No new updates to synch for {ankihub_did=}")
 
 
 def sync_on_profile_open() -> None:
@@ -296,6 +276,8 @@ def reset_note_types_of_notes(nid_mid_pairs: List[Tuple[NoteId, NotetypeId]]) ->
         LOGGER.debug(
             f"Changed note type: anki_nid {anki_nid} target_note_type_id {target_note_type_id}",
         )
+
+    LOGGER.debug("Reset note types of notes.")
 
 
 def change_note_type_of_note(nid: int, mid: int) -> None:
@@ -425,3 +407,140 @@ def create_backup_with_progress() -> None:
         raise exc
     finally:
         mw.progress.finish()
+
+
+def create_deck_with_id(deck_name: str, deck_id: DeckId) -> None:
+    source_did = mw.col.decks.add_normal_deck_with_name(
+        ensure_deck_name_unique(deck_name)
+    ).id
+    mw.col.db.execute(f"UPDATE decks SET id={deck_id} WHERE id={source_did};")
+    mw.col.db.execute(f"UPDATE cards SET did={deck_id} WHERE did={source_did};")
+
+    LOGGER.debug(f"Created deck {deck_name=} {deck_id=}")
+
+
+def import_ankihub_deck(
+    notes_data: List[dict],
+    deck_name: str,  # name that will be used for a deck if a new one gets created
+    local_did: DeckId = None,  # did that new notes should be put into if importing not for the first time
+) -> DeckId:
+    # Used for importing an ankihub deck and updates to an ankihub deck
+    # When no local_did is provided this functions assumes that the deck gets installed for the first time
+    # Returns id of the deck future cards should be imported into - the local_did
+
+    LOGGER.debug(f"Importing ankihub deck {deck_name=} {local_did=}")
+
+    dids: Set[DeckId] = set()  # set of ids of decks notes were imported into
+    first_time_import = local_did is None
+
+    local_did = adjust_deck(deck_name, local_did)
+    adjust_note_types_based_on_notes_data(notes_data)
+    reset_note_types_of_notes_based_on_notes_data(notes_data)
+
+    # TODO fix differences between csv when installing for the first time vs. when updating
+    # on the AnkiHub side
+    # for example for one the fields name is "note_id" and for the other "id"
+    for note_data in notes_data:
+        LOGGER.debug(f"Trying to update or create note:\n {pformat(note_data)}")
+        note = update_or_create_note(
+            anki_id=NoteId(int((note_data["anki_id"]))),
+            ankihub_id=note_data.get("id")
+            if note_data.get("id") is not None
+            else note_data.get("note_id"),
+            fields=json.loads(note_data["fields"])
+            if type(note_data["fields"]) == str
+            else note_data["fields"],
+            tags=json.loads(note_data["tags"])
+            if type(note_data["tags"]) == str
+            else note_data["tags"],
+            note_type_id=NotetypeId(int(note_data["note_type_id"])),
+            anki_did=local_did,
+        )
+        dids = dids.union(set(c.did for c in note.cards()))
+
+    dids = {x for x in dids if not mw.col.decks.is_filtered(x)}
+
+    if first_time_import:
+        local_did = _cleanup_first_time_deck_import(dids, local_did)
+
+    return local_did
+
+
+def adjust_deck(deck_name: str, local_did: Optional[DeckId] = None) -> DeckId:
+    if local_did is None:
+        local_did = DeckId(
+            mw.col.decks.add_normal_deck_with_name(
+                ensure_deck_name_unique(deck_name)
+            ).id
+        )
+        LOGGER.debug(f"Created deck {local_did=}")
+    elif mw.col.decks.name_if_exists(local_did) is None:
+        # recreate deck if it was deleted
+        create_deck_with_id(ensure_deck_name_unique(deck_name), local_did)
+        LOGGER.debug(f"Recreated deck {local_did=}")
+
+    return local_did
+
+
+def _cleanup_first_time_deck_import(
+    dids_cards_were_imported_to: Iterable[DeckId], created_did: DeckId
+) -> Optional[DeckId]:
+    dids = set(dids_cards_were_imported_to)
+
+    # if there is a single deck where all the existing cards were before the import,
+    # move the new cards there (from the newly created deck) and remove the created deck
+    # takes subdecks into account
+    if (dids_wh_created := dids - set([created_did])) and (
+        (common_ancestor_did := lowest_level_common_ancestor_did(dids_wh_created))
+    ) is not None:
+        cids = mw.col.find_cards(f"deck:{mw.col.decks.name(created_did)}")
+        mw.col.set_deck(cids, common_ancestor_did)
+        LOGGER.debug(f"Moved new cards to common ancestor deck {common_ancestor_did=}")
+
+        mw.col.decks.remove([created_did])
+        LOGGER.debug(f"Removed created deck {created_did=}")
+        return common_ancestor_did
+
+    return created_did
+
+
+def lowest_level_common_ancestor_did(dids: Iterable[DeckId]) -> Optional[DeckId]:
+    return mw.col.decks.id_for_name(
+        lowest_level_common_ancestor_deck_name([mw.col.decks.name(did) for did in dids])
+    )
+
+
+def lowest_level_common_ancestor_deck_name(deck_names: Iterable[str]) -> Optional[str]:
+    lowest_level_deck_name = max(deck_names, key=lambda name: name.count("::"))
+    parts = lowest_level_deck_name.split("::")
+    result = lowest_level_deck_name
+    for i in range(1, len(parts) + 1):
+        cur_deck_name = "::".join(parts[:i])
+        if any(not name.startswith(cur_deck_name) for name in deck_names):
+            result = "::".join(parts[: i - 1])
+            break
+
+    if result == "":
+        return None
+    else:
+        return result
+
+
+def ensure_deck_name_unique(deck_name: str) -> str:
+    if not mw.col.decks.by_name(deck_name):
+        return deck_name
+
+    suffix = " (AnkiHub)"
+    if suffix not in deck_name:
+        deck_name += suffix
+    else:
+        deck_name += f" {checksum(str(time.time()))[:5]}"
+    return deck_name
+
+
+def all_dids() -> Set[DeckId]:
+    return {DeckId(x.id) for x in mw.col.decks.all_names_and_ids()}
+
+
+def highest_level_did(dids: Iterable[DeckId]) -> DeckId:
+    return min(dids, key=lambda did: mw.col.decks.name(did).count("::"))
