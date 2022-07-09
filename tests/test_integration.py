@@ -281,7 +281,7 @@ def test_get_deck_by_id(
     assert response.status_code == 403
 
 
-def test_get_note_by_anki_id(
+def test_get_note_by_ankihub_id(
     anki_session_with_addon: AnkiSession, requests_mock, monkeypatch
 ):
     from ankihub.ankihub_client import AnkiHubClient
@@ -289,8 +289,8 @@ def test_get_note_by_anki_id(
 
     client = AnkiHubClient(hooks=[])
 
-    # test get note by anki id
-    note_anki_id = 1
+    # test get not by ankihub id
+    note_ankihub_id = "1"
     expected_data = {
         "deck_id": 1,
         "note_id": 1,
@@ -298,14 +298,14 @@ def test_get_note_by_anki_id(
         "tags": ["New Tag"],
         "fields": [{"name": "Text", "order": 0, "value": "Fake value"}],
     }
-    requests_mock.get(f"{API_URL_BASE}/notes/{note_anki_id}", json=expected_data)
-    response = client.get_note_by_ankihub_id(ankihub_id=note_anki_id)
+    requests_mock.get(f"{API_URL_BASE}/notes/{note_ankihub_id}", json=expected_data)
+    response = client.get_note_by_ankihub_id(ankihub_id=note_ankihub_id)  # type: ignore
     assert response.json() == expected_data
 
-    # test get note by anki id unauthenticated
-    note_anki_id = 1
-    requests_mock.get(f"{API_URL_BASE}/notes/{note_anki_id}", status_code=403)
-    response = client.get_note_by_ankihub_id(ankihub_id=note_anki_id)
+    # test get note by ankihub id unauthenticated
+    note_ankihub_id = "1"
+    requests_mock.get(f"{API_URL_BASE}/notes/{note_ankihub_id}", status_code=403)
+    response = client.get_note_by_ankihub_id(ankihub_id=note_ankihub_id)  # type: ignore
     assert response.status_code == 403
 
 
