@@ -2,7 +2,6 @@ import json
 import re
 import time
 from concurrent.futures import Future
-from pathlib import Path
 from pprint import pformat
 from typing import Dict, Iterable, List, Optional, Set, Tuple
 from urllib.error import HTTPError
@@ -15,7 +14,6 @@ from anki.models import ChangeNotetypeRequest, NoteType, NotetypeDict, NotetypeI
 from anki.notes import Note, NoteId
 from anki.utils import checksum, ids2str
 from aqt import mw
-from aqt.importing import AnkiPackageImporter
 from aqt.utils import tr
 from requests.exceptions import ConnectionError
 
@@ -536,32 +534,6 @@ def ensure_deck_name_unique(deck_name: str) -> str:
     else:
         deck_name += f" {checksum(str(time.time()))[:5]}"
     return deck_name
-
-
-def install_deck_apkg(
-    deck_file: Path,
-    deck_name: str,
-) -> DeckId:
-    # Returns id of the deck future cards should be imported into.
-
-    LOGGER.debug("Importing deck as apkg....")
-
-    dids_before_import = all_dids()
-
-    file = str(deck_file.absolute())
-    importer = AnkiPackageImporter(mw.col, file)
-    importer.run()
-
-    new_dids = all_dids() - dids_before_import
-
-    if new_dids:
-        return highest_level_did(new_dids)
-    else:
-        # XXX: Ideally this function would check if all updated / skipped notes belong to one deck
-        # and if this is the case not create a new deck (as it is done for csv imports).
-        # To implement this we would need to know the decks that contain the cards which
-        # were updated / skipped during the apkg import.
-        return adjust_deck(deck_name)
 
 
 def all_dids() -> Set[DeckId]:

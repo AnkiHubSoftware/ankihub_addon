@@ -447,53 +447,6 @@ def test_reset_note_types_of_notes(anki_session_with_addon: AnkiSession):
         assert mw.col.get_note(note.id).mid == cloze["id"]
 
 
-def test_install_new_deck_apkg(anki_session_with_addon: AnkiSession, monkeypatch):
-    from ankihub.utils import all_dids, install_deck_apkg
-
-    anki_session = anki_session_with_addon
-
-    monkeypatch.setattr("ankihub.utils.sync_with_ankihub", Mock())
-    with anki_session.profile_loaded():
-
-        # import the deck using install_deck_apkg
-        dids_before_import = all_dids()
-        local_did = install_deck_apkg(pathlib.Path(sample_deck), "test")
-        new_decks = all_dids() - dids_before_import
-
-        assert len(new_decks) == 2  # the deck in the apkg has a subdeck
-        assert local_did in new_decks
-
-
-def test_install_existing_deck_apkg(anki_session_with_addon: AnkiSession, monkeypatch):
-    from aqt import mw
-    from aqt.importing import AnkiPackageImporter
-
-    from ankihub.utils import all_dids, install_deck_apkg
-
-    anki_session = anki_session_with_addon
-
-    monkeypatch.setattr("ankihub.utils.sync_with_ankihub", Mock())
-    with anki_session.profile_loaded():
-
-        # import the deck
-        file = str(sample_deck.absolute())
-        importer = AnkiPackageImporter(mw.col, file)
-        importer.run()
-
-        # import the deck again using install_deck_apkg
-        dids_before_import = all_dids()
-        local_did = install_deck_apkg(pathlib.Path(sample_deck), "test")
-        new_decks = all_dids() - dids_before_import
-
-        # this would be the better behaviour which is not implemented yet
-        # existing_did = mw.col.decks.id_for_name("Testdeck")
-        # assert not new_decks
-        # assert local_did == existing_did
-
-        assert len(new_decks) == 1
-        assert local_did == list(new_decks)[0]
-
-
 def test_import_new_ankihub_deck(anki_session_with_addon: AnkiSession, monkeypatch):
     from aqt import mw
 

@@ -25,7 +25,7 @@ from .. import LOGGER
 from ..addon_ankihub_client import AddonAnkiHubClient as AnkiHubClient
 from ..config import config
 from ..constants import CSV_DELIMITER, URL_DECK_BASE, URL_DECKS, URL_HELP
-from ..utils import create_backup_with_progress, import_ankihub_deck, install_deck_apkg
+from ..utils import create_backup_with_progress, import_ankihub_deck
 
 
 class SubscribedDecksDialog(QDialog):
@@ -226,12 +226,7 @@ class SubscribeDialog(QDialog):
             return
 
         data = deck_response.json()
-        local_deck_ids = {deck.id for deck in mw.col.decks.all_names_and_ids()}
-        # XXX not reliable
-        first_time_install = data["anki_id"] not in local_deck_ids
-        deck_file_name = (
-            data["apkg_filename"] if first_time_install else data["csv_notes_filename"]
-        )
+        deck_file_name = data["csv_notes_filename"]
 
         def on_download_done(future: Future):
             response = future.result()
@@ -283,10 +278,7 @@ class SubscribeDialog(QDialog):
 
         local_did = None
         try:
-            if deck_file.suffix == ".apkg":
-                local_did = install_deck_apkg(deck_file, deck_name)
-            elif deck_file.suffix == ".csv":
-                local_did = self._install_deck_csv(deck_file, deck_name)
+            local_did = self._install_deck_csv(deck_file, deck_name)
         except Exception as e:
 
             def on_failure(e=e):
