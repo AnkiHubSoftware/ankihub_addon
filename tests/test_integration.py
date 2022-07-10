@@ -614,3 +614,44 @@ def test_update_ankihub_deck_when_deck_was_deleted(
         assert len(new_decks) == 1
         assert list(new_decks)[0] == first_local_did
         assert second_local_id == first_local_did
+
+
+def test_prepare_note(anki_session_with_addon: AnkiSession, monkeypatch):
+    from ankihub.utils import prepare_note, modify_note_type
+
+    anki_session = anki_session_with_addon
+    monkeypatch.setattr("ankihub.utils.sync_with_ankihub", Mock())
+    with anki_session_with_addon.profile_loaded():
+        mw = anki_session.mw
+
+        # create ankihub_basic note type because prepare_note needs a note type with an ankihub_id field
+        basic = mw.col.models.by_name("Basic")
+        modify_note_type(basic)
+        basic["id"] = 0
+        basic["name"] = "Basic (AnkiHub)"
+        ankihub_basic_mid = NotetypeId(mw.col.models.add_dict(basic).id)
+        ankihub_basic = mw.col.models.get(ankihub_basic_mid)
+
+        # create a new note with non-empty fields and tags
+        note = mw.col.new_note(ankihub_basic)
+        note["Front"] = "old front"
+        note["Back"] = "old back"
+        note.tags = ["a", "b"]
+
+        # prepare_note
+        prepare_note(
+            note=note,
+            ankihub_id="1",
+            fields=[
+                {"name": "Front", "value": "new front"},
+                {"name": "Back", "value": "new back"},
+            ],
+            tags=["c", "d"],
+            protected_fields={ankihub_basic["name"]: ["Back"]},
+            protected_tags=["a"],
+        )
+
+        # assert that the note was modified but the protected fields and tags were not
+        assert note["Front"] == "new front"
+        assert note["Back"] == "old back"
+        assert set(note.tags) == set(["a", "c", "d"])
