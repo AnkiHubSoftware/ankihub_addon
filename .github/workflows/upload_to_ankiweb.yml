@@ -15,6 +15,11 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v2
 
+      - name: Declare version variable
+        id: vars
+        run: |
+          echo "::set-output name=version::$(scripts/calver.sh)"
+
       - name: Create ankiaddon file
         run: |
           echo ${{ steps.vars.outputs.version }} > VERSION
