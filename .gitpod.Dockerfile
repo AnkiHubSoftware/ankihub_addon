@@ -39,4 +39,4 @@ RUN sudo apt-get update && \
 RUN pyenv install 3.9.13
 RUN pyenv global 3.9.13
 RUN python -m pip install --upgrade pip && \
-    python --log pip.log -m pip install -r /workspace/ankihub_addon/requirements/dev.txt
+    python -m pip --log pip.log install -r /workspace/ankihub_addon/requirements/dev.txt
