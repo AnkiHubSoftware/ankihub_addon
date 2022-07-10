@@ -206,3 +206,11 @@ class AnkiHubClient:
     def get_note_type(self, anki_id: int) -> Response:
         response = self._send_request("GET", f"/note-types/{anki_id}/")
         return response
+
+    def get_protected_fields(self, deck_id: str) -> Response:
+        response = self._send_request("GET", f"/decks/{deck_id}/protected-fields/")
+        return response
+
+    def get_protected_tags(self, deck_id: str) -> Response:
+        response = self._send_request("GET", f"/decks/{deck_id}/protected-tags/")
+        return response

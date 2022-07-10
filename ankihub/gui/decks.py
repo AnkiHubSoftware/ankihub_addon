@@ -2,6 +2,7 @@ import csv
 import tempfile
 from concurrent.futures import Future
 from pathlib import Path
+from typing import Dict, List
 
 from anki.collection import OpChanges
 from anki.decks import DeckId
@@ -279,9 +280,24 @@ class SubscribeDialog(QDialog):
 
         create_backup_with_progress()
 
+        response = self.client.get_protected_fields(ankihub_did)
+        if response.status_code != 200:
+            return
+        protected_fields = response.json()
+
+        response = self.client.get_protected_tags(ankihub_did)
+        if response.status_code != 200:
+            return
+        protected_tags = response.json()
+
         local_did = None
         try:
-            local_did = self._install_deck_csv(deck_file, deck_name)
+            local_did = self._install_deck_csv(
+                deck_file=deck_file,
+                deck_name=deck_name,
+                protected_fields=protected_fields,
+                protected_tags=protected_tags,
+            )
         except Exception as e:
 
             def on_failure(e=e):
@@ -302,6 +318,8 @@ class SubscribeDialog(QDialog):
         self,
         deck_file: Path,
         deck_name: str,
+        protected_fields: Dict[str, List[str]],
+        protected_tags: List[str],
     ) -> DeckId:
         LOGGER.debug("Importing deck as csv....")
         with deck_file.open(encoding="utf-8") as f:
@@ -310,6 +328,8 @@ class SubscribeDialog(QDialog):
         return import_ankihub_deck(
             notes_data=notes_data,
             deck_name=deck_name,
+            protected_fields=protected_fields,
+            protected_tags=protected_tags,
         )
 
     def on_browse_deck(self) -> None:

@@ -95,7 +95,7 @@ def prepare_note(
 
     # update fields which are not protected
     for field in fields:
-        # XXX: won't work if note type name was changed, better use the note type id
+        # TODO: won't work if note type name was changed, better use the note type id
         protected_fields_for_model = protected_fields.get(
             mw.col.models.get(note.mid)["name"], []
         )
@@ -441,9 +441,9 @@ def create_deck_with_id(deck_name: str, deck_id: DeckId) -> None:
 def import_ankihub_deck(
     notes_data: List[dict],
     deck_name: str,  # name that will be used for a deck if a new one gets created
+    protected_fields: Dict[str, List[str]],
+    protected_tags: List[str],
     local_did: DeckId = None,  # did that new notes should be put into if importing not for the first time
-    protected_fields: List[Dict[str, Any]] = None,
-    protected_tags: List[str] = None,
 ) -> DeckId:
     # Used for importing an ankihub deck and updates to an ankihub deck
     # When no local_did is provided this functions assumes that the deck gets installed for the first time
@@ -476,8 +476,8 @@ def import_ankihub_deck(
             else note_data["tags"],
             note_type_id=NotetypeId(int(note_data["note_type_id"])),
             anki_did=local_did,
-            protected_fields=protected_fields or {},  # type: ignore
-            protected_tags=protected_tags or [],
+            protected_fields=protected_fields,
+            protected_tags=protected_tags,
         )
         dids = dids.union(set(c.did for c in note.cards()))
 

@@ -468,7 +468,12 @@ def test_import_new_ankihub_deck(anki_session_with_addon: AnkiSession, monkeypat
         )
 
         dids_before_import = all_dids()
-        local_did = import_ankihub_deck(ankihub_sample_deck_notes_data, "test")
+        local_did = import_ankihub_deck(
+            notes_data=ankihub_sample_deck_notes_data,
+            deck_name="test",
+            protected_fields={},
+            protected_tags=[],
+        )
         new_decks = all_dids() - dids_before_import
 
         assert (
@@ -500,7 +505,12 @@ def test_import_existing_ankihub_deck(
         )
 
         dids_before_import = all_dids()
-        local_did = import_ankihub_deck(ankihub_sample_deck_notes_data, "test")
+        local_did = import_ankihub_deck(
+            notes_data=ankihub_sample_deck_notes_data,
+            deck_name="test",
+            protected_fields={},
+            protected_tags=[],
+        )
         new_decks = all_dids() - dids_before_import
 
         assert not new_decks
@@ -534,7 +544,12 @@ def test_import_existing_ankihub_deck_2(
         )
 
         dids_before_import = all_dids()
-        local_did = import_ankihub_deck(ankihub_sample_deck_notes_data, "test")
+        local_did = import_ankihub_deck(
+            notes_data=ankihub_sample_deck_notes_data,
+            deck_name="test",
+            protected_fields={},
+            protected_tags=[],
+        )
         new_decks = all_dids() - dids_before_import
 
         # if the existing cards are in multiple seperate decks a new deck is created deck
@@ -562,16 +577,25 @@ def test_update_ankihub_deck(anki_session_with_addon: AnkiSession, monkeypatch):
             "ankihub.utils.adjust_note_types_based_on_notes_data", Mock()
         )
 
-        first_local_did = import_ankihub_deck(ankihub_sample_deck_notes_data, "test")
+        first_local_did = import_ankihub_deck(
+            notes_data=ankihub_sample_deck_notes_data,
+            deck_name="test",
+            protected_fields={},
+            protected_tags=[],
+        )
 
         dids_before_import = all_dids()
-        second_local_id = import_ankihub_deck(
-            ankihub_sample_deck_notes_data, "test", local_did=first_local_did
+        second_local_did = import_ankihub_deck(
+            notes_data=ankihub_sample_deck_notes_data,
+            deck_name="test",
+            protected_fields={},
+            protected_tags=[],
+            local_did=first_local_did,
         )
         new_decks = all_dids() - dids_before_import
 
         assert len(new_decks) == 0
-        assert first_local_did == second_local_id
+        assert first_local_did == second_local_did
 
 
 def test_update_ankihub_deck_when_deck_was_deleted(
@@ -596,7 +620,12 @@ def test_update_ankihub_deck_when_deck_was_deleted(
             "ankihub.utils.adjust_note_types_based_on_notes_data", Mock()
         )
 
-        first_local_did = import_ankihub_deck(ankihub_sample_deck_notes_data, "test")
+        first_local_did = import_ankihub_deck(
+            notes_data=ankihub_sample_deck_notes_data,
+            deck_name="test",
+            protected_fields={},
+            protected_tags=[],
+        )
 
         # move cards to other deck and delete the deck
         other_deck = mw.col.decks.add_normal_deck_with_name("other deck").id
@@ -605,15 +634,19 @@ def test_update_ankihub_deck_when_deck_was_deleted(
         mw.col.decks.remove([first_local_did])
 
         dids_before_import = all_dids()
-        second_local_id = import_ankihub_deck(
-            ankihub_sample_deck_notes_data, "test", local_did=first_local_did
+        second_local_did = import_ankihub_deck(
+            notes_data=ankihub_sample_deck_notes_data,
+            deck_name="test",
+            protected_fields={},
+            protected_tags=[],
+            local_did=first_local_did,
         )
         new_decks = all_dids() - dids_before_import
 
         # deck with first_local_did should be recreated
         assert len(new_decks) == 1
         assert list(new_decks)[0] == first_local_did
-        assert second_local_id == first_local_did
+        assert second_local_did == first_local_did
 
 
 def test_prepare_note(anki_session_with_addon: AnkiSession, monkeypatch):
