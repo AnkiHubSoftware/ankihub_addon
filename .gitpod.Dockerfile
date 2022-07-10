@@ -32,8 +32,5 @@ RUN sudo apt-get install -y \
     pkg-config \
     portaudio19-dev \
     rsync \
-    zstd
-
-RUN pyenv install 3.9.13 \
-    && pyenv global 3.9.13 \
-    && python -m pip install --upgrade pip
+    zstd \
+    python3-pyqt5
