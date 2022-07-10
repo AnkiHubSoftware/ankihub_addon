@@ -2,7 +2,37 @@ FROM gitpod/workspace-full-vnc
 
 USER gitpod
 
-RUN sudo apt-get install -y build-essential libgl1-mesa-dev libxkbcommon-x11-0 libpulse-dev libxcb-util1 libxcb-glx0 libxcb-icccm4 libxcb-image0 libxcb-keysyms1 libxcb-randr0 libxcb-render-util0 libxcb-render0 libxcb-shape0 libxcb-shm0 libxcb-sync1 libxcb-xfixes0 libxcb-xinerama0 libxcb1
+RUN sudo apt-get install -y
+    findutils \
+    g++ \
+    gcc \
+    git \
+    grep \
+    libdbus-1-3 \
+    libegl1 \
+    libfontconfig1 \
+    libgl1 \
+    libgstreamer-gl1.0-0 \
+    libgstreamer-plugins-base1.0 \
+    libgstreamer1.0-0 \
+    libnss3 \
+    libpulse-mainloop-glib0 \
+    libpulse-mainloop-glib0 \
+    libssl-dev \
+    libxcomposite1 \
+    libxcursor1 \
+    libxi6 \
+    libxkbcommon-x11-0 \
+    libxkbcommon0 \
+    libxkbfile1	\
+    libxrandr2 \
+    libxrender1 \
+    libxtst6 \
+    make \
+    pkg-config \
+    portaudio19-dev \
+    rsync
+    zstd
 
 RUN pyenv install 3.9.13 \
     && pyenv global 3.9.13 \
