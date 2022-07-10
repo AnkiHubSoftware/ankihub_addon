@@ -1,10 +1,9 @@
 {
-    "package": "ankihub",
+    "package": "1322529746",
     "name": "AnkiHub",
     "ankiweb_id": 1322529746,
     "author": "AnkiHub, LLC",
     "version": "0.0.1",
     "homepage": "",
-    "conflicts": [],
-    "mod": 1651704648
+    "conflicts": []
 }
