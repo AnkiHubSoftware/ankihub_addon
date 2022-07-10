@@ -3,6 +3,7 @@ image:
   file: .gitpod.Dockerfile
 
 tasks:
+  - before: pyenv local 3.9.13
   - init: python -m pip install -r ./requirements/dev.txt
     command: python -m pytest tests
 
