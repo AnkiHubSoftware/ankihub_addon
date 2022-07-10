@@ -3,7 +3,7 @@ image:
   file: .gitpod.Dockerfile
 
 tasks:
-  - before: pyenv local 3.9.13
+  - before: pyenv install 3.9.13 && pyenv global 3.9.13 && python -m pip install --upgrade pip
   - init: python -m pip install -r ./requirements/dev.txt
     command: python -m pytest tests
 
