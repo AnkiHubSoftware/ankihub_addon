@@ -3,8 +3,8 @@ image:
   file: .gitpod.Dockerfile
 
 tasks:
-  - init: pip install -r ./requirements/dev.txt
-    command: pytest tests
+  - init: python -m pip install -r ./requirements/dev.txt
+    command: python -m pytest tests
 
 github:
   prebuilds:

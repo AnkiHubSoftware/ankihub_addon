@@ -36,4 +36,4 @@ RUN sudo apt-get install -y \
 
 RUN pyenv install 3.9.13 \
     && pyenv global 3.9.13 \
-    && pip install --upgrade pip
+    && python -m pip install --upgrade pip
