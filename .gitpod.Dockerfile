@@ -31,7 +31,7 @@ RUN sudo apt-get install -y
     make \
     pkg-config \
     portaudio19-dev \
-    rsync
+    rsync \
     zstd
 
 RUN pyenv install 3.9.13 \
