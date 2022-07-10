@@ -6,4 +6,4 @@ RUN sudo apt-get install -y build-essential libgl1-mesa-dev libxkbcommon-x11-0 l
 
 RUN pyenv install 3.9.13 \
     && pyenv global 3.9.13 \
-    && python -m pip install --upgrade pip
+    && pip install --upgrade pip
