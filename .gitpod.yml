@@ -4,6 +4,7 @@ image:
 
 tasks:
   - init: pip install -r ./requirements/dev.txt
+    command: pytest tests
 
 github:
   prebuilds:
