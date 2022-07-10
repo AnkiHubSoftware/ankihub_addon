@@ -21,7 +21,7 @@ from aqt.qt import (
 )
 from aqt.utils import askUser, openLink, showText, tooltip
 
-from .. import LOGGER
+from .. import LOGGER, report_exception
 from ..addon_ankihub_client import AddonAnkiHubClient as AnkiHubClient
 from ..config import config
 from ..constants import CSV_DELIMITER, URL_DECK_BASE, URL_DECKS, URL_HELP
@@ -205,9 +205,8 @@ class SubscribeDialog(QDialog):
 
     def download_and_install_deck(self, ankihub_did: str):
         """
-        Take the AnkiHub deck id, copyied/pasted by the user and
-        1) Download the deck .csv or .apkg, depending on if the user already has
-        the deck.
+        Take the AnkiHub deck id, copied/pasted by the user and
+        1) Download the deck .csv
 
         :param deck_id: the deck's ankihub id
         :return:
@@ -279,10 +278,14 @@ class SubscribeDialog(QDialog):
 
         create_backup_with_progress()
 
-        local_did = None
         try:
             local_did = self._install_deck_csv(deck_file, deck_name)
+            LOGGER.debug("Importing deck was successful.")
+            config.save_subscription(
+                name=deck_name, ankihub_did=ankihub_did, anki_did=local_did
+            )
         except Exception as e:
+            report_exception()
 
             def on_failure(e=e):
                 showText(f"Failed to import deck.\n\n{str(e)}")
@@ -291,12 +294,6 @@ class SubscribeDialog(QDialog):
             LOGGER.exception("Importing deck failed.")
             mw.taskman.run_on_main(on_failure)
             return
-
-        LOGGER.debug("Importing deck was succesful.")
-
-        config.save_subscription(
-            name=deck_name, ankihub_did=ankihub_did, anki_did=local_did
-        )
 
     def _install_deck_csv(
         self,
@@ -307,10 +304,8 @@ class SubscribeDialog(QDialog):
         with deck_file.open(encoding="utf-8") as f:
             reader = csv.DictReader(f, delimiter=CSV_DELIMITER, quotechar="'")
             notes_data = [row for row in reader]
-        return import_ankihub_deck(
-            notes_data=notes_data,
-            deck_name=deck_name,
-        )
+        deck_id = import_ankihub_deck(notes_data=notes_data, deck_name=deck_name)
+        return deck_id
 
     def on_browse_deck(self) -> None:
         openLink(URL_DECKS)

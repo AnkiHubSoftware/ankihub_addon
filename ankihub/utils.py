@@ -77,7 +77,8 @@ def create_note_with_id(note: Note, anki_id: NoteId, anki_did: DeckId) -> Note:
     mw.col.db.execute(f"UPDATE notes SET id={anki_id} WHERE id={note.id};")
     mw.col.db.execute(f"UPDATE cards SET nid={anki_id} WHERE nid={note.id};")
 
-    return mw.col.get_note(anki_id)
+    note = mw.col.get_note(anki_id)
+    return note
 
 
 def prepare_note(
@@ -148,7 +149,7 @@ def sync_with_ankihub() -> None:
             )
             config.save_latest_update(ankihub_did, data["latest_update"])
         else:
-            LOGGER.debug(f"No new updates to synch for {ankihub_did=}")
+            LOGGER.debug(f"No new updates to sync for {ankihub_did=}")
 
 
 def sync_on_profile_open() -> None:
@@ -411,7 +412,7 @@ def create_backup_with_progress() -> None:
 
 def create_deck_with_id(deck_name: str, deck_id: DeckId) -> None:
     source_did = mw.col.decks.add_normal_deck_with_name(
-        ensure_deck_name_unique(deck_name)
+        get_unique_deck_name(deck_name)
     ).id
     mw.col.db.execute(f"UPDATE decks SET id={deck_id} WHERE id={source_did};")
     mw.col.db.execute(f"UPDATE cards SET did={deck_id} WHERE did={source_did};")
@@ -424,9 +425,11 @@ def import_ankihub_deck(
     deck_name: str,  # name that will be used for a deck if a new one gets created
     local_did: DeckId = None,  # did that new notes should be put into if importing not for the first time
 ) -> DeckId:
-    # Used for importing an ankihub deck and updates to an ankihub deck
-    # When no local_did is provided this functions assumes that the deck gets installed for the first time
-    # Returns id of the deck future cards should be imported into - the local_did
+    """
+    Used for importing an ankihub deck and updates to an ankihub deck
+    When no local_did is provided this function assumes that the deck gets installed for the first time
+    Returns id of the deck future cards should be imported into - the local_did
+    """
 
     LOGGER.debug(f"Importing ankihub deck {deck_name=} {local_did=}")
 
@@ -448,10 +451,10 @@ def import_ankihub_deck(
             if note_data.get("id") is not None
             else note_data.get("note_id"),
             fields=json.loads(note_data["fields"])
-            if type(note_data["fields"]) == str
+            if isinstance(note_data["fields"], str)
             else note_data["fields"],
             tags=json.loads(note_data["tags"])
-            if type(note_data["tags"]) == str
+            if isinstance(note_data["tags"], str)
             else note_data["tags"],
             note_type_id=NotetypeId(int(note_data["note_type_id"])),
             anki_did=local_did,
@@ -467,16 +470,13 @@ def import_ankihub_deck(
 
 
 def adjust_deck(deck_name: str, local_did: Optional[DeckId] = None) -> DeckId:
+    unique_name = get_unique_deck_name(deck_name)
     if local_did is None:
-        local_did = DeckId(
-            mw.col.decks.add_normal_deck_with_name(
-                ensure_deck_name_unique(deck_name)
-            ).id
-        )
+        local_did = DeckId(mw.col.decks.add_normal_deck_with_name(unique_name).id)
         LOGGER.debug(f"Created deck {local_did=}")
     elif mw.col.decks.name_if_exists(local_did) is None:
         # recreate deck if it was deleted
-        create_deck_with_id(ensure_deck_name_unique(deck_name), local_did)
+        create_deck_with_id(unique_name, local_did)
         LOGGER.debug(f"Recreated deck {local_did=}")
 
     return local_did
@@ -526,7 +526,7 @@ def lowest_level_common_ancestor_deck_name(deck_names: Iterable[str]) -> Optiona
         return result
 
 
-def ensure_deck_name_unique(deck_name: str) -> str:
+def get_unique_deck_name(deck_name: str) -> str:
     if not mw.col.decks.by_name(deck_name):
         return deck_name
 
