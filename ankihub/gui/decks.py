@@ -212,6 +212,20 @@ class SubscribeDialog(QDialog):
         :return:
         """
 
+        def on_install_done(future: Future):
+            try:
+                future.result()
+            except Exception as e:
+                report_exception()
+                LOGGER.exception("Importing deck failed.")
+                showText(f"Failed to import deck.\n\n{str(e)}")
+                self.reject()
+                return
+
+            tooltip("The deck has successfully been installed!", parent=mw)
+            self.accept()
+            mw.reset()
+
         deck_response = self.client.get_deck_by_id(ankihub_did)
         if deck_response.status_code == 404:
             showText(
@@ -246,22 +260,15 @@ class SubscribeDialog(QDialog):
                     f"details.",
                     title="Please confirm to proceed.",
                 )
-                if confirmed:
+                if not confirmed:
+                    return
 
-                    def on_done(future: Future):
-                        # raises exception if task raised exception
-                        future.result()
-
-                        tooltip("The deck has successfully been installed!", parent=mw)
-                        self.accept()
-                        mw.reset()
-
-                    mw.taskman.with_progress(
-                        lambda: self.install_deck(out_file, data["name"], ankihub_did),
-                        on_done=on_done,
-                        parent=mw,
-                        label="Installing deck",
-                    )
+                mw.taskman.with_progress(
+                    lambda: self.install_deck(out_file, data["name"], ankihub_did),
+                    on_done=on_install_done,
+                    parent=mw,
+                    label="Installing deck",
+                )
 
         mw.taskman.with_progress(
             lambda: self.client.download_deck(deck_file_name),
@@ -277,23 +284,11 @@ class SubscribeDialog(QDialog):
         """
 
         create_backup_with_progress()
-
-        try:
-            local_did = self._install_deck_csv(deck_file, deck_name)
-            LOGGER.debug("Importing deck was successful.")
-            config.save_subscription(
-                name=deck_name, ankihub_did=ankihub_did, anki_did=local_did
-            )
-        except Exception as e:
-            report_exception()
-
-            def on_failure(e=e):
-                showText(f"Failed to import deck.\n\n{str(e)}")
-                self.reject()
-
-            LOGGER.exception("Importing deck failed.")
-            mw.taskman.run_on_main(on_failure)
-            return
+        local_did = self._install_deck_csv(deck_file, deck_name)
+        LOGGER.debug("Importing deck was succesful.")
+        config.save_subscription(
+            name=deck_name, ankihub_did=ankihub_did, anki_did=local_did
+        )
 
     def _install_deck_csv(
         self,

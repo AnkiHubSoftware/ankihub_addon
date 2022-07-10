@@ -433,7 +433,6 @@ def import_ankihub_deck(
 
     LOGGER.debug(f"Importing ankihub deck {deck_name=} {local_did=}")
 
-    dids: Set[DeckId] = set()  # set of ids of decks notes were imported into
     first_time_import = local_did is None
 
     local_did = adjust_deck(deck_name, local_did)
@@ -443,6 +442,7 @@ def import_ankihub_deck(
     # TODO fix differences between csv when installing for the first time vs. when updating
     # on the AnkiHub side
     # for example for one the fields name is "note_id" and for the other "id"
+    dids: Set[DeckId] = set()  # set of ids of decks notes were imported into
     for note_data in notes_data:
         LOGGER.debug(f"Trying to update or create note:\n {pformat(note_data)}")
         note = update_or_create_note(
@@ -459,9 +459,8 @@ def import_ankihub_deck(
             note_type_id=NotetypeId(int(note_data["note_type_id"])),
             anki_did=local_did,
         )
-        dids = dids.union(set(c.did for c in note.cards()))
-
-    dids = {x for x in dids if not mw.col.decks.is_filtered(x)}
+        dids_for_note = set(c.did for c in note.cards())
+        dids = dids | dids_for_note
 
     if first_time_import:
         local_did = _cleanup_first_time_deck_import(dids, local_did)
@@ -486,6 +485,9 @@ def _cleanup_first_time_deck_import(
     dids_cards_were_imported_to: Iterable[DeckId], created_did: DeckId
 ) -> Optional[DeckId]:
     dids = set(dids_cards_were_imported_to)
+
+    # remove "Custom Study" decks from dids
+    dids = {did for did in dids if not mw.col.decks.is_filtered(did)}
 
     # if there is a single deck where all the existing cards were before the import,
     # move the new cards there (from the newly created deck) and remove the created deck
