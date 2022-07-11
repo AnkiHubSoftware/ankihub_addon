@@ -40,4 +40,4 @@ RUN pyenv global 3.9.13
 
 COPY --chown=gitpod ./requirements /requirements
 RUN python -m pip install --upgrade pip && \
-    python -m pip --log pip.log install -r /requirements/dev.txt
+    python -m pip install -r /requirements/dev.txt
