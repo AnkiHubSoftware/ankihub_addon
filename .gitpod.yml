@@ -3,7 +3,7 @@ image:
 
 tasks:
   - init: pyenv local 3.9.13
-    command: SKIP_INIT=1 python -m pytest tests
+    command: python -m pytest tests
 
 github:
   prebuilds:
