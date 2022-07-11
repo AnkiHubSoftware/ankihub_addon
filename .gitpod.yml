@@ -1,0 +1,17 @@
+image:
+  file: .gitpod.Dockerfile
+
+tasks:
+  - init: pyenv local 3.9.13
+    command: python -m pytest tests
+
+github:
+  prebuilds:
+    addComment: true
+    addBadge: true
+
+vscode:
+  extensions:
+    - almenon.arepl
+    - ms-python.python
+    - littlefoxteam.vscode-python-test-adapter
