@@ -56,9 +56,9 @@ def get_note_types_in_deck(did: DeckId) -> List[NotetypeId]:
 def hide_ankihub_field_in_editor(
     js: str, note: anki.notes.Note, _: aqt.editor.Editor
 ) -> str:
-    if constants.ANKIHUB_NOTE_TYPE_FIELD_NAME not in note:
-        return js
     if ANKI_MINOR >= 50:
+        if constants.ANKIHUB_NOTE_TYPE_FIELD_NAME not in note:
+            return js
         extra = (
             'require("svelte/internal").tick().then(() => '
             "{{ require('anki/NoteEditor').instances[0].fields["
@@ -67,7 +67,25 @@ def hide_ankihub_field_in_editor(
             "=> {{ element.hidden = true; }}); }});"
         )
     else:
-        extra = ""
+        if constants.ANKIHUB_NOTE_TYPE_FIELD_NAME not in note:
+            extra = (
+                "(() => {"
+                'const field = document.querySelector("#fields div[data-ankihub-hidden]");'
+                "if (field) {"
+                "delete field.dataset.ankihubHidden;"
+                "field.hidden = false;"
+                "}"
+                "})()"
+            )
+        else:
+            extra = (
+                "(() => {"
+                'const fields = document.getElementById("fields").children;'
+                "const field = fields[fields.length -1];"
+                "field.dataset.ankihubHidden = true;"
+                "field.hidden = true;"
+                "})()"
+            )
     js += extra
     return js
 
