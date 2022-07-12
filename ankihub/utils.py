@@ -211,6 +211,7 @@ def adjust_note_types(remote_note_types: Dict[NotetypeId, NotetypeDict]) -> None
     LOGGER.debug("Beginning adjusting note types...")
 
     create_missing_note_types(remote_note_types)
+    rename_note_types(remote_note_types)
     ensure_local_and_remote_fields_are_same(remote_note_types)
     modify_note_type_templates(remote_note_types.keys())
 
@@ -246,6 +247,16 @@ def create_missing_note_types(
         new_note_type = remote_note_types[mid]
         create_note_type_with_id(new_note_type, mid)
         LOGGER.debug(f"Created missing note type {mid}")
+
+
+def rename_note_types(remote_note_types: Dict[NotetypeId, NotetypeDict]) -> None:
+    for mid, remote_note_type in remote_note_types.items():
+        local_note_type = mw.col.models.get(mid)
+        if local_note_type["name"] != remote_note_type["name"]:
+            local_note_type["name"] = remote_note_type["name"]
+            mw.col.models.ensure_name_unique(local_note_type)
+            mw.col.models.update_dict(local_note_type)
+            LOGGER.debug(f"Renamed note type {mid=} to {local_note_type['name']}")
 
 
 def ensure_local_and_remote_fields_are_same(
