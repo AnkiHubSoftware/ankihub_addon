@@ -401,11 +401,16 @@ def create_backup_with_progress() -> None:
         label = "Creating Backup..."
     mw.progress.start(label=label)
     try:
-        mw.col.create_backup(
-            backup_folder=mw.pm.backupFolder(),
-            force=True,
-            wait_for_completion=True,
-        )
+        try:
+            mw.col.create_backup(
+                backup_folder=mw.pm.backupFolder(),
+                force=True,
+                wait_for_completion=True,
+            )
+        except AttributeError:  # < 2.1.50
+            mw.col.close(downgrade=False)
+            mw.backup()  # type: ignore
+            mw.col.reopen(after_full_sync=False)
         LOGGER.debug("Backup successful.")
     except Exception as exc:
         LOGGER.debug("Backup failed.")
