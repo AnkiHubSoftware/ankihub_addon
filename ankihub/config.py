@@ -44,6 +44,7 @@ class Config:
         config_dict = dataclasses.asdict(self.private_config)
         LOGGER.debug(f"PrivateConfig init:\n {pformat(config_dict)}")
         self.token_change_hook: Optional[Callable[[], None]] = None
+        self.subscriptions_change_hook: Optional[Callable[[], None]] = None
 
     def new_config(self):
         private_config = PrivateConfig()
@@ -89,9 +90,15 @@ class Config:
         self.save_latest_update(ankihub_did)
         self._update_private_config()
 
+        if self.subscriptions_change_hook:
+            self.subscriptions_change_hook()
+
     def unsubscribe_deck(self, ankihub_did: str) -> None:
         self.private_config.decks.pop(ankihub_did)
         self._update_private_config()
+
+        if self.subscriptions_change_hook:
+            self.subscriptions_change_hook()
 
 
 config = Config()
