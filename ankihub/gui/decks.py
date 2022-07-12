@@ -29,6 +29,8 @@ from ..utils import create_backup_with_progress, import_ankihub_deck
 
 
 class SubscribedDecksDialog(QDialog):
+    silentlyClose = True
+
     def __init__(self):
         super(SubscribedDecksDialog, self).__init__()
         self.client = AnkiHubClient()
