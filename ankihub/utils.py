@@ -16,6 +16,7 @@ from anki.utils import checksum, ids2str
 from aqt import mw
 from aqt.utils import tr
 from requests.exceptions import ConnectionError
+from anki.buildinfo import version as ANKI_VERSION
 
 from . import LOGGER, constants
 from .addon_ankihub_client import AddonAnkiHubClient as AnkiHubClient
@@ -25,6 +26,8 @@ from .constants import (
     ANKIHUB_NOTE_TYPE_MODIFICATION_STRING,
     URL_VIEW_NOTE,
 )
+
+ANKI_MINOR = int(ANKI_VERSION.split(".")[2])
 
 
 def note_type_contains_field(
@@ -55,13 +58,16 @@ def hide_ankihub_field_in_editor(
 ) -> str:
     if constants.ANKIHUB_NOTE_TYPE_FIELD_NAME not in note:
         return js
-    extra = (
-        'require("svelte/internal").tick().then(() => '
-        "{{ require('anki/NoteEditor').instances[0].fields["
-        "require('anki/NoteEditor').instances[0].fields.length -1"
-        "].element.then((element) "
-        "=> {{ element.hidden = true; }}); }});"
-    )
+    if ANKI_MINOR >= 50:
+        extra = (
+            'require("svelte/internal").tick().then(() => '
+            "{{ require('anki/NoteEditor').instances[0].fields["
+            "require('anki/NoteEditor').instances[0].fields.length -1"
+            "].element.then((element) "
+            "=> {{ element.hidden = true; }}); }});"
+        )
+    else:
+        extra = ""
     js += extra
     return js
 
