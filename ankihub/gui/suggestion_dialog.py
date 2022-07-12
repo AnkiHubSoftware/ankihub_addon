@@ -14,6 +14,8 @@ from ..constants import RATIONALE_FOR_CHANGE_MAX_LENGTH, ChangeTypes, AnkiHubCom
 
 
 class SuggestionDialog(QDialog):
+    silentlyClose = True
+
     def __init__(self, command):
         super().__init__()
         self.command = command

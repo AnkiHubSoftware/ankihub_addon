@@ -144,6 +144,8 @@ class SubscribedDecksDialog(QDialog):
 
 
 class SubscribeDialog(QDialog):
+    silentlyClose = True
+
     def __init__(self):
         super(SubscribeDialog, self).__init__()
         self.results = None
