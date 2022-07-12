@@ -26,7 +26,7 @@ from .. import LOGGER, report_exception
 from ..addon_ankihub_client import AddonAnkiHubClient as AnkiHubClient
 from ..config import config
 from ..constants import CSV_DELIMITER, URL_DECK_BASE, URL_DECKS, URL_HELP
-from ..utils import create_backup_with_progress, import_ankihub_deck
+from ..utils import create_backup_with_progress, import_ankihub_deck, sync_with_ankihub
 
 
 class SubscribedDecksDialog(QDialog):
@@ -251,6 +251,7 @@ class SubscribeDialog(QDialog):
 
         data = deck_response.json()
         deck_file_name = data["csv_notes_filename"]
+        last_update = data["csv_last_upload"]
 
         def on_download_done(future: Future):
             response = future.result()
@@ -275,7 +276,9 @@ class SubscribeDialog(QDialog):
                     return
 
                 mw.taskman.with_progress(
-                    lambda: self.install_deck(out_file, data["name"], ankihub_did),
+                    lambda: self.install_deck(
+                        out_file, data["name"], ankihub_did, last_update
+                    ),
                     on_done=on_install_done,
                     parent=mw,
                     label="Installing deck",
@@ -288,7 +291,9 @@ class SubscribeDialog(QDialog):
             label="Downloading deck",
         )
 
-    def install_deck(self, deck_file: Path, deck_name: str, ankihub_did: str) -> None:
+    def install_deck(
+        self, deck_file: Path, deck_name: str, ankihub_did: str, last_update: str
+    ) -> None:
         """If we have a .csv, read data from the file and modify the user's note types
         and notes.
         :param: path to the .csv or .apkg file
@@ -296,10 +301,14 @@ class SubscribeDialog(QDialog):
 
         create_backup_with_progress()
         local_did = self._install_deck_csv(deck_file, deck_name)
-        LOGGER.debug("Importing deck was succesful.")
         config.save_subscription(
-            name=deck_name, ankihub_did=ankihub_did, anki_did=local_did
+            name=deck_name,
+            ankihub_did=ankihub_did,
+            anki_did=local_did,
+            last_update=last_update,
         )
+        LOGGER.debug("Importing deck was succesful.")
+        sync_with_ankihub()
 
     def _install_deck_csv(
         self,
