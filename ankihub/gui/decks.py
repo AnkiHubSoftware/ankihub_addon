@@ -2,6 +2,7 @@ import csv
 import tempfile
 from concurrent.futures import Future
 from pathlib import Path
+from typing import Optional
 
 from anki.collection import OpChanges
 from anki.decks import DeckId
@@ -29,6 +30,7 @@ from ..utils import create_backup_with_progress, import_ankihub_deck
 
 
 class SubscribedDecksDialog(QDialog):
+    _window: Optional["SubscribedDecksDialog"] = None
     silentlyClose = True
 
     def __init__(self):
@@ -131,9 +133,14 @@ class SubscribedDecksDialog(QDialog):
 
     @classmethod
     def display_subscribe_window(cls):
-        global __window
-        __window = cls()
-        return __window
+        if cls._window is None:
+            cls._window = cls()
+        else:
+            cls._window.refresh_decks_list()
+            cls._window.activateWindow()
+            cls._window.raise_()
+            cls._window.show()
+        return cls._window
 
 
 class SubscribeDialog(QDialog):
