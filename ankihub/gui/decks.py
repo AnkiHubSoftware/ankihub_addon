@@ -324,9 +324,9 @@ class SubscribeDialog(QDialog):
             anki_did=local_did,
             last_update=last_update,
         )
-        
+
         LOGGER.debug("Importing deck was succesful.")
-        
+
         sync_with_ankihub()
 
     def _install_deck_csv(
