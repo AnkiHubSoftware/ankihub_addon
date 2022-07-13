@@ -407,6 +407,8 @@ def test_adjust_note_types(anki_session_with_addon: AnkiSession):
         new_field = mw.col.models.new_field("foo")
         new_field["ord"] = 2
         mw.col.models.add_field(ankihub_basic_2, new_field)
+        # ... and change the name
+        ankihub_basic_2["name"] = "AnkiHub Basic 2 (new)"
 
         remote_note_types = {
             ankihub_basic_1["id"]: ankihub_basic_1,
@@ -416,6 +418,9 @@ def test_adjust_note_types(anki_session_with_addon: AnkiSession):
 
         assert mw.col.models.by_name("AnkiHub Basic 1") is not None
         assert mw.col.models.get(ankihub_basic_2["id"])["flds"][3]["name"] == "foo"
+        assert (
+            mw.col.models.get(ankihub_basic_2["id"])["name"] == "AnkiHub Basic 2 (new)"
+        )
 
 
 def test_reset_note_types_of_notes(anki_session_with_addon: AnkiSession):

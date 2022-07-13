@@ -25,6 +25,7 @@ from .decks import SubscribedDecksDialog
 
 class AnkiHubLogin(QWidget):
     _window: Optional["AnkiHubLogin"] = None
+    silentlyClose = True
 
     def __init__(self):
         super(AnkiHubLogin, self).__init__()
