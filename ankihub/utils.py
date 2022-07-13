@@ -16,6 +16,7 @@ from anki.utils import checksum, ids2str
 from aqt import mw
 from aqt.utils import tr
 from requests.exceptions import ConnectionError
+from anki.buildinfo import version as ANKI_VERSION
 
 from . import LOGGER, constants
 from .addon_ankihub_client import AddonAnkiHubClient as AnkiHubClient
@@ -25,6 +26,8 @@ from .constants import (
     ANKIHUB_NOTE_TYPE_MODIFICATION_STRING,
     URL_VIEW_NOTE,
 )
+
+ANKI_MINOR = int(ANKI_VERSION.split(".")[2])
 
 
 def note_type_contains_field(
@@ -53,15 +56,36 @@ def get_note_types_in_deck(did: DeckId) -> List[NotetypeId]:
 def hide_ankihub_field_in_editor(
     js: str, note: anki.notes.Note, _: aqt.editor.Editor
 ) -> str:
-    if constants.ANKIHUB_NOTE_TYPE_FIELD_NAME not in note:
-        return js
-    extra = (
-        'require("svelte/internal").tick().then(() => '
-        "{{ require('anki/NoteEditor').instances[0].fields["
-        "require('anki/NoteEditor').instances[0].fields.length -1"
-        "].element.then((element) "
-        "=> {{ element.hidden = true; }}); }});"
-    )
+    if ANKI_MINOR >= 50:
+        if constants.ANKIHUB_NOTE_TYPE_FIELD_NAME not in note:
+            return js
+        extra = (
+            'require("svelte/internal").tick().then(() => '
+            "{{ require('anki/NoteEditor').instances[0].fields["
+            "require('anki/NoteEditor').instances[0].fields.length -1"
+            "].element.then((element) "
+            "=> {{ element.hidden = true; }}); }});"
+        )
+    else:
+        if constants.ANKIHUB_NOTE_TYPE_FIELD_NAME not in note:
+            extra = (
+                "(() => {"
+                'const field = document.querySelector("#fields div[data-ankihub-hidden]");'
+                "if (field) {"
+                "delete field.dataset.ankihubHidden;"
+                "field.hidden = false;"
+                "}"
+                "})()"
+            )
+        else:
+            extra = (
+                "(() => {"
+                'const fields = document.getElementById("fields").children;'
+                "const field = fields[fields.length -1];"
+                "field.dataset.ankihubHidden = true;"
+                "field.hidden = true;"
+                "})()"
+            )
     js += extra
     return js
 
@@ -406,13 +430,22 @@ def create_backup_with_progress() -> None:
     # if there is already a progress bar present this will not create a new one / modify the existing one
 
     LOGGER.debug("Starting backup...")
-    mw.progress.start(label=tr.profiles_creating_backup())
     try:
-        mw.col.create_backup(
-            backup_folder=mw.pm.backupFolder(),
-            force=True,
-            wait_for_completion=True,
-        )
+        label = tr.profiles_creating_backup()
+    except:  # < 2.1.50
+        label = "Creating Backup..."
+    mw.progress.start(label=label)
+    try:
+        try:
+            mw.col.create_backup(
+                backup_folder=mw.pm.backupFolder(),
+                force=True,
+                wait_for_completion=True,
+            )
+        except AttributeError:  # < 2.1.50
+            mw.col.close(downgrade=False)
+            mw.backup()  # type: ignore
+            mw.col.reopen(after_full_sync=False)
         LOGGER.debug("Backup successful.")
     except Exception as exc:
         LOGGER.debug("Backup failed.")
