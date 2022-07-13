@@ -1,3 +1,4 @@
+from typing import List
 import uuid
 
 import anki
@@ -109,7 +110,7 @@ def on_ankihub_button_press(editor: Editor) -> None:
                 tooltip("Submitted new note suggestion to AnkiHub.")
 
 
-def setup_editor_buttons(buttons: list[str], editor: Editor) -> None:
+def setup_editor_buttons(buttons: List[str], editor: Editor) -> None:
     """Add buttons to Editor."""
     # TODO Figure out how to test this
     public_config = config.public_config
