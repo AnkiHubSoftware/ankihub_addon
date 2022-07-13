@@ -78,7 +78,7 @@ class AnkiHubClient:
         if result and result.status_code == 204:
             self.session.headers["Authorization"] = ""
 
-    def upload_deck(self, file: Path, deck_anki_id: int) -> Response:
+    def upload_deck(self, file: Path, anki_deck_id: int) -> Response:
         key = file.name
         presigned_url_response = self.get_presigned_url(key=key, action="upload")
         if presigned_url_response.status_code != 200:
@@ -93,7 +93,7 @@ class AnkiHubClient:
             return s3_response
 
         response = self._send_request(
-            "POST", "/decks/", data={"key": key, "anki_id": deck_anki_id}
+            "POST", "/decks/", data={"key": key, "anki_id": anki_deck_id}
         )
         return response
 
@@ -167,22 +167,22 @@ class AnkiHubClient:
         self,
         ankihub_deck_uuid: uuid.UUID,
         ankihub_note_uuid: uuid.UUID,
-        note_anki_id: int,
+        anki_note_id: int,
         fields: List[dict],
         tags: List[str],
         change_type: ChangeTypes,
         note_type_name: str,
-        note_type_anki_id: int,
+        anki_note_type_id: int,
         comment: str,
     ) -> Response:
         suggestion = {
-            "anki_id": note_anki_id,
+            "anki_id": anki_note_id,
             "ankihub_id": ankihub_note_uuid,
             "fields": fields,
             "tags": tags,
             "change_type": change_type.value[0],
             "note_type": note_type_name,
-            "note_type_id": note_type_anki_id,
+            "note_type_id": anki_note_type_id,
             "comment": comment,
         }
         response = self._send_request(
@@ -205,8 +205,8 @@ class AnkiHubClient:
         response = self._send_request(method, endpoint, params=data)
         return response
 
-    def get_note_type(self, note_type_anki_id: int) -> Response:
-        response = self._send_request("GET", f"/note-types/{note_type_anki_id}/")
+    def get_note_type(self, anki_note_type_id: int) -> Response:
+        response = self._send_request("GET", f"/note-types/{anki_note_type_id}/")
         return response
 
     def get_protected_fields(self, ankihub_deck_uuid: uuid.UUID) -> Response:

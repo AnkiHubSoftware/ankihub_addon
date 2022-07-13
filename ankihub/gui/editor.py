@@ -78,12 +78,12 @@ def on_ankihub_button_press(editor: Editor) -> None:
                 response = client.create_new_note_suggestion(
                     ankihub_deck_uuid=ankihub_deck_uuid,
                     ankihub_note_uuid=ankihub_note_uuid,
-                    note_anki_id=note.id,
+                    anki_note_id=note.id,
                     fields=fields,
                     tags=tags,
                     change_type=change_type,
                     note_type_name=note.note_type()["name"],
-                    note_type_anki_id=note.note_type()["id"],
+                    anki_note_type_id=note.note_type()["id"],
                     comment=comment,
                 )
                 if response.status_code == 201:
@@ -97,12 +97,12 @@ def on_ankihub_button_press(editor: Editor) -> None:
             response = client.create_new_note_suggestion(
                 ankihub_deck_uuid=ankihub_deck_uuid,
                 ankihub_note_uuid=ankihub_note_uuid,
-                note_anki_id=editor.note.id,
+                anki_note_id=editor.note.id,
                 fields=fields,
                 tags=tags,
                 change_type=change_type,
                 note_type_name=editor.note.note_type()["name"],
-                note_type_anki_id=editor.note.note_type()["id"],
+                anki_note_type_id=editor.note.note_type()["id"],
                 comment=comment,
             )
             if response.status_code == 201:

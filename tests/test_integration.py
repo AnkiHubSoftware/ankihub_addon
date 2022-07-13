@@ -198,12 +198,12 @@ def test_upload_deck(anki_session_with_addon: AnkiSession, requests_mock):
     )
 
     # test upload deck
-    response = client.upload_deck(file=pathlib.Path(sample_deck), deck_anki_id=1)
+    response = client.upload_deck(file=pathlib.Path(sample_deck), anki_deck_id=1)
     assert response.status_code == 201
 
     # test upload deck unauthenticated
     requests_mock.post(f"{API_URL_BASE}/decks/", status_code=403)
-    response = client.upload_deck(pathlib.Path(sample_deck), deck_anki_id=1)
+    response = client.upload_deck(pathlib.Path(sample_deck), anki_deck_id=1)
     assert response.status_code == 403
 
 
@@ -352,13 +352,13 @@ def test_create_new_note_suggestion(
     )
     response = client.create_new_note_suggestion(
         ankihub_deck_uuid=deck_id,  # type: ignore
-        note_anki_id=1,
+        anki_note_id=1,
         ankihub_note_uuid=str(1),  # type: ignore
         fields=[{"name": "abc", "order": 0, "value": "abc changed"}],
         tags=["test"],
         change_type=ChangeTypes.NEW_CARD_TO_ADD,
         note_type_name="Basic",
-        note_type_anki_id=1,
+        anki_note_type_id=1,
         comment="",
     )
     assert response.status_code == 201
@@ -370,12 +370,12 @@ def test_create_new_note_suggestion(
     response = client.create_new_note_suggestion(
         ankihub_deck_uuid=deck_id,  # type: ignore
         ankihub_note_uuid=str(1),  # type: ignore
-        note_anki_id=1,
+        anki_note_id=1,
         fields=[{"name": "abc", "order": 0, "value": "abc changed"}],
         tags=["test"],
         change_type=ChangeTypes.NEW_CARD_TO_ADD,
         note_type_name="Basic",
-        note_type_anki_id=1,
+        anki_note_type_id=1,
         comment="",
     )
     assert response.status_code == 403
