@@ -27,7 +27,8 @@ def on_context_menu_action(browser: Browser) -> None:
     (tags, ok) = getTag(
         parent=browser,
         deck=mw.col,
-        question="What tags do you want to suggest to be added to the selected notes?",
+        question="What tags do you want to suggest to be added to the selected notes?\n"
+        "(The tags will also be added to notes in your collection if they don't have them yet.)",
     )
 
     if not ok:
@@ -49,6 +50,9 @@ def on_context_menu_action(browser: Browser) -> None:
 
     LOGGER.debug("Bulk tag suggestion created.")
     tooltip("Bulk tag suggestion created.")
+
+    browser.add_tags_to_selected_notes(tags)
+    LOGGER.debug("Added chosen tags to selected notes if they didn't have them yet.")
 
 
 def setup() -> None:
