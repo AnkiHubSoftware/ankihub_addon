@@ -27,8 +27,9 @@ def on_context_menu_action(browser: Browser) -> None:
     (tags, ok) = getTag(
         parent=browser,
         deck=mw.col,
-        question="What tags do you want to suggest to be added to the selected notes?\n"
-        "(The tags will also be added to notes in your collection if they don't have them yet.)",
+        question="What tags do you want to suggest to be added to the selected notes?\n\n"
+        "(The tags will also be added to the notes in your collection\n"
+        "if they don't have them yet.)",
     )
 
     if not ok:
