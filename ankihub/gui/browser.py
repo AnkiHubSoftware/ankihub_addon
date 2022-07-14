@@ -18,11 +18,11 @@ def on_browser_will_show_context_menu(browser: Browser, context_menu: QMenu) -> 
     context_menu.addSeparator()
     context_menu.addAction(
         "AnkiHub: Bulk suggest tags",
-        lambda: on_context_menu_action(browser),
+        lambda: on_bulk_tag_suggestion_action(browser),
     )
 
 
-def on_context_menu_action(browser: Browser) -> None:
+def on_bulk_tag_suggestion_action(browser: Browser) -> None:
     selected_nids = browser.selected_notes()
     (tags, ok) = getTag(
         parent=browser,
