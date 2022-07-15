@@ -6,8 +6,6 @@ from pprint import pformat
 from typing import Dict, Iterable, List, Optional, Set, Tuple
 from urllib.error import HTTPError
 
-import anki
-import aqt
 from anki.decks import DeckId
 from anki.errors import NotFoundError
 from anki.models import ChangeNotetypeRequest, NoteType, NotetypeDict, NotetypeId
@@ -16,7 +14,6 @@ from anki.utils import checksum, ids2str
 from aqt import mw
 from aqt.utils import tr
 from requests.exceptions import ConnectionError
-from anki.buildinfo import version as ANKI_VERSION
 
 from . import LOGGER, constants
 from .addon_ankihub_client import AddonAnkiHubClient as AnkiHubClient
@@ -26,8 +23,6 @@ from .constants import (
     ANKIHUB_NOTE_TYPE_MODIFICATION_STRING,
     URL_VIEW_NOTE,
 )
-
-ANKI_MINOR = int(ANKI_VERSION.split(".")[2])
 
 
 def note_type_contains_field(
@@ -51,43 +46,6 @@ def get_note_types_in_deck(did: DeckId) -> List[NotetypeId]:
         f"WHERE did in {dids_str} or odid in {dids_str}"
     )
     return mw.col.db.list(query)
-
-
-def hide_ankihub_field_in_editor(
-    js: str, note: anki.notes.Note, _: aqt.editor.Editor
-) -> str:
-    if ANKI_MINOR >= 50:
-        if constants.ANKIHUB_NOTE_TYPE_FIELD_NAME not in note:
-            return js
-        extra = (
-            'require("svelte/internal").tick().then(() => '
-            "{{ require('anki/NoteEditor').instances[0].fields["
-            "require('anki/NoteEditor').instances[0].fields.length -1"
-            "].element.then((element) "
-            "=> {{ element.hidden = true; }}); }});"
-        )
-    else:
-        if constants.ANKIHUB_NOTE_TYPE_FIELD_NAME not in note:
-            extra = (
-                "(() => {"
-                'const field = document.querySelector("#fields div[data-ankihub-hidden]");'
-                "if (field) {"
-                "delete field.dataset.ankihubHidden;"
-                "field.hidden = false;"
-                "}"
-                "})()"
-            )
-        else:
-            extra = (
-                "(() => {"
-                'const fields = document.getElementById("fields").children;'
-                "const field = fields[fields.length -1];"
-                "field.dataset.ankihubHidden = true;"
-                "field.hidden = true;"
-                "})()"
-            )
-    js += extra
-    return js
 
 
 def create_note_with_id(note: Note, anki_id: NoteId, anki_did: DeckId) -> Note:

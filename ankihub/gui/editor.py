@@ -1,17 +1,23 @@
-from typing import List
 import uuid
+from typing import List
 
 import anki
+import aqt
 from anki.models import NoteType
 from aqt import gui_hooks
 from aqt.addcards import AddCards
 from aqt.editor import Editor
 from aqt.utils import chooseList, showText, tooltip
 
-
+from .. import constants
 from ..addon_ankihub_client import AddonAnkiHubClient as AnkiHubClient
 from ..config import config
-from ..constants import ICONS_PATH, AnkiHubCommands, ANKIHUB_NOTE_TYPE_FIELD_NAME
+from ..constants import (
+    ANKI_MINOR,
+    ANKIHUB_NOTE_TYPE_FIELD_NAME,
+    ICONS_PATH,
+    AnkiHubCommands,
+)
 from .suggestion_dialog import SuggestionDialog
 
 
@@ -111,6 +117,7 @@ def on_ankihub_button_press(editor: Editor) -> None:
 
 
 def setup_editor_buttons(buttons: List[str], editor: Editor) -> None:
+
     """Add buttons to Editor."""
     # TODO Figure out how to test this
     public_config = config.public_config
@@ -130,6 +137,43 @@ def setup_editor_buttons(buttons: List[str], editor: Editor) -> None:
         """<style> #ankihub-btn { width:auto; padding:1px; }
 #ankihub-btn[disabled] { opacity:.4; pointer-events: none; }</style>"""
     )
+
+
+def hide_ankihub_field_in_editor(
+    js: str, note: anki.notes.Note, _: aqt.editor.Editor
+) -> str:
+    if ANKI_MINOR >= 50:
+        if constants.ANKIHUB_NOTE_TYPE_FIELD_NAME not in note:
+            return js
+        extra = (
+            'require("svelte/internal").tick().then(() => '
+            "{{ require('anki/NoteEditor').instances[0].fields["
+            "require('anki/NoteEditor').instances[0].fields.length -1"
+            "].element.then((element) "
+            "=> {{ element.hidden = true; }}); }});"
+        )
+    else:
+        if constants.ANKIHUB_NOTE_TYPE_FIELD_NAME not in note:
+            extra = (
+                "(() => {"
+                'const field = document.querySelector("#fields div[data-ankihub-hidden]");'
+                "if (field) {"
+                "delete field.dataset.ankihubHidden;"
+                "field.hidden = false;"
+                "}"
+                "})()"
+            )
+        else:
+            extra = (
+                "(() => {"
+                'const fields = document.getElementById("fields").children;'
+                "const field = fields[fields.length -1];"
+                "field.dataset.ankihubHidden = true;"
+                "field.hidden = true;"
+                "})()"
+            )
+    js += extra
+    return js
 
 
 def refresh_ankihub_button(editor: Editor) -> None:
@@ -166,6 +210,7 @@ def on_add_cards_change_notetype(old: NoteType, new: NoteType) -> None:
 
 def setup() -> None:
     gui_hooks.editor_did_init_buttons.append(setup_editor_buttons)
+    gui_hooks.editor_will_load_note.append(hide_ankihub_field_in_editor)
     gui_hooks.editor_did_load_note.append(refresh_ankihub_button)
     gui_hooks.add_cards_did_init.append(on_add_cards_init)
     gui_hooks.add_cards_did_change_note_type.append(on_add_cards_change_notetype)
