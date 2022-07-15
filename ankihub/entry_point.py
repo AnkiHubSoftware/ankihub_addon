@@ -4,7 +4,7 @@ from aqt import gui_hooks, mw
 from . import LOGGER
 from .gui import editor
 from .gui.menu import setup_ankihub_menu
-from .utils import sync_on_profile_open
+from .sync import sync_on_profile_open
 
 
 def run():
