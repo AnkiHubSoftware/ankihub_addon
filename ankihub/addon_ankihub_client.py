@@ -24,13 +24,12 @@ def show_anki_message_hook(response: Response, *args, **kwargs):
     if expecting_http_success is False:
         return response
 
+    def message():
+        showText(messages.request_error(), type="html")
+
     if response.status_code > 299 and "/logout/" not in endpoint:
-        mw.taskman.run_on_main(show_request_error_message)
+        mw.taskman.run_on_main(message)
     return response
-
-
-def show_request_error_message():
-    showText(messages.request_error(), type="html")
 
 
 def logging_hook(response: Response, *args, **kwargs):
@@ -63,11 +62,6 @@ def report_exception_hook(response: Response, *args, **kwargs):
     if expecting_http_success is False:
         return response
 
-    report_request_exception(response)
-    return response
-
-
-def report_request_exception(response):
     try:
         response.raise_for_status()
     except HTTPError:

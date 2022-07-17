@@ -24,7 +24,6 @@ from aqt.utils import askUser, openLink, showText, tooltip
 
 from .. import LOGGER, report_exception
 from ..addon_ankihub_client import AddonAnkiHubClient as AnkiHubClient
-from ..addon_ankihub_client import report_request_exception, show_request_error_message
 from ..config import config
 from ..constants import CSV_DELIMITER, URL_DECK_BASE, URL_DECKS, URL_HELP
 from ..utils import create_backup_with_progress, import_ankihub_deck, sync_with_ankihub
@@ -309,8 +308,6 @@ class SubscribeDialog(QDialog):
         elif response.status_code == 404:
             protected_fields = {}
         else:
-            mw.taskman.run_on_main(show_request_error_message)
-            report_request_exception(response)
             return
 
         protected_tags = None
@@ -320,8 +317,6 @@ class SubscribeDialog(QDialog):
         elif response.status_code == 404:
             protected_tags = []
         else:
-            mw.taskman.run_on_main(show_request_error_message)
-            report_request_exception(response)
             return
 
         local_did = self._install_deck_csv(
