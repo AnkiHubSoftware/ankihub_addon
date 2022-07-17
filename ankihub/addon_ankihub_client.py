@@ -20,8 +20,8 @@ def show_anki_message_hook(response: Response, *args, **kwargs):
     LOGGER.debug("Begin show anki message hook.")
     endpoint = response.request.url
 
-    expecting_http_success = getattr(response.request, "expecting_http_success", True)
-    if expecting_http_success is False:
+    treat_404_as_error = getattr(response.request, "treat_404_as_error", True)
+    if not treat_404_as_error and response.status_code == 404:
         return response
 
     def message():
@@ -58,8 +58,8 @@ def logging_hook(response: Response, *args, **kwargs):
 def report_exception_hook(response: Response, *args, **kwargs):
     LOGGER.debug("Begin report exception hook.")
 
-    expecting_http_success = getattr(response.request, "expecting_http_success", True)
-    if expecting_http_success is False:
+    treat_404_as_error = getattr(response.request, "treat_404_as_error", True)
+    if not treat_404_as_error and response.status_code == 404:
         return response
 
     try:
