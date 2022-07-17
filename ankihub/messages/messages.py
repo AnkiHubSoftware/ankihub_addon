@@ -8,6 +8,9 @@ templates = (pathlib.Path(__file__).parent / "templates").absolute()
 env = Environment(loader=FileSystemLoader(templates), autoescape=select_autoescape())
 
 
-def request_error():
+def request_error(event_id):
     template = env.get_template("request_error.html")
-    return template.render(bug_report_form=BUG_REPORT_FORM)
+    return template.render(
+        bug_report_form=BUG_REPORT_FORM,
+        event_id=event_id,
+    )

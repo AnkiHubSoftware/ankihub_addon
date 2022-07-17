@@ -54,8 +54,8 @@ def report_exception(context: dict = None):
             for name, ctx in context.items():
                 scope.set_context(name, ctx)
 
-        capture_exception()
-        LOGGER.debug("Sentry captured exception.")
+        event_id = capture_exception()
+        LOGGER.debug(f"Sentry captured {event_id=}.")
         sentry_sdk.flush()
     except Exception as e:
         LOGGER.debug(f"Reporting to sentry failed: {e}")
@@ -63,6 +63,7 @@ def report_exception(context: dict = None):
     finally:
         sentry_sdk.init("")
         LOGGER.debug("Sentry disabled.")
+    return event_id
 
 
 if not SKIP_INIT:

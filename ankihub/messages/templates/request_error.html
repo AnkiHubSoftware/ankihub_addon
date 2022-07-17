@@ -7,3 +7,15 @@ account through email verification. If you believe this is an error, please use
 
 This error will be automatically reported. You can disable automatic error
 reporting in the AnkiHub add-on settings.
+
+<script
+    src="https://browser.sentry-cdn.com/7.7.0/bundle.min.js"
+    integrity="sha384-zVycKakbFST6m0pi9RFIAnb5nw7mrA1n/mE4C8grImB4B6iqCp/0LHOcTIu9AI7+"
+    crossorigin="anonymous"
+>
+
+ Sentry.init({ dsn: "https://715325d30fa44ecd939d12edda720f91@o1184291.ingest.sentry.io/6546414" });
+ Sentry.showReportDialog({
+     eventId: "{{ event_id }}",
+ });
+</script>

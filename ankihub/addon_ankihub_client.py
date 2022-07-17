@@ -19,9 +19,10 @@ from .messages import messages
 def show_anki_message_hook(response: Response, *args, **kwargs):
     LOGGER.debug("Begin show anki message hook.")
     endpoint = response.request.url
+    sentry_event_id = getattr(response, "sentry_event_id", None)
 
     def message():
-        showText(messages.request_error(), type="html")
+        showText(messages.request_error(event_id=sentry_event_id), type="html")
 
     if response.status_code > 299 and "/logout/" not in endpoint:
         mw.taskman.run_on_main(message)
@@ -57,7 +58,8 @@ def report_exception_hook(response: Response, *args, **kwargs):
         response.raise_for_status()
     except HTTPError:
         ctx = {"response": {"reason": response.reason, "content": response.text}}
-        report_exception(context=ctx)
+        event_id = report_exception(context=ctx)
+        response.sentry_event_id = event_id
 
 
 def sign_in_hook(response: Response, *args, **kwargs):
