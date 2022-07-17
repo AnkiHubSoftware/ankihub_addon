@@ -30,6 +30,9 @@ def show_anki_message_hook(response: Response, *args, **kwargs):
 
 def logging_hook(response: Response, *args, **kwargs):
     endpoint = response.request.url
+    if "/login/" in endpoint:
+        # Don't log this since it contains credentials.
+        return
     method = response.request.method
     body = response.request.body
     body = json.loads(body) if body else body
