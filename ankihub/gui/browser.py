@@ -27,9 +27,8 @@ def on_bulk_tag_suggestion_action(browser: Browser) -> None:
     (tags, ok) = getTag(
         parent=browser,
         deck=mw.col,
-        question="What tags do you want to suggest to be added to the selected notes?\n\n"
-        "(The tags will also be added to the notes in your collection\n"
-        "if they don't have them yet.)",
+        question="Enter space-separated list of tags to add to selected notes.\n\n"
+        "* Tags will be added to notes that don't already have them.",
     )
 
     if not ok:
