@@ -2,6 +2,8 @@ import os
 import pathlib
 from enum import Enum
 
+from anki.buildinfo import version as ANKI_VERSION
+
 from . import LOGGER
 from .config import config
 
@@ -28,6 +30,8 @@ USER_EMAIL_SLUG = "user_email"
 CSV_DELIMITER = ";"
 
 USER_SUPPORT_EMAIL_SLUG = "help@ankipalace.com"
+
+ANKI_MINOR = int(ANKI_VERSION.split(".")[2])
 
 
 class AnkiHubCommands(Enum):
