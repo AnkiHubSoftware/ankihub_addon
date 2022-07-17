@@ -2,6 +2,7 @@ image:
   file: .gitpod.Dockerfile
 
 tasks:
+  - before: ln -s /workspace/ankihub_addon/ankihub ~/.local/share/Anki2/addons21
   - init: pyenv local 3.9.13
     command: python -m pytest tests
 
