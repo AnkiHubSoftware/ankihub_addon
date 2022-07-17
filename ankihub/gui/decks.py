@@ -2,6 +2,7 @@ import csv
 import tempfile
 from concurrent.futures import Future
 from pathlib import Path
+from typing import Optional
 
 from anki.collection import OpChanges
 from anki.decks import DeckId
@@ -25,10 +26,13 @@ from .. import LOGGER, report_exception
 from ..addon_ankihub_client import AddonAnkiHubClient as AnkiHubClient
 from ..config import config
 from ..constants import CSV_DELIMITER, URL_DECK_BASE, URL_DECKS, URL_HELP
-from ..utils import create_backup_with_progress, import_ankihub_deck
+from ..utils import create_backup_with_progress, import_ankihub_deck, sync_with_ankihub
 
 
 class SubscribedDecksDialog(QDialog):
+    _window: Optional["SubscribedDecksDialog"] = None
+    silentlyClose = True
+
     def __init__(self):
         super(SubscribedDecksDialog, self).__init__()
         self.client = AnkiHubClient()
@@ -129,12 +133,19 @@ class SubscribedDecksDialog(QDialog):
 
     @classmethod
     def display_subscribe_window(cls):
-        global __window
-        __window = cls()
-        return __window
+        if cls._window is None:
+            cls._window = cls()
+        else:
+            cls._window.refresh_decks_list()
+            cls._window.activateWindow()
+            cls._window.raise_()
+            cls._window.show()
+        return cls._window
 
 
 class SubscribeDialog(QDialog):
+    silentlyClose = True
+
     def __init__(self):
         super(SubscribeDialog, self).__init__()
         self.results = None
@@ -240,6 +251,7 @@ class SubscribeDialog(QDialog):
 
         data = deck_response.json()
         deck_file_name = data["csv_notes_filename"]
+        last_update = data["csv_last_upload"]
 
         def on_download_done(future: Future):
             response = future.result()
@@ -264,7 +276,9 @@ class SubscribeDialog(QDialog):
                     return
 
                 mw.taskman.with_progress(
-                    lambda: self.install_deck(out_file, data["name"], ankihub_did),
+                    lambda: self.install_deck(
+                        out_file, data["name"], ankihub_did, last_update
+                    ),
                     on_done=on_install_done,
                     parent=mw,
                     label="Installing deck",
@@ -277,7 +291,9 @@ class SubscribeDialog(QDialog):
             label="Downloading deck",
         )
 
-    def install_deck(self, deck_file: Path, deck_name: str, ankihub_did: str) -> None:
+    def install_deck(
+        self, deck_file: Path, deck_name: str, ankihub_did: str, last_update: str
+    ) -> None:
         """If we have a .csv, read data from the file and modify the user's note types
         and notes.
         :param: path to the .csv or .apkg file
@@ -285,10 +301,14 @@ class SubscribeDialog(QDialog):
 
         create_backup_with_progress()
         local_did = self._install_deck_csv(deck_file, deck_name)
-        LOGGER.debug("Importing deck was succesful.")
         config.save_subscription(
-            name=deck_name, ankihub_did=ankihub_did, anki_did=local_did
+            name=deck_name,
+            ankihub_did=ankihub_did,
+            anki_did=local_did,
+            last_update=last_update,
         )
+        LOGGER.debug("Importing deck was succesful.")
+        sync_with_ankihub()
 
     def _install_deck_csv(
         self,

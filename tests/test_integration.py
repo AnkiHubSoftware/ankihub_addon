@@ -128,7 +128,6 @@ def test_create_collaborative_deck_and_upload(
 
     requests_mock.get(f"{API_URL_BASE}/decks/1/updates", json={"notes": []})
 
-    monkeypatch.setattr("ankihub.utils.sync_with_ankihub", Mock())
     with anki_session.profile_loaded():
         with anki_session.deck_installed(sample_deck) as deck_id:
 
@@ -177,7 +176,7 @@ def test_client_login_and_signout(anki_session_with_addon: AnkiSession, requests
     assert config.private_config.token == ""
 
 
-def test_upload_deck(anki_session_with_addon: AnkiSession, requests_mock, monkeypatch):
+def test_upload_deck(anki_session_with_addon: AnkiSession, requests_mock):
     from ankihub.addon_ankihub_client import AddonAnkiHubClient as AnkiHubClient
     from ankihub.constants import API_URL_BASE
 
@@ -208,9 +207,7 @@ def test_upload_deck(anki_session_with_addon: AnkiSession, requests_mock, monkey
     assert response.status_code == 403
 
 
-def test_get_deck_updates(
-    anki_session_with_addon: AnkiSession, requests_mock, monkeypatch
-):
+def test_get_deck_updates(anki_session_with_addon: AnkiSession, requests_mock):
     from ankihub.addon_ankihub_client import AddonAnkiHubClient as AnkiHubClient
     from ankihub.constants import API_URL_BASE
 
@@ -250,9 +247,7 @@ def test_get_deck_updates(
         assert response.status_code == 403
 
 
-def test_get_deck_by_id(
-    anki_session_with_addon: AnkiSession, requests_mock, monkeypatch
-):
+def test_get_deck_by_id(anki_session_with_addon: AnkiSession, requests_mock):
     from ankihub.addon_ankihub_client import AddonAnkiHubClient as AnkiHubClient
     from ankihub.constants import API_URL_BASE
 
@@ -281,9 +276,7 @@ def test_get_deck_by_id(
     assert response.status_code == 403
 
 
-def test_get_note_by_ankihub_id(
-    anki_session_with_addon: AnkiSession, requests_mock, monkeypatch
-):
+def test_get_note_by_ankihub_id(anki_session_with_addon: AnkiSession, requests_mock):
     from ankihub.ankihub_client import AnkiHubClient
     from ankihub.constants import API_URL_BASE
 
@@ -310,7 +303,7 @@ def test_get_note_by_ankihub_id(
 
 
 def test_create_change_note_suggestion(
-    anki_session_with_addon: AnkiSession, requests_mock, monkeypatch
+    anki_session_with_addon: AnkiSession, requests_mock
 ):
     from ankihub.ankihub_client import AnkiHubClient
     from ankihub.constants import API_URL_BASE, ChangeTypes
@@ -342,7 +335,7 @@ def test_create_change_note_suggestion(
 
 
 def test_create_new_note_suggestion(
-    anki_session_with_addon: AnkiSession, requests_mock, monkeypatch
+    anki_session_with_addon: AnkiSession, requests_mock
 ):
     from ankihub.ankihub_client import AnkiHubClient
     from ankihub.constants import API_URL_BASE, ChangeTypes
@@ -410,6 +403,8 @@ def test_adjust_note_types(anki_session_with_addon: AnkiSession):
         new_field = mw.col.models.new_field("foo")
         new_field["ord"] = 2
         mw.col.models.add_field(ankihub_basic_2, new_field)
+        # ... and change the name
+        ankihub_basic_2["name"] = "AnkiHub Basic 2 (new)"
 
         remote_note_types = {
             ankihub_basic_1["id"]: ankihub_basic_1,
@@ -419,6 +414,9 @@ def test_adjust_note_types(anki_session_with_addon: AnkiSession):
 
         assert mw.col.models.by_name("AnkiHub Basic 1") is not None
         assert mw.col.models.get(ankihub_basic_2["id"])["flds"][3]["name"] == "foo"
+        assert (
+            mw.col.models.get(ankihub_basic_2["id"])["name"] == "AnkiHub Basic 2 (new)"
+        )
 
 
 def test_reset_note_types_of_notes(anki_session_with_addon: AnkiSession):
@@ -453,8 +451,6 @@ def test_import_new_ankihub_deck(anki_session_with_addon: AnkiSession, monkeypat
     from ankihub.utils import all_dids, import_ankihub_deck
 
     anki_session = anki_session_with_addon
-
-    monkeypatch.setattr("ankihub.utils.sync_with_ankihub", Mock())
     with anki_session.profile_loaded():
 
         # import the apkg to get the note types, then delete the deck
@@ -485,8 +481,6 @@ def test_import_existing_ankihub_deck(
     from ankihub.utils import all_dids, import_ankihub_deck
 
     anki_session = anki_session_with_addon
-
-    monkeypatch.setattr("ankihub.utils.sync_with_ankihub", Mock())
     with anki_session.profile_loaded():
 
         # import the apkg
@@ -515,8 +509,6 @@ def test_import_existing_ankihub_deck_2(
     from ankihub.utils import all_dids, import_ankihub_deck
 
     anki_session = anki_session_with_addon
-
-    monkeypatch.setattr("ankihub.utils.sync_with_ankihub", Mock())
     with anki_session.profile_loaded():
 
         # import the apkg
@@ -548,8 +540,6 @@ def test_update_ankihub_deck(anki_session_with_addon: AnkiSession, monkeypatch):
     from ankihub.utils import all_dids, import_ankihub_deck
 
     anki_session = anki_session_with_addon
-
-    monkeypatch.setattr("ankihub.utils.sync_with_ankihub", Mock())
     with anki_session.profile_loaded():
 
         # import the apkg to get the note types, then delete the deck
@@ -582,8 +572,6 @@ def test_update_ankihub_deck_when_deck_was_deleted(
     from ankihub.utils import all_dids, import_ankihub_deck
 
     anki_session = anki_session_with_addon
-
-    monkeypatch.setattr("ankihub.utils.sync_with_ankihub", Mock())
     with anki_session.profile_loaded():
 
         # import the apkg to get the note types, then delete the deck

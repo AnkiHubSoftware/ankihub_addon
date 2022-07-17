@@ -69,7 +69,7 @@ class Config:
         self.private_config.user = user_email
         self._update_private_config()
 
-    def save_latest_update(self, ankihub_did: str, time=None):
+    def save_latest_update(self, ankihub_did: str, time: Optional[str] = None):
         if time:
             date_object = datetime.strptime(time, "%Y-%m-%dT%H:%M:%S.%f%z")
         else:
@@ -79,7 +79,12 @@ class Config:
         self._update_private_config()
 
     def save_subscription(
-        self, name: str, ankihub_did: str, anki_did: int, creator: bool = False
+        self,
+        name: str,
+        ankihub_did: str,
+        anki_did: int,
+        creator: bool = False,
+        last_update: Optional[str] = None,
     ) -> None:
         self.private_config.decks[ankihub_did] = {
             "name": name,
@@ -87,7 +92,7 @@ class Config:
             "creator": creator,
         }
         # remove duplicates
-        self.save_latest_update(ankihub_did)
+        self.save_latest_update(ankihub_did, last_update)
         self._update_private_config()
 
         if self.subscriptions_change_hook:
