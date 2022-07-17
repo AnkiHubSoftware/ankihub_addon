@@ -18,7 +18,7 @@ from aqt.utils import tr
 from requests.exceptions import ConnectionError
 from anki.buildinfo import version as ANKI_VERSION
 
-from . import LOGGER, constants
+from . import LOGGER, constants, report_exception
 from .addon_ankihub_client import AddonAnkiHubClient as AnkiHubClient
 from .config import config
 from .constants import (
@@ -184,6 +184,7 @@ def sync_on_profile_open() -> None:
         if exc := future.exception():
             LOGGER.debug(f"Unable to sync on profile open:\n{exc}")
             if not isinstance(exc, (ConnectionError, HTTPError)):
+                report_exception()
                 raise exc
 
         mw.reset()
@@ -449,6 +450,7 @@ def create_backup_with_progress() -> None:
         LOGGER.debug("Backup successful.")
     except Exception as exc:
         LOGGER.debug("Backup failed.")
+        report_exception()
         raise exc
     finally:
         mw.progress.finish()
