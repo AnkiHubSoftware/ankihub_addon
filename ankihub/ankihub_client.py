@@ -54,8 +54,10 @@ class AnkiHubClient:
         endpoint,
         data=None,
         params=None,
+        expecting_http_success=True,
     ) -> Response:
         request = self._build_request(method, endpoint, data, params)
+        request.expecting_http_success = expecting_http_success  # type: ignore
         try:
             response = self.session.send(request)
             self.session.close()
@@ -211,12 +213,16 @@ class AnkiHubClient:
 
     def get_protected_fields(self, ankihub_deck_uuid: uuid.UUID) -> Response:
         response = self._send_request(
-            "GET", f"/decks/{ankihub_deck_uuid}/protected-fields/"
+            "GET",
+            f"/decks/{ankihub_deck_uuid}/protected-fields/",
+            expecting_http_success=False,
         )
         return response
 
     def get_protected_tags(self, ankihub_deck_uuid: uuid.UUID) -> Response:
         response = self._send_request(
-            "GET", f"/decks/{ankihub_deck_uuid}/protected-tags/"
+            "GET",
+            f"/decks/{ankihub_deck_uuid}/protected-tags/",
+            expecting_http_success=False,
         )
         return response

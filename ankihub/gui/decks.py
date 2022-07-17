@@ -301,15 +301,23 @@ class SubscribeDialog(QDialog):
 
         create_backup_with_progress()
 
+        protected_fields = None
         response = self.client.get_protected_fields(ankihub_did)
-        if response.status_code != 200:
+        if response.status_code == 200:
+            protected_fields = response.json()["fields"]
+        elif response.status_code == 404:
+            protected_fields = {}
+        else:
             return
-        protected_fields = response.json()
 
+        protected_tags = None
         response = self.client.get_protected_tags(ankihub_did)
-        if response.status_code != 200:
+        if response.status_code == 200:
+            protected_tags = response.json()["tags"]
+        elif response.status_code == 404:
+            protected_tags = []
+        else:
             return
-        protected_tags = response.json()
 
         local_did = self._install_deck_csv(
             deck_file=deck_file,
