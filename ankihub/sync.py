@@ -11,7 +11,7 @@ from anki.notes import Note, NoteId
 from aqt import mw
 from requests.exceptions import ConnectionError
 
-from . import LOGGER, constants
+from . import LOGGER, constants, report_exception
 from .addon_ankihub_client import AddonAnkiHubClient as AnkiHubClient
 from .config import config
 from .utils import (
@@ -294,6 +294,7 @@ def sync_on_profile_open() -> None:
         if exc := future.exception():
             LOGGER.debug(f"Unable to sync on profile open:\n{exc}")
             if not isinstance(exc, (ConnectionError, HTTPError)):
+                report_exception()
                 raise exc
 
         mw.reset()
