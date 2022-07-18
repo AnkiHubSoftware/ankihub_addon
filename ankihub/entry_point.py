@@ -4,14 +4,14 @@ from aqt import gui_hooks, mw
 from . import LOGGER
 from .gui import browser, editor
 from .gui.menu import setup_ankihub_menu
-from .sync import sync_on_profile_open
+from .sync import setup_sync_on_startup
 
 
 def run():
     """Call this function in __init__.py when Anki starts."""
-    gui_hooks.profile_did_open.append(sync_on_profile_open)
-
     mw.addonManager.setWebExports(__name__, r"gui/web/.*")
+
+    setup_sync_on_startup()
 
     setup_ankihub_menu()
     LOGGER.debug("Set up AnkiHub menu.")
