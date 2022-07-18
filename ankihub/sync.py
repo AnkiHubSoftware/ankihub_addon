@@ -9,6 +9,7 @@ from anki.errors import NotFoundError
 from anki.models import NotetypeDict, NotetypeId
 from anki.notes import Note, NoteId
 from aqt import mw
+from aqt.utils import tooltip
 from requests.exceptions import ConnectionError
 
 from . import LOGGER, constants
@@ -286,17 +287,19 @@ def reset_note_types_of_notes_based_on_notes_data(notes_data: List[Dict]) -> Non
     reset_note_types_of_notes(nid_mid_pairs)
 
 
-def sync_on_profile_open() -> None:
+def sync_with_progress() -> None:
     def on_done(future: Future):
-
-        # Don't raise exception when automatically attempting to sync with AnkiHub
-        # with no Internet connection.
+        # Don't raise exception when attempting to sync with AnkiHub
+        # without an Internet connection.
         if exc := future.exception():
-            LOGGER.debug(f"Unable to sync on profile open:\n{exc}")
             if not isinstance(exc, (ConnectionError, HTTPError)):
+                LOGGER.debug(f"Unable to sync:\n{exc}")
                 raise exc
-
-        mw.reset()
+            else:
+                LOGGER.debug("Skipping sync due to no Internet connection.")
+                tooltip("AnkiHub: No Internet connection. Skipping sync.")
+        else:
+            mw.reset()
 
     if config.private_config.token:
         mw.taskman.with_progress(
@@ -305,3 +308,10 @@ def sync_on_profile_open() -> None:
             on_done=on_done,
             parent=mw,
         )
+    else:
+        LOGGER.debug("Skipping sync due to no token.")
+
+
+def sync_on_profile_open() -> None:
+    LOGGER.debug("Synchronizing on profile open...")
+    sync_with_progress()
