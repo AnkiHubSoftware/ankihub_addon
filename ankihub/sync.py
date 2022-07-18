@@ -9,6 +9,7 @@ from anki.errors import NotFoundError
 from anki.models import NotetypeDict, NotetypeId
 from anki.notes import Note, NoteId
 from aqt import mw
+from aqt.hooks_gen import profile_did_open, sync_did_finish
 from aqt.utils import tooltip
 from requests.exceptions import ConnectionError
 
@@ -312,6 +313,18 @@ def sync_with_progress() -> None:
         LOGGER.debug("Skipping sync due to no token.")
 
 
-def sync_on_profile_open() -> None:
-    LOGGER.debug("Synchronizing on profile open...")
-    sync_with_progress()
+def setup_sync_on_startup() -> None:
+    def on_profile_open():
+        # syncing with AnkiHub during sync with AnkiWeb causes an error,
+        # this is why we have to wait until the AnkiWeb sync is done if there is one
+        if not mw.can_auto_sync():
+            sync_with_progress()
+        else:
+
+            def on_sync_did_finish():
+                sync_with_progress()
+                sync_did_finish.remove(on_sync_did_finish)
+
+            sync_did_finish.append(on_sync_did_finish)
+
+    profile_did_open.append(on_profile_open)
