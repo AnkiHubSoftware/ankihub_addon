@@ -206,3 +206,10 @@ class AnkiHubClient:
     def get_note_type(self, anki_id: int) -> Response:
         response = self._send_request("GET", f"/note-types/{anki_id}/")
         return response
+
+    def bulk_suggest_tags(
+        self, ankihub_note_uuids: List[uuid.UUID], tags: List[str]
+    ) -> Response:
+        data = {"notes": [str(note_id) for note_id in ankihub_note_uuids], "tags": tags}
+        response = self._send_request("POST", "/suggestions/bulk/", data=data)
+        return response
