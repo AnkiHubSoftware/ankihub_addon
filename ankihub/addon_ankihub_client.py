@@ -34,7 +34,7 @@ def logging_hook(response: Response, *args, **kwargs):
     body = response.request.body
     body = json.loads(body) if body else body
     if "/login/" in endpoint:
-        body.pop("password")
+        body.pop("password")  # type: ignore
     headers = response.request.headers
     LOGGER.debug(
         f"request: {method} {endpoint}\ndata={pformat(body)}\nheaders={headers}"
