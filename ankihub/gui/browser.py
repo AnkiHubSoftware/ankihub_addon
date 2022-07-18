@@ -1,10 +1,11 @@
 import uuid
+from typing import Optional
 
 from aqt import mw
 from aqt.browser import Browser
 from aqt.gui_hooks import browser_will_show_context_menu
 from aqt.qt import QMenu
-from aqt.utils import getTag, tooltip
+from aqt.utils import getTag, tooltip, tr
 
 from .. import LOGGER
 from ..addon_ankihub_client import AddonAnkiHubClient as AnkiHubClient
@@ -12,11 +13,23 @@ from ..constants import ANKIHUB_NOTE_TYPE_FIELD_NAME
 
 
 def on_browser_will_show_context_menu(browser: Browser, context_menu: QMenu) -> None:
-    if not browser.table.is_notes_mode():
-        return
+    if browser.table.is_notes_mode():
+        menu = context_menu
+    else:
+        notes_submenu: Optional[QMenu] = next(
+            (
+                menu  # type: ignore
+                for menu in context_menu.findChildren(QMenu)
+                if menu.title() == tr.qt_accel_notes()  # type: ignore
+            ),
+            None,
+        )
+        if notes_submenu is None:
+            return
+        menu = notes_submenu
 
-    context_menu.addSeparator()
-    context_menu.addAction(
+    menu.addSeparator()
+    menu.addAction(
         "AnkiHub: Bulk suggest tags",
         lambda: on_bulk_tag_suggestion_action(browser),
     )
