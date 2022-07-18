@@ -7,7 +7,6 @@ from unittest.mock import MagicMock, Mock
 from anki.decks import DeckId
 from anki.models import NotetypeId
 from anki.notes import NoteId
-from aqt import gui_hooks
 from aqt.importing import AnkiPackageImporter
 from pytest_anki import AnkiSession
 
@@ -378,10 +377,9 @@ def test_create_new_note_suggestion(
 
 
 def test_adjust_note_types(anki_session_with_addon: AnkiSession):
-    from ankihub.sync import adjust_note_types, sync_on_profile_open
+    from ankihub.sync import adjust_note_types
     from ankihub.utils import modify_note_type
 
-    gui_hooks.profile_did_open.remove(sync_on_profile_open)
     anki_session = anki_session_with_addon
     with anki_session.profile_loaded():
         mw = anki_session.mw
