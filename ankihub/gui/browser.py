@@ -39,8 +39,13 @@ def on_bulk_tag_suggestion_action(browser: Browser) -> None:
         note = mw.col.get_note(nid)
         if ANKIHUB_NOTE_TYPE_FIELD_NAME not in note.keys():
             continue
-        ankihub_note_uuid = note[ANKIHUB_NOTE_TYPE_FIELD_NAME]
-        ankihub_note_uuids.append(uuid.UUID(ankihub_note_uuid))
+
+        try:
+            ankihub_note_uuid = uuid.UUID(note[ANKIHUB_NOTE_TYPE_FIELD_NAME])
+        except ValueError:
+            continue
+
+        ankihub_note_uuids.append(ankihub_note_uuid)
 
     client = AnkiHubClient()
     response = client.bulk_suggest_tags(ankihub_note_uuids, tags.split(" "))
