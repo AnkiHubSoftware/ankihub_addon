@@ -308,6 +308,7 @@ def sync_with_progress() -> None:
             label="Synchronizing with AnkiHub",
             on_done=on_done,
             parent=mw,
+            immediate=True,
         )
     else:
         LOGGER.debug("Skipping sync due to no token.")
