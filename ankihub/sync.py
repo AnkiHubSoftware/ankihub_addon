@@ -8,8 +8,7 @@ from anki.decks import DeckId
 from anki.errors import NotFoundError
 from anki.models import NotetypeDict, NotetypeId
 from anki.notes import Note, NoteId
-from aqt import mw
-from aqt.hooks_gen import profile_did_open, sync_did_finish
+from aqt import mw, gui_hooks
 from aqt.utils import tooltip
 from requests.exceptions import ConnectionError
 
@@ -309,6 +308,7 @@ def sync_with_progress() -> None:
             label="Synchronizing with AnkiHub",
             on_done=on_done,
             parent=mw,
+            immediate=True,
         )
     else:
         LOGGER.debug("Skipping sync due to no token.")
@@ -324,8 +324,8 @@ def setup_sync_on_startup() -> None:
 
             def on_sync_did_finish():
                 sync_with_progress()
-                sync_did_finish.remove(on_sync_did_finish)
+                gui_hooks.sync_did_finish.remove(on_sync_did_finish)
 
-            sync_did_finish.append(on_sync_did_finish)
+            gui_hooks.sync_did_finish.append(on_sync_did_finish)
 
-    profile_did_open.append(on_profile_open)
+    gui_hooks.profile_did_open.append(on_profile_open)

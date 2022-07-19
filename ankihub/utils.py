@@ -16,6 +16,7 @@ from .constants import (
     ANKIHUB_NOTE_TYPE_FIELD_NAME,
     ANKIHUB_NOTE_TYPE_MODIFICATION_STRING,
     URL_VIEW_NOTE,
+    ANKI_MINOR,
 )
 
 
@@ -254,13 +255,13 @@ def create_backup_with_progress() -> None:
         label = "Creating Backup..."
     mw.progress.start(label=label)
     try:
-        try:
+        if ANKI_MINOR >= 50:
             mw.col.create_backup(
                 backup_folder=mw.pm.backupFolder(),
                 force=True,
                 wait_for_completion=True,
             )
-        except AttributeError:  # < 2.1.50
+        else:
             mw.col.close(downgrade=False)
             mw.backup()  # type: ignore
             mw.col.reopen(after_full_sync=False)
