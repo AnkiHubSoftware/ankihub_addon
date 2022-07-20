@@ -1,9 +1,12 @@
 import copy
 import pathlib
+import re
 import uuid
 from datetime import datetime, timedelta, timezone
+from typing import Optional
 from unittest.mock import MagicMock, Mock
 
+import aqt
 from anki.decks import DeckId
 from anki.models import NotetypeId
 from anki.notes import NoteId
@@ -544,19 +547,7 @@ def test_update_ankihub_deck(anki_session_with_addon: AnkiSession, monkeypatch):
     anki_session = anki_session_with_addon
     with anki_session.profile_loaded():
 
-        # import the apkg to get the note types, then delete the deck
-        file = str(ankihub_sample_deck.absolute())
-        importer = AnkiPackageImporter(mw.col, file)
-        importer.run()
-        mw.col.decks.remove([mw.col.decks.id_for_name("Testdeck")])
-
-        monkeypatch.setattr(
-            "ankihub.sync.adjust_note_types_based_on_notes_data", Mock()
-        )
-
-        first_local_did = import_ankihub_deck(
-            "1", ankihub_sample_deck_notes_data, "test"
-        )
+        first_local_did = import_sample_ankihub_deck(mw, monkeypatch)
 
         dids_before_import = all_dids()
         second_local_id = import_ankihub_deck(
@@ -579,19 +570,7 @@ def test_update_ankihub_deck_when_deck_was_deleted(
     anki_session = anki_session_with_addon
     with anki_session.profile_loaded():
 
-        # import the apkg to get the note types, then delete the deck
-        file = str(ankihub_sample_deck.absolute())
-        importer = AnkiPackageImporter(mw.col, file)
-        importer.run()
-        mw.col.decks.remove([mw.col.decks.id_for_name("Testdeck")])
-
-        monkeypatch.setattr(
-            "ankihub.sync.adjust_note_types_based_on_notes_data", Mock()
-        )
-
-        first_local_did = import_ankihub_deck(
-            "1", ankihub_sample_deck_notes_data, "test"
-        )
+        first_local_did = import_sample_ankihub_deck(mw, monkeypatch)
 
         # move cards to other deck and delete the deck
         other_deck = mw.col.decks.add_normal_deck_with_name("other deck").id
@@ -609,3 +588,69 @@ def test_update_ankihub_deck_when_deck_was_deleted(
         assert len(new_decks) == 1
         assert list(new_decks)[0] == first_local_did
         assert second_local_id == first_local_did
+
+
+def test_unsubsribe_from_deck(anki_session_with_addon: AnkiSession, monkeypatch):
+    from aqt import mw
+
+    from ankihub.db import AnkiHubDB
+    from ankihub.gui.decks import SubscribedDecksDialog
+    from ankihub.utils import ANKIHUB_TEMPLATE_SNIPPET, note_type_contains_field
+
+    anki_session = anki_session_with_addon
+    with anki_session.profile_loaded():
+        ankihub_did = "1"
+
+        import_sample_ankihub_deck(
+            ankihub_did=ankihub_did, mw=mw, monkeypatch=monkeypatch
+        )
+
+        db = AnkiHubDB()
+        mids = db.note_types_for_ankihub_deck(ankihub_did)
+        assert len(mids) == 2
+
+        SubscribedDecksDialog.unsubscribe_from_deck(ankihub_did)
+
+        # check if note type modifications were removed
+        assert all(not note_type_contains_field(mw.col.models.get(mid)) for mid in mids)
+
+        assert all(
+            not re.search(
+                ANKIHUB_TEMPLATE_SNIPPET, mw.col.models.get(mid)["tmpls"][0]["afmt"]
+            )
+            for mid in mids
+        )
+
+        # check if the deck was removed from the db
+        mids = db.note_types_for_ankihub_deck(ankihub_did)
+        assert len(mids) == 0
+
+        nids = db.notes_for_ankihub_deck(ankihub_did)
+        assert len(nids) == 0
+
+
+def import_sample_ankihub_deck(
+    mw: aqt.AnkiQt, monkeypatch, ankihub_did: Optional[str] = None
+):
+    from ankihub.sync import import_ankihub_deck
+    from ankihub.utils import all_dids
+
+    if ankihub_did is None:
+        ankihub_did = "1"
+
+    # import the apkg to get the note types, then delete the deck
+    file = str(ankihub_sample_deck.absolute())
+    importer = AnkiPackageImporter(mw.col, file)
+    importer.run()
+    mw.col.decks.remove([mw.col.decks.id_for_name("Testdeck")])
+
+    monkeypatch.setattr("ankihub.sync.adjust_note_types_based_on_notes_data", Mock())
+
+    dids_before_import = all_dids()
+    local_did = import_ankihub_deck(ankihub_did, ankihub_sample_deck_notes_data, "test")
+    new_decks = all_dids() - dids_before_import
+
+    assert len(new_decks) == 1
+    assert local_did == list(new_decks)[0]
+
+    return local_did

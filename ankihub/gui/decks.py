@@ -112,13 +112,14 @@ class SubscribedDecksDialog(QDialog):
 
         for item in items:
             ankihub_did = item.data(Qt.ItemDataRole.UserRole)
+            config.unsubscribe_deck(ankihub_did)
             self.unsubscribe_from_deck(ankihub_did)
 
         tooltip("Unsubscribed from AnkiHub Deck.", parent=mw)
         self.refresh_decks_list()
 
-    def unsubscribe_from_deck(self, ankihub_did: str) -> None:
-        config.unsubscribe_deck(ankihub_did)
+    @staticmethod
+    def unsubscribe_from_deck(ankihub_did: str) -> None:
 
         db = AnkiHubDB()
         mids = db.note_types_for_ankihub_deck(ankihub_did=ankihub_did)
