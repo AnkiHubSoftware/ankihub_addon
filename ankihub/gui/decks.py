@@ -26,8 +26,9 @@ from .. import LOGGER, report_exception
 from ..addon_ankihub_client import AddonAnkiHubClient as AnkiHubClient
 from ..config import config
 from ..constants import CSV_DELIMITER, URL_DECK_BASE, URL_DECKS, URL_HELP
+from ..db import AnkiHubDB
 from ..sync import import_ankihub_deck, sync_with_ankihub
-from ..utils import create_backup_with_progress
+from ..utils import create_backup_with_progress, undo_note_type_modfications
 
 
 class SubscribedDecksDialog(QDialog):
@@ -110,13 +111,20 @@ class SubscribedDecksDialog(QDialog):
             return
 
         for item in items:
-            ankihub_id = item.data(Qt.ItemDataRole.UserRole)
-            config.unsubscribe_deck(ankihub_id)
-            # TODO Run clean up when implemented:
-            #  https://github.com/ankipalace/ankihub_addon/issues/20
+            ankihub_did = item.data(Qt.ItemDataRole.UserRole)
+            self.unsubscribe_from_deck(ankihub_did)
 
         tooltip("Unsubscribed from AnkiHub Deck.", parent=mw)
         self.refresh_decks_list()
+
+    def unsubscribe_from_deck(self, ankihub_did: str) -> None:
+        config.unsubscribe_deck(ankihub_did)
+
+        db = AnkiHubDB()
+        mids = db.note_types_for_ankihub_deck(ankihub_did=ankihub_did)
+        undo_note_type_modfications(mids)
+        # TODO: should we also change the ids of the note types in Anki's collection?
+        db.remove_deck(ankihub_did)
 
     def on_open_web(self) -> None:
         items = self.decks_list.selectedItems()

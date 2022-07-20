@@ -2,6 +2,7 @@ import sqlite3
 from pathlib import Path
 from typing import Dict, List
 
+from anki.models import NotetypeId
 from anki.notes import NoteId
 
 DB_PATH = Path(__file__).parent / "user_files/ankihub.db"
@@ -16,7 +17,8 @@ class AnkiHubDB:
             CREATE TABLE IF NOT EXISTS notes (
                 ankihub_note_id STRING PRIMARY KEY,
                 ankihub_deck_id STRING,
-                anki_note_id INTEGER
+                anki_note_id INTEGER,
+                anki_note_type_id INTEGER
             )
             """
         )
@@ -28,13 +30,15 @@ class AnkiHubDB:
                 INSERT OR REPLACE INTO notes (
                     ankihub_note_id,
                     ankihub_deck_id,
-                    anki_note_id
-                ) VALUES (?, ?, ?)
+                    anki_note_id,
+                    anki_note_type_id
+                ) VALUES (?, ?, ?, ?)
                 """,
                 (
                     note_data["ankihub_id"],
                     ankihub_did,
                     note_data["anki_id"],
+                    note_data["note_type_id"],
                 ),
             )
 
@@ -67,3 +71,22 @@ class AnkiHubDB:
             (anki_note_id,),
         )
         return self.c.fetchone()[0]
+
+    def note_types_for_ankihub_deck(self, ankihub_did: str) -> List[NotetypeId]:
+        self.c.execute(
+            """
+            SELECT DISTINCT anki_note_type_id FROM notes WHERE ankihub_deck_id = ?
+            """,
+            (ankihub_did,),
+        )
+        result = [NotetypeId(x[0]) for x in self.c.fetchall()]
+        return result
+
+    def remove_deck(self, ankihub_did: str):
+        self.c.execute(
+            """
+            DELETE FROM notes WHERE ankihub_deck_id = ?
+            """,
+            (ankihub_did,),
+        )
+        self.conn.commit()
