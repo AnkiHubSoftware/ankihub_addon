@@ -2,7 +2,7 @@ import csv
 import tempfile
 from concurrent.futures import Future
 from pathlib import Path
-from typing import Dict, List, Optional
+from typing import Optional
 
 from anki.collection import OpChanges
 from anki.decks import DeckId
@@ -302,29 +302,10 @@ class SubscribeDialog(QDialog):
 
         create_backup_with_progress()
 
-        protected_fields = None
-        response = self.client.get_protected_fields(ankihub_did)
-        if response.status_code == 200:
-            protected_fields = response.json()["fields"]
-        elif response.status_code == 404:
-            protected_fields = {}
-        else:
-            return
-
-        protected_tags = None
-        response = self.client.get_protected_tags(ankihub_did)
-        if response.status_code == 200:
-            protected_tags = response.json()["tags"]
-        elif response.status_code == 404:
-            protected_tags = []
-        else:
-            return
-
         local_did = self._install_deck_csv(
+            ankihub_did=ankihub_did,
             deck_file=deck_file,
             deck_name=deck_name,
-            protected_fields=protected_fields,
-            protected_tags=protected_tags,
         )
 
         config.save_subscription(
@@ -340,10 +321,9 @@ class SubscribeDialog(QDialog):
 
     def _install_deck_csv(
         self,
+        ankihub_did: str,
         deck_file: Path,
         deck_name: str,
-        protected_fields: Dict[str, List[str]],
-        protected_tags: List[str],
     ) -> DeckId:
         LOGGER.debug("Importing deck as csv....")
         with deck_file.open(encoding="utf-8") as f:
@@ -351,10 +331,9 @@ class SubscribeDialog(QDialog):
             notes_data = [row for row in reader]
 
         deck_id = import_ankihub_deck(
+            ankihub_did=ankihub_did,
             notes_data=notes_data,
             deck_name=deck_name,
-            protected_fields=protected_fields,
-            protected_tags=protected_tags,
         )
         return deck_id
 

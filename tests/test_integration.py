@@ -450,7 +450,7 @@ def test_reset_note_types_of_notes(anki_session_with_addon: AnkiSession):
 def test_import_new_ankihub_deck(anki_session_with_addon: AnkiSession, monkeypatch):
     from aqt import mw
 
-    from ankihub.sync import import_ankihub_deck
+    from ankihub.sync import import_ankihub_deck_inner
     from ankihub.utils import all_dids
 
     anki_session = anki_session_with_addon
@@ -467,7 +467,7 @@ def test_import_new_ankihub_deck(anki_session_with_addon: AnkiSession, monkeypat
         )
 
         dids_before_import = all_dids()
-        local_did = import_ankihub_deck(
+        local_did = import_ankihub_deck_inner(
             notes_data=ankihub_sample_deck_notes_data,
             deck_name="test",
             protected_fields={},
@@ -486,7 +486,7 @@ def test_import_existing_ankihub_deck(
 ):
     from aqt import mw
 
-    from ankihub.sync import import_ankihub_deck
+    from ankihub.sync import import_ankihub_deck_inner
     from ankihub.utils import all_dids
 
     anki_session = anki_session_with_addon
@@ -503,7 +503,7 @@ def test_import_existing_ankihub_deck(
         )
 
         dids_before_import = all_dids()
-        local_did = import_ankihub_deck(
+        local_did = import_ankihub_deck_inner(
             notes_data=ankihub_sample_deck_notes_data,
             deck_name="test",
             protected_fields={},
@@ -520,7 +520,7 @@ def test_import_existing_ankihub_deck_2(
 ):
     from aqt import mw
 
-    from ankihub.sync import import_ankihub_deck
+    from ankihub.sync import import_ankihub_deck_inner
     from ankihub.utils import all_dids
 
     anki_session = anki_session_with_addon
@@ -541,7 +541,7 @@ def test_import_existing_ankihub_deck_2(
         )
 
         dids_before_import = all_dids()
-        local_did = import_ankihub_deck(
+        local_did = import_ankihub_deck_inner(
             notes_data=ankihub_sample_deck_notes_data,
             deck_name="test",
             protected_fields={},
@@ -557,7 +557,7 @@ def test_import_existing_ankihub_deck_2(
 def test_update_ankihub_deck(anki_session_with_addon: AnkiSession, monkeypatch):
     from aqt import mw
 
-    from ankihub.sync import import_ankihub_deck
+    from ankihub.sync import import_ankihub_deck_inner
     from ankihub.utils import all_dids
 
     anki_session = anki_session_with_addon
@@ -573,7 +573,7 @@ def test_update_ankihub_deck(anki_session_with_addon: AnkiSession, monkeypatch):
             "ankihub.sync.adjust_note_types_based_on_notes_data", Mock()
         )
 
-        first_local_did = import_ankihub_deck(
+        first_local_did = import_ankihub_deck_inner(
             notes_data=ankihub_sample_deck_notes_data,
             deck_name="test",
             protected_fields={},
@@ -581,7 +581,7 @@ def test_update_ankihub_deck(anki_session_with_addon: AnkiSession, monkeypatch):
         )
 
         dids_before_import = all_dids()
-        second_local_did = import_ankihub_deck(
+        second_local_did = import_ankihub_deck_inner(
             notes_data=ankihub_sample_deck_notes_data,
             deck_name="test",
             protected_fields={},
@@ -599,7 +599,7 @@ def test_update_ankihub_deck_when_deck_was_deleted(
 ):
     from aqt import mw
 
-    from ankihub.sync import import_ankihub_deck
+    from ankihub.sync import import_ankihub_deck_inner
     from ankihub.utils import all_dids
 
     anki_session = anki_session_with_addon
@@ -615,7 +615,7 @@ def test_update_ankihub_deck_when_deck_was_deleted(
             "ankihub.sync.adjust_note_types_based_on_notes_data", Mock()
         )
 
-        first_local_did = import_ankihub_deck(
+        first_local_did = import_ankihub_deck_inner(
             notes_data=ankihub_sample_deck_notes_data,
             deck_name="test",
             protected_fields={},
@@ -629,7 +629,7 @@ def test_update_ankihub_deck_when_deck_was_deleted(
         mw.col.decks.remove([first_local_did])
 
         dids_before_import = all_dids()
-        second_local_did = import_ankihub_deck(
+        second_local_did = import_ankihub_deck_inner(
             notes_data=ankihub_sample_deck_notes_data,
             deck_name="test",
             protected_fields={},

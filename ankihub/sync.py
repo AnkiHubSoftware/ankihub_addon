@@ -1,4 +1,5 @@
 import json
+import uuid
 from concurrent.futures import Future
 from pprint import pformat
 from typing import Any, Dict, Iterable, List, Optional, Set, Tuple
@@ -8,7 +9,7 @@ from anki.decks import DeckId
 from anki.errors import NotFoundError
 from anki.models import NotetypeDict, NotetypeId
 from anki.notes import Note, NoteId
-from aqt import mw, gui_hooks
+from aqt import gui_hooks, mw
 from aqt.utils import tooltip
 from requests.exceptions import ConnectionError
 
@@ -49,11 +50,10 @@ def sync_with_ankihub() -> None:
 
         if notes_data:
             import_ankihub_deck(
+                ankihub_did=ankihub_did,
                 notes_data=notes_data,
                 deck_name=deck["name"],
                 local_did=deck["anki_id"],
-                protected_fields=deck["protected_fields"],
-                protected_tags=deck["protected_tags"],
             )
             config.save_latest_update(ankihub_did, data["latest_update"])
         else:
@@ -61,6 +61,42 @@ def sync_with_ankihub() -> None:
 
 
 def import_ankihub_deck(
+    ankihub_did: str,
+    notes_data: List[dict],
+    deck_name: str,  # name that will be used for a deck if a new one gets created
+    local_did: DeckId = None,  # did that new notes should be put into if importing not for the first time
+) -> Optional[DeckId]:
+
+    client = AnkiHubClient()
+    protected_fields = None
+    response = client.get_protected_fields(uuid.UUID(ankihub_did))
+    if response.status_code == 200:
+        protected_fields = response.json()["fields"]
+    elif response.status_code == 404:
+        protected_fields = {}
+    else:
+        return None
+
+    protected_tags = None
+    response = client.get_protected_tags(uuid.UUID(ankihub_did))
+    if response.status_code == 200:
+        protected_tags = response.json()["tags"]
+    elif response.status_code == 404:
+        protected_tags = []
+    else:
+        return None
+
+    anki_deck_id = import_ankihub_deck_inner(
+        notes_data=notes_data,
+        deck_name=deck_name,
+        protected_fields=protected_fields,
+        protected_tags=protected_tags,
+        local_did=local_did,
+    )
+    return anki_deck_id
+
+
+def import_ankihub_deck_inner(
     notes_data: List[dict],
     deck_name: str,  # name that will be used for a deck if a new one gets created
     protected_fields: Dict[str, List[str]],
