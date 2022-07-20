@@ -19,6 +19,7 @@ URL_DECK_BASE = f"{ANKIHUB_APP_URL}/decks"
 ANKIHUB_NOTE_TYPE_FIELD_NAME = "ankihub_id"
 ANKIHUB_NOTE_TYPE_MODIFICATION_STRING = "ANKIHUB MODFICATIONS"
 ADDON_PATH = pathlib.Path(__file__).parent.absolute()
+ADDON_PACKAGE = __name__.split(".")[0]
 ICONS_PATH = ADDON_PATH / "icons"
 
 TOKEN_SLUG = "token"
