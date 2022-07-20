@@ -1,21 +1,15 @@
-😬 Uh oh! There was a problem with your request.<br /><br />
-
-If you haven't already signed in using the AnkiHub menu please do so. Make sure
-your username and password are correct and that you have confirmed your AnkiHub
-account through email verification. If you believe this is an error, please use
-<a href="{{ bug_report_form }}">this form</a> to file a report.<br />
-
-This error will be automatically reported. You can disable automatic error
-reporting in the AnkiHub add-on settings.
-
 <style>
-  div.sentry-error-embed {
+  .sentry-error-embed {
     width: 100% !important;
     height: 100% !important;
     max-width: 100% !important;
     max-height: 100% !important;
     margin: 0 !important;
     box-sizing: border-box;
+  }
+
+  .sentry-error-embed header p {
+    white-space: pre-wrap;
   }
 </style>
 
@@ -39,5 +33,14 @@ reporting in the AnkiHub add-on settings.
   });
   Sentry.showReportDialog({
     eventId: "{{ event_id }}",
+    title: "😬 Uh oh! There was a problem with your request.",
+    subtitle: [
+      "If you haven't already signed in using the AnkiHub menu please do so. Make sure",
+      "your username and password are correct and that you have confirmed your AnkiHub",
+      "account through email verification. If you believe this is an error, please use",
+      "the below form to file a report.\n\n",
+      "This error will be automatically reported. You can disable automatic error",
+      "reporting in the AnkiHub add-on settings.",
+    ].join(" "),
   });
 </script>
