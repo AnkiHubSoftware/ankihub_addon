@@ -17,6 +17,7 @@ from .constants import (
     ANKIHUB_NOTE_TYPE_FIELD_NAME,
     ANKIHUB_NOTE_TYPE_MODIFICATION_STRING,
     URL_VIEW_NOTE,
+    ANKI_MINOR,
 )
 
 
