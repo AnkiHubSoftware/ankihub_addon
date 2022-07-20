@@ -171,7 +171,7 @@ def change_note_type_of_note(nid: int, mid: int) -> None:
 
 # ... note type modifications
 
-ANKIHUB_TEMPLATE_SNIPPET = (
+ANKIHUB_TEMPLATE_SNIPPET_RE = (
     f"<!-- BEGIN {ANKIHUB_NOTE_TYPE_MODIFICATION_STRING} -->"
     r"[\w\W]*"
     f"<!-- END {ANKIHUB_NOTE_TYPE_MODIFICATION_STRING} -->"
@@ -281,7 +281,7 @@ def undo_fields_modification(note_type: Dict) -> None:
 
 def undo_template_modification(template: Dict) -> None:
     template["afmt"] = re.sub(
-        r"\n{0,2}" + ANKIHUB_TEMPLATE_SNIPPET,
+        r"\n{0,2}" + ANKIHUB_TEMPLATE_SNIPPET_RE,
         "",
         template["afmt"],
     )

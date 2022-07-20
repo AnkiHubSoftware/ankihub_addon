@@ -595,7 +595,7 @@ def test_unsubsribe_from_deck(anki_session_with_addon: AnkiSession, monkeypatch)
 
     from ankihub.db import AnkiHubDB
     from ankihub.gui.decks import SubscribedDecksDialog
-    from ankihub.utils import ANKIHUB_TEMPLATE_SNIPPET, note_type_contains_field
+    from ankihub.utils import ANKIHUB_TEMPLATE_SNIPPET_RE, note_type_contains_field
 
     anki_session = anki_session_with_addon
     with anki_session.profile_loaded():
@@ -616,7 +616,7 @@ def test_unsubsribe_from_deck(anki_session_with_addon: AnkiSession, monkeypatch)
 
         assert all(
             not re.search(
-                ANKIHUB_TEMPLATE_SNIPPET, mw.col.models.get(mid)["tmpls"][0]["afmt"]
+                ANKIHUB_TEMPLATE_SNIPPET_RE, mw.col.models.get(mid)["tmpls"][0]["afmt"]
             )
             for mid in mids
         )
