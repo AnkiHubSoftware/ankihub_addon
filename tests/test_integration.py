@@ -447,7 +447,7 @@ def test_reset_note_types_of_notes(anki_session_with_addon: AnkiSession):
         assert mw.col.get_note(note.id).mid == cloze["id"]
 
 
-def test_import_new_ankihub_deck(anki_session_with_addon: AnkiSession, monkeypatch):
+def test_import_new_ankihub_deck(anki_session_with_addon: AnkiSession):
     from aqt import mw
 
     from ankihub.sync import import_ankihub_deck_inner
@@ -462,14 +462,11 @@ def test_import_new_ankihub_deck(anki_session_with_addon: AnkiSession, monkeypat
         importer.run()
         mw.col.decks.remove([mw.col.decks.id_for_name("Testdeck")])
 
-        monkeypatch.setattr(
-            "ankihub.sync.adjust_note_types_based_on_notes_data", Mock()
-        )
-
         dids_before_import = all_dids()
         local_did = import_ankihub_deck_inner(
             notes_data=ankihub_sample_deck_notes_data,
             deck_name="test",
+            remote_note_types=dict(),
             protected_fields={},
             protected_tags=[],
         )
@@ -481,9 +478,7 @@ def test_import_new_ankihub_deck(anki_session_with_addon: AnkiSession, monkeypat
         assert local_did == list(new_decks)[0]
 
 
-def test_import_existing_ankihub_deck(
-    anki_session_with_addon: AnkiSession, monkeypatch
-):
+def test_import_existing_ankihub_deck(anki_session_with_addon: AnkiSession):
     from aqt import mw
 
     from ankihub.sync import import_ankihub_deck_inner
@@ -498,14 +493,11 @@ def test_import_existing_ankihub_deck(
         importer.run()
         existing_did = mw.col.decks.id_for_name("Testdeck")
 
-        monkeypatch.setattr(
-            "ankihub.sync.adjust_note_types_based_on_notes_data", Mock()
-        )
-
         dids_before_import = all_dids()
         local_did = import_ankihub_deck_inner(
             notes_data=ankihub_sample_deck_notes_data,
             deck_name="test",
+            remote_note_types=dict(),
             protected_fields={},
             protected_tags=[],
         )
@@ -515,9 +507,7 @@ def test_import_existing_ankihub_deck(
         assert local_did == existing_did
 
 
-def test_import_existing_ankihub_deck_2(
-    anki_session_with_addon: AnkiSession, monkeypatch
-):
+def test_import_existing_ankihub_deck_2(anki_session_with_addon: AnkiSession):
     from aqt import mw
 
     from ankihub.sync import import_ankihub_deck_inner
@@ -536,14 +526,11 @@ def test_import_existing_ankihub_deck_2(
         cids = mw.col.find_cards("deck:Testdeck")
         mw.col.set_deck([cids[0]], other_deck_id)
 
-        monkeypatch.setattr(
-            "ankihub.sync.adjust_note_types_based_on_notes_data", Mock()
-        )
-
         dids_before_import = all_dids()
         local_did = import_ankihub_deck_inner(
             notes_data=ankihub_sample_deck_notes_data,
             deck_name="test",
+            remote_note_types=dict(),
             protected_fields={},
             protected_tags=[],
         )
@@ -554,7 +541,7 @@ def test_import_existing_ankihub_deck_2(
         assert local_did == list(new_decks)[0]
 
 
-def test_update_ankihub_deck(anki_session_with_addon: AnkiSession, monkeypatch):
+def test_update_ankihub_deck(anki_session_with_addon: AnkiSession):
     from aqt import mw
 
     from ankihub.sync import import_ankihub_deck_inner
@@ -569,13 +556,10 @@ def test_update_ankihub_deck(anki_session_with_addon: AnkiSession, monkeypatch):
         importer.run()
         mw.col.decks.remove([mw.col.decks.id_for_name("Testdeck")])
 
-        monkeypatch.setattr(
-            "ankihub.sync.adjust_note_types_based_on_notes_data", Mock()
-        )
-
         first_local_did = import_ankihub_deck_inner(
             notes_data=ankihub_sample_deck_notes_data,
             deck_name="test",
+            remote_note_types=dict(),
             protected_fields={},
             protected_tags=[],
         )
@@ -584,6 +568,7 @@ def test_update_ankihub_deck(anki_session_with_addon: AnkiSession, monkeypatch):
         second_local_did = import_ankihub_deck_inner(
             notes_data=ankihub_sample_deck_notes_data,
             deck_name="test",
+            remote_note_types=dict(),
             protected_fields={},
             protected_tags=[],
             local_did=first_local_did,
@@ -595,7 +580,7 @@ def test_update_ankihub_deck(anki_session_with_addon: AnkiSession, monkeypatch):
 
 
 def test_update_ankihub_deck_when_deck_was_deleted(
-    anki_session_with_addon: AnkiSession, monkeypatch
+    anki_session_with_addon: AnkiSession,
 ):
     from aqt import mw
 
@@ -611,13 +596,10 @@ def test_update_ankihub_deck_when_deck_was_deleted(
         importer.run()
         mw.col.decks.remove([mw.col.decks.id_for_name("Testdeck")])
 
-        monkeypatch.setattr(
-            "ankihub.sync.adjust_note_types_based_on_notes_data", Mock()
-        )
-
         first_local_did = import_ankihub_deck_inner(
             notes_data=ankihub_sample_deck_notes_data,
             deck_name="test",
+            remote_note_types=dict(),
             protected_fields={},
             protected_tags=[],
         )
@@ -632,6 +614,7 @@ def test_update_ankihub_deck_when_deck_was_deleted(
         second_local_did = import_ankihub_deck_inner(
             notes_data=ankihub_sample_deck_notes_data,
             deck_name="test",
+            remote_note_types=dict(),
             protected_fields={},
             protected_tags=[],
             local_did=first_local_did,
@@ -644,7 +627,7 @@ def test_update_ankihub_deck_when_deck_was_deleted(
         assert second_local_did == first_local_did
 
 
-def test_prepare_note(anki_session_with_addon: AnkiSession, monkeypatch):
+def test_prepare_note(anki_session_with_addon: AnkiSession):
     from ankihub.sync import prepare_note
     from ankihub.utils import modify_note_type
 

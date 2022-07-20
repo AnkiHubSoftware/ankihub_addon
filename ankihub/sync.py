@@ -67,6 +67,8 @@ def import_ankihub_deck(
     local_did: DeckId = None,  # did that new notes should be put into if importing not for the first time
 ) -> Optional[DeckId]:
 
+    remote_note_types = fetch_remote_note_types_based_on_notes_data(notes_data)
+
     client = AnkiHubClient()
     protected_fields = None
     response = client.get_protected_fields(uuid.UUID(ankihub_did))
@@ -89,6 +91,7 @@ def import_ankihub_deck(
     anki_deck_id = import_ankihub_deck_inner(
         notes_data=notes_data,
         deck_name=deck_name,
+        remote_note_types=remote_note_types,
         protected_fields=protected_fields,
         protected_tags=protected_tags,
         local_did=local_did,
@@ -99,6 +102,7 @@ def import_ankihub_deck(
 def import_ankihub_deck_inner(
     notes_data: List[dict],
     deck_name: str,  # name that will be used for a deck if a new one gets created
+    remote_note_types: Dict[NotetypeId, NotetypeDict],
     protected_fields: Dict[str, List[str]],
     protected_tags: List[str],
     local_did: DeckId = None,  # did that new notes should be put into if importing not for the first time
@@ -114,7 +118,7 @@ def import_ankihub_deck_inner(
     first_time_import = local_did is None
 
     local_did = adjust_deck(deck_name, local_did)
-    adjust_note_types_based_on_notes_data(notes_data)
+    adjust_note_types(remote_note_types)
     reset_note_types_of_notes_based_on_notes_data(notes_data)
 
     # TODO fix differences between csv when installing for the first time vs. when updating
@@ -243,12 +247,14 @@ def prepare_note(
         note[field["name"]] = field["value"]
 
 
-def adjust_note_types_based_on_notes_data(notes_data: List[Dict]) -> None:
+def fetch_remote_note_types_based_on_notes_data(
+    notes_data: List[Dict],
+) -> Dict[NotetypeId, NotetypeDict]:
     remote_mids = set(
         NotetypeId(int(note_dict["note_type_id"])) for note_dict in notes_data
     )
-    remote_note_types = fetch_remote_note_types(remote_mids)
-    adjust_note_types(remote_note_types)
+    result = fetch_remote_note_types(remote_mids)
+    return result
 
 
 def fetch_remote_note_types(
