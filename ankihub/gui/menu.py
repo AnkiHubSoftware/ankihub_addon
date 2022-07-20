@@ -1,4 +1,5 @@
 from typing import Optional
+
 from aqt import (
     QHBoxLayout,
     QLabel,
@@ -19,7 +20,7 @@ from .. import LOGGER
 from ..addon_ankihub_client import AddonAnkiHubClient as AnkiHubClient
 from ..config import config
 from ..register_decks import create_collaborative_deck
-from ..utils import sync_with_ankihub
+from ..sync import sync_with_progress
 from .decks import SubscribedDecksDialog
 
 
@@ -182,7 +183,7 @@ def upload_suggestions_action():
 
 
 def sync_with_ankihub_action():
-    sync_with_ankihub()
+    sync_with_progress()
 
 
 def ankihub_login_setup(parent):

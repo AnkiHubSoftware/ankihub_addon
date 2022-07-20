@@ -26,7 +26,8 @@ from .. import LOGGER, report_exception
 from ..addon_ankihub_client import AddonAnkiHubClient as AnkiHubClient
 from ..config import config
 from ..constants import CSV_DELIMITER, URL_DECK_BASE, URL_DECKS, URL_HELP
-from ..utils import create_backup_with_progress, import_ankihub_deck, sync_with_ankihub
+from ..sync import import_ankihub_deck, sync_with_ankihub
+from ..utils import create_backup_with_progress
 
 
 class SubscribedDecksDialog(QDialog):
