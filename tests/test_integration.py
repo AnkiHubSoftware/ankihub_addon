@@ -463,7 +463,7 @@ def test_import_new_ankihub_deck(anki_session_with_addon: AnkiSession, monkeypat
         )
 
         dids_before_import = all_dids()
-        local_did = import_ankihub_deck(ankihub_sample_deck_notes_data, "test")
+        local_did = import_ankihub_deck("1", ankihub_sample_deck_notes_data, "test")
         new_decks = all_dids() - dids_before_import
 
         assert (
@@ -494,7 +494,7 @@ def test_import_existing_ankihub_deck(
         )
 
         dids_before_import = all_dids()
-        local_did = import_ankihub_deck(ankihub_sample_deck_notes_data, "test")
+        local_did = import_ankihub_deck("1", ankihub_sample_deck_notes_data, "test")
         new_decks = all_dids() - dids_before_import
 
         assert not new_decks
@@ -527,7 +527,7 @@ def test_import_existing_ankihub_deck_2(
         )
 
         dids_before_import = all_dids()
-        local_did = import_ankihub_deck(ankihub_sample_deck_notes_data, "test")
+        local_did = import_ankihub_deck("1", ankihub_sample_deck_notes_data, "test")
         new_decks = all_dids() - dids_before_import
 
         # if the existing cards are in multiple seperate decks a new deck is created deck
@@ -554,11 +554,13 @@ def test_update_ankihub_deck(anki_session_with_addon: AnkiSession, monkeypatch):
             "ankihub.sync.adjust_note_types_based_on_notes_data", Mock()
         )
 
-        first_local_did = import_ankihub_deck(ankihub_sample_deck_notes_data, "test")
+        first_local_did = import_ankihub_deck(
+            "1", ankihub_sample_deck_notes_data, "test"
+        )
 
         dids_before_import = all_dids()
         second_local_id = import_ankihub_deck(
-            ankihub_sample_deck_notes_data, "test", local_did=first_local_did
+            "1", ankihub_sample_deck_notes_data, "test", local_did=first_local_did
         )
         new_decks = all_dids() - dids_before_import
 
@@ -587,7 +589,9 @@ def test_update_ankihub_deck_when_deck_was_deleted(
             "ankihub.sync.adjust_note_types_based_on_notes_data", Mock()
         )
 
-        first_local_did = import_ankihub_deck(ankihub_sample_deck_notes_data, "test")
+        first_local_did = import_ankihub_deck(
+            "1", ankihub_sample_deck_notes_data, "test"
+        )
 
         # move cards to other deck and delete the deck
         other_deck = mw.col.decks.add_normal_deck_with_name("other deck").id
@@ -597,7 +601,7 @@ def test_update_ankihub_deck_when_deck_was_deleted(
 
         dids_before_import = all_dids()
         second_local_id = import_ankihub_deck(
-            ankihub_sample_deck_notes_data, "test", local_did=first_local_did
+            "1", ankihub_sample_deck_notes_data, "test", local_did=first_local_did
         )
         new_decks = all_dids() - dids_before_import
 

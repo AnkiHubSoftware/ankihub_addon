@@ -8,13 +8,14 @@ from anki.decks import DeckId
 from anki.errors import NotFoundError
 from anki.models import NotetypeDict, NotetypeId
 from anki.notes import Note, NoteId
-from aqt import mw, gui_hooks
+from aqt import gui_hooks, mw
 from aqt.utils import tooltip
 from requests.exceptions import ConnectionError
 
 from . import LOGGER, constants, report_exception
 from .addon_ankihub_client import AddonAnkiHubClient as AnkiHubClient
 from .config import config
+from .db import AnkiHubDB
 from .utils import (
     create_backup_with_progress,
     create_deck_with_id,
@@ -49,6 +50,7 @@ def sync_with_ankihub() -> None:
 
         if notes_data:
             import_ankihub_deck(
+                ankihub_did=ankihub_did,
                 notes_data=notes_data,
                 deck_name=deck["name"],
                 local_did=deck["anki_id"],
@@ -59,7 +61,8 @@ def sync_with_ankihub() -> None:
 
 
 def import_ankihub_deck(
-    notes_data: List[dict],
+    ankihub_did: str,
+    notes_data: List[Dict],
     deck_name: str,  # name that will be used for a deck if a new one gets created
     local_did: DeckId = None,  # did that new notes should be put into if importing not for the first time
 ) -> DeckId:
@@ -70,6 +73,11 @@ def import_ankihub_deck(
     """
 
     LOGGER.debug(f"Importing ankihub deck {deck_name=} {local_did=}")
+
+    notes_data = transform_notes_data(notes_data)
+
+    db = AnkiHubDB()
+    db.save_notes(ankihub_did=ankihub_did, notes_data=notes_data)
 
     first_time_import = local_did is None
 
@@ -83,20 +91,7 @@ def import_ankihub_deck(
     dids: Set[DeckId] = set()  # set of ids of decks notes were imported into
     for note_data in notes_data:
         LOGGER.debug(f"Trying to update or create note:\n {pformat(note_data)}")
-        note = update_or_create_note(
-            anki_id=NoteId(int((note_data["anki_id"]))),
-            ankihub_id=note_data.get("id")
-            if note_data.get("id") is not None
-            else note_data.get("note_id"),
-            fields=json.loads(note_data["fields"])
-            if isinstance(note_data["fields"], str)
-            else note_data["fields"],
-            tags=json.loads(note_data["tags"])
-            if isinstance(note_data["tags"], str)
-            else note_data["tags"],
-            note_type_id=NotetypeId(int(note_data["note_type_id"])),
-            anki_did=local_did,
-        )
+        note = update_or_create_note(**note_data, anki_did=local_did)
         dids_for_note = set(c.did for c in note.cards())
         dids = dids | dids_for_note
 
@@ -104,6 +99,26 @@ def import_ankihub_deck(
         local_did = _cleanup_first_time_deck_import(dids, local_did)
 
     return local_did
+
+
+def transform_notes_data(notes_data: List[Dict]) -> List[Dict]:
+    result = [
+        {
+            "anki_id": NoteId(int((note_data["anki_id"]))),
+            "ankihub_id": note_data.get("id")
+            if note_data.get("id") is not None
+            else note_data.get("note_id"),
+            "fields": json.loads(note_data["fields"])
+            if isinstance(note_data["fields"], str)
+            else note_data["fields"],
+            "tags": json.loads(note_data["tags"])
+            if isinstance(note_data["tags"], str)
+            else note_data["tags"],
+            "note_type_id": NotetypeId(int(note_data["note_type_id"])),
+        }
+        for note_data in notes_data
+    ]
+    return result
 
 
 def adjust_deck(deck_name: str, local_did: Optional[DeckId] = None) -> DeckId:
@@ -185,9 +200,7 @@ def prepare_note(
 
 
 def adjust_note_types_based_on_notes_data(notes_data: List[Dict]) -> None:
-    remote_mids = set(
-        NotetypeId(int(note_dict["note_type_id"])) for note_dict in notes_data
-    )
+    remote_mids = set(note_data["note_type_id"] for note_data in notes_data)
     remote_note_types = fetch_remote_note_types(remote_mids)
     adjust_note_types(remote_note_types)
 
@@ -281,8 +294,7 @@ def ensure_local_and_remote_fields_are_same(
 def reset_note_types_of_notes_based_on_notes_data(notes_data: List[Dict]) -> None:
     """Set the note type of notes back to the note type they have in the remote deck if they have a different one"""
     nid_mid_pairs = [
-        (NoteId(int(note_dict["anki_id"])), NotetypeId(int(note_dict["note_type_id"])))
-        for note_dict in notes_data
+        (note_data["anki_id"], note_data["note_type_id"]) for note_data in notes_data
     ]
     reset_note_types_of_notes(nid_mid_pairs)
 
