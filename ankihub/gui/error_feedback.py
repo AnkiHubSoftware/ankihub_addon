@@ -1,4 +1,4 @@
-from aqt.qt import QDialog, QVBoxLayout
+from aqt.qt import QDialog, QVBoxLayout, Qt
 from aqt.webview import AnkiWebView
 from aqt.utils import restoreGeom, saveGeom, disable_help_button
 
@@ -19,15 +19,17 @@ class ErrorFeedbackDialog(QDialog):
         self.setMinimumHeight(500)
         restoreGeom(self, self.GEOM_KEY)
         self.setWindowTitle("Ankihub Error Feedback")
+        self.setWindowModality(Qt.WindowModality.NonModal)
 
         layout = QVBoxLayout()
         layout.setContentsMargins(0, 0, 0, 0)
         self.web = AnkiWebView(self, title="AnkiHub Error")
         self.web.stdHtml(body=messages.request_error(event_id=self.event_id))
         self.web.set_bridge_command(self.link_handler, self)
-
         layout.addWidget(self.web)
         self.setLayout(layout)
+
+        self.show()
 
     def link_handler(self, url: str) -> None:
         if url == "close":

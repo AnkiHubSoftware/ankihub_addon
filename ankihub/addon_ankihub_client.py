@@ -22,7 +22,7 @@ def show_anki_message_hook(response: Response, *args, **kwargs):
     sentry_event_id = getattr(response, "sentry_event_id", None)
 
     def message():
-        ErrorFeedbackDialog(sentry_event_id).exec()
+        ErrorFeedbackDialog(sentry_event_id)
 
     if response.status_code > 299 and "/logout/" not in endpoint:
         mw.taskman.run_on_main(message)
