@@ -1,21 +1,43 @@
-😬 Uh oh! There was a problem with your request.<br><br>
+😬 Uh oh! There was a problem with your request.<br /><br />
 
 If you haven't already signed in using the AnkiHub menu please do so. Make sure
 your username and password are correct and that you have confirmed your AnkiHub
 account through email verification. If you believe this is an error, please use
-<a href="{{ bug_report_form }}">this form</a> to file a report.<br>
+<a href="{{ bug_report_form }}">this form</a> to file a report.<br />
 
 This error will be automatically reported. You can disable automatic error
 reporting in the AnkiHub add-on settings.
 
-<script
-    src="https://browser.sentry-cdn.com/7.7.0/bundle.min.js"
-    integrity="sha384-zVycKakbFST6m0pi9RFIAnb5nw7mrA1n/mE4C8grImB4B6iqCp/0LHOcTIu9AI7+"
-    crossorigin="anonymous"
->
+<style>
+  div.sentry-error-embed {
+    width: 100% !important;
+    height: 100% !important;
+    max-width: 100% !important;
+    max-height: 100% !important;
+    margin: 0 !important;
+    box-sizing: border-box;
+  }
+</style>
 
- Sentry.init({ dsn: "https://715325d30fa44ecd939d12edda720f91@o1184291.ingest.sentry.io/6546414" });
- Sentry.showReportDialog({
-     eventId: "{{ event_id }}",
- });
+<script
+  src="https://browser.sentry-cdn.com/7.7.0/bundle.min.js"
+  integrity="sha384-zVycKakbFST6m0pi9RFIAnb5nw7mrA1n/mE4C8grImB4B6iqCp/0LHOcTIu9AI7+"
+  crossorigin="anonymous"
+></script>
+<script>
+  document.addEventListener("click", (ev) => {
+    const el = ev.target;
+    if (el.classList.contains("close")) {
+      pycmd("close");
+    }
+  });
+</script>
+
+<script>
+  Sentry.init({
+    dsn: "https://715325d30fa44ecd939d12edda720f91@o1184291.ingest.sentry.io/6546414",
+  });
+  Sentry.showReportDialog({
+    eventId: "{{ event_id }}",
+  });
 </script>

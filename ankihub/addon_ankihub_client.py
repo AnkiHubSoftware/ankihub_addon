@@ -13,7 +13,7 @@ from requests.models import HTTPError
 from . import LOGGER, report_exception
 from .ankihub_client import AnkiHubClient
 from .config import config
-from .messages import messages
+from .gui.error_feedback import ErrorFeedbackDialog
 
 
 def show_anki_message_hook(response: Response, *args, **kwargs):
@@ -22,7 +22,7 @@ def show_anki_message_hook(response: Response, *args, **kwargs):
     sentry_event_id = getattr(response, "sentry_event_id", None)
 
     def message():
-        showText(messages.request_error(event_id=sentry_event_id), type="html")
+        ErrorFeedbackDialog(sentry_event_id).exec()
 
     if response.status_code > 299 and "/logout/" not in endpoint:
         mw.taskman.run_on_main(message)
