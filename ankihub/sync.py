@@ -28,6 +28,10 @@ from .utils import (
 )
 
 
+class AnkiHubError(Exception):
+    pass
+
+
 def sync_with_ankihub() -> None:
     LOGGER.debug("Trying to sync with AnkiHub.")
 
@@ -67,7 +71,10 @@ def import_ankihub_deck(
     local_did: DeckId = None,  # did that new notes should be put into if importing not for the first time
 ) -> Optional[DeckId]:
 
-    remote_note_types = fetch_remote_note_types_based_on_notes_data(notes_data)
+    try:
+        remote_note_types = fetch_remote_note_types_based_on_notes_data(notes_data)
+    except AnkiHubError:
+        return None
 
     client = AnkiHubClient()
     protected_fields = None
@@ -267,7 +274,7 @@ def fetch_remote_note_types(
 
         if response.status_code != 200:
             LOGGER.debug(f"Failed fetching note type with id {mid}.")
-            continue
+            raise AnkiHubError()
 
         data = response.json()
         note_type = to_anki_note_type(data)
