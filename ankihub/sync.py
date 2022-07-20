@@ -1,7 +1,7 @@
 import json
 from concurrent.futures import Future
 from pprint import pformat
-from typing import Dict, Iterable, List, Optional, Set, Tuple
+from typing import Any, Dict, Iterable, List, Optional, Set, Tuple
 from urllib.error import HTTPError
 
 from anki.decks import DeckId
@@ -52,6 +52,8 @@ def sync_with_ankihub() -> None:
                 notes_data=notes_data,
                 deck_name=deck["name"],
                 local_did=deck["anki_id"],
+                protected_fields=deck["protected_fields"],
+                protected_tags=deck["protected_tags"],
             )
             config.save_latest_update(ankihub_did, data["latest_update"])
         else:
@@ -61,6 +63,8 @@ def sync_with_ankihub() -> None:
 def import_ankihub_deck(
     notes_data: List[dict],
     deck_name: str,  # name that will be used for a deck if a new one gets created
+    protected_fields: Dict[str, List[str]],
+    protected_tags: List[str],
     local_did: DeckId = None,  # did that new notes should be put into if importing not for the first time
 ) -> DeckId:
     """
@@ -96,6 +100,8 @@ def import_ankihub_deck(
             else note_data["tags"],
             note_type_id=NotetypeId(int(note_data["note_type_id"])),
             anki_did=local_did,
+            protected_fields=protected_fields,
+            protected_tags=protected_tags,
         )
         dids_for_note = set(c.did for c in note.cards())
         dids = dids | dids_for_note
@@ -151,6 +157,8 @@ def update_or_create_note(
     tags: List[str],
     note_type_id: NotetypeId,
     anki_did: DeckId,  # only relevant for newly created notes
+    protected_fields: Dict[str, List[str]],
+    protected_tags: List[str],
 ) -> Note:
     try:
         note = mw.col.get_note(id=anki_id)
@@ -162,25 +170,40 @@ def update_or_create_note(
                 "value": ankihub_id,
             }
         )
-        prepare_note(note, ankihub_id, fields, tags)
+        prepare_note(note, ankihub_id, fields, tags, protected_fields, protected_tags)
         mw.col.update_note(note)
         LOGGER.debug(f"Updated note: {anki_id=}")
     except NotFoundError:
         note_type = mw.col.models.get(NotetypeId(note_type_id))
         note = mw.col.new_note(note_type)
-        prepare_note(note, ankihub_id, fields, tags)
+        prepare_note(note, ankihub_id, fields, tags, protected_fields, protected_tags)
         note = create_note_with_id(note, anki_id, anki_did)
         LOGGER.debug(f"Created note: {anki_id=}")
     return note
 
 
 def prepare_note(
-    note: Note, ankihub_id: str, fields: List[Dict], tags: List[str]
+    note: Note,
+    ankihub_id: str,
+    fields: List[Dict[str, Any]],
+    tags: List[str],
+    protected_fields: Dict[str, List[str]],
+    protected_tags: List[str],
 ) -> None:
     note[constants.ANKIHUB_NOTE_TYPE_FIELD_NAME] = str(ankihub_id)
-    note.tags = [str(tag) for tag in tags]
-    # TODO Make sure we don't update protected fields.
+
+    # update tags, but don't remove protected ones
+    note.tags = list(set(note.tags).intersection(set(protected_tags)) | set(tags))
+
+    # update fields which are not protected
     for field in fields:
+        # TODO: won't work if note type name was changed, better use the note type id
+        protected_fields_for_model = protected_fields.get(
+            mw.col.models.get(note.mid)["name"], []
+        )
+        if field["name"] in protected_fields_for_model:
+            continue
+
         note[field["name"]] = field["value"]
 
 

@@ -645,10 +645,10 @@ def test_update_ankihub_deck_when_deck_was_deleted(
 
 
 def test_prepare_note(anki_session_with_addon: AnkiSession, monkeypatch):
-    from ankihub.utils import modify_note_type, prepare_note
+    from ankihub.sync import prepare_note
+    from ankihub.utils import modify_note_type
 
     anki_session = anki_session_with_addon
-    monkeypatch.setattr("ankihub.utils.sync_with_ankihub", Mock())
     with anki_session_with_addon.profile_loaded():
         mw = anki_session.mw
 
