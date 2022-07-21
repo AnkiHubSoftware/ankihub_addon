@@ -16,3 +16,9 @@ vscode:
     - almenon.arepl
     - ms-python.python
     - littlefoxteam.vscode-python-test-adapter
+
+ports:
+  - port: 6080
+    onOpen: open-browser
+  - port: 5900
+    onOpen: ignore
