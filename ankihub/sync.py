@@ -33,31 +33,33 @@ def sync_with_ankihub() -> None:
 
     create_backup_with_progress()
 
+    for ankihub_did in config.private_config.decks.keys():
+        sync_deck_with_ankihub(ankihub_did)
+
+
+def sync_deck_with_ankihub(ankihub_did: str) -> None:
+    deck = config.private_config.decks[ankihub_did]
     client = AnkiHubClient()
-    decks = config.private_config.decks
-    for ankihub_did, deck in decks.items():
-        notes_data = []
-        for response in client.get_deck_updates(
-            ankihub_did, since=deck["latest_update"]
-        ):
-            if response.status_code != 200:
-                return
+    notes_data = []
+    for response in client.get_deck_updates(ankihub_did, since=deck["latest_update"]):
+        if response.status_code != 200:
+            return
 
-            data = response.json()
-            notes = data["notes"]
-            if notes:
-                notes_data += notes
+        data = response.json()
+        notes = data["notes"]
+        if notes:
+            notes_data += notes
 
-        if notes_data:
-            import_ankihub_deck(
-                ankihub_did=ankihub_did,
-                notes_data=notes_data,
-                deck_name=deck["name"],
-                local_did=deck["anki_id"],
-            )
-            config.save_latest_update(ankihub_did, data["latest_update"])
-        else:
-            LOGGER.debug(f"No new updates to sync for {ankihub_did=}")
+    if notes_data:
+        import_ankihub_deck(
+            ankihub_did=ankihub_did,
+            notes_data=notes_data,
+            deck_name=deck["name"],
+            local_did=deck["anki_id"],
+        )
+        config.save_latest_update(ankihub_did, data["latest_update"])
+    else:
+        LOGGER.debug(f"No new updates to sync for {ankihub_did=}")
 
 
 def import_ankihub_deck(
@@ -316,7 +318,7 @@ def sync_with_progress() -> None:
 
     if config.private_config.token:
         mw.taskman.with_progress(
-            sync_with_ankihub,
+            lambda: sync_with_ankihub(),
             label="Synchronizing with AnkiHub",
             on_done=on_done,
             parent=mw,
