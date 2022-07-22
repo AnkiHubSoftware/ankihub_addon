@@ -28,7 +28,6 @@ USER_EMAIL_SLUG = "user_email"
 CSV_DELIMITER = ";"
 
 USER_SUPPORT_EMAIL_SLUG = "help@ankipalace.com"
-BUG_REPORT_FORM = "https://forms.gle/D5U6QQnLkfynzni59"
 
 
 class AnkiHubCommands(Enum):

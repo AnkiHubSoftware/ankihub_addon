@@ -6,7 +6,7 @@ from typing import Dict
 
 import requests
 from aqt import mw
-from aqt.utils import showText, tooltip
+from aqt.utils import tooltip
 from requests import Response
 from requests.models import HTTPError
 
@@ -19,12 +19,16 @@ from .gui.error_feedback import ErrorFeedbackDialog
 def show_anki_message_hook(response: Response, *args, **kwargs):
     LOGGER.debug("Begin show anki message hook.")
     endpoint = response.request.url
-    sentry_event_id = getattr(response, "sentry_event_id", None)
+    sentry_event_id: str = getattr(response, "sentry_event_id", None)
 
     def message():
         ErrorFeedbackDialog(sentry_event_id)
 
-    if response.status_code > 299 and "/logout/" not in endpoint:
+    if (
+        response.status_code > 299
+        and "/logout/" not in endpoint
+        and sentry_event_id is not None
+    ):
         mw.taskman.run_on_main(message)
     return response
 
@@ -59,7 +63,9 @@ def report_exception_hook(response: Response, *args, **kwargs):
     except HTTPError:
         ctx = {"response": {"reason": response.reason, "content": response.text}}
         event_id = report_exception(context=ctx)
-        response.sentry_event_id = event_id
+        response.sentry_event_id = event_id  # type: ignore
+
+    return response
 
 
 def sign_in_hook(response: Response, *args, **kwargs):

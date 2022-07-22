@@ -3,6 +3,7 @@ import logging.config
 import os
 import pathlib
 import sys
+from typing import Optional
 
 from . import settings
 
@@ -28,13 +29,13 @@ os.environ["SENTRY_RELEASE"] = version
 os.environ["SENTRY_ENVIRONMENT"] = sentry_env
 
 
-def report_exception(context: dict = None):
+def report_exception(context: dict = dict()) -> Optional[str]:
     from .config import config
     from .lib import sentry_sdk  # type: ignore
     from .lib.sentry_sdk import capture_exception, configure_scope  # type: ignore
 
     if not config.public_config.get("report_errors"):
-        return
+        return None
 
     try:
         sentry_sdk.init(
@@ -59,7 +60,7 @@ def report_exception(context: dict = None):
         sentry_sdk.flush()
     except Exception as e:
         LOGGER.debug(f"Reporting to sentry failed: {e}")
-        return False
+        return None
     finally:
         sentry_sdk.init("")
         LOGGER.debug("Sentry disabled.")
