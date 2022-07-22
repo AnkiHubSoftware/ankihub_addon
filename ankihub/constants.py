@@ -33,6 +33,8 @@ USER_SUPPORT_EMAIL_SLUG = "help@ankipalace.com"
 
 ANKI_MINOR = int(ANKI_VERSION.split(".")[2])
 
+ANKI_MINOR = int(ANKI_VERSION.split(".")[2])
+
 
 class AnkiHubCommands(Enum):
     CHANGE = "Suggest a change"
