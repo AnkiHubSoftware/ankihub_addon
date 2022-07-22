@@ -3,8 +3,8 @@ image:
 
 tasks:
   - init: >
+      pyenv local 3.9.13 &&
       ln -s /workspace/ankihub_addon/ankihub ~/.local/share/Anki2/addons21/1322529746
-      pyenv local 3.9.13
     env:
       ANKIHUB_APP_URL: "https://staging.ankihub.net"
       ANKIDEV: 1
