@@ -658,7 +658,7 @@ def test_prepare_note(anki_session_with_addon: AnkiSession):
                 {"name": "Back", "value": "new back"},
             ],
             tags=["c", "d"],
-            protected_fields={ankihub_basic["name"]: ["Back"]},
+            protected_fields={ankihub_basic["id"]: ["Back"]},
             protected_tags=["a"],
         )
 

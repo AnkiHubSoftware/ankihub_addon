@@ -80,7 +80,11 @@ def import_ankihub_deck(
     protected_fields = None
     response = client.get_protected_fields(uuid.UUID(ankihub_did))
     if response.status_code == 200:
-        protected_fields = response.json()["fields"]
+        protected_fields_raw = response.json()["fields"]
+        protected_fields = {
+            int(field_id): field_names
+            for field_id, field_names in protected_fields_raw.items()
+        }
     elif response.status_code == 404:
         protected_fields = {}
     else:
@@ -110,7 +114,7 @@ def import_ankihub_deck_inner(
     notes_data: List[dict],
     deck_name: str,  # name that will be used for a deck if a new one gets created
     remote_note_types: Dict[NotetypeId, NotetypeDict],
-    protected_fields: Dict[str, List[str]],
+    protected_fields: Dict[int, List[str]],
     protected_tags: List[str],
     local_did: DeckId = None,  # did that new notes should be put into if importing not for the first time
 ) -> DeckId:
@@ -204,7 +208,7 @@ def update_or_create_note(
     tags: List[str],
     note_type_id: NotetypeId,
     anki_did: DeckId,  # only relevant for newly created notes
-    protected_fields: Dict[str, List[str]],
+    protected_fields: Dict[int, List[str]],
     protected_tags: List[str],
 ) -> Note:
     try:
@@ -234,7 +238,7 @@ def prepare_note(
     ankihub_id: str,
     fields: List[Dict[str, Any]],
     tags: List[str],
-    protected_fields: Dict[str, List[str]],
+    protected_fields: Dict[int, List[str]],
     protected_tags: List[str],
 ) -> None:
     note[constants.ANKIHUB_NOTE_TYPE_FIELD_NAME] = str(ankihub_id)
@@ -244,9 +248,8 @@ def prepare_note(
 
     # update fields which are not protected
     for field in fields:
-        # TODO: won't work if note type name was changed, better use the note type id
         protected_fields_for_model = protected_fields.get(
-            mw.col.models.get(note.mid)["name"], []
+            mw.col.models.get(note.mid)["id"], []
         )
         if field["name"] in protected_fields_for_model:
             continue
