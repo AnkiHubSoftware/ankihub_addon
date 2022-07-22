@@ -9,7 +9,7 @@ from .sync import setup_sync_on_startup
 
 def run():
     """Call this function in __init__.py when Anki starts."""
-    
+
     mw.addonManager.setWebExports(__name__, r"gui/web/.*")
 
     setup_sync_on_startup()
