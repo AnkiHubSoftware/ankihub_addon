@@ -68,7 +68,9 @@ def import_ankihub_deck(
     ankihub_did: str,
     notes_data: List[dict],
     deck_name: str,  # name that will be used for a deck if a new one gets created
-    local_did: DeckId = None,  # did that new notes should be put into if importing not for the first time
+    local_did: Optional[  # did that new notes should be put into if importing not for the first time
+        DeckId
+    ] = None,
 ) -> Optional[DeckId]:
 
     try:
@@ -76,28 +78,27 @@ def import_ankihub_deck(
     except AnkiHubError:
         return None
 
-    client = AnkiHubClient()
-    protected_fields = None
-    response = client.get_protected_fields(uuid.UUID(ankihub_did))
-    if response.status_code == 200:
-        protected_fields_raw = response.json()["fields"]
-        protected_fields = {
-            int(field_id): field_names
-            for field_id, field_names in protected_fields_raw.items()
-        }
-    elif response.status_code == 404:
-        protected_fields = {}
-    else:
-        return None
+    protected_fields: Dict[int, List[str]] = {}
+    protected_tags: List[str] = []
+    if local_did is None:
+        # we only need to fetch protected fields and tags if we are installing the deck for the first time
+        # because protected fields and tags are excluded from deck updates by AnkiHub
+        client = AnkiHubClient()
+        response = client.get_protected_fields(uuid.UUID(ankihub_did))
+        if response.status_code == 200:
+            protected_fields_raw = response.json()["fields"]
+            protected_fields = {
+                int(field_id): field_names
+                for field_id, field_names in protected_fields_raw.items()
+            }
+        elif response.status_code != 404:
+            return None
 
-    protected_tags = None
-    response = client.get_protected_tags(uuid.UUID(ankihub_did))
-    if response.status_code == 200:
-        protected_tags = response.json()["tags"]
-    elif response.status_code == 404:
-        protected_tags = []
-    else:
-        return None
+        response = client.get_protected_tags(uuid.UUID(ankihub_did))
+        if response.status_code == 200:
+            protected_tags = response.json()["tags"]
+        elif response.status_code != 404:
+            return None
 
     anki_deck_id = import_ankihub_deck_inner(
         notes_data=notes_data,
