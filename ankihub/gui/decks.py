@@ -301,18 +301,27 @@ class SubscribeDialog(QDialog):
         """
 
         create_backup_with_progress()
-        local_did = self._install_deck_csv(deck_file, deck_name)
+
+        local_did = self._install_deck_csv(
+            ankihub_did=ankihub_did,
+            deck_file=deck_file,
+            deck_name=deck_name,
+        )
+
         config.save_subscription(
             name=deck_name,
             ankihub_did=ankihub_did,
             anki_did=local_did,
             last_update=last_update,
         )
+
         LOGGER.debug("Importing deck was succesful.")
+
         sync_with_ankihub()
 
     def _install_deck_csv(
         self,
+        ankihub_did: str,
         deck_file: Path,
         deck_name: str,
     ) -> DeckId:
@@ -320,7 +329,12 @@ class SubscribeDialog(QDialog):
         with deck_file.open(encoding="utf-8") as f:
             reader = csv.DictReader(f, delimiter=CSV_DELIMITER, quotechar="'")
             notes_data = [row for row in reader]
-        deck_id = import_ankihub_deck(notes_data=notes_data, deck_name=deck_name)
+
+        deck_id = import_ankihub_deck(
+            ankihub_did=ankihub_did,
+            notes_data=notes_data,
+            deck_name=deck_name,
+        )
         return deck_id
 
     def on_browse_deck(self) -> None:

@@ -21,6 +21,10 @@ def show_anki_message_hook(response: Response, *args, **kwargs):
     endpoint = response.request.url
     sentry_event_id: str = getattr(response, "sentry_event_id", None)
 
+    treat_404_as_error = getattr(response.request, "treat_404_as_error", True)
+    if not treat_404_as_error and response.status_code == 404:
+        return response
+
     def message():
         ErrorFeedbackDialog(sentry_event_id)
 
@@ -56,6 +60,11 @@ def logging_hook(response: Response, *args, **kwargs):
 
 def report_exception_hook(response: Response, *args, **kwargs):
     LOGGER.debug("Begin report exception hook.")
+
+    treat_404_as_error = getattr(response.request, "treat_404_as_error", True)
+    if not treat_404_as_error and response.status_code == 404:
+        return response
+
     try:
         response.raise_for_status()
     except HTTPError:

@@ -54,8 +54,10 @@ class AnkiHubClient:
         endpoint,
         data=None,
         params=None,
+        treat_404_as_error=True,
     ) -> Response:
         request = self._build_request(method, endpoint, data, params)
+        request.treat_404_as_error = treat_404_as_error  # type: ignore
         try:
             response = self.session.send(request)
             self.session.close()
@@ -78,7 +80,7 @@ class AnkiHubClient:
         if result and result.status_code == 204:
             self.session.headers["Authorization"] = ""
 
-    def upload_deck(self, file: Path, anki_id: int) -> Response:
+    def upload_deck(self, file: Path, anki_deck_id: int) -> Response:
         key = file.name
         presigned_url_response = self.get_presigned_url(key=key, action="upload")
         if presigned_url_response.status_code != 200:
@@ -93,7 +95,7 @@ class AnkiHubClient:
             return s3_response
 
         response = self._send_request(
-            "POST", "/decks/", data={"key": key, "anki_id": anki_id}
+            "POST", "/decks/", data={"key": key, "anki_id": anki_deck_id}
         )
         return response
 
@@ -107,7 +109,9 @@ class AnkiHubClient:
         s3_url = presigned_url_response.json()["pre_signed_url"]
         return requests.get(s3_url)
 
-    def get_deck_updates(self, deck_id: str, since: float) -> Iterator[Response]:
+    def get_deck_updates(
+        self, ankihub_deck_uuid: uuid.UUID, since: float
+    ) -> Iterator[Response]:
         class Params(TypedDict, total=False):
             page: int
             since: str
@@ -117,7 +121,7 @@ class AnkiHubClient:
         while has_next_page:
             response = self._send_request(
                 "GET",
-                f"/decks/{deck_id}/updates",
+                f"/decks/{ankihub_deck_uuid}/updates",
                 params=params,
             )
             if response.status_code == 200:
@@ -128,20 +132,20 @@ class AnkiHubClient:
                 has_next_page = False
                 yield response
 
-    def get_deck_by_id(self, deck_id: str) -> Response:
+    def get_deck_by_id(self, ankihub_deck_uuid: uuid.UUID) -> Response:
         response = self._send_request(
             "GET",
-            f"/decks/{deck_id}/",
+            f"/decks/{ankihub_deck_uuid}/",
         )
         return response
 
-    def get_note_by_ankihub_id(self, ankihub_id: uuid.UUID) -> Response:
-        response = self._send_request("GET", f"/notes/{ankihub_id}")
+    def get_note_by_ankihub_id(self, ankihub_note_uuid: uuid.UUID) -> Response:
+        response = self._send_request("GET", f"/notes/{ankihub_note_uuid}")
         return response
 
     def create_change_note_suggestion(
         self,
-        ankihub_note_uuid: str,
+        ankihub_note_uuid: uuid.UUID,
         fields: List[Dict],
         tags: List[str],
         change_type: ChangeTypes,
@@ -163,24 +167,24 @@ class AnkiHubClient:
 
     def create_new_note_suggestion(
         self,
-        ankihub_deck_uuid: str,
-        ankihub_note_uuid: str,
-        anki_id: int,
+        ankihub_deck_uuid: uuid.UUID,
+        ankihub_note_uuid: uuid.UUID,
+        anki_note_id: int,
         fields: List[dict],
         tags: List[str],
         change_type: ChangeTypes,
-        note_type: str,
-        note_type_id: int,
+        note_type_name: str,
+        anki_note_type_id: int,
         comment: str,
     ) -> Response:
         suggestion = {
-            "anki_id": anki_id,
+            "anki_id": anki_note_id,
             "ankihub_id": ankihub_note_uuid,
             "fields": fields,
             "tags": tags,
             "change_type": change_type.value[0],
-            "note_type": note_type,
-            "note_type_id": note_type_id,
+            "note_type": note_type_name,
+            "note_type_id": anki_note_type_id,
             "comment": comment,
         }
         response = self._send_request(
@@ -203,8 +207,24 @@ class AnkiHubClient:
         response = self._send_request(method, endpoint, params=data)
         return response
 
-    def get_note_type(self, anki_id: int) -> Response:
-        response = self._send_request("GET", f"/note-types/{anki_id}/")
+    def get_note_type(self, anki_note_type_id: int) -> Response:
+        response = self._send_request("GET", f"/note-types/{anki_note_type_id}/")
+        return response
+
+    def get_protected_fields(self, ankihub_deck_uuid: uuid.UUID) -> Response:
+        response = self._send_request(
+            "GET",
+            f"/decks/{ankihub_deck_uuid}/protected-fields/",
+            treat_404_as_error=False,
+        )
+        return response
+
+    def get_protected_tags(self, ankihub_deck_uuid: uuid.UUID) -> Response:
+        response = self._send_request(
+            "GET",
+            f"/decks/{ankihub_deck_uuid}/protected-tags/",
+            treat_404_as_error=False,
+        )
         return response
 
     def bulk_suggest_tags(
