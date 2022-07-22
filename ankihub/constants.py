@@ -21,6 +21,7 @@ URL_DECK_BASE = f"{ANKIHUB_APP_URL}/decks"
 ANKIHUB_NOTE_TYPE_FIELD_NAME = "ankihub_id"
 ANKIHUB_NOTE_TYPE_MODIFICATION_STRING = "ANKIHUB MODFICATIONS"
 ADDON_PATH = pathlib.Path(__file__).parent.absolute()
+ADDON_PACKAGE = __name__.split(".")[0]
 ICONS_PATH = ADDON_PATH / "icons"
 
 TOKEN_SLUG = "token"
@@ -29,7 +30,8 @@ USER_EMAIL_SLUG = "user_email"
 CSV_DELIMITER = ";"
 
 USER_SUPPORT_EMAIL_SLUG = "help@ankipalace.com"
-BUG_REPORT_FORM = "https://forms.gle/D5U6QQnLkfynzni59"
+
+ANKI_MINOR = int(ANKI_VERSION.split(".")[2])
 
 ANKI_MINOR = int(ANKI_VERSION.split(".")[2])
 
