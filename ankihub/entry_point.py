@@ -1,5 +1,5 @@
 """Code to be run on Anki start up."""
-from aqt import gui_hooks, mw
+from aqt import mw
 
 from . import LOGGER
 from .gui import browser, editor
