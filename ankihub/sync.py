@@ -80,7 +80,8 @@ def import_ankihub_deck(
     """
     Used for importing an ankihub deck and updates to an ankihub deck
     When no local_did is provided this function assumes that the deck gets installed for the first time
-    Returns id of the deck future cards should be imported into - the local_did
+    Returns id of the deck future cards should be imported into - the local_did - if the import was sucessful
+    else it returns None
     """
 
     LOGGER.debug(f"Importing ankihub deck {deck_name=} {local_did=}")
@@ -144,9 +145,6 @@ def import_ankihub_deck_inner(
     adjust_note_types(remote_note_types)
     reset_note_types_of_notes_based_on_notes_data(notes_data)
 
-    # TODO fix differences between csv when installing for the first time vs. when updating
-    # on the AnkiHub side
-    # for example for one the fields name is "note_id" and for the other "id"
     dids: Set[DeckId] = set()  # set of ids of decks notes were imported into
     for note_data in notes_data:
         LOGGER.debug(f"Trying to update or create note:\n {pformat(note_data)}")
@@ -166,6 +164,9 @@ def import_ankihub_deck_inner(
 
 
 def transform_notes_data(notes_data: List[Dict]) -> List[Dict]:
+    # TODO fix differences between csv when installing for the first time vs. when updating
+    # on the AnkiHub side
+    # for example for one the fields name is "note_id" and for the other "id"
     result = [
         {
             "anki_id": NoteId(int((note_data["anki_id"]))),
