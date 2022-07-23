@@ -61,6 +61,10 @@ def on_bulk_tag_suggestion_action(browser: Browser) -> None:
 
         ankihub_note_uuids.append(ankihub_note_uuid)
 
+    if not ankihub_note_uuids:
+        tooltip("No AnkiHub notes were selected.")
+        return
+
     client = AnkiHubClient()
     response = client.bulk_suggest_tags(ankihub_note_uuids, tags.split(" "))
     if response.status_code != 201:
