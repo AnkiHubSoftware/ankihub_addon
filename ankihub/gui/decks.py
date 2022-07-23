@@ -124,7 +124,6 @@ class SubscribedDecksDialog(QDialog):
         db = AnkiHubDB()
         mids = db.note_types_for_ankihub_deck(ankihub_did=ankihub_did)
         undo_note_type_modfications(mids)
-        # TODO: should we also change the ids of the note types in Anki's collection?
         db.remove_deck(ankihub_did)
 
     def on_open_web(self) -> None:
