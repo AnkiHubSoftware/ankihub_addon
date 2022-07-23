@@ -25,49 +25,42 @@ Overrides `ankihub_url` add-on config.
 
 See `./ankihub_addon/ankihub/__init__.py` for what this does.  You need to set this when running tests.
 
-Defining a `.envrc` with [`direnv`](https://direnv.net/) is great for managing env vars.
+Defining a `.envrc` with [`direnv`](https://direnv.net/) is great for managing env vars. Here is a sample
+`.envrc`:
+
+```
+export ADDONS_DIR=~/Library/Application\ Support/Anki2/addons21/
+export DEVELOPMENT=True
+export ANKIHUB_APP_URL=https://staging.ankihub.net
+export QTWEBENGINE_REMOTE_DEBUGGING=8080
+export ANKIDEV=1
+export LOGTERM=1
+export ANKI_BASE=tests/test_data/Anki2
+export ANKI_PROFILE=dev
+export LOGTERM=1
+```
 
 ### Development workflow
 
-#### Symlinking the add-on source
+Follow the instructions below for 
+- Automatically restarting Anki when add-on source code is modified
+- To see both add-on and Anki source-code output in the console
+- Start Anki with the data dir specified by the `ANKI_BASE` env var and `ANKI_PROFILE`
+  - This runs Anki in an environment that is completely isolated from the default data directory.
 
-To see your changes to this repo reflected in Anki, you can symlink this repo to
-the Anki add-on directory. To find the path to Anki's add-on directory, [see
-this section of the
-documentation](https://addon-docs.ankiweb.net/addon-folders.html#add-on-folders).
-
-> You can access the top level add-ons folder by going to the Tools>Add-ons menu
-> item in the main Anki window. Click on the View Files button, and a folder
-> will pop up. If you had no add-ons installed, the top level add-ons folder
-> will be shown. If you had an add-on selected, the add-on’s module folder will
-> be shown, and you will need to go up one level.
-
-For example:
-
-```
-ln -s /Users/username/anki/ankihub_addon/ankihub
-/Users/username/Library/Application\ Support/Anki2/addons21/
-```
-
-You will need to restart Anki in order for Anki to reload the add-on source
-code.
-
-#### A better development experience
-
-For a much better experience, follow the instructions below for automatically
-restarting Anki when add-on source files are modified, and to see both add-on
-and Anki source-code output in the console.
-
-1. Clone Anki: `git clone https://github.com/ankitects/anki`
-2. Follow the instructions [here](https://github.com/ankitects/anki/blob/main/docs/development.md) to build Anki from source.
-3. Install [watchexec](https://github.com/watchexec/watchexec), e.g.
+1. Install [watchexec](https://github.com/watchexec/watchexec), e.g.
 
     ```
     brew install watchexec
     ```
 
-4. From the root of the *anki* repo (not the add-on repo) you cloned in step one, run watchexec. E.g.,
-   `watchexec -r -e py -w ~/Projects/anki_addons/ankihub_addon -- ./run`
+2. From the root of the this repo, run `anki` under watchexec:
+
+```bash
+ANKIHUB_APP_URL=http://localhost:8000\
+watchexec -r -d 3000 -w ankihub -- \
+anki -p $ANKI_PROFILE
+```
 
 
 ## Tests and static checks
