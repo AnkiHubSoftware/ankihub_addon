@@ -5,6 +5,7 @@ from . import LOGGER
 from .gui import browser, editor
 from .gui.menu import setup_ankihub_menu
 from .sync import setup_sync_on_startup
+from .config import config
 
 
 def run():
@@ -12,8 +13,11 @@ def run():
 
     mw.addonManager.setWebExports(__name__, r"gui/web/.*")
 
-    setup_sync_on_startup()
-    LOGGER.debug("Set up AnkiHub sync on startup.")
+    if config.public_config.get("sync-on-startup", True):
+        setup_sync_on_startup()
+        LOGGER.debug("Set up AnkiHub sync on startup.")
+    else:
+        LOGGER.debug("Skipping setup sync on startup.")
 
     setup_ankihub_menu()
     LOGGER.debug("Set up AnkiHub menu.")
