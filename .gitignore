@@ -4,6 +4,8 @@ ankihub/meta.json
 # Ignore everything except the README.
 /ankihub/user_files/*
 !/ankihub/user_files/README.md
+*.colpkg
+/tests/test_data/Anki2/prefs21.db
 
 
 # Byte-compiled / optimized / DLL files
@@ -138,4 +140,3 @@ dmypy.json
 
 # mac os
 .DS_Store
-*.colpkg
