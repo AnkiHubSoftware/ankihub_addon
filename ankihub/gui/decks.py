@@ -26,8 +26,9 @@ from .. import LOGGER, report_exception
 from ..addon_ankihub_client import AddonAnkiHubClient as AnkiHubClient
 from ..config import config
 from ..constants import CSV_DELIMITER, URL_DECK_BASE, URL_DECKS, URL_HELP
+from ..db import AnkiHubDB
 from ..sync import import_ankihub_deck, sync_with_ankihub
-from ..utils import create_backup_with_progress
+from ..utils import create_backup_with_progress, undo_note_type_modfications
 
 
 class SubscribedDecksDialog(QDialog):
@@ -110,13 +111,20 @@ class SubscribedDecksDialog(QDialog):
             return
 
         for item in items:
-            ankihub_id = item.data(Qt.ItemDataRole.UserRole)
-            config.unsubscribe_deck(ankihub_id)
-            # TODO Run clean up when implemented:
-            #  https://github.com/ankipalace/ankihub_addon/issues/20
+            ankihub_did = item.data(Qt.ItemDataRole.UserRole)
+            config.unsubscribe_deck(ankihub_did)
+            self.unsubscribe_from_deck(ankihub_did)
 
         tooltip("Unsubscribed from AnkiHub Deck.", parent=mw)
         self.refresh_decks_list()
+
+    @staticmethod
+    def unsubscribe_from_deck(ankihub_did: str) -> None:
+
+        db = AnkiHubDB()
+        mids = db.note_types_for_ankihub_deck(ankihub_did=ankihub_did)
+        undo_note_type_modfications(mids)
+        db.remove_deck(ankihub_did)
 
     def on_open_web(self) -> None:
         items = self.decks_list.selectedItems()
@@ -225,18 +233,25 @@ class SubscribeDialog(QDialog):
         """
 
         def on_install_done(future: Future):
+            success = False
+            exc = None
             try:
-                future.result()
+                success = future.result()
             except Exception as e:
                 report_exception()
-                LOGGER.exception("Importing deck failed.")
-                showText(f"Failed to import deck.\n\n{str(e)}")
-                self.reject()
-                return
+                exc = e
 
-            tooltip("The deck has successfully been installed!", parent=mw)
-            self.accept()
-            mw.reset()
+            if success:
+                tooltip("The deck has successfully been installed!", parent=mw)
+                self.accept()
+                mw.reset()
+            else:
+                LOGGER.exception("Importing deck failed.")
+                msg = "Failed to import deck."
+                if exc:
+                    msg += f"\n\n{str(exc)}"
+                showText(msg)
+                self.reject()
 
         deck_response = self.client.get_deck_by_id(ankihub_did)
         if deck_response.status_code == 404:
@@ -294,19 +309,19 @@ class SubscribeDialog(QDialog):
 
     def install_deck(
         self, deck_file: Path, deck_name: str, ankihub_did: str, last_update: str
-    ) -> None:
+    ) -> bool:
         """If we have a .csv, read data from the file and modify the user's note types
         and notes.
         :param: path to the .csv or .apkg file
+        :return: True if successful, False if not
         """
 
         create_backup_with_progress()
-
         local_did = self._install_deck_csv(
-            ankihub_did=ankihub_did,
-            deck_file=deck_file,
-            deck_name=deck_name,
+            ankihub_did=ankihub_did, deck_file=deck_file, deck_name=deck_name
         )
+        if local_did is None:
+            return None
 
         config.save_subscription(
             name=deck_name,
@@ -319,12 +334,14 @@ class SubscribeDialog(QDialog):
 
         sync_with_ankihub()
 
+        return True
+
     def _install_deck_csv(
         self,
         ankihub_did: str,
         deck_file: Path,
         deck_name: str,
-    ) -> DeckId:
+    ) -> Optional[DeckId]:
         LOGGER.debug("Importing deck as csv....")
         with deck_file.open(encoding="utf-8") as f:
             reader = csv.DictReader(f, delimiter=CSV_DELIMITER, quotechar="'")

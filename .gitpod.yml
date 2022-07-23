@@ -2,6 +2,9 @@ image:
   file: .gitpod.Dockerfile
 
 tasks:
+  - before: >
+      mkdir -p /home/gitpod/.local/share/Anki2/addons21/ &&
+      ln -s /workspace/ankihub_addon/ankihub /home/gitpod/.local/share/Anki2/addons21/
   - init: >
       pyenv local 3.9.13
     env:
@@ -9,7 +12,6 @@ tasks:
       ANKIDEV: 1
       DEVELOPMENT: True
     command: >
-      ln -s /workspace/ankihub_addon/ankihub /home/gitpod/.local/share/Anki2/addons21/ &&
       anki
 
 github:

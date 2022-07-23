@@ -1,7 +1,7 @@
 import dataclasses
 import json
 import os
-from datetime import datetime, timezone
+from datetime import datetime
 from json import JSONDecodeError
 from pprint import pformat
 from typing import Any, Callable, Dict, Optional
@@ -69,13 +69,13 @@ class Config:
         self.private_config.user = user_email
         self._update_private_config()
 
-    def save_latest_update(self, ankihub_did: str, time: Optional[str] = None):
-        if time:
-            date_object = datetime.strptime(time, "%Y-%m-%dT%H:%M:%S.%f%z")
+    def save_latest_update(self, ankihub_did: str, time: Optional[str]):
+        if time is None:
+            self.private_config.decks[ankihub_did]["latest_update"] = None
         else:
-            date_object = datetime.now(tz=timezone.utc)
-        date_time_str = datetime.strftime(date_object, "%Y-%m-%dT%H:%M:%S.%f%z")
-        self.private_config.decks[ankihub_did]["latest_update"] = date_time_str
+            date_object = datetime.strptime(time, "%Y-%m-%dT%H:%M:%S.%f%z")
+            date_time_str = datetime.strftime(date_object, "%Y-%m-%dT%H:%M:%S.%f%z")
+            self.private_config.decks[ankihub_did]["latest_update"] = date_time_str
         self._update_private_config()
 
     def save_subscription(

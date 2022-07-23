@@ -10,8 +10,15 @@ ROOT = pathlib.Path(__file__).absolute().parent.parent
 
 @pytest.fixture(scope="function")
 def anki_session_with_addon(anki_session: AnkiSession):
+
     dest = pathlib.Path(anki_session.mw.addonManager.addonsFolder())
     shutil.copytree(ROOT / "ankihub", dest / "ankihub")
+
+    # clear database
+    from ankihub.constants import DB_PATH
+
+    DB_PATH.unlink(missing_ok=True)
+
     yield anki_session
 
 

@@ -1,6 +1,6 @@
 import os
-import pathlib
 from enum import Enum
+from pathlib import Path
 
 from anki.buildinfo import version as ANKI_VERSION
 
@@ -20,7 +20,7 @@ URL_DECKS = f"{ANKIHUB_APP_URL}/explore"
 URL_DECK_BASE = f"{ANKIHUB_APP_URL}/decks"
 ANKIHUB_NOTE_TYPE_FIELD_NAME = "ankihub_id"
 ANKIHUB_NOTE_TYPE_MODIFICATION_STRING = "ANKIHUB MODFICATIONS"
-ADDON_PATH = pathlib.Path(__file__).parent.absolute()
+ADDON_PATH = Path(__file__).parent.absolute()
 ADDON_PACKAGE = __name__.split(".")[0]
 ICONS_PATH = ADDON_PATH / "icons"
 
@@ -33,7 +33,11 @@ USER_SUPPORT_EMAIL_SLUG = "help@ankipalace.com"
 
 ANKI_MINOR = int(ANKI_VERSION.split(".")[2])
 
-ANKI_MINOR = int(ANKI_VERSION.split(".")[2])
+DB_PATH = Path(
+    os.getenv(
+        key="ANKIHUB_DB_PATH", default=Path(__file__).parent / "user_files/ankihub.db"
+    )
+)
 
 
 class AnkiHubCommands(Enum):
