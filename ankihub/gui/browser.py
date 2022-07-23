@@ -1,15 +1,15 @@
-import uuid
 from typing import Optional
 
 from aqt import mw
 from aqt.browser import Browser
 from aqt.gui_hooks import browser_will_show_context_menu
+from aqt.operations import CollectionOp
 from aqt.qt import QMenu
 from aqt.utils import getTag, tooltip, tr
 
 from .. import LOGGER
 from ..addon_ankihub_client import AddonAnkiHubClient as AnkiHubClient
-from ..constants import ANKIHUB_NOTE_TYPE_FIELD_NAME
+from ..utils import ankihub_uuids_of_notes
 
 
 def on_browser_will_show_context_menu(browser: Browser, context_menu: QMenu) -> None:
@@ -47,18 +47,11 @@ def on_bulk_tag_suggestion_action(browser: Browser) -> None:
     if not ok:
         return
 
-    ankihub_note_uuids = []
-    for nid in selected_nids:
-        note = mw.col.get_note(nid)
-        if ANKIHUB_NOTE_TYPE_FIELD_NAME not in note.keys():
-            continue
+    ankihub_note_uuids = ankihub_uuids_of_notes(selected_nids)
 
-        try:
-            ankihub_note_uuid = uuid.UUID(note[ANKIHUB_NOTE_TYPE_FIELD_NAME])
-        except ValueError:
-            continue
-
-        ankihub_note_uuids.append(ankihub_note_uuid)
+    if not ankihub_note_uuids:
+        tooltip("No AnkiHub notes were selected.")
+        return
 
     client = AnkiHubClient()
     response = client.bulk_suggest_tags(ankihub_note_uuids, tags.split(" "))
@@ -67,10 +60,22 @@ def on_bulk_tag_suggestion_action(browser: Browser) -> None:
         return
 
     LOGGER.debug("Bulk tag suggestion created.")
-    tooltip("Bulk tag suggestion created.")
+    tooltip("Bulk tag suggestion created.", parent=browser)
 
-    browser.add_tags_to_selected_notes(tags)
-    LOGGER.debug("Added chosen tags to selected notes if they didn't have them yet.")
+    # using this instead of browser.add_tags_to_notes to avoid tooltip conflict
+    # there will be no exception when adding the tags fails, this should not be a big problem
+    op = (
+        CollectionOp(browser, lambda col: col.tags.bulk_add(selected_nids, tags))
+        .success(
+            lambda out: LOGGER.debug(
+                "Added chosen tags to selected notes if they didn't have them yet."
+            )
+        )
+        .failure(
+            lambda exc: LOGGER.debug("Failed to add chosen tags to selected notes.")
+        )
+    )
+    op.run_in_background()
 
 
 def setup() -> None:
