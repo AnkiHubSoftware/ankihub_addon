@@ -170,6 +170,14 @@ def change_note_type_of_note(nid: int, mid: int) -> None:
 
 
 # ... note type modifications
+
+ANKIHUB_TEMPLATE_SNIPPET_RE = (
+    f"<!-- BEGIN {ANKIHUB_NOTE_TYPE_MODIFICATION_STRING} -->"
+    r"[\w\W]*"
+    f"<!-- END {ANKIHUB_NOTE_TYPE_MODIFICATION_STRING} -->"
+)
+
+
 def modify_note_types(note_type_ids: Iterable[NotetypeId]) -> None:
     for mid in note_type_ids:
         note_type = mw.col.models.get(mid)
@@ -192,7 +200,6 @@ def modify_note_type(note_type: NotetypeDict) -> None:
 
 
 def modify_note_type_templates(note_type_ids: Iterable[NotetypeId]) -> None:
-
     for mid in note_type_ids:
         note_type = mw.col.models.get(mid)
         for template in note_type["tmpls"]:
@@ -241,6 +248,43 @@ def modify_template(template: Dict) -> None:
         )
     else:
         template["afmt"] += "\n\n" + ankihub_snippet
+
+
+# ... undo modifications
+def undo_note_type_modfications(note_type_ids: Iterable[NotetypeId]) -> None:
+    for mid in note_type_ids:
+        note_type = mw.col.models.get(mid)
+        undo_note_type_modification(note_type)
+        mw.col.models.update_dict(note_type)
+
+
+def undo_note_type_modification(note_type: Dict) -> None:
+    """Removes the AnkiHub Field from the Note Type and modifies the template to
+    remove the field.
+    """
+    LOGGER.debug(f"Undoing modification of note type {note_type['name']}")
+
+    undo_fields_modification(note_type)
+
+    templates = note_type["tmpls"]
+    for template in templates:
+        undo_template_modification(template)
+
+
+def undo_fields_modification(note_type: Dict) -> None:
+    fields = note_type["flds"]
+    field_names = [field["name"] for field in fields]
+    if constants.ANKIHUB_NOTE_TYPE_FIELD_NAME not in field_names:
+        return
+    fields.pop(field_names.index(constants.ANKIHUB_NOTE_TYPE_FIELD_NAME))
+
+
+def undo_template_modification(template: Dict) -> None:
+    template["afmt"] = re.sub(
+        r"\n{0,2}" + ANKIHUB_TEMPLATE_SNIPPET_RE,
+        "",
+        template["afmt"],
+    )
 
 
 # backup
