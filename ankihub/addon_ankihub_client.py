@@ -6,24 +6,33 @@ from typing import Dict
 
 import requests
 from aqt import mw
-from aqt.utils import showText, tooltip
+from aqt.utils import tooltip
 from requests import Response
 from requests.models import HTTPError
 
 from . import LOGGER, report_exception
 from .ankihub_client import AnkiHubClient
 from .config import config
-from .messages import messages
+from .gui.error_feedback import ErrorFeedbackDialog
 
 
 def show_anki_message_hook(response: Response, *args, **kwargs):
     LOGGER.debug("Begin show anki message hook.")
     endpoint = response.request.url
+    sentry_event_id: str = getattr(response, "sentry_event_id", None)
+
+    treat_404_as_error = getattr(response.request, "treat_404_as_error", True)
+    if not treat_404_as_error and response.status_code == 404:
+        return response
 
     def message():
-        showText(messages.request_error(), type="html")
+        ErrorFeedbackDialog(sentry_event_id)
 
-    if response.status_code > 299 and "/logout/" not in endpoint:
+    if (
+        response.status_code > 299
+        and "/logout/" not in endpoint
+        and sentry_event_id is not None
+    ):
         mw.taskman.run_on_main(message)
     return response
 
@@ -51,11 +60,19 @@ def logging_hook(response: Response, *args, **kwargs):
 
 def report_exception_hook(response: Response, *args, **kwargs):
     LOGGER.debug("Begin report exception hook.")
+
+    treat_404_as_error = getattr(response.request, "treat_404_as_error", True)
+    if not treat_404_as_error and response.status_code == 404:
+        return response
+
     try:
         response.raise_for_status()
     except HTTPError:
         ctx = {"response": {"reason": response.reason, "content": response.text}}
-        report_exception(context=ctx)
+        event_id = report_exception(context=ctx)
+        response.sentry_event_id = event_id  # type: ignore
+
+    return response
 
 
 def sign_in_hook(response: Response, *args, **kwargs):

@@ -47,7 +47,7 @@ def upload_deck(did: DeckId) -> Response:
     LOGGER.debug(f"Deck {deck_name} exported to {out_file}")
     mw.col.models._clear_cache()
     client = AnkiHubClient()
-    response = client.upload_deck(file=out_file, anki_id=did)
+    response = client.upload_deck(file=out_file, anki_deck_id=did)
     return response
 
 

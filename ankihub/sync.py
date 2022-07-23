@@ -1,7 +1,8 @@
 import json
+import uuid
 from concurrent.futures import Future
 from pprint import pformat
-from typing import Dict, Iterable, List, Optional, Set, Tuple
+from typing import Any, Dict, Iterable, List, Optional, Set, Tuple
 from urllib.error import HTTPError
 
 from anki.decks import DeckId
@@ -28,6 +29,10 @@ from .utils import (
 )
 
 
+class AnkiHubError(Exception):
+    pass
+
+
 def sync_with_ankihub() -> None:
     LOGGER.debug("Trying to sync with AnkiHub.")
 
@@ -41,7 +46,9 @@ def sync_deck_with_ankihub(ankihub_did: str) -> None:
     deck = config.private_config.decks[ankihub_did]
     client = AnkiHubClient()
     notes_data = []
-    for response in client.get_deck_updates(ankihub_did, since=deck["latest_update"]):
+    for response in client.get_deck_updates(
+        uuid.UUID(ankihub_did), since=deck["latest_update"]
+    ):
         if response.status_code != 200:
             return
 
@@ -66,8 +73,10 @@ def import_ankihub_deck(
     ankihub_did: str,
     notes_data: List[Dict],
     deck_name: str,  # name that will be used for a deck if a new one gets created
-    local_did: DeckId = None,  # did that new notes should be put into if importing not for the first time
-) -> DeckId:
+    local_did: Optional[  # did that new notes should be put into if importing not for the first time
+        DeckId
+    ] = None,
+) -> Optional[DeckId]:
     """
     Used for importing an ankihub deck and updates to an ankihub deck
     When no local_did is provided this function assumes that the deck gets installed for the first time
@@ -76,6 +85,54 @@ def import_ankihub_deck(
 
     LOGGER.debug(f"Importing ankihub deck {deck_name=} {local_did=}")
 
+    try:
+        remote_note_types = fetch_remote_note_types_based_on_notes_data(notes_data)
+    except AnkiHubError:
+        return None
+
+    protected_fields: Dict[int, List[str]] = {}
+    protected_tags: List[str] = []
+    if local_did is None:
+        # we only need to fetch protected fields and tags if we are installing the deck for the first time
+        # because protected fields and tags are excluded from deck updates by AnkiHub
+        client = AnkiHubClient()
+        response = client.get_protected_fields(uuid.UUID(ankihub_did))
+        if response.status_code == 200:
+            protected_fields_raw = response.json()["fields"]
+            protected_fields = {
+                int(field_id): field_names
+                for field_id, field_names in protected_fields_raw.items()
+            }
+        elif response.status_code != 404:
+            return None
+
+        response = client.get_protected_tags(uuid.UUID(ankihub_did))
+        if response.status_code == 200:
+            protected_tags = response.json()["tags"]
+        elif response.status_code != 404:
+            return None
+
+    anki_deck_id = import_ankihub_deck_inner(
+        ankihub_did=ankihub_did,
+        notes_data=notes_data,
+        deck_name=deck_name,
+        remote_note_types=remote_note_types,
+        protected_fields=protected_fields,
+        protected_tags=protected_tags,
+        local_did=local_did,
+    )
+    return anki_deck_id
+
+
+def import_ankihub_deck_inner(
+    ankihub_did: str,
+    notes_data: List[dict],
+    deck_name: str,  # name that will be used for a deck if a new one gets created
+    remote_note_types: Dict[NotetypeId, NotetypeDict],
+    protected_fields: Dict[int, List[str]],
+    protected_tags: List[str],
+    local_did: DeckId = None,  # did that new notes should be put into if importing not for the first time
+) -> DeckId:
     notes_data = transform_notes_data(notes_data)
 
     db = AnkiHubDB()
@@ -84,7 +141,7 @@ def import_ankihub_deck(
     first_time_import = local_did is None
 
     local_did = adjust_deck(deck_name, local_did)
-    adjust_note_types_based_on_notes_data(notes_data)
+    adjust_note_types(remote_note_types)
     reset_note_types_of_notes_based_on_notes_data(notes_data)
 
     # TODO fix differences between csv when installing for the first time vs. when updating
@@ -93,7 +150,12 @@ def import_ankihub_deck(
     dids: Set[DeckId] = set()  # set of ids of decks notes were imported into
     for note_data in notes_data:
         LOGGER.debug(f"Trying to update or create note:\n {pformat(note_data)}")
-        note = update_or_create_note(**note_data, anki_did=local_did)
+        note = update_or_create_note(
+            **note_data,
+            anki_did=local_did,
+            protected_fields=protected_fields,
+            protected_tags=protected_tags,
+        )
         dids_for_note = set(c.did for c in note.cards())
         dids = dids | dids_for_note
 
@@ -168,6 +230,8 @@ def update_or_create_note(
     tags: List[str],
     note_type_id: NotetypeId,
     anki_did: DeckId,  # only relevant for newly created notes
+    protected_fields: Dict[int, List[str]],
+    protected_tags: List[str],
 ) -> Note:
     try:
         note = mw.col.get_note(id=anki_id)
@@ -179,32 +243,48 @@ def update_or_create_note(
                 "value": ankihub_id,
             }
         )
-        prepare_note(note, ankihub_id, fields, tags)
+        prepare_note(note, ankihub_id, fields, tags, protected_fields, protected_tags)
         mw.col.update_note(note)
         LOGGER.debug(f"Updated note: {anki_id=}")
     except NotFoundError:
         note_type = mw.col.models.get(NotetypeId(note_type_id))
         note = mw.col.new_note(note_type)
-        prepare_note(note, ankihub_id, fields, tags)
+        prepare_note(note, ankihub_id, fields, tags, protected_fields, protected_tags)
         note = create_note_with_id(note, anki_id, anki_did)
         LOGGER.debug(f"Created note: {anki_id=}")
     return note
 
 
 def prepare_note(
-    note: Note, ankihub_id: str, fields: List[Dict], tags: List[str]
+    note: Note,
+    ankihub_id: str,
+    fields: List[Dict[str, Any]],
+    tags: List[str],
+    protected_fields: Dict[int, List[str]],
+    protected_tags: List[str],
 ) -> None:
     note[constants.ANKIHUB_NOTE_TYPE_FIELD_NAME] = str(ankihub_id)
-    note.tags = [str(tag) for tag in tags]
-    # TODO Make sure we don't update protected fields.
+
+    # update tags, but don't remove protected ones
+    note.tags = list(set(note.tags).intersection(set(protected_tags)) | set(tags))
+
+    # update fields which are not protected
     for field in fields:
+        protected_fields_for_model = protected_fields.get(
+            mw.col.models.get(note.mid)["id"], []
+        )
+        if field["name"] in protected_fields_for_model:
+            continue
+
         note[field["name"]] = field["value"]
 
 
-def adjust_note_types_based_on_notes_data(notes_data: List[Dict]) -> None:
+def fetch_remote_note_types_based_on_notes_data(
+    notes_data: List[Dict],
+) -> Dict[NotetypeId, NotetypeDict]:
     remote_mids = set(note_data["note_type_id"] for note_data in notes_data)
-    remote_note_types = fetch_remote_note_types(remote_mids)
-    adjust_note_types(remote_note_types)
+    result = fetch_remote_note_types(remote_mids)
+    return result
 
 
 def fetch_remote_note_types(
@@ -217,7 +297,7 @@ def fetch_remote_note_types(
 
         if response.status_code != 200:
             LOGGER.debug(f"Failed fetching note type with id {mid}.")
-            continue
+            raise AnkiHubError()
 
         data = response.json()
         note_type = to_anki_note_type(data)

@@ -200,12 +200,12 @@ def test_upload_deck(anki_session_with_addon: AnkiSession, requests_mock):
     )
 
     # test upload deck
-    response = client.upload_deck(file=pathlib.Path(sample_deck), anki_id=1)
+    response = client.upload_deck(file=pathlib.Path(sample_deck), anki_deck_id=1)
     assert response.status_code == 201
 
     # test upload deck unauthenticated
     requests_mock.post(f"{API_URL_BASE}/decks/", status_code=403)
-    response = client.upload_deck(pathlib.Path(sample_deck), anki_id=1)
+    response = client.upload_deck(pathlib.Path(sample_deck), anki_deck_id=1)
     assert response.status_code == 403
 
 
@@ -239,13 +239,17 @@ def test_get_deck_updates(anki_session_with_addon: AnkiSession, requests_mock):
     }
 
     requests_mock.get(f"{API_URL_BASE}/decks/{deck_id}/updates", json=expected_data)
-    for response in client.get_deck_updates(deck_id=str(deck_id), since=timestamp):
+    for response in client.get_deck_updates(
+        ankihub_deck_uuid=str(deck_id), since=timestamp  # type: ignore
+    ):
         assert response.json() == expected_data
 
     # test get deck updates unauthenticated
     deck_id = 1
     requests_mock.get(f"{API_URL_BASE}/decks/{deck_id}/updates", status_code=403)
-    for response in client.get_deck_updates(deck_id=str(deck_id), since=timestamp):
+    for response in client.get_deck_updates(
+        ankihub_deck_uuid=str(deck_id), since=timestamp  # type: ignore
+    ):
         assert response.status_code == 403
 
 
@@ -268,13 +272,13 @@ def test_get_deck_by_id(anki_session_with_addon: AnkiSession, requests_mock):
     }
 
     requests_mock.get(f"{API_URL_BASE}/decks/{deck_id}/", json=expected_data)
-    response = client.get_deck_by_id(deck_id=str(deck_id))
+    response = client.get_deck_by_id(ankihub_deck_uuid=str(deck_id))  # type: ignore
     assert response.json() == expected_data
 
     # test get deck by id unauthenticated
     deck_id = DeckId(1)
     requests_mock.get(f"{API_URL_BASE}/decks/{deck_id}/", status_code=403)
-    response = client.get_deck_by_id(deck_id=str(deck_id))
+    response = client.get_deck_by_id(ankihub_deck_uuid=str(deck_id))  # type: ignore
     assert response.status_code == 403
 
 
@@ -294,13 +298,13 @@ def test_get_note_by_ankihub_id(anki_session_with_addon: AnkiSession, requests_m
         "fields": [{"name": "Text", "order": 0, "value": "Fake value"}],
     }
     requests_mock.get(f"{API_URL_BASE}/notes/{note_ankihub_id}", json=expected_data)
-    response = client.get_note_by_ankihub_id(ankihub_id=note_ankihub_id)  # type: ignore
+    response = client.get_note_by_ankihub_id(ankihub_note_uuid=note_ankihub_id)  # type: ignore
     assert response.json() == expected_data
 
     # test get note by ankihub id unauthenticated
     note_ankihub_id = "1"
     requests_mock.get(f"{API_URL_BASE}/notes/{note_ankihub_id}", status_code=403)
-    response = client.get_note_by_ankihub_id(ankihub_id=note_ankihub_id)  # type: ignore
+    response = client.get_note_by_ankihub_id(ankihub_note_uuid=note_ankihub_id)  # type: ignore
     assert response.status_code == 403
 
 
@@ -315,7 +319,7 @@ def test_create_change_note_suggestion(
     note_id = 1
     requests_mock.post(f"{API_URL_BASE}/notes/{note_id}/suggestion/", status_code=201)
     response = client.create_change_note_suggestion(
-        ankihub_note_uuid=str(1),
+        ankihub_note_uuid=str(1),  # type: ignore
         fields=[{"name": "abc", "order": 0, "value": "abc changed"}],
         tags=["test"],
         change_type=ChangeTypes.NEW_CONTENT,
@@ -327,7 +331,7 @@ def test_create_change_note_suggestion(
     note_id = 1
     requests_mock.post(f"{API_URL_BASE}/notes/{note_id}/suggestion/", status_code=403)
     response = client.create_change_note_suggestion(
-        ankihub_note_uuid=str(1),
+        ankihub_note_uuid=str(1),  # type: ignore
         fields=[{"name": "abc", "order": 0, "value": "abc changed"}],
         tags=["test"],
         change_type=ChangeTypes.NEW_CONTENT,
@@ -349,14 +353,14 @@ def test_create_new_note_suggestion(
         f"{API_URL_BASE}/decks/{deck_id}/note-suggestion/", status_code=201
     )
     response = client.create_new_note_suggestion(
-        ankihub_deck_uuid=deck_id,
-        anki_id=1,
-        ankihub_note_uuid=str(1),
+        ankihub_deck_uuid=deck_id,  # type: ignore
+        anki_note_id=1,
+        ankihub_note_uuid=str(1),  # type: ignore
         fields=[{"name": "abc", "order": 0, "value": "abc changed"}],
         tags=["test"],
         change_type=ChangeTypes.NEW_CARD_TO_ADD,
-        note_type="Basic",
-        note_type_id=1,
+        note_type_name="Basic",
+        anki_note_type_id=1,
         comment="",
     )
     assert response.status_code == 201
@@ -366,14 +370,14 @@ def test_create_new_note_suggestion(
         f"{API_URL_BASE}/decks/{deck_id}/note-suggestion/", status_code=403
     )
     response = client.create_new_note_suggestion(
-        ankihub_deck_uuid=deck_id,
-        ankihub_note_uuid=str(1),
-        anki_id=1,
+        ankihub_deck_uuid=deck_id,  # type: ignore
+        ankihub_note_uuid=str(1),  # type: ignore
+        anki_note_id=1,
         fields=[{"name": "abc", "order": 0, "value": "abc changed"}],
         tags=["test"],
         change_type=ChangeTypes.NEW_CARD_TO_ADD,
-        note_type="Basic",
-        note_type_id=1,
+        note_type_name="Basic",
+        anki_note_type_id=1,
         comment="",
     )
     assert response.status_code == 403
@@ -446,10 +450,10 @@ def test_reset_note_types_of_notes(anki_session_with_addon: AnkiSession):
         assert mw.col.get_note(note.id).mid == cloze["id"]
 
 
-def test_import_new_ankihub_deck(anki_session_with_addon: AnkiSession, monkeypatch):
+def test_import_new_ankihub_deck(anki_session_with_addon: AnkiSession):
     from aqt import mw
 
-    from ankihub.sync import import_ankihub_deck
+    from ankihub.sync import import_ankihub_deck_inner
     from ankihub.utils import all_dids
 
     anki_session = anki_session_with_addon
@@ -461,26 +465,27 @@ def test_import_new_ankihub_deck(anki_session_with_addon: AnkiSession, monkeypat
         importer.run()
         mw.col.decks.remove([mw.col.decks.id_for_name("Testdeck")])
 
-        monkeypatch.setattr(
-            "ankihub.sync.adjust_note_types_based_on_notes_data", Mock()
-        )
-
         dids_before_import = all_dids()
-        local_did = import_ankihub_deck("1", ankihub_sample_deck_notes_data, "test")
-        new_decks = all_dids() - dids_before_import
+        local_did = import_ankihub_deck_inner(
+            ankihub_did="1",
+            notes_data=ankihub_sample_deck_notes_data,
+            deck_name="test",
+            remote_note_types={},
+            protected_fields={},
+            protected_tags=[],
+        )
+        new_dids = all_dids() - dids_before_import
 
         assert (
-            len(new_decks) == 1
+            len(new_dids) == 1
         )  # we have no mechanism for importing subdecks from a csv yet, so ti will be just onen deck
-        assert local_did == list(new_decks)[0]
+        assert local_did == list(new_dids)[0]
 
 
-def test_import_existing_ankihub_deck(
-    anki_session_with_addon: AnkiSession, monkeypatch
-):
+def test_import_existing_ankihub_deck(anki_session_with_addon: AnkiSession):
     from aqt import mw
 
-    from ankihub.sync import import_ankihub_deck
+    from ankihub.sync import import_ankihub_deck_inner
     from ankihub.utils import all_dids
 
     anki_session = anki_session_with_addon
@@ -492,24 +497,25 @@ def test_import_existing_ankihub_deck(
         importer.run()
         existing_did = mw.col.decks.id_for_name("Testdeck")
 
-        monkeypatch.setattr(
-            "ankihub.sync.adjust_note_types_based_on_notes_data", Mock()
-        )
-
         dids_before_import = all_dids()
-        local_did = import_ankihub_deck("1", ankihub_sample_deck_notes_data, "test")
-        new_decks = all_dids() - dids_before_import
+        local_did = import_ankihub_deck_inner(
+            ankihub_did="1",
+            notes_data=ankihub_sample_deck_notes_data,
+            deck_name="test",
+            remote_note_types={},
+            protected_fields={},
+            protected_tags=[],
+        )
+        new_dids = all_dids() - dids_before_import
 
-        assert not new_decks
+        assert not new_dids
         assert local_did == existing_did
 
 
-def test_import_existing_ankihub_deck_2(
-    anki_session_with_addon: AnkiSession, monkeypatch
-):
+def test_import_existing_ankihub_deck_2(anki_session_with_addon: AnkiSession):
     from aqt import mw
 
-    from ankihub.sync import import_ankihub_deck
+    from ankihub.sync import import_ankihub_deck_inner
     from ankihub.utils import all_dids
 
     anki_session = anki_session_with_addon
@@ -525,38 +531,47 @@ def test_import_existing_ankihub_deck_2(
         cids = mw.col.find_cards("deck:Testdeck")
         mw.col.set_deck([cids[0]], other_deck_id)
 
-        monkeypatch.setattr(
-            "ankihub.sync.adjust_note_types_based_on_notes_data", Mock()
-        )
-
         dids_before_import = all_dids()
-        local_did = import_ankihub_deck("1", ankihub_sample_deck_notes_data, "test")
-        new_decks = all_dids() - dids_before_import
+        local_did = import_ankihub_deck_inner(
+            ankihub_did="1",
+            notes_data=ankihub_sample_deck_notes_data,
+            deck_name="test",
+            remote_note_types={},
+            protected_fields={},
+            protected_tags=[],
+        )
+        new_dids = all_dids() - dids_before_import
 
         # if the existing cards are in multiple seperate decks a new deck is created deck
-        assert len(new_decks) == 1
-        assert local_did == list(new_decks)[0]
+        assert len(new_dids) == 1
+        assert local_did == list(new_dids)[0]
 
 
-def test_update_ankihub_deck(anki_session_with_addon: AnkiSession, monkeypatch):
+def test_update_ankihub_deck(anki_session_with_addon: AnkiSession):
     from aqt import mw
 
-    from ankihub.sync import import_ankihub_deck
+    from ankihub.sync import import_ankihub_deck_inner
     from ankihub.utils import all_dids
 
     anki_session = anki_session_with_addon
     with anki_session.profile_loaded():
 
-        first_local_did = import_sample_ankihub_deck(mw, monkeypatch)
+        first_local_did = import_sample_ankihub_deck(mw)
 
         dids_before_import = all_dids()
-        second_local_id = import_ankihub_deck(
-            "1", ankihub_sample_deck_notes_data, "test", local_did=first_local_did
+        second_local_did = import_ankihub_deck_inner(
+            ankihub_did="1",
+            notes_data=ankihub_sample_deck_notes_data,
+            deck_name="test",
+            remote_note_types={},
+            protected_fields={},
+            protected_tags=[],
+            local_did=first_local_did,
         )
-        new_decks = all_dids() - dids_before_import
+        new_dids = all_dids() - dids_before_import
 
-        assert len(new_decks) == 0
-        assert first_local_did == second_local_id
+        assert len(new_dids) == 0
+        assert first_local_did == second_local_did
 
 
 def test_update_ankihub_deck_when_deck_was_deleted(
@@ -564,13 +579,13 @@ def test_update_ankihub_deck_when_deck_was_deleted(
 ):
     from aqt import mw
 
-    from ankihub.sync import import_ankihub_deck
+    from ankihub.sync import import_ankihub_deck_inner
     from ankihub.utils import all_dids
 
     anki_session = anki_session_with_addon
     with anki_session.profile_loaded():
 
-        first_local_did = import_sample_ankihub_deck(mw, monkeypatch)
+        first_local_did = import_sample_ankihub_deck(mw)
 
         # move cards to other deck and delete the deck
         other_deck = mw.col.decks.add_normal_deck_with_name("other deck").id
@@ -579,14 +594,20 @@ def test_update_ankihub_deck_when_deck_was_deleted(
         mw.col.decks.remove([first_local_did])
 
         dids_before_import = all_dids()
-        second_local_id = import_ankihub_deck(
-            "1", ankihub_sample_deck_notes_data, "test", local_did=first_local_did
+        second_local_id = import_ankihub_deck_inner(
+            ankihub_did="1",
+            notes_data=ankihub_sample_deck_notes_data,
+            deck_name="test",
+            remote_note_types={},
+            protected_fields={},
+            protected_tags=[],
+            local_did=first_local_did,
         )
-        new_decks = all_dids() - dids_before_import
+        new_dids = all_dids() - dids_before_import
 
         # deck with first_local_did should be recreated
-        assert len(new_decks) == 1
-        assert list(new_decks)[0] == first_local_did
+        assert len(new_dids) == 1
+        assert list(new_dids)[0] == first_local_did
         assert second_local_id == first_local_did
 
 
@@ -601,9 +622,7 @@ def test_unsubsribe_from_deck(anki_session_with_addon: AnkiSession, monkeypatch)
     with anki_session.profile_loaded():
         ankihub_did = "1"
 
-        import_sample_ankihub_deck(
-            ankihub_did=ankihub_did, mw=mw, monkeypatch=monkeypatch
-        )
+        import_sample_ankihub_deck(ankihub_did=ankihub_did, mw=mw)
 
         db = AnkiHubDB()
         mids = db.note_types_for_ankihub_deck(ankihub_did)
@@ -629,10 +648,8 @@ def test_unsubsribe_from_deck(anki_session_with_addon: AnkiSession, monkeypatch)
         assert len(nids) == 0
 
 
-def import_sample_ankihub_deck(
-    mw: aqt.AnkiQt, monkeypatch, ankihub_did: Optional[str] = None
-):
-    from ankihub.sync import import_ankihub_deck
+def import_sample_ankihub_deck(mw: aqt.AnkiQt, ankihub_did: Optional[str] = None):
+    from ankihub.sync import import_ankihub_deck_inner
     from ankihub.utils import all_dids
 
     if ankihub_did is None:
@@ -644,13 +661,59 @@ def import_sample_ankihub_deck(
     importer.run()
     mw.col.decks.remove([mw.col.decks.id_for_name("Testdeck")])
 
-    monkeypatch.setattr("ankihub.sync.adjust_note_types_based_on_notes_data", Mock())
-
     dids_before_import = all_dids()
-    local_did = import_ankihub_deck(ankihub_did, ankihub_sample_deck_notes_data, "test")
-    new_decks = all_dids() - dids_before_import
+    local_did = import_ankihub_deck_inner(
+        ankihub_did=ankihub_did,
+        notes_data=ankihub_sample_deck_notes_data,
+        deck_name="test",
+        protected_fields={},
+        protected_tags=[],
+        remote_note_types={},
+    )
+    new_dids = all_dids() - dids_before_import
 
-    assert len(new_decks) == 1
-    assert local_did == list(new_decks)[0]
+    assert len(new_dids) == 1
+    assert local_did == list(new_dids)[0]
 
     return local_did
+
+
+def test_prepare_note(anki_session_with_addon: AnkiSession):
+    from ankihub.sync import prepare_note
+    from ankihub.utils import modify_note_type
+
+    anki_session = anki_session_with_addon
+    with anki_session_with_addon.profile_loaded():
+        mw = anki_session.mw
+
+        # create ankihub_basic note type because prepare_note needs a note type with an ankihub_id field
+        basic = mw.col.models.by_name("Basic")
+        modify_note_type(basic)
+        basic["id"] = 0
+        basic["name"] = "Basic (AnkiHub)"
+        ankihub_basic_mid = NotetypeId(mw.col.models.add_dict(basic).id)
+        ankihub_basic = mw.col.models.get(ankihub_basic_mid)
+
+        # create a new note with non-empty fields and tags
+        note = mw.col.new_note(ankihub_basic)
+        note["Front"] = "old front"
+        note["Back"] = "old back"
+        note.tags = ["a", "b"]
+
+        # prepare_note
+        prepare_note(
+            note=note,
+            ankihub_id="1",
+            fields=[
+                {"name": "Front", "value": "new front"},
+                {"name": "Back", "value": "new back"},
+            ],
+            tags=["c", "d"],
+            protected_fields={ankihub_basic["id"]: ["Back"]},
+            protected_tags=["a"],
+        )
+
+        # assert that the note was modified but the protected fields and tags were not
+        assert note["Front"] == "new front"
+        assert note["Back"] == "old back"
+        assert set(note.tags) == set(["a", "c", "d"])

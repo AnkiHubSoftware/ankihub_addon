@@ -2,9 +2,15 @@ image:
   file: .gitpod.Dockerfile
 
 tasks:
-  - before: ln -s /workspace/ankihub_addon/ankihub ~/.local/share/Anki2/addons21
-  - init: pyenv local 3.9.13
-    command: python -m pytest tests
+  - init: >
+      pyenv local 3.9.13
+    env:
+      ANKIHUB_APP_URL: "https://staging.ankihub.net"
+      ANKIDEV: 1
+      DEVELOPMENT: True
+    command: >
+      ln -s /workspace/ankihub_addon/ankihub /home/gitpod/.local/share/Anki2/addons21/ &&
+      anki
 
 github:
   prebuilds:
@@ -16,3 +22,10 @@ vscode:
     - almenon.arepl
     - ms-python.python
     - littlefoxteam.vscode-python-test-adapter
+
+ports:
+  - port: 6080
+    onOpen: open-browser
+    visibility: public
+  - port: 5900
+    onOpen: ignore
