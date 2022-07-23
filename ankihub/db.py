@@ -1,11 +1,10 @@
 import sqlite3
-from pathlib import Path
 from typing import Dict, List
 
 from anki.models import NotetypeId
 from anki.notes import NoteId
 
-DB_PATH = Path(__file__).parent / "user_files/ankihub.db"
+from .constants import DB_PATH
 
 
 class AnkiHubDB:
