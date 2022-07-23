@@ -575,7 +575,7 @@ def test_update_ankihub_deck(anki_session_with_addon: AnkiSession):
 
 
 def test_update_ankihub_deck_when_deck_was_deleted(
-    anki_session_with_addon: AnkiSession, monkeypatch
+    anki_session_with_addon: AnkiSession,
 ):
     from aqt import mw
 
@@ -611,7 +611,7 @@ def test_update_ankihub_deck_when_deck_was_deleted(
         assert second_local_id == first_local_did
 
 
-def test_unsubsribe_from_deck(anki_session_with_addon: AnkiSession, monkeypatch):
+def test_unsubsribe_from_deck(anki_session_with_addon: AnkiSession):
     from aqt import mw
 
     from ankihub.db import AnkiHubDB
