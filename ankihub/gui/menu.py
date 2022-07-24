@@ -1,3 +1,4 @@
+from concurrent.futures import Future
 from typing import Optional
 
 from aqt import (
@@ -20,7 +21,7 @@ from .. import LOGGER
 from ..addon_ankihub_client import AddonAnkiHubClient as AnkiHubClient
 from ..config import config
 from ..register_decks import create_collaborative_deck
-from ..sync import sync_with_progress
+from ..sync import sync_deck_with_ankihub, sync_with_progress
 from .decks import SubscribedDecksDialog
 
 
@@ -151,6 +152,16 @@ def create_collaborative_deck_action() -> None:
             anki_did = mw.col.decks.id_for_name(deck_name)
             ankihub_did = data["deck_id"]
             config.save_subscription(deck_name, ankihub_did, anki_did, creator=True)
+
+            def on_done(future: Future):
+                future.result()  # raises exception if one accured in task
+
+            # sync the deck so that the database gets updated
+            mw.taskman.with_progress(
+                lambda: sync_deck_with_ankihub(ankihub_did),
+                on_done=on_done,
+                label="Syncing deck with AnkiHub",
+            )
         else:
             msg = f"😔 Deck upload failed: {response.text}"
         showInfo(msg)
