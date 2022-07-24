@@ -80,5 +80,4 @@ def upload_logs() -> None:
     if response.status_code == 200:
         LOGGER.debug("Logs uploaded.")
     else:
-        LOGGER.error("Failed to upload logs.")
-        raise RuntimeError("Failed to upload logs.", response)
+        LOGGER.debug("Failed to upload logs.")

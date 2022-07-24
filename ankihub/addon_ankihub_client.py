@@ -63,6 +63,7 @@ def report_exception_hook(response: Response, *args, **kwargs):
 
     LOGGER.debug("Begin report exception hook.")
 
+    endpoint = response.request.url
     treat_404_as_error = getattr(response.request, "treat_404_as_error", True)
     if not treat_404_as_error and response.status_code == 404:
         return response
@@ -70,6 +71,11 @@ def report_exception_hook(response: Response, *args, **kwargs):
     try:
         response.raise_for_status()
     except HTTPError:
+        if (
+                "pre-signed-url" in endpoint and
+                response.request.data.get("file").endswith("ankihub.log")
+        ):
+            return response
         ctx = {"response": {"reason": response.reason, "content": response.text}}
         event_id = report_exception_and_upload_logs(context=ctx)
         response.sentry_event_id = event_id  # type: ignore
