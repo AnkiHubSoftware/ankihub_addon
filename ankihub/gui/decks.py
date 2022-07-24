@@ -210,7 +210,7 @@ class SubscribeDialog(QDialog):
             self.show()
 
     def subscribe(self):
-        ankihub_did = self.deck_id_box_text.text()
+        ankihub_did = self.deck_id_box_text.text().strip()
         if ankihub_did in config.private_config.decks.keys():
             showText(
                 f"You've already subscribed to deck {ankihub_did}. "
