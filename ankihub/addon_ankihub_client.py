@@ -138,16 +138,3 @@ class AddonAnkiHubClient(AnkiHubClient):
             hooks=hooks if hooks is not None else DEFAULT_RESPONSE_HOOKS,
             token=config.private_config.token,
         )
-
-    def share_logs(self, file: Path) -> Response:
-        key = file.name
-        presigned_url_response = self.get_presigned_url(key=key, action="upload")
-        if presigned_url_response.status_code != 200:
-            return presigned_url_response
-
-        s3_url = presigned_url_response.json()["pre_signed_url"]
-        with open(file, "rb") as f:
-            log_bytes = f.read()
-
-        s3_response = requests.put(s3_url, data=log_bytes)
-        return s3_response
