@@ -268,6 +268,7 @@ class SubscribeDialog(QDialog):
         data = deck_response.json()
         deck_file_name = data["csv_notes_filename"]
         last_update = data["csv_last_upload"]
+        is_creator = bool(data["owner"])
 
         def on_download_done(future: Future):
             response = future.result()
@@ -293,7 +294,11 @@ class SubscribeDialog(QDialog):
 
                 mw.taskman.with_progress(
                     lambda: self.install_deck(
-                        out_file, data["name"], ankihub_did, last_update
+                        deck_file=out_file,
+                        deck_name=data["name"],
+                        ankihub_did=ankihub_did,
+                        last_update=last_update,
+                        is_creator=is_creator,
                     ),
                     on_done=on_install_done,
                     parent=mw,
@@ -308,7 +313,12 @@ class SubscribeDialog(QDialog):
         )
 
     def install_deck(
-        self, deck_file: Path, deck_name: str, ankihub_did: str, last_update: str
+        self,
+        deck_file: Path,
+        deck_name: str,
+        ankihub_did: str,
+        last_update: str,
+        is_creator: bool,
     ) -> bool:
         """If we have a .csv, read data from the file and modify the user's note types
         and notes.
@@ -328,6 +338,7 @@ class SubscribeDialog(QDialog):
             ankihub_did=ankihub_did,
             anki_did=local_did,
             last_update=last_update,
+            creator=is_creator,
         )
 
         LOGGER.debug("Importing deck was succesful.")
