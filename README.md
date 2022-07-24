@@ -57,9 +57,9 @@ Follow the instructions below for
 2. From the root of the this repo, run `anki` under watchexec:
 
 ```bash
-ANKIHUB_APP_URL=http://localhost:8000\
-watchexec -r -d 3000 -w ankihub -- \
-anki -p $ANKI_PROFILE
+ANKIHUB_APP_URL=http://localhost:8000 \
+    watchexec -r -d 3000 -w ankihub -- \
+    anki -p $ANKI_PROFILE
 ```
 
 
