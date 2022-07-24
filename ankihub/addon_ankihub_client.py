@@ -3,7 +3,6 @@ from json import JSONDecodeError
 from pprint import pformat
 from typing import Dict
 
-import requests
 from aqt import mw
 from aqt.utils import tooltip
 from requests import Response
