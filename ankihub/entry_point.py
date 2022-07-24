@@ -13,7 +13,7 @@ def run():
 
     mw.addonManager.setWebExports(__name__, r"gui/web/.*")
 
-    if config.public_config.get("sync-on-startup", True):
+    if config.public_config.get("sync_on_startup", True):
         setup_sync_on_startup()
         LOGGER.debug("Set up AnkiHub sync on startup.")
     else:

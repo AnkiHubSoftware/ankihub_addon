@@ -2,5 +2,5 @@
     "ankihub_url": "https://staging.ankihub.net",
     "hotkey": "Alt+u",
     "report_errors": true,
-    "sync-on-startup": true
+    "sync_on_startup": true
 }
