@@ -38,6 +38,9 @@ RUN sudo apt-get install -y \
 RUN pyenv install 3.9.13
 RUN pyenv global 3.9.13
 
+RUN curl https://sh.rustup.rs -sSf | sh && \
+    cargo install watchexec
+
 COPY --chown=gitpod ./requirements /requirements
 RUN python -m pip install --upgrade pip && \
     python -m pip install -r /requirements/dev.txt
