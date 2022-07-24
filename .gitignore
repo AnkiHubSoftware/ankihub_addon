@@ -4,6 +4,9 @@ ankihub/meta.json
 # Ignore everything except the README.
 /ankihub/user_files/*
 !/ankihub/user_files/README.md
+# Anki data dir
+*.colpkg
+Anki2/
 
 
 # Byte-compiled / optimized / DLL files
