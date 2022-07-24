@@ -1,6 +1,5 @@
 import json
 from json import JSONDecodeError
-from pathlib import Path
 from pprint import pformat
 from typing import Dict
 
@@ -71,9 +70,8 @@ def report_exception_hook(response: Response, *args, **kwargs):
     try:
         response.raise_for_status()
     except HTTPError:
-        if (
-                "pre-signed-url" in endpoint and
-                response.request.data.get("file").endswith("ankihub.log")
+        if "pre-signed-url" in endpoint and response.request.data.get("file").endswith(
+            "ankihub.log"
         ):
             return response
         ctx = {"response": {"reason": response.reason, "content": response.text}}
