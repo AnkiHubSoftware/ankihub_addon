@@ -42,7 +42,7 @@ export LOGTERM=1
 
 ### Development workflow
 
-Follow the instructions below for 
+Follow the instructions below for:
 - Automatically restarting Anki when add-on source code is modified
 - To see both add-on and Anki source-code output in the console
 - Start Anki with the data dir specified by the `ANKI_BASE` env var and `ANKI_PROFILE`
