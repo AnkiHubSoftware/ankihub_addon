@@ -38,7 +38,7 @@ RUN sudo apt-get install -y \
 RUN pyenv install 3.9.13 && \
     pyenv global 3.9.13
 
-RUN cargo install watchexec
+RUN cargo install watchexec-cli
 
 COPY --chown=gitpod ./requirements /requirements
 RUN python -m pip install --upgrade pip && \
