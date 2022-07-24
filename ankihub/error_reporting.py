@@ -1,10 +1,13 @@
 import dataclasses
 import os
 import time
+from concurrent.futures import Future
 from typing import Optional
 
+from aqt import mw
+
 from . import LOGGER
-from .addon_ankihub_client import AnkiHubClient
+from .addon_ankihub_client import AddonAnkiHubClient as AnkiHubClient
 from .config import config
 from .constants import VERSION
 from .settings import LOG_FILE
@@ -19,14 +22,15 @@ def report_exception_and_upload_logs(context: dict = dict()) -> Optional[str]:
     if not config.public_config.get("report_errors"):
         return None
 
+    def on_upload_logs_done(future: Future) -> None:
+        try:
+            future.result()
+        except Exception:
+            report_exception()
+
+    mw.taskman.run_in_background(task=upload_logs, on_done=on_upload_logs_done)
+
     sentry_event_id = report_exception(context)
-
-    try:
-        upload_logs()
-    except Exception as e:
-        LOGGER.debug(f"Failed to upload logs: {e}")
-        report_exception()
-
     return sentry_event_id
 
 
@@ -66,10 +70,15 @@ def report_exception(context: dict = dict()) -> Optional[str]:
 
 
 def upload_logs() -> None:
+    LOGGER.debug("Uploading logs...")
     client = AnkiHubClient()
+    key = f"ankihub_addon_logs_{config.private_config.user}_{int(time.time())}.log"
     response = client.upload_logs(
         file=LOG_FILE,
-        key=f"ankihub_addon_logs_{config.private_config['user']}_{time.time()}.log",
+        key=key,
     )
-    if response.status_code != 200:
+    if response.status_code == 200:
+        LOGGER.debug("Logs uploaded.")
+    else:
+        LOGGER.error("Failed to upload logs.")
         raise RuntimeError("Failed to upload logs.", response)
