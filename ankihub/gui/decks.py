@@ -22,7 +22,8 @@ from aqt.qt import (
 )
 from aqt.utils import askUser, openLink, showText, tooltip
 
-from .. import LOGGER, report_exception
+from .. import LOGGER
+from ..error_reporting import report_exception_and_upload_logs
 from ..addon_ankihub_client import AddonAnkiHubClient as AnkiHubClient
 from ..config import config
 from ..constants import CSV_DELIMITER, URL_DECK_BASE, URL_DECKS, URL_HELP
@@ -238,7 +239,7 @@ class SubscribeDialog(QDialog):
             try:
                 success = future.result()
             except Exception as e:
-                report_exception()
+                report_exception_and_upload_logs()
                 exc = e
 
             if success:

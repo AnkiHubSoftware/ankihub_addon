@@ -10,7 +10,7 @@ from aqt.utils import tooltip
 from requests import Response
 from requests.models import HTTPError
 
-from . import LOGGER, report_exception
+from . import LOGGER
 from .ankihub_client import AnkiHubClient
 from .config import config
 from .gui.error_feedback import ErrorFeedbackDialog
@@ -59,6 +59,8 @@ def logging_hook(response: Response, *args, **kwargs):
 
 
 def report_exception_hook(response: Response, *args, **kwargs):
+    from .error_reporting import report_exception_and_upload_logs
+
     LOGGER.debug("Begin report exception hook.")
 
     treat_404_as_error = getattr(response.request, "treat_404_as_error", True)
@@ -69,7 +71,7 @@ def report_exception_hook(response: Response, *args, **kwargs):
         response.raise_for_status()
     except HTTPError:
         ctx = {"response": {"reason": response.reason, "content": response.text}}
-        event_id = report_exception(context=ctx)
+        event_id = report_exception_and_upload_logs(context=ctx)
         response.sentry_event_id = event_id  # type: ignore
 
     return response
