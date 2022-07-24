@@ -1,4 +1,5 @@
 import dataclasses
+import logging
 import logging.config
 import os
 import pathlib
@@ -11,7 +12,7 @@ lib = (pathlib.Path(__file__).parent / "lib").absolute()
 sys.path.insert(0, str(lib))
 
 logging.config.dictConfig(settings.LOGGING)
-LOGGER = logging.getLogger("ankihub")
+LOGGER: logging.Logger = logging.getLogger("ankihub")
 
 SKIP_INIT = os.getenv("SKIP_INIT", False)
 LOGGER.debug(f"SKIP_INIT: {SKIP_INIT}")

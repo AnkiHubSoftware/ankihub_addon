@@ -5,6 +5,7 @@ from . import LOGGER
 from .gui import browser, editor
 from .gui.menu import setup_ankihub_menu
 from .sync import setup_sync_on_startup
+from .addons import setup_addons
 from .config import config
 
 
@@ -27,5 +28,8 @@ def run():
 
     browser.setup()
     LOGGER.debug("Set up browser.")
+
+    setup_addons()
+    LOGGER.debug("Set up addons.")
 
     return mw
