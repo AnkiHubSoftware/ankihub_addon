@@ -13,7 +13,7 @@ tasks:
       DEVELOPMENT: True
       ANKI_BASE: "/workspace/ankihub_addon/ankihub/tests/test_data/Anki2"
     command: >
-      anki -p dev
+      anki
 
 github:
   prebuilds:
