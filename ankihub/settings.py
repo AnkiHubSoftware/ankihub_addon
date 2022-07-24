@@ -3,15 +3,16 @@ import sys
 from logging.handlers import RotatingFileHandler
 from pathlib import Path
 
+LOG_FILE = Path(__file__).parent / "user_files/ankihub.log"
+
 
 def stdout_handler():
     return logging.StreamHandler(stream=sys.stdout)
 
 
 def file_handler():
-    LOG_FILENAME = Path(__file__).parent / "user_files/ankihub.log"
     return RotatingFileHandler(
-        LOG_FILENAME, maxBytes=1000000, backupCount=5, encoding="utf-8"
+        LOG_FILE, maxBytes=1000000, backupCount=5, encoding="utf-8"
     )
 
 
