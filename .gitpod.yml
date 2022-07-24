@@ -11,6 +11,7 @@ tasks:
       ANKIHUB_APP_URL: "https://staging.ankihub.net"
       ANKIDEV: 1
       DEVELOPMENT: True
+      ANKI_BASE: "/workspace/ankihub_addon/ankihub/tests/test_data/Anki2"
     command: >
       anki
 
