@@ -12,7 +12,7 @@ def stdout_handler():
 
 def file_handler():
     return RotatingFileHandler(
-        LOG_FILE, maxBytes=1000000, backupCount=5, encoding="utf-8"
+        LOG_FILE, maxBytes=3000000, backupCount=5, encoding="utf-8"
     )
 
 
