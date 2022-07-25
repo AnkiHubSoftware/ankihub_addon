@@ -30,6 +30,12 @@ jobs:
           python -m pip install --upgrade pip
           python -m pip install -r ./requirements/dev.txt
 
+      - name: Build
+        run: |
+          python ./scripts/build.py
+        env:
+          GOOGLE_API_KEY: ${{ secrets.GOOGLE_API_KEY }}
+
       - name: Run pytest
         run: pytest ./tests
 
