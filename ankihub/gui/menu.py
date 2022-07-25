@@ -23,7 +23,7 @@ from ..config import config
 from ..register_decks import create_collaborative_deck
 from ..sync import sync_deck_with_ankihub, sync_with_progress
 from .decks import SubscribedDecksDialog
-
+from ..media_import import open_import_dialog
 
 class AnkiHubLogin(QWidget):
     _window: Optional["AnkiHubLogin"] = None
@@ -216,6 +216,10 @@ def subscribe_to_deck_setup(parent):
     q_action.triggered.connect(SubscribedDecksDialog.display_subscribe_window)
     parent.addAction(q_action)
 
+def import_media_setup(parent):
+    q_action = QAction("🖼️ Import media", mw)
+    q_action.triggered.connect(open_import_dialog)
+    parent.addAction(q_action)
 
 def sync_with_ankihub_setup(parent):
     """Set up the menu item for uploading suggestions in bulk."""
@@ -254,6 +258,7 @@ def refresh_ankihub_menu() -> None:
     if config.private_config.token:
         create_collaborative_deck_setup(parent=ankihub_menu)
         subscribe_to_deck_setup(parent=ankihub_menu)
+        import_media_setup(parent=ankihub_menu)
         sync_with_ankihub_setup(parent=ankihub_menu)
         ankihub_logout_setup(parent=ankihub_menu)
         # upload_suggestions_setup(parent=ankihub_menu)

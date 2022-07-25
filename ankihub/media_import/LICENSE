@@ -1,0 +1,11 @@
+Code in directory '/core' is copied from https://github.com/python/cpython 
+and may be licensed under a different license.
+You can find its license in that directory.
+
+Code in directory '/libs' may be licensed under a different license.
+You can find their licenses in their respective directories.
+
+Code in '/pycryptodome' may be licensed under a different license.
+You can find their licenses in that directory.
+
+
