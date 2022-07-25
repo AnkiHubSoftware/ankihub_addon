@@ -23,14 +23,14 @@ class ImportResultDialog(QMessageBox):
             details += "&nbsp;" * (50 - len(details))
         text = f"<h3><b>{title}</b></h3>{details}<br>"
         self.setText(text)
-        self.setTextFormat(Qt.RichText)
+        self.setTextFormat(Qt.TextFormat.RichText)
         self.setDetailedText("\n".join(result.logs))
 
 
 class ImportDialog(QDialog):
 
     def __init__(self) -> None:
-        QDialog.__init__(self, mw, Qt.Window)
+        QDialog.__init__(self, mw, Qt.WindowType.Window)
         self.setWindowTitle("Import Media")
         self.setMinimumWidth(500)
         self.setup()
@@ -44,7 +44,7 @@ class ImportDialog(QDialog):
 
         main_tab = QTabWidget()
         self.main_tab = main_tab
-        main_tab.setFocusPolicy(Qt.StrongFocus)
+        main_tab.setFocusPolicy(Qt.FocusPolicy.StrongFocus)
         main_layout.addWidget(main_tab)
         main_layout.addSpacing(10)
 
@@ -76,10 +76,10 @@ class ImportDialog(QDialog):
     def finish_import(self, result: ImportResult) -> None:
         mw.progress.finish()
         if result.success:
-            ImportResultDialog(mw, result).exec_()
+            ImportResultDialog(mw, result).exec()
             self.close()
         else:
-            ImportResultDialog(self, result).exec_()
+            ImportResultDialog(self, result).exec()
             self.tab.update_root_file()
 
     def open_media_dir(self) -> None:

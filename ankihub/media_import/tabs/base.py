@@ -17,7 +17,7 @@ if TYPE_CHECKING:
 
 def qlabel(text: str) -> QLabel:
     label = QLabel(text)
-    label.setTextInteractionFlags(Qt.TextBrowserInteraction)
+    label.setTextInteractionFlags(Qt.TextInteractionFlag.TextBrowserInteraction)
     return label
 
 

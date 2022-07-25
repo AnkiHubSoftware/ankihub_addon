@@ -1,18 +1,23 @@
 from typing import Optional, TYPE_CHECKING
 
-from anki.utils import isWin
+try:
+    from anki.utils import is_win, is_lin
+except ImportError:
+    from anki.utils import isWin as is_win  # type: ignore
+    from anki.utils import isLin as is_lin  # type: ignore
+
 from aqt.qt import *
 from aqt.utils import tooltip
 import aqt.editor
 
 from ..pathlike.local import LocalRoot
 from .base import ImportTab
+
 if TYPE_CHECKING:
     from .base import ImportDialog
 
 
 class LocalTab(ImportTab):
-
     def __init__(self, dialog: "ImportDialog"):
         self.define_texts()
         ImportTab.__init__(self, dialog)
@@ -24,7 +29,9 @@ class LocalTab(ImportTab):
         self.while_create_rootpath_msg = "Calculating number of files..."
         self.malformed_url_msg = "Invalid Path"
         self.root_not_found_msg = "Folder doesn't exist."
-        self.is_a_file_msg = "This path leads to a file. Please write a path to a folder."
+        self.is_a_file_msg = (
+            "This path leads to a file. Please write a path to a folder."
+        )
 
     def create_root_file(self, url: str) -> LocalRoot:
         return LocalRoot(url)
@@ -51,16 +58,18 @@ class LocalTab(ImportTab):
         dialog = QFileDialog(self)
         dialog.setNameFilter(self.file_name_filter())
         dialog.setOption(QFileDialog.ShowDirsOnly, False)
-        if isWin:
+        if is_win or is_lin:
             # Windows directory chooser doesn't display files
+            # Some linux directory choosers (Nautilus) don't let you navigate directories
+            # by clicking them and show they greyed them out when FileMode.Directory is set
             # TODO: Check whether to use native or qt file chooser
-            dialog.setOption(QFileDialog.DontUseNativeDialog, True)
+            dialog.setOption(QFileDialog.Option.DontUseNativeDialog, True)
         return dialog
 
     def get_directory(self) -> Optional[str]:
         dialog = self.file_dialog()
         dialog.setFileMode(QFileDialog.Directory)
-        if dialog.exec_():
+        if dialog.exec():
             # This can return multiple paths onccasionally. Qt bug?
             if not len(dialog.selectedFiles()) == 1:
                 tooltip("Something went wrong. Please select the folder again.")
