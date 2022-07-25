@@ -143,5 +143,5 @@ dmypy.json
 # mac os
 .DS_Store
 
-# media_import requirements
-ankihub/media_import/libs
+# media_import
+ankihub/media_import/*
