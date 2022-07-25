@@ -16,9 +16,10 @@ SKIP_INIT = os.getenv("SKIP_INIT", False)
 LOGGER.debug(f"SKIP_INIT: {SKIP_INIT}")
 
 if not SKIP_INIT:
+    from .error_reporting import report_exception_and_upload_logs
+
     try:
         from . import entry_point
-        from .error_reporting import report_exception_and_upload_logs
 
         mw = entry_point.run()
     except Exception as e:
