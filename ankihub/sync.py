@@ -40,10 +40,12 @@ def sync_with_ankihub() -> None:
     create_backup_with_progress()
 
     for ankihub_did in config.private_config.decks.keys():
-        sync_deck_with_ankihub(ankihub_did)
+        success = sync_deck_with_ankihub(ankihub_did)
+        if not success:
+            break
 
 
-def sync_deck_with_ankihub(ankihub_did: str) -> None:
+def sync_deck_with_ankihub(ankihub_did: str) -> bool:
     deck = config.private_config.decks[ankihub_did]
     client = AnkiHubClient()
     notes_data = []
@@ -51,7 +53,7 @@ def sync_deck_with_ankihub(ankihub_did: str) -> None:
         uuid.UUID(ankihub_did), since=deck["latest_update"]
     ):
         if response.status_code != 200:
-            return
+            return False
 
         data = response.json()
         notes = data["notes"]
@@ -68,6 +70,8 @@ def sync_deck_with_ankihub(ankihub_did: str) -> None:
         config.save_latest_update(ankihub_did, data["latest_update"])
     else:
         LOGGER.debug(f"No new updates to sync for {ankihub_did=}")
+
+    return True
 
 
 def import_ankihub_deck(
