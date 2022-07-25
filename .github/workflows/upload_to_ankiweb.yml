@@ -20,6 +20,11 @@ jobs:
         run: |
           echo "::set-output name=version::$(scripts/calver.sh)"
 
+      - name: Setup ssh
+        run: |
+          eval `ssh-agent -s`
+          ssh-add - <<< '${{ secrets.MEDIA_IMPORT_DEPLOY_KEY }}'
+
       - name: Create ankiaddon file
         run: |
           echo ${{ steps.vars.outputs.version }} > VERSION
