@@ -9,7 +9,7 @@ from aqt import mw
 from . import LOGGER
 from .addon_ankihub_client import AddonAnkiHubClient as AnkiHubClient
 from .config import config
-from .constants import VERSION
+from .constants import VERSION, ANKI_VERSION
 from .settings import LOG_FILE
 
 SENTRY_ENV = "anki_desktop"
@@ -48,6 +48,7 @@ def report_exception(context: dict = dict()) -> Optional[str]:
             scope.set_context(
                 "add-on config", dataclasses.asdict(config.private_config)
             )
+            scope.set_context("anki version", {"version": ANKI_VERSION})
             for name, ctx in context.items():
                 scope.set_context(name, ctx)
 
