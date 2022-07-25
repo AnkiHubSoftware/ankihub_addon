@@ -62,8 +62,8 @@ def report_exception_hook(response: Response, *args, **kwargs):
     from .error_reporting import report_exception_and_upload_logs
 
     LOGGER.debug("Begin report exception hook.")
+
     if "pre-signed-url" in response.url and "addon_logs" in response.url:
-        LOGGER.debug("can't send logs due to invalid credentials")
         return response
 
     treat_404_as_error = getattr(response.request, "treat_404_as_error", True)
