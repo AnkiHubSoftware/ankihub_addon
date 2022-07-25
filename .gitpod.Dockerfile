@@ -35,8 +35,10 @@ RUN sudo apt-get install -y \
     zstd \
     python3-pyqt5
 
-RUN pyenv install 3.9.13
-RUN pyenv global 3.9.13
+RUN pyenv install 3.9.13 && \
+    pyenv global 3.9.13
+
+RUN cargo install watchexec-cli
 
 COPY --chown=gitpod ./requirements /requirements
 RUN python -m pip install --upgrade pip && \

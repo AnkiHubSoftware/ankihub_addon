@@ -22,7 +22,8 @@ from aqt.qt import (
 )
 from aqt.utils import askUser, openLink, showText, tooltip
 
-from .. import LOGGER, report_exception
+from .. import LOGGER
+from ..error_reporting import report_exception_and_upload_logs
 from ..addon_ankihub_client import AddonAnkiHubClient as AnkiHubClient
 from ..config import config
 from ..constants import CSV_DELIMITER, URL_DECK_BASE, URL_DECKS, URL_HELP
@@ -210,7 +211,7 @@ class SubscribeDialog(QDialog):
             self.show()
 
     def subscribe(self):
-        ankihub_did = self.deck_id_box_text.text()
+        ankihub_did = self.deck_id_box_text.text().strip()
         if ankihub_did in config.private_config.decks.keys():
             showText(
                 f"You've already subscribed to deck {ankihub_did}. "
@@ -238,7 +239,7 @@ class SubscribeDialog(QDialog):
             try:
                 success = future.result()
             except Exception as e:
-                report_exception()
+                report_exception_and_upload_logs()
                 exc = e
 
             if success:
@@ -268,6 +269,7 @@ class SubscribeDialog(QDialog):
         data = deck_response.json()
         deck_file_name = data["csv_notes_filename"]
         last_update = data["csv_last_upload"]
+        is_creator = bool(data["owner"])
 
         def on_download_done(future: Future):
             response = future.result()
@@ -293,7 +295,11 @@ class SubscribeDialog(QDialog):
 
                 mw.taskman.with_progress(
                     lambda: self.install_deck(
-                        out_file, data["name"], ankihub_did, last_update
+                        deck_file=out_file,
+                        deck_name=data["name"],
+                        ankihub_did=ankihub_did,
+                        last_update=last_update,
+                        is_creator=is_creator,
                     ),
                     on_done=on_install_done,
                     parent=mw,
@@ -308,7 +314,12 @@ class SubscribeDialog(QDialog):
         )
 
     def install_deck(
-        self, deck_file: Path, deck_name: str, ankihub_did: str, last_update: str
+        self,
+        deck_file: Path,
+        deck_name: str,
+        ankihub_did: str,
+        last_update: str,
+        is_creator: bool,
     ) -> bool:
         """If we have a .csv, read data from the file and modify the user's note types
         and notes.
@@ -328,6 +339,7 @@ class SubscribeDialog(QDialog):
             ankihub_did=ankihub_did,
             anki_did=local_did,
             last_update=last_update,
+            creator=is_creator,
         )
 
         LOGGER.debug("Importing deck was succesful.")

@@ -233,3 +233,15 @@ class AnkiHubClient:
         data = {"notes": [str(note_id) for note_id in ankihub_note_uuids], "tags": tags}
         response = self._send_request("POST", "/suggestions/bulk/", data=data)
         return response
+
+    def upload_logs(self, file: Path, key: str) -> Response:
+        presigned_url_response = self.get_presigned_url(key=key, action="upload")
+        if presigned_url_response.status_code != 200:
+            return presigned_url_response
+
+        s3_url = presigned_url_response.json()["pre_signed_url"]
+        with open(file, "rb") as f:
+            log_data = f.read()
+
+        s3_response = requests.put(s3_url, data=log_data)
+        return s3_response

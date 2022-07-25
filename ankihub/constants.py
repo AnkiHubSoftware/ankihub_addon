@@ -7,6 +7,13 @@ from anki.buildinfo import version as ANKI_VERSION
 from . import LOGGER
 from .config import config
 
+version_file = Path(__file__).parent / "VERSION"
+LOGGER.debug(f"VERSION file: {version_file}")
+with version_file.open() as f:
+    VERSION: str = f.read().strip()
+
+LOGGER.debug(f"version: {VERSION}")
+
 ANKIHUB_APP_URL = os.getenv("ANKIHUB_APP_URL")
 if ANKIHUB_APP_URL is None:
     ANKIHUB_APP_URL = config.public_config.get("ankihub_url")
