@@ -11,6 +11,8 @@ MEDIA_IMPORT_TARGET = PROJECT_ROOT / "ankihub/media_import"
 
 API_KEY_OBFUSCATE_SCRIPT = Path(__file__).parent / "google_api_obfuscate.py"
 
+subprocess.run("git submodule update --init --recursive", shell=True, cwd=PROJECT_ROOT)
+
 shutil.rmtree(MEDIA_IMPORT_TARGET, ignore_errors=True)
 shutil.copytree(MEDIA_IMPORT_SRC, MEDIA_IMPORT_TARGET)
 subprocess.run(
