@@ -12,7 +12,8 @@ from anki.utils import checksum, ids2str
 from aqt import mw
 from aqt.utils import tr
 
-from . import LOGGER, constants, report_exception
+from . import LOGGER, constants
+from .error_reporting import report_exception_and_upload_logs
 from .constants import (
     ANKI_MINOR,
     ANKIHUB_NOTE_TYPE_FIELD_NAME,
@@ -330,7 +331,7 @@ def create_backup_with_progress() -> None:
         LOGGER.debug("Backup successful.")
     except Exception as exc:
         LOGGER.debug("Backup failed.")
-        report_exception()
+        report_exception_and_upload_logs()
         raise exc
     finally:
         mw.progress.finish()

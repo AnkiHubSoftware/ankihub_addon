@@ -13,10 +13,11 @@ from aqt import gui_hooks, mw
 from aqt.utils import tooltip
 from requests.exceptions import ConnectionError
 
-from . import LOGGER, constants, report_exception
+from . import LOGGER, constants
 from .addon_ankihub_client import AddonAnkiHubClient as AnkiHubClient
 from .config import config
 from .db import AnkiHubDB
+from .error_reporting import report_exception_and_upload_logs
 from .utils import (
     create_backup_with_progress,
     create_deck_with_id,
@@ -389,7 +390,7 @@ def sync_with_progress() -> None:
         if exc := future.exception():
             if not isinstance(exc, (ConnectionError, HTTPError)):
                 LOGGER.debug(f"Unable to sync:\n{exc}")
-                report_exception()
+                report_exception_and_upload_logs()
                 raise exc
             else:
                 LOGGER.debug("Skipping sync due to no Internet connection.")
