@@ -21,6 +21,9 @@ ankihub_sample_deck_notes_data = eval(
     (pathlib.Path(__file__).parent / "test_data" / "small_ankihub.txt").read_text()
 )
 
+UUID_1 = uuid.UUID("1f28bc9e-f36d-4e1d-8720-5dd805f12dd0")
+UUID_2 = uuid.UUID("2f28bc9e-f36d-4e1d-8720-5dd805f12dd0")
+
 
 def test_entry_point(anki_session_with_addon: AnkiSession):
     from aqt.main import AnkiQt
@@ -48,23 +51,23 @@ def test_editor(anki_session_with_addon: AnkiSession, requests_mock, monkeypatch
     editor.mw = MagicMock()
     editor.note = MagicMock()
     editor.web = MagicMock()
-    editor.note.id = 1
-    editor.note.fields = ["a", "b", "1"]
+
+    ankihub_note_uuid = UUID_1
+    editor.note.fields = ["a", "b", str(ankihub_note_uuid)]
     editor.note.tags = ["test_tag"]
     field_value = {ANKIHUB_NOTE_TYPE_FIELD_NAME: ""}
     editor.note.__contains__.return_value = True
-    editor.note.__getitem__.side_effect = lambda i: field_value[i]
+    editor.note.__getitem__.side_effect = lambda k: field_value[k]
     refresh_ankihub_button(editor)
     assert editor.ankihub_command == AnkiHubCommands.NEW.value
-
-    field_value[ANKIHUB_NOTE_TYPE_FIELD_NAME] = "6f28bc9e-f36d-4e1d-8720-5dd805f12dd0"
+    field_value[ANKIHUB_NOTE_TYPE_FIELD_NAME] = str(ankihub_note_uuid)
     refresh_ankihub_button(editor)
     assert editor.ankihub_command == AnkiHubCommands.CHANGE.value
 
     # TODO Mock what this is actually expected to return
     expected_response = {}  # type: ignore
     requests_mock.post(
-        f"{API_URL_BASE}/notes/{editor.note.id}/suggestion/",
+        f"{API_URL_BASE}/notes/{ankihub_note_uuid}/suggestion/",
         status_code=201,
         json=expected_response,
     )
@@ -127,8 +130,6 @@ def test_create_collaborative_deck_and_upload(
     anki_session = anki_session_with_addon
 
     from ankihub.constants import API_URL_BASE
-
-    requests_mock.get(f"{API_URL_BASE}/decks/1/updates", json={"notes": []})
 
     with anki_session.profile_loaded():
         with anki_session.deck_installed(sample_deck) as deck_id:
@@ -216,9 +217,9 @@ def test_get_deck_updates(anki_session_with_addon: AnkiSession, requests_mock):
     client = AnkiHubClient(hooks=[])
 
     # test get deck updates
-    deck_id = 1
     date_object = datetime.now(tz=timezone.utc) - timedelta(days=30)
 
+    ankihub_deck_uuid = UUID_1
     timestamp = date_object.timestamp()
     expected_data = {
         "total": 1,
@@ -227,7 +228,7 @@ def test_get_deck_updates(anki_session_with_addon: AnkiSession, requests_mock):
         "since": timestamp,
         "notes": [
             {
-                "deck_id": deck_id,
+                "deck_id": str(ankihub_deck_uuid),
                 "note_id": 1,
                 "anki_id": 1,
                 "tags": ["New Tag"],
@@ -238,17 +239,20 @@ def test_get_deck_updates(anki_session_with_addon: AnkiSession, requests_mock):
         "protected_tags": ["Test"],
     }
 
-    requests_mock.get(f"{API_URL_BASE}/decks/{deck_id}/updates", json=expected_data)
+    requests_mock.get(
+        f"{API_URL_BASE}/decks/{ankihub_deck_uuid}/updates", json=expected_data
+    )
     for response in client.get_deck_updates(
-        ankihub_deck_uuid=str(deck_id), since=timestamp  # type: ignore
+        ankihub_deck_uuid=ankihub_deck_uuid, since=timestamp  # type: ignore
     ):
         assert response.json() == expected_data
 
     # test get deck updates unauthenticated
-    deck_id = 1
-    requests_mock.get(f"{API_URL_BASE}/decks/{deck_id}/updates", status_code=403)
+    requests_mock.get(
+        f"{API_URL_BASE}/decks/{ankihub_deck_uuid}/updates", status_code=403
+    )
     for response in client.get_deck_updates(
-        ankihub_deck_uuid=str(deck_id), since=timestamp  # type: ignore
+        ankihub_deck_uuid=ankihub_deck_uuid, since=timestamp  # type: ignore
     ):
         assert response.status_code == 403
 
@@ -260,10 +264,10 @@ def test_get_deck_by_id(anki_session_with_addon: AnkiSession, requests_mock):
     client = AnkiHubClient(hooks=[])
 
     # test get deck by id
-    deck_id = 1
+    ankihub_deck_uuid = UUID_1
     date_time_str = datetime.now(tz=timezone.utc).strftime("%Y-%m-%dT%H:%M:%S.%f%z")
     expected_data = {
-        "id": deck_id,
+        "id": str(ankihub_deck_uuid),
         "name": "test",
         "owner": 1,
         "anki_id": 1,
@@ -271,14 +275,13 @@ def test_get_deck_by_id(anki_session_with_addon: AnkiSession, requests_mock):
         "csv_notes_url": "http://fake-csv-url.com/test.csv",
     }
 
-    requests_mock.get(f"{API_URL_BASE}/decks/{deck_id}/", json=expected_data)
-    response = client.get_deck_by_id(ankihub_deck_uuid=str(deck_id))  # type: ignore
+    requests_mock.get(f"{API_URL_BASE}/decks/{ankihub_deck_uuid}/", json=expected_data)
+    response = client.get_deck_by_id(ankihub_deck_uuid=ankihub_deck_uuid)  # type: ignore
     assert response.json() == expected_data
 
     # test get deck by id unauthenticated
-    deck_id = DeckId(1)
-    requests_mock.get(f"{API_URL_BASE}/decks/{deck_id}/", status_code=403)
-    response = client.get_deck_by_id(ankihub_deck_uuid=str(deck_id))  # type: ignore
+    requests_mock.get(f"{API_URL_BASE}/decks/{ankihub_deck_uuid}/", status_code=403)
+    response = client.get_deck_by_id(ankihub_deck_uuid=ankihub_deck_uuid)  # type: ignore
     assert response.status_code == 403
 
 
@@ -289,22 +292,22 @@ def test_get_note_by_ankihub_id(anki_session_with_addon: AnkiSession, requests_m
     client = AnkiHubClient(hooks=[])
 
     # test get not by ankihub id
-    note_ankihub_id = "1"
+    ankihub_deck_uuid = UUID_1
+    ankihub_note_uuid = UUID_2
     expected_data = {
-        "deck_id": 1,
-        "note_id": 1,
+        "deck_id": str(ankihub_deck_uuid),
+        "note_id": str(ankihub_note_uuid),
         "anki_id": 1,
         "tags": ["New Tag"],
         "fields": [{"name": "Text", "order": 0, "value": "Fake value"}],
     }
-    requests_mock.get(f"{API_URL_BASE}/notes/{note_ankihub_id}", json=expected_data)
-    response = client.get_note_by_ankihub_id(ankihub_note_uuid=note_ankihub_id)  # type: ignore
+    requests_mock.get(f"{API_URL_BASE}/notes/{ankihub_note_uuid}", json=expected_data)
+    response = client.get_note_by_ankihub_id(ankihub_note_uuid=ankihub_note_uuid)
     assert response.json() == expected_data
 
     # test get note by ankihub id unauthenticated
-    note_ankihub_id = "1"
-    requests_mock.get(f"{API_URL_BASE}/notes/{note_ankihub_id}", status_code=403)
-    response = client.get_note_by_ankihub_id(ankihub_note_uuid=note_ankihub_id)  # type: ignore
+    requests_mock.get(f"{API_URL_BASE}/notes/{ankihub_note_uuid}", status_code=403)
+    response = client.get_note_by_ankihub_id(ankihub_note_uuid=ankihub_note_uuid)
     assert response.status_code == 403
 
 
@@ -316,10 +319,12 @@ def test_create_change_note_suggestion(
 
     client = AnkiHubClient(hooks=[])
     # test create change note suggestion
-    note_id = 1
-    requests_mock.post(f"{API_URL_BASE}/notes/{note_id}/suggestion/", status_code=201)
+    ankihub_note_uuid = UUID_1
+    requests_mock.post(
+        f"{API_URL_BASE}/notes/{ankihub_note_uuid}/suggestion/", status_code=201
+    )
     response = client.create_change_note_suggestion(
-        ankihub_note_uuid=str(1),  # type: ignore
+        ankihub_note_uuid=ankihub_note_uuid,
         fields=[{"name": "abc", "order": 0, "value": "abc changed"}],
         tags=["test"],
         change_type=ChangeTypes.NEW_CONTENT,
@@ -328,10 +333,11 @@ def test_create_change_note_suggestion(
     assert response.status_code == 201
 
     # test create change note suggestion unauthenticated
-    note_id = 1
-    requests_mock.post(f"{API_URL_BASE}/notes/{note_id}/suggestion/", status_code=403)
+    requests_mock.post(
+        f"{API_URL_BASE}/notes/{ankihub_note_uuid}/suggestion/", status_code=403
+    )
     response = client.create_change_note_suggestion(
-        ankihub_note_uuid=str(1),  # type: ignore
+        ankihub_note_uuid=ankihub_note_uuid,
         fields=[{"name": "abc", "order": 0, "value": "abc changed"}],
         tags=["test"],
         change_type=ChangeTypes.NEW_CONTENT,
@@ -348,14 +354,15 @@ def test_create_new_note_suggestion(
 
     client = AnkiHubClient(hooks=[])
     # test create new note suggestion
-    deck_id = str(uuid.uuid4())
+    ankihub_deck_uuid = UUID_1
+    ankihub_note_uuid = UUID_2
     requests_mock.post(
-        f"{API_URL_BASE}/decks/{deck_id}/note-suggestion/", status_code=201
+        f"{API_URL_BASE}/decks/{ankihub_deck_uuid}/note-suggestion/", status_code=201
     )
     response = client.create_new_note_suggestion(
-        ankihub_deck_uuid=deck_id,  # type: ignore
+        ankihub_deck_uuid=ankihub_deck_uuid,
+        ankihub_note_uuid=ankihub_note_uuid,
         anki_note_id=1,
-        ankihub_note_uuid=str(1),  # type: ignore
         fields=[{"name": "abc", "order": 0, "value": "abc changed"}],
         tags=["test"],
         change_type=ChangeTypes.NEW_CARD_TO_ADD,
@@ -367,11 +374,11 @@ def test_create_new_note_suggestion(
 
     # test create new note suggestion unauthenticated
     requests_mock.post(
-        f"{API_URL_BASE}/decks/{deck_id}/note-suggestion/", status_code=403
+        f"{API_URL_BASE}/decks/{ankihub_deck_uuid}/note-suggestion/", status_code=403
     )
     response = client.create_new_note_suggestion(
-        ankihub_deck_uuid=deck_id,  # type: ignore
-        ankihub_note_uuid=str(1),  # type: ignore
+        ankihub_deck_uuid=ankihub_deck_uuid,
+        ankihub_note_uuid=ankihub_note_uuid,
         anki_note_id=1,
         fields=[{"name": "abc", "order": 0, "value": "abc changed"}],
         tags=["test"],
