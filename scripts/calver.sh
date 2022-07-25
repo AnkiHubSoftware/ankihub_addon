@@ -1,3 +1,4 @@
+#!/bin/bash
 
 # use calver and increment version number if necessary
 version="$(date +%Y-%m-%d).1"

@@ -2,7 +2,7 @@
     "display_name": "AnkiHub",
     "module_name": "ankihub",
     "repo_name": "ankihub_addon",
-    "ankiweb_id": "",
+    "ankiweb_id": "1322529746",
     "author": "Anki Palace",
     "contact": "https://ankipalace.com/",
     "copyright_start": 2021,
@@ -11,5 +11,5 @@
     ],
     "conflicts": [],
     "min_anki_version": "2.1.47",
-    "tested_anki_version": "2.1.47"
+    "tested_anki_version": "2.1.54"
 }
