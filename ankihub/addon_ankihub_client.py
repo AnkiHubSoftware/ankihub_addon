@@ -1,16 +1,14 @@
 import json
 from json import JSONDecodeError
-from pathlib import Path
 from pprint import pformat
 from typing import Dict
 
-import requests
 from aqt import mw
 from aqt.utils import tooltip
 from requests import Response
 from requests.models import HTTPError
 
-from . import LOGGER, report_exception
+from . import LOGGER
 from .ankihub_client import AnkiHubClient
 from .config import config
 from .gui.error_feedback import ErrorFeedbackDialog
@@ -59,7 +57,12 @@ def logging_hook(response: Response, *args, **kwargs):
 
 
 def report_exception_hook(response: Response, *args, **kwargs):
+    from .error_reporting import report_exception_and_upload_logs
+
     LOGGER.debug("Begin report exception hook.")
+    if "pre-signed-url" in response.url and "addon_logs" in response.url:
+        LOGGER.debug("can't send logs due to invalid credentials")
+        return response
 
     treat_404_as_error = getattr(response.request, "treat_404_as_error", True)
     if not treat_404_as_error and response.status_code == 404:
@@ -69,7 +72,7 @@ def report_exception_hook(response: Response, *args, **kwargs):
         response.raise_for_status()
     except HTTPError:
         ctx = {"response": {"reason": response.reason, "content": response.text}}
-        event_id = report_exception(context=ctx)
+        event_id = report_exception_and_upload_logs(context=ctx)
         response.sentry_event_id = event_id  # type: ignore
 
     return response
@@ -130,16 +133,3 @@ class AddonAnkiHubClient(AnkiHubClient):
             hooks=hooks if hooks is not None else DEFAULT_RESPONSE_HOOKS,
             token=config.private_config.token,
         )
-
-    def share_logs(self, file: Path) -> Response:
-        key = file.name
-        presigned_url_response = self.get_presigned_url(key=key, action="upload")
-        if presigned_url_response.status_code != 200:
-            return presigned_url_response
-
-        s3_url = presigned_url_response.json()["pre_signed_url"]
-        with open(file, "rb") as f:
-            log_bytes = f.read()
-
-        s3_response = requests.put(s3_url, data=log_bytes)
-        return s3_response

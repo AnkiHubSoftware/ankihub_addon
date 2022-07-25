@@ -21,7 +21,7 @@ class PrivateConfig:
 class Config:
     def __init__(self):
         # self.public_config is editable by the user.
-        self.public_config = mw.addonManager.getConfig(__name__)
+        self.public_config: Dict[str, Any] = mw.addonManager.getConfig(__name__)
         # This is the location for private config which is only managed by our code
         # and is not exposed to the user.
         # See https://addon-docs.ankiweb.net/addon-config.html#user-files
@@ -106,4 +106,4 @@ class Config:
             self.subscriptions_change_hook()
 
 
-config = Config()
+config: Config = Config()
