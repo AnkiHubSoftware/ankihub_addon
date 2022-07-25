@@ -57,7 +57,7 @@ class LocalTab(ImportTab):
     def file_dialog(self) -> QFileDialog:
         dialog = QFileDialog(self)
         dialog.setNameFilter(self.file_name_filter())
-        dialog.setOption(QFileDialog.ShowDirsOnly, False)
+        dialog.setOption(QFileDialog.Option.ShowDirsOnly, False)
         if is_win or is_lin:
             # Windows directory chooser doesn't display files
             # Some linux directory choosers (Nautilus) don't let you navigate directories
@@ -68,7 +68,7 @@ class LocalTab(ImportTab):
 
     def get_directory(self) -> Optional[str]:
         dialog = self.file_dialog()
-        dialog.setFileMode(QFileDialog.Directory)
+        dialog.setFileMode(QFileDialog.FileMode.Directory)
         if dialog.exec():
             # This can return multiple paths onccasionally. Qt bug?
             if not len(dialog.selectedFiles()) == 1:

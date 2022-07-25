@@ -12,10 +12,10 @@ class ImportResultDialog(QMessageBox):
         QMessageBox.__init__(self, parent)
         if result.success:
             title = "Import Complete"
-            self.setIcon(QMessageBox.Information)
+            self.setIcon(QMessageBox.Icon.Information)
         else:
             title = "Import Failed"
-            self.setIcon(QMessageBox.Critical)
+            self.setIcon(QMessageBox.Icon.Critical)
         self.setWindowTitle(title)
         details = result.logs[-1]
         if len(details) < 50:
