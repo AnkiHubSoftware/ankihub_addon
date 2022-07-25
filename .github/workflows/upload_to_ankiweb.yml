@@ -20,16 +20,16 @@ jobs:
         run: |
           echo "::set-output name=version::$(scripts/calver.sh)"
 
+      - name: Setup Python
+        uses: actions/setup-python@v2.2.1
+        with:
+          python-version: 3.8
+
       - name: Create ankiaddon file
         run: |
           echo ${{ steps.vars.outputs.version }} > VERSION
           bash ../scripts/release.sh
         working-directory: ankihub
-
-      - name: Setup Python
-        uses: actions/setup-python@v2.2.1
-        with:
-          python-version: 3.8
 
       - name: Install dependencies
         run: |
