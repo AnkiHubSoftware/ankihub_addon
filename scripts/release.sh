@@ -1,3 +1,3 @@
-python3 scripts/update_media_import.py
+python3 scripts/build.py
 find . -regex '^.*\(__pycache__\|\.py[co]\)$' -delete
 zip -r "../ankihub.ankiaddon" . -x ./tests\*
