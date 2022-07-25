@@ -22,14 +22,8 @@ def report_exception_and_upload_logs(context: dict = dict()) -> Optional[str]:
     if not config.public_config.get("report_errors"):
         return None
 
-    def on_upload_logs_done(future: Future) -> None:
-        try:
-            future.result()
-        except Exception:
-            report_exception()
-
-    mw.taskman.run_in_background(task=upload_logs, on_done=on_upload_logs_done)
-
+    logs_key = upload_logs_in_background()
+    context = {**context, "logs": {"filename": logs_key}}
     sentry_event_id = report_exception(context)
     return sentry_event_id
 
@@ -69,15 +63,27 @@ def report_exception(context: dict = dict()) -> Optional[str]:
     return event_id
 
 
-def upload_logs() -> None:
+def upload_logs_in_background() -> str:
     LOGGER.debug("Uploading logs...")
-    client = AnkiHubClient()
     key = f"ankihub_addon_logs_{config.private_config.user}_{int(time.time())}.log"
-    response = client.upload_logs(
-        file=LOG_FILE,
-        key=key,
-    )
-    if response.status_code == 200:
-        LOGGER.debug("Logs uploaded.")
-    else:
-        LOGGER.debug("Failed to upload logs.")
+
+    def upload_logs():
+        client = AnkiHubClient()
+        response = client.upload_logs(
+            file=LOG_FILE,
+            key=key,
+        )
+        if response.status_code == 200:
+            LOGGER.debug("Logs uploaded.")
+        else:
+            LOGGER.debug("Failed to upload logs.")
+
+    def on_upload_logs_done(future: Future) -> None:
+        try:
+            future.result()
+        except Exception:
+            report_exception()
+
+    mw.taskman.run_in_background(task=upload_logs, on_done=on_upload_logs_done)
+
+    return key
