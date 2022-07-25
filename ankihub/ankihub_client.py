@@ -152,7 +152,7 @@ class AnkiHubClient:
         comment: str,
     ) -> Response:
         suggestion = {
-            "ankihub_id": ankihub_note_uuid,
+            "ankihub_id": str(ankihub_note_uuid),
             "fields": fields,
             "tags": tags,
             "change_type": change_type.value[0],
@@ -179,7 +179,7 @@ class AnkiHubClient:
     ) -> Response:
         suggestion = {
             "anki_id": anki_note_id,
-            "ankihub_id": ankihub_note_uuid,
+            "ankihub_id": str(ankihub_note_uuid),
             "fields": fields,
             "tags": tags,
             "change_type": change_type.value[0],
