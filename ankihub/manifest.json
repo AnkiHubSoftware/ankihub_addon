@@ -1,9 +1,9 @@
 {
-    "package": "1322529746",
+    "package": "ankihub",
     "name": "AnkiHub",
-    "ankiweb_id": 1322529746,
-    "author": "AnkiHub, LLC",
-    "version": "0.0.1",
-    "homepage": "",
+    "ankiweb_id": "1322529746",
+    "author": "Anki Palace",
+    "version": "2022-07-25.2",
+    "homepage": "https://ankipalace.com/",
     "conflicts": []
 }

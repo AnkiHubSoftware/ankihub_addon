@@ -1,3 +1,4 @@
+import json
 import os
 from enum import Enum
 from pathlib import Path
@@ -7,12 +8,16 @@ from anki.buildinfo import version as ANKI_VERSION
 from . import LOGGER
 from .config import config
 
+ADDON_VERSION = json.load((Path(__file__).parent / "manifest.json").open("r"))[
+    "version"
+]
+
 version_file = Path(__file__).parent / "VERSION"
 LOGGER.debug(f"VERSION file: {version_file}")
 with version_file.open() as f:
-    VERSION: str = f.read().strip()
+    VERSION_TYPE: str = f.read().strip()
 
-LOGGER.debug(f"version: {VERSION}")
+LOGGER.debug(f"version: {ADDON_VERSION} {VERSION_TYPE}")
 
 ANKIHUB_APP_URL = os.getenv("ANKIHUB_APP_URL")
 if ANKIHUB_APP_URL is None:

@@ -13,12 +13,17 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
-        uses: actions/checkout@v2
+        uses: actions/checkout@v3
 
       - name: Declare version variable
         id: vars
         run: |
           echo "::set-output name=version::$(scripts/calver.sh)"
+
+      - name: Setup Python
+        uses: actions/setup-python@v2.2.1
+        with:
+          python-version: 3.8
 
       - name: Setup ssh
         run: |
@@ -30,11 +35,6 @@ jobs:
           echo ${{ steps.vars.outputs.version }} > VERSION
           bash ../scripts/release.sh
         working-directory: ankihub
-
-      - name: Setup Python
-        uses: actions/setup-python@v2.2.1
-        with:
-          python-version: 3.8
 
       - name: Install dependencies
         run: |

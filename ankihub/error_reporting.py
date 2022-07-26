@@ -9,12 +9,12 @@ from aqt import mw
 from . import LOGGER
 from .addon_ankihub_client import AddonAnkiHubClient as AnkiHubClient
 from .config import config
-from .constants import VERSION
+from .constants import VERSION_TYPE, ANKI_VERSION, ADDON_VERSION
 from .settings import LOG_FILE
 
 SENTRY_ENV = "anki_desktop"
 # This prevents Sentry from trying to run a git command to infer the version.
-os.environ["SENTRY_RELEASE"] = VERSION
+os.environ["SENTRY_RELEASE"] = VERSION_TYPE
 os.environ["SENTRY_ENVIRONMENT"] = SENTRY_ENV
 
 
@@ -22,14 +22,8 @@ def report_exception_and_upload_logs(context: dict = dict()) -> Optional[str]:
     if not config.public_config.get("report_errors"):
         return None
 
-    def on_upload_logs_done(future: Future) -> None:
-        try:
-            future.result()
-        except Exception:
-            report_exception()
-
-    mw.taskman.run_in_background(task=upload_logs, on_done=on_upload_logs_done)
-
+    logs_key = upload_logs_in_background()
+    context = {**context, "logs": {"filename": logs_key}}
     sentry_event_id = report_exception(context)
     return sentry_event_id
 
@@ -43,7 +37,7 @@ def report_exception(context: dict = dict()) -> Optional[str]:
         sentry_sdk.init(
             dsn="https://715325d30fa44ecd939d12edda720f91@o1184291.ingest.sentry.io/6546414",
             traces_sample_rate=1.0,
-            release=VERSION,
+            release=VERSION_TYPE,
             environment=SENTRY_ENV,
         )
         LOGGER.debug("Sentry initialized.")
@@ -54,6 +48,8 @@ def report_exception(context: dict = dict()) -> Optional[str]:
             scope.set_context(
                 "add-on config", dataclasses.asdict(config.private_config)
             )
+            scope.set_context("addon version", {"version": ADDON_VERSION})
+            scope.set_context("anki version", {"version": ANKI_VERSION})
             for name, ctx in context.items():
                 scope.set_context(name, ctx)
 
@@ -69,15 +65,27 @@ def report_exception(context: dict = dict()) -> Optional[str]:
     return event_id
 
 
-def upload_logs() -> None:
+def upload_logs_in_background() -> str:
     LOGGER.debug("Uploading logs...")
-    client = AnkiHubClient()
     key = f"ankihub_addon_logs_{config.private_config.user}_{int(time.time())}.log"
-    response = client.upload_logs(
-        file=LOG_FILE,
-        key=key,
-    )
-    if response.status_code == 200:
-        LOGGER.debug("Logs uploaded.")
-    else:
-        LOGGER.debug("Failed to upload logs.")
+
+    def upload_logs():
+        client = AnkiHubClient()
+        response = client.upload_logs(
+            file=LOG_FILE,
+            key=key,
+        )
+        if response.status_code == 200:
+            LOGGER.debug("Logs uploaded.")
+        else:
+            LOGGER.debug("Failed to upload logs.")
+
+    def on_upload_logs_done(future: Future) -> None:
+        try:
+            future.result()
+        except Exception:
+            report_exception()
+
+    mw.taskman.run_in_background(task=upload_logs, on_done=on_upload_logs_done)
+
+    return key

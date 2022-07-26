@@ -19,6 +19,11 @@ jobs:
           git config user.name "GitHub Actions Bot"
           git config user.email "<>"
 
+      - name: Setup Python
+        uses: actions/setup-python@v2.2.1
+        with:
+          python-version: 3.8
+
       - name: Declare version variable
         id: vars
         run: |

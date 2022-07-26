@@ -1,8 +1,10 @@
 import json
 from json import JSONDecodeError
+from pathlib import Path
 from pprint import pformat
 from typing import Dict
 
+import requests
 from aqt import mw
 from aqt.utils import tooltip
 from requests import Response
@@ -60,8 +62,8 @@ def report_exception_hook(response: Response, *args, **kwargs):
     from .error_reporting import report_exception_and_upload_logs
 
     LOGGER.debug("Begin report exception hook.")
+
     if "pre-signed-url" in response.url and "addon_logs" in response.url:
-        LOGGER.debug("can't send logs due to invalid credentials")
         return response
 
     treat_404_as_error = getattr(response.request, "treat_404_as_error", True)
@@ -133,3 +135,15 @@ class AddonAnkiHubClient(AnkiHubClient):
             hooks=hooks if hooks is not None else DEFAULT_RESPONSE_HOOKS,
             token=config.private_config.token,
         )
+
+    def upload_logs(self, file: Path, key: str) -> Response:
+        presigned_url_response = self.get_presigned_url(key=key, action="upload")
+        if presigned_url_response.status_code != 200:
+            return presigned_url_response
+
+        s3_url = presigned_url_response.json()["pre_signed_url"]
+        with open(file, "rb") as f:
+            log_data = f.read()
+
+        s3_response = requests.put(s3_url, data=log_data)
+        return s3_response
