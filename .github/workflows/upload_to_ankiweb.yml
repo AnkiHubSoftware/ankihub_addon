@@ -29,6 +29,8 @@ jobs:
         run: |
           echo ${{ steps.vars.outputs.version }} > VERSION
           bash ./scripts/release.sh
+        env:
+          GOOGLE_API_KEY: ${{ secrets.GOOGLE_API_KEY }}
 
       - name: Install dependencies
         run: |

@@ -33,6 +33,8 @@ jobs:
         run: |
           echo ${{ steps.vars.outputs.version }} > VERSION
           bash ./scripts/release.sh
+        env:
+          GOOGLE_API_KEY: ${{ secrets.GOOGLE_API_KEY }}
 
       - name: Commit version bump and create tag
         run: |
