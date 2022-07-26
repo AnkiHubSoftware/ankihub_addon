@@ -29,13 +29,6 @@ jobs:
         run: |
           echo "::set-output name=version::$(scripts/calver.sh)"
 
-      - name: Commit version bump and create tag
-        run: |
-          git commit --allow-empty -m "Bump Version to ${{ steps.vars.outputs.version }}"
-          git push origin main
-          git tag ${{ steps.vars.outputs.version }}
-          git push origin ${{ steps.vars.outputs.version }}
-
       - name: Setup ssh
         run: |
           eval `ssh-agent -s`
@@ -46,6 +39,13 @@ jobs:
           echo ${{ steps.vars.outputs.version }} > VERSION
           bash ../scripts/release.sh
         working-directory: ankihub
+
+      - name: Commit version bump and create tag
+        run: |
+          git commit --allow-empty -m "Bump Version to ${{ steps.vars.outputs.version }}"
+          git push origin main
+          git tag ${{ steps.vars.outputs.version }}
+          git push origin ${{ steps.vars.outputs.version }}
 
       - name: Create github release
         uses: softprops/action-gh-release@v1
