@@ -3,6 +3,8 @@ import shutil
 import subprocess
 from pathlib import Path
 
+from generate_manifest import generate_manifest
+
 google_api_key = os.getenv("GOOGLE_API_KEY")
 
 PROJECT_ROOT = Path(__file__).parent.parent
@@ -27,6 +29,8 @@ subprocess.run(
         str(MEDIA_IMPORT_REQUIREMENTS),
     ]
 )
+
+generate_manifest()
 
 shutil.rmtree(MEDIA_IMPORT_TARGET, ignore_errors=True)
 shutil.copytree(MEDIA_IMPORT_SRC, MEDIA_IMPORT_TARGET)

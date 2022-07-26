@@ -1,6 +1,5 @@
 set -e
 
-python3 scripts/generate_manifest.py
 python3 scripts/build.py
 
 cd ankihub
