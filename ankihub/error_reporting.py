@@ -9,12 +9,12 @@ from aqt import mw
 from . import LOGGER
 from .addon_ankihub_client import AddonAnkiHubClient as AnkiHubClient
 from .config import config
-from .constants import VERSION_TYPE, ANKI_VERSION, ADDON_VERSION
+from .constants import ANKI_VERSION, ADDON_VERSION
 from .settings import LOG_FILE
 
 SENTRY_ENV = "anki_desktop"
 # This prevents Sentry from trying to run a git command to infer the version.
-os.environ["SENTRY_RELEASE"] = VERSION_TYPE
+os.environ["SENTRY_RELEASE"] = ADDON_VERSION
 os.environ["SENTRY_ENVIRONMENT"] = SENTRY_ENV
 
 
@@ -37,7 +37,7 @@ def report_exception(context: dict = dict()) -> Optional[str]:
         sentry_sdk.init(
             dsn="https://715325d30fa44ecd939d12edda720f91@o1184291.ingest.sentry.io/6546414",
             traces_sample_rate=1.0,
-            release=VERSION_TYPE,
+            release=ADDON_VERSION,
             environment=SENTRY_ENV,
         )
         LOGGER.debug("Sentry initialized.")
