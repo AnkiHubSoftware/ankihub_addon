@@ -2,6 +2,16 @@ set -e
 
 python3 scripts/build.py
 
-cd ankihub
+mkdir -p dist
+rm -rf dist/release
+cp -r ankihub dist/release
+
+cd dist/release
+
+# remove temporary files
 find . -name __pycache__ -or -regex ".*.py[cod]" -or -name .DS_Store -or -name ".pytest_cache" | xargs rm -rf
-zip -r "../ankihub.ankiaddon" . -x ./tests\*
+
+# remove all files from user_files except for the README.md file
+find user_files ! -name "README.md" -type f -exec rm -f {} +
+
+zip -r "../../ankihub.ankiaddon" . -x ./tests\*
