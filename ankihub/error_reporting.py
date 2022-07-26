@@ -22,6 +22,9 @@ def report_exception_and_upload_logs(context: dict = dict()) -> Optional[str]:
     if not config.public_config.get("report_errors"):
         return None
 
+    if os.getenv("REPORT_ERRORS", None) == "0":
+        return None
+
     logs_key = upload_logs_in_background()
     context = {**context, "logs": {"filename": logs_key}}
     sentry_event_id = report_exception(context)
