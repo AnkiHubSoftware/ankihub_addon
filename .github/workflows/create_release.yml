@@ -36,6 +36,11 @@ jobs:
           git tag ${{ steps.vars.outputs.version }}
           git push origin ${{ steps.vars.outputs.version }}
 
+      - name: Setup ssh
+        run: |
+          eval `ssh-agent -s`
+          ssh-add - <<< '${{ secrets.MEDIA_IMPORT_DEPLOY_KEY }}'
+
       - name: Create ankiaddon file
         run: |
           echo ${{ steps.vars.outputs.version }} > VERSION
