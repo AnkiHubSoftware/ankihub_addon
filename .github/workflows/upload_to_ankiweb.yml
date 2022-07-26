@@ -28,8 +28,7 @@ jobs:
       - name: Create ankiaddon file
         run: |
           echo ${{ steps.vars.outputs.version }} > VERSION
-          bash ../scripts/release.sh
-        working-directory: ankihub
+          bash ./scripts/release.sh
 
       - name: Install dependencies
         run: |

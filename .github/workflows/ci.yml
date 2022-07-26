@@ -41,9 +41,8 @@ jobs:
 
       - name: Create ankiaddon file
         run: |
-          echo ${{ github.sha }} > VERSION
-          bash ../scripts/release.sh
-        working-directory: ankihub
+          echo ${{ steps.vars.outputs.version }} > VERSION
+          bash ./scripts/release.sh
 
       - name: Archive .ankiaddon
         uses: actions/upload-artifact@v3
