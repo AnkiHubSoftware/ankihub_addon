@@ -25,6 +25,10 @@ def generate_manifest():
     }
     json.dump(manifest, MANIFEST_FILE.open("w"), indent=4)
 
+    # append new line so that pre-commit doesn't complain
+    with open(MANIFEST_FILE, "a") as f:
+        f.write("\n")
+
 
 if __name__ == "__main__":
     generate_manifest()
