@@ -1,5 +1,7 @@
 #!/bin/bash
 
+set -e
+
 # use calver and increment version number if necessary
 version="$(date +%Y-%m-%d).1"
 versionSplit=(${version//./ })

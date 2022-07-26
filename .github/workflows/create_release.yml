@@ -29,23 +29,19 @@ jobs:
         run: |
           echo "::set-output name=version::$(scripts/calver.sh)"
 
+      - name: Create ankiaddon file
+        run: |
+          echo ${{ steps.vars.outputs.version }} > VERSION
+          bash ./scripts/release.sh
+        env:
+          GOOGLE_API_KEY: ${{ secrets.GOOGLE_API_KEY }}
+
       - name: Commit version bump and create tag
         run: |
           git commit --allow-empty -m "Bump Version to ${{ steps.vars.outputs.version }}"
           git push origin main
           git tag ${{ steps.vars.outputs.version }}
           git push origin ${{ steps.vars.outputs.version }}
-
-      - name: Setup ssh
-        run: |
-          eval `ssh-agent -s`
-          ssh-add - <<< '${{ secrets.MEDIA_IMPORT_DEPLOY_KEY }}'
-
-      - name: Create ankiaddon file
-        run: |
-          echo ${{ steps.vars.outputs.version }} > VERSION
-          bash ../scripts/release.sh
-        working-directory: ankihub
 
       - name: Create github release
         uses: softprops/action-gh-release@v1
