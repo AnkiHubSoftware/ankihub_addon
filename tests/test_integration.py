@@ -130,6 +130,7 @@ def test_create_collaborative_deck_and_upload(
     anki_session = anki_session_with_addon
 
     from ankihub.constants import API_URL_BASE
+    from ankihub.db import AnkiHubDB
 
     with anki_session.profile_loaded():
         with anki_session.deck_installed(sample_deck) as deck_id:
@@ -155,6 +156,11 @@ def test_create_collaborative_deck_and_upload(
             )
 
             create_collaborative_deck(deck_name)
+
+            # check if deck info is in db
+            db = AnkiHubDB()
+            assert db.ankihub_deck_ids() == [str(ankihub_deck_uuid)]
+            assert len(db.notes_for_ankihub_deck(str(ankihub_deck_uuid))) == 3
 
 
 def test_client_login_and_signout(anki_session_with_addon: AnkiSession, requests_mock):
@@ -472,9 +478,10 @@ def test_import_new_ankihub_deck(anki_session_with_addon: AnkiSession):
         importer.run()
         mw.col.decks.remove([mw.col.decks.id_for_name("Testdeck")])
 
+        ankihub_deck_uuid = UUID_1
         dids_before_import = all_dids()
         local_did = import_ankihub_deck_inner(
-            ankihub_did="1",
+            ankihub_did=str(ankihub_deck_uuid),
             notes_data=ankihub_sample_deck_notes_data,
             deck_name="test",
             remote_note_types={},
@@ -487,6 +494,10 @@ def test_import_new_ankihub_deck(anki_session_with_addon: AnkiSession):
             len(new_dids) == 1
         )  # we have no mechanism for importing subdecks from a csv yet, so ti will be just onen deck
         assert local_did == list(new_dids)[0]
+
+        assert_that_only_ankihub_sample_deck_info_in_database(
+            ankihub_deck_uuid=ankihub_deck_uuid
+        )
 
 
 def test_import_existing_ankihub_deck(anki_session_with_addon: AnkiSession):
@@ -504,9 +515,10 @@ def test_import_existing_ankihub_deck(anki_session_with_addon: AnkiSession):
         importer.run()
         existing_did = mw.col.decks.id_for_name("Testdeck")
 
+        ankihub_deck_uuid = UUID_1
         dids_before_import = all_dids()
         local_did = import_ankihub_deck_inner(
-            ankihub_did="1",
+            ankihub_did=str(ankihub_deck_uuid),
             notes_data=ankihub_sample_deck_notes_data,
             deck_name="test",
             remote_note_types={},
@@ -517,6 +529,18 @@ def test_import_existing_ankihub_deck(anki_session_with_addon: AnkiSession):
 
         assert not new_dids
         assert local_did == existing_did
+
+        assert_that_only_ankihub_sample_deck_info_in_database(
+            ankihub_deck_uuid=ankihub_deck_uuid
+        )
+
+
+def assert_that_only_ankihub_sample_deck_info_in_database(ankihub_deck_uuid: uuid.UUID):
+    from ankihub.db import AnkiHubDB
+
+    db = AnkiHubDB()
+    assert db.ankihub_deck_ids() == [str(ankihub_deck_uuid)]
+    assert len(db.notes_for_ankihub_deck(str(ankihub_deck_uuid))) == 4
 
 
 def test_import_existing_ankihub_deck_2(anki_session_with_addon: AnkiSession):
@@ -538,9 +562,10 @@ def test_import_existing_ankihub_deck_2(anki_session_with_addon: AnkiSession):
         cids = mw.col.find_cards("deck:Testdeck")
         mw.col.set_deck([cids[0]], other_deck_id)
 
+        ankihub_deck_uuid = UUID_1
         dids_before_import = all_dids()
         local_did = import_ankihub_deck_inner(
-            ankihub_did="1",
+            ankihub_did=str(ankihub_deck_uuid),
             notes_data=ankihub_sample_deck_notes_data,
             deck_name="test",
             remote_note_types={},
@@ -552,6 +577,10 @@ def test_import_existing_ankihub_deck_2(anki_session_with_addon: AnkiSession):
         # if the existing cards are in multiple seperate decks a new deck is created deck
         assert len(new_dids) == 1
         assert local_did == list(new_dids)[0]
+
+        assert_that_only_ankihub_sample_deck_info_in_database(
+            ankihub_deck_uuid=ankihub_deck_uuid
+        )
 
 
 def test_update_ankihub_deck(anki_session_with_addon: AnkiSession):
@@ -565,9 +594,10 @@ def test_update_ankihub_deck(anki_session_with_addon: AnkiSession):
 
         first_local_did = import_sample_ankihub_deck(mw)
 
+        ankihub_deck_uuid = UUID_1
         dids_before_import = all_dids()
         second_local_did = import_ankihub_deck_inner(
-            ankihub_did="1",
+            ankihub_did=str(ankihub_deck_uuid),
             notes_data=ankihub_sample_deck_notes_data,
             deck_name="test",
             remote_note_types={},
@@ -579,6 +609,10 @@ def test_update_ankihub_deck(anki_session_with_addon: AnkiSession):
 
         assert len(new_dids) == 0
         assert first_local_did == second_local_did
+
+        assert_that_only_ankihub_sample_deck_info_in_database(
+            ankihub_deck_uuid=ankihub_deck_uuid
+        )
 
 
 def test_update_ankihub_deck_when_deck_was_deleted(
@@ -600,9 +634,10 @@ def test_update_ankihub_deck_when_deck_was_deleted(
         mw.col.set_deck(cids, other_deck)
         mw.col.decks.remove([first_local_did])
 
+        ankihub_deck_uuid = UUID_1
         dids_before_import = all_dids()
         second_local_id = import_ankihub_deck_inner(
-            ankihub_did="1",
+            ankihub_did=str(ankihub_deck_uuid),
             notes_data=ankihub_sample_deck_notes_data,
             deck_name="test",
             remote_note_types={},
@@ -616,6 +651,10 @@ def test_update_ankihub_deck_when_deck_was_deleted(
         assert len(new_dids) == 1
         assert list(new_dids)[0] == first_local_did
         assert second_local_id == first_local_did
+
+        assert_that_only_ankihub_sample_deck_info_in_database(
+            ankihub_deck_uuid=ankihub_deck_uuid
+        )
 
 
 def test_unsubsribe_from_deck(anki_session_with_addon: AnkiSession):
