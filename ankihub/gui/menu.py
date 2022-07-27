@@ -2,9 +2,11 @@ from datetime import datetime, timezone
 from typing import Optional
 
 from aqt import (
+    QCheckBox,
     QHBoxLayout,
     QLabel,
     QLineEdit,
+    QMessageBox,
     QPushButton,
     QSizePolicy,
     QVBoxLayout,
@@ -118,7 +120,41 @@ class AnkiHubLogin(QWidget):
         return cls._window
 
 
+class DeckCreationConfirmationDialog(QMessageBox):
+    def __init__(self):
+        super().__init__(parent=mw)
+
+        self.setWindowTitle("Confirm AnkiHub Deck Creation")
+        self.setIcon(QMessageBox.Icon.Question)
+        self.setText(
+            "Are you sure you want to create a new collaborative deck?<br><br><br>"
+            'Terms of use: <a href="https://www.ankihub.net/terms">https://www.ankihub.net/terms</a><br>'
+            'Privacy Policy: <a href="https://www.ankihub.net/privacy">https://www.ankihub.net/privacy</a><br>'
+        )
+        self.confirmation_cb = QCheckBox(
+            text=" by checking this checkbox you agree to the terms of use",
+            parent=self,
+        )
+        self.setCheckBox(self.confirmation_cb)
+
+    def run(self):
+        clicked_ok = self.exec()
+        if not clicked_ok:
+            return False
+
+        if not self.confirmation_cb.isChecked():
+            tooltip("You didn't agree to the terms of use.")
+            return False
+
+        return True
+
+
 def create_collaborative_deck_action() -> None:
+
+    confirm = DeckCreationConfirmationDialog().run()
+    if not confirm:
+        return
+
     deck_chooser = StudyDeck(
         mw,
         title="AnkiHub",
@@ -138,7 +174,7 @@ def create_collaborative_deck_action() -> None:
         return
     confirm = askUser(
         "Uploading the deck to AnkiHub requires modifying notes and note types in "
-        f"{deck_name} and will require a full sync afterwards.  Would you like to "
+        f"{deck_name} and will require a full sync afterwards. Would you like to "
         "continue?",
     )
     if not confirm:
