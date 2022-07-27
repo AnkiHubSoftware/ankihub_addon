@@ -134,27 +134,27 @@ def test_create_collaborative_deck_and_upload(
     with anki_session.profile_loaded():
         with anki_session.deck_installed(sample_deck) as deck_id:
 
-            from ankihub.register_decks import AnkiHubClient, create_collaborative_deck
+            from ankihub.register_decks import create_collaborative_deck
 
             deck_name = anki_session.mw.col.decks.name(DeckId(deck_id))
-            with monkeypatch.context() as m:
-                m.setattr(AnkiHubClient, "upload_deck", Mock())
-                create_collaborative_deck(deck_name)
 
-                requests_mock.get(
-                    f"{API_URL_BASE}/decks/pre-signed-url",
-                    status_code=200,
-                    json={"pre_signed_url": "http://fake_url"},
-                )
-                requests_mock.put(
-                    "http://fake_url",
-                    status_code=200,
-                )
-                requests_mock.post(f"{API_URL_BASE}/decks/", status_code=201)
+            requests_mock.get(
+                f"{API_URL_BASE}/decks/pre-signed-url",
+                status_code=200,
+                json={"pre_signed_url": "http://fake_url"},
+            )
+            requests_mock.put(
+                "http://fake_url",
+                status_code=200,
+            )
+            ankihub_deck_uuid = UUID_1
+            requests_mock.post(
+                f"{API_URL_BASE}/decks/",
+                status_code=201,
+                json={"deck_id": str(ankihub_deck_uuid)},
+            )
 
-                from ankihub.register_decks import upload_deck
-
-                upload_deck(DeckId(deck_id))
+            create_collaborative_deck(deck_name)
 
 
 def test_client_login_and_signout(anki_session_with_addon: AnkiSession, requests_mock):

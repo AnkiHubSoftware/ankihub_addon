@@ -142,7 +142,7 @@ def import_ankihub_deck_inner(
     notes_data = transform_notes_data(notes_data)
 
     db = AnkiHubDB()
-    db.save_notes(ankihub_did=ankihub_did, notes_data=notes_data)
+    db.save_notes_from_notes_data(ankihub_did=ankihub_did, notes_data=notes_data)
 
     first_time_import = local_did is None
 
