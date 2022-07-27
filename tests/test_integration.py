@@ -71,7 +71,7 @@ def test_editor(anki_session_with_addon: AnkiSession, requests_mock, monkeypatch
 
     # when the decks in the config are empty on_ankihub_button_press returns early
     monkeypatch.setattr(
-        "ankihub.gui.editor.config.private_config.decks", {"fake_id": Mock()}
+        "ankihub.gui.editor.config.private_config.decks", {str(UUID_1): Mock()}
     )
 
     # this makes it so that the note is added to the first ankihub deck from the list
