@@ -42,6 +42,8 @@ def sync_with_ankihub() -> None:
     for ankihub_did in config.private_config.decks.keys():
         success = sync_deck_with_ankihub(ankihub_did)
         if not success:
+            # Should we restore from backup on a failure?
+            # Also it would probably be good to count the number of updated notes and decks and display that to the user
             break
 
 
