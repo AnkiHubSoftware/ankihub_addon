@@ -66,6 +66,8 @@ def sync_deck_with_ankihub(ankihub_did: str) -> bool:
             notes_data=notes_data,
             deck_name=deck["name"],
             local_did=deck["anki_id"],
+            protected_fields=data["protected_fields"],
+            protected_tags=data["protected_tags"],
         )
         config.save_latest_update(ankihub_did, data["latest_update"])
     else:
@@ -81,6 +83,12 @@ def import_ankihub_deck(
     local_did: Optional[  # did that new notes should be put into if importing not for the first time
         DeckId
     ] = None,
+    protected_fields: Optional[
+        Dict[int, List[str]]
+    ] = None,  # will be fetched from api if not provided
+    protected_tags: Optional[
+        List[str]
+    ] = None,  # will be fetched from api if not provided
 ) -> Optional[DeckId]:
     """
     Used for importing an ankihub deck and updates to an ankihub deck
@@ -96,11 +104,7 @@ def import_ankihub_deck(
     except AnkiHubError:
         return None
 
-    protected_fields: Dict[int, List[str]] = {}
-    protected_tags: List[str] = []
-    if local_did is None:
-        # we only need to fetch protected fields and tags if we are installing the deck for the first time
-        # because protected fields and tags are excluded from deck updates by AnkiHub
+    if protected_fields is None:
         client = AnkiHubClient()
         response = client.get_protected_fields(uuid.UUID(ankihub_did))
         if response.status_code == 200:
@@ -112,6 +116,8 @@ def import_ankihub_deck(
         elif response.status_code != 404:
             return None
 
+    if protected_tags is None:
+        client = AnkiHubClient()
         response = client.get_protected_tags(uuid.UUID(ankihub_did))
         if response.status_code == 200:
             protected_tags = response.json()["tags"]
