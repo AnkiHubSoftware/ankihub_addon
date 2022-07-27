@@ -40,8 +40,10 @@ def on_ankihub_button_press(editor: Editor) -> None:
     _field_vals = list(editor.note.fields)
     # Exclude the AnkiHub ID field since we don't want to expose this as an
     # editable field in AnkiHub suggestion forms.
-    ankihub_note_uuid = uuid.UUID(_field_vals.pop())
-    if not ankihub_note_uuid:
+    ankihub_note_uuid_str = _field_vals.pop()
+    if ankihub_note_uuid_str:
+        ankihub_note_uuid = uuid.UUID(ankihub_note_uuid_str)
+    else:
         ankihub_note_uuid = uuid.uuid4()
     _fields_metadata = editor.note.note_type()["flds"][:-1]
     fields = [

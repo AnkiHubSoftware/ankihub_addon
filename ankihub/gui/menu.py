@@ -1,4 +1,3 @@
-from concurrent.futures import Future
 from datetime import datetime, timezone
 from typing import Optional
 
@@ -19,11 +18,11 @@ from aqt.utils import askUser, showInfo, showText, tooltip
 from requests import Response
 
 from .. import LOGGER
-from ..media_import.ui import open_import_dialog
 from ..addon_ankihub_client import AddonAnkiHubClient as AnkiHubClient
 from ..config import config
+from ..media_import.ui import open_import_dialog
 from ..register_decks import create_collaborative_deck
-from ..sync import sync_deck_with_ankihub, sync_with_progress
+from ..sync import sync_with_progress
 from .decks import SubscribedDecksDialog
 
 
@@ -162,16 +161,6 @@ def create_collaborative_deck_action() -> None:
                 anki_did,
                 creator=True,
                 last_update=creation_time,
-            )
-
-            def on_done(future: Future):
-                future.result()  # raises exception if one accured in task
-
-            # sync the deck so that the database gets updated
-            mw.taskman.with_progress(
-                lambda: sync_deck_with_ankihub(ankihub_did),
-                on_done=on_done,
-                label="Syncing deck with AnkiHub",
             )
         else:
             msg = f"😔 Deck upload failed: {response.text}"

@@ -16,10 +16,14 @@ def anki_session_with_addon(anki_session: AnkiSession, requests_mock) -> AnkiSes
     dest = pathlib.Path(anki_session.mw.addonManager.addonsFolder())
     shutil.copytree(ROOT / "ankihub", dest / "ankihub")
 
-    # clear database
-    from ankihub.constants import DB_PATH
+    # clear user files
+    from ankihub.constants import USER_FILES_PATH
 
-    DB_PATH.unlink(missing_ok=True)
+    for f in USER_FILES_PATH.glob("*"):
+        if f.is_file():
+            f.unlink()
+        elif f.is_dir():
+            shutil.rmtree(f)
 
     yield anki_session
 

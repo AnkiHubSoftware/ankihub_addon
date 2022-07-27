@@ -42,6 +42,8 @@ def sync_with_ankihub() -> None:
     for ankihub_did in config.private_config.decks.keys():
         success = sync_deck_with_ankihub(ankihub_did)
         if not success:
+            # Should we restore from backup on a failure?
+            # Also it would probably be good to count the number of updated notes and decks and display that to the user
             break
 
 
@@ -52,6 +54,10 @@ def sync_deck_with_ankihub(ankihub_did: str) -> bool:
     for response in client.get_deck_updates(
         uuid.UUID(ankihub_did), since=deck["latest_update"]
     ):
+        if mw.progress.want_cancel():
+            LOGGER.debug("User cancelled sync.")
+            return False
+
         if response.status_code != 200:
             return False
 
@@ -148,7 +154,7 @@ def import_ankihub_deck_inner(
     notes_data = transform_notes_data(notes_data)
 
     db = AnkiHubDB()
-    db.save_notes(ankihub_did=ankihub_did, notes_data=notes_data)
+    db.save_notes_from_notes_data(ankihub_did=ankihub_did, notes_data=notes_data)
 
     first_time_import = local_did is None
 
