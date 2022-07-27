@@ -72,6 +72,8 @@ def sync_deck_with_ankihub(ankihub_did: str) -> bool:
             notes_data=notes_data,
             deck_name=deck["name"],
             local_did=deck["anki_id"],
+            protected_fields=data["protected_fields"],
+            protected_tags=data["protected_tags"],
         )
         config.save_latest_update(ankihub_did, data["latest_update"])
     else:
@@ -87,6 +89,12 @@ def import_ankihub_deck(
     local_did: Optional[  # did that new notes should be put into if importing not for the first time
         DeckId
     ] = None,
+    protected_fields: Optional[
+        Dict[int, List[str]]
+    ] = None,  # will be fetched from api if not provided
+    protected_tags: Optional[
+        List[str]
+    ] = None,  # will be fetched from api if not provided
 ) -> Optional[DeckId]:
     """
     Used for importing an ankihub deck and updates to an ankihub deck
@@ -102,11 +110,7 @@ def import_ankihub_deck(
     except AnkiHubError:
         return None
 
-    protected_fields: Dict[int, List[str]] = {}
-    protected_tags: List[str] = []
-    if local_did is None:
-        # we only need to fetch protected fields and tags if we are installing the deck for the first time
-        # because protected fields and tags are excluded from deck updates by AnkiHub
+    if protected_fields is None:
         client = AnkiHubClient()
         response = client.get_protected_fields(uuid.UUID(ankihub_did))
         if response.status_code == 200:
@@ -118,6 +122,8 @@ def import_ankihub_deck(
         elif response.status_code != 404:
             return None
 
+    if protected_tags is None:
+        client = AnkiHubClient()
         response = client.get_protected_tags(uuid.UUID(ankihub_did))
         if response.status_code == 200:
             protected_tags = response.json()["tags"]
@@ -277,8 +283,9 @@ def prepare_note(
 ) -> None:
     note[constants.ANKIHUB_NOTE_TYPE_FIELD_NAME] = str(ankihub_id)
 
-    # update tags, but don't remove protected ones
-    note.tags = list(set(note.tags).intersection(set(protected_tags)) | set(tags))
+    note.tags = updated_tags(
+        cur_tags=note.tags, incoming_tags=tags, protected_tags=protected_tags
+    )
 
     # update fields which are not protected
     for field in fields:
@@ -289,6 +296,27 @@ def prepare_note(
             continue
 
         note[field["name"]] = field["value"]
+
+
+def updated_tags(
+    cur_tags: List[str], incoming_tags: List[str], protected_tags: List[str]
+) -> List[str]:
+
+    # get subset of cur_tags that are protected
+    # by being equal to a protected tag or by being a subtag of a protected tag
+    result = set(
+        tag
+        for tag in cur_tags
+        if any(
+            tag == protected_tag or tag.startswith(f"{protected_tag}::")
+            for protected_tag in protected_tags
+        )
+    )
+
+    # add new tags
+    result = set(result) | set(incoming_tags)
+
+    return list(result)
 
 
 def fetch_remote_note_types_based_on_notes_data(
