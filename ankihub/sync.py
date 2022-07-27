@@ -277,8 +277,9 @@ def prepare_note(
 ) -> None:
     note[constants.ANKIHUB_NOTE_TYPE_FIELD_NAME] = str(ankihub_id)
 
-    # update tags, but don't remove protected ones
-    note.tags = list(set(note.tags).intersection(set(protected_tags)) | set(tags))
+    note.tags = updated_tags(
+        cur_tags=note.tags, incoming_tags=tags, protected_tags=protected_tags
+    )
 
     # update fields which are not protected
     for field in fields:
@@ -289,6 +290,27 @@ def prepare_note(
             continue
 
         note[field["name"]] = field["value"]
+
+
+def updated_tags(
+    cur_tags: List[str], incoming_tags: List[str], protected_tags: List[str]
+) -> List[str]:
+
+    # get subset of cur_tags that are protected
+    # by being equal to a protected tag or by being a subtag of a protected tag
+    result = set(
+        tag
+        for tag in cur_tags
+        if any(
+            tag == protected_tag or tag.startswith(f"{protected_tag}::")
+            for protected_tag in protected_tags
+        )
+    )
+
+    # add new tags
+    result = set(result) | set(incoming_tags)
+
+    return list(result)
 
 
 def fetch_remote_note_types_based_on_notes_data(
