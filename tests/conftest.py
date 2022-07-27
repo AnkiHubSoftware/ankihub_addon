@@ -9,7 +9,9 @@ ROOT = pathlib.Path(__file__).absolute().parent.parent
 
 
 @pytest.fixture(scope="function")
-def anki_session_with_addon(anki_session: AnkiSession):
+def anki_session_with_addon(anki_session: AnkiSession, requests_mock) -> AnkiSession:
+    # the requests_mock argument is here to disallow real requests for all tests that use the fixture
+    # to prevent hidden real requests
 
     dest = pathlib.Path(anki_session.mw.addonManager.addonsFolder())
     shutil.copytree(ROOT / "ankihub", dest / "ankihub")
