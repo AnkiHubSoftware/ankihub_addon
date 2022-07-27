@@ -52,6 +52,10 @@ def sync_deck_with_ankihub(ankihub_did: str) -> bool:
     for response in client.get_deck_updates(
         uuid.UUID(ankihub_did), since=deck["latest_update"]
     ):
+        if mw.progress.want_cancel():
+            LOGGER.debug("User cancelled sync.")
+            return False
+
         if response.status_code != 200:
             return False
 
