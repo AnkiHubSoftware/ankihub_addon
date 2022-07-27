@@ -69,6 +69,11 @@ def test_editor(anki_session_with_addon: AnkiSession, requests_mock, monkeypatch
 
     monkeypatch.setattr("ankihub.gui.editor.SuggestionDialog.exec", Mock())
 
+    # when the decks in the config are empty on_ankihub_button_press returns early
+    monkeypatch.setattr(
+        "ankihub.gui.editor.config.private_config.decks", {"fake_id": Mock()}
+    )
+
     # this makes it so that the note is added to the first ankihub deck from the list
     # it could be any deck, we just don't want the dialog to open
     monkeypatch.setattr("ankihub.gui.editor.chooseList", lambda *args, **kwargs: 0)
