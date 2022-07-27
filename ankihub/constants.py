@@ -40,11 +40,8 @@ USER_SUPPORT_EMAIL_SLUG = "help@ankipalace.com"
 
 ANKI_MINOR = int(ANKI_VERSION.split(".")[2])
 
-DB_PATH = Path(
-    os.getenv(
-        key="ANKIHUB_DB_PATH", default=Path(__file__).parent / "user_files/ankihub.db"
-    )
-)
+USER_FILES_PATH = Path(__file__).parent / "user_files"
+DB_PATH = USER_FILES_PATH / "ankihub.db"
 
 
 class AnkiHubCommands(Enum):

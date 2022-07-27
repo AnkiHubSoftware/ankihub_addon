@@ -1,8 +1,10 @@
 import sqlite3
+from .constants import ANKIHUB_NOTE_TYPE_FIELD_NAME
 from typing import Dict, List
 
 from anki.models import NotetypeId
 from anki.notes import NoteId
+from aqt import mw
 
 from .constants import DB_PATH
 
@@ -22,7 +24,7 @@ class AnkiHubDB:
             """
         )
 
-    def save_notes(self, ankihub_did: str, notes_data: List[Dict]):
+    def save_notes_from_notes_data(self, ankihub_did: str, notes_data: List[Dict]):
         for note_data in notes_data:
             self.c.execute(
                 """
@@ -38,6 +40,28 @@ class AnkiHubDB:
                     ankihub_did,
                     note_data["anki_id"],
                     note_data["note_type_id"],
+                ),
+            )
+
+        self.conn.commit()
+
+    def save_notes_from_nids(self, ankihub_did: str, nids: List[NoteId]):
+        for nid in nids:
+            note = mw.col.get_note(nid)
+            self.c.execute(
+                """
+                INSERT OR REPLACE INTO notes (
+                    ankihub_note_id,
+                    ankihub_deck_id,
+                    anki_note_id,
+                    anki_note_type_id
+                ) VALUES (?, ?, ?, ?)
+                """,
+                (
+                    note[ANKIHUB_NOTE_TYPE_FIELD_NAME],
+                    ankihub_did,
+                    nid,
+                    note.mid,
                 ),
             )
 
@@ -89,3 +113,7 @@ class AnkiHubDB:
             (ankihub_did,),
         )
         self.conn.commit()
+
+    def ankihub_deck_ids(self) -> List[str]:
+        self.c.execute("SELECT DISTINCT ankihub_deck_id FROM notes")
+        return [x[0] for x in self.c.fetchall()]
