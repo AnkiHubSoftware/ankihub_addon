@@ -24,17 +24,16 @@ jobs:
         with:
           python-version: 3.8
 
+      - name: Create ankiaddon file
+        run: |
+          bash ./scripts/release.sh
+        env:
+          GOOGLE_API_KEY: ${{ secrets.GOOGLE_API_KEY }}
+
       - name: Declare version variable
         id: vars
         run: |
           echo "::set-output name=version::$(scripts/calver.sh)"
-
-      - name: Create ankiaddon file
-        run: |
-          echo ${{ steps.vars.outputs.version }} > VERSION
-          bash ./scripts/release.sh
-        env:
-          GOOGLE_API_KEY: ${{ secrets.GOOGLE_API_KEY }}
 
       - name: Commit version bump and create tag
         run: |

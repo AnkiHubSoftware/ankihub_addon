@@ -145,3 +145,4 @@ dmypy.json
 
 # media_import
 ankihub/media_import/*
+ankihub/manifest.json
