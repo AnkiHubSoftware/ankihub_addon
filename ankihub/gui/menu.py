@@ -1,4 +1,5 @@
 from concurrent.futures import Future
+from datetime import datetime, timezone
 from typing import Optional
 
 from aqt import (
@@ -152,7 +153,16 @@ def create_collaborative_deck_action() -> None:
             data = response.json()
             anki_did = mw.col.decks.id_for_name(deck_name)
             ankihub_did = data["deck_id"]
-            config.save_subscription(deck_name, ankihub_did, anki_did, creator=True)
+            creation_time = datetime.now(tz=timezone.utc).strftime(
+                "%Y-%m-%dT%H:%M:%S.%f%z"
+            )
+            config.save_subscription(
+                deck_name,
+                ankihub_did,
+                anki_did,
+                creator=True,
+                last_update=creation_time,
+            )
 
             def on_done(future: Future):
                 future.result()  # raises exception if one accured in task
