@@ -21,6 +21,7 @@ from . import LOGGER
 from .addon_ankihub_client import AddonAnkiHubClient as AnkiHubClient
 from .config import config
 from .constants import ANKIHUB_NOTE_TYPE_FIELD_NAME
+from .db import AnkiHubDB
 from .utils import (
     change_note_type_of_note,
     create_backup_with_progress,
@@ -67,6 +68,16 @@ def create_collaborative_deck(deck_name: str) -> Response:
     assign_ankihub_ids(note_ids)
 
     response = upload_deck(deck_id)
+    if response.status_code != 201:
+        return response
+
+    ankihub_did = response.json()["deck_id"]
+    db = AnkiHubDB()
+    db.save_notes_from_nids(
+        ankihub_did=ankihub_did,
+        nids=note_ids,
+    )
+
     return response
 
 
