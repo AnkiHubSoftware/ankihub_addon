@@ -8,8 +8,9 @@ import tempfile
 import typing
 import uuid
 from copy import deepcopy
-from typing import Dict
+from typing import Dict, List, Tuple
 
+from anki.cards import Card
 from anki.decks import DeckId
 from anki.exporting import AnkiPackageExporter
 from anki.models import NotetypeId
@@ -36,16 +37,38 @@ def upload_deck(did: DeckId) -> Response:
     """Upload the deck to AnkiHub."""
 
     deck_name = mw.col.decks.name(did)
-    exporter = AnkiPackageExporter(mw.col)
-    exporter.did = did
-    exporter.includeMedia = False
-    exporter.includeTags = True
-    deck_uuid = uuid.uuid4()
-    out_dir = pathlib.Path(tempfile.mkdtemp())
-    deck_name = re.sub('[\\\\/?<>:*|"^]', "_", deck_name)
-    out_file = out_dir / f"{deck_name}-{deck_uuid}.apkg"
-    exporter.exportInto(str(out_file))
-    LOGGER.debug(f"Deck {deck_name} exported to {out_file}")
+    cids = mw.col.find_cards(f'deck:"{deck_name}"')
+
+    # cards in filtered_decks are temporarily moved into the main deck before exporting
+    # so that the backend doesn't have to deal with filtered decks
+    # ... this stores the card + the filtered deck id for each card that is in a filtered deck
+    card_filtered_did_pairs: List[Tuple[Card, DeckId]] = [
+        ((card := mw.col.get_card(cid)), card.did)
+        for cid in mw.col.find_cards(f'deck:"{deck_name}" deck:filtered')
+    ]
+
+    try:
+        # move cards into the main deck
+        for card, _ in card_filtered_did_pairs:
+            card.did = did
+            card.flush()
+
+        exporter = AnkiPackageExporter(mw.col)
+        exporter.cids = list(cids)
+        exporter.includeMedia = False
+        exporter.includeTags = True
+        deck_uuid = uuid.uuid4()
+        out_dir = pathlib.Path(tempfile.mkdtemp())
+        deck_name = re.sub('[\\\\/?<>:*|"^]', "_", deck_name)
+        out_file = out_dir / f"{deck_name}-{deck_uuid}.apkg"
+        exporter.exportInto(str(out_file))
+        LOGGER.debug(f"Deck {deck_name} exported to {out_file}")
+    finally:
+        # move the cards back into the filtered decks
+        for card, filtered_did in card_filtered_did_pairs:
+            card.did = filtered_did
+            card.flush()
+
     mw.col.models._clear_cache()
     client = AnkiHubClient()
     response = client.upload_deck(file=out_file, anki_deck_id=did)
