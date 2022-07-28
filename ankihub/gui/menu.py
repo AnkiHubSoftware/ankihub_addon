@@ -22,6 +22,7 @@ from requests import Response
 from .. import LOGGER
 from ..addon_ankihub_client import AddonAnkiHubClient as AnkiHubClient
 from ..config import config
+from ..error_reporting import report_exception_and_upload_logs
 from ..media_import.ui import open_import_dialog
 from ..register_decks import create_collaborative_deck
 from ..sync import sync_with_progress
@@ -207,6 +208,10 @@ def create_collaborative_deck_action() -> None:
 
     def on_failure(exc: Exception):
         mw.progress.finish()
+        try:
+            raise exc
+        except:
+            report_exception_and_upload_logs()
         raise exc
 
     op = QueryOp(
