@@ -304,6 +304,7 @@ def updated_tags(
 
     # get subset of cur_tags that are protected
     # by being equal to a protected tag or by being a subtag of a protected tag
+    protected_tags = protected_tags or []
     result = set(
         tag
         for tag in cur_tags
