@@ -111,6 +111,7 @@ def import_ankihub_deck(
         return None
 
     if protected_fields is None:
+        protected_fields = {}
         client = AnkiHubClient()
         response = client.get_protected_fields(uuid.UUID(ankihub_did))
         if response.status_code == 200:
@@ -123,6 +124,7 @@ def import_ankihub_deck(
             return None
 
     if protected_tags is None:
+        protected_tags = []
         client = AnkiHubClient()
         response = client.get_protected_tags(uuid.UUID(ankihub_did))
         if response.status_code == 200:
@@ -288,7 +290,6 @@ def prepare_note(
     )
 
     # update fields which are not protected
-    protected_fields = protected_fields or {}
     for field in fields:
         protected_fields_for_model = protected_fields.get(
             mw.col.models.get(note.mid)["id"], []
@@ -305,7 +306,6 @@ def updated_tags(
 
     # get subset of cur_tags that are protected
     # by being equal to a protected tag or by being a subtag of a protected tag
-    protected_tags = protected_tags or []
     result = set(
         tag
         for tag in cur_tags
