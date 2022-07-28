@@ -288,6 +288,7 @@ def prepare_note(
     )
 
     # update fields which are not protected
+    protected_fields = protected_fields or {}
     for field in fields:
         protected_fields_for_model = protected_fields.get(
             mw.col.models.get(note.mid)["id"], []
