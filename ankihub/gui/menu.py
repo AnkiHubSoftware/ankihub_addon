@@ -99,8 +99,6 @@ class AnkiHubLogin(QWidget):
             showText("Oops! You forgot to put in a username or password!")
             return
         ankihub_client = AnkiHubClient()
-        ankihub_client.signout()
-
         response = ankihub_client.login(
             credentials={"username": username, "password": password}
         )
