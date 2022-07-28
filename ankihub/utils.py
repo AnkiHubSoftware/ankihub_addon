@@ -273,6 +273,9 @@ def modify_template(template: Dict) -> None:
 def undo_note_type_modfications(note_type_ids: Iterable[NotetypeId]) -> None:
     for mid in note_type_ids:
         note_type = mw.col.models.get(mid)
+        if note_type is None:
+            continue
+
         undo_note_type_modification(note_type)
         mw.col.models.update_dict(note_type)
 
