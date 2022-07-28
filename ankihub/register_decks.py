@@ -41,7 +41,10 @@ def upload_deck(did: DeckId) -> Response:
 
     # cards in filtered_decks are temporarily moved into the main deck before exporting
     # so that the backend doesn't have to deal with filtered decks
+
     # ... this stores the card + the filtered deck id for each card that is in a filtered deck
+    # "deck:filtered" searches for cards in filtered decks,
+    # see https://docs.ankiweb.net/searching.html#tags-decks-cards-and-notes
     card_filtered_did_pairs: List[Tuple[Card, DeckId]] = [
         ((card := mw.col.get_card(cid)), card.did)
         for cid in mw.col.find_cards(f'deck:"{deck_name}" deck:filtered')
