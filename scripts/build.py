@@ -27,7 +27,7 @@ subprocess.run(
         str(MEDIA_IMPORT_LIBS),
         "-r",
         str(MEDIA_IMPORT_REQUIREMENTS),
-        "--no-user",
+        "--no-user",  # needed for gitpod because it adds --user automatically and it conflicts with --target
     ],
     check=True,
 )
