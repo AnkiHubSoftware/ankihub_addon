@@ -28,7 +28,9 @@ subprocess.run(
         str(MEDIA_IMPORT_LIBS),
         "-r",
         str(MEDIA_IMPORT_REQUIREMENTS),
-    ]
+        "--no-user",
+    ],
+    check=True,
 )
 
 generate_manifest()
