@@ -273,6 +273,9 @@ def modify_template(template: Dict) -> None:
 def undo_note_type_modfications(note_type_ids: Iterable[NotetypeId]) -> None:
     for mid in note_type_ids:
         note_type = mw.col.models.get(mid)
+        if note_type is None:
+            continue
+
         undo_note_type_modification(note_type)
         mw.col.models.update_dict(note_type)
 
@@ -330,7 +333,7 @@ def create_backup_with_progress() -> None:
             mw.col.reopen(after_full_sync=False)
         LOGGER.debug("Backup successful.")
     except Exception as exc:
-        LOGGER.debug("Backup failed.")
+        LOGGER.exception("Backup failed")
         report_exception_and_upload_logs()
         raise exc
     finally:

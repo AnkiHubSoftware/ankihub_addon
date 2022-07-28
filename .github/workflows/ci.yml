@@ -43,6 +43,8 @@ jobs:
         env:
           CODECOV_TOKEN: "${{ secrets.CODECOV_TOKEN }}"
         uses: codecov/codecov-action@v1
+        with:
+          fail_ci_if_error: false
 
       - name: Create ankiaddon file
         run: |
