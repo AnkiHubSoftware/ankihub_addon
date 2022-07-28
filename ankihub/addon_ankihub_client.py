@@ -74,6 +74,7 @@ def report_exception_hook(response: Response, *args, **kwargs):
         response.raise_for_status()
     except HTTPError:
         ctx = {"response": {"reason": response.reason, "content": response.text}}
+        LOGGER.exception("Error in report exception hook.", extra=ctx)
         event_id = report_exception_and_upload_logs(context=ctx)
         response.sentry_event_id = event_id  # type: ignore
 

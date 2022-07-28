@@ -23,11 +23,11 @@ from aqt.qt import (
 from aqt.utils import askUser, openLink, showText, tooltip
 
 from .. import LOGGER
-from ..error_reporting import report_exception_and_upload_logs
 from ..addon_ankihub_client import AddonAnkiHubClient as AnkiHubClient
 from ..config import config
 from ..constants import CSV_DELIMITER, URL_DECK_BASE, URL_DECKS, URL_HELP
 from ..db import AnkiHubDB
+from ..error_reporting import report_exception_and_upload_logs
 from ..sync import import_ankihub_deck, sync_with_ankihub
 from ..utils import create_backup_with_progress, undo_note_type_modfications
 
@@ -239,6 +239,7 @@ class SubscribeDialog(QDialog):
             try:
                 success = future.result()
             except Exception as e:
+                LOGGER.exception("Error installing deck")
                 report_exception_and_upload_logs()
                 exc = e
 
@@ -247,7 +248,7 @@ class SubscribeDialog(QDialog):
                 self.accept()
                 mw.reset()
             else:
-                LOGGER.exception("Importing deck failed.")
+                LOGGER.warning("Importing deck failed.")
                 msg = "Failed to import deck."
                 if exc:
                     msg += f"\n\n{str(exc)}"

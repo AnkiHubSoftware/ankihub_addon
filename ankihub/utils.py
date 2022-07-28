@@ -333,7 +333,7 @@ def create_backup_with_progress() -> None:
             mw.col.reopen(after_full_sync=False)
         LOGGER.debug("Backup successful.")
     except Exception as exc:
-        LOGGER.debug("Backup failed.")
+        LOGGER.exception("Backup failed")
         report_exception_and_upload_logs()
         raise exc
     finally:
