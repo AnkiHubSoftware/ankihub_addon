@@ -170,6 +170,11 @@ def create_collaborative_deck_action() -> None:
     deck_name = deck_chooser.name
     if not deck_name:
         return
+
+    if len(mw.col.find_cards(f'deck:"{deck_name}"')) == 0:
+        showText("You can't upload an empty deck.")
+        return
+
     confirm = askUser(
         "Uploading the deck to AnkiHub requires modifying notes and note types in "
         f"{deck_name} and will require a full sync afterwards. Would you like to "
