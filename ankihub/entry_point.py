@@ -2,11 +2,12 @@
 from aqt import mw
 
 from . import LOGGER
+from .addons import setup_addons
+from .config import config
+from .errors import setup_error_handler
 from .gui import browser, editor
 from .gui.menu import setup_ankihub_menu
 from .sync import setup_sync_on_startup
-from .addons import setup_addons
-from .config import config
 
 
 def run():
@@ -31,5 +32,8 @@ def run():
 
     setup_addons()
     LOGGER.debug("Set up addons.")
+
+    setup_error_handler()
+    LOGGER.debug("Set up error handler.")
 
     return mw

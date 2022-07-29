@@ -18,7 +18,9 @@ os.environ["SENTRY_RELEASE"] = ADDON_VERSION
 os.environ["SENTRY_ENVIRONMENT"] = SENTRY_ENV
 
 
-def report_exception_and_upload_logs(context: dict = dict()) -> Optional[str]:
+def report_exception_and_upload_logs(
+    exception: Optional[BaseException] = None, context: dict = dict()
+) -> Optional[str]:
     if not config.public_config.get("report_errors"):
         return None
 
@@ -27,11 +29,13 @@ def report_exception_and_upload_logs(context: dict = dict()) -> Optional[str]:
 
     logs_key = upload_logs_in_background()
     context = {**context, "logs": {"filename": logs_key}}
-    sentry_event_id = report_exception(context)
+    sentry_event_id = report_exception(exception=exception, context=context)
     return sentry_event_id
 
 
-def report_exception(context: dict = dict()) -> Optional[str]:
+def report_exception(
+    exception: Optional[BaseException] = None, context: dict = dict()
+) -> Optional[str]:
     from .config import config
     from .lib import sentry_sdk  # type: ignore
     from .lib.sentry_sdk import capture_exception, configure_scope  # type: ignore
@@ -56,7 +60,10 @@ def report_exception(context: dict = dict()) -> Optional[str]:
             for name, ctx in context.items():
                 scope.set_context(name, ctx)
 
-        event_id = capture_exception()
+        if exception is None:
+            event_id = capture_exception()
+        else:
+            event_id = capture_exception(exception)
         LOGGER.debug(f"Sentry captured {event_id=}.")
         sentry_sdk.flush()
     except Exception as e:
