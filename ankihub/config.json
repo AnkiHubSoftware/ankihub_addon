@@ -1,5 +1,5 @@
 {
-    "ankihub_url": "https://staging.ankihub.net",
+    "ankihub_url": "https://app.ankihub.net",
     "hotkey": "Alt+u",
     "report_errors": true,
     "sync_on_startup": true

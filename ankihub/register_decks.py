@@ -138,7 +138,7 @@ def change_note_types_of_notes(
 def assign_ankihub_ids(note_ids: typing.List[NoteId]) -> None:
     """Assign UUID to notes that have an AnkiHub ID field already."""
     updated_notes = []
-    LOGGER.debug(f"Assigning AnkiHub IDs to {', '.join(map(str, note_ids))}")
+    LOGGER.debug("Assigning AnkiHub IDs to notes.")
     for note_id in note_ids:
         note = mw.col.get_note(id=note_id)
         note[ANKIHUB_NOTE_TYPE_FIELD_NAME] = str(uuid.uuid4())
