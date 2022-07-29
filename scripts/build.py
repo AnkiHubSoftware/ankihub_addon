@@ -4,8 +4,7 @@ import subprocess
 from pathlib import Path
 
 from generate_manifest import generate_manifest
-
-google_api_key = os.getenv("GOOGLE_API_KEY")
+from google_api_obfuscate import obfuscate_google_api_key
 
 PROJECT_ROOT = Path(__file__).parent.parent
 MEDIA_IMPORT_SRC = PROJECT_ROOT / "media_import/src/media_import"
@@ -13,7 +12,7 @@ MEDIA_IMPORT_LIBS = MEDIA_IMPORT_SRC / "libs"
 MEDIA_IMPORT_TARGET = PROJECT_ROOT / "ankihub/media_import"
 MEDIA_IMPORT_REQUIREMENTS = PROJECT_ROOT / "media_import" / "requirements.txt"
 
-API_KEY_OBFUSCATE_SCRIPT = Path(__file__).parent / "google_api_obfuscate.py"
+GOOGLE_API_KEY = os.getenv("GOOGLE_API_KEY")
 
 subprocess.run("git submodule update --init --recursive", shell=True, cwd=PROJECT_ROOT)
 
@@ -28,7 +27,9 @@ subprocess.run(
         str(MEDIA_IMPORT_LIBS),
         "-r",
         str(MEDIA_IMPORT_REQUIREMENTS),
-    ]
+        "--no-user",  # needed for gitpod because it adds --user automatically and it conflicts with --target
+    ],
+    check=True,
 )
 
 generate_manifest()
@@ -36,11 +37,4 @@ generate_manifest()
 shutil.rmtree(MEDIA_IMPORT_TARGET, ignore_errors=True)
 shutil.copytree(MEDIA_IMPORT_SRC, MEDIA_IMPORT_TARGET)
 
-subprocess.run(
-    [
-        "python3",
-        str(API_KEY_OBFUSCATE_SCRIPT),
-        google_api_key,
-        str(MEDIA_IMPORT_TARGET),
-    ]
-)
+obfuscate_google_api_key(GOOGLE_API_KEY, MEDIA_IMPORT_TARGET)

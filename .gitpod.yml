@@ -10,7 +10,7 @@ tasks:
       DEVELOPMENT: True
       ANKI_BASE: "/workspace/ankihub_addon/tests/test_data/Anki2"
     command: >
-      anki
+      python3 scripts/build.py && anki
 
 github:
   prebuilds:
