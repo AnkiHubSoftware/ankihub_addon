@@ -5,6 +5,7 @@ import traceback
 
 from aqt.gui_hooks import main_window_did_init
 
+from .. import LOGGER
 from .addon_ankihub_client import AnkiHubRequestError
 from .config import config
 from .constants import ANKIWEB_ID
@@ -15,6 +16,10 @@ from .gui.error_feedback import ErrorFeedbackDialog
 def overwrite_excepthook():
     def excepthook(etype, val: Exception, tb) -> None:
         try:
+            LOGGER.debug(
+                "From error handler: ", traceback.format_exception(etype, val, tb)
+            )
+
             tb_str = "".join(traceback.format_tb(tb))
             this_addon_is_involved = (
                 ANKIWEB_ID is not None
