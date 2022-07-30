@@ -5,6 +5,7 @@ import traceback
 
 from aqt.gui_hooks import main_window_did_init
 
+from .addon_ankihub_client import AnkiHubRequestError
 from .config import config
 from .constants import ANKIWEB_ID
 from .error_reporting import report_exception_and_upload_logs
@@ -25,7 +26,15 @@ def overwrite_excepthook():
                 and config.public_config.get("report_errors")
                 and not os.getenv("REPORT_ERRORS", None) == "0"
             ):
-                sentry_id = report_exception_and_upload_logs(exception=val)
+                context = None
+                if isinstance(val, AnkiHubRequestError):
+                    context = {
+                        "reason": val.response.reason,
+                        "content": val.response.content,
+                    }
+                sentry_id = report_exception_and_upload_logs(
+                    exception=val, context=context
+                )
                 ErrorFeedbackDialog(exception=val, event_id=sentry_id)
         finally:
             original_except_hook(etype, val, tb)
