@@ -26,7 +26,7 @@ def overwrite_excepthook():
                 and not os.getenv("REPORT_ERRORS", None) == "0"
             ):
                 sentry_id = report_exception_and_upload_logs(exception=val)
-                ErrorFeedbackDialog(sentry_id)
+                ErrorFeedbackDialog(exception=val, event_id=sentry_id)
         finally:
             original_except_hook(etype, val, tb)
 
