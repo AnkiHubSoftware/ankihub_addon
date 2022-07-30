@@ -49,10 +49,6 @@ def logging_hook(response: Response, *args, **kwargs):
 def authentication_and_exception_hook(response: Response, *args, **kwargs):
     LOGGER.debug("Begin raise exception hook.")
 
-    treat_404_as_error = getattr(response.request, "treat_404_as_error", True)
-    if not treat_404_as_error and response.status_code == 404:
-        return response
-
     if maybe_handle_sign_in(response):
         return response
 

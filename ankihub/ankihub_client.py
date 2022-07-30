@@ -54,10 +54,8 @@ class AnkiHubClient:
         endpoint,
         data=None,
         params=None,
-        treat_404_as_error=True,
     ) -> Response:
         request = self._build_request(method, endpoint, data, params)
-        request.treat_404_as_error = treat_404_as_error  # type: ignore
         try:
             response = self.session.send(request)
             self.session.close()
@@ -215,7 +213,6 @@ class AnkiHubClient:
         response = self._send_request(
             "GET",
             f"/decks/{ankihub_deck_uuid}/protected-fields/",
-            treat_404_as_error=False,
         )
         return response
 
@@ -223,7 +220,6 @@ class AnkiHubClient:
         response = self._send_request(
             "GET",
             f"/decks/{ankihub_deck_uuid}/protected-tags/",
-            treat_404_as_error=False,
         )
         return response
 

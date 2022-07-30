@@ -14,7 +14,10 @@ from aqt.utils import tooltip
 from requests.exceptions import ConnectionError
 
 from . import LOGGER, constants
-from .addon_ankihub_client import AddonAnkiHubClient as AnkiHubClient
+from .addon_ankihub_client import (
+    AddonAnkiHubClient as AnkiHubClient,
+    AnkiHubRequestError,
+)
 from .config import config
 from .db import AnkiHubDB
 from .utils import (
@@ -112,24 +115,28 @@ def import_ankihub_deck(
     if protected_fields is None:
         protected_fields = {}
         client = AnkiHubClient()
-        response = client.get_protected_fields(uuid.UUID(ankihub_did))
-        if response.status_code == 200:
+        try:
+            response = client.get_protected_fields(uuid.UUID(ankihub_did))
+        except AnkiHubRequestError as e:
+            if not e.response.status_code == 404:
+                raise e
+        else:
             protected_fields_raw = response.json()["fields"]
             protected_fields = {
                 int(field_id): field_names
                 for field_id, field_names in protected_fields_raw.items()
             }
-        elif response.status_code != 404:
-            return None
 
     if protected_tags is None:
         protected_tags = []
         client = AnkiHubClient()
-        response = client.get_protected_tags(uuid.UUID(ankihub_did))
-        if response.status_code == 200:
+        try:
+            response = client.get_protected_tags(uuid.UUID(ankihub_did))
+        except AnkiHubRequestError as e:
+            if not e.response.status_code == 404:
+                raise e
+        else:
             protected_tags = response.json()["tags"]
-        elif response.status_code != 404:
-            return None
 
     anki_deck_id = import_ankihub_deck_inner(
         ankihub_did=ankihub_did,
