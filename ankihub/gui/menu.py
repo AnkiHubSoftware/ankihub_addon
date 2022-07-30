@@ -163,7 +163,7 @@ def create_collaborative_deck_action() -> None:
         names=lambda: [
             d.name
             for d in mw.col.decks.all_names_and_ids(include_filtered=False)
-            if "::" not in d.name and d.name != "Default"
+            if "::" not in d.name and d.id != 1
         ],
     )
     deck_name = deck_chooser.name
