@@ -13,28 +13,16 @@ from requests.models import HTTPError
 from . import LOGGER
 from .ankihub_client import AnkiHubClient
 from .config import config
-from .gui.error_feedback import ErrorFeedbackDialog
 
 
-def show_anki_message_hook(response: Response, *args, **kwargs):
-    LOGGER.debug("Begin show anki message hook.")
-    endpoint = response.request.url
-    sentry_event_id: str = getattr(response, "sentry_event_id", None)
+class AnkiHubRequestError(Exception):
+    def __init__(self, response: Response):
+        self.response = response
 
-    treat_404_as_error = getattr(response.request, "treat_404_as_error", True)
-    if not treat_404_as_error and response.status_code == 404:
-        return response
-
-    def message():
-        ErrorFeedbackDialog(sentry_event_id)
-
-    if (
-        response.status_code > 299
-        and "/logout/" not in endpoint
-        and sentry_event_id is not None
-    ):
-        mw.taskman.run_on_main(message)
-    return response
+    def __str__(self):
+        return (
+            f"AnkiHub request error: {self.response.status_code} {self.response.reason}"
+        )
 
 
 def logging_hook(response: Response, *args, **kwargs):
@@ -58,45 +46,49 @@ def logging_hook(response: Response, *args, **kwargs):
     return response
 
 
-def report_exception_hook(response: Response, *args, **kwargs):
-    from .error_reporting import report_exception_and_upload_logs
-
-    LOGGER.debug("Begin report exception hook.")
-
-    if "pre-signed-url" in response.url and "addon_logs" in response.url:
-        return response
+def authentication_and_exception_hook(response: Response, *args, **kwargs):
+    LOGGER.debug("Begin raise exception hook.")
 
     treat_404_as_error = getattr(response.request, "treat_404_as_error", True)
     if not treat_404_as_error and response.status_code == 404:
         return response
 
+    if maybe_handle_sign_in(response):
+        return response
+
+    if maybe_handle_sign_out(response):
+        return response
+
     try:
         response.raise_for_status()
     except HTTPError:
-        ctx = {"response": {"reason": response.reason, "content": response.text}}
-        LOGGER.exception("Error in report exception hook.", extra=ctx)
-        event_id = report_exception_and_upload_logs(context=ctx)
-        response.sentry_event_id = event_id  # type: ignore
+        LOGGER.exception("raise_exception_hook raises AnkiHubRequestError.")
+        raise AnkiHubRequestError(response)
 
     return response
 
 
-def sign_in_hook(response: Response, *args, **kwargs):
-    LOGGER.debug("Begin sign in hook.")
+def maybe_handle_sign_in(response: Response) -> bool:
+    # Returns whether this function handled the response.
+    LOGGER.debug("Begin sign in handler.")
+
     if response.status_code == 401 and response.json()["detail"] == "Invalid token.":
+        # invalid token
         config.save_token("")
         from .gui.menu import AnkiHubLogin
 
         mw.taskman.run_on_main(AnkiHubLogin.display_login)
-        return response
+        return True
     elif "/login/" in response.url and response.status_code != 200:
+        # wrong credentials
         config.save_token("")
         from .gui.menu import AnkiHubLogin
 
         mw.taskman.run_on_main(AnkiHubLogin.display_login)
+        return True
 
-        return response
     elif "/login/" in response.url and response.status_code == 200:
+        # correct credentials
         data = response.json()
         token = data.get("token")
         body = response.request.body
@@ -106,27 +98,26 @@ def sign_in_hook(response: Response, *args, **kwargs):
         config.save_user_email(username)
 
         mw.taskman.run_on_main(lambda: tooltip("Signed into AnkiHub!", parent=mw))
-        return response
+        return True
     else:
-        return response
+        return False
 
 
-def sign_out_hook(response: Response, *args, **kwargs):
-    LOGGER.debug("Begin sign out hook.")
+def maybe_handle_sign_out(response: Response) -> bool:
+    # Returns whether this function handled the response.
+    LOGGER.debug("Begin sign out handler.")
+
     if "/logout/" not in response.url or response.status_code != 204:
-        return response
+        return False
 
     config.save_token("")
     mw.taskman.run_on_main(lambda: tooltip("Signed out of AnkiHub!", parent=mw))
-    return response
+    return True
 
 
 DEFAULT_RESPONSE_HOOKS = [
     logging_hook,
-    report_exception_hook,
-    sign_in_hook,
-    show_anki_message_hook,
-    sign_out_hook,
+    authentication_and_exception_hook,
 ]
 
 
