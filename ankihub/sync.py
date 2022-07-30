@@ -17,7 +17,6 @@ from . import LOGGER, constants
 from .addon_ankihub_client import AddonAnkiHubClient as AnkiHubClient
 from .config import config
 from .db import AnkiHubDB
-from .error_reporting import report_exception_and_upload_logs
 from .utils import (
     create_backup_with_progress,
     create_deck_with_id,
@@ -429,8 +428,7 @@ def sync_with_progress() -> None:
         # without an Internet connection.
         if exc := future.exception():
             if not isinstance(exc, (ConnectionError, HTTPError)):
-                LOGGER.debug(f"Unable to sync:\n{exc}")
-                report_exception_and_upload_logs()
+                LOGGER.exception("Unable to sync.")
                 raise exc
             else:
                 LOGGER.debug("Skipping sync due to no Internet connection.")

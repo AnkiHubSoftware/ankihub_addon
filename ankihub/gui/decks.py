@@ -27,7 +27,6 @@ from ..addon_ankihub_client import AddonAnkiHubClient as AnkiHubClient
 from ..config import config
 from ..constants import CSV_DELIMITER, URL_DECK_BASE, URL_DECKS, URL_HELP
 from ..db import AnkiHubDB
-from ..error_reporting import report_exception_and_upload_logs
 from ..sync import import_ankihub_deck, sync_with_ankihub
 from ..utils import create_backup_with_progress, undo_note_type_modfications
 
@@ -239,8 +238,7 @@ class SubscribeDialog(QDialog):
             try:
                 success = future.result()
             except Exception as e:
-                LOGGER.exception("Error installing deck")
-                report_exception_and_upload_logs()
+                LOGGER.exception("Error installing deck.")
                 exc = e
 
             if success:
@@ -249,11 +247,10 @@ class SubscribeDialog(QDialog):
                 mw.reset()
             else:
                 LOGGER.warning("Importing deck failed.")
-                msg = "Failed to import deck."
-                if exc:
-                    msg += f"\n\n{str(exc)}"
-                showText(msg)
                 self.reject()
+
+            if exc:
+                raise exc
 
         deck_response = self.client.get_deck_by_id(ankihub_did)
         if deck_response.status_code == 404:
