@@ -3,21 +3,16 @@ import uuid
 from concurrent.futures import Future
 from pprint import pformat
 from typing import Any, Dict, Iterable, List, Optional, Set, Tuple
-from urllib.error import HTTPError
 
 from anki.decks import DeckId
 from anki.errors import NotFoundError
 from anki.models import NotetypeDict, NotetypeId
 from anki.notes import Note, NoteId
 from aqt import gui_hooks, mw
-from aqt.utils import tooltip
-from requests.exceptions import ConnectionError
 
 from . import LOGGER, constants
-from .addon_ankihub_client import (
-    AddonAnkiHubClient as AnkiHubClient,
-    AnkiHubRequestError,
-)
+from .addon_ankihub_client import AddonAnkiHubClient as AnkiHubClient
+from .addon_ankihub_client import AnkiHubRequestError
 from .config import config
 from .db import AnkiHubDB
 from .utils import (
@@ -419,12 +414,8 @@ def sync_with_progress() -> None:
         # Don't raise exception when attempting to sync with AnkiHub
         # without an Internet connection.
         if exc := future.exception():
-            if not isinstance(exc, (ConnectionError, HTTPError)):
-                LOGGER.debug("Unable to sync.")
-                raise exc
-            else:
-                LOGGER.debug("Skipping sync due to no Internet connection.")
-                tooltip("AnkiHub: No Internet connection. Skipping sync.")
+            LOGGER.debug("Unable to sync.")
+            raise exc
         else:
             mw.reset()
 

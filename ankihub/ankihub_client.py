@@ -4,7 +4,7 @@ from typing import Dict, Iterator, List, TypedDict
 
 import requests
 from requests import PreparedRequest, Request, Response, Session
-from requests.exceptions import ConnectionError, HTTPError
+from requests.exceptions import HTTPError
 
 from . import LOGGER
 from .constants import API_URL_BASE, ChangeTypes
@@ -76,15 +76,9 @@ class AnkiHubClient:
         params=None,
     ) -> Response:
         request = self._build_request(method, endpoint, data, params)
-        try:
-            response = self.session.send(request)
-            self.session.close()
-            return response
-        except (ConnectionError, HTTPError) as e:
-            LOGGER.debug(f"Connection error: {e}")
-            raise ConnectionError(
-                "The AnkiHub add-on was unable to connect to the internet."
-            )
+        response = self.session.send(request)
+        self.session.close()
+        return response
 
     def login(self, credentials: dict) -> Response:
         response = self._send_request("POST", "/login/", credentials)

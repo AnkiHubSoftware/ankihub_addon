@@ -3,7 +3,10 @@ import re
 import sys
 import traceback
 
+from aqt import mw
 from aqt.gui_hooks import main_window_did_init
+from aqt.utils import tooltip
+from requests.exceptions import ConnectionError
 
 from . import LOGGER
 from .addon_ankihub_client import AnkiHubRequestError
@@ -19,11 +22,18 @@ def handle_exception(exc: BaseException, tb) -> bool:
 
     LOGGER.debug(f"From handle_exception:\n{''.join(traceback.format_exception(exc))}")
 
+    if not this_addon_is_involved(tb):
+        return False
+
     if isinstance(exc, AnkiHubRequestError):
         if maybe_handle_ankihub_request_error(exc):
             return True
 
-    if not should_report_error(tb):
+    if isinstance(exc, ConnectionError):
+        tooltip("AnkiHub: Could not connect to the internet.", parent=mw)
+        return True
+
+    if not should_report_error():
         return False
 
     context = None
@@ -37,17 +47,21 @@ def handle_exception(exc: BaseException, tb) -> bool:
     return False
 
 
-def should_report_error(tb) -> bool:
+def this_addon_is_involved(tb) -> bool:
     tb_str = "".join(traceback.format_tb(tb))
-    this_addon_is_involved = (
+    result = (
         ANKIWEB_ID is not None
         and re.search(rf"/addons21/(ankihub|{ANKIWEB_ID})/", tb_str)
     ) or (ANKIWEB_ID is None and re.search(r"/addons21/ankihub", tb_str))
-    return bool(
-        not this_addon_is_involved
-        or not config.public_config.get("report_errors")
-        or os.getenv("REPORT_ERRORS", None) == "0"
+    return bool(result)
+
+
+def should_report_error() -> bool:
+    result = bool(
+        config.public_config.get("report_errors")
+        and not os.getenv("REPORT_ERRORS", None) == "0"
     )
+    return result
 
 
 def maybe_handle_ankihub_request_error(error: AnkiHubRequestError) -> bool:
