@@ -21,13 +21,16 @@ os.environ["SENTRY_ENVIRONMENT"] = SENTRY_ENV
 
 
 def report_exception_and_upload_logs(
-    exception: Optional[BaseException] = None, context: dict = dict()
+    exception: Optional[BaseException] = None, context: Optional[dict] = None
 ) -> Optional[str]:
     if not config.public_config.get("report_errors"):
         return None
 
     if os.getenv("REPORT_ERRORS", None) == "0":
         return None
+
+    if context is None:
+        context = dict()
 
     logs_key = upload_logs_in_background()
     context = {**context, "logs": {"filename": logs_key}}

@@ -17,8 +17,7 @@ class ErrorFeedbackDialog(QDialog):
         if isinstance(exception, AnkiHubRequestError):
             self.body = messages.request_error(event_id=self.event_id)
         else:
-            # TODO replace with something
-            self.body = "Other error"
+            self.body = messages.other_error(event_id=self.event_id)
 
         self.setup()
 
