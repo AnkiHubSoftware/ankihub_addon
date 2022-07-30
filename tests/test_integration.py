@@ -196,11 +196,11 @@ def test_upload_deck(anki_session_with_addon: AnkiSession, monkeypatch):
         mw.col.add_note(note, main_did)
 
         # move card of note into filtered deck
+        # decks created by new_filtered have a term of "" and limit of 100 by default
+        # so the card will be moved into the deck
         filtered_did = mw.col.decks.new_filtered("filtered")
-        card = note.cards()[0]
-        card.odid = main_did
-        card.did = filtered_did
-        card.flush()
+        mw.col.sched.rebuild_filtered_deck(filtered_did)
+        assert mw.col.get_note(note.id).cards()[0].did == filtered_did
 
         monkeypatch.setattr("ankihub.register_decks.AnkiHubClient.upload_deck", Mock())
         upload_deck(main_did)
