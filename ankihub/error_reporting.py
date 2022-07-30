@@ -6,6 +6,8 @@ from typing import Optional
 
 from aqt import mw
 
+from ankihub.ankihub_client import AnkiHubRequestError
+
 from . import LOGGER
 from .addon_ankihub_client import AddonAnkiHubClient as AnkiHubClient
 from .config import config
@@ -36,11 +38,11 @@ def report_exception_and_upload_logs(
 def report_exception(
     exception: Optional[BaseException] = None, context: dict = dict()
 ) -> Optional[str]:
-    from .config import config
-    from .lib import sentry_sdk  # type: ignore
-    from .lib.sentry_sdk import capture_exception, configure_scope  # type: ignore
-
     try:
+        from .config import config
+        from .lib import sentry_sdk  # type: ignore
+        from .lib.sentry_sdk import capture_exception, configure_scope  # type: ignore
+
         sentry_sdk.init(
             dsn="https://715325d30fa44ecd939d12edda720f91@o1184291.ingest.sentry.io/6546414",
             traces_sample_rate=1.0,
@@ -80,15 +82,15 @@ def upload_logs_in_background() -> str:
     key = f"ankihub_addon_logs_{config.private_config.user}_{int(time.time())}.log"
 
     def upload_logs():
-        client = AnkiHubClient()
-        response = client.upload_logs(
-            file=LOG_FILE,
-            key=key,
-        )
-        if response.status_code == 200:
+        try:
+            client = AnkiHubClient()
+            client.upload_logs(
+                file=LOG_FILE,
+                key=key,
+            )
             LOGGER.debug("Logs uploaded.")
-        else:
-            LOGGER.debug("Failed to upload logs.")
+        except AnkiHubRequestError:
+            LOGGER.debug("Logs upload failed.")
 
     def on_upload_logs_done(future: Future) -> None:
         try:

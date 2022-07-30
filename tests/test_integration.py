@@ -180,28 +180,27 @@ def test_create_collaborative_deck_and_upload(
 
 def test_client_login_and_signout(anki_session_with_addon: AnkiSession, requests_mock):
     from ankihub.addon_ankihub_client import AddonAnkiHubClient as AnkiHubClient
-    from ankihub.addon_ankihub_client import authentication_and_exception_hook
-    from ankihub.config import config
     from ankihub.constants import API_URL_BASE
 
-    client = AnkiHubClient(hooks=[authentication_and_exception_hook])
+    client = AnkiHubClient()
     credentials_data = {"username": "test", "password": "testpassword"}
     requests_mock.post(f"{API_URL_BASE}/login/", json={"token": "f4k3t0k3n"})
     requests_mock.post(
         f"{API_URL_BASE}/logout/", json={"token": "f4k3t0k3n"}, status_code=204
     )
+
+    # test login
     client.login(credentials=credentials_data)
     assert client.session.headers["Authorization"] == "Token f4k3t0k3n"
-    assert config.private_config.token == "f4k3t0k3n"
 
     # test signout
     client.signout()
     assert client.session.headers["Authorization"] == ""
-    assert config.private_config.token == ""
 
 
 def test_upload_deck(anki_session_with_addon: AnkiSession, requests_mock):
     from ankihub.addon_ankihub_client import AddonAnkiHubClient as AnkiHubClient
+    from ankihub.ankihub_client import AnkiHubRequestError
     from ankihub.constants import API_URL_BASE
 
     client = AnkiHubClient(hooks=[])
@@ -222,17 +221,21 @@ def test_upload_deck(anki_session_with_addon: AnkiSession, requests_mock):
     )
 
     # test upload deck
-    response = client.upload_deck(file=pathlib.Path(sample_deck), anki_deck_id=1)
-    assert response.status_code == 201
+    client.upload_deck(file=pathlib.Path(sample_deck), anki_deck_id=1)
 
     # test upload deck unauthenticated
     requests_mock.post(f"{API_URL_BASE}/decks/", status_code=403)
-    response = client.upload_deck(pathlib.Path(sample_deck), anki_deck_id=1)
-    assert response.status_code == 403
+    exc = None
+    try:
+        client.upload_deck(pathlib.Path(sample_deck), anki_deck_id=1)
+    except AnkiHubRequestError as e:
+        exc = e
+    assert exc is not None and exc.response.status_code == 403
 
 
 def test_get_deck_updates(anki_session_with_addon: AnkiSession, requests_mock):
     from ankihub.addon_ankihub_client import AddonAnkiHubClient as AnkiHubClient
+    from ankihub.ankihub_client import AnkiHubRequestError
     from ankihub.constants import API_URL_BASE
 
     client = AnkiHubClient(hooks=[])
@@ -272,14 +275,21 @@ def test_get_deck_updates(anki_session_with_addon: AnkiSession, requests_mock):
     requests_mock.get(
         f"{API_URL_BASE}/decks/{ankihub_deck_uuid}/updates", status_code=403
     )
-    for response in client.get_deck_updates(
-        ankihub_deck_uuid=ankihub_deck_uuid, since=timestamp  # type: ignore
-    ):
-        assert response.status_code == 403
+
+    exc = None
+    try:
+        for response in client.get_deck_updates(
+            ankihub_deck_uuid=ankihub_deck_uuid, since=timestamp  # type: ignore
+        ):
+            pass
+    except AnkiHubRequestError as e:
+        exc = e
+    assert exc is not None and exc.response.status_code == 403
 
 
 def test_get_deck_by_id(anki_session_with_addon: AnkiSession, requests_mock):
     from ankihub.addon_ankihub_client import AddonAnkiHubClient as AnkiHubClient
+    from ankihub.ankihub_client import AnkiHubRequestError
     from ankihub.constants import API_URL_BASE
 
     client = AnkiHubClient(hooks=[])
@@ -302,12 +312,16 @@ def test_get_deck_by_id(anki_session_with_addon: AnkiSession, requests_mock):
 
     # test get deck by id unauthenticated
     requests_mock.get(f"{API_URL_BASE}/decks/{ankihub_deck_uuid}/", status_code=403)
-    response = client.get_deck_by_id(ankihub_deck_uuid=ankihub_deck_uuid)  # type: ignore
-    assert response.status_code == 403
+
+    try:
+        client.get_deck_by_id(ankihub_deck_uuid=ankihub_deck_uuid)  # type: ignore
+    except AnkiHubRequestError as e:
+        exc = e
+    assert exc is not None and exc.response.status_code == 403
 
 
 def test_get_note_by_ankihub_id(anki_session_with_addon: AnkiSession, requests_mock):
-    from ankihub.ankihub_client import AnkiHubClient
+    from ankihub.ankihub_client import AnkiHubClient, AnkiHubRequestError
     from ankihub.constants import API_URL_BASE
 
     client = AnkiHubClient(hooks=[])
@@ -328,14 +342,17 @@ def test_get_note_by_ankihub_id(anki_session_with_addon: AnkiSession, requests_m
 
     # test get note by ankihub id unauthenticated
     requests_mock.get(f"{API_URL_BASE}/notes/{ankihub_note_uuid}", status_code=403)
-    response = client.get_note_by_ankihub_id(ankihub_note_uuid=ankihub_note_uuid)
-    assert response.status_code == 403
+    try:
+        client.get_note_by_ankihub_id(ankihub_note_uuid=ankihub_note_uuid)
+    except AnkiHubRequestError as e:
+        exc = e
+    assert exc is not None and exc.response.status_code == 403
 
 
 def test_create_change_note_suggestion(
     anki_session_with_addon: AnkiSession, requests_mock
 ):
-    from ankihub.ankihub_client import AnkiHubClient
+    from ankihub.ankihub_client import AnkiHubClient, AnkiHubRequestError
     from ankihub.constants import API_URL_BASE, ChangeTypes
 
     client = AnkiHubClient(hooks=[])
@@ -344,33 +361,35 @@ def test_create_change_note_suggestion(
     requests_mock.post(
         f"{API_URL_BASE}/notes/{ankihub_note_uuid}/suggestion/", status_code=201
     )
-    response = client.create_change_note_suggestion(
+    client.create_change_note_suggestion(
         ankihub_note_uuid=ankihub_note_uuid,
         fields=[{"name": "abc", "order": 0, "value": "abc changed"}],
         tags=["test"],
         change_type=ChangeTypes.NEW_CONTENT,
         comment="",
     )
-    assert response.status_code == 201
 
     # test create change note suggestion unauthenticated
     requests_mock.post(
         f"{API_URL_BASE}/notes/{ankihub_note_uuid}/suggestion/", status_code=403
     )
-    response = client.create_change_note_suggestion(
-        ankihub_note_uuid=ankihub_note_uuid,
-        fields=[{"name": "abc", "order": 0, "value": "abc changed"}],
-        tags=["test"],
-        change_type=ChangeTypes.NEW_CONTENT,
-        comment="",
-    )
-    assert response.status_code == 403
+    try:
+        client.create_change_note_suggestion(
+            ankihub_note_uuid=ankihub_note_uuid,
+            fields=[{"name": "abc", "order": 0, "value": "abc changed"}],
+            tags=["test"],
+            change_type=ChangeTypes.NEW_CONTENT,
+            comment="",
+        )
+    except AnkiHubRequestError as e:
+        exc = e
+    assert exc is not None and exc.response.status_code == 403
 
 
 def test_create_new_note_suggestion(
     anki_session_with_addon: AnkiSession, requests_mock
 ):
-    from ankihub.ankihub_client import AnkiHubClient
+    from ankihub.ankihub_client import AnkiHubClient, AnkiHubRequestError
     from ankihub.constants import API_URL_BASE, ChangeTypes
 
     client = AnkiHubClient(hooks=[])
@@ -380,7 +399,7 @@ def test_create_new_note_suggestion(
     requests_mock.post(
         f"{API_URL_BASE}/decks/{ankihub_deck_uuid}/note-suggestion/", status_code=201
     )
-    response = client.create_new_note_suggestion(
+    client.create_new_note_suggestion(
         ankihub_deck_uuid=ankihub_deck_uuid,
         ankihub_note_uuid=ankihub_note_uuid,
         anki_note_id=1,
@@ -391,24 +410,26 @@ def test_create_new_note_suggestion(
         anki_note_type_id=1,
         comment="",
     )
-    assert response.status_code == 201
 
     # test create new note suggestion unauthenticated
     requests_mock.post(
         f"{API_URL_BASE}/decks/{ankihub_deck_uuid}/note-suggestion/", status_code=403
     )
-    response = client.create_new_note_suggestion(
-        ankihub_deck_uuid=ankihub_deck_uuid,
-        ankihub_note_uuid=ankihub_note_uuid,
-        anki_note_id=1,
-        fields=[{"name": "abc", "order": 0, "value": "abc changed"}],
-        tags=["test"],
-        change_type=ChangeTypes.NEW_CARD_TO_ADD,
-        note_type_name="Basic",
-        anki_note_type_id=1,
-        comment="",
-    )
-    assert response.status_code == 403
+    try:
+        client.create_new_note_suggestion(
+            ankihub_deck_uuid=ankihub_deck_uuid,
+            ankihub_note_uuid=ankihub_note_uuid,
+            anki_note_id=1,
+            fields=[{"name": "abc", "order": 0, "value": "abc changed"}],
+            tags=["test"],
+            change_type=ChangeTypes.NEW_CARD_TO_ADD,
+            note_type_name="Basic",
+            anki_note_type_id=1,
+            comment="",
+        )
+    except AnkiHubRequestError as e:
+        exc = e
+    assert exc is not None and exc.response.status_code == 403
 
 
 def test_adjust_note_types(anki_session_with_addon: AnkiSession):

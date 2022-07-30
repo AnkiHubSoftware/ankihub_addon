@@ -1,3 +1,4 @@
+import json
 from datetime import datetime, timezone
 from typing import Optional
 
@@ -21,6 +22,7 @@ from requests import Response
 
 from .. import LOGGER
 from ..addon_ankihub_client import AddonAnkiHubClient as AnkiHubClient
+from ..ankihub_client import AnkiHubRequestError
 from ..config import config
 from ..media_import.ui import open_import_dialog
 from ..register_decks import create_collaborative_deck
@@ -99,11 +101,26 @@ class AnkiHubLogin(QWidget):
             showText("Oops! You forgot to put in a username or password!")
             return
         ankihub_client = AnkiHubClient()
-        response = ankihub_client.login(
-            credentials={"username": username, "password": password}
-        )
-        if not response or response.status_code != 200:
+
+        try:
+            response = ankihub_client.login(
+                credentials={"username": username, "password": password}
+            )
+        except AnkiHubRequestError:
+            # wrong credentials or other error when calling /login/
+            LOGGER.exception("AnkiHub login failed.")
+            config.save_token("")
+            tooltip("Wrong credentials.", parent=mw)
             return
+
+        data = response.json()
+        token = data.get("token")
+        body = response.request.body
+        username = json.loads(body).get("username")
+        config.save_token(token)
+        config.save_user_email(username)
+
+        mw.taskman.run_on_main(lambda: tooltip("Signed into AnkiHub!", parent=mw))
 
         self.close()
 
@@ -180,25 +197,18 @@ def create_collaborative_deck_action() -> None:
         return
 
     def on_success(response: Response) -> None:
-        if response.status_code == 201:
-            msg = "🎉 Deck upload successful!"
-
-            data = response.json()
-            anki_did = mw.col.decks.id_for_name(deck_name)
-            ankihub_did = data["deck_id"]
-            creation_time = datetime.now(tz=timezone.utc).strftime(
-                "%Y-%m-%dT%H:%M:%S.%f%z"
-            )
-            config.save_subscription(
-                deck_name,
-                ankihub_did,
-                anki_did,
-                creator=True,
-                last_update=creation_time,
-            )
-        else:
-            msg = f"😔 Deck upload failed: {response.text}"
-        showInfo(msg)
+        data = response.json()
+        anki_did = mw.col.decks.id_for_name(deck_name)
+        ankihub_did = data["deck_id"]
+        creation_time = datetime.now(tz=timezone.utc).strftime("%Y-%m-%dT%H:%M:%S.%f%z")
+        config.save_subscription(
+            deck_name,
+            ankihub_did,
+            anki_did,
+            creator=True,
+            last_update=creation_time,
+        )
+        showInfo("🎉 Deck upload successful!")
 
     def on_failure(exc: Exception):
         mw.progress.finish()
@@ -229,6 +239,12 @@ def upload_suggestions_action():
 
 def sync_with_ankihub_action():
     sync_with_progress()
+
+
+def sign_out_action():
+    AnkiHubClient().signout()
+    config.save_token("")
+    tooltip("Signed out of AnkiHub!", parent=mw)
 
 
 def ankihub_login_setup(parent):
@@ -268,7 +284,7 @@ def sync_with_ankihub_setup(parent):
 
 def ankihub_logout_setup(parent):
     q_action = QAction("🔑 Sign out", mw)
-    q_action.triggered.connect(lambda: AnkiHubClient().signout())
+    q_action.triggered.connect(sign_out_action)
     parent.addAction(q_action)
 
 

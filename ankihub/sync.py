@@ -32,10 +32,6 @@ from .utils import (
 )
 
 
-class AnkiHubError(Exception):
-    pass
-
-
 def sync_with_ankihub() -> None:
     LOGGER.debug("Trying to sync with AnkiHub.")
 
@@ -58,9 +54,6 @@ def sync_deck_with_ankihub(ankihub_did: str) -> bool:
     ):
         if mw.progress.want_cancel():
             LOGGER.debug("User cancelled sync.")
-            return False
-
-        if response.status_code != 200:
             return False
 
         data = response.json()
@@ -107,10 +100,7 @@ def import_ankihub_deck(
 
     LOGGER.debug(f"Importing ankihub deck {deck_name=} {local_did=}")
 
-    try:
-        remote_note_types = fetch_remote_note_types_based_on_notes_data(notes_data)
-    except AnkiHubError:
-        return None
+    remote_note_types = fetch_remote_note_types_based_on_notes_data(notes_data)
 
     if protected_fields is None:
         protected_fields = {}
@@ -342,11 +332,6 @@ def fetch_remote_note_types(
     client = AnkiHubClient()
     for mid in mids:
         response = client.get_note_type(mid)
-
-        if response.status_code != 200:
-            LOGGER.debug(f"Failed fetching note type with id {mid}.")
-            raise AnkiHubError()
-
         data = response.json()
         note_type = to_anki_note_type(data)
         result[mid] = note_type
@@ -435,7 +420,7 @@ def sync_with_progress() -> None:
         # without an Internet connection.
         if exc := future.exception():
             if not isinstance(exc, (ConnectionError, HTTPError)):
-                LOGGER.exception("Unable to sync.")
+                LOGGER.debug("Unable to sync.")
                 raise exc
             else:
                 LOGGER.debug("Skipping sync due to no Internet connection.")

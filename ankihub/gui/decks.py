@@ -23,7 +23,10 @@ from aqt.qt import (
 from aqt.utils import askUser, openLink, showText, tooltip
 
 from .. import LOGGER
-from ..addon_ankihub_client import AddonAnkiHubClient as AnkiHubClient
+from ..addon_ankihub_client import (
+    AddonAnkiHubClient as AnkiHubClient,
+    AnkiHubRequestError,
+)
 from ..config import config
 from ..constants import CSV_DELIMITER, URL_DECK_BASE, URL_DECKS, URL_HELP
 from ..db import AnkiHubDB
@@ -238,7 +241,7 @@ class SubscribeDialog(QDialog):
             try:
                 success = future.result()
             except Exception as e:
-                LOGGER.exception("Error installing deck.")
+                LOGGER.debug("Error installing deck.")
                 exc = e
 
             if success:
@@ -252,17 +255,18 @@ class SubscribeDialog(QDialog):
             if exc:
                 raise exc
 
-        deck_response = self.client.get_deck_by_id(ankihub_did)
-        if deck_response.status_code == 404:
-            showText(
-                f"Deck {ankihub_did} doesn't exist. Please make sure you copy/paste "
-                f"the correct ID. If you believe this is an error, please reach "
-                f"out to user support at help@ankipalace.com."
-            )
-            return
-
-        if deck_response.status_code != 200:
-            return
+        try:
+            deck_response = self.client.get_deck_by_id(ankihub_did)
+        except AnkiHubRequestError as e:
+            if e.response.status_code == 404:
+                showText(
+                    f"Deck {ankihub_did} doesn't exist. Please make sure you copy/paste "
+                    f"the correct ID. If you believe this is an error, please reach "
+                    f"out to user support at help@ankipalace.com."
+                )
+                return
+            else:
+                raise e
 
         data = deck_response.json()
         deck_file_name = data["csv_notes_filename"]
@@ -271,8 +275,6 @@ class SubscribeDialog(QDialog):
 
         def on_download_done(future: Future):
             response = future.result()
-            if response.status_code != 200:
-                return
 
             out_file = Path(tempfile.mkdtemp()) / f"{deck_file_name}"
             with out_file.open("wb") as f:
