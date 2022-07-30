@@ -28,6 +28,7 @@ API_URL_BASE = f"{ANKIHUB_APP_URL}/api"
 
 LOGGER.debug(f"Starting with URL_BASE {API_URL_BASE}")
 URL_VIEW_NOTE = f"{ANKIHUB_APP_URL}/decks/notes/"
+URL_VIEW_DECK = f"{ANKIHUB_APP_URL}/decks/"
 URL_HELP = f"{ANKIHUB_APP_URL}/help"
 URL_DECKS = f"{ANKIHUB_APP_URL}/explore"
 URL_DECK_BASE = f"{ANKIHUB_APP_URL}/decks"

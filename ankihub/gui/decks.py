@@ -20,15 +20,13 @@ from aqt.qt import (
     Qt,
     QVBoxLayout,
 )
-from aqt.utils import askUser, openLink, showText, tooltip
+from aqt.utils import askUser, openLink, showInfo, showText, tooltip
 
 from .. import LOGGER
-from ..addon_ankihub_client import (
-    AddonAnkiHubClient as AnkiHubClient,
-    AnkiHubRequestError,
-)
+from ..addon_ankihub_client import AddonAnkiHubClient as AnkiHubClient
+from ..addon_ankihub_client import AnkiHubRequestError
 from ..config import config
-from ..constants import CSV_DELIMITER, URL_DECK_BASE, URL_DECKS, URL_HELP
+from ..constants import CSV_DELIMITER, URL_DECK_BASE, URL_DECKS, URL_HELP, URL_VIEW_DECK
 from ..db import AnkiHubDB
 from ..sync import import_ankihub_deck, sync_with_ankihub
 from ..utils import create_backup_with_progress, undo_note_type_modfications
@@ -263,6 +261,13 @@ class SubscribeDialog(QDialog):
                     f"Deck {ankihub_did} doesn't exist. Please make sure you copy/paste "
                     f"the correct ID. If you believe this is an error, please reach "
                     f"out to user support at help@ankipalace.com."
+                )
+                return
+            elif e.response.status_code == 403:
+                url_view_deck = f"{URL_VIEW_DECK}{ankihub_did}"
+                showInfo(
+                    f"Please first subscribe to the deck on the AnkiHub website.<br><br>"
+                    f'Link to the deck: <a href="{url_view_deck}">{url_view_deck}</a>',
                 )
                 return
             else:
