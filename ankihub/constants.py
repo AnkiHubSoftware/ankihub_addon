@@ -1,3 +1,4 @@
+import json
 import os
 from enum import Enum
 from pathlib import Path
@@ -11,8 +12,13 @@ version_file = Path(__file__).parent / "VERSION"
 LOGGER.debug(f"VERSION file: {version_file}")
 with version_file.open() as f:
     ADDON_VERSION: str = f.read().strip()
-
 LOGGER.debug(f"version: {ADDON_VERSION}")
+
+try:
+    manifest = json.loads((Path(__file__).parent / "manifest.json").read_text())
+    ANKIWEB_ID = manifest["ankiweb_id"]
+except FileNotFoundError:
+    ANKIWEB_ID = None
 
 ANKIHUB_APP_URL = os.getenv("ANKIHUB_APP_URL")
 if ANKIHUB_APP_URL is None:
