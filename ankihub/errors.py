@@ -20,7 +20,7 @@ from .gui.menu import AnkiHubLogin
 def handle_exception(exc: BaseException, tb) -> bool:
     # returns True if the exception was handled in such a way that it doesn't need to be handled further
 
-    LOGGER.debug(f"From handle_exception:\n{''.join(traceback.format_exception(exc))}")
+    LOGGER.debug(f"From handle_exception:\n{''.join(traceback.format_exception(exc))}")  # type: ignore
 
     if not this_addon_is_involved(tb):
         return False
