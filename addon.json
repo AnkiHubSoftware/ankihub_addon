@@ -10,7 +10,8 @@
         "anki21"
     ],
     "conflicts": [
-        "3491767031"
+        "3491767031",
+        "1896168623"
     ],
     "min_anki_version": "2.1.47",
     "tested_anki_version": "2.1.54"
