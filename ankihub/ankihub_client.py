@@ -254,7 +254,7 @@ class AnkiHubClient:
         tags: List[str],
         change_type: ChangeTypes,
         comment: str,
-    ) -> Response:
+    ) -> None:
         suggestion = {
             "ankihub_id": str(ankihub_note_uuid),
             "fields": fields,
@@ -269,7 +269,6 @@ class AnkiHubClient:
         )
         if response.status_code != 201:
             raise AnkiHubRequestError(response)
-        return response
 
     def create_new_note_suggestion(
         self,
@@ -282,7 +281,7 @@ class AnkiHubClient:
         note_type_name: str,
         anki_note_type_id: int,
         comment: str,
-    ) -> Response:
+    ):
         suggestion = {
             "anki_id": anki_note_id,
             "ankihub_id": str(ankihub_note_uuid),
@@ -300,7 +299,6 @@ class AnkiHubClient:
         )
         if response.status_code != 201:
             raise AnkiHubRequestError(response)
-        return response
 
     def get_presigned_url(self, key: str, action: str) -> Response:
         """
