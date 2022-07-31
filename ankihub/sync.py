@@ -98,27 +98,19 @@ def import_ankihub_deck(
         protected_fields = {}
         client = AnkiHubClient()
         try:
-            response = client.get_protected_fields(uuid.UUID(ankihub_did))
+            protected_fields = client.get_protected_fields(uuid.UUID(ankihub_did))
         except AnkiHubRequestError as e:
             if not e.response.status_code == 404:
                 raise e
-        else:
-            protected_fields_raw = response.json()["fields"]
-            protected_fields = {
-                int(field_id): field_names
-                for field_id, field_names in protected_fields_raw.items()
-            }
 
     if protected_tags is None:
         protected_tags = []
         client = AnkiHubClient()
         try:
-            response = client.get_protected_tags(uuid.UUID(ankihub_did))
+            protected_tags = client.get_protected_tags(uuid.UUID(ankihub_did))
         except AnkiHubRequestError as e:
             if not e.response.status_code == 404:
                 raise e
-        else:
-            protected_tags = response.json()["tags"]
 
     anki_deck_id = import_ankihub_deck_inner(
         ankihub_did=ankihub_did,

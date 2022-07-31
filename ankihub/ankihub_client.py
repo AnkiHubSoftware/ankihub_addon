@@ -316,23 +316,33 @@ class AnkiHubClient:
         result = to_anki_note_type(data)
         return result
 
-    def get_protected_fields(self, ankihub_deck_uuid: uuid.UUID) -> Response:
+    def get_protected_fields(
+        self, ankihub_deck_uuid: uuid.UUID
+    ) -> Dict[int, List[str]]:
         response = self._send_request(
             "GET",
             f"/decks/{ankihub_deck_uuid}/protected-fields/",
         )
         if response.status_code != 200:
             raise AnkiHubRequestError(response)
-        return response
 
-    def get_protected_tags(self, ankihub_deck_uuid: uuid.UUID) -> Response:
+        protected_fields_raw = response.json()["fields"]
+        result = {
+            int(field_id): field_names
+            for field_id, field_names in protected_fields_raw.items()
+        }
+        return result
+
+    def get_protected_tags(self, ankihub_deck_uuid: uuid.UUID) -> List[str]:
         response = self._send_request(
             "GET",
             f"/decks/{ankihub_deck_uuid}/protected-tags/",
         )
         if response.status_code != 200:
             raise AnkiHubRequestError(response)
-        return response
+
+        result = response.json()["tags"]
+        return result
 
     def bulk_suggest_tags(
         self, ankihub_note_uuids: List[uuid.UUID], tags: List[str]
