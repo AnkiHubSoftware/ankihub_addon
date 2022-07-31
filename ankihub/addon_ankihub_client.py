@@ -45,11 +45,7 @@ class AddonAnkiHubClient(AnkiHubClient):
         )
 
     def upload_logs(self, file: Path, key: str) -> Response:
-        presigned_url_response = self.get_presigned_url(key=key, action="upload")
-        if presigned_url_response.status_code != 200:
-            return presigned_url_response
-
-        s3_url = presigned_url_response.json()["pre_signed_url"]
+        s3_url = self.get_presigned_url(key=key, action="upload")
         with open(file, "rb") as f:
             log_data = f.read()
 

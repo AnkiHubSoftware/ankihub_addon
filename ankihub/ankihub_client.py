@@ -5,7 +5,7 @@ import tempfile
 import uuid
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Dict, Iterator, List, TypedDict
+from typing import Any, Dict, Iterator, List, TypedDict
 
 import requests
 from requests import PreparedRequest, Request, Response, Session
@@ -160,11 +160,7 @@ class AnkiHubClient:
 
     def upload_deck(self, file: Path, anki_deck_id: int) -> uuid.UUID:
         key = file.name
-        presigned_url_response = self.get_presigned_url(key=key, action="upload")
-        if presigned_url_response.status_code != 200:
-            raise AnkiHubRequestError(presigned_url_response)
-
-        s3_url = presigned_url_response.json()["pre_signed_url"]
+        s3_url = self.get_presigned_url(key=key, action="upload")
         with open(file, "rb") as f:
             deck_data = f.read()
 
@@ -183,13 +179,7 @@ class AnkiHubClient:
         return ankihub_did
 
     def download_deck(self, deck_file_name: str) -> List[NoteUpdate]:
-        presigned_url_response = self.get_presigned_url(
-            key=deck_file_name, action="download"
-        )
-        if presigned_url_response.status_code != 200:
-            raise AnkiHubRequestError(presigned_url_response)
-
-        s3_url = presigned_url_response.json()["pre_signed_url"]
+        s3_url = self.get_presigned_url(key=deck_file_name, action="download")
         s3_response = requests.get(s3_url)
         if s3_response.status_code != 200:
             raise AnkiHubRequestError(s3_response)
@@ -300,7 +290,7 @@ class AnkiHubClient:
         if response.status_code != 201:
             raise AnkiHubRequestError(response)
 
-    def get_presigned_url(self, key: str, action: str) -> Response:
+    def get_presigned_url(self, key: str, action: str) -> str:
         """
         Get URL for s3.
         :param key: deck name
@@ -313,13 +303,18 @@ class AnkiHubClient:
         response = self._send_request(method, endpoint, params=data)
         if response.status_code != 200:
             raise AnkiHubRequestError(response)
-        return response
 
-    def get_note_type(self, anki_note_type_id: int) -> Response:
+        result = response.json()["pre_signed_url"]
+        return result
+
+    def get_note_type(self, anki_note_type_id: int) -> Dict[str, Any]:
         response = self._send_request("GET", f"/note-types/{anki_note_type_id}/")
         if response.status_code != 200:
             raise AnkiHubRequestError(response)
-        return response
+
+        data = response.json()
+        result = to_anki_note_type(data)
+        return result
 
     def get_protected_fields(self, ankihub_deck_uuid: uuid.UUID) -> Response:
         response = self._send_request(
@@ -371,3 +366,11 @@ def transform_notes_data(notes_data: List[Dict]) -> List[Dict]:
         for note_data in notes_data
     ]
     return result
+
+
+def to_anki_note_type(note_type_data: Dict) -> Dict[str, Any]:
+    """Turn JSON response from AnkiHubClient.get_note_type into NotetypeDict."""
+    del note_type_data["anki_id"]
+    note_type_data["tmpls"] = note_type_data.pop("templates")
+    note_type_data["flds"] = note_type_data.pop("fields")
+    return note_type_data

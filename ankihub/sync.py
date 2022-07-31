@@ -298,22 +298,9 @@ def fetch_remote_note_types_based_on_notes_data(
 def fetch_remote_note_types(
     mids: Iterable[NotetypeId],
 ) -> Dict[NotetypeId, NotetypeDict]:
-    result = {}
     client = AnkiHubClient()
-    for mid in mids:
-        response = client.get_note_type(mid)
-        data = response.json()
-        note_type = to_anki_note_type(data)
-        result[mid] = note_type
+    result = {mid: NotetypeDict(client.get_note_type(mid)) for mid in mids}
     return result
-
-
-def to_anki_note_type(note_type_data: Dict) -> NotetypeDict:
-    """Turn JSON response from AnkiHubClient.get_note_type into NotetypeDict."""
-    del note_type_data["anki_id"]
-    note_type_data["tmpls"] = note_type_data.pop("templates")
-    note_type_data["flds"] = note_type_data.pop("fields")
-    return note_type_data
 
 
 def adjust_note_types(remote_note_types: Dict[NotetypeId, NotetypeDict]) -> None:
