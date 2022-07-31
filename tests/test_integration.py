@@ -178,6 +178,38 @@ def test_create_collaborative_deck_and_upload(
             assert len(db.notes_for_ankihub_deck(str(ankihub_deck_uuid))) == 3
 
 
+def test_upload_deck(anki_session_with_addon: AnkiSession, monkeypatch):
+
+    # check if moving cards temporarily from filtered decks into the main deck doesn't throw errors
+    # and if the cards are moved back to the filtered decks at the end
+    with anki_session_with_addon.profile_loaded():
+        from ankihub.register_decks import upload_deck
+        from aqt import mw
+
+        # create a deck
+        main_did = mw.col.decks.add_normal_deck_with_name("main").id
+        print(f"{main_did=}")
+
+        # add a note to it
+        note = mw.col.new_note(mw.col.models.by_name("Basic"))
+        note["Front"] = "test"
+        mw.col.add_note(note, main_did)
+
+        # move card of note into filtered deck
+        # decks created by new_filtered have a term of "" and limit of 100 by default
+        # so the card will be moved into the deck
+        filtered_did = mw.col.decks.new_filtered("filtered")
+        mw.col.sched.rebuild_filtered_deck(filtered_did)
+        assert mw.col.get_note(note.id).cards()[0].did == filtered_did
+
+        monkeypatch.setattr("ankihub.register_decks.AnkiHubClient.upload_deck", Mock())
+        upload_deck(main_did)
+
+        # assert that note is still in the filtered deck after upload_deck
+        card = mw.col.get_note(note.id).cards()[0]
+        assert card.did == filtered_did
+
+
 def test_client_login_and_signout(anki_session_with_addon: AnkiSession, requests_mock):
     from ankihub.addon_ankihub_client import AddonAnkiHubClient as AnkiHubClient
     from ankihub.addon_ankihub_client import sign_in_hook, sign_out_hook
@@ -200,7 +232,7 @@ def test_client_login_and_signout(anki_session_with_addon: AnkiSession, requests
     assert config.private_config.token == ""
 
 
-def test_upload_deck(anki_session_with_addon: AnkiSession, requests_mock):
+def test_client_upload_deck(anki_session_with_addon: AnkiSession, requests_mock):
     from ankihub.addon_ankihub_client import AddonAnkiHubClient as AnkiHubClient
     from ankihub.constants import API_URL_BASE
 

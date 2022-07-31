@@ -22,6 +22,7 @@ from requests import Response
 from .. import LOGGER
 from ..addon_ankihub_client import AddonAnkiHubClient as AnkiHubClient
 from ..config import config
+from ..error_reporting import report_exception_and_upload_logs
 from ..media_import.ui import open_import_dialog
 from ..register_decks import create_collaborative_deck
 from ..sync import sync_with_progress
@@ -161,15 +162,18 @@ def create_collaborative_deck_action() -> None:
         buttons=[],
         names=lambda: [
             d.name
-            for d in mw.col.decks.all_names_and_ids(
-                include_filtered=True, skip_empty_default=True
-            )
-            if "::" not in d.name
+            for d in mw.col.decks.all_names_and_ids(include_filtered=False)
+            if "::" not in d.name and d.id != 1
         ],
     )
     deck_name = deck_chooser.name
     if not deck_name:
         return
+
+    if len(mw.col.find_cards(f'deck:"{deck_name}"')) == 0:
+        showText("You can't upload an empty deck.")
+        return
+
     confirm = askUser(
         "Uploading the deck to AnkiHub requires modifying notes and note types in "
         f"{deck_name} and will require a full sync afterwards. Would you like to "
@@ -202,6 +206,10 @@ def create_collaborative_deck_action() -> None:
 
     def on_failure(exc: Exception):
         mw.progress.finish()
+        try:
+            raise exc
+        except:
+            report_exception_and_upload_logs()
         raise exc
 
     op = QueryOp(
