@@ -391,35 +391,6 @@ def test_get_deck_by_id(anki_session_with_addon: AnkiSession, requests_mock):
     assert exc is not None and exc.response.status_code == 403
 
 
-def test_get_note_by_ankihub_id(anki_session_with_addon: AnkiSession, requests_mock):
-    from ankihub.ankihub_client import AnkiHubClient, AnkiHubRequestError
-    from ankihub.constants import API_URL_BASE
-
-    client = AnkiHubClient(hooks=[])
-
-    # test get not by ankihub id
-    ankihub_deck_uuid = UUID_1
-    ankihub_note_uuid = UUID_2
-    expected_data = {
-        "deck_id": str(ankihub_deck_uuid),
-        "note_id": str(ankihub_note_uuid),
-        "anki_id": 1,
-        "tags": ["New Tag"],
-        "fields": [{"name": "Text", "order": 0, "value": "Fake value"}],
-    }
-    requests_mock.get(f"{API_URL_BASE}/notes/{ankihub_note_uuid}", json=expected_data)
-    response = client.get_note_by_ankihub_id(ankihub_note_uuid=ankihub_note_uuid)
-    assert response.json() == expected_data
-
-    # test get note by ankihub id unauthenticated
-    requests_mock.get(f"{API_URL_BASE}/notes/{ankihub_note_uuid}", status_code=403)
-    try:
-        client.get_note_by_ankihub_id(ankihub_note_uuid=ankihub_note_uuid)
-    except AnkiHubRequestError as e:
-        exc = e
-    assert exc is not None and exc.response.status_code == 403
-
-
 def test_create_change_note_suggestion(
     anki_session_with_addon: AnkiSession, requests_mock
 ):

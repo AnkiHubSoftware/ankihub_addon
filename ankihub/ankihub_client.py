@@ -247,12 +247,6 @@ class AnkiHubClient:
         result = DeckInfo.from_dict(data)
         return result
 
-    def get_note_by_ankihub_id(self, ankihub_note_uuid: uuid.UUID) -> Response:
-        response = self._send_request("GET", f"/notes/{ankihub_note_uuid}")
-        if response.status_code != 200:
-            raise AnkiHubRequestError(response)
-        return response
-
     def create_change_note_suggestion(
         self,
         ankihub_note_uuid: uuid.UUID,
