@@ -42,8 +42,8 @@ def report_exception(
 ) -> Optional[str]:
     try:
         from .config import config
-        from .lib import sentry_sdk  # type: ignore
-        from .lib.sentry_sdk import capture_exception, configure_scope  # type: ignore
+        from .lib import sentry_sdk
+        from .lib.sentry_sdk import capture_exception, configure_scope
 
         sentry_sdk.init(
             dsn="https://715325d30fa44ecd939d12edda720f91@o1184291.ingest.sentry.io/6546414",

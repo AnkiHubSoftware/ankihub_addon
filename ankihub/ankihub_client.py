@@ -7,14 +7,14 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Dict, Iterator, List, TypedDict
 
-import dataclasses_json
 import requests
-from dataclasses_json import DataClassJsonMixin
 from requests import PreparedRequest, Request, Response, Session
 from requests.exceptions import HTTPError
 
 from . import LOGGER
 from .constants import API_URL_BASE, ChangeTypes
+from .lib import dataclasses_json
+from .lib.dataclasses_json import DataClassJsonMixin
 
 CSV_DELIMITER = ";"
 
