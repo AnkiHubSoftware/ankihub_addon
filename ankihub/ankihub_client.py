@@ -346,6 +346,7 @@ class AnkiHubClient:
             raise AnkiHubRequestError(response)
 
         result = response.json()["tags"]
+        result = [x for x in result if x.strip()]
         return result
 
     def bulk_suggest_tags(
