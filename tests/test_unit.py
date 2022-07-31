@@ -41,11 +41,27 @@ def test_updated_tags(anki_session_with_addon: AnkiSession):
         )
     ) == set(["A"])
 
-    # dont delete subtags of protected tags
+    # dont delete tags that contain protected tags
     assert set(
         updated_tags(
             cur_tags=["A::B::C"],
             incoming_tags=[],
             protected_tags=["A"],
+        )
+    ) == set(["A::B::C"])
+
+    assert set(
+        updated_tags(
+            cur_tags=["A::B::C"],
+            incoming_tags=[],
+            protected_tags=["B"],
+        )
+    ) == set(["A::B::C"])
+
+    assert set(
+        updated_tags(
+            cur_tags=["A::B::C"],
+            incoming_tags=[],
+            protected_tags=["C"],
         )
     ) == set(["A::B::C"])
