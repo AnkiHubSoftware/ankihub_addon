@@ -54,11 +54,7 @@ def on_bulk_tag_suggestion_action(browser: Browser) -> None:
         return
 
     client = AnkiHubClient()
-    response = client.bulk_suggest_tags(ankihub_note_uuids, tags.split(" "))
-    if response.status_code != 201:
-        LOGGER.debug("Bulk tag suggestion failed.")
-        return
-
+    client.bulk_suggest_tags(ankihub_note_uuids, tags.split(" "))
     LOGGER.debug("Bulk tag suggestion created.")
     tooltip("Bulk tag suggestion created.", parent=browser)
 

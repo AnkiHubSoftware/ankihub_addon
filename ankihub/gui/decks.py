@@ -20,14 +20,14 @@ from aqt.qt import (
     Qt,
     QVBoxLayout,
 )
-from aqt.utils import askUser, openLink, showText, tooltip
+from aqt.utils import askUser, openLink, showInfo, showText, tooltip
 
 from .. import LOGGER
 from ..addon_ankihub_client import AddonAnkiHubClient as AnkiHubClient
+from ..addon_ankihub_client import AnkiHubRequestError
 from ..config import config
-from ..constants import CSV_DELIMITER, URL_DECK_BASE, URL_DECKS, URL_HELP
+from ..constants import CSV_DELIMITER, URL_DECK_BASE, URL_DECKS, URL_HELP, URL_VIEW_DECK
 from ..db import AnkiHubDB
-from ..error_reporting import report_exception_and_upload_logs
 from ..sync import import_ankihub_deck, sync_with_ankihub
 from ..utils import create_backup_with_progress, undo_note_type_modfications
 
@@ -239,8 +239,7 @@ class SubscribeDialog(QDialog):
             try:
                 success = future.result()
             except Exception as e:
-                LOGGER.exception("Error installing deck")
-                report_exception_and_upload_logs()
+                LOGGER.debug("Error installing deck.")
                 exc = e
 
             if success:
@@ -249,23 +248,30 @@ class SubscribeDialog(QDialog):
                 mw.reset()
             else:
                 LOGGER.warning("Importing deck failed.")
-                msg = "Failed to import deck."
-                if exc:
-                    msg += f"\n\n{str(exc)}"
-                showText(msg)
                 self.reject()
 
-        deck_response = self.client.get_deck_by_id(ankihub_did)
-        if deck_response.status_code == 404:
-            showText(
-                f"Deck {ankihub_did} doesn't exist. Please make sure you copy/paste "
-                f"the correct ID. If you believe this is an error, please reach "
-                f"out to user support at help@ankipalace.com."
-            )
-            return
+            if exc:
+                raise exc
 
-        if deck_response.status_code != 200:
-            return
+        try:
+            deck_response = self.client.get_deck_by_id(ankihub_did)
+        except AnkiHubRequestError as e:
+            if e.response.status_code == 404:
+                showText(
+                    f"Deck {ankihub_did} doesn't exist. Please make sure you copy/paste "
+                    f"the correct ID. If you believe this is an error, please reach "
+                    f"out to user support at help@ankipalace.com."
+                )
+                return
+            elif e.response.status_code == 403:
+                url_view_deck = f"{URL_VIEW_DECK}{ankihub_did}"
+                showInfo(
+                    f"Please first subscribe to the deck on the AnkiHub website.<br><br>"
+                    f'Link to the deck: <a href="{url_view_deck}">{url_view_deck}</a>',
+                )
+                return
+            else:
+                raise e
 
         data = deck_response.json()
         deck_file_name = data["csv_notes_filename"]
@@ -274,8 +280,6 @@ class SubscribeDialog(QDialog):
 
         def on_download_done(future: Future):
             response = future.result()
-            if response.status_code != 200:
-                return
 
             out_file = Path(tempfile.mkdtemp()) / f"{deck_file_name}"
             with out_file.open("wb") as f:

@@ -53,16 +53,15 @@ def on_ankihub_button_press(editor: Editor) -> None:
     tags = editor.note.tags
     client = AnkiHubClient()
     if command == AnkiHubCommands.CHANGE.value:
-        response = client.create_change_note_suggestion(
+        client.create_change_note_suggestion(
             ankihub_note_uuid=ankihub_note_uuid,
             fields=fields,
             tags=tags,
             change_type=change_type,
             comment=comment,
         )
-        if response.status_code == 201:
-            tooltip("Submitted change note suggestion to AnkiHub.")
-            return
+        tooltip("Submitted change note suggestion to AnkiHub.")
+        return
     elif command == AnkiHubCommands.NEW.value:
         subscribed_decks = config.private_config.decks
         if len(subscribed_decks) == 0:
@@ -84,7 +83,7 @@ def on_ankihub_button_press(editor: Editor) -> None:
         if editor.addMode:
 
             def on_add(note: anki.notes.Note) -> None:
-                response = client.create_new_note_suggestion(
+                client.create_new_note_suggestion(
                     ankihub_deck_uuid=ankihub_deck_uuid,
                     ankihub_note_uuid=ankihub_note_uuid,
                     anki_note_id=note.id,
@@ -95,15 +94,14 @@ def on_ankihub_button_press(editor: Editor) -> None:
                     anki_note_type_id=note.note_type()["id"],
                     comment=comment,
                 )
-                if response.status_code == 201:
-                    tooltip("Submitted new note suggestion to AnkiHub.")
+                tooltip("Submitted new note suggestion to AnkiHub.")
                 gui_hooks.add_cards_did_add_note.remove(on_add)
 
             gui_hooks.add_cards_did_add_note.append(on_add)
             add_note_window: AddCards = editor.parentWindow  # type: ignore
             add_note_window.add_current_note()
         else:
-            response = client.create_new_note_suggestion(
+            client.create_new_note_suggestion(
                 ankihub_deck_uuid=ankihub_deck_uuid,
                 ankihub_note_uuid=ankihub_note_uuid,
                 anki_note_id=editor.note.id,
@@ -114,8 +112,7 @@ def on_ankihub_button_press(editor: Editor) -> None:
                 anki_note_type_id=editor.note.note_type()["id"],
                 comment=comment,
             )
-            if response.status_code == 201:
-                tooltip("Submitted new note suggestion to AnkiHub.")
+            tooltip("Submitted new note suggestion to AnkiHub.")
 
 
 def setup_editor_buttons(buttons: List[str], editor: Editor) -> None:

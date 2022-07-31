@@ -14,3 +14,11 @@ def request_error(event_id):
         addon_package=ADDON_PACKAGE,
         event_id=event_id,
     )
+
+
+def other_error(event_id):
+    template = env.get_template("other_error.html")
+    return template.render(
+        addon_package=ADDON_PACKAGE,
+        event_id=event_id,
+    )

@@ -3,21 +3,18 @@ import uuid
 from concurrent.futures import Future
 from pprint import pformat
 from typing import Any, Dict, Iterable, List, Optional, Set, Tuple
-from urllib.error import HTTPError
 
 from anki.decks import DeckId
 from anki.errors import NotFoundError
 from anki.models import NotetypeDict, NotetypeId
 from anki.notes import Note, NoteId
 from aqt import gui_hooks, mw
-from aqt.utils import tooltip
-from requests.exceptions import ConnectionError
 
 from . import LOGGER, constants
 from .addon_ankihub_client import AddonAnkiHubClient as AnkiHubClient
+from .addon_ankihub_client import AnkiHubRequestError
 from .config import config
 from .db import AnkiHubDB
-from .error_reporting import report_exception_and_upload_logs
 from .utils import (
     create_backup_with_progress,
     create_deck_with_id,
@@ -28,10 +25,6 @@ from .utils import (
     modify_note_type_templates,
     reset_note_types_of_notes,
 )
-
-
-class AnkiHubError(Exception):
-    pass
 
 
 def sync_with_ankihub() -> None:
@@ -56,9 +49,6 @@ def sync_deck_with_ankihub(ankihub_did: str) -> bool:
     ):
         if mw.progress.want_cancel():
             LOGGER.debug("User cancelled sync.")
-            return False
-
-        if response.status_code != 200:
             return False
 
         data = response.json()
@@ -105,32 +95,33 @@ def import_ankihub_deck(
 
     LOGGER.debug(f"Importing ankihub deck {deck_name=} {local_did=}")
 
-    try:
-        remote_note_types = fetch_remote_note_types_based_on_notes_data(notes_data)
-    except AnkiHubError:
-        return None
+    remote_note_types = fetch_remote_note_types_based_on_notes_data(notes_data)
 
     if protected_fields is None:
         protected_fields = {}
         client = AnkiHubClient()
-        response = client.get_protected_fields(uuid.UUID(ankihub_did))
-        if response.status_code == 200:
+        try:
+            response = client.get_protected_fields(uuid.UUID(ankihub_did))
+        except AnkiHubRequestError as e:
+            if not e.response.status_code == 404:
+                raise e
+        else:
             protected_fields_raw = response.json()["fields"]
             protected_fields = {
                 int(field_id): field_names
                 for field_id, field_names in protected_fields_raw.items()
             }
-        elif response.status_code != 404:
-            return None
 
     if protected_tags is None:
         protected_tags = []
         client = AnkiHubClient()
-        response = client.get_protected_tags(uuid.UUID(ankihub_did))
-        if response.status_code == 200:
+        try:
+            response = client.get_protected_tags(uuid.UUID(ankihub_did))
+        except AnkiHubRequestError as e:
+            if not e.response.status_code == 404:
+                raise e
+        else:
             protected_tags = response.json()["tags"]
-        elif response.status_code != 404:
-            return None
 
     anki_deck_id = import_ankihub_deck_inner(
         ankihub_did=ankihub_did,
@@ -336,11 +327,6 @@ def fetch_remote_note_types(
     client = AnkiHubClient()
     for mid in mids:
         response = client.get_note_type(mid)
-
-        if response.status_code != 200:
-            LOGGER.debug(f"Failed fetching note type with id {mid}.")
-            raise AnkiHubError()
-
         data = response.json()
         note_type = to_anki_note_type(data)
         result[mid] = note_type
@@ -428,13 +414,8 @@ def sync_with_progress() -> None:
         # Don't raise exception when attempting to sync with AnkiHub
         # without an Internet connection.
         if exc := future.exception():
-            if not isinstance(exc, (ConnectionError, HTTPError)):
-                LOGGER.debug(f"Unable to sync:\n{exc}")
-                report_exception_and_upload_logs()
-                raise exc
-            else:
-                LOGGER.debug("Skipping sync due to no Internet connection.")
-                tooltip("AnkiHub: No Internet connection. Skipping sync.")
+            LOGGER.debug("Unable to sync.")
+            raise exc
         else:
             mw.reset()
 

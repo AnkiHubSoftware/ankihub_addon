@@ -94,9 +94,6 @@ def create_collaborative_deck(deck_name: str) -> Response:
     assign_ankihub_ids(note_ids)
 
     response = upload_deck(deck_id)
-    if response.status_code != 201:
-        return response
-
     ankihub_did = response.json()["deck_id"]
     db = AnkiHubDB()
     db.save_notes_from_nids(

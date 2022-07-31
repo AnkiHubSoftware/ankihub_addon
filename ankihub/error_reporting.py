@@ -8,8 +8,9 @@ from aqt import mw
 
 from . import LOGGER
 from .addon_ankihub_client import AddonAnkiHubClient as AnkiHubClient
+from .ankihub_client import AnkiHubRequestError
 from .config import config
-from .constants import ANKI_VERSION, ADDON_VERSION
+from .constants import ADDON_VERSION, ANKI_VERSION
 from .settings import LOG_FILE
 
 SENTRY_ENV = "anki_desktop"
@@ -18,25 +19,32 @@ os.environ["SENTRY_RELEASE"] = ADDON_VERSION
 os.environ["SENTRY_ENVIRONMENT"] = SENTRY_ENV
 
 
-def report_exception_and_upload_logs(context: dict = dict()) -> Optional[str]:
+def report_exception_and_upload_logs(
+    exception: Optional[BaseException] = None, context: Optional[dict] = None
+) -> Optional[str]:
     if not config.public_config.get("report_errors"):
         return None
 
     if os.getenv("REPORT_ERRORS", None) == "0":
         return None
 
+    if context is None:
+        context = dict()
+
     logs_key = upload_logs_in_background()
     context = {**context, "logs": {"filename": logs_key}}
-    sentry_event_id = report_exception(context)
+    sentry_event_id = report_exception(exception=exception, context=context)
     return sentry_event_id
 
 
-def report_exception(context: dict = dict()) -> Optional[str]:
-    from .config import config
-    from .lib import sentry_sdk  # type: ignore
-    from .lib.sentry_sdk import capture_exception, configure_scope  # type: ignore
-
+def report_exception(
+    exception: Optional[BaseException] = None, context: dict = dict()
+) -> Optional[str]:
     try:
+        from .config import config
+        from .lib import sentry_sdk  # type: ignore
+        from .lib.sentry_sdk import capture_exception, configure_scope  # type: ignore
+
         sentry_sdk.init(
             dsn="https://715325d30fa44ecd939d12edda720f91@o1184291.ingest.sentry.io/6546414",
             traces_sample_rate=1.0,
@@ -56,7 +64,10 @@ def report_exception(context: dict = dict()) -> Optional[str]:
             for name, ctx in context.items():
                 scope.set_context(name, ctx)
 
-        event_id = capture_exception()
+        if exception is None:
+            event_id = capture_exception()
+        else:
+            event_id = capture_exception(exception)
         LOGGER.debug(f"Sentry captured {event_id=}.")
         sentry_sdk.flush()
     except Exception as e:
@@ -73,15 +84,15 @@ def upload_logs_in_background() -> str:
     key = f"ankihub_addon_logs_{config.private_config.user}_{int(time.time())}.log"
 
     def upload_logs():
-        client = AnkiHubClient()
-        response = client.upload_logs(
-            file=LOG_FILE,
-            key=key,
-        )
-        if response.status_code == 200:
+        try:
+            client = AnkiHubClient()
+            client.upload_logs(
+                file=LOG_FILE,
+                key=key,
+            )
             LOGGER.debug("Logs uploaded.")
-        else:
-            LOGGER.debug("Failed to upload logs.")
+        except AnkiHubRequestError:
+            LOGGER.debug("Logs upload failed.")
 
     def on_upload_logs_done(future: Future) -> None:
         try:

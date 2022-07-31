@@ -4,21 +4,41 @@ from typing import Dict, Iterator, List, TypedDict
 
 import requests
 from requests import PreparedRequest, Request, Response, Session
-from requests.exceptions import ConnectionError
-from urllib3.exceptions import HTTPError
+from requests.exceptions import HTTPError
 
 from . import LOGGER
 from .constants import API_URL_BASE, ChangeTypes
+
+
+class AnkiHubRequestError(Exception):
+    def __init__(self, response: Response):
+        self.response = response
+
+    def __str__(self):
+        return (
+            f"AnkiHub request error: {self.response.status_code} {self.response.reason}"
+        )
+
+
+def http_error_hook(response: Response, *args, **kwargs):
+    LOGGER.debug("Begin http error hook.")
+
+    try:
+        response.raise_for_status()
+    except HTTPError:
+        LOGGER.debug("http error hook raises AnkiHubRequestError.")
+        raise AnkiHubRequestError(response)
+
+    return response
 
 
 class AnkiHubClient:
     """Client for interacting with the AnkiHub API."""
 
     def __init__(self, hooks=None, token=None):
-        if hooks is None:
-            self.hooks = []
-        else:
-            self.hooks = hooks
+        self.hooks = [http_error_hook]
+        if hooks is not None:
+            self.hooks += hooks
 
         self.session = Session()
         self.session.hooks["response"] = self.hooks
@@ -54,31 +74,28 @@ class AnkiHubClient:
         endpoint,
         data=None,
         params=None,
-        treat_404_as_error=True,
     ) -> Response:
         request = self._build_request(method, endpoint, data, params)
-        request.treat_404_as_error = treat_404_as_error  # type: ignore
-        try:
-            response = self.session.send(request)
-            self.session.close()
-            return response
-        except (ConnectionError, HTTPError) as e:
-            LOGGER.debug(f"Connection error: {e}")
-            raise ConnectionError(
-                "The AnkiHub add-on was unable to connect to the internet."
-            )
+        response = self.session.send(request)
+        self.session.close()
+        return response
 
     def login(self, credentials: dict) -> Response:
         response = self._send_request("POST", "/login/", credentials)
+        if response.status_code != 200:
+            raise AnkiHubRequestError(response)
+
         token = response.json().get("token") if response else ""
         if token:
             self.session.headers["Authorization"] = f"Token {token}"
         return response
 
     def signout(self):
-        result = self._send_request("POST", "/logout/")
-        if result and result.status_code == 204:
+        response = self._send_request("POST", "/logout/")
+        if response and response.status_code == 204:
             self.session.headers["Authorization"] = ""
+        else:
+            raise AnkiHubRequestError(response)
 
     def upload_deck(self, file: Path, anki_deck_id: int) -> Response:
         key = file.name
@@ -97,6 +114,8 @@ class AnkiHubClient:
         response = self._send_request(
             "POST", "/decks/", data={"key": key, "anki_id": anki_deck_id}
         )
+        if response.status_code != 201:
+            raise AnkiHubRequestError(response)
         return response
 
     def download_deck(self, deck_file_name: str) -> Response:
@@ -124,23 +143,26 @@ class AnkiHubClient:
                 f"/decks/{ankihub_deck_uuid}/updates",
                 params=params,
             )
-            if response.status_code == 200:
-                has_next_page = response.json()["has_next"]
-                params["page"] += 1
-                yield response
-            else:
-                has_next_page = False
-                yield response
+            if response.status_code != 200:
+                raise AnkiHubRequestError(response)
+
+            has_next_page = response.json()["has_next"]
+            params["page"] += 1
+            yield response
 
     def get_deck_by_id(self, ankihub_deck_uuid: uuid.UUID) -> Response:
         response = self._send_request(
             "GET",
             f"/decks/{ankihub_deck_uuid}/",
         )
+        if response.status_code != 200:
+            raise AnkiHubRequestError(response)
         return response
 
     def get_note_by_ankihub_id(self, ankihub_note_uuid: uuid.UUID) -> Response:
         response = self._send_request("GET", f"/notes/{ankihub_note_uuid}")
+        if response.status_code != 200:
+            raise AnkiHubRequestError(response)
         return response
 
     def create_change_note_suggestion(
@@ -163,6 +185,8 @@ class AnkiHubClient:
             f"/notes/{ankihub_note_uuid}/suggestion/",
             data=suggestion,
         )
+        if response.status_code != 201:
+            raise AnkiHubRequestError(response)
         return response
 
     def create_new_note_suggestion(
@@ -192,6 +216,8 @@ class AnkiHubClient:
             f"/decks/{ankihub_deck_uuid}/note-suggestion/",
             data=suggestion,
         )
+        if response.status_code != 201:
+            raise AnkiHubRequestError(response)
         return response
 
     def get_presigned_url(self, key: str, action: str) -> Response:
@@ -205,26 +231,32 @@ class AnkiHubClient:
         endpoint = "/decks/pre-signed-url"
         data = {"key": key, "type": action}
         response = self._send_request(method, endpoint, params=data)
+        if response.status_code != 200:
+            raise AnkiHubRequestError(response)
         return response
 
     def get_note_type(self, anki_note_type_id: int) -> Response:
         response = self._send_request("GET", f"/note-types/{anki_note_type_id}/")
+        if response.status_code != 200:
+            raise AnkiHubRequestError(response)
         return response
 
     def get_protected_fields(self, ankihub_deck_uuid: uuid.UUID) -> Response:
         response = self._send_request(
             "GET",
             f"/decks/{ankihub_deck_uuid}/protected-fields/",
-            treat_404_as_error=False,
         )
+        if response.status_code != 200:
+            raise AnkiHubRequestError(response)
         return response
 
     def get_protected_tags(self, ankihub_deck_uuid: uuid.UUID) -> Response:
         response = self._send_request(
             "GET",
             f"/decks/{ankihub_deck_uuid}/protected-tags/",
-            treat_404_as_error=False,
         )
+        if response.status_code != 200:
+            raise AnkiHubRequestError(response)
         return response
 
     def bulk_suggest_tags(
@@ -232,4 +264,6 @@ class AnkiHubClient:
     ) -> Response:
         data = {"notes": [str(note_id) for note_id in ankihub_note_uuids], "tags": tags}
         response = self._send_request("POST", "/suggestions/bulk/", data=data)
+        if response.status_code != 201:
+            raise AnkiHubRequestError(response)
         return response

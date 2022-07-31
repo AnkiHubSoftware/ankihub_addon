@@ -13,7 +13,6 @@ from aqt import mw
 from aqt.utils import tr
 
 from . import LOGGER, constants
-from .error_reporting import report_exception_and_upload_logs
 from .constants import (
     ANKI_MINOR,
     ANKIHUB_NOTE_TYPE_FIELD_NAME,
@@ -333,8 +332,7 @@ def create_backup_with_progress() -> None:
             mw.col.reopen(after_full_sync=False)
         LOGGER.debug("Backup successful.")
     except Exception as exc:
-        LOGGER.exception("Backup failed")
-        report_exception_and_upload_logs()
+        LOGGER.debug("Backup failed")
         raise exc
     finally:
         mw.progress.finish()
