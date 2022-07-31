@@ -353,7 +353,7 @@ def test_get_deck_updates(anki_session_with_addon: AnkiSession, requests_mock):
 
 def test_get_deck_by_id(anki_session_with_addon: AnkiSession, requests_mock):
     from ankihub.addon_ankihub_client import AddonAnkiHubClient as AnkiHubClient
-    from ankihub.ankihub_client import AnkiHubRequestError
+    from ankihub.ankihub_client import AnkiHubRequestError, DeckInfo
     from ankihub.constants import API_URL_BASE
 
     client = AnkiHubClient(hooks=[])
@@ -371,8 +371,15 @@ def test_get_deck_by_id(anki_session_with_addon: AnkiSession, requests_mock):
     }
 
     requests_mock.get(f"{API_URL_BASE}/decks/{ankihub_deck_uuid}/", json=expected_data)
-    response = client.get_deck_by_id(ankihub_deck_uuid=ankihub_deck_uuid)  # type: ignore
-    assert response.json() == expected_data
+    deck_info = client.get_deck_by_id(ankihub_deck_uuid=ankihub_deck_uuid)  # type: ignore
+    assert deck_info == DeckInfo(
+        ankihub_deck_uuid=ankihub_deck_uuid,
+        anki_did=1,
+        owner=True,
+        name="test",
+        csv_last_upload=date_time_str,
+        csv_notes_url="http://fake-csv-url.com/test.csv",
+    )
 
     # test get deck by id unauthenticated
     requests_mock.get(f"{API_URL_BASE}/decks/{ankihub_deck_uuid}/", status_code=403)

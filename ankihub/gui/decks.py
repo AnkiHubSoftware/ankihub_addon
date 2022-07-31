@@ -260,7 +260,7 @@ class SubscribeDialog(QDialog):
                 raise exc
 
         try:
-            deck_response = self.client.get_deck_by_id(ankihub_did)
+            deck_info = self.client.get_deck_by_id(ankihub_did)
         except AnkiHubRequestError as e:
             if e.response.status_code == 404:
                 showText(
@@ -279,21 +279,16 @@ class SubscribeDialog(QDialog):
             else:
                 raise e
 
-        data = deck_response.json()
-        deck_file_name = data["csv_notes_filename"]
-        last_update = data["csv_last_upload"]
-        is_creator = bool(data["owner"])
-
         def on_download_done(future: Future) -> None:
             notes_data: List[NoteUpdate] = future.result()
 
             mw.taskman.with_progress(
                 lambda: self.install_deck(
                     notes_data=notes_data,
-                    deck_name=data["name"],
+                    deck_name=deck_info.name,
                     ankihub_did=ankihub_did,
-                    last_update=last_update,
-                    is_creator=is_creator,
+                    last_update=deck_info.csv_last_upload,
+                    is_creator=deck_info.owner,
                 ),
                 on_done=on_install_done,
                 parent=mw,
@@ -301,7 +296,7 @@ class SubscribeDialog(QDialog):
             )
 
         mw.taskman.with_progress(
-            lambda: self.client.download_deck(deck_file_name),
+            lambda: self.client.download_deck(deck_info.ankihub_deck_uuid),
             on_done=on_download_done,
             parent=mw,
             label="Downloading deck",

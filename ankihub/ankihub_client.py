@@ -49,6 +49,25 @@ class DeckUpdateChunk(DataClassJsonMixin):
     notes: List[NoteUpdate]
 
 
+@dataclass
+class DeckInfo(DataClassJsonMixin):
+    ankihub_deck_uuid: uuid.UUID = dataclasses.field(
+        metadata=dataclasses_json.config(field_name="id")
+    )
+    owner: bool = dataclasses.field(
+        metadata=dataclasses_json.config(
+            encoder=lambda b: 1 if b else 0,
+            decoder=lambda i: bool(i),
+        )
+    )
+    anki_did: int = dataclasses.field(
+        metadata=dataclasses_json.config(field_name="anki_id")
+    )
+    name: str
+    csv_last_upload: str
+    csv_notes_url: str
+
+
 class AnkiHubRequestError(Exception):
     def __init__(self, response: Response):
         self.response = response
@@ -216,14 +235,17 @@ class AnkiHubClient:
             note_updates = DeckUpdateChunk.from_dict(data)
             yield note_updates
 
-    def get_deck_by_id(self, ankihub_deck_uuid: uuid.UUID) -> Response:
+    def get_deck_by_id(self, ankihub_deck_uuid: uuid.UUID) -> DeckInfo:
         response = self._send_request(
             "GET",
             f"/decks/{ankihub_deck_uuid}/",
         )
         if response.status_code != 200:
             raise AnkiHubRequestError(response)
-        return response
+
+        data = response.json()
+        result = DeckInfo.from_dict(data)
+        return result
 
     def get_note_by_ankihub_id(self, ankihub_note_uuid: uuid.UUID) -> Response:
         response = self._send_request("GET", f"/notes/{ankihub_note_uuid}")
