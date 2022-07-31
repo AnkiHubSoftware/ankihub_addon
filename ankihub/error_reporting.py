@@ -6,12 +6,11 @@ from typing import Optional
 
 from aqt import mw
 
-from ankihub.ankihub_client import AnkiHubRequestError
-
 from . import LOGGER
 from .addon_ankihub_client import AddonAnkiHubClient as AnkiHubClient
+from .ankihub_client import AnkiHubRequestError
 from .config import config
-from .constants import ANKI_VERSION, ADDON_VERSION
+from .constants import ADDON_VERSION, ANKI_VERSION
 from .settings import LOG_FILE
 
 SENTRY_ENV = "anki_desktop"
