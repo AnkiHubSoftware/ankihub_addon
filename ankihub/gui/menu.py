@@ -120,8 +120,7 @@ class AnkiHubLogin(QWidget):
         config.save_token(token)
         config.save_user_email(username)
 
-        mw.taskman.run_on_main(lambda: tooltip("Signed into AnkiHub!", parent=mw))
-
+        tooltip("Signed into AnkiHub!", parent=mw)
         self.close()
 
     @classmethod
