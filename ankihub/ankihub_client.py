@@ -346,32 +346,31 @@ class AnkiHubClient:
 
     def bulk_suggest_tags(
         self, ankihub_note_uuids: List[uuid.UUID], tags: List[str]
-    ) -> Response:
+    ) -> None:
         data = {"notes": [str(note_id) for note_id in ankihub_note_uuids], "tags": tags}
         response = self._send_request("POST", "/suggestions/bulk/", data=data)
         if response.status_code != 201:
             raise AnkiHubRequestError(response)
-        return response
 
 
 def transform_notes_data(notes_data: List[Dict]) -> List[Dict]:
-    # TODO fix differences between csv when installing for the first time vs. when updating
-    # on the AnkiHub side
-    # for example for one the fields name is "note_id" and for the other "id"
+    # TODO Fix differences between csv (used when installing for the first time) vs.
+    # json in responses (used when getting updates).
+    # For example for one a field is named "note_id" and for the other "id"
     result = [
         {
             **note_data,
+            "fields": json.loads(note_data["fields"])
+            if isinstance(note_data["fields"], str)
+            else note_data["fields"],
             "anki_id": int((note_data["anki_id"])),
             "note_id": note_data.get(
                 "note_id", note_data.get("ankihub_id", note_data.get("id"))
             ),
-            "fields": json.loads(note_data["fields"])
-            if isinstance(note_data["fields"], str)
-            else note_data["fields"],
+            "note_type_id": int(note_data["note_type_id"]),
             "tags": json.loads(note_data["tags"])
             if isinstance(note_data["tags"], str)
             else note_data["tags"],
-            "note_type_id": int(note_data["note_type_id"]),
         }
         for note_data in notes_data
     ]
