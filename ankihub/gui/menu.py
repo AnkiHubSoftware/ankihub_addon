@@ -1,4 +1,3 @@
-import json
 from datetime import datetime, timezone
 from typing import Optional
 
@@ -18,7 +17,6 @@ from aqt.operations import QueryOp
 from aqt.qt import QAction, QMenu, qconnect
 from aqt.studydeck import StudyDeck
 from aqt.utils import askUser, showInfo, showText, tooltip
-from requests import Response
 
 from .. import LOGGER
 from ..addon_ankihub_client import AddonAnkiHubClient as AnkiHubClient
@@ -104,7 +102,7 @@ class AnkiHubLogin(QWidget):
         ankihub_client = AnkiHubClient()
 
         try:
-            response = ankihub_client.login(
+            token = ankihub_client.login(
                 credentials={"username": username, "password": password}
             )
         except AnkiHubRequestError:
@@ -114,10 +112,6 @@ class AnkiHubLogin(QWidget):
             tooltip("Wrong credentials.", parent=mw)
             return
 
-        data = response.json()
-        token = data.get("token")
-        body = response.request.body
-        username = json.loads(body).get("username")
         config.save_token(token)
         config.save_user_email(username)
 
@@ -199,10 +193,8 @@ def create_collaborative_deck_action() -> None:
         tooltip("Cancelled Upload to AnkiHub")
         return
 
-    def on_success(response: Response) -> None:
-        data = response.json()
+    def on_success(ankihub_did: str) -> None:
         anki_did = mw.col.decks.id_for_name(deck_name)
-        ankihub_did = data["deck_id"]
         creation_time = datetime.now(tz=timezone.utc).strftime("%Y-%m-%dT%H:%M:%S.%f%z")
         config.save_subscription(
             deck_name,

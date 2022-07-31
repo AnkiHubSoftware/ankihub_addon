@@ -1,13 +1,52 @@
+import csv
+import dataclasses
+import json
+import tempfile
 import uuid
+from dataclasses import dataclass
 from pathlib import Path
 from typing import Dict, Iterator, List, TypedDict
 
+import dataclasses_json
 import requests
+from dataclasses_json import DataClassJsonMixin
 from requests import PreparedRequest, Request, Response, Session
 from requests.exceptions import HTTPError
 
 from . import LOGGER
 from .constants import API_URL_BASE, ChangeTypes
+
+CSV_DELIMITER = ";"
+
+
+@dataclass
+class FieldUpdate(DataClassJsonMixin):
+    name: str
+    order: int
+    value: str
+
+
+@dataclass
+class NoteUpdate(DataClassJsonMixin):
+    fields: List[FieldUpdate]
+    ankihub_note_uuid: uuid.UUID = dataclasses.field(
+        metadata=dataclasses_json.config(field_name="note_id")
+    )
+    anki_nid: int = dataclasses.field(
+        metadata=dataclasses_json.config(field_name="anki_id")
+    )
+    mid: int = dataclasses.field(
+        metadata=dataclasses_json.config(field_name="note_type_id")
+    )
+    tags: List[str]
+
+
+@dataclass
+class DeckUpdateChunk(DataClassJsonMixin):
+    latest_update: str
+    protected_fields: Dict[int, List[str]]
+    protected_tags: List[str]
+    notes: List[NoteUpdate]
 
 
 class AnkiHubRequestError(Exception):
@@ -80,7 +119,7 @@ class AnkiHubClient:
         self.session.close()
         return response
 
-    def login(self, credentials: dict) -> Response:
+    def login(self, credentials: dict) -> str:
         response = self._send_request("POST", "/login/", credentials)
         if response.status_code != 200:
             raise AnkiHubRequestError(response)
@@ -88,7 +127,10 @@ class AnkiHubClient:
         token = response.json().get("token") if response else ""
         if token:
             self.session.headers["Authorization"] = f"Token {token}"
-        return response
+
+        data = response.json()
+        token = data.get("token")
+        return token
 
     def signout(self):
         response = self._send_request("POST", "/logout/")
@@ -97,11 +139,11 @@ class AnkiHubClient:
         else:
             raise AnkiHubRequestError(response)
 
-    def upload_deck(self, file: Path, anki_deck_id: int) -> Response:
+    def upload_deck(self, file: Path, anki_deck_id: int) -> uuid.UUID:
         key = file.name
         presigned_url_response = self.get_presigned_url(key=key, action="upload")
         if presigned_url_response.status_code != 200:
-            return presigned_url_response
+            raise AnkiHubRequestError(presigned_url_response)
 
         s3_url = presigned_url_response.json()["pre_signed_url"]
         with open(file, "rb") as f:
@@ -109,28 +151,48 @@ class AnkiHubClient:
 
         s3_response = requests.put(s3_url, data=deck_data)
         if s3_response.status_code != 200:
-            return s3_response
+            raise AnkiHubRequestError(s3_response)
 
         response = self._send_request(
             "POST", "/decks/", data={"key": key, "anki_id": anki_deck_id}
         )
         if response.status_code != 201:
             raise AnkiHubRequestError(response)
-        return response
 
-    def download_deck(self, deck_file_name: str) -> Response:
+        data = response.json()
+        ankihub_did = uuid.UUID(data["deck_id"])
+        return ankihub_did
+
+    def download_deck(self, deck_file_name: str) -> List[NoteUpdate]:
         presigned_url_response = self.get_presigned_url(
             key=deck_file_name, action="download"
         )
         if presigned_url_response.status_code != 200:
-            return presigned_url_response
+            raise AnkiHubRequestError(presigned_url_response)
 
         s3_url = presigned_url_response.json()["pre_signed_url"]
-        return requests.get(s3_url)
+        s3_response = requests.get(s3_url)
+        if s3_response.status_code != 200:
+            raise AnkiHubRequestError(s3_response)
+
+        deck_csv_content = s3_response.content
+        out_file = Path(tempfile.mkdtemp()) / f"{deck_file_name}"
+        with out_file.open("wb") as f:
+            f.write(deck_csv_content)
+            LOGGER.debug(f"Wrote {deck_file_name} to {out_file}")
+            # TODO Validate .csv
+
+        with out_file.open(encoding="utf-8") as f:
+            reader = csv.DictReader(f, delimiter=CSV_DELIMITER, quotechar="'")
+            notes_data_raw = [row for row in reader]
+            notes_data_raw = transform_notes_data(notes_data_raw)
+            notes_data = [NoteUpdate.from_dict(row) for row in notes_data_raw]
+
+        return notes_data
 
     def get_deck_updates(
-        self, ankihub_deck_uuid: uuid.UUID, since: float
-    ) -> Iterator[Response]:
+        self, ankihub_deck_uuid: uuid.UUID, since: str
+    ) -> Iterator[DeckUpdateChunk]:
         class Params(TypedDict, total=False):
             page: int
             since: str
@@ -146,9 +208,13 @@ class AnkiHubClient:
             if response.status_code != 200:
                 raise AnkiHubRequestError(response)
 
-            has_next_page = response.json()["has_next"]
+            data = response.json()
+            has_next_page = data["has_next"]
             params["page"] += 1
-            yield response
+
+            data["notes"] = transform_notes_data(data["notes"])
+            note_updates = DeckUpdateChunk.from_dict(data)
+            yield note_updates
 
     def get_deck_by_id(self, ankihub_deck_uuid: uuid.UUID) -> Response:
         response = self._send_request(
@@ -267,3 +333,27 @@ class AnkiHubClient:
         if response.status_code != 201:
             raise AnkiHubRequestError(response)
         return response
+
+
+def transform_notes_data(notes_data: List[Dict]) -> List[Dict]:
+    # TODO fix differences between csv when installing for the first time vs. when updating
+    # on the AnkiHub side
+    # for example for one the fields name is "note_id" and for the other "id"
+    result = [
+        {
+            **note_data,
+            "anki_id": int((note_data["anki_id"])),
+            "note_id": note_data.get(
+                "note_id", note_data.get("ankihub_id", note_data.get("id"))
+            ),
+            "fields": json.loads(note_data["fields"])
+            if isinstance(note_data["fields"], str)
+            else note_data["fields"],
+            "tags": json.loads(note_data["tags"])
+            if isinstance(note_data["tags"], str)
+            else note_data["tags"],
+            "note_type_id": int(note_data["note_type_id"]),
+        }
+        for note_data in notes_data
+    ]
+    return result
