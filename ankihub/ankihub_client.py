@@ -65,7 +65,7 @@ class DeckInfo(DataClassJsonMixin):
     )
     name: str
     csv_last_upload: str
-    csv_notes_url: str
+    csv_notes_filename: str
 
 
 class AnkiHubRequestError(Exception):
@@ -178,17 +178,21 @@ class AnkiHubClient:
         ankihub_did = uuid.UUID(data["deck_id"])
         return ankihub_did
 
-    def download_deck(self, deck_file_name: str) -> List[NoteUpdate]:
-        s3_url = self.get_presigned_url(key=deck_file_name, action="download")
+    def download_deck(self, ankihub_deck_uuid: uuid.UUID) -> List[NoteUpdate]:
+        deck_info = self.get_deck_by_id(ankihub_deck_uuid)
+
+        s3_url = self.get_presigned_url(
+            key=deck_info.csv_notes_filename, action="download"
+        )
         s3_response = requests.get(s3_url)
         if s3_response.status_code != 200:
             raise AnkiHubRequestError(s3_response)
 
         deck_csv_content = s3_response.content
-        out_file = Path(tempfile.mkdtemp()) / f"{deck_file_name}"
+        out_file = Path(tempfile.mkdtemp()) / f"{deck_info.csv_notes_filename}"
         with out_file.open("wb") as f:
             f.write(deck_csv_content)
-            LOGGER.debug(f"Wrote {deck_file_name} to {out_file}")
+            LOGGER.debug(f"Wrote {deck_info.csv_notes_filename} to {out_file}")
             # TODO Validate .csv
 
         with out_file.open(encoding="utf-8") as f:

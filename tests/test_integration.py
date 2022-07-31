@@ -367,7 +367,7 @@ def test_get_deck_by_id(anki_session_with_addon: AnkiSession, requests_mock):
         "owner": 1,
         "anki_id": 1,
         "csv_last_upload": date_time_str,
-        "csv_notes_url": "http://fake-csv-url.com/test.csv",
+        "csv_notes_filename": "test.csv",
     }
 
     requests_mock.get(f"{API_URL_BASE}/decks/{ankihub_deck_uuid}/", json=expected_data)
@@ -378,7 +378,7 @@ def test_get_deck_by_id(anki_session_with_addon: AnkiSession, requests_mock):
         owner=True,
         name="test",
         csv_last_upload=date_time_str,
-        csv_notes_url="http://fake-csv-url.com/test.csv",
+        csv_notes_filename="test.csv",
     )
 
     # test get deck by id unauthenticated
