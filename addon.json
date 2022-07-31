@@ -9,7 +9,9 @@
     "targets": [
         "anki21"
     ],
-    "conflicts": [],
+    "conflicts": [
+        "3491767031"
+    ],
     "min_anki_version": "2.1.47",
     "tested_anki_version": "2.1.54"
 }
