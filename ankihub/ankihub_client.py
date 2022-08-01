@@ -13,8 +13,8 @@ from requests.exceptions import HTTPError
 
 from . import LOGGER
 from .constants import API_URL_BASE, ChangeTypes
-from .lib import dataclasses_json
-from .lib.dataclasses_json import DataClassJsonMixin
+from .lib import dataclasses_json  # type: ignore
+from .lib.dataclasses_json import DataClassJsonMixin  # type: ignore
 
 CSV_DELIMITER = ";"
 
