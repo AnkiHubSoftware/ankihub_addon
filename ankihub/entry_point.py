@@ -7,6 +7,7 @@ from .config import config
 from .errors import setup_error_handler
 from .gui import browser, editor
 from .gui.menu import setup_ankihub_menu
+from .progress import setup_progress_manager
 from .sync import setup_sync_on_startup
 
 
@@ -35,5 +36,8 @@ def run():
 
     setup_error_handler()
     LOGGER.debug("Set up error handler.")
+
+    setup_progress_manager()
+    LOGGER.debug("Set up progress manager")
 
     return mw
