@@ -1,5 +1,8 @@
 """Code to be run on Anki start up."""
+from pprint import pformat
+
 from aqt import mw
+from aqt.gui_hooks import main_window_did_init
 
 from . import LOGGER
 from .addons import setup_addons
@@ -13,6 +16,8 @@ from .sync import setup_sync_on_startup
 
 def run():
     """Call this function in __init__.py when Anki starts."""
+
+    main_window_did_init.append(log_enabled_addons)
 
     mw.addonManager.setWebExports(__name__, r"gui/web/.*")
 
@@ -41,3 +46,8 @@ def run():
     LOGGER.debug("Set up progress manager")
 
     return mw
+
+
+def log_enabled_addons():
+    enabled_addons = [x for x in mw.addonManager.all_addon_meta() if x.enabled]
+    LOGGER.debug(f"enabled addons:\n{pformat(enabled_addons)}")
