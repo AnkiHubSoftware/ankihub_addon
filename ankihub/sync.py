@@ -9,6 +9,7 @@ from anki.errors import NotFoundError
 from anki.models import NotetypeDict, NotetypeId
 from anki.notes import Note, NoteId
 from aqt import gui_hooks, mw
+from aqt.utils import tooltip
 
 from . import LOGGER, constants
 from .addon_ankihub_client import AddonAnkiHubClient as AnkiHubClient
@@ -27,49 +28,52 @@ from .utils import (
 )
 
 
-def sync_with_ankihub() -> None:
-    LOGGER.debug("Trying to sync with AnkiHub.")
+class AnkiHubSync:
+    def __init__(self):
+        self.num_note_updates = 0
 
-    create_backup_with_progress()
+    def sync_all_decks(self) -> None:
+        LOGGER.debug("Trying to sync with AnkiHub.")
 
-    for ankihub_did in config.private_config.decks.keys():
-        success = sync_deck_with_ankihub(ankihub_did)
-        if not success:
-            # Should we restore from backup on a failure?
-            # Also it would probably be good to count the number of updated notes and decks and display that to the user
-            break
+        create_backup_with_progress()
 
+        for ankihub_did in config.private_config.decks.keys():
+            success = self.sync_deck(ankihub_did)
+            if not success:
+                # Should we restore from backup on a failure?
+                break
 
-def sync_deck_with_ankihub(ankihub_did: str) -> bool:
-    deck = config.private_config.decks[ankihub_did]
-    client = AnkiHubClient()
-    notes_data = []
-    for response in client.get_deck_updates(
-        uuid.UUID(ankihub_did), since=deck["latest_update"]
-    ):
-        if mw.progress.want_cancel():
-            LOGGER.debug("User cancelled sync.")
-            return False
+    def sync_deck(self, ankihub_did: str) -> bool:
+        deck = config.private_config.decks[ankihub_did]
+        client = AnkiHubClient()
+        notes_data = []
+        for response in client.get_deck_updates(
+            uuid.UUID(ankihub_did), since=deck["latest_update"]
+        ):
+            if mw.progress.want_cancel():
+                LOGGER.debug("User cancelled sync.")
+                return False
 
-        data = response.json()
-        notes = data["notes"]
-        if notes:
-            notes_data += notes
+            data = response.json()
+            notes = data["notes"]
+            if notes:
+                notes_data += notes
 
-    if notes_data:
-        import_ankihub_deck(
-            ankihub_did=ankihub_did,
-            notes_data=notes_data,
-            deck_name=deck["name"],
-            local_did=deck["anki_id"],
-            protected_fields=data["protected_fields"],
-            protected_tags=data["protected_tags"],
-        )
-        config.save_latest_update(ankihub_did, data["latest_update"])
-    else:
-        LOGGER.debug(f"No new updates to sync for {ankihub_did=}")
+        if notes_data:
+            import_ankihub_deck(
+                ankihub_did=ankihub_did,
+                notes_data=notes_data,
+                deck_name=deck["name"],
+                local_did=deck["anki_id"],
+                protected_fields=data["protected_fields"],
+                protected_tags=data["protected_tags"],
+            )
+            config.save_latest_update(ankihub_did, data["latest_update"])
+            self.num_note_updates += len(notes_data)
+        else:
+            LOGGER.debug(f"No new updates to sync for {ankihub_did=}")
 
-    return True
+        return True
 
 
 def import_ankihub_deck(
@@ -410,6 +414,9 @@ def reset_note_types_of_notes_based_on_notes_data(notes_data: List[Dict]) -> Non
 
 
 def sync_with_progress() -> None:
+
+    sync = AnkiHubSync()
+
     def on_done(future: Future):
         # Don't raise exception when attempting to sync with AnkiHub
         # without an Internet connection.
@@ -417,11 +424,16 @@ def sync_with_progress() -> None:
             LOGGER.debug("Unable to sync.")
             raise exc
         else:
+            tooltip(
+                f"AnkiHub: Updated {sync.num_note_updates} "
+                f"note{'' if sync.num_note_updates == 1 else 's'}.",
+                parent=mw,
+            )
             mw.reset()
 
     if config.private_config.token:
         mw.taskman.with_progress(
-            lambda: sync_with_ankihub(),
+            lambda: sync.sync_all_decks(),
             label="Synchronizing with AnkiHub",
             on_done=on_done,
             parent=mw,

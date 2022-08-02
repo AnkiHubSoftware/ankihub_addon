@@ -28,7 +28,7 @@ from ..addon_ankihub_client import AnkiHubRequestError
 from ..config import config
 from ..constants import CSV_DELIMITER, URL_DECK_BASE, URL_DECKS, URL_HELP, URL_VIEW_DECK
 from ..db import AnkiHubDB
-from ..sync import import_ankihub_deck, sync_with_ankihub
+from ..sync import import_ankihub_deck
 from ..utils import create_backup_with_progress, undo_note_type_modfications
 
 
@@ -348,8 +348,6 @@ class SubscribeDialog(QDialog):
         )
 
         LOGGER.debug("Importing deck was succesful.")
-
-        sync_with_ankihub()
 
         return True
 
