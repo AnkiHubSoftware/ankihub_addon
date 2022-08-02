@@ -155,7 +155,7 @@ def hide_ankihub_field_in_editor(
         if constants.ANKIHUB_NOTE_TYPE_FIELD_NAME not in note:
             extra = (
                 "(() => {"
-                'const field = document.querySelector("#fields div[data-ankihub-hidden]");'
+                'const field = document.querySelector("#fields *[data-ankihub-hidden]");'
                 "if (field) {"
                 "delete field.dataset.ankihubHidden;"
                 "field.hidden = false;"
@@ -165,7 +165,11 @@ def hide_ankihub_field_in_editor(
         else:
             extra = (
                 "(() => {"
-                'const fields = document.getElementById("fields").children;'
+                'let fields = document.getElementById("fields").children;'
+                # For compatibility with the multi column editor add-on https://ankiweb.net/shared/info/3491767031
+                'if(fields[0].nodeName == "TABLE") {'
+                "   fields = fields[0].children;"
+                "}"
                 "const field = fields[fields.length -1];"
                 "field.dataset.ankihubHidden = true;"
                 "field.hidden = true;"
