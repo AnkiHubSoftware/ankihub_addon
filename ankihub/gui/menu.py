@@ -144,7 +144,10 @@ class DeckCreationConfirmationDialog(QMessageBox):
         self.setText(
             "Are you sure you want to create a new collaborative deck?<br><br><br>"
             'Terms of use: <a href="https://www.ankihub.net/terms">https://www.ankihub.net/terms</a><br>'
-            'Privacy Policy: <a href="https://www.ankihub.net/privacy">https://www.ankihub.net/privacy</a><br>'
+            'Privacy Policy: <a href="https://www.ankihub.net/privacy">https://www.ankihub.net/privacy</a><br>',
+        )
+        self.setStandardButtons(
+            QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.Cancel
         )
         self.confirmation_cb = QCheckBox(
             text=" by checking this checkbox you agree to the terms of use",
@@ -153,7 +156,7 @@ class DeckCreationConfirmationDialog(QMessageBox):
         self.setCheckBox(self.confirmation_cb)
 
     def run(self):
-        clicked_ok = self.exec()
+        clicked_ok = self.exec() == QMessageBox.StandardButton.Yes
         if not clicked_ok:
             return False
 
