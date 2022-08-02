@@ -1,7 +1,6 @@
 import csv
 import dataclasses
 import json
-import tempfile
 import uuid
 from dataclasses import dataclass
 from pathlib import Path
@@ -188,18 +187,14 @@ class AnkiHubClient:
         if s3_response.status_code != 200:
             raise AnkiHubRequestError(s3_response)
 
-        deck_csv_content = s3_response.content
-        out_file = Path(tempfile.mkdtemp()) / f"{deck_info.csv_notes_filename}"
-        with out_file.open("wb") as f:
-            f.write(deck_csv_content)
-            LOGGER.debug(f"Wrote {deck_info.csv_notes_filename} to {out_file}")
-            # TODO Validate .csv
-
-        with out_file.open(encoding="utf-8") as f:
-            reader = csv.DictReader(f, delimiter=CSV_DELIMITER, quotechar="'")
-            notes_data_raw = [row for row in reader]
-            notes_data_raw = transform_notes_data(notes_data_raw)
-            notes_data = [NoteUpdate.from_dict(row) for row in notes_data_raw]
+        deck_csv_content = s3_response.content.decode("utf-8")
+        reader = csv.DictReader(
+            deck_csv_content.splitlines(), delimiter=CSV_DELIMITER, quotechar="'"
+        )
+        # TODO Validate .csv
+        notes_data_raw = [row for row in reader]
+        notes_data_raw = transform_notes_data(notes_data_raw)
+        notes_data = [NoteUpdate.from_dict(row) for row in notes_data_raw]
 
         return notes_data
 
