@@ -2,6 +2,8 @@ import os
 import re
 import sys
 import traceback
+from types import TracebackType
+from typing import Type
 
 from aqt import mw
 from aqt.gui_hooks import main_window_did_init
@@ -17,10 +19,14 @@ from .gui.error_feedback import ErrorFeedbackDialog
 from .gui.menu import AnkiHubLogin
 
 
-def handle_exception(exc: BaseException, tb) -> bool:
+def handle_exception(
+    exc_type: Type[BaseException], exc: BaseException, tb: TracebackType
+) -> bool:
     # returns True if the exception was handled in such a way that it doesn't need to be handled further
 
-    LOGGER.debug(f"From handle_exception:\n{''.join(traceback.format_exception(exc))}")  # type: ignore
+    LOGGER.debug(
+        f"From handle_exception:\n{''.join(traceback.format_exception(exc_type, value=exc, tb=tb))}"
+    )
 
     if not this_addon_is_involved(tb):
         return False
@@ -75,10 +81,12 @@ def maybe_handle_ankihub_request_error(error: AnkiHubRequestError) -> bool:
 
 
 def overwrite_excepthook():
-    def excepthook(etype, val: Exception, tb) -> None:
+    def excepthook(
+        etype: Type[BaseException], val: Exception, tb: TracebackType
+    ) -> None:
         handled = False
         try:
-            handled = handle_exception(exc=val, tb=tb)
+            handled = handle_exception(exc_type=etype, exc=val, tb=tb)
         except Exception:
             # catching all exceptions here prevents an potential exception loop
             LOGGER.exception("handle_exception threw an exception.")
