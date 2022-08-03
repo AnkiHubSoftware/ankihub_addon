@@ -42,13 +42,7 @@ def handle_exception(
     if not should_report_error():
         return False
 
-    context = None
-    if isinstance(exc, AnkiHubRequestError):
-        context = {
-            "reason": exc.response.reason,
-            "content": exc.response.content,
-        }
-    sentry_id = report_exception_and_upload_logs(exception=exc, context=context)
+    sentry_id = report_exception_and_upload_logs(exception=exc)
     ErrorFeedbackDialog(exception=exc, event_id=sentry_id)
     return False
 

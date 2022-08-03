@@ -49,3 +49,13 @@ def test_updated_tags(anki_session_with_addon: AnkiSession):
             protected_tags=["A"],
         )
     ) == set(["A::B::C"])
+
+
+def test_normalize_url(anki_session_with_addon: AnkiSession):
+    from ankihub.error_reporting import normalize_url
+
+    url = "https://app.ankihub.net/api/decks/fc39e7e7-9705-4102-a6ec-90d128c64ed3/updates?since=2022-08-01T1?6%3A32%3A2"
+    assert normalize_url(url) == "https://app.ankihub.net/api/decks/<id>/updates"
+
+    url = "https://app.ankihub.net/api/note-types/2385223452/"
+    assert normalize_url(url) == "https://app.ankihub.net/api/note-types/<id>/"
