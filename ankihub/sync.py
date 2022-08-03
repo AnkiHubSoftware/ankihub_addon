@@ -9,6 +9,7 @@ from anki.errors import NotFoundError
 from anki.models import NotetypeDict, NotetypeId
 from anki.notes import Note, NoteId
 from aqt import gui_hooks, mw
+from aqt.utils import showInfo
 
 from . import LOGGER, constants
 from .addon_ankihub_client import AddonAnkiHubClient as AnkiHubClient
@@ -32,12 +33,39 @@ def sync_with_ankihub() -> None:
 
     create_backup_with_progress()
 
-    for ankihub_did in config.private_config.decks.keys():
-        success = sync_deck_with_ankihub(ankihub_did)
+    for ankihub_did, deck_info in config.private_config.decks.items():
+        success = None
+        try:
+            success = sync_deck_with_ankihub(ankihub_did)
+        except AnkiHubRequestError as e:
+            if "/updates" not in e.response.url:
+                raise e
+
+            if e.response.status_code == 403:
+                url_view_deck = f"{constants.URL_VIEW_DECK}{ankihub_did}"
+                mw.taskman.run_on_main(
+                    lambda: showInfo(
+                        f"Please subscribe to the \"{deck_info['name']}\" deck on the AnkiHub website to "
+                        "be able to sync.<br><br>"
+                        f'Link to the deck: <a href="{url_view_deck}">{url_view_deck}</a>',
+                    )
+                )
+                return
+            elif e.response.status_code == 404:
+                mw.taskman.run_on_main(
+                    lambda: showInfo(
+                        f"The deck \"{deck_info['name']}\" does not exist on the AnkiHub website. "
+                        f"Remove it from the subscribed decks to be able to sync.<br><br>"
+                        f"deck id: <i>{ankihub_did}</i>",
+                    )
+                )
+                return
+            raise e
+
         if not success:
             # Should we restore from backup on a failure?
             # Also it would probably be good to count the number of updated notes and decks and display that to the user
-            break
+            return
 
 
 def sync_deck_with_ankihub(ankihub_did: str) -> bool:
