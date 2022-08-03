@@ -111,7 +111,7 @@ class AnkiHubLogin(QWidget):
             LOGGER.exception("AnkiHub login failed.")
             config.save_token("")
 
-            if e.response.status_code in [401, 403]:
+            if e.response.status_code == 400:
                 tooltip("Wrong credentials.", parent=mw)
                 return
 
