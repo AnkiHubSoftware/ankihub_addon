@@ -44,7 +44,7 @@ def sync_with_ankihub() -> None:
             if e.response.status_code == 403:
                 url_view_deck = f"{constants.URL_VIEW_DECK}{ankihub_did}"
                 mw.taskman.run_on_main(
-                    lambda: showInfo(
+                    lambda: showInfo(  # type: ignore
                         f"Please subscribe to the \"{deck_info['name']}\" deck on the AnkiHub website to "
                         "be able to sync.<br><br>"
                         f'Link to the deck: <a href="{url_view_deck}">{url_view_deck}</a>',
@@ -56,7 +56,7 @@ def sync_with_ankihub() -> None:
                 return
             elif e.response.status_code == 404:
                 mw.taskman.run_on_main(
-                    lambda: showInfo(
+                    lambda: showInfo(  # type: ignore
                         f"The deck \"{deck_info['name']}\" does not exist on the AnkiHub website. "
                         f"Remove it from the subscribed decks to be able to sync.<br><br>"
                         f"deck id: <i>{ankihub_did}</i>",
