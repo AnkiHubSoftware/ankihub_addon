@@ -325,7 +325,7 @@ def fetch_remote_note_types(
     mids: Iterable[NotetypeId],
 ) -> Dict[NotetypeId, NotetypeDict]:
     client = AnkiHubClient()
-    result = {mid: NotetypeDict(client.get_note_type(mid)) for mid in mids}
+    result = {mid: client.get_note_type(mid) for mid in mids}
     return result
 
 
