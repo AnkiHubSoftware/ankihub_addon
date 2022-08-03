@@ -1,4 +1,5 @@
 import uuid
+from pprint import pformat
 from typing import List
 
 import anki
@@ -9,7 +10,7 @@ from aqt.addcards import AddCards
 from aqt.editor import Editor
 from aqt.utils import chooseList, showInfo, showText, tooltip
 
-from .. import constants
+from .. import LOGGER, constants
 from ..addon_ankihub_client import AddonAnkiHubClient as AnkiHubClient
 from ..ankihub_client import AnkiHubRequestError
 from ..config import config
@@ -41,6 +42,7 @@ def on_suggestion_button_press(editor: Editor) -> None:
                 ),
                 title="Problem with suggestion",
             )
+            LOGGER.debug(f"Can't submit suggestion due to: {pformat(error_messages)}")
             return
         raise e
 
