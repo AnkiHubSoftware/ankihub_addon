@@ -41,8 +41,8 @@ def test_editor(anki_session_with_addon: AnkiSession, requests_mock, monkeypatch
         AnkiHubCommands,
     )
     from ankihub.gui.editor import (
-        on_ankihub_button_press,
-        refresh_ankihub_button,
+        on_suggestion_button_press,
+        refresh_suggestion_button,
         setup,
     )
 
@@ -69,7 +69,7 @@ def test_editor(anki_session_with_addon: AnkiSession, requests_mock, monkeypatch
 
     monkeypatch.setattr("ankihub.gui.editor.SuggestionDialog.exec", Mock())
 
-    # when the decks in the config are empty on_ankihub_button_press returns early
+    # when the decks in the config are empty on_suggestion_button_press returns early
     monkeypatch.setattr(
         "ankihub.gui.editor.config.private_config.decks", {str(UUID_1): Mock()}
     )
@@ -78,15 +78,15 @@ def test_editor(anki_session_with_addon: AnkiSession, requests_mock, monkeypatch
     # it could be any deck, we just don't want the dialog to open
     monkeypatch.setattr("ankihub.gui.editor.chooseList", lambda *args, **kwargs: 0)
 
-    refresh_ankihub_button(editor)
+    refresh_suggestion_button(editor)
     assert editor.ankihub_command == AnkiHubCommands.NEW.value
-    on_ankihub_button_press(editor)
+    on_suggestion_button_press(editor)
 
     field_value[ANKIHUB_NOTE_TYPE_FIELD_NAME] = str(ankihub_note_uuid)
 
-    refresh_ankihub_button(editor)
+    refresh_suggestion_button(editor)
     assert editor.ankihub_command == AnkiHubCommands.CHANGE.value
-    on_ankihub_button_press(editor)
+    on_suggestion_button_press(editor)
 
     # This test is quite limited since we don't know how to run this test with a
     # "real," editor, instead of the manually instantiated one above. So for

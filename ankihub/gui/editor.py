@@ -7,10 +7,11 @@ from anki.models import NoteType
 from aqt import gui_hooks
 from aqt.addcards import AddCards
 from aqt.editor import Editor
-from aqt.utils import chooseList, showText, tooltip
+from aqt.utils import chooseList, showInfo, showText, tooltip
 
 from .. import constants
 from ..addon_ankihub_client import AddonAnkiHubClient as AnkiHubClient
+from ..ankihub_client import AnkiHubRequestError
 from ..config import config
 from ..constants import (
     ANKI_MINOR,
@@ -21,12 +22,30 @@ from ..constants import (
 from .suggestion_dialog import SuggestionDialog
 
 
-def on_ankihub_button_press(editor: Editor) -> None:
+def on_suggestion_button_press(editor: Editor) -> None:
     """
     Action to be performed when the AnkiHub icon button is clicked or when
     the hotkey is pressed.
     """
 
+    try:
+        on_suggestion_button_press_inner(editor)
+    except AnkiHubRequestError as e:
+        if "suggestion" in e.response.url and e.response.status_code == 400:
+            error_messages = e.response.json()["non_field_errors"]
+            newline = "\n"  # fstring expression parts can't contain backslashes
+            showInfo(
+                text=(
+                    "There are some problems with this suggestion:<br><br>"
+                    f"<b>{newline.join(error_messages)}</b>"
+                ),
+                title="Problem with suggestion",
+            )
+            return
+        raise e
+
+
+def on_suggestion_button_press_inner(editor: Editor) -> None:
     # The command is expected to have been set at this point already, either by
     # fetching the default or by selecting a command from the dropdown menu.
     command = editor.ankihub_command  # type: ignore
@@ -72,7 +91,7 @@ def on_ankihub_button_press(editor: Editor) -> None:
             return
         elif len(subscribed_decks) == 1:
             (decks,) = subscribed_decks.items()
-            ankihub_deck_uuid, deck = decks
+            ankihub_deck_uuid, _ = decks
         else:
             choice = chooseList(
                 "Which AnKiHub deck would you like to add this note to?",
@@ -125,7 +144,7 @@ def setup_editor_buttons(buttons: List[str], editor: Editor) -> None:
     button = editor.addButton(
         img,
         "CH",
-        on_ankihub_button_press,
+        on_suggestion_button_press,
         tip="Send your request to AnkiHub ({})".format(hotkey),
         label='<span id="ankihub-btn-label" style="vertical-align: top;"></span>',
         id="ankihub-btn",
@@ -179,7 +198,7 @@ def hide_ankihub_field_in_editor(
     return js
 
 
-def refresh_ankihub_button(editor: Editor) -> None:
+def refresh_suggestion_button(editor: Editor) -> None:
     """Set ankihub button label based on whether ankihub_id field is empty"""
     note = editor.note
     disable_btn_script = "document.getElementById('ankihub-btn').disabled={};"
@@ -208,13 +227,13 @@ def on_add_cards_init(add_cards: AddCards) -> None:
 
 def on_add_cards_change_notetype(old: NoteType, new: NoteType) -> None:
     global editor
-    refresh_ankihub_button(editor)
+    refresh_suggestion_button(editor)
 
 
 def setup() -> None:
     gui_hooks.editor_did_init_buttons.append(setup_editor_buttons)
     gui_hooks.editor_will_load_note.append(hide_ankihub_field_in_editor)
-    gui_hooks.editor_did_load_note.append(refresh_ankihub_button)
+    gui_hooks.editor_did_load_note.append(refresh_suggestion_button)
     gui_hooks.add_cards_did_init.append(on_add_cards_init)
     gui_hooks.add_cards_did_change_note_type.append(on_add_cards_change_notetype)
     Editor.ankihub_command = AnkiHubCommands.CHANGE.value  # type: ignore
