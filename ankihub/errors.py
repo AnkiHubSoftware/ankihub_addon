@@ -6,7 +6,6 @@ from types import TracebackType
 from typing import Type
 
 from aqt import mw
-from aqt.gui_hooks import main_window_did_init
 from aqt.utils import tooltip
 from requests.exceptions import ConnectionError
 
@@ -74,7 +73,7 @@ def maybe_handle_ankihub_request_error(error: AnkiHubRequestError) -> bool:
     return False
 
 
-def overwrite_excepthook():
+def setup_error_handler():
     def excepthook(
         etype: Type[BaseException], val: Exception, tb: TracebackType
     ) -> None:
@@ -90,7 +89,3 @@ def overwrite_excepthook():
 
     original_except_hook = sys.excepthook
     sys.excepthook = excepthook
-
-
-def setup_error_handler():
-    main_window_did_init.append(overwrite_excepthook)
