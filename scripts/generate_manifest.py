@@ -22,8 +22,8 @@ def generate_manifest():
         "version": addon_version,
         "homepage": addon_properties["contact"],
         "conflicts": addon_properties["conflicts"],
-        "min_point_version": addon_properties["min_anki_version"],
-        "max_point_version": addon_properties["tested_anki_version"],
+        "min_point_version": addon_properties["min_anki_version"].split(".")[-1],
+        "max_point_version": addon_properties["tested_anki_version"].split(".")[-1],
     }
     json.dump(manifest, MANIFEST_FILE.open("w"), indent=4)
 
