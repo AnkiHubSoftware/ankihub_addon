@@ -2,6 +2,7 @@ import json
 import uuid
 from concurrent.futures import Future
 from pprint import pformat
+from time import sleep
 from typing import Any, Dict, Iterable, List, Optional, Set, Tuple
 
 from anki.decks import DeckId
@@ -9,12 +10,13 @@ from anki.errors import NotFoundError
 from anki.models import NotetypeDict, NotetypeId
 from anki.notes import Note, NoteId
 from aqt import gui_hooks, mw
-from aqt.utils import tooltip
+from aqt.utils import showInfo, tooltip
 
 from . import LOGGER, constants
 from .addon_ankihub_client import AddonAnkiHubClient as AnkiHubClient
 from .addon_ankihub_client import AnkiHubRequestError
 from .config import config
+from .constants import ANKI_MINOR
 from .db import AnkiHubDB
 from .utils import (
     create_backup_with_progress,
@@ -37,13 +39,18 @@ class AnkiHubSync:
 
         create_backup_with_progress()
 
-        for ankihub_did in config.private_config.decks.keys():
-            success = self.sync_deck(ankihub_did)
-            if not success:
-                # Should we restore from backup on a failure?
-                break
+        for ankihub_did, deck_info in config.private_config.decks.items():
+            try:
+                should_continue = self._sync_deck(ankihub_did)
+                if not should_continue:
+                    return
+            except AnkiHubRequestError as e:
+                if self._handle_exception(e, ankihub_did, deck_info):
+                    return
+                else:
+                    raise e
 
-    def sync_deck(self, ankihub_did: str) -> bool:
+    def _sync_deck(self, ankihub_did: str) -> bool:
         deck = config.private_config.decks[ankihub_did]
         client = AnkiHubClient()
         notes_data = []
@@ -74,6 +81,39 @@ class AnkiHubSync:
             LOGGER.debug(f"No new updates to sync for {ankihub_did=}")
 
         return True
+
+    def _handle_exception(
+        self, exc: AnkiHubRequestError, ankihub_did: str, deck_info: Dict
+    ) -> bool:
+        # returns True if the exception was handled
+
+        if "/updates" not in exc.response.url:
+            return False
+
+        if exc.response.status_code == 403:
+            url_view_deck = f"{constants.URL_VIEW_DECK}{ankihub_did}"
+            mw.taskman.run_on_main(
+                lambda: showInfo(  # type: ignore
+                    f"Please subscribe to the \"{deck_info['name']}\" deck on the AnkiHub website to "
+                    "be able to sync.<br><br>"
+                    f'Link to the deck: <a href="{url_view_deck}">{url_view_deck}</a>',
+                )
+            )
+            LOGGER.debug(
+                "Unable to sync because of user not being subscribed to a deck."
+            )
+            return True
+        elif exc.response.status_code == 404:
+            mw.taskman.run_on_main(
+                lambda: showInfo(  # type: ignore
+                    f"The deck \"{deck_info['name']}\" does not exist on the AnkiHub website. "
+                    f"Remove it from the subscribed decks to be able to sync.<br><br>"
+                    f"deck id: <i>{ankihub_did}</i>",
+                )
+            )
+            LOGGER.debug("Unable to sync because a deck doesn't exist on AnkiHub.")
+            return True
+        return False
 
 
 def import_ankihub_deck(
@@ -417,9 +457,21 @@ def sync_with_progress() -> None:
 
     sync = AnkiHubSync()
 
+    def sync_with_ankihub_after_delay():
+
+        # sync_with_ankihub creates a backup before syncing and creating a backup requires to close
+        # the collection in Anki versions lower than 2.1.50.
+        # When other add-ons try to access the collection while it is closed they will get an error.
+        # Many add-ons are added to the profile_did_open hook so we can wait until they will probably finish
+        # and sync then.
+        # Another way to deal with that is to tell users to set the sync_on_startup option to false and
+        # to sync manually.
+        if ANKI_MINOR < 50:
+            sleep(3)
+
+        sync.sync_all_decks()
+
     def on_done(future: Future):
-        # Don't raise exception when attempting to sync with AnkiHub
-        # without an Internet connection.
         if exc := future.exception():
             LOGGER.debug("Unable to sync.")
             raise exc
@@ -433,7 +485,7 @@ def sync_with_progress() -> None:
 
     if config.private_config.token:
         mw.taskman.with_progress(
-            lambda: sync.sync_all_decks(),
+            lambda: sync_with_ankihub_after_delay(),
             label="Synchronizing with AnkiHub",
             on_done=on_done,
             parent=mw,

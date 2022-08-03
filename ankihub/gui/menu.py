@@ -107,12 +107,15 @@ class AnkiHubLogin(QWidget):
             response = ankihub_client.login(
                 credentials={"username": username, "password": password}
             )
-        except AnkiHubRequestError:
-            # wrong credentials or other error when calling /login/
+        except AnkiHubRequestError as e:
             LOGGER.exception("AnkiHub login failed.")
             config.save_token("")
-            tooltip("Wrong credentials.", parent=mw)
-            return
+
+            if e.response.status_code == 400:
+                tooltip("Wrong credentials.", parent=mw)
+                return
+
+            raise e
 
         data = response.json()
         token = data.get("token")
