@@ -50,6 +50,9 @@ def sync_with_ankihub() -> None:
                         f'Link to the deck: <a href="{url_view_deck}">{url_view_deck}</a>',
                     )
                 )
+                LOGGER.debug(
+                    "Unable to sync because of user not being subscribed to a deck."
+                )
                 return
             elif e.response.status_code == 404:
                 mw.taskman.run_on_main(
@@ -59,6 +62,7 @@ def sync_with_ankihub() -> None:
                         f"deck id: <i>{ankihub_did}</i>",
                     )
                 )
+                LOGGER.debug("Unable to sync because a deck doesn't exist on AnkiHub.")
                 return
             raise e
 
@@ -439,8 +443,6 @@ def reset_note_types_of_notes_based_on_notes_data(notes_data: List[Dict]) -> Non
 
 def sync_with_progress() -> None:
     def on_done(future: Future):
-        # Don't raise exception when attempting to sync with AnkiHub
-        # without an Internet connection.
         if exc := future.exception():
             LOGGER.debug("Unable to sync.")
             raise exc
