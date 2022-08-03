@@ -2,6 +2,7 @@ import json
 import uuid
 from concurrent.futures import Future
 from pprint import pformat
+from time import sleep
 from typing import Any, Dict, Iterable, List, Optional, Set, Tuple
 
 from anki.decks import DeckId
@@ -15,6 +16,7 @@ from . import LOGGER, constants
 from .addon_ankihub_client import AddonAnkiHubClient as AnkiHubClient
 from .addon_ankihub_client import AnkiHubRequestError
 from .config import config
+from .constants import ANKI_MINOR
 from .db import AnkiHubDB
 from .utils import (
     create_backup_with_progress,
@@ -449,9 +451,23 @@ def sync_with_progress() -> None:
         else:
             mw.reset()
 
+    def sync_with_ankihub_after_delay():
+
+        # sync_with_ankihub creates a backup before syncing and creating a backup requires to close
+        # the collection in Anki versions lower than 2.1.50.
+        # When other add-ons try to access the collection while it is closed they will get an error.
+        # Many add-ons are added to the profile_did_open hook so we can wait until they will probably finish
+        # and sync then.
+        # Another way to deal with that is to tell users to set the sync_on_startup option to false and
+        # to sync manually.
+        if ANKI_MINOR < 50:
+            sleep(3)
+
+        sync_with_ankihub()
+
     if config.private_config.token:
         mw.taskman.with_progress(
-            lambda: sync_with_ankihub(),
+            lambda: sync_with_ankihub_after_delay(),
             label="Synchronizing with AnkiHub",
             on_done=on_done,
             parent=mw,
