@@ -1,6 +1,7 @@
 import uuid
 from concurrent.futures import Future
 from pprint import pformat
+from time import sleep
 from typing import Dict, Iterable, List, Optional, Set, Tuple
 
 from anki.decks import DeckId
@@ -8,11 +9,13 @@ from anki.errors import NotFoundError
 from anki.models import NotetypeDict, NotetypeId
 from anki.notes import Note, NoteId
 from aqt import gui_hooks, mw
+from aqt.utils import showInfo
 
 from . import LOGGER, constants
 from .addon_ankihub_client import AddonAnkiHubClient as AnkiHubClient
 from .ankihub_client import AnkiHubRequestError, FieldUpdate, NoteUpdate
 from .config import config
+from .constants import ANKI_MINOR
 from .db import AnkiHubDB
 from .utils import (
     create_backup_with_progress,
@@ -31,12 +34,43 @@ def sync_with_ankihub() -> None:
 
     create_backup_with_progress()
 
-    for ankihub_did in config.private_config.decks.keys():
-        success = sync_deck_with_ankihub(ankihub_did)
+    for ankihub_did, deck_info in config.private_config.decks.items():
+        success = None
+        try:
+            success = sync_deck_with_ankihub(ankihub_did)
+        except AnkiHubRequestError as e:
+            if "/updates" not in e.response.url:
+                raise e
+
+            if e.response.status_code == 403:
+                url_view_deck = f"{constants.URL_VIEW_DECK}{ankihub_did}"
+                mw.taskman.run_on_main(
+                    lambda: showInfo(  # type: ignore
+                        f"Please subscribe to the \"{deck_info['name']}\" deck on the AnkiHub website to "
+                        "be able to sync.<br><br>"
+                        f'Link to the deck: <a href="{url_view_deck}">{url_view_deck}</a>',
+                    )
+                )
+                LOGGER.debug(
+                    "Unable to sync because of user not being subscribed to a deck."
+                )
+                return
+            elif e.response.status_code == 404:
+                mw.taskman.run_on_main(
+                    lambda: showInfo(  # type: ignore
+                        f"The deck \"{deck_info['name']}\" does not exist on the AnkiHub website. "
+                        f"Remove it from the subscribed decks to be able to sync.<br><br>"
+                        f"deck id: <i>{ankihub_did}</i>",
+                    )
+                )
+                LOGGER.debug("Unable to sync because a deck doesn't exist on AnkiHub.")
+                return
+            raise e
+
         if not success:
             # Should we restore from backup on a failure?
             # Also it would probably be good to count the number of updated notes and decks and display that to the user
-            break
+            return
 
 
 def sync_deck_with_ankihub(ankihub_did: str) -> bool:
@@ -366,17 +400,29 @@ def reset_note_types_of_notes_based_on_notes_data(notes_data: List[NoteUpdate]) 
 
 def sync_with_progress() -> None:
     def on_done(future: Future):
-        # Don't raise exception when attempting to sync with AnkiHub
-        # without an Internet connection.
         if exc := future.exception():
             LOGGER.debug("Unable to sync.")
             raise exc
         else:
             mw.reset()
 
+    def sync_with_ankihub_after_delay():
+
+        # sync_with_ankihub creates a backup before syncing and creating a backup requires to close
+        # the collection in Anki versions lower than 2.1.50.
+        # When other add-ons try to access the collection while it is closed they will get an error.
+        # Many add-ons are added to the profile_did_open hook so we can wait until they will probably finish
+        # and sync then.
+        # Another way to deal with that is to tell users to set the sync_on_startup option to false and
+        # to sync manually.
+        if ANKI_MINOR < 50:
+            sleep(3)
+
+        sync_with_ankihub()
+
     if config.private_config.token:
         mw.taskman.with_progress(
-            lambda: sync_with_ankihub(),
+            lambda: sync_with_ankihub_after_delay(),
             label="Synchronizing with AnkiHub",
             on_done=on_done,
             parent=mw,
