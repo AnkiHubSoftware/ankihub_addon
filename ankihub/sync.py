@@ -430,25 +430,61 @@ def rename_note_types(remote_note_types: Dict[NotetypeId, NotetypeDict]) -> None
 def ensure_local_and_remote_fields_are_same(
     remote_note_types: Dict[NotetypeId, NotetypeDict]
 ) -> None:
+    def field_tuples(flds: List[Dict]) -> List[Tuple[int, str]]:
+        return [(field["ord"], field["name"]) for field in flds]
 
     note_types_with_field_conflicts: List[Tuple[NotetypeDict, NotetypeDict]] = []
     for mid, remote_note_type in remote_note_types.items():
         local_note_type = mw.col.models.get(mid)
 
-        def field_tuples(note_type: NotetypeDict) -> List[Tuple[int, str]]:
-            return [(field["ord"], field["name"]) for field in note_type["flds"]]
-
-        if not field_tuples(local_note_type) == field_tuples(remote_note_type):
+        if not field_tuples(local_note_type["flds"]) == field_tuples(
+            remote_note_type["flds"]
+        ):
             LOGGER.debug(
                 f'Fields of local note type "{local_note_type["name"]}" differ from remote note_type. '
-                f"local:\n{pformat(field_tuples(local_note_type))}\nremote:\n{pformat(field_tuples(remote_note_type))}"
+                f"local:\n{pformat(field_tuples(local_note_type['flds']))}\n"
+                f"remote:\n{pformat(field_tuples(remote_note_type['flds']))}"
             )
             note_types_with_field_conflicts.append((local_note_type, remote_note_type))
 
     for local_note_type, remote_note_type in note_types_with_field_conflicts:
-        local_note_type["flds"] = remote_note_type["flds"]
+        LOGGER.debug(f"Adjusting fields of {local_note_type['name']}...")
+
+        local_note_type["flds"] = adjust_field_ords(
+            local_note_type["flds"], remote_note_type["flds"]
+        )
+        LOGGER.debug(
+            f"Fields after adjusting ords:\n{pformat(field_tuples(local_note_type['flds']))}"
+        )
+
         mw.col.models.update_dict(local_note_type)
-        LOGGER.debug(f"Updated fields of note type {local_note_type}.")
+        LOGGER.debug(
+            f"Fields after updating the model:\n"
+            f"{pformat(field_tuples(mw.col.models.get(local_note_type['id'])['flds']))}"
+        )
+
+
+def adjust_field_ords(
+    cur_model_flds: List[Dict], new_model_flds: List[Dict]
+) -> List[Dict]:
+    # This makes sure that when fields get added or are moved field contents end up
+    # in the field with the same name as before.
+    # This is relevant because people can protect fields.
+    # Note that the result will have exactly the same set of field names as the new_model,
+    # just the ords will be adjusted.
+    for fld in new_model_flds:
+        if (
+            cur_ord := next(
+                (_fld["ord"] for _fld in cur_model_flds if _fld["name"] == fld["name"]),
+                None,
+            )
+        ) is not None:
+            fld["ord"] = cur_ord
+        else:
+            # it's okay to assign this to multiple fields because the
+            # backend assigns new ords equal to the fields index
+            fld["ord"] = len(new_model_flds) - 1
+    return new_model_flds
 
 
 def reset_note_types_of_notes_based_on_notes_data(notes_data: List[Dict]) -> None:
