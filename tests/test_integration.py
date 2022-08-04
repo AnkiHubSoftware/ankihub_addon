@@ -575,6 +575,14 @@ def test_import_new_ankihub_deck(anki_session_with_addon: AnkiSession):
         )
 
 
+def assert_that_only_ankihub_sample_deck_info_in_database(ankihub_deck_uuid: uuid.UUID):
+    from ankihub.db import AnkiHubDB
+
+    db = AnkiHubDB()
+    assert db.ankihub_deck_ids() == [str(ankihub_deck_uuid)]
+    assert len(db.notes_for_ankihub_deck(str(ankihub_deck_uuid))) == 3
+
+
 def test_import_existing_ankihub_deck(anki_session_with_addon: AnkiSession):
     from aqt import mw
 
@@ -613,14 +621,6 @@ def test_import_existing_ankihub_deck(anki_session_with_addon: AnkiSession):
         assert_that_only_ankihub_sample_deck_info_in_database(
             ankihub_deck_uuid=ankihub_deck_uuid
         )
-
-
-def assert_that_only_ankihub_sample_deck_info_in_database(ankihub_deck_uuid: uuid.UUID):
-    from ankihub.db import AnkiHubDB
-
-    db = AnkiHubDB()
-    assert db.ankihub_deck_ids() == [str(ankihub_deck_uuid)]
-    assert len(db.notes_for_ankihub_deck(str(ankihub_deck_uuid))) == 3
 
 
 def test_import_existing_ankihub_deck_2(anki_session_with_addon: AnkiSession):
@@ -663,6 +663,57 @@ def test_import_existing_ankihub_deck_2(anki_session_with_addon: AnkiSession):
         # no notes should be changed because they already exist
         assert ankihub_importer.num_notes_created == 0
         assert ankihub_importer.num_notes_updated == 0
+
+        assert_that_only_ankihub_sample_deck_info_in_database(
+            ankihub_deck_uuid=ankihub_deck_uuid
+        )
+
+
+def test_import_existing_ankihub_deck_3(anki_session_with_addon: AnkiSession):
+    from aqt import mw
+
+    from ankihub.sync import AnkiHubImporter
+    from ankihub.utils import all_dids
+
+    anki_session = anki_session_with_addon
+    with anki_session.profile_loaded():
+
+        # import the apkg
+        file = str(ANKIHUB_SAMPLE_DECK_PATH.absolute())
+        importer = AnkiPackageImporter(mw.col, file)
+        importer.run()
+        existing_did = mw.col.decks.id_for_name("Testdeck")
+
+        # modify two notes
+        note_1 = mw.col.get_note(1608240057545)
+        note_1["Front"] = "new front"
+
+        note_2 = mw.col.get_note(1656968819662)
+        note_2.tags.append("foo")
+
+        mw.col.update_notes([note_1, note_2])
+
+        # delete one note
+        mw.col.remove_notes([1608240029527])
+
+        ankihub_deck_uuid = UUID_1
+        dids_before_import = all_dids()
+        ankihub_importer = AnkiHubImporter()
+        local_did = ankihub_importer._import_ankihub_deck_inner(
+            ankihub_did=str(ankihub_deck_uuid),
+            notes_data=ANKIHUB_SAMPLE_DECK_NOTES_DATA,
+            deck_name="test",
+            remote_note_types={},
+            protected_fields={},
+            protected_tags=[],
+        )
+        new_dids = all_dids() - dids_before_import
+
+        assert not new_dids
+        assert local_did == existing_did
+
+        assert ankihub_importer.num_notes_created == 1
+        assert ankihub_importer.num_notes_updated == 2
 
         assert_that_only_ankihub_sample_deck_info_in_database(
             ankihub_deck_uuid=ankihub_deck_uuid
