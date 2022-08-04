@@ -183,8 +183,9 @@ def test_upload_deck(anki_session_with_addon: AnkiSession, monkeypatch):
     # check if moving cards temporarily from filtered decks into the main deck doesn't throw errors
     # and if the cards are moved back to the filtered decks at the end
     with anki_session_with_addon.profile_loaded():
-        from ankihub.register_decks import upload_deck
         from aqt import mw
+
+        from ankihub.register_decks import upload_deck
 
         # create a deck
         main_did = mw.col.decks.add_normal_deck_with_name("main").id
@@ -534,7 +535,7 @@ def test_reset_note_types_of_notes(anki_session_with_addon: AnkiSession):
 def test_import_new_ankihub_deck(anki_session_with_addon: AnkiSession):
     from aqt import mw
 
-    from ankihub.sync import import_ankihub_deck_inner
+    from ankihub.sync import AnkiHubImporter
     from ankihub.utils import all_dids
 
     anki_session = anki_session_with_addon
@@ -548,7 +549,8 @@ def test_import_new_ankihub_deck(anki_session_with_addon: AnkiSession):
 
         ankihub_deck_uuid = UUID_1
         dids_before_import = all_dids()
-        local_did = import_ankihub_deck_inner(
+        ankihub_importer = AnkiHubImporter()
+        local_did = ankihub_importer._import_ankihub_deck_inner(
             ankihub_did=str(ankihub_deck_uuid),
             notes_data=ankihub_sample_deck_notes_data,
             deck_name="test",
@@ -571,7 +573,7 @@ def test_import_new_ankihub_deck(anki_session_with_addon: AnkiSession):
 def test_import_existing_ankihub_deck(anki_session_with_addon: AnkiSession):
     from aqt import mw
 
-    from ankihub.sync import import_ankihub_deck_inner
+    from ankihub.sync import AnkiHubImporter
     from ankihub.utils import all_dids
 
     anki_session = anki_session_with_addon
@@ -585,7 +587,8 @@ def test_import_existing_ankihub_deck(anki_session_with_addon: AnkiSession):
 
         ankihub_deck_uuid = UUID_1
         dids_before_import = all_dids()
-        local_did = import_ankihub_deck_inner(
+        ankihub_importer = AnkiHubImporter()
+        local_did = ankihub_importer._import_ankihub_deck_inner(
             ankihub_did=str(ankihub_deck_uuid),
             notes_data=ankihub_sample_deck_notes_data,
             deck_name="test",
@@ -614,7 +617,7 @@ def assert_that_only_ankihub_sample_deck_info_in_database(ankihub_deck_uuid: uui
 def test_import_existing_ankihub_deck_2(anki_session_with_addon: AnkiSession):
     from aqt import mw
 
-    from ankihub.sync import import_ankihub_deck_inner
+    from ankihub.sync import AnkiHubImporter
     from ankihub.utils import all_dids
 
     anki_session = anki_session_with_addon
@@ -632,7 +635,8 @@ def test_import_existing_ankihub_deck_2(anki_session_with_addon: AnkiSession):
 
         ankihub_deck_uuid = UUID_1
         dids_before_import = all_dids()
-        local_did = import_ankihub_deck_inner(
+        ankihub_importer = AnkiHubImporter()
+        local_did = ankihub_importer._import_ankihub_deck_inner(
             ankihub_did=str(ankihub_deck_uuid),
             notes_data=ankihub_sample_deck_notes_data,
             deck_name="test",
@@ -654,7 +658,7 @@ def test_import_existing_ankihub_deck_2(anki_session_with_addon: AnkiSession):
 def test_update_ankihub_deck(anki_session_with_addon: AnkiSession):
     from aqt import mw
 
-    from ankihub.sync import import_ankihub_deck_inner
+    from ankihub.sync import AnkiHubImporter
     from ankihub.utils import all_dids
 
     anki_session = anki_session_with_addon
@@ -664,7 +668,8 @@ def test_update_ankihub_deck(anki_session_with_addon: AnkiSession):
 
         ankihub_deck_uuid = UUID_1
         dids_before_import = all_dids()
-        second_local_did = import_ankihub_deck_inner(
+        ankihub_importer = AnkiHubImporter()
+        second_local_did = ankihub_importer._import_ankihub_deck_inner(
             ankihub_did=str(ankihub_deck_uuid),
             notes_data=ankihub_sample_deck_notes_data,
             deck_name="test",
@@ -688,7 +693,7 @@ def test_update_ankihub_deck_when_deck_was_deleted(
 ):
     from aqt import mw
 
-    from ankihub.sync import import_ankihub_deck_inner
+    from ankihub.sync import AnkiHubImporter
     from ankihub.utils import all_dids
 
     anki_session = anki_session_with_addon
@@ -704,7 +709,8 @@ def test_update_ankihub_deck_when_deck_was_deleted(
 
         ankihub_deck_uuid = UUID_1
         dids_before_import = all_dids()
-        second_local_id = import_ankihub_deck_inner(
+        ankihub_importer = AnkiHubImporter()
+        second_local_id = ankihub_importer._import_ankihub_deck_inner(
             ankihub_did=str(ankihub_deck_uuid),
             notes_data=ankihub_sample_deck_notes_data,
             deck_name="test",
@@ -763,7 +769,7 @@ def test_unsubsribe_from_deck(anki_session_with_addon: AnkiSession):
 
 
 def import_sample_ankihub_deck(mw: aqt.AnkiQt, ankihub_did: Optional[str] = None):
-    from ankihub.sync import import_ankihub_deck_inner
+    from ankihub.sync import AnkiHubImporter
     from ankihub.utils import all_dids
 
     if ankihub_did is None:
@@ -776,7 +782,8 @@ def import_sample_ankihub_deck(mw: aqt.AnkiQt, ankihub_did: Optional[str] = None
     mw.col.decks.remove([mw.col.decks.id_for_name("Testdeck")])
 
     dids_before_import = all_dids()
-    local_did = import_ankihub_deck_inner(
+    importer = AnkiHubImporter()
+    local_did = importer._import_ankihub_deck_inner(
         ankihub_did=ankihub_did,
         notes_data=ankihub_sample_deck_notes_data,
         deck_name="test",
@@ -793,7 +800,7 @@ def import_sample_ankihub_deck(mw: aqt.AnkiQt, ankihub_did: Optional[str] = None
 
 
 def test_prepare_note(anki_session_with_addon: AnkiSession):
-    from ankihub.sync import prepare_note
+    from ankihub.sync import AnkiHubImporter
     from ankihub.utils import modify_note_type
 
     anki_session = anki_session_with_addon
@@ -815,7 +822,8 @@ def test_prepare_note(anki_session_with_addon: AnkiSession):
         note.tags = ["a", "b"]
 
         # prepare_note
-        prepare_note(
+        ankihub_importer = AnkiHubImporter()
+        ankihub_importer.prepare_note(
             note=note,
             ankihub_id="1",
             fields=[
