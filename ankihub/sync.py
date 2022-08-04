@@ -2,6 +2,7 @@ import json
 import uuid
 from concurrent.futures import Future
 from pprint import pformat
+from time import sleep
 from typing import Any, Dict, Iterable, List, Optional, Set, Tuple
 
 from anki.decks import DeckId
@@ -9,11 +10,13 @@ from anki.errors import NotFoundError
 from anki.models import NotetypeDict, NotetypeId
 from anki.notes import Note, NoteId
 from aqt import gui_hooks, mw
+from aqt.utils import showInfo
 
 from . import LOGGER, constants
 from .addon_ankihub_client import AddonAnkiHubClient as AnkiHubClient
 from .addon_ankihub_client import AnkiHubRequestError
 from .config import config
+from .constants import ANKI_MINOR
 from .db import AnkiHubDB
 from .utils import (
     create_backup_with_progress,
@@ -32,12 +35,43 @@ def sync_with_ankihub() -> None:
 
     create_backup_with_progress()
 
-    for ankihub_did in config.private_config.decks.keys():
-        success = sync_deck_with_ankihub(ankihub_did)
+    for ankihub_did, deck_info in config.private_config.decks.items():
+        success = None
+        try:
+            success = sync_deck_with_ankihub(ankihub_did)
+        except AnkiHubRequestError as e:
+            if "/updates" not in e.response.url:
+                raise e
+
+            if e.response.status_code == 403:
+                url_view_deck = f"{constants.URL_VIEW_DECK}{ankihub_did}"
+                mw.taskman.run_on_main(
+                    lambda: showInfo(  # type: ignore
+                        f"Please subscribe to the \"{deck_info['name']}\" deck on the AnkiHub website to "
+                        "be able to sync.<br><br>"
+                        f'Link to the deck: <a href="{url_view_deck}">{url_view_deck}</a>',
+                    )
+                )
+                LOGGER.debug(
+                    "Unable to sync because of user not being subscribed to a deck."
+                )
+                return
+            elif e.response.status_code == 404:
+                mw.taskman.run_on_main(
+                    lambda: showInfo(  # type: ignore
+                        f"The deck \"{deck_info['name']}\" does not exist on the AnkiHub website. "
+                        f"Remove it from the subscribed decks to be able to sync.<br><br>"
+                        f"deck id: <i>{ankihub_did}</i>",
+                    )
+                )
+                LOGGER.debug("Unable to sync because a deck doesn't exist on AnkiHub.")
+                return
+            raise e
+
         if not success:
             # Should we restore from backup on a failure?
             # Also it would probably be good to count the number of updated notes and decks and display that to the user
-            break
+            return
 
 
 def sync_deck_with_ankihub(ankihub_did: str) -> bool:
@@ -378,25 +412,61 @@ def rename_note_types(remote_note_types: Dict[NotetypeId, NotetypeDict]) -> None
 def ensure_local_and_remote_fields_are_same(
     remote_note_types: Dict[NotetypeId, NotetypeDict]
 ) -> None:
+    def field_tuples(flds: List[Dict]) -> List[Tuple[int, str]]:
+        return [(field["ord"], field["name"]) for field in flds]
 
     note_types_with_field_conflicts: List[Tuple[NotetypeDict, NotetypeDict]] = []
     for mid, remote_note_type in remote_note_types.items():
         local_note_type = mw.col.models.get(mid)
 
-        def field_tuples(note_type: NotetypeDict) -> List[Tuple[int, str]]:
-            return [(field["ord"], field["name"]) for field in note_type["flds"]]
-
-        if not field_tuples(local_note_type) == field_tuples(remote_note_type):
+        if not field_tuples(local_note_type["flds"]) == field_tuples(
+            remote_note_type["flds"]
+        ):
             LOGGER.debug(
                 f'Fields of local note type "{local_note_type["name"]}" differ from remote note_type. '
-                f"local:\n{pformat(field_tuples(local_note_type))}\nremote:\n{pformat(field_tuples(remote_note_type))}"
+                f"local:\n{pformat(field_tuples(local_note_type['flds']))}\n"
+                f"remote:\n{pformat(field_tuples(remote_note_type['flds']))}"
             )
             note_types_with_field_conflicts.append((local_note_type, remote_note_type))
 
     for local_note_type, remote_note_type in note_types_with_field_conflicts:
-        local_note_type["flds"] = remote_note_type["flds"]
+        LOGGER.debug(f"Adjusting fields of {local_note_type['name']}...")
+
+        local_note_type["flds"] = adjust_field_ords(
+            local_note_type["flds"], remote_note_type["flds"]
+        )
+        LOGGER.debug(
+            f"Fields after adjusting ords:\n{pformat(field_tuples(local_note_type['flds']))}"
+        )
+
         mw.col.models.update_dict(local_note_type)
-        LOGGER.debug(f"Updated fields of note type {local_note_type}.")
+        LOGGER.debug(
+            f"Fields after updating the model:\n"
+            f"{pformat(field_tuples(mw.col.models.get(local_note_type['id'])['flds']))}"
+        )
+
+
+def adjust_field_ords(
+    cur_model_flds: List[Dict], new_model_flds: List[Dict]
+) -> List[Dict]:
+    # This makes sure that when fields get added or are moved field contents end up
+    # in the field with the same name as before.
+    # This is relevant because people can protect fields.
+    # Note that the result will have exactly the same set of field names as the new_model,
+    # just the ords will be adjusted.
+    for fld in new_model_flds:
+        if (
+            cur_ord := next(
+                (_fld["ord"] for _fld in cur_model_flds if _fld["name"] == fld["name"]),
+                None,
+            )
+        ) is not None:
+            fld["ord"] = cur_ord
+        else:
+            # it's okay to assign this to multiple fields because the
+            # backend assigns new ords equal to the fields index
+            fld["ord"] = len(new_model_flds) - 1
+    return new_model_flds
 
 
 def reset_note_types_of_notes_based_on_notes_data(notes_data: List[Dict]) -> None:
@@ -409,17 +479,29 @@ def reset_note_types_of_notes_based_on_notes_data(notes_data: List[Dict]) -> Non
 
 def sync_with_progress() -> None:
     def on_done(future: Future):
-        # Don't raise exception when attempting to sync with AnkiHub
-        # without an Internet connection.
         if exc := future.exception():
             LOGGER.debug("Unable to sync.")
             raise exc
         else:
             mw.reset()
 
+    def sync_with_ankihub_after_delay():
+
+        # sync_with_ankihub creates a backup before syncing and creating a backup requires to close
+        # the collection in Anki versions lower than 2.1.50.
+        # When other add-ons try to access the collection while it is closed they will get an error.
+        # Many add-ons are added to the profile_did_open hook so we can wait until they will probably finish
+        # and sync then.
+        # Another way to deal with that is to tell users to set the sync_on_startup option to false and
+        # to sync manually.
+        if ANKI_MINOR < 50:
+            sleep(3)
+
+        sync_with_ankihub()
+
     if config.private_config.token:
         mw.taskman.with_progress(
-            lambda: sync_with_ankihub(),
+            lambda: sync_with_ankihub_after_delay(),
             label="Synchronizing with AnkiHub",
             on_done=on_done,
             parent=mw,

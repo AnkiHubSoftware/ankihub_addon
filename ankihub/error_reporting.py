@@ -1,5 +1,6 @@
 import dataclasses
 import os
+import re
 import time
 from concurrent.futures import Future
 from typing import Optional
@@ -64,6 +65,20 @@ def report_exception(
             for name, ctx in context.items():
                 scope.set_context(name, ctx)
 
+            if isinstance(exception, AnkiHubRequestError):
+                scope.set_context(
+                    "response",
+                    {
+                        "url": exception.response.url,
+                        "reason": exception.response.reason,
+                        "content": exception.response.content,
+                    },
+                )
+                scope.fingerprint = [
+                    "{{ default }}",
+                    normalize_url(exception.response.url),
+                ]
+
         if exception is None:
             event_id = capture_exception()
         else:
@@ -77,6 +92,17 @@ def report_exception(
         sentry_sdk.init("")
         LOGGER.debug("Sentry disabled.")
     return event_id
+
+
+def normalize_url(url: str):
+
+    # remove parameters
+    result = re.sub(r"\?.+$", "", url)
+
+    # replace ids with placeholder
+    uuid_re = r"[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}"
+    result = re.sub(rf"/({uuid_re}|[0-9]+)", "/<id>", result)
+    return result
 
 
 def upload_logs_in_background() -> str:
