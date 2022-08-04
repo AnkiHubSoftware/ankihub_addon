@@ -274,15 +274,17 @@ class AnkiHubImporter:
                 mw.col.update_note(note)
                 self.num_notes_updated += 1
                 LOGGER.debug(f"Updated note: {anki_id=}")
+            else:
+                LOGGER.debug(f"No changes, skipping {anki_id=}")
         except NotFoundError:
             note_type = mw.col.models.get(NotetypeId(note_type_id))
             note = mw.col.new_note(note_type)
-            if self.prepare_note(
+            self.prepare_note(
                 note, ankihub_id, fields, tags, protected_fields, protected_tags
-            ):
-                note = create_note_with_id(note, anki_id, anki_did)
-                self.num_notes_created += 1
-                LOGGER.debug(f"Created note: {anki_id=}")
+            )
+            note = create_note_with_id(note, anki_id, anki_did)
+            self.num_notes_created += 1
+            LOGGER.debug(f"Created note: {anki_id=}")
         return note
 
     def prepare_note(
@@ -310,7 +312,7 @@ class AnkiHubImporter:
         note.tags = updated_tags(
             cur_tags=note.tags, incoming_tags=tags, protected_tags=protected_tags
         )
-        if prev_tags != note.tags:
+        if set(prev_tags) != set(note.tags):
             result = True
 
         # update fields which are not protected
