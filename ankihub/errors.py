@@ -5,8 +5,9 @@ import traceback
 from types import TracebackType
 from typing import Type
 
+from anki.errors import BackendIOError, DBError
 from aqt import mw
-from aqt.utils import tooltip
+from aqt.utils import showWarning, tooltip
 from requests.exceptions import ConnectionError
 
 from . import LOGGER
@@ -36,6 +37,14 @@ def handle_exception(
 
     if isinstance(exc, ConnectionError):
         tooltip("AnkiHub: Could not connect to the internet.", parent=mw)
+        return True
+
+    if (isinstance(exc, DBError) and "is full" in str(exc).lower()) or (
+        isinstance(exc, BackendIOError) and "no space left" in str(exc).lower()
+    ):
+        showWarning(
+            "Could not finish because your hard drive is full.", title="AnkiHub"
+        )
         return True
 
     if not should_report_error():
