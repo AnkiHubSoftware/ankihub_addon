@@ -306,6 +306,10 @@ class AnkiHubImporter:
 
         if note[constants.ANKIHUB_NOTE_TYPE_FIELD_NAME] != ankihub_id:
             note[constants.ANKIHUB_NOTE_TYPE_FIELD_NAME] = ankihub_id
+            LOGGER.debug(
+                f"AnkiHub id of note {note.id} changed from {note[constants.ANKIHUB_NOTE_TYPE_FIELD_NAME]} "
+                f"to {ankihub_id}",
+            )
             result = True
 
         prev_tags = note.tags
@@ -313,6 +317,9 @@ class AnkiHubImporter:
             cur_tags=note.tags, incoming_tags=tags, protected_tags=protected_tags
         )
         if set(prev_tags) != set(note.tags):
+            LOGGER.debug(
+                f"Tags were changed to {note.tags}.",
+            )
             result = True
 
         # update fields which are not protected
@@ -325,6 +332,9 @@ class AnkiHubImporter:
 
             if note[field["name"]] != field["value"]:
                 note[field["name"]] = field["value"]
+                LOGGER.debug(
+                    f"Field: \"{field['name']}\" was changed to \"{field['value']}\"."
+                )
                 result = True
 
         return result
