@@ -74,8 +74,7 @@ def should_report_error() -> bool:
 
 def maybe_handle_ankihub_request_error(error: AnkiHubRequestError) -> bool:
     response = error.response
-    if response.status_code == 401 and response.json()["detail"] == "Invalid token.":
-        # invalid token
+    if response.status_code == 401:
         config.save_token("")
         AnkiHubLogin.display_login()
         return True
