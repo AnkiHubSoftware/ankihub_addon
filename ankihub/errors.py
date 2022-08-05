@@ -29,10 +29,12 @@ def handle_exception(
     )
 
     if not this_addon_is_involved(tb):
+        LOGGER.debug("This addon is not involved.")
         return False
 
     if isinstance(exc, AnkiHubRequestError):
         if maybe_handle_ankihub_request_error(exc):
+            LOGGER.debug("AnkiHubRequestError was handled.")
             return True
 
     if isinstance(exc, ConnectionError):
@@ -45,9 +47,11 @@ def handle_exception(
         showWarning(
             "Could not finish because your hard drive is full.", title="AnkiHub"
         )
+        LOGGER.debug("Showing full disk warning.")
         return True
 
     if not should_report_error():
+        LOGGER.debug("Reporting errors is disabled.")
         return False
 
     sentry_id = report_exception_and_upload_logs(exception=exc)
@@ -59,8 +63,8 @@ def this_addon_is_involved(tb) -> bool:
     tb_str = "".join(traceback.format_tb(tb))
     result = (
         ANKIWEB_ID is not None
-        and re.search(rf"/addons21/(ankihub|{ANKIWEB_ID})/", tb_str)
-    ) or (ANKIWEB_ID is None and re.search(r"/addons21/ankihub", tb_str))
+        and re.search(rf"(/|\\)addons21(/|\\)(ankihub|{ANKIWEB_ID})(/|\\)", tb_str)
+    ) or (ANKIWEB_ID is None and re.search(r"(/|\\)addons21(/|\\)ankihub", tb_str))
     return bool(result)
 
 
