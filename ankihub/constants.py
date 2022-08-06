@@ -17,7 +17,7 @@ LOGGER.debug(f"version: {ADDON_VERSION}")
 try:
     manifest = json.loads((Path(__file__).parent / "manifest.json").read_text())
     ANKIWEB_ID = manifest["ankiweb_id"]
-except FileNotFoundError:
+except (FileNotFoundError, KeyError):
     ANKIWEB_ID = None
 
 ANKIHUB_APP_URL = os.getenv("ANKIHUB_APP_URL")
