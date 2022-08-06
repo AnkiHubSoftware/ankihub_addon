@@ -1,11 +1,7 @@
-import csv
-import tempfile
 from concurrent.futures import Future
-from pathlib import Path
-from typing import Optional
+from typing import List, Optional
 
 from anki.collection import OpChanges
-from anki.decks import DeckId
 from aqt import gui_hooks, mw
 from aqt.qt import (
     QDialog,
@@ -25,8 +21,9 @@ from aqt.utils import askUser, openLink, showInfo, showText, tooltip
 from .. import LOGGER
 from ..addon_ankihub_client import AddonAnkiHubClient as AnkiHubClient
 from ..addon_ankihub_client import AnkiHubRequestError
+from ..ankihub_client import NoteUpdate
 from ..config import config
-from ..constants import CSV_DELIMITER, URL_DECK_BASE, URL_DECKS, URL_HELP, URL_VIEW_DECK
+from ..constants import URL_DECK_BASE, URL_DECKS, URL_HELP, URL_VIEW_DECK
 from ..db import AnkiHubDB
 from ..sync import AnkiHubImporter
 from ..utils import create_backup_with_progress, undo_note_type_modfications
@@ -222,6 +219,15 @@ class SubscribeDialog(QDialog):
             self.close()
             return
 
+        confirmed = askUser(
+            f"Would you like to proceed with downloading and installing the deck? "
+            f"Your personal collection will be modified.<br><br>"
+            f"See <a href='{URL_HELP}'>{URL_HELP}</a> for details.",
+            title="Please confirm to proceed.",
+        )
+        if not confirmed:
+            return
+
         self.download_and_install_deck(ankihub_did)
 
     def download_and_install_deck(self, ankihub_did: str):
@@ -254,7 +260,7 @@ class SubscribeDialog(QDialog):
                 raise exc
 
         try:
-            deck_response = self.client.get_deck_by_id(ankihub_did)
+            deck_info = self.client.get_deck_by_id(ankihub_did)
         except AnkiHubRequestError as e:
             if e.response.status_code == 404:
                 showText(
@@ -273,46 +279,24 @@ class SubscribeDialog(QDialog):
             else:
                 raise e
 
-        data = deck_response.json()
-        deck_file_name = data["csv_notes_filename"]
-        last_update = data["csv_last_upload"]
-        is_creator = bool(data["owner"])
+        def on_download_done(future: Future) -> None:
+            notes_data: List[NoteUpdate] = future.result()
 
-        def on_download_done(future: Future):
-            response = future.result()
-
-            out_file = Path(tempfile.mkdtemp()) / f"{deck_file_name}"
-            with out_file.open("wb") as f:
-                f.write(response.content)
-                LOGGER.debug(f"Wrote {deck_file_name} to {out_file}")
-                # TODO Validate .csv
-
-            if out_file:
-                confirmed = askUser(
-                    f"The AnkiHub deck {data['name']} has been downloaded. Would you like to "
-                    f"proceed with modifying your personal collection in order to subscribe "
-                    f"to the collaborative deck? See {URL_HELP} for "
-                    f"details.",
-                    title="Please confirm to proceed.",
-                )
-                if not confirmed:
-                    return
-
-                mw.taskman.with_progress(
-                    lambda: self.install_deck(
-                        deck_file=out_file,
-                        deck_name=data["name"],
-                        ankihub_did=ankihub_did,
-                        last_update=last_update,
-                        is_creator=is_creator,
-                    ),
-                    on_done=on_install_done,
-                    parent=mw,
-                    label="Installing deck",
-                )
+            mw.taskman.with_progress(
+                lambda: self.install_deck(
+                    notes_data=notes_data,
+                    deck_name=deck_info.name,
+                    ankihub_did=ankihub_did,
+                    last_update=deck_info.csv_last_upload,
+                    is_creator=deck_info.owner,
+                ),
+                on_done=on_install_done,
+                parent=mw,
+                label="Installing deck",
+            )
 
         mw.taskman.with_progress(
-            lambda: self.client.download_deck(deck_file_name),
+            lambda: self.client.download_deck(deck_info.ankihub_deck_uuid),
             on_done=on_download_done,
             parent=mw,
             label="Downloading deck",
@@ -320,7 +304,7 @@ class SubscribeDialog(QDialog):
 
     def install_deck(
         self,
-        deck_file: Path,
+        notes_data: List[NoteUpdate],
         deck_name: str,
         ankihub_did: str,
         last_update: str,
@@ -333,9 +317,14 @@ class SubscribeDialog(QDialog):
         """
 
         create_backup_with_progress()
-        local_did = self._install_deck_csv(
-            ankihub_did=ankihub_did, deck_file=deck_file, deck_name=deck_name
+
+        importer = AnkiHubImporter()
+        local_did = importer.import_ankihub_deck(
+            ankihub_did=ankihub_did,
+            notes_data=notes_data,
+            deck_name=deck_name,
         )
+
         if local_did is None:
             return None
 
@@ -350,25 +339,6 @@ class SubscribeDialog(QDialog):
         LOGGER.debug("Importing deck was succesful.")
 
         return True
-
-    def _install_deck_csv(
-        self,
-        ankihub_did: str,
-        deck_file: Path,
-        deck_name: str,
-    ) -> Optional[DeckId]:
-        LOGGER.debug("Importing deck as csv....")
-        with deck_file.open(encoding="utf-8") as f:
-            reader = csv.DictReader(f, delimiter=CSV_DELIMITER, quotechar="'")
-            notes_data = [row for row in reader]
-
-        importer = AnkiHubImporter()
-        deck_id = importer.import_ankihub_deck(
-            ankihub_did=ankihub_did,
-            notes_data=notes_data,
-            deck_name=deck_name,
-        )
-        return deck_id
 
     def on_browse_deck(self) -> None:
         openLink(URL_DECKS)

@@ -2,7 +2,7 @@ import copy
 import pathlib
 import re
 import uuid
-from datetime import datetime, timedelta, timezone
+from datetime import datetime, timezone
 from typing import Optional
 from unittest.mock import MagicMock, Mock
 
@@ -19,12 +19,20 @@ sample_deck = pathlib.Path(__file__).parent / "test_data" / "small.apkg"
 ANKIHUB_SAMPLE_DECK_PATH = (
     pathlib.Path(__file__).parent / "test_data" / "small_ankihub.apkg"
 )
-ANKIHUB_SAMPLE_DECK_NOTES_DATA = eval(
-    (pathlib.Path(__file__).parent / "test_data" / "small_ankihub.txt").read_text()
-)
 
 UUID_1 = uuid.UUID("1f28bc9e-f36d-4e1d-8720-5dd805f12dd0")
 UUID_2 = uuid.UUID("2f28bc9e-f36d-4e1d-8720-5dd805f12dd0")
+
+
+def ankihub_sample_deck_notes_data():
+    from ankihub.ankihub_client import NoteUpdate, transform_notes_data
+
+    ankihub_sample_deck_notes_data = eval(
+        (pathlib.Path(__file__).parent / "test_data" / "small_ankihub.txt").read_text()
+    )
+    notes_data_raw = transform_notes_data(ankihub_sample_deck_notes_data)
+    result = [NoteUpdate.from_dict(x) for x in notes_data_raw]
+    return result
 
 
 def test_entry_point(anki_session_with_addon: AnkiSession):
@@ -225,7 +233,8 @@ def test_client_login_and_signout(anki_session_with_addon: AnkiSession, requests
     )
 
     # test login
-    client.login(credentials=credentials_data)
+    token = client.login(credentials=credentials_data)
+    assert token == "f4k3t0k3n"
     assert client.session.headers["Authorization"] == "Token f4k3t0k3n"
 
     # test signout
@@ -249,10 +258,11 @@ def test_client_upload_deck(anki_session_with_addon: AnkiSession, requests_mock)
         "http://fake_url",
         status_code=200,
     )
+    ankihub_deck_uuid = UUID_1
     requests_mock.post(
         f"{API_URL_BASE}/decks/",
         status_code=201,
-        json={"anki_id": 1, "key": "small.apkg"},
+        json={"anki_id": 1, "key": "small.apkg", "deck_id": str(ankihub_deck_uuid)},
     )
 
     # test upload deck
@@ -270,41 +280,62 @@ def test_client_upload_deck(anki_session_with_addon: AnkiSession, requests_mock)
 
 def test_get_deck_updates(anki_session_with_addon: AnkiSession, requests_mock):
     from ankihub.addon_ankihub_client import AddonAnkiHubClient as AnkiHubClient
-    from ankihub.ankihub_client import AnkiHubRequestError
+    from ankihub.ankihub_client import (
+        AnkiHubRequestError,
+        DeckUpdateChunk,
+        FieldUpdate,
+        NoteUpdate,
+    )
     from ankihub.constants import API_URL_BASE
 
-    client = AnkiHubClient(hooks=[])
-
     # test get deck updates
-    date_object = datetime.now(tz=timezone.utc) - timedelta(days=30)
-
     ankihub_deck_uuid = UUID_1
-    timestamp = date_object.timestamp()
+    ankihub_note_uuid = UUID_2
+    timestamp = "2022-04-05T10:56:19.456+00:00"
     expected_data = {
         "total": 1,
         "current_page": 1,
         "has_next": False,
-        "since": timestamp,
+        "latest_update": timestamp,
         "notes": [
             {
-                "deck_id": str(ankihub_deck_uuid),
-                "note_id": 1,
-                "anki_id": 1,
-                "tags": ["New Tag"],
                 "fields": [{"name": "Text", "order": 0, "value": "Fake value"}],
+                "deck_id": str(ankihub_deck_uuid),
+                "note_id": str(ankihub_note_uuid),
+                "anki_id": 1,
+                "note_type_id": 1,
+                "tags": ["New Tag"],
             }
         ],
-        "protected_fields": {"Basic": ["Back"]},
+        "protected_fields": {1: ["Back"]},
         "protected_tags": ["Test"],
     }
 
     requests_mock.get(
         f"{API_URL_BASE}/decks/{ankihub_deck_uuid}/updates", json=expected_data
     )
-    for response in client.get_deck_updates(
-        ankihub_deck_uuid=ankihub_deck_uuid, since=timestamp  # type: ignore
-    ):
-        assert response.json() == expected_data
+
+    client = AnkiHubClient(hooks=[])
+    deck_updates = list(
+        client.get_deck_updates(
+            ankihub_deck_uuid=ankihub_deck_uuid, since=timestamp  # type: ignore
+        )
+    )
+    assert len(deck_updates) == 1
+    assert deck_updates[0] == DeckUpdateChunk(
+        latest_update=timestamp,
+        notes=[
+            NoteUpdate(
+                fields=[FieldUpdate(name="Text", order=0, value="Fake value")],
+                ankihub_note_uuid=ankihub_note_uuid,
+                mid=1,
+                anki_nid=1,
+                tags=["New Tag"],
+            )
+        ],
+        protected_fields={1: ["Back"]},
+        protected_tags=["Test"],
+    )
 
     # test get deck updates unauthenticated
     requests_mock.get(
@@ -324,7 +355,7 @@ def test_get_deck_updates(anki_session_with_addon: AnkiSession, requests_mock):
 
 def test_get_deck_by_id(anki_session_with_addon: AnkiSession, requests_mock):
     from ankihub.addon_ankihub_client import AddonAnkiHubClient as AnkiHubClient
-    from ankihub.ankihub_client import AnkiHubRequestError
+    from ankihub.ankihub_client import AnkiHubRequestError, DeckInfo
     from ankihub.constants import API_URL_BASE
 
     client = AnkiHubClient(hooks=[])
@@ -338,47 +369,25 @@ def test_get_deck_by_id(anki_session_with_addon: AnkiSession, requests_mock):
         "owner": 1,
         "anki_id": 1,
         "csv_last_upload": date_time_str,
-        "csv_notes_url": "http://fake-csv-url.com/test.csv",
+        "csv_notes_filename": "test.csv",
     }
 
     requests_mock.get(f"{API_URL_BASE}/decks/{ankihub_deck_uuid}/", json=expected_data)
-    response = client.get_deck_by_id(ankihub_deck_uuid=ankihub_deck_uuid)  # type: ignore
-    assert response.json() == expected_data
+    deck_info = client.get_deck_by_id(ankihub_deck_uuid=ankihub_deck_uuid)  # type: ignore
+    assert deck_info == DeckInfo(
+        ankihub_deck_uuid=ankihub_deck_uuid,
+        anki_did=1,
+        owner=True,
+        name="test",
+        csv_last_upload=date_time_str,
+        csv_notes_filename="test.csv",
+    )
 
     # test get deck by id unauthenticated
     requests_mock.get(f"{API_URL_BASE}/decks/{ankihub_deck_uuid}/", status_code=403)
 
     try:
         client.get_deck_by_id(ankihub_deck_uuid=ankihub_deck_uuid)  # type: ignore
-    except AnkiHubRequestError as e:
-        exc = e
-    assert exc is not None and exc.response.status_code == 403
-
-
-def test_get_note_by_ankihub_id(anki_session_with_addon: AnkiSession, requests_mock):
-    from ankihub.ankihub_client import AnkiHubClient, AnkiHubRequestError
-    from ankihub.constants import API_URL_BASE
-
-    client = AnkiHubClient(hooks=[])
-
-    # test get not by ankihub id
-    ankihub_deck_uuid = UUID_1
-    ankihub_note_uuid = UUID_2
-    expected_data = {
-        "deck_id": str(ankihub_deck_uuid),
-        "note_id": str(ankihub_note_uuid),
-        "anki_id": 1,
-        "tags": ["New Tag"],
-        "fields": [{"name": "Text", "order": 0, "value": "Fake value"}],
-    }
-    requests_mock.get(f"{API_URL_BASE}/notes/{ankihub_note_uuid}", json=expected_data)
-    response = client.get_note_by_ankihub_id(ankihub_note_uuid=ankihub_note_uuid)
-    assert response.json() == expected_data
-
-    # test get note by ankihub id unauthenticated
-    requests_mock.get(f"{API_URL_BASE}/notes/{ankihub_note_uuid}", status_code=403)
-    try:
-        client.get_note_by_ankihub_id(ankihub_note_uuid=ankihub_note_uuid)
     except AnkiHubRequestError as e:
         exc = e
     assert exc is not None and exc.response.status_code == 403
@@ -554,7 +563,7 @@ def test_import_new_ankihub_deck(anki_session_with_addon: AnkiSession):
         ankihub_importer = AnkiHubImporter()
         local_did = ankihub_importer._import_ankihub_deck_inner(
             ankihub_did=str(ankihub_deck_uuid),
-            notes_data=ANKIHUB_SAMPLE_DECK_NOTES_DATA,
+            notes_data=ankihub_sample_deck_notes_data(),
             deck_name="test",
             remote_note_types={},
             protected_fields={},
@@ -603,7 +612,7 @@ def test_import_existing_ankihub_deck(anki_session_with_addon: AnkiSession):
         ankihub_importer = AnkiHubImporter()
         local_did = ankihub_importer._import_ankihub_deck_inner(
             ankihub_did=str(ankihub_deck_uuid),
-            notes_data=ANKIHUB_SAMPLE_DECK_NOTES_DATA,
+            notes_data=ankihub_sample_deck_notes_data(),
             deck_name="test",
             remote_note_types={},
             protected_fields={},
@@ -648,7 +657,7 @@ def test_import_existing_ankihub_deck_2(anki_session_with_addon: AnkiSession):
         ankihub_importer = AnkiHubImporter()
         local_did = ankihub_importer._import_ankihub_deck_inner(
             ankihub_did=str(ankihub_deck_uuid),
-            notes_data=ANKIHUB_SAMPLE_DECK_NOTES_DATA,
+            notes_data=ankihub_sample_deck_notes_data(),
             deck_name="test",
             remote_note_types={},
             protected_fields={},
@@ -701,7 +710,7 @@ def test_import_existing_ankihub_deck_3(anki_session_with_addon: AnkiSession):
         ankihub_importer = AnkiHubImporter()
         local_did = ankihub_importer._import_ankihub_deck_inner(
             ankihub_did=str(ankihub_deck_uuid),
-            notes_data=ANKIHUB_SAMPLE_DECK_NOTES_DATA,
+            notes_data=ankihub_sample_deck_notes_data(),
             deck_name="test",
             remote_note_types={},
             protected_fields={},
@@ -736,7 +745,7 @@ def test_update_ankihub_deck(anki_session_with_addon: AnkiSession):
         ankihub_importer = AnkiHubImporter()
         second_local_did = ankihub_importer._import_ankihub_deck_inner(
             ankihub_did=str(ankihub_deck_uuid),
-            notes_data=ANKIHUB_SAMPLE_DECK_NOTES_DATA,
+            notes_data=ankihub_sample_deck_notes_data(),
             deck_name="test",
             remote_note_types={},
             protected_fields={},
@@ -782,7 +791,7 @@ def test_update_ankihub_deck_when_deck_was_deleted(
         ankihub_importer = AnkiHubImporter()
         second_local_id = ankihub_importer._import_ankihub_deck_inner(
             ankihub_did=str(ankihub_deck_uuid),
-            notes_data=ANKIHUB_SAMPLE_DECK_NOTES_DATA,
+            notes_data=ankihub_sample_deck_notes_data(),
             deck_name="test",
             remote_note_types={},
             protected_fields={},
@@ -861,7 +870,7 @@ def import_sample_ankihub_deck(
     importer = AnkiHubImporter()
     local_did = importer._import_ankihub_deck_inner(
         ankihub_did=ankihub_did,
-        notes_data=ANKIHUB_SAMPLE_DECK_NOTES_DATA,
+        notes_data=ankihub_sample_deck_notes_data(),
         deck_name="test",
         protected_fields={},
         protected_tags=[],
@@ -876,6 +885,7 @@ def import_sample_ankihub_deck(
 
 
 def test_prepare_note(anki_session_with_addon: AnkiSession):
+    from ankihub.ankihub_client import FieldUpdate
     from ankihub.sync import AnkiHubImporter
     from ankihub.utils import modify_note_type
 
@@ -903,8 +913,8 @@ def test_prepare_note(anki_session_with_addon: AnkiSession):
                 note=note,
                 ankihub_id="1",
                 fields=[
-                    {"name": "Front", "value": "new front"},
-                    {"name": "Back", "value": "new back"},
+                    FieldUpdate(name="Front", value="new front", order=0),
+                    FieldUpdate(name="Back", value="new back", order=1),
                 ],
                 tags=["c", "d"],
                 protected_fields={ankihub_basic["id"]: ["Back"]},

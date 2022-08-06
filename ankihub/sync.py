@@ -1,9 +1,8 @@
-import json
 import uuid
 from concurrent.futures import Future
 from pprint import pformat
 from time import sleep
-from typing import Any, Dict, Iterable, List, Optional, Set, Tuple
+from typing import Dict, Iterable, List, Optional, Set, Tuple
 
 from anki.decks import DeckId
 from anki.errors import NotFoundError
@@ -14,7 +13,7 @@ from aqt.utils import showInfo, tooltip
 
 from . import LOGGER, constants
 from .addon_ankihub_client import AddonAnkiHubClient as AnkiHubClient
-from .addon_ankihub_client import AnkiHubRequestError
+from .ankihub_client import AnkiHubRequestError, FieldUpdate, NoteUpdate
 from .config import config
 from .constants import ANKI_MINOR
 from .db import AnkiHubDB
@@ -54,17 +53,15 @@ class AnkiHubSync:
         deck = config.private_config.decks[ankihub_did]
         client = AnkiHubClient()
         notes_data = []
-        for response in client.get_deck_updates(
+        for chunk in client.get_deck_updates(
             uuid.UUID(ankihub_did), since=deck["latest_update"]
         ):
             if mw.progress.want_cancel():
                 LOGGER.debug("User cancelled sync.")
                 return False
 
-            data = response.json()
-            notes = data["notes"]
-            if notes:
-                notes_data += notes
+            if chunk.notes:
+                notes_data += chunk.notes
 
         if notes_data:
             self.importer.import_ankihub_deck(
@@ -72,10 +69,10 @@ class AnkiHubSync:
                 notes_data=notes_data,
                 deck_name=deck["name"],
                 local_did=deck["anki_id"],
-                protected_fields=data["protected_fields"],
-                protected_tags=data["protected_tags"],
+                protected_fields=chunk.protected_fields,
+                protected_tags=chunk.protected_tags,
             )
-            config.save_latest_update(ankihub_did, data["latest_update"])
+            config.save_latest_update(ankihub_did, chunk.latest_update)
         else:
             LOGGER.debug(f"No new updates to sync for {ankihub_did=}")
 
@@ -110,7 +107,7 @@ class AnkiHubSync:
                     f"deck id: <i>{ankihub_did}</i>",
                 )
             )
-            LOGGER.debug("Unable to sync because a deck doesn't exist on AnkiHub.")
+            LOGGER.debug("Unable to sync because the deck doesn't exist on AnkiHub.")
             return True
         return False
 
@@ -123,7 +120,7 @@ class AnkiHubImporter:
     def import_ankihub_deck(
         self,
         ankihub_did: str,
-        notes_data: List[Dict],
+        notes_data: List[NoteUpdate],
         deck_name: str,  # name that will be used for a deck if a new one gets created
         local_did: Optional[  # did that new notes should be put into if importing not for the first time
             DeckId
@@ -150,27 +147,19 @@ class AnkiHubImporter:
             protected_fields = {}
             client = AnkiHubClient()
             try:
-                response = client.get_protected_fields(uuid.UUID(ankihub_did))
+                protected_fields = client.get_protected_fields(uuid.UUID(ankihub_did))
             except AnkiHubRequestError as e:
                 if not e.response.status_code == 404:
                     raise e
-            else:
-                protected_fields_raw = response.json()["fields"]
-                protected_fields = {
-                    int(field_id): field_names
-                    for field_id, field_names in protected_fields_raw.items()
-                }
 
         if protected_tags is None:
             protected_tags = []
             client = AnkiHubClient()
             try:
-                response = client.get_protected_tags(uuid.UUID(ankihub_did))
+                protected_tags = client.get_protected_tags(uuid.UUID(ankihub_did))
             except AnkiHubRequestError as e:
                 if not e.response.status_code == 404:
                     raise e
-            else:
-                protected_tags = response.json()["tags"]
 
         anki_deck_id = self._import_ankihub_deck_inner(
             ankihub_did=ankihub_did,
@@ -186,14 +175,13 @@ class AnkiHubImporter:
     def _import_ankihub_deck_inner(
         self,
         ankihub_did: str,
-        notes_data: List[dict],
+        notes_data: List[NoteUpdate],
         deck_name: str,  # name that will be used for a deck if a new one gets created
         remote_note_types: Dict[NotetypeId, NotetypeDict],
         protected_fields: Dict[int, List[str]],
         protected_tags: List[str],
         local_did: DeckId = None,  # did that new notes should be put into if importing not for the first time
     ) -> DeckId:
-        notes_data = transform_notes_data(notes_data)
 
         db = AnkiHubDB()
         db.save_notes_from_notes_data(ankihub_did=ankihub_did, notes_data=notes_data)
@@ -208,7 +196,11 @@ class AnkiHubImporter:
         for note_data in notes_data:
             LOGGER.debug(f"Trying to update or create note:\n {pformat(note_data)}")
             note = self.update_or_create_note(
-                **note_data,
+                anki_nid=NoteId(note_data.anki_nid),
+                mid=NotetypeId(note_data.mid),
+                ankihub_nid=str(note_data.ankihub_note_uuid),
+                fields=note_data.fields,
+                tags=note_data.tags,
                 anki_did=local_did,
                 protected_fields=protected_fields,
                 protected_tags=protected_tags,
@@ -249,49 +241,48 @@ class AnkiHubImporter:
 
     def update_or_create_note(
         self,
-        anki_id: NoteId,
-        ankihub_id: str,
-        fields: List[Dict],
+        anki_nid: NoteId,
+        ankihub_nid: str,
+        fields: List[FieldUpdate],
         tags: List[str],
-        note_type_id: NotetypeId,
+        mid: NotetypeId,
         anki_did: DeckId,  # only relevant for newly created notes
         protected_fields: Dict[int, List[str]],
         protected_tags: List[str],
     ) -> Note:
         try:
-            note = mw.col.get_note(id=anki_id)
+            note = mw.col.get_note(id=anki_nid)
             fields.append(
-                {
-                    "name": constants.ANKIHUB_NOTE_TYPE_FIELD_NAME,
-                    # Put the AnkiHub field last
-                    "order": len(fields),
-                    "value": ankihub_id,
-                }
+                FieldUpdate(
+                    name=constants.ANKIHUB_NOTE_TYPE_FIELD_NAME,
+                    order=len(fields),
+                    value=ankihub_nid,
+                )
             )
             if self.prepare_note(
-                note, ankihub_id, fields, tags, protected_fields, protected_tags
+                note, ankihub_nid, fields, tags, protected_fields, protected_tags
             ):
                 mw.col.update_note(note)
                 self.num_notes_updated += 1
-                LOGGER.debug(f"Updated note: {anki_id=}")
+                LOGGER.debug(f"Updated note: {anki_nid=}")
             else:
-                LOGGER.debug(f"No changes, skipping {anki_id=}")
+                LOGGER.debug(f"No changes, skipping {anki_nid=}")
         except NotFoundError:
-            note_type = mw.col.models.get(NotetypeId(note_type_id))
+            note_type = mw.col.models.get(NotetypeId(mid))
             note = mw.col.new_note(note_type)
             self.prepare_note(
-                note, ankihub_id, fields, tags, protected_fields, protected_tags
+                note, ankihub_nid, fields, tags, protected_fields, protected_tags
             )
-            note = create_note_with_id(note, anki_id, anki_did)
+            note = create_note_with_id(note, anki_nid, anki_did)
             self.num_notes_created += 1
-            LOGGER.debug(f"Created note: {anki_id=}")
+            LOGGER.debug(f"Created note: {anki_nid=}")
         return note
 
     def prepare_note(
         self,
         note: Note,
         ankihub_id: str,
-        fields: List[Dict[str, Any]],
+        fields: List[FieldUpdate],
         tags: List[str],
         protected_fields: Dict[int, List[str]],
         protected_tags: List[str],
@@ -327,13 +318,16 @@ class AnkiHubImporter:
             protected_fields_for_model = protected_fields.get(
                 mw.col.models.get(note.mid)["id"], []
             )
-            if field["name"] in protected_fields_for_model:
+            if field.name in protected_fields_for_model:
                 continue
 
-            if note[field["name"]] != field["value"]:
-                note[field["name"]] = field["value"]
+            if note[field.name] != field.value:
+                note[field.name] = field.value
                 LOGGER.debug(
-                    f"Field: \"{field['name']}\" was changed to \"{field['value']}\"."
+                    f'Field: "{field.name}" was changed from:\n'
+                    f"{note[field.name]}\n"
+                    "to:\n"
+                    f"{field.value}"
                 )
                 result = True
 
@@ -375,9 +369,9 @@ def updated_tags(
 
 
 def fetch_remote_note_types_based_on_notes_data(
-    notes_data: List[Dict],
+    notes_data: List[NoteUpdate],
 ) -> Dict[NotetypeId, NotetypeDict]:
-    remote_mids = set(note_data["note_type_id"] for note_data in notes_data)
+    remote_mids = set(NotetypeId(note_data.mid) for note_data in notes_data)
     result = fetch_remote_note_types(remote_mids)
     return result
 
@@ -385,22 +379,9 @@ def fetch_remote_note_types_based_on_notes_data(
 def fetch_remote_note_types(
     mids: Iterable[NotetypeId],
 ) -> Dict[NotetypeId, NotetypeDict]:
-    result = {}
     client = AnkiHubClient()
-    for mid in mids:
-        response = client.get_note_type(mid)
-        data = response.json()
-        note_type = to_anki_note_type(data)
-        result[mid] = note_type
+    result = {mid: client.get_note_type(mid) for mid in mids}
     return result
-
-
-def to_anki_note_type(note_type_data: Dict) -> NotetypeDict:
-    """Turn JSON response from AnkiHubClient.get_note_type into NotetypeDict."""
-    del note_type_data["anki_id"]
-    note_type_data["tmpls"] = note_type_data.pop("templates")
-    note_type_data["flds"] = note_type_data.pop("fields")
-    return note_type_data
 
 
 def adjust_note_types(remote_note_types: Dict[NotetypeId, NotetypeDict]) -> None:
@@ -453,7 +434,7 @@ def ensure_local_and_remote_fields_are_same(
             remote_note_type["flds"]
         ):
             LOGGER.debug(
-                f'Fields of local note type "{local_note_type["name"]}" differ from remote note_type. '
+                f'Fields of local note type "{local_note_type["name"]}" differ from remote note type.\n'
                 f"local:\n{pformat(field_tuples(local_note_type['flds']))}\n"
                 f"remote:\n{pformat(field_tuples(remote_note_type['flds']))}"
             )
@@ -499,35 +480,13 @@ def adjust_field_ords(
     return new_model_flds
 
 
-def reset_note_types_of_notes_based_on_notes_data(notes_data: List[Dict]) -> None:
+def reset_note_types_of_notes_based_on_notes_data(notes_data: List[NoteUpdate]) -> None:
     """Set the note type of notes back to the note type they have in the remote deck if they have a different one"""
     nid_mid_pairs = [
-        (note_data["anki_id"], note_data["note_type_id"]) for note_data in notes_data
-    ]
-    reset_note_types_of_notes(nid_mid_pairs)
-
-
-def transform_notes_data(notes_data: List[Dict]) -> List[Dict]:
-    # TODO fix differences between csv when installing for the first time vs. when updating
-    # on the AnkiHub side
-    # for example for one the fields name is "note_id" and for the other "id"
-    result = [
-        {
-            "anki_id": NoteId(int((note_data["anki_id"]))),
-            "ankihub_id": note_data.get("id")
-            if note_data.get("id") is not None
-            else note_data.get("note_id"),
-            "fields": json.loads(note_data["fields"])
-            if isinstance(note_data["fields"], str)
-            else note_data["fields"],
-            "tags": json.loads(note_data["tags"])
-            if isinstance(note_data["tags"], str)
-            else note_data["tags"],
-            "note_type_id": NotetypeId(int(note_data["note_type_id"])),
-        }
+        (NoteId(note_data.anki_nid), NotetypeId(note_data.mid))
         for note_data in notes_data
     ]
-    return result
+    reset_note_types_of_notes(nid_mid_pairs)
 
 
 def sync_with_progress() -> None:

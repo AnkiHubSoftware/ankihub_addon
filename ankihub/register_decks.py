@@ -16,7 +16,6 @@ from anki.exporting import AnkiPackageExporter
 from anki.models import NotetypeId
 from anki.notes import NoteId
 from aqt import mw
-from requests import Response
 
 from . import LOGGER
 from .addon_ankihub_client import AddonAnkiHubClient as AnkiHubClient
@@ -33,7 +32,7 @@ from .utils import (
 DIR_PATH = os.path.dirname(os.path.abspath(__file__))
 
 
-def upload_deck(did: DeckId) -> Response:
+def upload_deck(did: DeckId) -> str:
     """Upload the deck to AnkiHub."""
 
     deck_name = mw.col.decks.name(did)
@@ -74,11 +73,11 @@ def upload_deck(did: DeckId) -> Response:
 
     mw.col.models._clear_cache()
     client = AnkiHubClient()
-    response = client.upload_deck(file=out_file, anki_deck_id=did)
-    return response
+    ankihub_did = str(client.upload_deck(file=out_file, anki_deck_id=did))
+    return ankihub_did
 
 
-def create_collaborative_deck(deck_name: str) -> Response:
+def create_collaborative_deck(deck_name: str) -> str:
     LOGGER.debug("Creating collaborative deck")
 
     create_backup_with_progress()
@@ -93,15 +92,13 @@ def create_collaborative_deck(deck_name: str) -> Response:
 
     assign_ankihub_ids(note_ids)
 
-    response = upload_deck(deck_id)
-    ankihub_did = response.json()["deck_id"]
+    ankihub_did = upload_deck(deck_id)
     db = AnkiHubDB()
     db.save_notes_from_nids(
         ankihub_did=ankihub_did,
         nids=note_ids,
     )
-
-    return response
+    return ankihub_did
 
 
 def create_note_types_for_deck(deck_id: DeckId) -> Dict[NotetypeId, NotetypeId]:
