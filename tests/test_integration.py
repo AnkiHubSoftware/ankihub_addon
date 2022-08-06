@@ -584,14 +584,6 @@ def test_import_new_ankihub_deck(anki_session_with_addon: AnkiSession):
         )
 
 
-def assert_that_only_ankihub_sample_deck_info_in_database(ankihub_deck_uuid: uuid.UUID):
-    from ankihub.db import AnkiHubDB
-
-    db = AnkiHubDB()
-    assert db.ankihub_deck_ids() == [str(ankihub_deck_uuid)]
-    assert len(db.notes_for_ankihub_deck(str(ankihub_deck_uuid))) == 3
-
-
 def test_import_existing_ankihub_deck(anki_session_with_addon: AnkiSession):
     from aqt import mw
 
@@ -630,6 +622,14 @@ def test_import_existing_ankihub_deck(anki_session_with_addon: AnkiSession):
         assert_that_only_ankihub_sample_deck_info_in_database(
             ankihub_deck_uuid=ankihub_deck_uuid
         )
+
+
+def assert_that_only_ankihub_sample_deck_info_in_database(ankihub_deck_uuid: uuid.UUID):
+    from ankihub.db import AnkiHubDB
+
+    db = AnkiHubDB()
+    assert db.ankihub_deck_ids() == [str(ankihub_deck_uuid)]
+    assert len(db.notes_for_ankihub_deck(str(ankihub_deck_uuid))) == 3
 
 
 def test_import_existing_ankihub_deck_2(anki_session_with_addon: AnkiSession):
