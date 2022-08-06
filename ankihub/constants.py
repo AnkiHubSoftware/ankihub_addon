@@ -41,8 +41,6 @@ ICONS_PATH = ADDON_PATH / "icons"
 TOKEN_SLUG = "token"
 USER_EMAIL_SLUG = "user_email"
 
-CSV_DELIMITER = ";"
-
 USER_SUPPORT_EMAIL_SLUG = "help@ankipalace.com"
 
 ANKI_MINOR = int(ANKI_VERSION.split(".")[2])

@@ -1,12 +1,12 @@
 import sqlite3
-from .constants import ANKIHUB_NOTE_TYPE_FIELD_NAME
-from typing import Dict, List
+from typing import List
 
 from anki.models import NotetypeId
 from anki.notes import NoteId
 from aqt import mw
 
-from .constants import DB_PATH
+from .ankihub_client import NoteUpdate
+from .constants import ANKIHUB_NOTE_TYPE_FIELD_NAME, DB_PATH
 
 
 class AnkiHubDB:
@@ -24,7 +24,9 @@ class AnkiHubDB:
             """
         )
 
-    def save_notes_from_notes_data(self, ankihub_did: str, notes_data: List[Dict]):
+    def save_notes_from_notes_data(
+        self, ankihub_did: str, notes_data: List[NoteUpdate]
+    ):
         for note_data in notes_data:
             self.c.execute(
                 """
@@ -36,10 +38,10 @@ class AnkiHubDB:
                 ) VALUES (?, ?, ?, ?)
                 """,
                 (
-                    note_data["ankihub_id"],
+                    str(note_data.ankihub_note_uuid),
                     ankihub_did,
-                    note_data["anki_id"],
-                    note_data["note_type_id"],
+                    note_data.anki_nid,
+                    note_data.mid,
                 ),
             )
 
