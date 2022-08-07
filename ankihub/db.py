@@ -5,6 +5,7 @@ from anki.models import NotetypeId
 from anki.notes import NoteId
 from aqt import mw
 
+from . import LOGGER
 from .constants import ANKIHUB_NOTE_TYPE_FIELD_NAME, DB_PATH
 
 
@@ -25,6 +26,8 @@ class AnkiHubDB:
         self.migrate()
 
     def migrate(self) -> None:
+        LOGGER.debug(f"AnkiHub DB schema version: {self.schema_version()}")
+
         if self.schema_version() == 0:
             self.c.execute(
                 """
@@ -33,6 +36,9 @@ class AnkiHubDB:
             )
             self.c.execute("PRAGMA user_version = 1;")
             self.conn.commit()
+            LOGGER.debug(
+                f"AnkiHub DB migrated to schema version {self.schema_version()}"
+            )
 
     def schema_version(self) -> int:
         self.c.execute("PRAGMA user_version;")
