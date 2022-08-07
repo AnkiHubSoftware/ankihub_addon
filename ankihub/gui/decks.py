@@ -75,10 +75,19 @@ class SubscribedDecksDialog(QDialog):
     def refresh_decks_list(self) -> None:
         self.decks_list.clear()
         decks = config.private_config.decks
-        for ankihub_id in decks:
-            name = decks[ankihub_id]["name"]
+
+        own_decks = [deck for deck in decks.items() if deck[1]["creator"]]
+        for ankihub_did, deck_info in own_decks:
+            name = f"{deck_info['name']} (mine)"
             item = QListWidgetItem(name)
-            item.setData(Qt.ItemDataRole.UserRole, ankihub_id)
+            item.setData(Qt.ItemDataRole.UserRole, ankihub_did)
+            self.decks_list.addItem(item)
+
+        other_decks = [deck for deck in decks.items() if not deck[1]["creator"]]
+        for ankihub_did, deck_info in other_decks:
+            name = deck_info["name"]
+            item = QListWidgetItem(name)
+            item.setData(Qt.ItemDataRole.UserRole, ankihub_did)
             self.decks_list.addItem(item)
 
     def refresh_anki(self) -> None:
