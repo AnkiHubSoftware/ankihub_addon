@@ -5,7 +5,6 @@ from anki.models import NotetypeId
 from anki.notes import NoteId
 from aqt import mw
 
-from .ankihub_client import NoteUpdate
 from .constants import ANKIHUB_NOTE_TYPE_FIELD_NAME, DB_PATH
 
 
@@ -23,29 +22,22 @@ class AnkiHubDB:
             )
             """
         )
+        self.migrate()
 
-    def save_notes_from_notes_data(
-        self, ankihub_did: str, notes_data: List[NoteUpdate]
-    ):
-        for note_data in notes_data:
+    def migrate(self) -> None:
+        if self.schema_version() == 0:
             self.c.execute(
                 """
-                INSERT OR REPLACE INTO notes (
-                    ankihub_note_id,
-                    ankihub_deck_id,
-                    anki_note_id,
-                    anki_note_type_id
-                ) VALUES (?, ?, ?, ?)
-                """,
-                (
-                    str(note_data.ankihub_note_uuid),
-                    ankihub_did,
-                    note_data.anki_nid,
-                    note_data.mid,
-                ),
+                ALTER TABLE notes ADD COLUMN mod INTEGER
+                """
             )
+            self.c.execute("PRAGMA user_version = 1;")
+            self.conn.commit()
 
-        self.conn.commit()
+    def schema_version(self) -> int:
+        self.c.execute("PRAGMA user_version;")
+        result = self.c.fetchone()[0]
+        return result
 
     def save_notes_from_nids(self, ankihub_did: str, nids: List[NoteId]):
         for nid in nids:
@@ -56,14 +48,16 @@ class AnkiHubDB:
                     ankihub_note_id,
                     ankihub_deck_id,
                     anki_note_id,
-                    anki_note_type_id
-                ) VALUES (?, ?, ?, ?)
+                    anki_note_type_id,
+                    mod
+                ) VALUES (?, ?, ?, ?, ?)
                 """,
                 (
                     note[ANKIHUB_NOTE_TYPE_FIELD_NAME],
                     ankihub_did,
                     nid,
                     note.mid,
+                    note.mod,
                 ),
             )
 
