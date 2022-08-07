@@ -337,7 +337,7 @@ def sync_with_ankihub_setup(parent):
 
 def ankihub_help_setup(parent):
     """Set up the sub menu for help related items."""
-    help_menu = QMenu("Help", parent)
+    help_menu = QMenu("🆘 Help", parent)
 
     q_get_help_action = QAction("Get Help", help_menu)
     q_get_help_action.triggered.connect(
