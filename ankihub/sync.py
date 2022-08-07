@@ -513,10 +513,13 @@ def sync_with_progress() -> None:
             raise exc
         else:
             total = sync.importer.num_notes_created + sync.importer.num_notes_updated
-            tooltip(
-                f"AnkiHub: Synced {total} note{'' if total == 1 else 's'}.",
-                parent=mw,
-            )
+            if total == 0:
+                tooltip("AnkiHub: No new updates")
+            else:
+                tooltip(
+                    f"AnkiHub: Synced {total} note{'' if total == 1 else 's'}.",
+                    parent=mw,
+                )
             mw.reset()
 
     if config.private_config.token:
