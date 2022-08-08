@@ -27,10 +27,10 @@ UUID_2 = uuid.UUID("2f28bc9e-f36d-4e1d-8720-5dd805f12dd0")
 def ankihub_sample_deck_notes_data():
     from ankihub.ankihub_client import NoteUpdate, transform_notes_data
 
-    ankihub_sample_deck_notes_data = eval(
+    notes_data_raw = eval(
         (pathlib.Path(__file__).parent / "test_data" / "small_ankihub.txt").read_text()
     )
-    notes_data_raw = transform_notes_data(ankihub_sample_deck_notes_data)
+    notes_data_raw = transform_notes_data(notes_data_raw)
     result = [NoteUpdate.from_dict(x) for x in notes_data_raw]
     return result
 

@@ -352,14 +352,12 @@ def updated_tags(
 ) -> List[str]:
 
     # get subset of cur_tags that are protected
-    # by being equal to a protected tag or by being a subtag of a protected tag
+    # by being equal to a protected tag or by containing a protected tag
+    # protected_tags can't contain "::" (this is enforced when the user chooses them in the webapp)
     result = set(
         tag
         for tag in cur_tags
-        if any(
-            tag == protected_tag or tag.startswith(f"{protected_tag}::")
-            for protected_tag in protected_tags
-        )
+        if any(protected_tag in tag.split("::") for protected_tag in protected_tags)
     )
 
     # add new tags
