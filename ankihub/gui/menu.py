@@ -196,6 +196,11 @@ def create_collaborative_deck_action() -> None:
         showText("You can't upload an empty deck.")
         return
 
+    private = askUser(
+        "Would you like to make this deck public?\n\n"
+        'If you chose "No" it will be private and only you will be able to see it on the AnkiHub website.'
+    )
+
     confirm = askUser(
         "Uploading the deck to AnkiHub requires modifying notes and note types in "
         f"{deck_name} and will require a full sync afterwards. Would you like to "
@@ -227,7 +232,7 @@ def create_collaborative_deck_action() -> None:
 
     op = QueryOp(
         parent=mw,
-        op=lambda col: create_collaborative_deck(deck_name),
+        op=lambda col: create_collaborative_deck(deck_name, private=private),
         success=on_success,
     ).failure(on_failure)
     LOGGER.debug("Instantiated QueryOp for creating collaborative deck")

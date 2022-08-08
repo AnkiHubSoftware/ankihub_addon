@@ -32,7 +32,7 @@ from .utils import (
 DIR_PATH = os.path.dirname(os.path.abspath(__file__))
 
 
-def upload_deck(did: DeckId) -> str:
+def upload_deck(did: DeckId, private: bool) -> str:
     """Upload the deck to AnkiHub."""
 
     deck_name = mw.col.decks.name(did)
@@ -73,11 +73,13 @@ def upload_deck(did: DeckId) -> str:
 
     mw.col.models._clear_cache()
     client = AnkiHubClient()
-    ankihub_did = str(client.upload_deck(file=out_file, anki_deck_id=did))
+    ankihub_did = str(
+        client.upload_deck(file=out_file, anki_deck_id=did, private=private)
+    )
     return ankihub_did
 
 
-def create_collaborative_deck(deck_name: str) -> str:
+def create_collaborative_deck(deck_name: str, private: bool) -> str:
     LOGGER.debug("Creating collaborative deck")
 
     create_backup_with_progress()
@@ -92,7 +94,7 @@ def create_collaborative_deck(deck_name: str) -> str:
 
     assign_ankihub_ids(note_ids)
 
-    ankihub_did = upload_deck(deck_id)
+    ankihub_did = upload_deck(deck_id, private=private)
     db = AnkiHubDB()
     db.save_notes_from_nids(
         ankihub_did=ankihub_did,

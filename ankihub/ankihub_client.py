@@ -157,7 +157,7 @@ class AnkiHubClient:
         else:
             raise AnkiHubRequestError(response)
 
-    def upload_deck(self, file: Path, anki_deck_id: int) -> uuid.UUID:
+    def upload_deck(self, file: Path, anki_deck_id: int, private: bool) -> uuid.UUID:
         key = file.name
         s3_url = self.get_presigned_url(key=key, action="upload")
         with open(file, "rb") as f:
@@ -168,7 +168,9 @@ class AnkiHubClient:
             raise AnkiHubRequestError(s3_response)
 
         response = self._send_request(
-            "POST", "/decks/", data={"key": key, "anki_id": anki_deck_id}
+            "POST",
+            "/decks/",
+            data={"key": key, "anki_id": anki_deck_id, "is_private": private},
         )
         if response.status_code != 201:
             raise AnkiHubRequestError(response)
