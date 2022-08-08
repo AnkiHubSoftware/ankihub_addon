@@ -3,8 +3,9 @@ import os
 import re
 import time
 from concurrent.futures import Future
-from typing import Optional
+from typing import Callable, Optional
 
+from anki.utils import checksum
 from aqt import mw
 
 from . import LOGGER
@@ -105,11 +106,20 @@ def normalize_url(url: str):
     return result
 
 
-def upload_logs_in_background() -> str:
+def upload_logs_in_background(
+    on_done: Optional[Callable[[Future], None]] = None, hide_username=False
+) -> str:
     LOGGER.debug("Uploading logs...")
-    key = f"ankihub_addon_logs_{config.private_config.user}_{int(time.time())}.log"
 
-    def upload_logs():
+    # many users use their email address as their username and may not want to share it on a forum
+    user_name = (
+        config.private_config.user
+        if not hide_username
+        else checksum(config.private_config.user)[:5]
+    )
+    key = f"ankihub_addon_logs_{user_name}_{int(time.time())}.log"
+
+    def upload_logs() -> str:
         try:
             client = AnkiHubClient()
             client.upload_logs(
@@ -117,15 +127,21 @@ def upload_logs_in_background() -> str:
                 key=key,
             )
             LOGGER.debug("Logs uploaded.")
-        except AnkiHubRequestError:
+            return key
+        except AnkiHubRequestError as e:
             LOGGER.debug("Logs upload failed.")
+            raise e
 
-    def on_upload_logs_done(future: Future) -> None:
-        try:
-            future.result()
-        except Exception:
-            report_exception()
+    if on_done is not None:
+        mw.taskman.run_in_background(task=upload_logs, on_done=on_done)
+    else:
 
-    mw.taskman.run_in_background(task=upload_logs, on_done=on_upload_logs_done)
+        def on_upload_logs_done(future: Future) -> None:
+            try:
+                future.result()
+            except Exception:
+                report_exception()
+
+        mw.taskman.run_in_background(task=upload_logs, on_done=on_upload_logs_done)
 
     return key

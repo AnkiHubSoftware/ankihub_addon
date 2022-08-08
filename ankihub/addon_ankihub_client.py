@@ -44,13 +44,12 @@ class AddonAnkiHubClient(AnkiHubClient):
             token=config.private_config.token,
         )
 
-    def upload_logs(self, file: Path, key: str) -> Response:
-        s3_url = self.get_presigned_url(key=key, action="upload")
+    def upload_logs(self, file: Path, key: str) -> None:
+
         with open(file, "rb") as f:
             log_data = f.read()
 
+        s3_url = self.get_presigned_url(key=key, action="upload")
         s3_response = requests.put(s3_url, data=log_data)
         if s3_response.status_code != 200:
             raise AnkiHubRequestError(s3_response)
-
-        return s3_response

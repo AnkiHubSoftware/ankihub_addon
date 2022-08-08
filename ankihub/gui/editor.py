@@ -204,6 +204,12 @@ def refresh_suggestion_button(editor: Editor) -> None:
     """Set ankihub button label based on whether ankihub_id field is empty"""
     note = editor.note
     disable_btn_script = "document.getElementById('ankihub-btn').disabled={};"
+
+    if note is None:
+        # there were error reports where note was None, maybe because of some other add-on
+        editor.web.eval(disable_btn_script.format("true"))
+        return
+
     if ANKIHUB_NOTE_TYPE_FIELD_NAME in note:
         editor.web.eval(disable_btn_script.format("false"))
     else:

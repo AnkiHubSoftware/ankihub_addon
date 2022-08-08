@@ -1,7 +1,9 @@
+from concurrent.futures import Future
 from datetime import datetime, timezone
 from typing import Optional
 
 from aqt import (
+    AnkiApp,
     QCheckBox,
     QHBoxLayout,
     QLabel,
@@ -14,15 +16,19 @@ from aqt import (
     mw,
 )
 from aqt.operations import QueryOp
-from aqt.qt import QAction, QMenu, qconnect
+from aqt.qt import QAction, QDialog, QMenu, Qt, qconnect
 from aqt.studydeck import StudyDeck
-from aqt.utils import askUser, showInfo, showText, tooltip
+from aqt.utils import askUser, openLink, showInfo, showText, tooltip
 
 from .. import LOGGER
 from ..addon_ankihub_client import AddonAnkiHubClient as AnkiHubClient
 from ..ankihub_client import AnkiHubRequestError
 from ..config import config
-from ..error_reporting import report_exception_and_upload_logs
+from ..constants import ADDON_VERSION
+from ..error_reporting import (
+    report_exception_and_upload_logs,
+    upload_logs_in_background,
+)
 from ..media_import.ui import open_import_dialog
 from ..register_decks import create_collaborative_deck
 from ..sync import sync_with_progress
@@ -152,7 +158,7 @@ class DeckCreationConfirmationDialog(QMessageBox):
         )
         self.setCheckBox(self.confirmation_cb)
 
-    def run(self):
+    def run(self) -> bool:
         clicked_ok = self.exec() == QMessageBox.StandardButton.Yes
         if not clicked_ok:
             return False
@@ -252,6 +258,48 @@ def sign_out_action():
     tooltip("Signed out of AnkiHub!", parent=mw)
 
 
+class LogUploadResultDialog(QDialog):
+    def __init__(self, log_file_name: str):
+        super().__init__(parent=mw)
+
+        self.setWindowTitle("AnkiHub")
+
+        self.layout_ = QVBoxLayout()
+        self.setLayout(self.layout_)
+
+        self.label = QLabel(
+            "Logs uploaded successfully!<br><br>"
+            " Please copy this file name and include it in your bug report:<br><br>"
+            f"<b>{log_file_name}</b>",
+        )
+        self.label.setTextFormat(Qt.TextFormat.RichText)
+        self.layout_.addWidget(self.label)
+
+        self.layout_.addSpacing(8)
+
+        def on_click() -> None:
+            AnkiApp.clipboard().setText(log_file_name)
+
+        self.button = QPushButton("Copy to clipboard")
+        self.button.clicked.connect(on_click)  # type: ignore
+        self.layout_.addWidget(self.button)
+
+
+def upload_logs_action():
+    if not askUser(
+        "Do you want to upload the add-on's logs to AnkiHub to go along a bug report?"
+    ):
+        return
+
+    def on_done(future: Future):
+        mw.progress.finish()
+        log_file_name = future.result()
+        LogUploadResultDialog(log_file_name=log_file_name).exec()
+
+    mw.progress.start(label="Uploading logs...", parent=mw, immediate=True)
+    upload_logs_in_background(on_done=on_done, hide_username=True)
+
+
 def ankihub_login_setup(parent):
     sign_in_button = QAction("🔑 Sign into AnkiHub", mw)
     sign_in_button.triggered.connect(AnkiHubLogin.display_login)
@@ -285,6 +333,27 @@ def sync_with_ankihub_setup(parent):
     if not config.private_config.decks:
         q_action.setDisabled(True)
     parent.addAction(q_action)
+
+
+def ankihub_help_setup(parent):
+    """Set up the sub menu for help related items."""
+    help_menu = QMenu("🆘 Help", parent)
+
+    q_get_help_action = QAction("Get Help", help_menu)
+    q_get_help_action.triggered.connect(
+        lambda: openLink("https://www.ankihub.net/support")
+    )
+    help_menu.addAction(q_get_help_action)
+
+    q_upload_logs_action = QAction("Upload logs", help_menu)
+    q_upload_logs_action.triggered.connect(upload_logs_action)
+    help_menu.addAction(q_upload_logs_action)
+
+    q_version_action = QAction(f"Version {ADDON_VERSION}", help_menu)
+    q_version_action.setEnabled(False)
+    help_menu.addAction(q_version_action)
+
+    parent.addMenu(help_menu)
 
 
 def ankihub_logout_setup(parent):
@@ -321,3 +390,5 @@ def refresh_ankihub_menu() -> None:
         # upload_suggestions_setup(parent=ankihub_menu)
     else:
         ankihub_login_setup(parent=ankihub_menu)
+
+    ankihub_help_setup(parent=ankihub_menu)

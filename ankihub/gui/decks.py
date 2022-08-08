@@ -25,7 +25,7 @@ from ..ankihub_client import NoteUpdate
 from ..config import config
 from ..constants import URL_DECK_BASE, URL_DECKS, URL_HELP, URL_VIEW_DECK
 from ..db import AnkiHubDB
-from ..sync import import_ankihub_deck, sync_with_ankihub
+from ..sync import AnkiHubImporter
 from ..utils import create_backup_with_progress, undo_note_type_modfications
 
 
@@ -318,7 +318,8 @@ class SubscribeDialog(QDialog):
 
         create_backup_with_progress()
 
-        local_did = import_ankihub_deck(
+        importer = AnkiHubImporter()
+        local_did = importer.import_ankihub_deck(
             ankihub_did=ankihub_did,
             notes_data=notes_data,
             deck_name=deck_name,
@@ -336,8 +337,6 @@ class SubscribeDialog(QDialog):
         )
 
         LOGGER.debug("Importing deck was succesful.")
-
-        sync_with_ankihub()
 
         return True
 
