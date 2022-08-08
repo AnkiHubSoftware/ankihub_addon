@@ -9,7 +9,7 @@ from anki.errors import NotFoundError
 from anki.models import NotetypeDict, NotetypeId
 from anki.notes import Note, NoteId
 from aqt import gui_hooks, mw
-from aqt.utils import showInfo
+from aqt.utils import showInfo, tooltip
 
 from . import LOGGER, constants
 from .addon_ankihub_client import AddonAnkiHubClient as AnkiHubClient
@@ -29,175 +29,310 @@ from .utils import (
 )
 
 
-def sync_with_ankihub() -> None:
-    LOGGER.debug("Trying to sync with AnkiHub.")
+class AnkiHubSync:
+    def __init__(self):
+        self.importer = AnkiHubImporter()
 
-    create_backup_with_progress()
+    def sync_all_decks(self) -> None:
+        LOGGER.debug("Trying to sync with AnkiHub.")
 
-    for ankihub_did, deck_info in config.private_config.decks.items():
-        success = None
-        try:
-            success = sync_deck_with_ankihub(ankihub_did)
-        except AnkiHubRequestError as e:
-            if "/updates" not in e.response.url:
-                raise e
+        create_backup_with_progress()
 
-            if e.response.status_code == 403:
-                url_view_deck = f"{constants.URL_VIEW_DECK}{ankihub_did}"
-                mw.taskman.run_on_main(
-                    lambda: showInfo(  # type: ignore
-                        f"Please subscribe to the \"{deck_info['name']}\" deck on the AnkiHub website to "
-                        "be able to sync.<br><br>"
-                        f'Link to the deck: <a href="{url_view_deck}">{url_view_deck}</a>',
-                    )
-                )
-                LOGGER.debug(
-                    "Unable to sync because of user not being subscribed to a deck."
-                )
-                return
-            elif e.response.status_code == 404:
-                mw.taskman.run_on_main(
-                    lambda: showInfo(  # type: ignore
-                        f"The deck \"{deck_info['name']}\" does not exist on the AnkiHub website. "
-                        f"Remove it from the subscribed decks to be able to sync.<br><br>"
-                        f"deck id: <i>{ankihub_did}</i>",
-                    )
-                )
-                LOGGER.debug("Unable to sync because a deck doesn't exist on AnkiHub.")
-                return
-            raise e
+        for ankihub_did, deck_info in config.private_config.decks.items():
+            try:
+                should_continue = self._sync_deck(ankihub_did)
+                if not should_continue:
+                    return
+            except AnkiHubRequestError as e:
+                if self._handle_exception(e, ankihub_did, deck_info):
+                    return
+                else:
+                    raise e
 
-        if not success:
-            # Should we restore from backup on a failure?
-            # Also it would probably be good to count the number of updated notes and decks and display that to the user
-            return
+    def _sync_deck(self, ankihub_did: str) -> bool:
+        deck = config.private_config.decks[ankihub_did]
+        client = AnkiHubClient()
+        notes_data = []
+        for chunk in client.get_deck_updates(
+            uuid.UUID(ankihub_did), since=deck["latest_update"]
+        ):
+            if mw.progress.want_cancel():
+                LOGGER.debug("User cancelled sync.")
+                return False
 
+            if chunk.notes:
+                notes_data += chunk.notes
 
-def sync_deck_with_ankihub(ankihub_did: str) -> bool:
-    deck = config.private_config.decks[ankihub_did]
-    client = AnkiHubClient()
-    notes_data = []
-    for chunk in client.get_deck_updates(
-        uuid.UUID(ankihub_did), since=deck["latest_update"]
-    ):
-        if mw.progress.want_cancel():
-            LOGGER.debug("User cancelled sync.")
+        if notes_data:
+            self.importer.import_ankihub_deck(
+                ankihub_did=ankihub_did,
+                notes_data=notes_data,
+                deck_name=deck["name"],
+                local_did=deck["anki_id"],
+                protected_fields=chunk.protected_fields,
+                protected_tags=chunk.protected_tags,
+            )
+            config.save_latest_update(ankihub_did, chunk.latest_update)
+        else:
+            LOGGER.debug(f"No new updates to sync for {ankihub_did=}")
+
+        return True
+
+    def _handle_exception(
+        self, exc: AnkiHubRequestError, ankihub_did: str, deck_info: Dict
+    ) -> bool:
+        # returns True if the exception was handled
+
+        if "/updates" not in exc.response.url:
             return False
 
-        if chunk.notes:
-            notes_data += chunk.notes
+        if exc.response.status_code == 403:
+            url_view_deck = f"{constants.URL_VIEW_DECK}{ankihub_did}"
+            mw.taskman.run_on_main(
+                lambda: showInfo(  # type: ignore
+                    f"Please subscribe to the \"{deck_info['name']}\" deck on the AnkiHub website to "
+                    "be able to sync.<br><br>"
+                    f'Link to the deck: <a href="{url_view_deck}">{url_view_deck}</a>',
+                )
+            )
+            LOGGER.debug(
+                "Unable to sync because of user not being subscribed to a deck."
+            )
+            return True
+        elif exc.response.status_code == 404:
+            mw.taskman.run_on_main(
+                lambda: showInfo(  # type: ignore
+                    f"The deck \"{deck_info['name']}\" does not exist on the AnkiHub website. "
+                    f"Remove it from the subscribed decks to be able to sync.<br><br>"
+                    f"deck id: <i>{ankihub_did}</i>",
+                )
+            )
+            LOGGER.debug("Unable to sync because the deck doesn't exist on AnkiHub.")
+            return True
+        return False
 
-    if notes_data:
-        import_ankihub_deck(
+
+class AnkiHubImporter:
+    def __init__(self):
+        self.num_notes_updated = 0
+        self.num_notes_created = 0
+
+    def import_ankihub_deck(
+        self,
+        ankihub_did: str,
+        notes_data: List[NoteUpdate],
+        deck_name: str,  # name that will be used for a deck if a new one gets created
+        local_did: Optional[  # did that new notes should be put into if importing not for the first time
+            DeckId
+        ] = None,
+        protected_fields: Optional[
+            Dict[int, List[str]]
+        ] = None,  # will be fetched from api if not provided
+        protected_tags: Optional[
+            List[str]
+        ] = None,  # will be fetched from api if not provided
+    ) -> Optional[DeckId]:
+        """
+        Used for importing an ankihub deck and updates to an ankihub deck
+        When no local_did is provided this function assumes that the deck gets installed for the first time
+        Returns id of the deck future cards should be imported into - the local_did - if the import was sucessful
+        else it returns None
+        """
+
+        LOGGER.debug(f"Importing ankihub deck {deck_name=} {local_did=}")
+
+        remote_note_types = fetch_remote_note_types_based_on_notes_data(notes_data)
+
+        if protected_fields is None:
+            protected_fields = {}
+            client = AnkiHubClient()
+            try:
+                protected_fields = client.get_protected_fields(uuid.UUID(ankihub_did))
+            except AnkiHubRequestError as e:
+                if not e.response.status_code == 404:
+                    raise e
+
+        if protected_tags is None:
+            protected_tags = []
+            client = AnkiHubClient()
+            try:
+                protected_tags = client.get_protected_tags(uuid.UUID(ankihub_did))
+            except AnkiHubRequestError as e:
+                if not e.response.status_code == 404:
+                    raise e
+
+        anki_deck_id = self._import_ankihub_deck_inner(
             ankihub_did=ankihub_did,
             notes_data=notes_data,
-            deck_name=deck["name"],
-            local_did=deck["anki_id"],
-            protected_fields=chunk.protected_fields,
-            protected_tags=chunk.protected_tags,
-        )
-        config.save_latest_update(ankihub_did, chunk.latest_update)
-    else:
-        LOGGER.debug(f"No new updates to sync for {ankihub_did=}")
-
-    return True
-
-
-def import_ankihub_deck(
-    ankihub_did: str,
-    notes_data: List[NoteUpdate],
-    deck_name: str,  # name that will be used for a deck if a new one gets created
-    local_did: Optional[  # did that new notes should be put into if importing not for the first time
-        DeckId
-    ] = None,
-    protected_fields: Optional[
-        Dict[int, List[str]]
-    ] = None,  # will be fetched from api if not provided
-    protected_tags: Optional[
-        List[str]
-    ] = None,  # will be fetched from api if not provided
-) -> Optional[DeckId]:
-    """
-    Used for importing an ankihub deck and updates to an ankihub deck
-    When no local_did is provided this function assumes that the deck gets installed for the first time
-    Returns id of the deck future cards should be imported into - the local_did - if the import was sucessful
-    else it returns None
-    """
-
-    LOGGER.debug(f"Importing ankihub deck {deck_name=} {local_did=}")
-
-    remote_note_types = fetch_remote_note_types_based_on_notes_data(notes_data)
-
-    if protected_fields is None:
-        protected_fields = {}
-        client = AnkiHubClient()
-        try:
-            protected_fields = client.get_protected_fields(uuid.UUID(ankihub_did))
-        except AnkiHubRequestError as e:
-            if not e.response.status_code == 404:
-                raise e
-
-    if protected_tags is None:
-        protected_tags = []
-        client = AnkiHubClient()
-        try:
-            protected_tags = client.get_protected_tags(uuid.UUID(ankihub_did))
-        except AnkiHubRequestError as e:
-            if not e.response.status_code == 404:
-                raise e
-
-    anki_deck_id = import_ankihub_deck_inner(
-        ankihub_did=ankihub_did,
-        notes_data=notes_data,
-        deck_name=deck_name,
-        remote_note_types=remote_note_types,
-        protected_fields=protected_fields,
-        protected_tags=protected_tags,
-        local_did=local_did,
-    )
-    return anki_deck_id
-
-
-def import_ankihub_deck_inner(
-    ankihub_did: str,
-    notes_data: List[NoteUpdate],
-    deck_name: str,  # name that will be used for a deck if a new one gets created
-    remote_note_types: Dict[NotetypeId, NotetypeDict],
-    protected_fields: Dict[int, List[str]],
-    protected_tags: List[str],
-    local_did: DeckId = None,  # did that new notes should be put into if importing not for the first time
-) -> DeckId:
-
-    first_time_import = local_did is None
-
-    local_did = adjust_deck(deck_name, local_did)
-    adjust_note_types(remote_note_types)
-    reset_note_types_of_notes_based_on_notes_data(notes_data)
-
-    dids: Set[DeckId] = set()  # set of ids of decks notes were imported into
-    for note_data in notes_data:
-        LOGGER.debug(f"Trying to update or create note:\n {pformat(note_data)}")
-        note = update_or_create_note(
-            anki_nid=NoteId(note_data.anki_nid),
-            mid=NotetypeId(note_data.mid),
-            ankihub_nid=str(note_data.ankihub_note_uuid),
-            fields=note_data.fields,
-            tags=note_data.tags,
-            anki_did=local_did,
+            deck_name=deck_name,
+            remote_note_types=remote_note_types,
             protected_fields=protected_fields,
             protected_tags=protected_tags,
+            local_did=local_did,
         )
-        dids_for_note = set(c.did for c in note.cards())
-        dids = dids | dids_for_note
+        return anki_deck_id
 
-    if first_time_import:
-        local_did = _cleanup_first_time_deck_import(dids, local_did)
+    def _import_ankihub_deck_inner(
+        self,
+        ankihub_did: str,
+        notes_data: List[NoteUpdate],
+        deck_name: str,  # name that will be used for a deck if a new one gets created
+        remote_note_types: Dict[NotetypeId, NotetypeDict],
+        protected_fields: Dict[int, List[str]],
+        protected_tags: List[str],
+        local_did: DeckId = None,  # did that new notes should be put into if importing not for the first time
+    ) -> DeckId:
 
-    db = AnkiHubDB()
-    anki_nids = [NoteId(note_data.anki_nid) for note_data in notes_data]
-    db.save_notes_from_nids(ankihub_did=ankihub_did, nids=anki_nids)
+        first_time_import = local_did is None
 
-    return local_did
+        local_did = adjust_deck(deck_name, local_did)
+        adjust_note_types(remote_note_types)
+        reset_note_types_of_notes_based_on_notes_data(notes_data)
+
+        dids: Set[DeckId] = set()  # set of ids of decks notes were imported into
+        for note_data in notes_data:
+            LOGGER.debug(f"Trying to update or create note:\n {pformat(note_data)}")
+            note = self.update_or_create_note(
+                anki_nid=NoteId(note_data.anki_nid),
+                mid=NotetypeId(note_data.mid),
+                ankihub_nid=str(note_data.ankihub_note_uuid),
+                fields=note_data.fields,
+                tags=note_data.tags,
+                anki_did=local_did,
+                protected_fields=protected_fields,
+                protected_tags=protected_tags,
+            )
+            dids_for_note = set(c.did for c in note.cards())
+            dids = dids | dids_for_note
+
+        if first_time_import:
+            local_did = self._cleanup_first_time_deck_import(dids, local_did)
+
+        db = AnkiHubDB()
+        anki_nids = [NoteId(note_data.anki_nid) for note_data in notes_data]
+        db.save_notes_from_nids(ankihub_did=ankihub_did, nids=anki_nids)
+
+        return local_did
+
+    def _cleanup_first_time_deck_import(
+        self, dids_cards_were_imported_to: Iterable[DeckId], created_did: DeckId
+    ) -> Optional[DeckId]:
+        dids = set(dids_cards_were_imported_to)
+
+        # remove "Custom Study" decks from dids
+        dids = {did for did in dids if not mw.col.decks.is_filtered(did)}
+
+        # if there is a single deck where all the existing cards were before the import,
+        # move the new cards there (from the newly created deck) and remove the created deck
+        # takes subdecks into account
+        if (dids_wh_created := dids - set([created_did])) and (
+            (common_ancestor_did := lowest_level_common_ancestor_did(dids_wh_created))
+        ) is not None:
+            cids = mw.col.find_cards(f"deck:{mw.col.decks.name(created_did)}")
+            mw.col.set_deck(cids, common_ancestor_did)
+            LOGGER.debug(
+                f"Moved new cards to common ancestor deck {common_ancestor_did=}"
+            )
+
+            mw.col.decks.remove([created_did])
+            LOGGER.debug(f"Removed created deck {created_did=}")
+            return common_ancestor_did
+
+        return created_did
+
+    def update_or_create_note(
+        self,
+        anki_nid: NoteId,
+        ankihub_nid: str,
+        fields: List[FieldUpdate],
+        tags: List[str],
+        mid: NotetypeId,
+        anki_did: DeckId,  # only relevant for newly created notes
+        protected_fields: Dict[int, List[str]],
+        protected_tags: List[str],
+    ) -> Note:
+        try:
+            note = mw.col.get_note(id=anki_nid)
+            fields.append(
+                FieldUpdate(
+                    name=constants.ANKIHUB_NOTE_TYPE_FIELD_NAME,
+                    order=len(fields),
+                    value=ankihub_nid,
+                )
+            )
+            if self.prepare_note(
+                note, ankihub_nid, fields, tags, protected_fields, protected_tags
+            ):
+                mw.col.update_note(note)
+                self.num_notes_updated += 1
+                LOGGER.debug(f"Updated note: {anki_nid=}")
+            else:
+                LOGGER.debug(f"No changes, skipping {anki_nid=}")
+        except NotFoundError:
+            note_type = mw.col.models.get(NotetypeId(mid))
+            note = mw.col.new_note(note_type)
+            self.prepare_note(
+                note, ankihub_nid, fields, tags, protected_fields, protected_tags
+            )
+            note = create_note_with_id(note, anki_nid, anki_did)
+            self.num_notes_created += 1
+            LOGGER.debug(f"Created note: {anki_nid=}")
+        return note
+
+    def prepare_note(
+        self,
+        note: Note,
+        ankihub_id: str,
+        fields: List[FieldUpdate],
+        tags: List[str],
+        protected_fields: Dict[int, List[str]],
+        protected_tags: List[str],
+    ) -> bool:
+        """
+        Updates the note with the given fields and tags (taking protected fields and tags into account)
+        Sets the ankihub_id field to the given ankihub_id
+        Returns True if note was changed and False otherwise
+        """
+
+        result = False
+
+        if note[constants.ANKIHUB_NOTE_TYPE_FIELD_NAME] != ankihub_id:
+            note[constants.ANKIHUB_NOTE_TYPE_FIELD_NAME] = ankihub_id
+            LOGGER.debug(
+                f"AnkiHub id of note {note.id} changed from {note[constants.ANKIHUB_NOTE_TYPE_FIELD_NAME]} "
+                f"to {ankihub_id}",
+            )
+            result = True
+
+        prev_tags = note.tags
+        note.tags = updated_tags(
+            cur_tags=note.tags, incoming_tags=tags, protected_tags=protected_tags
+        )
+        if set(prev_tags) != set(note.tags):
+            LOGGER.debug(
+                f"Tags were changed to {note.tags}.",
+            )
+            result = True
+
+        # update fields which are not protected
+        for field in fields:
+            protected_fields_for_model = protected_fields.get(
+                mw.col.models.get(note.mid)["id"], []
+            )
+            if field.name in protected_fields_for_model:
+                continue
+
+            if note[field.name] != field.value:
+                note[field.name] = field.value
+                LOGGER.debug(
+                    f'Field: "{field.name}" was changed from:\n'
+                    f"{note[field.name]}\n"
+                    "to:\n"
+                    f"{field.value}"
+                )
+                result = True
+
+        return result
 
 
 def adjust_deck(deck_name: str, local_did: Optional[DeckId] = None) -> DeckId:
@@ -211,87 +346,6 @@ def adjust_deck(deck_name: str, local_did: Optional[DeckId] = None) -> DeckId:
         LOGGER.debug(f"Recreated deck {local_did=}")
 
     return local_did
-
-
-def _cleanup_first_time_deck_import(
-    dids_cards_were_imported_to: Iterable[DeckId], created_did: DeckId
-) -> Optional[DeckId]:
-    dids = set(dids_cards_were_imported_to)
-
-    # remove "Custom Study" decks from dids
-    dids = {did for did in dids if not mw.col.decks.is_filtered(did)}
-
-    # if there is a single deck where all the existing cards were before the import,
-    # move the new cards there (from the newly created deck) and remove the created deck
-    # takes subdecks into account
-    if (dids_wh_created := dids - set([created_did])) and (
-        (common_ancestor_did := lowest_level_common_ancestor_did(dids_wh_created))
-    ) is not None:
-        cids = mw.col.find_cards(f"deck:{mw.col.decks.name(created_did)}")
-        mw.col.set_deck(cids, common_ancestor_did)
-        LOGGER.debug(f"Moved new cards to common ancestor deck {common_ancestor_did=}")
-
-        mw.col.decks.remove([created_did])
-        LOGGER.debug(f"Removed created deck {created_did=}")
-        return common_ancestor_did
-
-    return created_did
-
-
-def update_or_create_note(
-    anki_nid: NoteId,
-    ankihub_nid: str,
-    fields: List[FieldUpdate],
-    tags: List[str],
-    mid: NotetypeId,
-    anki_did: DeckId,  # only relevant for newly created notes
-    protected_fields: Dict[int, List[str]],
-    protected_tags: List[str],
-) -> Note:
-    try:
-        note = mw.col.get_note(id=anki_nid)
-        fields.append(
-            FieldUpdate(
-                name=constants.ANKIHUB_NOTE_TYPE_FIELD_NAME,
-                order=len(fields),
-                value=ankihub_nid,
-            )
-        )
-        prepare_note(note, ankihub_nid, fields, tags, protected_fields, protected_tags)
-        mw.col.update_note(note)
-        LOGGER.debug(f"Updated note: {anki_nid=}")
-    except NotFoundError:
-        note_type = mw.col.models.get(NotetypeId(mid))
-        note = mw.col.new_note(note_type)
-        prepare_note(note, ankihub_nid, fields, tags, protected_fields, protected_tags)
-        note = create_note_with_id(note, anki_nid, anki_did)
-        LOGGER.debug(f"Created note: {anki_nid=}")
-    return note
-
-
-def prepare_note(
-    note: Note,
-    ankihub_id: str,
-    fields: List[FieldUpdate],
-    tags: List[str],
-    protected_fields: Dict[int, List[str]],
-    protected_tags: List[str],
-) -> None:
-    note[constants.ANKIHUB_NOTE_TYPE_FIELD_NAME] = str(ankihub_id)
-
-    note.tags = updated_tags(
-        cur_tags=note.tags, incoming_tags=tags, protected_tags=protected_tags
-    )
-
-    # update fields which are not protected
-    for field in fields:
-        protected_fields_for_model = protected_fields.get(
-            mw.col.models.get(note.mid)["id"], []
-        )
-        if field.name in protected_fields_for_model:
-            continue
-
-        note[field.name] = field.value
 
 
 def updated_tags(
@@ -381,7 +435,7 @@ def ensure_local_and_remote_fields_are_same(
             remote_note_type["flds"]
         ):
             LOGGER.debug(
-                f'Fields of local note type "{local_note_type["name"]}" differ from remote note_type. '
+                f'Fields of local note type "{local_note_type["name"]}" differ from remote note type.\n'
                 f"local:\n{pformat(field_tuples(local_note_type['flds']))}\n"
                 f"remote:\n{pformat(field_tuples(remote_note_type['flds']))}"
             )
@@ -437,12 +491,8 @@ def reset_note_types_of_notes_based_on_notes_data(notes_data: List[NoteUpdate]) 
 
 
 def sync_with_progress() -> None:
-    def on_done(future: Future):
-        if exc := future.exception():
-            LOGGER.debug("Unable to sync.")
-            raise exc
-        else:
-            mw.reset()
+
+    sync = AnkiHubSync()
 
     def sync_with_ankihub_after_delay():
 
@@ -456,7 +506,22 @@ def sync_with_progress() -> None:
         if ANKI_MINOR < 50:
             sleep(3)
 
-        sync_with_ankihub()
+        sync.sync_all_decks()
+
+    def on_done(future: Future):
+        if exc := future.exception():
+            LOGGER.debug("Unable to sync.")
+            raise exc
+        else:
+            total = sync.importer.num_notes_created + sync.importer.num_notes_updated
+            if total == 0:
+                tooltip("AnkiHub: No new updates")
+            else:
+                tooltip(
+                    f"AnkiHub: Synced {total} note{'' if total == 1 else 's'}.",
+                    parent=mw,
+                )
+            mw.reset()
 
     if config.private_config.token:
         mw.taskman.with_progress(

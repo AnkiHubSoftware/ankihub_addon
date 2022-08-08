@@ -3,7 +3,10 @@ import sys
 from logging.handlers import RotatingFileHandler
 from pathlib import Path
 
-LOG_FILE = Path(__file__).parent / "user_files/ankihub.log"
+LOG_FOLDER = Path(__file__).parent / "logs"
+LOG_FOLDER.mkdir(exist_ok=True)
+
+LOG_FILE = LOG_FOLDER / "ankihub.log"
 
 
 def stdout_handler():
