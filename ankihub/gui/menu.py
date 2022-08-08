@@ -24,7 +24,7 @@ from .. import LOGGER
 from ..addon_ankihub_client import AddonAnkiHubClient as AnkiHubClient
 from ..ankihub_client import AnkiHubRequestError
 from ..config import config
-from ..constants import ADDON_VERSION
+from ..constants import ADDON_VERSION, URL_VIEW_DECK
 from ..error_reporting import (
     report_exception_and_upload_logs,
     upload_logs_in_background,
@@ -197,13 +197,14 @@ def create_collaborative_deck_action() -> None:
         return
 
     private = askUser(
-        "Would you like to make this deck public?\n\n"
-        'If you chose "No" it will be private and only you will be able to see it on the AnkiHub website.'
+        "Would you like to make this deck public?<br><br>"
+        'If you chose "No" it will be private and only people with a link '
+        "will be able to see it on the AnkiHub website."
     )
 
     confirm = askUser(
         "Uploading the deck to AnkiHub requires modifying notes and note types in "
-        f"{deck_name} and will require a full sync afterwards. Would you like to "
+        f"<b>{deck_name}</b> and will require a full sync afterwards. Would you like to "
         "continue?",
     )
     if not confirm:
@@ -220,7 +221,12 @@ def create_collaborative_deck_action() -> None:
             creator=True,
             last_update=creation_time,
         )
-        showInfo("🎉 Deck upload successful!")
+        deck_url = f"{URL_VIEW_DECK}{ankihub_did}"
+        showInfo(
+            "🎉 Deck upload successful!<br><br>"
+            "Link to the deck on AnkiHub:<br>"
+            f"<a href={deck_url}>{deck_url}</a>"
+        )
 
     def on_failure(exc: Exception):
         mw.progress.finish()
