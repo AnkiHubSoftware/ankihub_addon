@@ -228,7 +228,7 @@ class AnkiHubImporter:
         if (dids_wh_created := dids - set([created_did])) and (
             (common_ancestor_did := lowest_level_common_ancestor_did(dids_wh_created))
         ) is not None:
-            cids = mw.col.find_cards(f"deck:{mw.col.decks.name(created_did)}")
+            cids = mw.col.find_cards(f'deck:"{mw.col.decks.name(created_did)}"')
             mw.col.set_deck(cids, common_ancestor_did)
             LOGGER.debug(
                 f"Moved new cards to common ancestor deck {common_ancestor_did=}"
