@@ -18,7 +18,7 @@ from .config import config
 from .constants import ANKI_MINOR
 from .db import AnkiHubDB
 from .utils import (
-    create_backup_with_progress,
+    create_backup,
     create_deck_with_id,
     create_note_type_with_id,
     create_note_with_id,
@@ -36,7 +36,7 @@ class AnkiHubSync:
     def sync_all_decks(self) -> None:
         LOGGER.debug("Trying to sync with AnkiHub.")
 
-        create_backup_with_progress()
+        create_backup()
 
         for ankihub_did, deck_info in config.private_config.decks.items():
             try:
