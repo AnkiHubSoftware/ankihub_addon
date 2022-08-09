@@ -183,9 +183,6 @@ class AnkiHubImporter:
         local_did: DeckId = None,  # did that new notes should be put into if importing not for the first time
     ) -> DeckId:
 
-        db = AnkiHubDB()
-        db.save_notes_from_notes_data(ankihub_did=ankihub_did, notes_data=notes_data)
-
         first_time_import = local_did is None
 
         local_did = adjust_deck(deck_name, local_did)
@@ -210,6 +207,10 @@ class AnkiHubImporter:
 
         if first_time_import:
             local_did = self._cleanup_first_time_deck_import(dids, local_did)
+
+        db = AnkiHubDB()
+        anki_nids = [NoteId(note_data.anki_nid) for note_data in notes_data]
+        db.save_notes_from_nids(ankihub_did=ankihub_did, nids=anki_nids)
 
         return local_did
 
