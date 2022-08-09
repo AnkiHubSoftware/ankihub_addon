@@ -274,7 +274,7 @@ class AnkiHubImporter:
             self.prepare_note(
                 note, ankihub_nid, fields, tags, protected_fields, protected_tags
             )
-            note = create_note_with_id(note, anki_nid, anki_did)
+            note = create_note_with_id(note, anki_id=anki_nid, anki_did=anki_did)
             self.num_notes_created += 1
             LOGGER.debug(f"Created note: {anki_nid=}")
         return note
@@ -297,11 +297,11 @@ class AnkiHubImporter:
         result = False
 
         if note[constants.ANKIHUB_NOTE_TYPE_FIELD_NAME] != ankihub_id:
-            note[constants.ANKIHUB_NOTE_TYPE_FIELD_NAME] = ankihub_id
             LOGGER.debug(
-                f"AnkiHub id of note {note.id} changed from {note[constants.ANKIHUB_NOTE_TYPE_FIELD_NAME]} "
+                f"AnkiHub id of note {note.id} will be changed from {note[constants.ANKIHUB_NOTE_TYPE_FIELD_NAME]} "
                 f"to {ankihub_id}",
             )
+            note[constants.ANKIHUB_NOTE_TYPE_FIELD_NAME] = ankihub_id
             result = True
 
         prev_tags = note.tags
@@ -310,7 +310,7 @@ class AnkiHubImporter:
         )
         if set(prev_tags) != set(note.tags):
             LOGGER.debug(
-                f"Tags were changed to {note.tags}.",
+                f"Tags were changed from {prev_tags} to {note.tags}.",
             )
             result = True
 
