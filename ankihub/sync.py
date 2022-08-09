@@ -323,13 +323,13 @@ class AnkiHubImporter:
                 continue
 
             if note[field.name] != field.value:
-                note[field.name] = field.value
                 LOGGER.debug(
-                    f'Field: "{field.name}" was changed from:\n'
+                    f'Field: "{field.name}" will be changed from:\n'
                     f"{note[field.name]}\n"
                     "to:\n"
                     f"{field.value}"
                 )
+                note[field.name] = field.value
                 result = True
 
         return result
