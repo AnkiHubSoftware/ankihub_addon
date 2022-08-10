@@ -5,7 +5,7 @@ from pathlib import Path
 
 from anki.buildinfo import version as ANKI_VERSION
 
-from . import LOGGER
+from . import LOGGER, ankihub_client
 from .config import config
 
 version_file = Path(__file__).parent / "VERSION"
@@ -25,6 +25,9 @@ if ANKIHUB_APP_URL is None:
     ANKIHUB_APP_URL = config.public_config.get("ankihub_url")
     ANKIHUB_APP_URL = ANKIHUB_APP_URL if ANKIHUB_APP_URL else "https://app.ankihub.net"
 API_URL_BASE = f"{ANKIHUB_APP_URL}/api"
+
+# maybe override default API_URL_BASE of client
+ankihub_client.API_URL_BASE = API_URL_BASE
 
 LOGGER.debug(f"Starting with URL_BASE {API_URL_BASE}")
 URL_VIEW_NOTE = f"{ANKIHUB_APP_URL}/decks/notes/"
@@ -52,16 +55,6 @@ DB_PATH = USER_FILES_PATH / "ankihub.db"
 class AnkiHubCommands(Enum):
     CHANGE = "Suggest a change"
     NEW = "Suggest a new note"
-
-
-# TODO Make sure these match up with SuggestionType.choices on AnkiHub
-class ChangeTypes(Enum):
-    UPDATED_CONTENT = "updated_content", "Updated content"
-    NEW_CONTENT = "new_content", "New content"
-    SPELLING_GRAMMATICAL = "spelling/grammatical", "Spelling/Grammatical"
-    CONTENT_ERROR = "content_error", "Content error"
-    NEW_CARD_TO_ADD = "new_card_to_add", "New card to add"
-    OTHER = "other", "Other"
 
 
 RATIONALE_FOR_CHANGE_MAX_LENGTH = 1024
