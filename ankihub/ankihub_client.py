@@ -3,6 +3,7 @@ import dataclasses
 import json
 import uuid
 from dataclasses import dataclass
+from enum import Enum
 from pathlib import Path
 from typing import Any, Dict, Iterator, List, TypedDict
 
@@ -11,9 +12,12 @@ from requests import PreparedRequest, Request, Response, Session
 from requests.exceptions import HTTPError
 
 from . import LOGGER
-from .constants import API_URL_BASE, ChangeTypes
 from .lib import dataclasses_json  # type: ignore
 from .lib.dataclasses_json import DataClassJsonMixin  # type: ignore
+
+API_URL_BASE = "https://app.ankihub.net/api"
+
+DECK_UPDATE_PAGE_SIZE = 2000  # seems to work well in terms of speed
 
 CSV_DELIMITER = ";"
 
@@ -87,6 +91,16 @@ def http_error_hook(response: Response, *args, **kwargs):
         raise AnkiHubRequestError(response)
 
     return response
+
+
+# TODO Make sure these match up with SuggestionType.choices on AnkiHub
+class ChangeTypes(Enum):
+    UPDATED_CONTENT = "updated_content", "Updated content"
+    NEW_CONTENT = "new_content", "New content"
+    SPELLING_GRAMMATICAL = "spelling/grammatical", "Spelling/Grammatical"
+    CONTENT_ERROR = "content_error", "Content error"
+    NEW_CARD_TO_ADD = "new_card_to_add", "New card to add"
+    OTHER = "other", "Other"
 
 
 class AnkiHubClient:
@@ -204,8 +218,13 @@ class AnkiHubClient:
         class Params(TypedDict, total=False):
             page: int
             since: str
+            size: int
 
-        params: Params = {"since": str(since), "page": 1} if since else {"page": 1}
+        params: Params = {
+            "since": str(since) if since else None,
+            "page": 1,
+            "size": DECK_UPDATE_PAGE_SIZE,
+        }
         has_next_page = True
         while has_next_page:
             response = self._send_request(

@@ -396,8 +396,8 @@ def test_get_deck_by_id(anki_session_with_addon: AnkiSession, requests_mock):
 def test_create_change_note_suggestion(
     anki_session_with_addon: AnkiSession, requests_mock
 ):
-    from ankihub.ankihub_client import AnkiHubClient, AnkiHubRequestError
-    from ankihub.constants import API_URL_BASE, ChangeTypes
+    from ankihub.ankihub_client import AnkiHubClient, AnkiHubRequestError, ChangeTypes
+    from ankihub.constants import API_URL_BASE
 
     client = AnkiHubClient(hooks=[])
     # test create change note suggestion
@@ -433,8 +433,8 @@ def test_create_change_note_suggestion(
 def test_create_new_note_suggestion(
     anki_session_with_addon: AnkiSession, requests_mock
 ):
-    from ankihub.ankihub_client import AnkiHubClient, AnkiHubRequestError
-    from ankihub.constants import API_URL_BASE, ChangeTypes
+    from ankihub.ankihub_client import AnkiHubClient, AnkiHubRequestError, ChangeTypes
+    from ankihub.constants import API_URL_BASE
 
     client = AnkiHubClient(hooks=[])
     # test create new note suggestion
