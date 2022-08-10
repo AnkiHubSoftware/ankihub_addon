@@ -17,6 +17,8 @@ from .lib.dataclasses_json import DataClassJsonMixin  # type: ignore
 
 API_URL_BASE = "https://app.ankihub.net/api"
 
+DECK_UPDATE_PAGE_SIZE = 2000  # seems to work well in terms of speed
+
 CSV_DELIMITER = ";"
 
 
@@ -216,10 +218,12 @@ class AnkiHubClient:
         class Params(TypedDict, total=False):
             page: int
             since: str
+            size: int
 
         params: Params = {
             "since": str(since) if since else None,
             "page": 1,
+            "size": DECK_UPDATE_PAGE_SIZE,
         }
         has_next_page = True
         while has_next_page:
