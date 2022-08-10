@@ -56,18 +56,34 @@ def on_deleteAddon(self, module: str):
     LOGGER.debug(f"Changed file permissions for all files in {addon_dir}")
 
 
-def before_prompt_to_update(*args, **kwargs):
-    # When Anki checks for add-on updates and AnkiHub syncs at the same time there can be a UI deadlock,
-    # because the progress dialog is blocking the ChooseAddonsToUpdateDialog
+def with_hidden_progress_dialog(*args, **kwargs):
+    # When Anki checks for add-on updates and AnkiHub syncs at the same time there can be a UI "deadlock",
+    # because the progress dialog is blocking the ChooseAddonsToUpdateDialog (not really, see below)
     # and the closure that shows the ChooseAddonsToUpdateDialog blocks the closure for closing the progress dialog
     # in mw.taskman.
+    # It's not really a deadlock, because you can interact with the ChooseAddonsToUpdateDialog despite
+    # the busy mouse cursor, but it looks like one.
 
-    LOGGER.debug("From on_prompt_to_update")
-    while mw.progress._levels > 0:
-        LOGGER.debug(
-            "Calling mw.progress.finish() to prevent the progress dialog blocking the ChooseAddonsToUpdateDialog."
-        )
-        mw.progress.finish()
+    LOGGER.debug("From with_hidden_progress_dialog")
+
+    did_hide_dialog = False
+    if mw.progress._win:
+        LOGGER.debug("Hiding progress dialog")
+        mw.progress._win.hide()
+        mw.progress._restore_cursor()
+        did_hide_dialog = True
+
+    _old: Callable = kwargs["_old"]
+    del kwargs["_old"]
+
+    result = _old(*args, **kwargs)
+
+    if mw.progress._win and did_hide_dialog:
+        LOGGER.debug("Restoring progress dialog")
+        mw.progress._win.show()
+        mw.progress._set_busy_cursor()
+
+    return result
 
 
 def setup_addons():
@@ -91,7 +107,7 @@ def setup_addons():
         pos="around",
     )
 
-    # prevent UI deadlock when Anki checks for add-on updates and AnkiHub syncs at the same time
+    # prevent UI "deadlock" when Anki checks for add-on updates and AnkiHub syncs at the same time
     addons.prompt_to_update = wrap(
-        old=addons.prompt_to_update, new=before_prompt_to_update, pos="before"
+        old=addons.prompt_to_update, new=with_hidden_progress_dialog, pos="around"
     )
