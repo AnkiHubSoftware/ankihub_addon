@@ -90,9 +90,10 @@ class AnkiHubSync:
             url_view_deck = f"{constants.URL_VIEW_DECK}{ankihub_did}"
             mw.taskman.run_on_main(
                 lambda: showInfo(  # type: ignore
-                    f"Please subscribe to the \"{deck_info['name']}\" deck on the AnkiHub website to "
+                    f"Please subscribe to the deck <br><b>{deck_info['name']}</b><br>on the AnkiHub website to "
                     "be able to sync.<br><br>"
-                    f'Link to the deck: <a href="{url_view_deck}">{url_view_deck}</a>',
+                    f'Link to the deck: <a href="{url_view_deck}">{url_view_deck}</a><br><br>'
+                    f"Note that you also need an active AnkiHub membership.",
                 )
             )
             LOGGER.debug(
