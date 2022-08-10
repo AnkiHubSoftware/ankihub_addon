@@ -72,14 +72,14 @@ def before_prompt_to_update(*args, **kwargs):
 
 def setup_addons():
 
-    # prevent erros when updating the add-on
+    # prevent errors when updating the add-on
     DownloaderInstaller._download_all = wrap(
         old=DownloaderInstaller._download_all,
         new=with_disabled_log_file_handler,
         pos="around",
     )
 
-    # prevent errors when deleting the add-on (AddonManager.deleteAtton also gets called during an update)
+    # prevent errors when deleting the add-on (AddonManager.deleteAddon also gets called during an update)
     AddonManager.deleteAddon = wrap(
         old=AddonManager.deleteAddon,
         new=on_deleteAddon,
