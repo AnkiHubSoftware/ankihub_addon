@@ -90,9 +90,10 @@ class AnkiHubSync:
             url_view_deck = f"{constants.URL_VIEW_DECK}{ankihub_did}"
             mw.taskman.run_on_main(
                 lambda: showInfo(  # type: ignore
-                    f"Please subscribe to the <b>{deck_info['name']}</b> deck on the AnkiHub website to "
+                    f"Please subscribe to the deck <br><b>{deck_info['name']}</b><br>on the AnkiHub website to "
                     "be able to sync.<br><br>"
-                    f'Link to the deck: <a href="{url_view_deck}">{url_view_deck}</a>',
+                    f'Link to the deck: <a href="{url_view_deck}">{url_view_deck}</a><br><br>'
+                    f"Note that you also need an active AnkiHub membership.",
                 )
             )
             LOGGER.debug(
@@ -183,9 +184,6 @@ class AnkiHubImporter:
         local_did: DeckId = None,  # did that new notes should be put into if importing not for the first time
     ) -> DeckId:
 
-        db = AnkiHubDB()
-        db.save_notes_from_notes_data(ankihub_did=ankihub_did, notes_data=notes_data)
-
         first_time_import = local_did is None
 
         local_did = adjust_deck(deck_name, local_did)
@@ -211,6 +209,10 @@ class AnkiHubImporter:
         if first_time_import:
             local_did = self._cleanup_first_time_deck_import(dids, local_did)
 
+        db = AnkiHubDB()
+        anki_nids = [NoteId(note_data.anki_nid) for note_data in notes_data]
+        db.save_notes_from_nids(ankihub_did=ankihub_did, nids=anki_nids)
+
         return local_did
 
     def _cleanup_first_time_deck_import(
@@ -227,7 +229,7 @@ class AnkiHubImporter:
         if (dids_wh_created := dids - set([created_did])) and (
             (common_ancestor_did := lowest_level_common_ancestor_did(dids_wh_created))
         ) is not None:
-            cids = mw.col.find_cards(f"deck:{mw.col.decks.name(created_did)}")
+            cids = mw.col.find_cards(f'deck:"{mw.col.decks.name(created_did)}"')
             mw.col.set_deck(cids, common_ancestor_did)
             LOGGER.debug(
                 f"Moved new cards to common ancestor deck {common_ancestor_did=}"
@@ -273,7 +275,7 @@ class AnkiHubImporter:
             self.prepare_note(
                 note, ankihub_nid, fields, tags, protected_fields, protected_tags
             )
-            note = create_note_with_id(note, anki_nid, anki_did)
+            note = create_note_with_id(note, anki_id=anki_nid, anki_did=anki_did)
             self.num_notes_created += 1
             LOGGER.debug(f"Created note: {anki_nid=}")
         return note
@@ -296,11 +298,11 @@ class AnkiHubImporter:
         result = False
 
         if note[constants.ANKIHUB_NOTE_TYPE_FIELD_NAME] != ankihub_id:
-            note[constants.ANKIHUB_NOTE_TYPE_FIELD_NAME] = ankihub_id
             LOGGER.debug(
-                f"AnkiHub id of note {note.id} changed from {note[constants.ANKIHUB_NOTE_TYPE_FIELD_NAME]} "
+                f"AnkiHub id of note {note.id} will be changed from {note[constants.ANKIHUB_NOTE_TYPE_FIELD_NAME]} "
                 f"to {ankihub_id}",
             )
+            note[constants.ANKIHUB_NOTE_TYPE_FIELD_NAME] = ankihub_id
             result = True
 
         prev_tags = note.tags
@@ -309,7 +311,7 @@ class AnkiHubImporter:
         )
         if set(prev_tags) != set(note.tags):
             LOGGER.debug(
-                f"Tags were changed to {note.tags}.",
+                f"Tags were changed from {prev_tags} to {note.tags}.",
             )
             result = True
 
@@ -322,13 +324,13 @@ class AnkiHubImporter:
                 continue
 
             if note[field.name] != field.value:
-                note[field.name] = field.value
                 LOGGER.debug(
-                    f'Field: "{field.name}" was changed from:\n'
+                    f'Field: "{field.name}" will be changed from:\n'
                     f"{note[field.name]}\n"
                     "to:\n"
                     f"{field.value}"
                 )
+                note[field.name] = field.value
                 result = True
 
         return result
@@ -352,14 +354,12 @@ def updated_tags(
 ) -> List[str]:
 
     # get subset of cur_tags that are protected
-    # by being equal to a protected tag or by being a subtag of a protected tag
+    # by being equal to a protected tag or by containing a protected tag
+    # protected_tags can't contain "::" (this is enforced when the user chooses them in the webapp)
     result = set(
         tag
         for tag in cur_tags
-        if any(
-            tag == protected_tag or tag.startswith(f"{protected_tag}::")
-            for protected_tag in protected_tags
-        )
+        if any(protected_tag in tag.split("::") for protected_tag in protected_tags)
     )
 
     # add new tags
