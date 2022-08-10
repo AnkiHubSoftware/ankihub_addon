@@ -4,7 +4,7 @@ from logging.handlers import RotatingFileHandler
 from pathlib import Path
 
 
-LOG_FILE = Path(__file__).parent / "logs/ankihub.log"
+LOG_FILE = Path(__file__).parent / "user_files/ankihub.log"
 
 
 def stdout_handler():

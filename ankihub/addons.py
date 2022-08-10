@@ -26,22 +26,20 @@ def with_disabled_log_file_handler(*args: Any, **kwargs: Any) -> Any:
             LOGGER.debug(
                 f"Removing handler: {handler}",
             )
-            LOGGER.removeHandler(handler)
             LOGGER.root.removeHandler(handler)
             handler.close()
-            LOG_FILE.unlink()  # Without this there are PermissionErrors or FileNotFoundErrors on Windows
 
     result = _old(*args, **kwargs)
 
-    # if the add-on was deleted it makes no sense to re-add the FileHandler and it throws an error
+    # if the add-on was deleted it makes no sense to re-add the FileHandler (and it throws an error)
     if LOG_FILE.parent.exists():
-        LOGGER.addHandler(file_handler())
+        LOGGER.root.addHandler(file_handler())
         LOGGER.debug("Re-added FileHandler")
 
     return result
 
 
-def on_deleteAddon(self, module: str):
+def on_deleteAddon(self, module: str) -> None:
     # without this Anki is not able to delete all contents of the media_import libs folder
     # on Windows
     LOGGER.debug(f"on_deleteAddon was called with {module=}")
@@ -56,7 +54,7 @@ def on_deleteAddon(self, module: str):
     LOGGER.debug(f"Changed file permissions for all files in {addon_dir}")
 
 
-def with_hidden_progress_dialog(*args, **kwargs):
+def with_hidden_progress_dialog(*args, **kwargs) -> Any:
     # When Anki checks for add-on updates and AnkiHub syncs at the same time there can be a UI "deadlock",
     # because the progress dialog is blocking the ChooseAddonsToUpdateDialog (not really, see below)
     # and the closure that shows the ChooseAddonsToUpdateDialog blocks the closure for closing the progress dialog
