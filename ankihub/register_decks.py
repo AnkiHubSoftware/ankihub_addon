@@ -24,7 +24,7 @@ from .constants import ANKIHUB_NOTE_TYPE_FIELD_NAME
 from .db import AnkiHubDB
 from .utils import (
     change_note_type_of_note,
-    create_backup_with_progress,
+    create_backup,
     get_note_types_in_deck,
     modify_note_type,
 )
@@ -80,7 +80,7 @@ def upload_deck(did: DeckId) -> str:
 def create_collaborative_deck(deck_name: str) -> str:
     LOGGER.debug("Creating collaborative deck")
 
-    create_backup_with_progress()
+    create_backup()
 
     mw.col.models._clear_cache()
 

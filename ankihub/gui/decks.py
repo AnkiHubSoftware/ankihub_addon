@@ -26,7 +26,7 @@ from ..config import config
 from ..constants import URL_DECK_BASE, URL_DECKS, URL_HELP, URL_VIEW_DECK
 from ..db import AnkiHubDB
 from ..sync import AnkiHubImporter
-from ..utils import create_backup_with_progress, undo_note_type_modfications
+from ..utils import create_backup, undo_note_type_modfications
 
 
 class SubscribedDecksDialog(QDialog):
@@ -316,7 +316,7 @@ class SubscribeDialog(QDialog):
         :return: True if successful, False if not
         """
 
-        create_backup_with_progress()
+        create_backup()
 
         importer = AnkiHubImporter()
         local_did = importer.import_ankihub_deck(

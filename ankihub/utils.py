@@ -10,7 +10,6 @@ from anki.models import ChangeNotetypeRequest, NoteType, NotetypeDict, NotetypeI
 from anki.notes import Note, NoteId
 from anki.utils import checksum, ids2str
 from aqt import mw
-from aqt.utils import tr
 
 from . import LOGGER, constants
 from .constants import (
@@ -309,16 +308,9 @@ def undo_template_modification(template: Dict) -> None:
 
 
 # backup
-def create_backup_with_progress() -> None:
+def create_backup() -> None:
     # has to be called from a background thread
-    # if there is already a progress bar present this will not create a new one / modify the existing one
-
     LOGGER.debug("Starting backup...")
-    try:
-        label = tr.profiles_creating_backup()
-    except:  # < 2.1.50
-        label = "Creating Backup..."
-    mw.progress.start(label=label)
     try:
         if ANKI_MINOR >= 50:
             mw.col.create_backup(
@@ -334,5 +326,3 @@ def create_backup_with_progress() -> None:
     except Exception as exc:
         LOGGER.debug("Backup failed")
         raise exc
-    finally:
-        mw.progress.finish()
