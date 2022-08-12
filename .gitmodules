@@ -1,3 +1,6 @@
 [submodule "media_import"]
 	path = media_import
 	url = https://github.com/ankipalace/anki-media-import.git
+[submodule "media_export"]
+	path = media_export
+	url = git@github.com:RisingOrange/anki-media-exporter.git
