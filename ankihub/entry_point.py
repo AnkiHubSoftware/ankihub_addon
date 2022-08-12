@@ -1,4 +1,5 @@
 """Code to be run on Anki start up."""
+import time
 from pprint import pformat
 
 from aqt import mw
@@ -43,7 +44,10 @@ def run():
     LOGGER.debug("Set up error handler.")
 
     setup_progress_manager()
-    LOGGER.debug("Set up progress manager")
+    LOGGER.debug("Set up progress manager.")
+
+    trigger_addon_update_check()
+    LOGGER.debug("Triggered add-on update check.")
 
     return mw
 
@@ -51,3 +55,10 @@ def run():
 def log_enabled_addons():
     enabled_addons = [x for x in mw.addonManager.all_addon_meta() if x.enabled]
     LOGGER.debug(f"enabled addons:\n{pformat(enabled_addons)}")
+
+
+def trigger_addon_update_check():
+    # This sets the last_addon_update_check time to 25 hours before now and Anki usually checks
+    # for add-on updates every 24 hours, so this will trigger an add-on update check on Anki startup.
+    # See https://github.com/ankitects/anki/blob/21812556a6a29c7da34561e58824219783a867e7/qt/aqt/main.py#L896-L916
+    mw.pm.set_last_addon_update_check(int(time.time()) - (60 * 60 * 25))
