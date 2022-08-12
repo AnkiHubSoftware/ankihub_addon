@@ -28,6 +28,15 @@ from .utils import (
     reset_note_types_of_notes,
 )
 
+TAG_FOR_UPDATED_NOTES = "AnkiHub::updated"
+TAG_FOR_CREATED_NOTES = "AnkiHub::new"
+
+# tags that are only used by the add-on, but not by the web app
+ADDON_INTERNAL_TAGS = [
+    TAG_FOR_UPDATED_NOTES,
+    TAG_FOR_CREATED_NOTES,
+]
+
 
 class AnkiHubSync:
     def __init__(self):
@@ -184,7 +193,7 @@ class AnkiHubImporter:
         local_did: DeckId = None,  # did that new notes should be put into if importing not for the first time
     ) -> DeckId:
 
-        first_time_import = local_did is None
+        first_import_of_deck = local_did is None
 
         local_did = adjust_deck(deck_name, local_did)
         adjust_note_types(remote_note_types)
@@ -202,11 +211,12 @@ class AnkiHubImporter:
                 anki_did=local_did,
                 protected_fields=protected_fields,
                 protected_tags=protected_tags,
+                first_import_of_deck=first_import_of_deck,
             )
             dids_for_note = set(c.did for c in note.cards())
             dids = dids | dids_for_note
 
-        if first_time_import:
+        if first_import_of_deck:
             local_did = self._cleanup_first_time_deck_import(dids, local_did)
 
         db = AnkiHubDB()
@@ -251,6 +261,7 @@ class AnkiHubImporter:
         anki_did: DeckId,  # only relevant for newly created notes
         protected_fields: Dict[int, List[str]],
         protected_tags: List[str],
+        first_import_of_deck: bool,
     ) -> Note:
         try:
             note = mw.col.get_note(id=anki_nid)
@@ -262,7 +273,13 @@ class AnkiHubImporter:
                 )
             )
             if self.prepare_note(
-                note, ankihub_nid, fields, tags, protected_fields, protected_tags
+                note,
+                ankihub_nid,
+                fields,
+                tags,
+                protected_fields,
+                protected_tags,
+                first_import_of_deck,
             ):
                 mw.col.update_note(note)
                 self.num_notes_updated += 1
@@ -273,7 +290,13 @@ class AnkiHubImporter:
             note_type = mw.col.models.get(NotetypeId(mid))
             note = mw.col.new_note(note_type)
             self.prepare_note(
-                note, ankihub_nid, fields, tags, protected_fields, protected_tags
+                note,
+                ankihub_nid,
+                fields,
+                tags,
+                protected_fields,
+                protected_tags,
+                first_import_of_deck,
             )
             note = create_note_with_id(note, anki_id=anki_nid, anki_did=anki_did)
             self.num_notes_created += 1
@@ -288,6 +311,7 @@ class AnkiHubImporter:
         tags: List[str],
         protected_fields: Dict[int, List[str]],
         protected_tags: List[str],
+        first_import_of_deck: bool,
     ) -> bool:
         """
         Updates the note with the given fields and tags (taking protected fields and tags into account)
@@ -295,7 +319,7 @@ class AnkiHubImporter:
         Returns True if note was changed and False otherwise
         """
 
-        result = False
+        changed = False
 
         if note[constants.ANKIHUB_NOTE_TYPE_FIELD_NAME] != ankihub_id:
             LOGGER.debug(
@@ -303,7 +327,7 @@ class AnkiHubImporter:
                 f"to {ankihub_id}",
             )
             note[constants.ANKIHUB_NOTE_TYPE_FIELD_NAME] = ankihub_id
-            result = True
+            changed = True
 
         prev_tags = note.tags
         note.tags = updated_tags(
@@ -313,7 +337,7 @@ class AnkiHubImporter:
             LOGGER.debug(
                 f"Tags were changed from {prev_tags} to {note.tags}.",
             )
-            result = True
+            changed = True
 
         # update fields which are not protected
         for field in fields:
@@ -331,9 +355,18 @@ class AnkiHubImporter:
                     f"{field.value}"
                 )
                 note[field.name] = field.value
-                result = True
+                changed = True
 
-        return result
+        if changed and not first_import_of_deck:
+            if note.id == 0 and TAG_FOR_CREATED_NOTES not in note.tags:
+                note.tags += [TAG_FOR_CREATED_NOTES]
+                LOGGER.debug(f"Added {TAG_FOR_CREATED_NOTES} to tags of note.")
+
+            elif note.id != 0 and TAG_FOR_UPDATED_NOTES not in note.tags:
+                note.tags += [TAG_FOR_UPDATED_NOTES]
+                LOGGER.debug(f"Added {TAG_FOR_UPDATED_NOTES} to tags of note.")
+
+        return changed
 
 
 def adjust_deck(deck_name: str, local_did: Optional[DeckId] = None) -> DeckId:

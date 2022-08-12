@@ -90,21 +90,30 @@ def create_note_with_id(note: Note, anki_id: NoteId, anki_did: DeckId) -> Note:
     return note
 
 
-def ankihub_uuids_of_notes(nids: Iterable[NoteId]) -> List[uuid.UUID]:
-    result = []
-    for nid in nids:
-        note = mw.col.get_note(nid)
-        if ANKIHUB_NOTE_TYPE_FIELD_NAME not in note.keys():
-            continue
+def ankihub_uuids_of_nids(
+    nids: Iterable[NoteId], ignore_invalid=False
+) -> List[uuid.UUID]:
 
-        try:
-            ankihub_note_uuid = uuid.UUID(note[ANKIHUB_NOTE_TYPE_FIELD_NAME])
-        except ValueError:
-            # invalid uuids are ignored
-            continue
-
-        result.append(ankihub_note_uuid)
+    note_uuid: Optional[uuid.UUID] = None
+    result = [
+        (note_uuid := ankihub_uuid_of_note(mw.col.get_note(nid), ignore_invalid))
+        for nid in nids
+        if note_uuid
+    ]
     return result
+
+
+def ankihub_uuid_of_note(note: Note, ignore_invalid=False) -> Optional[uuid.UUID]:
+    if ANKIHUB_NOTE_TYPE_FIELD_NAME not in note.keys():
+        return None
+
+    try:
+        return uuid.UUID(note[ANKIHUB_NOTE_TYPE_FIELD_NAME])
+    except ValueError as e:
+        if ignore_invalid:
+            return None
+        else:
+            raise e
 
 
 # note types
