@@ -1,3 +1,4 @@
+import uuid
 from pprint import pformat
 from typing import List
 
@@ -87,7 +88,7 @@ def on_suggestion_button_press_inner(editor: Editor) -> None:
                 suggest_new_note(
                     note=note,
                     change_type=change_type,
-                    ankihub_did=ankihub_did,
+                    ankihub_deck_uuid=uuid.UUID(ankihub_did),
                     comment=comment,
                 )
                 tooltip("Submitted new note suggestion to AnkiHub.")
@@ -100,7 +101,7 @@ def on_suggestion_button_press_inner(editor: Editor) -> None:
             suggest_new_note(
                 note=editor.note,
                 change_type=change_type,
-                ankihub_did=ankihub_did,
+                ankihub_deck_uuid=uuid.UUID(ankihub_did),
                 comment=comment,
             )
             tooltip("Submitted new note suggestion to AnkiHub.")

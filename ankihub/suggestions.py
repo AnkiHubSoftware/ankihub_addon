@@ -26,7 +26,7 @@ def suggest_note_update(note: Note, change_type: ChangeTypes, comment: str):
 
 
 def suggest_new_note(
-    note: Note, change_type: ChangeTypes, comment: str, ankihub_did: uuid.UUID
+    note: Note, change_type: ChangeTypes, comment: str, ankihub_deck_uuid: uuid.UUID
 ):
 
     ankihub_note_uuid = ankihub_uuid_of_note(note, ignore_invalid=True)
@@ -38,7 +38,7 @@ def suggest_new_note(
 
     client = AnkiHubClient()
     client.create_new_note_suggestion(
-        ankihub_deck_uuid=ankihub_did,
+        ankihub_deck_uuid=ankihub_deck_uuid,
         ankihub_note_uuid=ankihub_note_uuid,
         anki_note_id=note.id,
         fields=fields,

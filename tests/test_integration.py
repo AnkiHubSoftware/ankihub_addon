@@ -394,87 +394,112 @@ def test_get_deck_by_id(anki_session_with_addon: AnkiSession, requests_mock):
     assert exc is not None and exc.response.status_code == 403
 
 
-def test_create_change_note_suggestion(
-    anki_session_with_addon: AnkiSession, requests_mock
-):
-    from ankihub.ankihub_client import AnkiHubClient, AnkiHubRequestError, ChangeTypes
+def test_suggest_note_upate(anki_session_with_addon: AnkiSession, requests_mock):
+    from ankihub.ankihub_client import AnkiHubRequestError, ChangeTypes, NoteUpdate
     from ankihub.constants import API_URL_BASE
+    from ankihub.suggestions import suggest_note_update
+    from ankihub.sync import ADDON_INTERNAL_TAGS
 
-    client = AnkiHubClient(hooks=[])
-    # test create change note suggestion
-    ankihub_note_uuid = UUID_1
-    requests_mock.post(
-        f"{API_URL_BASE}/notes/{ankihub_note_uuid}/suggestion/", status_code=201
-    )
-    client.create_change_note_suggestion(
-        ankihub_note_uuid=ankihub_note_uuid,
-        fields=[{"name": "abc", "order": 0, "value": "abc changed"}],
-        tags=["test"],
-        change_type=ChangeTypes.NEW_CONTENT,
-        comment="",
-    )
+    anki_session = anki_session_with_addon
+    with anki_session.profile_loaded():
+        mw = anki_session.mw
 
-    # test create change note suggestion unauthenticated
-    requests_mock.post(
-        f"{API_URL_BASE}/notes/{ankihub_note_uuid}/suggestion/", status_code=403
-    )
-    try:
-        client.create_change_note_suggestion(
-            ankihub_note_uuid=ankihub_note_uuid,
-            fields=[{"name": "abc", "order": 0, "value": "abc changed"}],
-            tags=["test"],
-            change_type=ChangeTypes.NEW_CONTENT,
-            comment="",
+        import_sample_ankihub_deck(mw, str(UUID_1))
+        notes_data: NoteUpdate = ankihub_sample_deck_notes_data()
+        note = mw.col.get_note(notes_data[0].anki_nid)
+        ankihub_note_uuid = notes_data[0].ankihub_note_uuid
+
+        # test create change note suggestion
+        adapter = requests_mock.post(
+            f"{API_URL_BASE}/notes/{ankihub_note_uuid}/suggestion/", status_code=201
         )
-    except AnkiHubRequestError as e:
-        exc = e
-    assert exc is not None and exc.response.status_code == 403
+
+        note.tags = ["a", *ADDON_INTERNAL_TAGS]
+        suggest_note_update(
+            note=note,
+            change_type=ChangeTypes.NEW_CONTENT,
+            comment="test",
+        )
+
+        # ... assert that add-on internal tags were filtered out
+        suggestion_data = adapter.last_request.json()
+        assert set(suggestion_data["tags"]) == set(
+            [
+                "a",
+            ]
+        )
+
+        # test create change note suggestion unauthenticated
+        requests_mock.post(
+            f"{API_URL_BASE}/notes/{ankihub_note_uuid}/suggestion/", status_code=403
+        )
+
+        try:
+            suggest_note_update(
+                note=note,
+                change_type=ChangeTypes.NEW_CONTENT,
+                comment="test",
+            )
+        except AnkiHubRequestError as e:
+            exc = e
+        assert exc is not None and exc.response.status_code == 403
 
 
 def test_create_new_note_suggestion(
     anki_session_with_addon: AnkiSession, requests_mock
 ):
-    from ankihub.ankihub_client import AnkiHubClient, AnkiHubRequestError, ChangeTypes
+    from ankihub.ankihub_client import AnkiHubRequestError, ChangeTypes
     from ankihub.constants import API_URL_BASE
+    from ankihub.suggestions import suggest_new_note
+    from ankihub.sync import ADDON_INTERNAL_TAGS
 
-    client = AnkiHubClient(hooks=[])
-    # test create new note suggestion
-    ankihub_deck_uuid = UUID_1
-    ankihub_note_uuid = UUID_2
-    requests_mock.post(
-        f"{API_URL_BASE}/decks/{ankihub_deck_uuid}/note-suggestion/", status_code=201
-    )
-    client.create_new_note_suggestion(
-        ankihub_deck_uuid=ankihub_deck_uuid,
-        ankihub_note_uuid=ankihub_note_uuid,
-        anki_note_id=1,
-        fields=[{"name": "abc", "order": 0, "value": "abc changed"}],
-        tags=["test"],
-        change_type=ChangeTypes.NEW_CARD_TO_ADD,
-        note_type_name="Basic",
-        anki_note_type_id=1,
-        comment="",
-    )
+    anki_session = anki_session_with_addon
+    with anki_session.profile_loaded():
+        mw = anki_session.mw
 
-    # test create new note suggestion unauthenticated
-    requests_mock.post(
-        f"{API_URL_BASE}/decks/{ankihub_deck_uuid}/note-suggestion/", status_code=403
-    )
-    try:
-        client.create_new_note_suggestion(
-            ankihub_deck_uuid=ankihub_deck_uuid,
-            ankihub_note_uuid=ankihub_note_uuid,
-            anki_note_id=1,
-            fields=[{"name": "abc", "order": 0, "value": "abc changed"}],
-            tags=["test"],
-            change_type=ChangeTypes.NEW_CARD_TO_ADD,
-            note_type_name="Basic",
-            anki_note_type_id=1,
-            comment="",
+        import_sample_ankihub_deck(mw, str(UUID_1))
+        note = mw.col.new_note(
+            mw.col.models.by_name("Basic-4827c (Testdeck / andrew1)")
         )
-    except AnkiHubRequestError as e:
-        exc = e
-    assert exc is not None and exc.response.status_code == 403
+        ankihub_deck_uuid = UUID_1
+
+        adapter = requests_mock.post(
+            f"{API_URL_BASE}/decks/{ankihub_deck_uuid}/note-suggestion/",
+            status_code=201,
+        )
+
+        note.tags = ["a", *ADDON_INTERNAL_TAGS]
+        suggest_new_note(
+            note=note,
+            change_type=ChangeTypes.NEW_CARD_TO_ADD,
+            ankihub_did=ankihub_deck_uuid,
+            comment="test",
+        )
+
+        # ... assert that add-on internal tags were filtered out
+        suggestion_data = adapter.last_request.json()
+        assert set(suggestion_data["tags"]) == set(
+            [
+                "a",
+            ]
+        )
+
+        # test create change note suggestion unauthenticated
+        requests_mock.post(
+            f"{API_URL_BASE}/decks/{ankihub_deck_uuid}/note-suggestion/",
+            status_code=403,
+        )
+
+        try:
+            suggest_new_note(
+                note=note,
+                change_type=ChangeTypes.NEW_CONTENT,
+                ankihub_did=ankihub_deck_uuid,
+                comment="test",
+            )
+        except AnkiHubRequestError as e:
+            exc = e
+        assert exc is not None and exc.response.status_code == 403
 
 
 def test_adjust_note_types(anki_session_with_addon: AnkiSession):
