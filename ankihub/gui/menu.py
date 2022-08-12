@@ -196,11 +196,13 @@ def create_collaborative_deck_action() -> None:
         showText("You can't upload an empty deck.")
         return
 
-    private = askUser(
+    public = askUser(
         "Would you like to make this deck public?<br><br>"
         'If you chose "No" it will be private and only people with a link '
         "will be able to see it on the AnkiHub website."
     )
+    
+    private = public is False
 
     confirm = askUser(
         "Uploading the deck to AnkiHub requires modifying notes and note types in "
