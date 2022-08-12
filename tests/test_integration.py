@@ -445,9 +445,7 @@ def test_suggest_note_upate(anki_session_with_addon: AnkiSession, requests_mock)
         assert exc is not None and exc.response.status_code == 403
 
 
-def test_create_new_note_suggestion(
-    anki_session_with_addon: AnkiSession, requests_mock
-):
+def test_suggest_new_note(anki_session_with_addon: AnkiSession, requests_mock):
     from ankihub.ankihub_client import AnkiHubRequestError, ChangeTypes
     from ankihub.constants import API_URL_BASE
     from ankihub.suggestions import suggest_new_note
@@ -472,7 +470,7 @@ def test_create_new_note_suggestion(
         suggest_new_note(
             note=note,
             change_type=ChangeTypes.NEW_CARD_TO_ADD,
-            ankihub_did=ankihub_deck_uuid,
+            ankihub_deck_uuid=ankihub_deck_uuid,
             comment="test",
         )
 
@@ -494,7 +492,7 @@ def test_create_new_note_suggestion(
             suggest_new_note(
                 note=note,
                 change_type=ChangeTypes.NEW_CONTENT,
-                ankihub_did=ankihub_deck_uuid,
+                ankihub_deck_uuid=ankihub_deck_uuid,
                 comment="test",
             )
         except AnkiHubRequestError as e:
