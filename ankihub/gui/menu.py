@@ -201,7 +201,7 @@ def create_collaborative_deck_action() -> None:
         'If you chose "No" it will be private and only people with a link '
         "will be able to see it on the AnkiHub website."
     )
-    
+
     private = public is False
 
     confirm = askUser(
