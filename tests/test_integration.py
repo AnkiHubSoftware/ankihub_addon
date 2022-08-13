@@ -1029,3 +1029,105 @@ def test_prepare_note(anki_session_with_addon: AnkiSession):
         assert not note_was_changed_7
         assert note["Front"] == "old front"
         assert note["Back"] == "old back"
+
+        # assert that fields with spaces are protected by tags
+        note = example_note()
+        note.tags = [f"{TAG_FOR_PROTECTING_FIELDS}::All"]
+        note_was_changed_7 = prepare_note(
+            note,
+            fields=[
+                FieldUpdate(name="Front", value="new front", order=0),
+                FieldUpdate(name="Back", value="new back", order=1),
+            ],
+        )
+        assert not note_was_changed_7
+        assert note["Front"] == "old front"
+        assert note["Back"] == "old back"
+
+
+def test_prepare_note_protect_field_with_spaces(anki_session_with_addon: AnkiSession):
+    from anki.notes import Note
+
+    from ankihub.ankihub_client import FieldUpdate
+    from ankihub.constants import ANKIHUB_NOTE_TYPE_FIELD_NAME
+    from ankihub.sync import (
+        TAG_FOR_PROTECTING_FIELDS,
+        AnkiHubImporter,
+    )
+    from ankihub.utils import modify_note_type
+
+    anki_session = anki_session_with_addon
+    with anki_session_with_addon.profile_loaded():
+        mw = anki_session.mw
+
+        ankihub_nid = str(UUID_1)
+
+        def prepare_note(
+            note,
+            tags: List[str] = [],
+            fields: Optional[List[FieldUpdate]] = [],
+            protected_fields: Optional[Dict] = {},
+            protected_tags: List[str] = [],
+        ):
+
+            ankihub_importer = AnkiHubImporter()
+            result = ankihub_importer.prepare_note(
+                note=note,
+                ankihub_nid=ankihub_nid,
+                fields=fields,
+                tags=tags,
+                protected_fields=protected_fields,
+                protected_tags=protected_tags,
+            )
+            return result
+
+        # create ankihub_basic note type because prepare_note needs a note type with an ankihub_id field
+        basic = mw.col.models.by_name("Basic")
+        modify_note_type(basic)
+        basic["id"] = 0
+        basic["name"] = "Basic (AnkiHub)"
+
+        field_name_with_spaces = "Field name with spaces"
+        basic["flds"][0]["name"] = field_name_with_spaces
+        basic["tmpls"][0]["qfmt"] = basic["tmpls"][0]["qfmt"].replace(
+            "Front", field_name_with_spaces
+        )
+
+        ankihub_basic_mid = NotetypeId(mw.col.models.add_dict(basic).id)
+        ankihub_basic = mw.col.models.get(ankihub_basic_mid)
+
+        def example_note() -> Note:
+            # create a new note with non-empty fields
+            # that has the ankihub_basic note type
+            note = mw.col.new_note(ankihub_basic)
+            note[field_name_with_spaces] = "old front"
+            note["Back"] = "old back"
+            note[ANKIHUB_NOTE_TYPE_FIELD_NAME] = ankihub_nid
+            note.tags = []
+            note.id = 42  # to simulate an existing note
+            return note
+
+        # assert that fields with spaces are protected by tags that have spaces replaced by underscores
+        note = example_note()
+        note.tags = [
+            f"{TAG_FOR_PROTECTING_FIELDS}::{field_name_with_spaces.replace(' ', '_')}"
+        ]
+        note_changed = prepare_note(
+            note,
+            fields=[
+                FieldUpdate(name=field_name_with_spaces, value="new front", order=0)
+            ],
+        )
+        assert not note_changed
+        assert note[field_name_with_spaces] == "old front"
+
+        # assert that field is not protected without this tag (to make sure the test is correct)
+        note = example_note()
+        note_changed = prepare_note(
+            note,
+            fields=[
+                FieldUpdate(name=field_name_with_spaces, value="new front", order=0)
+            ],
+        )
+        assert note_changed
+        assert note[field_name_with_spaces] == "new front"

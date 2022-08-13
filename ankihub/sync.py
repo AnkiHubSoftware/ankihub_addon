@@ -425,8 +425,8 @@ def get_fields_protected_by_tags(note: Note) -> List[str]:
 
     result = [
         field
-        for field in standardized_field_names_from_note
-        if field in standardized_field_names_from_tags
+        for field, field_std in zip(note.keys(), standardized_field_names_from_note)
+        if field_std in standardized_field_names_from_tags
     ]
 
     return result
