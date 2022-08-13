@@ -14,7 +14,6 @@ tasks:
 
 github:
   prebuilds:
-    addComment: true
     addBadge: true
 
 vscode:
