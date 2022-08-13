@@ -180,7 +180,7 @@ def test_create_collaborative_deck_and_upload(
                 json={"deck_id": str(ankihub_deck_uuid)},
             )
 
-            create_collaborative_deck(deck_name)
+            create_collaborative_deck(deck_name, private=False)
 
             # check if deck info is in db
             db = AnkiHubDB()
@@ -214,7 +214,7 @@ def test_upload_deck(anki_session_with_addon: AnkiSession, monkeypatch):
         assert mw.col.get_note(note.id).cards()[0].did == filtered_did
 
         monkeypatch.setattr("ankihub.register_decks.AnkiHubClient.upload_deck", Mock())
-        upload_deck(main_did)
+        upload_deck(main_did, private=False)
 
         # assert that note is still in the filtered deck after upload_deck
         card = mw.col.get_note(note.id).cards()[0]
@@ -266,13 +266,13 @@ def test_client_upload_deck(anki_session_with_addon: AnkiSession, requests_mock)
     )
 
     # test upload deck
-    client.upload_deck(file=pathlib.Path(sample_deck), anki_deck_id=1)
+    client.upload_deck(file=pathlib.Path(sample_deck), anki_deck_id=1, private=False)
 
     # test upload deck unauthenticated
     requests_mock.post(f"{API_URL_BASE}/decks/", status_code=403)
     exc = None
     try:
-        client.upload_deck(pathlib.Path(sample_deck), anki_deck_id=1)
+        client.upload_deck(pathlib.Path(sample_deck), anki_deck_id=1, private=False)
     except AnkiHubRequestError as e:
         exc = e
     assert exc is not None and exc.response.status_code == 403
