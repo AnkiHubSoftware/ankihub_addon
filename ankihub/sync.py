@@ -103,7 +103,7 @@ class AnkiHubSync:
         elif exc.response.status_code == 404:
             mw.taskman.run_on_main(
                 lambda: showInfo(  # type: ignore
-                    f"The deck \"{deck_info['name']}\" does not exist on the AnkiHub website. "
+                    f"The deck <b>{deck_info['name']}</b> does not exist on the AnkiHub website. "
                     f"Remove it from the subscribed decks to be able to sync.<br><br>"
                     f"deck id: <i>{ankihub_did}</i>",
                 )
