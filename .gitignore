@@ -144,6 +144,10 @@ dmypy.json
 # mac os
 .DS_Store
 
+ankihub/manifest.json
+
 # media_import
 ankihub/media_import/*
-ankihub/manifest.json
+
+# media_export
+ankihub/media_export/*
