@@ -132,7 +132,7 @@ class AnkiHubImporter:
         protected_tags: Optional[
             List[str]
         ] = None,  # will be fetched from api if not provided
-    ) -> Optional[DeckId]:
+    ) -> DeckId:
         """
         Used for importing an ankihub deck and updates to an ankihub deck
         When no local_did is provided this function assumes that the deck gets installed for the first time
@@ -217,7 +217,7 @@ class AnkiHubImporter:
 
     def _cleanup_first_time_deck_import(
         self, dids_cards_were_imported_to: Iterable[DeckId], created_did: DeckId
-    ) -> Optional[DeckId]:
+    ) -> DeckId:
         dids = set(dids_cards_were_imported_to)
 
         # remove "Custom Study" decks from dids
