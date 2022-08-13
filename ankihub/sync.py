@@ -30,15 +30,10 @@ from .utils import (
 
 INTERNAL_TAG_PREFIX = "AnkiHub_"
 
-TAG_FOR_CHANGES = f"{INTERNAL_TAG_PREFIX}Update"
-TAG_FOR_UPDATED_NOTES = f"{TAG_FOR_CHANGES}::updated"
-TAG_FOR_NEW_NOTES = f"{TAG_FOR_CHANGES}::new"
-
 TAG_FOR_PROTECTED_NOTES = f"{INTERNAL_TAG_PREFIX}Protect"
 
 # top-level tags that are only used by the add-on, but not by the web app
 ADDON_INTERNAL_TAGS = [
-    TAG_FOR_CHANGES,
     TAG_FOR_PROTECTED_NOTES,
 ]
 
@@ -223,7 +218,6 @@ class AnkiHubImporter:
                 anki_did=local_did,
                 protected_fields=protected_fields,
                 protected_tags=protected_tags,
-                first_import_of_deck=first_import_of_deck,
             )
             dids_for_note = set(c.did for c in note.cards())
             dids = dids | dids_for_note
@@ -273,7 +267,6 @@ class AnkiHubImporter:
         anki_did: DeckId,  # only relevant for newly created notes
         protected_fields: Dict[int, List[str]],
         protected_tags: List[str],
-        first_import_of_deck: bool,
     ) -> Note:
         try:
             note = mw.col.get_note(id=anki_nid)
@@ -291,7 +284,6 @@ class AnkiHubImporter:
                 tags,
                 protected_fields,
                 protected_tags,
-                first_import_of_deck,
             ):
                 mw.col.update_note(note)
                 self.num_notes_updated += 1
@@ -308,7 +300,6 @@ class AnkiHubImporter:
                 tags,
                 protected_fields,
                 protected_tags,
-                first_import_of_deck,
             )
             note = create_note_with_id(note, anki_id=anki_nid, anki_did=anki_did)
             self.num_notes_created += 1
@@ -323,7 +314,6 @@ class AnkiHubImporter:
         tags: List[str],
         protected_fields: Dict[int, List[str]],
         protected_tags: List[str],
-        first_import_of_deck: bool,
     ) -> bool:
         """
         Updates the note with the given fields and tags (taking protected fields and tags into account)
@@ -347,7 +337,6 @@ class AnkiHubImporter:
             note,
             tags=tags,
             protected_tags=protected_tags,
-            first_import_of_deck=first_import_of_deck,
         )
         changed = changed_ankihub_id_field or changed_fields or changed_tags
 
@@ -398,7 +387,6 @@ class AnkiHubImporter:
         note: Note,
         tags: List[str],
         protected_tags: List[str],
-        first_import_of_deck: bool,
     ) -> bool:
         changed = False
         prev_tags = note.tags
@@ -410,18 +398,6 @@ class AnkiHubImporter:
                 f"Tags were changed from {prev_tags} to {note.tags}.",
             )
             changed = True
-
-        if not first_import_of_deck:
-            # ... add special tag if note is new
-            if note.id == 0 and TAG_FOR_NEW_NOTES not in note.tags:
-                note.tags += [TAG_FOR_NEW_NOTES]
-                LOGGER.debug(f"Added {TAG_FOR_NEW_NOTES} to tags of note.")
-                changed = True
-
-            # ... add special tag if note was updated
-            if note.id != 0 and changed and TAG_FOR_UPDATED_NOTES not in note.tags:
-                note.tags += [TAG_FOR_UPDATED_NOTES]
-                LOGGER.debug(f"Added {TAG_FOR_UPDATED_NOTES} to tags of note.")
 
         return changed
 

@@ -915,9 +915,7 @@ def test_prepare_note(anki_session_with_addon: AnkiSession):
     from ankihub.constants import ANKIHUB_NOTE_TYPE_FIELD_NAME
     from ankihub.sync import (
         ADDON_INTERNAL_TAGS,
-        TAG_FOR_NEW_NOTES,
         TAG_FOR_PROTECTED_NOTES,
-        TAG_FOR_UPDATED_NOTES,
         AnkiHubImporter,
     )
     from ankihub.utils import modify_note_type
@@ -930,7 +928,6 @@ def test_prepare_note(anki_session_with_addon: AnkiSession):
 
         def prepare_note(
             note,
-            first_import_of_deck: bool,
             tags: List[str] = [],
             fields: Optional[List[FieldUpdate]] = [],
             protected_fields: Optional[Dict] = {},
@@ -945,7 +942,6 @@ def test_prepare_note(anki_session_with_addon: AnkiSession):
                 tags=tags,
                 protected_fields=protected_fields,
                 protected_tags=protected_tags,
-                first_import_of_deck=first_import_of_deck,
             )
             return result
 
@@ -978,7 +974,6 @@ def test_prepare_note(anki_session_with_addon: AnkiSession):
         note.tags = ["a", "b"]
         note_was_changed_1 = prepare_note(
             note,
-            first_import_of_deck=True,
             fields=new_fields,
             tags=new_tags,
             protected_fields={ankihub_basic["id"]: ["Back"]},
@@ -993,7 +988,6 @@ def test_prepare_note(anki_session_with_addon: AnkiSession):
         # assert that the note was not modified because the same arguments were used on the same note
         note_was_changed_2 = prepare_note(
             note,
-            first_import_of_deck=True,
             fields=new_fields,
             tags=new_tags,
             protected_fields={ankihub_basic["id"]: ["Back"]},
@@ -1004,24 +998,10 @@ def test_prepare_note(anki_session_with_addon: AnkiSession):
         assert note["Back"] == "old back"
         assert set(note.tags) == set(["a", "c", "d"])
 
-        # assert that the TAG_FOR_CREATED_NOTES tag gets added when a note gets created and first_import_of_deck=False
-        note = example_note()
-        note.id = 0  # simulate new note
-        note_was_changed_3 = prepare_note(note, first_import_of_deck=False)
-        assert note_was_changed_3
-        assert set(note.tags) == set([TAG_FOR_NEW_NOTES])
-
-        # assert that the TAG_FOR_UPDATED_NOTES tag gets added when a note gets updated and first_import_of_deck=False
-        note = example_note()
-        note.tags = []
-        note_was_changed_4 = prepare_note(note, tags=["e"], first_import_of_deck=False)
-        assert note_was_changed_4
-        assert set(note.tags) == set(["e", TAG_FOR_UPDATED_NOTES])
-
         # assert that addon-internal don't get removed
         note = example_note()
         note.tags = list(ADDON_INTERNAL_TAGS)
-        note_was_changed_5 = prepare_note(note, tags=[], first_import_of_deck=False)
+        note_was_changed_5 = prepare_note(note, tags=[])
         assert not note_was_changed_5
         assert set(note.tags) == set(ADDON_INTERNAL_TAGS)
 
@@ -1031,7 +1011,6 @@ def test_prepare_note(anki_session_with_addon: AnkiSession):
         note["Front"] = "old front"
         note_was_changed_6 = prepare_note(
             note,
-            first_import_of_deck=False,
             fields=[FieldUpdate(name="Front", value="new front", order=0)],
         )
         assert not note_was_changed_6
