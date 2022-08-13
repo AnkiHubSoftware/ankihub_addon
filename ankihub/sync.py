@@ -192,7 +192,9 @@ class AnkiHubImporter:
 
         dids: Set[DeckId] = set()  # set of ids of decks notes were imported into
         for note_data in notes_data:
-            LOGGER.debug(f"Trying to update or create note:\n {pformat(note_data)}")
+            LOGGER.debug(
+                f"Trying to update or create note: {note_data.anki_nid=}, {note_data.ankihub_note_uuid=}"
+            )
             note = self.update_or_create_note(
                 anki_nid=NoteId(note_data.anki_nid),
                 mid=NotetypeId(note_data.mid),
