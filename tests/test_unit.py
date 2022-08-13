@@ -22,7 +22,7 @@ def test_lowest_level_common_ancestor_deck_name(anki_session_with_addon: AnkiSes
 
 
 def test_updated_tags(anki_session_with_addon: AnkiSession):
-    from ankihub.sync import updated_tags
+    from ankihub.sync import ADDON_INTERNAL_TAGS, updated_tags
 
     assert set(
         updated_tags(
@@ -65,6 +65,15 @@ def test_updated_tags(anki_session_with_addon: AnkiSession):
             protected_tags=["C"],
         )
     ) == set(["A::B::C"])
+
+    # keep add-on internal tags
+    assert set(
+        updated_tags(
+            cur_tags=ADDON_INTERNAL_TAGS,
+            incoming_tags=[],
+            protected_tags=[],
+        )
+    ) == set(ADDON_INTERNAL_TAGS)
 
 
 def test_normalize_url(anki_session_with_addon: AnkiSession):

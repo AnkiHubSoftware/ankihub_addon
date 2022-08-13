@@ -389,16 +389,17 @@ def updated_tags(
     # get subset of cur_tags that are protected
     # by being equal to a protected tag or by containing a protected tag
     # protected_tags can't contain "::" (this is enforced when the user chooses them in the webapp)
-    result = set(
+    protected = set(
         tag
         for tag in cur_tags
         if any(protected_tag in tag.split("::") for protected_tag in protected_tags)
     )
 
-    # add new tags
-    result = set(result) | set(incoming_tags)
+    # keep addon internal tags
+    internal = [tag for tag in cur_tags if tag in ADDON_INTERNAL_TAGS]
 
-    return list(result)
+    result = list(set(protected) | set(internal) | set(incoming_tags))
+    return result
 
 
 def fetch_remote_note_types_based_on_notes_data(

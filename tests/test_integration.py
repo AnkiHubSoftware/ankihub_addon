@@ -911,6 +911,7 @@ def import_sample_ankihub_deck(
 def test_prepare_note(anki_session_with_addon: AnkiSession):
     from ankihub.ankihub_client import FieldUpdate
     from ankihub.sync import (
+        ADDON_INTERNAL_TAGS,
         TAG_FOR_CREATED_NOTES,
         TAG_FOR_UPDATED_NOTES,
         AnkiHubImporter,
@@ -971,12 +972,20 @@ def test_prepare_note(anki_session_with_addon: AnkiSession):
 
         # assert that the TAG_FOR_CREATED_NOTES tag gets added when note gets created and first_import_of_deck is False
         note.id = 0
+        note.tags = ["a", "b"]
         note_was_changed_3 = prepare_note(note, tags=[], first_import_of_deck=False)
         assert note_was_changed_3
         assert set(note.tags) == set(["a", TAG_FOR_CREATED_NOTES])
 
         # assert that the TAG_FOR_UPDATED_NOTES tag gets added when note gets updated and first_import_of_deck is False
         note.id = 42
+        note.tags = []
         note_was_changed_4 = prepare_note(note, tags=["e"], first_import_of_deck=False)
         assert note_was_changed_4
-        assert set(note.tags) == set(["a", "e", TAG_FOR_UPDATED_NOTES])
+        assert set(note.tags) == set(["e", TAG_FOR_UPDATED_NOTES])
+
+        # assert that ADDON_INTERNAL_TAGS don't get removed
+        note.tags = list(ADDON_INTERNAL_TAGS)
+        note_was_changed_5 = prepare_note(note, tags=[], first_import_of_deck=False)
+        assert not note_was_changed_5
+        assert set(note.tags) == set(ADDON_INTERNAL_TAGS)
