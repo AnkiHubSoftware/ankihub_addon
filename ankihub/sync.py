@@ -336,18 +336,40 @@ class AnkiHubImporter:
             LOGGER.debug("Skipping note because it is protected by a tag.")
             return False
 
-        changed = False
+        changed_ankihub_id_field = self._prepare_ankihub_id_field(
+            note, ankihub_nid=ankihub_nid
+        )
+        changed_fields = self._prepare_fields(
+            note, fields=fields, protected_fields=protected_fields
+        )
+        changed_tags = self._prepare_tags(
+            note,
+            tags=tags,
+            protected_tags=protected_tags,
+            first_import_of_deck=first_import_of_deck,
+        )
+        changed = changed_ankihub_id_field or changed_fields or changed_tags
 
-        # update ankihub id
+        LOGGER.debug(f"Prepared note. {changed=}")
+        return changed
+
+    def _prepare_ankihub_id_field(self, note: Note, ankihub_nid: str) -> bool:
         if note[constants.ANKIHUB_NOTE_TYPE_FIELD_NAME] != ankihub_nid:
             LOGGER.debug(
                 f"AnkiHub id of note {note.id} will be changed from {note[constants.ANKIHUB_NOTE_TYPE_FIELD_NAME]} "
                 f"to {ankihub_nid}",
             )
             note[constants.ANKIHUB_NOTE_TYPE_FIELD_NAME] = ankihub_nid
-            changed = True
+            return True
+        return False
 
-        # update fields
+    def _prepare_fields(
+        self,
+        note: Note,
+        fields: List[FieldUpdate],
+        protected_fields: Dict[int, List[str]],
+    ) -> bool:
+        changed = False
         fields_protected_by_tags = get_fields_protected_by_tags(note)
         for field in fields:
             protected_fields_for_model = protected_fields.get(
@@ -368,8 +390,16 @@ class AnkiHubImporter:
                 )
                 note[field.name] = field.value
                 changed = True
+        return changed
 
-        # update tags
+    def _prepare_tags(
+        self,
+        note: Note,
+        tags: List[str],
+        protected_tags: List[str],
+        first_import_of_deck: bool,
+    ) -> bool:
+        changed = False
         prev_tags = note.tags
         note.tags = updated_tags(
             cur_tags=note.tags, incoming_tags=tags, protected_tags=protected_tags
@@ -392,7 +422,6 @@ class AnkiHubImporter:
                 note.tags += [TAG_FOR_UPDATED_NOTES]
                 LOGGER.debug(f"Added {TAG_FOR_UPDATED_NOTES} to tags of note.")
 
-        LOGGER.debug(f"Prepared note. {changed=}")
         return changed
 
 
