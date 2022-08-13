@@ -365,10 +365,14 @@ class AnkiHubImporter:
             protected_fields_for_model = protected_fields.get(
                 mw.col.models.get(note.mid)["id"], []
             )
-            if (
-                field.name in protected_fields_for_model
-                or field.name in fields_protected_by_tags
-            ):
+            if field.name in protected_fields_for_model:
+                LOGGER.debug(
+                    f"Field {field.name} is protected by the protected_fields for the model, skipping."
+                )
+                continue
+
+            if field.name in fields_protected_by_tags:
+                LOGGER.debug(f"Field {field.name} is protected by a tag, skipping.")
                 continue
 
             if note[field.name] != field.value:
