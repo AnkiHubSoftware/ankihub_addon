@@ -28,16 +28,17 @@ from .utils import (
     reset_note_types_of_notes,
 )
 
-INTERNAL_TAG_PREFIX = "AnkiHub"
+INTERNAL_TAG_PREFIX = "AnkiHub_"
 
-TAG_FOR_UPDATED_NOTES = f"{INTERNAL_TAG_PREFIX}::updated"
-TAG_FOR_NEW_NOTES = f"{INTERNAL_TAG_PREFIX}::new"
-TAG_FOR_PROTECTED_NOTES = f"{INTERNAL_TAG_PREFIX}::Protected"
+TAG_FOR_CHANGES = f"{INTERNAL_TAG_PREFIX}Update"
+TAG_FOR_UPDATED_NOTES = f"{TAG_FOR_CHANGES}::updated"
+TAG_FOR_NEW_NOTES = f"{TAG_FOR_CHANGES}::new"
 
-# tags that are only used by the add-on, but not by the web app
+TAG_FOR_PROTECTED_NOTES = f"{INTERNAL_TAG_PREFIX}Protect"
+
+# top-level tags that are only used by the add-on, but not by the web app
 ADDON_INTERNAL_TAGS = [
-    TAG_FOR_UPDATED_NOTES,
-    TAG_FOR_NEW_NOTES,
+    TAG_FOR_CHANGES,
     TAG_FOR_PROTECTED_NOTES,
 ]
 
