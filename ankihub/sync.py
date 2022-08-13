@@ -28,14 +28,25 @@ from .utils import (
     reset_note_types_of_notes,
 )
 
-TAG_FOR_UPDATED_NOTES = "AnkiHub::updated"
-TAG_FOR_CREATED_NOTES = "AnkiHub::new"
+INTERNAL_TAG_PREFIX = "AnkiHub"
+
+TAG_FOR_UPDATED_NOTES = f"{INTERNAL_TAG_PREFIX}::updated"
+TAG_FOR_NEW_NOTES = f"{INTERNAL_TAG_PREFIX}::new"
+TAG_FOR_PROTECTED_NOTES = f"{INTERNAL_TAG_PREFIX}::Protected"
 
 # tags that are only used by the add-on, but not by the web app
 ADDON_INTERNAL_TAGS = [
     TAG_FOR_UPDATED_NOTES,
-    TAG_FOR_CREATED_NOTES,
+    TAG_FOR_NEW_NOTES,
+    TAG_FOR_PROTECTED_NOTES,
 ]
+
+
+def is_internal_tag(tag: str) -> bool:
+    return any(
+        tag == internal_tag or tag.startswith(f"{internal_tag}::")
+        for internal_tag in ADDON_INTERNAL_TAGS
+    )
 
 
 class AnkiHubSync:
@@ -306,7 +317,7 @@ class AnkiHubImporter:
     def prepare_note(
         self,
         note: Note,
-        ankihub_id: str,
+        ankihub_nid: str,
         fields: List[FieldUpdate],
         tags: List[str],
         protected_fields: Dict[int, List[str]],
@@ -319,32 +330,33 @@ class AnkiHubImporter:
         Returns True if note was changed and False otherwise
         """
 
+        LOGGER.debug("Preparing note...")
+
+        if TAG_FOR_PROTECTED_NOTES in note.tags:
+            LOGGER.debug("Skipping note because it is protected by a tag.")
+            return False
+
         changed = False
 
-        if note[constants.ANKIHUB_NOTE_TYPE_FIELD_NAME] != ankihub_id:
+        # update ankihub id
+        if note[constants.ANKIHUB_NOTE_TYPE_FIELD_NAME] != ankihub_nid:
             LOGGER.debug(
                 f"AnkiHub id of note {note.id} will be changed from {note[constants.ANKIHUB_NOTE_TYPE_FIELD_NAME]} "
-                f"to {ankihub_id}",
+                f"to {ankihub_nid}",
             )
-            note[constants.ANKIHUB_NOTE_TYPE_FIELD_NAME] = ankihub_id
+            note[constants.ANKIHUB_NOTE_TYPE_FIELD_NAME] = ankihub_nid
             changed = True
 
-        prev_tags = note.tags
-        note.tags = updated_tags(
-            cur_tags=note.tags, incoming_tags=tags, protected_tags=protected_tags
-        )
-        if set(prev_tags) != set(note.tags):
-            LOGGER.debug(
-                f"Tags were changed from {prev_tags} to {note.tags}.",
-            )
-            changed = True
-
-        # update fields which are not protected
+        # update fields
+        fields_protected_by_tags = get_fields_protected_by_tags(note)
         for field in fields:
             protected_fields_for_model = protected_fields.get(
                 mw.col.models.get(note.mid)["id"], []
             )
-            if field.name in protected_fields_for_model:
+            if (
+                field.name in protected_fields_for_model
+                or field.name in fields_protected_by_tags
+            ):
                 continue
 
             if note[field.name] != field.value:
@@ -357,16 +369,56 @@ class AnkiHubImporter:
                 note[field.name] = field.value
                 changed = True
 
-        if changed and not first_import_of_deck:
-            if note.id == 0 and TAG_FOR_CREATED_NOTES not in note.tags:
-                note.tags += [TAG_FOR_CREATED_NOTES]
-                LOGGER.debug(f"Added {TAG_FOR_CREATED_NOTES} to tags of note.")
+        # update tags
+        prev_tags = note.tags
+        note.tags = updated_tags(
+            cur_tags=note.tags, incoming_tags=tags, protected_tags=protected_tags
+        )
+        if set(prev_tags) != set(note.tags):
+            LOGGER.debug(
+                f"Tags were changed from {prev_tags} to {note.tags}.",
+            )
+            changed = True
 
-            elif note.id != 0 and TAG_FOR_UPDATED_NOTES not in note.tags:
+        if not first_import_of_deck:
+            # ... add special tag if note is new
+            if note.id == 0 and TAG_FOR_NEW_NOTES not in note.tags:
+                note.tags += [TAG_FOR_NEW_NOTES]
+                LOGGER.debug(f"Added {TAG_FOR_NEW_NOTES} to tags of note.")
+                changed = True
+
+            # ... add special tag if note was updated
+            if note.id != 0 and changed and TAG_FOR_UPDATED_NOTES not in note.tags:
                 note.tags += [TAG_FOR_UPDATED_NOTES]
                 LOGGER.debug(f"Added {TAG_FOR_UPDATED_NOTES} to tags of note.")
 
+        LOGGER.debug(f"Prepared note. {changed=}")
         return changed
+
+
+def get_fields_protected_by_tags(note: Note) -> List[str]:
+    field_names_from_tags = [
+        tag[len(prefix) :]
+        for tag in note.tags
+        if tag.startswith((prefix := f"{TAG_FOR_PROTECTED_NOTES}::"))
+    ]
+
+    # Both a field and the field with underscores replaced with spaces should be protected.
+    # This makes it possible to protect fields with spaces in their name because tags cant contain spaces.
+    standardized_field_names_from_tags = [
+        field.replace("_", " ") for field in field_names_from_tags
+    ]
+    standardized_field_names_from_note = [
+        field.replace("_", " ") for field in note.keys()
+    ]
+
+    result = [
+        field
+        for field in standardized_field_names_from_note
+        if field in standardized_field_names_from_tags
+    ]
+
+    return result
 
 
 def adjust_deck(deck_name: str, local_did: Optional[DeckId] = None) -> DeckId:
@@ -396,7 +448,7 @@ def updated_tags(
     )
 
     # keep addon internal tags
-    internal = [tag for tag in cur_tags if tag in ADDON_INTERNAL_TAGS]
+    internal = [tag for tag in cur_tags if is_internal_tag(tag)]
 
     result = list(set(protected) | set(internal) | set(incoming_tags))
     return result

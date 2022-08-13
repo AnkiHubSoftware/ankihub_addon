@@ -5,7 +5,7 @@ from anki.notes import Note
 
 from .addon_ankihub_client import AddonAnkiHubClient as AnkiHubClient
 from .ankihub_client import ChangeTypes
-from .sync import ADDON_INTERNAL_TAGS
+from .sync import is_internal_tag
 from .utils import ankihub_uuid_of_note
 
 
@@ -65,4 +65,4 @@ def _prepare_fields(note: Note) -> List[Dict]:
 
 
 def _prepare_tags(tags: List[str]):
-    return list(set(tags) - set(ADDON_INTERNAL_TAGS))
+    return [tag for tag in tags if not is_internal_tag(tag)]

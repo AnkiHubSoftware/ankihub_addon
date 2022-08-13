@@ -3,7 +3,7 @@ import pathlib
 import re
 import uuid
 from datetime import datetime, timezone
-from typing import List, Optional
+from typing import Dict, List, Optional
 from unittest.mock import MagicMock, Mock
 
 import aqt
@@ -909,10 +909,14 @@ def import_sample_ankihub_deck(
 
 
 def test_prepare_note(anki_session_with_addon: AnkiSession):
+    from anki.notes import Note
+
     from ankihub.ankihub_client import FieldUpdate
+    from ankihub.constants import ANKIHUB_NOTE_TYPE_FIELD_NAME
     from ankihub.sync import (
         ADDON_INTERNAL_TAGS,
-        TAG_FOR_CREATED_NOTES,
+        TAG_FOR_NEW_NOTES,
+        TAG_FOR_PROTECTED_NOTES,
         TAG_FOR_UPDATED_NOTES,
         AnkiHubImporter,
     )
@@ -922,6 +926,29 @@ def test_prepare_note(anki_session_with_addon: AnkiSession):
     with anki_session_with_addon.profile_loaded():
         mw = anki_session.mw
 
+        ankihub_nid = str(UUID_1)
+
+        def prepare_note(
+            note,
+            first_import_of_deck: bool,
+            tags: List[str] = [],
+            fields: Optional[List[FieldUpdate]] = [],
+            protected_fields: Optional[Dict] = {},
+            protected_tags: List[str] = [],
+        ):
+
+            ankihub_importer = AnkiHubImporter()
+            result = ankihub_importer.prepare_note(
+                note=note,
+                ankihub_nid=ankihub_nid,
+                fields=fields,
+                tags=tags,
+                protected_fields=protected_fields,
+                protected_tags=protected_tags,
+                first_import_of_deck=first_import_of_deck,
+            )
+            return result
+
         # create ankihub_basic note type because prepare_note needs a note type with an ankihub_id field
         basic = mw.col.models.by_name("Basic")
         modify_note_type(basic)
@@ -930,30 +957,32 @@ def test_prepare_note(anki_session_with_addon: AnkiSession):
         ankihub_basic_mid = NotetypeId(mw.col.models.add_dict(basic).id)
         ankihub_basic = mw.col.models.get(ankihub_basic_mid)
 
-        # create a new note with non-empty fields and tags
-        note = mw.col.new_note(ankihub_basic)
-        note["Front"] = "old front"
-        note["Back"] = "old back"
+        def example_note() -> Note:
+            # create a new note with non-empty fields
+            # that has the ankihub_basic note type
+            note = mw.col.new_note(ankihub_basic)
+            note["Front"] = "old front"
+            note["Back"] = "old back"
+            note[ANKIHUB_NOTE_TYPE_FIELD_NAME] = ankihub_nid
+            note.tags = []
+            note.id = 42  # to simulate an existing note
+            return note
+
+        new_fields = [
+            FieldUpdate(name="Front", value="new front", order=0),
+            FieldUpdate(name="Back", value="new back", order=1),
+        ]
+        new_tags = ["c", "d"]
+
+        note = example_note()
         note.tags = ["a", "b"]
-
-        def prepare_note(note, tags: List[str], first_import_of_deck: bool):
-            ankihub_importer = AnkiHubImporter()
-            result = ankihub_importer.prepare_note(
-                note=note,
-                ankihub_id="1",
-                fields=[
-                    FieldUpdate(name="Front", value="new front", order=0),
-                    FieldUpdate(name="Back", value="new back", order=1),
-                ],
-                tags=tags,
-                protected_fields={ankihub_basic["id"]: ["Back"]},
-                protected_tags=["a"],
-                first_import_of_deck=first_import_of_deck,
-            )
-            return result
-
         note_was_changed_1 = prepare_note(
-            note, tags=["c", "d"], first_import_of_deck=True
+            note,
+            first_import_of_deck=True,
+            fields=new_fields,
+            tags=new_tags,
+            protected_fields={ankihub_basic["id"]: ["Back"]},
+            protected_tags=["a"],
         )
         # assert that the note was modified but the protected fields and tags were not
         assert note_was_changed_1
@@ -961,31 +990,49 @@ def test_prepare_note(anki_session_with_addon: AnkiSession):
         assert note["Back"] == "old back"
         assert set(note.tags) == set(["a", "c", "d"])
 
-        # assert that the note was not modified because the same arguments are used
+        # assert that the note was not modified because the same arguments were used on the same note
         note_was_changed_2 = prepare_note(
-            note, tags=["c", "d"], first_import_of_deck=True
+            note,
+            first_import_of_deck=True,
+            fields=new_fields,
+            tags=new_tags,
+            protected_fields={ankihub_basic["id"]: ["Back"]},
+            protected_tags=["a"],
         )
         assert not note_was_changed_2
         assert note["Front"] == "new front"
         assert note["Back"] == "old back"
         assert set(note.tags) == set(["a", "c", "d"])
 
-        # assert that the TAG_FOR_CREATED_NOTES tag gets added when note gets created and first_import_of_deck is False
-        note.id = 0
-        note.tags = ["a", "b"]
-        note_was_changed_3 = prepare_note(note, tags=[], first_import_of_deck=False)
+        # assert that the TAG_FOR_CREATED_NOTES tag gets added when a note gets created and first_import_of_deck=False
+        note = example_note()
+        note.id = 0  # simulate new note
+        note_was_changed_3 = prepare_note(note, first_import_of_deck=False)
         assert note_was_changed_3
-        assert set(note.tags) == set(["a", TAG_FOR_CREATED_NOTES])
+        assert set(note.tags) == set([TAG_FOR_NEW_NOTES])
 
-        # assert that the TAG_FOR_UPDATED_NOTES tag gets added when note gets updated and first_import_of_deck is False
-        note.id = 42
+        # assert that the TAG_FOR_UPDATED_NOTES tag gets added when a note gets updated and first_import_of_deck=False
+        note = example_note()
         note.tags = []
         note_was_changed_4 = prepare_note(note, tags=["e"], first_import_of_deck=False)
         assert note_was_changed_4
         assert set(note.tags) == set(["e", TAG_FOR_UPDATED_NOTES])
 
-        # assert that ADDON_INTERNAL_TAGS don't get removed
+        # assert that addon-internal don't get removed
+        note = example_note()
         note.tags = list(ADDON_INTERNAL_TAGS)
         note_was_changed_5 = prepare_note(note, tags=[], first_import_of_deck=False)
         assert not note_was_changed_5
         assert set(note.tags) == set(ADDON_INTERNAL_TAGS)
+
+        # assert that fields protected by tags are in fact protected
+        note = example_note()
+        note.tags = [f"{TAG_FOR_PROTECTED_NOTES}::Front"]
+        note["Front"] = "old front"
+        note_was_changed_6 = prepare_note(
+            note,
+            first_import_of_deck=False,
+            fields=[FieldUpdate(name="Front", value="new front", order=0)],
+        )
+        assert not note_was_changed_6
+        assert note["Front"] == "old front"
