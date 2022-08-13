@@ -11,3 +11,4 @@ requests-mock==1.9.3
 types-requests
 pytest-env
 typeguard
+pdbpp

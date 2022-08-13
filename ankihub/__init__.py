@@ -4,6 +4,8 @@ import os
 import pathlib
 import sys
 
+from aqt.qt import pyqtRemoveInputHook
+
 from . import settings
 
 lib = (pathlib.Path(__file__).parent / "lib").absolute()
@@ -14,6 +16,11 @@ LOGGER: logging.Logger = logging.getLogger("ankihub")
 
 SKIP_INIT = os.getenv("SKIP_INIT", False)
 LOGGER.debug(f"SKIP_INIT: {SKIP_INIT}")
+
+def debug() -> None:
+    pyqtRemoveInputHook()
+    breakpoint()
+
 
 if not SKIP_INIT:
     from .error_reporting import report_exception_and_upload_logs
