@@ -915,7 +915,7 @@ def test_prepare_note(anki_session_with_addon: AnkiSession):
     from ankihub.constants import ANKIHUB_NOTE_TYPE_FIELD_NAME
     from ankihub.sync import (
         ADDON_INTERNAL_TAGS,
-        TAG_FOR_PROTECTED_NOTES,
+        TAG_FOR_PROTECTING_FIELDS,
         AnkiHubImporter,
     )
     from ankihub.utils import modify_note_type
@@ -1007,7 +1007,7 @@ def test_prepare_note(anki_session_with_addon: AnkiSession):
 
         # assert that fields protected by tags are in fact protected
         note = example_note()
-        note.tags = [f"{TAG_FOR_PROTECTED_NOTES}::Front"]
+        note.tags = [f"{TAG_FOR_PROTECTING_FIELDS}::Front"]
         note["Front"] = "old front"
         note_was_changed_6 = prepare_note(
             note,
@@ -1015,3 +1015,17 @@ def test_prepare_note(anki_session_with_addon: AnkiSession):
         )
         assert not note_was_changed_6
         assert note["Front"] == "old front"
+
+        # assert that fields protected by tags are in fact protected
+        note = example_note()
+        note.tags = [f"{TAG_FOR_PROTECTING_FIELDS}::All"]
+        note_was_changed_7 = prepare_note(
+            note,
+            fields=[
+                FieldUpdate(name="Front", value="new front", order=0),
+                FieldUpdate(name="Back", value="new back", order=1),
+            ],
+        )
+        assert not note_was_changed_7
+        assert note["Front"] == "old front"
+        assert note["Back"] == "old back"

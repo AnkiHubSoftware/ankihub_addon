@@ -30,11 +30,12 @@ from .utils import (
 
 INTERNAL_TAG_PREFIX = "AnkiHub_"
 
-TAG_FOR_PROTECTED_NOTES = f"{INTERNAL_TAG_PREFIX}Protect"
+TAG_FOR_PROTECTING_FIELDS = f"{INTERNAL_TAG_PREFIX}Protect"
+TAG_FOR_PROTECTING_ALL_FIELDS = f"{TAG_FOR_PROTECTING_FIELDS}::All"
 
 # top-level tags that are only used by the add-on, but not by the web app
 ADDON_INTERNAL_TAGS = [
-    TAG_FOR_PROTECTED_NOTES,
+    TAG_FOR_PROTECTING_FIELDS,
 ]
 
 
@@ -323,7 +324,7 @@ class AnkiHubImporter:
 
         LOGGER.debug("Preparing note...")
 
-        if TAG_FOR_PROTECTED_NOTES in note.tags:
+        if TAG_FOR_PROTECTING_ALL_FIELDS in note.tags:
             LOGGER.debug("Skipping note because it is protected by a tag.")
             return False
 
@@ -410,7 +411,7 @@ def get_fields_protected_by_tags(note: Note) -> List[str]:
     field_names_from_tags = [
         tag[len(prefix) :]
         for tag in note.tags
-        if tag.startswith((prefix := f"{TAG_FOR_PROTECTED_NOTES}::"))
+        if tag.startswith((prefix := f"{TAG_FOR_PROTECTING_FIELDS}::"))
     ]
 
     # Both a field and the field with underscores replaced with spaces should be protected.
