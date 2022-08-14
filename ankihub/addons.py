@@ -48,7 +48,9 @@ def on_deleteAddon(self, module: str) -> None:
     addon_dir = Path(self.addonsFolder(module))
     for file in addon_dir.rglob("*"):
         os.chmod(file, 0o777)
-    LOGGER.debug(f"On deleteAddon changed file permissions for all files in {addon_dir}")
+    LOGGER.debug(
+        f"On deleteAddon changed file permissions for all files in {addon_dir}"
+    )
 
 
 def with_hidden_progress_dialog(*args, **kwargs) -> Any:
