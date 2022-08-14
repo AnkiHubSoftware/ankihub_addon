@@ -324,10 +324,6 @@ class AnkiHubImporter:
 
         LOGGER.debug("Preparing note...")
 
-        if TAG_FOR_PROTECTING_ALL_FIELDS in note.tags:
-            LOGGER.debug("Skipping note because it is protected by a tag.")
-            return False
-
         changed_ankihub_id_field = self._prepare_ankihub_id_field(
             note, ankihub_nid=ankihub_nid
         )
@@ -360,6 +356,13 @@ class AnkiHubImporter:
         fields: List[FieldUpdate],
         protected_fields: Dict[int, List[str]],
     ) -> bool:
+
+        if TAG_FOR_PROTECTING_ALL_FIELDS in note.tags:
+            LOGGER.debug(
+                "Skipping preparing fields because they are protected by a tag."
+            )
+            return False
+
         changed = False
         fields_protected_by_tags = get_fields_protected_by_tags(note)
         for field in fields:
