@@ -12,6 +12,9 @@ MEDIA_IMPORT_LIBS = MEDIA_IMPORT_SRC / "libs"
 MEDIA_IMPORT_TARGET = PROJECT_ROOT / "ankihub/media_import"
 MEDIA_IMPORT_REQUIREMENTS = PROJECT_ROOT / "media_import" / "requirements.txt"
 
+MEDIA_EXPORT_SRC = PROJECT_ROOT / "media_export/src"
+MEDIA_EXPORT_TARGET = PROJECT_ROOT / "ankihub/media_export"
+
 GOOGLE_API_KEY = os.getenv("GOOGLE_API_KEY")
 
 subprocess.run("git submodule update --init --recursive", shell=True, cwd=PROJECT_ROOT)
@@ -36,5 +39,8 @@ generate_manifest()
 
 shutil.rmtree(MEDIA_IMPORT_TARGET, ignore_errors=True)
 shutil.copytree(MEDIA_IMPORT_SRC, MEDIA_IMPORT_TARGET)
+
+shutil.rmtree(MEDIA_EXPORT_TARGET, ignore_errors=True)
+shutil.copytree(MEDIA_EXPORT_SRC, MEDIA_EXPORT_TARGET)
 
 obfuscate_google_api_key(GOOGLE_API_KEY, MEDIA_IMPORT_TARGET)

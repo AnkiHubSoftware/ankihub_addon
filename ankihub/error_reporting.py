@@ -80,6 +80,15 @@ def report_exception(
                     normalize_url(exception.response.url),
                 ]
 
+                scope.set_context(
+                    "request",
+                    {
+                        "method": exception.response.request.method,
+                        "url": exception.response.request.url,
+                        "body": exception.response.request.body,
+                    },
+                )
+
         if exception is None:
             event_id = capture_exception()
         else:
