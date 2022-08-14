@@ -3,6 +3,8 @@ from typing import List, Optional
 
 from anki.collection import OpChanges
 from aqt import gui_hooks, mw
+from aqt.emptycards import show_empty_cards
+from aqt.operations.tag import clear_unused_tags
 from aqt.qt import (
     QDialog,
     QDialogButtonBox,
@@ -249,9 +251,19 @@ class SubscribeDialog(QDialog):
                 exc = e
 
             if success:
-                tooltip("The deck has successfully been installed!", parent=mw)
                 self.accept()
                 mw.reset()
+
+                if askUser(
+                    "The deck has successfully been installed!<br><br>"
+                    "Do you want to clear unused tags and empty cards from your collection? (recommended if you had "
+                    " a previous version of the deck in your collection)",
+                    title="AnkiHub",
+                    parent=self,
+                ):
+                    clear_unused_tags(parent=self).run_in_background()
+                    show_empty_cards(mw)
+
             else:
                 LOGGER.warning("Importing deck failed.")
                 self.reject()
@@ -324,9 +336,6 @@ class SubscribeDialog(QDialog):
             notes_data=notes_data,
             deck_name=deck_name,
         )
-
-        if local_did is None:
-            return None
 
         config.save_subscription(
             name=deck_name,
