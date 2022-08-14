@@ -8,7 +8,6 @@ from aqt import addons, mw
 from aqt.addons import AddonManager, DownloaderInstaller
 
 from . import LOGGER
-from .constants import ANKIWEB_ID
 from .settings import LOG_FILE, file_handler
 
 
@@ -42,16 +41,14 @@ def with_disabled_log_file_handler(*args: Any, **kwargs: Any) -> Any:
 def on_deleteAddon(self, module: str) -> None:
     # without this Anki is not able to delete all contents of the media_import libs folder
     # on Windows
-    LOGGER.debug(f"on_deleteAddon was called with {module=}")
-
-    if module.lower() not in ["ankihub", str(ANKIWEB_ID)]:
-        LOGGER.debug(f"Skipping because {module} is not this add-on.")
+    ankihub_module = mw.addonManager.addonFromModule(__name__)
+    if module != ankihub_module:
         return
 
     addon_dir = Path(self.addonsFolder(module))
     for file in addon_dir.rglob("*"):
         os.chmod(file, 0o777)
-    LOGGER.debug(f"Changed file permissions for all files in {addon_dir}")
+    LOGGER.debug(f"On deleteAddon changed file permissions for all files in {addon_dir}")
 
 
 def with_hidden_progress_dialog(*args, **kwargs) -> Any:
