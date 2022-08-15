@@ -28,6 +28,23 @@ from .utils import (
     reset_note_types_of_notes,
 )
 
+INTERNAL_TAG_PREFIX = "AnkiHub_"
+
+TAG_FOR_PROTECTING_FIELDS = f"{INTERNAL_TAG_PREFIX}Protect"
+TAG_FOR_PROTECTING_ALL_FIELDS = f"{TAG_FOR_PROTECTING_FIELDS}::All"
+
+# top-level tags that are only used by the add-on, but not by the web app
+ADDON_INTERNAL_TAGS = [
+    TAG_FOR_PROTECTING_FIELDS,
+]
+
+
+def is_internal_tag(tag: str) -> bool:
+    return any(
+        tag == internal_tag or tag.startswith(f"{internal_tag}::")
+        for internal_tag in ADDON_INTERNAL_TAGS
+    )
+
 
 class AnkiHubSync:
     def __init__(self):
@@ -184,7 +201,7 @@ class AnkiHubImporter:
         local_did: DeckId = None,  # did that new notes should be put into if importing not for the first time
     ) -> DeckId:
 
-        first_time_import = local_did is None
+        first_import_of_deck = local_did is None
 
         local_did = adjust_deck(deck_name, local_did)
         adjust_note_types(remote_note_types)
@@ -208,7 +225,7 @@ class AnkiHubImporter:
             dids_for_note = set(c.did for c in note.cards())
             dids = dids | dids_for_note
 
-        if first_time_import:
+        if first_import_of_deck:
             local_did = self._cleanup_first_time_deck_import(dids, local_did)
 
         db = AnkiHubDB()
@@ -264,7 +281,12 @@ class AnkiHubImporter:
                 )
             )
             if self.prepare_note(
-                note, ankihub_nid, fields, tags, protected_fields, protected_tags
+                note,
+                ankihub_nid,
+                fields,
+                tags,
+                protected_fields,
+                protected_tags,
             ):
                 mw.col.update_note(note)
                 self.num_notes_updated += 1
@@ -275,7 +297,12 @@ class AnkiHubImporter:
             note_type = mw.col.models.get(NotetypeId(mid))
             note = mw.col.new_note(note_type)
             self.prepare_note(
-                note, ankihub_nid, fields, tags, protected_fields, protected_tags
+                note,
+                ankihub_nid,
+                fields,
+                tags,
+                protected_fields,
+                protected_tags,
             )
             note = create_note_with_id(note, anki_id=anki_nid, anki_did=anki_did)
             self.num_notes_created += 1
@@ -285,7 +312,7 @@ class AnkiHubImporter:
     def prepare_note(
         self,
         note: Note,
-        ankihub_id: str,
+        ankihub_nid: str,
         fields: List[FieldUpdate],
         tags: List[str],
         protected_fields: Dict[int, List[str]],
@@ -297,32 +324,61 @@ class AnkiHubImporter:
         Returns True if note was changed and False otherwise
         """
 
-        result = False
+        LOGGER.debug("Preparing note...")
 
-        if note[constants.ANKIHUB_NOTE_TYPE_FIELD_NAME] != ankihub_id:
+        changed_ankihub_id_field = self._prepare_ankihub_id_field(
+            note, ankihub_nid=ankihub_nid
+        )
+        changed_fields = self._prepare_fields(
+            note, fields=fields, protected_fields=protected_fields
+        )
+        changed_tags = self._prepare_tags(
+            note,
+            tags=tags,
+            protected_tags=protected_tags,
+        )
+        changed = changed_ankihub_id_field or changed_fields or changed_tags
+
+        LOGGER.debug(f"Prepared note. {changed=}")
+        return changed
+
+    def _prepare_ankihub_id_field(self, note: Note, ankihub_nid: str) -> bool:
+        if note[constants.ANKIHUB_NOTE_TYPE_FIELD_NAME] != ankihub_nid:
             LOGGER.debug(
                 f"AnkiHub id of note {note.id} will be changed from {note[constants.ANKIHUB_NOTE_TYPE_FIELD_NAME]} "
-                f"to {ankihub_id}",
+                f"to {ankihub_nid}",
             )
-            note[constants.ANKIHUB_NOTE_TYPE_FIELD_NAME] = ankihub_id
-            result = True
+            note[constants.ANKIHUB_NOTE_TYPE_FIELD_NAME] = ankihub_nid
+            return True
+        return False
 
-        prev_tags = note.tags
-        note.tags = updated_tags(
-            cur_tags=note.tags, incoming_tags=tags, protected_tags=protected_tags
-        )
-        if set(prev_tags) != set(note.tags):
+    def _prepare_fields(
+        self,
+        note: Note,
+        fields: List[FieldUpdate],
+        protected_fields: Dict[int, List[str]],
+    ) -> bool:
+
+        if TAG_FOR_PROTECTING_ALL_FIELDS in note.tags:
             LOGGER.debug(
-                f"Tags were changed from {prev_tags} to {note.tags}.",
+                "Skipping preparing fields because they are protected by a tag."
             )
-            result = True
+            return False
 
-        # update fields which are not protected
+        changed = False
+        fields_protected_by_tags = get_fields_protected_by_tags(note)
         for field in fields:
             protected_fields_for_model = protected_fields.get(
                 mw.col.models.get(note.mid)["id"], []
             )
             if field.name in protected_fields_for_model:
+                LOGGER.debug(
+                    f"Field {field.name} is protected by the protected_fields for the model, skipping."
+                )
+                continue
+
+            if field.name in fields_protected_by_tags:
+                LOGGER.debug(f"Field {field.name} is protected by a tag, skipping.")
                 continue
 
             if note[field.name] != field.value:
@@ -333,9 +389,52 @@ class AnkiHubImporter:
                     f"{field.value}"
                 )
                 note[field.name] = field.value
-                result = True
+                changed = True
+        return changed
 
-        return result
+    def _prepare_tags(
+        self,
+        note: Note,
+        tags: List[str],
+        protected_tags: List[str],
+    ) -> bool:
+        changed = False
+        prev_tags = note.tags
+        note.tags = updated_tags(
+            cur_tags=note.tags, incoming_tags=tags, protected_tags=protected_tags
+        )
+        if set(prev_tags) != set(note.tags):
+            LOGGER.debug(
+                f"Tags were changed from {prev_tags} to {note.tags}.",
+            )
+            changed = True
+
+        return changed
+
+
+def get_fields_protected_by_tags(note: Note) -> List[str]:
+    field_names_from_tags = [
+        tag[len(prefix) :]
+        for tag in note.tags
+        if tag.startswith((prefix := f"{TAG_FOR_PROTECTING_FIELDS}::"))
+    ]
+
+    # Both a field and the field with underscores replaced with spaces should be protected.
+    # This makes it possible to protect fields with spaces in their name because tags cant contain spaces.
+    standardized_field_names_from_tags = [
+        field.replace("_", " ") for field in field_names_from_tags
+    ]
+    standardized_field_names_from_note = [
+        field.replace("_", " ") for field in note.keys()
+    ]
+
+    result = [
+        field
+        for field, field_std in zip(note.keys(), standardized_field_names_from_note)
+        if field_std in standardized_field_names_from_tags
+    ]
+
+    return result
 
 
 def adjust_deck(deck_name: str, local_did: Optional[DeckId] = None) -> DeckId:
@@ -358,16 +457,17 @@ def updated_tags(
     # get subset of cur_tags that are protected
     # by being equal to a protected tag or by containing a protected tag
     # protected_tags can't contain "::" (this is enforced when the user chooses them in the webapp)
-    result = set(
+    protected = set(
         tag
         for tag in cur_tags
         if any(protected_tag in tag.split("::") for protected_tag in protected_tags)
     )
 
-    # add new tags
-    result = set(result) | set(incoming_tags)
+    # keep addon internal tags
+    internal = [tag for tag in cur_tags if is_internal_tag(tag)]
 
-    return list(result)
+    result = list(set(protected) | set(internal) | set(incoming_tags))
+    return result
 
 
 def fetch_remote_note_types_based_on_notes_data(

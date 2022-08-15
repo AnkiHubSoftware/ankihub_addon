@@ -3,7 +3,7 @@ import pathlib
 import re
 import uuid
 from datetime import datetime, timezone
-from typing import Optional
+from typing import Dict, List, Optional
 from unittest.mock import MagicMock, Mock
 
 import aqt
@@ -63,6 +63,7 @@ def test_editor(anki_session_with_addon: AnkiSession, requests_mock, monkeypatch
     editor.web = MagicMock()
 
     ankihub_note_uuid = UUID_1
+    editor.note.keys = lambda: ["Front", "Back", ANKIHUB_NOTE_TYPE_FIELD_NAME]
     editor.note.fields = ["a", "b", str(ankihub_note_uuid)]
     editor.note.tags = ["test_tag"]
     field_value = {ANKIHUB_NOTE_TYPE_FIELD_NAME: ""}
@@ -393,87 +394,110 @@ def test_get_deck_by_id(anki_session_with_addon: AnkiSession, requests_mock):
     assert exc is not None and exc.response.status_code == 403
 
 
-def test_create_change_note_suggestion(
-    anki_session_with_addon: AnkiSession, requests_mock
-):
-    from ankihub.ankihub_client import AnkiHubClient, AnkiHubRequestError, ChangeTypes
+def test_suggest_note_upate(anki_session_with_addon: AnkiSession, requests_mock):
+    from ankihub.ankihub_client import AnkiHubRequestError, ChangeTypes, NoteUpdate
     from ankihub.constants import API_URL_BASE
+    from ankihub.suggestions import suggest_note_update
+    from ankihub.sync import ADDON_INTERNAL_TAGS
 
-    client = AnkiHubClient(hooks=[])
-    # test create change note suggestion
-    ankihub_note_uuid = UUID_1
-    requests_mock.post(
-        f"{API_URL_BASE}/notes/{ankihub_note_uuid}/suggestion/", status_code=201
-    )
-    client.create_change_note_suggestion(
-        ankihub_note_uuid=ankihub_note_uuid,
-        fields=[{"name": "abc", "order": 0, "value": "abc changed"}],
-        tags=["test"],
-        change_type=ChangeTypes.NEW_CONTENT,
-        comment="",
-    )
+    anki_session = anki_session_with_addon
+    with anki_session.profile_loaded():
+        mw = anki_session.mw
 
-    # test create change note suggestion unauthenticated
-    requests_mock.post(
-        f"{API_URL_BASE}/notes/{ankihub_note_uuid}/suggestion/", status_code=403
-    )
-    try:
-        client.create_change_note_suggestion(
-            ankihub_note_uuid=ankihub_note_uuid,
-            fields=[{"name": "abc", "order": 0, "value": "abc changed"}],
-            tags=["test"],
+        import_sample_ankihub_deck(mw, str(UUID_1))
+        notes_data: NoteUpdate = ankihub_sample_deck_notes_data()
+        note = mw.col.get_note(notes_data[0].anki_nid)
+        ankihub_note_uuid = notes_data[0].ankihub_note_uuid
+
+        # test create change note suggestion
+        adapter = requests_mock.post(
+            f"{API_URL_BASE}/notes/{ankihub_note_uuid}/suggestion/", status_code=201
+        )
+
+        note.tags = ["a", *ADDON_INTERNAL_TAGS]
+        suggest_note_update(
+            note=note,
             change_type=ChangeTypes.NEW_CONTENT,
-            comment="",
+            comment="test",
         )
-    except AnkiHubRequestError as e:
-        exc = e
-    assert exc is not None and exc.response.status_code == 403
+
+        # ... assert that add-on internal tags were filtered out
+        suggestion_data = adapter.last_request.json()
+        assert set(suggestion_data["tags"]) == set(
+            [
+                "a",
+            ]
+        )
+
+        # test create change note suggestion unauthenticated
+        requests_mock.post(
+            f"{API_URL_BASE}/notes/{ankihub_note_uuid}/suggestion/", status_code=403
+        )
+
+        try:
+            suggest_note_update(
+                note=note,
+                change_type=ChangeTypes.NEW_CONTENT,
+                comment="test",
+            )
+        except AnkiHubRequestError as e:
+            exc = e
+        assert exc is not None and exc.response.status_code == 403
 
 
-def test_create_new_note_suggestion(
-    anki_session_with_addon: AnkiSession, requests_mock
-):
-    from ankihub.ankihub_client import AnkiHubClient, AnkiHubRequestError, ChangeTypes
+def test_suggest_new_note(anki_session_with_addon: AnkiSession, requests_mock):
+    from ankihub.ankihub_client import AnkiHubRequestError, ChangeTypes
     from ankihub.constants import API_URL_BASE
+    from ankihub.suggestions import suggest_new_note
+    from ankihub.sync import ADDON_INTERNAL_TAGS
 
-    client = AnkiHubClient(hooks=[])
-    # test create new note suggestion
-    ankihub_deck_uuid = UUID_1
-    ankihub_note_uuid = UUID_2
-    requests_mock.post(
-        f"{API_URL_BASE}/decks/{ankihub_deck_uuid}/note-suggestion/", status_code=201
-    )
-    client.create_new_note_suggestion(
-        ankihub_deck_uuid=ankihub_deck_uuid,
-        ankihub_note_uuid=ankihub_note_uuid,
-        anki_note_id=1,
-        fields=[{"name": "abc", "order": 0, "value": "abc changed"}],
-        tags=["test"],
-        change_type=ChangeTypes.NEW_CARD_TO_ADD,
-        note_type_name="Basic",
-        anki_note_type_id=1,
-        comment="",
-    )
+    anki_session = anki_session_with_addon
+    with anki_session.profile_loaded():
+        mw = anki_session.mw
 
-    # test create new note suggestion unauthenticated
-    requests_mock.post(
-        f"{API_URL_BASE}/decks/{ankihub_deck_uuid}/note-suggestion/", status_code=403
-    )
-    try:
-        client.create_new_note_suggestion(
-            ankihub_deck_uuid=ankihub_deck_uuid,
-            ankihub_note_uuid=ankihub_note_uuid,
-            anki_note_id=1,
-            fields=[{"name": "abc", "order": 0, "value": "abc changed"}],
-            tags=["test"],
-            change_type=ChangeTypes.NEW_CARD_TO_ADD,
-            note_type_name="Basic",
-            anki_note_type_id=1,
-            comment="",
+        import_sample_ankihub_deck(mw, str(UUID_1))
+        note = mw.col.new_note(
+            mw.col.models.by_name("Basic-4827c (Testdeck / andrew1)")
         )
-    except AnkiHubRequestError as e:
-        exc = e
-    assert exc is not None and exc.response.status_code == 403
+        ankihub_deck_uuid = UUID_1
+
+        adapter = requests_mock.post(
+            f"{API_URL_BASE}/decks/{ankihub_deck_uuid}/note-suggestion/",
+            status_code=201,
+        )
+
+        note.tags = ["a", *ADDON_INTERNAL_TAGS]
+        suggest_new_note(
+            note=note,
+            change_type=ChangeTypes.NEW_CARD_TO_ADD,
+            ankihub_deck_uuid=ankihub_deck_uuid,
+            comment="test",
+        )
+
+        # ... assert that add-on internal tags were filtered out
+        suggestion_data = adapter.last_request.json()
+        assert set(suggestion_data["tags"]) == set(
+            [
+                "a",
+            ]
+        )
+
+        # test create change note suggestion unauthenticated
+        requests_mock.post(
+            f"{API_URL_BASE}/decks/{ankihub_deck_uuid}/note-suggestion/",
+            status_code=403,
+        )
+
+        try:
+            suggest_new_note(
+                note=note,
+                change_type=ChangeTypes.NEW_CONTENT,
+                ankihub_deck_uuid=ankihub_deck_uuid,
+                comment="test",
+            )
+        except AnkiHubRequestError as e:
+            exc = e
+        assert exc is not None and exc.response.status_code == 403
 
 
 def test_adjust_note_types(anki_session_with_addon: AnkiSession):
@@ -885,13 +909,41 @@ def import_sample_ankihub_deck(
 
 
 def test_prepare_note(anki_session_with_addon: AnkiSession):
+    from anki.notes import Note
+
     from ankihub.ankihub_client import FieldUpdate
-    from ankihub.sync import AnkiHubImporter
+    from ankihub.constants import ANKIHUB_NOTE_TYPE_FIELD_NAME
+    from ankihub.sync import (
+        ADDON_INTERNAL_TAGS,
+        TAG_FOR_PROTECTING_FIELDS,
+        AnkiHubImporter,
+    )
     from ankihub.utils import modify_note_type
 
     anki_session = anki_session_with_addon
     with anki_session_with_addon.profile_loaded():
         mw = anki_session.mw
+
+        ankihub_nid = str(UUID_1)
+
+        def prepare_note(
+            note,
+            tags: List[str] = [],
+            fields: Optional[List[FieldUpdate]] = [],
+            protected_fields: Optional[Dict] = {},
+            protected_tags: List[str] = [],
+        ):
+
+            ankihub_importer = AnkiHubImporter()
+            result = ankihub_importer.prepare_note(
+                note=note,
+                ankihub_nid=ankihub_nid,
+                fields=fields,
+                tags=tags,
+                protected_fields=protected_fields,
+                protected_tags=protected_tags,
+            )
+            return result
 
         # create ankihub_basic note type because prepare_note needs a note type with an ankihub_id field
         basic = mw.col.models.by_name("Basic")
@@ -901,33 +953,181 @@ def test_prepare_note(anki_session_with_addon: AnkiSession):
         ankihub_basic_mid = NotetypeId(mw.col.models.add_dict(basic).id)
         ankihub_basic = mw.col.models.get(ankihub_basic_mid)
 
-        # create a new note with non-empty fields and tags
-        note = mw.col.new_note(ankihub_basic)
-        note["Front"] = "old front"
-        note["Back"] = "old back"
+        def example_note() -> Note:
+            # create a new note with non-empty fields
+            # that has the ankihub_basic note type
+            note = mw.col.new_note(ankihub_basic)
+            note["Front"] = "old front"
+            note["Back"] = "old back"
+            note[ANKIHUB_NOTE_TYPE_FIELD_NAME] = ankihub_nid
+            note.tags = []
+            note.id = 42  # to simulate an existing note
+            return note
+
+        new_fields = [
+            FieldUpdate(name="Front", value="new front", order=0),
+            FieldUpdate(name="Back", value="new back", order=1),
+        ]
+        new_tags = ["c", "d"]
+
+        note = example_note()
         note.tags = ["a", "b"]
-
-        def prepare_note(note):
-            ankihub_importer = AnkiHubImporter()
-            result = ankihub_importer.prepare_note(
-                note=note,
-                ankihub_id="1",
-                fields=[
-                    FieldUpdate(name="Front", value="new front", order=0),
-                    FieldUpdate(name="Back", value="new back", order=1),
-                ],
-                tags=["c", "d"],
-                protected_fields={ankihub_basic["id"]: ["Back"]},
-                protected_tags=["a"],
-            )
-            return result
-
-        note_was_changed_1 = prepare_note(note)
-        note_was_changed_2 = prepare_note(note)
-
+        note_was_changed_1 = prepare_note(
+            note,
+            fields=new_fields,
+            tags=new_tags,
+            protected_fields={ankihub_basic["id"]: ["Back"]},
+            protected_tags=["a"],
+        )
         # assert that the note was modified but the protected fields and tags were not
         assert note_was_changed_1
+        assert note["Front"] == "new front"
+        assert note["Back"] == "old back"
+        assert set(note.tags) == set(["a", "c", "d"])
+
+        # assert that the note was not modified because the same arguments were used on the same note
+        note_was_changed_2 = prepare_note(
+            note,
+            fields=new_fields,
+            tags=new_tags,
+            protected_fields={ankihub_basic["id"]: ["Back"]},
+            protected_tags=["a"],
+        )
         assert not note_was_changed_2
         assert note["Front"] == "new front"
         assert note["Back"] == "old back"
         assert set(note.tags) == set(["a", "c", "d"])
+
+        # assert that addon-internal don't get removed
+        note = example_note()
+        note.tags = list(ADDON_INTERNAL_TAGS)
+        note_was_changed_5 = prepare_note(note, tags=[])
+        assert not note_was_changed_5
+        assert set(note.tags) == set(ADDON_INTERNAL_TAGS)
+
+        # assert that fields protected by tags are in fact protected
+        note = example_note()
+        note.tags = [f"{TAG_FOR_PROTECTING_FIELDS}::Front"]
+        note["Front"] = "old front"
+        note_was_changed_6 = prepare_note(
+            note,
+            fields=[FieldUpdate(name="Front", value="new front", order=0)],
+        )
+        assert not note_was_changed_6
+        assert note["Front"] == "old front"
+
+        # assert that fields protected by tags are in fact protected
+        note = example_note()
+        note.tags = [f"{TAG_FOR_PROTECTING_FIELDS}::All"]
+        note_was_changed_7 = prepare_note(
+            note,
+            fields=[
+                FieldUpdate(name="Front", value="new front", order=0),
+                FieldUpdate(name="Back", value="new back", order=1),
+            ],
+        )
+        assert not note_was_changed_7
+        assert note["Front"] == "old front"
+        assert note["Back"] == "old back"
+
+        # assert that fields with spaces are protected by tags
+        note = example_note()
+        note.tags = [f"{TAG_FOR_PROTECTING_FIELDS}::All"]
+        note_was_changed_7 = prepare_note(
+            note,
+            fields=[
+                FieldUpdate(name="Front", value="new front", order=0),
+                FieldUpdate(name="Back", value="new back", order=1),
+            ],
+        )
+        assert not note_was_changed_7
+        assert note["Front"] == "old front"
+        assert note["Back"] == "old back"
+
+
+def test_prepare_note_protect_field_with_spaces(anki_session_with_addon: AnkiSession):
+    from anki.notes import Note
+
+    from ankihub.ankihub_client import FieldUpdate
+    from ankihub.constants import ANKIHUB_NOTE_TYPE_FIELD_NAME
+    from ankihub.sync import (
+        TAG_FOR_PROTECTING_FIELDS,
+        AnkiHubImporter,
+    )
+    from ankihub.utils import modify_note_type
+
+    anki_session = anki_session_with_addon
+    with anki_session_with_addon.profile_loaded():
+        mw = anki_session.mw
+
+        ankihub_nid = str(UUID_1)
+
+        def prepare_note(
+            note,
+            tags: List[str] = [],
+            fields: Optional[List[FieldUpdate]] = [],
+            protected_fields: Optional[Dict] = {},
+            protected_tags: List[str] = [],
+        ):
+
+            ankihub_importer = AnkiHubImporter()
+            result = ankihub_importer.prepare_note(
+                note=note,
+                ankihub_nid=ankihub_nid,
+                fields=fields,
+                tags=tags,
+                protected_fields=protected_fields,
+                protected_tags=protected_tags,
+            )
+            return result
+
+        # create ankihub_basic note type because prepare_note needs a note type with an ankihub_id field
+        basic = mw.col.models.by_name("Basic")
+        modify_note_type(basic)
+        basic["id"] = 0
+        basic["name"] = "Basic (AnkiHub)"
+
+        field_name_with_spaces = "Field name with spaces"
+        basic["flds"][0]["name"] = field_name_with_spaces
+        basic["tmpls"][0]["qfmt"] = basic["tmpls"][0]["qfmt"].replace(
+            "Front", field_name_with_spaces
+        )
+
+        ankihub_basic_mid = NotetypeId(mw.col.models.add_dict(basic).id)
+        ankihub_basic = mw.col.models.get(ankihub_basic_mid)
+
+        def example_note() -> Note:
+            # create a new note with non-empty fields
+            # that has the ankihub_basic note type
+            note = mw.col.new_note(ankihub_basic)
+            note[field_name_with_spaces] = "old front"
+            note["Back"] = "old back"
+            note[ANKIHUB_NOTE_TYPE_FIELD_NAME] = ankihub_nid
+            note.tags = []
+            note.id = 42  # to simulate an existing note
+            return note
+
+        # assert that fields with spaces are protected by tags that have spaces replaced by underscores
+        note = example_note()
+        note.tags = [
+            f"{TAG_FOR_PROTECTING_FIELDS}::{field_name_with_spaces.replace(' ', '_')}"
+        ]
+        note_changed = prepare_note(
+            note,
+            fields=[
+                FieldUpdate(name=field_name_with_spaces, value="new front", order=0)
+            ],
+        )
+        assert not note_changed
+        assert note[field_name_with_spaces] == "old front"
+
+        # assert that field is not protected without this tag (to make sure the test is correct)
+        note = example_note()
+        note_changed = prepare_note(
+            note,
+            fields=[
+                FieldUpdate(name=field_name_with_spaces, value="new front", order=0)
+            ],
+        )
+        assert note_changed
+        assert note[field_name_with_spaces] == "new front"

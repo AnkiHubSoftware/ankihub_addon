@@ -11,7 +11,6 @@ from aqt.editor import Editor
 from aqt.utils import chooseList, showInfo, showText, tooltip
 
 from .. import LOGGER, constants
-from ..addon_ankihub_client import AddonAnkiHubClient as AnkiHubClient
 from ..ankihub_client import AnkiHubRequestError
 from ..config import config
 from ..constants import (
@@ -20,6 +19,7 @@ from ..constants import (
     ICONS_PATH,
     AnkiHubCommands,
 )
+from ..suggestions import suggest_new_note, suggest_note_update
 from .suggestion_dialog import SuggestionDialog
 
 
@@ -56,28 +56,9 @@ def on_suggestion_button_press_inner(editor: Editor) -> None:
         return
 
     change_type, comment = dialog.change_type(), dialog.comment()
-    # See build_note_fields in ankihub
-    # _field_vals is the actual contents of each note field.
-    _field_vals = list(editor.note.fields)
-    # Exclude the AnkiHub ID field since we don't want to expose this as an
-    # editable field in AnkiHub suggestion forms.
-    ankihub_note_uuid_str = _field_vals.pop()
-    if ankihub_note_uuid_str:
-        ankihub_note_uuid = uuid.UUID(ankihub_note_uuid_str)
-    else:
-        ankihub_note_uuid = uuid.uuid4()
-    _fields_metadata = editor.note.note_type()["flds"][:-1]
-    fields = [
-        {"name": field["name"], "order": field["ord"], "value": val}
-        for field, val in zip(_fields_metadata, _field_vals)
-    ]
-    tags = editor.note.tags
-    client = AnkiHubClient()
     if command == AnkiHubCommands.CHANGE.value:
-        client.create_change_note_suggestion(
-            ankihub_note_uuid=ankihub_note_uuid,
-            fields=fields,
-            tags=tags,
+        suggest_note_update(
+            note=editor.note,
             change_type=change_type,
             comment=comment,
         )
@@ -93,26 +74,21 @@ def on_suggestion_button_press_inner(editor: Editor) -> None:
             return
         elif len(subscribed_decks) == 1:
             (decks,) = subscribed_decks.items()
-            ankihub_deck_uuid, _ = decks
+            ankihub_did, _ = decks
         else:
             choice = chooseList(
                 "Which AnKiHub deck would you like to add this note to?",
                 choices=[subscribed_decks[id]["name"] for id in subscribed_decks],
             )
-            ankihub_deck_uuid = list(subscribed_decks.keys())[choice]
+            ankihub_did = list(subscribed_decks.keys())[choice]
 
         if editor.addMode:
 
             def on_add(note: anki.notes.Note) -> None:
-                client.create_new_note_suggestion(
-                    ankihub_deck_uuid=ankihub_deck_uuid,
-                    ankihub_note_uuid=ankihub_note_uuid,
-                    anki_note_id=note.id,
-                    fields=fields,
-                    tags=tags,
+                suggest_new_note(
+                    note=note,
                     change_type=change_type,
-                    note_type_name=note.note_type()["name"],
-                    anki_note_type_id=note.note_type()["id"],
+                    ankihub_deck_uuid=uuid.UUID(ankihub_did),
                     comment=comment,
                 )
                 tooltip("Submitted new note suggestion to AnkiHub.")
@@ -122,15 +98,10 @@ def on_suggestion_button_press_inner(editor: Editor) -> None:
             add_note_window: AddCards = editor.parentWindow  # type: ignore
             add_note_window.add_current_note()
         else:
-            client.create_new_note_suggestion(
-                ankihub_deck_uuid=ankihub_deck_uuid,
-                ankihub_note_uuid=ankihub_note_uuid,
-                anki_note_id=editor.note.id,
-                fields=fields,
-                tags=tags,
+            suggest_new_note(
+                note=editor.note,
                 change_type=change_type,
-                note_type_name=editor.note.note_type()["name"],
-                anki_note_type_id=editor.note.note_type()["id"],
+                ankihub_deck_uuid=uuid.UUID(ankihub_did),
                 comment=comment,
             )
             tooltip("Submitted new note suggestion to AnkiHub.")

@@ -9,7 +9,7 @@ from aqt.utils import getTag, tooltip, tr
 
 from .. import LOGGER
 from ..addon_ankihub_client import AddonAnkiHubClient as AnkiHubClient
-from ..utils import ankihub_uuids_of_notes
+from ..utils import ankihub_uuids_of_nids
 
 
 def on_browser_will_show_context_menu(browser: Browser, context_menu: QMenu) -> None:
@@ -47,7 +47,7 @@ def on_bulk_tag_suggestion_action(browser: Browser) -> None:
     if not ok:
         return
 
-    ankihub_note_uuids = ankihub_uuids_of_notes(selected_nids)
+    ankihub_note_uuids = ankihub_uuids_of_nids(selected_nids, ignore_invalid=True)
 
     if not ankihub_note_uuids:
         tooltip("No AnkiHub notes were selected.")
