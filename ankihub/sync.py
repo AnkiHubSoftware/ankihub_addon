@@ -120,7 +120,7 @@ class AnkiHubSync:
         elif exc.response.status_code == 404:
             mw.taskman.run_on_main(
                 lambda: showInfo(  # type: ignore
-                    f"The deck \"{deck_info['name']}\" does not exist on the AnkiHub website. "
+                    f"The deck <b>{deck_info['name']}</b> does not exist on the AnkiHub website. "
                     f"Remove it from the subscribed decks to be able to sync.<br><br>"
                     f"deck id: <i>{ankihub_did}</i>",
                 )
@@ -149,7 +149,7 @@ class AnkiHubImporter:
         protected_tags: Optional[
             List[str]
         ] = None,  # will be fetched from api if not provided
-    ) -> Optional[DeckId]:
+    ) -> DeckId:
         """
         Used for importing an ankihub deck and updates to an ankihub deck
         When no local_did is provided this function assumes that the deck gets installed for the first time
@@ -209,7 +209,9 @@ class AnkiHubImporter:
 
         dids: Set[DeckId] = set()  # set of ids of decks notes were imported into
         for note_data in notes_data:
-            LOGGER.debug(f"Trying to update or create note:\n {pformat(note_data)}")
+            LOGGER.debug(
+                f"Trying to update or create note: {note_data.anki_nid=}, {note_data.ankihub_note_uuid=}"
+            )
             note = self.update_or_create_note(
                 anki_nid=NoteId(note_data.anki_nid),
                 mid=NotetypeId(note_data.mid),
@@ -234,7 +236,7 @@ class AnkiHubImporter:
 
     def _cleanup_first_time_deck_import(
         self, dids_cards_were_imported_to: Iterable[DeckId], created_did: DeckId
-    ) -> Optional[DeckId]:
+    ) -> DeckId:
         dids = set(dids_cards_were_imported_to)
 
         # remove "Custom Study" decks from dids

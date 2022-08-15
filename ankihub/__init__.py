@@ -15,6 +15,14 @@ LOGGER: logging.Logger = logging.getLogger("ankihub")
 SKIP_INIT = os.getenv("SKIP_INIT", False)
 LOGGER.debug(f"SKIP_INIT: {SKIP_INIT}")
 
+
+def debug() -> None:
+    from aqt.qt import pyqtRemoveInputHook
+
+    pyqtRemoveInputHook()
+    breakpoint()
+
+
 if not SKIP_INIT:
     from .error_reporting import report_exception_and_upload_logs
 
