@@ -49,6 +49,10 @@ def run():
     trigger_addon_update_check()
     LOGGER.debug("Triggered add-on update check.")
 
+    from . import media_export  # noqa: F401
+
+    LOGGER.debug("Loaded media_export.")
+
     return mw
 
 
