@@ -32,6 +32,16 @@ class SuggestionType(Enum):
     OTHER = "other", "Other"
 
 
+def suggestion_type_from_str(s: str) -> SuggestionType:
+    # XXX NEW_CARD_TO_ADD is used as the SuggestionType for new notes in suggestion_dialog.py,
+    # but is that correct? Is the name incorrect or the usage?
+    if s == "new_note":
+        return SuggestionType.NEW_CARD_TO_ADD
+
+    result = next(x for x in SuggestionType if x.value[0] == s)
+    return result
+
+
 @dataclass
 class FieldUpdate(DataClassJsonMixin):
     name: str
@@ -55,7 +65,7 @@ class NoteUpdate(DataClassJsonMixin):
     last_update_type: SuggestionType = dataclasses.field(
         metadata=dataclasses_json.config(
             encoder=lambda x: x.value[0],
-            decoder=lambda s: next(x for x in SuggestionType if x.value[0] == s),
+            decoder=suggestion_type_from_str,
         )
     )
 

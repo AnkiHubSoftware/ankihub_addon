@@ -342,13 +342,41 @@ class AnkiHubImporter:
             note,
             tags=note_data.tags,
             protected_tags=protected_tags,
-            last_update_type=note_data.last_update_type,
-            first_import_of_deck=first_import_of_deck,
         )
         changed = changed_ankihub_id_field or changed_fields or changed_tags
 
+        self._prepare_internal_tags(
+            note=note,
+            first_import_of_deck=first_import_of_deck,
+            last_update_type=note_data.last_update_type,
+            note_changed=changed,
+        )
+
         LOGGER.debug(f"Prepared note. {changed=}")
         return changed
+
+    def _prepare_internal_tags(
+        self,
+        note: Note,
+        first_import_of_deck: bool,
+        last_update_type: SuggestionType,
+        note_changed: bool,
+    ):
+        if first_import_of_deck or not note_changed:
+            return
+
+        # add special tag if note is new
+        update_tag = None
+        if note.id == 0:
+            update_tag = TAG_FOR_SUGGESTION_TYPE[SuggestionType.NEW_CARD_TO_ADD]
+
+        # add special tag if note was updated
+        elif note.id != 0:
+            update_tag = TAG_FOR_SUGGESTION_TYPE[last_update_type]
+
+        if update_tag and update_tag not in note.tags:
+            note.tags += [update_tag]
+            LOGGER.debug(f'Added "{update_tag}" to tags of note.')
 
     def _prepare_ankihub_id_field(self, note: Note, ankihub_nid: str) -> bool:
         if note[constants.ANKIHUB_NOTE_TYPE_FIELD_NAME] != ankihub_nid:
@@ -405,8 +433,6 @@ class AnkiHubImporter:
         note: Note,
         tags: List[str],
         protected_tags: List[str],
-        last_update_type: SuggestionType,
-        first_import_of_deck: bool,
     ) -> bool:
         changed = False
         prev_tags = note.tags
@@ -418,21 +444,6 @@ class AnkiHubImporter:
                 f"Tags were changed from {prev_tags} to {note.tags}.",
             )
             changed = True
-
-        if not first_import_of_deck:
-            # ... add special tag if note is new
-            update_tag = None
-            if note.id == 0:
-                update_tag = TAG_FOR_SUGGESTION_TYPE[SuggestionType.NEW_CARD_TO_ADD]
-
-            # ... add special tag if note was updated
-            elif note.id != 0 and changed:
-                update_tag = TAG_FOR_SUGGESTION_TYPE[last_update_type]
-
-            if update_tag and update_tag not in note.tags:
-                note.tags += [update_tag]
-                changed = True
-                LOGGER.debug(f'Added "{update_tag}" to tags of note.')
 
         return changed
 
