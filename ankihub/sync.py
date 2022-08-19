@@ -432,7 +432,7 @@ class AnkiHubImporter:
             if update_tag and update_tag not in note.tags:
                 note.tags += [update_tag]
                 changed = True
-                LOGGER.debug(f"Added {update_tag} to tags of note.")
+                LOGGER.debug(f'Added "{update_tag}" to tags of note.')
 
         return changed
 
