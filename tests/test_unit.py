@@ -84,3 +84,11 @@ def test_normalize_url(anki_session_with_addon: AnkiSession):
 
     url = "https://app.ankihub.net/api/note-types/2385223452/"
     assert normalize_url(url) == "https://app.ankihub.net/api/note-types/<id>/"
+
+
+def test_tag_exists_for_every_suggestion_type(anki_session_with_addon: AnkiSession):
+    from ankihub.suggestions import SuggestionType
+    from ankihub.sync import TAG_FOR_SUGGESTION_TYPE
+
+    for suggestion_type in SuggestionType:
+        assert TAG_FOR_SUGGESTION_TYPE.get(suggestion_type, None) is not None

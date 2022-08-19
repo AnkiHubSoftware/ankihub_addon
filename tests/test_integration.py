@@ -286,6 +286,7 @@ def test_get_deck_updates(anki_session_with_addon: AnkiSession, requests_mock):
         DeckUpdateChunk,
         FieldUpdate,
         NoteUpdate,
+        SuggestionType,
     )
     from ankihub.constants import API_URL_BASE
 
@@ -306,6 +307,7 @@ def test_get_deck_updates(anki_session_with_addon: AnkiSession, requests_mock):
                 "anki_id": 1,
                 "note_type_id": 1,
                 "tags": ["New Tag"],
+                "last_update_type": "new_content",
             }
         ],
         "protected_fields": {1: ["Back"]},
@@ -332,6 +334,7 @@ def test_get_deck_updates(anki_session_with_addon: AnkiSession, requests_mock):
                 mid=1,
                 anki_nid=1,
                 tags=["New Tag"],
+                last_update_type=SuggestionType.NEW_CONTENT,
             )
         ],
         protected_fields={1: ["Back"]},
@@ -345,7 +348,7 @@ def test_get_deck_updates(anki_session_with_addon: AnkiSession, requests_mock):
 
     exc = None
     try:
-        for response in client.get_deck_updates(
+        for _ in client.get_deck_updates(
             ankihub_deck_uuid=ankihub_deck_uuid, since=timestamp  # type: ignore
         ):
             pass
@@ -395,7 +398,7 @@ def test_get_deck_by_id(anki_session_with_addon: AnkiSession, requests_mock):
 
 
 def test_suggest_note_upate(anki_session_with_addon: AnkiSession, requests_mock):
-    from ankihub.ankihub_client import AnkiHubRequestError, ChangeTypes, NoteUpdate
+    from ankihub.ankihub_client import AnkiHubRequestError, NoteUpdate, SuggestionType
     from ankihub.constants import API_URL_BASE
     from ankihub.suggestions import suggest_note_update
     from ankihub.sync import ADDON_INTERNAL_TAGS
@@ -417,7 +420,7 @@ def test_suggest_note_upate(anki_session_with_addon: AnkiSession, requests_mock)
         note.tags = ["a", *ADDON_INTERNAL_TAGS]
         suggest_note_update(
             note=note,
-            change_type=ChangeTypes.NEW_CONTENT,
+            change_type=SuggestionType.NEW_CONTENT,
             comment="test",
         )
 
@@ -437,7 +440,7 @@ def test_suggest_note_upate(anki_session_with_addon: AnkiSession, requests_mock)
         try:
             suggest_note_update(
                 note=note,
-                change_type=ChangeTypes.NEW_CONTENT,
+                change_type=SuggestionType.NEW_CONTENT,
                 comment="test",
             )
         except AnkiHubRequestError as e:
@@ -446,7 +449,7 @@ def test_suggest_note_upate(anki_session_with_addon: AnkiSession, requests_mock)
 
 
 def test_suggest_new_note(anki_session_with_addon: AnkiSession, requests_mock):
-    from ankihub.ankihub_client import AnkiHubRequestError, ChangeTypes
+    from ankihub.ankihub_client import AnkiHubRequestError, SuggestionType
     from ankihub.constants import API_URL_BASE
     from ankihub.suggestions import suggest_new_note
     from ankihub.sync import ADDON_INTERNAL_TAGS
@@ -469,7 +472,7 @@ def test_suggest_new_note(anki_session_with_addon: AnkiSession, requests_mock):
         note.tags = ["a", *ADDON_INTERNAL_TAGS]
         suggest_new_note(
             note=note,
-            change_type=ChangeTypes.NEW_CARD_TO_ADD,
+            change_type=SuggestionType.NEW_CARD_TO_ADD,
             ankihub_deck_uuid=ankihub_deck_uuid,
             comment="test",
         )
@@ -491,7 +494,7 @@ def test_suggest_new_note(anki_session_with_addon: AnkiSession, requests_mock):
         try:
             suggest_new_note(
                 note=note,
-                change_type=ChangeTypes.NEW_CONTENT,
+                change_type=SuggestionType.NEW_CONTENT,
                 ankihub_deck_uuid=ankihub_deck_uuid,
                 comment="test",
             )
@@ -911,10 +914,11 @@ def import_sample_ankihub_deck(
 def test_prepare_note(anki_session_with_addon: AnkiSession):
     from anki.notes import Note
 
-    from ankihub.ankihub_client import FieldUpdate
+    from ankihub.ankihub_client import FieldUpdate, NoteUpdate, SuggestionType
     from ankihub.constants import ANKIHUB_NOTE_TYPE_FIELD_NAME
     from ankihub.sync import (
         ADDON_INTERNAL_TAGS,
+        TAG_FOR_SUGGESTION_TYPE,
         TAG_FOR_PROTECTING_FIELDS,
         AnkiHubImporter,
     )
@@ -928,20 +932,29 @@ def test_prepare_note(anki_session_with_addon: AnkiSession):
 
         def prepare_note(
             note,
+            first_import_of_deck: bool,
             tags: List[str] = [],
             fields: Optional[List[FieldUpdate]] = [],
             protected_fields: Optional[Dict] = {},
             protected_tags: List[str] = [],
+            last_update_type: SuggestionType = SuggestionType.NEW_CONTENT,
         ):
+            note_data = NoteUpdate(
+                ankihub_note_uuid=str(UUID_1),
+                anki_nid=note.id,
+                fields=fields,
+                tags=tags,
+                mid=note.mid,
+                last_update_type=last_update_type,
+            )
 
             ankihub_importer = AnkiHubImporter()
             result = ankihub_importer.prepare_note(
-                note=note,
-                ankihub_nid=ankihub_nid,
-                fields=fields,
-                tags=tags,
+                note,
+                note_data=note_data,
                 protected_fields=protected_fields,
                 protected_tags=protected_tags,
+                first_import_of_deck=first_import_of_deck,
             )
             return result
 
@@ -974,6 +987,7 @@ def test_prepare_note(anki_session_with_addon: AnkiSession):
         note.tags = ["a", "b"]
         note_was_changed_1 = prepare_note(
             note,
+            first_import_of_deck=True,
             fields=new_fields,
             tags=new_tags,
             protected_fields={ankihub_basic["id"]: ["Back"]},
@@ -988,6 +1002,7 @@ def test_prepare_note(anki_session_with_addon: AnkiSession):
         # assert that the note was not modified because the same arguments were used on the same note
         note_was_changed_2 = prepare_note(
             note,
+            first_import_of_deck=True,
             fields=new_fields,
             tags=new_tags,
             protected_fields={ankihub_basic["id"]: ["Back"]},
@@ -998,10 +1013,33 @@ def test_prepare_note(anki_session_with_addon: AnkiSession):
         assert note["Back"] == "old back"
         assert set(note.tags) == set(["a", "c", "d"])
 
+        # assert that the special tag for new notes gets added when a note gets created and first_import_of_deck=False
+        note = example_note()
+        note.id = 0  # simulate new note
+        note_was_changed_3 = prepare_note(note, first_import_of_deck=False)
+        assert note_was_changed_3
+        assert set(note.tags) == set(
+            [TAG_FOR_SUGGESTION_TYPE[SuggestionType.NEW_CARD_TO_ADD]]
+        )
+
+        # assert that tags for updated notes get added when a note gets updated and first_import_of_deck=False
+        note = example_note()
+        note.tags = []
+        note_was_changed_4 = prepare_note(
+            note,
+            tags=["e"],
+            first_import_of_deck=False,
+            last_update_type=SuggestionType.UPDATED_CONTENT,
+        )
+        assert note_was_changed_4
+        assert set(note.tags) == set(
+            ["e", TAG_FOR_SUGGESTION_TYPE[SuggestionType.UPDATED_CONTENT]]
+        )
+
         # assert that addon-internal don't get removed
         note = example_note()
         note.tags = list(ADDON_INTERNAL_TAGS)
-        note_was_changed_5 = prepare_note(note, tags=[])
+        note_was_changed_5 = prepare_note(note, tags=[], first_import_of_deck=True)
         assert not note_was_changed_5
         assert set(note.tags) == set(ADDON_INTERNAL_TAGS)
 
@@ -1012,6 +1050,7 @@ def test_prepare_note(anki_session_with_addon: AnkiSession):
         note_was_changed_6 = prepare_note(
             note,
             fields=[FieldUpdate(name="Front", value="new front", order=0)],
+            first_import_of_deck=True,
         )
         assert not note_was_changed_6
         assert note["Front"] == "old front"
@@ -1025,6 +1064,7 @@ def test_prepare_note(anki_session_with_addon: AnkiSession):
                 FieldUpdate(name="Front", value="new front", order=0),
                 FieldUpdate(name="Back", value="new back", order=1),
             ],
+            first_import_of_deck=True,
         )
         assert not note_was_changed_7
         assert note["Front"] == "old front"
@@ -1039,6 +1079,7 @@ def test_prepare_note(anki_session_with_addon: AnkiSession):
                 FieldUpdate(name="Front", value="new front", order=0),
                 FieldUpdate(name="Back", value="new back", order=1),
             ],
+            first_import_of_deck=True,
         )
         assert not note_was_changed_7
         assert note["Front"] == "old front"
@@ -1048,12 +1089,9 @@ def test_prepare_note(anki_session_with_addon: AnkiSession):
 def test_prepare_note_protect_field_with_spaces(anki_session_with_addon: AnkiSession):
     from anki.notes import Note
 
-    from ankihub.ankihub_client import FieldUpdate
+    from ankihub.ankihub_client import FieldUpdate, NoteUpdate, SuggestionType
     from ankihub.constants import ANKIHUB_NOTE_TYPE_FIELD_NAME
-    from ankihub.sync import (
-        TAG_FOR_PROTECTING_FIELDS,
-        AnkiHubImporter,
-    )
+    from ankihub.sync import TAG_FOR_PROTECTING_FIELDS, AnkiHubImporter
     from ankihub.utils import modify_note_type
 
     anki_session = anki_session_with_addon
@@ -1064,20 +1102,29 @@ def test_prepare_note_protect_field_with_spaces(anki_session_with_addon: AnkiSes
 
         def prepare_note(
             note,
+            first_import_of_deck: bool,
             tags: List[str] = [],
             fields: Optional[List[FieldUpdate]] = [],
             protected_fields: Optional[Dict] = {},
             protected_tags: List[str] = [],
+            last_update_type: str = SuggestionType.NEW_CONTENT,
         ):
+            note_data = NoteUpdate(
+                ankihub_note_uuid=ankihub_nid,
+                anki_nid=note.id,
+                fields=fields,
+                tags=tags,
+                mid=note.mid,
+                last_update_type=last_update_type,
+            )
 
             ankihub_importer = AnkiHubImporter()
             result = ankihub_importer.prepare_note(
-                note=note,
-                ankihub_nid=ankihub_nid,
-                fields=fields,
-                tags=tags,
+                note,
+                note_data=note_data,
                 protected_fields=protected_fields,
                 protected_tags=protected_tags,
+                first_import_of_deck=first_import_of_deck,
             )
             return result
 
@@ -1117,6 +1164,7 @@ def test_prepare_note_protect_field_with_spaces(anki_session_with_addon: AnkiSes
             fields=[
                 FieldUpdate(name=field_name_with_spaces, value="new front", order=0)
             ],
+            first_import_of_deck=True,
         )
         assert not note_changed
         assert note[field_name_with_spaces] == "old front"
@@ -1128,6 +1176,7 @@ def test_prepare_note_protect_field_with_spaces(anki_session_with_addon: AnkiSes
             fields=[
                 FieldUpdate(name=field_name_with_spaces, value="new front", order=0)
             ],
+            first_import_of_deck=True,
         )
         assert note_changed
         assert note[field_name_with_spaces] == "new front"

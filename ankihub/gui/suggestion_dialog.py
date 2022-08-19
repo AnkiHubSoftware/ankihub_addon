@@ -10,7 +10,7 @@ from aqt.qt import (
     qconnect,
 )
 
-from ..ankihub_client import ChangeTypes
+from ..ankihub_client import SuggestionType
 from ..constants import RATIONALE_FOR_CHANGE_MAX_LENGTH, AnkiHubCommands
 
 
@@ -29,7 +29,7 @@ class SuggestionDialog(QDialog):
         self.setLayout(layout)
 
         self.select = select = CustomListWidget()
-        select.addItems([x.value[1] for x in ChangeTypes])
+        select.addItems([x.value[1] for x in SuggestionType])
         select.setCurrentRow(0)
         # Hide the change type options if it's a new card.
         if self.command != AnkiHubCommands.NEW.value:
@@ -73,12 +73,14 @@ class SuggestionDialog(QDialog):
     def comment(self) -> str:
         return self.edit.toPlainText()
 
-    def change_type(self) -> ChangeTypes:
+    def change_type(self) -> SuggestionType:
         if self.command == AnkiHubCommands.NEW.value:
-            return ChangeTypes.NEW_CARD_TO_ADD
+            return SuggestionType.NEW_CARD_TO_ADD
         else:
             return next(
-                x for x in ChangeTypes if x.value[1] == self.select.currentItem().text()
+                x
+                for x in SuggestionType
+                if x.value[1] == self.select.currentItem().text()
             )
 
 

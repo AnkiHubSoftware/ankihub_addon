@@ -4,12 +4,12 @@ from typing import Dict, List
 from anki.notes import Note
 
 from .addon_ankihub_client import AddonAnkiHubClient as AnkiHubClient
-from .ankihub_client import ChangeTypes
+from .ankihub_client import SuggestionType
 from .sync import is_internal_tag
 from .utils import ankihub_uuid_of_note
 
 
-def suggest_note_update(note: Note, change_type: ChangeTypes, comment: str):
+def suggest_note_update(note: Note, change_type: SuggestionType, comment: str):
 
     ankihub_note_uuid = ankihub_uuid_of_note(note, ignore_invalid=False)
     tags = _prepare_tags(note.tags)
@@ -26,7 +26,7 @@ def suggest_note_update(note: Note, change_type: ChangeTypes, comment: str):
 
 
 def suggest_new_note(
-    note: Note, change_type: ChangeTypes, comment: str, ankihub_deck_uuid: uuid.UUID
+    note: Note, change_type: SuggestionType, comment: str, ankihub_deck_uuid: uuid.UUID
 ):
 
     ankihub_note_uuid = ankihub_uuid_of_note(note, ignore_invalid=True)

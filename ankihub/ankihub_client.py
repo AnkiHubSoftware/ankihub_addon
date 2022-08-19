@@ -22,6 +22,16 @@ DECK_UPDATE_PAGE_SIZE = 2000  # seems to work well in terms of speed
 CSV_DELIMITER = ";"
 
 
+# TODO Make sure these match up with SuggestionType.choices on AnkiHub
+class SuggestionType(Enum):
+    UPDATED_CONTENT = "updated_content", "Updated content"
+    NEW_CONTENT = "new_content", "New content"
+    SPELLING_GRAMMATICAL = "spelling/grammatical", "Spelling/Grammatical"
+    CONTENT_ERROR = "content_error", "Content error"
+    NEW_CARD_TO_ADD = "new_card_to_add", "New card to add"
+    OTHER = "other", "Other"
+
+
 @dataclass
 class FieldUpdate(DataClassJsonMixin):
     name: str
@@ -42,6 +52,12 @@ class NoteUpdate(DataClassJsonMixin):
         metadata=dataclasses_json.config(field_name="note_type_id")
     )
     tags: List[str]
+    last_update_type: SuggestionType = dataclasses.field(
+        metadata=dataclasses_json.config(
+            encoder=lambda x: x.value[0],
+            decoder=lambda s: next(x for x in SuggestionType if x.value[0] == s),
+        )
+    )
 
 
 @dataclass
@@ -91,16 +107,6 @@ def http_error_hook(response: Response, *args, **kwargs):
         raise AnkiHubRequestError(response)
 
     return response
-
-
-# TODO Make sure these match up with SuggestionType.choices on AnkiHub
-class ChangeTypes(Enum):
-    UPDATED_CONTENT = "updated_content", "Updated content"
-    NEW_CONTENT = "new_content", "New content"
-    SPELLING_GRAMMATICAL = "spelling/grammatical", "Spelling/Grammatical"
-    CONTENT_ERROR = "content_error", "Content error"
-    NEW_CARD_TO_ADD = "new_card_to_add", "New card to add"
-    OTHER = "other", "Other"
 
 
 class AnkiHubClient:
@@ -262,7 +268,7 @@ class AnkiHubClient:
         ankihub_note_uuid: uuid.UUID,
         fields: List[Dict],
         tags: List[str],
-        change_type: ChangeTypes,
+        change_type: SuggestionType,
         comment: str,
     ) -> None:
         suggestion = {
@@ -287,7 +293,7 @@ class AnkiHubClient:
         anki_note_id: int,
         fields: List[dict],
         tags: List[str],
-        change_type: ChangeTypes,
+        change_type: SuggestionType,
         note_type_name: str,
         anki_note_type_id: int,
         comment: str,
