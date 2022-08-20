@@ -1018,9 +1018,7 @@ def test_prepare_note(anki_session_with_addon: AnkiSession):
         note.id = 0  # simulate new note
         note_was_changed_3 = prepare_note(note, tags=["a"], first_import_of_deck=False)
         assert note_was_changed_3
-        assert set(note.tags) == set(
-            [TAG_FOR_SUGGESTION_TYPE[SuggestionType.NEW_CARD_TO_ADD], "a"]
-        )
+        assert set(note.tags) == {"a", "AnkiHub_Update::New_Note"}
 
         # assert that tags for updated notes get added when a note gets updated and first_import_of_deck=False
         note = example_note()
