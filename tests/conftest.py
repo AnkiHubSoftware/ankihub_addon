@@ -1,6 +1,7 @@
 import json
 import pathlib
 import shutil
+from unittest.mock import MagicMock
 
 import pytest
 from pytest_anki import AnkiSession
@@ -40,3 +41,26 @@ def anki_session_with_config(anki_session: AnkiSession):
         package_name="ankihub", default_config=config_dict, user_config=meta_dict
     )
     yield anki_session
+
+
+@pytest.fixture
+def mw_mock(monkeypatch):
+    """Mock the AnkiQt object."""
+
+    import aqt
+
+    mock = MagicMock()
+    monkeypatch.setattr(aqt, "mw", mock)
+
+    # Mock methods called by our Config object.
+    mock.addonManager.getConfig.return_value = {
+        "ankihub_url": "https://app.ankihub.net",
+        "hotkey": "Alt+u",
+        "report_errors": True,
+        "sync_on_startup": True,
+    }
+    mock.addonManager.addonFromModule.return_value = "ankihub"
+    mock.addonManager.addonsFolder.return_value = (
+        pathlib.Path(__file__).parent.parent / "ankihub"
+    ).absolute()
+    yield mock
