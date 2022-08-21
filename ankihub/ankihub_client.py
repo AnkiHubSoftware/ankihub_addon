@@ -5,7 +5,7 @@ import uuid
 from dataclasses import dataclass
 from enum import Enum
 from pathlib import Path
-from typing import Any, Dict, Iterator, List, TypedDict
+from typing import Any, Dict, Iterator, List, Optional, TypedDict
 
 import requests
 from requests import PreparedRequest, Request, Response, Session
@@ -32,11 +32,13 @@ class SuggestionType(Enum):
     OTHER = "other", "Other"
 
 
-def suggestion_type_from_str(s: str) -> SuggestionType:
+def suggestion_type_from_str(s: str) -> Optional[SuggestionType]:
     # XXX NEW_CARD_TO_ADD is used as the SuggestionType for new notes in suggestion_dialog.py,
     # but is that correct? Is the name incorrect or the usage?
     if s == "new_note":
         return SuggestionType.NEW_CARD_TO_ADD
+    elif s == "original_content":
+        return None
 
     result = next(x for x in SuggestionType if x.value[0] == s)
     return result
@@ -62,7 +64,7 @@ class NoteUpdate(DataClassJsonMixin):
         metadata=dataclasses_json.config(field_name="note_type_id")
     )
     tags: List[str]
-    last_update_type: SuggestionType = dataclasses.field(
+    last_update_type: Optional[SuggestionType] = dataclasses.field(
         metadata=dataclasses_json.config(
             encoder=lambda x: x.value[0],
             decoder=suggestion_type_from_str,

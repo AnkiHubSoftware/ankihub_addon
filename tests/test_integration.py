@@ -1068,7 +1068,7 @@ def test_prepare_note(anki_session_with_addon: AnkiSession):
         assert note["Front"] == "old front"
         assert note["Back"] == "old back"
 
-        # assert that fields with spaces are protected by tags
+        # assert that the tag for protecting all fields works
         note = example_note()
         note.tags = [f"{TAG_FOR_PROTECTING_FIELDS}::All"]
         note_was_changed_7 = prepare_note(

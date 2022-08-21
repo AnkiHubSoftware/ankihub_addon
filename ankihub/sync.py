@@ -359,10 +359,10 @@ class AnkiHubImporter:
         self,
         note: Note,
         first_import_of_deck: bool,
-        last_update_type: SuggestionType,
+        last_update_type: Optional[SuggestionType],
         note_changed: bool,
     ):
-        if first_import_of_deck or not note_changed:
+        if first_import_of_deck or not note_changed or not last_update_type:
             return
 
         # add special tag if note is new
