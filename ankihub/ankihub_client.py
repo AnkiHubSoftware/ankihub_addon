@@ -66,7 +66,8 @@ class NoteUpdate(DataClassJsonMixin):
         metadata=dataclasses_json.config(
             encoder=lambda x: x.value[0],
             decoder=suggestion_type_from_str,
-        )
+        ),
+        default=None,
     )
 
 
