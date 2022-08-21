@@ -226,27 +226,6 @@ def test_upload_deck(anki_session_with_addon: AnkiSession, monkeypatch):
         assert card.did == filtered_did
 
 
-def test_client_login_and_signout(anki_session_with_addon: AnkiSession, requests_mock):
-    from ankihub.addon_ankihub_client import AddonAnkiHubClient as AnkiHubClient
-    from ankihub.constants import API_URL_BASE
-
-    client = AnkiHubClient()
-    credentials_data = {"username": "test", "password": "testpassword"}
-    requests_mock.post(f"{API_URL_BASE}/login/", json={"token": "f4k3t0k3n"})
-    requests_mock.post(
-        f"{API_URL_BASE}/logout/", json={"token": "f4k3t0k3n"}, status_code=204
-    )
-
-    # test login
-    token = client.login(credentials=credentials_data)
-    assert token == "f4k3t0k3n"
-    assert client.session.headers["Authorization"] == "Token f4k3t0k3n"
-
-    # test signout
-    client.signout()
-    assert client.session.headers["Authorization"] == ""
-
-
 def test_client_upload_deck(anki_session_with_addon: AnkiSession, requests_mock):
     from ankihub.addon_ankihub_client import AddonAnkiHubClient as AnkiHubClient
     from ankihub.ankihub_client import AnkiHubRequestError
