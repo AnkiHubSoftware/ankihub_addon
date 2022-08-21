@@ -23,7 +23,7 @@ from aqt.utils import askUser, openLink, showInfo, showText, tooltip
 from .. import LOGGER
 from ..addon_ankihub_client import AddonAnkiHubClient as AnkiHubClient
 from ..ankihub_client import AnkiHubRequestError
-from ..config import config
+from ..settings import config
 from ..constants import ADDON_VERSION, URL_VIEW_DECK
 from ..error_reporting import (
     report_exception_and_upload_logs,
