@@ -40,8 +40,10 @@ TAG_FOR_SUGGESTION_TYPE = {
     SuggestionType.NEW_CONTENT: f"{TAG_FOR_UPDATES}::Content::New",
     SuggestionType.CONTENT_ERROR: f"{TAG_FOR_UPDATES}::Content::Error",
     SuggestionType.SPELLING_GRAMMATICAL: f"{TAG_FOR_UPDATES}::Spelling/Grammar",
-    SuggestionType.OTHER: f"{TAG_FOR_UPDATES}::Other",
+    SuggestionType.NEW_TAGS = f"{TAG_FOR_UPDATES}::New_tags",
+    SuggestionType.UPDATED_TAGS = f"{TAG_FOR_UPDATES}::Updated_tags",
     SuggestionType.NEW_CARD_TO_ADD: f"{TAG_FOR_UPDATES}::New_Card",
+    SuggestionType.OTHER: f"{TAG_FOR_UPDATES}::Other",
 }
 
 # top-level tags that are only used by the add-on, but not by the web app
