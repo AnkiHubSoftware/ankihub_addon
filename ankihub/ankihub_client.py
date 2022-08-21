@@ -33,11 +33,7 @@ class SuggestionType(Enum):
 
 
 def suggestion_type_from_str(s: str) -> Optional[SuggestionType]:
-    # XXX NEW_CARD_TO_ADD is used as the SuggestionType for new notes in suggestion_dialog.py,
-    # but is that correct? Is the name incorrect or the usage?
-    if s == "new_note":
-        return SuggestionType.NEW_CARD_TO_ADD
-    elif s == "original_content":
+    if s in ["original_content", "new_note"]:
         return None
 
     result = next(x for x in SuggestionType if x.value[0] == s)
@@ -305,7 +301,6 @@ class AnkiHubClient:
         anki_note_id: int,
         fields: List[dict],
         tags: List[str],
-        change_type: SuggestionType,
         note_type_name: str,
         anki_note_type_id: int,
         comment: str,
@@ -315,7 +310,6 @@ class AnkiHubClient:
             "ankihub_id": str(ankihub_note_uuid),
             "fields": fields,
             "tags": tags,
-            "change_type": change_type.value[0],
             "note_type": note_type_name,
             "note_type_id": anki_note_type_id,
             "comment": comment,

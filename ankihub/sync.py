@@ -34,13 +34,14 @@ TAG_FOR_PROTECTING_FIELDS = f"{INTERNAL_TAG_PREFIX}Protect"
 TAG_FOR_PROTECTING_ALL_FIELDS = f"{TAG_FOR_PROTECTING_FIELDS}::All"
 
 TAG_FOR_UPDATES = f"{INTERNAL_TAG_PREFIX}Update"
+TAG_FOR_NEW_NOTE = f"{TAG_FOR_UPDATES}::New_Note"
 TAG_FOR_SUGGESTION_TYPE = {
     SuggestionType.UPDATED_CONTENT: f"{TAG_FOR_UPDATES}::Content::Updated",
     SuggestionType.NEW_CONTENT: f"{TAG_FOR_UPDATES}::Content::New",
     SuggestionType.CONTENT_ERROR: f"{TAG_FOR_UPDATES}::Content::Error",
     SuggestionType.SPELLING_GRAMMATICAL: f"{TAG_FOR_UPDATES}::Spelling/Grammar",
     SuggestionType.OTHER: f"{TAG_FOR_UPDATES}::Other",
-    SuggestionType.NEW_CARD_TO_ADD: f"{TAG_FOR_UPDATES}::New_Note",
+    SuggestionType.NEW_CARD_TO_ADD: f"{TAG_FOR_UPDATES}::New_Card",
 }
 
 # top-level tags that are only used by the add-on, but not by the web app
@@ -362,19 +363,22 @@ class AnkiHubImporter:
         last_update_type: Optional[SuggestionType],
         note_changed: bool,
     ):
-        if first_import_of_deck or not note_changed or not last_update_type:
+        if (
+            first_import_of_deck
+            or not note_changed
+            or (note.id != 0 and not last_update_type)
+        ):
             return
 
         # add special tag if note is new
-        update_tag = None
         if note.id == 0:
-            update_tag = TAG_FOR_SUGGESTION_TYPE[SuggestionType.NEW_CARD_TO_ADD]
+            update_tag = TAG_FOR_NEW_NOTE
 
         # add special tag if note was updated
         elif note.id != 0:
             update_tag = TAG_FOR_SUGGESTION_TYPE[last_update_type]
 
-        if update_tag and update_tag not in note.tags:
+        if update_tag not in note.tags:
             note.tags += [update_tag]
             LOGGER.debug(f'Added "{update_tag}" to tags of note.')
 

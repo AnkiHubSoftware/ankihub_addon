@@ -449,7 +449,7 @@ def test_suggest_note_upate(anki_session_with_addon: AnkiSession, requests_mock)
 
 
 def test_suggest_new_note(anki_session_with_addon: AnkiSession, requests_mock):
-    from ankihub.ankihub_client import AnkiHubRequestError, SuggestionType
+    from ankihub.ankihub_client import AnkiHubRequestError
     from ankihub.constants import API_URL_BASE
     from ankihub.suggestions import suggest_new_note
     from ankihub.sync import ADDON_INTERNAL_TAGS
@@ -472,7 +472,6 @@ def test_suggest_new_note(anki_session_with_addon: AnkiSession, requests_mock):
         note.tags = ["a", *ADDON_INTERNAL_TAGS]
         suggest_new_note(
             note=note,
-            change_type=SuggestionType.NEW_CARD_TO_ADD,
             ankihub_deck_uuid=ankihub_deck_uuid,
             comment="test",
         )
@@ -494,7 +493,6 @@ def test_suggest_new_note(anki_session_with_addon: AnkiSession, requests_mock):
         try:
             suggest_new_note(
                 note=note,
-                change_type=SuggestionType.NEW_CONTENT,
                 ankihub_deck_uuid=ankihub_deck_uuid,
                 comment="test",
             )
@@ -918,8 +916,8 @@ def test_prepare_note(anki_session_with_addon: AnkiSession):
     from ankihub.constants import ANKIHUB_NOTE_TYPE_FIELD_NAME
     from ankihub.sync import (
         ADDON_INTERNAL_TAGS,
-        TAG_FOR_SUGGESTION_TYPE,
         TAG_FOR_PROTECTING_FIELDS,
+        TAG_FOR_SUGGESTION_TYPE,
         AnkiHubImporter,
     )
     from ankihub.utils import modify_note_type

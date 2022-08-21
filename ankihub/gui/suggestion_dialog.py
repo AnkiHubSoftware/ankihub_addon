@@ -1,3 +1,5 @@
+from typing import Optional
+
 from aqt.qt import (
     QDialog,
     QDialogButtonBox,
@@ -73,9 +75,9 @@ class SuggestionDialog(QDialog):
     def comment(self) -> str:
         return self.edit.toPlainText()
 
-    def change_type(self) -> SuggestionType:
+    def change_type(self) -> Optional[SuggestionType]:
         if self.command == AnkiHubCommands.NEW.value:
-            return SuggestionType.NEW_CARD_TO_ADD
+            return None
         else:
             return next(
                 x
