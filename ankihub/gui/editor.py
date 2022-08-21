@@ -12,7 +12,7 @@ from aqt.utils import chooseList, showInfo, showText, tooltip
 
 from .. import LOGGER, constants
 from ..ankihub_client import AnkiHubRequestError
-from ..config import config
+from ..settings import config
 from ..constants import (
     ANKI_MINOR,
     ANKIHUB_NOTE_TYPE_FIELD_NAME,

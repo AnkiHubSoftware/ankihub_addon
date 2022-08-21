@@ -19,7 +19,7 @@ from aqt import mw
 
 from . import LOGGER
 from .addon_ankihub_client import AddonAnkiHubClient as AnkiHubClient
-from .config import config
+from .settings import config
 from .constants import ANKIHUB_NOTE_TYPE_FIELD_NAME
 from .db import AnkiHubDB
 from .utils import (

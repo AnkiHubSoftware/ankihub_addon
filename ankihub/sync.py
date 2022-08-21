@@ -14,7 +14,7 @@ from aqt.utils import showInfo, tooltip
 from . import LOGGER, constants
 from .addon_ankihub_client import AddonAnkiHubClient as AnkiHubClient
 from .ankihub_client import AnkiHubRequestError, FieldUpdate, NoteUpdate, SuggestionType
-from .config import config
+from .settings import config
 from .constants import ANKI_MINOR
 from .db import AnkiHubDB
 from .utils import (

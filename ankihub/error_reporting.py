@@ -11,7 +11,7 @@ from aqt import mw
 from . import LOGGER
 from .addon_ankihub_client import AddonAnkiHubClient as AnkiHubClient
 from .ankihub_client import AnkiHubRequestError
-from .config import config
+from .settings import config
 from .constants import ADDON_VERSION, ANKI_VERSION
 from .settings import LOG_FILE
 
@@ -43,7 +43,7 @@ def report_exception(
     exception: Optional[BaseException] = None, context: dict = dict()
 ) -> Optional[str]:
     try:
-        from .config import config
+        from .settings import config
         from .lib import sentry_sdk  # type: ignore
         from .lib.sentry_sdk import capture_exception, configure_scope  # type: ignore
 

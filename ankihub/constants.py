@@ -6,7 +6,7 @@ from pathlib import Path
 from anki.buildinfo import version as ANKI_VERSION
 
 from . import LOGGER, ankihub_client
-from .config import config
+from .settings import config
 
 version_file = Path(__file__).parent / "VERSION"
 LOGGER.debug(f"VERSION file: {version_file}")
