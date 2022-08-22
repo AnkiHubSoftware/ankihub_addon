@@ -1,8 +1,4 @@
-import pytest
 from pytest_anki import AnkiSession
-
-
-pytestmark = pytest.mark.forked
 
 
 def test_lowest_level_common_ancestor_deck_name(anki_session_with_addon: AnkiSession):
