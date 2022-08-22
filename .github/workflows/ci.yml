@@ -1,4 +1,8 @@
 name: tests
+env:
+  DOCKER_BUILDKIT: 1
+  COMPOSE_DOCKER_CLI_BUILD: 1
+  COMPOSE_FILE: ${{ github.workspace }}/ankihub_addon/ankihub_web/local.yml
 
 on:
   push:
@@ -47,10 +51,6 @@ jobs:
           docker-compose up --build
           docker-compose run --rm django python manage.py makemigrations
           docker-compose run --rm django python manage.py migrate
-        env:
-          DOCKER_BUILDKIT: 1
-          COMPOSE_DOCKER_CLI_BUILD: 1
-          COMPOSE_FILE: ${{ github.workspace }}/ankihub_addon/ankihub_web/local.yml
 
 
       - uses: actions/setup-python@v3
