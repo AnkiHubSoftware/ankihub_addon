@@ -25,7 +25,7 @@ from ..addon_ankihub_client import AddonAnkiHubClient as AnkiHubClient
 from ..addon_ankihub_client import AnkiHubRequestError
 from ..ankihub_client import NoteUpdate
 from ..settings import config
-from ..constants import URL_DECK_BASE, URL_DECKS, URL_HELP, URL_VIEW_DECK
+from ..settings import URL_DECK_BASE, URL_DECKS, URL_HELP, URL_VIEW_DECK
 from ..db import AnkiHubDB
 from ..sync import AnkiHubImporter
 from ..utils import create_backup, undo_note_type_modfications
