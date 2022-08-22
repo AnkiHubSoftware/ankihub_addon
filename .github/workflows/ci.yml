@@ -11,7 +11,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout ankihub_addon
-        uses: actions/checkout@v2
+        uses: actions/checkout@v3
 
       - name: Enable cloning web app repo
         uses: webfactory/ssh-agent@v0.5.4
@@ -25,7 +25,6 @@ jobs:
           ref: dev
           path: ankihub_web
 
-      - uses: actions/checkout@v3
       - uses: actions/setup-python@v3
         with:
           python-version: "3.9.7"
