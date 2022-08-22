@@ -13,6 +13,18 @@ jobs:
       - name: Checkout ankihub_addon
         uses: actions/checkout@v2
 
+      - name: Enable cloning web app repo
+        uses: webfactory/ssh-agent@v0.5.4
+        with:
+            ssh-private-key: ${{ secrets.ANKIHUB_SSH_PRIVATE_KEY }}
+
+      - name: Checkout ankipalace/ankihub web app repo
+        uses: actions/checkout@v3
+        with:
+          repository: ankipalace/ankihub
+          ref: dev
+          path: ankihub_web
+
       - uses: actions/checkout@v3
       - uses: actions/setup-python@v3
         with:
