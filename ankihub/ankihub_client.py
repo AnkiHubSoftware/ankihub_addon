@@ -26,7 +26,7 @@ CSV_DELIMITER = ";"
 class SuggestionType(Enum):
     UPDATED_CONTENT = "updated_content", "Updated content"
     NEW_CONTENT = "new_content", "New content"
-    SPELLING_GRAMMATICAL = "spelling/grammatical", "Spelling/Grammatical"
+    SPELLING_GRAMMATICAL = "spelling/grammar", "Spelling/Grammatical"
     CONTENT_ERROR = "content_error", "Content error"
     NEW_CARD_TO_ADD = "new_card_to_add", "New card to add"
     NEW_TAGS = "new_tags", "New Tags"
