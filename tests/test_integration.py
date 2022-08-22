@@ -25,7 +25,7 @@ UUID_1 = uuid.UUID("1f28bc9e-f36d-4e1d-8720-5dd805f12dd0")
 UUID_2 = uuid.UUID("2f28bc9e-f36d-4e1d-8720-5dd805f12dd0")
 
 
-pytestmark = pytest.mark.usefixtures("forked")
+pytestmark = pytest.mark.forked
 
 
 def ankihub_sample_deck_notes_data():
