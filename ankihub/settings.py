@@ -1,9 +1,9 @@
 import dataclasses
 import json
+from enum import Enum
 import os
 from datetime import datetime
 from json import JSONDecodeError
-from pprint import pformat
 from typing import Any, Callable, Dict, Optional
 import logging
 import sys
@@ -12,8 +12,9 @@ from pathlib import Path
 
 
 from aqt import mw
+from anki.buildinfo import version as ANKI_VERSION
 
-from . import LOGGER
+from . import ankihub_client
 
 
 @dataclasses.dataclass
@@ -46,8 +47,6 @@ class Config:
                 except JSONDecodeError:
                     # TODO Instead of overwriting, query AnkiHub for config values.
                     self.private_config = self.new_config()
-        config_dict = dataclasses.asdict(self.private_config)
-        LOGGER.debug(f"PrivateConfig init:\n {pformat(config_dict)}")
         self.token_change_hook: Optional[Callable[[], None]] = None
         self.subscriptions_change_hook: Optional[Callable[[], None]] = None
 
@@ -62,7 +61,6 @@ class Config:
         with open(self._private_config_file_path, "w") as f:
             config_dict = dataclasses.asdict(self.private_config)
             f.write(json.dumps(config_dict, indent=4, sort_keys=True))
-            LOGGER.debug(f"Updated PrivateConfig:\n {pformat(config_dict)}")
 
     def save_token(self, token: str):
         self.private_config.token = token
@@ -152,3 +150,55 @@ LOGGING = {
         "handlers": ["console", "file"],
     },
 }
+
+logging.config.dictConfig(LOGGING)
+
+
+version_file = Path(__file__).parent / "VERSION"
+with version_file.open() as f:
+    ADDON_VERSION: str = f.read().strip()
+
+try:
+    manifest = json.loads((Path(__file__).parent / "manifest.json").read_text())
+    ANKIWEB_ID = manifest.get("ankiweb_id")
+except (FileNotFoundError, KeyError):
+    ANKIWEB_ID = 1322529746
+
+
+ANKIHUB_APP_URL = os.getenv("ANKIHUB_APP_URL")
+if ANKIHUB_APP_URL is None:
+    ANKIHUB_APP_URL = config.public_config.get("ankihub_url")
+    ANKIHUB_APP_URL = ANKIHUB_APP_URL if ANKIHUB_APP_URL else "https://app.ankihub.net"
+API_URL_BASE = f"{ANKIHUB_APP_URL}/api"
+
+# maybe override default API_URL_BASE of client
+ankihub_client.API_URL_BASE = API_URL_BASE
+
+URL_VIEW_NOTE = f"{ANKIHUB_APP_URL}/decks/notes/"
+URL_VIEW_DECK = f"{ANKIHUB_APP_URL}/decks/"
+URL_HELP = f"{ANKIHUB_APP_URL}/help"
+URL_DECKS = f"{ANKIHUB_APP_URL}/explore"
+URL_DECK_BASE = f"{ANKIHUB_APP_URL}/decks"
+ANKIHUB_NOTE_TYPE_FIELD_NAME = "ankihub_id"
+ANKIHUB_NOTE_TYPE_MODIFICATION_STRING = "ANKIHUB MODFICATIONS"
+ADDON_PATH = Path(__file__).parent.absolute()
+ADDON_PACKAGE = __name__.split(".")[0]
+ICONS_PATH = ADDON_PATH / "icons"
+
+TOKEN_SLUG = "token"
+USER_EMAIL_SLUG = "user_email"
+
+USER_SUPPORT_EMAIL_SLUG = "help@ankipalace.com"
+
+ANKI_MINOR = int(ANKI_VERSION.split(".")[2])
+
+USER_FILES_PATH = Path(__file__).parent / "user_files"
+DB_PATH = USER_FILES_PATH / "ankihub.db"
+
+
+class AnkiHubCommands(Enum):
+    CHANGE = "Suggest a change"
+    NEW = "Suggest a new note"
+
+
+RATIONALE_FOR_CHANGE_MAX_LENGTH = 1024

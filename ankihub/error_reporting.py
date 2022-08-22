@@ -12,7 +12,7 @@ from . import LOGGER
 from .addon_ankihub_client import AddonAnkiHubClient as AnkiHubClient
 from .ankihub_client import AnkiHubRequestError
 from .settings import config
-from .constants import ADDON_VERSION, ANKI_VERSION
+from .settings import ADDON_VERSION, ANKI_VERSION
 from .settings import LOG_FILE
 
 SENTRY_ENV = "anki_desktop"

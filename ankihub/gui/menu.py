@@ -24,7 +24,7 @@ from .. import LOGGER
 from ..addon_ankihub_client import AddonAnkiHubClient as AnkiHubClient
 from ..ankihub_client import AnkiHubRequestError
 from ..settings import config
-from ..constants import ADDON_VERSION, URL_VIEW_DECK
+from ..settings import ADDON_VERSION, URL_VIEW_DECK
 from ..error_reporting import (
     report_exception_and_upload_logs,
     upload_logs_in_background,

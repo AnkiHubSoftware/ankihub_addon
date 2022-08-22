@@ -18,7 +18,7 @@ def anki_session_with_addon(anki_session: AnkiSession, requests_mock) -> AnkiSes
     shutil.copytree(ROOT / "ankihub", dest / "ankihub")
 
     # clear user files
-    from ankihub.constants import USER_FILES_PATH
+    from ankihub.settings import USER_FILES_PATH
 
     for f in USER_FILES_PATH.glob("*"):
         if f.is_file():

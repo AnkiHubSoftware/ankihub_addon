@@ -2,7 +2,7 @@ import pathlib
 
 from jinja2 import Environment, FileSystemLoader, select_autoescape
 
-from ..constants import ADDON_PACKAGE
+from ..settings import ADDON_PACKAGE
 
 templates = (pathlib.Path(__file__).parent / "templates").absolute()
 env = Environment(loader=FileSystemLoader(templates), autoescape=select_autoescape())

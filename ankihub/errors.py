@@ -13,7 +13,7 @@ from requests.exceptions import ConnectionError
 from . import LOGGER
 from .addon_ankihub_client import AnkiHubRequestError
 from .settings import config
-from .constants import ANKIWEB_ID
+from .settings import ANKIWEB_ID
 from .error_reporting import report_exception_and_upload_logs
 from .gui.error_feedback import ErrorFeedbackDialog
 from .gui.menu import AnkiHubLogin
