@@ -7,7 +7,6 @@ from typing import Dict, List, Optional
 from unittest.mock import MagicMock, Mock
 
 import aqt
-import pytest
 from anki.decks import DeckId
 from anki.models import NotetypeId
 from anki.notes import NoteId
@@ -23,9 +22,6 @@ ANKIHUB_SAMPLE_DECK_PATH = (
 
 UUID_1 = uuid.UUID("1f28bc9e-f36d-4e1d-8720-5dd805f12dd0")
 UUID_2 = uuid.UUID("2f28bc9e-f36d-4e1d-8720-5dd805f12dd0")
-
-
-pytestmark = pytest.mark.forked
 
 
 def ankihub_sample_deck_notes_data():
