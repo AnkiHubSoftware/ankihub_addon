@@ -5,7 +5,7 @@ import uuid
 from dataclasses import dataclass
 from enum import Enum
 from pathlib import Path
-from typing import Any, Dict, Iterator, List, TypedDict
+from typing import Any, Dict, Iterator, List, Optional, TypedDict
 
 import requests
 from requests import PreparedRequest, Request, Response, Session
@@ -20,6 +20,26 @@ API_URL_BASE = "https://app.ankihub.net/api"
 DECK_UPDATE_PAGE_SIZE = 2000  # seems to work well in terms of speed
 
 CSV_DELIMITER = ";"
+
+
+# TODO Make sure these match up with SuggestionType.choices on AnkiHub
+class SuggestionType(Enum):
+    UPDATED_CONTENT = "updated_content", "Updated content"
+    NEW_CONTENT = "new_content", "New content"
+    SPELLING_GRAMMATICAL = "spelling/grammar", "Spelling/Grammar"
+    CONTENT_ERROR = "content_error", "Content error"
+    NEW_CARD_TO_ADD = "new_card_to_add", "New card to add"
+    NEW_TAGS = "new_tags", "New Tags"
+    UPDATED_TAGS = "updated_tags", "Updated Tags"
+    OTHER = "other", "Other"
+
+
+def suggestion_type_from_str(s: str) -> Optional[SuggestionType]:
+    if s in ["original_content", "new_note", None]:
+        return None
+
+    result = next(x for x in SuggestionType if x.value[0] == s)
+    return result
 
 
 @dataclass
@@ -42,6 +62,13 @@ class NoteUpdate(DataClassJsonMixin):
         metadata=dataclasses_json.config(field_name="note_type_id")
     )
     tags: List[str]
+    last_update_type: Optional[SuggestionType] = dataclasses.field(
+        metadata=dataclasses_json.config(
+            encoder=lambda x: x.value[0],
+            decoder=suggestion_type_from_str,
+        ),
+        default=None,
+    )
 
 
 @dataclass
@@ -91,16 +118,6 @@ def http_error_hook(response: Response, *args, **kwargs):
         raise AnkiHubRequestError(response)
 
     return response
-
-
-# TODO Make sure these match up with SuggestionType.choices on AnkiHub
-class ChangeTypes(Enum):
-    UPDATED_CONTENT = "updated_content", "Updated content"
-    NEW_CONTENT = "new_content", "New content"
-    SPELLING_GRAMMATICAL = "spelling/grammatical", "Spelling/Grammatical"
-    CONTENT_ERROR = "content_error", "Content error"
-    NEW_CARD_TO_ADD = "new_card_to_add", "New card to add"
-    OTHER = "other", "Other"
 
 
 class AnkiHubClient:
@@ -262,7 +279,7 @@ class AnkiHubClient:
         ankihub_note_uuid: uuid.UUID,
         fields: List[Dict],
         tags: List[str],
-        change_type: ChangeTypes,
+        change_type: SuggestionType,
         comment: str,
     ) -> None:
         suggestion = {
@@ -287,7 +304,6 @@ class AnkiHubClient:
         anki_note_id: int,
         fields: List[dict],
         tags: List[str],
-        change_type: ChangeTypes,
         note_type_name: str,
         anki_note_type_id: int,
         comment: str,
@@ -297,7 +313,6 @@ class AnkiHubClient:
             "ankihub_id": str(ankihub_note_uuid),
             "fields": fields,
             "tags": tags,
-            "change_type": change_type.value[0],
             "note_type": note_type_name,
             "note_type_id": anki_note_type_id,
             "comment": comment,

@@ -13,7 +13,7 @@ from aqt.utils import showInfo, tooltip
 
 from . import LOGGER, constants
 from .addon_ankihub_client import AddonAnkiHubClient as AnkiHubClient
-from .ankihub_client import AnkiHubRequestError, FieldUpdate, NoteUpdate
+from .ankihub_client import AnkiHubRequestError, FieldUpdate, NoteUpdate, SuggestionType
 from .config import config
 from .constants import ANKI_MINOR
 from .db import AnkiHubDB
@@ -33,9 +33,23 @@ INTERNAL_TAG_PREFIX = "AnkiHub_"
 TAG_FOR_PROTECTING_FIELDS = f"{INTERNAL_TAG_PREFIX}Protect"
 TAG_FOR_PROTECTING_ALL_FIELDS = f"{TAG_FOR_PROTECTING_FIELDS}::All"
 
+TAG_FOR_UPDATES = f"{INTERNAL_TAG_PREFIX}Update"
+TAG_FOR_NEW_NOTE = f"{TAG_FOR_UPDATES}::New_Note"
+TAG_FOR_SUGGESTION_TYPE = {
+    SuggestionType.UPDATED_CONTENT: f"{TAG_FOR_UPDATES}::Content::Updated",
+    SuggestionType.NEW_CONTENT: f"{TAG_FOR_UPDATES}::Content::New",
+    SuggestionType.CONTENT_ERROR: f"{TAG_FOR_UPDATES}::Content::Error",
+    SuggestionType.SPELLING_GRAMMATICAL: f"{TAG_FOR_UPDATES}::Spelling/Grammar",
+    SuggestionType.NEW_TAGS: f"{TAG_FOR_UPDATES}::New_tags",
+    SuggestionType.UPDATED_TAGS: f"{TAG_FOR_UPDATES}::Updated_tags",
+    SuggestionType.NEW_CARD_TO_ADD: f"{TAG_FOR_UPDATES}::New_Card",
+    SuggestionType.OTHER: f"{TAG_FOR_UPDATES}::Other",
+}
+
 # top-level tags that are only used by the add-on, but not by the web app
 ADDON_INTERNAL_TAGS = [
     TAG_FOR_PROTECTING_FIELDS,
+    TAG_FOR_UPDATES,
 ]
 
 
@@ -213,14 +227,11 @@ class AnkiHubImporter:
                 f"Trying to update or create note: {note_data.anki_nid=}, {note_data.ankihub_note_uuid=}"
             )
             note = self.update_or_create_note(
-                anki_nid=NoteId(note_data.anki_nid),
-                mid=NotetypeId(note_data.mid),
-                ankihub_nid=str(note_data.ankihub_note_uuid),
-                fields=note_data.fields,
-                tags=note_data.tags,
+                note_data,
                 anki_did=local_did,
                 protected_fields=protected_fields,
                 protected_tags=protected_tags,
+                first_import_of_deck=first_import_of_deck,
             )
             dids_for_note = set(c.did for c in note.cards())
             dids = dids | dids_for_note
@@ -262,61 +273,59 @@ class AnkiHubImporter:
 
     def update_or_create_note(
         self,
-        anki_nid: NoteId,
-        ankihub_nid: str,
-        fields: List[FieldUpdate],
-        tags: List[str],
-        mid: NotetypeId,
+        note_data: NoteUpdate,
         anki_did: DeckId,  # only relevant for newly created notes
         protected_fields: Dict[int, List[str]],
         protected_tags: List[str],
+        first_import_of_deck: bool,
     ) -> Note:
+        fields = note_data.fields
+
         try:
-            note = mw.col.get_note(id=anki_nid)
+            note = mw.col.get_note(id=NoteId(note_data.anki_nid))
             fields.append(
                 FieldUpdate(
                     name=constants.ANKIHUB_NOTE_TYPE_FIELD_NAME,
                     order=len(fields),
-                    value=ankihub_nid,
+                    value=str(note_data.ankihub_note_uuid),
                 )
             )
             if self.prepare_note(
                 note,
-                ankihub_nid,
-                fields,
-                tags,
+                note_data,
                 protected_fields,
                 protected_tags,
+                first_import_of_deck,
             ):
                 mw.col.update_note(note)
                 self.num_notes_updated += 1
-                LOGGER.debug(f"Updated note: {anki_nid=}")
+                LOGGER.debug(f"Updated note: {note_data.anki_nid=}")
             else:
-                LOGGER.debug(f"No changes, skipping {anki_nid=}")
+                LOGGER.debug(f"No changes, skipping {note_data.anki_nid=}")
         except NotFoundError:
-            note_type = mw.col.models.get(NotetypeId(mid))
+            note_type = mw.col.models.get(NotetypeId(note_data.mid))
             note = mw.col.new_note(note_type)
             self.prepare_note(
                 note,
-                ankihub_nid,
-                fields,
-                tags,
+                note_data,
                 protected_fields,
                 protected_tags,
+                first_import_of_deck,
             )
-            note = create_note_with_id(note, anki_id=anki_nid, anki_did=anki_did)
+            note = create_note_with_id(
+                note, anki_id=NoteId(note_data.anki_nid), anki_did=anki_did
+            )
             self.num_notes_created += 1
-            LOGGER.debug(f"Created note: {anki_nid=}")
+            LOGGER.debug(f"Created note: {note_data.anki_nid=}")
         return note
 
     def prepare_note(
         self,
         note: Note,
-        ankihub_nid: str,
-        fields: List[FieldUpdate],
-        tags: List[str],
+        note_data: NoteUpdate,
         protected_fields: Dict[int, List[str]],
         protected_tags: List[str],
+        first_import_of_deck: bool,
     ) -> bool:
         """
         Updates the note with the given fields and tags (taking protected fields and tags into account)
@@ -327,20 +336,53 @@ class AnkiHubImporter:
         LOGGER.debug("Preparing note...")
 
         changed_ankihub_id_field = self._prepare_ankihub_id_field(
-            note, ankihub_nid=ankihub_nid
+            note, ankihub_nid=str(note_data.ankihub_note_uuid)
         )
         changed_fields = self._prepare_fields(
-            note, fields=fields, protected_fields=protected_fields
+            note, fields=note_data.fields, protected_fields=protected_fields
         )
         changed_tags = self._prepare_tags(
             note,
-            tags=tags,
+            tags=note_data.tags,
             protected_tags=protected_tags,
         )
         changed = changed_ankihub_id_field or changed_fields or changed_tags
 
+        self._prepare_internal_tags(
+            note=note,
+            first_import_of_deck=first_import_of_deck,
+            last_update_type=note_data.last_update_type,
+            note_changed=changed,
+        )
+
         LOGGER.debug(f"Prepared note. {changed=}")
         return changed
+
+    def _prepare_internal_tags(
+        self,
+        note: Note,
+        first_import_of_deck: bool,
+        last_update_type: Optional[SuggestionType],
+        note_changed: bool,
+    ):
+        if (
+            first_import_of_deck
+            or not note_changed
+            or (note.id != 0 and not last_update_type)
+        ):
+            return
+
+        # add special tag if note is new
+        if note.id == 0:
+            update_tag = TAG_FOR_NEW_NOTE
+
+        # add special tag if note was updated
+        elif note.id != 0:
+            update_tag = TAG_FOR_SUGGESTION_TYPE[last_update_type]
+
+        if update_tag not in note.tags:
+            note.tags += [update_tag]
+            LOGGER.debug(f'Added "{update_tag}" to tags of note.')
 
     def _prepare_ankihub_id_field(self, note: Note, ankihub_nid: str) -> bool:
         if note[constants.ANKIHUB_NOTE_TYPE_FIELD_NAME] != ankihub_nid:

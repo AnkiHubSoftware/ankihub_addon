@@ -87,7 +87,6 @@ def on_suggestion_button_press_inner(editor: Editor) -> None:
             def on_add(note: anki.notes.Note) -> None:
                 suggest_new_note(
                     note=note,
-                    change_type=change_type,
                     ankihub_deck_uuid=uuid.UUID(ankihub_did),
                     comment=comment,
                 )
@@ -100,7 +99,6 @@ def on_suggestion_button_press_inner(editor: Editor) -> None:
         else:
             suggest_new_note(
                 note=editor.note,
-                change_type=change_type,
                 ankihub_deck_uuid=uuid.UUID(ankihub_did),
                 comment=comment,
             )
