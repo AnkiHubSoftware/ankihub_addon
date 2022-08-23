@@ -51,7 +51,7 @@ jobs:
       - uses: satackey/action-docker-layer-caching@v0.0.11
         continue-on-error: true
       - run: |
-          docker-compose up --build
+          docker-compose up --build -d
           docker-compose run --rm django python manage.py makemigrations
           docker-compose run --rm django python manage.py migrate
 
