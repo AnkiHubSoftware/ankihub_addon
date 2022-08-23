@@ -79,7 +79,7 @@ jobs:
           GOOGLE_API_KEY: ${{ secrets.GOOGLE_API_KEY }}
 
       - name: Run pytest with coverage
-        run: pytest ./tests --cov --cov-report=xml --vcr-record=none
+        run: pytest ./tests --cov --cov-report=xml --disable-vcr
 
       - name: Upload coverage to Codecov
         env:
