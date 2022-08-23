@@ -3,6 +3,7 @@ env:
   DOCKER_BUILDKIT: 1
   COMPOSE_DOCKER_CLI_BUILD: 1
   COMPOSE_FILE: ${{ github.workspace }}/ankihub_web/local.yml
+  ENV_FILE: ${{ github.workspace }}/ankihub_web/.env.dev
 
 on:
   push:
@@ -44,11 +45,11 @@ jobs:
           ref: dev
           path: ankihub_web
 
-      - run: docker-compose pull
+      - run: docker-compose --env-file $ENV_FILE pull
       - uses: satackey/action-docker-layer-caching@v0.0.11
         continue-on-error: true
       - run: |
-          docker-compose up --build
+          docker-compose --env-file $ENV_FILE up --build
           docker-compose run --rm django python manage.py makemigrations
           docker-compose run --rm django python manage.py migrate
 
