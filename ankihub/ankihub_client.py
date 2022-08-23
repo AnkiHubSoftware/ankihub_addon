@@ -35,7 +35,7 @@ class SuggestionType(Enum):
 
 
 def suggestion_type_from_str(s: str) -> Optional[SuggestionType]:
-    if s in ["original_content", "new_note"]:
+    if s in ["original_content", "new_note", None]:
         return None
 
     result = next(x for x in SuggestionType if x.value[0] == s)
