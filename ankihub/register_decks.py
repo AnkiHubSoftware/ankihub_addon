@@ -19,9 +19,8 @@ from aqt import mw
 
 from . import LOGGER
 from .addon_ankihub_client import AddonAnkiHubClient as AnkiHubClient
-from .settings import config
-from .settings import ANKIHUB_NOTE_TYPE_FIELD_NAME
 from .db import AnkiHubDB
+from .settings import ANKIHUB_NOTE_TYPE_FIELD_NAME, config
 from .utils import (
     change_note_type_of_note,
     create_backup,

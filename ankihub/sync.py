@@ -14,9 +14,8 @@ from aqt.utils import showInfo, tooltip
 from . import LOGGER, settings
 from .addon_ankihub_client import AddonAnkiHubClient as AnkiHubClient
 from .ankihub_client import AnkiHubRequestError, FieldUpdate, NoteUpdate, SuggestionType
-from .settings import config
-from .settings import ANKI_MINOR
 from .db import AnkiHubDB
+from .settings import ANKI_MINOR, config
 from .utils import (
     create_backup,
     create_deck_with_id,

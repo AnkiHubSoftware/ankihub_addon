@@ -1,18 +1,17 @@
 import dataclasses
 import json
-from enum import Enum
-import os
-from datetime import datetime
-from json import JSONDecodeError
-from typing import Any, Callable, Dict, Optional
 import logging
+import os
 import sys
+from datetime import datetime
+from enum import Enum
+from json import JSONDecodeError
 from logging.handlers import RotatingFileHandler
 from pathlib import Path
+from typing import Any, Callable, Dict, Optional
 
-
-from aqt import mw
 from anki.buildinfo import version as ANKI_VERSION
+from aqt import mw
 
 from . import ankihub_client
 

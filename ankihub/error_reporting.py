@@ -11,9 +11,7 @@ from aqt import mw
 from . import LOGGER
 from .addon_ankihub_client import AddonAnkiHubClient as AnkiHubClient
 from .ankihub_client import AnkiHubRequestError
-from .settings import config
-from .settings import ADDON_VERSION, ANKI_VERSION
-from .settings import LOG_FILE
+from .settings import ADDON_VERSION, ANKI_VERSION, LOG_FILE, config
 
 SENTRY_ENV = "anki_desktop"
 # This prevents Sentry from trying to run a git command to infer the version.
@@ -43,9 +41,9 @@ def report_exception(
     exception: Optional[BaseException] = None, context: dict = dict()
 ) -> Optional[str]:
     try:
-        from .settings import config
         from .lib import sentry_sdk  # type: ignore
         from .lib.sentry_sdk import capture_exception, configure_scope  # type: ignore
+        from .settings import config
 
         sentry_sdk.init(
             dsn="https://715325d30fa44ecd939d12edda720f91@o1184291.ingest.sentry.io/6546414",

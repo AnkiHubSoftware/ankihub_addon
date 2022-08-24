@@ -45,15 +45,15 @@ def test_entry_point(anki_session_with_addon: AnkiSession):
 
 
 def test_editor(anki_session_with_addon: AnkiSession, requests_mock, monkeypatch):
-    from ankihub.settings import (
-        ANKIHUB_NOTE_TYPE_FIELD_NAME,
-        API_URL_BASE,
-        AnkiHubCommands,
-    )
     from ankihub.gui.editor import (
         on_suggestion_button_press,
         refresh_suggestion_button,
         setup,
+    )
+    from ankihub.settings import (
+        ANKIHUB_NOTE_TYPE_FIELD_NAME,
+        API_URL_BASE,
+        AnkiHubCommands,
     )
 
     setup()
@@ -137,8 +137,8 @@ def test_modify_note_type(anki_session_with_addon: AnkiSession):
     anki_session = anki_session_with_addon
     with anki_session.profile_loaded():
         with anki_session.deck_installed(sample_deck):
-            from ankihub.settings import ANKIHUB_NOTE_TYPE_FIELD_NAME
             from ankihub.register_decks import modify_note_type
+            from ankihub.settings import ANKIHUB_NOTE_TYPE_FIELD_NAME
 
             note_type = anki_session.mw.col.models.by_name("Basic")
             original_note_type = copy.deepcopy(note_type)
@@ -155,8 +155,8 @@ def test_create_collaborative_deck_and_upload(
 ):
     anki_session = anki_session_with_addon
 
-    from ankihub.settings import API_URL_BASE
     from ankihub.db import AnkiHubDB
+    from ankihub.settings import API_URL_BASE
 
     with anki_session.profile_loaded():
         with anki_session.deck_installed(sample_deck) as deck_id:
