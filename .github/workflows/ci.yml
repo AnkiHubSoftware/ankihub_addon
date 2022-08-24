@@ -34,7 +34,9 @@ jobs:
           path: ankihub_web
 
       - name: Set up AnkiHub env
-        run: mv ${{ github.workspace }}/ankihub_web/.env.dev ${{ github.workspace }}/ankihub_web/.env
+        run: |
+          mv ${{ github.workspace }}/ankihub_web/.env.dev ${{ github.workspace }}/ankihub_web/.env
+          echo DEPLOYMENT_ENVIRONMENT=local >> ${{ github.workspace }}/ankihub_web/.env
 
       - name: Get pip cache dir
         id: pip-cache
