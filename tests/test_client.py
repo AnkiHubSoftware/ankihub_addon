@@ -6,7 +6,7 @@ pytestmark = pytest.mark.usefixtures("mw_mock")
 @pytest.mark.vcr()
 def test_client_login_and_signout(monkeypatch):
     monkeypatch.setenv("ANKIHUB_APP_URL", "http://localhost:8000")
-    from ankihub.addon_ankihub_client import AddonAnkiHubClient as AnkiHubClient
+    from ankihub.addon_ankihub_client import AnkiHubClient
 
     client = AnkiHubClient()
     credentials_data = {"username": "test1", "password": "asdf"}
