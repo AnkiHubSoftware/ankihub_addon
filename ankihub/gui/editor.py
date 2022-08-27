@@ -33,7 +33,9 @@ def on_suggestion_button_press(editor: Editor) -> None:
         on_suggestion_button_press_inner(editor)
     except AnkiHubRequestError as e:
         if "suggestion" in e.response.url and e.response.status_code == 400:
-            error_messages = e.response.json()["non_field_errors"]
+            error_messages = e.response.json().get(
+                "non_field_errors", ["Unknown error"]
+            )
             newline = "\n"  # fstring expression parts can't contain backslashes
             showInfo(
                 text=(
