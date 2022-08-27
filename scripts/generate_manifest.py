@@ -15,15 +15,17 @@ def generate_manifest():
         [str(VERSION_SCRIPT)], capture_output=True, text=True
     ).stdout.strip()
     manifest = {
-        "package": addon_properties["module_name"],
+        "package": addon_properties["ankiweb_id"],
         "name": addon_properties["display_name"],
         "ankiweb_id": addon_properties["ankiweb_id"],
         "author": addon_properties["author"],
         "version": addon_version,
         "homepage": addon_properties["contact"],
         "conflicts": addon_properties["conflicts"],
-        "min_point_version": addon_properties["min_anki_version"].split(".")[-1],
-        "max_point_version": addon_properties["tested_anki_version"].split(".")[-1],
+        "min_point_version": int(addon_properties["min_anki_version"].split(".")[-1]),
+        "max_point_version": int(
+            addon_properties["tested_anki_version"].split(".")[-1]
+        ),
     }
     json.dump(manifest, MANIFEST_FILE.open("w"), indent=4)
 
