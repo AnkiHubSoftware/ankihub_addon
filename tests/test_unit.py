@@ -75,6 +75,15 @@ def test_updated_tags(anki_session_with_addon: AnkiSession):
         )
     ) == set(ADDON_INTERNAL_TAGS)
 
+    # keep Anki internal tags
+    assert set(
+        updated_tags(
+            cur_tags=["marked", "leech"],
+            incoming_tags=[],
+            protected_tags=[],
+        )
+    ) == set(["marked", "leech"])
+
 
 def test_normalize_url(anki_session_with_addon: AnkiSession):
     from ankihub.error_reporting import normalize_url

@@ -401,7 +401,7 @@ def test_suggest_note_upate(anki_session_with_addon: AnkiSession, requests_mock)
     from ankihub.ankihub_client import AnkiHubRequestError, NoteUpdate, SuggestionType
     from ankihub.constants import API_URL_BASE
     from ankihub.suggestions import suggest_note_update
-    from ankihub.sync import ADDON_INTERNAL_TAGS
+    from ankihub.sync import ADDON_INTERNAL_TAGS, ANKI_INTERNAL_TAGS
 
     anki_session = anki_session_with_addon
     with anki_session.profile_loaded():
@@ -417,14 +417,14 @@ def test_suggest_note_upate(anki_session_with_addon: AnkiSession, requests_mock)
             f"{API_URL_BASE}/notes/{ankihub_note_uuid}/suggestion/", status_code=201
         )
 
-        note.tags = ["a", *ADDON_INTERNAL_TAGS]
+        note.tags = ["a", *ADDON_INTERNAL_TAGS, *ANKI_INTERNAL_TAGS]
         suggest_note_update(
             note=note,
             change_type=SuggestionType.NEW_CONTENT,
             comment="test",
         )
 
-        # ... assert that add-on internal tags were filtered out
+        # ... assert that internal tags were filtered out
         suggestion_data = adapter.last_request.json()
         assert set(suggestion_data["tags"]) == set(
             [
