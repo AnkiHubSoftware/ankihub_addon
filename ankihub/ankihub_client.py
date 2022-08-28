@@ -1,6 +1,7 @@
 import csv
 import dataclasses
 import json
+import logging
 import uuid
 from dataclasses import dataclass
 from enum import Enum
@@ -11,9 +12,10 @@ import requests
 from requests import PreparedRequest, Request, Response, Session
 from requests.exceptions import HTTPError
 
-from . import LOGGER
 from .lib import dataclasses_json  # type: ignore
 from .lib.dataclasses_json import DataClassJsonMixin  # type: ignore
+
+LOGGER = logging.getLogger(__name__)
 
 API_URL_BASE = "https://app.ankihub.net/api"
 

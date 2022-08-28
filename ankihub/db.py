@@ -6,7 +6,7 @@ from anki.notes import NoteId
 from aqt import mw
 
 from . import LOGGER
-from .constants import ANKIHUB_NOTE_TYPE_FIELD_NAME, DB_PATH
+from .settings import ANKIHUB_NOTE_TYPE_FIELD_NAME, DB_PATH
 
 
 class AnkiHubDB:

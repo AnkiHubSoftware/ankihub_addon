@@ -11,12 +11,11 @@ from anki.notes import Note, NoteId
 from aqt import gui_hooks, mw
 from aqt.utils import showInfo, tooltip
 
-from . import LOGGER, constants
+from . import LOGGER, settings
 from .addon_ankihub_client import AddonAnkiHubClient as AnkiHubClient
 from .ankihub_client import AnkiHubRequestError, FieldUpdate, NoteUpdate, SuggestionType
-from .config import config
-from .constants import ANKI_MINOR
 from .db import AnkiHubDB
+from .settings import ANKI_MINOR, config
 from .utils import (
     create_backup,
     create_deck_with_id,
@@ -118,7 +117,7 @@ class AnkiHubSync:
             return False
 
         if exc.response.status_code == 403:
-            url_view_deck = f"{constants.URL_VIEW_DECK}{ankihub_did}"
+            url_view_deck = f"{settings.URL_VIEW_DECK}{ankihub_did}"
             mw.taskman.run_on_main(
                 lambda: showInfo(  # type: ignore
                     f"Please subscribe to the deck <br><b>{deck_info['name']}</b><br>on the AnkiHub website to "
@@ -285,7 +284,7 @@ class AnkiHubImporter:
             note = mw.col.get_note(id=NoteId(note_data.anki_nid))
             fields.append(
                 FieldUpdate(
-                    name=constants.ANKIHUB_NOTE_TYPE_FIELD_NAME,
+                    name=settings.ANKIHUB_NOTE_TYPE_FIELD_NAME,
                     order=len(fields),
                     value=str(note_data.ankihub_note_uuid),
                 )
@@ -385,12 +384,12 @@ class AnkiHubImporter:
             LOGGER.debug(f'Added "{update_tag}" to tags of note.')
 
     def _prepare_ankihub_id_field(self, note: Note, ankihub_nid: str) -> bool:
-        if note[constants.ANKIHUB_NOTE_TYPE_FIELD_NAME] != ankihub_nid:
+        if note[settings.ANKIHUB_NOTE_TYPE_FIELD_NAME] != ankihub_nid:
             LOGGER.debug(
-                f"AnkiHub id of note {note.id} will be changed from {note[constants.ANKIHUB_NOTE_TYPE_FIELD_NAME]} "
+                f"AnkiHub id of note {note.id} will be changed from {note[settings.ANKIHUB_NOTE_TYPE_FIELD_NAME]} "
                 f"to {ankihub_nid}",
             )
-            note[constants.ANKIHUB_NOTE_TYPE_FIELD_NAME] = ankihub_nid
+            note[settings.ANKIHUB_NOTE_TYPE_FIELD_NAME] = ankihub_nid
             return True
         return False
 

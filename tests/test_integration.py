@@ -45,15 +45,15 @@ def test_entry_point(anki_session_with_addon: AnkiSession):
 
 
 def test_editor(anki_session_with_addon: AnkiSession, requests_mock, monkeypatch):
-    from ankihub.constants import (
-        ANKIHUB_NOTE_TYPE_FIELD_NAME,
-        API_URL_BASE,
-        AnkiHubCommands,
-    )
     from ankihub.gui.editor import (
         on_suggestion_button_press,
         refresh_suggestion_button,
         setup,
+    )
+    from ankihub.settings import (
+        ANKIHUB_NOTE_TYPE_FIELD_NAME,
+        API_URL_BASE,
+        AnkiHubCommands,
     )
 
     setup()
@@ -122,7 +122,7 @@ def test_note_type_contains_field(anki_session_with_addon: AnkiSession):
     anki_session = anki_session_with_addon
     with anki_session.profile_loaded():
         with anki_session.deck_installed(sample_deck):
-            from ankihub.constants import ANKIHUB_NOTE_TYPE_FIELD_NAME
+            from ankihub.settings import ANKIHUB_NOTE_TYPE_FIELD_NAME
             from ankihub.utils import note_type_contains_field
 
             note_type = anki_session.mw.col.models.get(sample_model_id)
@@ -137,8 +137,8 @@ def test_modify_note_type(anki_session_with_addon: AnkiSession):
     anki_session = anki_session_with_addon
     with anki_session.profile_loaded():
         with anki_session.deck_installed(sample_deck):
-            from ankihub.constants import ANKIHUB_NOTE_TYPE_FIELD_NAME
             from ankihub.register_decks import modify_note_type
+            from ankihub.settings import ANKIHUB_NOTE_TYPE_FIELD_NAME
 
             note_type = anki_session.mw.col.models.by_name("Basic")
             original_note_type = copy.deepcopy(note_type)
@@ -155,8 +155,8 @@ def test_create_collaborative_deck_and_upload(
 ):
     anki_session = anki_session_with_addon
 
-    from ankihub.constants import API_URL_BASE
     from ankihub.db import AnkiHubDB
+    from ankihub.settings import API_URL_BASE
 
     with anki_session.profile_loaded():
         with anki_session.deck_installed(sample_deck) as deck_id:
@@ -222,31 +222,10 @@ def test_upload_deck(anki_session_with_addon: AnkiSession, monkeypatch):
         assert card.did == filtered_did
 
 
-def test_client_login_and_signout(anki_session_with_addon: AnkiSession, requests_mock):
-    from ankihub.addon_ankihub_client import AddonAnkiHubClient as AnkiHubClient
-    from ankihub.constants import API_URL_BASE
-
-    client = AnkiHubClient()
-    credentials_data = {"username": "test", "password": "testpassword"}
-    requests_mock.post(f"{API_URL_BASE}/login/", json={"token": "f4k3t0k3n"})
-    requests_mock.post(
-        f"{API_URL_BASE}/logout/", json={"token": "f4k3t0k3n"}, status_code=204
-    )
-
-    # test login
-    token = client.login(credentials=credentials_data)
-    assert token == "f4k3t0k3n"
-    assert client.session.headers["Authorization"] == "Token f4k3t0k3n"
-
-    # test signout
-    client.signout()
-    assert client.session.headers["Authorization"] == ""
-
-
 def test_client_upload_deck(anki_session_with_addon: AnkiSession, requests_mock):
     from ankihub.addon_ankihub_client import AddonAnkiHubClient as AnkiHubClient
     from ankihub.ankihub_client import AnkiHubRequestError
-    from ankihub.constants import API_URL_BASE
+    from ankihub.settings import API_URL_BASE
 
     client = AnkiHubClient(hooks=[])
 
@@ -288,7 +267,7 @@ def test_get_deck_updates(anki_session_with_addon: AnkiSession, requests_mock):
         NoteUpdate,
         SuggestionType,
     )
-    from ankihub.constants import API_URL_BASE
+    from ankihub.settings import API_URL_BASE
 
     # test get deck updates
     ankihub_deck_uuid = UUID_1
@@ -360,7 +339,7 @@ def test_get_deck_updates(anki_session_with_addon: AnkiSession, requests_mock):
 def test_get_deck_by_id(anki_session_with_addon: AnkiSession, requests_mock):
     from ankihub.addon_ankihub_client import AddonAnkiHubClient as AnkiHubClient
     from ankihub.ankihub_client import AnkiHubRequestError, DeckInfo
-    from ankihub.constants import API_URL_BASE
+    from ankihub.settings import API_URL_BASE
 
     client = AnkiHubClient(hooks=[])
 
@@ -399,7 +378,7 @@ def test_get_deck_by_id(anki_session_with_addon: AnkiSession, requests_mock):
 
 def test_suggest_note_upate(anki_session_with_addon: AnkiSession, requests_mock):
     from ankihub.ankihub_client import AnkiHubRequestError, NoteUpdate, SuggestionType
-    from ankihub.constants import API_URL_BASE
+    from ankihub.settings import API_URL_BASE
     from ankihub.suggestions import suggest_note_update
     from ankihub.sync import ADDON_INTERNAL_TAGS
 
@@ -450,7 +429,7 @@ def test_suggest_note_upate(anki_session_with_addon: AnkiSession, requests_mock)
 
 def test_suggest_new_note(anki_session_with_addon: AnkiSession, requests_mock):
     from ankihub.ankihub_client import AnkiHubRequestError
-    from ankihub.constants import API_URL_BASE
+    from ankihub.settings import API_URL_BASE
     from ankihub.suggestions import suggest_new_note
     from ankihub.sync import ADDON_INTERNAL_TAGS
 
@@ -913,7 +892,7 @@ def test_prepare_note(anki_session_with_addon: AnkiSession):
     from anki.notes import Note
 
     from ankihub.ankihub_client import FieldUpdate, NoteUpdate, SuggestionType
-    from ankihub.constants import ANKIHUB_NOTE_TYPE_FIELD_NAME
+    from ankihub.settings import ANKIHUB_NOTE_TYPE_FIELD_NAME
     from ankihub.sync import (
         ADDON_INTERNAL_TAGS,
         TAG_FOR_PROTECTING_FIELDS,
@@ -1086,7 +1065,7 @@ def test_prepare_note_protect_field_with_spaces(anki_session_with_addon: AnkiSes
     from anki.notes import Note
 
     from ankihub.ankihub_client import FieldUpdate, NoteUpdate, SuggestionType
-    from ankihub.constants import ANKIHUB_NOTE_TYPE_FIELD_NAME
+    from ankihub.settings import ANKIHUB_NOTE_TYPE_FIELD_NAME
     from ankihub.sync import TAG_FOR_PROTECTING_FIELDS, AnkiHubImporter
     from ankihub.utils import modify_note_type
 
