@@ -10,14 +10,14 @@ from aqt.addcards import AddCards
 from aqt.editor import Editor
 from aqt.utils import chooseList, showInfo, showText, tooltip
 
-from .. import LOGGER, constants
+from .. import LOGGER, settings
 from ..ankihub_client import AnkiHubRequestError
-from ..config import config
-from ..constants import (
+from ..settings import (
     ANKI_MINOR,
     ANKIHUB_NOTE_TYPE_FIELD_NAME,
     ICONS_PATH,
     AnkiHubCommands,
+    config,
 )
 from ..suggestions import suggest_new_note, suggest_note_update
 from .suggestion_dialog import SuggestionDialog
@@ -132,7 +132,7 @@ def hide_ankihub_field_in_editor(
     js: str, note: anki.notes.Note, _: aqt.editor.Editor
 ) -> str:
     if ANKI_MINOR >= 50:
-        if constants.ANKIHUB_NOTE_TYPE_FIELD_NAME not in note:
+        if settings.ANKIHUB_NOTE_TYPE_FIELD_NAME not in note:
             return js
         extra = (
             'require("svelte/internal").tick().then(() => '
@@ -142,7 +142,7 @@ def hide_ankihub_field_in_editor(
             "=> {{ element.hidden = true; }}); }});"
         )
     else:
-        if constants.ANKIHUB_NOTE_TYPE_FIELD_NAME not in note:
+        if settings.ANKIHUB_NOTE_TYPE_FIELD_NAME not in note:
             extra = (
                 "(() => {"
                 'const field = document.querySelector("#fields *[data-ankihub-hidden]");'

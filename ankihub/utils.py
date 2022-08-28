@@ -11,8 +11,8 @@ from anki.notes import Note, NoteId
 from anki.utils import checksum, ids2str
 from aqt import mw
 
-from . import LOGGER, constants
-from .constants import (
+from . import LOGGER, settings
+from .settings import (
     ANKI_MINOR,
     ANKIHUB_NOTE_TYPE_FIELD_NAME,
     ANKIHUB_NOTE_TYPE_MODIFICATION_STRING,
@@ -133,7 +133,7 @@ def create_note_type_with_id(note_type: NotetypeDict, mid: NotetypeId) -> None:
 
 
 def note_type_contains_field(
-    note_type: NoteType, field=constants.ANKIHUB_NOTE_TYPE_FIELD_NAME
+    note_type: NoteType, field=settings.ANKIHUB_NOTE_TYPE_FIELD_NAME
 ) -> bool:
     """Check that a field is defined in the note type."""
     fields: List[Dict] = note_type["flds"]
@@ -236,8 +236,8 @@ def modify_note_type_templates(note_type_ids: Iterable[NotetypeId]) -> None:
 def modify_fields(note_type: Dict) -> None:
     fields = note_type["flds"]
     field_names = [field["name"] for field in fields]
-    if constants.ANKIHUB_NOTE_TYPE_FIELD_NAME in field_names:
-        LOGGER.debug(f"{constants.ANKIHUB_NOTE_TYPE_FIELD_NAME} already exists.")
+    if settings.ANKIHUB_NOTE_TYPE_FIELD_NAME in field_names:
+        LOGGER.debug(f"{settings.ANKIHUB_NOTE_TYPE_FIELD_NAME} already exists.")
         return
     ankihub_field = mw.col.models.new_field(ANKIHUB_NOTE_TYPE_FIELD_NAME)
     # Put AnkiHub field last
@@ -303,9 +303,9 @@ def undo_note_type_modification(note_type: Dict) -> None:
 def undo_fields_modification(note_type: Dict) -> None:
     fields = note_type["flds"]
     field_names = [field["name"] for field in fields]
-    if constants.ANKIHUB_NOTE_TYPE_FIELD_NAME not in field_names:
+    if settings.ANKIHUB_NOTE_TYPE_FIELD_NAME not in field_names:
         return
-    fields.pop(field_names.index(constants.ANKIHUB_NOTE_TYPE_FIELD_NAME))
+    fields.pop(field_names.index(settings.ANKIHUB_NOTE_TYPE_FIELD_NAME))
 
 
 def undo_template_modification(template: Dict) -> None:

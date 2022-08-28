@@ -13,7 +13,7 @@ from aqt.qt import (
 )
 
 from ..ankihub_client import SuggestionType
-from ..constants import RATIONALE_FOR_CHANGE_MAX_LENGTH, AnkiHubCommands
+from ..settings import RATIONALE_FOR_CHANGE_MAX_LENGTH, AnkiHubCommands
 
 
 class SuggestionDialog(QDialog):

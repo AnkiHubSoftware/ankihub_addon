@@ -7,7 +7,7 @@ from aqt.gui_hooks import main_window_did_init
 
 from . import LOGGER
 from .addons import setup_addons
-from .config import config
+from .settings import config
 from .errors import setup_error_handler
 from .gui import browser, editor
 from .gui.menu import setup_ankihub_menu
