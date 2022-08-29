@@ -1,6 +1,6 @@
 name: tests
 env:
-  # DOCKER_BUILDKIT: 1
+  DOCKER_BUILDKIT: 1
   COMPOSE_DOCKER_CLI_BUILD: 1
   COMPOSE_FILE: ${{ github.workspace }}/ankihub_web/local.yml
 
@@ -24,7 +24,7 @@ jobs:
       - name: Enable cloning web app repo
         uses: webfactory/ssh-agent@v0.5.4
         with:
-            ssh-private-key: ${{ secrets.ANKIHUB_SSH_PRIVATE_KEY }}
+          ssh-private-key: ${{ secrets.ANKIHUB_SSH_PRIVATE_KEY }}
 
       - name: Checkout ankipalace/ankihub web app repo
         uses: actions/checkout@v3
@@ -58,7 +58,7 @@ jobs:
       - uses: satackey/action-docker-layer-caching@v0.0.11
         continue-on-error: true
       - run: |
-          docker-compose build
+          docker-compose build --build-arg BUILDKIT_INLINE_CACHE=1
           docker-compose run --rm django python manage.py makemigrations
           docker-compose run --rm django bash release.sh
           docker-compose up -d
