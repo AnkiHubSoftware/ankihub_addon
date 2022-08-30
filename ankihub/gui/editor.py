@@ -19,6 +19,7 @@ from ..constants import (
     ICONS_PATH,
     AnkiHubCommands,
 )
+from ..error_reporting import report_exception_and_upload_logs
 from ..suggestions import suggest_new_note, suggest_note_update
 from .suggestion_dialog import SuggestionDialog
 
@@ -33,18 +34,19 @@ def on_suggestion_button_press(editor: Editor) -> None:
         on_suggestion_button_press_inner(editor)
     except AnkiHubRequestError as e:
         if "suggestion" in e.response.url and e.response.status_code == 400:
-            error_messages = e.response.json().get(
-                "non_field_errors", ["Unknown error"]
-            )
-            newline = "\n"  # fstring expression parts can't contain backslashes
+            if non_field_errors := e.response.json().get("non_field_errors", None):
+                error_message = "\n".join(non_field_errors)
+            else:
+                error_message = pformat(e.response.json())
+                report_exception_and_upload_logs(e)
             showInfo(
                 text=(
                     "There are some problems with this suggestion:<br><br>"
-                    f"<b>{newline.join(error_messages)}</b>"
+                    f"<b>{error_message}</b>"
                 ),
                 title="Problem with suggestion",
             )
-            LOGGER.debug(f"Can't submit suggestion due to: {pformat(error_messages)}")
+            LOGGER.debug(f"Can't submit suggestion due to: {pformat(error_message)}")
             return
         raise e
 
