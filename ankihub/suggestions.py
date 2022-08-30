@@ -62,4 +62,6 @@ def _prepare_fields(note: Note) -> List[Dict]:
 
 
 def _prepare_tags(tags: List[str]):
-    return [tag for tag in tags if not is_internal_tag(tag)]
+
+    # removing empty tags is necessary because note have empty tags in the editor sometimes
+    return [tag for tag in tags if tag.strip() and not is_internal_tag(tag)]
