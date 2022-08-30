@@ -38,6 +38,7 @@ def on_suggestion_button_press(editor: Editor) -> None:
                 error_message = "\n".join(non_field_errors)
             else:
                 error_message = pformat(e.response.json())
+                # these errors are not expected and should be reported
                 report_exception_and_upload_logs(e)
             showInfo(
                 text=(
