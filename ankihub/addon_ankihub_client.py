@@ -8,7 +8,7 @@ from requests import Response
 
 from . import LOGGER
 from .ankihub_client import AnkiHubClient, AnkiHubRequestError
-from .config import config
+from .settings import config
 
 
 def logging_hook(response: Response, *args, **kwargs):

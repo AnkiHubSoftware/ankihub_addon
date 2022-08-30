@@ -1,4 +1,8 @@
 name: tests
+env:
+  DOCKER_BUILDKIT: 1
+  COMPOSE_DOCKER_CLI_BUILD: 1
+  COMPOSE_FILE: ${{ github.workspace }}/ankihub_web/local.yml
 
 on:
   push:
@@ -10,14 +14,54 @@ jobs:
   test:
     runs-on: ubuntu-latest
     steps:
-      - name: Checkout ankihub_addon
-        uses: actions/checkout@v2
-
-      - uses: actions/checkout@v3
       - uses: actions/setup-python@v3
         with:
           python-version: "3.9.7"
-          # architecture: 'x64' # optional x64 or x86. Defaults to x64 if not specified
+
+      - name: Checkout ankihub_addon
+        uses: actions/checkout@v3
+
+      - name: Enable cloning web app repo
+        uses: webfactory/ssh-agent@v0.5.4
+        with:
+            ssh-private-key: ${{ secrets.ANKIHUB_SSH_PRIVATE_KEY }}
+
+      - name: Checkout ankipalace/ankihub web app repo
+        uses: actions/checkout@v3
+        with:
+          repository: ankipalace/ankihub
+          ref: dev
+          path: ankihub_web
+
+      - name: Set up AnkiHub env
+        run: |
+          mv ${{ github.workspace }}/ankihub_web/.env.dev ${{ github.workspace }}/ankihub_web/.env
+          echo DEPLOYMENT_ENVIRONMENT=local >> ${{ github.workspace }}/ankihub_web/.env
+
+      - name: Get pip cache dir
+        id: pip-cache
+        run: |
+          python -m pip install --upgrade pip
+          echo "::set-output name=dir::$(pip cache dir)"
+
+      - name: pip cache
+        uses: actions/cache@v3
+        with:
+          path: |
+            ${{ steps.pip-cache.outputs.dir }}
+            ~/.cache/pre-commit
+          key: ${{ runner.os }}-pip-${{ hashFiles('**/dev.txt', '**/base.txt', '.pre-commit-config.yaml') }}
+          restore-keys: |
+            ${{ runner.os }}-pip-
+
+      - run: docker-compose pull
+      - uses: satackey/action-docker-layer-caching@v0.0.11
+        continue-on-error: true
+      - run: |
+          docker-compose build
+          docker-compose run --rm django python manage.py makemigrations
+          docker-compose run --rm django bash release.sh
+          docker-compose up -d
 
       - name: Install Qt
         uses: jurplel/install-qt-action@v2
@@ -26,9 +70,7 @@ jobs:
           setup-python: "false"
 
       - name: Install deps
-        run: |
-          python -m pip install --upgrade pip
-          python -m pip install -r ./requirements/dev.txt
+        run: python -m pip install -r ./requirements/dev.txt
 
       - name: Build
         run: |
@@ -37,7 +79,7 @@ jobs:
           GOOGLE_API_KEY: ${{ secrets.GOOGLE_API_KEY }}
 
       - name: Run pytest with coverage
-        run: pytest ./tests --cov --cov-report=xml
+        run: pytest ./tests --cov --cov-report=xml --disable-vcr
 
       - name: Upload coverage to Codecov
         env:
