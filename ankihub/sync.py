@@ -27,12 +27,12 @@ from .utils import (
     reset_note_types_of_notes,
 )
 
-INTERNAL_TAG_PREFIX = "AnkiHub_"
+ADDON_INTERNAL_TAG_PREFIX = "AnkiHub_"
 
-TAG_FOR_PROTECTING_FIELDS = f"{INTERNAL_TAG_PREFIX}Protect"
+TAG_FOR_PROTECTING_FIELDS = f"{ADDON_INTERNAL_TAG_PREFIX}Protect"
 TAG_FOR_PROTECTING_ALL_FIELDS = f"{TAG_FOR_PROTECTING_FIELDS}::All"
 
-TAG_FOR_UPDATES = f"{INTERNAL_TAG_PREFIX}Update"
+TAG_FOR_UPDATES = f"{ADDON_INTERNAL_TAG_PREFIX}Update"
 TAG_FOR_NEW_NOTE = f"{TAG_FOR_UPDATES}::New_Note"
 TAG_FOR_SUGGESTION_TYPE = {
     SuggestionType.UPDATED_CONTENT: f"{TAG_FOR_UPDATES}::Content::Updated",
@@ -51,12 +51,15 @@ ADDON_INTERNAL_TAGS = [
     TAG_FOR_UPDATES,
 ]
 
+# tags that are used internally by Anki and should not be deleted or appear in suggestions
+ANKI_INTERNAL_TAGS = ["leech", "marked"]
+
 
 def is_internal_tag(tag: str) -> bool:
     return any(
         tag == internal_tag or tag.startswith(f"{internal_tag}::")
-        for internal_tag in ADDON_INTERNAL_TAGS
-    )
+        for internal_tag in [*ADDON_INTERNAL_TAGS]
+    ) or any(tag == internal_tag for internal_tag in ANKI_INTERNAL_TAGS)
 
 
 class AnkiHubSync:
