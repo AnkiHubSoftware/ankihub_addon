@@ -254,7 +254,7 @@ class AnkiHubClient:
             total_size = int(response.headers.get("content-length"))
             prev_percent = 0
             for i, chunk in enumerate(response.iter_content(chunk_size=chunk_size)):
-                percent = int(i * chunk_size / max(total_size, 1) * 100)
+                percent = min(int(i * chunk_size / max(total_size, 1) * 100), 100)
                 if chunk:
                     content += chunk
                     if percent != prev_percent:
@@ -266,6 +266,7 @@ class AnkiHubClient:
         self,
         ankihub_deck_uuid: uuid.UUID,
         since: str,
+        download_progress_cb: Optional[Callable[[int], None]] = None,
     ) -> Iterator[DeckUpdateChunk]:
         class Params(TypedDict, total=False):
             page: int
@@ -278,6 +279,8 @@ class AnkiHubClient:
             "size": DECK_UPDATE_PAGE_SIZE,
         }
         has_next_page = True
+        i = 0
+        prev_percent = 0
         while has_next_page:
             response = self._send_request(
                 "GET",
@@ -294,6 +297,15 @@ class AnkiHubClient:
             data["notes"] = transform_notes_data(data["notes"])
             note_updates = DeckUpdateChunk.from_dict(data)
             yield note_updates
+
+            i += 1
+
+            if download_progress_cb:
+                total = data["total"]
+                percent = min(int(i * DECK_UPDATE_PAGE_SIZE / max(total, 1) * 100), 100)
+                if percent != prev_percent:
+                    download_progress_cb(percent)
+                    prev_percent = percent
 
     def get_deck_by_id(self, ankihub_deck_uuid: uuid.UUID) -> DeckInfo:
         response = self._send_request(

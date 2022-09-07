@@ -83,11 +83,33 @@ class AnkiHubSync:
                     raise e
 
     def _sync_deck(self, ankihub_did: str) -> bool:
+
+        called_progress_cb_before = False
+
+        def download_progress_cb(percent: int) -> None:
+
+            # don't show progress bar if it's already at 100% on the first call
+            nonlocal called_progress_cb_before
+            if not called_progress_cb_before and percent == 100:
+                return
+            called_progress_cb_before = True
+
+            mw.taskman.run_on_main(
+                lambda: mw.progress.update(
+                    f"Downloading updates\nfor {deck['name']}",
+                    maybeShow=False,
+                    value=percent,
+                    max=100,
+                )
+            )
+
         deck = config.private_config.decks[ankihub_did]
         client = AnkiHubClient()
         notes_data = []
         for chunk in client.get_deck_updates(
-            uuid.UUID(ankihub_did), since=deck["latest_update"]
+            uuid.UUID(ankihub_did),
+            since=deck["latest_update"],
+            download_progress_cb=download_progress_cb,
         ):
             if mw.progress.want_cancel():
                 LOGGER.debug("User cancelled sync.")
