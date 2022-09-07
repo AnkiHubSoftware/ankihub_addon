@@ -254,7 +254,7 @@ class AnkiHubClient:
             total_size = int(response.headers.get("content-length"))
             prev_percent = 0
             for i, chunk in enumerate(response.iter_content(chunk_size=chunk_size)):
-                percent = int(i * chunk_size / total_size * 100)
+                percent = int(i * chunk_size / max(total_size, 1) * 100)
                 if chunk:
                     content += chunk
                     if percent != prev_percent:
