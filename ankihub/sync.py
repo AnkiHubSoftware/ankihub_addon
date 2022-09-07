@@ -4,6 +4,8 @@ from pprint import pformat
 from time import sleep
 from typing import Dict, Iterable, List, Optional, Set, Tuple
 
+from anki.cards import Card
+from anki.consts import QUEUE_TYPE_SUSPENDED
 from anki.decks import DeckId
 from anki.errors import NotFoundError
 from anki.models import NotetypeDict, NotetypeId
@@ -216,7 +218,6 @@ class AnkiHubImporter:
         protected_tags: List[str],
         local_did: DeckId = None,  # did that new notes should be put into if importing not for the first time
     ) -> DeckId:
-
         first_import_of_deck = local_did is None
 
         local_did = adjust_deck(deck_name, local_did)
@@ -225,16 +226,14 @@ class AnkiHubImporter:
 
         dids: Set[DeckId] = set()  # set of ids of decks notes were imported into
         for note_data in notes_data:
-            LOGGER.debug(
-                f"Trying to update or create note: {note_data.anki_nid=}, {note_data.ankihub_note_uuid=}"
-            )
-            note = self.update_or_create_note(
-                note_data,
+            note = self._update_or_create_note(
+                note_data=note_data,
                 anki_did=local_did,
                 protected_fields=protected_fields,
                 protected_tags=protected_tags,
                 first_import_of_deck=first_import_of_deck,
             )
+
             dids_for_note = set(c.did for c in note.cards())
             dids = dids | dids_for_note
 
@@ -273,7 +272,73 @@ class AnkiHubImporter:
 
         return created_did
 
-    def update_or_create_note(
+    def _update_or_create_note(
+        self,
+        note_data: NoteUpdate,
+        anki_did: DeckId,
+        protected_fields: Dict[int, List[str]],
+        protected_tags: List[str],
+        first_import_of_deck: bool,
+    ) -> Note:
+        LOGGER.debug(
+            f"Trying to update or create note: {note_data.anki_nid=}, {note_data.ankihub_note_uuid=}"
+        )
+
+        note_before_changes = None
+        try:
+            note_before_changes = mw.col.get_note(NoteId(note_data.anki_nid))
+        except NotFoundError:
+            pass
+        cards_before_changes = (
+            note_before_changes.cards() if note_before_changes else []
+        )
+
+        note = self._update_or_create_note_inner(
+            note_data,
+            anki_did=anki_did,
+            protected_fields=protected_fields,
+            protected_tags=protected_tags,
+            first_import_of_deck=first_import_of_deck,
+        )
+
+        self._maybe_suspend_new_cards(note, cards_before_changes)
+
+        return note
+
+    def _maybe_suspend_new_cards(
+        self, note: Note, cards_before_changes: List[Card]
+    ) -> None:
+        if not cards_before_changes:
+            return
+
+        def new_cards():
+            return [
+                c
+                for c in note.cards()
+                if c.id not in [c.id for c in cards_before_changes]
+            ]
+
+        def suspend_new_cards():
+            if not (new_cards_ := new_cards()):
+                return
+
+            LOGGER.debug(f"Suspending new cards of note {note.id}")
+            for card in new_cards_:
+                card.queue = QUEUE_TYPE_SUSPENDED
+                card.flush()
+
+        config_value = config.public_config["suspend_new_cards_of_existing_notes"]
+        if config_value == "never":
+            return
+        elif config_value == "always":
+            suspend_new_cards()
+        elif config_value == "if_siblings_are_suspended":
+            if all(card.queue == QUEUE_TYPE_SUSPENDED for card in cards_before_changes):
+                suspend_new_cards()
+        else:
+            raise ValueError("Invalid suspend_new_cards config value")
+
+    def _update_or_create_note_inner(
         self,
         note_data: NoteUpdate,
         anki_did: DeckId,  # only relevant for newly created notes
@@ -299,7 +364,7 @@ class AnkiHubImporter:
                 protected_tags,
                 first_import_of_deck,
             ):
-                mw.col.update_note(note)
+                note.flush()
                 self.num_notes_updated += 1
                 LOGGER.debug(f"Updated note: {note_data.anki_nid=}")
             else:
