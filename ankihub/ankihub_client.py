@@ -6,7 +6,7 @@ import uuid
 from dataclasses import dataclass
 from enum import Enum
 from pathlib import Path
-from typing import Any, Dict, Iterator, List, Optional, TypedDict
+from typing import Any, Callable, Dict, Iterator, List, Optional, TypedDict
 
 import requests
 from requests import PreparedRequest, Request, Response, Session
@@ -212,17 +212,28 @@ class AnkiHubClient:
         ankihub_did = uuid.UUID(data["deck_id"])
         return ankihub_did
 
-    def download_deck(self, ankihub_deck_uuid: uuid.UUID) -> List[NoteUpdate]:
+    def download_deck(
+        self,
+        ankihub_deck_uuid: uuid.UUID,
+        download_progress_cb: Optional[Callable[[int], None]] = None,
+    ) -> List[NoteUpdate]:
         deck_info = self.get_deck_by_id(ankihub_deck_uuid)
 
         s3_url = self.get_presigned_url(
             key=deck_info.csv_notes_filename, action="download"
         )
-        s3_response = requests.get(s3_url)
-        if s3_response.status_code != 200:
-            raise AnkiHubRequestError(s3_response)
 
-        deck_csv_content = s3_response.content.decode("utf-8")
+        if download_progress_cb:
+            s3_response_content = self._download_with_progress_cb(
+                s3_url, download_progress_cb
+            )
+        else:
+            s3_response = requests.get(s3_url)
+            if s3_response.status_code != 200:
+                raise AnkiHubRequestError(s3_response)
+            s3_response_content = s3_response.content
+
+        deck_csv_content = s3_response_content.decode("utf-8")
         reader = csv.DictReader(
             deck_csv_content.splitlines(), delimiter=CSV_DELIMITER, quotechar="'"
         )
@@ -233,8 +244,28 @@ class AnkiHubClient:
 
         return notes_data
 
+    def _download_with_progress_cb(self, url: str, progress_cb: Callable[[int], None]):
+        content = b""
+        with requests.get(url, stream=True) as response:
+            if response.status_code != 200:
+                raise AnkiHubRequestError(response)
+
+            chunk_size = 8192
+            total_size = int(response.headers.get("content-length"))
+            prev_percent = 0
+            for i, chunk in enumerate(response.iter_content(chunk_size=chunk_size)):
+                percent = int(i * chunk_size / total_size * 100)
+                if chunk:
+                    content += chunk
+                    if percent != prev_percent:
+                        progress_cb(percent)
+                        prev_percent = percent
+        return content
+
     def get_deck_updates(
-        self, ankihub_deck_uuid: uuid.UUID, since: str
+        self,
+        ankihub_deck_uuid: uuid.UUID,
+        since: str,
     ) -> Iterator[DeckUpdateChunk]:
         class Params(TypedDict, total=False):
             page: int

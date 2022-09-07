@@ -290,6 +290,15 @@ class SubscribeDialog(QDialog):
             else:
                 raise e
 
+        def download_progress_cb(percent: int):
+            mw.taskman.run_on_main(
+                lambda: mw.progress.update(
+                    label="Downloading deck...",
+                    value=percent,
+                    max=100,
+                )
+            )
+
         def on_download_done(future: Future) -> None:
             notes_data: List[NoteUpdate] = future.result()
 
@@ -307,7 +316,9 @@ class SubscribeDialog(QDialog):
             )
 
         mw.taskman.with_progress(
-            lambda: self.client.download_deck(deck_info.ankihub_deck_uuid),
+            lambda: self.client.download_deck(
+                deck_info.ankihub_deck_uuid, download_progress_cb=download_progress_cb
+            ),
             on_done=on_download_done,
             parent=mw,
             label="Downloading deck",
