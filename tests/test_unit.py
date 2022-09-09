@@ -101,3 +101,14 @@ def test_tag_exists_for_every_suggestion_type(anki_session_with_addon: AnkiSessi
 
     for suggestion_type in SuggestionType:
         assert TAG_FOR_SUGGESTION_TYPE.get(suggestion_type, None) is not None
+
+
+def test_prepared_field_content(anki_session_with_addon: AnkiSession):
+    from ankihub.suggestions import _prepared_field_val
+
+    assert _prepared_field_val('<img src="foo.jpg">') == '<img src="foo.jpg">'
+
+    assert (
+        _prepared_field_val('<img src="foo.jpg" data-editor-shrink="true">')
+        == '<img src="foo.jpg">'
+    )
