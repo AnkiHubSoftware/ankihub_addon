@@ -53,7 +53,7 @@ def _prepare_fields(note: Note) -> List[Dict]:
     field_vals = list(note.fields[:-1])
     fields_metadata = note.note_type()["flds"][:-1]
 
-    prepared_field_vals = [_prepared_field_val(field) for field in field_vals]
+    prepared_field_vals = [_prepared_field_html(field) for field in field_vals]
     fields = [
         {"name": field["name"], "order": field["ord"], "value": val}
         for field, val in zip(fields_metadata, prepared_field_vals)
@@ -61,7 +61,7 @@ def _prepare_fields(note: Note) -> List[Dict]:
     return fields
 
 
-def _prepared_field_val(html: str) -> str:
+def _prepared_field_html(html: str) -> str:
     # Since Anki 2.1.54 data-editor-shrink attribute="True" is added to img tags when you double click them.
     # We don't want this attribute to appear in suggestions.
     result = re.sub(r" ?data-editor-shrink=['\"]true['\"]", "", html)
