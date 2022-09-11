@@ -45,7 +45,7 @@ def suggestion_type_from_str(s: str) -> Optional[SuggestionType]:
 
 
 @dataclass
-class FieldUpdate(DataClassJsonMixin):
+class Field(DataClassJsonMixin):
     name: str
     order: int
     value: str
@@ -53,7 +53,7 @@ class FieldUpdate(DataClassJsonMixin):
 
 @dataclass
 class NoteUpdate(DataClassJsonMixin):
-    fields: List[FieldUpdate]
+    fields: List[Field]
     ankihub_note_uuid: uuid.UUID = dataclasses.field(
         metadata=dataclasses_json.config(field_name="note_id")
     )
@@ -98,6 +98,54 @@ class DeckInfo(DataClassJsonMixin):
     name: str
     csv_last_upload: str
     csv_notes_filename: str
+
+
+@dataclass
+class NoteSuggestion:
+    ankihub_note_uuid: uuid.UUID = dataclasses.field(
+        metadata=dataclasses_json.config(
+            field_name="note_id",
+            encoder=str,
+        ),
+    )
+    fields: List[Field]
+    tags: List[str]
+    comment: str
+
+
+@dataclass
+class ChangeNoteSuggestion(NoteSuggestion, DataClassJsonMixin):
+    change_type: SuggestionType = dataclasses.field(
+        metadata=dataclasses_json.config(
+            encoder=lambda x: x.value[0],
+            decoder=suggestion_type_from_str,
+        ),
+    )
+
+
+@dataclass
+class NewNoteSuggestion(NoteSuggestion, DataClassJsonMixin):
+    ankihub_deck_uuid: uuid.UUID = dataclasses.field(
+        metadata=dataclasses_json.config(
+            field_name="deck_id",
+            encoder=str,
+        ),
+    )
+    anki_note_id: int = dataclasses.field(
+        metadata=dataclasses_json.config(
+            field_name="anki_id",
+        )
+    )
+    note_type_name: str = dataclasses.field(
+        metadata=dataclasses_json.config(
+            field_name="note_type",
+        )
+    )
+    anki_note_type_id: int = dataclasses.field(
+        metadata=dataclasses_json.config(
+            field_name="note_type_id",
+        )
+    )
 
 
 class AnkiHubRequestError(Exception):
@@ -278,51 +326,24 @@ class AnkiHubClient:
 
     def create_change_note_suggestion(
         self,
-        ankihub_note_uuid: uuid.UUID,
-        fields: List[Dict],
-        tags: List[str],
-        change_type: SuggestionType,
-        comment: str,
+        change_note_suggestion: ChangeNoteSuggestion,
     ) -> None:
-        suggestion = {
-            "ankihub_id": str(ankihub_note_uuid),
-            "fields": fields,
-            "tags": tags,
-            "change_type": change_type.value[0],
-            "comment": comment,
-        }
         response = self._send_request(
             "POST",
-            f"/notes/{ankihub_note_uuid}/suggestion/",
-            data=suggestion,
+            f"/notes/{change_note_suggestion.ankihub_note_uuid}/suggestion/",
+            data=change_note_suggestion.to_dict(),
         )
         if response.status_code != 201:
             raise AnkiHubRequestError(response)
 
     def create_new_note_suggestion(
         self,
-        ankihub_deck_uuid: uuid.UUID,
-        ankihub_note_uuid: uuid.UUID,
-        anki_note_id: int,
-        fields: List[dict],
-        tags: List[str],
-        note_type_name: str,
-        anki_note_type_id: int,
-        comment: str,
+        new_note_suggestion: NewNoteSuggestion,
     ):
-        suggestion = {
-            "anki_id": anki_note_id,
-            "ankihub_id": str(ankihub_note_uuid),
-            "fields": fields,
-            "tags": tags,
-            "note_type": note_type_name,
-            "note_type_id": anki_note_type_id,
-            "comment": comment,
-        }
         response = self._send_request(
             "POST",
-            f"/decks/{ankihub_deck_uuid}/note-suggestion/",
-            data=suggestion,
+            f"/decks/{new_note_suggestion.ankihub_deck_uuid}/note-suggestion/",
+            data=new_note_suggestion.to_dict(),
         )
         if response.status_code != 201:
             raise AnkiHubRequestError(response)

@@ -1,10 +1,15 @@
 import uuid
-from typing import Dict, List
+from typing import List
 
 from anki.notes import Note
 
 from .addon_ankihub_client import AddonAnkiHubClient as AnkiHubClient
-from .ankihub_client import SuggestionType
+from .ankihub_client import (
+    ChangeNoteSuggestion,
+    Field,
+    NewNoteSuggestion,
+    SuggestionType,
+)
 from .sync import is_internal_tag
 from .utils import ankihub_uuid_of_note
 
@@ -17,11 +22,13 @@ def suggest_note_update(note: Note, change_type: SuggestionType, comment: str):
 
     client = AnkiHubClient()
     client.create_change_note_suggestion(
-        ankihub_note_uuid=ankihub_note_uuid,
-        fields=fields,
-        tags=tags,
-        change_type=change_type,
-        comment=comment,
+        ChangeNoteSuggestion(
+            ankihub_note_uuid=ankihub_note_uuid,
+            fields=fields,
+            tags=tags,
+            change_type=change_type,
+            comment=comment,
+        )
     )
 
 
@@ -36,18 +43,20 @@ def suggest_new_note(note: Note, comment: str, ankihub_deck_uuid: uuid.UUID):
 
     client = AnkiHubClient()
     client.create_new_note_suggestion(
-        ankihub_deck_uuid=ankihub_deck_uuid,
-        ankihub_note_uuid=ankihub_note_uuid,
-        anki_note_id=note.id,
-        fields=fields,
-        tags=tags,
-        note_type_name=note.note_type()["name"],
-        anki_note_type_id=note.note_type()["id"],
-        comment=comment,
+        NewNoteSuggestion(
+            ankihub_deck_uuid=ankihub_deck_uuid,
+            ankihub_note_uuid=ankihub_note_uuid,
+            anki_note_id=note.id,
+            fields=fields,
+            tags=tags,
+            note_type_name=note.note_type()["name"],
+            anki_note_type_id=note.note_type()["id"],
+            comment=comment,
+        )
     )
 
 
-def _prepare_fields(note: Note) -> List[Dict]:
+def _prepare_fields(note: Note) -> List[Field]:
 
     # Exclude the AnkiHub ID field since we don't want to expose this as an
     # editable field in AnkiHub suggestion forms.
@@ -55,7 +64,7 @@ def _prepare_fields(note: Note) -> List[Dict]:
     fields_metadata = note.note_type()["flds"][:-1]
 
     fields = [
-        {"name": field["name"], "order": field["ord"], "value": val}
+        Field(name=field["name"], order=field["ord"], value=val)
         for field, val in zip(fields_metadata, field_vals)
     ]
     return fields

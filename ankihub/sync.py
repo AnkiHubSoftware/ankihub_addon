@@ -13,7 +13,7 @@ from aqt.utils import showInfo, tooltip
 
 from . import LOGGER, settings
 from .addon_ankihub_client import AddonAnkiHubClient as AnkiHubClient
-from .ankihub_client import AnkiHubRequestError, FieldUpdate, NoteUpdate, SuggestionType
+from .ankihub_client import AnkiHubRequestError, Field, NoteUpdate, SuggestionType
 from .db import AnkiHubDB
 from .settings import ANKI_MINOR, config
 from .utils import (
@@ -286,7 +286,7 @@ class AnkiHubImporter:
         try:
             note = mw.col.get_note(id=NoteId(note_data.anki_nid))
             fields.append(
-                FieldUpdate(
+                Field(
                     name=settings.ANKIHUB_NOTE_TYPE_FIELD_NAME,
                     order=len(fields),
                     value=str(note_data.ankihub_note_uuid),
@@ -399,7 +399,7 @@ class AnkiHubImporter:
     def _prepare_fields(
         self,
         note: Note,
-        fields: List[FieldUpdate],
+        fields: List[Field],
         protected_fields: Dict[int, List[str]],
     ) -> bool:
 

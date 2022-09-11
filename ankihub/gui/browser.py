@@ -30,6 +30,10 @@ def on_browser_will_show_context_menu(browser: Browser, context_menu: QMenu) -> 
 
     menu.addSeparator()
     menu.addAction(
+        "AnkiHub: Bulk suggest notes",
+        lambda: on_bulk_tag_suggestion_action(browser),
+    )
+    menu.addAction(
         "AnkiHub: Bulk suggest tags",
         lambda: on_bulk_tag_suggestion_action(browser),
     )
