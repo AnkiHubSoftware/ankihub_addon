@@ -6,10 +6,11 @@ from aqt.browser import Browser
 from aqt.gui_hooks import browser_will_show_context_menu
 from aqt.operations import CollectionOp
 from aqt.qt import QCheckBox, QMenu, QMessageBox
-from aqt.utils import getTag, showText, tooltip, tr
+from aqt.utils import getTag, showInfo, showText, tooltip, tr
 
 from .. import LOGGER
 from ..addon_ankihub_client import AddonAnkiHubClient as AnkiHubClient
+from ..ankihub_client import AnkiHubRequestError
 from ..suggestions import suggest_notes_in_bulk
 from ..utils import ankihub_uuids_of_nids
 
@@ -72,7 +73,24 @@ def on_bulk_notes_suggest_action(browser: Browser) -> None:
     if not (dialog := BulkNoteSuggestionConfirmationDialog(parent=browser)).run():
         return
 
-    errors_by_nid = suggest_notes_in_bulk(notes, auto_accept=dialog.auto_accept())
+    try:
+        errors_by_nid = suggest_notes_in_bulk(notes, auto_accept=dialog.auto_accept())
+    except AnkiHubRequestError as e:
+        if e.response.status_code != 403:
+            raise e
+
+        if dialog.auto_accept():
+            msg = (
+                "You are not allowed to submit changes without a review for some of the selected AnkiHub notes.<br><br>"
+                "Are you the owner or a maintainer of the AnkiHub deck(s) the notes are from?"
+            )
+        else:
+            msg = (
+                "You are not allowed to create suggestions for some of the selected AnkiHub notes.<br><br>"
+                "Are you subscribed to the AnkiHub deck(s) the notes are from?"
+            )
+        showInfo(msg, parent=browser)
+        return
 
     LOGGER.debug("Created note suggestions in bulk.")
     tooltip("Done", parent=browser)
