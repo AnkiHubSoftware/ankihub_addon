@@ -1,7 +1,7 @@
 import uuid
-from typing import List
+from typing import Dict, List
 
-from anki.notes import Note
+from anki.notes import Note, NoteId
 
 from .addon_ankihub_client import AddonAnkiHubClient as AnkiHubClient
 from .ankihub_client import (
@@ -29,9 +29,17 @@ def suggest_new_note(note: Note, comment: str, ankihub_deck_uuid: uuid.UUID):
     )
 
 
-def suggest_notes_in_bulk(notes: List[Note], auto_accept: bool):
+def suggest_notes_in_bulk(
+    notes: List[Note], auto_accept: bool
+) -> Dict[NoteId, Dict[str, List[str]]]:
+    ankihub_notes = [
+        note for note in notes if AnkiHubDB().ankihub_did_for_note_type(note.mid)
+    ]
+
     notes_that_exist_on_remote = [
-        note for note in notes if ankihub_uuid_of_note(note, ignore_invalid=True)
+        note
+        for note in ankihub_notes
+        if ankihub_uuid_of_note(note, ignore_invalid=True)
     ]
     change_suggestions = [
         change_note_suggestion(note, SuggestionType.UPDATED_CONTENT, "Bulk update")
@@ -39,7 +47,9 @@ def suggest_notes_in_bulk(notes: List[Note], auto_accept: bool):
     ]
 
     notes_that_dont_exist_on_remote = [
-        note for note in notes if not ankihub_uuid_of_note(note, ignore_invalid=True)
+        note
+        for note in ankihub_notes
+        if not ankihub_uuid_of_note(note, ignore_invalid=True)
     ]
     new_note_suggestions = [
         new_note_suggestion(
@@ -52,7 +62,11 @@ def suggest_notes_in_bulk(notes: List[Note], auto_accept: bool):
 
     all_suggestions = change_suggestions + new_note_suggestions
     client = AnkiHubClient()
-    client.create_suggestions_in_bulk(all_suggestions, auto_accept=auto_accept)
+    errors_by_nid_int = client.create_suggestions_in_bulk(
+        all_suggestions, auto_accept=auto_accept
+    )
+    errors_by_nid = {NoteId(nid): errors for nid, errors in errors_by_nid_int.items()}
+    return errors_by_nid
 
 
 def change_note_suggestion(
@@ -64,6 +78,7 @@ def change_note_suggestion(
 
     return ChangeNoteSuggestion(
         ankihub_note_uuid=ankihub_note_uuid,
+        anki_note_id=note.id,
         fields=fields,
         tags=tags,
         change_type=change_type,

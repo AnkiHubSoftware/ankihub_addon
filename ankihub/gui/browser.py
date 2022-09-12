@@ -1,11 +1,12 @@
+from pprint import pformat
 from typing import Optional
 
 from aqt import mw
 from aqt.browser import Browser
 from aqt.gui_hooks import browser_will_show_context_menu
 from aqt.operations import CollectionOp
-from aqt.qt import QMenu
-from aqt.utils import askUser, getTag, tooltip, tr
+from aqt.qt import QCheckBox, QMenu, QMessageBox
+from aqt.utils import getTag, showText, tooltip, tr
 
 from .. import LOGGER
 from ..addon_ankihub_client import AddonAnkiHubClient as AnkiHubClient
@@ -40,15 +41,62 @@ def on_browser_will_show_context_menu(browser: Browser, context_menu: QMenu) -> 
     )
 
 
-def on_bulk_notes_suggest_action(browser: Browser):
+class BulkNoteSuggestionConfirmationDialog(QMessageBox):
+    def __init__(self, parent):
+        super().__init__(parent)
+
+        self.setWindowTitle("Bulk Note Suggestions")
+        self.setIcon(QMessageBox.Icon.Question)
+        self.setText("Do you want to submit suggestions for all selected notes?")
+        self.setStandardButtons(
+            QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.Cancel
+        )
+        self.auto_accept_cb = QCheckBox(
+            text="submit without review (only works for deck owner or maintainer)",
+            parent=self,
+        )
+        self.setCheckBox(self.auto_accept_cb)
+
+    def run(self) -> Optional[bool]:
+        clicked_ok = self.exec() == QMessageBox.StandardButton.Yes
+        return clicked_ok
+
+    def auto_accept(self) -> bool:
+        return self.auto_accept_cb.isChecked()
+
+
+def on_bulk_notes_suggest_action(browser: Browser) -> None:
     selected_nids = browser.selected_notes()
     notes = [mw.col.get_note(selected_nid) for selected_nid in selected_nids]
 
-    auto_accept = askUser("Do you want to submit these notes without review?")
-    suggest_notes_in_bulk(notes, auto_accept=auto_accept)
+    if not (dialog := BulkNoteSuggestionConfirmationDialog(parent=browser)).run():
+        return
 
-    LOGGER.debug("Bulk note suggestion created.")
-    tooltip("Bulk note suggestion created.", parent=browser)
+    errors_by_nid = suggest_notes_in_bulk(notes, auto_accept=dialog.auto_accept())
+
+    LOGGER.debug("Created note suggestions in bulk.")
+    tooltip("Done", parent=browser)
+    LOGGER.debug(f"errors_by_nid:\n{pformat(errors_by_nid)}")
+
+    if not errors_by_nid:
+        return
+
+    notes_without_changes = [
+        note
+        for note, errors in errors_by_nid.items()
+        if "Suggestion fields and tags don't have any changes to the original note"
+        in str(errors)
+    ]
+    showText(
+        txt=(
+            f"Failed to submit suggestions for {len(errors_by_nid)} note(s).\n\n"
+            "All notes:\n"
+            f'{", ".join(str(nid) for nid in errors_by_nid.keys())}\n\n'
+            f"Notes without changes ({len(notes_without_changes)}):\n"
+            f'{", ".join(str(nid) for nid in notes_without_changes)}\n'
+        ),
+        parent=browser,
+    )
 
 
 def on_bulk_tag_suggestion_action(browser: Browser) -> None:

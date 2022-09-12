@@ -1,5 +1,5 @@
 import sqlite3
-from typing import List
+from typing import List, Optional
 
 from anki.models import NotetypeId
 from anki.notes import NoteId
@@ -79,16 +79,16 @@ class AnkiHubDB:
         result = [NoteId(x[0]) for x in self.c.fetchall()]
         return result
 
-    def ankihub_did_for_note(self, anki_note_id: int) -> str:
+    def ankihub_did_for_note(self, anki_note_id: int) -> Optional[str]:
         self.c.execute(
             """
             SELECT ankihub_deck_id FROM notes WHERE anki_note_id = ?
             """,
             (anki_note_id,),
         )
-        return self.c.fetchone()[0]
+        return x[0] if (x := self.c.fetchone()) else None
 
-    def ankihub_did_for_note_type(self, anki_note_type_id: int) -> str:
+    def ankihub_did_for_note_type(self, anki_note_type_id: int) -> Optional[str]:
         # TODO: doesn't work if the deck has no notes, the schema probably needs to be changed
         self.c.execute(
             """
@@ -96,16 +96,16 @@ class AnkiHubDB:
             """,
             (anki_note_type_id,),
         )
-        return self.c.fetchone()[0]
+        return x[0] if (x := self.c.fetchone()) else None
 
-    def ankihub_id_for_note(self, anki_note_id: int) -> str:
+    def ankihub_id_for_note(self, anki_note_id: int) -> Optional[str]:
         self.c.execute(
             """
             SELECT ankihub_note_id FROM notes WHERE anki_note_id = ?
             """,
             (anki_note_id,),
         )
-        return self.c.fetchone()[0]
+        return x[0] if (x := self.c.fetchone()) else None
 
     def note_types_for_ankihub_deck(self, ankihub_did: str) -> List[NotetypeId]:
         self.c.execute(
