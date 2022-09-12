@@ -10,30 +10,70 @@ from .ankihub_client import (
     NewNoteSuggestion,
     SuggestionType,
 )
+from .db import AnkiHubDB
 from .sync import is_internal_tag
 from .utils import ankihub_uuid_of_note
 
 
 def suggest_note_update(note: Note, change_type: SuggestionType, comment: str):
-
-    ankihub_note_uuid = ankihub_uuid_of_note(note, ignore_invalid=False)
-    tags = _prepare_tags(note.tags)
-    fields = _prepare_fields(note)
-
     client = AnkiHubClient()
     client.create_change_note_suggestion(
-        ChangeNoteSuggestion(
-            ankihub_note_uuid=ankihub_note_uuid,
-            fields=fields,
-            tags=tags,
-            change_type=change_type,
-            comment=comment,
-        )
+        change_note_suggestion(note, change_type, comment)
     )
 
 
 def suggest_new_note(note: Note, comment: str, ankihub_deck_uuid: uuid.UUID):
+    client = AnkiHubClient()
+    client.create_new_note_suggestion(
+        new_note_suggestion(note, ankihub_deck_uuid, comment)
+    )
 
+
+def suggest_notes_in_bulk(notes: List[Note], auto_accept: bool):
+    notes_that_exist_on_remote = [
+        note for note in notes if ankihub_uuid_of_note(note, ignore_invalid=True)
+    ]
+    change_suggestions = [
+        change_note_suggestion(note, SuggestionType.UPDATED_CONTENT, "Bulk update")
+        for note in notes_that_exist_on_remote
+    ]
+
+    notes_that_dont_exist_on_remote = [
+        note for note in notes if not ankihub_uuid_of_note(note, ignore_invalid=True)
+    ]
+    new_note_suggestions = [
+        new_note_suggestion(
+            note,
+            uuid.UUID(AnkiHubDB().ankihub_did_for_note_type(note.mid)),
+            "Bulk update",
+        )
+        for note in notes_that_dont_exist_on_remote
+    ]
+
+    all_suggestions = change_suggestions + new_note_suggestions
+    client = AnkiHubClient()
+    client.create_suggestions_in_bulk(all_suggestions, auto_accept=auto_accept)
+
+
+def change_note_suggestion(
+    note: Note, change_type: SuggestionType, comment: str
+) -> NewNoteSuggestion:
+    ankihub_note_uuid = ankihub_uuid_of_note(note, ignore_invalid=False)
+    tags = _prepare_tags(note.tags)
+    fields = _prepare_fields(note)
+
+    return ChangeNoteSuggestion(
+        ankihub_note_uuid=ankihub_note_uuid,
+        fields=fields,
+        tags=tags,
+        change_type=change_type,
+        comment=comment,
+    )
+
+
+def new_note_suggestion(
+    note: Note, ankihub_deck_uuid: uuid.UUID, comment: str
+) -> NewNoteSuggestion:
     ankihub_note_uuid = ankihub_uuid_of_note(note, ignore_invalid=True)
     if not ankihub_note_uuid:
         ankihub_note_uuid = uuid.uuid4()
@@ -41,18 +81,15 @@ def suggest_new_note(note: Note, comment: str, ankihub_deck_uuid: uuid.UUID):
     tags = _prepare_tags(note.tags)
     fields = _prepare_fields(note)
 
-    client = AnkiHubClient()
-    client.create_new_note_suggestion(
-        NewNoteSuggestion(
-            ankihub_deck_uuid=ankihub_deck_uuid,
-            ankihub_note_uuid=ankihub_note_uuid,
-            anki_note_id=note.id,
-            fields=fields,
-            tags=tags,
-            note_type_name=note.note_type()["name"],
-            anki_note_type_id=note.note_type()["id"],
-            comment=comment,
-        )
+    return NewNoteSuggestion(
+        ankihub_deck_uuid=ankihub_deck_uuid,
+        ankihub_note_uuid=ankihub_note_uuid,
+        anki_note_id=note.id,
+        fields=fields,
+        tags=tags,
+        note_type_name=note.note_type()["name"],
+        anki_note_type_id=note.note_type()["id"],
+        comment=comment,
     )
 
 

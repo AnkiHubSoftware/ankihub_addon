@@ -88,6 +88,16 @@ class AnkiHubDB:
         )
         return self.c.fetchone()[0]
 
+    def ankihub_did_for_note_type(self, anki_note_type_id: int) -> str:
+        # TODO: doesn't work if the deck has no notes, the schema probably needs to be changed
+        self.c.execute(
+            """
+            SELECT ankihub_deck_id FROM notes WHERE anki_note_type_id = ?
+            """,
+            (anki_note_type_id,),
+        )
+        return self.c.fetchone()[0]
+
     def ankihub_id_for_note(self, anki_note_id: int) -> str:
         self.c.execute(
             """

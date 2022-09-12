@@ -5,10 +5,11 @@ from aqt.browser import Browser
 from aqt.gui_hooks import browser_will_show_context_menu
 from aqt.operations import CollectionOp
 from aqt.qt import QMenu
-from aqt.utils import getTag, tooltip, tr
+from aqt.utils import askUser, getTag, tooltip, tr
 
 from .. import LOGGER
 from ..addon_ankihub_client import AddonAnkiHubClient as AnkiHubClient
+from ..suggestions import suggest_notes_in_bulk
 from ..utils import ankihub_uuids_of_nids
 
 
@@ -31,12 +32,23 @@ def on_browser_will_show_context_menu(browser: Browser, context_menu: QMenu) -> 
     menu.addSeparator()
     menu.addAction(
         "AnkiHub: Bulk suggest notes",
-        lambda: on_bulk_tag_suggestion_action(browser),
+        lambda: on_bulk_notes_suggest_action(browser),
     )
     menu.addAction(
         "AnkiHub: Bulk suggest tags",
         lambda: on_bulk_tag_suggestion_action(browser),
     )
+
+
+def on_bulk_notes_suggest_action(browser: Browser):
+    selected_nids = browser.selected_notes()
+    notes = [mw.col.get_note(selected_nid) for selected_nid in selected_nids]
+
+    auto_accept = askUser("Do you want to submit these notes without review?")
+    suggest_notes_in_bulk(notes, auto_accept=auto_accept)
+
+    LOGGER.debug("Bulk note suggestion created.")
+    tooltip("Bulk note suggestion created.", parent=browser)
 
 
 def on_bulk_tag_suggestion_action(browser: Browser) -> None:
