@@ -1,3 +1,4 @@
+import re
 import uuid
 from typing import Dict, List
 
@@ -10,7 +11,6 @@ from .utils import ankihub_uuid_of_note
 
 
 def suggest_note_update(note: Note, change_type: SuggestionType, comment: str):
-
     ankihub_note_uuid = ankihub_uuid_of_note(note, ignore_invalid=False)
     tags = _prepare_tags(note.tags)
     fields = _prepare_fields(note)
@@ -26,7 +26,6 @@ def suggest_note_update(note: Note, change_type: SuggestionType, comment: str):
 
 
 def suggest_new_note(note: Note, comment: str, ankihub_deck_uuid: uuid.UUID):
-
     ankihub_note_uuid = ankihub_uuid_of_note(note, ignore_invalid=True)
     if not ankihub_note_uuid:
         ankihub_note_uuid = uuid.uuid4()
@@ -54,14 +53,21 @@ def _prepare_fields(note: Note) -> List[Dict]:
     field_vals = list(note.fields[:-1])
     fields_metadata = note.note_type()["flds"][:-1]
 
+    prepared_field_vals = [_prepared_field_html(field) for field in field_vals]
     fields = [
         {"name": field["name"], "order": field["ord"], "value": val}
-        for field, val in zip(fields_metadata, field_vals)
+        for field, val in zip(fields_metadata, prepared_field_vals)
     ]
     return fields
 
 
-def _prepare_tags(tags: List[str]):
+def _prepared_field_html(html: str) -> str:
+    # Since Anki 2.1.54 data-editor-shrink attribute="True" is added to img tags when you double click them.
+    # We don't want this attribute to appear in suggestions.
+    result = re.sub(r" ?data-editor-shrink=['\"]true['\"]", "", html)
+    return result
 
-    # removing empty tags is necessary because note have empty tags in the editor sometimes
+
+def _prepare_tags(tags: List[str]):
+    # removing empty tags is necessary because notes have empty tags in the editor sometimes
     return [tag for tag in tags if tag.strip() and not is_internal_tag(tag)]
