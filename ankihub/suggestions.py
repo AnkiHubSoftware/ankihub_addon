@@ -1,3 +1,4 @@
+import re
 import uuid
 from typing import Dict, List
 
@@ -115,14 +116,21 @@ def _prepare_fields(note: Note) -> List[Field]:
     field_vals = list(note.fields[:-1])
     fields_metadata = note.note_type()["flds"][:-1]
 
+    prepared_field_vals = [_prepared_field_html(field) for field in field_vals]
     fields = [
         Field(name=field["name"], order=field["ord"], value=val)
-        for field, val in zip(fields_metadata, field_vals)
+        for field, val in zip(fields_metadata, prepared_field_vals)
     ]
     return fields
 
 
-def _prepare_tags(tags: List[str]):
+def _prepared_field_html(html: str) -> str:
+    # Since Anki 2.1.54 data-editor-shrink attribute="True" is added to img tags when you double click them.
+    # We don't want this attribute to appear in suggestions.
+    result = re.sub(r" ?data-editor-shrink=['\"]true['\"]", "", html)
+    return result
 
-    # removing empty tags is necessary because note have empty tags in the editor sometimes
+
+def _prepare_tags(tags: List[str]):
+    # removing empty tags is necessary because notes have empty tags in the editor sometimes
     return [tag for tag in tags if tag.strip() and not is_internal_tag(tag)]
