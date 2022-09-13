@@ -334,11 +334,12 @@ class AnkiHubClient:
     def create_change_note_suggestion(
         self,
         change_note_suggestion: ChangeNoteSuggestion,
+        auto_accept: bool = False,
     ) -> None:
         response = self._send_request(
             "POST",
             f"/notes/{change_note_suggestion.ankihub_note_uuid}/suggestion/",
-            data=change_note_suggestion.to_dict(),
+            data={**change_note_suggestion.to_dict(), "auto_accept": auto_accept},
         )
         if response.status_code != 201:
             raise AnkiHubRequestError(response)
@@ -346,11 +347,12 @@ class AnkiHubClient:
     def create_new_note_suggestion(
         self,
         new_note_suggestion: NewNoteSuggestion,
+        auto_accept: bool = False,
     ):
         response = self._send_request(
             "POST",
             f"/decks/{new_note_suggestion.ankihub_deck_uuid}/note-suggestion/",
-            data=new_note_suggestion.to_dict(),
+            data={**new_note_suggestion.to_dict(), "auto_accept": auto_accept},
         )
         if response.status_code != 201:
             raise AnkiHubRequestError(response)

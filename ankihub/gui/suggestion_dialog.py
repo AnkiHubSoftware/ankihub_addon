@@ -1,6 +1,7 @@
 from typing import Optional
 
 from aqt.qt import (
+    QCheckBox,
     QDialog,
     QDialogButtonBox,
     QLabel,
@@ -27,6 +28,8 @@ class SuggestionDialog(QDialog):
 
     def setup_ui(self) -> None:
         self.setWindowModality(Qt.WindowModality.WindowModal)
+        self.setWindowTitle("Note Suggestion(s)")
+
         layout = QVBoxLayout()
         self.setLayout(layout)
 
@@ -52,6 +55,10 @@ class SuggestionDialog(QDialog):
 
         edit.textChanged.connect(limit_length)  # type: ignore
         layout.addWidget(edit)
+
+        # "auto-accept" checkbox
+        self.auto_accept_cb = QCheckBox("submit without review")
+        layout.addWidget(self.auto_accept_cb)
 
         # button box
         button_box = QDialogButtonBox(QDialogButtonBox.StandardButton.Ok)
@@ -84,6 +91,9 @@ class SuggestionDialog(QDialog):
                 for x in SuggestionType
                 if x.value[1] == self.select.currentItem().text()
             )
+
+    def auto_accept(self) -> bool:
+        return self.auto_accept_cb.isChecked()
 
 
 class CustomListWidget(QListWidget):

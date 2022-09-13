@@ -16,22 +16,30 @@ from .sync import is_internal_tag
 from .utils import ankihub_uuid_of_note
 
 
-def suggest_note_update(note: Note, change_type: SuggestionType, comment: str):
+def suggest_note_update(
+    note: Note, change_type: SuggestionType, comment: str, auto_accept: bool = False
+):
     client = AnkiHubClient()
     client.create_change_note_suggestion(
-        change_note_suggestion(note, change_type, comment)
+        change_note_suggestion(note, change_type, comment),
+        auto_accept=auto_accept,
     )
 
 
-def suggest_new_note(note: Note, comment: str, ankihub_deck_uuid: uuid.UUID):
+def suggest_new_note(
+    note: Note, comment: str, ankihub_deck_uuid: uuid.UUID, auto_accept: bool = False
+):
     client = AnkiHubClient()
     client.create_new_note_suggestion(
-        new_note_suggestion(note, ankihub_deck_uuid, comment)
+        new_note_suggestion(note, ankihub_deck_uuid, comment), auto_accept=auto_accept
     )
 
 
 def suggest_notes_in_bulk(
-    notes: List[Note], auto_accept: bool
+    notes: List[Note],
+    auto_accept: bool,
+    change_type: SuggestionType,
+    comment: str,
 ) -> Dict[NoteId, Dict[str, List[str]]]:
     ankihub_notes = [
         note for note in notes if AnkiHubDB().ankihub_did_for_note_type(note.mid)
@@ -43,7 +51,11 @@ def suggest_notes_in_bulk(
         if ankihub_uuid_of_note(note, ignore_invalid=True)
     ]
     change_suggestions = [
-        change_note_suggestion(note, SuggestionType.UPDATED_CONTENT, "Bulk update")
+        change_note_suggestion(
+            note,
+            change_type=change_type,
+            comment=comment,
+        )
         for note in notes_that_exist_on_remote
     ]
 
@@ -56,7 +68,7 @@ def suggest_notes_in_bulk(
         new_note_suggestion(
             note,
             uuid.UUID(AnkiHubDB().ankihub_did_for_note_type(note.mid)),
-            "Bulk update",
+            comment=comment,
         )
         for note in notes_that_dont_exist_on_remote
     ]

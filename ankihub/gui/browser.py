@@ -5,14 +5,16 @@ from aqt import mw
 from aqt.browser import Browser
 from aqt.gui_hooks import browser_will_show_context_menu
 from aqt.operations import CollectionOp
-from aqt.qt import QCheckBox, QMenu, QMessageBox
+from aqt.qt import QMenu
 from aqt.utils import getTag, showInfo, showText, tooltip, tr
 
 from .. import LOGGER
 from ..addon_ankihub_client import AddonAnkiHubClient as AnkiHubClient
 from ..ankihub_client import AnkiHubRequestError
+from ..settings import AnkiHubCommands
 from ..suggestions import suggest_notes_in_bulk
 from ..utils import ankihub_uuids_of_nids
+from .suggestion_dialog import SuggestionDialog
 
 
 def on_browser_will_show_context_menu(browser: Browser, context_menu: QMenu) -> None:
@@ -42,39 +44,20 @@ def on_browser_will_show_context_menu(browser: Browser, context_menu: QMenu) -> 
     )
 
 
-class BulkNoteSuggestionConfirmationDialog(QMessageBox):
-    def __init__(self, parent):
-        super().__init__(parent)
-
-        self.setWindowTitle("Bulk Note Suggestions")
-        self.setIcon(QMessageBox.Icon.Question)
-        self.setText("Do you want to submit suggestions for all selected notes?")
-        self.setStandardButtons(
-            QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.Cancel
-        )
-        self.auto_accept_cb = QCheckBox(
-            text="submit without review (only works for deck owner or maintainer)",
-            parent=self,
-        )
-        self.setCheckBox(self.auto_accept_cb)
-
-    def run(self) -> Optional[bool]:
-        clicked_ok = self.exec() == QMessageBox.StandardButton.Yes
-        return clicked_ok
-
-    def auto_accept(self) -> bool:
-        return self.auto_accept_cb.isChecked()
-
-
 def on_bulk_notes_suggest_action(browser: Browser) -> None:
     selected_nids = browser.selected_notes()
     notes = [mw.col.get_note(selected_nid) for selected_nid in selected_nids]
 
-    if not (dialog := BulkNoteSuggestionConfirmationDialog(parent=browser)).run():
+    if not (dialog := SuggestionDialog(command=AnkiHubCommands.CHANGE)).exec():
         return
 
     try:
-        errors_by_nid = suggest_notes_in_bulk(notes, auto_accept=dialog.auto_accept())
+        errors_by_nid = suggest_notes_in_bulk(
+            notes,
+            auto_accept=dialog.auto_accept(),
+            change_type=dialog.change_type(),
+            comment=dialog.comment(),
+        )
     except AnkiHubRequestError as e:
         if e.response.status_code != 403:
             raise e
