@@ -244,17 +244,22 @@ class AnkiHubClient:
 
         return notes_data
 
-    def _download_with_progress_cb(self, url: str, progress_cb: Callable[[int], None]):
-        content = b""
+    def _download_with_progress_cb(
+        self, url: str, progress_cb: Callable[[int], None]
+    ) -> bytes:
         with requests.get(url, stream=True) as response:
             if response.status_code != 200:
                 raise AnkiHubRequestError(response)
 
-            chunk_size = 8192
             total_size = int(response.headers.get("content-length"))
+            if total_size == 0:
+                return response.content
+
+            content = b""
+            chunk_size = int(min(total_size * 0.05, 10**6))
             prev_percent = 0
             for i, chunk in enumerate(response.iter_content(chunk_size=chunk_size)):
-                percent = min(int(i * chunk_size / max(total_size, 1) * 100), 100)
+                percent = int(i * chunk_size / total_size * 100)
                 if chunk:
                     content += chunk
                     if percent != prev_percent:
@@ -302,7 +307,10 @@ class AnkiHubClient:
 
             if download_progress_cb:
                 total = data["total"]
-                percent = min(int(i * DECK_UPDATE_PAGE_SIZE / max(total, 1) * 100), 100)
+                if total == 0:
+                    percent = 100
+                else:
+                    percent = int(i * DECK_UPDATE_PAGE_SIZE / total * 100)
                 if percent != prev_percent:
                     download_progress_cb(percent)
                     prev_percent = percent
