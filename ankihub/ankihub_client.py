@@ -261,6 +261,7 @@ class AnkiHubClient:
                 if chunk:
                     percent = int(i * chunk_size / total_size * 100)
                     progress_cb(percent)
+                    content += chunk
         return content
 
     def get_deck_updates(
