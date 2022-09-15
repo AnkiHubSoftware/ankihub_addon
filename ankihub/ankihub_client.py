@@ -257,14 +257,10 @@ class AnkiHubClient:
 
             content = b""
             chunk_size = int(min(total_size * 0.05, 10**6))
-            prev_percent = 0
             for i, chunk in enumerate(response.iter_content(chunk_size=chunk_size)):
-                percent = int(i * chunk_size / total_size * 100)
                 if chunk:
-                    content += chunk
-                    if percent != prev_percent:
-                        progress_cb(percent)
-                        prev_percent = percent
+                    percent = int(i * chunk_size / total_size * 100)
+                    progress_cb(percent)
         return content
 
     def get_deck_updates(
@@ -285,7 +281,6 @@ class AnkiHubClient:
         }
         has_next_page = True
         i = 0
-        prev_percent = 0
         while has_next_page:
             response = self._send_request(
                 "GET",
@@ -311,9 +306,10 @@ class AnkiHubClient:
                     percent = 100
                 else:
                     percent = int(i * DECK_UPDATE_PAGE_SIZE / total * 100)
-                if percent != prev_percent:
-                    download_progress_cb(percent)
-                    prev_percent = percent
+                    # min is needed because on the last page DECK_UPDATE_PAGE_SIZE is larger than
+                    # the actual number of notes
+                    percent = min(percent, 100)
+                download_progress_cb(percent)
 
     def get_deck_by_id(self, ankihub_deck_uuid: uuid.UUID) -> DeckInfo:
         response = self._send_request(

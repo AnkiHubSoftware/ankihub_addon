@@ -83,23 +83,19 @@ class AnkiHubSync:
                     raise e
 
     def _sync_deck(self, ankihub_did: str) -> bool:
-
-        called_progress_cb_before = False
-
         def download_progress_cb(percent: int) -> None:
 
             # don't show progress bar if it's already at 100% on the first call
-            nonlocal called_progress_cb_before
-            if not called_progress_cb_before and percent == 100:
+            if percent == 100:
                 return
-            called_progress_cb_before = True
 
+            # adding +1 to avoid progress increasing while at 0% progress
+            # (the mw.progress.update function does that)
             mw.taskman.run_on_main(
                 lambda: mw.progress.update(
                     f"Downloading updates\nfor {deck['name']}",
-                    maybeShow=False,
-                    value=percent,
-                    max=100,
+                    value=percent + 1,
+                    max=101,
                 )
             )
 
