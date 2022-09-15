@@ -8,8 +8,8 @@ from unittest.mock import MagicMock, Mock
 
 import aqt
 from anki.decks import DeckId
-from anki.models import NotetypeId
-from anki.notes import NoteId
+from anki.models import NotetypeDict, NotetypeId
+from anki.notes import Note, NoteId
 from aqt.importing import AnkiPackageImporter
 from pytest_anki import AnkiSession
 
@@ -818,6 +818,105 @@ def test_update_ankihub_deck_when_deck_was_deleted(
         )
 
 
+def test_suspend_new_cards_of_existing_notes(
+    anki_session_with_addon: AnkiSession, monkeypatch
+):
+    from anki.consts import QUEUE_TYPE_SUSPENDED
+    from aqt import AnkiQt
+
+    from ankihub.ankihub_client import FieldUpdate, NoteUpdate
+    from ankihub.settings import config
+    from ankihub.sync import AnkiHubImporter
+
+    anki_session = anki_session_with_addon
+    with anki_session.profile_loaded():
+        mw: AnkiQt = anki_session.mw
+
+        ankihub_cloze = create_ankihub_version_of_note_type(
+            mw, mw.col.models.by_name("Cloze")
+        )
+
+        def test_case(suspend_existing_card_before_update: bool):
+            # create a cloze note with one card, optionally suspend the existing card,
+            # then update the note using AnkiHubImporter adding a new cloze
+            # which results in a new card getting created for the added cloze
+
+            note = mw.col.new_note(ankihub_cloze)
+            note["Text"] = "{{c1::foo}}"
+            mw.col.add_note(note, 0)
+
+            if suspend_existing_card_before_update:
+                # suspend the only card of the note
+                card = note.cards()[0]
+                card.queue = QUEUE_TYPE_SUSPENDED
+                card.flush()
+
+            # update the note using the AnkiHub importer
+            note_data = NoteUpdate(
+                anki_nid=note.id,
+                ankihub_note_uuid=UUID_1,
+                fields=[
+                    FieldUpdate(name="Text", value="{{c1::foo}} {{c2::bar}}", order=0)
+                ],
+                tags=[],
+                mid=note.model()["id"],
+                last_update_type=None,
+            )
+            importer = AnkiHubImporter()
+            updated_note = importer._update_or_create_note(
+                note_data=note_data,
+                anki_did=0,
+                protected_fields={},
+                protected_tags=[],
+                first_import_of_deck=False,
+            )
+            assert len(updated_note.cards()) == 2
+            return updated_note
+
+        def new_card(note: Note):
+            # the card with the higher was created later
+            return max(note.cards(), key=lambda c: c.id)
+
+        # test "always" option
+        config.public_config["suspend_new_cards_of_existing_notes"] = "always"
+
+        updated_note = test_case(suspend_existing_card_before_update=False)
+        assert new_card(updated_note).queue == QUEUE_TYPE_SUSPENDED
+
+        updated_note = test_case(suspend_existing_card_before_update=True)
+        assert new_card(updated_note).queue == QUEUE_TYPE_SUSPENDED
+
+        # test "never" option
+        config.public_config["suspend_new_cards_of_existing_notes"] = "never"
+
+        updated_note = test_case(suspend_existing_card_before_update=False)
+        assert new_card(updated_note).queue != QUEUE_TYPE_SUSPENDED
+
+        updated_note = test_case(suspend_existing_card_before_update=True)
+        assert new_card(updated_note).queue != QUEUE_TYPE_SUSPENDED
+
+        # test "if_siblings_are_suspended" option
+        config.public_config[
+            "suspend_new_cards_of_existing_notes"
+        ] = "if_siblings_are_suspended"
+
+        updated_note = test_case(suspend_existing_card_before_update=False)
+        assert all(card.queue != QUEUE_TYPE_SUSPENDED for card in updated_note.cards())
+
+        updated_note = test_case(suspend_existing_card_before_update=True)
+        assert all(card.queue == QUEUE_TYPE_SUSPENDED for card in updated_note.cards())
+
+
+def create_ankihub_version_of_note_type(mw, note_type: NotetypeDict) -> NotetypeDict:
+    from ankihub.utils import modify_note_type
+
+    note_type["id"] = 0
+    note_type["name"] = note_type["name"] + " (AnkiHub)"
+    modify_note_type(note_type)
+    mw.col.models.add_dict(note_type)
+    return mw.col.models.by_name(note_type["name"])
+
+
 def test_unsubsribe_from_deck(anki_session_with_addon: AnkiSession):
     from aqt import mw
 
@@ -899,7 +998,6 @@ def test_prepare_note(anki_session_with_addon: AnkiSession):
         TAG_FOR_SUGGESTION_TYPE,
         AnkiHubImporter,
     )
-    from ankihub.utils import modify_note_type
 
     anki_session = anki_session_with_addon
     with anki_session_with_addon.profile_loaded():
@@ -936,12 +1034,9 @@ def test_prepare_note(anki_session_with_addon: AnkiSession):
             return result
 
         # create ankihub_basic note type because prepare_note needs a note type with an ankihub_id field
-        basic = mw.col.models.by_name("Basic")
-        modify_note_type(basic)
-        basic["id"] = 0
-        basic["name"] = "Basic (AnkiHub)"
-        ankihub_basic_mid = NotetypeId(mw.col.models.add_dict(basic).id)
-        ankihub_basic = mw.col.models.get(ankihub_basic_mid)
+        ankihub_basic = create_ankihub_version_of_note_type(
+            mw, mw.col.models.by_name("Basic")
+        )
 
         def example_note() -> Note:
             # create a new note with non-empty fields
@@ -1067,7 +1162,6 @@ def test_prepare_note_protect_field_with_spaces(anki_session_with_addon: AnkiSes
     from ankihub.ankihub_client import FieldUpdate, NoteUpdate, SuggestionType
     from ankihub.settings import ANKIHUB_NOTE_TYPE_FIELD_NAME
     from ankihub.sync import TAG_FOR_PROTECTING_FIELDS, AnkiHubImporter
-    from ankihub.utils import modify_note_type
 
     anki_session = anki_session_with_addon
     with anki_session_with_addon.profile_loaded():
@@ -1104,19 +1198,16 @@ def test_prepare_note_protect_field_with_spaces(anki_session_with_addon: AnkiSes
             return result
 
         # create ankihub_basic note type because prepare_note needs a note type with an ankihub_id field
-        basic = mw.col.models.by_name("Basic")
-        modify_note_type(basic)
-        basic["id"] = 0
-        basic["name"] = "Basic (AnkiHub)"
-
-        field_name_with_spaces = "Field name with spaces"
-        basic["flds"][0]["name"] = field_name_with_spaces
-        basic["tmpls"][0]["qfmt"] = basic["tmpls"][0]["qfmt"].replace(
-            "Front", field_name_with_spaces
+        ankihub_basic = create_ankihub_version_of_note_type(
+            mw, mw.col.models.by_name("Basic")
         )
 
-        ankihub_basic_mid = NotetypeId(mw.col.models.add_dict(basic).id)
-        ankihub_basic = mw.col.models.get(ankihub_basic_mid)
+        field_name_with_spaces = "Field name with spaces"
+        ankihub_basic["flds"][0]["name"] = field_name_with_spaces
+        ankihub_basic["tmpls"][0]["qfmt"] = ankihub_basic["tmpls"][0]["qfmt"].replace(
+            "Front", field_name_with_spaces
+        )
+        mw.col.models.update_dict(ankihub_basic)
 
         def example_note() -> Note:
             # create a new note with non-empty fields

@@ -2,5 +2,6 @@
     "ankihub_url": "https://app.ankihub.net",
     "hotkey": "Alt+u",
     "report_errors": true,
-    "sync_on_startup": true
+    "sync_on_startup": true,
+    "suspend_new_cards_of_existing_notes": "if_siblings_are_suspended"
 }
