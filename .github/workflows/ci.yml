@@ -89,7 +89,6 @@ jobs:
           # Client tests (not run in parallel)
           pytest ./tests \
           -m "client" \
-          # Make real http requests
           --disable-vcr \
           --cov --cov-report=xml --cov-append
 
