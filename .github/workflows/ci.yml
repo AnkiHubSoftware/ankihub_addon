@@ -87,9 +87,10 @@ jobs:
           --cov --cov-report=xml
 
           # Client tests (not run in parallel)
-          pytest \
+          pytest ./tests \
           -m "client" \
-          --disable-vcr \ # Make real http requests
+          # Make real http requests
+          --disable-vcr \
           --cov --cov-report=xml --cov-append
 
       - name: Upload coverage to Codecov
