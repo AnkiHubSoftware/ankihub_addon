@@ -20,6 +20,9 @@ jobs:
       - name: Checkout ankihub_addon
         uses: actions/checkout@v3
 
+      - name: Setup tmate session
+        uses: mxschmitt/action-tmate@v3
+
       - name: Enable cloning web app repo
         uses: webfactory/ssh-agent@v0.5.4
         with:
@@ -77,9 +80,6 @@ jobs:
           python ./scripts/build.py
         env:
           GOOGLE_API_KEY: ${{ secrets.GOOGLE_API_KEY }}
-
-      - name: Setup upterm session
-        uses: lhotari/action-upterm@v1
 
       - name: Run pytest with coverage
         run: pytest ./tests --cov --cov-report=xml --disable-vcr
