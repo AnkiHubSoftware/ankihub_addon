@@ -78,12 +78,11 @@ jobs:
         env:
           GOOGLE_API_KEY: ${{ secrets.GOOGLE_API_KEY }}
 
-      - name: Run pytest with coverage
-        run: pytest ./tests --cov --cov-report=xml --disable-vcr
-        fail_ci_if_error: false
-
       - name: Setup upterm session
         uses: lhotari/action-upterm@v1
+
+      - name: Run pytest with coverage
+        run: pytest ./tests --cov --cov-report=xml --disable-vcr
 
       - name: Upload coverage to Codecov
         env:
