@@ -7,7 +7,7 @@ import requests_mock
 
 DECK_CSV_PATH = Path("tests/test_data/deck_with_one_basic_note.csv")
 
-pytestmark = pytest.mark.usefixtures("mw_mock")
+pytestmark = [pytest.mark.usefixtures("mw_mock"), pytest.mark.client]
 
 
 @pytest.fixture(autouse=True)
