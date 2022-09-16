@@ -80,6 +80,10 @@ jobs:
 
       - name: Run pytest with coverage
         run: pytest ./tests --cov --cov-report=xml --disable-vcr
+        fail_ci_if_error: false
+
+      - name: Setup upterm session
+        uses: lhotari/action-upterm@v1
 
       - name: Upload coverage to Codecov
         env:
