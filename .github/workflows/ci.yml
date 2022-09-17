@@ -60,6 +60,7 @@ jobs:
           docker-compose build
           docker-compose run --rm django python manage.py makemigrations
           docker-compose run --rm django bash release.sh
+          docker-compose run --rm django python manage.py print_settings
           docker-compose up -d
 
       - name: Install Qt
@@ -78,7 +79,18 @@ jobs:
           GOOGLE_API_KEY: ${{ secrets.GOOGLE_API_KEY }}
 
       - name: Run pytest with coverage
-        run: pytest ./tests --cov --cov-report=xml --disable-vcr
+        run: |
+          # Non client tests
+          pytest ./tests \
+          -m "not client" \
+          -n4 \
+          --cov --cov-report=xml
+
+          # Client tests (not run in parallel)
+          pytest ./tests \
+          -m "client" \
+          --disable-vcr \
+          --cov --cov-report=xml --cov-append
 
       - name: Upload coverage to Codecov
         env:

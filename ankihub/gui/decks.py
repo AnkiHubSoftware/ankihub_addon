@@ -307,10 +307,12 @@ class SubscribeDialog(QDialog):
             )
 
         mw.taskman.with_progress(
-            lambda: self.client.download_deck(deck_info.ankihub_deck_uuid),
+            lambda: self.client.download_deck(
+                deck_info.ankihub_deck_uuid, download_progress_cb=download_progress_cb
+            ),
             on_done=on_download_done,
             parent=mw,
-            label="Downloading deck",
+            label="Downloading deck...",
         )
 
     def install_deck(
@@ -350,3 +352,15 @@ class SubscribeDialog(QDialog):
 
     def on_browse_deck(self) -> None:
         openLink(URL_DECKS)
+
+
+def download_progress_cb(percent: int):
+    # adding +1 to avoid progress increasing while at 0% progress
+    # (the mw.progress.update function does that)
+    mw.taskman.run_on_main(
+        lambda: mw.progress.update(
+            label="Downloading deck...",
+            value=percent + 1,
+            max=101,
+        )
+    )
