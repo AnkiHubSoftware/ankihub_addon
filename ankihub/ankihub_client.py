@@ -257,7 +257,9 @@ class AnkiHubClient:
 
             content = b""
             chunk_size = int(min(total_size * 0.05, 10**6))
-            for i, chunk in enumerate(response.iter_content(chunk_size=chunk_size)):
+            for i, chunk in enumerate(
+                response.iter_content(chunk_size=chunk_size), start=1
+            ):
                 if chunk:
                     percent = int(i * chunk_size / total_size * 100)
                     progress_cb(percent)
