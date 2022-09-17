@@ -5,6 +5,7 @@ from unittest.mock import MagicMock
 import pytest
 import requests_mock
 
+
 DECK_CSV_PATH = Path("tests/test_data/deck_with_one_basic_note.csv")
 
 pytestmark = [pytest.mark.usefixtures("mw_mock"), pytest.mark.client]
@@ -58,5 +59,29 @@ def test_download_deck(authorized_client, monkeypatch):
             "GET", get_presigned_url.return_value, content=DECK_CSV_PATH.read_bytes()
         )
         notes_data = client.download_deck(ankihub_deck_uuid=deck_id)
+    assert len(notes_data) == 1
+    assert notes_data[0].tags == ["asdf"]
+
+
+@pytest.mark.vcr()
+def test_download_deck_with_progress(authorized_client, monkeypatch):
+    from ankihub.ankihub_client import AnkiHubClient
+    from ankihub.gui.decks import download_progress_cb
+
+    client: AnkiHubClient = authorized_client
+    deck_id = uuid.UUID("dda0d3ad-89cd-45fb-8ddc-fabad93c2d7b")
+    get_presigned_url = MagicMock()
+    get_presigned_url.return_value = "https://fake_s3.com"
+    monkeypatch.setattr(client, "get_presigned_url", get_presigned_url)
+    with requests_mock.Mocker(real_http=True) as m:
+        m.register_uri(
+            "GET",
+            get_presigned_url.return_value,
+            content=DECK_CSV_PATH.read_bytes(),
+            headers={"content-length": "1000000"},
+        )
+        notes_data = client.download_deck(
+            ankihub_deck_uuid=deck_id, download_progress_cb=download_progress_cb
+        )
     assert len(notes_data) == 1
     assert notes_data[0].tags == ["asdf"]
