@@ -191,7 +191,7 @@ class AnkiHubClient:
             if e.response.status_code != 401:
                 raise e
             response = e.response
-        if response.status_code != 204 and response.status_code != 401:
+        if response.status_code not in [204, 401]:
             raise AnkiHubRequestError(response)
 
         self.session.headers["Authorization"] = ""
