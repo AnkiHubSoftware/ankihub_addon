@@ -7,7 +7,7 @@ from abc import ABC
 from dataclasses import dataclass
 from enum import Enum
 from pathlib import Path
-from typing import Any, Dict, Iterator, List, Optional, Sequence, TypedDict
+from typing import Any, Callable, Dict, Iterator, List, Optional, Sequence, TypedDict
 
 import requests
 from requests import PreparedRequest, Request, Response, Session
@@ -267,17 +267,28 @@ class AnkiHubClient:
         ankihub_did = uuid.UUID(data["deck_id"])
         return ankihub_did
 
-    def download_deck(self, ankihub_deck_uuid: uuid.UUID) -> List[NoteUpdate]:
+    def download_deck(
+        self,
+        ankihub_deck_uuid: uuid.UUID,
+        download_progress_cb: Optional[Callable[[int], None]] = None,
+    ) -> List[NoteUpdate]:
         deck_info = self.get_deck_by_id(ankihub_deck_uuid)
 
         s3_url = self.get_presigned_url(
             key=deck_info.csv_notes_filename, action="download"
         )
-        s3_response = requests.get(s3_url)
-        if s3_response.status_code != 200:
-            raise AnkiHubRequestError(s3_response)
 
-        deck_csv_content = s3_response.content.decode("utf-8")
+        if download_progress_cb:
+            s3_response_content = self._download_with_progress_cb(
+                s3_url, download_progress_cb
+            )
+        else:
+            s3_response = requests.get(s3_url)
+            if s3_response.status_code != 200:
+                raise AnkiHubRequestError(s3_response)
+            s3_response_content = s3_response.content
+
+        deck_csv_content = s3_response_content.decode("utf-8")
         reader = csv.DictReader(
             deck_csv_content.splitlines(), delimiter=CSV_DELIMITER, quotechar="'"
         )
@@ -288,8 +299,33 @@ class AnkiHubClient:
 
         return notes_data
 
+    def _download_with_progress_cb(
+        self, url: str, progress_cb: Callable[[int], None]
+    ) -> bytes:
+        with requests.get(url, stream=True) as response:
+            if response.status_code != 200:
+                raise AnkiHubRequestError(response)
+
+            total_size = int(response.headers.get("content-length"))
+            if total_size == 0:
+                return response.content
+
+            content = b""
+            chunk_size = int(min(total_size * 0.05, 10**6))
+            for i, chunk in enumerate(
+                response.iter_content(chunk_size=chunk_size), start=1
+            ):
+                if chunk:
+                    percent = int(i * chunk_size / total_size * 100)
+                    progress_cb(percent)
+                    content += chunk
+        return content
+
     def get_deck_updates(
-        self, ankihub_deck_uuid: uuid.UUID, since: str
+        self,
+        ankihub_deck_uuid: uuid.UUID,
+        since: str,
+        download_progress_cb: Optional[Callable[[int], None]] = None,
     ) -> Iterator[DeckUpdateChunk]:
         class Params(TypedDict, total=False):
             page: int
@@ -302,6 +338,7 @@ class AnkiHubClient:
             "size": DECK_UPDATE_PAGE_SIZE,
         }
         has_next_page = True
+        i = 0
         while has_next_page:
             response = self._send_request(
                 "GET",
@@ -318,6 +355,19 @@ class AnkiHubClient:
             data["notes"] = transform_notes_data(data["notes"])
             note_updates = DeckUpdateChunk.from_dict(data)
             yield note_updates
+
+            i += 1
+
+            if download_progress_cb:
+                total = data["total"]
+                if total == 0:
+                    percent = 100
+                else:
+                    percent = int(i * DECK_UPDATE_PAGE_SIZE / total * 100)
+                    # min is needed because on the last page DECK_UPDATE_PAGE_SIZE is larger than
+                    # the actual number of notes
+                    percent = min(percent, 100)
+                download_progress_cb(percent)
 
     def get_deck_by_id(self, ankihub_deck_uuid: uuid.UUID) -> DeckInfo:
         response = self._send_request(
