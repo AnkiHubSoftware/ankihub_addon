@@ -23,7 +23,7 @@ from aqt.utils import askUser, openLink, showInfo, showText, tooltip
 from .. import LOGGER
 from ..addon_ankihub_client import AddonAnkiHubClient as AnkiHubClient
 from ..addon_ankihub_client import AnkiHubRequestError
-from ..ankihub_client import NoteUpdate
+from ..ankihub_client import NoteInfo
 from ..db import AnkiHubDB
 from ..settings import URL_DECK_BASE, URL_DECKS, URL_HELP, URL_VIEW_DECK, config
 from ..sync import AnkiHubImporter
@@ -291,7 +291,7 @@ class SubscribeDialog(QDialog):
                 raise e
 
         def on_download_done(future: Future) -> None:
-            notes_data: List[NoteUpdate] = future.result()
+            notes_data: List[NoteInfo] = future.result()
 
             mw.taskman.with_progress(
                 lambda: self.install_deck(
@@ -317,7 +317,7 @@ class SubscribeDialog(QDialog):
 
     def install_deck(
         self,
-        notes_data: List[NoteUpdate],
+        notes_data: List[NoteInfo],
         deck_name: str,
         ankihub_did: str,
         last_update: str,

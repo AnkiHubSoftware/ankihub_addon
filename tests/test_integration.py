@@ -25,13 +25,13 @@ UUID_2 = uuid.UUID("2f28bc9e-f36d-4e1d-8720-5dd805f12dd0")
 
 
 def ankihub_sample_deck_notes_data():
-    from ankihub.ankihub_client import NoteUpdate, transform_notes_data
+    from ankihub.ankihub_client import NoteInfo, transform_notes_data
 
     notes_data_raw = eval(
         (pathlib.Path(__file__).parent / "test_data" / "small_ankihub.txt").read_text()
     )
     notes_data_raw = transform_notes_data(notes_data_raw)
-    result = [NoteUpdate.from_dict(x) for x in notes_data_raw]
+    result = [NoteInfo.from_dict(x) for x in notes_data_raw]
     return result
 
 
@@ -264,7 +264,7 @@ def test_get_deck_updates(anki_session_with_addon: AnkiSession, requests_mock):
         AnkiHubRequestError,
         DeckUpdateChunk,
         Field,
-        NoteUpdate,
+        NoteInfo,
         SuggestionType,
     )
     from ankihub.settings import API_URL_BASE
@@ -307,7 +307,7 @@ def test_get_deck_updates(anki_session_with_addon: AnkiSession, requests_mock):
     assert deck_updates[0] == DeckUpdateChunk(
         latest_update=timestamp,
         notes=[
-            NoteUpdate(
+            NoteInfo(
                 fields=[Field(name="Text", order=0, value="Fake value")],
                 ankihub_note_uuid=ankihub_note_uuid,
                 mid=1,
@@ -338,7 +338,7 @@ def test_get_deck_updates(anki_session_with_addon: AnkiSession, requests_mock):
 
 def test_get_deck_by_id(anki_session_with_addon: AnkiSession, requests_mock):
     from ankihub.addon_ankihub_client import AddonAnkiHubClient as AnkiHubClient
-    from ankihub.ankihub_client import AnkiHubRequestError, DeckInfo
+    from ankihub.ankihub_client import AnkiHubRequestError, Deck
     from ankihub.settings import API_URL_BASE
 
     client = AnkiHubClient(hooks=[])
@@ -357,7 +357,7 @@ def test_get_deck_by_id(anki_session_with_addon: AnkiSession, requests_mock):
 
     requests_mock.get(f"{API_URL_BASE}/decks/{ankihub_deck_uuid}/", json=expected_data)
     deck_info = client.get_deck_by_id(ankihub_deck_uuid=ankihub_deck_uuid)  # type: ignore
-    assert deck_info == DeckInfo(
+    assert deck_info == Deck(
         ankihub_deck_uuid=ankihub_deck_uuid,
         anki_did=1,
         owner=True,
@@ -377,7 +377,7 @@ def test_get_deck_by_id(anki_session_with_addon: AnkiSession, requests_mock):
 
 
 def test_suggest_note_upate(anki_session_with_addon: AnkiSession, requests_mock):
-    from ankihub.ankihub_client import AnkiHubRequestError, NoteUpdate, SuggestionType
+    from ankihub.ankihub_client import AnkiHubRequestError, NoteInfo, SuggestionType
     from ankihub.settings import API_URL_BASE
     from ankihub.suggestions import suggest_note_update
     from ankihub.sync import ADDON_INTERNAL_TAGS, ANKI_INTERNAL_TAGS
@@ -387,7 +387,7 @@ def test_suggest_note_upate(anki_session_with_addon: AnkiSession, requests_mock)
         mw = anki_session.mw
 
         import_sample_ankihub_deck(mw, str(UUID_1))
-        notes_data: NoteUpdate = ankihub_sample_deck_notes_data()
+        notes_data: NoteInfo = ankihub_sample_deck_notes_data()
         note = mw.col.get_note(notes_data[0].anki_nid)
         ankihub_note_uuid = notes_data[0].ankihub_note_uuid
 
@@ -824,7 +824,7 @@ def test_suspend_new_cards_of_existing_notes(
     from anki.consts import QUEUE_TYPE_SUSPENDED
     from aqt import AnkiQt
 
-    from ankihub.ankihub_client import Field, NoteUpdate
+    from ankihub.ankihub_client import Field, NoteInfo
     from ankihub.settings import config
     from ankihub.sync import AnkiHubImporter
 
@@ -852,7 +852,7 @@ def test_suspend_new_cards_of_existing_notes(
                 card.flush()
 
             # update the note using the AnkiHub importer
-            note_data = NoteUpdate(
+            note_data = NoteInfo(
                 anki_nid=note.id,
                 ankihub_note_uuid=UUID_1,
                 fields=[Field(name="Text", value="{{c1::foo}} {{c2::bar}}", order=0)],
@@ -986,9 +986,7 @@ def import_sample_ankihub_deck(
 
 
 def test_prepare_note(anki_session_with_addon: AnkiSession):
-    from anki.notes import Note
-
-    from ankihub.ankihub_client import Field, NoteUpdate, SuggestionType
+    from ankihub.ankihub_client import Field, NoteInfo, SuggestionType
     from ankihub.settings import ANKIHUB_NOTE_TYPE_FIELD_NAME
     from ankihub.sync import (
         ADDON_INTERNAL_TAGS,
@@ -1012,7 +1010,7 @@ def test_prepare_note(anki_session_with_addon: AnkiSession):
             protected_tags: List[str] = [],
             last_update_type: SuggestionType = SuggestionType.NEW_CONTENT,
         ):
-            note_data = NoteUpdate(
+            note_data = NoteInfo(
                 ankihub_note_uuid=str(UUID_1),
                 anki_nid=note.id,
                 fields=fields,
@@ -1155,9 +1153,7 @@ def test_prepare_note(anki_session_with_addon: AnkiSession):
 
 
 def test_prepare_note_protect_field_with_spaces(anki_session_with_addon: AnkiSession):
-    from anki.notes import Note
-
-    from ankihub.ankihub_client import Field, NoteUpdate, SuggestionType
+    from ankihub.ankihub_client import Field, NoteInfo, SuggestionType
     from ankihub.settings import ANKIHUB_NOTE_TYPE_FIELD_NAME
     from ankihub.sync import TAG_FOR_PROTECTING_FIELDS, AnkiHubImporter
 
@@ -1176,7 +1172,7 @@ def test_prepare_note_protect_field_with_spaces(anki_session_with_addon: AnkiSes
             protected_tags: List[str] = [],
             last_update_type: str = SuggestionType.NEW_CONTENT,
         ):
-            note_data = NoteUpdate(
+            note_data = NoteInfo(
                 ankihub_note_uuid=ankihub_nid,
                 anki_nid=note.id,
                 fields=fields,

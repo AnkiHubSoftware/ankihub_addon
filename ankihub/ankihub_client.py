@@ -53,7 +53,7 @@ class Field(DataClassJsonMixin):
 
 
 @dataclass
-class NoteUpdate(DataClassJsonMixin):
+class NoteInfo(DataClassJsonMixin):
     fields: List[Field]
     ankihub_note_uuid: uuid.UUID = dataclasses.field(
         metadata=dataclasses_json.config(field_name="note_id")
@@ -79,11 +79,11 @@ class DeckUpdateChunk(DataClassJsonMixin):
     latest_update: str
     protected_fields: Dict[int, List[str]]
     protected_tags: List[str]
-    notes: List[NoteUpdate]
+    notes: List[NoteInfo]
 
 
 @dataclass
-class DeckInfo(DataClassJsonMixin):
+class Deck(DataClassJsonMixin):
     ankihub_deck_uuid: uuid.UUID = dataclasses.field(
         metadata=dataclasses_json.config(field_name="id")
     )
@@ -271,7 +271,7 @@ class AnkiHubClient:
         self,
         ankihub_deck_uuid: uuid.UUID,
         download_progress_cb: Optional[Callable[[int], None]] = None,
-    ) -> List[NoteUpdate]:
+    ) -> List[NoteInfo]:
         deck_info = self.get_deck_by_id(ankihub_deck_uuid)
 
         s3_url = self.get_presigned_url(
@@ -295,7 +295,7 @@ class AnkiHubClient:
         # TODO Validate .csv
         notes_data_raw = [row for row in reader]
         notes_data_raw = transform_notes_data(notes_data_raw)
-        notes_data = [NoteUpdate.from_dict(row) for row in notes_data_raw]
+        notes_data = [NoteInfo.from_dict(row) for row in notes_data_raw]
 
         return notes_data
 
@@ -369,7 +369,7 @@ class AnkiHubClient:
                     percent = min(percent, 100)
                 download_progress_cb(percent)
 
-    def get_deck_by_id(self, ankihub_deck_uuid: uuid.UUID) -> DeckInfo:
+    def get_deck_by_id(self, ankihub_deck_uuid: uuid.UUID) -> Deck:
         response = self._send_request(
             "GET",
             f"/decks/{ankihub_deck_uuid}/",
@@ -378,7 +378,19 @@ class AnkiHubClient:
             raise AnkiHubRequestError(response)
 
         data = response.json()
-        result = DeckInfo.from_dict(data)
+        result = Deck.from_dict(data)
+        return result
+
+    def get_note_by_id(self, ankihub_note_uuid: uuid.UUID) -> NoteInfo:
+        response = self._send_request(
+            "GET",
+            f"/notes/{ankihub_note_uuid}",
+        )
+        if response.status_code != 200:
+            raise AnkiHubRequestError(response)
+
+        data = response.json()
+        result = NoteInfo.from_dict(data)
         return result
 
     def create_change_note_suggestion(
