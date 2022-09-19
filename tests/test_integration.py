@@ -480,6 +480,80 @@ def test_suggest_new_note(anki_session_with_addon: AnkiSession, requests_mock):
         assert exc is not None and exc.response.status_code == 403
 
 
+def test_suggest_notes_in_bulk(anki_session_with_addon: AnkiSession, monkeypatch):
+    from uuid import UUID
+
+    from ankihub.ankihub_client import (
+        ChangeNoteSuggestion,
+        Field,
+        NewNoteSuggestion,
+        SuggestionType,
+    )
+    from ankihub.suggestions import suggest_notes_in_bulk
+
+    anki_session = anki_session_with_addon
+    bulk_suggestions_method_mock = MagicMock()
+    monkeypatch.setattr(
+        "ankihub.ankihub_client.AnkiHubClient.create_suggestions_in_bulk",
+        bulk_suggestions_method_mock,
+    )
+    with anki_session.profile_loaded():
+        mw = anki_session.mw
+
+        anki_did = import_sample_ankihub_deck(mw, str(UUID_1))
+        note = mw.col.new_note(
+            mw.col.models.by_name("Basic-4827c (Testdeck / andrew1)")
+        )
+        mw.col.add_note(note, deck_id=anki_did)
+
+        new_note_ankihub_uuid = UUID_2
+        monkeypatch.setattr("uuid.uuid4", lambda: new_note_ankihub_uuid)
+
+        # suggest two notes, one new and one updated, check if the client method was called with the correct arguments
+        nids = [1608240057545, note.id]
+        notes = [mw.col.get_note(nid) for nid in nids]
+        suggest_notes_in_bulk(
+            notes=notes,
+            auto_accept=False,
+            change_type=SuggestionType.NEW_CONTENT,
+            comment="test",
+        )
+        assert bulk_suggestions_method_mock.call_count == 1
+        assert bulk_suggestions_method_mock.call_args.kwargs == {"auto_accept": False}
+        assert bulk_suggestions_method_mock.call_args.args == (
+            [
+                ChangeNoteSuggestion(
+                    ankihub_note_uuid=UUID("67f182c2-7306-47f8-aed6-d7edb42cd7de"),
+                    anki_note_id=1608240057545,
+                    fields=[
+                        Field(
+                            name="Front",
+                            order=0,
+                            value="<p>This is the front 2 without review</p>",
+                        ),
+                        Field(name="Back", order=1, value="This is the back 2"),
+                    ],
+                    tags=["my::tag", "my::tag2", "my::tag3"],
+                    comment="test",
+                    change_type=SuggestionType.NEW_CONTENT,
+                ),
+                NewNoteSuggestion(
+                    ankihub_note_uuid=new_note_ankihub_uuid,
+                    anki_note_id=note.id,
+                    fields=[
+                        Field(name="Front", order=0, value=""),
+                        Field(name="Back", order=1, value=""),
+                    ],
+                    tags=[],
+                    comment="test",
+                    ankihub_deck_uuid=UUID("1f28bc9e-f36d-4e1d-8720-5dd805f12dd0"),
+                    note_type_name="Basic-4827c (Testdeck / andrew1)",
+                    anki_note_type_id=1657023668893,
+                ),
+            ],
+        )
+
+
 def test_adjust_note_types(anki_session_with_addon: AnkiSession):
     from ankihub.sync import adjust_note_types
     from ankihub.utils import modify_note_type

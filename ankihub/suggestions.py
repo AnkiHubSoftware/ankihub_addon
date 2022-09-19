@@ -52,7 +52,7 @@ def suggest_notes_in_bulk(
     ]
     change_suggestions = [
         change_note_suggestion(
-            note,
+            note=note,
             change_type=change_type,
             comment=comment,
         )
@@ -66,8 +66,10 @@ def suggest_notes_in_bulk(
     ]
     new_note_suggestions = [
         new_note_suggestion(
-            note,
-            uuid.UUID(AnkiHubDB().ankihub_did_for_note_type(note.mid)),
+            note=note,
+            ankihub_deck_uuid=uuid.UUID(
+                AnkiHubDB().ankihub_did_for_note_type(note.mid)
+            ),
             comment=comment,
         )
         for note in notes_that_dont_exist_on_remote
