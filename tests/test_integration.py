@@ -824,7 +824,7 @@ def test_suspend_new_cards_of_existing_notes(
     from anki.consts import QUEUE_TYPE_SUSPENDED
     from aqt import AnkiQt
 
-    from ankihub.ankihub_client import FieldUpdate, NoteUpdate
+    from ankihub.ankihub_client import Field, NoteUpdate
     from ankihub.settings import config
     from ankihub.sync import AnkiHubImporter
 
@@ -855,9 +855,7 @@ def test_suspend_new_cards_of_existing_notes(
             note_data = NoteUpdate(
                 anki_nid=note.id,
                 ankihub_note_uuid=UUID_1,
-                fields=[
-                    FieldUpdate(name="Text", value="{{c1::foo}} {{c2::bar}}", order=0)
-                ],
+                fields=[Field(name="Text", value="{{c1::foo}} {{c2::bar}}", order=0)],
                 tags=[],
                 mid=note.model()["id"],
                 last_update_type=None,
