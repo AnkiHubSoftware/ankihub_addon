@@ -41,6 +41,8 @@ def suggest_notes_in_bulk(
     change_type: SuggestionType,
     comment: str,
 ) -> Dict[NoteId, Dict[str, List[str]]]:
+    # returns a dict of errors by anki_note_id
+
     ankihub_notes = [
         note for note in notes if AnkiHubDB().ankihub_did_for_note_type(note.mid)
     ]
