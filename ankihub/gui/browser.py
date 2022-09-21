@@ -60,7 +60,7 @@ def on_suggest_notes_in_bulk_done(future: Future, browser: Browser) -> None:
     LOGGER.debug("Created note suggestions in bulk.")
     LOGGER.debug(f"errors_by_nid:\n{pformat(suggestions_result.errors_by_nid)}")
 
-    summary_about_created_notes = (
+    msg_about_created_suggestions = (
         f"Created {suggestions_result.change_note_suggestions_count} suggestion(s) to change notes.\n"
         f"Created {suggestions_result.new_note_suggestions_count} suggestion(s) to create notes.\n\n\n"
     )
@@ -71,7 +71,7 @@ def on_suggest_notes_in_bulk_done(future: Future, browser: Browser) -> None:
         if "Suggestion fields and tags don't have any changes to the original note"
         in str(errors)
     ]
-    summary_about_failed_suggestions = (
+    msg_about_failed_suggestions = (
         (
             f"Failed to submit suggestions for {len(suggestions_result.errors_by_nid)} note(s).\n"
             "All notes with failed suggestions:\n"
@@ -83,8 +83,8 @@ def on_suggest_notes_in_bulk_done(future: Future, browser: Browser) -> None:
         else ""
     )
 
-    summary = summary_about_created_notes + summary_about_failed_suggestions
-    showText(summary, parent=browser)
+    msg = msg_about_created_suggestions + msg_about_failed_suggestions
+    showText(msg, parent=browser)
 
 
 def setup() -> None:
