@@ -23,7 +23,7 @@ jobs:
       - name: Enable cloning web app repo
         uses: webfactory/ssh-agent@v0.5.4
         with:
-            ssh-private-key: ${{ secrets.ANKIHUB_SSH_PRIVATE_KEY }}
+          ssh-private-key: ${{ secrets.ANKIHUB_SSH_PRIVATE_KEY }}
 
       - name: Checkout ankipalace/ankihub web app repo
         uses: actions/checkout@v3
@@ -80,17 +80,8 @@ jobs:
 
       - name: Run pytest with coverage
         run: |
-          # Non client tests
-          pytest ./tests \
-          -m "not client" \
-          -n4 \
-          --cov --cov-report=xml
-
-          # Client tests (not run in parallel)
-          pytest ./tests \
-          -m "client" \
-          --disable-vcr \
-          --cov --cov-report=xml --cov-append
+          pytest ./tests/addon --cov --cov-report=xml
+          pytest ./tests/client --disable-vcr --cov --cov-report=xml --cov-append
 
       - name: Upload coverage to Codecov
         env:
