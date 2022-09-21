@@ -1,8 +1,8 @@
 import copy
-import pathlib
 import re
 import uuid
 from datetime import datetime, timezone
+from pathlib import Path
 from typing import Dict, List, Optional
 from unittest.mock import MagicMock, Mock
 
@@ -13,12 +13,11 @@ from anki.notes import Note, NoteId
 from aqt.importing import AnkiPackageImporter
 from pytest_anki import AnkiSession
 
-sample_model_id = NotetypeId(1656968697414)
-sample_deck = pathlib.Path(__file__).parent / "test_data" / "small.apkg"
-
-ANKIHUB_SAMPLE_DECK_PATH = (
-    pathlib.Path(__file__).parent / "test_data" / "small_ankihub.apkg"
-)
+SAMPLE_MODEL_ID = NotetypeId(1656968697414)
+TEST_DATA_PATH = Path(__file__).parent.parent / "test_data"
+SAMPLE_DECK_APKG = TEST_DATA_PATH / "small.apkg"
+ANKIHUB_SAMPLE_DECK_APKG = TEST_DATA_PATH / "small_ankihub.apkg"
+SAMPLE_NOTES_DATA = eval((TEST_DATA_PATH / "small_ankihub.txt").read_text())
 
 UUID_1 = uuid.UUID("1f28bc9e-f36d-4e1d-8720-5dd805f12dd0")
 UUID_2 = uuid.UUID("2f28bc9e-f36d-4e1d-8720-5dd805f12dd0")
@@ -27,10 +26,7 @@ UUID_2 = uuid.UUID("2f28bc9e-f36d-4e1d-8720-5dd805f12dd0")
 def ankihub_sample_deck_notes_data():
     from ankihub.ankihub_client import NoteInfo, transform_notes_data
 
-    notes_data_raw = eval(
-        (pathlib.Path(__file__).parent / "test_data" / "small_ankihub.txt").read_text()
-    )
-    notes_data_raw = transform_notes_data(notes_data_raw)
+    notes_data_raw = transform_notes_data(SAMPLE_NOTES_DATA)
     result = [NoteInfo.from_dict(x) for x in notes_data_raw]
     return result
 
@@ -108,7 +104,7 @@ def test_editor(anki_session_with_addon: AnkiSession, requests_mock, monkeypatch
 def test_get_note_types_in_deck(anki_session_with_addon: AnkiSession):
     anki_session = anki_session_with_addon
     with anki_session.profile_loaded():
-        with anki_session.deck_installed(sample_deck) as deck_id:
+        with anki_session.deck_installed(SAMPLE_DECK_APKG) as deck_id:
             # test get note types in deck
             from ankihub.utils import get_note_types_in_deck
 
@@ -121,12 +117,12 @@ def test_get_note_types_in_deck(anki_session_with_addon: AnkiSession):
 def test_note_type_contains_field(anki_session_with_addon: AnkiSession):
     anki_session = anki_session_with_addon
     with anki_session.profile_loaded():
-        with anki_session.deck_installed(sample_deck):
+        with anki_session.deck_installed(SAMPLE_DECK_APKG):
             from ankihub.settings import ANKIHUB_NOTE_TYPE_FIELD_NAME
             from ankihub.utils import note_type_contains_field
 
-            note_type = anki_session.mw.col.models.get(sample_model_id)
-            assert note_type_contains_field(note_type, sample_model_id) is False
+            note_type = anki_session.mw.col.models.get(SAMPLE_MODEL_ID)
+            assert note_type_contains_field(note_type, SAMPLE_MODEL_ID) is False
             new_field = {"name": ANKIHUB_NOTE_TYPE_FIELD_NAME}
             note_type["flds"].append(new_field)
             assert note_type_contains_field(note_type, ANKIHUB_NOTE_TYPE_FIELD_NAME)
@@ -136,7 +132,7 @@ def test_note_type_contains_field(anki_session_with_addon: AnkiSession):
 def test_modify_note_type(anki_session_with_addon: AnkiSession):
     anki_session = anki_session_with_addon
     with anki_session.profile_loaded():
-        with anki_session.deck_installed(sample_deck):
+        with anki_session.deck_installed(SAMPLE_DECK_APKG):
             from ankihub.register_decks import modify_note_type
             from ankihub.settings import ANKIHUB_NOTE_TYPE_FIELD_NAME
 
@@ -159,7 +155,7 @@ def test_create_collaborative_deck_and_upload(
     from ankihub.settings import API_URL_BASE
 
     with anki_session.profile_loaded():
-        with anki_session.deck_installed(sample_deck) as deck_id:
+        with anki_session.deck_installed(SAMPLE_DECK_APKG) as deck_id:
 
             from ankihub.register_decks import create_collaborative_deck
 
@@ -246,13 +242,13 @@ def test_client_upload_deck(anki_session_with_addon: AnkiSession, requests_mock)
     )
 
     # test upload deck
-    client.upload_deck(file=pathlib.Path(sample_deck), anki_deck_id=1, private=False)
+    client.upload_deck(file=Path(SAMPLE_DECK_APKG), anki_deck_id=1, private=False)
 
     # test upload deck unauthenticated
     requests_mock.post(f"{API_URL_BASE}/decks/", status_code=403)
     exc = None
     try:
-        client.upload_deck(pathlib.Path(sample_deck), anki_deck_id=1, private=False)
+        client.upload_deck(Path(SAMPLE_DECK_APKG), anki_deck_id=1, private=False)
     except AnkiHubRequestError as e:
         exc = e
     assert exc is not None and exc.response.status_code == 403
@@ -631,7 +627,7 @@ def test_import_new_ankihub_deck(anki_session_with_addon: AnkiSession):
     with anki_session.profile_loaded():
 
         # import the apkg to get the note types, then delete the deck
-        file = str(ANKIHUB_SAMPLE_DECK_PATH.absolute())
+        file = str(ANKIHUB_SAMPLE_DECK_APKG.absolute())
         importer = AnkiPackageImporter(mw.col, file)
         importer.run()
         mw.col.decks.remove([mw.col.decks.id_for_name("Testdeck")])
@@ -672,7 +668,7 @@ def test_import_existing_ankihub_deck(anki_session_with_addon: AnkiSession):
     with anki_session.profile_loaded():
 
         # import the apkg
-        file = str(ANKIHUB_SAMPLE_DECK_PATH.absolute())
+        file = str(ANKIHUB_SAMPLE_DECK_APKG.absolute())
         importer = AnkiPackageImporter(mw.col, file)
         importer.run()
         existing_did = mw.col.decks.id_for_name("Testdeck")
@@ -720,7 +716,7 @@ def test_import_existing_ankihub_deck_2(anki_session_with_addon: AnkiSession):
     with anki_session.profile_loaded():
 
         # import the apkg
-        file = str(ANKIHUB_SAMPLE_DECK_PATH.absolute())
+        file = str(ANKIHUB_SAMPLE_DECK_APKG.absolute())
         importer = AnkiPackageImporter(mw.col, file)
         importer.run()
 
@@ -766,7 +762,7 @@ def test_import_existing_ankihub_deck_3(anki_session_with_addon: AnkiSession):
     with anki_session.profile_loaded():
 
         # import the apkg
-        file = str(ANKIHUB_SAMPLE_DECK_PATH.absolute())
+        file = str(ANKIHUB_SAMPLE_DECK_APKG.absolute())
         importer = AnkiPackageImporter(mw.col, file)
         importer.run()
         existing_did = mw.col.decks.id_for_name("Testdeck")
@@ -1036,7 +1032,7 @@ def import_sample_ankihub_deck(
         ankihub_did = "1"
 
     # import the apkg to get the note types, then delete the deck
-    file = str(ANKIHUB_SAMPLE_DECK_PATH.absolute())
+    file = str(ANKIHUB_SAMPLE_DECK_APKG.absolute())
     importer = AnkiPackageImporter(mw.col, file)
     importer.run()
     mw.col.decks.remove([mw.col.decks.id_for_name("Testdeck")])

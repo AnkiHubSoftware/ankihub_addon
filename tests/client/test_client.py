@@ -7,7 +7,8 @@ from unittest.mock import MagicMock
 import pytest
 import requests_mock
 
-DECK_CSV_PATH = Path("tests/test_data/deck_with_one_basic_note.csv")
+TEST_DATA_PATH = Path(__file__).parent.parent / "test_data"
+DECK_CSV = TEST_DATA_PATH / "deck_with_one_basic_note.csv"
 
 UUID_1 = uuid.UUID("1da0d3ad-89cd-45fb-8ddc-fabad93c2d7b")
 UUID_2 = uuid.UUID("2da0d3ad-89cd-45fb-8ddc-fabad93c2d7b")
@@ -107,7 +108,7 @@ def test_download_deck(authorized_client, monkeypatch):
     monkeypatch.setattr(client, "get_presigned_url", get_presigned_url)
     with requests_mock.Mocker(real_http=True) as m:
         m.register_uri(
-            "GET", get_presigned_url.return_value, content=DECK_CSV_PATH.read_bytes()
+            "GET", get_presigned_url.return_value, content=DECK_CSV.read_bytes()
         )
         notes_data = client.download_deck(ankihub_deck_uuid=deck_id)
     assert len(notes_data) == 1
@@ -128,7 +129,7 @@ def test_download_deck_with_progress(authorized_client, monkeypatch):
         m.register_uri(
             "GET",
             get_presigned_url.return_value,
-            content=DECK_CSV_PATH.read_bytes(),
+            content=DECK_CSV.read_bytes(),
             headers={"content-length": "1000000"},
         )
         notes_data = client.download_deck(

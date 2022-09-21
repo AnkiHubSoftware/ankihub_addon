@@ -1,0 +1,59 @@
+interactions:
+- request:
+    body: '{"username": "test1", "password": "asdf"}'
+    headers:
+      Accept:
+      - '*/*'
+      Accept-Encoding:
+      - gzip, deflate
+      Connection:
+      - keep-alive
+      Content-Length:
+      - '41'
+      Content-Type:
+      - application/json
+      User-Agent:
+      - python-requests/2.28.1
+    method: POST
+    uri: http://localhost:8000/api/login/
+  response:
+    body:
+      string: '{"expiry":"2022-09-28T20:00:10.193797Z","token":"89b7377b85043979c818a501a7a79fa01ab119e47432c723b555257378039198"}'
+    headers:
+      Allow:
+      - POST, OPTIONS
+      Content-Language:
+      - en
+      Content-Length:
+      - '115'
+      Content-Type:
+      - application/json
+      Date:
+      - Wed, 21 Sep 2022 20:00:10 GMT
+      Referrer-Policy:
+      - same-origin
+      Server:
+      - WSGIServer/0.2 CPython/3.8.13
+      Server-Timing:
+      - TimerPanel_utime;dur=589.9000000000001;desc="User CPU time", TimerPanel_stime;dur=64.05200000000377;desc="System
+        CPU time", TimerPanel_total;dur=653.9520000000039;desc="Total CPU time", TimerPanel_total_time;dur=426.53918266296387;desc="Elapsed
+        time", SQLPanel_sql_time;dur=3.817319869995117;desc="SQL 10 queries", CachePanel_total_time;dur=0;desc="Cache
+        0 Calls"
+      Set-Cookie:
+      - csrftoken=5j5krqnm99upIl5Hbfq4ExR2WR5BNxusK3mlpGpVk6ETacw8MEZJcYiuAlnfs95K;
+        expires=Wed, 20 Sep 2023 20:00:10 GMT; HttpOnly; Max-Age=31449600; Path=/;
+        SameSite=Lax
+      - sessionid=1b3v7faa78ip7mmk9qnemqa108o162cd; expires=Wed, 28 Sep 2022 20:00:10
+        GMT; HttpOnly; Max-Age=604800; Path=/; SameSite=Lax
+      Vary:
+      - Accept, Cookie, Accept-Language, Origin
+      X-Content-Type-Options:
+      - nosniff
+      X-Frame-Options:
+      - DENY
+      X-XSS-Protection:
+      - 1; mode=block
+    status:
+      code: 200
+      message: OK
+version: 1
