@@ -1,3 +1,4 @@
+import random
 import uuid
 from copy import deepcopy
 from pathlib import Path
@@ -8,7 +9,17 @@ import requests_mock
 
 DECK_CSV_PATH = Path("tests/test_data/deck_with_one_basic_note.csv")
 
-pytestmark = [pytest.mark.usefixtures("mw_mock"), pytest.mark.client]
+UUID_1 = uuid.UUID("1da0d3ad-89cd-45fb-8ddc-fabad93c2d7b")
+UUID_2 = uuid.UUID("2da0d3ad-89cd-45fb-8ddc-fabad93c2d7b")
+UUID_3 = uuid.UUID("3da0d3ad-89cd-45fb-8ddc-fabad93c2d7b")
+UUID_4 = uuid.UUID("4da0d3ad-89cd-45fb-8ddc-fabad93c2d7b")
+
+
+UUID_RND = random.seed(0)
+
+
+def next_uuid():
+    return uuid.UUID(int=UUID_RND.getrandbits(128))
 
 
 @pytest.fixture(autouse=True)
@@ -32,6 +43,46 @@ def authorized_client():
     credentials_data = {"username": "test1", "password": "asdf"}
     client.login(credentials=credentials_data)
     yield client
+
+
+@pytest.fixture
+def uuid_of_deck_of_user_test1():
+    return uuid.UUID("dda0d3ad-89cd-45fb-8ddc-fabad93c2d7b")
+
+
+@pytest.fixture
+def new_note_suggestion():
+    from ankihub.ankihub_client import Field, NewNoteSuggestion
+
+    return NewNoteSuggestion(
+        ankihub_note_uuid=UUID_1,
+        anki_note_id=1,
+        fields=[
+            Field(name="Front", value="front1", order=0),
+            Field(name="Back", value="back1", order=1),
+        ],
+        tags=["tag1", "tag2"],
+        comment="comment1",
+        ankihub_deck_uuid=UUID_2,
+        note_type_name="Basic",
+        anki_note_type_id=1,
+    )
+
+
+def change_note_suggestion():
+    from ankihub.ankihub_client import ChangeNoteSuggestion, Field, SuggestionType
+
+    return ChangeNoteSuggestion(
+        ankihub_note_uuid=UUID_1,
+        anki_note_id=1,
+        fields=[
+            Field(name="Front", value="front2", order=0),
+            Field(name="Back", value="back2", order=1),
+        ],
+        tags=["tag3", "tag4"],
+        comment="comment1",
+        change_type=SuggestionType.UPDATED_CONTENT,
+    )
 
 
 @pytest.mark.vcr()
@@ -88,43 +139,26 @@ def test_download_deck_with_progress(authorized_client, monkeypatch):
 
 
 @pytest.mark.vcr()
-def test_create_suggestions_in_bulk(authorized_client):
-    from ankihub.ankihub_client import (
-        AnkiHubClient,
-        ChangeNoteSuggestion,
-        Field,
-        NewNoteSuggestion,
-        SuggestionType,
-    )
-
-    # the uuids have to be the same in each run to make testing with vcr casettes work
-    UUID_1 = uuid.UUID("1da0d3ad-89cd-45fb-8ddc-fabad93c2d7b")
-    UUID_2 = uuid.UUID("2da0d3ad-89cd-45fb-8ddc-fabad93c2d7b")
-    UUID_3 = uuid.UUID("3da0d3ad-89cd-45fb-8ddc-fabad93c2d7b")
-    UUID_4 = uuid.UUID("4da0d3ad-89cd-45fb-8ddc-fabad93c2d7b")
+def test_create_suggestions_in_bulk_1(
+    authorized_client, uuid_of_deck_of_user_test1, new_note_suggestion
+):
+    from ankihub.ankihub_client import AnkiHubClient
 
     client: AnkiHubClient = authorized_client
-    deck_id = uuid.UUID("dda0d3ad-89cd-45fb-8ddc-fabad93c2d7b")
 
-    new_note_suggestion = NewNoteSuggestion(
-        ankihub_note_uuid=UUID_1,
-        anki_note_id=1,
-        fields=[
-            Field(name="Front", value="front1", order=0),
-            Field(name="Back", value="back1", order=1),
-        ],
-        tags=["tag1", "tag2"],
-        comment="comment1",
-        ankihub_deck_uuid=deck_id,
-        note_type_name="Basic",
-        anki_note_type_id=1,
-    )
-
-    # create a new note suggestion
+    new_note_suggestion.ankihub_deck_uuid = uuid_of_deck_of_user_test1
     errors_by_nid = client.create_suggestions_in_bulk(
-        suggestions=[new_note_suggestion], auto_accept=False
+        suggestions=[new_note_suggestion],
+        auto_accept=False,
     )
     assert errors_by_nid == {}
+
+
+@pytest.mark.vcr()
+def test_create_suggestions_in_bulk_2(authorized_client, new_note_suggestion):
+    from ankihub.ankihub_client import AnkiHubClient
+
+    client: AnkiHubClient = authorized_client
 
     # create two new note suggestions at once
     new_note_suggestion.ankihub_note_uuid = UUID_2
@@ -132,10 +166,14 @@ def test_create_suggestions_in_bulk(authorized_client):
     new_note_suggestion_2 = deepcopy(new_note_suggestion)
     new_note_suggestion_2.ankihub_note_uuid = UUID_3
     new_note_suggestion_2.anki_note_id = 2
+
     errors_by_nid = client.create_suggestions_in_bulk(
         suggestions=[new_note_suggestion, new_note_suggestion_2], auto_accept=False
     )
     assert errors_by_nid == {}
+
+
+def foo():
 
     # try creating a new note suggestion with the same ankihub_note_uuid as the first one
     new_note_suggestion.anki_note_id = 3
@@ -159,18 +197,6 @@ def test_create_suggestions_in_bulk(authorized_client):
     note = client.get_note_by_id(ankihub_note_uuid=ankihub_note_uuid)
     assert note.fields == new_note_suggestion.fields
     assert note.tags == new_note_suggestion.tags
-
-    change_note_suggestion = ChangeNoteSuggestion(
-        ankihub_note_uuid=ankihub_note_uuid,
-        anki_note_id=1,
-        fields=[
-            Field(name="Front", value="front2", order=0),
-            Field(name="Back", value="back2", order=1),
-        ],
-        tags=["tag3", "tag4"],
-        comment="comment1",
-        change_type=SuggestionType.UPDATED_CONTENT,
-    )
 
     # create a change note suggestion
     errors_by_nid = client.create_suggestions_in_bulk(
