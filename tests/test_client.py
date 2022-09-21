@@ -128,14 +128,17 @@ def test_create_suggestions_in_bulk(authorized_client):
 
     # create two new note suggestions at once
     new_note_suggestion.ankihub_note_uuid = UUID_2
+
     new_note_suggestion_2 = deepcopy(new_note_suggestion)
     new_note_suggestion_2.ankihub_note_uuid = UUID_3
+    new_note_suggestion_2.anki_note_id = 2
     errors_by_nid = client.create_suggestions_in_bulk(
         suggestions=[new_note_suggestion, new_note_suggestion_2], auto_accept=False
     )
     assert errors_by_nid == {}
 
     # try creating a new note suggestion with the same ankihub_note_uuid as the first one
+    new_note_suggestion.anki_note_id = 3
     errors_by_nid = client.create_suggestions_in_bulk(
         suggestions=[new_note_suggestion], auto_accept=False
     )
@@ -149,6 +152,7 @@ def test_create_suggestions_in_bulk(authorized_client):
 
     # create an auto-accepted new note suggestion and check if note was created
     new_note_suggestion.ankihub_note_uuid = ankihub_note_uuid
+    new_note_suggestion.anki_note_id = 4
     errors_by_nid = client.create_suggestions_in_bulk(
         suggestions=[new_note_suggestion], auto_accept=True
     )
