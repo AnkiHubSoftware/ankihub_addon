@@ -1,11 +1,10 @@
 from pprint import pformat
-from typing import Optional
 
 from aqt import mw
 from aqt.browser import Browser
 from aqt.gui_hooks import browser_will_show_context_menu
 from aqt.qt import QMenu
-from aqt.utils import showInfo, showText, tooltip, tr
+from aqt.utils import showInfo, showText, tooltip
 
 from .. import LOGGER
 from ..ankihub_client import AnkiHubRequestError
@@ -15,21 +14,7 @@ from .suggestion_dialog import SuggestionDialog
 
 
 def on_browser_will_show_context_menu(browser: Browser, context_menu: QMenu) -> None:
-    if browser.table.is_notes_mode():
-        menu = context_menu
-    else:
-        notes_submenu: Optional[QMenu] = next(
-            (
-                menu  # type: ignore
-                for menu in context_menu.findChildren(QMenu)
-                if menu.title() == tr.qt_accel_notes()  # type: ignore
-            ),
-            None,
-        )
-        if notes_submenu is None:
-            return
-        menu = notes_submenu
-
+    menu = context_menu
     menu.addSeparator()
     menu.addAction(
         "AnkiHub: Bulk suggest notes",
