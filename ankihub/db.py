@@ -1,5 +1,5 @@
 import sqlite3
-from typing import List, Optional
+from typing import Any, List, Optional
 
 from anki.models import NotetypeId
 from anki.notes import NoteId
@@ -86,7 +86,7 @@ class AnkiHubDB:
             """,
             (anki_note_id,),
         )
-        return x[0] if (x := self.c.fetchone()) else None
+        return fetch_one_or_none(self.c)
 
     def ankihub_did_for_note_type(self, anki_note_type_id: int) -> Optional[str]:
         self.c.execute(
@@ -95,7 +95,7 @@ class AnkiHubDB:
             """,
             (anki_note_type_id,),
         )
-        return x[0] if (x := self.c.fetchone()) else None
+        return fetch_one_or_none(self.c)
 
     def ankihub_id_for_note(self, anki_note_id: int) -> Optional[str]:
         self.c.execute(
@@ -104,7 +104,7 @@ class AnkiHubDB:
             """,
             (anki_note_id,),
         )
-        return x[0] if (x := self.c.fetchone()) else None
+        return fetch_one_or_none(self.c)
 
     def note_types_for_ankihub_deck(self, ankihub_did: str) -> List[NotetypeId]:
         self.c.execute(
@@ -128,3 +128,7 @@ class AnkiHubDB:
     def ankihub_deck_ids(self) -> List[str]:
         self.c.execute("SELECT DISTINCT ankihub_deck_id FROM notes")
         return [x[0] for x in self.c.fetchall()]
+
+
+def fetch_one_or_none(c: sqlite3.Cursor) -> Optional[Any]:
+    return x[0] if (x := c.fetchone()) else None
