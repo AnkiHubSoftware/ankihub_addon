@@ -88,7 +88,7 @@ def suggest_notes_in_bulk(
 
 def change_note_suggestion(
     note: Note, change_type: SuggestionType, comment: str
-) -> NewNoteSuggestion:
+) -> ChangeNoteSuggestion:
     ankihub_note_uuid = ankihub_uuid_of_note(note, ignore_invalid=False)
     tags = _prepare_tags(note.tags)
     fields = _prepare_fields(note)
