@@ -1,3 +1,4 @@
+from dataclasses import dataclass
 import re
 import uuid
 from typing import Dict, List
@@ -35,13 +36,19 @@ def suggest_new_note(
     )
 
 
+@dataclass
+class BulkNoteSuggestionsResult:
+    errors_by_nid: Dict[NoteId, Dict[str, List[str]]]  # dict of errors by anki_note_id
+    new_note_suggestions_count: int
+    change_note_suggestions_count: int
+
+
 def suggest_notes_in_bulk(
     notes: List[Note],
     auto_accept: bool,
     change_type: SuggestionType,
     comment: str,
-) -> Dict[NoteId, Dict[str, List[str]]]:
-    # returns a dict of errors by anki_note_id
+) -> BulkNoteSuggestionsResult:
 
     ankihub_did_for_mid = {
         mid: ankihub_did
@@ -82,7 +89,16 @@ def suggest_notes_in_bulk(
         all_suggestions, auto_accept=auto_accept
     )
     errors_by_nid = {NoteId(nid): errors for nid, errors in errors_by_nid_int.items()}
-    return errors_by_nid
+    result = BulkNoteSuggestionsResult(
+        errors_by_nid=errors_by_nid,
+        change_note_suggestions_count=len(
+            [x for x in change_suggestions if x.anki_note_id not in errors_by_nid]
+        ),
+        new_note_suggestions_count=len(
+            [x for x in new_note_suggestions if x.anki_note_id not in errors_by_nid]
+        ),
+    )
+    return result
 
 
 def change_note_suggestion(

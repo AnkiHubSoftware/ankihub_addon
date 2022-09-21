@@ -56,7 +56,7 @@ def on_suggestion_button_press(editor: Editor) -> None:
             msg = (
                 "You are not allowed to create a suggestion for this note.<br>"
                 "Are you subscribed to the AnkiHub deck this notes is from?<br><br>"
-                "You can ownly submit changes without a review if you are an owner or maintainer of the deck."
+                "You can only submit changes without a review if you are an owner or maintainer of the deck."
             )
             showInfo(msg, parent=editor.parentWindow)
             return
