@@ -18,7 +18,7 @@ interactions:
     uri: http://localhost:8000/api/login/
   response:
     body:
-      string: '{"expiry":"2022-09-28T20:00:09.230207Z","token":"a57b8ef951d9eb511194e30f6913ee58cf6e2dc057ef152df6ff82b6a3f2fb09"}'
+      string: '{"expiry":"2022-09-28T20:55:19.736071Z","token":"358e1ec766ee5c90d6ea7bf79bcbc294f48ecedccbf148db1498d2b5341132db"}'
     headers:
       Allow:
       - POST, OPTIONS
@@ -29,21 +29,21 @@ interactions:
       Content-Type:
       - application/json
       Date:
-      - Wed, 21 Sep 2022 20:00:09 GMT
+      - Wed, 21 Sep 2022 20:55:19 GMT
       Referrer-Policy:
       - same-origin
       Server:
       - WSGIServer/0.2 CPython/3.8.13
       Server-Timing:
-      - TimerPanel_utime;dur=513.6269999999854;desc="User CPU time", TimerPanel_stime;dur=59.3900000000005;desc="System
-        CPU time", TimerPanel_total;dur=573.016999999986;desc="Total CPU time", TimerPanel_total_time;dur=340.96479415893555;desc="Elapsed
-        time", SQLPanel_sql_time;dur=5.165815353393555;desc="SQL 10 queries", CachePanel_total_time;dur=0;desc="Cache
+      - TimerPanel_utime;dur=432.63600000000224;desc="User CPU time", TimerPanel_stime;dur=80.07800000000032;desc="System
+        CPU time", TimerPanel_total;dur=512.7140000000026;desc="Total CPU time", TimerPanel_total_time;dur=344.18320655822754;desc="Elapsed
+        time", SQLPanel_sql_time;dur=4.084587097167969;desc="SQL 9 queries", CachePanel_total_time;dur=0;desc="Cache
         0 Calls"
       Set-Cookie:
-      - csrftoken=kwLgnOs0Z9qf5c7Y1oN6mJgWwAwoiogcQPE3SdhhrAZPMgcJe0GyOHD3ZyCkUvb7;
-        expires=Wed, 20 Sep 2023 20:00:09 GMT; HttpOnly; Max-Age=31449600; Path=/;
+      - csrftoken=w9TIJ2eGotOmY3oyt3ZCkV7ADwIiIsE1n8qTaexIwr50UhQ6cdzKzxmDVMfUjNsP;
+        expires=Wed, 20 Sep 2023 20:55:19 GMT; HttpOnly; Max-Age=31449600; Path=/;
         SameSite=Lax
-      - sessionid=nwyme17lk3pzu81tgtjlgsnq91ug4eh6; expires=Wed, 28 Sep 2022 20:00:09
+      - sessionid=b18os50dgsdk7jy7ca23oihsjno0x1qh; expires=Wed, 28 Sep 2022 20:55:19
         GMT; HttpOnly; Max-Age=604800; Path=/; SameSite=Lax
       Vary:
       - Accept, Cookie, Accept-Language, Origin
@@ -64,7 +64,7 @@ interactions:
       Accept-Encoding:
       - gzip, deflate
       Authorization:
-      - Token a57b8ef951d9eb511194e30f6913ee58cf6e2dc057ef152df6ff82b6a3f2fb09
+      - Token 358e1ec766ee5c90d6ea7bf79bcbc294f48ecedccbf148db1498d2b5341132db
       Connection:
       - keep-alive
       Content-Length:
@@ -86,15 +86,15 @@ interactions:
       Content-Length:
       - '0'
       Date:
-      - Wed, 21 Sep 2022 20:00:09 GMT
+      - Wed, 21 Sep 2022 20:55:20 GMT
       Referrer-Policy:
       - same-origin
       Server:
       - WSGIServer/0.2 CPython/3.8.13
       Server-Timing:
-      - TimerPanel_utime;dur=146.24300000002677;desc="User CPU time", TimerPanel_stime;dur=3.593000000002178;desc="System
-        CPU time", TimerPanel_total;dur=149.83600000002895;desc="Total CPU time",
-        TimerPanel_total_time;dur=154.51550483703613;desc="Elapsed time", SQLPanel_sql_time;dur=1.8177032470703125;desc="SQL
+      - TimerPanel_utime;dur=184.3810000000019;desc="User CPU time", TimerPanel_stime;dur=8.592000000000155;desc="System
+        CPU time", TimerPanel_total;dur=192.97300000000206;desc="Total CPU time",
+        TimerPanel_total_time;dur=181.6542148590088;desc="Elapsed time", SQLPanel_sql_time;dur=1.8489360809326172;desc="SQL
         4 queries", CachePanel_total_time;dur=0;desc="Cache 0 Calls"
       Vary:
       - Accept, Accept-Language, Cookie, Origin

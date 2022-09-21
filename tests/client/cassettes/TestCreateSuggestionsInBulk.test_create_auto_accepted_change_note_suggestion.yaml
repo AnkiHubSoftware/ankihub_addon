@@ -1,0 +1,282 @@
+interactions:
+- request:
+    body: '{"username": "test1", "password": "asdf"}'
+    headers:
+      Accept:
+      - '*/*'
+      Accept-Encoding:
+      - gzip, deflate
+      Connection:
+      - keep-alive
+      Content-Length:
+      - '41'
+      Content-Type:
+      - application/json
+      User-Agent:
+      - python-requests/2.28.1
+    method: POST
+    uri: http://localhost:8000/api/login/
+  response:
+    body:
+      string: '{"expiry":"2022-09-28T20:55:29.897919Z","token":"3bd4172da095362aadaf69f28d6e131df237b42414d017c68bb74dc79d6ea965"}'
+    headers:
+      Allow:
+      - POST, OPTIONS
+      Content-Language:
+      - en
+      Content-Length:
+      - '115'
+      Content-Type:
+      - application/json
+      Date:
+      - Wed, 21 Sep 2022 20:55:30 GMT
+      Referrer-Policy:
+      - same-origin
+      Server:
+      - WSGIServer/0.2 CPython/3.8.13
+      Server-Timing:
+      - TimerPanel_utime;dur=404.0950000000407;desc="User CPU time", TimerPanel_stime;dur=75.65199999999805;desc="System
+        CPU time", TimerPanel_total;dur=479.7470000000388;desc="Total CPU time", TimerPanel_total_time;dur=324.9824047088623;desc="Elapsed
+        time", SQLPanel_sql_time;dur=3.593921661376953;desc="SQL 10 queries", CachePanel_total_time;dur=0;desc="Cache
+        0 Calls"
+      Set-Cookie:
+      - csrftoken=Y1vaK3kF1ukmFv4DENGjcssX6oz1PjYLIzrFtV0Aooz0CVD00aB50IAPVek3Tjh9;
+        expires=Wed, 20 Sep 2023 20:55:30 GMT; HttpOnly; Max-Age=31449600; Path=/;
+        SameSite=Lax
+      - sessionid=2v6d77e1c6s5tu6uhe1h0s030da522d4; expires=Wed, 28 Sep 2022 20:55:30
+        GMT; HttpOnly; Max-Age=604800; Path=/; SameSite=Lax
+      Vary:
+      - Accept, Cookie, Accept-Language, Origin
+      X-Content-Type-Options:
+      - nosniff
+      X-Frame-Options:
+      - DENY
+      X-XSS-Protection:
+      - 1; mode=block
+    status:
+      code: 200
+      message: OK
+- request:
+    body: '{"suggestions": [{"ankihub_id": "5a921187-19c7-8df4-8f4f-f31e78de5857",
+      "anki_id": 8, "fields": [{"name": "Front", "order": 0, "value": "front1"}, {"name":
+      "Back", "order": 1, "value": "back1"}], "tags": ["tag1", "tag2"], "comment":
+      "comment1", "deck_id": "dda0d3ad-89cd-45fb-8ddc-fabad93c2d7b", "note_type":
+      "Basic", "note_type_id": 1}], "auto_accept": true}'
+    headers:
+      Accept:
+      - '*/*'
+      Accept-Encoding:
+      - gzip, deflate
+      Authorization:
+      - Token 3bd4172da095362aadaf69f28d6e131df237b42414d017c68bb74dc79d6ea965
+      Connection:
+      - keep-alive
+      Content-Length:
+      - '359'
+      Content-Type:
+      - application/json
+      User-Agent:
+      - python-requests/2.28.1
+    method: POST
+    uri: http://localhost:8000/api/notes/bulk-new-note-suggestions/
+  response:
+    body:
+      string: '[{"tags":["tag1","tag2"],"fields":[{"name":"Front","order":0,"value":"front1"},{"name":"Back","order":1,"value":"back1"}],"ankihub_id":"5a921187-19c7-8df4-8f4f-f31e78de5857","anki_id":8,"note_type":"Basic","note_type_id":1,"state_change_responsible":null,"author":1,"related_deck":"dda0d3ad-89cd-45fb-8ddc-fabad93c2d7b","id":7}]'
+    headers:
+      Allow:
+      - POST, OPTIONS
+      Content-Language:
+      - en
+      Content-Length:
+      - '328'
+      Content-Type:
+      - application/json
+      Date:
+      - Wed, 21 Sep 2022 20:55:31 GMT
+      Referrer-Policy:
+      - same-origin
+      Server:
+      - WSGIServer/0.2 CPython/3.8.13
+      Server-Timing:
+      - TimerPanel_utime;dur=975.1679999999965;desc="User CPU time", TimerPanel_stime;dur=36.07700000000236;desc="System
+        CPU time", TimerPanel_total;dur=1011.2449999999989;desc="Total CPU time",
+        TimerPanel_total_time;dur=990.6187057495117;desc="Elapsed time", SQLPanel_sql_time;dur=9.377479553222656;desc="SQL
+        22 queries", CachePanel_total_time;dur=0;desc="Cache 0 Calls"
+      Vary:
+      - Accept, Accept-Language, Cookie, Origin
+      X-Content-Type-Options:
+      - nosniff
+      X-Frame-Options:
+      - DENY
+      X-XSS-Protection:
+      - 1; mode=block
+    status:
+      code: 200
+      message: OK
+- request:
+    body: '{"suggestions": [{"ankihub_id": "5a921187-19c7-8df4-8f4f-f31e78de5857",
+      "anki_id": -1, "fields": [{"name": "Front", "order": 0, "value": "front2"},
+      {"name": "Back", "order": 1, "value": "back2"}], "tags": ["tag3", "tag4"], "comment":
+      "comment1", "change_type": "updated_content", "note_id": "5a921187-19c7-8df4-8f4f-f31e78de5857"}],
+      "auto_accept": true}'
+    headers:
+      Accept:
+      - '*/*'
+      Accept-Encoding:
+      - gzip, deflate
+      Authorization:
+      - Token 3bd4172da095362aadaf69f28d6e131df237b42414d017c68bb74dc79d6ea965
+      Connection:
+      - keep-alive
+      Content-Length:
+      - '353'
+      Content-Type:
+      - application/json
+      User-Agent:
+      - python-requests/2.28.1
+    method: POST
+    uri: http://localhost:8000/api/notes/bulk-change-suggestions/
+  response:
+    body:
+      string: '[{"tags":["tag3","tag4"],"comment":"comment1","fields":[{"name":"Front","order":0,"value":"front2","changed":true},{"name":"Back","order":1,"value":"back2","changed":true}],"change_type":"updated_content","tags_state":"added","original_note_fields":[{"name":"Front","order":0,"value":"front1"},{"name":"Back","order":1,"value":"back1"}],"original_tags":["tag1","tag2"],"state_change_responsible":null,"author":1,"related_note":"5a921187-19c7-8df4-8f4f-f31e78de5857","id":2}]'
+    headers:
+      Allow:
+      - POST, OPTIONS
+      Content-Language:
+      - en
+      Content-Length:
+      - '474'
+      Content-Type:
+      - application/json
+      Date:
+      - Wed, 21 Sep 2022 20:55:32 GMT
+      Referrer-Policy:
+      - same-origin
+      Server:
+      - WSGIServer/0.2 CPython/3.8.13
+      Server-Timing:
+      - TimerPanel_utime;dur=1146.022999999957;desc="User CPU time", TimerPanel_stime;dur=27.48099999999809;desc="System
+        CPU time", TimerPanel_total;dur=1173.503999999955;desc="Total CPU time", TimerPanel_total_time;dur=1191.0243034362793;desc="Elapsed
+        time", SQLPanel_sql_time;dur=13.14401626586914;desc="SQL 30 queries", CachePanel_total_time;dur=0;desc="Cache
+        0 Calls"
+      Vary:
+      - Accept, Accept-Language, Cookie, Origin
+      X-Content-Type-Options:
+      - nosniff
+      X-Frame-Options:
+      - DENY
+      X-XSS-Protection:
+      - 1; mode=block
+    status:
+      code: 200
+      message: OK
+- request:
+    body: null
+    headers:
+      Accept:
+      - '*/*'
+      Accept-Encoding:
+      - gzip, deflate
+      Authorization:
+      - Token 3bd4172da095362aadaf69f28d6e131df237b42414d017c68bb74dc79d6ea965
+      Connection:
+      - keep-alive
+      Content-Type:
+      - application/json
+      User-Agent:
+      - python-requests/2.28.1
+    method: GET
+    uri: http://localhost:8000/api/notes/5a921187-19c7-8df4-8f4f-f31e78de5857
+  response:
+    body:
+      string: '{"deck_id":"dda0d3ad-89cd-45fb-8ddc-fabad93c2d7b","note_id":"5a921187-19c7-8df4-8f4f-f31e78de5857","tags":["tag3","tag4"],"anki_id":8,"fields":[{"name":"Front","order":0,"value":"front2"},{"name":"Back","order":1,"value":"back2"}],"note_type":"Basic","note_type_id":1,"last_update_type":"updated_content"}'
+    headers:
+      Allow:
+      - GET, HEAD, OPTIONS
+      Content-Language:
+      - en
+      Content-Length:
+      - '305'
+      Content-Type:
+      - application/json
+      Date:
+      - Wed, 21 Sep 2022 20:55:32 GMT
+      Referrer-Policy:
+      - same-origin
+      Server:
+      - WSGIServer/0.2 CPython/3.8.13
+      Server-Timing:
+      - TimerPanel_utime;dur=391.2049999999567;desc="User CPU time", TimerPanel_stime;dur=8.179000000001935;desc="System
+        CPU time", TimerPanel_total;dur=399.38399999995863;desc="Total CPU time",
+        TimerPanel_total_time;dur=379.75358963012695;desc="Elapsed time", SQLPanel_sql_time;dur=3.7436485290527344;desc="SQL
+        7 queries", CachePanel_total_time;dur=0;desc="Cache 0 Calls"
+      Vary:
+      - Accept, Accept-Language, Cookie, Origin
+      X-Content-Type-Options:
+      - nosniff
+      X-Frame-Options:
+      - DENY
+      X-XSS-Protection:
+      - 1; mode=block
+    status:
+      code: 200
+      message: OK
+- request:
+    body: '{"suggestions": [{"ankihub_id": "5a921187-19c7-8df4-8f4f-f31e78de5857",
+      "anki_id": -1, "fields": [{"name": "Front", "order": 0, "value": "front2"},
+      {"name": "Back", "order": 1, "value": "back2"}], "tags": ["tag3", "tag4"], "comment":
+      "comment1", "change_type": "updated_content", "note_id": "5a921187-19c7-8df4-8f4f-f31e78de5857"}],
+      "auto_accept": false}'
+    headers:
+      Accept:
+      - '*/*'
+      Accept-Encoding:
+      - gzip, deflate
+      Authorization:
+      - Token 3bd4172da095362aadaf69f28d6e131df237b42414d017c68bb74dc79d6ea965
+      Connection:
+      - keep-alive
+      Content-Length:
+      - '354'
+      Content-Type:
+      - application/json
+      User-Agent:
+      - python-requests/2.28.1
+    method: POST
+    uri: http://localhost:8000/api/notes/bulk-change-suggestions/
+  response:
+    body:
+      string: '[{"validation_errors":{"non_field_errors":["Suggestion fields and tags
+        don''t have any changes to the original note"]}}]'
+    headers:
+      Allow:
+      - POST, OPTIONS
+      Content-Language:
+      - en
+      Content-Length:
+      - '119'
+      Content-Type:
+      - application/json
+      Date:
+      - Wed, 21 Sep 2022 20:55:33 GMT
+      Referrer-Policy:
+      - same-origin
+      Server:
+      - WSGIServer/0.2 CPython/3.8.13
+      Server-Timing:
+      - TimerPanel_utime;dur=546.3260000000218;desc="User CPU time", TimerPanel_stime;dur=11.762999999998414;desc="System
+        CPU time", TimerPanel_total;dur=558.0890000000203;desc="Total CPU time", TimerPanel_total_time;dur=548.8927364349365;desc="Elapsed
+        time", SQLPanel_sql_time;dur=5.1136016845703125;desc="SQL 12 queries", CachePanel_total_time;dur=0;desc="Cache
+        0 Calls"
+      Vary:
+      - Accept, Accept-Language, Cookie, Origin
+      X-Content-Type-Options:
+      - nosniff
+      X-Frame-Options:
+      - DENY
+      X-XSS-Protection:
+      - 1; mode=block
+    status:
+      code: 200
+      message: OK
+version: 1
