@@ -61,8 +61,8 @@ def on_suggest_notes_in_bulk_done(future: Future, browser: Browser) -> None:
     LOGGER.debug(f"errors_by_nid:\n{pformat(suggestions_result.errors_by_nid)}")
 
     msg_about_created_suggestions = (
-        f"Created {suggestions_result.change_note_suggestions_count} suggestion(s) to change notes.\n"
-        f"Created {suggestions_result.new_note_suggestions_count} suggestion(s) to create notes.\n\n\n"
+        f"Submitted {suggestions_result.change_note_suggestions_count} change note suggestion(s).\n"
+        f"Submitted {suggestions_result.new_note_suggestions_count} new note suggestion(s) to.\n\n\n"
     )
 
     notes_without_changes = [
