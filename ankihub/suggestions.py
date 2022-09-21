@@ -43,15 +43,21 @@ def suggest_notes_in_bulk(
 ) -> Dict[NoteId, Dict[str, List[str]]]:
     # returns a dict of errors by anki_note_id
 
-    ankihub_notes = [
-        note for note in notes if AnkiHubDB().ankihub_did_for_note_type(note.mid)
-    ]
+    ankihub_did_for_mid = {
+        mid: ankihub_did
+        for mid in set(note.mid for note in notes)
+        if (ankihub_did := AnkiHubDB().ankihub_did_for_note_type(mid))
+    }
 
-    notes_that_exist_on_remote = [
-        note
-        for note in ankihub_notes
-        if ankihub_uuid_of_note(note, ignore_invalid=True)
-    ]
+    notes_that_exist_on_remote = []
+    notes_that_dont_exist_on_remote = []
+    ankihub_notes = [note for note in notes if ankihub_did_for_mid.get(note.mid)]
+    for note in ankihub_notes:
+        if ankihub_uuid_of_note(note, ignore_invalid=True):
+            notes_that_exist_on_remote.append(note)
+        else:
+            notes_that_dont_exist_on_remote.append(note)
+
     change_suggestions = [
         change_note_suggestion(
             note=note,
@@ -61,17 +67,10 @@ def suggest_notes_in_bulk(
         for note in notes_that_exist_on_remote
     ]
 
-    notes_that_dont_exist_on_remote = [
-        note
-        for note in ankihub_notes
-        if not ankihub_uuid_of_note(note, ignore_invalid=True)
-    ]
     new_note_suggestions = [
         new_note_suggestion(
             note=note,
-            ankihub_deck_uuid=uuid.UUID(
-                AnkiHubDB().ankihub_did_for_note_type(note.mid)
-            ),
+            ankihub_deck_uuid=uuid.UUID(ankihub_did_for_mid[note.mid]),
             comment=comment,
         )
         for note in notes_that_dont_exist_on_remote
