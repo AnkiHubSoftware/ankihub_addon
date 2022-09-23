@@ -1,5 +1,5 @@
 import sqlite3
-from typing import List
+from typing import Any, List, Optional
 
 from anki.models import NotetypeId
 from anki.notes import NoteId
@@ -79,23 +79,32 @@ class AnkiHubDB:
         result = [NoteId(x[0]) for x in self.c.fetchall()]
         return result
 
-    def ankihub_did_for_note(self, anki_note_id: int) -> str:
+    def ankihub_did_for_note(self, anki_note_id: int) -> Optional[str]:
         self.c.execute(
             """
             SELECT ankihub_deck_id FROM notes WHERE anki_note_id = ?
             """,
             (anki_note_id,),
         )
-        return self.c.fetchone()[0]
+        return fetch_one_or_none(self.c)
 
-    def ankihub_id_for_note(self, anki_note_id: int) -> str:
+    def ankihub_did_for_note_type(self, anki_note_type_id: int) -> Optional[str]:
+        self.c.execute(
+            """
+            SELECT ankihub_deck_id FROM notes WHERE anki_note_type_id = ?
+            """,
+            (anki_note_type_id,),
+        )
+        return fetch_one_or_none(self.c)
+
+    def ankihub_id_for_note(self, anki_note_id: int) -> Optional[str]:
         self.c.execute(
             """
             SELECT ankihub_note_id FROM notes WHERE anki_note_id = ?
             """,
             (anki_note_id,),
         )
-        return self.c.fetchone()[0]
+        return fetch_one_or_none(self.c)
 
     def note_types_for_ankihub_deck(self, ankihub_did: str) -> List[NotetypeId]:
         self.c.execute(
@@ -119,3 +128,7 @@ class AnkiHubDB:
     def ankihub_deck_ids(self) -> List[str]:
         self.c.execute("SELECT DISTINCT ankihub_deck_id FROM notes")
         return [x[0] for x in self.c.fetchall()]
+
+
+def fetch_one_or_none(c: sqlite3.Cursor) -> Optional[Any]:
+    return x[0] if (x := c.fetchone()) else None

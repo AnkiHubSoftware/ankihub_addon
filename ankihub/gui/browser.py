@@ -1,77 +1,90 @@
-from typing import Optional
+from concurrent.futures import Future
+from pprint import pformat
 
 from aqt import mw
 from aqt.browser import Browser
 from aqt.gui_hooks import browser_will_show_context_menu
-from aqt.operations import CollectionOp
 from aqt.qt import QMenu
-from aqt.utils import getTag, tooltip, tr
+from aqt.utils import showInfo, showText
 
 from .. import LOGGER
-from ..addon_ankihub_client import AddonAnkiHubClient as AnkiHubClient
-from ..utils import ankihub_uuids_of_nids
+from ..ankihub_client import AnkiHubRequestError
+from ..settings import AnkiHubCommands
+from ..suggestions import BulkNoteSuggestionsResult, suggest_notes_in_bulk
+from .suggestion_dialog import SuggestionDialog
 
 
 def on_browser_will_show_context_menu(browser: Browser, context_menu: QMenu) -> None:
-    if browser.table.is_notes_mode():
-        menu = context_menu
-    else:
-        notes_submenu: Optional[QMenu] = next(
-            (
-                menu  # type: ignore
-                for menu in context_menu.findChildren(QMenu)
-                if menu.title() == tr.qt_accel_notes()  # type: ignore
-            ),
-            None,
-        )
-        if notes_submenu is None:
-            return
-        menu = notes_submenu
-
+    menu = context_menu
     menu.addSeparator()
     menu.addAction(
-        "AnkiHub: Bulk suggest tags",
-        lambda: on_bulk_tag_suggestion_action(browser),
+        "AnkiHub: Bulk suggest notes",
+        lambda: on_bulk_notes_suggest_action(browser),
     )
 
 
-def on_bulk_tag_suggestion_action(browser: Browser) -> None:
+def on_bulk_notes_suggest_action(browser: Browser) -> None:
     selected_nids = browser.selected_notes()
-    (tags, ok) = getTag(
+    notes = [mw.col.get_note(selected_nid) for selected_nid in selected_nids]
+
+    if not (dialog := SuggestionDialog(command=AnkiHubCommands.CHANGE)).exec():
+        return
+
+    mw.taskman.with_progress(
+        task=lambda: suggest_notes_in_bulk(
+            notes,
+            auto_accept=dialog.auto_accept(),
+            change_type=dialog.change_type(),
+            comment=dialog.comment(),
+        ),
+        on_done=lambda future: on_suggest_notes_in_bulk_done(future, browser),
         parent=browser,
-        deck=mw.col,
-        question="Enter space-separated list of tags to add to selected notes.\n\n"
-        "* Tags will be added to notes that don't already have them.",
     )
 
-    if not ok:
+
+def on_suggest_notes_in_bulk_done(future: Future, browser: Browser) -> None:
+    try:
+        suggestions_result: BulkNoteSuggestionsResult = future.result()
+    except AnkiHubRequestError as e:
+        if e.response.status_code != 403:
+            raise e
+
+        msg = (
+            "You are not allowed to create suggestion for all selected notes.<br>"
+            "Are you subscribed to the AnkiHub deck(s) these notes are from?<br><br>"
+            "You can only submit changes without a review if you are an owner or maintainer of the deck."
+        )
+        showInfo(msg, parent=browser)
         return
 
-    ankihub_note_uuids = ankihub_uuids_of_nids(selected_nids, ignore_invalid=True)
+    LOGGER.debug("Created note suggestions in bulk.")
+    LOGGER.debug(f"errors_by_nid:\n{pformat(suggestions_result.errors_by_nid)}")
 
-    if not ankihub_note_uuids:
-        tooltip("No AnkiHub notes were selected.")
-        return
-
-    client = AnkiHubClient()
-    client.bulk_suggest_tags(ankihub_note_uuids, tags.split(" "))
-    LOGGER.debug("Bulk tag suggestion created.")
-    tooltip("Bulk tag suggestion created.", parent=browser)
-
-    # using this instead of browser.add_tags_to_notes to avoid tooltip conflict
-    # there will be no exception when adding the tags fails, this should not be a big problem
-    op = (
-        CollectionOp(browser, lambda col: col.tags.bulk_add(selected_nids, tags))
-        .success(
-            lambda out: LOGGER.debug(
-                "Added chosen tags to selected notes if they didn't have them yet."
-            )
-        )
-        .failure(
-            lambda exc: LOGGER.debug("Failed to add chosen tags to selected notes.")
-        )
+    msg_about_created_suggestions = (
+        f"Submitted {suggestions_result.change_note_suggestions_count} change note suggestion(s).\n"
+        f"Submitted {suggestions_result.new_note_suggestions_count} new note suggestion(s) to.\n\n\n"
     )
-    op.run_in_background()
+
+    notes_without_changes = [
+        note
+        for note, errors in suggestions_result.errors_by_nid.items()
+        if "Suggestion fields and tags don't have any changes to the original note"
+        in str(errors)
+    ]
+    msg_about_failed_suggestions = (
+        (
+            f"Failed to submit suggestions for {len(suggestions_result.errors_by_nid)} note(s).\n"
+            "All notes with failed suggestions:\n"
+            f'{", ".join(str(nid) for nid in suggestions_result.errors_by_nid.keys())}\n\n'
+            f"Notes without changes ({len(notes_without_changes)}):\n"
+            f'{", ".join(str(nid) for nid in notes_without_changes)}\n'
+        )
+        if suggestions_result.errors_by_nid
+        else ""
+    )
+
+    msg = msg_about_created_suggestions + msg_about_failed_suggestions
+    showText(msg, parent=browser)
 
 
 def setup() -> None:

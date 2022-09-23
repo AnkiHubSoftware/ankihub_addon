@@ -15,7 +15,7 @@ from aqt.utils import showInfo, tooltip
 
 from . import LOGGER, settings
 from .addon_ankihub_client import AddonAnkiHubClient as AnkiHubClient
-from .ankihub_client import AnkiHubRequestError, FieldUpdate, NoteUpdate, SuggestionType
+from .ankihub_client import AnkiHubRequestError, Field, NoteInfo, SuggestionType
 from .db import AnkiHubDB
 from .settings import ANKI_MINOR, config
 from .utils import (
@@ -174,7 +174,7 @@ class AnkiHubImporter:
     def import_ankihub_deck(
         self,
         ankihub_did: str,
-        notes_data: List[NoteUpdate],
+        notes_data: List[NoteInfo],
         deck_name: str,  # name that will be used for a deck if a new one gets created
         local_did: Optional[  # did that new notes should be put into if importing not for the first time
             DeckId
@@ -229,7 +229,7 @@ class AnkiHubImporter:
     def _import_ankihub_deck_inner(
         self,
         ankihub_did: str,
-        notes_data: List[NoteUpdate],
+        notes_data: List[NoteInfo],
         deck_name: str,  # name that will be used for a deck if a new one gets created
         remote_note_types: Dict[NotetypeId, NotetypeDict],
         protected_fields: Dict[int, List[str]],
@@ -292,7 +292,7 @@ class AnkiHubImporter:
 
     def _update_or_create_note(
         self,
-        note_data: NoteUpdate,
+        note_data: NoteInfo,
         anki_did: DeckId,
         protected_fields: Dict[int, List[str]],
         protected_tags: List[str],
@@ -358,7 +358,7 @@ class AnkiHubImporter:
 
     def _update_or_create_note_inner(
         self,
-        note_data: NoteUpdate,
+        note_data: NoteInfo,
         anki_did: DeckId,  # only relevant for newly created notes
         protected_fields: Dict[int, List[str]],
         protected_tags: List[str],
@@ -369,7 +369,7 @@ class AnkiHubImporter:
         try:
             note = mw.col.get_note(id=NoteId(note_data.anki_nid))
             fields.append(
-                FieldUpdate(
+                Field(
                     name=settings.ANKIHUB_NOTE_TYPE_FIELD_NAME,
                     order=len(fields),
                     value=str(note_data.ankihub_note_uuid),
@@ -407,7 +407,7 @@ class AnkiHubImporter:
     def prepare_note(
         self,
         note: Note,
-        note_data: NoteUpdate,
+        note_data: NoteInfo,
         protected_fields: Dict[int, List[str]],
         protected_tags: List[str],
         first_import_of_deck: bool,
@@ -482,7 +482,7 @@ class AnkiHubImporter:
     def _prepare_fields(
         self,
         note: Note,
-        fields: List[FieldUpdate],
+        fields: List[Field],
         protected_fields: Dict[int, List[str]],
     ) -> bool:
 
@@ -598,7 +598,7 @@ def updated_tags(
 
 
 def fetch_remote_note_types_based_on_notes_data(
-    notes_data: List[NoteUpdate],
+    notes_data: List[NoteInfo],
 ) -> Dict[NotetypeId, NotetypeDict]:
     remote_mids = set(NotetypeId(note_data.mid) for note_data in notes_data)
     result = fetch_remote_note_types(remote_mids)
@@ -709,7 +709,7 @@ def adjust_field_ords(
     return new_model_flds
 
 
-def reset_note_types_of_notes_based_on_notes_data(notes_data: List[NoteUpdate]) -> None:
+def reset_note_types_of_notes_based_on_notes_data(notes_data: List[NoteInfo]) -> None:
     """Set the note type of notes back to the note type they have in the remote deck if they have a different one"""
     nid_mid_pairs = [
         (NoteId(note_data.anki_nid), NotetypeId(note_data.mid))

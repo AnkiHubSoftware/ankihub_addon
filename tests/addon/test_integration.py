@@ -1,8 +1,8 @@
 import copy
-import pathlib
 import re
 import uuid
 from datetime import datetime, timezone
+from pathlib import Path
 from typing import Dict, List, Optional
 from unittest.mock import MagicMock, Mock
 
@@ -13,25 +13,21 @@ from anki.notes import Note, NoteId
 from aqt.importing import AnkiPackageImporter
 from pytest_anki import AnkiSession
 
-sample_model_id = NotetypeId(1656968697414)
-sample_deck = pathlib.Path(__file__).parent / "test_data" / "small.apkg"
-
-ANKIHUB_SAMPLE_DECK_PATH = (
-    pathlib.Path(__file__).parent / "test_data" / "small_ankihub.apkg"
-)
+SAMPLE_MODEL_ID = NotetypeId(1656968697414)
+TEST_DATA_PATH = Path(__file__).parent.parent / "test_data"
+SAMPLE_DECK_APKG = TEST_DATA_PATH / "small.apkg"
+ANKIHUB_SAMPLE_DECK_APKG = TEST_DATA_PATH / "small_ankihub.apkg"
+SAMPLE_NOTES_DATA = eval((TEST_DATA_PATH / "small_ankihub.txt").read_text())
 
 UUID_1 = uuid.UUID("1f28bc9e-f36d-4e1d-8720-5dd805f12dd0")
 UUID_2 = uuid.UUID("2f28bc9e-f36d-4e1d-8720-5dd805f12dd0")
 
 
 def ankihub_sample_deck_notes_data():
-    from ankihub.ankihub_client import NoteUpdate, transform_notes_data
+    from ankihub.ankihub_client import NoteInfo, transform_notes_data
 
-    notes_data_raw = eval(
-        (pathlib.Path(__file__).parent / "test_data" / "small_ankihub.txt").read_text()
-    )
-    notes_data_raw = transform_notes_data(notes_data_raw)
-    result = [NoteUpdate.from_dict(x) for x in notes_data_raw]
+    notes_data_raw = transform_notes_data(SAMPLE_NOTES_DATA)
+    result = [NoteInfo.from_dict(x) for x in notes_data_raw]
     return result
 
 
@@ -108,7 +104,7 @@ def test_editor(anki_session_with_addon: AnkiSession, requests_mock, monkeypatch
 def test_get_note_types_in_deck(anki_session_with_addon: AnkiSession):
     anki_session = anki_session_with_addon
     with anki_session.profile_loaded():
-        with anki_session.deck_installed(sample_deck) as deck_id:
+        with anki_session.deck_installed(SAMPLE_DECK_APKG) as deck_id:
             # test get note types in deck
             from ankihub.utils import get_note_types_in_deck
 
@@ -121,12 +117,12 @@ def test_get_note_types_in_deck(anki_session_with_addon: AnkiSession):
 def test_note_type_contains_field(anki_session_with_addon: AnkiSession):
     anki_session = anki_session_with_addon
     with anki_session.profile_loaded():
-        with anki_session.deck_installed(sample_deck):
+        with anki_session.deck_installed(SAMPLE_DECK_APKG):
             from ankihub.settings import ANKIHUB_NOTE_TYPE_FIELD_NAME
             from ankihub.utils import note_type_contains_field
 
-            note_type = anki_session.mw.col.models.get(sample_model_id)
-            assert note_type_contains_field(note_type, sample_model_id) is False
+            note_type = anki_session.mw.col.models.get(SAMPLE_MODEL_ID)
+            assert note_type_contains_field(note_type, SAMPLE_MODEL_ID) is False
             new_field = {"name": ANKIHUB_NOTE_TYPE_FIELD_NAME}
             note_type["flds"].append(new_field)
             assert note_type_contains_field(note_type, ANKIHUB_NOTE_TYPE_FIELD_NAME)
@@ -136,7 +132,7 @@ def test_note_type_contains_field(anki_session_with_addon: AnkiSession):
 def test_modify_note_type(anki_session_with_addon: AnkiSession):
     anki_session = anki_session_with_addon
     with anki_session.profile_loaded():
-        with anki_session.deck_installed(sample_deck):
+        with anki_session.deck_installed(SAMPLE_DECK_APKG):
             from ankihub.register_decks import modify_note_type
             from ankihub.settings import ANKIHUB_NOTE_TYPE_FIELD_NAME
 
@@ -159,7 +155,7 @@ def test_create_collaborative_deck_and_upload(
     from ankihub.settings import API_URL_BASE
 
     with anki_session.profile_loaded():
-        with anki_session.deck_installed(sample_deck) as deck_id:
+        with anki_session.deck_installed(SAMPLE_DECK_APKG) as deck_id:
 
             from ankihub.register_decks import create_collaborative_deck
 
@@ -246,13 +242,13 @@ def test_client_upload_deck(anki_session_with_addon: AnkiSession, requests_mock)
     )
 
     # test upload deck
-    client.upload_deck(file=pathlib.Path(sample_deck), anki_deck_id=1, private=False)
+    client.upload_deck(file=Path(SAMPLE_DECK_APKG), anki_deck_id=1, private=False)
 
     # test upload deck unauthenticated
     requests_mock.post(f"{API_URL_BASE}/decks/", status_code=403)
     exc = None
     try:
-        client.upload_deck(pathlib.Path(sample_deck), anki_deck_id=1, private=False)
+        client.upload_deck(Path(SAMPLE_DECK_APKG), anki_deck_id=1, private=False)
     except AnkiHubRequestError as e:
         exc = e
     assert exc is not None and exc.response.status_code == 403
@@ -263,8 +259,8 @@ def test_get_deck_updates(anki_session_with_addon: AnkiSession, requests_mock):
     from ankihub.ankihub_client import (
         AnkiHubRequestError,
         DeckUpdateChunk,
-        FieldUpdate,
-        NoteUpdate,
+        Field,
+        NoteInfo,
         SuggestionType,
     )
     from ankihub.settings import API_URL_BASE
@@ -307,8 +303,8 @@ def test_get_deck_updates(anki_session_with_addon: AnkiSession, requests_mock):
     assert deck_updates[0] == DeckUpdateChunk(
         latest_update=timestamp,
         notes=[
-            NoteUpdate(
-                fields=[FieldUpdate(name="Text", order=0, value="Fake value")],
+            NoteInfo(
+                fields=[Field(name="Text", order=0, value="Fake value")],
                 ankihub_note_uuid=ankihub_note_uuid,
                 mid=1,
                 anki_nid=1,
@@ -338,7 +334,7 @@ def test_get_deck_updates(anki_session_with_addon: AnkiSession, requests_mock):
 
 def test_get_deck_by_id(anki_session_with_addon: AnkiSession, requests_mock):
     from ankihub.addon_ankihub_client import AddonAnkiHubClient as AnkiHubClient
-    from ankihub.ankihub_client import AnkiHubRequestError, DeckInfo
+    from ankihub.ankihub_client import AnkiHubRequestError, Deck
     from ankihub.settings import API_URL_BASE
 
     client = AnkiHubClient(hooks=[])
@@ -357,7 +353,7 @@ def test_get_deck_by_id(anki_session_with_addon: AnkiSession, requests_mock):
 
     requests_mock.get(f"{API_URL_BASE}/decks/{ankihub_deck_uuid}/", json=expected_data)
     deck_info = client.get_deck_by_id(ankihub_deck_uuid=ankihub_deck_uuid)  # type: ignore
-    assert deck_info == DeckInfo(
+    assert deck_info == Deck(
         ankihub_deck_uuid=ankihub_deck_uuid,
         anki_did=1,
         owner=True,
@@ -377,7 +373,7 @@ def test_get_deck_by_id(anki_session_with_addon: AnkiSession, requests_mock):
 
 
 def test_suggest_note_upate(anki_session_with_addon: AnkiSession, requests_mock):
-    from ankihub.ankihub_client import AnkiHubRequestError, NoteUpdate, SuggestionType
+    from ankihub.ankihub_client import AnkiHubRequestError, NoteInfo, SuggestionType
     from ankihub.settings import API_URL_BASE
     from ankihub.suggestions import suggest_note_update
     from ankihub.sync import ADDON_INTERNAL_TAGS, ANKI_INTERNAL_TAGS
@@ -387,7 +383,7 @@ def test_suggest_note_upate(anki_session_with_addon: AnkiSession, requests_mock)
         mw = anki_session.mw
 
         import_sample_ankihub_deck(mw, str(UUID_1))
-        notes_data: NoteUpdate = ankihub_sample_deck_notes_data()
+        notes_data: NoteInfo = ankihub_sample_deck_notes_data()
         note = mw.col.get_note(notes_data[0].anki_nid)
         ankihub_note_uuid = notes_data[0].ankihub_note_uuid
 
@@ -480,6 +476,80 @@ def test_suggest_new_note(anki_session_with_addon: AnkiSession, requests_mock):
         assert exc is not None and exc.response.status_code == 403
 
 
+def test_suggest_notes_in_bulk(anki_session_with_addon: AnkiSession, monkeypatch):
+    from uuid import UUID
+
+    from ankihub.ankihub_client import (
+        ChangeNoteSuggestion,
+        Field,
+        NewNoteSuggestion,
+        SuggestionType,
+    )
+    from ankihub.suggestions import suggest_notes_in_bulk
+
+    anki_session = anki_session_with_addon
+    bulk_suggestions_method_mock = MagicMock()
+    monkeypatch.setattr(
+        "ankihub.ankihub_client.AnkiHubClient.create_suggestions_in_bulk",
+        bulk_suggestions_method_mock,
+    )
+    with anki_session.profile_loaded():
+        mw = anki_session.mw
+
+        anki_did = import_sample_ankihub_deck(mw, str(UUID_1))
+        note = mw.col.new_note(
+            mw.col.models.by_name("Basic-4827c (Testdeck / andrew1)")
+        )
+        mw.col.add_note(note, deck_id=anki_did)
+
+        new_note_ankihub_uuid = UUID_2
+        monkeypatch.setattr("uuid.uuid4", lambda: new_note_ankihub_uuid)
+
+        # suggest two notes, one new and one updated, check if the client method was called with the correct arguments
+        nids = [1608240057545, note.id]
+        notes = [mw.col.get_note(nid) for nid in nids]
+        suggest_notes_in_bulk(
+            notes=notes,
+            auto_accept=False,
+            change_type=SuggestionType.NEW_CONTENT,
+            comment="test",
+        )
+        assert bulk_suggestions_method_mock.call_count == 1
+        assert bulk_suggestions_method_mock.call_args.kwargs == {"auto_accept": False}
+        assert bulk_suggestions_method_mock.call_args.args == (
+            [
+                ChangeNoteSuggestion(
+                    ankihub_note_uuid=UUID("67f182c2-7306-47f8-aed6-d7edb42cd7de"),
+                    anki_note_id=1608240057545,
+                    fields=[
+                        Field(
+                            name="Front",
+                            order=0,
+                            value="<p>This is the front 2 without review</p>",
+                        ),
+                        Field(name="Back", order=1, value="This is the back 2"),
+                    ],
+                    tags=["my::tag", "my::tag2", "my::tag3"],
+                    comment="test",
+                    change_type=SuggestionType.NEW_CONTENT,
+                ),
+                NewNoteSuggestion(
+                    ankihub_note_uuid=new_note_ankihub_uuid,
+                    anki_note_id=note.id,
+                    fields=[
+                        Field(name="Front", order=0, value=""),
+                        Field(name="Back", order=1, value=""),
+                    ],
+                    tags=[],
+                    comment="test",
+                    ankihub_deck_uuid=UUID("1f28bc9e-f36d-4e1d-8720-5dd805f12dd0"),
+                    note_type_name="Basic-4827c (Testdeck / andrew1)",
+                    anki_note_type_id=1657023668893,
+                ),
+            ],
+        )
+
+
 def test_adjust_note_types(anki_session_with_addon: AnkiSession):
     from ankihub.sync import adjust_note_types
     from ankihub.utils import modify_note_type
@@ -557,7 +627,7 @@ def test_import_new_ankihub_deck(anki_session_with_addon: AnkiSession):
     with anki_session.profile_loaded():
 
         # import the apkg to get the note types, then delete the deck
-        file = str(ANKIHUB_SAMPLE_DECK_PATH.absolute())
+        file = str(ANKIHUB_SAMPLE_DECK_APKG.absolute())
         importer = AnkiPackageImporter(mw.col, file)
         importer.run()
         mw.col.decks.remove([mw.col.decks.id_for_name("Testdeck")])
@@ -598,7 +668,7 @@ def test_import_existing_ankihub_deck(anki_session_with_addon: AnkiSession):
     with anki_session.profile_loaded():
 
         # import the apkg
-        file = str(ANKIHUB_SAMPLE_DECK_PATH.absolute())
+        file = str(ANKIHUB_SAMPLE_DECK_APKG.absolute())
         importer = AnkiPackageImporter(mw.col, file)
         importer.run()
         existing_did = mw.col.decks.id_for_name("Testdeck")
@@ -646,7 +716,7 @@ def test_import_existing_ankihub_deck_2(anki_session_with_addon: AnkiSession):
     with anki_session.profile_loaded():
 
         # import the apkg
-        file = str(ANKIHUB_SAMPLE_DECK_PATH.absolute())
+        file = str(ANKIHUB_SAMPLE_DECK_APKG.absolute())
         importer = AnkiPackageImporter(mw.col, file)
         importer.run()
 
@@ -692,7 +762,7 @@ def test_import_existing_ankihub_deck_3(anki_session_with_addon: AnkiSession):
     with anki_session.profile_loaded():
 
         # import the apkg
-        file = str(ANKIHUB_SAMPLE_DECK_PATH.absolute())
+        file = str(ANKIHUB_SAMPLE_DECK_APKG.absolute())
         importer = AnkiPackageImporter(mw.col, file)
         importer.run()
         existing_did = mw.col.decks.id_for_name("Testdeck")
@@ -824,7 +894,7 @@ def test_suspend_new_cards_of_existing_notes(
     from anki.consts import QUEUE_TYPE_SUSPENDED
     from aqt import AnkiQt
 
-    from ankihub.ankihub_client import FieldUpdate, NoteUpdate
+    from ankihub.ankihub_client import Field, NoteInfo
     from ankihub.settings import config
     from ankihub.sync import AnkiHubImporter
 
@@ -852,12 +922,10 @@ def test_suspend_new_cards_of_existing_notes(
                 card.flush()
 
             # update the note using the AnkiHub importer
-            note_data = NoteUpdate(
+            note_data = NoteInfo(
                 anki_nid=note.id,
                 ankihub_note_uuid=UUID_1,
-                fields=[
-                    FieldUpdate(name="Text", value="{{c1::foo}} {{c2::bar}}", order=0)
-                ],
+                fields=[Field(name="Text", value="{{c1::foo}} {{c2::bar}}", order=0)],
                 tags=[],
                 mid=note.model()["id"],
                 last_update_type=None,
@@ -964,7 +1032,7 @@ def import_sample_ankihub_deck(
         ankihub_did = "1"
 
     # import the apkg to get the note types, then delete the deck
-    file = str(ANKIHUB_SAMPLE_DECK_PATH.absolute())
+    file = str(ANKIHUB_SAMPLE_DECK_APKG.absolute())
     importer = AnkiPackageImporter(mw.col, file)
     importer.run()
     mw.col.decks.remove([mw.col.decks.id_for_name("Testdeck")])
@@ -988,9 +1056,7 @@ def import_sample_ankihub_deck(
 
 
 def test_prepare_note(anki_session_with_addon: AnkiSession):
-    from anki.notes import Note
-
-    from ankihub.ankihub_client import FieldUpdate, NoteUpdate, SuggestionType
+    from ankihub.ankihub_client import Field, NoteInfo, SuggestionType
     from ankihub.settings import ANKIHUB_NOTE_TYPE_FIELD_NAME
     from ankihub.sync import (
         ADDON_INTERNAL_TAGS,
@@ -1009,12 +1075,12 @@ def test_prepare_note(anki_session_with_addon: AnkiSession):
             note,
             first_import_of_deck: bool,
             tags: List[str] = [],
-            fields: Optional[List[FieldUpdate]] = [],
+            fields: Optional[List[Field]] = [],
             protected_fields: Optional[Dict] = {},
             protected_tags: List[str] = [],
             last_update_type: SuggestionType = SuggestionType.NEW_CONTENT,
         ):
-            note_data = NoteUpdate(
+            note_data = NoteInfo(
                 ankihub_note_uuid=str(UUID_1),
                 anki_nid=note.id,
                 fields=fields,
@@ -1050,8 +1116,8 @@ def test_prepare_note(anki_session_with_addon: AnkiSession):
             return note
 
         new_fields = [
-            FieldUpdate(name="Front", value="new front", order=0),
-            FieldUpdate(name="Back", value="new back", order=1),
+            Field(name="Front", value="new front", order=0),
+            Field(name="Back", value="new back", order=1),
         ]
         new_tags = ["c", "d"]
 
@@ -1119,7 +1185,7 @@ def test_prepare_note(anki_session_with_addon: AnkiSession):
         note["Front"] = "old front"
         note_was_changed_6 = prepare_note(
             note,
-            fields=[FieldUpdate(name="Front", value="new front", order=0)],
+            fields=[Field(name="Front", value="new front", order=0)],
             first_import_of_deck=True,
         )
         assert not note_was_changed_6
@@ -1131,8 +1197,8 @@ def test_prepare_note(anki_session_with_addon: AnkiSession):
         note_was_changed_7 = prepare_note(
             note,
             fields=[
-                FieldUpdate(name="Front", value="new front", order=0),
-                FieldUpdate(name="Back", value="new back", order=1),
+                Field(name="Front", value="new front", order=0),
+                Field(name="Back", value="new back", order=1),
             ],
             first_import_of_deck=True,
         )
@@ -1146,8 +1212,8 @@ def test_prepare_note(anki_session_with_addon: AnkiSession):
         note_was_changed_7 = prepare_note(
             note,
             fields=[
-                FieldUpdate(name="Front", value="new front", order=0),
-                FieldUpdate(name="Back", value="new back", order=1),
+                Field(name="Front", value="new front", order=0),
+                Field(name="Back", value="new back", order=1),
             ],
             first_import_of_deck=True,
         )
@@ -1157,9 +1223,7 @@ def test_prepare_note(anki_session_with_addon: AnkiSession):
 
 
 def test_prepare_note_protect_field_with_spaces(anki_session_with_addon: AnkiSession):
-    from anki.notes import Note
-
-    from ankihub.ankihub_client import FieldUpdate, NoteUpdate, SuggestionType
+    from ankihub.ankihub_client import Field, NoteInfo, SuggestionType
     from ankihub.settings import ANKIHUB_NOTE_TYPE_FIELD_NAME
     from ankihub.sync import TAG_FOR_PROTECTING_FIELDS, AnkiHubImporter
 
@@ -1173,12 +1237,12 @@ def test_prepare_note_protect_field_with_spaces(anki_session_with_addon: AnkiSes
             note,
             first_import_of_deck: bool,
             tags: List[str] = [],
-            fields: Optional[List[FieldUpdate]] = [],
+            fields: Optional[List[Field]] = [],
             protected_fields: Optional[Dict] = {},
             protected_tags: List[str] = [],
             last_update_type: str = SuggestionType.NEW_CONTENT,
         ):
-            note_data = NoteUpdate(
+            note_data = NoteInfo(
                 ankihub_note_uuid=ankihub_nid,
                 anki_nid=note.id,
                 fields=fields,
@@ -1227,9 +1291,7 @@ def test_prepare_note_protect_field_with_spaces(anki_session_with_addon: AnkiSes
         ]
         note_changed = prepare_note(
             note,
-            fields=[
-                FieldUpdate(name=field_name_with_spaces, value="new front", order=0)
-            ],
+            fields=[Field(name=field_name_with_spaces, value="new front", order=0)],
             first_import_of_deck=True,
         )
         assert not note_changed
@@ -1239,9 +1301,7 @@ def test_prepare_note_protect_field_with_spaces(anki_session_with_addon: AnkiSes
         note = example_note()
         note_changed = prepare_note(
             note,
-            fields=[
-                FieldUpdate(name=field_name_with_spaces, value="new front", order=0)
-            ],
+            fields=[Field(name=field_name_with_spaces, value="new front", order=0)],
             first_import_of_deck=True,
         )
         assert note_changed

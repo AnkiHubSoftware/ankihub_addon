@@ -33,7 +33,10 @@ def on_suggestion_button_press(editor: Editor) -> None:
     try:
         on_suggestion_button_press_inner(editor)
     except AnkiHubRequestError as e:
-        if "suggestion" in e.response.url and e.response.status_code == 400:
+        if "suggestion" not in e.response.url:
+            raise e
+
+        if e.response.status_code == 400:
             if non_field_errors := e.response.json().get("non_field_errors", None):
                 error_message = "\n".join(non_field_errors)
             else:
@@ -49,6 +52,15 @@ def on_suggestion_button_press(editor: Editor) -> None:
             )
             LOGGER.debug(f"Can't submit suggestion due to: {pformat(error_message)}")
             return
+        elif e.response.status_code == 403:
+            msg = (
+                "You are not allowed to create a suggestion for this note.<br>"
+                "Are you subscribed to the AnkiHub deck this notes is from?<br><br>"
+                "You can only submit changes without a review if you are an owner or maintainer of the deck."
+            )
+            showInfo(msg, parent=editor.parentWindow)
+            return
+
         raise e
 
 
@@ -60,12 +72,17 @@ def on_suggestion_button_press_inner(editor: Editor) -> None:
     if not dialog.exec():
         return
 
-    change_type, comment = dialog.change_type(), dialog.comment()
+    change_type, comment, auto_accept = (
+        dialog.change_type(),
+        dialog.comment(),
+        dialog.auto_accept(),
+    )
     if command == AnkiHubCommands.CHANGE.value:
         suggest_note_update(
             note=editor.note,
             change_type=change_type,
             comment=comment,
+            auto_accept=auto_accept,
         )
         tooltip("Submitted change note suggestion to AnkiHub.")
         return
@@ -94,6 +111,7 @@ def on_suggestion_button_press_inner(editor: Editor) -> None:
                     note=note,
                     ankihub_deck_uuid=uuid.UUID(ankihub_did),
                     comment=comment,
+                    auto_accept=auto_accept,
                 )
                 tooltip("Submitted new note suggestion to AnkiHub.")
                 gui_hooks.add_cards_did_add_note.remove(on_add)
@@ -106,6 +124,7 @@ def on_suggestion_button_press_inner(editor: Editor) -> None:
                 note=editor.note,
                 ankihub_deck_uuid=uuid.UUID(ankihub_did),
                 comment=comment,
+                auto_accept=auto_accept,
             )
             tooltip("Submitted new note suggestion to AnkiHub.")
 

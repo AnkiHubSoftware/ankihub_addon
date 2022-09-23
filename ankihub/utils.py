@@ -93,12 +93,10 @@ def create_note_with_id(note: Note, anki_id: NoteId, anki_did: DeckId) -> Note:
 def ankihub_uuids_of_nids(
     nids: Iterable[NoteId], ignore_invalid=False
 ) -> List[uuid.UUID]:
-
-    note_uuid: Optional[uuid.UUID] = None
     result = [
-        (note_uuid := ankihub_uuid_of_note(mw.col.get_note(nid), ignore_invalid))
+        note_uuid
         for nid in nids
-        if note_uuid
+        if (note_uuid := ankihub_uuid_of_note(mw.col.get_note(nid), ignore_invalid))
     ]
     return result
 

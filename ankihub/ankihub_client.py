@@ -3,10 +3,20 @@ import dataclasses
 import json
 import logging
 import uuid
+from abc import ABC
 from dataclasses import dataclass
 from enum import Enum
 from pathlib import Path
-from typing import Any, Callable, Dict, Iterator, List, Optional, TypedDict
+from typing import (
+    Any,
+    Callable,
+    Dict,
+    Iterator,
+    List,
+    Optional,
+    Sequence,
+    TypedDict,
+)
 
 import requests
 from requests import PreparedRequest, Request, Response, Session
@@ -45,15 +55,15 @@ def suggestion_type_from_str(s: str) -> Optional[SuggestionType]:
 
 
 @dataclass
-class FieldUpdate(DataClassJsonMixin):
+class Field(DataClassJsonMixin):
     name: str
     order: int
     value: str
 
 
 @dataclass
-class NoteUpdate(DataClassJsonMixin):
-    fields: List[FieldUpdate]
+class NoteInfo(DataClassJsonMixin):
+    fields: List[Field]
     ankihub_note_uuid: uuid.UUID = dataclasses.field(
         metadata=dataclasses_json.config(field_name="note_id")
     )
@@ -78,11 +88,11 @@ class DeckUpdateChunk(DataClassJsonMixin):
     latest_update: str
     protected_fields: Dict[int, List[str]]
     protected_tags: List[str]
-    notes: List[NoteUpdate]
+    notes: List[NoteInfo]
 
 
 @dataclass
-class DeckInfo(DataClassJsonMixin):
+class Deck(DataClassJsonMixin):
     ankihub_deck_uuid: uuid.UUID = dataclasses.field(
         metadata=dataclasses_json.config(field_name="id")
     )
@@ -98,6 +108,60 @@ class DeckInfo(DataClassJsonMixin):
     name: str
     csv_last_upload: str
     csv_notes_filename: str
+
+
+@dataclass
+class NoteSuggestion(DataClassJsonMixin, ABC):
+    ankihub_note_uuid: uuid.UUID = dataclasses.field(
+        metadata=dataclasses_json.config(
+            field_name="ankihub_id",
+            encoder=str,
+        ),
+    )
+    anki_note_id: int = dataclasses.field(
+        metadata=dataclasses_json.config(
+            field_name="anki_id",
+        )
+    )
+    fields: List[Field]
+    tags: List[str]
+    comment: str
+
+
+@dataclass
+class ChangeNoteSuggestion(NoteSuggestion):
+    change_type: SuggestionType = dataclasses.field(
+        metadata=dataclasses_json.config(
+            encoder=lambda x: x.value[0],
+            decoder=suggestion_type_from_str,
+        ),
+    )
+
+    def to_dict(self):
+        result = super().to_dict()
+        # note_id is needed for bulk change notes suggestions
+        result["note_id"] = str(self.ankihub_note_uuid)
+        return result
+
+
+@dataclass
+class NewNoteSuggestion(NoteSuggestion):
+    ankihub_deck_uuid: uuid.UUID = dataclasses.field(
+        metadata=dataclasses_json.config(
+            field_name="deck_id",
+            encoder=str,
+        ),
+    )
+    note_type_name: str = dataclasses.field(
+        metadata=dataclasses_json.config(
+            field_name="note_type",
+        )
+    )
+    anki_note_type_id: int = dataclasses.field(
+        metadata=dataclasses_json.config(
+            field_name="note_type_id",
+        )
+    )
 
 
 class AnkiHubRequestError(Exception):
@@ -216,7 +280,7 @@ class AnkiHubClient:
         self,
         ankihub_deck_uuid: uuid.UUID,
         download_progress_cb: Optional[Callable[[int], None]] = None,
-    ) -> List[NoteUpdate]:
+    ) -> List[NoteInfo]:
         deck_info = self.get_deck_by_id(ankihub_deck_uuid)
 
         s3_url = self.get_presigned_url(
@@ -240,7 +304,7 @@ class AnkiHubClient:
         # TODO Validate .csv
         notes_data_raw = [row for row in reader]
         notes_data_raw = transform_notes_data(notes_data_raw)
-        notes_data = [NoteUpdate.from_dict(row) for row in notes_data_raw]
+        notes_data = [NoteInfo.from_dict(row) for row in notes_data_raw]
 
         return notes_data
 
@@ -314,7 +378,7 @@ class AnkiHubClient:
                     percent = min(percent, 100)
                 download_progress_cb(percent)
 
-    def get_deck_by_id(self, ankihub_deck_uuid: uuid.UUID) -> DeckInfo:
+    def get_deck_by_id(self, ankihub_deck_uuid: uuid.UUID) -> Deck:
         response = self._send_request(
             "GET",
             f"/decks/{ankihub_deck_uuid}/",
@@ -323,59 +387,103 @@ class AnkiHubClient:
             raise AnkiHubRequestError(response)
 
         data = response.json()
-        result = DeckInfo.from_dict(data)
+        result = Deck.from_dict(data)
+        return result
+
+    def get_note_by_id(self, ankihub_note_uuid: uuid.UUID) -> NoteInfo:
+        response = self._send_request(
+            "GET",
+            f"/notes/{ankihub_note_uuid}",
+        )
+        if response.status_code != 200:
+            raise AnkiHubRequestError(response)
+
+        data = response.json()
+        result = NoteInfo.from_dict(data)
         return result
 
     def create_change_note_suggestion(
         self,
-        ankihub_note_uuid: uuid.UUID,
-        fields: List[Dict],
-        tags: List[str],
-        change_type: SuggestionType,
-        comment: str,
+        change_note_suggestion: ChangeNoteSuggestion,
+        auto_accept: bool = False,
     ) -> None:
-        suggestion = {
-            "ankihub_id": str(ankihub_note_uuid),
-            "fields": fields,
-            "tags": tags,
-            "change_type": change_type.value[0],
-            "comment": comment,
-        }
         response = self._send_request(
             "POST",
-            f"/notes/{ankihub_note_uuid}/suggestion/",
-            data=suggestion,
+            f"/notes/{change_note_suggestion.ankihub_note_uuid}/suggestion/",
+            data={**change_note_suggestion.to_dict(), "auto_accept": auto_accept},
         )
         if response.status_code != 201:
             raise AnkiHubRequestError(response)
 
     def create_new_note_suggestion(
         self,
-        ankihub_deck_uuid: uuid.UUID,
-        ankihub_note_uuid: uuid.UUID,
-        anki_note_id: int,
-        fields: List[dict],
-        tags: List[str],
-        note_type_name: str,
-        anki_note_type_id: int,
-        comment: str,
+        new_note_suggestion: NewNoteSuggestion,
+        auto_accept: bool = False,
     ):
-        suggestion = {
-            "anki_id": anki_note_id,
-            "ankihub_id": str(ankihub_note_uuid),
-            "fields": fields,
-            "tags": tags,
-            "note_type": note_type_name,
-            "note_type_id": anki_note_type_id,
-            "comment": comment,
-        }
         response = self._send_request(
             "POST",
-            f"/decks/{ankihub_deck_uuid}/note-suggestion/",
-            data=suggestion,
+            f"/decks/{new_note_suggestion.ankihub_deck_uuid}/note-suggestion/",
+            data={**new_note_suggestion.to_dict(), "auto_accept": auto_accept},
         )
         if response.status_code != 201:
             raise AnkiHubRequestError(response)
+
+    def create_suggestions_in_bulk(
+        self, suggestions: Sequence[NoteSuggestion], auto_accept: bool
+    ) -> Dict[int, Dict[str, List[str]]]:
+        # returns a dict of errors by anki_note_id
+
+        change_note_suggestions = [
+            suggestion
+            for suggestion in suggestions
+            if isinstance(suggestion, ChangeNoteSuggestion)
+        ]
+        errors_for_change_suggestions = self._create_suggestion_in_bulk_inner(
+            suggestions=change_note_suggestions,
+            url="/notes/bulk-change-suggestions/",
+            auto_accept=auto_accept,
+        )
+
+        new_note_suggestions = [
+            suggestion
+            for suggestion in suggestions
+            if isinstance(suggestion, NewNoteSuggestion)
+        ]
+        errors_for_new_note_suggestions = self._create_suggestion_in_bulk_inner(
+            suggestions=new_note_suggestions,
+            url="/notes/bulk-new-note-suggestions/",
+            auto_accept=auto_accept,
+        )
+
+        return {
+            **errors_for_change_suggestions,
+            **errors_for_new_note_suggestions,
+        }
+
+    def _create_suggestion_in_bulk_inner(
+        self, suggestions: Sequence[NoteSuggestion], url: str, auto_accept: bool
+    ) -> Dict[int, Dict[str, List[str]]]:
+        if not suggestions:
+            return {}
+
+        response = self._send_request(
+            "POST",
+            endpoint=url,
+            data={
+                "suggestions": [d.to_dict() for d in suggestions],
+                "auto_accept": auto_accept,
+            },
+        )
+        if response.status_code != 200:
+            raise AnkiHubRequestError(response)
+
+        data = response.json()
+        errors_by_anki_note_id = {
+            suggestion.anki_note_id: d["validation_errors"]
+            for d, suggestion in zip(data, suggestions)
+            if d.get("validation_errors")
+        }
+        return errors_by_anki_note_id
 
     def get_presigned_url(self, key: str, action: str) -> str:
         """
