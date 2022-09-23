@@ -118,7 +118,7 @@ class NoteSuggestion(DataClassJsonMixin, ABC):
             encoder=str,
         ),
     )
-    anki_note_id: int = dataclasses.field(
+    anki_nid: int = dataclasses.field(
         metadata=dataclasses_json.config(
             field_name="anki_id",
         )
@@ -334,7 +334,6 @@ class AnkiHubClient:
         self,
         ankihub_deck_uuid: uuid.UUID,
         since: str,
-        download_progress_cb: Optional[Callable[[int], None]] = None,
     ) -> Iterator[DeckUpdateChunk]:
         class Params(TypedDict, total=False):
             page: int
@@ -343,40 +342,27 @@ class AnkiHubClient:
 
         params: Params = {
             "since": str(since) if since else None,
-            "page": 1,
             "size": DECK_UPDATE_PAGE_SIZE,
         }
-        has_next_page = True
+        url = f"/decks/{ankihub_deck_uuid}/updates"
         i = 0
-        while has_next_page:
+        while url is not None:
             response = self._send_request(
                 "GET",
-                f"/decks/{ankihub_deck_uuid}/updates",
-                params=params,
+                url,
+                params=params if i == 0 else None,
             )
             if response.status_code != 200:
                 raise AnkiHubRequestError(response)
 
             data = response.json()
-            has_next_page = data["has_next"]
-            params["page"] += 1
+            url = data["next"].split("/api", maxsplit=1)[1] if data["next"] else None
 
             data["notes"] = transform_notes_data(data["notes"])
             note_updates = DeckUpdateChunk.from_dict(data)
             yield note_updates
 
             i += 1
-
-            if download_progress_cb:
-                total = data["total"]
-                if total == 0:
-                    percent = 100
-                else:
-                    percent = int(i * DECK_UPDATE_PAGE_SIZE / total * 100)
-                    # min is needed because on the last page DECK_UPDATE_PAGE_SIZE is larger than
-                    # the actual number of notes
-                    percent = min(percent, 100)
-                download_progress_cb(percent)
 
     def get_deck_by_id(self, ankihub_deck_uuid: uuid.UUID) -> Deck:
         response = self._send_request(
@@ -431,7 +417,7 @@ class AnkiHubClient:
     def create_suggestions_in_bulk(
         self, suggestions: Sequence[NoteSuggestion], auto_accept: bool
     ) -> Dict[int, Dict[str, List[str]]]:
-        # returns a dict of errors by anki_note_id
+        # returns a dict of errors by anki_nid
 
         change_note_suggestions = [
             suggestion
@@ -478,12 +464,12 @@ class AnkiHubClient:
             raise AnkiHubRequestError(response)
 
         data = response.json()
-        errors_by_anki_note_id = {
-            suggestion.anki_note_id: d["validation_errors"]
+        errors_by_anki_nid = {
+            suggestion.anki_nid: d["validation_errors"]
             for d, suggestion in zip(data, suggestions)
             if d.get("validation_errors")
         }
-        return errors_by_anki_note_id
+        return errors_by_anki_nid
 
     def get_presigned_url(self, key: str, action: str) -> str:
         """

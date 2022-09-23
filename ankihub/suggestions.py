@@ -38,7 +38,7 @@ def suggest_new_note(
 
 @dataclass
 class BulkNoteSuggestionsResult:
-    errors_by_nid: Dict[NoteId, Dict[str, List[str]]]  # dict of errors by anki_note_id
+    errors_by_nid: Dict[NoteId, Dict[str, List[str]]]  # dict of errors by anki_nid
     new_note_suggestions_count: int
     change_note_suggestions_count: int
 
@@ -92,10 +92,10 @@ def suggest_notes_in_bulk(
     result = BulkNoteSuggestionsResult(
         errors_by_nid=errors_by_nid,
         change_note_suggestions_count=len(
-            [x for x in change_suggestions if x.anki_note_id not in errors_by_nid]
+            [x for x in change_suggestions if x.anki_nid not in errors_by_nid]
         ),
         new_note_suggestions_count=len(
-            [x for x in new_note_suggestions if x.anki_note_id not in errors_by_nid]
+            [x for x in new_note_suggestions if x.anki_nid not in errors_by_nid]
         ),
     )
     return result
@@ -110,7 +110,7 @@ def change_note_suggestion(
 
     return ChangeNoteSuggestion(
         ankihub_note_uuid=ankihub_note_uuid,
-        anki_note_id=note.id,
+        anki_nid=note.id,
         fields=fields,
         tags=tags,
         change_type=change_type,
@@ -131,7 +131,7 @@ def new_note_suggestion(
     return NewNoteSuggestion(
         ankihub_deck_uuid=ankihub_deck_uuid,
         ankihub_note_uuid=ankihub_note_uuid,
-        anki_note_id=note.id,
+        anki_nid=note.id,
         fields=fields,
         tags=tags,
         note_type_name=note.note_type()["name"],
