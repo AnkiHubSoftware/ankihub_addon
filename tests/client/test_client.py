@@ -1,32 +1,84 @@
 import random
+import sys
 import uuid
 from copy import deepcopy
+from datetime import datetime, timezone
 from pathlib import Path
+from typing import List
 from unittest.mock import MagicMock
+from urllib.parse import parse_qs, urlencode, urlparse, urlunparse
 
 import pytest
 import requests_mock
+from vcr import VCR
 
 TEST_DATA_PATH = Path(__file__).parent.parent / "test_data"
 DECK_CSV = TEST_DATA_PATH / "deck_with_one_basic_note.csv"
 
+VCR_CASSETTES_PATH = Path(__file__).parent / "cassettes"
+
+# TODO It would be great if we could automatically reset decks in the web app database before each test.
+# Then we could use a couple of deterministic ids instead of next_anki_id and next_uuid.
+#
+# Currently ids are problematic because they have to be unique to be succesfully validated in the web app and
+# deterministic for vcr to work.
+#
+# To record new casettes, delete the exising ones and run all tests in this file in one process:
+# pytest tests/client
+#
+# To run tests using the recorded cassettes run all tests in one process:
+# pytest tests/client
+# Tests don't pass when run individually with vcr enabled and existing casettes because the ids won't be the same.
+#
+# To run tests with vcr disabled, you have to reset the web app database and run the create_test_users script
+# between each run of the tests:
+# pytest tests/client --disable-vcr
+# or you can set DETERMINISTIC_IDS to False to not have to do that.
+DETERMINISTIC_IDS = True
 
 UUID_RND = random.Random()
-UUID_RND.seed(0)
+ANKI_NID_RND = random.Random()
+
+if DETERMINISTIC_IDS:
+    UUID_RND.seed(0)
+    ANKI_NID_RND.seed(0)
 
 
-# uuids have to be deterministc so that using vcr works
+@pytest.fixture(scope="module")
+def vcr(vcr):
+    vcr.register_matcher("ignore_since", ignore_since_query_param_matcher)
+    return vcr
+
+
+@pytest.fixture(scope="module")
+def vcr_enabled(vcr):
+    # See https://github.com/ktosiek/pytest-vcr/blob/master/pytest_vcr.py#L59-L62
+    return not (
+        vcr.record_mode == "new_episodes"
+        and vcr.before_record_response
+        and vcr.before_record_response() is None
+    )
+
+
+def ignore_since_query_param_matcher(r1, r2):
+    assert remove_query_param(r1.uri, "since") == remove_query_param(r2.uri, "since")
+
+
+def remove_query_param(url, param_name):
+    u = urlparse(url)
+    query = parse_qs(u.query, keep_blank_values=True)
+    query.pop(param_name, None)
+    u = u._replace(query=urlencode(query, doseq=True))
+    result = urlunparse(u)
+    return result
+
+
 def next_uuid():
     return uuid.UUID(int=UUID_RND.getrandbits(128))
 
 
-anki_id_counter = 0
-
-
 def next_anki_id():
-    global anki_id_counter
-    anki_id_counter += 1
-    return anki_id_counter
+    return ANKI_NID_RND.randint(0, sys.maxsize)
 
 
 @pytest.fixture(autouse=True)
@@ -43,11 +95,21 @@ def client():
 
 
 @pytest.fixture
-def authorized_client():
+def authorized_client_for_user_test1():
     from ankihub.ankihub_client import AnkiHubClient
 
     client = AnkiHubClient()
     credentials_data = {"username": "test1", "password": "asdf"}
+    client.login(credentials=credentials_data)
+    yield client
+
+
+@pytest.fixture
+def authorized_client_for_user_test2():
+    from ankihub.ankihub_client import AnkiHubClient
+
+    client = AnkiHubClient()
+    credentials_data = {"username": "test2", "password": "asdf"}
     client.login(credentials=credentials_data)
     yield client
 
@@ -58,12 +120,17 @@ def uuid_of_deck_of_user_test1():
 
 
 @pytest.fixture
+def uuid_of_deck_of_user_test2():
+    return uuid.UUID("5528aef7-f7ac-406b-9b35-4eaf00de4b20")
+
+
+@pytest.fixture
 def new_note_suggestion():
     from ankihub.ankihub_client import Field, NewNoteSuggestion
 
     return NewNoteSuggestion(
         ankihub_note_uuid=next_uuid(),
-        anki_note_id=next_anki_id(),
+        anki_nid=next_anki_id(),
         fields=[
             Field(name="Front", value="front1", order=0),
             Field(name="Back", value="back1", order=1),
@@ -77,12 +144,29 @@ def new_note_suggestion():
 
 
 @pytest.fixture
+def new_note_suggestion_note_info():
+    from ankihub.ankihub_client import Field, NoteInfo
+
+    return NoteInfo(
+        ankihub_note_uuid=next_uuid(),
+        anki_nid=next_anki_id(),
+        fields=[
+            Field(name="Front", value="front1", order=0),
+            Field(name="Back", value="back1", order=1),
+        ],
+        tags=["tag1", "tag2"],
+        mid=1,
+        last_update_type=None,
+    )
+
+
+@pytest.fixture
 def change_note_suggestion():
     from ankihub.ankihub_client import ChangeNoteSuggestion, Field, SuggestionType
 
     return ChangeNoteSuggestion(
         ankihub_note_uuid=next_uuid(),
-        anki_note_id=-1,
+        anki_nid=-1,
         fields=[
             Field(name="Front", value="front2", order=0),
             Field(name="Back", value="back2", order=1),
@@ -105,10 +189,10 @@ def test_client_login_and_signout(client):
 
 
 @pytest.mark.vcr()
-def test_download_deck(authorized_client, monkeypatch):
+def test_download_deck(authorized_client_for_user_test1, monkeypatch):
     from ankihub.ankihub_client import AnkiHubClient
 
-    client: AnkiHubClient = authorized_client
+    client: AnkiHubClient = authorized_client_for_user_test1
     deck_id = uuid.UUID("dda0d3ad-89cd-45fb-8ddc-fabad93c2d7b")
     get_presigned_url = MagicMock()
     get_presigned_url.return_value = "https://fake_s3.com"
@@ -123,11 +207,11 @@ def test_download_deck(authorized_client, monkeypatch):
 
 
 @pytest.mark.vcr()
-def test_download_deck_with_progress(authorized_client, monkeypatch):
+def test_download_deck_with_progress(authorized_client_for_user_test1, monkeypatch):
     from ankihub.ankihub_client import AnkiHubClient
     from ankihub.gui.decks import download_progress_cb
 
-    client: AnkiHubClient = authorized_client
+    client: AnkiHubClient = authorized_client_for_user_test1
     deck_id = uuid.UUID("dda0d3ad-89cd-45fb-8ddc-fabad93c2d7b")
     get_presigned_url = MagicMock()
     get_presigned_url.return_value = "https://fake_s3.com"
@@ -149,11 +233,14 @@ def test_download_deck_with_progress(authorized_client, monkeypatch):
 class TestCreateSuggestionsInBulk:
     @pytest.mark.vcr()
     def test_create_one_new_note_suggestion(
-        self, authorized_client, new_note_suggestion, uuid_of_deck_of_user_test1
+        self,
+        authorized_client_for_user_test1,
+        new_note_suggestion,
+        uuid_of_deck_of_user_test1,
     ):
         from ankihub.ankihub_client import AnkiHubClient
 
-        client: AnkiHubClient = authorized_client
+        client: AnkiHubClient = authorized_client_for_user_test1
 
         new_note_suggestion.ankihub_deck_uuid = uuid_of_deck_of_user_test1
         errors_by_nid = client.create_suggestions_in_bulk(
@@ -164,18 +251,21 @@ class TestCreateSuggestionsInBulk:
 
     @pytest.mark.vcr()
     def test_create_two_new_note_suggestions(
-        self, authorized_client, new_note_suggestion, uuid_of_deck_of_user_test1
+        self,
+        authorized_client_for_user_test1,
+        new_note_suggestion,
+        uuid_of_deck_of_user_test1,
     ):
         from ankihub.ankihub_client import AnkiHubClient
 
-        client: AnkiHubClient = authorized_client
+        client: AnkiHubClient = authorized_client_for_user_test1
 
         # create two new note suggestions at once
         new_note_suggestion.ankihub_deck_uuid = uuid_of_deck_of_user_test1
 
         new_note_suggestion_2 = deepcopy(new_note_suggestion)
         new_note_suggestion_2.ankihub_note_uuid = next_uuid()
-        new_note_suggestion_2.anki_note_id = next_anki_id()
+        new_note_suggestion_2.anki_nid = next_anki_id()
 
         errors_by_nid = client.create_suggestions_in_bulk(
             suggestions=[new_note_suggestion, new_note_suggestion_2], auto_accept=False
@@ -184,11 +274,14 @@ class TestCreateSuggestionsInBulk:
 
     @pytest.mark.vcr()
     def test_use_same_ankihub_id_for_new_note_suggestion(
-        self, authorized_client, new_note_suggestion, uuid_of_deck_of_user_test1
+        self,
+        authorized_client_for_user_test1,
+        new_note_suggestion,
+        uuid_of_deck_of_user_test1,
     ):
         from ankihub.ankihub_client import AnkiHubClient
 
-        client: AnkiHubClient = authorized_client
+        client: AnkiHubClient = authorized_client_for_user_test1
 
         # create a new note suggestion
         new_note_suggestion.ankihub_deck_uuid = uuid_of_deck_of_user_test1
@@ -199,23 +292,24 @@ class TestCreateSuggestionsInBulk:
 
         # try creating a new note suggestion with the same ankihub_note_uuid as the first one
         new_note_suggestion_2 = deepcopy(new_note_suggestion)
-        new_note_suggestion_2.anki_note_id = next_anki_id()
+        new_note_suggestion_2.anki_nid = next_anki_id()
         errors_by_nid = client.create_suggestions_in_bulk(
             suggestions=[new_note_suggestion], auto_accept=False
         )
         assert len(
             errors_by_nid
-        ) == 1 and "new note suggestion with this ankihub id already exists." in str(
-            errors_by_nid
-        )
+        ) == 1 and "Suggestion with this id already exists" in str(errors_by_nid)
 
     @pytest.mark.vcr()
     def test_create_auto_accepted_new_note_suggestion(
-        self, authorized_client, new_note_suggestion, uuid_of_deck_of_user_test1
+        self,
+        authorized_client_for_user_test1,
+        new_note_suggestion,
+        uuid_of_deck_of_user_test1,
     ):
         from ankihub.ankihub_client import AnkiHubClient
 
-        client: AnkiHubClient = authorized_client
+        client: AnkiHubClient = authorized_client_for_user_test1
 
         # create an auto-accepted new note suggestion and check if note was created
         new_note_suggestion.ankihub_deck_uuid = uuid_of_deck_of_user_test1
@@ -233,14 +327,14 @@ class TestCreateSuggestionsInBulk:
     @pytest.mark.vcr()
     def test_create_change_note_suggestion(
         self,
-        authorized_client,
+        authorized_client_for_user_test1,
         new_note_suggestion,
         change_note_suggestion,
         uuid_of_deck_of_user_test1,
     ):
         from ankihub.ankihub_client import AnkiHubClient
 
-        client: AnkiHubClient = authorized_client
+        client: AnkiHubClient = authorized_client_for_user_test1
 
         # create an auto-accepted new note suggestion and check if note was created
         new_note_suggestion.ankihub_deck_uuid = uuid_of_deck_of_user_test1
@@ -265,14 +359,14 @@ class TestCreateSuggestionsInBulk:
     @pytest.mark.vcr()
     def test_create_auto_accepted_change_note_suggestion(
         self,
-        authorized_client,
+        authorized_client_for_user_test1,
         new_note_suggestion,
         change_note_suggestion,
         uuid_of_deck_of_user_test1,
     ):
         from ankihub.ankihub_client import AnkiHubClient
 
-        client: AnkiHubClient = authorized_client
+        client: AnkiHubClient = authorized_client_for_user_test1
 
         # create an auto-accepted new note suggestion and check if note was created
         new_note_suggestion.ankihub_deck_uuid = uuid_of_deck_of_user_test1
@@ -301,4 +395,81 @@ class TestCreateSuggestionsInBulk:
             errors_by_nid
         ) == 1 and "Suggestion fields and tags don't have any changes to the original note" in str(
             errors_by_nid
+        )
+
+
+class TestGetDeckUpdates:
+    @pytest.mark.vcr()
+    def test_get_deck_updates(
+        self, authorized_client_for_user_test2, uuid_of_deck_of_user_test2, monkeypatch
+    ):
+        from ankihub.ankihub_client import AnkiHubClient, DeckUpdateChunk
+
+        client: AnkiHubClient = authorized_client_for_user_test2
+
+        page_size = 5
+        monkeypatch.setattr("ankihub.ankihub_client.DECK_UPDATE_PAGE_SIZE", page_size)
+        update_chunks: List[DeckUpdateChunk] = list(
+            client.get_deck_updates(uuid_of_deck_of_user_test2, since=None)
+        )
+        assert len(update_chunks) == 2
+        assert all(len(chunk.notes) == page_size for chunk in update_chunks)
+
+    @pytest.mark.vcr()
+    def test_get_deck_updates_since(
+        self,
+        authorized_client_for_user_test1,
+        uuid_of_deck_of_user_test1,
+        new_note_suggestion,
+        new_note_suggestion_note_info,
+        vcr: VCR,
+        vcr_enabled,
+    ):
+        from ankihub.ankihub_client import AnkiHubClient, DeckUpdateChunk, NoteInfo
+
+        client: AnkiHubClient = authorized_client_for_user_test1
+
+        since_time = datetime.now(timezone.utc)
+        since_time_str = since_time.strftime("%Y-%m-%dT%H:%M:%S.%f%z")
+
+        # create a new note
+        new_note_suggestion.ankihub_deck_uuid = uuid_of_deck_of_user_test1
+        client.create_new_note_suggestion(new_note_suggestion, auto_accept=True)
+
+        # get deck updates since the time of the new note creation
+        casette_path = (
+            VCR_CASSETTES_PATH / "TestGetDeckUpdates.test_get_deck_updates_since.yaml"
+        )
+        if casette_path.exists():
+            with vcr.use_cassette(
+                str(casette_path),
+                match_on=["ignore_since"],
+            ):
+                chunks = list(
+                    client.get_deck_updates(
+                        ankihub_deck_uuid=uuid_of_deck_of_user_test1,
+                        since=since_time_str,
+                    )
+                )
+        else:
+            # when using vcr.use_casette, the request doesn't get recorded, so this has to be called without the context
+            chunks = list(
+                client.get_deck_updates(
+                    ankihub_deck_uuid=uuid_of_deck_of_user_test1, since=since_time_str
+                )
+            )
+
+        note_info: NoteInfo = new_note_suggestion_note_info
+        if vcr_enabled:
+            note_info.ankihub_note_uuid = chunks[0].notes[0].ankihub_note_uuid
+        else:
+            note_info.ankihub_note_uuid = new_note_suggestion.ankihub_note_uuid
+        note_info.anki_nid = new_note_suggestion.anki_nid
+
+        assert len(chunks) == 1
+        assert chunks[0] == DeckUpdateChunk(
+            latest_update=chunks[0].latest_update,  # not the same as since_time_str
+            notes=[note_info],
+            protected_fields={},
+            protected_tags=[],
         )

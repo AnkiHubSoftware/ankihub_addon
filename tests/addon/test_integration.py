@@ -254,84 +254,6 @@ def test_client_upload_deck(anki_session_with_addon: AnkiSession, requests_mock)
     assert exc is not None and exc.response.status_code == 403
 
 
-def test_get_deck_updates(anki_session_with_addon: AnkiSession, requests_mock):
-    from ankihub.addon_ankihub_client import AddonAnkiHubClient as AnkiHubClient
-    from ankihub.ankihub_client import (
-        AnkiHubRequestError,
-        DeckUpdateChunk,
-        Field,
-        NoteInfo,
-        SuggestionType,
-    )
-    from ankihub.settings import API_URL_BASE
-
-    # test get deck updates
-    ankihub_deck_uuid = UUID_1
-    ankihub_note_uuid = UUID_2
-    timestamp = "2022-04-05T10:56:19.456+00:00"
-    expected_data = {
-        "total": 1,
-        "current_page": 1,
-        "has_next": False,
-        "latest_update": timestamp,
-        "notes": [
-            {
-                "fields": [{"name": "Text", "order": 0, "value": "Fake value"}],
-                "deck_id": str(ankihub_deck_uuid),
-                "note_id": str(ankihub_note_uuid),
-                "anki_id": 1,
-                "note_type_id": 1,
-                "tags": ["New Tag"],
-                "last_update_type": "new_content",
-            }
-        ],
-        "protected_fields": {1: ["Back"]},
-        "protected_tags": ["Test"],
-    }
-
-    requests_mock.get(
-        f"{API_URL_BASE}/decks/{ankihub_deck_uuid}/updates", json=expected_data
-    )
-
-    client = AnkiHubClient(hooks=[])
-    deck_updates = list(
-        client.get_deck_updates(
-            ankihub_deck_uuid=ankihub_deck_uuid, since=timestamp  # type: ignore
-        )
-    )
-    assert len(deck_updates) == 1
-    assert deck_updates[0] == DeckUpdateChunk(
-        latest_update=timestamp,
-        notes=[
-            NoteInfo(
-                fields=[Field(name="Text", order=0, value="Fake value")],
-                ankihub_note_uuid=ankihub_note_uuid,
-                mid=1,
-                anki_nid=1,
-                tags=["New Tag"],
-                last_update_type=SuggestionType.NEW_CONTENT,
-            )
-        ],
-        protected_fields={1: ["Back"]},
-        protected_tags=["Test"],
-    )
-
-    # test get deck updates unauthenticated
-    requests_mock.get(
-        f"{API_URL_BASE}/decks/{ankihub_deck_uuid}/updates", status_code=403
-    )
-
-    exc = None
-    try:
-        for _ in client.get_deck_updates(
-            ankihub_deck_uuid=ankihub_deck_uuid, since=timestamp  # type: ignore
-        ):
-            pass
-    except AnkiHubRequestError as e:
-        exc = e
-    assert exc is not None and exc.response.status_code == 403
-
-
 def test_get_deck_by_id(anki_session_with_addon: AnkiSession, requests_mock):
     from ankihub.addon_ankihub_client import AddonAnkiHubClient as AnkiHubClient
     from ankihub.ankihub_client import AnkiHubRequestError, Deck
@@ -520,7 +442,7 @@ def test_suggest_notes_in_bulk(anki_session_with_addon: AnkiSession, monkeypatch
             [
                 ChangeNoteSuggestion(
                     ankihub_note_uuid=UUID("67f182c2-7306-47f8-aed6-d7edb42cd7de"),
-                    anki_note_id=1608240057545,
+                    anki_nid=1608240057545,
                     fields=[
                         Field(
                             name="Front",
@@ -535,7 +457,7 @@ def test_suggest_notes_in_bulk(anki_session_with_addon: AnkiSession, monkeypatch
                 ),
                 NewNoteSuggestion(
                     ankihub_note_uuid=new_note_ankihub_uuid,
-                    anki_note_id=note.id,
+                    anki_nid=note.id,
                     fields=[
                         Field(name="Front", order=0, value=""),
                         Field(name="Back", order=1, value=""),
