@@ -184,17 +184,14 @@ class AnkiHubClient:
         return token
 
     def signout(self):
-        # Allow client signout when credentials are wrong and returns 401
         try:
             response = self._send_request("POST", "/logout/")
         except AnkiHubRequestError as e:
-            if e.response.status_code != 401:
-                raise e
             response = e.response
-        if response.status_code not in [204, 401]:
-            raise AnkiHubRequestError(response)
-
-        self.session.headers["Authorization"] = ""
+        finally:
+            self.session.headers["Authorization"] = ""
+            if response.status_code not in [204, 401]:
+                raise AnkiHubRequestError(response)
 
     def upload_deck(self, file: Path, anki_deck_id: int, private: bool) -> uuid.UUID:
         key = file.name
