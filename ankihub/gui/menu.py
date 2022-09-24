@@ -265,9 +265,11 @@ def sync_with_ankihub_action():
 
 
 def sign_out_action():
-    AnkiHubClient().signout()
-    config.save_token("")
-    tooltip("Signed out of AnkiHub!", parent=mw)
+    try:
+        AnkiHubClient().signout()
+    finally:
+        config.save_token("")
+        tooltip("Signed out of AnkiHub!", parent=mw)
 
 
 class LogUploadResultDialog(QDialog):

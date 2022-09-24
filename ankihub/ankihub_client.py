@@ -248,10 +248,12 @@ class AnkiHubClient:
         return token
 
     def signout(self):
-        response = self._send_request("POST", "/logout/")
-        if response and response.status_code == 204:
-            self.session.headers["Authorization"] = ""
-        else:
+        self.session.headers["Authorization"] = ""
+        try:
+            response = self._send_request("POST", "/logout/")
+        except AnkiHubRequestError as e:
+            response = e.response            
+        if response and response.status_code not in [204, 401]:
             raise AnkiHubRequestError(response)
 
     def upload_deck(self, file: Path, anki_deck_id: int, private: bool) -> uuid.UUID:
