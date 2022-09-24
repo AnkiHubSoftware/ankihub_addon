@@ -188,10 +188,9 @@ class AnkiHubClient:
             response = self._send_request("POST", "/logout/")
         except AnkiHubRequestError as e:
             response = e.response
-        finally:
-            self.session.headers["Authorization"] = ""
-            if response.status_code not in [204, 401]:
-                raise AnkiHubRequestError(response)
+        self.session.headers["Authorization"] = ""
+        if response.status_code not in [204, 401]:
+            raise AnkiHubRequestError(response)
 
     def upload_deck(self, file: Path, anki_deck_id: int, private: bool) -> uuid.UUID:
         key = file.name
