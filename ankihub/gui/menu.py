@@ -269,7 +269,7 @@ def sign_out_action():
         AnkiHubClient().signout()
     finally:
         config.save_token("")
-    tooltip("Signed out of AnkiHub!", parent=mw)
+        tooltip("Signed out of AnkiHub!", parent=mw)
 
 
 class LogUploadResultDialog(QDialog):
