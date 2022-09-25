@@ -336,7 +336,10 @@ class AnkiHubClient:
         self,
         ankihub_deck_uuid: uuid.UUID,
         since: str,
+        download_progress_cb: Optional[Callable[[int], None]] = None,
     ) -> Iterator[DeckUpdateChunk]:
+        # download_progress_cb gets passed the number of notes downloaded until now
+
         class Params(TypedDict, total=False):
             page: int
             since: str
@@ -348,6 +351,7 @@ class AnkiHubClient:
         }
         url = f"/decks/{ankihub_deck_uuid}/updates"
         i = 0
+        notes_count = 0
         while url is not None:
             response = self._send_request(
                 "GET",
@@ -365,6 +369,10 @@ class AnkiHubClient:
             yield note_updates
 
             i += 1
+            notes_count += len(note_updates.notes)
+
+            if download_progress_cb:
+                download_progress_cb(notes_count)
 
     def get_deck_by_id(self, ankihub_deck_uuid: uuid.UUID) -> Deck:
         response = self._send_request(

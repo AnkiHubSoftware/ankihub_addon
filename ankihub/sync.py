@@ -86,11 +86,22 @@ class AnkiHubSync:
 
     def _sync_deck(self, ankihub_did: str) -> bool:
         deck = config.private_config.decks[ankihub_did]
+
+        def download_progress_cb(notes_count: int):
+            mw.taskman.run_on_main(
+                lambda: mw.progress.update(
+                    "Downloading updates\n"
+                    f"for {deck['name']}\n"
+                    f"Notes downloaded: {notes_count}"
+                )
+            )
+
         client = AnkiHubClient()
         notes_data = []
         for chunk in client.get_deck_updates(
             uuid.UUID(ankihub_did),
             since=deck["latest_update"],
+            download_progress_cb=download_progress_cb,
         ):
             if mw.progress.want_cancel():
                 LOGGER.debug("User cancelled sync.")
