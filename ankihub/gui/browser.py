@@ -1,9 +1,16 @@
 from concurrent.futures import Future
 from pprint import pformat
+from typing import Optional, Sequence
 
+from anki.collection import BrowserColumns
 from aqt import mw
-from aqt.browser import Browser
-from aqt.gui_hooks import browser_will_show_context_menu
+from aqt.browser import Browser, CellRow, Column, ItemId
+from aqt.gui_hooks import (
+    browser_did_fetch_columns,
+    browser_did_fetch_row,
+    browser_will_show,
+    browser_will_show_context_menu,
+)
 from aqt.qt import QMenu
 from aqt.utils import showInfo, showText
 
@@ -12,6 +19,8 @@ from ..ankihub_client import AnkiHubRequestError
 from ..settings import AnkiHubCommands
 from ..suggestions import BulkNoteSuggestionsResult, suggest_notes_in_bulk
 from .suggestion_dialog import SuggestionDialog
+
+browser: Optional[Browser] = None
 
 
 def on_browser_will_show_context_menu(browser: Browser, context_menu: QMenu) -> None:
@@ -87,5 +96,51 @@ def on_suggest_notes_in_bulk_done(future: Future, browser: Browser) -> None:
     showText(msg, parent=browser)
 
 
+def on_browser_did_fetch_columns(columns: dict[str, Column]):
+    columns["ankihub"] = Column(
+        key="ankihub",
+        cards_mode_label="AnkiHub",
+        notes_mode_label="AnkiHub",
+        sorting=BrowserColumns.SORTING_NONE,
+        uses_cell_font=False,
+        alignment=BrowserColumns.ALIGNMENT_CENTER,
+    )
+
+
+def on_browser_did_fetch_row(
+    item_id: ItemId,
+    is_notes_mode: bool,
+    row: CellRow,
+    active_columns: Sequence[str],
+):
+    global browser
+
+    note = browser.table._state.get_note(item_id)
+    for index, key in enumerate(active_columns):
+        if key != "ankihub":
+            continue
+
+        try:
+            if "ankihub_id" in note:
+                if note["ankihub_id"]:
+                    val = "👑"
+                else:
+                    val = "👑 (not synced)"
+            else:
+                val = ""
+
+            row.cells[index].text = val
+        except Exception as error:
+            row.cells[index].text = f"{error}"
+
+
 def setup() -> None:
+    def store_browser_reference(browser_: Browser) -> None:
+        global browser
+        browser = browser_
+
+    browser_will_show.append(store_browser_reference)
+    browser_did_fetch_columns.append(on_browser_did_fetch_columns)
+    browser_did_fetch_row.append(on_browser_did_fetch_row)
+
     browser_will_show_context_menu.append(on_browser_will_show_context_menu)
