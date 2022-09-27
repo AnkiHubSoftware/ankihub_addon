@@ -97,10 +97,10 @@ def on_suggest_notes_in_bulk_done(future: Future, browser: Browser) -> None:
 
 
 def on_browser_did_fetch_columns(columns: dict[str, Column]):
-    columns["ankihub"] = Column(
-        key="ankihub",
-        cards_mode_label="AnkiHub",
-        notes_mode_label="AnkiHub",
+    columns["ankihub_id"] = Column(
+        key="ankihub_id",
+        cards_mode_label="AnkiHub ID",
+        notes_mode_label="AnkiHub ID",
         sorting=BrowserColumns.SORTING_NONE,
         uses_cell_font=False,
         alignment=BrowserColumns.ALIGNMENT_CENTER,
@@ -112,26 +112,29 @@ def on_browser_did_fetch_row(
     is_notes_mode: bool,
     row: CellRow,
     active_columns: Sequence[str],
-):
+) -> None:
     global browser
 
     note = browser.table._state.get_note(item_id)
-    for index, key in enumerate(active_columns):
-        if key != "ankihub":
-            continue
+    if (
+        index := active_columns.index("ankihub_id")
+        if "ankihub_id" in active_columns
+        else None
+    ) is None:
+        return
 
-        try:
-            if "ankihub_id" in note:
-                if note["ankihub_id"]:
-                    val = "👑"
-                else:
-                    val = "👑 (not synced)"
+    try:
+        if "ankihub_id" in note:
+            if note["ankihub_id"]:
+                val = note["ankihub_id"]
             else:
                 val = ""
+        else:
+            val = "❌"
 
-            row.cells[index].text = val
-        except Exception as error:
-            row.cells[index].text = f"{error}"
+        row.cells[index].text = val
+    except Exception as error:
+        row.cells[index].text = f"{error}"
 
 
 def setup() -> None:
