@@ -25,11 +25,27 @@ browser: Optional[Browser] = None
 
 def on_browser_will_show_context_menu(browser: Browser, context_menu: QMenu) -> None:
     menu = context_menu
+
     menu.addSeparator()
+
     menu.addAction(
         "AnkiHub: Bulk suggest notes",
         lambda: on_bulk_notes_suggest_action(browser),
     )
+
+    # setup copy ankihub_id to clipboard action
+    selected_nids = browser.selected_notes()
+    notes = [mw.col.get_note(selected_nid) for selected_nid in selected_nids]
+
+    copy_ankihub_id_action = menu.addAction(
+        "AnkiHub: Copy AnkiHub ID to clipboard",
+        lambda: mw.app.clipboard().setText(notes[0]["ankihub_id"]),
+    )
+
+    if not (
+        len(notes) == 1 and "ankihub_id" in (note := notes[0]) and note["ankihub_id"]
+    ):
+        copy_ankihub_id_action.setDisabled(True)
 
 
 def on_bulk_notes_suggest_action(browser: Browser) -> None:
