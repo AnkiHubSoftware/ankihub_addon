@@ -82,7 +82,7 @@ def authorized_client_for_user_test1():
     try:
         client.login(credentials=credentials_data)
     except:
-        # needed so that tests that should be skipped when not using vcr don't fail
+        # needed so that tests that are skipped when not using vcr don't fail
         yield None
     else:
         yield client
@@ -97,7 +97,7 @@ def authorized_client_for_user_test2():
     try:
         client.login(credentials=credentials_data)
     except:
-        # needed so that tests that should be skipped when not using vcr don't fail
+        # needed so that tests that are skipped when not using vcr don't fail
         yield None
     else:
         yield client
