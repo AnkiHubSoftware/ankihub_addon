@@ -165,6 +165,8 @@ logging.config.dictConfig(LOGGING)
 version_file = Path(__file__).parent / "VERSION"
 with version_file.open() as f:
     ADDON_VERSION: str = f.read().strip()
+LOGGER.debug(f"version: {ADDON_VERSION}")
+LOGGER.debug(f"VERSION file: {version_file}")
 
 try:
     manifest = json.loads((Path(__file__).parent / "manifest.json").read_text())
@@ -178,6 +180,7 @@ if ANKIHUB_APP_URL is None:
     ANKIHUB_APP_URL = config.public_config.get("ankihub_url")
     ANKIHUB_APP_URL = ANKIHUB_APP_URL if ANKIHUB_APP_URL else "https://app.ankihub.net"
 API_URL_BASE = f"{ANKIHUB_APP_URL}/api"
+LOGGER.debug(f"Starting with URL_BASE {API_URL_BASE}")
 
 # maybe override default API_URL_BASE of client
 ankihub_client.API_URL_BASE = API_URL_BASE
