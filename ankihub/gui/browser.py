@@ -150,7 +150,7 @@ def on_browser_did_fetch_row(
 
         row.cells[index].text = val
     except Exception as error:
-        row.cells[index].text = f"{error}"
+        row.cells[index].text = str(error)
 
 
 def setup() -> None:
