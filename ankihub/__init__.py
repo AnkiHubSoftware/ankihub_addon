@@ -7,16 +7,11 @@ import sys
 lib = (pathlib.Path(__file__).parent / "lib").absolute()
 sys.path.insert(0, str(lib))
 
-from . import settings  # noqa: E402
 
 LOGGER: logging.Logger = logging.getLogger("ankihub")
 
 SKIP_INIT = os.getenv("SKIP_INIT", False)
 LOGGER.debug(f"SKIP_INIT: {SKIP_INIT}")
-
-LOGGER.debug(f"VERSION file: {settings.version_file}")
-LOGGER.debug(f"version: {settings.ADDON_VERSION}")
-LOGGER.debug(f"Starting with URL_BASE {settings.API_URL_BASE}")
 
 
 def debug() -> None:
