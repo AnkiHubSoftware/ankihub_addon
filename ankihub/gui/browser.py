@@ -1,9 +1,16 @@
 from concurrent.futures import Future
 from pprint import pformat
+from typing import Optional, Sequence
 
+from anki.collection import BrowserColumns
 from aqt import mw
-from aqt.browser import Browser
-from aqt.gui_hooks import browser_will_show_context_menu
+from aqt.browser import Browser, CellRow, Column, ItemId
+from aqt.gui_hooks import (
+    browser_did_fetch_columns,
+    browser_did_fetch_row,
+    browser_will_show,
+    browser_will_show_context_menu,
+)
 from aqt.qt import QMenu
 from aqt.utils import showInfo, showText
 
@@ -13,14 +20,32 @@ from ..settings import AnkiHubCommands
 from ..suggestions import BulkNoteSuggestionsResult, suggest_notes_in_bulk
 from .suggestion_dialog import SuggestionDialog
 
+browser: Optional[Browser] = None
+
 
 def on_browser_will_show_context_menu(browser: Browser, context_menu: QMenu) -> None:
     menu = context_menu
+
     menu.addSeparator()
+
     menu.addAction(
         "AnkiHub: Bulk suggest notes",
         lambda: on_bulk_notes_suggest_action(browser),
     )
+
+    # setup copy ankihub_id to clipboard action
+    selected_nids = browser.selected_notes()
+    notes = [mw.col.get_note(selected_nid) for selected_nid in selected_nids]
+
+    copy_ankihub_id_action = menu.addAction(
+        "AnkiHub: Copy AnkiHub ID to clipboard",
+        lambda: mw.app.clipboard().setText(notes[0]["ankihub_id"]),
+    )
+
+    if not (
+        len(notes) == 1 and "ankihub_id" in (note := notes[0]) and note["ankihub_id"]
+    ):
+        copy_ankihub_id_action.setDisabled(True)
 
 
 def on_bulk_notes_suggest_action(browser: Browser) -> None:
@@ -87,5 +112,54 @@ def on_suggest_notes_in_bulk_done(future: Future, browser: Browser) -> None:
     showText(msg, parent=browser)
 
 
+def on_browser_did_fetch_columns(columns: dict[str, Column]):
+    columns["ankihub_id"] = Column(
+        key="ankihub_id",
+        cards_mode_label="AnkiHub ID",
+        notes_mode_label="AnkiHub ID",
+        sorting=BrowserColumns.SORTING_NONE,
+        uses_cell_font=False,
+        alignment=BrowserColumns.ALIGNMENT_CENTER,
+    )
+
+
+def on_browser_did_fetch_row(
+    item_id: ItemId,
+    is_notes_mode: bool,
+    row: CellRow,
+    active_columns: Sequence[str],
+) -> None:
+    global browser
+
+    note = browser.table._state.get_note(item_id)
+    if (
+        index := active_columns.index("ankihub_id")
+        if "ankihub_id" in active_columns
+        else None
+    ) is None:
+        return
+
+    try:
+        if "ankihub_id" in note:
+            if note["ankihub_id"]:
+                val = note["ankihub_id"]
+            else:
+                val = "ID Pending"
+        else:
+            val = "Not AnkiHub Note Type"
+
+        row.cells[index].text = val
+    except Exception as error:
+        row.cells[index].text = str(error)
+
+
 def setup() -> None:
+    def store_browser_reference(browser_: Browser) -> None:
+        global browser
+        browser = browser_
+
+    browser_will_show.append(store_browser_reference)
+    browser_did_fetch_columns.append(on_browser_did_fetch_columns)
+    browser_did_fetch_row.append(on_browser_did_fetch_row)
+
     browser_will_show_context_menu.append(on_browser_will_show_context_menu)
