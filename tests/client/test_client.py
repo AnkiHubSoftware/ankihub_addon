@@ -205,9 +205,7 @@ class TestCreateSuggestionsInBulk:
         )
         assert len(
             errors_by_nid
-        ) == 1 and "new note suggestion with this ankihub id already exists." in str(
-            errors_by_nid
-        )
+        ) == 1 and "Suggestion with this id already exists" in str(errors_by_nid)
 
     @pytest.mark.vcr()
     def test_create_auto_accepted_new_note_suggestion(
