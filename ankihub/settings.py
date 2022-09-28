@@ -8,12 +8,13 @@ from enum import Enum
 from json import JSONDecodeError
 from logging.handlers import RotatingFileHandler
 from pathlib import Path
+from pprint import pformat
 from typing import Any, Callable, Dict, Optional
 
 from anki.buildinfo import version as ANKI_VERSION
 from aqt import mw
 
-from . import ankihub_client
+from . import LOGGER, ankihub_client
 
 
 @dataclasses.dataclass
@@ -46,6 +47,7 @@ class Config:
                 except JSONDecodeError:
                     # TODO Instead of overwriting, query AnkiHub for config values.
                     self.private_config = self.new_config()
+        self._log_private_config()
         self.token_change_hook: Optional[Callable[[], None]] = None
         self.subscriptions_change_hook: Optional[Callable[[], None]] = None
 
@@ -60,6 +62,7 @@ class Config:
         with open(self._private_config_file_path, "w") as f:
             config_dict = dataclasses.asdict(self.private_config)
             f.write(json.dumps(config_dict, indent=4, sort_keys=True))
+        self._log_private_config()
 
     def save_token(self, token: str):
         self.private_config.token = token
@@ -106,6 +109,12 @@ class Config:
 
         if self.subscriptions_change_hook:
             self.subscriptions_change_hook()
+
+    def _log_private_config(self):
+        config_dict = dataclasses.asdict(self.private_config)
+        if config_dict["token"]:
+            config_dict["token"] = "REDACTED"
+        LOGGER.debug(f"private config:\n{pformat(config_dict)}")
 
 
 config: Config = Config()
@@ -156,6 +165,8 @@ logging.config.dictConfig(LOGGING)
 version_file = Path(__file__).parent / "VERSION"
 with version_file.open() as f:
     ADDON_VERSION: str = f.read().strip()
+LOGGER.debug(f"version: {ADDON_VERSION}")
+LOGGER.debug(f"VERSION file: {version_file}")
 
 try:
     manifest = json.loads((Path(__file__).parent / "manifest.json").read_text())
@@ -169,6 +180,7 @@ if ANKIHUB_APP_URL is None:
     ANKIHUB_APP_URL = config.public_config.get("ankihub_url")
     ANKIHUB_APP_URL = ANKIHUB_APP_URL if ANKIHUB_APP_URL else "https://app.ankihub.net"
 API_URL_BASE = f"{ANKIHUB_APP_URL}/api"
+LOGGER.debug(f"Starting with URL_BASE {API_URL_BASE}")
 
 # maybe override default API_URL_BASE of client
 ankihub_client.API_URL_BASE = API_URL_BASE
