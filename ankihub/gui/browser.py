@@ -144,9 +144,9 @@ def on_browser_did_fetch_row(
             if note["ankihub_id"]:
                 val = note["ankihub_id"]
             else:
-                val = ""
+                val = "ID Pending"
         else:
-            val = "❌"
+            val = "Not AnkiHub Note Type"
 
         row.cells[index].text = val
     except Exception as error:
