@@ -1,5 +1,5 @@
-import random
-import sys
+import os
+import subprocess
 import uuid
 from copy import deepcopy
 from datetime import datetime, timezone
@@ -11,36 +11,53 @@ import pytest
 import requests_mock
 from vcr import VCR
 
+COMPOSE_FILE = Path(os.getenv("COMPOSE_FILE"))
+
 TEST_DATA_PATH = Path(__file__).parent.parent / "test_data"
 DECK_CSV = TEST_DATA_PATH / "deck_with_one_basic_note.csv"
 
 VCR_CASSETTES_PATH = Path(__file__).parent / "cassettes"
 
-# TODO It would be great if we could automatically reset decks in the web app database before each test.
-# Then we could use a couple of deterministic ids instead of next_anki_id and next_uuid.
-#
-# Currently ids are problematic because they have to be unique to be succesfully validated in the web app and
-# deterministic for vcr to work.
-#
-# To record new casettes, delete the exising ones and run all tests in this file in one process:
-# pytest tests/client
-#
-# To run tests using the recorded cassettes run all tests in one process:
-# pytest tests/client
-# Tests don't pass when run individually with vcr enabled and existing casettes because the ids won't be the same.
-#
-# To run tests with vcr disabled, you have to reset the web app database and run the create_test_users script
-# between each run of the tests:
-# pytest tests/client --disable-vcr
-# or you can set DETERMINISTIC_IDS to False to not have to do that.
-DETERMINISTIC_IDS = True
+UUID_1 = uuid.UUID("11111111-1111-1111-1111-111111111111")
+UUID_2 = uuid.UUID("22222222-2222-2222-2222-222222222222")
 
-UUID_RND = random.Random()
-ANKI_NID_RND = random.Random()
 
-if DETERMINISTIC_IDS:
-    UUID_RND.seed(0)
-    ANKI_NID_RND.seed(0)
+@pytest.fixture(autouse=True)
+def set_ankihub_app_url():
+    from ankihub import ankihub_client
+
+    ankihub_client.API_URL_BASE = "http://localhost:8000/api"
+
+
+@pytest.fixture
+def client(vcr: VCR, request, marks):
+    from ankihub.ankihub_client import AnkiHubClient
+
+    if "skipifvcr" in marks and vcr_enabled(vcr):
+        pytest.skip("Skipping test because test has skipifvcr mark and VCR is enabled")
+
+    cassette_name = ".".join(request.node.nodeid.split("::")[1:]) + ".yaml"
+    cassette_path = VCR_CASSETTES_PATH / cassette_name
+    playback_mode = vcr_enabled(vcr) and cassette_path.exists()
+
+    if not playback_mode:
+        run_command_in_django_container("python manage.py runscript create_test_users")
+
+    client = AnkiHubClient()
+    yield client
+
+    if not playback_mode:
+        run_command_in_django_container("python manage.py flush --no-input")
+
+
+@pytest.fixture
+def marks(request):
+    # Yields a list of all marks on the current test
+    # See https://stackoverflow.com/a/61379477/6827339
+    marks = [m.name for m in request.node.iter_markers()]
+    if request.node.parent:
+        marks += [m.name for m in request.node.parent.iter_markers()]
+    yield marks
 
 
 def vcr_enabled(vcr: VCR):
@@ -52,55 +69,40 @@ def vcr_enabled(vcr: VCR):
     )
 
 
-def next_uuid():
-    return uuid.UUID(int=UUID_RND.getrandbits(128))
-
-
-def next_anki_id():
-    return ANKI_NID_RND.randint(0, sys.maxsize)
-
-
-@pytest.fixture(autouse=True)
-def set_ankihub_app_url(monkeypatch):
-    monkeypatch.setenv("ANKIHUB_APP_URL", "http://localhost:8000")
+def run_command_in_django_container(command):
+    subprocess.run(
+        [
+            "docker-compose",
+            "-f",
+            COMPOSE_FILE.absolute(),
+            "run",
+            "--rm",
+            "django",
+            "bash",
+            "-c",
+            command,
+        ]
+    )
 
 
 @pytest.fixture
-def client():
+def authorized_client_for_user_test1(client):
     from ankihub.ankihub_client import AnkiHubClient
 
-    client = AnkiHubClient()
+    client: AnkiHubClient = client
+    credentials_data = {"username": "test1", "password": "asdf"}
+    client.login(credentials=credentials_data)
     yield client
 
 
 @pytest.fixture
-def authorized_client_for_user_test1():
+def authorized_client_for_user_test2(client, request):
     from ankihub.ankihub_client import AnkiHubClient
 
-    client = AnkiHubClient()
-    credentials_data = {"username": "test1", "password": "asdf"}
-    try:
-        client.login(credentials=credentials_data)
-    except:
-        # needed so that tests that are skipped when not using vcr don't fail
-        yield None
-    else:
-        yield client
-
-
-@pytest.fixture
-def authorized_client_for_user_test2():
-    from ankihub.ankihub_client import AnkiHubClient
-
-    client = AnkiHubClient()
+    client: AnkiHubClient = client
     credentials_data = {"username": "test2", "password": "asdf"}
-    try:
-        client.login(credentials=credentials_data)
-    except:
-        # needed so that tests that are skipped when not using vcr don't fail
-        yield None
-    else:
-        yield client
+    client.login(credentials=credentials_data)
+    yield client
 
 
 @pytest.fixture
@@ -118,15 +120,15 @@ def new_note_suggestion():
     from ankihub.ankihub_client import Field, NewNoteSuggestion
 
     return NewNoteSuggestion(
-        ankihub_note_uuid=next_uuid(),
-        anki_nid=next_anki_id(),
+        ankihub_note_uuid=UUID_1,
+        anki_nid=1,
         fields=[
             Field(name="Front", value="front1", order=0),
             Field(name="Back", value="back1", order=1),
         ],
         tags=["tag1", "tag2"],
         comment="comment1",
-        ankihub_deck_uuid=next_uuid(),
+        ankihub_deck_uuid=UUID_1,
         note_type_name="Basic",
         anki_note_type_id=1,
     )
@@ -137,8 +139,8 @@ def new_note_suggestion_note_info():
     from ankihub.ankihub_client import Field, NoteInfo
 
     return NoteInfo(
-        ankihub_note_uuid=next_uuid(),
-        anki_nid=next_anki_id(),
+        ankihub_note_uuid=UUID_1,
+        anki_nid=1,
         fields=[
             Field(name="Front", value="front1", order=0),
             Field(name="Back", value="back1", order=1),
@@ -154,8 +156,8 @@ def change_note_suggestion():
     from ankihub.ankihub_client import ChangeNoteSuggestion, Field, SuggestionType
 
     return ChangeNoteSuggestion(
-        ankihub_note_uuid=next_uuid(),
-        anki_nid=-1,
+        ankihub_note_uuid=UUID_1,
+        anki_nid=1,
         fields=[
             Field(name="Front", value="front2", order=0),
             Field(name="Back", value="back2", order=1),
@@ -253,8 +255,8 @@ class TestCreateSuggestionsInBulk:
         new_note_suggestion.ankihub_deck_uuid = uuid_of_deck_of_user_test1
 
         new_note_suggestion_2 = deepcopy(new_note_suggestion)
-        new_note_suggestion_2.ankihub_note_uuid = next_uuid()
-        new_note_suggestion_2.anki_nid = next_anki_id()
+        new_note_suggestion_2.ankihub_note_uuid = UUID_2
+        new_note_suggestion_2.anki_nid = 2
 
         errors_by_nid = client.create_suggestions_in_bulk(
             suggestions=[new_note_suggestion, new_note_suggestion_2], auto_accept=False
@@ -281,7 +283,7 @@ class TestCreateSuggestionsInBulk:
 
         # try creating a new note suggestion with the same ankihub_note_uuid as the first one
         new_note_suggestion_2 = deepcopy(new_note_suggestion)
-        new_note_suggestion_2.anki_nid = next_anki_id()
+        new_note_suggestion_2.anki_nid = 2
         errors_by_nid = client.create_suggestions_in_bulk(
             suggestions=[new_note_suggestion], auto_accept=False
         )
@@ -404,6 +406,7 @@ class TestGetDeckUpdates:
         assert len(update_chunks) == 2
         assert all(len(chunk.notes) == page_size for chunk in update_chunks)
 
+    @pytest.mark.skipifvcr()
     def test_get_deck_updates_since(
         self,
         authorized_client_for_user_test1,
@@ -413,10 +416,6 @@ class TestGetDeckUpdates:
         vcr,
     ):
         from ankihub.ankihub_client import AnkiHubClient, DeckUpdateChunk, NoteInfo
-
-        if vcr_enabled(vcr):
-            # Skipping test as using VCR for it is not straightforward
-            pytest.skip("VCR is enabled, skipping test")
 
         client: AnkiHubClient = authorized_client_for_user_test1
 

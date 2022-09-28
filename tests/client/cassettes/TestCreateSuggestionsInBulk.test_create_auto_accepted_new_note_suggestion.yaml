@@ -18,7 +18,7 @@ interactions:
     uri: http://localhost:8000/api/login/
   response:
     body:
-      string: '{"expiry":"2022-09-30T13:33:17.827029Z","token":"33524cc8c3804e51348e86162f737e1e3c068808ec7217268b5f6e2f6145dd9f"}'
+      string: '{"expiry":"2022-10-05T10:51:08.465851Z","token":"999e6ef47cf0c1b0d8dad840139a5e78ae75913f859c9663c2e0096a2e223cbe"}'
     headers:
       Allow:
       - POST, OPTIONS
@@ -29,21 +29,21 @@ interactions:
       Content-Type:
       - application/json
       Date:
-      - Fri, 23 Sep 2022 13:33:18 GMT
+      - Wed, 28 Sep 2022 10:51:08 GMT
       Referrer-Policy:
       - same-origin
       Server:
       - WSGIServer/0.2 CPython/3.8.13
       Server-Timing:
-      - TimerPanel_utime;dur=488.9670000000024;desc="User CPU time", TimerPanel_stime;dur=80.28799999999947;desc="System
-        CPU time", TimerPanel_total;dur=569.2550000000018;desc="Total CPU time", TimerPanel_total_time;dur=352.60963439941406;desc="Elapsed
-        time", SQLPanel_sql_time;dur=4.824399948120117;desc="SQL 10 queries", CachePanel_total_time;dur=0;desc="Cache
+      - TimerPanel_utime;dur=447.50199999998586;desc="User CPU time", TimerPanel_stime;dur=35.356000000000165;desc="System
+        CPU time", TimerPanel_total;dur=482.857999999986;desc="Total CPU time", TimerPanel_total_time;dur=326.7195224761963;desc="Elapsed
+        time", SQLPanel_sql_time;dur=5.456686019897461;desc="SQL 9 queries", CachePanel_total_time;dur=0;desc="Cache
         0 Calls"
       Set-Cookie:
-      - csrftoken=gkWIuJxEQN1eLROVZbxBcoSBdRD9zrZpJ2M4iHQf8oKOOpNyhPpDKFBsCWGBYQRY;
-        expires=Fri, 22 Sep 2023 13:33:18 GMT; HttpOnly; Max-Age=31449600; Path=/;
+      - csrftoken=Rge4PWjDu1Ovq6JTaTdIwcNZ2hUIcZtZsscLtwn3DAi5GZy0WqY3lEs0yk2urxxy;
+        expires=Wed, 27 Sep 2023 10:51:08 GMT; HttpOnly; Max-Age=31449600; Path=/;
         SameSite=Lax
-      - sessionid=dbh7104j2ydiuphussx0itvm85ejbfck; expires=Fri, 30 Sep 2022 13:33:18
+      - sessionid=9hdlrnq9rcn8ltg0l96ix7ubjm3dvn02; expires=Wed, 05 Oct 2022 10:51:08
         GMT; HttpOnly; Max-Age=604800; Path=/; SameSite=Lax
       Vary:
       - Accept, Cookie, Accept-Language, Origin
@@ -57,22 +57,22 @@ interactions:
       code: 200
       message: OK
 - request:
-    body: '{"suggestions": [{"ankihub_id": "fcbd04c3-4021-2ef7-cca5-a5a19e4d6e3c",
-      "anki_id": 2569146471088859254, "fields": [{"name": "Front", "order": 0, "value":
-      "front1"}, {"name": "Back", "order": 1, "value": "back1"}], "tags": ["tag1",
-      "tag2"], "comment": "comment1", "deck_id": "dda0d3ad-89cd-45fb-8ddc-fabad93c2d7b",
-      "note_type": "Basic", "note_type_id": 1}], "auto_accept": true}'
+    body: '{"suggestions": [{"ankihub_id": "11111111-1111-1111-1111-111111111111",
+      "anki_id": 1, "fields": [{"name": "Front", "order": 0, "value": "front1"}, {"name":
+      "Back", "order": 1, "value": "back1"}], "tags": ["tag1", "tag2"], "comment":
+      "comment1", "deck_id": "dda0d3ad-89cd-45fb-8ddc-fabad93c2d7b", "note_type":
+      "Basic", "note_type_id": 1}], "auto_accept": true}'
     headers:
       Accept:
       - '*/*'
       Accept-Encoding:
       - gzip, deflate
       Authorization:
-      - Token 33524cc8c3804e51348e86162f737e1e3c068808ec7217268b5f6e2f6145dd9f
+      - Token 999e6ef47cf0c1b0d8dad840139a5e78ae75913f859c9663c2e0096a2e223cbe
       Connection:
       - keep-alive
       Content-Length:
-      - '377'
+      - '359'
       Content-Type:
       - application/json
       User-Agent:
@@ -81,26 +81,26 @@ interactions:
     uri: http://localhost:8000/api/notes/bulk-new-note-suggestions/
   response:
     body:
-      string: '[{"ankihub_id":"fcbd04c3-4021-2ef7-cca5-a5a19e4d6e3c","anki_id":2569146471088859254,"fields":[{"name":"Front","order":0,"value":"front1"},{"name":"Back","order":1,"value":"back1"}],"tags":["tag1","tag2"],"comment":"comment1","deck_id":"dda0d3ad-89cd-45fb-8ddc-fabad93c2d7b","note_type":"Basic","note_type_id":1,"id":5}]'
+      string: '[{"ankihub_id":"11111111-1111-1111-1111-111111111111","anki_id":1,"fields":[{"name":"Front","order":0,"value":"front1"},{"name":"Back","order":1,"value":"back1"}],"tags":["tag1","tag2"],"comment":"comment1","deck_id":"dda0d3ad-89cd-45fb-8ddc-fabad93c2d7b","note_type":"Basic","note_type_id":1,"id":1}]'
     headers:
       Allow:
       - POST, OPTIONS
       Content-Language:
       - en
       Content-Length:
-      - '319'
+      - '301'
       Content-Type:
       - application/json
       Date:
-      - Fri, 23 Sep 2022 13:33:19 GMT
+      - Wed, 28 Sep 2022 10:51:09 GMT
       Referrer-Policy:
       - same-origin
       Server:
       - WSGIServer/0.2 CPython/3.8.13
       Server-Timing:
-      - TimerPanel_utime;dur=1109.0649999999869;desc="User CPU time", TimerPanel_stime;dur=11.757000000002904;desc="System
-        CPU time", TimerPanel_total;dur=1120.8219999999897;desc="Total CPU time",
-        TimerPanel_total_time;dur=1136.2690925598145;desc="Elapsed time", SQLPanel_sql_time;dur=14.671087265014648;desc="SQL
+      - TimerPanel_utime;dur=1139.154000000019;desc="User CPU time", TimerPanel_stime;dur=70.35700000000134;desc="System
+        CPU time", TimerPanel_total;dur=1209.5110000000204;desc="Total CPU time",
+        TimerPanel_total_time;dur=1164.820909500122;desc="Elapsed time", SQLPanel_sql_time;dur=8.861541748046875;desc="SQL
         28 queries", CachePanel_total_time;dur=0;desc="Cache 0 Calls"
       Vary:
       - Accept, Accept-Language, Cookie, Origin
@@ -121,7 +121,7 @@ interactions:
       Accept-Encoding:
       - gzip, deflate
       Authorization:
-      - Token 33524cc8c3804e51348e86162f737e1e3c068808ec7217268b5f6e2f6145dd9f
+      - Token 999e6ef47cf0c1b0d8dad840139a5e78ae75913f859c9663c2e0096a2e223cbe
       Connection:
       - keep-alive
       Content-Type:
@@ -129,30 +129,30 @@ interactions:
       User-Agent:
       - python-requests/2.28.1
     method: GET
-    uri: http://localhost:8000/api/notes/fcbd04c3-4021-2ef7-cca5-a5a19e4d6e3c
+    uri: http://localhost:8000/api/notes/11111111-1111-1111-1111-111111111111
   response:
     body:
-      string: '{"deck_id":"dda0d3ad-89cd-45fb-8ddc-fabad93c2d7b","note_id":"fcbd04c3-4021-2ef7-cca5-a5a19e4d6e3c","tags":["tag1","tag2"],"anki_id":2569146471088859254,"fields":[{"name":"Front","order":0,"value":"front1"},{"name":"Back","order":1,"value":"back1"}],"note_type":"Basic","note_type_id":1,"last_update_type":"new_note"}'
+      string: '{"deck_id":"dda0d3ad-89cd-45fb-8ddc-fabad93c2d7b","note_id":"11111111-1111-1111-1111-111111111111","tags":["tag1","tag2"],"anki_id":1,"fields":[{"name":"Front","order":0,"value":"front1"},{"name":"Back","order":1,"value":"back1"}],"note_type":"Basic","note_type_id":1,"last_update_type":"new_note"}'
     headers:
       Allow:
       - GET, HEAD, OPTIONS
       Content-Language:
       - en
       Content-Length:
-      - '316'
+      - '298'
       Content-Type:
       - application/json
       Date:
-      - Fri, 23 Sep 2022 13:33:19 GMT
+      - Wed, 28 Sep 2022 10:51:10 GMT
       Referrer-Policy:
       - same-origin
       Server:
       - WSGIServer/0.2 CPython/3.8.13
       Server-Timing:
-      - TimerPanel_utime;dur=377.22300000001496;desc="User CPU time", TimerPanel_stime;dur=48.33099999999746;desc="System
-        CPU time", TimerPanel_total;dur=425.5540000000124;desc="Total CPU time", TimerPanel_total_time;dur=403.0325412750244;desc="Elapsed
-        time", SQLPanel_sql_time;dur=3.651142120361328;desc="SQL 7 queries", CachePanel_total_time;dur=0;desc="Cache
-        0 Calls"
+      - TimerPanel_utime;dur=359.6200000000067;desc="User CPU time", TimerPanel_stime;dur=11.925999999998993;desc="System
+        CPU time", TimerPanel_total;dur=371.54600000000573;desc="Total CPU time",
+        TimerPanel_total_time;dur=351.5346050262451;desc="Elapsed time", SQLPanel_sql_time;dur=4.163026809692383;desc="SQL
+        7 queries", CachePanel_total_time;dur=0;desc="Cache 0 Calls"
       Vary:
       - Accept, Accept-Language, Cookie, Origin
       X-Content-Type-Options:
