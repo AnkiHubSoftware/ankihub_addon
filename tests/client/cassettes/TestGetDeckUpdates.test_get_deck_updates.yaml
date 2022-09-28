@@ -1,0 +1,161 @@
+interactions:
+- request:
+    body: '{"username": "test2", "password": "asdf"}'
+    headers:
+      Accept:
+      - '*/*'
+      Accept-Encoding:
+      - gzip, deflate
+      Connection:
+      - keep-alive
+      Content-Length:
+      - '41'
+      Content-Type:
+      - application/json
+      User-Agent:
+      - python-requests/2.28.1
+    method: POST
+    uri: http://localhost:8000/api/login/
+  response:
+    body:
+      string: '{"expiry":"2022-10-05T10:51:32.874513Z","token":"a13c4a4f1e27c9a112d0c1e78b641fba2b656a2eeeb43f62adc34526c7a2462f"}'
+    headers:
+      Allow:
+      - POST, OPTIONS
+      Content-Language:
+      - en
+      Content-Length:
+      - '115'
+      Content-Type:
+      - application/json
+      Date:
+      - Wed, 28 Sep 2022 10:51:33 GMT
+      Referrer-Policy:
+      - same-origin
+      Server:
+      - WSGIServer/0.2 CPython/3.8.13
+      Server-Timing:
+      - TimerPanel_utime;dur=411.4490000000046;desc="User CPU time", TimerPanel_stime;dur=67.56100000000131;desc="System
+        CPU time", TimerPanel_total;dur=479.0100000000059;desc="Total CPU time", TimerPanel_total_time;dur=329.61153984069824;desc="Elapsed
+        time", SQLPanel_sql_time;dur=4.055261611938477;desc="SQL 9 queries", CachePanel_total_time;dur=0;desc="Cache
+        0 Calls"
+      Set-Cookie:
+      - csrftoken=lH6SBjJbztTkVELR0y6c9kvxOLUKifId5EjuPQI1khIECLPXOnCYudNLha8IwEdN;
+        expires=Wed, 27 Sep 2023 10:51:33 GMT; HttpOnly; Max-Age=31449600; Path=/;
+        SameSite=Lax
+      - sessionid=84pn3djyr76c3t5x8mm8dhkw7lbmij58; expires=Wed, 05 Oct 2022 10:51:33
+        GMT; HttpOnly; Max-Age=604800; Path=/; SameSite=Lax
+      Vary:
+      - Accept, Cookie, Accept-Language, Origin
+      X-Content-Type-Options:
+      - nosniff
+      X-Frame-Options:
+      - DENY
+      X-XSS-Protection:
+      - 1; mode=block
+    status:
+      code: 200
+      message: OK
+- request:
+    body: null
+    headers:
+      Accept:
+      - '*/*'
+      Accept-Encoding:
+      - gzip, deflate
+      Authorization:
+      - Token a13c4a4f1e27c9a112d0c1e78b641fba2b656a2eeeb43f62adc34526c7a2462f
+      Connection:
+      - keep-alive
+      Content-Type:
+      - application/json
+      User-Agent:
+      - python-requests/2.28.1
+    method: GET
+    uri: http://localhost:8000/api/decks/5528aef7-f7ac-406b-9b35-4eaf00de4b20/updates?size=5
+  response:
+    body:
+      string: '{"next":"http://localhost:8000/api/decks/5528aef7-f7ac-406b-9b35-4eaf00de4b20/updates?cursor=cD00OTY5NjVlNy1jZmU2LTRkYWItYWMwNi04NWVjNmYwMTJmMGY%3D&size=5","notes":[{"deck_id":"5528aef7-f7ac-406b-9b35-4eaf00de4b20","note_id":"0ce33e24-2b41-4c5a-a5f2-dbdc02382d9b","tags":["tag_0","tag_1","tag_2","tag_3","tag_4","tag_5","tag_6","tag_7","tag_8","tag_9"],"anki_id":1335510602,"fields":[{"name":"abc_0","order":0,"value":"abc"},{"name":"abc_1","order":1,"value":"abc"}],"note_type":"Basic","note_type_id":2,"last_update_type":"original_content"},{"deck_id":"5528aef7-f7ac-406b-9b35-4eaf00de4b20","note_id":"2261843c-ac98-4850-ab62-3708c1d43ad1","tags":["tag_0","tag_1","tag_2","tag_3","tag_4","tag_5","tag_6","tag_7","tag_8","tag_9"],"anki_id":4251792173,"fields":[{"name":"abc_0","order":0,"value":"abc"},{"name":"abc_1","order":1,"value":"abc"}],"note_type":"Basic","note_type_id":2,"last_update_type":"original_content"},{"deck_id":"5528aef7-f7ac-406b-9b35-4eaf00de4b20","note_id":"2aaea44b-0674-4c8f-a1d5-20601c53fefc","tags":["tag_0","tag_1","tag_2","tag_3","tag_4","tag_5","tag_6","tag_7","tag_8","tag_9"],"anki_id":4157659139,"fields":[{"name":"abc_0","order":0,"value":"abc"},{"name":"abc_1","order":1,"value":"abc"}],"note_type":"Basic","note_type_id":2,"last_update_type":"original_content"},{"deck_id":"5528aef7-f7ac-406b-9b35-4eaf00de4b20","note_id":"3a3d85c2-f5dc-4d7d-9f8b-b08b45dbc1d4","tags":["tag_0","tag_1","tag_2","tag_3","tag_4","tag_5","tag_6","tag_7","tag_8","tag_9"],"anki_id":2419746006,"fields":[{"name":"abc_0","order":0,"value":"abc"},{"name":"abc_1","order":1,"value":"abc"}],"note_type":"Basic","note_type_id":2,"last_update_type":"original_content"},{"deck_id":"5528aef7-f7ac-406b-9b35-4eaf00de4b20","note_id":"496965e7-cfe6-4dab-ac06-85ec6f012f0f","tags":["tag_0","tag_1","tag_2","tag_3","tag_4","tag_5","tag_6","tag_7","tag_8","tag_9"],"anki_id":1733573066,"fields":[{"name":"abc_0","order":0,"value":"abc"},{"name":"abc_1","order":1,"value":"abc"}],"note_type":"Basic","note_type_id":2,"last_update_type":"original_content"}],"protected_fields":{},"protected_tags":[],"latest_update":"2022-09-28T10:51:33.225279+0000"}'
+    headers:
+      Allow:
+      - GET, HEAD, OPTIONS
+      Content-Language:
+      - en
+      Content-Length:
+      - '2148'
+      Content-Type:
+      - application/json
+      Date:
+      - Wed, 28 Sep 2022 10:51:33 GMT
+      Referrer-Policy:
+      - same-origin
+      Server:
+      - WSGIServer/0.2 CPython/3.8.13
+      Server-Timing:
+      - TimerPanel_utime;dur=490.65400000000636;desc="User CPU time", TimerPanel_stime;dur=11.272000000001725;desc="System
+        CPU time", TimerPanel_total;dur=501.9260000000081;desc="Total CPU time", TimerPanel_total_time;dur=506.5140724182129;desc="Elapsed
+        time", SQLPanel_sql_time;dur=4.799842834472656;desc="SQL 10 queries", CachePanel_total_time;dur=0;desc="Cache
+        0 Calls"
+      Vary:
+      - Accept, Accept-Language, Cookie, Origin
+      X-Content-Type-Options:
+      - nosniff
+      X-Frame-Options:
+      - DENY
+      X-XSS-Protection:
+      - 1; mode=block
+    status:
+      code: 200
+      message: OK
+- request:
+    body: null
+    headers:
+      Accept:
+      - '*/*'
+      Accept-Encoding:
+      - gzip, deflate
+      Authorization:
+      - Token a13c4a4f1e27c9a112d0c1e78b641fba2b656a2eeeb43f62adc34526c7a2462f
+      Connection:
+      - keep-alive
+      Content-Type:
+      - application/json
+      User-Agent:
+      - python-requests/2.28.1
+    method: GET
+    uri: http://localhost:8000/api/decks/5528aef7-f7ac-406b-9b35-4eaf00de4b20/updates?cursor=cD00OTY5NjVlNy1jZmU2LTRkYWItYWMwNi04NWVjNmYwMTJmMGY%3D&size=5
+  response:
+    body:
+      string: '{"next":null,"notes":[{"deck_id":"5528aef7-f7ac-406b-9b35-4eaf00de4b20","note_id":"7c69383e-a907-4432-8b58-3732d1a00e48","tags":["tag_0","tag_1","tag_2","tag_3","tag_4","tag_5","tag_6","tag_7","tag_8","tag_9"],"anki_id":3902837405,"fields":[{"name":"abc_0","order":0,"value":"abc"},{"name":"abc_1","order":1,"value":"abc"}],"note_type":"Basic","note_type_id":2,"last_update_type":"original_content"},{"deck_id":"5528aef7-f7ac-406b-9b35-4eaf00de4b20","note_id":"915e3192-f897-4b19-a922-b3fcf0f66e92","tags":["tag_0","tag_1","tag_2","tag_3","tag_4","tag_5","tag_6","tag_7","tag_8","tag_9"],"anki_id":4169756873,"fields":[{"name":"abc_0","order":0,"value":"abc"},{"name":"abc_1","order":1,"value":"abc"}],"note_type":"Basic","note_type_id":2,"last_update_type":"original_content"},{"deck_id":"5528aef7-f7ac-406b-9b35-4eaf00de4b20","note_id":"a3b9f4f0-b486-4073-aa4e-cbab189af4bb","tags":["tag_0","tag_1","tag_2","tag_3","tag_4","tag_5","tag_6","tag_7","tag_8","tag_9"],"anki_id":962823065,"fields":[{"name":"abc_0","order":0,"value":"abc"},{"name":"abc_1","order":1,"value":"abc"}],"note_type":"Basic","note_type_id":2,"last_update_type":"original_content"},{"deck_id":"5528aef7-f7ac-406b-9b35-4eaf00de4b20","note_id":"aa46d015-31f1-4996-b220-d4a7f3291593","tags":["tag_0","tag_1","tag_2","tag_3","tag_4","tag_5","tag_6","tag_7","tag_8","tag_9"],"anki_id":4184818270,"fields":[{"name":"abc_0","order":0,"value":"abc"},{"name":"abc_1","order":1,"value":"abc"}],"note_type":"Basic","note_type_id":2,"last_update_type":"original_content"},{"deck_id":"5528aef7-f7ac-406b-9b35-4eaf00de4b20","note_id":"b31787de-03ce-4b50-9031-16266a8ca8c1","tags":["tag_0","tag_1","tag_2","tag_3","tag_4","tag_5","tag_6","tag_7","tag_8","tag_9"],"anki_id":3995284795,"fields":[{"name":"abc_0","order":0,"value":"abc"},{"name":"abc_1","order":1,"value":"abc"}],"note_type":"Basic","note_type_id":2,"last_update_type":"original_content"}],"protected_fields":{},"protected_tags":[],"latest_update":"2022-09-28T10:51:33.790554+0000"}'
+    headers:
+      Allow:
+      - GET, HEAD, OPTIONS
+      Content-Language:
+      - en
+      Content-Length:
+      - '2004'
+      Content-Type:
+      - application/json
+      Date:
+      - Wed, 28 Sep 2022 10:51:34 GMT
+      Referrer-Policy:
+      - same-origin
+      Server:
+      - WSGIServer/0.2 CPython/3.8.13
+      Server-Timing:
+      - TimerPanel_utime;dur=622.5620000000163;desc="User CPU time", TimerPanel_stime;dur=24.39099999999783;desc="System
+        CPU time", TimerPanel_total;dur=646.9530000000141;desc="Total CPU time", TimerPanel_total_time;dur=622.3056316375732;desc="Elapsed
+        time", SQLPanel_sql_time;dur=5.113840103149414;desc="SQL 10 queries", CachePanel_total_time;dur=0;desc="Cache
+        0 Calls"
+      Vary:
+      - Accept, Accept-Language, Cookie, Origin
+      X-Content-Type-Options:
+      - nosniff
+      X-Frame-Options:
+      - DENY
+      X-XSS-Protection:
+      - 1; mode=block
+    status:
+      code: 200
+      message: OK
+version: 1
