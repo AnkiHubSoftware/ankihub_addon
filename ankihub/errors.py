@@ -83,7 +83,7 @@ def maybe_handle_ankihub_request_error(error: AnkiHubRequestError) -> bool:
         return True
     elif (
         response.status_code == 406
-        and response.reason == "Outdated client, please update"
+        and response.reason == "Outdated client, please update the AnkiHub add-on."
     ):
         showWarning(
             "Please update the AnkiHub add-on to the latest version.",
