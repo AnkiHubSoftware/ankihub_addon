@@ -28,6 +28,7 @@ from .lib.dataclasses_json import DataClassJsonMixin  # type: ignore
 LOGGER = logging.getLogger(__name__)
 
 API_URL_BASE = "https://app.ankihub.net/api"
+API_VERSION = 1.0
 
 DECK_UPDATE_PAGE_SIZE = 2000  # seems to work well in terms of speed
 
@@ -197,6 +198,9 @@ class AnkiHubClient:
         self.session = Session()
         self.session.hooks["response"] = self.hooks
         self.session.headers.update({"Content-Type": "application/json"})
+        self.session.headers.update(
+            {"Accept": f"application/json; version={API_VERSION}"}
+        )
         if token:
             self.session.headers["Authorization"] = f"Token {token}"
 
