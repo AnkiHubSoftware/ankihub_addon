@@ -37,7 +37,10 @@ def handle_exception(
             return True
 
     if isinstance(exc, ConnectionError):
-        tooltip("AnkiHub: Could not connect to the internet.", parent=mw)
+        tooltip(
+            "Could not connect to AnkiHub (no internet or the site is down for maintenance)",
+            parent=mw,
+        )
         return True
 
     if (isinstance(exc, DBError) and "is full" in str(exc).lower()) or (
