@@ -52,6 +52,11 @@ def on_bulk_notes_suggest_action(browser: Browser) -> None:
     selected_nids = browser.selected_notes()
     notes = [mw.col.get_note(selected_nid) for selected_nid in selected_nids]
 
+    if len(notes) > 500:
+        msg = "Please select less than 500 notes at a time for bulk suggestions.<br>"
+        showInfo(msg, parent=browser)
+        return
+
     if not (dialog := SuggestionDialog(command=AnkiHubCommands.CHANGE)).exec():
         return
 
