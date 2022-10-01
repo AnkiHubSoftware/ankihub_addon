@@ -57,7 +57,7 @@ class SuggestionDialog(QDialog):
         layout.addWidget(edit)
 
         # "auto-accept" checkbox
-        self.auto_accept_cb = QCheckBox("submit without review")
+        self.auto_accept_cb = QCheckBox("Submit without review (maintainers only).")
         layout.addWidget(self.auto_accept_cb)
 
         # button box
