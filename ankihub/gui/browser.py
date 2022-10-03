@@ -200,6 +200,10 @@ class EditedAfterSyncColumn(CustomColumn):
 
         db = AnkiHubDB()
         sync_mod = db.last_sync(uuid.UUID(note["ankihub_id"]))
+        if sync_mod is None:
+            # The sync_mod value can be None if the note was synced with an early version of the AnkiHub add-on
+            return "No Information"
+
         return "Yes" if note.mod > sync_mod else "No"
 
 
