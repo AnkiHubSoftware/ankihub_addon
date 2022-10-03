@@ -1,4 +1,5 @@
 import sqlite3
+import uuid
 from typing import Any, List, Optional
 
 from anki.models import NotetypeId
@@ -128,6 +129,12 @@ class AnkiHubDB:
     def ankihub_deck_ids(self) -> List[str]:
         self.c.execute("SELECT DISTINCT ankihub_deck_id FROM notes")
         return [x[0] for x in self.c.fetchall()]
+
+    def last_sync(self, ankihub_note_id: uuid.UUID) -> Optional[int]:
+        self.c.execute(
+            "SELECT mod FROM notes WHERE ankihub_note_id = ?", (str(ankihub_note_id),)
+        )
+        return fetch_one_or_none(self.c)
 
 
 def fetch_one_or_none(c: sqlite3.Cursor) -> Optional[Any]:

@@ -1,7 +1,8 @@
+import uuid
 from abc import abstractmethod
 from concurrent.futures import Future
 from pprint import pformat
-from typing import Optional, Sequence
+from typing import List, Optional, Sequence
 
 from anki.collection import BrowserColumns
 from anki.notes import Note
@@ -18,6 +19,7 @@ from aqt.utils import showInfo, showText
 
 from .. import LOGGER
 from ..ankihub_client import AnkiHubRequestError
+from ..db import AnkiHubDB
 from ..settings import AnkiHubCommands
 from ..suggestions import BulkNoteSuggestionsResult, suggest_notes_in_bulk
 from .suggestion_dialog import SuggestionDialog
@@ -125,7 +127,6 @@ class CustomColumn:
     def on_browser_did_fetch_row(
         self,
         item_id: ItemId,
-        is_notes_mode: bool,
         row: CellRow,
         active_columns: Sequence[str],
     ) -> None:
@@ -179,7 +180,30 @@ class AnkiHubIdColumn(CustomColumn):
             return "Not AnkiHub Note Type"
 
 
-custom_columns = [AnkiHubIdColumn()]
+class EditedAfterSyncColumn(CustomColumn):
+
+    builtin_column = Column(
+        key="edited_after_sync",
+        cards_mode_label="AnkiHub: Edited After Sync",
+        notes_mode_label="AnkiHub: Edited After Sync",
+        sorting=BrowserColumns.SORTING_NONE,
+        uses_cell_font=False,
+        alignment=BrowserColumns.ALIGNMENT_CENTER,
+    )
+
+    def _display_value(
+        self,
+        note: Note,
+    ) -> str:
+        if "ankihub_id" not in note or not note["ankihub_id"]:
+            return ""
+
+        db = AnkiHubDB()
+        sync_mod = db.last_sync(uuid.UUID(note["ankihub_id"]))
+        return "Yes" if note.mod > sync_mod else "No"
+
+
+custom_columns: List[CustomColumn] = [AnkiHubIdColumn(), EditedAfterSyncColumn()]
 
 
 def on_browser_did_fetch_columns(columns: dict[str, Column]):
@@ -194,7 +218,11 @@ def on_browser_did_fetch_row(
     active_columns: Sequence[str],
 ) -> None:
     for column in custom_columns:
-        column.on_browser_did_fetch_row(item_id, is_notes_mode, row, active_columns)
+        column.on_browser_did_fetch_row(
+            item_id=item_id,
+            row=row,
+            active_columns=active_columns,
+        )
 
 
 def setup() -> None:
