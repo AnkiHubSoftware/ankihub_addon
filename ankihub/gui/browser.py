@@ -1,8 +1,10 @@
+from abc import abstractmethod
 from concurrent.futures import Future
 from pprint import pformat
 from typing import Optional, Sequence
 
 from anki.collection import BrowserColumns
+from anki.notes import Note
 from aqt import mw
 from aqt.browser import Browser, CellRow, Column, ItemId
 from aqt.gui_hooks import (
@@ -117,8 +119,45 @@ def on_suggest_notes_in_bulk_done(future: Future, browser: Browser) -> None:
     showText(msg, parent=browser)
 
 
-def on_browser_did_fetch_columns(columns: dict[str, Column]):
-    columns["ankihub_id"] = Column(
+class CustomColumn:
+    builtin_column: Column
+
+    def on_browser_did_fetch_row(
+        self,
+        item_id: ItemId,
+        is_notes_mode: bool,
+        row: CellRow,
+        active_columns: Sequence[str],
+    ) -> None:
+        if (
+            index := active_columns.index(self.key)
+            if self.key in active_columns
+            else None
+        ) is None:
+            return
+
+        note = browser.table._state.get_note(item_id)
+        try:
+            value = self._display_value(note)
+            row.cells[index].text = value
+        except Exception as error:
+            row.cells[index].text = str(error)
+
+    @property
+    def key(self):
+        return self.builtin_column.key
+
+    @abstractmethod
+    def _display_value(
+        self,
+        note: Note,
+    ) -> str:
+        raise NotImplementedError
+
+
+class AnkiHubIdColumn(CustomColumn):
+
+    builtin_column = Column(
         key="ankihub_id",
         cards_mode_label="AnkiHub ID",
         notes_mode_label="AnkiHub ID",
@@ -127,6 +166,26 @@ def on_browser_did_fetch_columns(columns: dict[str, Column]):
         alignment=BrowserColumns.ALIGNMENT_CENTER,
     )
 
+    def _display_value(
+        self,
+        note: Note,
+    ) -> str:
+        if "ankihub_id" in note:
+            if note["ankihub_id"]:
+                return note["ankihub_id"]
+            else:
+                return "ID Pending"
+        else:
+            return "Not AnkiHub Note Type"
+
+
+custom_columns = [AnkiHubIdColumn()]
+
+
+def on_browser_did_fetch_columns(columns: dict[str, Column]):
+    for column in custom_columns:
+        columns[column.key] = column.builtin_column
+
 
 def on_browser_did_fetch_row(
     item_id: ItemId,
@@ -134,28 +193,8 @@ def on_browser_did_fetch_row(
     row: CellRow,
     active_columns: Sequence[str],
 ) -> None:
-    global browser
-
-    note = browser.table._state.get_note(item_id)
-    if (
-        index := active_columns.index("ankihub_id")
-        if "ankihub_id" in active_columns
-        else None
-    ) is None:
-        return
-
-    try:
-        if "ankihub_id" in note:
-            if note["ankihub_id"]:
-                val = note["ankihub_id"]
-            else:
-                val = "ID Pending"
-        else:
-            val = "Not AnkiHub Note Type"
-
-        row.cells[index].text = val
-    except Exception as error:
-        row.cells[index].text = str(error)
+    for column in custom_columns:
+        column.on_browser_did_fetch_row(item_id, is_notes_mode, row, active_columns)
 
 
 def setup() -> None:
