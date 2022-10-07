@@ -185,8 +185,8 @@ class EditedAfterSyncColumn(CustomColumn):
 
     builtin_column = Column(
         key="edited_after_sync",
-        cards_mode_label="AnkiHub: Edited After Sync",
-        notes_mode_label="AnkiHub: Edited After Sync",
+        cards_mode_label="AnkiHub: Modified After Sync",
+        notes_mode_label="AnkiHub: Modified After Sync",
         sorting=BrowserColumns.SORTING_NONE,
         uses_cell_font=False,
         alignment=BrowserColumns.ALIGNMENT_CENTER,
