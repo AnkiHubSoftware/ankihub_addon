@@ -197,12 +197,12 @@ class EditedAfterSyncColumn(CustomColumn):
         note: Note,
     ) -> str:
         if "ankihub_id" not in note or not note["ankihub_id"]:
-            return ""
+            return "N/A"
 
         last_sync = db.last_sync(uuid.UUID(note["ankihub_id"]))
         if last_sync is None:
             # The sync_mod value can be None if the note was synced with an early version of the AnkiHub add-on
-            return "No Information"
+            return "Unknown"
 
         return "Yes" if note.mod > last_sync else "No"
 
