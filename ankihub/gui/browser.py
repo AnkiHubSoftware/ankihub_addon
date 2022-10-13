@@ -2,7 +2,7 @@ import uuid
 from abc import abstractmethod
 from concurrent.futures import Future
 from pprint import pformat
-from typing import Callable, List, Optional, Sequence
+from typing import List, Optional, Sequence
 
 from anki.collection import BrowserColumns
 from anki.notes import Note
@@ -21,7 +21,7 @@ from aqt.utils import showInfo, showText
 
 from .. import LOGGER
 from ..ankihub_client import AnkiHubRequestError
-from ..db import AnkiHubDB, attach_ankihub_db_to_anki_db
+from ..db import AnkiHubDB
 from ..settings import ANKIHUB_NOTE_TYPE_FIELD_NAME, AnkiHubCommands
 from ..suggestions import BulkNoteSuggestionsResult, suggest_notes_in_bulk
 from .suggestion_dialog import SuggestionDialog
@@ -126,8 +126,6 @@ def on_suggest_notes_in_bulk_done(future: Future, browser: Browser) -> None:
 
 class CustomColumn:
     builtin_column: Column
-    order_by_str: Optional[str] = None
-    create_sort_table: Optional[Callable] = None
 
     def on_browser_did_fetch_row(
         self,
@@ -160,6 +158,11 @@ class CustomColumn:
     ) -> str:
         raise NotImplementedError
 
+    def order_by_str(self) -> Optional[str]:
+        """Return the SQL string that will be appended after "ORDER BY" to the query that
+        fetches the search results when sorting by this column."""
+        return None
+
 
 class AnkiHubIdColumn(CustomColumn):
 
@@ -190,7 +193,7 @@ class EditedAfterSyncColumn(CustomColumn):
         key="edited_after_sync",
         cards_mode_label="AnkiHub: Modified After Sync",
         notes_mode_label="AnkiHub: Modified After Sync",
-        sorting=BrowserColumns.SORTING_ASCENDING,
+        sorting=BrowserColumns.SORTING_DESCENDING,
         uses_cell_font=False,
         alignment=BrowserColumns.ALIGNMENT_CENTER,
     )
@@ -209,17 +212,6 @@ class EditedAfterSyncColumn(CustomColumn):
 
         return "Yes" if note.mod > last_sync else "No"
 
-    def create_sort_table(self) -> None:
-        attach_ankihub_db_to_anki_db()
-
-        mw.col.db.execute("DROP TABLE IF EXISTS temp")
-        mw.col.db.execute(
-            "CREATE TABLE temp (anki_id INTEGER PRIMARY KEY, mod INTEGER)"
-        )
-        mw.col.db.execute(
-            "INSERT INTO temp SELECT anki_note_id, mod FROM ankihub_db.notes"
-        )
-
     def order_by_str(self) -> str:
         ids_of_ankihub_models = [
             model["id"]
@@ -229,8 +221,8 @@ class EditedAfterSyncColumn(CustomColumn):
             )
         ]
         return (
-            "(select n.mod > temp.mod from temp where temp.anki_id = n.id limit 1), "
-            f"(n.mid in ({', '.join(map(str, ids_of_ankihub_models))}))"
+            "(select n.mod > ah_n.mod from ankihub_db.notes as ah_n where ah_n.anki_note_id = n.id limit 1) desc, "
+            f"(n.mid in ({', '.join(map(str, ids_of_ankihub_models))})) desc"
         )
 
 
@@ -267,10 +259,6 @@ def on_browser_will_search(ctx: SearchContext):
         return
 
     ctx.order = custom_column.order_by_str()
-
-    # If this column relies on a temporary table for sorting, build it now
-    if custom_column.create_sort_table:
-        custom_column.create_sort_table()
 
 
 def on_browser_did_search(ctx: SearchContext):

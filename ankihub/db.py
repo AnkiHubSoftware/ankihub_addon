@@ -41,6 +41,17 @@ class AnkiHubDB:
                 f"AnkiHub DB migrated to schema version {self.schema_version()}"
             )
 
+        if self.schema_version() <= 1:
+            self.c.execute(
+                "CREATE INDEX ankihub_deck_id_idx ON notes (ankihub_deck_id)"
+            )
+            self.c.execute("CREATE INDEX anki_note_id_idx ON notes (anki_note_id)")
+            self.c.execute("PRAGMA user_version = 2;")
+            self.conn.commit()
+            LOGGER.debug(
+                f"AnkiHub DB migrated to schema version {self.schema_version()}"
+            )
+
     def schema_version(self) -> int:
         self.c.execute("PRAGMA user_version;")
         result = self.c.fetchone()[0]
@@ -146,3 +157,6 @@ def attach_ankihub_db_to_anki_db() -> None:
         name for _, name, _ in mw.col.db.all("PRAGMA database_list")
     ]:
         mw.col.db.execute("ATTACH DATABASE ? AS ankihub_db", str(DB_PATH))
+        LOGGER.debug("Attached AnkiHub DB to Anki DB")
+    else:
+        LOGGER.debug("AnkiHub DB already attached to Anki DB")

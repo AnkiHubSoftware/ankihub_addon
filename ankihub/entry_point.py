@@ -3,15 +3,16 @@ import time
 from pprint import pformat
 
 from aqt import mw
-from aqt.gui_hooks import main_window_did_init
+from aqt.gui_hooks import collection_did_load, main_window_did_init
 
 from . import LOGGER
 from .addons import setup_addons
-from .settings import config
+from .db import attach_ankihub_db_to_anki_db
 from .errors import setup_error_handler
 from .gui import browser, editor
 from .gui.menu import setup_ankihub_menu
 from .progress import setup_progress_manager
+from .settings import config
 from .sync import setup_sync_on_startup
 
 
@@ -52,6 +53,9 @@ def run():
     from . import media_export  # noqa: F401
 
     LOGGER.debug("Loaded media_export.")
+
+    collection_did_load.append(lambda _: attach_ankihub_db_to_anki_db())
+    LOGGER.debug("Set up ankihub database attachement.")
 
     return mw
 
