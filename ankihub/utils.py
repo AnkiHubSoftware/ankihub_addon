@@ -114,6 +114,18 @@ def ankihub_uuid_of_note(note: Note, ignore_invalid=False) -> Optional[uuid.UUID
             raise e
 
 
+def note_types_with_ankihub_id_field() -> List[NotetypeId]:
+    return [
+        mid
+        for mid in mw.col.models.ids()
+        if has_ankihub_id_field(mw.col.models.get(mid))
+    ]
+
+
+def has_ankihub_id_field(model: NotetypeDict) -> bool:
+    return any(field["name"] == ANKIHUB_NOTE_TYPE_FIELD_NAME for field in model["flds"])
+
+
 # note types
 def create_note_type_with_id(note_type: NotetypeDict, mid: NotetypeId) -> None:
     note_type["id"] = 0

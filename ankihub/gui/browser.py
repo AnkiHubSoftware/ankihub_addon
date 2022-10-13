@@ -6,12 +6,12 @@ from typing import List, Optional, Sequence
 
 from anki.collection import BrowserColumns
 from anki.notes import Note
+from anki.utils import ids2str
 from aqt import mw
 from aqt.browser import Browser, CellRow, Column, ItemId, SearchContext
 from aqt.gui_hooks import (
     browser_did_fetch_columns,
     browser_did_fetch_row,
-    browser_did_search,
     browser_will_search,
     browser_will_show,
     browser_will_show_context_menu,
@@ -22,8 +22,9 @@ from aqt.utils import showInfo, showText
 from .. import LOGGER
 from ..ankihub_client import AnkiHubRequestError
 from ..db import AnkiHubDB
-from ..settings import ANKIHUB_NOTE_TYPE_FIELD_NAME, AnkiHubCommands
+from ..settings import AnkiHubCommands
 from ..suggestions import BulkNoteSuggestionsResult, suggest_notes_in_bulk
+from ..utils import note_types_with_ankihub_id_field
 from .suggestion_dialog import SuggestionDialog
 
 browser: Optional[Browser] = None
@@ -213,16 +214,9 @@ class EditedAfterSyncColumn(CustomColumn):
         return "Yes" if note.mod > last_sync else "No"
 
     def order_by_str(self) -> str:
-        ids_of_ankihub_models = [
-            model["id"]
-            for model in mw.col.models.all()
-            if any(
-                field["name"] == ANKIHUB_NOTE_TYPE_FIELD_NAME for field in model["flds"]
-            )
-        ]
         return (
             "(select n.mod > ah_n.mod from ankihub_db.notes as ah_n where ah_n.anki_note_id = n.id limit 1) desc, "
-            f"(n.mid in ({', '.join(map(str, ids_of_ankihub_models))})) desc"
+            f"(n.mid in {ids2str(note_types_with_ankihub_id_field())}) desc"
         )
 
 
@@ -261,10 +255,6 @@ def on_browser_will_search(ctx: SearchContext):
     ctx.order = custom_column.order_by_str()
 
 
-def on_browser_did_search(ctx: SearchContext):
-    pass
-
-
 def setup() -> None:
     def store_browser_reference(browser_: Browser) -> None:
         global browser
@@ -274,6 +264,5 @@ def setup() -> None:
     browser_did_fetch_columns.append(on_browser_did_fetch_columns)
     browser_did_fetch_row.append(on_browser_did_fetch_row)
     browser_will_search.append(on_browser_will_search)
-    browser_did_search.append(on_browser_did_search)
 
     browser_will_show_context_menu.append(on_browser_will_show_context_menu)
