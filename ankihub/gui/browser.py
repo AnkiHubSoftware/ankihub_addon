@@ -11,6 +11,7 @@ from aqt.browser import Browser, CellRow, Column, ItemId, SearchContext
 from aqt.gui_hooks import (
     browser_did_fetch_columns,
     browser_did_fetch_row,
+    browser_did_search,
     browser_will_search,
     browser_will_show,
     browser_will_show_context_menu,
@@ -21,7 +22,7 @@ from aqt.utils import showInfo, showText
 from .. import LOGGER
 from ..ankihub_client import AnkiHubRequestError
 from ..db import AnkiHubDB, attach_ankihub_db_to_anki_db
-from ..settings import AnkiHubCommands
+from ..settings import ANKIHUB_NOTE_TYPE_FIELD_NAME, AnkiHubCommands
 from ..suggestions import BulkNoteSuggestionsResult, suggest_notes_in_bulk
 from .suggestion_dialog import SuggestionDialog
 
@@ -193,9 +194,6 @@ class EditedAfterSyncColumn(CustomColumn):
         uses_cell_font=False,
         alignment=BrowserColumns.ALIGNMENT_CENTER,
     )
-    order_by_str = (
-        "(select temp.mod > n.mod from temp where temp.anki_id = n.id limit 1) asc"
-    )
 
     def _display_value(
         self,
@@ -220,6 +218,19 @@ class EditedAfterSyncColumn(CustomColumn):
         )
         mw.col.db.execute(
             "INSERT INTO temp SELECT anki_note_id, mod FROM ankihub_db.notes"
+        )
+
+    def order_by_str(self) -> str:
+        ids_of_ankihub_models = [
+            model["id"]
+            for model in mw.col.models.all()
+            if any(
+                field["name"] == ANKIHUB_NOTE_TYPE_FIELD_NAME for field in model["flds"]
+            )
+        ]
+        return (
+            "(select n.mod > temp.mod from temp where temp.anki_id = n.id limit 1), "
+            f"(n.mid in ({', '.join(map(str, ids_of_ankihub_models))}))"
         )
 
 
@@ -255,11 +266,15 @@ def on_browser_will_search(ctx: SearchContext):
     if custom_column is None:
         return
 
-    ctx.order = custom_column.order_by_str
+    ctx.order = custom_column.order_by_str()
 
     # If this column relies on a temporary table for sorting, build it now
     if custom_column.create_sort_table:
         custom_column.create_sort_table()
+
+
+def on_browser_did_search(ctx: SearchContext):
+    pass
 
 
 def setup() -> None:
@@ -271,5 +286,6 @@ def setup() -> None:
     browser_did_fetch_columns.append(on_browser_did_fetch_columns)
     browser_did_fetch_row.append(on_browser_did_fetch_row)
     browser_will_search.append(on_browser_will_search)
+    browser_did_search.append(on_browser_did_search)
 
     browser_will_show_context_menu.append(on_browser_will_show_context_menu)
