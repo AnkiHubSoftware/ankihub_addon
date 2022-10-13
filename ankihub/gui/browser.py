@@ -2,15 +2,16 @@ import uuid
 from abc import abstractmethod
 from concurrent.futures import Future
 from pprint import pformat
-from typing import List, Optional, Sequence
+from typing import Callable, List, Optional, Sequence
 
 from anki.collection import BrowserColumns
 from anki.notes import Note
 from aqt import mw
-from aqt.browser import Browser, CellRow, Column, ItemId
+from aqt.browser import Browser, CellRow, Column, ItemId, SearchContext
 from aqt.gui_hooks import (
     browser_did_fetch_columns,
     browser_did_fetch_row,
+    browser_will_search,
     browser_will_show,
     browser_will_show_context_menu,
 )
@@ -19,7 +20,7 @@ from aqt.utils import showInfo, showText
 
 from .. import LOGGER
 from ..ankihub_client import AnkiHubRequestError
-from ..db import AnkiHubDB
+from ..db import AnkiHubDB, attach_ankihub_db_to_anki_db
 from ..settings import AnkiHubCommands
 from ..suggestions import BulkNoteSuggestionsResult, suggest_notes_in_bulk
 from .suggestion_dialog import SuggestionDialog
@@ -124,6 +125,8 @@ def on_suggest_notes_in_bulk_done(future: Future, browser: Browser) -> None:
 
 class CustomColumn:
     builtin_column: Column
+    order_by_str: Optional[str] = None
+    create_sort_table: Optional[Callable] = None
 
     def on_browser_did_fetch_row(
         self,
@@ -182,14 +185,16 @@ class AnkiHubIdColumn(CustomColumn):
 
 
 class EditedAfterSyncColumn(CustomColumn):
-
     builtin_column = Column(
         key="edited_after_sync",
         cards_mode_label="AnkiHub: Modified After Sync",
         notes_mode_label="AnkiHub: Modified After Sync",
-        sorting=BrowserColumns.SORTING_NONE,
+        sorting=BrowserColumns.SORTING_ASCENDING,
         uses_cell_font=False,
         alignment=BrowserColumns.ALIGNMENT_CENTER,
+    )
+    order_by_str = (
+        "(select temp.mod > n.mod from temp where temp.anki_id = n.id limit 1) asc"
     )
 
     def _display_value(
@@ -205,6 +210,17 @@ class EditedAfterSyncColumn(CustomColumn):
             return "Unknown"
 
         return "Yes" if note.mod > last_sync else "No"
+
+    def create_sort_table(self) -> None:
+        attach_ankihub_db_to_anki_db()
+
+        mw.col.db.execute("DROP TABLE IF EXISTS temp")
+        mw.col.db.execute(
+            "CREATE TABLE temp (anki_id INTEGER PRIMARY KEY, mod INTEGER)"
+        )
+        mw.col.db.execute(
+            "INSERT INTO temp SELECT anki_note_id, mod FROM ankihub_db.notes"
+        )
 
 
 custom_columns: List[CustomColumn] = [AnkiHubIdColumn(), EditedAfterSyncColumn()]
@@ -229,6 +245,23 @@ def on_browser_did_fetch_row(
         )
 
 
+def on_browser_will_search(ctx: SearchContext):
+    if not isinstance(ctx.order, Column):
+        return
+
+    custom_column: CustomColumn = next(
+        (c for c in custom_columns if c.builtin_column.key == ctx.order.key), None
+    )
+    if custom_column is None:
+        return
+
+    ctx.order = custom_column.order_by_str
+
+    # If this column relies on a temporary table for sorting, build it now
+    if custom_column.create_sort_table:
+        custom_column.create_sort_table()
+
+
 def setup() -> None:
     def store_browser_reference(browser_: Browser) -> None:
         global browser
@@ -237,5 +270,6 @@ def setup() -> None:
     browser_will_show.append(store_browser_reference)
     browser_did_fetch_columns.append(on_browser_did_fetch_columns)
     browser_did_fetch_row.append(on_browser_did_fetch_row)
+    browser_will_search.append(on_browser_will_search)
 
     browser_will_show_context_menu.append(on_browser_will_show_context_menu)

@@ -139,3 +139,10 @@ class AnkiHubDB:
 
 def fetch_one_or_none(c: sqlite3.Cursor) -> Optional[Any]:
     return x[0] if (x := c.fetchone()) else None
+
+
+def attach_ankihub_db_to_anki_db() -> None:
+    if "ankihub_db" not in [
+        name for _, name, _ in mw.col.db.all("PRAGMA database_list")
+    ]:
+        mw.col.db.execute("ATTACH DATABASE ? AS ankihub_db", str(DB_PATH))
