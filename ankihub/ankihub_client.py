@@ -20,7 +20,7 @@ from .lib.dataclasses_json import DataClassJsonMixin  # type: ignore
 LOGGER = logging.getLogger(__name__)
 
 API_URL_BASE = "https://app.ankihub.net/api"
-API_VERSION = 1.0
+API_VERSION = 2.0
 
 DECK_UPDATE_PAGE_SIZE = 2000  # seems to work well in terms of speed
 
