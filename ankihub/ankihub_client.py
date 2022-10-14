@@ -5,18 +5,10 @@ import logging
 import uuid
 from abc import ABC
 from dataclasses import dataclass
+from datetime import datetime
 from enum import Enum
 from pathlib import Path
-from typing import (
-    Any,
-    Callable,
-    Dict,
-    Iterator,
-    List,
-    Optional,
-    Sequence,
-    TypedDict,
-)
+from typing import Any, Callable, Dict, Iterator, List, Optional, Sequence, TypedDict
 
 import requests
 from requests import PreparedRequest, Request, Response, Session
@@ -33,6 +25,8 @@ API_VERSION = 1.0
 DECK_UPDATE_PAGE_SIZE = 2000  # seems to work well in terms of speed
 
 CSV_DELIMITER = ";"
+
+ANKIHUB_DATETIME_FORMAT_STR = "%Y-%m-%dT%H:%M:%S.%f%z"
 
 
 # TODO Make sure these match up with SuggestionType.choices on AnkiHub
@@ -86,7 +80,13 @@ class NoteInfo(DataClassJsonMixin):
 
 @dataclass
 class DeckUpdateChunk(DataClassJsonMixin):
-    latest_update: str
+    latest_update: Optional[datetime] = dataclasses.field(
+        metadata=dataclasses_json.config(
+            decoder=lambda x: datetime.strptime(x, ANKIHUB_DATETIME_FORMAT_STR)
+            if x
+            else None,
+        ),
+    )
     protected_fields: Dict[int, List[str]]
     protected_tags: List[str]
     notes: List[NoteInfo]
@@ -107,7 +107,11 @@ class Deck(DataClassJsonMixin):
         metadata=dataclasses_json.config(field_name="anki_id")
     )
     name: str
-    csv_last_upload: str
+    csv_last_upload: datetime = dataclasses.field(
+        metadata=dataclasses_json.config(
+            decoder=lambda x: datetime.strptime(x, ANKIHUB_DATETIME_FORMAT_STR)
+        )
+    )
     csv_notes_filename: str
 
 
@@ -339,7 +343,7 @@ class AnkiHubClient:
     def get_deck_updates(
         self,
         ankihub_deck_uuid: uuid.UUID,
-        since: str,
+        since: datetime,
         download_progress_cb: Optional[Callable[[int], None]] = None,
     ) -> Iterator[DeckUpdateChunk]:
         # download_progress_cb gets passed the number of notes downloaded until now
@@ -350,7 +354,7 @@ class AnkiHubClient:
             size: int
 
         params: Params = {
-            "since": str(since) if since else None,
+            "since": since.strftime(ANKIHUB_DATETIME_FORMAT_STR) if since else None,
             "size": DECK_UPDATE_PAGE_SIZE,
         }
         url = f"/decks/{ankihub_deck_uuid}/updates"

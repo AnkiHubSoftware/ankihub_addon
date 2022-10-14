@@ -256,20 +256,24 @@ def test_client_upload_deck(anki_session_with_addon: AnkiSession, requests_mock)
 
 def test_get_deck_by_id(anki_session_with_addon: AnkiSession, requests_mock):
     from ankihub.addon_ankihub_client import AddonAnkiHubClient as AnkiHubClient
-    from ankihub.ankihub_client import AnkiHubRequestError, Deck
+    from ankihub.ankihub_client import (
+        ANKIHUB_DATETIME_FORMAT_STR,
+        AnkiHubRequestError,
+        Deck,
+    )
     from ankihub.settings import API_URL_BASE
 
     client = AnkiHubClient(hooks=[])
 
     # test get deck by id
     ankihub_deck_uuid = UUID_1
-    date_time_str = datetime.now(tz=timezone.utc).strftime("%Y-%m-%dT%H:%M:%S.%f%z")
+    date_time = datetime.now(tz=timezone.utc)
     expected_data = {
         "id": str(ankihub_deck_uuid),
         "name": "test",
         "owner": 1,
         "anki_id": 1,
-        "csv_last_upload": date_time_str,
+        "csv_last_upload": date_time.strftime(ANKIHUB_DATETIME_FORMAT_STR),
         "csv_notes_filename": "test.csv",
     }
 
@@ -280,7 +284,7 @@ def test_get_deck_by_id(anki_session_with_addon: AnkiSession, requests_mock):
         anki_did=1,
         owner=True,
         name="test",
-        csv_last_upload=date_time_str,
+        csv_last_upload=date_time,
         csv_notes_filename="test.csv",
     )
 
