@@ -25,6 +25,7 @@ class AnkiHubDB:
             """
         )
         self.migrate()
+        self.conn.commit()
 
     def migrate(self) -> None:
         LOGGER.debug(f"AnkiHub DB schema version: {self.schema_version()}")
@@ -36,7 +37,6 @@ class AnkiHubDB:
                 """
             )
             self.c.execute("PRAGMA user_version = 1;")
-            self.conn.commit()
             LOGGER.debug(
                 f"AnkiHub DB migrated to schema version {self.schema_version()}"
             )
@@ -47,7 +47,6 @@ class AnkiHubDB:
             )
             self.c.execute("CREATE INDEX anki_note_id_idx ON notes (anki_note_id)")
             self.c.execute("PRAGMA user_version = 2;")
-            self.conn.commit()
             LOGGER.debug(
                 f"AnkiHub DB migrated to schema version {self.schema_version()}"
             )
