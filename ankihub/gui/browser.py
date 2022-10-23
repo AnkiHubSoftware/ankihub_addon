@@ -214,9 +214,13 @@ class EditedAfterSyncColumn(CustomColumn):
         return "Yes" if note.mod > last_sync else "No"
 
     def order_by_str(self) -> str:
+        mids = note_types_with_ankihub_id_field()
+        if not mids:
+            return None
+
         return (
             "(select n.mod > ah_n.mod from ankihub_db.notes as ah_n where ah_n.anki_note_id = n.id limit 1) desc, "
-            f"(n.mid in {ids2str(note_types_with_ankihub_id_field())}) desc"
+            f"(n.mid in {ids2str(mids)}) desc"
         )
 
 
