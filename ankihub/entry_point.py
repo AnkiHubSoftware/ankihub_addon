@@ -3,7 +3,11 @@ import time
 from pprint import pformat
 
 from aqt import mw
-from aqt.gui_hooks import collection_did_load, main_window_did_init
+from aqt.gui_hooks import (
+    collection_did_load,
+    collection_did_temporarily_close,
+    main_window_did_init,
+)
 
 from . import LOGGER
 from .addons import setup_addons
@@ -55,6 +59,7 @@ def run():
     LOGGER.debug("Loaded media_export.")
 
     collection_did_load.append(lambda _: attach_ankihub_db_to_anki_db())
+    collection_did_temporarily_close.append(lambda _: attach_ankihub_db_to_anki_db())
     LOGGER.debug("Set up ankihub database attachement.")
 
     return mw
