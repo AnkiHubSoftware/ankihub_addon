@@ -11,7 +11,7 @@ from aqt.gui_hooks import (
 
 from . import LOGGER
 from .addons import setup_addons
-from .db import attach_ankihub_db_to_anki_db
+from .db import AnkiHubDB
 from .errors import setup_error_handler
 from .gui import browser, editor
 from .gui.menu import setup_ankihub_menu
@@ -58,9 +58,12 @@ def run():
 
     LOGGER.debug("Loaded media_export.")
 
-    collection_did_load.append(lambda _: attach_ankihub_db_to_anki_db())
-    collection_did_temporarily_close.append(lambda _: attach_ankihub_db_to_anki_db())
-    LOGGER.debug("Set up ankihub database attachement.")
+    def setup_database(_):
+        AnkiHubDB().setup()
+
+    collection_did_load.append(setup_database)
+    collection_did_temporarily_close.append(setup_database)
+    LOGGER.debug("Set up ankihub database.")
 
     return mw
 
