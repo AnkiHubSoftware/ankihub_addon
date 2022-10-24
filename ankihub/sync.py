@@ -102,7 +102,9 @@ class AnkiHubSync:
         latest_update: Optional[datetime] = None
         for chunk in client.get_deck_updates(
             uuid.UUID(ankihub_did),
-            since=datetime.strptime(deck["latest_update"], ANKIHUB_DATETIME_FORMAT_STR),
+            since=datetime.strptime(deck["latest_update"], ANKIHUB_DATETIME_FORMAT_STR)
+            if deck["latest_update"]
+            else None,
             download_progress_cb=download_progress_cb,
         ):
             if mw.progress.want_cancel():

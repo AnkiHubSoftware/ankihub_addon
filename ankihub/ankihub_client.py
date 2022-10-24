@@ -110,6 +110,8 @@ class Deck(DataClassJsonMixin):
     csv_last_upload: datetime = dataclasses.field(
         metadata=dataclasses_json.config(
             decoder=lambda x: datetime.strptime(x, ANKIHUB_DATETIME_FORMAT_STR)
+            if x
+            else None,
         )
     )
     csv_notes_filename: str
