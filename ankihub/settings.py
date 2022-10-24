@@ -15,6 +15,7 @@ from anki.buildinfo import version as ANKI_VERSION
 from aqt import mw
 
 from . import LOGGER, ankihub_client
+from .ankihub_client import ANKIHUB_DATETIME_FORMAT_STR
 
 
 @dataclasses.dataclass
@@ -74,12 +75,13 @@ class Config:
         self.private_config.user = user_email
         self._update_private_config()
 
-    def save_latest_update(self, ankihub_did: str, time: Optional[str]):
-        if time is None:
+    def save_latest_update(self, ankihub_did: str, latest_update: Optional[datetime]):
+        if latest_update is None:
             self.private_config.decks[ankihub_did]["latest_update"] = None
         else:
-            date_object = datetime.strptime(time, "%Y-%m-%dT%H:%M:%S.%f%z")
-            date_time_str = datetime.strftime(date_object, "%Y-%m-%dT%H:%M:%S.%f%z")
+            date_time_str = datetime.strftime(
+                latest_update, ANKIHUB_DATETIME_FORMAT_STR
+            )
             self.private_config.decks[ankihub_did]["latest_update"] = date_time_str
         self._update_private_config()
 
@@ -89,7 +91,7 @@ class Config:
         ankihub_did: str,
         anki_did: int,
         creator: bool = False,
-        last_update: Optional[str] = None,
+        latest_udpate: Optional[datetime] = None,
     ) -> None:
         self.private_config.decks[ankihub_did] = {
             "name": name,
@@ -97,7 +99,7 @@ class Config:
             "creator": creator,
         }
         # remove duplicates
-        self.save_latest_update(ankihub_did, last_update)
+        self.save_latest_update(ankihub_did, latest_udpate)
         self._update_private_config()
 
         if self.subscriptions_change_hook:

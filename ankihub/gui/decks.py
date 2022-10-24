@@ -1,4 +1,5 @@
 from concurrent.futures import Future
+from datetime import datetime
 from typing import List, Optional
 
 from anki.collection import OpChanges
@@ -296,7 +297,7 @@ class SubscribeDialog(QDialog):
                     notes_data=notes_data,
                     deck_name=deck_info.name,
                     ankihub_did=ankihub_did,
-                    last_update=deck_info.csv_last_upload,
+                    latest_update=deck_info.csv_last_upload,
                     is_creator=deck_info.owner,
                 ),
                 on_done=on_install_done,
@@ -318,7 +319,7 @@ class SubscribeDialog(QDialog):
         notes_data: List[NoteInfo],
         deck_name: str,
         ankihub_did: str,
-        last_update: str,
+        latest_update: datetime,
         is_creator: bool,
     ) -> bool:
         """If we have a .csv, read data from the file and modify the user's note types
@@ -340,7 +341,7 @@ class SubscribeDialog(QDialog):
             name=deck_name,
             ankihub_did=ankihub_did,
             anki_did=local_did,
-            last_update=last_update,
+            latest_udpate=latest_update,
             creator=is_creator,
         )
 

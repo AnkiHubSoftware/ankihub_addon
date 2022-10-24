@@ -420,7 +420,6 @@ class TestGetDeckUpdates:
         client: AnkiHubClient = authorized_client_for_user_test1
 
         since_time = datetime.now(timezone.utc)
-        since_time_str = since_time.strftime("%Y-%m-%dT%H:%M:%S.%f%z")
 
         # create a new note
         new_note_suggestion.ankihub_deck_uuid = uuid_of_deck_of_user_test1
@@ -429,7 +428,7 @@ class TestGetDeckUpdates:
         # get deck updates since the time of the new note creation
         chunks = list(
             client.get_deck_updates(
-                ankihub_deck_uuid=uuid_of_deck_of_user_test1, since=since_time_str
+                ankihub_deck_uuid=uuid_of_deck_of_user_test1, since=since_time
             )
         )
 
