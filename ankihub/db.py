@@ -5,6 +5,7 @@ from anki.dbproxy import DBProxy
 from anki.models import NotetypeId
 from anki.notes import NoteId
 from aqt import mw
+from aqt.gui_hooks import collection_did_load, collection_did_temporarily_close
 
 from . import LOGGER
 from .settings import ANKIHUB_NOTE_TYPE_FIELD_NAME, DB_PATH
@@ -13,19 +14,19 @@ from .settings import ANKIHUB_NOTE_TYPE_FIELD_NAME, DB_PATH
 class AnkiHubDB:
     database_name = "ankihub_db"
 
-    def setup(self):
-        self._attach_ankihub_db_to_anki_db_connection()
-        self._setup_tables_and_migrate()
-
     @property
     def anki_db(self) -> DBProxy:
         return mw.col.db
+
+    def setup(self):
+        self._attach_ankihub_db_to_anki_db_connection()
+        self._setup_tables_and_migrate()
 
     def _attach_ankihub_db_to_anki_db_connection(self) -> None:
         if "ankihub_db" not in [
             name for _, name, _ in mw.col.db.all("PRAGMA database_list")
         ]:
-            mw.col.db.execute(
+            self.anki_db.execute(
                 f"ATTACH DATABASE ? AS {AnkiHubDB.database_name}", str(DB_PATH)
             )
             LOGGER.debug("Attached AnkiHub DB to Anki DB connection")
@@ -59,10 +60,10 @@ class AnkiHubDB:
 
         if self.schema_version() <= 1:
             self.anki_db.execute(
-                f"CREATE INDEX ankihub_deck_id_idx ON {self.database_name}.notes (ankihub_deck_id)"
+                f"CREATE INDEX {self.database_name}.ankihub_deck_id_idx ON notes (ankihub_deck_id)"
             )
             self.anki_db.execute(
-                f"CREATE INDEX anki_note_id_idx ON {self.database_name}.notes (anki_note_id)"
+                f"CREATE INDEX {self.database_name}.anki_note_id_idx ON notes (anki_note_id)"
             )
             self.anki_db.execute(f"PRAGMA {self.database_name}.user_version = 2;")
             LOGGER.debug(
@@ -148,7 +149,7 @@ class AnkiHubDB:
 
     def ankihub_deck_ids(self) -> List[str]:
         result = self.anki_db.list(
-            f"SELECT DISTINCT {self.database_name}.ankihub_deck_id FROM notes"
+            f"SELECT DISTINCT ankihub_deck_id FROM {self.database_name}.notes"
         )
         return result
 
@@ -158,3 +159,14 @@ class AnkiHubDB:
             str(ankihub_note_id),
         )
         return result
+
+
+ankihub_db = AnkiHubDB()
+
+
+def setup_ankihub_database():
+    """Sets up the AnkiHub database and attaches it to the Anki database connection
+    when Anki opens its database.
+    """
+    collection_did_load.append(lambda _: ankihub_db.setup())
+    collection_did_temporarily_close.append(lambda _: ankihub_db.setup())

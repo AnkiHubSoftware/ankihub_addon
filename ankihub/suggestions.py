@@ -12,7 +12,7 @@ from .ankihub_client import (
     NewNoteSuggestion,
     SuggestionType,
 )
-from .db import AnkiHubDB
+from .db import ankihub_db
 from .sync import is_internal_tag
 from .utils import ankihub_uuid_of_note
 
@@ -53,7 +53,7 @@ def suggest_notes_in_bulk(
     ankihub_did_for_mid = {
         mid: ankihub_did
         for mid in set(note.mid for note in notes)
-        if (ankihub_did := AnkiHubDB().ankihub_did_for_note_type(mid))
+        if (ankihub_did := ankihub_db.ankihub_did_for_note_type(mid))
     }
 
     notes_that_exist_on_remote = []

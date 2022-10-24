@@ -3,15 +3,11 @@ import time
 from pprint import pformat
 
 from aqt import mw
-from aqt.gui_hooks import (
-    collection_did_load,
-    collection_did_temporarily_close,
-    main_window_did_init,
-)
+from aqt.gui_hooks import main_window_did_init
 
 from . import LOGGER
 from .addons import setup_addons
-from .db import AnkiHubDB
+from .db import setup_ankihub_database
 from .errors import setup_error_handler
 from .gui import browser, editor
 from .gui.menu import setup_ankihub_menu
@@ -58,11 +54,7 @@ def run():
 
     LOGGER.debug("Loaded media_export.")
 
-    def setup_database(_):
-        AnkiHubDB().setup()
-
-    collection_did_load.append(setup_database)
-    collection_did_temporarily_close.append(setup_database)
+    setup_ankihub_database()
     LOGGER.debug("Set up ankihub database.")
 
     return mw

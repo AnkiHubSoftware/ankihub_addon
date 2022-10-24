@@ -21,14 +21,13 @@ from aqt.utils import showInfo, showText
 
 from .. import LOGGER
 from ..ankihub_client import AnkiHubRequestError
-from ..db import AnkiHubDB
+from ..db import ankihub_db
 from ..settings import AnkiHubCommands
 from ..suggestions import BulkNoteSuggestionsResult, suggest_notes_in_bulk
 from ..utils import note_types_with_ankihub_id_field
 from .suggestion_dialog import SuggestionDialog
 
 browser: Optional[Browser] = None
-db: AnkiHubDB = AnkiHubDB()
 
 
 def on_browser_will_show_context_menu(browser: Browser, context_menu: QMenu) -> None:
@@ -206,7 +205,7 @@ class EditedAfterSyncColumn(CustomColumn):
         if "ankihub_id" not in note or not note["ankihub_id"]:
             return "N/A"
 
-        last_sync = db.last_sync(uuid.UUID(note["ankihub_id"]))
+        last_sync = ankihub_db.last_sync(uuid.UUID(note["ankihub_id"]))
         if last_sync is None:
             # The sync_mod value can be None if the note was synced with an early version of the AnkiHub add-on
             return "Unknown"

@@ -19,7 +19,7 @@ from aqt import mw
 
 from . import LOGGER
 from .addon_ankihub_client import AddonAnkiHubClient as AnkiHubClient
-from .db import AnkiHubDB
+from .db import ankihub_db
 from .settings import ANKIHUB_NOTE_TYPE_FIELD_NAME, config
 from .utils import (
     change_note_type_of_note,
@@ -94,8 +94,7 @@ def create_collaborative_deck(deck_name: str, private: bool) -> str:
     assign_ankihub_ids(note_ids)
 
     ankihub_did = upload_deck(deck_id, private=private)
-    db = AnkiHubDB()
-    db.save_notes_from_nids(
+    ankihub_db.save_notes_from_nids(
         ankihub_did=ankihub_did,
         nids=note_ids,
     )
