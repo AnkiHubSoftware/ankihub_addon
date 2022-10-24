@@ -214,13 +214,13 @@ def create_collaborative_deck_action() -> None:
 
     def on_success(ankihub_did: str) -> None:
         anki_did = mw.col.decks.id_for_name(deck_name)
-        creation_time = datetime.now(tz=timezone.utc).strftime("%Y-%m-%dT%H:%M:%S.%f%z")
+        creation_time = datetime.now(tz=timezone.utc)
         config.save_subscription(
             deck_name,
             ankihub_did,
             anki_did,
             creator=True,
-            last_update=creation_time,
+            latest_udpate=creation_time,
         )
         deck_url = f"{URL_VIEW_DECK}{ankihub_did}"
         showInfo(

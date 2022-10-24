@@ -1,5 +1,6 @@
 import uuid
 from concurrent.futures import Future
+from datetime import datetime
 from pprint import pformat
 from time import sleep
 from typing import Dict, Iterable, List, Optional, Set, Tuple
@@ -17,7 +18,7 @@ from . import LOGGER, settings
 from .addon_ankihub_client import AddonAnkiHubClient as AnkiHubClient
 from .ankihub_client import AnkiHubRequestError, Field, NoteInfo, SuggestionType
 from .db import AnkiHubDB
-from .settings import ANKI_MINOR, config
+from .settings import ANKI_MINOR, ANKIHUB_DATETIME_FORMAT_STR, config
 from .utils import (
     create_backup,
     create_deck_with_id,
@@ -98,17 +99,27 @@ class AnkiHubSync:
 
         client = AnkiHubClient()
         notes_data = []
+        latest_update: Optional[datetime] = None
         for chunk in client.get_deck_updates(
             uuid.UUID(ankihub_did),
-            since=deck["latest_update"],
+            since=datetime.strptime(deck["latest_update"], ANKIHUB_DATETIME_FORMAT_STR)
+            if deck["latest_update"]
+            else None,
             download_progress_cb=download_progress_cb,
         ):
             if mw.progress.want_cancel():
                 LOGGER.debug("User cancelled sync.")
                 return False
 
-            if chunk.notes:
-                notes_data += chunk.notes
+            if not chunk.notes:
+                continue
+
+            notes_data += chunk.notes
+
+            # each chunk contains the latest update timestamp of the notes in it, we need the latest one
+            latest_update = max(
+                chunk.latest_update, latest_update or chunk.latest_update
+            )
 
         if notes_data:
             self.importer.import_ankihub_deck(
@@ -119,7 +130,7 @@ class AnkiHubSync:
                 protected_fields=chunk.protected_fields,
                 protected_tags=chunk.protected_tags,
             )
-            config.save_latest_update(ankihub_did, chunk.latest_update)
+            config.save_latest_update(ankihub_did, latest_update)
         else:
             LOGGER.debug(f"No new updates to sync for {ankihub_did=}")
 
