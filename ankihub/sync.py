@@ -17,7 +17,7 @@ from aqt.utils import showInfo, tooltip
 from . import LOGGER, settings
 from .addon_ankihub_client import AddonAnkiHubClient as AnkiHubClient
 from .ankihub_client import AnkiHubRequestError, Field, NoteInfo, SuggestionType
-from .db import AnkiHubDB
+from .db import ankihub_db
 from .settings import ANKI_MINOR, ANKIHUB_DATETIME_FORMAT_STR, config
 from .utils import (
     create_backup,
@@ -263,9 +263,8 @@ class AnkiHubImporter:
         if first_import_of_deck:
             local_did = self._cleanup_first_time_deck_import(dids, local_did)
 
-        db = AnkiHubDB()
         anki_nids = [NoteId(note_data.anki_nid) for note_data in notes_data]
-        db.save_notes_from_nids(ankihub_did=ankihub_did, nids=anki_nids)
+        ankihub_db.save_notes_from_nids(ankihub_did=ankihub_did, nids=anki_nids)
 
         return local_did
 

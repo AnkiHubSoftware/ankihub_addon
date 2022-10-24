@@ -1,21 +1,42 @@
-import sqlite3
-from typing import Any, List, Optional
+import uuid
+from typing import List, Optional
 
+from anki.dbproxy import DBProxy
 from anki.models import NotetypeId
 from anki.notes import NoteId
 from aqt import mw
+from aqt.gui_hooks import collection_did_load, collection_did_temporarily_close
 
 from . import LOGGER
 from .settings import ANKIHUB_NOTE_TYPE_FIELD_NAME, DB_PATH
 
 
 class AnkiHubDB:
-    def __init__(self):
-        self.conn = sqlite3.connect(DB_PATH)
-        self.c = self.conn.cursor()
-        self.c.execute(
-            """
-            CREATE TABLE IF NOT EXISTS notes (
+    database_name = "ankihub_db"
+
+    @property
+    def anki_db(self) -> DBProxy:
+        return mw.col.db
+
+    def setup(self):
+        self._attach_ankihub_db_to_anki_db_connection()
+        self._setup_tables_and_migrate()
+
+    def _attach_ankihub_db_to_anki_db_connection(self) -> None:
+        if "ankihub_db" not in [
+            name for _, name, _ in mw.col.db.all("PRAGMA database_list")
+        ]:
+            self.anki_db.execute(
+                f"ATTACH DATABASE ? AS {AnkiHubDB.database_name}", str(DB_PATH)
+            )
+            LOGGER.debug("Attached AnkiHub DB to Anki DB connection")
+        else:
+            LOGGER.debug("AnkiHub DB already attached to Anki DB connection")
+
+    def _setup_tables_and_migrate(self) -> None:
+        self.anki_db.execute(
+            f"""
+            CREATE TABLE IF NOT EXISTS {self.database_name}.notes (
                 ankihub_note_id STRING PRIMARY KEY,
                 ankihub_deck_id STRING,
                 anki_note_id INTEGER,
@@ -23,34 +44,42 @@ class AnkiHubDB:
             )
             """
         )
-        self.migrate()
 
-    def migrate(self) -> None:
         LOGGER.debug(f"AnkiHub DB schema version: {self.schema_version()}")
 
         if self.schema_version() == 0:
-            self.c.execute(
-                """
-                ALTER TABLE notes ADD COLUMN mod INTEGER
+            self.anki_db.execute(
+                f"""
+                ALTER TABLE {self.database_name}.notes ADD COLUMN mod INTEGER
                 """
             )
-            self.c.execute("PRAGMA user_version = 1;")
-            self.conn.commit()
+            self.anki_db.execute(f"PRAGMA {self.database_name}.user_version = 1;")
+            LOGGER.debug(
+                f"AnkiHub DB migrated to schema version {self.schema_version()}"
+            )
+
+        if self.schema_version() <= 1:
+            self.anki_db.execute(
+                f"CREATE INDEX {self.database_name}.ankihub_deck_id_idx ON notes (ankihub_deck_id)"
+            )
+            self.anki_db.execute(
+                f"CREATE INDEX {self.database_name}.anki_note_id_idx ON notes (anki_note_id)"
+            )
+            self.anki_db.execute(f"PRAGMA {self.database_name}.user_version = 2;")
             LOGGER.debug(
                 f"AnkiHub DB migrated to schema version {self.schema_version()}"
             )
 
     def schema_version(self) -> int:
-        self.c.execute("PRAGMA user_version;")
-        result = self.c.fetchone()[0]
+        result = self.anki_db.scalar(f"PRAGMA {self.database_name}.user_version;")
         return result
 
     def save_notes_from_nids(self, ankihub_did: str, nids: List[NoteId]):
         for nid in nids:
             note = mw.col.get_note(nid)
-            self.c.execute(
-                """
-                INSERT OR REPLACE INTO notes (
+            self.anki_db.execute(
+                f"""
+                INSERT OR REPLACE INTO {self.database_name}.notes (
                     ankihub_note_id,
                     ankihub_deck_id,
                     anki_note_id,
@@ -58,77 +87,86 @@ class AnkiHubDB:
                     mod
                 ) VALUES (?, ?, ?, ?, ?)
                 """,
-                (
-                    note[ANKIHUB_NOTE_TYPE_FIELD_NAME],
-                    ankihub_did,
-                    nid,
-                    note.mid,
-                    note.mod,
-                ),
+                note[ANKIHUB_NOTE_TYPE_FIELD_NAME],
+                ankihub_did,
+                nid,
+                note.mid,
+                note.mod,
             )
 
-        self.conn.commit()
-
     def notes_for_ankihub_deck(self, ankihub_did: str) -> List[NoteId]:
-        self.c.execute(
-            """
-            SELECT anki_note_id FROM notes WHERE ankihub_deck_id = ?
+        result = self.anki_db.list(
+            f"""
+            SELECT anki_note_id FROM {self.database_name}.notes WHERE ankihub_deck_id = ?
             """,
-            (ankihub_did,),
+            ankihub_did,
         )
-        result = [NoteId(x[0]) for x in self.c.fetchall()]
         return result
 
     def ankihub_did_for_note(self, anki_note_id: int) -> Optional[str]:
-        self.c.execute(
-            """
-            SELECT ankihub_deck_id FROM notes WHERE anki_note_id = ?
+        result = self.anki_db.scalar(
+            f"""
+            SELECT ankihub_deck_id FROM {self.database_name}.notes WHERE anki_note_id = ?
             """,
-            (anki_note_id,),
-        )
-        return fetch_one_or_none(self.c)
+            anki_note_id,
+        )[0]
+        return result
 
     def ankihub_did_for_note_type(self, anki_note_type_id: int) -> Optional[str]:
-        self.c.execute(
-            """
-            SELECT ankihub_deck_id FROM notes WHERE anki_note_type_id = ?
+        result = self.anki_db.scalar(
+            f"""
+            SELECT ankihub_deck_id FROM {self.database_name}.notes WHERE anki_note_type_id = ?
             """,
-            (anki_note_type_id,),
+            anki_note_type_id,
         )
-        return fetch_one_or_none(self.c)
+        return result
 
     def ankihub_id_for_note(self, anki_note_id: int) -> Optional[str]:
-        self.c.execute(
-            """
-            SELECT ankihub_note_id FROM notes WHERE anki_note_id = ?
+        result = self.anki_db.scalar(
+            f"""
+            SELECT ankihub_note_id FROM {self.database_name}.notes WHERE anki_note_id = ?
             """,
-            (anki_note_id,),
+            anki_note_id,
         )
-        return fetch_one_or_none(self.c)
+        return result
 
     def note_types_for_ankihub_deck(self, ankihub_did: str) -> List[NotetypeId]:
-        self.c.execute(
-            """
-            SELECT DISTINCT anki_note_type_id FROM notes WHERE ankihub_deck_id = ?
+        result = self.anki_db.list(
+            f"""
+            SELECT DISTINCT anki_note_type_id FROM {self.database_name}.notes WHERE ankihub_deck_id = ?
             """,
-            (ankihub_did,),
+            ankihub_did,
         )
-        result = [NotetypeId(x[0]) for x in self.c.fetchall()]
         return result
 
     def remove_deck(self, ankihub_did: str):
-        self.c.execute(
-            """
-            DELETE FROM notes WHERE ankihub_deck_id = ?
+        self.anki_db.execute(
+            f"""
+            DELETE FROM {self.database_name}.notes WHERE ankihub_deck_id = ?
             """,
-            (ankihub_did,),
+            ankihub_did,
         )
-        self.conn.commit()
 
     def ankihub_deck_ids(self) -> List[str]:
-        self.c.execute("SELECT DISTINCT ankihub_deck_id FROM notes")
-        return [x[0] for x in self.c.fetchall()]
+        result = self.anki_db.list(
+            f"SELECT DISTINCT ankihub_deck_id FROM {self.database_name}.notes"
+        )
+        return result
+
+    def last_sync(self, ankihub_note_id: uuid.UUID) -> Optional[int]:
+        result = self.anki_db.scalar(
+            f"SELECT mod FROM {self.database_name}.notes WHERE ankihub_note_id = ?",
+            str(ankihub_note_id),
+        )
+        return result
 
 
-def fetch_one_or_none(c: sqlite3.Cursor) -> Optional[Any]:
-    return x[0] if (x := c.fetchone()) else None
+ankihub_db = AnkiHubDB()
+
+
+def setup_ankihub_database():
+    """Sets up the AnkiHub database and attaches it to the Anki database connection
+    when Anki opens its database.
+    """
+    collection_did_load.append(lambda _: ankihub_db.setup())
+    collection_did_temporarily_close.append(lambda _: ankihub_db.setup())

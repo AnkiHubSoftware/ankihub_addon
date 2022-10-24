@@ -151,7 +151,7 @@ def test_create_collaborative_deck_and_upload(
 ):
     anki_session = anki_session_with_addon
 
-    from ankihub.db import AnkiHubDB
+    from ankihub.db import ankihub_db
     from ankihub.settings import API_URL_BASE
 
     with anki_session.profile_loaded():
@@ -180,9 +180,8 @@ def test_create_collaborative_deck_and_upload(
             create_collaborative_deck(deck_name, private=False)
 
             # check if deck info is in db
-            db = AnkiHubDB()
-            assert db.ankihub_deck_ids() == [str(ankihub_deck_uuid)]
-            assert len(db.notes_for_ankihub_deck(str(ankihub_deck_uuid))) == 3
+            assert ankihub_db.ankihub_deck_ids() == [str(ankihub_deck_uuid)]
+            assert len(ankihub_db.notes_for_ankihub_deck(str(ankihub_deck_uuid))) == 3
 
 
 def test_upload_deck(anki_session_with_addon: AnkiSession, monkeypatch):
@@ -625,11 +624,10 @@ def test_import_existing_ankihub_deck(anki_session_with_addon: AnkiSession):
 
 
 def assert_that_only_ankihub_sample_deck_info_in_database(ankihub_deck_uuid: uuid.UUID):
-    from ankihub.db import AnkiHubDB
+    from ankihub.db import ankihub_db
 
-    db = AnkiHubDB()
-    assert db.ankihub_deck_ids() == [str(ankihub_deck_uuid)]
-    assert len(db.notes_for_ankihub_deck(str(ankihub_deck_uuid))) == 3
+    assert ankihub_db.ankihub_deck_ids() == [str(ankihub_deck_uuid)]
+    assert len(ankihub_db.notes_for_ankihub_deck(str(ankihub_deck_uuid))) == 3
 
 
 def test_import_existing_ankihub_deck_2(anki_session_with_addon: AnkiSession):
@@ -914,7 +912,7 @@ def create_ankihub_version_of_note_type(mw, note_type: NotetypeDict) -> Notetype
 def test_unsubsribe_from_deck(anki_session_with_addon: AnkiSession):
     from aqt import mw
 
-    from ankihub.db import AnkiHubDB
+    from ankihub.db import ankihub_db
     from ankihub.gui.decks import SubscribedDecksDialog
     from ankihub.utils import ANKIHUB_TEMPLATE_SNIPPET_RE, note_type_contains_field
 
@@ -924,8 +922,7 @@ def test_unsubsribe_from_deck(anki_session_with_addon: AnkiSession):
 
         import_sample_ankihub_deck(ankihub_did=ankihub_did, mw=mw)
 
-        db = AnkiHubDB()
-        mids = db.note_types_for_ankihub_deck(ankihub_did)
+        mids = ankihub_db.note_types_for_ankihub_deck(ankihub_did)
         assert len(mids) == 2
 
         SubscribedDecksDialog.unsubscribe_from_deck(ankihub_did)
@@ -941,10 +938,10 @@ def test_unsubsribe_from_deck(anki_session_with_addon: AnkiSession):
         )
 
         # check if the deck was removed from the db
-        mids = db.note_types_for_ankihub_deck(ankihub_did)
+        mids = ankihub_db.note_types_for_ankihub_deck(ankihub_did)
         assert len(mids) == 0
 
-        nids = db.notes_for_ankihub_deck(ankihub_did)
+        nids = ankihub_db.notes_for_ankihub_deck(ankihub_did)
         assert len(nids) == 0
 
 

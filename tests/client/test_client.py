@@ -11,7 +11,7 @@ import pytest
 import requests_mock
 from vcr import VCR
 
-COMPOSE_FILE = Path(os.getenv("COMPOSE_FILE"))
+COMPOSE_FILE = Path(os.getenv("COMPOSE_FILE")) if os.getenv("COMPOSE_FILE") else None
 
 TEST_DATA_PATH = Path(__file__).parent.parent / "test_data"
 DECK_CSV = TEST_DATA_PATH / "deck_with_one_basic_note.csv"

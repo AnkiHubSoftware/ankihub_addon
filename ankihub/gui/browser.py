@@ -1,13 +1,18 @@
+import uuid
+from abc import abstractmethod
 from concurrent.futures import Future
 from pprint import pformat
-from typing import Optional, Sequence
+from typing import List, Optional, Sequence
 
 from anki.collection import BrowserColumns
+from anki.notes import Note
+from anki.utils import ids2str
 from aqt import mw
-from aqt.browser import Browser, CellRow, Column, ItemId
+from aqt.browser import Browser, CellRow, Column, ItemId, SearchContext
 from aqt.gui_hooks import (
     browser_did_fetch_columns,
     browser_did_fetch_row,
+    browser_will_search,
     browser_will_show,
     browser_will_show_context_menu,
 )
@@ -16,8 +21,10 @@ from aqt.utils import showInfo, showText
 
 from .. import LOGGER
 from ..ankihub_client import AnkiHubRequestError
+from ..db import ankihub_db
 from ..settings import AnkiHubCommands
 from ..suggestions import BulkNoteSuggestionsResult, suggest_notes_in_bulk
+from ..utils import note_types_with_ankihub_id_field
 from .suggestion_dialog import SuggestionDialog
 
 browser: Optional[Browser] = None
@@ -117,8 +124,49 @@ def on_suggest_notes_in_bulk_done(future: Future, browser: Browser) -> None:
     showText(msg, parent=browser)
 
 
-def on_browser_did_fetch_columns(columns: dict[str, Column]):
-    columns["ankihub_id"] = Column(
+class CustomColumn:
+    builtin_column: Column
+
+    def on_browser_did_fetch_row(
+        self,
+        item_id: ItemId,
+        row: CellRow,
+        active_columns: Sequence[str],
+    ) -> None:
+        if (
+            index := active_columns.index(self.key)
+            if self.key in active_columns
+            else None
+        ) is None:
+            return
+
+        note = browser.table._state.get_note(item_id)
+        try:
+            value = self._display_value(note)
+            row.cells[index].text = value
+        except Exception as error:
+            row.cells[index].text = str(error)
+
+    @property
+    def key(self):
+        return self.builtin_column.key
+
+    @abstractmethod
+    def _display_value(
+        self,
+        note: Note,
+    ) -> str:
+        raise NotImplementedError
+
+    def order_by_str(self) -> Optional[str]:
+        """Return the SQL string that will be appended after "ORDER BY" to the query that
+        fetches the search results when sorting by this column."""
+        return None
+
+
+class AnkiHubIdColumn(CustomColumn):
+
+    builtin_column = Column(
         key="ankihub_id",
         cards_mode_label="AnkiHub ID",
         notes_mode_label="AnkiHub ID",
@@ -127,6 +175,61 @@ def on_browser_did_fetch_columns(columns: dict[str, Column]):
         alignment=BrowserColumns.ALIGNMENT_CENTER,
     )
 
+    def _display_value(
+        self,
+        note: Note,
+    ) -> str:
+        if "ankihub_id" in note:
+            if note["ankihub_id"]:
+                return note["ankihub_id"]
+            else:
+                return "ID Pending"
+        else:
+            return "Not AnkiHub Note Type"
+
+
+class EditedAfterSyncColumn(CustomColumn):
+    builtin_column = Column(
+        key="edited_after_sync",
+        cards_mode_label="AnkiHub: Modified After Sync",
+        notes_mode_label="AnkiHub: Modified After Sync",
+        sorting=BrowserColumns.SORTING_DESCENDING,
+        uses_cell_font=False,
+        alignment=BrowserColumns.ALIGNMENT_CENTER,
+    )
+
+    def _display_value(
+        self,
+        note: Note,
+    ) -> str:
+        if "ankihub_id" not in note or not note["ankihub_id"]:
+            return "N/A"
+
+        last_sync = ankihub_db.last_sync(uuid.UUID(note["ankihub_id"]))
+        if last_sync is None:
+            # The sync_mod value can be None if the note was synced with an early version of the AnkiHub add-on
+            return "Unknown"
+
+        return "Yes" if note.mod > last_sync else "No"
+
+    def order_by_str(self) -> str:
+        mids = note_types_with_ankihub_id_field()
+        if not mids:
+            return None
+
+        return (
+            "(select n.mod > ah_n.mod from ankihub_db.notes as ah_n where ah_n.anki_note_id = n.id limit 1) desc, "
+            f"(n.mid in {ids2str(mids)}) desc"
+        )
+
+
+custom_columns: List[CustomColumn] = [AnkiHubIdColumn(), EditedAfterSyncColumn()]
+
+
+def on_browser_did_fetch_columns(columns: dict[str, Column]):
+    for column in custom_columns:
+        columns[column.key] = column.builtin_column
+
 
 def on_browser_did_fetch_row(
     item_id: ItemId,
@@ -134,28 +237,25 @@ def on_browser_did_fetch_row(
     row: CellRow,
     active_columns: Sequence[str],
 ) -> None:
-    global browser
+    for column in custom_columns:
+        column.on_browser_did_fetch_row(
+            item_id=item_id,
+            row=row,
+            active_columns=active_columns,
+        )
 
-    note = browser.table._state.get_note(item_id)
-    if (
-        index := active_columns.index("ankihub_id")
-        if "ankihub_id" in active_columns
-        else None
-    ) is None:
+
+def on_browser_will_search(ctx: SearchContext):
+    if not isinstance(ctx.order, Column):
         return
 
-    try:
-        if "ankihub_id" in note:
-            if note["ankihub_id"]:
-                val = note["ankihub_id"]
-            else:
-                val = "ID Pending"
-        else:
-            val = "Not AnkiHub Note Type"
+    custom_column: CustomColumn = next(
+        (c for c in custom_columns if c.builtin_column.key == ctx.order.key), None
+    )
+    if custom_column is None:
+        return
 
-        row.cells[index].text = val
-    except Exception as error:
-        row.cells[index].text = str(error)
+    ctx.order = custom_column.order_by_str()
 
 
 def setup() -> None:
@@ -166,5 +266,6 @@ def setup() -> None:
     browser_will_show.append(store_browser_reference)
     browser_did_fetch_columns.append(on_browser_did_fetch_columns)
     browser_did_fetch_row.append(on_browser_did_fetch_row)
+    browser_will_search.append(on_browser_will_search)
 
     browser_will_show_context_menu.append(on_browser_will_show_context_menu)

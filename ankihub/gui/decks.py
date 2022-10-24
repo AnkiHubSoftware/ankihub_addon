@@ -25,7 +25,7 @@ from .. import LOGGER
 from ..addon_ankihub_client import AddonAnkiHubClient as AnkiHubClient
 from ..addon_ankihub_client import AnkiHubRequestError
 from ..ankihub_client import NoteInfo
-from ..db import AnkiHubDB
+from ..db import ankihub_db
 from ..settings import URL_DECK_BASE, URL_DECKS, URL_HELP, URL_VIEW_DECK, config
 from ..sync import AnkiHubImporter
 from ..utils import create_backup, undo_note_type_modfications
@@ -120,11 +120,9 @@ class SubscribedDecksDialog(QDialog):
 
     @staticmethod
     def unsubscribe_from_deck(ankihub_did: str) -> None:
-
-        db = AnkiHubDB()
-        mids = db.note_types_for_ankihub_deck(ankihub_did=ankihub_did)
+        mids = ankihub_db.note_types_for_ankihub_deck(ankihub_did=ankihub_did)
         undo_note_type_modfications(mids)
-        db.remove_deck(ankihub_did)
+        ankihub_db.remove_deck(ankihub_did)
 
     def on_open_web(self) -> None:
         items = self.decks_list.selectedItems()

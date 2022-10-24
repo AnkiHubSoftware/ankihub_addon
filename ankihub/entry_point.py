@@ -7,11 +7,12 @@ from aqt.gui_hooks import main_window_did_init
 
 from . import LOGGER
 from .addons import setup_addons
-from .settings import config
+from .db import setup_ankihub_database
 from .errors import setup_error_handler
 from .gui import browser, editor
 from .gui.menu import setup_ankihub_menu
 from .progress import setup_progress_manager
+from .settings import config
 from .sync import setup_sync_on_startup
 
 
@@ -52,6 +53,9 @@ def run():
     from . import media_export  # noqa: F401
 
     LOGGER.debug("Loaded media_export.")
+
+    setup_ankihub_database()
+    LOGGER.debug("Set up ankihub database.")
 
     return mw
 
