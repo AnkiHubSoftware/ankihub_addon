@@ -85,7 +85,10 @@ def on_protect_fields_action(browser: Browser) -> None:
     ]
     old_fields_protected_by_tags: List[str] = get_fields_protected_by_tags(note)
     new_fields_protected_by_tags = choose_subset(
-        "Choose the fields to protect from updates",
+        "Choose which fields of this note should be protected<br>"
+        "from updates.<br><br>"
+        "Note: Fields you have protected for the note type<br>"
+        "on AnkiHub will be protected automatically.",
         choices=fields,
         current=old_fields_protected_by_tags,
         description_html="This will edit the AnkiHub_Protect tags of the note.",
