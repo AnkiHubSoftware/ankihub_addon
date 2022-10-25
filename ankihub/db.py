@@ -103,15 +103,6 @@ class AnkiHubDB:
         )
         return result
 
-    def ankihub_did_for_note(self, anki_note_id: int) -> Optional[str]:
-        result = self.anki_db.scalar(
-            f"""
-            SELECT ankihub_deck_id FROM {self.database_name}.notes WHERE anki_note_id = ?
-            """,
-            anki_note_id,
-        )[0]
-        return result
-
     def ankihub_did_for_note_type(self, anki_note_type_id: int) -> Optional[str]:
         result = self.anki_db.scalar(
             f"""
