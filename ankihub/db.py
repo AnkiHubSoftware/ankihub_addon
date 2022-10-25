@@ -4,6 +4,7 @@ from typing import List, Optional
 from anki.dbproxy import DBProxy
 from anki.models import NotetypeId
 from anki.notes import NoteId
+from anki.utils import ids2str
 from aqt import mw
 from aqt.gui_hooks import collection_did_load, collection_did_temporarily_close
 
@@ -21,6 +22,7 @@ class AnkiHubDB:
     def setup(self):
         self._attach_ankihub_db_to_anki_db_connection()
         self._setup_tables_and_migrate()
+        self.anki_db.commit()
 
     def _attach_ankihub_db_to_anki_db_connection(self) -> None:
         if "ankihub_db" not in [
@@ -70,6 +72,18 @@ class AnkiHubDB:
                 f"AnkiHub DB migrated to schema version {self.schema_version()}"
             )
 
+        if self.schema_version() <= 2:
+            self.anki_db.execute(
+                f"ALTER TABLE {self.database_name}.notes ADD tags text"
+            )
+            self.anki_db.execute(
+                f"ALTER TABLE {self.database_name}.notes ADD flds text"
+            )
+            self.anki_db.execute(f"PRAGMA {self.database_name}.user_version = 3;")
+            LOGGER.debug(
+                f"AnkiHub DB migrated to schema version {self.schema_version()}"
+            )
+
     def schema_version(self) -> int:
         result = self.anki_db.scalar(f"PRAGMA {self.database_name}.user_version;")
         return result
@@ -93,6 +107,29 @@ class AnkiHubDB:
                 note.mid,
                 note.mod,
             )
+
+        # copy tags and flds to ankihub db
+        self.anki_db.execute(
+            f"""
+            UPDATE {self.database_name}.notes as ah_n
+            SET
+            tags = main.notes.tags,
+            flds = main.notes.flds
+            FROM {self.database_name}.notes JOIN notes ON notes.id = ah_n.anki_note_id
+            WHERE notes.id in {ids2str(nids)}
+            """
+        )
+
+    def differs_from_ankihub_version(self, nid: NoteId) -> Optional[bool]:
+        result = self.anki_db.scalar(
+            f"""
+            SELECT (n.flds != ah_n.flds OR n.tags != ah_n.tags)
+            FROM notes as n, {self.database_name}.notes as ah_n
+            WHERE n.id = ? AND ah_n.anki_note_id = n.id
+            """,
+            nid,
+        )
+        return result
 
     def notes_for_ankihub_deck(self, ankihub_did: str) -> List[NoteId]:
         result = self.anki_db.list(
