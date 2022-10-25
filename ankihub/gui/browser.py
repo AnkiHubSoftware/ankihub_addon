@@ -1,4 +1,3 @@
-import uuid
 from abc import abstractmethod
 from concurrent.futures import Future
 from pprint import pformat
@@ -205,12 +204,11 @@ class EditedAfterSyncColumn(CustomColumn):
         if "ankihub_id" not in note or not note["ankihub_id"]:
             return "N/A"
 
-        last_sync = ankihub_db.last_sync(uuid.UUID(note["ankihub_id"]))
-        if last_sync is None:
-            # The sync_mod value can be None if the note was synced with an early version of the AnkiHub add-on
+        differs = ankihub_db.differs_from_ankihub_version(note.id)
+        if differs is None:
             return "Unknown"
 
-        return "Yes" if note.mod > last_sync else "No"
+        return "Yes" if differs else "No"
 
     def order_by_str(self) -> str:
         mids = note_types_with_ankihub_id_field()
@@ -218,8 +216,12 @@ class EditedAfterSyncColumn(CustomColumn):
             return None
 
         return (
-            "(select n.mod > ah_n.mod from ankihub_db.notes as ah_n where ah_n.anki_note_id = n.id limit 1) desc, "
-            f"(n.mid in {ids2str(mids)}) desc"
+            "("
+            "   SELECT (n.flds != ah_n.flds OR n.tags != ah_n.tags) "
+            "   FROM ankihub_db.notes as ah_n "
+            "   WHERE ah_n.anki_note_id = n.id limit 1 "
+            ") desc, "
+            f"(n.mid in {ids2str(mids)}) desc "
         )
 
 
