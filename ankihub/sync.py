@@ -544,6 +544,11 @@ class AnkiHubImporter:
 
 
 def get_fields_protected_by_tags(note: Note) -> List[str]:
+    if TAG_FOR_PROTECTING_ALL_FIELDS in note.tags:
+        return [
+            tag for tag in note.keys() if tag != settings.ANKIHUB_NOTE_TYPE_FIELD_NAME
+        ]
+
     field_names_from_tags = [
         tag[len(prefix) :]
         for tag in note.tags

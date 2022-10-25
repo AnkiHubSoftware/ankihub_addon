@@ -22,10 +22,16 @@ from aqt.utils import showInfo, showText
 from .. import LOGGER
 from ..ankihub_client import AnkiHubRequestError
 from ..db import ankihub_db
-from ..settings import AnkiHubCommands
+from ..settings import ANKIHUB_NOTE_TYPE_FIELD_NAME, AnkiHubCommands
 from ..suggestions import BulkNoteSuggestionsResult, suggest_notes_in_bulk
+from ..sync import (
+    TAG_FOR_PROTECTING_ALL_FIELDS,
+    TAG_FOR_PROTECTING_FIELDS,
+    get_fields_protected_by_tags,
+)
 from ..utils import note_types_with_ankihub_id_field
 from .suggestion_dialog import SuggestionDialog
+from .utils import choose_subset
 
 browser: Optional[Browser] = None
 
@@ -38,6 +44,11 @@ def on_browser_will_show_context_menu(browser: Browser, context_menu: QMenu) -> 
     menu.addAction(
         "AnkiHub: Bulk suggest notes",
         lambda: on_bulk_notes_suggest_action(browser),
+    )
+
+    menu.addAction(
+        "AnkiHub: Protect fields",
+        lambda: on_protect_fields_action(browser),
     )
 
     # setup copy ankihub_id to clipboard action
@@ -53,6 +64,61 @@ def on_browser_will_show_context_menu(browser: Browser, context_menu: QMenu) -> 
         len(notes) == 1 and "ankihub_id" in (note := notes[0]) and note["ankihub_id"]
     ):
         copy_ankihub_id_action.setDisabled(True)
+
+
+def on_protect_fields_action(browser: Browser) -> None:
+    nids = browser.selected_notes()
+    if len(nids) != 1:
+        showInfo("Please select exactly one note.", parent=browser)
+        return
+
+    nid = nids[0]
+
+    if ankihub_db.ankihub_id_for_note(nid) is None:
+        showInfo("This note is not an AnkiHub note.", parent=browser)
+        return
+
+    note = mw.col.get_note(nid)
+
+    fields: List[str] = [
+        field for field in note.keys() if field != ANKIHUB_NOTE_TYPE_FIELD_NAME
+    ]
+    old_fields_protected_by_tags: List[str] = get_fields_protected_by_tags(note)
+    new_fields_protected_by_tags = choose_subset(
+        "Choose which fields of this note should be protected<br>"
+        "from updates.<br><br>"
+        "Note: Fields you have protected for the note type<br>"
+        "on AnkiHub will be protected automatically.",
+        choices=fields,
+        current=old_fields_protected_by_tags,
+        description_html="This will edit the AnkiHub_Protect tags of the note.",
+        parent=browser,
+    )
+
+    if set(new_fields_protected_by_tags) == set(fields):
+        new_tags_for_protecting_fields = [TAG_FOR_PROTECTING_ALL_FIELDS]
+    else:
+        new_tags_for_protecting_fields = [
+            f"{TAG_FOR_PROTECTING_FIELDS}::{field.replace(' ', '_')}"
+            for field in new_fields_protected_by_tags
+        ]
+
+    # remove old tags for protecting fields
+    note.tags = [
+        tag for tag in note.tags if not tag.startswith(TAG_FOR_PROTECTING_FIELDS)
+    ]
+
+    # add new tags for protecting fields
+    note.tags += new_tags_for_protecting_fields
+
+    note.flush()
+
+    # without this the tags in the browser editor are not updated until you switch away from the note
+    browser.table.reset()
+
+    LOGGER.debug(
+        f"Updated tags for protecting fields for note {note.id} to protect these fields {new_fields_protected_by_tags}"
+    )
 
 
 def on_bulk_notes_suggest_action(browser: Browser) -> None:
