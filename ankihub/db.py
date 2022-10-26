@@ -9,6 +9,7 @@ from aqt import mw
 from aqt.gui_hooks import collection_did_load, collection_did_temporarily_close
 
 from . import LOGGER
+from .ankihub_client import NoteInfo
 from .settings import ANKIHUB_NOTE_TYPE_FIELD_NAME, DB_PATH
 
 
@@ -88,7 +89,46 @@ class AnkiHubDB:
         result = self.anki_db.scalar(f"PRAGMA {self.database_name}.user_version;")
         return result
 
-    def save_notes_from_nids(self, ankihub_did: str, nids: List[NoteId]):
+    def save_notes_from_notes_data(
+        self, ankihub_did: str, notes_data: List[NoteInfo]
+    ) -> None:
+        """Save notes from AnkiHub data to AnkiHub DB
+        To be used when syncing from AnkiHub to Anki.
+        """
+        for note_data in notes_data:
+            note = mw.col.get_note(NoteId(note_data.anki_nid))
+            self.anki_db.execute(
+                f"""
+                INSERT OR REPLACE INTO {self.database_name}.notes (
+                    ankihub_note_id,
+                    ankihub_deck_id,
+                    anki_note_id,
+                    anki_note_type_id,
+                    mod,
+                    tags,
+                    flds
+                ) VALUES (?, ?, ?, ?, ?, ?, ?)
+                """,
+                str(note_data.ankihub_note_uuid),
+                ankihub_did,
+                note_data.anki_nid,
+                note_data.mid,
+                note.mod,
+                mw.col.tags.join(note_data.tags),
+                join_fields(
+                    [
+                        field.value
+                        for field in sorted(
+                            note_data.fields, key=lambda field: field.order
+                        )
+                    ]
+                ),
+            )
+
+    def save_notes_from_nids(self, ankihub_did: str, nids: List[NoteId]) -> None:
+        """Save notes from Anki to AnkiHub DB
+        To be used when creating a collaborative deck.
+        """
         for nid in nids:
             note = mw.col.get_note(nid)
             self.anki_db.execute(
