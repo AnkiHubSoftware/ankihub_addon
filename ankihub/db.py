@@ -6,6 +6,7 @@ from anki.dbproxy import DBProxy
 from anki.models import NotetypeId
 from anki.notes import NoteId
 from aqt import mw
+from aqt.gui_hooks import collection_did_load, collection_did_temporarily_close
 
 from . import LOGGER
 from .settings import ANKIHUB_NOTE_TYPE_FIELD_NAME, DB_PATH
@@ -173,3 +174,11 @@ class AnkiHubDB:
 
 
 ankihub_db = AnkiHubDB()
+
+
+def setup_ankihub_database():
+    """Sets up the AnkiHub database and attaches it to the Anki database connection
+    when Anki opens its database.
+    """
+    collection_did_load.append(lambda _: ankihub_db.setup())
+    collection_did_temporarily_close.append(lambda _: ankihub_db.setup())
