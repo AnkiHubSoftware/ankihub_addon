@@ -82,14 +82,6 @@ jobs:
         run: |
           pytest ./tests/addon --cov --cov-report=xml
           pytest ./tests/client --disable-vcr --cov --cov-report=xml --cov-append
-          coverage html
-
-      - name: Archive coverage html report
-        if: always()
-        uses: actions/upload-artifact@v3
-        with:
-          name: coverage_html_report
-          path: coverage_html_report
 
       - name: Upload coverage to Codecov
         env:
