@@ -4,7 +4,7 @@ from typing import List, Optional
 from anki.dbproxy import DBProxy
 from anki.models import NotetypeId
 from anki.notes import NoteId
-from anki.utils import ids2str
+from anki.utils import join_fields
 from aqt import mw
 from aqt.gui_hooks import collection_did_load, collection_did_temporarily_close
 
@@ -98,27 +98,19 @@ class AnkiHubDB:
                     ankihub_deck_id,
                     anki_note_id,
                     anki_note_type_id,
-                    mod
-                ) VALUES (?, ?, ?, ?, ?)
+                    mod,
+                    tags,
+                    flds
+                ) VALUES (?, ?, ?, ?, ?, ?, ?)
                 """,
                 note[ANKIHUB_NOTE_TYPE_FIELD_NAME],
                 ankihub_did,
                 nid,
                 note.mid,
                 note.mod,
+                note.string_tags(),
+                join_fields(note.values()),
             )
-
-        # copy tags and flds to ankihub db
-        self.anki_db.execute(
-            f"""
-            UPDATE {self.database_name}.notes as ah_n
-            SET
-            tags = main.notes.tags,
-            flds = main.notes.flds
-            FROM {self.database_name}.notes JOIN notes ON notes.id = ah_n.anki_note_id
-            WHERE notes.id in {ids2str(nids)}
-            """
-        )
 
     def differs_from_ankihub_version(self, nid: NoteId) -> Optional[bool]:
         result = self.anki_db.scalar(
