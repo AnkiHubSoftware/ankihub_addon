@@ -1,14 +1,35 @@
 import uuid
-from typing import List, Optional
+from functools import wraps
+from typing import Callable, List, Optional
 
 from anki.dbproxy import DBProxy
 from anki.models import NotetypeId
 from anki.notes import NoteId
 from aqt import mw
-from aqt.gui_hooks import collection_did_load, collection_did_temporarily_close
 
 from . import LOGGER
 from .settings import ANKIHUB_NOTE_TYPE_FIELD_NAME, DB_PATH
+
+
+def attach_ankihub_db(func: Callable) -> Callable:
+    @wraps(func)
+    def wrapper(*args, **kwargs):
+        attach_ankihub_db_to_anki_db_connection()
+        return func(*args, **kwargs)
+
+    return wrapper
+
+
+def attach_ankihub_db_to_anki_db_connection() -> None:
+    if "ankihub_db" not in [
+        name for _, name, _ in mw.col.db.all("PRAGMA database_list")
+    ]:
+        mw.col.db.execute(
+            f"ATTACH DATABASE ? AS {AnkiHubDB.database_name}", str(DB_PATH)
+        )
+        LOGGER.debug("Attached AnkiHub DB to Anki DB connection")
+    else:
+        LOGGER.debug("AnkiHub DB already attached to Anki DB connection")
 
 
 class AnkiHubDB:
@@ -19,20 +40,10 @@ class AnkiHubDB:
         return mw.col.db
 
     def setup(self):
-        self._attach_ankihub_db_to_anki_db_connection()
         self._setup_tables_and_migrate()
+        self.anki_db.commit()
 
-    def _attach_ankihub_db_to_anki_db_connection(self) -> None:
-        if "ankihub_db" not in [
-            name for _, name, _ in mw.col.db.all("PRAGMA database_list")
-        ]:
-            self.anki_db.execute(
-                f"ATTACH DATABASE ? AS {AnkiHubDB.database_name}", str(DB_PATH)
-            )
-            LOGGER.debug("Attached AnkiHub DB to Anki DB connection")
-        else:
-            LOGGER.debug("AnkiHub DB already attached to Anki DB connection")
-
+    @attach_ankihub_db
     def _setup_tables_and_migrate(self) -> None:
         self.anki_db.execute(
             f"""
@@ -70,10 +81,12 @@ class AnkiHubDB:
                 f"AnkiHub DB migrated to schema version {self.schema_version()}"
             )
 
+    @attach_ankihub_db
     def schema_version(self) -> int:
         result = self.anki_db.scalar(f"PRAGMA {self.database_name}.user_version;")
         return result
 
+    @attach_ankihub_db
     def save_notes_from_nids(self, ankihub_did: str, nids: List[NoteId]):
         for nid in nids:
             note = mw.col.get_note(nid)
@@ -94,6 +107,7 @@ class AnkiHubDB:
                 note.mod,
             )
 
+    @attach_ankihub_db
     def notes_for_ankihub_deck(self, ankihub_did: str) -> List[NoteId]:
         result = self.anki_db.list(
             f"""
@@ -103,6 +117,7 @@ class AnkiHubDB:
         )
         return result
 
+    @attach_ankihub_db
     def ankihub_did_for_note_type(self, anki_note_type_id: int) -> Optional[str]:
         result = self.anki_db.scalar(
             f"""
@@ -112,6 +127,7 @@ class AnkiHubDB:
         )
         return result
 
+    @attach_ankihub_db
     def ankihub_id_for_note(self, anki_note_id: int) -> Optional[str]:
         result = self.anki_db.scalar(
             f"""
@@ -121,6 +137,7 @@ class AnkiHubDB:
         )
         return result
 
+    @attach_ankihub_db
     def note_types_for_ankihub_deck(self, ankihub_did: str) -> List[NotetypeId]:
         result = self.anki_db.list(
             f"""
@@ -130,6 +147,7 @@ class AnkiHubDB:
         )
         return result
 
+    @attach_ankihub_db
     def remove_deck(self, ankihub_did: str):
         self.anki_db.execute(
             f"""
@@ -138,12 +156,14 @@ class AnkiHubDB:
             ankihub_did,
         )
 
+    @attach_ankihub_db
     def ankihub_deck_ids(self) -> List[str]:
         result = self.anki_db.list(
             f"SELECT DISTINCT ankihub_deck_id FROM {self.database_name}.notes"
         )
         return result
 
+    @attach_ankihub_db
     def last_sync(self, ankihub_note_id: uuid.UUID) -> Optional[int]:
         result = self.anki_db.scalar(
             f"SELECT mod FROM {self.database_name}.notes WHERE ankihub_note_id = ?",
@@ -153,11 +173,3 @@ class AnkiHubDB:
 
 
 ankihub_db = AnkiHubDB()
-
-
-def setup_ankihub_database():
-    """Sets up the AnkiHub database and attaches it to the Anki database connection
-    when Anki opens its database.
-    """
-    collection_did_load.append(lambda _: ankihub_db.setup())
-    collection_did_temporarily_close.append(lambda _: ankihub_db.setup())
