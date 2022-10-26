@@ -360,15 +360,16 @@ def setup_reset_deck_action(browser: Browser, menu: QMenu) -> None:
         ankihub_dids = list(config.private_config.decks.keys())
 
         chosen_deck_idx = chooseList(
-            prompt="Choose the AnkiHub deck you want to reset",
+            prompt="Choose the AnkiHub deck for which<br>you want to reset local changes",
             choices=[deck["name"] for deck in decks],
             parent=browser,
         )
         chosen_deck = decks[chosen_deck_idx]
-        askUser(
+        if not askUser(
             f"Are you sure you want to reset all local changes to the deck <b>{chosen_deck['name']}</b>?",
             parent=browser,
-        )
+        ):
+            return
 
         nids = ankihub_db.notes_for_ankihub_deck(ankihub_dids[chosen_deck_idx])
         anki_deck_id = chosen_deck["anki_id"]
