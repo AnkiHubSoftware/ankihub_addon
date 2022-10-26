@@ -17,7 +17,7 @@ from aqt.gui_hooks import (
     browser_will_show_context_menu,
 )
 from aqt.qt import QMenu
-from aqt.utils import showInfo, showText
+from aqt.utils import showInfo, showText, tooltip
 
 from .. import LOGGER
 from ..ankihub_client import AnkiHubRequestError
@@ -75,24 +75,26 @@ def on_browser_will_show_context_menu(browser: Browser, context_menu: QMenu) -> 
 def on_reset_local_changes_action(browser: Browser) -> None:
     nids = browser.selected_notes()
 
-    if len(nids) != 1:
-        showInfo("Please select exactly one note.", parent=browser)
-        return
+    def reset_local_changes() -> None:
+        importer = AnkiHubImporter()
+        for nid in nids:
+            importer.update_or_create_note(
+                ankihub_db.note_data(nid),
+                # TODO get protected fields and tags from ankihub or store the most currently used ones to use them here
+                protected_fields={},
+                protected_tags=[],
+            )
 
-    nid = nids[0]
-    if ankihub_db.ankihub_id_for_note(nid) is None:
-        showInfo("This note is not an AnkiHub note.", parent=browser)
-        return
+    def on_done(_) -> None:
+        browser.table.reset()
+        tooltip("Reset local changes for selected notes.", parent=browser)
 
-    importer = AnkiHubImporter()
-    importer.update_or_create_note(
-        ankihub_db.note_data(nid),
-        # TODO get protected fields and tags from ankihub or store the most currently used ones to use them here
-        protected_fields={},
-        protected_tags=[],
+    mw.taskman.with_progress(
+        task=reset_local_changes,
+        on_done=on_done,
+        label="Resetting local changes...",
+        parent=browser,
     )
-
-    browser.table.reset()
 
 
 def on_protect_fields_action(browser: Browser) -> None:
