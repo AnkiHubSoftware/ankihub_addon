@@ -249,7 +249,7 @@ class AnkiHubImporter:
 
         dids: Set[DeckId] = set()  # set of ids of decks notes were imported into
         for note_data in notes_data:
-            note = self._update_or_create_note(
+            note = self.update_or_create_note(
                 note_data=note_data,
                 anki_did=local_did,
                 protected_fields=protected_fields,
@@ -293,13 +293,13 @@ class AnkiHubImporter:
 
         return created_did
 
-    def _update_or_create_note(
+    def update_or_create_note(
         self,
         note_data: NoteInfo,
-        anki_did: DeckId,
         protected_fields: Dict[int, List[str]],
         protected_tags: List[str],
-        first_import_of_deck: bool,
+        anki_did: Optional[DeckId] = None,
+        first_import_of_deck: bool = False,
     ) -> Note:
         LOGGER.debug(
             f"Trying to update or create note: {note_data.anki_nid=}, {note_data.ankihub_note_uuid=}"
@@ -316,9 +316,9 @@ class AnkiHubImporter:
 
         note = self._update_or_create_note_inner(
             note_data,
-            anki_did=anki_did,
             protected_fields=protected_fields,
             protected_tags=protected_tags,
+            anki_did=anki_did,
             first_import_of_deck=first_import_of_deck,
         )
 
@@ -362,9 +362,9 @@ class AnkiHubImporter:
     def _update_or_create_note_inner(
         self,
         note_data: NoteInfo,
-        anki_did: DeckId,  # only relevant for newly created notes
         protected_fields: Dict[int, List[str]],
         protected_tags: List[str],
+        anki_did: Optional[DeckId],  # only relevant for newly created notes
         first_import_of_deck: bool,
     ) -> Note:
         fields = note_data.fields
@@ -391,6 +391,9 @@ class AnkiHubImporter:
             else:
                 LOGGER.debug(f"No changes, skipping {note_data.anki_nid=}")
         except NotFoundError:
+            if anki_did is None:
+                raise ValueError("anki_did must be set for new notes")
+
             note_type = mw.col.models.get(NotetypeId(note_data.mid))
             note = mw.col.new_note(note_type)
             self.prepare_note(

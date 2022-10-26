@@ -4,12 +4,12 @@ from typing import List, Optional
 from anki.dbproxy import DBProxy
 from anki.models import NotetypeId
 from anki.notes import NoteId
-from anki.utils import join_fields
+from anki.utils import join_fields, split_fields
 from aqt import mw
 from aqt.gui_hooks import collection_did_load, collection_did_temporarily_close
 
 from . import LOGGER
-from .ankihub_client import NoteInfo
+from .ankihub_client import Field, NoteInfo
 from .settings import ANKIHUB_NOTE_TYPE_FIELD_NAME, DB_PATH
 
 
@@ -88,6 +88,42 @@ class AnkiHubDB:
     def schema_version(self) -> int:
         result = self.anki_db.scalar(f"PRAGMA {self.database_name}.user_version;")
         return result
+
+    def note_data(self, anki_note_id: int) -> Optional[NoteInfo]:
+        result = self.anki_db.first(
+            f"""
+            SELECT
+                ah_n.ankihub_note_id,
+                ah_n.anki_note_id,
+                ah_n.anki_note_type_id,
+                ah_n.tags,
+                ah_n.flds
+            FROM {self.database_name}.notes as ah_n
+            WHERE ah_n.anki_note_id = ?
+            """,
+            anki_note_id,
+        )
+        if result is None:
+            return None
+
+        ah_nid, anki_nid, mid, tags, flds = result
+        field_names = [
+            field["name"] for field in mw.col.models.get(NotetypeId(mid))["flds"]
+        ]
+        return NoteInfo(
+            ankihub_note_uuid=uuid.UUID(ah_nid),
+            anki_nid=anki_nid,
+            mid=mid,
+            tags=mw.col.tags.split(tags),
+            fields=[
+                Field(
+                    name=field_names[i],
+                    value=value,
+                    order=i,
+                )
+                for i, value in enumerate(split_fields(flds))
+            ],
+        )
 
     def save_notes_from_notes_data(
         self, ankihub_did: str, notes_data: List[NoteInfo]

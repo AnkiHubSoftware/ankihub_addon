@@ -27,6 +27,7 @@ from ..suggestions import BulkNoteSuggestionsResult, suggest_notes_in_bulk
 from ..sync import (
     TAG_FOR_PROTECTING_ALL_FIELDS,
     TAG_FOR_PROTECTING_FIELDS,
+    AnkiHubImporter,
     get_fields_protected_by_tags,
 )
 from ..utils import note_types_with_ankihub_id_field
@@ -40,6 +41,11 @@ def on_browser_will_show_context_menu(browser: Browser, context_menu: QMenu) -> 
     menu = context_menu
 
     menu.addSeparator()
+
+    menu.addAction(
+        "AnkiHub: Reset local changes",
+        lambda: on_reset_local_changes_action(browser),
+    )
 
     menu.addAction(
         "AnkiHub: Bulk suggest notes",
@@ -64,6 +70,29 @@ def on_browser_will_show_context_menu(browser: Browser, context_menu: QMenu) -> 
         len(notes) == 1 and "ankihub_id" in (note := notes[0]) and note["ankihub_id"]
     ):
         copy_ankihub_id_action.setDisabled(True)
+
+
+def on_reset_local_changes_action(browser: Browser) -> None:
+    nids = browser.selected_notes()
+
+    if len(nids) != 1:
+        showInfo("Please select exactly one note.", parent=browser)
+        return
+
+    nid = nids[0]
+    if ankihub_db.ankihub_id_for_note(nid) is None:
+        showInfo("This note is not an AnkiHub note.", parent=browser)
+        return
+
+    importer = AnkiHubImporter()
+    importer.update_or_create_note(
+        ankihub_db.note_data(nid),
+        # TODO get protected fields and tags from ankihub or store the most currently used ones to use them here
+        protected_fields={},
+        protected_tags=[],
+    )
+
+    browser.table.reset()
 
 
 def on_protect_fields_action(browser: Browser) -> None:
