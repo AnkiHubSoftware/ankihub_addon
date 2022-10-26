@@ -5,24 +5,26 @@ from pprint import pformat
 from typing import List, Optional, Sequence
 
 from anki.collection import BrowserColumns
-from anki.notes import Note
+from anki.decks import DeckId
+from anki.notes import Note, NoteId
 from anki.utils import ids2str
 from aqt import mw
 from aqt.browser import Browser, CellRow, Column, ItemId, SearchContext
 from aqt.gui_hooks import (
     browser_did_fetch_columns,
     browser_did_fetch_row,
+    browser_menus_did_init,
     browser_will_search,
     browser_will_show,
     browser_will_show_context_menu,
 )
-from aqt.qt import QMenu
-from aqt.utils import showInfo, showText, tooltip
+from aqt.qt import QAction, QMenu, qconnect
+from aqt.utils import askUser, chooseList, showInfo, showText, tooltip
 
 from .. import LOGGER
 from ..ankihub_client import AnkiHubRequestError
 from ..db import ankihub_db
-from ..settings import ANKIHUB_NOTE_TYPE_FIELD_NAME, AnkiHubCommands
+from ..settings import ANKIHUB_NOTE_TYPE_FIELD_NAME, AnkiHubCommands, config
 from ..suggestions import BulkNoteSuggestionsResult, suggest_notes_in_bulk
 from ..sync import (
     TAG_FOR_PROTECTING_ALL_FIELDS,
@@ -75,22 +77,12 @@ def on_browser_will_show_context_menu(browser: Browser, context_menu: QMenu) -> 
 def on_reset_local_changes_action(browser: Browser) -> None:
     nids = browser.selected_notes()
 
-    def reset_local_changes() -> None:
-        importer = AnkiHubImporter()
-        for nid in nids:
-            importer.update_or_create_note(
-                ankihub_db.note_data(nid),
-                # TODO get protected fields and tags from ankihub or store the most currently used ones to use them here
-                protected_fields={},
-                protected_tags=[],
-            )
-
     def on_done(_) -> None:
         browser.table.reset()
         tooltip("Reset local changes for selected notes.", parent=browser)
 
     mw.taskman.with_progress(
-        task=reset_local_changes,
+        task=lambda: reset_local_changes(nids),
         on_done=on_done,
         label="Resetting local changes...",
         parent=browser,
@@ -355,6 +347,64 @@ def on_browser_will_search(ctx: SearchContext):
     ctx.order = custom_column.order_by_str()
 
 
+def on_browser_menus_did_init(browser: Browser):
+    menu = QMenu("AnkiHub")
+    browser.form.menubar.addMenu(menu)
+
+    setup_reset_deck_action(browser, menu)
+
+
+def setup_reset_deck_action(browser: Browser, menu: QMenu) -> None:
+    def on_reset_deck_action():
+        decks = list(config.private_config.decks.values())
+        ankihub_dids = list(config.private_config.decks.keys())
+
+        chosen_deck_idx = chooseList(
+            prompt="Choose the AnkiHub deck you want to reset",
+            choices=[deck["name"] for deck in decks],
+            parent=browser,
+        )
+        chosen_deck = decks[chosen_deck_idx]
+        askUser(
+            f"Are you sure you want to reset all local changes to the deck <b>{chosen_deck['name']}</b>?",
+            parent=browser,
+        )
+
+        nids = ankihub_db.notes_for_ankihub_deck(ankihub_dids[chosen_deck_idx])
+        anki_deck_id = chosen_deck["anki_id"]
+
+        def on_done(_) -> None:
+            browser.model.reset()
+            tooltip(f"Reset local changes to deck <b>{chosen_deck['name']}</b>")
+
+        mw.taskman.with_progress(
+            lambda: reset_local_changes(nids, anki_deck_id=anki_deck_id),
+            on_done=on_done,
+            label="Resetting local changes...",
+            parent=browser,
+        )
+
+    reset_deck_action = QAction("Reset all local changes to a deck", browser)
+    qconnect(reset_deck_action.triggered, on_reset_deck_action)
+    menu.addAction(reset_deck_action)
+
+
+def reset_local_changes(
+    nids: Sequence[NoteId], anki_deck_id: Optional[DeckId] = None
+) -> None:
+    importer = AnkiHubImporter()
+    for nid in nids:
+        importer.update_or_create_note(
+            ankihub_db.note_data(nid),
+            # TODO get protected fields and tags from ankihub or store the most currently used ones to use them here
+            protected_fields={},
+            protected_tags=[],
+            anki_did=anki_deck_id,
+        )
+
+    # TODO maybe reset notes mod value so that it doesn't show up in the "edited after sync" column
+
+
 def setup() -> None:
     def store_browser_reference(browser_: Browser) -> None:
         global browser
@@ -366,3 +416,5 @@ def setup() -> None:
     browser_will_search.append(on_browser_will_search)
 
     browser_will_show_context_menu.append(on_browser_will_show_context_menu)
+
+    browser_menus_did_init.append(on_browser_menus_did_init)
