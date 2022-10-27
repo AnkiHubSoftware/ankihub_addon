@@ -116,7 +116,7 @@ def setup_addons():
     )
 
     AddonManager.deleteAddon = wrap(
-        old=AddonManager.backupUserFiles,
+        old=AddonManager.deleteAddon,
         new=detach_ankihub_db,
         pos="before",
     )
