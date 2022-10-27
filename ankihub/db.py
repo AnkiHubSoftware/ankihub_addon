@@ -1,5 +1,6 @@
 import sqlite3
 import uuid
+from contextlib import contextmanager
 from typing import List, Optional
 
 from anki.models import NotetypeId
@@ -33,6 +34,13 @@ def detach_ankihub_db_from_anki_db_connection() -> None:
         mw.col.db.begin()
 
         LOGGER.debug("Detached AnkiHub DB from Anki DB connection")
+
+
+@contextmanager
+def db_transaction():
+    with sqlite3.connect(DB_PATH) as conn:
+        yield conn
+    conn.close()
 
 
 class AnkiHubDB:
@@ -104,24 +112,27 @@ class AnkiHubDB:
         return result
 
     def save_notes_from_nids(self, ankihub_did: str, nids: List[NoteId]):
-        for nid in nids:
-            note = mw.col.get_note(nid)
-            self.execute(
-                """
-                INSERT OR REPLACE INTO notes (
-                    ankihub_note_id,
-                    ankihub_deck_id,
-                    anki_note_id,
-                    anki_note_type_id,
-                    mod
-                ) VALUES (?, ?, ?, ?, ?)
-                """,
-                note[ANKIHUB_NOTE_TYPE_FIELD_NAME],
-                ankihub_did,
-                nid,
-                note.mid,
-                note.mod,
-            )
+        with db_transaction() as conn:
+            for nid in nids:
+                note = mw.col.get_note(nid)
+                conn.execute(
+                    """
+                    INSERT OR REPLACE INTO notes (
+                        ankihub_note_id,
+                        ankihub_deck_id,
+                        anki_note_id,
+                        anki_note_type_id,
+                        mod
+                    ) VALUES (?, ?, ?, ?, ?)
+                    """,
+                    (
+                        note[ANKIHUB_NOTE_TYPE_FIELD_NAME],
+                        ankihub_did,
+                        nid,
+                        note.mid,
+                        note.mod,
+                    ),
+                )
 
     def notes_for_ankihub_deck(self, ankihub_did: str) -> List[NoteId]:
         result = self.list(
