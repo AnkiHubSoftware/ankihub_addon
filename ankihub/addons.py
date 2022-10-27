@@ -115,7 +115,7 @@ def setup_addons():
     )
 
     DownloaderInstaller._download_all = wrap(
-        old=AddonManager._download_all,
+        old=DownloaderInstaller._download_all,
         new=with_detached_ankihub_db,
         pos="around",
     )
