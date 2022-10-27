@@ -8,11 +8,8 @@ from aqt import addons, mw
 from aqt.addons import AddonManager, DownloaderInstaller
 
 from . import LOGGER
-from .db import (
-    attach_ankihub_db_to_anki_db_connection,
-    detach_ankihub_db_from_anki_db_connection,
-)
-from .settings import DB_PATH, LOG_FILE, file_handler
+from .db import detach_ankihub_db_from_anki_db_connection
+from .settings import LOG_FILE, file_handler
 
 
 def with_disabled_log_file_handler(*args: Any, **kwargs: Any) -> Any:
@@ -42,22 +39,8 @@ def with_disabled_log_file_handler(*args: Any, **kwargs: Any) -> Any:
     return result
 
 
-def with_detached_ankihub_db(*args: Any, **kwargs: Any) -> Any:
-    # This is done to prevent DB errors when deleting or updating the add-on
-
-    _old: Callable = kwargs["_old"]
-    del kwargs["_old"]
-
-    mw.col.db.commit()
+def detach_ankihub_db(*args: Any, **kwargs: Any) -> None:
     detach_ankihub_db_from_anki_db_connection()
-
-    result = _old(*args, **kwargs)
-
-    # if the add-on was deleted it makes no sense to re-attach the database and it would throw an error
-    if DB_PATH.exists():
-        attach_ankihub_db_to_anki_db_connection()
-
-    return result
 
 
 def on_deleteAddon(self, module: str) -> None:
@@ -116,8 +99,8 @@ def setup_addons():
 
     DownloaderInstaller._download_all = wrap(
         old=DownloaderInstaller._download_all,
-        new=with_detached_ankihub_db,
-        pos="around",
+        new=detach_ankihub_db,
+        pos="before",
     )
 
     # prevent errors when deleting the add-on (AddonManager.deleteAddon also gets called during an update)
@@ -134,8 +117,8 @@ def setup_addons():
 
     AddonManager.deleteAddon = wrap(
         old=AddonManager.backupUserFiles,
-        new=with_detached_ankihub_db,
-        pos="around",
+        new=detach_ankihub_db,
+        pos="before",
     )
 
     # prevent UI "deadlock" when Anki checks for add-on updates and AnkiHub syncs at the same time
