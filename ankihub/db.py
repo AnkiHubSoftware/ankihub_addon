@@ -33,6 +33,14 @@ def attach_ankihub_db_to_anki_db_connection() -> None:
         LOGGER.debug("AnkiHub DB already attached to Anki DB connection")
 
 
+def detach_ankihub_db_from_anki_db_connection() -> None:
+    if "ankihub_db" in [name for _, name, _ in mw.col.db.all("PRAGMA database_list")]:
+        mw.col.db.execute(f"DETACH DATABASE {AnkiHubDB.database_name}")
+        LOGGER.debug("Detached AnkiHub DB from Anki DB connection")
+    else:
+        LOGGER.debug("AnkiHub DB was not attached to Anki DB connection.")
+
+
 class AnkiHubDB:
     database_name = "ankihub_db"
 
