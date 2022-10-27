@@ -284,8 +284,11 @@ class EditedAfterSyncColumn(CustomColumn):
             return None
 
         return (
-            "(select n.mod > ah_n.mod from ankihub_db.notes as ah_n where ah_n.anki_note_id = n.id limit 1) desc, "
-            f"(n.mid in {ids2str(mids)}) desc"
+            "("
+            f"   SELECT n.mod > ah_n.mod from {ankihub_db.database_name}.notes AS ah_n "
+            "    WHERE ah_n.anki_note_id = n.id LIMIT 1"
+            ") DESC, "
+            f"(n.mid IN {ids2str(mids)}) DESC"
         )
 
 

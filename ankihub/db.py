@@ -22,7 +22,7 @@ def attach_ankihub_db(func: Callable) -> Callable:
 
 
 def attach_ankihub_db_to_anki_db_connection() -> None:
-    if "ankihub_db" not in [
+    if AnkiHubDB.database_name not in [
         name for _, name, _ in mw.col.db.all("PRAGMA database_list")
     ]:
         mw.col.db.execute(
@@ -34,7 +34,9 @@ def attach_ankihub_db_to_anki_db_connection() -> None:
 
 
 def detach_ankihub_db_from_anki_db_connection() -> None:
-    if "ankihub_db" in [name for _, name, _ in mw.col.db.all("PRAGMA database_list")]:
+    if AnkiHubDB.database_name in [
+        name for _, name, _ in mw.col.db.all("PRAGMA database_list")
+    ]:
         mw.col.db.execute(f"DETACH DATABASE {AnkiHubDB.database_name}")
         LOGGER.debug("Detached AnkiHub DB from Anki DB connection")
     else:
