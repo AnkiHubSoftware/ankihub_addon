@@ -1,7 +1,7 @@
 import sqlite3
 import uuid
 from contextlib import contextmanager
-from typing import List, Optional
+from typing import Any, List, Optional
 
 from anki.models import NotetypeId
 from anki.notes import NoteId
@@ -65,7 +65,7 @@ class AnkiHubDB:
         conn.close()
         return result
 
-    def scalar(self, sql: str, *args):
+    def scalar(self, sql: str, *args) -> Any:
         rows = self.execute(sql, *args, first_row_only=True)
         if rows:
             return rows[0]
