@@ -12,6 +12,7 @@ from aqt.browser import Browser, CellRow, Column, ItemId, SearchContext
 from aqt.gui_hooks import (
     browser_did_fetch_columns,
     browser_did_fetch_row,
+    browser_did_search,
     browser_will_search,
     browser_will_show,
     browser_will_show_context_menu,
@@ -21,7 +22,11 @@ from aqt.utils import showInfo, showText
 
 from .. import LOGGER
 from ..ankihub_client import AnkiHubRequestError
-from ..db import ankihub_db
+from ..db import (
+    ankihub_db,
+    attach_ankihub_db_to_anki_db_connection,
+    detach_ankihub_db_from_anki_db_connection,
+)
 from ..settings import ANKIHUB_NOTE_TYPE_FIELD_NAME, AnkiHubCommands
 from ..suggestions import BulkNoteSuggestionsResult, suggest_notes_in_bulk
 from ..sync import (
@@ -284,8 +289,11 @@ class EditedAfterSyncColumn(CustomColumn):
             return None
 
         return (
-            "(select n.mod > ah_n.mod from ankihub_db.notes as ah_n where ah_n.anki_note_id = n.id limit 1) desc, "
-            f"(n.mid in {ids2str(mids)}) desc"
+            "("
+            f"   SELECT n.mod > ah_n.mod from {ankihub_db.database_name}.notes AS ah_n "
+            "    WHERE ah_n.anki_note_id = n.id LIMIT 1"
+            ") DESC, "
+            f"(n.mid IN {ids2str(mids)}) DESC"
         )
 
 
@@ -321,7 +329,13 @@ def on_browser_will_search(ctx: SearchContext):
     if custom_column is None:
         return
 
+    attach_ankihub_db_to_anki_db_connection()
+
     ctx.order = custom_column.order_by_str()
+
+
+def on_browser_did_search(ctx: SearchContext):
+    detach_ankihub_db_from_anki_db_connection()
 
 
 def setup() -> None:
@@ -333,5 +347,6 @@ def setup() -> None:
     browser_did_fetch_columns.append(on_browser_did_fetch_columns)
     browser_did_fetch_row.append(on_browser_did_fetch_row)
     browser_will_search.append(on_browser_will_search)
+    browser_did_search.append(on_browser_did_search)
 
     browser_will_show_context_menu.append(on_browser_will_show_context_menu)
