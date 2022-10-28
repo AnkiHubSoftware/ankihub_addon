@@ -25,16 +25,25 @@ def detach_ankihub_db_from_anki_db_connection() -> None:
     if AnkiHubDB.database_name in [
         name for _, name, _ in mw.col.db.all("PRAGMA database_list")
     ]:
+        # Liberal use of try/except to ensure we always try to detach and begin a new
+        # transaction.
         try:
             # close the current transaction to avoid a "database is locked" error
             mw.col.save(trx=False)
-        finally:
+        except Exception:
+            LOGGER.debug("Failed to close transaction.")
+
+        # begin a new transaction because Anki expects one to be open
+        try:
             mw.col.db.execute(f"DETACH DATABASE {AnkiHubDB.database_name}")
+            LOGGER.debug("Detached AnkiHub DB from Anki DB connection")
+        except Exception:
+            LOGGER.debug("Failed to detach AnkiHub database.")
 
         # begin a new transaction because Anki expects one to be open
         mw.col.db.begin()
 
-        LOGGER.debug("Detached AnkiHub DB from Anki DB connection")
+        LOGGER.debug("Began new transaction.")
 
 
 @contextmanager
