@@ -33,7 +33,6 @@ def detach_ankihub_db_from_anki_db_connection() -> None:
         except Exception:
             LOGGER.debug("Failed to close transaction.")
 
-        # begin a new transaction because Anki expects one to be open
         try:
             mw.col.db.execute(f"DETACH DATABASE {AnkiHubDB.database_name}")
             LOGGER.debug("Detached AnkiHub DB from Anki DB connection")
