@@ -82,7 +82,7 @@ def on_reset_local_changes_action(browser: Browser) -> None:
         tooltip("Reset local changes for selected notes.", parent=browser)
 
     mw.taskman.with_progress(
-        task=lambda: reset_local_changes(nids),
+        task=lambda: reset_local_changes_to_notes(nids),
         on_done=on_done,
         label="Resetting local changes...",
         parent=browser,
@@ -378,7 +378,7 @@ def on_reset_deck_action(browser: Browser):
         tooltip(f"Reset local changes to deck <b>{chosen_deck['name']}</b>")
 
     mw.taskman.with_progress(
-        lambda: reset_local_changes(nids, anki_deck_id=anki_deck_id),
+        lambda: reset_local_changes_to_notes(nids, anki_deck_id=anki_deck_id),
         on_done=on_done,
         label="Resetting local changes...",
         parent=browser,
@@ -391,7 +391,7 @@ def setup_reset_deck_action(browser: Browser, menu: QMenu) -> None:
     menu.addAction(reset_deck_action)
 
 
-def reset_local_changes(
+def reset_local_changes_to_notes(
     nids: Sequence[NoteId], anki_deck_id: Optional[DeckId] = None
 ) -> None:
     importer = AnkiHubImporter()
