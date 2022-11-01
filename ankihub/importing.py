@@ -19,8 +19,8 @@ from .db import ankihub_db
 from .note_conversion import (
     TAG_FOR_NEW_NOTE,
     TAG_FOR_PROTECTING_ALL_FIELDS,
-    TAG_FOR_PROTECTING_FIELDS,
     TAG_FOR_SUGGESTION_TYPE,
+    get_fields_protected_by_tags,
     is_internal_tag,
 )
 from .settings import config
@@ -407,36 +407,6 @@ class AnkiHubImporter:
             changed = True
 
         return changed
-
-
-def get_fields_protected_by_tags(note: Note) -> List[str]:
-    if TAG_FOR_PROTECTING_ALL_FIELDS in note.tags:
-        return [
-            tag for tag in note.keys() if tag != settings.ANKIHUB_NOTE_TYPE_FIELD_NAME
-        ]
-
-    field_names_from_tags = [
-        tag[len(prefix) :]
-        for tag in note.tags
-        if tag.startswith((prefix := f"{TAG_FOR_PROTECTING_FIELDS}::"))
-    ]
-
-    # Both a field and the field with underscores replaced with spaces should be protected.
-    # This makes it possible to protect fields with spaces in their name because tags cant contain spaces.
-    standardized_field_names_from_tags = [
-        field.replace("_", " ") for field in field_names_from_tags
-    ]
-    standardized_field_names_from_note = [
-        field.replace("_", " ") for field in note.keys()
-    ]
-
-    result = [
-        field
-        for field, field_std in zip(note.keys(), standardized_field_names_from_note)
-        if field_std in standardized_field_names_from_tags
-    ]
-
-    return result
 
 
 def adjust_deck(deck_name: str, local_did: Optional[DeckId] = None) -> DeckId:
