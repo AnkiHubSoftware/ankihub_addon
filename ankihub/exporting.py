@@ -13,7 +13,7 @@ from .utils import ankihub_uuid_of_note
 
 def to_note_data(note: Note, set_new_id: bool = False) -> NoteInfo:
     """Convert an Anki note to a NoteInfo object.
-    Tags and fields are altered (internal tags are removed, ankihub id fields is removed, etc.).
+    Tags and fields are altered (internal tags are removed, ankihub id field is removed, etc.).
     Protected fields are removed.
     """
 
