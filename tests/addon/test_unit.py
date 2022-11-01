@@ -104,7 +104,7 @@ def test_tag_exists_for_every_suggestion_type(anki_session_with_addon: AnkiSessi
 
 
 def test_prepared_field_html(anki_session_with_addon: AnkiSession):
-    from ankihub.suggestions import _prepared_field_html
+    from ankihub.export import _prepared_field_html
 
     assert _prepared_field_html('<img src="foo.jpg">') == '<img src="foo.jpg">'
 

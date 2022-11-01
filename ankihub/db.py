@@ -10,7 +10,8 @@ from aqt import mw
 
 from . import LOGGER
 from .ankihub_client import Field, NoteInfo
-from .settings import ANKIHUB_NOTE_TYPE_FIELD_NAME, DB_PATH
+from .export import to_note_data
+from .settings import DB_PATH
 
 
 def attach_ankihub_db_to_anki_db_connection() -> None:
@@ -216,32 +217,10 @@ class AnkiHubDB:
         """Save notes from Anki to AnkiHub DB
         To be used when creating a collaborative deck.
         """
-        # TODO convert note tags and fields to "AnkiHub format", remove internal tags, exclude the AnkiHub id field
-        with db_transaction() as conn:
-            for nid in nids:
-                note = mw.col.get_note(nid)
-                conn.execute(
-                    """
-                    INSERT OR REPLACE INTO notes (
-                        ankihub_note_id,
-                        ankihub_deck_id,
-                        anki_note_id,
-                        anki_note_type_id,
-                        mod,
-                        tags,
-                        flds
-                    ) VALUES (?, ?, ?, ?, ?, ?, ?)
-                    """,
-                    (
-                        note[ANKIHUB_NOTE_TYPE_FIELD_NAME],
-                        ankihub_did,
-                        nid,
-                        note.mid,
-                        note.mod,
-                        note.string_tags(),
-                        join_fields(note.values()),
-                    ),
-                )
+        self.save_notes_from_notes_data(
+            ankihub_did=ankihub_did,
+            notes_data=[to_note_data(mw.col.get_note(nid)) for nid in nids],
+        )
 
     def notes_for_ankihub_deck(self, ankihub_did: str) -> List[NoteId]:
         result = self.list(
