@@ -1147,7 +1147,8 @@ def test_prepare_note(anki_session_with_addon: AnkiSession):
 
 def test_prepare_note_protect_field_with_spaces(anki_session_with_addon: AnkiSession):
     from ankihub.ankihub_client import Field, NoteInfo, SuggestionType
-    from ankihub.importing import TAG_FOR_PROTECTING_FIELDS, AnkiHubImporter
+    from ankihub.importing import AnkiHubImporter
+    from ankihub.note_conversion import TAG_FOR_PROTECTING_FIELDS
     from ankihub.settings import ANKIHUB_NOTE_TYPE_FIELD_NAME
 
     anki_session = anki_session_with_addon

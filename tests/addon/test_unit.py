@@ -22,7 +22,6 @@ def test_lowest_level_common_ancestor_deck_name(anki_session_with_addon: AnkiSes
 
 
 def test_updated_tags(anki_session_with_addon: AnkiSession):
-    from ankihub.sync import ADDON_INTERNAL_TAGS, updated_tags
     from ankihub.importing import updated_tags
     from ankihub.note_conversion import ADDON_INTERNAL_TAGS
 

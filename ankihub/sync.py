@@ -9,8 +9,7 @@ from aqt.utils import showInfo, tooltip
 
 from . import LOGGER, settings
 from .addon_ankihub_client import AddonAnkiHubClient as AnkiHubClient
-from .ankihub_client import AnkiHubRequestError, Field, NoteInfo, SuggestionType
-from .db import ankihub_db
+from .ankihub_client import AnkiHubRequestError, SuggestionType
 from .importing import AnkiHubImporter
 from .settings import ANKI_MINOR, ANKIHUB_DATETIME_FORMAT_STR, config
 from .utils import create_backup

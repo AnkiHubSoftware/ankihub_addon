@@ -7,13 +7,14 @@ from typing import List
 from anki.notes import Note
 
 from .ankihub_client import Field, NoteInfo
-from .note_conversion import is_internal_tag
+from .note_conversion import get_fields_protected_by_tags, is_internal_tag
 from .utils import ankihub_uuid_of_note
 
 
 def to_note_data(note: Note, set_new_id: bool = False) -> NoteInfo:
     """Convert an Anki note to a NoteInfo object.
     Tags and fields are altered (internal tags are removed, ankihub id fields is removed, etc.).
+    Protected fields are removed.
     """
 
     if set_new_id:
@@ -40,10 +41,15 @@ def _prepare_fields(note: Note) -> List[Field]:
     field_vals = list(note.fields[:-1])
     fields_metadata = note.note_type()["flds"][:-1]
 
+    # Transform the field values
     prepared_field_vals = [_prepared_field_html(field) for field in field_vals]
+
+    # Convert fields to Field objects, exclude fields that are protected by tags
+    fields_protected_by_tags = get_fields_protected_by_tags(note)
     fields = [
         Field(name=field["name"], order=field["ord"], value=val)
         for field, val in zip(fields_metadata, prepared_field_vals)
+        if field["name"] not in fields_protected_by_tags
     ]
     return fields
 
