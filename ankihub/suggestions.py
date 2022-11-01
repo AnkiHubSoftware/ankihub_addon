@@ -14,6 +14,7 @@ from .ankihub_client import (
 )
 from .db import ankihub_db
 from .sync import is_internal_tag
+from .exporting import to_note_data
 from .utils import ankihub_uuid_of_note
 
 

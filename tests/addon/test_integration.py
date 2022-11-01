@@ -476,7 +476,7 @@ def test_suggest_notes_in_bulk(anki_session_with_addon: AnkiSession, monkeypatch
 
 
 def test_adjust_note_types(anki_session_with_addon: AnkiSession):
-    from ankihub.sync import adjust_note_types
+    from ankihub.importing import adjust_note_types
     from ankihub.utils import modify_note_type
 
     anki_session = anki_session_with_addon
@@ -1147,8 +1147,8 @@ def test_prepare_note(anki_session_with_addon: AnkiSession):
 
 def test_prepare_note_protect_field_with_spaces(anki_session_with_addon: AnkiSession):
     from ankihub.ankihub_client import Field, NoteInfo, SuggestionType
+    from ankihub.importing import TAG_FOR_PROTECTING_FIELDS, AnkiHubImporter
     from ankihub.settings import ANKIHUB_NOTE_TYPE_FIELD_NAME
-    from ankihub.sync import TAG_FOR_PROTECTING_FIELDS, AnkiHubImporter
 
     anki_session = anki_session_with_addon
     with anki_session_with_addon.profile_loaded():
