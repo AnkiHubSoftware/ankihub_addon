@@ -1,3 +1,5 @@
+"""Convert Anki notes to NoteInfo objects"""
+
 import re
 import uuid
 from typing import List
