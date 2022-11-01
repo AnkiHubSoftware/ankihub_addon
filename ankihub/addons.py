@@ -8,6 +8,7 @@ from aqt import addons, mw
 from aqt.addons import AddonManager, DownloaderInstaller
 
 from . import LOGGER
+from .db import detach_ankihub_db_from_anki_db_connection
 from .settings import LOG_FILE, file_handler
 
 
@@ -36,6 +37,10 @@ def with_disabled_log_file_handler(*args: Any, **kwargs: Any) -> Any:
         LOGGER.debug("Re-added FileHandler")
 
     return result
+
+
+def detach_ankihub_db(*args: Any, **kwargs: Any) -> None:
+    detach_ankihub_db_from_anki_db_connection()
 
 
 def on_deleteAddon(self, module: str) -> None:
@@ -92,6 +97,12 @@ def setup_addons():
         pos="around",
     )
 
+    DownloaderInstaller._download_all = wrap(
+        old=DownloaderInstaller._download_all,
+        new=detach_ankihub_db,
+        pos="before",
+    )
+
     # prevent errors when deleting the add-on (AddonManager.deleteAddon also gets called during an update)
     AddonManager.deleteAddon = wrap(
         old=AddonManager.deleteAddon,
@@ -102,6 +113,12 @@ def setup_addons():
         old=AddonManager.deleteAddon,
         new=with_disabled_log_file_handler,
         pos="around",
+    )
+
+    AddonManager.deleteAddon = wrap(
+        old=AddonManager.deleteAddon,
+        new=detach_ankihub_db,
+        pos="before",
     )
 
     # prevent UI "deadlock" when Anki checks for add-on updates and AnkiHub syncs at the same time
