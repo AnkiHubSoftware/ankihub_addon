@@ -1,3 +1,5 @@
+"""Import NoteInfo objects into Anki, create/update decks and note types if necessary"""
+
 import uuid
 from pprint import pformat
 from typing import Dict, Iterable, List, Optional, Set, Tuple
