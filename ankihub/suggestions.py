@@ -7,7 +7,7 @@ from anki.notes import Note, NoteId
 from .addon_ankihub_client import AddonAnkiHubClient as AnkiHubClient
 from .ankihub_client import ChangeNoteSuggestion, NewNoteSuggestion, SuggestionType
 from .db import ankihub_db
-from .export import to_note_data
+from .exporting import to_note_data
 from .utils import ankihub_uuid_of_note
 
 

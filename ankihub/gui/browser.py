@@ -29,14 +29,14 @@ from ..db import (
     attach_ankihub_db_to_anki_db_connection,
     detach_ankihub_db_from_anki_db_connection,
 )
-from ..settings import ANKIHUB_NOTE_TYPE_FIELD_NAME, AnkiHubCommands, config
-from ..suggestions import BulkNoteSuggestionsResult, suggest_notes_in_bulk
-from ..sync import (
+from ..importing import (
     TAG_FOR_PROTECTING_ALL_FIELDS,
     TAG_FOR_PROTECTING_FIELDS,
     AnkiHubImporter,
     get_fields_protected_by_tags,
 )
+from ..settings import ANKIHUB_NOTE_TYPE_FIELD_NAME, AnkiHubCommands, config
+from ..suggestions import BulkNoteSuggestionsResult, suggest_notes_in_bulk
 from ..utils import note_types_with_ankihub_id_field
 from .suggestion_dialog import SuggestionDialog
 from .utils import choose_subset

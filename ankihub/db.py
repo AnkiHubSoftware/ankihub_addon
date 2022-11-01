@@ -10,7 +10,7 @@ from aqt import mw
 
 from . import LOGGER
 from .ankihub_client import Field, NoteInfo
-from .export import to_note_data
+from .exporting import to_note_data
 from .settings import DB_PATH
 
 
