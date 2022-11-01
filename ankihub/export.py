@@ -1,11 +1,11 @@
 import re
-from typing import List
 import uuid
+from typing import List
 
 from anki.notes import Note
 
 from .ankihub_client import Field, NoteInfo
-from .sync import is_internal_tag
+from .note_conversion import is_internal_tag
 from .utils import ankihub_uuid_of_note
 
 
