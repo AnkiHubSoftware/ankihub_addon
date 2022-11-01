@@ -221,8 +221,8 @@ class AnkiHubDB:
             for nid in nids:
                 note = mw.col.get_note(nid)
                 conn.execute(
-                    f"""
-                    INSERT OR REPLACE INTO {self.database_name}.notes (
+                    """
+                    INSERT OR REPLACE INTO notes (
                         ankihub_note_id,
                         ankihub_deck_id,
                         anki_note_id,
@@ -232,13 +232,15 @@ class AnkiHubDB:
                         flds
                     ) VALUES (?, ?, ?, ?, ?, ?, ?)
                     """,
-                    note[ANKIHUB_NOTE_TYPE_FIELD_NAME],
-                    ankihub_did,
-                    nid,
-                    note.mid,
-                    note.mod,
-                    note.string_tags(),
-                    join_fields(note.values()),
+                    (
+                        note[ANKIHUB_NOTE_TYPE_FIELD_NAME],
+                        ankihub_did,
+                        nid,
+                        note.mid,
+                        note.mod,
+                        note.string_tags(),
+                        join_fields(note.values()),
+                    ),
                 )
 
     def notes_for_ankihub_deck(self, ankihub_did: str) -> List[NoteId]:
