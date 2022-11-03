@@ -221,6 +221,63 @@ def test_download_deck_with_progress(authorized_client_for_user_test1, monkeypat
     assert notes_data[0].tags == ["asdf"]
 
 
+def create_note_on_ankihub_and_assert(client, new_note_suggestion, uuid_of_deck: uuid):
+    # utility function meant to be used in tests for creating a note with known values on ankihub
+    # asserts that the note was created correctly
+
+    from ankihub.ankihub_client import AnkiHubClient, NewNoteSuggestion
+
+    assert isinstance(client, AnkiHubClient)
+    assert isinstance(new_note_suggestion, NewNoteSuggestion)
+
+    # create an auto-accepted new note suggestion
+    new_note_suggestion.ankihub_deck_uuid = uuid_of_deck
+    errors_by_nid = client.create_suggestions_in_bulk(
+        suggestions=[new_note_suggestion], auto_accept=True
+    )
+    assert errors_by_nid == {}
+
+    # assert that note was created
+    note = client.get_note_by_id(
+        ankihub_note_uuid=new_note_suggestion.ankihub_note_uuid
+    )
+    assert note.fields == new_note_suggestion.fields
+    assert note.tags == new_note_suggestion.tags
+
+
+class TestCreateSuggestion:
+    @pytest.mark.vcr()
+    def test_create_change_note_suggestion_without_all_fields(
+        self,
+        authorized_client_for_user_test1,
+        uuid_of_deck_of_user_test1,
+        new_note_suggestion,
+        change_note_suggestion,
+    ):
+        from ankihub.ankihub_client import AnkiHubClient, ChangeNoteSuggestion, Field
+
+        client: AnkiHubClient = authorized_client_for_user_test1
+
+        create_note_on_ankihub_and_assert(
+            authorized_client_for_user_test1,
+            new_note_suggestion,
+            uuid_of_deck_of_user_test1,
+        )
+
+        # create a change note suggestion without all fields (for the same note)
+        cns: ChangeNoteSuggestion = change_note_suggestion
+        cns.ankihub_note_uuid = new_note_suggestion.ankihub_note_uuid
+        cns.fields = [
+            Field(name="Front", value="front2", order=0),
+        ]
+
+        # ... this shouldn't raise an exception
+        client.create_change_note_suggestion(
+            change_note_suggestion=cns,
+            auto_accept=True,
+        )
+
+
 class TestCreateSuggestionsInBulk:
     @pytest.mark.vcr()
     def test_create_one_new_note_suggestion(
@@ -298,22 +355,11 @@ class TestCreateSuggestionsInBulk:
         new_note_suggestion,
         uuid_of_deck_of_user_test1,
     ):
-        from ankihub.ankihub_client import AnkiHubClient
-
-        client: AnkiHubClient = authorized_client_for_user_test1
-
-        # create an auto-accepted new note suggestion and check if note was created
-        new_note_suggestion.ankihub_deck_uuid = uuid_of_deck_of_user_test1
-        errors_by_nid = client.create_suggestions_in_bulk(
-            suggestions=[new_note_suggestion], auto_accept=True
+        create_note_on_ankihub_and_assert(
+            authorized_client_for_user_test1,
+            new_note_suggestion,
+            uuid_of_deck_of_user_test1,
         )
-        assert errors_by_nid == {}
-
-        note = client.get_note_by_id(
-            ankihub_note_uuid=new_note_suggestion.ankihub_note_uuid
-        )
-        assert note.fields == new_note_suggestion.fields
-        assert note.tags == new_note_suggestion.tags
 
     @pytest.mark.vcr()
     def test_create_change_note_suggestion(
@@ -327,18 +373,12 @@ class TestCreateSuggestionsInBulk:
 
         client: AnkiHubClient = authorized_client_for_user_test1
 
-        # create an auto-accepted new note suggestion and check if note was created
         new_note_suggestion.ankihub_deck_uuid = uuid_of_deck_of_user_test1
-        errors_by_nid = client.create_suggestions_in_bulk(
-            suggestions=[new_note_suggestion], auto_accept=True
+        create_note_on_ankihub_and_assert(
+            authorized_client_for_user_test1,
+            new_note_suggestion,
+            uuid_of_deck_of_user_test1,
         )
-        assert errors_by_nid == {}
-
-        note = client.get_note_by_id(
-            ankihub_note_uuid=new_note_suggestion.ankihub_note_uuid
-        )
-        assert note.fields == new_note_suggestion.fields
-        assert note.tags == new_note_suggestion.tags
 
         # create a change note suggestion
         change_note_suggestion.ankihub_note_uuid = new_note_suggestion.ankihub_note_uuid
@@ -359,12 +399,11 @@ class TestCreateSuggestionsInBulk:
 
         client: AnkiHubClient = authorized_client_for_user_test1
 
-        # create an auto-accepted new note suggestion and check if note was created
-        new_note_suggestion.ankihub_deck_uuid = uuid_of_deck_of_user_test1
-        errors_by_nid = client.create_suggestions_in_bulk(
-            suggestions=[new_note_suggestion], auto_accept=True
+        create_note_on_ankihub_and_assert(
+            authorized_client_for_user_test1,
+            new_note_suggestion,
+            uuid_of_deck_of_user_test1,
         )
-        assert errors_by_nid == {}
 
         # create an auto-accepted change note suggestion and assert that note was changed
         change_note_suggestion.ankihub_note_uuid = new_note_suggestion.ankihub_note_uuid
