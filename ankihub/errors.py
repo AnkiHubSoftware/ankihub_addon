@@ -7,7 +7,7 @@ from typing import Type
 
 from anki.errors import BackendIOError, DBError
 from aqt import mw
-from aqt.utils import showWarning, tooltip
+from aqt.utils import showText, showWarning, tooltip
 from requests.exceptions import ConnectionError
 
 from . import LOGGER
@@ -35,6 +35,15 @@ def handle_exception(
         if maybe_handle_ankihub_request_error(exc):
             LOGGER.debug("AnkiHubRequestError was handled.")
             return True
+
+        try:
+            response_data = exc.response.json()
+            details = response_data["details"]
+        except:
+            details = None
+
+        if details:
+            showText(f"Error while communicating with AnkiHub:\n{details}")
 
     if isinstance(exc, ConnectionError):
         tooltip(
