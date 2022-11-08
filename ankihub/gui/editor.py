@@ -146,10 +146,22 @@ def setup_editor_buttons(buttons: List[str], editor: Editor) -> None:
         keys=hotkey,
     )
     buttons.append(button)
-    buttons.append(
-        """<style> #ankihub-btn { width:auto; padding:1px; }
-#ankihub-btn[disabled] { opacity:.4; pointer-events: none; }</style>"""
-    )
+    if ANKI_MINOR >= 55:
+        buttons.append(
+            "<style> "
+            "   #ankihub-btn img { "
+            "     height: 100%; padding: 2px; position: relative; width: auto; top: -1px; right: 0; bottom: 0; left: 0;"
+            "}\n"
+            "   #ankihub-btn[disabled] { opacity:.4; pointer-events: none; }\n"
+            "</style>"
+        )
+    else:
+        buttons.append(
+            "<style> "
+            "    #ankihub-btn { width:auto; padding:1px; }\n"
+            "    #ankihub-btn[disabled] { opacity:.4; pointer-events: none; }\n"
+            "</style>"
+        )
 
 
 def hide_ankihub_field_in_editor(
