@@ -1,6 +1,6 @@
 import uuid
 from pprint import pformat
-from typing import List
+from typing import Any, List, Tuple
 
 import anki
 import aqt
@@ -12,6 +12,7 @@ from aqt.utils import chooseList, showInfo, showText, tooltip
 
 from .. import LOGGER, settings
 from ..ankihub_client import AnkiHubRequestError
+from ..error_reporting import report_exception_and_upload_logs
 from ..settings import (
     ANKI_MINOR,
     ANKIHUB_NOTE_TYPE_FIELD_NAME,
@@ -19,7 +20,6 @@ from ..settings import (
     AnkiHubCommands,
     config,
 )
-from ..error_reporting import report_exception_and_upload_logs
 from ..suggestions import suggest_new_note, suggest_note_update
 from .suggestion_dialog import SuggestionDialog
 
@@ -253,12 +253,36 @@ def on_add_cards_change_notetype(old: NoteType, new: NoteType) -> None:
     refresh_suggestion_button(editor)
 
 
+def setup_editor_did_load_js_message(editor: Editor) -> None:
+    script = (
+        "require('anki/ui').loaded.then(() => setTimeout( () => {"
+        "   pycmd('editor_did_load') "
+        "}));"
+    )
+    editor.web.eval(script)
+
+
+def on_js_message(
+    handled: tuple[bool, Any], message: str, context: Any
+) -> Tuple[bool, Any]:
+    if message == "editor_did_load":
+        refresh_suggestion_button(context)
+        return (True, None)
+
+    return handled
+
+
 def setup() -> None:
+    # setup suggestion button
     gui_hooks.editor_did_init_buttons.append(setup_editor_buttons)
-    gui_hooks.editor_will_load_note.append(hide_ankihub_field_in_editor)
+    gui_hooks.editor_did_init.append(setup_editor_did_load_js_message)
+    gui_hooks.webview_did_receive_js_message.append(on_js_message)
     gui_hooks.editor_did_load_note.append(refresh_suggestion_button)
     gui_hooks.add_cards_did_init.append(on_add_cards_init)
     gui_hooks.add_cards_did_change_note_type.append(on_add_cards_change_notetype)
+
+    gui_hooks.editor_will_load_note.append(hide_ankihub_field_in_editor)
+
     Editor.ankihub_command = AnkiHubCommands.CHANGE.value  # type: ignore
     # We can wrap Editor.__init__ if more complicated logic is needed, such as
     # pulling a default command from a config option.  E.g.,
