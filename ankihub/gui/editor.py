@@ -155,7 +155,17 @@ def setup_editor_buttons(buttons: List[str], editor: Editor) -> None:
 def hide_ankihub_field_in_editor(
     js: str, note: anki.notes.Note, _: aqt.editor.Editor
 ) -> str:
-    if ANKI_MINOR >= 50:
+    if ANKI_MINOR >= 55:
+        if settings.ANKIHUB_NOTE_TYPE_FIELD_NAME not in note:
+            return js
+        extra = (
+            'require("svelte/internal").tick().then(() => '
+            "{{ require('anki/NoteEditor').instances[0].fields["
+            "require('anki/NoteEditor').instances[0].fields.length -1"
+            "].element.then((element) "
+            "=> {{ element.parentElement.parentElement.hidden = true; }}); }});"
+        )
+    elif ANKI_MINOR >= 50:
         if settings.ANKIHUB_NOTE_TYPE_FIELD_NAME not in note:
             return js
         extra = (
