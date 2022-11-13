@@ -93,3 +93,23 @@ Here is an example to run a specific test: `pytest
 test_register_decks.py::test_note_type_preparations`. Refer [this
 section](https://docs.pytest.org/en/6.2.x/usage.html#specifying-tests-selecting-tests)
 of pytest's docs for details.
+
+Tests are seperated into add-on tests and client tests. 
+
+#### Running add-on tests
+```
+pytest tests/addon
+```
+
+#### Running client tests
+##### With vcr
+```
+pytest tests/client
+```
+See https://vcrpy.readthedocs.io/en/latest/.
+
+##### Without vcr
+This requires ankihub runnig locally on localhost:8000. **The test setup clears the ankihub database.**
+```
+pytest tests/client --disable-vcr
+```
