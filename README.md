@@ -113,3 +113,8 @@ This requires ankihub runnig locally on localhost:8000. **The test setup clears 
 ```
 pytest tests/client --disable-vcr
 ```
+
+#### Type checking
+```
+mypy ankihub
+```
