@@ -94,7 +94,7 @@ test_register_decks.py::test_note_type_preparations`. Refer [this
 section](https://docs.pytest.org/en/6.2.x/usage.html#specifying-tests-selecting-tests)
 of pytest's docs for details.
 
-Tests are seperated into add-on tests and client tests. 
+Tests are seperated into add-on tests and client tests.
 
 #### Running add-on tests
 ```
