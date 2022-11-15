@@ -127,6 +127,7 @@ def new_note_suggestion():
             Field(name="Back", value="back1", order=1),
         ],
         tags=["tag1", "tag2"],
+        guid="asdf",
         comment="comment1",
         ankihub_deck_uuid=UUID_1,
         note_type_name="Basic",
@@ -474,6 +475,7 @@ class TestGetDeckUpdates:
         note_info: NoteInfo = new_note_suggestion_note_info
         note_info.ankihub_note_uuid = new_note_suggestion.ankihub_note_uuid
         note_info.anki_nid = new_note_suggestion.anki_nid
+        note_info.guid = new_note_suggestion.guid
 
         assert len(chunks) == 1
         assert chunks[0] == DeckUpdateChunk(
