@@ -22,7 +22,7 @@ from .ankihub_client import ANKIHUB_DATETIME_FORMAT_STR
 class PrivateConfig:
     token: str = ""
     user: str = ""
-    decks: Dict[int, Dict[str, Any]] = dataclasses.field(default_factory=dict)
+    decks: Dict[str, Dict[str, Any]] = dataclasses.field(default_factory=dict)
 
 
 class Config:

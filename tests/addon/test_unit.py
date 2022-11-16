@@ -22,7 +22,8 @@ def test_lowest_level_common_ancestor_deck_name(anki_session_with_addon: AnkiSes
 
 
 def test_updated_tags(anki_session_with_addon: AnkiSession):
-    from ankihub.sync import ADDON_INTERNAL_TAGS, updated_tags
+    from ankihub.importing import updated_tags
+    from ankihub.note_conversion import ADDON_INTERNAL_TAGS
 
     assert set(
         updated_tags(
@@ -96,15 +97,15 @@ def test_normalize_url(anki_session_with_addon: AnkiSession):
 
 
 def test_tag_exists_for_every_suggestion_type(anki_session_with_addon: AnkiSession):
+    from ankihub.note_conversion import TAG_FOR_SUGGESTION_TYPE
     from ankihub.suggestions import SuggestionType
-    from ankihub.sync import TAG_FOR_SUGGESTION_TYPE
 
     for suggestion_type in SuggestionType:
         assert TAG_FOR_SUGGESTION_TYPE.get(suggestion_type, None) is not None
 
 
 def test_prepared_field_html(anki_session_with_addon: AnkiSession):
-    from ankihub.suggestions import _prepared_field_html
+    from ankihub.exporting import _prepared_field_html
 
     assert _prepared_field_html('<img src="foo.jpg">') == '<img src="foo.jpg">'
 
