@@ -77,7 +77,7 @@ class NoteInfo(DataClassJsonMixin):
         ),
         default=None,
     )
-    anki_guid: Optional[str] = dataclasses.field(default=None)
+    guid: Optional[str] = dataclasses.field(default=None)
 
 
 @dataclass
@@ -93,7 +93,7 @@ class NoteInfoForUpload(DataClassJsonMixin):
     )
     fields: List[Field]
     tags: List[str]
-    anki_guid: str
+    guid: str
 
 
 def note_info_for_upload(note_info: NoteInfo) -> NoteInfoForUpload:
@@ -103,7 +103,7 @@ def note_info_for_upload(note_info: NoteInfo) -> NoteInfoForUpload:
         mid=note_info.mid,
         fields=note_info.fields,
         tags=note_info.tags,
-        anki_guid=note_info.anki_guid,
+        guid=note_info.guid,
     )
 
 
