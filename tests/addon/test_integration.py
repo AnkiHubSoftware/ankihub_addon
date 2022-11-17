@@ -230,9 +230,9 @@ def test_get_deck_by_id(anki_session_with_addon: AnkiSession, requests_mock):
 
 def test_suggest_note_upate(anki_session_with_addon: AnkiSession, requests_mock):
     from ankihub.ankihub_client import AnkiHubRequestError, NoteInfo, SuggestionType
+    from ankihub.note_conversion import ADDON_INTERNAL_TAGS, ANKI_INTERNAL_TAGS
     from ankihub.settings import API_URL_BASE
     from ankihub.suggestions import suggest_note_update
-    from ankihub.sync import ADDON_INTERNAL_TAGS, ANKI_INTERNAL_TAGS
 
     anki_session = anki_session_with_addon
     with anki_session.profile_loaded():
@@ -281,9 +281,9 @@ def test_suggest_note_upate(anki_session_with_addon: AnkiSession, requests_mock)
 
 def test_suggest_new_note(anki_session_with_addon: AnkiSession, requests_mock):
     from ankihub.ankihub_client import AnkiHubRequestError
+    from ankihub.note_conversion import ADDON_INTERNAL_TAGS
     from ankihub.settings import API_URL_BASE
     from ankihub.suggestions import suggest_new_note
-    from ankihub.sync import ADDON_INTERNAL_TAGS
 
     anki_session = anki_session_with_addon
     with anki_session.profile_loaded():
@@ -397,6 +397,7 @@ def test_suggest_notes_in_bulk(anki_session_with_addon: AnkiSession, monkeypatch
                         Field(name="Back", order=1, value=""),
                     ],
                     tags=[],
+                    guid=note.guid,
                     comment="test",
                     ankihub_deck_uuid=UUID("1f28bc9e-f36d-4e1d-8720-5dd805f12dd0"),
                     note_type_name="Basic-4827c (Testdeck / andrew1)",
@@ -911,13 +912,13 @@ def import_sample_ankihub_deck(
 
 def test_prepare_note(anki_session_with_addon: AnkiSession):
     from ankihub.ankihub_client import Field, NoteInfo, SuggestionType
-    from ankihub.settings import ANKIHUB_NOTE_TYPE_FIELD_NAME
-    from ankihub.sync import (
+    from ankihub.importing import AnkiHubImporter
+    from ankihub.note_conversion import (
         ADDON_INTERNAL_TAGS,
         TAG_FOR_PROTECTING_FIELDS,
         TAG_FOR_SUGGESTION_TYPE,
-        AnkiHubImporter,
     )
+    from ankihub.settings import ANKIHUB_NOTE_TYPE_FIELD_NAME
 
     anki_session = anki_session_with_addon
     with anki_session_with_addon.profile_loaded():

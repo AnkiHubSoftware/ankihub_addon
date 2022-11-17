@@ -123,5 +123,6 @@ def new_note_suggestion(
         tags=note_data.tags,
         note_type_name=note.note_type()["name"],
         anki_note_type_id=note.mid,
+        guid=note.guid,
         comment=comment,
     )

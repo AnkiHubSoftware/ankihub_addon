@@ -198,6 +198,7 @@ class NewNoteSuggestion(NoteSuggestion):
             field_name="note_type_id",
         )
     )
+    guid: str
 
 
 class AnkiHubRequestError(Exception):
