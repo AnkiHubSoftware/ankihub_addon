@@ -51,7 +51,6 @@ def on_suggestion_button_press(editor: Editor) -> None:
                 title="Problem with suggestion",
             )
             LOGGER.debug(f"Can't submit suggestion due to: {pformat(error_message)}")
-            return
         elif e.response.status_code == 403:
             msg = (
                 "You are not allowed to create a suggestion for this note.<br>"
@@ -59,9 +58,8 @@ def on_suggestion_button_press(editor: Editor) -> None:
                 "You can only submit changes without a review if you are an owner or maintainer of the deck."
             )
             showInfo(msg, parent=editor.parentWindow)
-            return
-
-        raise e
+        else:
+            raise e
 
 
 def on_suggestion_button_press_inner(editor: Editor) -> None:
