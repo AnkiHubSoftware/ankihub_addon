@@ -31,6 +31,7 @@ def to_note_data(note: Note, set_new_id: bool = False) -> NoteInfo:
         mid=note.mid,
         fields=fields,
         tags=tags,
+        guid=note.guid,
     )
 
 

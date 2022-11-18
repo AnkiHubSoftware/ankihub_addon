@@ -1,4 +1,6 @@
 import copy
+import gzip
+import json
 import re
 import uuid
 from datetime import datetime, timezone
@@ -156,10 +158,11 @@ def test_create_collaborative_deck_and_upload(
 
     with anki_session.profile_loaded():
         with anki_session.deck_installed(SAMPLE_DECK_APKG) as deck_id:
+            mw = anki_session.mw
 
             from ankihub.register_decks import create_collaborative_deck
 
-            deck_name = anki_session.mw.col.decks.name(DeckId(deck_id))
+            deck_name = mw.col.decks.name(DeckId(deck_id))
 
             requests_mock.get(
                 f"{API_URL_BASE}/decks/pre-signed-url",
@@ -167,7 +170,7 @@ def test_create_collaborative_deck_and_upload(
                 json={"pre_signed_url": "http://fake_url"},
             )
             requests_mock.put(
-                "http://fake_url",
+                "http://fake_url/",
                 status_code=200,
             )
             ankihub_deck_uuid = UUID_1
@@ -179,78 +182,30 @@ def test_create_collaborative_deck_and_upload(
 
             create_collaborative_deck(deck_name, private=False)
 
-            # check if deck info is in db
+            # check that the deck payload is correct
+            assert requests_mock.request_history[-2].url == "http://fake_url/"
+            payload = json.loads(
+                gzip.decompress(requests_mock.request_history[-2].body).decode("utf-8")
+            )
+            notes_in_deck = [
+                mw.col.get_note(nid) for nid in mw.col.find_notes(f"deck:{deck_name}")
+            ]
+            assert len(payload["notes"]) == len(notes_in_deck)
+            assert len(payload["note_types"]) == len(
+                set([note.mid for note in notes_in_deck])
+            )
+
+            # check that the request to the create deck endpoint is correct
+            assert requests_mock.last_request.json() == {
+                "key": requests_mock.last_request.json()["key"],
+                "name": deck_name,
+                "anki_id": deck_id,
+                "is_private": False,
+            }
+
+            # check that deck info is in db
             assert ankihub_db.ankihub_deck_ids() == [str(ankihub_deck_uuid)]
             assert len(ankihub_db.notes_for_ankihub_deck(str(ankihub_deck_uuid))) == 3
-
-
-def test_upload_deck(anki_session_with_addon: AnkiSession, monkeypatch):
-
-    # check if moving cards temporarily from filtered decks into the main deck doesn't throw errors
-    # and if the cards are moved back to the filtered decks at the end
-    with anki_session_with_addon.profile_loaded():
-        from aqt import mw
-
-        from ankihub.register_decks import upload_deck
-
-        # create a deck
-        main_did = mw.col.decks.add_normal_deck_with_name("main").id
-        print(f"{main_did=}")
-
-        # add a note to it
-        note = mw.col.new_note(mw.col.models.by_name("Basic"))
-        note["Front"] = "test"
-        mw.col.add_note(note, main_did)
-
-        # move card of note into filtered deck
-        # decks created by new_filtered have a term of "" and limit of 100 by default
-        # so the card will be moved into the deck
-        filtered_did = mw.col.decks.new_filtered("filtered")
-        mw.col.sched.rebuild_filtered_deck(filtered_did)
-        assert mw.col.get_note(note.id).cards()[0].did == filtered_did
-
-        monkeypatch.setattr("ankihub.register_decks.AnkiHubClient.upload_deck", Mock())
-        upload_deck(main_did, private=False)
-
-        # assert that note is still in the filtered deck after upload_deck
-        card = mw.col.get_note(note.id).cards()[0]
-        assert card.did == filtered_did
-
-
-def test_client_upload_deck(anki_session_with_addon: AnkiSession, requests_mock):
-    from ankihub.addon_ankihub_client import AddonAnkiHubClient as AnkiHubClient
-    from ankihub.ankihub_client import AnkiHubRequestError
-    from ankihub.settings import API_URL_BASE
-
-    client = AnkiHubClient(hooks=[])
-
-    requests_mock.get(
-        f"{API_URL_BASE}/decks/pre-signed-url",
-        status_code=200,
-        json={"pre_signed_url": "http://fake_url"},
-    )
-    requests_mock.put(
-        "http://fake_url",
-        status_code=200,
-    )
-    ankihub_deck_uuid = UUID_1
-    requests_mock.post(
-        f"{API_URL_BASE}/decks/",
-        status_code=201,
-        json={"anki_id": 1, "key": "small.apkg", "deck_id": str(ankihub_deck_uuid)},
-    )
-
-    # test upload deck
-    client.upload_deck(file=Path(SAMPLE_DECK_APKG), anki_deck_id=1, private=False)
-
-    # test upload deck unauthenticated
-    requests_mock.post(f"{API_URL_BASE}/decks/", status_code=403)
-    exc = None
-    try:
-        client.upload_deck(Path(SAMPLE_DECK_APKG), anki_deck_id=1, private=False)
-    except AnkiHubRequestError as e:
-        exc = e
-    assert exc is not None and exc.response.status_code == 403
 
 
 def test_get_deck_by_id(anki_session_with_addon: AnkiSession, requests_mock):

@@ -1,13 +1,14 @@
 import csv
 import dataclasses
+import gzip
 import json
 import logging
+import re
 import uuid
 from abc import ABC
 from dataclasses import dataclass
 from datetime import datetime
 from enum import Enum
-from pathlib import Path
 from typing import Any, Callable, Dict, Iterator, List, Optional, Sequence, TypedDict
 
 import requests
@@ -20,7 +21,7 @@ from .lib.dataclasses_json import DataClassJsonMixin  # type: ignore
 LOGGER = logging.getLogger(__name__)
 
 API_URL_BASE = "https://app.ankihub.net/api"
-API_VERSION = 3.0
+API_VERSION = 4.0
 
 DECK_UPDATE_PAGE_SIZE = 2000  # seems to work well in terms of speed
 
@@ -58,7 +59,6 @@ class Field(DataClassJsonMixin):
 
 @dataclass
 class NoteInfo(DataClassJsonMixin):
-    fields: List[Field]
     ankihub_note_uuid: uuid.UUID = dataclasses.field(
         metadata=dataclasses_json.config(field_name="note_id")
     )
@@ -68,13 +68,42 @@ class NoteInfo(DataClassJsonMixin):
     mid: int = dataclasses.field(
         metadata=dataclasses_json.config(field_name="note_type_id")
     )
+    fields: List[Field]
     tags: List[str]
     last_update_type: Optional[SuggestionType] = dataclasses.field(
         metadata=dataclasses_json.config(
-            encoder=lambda x: x.value[0],
+            encoder=lambda x: x.value[0] if x is not None else None,
             decoder=suggestion_type_from_str,
         ),
         default=None,
+    )
+    guid: Optional[str] = dataclasses.field(default=None)
+
+
+@dataclass
+class NoteInfoForUpload(DataClassJsonMixin):
+    ankihub_note_uuid_str: str = dataclasses.field(
+        metadata=dataclasses_json.config(field_name="id")
+    )
+    anki_nid: int = dataclasses.field(
+        metadata=dataclasses_json.config(field_name="anki_id")
+    )
+    mid: int = dataclasses.field(
+        metadata=dataclasses_json.config(field_name="note_type_id")
+    )
+    fields: List[Field]
+    tags: List[str]
+    guid: str
+
+
+def note_info_for_upload(note_info: NoteInfo) -> NoteInfoForUpload:
+    return NoteInfoForUpload(
+        ankihub_note_uuid_str=str(note_info.ankihub_note_uuid),
+        anki_nid=note_info.anki_nid,
+        mid=note_info.mid,
+        fields=note_info.fields,
+        tags=note_info.tags,
+        guid=note_info.guid,
     )
 
 
@@ -267,27 +296,62 @@ class AnkiHubClient:
         if response and response.status_code not in [204, 401]:
             raise AnkiHubRequestError(response)
 
-    def upload_deck(self, file: Path, anki_deck_id: int, private: bool) -> uuid.UUID:
-        key = file.name
-        s3_url = self.get_presigned_url(key=key, action="upload")
-        with open(file, "rb") as f:
-            deck_data = f.read()
+    def upload_deck(
+        self,
+        deck_name: str,
+        notes_data: List[NoteInfo],
+        note_types_data: List[Dict],
+        anki_deck_id: int,
+        private: bool,
+    ) -> uuid.UUID:
+        deck_name_normalized = re.sub('[\\\\/?<>:*|"^]', "_", deck_name)
+        deck_file_name = f"{deck_name_normalized}-{uuid.uuid4()}.json.gz"
 
-        s3_response = requests.put(s3_url, data=deck_data)
+        s3_url = self.get_presigned_url(key=deck_file_name, action="upload")
+
+        notes_data_transformed = [
+            note_info_for_upload(note_data).to_dict() for note_data in notes_data
+        ]
+        data = self._gzip_compress_string(
+            json.dumps(
+                {
+                    "notes": notes_data_transformed,
+                    "note_types": note_types_data,
+                }
+            ),
+        )
+        s3_response = requests.put(
+            s3_url,
+            data=data,
+        )
         if s3_response.status_code != 200:
             raise AnkiHubRequestError(s3_response)
 
         response = self._send_request(
             "POST",
             "/decks/",
-            data={"key": key, "anki_id": anki_deck_id, "is_private": private},
+            data={
+                "key": deck_file_name,
+                "name": deck_name,
+                "anki_id": anki_deck_id,
+                "is_private": private,
+            },
         )
         if response.status_code != 201:
             raise AnkiHubRequestError(response)
 
-        data = response.json()
-        ankihub_did = uuid.UUID(data["deck_id"])
+        response_data = response.json()
+        ankihub_did = uuid.UUID(response_data["deck_id"])
         return ankihub_did
+
+    def _gzip_compress_string(self, string: str) -> bytes:
+        result = gzip.compress(
+            bytes(
+                string,
+                encoding="utf-8",
+            )
+        )
+        return result
 
     def download_deck(
         self,

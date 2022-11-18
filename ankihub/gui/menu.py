@@ -23,10 +23,7 @@ from aqt.utils import askUser, openLink, showInfo, showText, tooltip
 from .. import LOGGER
 from ..addon_ankihub_client import AddonAnkiHubClient as AnkiHubClient
 from ..ankihub_client import AnkiHubRequestError
-from ..error_reporting import (
-    report_exception_and_upload_logs,
-    upload_logs_in_background,
-)
+from ..error_reporting import upload_logs_in_background
 from ..media_import.ui import open_import_dialog
 from ..register_decks import create_collaborative_deck
 from ..settings import ADDON_VERSION, URL_VIEW_DECK, config
@@ -231,10 +228,6 @@ def create_collaborative_deck_action() -> None:
 
     def on_failure(exc: Exception):
         mw.progress.finish()
-        try:
-            raise exc
-        except:
-            report_exception_and_upload_logs()
         raise exc
 
     op = QueryOp(
