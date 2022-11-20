@@ -395,9 +395,8 @@ def test_suggest_notes_in_bulk(anki_session_with_addon: AnkiSession, monkeypatch
             comment="test",
         )
         assert bulk_suggestions_method_mock.call_count == 1
-        assert bulk_suggestions_method_mock.call_args.kwargs == {"auto_accept": False}
-        assert bulk_suggestions_method_mock.call_args.args == (
-            [
+        assert bulk_suggestions_method_mock.call_args.kwargs == {
+            "change_note_suggestions": [
                 ChangeNoteSuggestion(
                     ankihub_note_uuid=UUID("67f182c2-7306-47f8-aed6-d7edb42cd7de"),
                     anki_nid=1608240057545,
@@ -413,6 +412,8 @@ def test_suggest_notes_in_bulk(anki_session_with_addon: AnkiSession, monkeypatch
                     comment="test",
                     change_type=SuggestionType.NEW_CONTENT,
                 ),
+            ],
+            "new_note_suggestions": [
                 NewNoteSuggestion(
                     ankihub_note_uuid=new_note_ankihub_uuid,
                     anki_nid=note.id,
@@ -428,7 +429,8 @@ def test_suggest_notes_in_bulk(anki_session_with_addon: AnkiSession, monkeypatch
                     anki_note_type_id=1657023668893,
                 ),
             ],
-        )
+            "auto_accept": False,
+        }
 
 
 def test_adjust_note_types(anki_session_with_addon: AnkiSession):
