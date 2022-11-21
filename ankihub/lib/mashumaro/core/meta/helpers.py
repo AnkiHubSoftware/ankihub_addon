@@ -176,7 +176,13 @@ def type_name(
         if short:
             return t.__qualname__
         else:
-            return f"{t.__module__}.{t.__qualname__}"
+            # patched for ankihub_addon to support module names starting with a number
+            # as Anki installs an add-on downloaded from AnkiWeb in a directory named by a number - its AnkiWeb id
+            result = f"{t.__module__}.{t.__qualname__}"
+            if re.match("[0-9].+", result):
+                top_level, rest = result.split(".", maxsplit=1)
+                result = f'globals()["{top_level}"].{rest}'
+            return result
     except AttributeError:
         return str(t)
 
