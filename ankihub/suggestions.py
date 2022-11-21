@@ -59,7 +59,7 @@ def suggest_notes_in_bulk(
         else:
             notes_that_dont_exist_on_remote.append(note)
 
-    change_suggestions = [
+    change_note_suggestions = [
         change_note_suggestion(
             note=note,
             change_type=change_type,
@@ -77,16 +77,17 @@ def suggest_notes_in_bulk(
         for note in notes_that_dont_exist_on_remote
     ]
 
-    all_suggestions = change_suggestions + new_note_suggestions
     client = AnkiHubClient()
     errors_by_nid_int = client.create_suggestions_in_bulk(
-        all_suggestions, auto_accept=auto_accept
+        new_note_suggestions=new_note_suggestions,
+        change_note_suggestions=change_note_suggestions,
+        auto_accept=auto_accept,
     )
     errors_by_nid = {NoteId(nid): errors for nid, errors in errors_by_nid_int.items()}
     result = BulkNoteSuggestionsResult(
         errors_by_nid=errors_by_nid,
         change_note_suggestions_count=len(
-            [x for x in change_suggestions if x.anki_nid not in errors_by_nid]
+            [x for x in change_note_suggestions if x.anki_nid not in errors_by_nid]
         ),
         new_note_suggestions_count=len(
             [x for x in new_note_suggestions if x.anki_nid not in errors_by_nid]

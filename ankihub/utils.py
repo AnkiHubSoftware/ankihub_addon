@@ -86,7 +86,7 @@ def create_note_with_id(note: Note, anki_id: NoteId, anki_did: DeckId) -> Note:
     mw.col.db.execute(f"UPDATE notes SET id={anki_id} WHERE id={note.id};")
     mw.col.db.execute(f"UPDATE cards SET nid={anki_id} WHERE nid={note.id};")
 
-    note = mw.col.get_note(anki_id)
+    note.id = anki_id
     return note
 
 

@@ -5,10 +5,11 @@ from typing import Any, List, Optional
 
 from anki.models import NotetypeId
 from anki.notes import NoteId
+from anki.utils import ids2str, split_fields
 from aqt import mw
 
 from . import LOGGER
-from .settings import ANKIHUB_NOTE_TYPE_FIELD_NAME, DB_PATH
+from .settings import DB_PATH
 
 
 def attach_ankihub_db_to_anki_db_connection() -> None:
@@ -122,8 +123,12 @@ class AnkiHubDB:
 
     def save_notes_from_nids(self, ankihub_did: str, nids: List[NoteId]):
         with db_transaction() as conn:
-            for nid in nids:
-                note = mw.col.get_note(nid)
+            raw_notes = mw.col.db.all(
+                f"SELECT id, mid, mod, flds FROM notes WHERE id IN {ids2str(nids)}"
+            )
+            for raw_note in raw_notes:
+                nid, mid, mod, flds = raw_note
+                ankihub_id = split_fields(flds)[-1]
                 conn.execute(
                     """
                     INSERT OR REPLACE INTO notes (
@@ -135,11 +140,11 @@ class AnkiHubDB:
                     ) VALUES (?, ?, ?, ?, ?)
                     """,
                     (
-                        note[ANKIHUB_NOTE_TYPE_FIELD_NAME],
+                        ankihub_id,
                         ankihub_did,
                         nid,
-                        note.mid,
-                        note.mod,
+                        mid,
+                        mod,
                     ),
                 )
 

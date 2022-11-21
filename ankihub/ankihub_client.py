@@ -15,8 +15,9 @@ import requests
 from requests import PreparedRequest, Request, Response, Session
 from requests.exceptions import HTTPError
 
-from .lib import dataclasses_json  # type: ignore
-from .lib.dataclasses_json import DataClassJsonMixin  # type: ignore
+from .lib.mashumaro import field_options
+from .lib.mashumaro.config import BaseConfig
+from .lib.mashumaro.mixins.json import DataClassJSONMixin
 
 LOGGER = logging.getLogger(__name__)
 
@@ -50,30 +51,31 @@ def suggestion_type_from_str(s: str) -> Optional[SuggestionType]:
     return result
 
 
+class DataClassJSONMixinWithConfig(DataClassJSONMixin):
+    class Config(BaseConfig):
+        serialize_by_alias = True
+
+
 @dataclass
-class Field(DataClassJsonMixin):
+class Field(DataClassJSONMixinWithConfig):
     name: str
     order: int
     value: str
 
 
 @dataclass
-class NoteInfo(DataClassJsonMixin):
+class NoteInfo(DataClassJSONMixinWithConfig):
     ankihub_note_uuid: uuid.UUID = dataclasses.field(
-        metadata=dataclasses_json.config(field_name="note_id")
+        metadata=field_options(alias="note_id")
     )
-    anki_nid: int = dataclasses.field(
-        metadata=dataclasses_json.config(field_name="anki_id")
-    )
-    mid: int = dataclasses.field(
-        metadata=dataclasses_json.config(field_name="note_type_id")
-    )
+    anki_nid: int = dataclasses.field(metadata=field_options(alias="anki_id"))
+    mid: int = dataclasses.field(metadata=field_options(alias="note_type_id"))
     fields: List[Field]
     tags: List[str]
     last_update_type: Optional[SuggestionType] = dataclasses.field(
-        metadata=dataclasses_json.config(
-            encoder=lambda x: x.value[0] if x is not None else None,
-            decoder=suggestion_type_from_str,
+        metadata=field_options(
+            serialize=lambda x: x.value[0] if x is not None else None,
+            deserialize=suggestion_type_from_str,
         ),
         default=None,
     )
@@ -81,16 +83,10 @@ class NoteInfo(DataClassJsonMixin):
 
 
 @dataclass
-class NoteInfoForUpload(DataClassJsonMixin):
-    ankihub_note_uuid_str: str = dataclasses.field(
-        metadata=dataclasses_json.config(field_name="id")
-    )
-    anki_nid: int = dataclasses.field(
-        metadata=dataclasses_json.config(field_name="anki_id")
-    )
-    mid: int = dataclasses.field(
-        metadata=dataclasses_json.config(field_name="note_type_id")
-    )
+class NoteInfoForUpload(DataClassJSONMixinWithConfig):
+    ankihub_note_uuid_str: str = dataclasses.field(metadata=field_options(alias="id"))
+    anki_nid: int = dataclasses.field(metadata=field_options(alias="anki_id"))
+    mid: int = dataclasses.field(metadata=field_options(alias="note_type_id"))
     fields: List[Field]
     tags: List[str]
     guid: str
@@ -108,10 +104,10 @@ def note_info_for_upload(note_info: NoteInfo) -> NoteInfoForUpload:
 
 
 @dataclass
-class DeckUpdateChunk(DataClassJsonMixin):
+class DeckUpdateChunk(DataClassJSONMixinWithConfig):
     latest_update: Optional[datetime] = dataclasses.field(
-        metadata=dataclasses_json.config(
-            decoder=lambda x: datetime.strptime(x, ANKIHUB_DATETIME_FORMAT_STR)
+        metadata=field_options(
+            deserialize=lambda x: datetime.strptime(x, ANKIHUB_DATETIME_FORMAT_STR)
             if x
             else None,
         ),
@@ -122,41 +118,37 @@ class DeckUpdateChunk(DataClassJsonMixin):
 
 
 @dataclass
-class Deck(DataClassJsonMixin):
-    ankihub_deck_uuid: uuid.UUID = dataclasses.field(
-        metadata=dataclasses_json.config(field_name="id")
-    )
+class Deck(DataClassJSONMixinWithConfig):
+    ankihub_deck_uuid: uuid.UUID = dataclasses.field(metadata=field_options(alias="id"))
     owner: bool = dataclasses.field(
-        metadata=dataclasses_json.config(
-            encoder=lambda b: 1 if b else 0,
-            decoder=lambda i: bool(i),
+        metadata=field_options(
+            serialize=lambda b: 1 if b else 0,
+            deserialize=lambda i: bool(i),
         )
     )
-    anki_did: int = dataclasses.field(
-        metadata=dataclasses_json.config(field_name="anki_id")
-    )
+    anki_did: int = dataclasses.field(metadata=field_options(alias="anki_id"))
     name: str
     csv_last_upload: datetime = dataclasses.field(
-        metadata=dataclasses_json.config(
-            decoder=lambda x: datetime.strptime(x, ANKIHUB_DATETIME_FORMAT_STR)
+        metadata=field_options(
+            deserialize=lambda x: datetime.strptime(x, ANKIHUB_DATETIME_FORMAT_STR)
             if x
-            else None,
+            else None
         )
     )
     csv_notes_filename: str
 
 
 @dataclass
-class NoteSuggestion(DataClassJsonMixin, ABC):
+class NoteSuggestion(DataClassJSONMixinWithConfig, ABC):
     ankihub_note_uuid: uuid.UUID = dataclasses.field(
-        metadata=dataclasses_json.config(
-            field_name="ankihub_id",
-            encoder=str,
+        metadata=field_options(
+            alias="ankihub_id",
+            serialize=str,
         ),
     )
     anki_nid: int = dataclasses.field(
-        metadata=dataclasses_json.config(
-            field_name="anki_id",
+        metadata=field_options(
+            alias="anki_id",
         )
     )
     fields: List[Field]
@@ -167,35 +159,34 @@ class NoteSuggestion(DataClassJsonMixin, ABC):
 @dataclass
 class ChangeNoteSuggestion(NoteSuggestion):
     change_type: SuggestionType = dataclasses.field(
-        metadata=dataclasses_json.config(
-            encoder=lambda x: x.value[0],
-            decoder=suggestion_type_from_str,
+        metadata=field_options(
+            serialize=lambda x: x.value[0],
+            deserialize=suggestion_type_from_str,
         ),
     )
 
-    def to_dict(self):
-        result = super().to_dict()
-        # note_id is needed for bulk change notes suggestions
-        result["note_id"] = str(self.ankihub_note_uuid)
-        return result
+    def __post_serialize__(self, d: Dict[Any, Any]) -> Dict[Any, Any]:
+        # note_id is needed for bulk change note suggestions
+        d["note_id"] = d["ankihub_id"]
+        return d
 
 
 @dataclass
 class NewNoteSuggestion(NoteSuggestion):
     ankihub_deck_uuid: uuid.UUID = dataclasses.field(
-        metadata=dataclasses_json.config(
-            field_name="deck_id",
-            encoder=str,
+        metadata=field_options(
+            alias="deck_id",
+            serialize=str,
         ),
     )
     note_type_name: str = dataclasses.field(
-        metadata=dataclasses_json.config(
-            field_name="note_type",
+        metadata=field_options(
+            alias="note_type",
         )
     )
     anki_note_type_id: int = dataclasses.field(
-        metadata=dataclasses_json.config(
-            field_name="note_type_id",
+        metadata=field_options(
+            alias="note_type_id",
         )
     )
     guid: str
@@ -500,26 +491,19 @@ class AnkiHubClient:
             raise AnkiHubRequestError(response)
 
     def create_suggestions_in_bulk(
-        self, suggestions: Sequence[NoteSuggestion], auto_accept: bool
+        self,
+        new_note_suggestions: List[NewNoteSuggestion] = [],
+        change_note_suggestions: List[ChangeNoteSuggestion] = [],
+        auto_accept: bool = False,
     ) -> Dict[int, Dict[str, List[str]]]:
         # returns a dict of errors by anki_nid
 
-        change_note_suggestions = [
-            suggestion
-            for suggestion in suggestions
-            if isinstance(suggestion, ChangeNoteSuggestion)
-        ]
         errors_for_change_suggestions = self._create_suggestion_in_bulk_inner(
             suggestions=change_note_suggestions,
             url="/notes/bulk-change-suggestions/",
             auto_accept=auto_accept,
         )
 
-        new_note_suggestions = [
-            suggestion
-            for suggestion in suggestions
-            if isinstance(suggestion, NewNoteSuggestion)
-        ]
         errors_for_new_note_suggestions = self._create_suggestion_in_bulk_inner(
             suggestions=new_note_suggestions,
             url="/notes/bulk-new-note-suggestions/",

@@ -234,7 +234,7 @@ def create_note_on_ankihub_and_assert(client, new_note_suggestion, uuid_of_deck:
     # create an auto-accepted new note suggestion
     new_note_suggestion.ankihub_deck_uuid = uuid_of_deck
     errors_by_nid = client.create_suggestions_in_bulk(
-        suggestions=[new_note_suggestion], auto_accept=True
+        new_note_suggestions=[new_note_suggestion], auto_accept=True
     )
     assert errors_by_nid == {}
 
@@ -293,7 +293,7 @@ class TestCreateSuggestionsInBulk:
 
         new_note_suggestion.ankihub_deck_uuid = uuid_of_deck_of_user_test1
         errors_by_nid = client.create_suggestions_in_bulk(
-            suggestions=[new_note_suggestion],
+            new_note_suggestions=[new_note_suggestion],
             auto_accept=False,
         )
         assert errors_by_nid == {}
@@ -317,7 +317,8 @@ class TestCreateSuggestionsInBulk:
         new_note_suggestion_2.anki_nid = 2
 
         errors_by_nid = client.create_suggestions_in_bulk(
-            suggestions=[new_note_suggestion, new_note_suggestion_2], auto_accept=False
+            new_note_suggestions=[new_note_suggestion, new_note_suggestion_2],
+            auto_accept=False,
         )
         assert errors_by_nid == {}
 
@@ -335,7 +336,7 @@ class TestCreateSuggestionsInBulk:
         # create a new note suggestion
         new_note_suggestion.ankihub_deck_uuid = uuid_of_deck_of_user_test1
         errors_by_nid = client.create_suggestions_in_bulk(
-            suggestions=[new_note_suggestion], auto_accept=False
+            new_note_suggestions=[new_note_suggestion], auto_accept=False
         )
         assert errors_by_nid == {}
 
@@ -343,7 +344,7 @@ class TestCreateSuggestionsInBulk:
         new_note_suggestion_2 = deepcopy(new_note_suggestion)
         new_note_suggestion_2.anki_nid = 2
         errors_by_nid = client.create_suggestions_in_bulk(
-            suggestions=[new_note_suggestion], auto_accept=False
+            new_note_suggestions=[new_note_suggestion], auto_accept=False
         )
         assert len(
             errors_by_nid
@@ -384,7 +385,7 @@ class TestCreateSuggestionsInBulk:
         # create a change note suggestion
         change_note_suggestion.ankihub_note_uuid = new_note_suggestion.ankihub_note_uuid
         errors_by_nid = client.create_suggestions_in_bulk(
-            suggestions=[change_note_suggestion], auto_accept=False
+            change_note_suggestions=[change_note_suggestion], auto_accept=False
         )
         assert errors_by_nid == {}
 
@@ -409,7 +410,7 @@ class TestCreateSuggestionsInBulk:
         # create an auto-accepted change note suggestion and assert that note was changed
         change_note_suggestion.ankihub_note_uuid = new_note_suggestion.ankihub_note_uuid
         errors_by_nid = client.create_suggestions_in_bulk(
-            suggestions=[change_note_suggestion], auto_accept=True
+            change_note_suggestions=[change_note_suggestion], auto_accept=True
         )
         note = client.get_note_by_id(
             ankihub_note_uuid=new_note_suggestion.ankihub_note_uuid
@@ -420,7 +421,7 @@ class TestCreateSuggestionsInBulk:
 
         # create a change note suggestion without any changes
         errors_by_nid = client.create_suggestions_in_bulk(
-            suggestions=[change_note_suggestion], auto_accept=False
+            change_note_suggestions=[change_note_suggestion], auto_accept=False
         )
         assert len(
             errors_by_nid
