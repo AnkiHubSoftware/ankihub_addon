@@ -47,6 +47,15 @@ def detach_ankihub_db_from_anki_db_connection() -> None:
 
 
 @contextmanager
+def attached_ankihub_db():
+    attach_ankihub_db_to_anki_db_connection()
+    try:
+        yield
+    finally:
+        detach_ankihub_db_from_anki_db_connection()
+
+
+@contextmanager
 def db_transaction():
     with sqlite3.connect(DB_PATH) as conn:
         yield conn

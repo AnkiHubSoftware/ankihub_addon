@@ -1,30 +1,43 @@
+import re
 import uuid
-from abc import abstractmethod
+from abc import ABC, abstractmethod
 from concurrent.futures import Future
+from datetime import datetime
 from pprint import pformat
 from typing import List, Optional, Sequence
 
-from anki.collection import BrowserColumns
+from anki.collection import BrowserColumns, SearchNode
 from anki.notes import Note
 from anki.utils import ids2str
 from aqt import mw
-from aqt.browser import Browser, CellRow, Column, ItemId, SearchContext
+from aqt.browser import (
+    Browser,
+    CellRow,
+    Column,
+    ItemId,
+    SearchContext,
+    SidebarItem,
+    SidebarItemType,
+    SidebarStage,
+)
 from aqt.gui_hooks import (
     browser_did_fetch_columns,
     browser_did_fetch_row,
     browser_did_search,
+    browser_will_build_tree,
     browser_will_search,
     browser_will_show,
     browser_will_show_context_menu,
 )
 from aqt.qt import QMenu
-from aqt.utils import showInfo, showText
+from aqt.utils import showInfo, showText, showWarning
 
 from .. import LOGGER
 from ..ankihub_client import AnkiHubRequestError
 from ..db import (
     ankihub_db,
     attach_ankihub_db_to_anki_db_connection,
+    attached_ankihub_db,
     detach_ankihub_db_from_anki_db_connection,
 )
 from ..importing import get_fields_protected_by_tags
@@ -36,6 +49,107 @@ from .suggestion_dialog import SuggestionDialog
 from .utils import choose_subset
 
 browser: Optional[Browser] = None
+
+
+class CustomSearchNode(ABC):
+    @classmethod
+    def from_parameter_type_and_value(cls, parameter_name, value):
+        custom_search_node_types = [
+            ModifiedAfterSyncSearchNode,
+            UpdatedInTheLastXDaysSearchNode,
+        ]
+        for custom_search_node_type in custom_search_node_types:
+            if custom_search_node_type.parameter_name == parameter_name:
+                return custom_search_node_type(value)
+
+        raise ValueError(f"Unknown custom search parameter: {parameter_name}")
+
+    @abstractmethod
+    def filter_ids(self, ids: Sequence[ItemId]) -> Sequence[ItemId]:
+        # Filters the given ids to only those that match the custom search node.
+        # Expects the ankihub database to be attached to the anki database connection.
+        # Ids can be either note ids or card ids.
+        pass
+
+    def _retain_ids_where(self, ids: Sequence[ItemId], where: str) -> Sequence[ItemId]:
+        # Returns these ids that match the given where clause
+        # while joining notes with their corresponding information from the ankihub database.
+        # The provided ids can be either note ids or card ids.
+        # The anki notes table can be accessed with the table name "notes",
+        # cards can be accessed as "cards" and the ankihub notes
+        # table can be accessed as "ah_notes".
+        global browser
+
+        browser_: Browser = browser
+        if browser_.table.is_notes_mode():
+            nids = mw.col.db.list(
+                "SELECT id FROM notes, ankihub_db.notes as ah_notes "
+                "WHERE notes.id = ah_notes.anki_note_id AND "
+                f"notes.id IN {ids2str(ids)} AND " + where
+            )
+            return nids
+        else:
+            # this approach is faster than joining notes with cards in the query,
+            # but maybe this wouldn't be the case if the query were written better
+            nids = mw.col.db.list(
+                "SELECT DISTINCT nid FROM cards WHERE id IN " + ids2str(ids)
+            )
+            selected_note_ids = mw.col.db.list(
+                "SELECT id FROM notes, ankihub_db.notes as ah_notes "
+                "WHERE notes.id = ah_notes.anki_note_id AND "
+                f"notes.id IN {ids2str(nids)} AND " + where
+            )
+            cids = mw.col.db.list(
+                "SELECT id FROM cards WHERE nid IN " + ids2str(selected_note_ids)
+            )
+            return cids
+
+
+class ModifiedAfterSyncSearchNode(CustomSearchNode):
+
+    parameter_name = "_ankihub_modified_after_sync"
+
+    def __init__(self, value: str):
+        self.value = value
+
+    def filter_ids(self, ids: Sequence[ItemId]) -> Sequence[ItemId]:
+        if self.value == "yes":
+            ids = self._retain_ids_where(ids, "notes.mod > ah_notes.mod")
+        elif self.value == "no":
+            ids = self._retain_ids_where(ids, "notes.mod <= ah_notes.mod")
+        else:
+            raise ValueError(
+                f"Unknown search parameter value: {self.value}. Options are 'yes' and 'no'."
+            )
+
+        return ids
+
+
+class UpdatedInTheLastXDaysSearchNode(CustomSearchNode):
+
+    parameter_name = "_ankihub_updated"
+
+    def __init__(self, value: str):
+        self.value = value
+
+    def filter_ids(self, ids: Sequence[ItemId]) -> Sequence[ItemId]:
+        try:
+            days = int(self.value)
+            if days <= 0:
+                raise ValueError
+        except ValueError:
+            raise ValueError(
+                f"Invalid value for {self.parameter_name}: {self.value}. Must be an positive integer."
+            )
+
+        threshold_timestamp = int(datetime.now().timestamp() - (days * 24 * 60 * 60))
+        ids = self._retain_ids_where(ids, f"ah_notes.mod > {threshold_timestamp}")
+
+        return ids
+
+
+# stores the custom search nodes for the current search
+custom_search_nodes: List[CustomSearchNode] = []
 
 
 def on_browser_will_show_context_menu(browser: Browser, context_menu: QMenu) -> None:
@@ -317,6 +431,11 @@ def on_browser_did_fetch_row(
 
 
 def on_browser_will_search(ctx: SearchContext):
+    on_browser_will_search_handle_custom_column_ordering(ctx)
+    on_browser_will_search_handle_custom_search_parameters(ctx)
+
+
+def on_browser_will_search_handle_custom_column_ordering(ctx: SearchContext):
     if not isinstance(ctx.order, Column):
         return
 
@@ -331,8 +450,118 @@ def on_browser_will_search(ctx: SearchContext):
     ctx.order = custom_column.order_by_str()
 
 
+def on_browser_will_search_handle_custom_search_parameters(ctx: SearchContext):
+    if not ctx.search:
+        return
+
+    global custom_search_nodes
+    custom_search_nodes = []
+
+    for m in re.finditer(r"(_ankihub_\w+):(\w*)", ctx.search):
+        parameter_name, parameter_value = m.group(1), m.group(2)
+        try:
+            custom_search_nodes.append(
+                CustomSearchNode.from_parameter_type_and_value(
+                    parameter_name, parameter_value
+                )
+            )
+        except ValueError as e:
+            showWarning(f"AnkiHub search error: {e}")
+            return
+
+        # remove the custom search parameter from the search string
+        ctx.search = ctx.search.replace(m.group(0), "")
+
+
 def on_browser_did_search(ctx: SearchContext):
+    # Detach the ankihub database in case it was attached in on_browser_will_search_handle_custom_column_ordering.
+    # The attached_ankihub_db context manager can't be used for this because the database query happens
+    # in the rust backend.
     detach_ankihub_db_from_anki_db_connection()
+
+    on_browser_did_search_handle_custom_search_parameters(ctx)
+
+
+def on_browser_did_search_handle_custom_search_parameters(ctx: SearchContext):
+    global custom_search_nodes
+
+    if not custom_search_nodes:
+        return
+
+    with attached_ankihub_db():
+        try:
+            for node in custom_search_nodes:
+                ctx.ids = node.filter_ids(ctx.ids)
+        except ValueError as e:
+            showWarning(f"AnkiHub search error: {e}")
+            return
+        finally:
+            custom_search_nodes = []
+
+
+def on_browser_will_build_tree(
+    handled: bool,
+    tree: SidebarItem,
+    stage: SidebarStage,
+    browser: Browser,
+):
+    if stage != SidebarStage.ROOT:
+        return handled
+
+    ankihub_item = tree.add_simple(
+        name="AnkiHub",
+        icon="AnkiHub",
+        type=SidebarItemType.SAVED_SEARCH_ROOT,
+        search_node=SearchNode(
+            parsable_text="ankihub_id:*",
+        ),
+    )
+
+    ankihub_item.add_simple(
+        name="With AnkiHub ID",
+        icon="With AnkiHub ID",
+        type=SidebarItemType.SAVED_SEARCH,
+        search_node=SearchNode(parsable_text="ankihub_id:_*"),
+    )
+
+    ankihub_item.add_simple(
+        name="Without AnkiHub ID",
+        icon="Without AnkiHub ID",
+        type=SidebarItemType.SAVED_SEARCH,
+        search_node=SearchNode(parsable_text="ankihub_id:"),
+    )
+
+    ankihub_item.add_simple(
+        name="Modified After Sync",
+        icon="Modified After Sync",
+        type=SidebarItemType.SAVED_SEARCH,
+        search_node=SearchNode(
+            parsable_text=f"{ModifiedAfterSyncSearchNode.parameter_name}:yes"
+        ),
+    )
+
+    ankihub_item.add_simple(
+        name="Not Modified After Sync",
+        icon="Not Modified After Sync",
+        type=SidebarItemType.SAVED_SEARCH,
+        search_node=SearchNode(
+            parsable_text=f"{ModifiedAfterSyncSearchNode.parameter_name}:no"
+        ),
+    )
+
+    ankihub_item.add_simple(
+        name="Updated Today",
+        icon="Updated Today",
+        type=SidebarItemType.SAVED_SEARCH_ROOT,
+        search_node=mw.col.group_searches(
+            SearchNode(parsable_text="ankihub_id:_*"),
+            SearchNode(
+                parsable_text=f"{UpdatedInTheLastXDaysSearchNode.parameter_name}:1"
+            ),
+        ),
+    )
+
+    return handled
 
 
 def setup() -> None:
@@ -347,3 +576,5 @@ def setup() -> None:
     browser_did_search.append(on_browser_did_search)
 
     browser_will_show_context_menu.append(on_browser_will_show_context_menu)
+
+    browser_will_build_tree.append(on_browser_will_build_tree)
