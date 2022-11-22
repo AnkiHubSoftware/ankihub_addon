@@ -525,8 +525,8 @@ def on_browser_will_build_tree(
     )
 
     ankihub_item.add_simple(
-        name="Without AnkiHub ID",
-        icon="Without AnkiHub ID",
+        name="ID Pending",
+        icon="ID Pending",
         type=SidebarItemType.SAVED_SEARCH,
         search_node=SearchNode(parsable_text="ankihub_id:"),
     )
