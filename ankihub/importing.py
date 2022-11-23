@@ -286,10 +286,13 @@ class AnkiHubImporter:
         """
         Updates the note with the given fields and tags (taking protected fields and tags into account)
         Sets the ankihub_id field to the given ankihub_id
+        Sets the guid to the given guid
         Returns True if note was changed and False otherwise
         """
 
         LOGGER.debug("Preparing note...")
+
+        changed_guid = self._prepare_guid(note, note_data.guid)
 
         changed_ankihub_id_field = self._prepare_ankihub_id_field(
             note, ankihub_nid=str(note_data.ankihub_note_uuid)
@@ -302,7 +305,9 @@ class AnkiHubImporter:
             tags=note_data.tags,
             protected_tags=protected_tags,
         )
-        changed = changed_ankihub_id_field or changed_fields or changed_tags
+        changed = (
+            changed_guid or changed_ankihub_id_field or changed_fields or changed_tags
+        )
 
         self._prepare_internal_tags(
             note=note,
@@ -313,6 +318,14 @@ class AnkiHubImporter:
 
         LOGGER.debug(f"Prepared note. {changed=}")
         return changed
+
+    def _prepare_guid(self, note: Note, guid: str) -> bool:
+        if note.guid == guid:
+            return False
+
+        LOGGER.debug(f"Changing guid of note {note.id} from {note.guid} to {guid}")
+        note.guid = guid
+        return True
 
     def _prepare_internal_tags(
         self,
