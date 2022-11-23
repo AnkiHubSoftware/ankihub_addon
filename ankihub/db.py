@@ -212,5 +212,15 @@ class AnkiHubDB:
         )
         return result
 
+    def ankihub_dids_of_decks_with_missing_values(self) -> List[str]:
+        # currently only checks the guid, fields and tags columns
+        result = self.list(
+            "SELECT DISTINCT ankihub_deck_id FROM notes WHERE "
+            "guid IS NULL OR "
+            "fields IS NULL OR "
+            "tags IS NULL"
+        )
+        return result
+
 
 ankihub_db = AnkiHubDB()
