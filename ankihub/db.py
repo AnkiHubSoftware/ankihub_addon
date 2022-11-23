@@ -133,10 +133,10 @@ class AnkiHubDB:
     def save_notes_from_nids(self, ankihub_did: str, nids: List[NoteId]):
         with db_transaction() as conn:
             raw_notes = mw.col.db.all(
-                f"SELECT id, mid, mod, flds FROM notes WHERE id IN {ids2str(nids)}"
+                f"SELECT id, mid, mod, flds, tags, guid FROM notes WHERE id IN {ids2str(nids)}"
             )
             for raw_note in raw_notes:
-                nid, mid, mod, flds = raw_note
+                nid, mid, mod, flds, tags, guid = raw_note
                 ankihub_id = split_fields(flds)[-1]
                 conn.execute(
                     """
@@ -145,8 +145,11 @@ class AnkiHubDB:
                         ankihub_deck_id,
                         anki_note_id,
                         anki_note_type_id,
-                        mod
-                    ) VALUES (?, ?, ?, ?, ?)
+                        mod,
+                        fields,
+                        tags,
+                        guid
+                    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?)
                     """,
                     (
                         ankihub_id,
@@ -154,6 +157,9 @@ class AnkiHubDB:
                         nid,
                         mid,
                         mod,
+                        flds,
+                        tags,
+                        guid,
                     ),
                 )
 
