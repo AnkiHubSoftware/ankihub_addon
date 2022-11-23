@@ -2,9 +2,9 @@ import uuid
 from concurrent.futures import Future
 from datetime import datetime
 from time import sleep
-from typing import Dict, Optional
+from typing import Callable, Dict, Optional
 
-from aqt import gui_hooks, mw
+from aqt import mw
 from aqt.utils import showInfo, tooltip
 
 from . import LOGGER, settings
@@ -121,7 +121,7 @@ class AnkiHubSync:
         return False
 
 
-def sync_with_progress() -> None:
+def sync_with_progress(on_done: Callable[[], None]) -> None:
 
     sync = AnkiHubSync()
 
@@ -139,45 +139,30 @@ def sync_with_progress() -> None:
 
         sync.sync_all_decks()
 
-    def on_done(future: Future):
+    def on_syncing_done(future: Future):
         if exc := future.exception():
             LOGGER.debug("Unable to sync.")
             raise exc
+
+        total = sync.importer.num_notes_created + sync.importer.num_notes_updated
+        if total == 0:
+            tooltip("AnkiHub: No new updates")
         else:
-            total = sync.importer.num_notes_created + sync.importer.num_notes_updated
-            if total == 0:
-                tooltip("AnkiHub: No new updates")
-            else:
-                tooltip(
-                    f"AnkiHub: Synced {total} note{'' if total == 1 else 's'}.",
-                    parent=mw,
-                )
-            mw.reset()
+            tooltip(
+                f"AnkiHub: Synced {total} note{'' if total == 1 else 's'}.",
+                parent=mw,
+            )
+        mw.reset()
+
+        on_done()
 
     if config.private_config.token:
         mw.taskman.with_progress(
-            lambda: sync_with_ankihub_after_delay(),
+            sync_with_ankihub_after_delay,
             label="Synchronizing with AnkiHub",
-            on_done=on_done,
+            on_done=on_syncing_done,
             parent=mw,
             immediate=True,
         )
     else:
         LOGGER.debug("Skipping sync due to no token.")
-
-
-def setup_sync_on_startup() -> None:
-    def on_profile_open():
-        # syncing with AnkiHub during sync with AnkiWeb causes an error,
-        # this is why we have to wait until the AnkiWeb sync is done if there is one
-        if not mw.can_auto_sync():
-            sync_with_progress()
-        else:
-
-            def on_sync_did_finish():
-                sync_with_progress()
-                gui_hooks.sync_did_finish.remove(on_sync_did_finish)
-
-            gui_hooks.sync_did_finish.append(on_sync_did_finish)
-
-    gui_hooks.profile_did_open.append(on_profile_open)
