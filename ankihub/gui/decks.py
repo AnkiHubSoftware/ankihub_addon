@@ -1,6 +1,6 @@
 from concurrent.futures import Future
 from datetime import datetime
-from typing import List, Optional
+from typing import Callable, List, Optional
 
 from anki.collection import OpChanges
 from aqt import gui_hooks, mw
@@ -18,6 +18,7 @@ from aqt.qt import (
     QSizePolicy,
     Qt,
     QVBoxLayout,
+    QWidget,
 )
 from aqt.utils import askUser, openLink, showInfo, showText, tooltip
 
@@ -230,7 +231,12 @@ class SubscribeDialog(QDialog):
 
         self.download_and_install_deck(ankihub_did)
 
-    def download_and_install_deck(self, ankihub_did: str):
+    def download_and_install_deck(
+        self,
+        ankihub_did: str,
+        on_success: Optional[Callable[[], None]] = None,
+        cleanup: bool = True,
+    ):
         """
         Take the AnkiHub deck id, copied/pasted by the user and
         1) Download the deck .csv
@@ -252,16 +258,11 @@ class SubscribeDialog(QDialog):
                 self.accept()
                 mw.reset()
 
-                if askUser(
-                    "The deck has successfully been installed!<br><br>"
-                    "Do you want to clear unused tags and empty cards from your collection? (recommended if you had "
-                    " a previous version of the deck in your collection)",
-                    title="AnkiHub",
-                    parent=self,
-                ):
-                    clear_unused_tags(parent=self).run_in_background()
-                    show_empty_cards(mw)
+                if cleanup:
+                    cleanup_after_deck_install(parent=self)
 
+                if on_success is not None:
+                    on_success()
             else:
                 LOGGER.warning("Importing deck failed.")
                 self.reject()
@@ -363,3 +364,18 @@ def download_progress_cb(percent: int):
             max=101,
         )
     )
+
+
+def cleanup_after_deck_install(
+    parent: QWidget = None, multiple_decks: bool = False
+) -> None:
+    if askUser(
+        "The deck has successfully been installed!<br><br>"
+        if not multiple_decks
+        else ""
+        "Do you want to clear unused tags and empty cards from your collection? (It is recommended.)",
+        title="AnkiHub",
+        parent=parent,
+    ):
+        clear_unused_tags(parent=parent).run_in_background()
+        show_empty_cards(mw)

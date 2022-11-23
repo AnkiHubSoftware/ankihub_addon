@@ -10,7 +10,7 @@ from . import LOGGER
 from .addons import setup_addons
 from .errors import setup_error_handler
 from .gui import browser, editor
-from .gui.db_check import check_db
+from .gui.db_check import check_ankihub_db
 from .gui.menu import setup_ankihub_menu
 from .progress import setup_progress_manager
 from .settings import config
@@ -61,9 +61,9 @@ def on_startup_ankiweb_sync_done():
     # The database check should be done after the AnkiHub sync to not open all dialogs at once
     # and the AnkiHub sync could also make the database check obsolete.
     if config.public_config.get("sync_on_startup", True):
-        sync_with_progress(on_done=check_db)
+        sync_with_progress(on_done=check_ankihub_db)
     else:
-        check_db()
+        check_ankihub_db()
 
 
 def do_after_ankiweb_sync(callback: Callable[[None], None]) -> None:
