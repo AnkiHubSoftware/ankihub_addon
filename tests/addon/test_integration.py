@@ -811,6 +811,7 @@ def test_suspend_new_cards_of_existing_notes(
                 tags=[],
                 mid=note.model()["id"],
                 last_update_type=None,
+                guid=note.guid,
             )
             importer = AnkiHubImporter()
             updated_note = importer._update_or_create_note(
@@ -968,6 +969,7 @@ def test_prepare_note(anki_session_with_addon: AnkiSession):
                 tags=tags,
                 mid=note.mid,
                 last_update_type=last_update_type,
+                guid=note.guid,
             )
 
             ankihub_importer = AnkiHubImporter()
@@ -1131,6 +1133,7 @@ def test_prepare_note_protect_field_with_spaces(anki_session_with_addon: AnkiSes
                 tags=tags,
                 mid=note.mid,
                 last_update_type=last_update_type,
+                guid=note.guid,
             )
 
             ankihub_importer = AnkiHubImporter()

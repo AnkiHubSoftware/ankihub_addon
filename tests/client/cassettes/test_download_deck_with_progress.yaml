@@ -3,7 +3,7 @@ interactions:
     body: '{"username": "test1", "password": "asdf"}'
     headers:
       Accept:
-      - '*/*'
+      - application/json; version=4.0
       Accept-Encoding:
       - gzip, deflate
       Connection:
@@ -18,7 +18,7 @@ interactions:
     uri: http://localhost:8000/api/login/
   response:
     body:
-      string: '{"expiry":"2022-10-05T10:50:43.593362Z","token":"fc74a24c12f045a0db6e9d30177ad6b3986e55de5b8d7e05b53260ded986a1f7"}'
+      string: '{"expiry":"2022-11-30T16:43:33.981314Z","token":"39a2de648cec190dfab53240eef09548d6a145648e05e71ac784959287eac9f2"}'
     headers:
       Allow:
       - POST, OPTIONS
@@ -29,21 +29,21 @@ interactions:
       Content-Type:
       - application/json
       Date:
-      - Wed, 28 Sep 2022 10:50:43 GMT
+      - Wed, 23 Nov 2022 16:43:34 GMT
       Referrer-Policy:
       - same-origin
       Server:
-      - WSGIServer/0.2 CPython/3.8.13
+      - WSGIServer/0.2 CPython/3.8.15
       Server-Timing:
-      - TimerPanel_utime;dur=514.3190000000004;desc="User CPU time", TimerPanel_stime;dur=47.21200000000181;desc="System
-        CPU time", TimerPanel_total;dur=561.5310000000022;desc="Total CPU time", TimerPanel_total_time;dur=374.2542266845703;desc="Elapsed
-        time", SQLPanel_sql_time;dur=3.8728713989257812;desc="SQL 9 queries", CachePanel_total_time;dur=0;desc="Cache
+      - TimerPanel_utime;dur=433.0389999999991;desc="User CPU time", TimerPanel_stime;dur=52.31699999999995;desc="System
+        CPU time", TimerPanel_total;dur=485.355999999999;desc="Total CPU time", TimerPanel_total_time;dur=339.53380584716797;desc="Elapsed
+        time", SQLPanel_sql_time;dur=4.210948944091797;desc="SQL 9 queries", CachePanel_total_time;dur=0;desc="Cache
         0 Calls"
       Set-Cookie:
-      - csrftoken=nGGuzADpn9O1zYmqegPpNxmqiC169PbiaOK75uPo7BeprJu4oqgXK2W25v2CMr9K;
-        expires=Wed, 27 Sep 2023 10:50:43 GMT; HttpOnly; Max-Age=31449600; Path=/;
+      - csrftoken=QRxXsgVBnpU52hxVaSgTOsS6uRSQp1IXDSHpn1IVD8uEB7mQlm2WMay7yyODLjZF;
+        expires=Wed, 22 Nov 2023 16:43:34 GMT; HttpOnly; Max-Age=31449600; Path=/;
         SameSite=Lax
-      - sessionid=priaorjnoye4z3m33sb7g18624l0lt4k; expires=Wed, 05 Oct 2022 10:50:43
+      - sessionid=r6r02zng6r8b1nz52vi0kfucu55ququc; expires=Wed, 30 Nov 2022 16:43:34
         GMT; HttpOnly; Max-Age=604800; Path=/; SameSite=Lax
       Vary:
       - Accept, Cookie, Accept-Language, Origin
@@ -60,11 +60,11 @@ interactions:
     body: null
     headers:
       Accept:
-      - '*/*'
+      - application/json; version=4.0
       Accept-Encoding:
       - gzip, deflate
       Authorization:
-      - Token fc74a24c12f045a0db6e9d30177ad6b3986e55de5b8d7e05b53260ded986a1f7
+      - Token 39a2de648cec190dfab53240eef09548d6a145648e05e71ac784959287eac9f2
       Connection:
       - keep-alive
       Content-Type:
@@ -75,27 +75,27 @@ interactions:
     uri: http://localhost:8000/api/decks/dda0d3ad-89cd-45fb-8ddc-fabad93c2d7b/
   response:
     body:
-      string: '{"id":"dda0d3ad-89cd-45fb-8ddc-fabad93c2d7b","csv_last_upload":null,"note_types":[],"name":"Wendy
-        Howell","anki_id":4233283832,"apkg_filename":null,"csv_notes_filename":null,"is_private":false,"notes_count":10,"subscribers_count":0,"updates_count":0,"last_note_update":null,"owner":1}'
+      string: '{"id":"dda0d3ad-89cd-45fb-8ddc-fabad93c2d7b","csv_last_upload":null,"note_types":[],"name":"Bradley
+        Collins","anki_id":3949751715,"initial_deck_filename":null,"csv_notes_filename":null,"is_private":false,"notes_count":10,"subscribers_count":0,"updates_count":0,"last_note_update":null,"owner":1,"associated_partner":null}'
     headers:
       Allow:
       - GET, HEAD, OPTIONS
       Content-Language:
       - en
       Content-Length:
-      - '284'
+      - '321'
       Content-Type:
       - application/json
       Date:
-      - Wed, 28 Sep 2022 10:50:44 GMT
+      - Wed, 23 Nov 2022 16:43:34 GMT
       Referrer-Policy:
       - same-origin
       Server:
-      - WSGIServer/0.2 CPython/3.8.13
+      - WSGIServer/0.2 CPython/3.8.15
       Server-Timing:
-      - TimerPanel_utime;dur=349.6979999999894;desc="User CPU time", TimerPanel_stime;dur=15.864000000000544;desc="System
-        CPU time", TimerPanel_total;dur=365.56199999998995;desc="Total CPU time",
-        TimerPanel_total_time;dur=352.33330726623535;desc="Elapsed time", SQLPanel_sql_time;dur=3.3888816833496094;desc="SQL
+      - TimerPanel_utime;dur=325.88099999999895;desc="User CPU time", TimerPanel_stime;dur=0.0;desc="System
+        CPU time", TimerPanel_total;dur=325.88099999999895;desc="Total CPU time",
+        TimerPanel_total_time;dur=331.10904693603516;desc="Elapsed time", SQLPanel_sql_time;dur=3.3054351806640625;desc="SQL
         6 queries", CachePanel_total_time;dur=0;desc="Cache 0 Calls"
       Vary:
       - Accept, Accept-Language, Cookie, Origin
