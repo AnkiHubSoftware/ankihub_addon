@@ -117,6 +117,15 @@ class AnkiHubDB:
                 f"AnkiHub DB migrated to schema version {self.schema_version()}"
             )
 
+        if self.schema_version() <= 2:
+            self.execute("ALTER TABLE notes ADD COLUMN guid TEXT")
+            self.execute("ALTER TABLE notes ADD COLUMN fields TEXT")
+            self.execute("ALTER TABLE notes ADD COLUMN tags TEXT")
+            self.execute("PRAGMA user_version = 3;")
+            LOGGER.debug(
+                f"AnkiHub DB migrated to schema version {self.schema_version()}"
+            )
+
     def schema_version(self) -> int:
         result = self.scalar("PRAGMA user_version;")
         return result
