@@ -956,20 +956,21 @@ def test_prepare_note(anki_session_with_addon: AnkiSession):
         def prepare_note(
             note,
             first_import_of_deck: bool,
-            tags: List[str] = [],
-            fields: Optional[List[Field]] = [],
+            tags: List[str] = None,
+            fields: Optional[List[Field]] = None,
             protected_fields: Optional[Dict] = {},
             protected_tags: List[str] = [],
             last_update_type: SuggestionType = SuggestionType.NEW_CONTENT,
+            guid: Optional[str] = None,
         ):
             note_data = NoteInfo(
                 ankihub_note_uuid=str(UUID_1),
                 anki_nid=note.id,
-                fields=fields,
-                tags=tags,
+                fields=fields or [],
+                tags=tags or [],
                 mid=note.mid,
                 last_update_type=last_update_type,
-                guid=note.guid,
+                guid=note.guid if guid is None else guid,
             )
 
             ankihub_importer = AnkiHubImporter()
@@ -996,6 +997,7 @@ def test_prepare_note(anki_session_with_addon: AnkiSession):
             note[ANKIHUB_NOTE_TYPE_FIELD_NAME] = ankihub_nid
             note.tags = []
             note.id = 42  # to simulate an existing note
+            note.guid = "old guid"
             return note
 
         new_fields = [
@@ -1103,6 +1105,16 @@ def test_prepare_note(anki_session_with_addon: AnkiSession):
         assert not note_was_changed_7
         assert note["Front"] == "old front"
         assert note["Back"] == "old back"
+
+        # assert that the note guid is changed
+        note = example_note()
+        note_was_changed_8 = prepare_note(
+            note,
+            guid="new guid",
+            first_import_of_deck=True,
+        )
+        assert note_was_changed_8
+        assert note.guid == "new guid"
 
 
 def test_prepare_note_protect_field_with_spaces(anki_session_with_addon: AnkiSession):
