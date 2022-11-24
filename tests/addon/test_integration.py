@@ -1203,3 +1203,58 @@ def test_prepare_note_protect_field_with_spaces(anki_session_with_addon: AnkiSes
         )
         assert note_changed
         assert note[field_name_with_spaces] == "new front"
+
+
+def test_import_deck_and_check_that_values_are_saved_to_databases(
+    anki_session_with_addon: AnkiSession,
+):
+    from ankihub.db import AnkiHubDB
+    from ankihub.importing import AnkiHubImporter
+
+    with anki_session_with_addon.profile_loaded():
+        mw = anki_session_with_addon.mw
+
+        # import the deck to setup note types
+        anki_did = import_sample_ankihub_deck(mw)
+
+        note_data = ankihub_sample_deck_notes_data()[0]
+
+        # set fields and tags of note_data
+        # so that we can check if protected fields and tags are handled correctly
+        protected_field_name = note_data.fields[0].name
+        note_data.fields[0].value = "new field content"
+        note_type_id = note_data.mid
+
+        note_data.tags = ["tag1", "tag2"]
+
+        nid = note_data.anki_nid
+        note = mw.col.get_note(nid)
+        note.tags = ["protected_tag"]
+
+        protected_field_content = "protected field content"
+        note[protected_field_name] = protected_field_content
+
+        note.flush()
+
+        importer = AnkiHubImporter()
+        importer._import_ankihub_deck_inner(
+            ankihub_did=anki_did,
+            notes_data=[note_data],
+            deck_name="test",
+            protected_fields={note_type_id: [protected_field_name]},
+            protected_tags=["protected_tag"],
+            remote_note_types={},
+        )
+
+        # assert that the fields are saved correctly in the Anki DB (protected)
+        assert note[protected_field_name] == protected_field_content
+
+        # assert that the tags are saved correctly in the Anki DB (protected)
+        note = mw.col.get_note(nid)
+        assert set(note.tags) == set(["tag1", "tag2", "protected_tag"])
+
+        # assert that the note_data was saved correctly in the AnkiHub DB (without modifications)
+        note_data_from_db = AnkiHubDB().note_data(nid)
+        # ... last_update_type is not relevant here because it is not saved in the AnkiHub DB
+        note_data_from_db.last_update_type = note_data.last_update_type
+        assert note_data_from_db == note_data

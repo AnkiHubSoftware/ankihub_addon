@@ -1,15 +1,15 @@
 import sqlite3
 import uuid
 from contextlib import contextmanager
-from typing import Any, List, Optional
+from typing import Any, List, Optional, Tuple
 
 from anki.models import NotetypeId
 from anki.notes import NoteId
-from anki.utils import join_fields
+from anki.utils import join_fields, split_fields
 from aqt import mw
 
 from . import LOGGER
-from .ankihub_client import NoteInfo
+from .ankihub_client import Field, NoteInfo
 from .settings import DB_PATH
 
 
@@ -84,6 +84,13 @@ class AnkiHubDB:
 
     def list(self, sql: str, *args) -> List:
         return [x[0] for x in self.execute(sql, *args, first_row_only=False)]
+
+    def first(self, sql: str, *args) -> Optional[Tuple]:
+        rows = self.execute(sql, *args, first_row_only=True)
+        if rows:
+            return tuple(rows)
+        else:
+            return None
 
     def _setup_tables_and_migrate(self) -> None:
         self.execute(
@@ -176,6 +183,43 @@ class AnkiHubDB:
                         note_data.guid,
                     ),
                 )
+
+    def note_data(self, anki_note_id: int) -> Optional[NoteInfo]:
+        result = self.first(
+            f"""
+            SELECT
+                ankihub_note_id,
+                anki_note_id,
+                anki_note_type_id,
+                tags,
+                fields,
+                guid
+            FROM notes
+            WHERE anki_note_id = {anki_note_id}
+            """,
+        )
+        if result is None:
+            return None
+
+        ah_nid, anki_nid, mid, tags, flds, guid = result
+        field_names = [
+            field["name"] for field in mw.col.models.get(NotetypeId(mid))["flds"]
+        ]
+        return NoteInfo(
+            ankihub_note_uuid=uuid.UUID(ah_nid),
+            anki_nid=anki_nid,
+            mid=mid,
+            tags=mw.col.tags.split(tags),
+            fields=[
+                Field(
+                    name=field_names[i],
+                    value=value,
+                    order=i,
+                )
+                for i, value in enumerate(split_fields(flds))
+            ],
+            guid=guid,
+        )
 
     def notes_for_ankihub_deck(self, ankihub_did: str) -> List[NoteId]:
         result = self.list(
