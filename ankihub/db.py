@@ -5,10 +5,11 @@ from typing import Any, List, Optional
 
 from anki.models import NotetypeId
 from anki.notes import NoteId
-from anki.utils import ids2str, split_fields
+from anki.utils import join_fields
 from aqt import mw
 
 from . import LOGGER
+from .ankihub_client import NoteInfo
 from .settings import DB_PATH
 
 
@@ -130,14 +131,27 @@ class AnkiHubDB:
         result = self.scalar("PRAGMA user_version;")
         return result
 
-    def save_notes_from_nids(self, ankihub_did: str, nids: List[NoteId]):
+    def save_notes_data_and_mod_values(
+        self, ankihub_did: str, notes_data: List[NoteInfo]
+    ):
+        """Save notes data in the AnkiHub DB.
+        It also takes mod values for the notes from the Anki DB and saves them to the AnkiHub DB.
+        This is why it should be be called after importing or exporting a deck.
+        (The mod values are used to determine if a note has been modified in Anki since it was last imported/exported.)
+        """
         with db_transaction() as conn:
-            raw_notes = mw.col.db.all(
-                f"SELECT id, mid, mod, flds, tags, guid FROM notes WHERE id IN {ids2str(nids)}"
-            )
-            for raw_note in raw_notes:
-                nid, mid, mod, flds, tags, guid = raw_note
-                ankihub_id = split_fields(flds)[-1]
+            for note_data in notes_data:
+                mod = mw.col.db.scalar(
+                    f"SELECT mod FROM notes WHERE id = {note_data.anki_nid}",
+                )
+                fields = join_fields(
+                    [
+                        field.value
+                        for field in sorted(
+                            note_data.fields, key=lambda field: field.order
+                        )
+                    ]
+                )
                 conn.execute(
                     """
                     INSERT OR REPLACE INTO notes (
@@ -152,14 +166,14 @@ class AnkiHubDB:
                     ) VALUES (?, ?, ?, ?, ?, ?, ?, ?)
                     """,
                     (
-                        ankihub_id,
+                        str(note_data.ankihub_note_uuid),
                         ankihub_did,
-                        nid,
-                        mid,
+                        note_data.anki_nid,
+                        note_data.mid,
                         mod,
-                        flds,
-                        tags,
-                        guid,
+                        fields,
+                        mw.col.tags.join(note_data.tags),
+                        note_data.guid,
                     ),
                 )
 

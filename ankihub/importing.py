@@ -127,8 +127,9 @@ class AnkiHubImporter:
         if first_import_of_deck:
             local_did = self._cleanup_first_time_deck_import(dids, local_did)
 
-        anki_nids = [NoteId(note_data.anki_nid) for note_data in notes_data]
-        ankihub_db.save_notes_from_nids(ankihub_did=ankihub_did, nids=anki_nids)
+        ankihub_db.save_notes_data_and_mod_values(
+            ankihub_did=ankihub_did, notes_data=notes_data
+        )
 
         return local_did
 
