@@ -5,7 +5,7 @@ from aqt.utils import askUser
 from .. import LOGGER
 from ..db import ankihub_db
 from ..settings import config
-from .decks import SubscribeDialog, cleanup_after_deck_install
+from .decks import cleanup_after_deck_install, download_and_install_deck
 
 
 def check_ankihub_db():
@@ -46,10 +46,7 @@ def download_and_install_decks(ankihub_dids: List[str]):
 
     cur_did = ankihub_dids.pop()
 
-    subscribe_dialog = SubscribeDialog()
-    subscribe_dialog.hide()
-
-    subscribe_dialog.download_and_install_deck(
+    download_and_install_deck(
         cur_did,
         on_success=lambda: download_and_install_decks(ankihub_dids),
         cleanup=False,
