@@ -15,6 +15,7 @@ COMPOSE_FILE = Path(os.getenv("COMPOSE_FILE")) if os.getenv("COMPOSE_FILE") else
 
 TEST_DATA_PATH = Path(__file__).parent.parent / "test_data"
 DECK_CSV = TEST_DATA_PATH / "deck_with_one_basic_note.csv"
+DECK_CSV_GZ = TEST_DATA_PATH / "deck_with_one_basic_note.csv.gz"
 
 VCR_CASSETTES_PATH = Path(__file__).parent / "cassettes"
 
@@ -183,13 +184,24 @@ def test_client_login_and_signout(client):
 
 @pytest.mark.vcr()
 def test_download_deck(authorized_client_for_user_test1, monkeypatch):
-    from ankihub.ankihub_client import AnkiHubClient
+    from ankihub.ankihub_client import AnkiHubClient, Deck
 
     client: AnkiHubClient = authorized_client_for_user_test1
     deck_id = uuid.UUID("dda0d3ad-89cd-45fb-8ddc-fabad93c2d7b")
+
     get_presigned_url = MagicMock()
     get_presigned_url.return_value = "https://fake_s3.com"
     monkeypatch.setattr(client, "get_presigned_url", get_presigned_url)
+
+    original_get_deck_by_id = client.get_deck_by_id
+
+    def get_deck_by_id(*args, **kwargs) -> Deck:
+        result = original_get_deck_by_id(*args, **kwargs)
+        result.csv_notes_filename = "notes.csv"
+        return result
+
+    monkeypatch.setattr(client, "get_deck_by_id", get_deck_by_id)
+
     with requests_mock.Mocker(real_http=True) as m:
         m.register_uri(
             "GET", get_presigned_url.return_value, content=DECK_CSV.read_bytes()
@@ -200,15 +212,55 @@ def test_download_deck(authorized_client_for_user_test1, monkeypatch):
 
 
 @pytest.mark.vcr()
+def test_download_compressed_deck(authorized_client_for_user_test1, monkeypatch):
+    from ankihub.ankihub_client import AnkiHubClient, Deck
+
+    client: AnkiHubClient = authorized_client_for_user_test1
+    deck_id = uuid.UUID("dda0d3ad-89cd-45fb-8ddc-fabad93c2d7b")
+
+    get_presigned_url = MagicMock()
+    get_presigned_url.return_value = "https://fake_s3.com"
+    monkeypatch.setattr(client, "get_presigned_url", get_presigned_url)
+
+    original_get_deck_by_id = client.get_deck_by_id
+
+    def get_deck_by_id(*args, **kwargs) -> Deck:
+        result = original_get_deck_by_id(*args, **kwargs)
+        result.csv_notes_filename = "notes.csv.gz"
+        return result
+
+    monkeypatch.setattr(client, "get_deck_by_id", get_deck_by_id)
+
+    with requests_mock.Mocker(real_http=True) as m:
+        m.register_uri(
+            "GET", get_presigned_url.return_value, content=DECK_CSV_GZ.read_bytes()
+        )
+        notes_data = client.download_deck(ankihub_deck_uuid=deck_id)
+    assert len(notes_data) == 1
+    assert notes_data[0].tags == ["asdf"]
+
+
+@pytest.mark.vcr()
 def test_download_deck_with_progress(authorized_client_for_user_test1, monkeypatch):
-    from ankihub.ankihub_client import AnkiHubClient
+    from ankihub.ankihub_client import AnkiHubClient, Deck
     from ankihub.gui.decks import download_progress_cb
 
     client: AnkiHubClient = authorized_client_for_user_test1
     deck_id = uuid.UUID("dda0d3ad-89cd-45fb-8ddc-fabad93c2d7b")
+
     get_presigned_url = MagicMock()
     get_presigned_url.return_value = "https://fake_s3.com"
     monkeypatch.setattr(client, "get_presigned_url", get_presigned_url)
+
+    original_get_deck_by_id = client.get_deck_by_id
+
+    def get_deck_by_id(*args, **kwargs) -> Deck:
+        result = original_get_deck_by_id(*args, **kwargs)
+        result.csv_notes_filename = "notes.csv"
+        return result
+
+    monkeypatch.setattr(client, "get_deck_by_id", get_deck_by_id)
+
     with requests_mock.Mocker(real_http=True) as m:
         m.register_uri(
             "GET",

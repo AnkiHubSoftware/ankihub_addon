@@ -365,7 +365,11 @@ class AnkiHubClient:
                 raise AnkiHubRequestError(s3_response)
             s3_response_content = s3_response.content
 
-        deck_csv_content = s3_response_content.decode("utf-8")
+        if deck_info.csv_notes_filename.endswith(".gz"):
+            deck_csv_content = gzip.decompress(s3_response_content).decode("utf-8")
+        else:
+            deck_csv_content = s3_response_content.decode("utf-8")
+
         reader = csv.DictReader(
             deck_csv_content.splitlines(), delimiter=CSV_DELIMITER, quotechar="'"
         )
