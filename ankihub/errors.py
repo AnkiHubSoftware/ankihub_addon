@@ -38,7 +38,7 @@ def handle_exception(
 
         try:
             response_data = exc.response.json()
-            details = response_data["details"]
+            details = response_data.get("detail") or response_data.get("details")
         except:
             details = None
 
