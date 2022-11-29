@@ -171,8 +171,18 @@ def change_note_suggestion():
 
 
 @pytest.mark.vcr()
-def test_client_login_and_signout(client):
+def test_client_login_and_signout_with_username(client):
     credentials_data = {"username": "test1", "password": "asdf"}
+    token = client.login(credentials=credentials_data)
+    assert len(token) == 64
+    assert client.session.headers["Authorization"] == f"Token {token}"
+
+    client.signout()
+    assert client.session.headers["Authorization"] == ""
+    
+@pytest.mark.vcr()
+def test_client_login_and_signout_with_email(client):
+    credentials_data = {"email": "test1@email.com", "password": "asdf"}
     token = client.login(credentials=credentials_data)
     assert len(token) == 64
     assert client.session.headers["Authorization"] == f"Token {token}"
