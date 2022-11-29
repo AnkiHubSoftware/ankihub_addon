@@ -272,7 +272,7 @@ def download_and_install_deck(
     except AnkiHubRequestError as e:
         if e.response.status_code == 404:
             showText(
-                f"Deck {ankihub_did} doesn't exist. Please make sure you copy/paste "
+                f"Deck {ankihub_did} doesn't exist. Please make sure to copy/paste "
                 f"the correct ID. If you believe this is an error, please reach "
                 f"out to user support at help@ankipalace.com."
             )
