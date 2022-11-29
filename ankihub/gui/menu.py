@@ -105,14 +105,12 @@ class AnkiHubLogin(QWidget):
         ankihub_client = AnkiHubClient()
 
         try:
-            credentials = { "password": password }
+            credentials = {"password": password}
             if self._is_email(username_or_email):
                 credentials.update({"email": username_or_email})
             else:
                 credentials.update({"username": username_or_email})
-            token = ankihub_client.login(
-                credentials=credentials
-            )
+            token = ankihub_client.login(credentials=credentials)
         except AnkiHubRequestError as e:
             LOGGER.exception("AnkiHub login failed.")
             config.save_token("")
@@ -128,9 +126,11 @@ class AnkiHubLogin(QWidget):
 
         tooltip("Signed into AnkiHub!", parent=mw)
         self.close()
-        
+
     def _is_email(self, value):
-        return re.fullmatch(r'\b[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Z|a-z]{2,}\b', value)
+        return re.fullmatch(
+            r"\b[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Z|a-z]{2,}\b", value
+        )
 
     @classmethod
     def display_login(cls):

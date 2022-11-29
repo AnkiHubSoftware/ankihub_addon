@@ -179,7 +179,8 @@ def test_client_login_and_signout_with_username(client):
 
     client.signout()
     assert client.session.headers["Authorization"] == ""
-    
+
+
 @pytest.mark.vcr()
 def test_client_login_and_signout_with_email(client):
     credentials_data = {"email": "test1@email.com", "password": "asdf"}
