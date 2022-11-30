@@ -79,15 +79,8 @@ class AnkiHubLogin(QWidget):
         self.box_upper.addSpacing(20)
         self.box_upper.addLayout(self.box_right)
 
-        self.label_results = QLabel(
-            """
-            \r\n<center><i>Use your AnkiHub username and password to log in.</i></center>
-            """
-        )
-
         # Add all widgets to top layout.
         self.box_top.addLayout(self.box_upper)
-        self.box_top.addWidget(self.label_results)
         self.box_top.addStretch(1)
         self.setLayout(self.box_top)
 
