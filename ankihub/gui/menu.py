@@ -1,3 +1,4 @@
+import re
 from concurrent.futures import Future
 from datetime import datetime, timezone
 from typing import Optional
@@ -46,13 +47,13 @@ class AnkiHubLogin(QWidget):
         self.bottom_box_section = QHBoxLayout()
 
         # Username
-        self.username_box = QHBoxLayout()
-        self.username_box_label = QLabel("Username:")
-        self.username_box_text = QLineEdit("", self)
-        self.username_box_text.setMinimumWidth(300)
-        self.username_box.addWidget(self.username_box_label)
-        self.username_box.addWidget(self.username_box_text)
-        self.box_left.addLayout(self.username_box)
+        self.username_or_email_box = QHBoxLayout()
+        self.username_or_email_box_label = QLabel("Username or E-mail:")
+        self.username_or_email_box_text = QLineEdit("", self)
+        self.username_or_email_box_text.setMinimumWidth(300)
+        self.username_or_email_box.addWidget(self.username_or_email_box_label)
+        self.username_or_email_box.addWidget(self.username_or_email_box_text)
+        self.box_left.addLayout(self.username_or_email_box)
 
         # Password
         self.password_box = QHBoxLayout()
@@ -78,15 +79,8 @@ class AnkiHubLogin(QWidget):
         self.box_upper.addSpacing(20)
         self.box_upper.addLayout(self.box_right)
 
-        self.label_results = QLabel(
-            """
-            \r\n<center><i>Use your AnkiHub username and password to log in.</i></center>
-            """
-        )
-
         # Add all widgets to top layout.
         self.box_top.addLayout(self.box_upper)
-        self.box_top.addWidget(self.label_results)
         self.box_top.addStretch(1)
         self.setLayout(self.box_top)
 
@@ -96,17 +90,20 @@ class AnkiHubLogin(QWidget):
         self.show()
 
     def login(self):
-        username = self.username_box_text.text()
+        username_or_email = self.username_or_email_box_text.text()
         password = self.password_box_text.text()
-        if not all([username, password]):
+        if not all([username_or_email, password]):
             showText("Oops! You forgot to put in a username or password!")
             return
         ankihub_client = AnkiHubClient()
 
         try:
-            token = ankihub_client.login(
-                credentials={"username": username, "password": password}
-            )
+            credentials = {"password": password}
+            if self._is_email(username_or_email):
+                credentials.update({"email": username_or_email})
+            else:
+                credentials.update({"username": username_or_email})
+            token = ankihub_client.login(credentials=credentials)
         except AnkiHubRequestError as e:
             LOGGER.exception("AnkiHub login failed.")
             config.save_token("")
@@ -118,10 +115,16 @@ class AnkiHubLogin(QWidget):
             raise e
 
         config.save_token(token)
-        config.save_user_email(username)
+        config.save_user_email(username_or_email)
 
         tooltip("Signed into AnkiHub!", parent=mw)
         self.close()
+
+    def _is_email(self, value):
+        return re.fullmatch(
+            r"^[a-zA-Z0-9.!#$%&’*+/=?^_`{|}~-]+@[a-zA-Z0-9-]+(?:\.[a-zA-Z0-9-]+)*$",
+            value,
+        )
 
     @classmethod
     def display_login(cls):
