@@ -129,7 +129,8 @@ class AnkiHubLogin(QWidget):
 
     def _is_email(self, value):
         return re.fullmatch(
-            r'^[a-zA-Z0-9.!#$%&’*+/=?^_`{|}~-]+@[a-zA-Z0-9-]+(?:\.[a-zA-Z0-9-]+)*$', value
+            r"^[a-zA-Z0-9.!#$%&’*+/=?^_`{|}~-]+@[a-zA-Z0-9-]+(?:\.[a-zA-Z0-9-]+)*$",
+            value,
         )
 
     @classmethod
