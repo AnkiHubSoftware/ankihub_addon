@@ -150,6 +150,7 @@ def new_note_suggestion_note_info():
         tags=["tag1", "tag2"],
         mid=1,
         last_update_type=None,
+        guid="asdf",
     )
 
 
