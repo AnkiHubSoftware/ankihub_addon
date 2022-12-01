@@ -8,6 +8,7 @@
         "note_type": "Basic-4827c (Testdeck / andrew1)",
         "note_type_id": "1657023668893",
         "tags": '["my::tag", "my::tag2", "my::tag3"]',
+        "guid": "oWy1/DF}=z",
         "last_update_type": "new_content",
     },
     {
@@ -19,6 +20,7 @@
         "note_type": "Cloze-fe45f (Testdeck / andrew1)",
         "note_type_id": "1657023668894",
         "tags": '[]',
+        "guid": "nWWAu|`-!E",
         "last_update_type": "new_content",
     },
     {
@@ -30,6 +32,7 @@
         "note_type": "Basic-4827c (Testdeck / andrew1)",
         "note_type_id": "1657023668893",
         "tags": '["my::tag", "tag2"]',
+        "guid": "I~b-Y@`+{",
         "last_update_type": "new_content",
     },
 ]

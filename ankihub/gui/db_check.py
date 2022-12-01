@@ -1,0 +1,63 @@
+from typing import List
+
+from aqt.utils import askUser, showInfo, showWarning
+
+from .. import LOGGER
+from ..db import ankihub_db
+from ..settings import config
+from .decks import cleanup_after_deck_install, download_and_install_deck
+
+
+def check_ankihub_db():
+    dids_with_missing_values = ankihub_db.ankihub_dids_of_decks_with_missing_values()
+
+    if not dids_with_missing_values:
+        LOGGER.debug("No decks with missing values found.")
+        return
+
+    LOGGER.debug(f"Decks with missing values found: {dids_with_missing_values}")
+
+    deck_names = sorted(
+        [
+            config.private_config.decks[deck_id]["name"]
+            for deck_id in dids_with_missing_values
+        ],
+        key=str.lower,
+    )
+
+    if askUser(
+        text=(
+            "AnkiHub has detected that the following deck(s) have missing values in the database:<br>"
+            f"{'<br>'.join('<b>' + deck_name + '</b>' for deck_name in deck_names)}<br><br>"
+            "The add-on needs to download and import these decks again. This may take a while.<br><br>"
+            "Do you want to fix the missing values now?"
+        ),
+        title="AnkiHub Database Check",
+    ):
+        download_and_install_decks(dids_with_missing_values)
+
+
+def download_and_install_decks(ankihub_dids: List[str]):
+    # Installs decks one by one and then cleans up.
+    # If a deck install fails, the other deck installs and the cleanup are **not** executed.
+    # (The cleanup is not essential, it's just nice to have.)
+    if not ankihub_dids:
+        showInfo("All decks have been downloaded and imported.", title="AnkiHub")
+        cleanup_after_deck_install(multiple_decks=True)
+        return
+
+    cur_did = ankihub_dids.pop()
+
+    download_and_install_deck(
+        cur_did,
+        on_success=lambda: download_and_install_decks(ankihub_dids),
+        on_failure=show_failure_message,
+        cleanup=False,
+    )
+
+
+def show_failure_message() -> None:
+    showWarning(
+        "AnkiHub was unable to download and import all deck(s).",
+        title="AnkiHub",
+    )

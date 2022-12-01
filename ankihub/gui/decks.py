@@ -1,6 +1,7 @@
 from concurrent.futures import Future
 from datetime import datetime
-from typing import List, Optional
+from typing import Callable, List, Optional
+from uuid import UUID
 
 from anki.collection import OpChanges
 from aqt import gui_hooks, mw
@@ -228,129 +229,123 @@ class SubscribeDialog(QDialog):
         if not confirmed:
             return
 
-        self.download_and_install_deck(ankihub_did)
-
-    def download_and_install_deck(self, ankihub_did: str):
-        """
-        Take the AnkiHub deck id, copied/pasted by the user and
-        1) Download the deck .csv
-
-        :param deck_id: the deck's ankihub id
-        :return:
-        """
-
-        def on_install_done(future: Future):
-            success = False
-            exc = None
-            try:
-                success = future.result()
-            except Exception as e:
-                LOGGER.debug("Error installing deck.")
-                exc = e
-
-            if success:
-                self.accept()
-                mw.reset()
-
-                if askUser(
-                    "The deck has successfully been installed!<br><br>"
-                    "Do you want to clear unused tags and empty cards from your collection? (recommended if you had "
-                    " a previous version of the deck in your collection)",
-                    title="AnkiHub",
-                    parent=self,
-                ):
-                    clear_unused_tags(parent=self).run_in_background()
-                    show_empty_cards(mw)
-
-            else:
-                LOGGER.warning("Importing deck failed.")
-                self.reject()
-
-            if exc:
-                raise exc
-
-        try:
-            deck_info = self.client.get_deck_by_id(ankihub_did)
-        except AnkiHubRequestError as e:
-            if e.response.status_code == 404:
-                showText(
-                    f"Deck {ankihub_did} doesn't exist. Please make sure you copy/paste "
-                    f"the correct ID. If you believe this is an error, please reach "
-                    f"out to user support at help@ankipalace.com."
-                )
-                return
-            elif e.response.status_code == 403:
-                url_view_deck = f"{URL_VIEW_DECK}{ankihub_did}"
-                showInfo(
-                    f"Please first subscribe to the deck on the AnkiHub website.<br><br>"
-                    f'Link to the deck: <a href="{url_view_deck}">{url_view_deck}</a>',
-                )
-                return
-            else:
-                raise e
-
-        def on_download_done(future: Future) -> None:
-            notes_data: List[NoteInfo] = future.result()
-
-            mw.taskman.with_progress(
-                lambda: self.install_deck(
-                    notes_data=notes_data,
-                    deck_name=deck_info.name,
-                    ankihub_did=ankihub_did,
-                    latest_update=deck_info.csv_last_upload,
-                    is_creator=deck_info.owner,
-                ),
-                on_done=on_install_done,
-                parent=mw,
-                label="Installing deck",
-            )
-
-        mw.taskman.with_progress(
-            lambda: self.client.download_deck(
-                deck_info.ankihub_deck_uuid, download_progress_cb=download_progress_cb
-            ),
-            on_done=on_download_done,
-            parent=mw,
-            label="Downloading deck...",
+        download_and_install_deck(
+            ankihub_did, on_success=self.accept, on_failure=self.reject
         )
-
-    def install_deck(
-        self,
-        notes_data: List[NoteInfo],
-        deck_name: str,
-        ankihub_did: str,
-        latest_update: datetime,
-        is_creator: bool,
-    ) -> bool:
-        """If we have a .csv, read data from the file and modify the user's note types
-        and notes.
-        :param: path to the .csv or .apkg file
-        :return: True if successful, False if not
-        """
-
-        create_backup()
-
-        importer = AnkiHubImporter()
-        local_did = importer.import_ankihub_deck(
-            ankihub_did=ankihub_did,
-            notes_data=notes_data,
-            deck_name=deck_name,
-        )
-
-        config.save_subscription(
-            name=deck_name,
-            ankihub_did=ankihub_did,
-            anki_did=local_did,
-            latest_udpate=latest_update,
-            creator=is_creator,
-        )
-
-        LOGGER.debug("Importing deck was succesful.")
-
-        return True
 
     def on_browse_deck(self) -> None:
         openLink(URL_DECKS)
+
+
+def download_and_install_deck(
+    ankihub_did: str,
+    on_success: Optional[Callable[[], None]] = None,
+    on_failure: Optional[Callable[[], None]] = None,
+    cleanup: bool = True,
+):
+    def on_install_done(future: Future):
+        success = False
+        exc = None
+        try:
+            success = future.result()
+        except Exception as e:
+            exc = e
+
+        if exc is not None or not success:
+            LOGGER.debug("Error installing deck.")
+            if on_failure is not None:
+                on_failure()
+
+            if exc:
+                raise exc
+        else:
+            mw.reset()
+
+            if cleanup:
+                cleanup_after_deck_install()
+
+            if on_success is not None:
+                on_success()
+
+    try:
+        deck_info = AnkiHubClient().get_deck_by_id(UUID(ankihub_did))
+    except AnkiHubRequestError as e:
+        if e.response.status_code == 404:
+            showText(
+                f"Deck {ankihub_did} doesn't exist. Please make sure to copy/paste "
+                f"the correct ID. If you believe this is an error, please reach "
+                f"out to user support at help@ankipalace.com."
+            )
+            return
+        elif e.response.status_code == 403:
+            url_view_deck = f"{URL_VIEW_DECK}{ankihub_did}"
+            showInfo(
+                f"Please first subscribe to the deck on the AnkiHub website.<br><br>"
+                f'Link to the deck: <a href="{url_view_deck}">{url_view_deck}</a>',
+            )
+            return
+        else:
+            raise e
+
+    def on_download_done(future: Future) -> None:
+        notes_data: List[NoteInfo] = future.result()
+
+        mw.taskman.with_progress(
+            lambda: install_deck(
+                notes_data=notes_data,
+                deck_name=deck_info.name,
+                ankihub_did=ankihub_did,
+                latest_update=deck_info.csv_last_upload,
+                is_creator=deck_info.owner,
+            ),
+            on_done=on_install_done,
+            parent=mw,
+            label="Installing deck",
+        )
+
+    mw.taskman.with_progress(
+        lambda: AnkiHubClient().download_deck(
+            deck_info.ankihub_deck_uuid, download_progress_cb=download_progress_cb
+        ),
+        on_done=on_download_done,
+        parent=mw,
+        label="Downloading deck...",
+    )
+
+
+def install_deck(
+    notes_data: List[NoteInfo],
+    deck_name: str,
+    ankihub_did: str,
+    latest_update: datetime,
+    is_creator: bool,
+) -> bool:
+    """If we have a .csv, read data from the file and modify the user's note types
+    and notes.
+    :param: path to the .csv or .apkg file
+    :return: True if successful, False if not
+    """
+
+    create_backup()
+
+    importer = AnkiHubImporter()
+    local_did = importer.import_ankihub_deck(
+        ankihub_did=ankihub_did,
+        notes_data=notes_data,
+        deck_name=deck_name,
+    )
+
+    config.save_subscription(
+        name=deck_name,
+        ankihub_did=ankihub_did,
+        anki_did=local_did,
+        latest_udpate=latest_update,
+        creator=is_creator,
+    )
+
+    LOGGER.debug("Importing deck was succesful.")
+
+    return True
 
 
 def download_progress_cb(percent: int):
@@ -363,3 +358,15 @@ def download_progress_cb(percent: int):
             max=101,
         )
     )
+
+
+def cleanup_after_deck_install(multiple_decks: bool = False) -> None:
+    if askUser(
+        "The deck has successfully been installed!<br><br>"
+        if not multiple_decks
+        else ""
+        "Do you want to clear unused tags and empty cards from your collection? (It is recommended.)",
+        title="AnkiHub",
+    ):
+        clear_unused_tags(parent=mw).run_in_background()
+        show_empty_cards(mw)

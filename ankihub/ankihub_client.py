@@ -72,6 +72,7 @@ class NoteInfo(DataClassJSONMixinWithConfig):
     mid: int = dataclasses.field(metadata=field_options(alias="note_type_id"))
     fields: List[Field]
     tags: List[str]
+    guid: str
     last_update_type: Optional[SuggestionType] = dataclasses.field(
         metadata=field_options(
             serialize=lambda x: x.value[0] if x is not None else None,
@@ -79,7 +80,6 @@ class NoteInfo(DataClassJSONMixinWithConfig):
         ),
         default=None,
     )
-    guid: Optional[str] = dataclasses.field(default=None)
 
 
 @dataclass

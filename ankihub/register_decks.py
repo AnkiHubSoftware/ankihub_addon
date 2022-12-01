@@ -5,7 +5,7 @@ import os
 import typing
 import uuid
 from copy import deepcopy
-from typing import Dict
+from typing import Dict, List
 
 from anki.decks import DeckId
 from anki.models import NotetypeId
@@ -14,6 +14,7 @@ from aqt import mw
 
 from . import LOGGER
 from .addon_ankihub_client import AddonAnkiHubClient as AnkiHubClient
+from .ankihub_client import NoteInfo
 from .db import ankihub_db
 from .exporting import to_note_data
 from .settings import ANKIHUB_NOTE_TYPE_FIELD_NAME, config
@@ -27,13 +28,10 @@ from .utils import (
 DIR_PATH = os.path.dirname(os.path.abspath(__file__))
 
 
-def upload_deck(did: DeckId, private: bool) -> str:
+def upload_deck(did: DeckId, notes_data: List[NoteInfo], private: bool) -> str:
     """Upload the deck to AnkiHub."""
 
     deck_name = mw.col.decks.name(did)
-    nids = mw.col.find_notes(f'deck:"{deck_name}"')
-
-    notes_data = [to_note_data(mw.col.get_note(nid)) for nid in nids]
 
     note_types_data = [mw.col.models.get(mid) for mid in get_note_types_in_deck(did)]
 
@@ -65,10 +63,12 @@ def create_collaborative_deck(deck_name: str, private: bool) -> str:
 
     assign_ankihub_ids(note_ids)
 
-    ankihub_did = upload_deck(deck_id, private=private)
-    ankihub_db.save_notes_from_nids(
-        ankihub_did=ankihub_did,
-        nids=note_ids,
+    nids = mw.col.find_notes(f'deck:"{deck_name}"')
+    notes_data = [to_note_data(mw.col.get_note(nid)) for nid in nids]
+
+    ankihub_did = upload_deck(deck_id, notes_data=notes_data, private=private)
+    ankihub_db.save_notes_data_and_mod_values(
+        ankihub_did=ankihub_did, notes_data=notes_data
     )
     return ankihub_did
 

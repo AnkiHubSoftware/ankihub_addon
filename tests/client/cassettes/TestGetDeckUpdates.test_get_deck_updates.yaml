@@ -3,7 +3,7 @@ interactions:
     body: '{"username": "test2", "password": "asdf"}'
     headers:
       Accept:
-      - '*/*'
+      - application/json; version=4.0
       Accept-Encoding:
       - gzip, deflate
       Connection:
@@ -18,7 +18,7 @@ interactions:
     uri: http://localhost:8000/api/login/
   response:
     body:
-      string: '{"expiry":"2022-10-05T10:51:32.874513Z","token":"a13c4a4f1e27c9a112d0c1e78b641fba2b656a2eeeb43f62adc34526c7a2462f"}'
+      string: '{"expiry":"2022-11-30T16:49:03.485994Z","token":"295a36d153b919a31e4fdc86d1bfe3c4a88b88e96ed3104525a57696d3288c06"}'
     headers:
       Allow:
       - POST, OPTIONS
@@ -29,21 +29,21 @@ interactions:
       Content-Type:
       - application/json
       Date:
-      - Wed, 28 Sep 2022 10:51:33 GMT
+      - Wed, 23 Nov 2022 16:49:03 GMT
       Referrer-Policy:
       - same-origin
       Server:
-      - WSGIServer/0.2 CPython/3.8.13
+      - WSGIServer/0.2 CPython/3.8.15
       Server-Timing:
-      - TimerPanel_utime;dur=411.4490000000046;desc="User CPU time", TimerPanel_stime;dur=67.56100000000131;desc="System
-        CPU time", TimerPanel_total;dur=479.0100000000059;desc="Total CPU time", TimerPanel_total_time;dur=329.61153984069824;desc="Elapsed
-        time", SQLPanel_sql_time;dur=4.055261611938477;desc="SQL 9 queries", CachePanel_total_time;dur=0;desc="Cache
+      - TimerPanel_utime;dur=438.99499999999847;desc="User CPU time", TimerPanel_stime;dur=50.13000000000023;desc="System
+        CPU time", TimerPanel_total;dur=489.1249999999987;desc="Total CPU time", TimerPanel_total_time;dur=333.88733863830566;desc="Elapsed
+        time", SQLPanel_sql_time;dur=7.0648193359375;desc="SQL 9 queries", CachePanel_total_time;dur=0;desc="Cache
         0 Calls"
       Set-Cookie:
-      - csrftoken=lH6SBjJbztTkVELR0y6c9kvxOLUKifId5EjuPQI1khIECLPXOnCYudNLha8IwEdN;
-        expires=Wed, 27 Sep 2023 10:51:33 GMT; HttpOnly; Max-Age=31449600; Path=/;
+      - csrftoken=JToUV8Ry0RYMWalXzqg9gV0kbXaGn3kMtUDyOFVR7brGLAPycifhyZRnbFjueLqq;
+        expires=Wed, 22 Nov 2023 16:49:03 GMT; HttpOnly; Max-Age=31449600; Path=/;
         SameSite=Lax
-      - sessionid=84pn3djyr76c3t5x8mm8dhkw7lbmij58; expires=Wed, 05 Oct 2022 10:51:33
+      - sessionid=jpqsigtpas0txpswvzcq4mfnf2d55i2j; expires=Wed, 30 Nov 2022 16:49:03
         GMT; HttpOnly; Max-Age=604800; Path=/; SameSite=Lax
       Vary:
       - Accept, Cookie, Accept-Language, Origin
@@ -60,11 +60,11 @@ interactions:
     body: null
     headers:
       Accept:
-      - '*/*'
+      - application/json; version=4.0
       Accept-Encoding:
       - gzip, deflate
       Authorization:
-      - Token a13c4a4f1e27c9a112d0c1e78b641fba2b656a2eeeb43f62adc34526c7a2462f
+      - Token 295a36d153b919a31e4fdc86d1bfe3c4a88b88e96ed3104525a57696d3288c06
       Connection:
       - keep-alive
       Content-Type:
@@ -75,26 +75,26 @@ interactions:
     uri: http://localhost:8000/api/decks/5528aef7-f7ac-406b-9b35-4eaf00de4b20/updates?size=5
   response:
     body:
-      string: '{"next":"http://localhost:8000/api/decks/5528aef7-f7ac-406b-9b35-4eaf00de4b20/updates?cursor=cD00OTY5NjVlNy1jZmU2LTRkYWItYWMwNi04NWVjNmYwMTJmMGY%3D&size=5","notes":[{"deck_id":"5528aef7-f7ac-406b-9b35-4eaf00de4b20","note_id":"0ce33e24-2b41-4c5a-a5f2-dbdc02382d9b","tags":["tag_0","tag_1","tag_2","tag_3","tag_4","tag_5","tag_6","tag_7","tag_8","tag_9"],"anki_id":1335510602,"fields":[{"name":"abc_0","order":0,"value":"abc"},{"name":"abc_1","order":1,"value":"abc"}],"note_type":"Basic","note_type_id":2,"last_update_type":"original_content"},{"deck_id":"5528aef7-f7ac-406b-9b35-4eaf00de4b20","note_id":"2261843c-ac98-4850-ab62-3708c1d43ad1","tags":["tag_0","tag_1","tag_2","tag_3","tag_4","tag_5","tag_6","tag_7","tag_8","tag_9"],"anki_id":4251792173,"fields":[{"name":"abc_0","order":0,"value":"abc"},{"name":"abc_1","order":1,"value":"abc"}],"note_type":"Basic","note_type_id":2,"last_update_type":"original_content"},{"deck_id":"5528aef7-f7ac-406b-9b35-4eaf00de4b20","note_id":"2aaea44b-0674-4c8f-a1d5-20601c53fefc","tags":["tag_0","tag_1","tag_2","tag_3","tag_4","tag_5","tag_6","tag_7","tag_8","tag_9"],"anki_id":4157659139,"fields":[{"name":"abc_0","order":0,"value":"abc"},{"name":"abc_1","order":1,"value":"abc"}],"note_type":"Basic","note_type_id":2,"last_update_type":"original_content"},{"deck_id":"5528aef7-f7ac-406b-9b35-4eaf00de4b20","note_id":"3a3d85c2-f5dc-4d7d-9f8b-b08b45dbc1d4","tags":["tag_0","tag_1","tag_2","tag_3","tag_4","tag_5","tag_6","tag_7","tag_8","tag_9"],"anki_id":2419746006,"fields":[{"name":"abc_0","order":0,"value":"abc"},{"name":"abc_1","order":1,"value":"abc"}],"note_type":"Basic","note_type_id":2,"last_update_type":"original_content"},{"deck_id":"5528aef7-f7ac-406b-9b35-4eaf00de4b20","note_id":"496965e7-cfe6-4dab-ac06-85ec6f012f0f","tags":["tag_0","tag_1","tag_2","tag_3","tag_4","tag_5","tag_6","tag_7","tag_8","tag_9"],"anki_id":1733573066,"fields":[{"name":"abc_0","order":0,"value":"abc"},{"name":"abc_1","order":1,"value":"abc"}],"note_type":"Basic","note_type_id":2,"last_update_type":"original_content"}],"protected_fields":{},"protected_tags":[],"latest_update":"2022-09-28T10:51:33.225279+0000"}'
+      string: '{"next":"http://localhost:8000/api/decks/5528aef7-f7ac-406b-9b35-4eaf00de4b20/updates?cursor=cD0yMDIyLTExLTIzKzE2JTNBNDklM0EwMi44NTI0NDMlMkIwMCUzQTAw&size=5","notes":[{"deck_id":"5528aef7-f7ac-406b-9b35-4eaf00de4b20","note_id":"0dcfbd56-6041-4da6-93f4-1bf669e8b12e","anki_id":3980069551,"guid":"X)7Y9D?U0b","fields":[{"name":"abc_0","order":0,"value":"abc"},{"name":"abc_1","order":1,"value":"abc"}],"note_type":"Basic","note_type_id":2,"last_update_type":"original_content","tags":["tag_0","tag_1","tag_2","tag_3","tag_4","tag_5","tag_6","tag_7","tag_8","tag_9"]},{"deck_id":"5528aef7-f7ac-406b-9b35-4eaf00de4b20","note_id":"a09b9816-c18f-4bb7-ab3f-e1c0901f8654","anki_id":2957856627,"guid":"X)7Y9D?U0b","fields":[{"name":"abc_0","order":0,"value":"abc"},{"name":"abc_1","order":1,"value":"abc"}],"note_type":"Basic","note_type_id":2,"last_update_type":"original_content","tags":["tag_0","tag_1","tag_2","tag_3","tag_4","tag_5","tag_6","tag_7","tag_8","tag_9"]},{"deck_id":"5528aef7-f7ac-406b-9b35-4eaf00de4b20","note_id":"dc89f525-4e79-449d-be78-d6691821deab","anki_id":2918044860,"guid":"X)7Y9D?U0b","fields":[{"name":"abc_0","order":0,"value":"abc"},{"name":"abc_1","order":1,"value":"abc"}],"note_type":"Basic","note_type_id":2,"last_update_type":"original_content","tags":["tag_0","tag_1","tag_2","tag_3","tag_4","tag_5","tag_6","tag_7","tag_8","tag_9"]},{"deck_id":"5528aef7-f7ac-406b-9b35-4eaf00de4b20","note_id":"57aaa413-c4da-4650-a8d7-fdf9c552d455","anki_id":2663960640,"guid":"X)7Y9D?U0b","fields":[{"name":"abc_0","order":0,"value":"abc"},{"name":"abc_1","order":1,"value":"abc"}],"note_type":"Basic","note_type_id":2,"last_update_type":"original_content","tags":["tag_0","tag_1","tag_2","tag_3","tag_4","tag_5","tag_6","tag_7","tag_8","tag_9"]},{"deck_id":"5528aef7-f7ac-406b-9b35-4eaf00de4b20","note_id":"a0370e77-1a99-4749-975c-9605b9edf534","anki_id":2421125776,"guid":"X)7Y9D?U0b","fields":[{"name":"abc_0","order":0,"value":"abc"},{"name":"abc_1","order":1,"value":"abc"}],"note_type":"Basic","note_type_id":2,"last_update_type":"original_content","tags":["tag_0","tag_1","tag_2","tag_3","tag_4","tag_5","tag_6","tag_7","tag_8","tag_9"]}],"protected_fields":{},"protected_tags":[],"latest_update":"2022-11-23T16:49:02.919906Z"}'
     headers:
       Allow:
       - GET, HEAD, OPTIONS
       Content-Language:
       - en
       Content-Length:
-      - '2148'
+      - '2246'
       Content-Type:
       - application/json
       Date:
-      - Wed, 28 Sep 2022 10:51:33 GMT
+      - Wed, 23 Nov 2022 16:49:04 GMT
       Referrer-Policy:
       - same-origin
       Server:
-      - WSGIServer/0.2 CPython/3.8.13
+      - WSGIServer/0.2 CPython/3.8.15
       Server-Timing:
-      - TimerPanel_utime;dur=490.65400000000636;desc="User CPU time", TimerPanel_stime;dur=11.272000000001725;desc="System
-        CPU time", TimerPanel_total;dur=501.9260000000081;desc="Total CPU time", TimerPanel_total_time;dur=506.5140724182129;desc="Elapsed
-        time", SQLPanel_sql_time;dur=4.799842834472656;desc="SQL 10 queries", CachePanel_total_time;dur=0;desc="Cache
+      - TimerPanel_utime;dur=492.2600000000017;desc="User CPU time", TimerPanel_stime;dur=23.50799999999964;desc="System
+        CPU time", TimerPanel_total;dur=515.7680000000014;desc="Total CPU time", TimerPanel_total_time;dur=530.0331115722656;desc="Elapsed
+        time", SQLPanel_sql_time;dur=5.457162857055664;desc="SQL 9 queries", CachePanel_total_time;dur=0;desc="Cache
         0 Calls"
       Vary:
       - Accept, Accept-Language, Cookie, Origin
@@ -111,11 +111,11 @@ interactions:
     body: null
     headers:
       Accept:
-      - '*/*'
+      - application/json; version=4.0
       Accept-Encoding:
       - gzip, deflate
       Authorization:
-      - Token a13c4a4f1e27c9a112d0c1e78b641fba2b656a2eeeb43f62adc34526c7a2462f
+      - Token 295a36d153b919a31e4fdc86d1bfe3c4a88b88e96ed3104525a57696d3288c06
       Connection:
       - keep-alive
       Content-Type:
@@ -123,29 +123,29 @@ interactions:
       User-Agent:
       - python-requests/2.28.1
     method: GET
-    uri: http://localhost:8000/api/decks/5528aef7-f7ac-406b-9b35-4eaf00de4b20/updates?cursor=cD00OTY5NjVlNy1jZmU2LTRkYWItYWMwNi04NWVjNmYwMTJmMGY%3D&size=5
+    uri: http://localhost:8000/api/decks/5528aef7-f7ac-406b-9b35-4eaf00de4b20/updates?cursor=cD0yMDIyLTExLTIzKzE2JTNBNDklM0EwMi44NTI0NDMlMkIwMCUzQTAw&size=5
   response:
     body:
-      string: '{"next":null,"notes":[{"deck_id":"5528aef7-f7ac-406b-9b35-4eaf00de4b20","note_id":"7c69383e-a907-4432-8b58-3732d1a00e48","tags":["tag_0","tag_1","tag_2","tag_3","tag_4","tag_5","tag_6","tag_7","tag_8","tag_9"],"anki_id":3902837405,"fields":[{"name":"abc_0","order":0,"value":"abc"},{"name":"abc_1","order":1,"value":"abc"}],"note_type":"Basic","note_type_id":2,"last_update_type":"original_content"},{"deck_id":"5528aef7-f7ac-406b-9b35-4eaf00de4b20","note_id":"915e3192-f897-4b19-a922-b3fcf0f66e92","tags":["tag_0","tag_1","tag_2","tag_3","tag_4","tag_5","tag_6","tag_7","tag_8","tag_9"],"anki_id":4169756873,"fields":[{"name":"abc_0","order":0,"value":"abc"},{"name":"abc_1","order":1,"value":"abc"}],"note_type":"Basic","note_type_id":2,"last_update_type":"original_content"},{"deck_id":"5528aef7-f7ac-406b-9b35-4eaf00de4b20","note_id":"a3b9f4f0-b486-4073-aa4e-cbab189af4bb","tags":["tag_0","tag_1","tag_2","tag_3","tag_4","tag_5","tag_6","tag_7","tag_8","tag_9"],"anki_id":962823065,"fields":[{"name":"abc_0","order":0,"value":"abc"},{"name":"abc_1","order":1,"value":"abc"}],"note_type":"Basic","note_type_id":2,"last_update_type":"original_content"},{"deck_id":"5528aef7-f7ac-406b-9b35-4eaf00de4b20","note_id":"aa46d015-31f1-4996-b220-d4a7f3291593","tags":["tag_0","tag_1","tag_2","tag_3","tag_4","tag_5","tag_6","tag_7","tag_8","tag_9"],"anki_id":4184818270,"fields":[{"name":"abc_0","order":0,"value":"abc"},{"name":"abc_1","order":1,"value":"abc"}],"note_type":"Basic","note_type_id":2,"last_update_type":"original_content"},{"deck_id":"5528aef7-f7ac-406b-9b35-4eaf00de4b20","note_id":"b31787de-03ce-4b50-9031-16266a8ca8c1","tags":["tag_0","tag_1","tag_2","tag_3","tag_4","tag_5","tag_6","tag_7","tag_8","tag_9"],"anki_id":3995284795,"fields":[{"name":"abc_0","order":0,"value":"abc"},{"name":"abc_1","order":1,"value":"abc"}],"note_type":"Basic","note_type_id":2,"last_update_type":"original_content"}],"protected_fields":{},"protected_tags":[],"latest_update":"2022-09-28T10:51:33.790554+0000"}'
+      string: '{"next":null,"notes":[{"deck_id":"5528aef7-f7ac-406b-9b35-4eaf00de4b20","note_id":"d899ca02-c040-40f8-9cfe-b87a3db94918","anki_id":2404413088,"guid":"X)7Y9D?U0b","fields":[{"name":"abc_0","order":0,"value":"abc"},{"name":"abc_1","order":1,"value":"abc"}],"note_type":"Basic","note_type_id":2,"last_update_type":"original_content","tags":["tag_0","tag_1","tag_2","tag_3","tag_4","tag_5","tag_6","tag_7","tag_8","tag_9"]},{"deck_id":"5528aef7-f7ac-406b-9b35-4eaf00de4b20","note_id":"5b10aebd-b3fb-41ee-ab36-f8fa9ff976f3","anki_id":1566791613,"guid":"X)7Y9D?U0b","fields":[{"name":"abc_0","order":0,"value":"abc"},{"name":"abc_1","order":1,"value":"abc"}],"note_type":"Basic","note_type_id":2,"last_update_type":"original_content","tags":["tag_0","tag_1","tag_2","tag_3","tag_4","tag_5","tag_6","tag_7","tag_8","tag_9"]},{"deck_id":"5528aef7-f7ac-406b-9b35-4eaf00de4b20","note_id":"f68e4660-e41e-43f9-8adc-a43be6e89c74","anki_id":1079469504,"guid":"X)7Y9D?U0b","fields":[{"name":"abc_0","order":0,"value":"abc"},{"name":"abc_1","order":1,"value":"abc"}],"note_type":"Basic","note_type_id":2,"last_update_type":"original_content","tags":["tag_0","tag_1","tag_2","tag_3","tag_4","tag_5","tag_6","tag_7","tag_8","tag_9"]},{"deck_id":"5528aef7-f7ac-406b-9b35-4eaf00de4b20","note_id":"6c32efd4-d73b-40a3-bff6-27e6b6507a8b","anki_id":755541605,"guid":"X)7Y9D?U0b","fields":[{"name":"abc_0","order":0,"value":"abc"},{"name":"abc_1","order":1,"value":"abc"}],"note_type":"Basic","note_type_id":2,"last_update_type":"original_content","tags":["tag_0","tag_1","tag_2","tag_3","tag_4","tag_5","tag_6","tag_7","tag_8","tag_9"]},{"deck_id":"5528aef7-f7ac-406b-9b35-4eaf00de4b20","note_id":"244201a3-eafd-4fef-9c37-3910c1084ffb","anki_id":190310644,"guid":"X)7Y9D?U0b","fields":[{"name":"abc_0","order":0,"value":"abc"},{"name":"abc_1","order":1,"value":"abc"}],"note_type":"Basic","note_type_id":2,"last_update_type":"original_content","tags":["tag_0","tag_1","tag_2","tag_3","tag_4","tag_5","tag_6","tag_7","tag_8","tag_9"]}],"protected_fields":{},"protected_tags":[],"latest_update":"2022-11-23T16:49:02.836899Z"}'
     headers:
       Allow:
       - GET, HEAD, OPTIONS
       Content-Language:
       - en
       Content-Length:
-      - '2004'
+      - '2099'
       Content-Type:
       - application/json
       Date:
-      - Wed, 28 Sep 2022 10:51:34 GMT
+      - Wed, 23 Nov 2022 16:49:04 GMT
       Referrer-Policy:
       - same-origin
       Server:
-      - WSGIServer/0.2 CPython/3.8.13
+      - WSGIServer/0.2 CPython/3.8.15
       Server-Timing:
-      - TimerPanel_utime;dur=622.5620000000163;desc="User CPU time", TimerPanel_stime;dur=24.39099999999783;desc="System
-        CPU time", TimerPanel_total;dur=646.9530000000141;desc="Total CPU time", TimerPanel_total_time;dur=622.3056316375732;desc="Elapsed
-        time", SQLPanel_sql_time;dur=5.113840103149414;desc="SQL 10 queries", CachePanel_total_time;dur=0;desc="Cache
+      - TimerPanel_utime;dur=692.5319999999999;desc="User CPU time", TimerPanel_stime;dur=50.57899999999993;desc="System
+        CPU time", TimerPanel_total;dur=743.1109999999999;desc="Total CPU time", TimerPanel_total_time;dur=692.8765773773193;desc="Elapsed
+        time", SQLPanel_sql_time;dur=4.264593124389648;desc="SQL 9 queries", CachePanel_total_time;dur=0;desc="Cache
         0 Calls"
       Vary:
       - Accept, Accept-Language, Cookie, Origin
