@@ -15,7 +15,7 @@ jobs:
     steps:
       - uses: actions/setup-python@v4
         with:
-          python-version: "3.9.7"
+          python-version: "3.9"
 
       - name: Checkout ankihub_addon
         uses: actions/checkout@v3
