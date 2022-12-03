@@ -121,7 +121,7 @@ class AnkiHubSync:
         return False
 
 
-def sync_with_progress(on_done: Callable[[], None]) -> None:
+def sync_with_progress(on_done: Optional[Callable[[], None]] = None) -> None:
 
     sync = AnkiHubSync()
 
@@ -154,7 +154,8 @@ def sync_with_progress(on_done: Callable[[], None]) -> None:
             )
         mw.reset()
 
-        on_done()
+        if on_done is not None:
+            on_done()
 
     if config.private_config.token:
         mw.taskman.with_progress(
