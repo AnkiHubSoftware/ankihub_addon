@@ -39,7 +39,7 @@ class AnkiHubLogin(QWidget):
     def __init__(self):
         super(AnkiHubLogin, self).__init__()
         self.results = None
-        self.thread = None
+        self.thread = None  # type: ignore
         self.box_top = QVBoxLayout()
         self.box_upper = QHBoxLayout()
         self.box_left = QVBoxLayout()
@@ -61,7 +61,7 @@ class AnkiHubLogin(QWidget):
         self.password_box_text = QLineEdit("", self)
         self.password_box_text.setEchoMode(QLineEdit.EchoMode.Password)
         self.password_box_text.setMinimumWidth(300)
-        self.password_box_text.returnPressed.connect(self.login)
+        qconnect(self.password_box_text.returnPressed, self.login)
         self.password_box.addWidget(self.password_box_label)
         self.password_box.addWidget(self.password_box_text)
         self.box_left.addLayout(self.password_box)
@@ -69,7 +69,7 @@ class AnkiHubLogin(QWidget):
         # Login
         self.login_button = QPushButton("Login", self)
         self.bottom_box_section.addWidget(self.login_button)
-        self.login_button.clicked.connect(self.login)
+        qconnect(self.login_button.clicked, self.login)
         self.login_button.setDefault(True)
 
         self.box_left.addLayout(self.bottom_box_section)
@@ -149,7 +149,7 @@ class DeckCreationConfirmationDialog(QMessageBox):
             'Privacy Policy: <a href="https://www.ankihub.net/privacy">https://www.ankihub.net/privacy</a><br>',
         )
         self.setStandardButtons(
-            QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.Cancel
+            QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.Cancel  # type: ignore
         )
         self.confirmation_cb = QCheckBox(
             text=" by checking this checkbox you agree to the terms of use",
@@ -312,7 +312,7 @@ def upload_logs_action():
 
 def ankihub_login_setup(parent):
     sign_in_button = QAction("🔑 Sign into AnkiHub", mw)
-    sign_in_button.triggered.connect(AnkiHubLogin.display_login)
+    qconnect(sign_in_button.triggered, AnkiHubLogin.display_login)
     parent.addAction(sign_in_button)
 
 
@@ -326,20 +326,20 @@ def upload_suggestions_setup(parent):
 def subscribe_to_deck_setup(parent):
     """Set up the menu item for uploading suggestions in bulk."""
     q_action = QAction("📚 Subscribed Decks", mw)
-    q_action.triggered.connect(SubscribedDecksDialog.display_subscribe_window)
+    qconnect(q_action.triggered, SubscribedDecksDialog.display_subscribe_window)
     parent.addAction(q_action)
 
 
 def import_media_setup(parent):
     q_action = QAction("🖼️ Import media", mw)
-    q_action.triggered.connect(open_import_dialog)
+    qconnect(q_action.triggered, open_import_dialog)
     parent.addAction(q_action)
 
 
 def sync_with_ankihub_setup(parent):
     """Set up the menu item for uploading suggestions in bulk."""
     q_action = QAction("🔃️ Sync with AnkiHub", mw)
-    q_action.triggered.connect(sync_with_ankihub_action)
+    qconnect(q_action.triggered, sync_with_ankihub_action)
     if not config.private_config.decks:
         q_action.setDisabled(True)
     parent.addAction(q_action)
@@ -350,13 +350,13 @@ def ankihub_help_setup(parent):
     help_menu = QMenu("🆘 Help", parent)
 
     q_get_help_action = QAction("Get Help", help_menu)
-    q_get_help_action.triggered.connect(
-        lambda: openLink("https://www.ankihub.net/support")
+    qconnect(
+        q_get_help_action.triggered, lambda: openLink("https://www.ankihub.net/support")
     )
     help_menu.addAction(q_get_help_action)
 
     q_upload_logs_action = QAction("Upload logs", help_menu)
-    q_upload_logs_action.triggered.connect(upload_logs_action)
+    qconnect(q_upload_logs_action.triggered, upload_logs_action)
     help_menu.addAction(q_upload_logs_action)
 
     q_version_action = QAction(f"Version {ADDON_VERSION}", help_menu)
@@ -368,7 +368,7 @@ def ankihub_help_setup(parent):
 
 def ankihub_logout_setup(parent):
     q_action = QAction("🔑 Sign out", mw)
-    q_action.triggered.connect(sign_out_action)
+    qconnect(q_action.triggered, sign_out_action)
     parent.addAction(q_action)
 
 

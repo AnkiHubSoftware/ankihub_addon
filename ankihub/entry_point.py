@@ -55,7 +55,7 @@ def run():
     return mw
 
 
-def on_startup_ankiweb_sync_done():
+def on_startup_ankiweb_sync_done() -> None:
     # Syncing with AnkiHub during sync with AnkiWeb causes an error,
     # this is why we have to wait until the AnkiWeb sync is done if there is one.
     # The database check should be done after the AnkiHub sync to not open all dialogs at once
@@ -66,7 +66,7 @@ def on_startup_ankiweb_sync_done():
         check_ankihub_db()
 
 
-def do_after_ankiweb_sync(callback: Callable[[None], None]) -> None:
+def do_after_ankiweb_sync(callback: Callable[[], None]) -> None:
     """The callback is called after the AnkiWeb sync is done if there is one, otherwise it is called
     when the Anki profile is opened.
     """
