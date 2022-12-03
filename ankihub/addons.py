@@ -91,37 +91,37 @@ def with_hidden_progress_dialog(*args, **kwargs) -> Any:
 def setup_addons():
 
     # prevent errors when updating the add-on
-    DownloaderInstaller._download_all = wrap(
+    DownloaderInstaller._download_all = wrap(  # type: ignore
         old=DownloaderInstaller._download_all,
         new=with_disabled_log_file_handler,
         pos="around",
     )
 
-    DownloaderInstaller._download_all = wrap(
+    DownloaderInstaller._download_all = wrap(  # type: ignore
         old=DownloaderInstaller._download_all,
         new=detach_ankihub_db,
         pos="before",
     )
 
     # prevent errors when deleting the add-on (AddonManager.deleteAddon also gets called during an update)
-    AddonManager.deleteAddon = wrap(
+    AddonManager.deleteAddon = wrap(  # type: ignore
         old=AddonManager.deleteAddon,
         new=on_deleteAddon,
         pos="before",
     )
-    AddonManager.deleteAddon = wrap(
+    AddonManager.deleteAddon = wrap(  # type: ignore
         old=AddonManager.deleteAddon,
         new=with_disabled_log_file_handler,
         pos="around",
     )
 
-    AddonManager.deleteAddon = wrap(
+    AddonManager.deleteAddon = wrap(  # type: ignore
         old=AddonManager.deleteAddon,
         new=detach_ankihub_db,
         pos="before",
     )
 
     # prevent UI "deadlock" when Anki checks for add-on updates and AnkiHub syncs at the same time
-    addons.prompt_to_update = wrap(
+    addons.prompt_to_update = wrap(  # type: ignore
         old=addons.prompt_to_update, new=with_hidden_progress_dialog, pos="around"
     )
