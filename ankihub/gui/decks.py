@@ -19,6 +19,7 @@ from aqt.qt import (
     QSizePolicy,
     Qt,
     QVBoxLayout,
+    qconnect,
 )
 from aqt.utils import askUser, openLink, showInfo, showText, tooltip
 
@@ -57,14 +58,14 @@ class SubscribedDecksDialog(QDialog):
         self.box_right = QVBoxLayout()
 
         self.decks_list = QListWidget()
-        self.decks_list.itemSelectionChanged.connect(self.on_item_selection_changed)
+        qconnect(self.decks_list.itemSelectionChanged, self.on_item_selection_changed)
 
         self.add_btn = QPushButton("Add")
         self.unsubscribe_btn = QPushButton("Unsubscribe")
         self.open_web_btn = QPushButton("Open on AnkiHub")
-        self.add_btn.clicked.connect(self.on_add)
-        self.unsubscribe_btn.clicked.connect(self.on_unsubscribe)
-        self.open_web_btn.clicked.connect(self.on_open_web)
+        qconnect(self.add_btn.clicked, self.on_add)
+        qconnect(self.unsubscribe_btn.clicked, self.on_unsubscribe)
+        qconnect(self.open_web_btn.clicked, self.on_open_web)
         self.box_right.addWidget(self.add_btn)
         self.box_right.addWidget(self.unsubscribe_btn)
         self.box_right.addWidget(self.open_web_btn)
@@ -157,7 +158,7 @@ class SubscribeDialog(QDialog):
     def __init__(self):
         super(SubscribeDialog, self).__init__()
         self.results = None
-        self.thread = None
+        self.thread = None  # type: ignore
         self.box_top = QVBoxLayout()
         self.box_mid = QHBoxLayout()
         self.box_left = QVBoxLayout()
@@ -176,14 +177,14 @@ class SubscribeDialog(QDialog):
         self.box_mid.addLayout(self.box_right)
 
         self.buttonbox = QDialogButtonBox(
-            QDialogButtonBox.StandardButton.Ok | QDialogButtonBox.StandardButton.Cancel
+            QDialogButtonBox.StandardButton.Ok | QDialogButtonBox.StandardButton.Cancel  # type: ignore
         )
         self.buttonbox.button(QDialogButtonBox.StandardButton.Ok).setText("Subscribe")
         self.browse_btn = self.buttonbox.addButton(
             "Browse Decks", QDialogButtonBox.ButtonRole.ActionRole
         )
-        self.browse_btn.clicked.connect(self.on_browse_deck)
-        self.buttonbox.accepted.connect(self.subscribe)
+        qconnect(self.browse_btn.clicked, self.on_browse_deck)
+        qconnect(self.buttonbox.accepted, self.subscribe)
         self.buttonbox.rejected.connect(self.close)
 
         self.instructions_label = QLabel(

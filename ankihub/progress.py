@@ -31,7 +31,7 @@ def setup_progress_manager():
     # TypeError: isdeleted() argument 1 must be sip.simplewrapper, not None after ProgressManager._closeWin was called.
     # See for example https://github.com/ankipalace/ankihub_addon/issues/227
     # Not sure how the value can be None, maybe it's caused by another add-on.
-    ProgressManager._closeWin = wrap(
+    ProgressManager._closeWin = wrap(  # type: ignore
         old=ProgressManager._closeWin,
         new=with_patched_isdeleted,
         pos="around",
