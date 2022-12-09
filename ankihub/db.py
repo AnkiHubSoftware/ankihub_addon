@@ -1,14 +1,16 @@
 import sqlite3
 import uuid
 from contextlib import contextmanager
-from typing import Any, List, Optional
+from typing import Any, List, Optional, Tuple
 
 from anki.models import NotetypeId
 from anki.notes import NoteId
+from anki.utils import join_fields, split_fields
 from aqt import mw
 
 from . import LOGGER
-from .settings import ANKIHUB_NOTE_TYPE_FIELD_NAME, DB_PATH
+from .ankihub_client import Field, NoteInfo
+from .settings import DB_PATH
 
 
 def attach_ankihub_db_to_anki_db_connection() -> None:
@@ -83,6 +85,13 @@ class AnkiHubDB:
     def list(self, sql: str, *args) -> List:
         return [x[0] for x in self.execute(sql, *args, first_row_only=False)]
 
+    def first(self, sql: str, *args) -> Optional[Tuple]:
+        rows = self.execute(sql, *args, first_row_only=True)
+        if rows:
+            return tuple(rows)
+        else:
+            return None
+
     def _setup_tables_and_migrate(self) -> None:
         self.execute(
             """
@@ -116,14 +125,40 @@ class AnkiHubDB:
                 f"AnkiHub DB migrated to schema version {self.schema_version()}"
             )
 
+        if self.schema_version() <= 2:
+            self.execute("ALTER TABLE notes ADD COLUMN guid TEXT")
+            self.execute("ALTER TABLE notes ADD COLUMN fields TEXT")
+            self.execute("ALTER TABLE notes ADD COLUMN tags TEXT")
+            self.execute("PRAGMA user_version = 3;")
+            LOGGER.debug(
+                f"AnkiHub DB migrated to schema version {self.schema_version()}"
+            )
+
     def schema_version(self) -> int:
         result = self.scalar("PRAGMA user_version;")
         return result
 
-    def save_notes_from_nids(self, ankihub_did: str, nids: List[NoteId]):
+    def save_notes_data_and_mod_values(
+        self, ankihub_did: str, notes_data: List[NoteInfo]
+    ):
+        """Save notes data in the AnkiHub DB.
+        It also takes mod values for the notes from the Anki DB and saves them to the AnkiHub DB.
+        This is why it should be be called after importing or exporting a deck.
+        (The mod values are used to determine if a note has been modified in Anki since it was last imported/exported.)
+        """
         with db_transaction() as conn:
-            for nid in nids:
-                note = mw.col.get_note(nid)
+            for note_data in notes_data:
+                mod = mw.col.db.scalar(
+                    f"SELECT mod FROM notes WHERE id = {note_data.anki_nid}",
+                )
+                fields = join_fields(
+                    [
+                        field.value
+                        for field in sorted(
+                            note_data.fields, key=lambda field: field.order
+                        )
+                    ]
+                )
                 conn.execute(
                     """
                     INSERT OR REPLACE INTO notes (
@@ -131,17 +166,60 @@ class AnkiHubDB:
                         ankihub_deck_id,
                         anki_note_id,
                         anki_note_type_id,
-                        mod
-                    ) VALUES (?, ?, ?, ?, ?)
+                        mod,
+                        fields,
+                        tags,
+                        guid
+                    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?)
                     """,
                     (
-                        note[ANKIHUB_NOTE_TYPE_FIELD_NAME],
+                        str(note_data.ankihub_note_uuid),
                         ankihub_did,
-                        nid,
-                        note.mid,
-                        note.mod,
+                        note_data.anki_nid,
+                        note_data.mid,
+                        mod,
+                        fields,
+                        mw.col.tags.join(note_data.tags),
+                        note_data.guid,
                     ),
                 )
+
+    def note_data(self, anki_note_id: int) -> Optional[NoteInfo]:
+        result = self.first(
+            f"""
+            SELECT
+                ankihub_note_id,
+                anki_note_id,
+                anki_note_type_id,
+                tags,
+                fields,
+                guid
+            FROM notes
+            WHERE anki_note_id = {anki_note_id}
+            """,
+        )
+        if result is None:
+            return None
+
+        ah_nid, anki_nid, mid, tags, flds, guid = result
+        field_names = [
+            field["name"] for field in mw.col.models.get(NotetypeId(mid))["flds"]
+        ]
+        return NoteInfo(
+            ankihub_note_uuid=uuid.UUID(ah_nid),
+            anki_nid=anki_nid,
+            mid=mid,
+            tags=mw.col.tags.split(tags),
+            fields=[
+                Field(
+                    name=field_names[i],
+                    value=value,
+                    order=i,
+                )
+                for i, value in enumerate(split_fields(flds))
+            ],
+            guid=guid,
+        )
 
     def notes_for_ankihub_deck(self, ankihub_did: str) -> List[NoteId]:
         result = self.list(
@@ -195,6 +273,16 @@ class AnkiHubDB:
         result = self.scalar(
             "SELECT mod FROM notes WHERE ankihub_note_id = ?",
             str(ankihub_note_id),
+        )
+        return result
+
+    def ankihub_dids_of_decks_with_missing_values(self) -> List[str]:
+        # currently only checks the guid, fields and tags columns
+        result = self.list(
+            "SELECT DISTINCT ankihub_deck_id FROM notes WHERE "
+            "guid IS NULL OR "
+            "fields IS NULL OR "
+            "tags IS NULL"
         )
         return result
 

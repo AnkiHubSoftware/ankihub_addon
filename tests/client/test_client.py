@@ -15,6 +15,7 @@ COMPOSE_FILE = Path(os.getenv("COMPOSE_FILE")) if os.getenv("COMPOSE_FILE") else
 
 TEST_DATA_PATH = Path(__file__).parent.parent / "test_data"
 DECK_CSV = TEST_DATA_PATH / "deck_with_one_basic_note.csv"
+DECK_CSV_GZ = TEST_DATA_PATH / "deck_with_one_basic_note.csv.gz"
 
 VCR_CASSETTES_PATH = Path(__file__).parent / "cassettes"
 
@@ -127,6 +128,7 @@ def new_note_suggestion():
             Field(name="Back", value="back1", order=1),
         ],
         tags=["tag1", "tag2"],
+        guid="asdf",
         comment="comment1",
         ankihub_deck_uuid=UUID_1,
         note_type_name="Basic",
@@ -148,6 +150,7 @@ def new_note_suggestion_note_info():
         tags=["tag1", "tag2"],
         mid=1,
         last_update_type=None,
+        guid="asdf",
     )
 
 
@@ -169,7 +172,7 @@ def change_note_suggestion():
 
 
 @pytest.mark.vcr()
-def test_client_login_and_signout(client):
+def test_client_login_and_signout_with_username(client):
     credentials_data = {"username": "test1", "password": "asdf"}
     token = client.login(credentials=credentials_data)
     assert len(token) == 64
@@ -180,14 +183,36 @@ def test_client_login_and_signout(client):
 
 
 @pytest.mark.vcr()
+def test_client_login_and_signout_with_email(client):
+    credentials_data = {"email": "test1@email.com", "password": "asdf"}
+    token = client.login(credentials=credentials_data)
+    assert len(token) == 64
+    assert client.session.headers["Authorization"] == f"Token {token}"
+
+    client.signout()
+    assert client.session.headers["Authorization"] == ""
+
+
+@pytest.mark.vcr()
 def test_download_deck(authorized_client_for_user_test1, monkeypatch):
-    from ankihub.ankihub_client import AnkiHubClient
+    from ankihub.ankihub_client import AnkiHubClient, Deck
 
     client: AnkiHubClient = authorized_client_for_user_test1
     deck_id = uuid.UUID("dda0d3ad-89cd-45fb-8ddc-fabad93c2d7b")
+
     get_presigned_url = MagicMock()
     get_presigned_url.return_value = "https://fake_s3.com"
     monkeypatch.setattr(client, "get_presigned_url", get_presigned_url)
+
+    original_get_deck_by_id = client.get_deck_by_id
+
+    def get_deck_by_id(*args, **kwargs) -> Deck:
+        result = original_get_deck_by_id(*args, **kwargs)
+        result.csv_notes_filename = "notes.csv"
+        return result
+
+    monkeypatch.setattr(client, "get_deck_by_id", get_deck_by_id)
+
     with requests_mock.Mocker(real_http=True) as m:
         m.register_uri(
             "GET", get_presigned_url.return_value, content=DECK_CSV.read_bytes()
@@ -198,15 +223,55 @@ def test_download_deck(authorized_client_for_user_test1, monkeypatch):
 
 
 @pytest.mark.vcr()
+def test_download_compressed_deck(authorized_client_for_user_test1, monkeypatch):
+    from ankihub.ankihub_client import AnkiHubClient, Deck
+
+    client: AnkiHubClient = authorized_client_for_user_test1
+    deck_id = uuid.UUID("dda0d3ad-89cd-45fb-8ddc-fabad93c2d7b")
+
+    get_presigned_url = MagicMock()
+    get_presigned_url.return_value = "https://fake_s3.com"
+    monkeypatch.setattr(client, "get_presigned_url", get_presigned_url)
+
+    original_get_deck_by_id = client.get_deck_by_id
+
+    def get_deck_by_id(*args, **kwargs) -> Deck:
+        result = original_get_deck_by_id(*args, **kwargs)
+        result.csv_notes_filename = "notes.csv.gz"
+        return result
+
+    monkeypatch.setattr(client, "get_deck_by_id", get_deck_by_id)
+
+    with requests_mock.Mocker(real_http=True) as m:
+        m.register_uri(
+            "GET", get_presigned_url.return_value, content=DECK_CSV_GZ.read_bytes()
+        )
+        notes_data = client.download_deck(ankihub_deck_uuid=deck_id)
+    assert len(notes_data) == 1
+    assert notes_data[0].tags == ["asdf"]
+
+
+@pytest.mark.vcr()
 def test_download_deck_with_progress(authorized_client_for_user_test1, monkeypatch):
-    from ankihub.ankihub_client import AnkiHubClient
+    from ankihub.ankihub_client import AnkiHubClient, Deck
     from ankihub.gui.decks import download_progress_cb
 
     client: AnkiHubClient = authorized_client_for_user_test1
     deck_id = uuid.UUID("dda0d3ad-89cd-45fb-8ddc-fabad93c2d7b")
+
     get_presigned_url = MagicMock()
     get_presigned_url.return_value = "https://fake_s3.com"
     monkeypatch.setattr(client, "get_presigned_url", get_presigned_url)
+
+    original_get_deck_by_id = client.get_deck_by_id
+
+    def get_deck_by_id(*args, **kwargs) -> Deck:
+        result = original_get_deck_by_id(*args, **kwargs)
+        result.csv_notes_filename = "notes.csv"
+        return result
+
+    monkeypatch.setattr(client, "get_deck_by_id", get_deck_by_id)
+
     with requests_mock.Mocker(real_http=True) as m:
         m.register_uri(
             "GET",
@@ -219,6 +284,63 @@ def test_download_deck_with_progress(authorized_client_for_user_test1, monkeypat
         )
     assert len(notes_data) == 1
     assert notes_data[0].tags == ["asdf"]
+
+
+def create_note_on_ankihub_and_assert(client, new_note_suggestion, uuid_of_deck: uuid):
+    # utility function meant to be used in tests for creating a note with known values on ankihub
+    # asserts that the note was created correctly
+
+    from ankihub.ankihub_client import AnkiHubClient, NewNoteSuggestion
+
+    assert isinstance(client, AnkiHubClient)
+    assert isinstance(new_note_suggestion, NewNoteSuggestion)
+
+    # create an auto-accepted new note suggestion
+    new_note_suggestion.ankihub_deck_uuid = uuid_of_deck
+    errors_by_nid = client.create_suggestions_in_bulk(
+        new_note_suggestions=[new_note_suggestion], auto_accept=True
+    )
+    assert errors_by_nid == {}
+
+    # assert that note was created
+    note = client.get_note_by_id(
+        ankihub_note_uuid=new_note_suggestion.ankihub_note_uuid
+    )
+    assert note.fields == new_note_suggestion.fields
+    assert note.tags == new_note_suggestion.tags
+
+
+class TestCreateSuggestion:
+    @pytest.mark.vcr()
+    def test_create_change_note_suggestion_without_all_fields(
+        self,
+        authorized_client_for_user_test1,
+        uuid_of_deck_of_user_test1,
+        new_note_suggestion,
+        change_note_suggestion,
+    ):
+        from ankihub.ankihub_client import AnkiHubClient, ChangeNoteSuggestion, Field
+
+        client: AnkiHubClient = authorized_client_for_user_test1
+
+        create_note_on_ankihub_and_assert(
+            authorized_client_for_user_test1,
+            new_note_suggestion,
+            uuid_of_deck_of_user_test1,
+        )
+
+        # create a change note suggestion without all fields (for the same note)
+        cns: ChangeNoteSuggestion = change_note_suggestion
+        cns.ankihub_note_uuid = new_note_suggestion.ankihub_note_uuid
+        cns.fields = [
+            Field(name="Front", value="front2", order=0),
+        ]
+
+        # ... this shouldn't raise an exception
+        client.create_change_note_suggestion(
+            change_note_suggestion=cns,
+            auto_accept=True,
+        )
 
 
 class TestCreateSuggestionsInBulk:
@@ -235,7 +357,7 @@ class TestCreateSuggestionsInBulk:
 
         new_note_suggestion.ankihub_deck_uuid = uuid_of_deck_of_user_test1
         errors_by_nid = client.create_suggestions_in_bulk(
-            suggestions=[new_note_suggestion],
+            new_note_suggestions=[new_note_suggestion],
             auto_accept=False,
         )
         assert errors_by_nid == {}
@@ -259,7 +381,8 @@ class TestCreateSuggestionsInBulk:
         new_note_suggestion_2.anki_nid = 2
 
         errors_by_nid = client.create_suggestions_in_bulk(
-            suggestions=[new_note_suggestion, new_note_suggestion_2], auto_accept=False
+            new_note_suggestions=[new_note_suggestion, new_note_suggestion_2],
+            auto_accept=False,
         )
         assert errors_by_nid == {}
 
@@ -277,7 +400,7 @@ class TestCreateSuggestionsInBulk:
         # create a new note suggestion
         new_note_suggestion.ankihub_deck_uuid = uuid_of_deck_of_user_test1
         errors_by_nid = client.create_suggestions_in_bulk(
-            suggestions=[new_note_suggestion], auto_accept=False
+            new_note_suggestions=[new_note_suggestion], auto_accept=False
         )
         assert errors_by_nid == {}
 
@@ -285,7 +408,7 @@ class TestCreateSuggestionsInBulk:
         new_note_suggestion_2 = deepcopy(new_note_suggestion)
         new_note_suggestion_2.anki_nid = 2
         errors_by_nid = client.create_suggestions_in_bulk(
-            suggestions=[new_note_suggestion], auto_accept=False
+            new_note_suggestions=[new_note_suggestion], auto_accept=False
         )
         assert len(
             errors_by_nid
@@ -298,22 +421,11 @@ class TestCreateSuggestionsInBulk:
         new_note_suggestion,
         uuid_of_deck_of_user_test1,
     ):
-        from ankihub.ankihub_client import AnkiHubClient
-
-        client: AnkiHubClient = authorized_client_for_user_test1
-
-        # create an auto-accepted new note suggestion and check if note was created
-        new_note_suggestion.ankihub_deck_uuid = uuid_of_deck_of_user_test1
-        errors_by_nid = client.create_suggestions_in_bulk(
-            suggestions=[new_note_suggestion], auto_accept=True
+        create_note_on_ankihub_and_assert(
+            authorized_client_for_user_test1,
+            new_note_suggestion,
+            uuid_of_deck_of_user_test1,
         )
-        assert errors_by_nid == {}
-
-        note = client.get_note_by_id(
-            ankihub_note_uuid=new_note_suggestion.ankihub_note_uuid
-        )
-        assert note.fields == new_note_suggestion.fields
-        assert note.tags == new_note_suggestion.tags
 
     @pytest.mark.vcr()
     def test_create_change_note_suggestion(
@@ -327,23 +439,17 @@ class TestCreateSuggestionsInBulk:
 
         client: AnkiHubClient = authorized_client_for_user_test1
 
-        # create an auto-accepted new note suggestion and check if note was created
         new_note_suggestion.ankihub_deck_uuid = uuid_of_deck_of_user_test1
-        errors_by_nid = client.create_suggestions_in_bulk(
-            suggestions=[new_note_suggestion], auto_accept=True
+        create_note_on_ankihub_and_assert(
+            authorized_client_for_user_test1,
+            new_note_suggestion,
+            uuid_of_deck_of_user_test1,
         )
-        assert errors_by_nid == {}
-
-        note = client.get_note_by_id(
-            ankihub_note_uuid=new_note_suggestion.ankihub_note_uuid
-        )
-        assert note.fields == new_note_suggestion.fields
-        assert note.tags == new_note_suggestion.tags
 
         # create a change note suggestion
         change_note_suggestion.ankihub_note_uuid = new_note_suggestion.ankihub_note_uuid
         errors_by_nid = client.create_suggestions_in_bulk(
-            suggestions=[change_note_suggestion], auto_accept=False
+            change_note_suggestions=[change_note_suggestion], auto_accept=False
         )
         assert errors_by_nid == {}
 
@@ -359,17 +465,16 @@ class TestCreateSuggestionsInBulk:
 
         client: AnkiHubClient = authorized_client_for_user_test1
 
-        # create an auto-accepted new note suggestion and check if note was created
-        new_note_suggestion.ankihub_deck_uuid = uuid_of_deck_of_user_test1
-        errors_by_nid = client.create_suggestions_in_bulk(
-            suggestions=[new_note_suggestion], auto_accept=True
+        create_note_on_ankihub_and_assert(
+            authorized_client_for_user_test1,
+            new_note_suggestion,
+            uuid_of_deck_of_user_test1,
         )
-        assert errors_by_nid == {}
 
         # create an auto-accepted change note suggestion and assert that note was changed
         change_note_suggestion.ankihub_note_uuid = new_note_suggestion.ankihub_note_uuid
         errors_by_nid = client.create_suggestions_in_bulk(
-            suggestions=[change_note_suggestion], auto_accept=True
+            change_note_suggestions=[change_note_suggestion], auto_accept=True
         )
         note = client.get_note_by_id(
             ankihub_note_uuid=new_note_suggestion.ankihub_note_uuid
@@ -380,7 +485,7 @@ class TestCreateSuggestionsInBulk:
 
         # create a change note suggestion without any changes
         errors_by_nid = client.create_suggestions_in_bulk(
-            suggestions=[change_note_suggestion], auto_accept=False
+            change_note_suggestions=[change_note_suggestion], auto_accept=False
         )
         assert len(
             errors_by_nid
@@ -435,6 +540,7 @@ class TestGetDeckUpdates:
         note_info: NoteInfo = new_note_suggestion_note_info
         note_info.ankihub_note_uuid = new_note_suggestion.ankihub_note_uuid
         note_info.anki_nid = new_note_suggestion.anki_nid
+        note_info.guid = new_note_suggestion.guid
 
         assert len(chunks) == 1
         assert chunks[0] == DeckUpdateChunk(

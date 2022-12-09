@@ -3,11 +3,11 @@ import re
 import sys
 import traceback
 from types import TracebackType
-from typing import Type
+from typing import Any, Optional, Type
 
 from anki.errors import BackendIOError, DBError
 from aqt import mw
-from aqt.utils import showWarning, tooltip
+from aqt.utils import showText, showWarning, tooltip
 from requests.exceptions import ConnectionError
 
 from . import LOGGER
@@ -35,6 +35,15 @@ def handle_exception(
         if maybe_handle_ankihub_request_error(exc):
             LOGGER.debug("AnkiHubRequestError was handled.")
             return True
+
+        try:
+            response_data = exc.response.json()
+            details = response_data.get("detail") or response_data.get("details")
+        except:
+            details = None
+
+        if details:
+            showText(f"Error while communicating with AnkiHub:\n{details}")
 
     if isinstance(exc, ConnectionError):
         tooltip(
@@ -98,8 +107,8 @@ def maybe_handle_ankihub_request_error(error: AnkiHubRequestError) -> bool:
 
 def setup_error_handler():
     def excepthook(
-        etype: Type[BaseException], val: Exception, tb: TracebackType
-    ) -> None:
+        etype: Type[BaseException], val: BaseException, tb: Optional[TracebackType]
+    ) -> Any:
         handled = False
         try:
             handled = handle_exception(exc_type=etype, exc=val, tb=tb)

@@ -2,24 +2,22 @@
 decks for deck creators.
 """
 import os
-import pathlib
 import re
-import tempfile
 import typing
 import uuid
 from copy import deepcopy
-from typing import Dict, List, Tuple
+from typing import Dict, List
 
-from anki.cards import Card
 from anki.decks import DeckId
-from anki.exporting import AnkiPackageExporter
 from anki.models import NotetypeId
 from anki.notes import NoteId
 from aqt import mw
 
 from . import LOGGER
 from .addon_ankihub_client import AddonAnkiHubClient as AnkiHubClient
+from .ankihub_client import NoteInfo
 from .db import ankihub_db
+from .exporting import to_note_data
 from .settings import ANKIHUB_NOTE_TYPE_FIELD_NAME, config
 from .utils import (
     change_note_type_of_note,
@@ -31,49 +29,22 @@ from .utils import (
 DIR_PATH = os.path.dirname(os.path.abspath(__file__))
 
 
-def upload_deck(did: DeckId, private: bool) -> str:
+def upload_deck(did: DeckId, notes_data: List[NoteInfo], private: bool) -> str:
     """Upload the deck to AnkiHub."""
 
     deck_name = mw.col.decks.name(did)
-    cids = mw.col.find_cards(f'deck:"{deck_name}"')
 
-    # cards in filtered_decks are temporarily moved into the main deck before exporting
-    # so that the backend doesn't have to deal with filtered decks
+    note_types_data = [mw.col.models.get(mid) for mid in get_note_types_in_deck(did)]
 
-    # ... this stores the card + the filtered deck id for each card that is in a filtered deck
-    # "deck:filtered" searches for cards in filtered decks,
-    # see https://docs.ankiweb.net/searching.html#tags-decks-cards-and-notes
-    card_filtered_did_pairs: List[Tuple[Card, DeckId]] = [
-        ((card := mw.col.get_card(cid)), card.did)
-        for cid in mw.col.find_cards(f'deck:"{deck_name}" deck:filtered')
-    ]
-
-    try:
-        # move cards into the main deck
-        for card, _ in card_filtered_did_pairs:
-            card.did = did
-            card.flush()
-
-        exporter = AnkiPackageExporter(mw.col)
-        exporter.cids = list(cids)
-        exporter.includeMedia = False
-        exporter.includeTags = True
-        deck_uuid = uuid.uuid4()
-        out_dir = pathlib.Path(tempfile.mkdtemp())
-        deck_name = re.sub('[\\\\/?<>:*|"^]', "_", deck_name)
-        out_file = out_dir / f"{deck_name}-{deck_uuid}.apkg"
-        exporter.exportInto(str(out_file))
-        LOGGER.debug(f"Deck {deck_name} exported to {out_file}")
-    finally:
-        # move the cards back into the filtered decks
-        for card, filtered_did in card_filtered_did_pairs:
-            card.did = filtered_did
-            card.flush()
-
-    mw.col.models._clear_cache()
     client = AnkiHubClient()
     ankihub_did = str(
-        client.upload_deck(file=out_file, anki_deck_id=did, private=private)
+        client.upload_deck(
+            deck_name=deck_name,
+            notes_data=notes_data,
+            note_types_data=note_types_data,
+            anki_deck_id=did,
+            private=private,
+        )
     )
     return ankihub_did
 
@@ -93,10 +64,12 @@ def create_collaborative_deck(deck_name: str, private: bool) -> str:
 
     assign_ankihub_ids(note_ids)
 
-    ankihub_did = upload_deck(deck_id, private=private)
-    ankihub_db.save_notes_from_nids(
-        ankihub_did=ankihub_did,
-        nids=note_ids,
+    nids = mw.col.find_notes(f'deck:"{deck_name}"')
+    notes_data = [to_note_data(mw.col.get_note(nid)) for nid in nids]
+
+    ankihub_did = upload_deck(deck_id, notes_data=notes_data, private=private)
+    ankihub_db.save_notes_data_and_mod_values(
+        ankihub_did=ankihub_did, notes_data=notes_data
     )
     return ankihub_did
 
@@ -107,13 +80,20 @@ def create_note_types_for_deck(deck_id: DeckId) -> Dict[NotetypeId, NotetypeId]:
     for mid in model_ids:
         new_model = deepcopy(mw.col.models.get(mid))
         modify_note_type(new_model)
-        name = f"{new_model['name']} ({mw.col.decks.name(deck_id)} / {config.private_config.user})"
+        name_without_modifications = note_type_name_without_ankihub_modifications(
+            new_model["name"]
+        )
+        name = f"{name_without_modifications} ({mw.col.decks.name(deck_id)} / {config.private_config.user})"
         new_model["name"] = name
         mw.col.models.ensure_name_unique(new_model)
         new_model["id"] = 0
         mw.col.models.add_dict(new_model)
         result[mid] = mw.col.models.by_name(new_model["name"])["id"]
     return result
+
+
+def note_type_name_without_ankihub_modifications(name: str) -> str:
+    return re.sub(r" \(.*? / .*?\)", "", name)
 
 
 def change_note_types_of_notes(

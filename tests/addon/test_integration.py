@@ -1,4 +1,6 @@
 import copy
+import gzip
+import json
 import re
 import uuid
 from datetime import datetime, timezone
@@ -156,10 +158,11 @@ def test_create_collaborative_deck_and_upload(
 
     with anki_session.profile_loaded():
         with anki_session.deck_installed(SAMPLE_DECK_APKG) as deck_id:
+            mw = anki_session.mw
 
             from ankihub.register_decks import create_collaborative_deck
 
-            deck_name = anki_session.mw.col.decks.name(DeckId(deck_id))
+            deck_name = mw.col.decks.name(DeckId(deck_id))
 
             requests_mock.get(
                 f"{API_URL_BASE}/decks/pre-signed-url",
@@ -167,7 +170,7 @@ def test_create_collaborative_deck_and_upload(
                 json={"pre_signed_url": "http://fake_url"},
             )
             requests_mock.put(
-                "http://fake_url",
+                "http://fake_url/",
                 status_code=200,
             )
             ankihub_deck_uuid = UUID_1
@@ -179,78 +182,30 @@ def test_create_collaborative_deck_and_upload(
 
             create_collaborative_deck(deck_name, private=False)
 
-            # check if deck info is in db
+            # check that the deck payload is correct
+            assert requests_mock.request_history[-2].url == "http://fake_url/"
+            payload = json.loads(
+                gzip.decompress(requests_mock.request_history[-2].body).decode("utf-8")
+            )
+            notes_in_deck = [
+                mw.col.get_note(nid) for nid in mw.col.find_notes(f"deck:{deck_name}")
+            ]
+            assert len(payload["notes"]) == len(notes_in_deck)
+            assert len(payload["note_types"]) == len(
+                set([note.mid for note in notes_in_deck])
+            )
+
+            # check that the request to the create deck endpoint is correct
+            assert requests_mock.last_request.json() == {
+                "key": requests_mock.last_request.json()["key"],
+                "name": deck_name,
+                "anki_id": deck_id,
+                "is_private": False,
+            }
+
+            # check that deck info is in db
             assert ankihub_db.ankihub_deck_ids() == [str(ankihub_deck_uuid)]
             assert len(ankihub_db.notes_for_ankihub_deck(str(ankihub_deck_uuid))) == 3
-
-
-def test_upload_deck(anki_session_with_addon: AnkiSession, monkeypatch):
-
-    # check if moving cards temporarily from filtered decks into the main deck doesn't throw errors
-    # and if the cards are moved back to the filtered decks at the end
-    with anki_session_with_addon.profile_loaded():
-        from aqt import mw
-
-        from ankihub.register_decks import upload_deck
-
-        # create a deck
-        main_did = mw.col.decks.add_normal_deck_with_name("main").id
-        print(f"{main_did=}")
-
-        # add a note to it
-        note = mw.col.new_note(mw.col.models.by_name("Basic"))
-        note["Front"] = "test"
-        mw.col.add_note(note, main_did)
-
-        # move card of note into filtered deck
-        # decks created by new_filtered have a term of "" and limit of 100 by default
-        # so the card will be moved into the deck
-        filtered_did = mw.col.decks.new_filtered("filtered")
-        mw.col.sched.rebuild_filtered_deck(filtered_did)
-        assert mw.col.get_note(note.id).cards()[0].did == filtered_did
-
-        monkeypatch.setattr("ankihub.register_decks.AnkiHubClient.upload_deck", Mock())
-        upload_deck(main_did, private=False)
-
-        # assert that note is still in the filtered deck after upload_deck
-        card = mw.col.get_note(note.id).cards()[0]
-        assert card.did == filtered_did
-
-
-def test_client_upload_deck(anki_session_with_addon: AnkiSession, requests_mock):
-    from ankihub.addon_ankihub_client import AddonAnkiHubClient as AnkiHubClient
-    from ankihub.ankihub_client import AnkiHubRequestError
-    from ankihub.settings import API_URL_BASE
-
-    client = AnkiHubClient(hooks=[])
-
-    requests_mock.get(
-        f"{API_URL_BASE}/decks/pre-signed-url",
-        status_code=200,
-        json={"pre_signed_url": "http://fake_url"},
-    )
-    requests_mock.put(
-        "http://fake_url",
-        status_code=200,
-    )
-    ankihub_deck_uuid = UUID_1
-    requests_mock.post(
-        f"{API_URL_BASE}/decks/",
-        status_code=201,
-        json={"anki_id": 1, "key": "small.apkg", "deck_id": str(ankihub_deck_uuid)},
-    )
-
-    # test upload deck
-    client.upload_deck(file=Path(SAMPLE_DECK_APKG), anki_deck_id=1, private=False)
-
-    # test upload deck unauthenticated
-    requests_mock.post(f"{API_URL_BASE}/decks/", status_code=403)
-    exc = None
-    try:
-        client.upload_deck(Path(SAMPLE_DECK_APKG), anki_deck_id=1, private=False)
-    except AnkiHubRequestError as e:
-        exc = e
-    assert exc is not None and exc.response.status_code == 403
 
 
 def test_get_deck_by_id(anki_session_with_addon: AnkiSession, requests_mock):
@@ -299,9 +254,9 @@ def test_get_deck_by_id(anki_session_with_addon: AnkiSession, requests_mock):
 
 def test_suggest_note_upate(anki_session_with_addon: AnkiSession, requests_mock):
     from ankihub.ankihub_client import AnkiHubRequestError, NoteInfo, SuggestionType
+    from ankihub.note_conversion import ADDON_INTERNAL_TAGS, ANKI_INTERNAL_TAGS
     from ankihub.settings import API_URL_BASE
     from ankihub.suggestions import suggest_note_update
-    from ankihub.sync import ADDON_INTERNAL_TAGS, ANKI_INTERNAL_TAGS
 
     anki_session = anki_session_with_addon
     with anki_session.profile_loaded():
@@ -350,9 +305,9 @@ def test_suggest_note_upate(anki_session_with_addon: AnkiSession, requests_mock)
 
 def test_suggest_new_note(anki_session_with_addon: AnkiSession, requests_mock):
     from ankihub.ankihub_client import AnkiHubRequestError
+    from ankihub.note_conversion import ADDON_INTERNAL_TAGS
     from ankihub.settings import API_URL_BASE
     from ankihub.suggestions import suggest_new_note
-    from ankihub.sync import ADDON_INTERNAL_TAGS
 
     anki_session = anki_session_with_addon
     with anki_session.profile_loaded():
@@ -440,9 +395,8 @@ def test_suggest_notes_in_bulk(anki_session_with_addon: AnkiSession, monkeypatch
             comment="test",
         )
         assert bulk_suggestions_method_mock.call_count == 1
-        assert bulk_suggestions_method_mock.call_args.kwargs == {"auto_accept": False}
-        assert bulk_suggestions_method_mock.call_args.args == (
-            [
+        assert bulk_suggestions_method_mock.call_args.kwargs == {
+            "change_note_suggestions": [
                 ChangeNoteSuggestion(
                     ankihub_note_uuid=UUID("67f182c2-7306-47f8-aed6-d7edb42cd7de"),
                     anki_nid=1608240057545,
@@ -458,6 +412,8 @@ def test_suggest_notes_in_bulk(anki_session_with_addon: AnkiSession, monkeypatch
                     comment="test",
                     change_type=SuggestionType.NEW_CONTENT,
                 ),
+            ],
+            "new_note_suggestions": [
                 NewNoteSuggestion(
                     ankihub_note_uuid=new_note_ankihub_uuid,
                     anki_nid=note.id,
@@ -466,17 +422,19 @@ def test_suggest_notes_in_bulk(anki_session_with_addon: AnkiSession, monkeypatch
                         Field(name="Back", order=1, value=""),
                     ],
                     tags=[],
+                    guid=note.guid,
                     comment="test",
                     ankihub_deck_uuid=UUID("1f28bc9e-f36d-4e1d-8720-5dd805f12dd0"),
                     note_type_name="Basic-4827c (Testdeck / andrew1)",
                     anki_note_type_id=1657023668893,
                 ),
             ],
-        )
+            "auto_accept": False,
+        }
 
 
 def test_adjust_note_types(anki_session_with_addon: AnkiSession):
-    from ankihub.sync import adjust_note_types
+    from ankihub.importing import adjust_note_types
     from ankihub.utils import modify_note_type
 
     anki_session = anki_session_with_addon
@@ -853,6 +811,7 @@ def test_suspend_new_cards_of_existing_notes(
                 tags=[],
                 mid=note.model()["id"],
                 last_update_type=None,
+                guid=note.guid,
             )
             importer = AnkiHubImporter()
             updated_note = importer._update_or_create_note(
@@ -980,13 +939,13 @@ def import_sample_ankihub_deck(
 
 def test_prepare_note(anki_session_with_addon: AnkiSession):
     from ankihub.ankihub_client import Field, NoteInfo, SuggestionType
-    from ankihub.settings import ANKIHUB_NOTE_TYPE_FIELD_NAME
-    from ankihub.sync import (
+    from ankihub.importing import AnkiHubImporter
+    from ankihub.note_conversion import (
         ADDON_INTERNAL_TAGS,
         TAG_FOR_PROTECTING_FIELDS,
         TAG_FOR_SUGGESTION_TYPE,
-        AnkiHubImporter,
     )
+    from ankihub.settings import ANKIHUB_NOTE_TYPE_FIELD_NAME
 
     anki_session = anki_session_with_addon
     with anki_session_with_addon.profile_loaded():
@@ -997,19 +956,21 @@ def test_prepare_note(anki_session_with_addon: AnkiSession):
         def prepare_note(
             note,
             first_import_of_deck: bool,
-            tags: List[str] = [],
-            fields: Optional[List[Field]] = [],
+            tags: List[str] = None,
+            fields: Optional[List[Field]] = None,
             protected_fields: Optional[Dict] = {},
             protected_tags: List[str] = [],
             last_update_type: SuggestionType = SuggestionType.NEW_CONTENT,
+            guid: Optional[str] = None,
         ):
             note_data = NoteInfo(
                 ankihub_note_uuid=str(UUID_1),
                 anki_nid=note.id,
-                fields=fields,
-                tags=tags,
+                fields=fields or [],
+                tags=tags or [],
                 mid=note.mid,
                 last_update_type=last_update_type,
+                guid=note.guid if guid is None else guid,
             )
 
             ankihub_importer = AnkiHubImporter()
@@ -1036,6 +997,7 @@ def test_prepare_note(anki_session_with_addon: AnkiSession):
             note[ANKIHUB_NOTE_TYPE_FIELD_NAME] = ankihub_nid
             note.tags = []
             note.id = 42  # to simulate an existing note
+            note.guid = "old guid"
             return note
 
         new_fields = [
@@ -1144,11 +1106,22 @@ def test_prepare_note(anki_session_with_addon: AnkiSession):
         assert note["Front"] == "old front"
         assert note["Back"] == "old back"
 
+        # assert that the note guid is changed
+        note = example_note()
+        note_was_changed_8 = prepare_note(
+            note,
+            guid="new guid",
+            first_import_of_deck=True,
+        )
+        assert note_was_changed_8
+        assert note.guid == "new guid"
+
 
 def test_prepare_note_protect_field_with_spaces(anki_session_with_addon: AnkiSession):
     from ankihub.ankihub_client import Field, NoteInfo, SuggestionType
+    from ankihub.importing import AnkiHubImporter
+    from ankihub.note_conversion import TAG_FOR_PROTECTING_FIELDS
     from ankihub.settings import ANKIHUB_NOTE_TYPE_FIELD_NAME
-    from ankihub.sync import TAG_FOR_PROTECTING_FIELDS, AnkiHubImporter
 
     anki_session = anki_session_with_addon
     with anki_session_with_addon.profile_loaded():
@@ -1172,6 +1145,7 @@ def test_prepare_note_protect_field_with_spaces(anki_session_with_addon: AnkiSes
                 tags=tags,
                 mid=note.mid,
                 last_update_type=last_update_type,
+                guid=note.guid,
             )
 
             ankihub_importer = AnkiHubImporter()
@@ -1229,3 +1203,58 @@ def test_prepare_note_protect_field_with_spaces(anki_session_with_addon: AnkiSes
         )
         assert note_changed
         assert note[field_name_with_spaces] == "new front"
+
+
+def test_import_deck_and_check_that_values_are_saved_to_databases(
+    anki_session_with_addon: AnkiSession,
+):
+    from ankihub.db import AnkiHubDB
+    from ankihub.importing import AnkiHubImporter
+
+    with anki_session_with_addon.profile_loaded():
+        mw = anki_session_with_addon.mw
+
+        # import the deck to setup note types
+        anki_did = import_sample_ankihub_deck(mw)
+
+        note_data = ankihub_sample_deck_notes_data()[0]
+
+        # set fields and tags of note_data
+        # so that we can check if protected fields and tags are handled correctly
+        protected_field_name = note_data.fields[0].name
+        note_data.fields[0].value = "new field content"
+        note_type_id = note_data.mid
+
+        note_data.tags = ["tag1", "tag2"]
+
+        nid = note_data.anki_nid
+        note = mw.col.get_note(nid)
+        note.tags = ["protected_tag"]
+
+        protected_field_content = "protected field content"
+        note[protected_field_name] = protected_field_content
+
+        note.flush()
+
+        importer = AnkiHubImporter()
+        importer._import_ankihub_deck_inner(
+            ankihub_did=anki_did,
+            notes_data=[note_data],
+            deck_name="test",
+            protected_fields={note_type_id: [protected_field_name]},
+            protected_tags=["protected_tag"],
+            remote_note_types={},
+        )
+
+        # assert that the fields are saved correctly in the Anki DB (protected)
+        assert note[protected_field_name] == protected_field_content
+
+        # assert that the tags are saved correctly in the Anki DB (protected)
+        note = mw.col.get_note(nid)
+        assert set(note.tags) == set(["tag1", "tag2", "protected_tag"])
+
+        # assert that the note_data was saved correctly in the AnkiHub DB (without modifications)
+        note_data_from_db = AnkiHubDB().note_data(nid)
+        # ... last_update_type is not relevant here because it is not saved in the AnkiHub DB
+        note_data_from_db.last_update_type = note_data.last_update_type
+        assert note_data_from_db == note_data

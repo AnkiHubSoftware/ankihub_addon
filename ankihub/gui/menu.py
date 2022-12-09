@@ -1,3 +1,4 @@
+import re
 from concurrent.futures import Future
 from datetime import datetime, timezone
 from typing import Optional
@@ -23,10 +24,7 @@ from aqt.utils import askUser, openLink, showInfo, showText, tooltip
 from .. import LOGGER
 from ..addon_ankihub_client import AddonAnkiHubClient as AnkiHubClient
 from ..ankihub_client import AnkiHubRequestError
-from ..error_reporting import (
-    report_exception_and_upload_logs,
-    upload_logs_in_background,
-)
+from ..error_reporting import upload_logs_in_background
 from ..media_import.ui import open_import_dialog
 from ..register_decks import create_collaborative_deck
 from ..settings import ADDON_VERSION, URL_VIEW_DECK, config
@@ -41,7 +39,7 @@ class AnkiHubLogin(QWidget):
     def __init__(self):
         super(AnkiHubLogin, self).__init__()
         self.results = None
-        self.thread = None
+        self.thread = None  # type: ignore
         self.box_top = QVBoxLayout()
         self.box_upper = QHBoxLayout()
         self.box_left = QVBoxLayout()
@@ -49,13 +47,13 @@ class AnkiHubLogin(QWidget):
         self.bottom_box_section = QHBoxLayout()
 
         # Username
-        self.username_box = QHBoxLayout()
-        self.username_box_label = QLabel("Username:")
-        self.username_box_text = QLineEdit("", self)
-        self.username_box_text.setMinimumWidth(300)
-        self.username_box.addWidget(self.username_box_label)
-        self.username_box.addWidget(self.username_box_text)
-        self.box_left.addLayout(self.username_box)
+        self.username_or_email_box = QHBoxLayout()
+        self.username_or_email_box_label = QLabel("Username or E-mail:")
+        self.username_or_email_box_text = QLineEdit("", self)
+        self.username_or_email_box_text.setMinimumWidth(300)
+        self.username_or_email_box.addWidget(self.username_or_email_box_label)
+        self.username_or_email_box.addWidget(self.username_or_email_box_text)
+        self.box_left.addLayout(self.username_or_email_box)
 
         # Password
         self.password_box = QHBoxLayout()
@@ -63,7 +61,7 @@ class AnkiHubLogin(QWidget):
         self.password_box_text = QLineEdit("", self)
         self.password_box_text.setEchoMode(QLineEdit.EchoMode.Password)
         self.password_box_text.setMinimumWidth(300)
-        self.password_box_text.returnPressed.connect(self.login)
+        qconnect(self.password_box_text.returnPressed, self.login)
         self.password_box.addWidget(self.password_box_label)
         self.password_box.addWidget(self.password_box_text)
         self.box_left.addLayout(self.password_box)
@@ -71,7 +69,7 @@ class AnkiHubLogin(QWidget):
         # Login
         self.login_button = QPushButton("Login", self)
         self.bottom_box_section.addWidget(self.login_button)
-        self.login_button.clicked.connect(self.login)
+        qconnect(self.login_button.clicked, self.login)
         self.login_button.setDefault(True)
 
         self.box_left.addLayout(self.bottom_box_section)
@@ -81,15 +79,8 @@ class AnkiHubLogin(QWidget):
         self.box_upper.addSpacing(20)
         self.box_upper.addLayout(self.box_right)
 
-        self.label_results = QLabel(
-            """
-            \r\n<center><i>Use your AnkiHub username and password to log in.</i></center>
-            """
-        )
-
         # Add all widgets to top layout.
         self.box_top.addLayout(self.box_upper)
-        self.box_top.addWidget(self.label_results)
         self.box_top.addStretch(1)
         self.setLayout(self.box_top)
 
@@ -99,17 +90,20 @@ class AnkiHubLogin(QWidget):
         self.show()
 
     def login(self):
-        username = self.username_box_text.text()
+        username_or_email = self.username_or_email_box_text.text()
         password = self.password_box_text.text()
-        if not all([username, password]):
+        if not all([username_or_email, password]):
             showText("Oops! You forgot to put in a username or password!")
             return
         ankihub_client = AnkiHubClient()
 
         try:
-            token = ankihub_client.login(
-                credentials={"username": username, "password": password}
-            )
+            credentials = {"password": password}
+            if self._is_email(username_or_email):
+                credentials.update({"email": username_or_email})
+            else:
+                credentials.update({"username": username_or_email})
+            token = ankihub_client.login(credentials=credentials)
         except AnkiHubRequestError as e:
             LOGGER.exception("AnkiHub login failed.")
             config.save_token("")
@@ -121,10 +115,16 @@ class AnkiHubLogin(QWidget):
             raise e
 
         config.save_token(token)
-        config.save_user_email(username)
+        config.save_user_email(username_or_email)
 
         tooltip("Signed into AnkiHub!", parent=mw)
         self.close()
+
+    def _is_email(self, value):
+        return re.fullmatch(
+            r"^[a-zA-Z0-9.!#$%&’*+/=?^_`{|}~-]+@[a-zA-Z0-9-]+(?:\.[a-zA-Z0-9-]+)*$",
+            value,
+        )
 
     @classmethod
     def display_login(cls):
@@ -149,7 +149,7 @@ class DeckCreationConfirmationDialog(QMessageBox):
             'Privacy Policy: <a href="https://www.ankihub.net/privacy">https://www.ankihub.net/privacy</a><br>',
         )
         self.setStandardButtons(
-            QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.Cancel
+            QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.Cancel  # type: ignore
         )
         self.confirmation_cb = QCheckBox(
             text=" by checking this checkbox you agree to the terms of use",
@@ -231,10 +231,6 @@ def create_collaborative_deck_action() -> None:
 
     def on_failure(exc: Exception):
         mw.progress.finish()
-        try:
-            raise exc
-        except:
-            report_exception_and_upload_logs()
         raise exc
 
     op = QueryOp(
@@ -316,7 +312,7 @@ def upload_logs_action():
 
 def ankihub_login_setup(parent):
     sign_in_button = QAction("🔑 Sign into AnkiHub", mw)
-    sign_in_button.triggered.connect(AnkiHubLogin.display_login)
+    qconnect(sign_in_button.triggered, AnkiHubLogin.display_login)
     parent.addAction(sign_in_button)
 
 
@@ -330,20 +326,20 @@ def upload_suggestions_setup(parent):
 def subscribe_to_deck_setup(parent):
     """Set up the menu item for uploading suggestions in bulk."""
     q_action = QAction("📚 Subscribed Decks", mw)
-    q_action.triggered.connect(SubscribedDecksDialog.display_subscribe_window)
+    qconnect(q_action.triggered, SubscribedDecksDialog.display_subscribe_window)
     parent.addAction(q_action)
 
 
 def import_media_setup(parent):
     q_action = QAction("🖼️ Import media", mw)
-    q_action.triggered.connect(open_import_dialog)
+    qconnect(q_action.triggered, open_import_dialog)
     parent.addAction(q_action)
 
 
 def sync_with_ankihub_setup(parent):
     """Set up the menu item for uploading suggestions in bulk."""
     q_action = QAction("🔃️ Sync with AnkiHub", mw)
-    q_action.triggered.connect(sync_with_ankihub_action)
+    qconnect(q_action.triggered, sync_with_ankihub_action)
     if not config.private_config.decks:
         q_action.setDisabled(True)
     parent.addAction(q_action)
@@ -354,13 +350,13 @@ def ankihub_help_setup(parent):
     help_menu = QMenu("🆘 Help", parent)
 
     q_get_help_action = QAction("Get Help", help_menu)
-    q_get_help_action.triggered.connect(
-        lambda: openLink("https://www.ankihub.net/support")
+    qconnect(
+        q_get_help_action.triggered, lambda: openLink("https://www.ankihub.net/support")
     )
     help_menu.addAction(q_get_help_action)
 
     q_upload_logs_action = QAction("Upload logs", help_menu)
-    q_upload_logs_action.triggered.connect(upload_logs_action)
+    qconnect(q_upload_logs_action.triggered, upload_logs_action)
     help_menu.addAction(q_upload_logs_action)
 
     q_version_action = QAction(f"Version {ADDON_VERSION}", help_menu)
@@ -372,7 +368,7 @@ def ankihub_help_setup(parent):
 
 def ankihub_logout_setup(parent):
     q_action = QAction("🔑 Sign out", mw)
-    q_action.triggered.connect(sign_out_action)
+    qconnect(q_action.triggered, sign_out_action)
     parent.addAction(q_action)
 
 
