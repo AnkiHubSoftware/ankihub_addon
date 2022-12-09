@@ -113,3 +113,16 @@ def test_prepared_field_html(anki_session_with_addon: AnkiSession):
         _prepared_field_html('<img src="foo.jpg" data-editor-shrink="true">')
         == '<img src="foo.jpg">'
     )
+
+
+def test_remove_note_type_name_modifications(anki_session_with_addon: AnkiSession):
+    from ankihub.register_decks import note_type_name_without_ankihub_modifications
+
+    name = "Basic (deck_name / user_name)"
+    assert note_type_name_without_ankihub_modifications(name) == "Basic"
+
+    name = "Basic (deck_name / user_name) (deck_name2 / user_name2)"
+    assert note_type_name_without_ankihub_modifications(name) == "Basic"
+
+    name = "Basic (deck_name/user_name)"
+    assert note_type_name_without_ankihub_modifications(name) == name
