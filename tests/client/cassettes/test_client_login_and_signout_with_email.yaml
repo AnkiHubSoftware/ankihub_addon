@@ -1,0 +1,117 @@
+interactions:
+- request:
+    body: '{"email": "test1@email.com", "password": "asdf"}'
+    headers:
+      Accept:
+      - application/json; version=4.0
+      Accept-Encoding:
+      - gzip, deflate
+      Connection:
+      - keep-alive
+      Content-Length:
+      - '48'
+      Content-Type:
+      - application/json
+      User-Agent:
+      - python-requests/2.28.1
+    method: POST
+    uri: http://localhost:8000/api/login/
+  response:
+    body:
+      string: '{"expiry":"2022-12-16T12:13:53.538153Z","token":"8f892edf7e7079011696a26dcb3f20a3fd22a8b0ef9f9d11fdc14a7d6225518b"}'
+    headers:
+      Allow:
+      - POST, OPTIONS
+      Content-Language:
+      - en
+      Content-Length:
+      - '115'
+      Content-Type:
+      - application/json
+      Cross-Origin-Opener-Policy:
+      - same-origin
+      Date:
+      - Fri, 09 Dec 2022 12:13:53 GMT
+      Referrer-Policy:
+      - same-origin
+      Server:
+      - WSGIServer/0.2 CPython/3.8.16
+      Server-Timing:
+      - TimerPanel_utime;dur=393.18099999999845;desc="User CPU time", TimerPanel_stime;dur=35.94000000000008;desc="System
+        CPU time", TimerPanel_total;dur=429.1209999999985;desc="Total CPU time", TimerPanel_total_time;dur=268.2352066040039;desc="Elapsed
+        time", SQLPanel_sql_time;dur=3.991365432739258;desc="SQL 11 queries", CachePanel_total_time;dur=0;desc="Cache
+        0 Calls"
+      Set-Cookie:
+      - csrftoken=Kg3Gzeuw5jSbxJtycxeOlx6AzD49GIYX; expires=Fri, 08 Dec 2023 12:13:53
+        GMT; HttpOnly; Max-Age=31449600; Path=/; SameSite=Lax
+      - sessionid=tst2qns9a59fd72quf76urkazshd7v7o; expires=Fri, 16 Dec 2022 12:13:53
+        GMT; HttpOnly; Max-Age=604800; Path=/; SameSite=Lax
+      Vary:
+      - Accept, Cookie, Accept-Language, Origin
+      X-Content-Type-Options:
+      - nosniff
+      X-Frame-Options:
+      - DENY
+      djdt-store-id:
+      - f1de667d540644d9ad308cd0c35e7600
+    status:
+      code: 200
+      message: OK
+- request:
+    body: null
+    headers:
+      Accept:
+      - application/json; version=4.0
+      Accept-Encoding:
+      - gzip, deflate
+      Authorization:
+      - ''
+      Connection:
+      - keep-alive
+      Content-Length:
+      - '0'
+      Content-Type:
+      - application/json
+      User-Agent:
+      - python-requests/2.28.1
+    method: POST
+    uri: http://localhost:8000/api/logout/
+  response:
+    body:
+      string: '{"detail":"Authentication credentials were not provided."}'
+    headers:
+      Allow:
+      - POST, OPTIONS
+      Content-Language:
+      - en
+      Content-Length:
+      - '58'
+      Content-Type:
+      - application/json
+      Cross-Origin-Opener-Policy:
+      - same-origin
+      Date:
+      - Fri, 09 Dec 2022 12:13:53 GMT
+      Referrer-Policy:
+      - same-origin
+      Server:
+      - WSGIServer/0.2 CPython/3.8.16
+      Server-Timing:
+      - TimerPanel_utime;dur=24.924999999999642;desc="User CPU time", TimerPanel_stime;dur=0.0;desc="System
+        CPU time", TimerPanel_total;dur=24.924999999999642;desc="Total CPU time",
+        TimerPanel_total_time;dur=26.336193084716797;desc="Elapsed time", SQLPanel_sql_time;dur=0;desc="SQL
+        0 queries", CachePanel_total_time;dur=0;desc="Cache 0 Calls"
+      Vary:
+      - Accept, Accept-Language, Cookie, Origin
+      WWW-Authenticate:
+      - Token
+      X-Content-Type-Options:
+      - nosniff
+      X-Frame-Options:
+      - DENY
+      djdt-store-id:
+      - 83b8ff354e2c4bf9bce5cd716e7dd27e
+    status:
+      code: 401
+      message: Unauthorized
+version: 1
