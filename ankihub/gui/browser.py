@@ -5,7 +5,6 @@ from pprint import pformat
 from typing import List, Optional, Sequence
 
 from anki.collection import BrowserColumns
-from anki.decks import DeckId
 from anki.notes import Note, NoteId
 from anki.utils import ids2str
 from aqt import mw
@@ -23,6 +22,7 @@ from aqt.qt import QAction, QMenu, qconnect
 from aqt.utils import askUser, chooseList, showInfo, showText, tooltip
 
 from .. import LOGGER
+from ..addon_ankihub_client import AddonAnkiHubClient as AnkiHubClient
 from ..ankihub_client import AnkiHubRequestError
 from ..db import (
     ankihub_db,
@@ -202,6 +202,27 @@ def on_suggest_notes_in_bulk_done(future: Future, browser: Browser) -> None:
 def on_reset_local_changes_action(browser: Browser) -> None:
     nids = browser.selected_notes()
 
+    if not nids:
+        return
+
+    ankihub_dids = ankihub_db.ankihub_dids_for_anki_nids(nids)
+
+    if not ankihub_dids:
+        showInfo(
+            "Please select notes from an AnkiHub deck to reset local changes.",
+            parent=browser,
+        )
+        return
+
+    if len(ankihub_dids) > 1:
+        showInfo(
+            "Please select notes from only one AnkiHub deck at a time.",
+            parent=browser,
+        )
+        return
+
+    ankihub_did = list(ankihub_dids)[0]
+
     def on_done(future: Future) -> None:
         future.result()  # raise exception if there was one
 
@@ -209,7 +230,7 @@ def on_reset_local_changes_action(browser: Browser) -> None:
         tooltip("Reset local changes for selected notes.", parent=browser)
 
     mw.taskman.with_progress(
-        task=lambda: reset_local_changes_to_notes(nids),
+        task=lambda: reset_local_changes_to_notes(nids, ankihub_deck_uuid=ankihub_did),
         on_done=on_done,
         label="Resetting local changes...",
         parent=browser,
@@ -233,6 +254,7 @@ def on_reset_deck_action(browser: Browser):
         parent=browser,
     )
     chosen_deck = decks[chosen_deck_idx]
+    chosen_deck_ankihub_uuid = ankihub_dids[chosen_deck_idx]
     if not askUser(
         f"Are you sure you want to reset all local changes to the deck <b>{chosen_deck['name']}</b>?",
         parent=browser,
@@ -240,14 +262,15 @@ def on_reset_deck_action(browser: Browser):
         return
 
     nids = ankihub_db.notes_for_ankihub_deck(ankihub_dids[chosen_deck_idx])
-    anki_deck_id = chosen_deck["anki_id"]
 
     def on_done(_) -> None:
         browser.model.reset()
         tooltip(f"Reset local changes to deck <b>{chosen_deck['name']}</b>")
 
     mw.taskman.with_progress(
-        lambda: reset_local_changes_to_notes(nids, anki_deck_id=anki_deck_id),
+        lambda: reset_local_changes_to_notes(
+            nids, ankihub_deck_uuid=chosen_deck_ankihub_uuid
+        ),
         on_done=on_done,
         label="Resetting local changes...",
         parent=browser,
@@ -261,16 +284,22 @@ def setup_reset_deck_action(browser: Browser, menu: QMenu) -> None:
 
 
 def reset_local_changes_to_notes(
-    nids: Sequence[NoteId], anki_deck_id: Optional[DeckId] = None
+    nids: Sequence[NoteId], ankihub_deck_uuid: uuid.UUID
 ) -> None:
+    deck_dict = config.private_config.decks[str(ankihub_deck_uuid)]
+    anki_did = deck_dict["anki_id"]
+
+    client = AnkiHubClient()
+    protected_fields = client.get_protected_fields(ankihub_deck_uuid=ankihub_deck_uuid)
+    protected_tags = client.get_protected_tags(ankihub_deck_uuid=ankihub_deck_uuid)
+
     importer = AnkiHubImporter()
     for nid in nids:
-        importer._update_or_create_note(
+        importer.update_or_create_note(
             ankihub_db.note_data(nid),
-            # TODO get protected fields and tags from ankihub or store the most currently used ones to use them here
-            protected_fields={},
-            protected_tags=[],
-            anki_did=anki_deck_id,
+            protected_fields=protected_fields,
+            protected_tags=protected_tags,
+            anki_did=anki_did,
         )
 
     # TODO maybe reset notes mod value so that it doesn't show up in the "edited after sync" column

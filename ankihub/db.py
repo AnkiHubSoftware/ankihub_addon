@@ -1,11 +1,11 @@
 import sqlite3
 import uuid
 from contextlib import contextmanager
-from typing import Any, List, Optional, Tuple
+from typing import Any, Iterable, List, Optional, Set, Tuple
 
 from anki.models import NotetypeId
 from anki.notes import NoteId
-from anki.utils import join_fields, split_fields
+from anki.utils import ids2str, join_fields, split_fields
 from aqt import mw
 
 from . import LOGGER
@@ -236,6 +236,14 @@ class AnkiHubDB:
             SELECT ankihub_deck_id FROM notes WHERE anki_note_type_id = ?
             """,
             anki_note_type_id,
+        )
+        return result
+
+    def ankihub_dids_for_anki_nids(self, anki_nids: Iterable[NoteId]) -> Set[uuid.UUID]:
+        result = self.list(
+            f"""
+            SELECT DISTINCT ankihub_deck_id FROM notes WHERE anki_note_id IN {ids2str(anki_nids)}
+            """
         )
         return result
 

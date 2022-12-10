@@ -103,7 +103,7 @@ class AnkiHubImporter:
 
         dids: Set[DeckId] = set()  # set of ids of decks notes were imported into
         for note_data in notes_data:
-            note = self._update_or_create_note(
+            note = self.update_or_create_note(
                 note_data=note_data,
                 anki_did=local_did,
                 protected_fields=protected_fields,
@@ -149,7 +149,7 @@ class AnkiHubImporter:
 
         return created_did
 
-    def _update_or_create_note(
+    def update_or_create_note(
         self,
         note_data: NoteInfo,
         protected_fields: Dict[int, List[str]],
