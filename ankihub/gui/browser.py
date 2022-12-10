@@ -5,7 +5,8 @@ from pprint import pformat
 from typing import List, Optional, Sequence
 
 from anki.collection import BrowserColumns
-from anki.notes import Note
+from anki.decks import DeckId
+from anki.notes import Note, NoteId
 from anki.utils import ids2str
 from aqt import mw
 from aqt.browser import Browser, CellRow, Column, ItemId, SearchContext
@@ -13,12 +14,13 @@ from aqt.gui_hooks import (
     browser_did_fetch_columns,
     browser_did_fetch_row,
     browser_did_search,
+    browser_menus_did_init,
     browser_will_search,
     browser_will_show,
     browser_will_show_context_menu,
 )
-from aqt.qt import QMenu
-from aqt.utils import showInfo, showText
+from aqt.qt import QAction, QMenu, qconnect
+from aqt.utils import askUser, chooseList, showInfo, showText, tooltip
 
 from .. import LOGGER
 from ..ankihub_client import AnkiHubRequestError
@@ -27,9 +29,9 @@ from ..db import (
     attach_ankihub_db_to_anki_db_connection,
     detach_ankihub_db_from_anki_db_connection,
 )
-from ..importing import get_fields_protected_by_tags
+from ..importing import AnkiHubImporter, get_fields_protected_by_tags
 from ..note_conversion import TAG_FOR_PROTECTING_ALL_FIELDS, TAG_FOR_PROTECTING_FIELDS
-from ..settings import ANKIHUB_NOTE_TYPE_FIELD_NAME, AnkiHubCommands
+from ..settings import ANKIHUB_NOTE_TYPE_FIELD_NAME, AnkiHubCommands, config
 from ..suggestions import BulkNoteSuggestionsResult, suggest_notes_in_bulk
 from ..utils import note_types_with_ankihub_id_field
 from .suggestion_dialog import SuggestionDialog
@@ -51,6 +53,11 @@ def on_browser_will_show_context_menu(browser: Browser, context_menu: QMenu) -> 
     menu.addAction(
         "AnkiHub: Protect fields",
         lambda: on_protect_fields_action(browser),
+    )
+
+    menu.addAction(
+        "AnkiHub: Reset local changes",
+        lambda: on_reset_local_changes_action(browser),
     )
 
     # setup copy ankihub_id to clipboard action
@@ -190,6 +197,83 @@ def on_suggest_notes_in_bulk_done(future: Future, browser: Browser) -> None:
 
     msg = msg_about_created_suggestions + msg_about_failed_suggestions
     showText(msg, parent=browser)
+
+
+def on_reset_local_changes_action(browser: Browser) -> None:
+    nids = browser.selected_notes()
+
+    def on_done(future: Future) -> None:
+        future.result()  # raise exception if there was one
+
+        browser.table.reset()
+        tooltip("Reset local changes for selected notes.", parent=browser)
+
+    mw.taskman.with_progress(
+        task=lambda: reset_local_changes_to_notes(nids),
+        on_done=on_done,
+        label="Resetting local changes...",
+        parent=browser,
+    )
+
+
+def on_browser_menus_did_init(browser: Browser):
+    menu = browser._ankihub_menu = QMenu("AnkiHub")
+    browser.form.menubar.addMenu(menu)
+
+    setup_reset_deck_action(browser, menu)
+
+
+def on_reset_deck_action(browser: Browser):
+    decks = list(config.private_config.decks.values())
+    ankihub_dids = list(config.private_config.decks.keys())
+
+    chosen_deck_idx = chooseList(
+        prompt="Choose the AnkiHub deck for which<br>you want to reset local changes",
+        choices=[deck["name"] for deck in decks],
+        parent=browser,
+    )
+    chosen_deck = decks[chosen_deck_idx]
+    if not askUser(
+        f"Are you sure you want to reset all local changes to the deck <b>{chosen_deck['name']}</b>?",
+        parent=browser,
+    ):
+        return
+
+    nids = ankihub_db.notes_for_ankihub_deck(ankihub_dids[chosen_deck_idx])
+    anki_deck_id = chosen_deck["anki_id"]
+
+    def on_done(_) -> None:
+        browser.model.reset()
+        tooltip(f"Reset local changes to deck <b>{chosen_deck['name']}</b>")
+
+    mw.taskman.with_progress(
+        lambda: reset_local_changes_to_notes(nids, anki_deck_id=anki_deck_id),
+        on_done=on_done,
+        label="Resetting local changes...",
+        parent=browser,
+    )
+
+
+def setup_reset_deck_action(browser: Browser, menu: QMenu) -> None:
+    reset_deck_action = QAction("Reset all local changes to a deck", browser)
+    qconnect(reset_deck_action.triggered, lambda: on_reset_deck_action(browser))
+    menu.addAction(reset_deck_action)
+
+
+def reset_local_changes_to_notes(
+    nids: Sequence[NoteId], anki_deck_id: Optional[DeckId] = None
+) -> None:
+    importer = AnkiHubImporter()
+    for nid in nids:
+        importer._update_or_create_note(
+            ankihub_db.note_data(nid),
+            # TODO get protected fields and tags from ankihub or store the most currently used ones to use them here
+            protected_fields={},
+            protected_tags=[],
+            anki_did=anki_deck_id,
+        )
+
+    # TODO maybe reset notes mod value so that it doesn't show up in the "edited after sync" column
 
 
 class CustomColumn:
@@ -347,3 +431,5 @@ def setup() -> None:
     browser_did_search.append(on_browser_did_search)
 
     browser_will_show_context_menu.append(on_browser_will_show_context_menu)
+
+    browser_menus_did_init.append(on_browser_menus_did_init)
