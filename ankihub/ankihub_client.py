@@ -560,7 +560,9 @@ class AnkiHubClient:
             "GET",
             f"/decks/{ankihub_deck_uuid}/protected-fields/",
         )
-        if response.status_code != 200:
+        if response.status_code == 404:
+            return {}
+        elif response.status_code != 200:
             raise AnkiHubRequestError(response)
 
         protected_fields_raw = response.json()["fields"]
@@ -575,7 +577,9 @@ class AnkiHubClient:
             "GET",
             f"/decks/{ankihub_deck_uuid}/protected-tags/",
         )
-        if response.status_code != 200:
+        if response.status_code == 404:
+            return []
+        elif response.status_code != 200:
             raise AnkiHubRequestError(response)
 
         result = response.json()["tags"]
