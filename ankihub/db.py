@@ -1,7 +1,7 @@
 import sqlite3
 import uuid
 from contextlib import contextmanager
-from typing import Any, Iterable, List, Optional, Set, Tuple
+from typing import Any, Iterable, List, Optional, Tuple
 
 from anki.models import NotetypeId
 from anki.notes import NoteId
@@ -184,6 +184,21 @@ class AnkiHubDB:
                     ),
                 )
 
+    def reset_mod_values_in_anki_db(self, anki_nids: List[int]) -> None:
+        # resets the mod values of the notes in the Anki DB to the
+        # mod values stored in the AnkiHub DB
+        nid_mod_tuples = self.execute(
+            f"""
+            SELECT anki_note_id, mod from notes WHERE anki_note_id IN {ids2str(anki_nids)}
+            """
+        )
+        for nid, mod in nid_mod_tuples:
+            mw.col.db.execute(
+                "UPDATE notes SET mod = ? WHERE id = ?",
+                mod,
+                nid,
+            )
+
     def note_data(self, anki_note_id: int) -> Optional[NoteInfo]:
         result = self.first(
             f"""
@@ -239,7 +254,9 @@ class AnkiHubDB:
         )
         return result
 
-    def ankihub_dids_for_anki_nids(self, anki_nids: Iterable[NoteId]) -> Set[uuid.UUID]:
+    def ankihub_dids_for_anki_nids(
+        self, anki_nids: Iterable[NoteId]
+    ) -> List[uuid.UUID]:
         result = self.list(
             f"""
             SELECT DISTINCT ankihub_deck_id FROM notes WHERE anki_note_id IN {ids2str(anki_nids)}

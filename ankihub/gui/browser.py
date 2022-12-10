@@ -302,7 +302,8 @@ def reset_local_changes_to_notes(
             anki_did=anki_did,
         )
 
-    # TODO maybe reset notes mod value so that it doesn't show up in the "edited after sync" column
+    # this way the notes won't be marked as "changed after sync" anymore
+    ankihub_db.reset_mod_values_in_anki_db(nids)
 
 
 class CustomColumn:
