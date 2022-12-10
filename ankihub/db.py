@@ -264,6 +264,14 @@ class AnkiHubDB:
         )
         return result
 
+    def are_ankihub_notes(self, anki_nids: List[NoteId]) -> bool:
+        notes_count = self.scalar(
+            f"""
+            SELECT COUNT(*) FROM notes WHERE anki_note_id IN {ids2str(anki_nids)}
+            """
+        )
+        return notes_count == len(set(anki_nids))
+
     def ankihub_id_for_note(self, anki_note_id: int) -> Optional[str]:
         result = self.scalar(
             """

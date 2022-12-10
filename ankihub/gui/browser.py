@@ -205,14 +205,14 @@ def on_reset_local_changes_action(browser: Browser) -> None:
     if not nids:
         return
 
-    ankihub_dids = ankihub_db.ankihub_dids_for_anki_nids(nids)
-
-    if not ankihub_dids:
+    if not ankihub_db.are_ankihub_notes(list(nids)):
         showInfo(
-            "Please select notes from an AnkiHub deck to reset local changes.",
+            "Please only select notes from an AnkiHub deck to reset local changes.",
             parent=browser,
         )
         return
+
+    ankihub_dids = ankihub_db.ankihub_dids_for_anki_nids(nids)
 
     if len(ankihub_dids) > 1:
         showInfo(
@@ -286,6 +286,8 @@ def setup_reset_deck_action(browser: Browser, menu: QMenu) -> None:
 def reset_local_changes_to_notes(
     nids: Sequence[NoteId], ankihub_deck_uuid: uuid.UUID
 ) -> None:
+    # all notes have to be from the ankihub deck with the given uuid
+
     deck_dict = config.private_config.decks[str(ankihub_deck_uuid)]
     anki_did = deck_dict["anki_id"]
 
@@ -303,7 +305,7 @@ def reset_local_changes_to_notes(
         )
 
     # this way the notes won't be marked as "changed after sync" anymore
-    ankihub_db.reset_mod_values_in_anki_db(nids)
+    ankihub_db.reset_mod_values_in_anki_db(list(nids))
 
 
 class CustomColumn:
