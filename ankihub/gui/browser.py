@@ -509,7 +509,7 @@ def on_browser_will_build_tree(
         return handled
 
     ankihub_item = tree.add_simple(
-        name="AnkiHub",
+        name="👑 AnkiHub",
         icon="AnkiHub",
         type=SidebarItemType.SAVED_SEARCH_ROOT,
         search_node=SearchNode(
