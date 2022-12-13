@@ -146,7 +146,7 @@ class UpdatedSinceLastReviewSearchNode(CustomSearchNode):
             ids = self._retain_ids_where(
                 ids,
                 """
-                ah_notes.mod > (
+                ah_notes.mod >= (
                     SELECT max(revlog.id) FROM revlog, cards
                     WHERE revlog.cid = cards.id AND cards.nid = notes.id
                 ) / 1000
