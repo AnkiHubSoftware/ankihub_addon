@@ -464,7 +464,47 @@ class EditedAfterSyncColumn(CustomColumn):
         )
 
 
-custom_columns: List[CustomColumn] = [AnkiHubIdColumn(), EditedAfterSyncColumn()]
+class UpdatedSinceLastReviewColumn(CustomColumn):
+    builtin_column = Column(
+        key="updated_since_last_review",
+        cards_mode_label="AnkiHub: Updated Since Last Review",
+        notes_mode_label="AnkiHub: Updated Since Last Review",
+        sorting=BrowserColumns.SORTING_NONE,
+        uses_cell_font=False,
+        alignment=BrowserColumns.ALIGNMENT_CENTER,
+    )
+
+    def _display_value(
+        self,
+        note: Note,
+    ) -> str:
+        if "ankihub_id" not in note or not note["ankihub_id"]:
+            return "N/A"
+
+        last_sync = ankihub_db.last_sync(uuid.UUID(note["ankihub_id"]))
+        if last_sync is None:
+            # The sync_mod value can be None if the note was synced with an early version of the AnkiHub add-on
+            return "Unknown"
+
+        last_review_ms = mw.col.db.scalar(
+            f"""
+            SELECT max(revlog.id) FROM revlog, cards
+            WHERE {note.id} = cards.nid AND cards.id = revlog.cid
+            """,
+        )
+        if last_review_ms is None:
+            return "No"
+
+        last_review = last_review_ms // 1000
+
+        return "Yes" if last_sync > last_review else "No"
+
+
+custom_columns: List[CustomColumn] = [
+    AnkiHubIdColumn(),
+    EditedAfterSyncColumn(),
+    UpdatedSinceLastReviewColumn(),
+]
 
 
 def on_browser_did_fetch_columns(columns: dict[str, Column]):
