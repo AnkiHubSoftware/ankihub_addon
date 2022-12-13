@@ -33,7 +33,11 @@ from aqt.qt import QMenu
 from aqt.utils import showInfo, showText, showWarning
 
 from .. import LOGGER
-from ..ankihub_client import AnkiHubRequestError
+from ..ankihub_client import (
+    AnkiHubRequestError,
+    SuggestionType,
+    suggestion_type_from_str,
+)
 from ..db import (
     ankihub_db,
     attach_ankihub_db_to_anki_db_connection,
@@ -57,13 +61,14 @@ class CustomSearchNode(ABC):
 
     @classmethod
     def from_parameter_type_and_value(cls, parameter_name, value):
-        custom_search_node_types = [
+        custom_search_node_types = (
             ModifiedAfterSyncSearchNode,
             UpdatedInTheLastXDaysSearchNode,
-        ]
+            SuggestionTypeSearchNode,
+        )
         for custom_search_node_type in custom_search_node_types:
             if custom_search_node_type.parameter_name == parameter_name:
-                return custom_search_node_type(value)
+                return custom_search_node_type(value)  # type: ignore
 
         raise ValueError(f"Unknown custom search parameter: {parameter_name}")
 
@@ -142,11 +147,32 @@ class UpdatedInTheLastXDaysSearchNode(CustomSearchNode):
                 raise ValueError
         except ValueError:
             raise ValueError(
-                f"Invalid value for {self.parameter_name}: {self.value}. Must be an positive integer."
+                f"Invalid value for {self.parameter_name}: {self.value}. Must be a positive integer."
             )
 
         threshold_timestamp = int(datetime.now().timestamp() - (days * 24 * 60 * 60))
         ids = self._retain_ids_where(ids, f"ah_notes.mod > {threshold_timestamp}")
+
+        return ids
+
+
+class SuggestionTypeSearchNode(CustomSearchNode):
+
+    parameter_name = "_ankihub_suggestion_type"
+
+    def __init__(self, value: str):
+        self.value = value
+
+    def filter_ids(self, ids: Sequence[ItemId]) -> Sequence[ItemId]:
+        value = self.value.replace("_slash_", "/")
+        try:
+            suggestion_type_from_str(value)
+        except ValueError:
+            raise ValueError(
+                f"Invalid value for {self.parameter_name}: {value}. Must be a suggestion type."
+            )
+
+        ids = self._retain_ids_where(ids, f"ah_notes.last_update_type = '{value}'")
 
         return ids
 
@@ -552,7 +578,7 @@ def on_browser_will_build_tree(
         ),
     )
 
-    ankihub_item.add_simple(
+    updated_today_item = ankihub_item.add_simple(
         name="Updated Today",
         icon="Updated Today",
         type=SidebarItemType.SAVED_SEARCH_ROOT,
@@ -563,6 +589,25 @@ def on_browser_will_build_tree(
             ),
         ),
     )
+
+    for suggestion_type in SuggestionType:
+        suggestion_value, suggestion_name = suggestion_type.value
+        # anki doesn't allow slashes in search parameters
+        suggestion_value_escaped = suggestion_value.replace("/", "_slash_")
+        updated_today_item.add_simple(
+            name=suggestion_name,
+            icon=suggestion_name,
+            type=SidebarItemType.SAVED_SEARCH,
+            search_node=mw.col.group_searches(
+                SearchNode(parsable_text="ankihub_id:_*"),
+                SearchNode(
+                    parsable_text=f"{UpdatedInTheLastXDaysSearchNode.parameter_name}:1"
+                ),
+                SearchNode(
+                    parsable_text=f"{SuggestionTypeSearchNode.parameter_name}:{suggestion_value_escaped}"
+                ),
+            ),
+        )
 
     return handled
 

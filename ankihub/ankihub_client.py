@@ -47,7 +47,9 @@ def suggestion_type_from_str(s: str) -> Optional[SuggestionType]:
     if s in ["original_content", "new_note", None]:
         return None
 
-    result = next(x for x in SuggestionType if x.value[0] == s)
+    result = next((x for x in SuggestionType if x.value[0] == s), None)
+    if result is None:
+        raise ValueError("Invalid suggestion type string")
     return result
 
 
