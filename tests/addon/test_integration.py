@@ -1255,6 +1255,4 @@ def test_import_deck_and_check_that_values_are_saved_to_databases(
 
         # assert that the note_data was saved correctly in the AnkiHub DB (without modifications)
         note_data_from_db = AnkiHubDB().note_data(nid)
-        # ... last_update_type is not relevant here because it is not saved in the AnkiHub DB
-        note_data_from_db.last_update_type = note_data.last_update_type
         assert note_data_from_db == note_data
