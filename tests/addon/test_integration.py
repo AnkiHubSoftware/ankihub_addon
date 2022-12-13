@@ -814,7 +814,7 @@ def test_suspend_new_cards_of_existing_notes(
                 guid=note.guid,
             )
             importer = AnkiHubImporter()
-            updated_note = importer._update_or_create_note(
+            updated_note = importer.update_or_create_note(
                 note_data=note_data,
                 anki_did=0,
                 protected_fields={},

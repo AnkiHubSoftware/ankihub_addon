@@ -13,7 +13,6 @@ from typing import Any, Callable, Dict, Iterator, List, Optional, Sequence, Type
 
 import requests
 from requests import PreparedRequest, Request, Response, Session
-from requests.exceptions import HTTPError
 
 from .lib.mashumaro import field_options
 from .lib.mashumaro.config import BaseConfig
@@ -204,28 +203,15 @@ class AnkiHubRequestError(Exception):
         )
 
 
-def http_error_hook(response: Response, *args, **kwargs):
-    LOGGER.debug("Begin http error hook.")
-
-    try:
-        response.raise_for_status()
-    except HTTPError:
-        LOGGER.debug("http error hook raises AnkiHubRequestError.")
-        raise AnkiHubRequestError(response)
-
-    return response
-
-
 class AnkiHubClient:
     """Client for interacting with the AnkiHub API."""
 
     def __init__(self, hooks=None, token=None):
-        self.hooks = [http_error_hook]
-        if hooks is not None:
-            self.hooks += hooks
-
         self.session = Session()
-        self.session.hooks["response"] = self.hooks
+
+        if hooks is not None:
+            self.session.hooks["response"] = hooks
+
         self.session.headers.update({"Content-Type": "application/json"})
         self.session.headers.update(
             {"Accept": f"application/json; version={API_VERSION}"}
@@ -282,11 +268,8 @@ class AnkiHubClient:
 
     def signout(self):
         self.session.headers["Authorization"] = ""
-        try:
-            response = self._send_request("POST", "/logout/")
-        except AnkiHubRequestError as e:
-            response = e.response
-        if response and response.status_code not in [204, 401]:
+        response = self._send_request("POST", "/logout/")
+        if response.status_code not in [204, 401]:
             raise AnkiHubRequestError(response)
 
     def upload_deck(
@@ -579,7 +562,9 @@ class AnkiHubClient:
             "GET",
             f"/decks/{ankihub_deck_uuid}/protected-fields/",
         )
-        if response.status_code != 200:
+        if response.status_code == 404:
+            return {}
+        elif response.status_code != 200:
             raise AnkiHubRequestError(response)
 
         protected_fields_raw = response.json()["fields"]
@@ -594,7 +579,9 @@ class AnkiHubClient:
             "GET",
             f"/decks/{ankihub_deck_uuid}/protected-tags/",
         )
-        if response.status_code != 200:
+        if response.status_code == 404:
+            return []
+        elif response.status_code != 200:
             raise AnkiHubRequestError(response)
 
         result = response.json()["tags"]
