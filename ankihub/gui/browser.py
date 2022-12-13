@@ -52,6 +52,9 @@ browser: Optional[Browser] = None
 
 
 class CustomSearchNode(ABC):
+
+    parameter_name: Optional[str] = None
+
     @classmethod
     def from_parameter_type_and_value(cls, parameter_name, value):
         custom_search_node_types = [
