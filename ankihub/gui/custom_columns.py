@@ -105,13 +105,13 @@ class EditedAfterSyncColumn(CustomColumn):
         if not mids:
             return None
 
-        return (
-            "("
-            f"   SELECT n.mod > ah_n.mod from {ankihub_db.database_name}.notes AS ah_n "
-            "    WHERE ah_n.anki_note_id = n.id LIMIT 1"
-            ") DESC, "
-            f"(n.mid IN {ids2str(mids)}) DESC"
-        )
+        return f"""
+            (
+                SELECT n.mod > ah_n.mod from {ankihub_db.database_name}.notes AS ah_n
+                WHERE ah_n.anki_note_id = n.id LIMIT 1
+            ) DESC,
+            (n.mid IN {ids2str(mids)}) DESC
+            """
 
 
 class UpdatedSinceLastReviewColumn(CustomColumn):
