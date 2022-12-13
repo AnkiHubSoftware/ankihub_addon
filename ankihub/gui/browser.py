@@ -116,7 +116,7 @@ class CustomSearchNode(ABC):
 
 class ModifiedAfterSyncSearchNode(CustomSearchNode):
 
-    parameter_name = "_ankihub_modified_after_sync"
+    parameter_name = "ankihub_modified_after_sync"
 
     def __init__(self, value: str):
         self.value = value
@@ -136,7 +136,7 @@ class ModifiedAfterSyncSearchNode(CustomSearchNode):
 
 class UpdatedInTheLastXDaysSearchNode(CustomSearchNode):
 
-    parameter_name = "_ankihub_updated"
+    parameter_name = "ankihub_updated"
 
     def __init__(self, value: str):
         self.value = value
@@ -159,7 +159,7 @@ class UpdatedInTheLastXDaysSearchNode(CustomSearchNode):
 
 class SuggestionTypeSearchNode(CustomSearchNode):
 
-    parameter_name = "_ankihub_suggestion_type"
+    parameter_name = "ankihub_suggestion_type"
 
     def __init__(self, value: str):
         self.value = value
@@ -180,7 +180,7 @@ class SuggestionTypeSearchNode(CustomSearchNode):
 
 class UpdatedSinceLastReviewSearchNode(CustomSearchNode):
 
-    parameter_name = "_ankihub_updated_since_last_review"
+    parameter_name = "ankihub_updated_since_last_review"
 
     def __init__(self, value: str):
         self.value = value
@@ -553,7 +553,10 @@ def on_browser_will_search_handle_custom_search_parameters(ctx: SearchContext):
     global custom_search_nodes
     custom_search_nodes = []
 
-    for m in re.finditer(r"(_ankihub_\w+):(\w*)", ctx.search):
+    for m in re.finditer(r"(ankihub_\w+):(\w*)", ctx.search):
+        if m.group(1) == "ankihub_id":
+            continue
+
         parameter_name, parameter_value = m.group(1), m.group(2)
         try:
             custom_search_nodes.append(
