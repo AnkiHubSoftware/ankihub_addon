@@ -65,6 +65,7 @@ class CustomSearchNode(ABC):
             ModifiedAfterSyncSearchNode,
             UpdatedInTheLastXDaysSearchNode,
             SuggestionTypeSearchNode,
+            UpdatedSinceLastReviewSearchNode,
         )
         for custom_search_node_type in custom_search_node_types:
             if custom_search_node_type.parameter_name == parameter_name:
@@ -127,7 +128,7 @@ class ModifiedAfterSyncSearchNode(CustomSearchNode):
             ids = self._retain_ids_where(ids, "notes.mod <= ah_notes.mod")
         else:
             raise ValueError(
-                f"Unknown search parameter value: {self.value}. Options are 'yes' and 'no'."
+                f"Invalid value for {self.parameter_name}: {self.value}. Options are 'yes' and 'no'."
             )
 
         return ids
@@ -173,6 +174,32 @@ class SuggestionTypeSearchNode(CustomSearchNode):
             )
 
         ids = self._retain_ids_where(ids, f"ah_notes.last_update_type = '{value}'")
+
+        return ids
+
+
+class UpdatedSinceLastReviewSearchNode(CustomSearchNode):
+
+    parameter_name = "_ankihub_updated_since_last_review"
+
+    def __init__(self, value: str):
+        self.value = value
+
+    def filter_ids(self, ids: Sequence[ItemId]) -> Sequence[ItemId]:
+        if self.value.strip() == "":
+            ids = self._retain_ids_where(
+                ids,
+                """
+                ah_notes.mod > (
+                    SELECT max(revlog.id) FROM revlog, cards
+                    WHERE revlog.cid = cards.id AND cards.nid = notes.id
+                ) / 1000
+                """,
+            )
+        else:
+            raise ValueError(
+                f"Invalid value for {self.parameter_name}: {self.value}. This search parameter takes no values."
+            )
 
         return ids
 
@@ -608,6 +635,18 @@ def on_browser_will_build_tree(
                 ),
             ),
         )
+
+    updated_today_item = ankihub_item.add_simple(
+        name="Updated Since Last Review",
+        icon="Updated Since Last Review",
+        type=SidebarItemType.SAVED_SEARCH_ROOT,
+        search_node=mw.col.group_searches(
+            SearchNode(parsable_text="ankihub_id:_*"),
+            SearchNode(
+                parsable_text=f"{UpdatedSinceLastReviewSearchNode.parameter_name}:"
+            ),
+        ),
+    )
 
     return handled
 
