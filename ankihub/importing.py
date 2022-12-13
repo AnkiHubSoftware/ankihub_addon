@@ -14,7 +14,7 @@ from aqt import mw
 
 from . import LOGGER, settings
 from .addon_ankihub_client import AddonAnkiHubClient as AnkiHubClient
-from .ankihub_client import AnkiHubRequestError, Field, NoteInfo, SuggestionType
+from .ankihub_client import Field, NoteInfo, SuggestionType
 from .db import ankihub_db
 from .note_conversion import (
     TAG_FOR_NEW_NOTE,
@@ -67,22 +67,12 @@ class AnkiHubImporter:
         remote_note_types = fetch_remote_note_types_based_on_notes_data(notes_data)
 
         if protected_fields is None:
-            protected_fields = {}
-            client = AnkiHubClient()
-            try:
-                protected_fields = client.get_protected_fields(uuid.UUID(ankihub_did))
-            except AnkiHubRequestError as e:
-                if not e.response.status_code == 404:
-                    raise e
+            protected_fields = AnkiHubClient().get_protected_fields(
+                uuid.UUID(ankihub_did)
+            )
 
         if protected_tags is None:
-            protected_tags = []
-            client = AnkiHubClient()
-            try:
-                protected_tags = client.get_protected_tags(uuid.UUID(ankihub_did))
-            except AnkiHubRequestError as e:
-                if not e.response.status_code == 404:
-                    raise e
+            protected_tags = AnkiHubClient().get_protected_tags(uuid.UUID(ankihub_did))
 
         anki_deck_id = self._import_ankihub_deck_inner(
             ankihub_did=ankihub_did,
@@ -113,7 +103,7 @@ class AnkiHubImporter:
 
         dids: Set[DeckId] = set()  # set of ids of decks notes were imported into
         for note_data in notes_data:
-            note = self._update_or_create_note(
+            note = self.update_or_create_note(
                 note_data=note_data,
                 anki_did=local_did,
                 protected_fields=protected_fields,
@@ -159,7 +149,7 @@ class AnkiHubImporter:
 
         return created_did
 
-    def _update_or_create_note(
+    def update_or_create_note(
         self,
         note_data: NoteInfo,
         protected_fields: Dict[int, List[str]],
