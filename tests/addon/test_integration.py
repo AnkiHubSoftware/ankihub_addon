@@ -399,7 +399,7 @@ def test_suggest_notes_in_bulk(anki_session_with_addon: AnkiSession, monkeypatch
                             value="changed front",
                         ),
                     ],
-                    tags=["my::tag", "my::tag2", "my::tag3"],
+                    tags=None,
                     comment="test",
                     change_type=SuggestionType.NEW_CONTENT,
                 ),

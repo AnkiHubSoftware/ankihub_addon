@@ -1,7 +1,7 @@
 """Convert Anki notes to NoteInfo objects"""
 import re
 import uuid
-from typing import List
+from typing import List, Optional
 
 from anki.notes import Note
 
@@ -23,7 +23,7 @@ def to_note_data(note: Note, set_new_id: bool = False, diff: bool = False) -> No
     else:
         ankihub_note_uuid = ankihub_uuid_of_note(note, ignore_invalid=False)
 
-    tags = _prepare_tags(note.tags)
+    tags = _prepare_tags(note, diff=diff)
     fields = _prepare_fields(note, diff=diff)
 
     return NoteInfo(
@@ -76,6 +76,16 @@ def _prepared_field_html(html: str) -> str:
     return result
 
 
-def _prepare_tags(tags: List[str]):
+def _prepare_tags(note: Note, diff: bool) -> Optional[List[str]]:
+    # returns None if diff=True and the tags didn't change since the last sync
+
+    note_data_from_ah = ankihub_db.note_data(note.id)
+
     # removing empty tags is necessary because notes have empty tags in the editor sometimes
-    return [tag for tag in tags if tag.strip() and not is_internal_tag(tag)]
+    result = [tag for tag in note.tags if tag.strip() and not is_internal_tag(tag)]
+
+    if diff:
+        if set(note_data_from_ah.tags) == set(result):
+            return None
+
+    return result
