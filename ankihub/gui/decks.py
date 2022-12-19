@@ -362,12 +362,14 @@ def download_progress_cb(percent: int):
 
 
 def cleanup_after_deck_install(multiple_decks: bool = False) -> None:
-    if askUser(
-        "The deck has successfully been installed!<br><br>"
-        if not multiple_decks
-        else ""
-        "Do you want to clear unused tags and empty cards from your collection? (It is recommended.)",
-        title="AnkiHub",
-    ):
+    message = (
+        (
+            "The deck has been successfully installed!<br><br>"
+            if not multiple_decks
+            else ""
+        )
+        + "Do you want to clear unused tags and empty cards from your collection? (It is recommended.)"
+    )
+    if askUser(message, title="AnkiHub"):
         clear_unused_tags(parent=mw).run_in_background()
         show_empty_cards(mw)
