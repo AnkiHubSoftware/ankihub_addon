@@ -349,6 +349,16 @@ def ankihub_help_setup(parent):
     """Set up the sub menu for help related items."""
     help_menu = QMenu("🆘 Help", parent)
 
+    # && is an escaped & in qt
+    q_notion_action = QAction("Instructions && Changelog", help_menu)
+    qconnect(
+        q_notion_action.triggered,
+        lambda: openLink(
+            "https://www.notion.so/ankipalace/AnkiHub-Documentation-dd8584f3e6c04068ab47e072c17b3a0a"
+        ),
+    )
+    help_menu.addAction(q_notion_action)
+
     q_get_help_action = QAction("Get Help", help_menu)
     qconnect(
         q_get_help_action.triggered, lambda: openLink("https://www.ankihub.net/support")
@@ -362,6 +372,8 @@ def ankihub_help_setup(parent):
     q_version_action = QAction(f"Version {ADDON_VERSION}", help_menu)
     q_version_action.setEnabled(False)
     help_menu.addAction(q_version_action)
+
+    help_menu.setMinimumWidth(250)
 
     parent.addMenu(help_menu)
 
