@@ -101,7 +101,7 @@ class AnkiHubSync:
                     f"Please subscribe to the deck <br><b>{deck_info['name']}</b><br>on the AnkiHub website to "
                     "be able to sync.<br><br>"
                     f'Link to the deck: <a href="{url_view_deck}">{url_view_deck}</a><br><br>'
-                    f"Note that you also need an active AnkiHub membership.",
+                    f"Note that you also need an active AnkiHub subscription.",
                 )
             )
             LOGGER.debug(
