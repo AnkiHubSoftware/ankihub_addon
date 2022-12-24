@@ -37,7 +37,7 @@ def check_for_missing_ankihub_ids():
         text=(
             "AnkiHub has detected that the following deck(s) have missing values:<br>"
             f"{'<br>'.join('<b>' + deck_name + '</b>' for deck_name in deck_names)}<br><br>"
-            "The add-on needs to reset-local changes to these decks. This may take a while.<br><br>"
+            "The add-on needs to reset local changes to these decks. This may take a while.<br><br>"
             "Protected fields and tags will not be affected.<br><br>"
             "A full sync with AnkiWeb might be necessary after the reset, so it's recommended "
             "to sync changes from other devices before doing this.<br><br>"
