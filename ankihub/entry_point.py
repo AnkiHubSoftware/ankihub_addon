@@ -11,6 +11,7 @@ from .addons import setup_addons
 from .errors import setup_error_handler
 from .gui import browser, editor
 from .gui.db_check import check_ankihub_db
+from .gui.anki_db_check import check_for_missing_ankihub_ids
 from .gui.menu import setup_ankihub_menu
 from .progress import setup_progress_manager
 from .settings import config
@@ -55,15 +56,22 @@ def run():
     return mw
 
 
+def on_startup_syncs_done() -> None:
+    # Called after AnkiWeb sync and AnkiHub sync are done after starting Anki.
+    check_ankihub_db()
+
+    check_for_missing_ankihub_ids()
+
+
 def on_startup_ankiweb_sync_done() -> None:
     # Syncing with AnkiHub during sync with AnkiWeb causes an error,
     # this is why we have to wait until the AnkiWeb sync is done if there is one.
     # The database check should be done after the AnkiHub sync to not open all dialogs at once
     # and the AnkiHub sync could also make the database check obsolete.
     if config.public_config.get("sync_on_startup", True):
-        sync_with_progress(on_done=check_ankihub_db)
+        sync_with_progress(on_done=on_startup_syncs_done)
     else:
-        check_ankihub_db()
+        on_startup_syncs_done()
 
 
 def do_after_ankiweb_sync(callback: Callable[[], None]) -> None:

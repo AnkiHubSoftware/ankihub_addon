@@ -5,7 +5,7 @@ from pprint import pformat
 from typing import List, Optional, Sequence
 
 from anki.collection import BrowserColumns
-from anki.notes import Note, NoteId
+from anki.notes import Note
 from anki.utils import ids2str
 from aqt import mw
 from aqt.browser import Browser, CellRow, Column, ItemId, SearchContext
@@ -28,8 +28,9 @@ from ..db import (
     attach_ankihub_db_to_anki_db_connection,
     detach_ankihub_db_from_anki_db_connection,
 )
-from ..importing import AnkiHubImporter, get_fields_protected_by_tags
+from ..importing import get_fields_protected_by_tags
 from ..note_conversion import TAG_FOR_PROTECTING_ALL_FIELDS, TAG_FOR_PROTECTING_FIELDS
+from ..reset_changes import reset_local_changes_to_notes
 from ..settings import ANKIHUB_NOTE_TYPE_FIELD_NAME, AnkiHubCommands, config
 from ..suggestions import BulkNoteSuggestionsResult, suggest_notes_in_bulk
 from ..utils import note_types_with_ankihub_id_field
@@ -282,44 +283,6 @@ def setup_reset_deck_action(browser: Browser, menu: QMenu) -> None:
     reset_deck_action = QAction("Reset all local changes to a deck", browser)
     qconnect(reset_deck_action.triggered, lambda: on_reset_deck_action(browser))
     menu.addAction(reset_deck_action)
-
-
-def reset_local_changes_to_notes(
-    nids: Sequence[NoteId], ankihub_deck_uuid: uuid.UUID
-) -> None:
-    # all notes have to be from the ankihub deck with the given uuid
-
-    deck_dict = config.private_config.decks[str(ankihub_deck_uuid)]
-    anki_did = deck_dict["anki_id"]
-
-    importer = AnkiHubImporter()
-
-    # import deck with empty notes_data to reset changes to note types and deck
-    # this is needed so that notes_data can be retrieved from the database if the fields
-    # of the note type have changed
-    importer.import_ankihub_deck(
-        ankihub_did=str(ankihub_deck_uuid),
-        notes_data=[],
-        deck_name=deck_dict["name"],
-        save_to_ankihub_db=False,  # no need to save to ankihub_db, we're just resetting local changes
-    )
-
-    notes_data = [
-        note_data
-        for nid in nids
-        if (note_data := ankihub_db.note_data(nid)) is not None
-    ]
-
-    importer.import_ankihub_deck(
-        ankihub_did=str(ankihub_deck_uuid),
-        notes_data=notes_data,
-        deck_name=deck_dict["name"],
-        local_did=anki_did,
-        save_to_ankihub_db=False,  # no need to save to ankihub_db, we're just resetting local changes
-    )
-
-    # this way the notes won't be marked as "changed after sync" anymore
-    ankihub_db.reset_mod_values_in_anki_db(list(nids))
 
 
 class CustomColumn:

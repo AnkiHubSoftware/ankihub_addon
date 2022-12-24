@@ -245,6 +245,10 @@ class AnkiHubDB:
         )
         return result
 
+    def ankihub_dids(self) -> List[str]:
+        result = self.list("SELECT DISTINCT ankihub_deck_id FROM notes")
+        return result
+
     def ankihub_did_for_note_type(self, anki_note_type_id: int) -> Optional[str]:
         result = self.scalar(
             """
