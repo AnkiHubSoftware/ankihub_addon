@@ -30,6 +30,8 @@ def check_ankihub_db():
             "AnkiHub has detected that the following deck(s) have missing values in the database:<br>"
             f"{'<br>'.join('<b>' + deck_name + '</b>' for deck_name in deck_names)}<br><br>"
             "The add-on needs to download and import these decks again. This may take a while.<br><br>"
+            "A full sync with AnkiWeb might be necessary after the reset, so it's recommended "
+            "to sync changes from other devices before doing this.<br><br>"
             "Do you want to fix the missing values now?"
         ),
         title="AnkiHub Database Check",

@@ -5,7 +5,7 @@ from pprint import pformat
 from typing import List, Optional, Sequence
 
 from anki.collection import BrowserColumns
-from anki.notes import Note, NoteId
+from anki.notes import Note
 from anki.utils import ids2str
 from aqt import mw
 from aqt.browser import Browser, CellRow, Column, ItemId, SearchContext
@@ -22,15 +22,15 @@ from aqt.qt import QAction, QMenu, qconnect
 from aqt.utils import askUser, chooseList, showInfo, showText, tooltip
 
 from .. import LOGGER
-from ..addon_ankihub_client import AddonAnkiHubClient as AnkiHubClient
 from ..ankihub_client import AnkiHubRequestError
 from ..db import (
     ankihub_db,
     attach_ankihub_db_to_anki_db_connection,
     detach_ankihub_db_from_anki_db_connection,
 )
-from ..importing import AnkiHubImporter, get_fields_protected_by_tags
+from ..importing import get_fields_protected_by_tags
 from ..note_conversion import TAG_FOR_PROTECTING_ALL_FIELDS, TAG_FOR_PROTECTING_FIELDS
+from ..reset_changes import reset_local_changes_to_notes
 from ..settings import ANKIHUB_NOTE_TYPE_FIELD_NAME, AnkiHubCommands, config
 from ..suggestions import BulkNoteSuggestionsResult, suggest_notes_in_bulk
 from ..utils import note_types_with_ankihub_id_field
@@ -263,7 +263,9 @@ def on_reset_deck_action(browser: Browser):
 
     nids = ankihub_db.notes_for_ankihub_deck(ankihub_dids[chosen_deck_idx])
 
-    def on_done(_) -> None:
+    def on_done(future: Future) -> None:
+        future.result()
+
         browser.model.reset()
         tooltip(f"Reset local changes to deck <b>{chosen_deck['name']}</b>")
 
@@ -281,31 +283,6 @@ def setup_reset_deck_action(browser: Browser, menu: QMenu) -> None:
     reset_deck_action = QAction("Reset all local changes to a deck", browser)
     qconnect(reset_deck_action.triggered, lambda: on_reset_deck_action(browser))
     menu.addAction(reset_deck_action)
-
-
-def reset_local_changes_to_notes(
-    nids: Sequence[NoteId], ankihub_deck_uuid: uuid.UUID
-) -> None:
-    # all notes have to be from the ankihub deck with the given uuid
-
-    deck_dict = config.private_config.decks[str(ankihub_deck_uuid)]
-    anki_did = deck_dict["anki_id"]
-
-    client = AnkiHubClient()
-    protected_fields = client.get_protected_fields(ankihub_deck_uuid=ankihub_deck_uuid)
-    protected_tags = client.get_protected_tags(ankihub_deck_uuid=ankihub_deck_uuid)
-
-    importer = AnkiHubImporter()
-    for nid in nids:
-        importer.update_or_create_note(
-            ankihub_db.note_data(nid),
-            protected_fields=protected_fields,
-            protected_tags=protected_tags,
-            anki_did=anki_did,
-        )
-
-    # this way the notes won't be marked as "changed after sync" anymore
-    ankihub_db.reset_mod_values_in_anki_db(list(nids))
 
 
 class CustomColumn:
