@@ -68,6 +68,10 @@ def _decks_with_missing_ankihub_nids():
         mids = ankihub_db.note_types_for_ankihub_deck(ah_did)
         for mid in mids:
             note_type = mw.col.models.get(mid)
+
+            if note_type is None:
+                continue
+
             ankihub_id_field = next(
                 (
                     field_dict
