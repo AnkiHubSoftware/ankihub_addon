@@ -11,7 +11,7 @@ from .addons import setup_addons
 from .errors import setup_error_handler
 from .gui import browser, editor
 from .gui.db_check import check_ankihub_db
-from .gui.anki_db_check import check_for_missing_ankihub_ids
+from .gui.anki_db_check import check_anki_db
 from .gui.menu import setup_ankihub_menu
 from .progress import setup_progress_manager
 from .settings import config
@@ -58,9 +58,7 @@ def run():
 
 def on_startup_syncs_done() -> None:
     # Called after AnkiWeb sync and AnkiHub sync are done after starting Anki.
-    check_ankihub_db()
-
-    check_for_missing_ankihub_ids()
+    check_ankihub_db(on_success=check_anki_db)
 
 
 def on_startup_ankiweb_sync_done() -> None:
