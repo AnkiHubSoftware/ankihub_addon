@@ -118,6 +118,10 @@ class Config:
             config_dict["token"] = "REDACTED"
         LOGGER.debug(f"private config:\n{pformat(config_dict)}")
 
+    def set_home_deck(self, ankihub_did: str, anki_did: int):
+        self.private_config.decks[ankihub_did]["anki_id"] = anki_did
+        self._update_private_config()
+
 
 config: Config = Config()
 

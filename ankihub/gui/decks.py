@@ -21,6 +21,7 @@ from aqt.qt import (
     QVBoxLayout,
     qconnect,
 )
+from aqt.studydeck import StudyDeck
 from aqt.utils import askUser, openLink, showInfo, showText, tooltip
 
 from .. import LOGGER
@@ -61,14 +62,21 @@ class SubscribedDecksDialog(QDialog):
         qconnect(self.decks_list.itemSelectionChanged, self.on_item_selection_changed)
 
         self.add_btn = QPushButton("Add")
-        self.unsubscribe_btn = QPushButton("Unsubscribe")
-        self.open_web_btn = QPushButton("Open on AnkiHub")
-        qconnect(self.add_btn.clicked, self.on_add)
-        qconnect(self.unsubscribe_btn.clicked, self.on_unsubscribe)
-        qconnect(self.open_web_btn.clicked, self.on_open_web)
         self.box_right.addWidget(self.add_btn)
+        qconnect(self.add_btn.clicked, self.on_add)
+
+        self.unsubscribe_btn = QPushButton("Unsubscribe")
         self.box_right.addWidget(self.unsubscribe_btn)
+        qconnect(self.unsubscribe_btn.clicked, self.on_unsubscribe)
+
+        self.open_web_btn = QPushButton("Open on AnkiHub")
         self.box_right.addWidget(self.open_web_btn)
+        qconnect(self.open_web_btn.clicked, self.on_open_web)
+
+        self.set_home_deck = QPushButton("Set Home deck")
+        qconnect(self.set_home_deck.clicked, self.on_set_home_deck)
+        self.box_right.addWidget(self.set_home_deck)
+
         self.box_right.addStretch(1)
 
         self.setLayout(self.box_top)
@@ -134,11 +142,48 @@ class SubscribedDecksDialog(QDialog):
             ankihub_id = item.data(Qt.ItemDataRole.UserRole)
             openLink(f"{URL_DECK_BASE}/{ankihub_id}")
 
+    def on_set_home_deck(self):
+        deck_names = self.decks_list.selectedItems()
+        if len(deck_names) == 0:
+            return
+        elif len(deck_names) > 1:
+            tooltip("Please select only one deck.", parent=mw)
+            return
+
+        deck_name = deck_names[0]
+        ankihub_id = deck_name.data(Qt.ItemDataRole.UserRole)
+        current_home_deck = mw.col.decks.get(
+            config.private_config.decks[ankihub_id]["anki_id"]
+        )
+        if current_home_deck is None:
+            current = None
+        else:
+            current = current_home_deck["name"]
+
+        def update_deck_config(ret: StudyDeck):
+            if not ret.name:
+                return
+
+            anki_did = mw.col.decks.id(ret.name)
+            config.set_home_deck(ankihub_did=ankihub_id, anki_did=anki_did)
+            tooltip("Home deck updated.", parent=self)
+
+        # this lets the user pick a deck
+        StudyDeck(
+            mw,
+            current=current,
+            accept="Set Home Deck",
+            title="Change Home Deck",
+            parent=self,
+            callback=update_deck_config,
+        )
+
     def on_item_selection_changed(self) -> None:
         selection = self.decks_list.selectedItems()
         isSelected: bool = len(selection) > 0
         self.unsubscribe_btn.setEnabled(isSelected)
         self.open_web_btn.setEnabled(isSelected)
+        self.set_home_deck.setEnabled(isSelected)
 
     @classmethod
     def display_subscribe_window(cls):
