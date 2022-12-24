@@ -22,7 +22,6 @@ from aqt.qt import QAction, QMenu, qconnect
 from aqt.utils import askUser, chooseList, showInfo, showText, tooltip
 
 from .. import LOGGER
-from ..addon_ankihub_client import AddonAnkiHubClient as AnkiHubClient
 from ..ankihub_client import AnkiHubRequestError
 from ..db import (
     ankihub_db,
@@ -263,7 +262,9 @@ def on_reset_deck_action(browser: Browser):
 
     nids = ankihub_db.notes_for_ankihub_deck(ankihub_dids[chosen_deck_idx])
 
-    def on_done(_) -> None:
+    def on_done(future: Future) -> None:
+        future.result()
+
         browser.model.reset()
         tooltip(f"Reset local changes to deck <b>{chosen_deck['name']}</b>")
 
@@ -291,18 +292,31 @@ def reset_local_changes_to_notes(
     deck_dict = config.private_config.decks[str(ankihub_deck_uuid)]
     anki_did = deck_dict["anki_id"]
 
-    client = AnkiHubClient()
-    protected_fields = client.get_protected_fields(ankihub_deck_uuid=ankihub_deck_uuid)
-    protected_tags = client.get_protected_tags(ankihub_deck_uuid=ankihub_deck_uuid)
-
     importer = AnkiHubImporter()
-    for nid in nids:
-        importer.update_or_create_note(
-            ankihub_db.note_data(nid),
-            protected_fields=protected_fields,
-            protected_tags=protected_tags,
-            anki_did=anki_did,
-        )
+
+    # import deck with empty notes_data to reset changes to note types and deck
+    # this is needed so that notes_data can be retrieved from the database if the fields
+    # of the note type have changed
+    importer.import_ankihub_deck(
+        ankihub_did=str(ankihub_deck_uuid),
+        notes_data=[],
+        deck_name=deck_dict["name"],
+        save_to_ankihub_db=False,  # no need to save to ankihub_db, we're just resetting local changes
+    )
+
+    notes_data = [
+        note_data
+        for nid in nids
+        if (note_data := ankihub_db.note_data(nid)) is not None
+    ]
+
+    importer.import_ankihub_deck(
+        ankihub_did=str(ankihub_deck_uuid),
+        notes_data=notes_data,
+        deck_name=deck_dict["name"],
+        local_did=anki_did,
+        save_to_ankihub_db=False,  # no need to save to ankihub_db, we're just resetting local changes
+    )
 
     # this way the notes won't be marked as "changed after sync" anymore
     ankihub_db.reset_mod_values_in_anki_db(list(nids))
