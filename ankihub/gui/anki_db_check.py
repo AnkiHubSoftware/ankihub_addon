@@ -4,7 +4,7 @@ from typing import List
 
 from anki.utils import ids2str
 from aqt import mw
-from aqt.utils import askUser
+from aqt.utils import askUser, showInfo
 
 from .. import LOGGER
 from ..db import ankihub_db
@@ -56,6 +56,7 @@ def on_done(future: Future):
     future.result()
 
     LOGGER.debug("Done resetting local changes.")
+    showInfo("Missing values have been restored.")
 
 
 def _decks_with_missing_ankihub_nids():
