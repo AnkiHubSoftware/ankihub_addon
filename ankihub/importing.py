@@ -65,8 +65,12 @@ class AnkiHubImporter:
 
         LOGGER.debug(f"Importing ankihub deck {deck_name=} {local_did=}")
 
-        mids = ankihub_db.note_types_for_ankihub_deck(ankihub_did)
-        remote_note_types = fetch_remote_note_types(mids)
+        # this is not ideal, it would be probably better to fetch all note types associated with the deck each time
+        if not notes_data:
+            mids = ankihub_db.note_types_for_ankihub_deck(ankihub_did)
+            remote_note_types = fetch_remote_note_types(mids)
+        else:
+            remote_note_types = fetch_remote_note_types_based_on_notes_data(notes_data)
 
         if protected_fields is None:
             protected_fields = AnkiHubClient().get_protected_fields(
@@ -449,6 +453,14 @@ def updated_tags(
     internal = [tag for tag in cur_tags if is_internal_tag(tag)]
 
     result = list(set(protected) | set(internal) | set(incoming_tags))
+    return result
+
+
+def fetch_remote_note_types_based_on_notes_data(
+    notes_data: List[NoteInfo],
+) -> Dict[NotetypeId, NotetypeDict]:
+    remote_mids = set(NotetypeId(note_data.mid) for note_data in notes_data)
+    result = fetch_remote_note_types(remote_mids)
     return result
 
 
