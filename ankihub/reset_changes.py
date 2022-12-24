@@ -25,6 +25,7 @@ def reset_local_changes_to_notes(
         ankihub_did=str(ankihub_deck_uuid),
         notes_data=[],
         deck_name=deck_dict["name"],
+        local_did=anki_did,
         save_to_ankihub_db=False,  # no need to save to ankihub_db, we're just resetting local changes
     )
 
