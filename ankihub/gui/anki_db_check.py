@@ -12,7 +12,7 @@ from ..reset_changes import reset_local_changes_to_notes
 from ..settings import ANKIHUB_NOTE_TYPE_FIELD_NAME, config
 
 
-def check_for_missing_ankihub_ids():
+def check_anki_db():
     # This is a fix for a bug in another add-on that removed the AnkiHub ID field from note types.
     # To restore the missing ankihub_ids this function resets local changes to the affected decks
     # when the user confirms the dialog.
