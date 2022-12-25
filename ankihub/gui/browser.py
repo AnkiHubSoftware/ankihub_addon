@@ -245,33 +245,33 @@ def on_browser_menus_did_init(browser: Browser):
 
 
 def on_reset_deck_action(browser: Browser):
-    decks = list(config.private_config.decks.values())
-    ankihub_dids = list(config.private_config.decks.keys())
+    ah_dids = config.deck_ids()
+    deck_configs = [config.deck_config(did) for did in ah_dids]
 
     chosen_deck_idx = chooseList(
         prompt="Choose the AnkiHub deck for which<br>you want to reset local changes",
-        choices=[deck["name"] for deck in decks],
+        choices=[deck.name for deck in deck_configs],
         parent=browser,
     )
-    chosen_deck = decks[chosen_deck_idx]
-    chosen_deck_ankihub_uuid = ankihub_dids[chosen_deck_idx]
+    chosen_deck_config = deck_configs[chosen_deck_idx]
+    chosen_deck_ah_did = ah_dids[chosen_deck_idx]
     if not askUser(
-        f"Are you sure you want to reset all local changes to the deck <b>{chosen_deck['name']}</b>?",
+        f"Are you sure you want to reset all local changes to the deck <b>{chosen_deck_config.name}</b>?",
         parent=browser,
     ):
         return
 
-    nids = ankihub_db.notes_for_ankihub_deck(ankihub_dids[chosen_deck_idx])
+    nids = ankihub_db.notes_for_ankihub_deck(str(ah_dids[chosen_deck_idx]))
 
     def on_done(future: Future) -> None:
         future.result()
 
         browser.model.reset()
-        tooltip(f"Reset local changes to deck <b>{chosen_deck['name']}</b>")
+        tooltip(f"Reset local changes to deck <b>{chosen_deck_config.name}</b>")
 
     mw.taskman.with_progress(
         lambda: reset_local_changes_to_notes(
-            nids, ankihub_deck_uuid=chosen_deck_ankihub_uuid
+            nids, ankihub_deck_uuid=chosen_deck_ah_did
         ),
         on_done=on_done,
         label="Resetting local changes...",

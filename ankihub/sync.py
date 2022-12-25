@@ -1,5 +1,5 @@
-import uuid
 import dataclasses
+import uuid
 from concurrent.futures import Future
 from datetime import datetime
 from time import sleep
@@ -25,26 +25,23 @@ class AnkiHubSync:
 
         create_backup()
 
-        for ankihub_did_str, deck_info in config.private_config.decks.items():
-            ankihub_did = uuid.UUID(ankihub_did_str)
+        for ah_did in config.deck_ids():
             try:
-                should_continue = self._sync_deck(ankihub_did)
+                should_continue = self._sync_deck(ah_did)
                 if not should_continue:
                     return
             except AnkiHubRequestError as e:
-                if self._handle_exception(e, ankihub_did):
+                if self._handle_exception(e, ah_did):
                     return
                 else:
                     raise e
 
     def _sync_deck(self, ankihub_did: uuid.UUID) -> bool:
-        deck = config.private_config.decks[str(ankihub_did)]
-
         def download_progress_cb(notes_count: int):
             mw.taskman.run_on_main(
                 lambda: mw.progress.update(
                     "Downloading updates\n"
-                    f"for {deck['name']}\n"
+                    f"for {config.deck_config(ankihub_did).name}\n"
                     f"Notes downloaded: {notes_count}"
                 )
             )
@@ -52,10 +49,13 @@ class AnkiHubSync:
         client = AnkiHubClient()
         notes_data = []
         latest_update: Optional[datetime] = None
+        deck_config = config.deck_config(ankihub_did)
         for chunk in client.get_deck_updates(
             ankihub_did,
-            since=datetime.strptime(deck["latest_update"], ANKIHUB_DATETIME_FORMAT_STR)
-            if deck["latest_update"]
+            since=datetime.strptime(
+                deck_config.latest_update, ANKIHUB_DATETIME_FORMAT_STR
+            )
+            if deck_config.latest_update
             else None,
             download_progress_cb=download_progress_cb,
         ):
@@ -77,8 +77,8 @@ class AnkiHubSync:
             self.importer.import_ankihub_deck(
                 ankihub_did=ankihub_did,
                 notes_data=notes_data,
-                deck_name=deck["name"],
-                local_did=deck["anki_id"],
+                deck_name=deck_config.name,
+                local_did=deck_config.anki_id,
                 protected_fields=chunk.protected_fields,
                 protected_tags=chunk.protected_tags,
             )
@@ -161,7 +161,7 @@ def sync_with_progress(on_done: Optional[Callable[[], None]] = None) -> None:
         if on_done is not None:
             on_done()
 
-    if config.private_config.token:
+    if config.token():
         mw.taskman.with_progress(
             sync_with_ankihub_after_delay,
             label="Synchronizing with AnkiHub",

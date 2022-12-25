@@ -27,7 +27,7 @@ def check_anki_db():
 
     deck_names = sorted(
         [
-            config.private_config.decks[deck_id]["name"]
+            config.deck_config(uuid.UUID(deck_id)).name
             for deck_id in ah_dids_with_missing_ah_nids
         ],
         key=str.lower,

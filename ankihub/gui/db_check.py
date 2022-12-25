@@ -29,7 +29,7 @@ def check_ankihub_db(on_success: Optional[Callable[[], None]] = None):
     else:
         deck_names = sorted(
             [
-                config.private_config.decks[deck_id]["name"]
+                config.deck_config(uuid.UUID(deck_id)).name
                 for deck_id in ah_dids_with_missing_values
             ],
             key=str.lower,
@@ -87,6 +87,6 @@ def show_failure_message() -> None:
 
 def decks_missing_from_config() -> List[str]:
     ah_dids_from_ankihub_db = ankihub_db.ankihub_deck_ids()
-    ah_dids_from_config = [ah_did for ah_did in config.private_config.decks]
+    ah_dids_from_config = list(map(str, config.deck_ids()))
 
     return list(set(ah_dids_from_ankihub_db) - set(ah_dids_from_config))

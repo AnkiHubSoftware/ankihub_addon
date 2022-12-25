@@ -1,8 +1,8 @@
+import uuid
 from concurrent.futures import Future
 from datetime import datetime
 from typing import Callable, List, Optional
 from uuid import UUID
-import uuid
 
 from anki.collection import OpChanges
 from aqt import gui_hooks, mw
@@ -88,11 +88,10 @@ class SubscribedDecksDialog(QDialog):
 
     def refresh_decks_list(self) -> None:
         self.decks_list.clear()
-        decks = config.private_config.decks
-        for ankihub_id_str in decks:
-            name = decks[ankihub_id_str]["name"]
+        for ah_did in config.deck_ids():
+            name = config.deck_config(ah_did).name
             item = QListWidgetItem(name)
-            item.setData(Qt.ItemDataRole.UserRole, ankihub_id_str)
+            item.setData(Qt.ItemDataRole.UserRole, ah_did)
             self.decks_list.addItem(item)
 
     def refresh_anki(self) -> None:
@@ -123,7 +122,7 @@ class SubscribedDecksDialog(QDialog):
             return
 
         for item in items:
-            ankihub_did = item.data(Qt.ItemDataRole.UserRole)
+            ankihub_did: UUID = item.data(Qt.ItemDataRole.UserRole)
             config.unsubscribe_deck(ankihub_did)
             self.unsubscribe_from_deck(ankihub_did)
 
@@ -131,17 +130,17 @@ class SubscribedDecksDialog(QDialog):
         self.refresh_decks_list()
 
     @staticmethod
-    def unsubscribe_from_deck(ankihub_did: str) -> None:
-        mids = ankihub_db.note_types_for_ankihub_deck(ankihub_did=ankihub_did)
+    def unsubscribe_from_deck(ankihub_did: UUID) -> None:
+        mids = ankihub_db.note_types_for_ankihub_deck(str(ankihub_did))
         undo_note_type_modfications(mids)
-        ankihub_db.remove_deck(ankihub_did)
+        ankihub_db.remove_deck(str(ankihub_did))
 
     def on_open_web(self) -> None:
         items = self.decks_list.selectedItems()
         if len(items) == 0:
             return
         for item in items:
-            ankihub_id = item.data(Qt.ItemDataRole.UserRole)
+            ankihub_id: UUID = item.data(Qt.ItemDataRole.UserRole)
             openLink(f"{URL_DECK_BASE}/{ankihub_id}")
 
     def on_set_home_deck(self):
@@ -153,10 +152,8 @@ class SubscribedDecksDialog(QDialog):
             return
 
         deck_name = deck_names[0]
-        ankihub_id = uuid.UUID(deck_name.data(Qt.ItemDataRole.UserRole))
-        current_home_deck = mw.col.decks.get(
-            config.private_config.decks[str(ankihub_id)]["anki_id"]
-        )
+        ankihub_id: UUID = deck_name.data(Qt.ItemDataRole.UserRole)
+        current_home_deck = mw.col.decks.get(config.deck_config(ankihub_id).anki_id)
         if current_home_deck is None:
             current = None
         else:
@@ -266,23 +263,24 @@ class SubscribeDialog(QDialog):
             self.show()
 
     def subscribe(self):
-        ankihub_did_str = self.deck_id_box_text.text().strip()
-        if ankihub_did_str in config.private_config.decks.keys():
+        ah_did_str = self.deck_id_box_text.text().strip()
+
+        try:
+            ah_did = uuid.UUID(ah_did_str)
+        except ValueError:
+            showInfo(
+                "The format of the Deck ID is invalid. Please make sure you copied the Deck ID correctly."
+            )
+            return
+
+        if ah_did in config.deck_ids():
             showText(
-                f"You've already subscribed to deck {ankihub_did_str}. "
+                f"You've already subscribed to deck {ah_did}. "
                 "Syncing with AnkiHub will happen automatically everytime you "
                 "restart Anki. You can manually sync with AnkiHub from the AnkiHub "
                 f"menu. See {URL_HELP} for more details."
             )
             self.close()
-            return
-
-        try:
-            ankihub_did = uuid.UUID(ankihub_did_str)
-        except ValueError:
-            showInfo(
-                "The format of the Deck ID is invalid. Please make sure you copied the Deck ID correctly."
-            )
             return
 
         confirmed = askUser(
@@ -295,7 +293,7 @@ class SubscribeDialog(QDialog):
             return
 
         download_and_install_deck(
-            ankihub_did, on_success=self.accept, on_failure=self.reject
+            ah_did, on_success=self.accept, on_failure=self.reject
         )
 
     def on_browse_deck(self) -> None:

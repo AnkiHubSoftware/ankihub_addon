@@ -341,7 +341,7 @@ def sync_with_ankihub_setup(parent):
     """Set up the menu item for uploading suggestions in bulk."""
     q_action = QAction("🔃️ Sync with AnkiHub", mw)
     qconnect(q_action.triggered, sync_with_ankihub_action)
-    if not config.private_config.decks:
+    if not config.deck_ids():
         q_action.setDisabled(True)
     parent.addAction(q_action)
 
@@ -404,7 +404,7 @@ def refresh_ankihub_menu() -> None:
     global ankihub_menu
     ankihub_menu.clear()
 
-    if config.private_config.token:
+    if config.token():
         create_collaborative_deck_setup(parent=ankihub_menu)
         subscribe_to_deck_setup(parent=ankihub_menu)
         import_media_setup(parent=ankihub_menu)
