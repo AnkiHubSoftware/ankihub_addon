@@ -277,6 +277,14 @@ class SubscribeDialog(QDialog):
             self.close()
             return
 
+        try:
+            ankihub_did = uuid.UUID(ankihub_did_str)
+        except ValueError:
+            showInfo(
+                "The format of the Deck ID is invalid. Please make sure you copied the Deck ID correctly."
+            )
+            return
+
         confirmed = askUser(
             f"Would you like to proceed with downloading and installing the deck? "
             f"Your personal collection will be modified.<br><br>"
@@ -286,7 +294,6 @@ class SubscribeDialog(QDialog):
         if not confirmed:
             return
 
-        ankihub_did = uuid.UUID(ankihub_did_str)
         download_and_install_deck(
             ankihub_did, on_success=self.accept, on_failure=self.reject
         )
