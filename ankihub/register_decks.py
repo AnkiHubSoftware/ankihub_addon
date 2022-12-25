@@ -67,7 +67,7 @@ def create_collaborative_deck(deck_name: str, private: bool) -> uuid.UUID:
 
     ankihub_did = upload_deck(deck_id, notes_data=notes_data, private=private)
     ankihub_db.save_notes_data_and_mod_values(
-        ankihub_did=str(ankihub_did), notes_data=notes_data
+        ankihub_did=ankihub_did, notes_data=notes_data
     )
     return ankihub_did
 

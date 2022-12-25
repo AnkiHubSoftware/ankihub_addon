@@ -131,9 +131,9 @@ class SubscribedDecksDialog(QDialog):
 
     @staticmethod
     def unsubscribe_from_deck(ankihub_did: UUID) -> None:
-        mids = ankihub_db.note_types_for_ankihub_deck(str(ankihub_did))
+        mids = ankihub_db.note_types_for_ankihub_deck(ankihub_did)
         undo_note_type_modfications(mids)
-        ankihub_db.remove_deck(str(ankihub_did))
+        ankihub_db.remove_deck(ankihub_did)
 
     def on_open_web(self) -> None:
         items = self.decks_list.selectedItems()

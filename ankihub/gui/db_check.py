@@ -29,7 +29,7 @@ def check_ankihub_db(on_success: Optional[Callable[[], None]] = None):
     else:
         deck_names = sorted(
             [
-                config.deck_config(uuid.UUID(deck_id)).name
+                config.deck_config(deck_id).name
                 for deck_id in ah_dids_with_missing_values
             ],
             key=str.lower,
@@ -55,7 +55,7 @@ def check_ankihub_db(on_success: Optional[Callable[[], None]] = None):
 
 
 def download_and_install_decks(
-    ankihub_dids: List[str], on_success: Optional[Callable[[], None]] = None
+    ankihub_dids: List[uuid.UUID], on_success: Optional[Callable[[], None]] = None
 ):
     # Installs decks one by one and then cleans up.
     # If a deck install fails, the other deck installs and the cleanup are **not** executed.
@@ -68,7 +68,7 @@ def download_and_install_decks(
             on_success()
         return
 
-    cur_did = uuid.UUID(ankihub_dids.pop())
+    cur_did = ankihub_dids.pop()
 
     download_and_install_deck(
         cur_did,
@@ -85,8 +85,7 @@ def show_failure_message() -> None:
     )
 
 
-def decks_missing_from_config() -> List[str]:
+def decks_missing_from_config() -> List[uuid.UUID]:
     ah_dids_from_ankihub_db = ankihub_db.ankihub_deck_ids()
-    ah_dids_from_config = list(map(str, config.deck_ids()))
-
+    ah_dids_from_config = config.deck_ids()
     return list(set(ah_dids_from_ankihub_db) - set(ah_dids_from_config))

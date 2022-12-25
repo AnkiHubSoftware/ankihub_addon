@@ -204,7 +204,7 @@ def test_create_collaborative_deck_and_upload(
             }
 
             # check that deck info is in db
-            assert ankihub_db.ankihub_deck_ids() == [str(ankihub_deck_uuid)]
+            assert ankihub_db.ankihub_deck_ids() == [ankihub_deck_uuid]
             assert len(ankihub_db.notes_for_ankihub_deck(str(ankihub_deck_uuid))) == 3
 
 
@@ -584,7 +584,7 @@ def test_import_existing_ankihub_deck(anki_session_with_addon: AnkiSession):
 def assert_that_only_ankihub_sample_deck_info_in_database(ankihub_deck_uuid: uuid.UUID):
     from ankihub.db import ankihub_db
 
-    assert ankihub_db.ankihub_deck_ids() == [str(ankihub_deck_uuid)]
+    assert ankihub_db.ankihub_deck_ids() == [ankihub_deck_uuid]
     assert len(ankihub_db.notes_for_ankihub_deck(str(ankihub_deck_uuid))) == 3
 
 

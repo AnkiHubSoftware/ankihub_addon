@@ -67,7 +67,7 @@ class AnkiHubImporter:
 
         # this is not ideal, it would be probably better to fetch all note types associated with the deck each time
         if not notes_data:
-            mids = ankihub_db.note_types_for_ankihub_deck(str(ankihub_did))
+            mids = ankihub_db.note_types_for_ankihub_deck(ankihub_did)
             remote_note_types = fetch_remote_note_types(mids)
         else:
             remote_note_types = fetch_remote_note_types_based_on_notes_data(notes_data)
@@ -125,7 +125,7 @@ class AnkiHubImporter:
 
         if save_to_ankihub_db:
             ankihub_db.save_notes_data_and_mod_values(
-                ankihub_did=str(ankihub_did), notes_data=notes_data
+                ankihub_did=ankihub_did, notes_data=notes_data
             )
 
         return local_did
