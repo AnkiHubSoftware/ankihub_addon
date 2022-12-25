@@ -74,6 +74,7 @@ class SubscribedDecksDialog(QDialog):
         qconnect(self.open_web_btn.clicked, self.on_open_web)
 
         self.set_home_deck = QPushButton("Set Home deck")
+        self.set_home_deck.setToolTip("New cards will be added to this deck.")
         qconnect(self.set_home_deck.clicked, self.on_set_home_deck)
         self.box_right.addWidget(self.set_home_deck)
 
