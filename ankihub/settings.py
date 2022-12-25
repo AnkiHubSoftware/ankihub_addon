@@ -10,6 +10,7 @@ from logging.handlers import RotatingFileHandler
 from pathlib import Path
 from pprint import pformat
 from typing import Any, Callable, Dict, Optional
+import uuid
 
 from anki.buildinfo import version as ANKI_VERSION
 from aqt import mw
@@ -75,25 +76,27 @@ class Config:
         self.private_config.user = user_email
         self._update_private_config()
 
-    def save_latest_update(self, ankihub_did: str, latest_update: Optional[datetime]):
+    def save_latest_update(
+        self, ankihub_did: uuid.UUID, latest_update: Optional[datetime]
+    ):
         if latest_update is None:
-            self.private_config.decks[ankihub_did]["latest_update"] = None
+            self.private_config.decks[str(ankihub_did)]["latest_update"] = None
         else:
             date_time_str = datetime.strftime(
                 latest_update, ANKIHUB_DATETIME_FORMAT_STR
             )
-            self.private_config.decks[ankihub_did]["latest_update"] = date_time_str
+            self.private_config.decks[str(ankihub_did)]["latest_update"] = date_time_str
         self._update_private_config()
 
     def save_subscription(
         self,
         name: str,
-        ankihub_did: str,
+        ankihub_did: uuid.UUID,
         anki_did: int,
         creator: bool = False,
         latest_udpate: Optional[datetime] = None,
     ) -> None:
-        self.private_config.decks[ankihub_did] = {
+        self.private_config.decks[str(ankihub_did)] = {
             "name": name,
             "anki_id": anki_did,
             "creator": creator,
@@ -118,8 +121,8 @@ class Config:
             config_dict["token"] = "REDACTED"
         LOGGER.debug(f"private config:\n{pformat(config_dict)}")
 
-    def set_home_deck(self, ankihub_did: str, anki_did: int):
-        self.private_config.decks[ankihub_did]["anki_id"] = anki_did
+    def set_home_deck(self, ankihub_did: uuid.UUID, anki_did: int):
+        self.private_config.decks[str(ankihub_did)]["anki_id"] = anki_did
         self._update_private_config()
 
 

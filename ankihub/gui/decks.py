@@ -2,6 +2,7 @@ from concurrent.futures import Future
 from datetime import datetime
 from typing import Callable, List, Optional
 from uuid import UUID
+import uuid
 
 from anki.collection import OpChanges
 from aqt import gui_hooks, mw
@@ -88,10 +89,10 @@ class SubscribedDecksDialog(QDialog):
     def refresh_decks_list(self) -> None:
         self.decks_list.clear()
         decks = config.private_config.decks
-        for ankihub_id in decks:
-            name = decks[ankihub_id]["name"]
+        for ankihub_id_str in decks:
+            name = decks[ankihub_id_str]["name"]
             item = QListWidgetItem(name)
-            item.setData(Qt.ItemDataRole.UserRole, ankihub_id)
+            item.setData(Qt.ItemDataRole.UserRole, ankihub_id_str)
             self.decks_list.addItem(item)
 
     def refresh_anki(self) -> None:
@@ -152,9 +153,9 @@ class SubscribedDecksDialog(QDialog):
             return
 
         deck_name = deck_names[0]
-        ankihub_id = deck_name.data(Qt.ItemDataRole.UserRole)
+        ankihub_id = uuid.UUID(deck_name.data(Qt.ItemDataRole.UserRole))
         current_home_deck = mw.col.decks.get(
-            config.private_config.decks[ankihub_id]["anki_id"]
+            config.private_config.decks[str(ankihub_id)]["anki_id"]
         )
         if current_home_deck is None:
             current = None
@@ -265,10 +266,10 @@ class SubscribeDialog(QDialog):
             self.show()
 
     def subscribe(self):
-        ankihub_did = self.deck_id_box_text.text().strip()
-        if ankihub_did in config.private_config.decks.keys():
+        ankihub_did_str = self.deck_id_box_text.text().strip()
+        if ankihub_did_str in config.private_config.decks.keys():
             showText(
-                f"You've already subscribed to deck {ankihub_did}. "
+                f"You've already subscribed to deck {ankihub_did_str}. "
                 "Syncing with AnkiHub will happen automatically everytime you "
                 "restart Anki. You can manually sync with AnkiHub from the AnkiHub "
                 f"menu. See {URL_HELP} for more details."
@@ -285,6 +286,7 @@ class SubscribeDialog(QDialog):
         if not confirmed:
             return
 
+        ankihub_did = uuid.UUID(ankihub_did_str)
         download_and_install_deck(
             ankihub_did, on_success=self.accept, on_failure=self.reject
         )
@@ -294,7 +296,7 @@ class SubscribeDialog(QDialog):
 
 
 def download_and_install_deck(
-    ankihub_did: str,
+    ankihub_did: uuid.UUID,
     on_success: Optional[Callable[[], None]] = None,
     on_failure: Optional[Callable[[], None]] = None,
     cleanup: bool = True,
@@ -324,7 +326,7 @@ def download_and_install_deck(
                 on_success()
 
     try:
-        deck_info = AnkiHubClient().get_deck_by_id(UUID(ankihub_did))
+        deck_info = AnkiHubClient().get_deck_by_id(ankihub_did)
     except AnkiHubRequestError as e:
         if e.response.status_code == 404:
             showText(
@@ -372,7 +374,7 @@ def download_and_install_deck(
 def install_deck(
     notes_data: List[NoteInfo],
     deck_name: str,
-    ankihub_did: str,
+    ankihub_did: UUID,
     latest_update: datetime,
     is_creator: bool,
 ) -> bool:

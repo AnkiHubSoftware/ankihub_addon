@@ -22,7 +22,7 @@ def reset_local_changes_to_notes(
     # this is needed so that notes_data can be retrieved from the database if the fields
     # of the note type have changed
     importer.import_ankihub_deck(
-        ankihub_did=str(ankihub_deck_uuid),
+        ankihub_did=ankihub_deck_uuid,
         notes_data=[],
         deck_name=deck_dict["name"],
         local_did=anki_did,
@@ -36,7 +36,7 @@ def reset_local_changes_to_notes(
     ]
 
     importer.import_ankihub_deck(
-        ankihub_did=str(ankihub_deck_uuid),
+        ankihub_did=ankihub_deck_uuid,
         notes_data=notes_data,
         deck_name=deck_dict["name"],
         local_did=anki_did,

@@ -2,6 +2,7 @@ import re
 from concurrent.futures import Future
 from datetime import datetime, timezone
 from typing import Optional
+import uuid
 
 from aqt import (
     AnkiApp,
@@ -212,7 +213,7 @@ def create_collaborative_deck_action() -> None:
         tooltip("Cancelled Upload to AnkiHub")
         return
 
-    def on_success(ankihub_did: str) -> None:
+    def on_success(ankihub_did: uuid.UUID) -> None:
         anki_did = mw.col.decks.id_for_name(deck_name)
         creation_time = datetime.now(tz=timezone.utc)
         config.save_subscription(

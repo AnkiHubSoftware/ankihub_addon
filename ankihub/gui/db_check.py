@@ -1,4 +1,5 @@
 from typing import Callable, List, Optional
+import uuid
 
 from aqt.utils import askUser, showInfo, showWarning
 
@@ -67,7 +68,7 @@ def download_and_install_decks(
             on_success()
         return
 
-    cur_did = ankihub_dids.pop()
+    cur_did = uuid.UUID(ankihub_dids.pop())
 
     download_and_install_deck(
         cur_did,

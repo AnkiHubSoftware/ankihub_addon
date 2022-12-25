@@ -29,7 +29,7 @@ from .utils import (
 DIR_PATH = os.path.dirname(os.path.abspath(__file__))
 
 
-def upload_deck(did: DeckId, notes_data: List[NoteInfo], private: bool) -> str:
+def upload_deck(did: DeckId, notes_data: List[NoteInfo], private: bool) -> uuid.UUID:
     """Upload the deck to AnkiHub."""
 
     deck_name = mw.col.decks.name(did)
@@ -37,19 +37,17 @@ def upload_deck(did: DeckId, notes_data: List[NoteInfo], private: bool) -> str:
     note_types_data = [mw.col.models.get(mid) for mid in get_note_types_in_deck(did)]
 
     client = AnkiHubClient()
-    ankihub_did = str(
-        client.upload_deck(
-            deck_name=deck_name,
-            notes_data=notes_data,
-            note_types_data=note_types_data,
-            anki_deck_id=did,
-            private=private,
-        )
+    ankihub_did = client.upload_deck(
+        deck_name=deck_name,
+        notes_data=notes_data,
+        note_types_data=note_types_data,
+        anki_deck_id=did,
+        private=private,
     )
     return ankihub_did
 
 
-def create_collaborative_deck(deck_name: str, private: bool) -> str:
+def create_collaborative_deck(deck_name: str, private: bool) -> uuid.UUID:
     LOGGER.debug("Creating collaborative deck")
 
     create_backup()
@@ -69,7 +67,7 @@ def create_collaborative_deck(deck_name: str, private: bool) -> str:
 
     ankihub_did = upload_deck(deck_id, notes_data=notes_data, private=private)
     ankihub_db.save_notes_data_and_mod_values(
-        ankihub_did=ankihub_did, notes_data=notes_data
+        ankihub_did=str(ankihub_did), notes_data=notes_data
     )
     return ankihub_did
 
