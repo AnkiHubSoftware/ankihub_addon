@@ -170,7 +170,7 @@ class SubscribedDecksDialog(QDialog):
             tooltip("Home deck updated.", parent=self)
 
         # this lets the user pick a deck
-        StudyDeck(
+        StudyDeckWithoutHelpButton(
             mw,
             current=current,
             accept="Set Home Deck",
@@ -196,6 +196,15 @@ class SubscribedDecksDialog(QDialog):
             cls._window.raise_()
             cls._window.show()
         return cls._window
+
+
+class StudyDeckWithoutHelpButton(StudyDeck):
+    def __init__(self, *args, **kwargs) -> None:
+        super().__init__(*args, **kwargs)
+
+        self.form.buttonBox.removeButton(
+            self.form.buttonBox.button(QDialogButtonBox.StandardButton.Help)
+        )
 
 
 class SubscribeDialog(QDialog):
