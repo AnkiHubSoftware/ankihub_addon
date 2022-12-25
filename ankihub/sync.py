@@ -1,4 +1,3 @@
-import dataclasses
 import uuid
 from concurrent.futures import Future
 from datetime import datetime
