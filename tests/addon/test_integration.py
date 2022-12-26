@@ -56,7 +56,6 @@ def test_editor(anki_session_with_addon: AnkiSession, requests_mock, monkeypatch
     monkeypatch.setattr("ankihub.gui.editor.SuggestionDialog.exec", Mock())
 
     # when the decks in the config are empty on_suggestion_button_press returns early
-
     monkeypatch.setattr(
         "ankihub.settings.config._private_config.decks",
         {str(ankihub_deck_uuid): Mock()},
