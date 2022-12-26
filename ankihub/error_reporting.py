@@ -55,9 +55,9 @@ def report_exception(
 
         with configure_scope() as scope:
             scope.level = "error"
-            scope.user = {"id": config.private_config.user}
+            scope.user = {"id": config.user()}
             scope.set_context(
-                "add-on config", dataclasses.asdict(config.private_config)
+                "add-on config", dataclasses.asdict(config._private_config)
             )
             scope.set_context("addon version", {"version": ADDON_VERSION})
             scope.set_context("anki version", {"version": ANKI_VERSION})
@@ -119,11 +119,7 @@ def upload_logs_in_background(
     LOGGER.debug("Uploading logs...")
 
     # many users use their email address as their username and may not want to share it on a forum
-    user_name = (
-        config.private_config.user
-        if not hide_username
-        else checksum(config.private_config.user)[:5]
-    )
+    user_name = config.user() if not hide_username else checksum(config.user())[:5]
     key = f"ankihub_addon_logs_{user_name}_{int(time.time())}.log"
 
     def upload_logs() -> str:

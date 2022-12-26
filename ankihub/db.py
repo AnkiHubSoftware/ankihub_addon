@@ -139,7 +139,7 @@ class AnkiHubDB:
         return result
 
     def save_notes_data_and_mod_values(
-        self, ankihub_did: str, notes_data: List[NoteInfo]
+        self, ankihub_did: uuid.UUID, notes_data: List[NoteInfo]
     ):
         """Save notes data in the AnkiHub DB.
         It also takes mod values for the notes from the Anki DB and saves them to the AnkiHub DB.
@@ -174,7 +174,7 @@ class AnkiHubDB:
                     """,
                     (
                         str(note_data.ankihub_note_uuid),
-                        ankihub_did,
+                        str(ankihub_did),
                         note_data.anki_nid,
                         note_data.mid,
                         mod,
@@ -184,7 +184,7 @@ class AnkiHubDB:
                     ),
                 )
 
-    def reset_mod_values_in_anki_db(self, anki_nids: List[int]) -> None:
+    def reset_mod_values_in_anki_db(self, anki_nids: List[NoteId]) -> None:
         # resets the mod values of the notes in the Anki DB to the
         # mod values stored in the AnkiHub DB
         nid_mod_tuples = self.execute(
@@ -199,7 +199,7 @@ class AnkiHubDB:
                 nid,
             )
 
-    def note_data(self, anki_note_id: int) -> Optional[NoteInfo]:
+    def note_data(self, anki_note_id: NoteId) -> Optional[NoteInfo]:
         result = self.first(
             f"""
             SELECT
@@ -236,32 +236,46 @@ class AnkiHubDB:
             guid=guid,
         )
 
-    def notes_for_ankihub_deck(self, ankihub_did: str) -> List[NoteId]:
+    def notes_for_ankihub_deck(self, ankihub_did: uuid.UUID) -> List[NoteId]:
         result = self.list(
             """
             SELECT anki_note_id FROM notes WHERE ankihub_deck_id = ?
             """,
-            ankihub_did,
+            str(ankihub_did),
         )
         return result
 
-    def ankihub_did_for_note_type(self, anki_note_type_id: int) -> Optional[str]:
-        result = self.scalar(
+    def ankihub_dids(self) -> List[uuid.UUID]:
+        result = [
+            uuid.UUID(did)
+            for did in self.list("SELECT DISTINCT ankihub_deck_id FROM notes")
+        ]
+        return result
+
+    def ankihub_did_for_note_type(
+        self, anki_note_type_id: NotetypeId
+    ) -> Optional[uuid.UUID]:
+        did_str = self.scalar(
             """
             SELECT ankihub_deck_id FROM notes WHERE anki_note_type_id = ?
             """,
             anki_note_type_id,
         )
+        if did_str is None:
+            return None
+
+        result = uuid.UUID(did_str)
         return result
 
     def ankihub_dids_for_anki_nids(
         self, anki_nids: Iterable[NoteId]
     ) -> List[uuid.UUID]:
-        result = self.list(
+        did_strs = self.list(
             f"""
             SELECT DISTINCT ankihub_deck_id FROM notes WHERE anki_note_id IN {ids2str(anki_nids)}
             """
         )
+        result = [uuid.UUID(did) for did in did_strs]
         return result
 
     def are_ankihub_notes(self, anki_nids: List[NoteId]) -> bool:
@@ -272,34 +286,41 @@ class AnkiHubDB:
         )
         return notes_count == len(set(anki_nids))
 
-    def ankihub_id_for_note(self, anki_note_id: int) -> Optional[str]:
-        result = self.scalar(
+    def ankihub_id_for_note(self, anki_note_id: NoteId) -> Optional[uuid.UUID]:
+        nid_str = self.scalar(
             """
             SELECT ankihub_note_id FROM notes WHERE anki_note_id = ?
             """,
             anki_note_id,
         )
+        if nid_str is None:
+            return None
+
+        result = uuid.UUID(nid_str)
         return result
 
-    def note_types_for_ankihub_deck(self, ankihub_did: str) -> List[NotetypeId]:
+    def note_types_for_ankihub_deck(self, ankihub_did: uuid.UUID) -> List[NotetypeId]:
         result = self.list(
             """
             SELECT DISTINCT anki_note_type_id FROM notes WHERE ankihub_deck_id = ?
             """,
-            ankihub_did,
+            str(ankihub_did),
         )
         return result
 
-    def remove_deck(self, ankihub_did: str):
+    def remove_deck(self, ankihub_did: uuid.UUID):
         self.execute(
             """
             DELETE FROM notes WHERE ankihub_deck_id = ?
             """,
-            ankihub_did,
+            str(ankihub_did),
         )
 
-    def ankihub_deck_ids(self) -> List[str]:
-        result = self.list("SELECT DISTINCT ankihub_deck_id FROM notes")
+    def ankihub_deck_ids(self) -> List[uuid.UUID]:
+        result = [
+            uuid.UUID(did)
+            for did in self.list("SELECT DISTINCT ankihub_deck_id FROM notes")
+        ]
         return result
 
     def last_sync(self, ankihub_note_id: uuid.UUID) -> Optional[int]:
@@ -309,14 +330,15 @@ class AnkiHubDB:
         )
         return result
 
-    def ankihub_dids_of_decks_with_missing_values(self) -> List[str]:
+    def ankihub_dids_of_decks_with_missing_values(self) -> List[uuid.UUID]:
         # currently only checks the guid, fields and tags columns
-        result = self.list(
+        did_strs = self.list(
             "SELECT DISTINCT ankihub_deck_id FROM notes WHERE "
             "guid IS NULL OR "
             "fields IS NULL OR "
             "tags IS NULL"
         )
+        result = [uuid.UUID(did) for did in did_strs]
         return result
 
 

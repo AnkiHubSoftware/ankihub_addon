@@ -1,4 +1,3 @@
-import uuid
 from pprint import pformat
 from typing import Any, List, Tuple
 
@@ -8,7 +7,7 @@ from anki.models import NoteType
 from aqt import gui_hooks
 from aqt.addcards import AddCards
 from aqt.editor import Editor
-from aqt.utils import chooseList, showInfo, showText, tooltip
+from aqt.utils import showInfo, showText, tooltip
 
 from .. import LOGGER, settings
 from ..ankihub_client import AnkiHubRequestError
@@ -22,6 +21,7 @@ from ..settings import (
 )
 from ..suggestions import suggest_new_note, suggest_note_update
 from .suggestion_dialog import SuggestionDialog
+from .utils import choose_list
 
 
 def on_suggestion_button_press(editor: Editor) -> None:
@@ -85,29 +85,31 @@ def on_suggestion_button_press_inner(editor: Editor) -> None:
         tooltip("Submitted change note suggestion to AnkiHub.")
         return
     elif command == AnkiHubCommands.NEW.value:
-        subscribed_decks = config.private_config.decks
-        if len(subscribed_decks) == 0:
+        subscribed_dids = config.deck_ids()
+        if len(subscribed_dids) == 0:
             showText(
                 "You aren't currently subscribed to any AnkiHub decks. "
                 "Please subscribe to an AnkiHub deck first."
             )
             return
-        elif len(subscribed_decks) == 1:
-            (decks,) = subscribed_decks.items()
-            ankihub_did, _ = decks
+        elif len(subscribed_dids) == 1:
+            ankihub_did = subscribed_dids[0]
         else:
-            choice = chooseList(
+            choice = choose_list(
                 "Which AnKiHub deck would you like to add this note to?",
-                choices=[subscribed_decks[id]["name"] for id in subscribed_decks],
+                choices=[config.deck_config(did).name for did in subscribed_dids],
             )
-            ankihub_did = list(subscribed_decks.keys())[choice]
+            if choice is None:
+                return
+
+            ankihub_did = subscribed_dids[choice]
 
         if editor.addMode:
 
             def on_add(note: anki.notes.Note) -> None:
                 suggest_new_note(
                     note=note,
-                    ankihub_deck_uuid=uuid.UUID(ankihub_did),
+                    ankihub_deck_uuid=ankihub_did,
                     comment=comment,
                     auto_accept=auto_accept,
                 )
@@ -120,7 +122,7 @@ def on_suggestion_button_press_inner(editor: Editor) -> None:
         else:
             suggest_new_note(
                 note=editor.note,
-                ankihub_deck_uuid=uuid.UUID(ankihub_did),
+                ankihub_deck_uuid=ankihub_did,
                 comment=comment,
                 auto_accept=auto_accept,
             )

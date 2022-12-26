@@ -2,7 +2,7 @@ import uuid
 from concurrent.futures import Future
 from datetime import datetime
 from time import sleep
-from typing import Callable, Dict, Optional
+from typing import Callable, Optional
 
 from aqt import mw
 from aqt.utils import showInfo, tooltip
@@ -24,25 +24,23 @@ class AnkiHubSync:
 
         create_backup()
 
-        for ankihub_did, deck_info in config.private_config.decks.items():
+        for ah_did in config.deck_ids():
             try:
-                should_continue = self._sync_deck(ankihub_did)
+                should_continue = self._sync_deck(ah_did)
                 if not should_continue:
                     return
             except AnkiHubRequestError as e:
-                if self._handle_exception(e, ankihub_did, deck_info):
+                if self._handle_exception(e, ah_did):
                     return
                 else:
                     raise e
 
-    def _sync_deck(self, ankihub_did: str) -> bool:
-        deck = config.private_config.decks[ankihub_did]
-
+    def _sync_deck(self, ankihub_did: uuid.UUID) -> bool:
         def download_progress_cb(notes_count: int):
             mw.taskman.run_on_main(
                 lambda: mw.progress.update(
                     "Downloading updates\n"
-                    f"for {deck['name']}\n"
+                    f"for {config.deck_config(ankihub_did).name}\n"
                     f"Notes downloaded: {notes_count}"
                 )
             )
@@ -50,10 +48,13 @@ class AnkiHubSync:
         client = AnkiHubClient()
         notes_data = []
         latest_update: Optional[datetime] = None
+        deck_config = config.deck_config(ankihub_did)
         for chunk in client.get_deck_updates(
-            uuid.UUID(ankihub_did),
-            since=datetime.strptime(deck["latest_update"], ANKIHUB_DATETIME_FORMAT_STR)
-            if deck["latest_update"]
+            ankihub_did,
+            since=datetime.strptime(
+                deck_config.latest_update, ANKIHUB_DATETIME_FORMAT_STR
+            )
+            if deck_config.latest_update
             else None,
             download_progress_cb=download_progress_cb,
         ):
@@ -75,8 +76,8 @@ class AnkiHubSync:
             self.importer.import_ankihub_deck(
                 ankihub_did=ankihub_did,
                 notes_data=notes_data,
-                deck_name=deck["name"],
-                local_did=deck["anki_id"],
+                deck_name=deck_config.name,
+                local_did=deck_config.anki_id,
                 protected_fields=chunk.protected_fields,
                 protected_tags=chunk.protected_tags,
             )
@@ -87,21 +88,23 @@ class AnkiHubSync:
         return True
 
     def _handle_exception(
-        self, exc: AnkiHubRequestError, ankihub_did: str, deck_info: Dict
+        self, exc: AnkiHubRequestError, ankihub_did: uuid.UUID
     ) -> bool:
         # returns True if the exception was handled
 
         if "/updates" not in exc.response.url:
             return False
 
+        deck_config = config.deck_config(ankihub_did)
+
         if exc.response.status_code == 403:
             url_view_deck = f"{settings.URL_VIEW_DECK}{ankihub_did}"
             mw.taskman.run_on_main(
                 lambda: showInfo(  # type: ignore
-                    f"Please subscribe to the deck <br><b>{deck_info['name']}</b><br>on the AnkiHub website to "
+                    f"Please subscribe to the deck <br><b>{deck_config.name}</b><br>on the AnkiHub website to "
                     "be able to sync.<br><br>"
                     f'Link to the deck: <a href="{url_view_deck}">{url_view_deck}</a><br><br>'
-                    f"Note that you also need an active AnkiHub membership.",
+                    f"Note that you also need an active AnkiHub subscription.",
                 )
             )
             LOGGER.debug(
@@ -111,7 +114,7 @@ class AnkiHubSync:
         elif exc.response.status_code == 404:
             mw.taskman.run_on_main(
                 lambda: showInfo(  # type: ignore
-                    f"The deck <b>{deck_info['name']}</b> does not exist on the AnkiHub website. "
+                    f"The deck <b>{deck_config.name}</b> does not exist on the AnkiHub website. "
                     f"Remove it from the subscribed decks to be able to sync.<br><br>"
                     f"deck id: <i>{ankihub_did}</i>",
                 )
@@ -157,7 +160,7 @@ def sync_with_progress(on_done: Optional[Callable[[], None]] = None) -> None:
         if on_done is not None:
             on_done()
 
-    if config.private_config.token:
+    if config.token():
         mw.taskman.with_progress(
             sync_with_ankihub_after_delay,
             label="Synchronizing with AnkiHub",

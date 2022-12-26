@@ -41,7 +41,7 @@ class AddonAnkiHubClient(AnkiHubClient):
     def __init__(self, hooks=None) -> None:
         super().__init__(
             hooks=hooks if hooks is not None else DEFAULT_RESPONSE_HOOKS,
-            token=config.private_config.token,
+            token=config.token(),
         )
 
     def upload_logs(self, file: Path, key: str) -> None:

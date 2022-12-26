@@ -3,15 +3,17 @@ import json
 import logging
 import os
 import sys
+import uuid
 from datetime import datetime
 from enum import Enum
 from json import JSONDecodeError
 from logging.handlers import RotatingFileHandler
 from pathlib import Path
 from pprint import pformat
-from typing import Any, Callable, Dict, Optional
+from typing import Any, Callable, Dict, List, Optional
 
 from anki.buildinfo import version as ANKI_VERSION
+from anki.decks import DeckId
 from aqt import mw
 
 from . import LOGGER, ankihub_client
@@ -19,10 +21,18 @@ from .ankihub_client import ANKIHUB_DATETIME_FORMAT_STR
 
 
 @dataclasses.dataclass
+class DeckConfig:
+    anki_id: DeckId
+    creator: bool
+    name: str
+    latest_update: Optional[str] = None
+
+
+@dataclasses.dataclass
 class PrivateConfig:
     token: str = ""
     user: str = ""
-    decks: Dict[str, Dict[str, Any]] = dataclasses.field(default_factory=dict)
+    decks: Dict[uuid.UUID, DeckConfig] = dataclasses.field(default_factory=dict)
 
 
 class Config:
@@ -40,14 +50,19 @@ class Config:
             user_files_path, ".private_config.json"
         )
         if not os.path.exists(self._private_config_file_path):
-            self.private_config = self.new_config()
+            self._private_config = self.new_config()
         else:
             with open(self._private_config_file_path) as f:
                 try:
-                    self.private_config = PrivateConfig(**json.load(f))
+                    private_config_dict = json.load(f)
+                    decks_dict = private_config_dict["decks"]
+                    private_config_dict["decks"] = {
+                        uuid.UUID(k): DeckConfig(**v) for k, v in decks_dict.items()
+                    }
+                    self._private_config = PrivateConfig(**private_config_dict)
                 except JSONDecodeError:
                     # TODO Instead of overwriting, query AnkiHub for config values.
-                    self.private_config = self.new_config()
+                    self._private_config = self.new_config()
         self._log_private_config()
         self.token_change_hook: Optional[Callable[[], None]] = None
         self.subscriptions_change_hook: Optional[Callable[[], None]] = None
@@ -61,43 +76,47 @@ class Config:
 
     def _update_private_config(self):
         with open(self._private_config_file_path, "w") as f:
-            config_dict = dataclasses.asdict(self.private_config)
+            config_dict = dataclasses.asdict(self._private_config)
+            # convert uuid keys to strings
+            config_dict["decks"] = {str(k): v for k, v in config_dict["decks"].items()}
             f.write(json.dumps(config_dict, indent=4, sort_keys=True))
         self._log_private_config()
 
     def save_token(self, token: str):
-        self.private_config.token = token
+        self._private_config.token = token
         self._update_private_config()
         if self.token_change_hook:
             self.token_change_hook()
 
     def save_user_email(self, user_email: str):
-        self.private_config.user = user_email
+        self._private_config.user = user_email
         self._update_private_config()
 
-    def save_latest_update(self, ankihub_did: str, latest_update: Optional[datetime]):
+    def save_latest_update(
+        self, ankihub_did: uuid.UUID, latest_update: Optional[datetime]
+    ):
         if latest_update is None:
-            self.private_config.decks[ankihub_did]["latest_update"] = None
+            self.deck_config(ankihub_did).latest_update = None
         else:
             date_time_str = datetime.strftime(
                 latest_update, ANKIHUB_DATETIME_FORMAT_STR
             )
-            self.private_config.decks[ankihub_did]["latest_update"] = date_time_str
+            self.deck_config(ankihub_did).latest_update = date_time_str
         self._update_private_config()
 
     def save_subscription(
         self,
         name: str,
-        ankihub_did: str,
-        anki_did: int,
+        ankihub_did: uuid.UUID,
+        anki_did: DeckId,
         creator: bool = False,
         latest_udpate: Optional[datetime] = None,
     ) -> None:
-        self.private_config.decks[ankihub_did] = {
-            "name": name,
-            "anki_id": anki_did,
-            "creator": creator,
-        }
+        self._private_config.decks[ankihub_did] = DeckConfig(
+            name=name,
+            anki_id=DeckId(anki_did),
+            creator=creator,
+        )
         # remove duplicates
         self.save_latest_update(ankihub_did, latest_udpate)
         self._update_private_config()
@@ -105,18 +124,34 @@ class Config:
         if self.subscriptions_change_hook:
             self.subscriptions_change_hook()
 
-    def unsubscribe_deck(self, ankihub_did: str) -> None:
-        self.private_config.decks.pop(ankihub_did)
+    def unsubscribe_deck(self, ankihub_did: uuid.UUID) -> None:
+        self._private_config.decks.pop(ankihub_did)
         self._update_private_config()
 
         if self.subscriptions_change_hook:
             self.subscriptions_change_hook()
 
     def _log_private_config(self):
-        config_dict = dataclasses.asdict(self.private_config)
+        config_dict = dataclasses.asdict(self._private_config)
         if config_dict["token"]:
             config_dict["token"] = "REDACTED"
         LOGGER.debug(f"private config:\n{pformat(config_dict)}")
+
+    def set_home_deck(self, ankihub_did: uuid.UUID, anki_did: DeckId):
+        self.deck_config(ankihub_did).anki_id = anki_did
+        self._update_private_config()
+
+    def deck_ids(self) -> List[uuid.UUID]:
+        return list(self._private_config.decks.keys())
+
+    def deck_config(self, ankihub_did: uuid.UUID) -> DeckConfig:
+        return self._private_config.decks[ankihub_did]
+
+    def token(self) -> Optional[str]:
+        return self._private_config.token
+
+    def user(self) -> Optional[str]:
+        return self._private_config.user
 
 
 config: Config = Config()

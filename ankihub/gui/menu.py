@@ -2,6 +2,7 @@ import re
 from concurrent.futures import Future
 from datetime import datetime, timezone
 from typing import Optional
+import uuid
 
 from aqt import (
     AnkiApp,
@@ -212,7 +213,7 @@ def create_collaborative_deck_action() -> None:
         tooltip("Cancelled Upload to AnkiHub")
         return
 
-    def on_success(ankihub_did: str) -> None:
+    def on_success(ankihub_did: uuid.UUID) -> None:
         anki_did = mw.col.decks.id_for_name(deck_name)
         creation_time = datetime.now(tz=timezone.utc)
         config.save_subscription(
@@ -340,7 +341,7 @@ def sync_with_ankihub_setup(parent):
     """Set up the menu item for uploading suggestions in bulk."""
     q_action = QAction("🔃️ Sync with AnkiHub", mw)
     qconnect(q_action.triggered, sync_with_ankihub_action)
-    if not config.private_config.decks:
+    if not config.deck_ids():
         q_action.setDisabled(True)
     parent.addAction(q_action)
 
@@ -348,6 +349,16 @@ def sync_with_ankihub_setup(parent):
 def ankihub_help_setup(parent):
     """Set up the sub menu for help related items."""
     help_menu = QMenu("🆘 Help", parent)
+
+    # && is an escaped & in qt
+    q_notion_action = QAction("Instructions && Changelog", help_menu)
+    qconnect(
+        q_notion_action.triggered,
+        lambda: openLink(
+            "https://www.notion.so/ankipalace/AnkiHub-Documentation-dd8584f3e6c04068ab47e072c17b3a0a"
+        ),
+    )
+    help_menu.addAction(q_notion_action)
 
     q_get_help_action = QAction("Get Help", help_menu)
     qconnect(
@@ -362,6 +373,8 @@ def ankihub_help_setup(parent):
     q_version_action = QAction(f"Version {ADDON_VERSION}", help_menu)
     q_version_action.setEnabled(False)
     help_menu.addAction(q_version_action)
+
+    help_menu.setMinimumWidth(250)
 
     parent.addMenu(help_menu)
 
@@ -391,7 +404,7 @@ def refresh_ankihub_menu() -> None:
     global ankihub_menu
     ankihub_menu.clear()
 
-    if config.private_config.token:
+    if config.token():
         create_collaborative_deck_setup(parent=ankihub_menu)
         subscribe_to_deck_setup(parent=ankihub_menu)
         import_media_setup(parent=ankihub_menu)
