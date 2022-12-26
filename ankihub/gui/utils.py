@@ -1,5 +1,6 @@
 from typing import Any, List, Optional
 
+import aqt
 from aqt import mw
 from aqt.qt import (
     QDialog,
@@ -96,3 +97,29 @@ def choose_subset(
         if list_widget.item(i).checkState() == Qt.CheckState.Checked
     ]
     return result
+
+
+def choose_list(
+    prompt: str, choices: list[str], startrow: int = 0, parent: Any = None
+) -> Optional[int]:
+    # adapted from aqt.utils.chooseList
+    if not parent:
+        parent = aqt.mw.app.activeWindow()
+    d = QDialog(parent)
+    disable_help_button(d)
+    d.setWindowModality(Qt.WindowModality.WindowModal)
+    layout = QVBoxLayout()
+    d.setLayout(layout)
+    t = QLabel(prompt)
+    layout.addWidget(t)
+    c = QListWidget()
+    c.addItems(choices)
+    c.setCurrentRow(startrow)
+    layout.addWidget(c)
+    bb = QDialogButtonBox(QDialogButtonBox.StandardButton.Ok)
+    qconnect(bb.accepted, d.accept)
+    layout.addWidget(bb)
+    if d.exec() == QDialog.DialogCode.Accepted:
+        return c.currentRow()
+    else:
+        return None

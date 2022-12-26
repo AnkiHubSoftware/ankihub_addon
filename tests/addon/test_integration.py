@@ -84,12 +84,12 @@ def test_editor(anki_session_with_addon: AnkiSession, requests_mock, monkeypatch
 
     # when the decks in the config are empty on_suggestion_button_press returns early
     monkeypatch.setattr(
-        "ankihub.gui.editor.config.private_config.decks", {str(UUID_1): Mock()}
+        "ankihub.gui.editor.config._private_config.decks", {UUID_1: Mock()}
     )
 
     # this makes it so that the note is added to the first ankihub deck from the list
     # it could be any deck, we just don't want the dialog to open
-    monkeypatch.setattr("ankihub.gui.editor.chooseList", lambda *args, **kwargs: 0)
+    monkeypatch.setattr("ankihub.gui.editor.choose_list", lambda *args, **kwargs: 0)
 
     refresh_suggestion_button(editor)
     assert editor.ankihub_command == AnkiHubCommands.NEW.value
@@ -208,7 +208,7 @@ def test_create_collaborative_deck_and_upload(
             }
 
             # check that deck info is in db
-            assert ankihub_db.ankihub_deck_ids() == [str(ankihub_deck_uuid)]
+            assert ankihub_db.ankihub_deck_ids() == [ankihub_deck_uuid]
             assert len(ankihub_db.notes_for_ankihub_deck(str(ankihub_deck_uuid))) == 3
 
 
@@ -588,7 +588,7 @@ def test_import_existing_ankihub_deck(anki_session_with_addon: AnkiSession):
 def assert_that_only_ankihub_sample_deck_info_in_database(ankihub_deck_uuid: uuid.UUID):
     from ankihub.db import ankihub_db
 
-    assert ankihub_db.ankihub_deck_ids() == [str(ankihub_deck_uuid)]
+    assert ankihub_db.ankihub_deck_ids() == [ankihub_deck_uuid]
     assert len(ankihub_db.notes_for_ankihub_deck(str(ankihub_deck_uuid))) == 3
 
 

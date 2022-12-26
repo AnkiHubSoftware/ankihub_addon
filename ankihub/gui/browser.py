@@ -1,11 +1,9 @@
 import re
-import uuid
 from concurrent.futures import Future
 from pprint import pformat
 from typing import List, Optional, Sequence
 
 from anki.collection import SearchNode
-from anki.notes import NoteId
 from aqt import mw
 from aqt.browser import (
     Browser,
@@ -28,10 +26,9 @@ from aqt.gui_hooks import (
     browser_will_show_context_menu,
 )
 from aqt.qt import QAction, QMenu, qconnect
-from aqt.utils import askUser, chooseList, showInfo, showText, showWarning, tooltip
+from aqt.utils import askUser, showInfo, showText, showWarning, tooltip
 
 from .. import LOGGER
-from ..addon_ankihub_client import AddonAnkiHubClient as AnkiHubClient
 from ..ankihub_client import AnkiHubRequestError, SuggestionType
 from ..db import (
     ankihub_db,
@@ -39,8 +36,9 @@ from ..db import (
     attached_ankihub_db,
     detach_ankihub_db_from_anki_db_connection,
 )
-from ..importing import AnkiHubImporter, get_fields_protected_by_tags
+from ..importing import get_fields_protected_by_tags
 from ..note_conversion import TAG_FOR_PROTECTING_ALL_FIELDS, TAG_FOR_PROTECTING_FIELDS
+from ..reset_changes import reset_local_changes_to_notes
 from ..settings import ANKIHUB_NOTE_TYPE_FIELD_NAME, AnkiHubCommands, config
 from ..suggestions import BulkNoteSuggestionsResult, suggest_notes_in_bulk
 from .custom_columns import (
@@ -57,7 +55,7 @@ from .custom_search_nodes import (
     UpdatedSinceLastReviewSearchNode,
 )
 from .suggestion_dialog import SuggestionDialog
-from .utils import choose_subset
+from .utils import choose_list, choose_subset
 
 browser: Optional[Browser] = None
 
@@ -276,31 +274,44 @@ def on_browser_menus_did_init(browser: Browser):
 
 
 def on_reset_deck_action(browser: Browser):
-    decks = list(config.private_config.decks.values())
-    ankihub_dids = list(config.private_config.decks.keys())
+    ah_dids = config.deck_ids()
+    deck_configs = [config.deck_config(did) for did in ah_dids]
 
-    chosen_deck_idx = chooseList(
+    if not ah_dids:
+        showInfo(
+            "You don't have any AnkiHub decks configured yet.",
+            parent=browser,
+        )
+        return
+
+    chosen_deck_idx = choose_list(
         prompt="Choose the AnkiHub deck for which<br>you want to reset local changes",
-        choices=[deck["name"] for deck in decks],
+        choices=[deck.name for deck in deck_configs],
         parent=browser,
     )
-    chosen_deck = decks[chosen_deck_idx]
-    chosen_deck_ankihub_uuid = ankihub_dids[chosen_deck_idx]
+
+    if chosen_deck_idx is None:
+        return
+
+    chosen_deck_config = deck_configs[chosen_deck_idx]
+    chosen_deck_ah_did = ah_dids[chosen_deck_idx]
     if not askUser(
-        f"Are you sure you want to reset all local changes to the deck <b>{chosen_deck['name']}</b>?",
+        f"Are you sure you want to reset all local changes to the deck <b>{chosen_deck_config.name}</b>?",
         parent=browser,
     ):
         return
 
-    nids = ankihub_db.notes_for_ankihub_deck(ankihub_dids[chosen_deck_idx])
+    nids = ankihub_db.notes_for_ankihub_deck(ah_dids[chosen_deck_idx])
 
-    def on_done(_) -> None:
+    def on_done(future: Future) -> None:
+        future.result()
+
         browser.model.reset()
-        tooltip(f"Reset local changes to deck <b>{chosen_deck['name']}</b>")
+        tooltip(f"Reset local changes to deck <b>{chosen_deck_config.name}</b>")
 
     mw.taskman.with_progress(
         lambda: reset_local_changes_to_notes(
-            nids, ankihub_deck_uuid=chosen_deck_ankihub_uuid
+            nids, ankihub_deck_uuid=chosen_deck_ah_did
         ),
         on_done=on_done,
         label="Resetting local changes...",
@@ -312,31 +323,6 @@ def setup_reset_deck_action(browser: Browser, menu: QMenu) -> None:
     reset_deck_action = QAction("Reset all local changes to a deck", browser)
     qconnect(reset_deck_action.triggered, lambda: on_reset_deck_action(browser))
     menu.addAction(reset_deck_action)
-
-
-def reset_local_changes_to_notes(
-    nids: Sequence[NoteId], ankihub_deck_uuid: uuid.UUID
-) -> None:
-    # all notes have to be from the ankihub deck with the given uuid
-
-    deck_dict = config.private_config.decks[str(ankihub_deck_uuid)]
-    anki_did = deck_dict["anki_id"]
-
-    client = AnkiHubClient()
-    protected_fields = client.get_protected_fields(ankihub_deck_uuid=ankihub_deck_uuid)
-    protected_tags = client.get_protected_tags(ankihub_deck_uuid=ankihub_deck_uuid)
-
-    importer = AnkiHubImporter()
-    for nid in nids:
-        importer.update_or_create_note(
-            ankihub_db.note_data(nid),
-            protected_fields=protected_fields,
-            protected_tags=protected_tags,
-            anki_did=anki_did,
-        )
-
-    # this way the notes won't be marked as "changed after sync" anymore
-    ankihub_db.reset_mod_values_in_anki_db(list(nids))
 
 
 def on_browser_did_fetch_columns(columns: dict[str, Column]):
