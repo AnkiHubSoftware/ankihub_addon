@@ -19,7 +19,7 @@ from aqt.gui_hooks import (
     browser_will_show_context_menu,
 )
 from aqt.qt import QAction, QMenu, qconnect
-from aqt.utils import askUser, chooseList, showInfo, showText, tooltip
+from aqt.utils import askUser, showInfo, showText, tooltip
 
 from .. import LOGGER
 from ..ankihub_client import AnkiHubRequestError
@@ -35,7 +35,7 @@ from ..settings import ANKIHUB_NOTE_TYPE_FIELD_NAME, AnkiHubCommands, config
 from ..suggestions import BulkNoteSuggestionsResult, suggest_notes_in_bulk
 from ..utils import note_types_with_ankihub_id_field
 from .suggestion_dialog import SuggestionDialog
-from .utils import choose_subset
+from .utils import choose_list, choose_subset
 
 browser: Optional[Browser] = None
 
@@ -248,11 +248,22 @@ def on_reset_deck_action(browser: Browser):
     ah_dids = config.deck_ids()
     deck_configs = [config.deck_config(did) for did in ah_dids]
 
-    chosen_deck_idx = chooseList(
+    if not ah_dids:
+        showInfo(
+            "You don't have any AnkiHub decks configured yet.",
+            parent=browser,
+        )
+        return
+
+    chosen_deck_idx = choose_list(
         prompt="Choose the AnkiHub deck for which<br>you want to reset local changes",
         choices=[deck.name for deck in deck_configs],
         parent=browser,
     )
+
+    if chosen_deck_idx is None:
+        return
+
     chosen_deck_config = deck_configs[chosen_deck_idx]
     chosen_deck_ah_did = ah_dids[chosen_deck_idx]
     if not askUser(
