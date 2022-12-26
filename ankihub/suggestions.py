@@ -71,7 +71,7 @@ def suggest_notes_in_bulk(
     new_note_suggestions = [
         new_note_suggestion(
             note=note,
-            ankihub_deck_uuid=uuid.UUID(ankihub_did_for_mid[note.mid]),
+            ankihub_deck_uuid=ankihub_did_for_mid[note.mid],
             comment=comment,
         )
         for note in notes_that_dont_exist_on_remote
