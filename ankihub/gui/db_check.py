@@ -1,4 +1,5 @@
 from typing import Callable, List, Optional
+import uuid
 
 from aqt.utils import askUser, showInfo, showWarning
 
@@ -28,7 +29,7 @@ def check_ankihub_db(on_success: Optional[Callable[[], None]] = None):
     else:
         deck_names = sorted(
             [
-                config.private_config.decks[deck_id]["name"]
+                config.deck_config(deck_id).name
                 for deck_id in ah_dids_with_missing_values
             ],
             key=str.lower,
@@ -54,7 +55,7 @@ def check_ankihub_db(on_success: Optional[Callable[[], None]] = None):
 
 
 def download_and_install_decks(
-    ankihub_dids: List[str], on_success: Optional[Callable[[], None]] = None
+    ankihub_dids: List[uuid.UUID], on_success: Optional[Callable[[], None]] = None
 ):
     # Installs decks one by one and then cleans up.
     # If a deck install fails, the other deck installs and the cleanup are **not** executed.
@@ -84,8 +85,7 @@ def show_failure_message() -> None:
     )
 
 
-def decks_missing_from_config() -> List[str]:
+def decks_missing_from_config() -> List[uuid.UUID]:
     ah_dids_from_ankihub_db = ankihub_db.ankihub_deck_ids()
-    ah_dids_from_config = [ah_did for ah_did in config.private_config.decks]
-
+    ah_dids_from_config = config.deck_ids()
     return list(set(ah_dids_from_ankihub_db) - set(ah_dids_from_config))

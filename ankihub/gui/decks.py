@@ -1,3 +1,4 @@
+import uuid
 from concurrent.futures import Future
 from datetime import datetime
 from typing import Callable, List, Optional
@@ -21,6 +22,7 @@ from aqt.qt import (
     QVBoxLayout,
     qconnect,
 )
+from aqt.studydeck import StudyDeck
 from aqt.utils import askUser, openLink, showInfo, showText, tooltip
 
 from .. import LOGGER
@@ -61,14 +63,22 @@ class SubscribedDecksDialog(QDialog):
         qconnect(self.decks_list.itemSelectionChanged, self.on_item_selection_changed)
 
         self.add_btn = QPushButton("Add")
-        self.unsubscribe_btn = QPushButton("Unsubscribe")
-        self.open_web_btn = QPushButton("Open on AnkiHub")
-        qconnect(self.add_btn.clicked, self.on_add)
-        qconnect(self.unsubscribe_btn.clicked, self.on_unsubscribe)
-        qconnect(self.open_web_btn.clicked, self.on_open_web)
         self.box_right.addWidget(self.add_btn)
+        qconnect(self.add_btn.clicked, self.on_add)
+
+        self.unsubscribe_btn = QPushButton("Unsubscribe")
         self.box_right.addWidget(self.unsubscribe_btn)
+        qconnect(self.unsubscribe_btn.clicked, self.on_unsubscribe)
+
+        self.open_web_btn = QPushButton("Open on AnkiHub")
         self.box_right.addWidget(self.open_web_btn)
+        qconnect(self.open_web_btn.clicked, self.on_open_web)
+
+        self.set_home_deck = QPushButton("Set Home deck")
+        self.set_home_deck.setToolTip("New cards will be added to this deck.")
+        qconnect(self.set_home_deck.clicked, self.on_set_home_deck)
+        self.box_right.addWidget(self.set_home_deck)
+
         self.box_right.addStretch(1)
 
         self.setLayout(self.box_top)
@@ -78,11 +88,10 @@ class SubscribedDecksDialog(QDialog):
 
     def refresh_decks_list(self) -> None:
         self.decks_list.clear()
-        decks = config.private_config.decks
-        for ankihub_id in decks:
-            name = decks[ankihub_id]["name"]
+        for ah_did in config.deck_ids():
+            name = config.deck_config(ah_did).name
             item = QListWidgetItem(name)
-            item.setData(Qt.ItemDataRole.UserRole, ankihub_id)
+            item.setData(Qt.ItemDataRole.UserRole, ah_did)
             self.decks_list.addItem(item)
 
     def refresh_anki(self) -> None:
@@ -113,7 +122,7 @@ class SubscribedDecksDialog(QDialog):
             return
 
         for item in items:
-            ankihub_did = item.data(Qt.ItemDataRole.UserRole)
+            ankihub_did: UUID = item.data(Qt.ItemDataRole.UserRole)
             config.unsubscribe_deck(ankihub_did)
             self.unsubscribe_from_deck(ankihub_did)
 
@@ -121,8 +130,8 @@ class SubscribedDecksDialog(QDialog):
         self.refresh_decks_list()
 
     @staticmethod
-    def unsubscribe_from_deck(ankihub_did: str) -> None:
-        mids = ankihub_db.note_types_for_ankihub_deck(ankihub_did=ankihub_did)
+    def unsubscribe_from_deck(ankihub_did: UUID) -> None:
+        mids = ankihub_db.note_types_for_ankihub_deck(ankihub_did)
         undo_note_type_modfications(mids)
         ankihub_db.remove_deck(ankihub_did)
 
@@ -131,14 +140,49 @@ class SubscribedDecksDialog(QDialog):
         if len(items) == 0:
             return
         for item in items:
-            ankihub_id = item.data(Qt.ItemDataRole.UserRole)
+            ankihub_id: UUID = item.data(Qt.ItemDataRole.UserRole)
             openLink(f"{URL_DECK_BASE}/{ankihub_id}")
+
+    def on_set_home_deck(self):
+        deck_names = self.decks_list.selectedItems()
+        if len(deck_names) == 0:
+            return
+        elif len(deck_names) > 1:
+            tooltip("Please select only one deck.", parent=mw)
+            return
+
+        deck_name = deck_names[0]
+        ankihub_id: UUID = deck_name.data(Qt.ItemDataRole.UserRole)
+        current_home_deck = mw.col.decks.get(config.deck_config(ankihub_id).anki_id)
+        if current_home_deck is None:
+            current = None
+        else:
+            current = current_home_deck["name"]
+
+        def update_deck_config(ret: StudyDeck):
+            if not ret.name:
+                return
+
+            anki_did = mw.col.decks.id(ret.name)
+            config.set_home_deck(ankihub_did=ankihub_id, anki_did=anki_did)
+            tooltip("Home deck updated.", parent=self)
+
+        # this lets the user pick a deck
+        StudyDeckWithoutHelpButton(
+            mw,
+            current=current,
+            accept="Set Home Deck",
+            title="Change Home Deck",
+            parent=self,
+            callback=update_deck_config,
+        )
 
     def on_item_selection_changed(self) -> None:
         selection = self.decks_list.selectedItems()
         isSelected: bool = len(selection) > 0
         self.unsubscribe_btn.setEnabled(isSelected)
         self.open_web_btn.setEnabled(isSelected)
+        self.set_home_deck.setEnabled(isSelected)
 
     @classmethod
     def display_subscribe_window(cls):
@@ -150,6 +194,15 @@ class SubscribedDecksDialog(QDialog):
             cls._window.raise_()
             cls._window.show()
         return cls._window
+
+
+class StudyDeckWithoutHelpButton(StudyDeck):
+    def __init__(self, *args, **kwargs) -> None:
+        super().__init__(*args, **kwargs)
+
+        self.form.buttonBox.removeButton(
+            self.form.buttonBox.button(QDialogButtonBox.StandardButton.Help)
+        )
 
 
 class SubscribeDialog(QDialog):
@@ -210,10 +263,19 @@ class SubscribeDialog(QDialog):
             self.show()
 
     def subscribe(self):
-        ankihub_did = self.deck_id_box_text.text().strip()
-        if ankihub_did in config.private_config.decks.keys():
+        ah_did_str = self.deck_id_box_text.text().strip()
+
+        try:
+            ah_did = uuid.UUID(ah_did_str)
+        except ValueError:
+            showInfo(
+                "The format of the Deck ID is invalid. Please make sure you copied the Deck ID correctly."
+            )
+            return
+
+        if ah_did in config.deck_ids():
             showText(
-                f"You've already subscribed to deck {ankihub_did}. "
+                f"You've already subscribed to deck {ah_did}. "
                 "Syncing with AnkiHub will happen automatically everytime you "
                 "restart Anki. You can manually sync with AnkiHub from the AnkiHub "
                 f"menu. See {URL_HELP} for more details."
@@ -231,7 +293,7 @@ class SubscribeDialog(QDialog):
             return
 
         download_and_install_deck(
-            ankihub_did, on_success=self.accept, on_failure=self.reject
+            ah_did, on_success=self.accept, on_failure=self.reject
         )
 
     def on_browse_deck(self) -> None:
@@ -239,7 +301,7 @@ class SubscribeDialog(QDialog):
 
 
 def download_and_install_deck(
-    ankihub_did: str,
+    ankihub_did: uuid.UUID,
     on_success: Optional[Callable[[], None]] = None,
     on_failure: Optional[Callable[[], None]] = None,
     cleanup: bool = True,
@@ -269,7 +331,7 @@ def download_and_install_deck(
                 on_success()
 
     try:
-        deck_info = AnkiHubClient().get_deck_by_id(UUID(ankihub_did))
+        deck_info = AnkiHubClient().get_deck_by_id(ankihub_did)
     except AnkiHubRequestError as e:
         if e.response.status_code == 404:
             showText(
@@ -317,7 +379,7 @@ def download_and_install_deck(
 def install_deck(
     notes_data: List[NoteInfo],
     deck_name: str,
-    ankihub_did: str,
+    ankihub_did: UUID,
     latest_update: datetime,
     is_creator: bool,
 ) -> bool:

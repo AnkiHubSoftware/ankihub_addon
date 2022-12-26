@@ -13,8 +13,7 @@ def reset_local_changes_to_notes(
 ) -> None:
     # all notes have to be from the ankihub deck with the given uuid
 
-    deck_dict = config.private_config.decks[str(ankihub_deck_uuid)]
-    anki_did = deck_dict["anki_id"]
+    deck_config = config.deck_config(ankihub_deck_uuid)
 
     importer = AnkiHubImporter()
 
@@ -22,10 +21,10 @@ def reset_local_changes_to_notes(
     # this is needed so that notes_data can be retrieved from the database if the fields
     # of the note type have changed
     importer.import_ankihub_deck(
-        ankihub_did=str(ankihub_deck_uuid),
+        ankihub_did=ankihub_deck_uuid,
         notes_data=[],
-        deck_name=deck_dict["name"],
-        local_did=anki_did,
+        deck_name=deck_config.name,
+        local_did=deck_config.anki_id,
         save_to_ankihub_db=False,  # no need to save to ankihub_db, we're just resetting local changes
     )
 
@@ -36,10 +35,10 @@ def reset_local_changes_to_notes(
     ]
 
     importer.import_ankihub_deck(
-        ankihub_did=str(ankihub_deck_uuid),
+        ankihub_did=ankihub_deck_uuid,
         notes_data=notes_data,
-        deck_name=deck_dict["name"],
-        local_did=anki_did,
+        deck_name=deck_config.name,
+        local_did=deck_config.anki_id,
         save_to_ankihub_db=False,  # no need to save to ankihub_db, we're just resetting local changes
     )
 

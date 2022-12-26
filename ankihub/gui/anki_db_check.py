@@ -26,10 +26,7 @@ def check_anki_db():
     )
 
     deck_names = sorted(
-        [
-            config.private_config.decks[deck_id]["name"]
-            for deck_id in ah_dids_with_missing_ah_nids
-        ],
+        [config.deck_config(deck_id).name for deck_id in ah_dids_with_missing_ah_nids],
         key=str.lower,
     )
 
@@ -106,7 +103,7 @@ def _decks_with_missing_ankihub_nids():
     return result
 
 
-def _reset_decks(ah_dids: List[str]):
+def _reset_decks(ah_dids: List[uuid.UUID]):
     for ah_did in ah_dids:
         nids = ankihub_db.notes_for_ankihub_deck(ah_did)
-        reset_local_changes_to_notes(nids, ankihub_deck_uuid=uuid.UUID(ah_did))
+        reset_local_changes_to_notes(nids, ankihub_deck_uuid=ah_did)
