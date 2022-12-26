@@ -85,7 +85,7 @@ def test_editor(anki_session_with_addon: AnkiSession, requests_mock, monkeypatch
 
     # this makes it so that the note is added to the first ankihub deck from the list
     # it could be any deck, we just don't want the dialog to open
-    monkeypatch.setattr("ankihub.gui.editor.chooseList", lambda *args, **kwargs: 0)
+    monkeypatch.setattr("ankihub.gui.editor.choose_list", lambda *args, **kwargs: 0)
 
     refresh_suggestion_button(editor)
     assert editor.ankihub_command == AnkiHubCommands.NEW.value

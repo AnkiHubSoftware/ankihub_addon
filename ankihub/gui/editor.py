@@ -7,7 +7,7 @@ from anki.models import NoteType
 from aqt import gui_hooks
 from aqt.addcards import AddCards
 from aqt.editor import Editor
-from aqt.utils import chooseList, showInfo, showText, tooltip
+from aqt.utils import showInfo, showText, tooltip
 
 from .. import LOGGER, settings
 from ..ankihub_client import AnkiHubRequestError
@@ -21,6 +21,7 @@ from ..settings import (
 )
 from ..suggestions import suggest_new_note, suggest_note_update
 from .suggestion_dialog import SuggestionDialog
+from .utils import choose_list
 
 
 def on_suggestion_button_press(editor: Editor) -> None:
@@ -94,10 +95,13 @@ def on_suggestion_button_press_inner(editor: Editor) -> None:
         elif len(subscribed_dids) == 1:
             ankihub_did = subscribed_dids[0]
         else:
-            choice = chooseList(
+            choice = choose_list(
                 "Which AnKiHub deck would you like to add this note to?",
                 choices=[config.deck_config(did).name for did in subscribed_dids],
             )
+            if choice is None:
+                return
+
             ankihub_did = subscribed_dids[choice]
 
         if editor.addMode:
