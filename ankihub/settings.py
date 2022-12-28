@@ -2,6 +2,7 @@ import dataclasses
 import json
 import logging
 import os
+import re
 import sys
 import uuid
 from datetime import datetime
@@ -10,14 +11,23 @@ from json import JSONDecodeError
 from logging.handlers import RotatingFileHandler
 from pathlib import Path
 from pprint import pformat
+from shutil import copyfile, rmtree
 from typing import Any, Callable, Dict, List, Optional
 
 from anki.buildinfo import version as ANKI_VERSION
 from anki.decks import DeckId
 from aqt import mw
+from aqt.utils import askUser, showInfo
 
 from . import LOGGER, ankihub_client
 from .ankihub_client import ANKIHUB_DATETIME_FORMAT_STR
+
+ANKIHUB_DATABE_FILENAME = "ankihub.db"
+PRIVATE_CONFIG_FILENAME = "private_config.json"
+
+# the id of the Anki profile is saved under this key in Anki's profile config
+# (profile configs are stored by Anki in prefs21.db in the anki base directory)
+PROFILE_ID_FIELD_NAME = "ankihub_id"
 
 
 @dataclasses.dataclass
@@ -37,45 +47,38 @@ class PrivateConfig:
 
 class Config:
     def __init__(self):
-        # self.public_config is editable by the user.
+        # self.public_config is editable by the user using a built-in Anki feature.
         self.public_config: Dict[str, Any] = mw.addonManager.getConfig(__name__)
-        # This is the location for private config which is only managed by our code
-        # and is not exposed to the user.
-        # See https://addon-docs.ankiweb.net/addon-config.html#user-files
-        addon_dir_name = mw.addonManager.addonFromModule(__name__)
-        user_files_path = os.path.join(
-            mw.addonManager.addonsFolder(addon_dir_name), "user_files"
-        )
-        self._private_config_file_path = os.path.join(
-            user_files_path, ".private_config.json"
-        )
-        if not os.path.exists(self._private_config_file_path):
-            self._private_config = self.new_config()
-        else:
-            with open(self._private_config_file_path) as f:
-                try:
-                    private_config_dict = json.load(f)
-                    decks_dict = private_config_dict["decks"]
-                    private_config_dict["decks"] = {
-                        uuid.UUID(k): DeckConfig(**v) for k, v in decks_dict.items()
-                    }
-                    self._private_config = PrivateConfig(**private_config_dict)
-                except JSONDecodeError:
-                    # TODO Instead of overwriting, query AnkiHub for config values.
-                    self._private_config = self.new_config()
-        self._log_private_config()
         self.token_change_hook: Optional[Callable[[], None]] = None
         self.subscriptions_change_hook: Optional[Callable[[], None]] = None
+
+    def setup(self):
+        self._private_config_path = private_config_path()
+        if not self._private_config_path.exists():
+            self._private_config = self.new_config()
+        else:
+            try:
+                with open(self._private_config_path) as f:
+                    private_config_dict = json.load(f)
+                decks_dict = private_config_dict["decks"]
+                private_config_dict["decks"] = {
+                    uuid.UUID(k): DeckConfig(**v) for k, v in decks_dict.items()
+                }
+                self._private_config = PrivateConfig(**private_config_dict)
+            except JSONDecodeError:
+                # TODO Instead of overwriting, query AnkiHub for config values.
+                self._private_config = self.new_config()
+        self._log_private_config()
 
     def new_config(self):
         private_config = PrivateConfig()
         config_dict = dataclasses.asdict(private_config)
-        with open(self._private_config_file_path, "w") as f:
+        with open(self._private_config_path, "w") as f:
             f.write(json.dumps(config_dict, indent=4, sort_keys=True))
         return private_config
 
     def _update_private_config(self):
-        with open(self._private_config_file_path, "w") as f:
+        with open(self._private_config_path, "w") as f:
             config_dict = dataclasses.asdict(self._private_config)
             # convert uuid keys to strings
             config_dict["decks"] = {str(k): v for k, v in config_dict["decks"].items()}
@@ -154,9 +157,121 @@ class Config:
         return self._private_config.user
 
 
-config: Config = Config()
+config = Config()
 
-LOG_FILE = Path(__file__).parent / "user_files/ankihub.log"
+
+def setup_profile_data_folder() -> bool:
+    """Returns False if the migration from the old location needs yet to be done."""
+    assign_id_to_profile_if_not_exists()
+
+    if not (path := profile_files_path()).exists():
+        path.mkdir(parents=True)
+
+    if profile_data_exists_at_old_location():
+        if migrate_profile_data_from_old_location():
+            return True
+        else:
+            return False
+
+    return True
+
+
+def assign_id_to_profile_if_not_exists() -> None:
+    """Assigns an id to the currently open profile if it doesn't have one."""
+    if mw.pm.profile.get("ankihub_id") is not None:
+        return
+
+    mw.pm.profile[PROFILE_ID_FIELD_NAME] = str(uuid.uuid4())
+    mw.pm.save()
+
+
+def user_files_path() -> Path:
+    # The contents of the user_files folder are retained during updates.
+    # See https://addon-docs.ankiweb.net/addon-config.html#user-files
+    addon_dir_name = mw.addonManager.addonFromModule(__name__)
+    result = Path(mw.addonManager.addonsFolder(addon_dir_name)) / "user_files"
+    return result
+
+
+def profile_files_path() -> Path:
+    # we need an id instead of using the profile name because profiles can be renamed
+    cur_profile_id = mw.pm.profile[PROFILE_ID_FIELD_NAME]
+    result = user_files_path() / cur_profile_id
+    return result
+
+
+def ankihub_db_path() -> Path:
+    result = profile_files_path() / ANKIHUB_DATABE_FILENAME
+    return result
+
+
+def private_config_path() -> Path:
+    result = profile_files_path() / PRIVATE_CONFIG_FILENAME
+    return result
+
+
+def profile_data_exists_at_old_location() -> bool:
+    result = (user_files_path() / PRIVATE_CONFIG_FILENAME).exists()
+    return result
+
+
+def migrate_profile_data_from_old_location() -> bool:
+    """Returns True if the data was migrated and False if it remains at the old location."""
+    if not profile_data_exists_at_old_location():
+        LOGGER.debug("No data to migrate.")
+        return True
+
+    if len(mw.pm.profiles()) > 1:
+        if not askUser(
+            (
+                "The AnkiHub add-on now has support for multiple Anki profiles.<br><br>"
+                "Is this the profile that you were using AnkiHub with before?<br>"
+            ),
+            title="AnkiHub",
+        ):
+            showInfo(
+                "Please switch to the profile that you were using AnkiHub with before (File -> Switch Profile)."
+                "The add-on will then again ask you if this is the correct profile.<br><br>"
+                "<b>Note that you won't be able to use the AnkiHub add-on until you do this.</b>"
+            )
+            return False
+
+    # move database, config and log files to profile folder
+    try:
+        for file in user_files_path().glob("*"):
+            if not file_should_be_migrated(file):
+                continue
+
+            copyfile(file, profile_files_path() / file.name)
+    except Exception as e:
+        LOGGER.error(
+            f"Failed to migrate profile data from user_files to profile folder: {e}"
+        )
+        # remove the profile folder to avoid a partial migration
+        rmtree(profile_files_path())
+        raise e
+
+    # delete old files after all files have been copied successfully
+    for file in user_files_path().glob("*"):
+        if not file_should_be_migrated(file):
+            continue
+
+        file.unlink()
+
+    return True
+
+
+def file_should_be_migrated(file_path: Path) -> bool:
+    result = (
+        file_path.is_file()
+        and not str(file_path.name).startswith("README")
+        and not re.match(r".+\.log(\.\d+)?$", file_path.name)
+    )
+    return result
+
+
+def log_file_path() -> Path:
+    return user_files_path() / "ankihub.log"
 
 
 def stdout_handler():
@@ -165,7 +280,7 @@ def stdout_handler():
 
 def file_handler():
     return RotatingFileHandler(
-        LOG_FILE, maxBytes=3000000, backupCount=5, encoding="utf-8"
+        log_file_path(), maxBytes=3000000, backupCount=5, encoding="utf-8"
     )
 
 
@@ -241,7 +356,6 @@ USER_SUPPORT_EMAIL_SLUG = "help@ankipalace.com"
 ANKI_MINOR = int(ANKI_VERSION.split(".")[2])
 
 USER_FILES_PATH = Path(__file__).parent / "user_files"
-DB_PATH = USER_FILES_PATH / "ankihub.db"
 
 
 class AnkiHubCommands(Enum):

@@ -9,7 +9,7 @@ from aqt.addons import AddonManager, DownloaderInstaller
 
 from . import LOGGER
 from .db import detach_ankihub_db_from_anki_db_connection
-from .settings import LOG_FILE, file_handler
+from .settings import log_file_path, file_handler
 
 
 def with_disabled_log_file_handler(*args: Any, **kwargs: Any) -> Any:
@@ -32,7 +32,7 @@ def with_disabled_log_file_handler(*args: Any, **kwargs: Any) -> Any:
     result = _old(*args, **kwargs)
 
     # if the add-on was deleted it makes no sense to re-add the FileHandler (and it throws an error)
-    if LOG_FILE.parent.exists():
+    if log_file_path().parent.exists():
         LOGGER.root.addHandler(file_handler())
         LOGGER.debug("Re-added FileHandler")
 
