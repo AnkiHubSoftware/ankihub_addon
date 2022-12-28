@@ -194,6 +194,7 @@ def user_files_path() -> Path:
 
 
 def profile_files_path() -> Path:
+    """Path to the add-on data for this Anki profile."""
     # we need an id instead of using the profile name because profiles can be renamed
     cur_profile_id = mw.pm.profile[PROFILE_ID_FIELD_NAME]
     result = user_files_path() / cur_profile_id
