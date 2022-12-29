@@ -43,45 +43,53 @@ def test_entry_point(anki_session_with_addon: AnkiSession):
 
 
 def test_editor(anki_session_with_addon: AnkiSession, requests_mock, monkeypatch):
+    from ankihub.db import ankihub_db
     from ankihub.gui.editor import on_suggestion_button_press, refresh_suggestion_button
-    from ankihub.settings import (
-        ANKIHUB_NOTE_TYPE_FIELD_NAME,
-        API_URL_BASE,
-        AnkiHubCommands,
-    )
-
-    ankihub_note_uuid = UUID_1
-    ankihub_deck_uuid = UUID_2
-
-    monkeypatch.setattr("ankihub.gui.editor.SuggestionDialog.exec", Mock())
-
-    # when the decks in the config are empty on_suggestion_button_press returns early
-    monkeypatch.setattr(
-        "ankihub.settings.config._private_config.decks",
-        {str(ankihub_deck_uuid): Mock()},
-    )
-
-    expected_response = {}  # type: ignore
-    requests_mock.post(
-        f"{API_URL_BASE}/notes/{ankihub_note_uuid}/suggestion/",
-        status_code=201,
-        json=expected_response,
-    )
+    from ankihub.settings import API_URL_BASE, AnkiHubCommands
 
     with anki_session_with_addon.profile_loaded():
         mw = anki_session_with_addon.mw
 
+        # mock the dialog so it doesn't block the testq
+        monkeypatch.setattr("ankihub.gui.editor.SuggestionDialog.exec", Mock())
+
+        # when the decks in the config are empty on_suggestion_button_press returns early
+        monkeypatch.setattr(
+            "ankihub.settings.config._private_config.decks",
+            {"placeholder deck id": Mock()},
+        )
+
         import_sample_ankihub_deck(mw)
 
         editor = MagicMock()
-        editor.note = note = mw.col.get_note(mw.col.find_notes("")[0])
-        note[ANKIHUB_NOTE_TYPE_FIELD_NAME] = ""
+
+        # test a new note suggestion
+        editor.note = mw.col.new_note(mw.col.models.by_name("Basic (Testdeck / user1)"))
+
+        note_1_ah_nid = UUID_1
+
+        monkeypatch.setattr("ankihub.exporting.uuid.uuid4", lambda: note_1_ah_nid)
+
+        requests_mock.post(
+            f"{API_URL_BASE}/notes/{note_1_ah_nid}/suggestion/",
+            status_code=201,
+            json={},
+        )
 
         refresh_suggestion_button(editor)
         assert editor.ankihub_command == AnkiHubCommands.NEW.value
         on_suggestion_button_press(editor)
 
-        note[ANKIHUB_NOTE_TYPE_FIELD_NAME] = str(ankihub_note_uuid)
+        # test a change note suggestion
+        note = mw.col.get_note(mw.col.find_notes("")[0])
+        editor.note = note
+        noes_2_ah_nid = ankihub_db.ankihub_id_for_note(note.id)
+
+        requests_mock.post(
+            f"{API_URL_BASE}/notes/{noes_2_ah_nid}/suggestion/",
+            status_code=201,
+            json={},
+        )
 
         refresh_suggestion_button(editor)
         assert editor.ankihub_command == AnkiHubCommands.CHANGE.value

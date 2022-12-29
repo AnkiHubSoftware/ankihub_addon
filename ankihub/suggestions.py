@@ -8,7 +8,6 @@ from .addon_ankihub_client import AddonAnkiHubClient as AnkiHubClient
 from .ankihub_client import ChangeNoteSuggestion, NewNoteSuggestion, SuggestionType
 from .db import ankihub_db
 from .exporting import to_note_data
-from .utils import ankihub_uuid_of_note
 
 
 def suggest_note_update(
@@ -54,7 +53,7 @@ def suggest_notes_in_bulk(
     notes_that_dont_exist_on_remote = []
     ankihub_notes = [note for note in notes if ankihub_did_for_mid.get(note.mid)]
     for note in ankihub_notes:
-        if ankihub_uuid_of_note(note, ignore_invalid=True):
+        if ankihub_db.ankihub_id_for_note(note.id):
             notes_that_exist_on_remote.append(note)
         else:
             notes_that_dont_exist_on_remote.append(note)
@@ -100,6 +99,7 @@ def change_note_suggestion(
     note: Note, change_type: SuggestionType, comment: str
 ) -> ChangeNoteSuggestion:
     note_data = to_note_data(note, diff=True)
+    assert note_data.ankihub_note_uuid is not None
 
     return ChangeNoteSuggestion(
         ankihub_note_uuid=note_data.ankihub_note_uuid,

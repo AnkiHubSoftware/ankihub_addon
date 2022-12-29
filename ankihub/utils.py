@@ -1,6 +1,5 @@
 import re
 import time
-import uuid
 from pprint import pformat
 from typing import Dict, Iterable, List, Optional, Set, Tuple
 
@@ -88,30 +87,6 @@ def create_note_with_id(note: Note, anki_id: NoteId, anki_did: DeckId) -> Note:
 
     note.id = anki_id
     return note
-
-
-def ankihub_uuids_of_nids(
-    nids: Iterable[NoteId], ignore_invalid=False
-) -> List[uuid.UUID]:
-    result = [
-        note_uuid
-        for nid in nids
-        if (note_uuid := ankihub_uuid_of_note(mw.col.get_note(nid), ignore_invalid))
-    ]
-    return result
-
-
-def ankihub_uuid_of_note(note: Note, ignore_invalid=False) -> Optional[uuid.UUID]:
-    if ANKIHUB_NOTE_TYPE_FIELD_NAME not in note.keys():
-        return None
-
-    try:
-        return uuid.UUID(note[ANKIHUB_NOTE_TYPE_FIELD_NAME])
-    except ValueError as e:
-        if ignore_invalid:
-            return None
-        else:
-            raise e
 
 
 def note_types_with_ankihub_id_field() -> List[NotetypeId]:

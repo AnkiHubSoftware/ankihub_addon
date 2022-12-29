@@ -8,7 +8,6 @@ from anki.notes import Note
 from .ankihub_client import Field, NoteInfo
 from .db import ankihub_db
 from .note_conversion import get_fields_protected_by_tags, is_internal_tag
-from .utils import ankihub_uuid_of_note
 
 
 def to_note_data(note: Note, set_new_id: bool = False, diff: bool = False) -> NoteInfo:
@@ -21,7 +20,7 @@ def to_note_data(note: Note, set_new_id: bool = False, diff: bool = False) -> No
     if set_new_id:
         ankihub_note_uuid = uuid.uuid4()
     else:
-        ankihub_note_uuid = ankihub_uuid_of_note(note, ignore_invalid=False)
+        ankihub_note_uuid = ankihub_db.ankihub_id_for_note(note.id)
 
     tags = _prepare_tags(note, diff=diff)
     fields = _prepare_fields(note, diff=diff)
