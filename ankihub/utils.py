@@ -2,7 +2,7 @@ import re
 import time
 import uuid
 from pprint import pformat
-from typing import Dict, Iterable, List, Optional, Set, Tuple
+from typing import Dict, Iterable, List, Optional, Sequence, Set, Tuple
 
 from anki.decks import DeckId
 from anki.errors import NotFoundError
@@ -124,6 +124,13 @@ def note_types_with_ankihub_id_field() -> List[NotetypeId]:
 
 def has_ankihub_id_field(model: NotetypeDict) -> bool:
     return any(field["name"] == ANKIHUB_NOTE_TYPE_FIELD_NAME for field in model["flds"])
+
+
+def nids_in_deck_but_not_in_subdeck(deck_name: str) -> Sequence[NoteId]:
+    """Return note IDs of notes that are in the deck but not also in a subdeck of the deck.
+    For example if a notes is in the deck "A" but not in "A::B" or "A::C" then it is returned.
+    """
+    return mw.col.find_notes(f'deck:"{deck_name}" -deck:"{deck_name}::*"')
 
 
 # note types

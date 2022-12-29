@@ -1,4 +1,5 @@
 import re
+from ..register_decks import DECK_HIERARCHY_TAG_PREFIX
 import uuid
 from concurrent.futures import Future
 from datetime import datetime, timezone
@@ -207,13 +208,24 @@ def create_collaborative_deck_action() -> None:
 
     private = public is False
 
+    add_deck_hierarchy_tags = False
+    if mw.col.decks.children(mw.col.decks.id_for_name(deck_name)):
+        add_deck_hierarchy_tags = ask_user(
+            "Would you like to add a tag to each note in the deck that indicates which subdeck it belongs to?<br><br>"
+            "For example, if you have a deck named <b>My Deck</b> with a subdeck named <b>My Deck::Subdeck</b>, "
+            "each note in <b>My Deck::Subdeck</b> will have a tag "
+            f"<b>{DECK_HIERARCHY_TAG_PREFIX}::My Deck::Subdeck</b> added to it.<br><br>"
+            "This will enable subscribers to have the same deck hierarchy as you if they want to."
+        )
+        if add_deck_hierarchy_tags is None:
+            return
+
     confirm = ask_user(
         "Uploading the deck to AnkiHub requires modifying notes and note types in "
         f"<b>{deck_name}</b> and will require a full sync afterwards. Would you like to "
         "continue?",
     )
     if not confirm:
-        tooltip("Cancelled Upload to AnkiHub")
         return
 
     def on_success(ankihub_did: uuid.UUID) -> None:
@@ -239,7 +251,9 @@ def create_collaborative_deck_action() -> None:
 
     op = QueryOp(
         parent=mw,
-        op=lambda col: create_collaborative_deck(deck_name, private=private),
+        op=lambda col: create_collaborative_deck(
+            deck_name, private=private, add_deck_hierarchy_tags=add_deck_hierarchy_tags
+        ),
         success=on_success,
     ).failure(on_failure)
     LOGGER.debug("Instantiated QueryOp for creating collaborative deck")
