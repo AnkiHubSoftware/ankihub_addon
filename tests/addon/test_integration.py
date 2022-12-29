@@ -299,9 +299,7 @@ def test_suggest_new_note(anki_session_with_addon: AnkiSession, requests_mock):
         mw = anki_session.mw
 
         import_sample_ankihub_deck(mw, str(UUID_1))
-        note = mw.col.new_note(
-            mw.col.models.by_name("Basic-4827c (Testdeck / andrew1)")
-        )
+        note = mw.col.new_note(mw.col.models.by_name("Basic (Testdeck / user1)"))
         ankihub_deck_uuid = UUID_1
 
         adapter = requests_mock.post(
@@ -364,9 +362,7 @@ def test_suggest_notes_in_bulk(anki_session_with_addon: AnkiSession, monkeypatch
         anki_did = import_sample_ankihub_deck(mw, str(UUID_1))
 
         # add a new note
-        new_note = mw.col.new_note(
-            mw.col.models.by_name("Basic-4827c (Testdeck / andrew1)")
-        )
+        new_note = mw.col.new_note(mw.col.models.by_name("Basic (Testdeck / user1)"))
         mw.col.add_note(new_note, deck_id=anki_did)
 
         new_note_ankihub_uuid = UUID_2
@@ -416,7 +412,7 @@ def test_suggest_notes_in_bulk(anki_session_with_addon: AnkiSession, monkeypatch
                     guid=new_note.guid,
                     comment="test",
                     ankihub_deck_uuid=UUID("1f28bc9e-f36d-4e1d-8720-5dd805f12dd0"),
-                    note_type_name="Basic-4827c (Testdeck / andrew1)",
+                    note_type_name="Basic (Testdeck / user1)",
                     anki_note_type_id=1657023668893,
                 ),
             ],
