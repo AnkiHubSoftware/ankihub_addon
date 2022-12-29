@@ -46,7 +46,9 @@ def is_internal_tag(tag: str) -> bool:
 def get_fields_protected_by_tags(note: Note) -> List[str]:
     if TAG_FOR_PROTECTING_ALL_FIELDS in note.tags:
         return [
-            tag for tag in note.keys() if tag != settings.ANKIHUB_NOTE_TYPE_FIELD_NAME
+            field_name
+            for field_name in note.keys()
+            if field_name != settings.ANKIHUB_NOTE_TYPE_FIELD_NAME
         ]
 
     field_names_from_tags = [

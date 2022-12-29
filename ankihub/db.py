@@ -220,6 +220,7 @@ class AnkiHubDB:
             )
 
     def note_data(self, anki_note_id: NoteId) -> Optional[NoteInfo]:
+        # The AnkiHub note type of the note has to exist in the Anki DB, otherwise this will fail.
         result = self.first(
             f"""
             SELECT
@@ -321,6 +322,15 @@ class AnkiHubDB:
             return None
 
         result = uuid.UUID(nid_str)
+        return result
+
+    def is_ankihub_note_type(self, anki_note_type_id: NotetypeId) -> bool:
+        result = self.scalar(
+            """
+            SELECT EXISTS(SELECT 1 FROM notes WHERE anki_note_type_id = ?)
+            """,
+            anki_note_type_id,
+        )
         return result
 
     def note_types_for_ankihub_deck(self, ankihub_did: uuid.UUID) -> List[NotetypeId]:
