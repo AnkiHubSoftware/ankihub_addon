@@ -1,12 +1,13 @@
-from typing import Callable, List, Optional
 import uuid
+from typing import Callable, List, Optional
 
-from aqt.utils import askUser, showInfo, showWarning
+from aqt.utils import showInfo, showWarning
 
 from .. import LOGGER
 from ..db import ankihub_db
 from ..settings import config
 from .decks import cleanup_after_deck_install, download_and_install_deck
+from .utils import ask_user
 
 
 def check_ankihub_db(on_success: Optional[Callable[[], None]] = None):
@@ -39,7 +40,7 @@ def check_ankihub_db(on_success: Optional[Callable[[], None]] = None):
             f"{'<br>'.join('<b>' + deck_name + '</b>' for deck_name in deck_names)}<br><br>"
         )
 
-    if askUser(
+    if ask_user(
         text=(
             messsage_begin
             + "The add-on needs to download and import these decks again. This may take a while.<br><br>"

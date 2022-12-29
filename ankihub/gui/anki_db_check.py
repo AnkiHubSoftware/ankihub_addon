@@ -4,12 +4,13 @@ from typing import List
 
 from anki.utils import ids2str
 from aqt import mw
-from aqt.utils import askUser, showInfo
+from aqt.utils import showInfo
 
 from .. import LOGGER
 from ..db import ankihub_db
 from ..reset_changes import reset_local_changes_to_notes
 from ..settings import ANKIHUB_NOTE_TYPE_FIELD_NAME, config
+from .utils import ask_user
 
 
 def check_anki_db():
@@ -30,7 +31,7 @@ def check_anki_db():
         key=str.lower,
     )
 
-    if askUser(
+    if ask_user(
         text=(
             "AnkiHub has detected that the following deck(s) have missing values:<br>"
             f"{'<br>'.join('<b>' + deck_name + '</b>' for deck_name in deck_names)}<br><br>"

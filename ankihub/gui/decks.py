@@ -23,7 +23,7 @@ from aqt.qt import (
     qconnect,
 )
 from aqt.studydeck import StudyDeck
-from aqt.utils import askUser, openLink, showInfo, showText, tooltip
+from aqt.utils import openLink, showInfo, showText, tooltip
 
 from .. import LOGGER
 from ..addon_ankihub_client import AddonAnkiHubClient as AnkiHubClient
@@ -33,6 +33,7 @@ from ..db import ankihub_db
 from ..settings import URL_DECK_BASE, URL_DECKS, URL_HELP, URL_VIEW_DECK, config
 from ..sync import AnkiHubImporter
 from ..utils import create_backup, undo_note_type_modfications
+from .utils import ask_user
 
 
 class SubscribedDecksDialog(QDialog):
@@ -113,7 +114,7 @@ class SubscribedDecksDialog(QDialog):
             return
         deck_names = [item.text() for item in items]
         deck_names_text = ", ".join(deck_names)
-        confirm = askUser(
+        confirm = ask_user(
             f"Unsubscribe from deck {deck_names_text}?\n\n"
             "The deck will remain in your collection, but it will no longer sync with AnkiHub.",
             title="Unsubscribe AnkiHub Deck",
@@ -283,7 +284,7 @@ class SubscribeDialog(QDialog):
             self.close()
             return
 
-        confirmed = askUser(
+        confirmed = ask_user(
             f"Would you like to proceed with downloading and installing the deck? "
             f"Your personal collection will be modified.<br><br>"
             f"See <a href='{URL_HELP}'>{URL_HELP}</a> for details.",
@@ -432,6 +433,6 @@ def cleanup_after_deck_install(multiple_decks: bool = False) -> None:
         )
         + "Do you want to clear unused tags and empty cards from your collection? (It is recommended.)"
     )
-    if askUser(message, title="AnkiHub"):
+    if ask_user(message, title="AnkiHub"):
         clear_unused_tags(parent=mw).run_in_background()
         show_empty_cards(mw)
