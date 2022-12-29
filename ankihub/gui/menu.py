@@ -1,8 +1,8 @@
 import re
+import uuid
 from concurrent.futures import Future
 from datetime import datetime, timezone
 from typing import Optional
-import uuid
 
 from aqt import (
     AnkiApp,
@@ -20,7 +20,7 @@ from aqt import (
 from aqt.operations import QueryOp
 from aqt.qt import QAction, QDialog, QMenu, Qt, qconnect
 from aqt.studydeck import StudyDeck
-from aqt.utils import askUser, openLink, showInfo, showText, tooltip
+from aqt.utils import openLink, showInfo, showText, tooltip
 
 from .. import LOGGER
 from ..addon_ankihub_client import AddonAnkiHubClient as AnkiHubClient
@@ -31,6 +31,7 @@ from ..register_decks import create_collaborative_deck
 from ..settings import ADDON_VERSION, URL_VIEW_DECK, config
 from ..sync import sync_with_progress
 from .decks import SubscribedDecksDialog
+from .utils import ask_user
 
 
 class AnkiHubLogin(QWidget):
@@ -196,15 +197,17 @@ def create_collaborative_deck_action() -> None:
         showText("You can't upload an empty deck.")
         return
 
-    public = askUser(
+    public = ask_user(
         "Would you like to make this deck public?<br><br>"
         'If you chose "No" it will be private and only people with a link '
         "will be able to see it on the AnkiHub website."
     )
+    if public is None:
+        return
 
     private = public is False
 
-    confirm = askUser(
+    confirm = ask_user(
         "Uploading the deck to AnkiHub requires modifying notes and note types in "
         f"<b>{deck_name}</b> and will require a full sync afterwards. Would you like to "
         "continue?",
@@ -297,7 +300,7 @@ class LogUploadResultDialog(QDialog):
 
 
 def upload_logs_action():
-    if not askUser(
+    if not ask_user(
         "Do you want to upload the add-on's logs to AnkiHub to go along a bug report?"
     ):
         return
