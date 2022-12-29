@@ -79,12 +79,11 @@ def _prepared_field_html(html: str) -> str:
 def _prepare_tags(note: Note, diff: bool) -> Optional[List[str]]:
     # returns None if diff=True and the tags didn't change since the last sync
 
-    note_data_from_ah = ankihub_db.note_data(note.id)
-
     # removing empty tags is necessary because notes have empty tags in the editor sometimes
     result = [tag for tag in note.tags if tag.strip() and not is_internal_tag(tag)]
 
     if diff:
+        note_data_from_ah = ankihub_db.note_data(note.id)
         if set(note_data_from_ah.tags) == set(result):
             return None
 
