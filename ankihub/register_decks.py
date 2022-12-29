@@ -60,10 +60,10 @@ def create_collaborative_deck(deck_name: str, private: bool) -> uuid.UUID:
     note_type_mapping = create_note_types_for_deck(deck_id)
     change_note_types_of_notes(note_ids, note_type_mapping)
 
-    assign_ankihub_ids(note_ids)
-
     nids = mw.col.find_notes(f'deck:"{deck_name}"')
-    notes_data = [to_note_data(mw.col.get_note(nid)) for nid in nids]
+    notes_data = [to_note_data(mw.col.get_note(nid), set_new_id=True) for nid in nids]
+
+    set_ankihub_id_fields_based_on_notes_data(notes_data)
 
     ankihub_did = upload_deck(deck_id, notes_data=notes_data, private=private)
     ankihub_db.save_notes_data_and_mod_values(
@@ -107,13 +107,13 @@ def change_note_types_of_notes(
     LOGGER.debug("Changed note types of notes.")
 
 
-def assign_ankihub_ids(note_ids: typing.List[NoteId]) -> None:
+def set_ankihub_id_fields_based_on_notes_data(notes_data: List[NoteInfo]) -> None:
     """Assign UUID to notes that have an AnkiHub ID field already."""
     updated_notes = []
     LOGGER.debug("Assigning AnkiHub IDs to notes.")
-    for note_id in note_ids:
-        note = mw.col.get_note(id=note_id)
-        note[ANKIHUB_NOTE_TYPE_FIELD_NAME] = str(uuid.uuid4())
+    for note_data in notes_data:
+        note = mw.col.get_note(id=NoteId(note_data.anki_nid))
+        note[ANKIHUB_NOTE_TYPE_FIELD_NAME] = str(note_data.ankihub_note_uuid)
         updated_notes.append(note)
     mw.col.update_notes(updated_notes)
-    LOGGER.debug(f"Updated notes: {', '.join(map(str, note_ids))}")
+    LOGGER.debug(f"Updated notes: {', '.join(map(str, [n.id for n in updated_notes]))}")
