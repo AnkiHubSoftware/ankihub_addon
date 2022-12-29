@@ -99,7 +99,7 @@ def suggest_notes_in_bulk(
 def change_note_suggestion(
     note: Note, change_type: SuggestionType, comment: str
 ) -> ChangeNoteSuggestion:
-    note_data = to_note_data(note)
+    note_data = to_note_data(note, diff=True)
 
     return ChangeNoteSuggestion(
         ankihub_note_uuid=note_data.ankihub_note_uuid,

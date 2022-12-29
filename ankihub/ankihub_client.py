@@ -21,7 +21,7 @@ from .lib.mashumaro.mixins.json import DataClassJSONMixin
 LOGGER = logging.getLogger(__name__)
 
 API_URL_BASE = "https://app.ankihub.net/api"
-API_VERSION = 4.0
+API_VERSION = 5.0
 
 DECK_UPDATE_PAGE_SIZE = 2000  # seems to work well in terms of speed
 
@@ -70,7 +70,7 @@ class NoteInfo(DataClassJSONMixinWithConfig):
     anki_nid: int = dataclasses.field(metadata=field_options(alias="anki_id"))
     mid: int = dataclasses.field(metadata=field_options(alias="note_type_id"))
     fields: List[Field]
-    tags: List[str]
+    tags: Optional[List[str]]  # None means no tag changes
     guid: str
     last_update_type: Optional[SuggestionType] = dataclasses.field(
         metadata=field_options(
@@ -151,7 +151,7 @@ class NoteSuggestion(DataClassJSONMixinWithConfig, ABC):
         )
     )
     fields: List[Field]
-    tags: List[str]
+    tags: Optional[List[str]]  # None means no tag changes
     comment: str
 
 
