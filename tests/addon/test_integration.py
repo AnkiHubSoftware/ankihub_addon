@@ -40,64 +40,57 @@ def test_entry_point(anki_session_with_addon: AnkiSession):
 
 
 def test_editor(anki_session_with_addon: AnkiSession, requests_mock, monkeypatch):
-    from ankihub.gui.editor import (
-        on_suggestion_button_press,
-        refresh_suggestion_button,
-        setup,
-    )
-    from ankihub.settings import (
-        ANKIHUB_NOTE_TYPE_FIELD_NAME,
-        API_URL_BASE,
-        AnkiHubCommands,
-    )
+    from ankihub.db import ankihub_db
+    from ankihub.gui.editor import on_suggestion_button_press, refresh_suggestion_button
+    from ankihub.settings import API_URL_BASE, AnkiHubCommands
 
-    setup()
-    editor = MagicMock()
-    editor.mw = MagicMock()
-    editor.note = MagicMock()
-    editor.web = MagicMock()
+    with anki_session_with_addon.profile_loaded():
+        mw = anki_session_with_addon.mw
 
-    ankihub_note_uuid = UUID_1
-    editor.note.keys = lambda: ["Front", "Back", ANKIHUB_NOTE_TYPE_FIELD_NAME]
-    editor.note.fields = ["a", "b", str(ankihub_note_uuid)]
-    editor.note.tags = ["test_tag"]
-    field_value = {ANKIHUB_NOTE_TYPE_FIELD_NAME: ""}
-    editor.note.__contains__.return_value = True
-    editor.note.__getitem__.side_effect = lambda k: field_value[k]
+        # mock the dialog so it doesn't block the testq
+        monkeypatch.setattr("ankihub.gui.editor.SuggestionDialog.exec", Mock())
 
-    # TODO Mock what this is actually expected to return
-    expected_response = {}  # type: ignore
-    requests_mock.post(
-        f"{API_URL_BASE}/notes/{ankihub_note_uuid}/suggestion/",
-        status_code=201,
-        json=expected_response,
-    )
+        # when the decks in the config are empty on_suggestion_button_press returns early
+        monkeypatch.setattr(
+            "ankihub.settings.config._private_config.decks",
+            {"placeholder deck id": Mock()},
+        )
 
-    monkeypatch.setattr("ankihub.gui.editor.SuggestionDialog.exec", Mock())
+        import_sample_ankihub_deck(mw)
 
-    # when the decks in the config are empty on_suggestion_button_press returns early
-    monkeypatch.setattr(
-        "ankihub.gui.editor.config._private_config.decks", {UUID_1: Mock()}
-    )
+        editor = MagicMock()
 
-    # this makes it so that the note is added to the first ankihub deck from the list
-    # it could be any deck, we just don't want the dialog to open
-    monkeypatch.setattr("ankihub.gui.editor.choose_list", lambda *args, **kwargs: 0)
+        # test a new note suggestion
+        editor.note = mw.col.new_note(mw.col.models.by_name("Basic (Testdeck / user1)"))
 
-    refresh_suggestion_button(editor)
-    assert editor.ankihub_command == AnkiHubCommands.NEW.value
-    on_suggestion_button_press(editor)
+        note_1_ah_nid = UUID_1
 
-    field_value[ANKIHUB_NOTE_TYPE_FIELD_NAME] = str(ankihub_note_uuid)
+        monkeypatch.setattr("ankihub.exporting.uuid.uuid4", lambda: note_1_ah_nid)
 
-    refresh_suggestion_button(editor)
-    assert editor.ankihub_command == AnkiHubCommands.CHANGE.value
-    on_suggestion_button_press(editor)
+        requests_mock.post(
+            f"{API_URL_BASE}/notes/{note_1_ah_nid}/suggestion/",
+            status_code=201,
+            json={},
+        )
 
-    # This test is quite limited since we don't know how to run this test with a
-    # "real," editor, instead of the manually instantiated one above. So for
-    # now, this test just checks that on_ankihub_button_press runs without
-    # raising any errors.
+        refresh_suggestion_button(editor)
+        assert editor.ankihub_command == AnkiHubCommands.NEW.value
+        on_suggestion_button_press(editor)
+
+        # test a change note suggestion
+        note = mw.col.get_note(mw.col.find_notes("")[0])
+        editor.note = note
+        noes_2_ah_nid = ankihub_db.ankihub_id_for_note(note.id)
+
+        requests_mock.post(
+            f"{API_URL_BASE}/notes/{noes_2_ah_nid}/suggestion/",
+            status_code=201,
+            json={},
+        )
+
+        refresh_suggestion_button(editor)
+        assert editor.ankihub_command == AnkiHubCommands.CHANGE.value
+        on_suggestion_button_press(editor)
 
 
 def test_get_note_types_in_deck(anki_session_with_addon: AnkiSession):
@@ -311,9 +304,7 @@ def test_suggest_new_note(anki_session_with_addon: AnkiSession, requests_mock):
         mw = anki_session.mw
 
         import_sample_ankihub_deck(mw, str(UUID_1))
-        note = mw.col.new_note(
-            mw.col.models.by_name("Basic-4827c (Testdeck / andrew1)")
-        )
+        note = mw.col.new_note(mw.col.models.by_name("Basic (Testdeck / user1)"))
         ankihub_deck_uuid = UUID_1
 
         adapter = requests_mock.post(
@@ -374,16 +365,21 @@ def test_suggest_notes_in_bulk(anki_session_with_addon: AnkiSession, monkeypatch
         mw = anki_session.mw
 
         anki_did = import_sample_ankihub_deck(mw, str(UUID_1))
-        note = mw.col.new_note(
-            mw.col.models.by_name("Basic-4827c (Testdeck / andrew1)")
-        )
-        mw.col.add_note(note, deck_id=anki_did)
+
+        # add a new note
+        new_note = mw.col.new_note(mw.col.models.by_name("Basic (Testdeck / user1)"))
+        mw.col.add_note(new_note, deck_id=anki_did)
 
         new_note_ankihub_uuid = UUID_2
         monkeypatch.setattr("uuid.uuid4", lambda: new_note_ankihub_uuid)
 
+        CHANGED_NOTE_ID = 1608240057545
+        changed_note = mw.col.get_note(CHANGED_NOTE_ID)
+        changed_note["Front"] = "changed front"
+        changed_note.flush()
+
         # suggest two notes, one new and one updated, check if the client method was called with the correct arguments
-        nids = [1608240057545, note.id]
+        nids = [changed_note.id, new_note.id]
         notes = [mw.col.get_note(nid) for nid in nids]
         suggest_notes_in_bulk(
             notes=notes,
@@ -396,16 +392,15 @@ def test_suggest_notes_in_bulk(anki_session_with_addon: AnkiSession, monkeypatch
             "change_note_suggestions": [
                 ChangeNoteSuggestion(
                     ankihub_note_uuid=UUID("67f182c2-7306-47f8-aed6-d7edb42cd7de"),
-                    anki_nid=1608240057545,
+                    anki_nid=CHANGED_NOTE_ID,
                     fields=[
                         Field(
                             name="Front",
                             order=0,
-                            value="<p>This is the front 2 without review</p>",
+                            value="changed front",
                         ),
-                        Field(name="Back", order=1, value="This is the back 2"),
                     ],
-                    tags=["my::tag", "my::tag2", "my::tag3"],
+                    tags=None,
                     comment="test",
                     change_type=SuggestionType.NEW_CONTENT,
                 ),
@@ -413,16 +408,16 @@ def test_suggest_notes_in_bulk(anki_session_with_addon: AnkiSession, monkeypatch
             "new_note_suggestions": [
                 NewNoteSuggestion(
                     ankihub_note_uuid=new_note_ankihub_uuid,
-                    anki_nid=note.id,
+                    anki_nid=new_note.id,
                     fields=[
                         Field(name="Front", order=0, value=""),
                         Field(name="Back", order=1, value=""),
                     ],
                     tags=[],
-                    guid=note.guid,
+                    guid=new_note.guid,
                     comment="test",
                     ankihub_deck_uuid=UUID("1f28bc9e-f36d-4e1d-8720-5dd805f12dd0"),
-                    note_type_name="Basic-4827c (Testdeck / andrew1)",
+                    note_type_name="Basic (Testdeck / user1)",
                     anki_note_type_id=1657023668893,
                 ),
             ],

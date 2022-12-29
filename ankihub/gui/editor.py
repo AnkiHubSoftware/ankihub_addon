@@ -11,14 +11,9 @@ from aqt.utils import showInfo, showText, tooltip
 
 from .. import LOGGER, settings
 from ..ankihub_client import AnkiHubRequestError
+from ..db import ankihub_db
 from ..error_reporting import report_exception_and_upload_logs
-from ..settings import (
-    ANKI_MINOR,
-    ANKIHUB_NOTE_TYPE_FIELD_NAME,
-    ICONS_PATH,
-    AnkiHubCommands,
-    config,
-)
+from ..settings import ANKI_MINOR, ICONS_PATH, AnkiHubCommands, config
 from ..suggestions import suggest_new_note, suggest_note_update
 from .suggestion_dialog import SuggestionDialog
 from .utils import choose_list
@@ -225,14 +220,14 @@ def refresh_suggestion_button(editor: Editor) -> None:
         editor.web.eval(disable_btn_script.format("true"))
         return
 
-    if ANKIHUB_NOTE_TYPE_FIELD_NAME in note:
+    if ankihub_db.is_ankihub_note_type(note.mid):
         editor.web.eval(disable_btn_script.format("false"))
     else:
         editor.web.eval(disable_btn_script.format("true"))
         return
 
     set_label_script = "document.getElementById('ankihub-btn-label').textContent='{}';"
-    if note[ANKIHUB_NOTE_TYPE_FIELD_NAME]:
+    if ankihub_db.ankihub_id_for_note(note.id):
         editor.web.eval(set_label_script.format(AnkiHubCommands.CHANGE.value))
         editor.ankihub_command = AnkiHubCommands.CHANGE.value  # type: ignore
     else:
