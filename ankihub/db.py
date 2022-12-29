@@ -200,6 +200,7 @@ class AnkiHubDB:
             )
 
     def note_data(self, anki_note_id: NoteId) -> Optional[NoteInfo]:
+        # The AnkiHub note type of the note has to exist in the Anki DB, otherwise this will fail.
         result = self.first(
             f"""
             SELECT
