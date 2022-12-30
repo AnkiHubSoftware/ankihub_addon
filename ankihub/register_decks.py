@@ -130,8 +130,7 @@ def set_ankihub_id_fields_based_on_notes_data(notes_data: List[NoteInfo]) -> Non
 def add_deck_hierarchy_tags_to_notes(deck_name: str, separator: str) -> None:
     """To every note in the deck a tags is added that indicates where in the deck hierarchy
     the note is located. For example, if the deck is called "A" and the note is in
-    the deck "A::B", the tag f"{DECK_HIERARCHY_TAG_PREFIX}::A::B" is added to the note.
-    """
+    the deck "A::B", the tag f"{DECK_HIERARCHY_TAG_PREFIX}::A::B" is added to the note."""
 
     assert "::" not in deck_name, "Deck must be a top level deck."
 
@@ -154,7 +153,8 @@ def add_deck_hierarchy_tags_to_notes(deck_name: str, separator: str) -> None:
 
 
 def subdeck_name_to_tag(deck_name: str, separator: str) -> str:
-    """Convert deck name with spaces to compatible and clean Anki tag name starting with SUBDECK_TAG_PREFIX."""
+    """Convert deck name with spaces to compatible and clean Anki tag name starting with
+    DECK_HIERARCHY_TAG_PREFIX."""
 
     result = f"{DECK_HIERARCHY_TAG_PREFIX}::{deck_name}"
 
