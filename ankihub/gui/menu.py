@@ -1,5 +1,4 @@
 import re
-from ..register_decks import DECK_HIERARCHY_TAG_PREFIX
 import uuid
 from concurrent.futures import Future
 from datetime import datetime, timezone
@@ -26,6 +25,7 @@ from aqt.utils import openLink, showInfo, showText, tooltip
 from .. import LOGGER
 from ..addon_ankihub_client import AddonAnkiHubClient as AnkiHubClient
 from ..ankihub_client import AnkiHubRequestError
+from ..deck_hierarchy import DECK_HIERARCHY_TAG_PREFIX
 from ..error_reporting import upload_logs_in_background
 from ..media_import.ui import open_import_dialog
 from ..register_decks import create_collaborative_deck
@@ -214,7 +214,7 @@ def create_collaborative_deck_action() -> None:
             "Would you like to add a tag to each note in the deck that indicates which subdeck it belongs to?<br><br>"
             "For example, if you have a deck named <b>My Deck</b> with a subdeck named <b>My Deck::Subdeck</b>, "
             "each note in <b>My Deck::Subdeck</b> will have a tag "
-            f"<b>{DECK_HIERARCHY_TAG_PREFIX}::My Deck::Subdeck</b> added to it."
+            f"<b>{DECK_HIERARCHY_TAG_PREFIX}::Subdeck</b> added to it."
         )
         if add_deck_hierarchy_tags is None:
             return

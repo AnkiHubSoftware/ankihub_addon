@@ -129,7 +129,7 @@ def test_remove_note_type_name_modifications(anki_session_with_addon: AnkiSessio
 
 
 def test_add_deck_hierarchy_tags_to_notes(anki_session_with_addon: AnkiSession):
-    from ankihub.register_decks import (
+    from ankihub.deck_hierarchy import (
         DECK_HIERARCHY_TAG_PREFIX,
         add_deck_hierarchy_tags_to_notes,
     )
@@ -154,19 +154,19 @@ def test_add_deck_hierarchy_tags_to_notes(anki_session_with_addon: AnkiSession):
         add_deck_hierarchy_tags_to_notes("A", "_")
 
         note1.load()
-        assert note1.tags == [f"{DECK_HIERARCHY_TAG_PREFIX}::A"]
+        assert note1.tags == []
 
         note2.load()
-        assert note2.tags == [f"{DECK_HIERARCHY_TAG_PREFIX}::A::B"]
+        assert note2.tags == [f"{DECK_HIERARCHY_TAG_PREFIX}::B"]
 
         note3.load()
-        assert note3.tags == [f"{DECK_HIERARCHY_TAG_PREFIX}::A::B::C"]
+        assert note3.tags == [f"{DECK_HIERARCHY_TAG_PREFIX}::B::C"]
 
 
 def test_add_deck_hierarchy_tags_to_notes_with_spaces_in_deck_name(
     anki_session_with_addon: AnkiSession,
 ):
-    from ankihub.register_decks import (
+    from ankihub.deck_hierarchy import (
         DECK_HIERARCHY_TAG_PREFIX,
         add_deck_hierarchy_tags_to_notes,
     )
@@ -191,10 +191,10 @@ def test_add_deck_hierarchy_tags_to_notes_with_spaces_in_deck_name(
         add_deck_hierarchy_tags_to_notes(" a a ", "_")
 
         note1.load()
-        assert note1.tags == [f"{DECK_HIERARCHY_TAG_PREFIX}::a_a"]
+        assert note1.tags == []
 
         note2.load()
-        assert note2.tags == [f"{DECK_HIERARCHY_TAG_PREFIX}::a_a::b_b"]
+        assert note2.tags == [f"{DECK_HIERARCHY_TAG_PREFIX}::b_b"]
 
         note3.load()
-        assert note3.tags == [f"{DECK_HIERARCHY_TAG_PREFIX}::a_a::b_b::c_c"]
+        assert note3.tags == [f"{DECK_HIERARCHY_TAG_PREFIX}::b_b::c_c"]
