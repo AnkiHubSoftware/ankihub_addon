@@ -75,10 +75,10 @@ class SubscribedDecksDialog(QDialog):
         self.box_right.addWidget(self.open_web_btn)
         qconnect(self.open_web_btn.clicked, self.on_open_web)
 
-        self.set_home_deck = QPushButton("Set Home deck")
-        self.set_home_deck.setToolTip("New cards will be added to this deck.")
-        qconnect(self.set_home_deck.clicked, self.on_set_home_deck)
-        self.box_right.addWidget(self.set_home_deck)
+        self.set_home_deck_btn = QPushButton("Set Home deck")
+        self.set_home_deck_btn.setToolTip("New cards will be added to this deck.")
+        qconnect(self.set_home_deck_btn.clicked, self.on_set_home_deck)
+        self.box_right.addWidget(self.set_home_deck_btn)
 
         self.box_right.addStretch(1)
 
@@ -183,7 +183,7 @@ class SubscribedDecksDialog(QDialog):
         isSelected: bool = len(selection) > 0
         self.unsubscribe_btn.setEnabled(isSelected)
         self.open_web_btn.setEnabled(isSelected)
-        self.set_home_deck.setEnabled(isSelected)
+        self.set_home_deck_btn.setEnabled(isSelected)
 
     @classmethod
     def display_subscribe_window(cls):
