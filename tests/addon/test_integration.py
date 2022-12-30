@@ -198,7 +198,9 @@ def test_create_collaborative_deck_and_upload(
 
             # check that deck info is in db
             assert ankihub_db.ankihub_deck_ids() == [ankihub_deck_uuid]
-            assert len(ankihub_db.notes_for_ankihub_deck(str(ankihub_deck_uuid))) == 3
+            assert (
+                len(ankihub_db.anki_nids_for_ankihub_deck(str(ankihub_deck_uuid))) == 3
+            )
 
 
 def test_get_deck_by_id(anki_session_with_addon: AnkiSession, requests_mock):
@@ -580,7 +582,7 @@ def assert_that_only_ankihub_sample_deck_info_in_database(ankihub_deck_uuid: uui
     from ankihub.db import ankihub_db
 
     assert ankihub_db.ankihub_deck_ids() == [ankihub_deck_uuid]
-    assert len(ankihub_db.notes_for_ankihub_deck(str(ankihub_deck_uuid))) == 3
+    assert len(ankihub_db.anki_nids_for_ankihub_deck(str(ankihub_deck_uuid))) == 3
 
 
 def test_import_existing_ankihub_deck_2(anki_session_with_addon: AnkiSession):
@@ -895,18 +897,18 @@ def test_unsubsribe_from_deck(anki_session_with_addon: AnkiSession):
         mids = ankihub_db.note_types_for_ankihub_deck(ankihub_did)
         assert len(mids) == 0
 
-        nids = ankihub_db.notes_for_ankihub_deck(ankihub_did)
+        nids = ankihub_db.anki_nids_for_ankihub_deck(ankihub_did)
         assert len(nids) == 0
 
 
 def import_sample_ankihub_deck(
-    mw: aqt.AnkiQt, ankihub_did: Optional[str] = None
+    mw: aqt.AnkiQt, ankihub_did: Optional[uuid.UUID] = None
 ) -> DeckId:
     from ankihub.sync import AnkiHubImporter
     from ankihub.utils import all_dids
 
     if ankihub_did is None:
-        ankihub_did = "1"
+        ankihub_did = uuid.UUID("00000000-0000-0000-0000-000000000001")
 
     # import the apkg to get the note types, then delete the deck
     file = str(ANKIHUB_SAMPLE_DECK_APKG.absolute())
@@ -919,7 +921,7 @@ def import_sample_ankihub_deck(
     local_did = importer._import_ankihub_deck_inner(
         ankihub_did=ankihub_did,
         notes_data=ankihub_sample_deck_notes_data(),
-        deck_name="test",
+        deck_name="Testdeck",
         protected_fields={},
         protected_tags=[],
         remote_note_types={},
@@ -1253,3 +1255,122 @@ def test_import_deck_and_check_that_values_are_saved_to_databases(
         # ... last_update_type is not relevant here because it is not saved in the AnkiHub DB
         note_data_from_db.last_update_type = note_data.last_update_type
         assert note_data_from_db == note_data
+
+
+def test_build_deck_hierarchy_and_move_cards_into_it(
+    anki_session_with_addon: AnkiSession,
+):
+
+    from ankihub.deck_hierarchy import (
+        DECK_HIERARCHY_TAG_PREFIX,
+        build_deck_hierarchy_and_move_cards_into_it,
+    )
+    from ankihub.settings import config
+
+    with anki_session_with_addon.profile_loaded():
+        mw = anki_session_with_addon.mw
+
+        ah_did = UUID_1
+        anki_did = import_sample_ankihub_deck(mw, ankihub_did=ah_did)
+        # this would not be necessary if deck configs were saved in the AnkiHub DB
+        config.save_subscription(name="Testdeck", ankihub_did=ah_did, anki_did=anki_did)
+
+        # add a deck hierarchy tag to a note
+        nids = mw.col.find_notes("deck:Testdeck")
+        note = mw.col.get_note(nids[0])
+        note.tags = [f"{DECK_HIERARCHY_TAG_PREFIX}::B::C"]
+        note.flush()
+
+        # call the function that moves all cards in the deck to their place in the deck hierarchy
+        build_deck_hierarchy_and_move_cards_into_it(ah_did)
+
+        # assert that the decks were created and the cards of the note were moved to it
+        assert note.cards()
+        for card in note.cards():
+            assert mw.col.decks.name(card.did) == "Testdeck::B::C"
+
+
+def test_build_deck_hierarchy_and_move_cards_into_it_with_empty_decks(
+    anki_session_with_addon: AnkiSession,
+):
+
+    from ankihub.deck_hierarchy import build_deck_hierarchy_and_move_cards_into_it
+    from ankihub.settings import config
+
+    with anki_session_with_addon.profile_loaded():
+        mw = anki_session_with_addon.mw
+
+        ah_did = UUID_1
+        anki_did = import_sample_ankihub_deck(mw, ankihub_did=ah_did)
+        # this would not be necessary if deck configs were saved in the AnkiHub DB
+        config.save_subscription(name="Testdeck", ankihub_did=ah_did, anki_did=anki_did)
+
+        # create empty decks
+        mw.col.decks.add_normal_deck_with_name("Testdeck::empty::A")
+        # assert that the empty decks were created to be sure
+        assert mw.col.decks.id("Testdeck::empty", create=False)
+        assert mw.col.decks.id("Testdeck::empty::A", create=False)
+
+        # call the function that moves all cards in the deck to their place in the deck hierarchy
+        build_deck_hierarchy_and_move_cards_into_it(ah_did)
+
+        # assert that the empty decks were deleted
+        assert mw.col.decks.id("Testdeck::empty", create=False) is None
+        assert mw.col.decks.id("Testdeck::empty::A", create=False) is None
+
+
+def test_build_deck_hierarchy_and_move_cards_into_it_with_filtered_decks(
+    anki_session_with_addon: AnkiSession,
+):
+    from anki.decks import FilteredDeckConfig
+
+    from ankihub.deck_hierarchy import (
+        DECK_HIERARCHY_TAG_PREFIX,
+        build_deck_hierarchy_and_move_cards_into_it,
+    )
+    from ankihub.settings import config
+
+    with anki_session_with_addon.profile_loaded():
+        mw = anki_session_with_addon.mw
+
+        ah_did = UUID_1
+        anki_did = import_sample_ankihub_deck(mw, ankihub_did=ah_did)
+        # this would not be necessary if deck configs were saved in the AnkiHub DB
+        config.save_subscription(name="Testdeck", ankihub_did=ah_did, anki_did=anki_did)
+
+        nids = mw.col.find_notes("deck:Testdeck")
+
+        # create a filtered deck that will contain the cards of the imported deck
+        filtered_deck = mw.col.sched.get_or_create_filtered_deck(DeckId(0))
+        filtered_deck.name = "filtered deck"
+        filtered_deck.config.search_terms.pop(0)
+        filtered_deck.config.search_terms.append(
+            FilteredDeckConfig.SearchTerm(
+                search="deck:Testdeck",
+                limit=100,
+                order=0,
+            )
+        )
+        mw.col.sched.add_or_update_filtered_deck(filtered_deck)
+        filtered_deck_id = mw.col.decks.id("filtered deck", create=False)
+        filtered_deck = mw.col.sched.get_or_create_filtered_deck(filtered_deck_id)
+
+        # assign a deck hierarchy tag to a note
+        nids = mw.col.find_notes("deck:Testdeck")
+        note = mw.col.get_note(nids[0])
+        note.tags = [f"{DECK_HIERARCHY_TAG_PREFIX}::B::C"]
+        note.flush()
+
+        # assert that the note is in the filtered deck to be safe
+        assert note.cards()
+        for card in note.cards():
+            assert card.did == filtered_deck.id
+
+        # call the function that moves all cards in the deck to their place in the deck hierarchy
+        build_deck_hierarchy_and_move_cards_into_it(ah_did)
+
+        # assert that only the odid of the cards of the note was changed
+        assert note.cards()
+        for card in note.cards():
+            assert mw.col.decks.name(card.did) == "filtered deck"
+            assert mw.col.decks.name(card.odid) == "Testdeck::B::C"

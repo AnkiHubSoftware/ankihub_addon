@@ -16,6 +16,9 @@ from . import LOGGER, settings
 from .addon_ankihub_client import AddonAnkiHubClient as AnkiHubClient
 from .ankihub_client import Field, NoteInfo, SuggestionType
 from .db import ankihub_db
+from .deck_hierarchy import (
+    build_deck_hierarchy_and_move_cards_into_it,
+)
 from .note_conversion import (
     TAG_FOR_NEW_NOTE,
     TAG_FOR_PROTECTING_ALL_FIELDS,
@@ -100,6 +103,7 @@ class AnkiHubImporter:
         protected_tags: List[str],
         local_did: DeckId = None,  # did that new notes should be put into if importing not for the first time
         save_to_ankihub_db: bool = True,
+        move_cards_into_subdecks_based_on_tags: bool = False,
     ) -> DeckId:
         first_import_of_deck = local_did is None
 
@@ -108,14 +112,16 @@ class AnkiHubImporter:
         reset_note_types_of_notes_based_on_notes_data(notes_data)
 
         dids: Set[DeckId] = set()  # set of ids of decks notes were imported into
+        notes = []
         for note_data in notes_data:
-            note = self.update_or_create_note(
+            note: Note = self.update_or_create_note(
                 note_data=note_data,
                 anki_did=local_did,
                 protected_fields=protected_fields,
                 protected_tags=protected_tags,
                 first_import_of_deck=first_import_of_deck,
             )
+            notes.append(note)
 
             dids_for_note = set(c.did for c in note.cards())
             dids = dids | dids_for_note
@@ -127,6 +133,9 @@ class AnkiHubImporter:
             ankihub_db.save_notes_data_and_mod_values(
                 ankihub_did=ankihub_did, notes_data=notes_data
             )
+
+        if move_cards_into_subdecks_based_on_tags:
+            build_deck_hierarchy_and_move_cards_into_it(ankihub_did, notes=notes)
 
         return local_did
 

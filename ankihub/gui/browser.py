@@ -272,7 +272,7 @@ def on_reset_deck_action(browser: Browser):
     ):
         return
 
-    nids = ankihub_db.notes_for_ankihub_deck(ah_dids[chosen_deck_idx])
+    nids = ankihub_db.anki_nids_for_ankihub_deck(ah_dids[chosen_deck_idx])
 
     def on_done(future: Future) -> None:
         future.result()

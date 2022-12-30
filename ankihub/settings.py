@@ -26,6 +26,7 @@ class DeckConfig:
     creator: bool
     name: str
     latest_update: Optional[str] = None
+    subdecks: bool = False  # whether deck is organized into subdecks by the add-on
 
 
 @dataclasses.dataclass
@@ -102,6 +103,10 @@ class Config:
                 latest_update, ANKIHUB_DATETIME_FORMAT_STR
             )
             self.deck_config(ankihub_did).latest_update = date_time_str
+        self._update_private_config()
+
+    def set_subdecks(self, ankihub_did: uuid.UUID, subdecks: bool):
+        self.deck_config(ankihub_did).subdecks = subdecks
         self._update_private_config()
 
     def save_subscription(

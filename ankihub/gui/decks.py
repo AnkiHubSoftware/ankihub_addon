@@ -30,6 +30,10 @@ from ..addon_ankihub_client import AddonAnkiHubClient as AnkiHubClient
 from ..addon_ankihub_client import AnkiHubRequestError
 from ..ankihub_client import NoteInfo
 from ..db import ankihub_db
+from ..deck_hierarchy import (
+    flatten_hierarchy,
+    build_deck_hierarchy_and_move_cards_into_it,
+)
 from ..settings import URL_DECK_BASE, URL_DECKS, URL_HELP, URL_VIEW_DECK, config
 from ..sync import AnkiHubImporter
 from ..utils import create_backup, undo_note_type_modfications
@@ -79,6 +83,13 @@ class SubscribedDecksDialog(QDialog):
         self.set_home_deck_btn.setToolTip("New cards will be added to this deck.")
         qconnect(self.set_home_deck_btn.clicked, self.on_set_home_deck)
         self.box_right.addWidget(self.set_home_deck_btn)
+
+        self.toggle_subdecks_btn = QPushButton("Toggle Subdecks")
+        self.toggle_subdecks_btn.setToolTip(
+            "Toggle between deck being organized as subdecks or not."
+        )
+        qconnect(self.toggle_subdecks_btn.clicked, self.on_toggle_subdecks)
+        self.box_right.addWidget(self.toggle_subdecks_btn)
 
         self.box_right.addStretch(1)
 
@@ -178,12 +189,49 @@ class SubscribedDecksDialog(QDialog):
             callback=update_deck_config,
         )
 
+    def on_toggle_subdecks(self):
+        deck_names = self.decks_list.selectedItems()
+        if len(deck_names) == 0:
+            return
+        elif len(deck_names) > 1:
+            tooltip("Please select only one deck.", parent=mw)
+            return
+
+        deck_name = deck_names[0]
+        ankihub_id: UUID = deck_name.data(Qt.ItemDataRole.UserRole)
+        using_subdecks = config.deck_config(ankihub_id).subdecks
+
+        def on_done(future: Future):
+            future.result()
+
+            tooltip("Subdecks updated.", parent=self)
+
+        if using_subdecks:
+            flatten = ask_user("Do you want to remove the subdecks?")
+            if flatten is None:
+                return
+            elif flatten:
+                mw.taskman.with_progress(
+                    label="Flattening into single deck",
+                    task=lambda: flatten_hierarchy(ankihub_id),
+                    on_done=on_done,
+                )
+        else:
+            mw.taskman.with_progress(
+                label="Moving cards into subdecks",
+                task=lambda: build_deck_hierarchy_and_move_cards_into_it(ankihub_id),
+                on_done=on_done,
+            )
+
+        config.set_subdecks(ankihub_id, not using_subdecks)
+
     def on_item_selection_changed(self) -> None:
         selection = self.decks_list.selectedItems()
         isSelected: bool = len(selection) > 0
         self.unsubscribe_btn.setEnabled(isSelected)
         self.open_web_btn.setEnabled(isSelected)
         self.set_home_deck_btn.setEnabled(isSelected)
+        self.toggle_subdecks_btn.setEnabled(isSelected)
 
     @classmethod
     def display_subscribe_window(cls):
