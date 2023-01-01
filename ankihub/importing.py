@@ -40,8 +40,8 @@ from .utils import (
 
 class AnkiHubImporter:
     def __init__(self):
-        self.num_notes_updated = 0
-        self.num_notes_created = 0
+        self.updated_nids = []
+        self.created_nids = []
 
     def import_ankihub_deck(
         self,
@@ -59,12 +59,15 @@ class AnkiHubImporter:
         ] = None,  # will be fetched from api if not provided
         save_to_ankihub_db: bool = True,
         subdecks: bool = False,
+        subdecks_for_new_notes_only: bool = False,
     ) -> DeckId:
         """
-        Used for importing an ankihub deck and updates to an ankihub deck
-        When no local_did is provided this function assumes that the deck gets installed for the first time
-        Returns id of the deck future cards should be imported into - the local_did - if the import was sucessful
-        else it returns None
+        Used for importing an ankihub deck for the first time or updating it.
+        When no local_did is provided this function assumes that the deck gets installed for the first time.
+        Returns id of the deck future cards should be imported into - the local_did - if the import was sucessful,
+        else it returns None.
+        subdeck indicates whether cards should be moved into subdecks based on subdeck tags
+        subdecks_for_new_notes_only indicates whether only new notes should be moved into subdecks
         """
 
         LOGGER.debug(f"Importing ankihub deck {deck_name=} {local_did=}")
@@ -92,6 +95,7 @@ class AnkiHubImporter:
             local_did=local_did,
             save_to_ankihub_db=save_to_ankihub_db,
             subdecks=subdecks,
+            subdecks_for_new_notes_only=subdecks_for_new_notes_only,
         )
         return anki_deck_id
 
@@ -106,6 +110,7 @@ class AnkiHubImporter:
         local_did: DeckId = None,  # did that new notes should be put into if importing not for the first time
         save_to_ankihub_db: bool = True,
         subdecks: bool = False,
+        subdecks_for_new_notes_only: bool = False,
     ) -> DeckId:
         first_import_of_deck = local_did is None
 
@@ -114,7 +119,6 @@ class AnkiHubImporter:
         reset_note_types_of_notes_based_on_notes_data(notes_data)
 
         dids: Set[DeckId] = set()  # set of ids of decks notes were imported into
-        notes = []
         for note_data in notes_data:
             note: Note = self.update_or_create_note(
                 note_data=note_data,
@@ -123,7 +127,6 @@ class AnkiHubImporter:
                 protected_tags=protected_tags,
                 first_import_of_deck=first_import_of_deck,
             )
-            notes.append(note)
 
             dids_for_note = set(c.did for c in note.cards())
             dids = dids | dids_for_note
@@ -136,8 +139,15 @@ class AnkiHubImporter:
                 ankihub_did=ankihub_did, notes_data=notes_data
             )
 
-        if subdecks:
-            build_deck_hierarchy_and_move_cards_into_it(ankihub_did, notes=notes)
+        if subdecks or subdecks_for_new_notes_only:
+            if subdecks_for_new_notes_only:
+                nids = list(self.created_nids)
+            else:
+                nids = list(self.created_nids + self.updated_nids)
+
+            build_deck_hierarchy_and_move_cards_into_it(
+                ankihub_did=ankihub_did, nids=nids
+            )
 
         return local_did
 
@@ -260,7 +270,7 @@ class AnkiHubImporter:
                 first_import_of_deck,
             ):
                 note.flush()
-                self.num_notes_updated += 1
+                self.updated_nids.append(note.id)
                 LOGGER.debug(f"Updated note: {note_data.anki_nid=}")
             else:
                 LOGGER.debug(f"No changes, skipping {note_data.anki_nid=}")
@@ -280,7 +290,7 @@ class AnkiHubImporter:
             note = create_note_with_id(
                 note, anki_id=NoteId(note_data.anki_nid), anki_did=anki_did
             )
-            self.num_notes_created += 1
+            self.created_nids.append(note.id)
             LOGGER.debug(f"Created note: {note_data.anki_nid=}")
         return note
 

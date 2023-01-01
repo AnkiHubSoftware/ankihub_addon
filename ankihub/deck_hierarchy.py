@@ -4,7 +4,7 @@ from typing import List, Optional
 
 from anki.decks import DeckId
 from anki.errors import NotFoundError
-from anki.notes import Note
+from anki.notes import Note, NoteId
 from aqt import mw
 
 from . import LOGGER
@@ -16,7 +16,7 @@ DECK_HIERARCHY_TAG_PREFIX = "AH_Deck_Hierarchy"
 
 
 def build_deck_hierarchy_and_move_cards_into_it(
-    ankihub_did: uuid.UUID, notes: Optional[List[Note]] = None
+    ankihub_did: uuid.UUID, nids: Optional[List[NoteId]] = None
 ) -> None:
     """Move cards belonging to the ankihub deck into their subdeck based on the deck hierarchy tags of the notes.
     If notes is None, all of the cards belonging to the deck will be moved.
@@ -25,9 +25,10 @@ def build_deck_hierarchy_and_move_cards_into_it(
     Subdecks that are empty after the move will be deleted.
     """
 
-    if notes is None:
+    if nids is None:
         nids = ankihub_db.anki_nids_for_ankihub_deck(ankihub_did)
-        notes = [mw.col.get_note(nid) for nid in nids]
+
+    notes = [mw.col.get_note(nid) for nid in nids]
 
     root_deck_id = config.deck_config(ankihub_did).anki_id
     # the deck name name could be different from the deck name in the config

@@ -530,8 +530,8 @@ def test_import_new_ankihub_deck(anki_session_with_addon: AnkiSession):
         )  # we have no mechanism for importing subdecks from a csv yet, so ti will be just onen deck
         assert local_did == list(new_dids)[0]
 
-        assert ankihub_importer.num_notes_created == 3
-        assert ankihub_importer.num_notes_updated == 0
+        assert len(ankihub_importer.created_nids) == 3
+        assert len(ankihub_importer.updated_nids) == 0
 
         assert_that_only_ankihub_sample_deck_info_in_database(
             ankihub_deck_uuid=ankihub_deck_uuid
@@ -570,8 +570,8 @@ def test_import_existing_ankihub_deck(anki_session_with_addon: AnkiSession):
         assert local_did == existing_did
 
         # no notes should be changed because they already exist
-        assert ankihub_importer.num_notes_created == 0
-        assert ankihub_importer.num_notes_updated == 0
+        assert len(ankihub_importer.created_nids) == 0
+        assert len(ankihub_importer.updated_nids) == 0
 
         assert_that_only_ankihub_sample_deck_info_in_database(
             ankihub_deck_uuid=ankihub_deck_uuid
@@ -623,8 +623,8 @@ def test_import_existing_ankihub_deck_2(anki_session_with_addon: AnkiSession):
         assert local_did == list(new_dids)[0]
 
         # no notes should be changed because they already exist
-        assert ankihub_importer.num_notes_created == 0
-        assert ankihub_importer.num_notes_updated == 0
+        assert len(ankihub_importer.created_nids) == 0
+        assert len(ankihub_importer.updated_nids) == 0
 
         assert_that_only_ankihub_sample_deck_info_in_database(
             ankihub_deck_uuid=ankihub_deck_uuid
@@ -674,8 +674,8 @@ def test_import_existing_ankihub_deck_3(anki_session_with_addon: AnkiSession):
         assert not new_dids
         assert local_did == existing_did
 
-        assert ankihub_importer.num_notes_created == 1
-        assert ankihub_importer.num_notes_updated == 2
+        assert len(ankihub_importer.created_nids) == 1
+        assert len(ankihub_importer.updated_nids) == 2
 
         assert_that_only_ankihub_sample_deck_info_in_database(
             ankihub_deck_uuid=ankihub_deck_uuid
@@ -711,8 +711,8 @@ def test_update_ankihub_deck(anki_session_with_addon: AnkiSession):
         assert first_local_did == second_local_did
 
         # no notes should be changed because they already exist
-        assert ankihub_importer.num_notes_created == 0
-        assert ankihub_importer.num_notes_updated == 0
+        assert len(ankihub_importer.created_nids) == 0
+        assert len(ankihub_importer.updated_nids) == 0
 
         assert_that_only_ankihub_sample_deck_info_in_database(
             ankihub_deck_uuid=ankihub_deck_uuid
@@ -759,8 +759,8 @@ def test_update_ankihub_deck_when_deck_was_deleted(
         assert second_local_id == first_local_did
 
         # no notes should be changed because they already exist
-        assert ankihub_importer.num_notes_created == 0
-        assert ankihub_importer.num_notes_updated == 0
+        assert len(ankihub_importer.created_nids) == 0
+        assert len(ankihub_importer.updated_nids) == 0
 
         assert_that_only_ankihub_sample_deck_info_in_database(
             ankihub_deck_uuid=ankihub_deck_uuid
