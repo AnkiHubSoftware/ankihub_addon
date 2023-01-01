@@ -42,7 +42,7 @@ def build_subdecks_and_move_cards_to_them(
     deck_names = [subdeck_tag_to_deck_name(root_deck_name, tag) for tag in subdeck_tags]
     create_decks(deck_names)
 
-    # move cards into subdecks
+    # move cards into subdecks (or to the root deck if the note has no subdeck tag)
     for note in notes:
         if (subdeck_tag_ := subdeck_tag(note.tags)) is None:
             set_deck_while_respecting_odid(note, root_deck_id)
