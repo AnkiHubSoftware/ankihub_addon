@@ -88,7 +88,8 @@ class SubscribedDecksDialog(QDialog):
 
         self.toggle_subdecks_btn = QPushButton("Enable Subdecks")
         self.toggle_subdecks_btn.setToolTip(
-            "Toggle between deck being organized as subdecks or not."
+            "Toggle between the deck being organized into subdecks or not.<br>"
+            f"This will only have an effect if notes in the deck have <b>{SUBDECK_TAG}</b> tags."
         )
         qconnect(self.toggle_subdecks_btn.clicked, self._on_toggle_subdecks)
         self.box_right.addWidget(self.toggle_subdecks_btn)
