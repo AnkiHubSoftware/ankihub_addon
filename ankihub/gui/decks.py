@@ -31,10 +31,10 @@ from ..addon_ankihub_client import AddonAnkiHubClient as AnkiHubClient
 from ..addon_ankihub_client import AnkiHubRequestError
 from ..ankihub_client import NoteInfo
 from ..db import ankihub_db
-from ..deck_hierarchy import (
-    DECK_HIERARCHY_TAG_PREFIX,
-    build_deck_hierarchy_and_move_cards_into_it,
-    flatten_hierarchy,
+from ..subdecks import (
+    SUBDECK_TAG,
+    build_subdecks_and_move_cards_to_them,
+    flatten_deck,
 )
 from ..settings import URL_DECK_BASE, URL_DECKS, URL_HELP, URL_VIEW_DECK, config
 from ..sync import AnkiHubImporter
@@ -126,7 +126,7 @@ class SubscribedDecksDialog(QDialog):
 
         anki_did = config.deck_config(ah_did).anki_id
         deck_name = mw.col.decks.name(anki_did)
-        if mw.col.find_notes(f'"deck:{deck_name}" "tag:{DECK_HIERARCHY_TAG_PREFIX}*"'):
+        if mw.col.find_notes(f'"deck:{deck_name}" "tag:{SUBDECK_TAG}*"'):
             if ask_user(
                 "The deck you subscribed to contains subdeck tags.<br>"
                 "Do you want to enable subdecks for this deck?"
@@ -242,13 +242,13 @@ class SubscribedDecksDialog(QDialog):
             elif flatten:
                 mw.taskman.with_progress(
                     label="Flattening into single deck",
-                    task=lambda: flatten_hierarchy(ankihub_id),
+                    task=lambda: flatten_deck(ankihub_id),
                     on_done=on_done,
                 )
         else:
             mw.taskman.with_progress(
                 label="Moving cards into subdecks",
-                task=lambda: build_deck_hierarchy_and_move_cards_into_it(ankihub_id),
+                task=lambda: build_subdecks_and_move_cards_to_them(ankihub_id),
                 on_done=on_done,
             )
 

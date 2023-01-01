@@ -8,12 +8,10 @@ from anki.notes import Note
 from . import settings
 from .ankihub_client import SuggestionType
 
-ADDON_INTERNAL_TAG_PREFIX = "AnkiHub_"
-
-TAG_FOR_PROTECTING_FIELDS = f"{ADDON_INTERNAL_TAG_PREFIX}Protect"
+TAG_FOR_PROTECTING_FIELDS = "AnkiHub_Protect"
 TAG_FOR_PROTECTING_ALL_FIELDS = f"{TAG_FOR_PROTECTING_FIELDS}::All"
 
-TAG_FOR_UPDATES = f"{ADDON_INTERNAL_TAG_PREFIX}Update"
+TAG_FOR_UPDATES = "AnkiHub_Update"
 TAG_FOR_NEW_NOTE = f"{TAG_FOR_UPDATES}::New_Note"
 TAG_FOR_SUGGESTION_TYPE = {
     SuggestionType.UPDATED_CONTENT: f"{TAG_FOR_UPDATES}::Content::Updated",

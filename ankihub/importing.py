@@ -16,8 +16,8 @@ from . import LOGGER, settings
 from .addon_ankihub_client import AddonAnkiHubClient as AnkiHubClient
 from .ankihub_client import Field, NoteInfo, SuggestionType
 from .db import ankihub_db
-from .deck_hierarchy import (
-    build_deck_hierarchy_and_move_cards_into_it,
+from .subdecks import (
+    build_subdecks_and_move_cards_to_them,
 )
 from .note_conversion import (
     TAG_FOR_NEW_NOTE,
@@ -145,9 +145,7 @@ class AnkiHubImporter:
             else:
                 nids = list(self.created_nids + self.updated_nids)
 
-            build_deck_hierarchy_and_move_cards_into_it(
-                ankihub_did=ankihub_did, nids=nids
-            )
+            build_subdecks_and_move_cards_to_them(ankihub_did=ankihub_did, nids=nids)
 
         return local_did
 

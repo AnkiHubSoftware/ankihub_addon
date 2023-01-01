@@ -1257,13 +1257,13 @@ def test_import_deck_and_check_that_values_are_saved_to_databases(
         assert note_data_from_db == note_data
 
 
-def test_build_deck_hierarchy_and_move_cards_into_it(
+def test_build_subdeck_and_move_cards_to_them(
     anki_session_with_addon: AnkiSession,
 ):
 
-    from ankihub.deck_hierarchy import (
-        DECK_HIERARCHY_TAG_PREFIX,
-        build_deck_hierarchy_and_move_cards_into_it,
+    from ankihub.subdecks import (
+        SUBDECK_TAG,
+        build_subdecks_and_move_cards_to_them,
     )
     from ankihub.settings import config
 
@@ -1275,14 +1275,14 @@ def test_build_deck_hierarchy_and_move_cards_into_it(
         # this would not be necessary if deck configs were saved in the AnkiHub DB
         config.save_subscription(name="Testdeck", ankihub_did=ah_did, anki_did=anki_did)
 
-        # add a deck hierarchy tag to a note
+        # add a subdeck tag to a note
         nids = mw.col.find_notes("deck:Testdeck")
         note = mw.col.get_note(nids[0])
-        note.tags = [f"{DECK_HIERARCHY_TAG_PREFIX}::B::C"]
+        note.tags = [f"{SUBDECK_TAG}::B::C"]
         note.flush()
 
-        # call the function that moves all cards in the deck to their place in the deck hierarchy
-        build_deck_hierarchy_and_move_cards_into_it(ah_did)
+        # call the function that moves all cards in the deck to their subdecks
+        build_subdecks_and_move_cards_to_them(ah_did)
 
         # assert that the decks were created and the cards of the note were moved to it
         assert note.cards()
@@ -1290,11 +1290,11 @@ def test_build_deck_hierarchy_and_move_cards_into_it(
             assert mw.col.decks.name(card.did) == "Testdeck::B::C"
 
 
-def test_build_deck_hierarchy_and_move_cards_into_it_with_empty_decks(
+def test_build_subdeck_and_move_cards_to_them_with_empty_decks(
     anki_session_with_addon: AnkiSession,
 ):
 
-    from ankihub.deck_hierarchy import build_deck_hierarchy_and_move_cards_into_it
+    from ankihub.subdecks import build_subdecks_and_move_cards_to_them
     from ankihub.settings import config
 
     with anki_session_with_addon.profile_loaded():
@@ -1311,22 +1311,22 @@ def test_build_deck_hierarchy_and_move_cards_into_it_with_empty_decks(
         assert mw.col.decks.id("Testdeck::empty", create=False)
         assert mw.col.decks.id("Testdeck::empty::A", create=False)
 
-        # call the function that moves all cards in the deck to their place in the deck hierarchy
-        build_deck_hierarchy_and_move_cards_into_it(ah_did)
+        # call the function that moves all cards in the deck to their subdecks
+        build_subdecks_and_move_cards_to_them(ah_did)
 
         # assert that the empty decks were deleted
         assert mw.col.decks.id("Testdeck::empty", create=False) is None
         assert mw.col.decks.id("Testdeck::empty::A", create=False) is None
 
 
-def test_build_deck_hierarchy_and_move_cards_into_it_with_filtered_decks(
+def test_build_subdeck_and_move_cards_to_them_with_filtered_decks(
     anki_session_with_addon: AnkiSession,
 ):
     from anki.decks import FilteredDeckConfig
 
-    from ankihub.deck_hierarchy import (
-        DECK_HIERARCHY_TAG_PREFIX,
-        build_deck_hierarchy_and_move_cards_into_it,
+    from ankihub.subdecks import (
+        SUBDECK_TAG,
+        build_subdecks_and_move_cards_to_them,
     )
     from ankihub.settings import config
 
@@ -1355,10 +1355,10 @@ def test_build_deck_hierarchy_and_move_cards_into_it_with_filtered_decks(
         filtered_deck_id = mw.col.decks.id("filtered deck", create=False)
         filtered_deck = mw.col.sched.get_or_create_filtered_deck(filtered_deck_id)
 
-        # assign a deck hierarchy tag to a note
+        # assign a subdeck tag to a note
         nids = mw.col.find_notes("deck:Testdeck")
         note = mw.col.get_note(nids[0])
-        note.tags = [f"{DECK_HIERARCHY_TAG_PREFIX}::B::C"]
+        note.tags = [f"{SUBDECK_TAG}::B::C"]
         note.flush()
 
         # assert that the note is in the filtered deck to be safe
@@ -1366,8 +1366,8 @@ def test_build_deck_hierarchy_and_move_cards_into_it_with_filtered_decks(
         for card in note.cards():
             assert card.did == filtered_deck.id
 
-        # call the function that moves all cards in the deck to their place in the deck hierarchy
-        build_deck_hierarchy_and_move_cards_into_it(ah_did)
+        # call the function that moves all cards in the deck to their subdecks
+        build_subdecks_and_move_cards_to_them(ah_did)
 
         # assert that only the odid of the cards of the note was changed
         assert note.cards()

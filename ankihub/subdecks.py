@@ -12,13 +12,14 @@ from .db import ankihub_db
 from .settings import config
 from .utils import nids_in_deck_but_not_in_subdeck
 
-DECK_HIERARCHY_TAG_PREFIX = "AH_Deck_Hierarchy"
+# root tag for tags that indicate which subdeck a note belongs to
+SUBDECK_TAG = "AnkiHub_Subdeck"
 
 
-def build_deck_hierarchy_and_move_cards_into_it(
+def build_subdecks_and_move_cards_to_them(
     ankihub_did: uuid.UUID, nids: Optional[List[NoteId]] = None
 ) -> None:
-    """Move cards belonging to the ankihub deck into their subdeck based on the deck hierarchy tags of the notes.
+    """Move cards belonging to the ankihub deck into their subdeck based on the subdeck tags of the notes.
     If notes is None, all of the cards belonging to the deck will be moved.
     If notes is not None, only the cards belonging to the provided notes will be moved.
     Creates subdecks if they don't exist.
@@ -35,20 +36,18 @@ def build_deck_hierarchy_and_move_cards_into_it(
     root_deck_name = mw.col.decks.name(root_deck_id)
 
     # create missing subdecks
-    hierarchy_tags = set(
-        tag for note in notes if (tag := hierarchy_tag(note.tags)) is not None
+    subdeck_tags = set(
+        tag for note in notes if (tag := subdeck_tag(note.tags)) is not None
     )
-    deck_names = [
-        hierarchy_tag_to_deck_name(root_deck_name, tag) for tag in hierarchy_tags
-    ]
+    deck_names = [subdeck_tag_to_deck_name(root_deck_name, tag) for tag in subdeck_tags]
     create_decks(deck_names)
 
     # move cards into subdecks
     for note in notes:
-        if (hierarchy_tag_ := hierarchy_tag(note.tags)) is None:
+        if (subdeck_tag_ := subdeck_tag(note.tags)) is None:
             set_deck_while_respecting_odid(note, root_deck_id)
         else:
-            deck_name = hierarchy_tag_to_deck_name(root_deck_name, hierarchy_tag_)
+            deck_name = subdeck_tag_to_deck_name(root_deck_name, subdeck_tag_)
             deck_id = mw.col.decks.id(deck_name, create=False)
             set_deck_while_respecting_odid(note, deck_id)
 
@@ -66,7 +65,7 @@ def build_deck_hierarchy_and_move_cards_into_it(
             # this can happen if a parent deck was deleted earlier in the loop
             pass
 
-    LOGGER.info("Built deck hierarchy and moved cards into it.")
+    LOGGER.info("Built subdecks and moved cards to them.")
 
 
 def set_deck_while_respecting_odid(note: Note, deck_id: DeckId) -> None:
@@ -79,7 +78,7 @@ def set_deck_while_respecting_odid(note: Note, deck_id: DeckId) -> None:
         card.flush()
 
 
-def hierarchy_tag_to_deck_name(top_level_deck_name: str, tag: str) -> str:
+def subdeck_tag_to_deck_name(top_level_deck_name: str, tag: str) -> str:
     return f"{top_level_deck_name}::{tag.split('::', 1)[1]}"
 
 
@@ -88,17 +87,19 @@ def create_decks(deck_names: List[str]) -> None:
         mw.col.decks.add_normal_deck_with_name(deck_name)
 
 
-def hierarchy_tag(tags: List[str]) -> str:
+def subdeck_tag(tags: List[str]) -> Optional[str]:
     result = next(
-        (tag for tag in tags if tag.startswith(DECK_HIERARCHY_TAG_PREFIX)),
+        (tag for tag in tags if tag.startswith(SUBDECK_TAG)),
         None,
     )
     return result
 
 
-def flatten_hierarchy(ankihub_did: uuid.UUID) -> None:
+def flatten_deck(ankihub_did: uuid.UUID) -> None:
+    """Remove all subdecks of the deck with the given ankihub_did and move all cards
+    that were in the subdecks back to the root deck."""
 
-    # move cards that are in subdecks back to the top level deck
+    # move cards that are in subdecks back to the root deck
     root_deck_id = config.deck_config(ankihub_did).anki_id
     root_deck_name = mw.col.decks.name(root_deck_id)
     nids = mw.col.find_notes(f"deck:{root_deck_name}::*")
@@ -117,10 +118,10 @@ def flatten_hierarchy(ankihub_did: uuid.UUID) -> None:
             pass
 
 
-def add_deck_hierarchy_tags_to_notes(deck_name: str, separator: str) -> None:
-    """To every note in the deck a tags is added that indicates where in the deck hierarchy
+def add_subdeck_tags_notes(deck_name: str, separator: str) -> None:
+    """To every note in the deck a tags is added that indicates in which subdeck
     the note is located. For example, if the deck is called "A" and the note is in
-    the deck "A::B::C", the tag f"{DECK_HIERARCHY_TAG_PREFIX}::B::C" is added to the note.
+    the deck "A::B::C", the tag f"{TAG_FOR_SUBDECK}::B::C" is added to the note.
     If the note is in deck "A" and not in a subdeck of A no tag is added.
     """
 
@@ -141,9 +142,9 @@ def add_deck_hierarchy_tags_to_notes(deck_name: str, separator: str) -> None:
 
 def subdeck_name_to_tag(deck_name: str, separator: str) -> str:
     """Convert deck name with spaces to compatible and clean Anki tag name starting with
-    DECK_HIERARCHY_TAG_PREFIX."""
+    TAG_FOR_SUBDECK."""
 
-    result = f"{DECK_HIERARCHY_TAG_PREFIX}::{deck_name}"
+    result = f"{SUBDECK_TAG}::{deck_name}"
 
     # Remove apostrophes
     result = result.replace("'", "")

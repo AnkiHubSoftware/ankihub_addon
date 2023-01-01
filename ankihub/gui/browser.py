@@ -28,7 +28,7 @@ from ..db import (
     attach_ankihub_db_to_anki_db_connection,
     detach_ankihub_db_from_anki_db_connection,
 )
-from ..deck_hierarchy import build_deck_hierarchy_and_move_cards_into_it
+from ..subdecks import build_subdecks_and_move_cards_to_them
 from ..importing import get_fields_protected_by_tags
 from ..note_conversion import TAG_FOR_PROTECTING_ALL_FIELDS, TAG_FOR_PROTECTING_FIELDS
 from ..reset_changes import reset_local_changes_to_notes
@@ -318,7 +318,7 @@ def on_reset_subdecks_action(browser: Browser):
         tooltip("Rebuilt subdecks and moved cards.")
 
     mw.taskman.with_progress(
-        task=lambda: build_deck_hierarchy_and_move_cards_into_it(ankihub_did=ah_did),
+        task=lambda: build_subdecks_and_move_cards_to_them(ankihub_did=ah_did),
         on_done=on_done,
     )
 
