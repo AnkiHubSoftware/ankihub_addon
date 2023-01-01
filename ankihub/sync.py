@@ -80,6 +80,7 @@ class AnkiHubSync:
                 local_did=deck_config.anki_id,
                 protected_fields=chunk.protected_fields,
                 protected_tags=chunk.protected_tags,
+                subdecks=deck_config.subdecks_enabled,
             )
             config.save_latest_update(ankihub_did, latest_update)
         else:

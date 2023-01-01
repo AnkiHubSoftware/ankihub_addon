@@ -58,6 +58,7 @@ class AnkiHubImporter:
             List[str]
         ] = None,  # will be fetched from api if not provided
         save_to_ankihub_db: bool = True,
+        subdecks: bool = False,
     ) -> DeckId:
         """
         Used for importing an ankihub deck and updates to an ankihub deck
@@ -90,6 +91,7 @@ class AnkiHubImporter:
             protected_tags=protected_tags,
             local_did=local_did,
             save_to_ankihub_db=save_to_ankihub_db,
+            subdecks=subdecks,
         )
         return anki_deck_id
 
@@ -103,7 +105,7 @@ class AnkiHubImporter:
         protected_tags: List[str],
         local_did: DeckId = None,  # did that new notes should be put into if importing not for the first time
         save_to_ankihub_db: bool = True,
-        move_cards_into_subdecks_based_on_tags: bool = False,
+        subdecks: bool = False,
     ) -> DeckId:
         first_import_of_deck = local_did is None
 
@@ -134,7 +136,7 @@ class AnkiHubImporter:
                 ankihub_did=ankihub_did, notes_data=notes_data
             )
 
-        if move_cards_into_subdecks_based_on_tags:
+        if subdecks:
             build_deck_hierarchy_and_move_cards_into_it(ankihub_did, notes=notes)
 
         return local_did

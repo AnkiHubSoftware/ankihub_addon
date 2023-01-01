@@ -2,6 +2,7 @@ import re
 import uuid
 from typing import List, Optional
 
+from anki.decks import DeckId
 from anki.errors import NotFoundError
 from anki.notes import Note
 from aqt import mw
@@ -67,7 +68,7 @@ def build_deck_hierarchy_and_move_cards_into_it(
     LOGGER.info("Built deck hierarchy and moved cards into it.")
 
 
-def set_deck_while_respecting_odid(note: Note, deck_id: int) -> None:
+def set_deck_while_respecting_odid(note: Note, deck_id: DeckId) -> None:
     for card in note.cards():
         # if the card is in a filtered deck, we only change the original deck id
         if card.odid == 0:

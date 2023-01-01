@@ -9,7 +9,8 @@ from .settings import config
 
 
 def reset_local_changes_to_notes(
-    nids: Sequence[NoteId], ankihub_deck_uuid: uuid.UUID
+    nids: Sequence[NoteId],
+    ankihub_deck_uuid: uuid.UUID,
 ) -> None:
     # all notes have to be from the ankihub deck with the given uuid
 

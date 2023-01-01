@@ -26,7 +26,9 @@ class DeckConfig:
     creator: bool
     name: str
     latest_update: Optional[str] = None
-    subdecks: bool = False  # whether deck is organized into subdecks by the add-on
+    subdecks_enabled: bool = (
+        False  # whether deck is organized into subdecks by the add-on
+    )
 
 
 @dataclasses.dataclass
@@ -106,7 +108,7 @@ class Config:
         self._update_private_config()
 
     def set_subdecks(self, ankihub_did: uuid.UUID, subdecks: bool):
-        self.deck_config(ankihub_did).subdecks = subdecks
+        self.deck_config(ankihub_did).subdecks_enabled = subdecks
         self._update_private_config()
 
     def save_subscription(
@@ -116,11 +118,13 @@ class Config:
         anki_did: DeckId,
         creator: bool = False,
         latest_udpate: Optional[datetime] = None,
+        subdecks_enabled: bool = False,
     ) -> None:
         self._private_config.decks[ankihub_did] = DeckConfig(
             name=name,
             anki_id=DeckId(anki_did),
             creator=creator,
+            subdecks_enabled=subdecks_enabled,
         )
         # remove duplicates
         self.save_latest_update(ankihub_did, latest_udpate)

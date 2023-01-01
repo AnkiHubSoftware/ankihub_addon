@@ -194,7 +194,7 @@ class SubscribedDecksDialog(QDialog):
 
         deck_name = deck_names[0]
         ankihub_id: UUID = deck_name.data(Qt.ItemDataRole.UserRole)
-        using_subdecks = config.deck_config(ankihub_id).subdecks
+        using_subdecks = config.deck_config(ankihub_id).subdecks_enabled
 
         def on_done(future: Future):
             future.result()
@@ -232,7 +232,7 @@ class SubscribedDecksDialog(QDialog):
             return
 
         ankihub_did: UUID = selection[0].data(Qt.ItemDataRole.UserRole)
-        using_subdecks = config.deck_config(ankihub_did).subdecks
+        using_subdecks = config.deck_config(ankihub_did).subdecks_enabled
         self.toggle_subdecks_btn.setText(
             "Disable Subdecks" if using_subdecks else "Enable Subdecks"
         )
