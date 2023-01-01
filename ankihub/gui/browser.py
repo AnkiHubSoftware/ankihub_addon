@@ -2,7 +2,7 @@ import uuid
 from abc import abstractmethod
 from concurrent.futures import Future
 from pprint import pformat
-from typing import List, Optional, Sequence
+from typing import List, Optional, Sequence, Tuple
 
 from anki.collection import BrowserColumns
 from anki.notes import Note
@@ -28,10 +28,11 @@ from ..db import (
     attach_ankihub_db_to_anki_db_connection,
     detach_ankihub_db_from_anki_db_connection,
 )
+from ..deck_hierarchy import build_deck_hierarchy_and_move_cards_into_it
 from ..importing import get_fields_protected_by_tags
 from ..note_conversion import TAG_FOR_PROTECTING_ALL_FIELDS, TAG_FOR_PROTECTING_FIELDS
 from ..reset_changes import reset_local_changes_to_notes
-from ..settings import ANKIHUB_NOTE_TYPE_FIELD_NAME, AnkiHubCommands, config
+from ..settings import ANKIHUB_NOTE_TYPE_FIELD_NAME, AnkiHubCommands, DeckConfig, config
 from ..suggestions import BulkNoteSuggestionsResult, suggest_notes_in_bulk
 from ..utils import note_types_with_ankihub_id_field
 from .suggestion_dialog import SuggestionDialog
@@ -241,59 +242,102 @@ def on_browser_menus_did_init(browser: Browser):
     menu = browser._ankihub_menu = QMenu("AnkiHub")
     browser.form.menubar.addMenu(menu)
 
-    setup_reset_deck_action(browser, menu)
+    reset_deck_action = QAction("Reset all local changes to a deck", browser)
+    qconnect(reset_deck_action.triggered, lambda: on_reset_deck_action(browser))
+    menu.addAction(reset_deck_action)
+
+    reset_subdecks_action = QAction(
+        "Rebuild subdecks and move cards into subdecks", browser
+    )
+    qconnect(reset_subdecks_action.triggered, lambda: on_reset_subdecks_action(browser))
+    menu.addAction(reset_subdecks_action)
 
 
 def on_reset_deck_action(browser: Browser):
-    ah_dids = config.deck_ids()
-    deck_configs = [config.deck_config(did) for did in ah_dids]
-
-    if not ah_dids:
+    if not config.deck_ids():
         showInfo(
             "You don't have any AnkiHub decks configured yet.",
             parent=browser,
         )
         return
 
-    chosen_deck_idx = choose_list(
-        prompt="Choose the AnkiHub deck for which<br>you want to reset local changes",
-        choices=[deck.name for deck in deck_configs],
-        parent=browser,
+    ah_did, deck_config = choose_deck(
+        "Choose the AnkiHub deck for which<br>you want to reset local changes"
     )
-
-    if chosen_deck_idx is None:
+    if ah_did is None:
         return
 
-    chosen_deck_config = deck_configs[chosen_deck_idx]
-    chosen_deck_ah_did = ah_dids[chosen_deck_idx]
     if not ask_user(
-        f"Are you sure you want to reset all local changes to the deck <b>{chosen_deck_config.name}</b>?",
+        f"Are you sure you want to reset all local changes to the deck <b>{deck_config.name}</b>?",
         parent=browser,
     ):
         return
 
-    nids = ankihub_db.anki_nids_for_ankihub_deck(ah_dids[chosen_deck_idx])
+    nids = ankihub_db.anki_nids_for_ankihub_deck(ah_did)
 
     def on_done(future: Future) -> None:
         future.result()
 
         browser.model.reset()
-        tooltip(f"Reset local changes to deck <b>{chosen_deck_config.name}</b>")
+        tooltip(f"Reset local changes to deck <b>{deck_config.name}</b>")
 
     mw.taskman.with_progress(
-        lambda: reset_local_changes_to_notes(
-            nids, ankihub_deck_uuid=chosen_deck_ah_did
-        ),
+        lambda: reset_local_changes_to_notes(nids, ankihub_deck_uuid=ah_did),
         on_done=on_done,
         label="Resetting local changes...",
         parent=browser,
     )
 
 
-def setup_reset_deck_action(browser: Browser, menu: QMenu) -> None:
-    reset_deck_action = QAction("Reset all local changes to a deck", browser)
-    qconnect(reset_deck_action.triggered, lambda: on_reset_deck_action(browser))
-    menu.addAction(reset_deck_action)
+def on_reset_subdecks_action(browser: Browser):
+    if not config.deck_ids():
+        showInfo(
+            "You don't have any AnkiHub decks configured yet.",
+            parent=browser,
+        )
+        return
+
+    ah_did, deck_config = choose_deck(
+        "Choose the AnkiHub deck for which<br>"
+        "you want to rebuild subdecks and move<br>"
+        "cards to their original subdeck."
+    )
+    if ah_did is None:
+        return
+
+    if not ask_user(
+        f"Are you sure you want to rebuild subdecks for <b>{deck_config.name}</b>"
+        "and move cards to their original subdecks?",
+        parent=browser,
+    ):
+        return
+
+    def on_done(future: Future) -> None:
+        future.result()
+        browser.sidebar.refresh()
+        tooltip("Rebuilt subdecks and moved cards.")
+
+    mw.taskman.with_progress(
+        task=lambda: build_deck_hierarchy_and_move_cards_into_it(ankihub_did=ah_did),
+        on_done=on_done,
+    )
+
+
+def choose_deck(prompt: str) -> Tuple[Optional[uuid.UUID], Optional[DeckConfig]]:
+    ah_dids = config.deck_ids()
+    deck_configs = [config.deck_config(did) for did in ah_dids]
+    chosen_deck_idx = choose_list(
+        prompt=prompt,
+        choices=[deck.name for deck in deck_configs],
+        parent=browser,
+    )
+
+    if chosen_deck_idx is None:
+        return None, None
+
+    chosen_deck_ah_did = ah_dids[chosen_deck_idx]
+    chosen_deck_config = deck_configs[chosen_deck_idx]
+    return chosen_deck_ah_did, chosen_deck_config
 
 
 class CustomColumn:
