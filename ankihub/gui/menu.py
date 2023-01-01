@@ -214,7 +214,8 @@ def create_collaborative_deck_action() -> None:
             "Would you like to add a tag to each note in the deck that indicates which subdeck it belongs to?<br><br>"
             "For example, if you have a deck named <b>My Deck</b> with a subdeck named <b>My Deck::Subdeck</b>, "
             "each note in <b>My Deck::Subdeck</b> will have a tag "
-            f"<b>{SUBDECK_TAG}::Subdeck</b> added to it."
+            f"<b>{SUBDECK_TAG}::Subdeck</b> added to it.<br><br>"
+            "This allows subscribers to have the same subdeck structure as you have."
         )
         if add_subdeck_tags is None:
             return
