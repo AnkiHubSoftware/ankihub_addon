@@ -200,6 +200,7 @@ class SubscribedDecksDialog(QDialog):
             future.result()
 
             tooltip("Subdecks updated.", parent=self)
+            mw.deckBrowser.refresh()
 
         if using_subdecks:
             flatten = ask_user("Do you want to remove the subdecks?")

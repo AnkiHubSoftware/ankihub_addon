@@ -48,13 +48,7 @@ def build_deck_hierarchy_and_move_cards_into_it(
         else:
             deck_name = hierarchy_tag_to_deck_name(root_deck_name, hierarchy_tag_)
             deck_id = mw.col.decks.id(deck_name, create=False)
-            for card in note.cards():
-                # if the card is in a filtered deck, we only change the original deck id
-                if card.odid == 0:
-                    card.did = deck_id
-                else:
-                    card.odid = deck_id
-                card.flush()
+            set_deck_while_respecting_odid(note, deck_id)
 
     # remove empty subdecks
     for name_and_did in mw.col.decks.children(root_deck_id):
@@ -71,6 +65,16 @@ def build_deck_hierarchy_and_move_cards_into_it(
             pass
 
     LOGGER.info("Built deck hierarchy and moved cards into it.")
+
+
+def set_deck_while_respecting_odid(note: Note, deck_id: int) -> None:
+    for card in note.cards():
+        # if the card is in a filtered deck, we only change the original deck id
+        if card.odid == 0:
+            card.did = deck_id
+        else:
+            card.odid = deck_id
+        card.flush()
 
 
 def hierarchy_tag_to_deck_name(top_level_deck_name: str, tag: str) -> str:
@@ -91,7 +95,24 @@ def hierarchy_tag(tags: List[str]) -> str:
 
 
 def flatten_hierarchy(ankihub_did: uuid.UUID) -> None:
-    raise NotImplementedError
+
+    # move cards that are in subdecks back to the top level deck
+    root_deck_id = config.deck_config(ankihub_did).anki_id
+    root_deck_name = mw.col.decks.name(root_deck_id)
+    nids = mw.col.find_notes(f"deck:{root_deck_name}::*")
+    for nid in nids:
+        note = mw.col.get_note(nid)
+        set_deck_while_respecting_odid(note, root_deck_id)
+
+    # remove subdecks
+    for name_and_did in mw.col.decks.children(root_deck_id):
+        _, did = name_and_did
+        try:
+            mw.col.decks.remove([did])
+            LOGGER.debug(f"Removed subdeck with id {did}.")
+        except NotFoundError:
+            # this can happen if a parent deck was deleted earlier in the loop
+            pass
 
 
 def add_deck_hierarchy_tags_to_notes(deck_name: str, separator: str) -> None:
