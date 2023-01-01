@@ -49,9 +49,9 @@ class SubscribedDecksDialog(QDialog):
         self.client = AnkiHubClient()
         self.setWindowTitle("Subscribed AnkiHub Decks")
 
-        self.setup_ui()
-        self.on_item_selection_changed()
-        self.refresh_decks_list()
+        self._setup_ui()
+        self._on_item_selection_changed()
+        self._refresh_decks_list()
 
         if not self.client.has_token():
             showText("Oops! Please make sure you are logged into AnkiHub!")
@@ -59,36 +59,36 @@ class SubscribedDecksDialog(QDialog):
         else:
             self.show()
 
-    def setup_ui(self):
+    def _setup_ui(self):
         self.box_top = QVBoxLayout()
         self.box_above = QHBoxLayout()
         self.box_right = QVBoxLayout()
 
         self.decks_list = QListWidget()
-        qconnect(self.decks_list.itemSelectionChanged, self.on_item_selection_changed)
+        qconnect(self.decks_list.itemSelectionChanged, self._on_item_selection_changed)
 
         self.add_btn = QPushButton("Add")
         self.box_right.addWidget(self.add_btn)
-        qconnect(self.add_btn.clicked, self.on_add)
+        qconnect(self.add_btn.clicked, self._on_add)
 
         self.unsubscribe_btn = QPushButton("Unsubscribe")
         self.box_right.addWidget(self.unsubscribe_btn)
-        qconnect(self.unsubscribe_btn.clicked, self.on_unsubscribe)
+        qconnect(self.unsubscribe_btn.clicked, self._on_unsubscribe)
 
         self.open_web_btn = QPushButton("Open on AnkiHub")
         self.box_right.addWidget(self.open_web_btn)
-        qconnect(self.open_web_btn.clicked, self.on_open_web)
+        qconnect(self.open_web_btn.clicked, self._on_open_web)
 
         self.set_home_deck_btn = QPushButton("Set Home deck")
         self.set_home_deck_btn.setToolTip("New cards will be added to this deck.")
-        qconnect(self.set_home_deck_btn.clicked, self.on_set_home_deck)
+        qconnect(self.set_home_deck_btn.clicked, self._on_set_home_deck)
         self.box_right.addWidget(self.set_home_deck_btn)
 
-        self.toggle_subdecks_btn = QPushButton("Toggle Subdecks")
+        self.toggle_subdecks_btn = QPushButton("Enable Subdecks")
         self.toggle_subdecks_btn.setToolTip(
             "Toggle between deck being organized as subdecks or not."
         )
-        qconnect(self.toggle_subdecks_btn.clicked, self.on_toggle_subdecks)
+        qconnect(self.toggle_subdecks_btn.clicked, self._on_toggle_subdecks)
         self.box_right.addWidget(self.toggle_subdecks_btn)
 
         self.box_right.addStretch(1)
@@ -98,7 +98,7 @@ class SubscribedDecksDialog(QDialog):
         self.box_above.addWidget(self.decks_list)
         self.box_above.addLayout(self.box_right)
 
-    def refresh_decks_list(self) -> None:
+    def _refresh_decks_list(self) -> None:
         self.decks_list.clear()
         for ah_did in config.deck_ids():
             name = config.deck_config(ah_did).name
@@ -106,7 +106,7 @@ class SubscribedDecksDialog(QDialog):
             item.setData(Qt.ItemDataRole.UserRole, ah_did)
             self.decks_list.addItem(item)
 
-    def refresh_anki(self) -> None:
+    def _refresh_anki(self) -> None:
         op = OpChanges()
         op.deck = True
         op.browser_table = True
@@ -114,12 +114,12 @@ class SubscribedDecksDialog(QDialog):
         op.study_queues = True
         gui_hooks.operation_did_execute(op, handler=None)
 
-    def on_add(self) -> None:
+    def _on_add(self) -> None:
         SubscribeDialog().exec()
-        self.refresh_decks_list()
-        self.refresh_anki()
+        self._refresh_decks_list()
+        self._refresh_anki()
 
-    def on_unsubscribe(self) -> None:
+    def _on_unsubscribe(self) -> None:
         items = self.decks_list.selectedItems()
         if len(items) == 0:
             return
@@ -139,7 +139,7 @@ class SubscribedDecksDialog(QDialog):
             self.unsubscribe_from_deck(ankihub_did)
 
         tooltip("Unsubscribed from AnkiHub Deck.", parent=mw)
-        self.refresh_decks_list()
+        self._refresh_decks_list()
 
     @staticmethod
     def unsubscribe_from_deck(ankihub_did: UUID) -> None:
@@ -147,20 +147,18 @@ class SubscribedDecksDialog(QDialog):
         undo_note_type_modfications(mids)
         ankihub_db.remove_deck(ankihub_did)
 
-    def on_open_web(self) -> None:
+    def _on_open_web(self) -> None:
         items = self.decks_list.selectedItems()
         if len(items) == 0:
             return
+
         for item in items:
             ankihub_id: UUID = item.data(Qt.ItemDataRole.UserRole)
             openLink(f"{URL_DECK_BASE}/{ankihub_id}")
 
-    def on_set_home_deck(self):
+    def _on_set_home_deck(self):
         deck_names = self.decks_list.selectedItems()
         if len(deck_names) == 0:
-            return
-        elif len(deck_names) > 1:
-            tooltip("Please select only one deck.", parent=mw)
             return
 
         deck_name = deck_names[0]
@@ -189,12 +187,9 @@ class SubscribedDecksDialog(QDialog):
             callback=update_deck_config,
         )
 
-    def on_toggle_subdecks(self):
+    def _on_toggle_subdecks(self):
         deck_names = self.decks_list.selectedItems()
         if len(deck_names) == 0:
-            return
-        elif len(deck_names) > 1:
-            tooltip("Please select only one deck.", parent=mw)
             return
 
         deck_name = deck_names[0]
@@ -225,20 +220,38 @@ class SubscribedDecksDialog(QDialog):
 
         config.set_subdecks(ankihub_id, not using_subdecks)
 
-    def on_item_selection_changed(self) -> None:
+        self._refresh_subdecks_button()
+
+    def _refresh_subdecks_button(self):
         selection = self.decks_list.selectedItems()
-        isSelected: bool = len(selection) > 0
-        self.unsubscribe_btn.setEnabled(isSelected)
-        self.open_web_btn.setEnabled(isSelected)
-        self.set_home_deck_btn.setEnabled(isSelected)
-        self.toggle_subdecks_btn.setEnabled(isSelected)
+        one_selected: bool = len(selection) == 1
+
+        self.toggle_subdecks_btn.setEnabled(one_selected)
+        if not one_selected:
+            return
+
+        ankihub_did: UUID = selection[0].data(Qt.ItemDataRole.UserRole)
+        using_subdecks = config.deck_config(ankihub_did).subdecks
+        self.toggle_subdecks_btn.setText(
+            "Disable Subdecks" if using_subdecks else "Enable Subdecks"
+        )
+
+    def _on_item_selection_changed(self) -> None:
+        selection = self.decks_list.selectedItems()
+        one_selected: bool = len(selection) == 1
+
+        self.unsubscribe_btn.setEnabled(one_selected)
+        self.open_web_btn.setEnabled(one_selected)
+        self.set_home_deck_btn.setEnabled(one_selected)
+
+        self._refresh_subdecks_button()
 
     @classmethod
     def display_subscribe_window(cls):
         if cls._window is None:
             cls._window = cls()
         else:
-            cls._window.refresh_decks_list()
+            cls._window._refresh_decks_list()
             cls._window.activateWindow()
             cls._window.raise_()
             cls._window.show()
@@ -285,8 +298,8 @@ class SubscribeDialog(QDialog):
         self.browse_btn = self.buttonbox.addButton(
             "Browse Decks", QDialogButtonBox.ButtonRole.ActionRole
         )
-        qconnect(self.browse_btn.clicked, self.on_browse_deck)
-        qconnect(self.buttonbox.accepted, self.subscribe)
+        qconnect(self.browse_btn.clicked, self._on_browse_deck)
+        qconnect(self.buttonbox.accepted, self._subscribe)
         self.buttonbox.rejected.connect(self.close)
 
         self.instructions_label = QLabel(
@@ -311,7 +324,7 @@ class SubscribeDialog(QDialog):
         else:
             self.show()
 
-    def subscribe(self):
+    def _subscribe(self):
         ah_did_str = self.deck_id_box_text.text().strip()
 
         try:
@@ -345,7 +358,7 @@ class SubscribeDialog(QDialog):
             ah_did, on_success=self.accept, on_failure=self.reject
         )
 
-    def on_browse_deck(self) -> None:
+    def _on_browse_deck(self) -> None:
         openLink(URL_DECKS)
 
 
