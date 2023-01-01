@@ -32,6 +32,7 @@ from ..addon_ankihub_client import AnkiHubRequestError
 from ..ankihub_client import NoteInfo
 from ..db import ankihub_db
 from ..deck_hierarchy import (
+    DECK_HIERARCHY_TAG_PREFIX,
     build_deck_hierarchy_and_move_cards_into_it,
     flatten_hierarchy,
 )
@@ -116,9 +117,37 @@ class SubscribedDecksDialog(QDialog):
         gui_hooks.operation_did_execute(op, handler=None)
 
     def _on_add(self) -> None:
-        SubscribeDialog().exec()
+        ah_did = SubscribeDialog().run()
+        if ah_did is None:
+            return
+
         self._refresh_decks_list()
         self._refresh_anki()
+
+        anki_did = config.deck_config(ah_did).anki_id
+        deck_name = mw.col.decks.name(anki_did)
+        if mw.col.find_notes(f'"deck:{deck_name}" "tag:{DECK_HIERARCHY_TAG_PREFIX}*"'):
+            if ask_user(
+                "The deck you subscribed to contains subdeck tags.<br>"
+                "Do you want to enable subdecks for this deck?"
+            ):
+                self._select_deck(ah_did)
+                self._on_toggle_subdecks()
+
+        cleanup_after_deck_install()
+
+    def _select_deck(self, ah_did: uuid.UUID):
+        deck_item = next(
+            (
+                item
+                for i in range(self.decks_list.count())
+                if (item := self.decks_list.item(i)).data(Qt.ItemDataRole.UserRole)
+                == ah_did
+            ),
+            None,
+        )
+        if deck_item is not None:
+            self.decks_list.setCurrentItem(deck_item)
 
     def _on_unsubscribe(self) -> None:
         items = self.decks_list.selectedItems()
@@ -277,6 +306,9 @@ class SubscribeDialog(QDialog):
 
     def __init__(self):
         super(SubscribeDialog, self).__init__()
+
+        self.ah_did = None
+
         self.results = None
         self.thread = None  # type: ignore
         self.box_top = QVBoxLayout()
@@ -329,6 +361,11 @@ class SubscribeDialog(QDialog):
         else:
             self.show()
 
+    def run(self) -> uuid.UUID:
+        """Returns the ankihub deck id of the newly subscribed deck or None if no deck was subscribed to"""
+        self.exec()
+        return self.ah_did
+
     def _subscribe(self):
         ah_did_str = self.deck_id_box_text.text().strip()
 
@@ -348,7 +385,7 @@ class SubscribeDialog(QDialog):
                 f"menu. See {URL_HELP} for more details."
             )
             self.close()
-            return
+            return self.ah_did
 
         confirmed = ask_user(
             f"Would you like to proceed with downloading and installing the deck? "
@@ -359,9 +396,11 @@ class SubscribeDialog(QDialog):
         if not confirmed:
             return
 
-        download_and_install_deck(
-            ah_did, on_success=self.accept, on_failure=self.reject
-        )
+        def on_success():
+            self.ah_did = ah_did
+            self.accept()
+
+        download_and_install_deck(ah_did, on_success=on_success, on_failure=self.reject)
 
     def _on_browse_deck(self) -> None:
         openLink(URL_DECKS)
@@ -371,7 +410,6 @@ def download_and_install_deck(
     ankihub_did: uuid.UUID,
     on_success: Optional[Callable[[], None]] = None,
     on_failure: Optional[Callable[[], None]] = None,
-    cleanup: bool = True,
 ):
     def on_install_done(future: Future):
         success = False
@@ -390,9 +428,6 @@ def download_and_install_deck(
                 raise exc
         else:
             mw.reset()
-
-            if cleanup:
-                cleanup_after_deck_install()
 
             if on_success is not None:
                 on_success()

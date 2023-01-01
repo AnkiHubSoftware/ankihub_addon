@@ -75,7 +75,6 @@ def download_and_install_decks(
         cur_did,
         on_success=lambda: download_and_install_decks(ankihub_dids, on_success),
         on_failure=show_failure_message,
-        cleanup=False,
     )
 
 
