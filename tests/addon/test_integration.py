@@ -1257,15 +1257,12 @@ def test_import_deck_and_check_that_values_are_saved_to_databases(
         assert note_data_from_db == note_data
 
 
-def test_build_subdeck_and_move_cards_to_them(
+def test_build_subdecks_and_move_cards_to_them(
     anki_session_with_addon: AnkiSession,
 ):
 
-    from ankihub.subdecks import (
-        SUBDECK_TAG,
-        build_subdecks_and_move_cards_to_them,
-    )
     from ankihub.settings import config
+    from ankihub.subdecks import SUBDECK_TAG, build_subdecks_and_move_cards_to_them
 
     with anki_session_with_addon.profile_loaded():
         mw = anki_session_with_addon.mw
@@ -1290,12 +1287,12 @@ def test_build_subdeck_and_move_cards_to_them(
             assert mw.col.decks.name(card.did) == "Testdeck::B::C"
 
 
-def test_build_subdeck_and_move_cards_to_them_with_empty_decks(
+def test_build_subdecks_and_move_cards_to_them_with_empty_decks(
     anki_session_with_addon: AnkiSession,
 ):
 
-    from ankihub.subdecks import build_subdecks_and_move_cards_to_them
     from ankihub.settings import config
+    from ankihub.subdecks import build_subdecks_and_move_cards_to_them
 
     with anki_session_with_addon.profile_loaded():
         mw = anki_session_with_addon.mw
@@ -1319,16 +1316,13 @@ def test_build_subdeck_and_move_cards_to_them_with_empty_decks(
         assert mw.col.decks.id("Testdeck::empty::A", create=False) is None
 
 
-def test_build_subdeck_and_move_cards_to_them_with_filtered_decks(
+def test_build_subdecks_and_move_cards_to_them_with_filtered_decks(
     anki_session_with_addon: AnkiSession,
 ):
     from anki.decks import FilteredDeckConfig
 
-    from ankihub.subdecks import (
-        SUBDECK_TAG,
-        build_subdecks_and_move_cards_to_them,
-    )
     from ankihub.settings import config
+    from ankihub.subdecks import SUBDECK_TAG, build_subdecks_and_move_cards_to_them
 
     with anki_session_with_addon.profile_loaded():
         mw = anki_session_with_addon.mw
@@ -1374,3 +1368,32 @@ def test_build_subdeck_and_move_cards_to_them_with_filtered_decks(
         for card in note.cards():
             assert mw.col.decks.name(card.did) == "filtered deck"
             assert mw.col.decks.name(card.odid) == "Testdeck::B::C"
+
+
+def test_build_subdecks_and_move_cards_to_them_with_no_tag(
+    anki_session_with_addon: AnkiSession,
+):
+    from ankihub.settings import config
+    from ankihub.subdecks import build_subdecks_and_move_cards_to_them
+
+    with anki_session_with_addon.profile_loaded():
+        mw = anki_session_with_addon.mw
+
+        ah_did = UUID_1
+        anki_did = import_sample_ankihub_deck(mw, ankihub_did=ah_did)
+        # this would not be necessary if deck configs were saved in the AnkiHub DB
+        config.save_subscription(name="Testdeck", ankihub_did=ah_did, anki_did=anki_did)
+
+        # move cards of a note to the default deck
+        nids = mw.col.find_notes("deck:Testdeck")
+        note = mw.col.get_note(nids[0])
+        mw.col.set_deck(note.card_ids(), 1)
+
+        # call the function that moves all cards in the deck to their subdecks
+        build_subdecks_and_move_cards_to_them(ah_did)
+
+        # assert that the cards of the note were moved back to the root deck
+        # because the note has no subdeck tag
+        assert note.cards()
+        for card in note.cards():
+            assert mw.col.decks.name(card.did) == "Testdeck"
