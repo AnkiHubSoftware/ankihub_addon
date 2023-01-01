@@ -5,7 +5,8 @@ from typing import Callable, List, Optional
 from uuid import UUID
 
 from anki.collection import OpChanges
-from aqt import gui_hooks, mw
+from aqt import dialogs, gui_hooks, mw
+from aqt.browser import Browser
 from aqt.emptycards import show_empty_cards
 from aqt.operations.tag import clear_unused_tags
 from aqt.qt import (
@@ -31,8 +32,8 @@ from ..addon_ankihub_client import AnkiHubRequestError
 from ..ankihub_client import NoteInfo
 from ..db import ankihub_db
 from ..deck_hierarchy import (
-    flatten_hierarchy,
     build_deck_hierarchy_and_move_cards_into_it,
+    flatten_hierarchy,
 )
 from ..settings import URL_DECK_BASE, URL_DECKS, URL_HELP, URL_VIEW_DECK, config
 from ..sync import AnkiHubImporter
@@ -201,6 +202,9 @@ class SubscribedDecksDialog(QDialog):
 
             tooltip("Subdecks updated.", parent=self)
             mw.deckBrowser.refresh()
+            browser: Optional[Browser] = dialogs._dialogs["Browser"][1]
+            if browser is not None:
+                browser.sidebar.refresh()
 
         if using_subdecks:
             flatten = ask_user("Do you want to remove the subdecks?")
