@@ -250,13 +250,13 @@ class SubscribedDecksDialog(QDialog):
                 return
             elif flatten:
                 mw.taskman.with_progress(
-                    label="Flattening into single deck",
+                    label="Removing subdecks and moving cards...",
                     task=lambda: flatten_deck(ankihub_id),
                     on_done=on_done,
                 )
         else:
             mw.taskman.with_progress(
-                label="Moving cards into subdecks",
+                label="Building subdecks and moving cards...",
                 task=lambda: build_subdecks_and_move_cards_to_them(ankihub_id),
                 on_done=on_done,
             )
@@ -474,7 +474,7 @@ def download_and_install_deck(
             ),
             on_done=on_install_done,
             parent=mw,
-            label="Installing deck",
+            label="Installing deck...",
         )
 
     mw.taskman.with_progress(

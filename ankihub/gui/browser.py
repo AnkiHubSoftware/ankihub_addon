@@ -331,6 +331,7 @@ def on_reset_subdecks_action(browser: Browser):
     mw.taskman.with_progress(
         task=lambda: build_subdecks_and_move_cards_to_them(ankihub_did=ah_did),
         on_done=on_done,
+        label="Rebuilding subdecks and moving cards...",
     )
 
 
