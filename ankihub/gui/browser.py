@@ -28,11 +28,11 @@ from ..db import (
     attach_ankihub_db_to_anki_db_connection,
     detach_ankihub_db_from_anki_db_connection,
 )
-from ..subdecks import build_subdecks_and_move_cards_to_them
 from ..importing import get_fields_protected_by_tags
 from ..note_conversion import TAG_FOR_PROTECTING_ALL_FIELDS, TAG_FOR_PROTECTING_FIELDS
 from ..reset_changes import reset_local_changes_to_notes
 from ..settings import ANKIHUB_NOTE_TYPE_FIELD_NAME, AnkiHubCommands, DeckConfig, config
+from ..subdecks import build_subdecks_and_move_cards_to_them
 from ..suggestions import BulkNoteSuggestionsResult, suggest_notes_in_bulk
 from ..utils import note_types_with_ankihub_id_field
 from .suggestion_dialog import SuggestionDialog
@@ -326,6 +326,7 @@ def on_reset_subdecks_action(browser: Browser):
     def on_done(future: Future) -> None:
         future.result()
         browser.sidebar.refresh()
+        mw.deckBrowser.refresh()
         tooltip("Rebuilt subdecks and moved cards.")
 
     mw.taskman.with_progress(
