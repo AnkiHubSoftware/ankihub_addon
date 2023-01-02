@@ -24,6 +24,7 @@ def build_subdecks_and_move_cards_to_them(
     If notes is not None, only the cards belonging to the provided notes will be moved.
     Creates subdecks if they don't exist.
     Subdecks that are empty after the move will be deleted.
+    This function expects the home deck (the one of which the anki id is stored in the deck config) to exist.
     """
 
     if nids is None:
@@ -32,6 +33,9 @@ def build_subdecks_and_move_cards_to_them(
     notes = [mw.col.get_note(nid) for nid in nids]
 
     root_deck_id = config.deck_config(ankihub_did).anki_id
+    if mw.col.decks.name_if_exists(root_deck_id) is None:
+        raise NotFoundError(f"Deck with id {root_deck_id} not found")
+
     # the deck name name could be different from the deck name in the config
     root_deck_name = mw.col.decks.name(root_deck_id)
 

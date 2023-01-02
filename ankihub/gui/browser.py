@@ -305,6 +305,17 @@ def on_reset_subdecks_action(browser: Browser):
     if ah_did is None:
         return
 
+    if mw.col.decks.name_if_exists(deck_config.anki_id) is None:
+        showInfo(
+            (
+                f"Anki deck <b>{deck_config.name}</b> doesn't exist in your Anki collection.<br>"
+                "It might help to reset local changes to the deck first.<br>"
+                "(You can do that from the AnkiHub menu in the Anki browser.)"
+            ),
+            parent=browser,
+        )
+        return
+
     if not ask_user(
         f"Are you sure you want to rebuild subdecks for <b>{deck_config.name}</b> "
         "and move cards to their original subdecks?",

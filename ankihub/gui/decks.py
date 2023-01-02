@@ -221,7 +221,19 @@ class SubscribedDecksDialog(QDialog):
 
         deck_name = deck_names[0]
         ankihub_id: UUID = deck_name.data(Qt.ItemDataRole.UserRole)
-        using_subdecks = config.deck_config(ankihub_id).subdecks_enabled
+        deck_config = config.deck_config(ankihub_id)
+        using_subdecks = deck_config.subdecks_enabled
+
+        if mw.col.decks.name_if_exists(deck_config.anki_id) is None:
+            showInfo(
+                (
+                    f"Anki deck <b>{deck_config.name}</b> doesn't exist in your Anki collection.<br>"
+                    "It might help to reset local changes to the deck first.<br>"
+                    "(You can do that from the AnkiHub menu in the Anki browser.)"
+                ),
+                parent=self,
+            )
+            return
 
         def on_done(future: Future):
             future.result()
