@@ -306,7 +306,7 @@ def on_reset_subdecks_action(browser: Browser):
         return
 
     if not ask_user(
-        f"Are you sure you want to rebuild subdecks for <b>{deck_config.name}</b>"
+        f"Are you sure you want to rebuild subdecks for <b>{deck_config.name}</b> "
         "and move cards to their original subdecks?",
         parent=browser,
     ):

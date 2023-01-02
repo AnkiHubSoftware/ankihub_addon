@@ -31,12 +31,8 @@ from ..addon_ankihub_client import AddonAnkiHubClient as AnkiHubClient
 from ..addon_ankihub_client import AnkiHubRequestError
 from ..ankihub_client import NoteInfo
 from ..db import ankihub_db
-from ..subdecks import (
-    SUBDECK_TAG,
-    build_subdecks_and_move_cards_to_them,
-    flatten_deck,
-)
 from ..settings import URL_DECK_BASE, URL_DECKS, URL_HELP, URL_VIEW_DECK, config
+from ..subdecks import SUBDECK_TAG, build_subdecks_and_move_cards_to_them, flatten_deck
 from ..sync import AnkiHubImporter
 from ..utils import create_backup, undo_note_type_modfications
 from .utils import ask_user
