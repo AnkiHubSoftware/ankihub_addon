@@ -1,10 +1,10 @@
 import re
 import uuid
-from typing import List, Optional
+from typing import Dict, Iterable, List, Optional
 
 from anki.decks import DeckId
 from anki.errors import NotFoundError
-from anki.notes import Note, NoteId
+from anki.notes import NoteId
 from aqt import mw
 
 from . import LOGGER
@@ -30,8 +30,6 @@ def build_subdecks_and_move_cards_to_them(
     if nids is None:
         nids = ankihub_db.anki_nids_for_ankihub_deck(ankihub_did)
 
-    notes = [mw.col.get_note(nid) for nid in nids]
-
     root_deck_id = config.deck_config(ankihub_did).anki_id
     if mw.col.decks.name_if_exists(root_deck_id) is None:
         raise NotFoundError(f"Deck with id {root_deck_id} not found")
@@ -39,21 +37,19 @@ def build_subdecks_and_move_cards_to_them(
     # the deck name name could be different from the deck name in the config
     root_deck_name = mw.col.decks.name(root_deck_id)
 
-    # create missing subdecks
-    subdeck_tags = set(
-        tag for note in notes if (tag := subdeck_tag(note.tags)) is not None
+    # create mapping between notes and destination decks
+    nid_to_dest_deck_name = _nid_to_destination_deck_name(
+        nids, root_deck_name=root_deck_name
     )
-    deck_names = [subdeck_tag_to_deck_name(root_deck_name, tag) for tag in subdeck_tags]
-    create_decks(deck_names)
 
-    # move cards into subdecks (or to the root deck if the note has no subdeck tag)
-    for note in notes:
-        if (subdeck_tag_ := subdeck_tag(note.tags)) is None:
-            set_deck_while_respecting_odid(note, root_deck_id)
-        else:
-            deck_name = subdeck_tag_to_deck_name(root_deck_name, subdeck_tag_)
-            deck_id = mw.col.decks.id(deck_name, create=False)
-            set_deck_while_respecting_odid(note, deck_id)
+    # create missing subdecks
+    deck_names = set(nid_to_dest_deck_name.values())
+    _create_decks(deck_names)
+
+    # move cards to their destination decks
+    for nid, dest_deck_name in nid_to_dest_deck_name.items():
+        dest_did = mw.col.decks.id_for_name(dest_deck_name)
+        _set_deck_while_respecting_odid(nid=nid, did=dest_did)
 
     # remove empty subdecks
     for name_and_did in mw.col.decks.children(root_deck_id):
@@ -72,26 +68,49 @@ def build_subdecks_and_move_cards_to_them(
     LOGGER.info("Built subdecks and moved cards to them.")
 
 
-def set_deck_while_respecting_odid(note: Note, deck_id: DeckId) -> None:
-    for card in note.cards():
-        # if the card is in a filtered deck, we only change the original deck id
-        if card.odid == 0:
-            card.did = deck_id
+def _nid_to_destination_deck_name(
+    nids: List[NoteId], root_deck_name: str
+) -> Dict[NoteId, str]:
+    result = dict()
+    for nid in nids:
+        tags_str = mw.col.db.scalar("SELECT tags FROM notes WHERE id = ?", nid)
+        tags = mw.col.tags.split(tags_str)
+        subdeck_tag_ = _subdeck_tag(tags)
+        if subdeck_tag_ is None:
+            deck_name = root_deck_name
         else:
-            card.odid = deck_id
-        card.flush()
+            deck_name = _subdeck_tag_to_deck_name(root_deck_name, subdeck_tag_)
+        result[nid] = deck_name
+    return result
 
 
-def subdeck_tag_to_deck_name(top_level_deck_name: str, tag: str) -> str:
+def _set_deck_while_respecting_odid(nid: NoteId, did: DeckId) -> None:
+    """Moves the cards of the note to the deck. If a card is in a filtered deck
+    it is not moved and only its original deck id value gets changed."""
+
+    # using database operations for performance reasons
+    cids = mw.col.db.list("SELECT id FROM cards WHERE nid = ?", nid)
+    for cid in cids:
+        odid = mw.col.db.scalar("SELECT odid FROM cards WHERE id=?", cid)
+        # if the card is in a filtered deck, we only change the original deck id
+        if odid == 0:
+            # setting usn to -1 so that this change is synced to AnkiWeb
+            # see https://github.com/ankidroid/Anki-Android/wiki/Database-Structure#cards
+            mw.col.db.execute("UPDATE cards SET did=?, usn=-1 WHERE id=?", did, cid)
+        else:
+            mw.col.db.execute("UPDATE cards SET odid=?, usn=-1 WHERE id=?", did, cid)
+
+
+def _subdeck_tag_to_deck_name(top_level_deck_name: str, tag: str) -> str:
     return f"{top_level_deck_name}::{tag.split('::', 1)[1]}"
 
 
-def create_decks(deck_names: List[str]) -> None:
+def _create_decks(deck_names: Iterable[str]) -> None:
     for deck_name in deck_names:
         mw.col.decks.add_normal_deck_with_name(deck_name)
 
 
-def subdeck_tag(tags: List[str]) -> Optional[str]:
+def _subdeck_tag(tags: List[str]) -> Optional[str]:
     result = next(
         (tag for tag in tags if tag.startswith(SUBDECK_TAG)),
         None,
@@ -108,8 +127,7 @@ def flatten_deck(ankihub_did: uuid.UUID) -> None:
     root_deck_name = mw.col.decks.name(root_deck_id)
     nids = mw.col.find_notes(f"deck:{root_deck_name}::*")
     for nid in nids:
-        note = mw.col.get_note(nid)
-        set_deck_while_respecting_odid(note, root_deck_id)
+        _set_deck_while_respecting_odid(nid, root_deck_id)
 
     # remove subdecks
     for name_and_did in mw.col.decks.children(root_deck_id):
@@ -139,12 +157,12 @@ def add_subdeck_tags_notes(deck_name: str, separator: str) -> None:
     # (mw.col.decks also returns children of children)
     for child_deck_name, _ in mw.col.decks.children(deck["id"]):
         child_deck_name_wh_root = child_deck_name.split("::", 1)[1]
-        tag = subdeck_name_to_tag(child_deck_name_wh_root, separator)
+        tag = _subdeck_name_to_tag(child_deck_name_wh_root, separator)
         nids = nids_in_deck_but_not_in_subdeck(child_deck_name)
         mw.col.tags.bulk_add(nids, tag)
 
 
-def subdeck_name_to_tag(deck_name: str, separator: str) -> str:
+def _subdeck_name_to_tag(deck_name: str, separator: str) -> str:
     """Convert deck name with spaces to compatible and clean Anki tag name starting with
     TAG_FOR_SUBDECK."""
 
