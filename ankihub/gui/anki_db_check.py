@@ -4,12 +4,13 @@ from typing import List
 
 from anki.utils import ids2str
 from aqt import mw
-from aqt.utils import askUser, showInfo
+from aqt.utils import showInfo
 
 from .. import LOGGER
 from ..db import ankihub_db
 from ..reset_changes import reset_local_changes_to_notes
 from ..settings import ANKIHUB_NOTE_TYPE_FIELD_NAME, config
+from .utils import ask_user
 
 
 def check_anki_db():
@@ -30,7 +31,7 @@ def check_anki_db():
         key=str.lower,
     )
 
-    if askUser(
+    if ask_user(
         text=(
             "AnkiHub has detected that the following deck(s) have missing values:<br>"
             f"{'<br>'.join('<b>' + deck_name + '</b>' for deck_name in deck_names)}<br><br>"
@@ -82,7 +83,7 @@ def _decks_with_missing_ankihub_nids():
                 break
         else:
             # add ah_did to results if for any note of the deck the AnkiHub ID field is empty
-            nids = ankihub_db.notes_for_ankihub_deck(ah_did)
+            nids = ankihub_db.anki_nids_for_ankihub_deck(ah_did)
             field_seperator = "\x1f"  # see anki.utils.split_fields
 
             # Check if any note has an empty AnkiHub ID field by checking if the last field is empty.
@@ -105,5 +106,5 @@ def _decks_with_missing_ankihub_nids():
 
 def _reset_decks(ah_dids: List[uuid.UUID]):
     for ah_did in ah_dids:
-        nids = ankihub_db.notes_for_ankihub_deck(ah_did)
+        nids = ankihub_db.anki_nids_for_ankihub_deck(ah_did)
         reset_local_changes_to_notes(nids, ankihub_deck_uuid=ah_did)

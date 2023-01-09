@@ -80,6 +80,7 @@ class AnkiHubSync:
                 local_did=deck_config.anki_id,
                 protected_fields=chunk.protected_fields,
                 protected_tags=chunk.protected_tags,
+                subdecks=deck_config.subdecks_enabled,
             )
             config.save_latest_update(ankihub_did, latest_update)
         else:
@@ -147,7 +148,7 @@ def sync_with_progress(on_done: Optional[Callable[[], None]] = None) -> None:
             LOGGER.debug("Unable to sync.")
             raise exc
 
-        total = sync.importer.num_notes_created + sync.importer.num_notes_updated
+        total = len(sync.importer.created_nids) + len(sync.importer.updated_nids)
         if total == 0:
             tooltip("AnkiHub: No new updates")
         else:

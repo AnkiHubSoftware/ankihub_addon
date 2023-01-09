@@ -8,9 +8,11 @@ from aqt.qt import (
     QLabel,
     QListWidget,
     QListWidgetItem,
+    QMessageBox,
     QPushButton,
     Qt,
     QVBoxLayout,
+    QWidget,
     qconnect,
 )
 from aqt.utils import disable_help_button
@@ -121,5 +123,43 @@ def choose_list(
     layout.addWidget(bb)
     if d.exec() == QDialog.DialogCode.Accepted:
         return c.currentRow()
+    else:
+        return None
+
+
+def ask_user(
+    text: str,
+    parent: QWidget = None,
+    defaultno: bool = False,
+    title: str = "Anki",
+) -> Optional[bool]:
+    "Show a yes/no question. Return true if yes. Return false if no. Return None if cancelled."
+
+    if not parent:
+        parent = aqt.mw.app.activeWindow()
+
+    msg = QMessageBox(parent=parent)
+    msg.setWindowTitle(title)
+    msg.setText(text)
+
+    buttons = (
+        QMessageBox.StandardButton.Yes
+        | QMessageBox.StandardButton.No
+        | QMessageBox.StandardButton.Cancel
+    )
+    msg.setStandardButtons(buttons)  # type: ignore
+    msg.setIcon(QMessageBox.Icon.Question)
+
+    if defaultno:
+        msg.setDefaultButton(QMessageBox.StandardButton.No)
+    else:
+        msg.setDefaultButton(QMessageBox.StandardButton.Yes)
+
+    response = msg.exec()
+
+    if response == QMessageBox.StandardButton.Yes:
+        return True
+    elif response == QMessageBox.StandardButton.No:
+        return False
     else:
         return None
