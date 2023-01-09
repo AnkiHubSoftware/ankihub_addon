@@ -37,6 +37,7 @@ def test_entry_point(anki_session_with_addon: AnkiSession):
     from ankihub import entry_point
 
     entry_point.run()
+    # this test is just to make sure the entry point doesn't crash
 
 
 def test_editor(anki_session_with_addon: AnkiSession, requests_mock, monkeypatch):
