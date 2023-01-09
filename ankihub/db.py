@@ -239,7 +239,7 @@ class AnkiHubDB:
             guid=guid,
         )
 
-    def notes_for_ankihub_deck(self, ankihub_did: uuid.UUID) -> List[NoteId]:
+    def anki_nids_for_ankihub_deck(self, ankihub_did: uuid.UUID) -> List[NoteId]:
         result = self.list(
             """
             SELECT anki_note_id FROM notes WHERE ankihub_deck_id = ?
