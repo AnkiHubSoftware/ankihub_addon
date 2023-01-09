@@ -25,7 +25,7 @@ def anki_session_with_addon(
     # copy the addon to the addons folder
     shutil.copytree(ROOT / "ankihub", ANKIHUB_PATH)
 
-    # clear ther user files folder at the destination - it might contain files from using the add-on
+    # clear the user files folder at the destination - it might contain files from using the add-on
     for f in USER_FILES_PATH.glob("*"):
         if f.is_file():
             f.unlink()
