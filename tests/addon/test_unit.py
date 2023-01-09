@@ -118,3 +118,75 @@ def test_remove_note_type_name_modifications(anki_session_with_addon: AnkiSessio
 
     name = "Basic (deck_name/user_name)"
     assert note_type_name_without_ankihub_modifications(name) == name
+
+
+def test_add_subdeck_tags_to_notes(anki_session_with_addon: AnkiSession):
+    from ankihub.subdecks import (
+        SUBDECK_TAG,
+        add_subdeck_tags_notes,
+    )
+
+    with anki_session_with_addon.profile_loaded():
+        mw = anki_session_with_addon.mw
+
+        mw.col.decks.add_normal_deck_with_name("A::B::C")
+
+        note1 = mw.col.new_note(mw.col.models.by_name("Basic"))
+        note1["Front"] = "note1"
+        mw.col.add_note(note1, mw.col.decks.by_name("A")["id"])
+
+        note2 = mw.col.new_note(mw.col.models.by_name("Basic"))
+        note2["Front"] = "note2"
+        mw.col.add_note(note2, mw.col.decks.by_name("A::B")["id"])
+
+        note3 = mw.col.new_note(mw.col.models.by_name("Basic"))
+        note3["Front"] = "note3"
+        mw.col.add_note(note3, mw.col.decks.by_name("A::B::C")["id"])
+
+        add_subdeck_tags_notes("A", "_")
+
+        note1.load()
+        assert note1.tags == []
+
+        note2.load()
+        assert note2.tags == [f"{SUBDECK_TAG}::B"]
+
+        note3.load()
+        assert note3.tags == [f"{SUBDECK_TAG}::B::C"]
+
+
+def test_add_subdeck_tags_to_notes_with_spaces_in_deck_name(
+    anki_session_with_addon: AnkiSession,
+):
+    from ankihub.subdecks import (
+        SUBDECK_TAG,
+        add_subdeck_tags_notes,
+    )
+
+    with anki_session_with_addon.profile_loaded():
+        mw = anki_session_with_addon.mw
+
+        mw.col.decks.add_normal_deck_with_name(" a a :: b b :: c c ")
+
+        note1 = mw.col.new_note(mw.col.models.by_name("Basic"))
+        note1["Front"] = "note1"
+        mw.col.add_note(note1, mw.col.decks.by_name(" a a ")["id"])
+
+        note2 = mw.col.new_note(mw.col.models.by_name("Basic"))
+        note2["Front"] = "note2"
+        mw.col.add_note(note2, mw.col.decks.by_name(" a a :: b b ")["id"])
+
+        note3 = mw.col.new_note(mw.col.models.by_name("Basic"))
+        note3["Front"] = "note3"
+        mw.col.add_note(note3, mw.col.decks.by_name(" a a :: b b :: c c ")["id"])
+
+        add_subdeck_tags_notes(" a a ", "_")
+
+        note1.load()
+        assert note1.tags == []
+
+        note2.load()
+        assert note2.tags == [f"{SUBDECK_TAG}::b_b"]
+
+        note3.load()
+        assert note3.tags == [f"{SUBDECK_TAG}::b_b::c_c"]

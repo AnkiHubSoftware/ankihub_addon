@@ -16,6 +16,9 @@ from . import LOGGER, settings
 from .addon_ankihub_client import AddonAnkiHubClient as AnkiHubClient
 from .ankihub_client import Field, NoteInfo
 from .db import ankihub_db
+from .subdecks import (
+    build_subdecks_and_move_cards_to_them,
+)
 from .note_conversion import (
     TAG_FOR_PROTECTING_ALL_FIELDS,
     get_fields_protected_by_tags,
@@ -35,8 +38,8 @@ from .utils import (
 
 class AnkiHubImporter:
     def __init__(self):
-        self.num_notes_updated = 0
-        self.num_notes_created = 0
+        self.updated_nids = []
+        self.created_nids = []
 
     def import_ankihub_deck(
         self,
@@ -53,12 +56,16 @@ class AnkiHubImporter:
             List[str]
         ] = None,  # will be fetched from api if not provided
         save_to_ankihub_db: bool = True,
+        subdecks: bool = False,
+        subdecks_for_new_notes_only: bool = False,
     ) -> DeckId:
         """
-        Used for importing an ankihub deck and updates to an ankihub deck
-        When no local_did is provided this function assumes that the deck gets installed for the first time
-        Returns id of the deck future cards should be imported into - the local_did - if the import was sucessful
-        else it returns None
+        Used for importing an ankihub deck for the first time or updating it.
+        When no local_did is provided this function assumes that the deck gets installed for the first time.
+        Returns id of the deck future cards should be imported into - the local_did - if the import was sucessful,
+        else it returns None.
+        subdeck indicates whether cards should be moved into subdecks based on subdeck tags
+        subdecks_for_new_notes_only indicates whether only new notes should be moved into subdecks
         """
 
         LOGGER.debug(f"Importing ankihub deck {deck_name=} {local_did=}")
@@ -85,6 +92,8 @@ class AnkiHubImporter:
             protected_tags=protected_tags,
             local_did=local_did,
             save_to_ankihub_db=save_to_ankihub_db,
+            subdecks=subdecks,
+            subdecks_for_new_notes_only=subdecks_for_new_notes_only,
         )
         return anki_deck_id
 
@@ -98,6 +107,8 @@ class AnkiHubImporter:
         protected_tags: List[str],
         local_did: DeckId = None,  # did that new notes should be put into if importing not for the first time
         save_to_ankihub_db: bool = True,
+        subdecks: bool = False,
+        subdecks_for_new_notes_only: bool = False,
     ) -> DeckId:
         first_import_of_deck = local_did is None
 
@@ -107,7 +118,7 @@ class AnkiHubImporter:
 
         dids: Set[DeckId] = set()  # set of ids of decks notes were imported into
         for note_data in notes_data:
-            note = self.update_or_create_note(
+            note: Note = self.update_or_create_note(
                 note_data=note_data,
                 anki_did=local_did,
                 protected_fields=protected_fields,
@@ -125,6 +136,14 @@ class AnkiHubImporter:
             ankihub_db.save_notes_data_and_mod_values(
                 ankihub_did=ankihub_did, notes_data=notes_data
             )
+
+        if subdecks or subdecks_for_new_notes_only:
+            if subdecks_for_new_notes_only:
+                nids = list(self.created_nids)
+            else:
+                nids = list(self.created_nids + self.updated_nids)
+
+            build_subdecks_and_move_cards_to_them(ankihub_did=ankihub_did, nids=nids)
 
         return local_did
 
@@ -247,7 +266,7 @@ class AnkiHubImporter:
                 first_import_of_deck,
             ):
                 note.flush()
-                self.num_notes_updated += 1
+                self.updated_nids.append(note.id)
                 LOGGER.debug(f"Updated note: {note_data.anki_nid=}")
             else:
                 LOGGER.debug(f"No changes, skipping {note_data.anki_nid=}")
@@ -267,7 +286,7 @@ class AnkiHubImporter:
             note = create_note_with_id(
                 note, anki_id=NoteId(note_data.anki_nid), anki_did=anki_did
             )
-            self.num_notes_created += 1
+            self.created_nids.append(note.id)
             LOGGER.debug(f"Created note: {note_data.anki_nid=}")
         return note
 

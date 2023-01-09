@@ -7,9 +7,7 @@ from anki.notes import Note
 
 from . import settings
 
-ADDON_INTERNAL_TAG_PREFIX = "AnkiHub_"
-
-TAG_FOR_PROTECTING_FIELDS = f"{ADDON_INTERNAL_TAG_PREFIX}Protect"
+TAG_FOR_PROTECTING_FIELDS = "AnkiHub_Protect"
 TAG_FOR_PROTECTING_ALL_FIELDS = f"{TAG_FOR_PROTECTING_FIELDS}::All"
 
 

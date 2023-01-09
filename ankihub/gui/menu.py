@@ -1,8 +1,8 @@
 import re
+import uuid
 from concurrent.futures import Future
 from datetime import datetime, timezone
 from typing import Optional
-import uuid
 
 from aqt import (
     AnkiApp,
@@ -20,17 +20,19 @@ from aqt import (
 from aqt.operations import QueryOp
 from aqt.qt import QAction, QDialog, QMenu, Qt, qconnect
 from aqt.studydeck import StudyDeck
-from aqt.utils import askUser, openLink, showInfo, showText, tooltip
+from aqt.utils import openLink, showInfo, showText, tooltip
 
 from .. import LOGGER
 from ..addon_ankihub_client import AddonAnkiHubClient as AnkiHubClient
 from ..ankihub_client import AnkiHubRequestError
+from ..subdecks import SUBDECK_TAG
 from ..error_reporting import upload_logs_in_background
 from ..media_import.ui import open_import_dialog
 from ..register_decks import create_collaborative_deck
 from ..settings import ADDON_VERSION, URL_VIEW_DECK, config
 from ..sync import sync_with_progress
 from .decks import SubscribedDecksDialog
+from .utils import ask_user
 
 
 class AnkiHubLogin(QWidget):
@@ -196,21 +198,34 @@ def create_collaborative_deck_action() -> None:
         showText("You can't upload an empty deck.")
         return
 
-    public = askUser(
+    public = ask_user(
         "Would you like to make this deck public?<br><br>"
         'If you chose "No" it will be private and only people with a link '
         "will be able to see it on the AnkiHub website."
     )
+    if public is None:
+        return
 
     private = public is False
 
-    confirm = askUser(
+    add_subdeck_tags = False
+    if mw.col.decks.children(mw.col.decks.id_for_name(deck_name)):
+        add_subdeck_tags = ask_user(
+            "Would you like to add a tag to each note in the deck that indicates which subdeck it belongs to?<br><br>"
+            "For example, if you have a deck named <b>My Deck</b> with a subdeck named <b>My Deck::Subdeck</b>, "
+            "each note in <b>My Deck::Subdeck</b> will have a tag "
+            f"<b>{SUBDECK_TAG}::Subdeck</b> added to it.<br><br>"
+            "This allows subscribers to have the same subdeck structure as you have."
+        )
+        if add_subdeck_tags is None:
+            return
+
+    confirm = ask_user(
         "Uploading the deck to AnkiHub requires modifying notes and note types in "
         f"<b>{deck_name}</b> and will require a full sync afterwards. Would you like to "
         "continue?",
     )
     if not confirm:
-        tooltip("Cancelled Upload to AnkiHub")
         return
 
     def on_success(ankihub_did: uuid.UUID) -> None:
@@ -236,7 +251,9 @@ def create_collaborative_deck_action() -> None:
 
     op = QueryOp(
         parent=mw,
-        op=lambda col: create_collaborative_deck(deck_name, private=private),
+        op=lambda col: create_collaborative_deck(
+            deck_name, private=private, add_subdeck_tags=add_subdeck_tags
+        ),
         success=on_success,
     ).failure(on_failure)
     LOGGER.debug("Instantiated QueryOp for creating collaborative deck")
@@ -297,7 +314,7 @@ class LogUploadResultDialog(QDialog):
 
 
 def upload_logs_action():
-    if not askUser(
+    if not ask_user(
         "Do you want to upload the add-on's logs to AnkiHub to go along a bug report?"
     ):
         return

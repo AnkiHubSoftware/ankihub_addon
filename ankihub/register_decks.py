@@ -17,6 +17,7 @@ from . import LOGGER
 from .addon_ankihub_client import AddonAnkiHubClient as AnkiHubClient
 from .ankihub_client import NoteInfo
 from .db import ankihub_db
+from .subdecks import add_subdeck_tags_notes
 from .exporting import to_note_data
 from .settings import ANKIHUB_NOTE_TYPE_FIELD_NAME, config
 from .utils import (
@@ -47,7 +48,9 @@ def upload_deck(did: DeckId, notes_data: List[NoteInfo], private: bool) -> uuid.
     return ankihub_did
 
 
-def create_collaborative_deck(deck_name: str, private: bool) -> uuid.UUID:
+def create_collaborative_deck(
+    deck_name: str, private: bool, add_subdeck_tags: bool = False
+) -> uuid.UUID:
     LOGGER.debug("Creating collaborative deck")
 
     create_backup()
@@ -59,6 +62,9 @@ def create_collaborative_deck(deck_name: str, private: bool) -> uuid.UUID:
 
     note_type_mapping = create_note_types_for_deck(deck_id)
     change_note_types_of_notes(note_ids, note_type_mapping)
+
+    if add_subdeck_tags:
+        add_subdeck_tags_notes(deck_name, separator="_")
 
     nids = mw.col.find_notes(f'deck:"{deck_name}"')
     notes_data = [to_note_data(mw.col.get_note(nid), set_new_id=True) for nid in nids]

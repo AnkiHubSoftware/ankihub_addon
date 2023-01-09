@@ -5,7 +5,8 @@ from typing import Callable, List, Optional
 from uuid import UUID
 
 from anki.collection import OpChanges
-from aqt import gui_hooks, mw
+from aqt import dialogs, gui_hooks, mw
+from aqt.browser import Browser
 from aqt.emptycards import show_empty_cards
 from aqt.operations.tag import clear_unused_tags
 from aqt.qt import (
@@ -23,7 +24,7 @@ from aqt.qt import (
     qconnect,
 )
 from aqt.studydeck import StudyDeck
-from aqt.utils import askUser, openLink, showInfo, showText, tooltip
+from aqt.utils import openLink, showInfo, showText, tooltip
 
 from .. import LOGGER
 from ..addon_ankihub_client import AddonAnkiHubClient as AnkiHubClient
@@ -31,8 +32,10 @@ from ..addon_ankihub_client import AnkiHubRequestError
 from ..ankihub_client import NoteInfo
 from ..db import ankihub_db
 from ..settings import URL_DECK_BASE, URL_DECKS, URL_HELP, URL_VIEW_DECK, config
+from ..subdecks import SUBDECK_TAG, build_subdecks_and_move_cards_to_them, flatten_deck
 from ..sync import AnkiHubImporter
 from ..utils import create_backup, undo_note_type_modfications
+from .utils import ask_user
 
 
 class SubscribedDecksDialog(QDialog):
@@ -44,9 +47,9 @@ class SubscribedDecksDialog(QDialog):
         self.client = AnkiHubClient()
         self.setWindowTitle("Subscribed AnkiHub Decks")
 
-        self.setup_ui()
-        self.on_item_selection_changed()
-        self.refresh_decks_list()
+        self._setup_ui()
+        self._on_item_selection_changed()
+        self._refresh_decks_list()
 
         if not self.client.has_token():
             showText("Oops! Please make sure you are logged into AnkiHub!")
@@ -54,30 +57,38 @@ class SubscribedDecksDialog(QDialog):
         else:
             self.show()
 
-    def setup_ui(self):
+    def _setup_ui(self):
         self.box_top = QVBoxLayout()
         self.box_above = QHBoxLayout()
         self.box_right = QVBoxLayout()
 
         self.decks_list = QListWidget()
-        qconnect(self.decks_list.itemSelectionChanged, self.on_item_selection_changed)
+        qconnect(self.decks_list.itemSelectionChanged, self._on_item_selection_changed)
 
         self.add_btn = QPushButton("Add")
         self.box_right.addWidget(self.add_btn)
-        qconnect(self.add_btn.clicked, self.on_add)
+        qconnect(self.add_btn.clicked, self._on_add)
 
         self.unsubscribe_btn = QPushButton("Unsubscribe")
         self.box_right.addWidget(self.unsubscribe_btn)
-        qconnect(self.unsubscribe_btn.clicked, self.on_unsubscribe)
+        qconnect(self.unsubscribe_btn.clicked, self._on_unsubscribe)
 
         self.open_web_btn = QPushButton("Open on AnkiHub")
         self.box_right.addWidget(self.open_web_btn)
-        qconnect(self.open_web_btn.clicked, self.on_open_web)
+        qconnect(self.open_web_btn.clicked, self._on_open_web)
 
-        self.set_home_deck = QPushButton("Set Home deck")
-        self.set_home_deck.setToolTip("New cards will be added to this deck.")
-        qconnect(self.set_home_deck.clicked, self.on_set_home_deck)
-        self.box_right.addWidget(self.set_home_deck)
+        self.set_home_deck_btn = QPushButton("Set Home deck")
+        self.set_home_deck_btn.setToolTip("New cards will be added to this deck.")
+        qconnect(self.set_home_deck_btn.clicked, self._on_set_home_deck)
+        self.box_right.addWidget(self.set_home_deck_btn)
+
+        self.toggle_subdecks_btn = QPushButton("Enable Subdecks")
+        self.toggle_subdecks_btn.setToolTip(
+            "Toggle between the deck being organized into subdecks or not.<br>"
+            f"This will only have an effect if notes in the deck have <b>{SUBDECK_TAG}</b> tags."
+        )
+        qconnect(self.toggle_subdecks_btn.clicked, self._on_toggle_subdecks)
+        self.box_right.addWidget(self.toggle_subdecks_btn)
 
         self.box_right.addStretch(1)
 
@@ -86,7 +97,7 @@ class SubscribedDecksDialog(QDialog):
         self.box_above.addWidget(self.decks_list)
         self.box_above.addLayout(self.box_right)
 
-    def refresh_decks_list(self) -> None:
+    def _refresh_decks_list(self) -> None:
         self.decks_list.clear()
         for ah_did in config.deck_ids():
             name = config.deck_config(ah_did).name
@@ -94,7 +105,7 @@ class SubscribedDecksDialog(QDialog):
             item.setData(Qt.ItemDataRole.UserRole, ah_did)
             self.decks_list.addItem(item)
 
-    def refresh_anki(self) -> None:
+    def _refresh_anki(self) -> None:
         op = OpChanges()
         op.deck = True
         op.browser_table = True
@@ -102,18 +113,46 @@ class SubscribedDecksDialog(QDialog):
         op.study_queues = True
         gui_hooks.operation_did_execute(op, handler=None)
 
-    def on_add(self) -> None:
-        SubscribeDialog().exec()
-        self.refresh_decks_list()
-        self.refresh_anki()
+    def _on_add(self) -> None:
+        ah_did = SubscribeDialog().run()
+        if ah_did is None:
+            return
 
-    def on_unsubscribe(self) -> None:
+        self._refresh_decks_list()
+        self._refresh_anki()
+
+        anki_did = config.deck_config(ah_did).anki_id
+        deck_name = mw.col.decks.name(anki_did)
+        if mw.col.find_notes(f'"deck:{deck_name}" "tag:{SUBDECK_TAG}*"'):
+            if ask_user(
+                "The deck you subscribed to contains subdeck tags.<br>"
+                "Do you want to enable subdecks for this deck?"
+            ):
+                self._select_deck(ah_did)
+                self._on_toggle_subdecks()
+
+        cleanup_after_deck_install()
+
+    def _select_deck(self, ah_did: uuid.UUID):
+        deck_item = next(
+            (
+                item
+                for i in range(self.decks_list.count())
+                if (item := self.decks_list.item(i)).data(Qt.ItemDataRole.UserRole)
+                == ah_did
+            ),
+            None,
+        )
+        if deck_item is not None:
+            self.decks_list.setCurrentItem(deck_item)
+
+    def _on_unsubscribe(self) -> None:
         items = self.decks_list.selectedItems()
         if len(items) == 0:
             return
         deck_names = [item.text() for item in items]
         deck_names_text = ", ".join(deck_names)
-        confirm = askUser(
+        confirm = ask_user(
             f"Unsubscribe from deck {deck_names_text}?\n\n"
             "The deck will remain in your collection, but it will no longer sync with AnkiHub.",
             title="Unsubscribe AnkiHub Deck",
@@ -127,7 +166,7 @@ class SubscribedDecksDialog(QDialog):
             self.unsubscribe_from_deck(ankihub_did)
 
         tooltip("Unsubscribed from AnkiHub Deck.", parent=mw)
-        self.refresh_decks_list()
+        self._refresh_decks_list()
 
     @staticmethod
     def unsubscribe_from_deck(ankihub_did: UUID) -> None:
@@ -135,20 +174,18 @@ class SubscribedDecksDialog(QDialog):
         undo_note_type_modfications(mids)
         ankihub_db.remove_deck(ankihub_did)
 
-    def on_open_web(self) -> None:
+    def _on_open_web(self) -> None:
         items = self.decks_list.selectedItems()
         if len(items) == 0:
             return
+
         for item in items:
             ankihub_id: UUID = item.data(Qt.ItemDataRole.UserRole)
             openLink(f"{URL_DECK_BASE}/{ankihub_id}")
 
-    def on_set_home_deck(self):
+    def _on_set_home_deck(self):
         deck_names = self.decks_list.selectedItems()
         if len(deck_names) == 0:
-            return
-        elif len(deck_names) > 1:
-            tooltip("Please select only one deck.", parent=mw)
             return
 
         deck_name = deck_names[0]
@@ -177,19 +214,87 @@ class SubscribedDecksDialog(QDialog):
             callback=update_deck_config,
         )
 
-    def on_item_selection_changed(self) -> None:
+    def _on_toggle_subdecks(self):
+        deck_names = self.decks_list.selectedItems()
+        if len(deck_names) == 0:
+            return
+
+        deck_name = deck_names[0]
+        ankihub_id: UUID = deck_name.data(Qt.ItemDataRole.UserRole)
+        deck_config = config.deck_config(ankihub_id)
+        using_subdecks = deck_config.subdecks_enabled
+
+        if mw.col.decks.name_if_exists(deck_config.anki_id) is None:
+            showInfo(
+                (
+                    f"Anki deck <b>{deck_config.name}</b> doesn't exist in your Anki collection.<br>"
+                    "It might help to reset local changes to the deck first.<br>"
+                    "(You can do that from the AnkiHub menu in the Anki browser.)"
+                ),
+                parent=self,
+            )
+            return
+
+        def on_done(future: Future):
+            future.result()
+
+            tooltip("Subdecks updated.", parent=self)
+            mw.deckBrowser.refresh()
+            browser: Optional[Browser] = dialogs._dialogs["Browser"][1]
+            if browser is not None:
+                browser.sidebar.refresh()
+
+        if using_subdecks:
+            flatten = ask_user("Do you want to remove the subdecks?")
+            if flatten is None:
+                return
+            elif flatten:
+                mw.taskman.with_progress(
+                    label="Removing subdecks and moving cards...",
+                    task=lambda: flatten_deck(ankihub_id),
+                    on_done=on_done,
+                )
+        else:
+            mw.taskman.with_progress(
+                label="Building subdecks and moving cards...",
+                task=lambda: build_subdecks_and_move_cards_to_them(ankihub_id),
+                on_done=on_done,
+            )
+
+        config.set_subdecks(ankihub_id, not using_subdecks)
+
+        self._refresh_subdecks_button()
+
+    def _refresh_subdecks_button(self):
         selection = self.decks_list.selectedItems()
-        isSelected: bool = len(selection) > 0
-        self.unsubscribe_btn.setEnabled(isSelected)
-        self.open_web_btn.setEnabled(isSelected)
-        self.set_home_deck.setEnabled(isSelected)
+        one_selected: bool = len(selection) == 1
+
+        self.toggle_subdecks_btn.setEnabled(one_selected)
+        if not one_selected:
+            return
+
+        ankihub_did: UUID = selection[0].data(Qt.ItemDataRole.UserRole)
+        using_subdecks = config.deck_config(ankihub_did).subdecks_enabled
+        self.toggle_subdecks_btn.setText(
+            "Disable Subdecks" if using_subdecks else "Enable Subdecks"
+        )
+
+    def _on_item_selection_changed(self) -> None:
+        selection = self.decks_list.selectedItems()
+        one_selected: bool = len(selection) == 1
+
+        self.unsubscribe_btn.setEnabled(one_selected)
+        self.open_web_btn.setEnabled(one_selected)
+        self.set_home_deck_btn.setEnabled(one_selected)
+
+        self._refresh_subdecks_button()
 
     @classmethod
     def display_subscribe_window(cls):
         if cls._window is None:
             cls._window = cls()
         else:
-            cls._window.refresh_decks_list()
+            cls._window._refresh_decks_list()
             cls._window.activateWindow()
             cls._window.raise_()
             cls._window.show()
@@ -210,6 +315,9 @@ class SubscribeDialog(QDialog):
 
     def __init__(self):
         super(SubscribeDialog, self).__init__()
+
+        self.ah_did = None
+
         self.results = None
         self.thread = None  # type: ignore
         self.box_top = QVBoxLayout()
@@ -236,8 +344,8 @@ class SubscribeDialog(QDialog):
         self.browse_btn = self.buttonbox.addButton(
             "Browse Decks", QDialogButtonBox.ButtonRole.ActionRole
         )
-        qconnect(self.browse_btn.clicked, self.on_browse_deck)
-        qconnect(self.buttonbox.accepted, self.subscribe)
+        qconnect(self.browse_btn.clicked, self._on_browse_deck)
+        qconnect(self.buttonbox.accepted, self._subscribe)
         self.buttonbox.rejected.connect(self.close)
 
         self.instructions_label = QLabel(
@@ -262,7 +370,12 @@ class SubscribeDialog(QDialog):
         else:
             self.show()
 
-    def subscribe(self):
+    def run(self) -> uuid.UUID:
+        """Returns the ankihub deck id of the newly subscribed deck or None if no deck was subscribed to"""
+        self.exec()
+        return self.ah_did
+
+    def _subscribe(self):
         ah_did_str = self.deck_id_box_text.text().strip()
 
         try:
@@ -281,9 +394,9 @@ class SubscribeDialog(QDialog):
                 f"menu. See {URL_HELP} for more details."
             )
             self.close()
-            return
+            return self.ah_did
 
-        confirmed = askUser(
+        confirmed = ask_user(
             f"Would you like to proceed with downloading and installing the deck? "
             f"Your personal collection will be modified.<br><br>"
             f"See <a href='{URL_HELP}'>{URL_HELP}</a> for details.",
@@ -292,11 +405,13 @@ class SubscribeDialog(QDialog):
         if not confirmed:
             return
 
-        download_and_install_deck(
-            ah_did, on_success=self.accept, on_failure=self.reject
-        )
+        def on_success():
+            self.ah_did = ah_did
+            self.accept()
 
-    def on_browse_deck(self) -> None:
+        download_and_install_deck(ah_did, on_success=on_success, on_failure=self.reject)
+
+    def _on_browse_deck(self) -> None:
         openLink(URL_DECKS)
 
 
@@ -304,7 +419,6 @@ def download_and_install_deck(
     ankihub_did: uuid.UUID,
     on_success: Optional[Callable[[], None]] = None,
     on_failure: Optional[Callable[[], None]] = None,
-    cleanup: bool = True,
 ):
     def on_install_done(future: Future):
         success = False
@@ -323,9 +437,6 @@ def download_and_install_deck(
                 raise exc
         else:
             mw.reset()
-
-            if cleanup:
-                cleanup_after_deck_install()
 
             if on_success is not None:
                 on_success()
@@ -363,7 +474,7 @@ def download_and_install_deck(
             ),
             on_done=on_install_done,
             parent=mw,
-            label="Installing deck",
+            label="Installing deck...",
         )
 
     mw.taskman.with_progress(
@@ -432,6 +543,6 @@ def cleanup_after_deck_install(multiple_decks: bool = False) -> None:
         )
         + "Do you want to clear unused tags and empty cards from your collection? (It is recommended.)"
     )
-    if askUser(message, title="AnkiHub"):
+    if ask_user(message, title="AnkiHub"):
         clear_unused_tags(parent=mw).run_in_background()
         show_empty_cards(mw)
