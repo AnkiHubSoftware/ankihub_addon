@@ -555,21 +555,23 @@ class TestGetDeckUpdates:
 
 
 @pytest.mark.vcr()
-def test_get_deck_extensions_by_deck_id(authorized_client_for_user_test1):
+def test_get_deck_extensions_by_deck_id():
     from ankihub.ankihub_client import AnkiHubClient
 
-    client: AnkiHubClient = authorized_client_for_user_test1
+    client = AnkiHubClient()
+    credentials_data = {"username": "admin", "password": "admin"}
+    client.login(credentials=credentials_data)
 
-    deck_id = uuid.UUID("100df7b9-7749-4fe0-b801-e3dec1decd72")
+    deck_id = uuid.UUID("fdc31929-0cb0-4809-a502-1ee78ee24857")
 
     expected_response = {
         "deck_extensions": [
             {
-                "id": 999,
+                "id": 31,
                 "owner": 1,
-                "deck": str(deck_id),
-                "name": "test100",
-                "tag_group_name": "test100",
+                "deck": "fdc31929-0cb0-4809-a502-1ee78ee24857",
+                "name": "test99",
+                "tag_group_name": "test99",
                 "description": "",
             }
         ]
@@ -581,12 +583,14 @@ def test_get_deck_extensions_by_deck_id(authorized_client_for_user_test1):
 
 
 @pytest.mark.vcr()
-def test_get_note_customizations_by_deck_extension_id(authorized_client_for_user_test1):
+def test_get_note_customizations_by_deck_extension_id():
     from ankihub.ankihub_client import AnkiHubClient
 
-    client: AnkiHubClient = authorized_client_for_user_test1
+    client = AnkiHubClient()
+    credentials_data = {"username": "admin", "password": "admin"}
+    client.login(credentials=credentials_data)
 
-    deck_extension_id = 999
+    deck_extension_id = 31
 
     expected_response = {
         "next": None,
