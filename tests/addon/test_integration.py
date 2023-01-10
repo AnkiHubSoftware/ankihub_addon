@@ -20,6 +20,7 @@ from pytest_anki import AnkiSession
 from pytestqt.qtbot import QtBot
 
 
+
 SAMPLE_MODEL_ID = NotetypeId(1656968697414)
 TEST_DATA_PATH = Path(__file__).parent.parent / "test_data"
 SAMPLE_DECK_APKG = TEST_DATA_PATH / "small.apkg"
