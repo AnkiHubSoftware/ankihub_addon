@@ -300,6 +300,19 @@ class AnkiHubDB:
         result = uuid.UUID(nid_str)
         return result
 
+    def ankihub_id_to_anki_id(self, ankihub_id: uuid.UUID) -> Optional[NoteId]:
+        note_id_str = self.scalar(
+            """
+            SELECT anki_note_id FROM notes WHERE ankihub_note_id = ?
+            """,
+            ankihub_id,
+        )
+        if note_id_str is None:
+            return None
+
+        result = NoteId(note_id_str)
+        return result
+
     def is_ankihub_note_type(self, anki_note_type_id: NotetypeId) -> bool:
         result = self.scalar(
             """
