@@ -13,6 +13,9 @@ from .ankihub_client import AnkiHubRequestError
 from .importing import AnkiHubImporter
 from .settings import ANKI_MINOR, ANKIHUB_DATETIME_FORMAT_STR, config
 from .utils import create_backup
+from .db import ankihub_db
+
+from anki.errors import NotFoundError
 
 
 class AnkiHubSync:
@@ -85,8 +88,60 @@ class AnkiHubSync:
             config.save_latest_update(ankihub_did, latest_update)
         else:
             LOGGER.debug(f"No new updates to sync for {ankihub_did=}")
-
+        self._add_optional_content_to_notes(client, ankihub_did)
         return True
+
+    def _add_optional_content_to_notes(
+        self, client: AnkiHubClient, ankihub_did: uuid.UUID
+    ):
+        LOGGER.debug("Begin to add optional content")
+        result = client.get_deck_extensions_by_deck_id(ankihub_did)
+        extensions = result.get("deck_extensions", [])
+
+        LOGGER.debug("RETRIEVED EXTENSIONS")
+        LOGGER.debug(extensions)
+
+        for extension in extensions:
+            result = client.get_note_customizations_by_deck_extension_id(
+                extension.get("id")
+            )
+            customizations = result.get("note_customizations", [])
+            updated_notes = []
+
+            LOGGER.debug("RETRIEVED CUSTOMIZATIONS")
+            LOGGER.debug(customizations)
+
+            for customization in customizations:
+                LOGGER.debug("PROCESSING CUSTOMIZATION")
+                LOGGER.debug(customization)
+
+                note_anki_id = ankihub_db.ankihub_id_to_anki_id(
+                    customization.get("note")
+                )
+                try:
+                    note = mw.col.get_note(note_anki_id)
+                    updated_notes.append(note)
+
+                    LOGGER.debug(f"FOUND NOTE {note_anki_id} TO BE CUSTOMIZED")
+                except NotFoundError:
+                    # TODO: add customization ID to the return payload on the webapp side so logging is more meaningful
+                    LOGGER.warning(
+                        f"Tried to apply customization for note {customization.get('note')} but note was not found"
+                    )
+                    continue
+                else:
+                    LOGGER.debug("APPLYING TAGS TO NOTE... CURRENT TAGS:")
+                    LOGGER.debug(note.tags)
+
+                    note.tags = list(
+                        set(note.tags) | set(customization.get("tags", []))
+                    )
+
+                    LOGGER.debug("APPLIED CUSTOM TAGS TO NOTE, NEW TAGS:")
+                    LOGGER.debug(note.tags)
+
+            mw.col.update_notes(updated_notes)
+            LOGGER.debug(f"SAVED {len(updated_notes)} NOTES WITH CUSTOM TAGS")
 
     def _handle_exception(
         self, exc: AnkiHubRequestError, ankihub_did: uuid.UUID
