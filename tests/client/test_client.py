@@ -549,3 +549,68 @@ class TestGetDeckUpdates:
             protected_fields={},
             protected_tags=[],
         )
+
+
+@pytest.mark.vcr()
+def test_get_deck_extensions_by_deck_id():
+    from ankihub.ankihub_client import AnkiHubClient
+
+    client = AnkiHubClient()
+    credentials_data = {"username": "admin", "password": "admin"}
+    client.login(credentials=credentials_data)
+
+    deck_id = uuid.UUID("fdc31929-0cb0-4809-a502-1ee78ee24857")
+
+    expected_response = {
+        "deck_extensions": [
+            {
+                "id": 31,
+                "owner": 1,
+                "deck": "fdc31929-0cb0-4809-a502-1ee78ee24857",
+                "name": "test99",
+                "tag_group_name": "test99",
+                "description": "",
+            }
+        ]
+    }
+
+    response = client.get_deck_extensions_by_deck_id(deck_id=deck_id)
+
+    assert response == expected_response
+
+
+@pytest.mark.vcr()
+def test_get_note_customizations_by_deck_extension_id():
+    from ankihub.ankihub_client import AnkiHubClient
+
+    client = AnkiHubClient()
+    credentials_data = {"username": "admin", "password": "admin"}
+    client.login(credentials=credentials_data)
+
+    deck_extension_id = 31
+
+    expected_response = {
+        "next": None,
+        "note_customizations": [
+            {
+                "note": "01856763-d674-4e8e-aae7-02e7186bc571",
+                "tags": [
+                    "#AnkiHub_Optional::test99::test1",
+                    "#AnkiHub_Optional::test99::test2",
+                ],
+            },
+            {
+                "note": "0eabb96a-206c-4a48-a602-99c7ab92042f",
+                "tags": [
+                    "#AnkiHub_Optional::test99::test1",
+                    "#AnkiHub_Optional::test99::test2",
+                ],
+            },
+        ],
+    }
+
+    response = client.get_note_customizations_by_deck_extension_id(
+        deck_extension_id=deck_extension_id
+    )
+
+    assert response == expected_response
