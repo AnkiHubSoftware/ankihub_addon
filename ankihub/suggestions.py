@@ -4,6 +4,8 @@ from typing import Dict, List
 
 from anki.notes import Note, NoteId
 
+from .note_conversion import TAG_FOR_OPTIONAL_TAGS
+
 from .addon_ankihub_client import AddonAnkiHubClient as AnkiHubClient
 from .ankihub_client import ChangeNoteSuggestion, NewNoteSuggestion, SuggestionType
 from .db import ankihub_db
@@ -105,7 +107,7 @@ def change_note_suggestion(
         ankihub_note_uuid=note_data.ankihub_note_uuid,
         anki_nid=note.id,
         fields=note_data.fields,
-        tags=note_data.tags,
+        tags=_filter_optional_tags(note_data.tags),
         change_type=change_type,
         comment=comment,
     )
@@ -121,9 +123,15 @@ def new_note_suggestion(
         ankihub_note_uuid=note_data.ankihub_note_uuid,
         anki_nid=note.id,
         fields=note_data.fields,
-        tags=note_data.tags,
+        tags=_filter_optional_tags(note_data.tags),
         note_type_name=note.note_type()["name"],
         anki_note_type_id=note.mid,
         guid=note.guid,
         comment=comment,
     )
+
+
+def _filter_optional_tags(tags: List[str]):
+    if tags is None:
+        return None
+    return [tag for tag in tags if not tag.startswith(TAG_FOR_OPTIONAL_TAGS)]
