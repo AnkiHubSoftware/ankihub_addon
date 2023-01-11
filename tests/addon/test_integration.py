@@ -253,9 +253,13 @@ def test_get_deck_by_id(anki_session_with_addon: AnkiSession, requests_mock):
     assert exc is not None and exc.response.status_code == 403
 
 
-def test_suggest_note_upate(anki_session_with_addon: AnkiSession, requests_mock):
+def test_suggest_note_update(anki_session_with_addon: AnkiSession, requests_mock):
     from ankihub.ankihub_client import AnkiHubRequestError, NoteInfo, SuggestionType
-    from ankihub.note_conversion import ADDON_INTERNAL_TAGS, ANKI_INTERNAL_TAGS
+    from ankihub.note_conversion import (
+        ADDON_INTERNAL_TAGS,
+        ANKI_INTERNAL_TAGS,
+        TAG_FOR_OPTIONAL_TAGS,
+    )
     from ankihub.settings import API_URL_BASE
     from ankihub.suggestions import suggest_note_update
 
@@ -273,7 +277,12 @@ def test_suggest_note_upate(anki_session_with_addon: AnkiSession, requests_mock)
             f"{API_URL_BASE}/notes/{ankihub_note_uuid}/suggestion/", status_code=201
         )
 
-        note.tags = ["a", *ADDON_INTERNAL_TAGS, *ANKI_INTERNAL_TAGS]
+        note.tags = [
+            "a",
+            *ADDON_INTERNAL_TAGS,
+            *ANKI_INTERNAL_TAGS,
+            f"{TAG_FOR_OPTIONAL_TAGS}::TAG_GROUP::OptionalTag",
+        ]
         suggest_note_update(
             note=note,
             change_type=SuggestionType.NEW_CONTENT,
@@ -306,7 +315,7 @@ def test_suggest_note_upate(anki_session_with_addon: AnkiSession, requests_mock)
 
 def test_suggest_new_note(anki_session_with_addon: AnkiSession, requests_mock):
     from ankihub.ankihub_client import AnkiHubRequestError
-    from ankihub.note_conversion import ADDON_INTERNAL_TAGS
+    from ankihub.note_conversion import ADDON_INTERNAL_TAGS, TAG_FOR_OPTIONAL_TAGS
     from ankihub.settings import API_URL_BASE
     from ankihub.suggestions import suggest_new_note
 
@@ -323,7 +332,11 @@ def test_suggest_new_note(anki_session_with_addon: AnkiSession, requests_mock):
             status_code=201,
         )
 
-        note.tags = ["a", *ADDON_INTERNAL_TAGS]
+        note.tags = [
+            "a",
+            *ADDON_INTERNAL_TAGS,
+            f"{TAG_FOR_OPTIONAL_TAGS}::TAG_GROUP::OptionalTag",
+        ]
         suggest_new_note(
             note=note,
             ankihub_deck_uuid=ankihub_deck_uuid,
@@ -365,6 +378,7 @@ def test_suggest_notes_in_bulk(anki_session_with_addon: AnkiSession, monkeypatch
         SuggestionType,
     )
     from ankihub.suggestions import suggest_notes_in_bulk
+    from ankihub.note_conversion import TAG_FOR_OPTIONAL_TAGS
 
     anki_session = anki_session_with_addon
     bulk_suggestions_method_mock = MagicMock()
@@ -392,6 +406,13 @@ def test_suggest_notes_in_bulk(anki_session_with_addon: AnkiSession, monkeypatch
         # suggest two notes, one new and one updated, check if the client method was called with the correct arguments
         nids = [changed_note.id, new_note.id]
         notes = [mw.col.get_note(nid) for nid in nids]
+        # also add one optional tag to each one of them to verify that the optional tags are not sent
+        for note in notes:
+            note.tags = list(
+                set(note.tags)
+                | set([f"{TAG_FOR_OPTIONAL_TAGS}::TAG_GROUP::OptionalTag"])
+            )
+        mw.col.update_notes(notes)
         suggest_notes_in_bulk(
             notes=notes,
             auto_accept=False,
