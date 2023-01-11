@@ -553,6 +553,9 @@ class TestGetDeckUpdates:
 
 @pytest.mark.vcr()
 def test_get_deck_extensions_by_deck_id(client):
+    from ankihub.ankihub_client import AnkiHubClient
+
+    client: AnkiHubClient = client
     credentials_data = {"username": "test1", "password": "asdf"}
     client.login(credentials=credentials_data)
 
@@ -578,6 +581,9 @@ def test_get_deck_extensions_by_deck_id(client):
 
 @pytest.mark.vcr()
 def test_get_note_customizations_by_deck_extension_id(client):
+    from ankihub.ankihub_client import AnkiHubClient
+
+    client: AnkiHubClient = client
     credentials_data = {"username": "test1", "password": "asdf"}
     client.login(credentials=credentials_data)
 
