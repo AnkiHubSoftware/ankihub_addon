@@ -559,7 +559,7 @@ def test_get_deck_extensions_by_deck_id(client):
     from ankihub.ankihub_client import AnkiHubClient
 
     client: AnkiHubClient = client
-    credentials_data = {"username": "test1", "password": "asdf"}
+    credentials_data = {"username": "test2", "password": "asdf"}
     client.login(credentials=credentials_data)
 
     deck_id = uuid.UUID("100df7b9-7749-4fe0-b801-e3dec1decd72")
@@ -587,7 +587,7 @@ def test_get_note_customizations_by_deck_extension_id(client):
     from ankihub.ankihub_client import AnkiHubClient
 
     client: AnkiHubClient = client
-    credentials_data = {"username": "test1", "password": "asdf"}
+    credentials_data = {"username": "test2", "password": "asdf"}
     client.login(credentials=credentials_data)
 
     deck_extension_id = 999
