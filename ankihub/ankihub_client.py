@@ -606,9 +606,7 @@ class AnkiHubClient:
     def get_note_customizations_by_deck_extension_id(self, deck_extension_id: int):
         url = f"/deck_extensions/{deck_extension_id}/note_customizations/"
         while url is not None:
-            response = self._send_request(
-                "GET", url
-            )
+            response = self._send_request("GET", url)
             if response.status_code != 200:
                 raise AnkiHubRequestError(response)
 

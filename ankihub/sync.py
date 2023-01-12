@@ -103,36 +103,17 @@ class AnkiHubSync:
                 extension.get("id")
             ):
                 customizations = chunk.get("note_customizations", [])
-
-<<<<<<< HEAD
-            for customization in customizations:
-                note_anki_id = ankihub_db.ankihub_id_to_anki_id(
-                    customization.get("note")
-                )
-                try:
-                    note = mw.col.get_note(note_anki_id)
-                    updated_notes.append(note)
-                except NotFoundError:
-                    LOGGER.warning(
-                        f"""Tried to apply customization #{customization.id}
-                        for note #{customization.get('note')} but note was not found"""
-                    )
-                    continue
-                else:
-                    note.tags = list(
-                        set(note.tags) | set(customization.get("tags", []))
-=======
                 for customization in customizations:
                     note_anki_id = ankihub_db.ankihub_id_to_anki_id(
                         customization.get("note")
->>>>>>> 0535191 (Refactor client to handle pagination)
                     )
                     try:
                         note = mw.col.get_note(note_anki_id)
                         updated_notes.append(note)
                     except NotFoundError:
                         LOGGER.warning(
-                            f"Tried to apply customization #{customization.id} but Note #{customization.get('note')} was not found"
+                            f"""Tried to apply customization #{customization.id}
+                            for note #{customization.get('note')} but note was not found"""
                         )
                         continue
                     else:
