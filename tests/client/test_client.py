@@ -43,6 +43,7 @@ def client(vcr: VCR, request, marks):
 
     if not playback_mode:
         run_command_in_django_container("python manage.py runscript create_test_users")
+        run_command_in_django_container("python manage.py runscript create_fixture_data")
 
     client = AnkiHubClient()
     yield client
