@@ -604,13 +604,18 @@ class AnkiHubClient:
         return self.get_deck_extensions(params={"deck_id": str(deck_id)})
 
     def get_note_customizations_by_deck_extension_id(self, deck_extension_id: int):
-        # TODO: Handle pagination
-        response = self._send_request(
-            "GET", f"/deck_extensions/{deck_extension_id}/note_customizations/"
-        )
-        if response.status_code != 200:
-            raise AnkiHubRequestError(response)
-        return response.json()
+        url = f"/deck_extensions/{deck_extension_id}/note_customizations/"
+        while url is not None:
+            response = self._send_request(
+                "GET", url
+            )
+            if response.status_code != 200:
+                raise AnkiHubRequestError(response)
+
+            data = response.json()
+            url = data["next"].split("/api", maxsplit=1)[1] if data["next"] else None
+
+            yield data
 
 
 def transform_notes_data(notes_data: List[Dict]) -> List[Dict]:
