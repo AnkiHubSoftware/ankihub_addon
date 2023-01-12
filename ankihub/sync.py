@@ -124,9 +124,8 @@ class AnkiHubSync:
 
                     LOGGER.debug(f"FOUND NOTE {note_anki_id} TO BE CUSTOMIZED")
                 except NotFoundError:
-                    # TODO: add customization ID to the return payload on the webapp side so logging is more meaningful
                     LOGGER.warning(
-                        f"Tried to apply customization for note {customization.get('note')} but note was not found"
+                        f"Tried to apply customization #{customization.id} for note #{customization.get('note')} but note was not found"
                     )
                     continue
                 else:
