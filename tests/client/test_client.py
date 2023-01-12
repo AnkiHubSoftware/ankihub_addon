@@ -596,16 +596,16 @@ def test_get_note_customizations_by_deck_extension_id(client):
         "next": None,
         "note_customizations": [
             {
-                "id": 1,
-                "note": "b2344a94-0ca6-44a1-87a1-1593558c10a9",
+                "id": 2,
+                "note": "8645c6d6-4f3d-417e-8295-8f5009042b6e",
                 "tags": [
                     "#AnkiHub_Optional::test100::test1",
                     "#AnkiHub_Optional::test100::test2",
                 ],
             },
             {
-                "id": 2,
-                "note": "8645c6d6-4f3d-417e-8295-8f5009042b6e",
+                "id": 1,
+                "note": "b2344a94-0ca6-44a1-87a1-1593558c10a9",
                 "tags": [
                     "#AnkiHub_Optional::test100::test1",
                     "#AnkiHub_Optional::test100::test2",
