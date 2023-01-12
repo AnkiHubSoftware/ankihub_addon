@@ -559,14 +559,14 @@ def test_get_deck_extensions_by_deck_id(client):
     credentials_data = {"username": "test1", "password": "asdf"}
     client.login(credentials=credentials_data)
 
-    deck_id = uuid.UUID("fdc31929-0cb0-4809-a502-1ee78ee24857")
+    deck_id = uuid.UUID("100df7b9-7749-4fe0-b801-e3dec1decd72")
 
     expected_response = {
         "deck_extensions": [
             {
-                "id": 31,
+                "id": 999,
                 "owner": 1,
-                "deck": "fdc31929-0cb0-4809-a502-1ee78ee24857",
+                "deck": "100df7b9-7749-4fe0-b801-e3dec1decd72",
                 "name": "test99",
                 "tag_group_name": "test99",
                 "description": "",
@@ -587,20 +587,22 @@ def test_get_note_customizations_by_deck_extension_id(client):
     credentials_data = {"username": "test1", "password": "asdf"}
     client.login(credentials=credentials_data)
 
-    deck_extension_id = 31
+    deck_extension_id = 999
 
     expected_response = {
         "next": None,
         "note_customizations": [
             {
-                "note": "01856763-d674-4e8e-aae7-02e7186bc571",
+                "id": 1,
+                "note": "b2344a94-0ca6-44a1-87a1-1593558c10a9",
                 "tags": [
                     "#AnkiHub_Optional::test99::test1",
                     "#AnkiHub_Optional::test99::test2",
                 ],
             },
             {
-                "note": "0eabb96a-206c-4a48-a602-99c7ab92042f",
+                "id": 2,
+                "note": "8645c6d6-4f3d-417e-8295-8f5009042b6e",
                 "tags": [
                     "#AnkiHub_Optional::test99::test1",
                     "#AnkiHub_Optional::test99::test2",
