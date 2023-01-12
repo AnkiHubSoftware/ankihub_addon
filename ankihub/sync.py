@@ -113,7 +113,8 @@ class AnkiHubSync:
                     updated_notes.append(note)
                 except NotFoundError:
                     LOGGER.warning(
-                        f"Tried to apply customization #{customization.id} for note #{customization.get('note')} but note was not found"
+                        f"""Tried to apply customization #{customization.id}
+                        for note #{customization.get('note')} but note was not found"""
                     )
                     continue
                 else:
