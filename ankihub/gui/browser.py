@@ -1,31 +1,40 @@
+import re
 import uuid
-from abc import abstractmethod
 from concurrent.futures import Future
 from pprint import pformat
 from typing import List, Optional, Sequence, Tuple
 
-from anki.collection import BrowserColumns
-from anki.notes import Note
-from anki.utils import ids2str
+from anki.collection import SearchNode
 from aqt import mw
-from aqt.browser import Browser, CellRow, Column, ItemId, SearchContext
+from aqt.browser import (
+    Browser,
+    CellRow,
+    Column,
+    ItemId,
+    SearchContext,
+    SidebarItem,
+    SidebarItemType,
+    SidebarStage,
+)
 from aqt.gui_hooks import (
     browser_did_fetch_columns,
     browser_did_fetch_row,
     browser_did_search,
     browser_menus_did_init,
+    browser_will_build_tree,
     browser_will_search,
     browser_will_show,
     browser_will_show_context_menu,
 )
 from aqt.qt import QAction, QMenu, qconnect
-from aqt.utils import showInfo, showText, tooltip
+from aqt.utils import showInfo, showText, showWarning, tooltip
 
 from .. import LOGGER
-from ..ankihub_client import AnkiHubRequestError
+from ..ankihub_client import AnkiHubRequestError, SuggestionType
 from ..db import (
     ankihub_db,
     attach_ankihub_db_to_anki_db_connection,
+    attached_ankihub_db,
     detach_ankihub_db_from_anki_db_connection,
 )
 from ..importing import get_fields_protected_by_tags
@@ -34,11 +43,32 @@ from ..reset_changes import reset_local_changes_to_notes
 from ..settings import ANKIHUB_NOTE_TYPE_FIELD_NAME, AnkiHubCommands, DeckConfig, config
 from ..subdecks import build_subdecks_and_move_cards_to_them
 from ..suggestions import BulkNoteSuggestionsResult, suggest_notes_in_bulk
-from ..utils import note_types_with_ankihub_id_field
+from .custom_columns import (
+    AnkiHubIdColumn,
+    CustomColumn,
+    EditedAfterSyncColumn,
+    UpdatedSinceLastReviewColumn,
+)
+from .custom_search_nodes import (
+    CustomSearchNode,
+    ModifiedAfterSyncSearchNode,
+    SuggestionTypeSearchNode,
+    UpdatedInTheLastXDaysSearchNode,
+    UpdatedSinceLastReviewSearchNode,
+)
 from .suggestion_dialog import SuggestionDialog
 from .utils import ask_user, choose_list, choose_subset
 
 browser: Optional[Browser] = None
+
+custom_columns = [
+    AnkiHubIdColumn(),
+    EditedAfterSyncColumn(),
+    UpdatedSinceLastReviewColumn(),
+]
+
+# stores the custom search nodes for the current search
+custom_search_nodes: List[CustomSearchNode] = []
 
 
 def on_browser_will_show_context_menu(browser: Browser, context_menu: QMenu) -> None:
@@ -353,111 +383,6 @@ def choose_deck(prompt: str) -> Tuple[Optional[uuid.UUID], Optional[DeckConfig]]
     return chosen_deck_ah_did, chosen_deck_config
 
 
-class CustomColumn:
-    builtin_column: Column
-
-    def on_browser_did_fetch_row(
-        self,
-        item_id: ItemId,
-        row: CellRow,
-        active_columns: Sequence[str],
-    ) -> None:
-        if (
-            index := active_columns.index(self.key)
-            if self.key in active_columns
-            else None
-        ) is None:
-            return
-
-        note = browser.table._state.get_note(item_id)
-        try:
-            value = self._display_value(note)
-            row.cells[index].text = value
-        except Exception as error:
-            row.cells[index].text = str(error)
-
-    @property
-    def key(self):
-        return self.builtin_column.key
-
-    @abstractmethod
-    def _display_value(
-        self,
-        note: Note,
-    ) -> str:
-        raise NotImplementedError
-
-    def order_by_str(self) -> Optional[str]:
-        """Return the SQL string that will be appended after "ORDER BY" to the query that
-        fetches the search results when sorting by this column."""
-        return None
-
-
-class AnkiHubIdColumn(CustomColumn):
-
-    builtin_column = Column(
-        key="ankihub_id",
-        cards_mode_label="AnkiHub ID",
-        notes_mode_label="AnkiHub ID",
-        sorting=BrowserColumns.SORTING_NONE,
-        uses_cell_font=False,
-        alignment=BrowserColumns.ALIGNMENT_CENTER,
-    )
-
-    def _display_value(
-        self,
-        note: Note,
-    ) -> str:
-        if "ankihub_id" in note:
-            if note["ankihub_id"]:
-                return note["ankihub_id"]
-            else:
-                return "ID Pending"
-        else:
-            return "Not AnkiHub Note Type"
-
-
-class EditedAfterSyncColumn(CustomColumn):
-    builtin_column = Column(
-        key="edited_after_sync",
-        cards_mode_label="AnkiHub: Modified After Sync",
-        notes_mode_label="AnkiHub: Modified After Sync",
-        sorting=BrowserColumns.SORTING_DESCENDING,
-        uses_cell_font=False,
-        alignment=BrowserColumns.ALIGNMENT_CENTER,
-    )
-
-    def _display_value(
-        self,
-        note: Note,
-    ) -> str:
-        if "ankihub_id" not in note or not note["ankihub_id"]:
-            return "N/A"
-
-        last_sync = ankihub_db.last_sync(uuid.UUID(note["ankihub_id"]))
-        if last_sync is None:
-            # The sync_mod value can be None if the note was synced with an early version of the AnkiHub add-on
-            return "Unknown"
-
-        return "Yes" if note.mod > last_sync else "No"
-
-    def order_by_str(self) -> str:
-        mids = note_types_with_ankihub_id_field()
-        if not mids:
-            return None
-
-        return (
-            "("
-            f"   SELECT n.mod > ah_n.mod from {ankihub_db.database_name}.notes AS ah_n "
-            "    WHERE ah_n.anki_note_id = n.id LIMIT 1"
-            ") DESC, "
-            f"(n.mid IN {ids2str(mids)}) DESC"
-        )
-
-
-custom_columns: List[CustomColumn] = [AnkiHubIdColumn(), EditedAfterSyncColumn()]
-
-
 def on_browser_did_fetch_columns(columns: dict[str, Column]):
     for column in custom_columns:
         columns[column.key] = column.builtin_column
@@ -471,6 +396,7 @@ def on_browser_did_fetch_row(
 ) -> None:
     for column in custom_columns:
         column.on_browser_did_fetch_row(
+            browser=browser,
             item_id=item_id,
             row=row,
             active_columns=active_columns,
@@ -478,6 +404,11 @@ def on_browser_did_fetch_row(
 
 
 def on_browser_will_search(ctx: SearchContext):
+    on_browser_will_search_handle_custom_column_ordering(ctx)
+    on_browser_will_search_handle_custom_search_parameters(ctx)
+
+
+def on_browser_will_search_handle_custom_column_ordering(ctx: SearchContext):
     if not isinstance(ctx.order, Column):
         return
 
@@ -492,21 +423,170 @@ def on_browser_will_search(ctx: SearchContext):
     ctx.order = custom_column.order_by_str()
 
 
+def on_browser_will_search_handle_custom_search_parameters(ctx: SearchContext):
+    if not ctx.search:
+        return
+
+    global custom_search_nodes
+    custom_search_nodes = []
+
+    for m in re.finditer(r"(ankihub_\w+):(\w*)", ctx.search):
+        if m.group(1) == "ankihub_id":
+            continue
+
+        parameter_name, parameter_value = m.group(1), m.group(2)
+        try:
+            custom_search_nodes.append(
+                CustomSearchNode.from_parameter_type_and_value(
+                    browser, parameter_name, parameter_value
+                )
+            )
+        except ValueError as e:
+            showWarning(f"AnkiHub search error: {e}")
+            return
+
+        # remove the custom search parameter from the search string
+        ctx.search = ctx.search.replace(m.group(0), "")
+
+
 def on_browser_did_search(ctx: SearchContext):
+    # Detach the ankihub database in case it was attached in on_browser_will_search_handle_custom_column_ordering.
+    # The attached_ankihub_db context manager can't be used for this because the database query happens
+    # in the rust backend.
     detach_ankihub_db_from_anki_db_connection()
+
+    on_browser_did_search_handle_custom_search_parameters(ctx)
+
+
+def on_browser_did_search_handle_custom_search_parameters(ctx: SearchContext):
+    global custom_search_nodes
+
+    if not custom_search_nodes:
+        return
+
+    with attached_ankihub_db():
+        try:
+            for node in custom_search_nodes:
+                ctx.ids = node.filter_ids(ctx.ids)
+        except ValueError as e:
+            showWarning(f"AnkiHub search error: {e}")
+            return
+        finally:
+            custom_search_nodes = []
+
+
+def on_browser_will_build_tree(
+    handled: bool,
+    tree: SidebarItem,
+    stage: SidebarStage,
+    browser: Browser,
+):
+    if stage != SidebarStage.ROOT:
+        return handled
+
+    ankihub_item = tree.add_simple(
+        name="👑 AnkiHub",
+        icon="AnkiHub",
+        type=SidebarItemType.SAVED_SEARCH_ROOT,
+        search_node=SearchNode(
+            parsable_text="ankihub_id:*",
+        ),
+    )
+
+    ankihub_item.add_simple(
+        name="With AnkiHub ID",
+        icon="With AnkiHub ID",
+        type=SidebarItemType.SAVED_SEARCH,
+        search_node=SearchNode(parsable_text="ankihub_id:_*"),
+    )
+
+    ankihub_item.add_simple(
+        name="ID Pending",
+        icon="ID Pending",
+        type=SidebarItemType.SAVED_SEARCH,
+        search_node=SearchNode(parsable_text="ankihub_id:"),
+    )
+
+    ankihub_item.add_simple(
+        name="Modified After Sync",
+        icon="Modified After Sync",
+        type=SidebarItemType.SAVED_SEARCH,
+        search_node=SearchNode(
+            parsable_text=f"{ModifiedAfterSyncSearchNode.parameter_name}:yes"
+        ),
+    )
+
+    ankihub_item.add_simple(
+        name="Not Modified After Sync",
+        icon="Not Modified After Sync",
+        type=SidebarItemType.SAVED_SEARCH,
+        search_node=SearchNode(
+            parsable_text=f"{ModifiedAfterSyncSearchNode.parameter_name}:no"
+        ),
+    )
+
+    updated_today_item = ankihub_item.add_simple(
+        name="Updated Today",
+        icon="Updated Today",
+        type=SidebarItemType.SAVED_SEARCH_ROOT,
+        search_node=mw.col.group_searches(
+            SearchNode(parsable_text="ankihub_id:_*"),
+            SearchNode(
+                parsable_text=f"{UpdatedInTheLastXDaysSearchNode.parameter_name}:1"
+            ),
+        ),
+    )
+
+    for suggestion_type in SuggestionType:
+        suggestion_value, suggestion_name = suggestion_type.value
+        # anki doesn't allow slashes in search parameters
+        suggestion_value_escaped = suggestion_value.replace("/", "_slash_")
+        updated_today_item.add_simple(
+            name=suggestion_name,
+            icon=suggestion_name,
+            type=SidebarItemType.SAVED_SEARCH,
+            search_node=mw.col.group_searches(
+                SearchNode(parsable_text="ankihub_id:_*"),
+                SearchNode(
+                    parsable_text=f"{UpdatedInTheLastXDaysSearchNode.parameter_name}:1"
+                ),
+                SearchNode(
+                    parsable_text=f"{SuggestionTypeSearchNode.parameter_name}:{suggestion_value_escaped}"
+                ),
+            ),
+        )
+
+    updated_today_item = ankihub_item.add_simple(
+        name="Updated Since Last Review",
+        icon="Updated Since Last Review",
+        type=SidebarItemType.SAVED_SEARCH_ROOT,
+        search_node=mw.col.group_searches(
+            SearchNode(parsable_text="ankihub_id:_*"),
+            SearchNode(
+                parsable_text=f"{UpdatedSinceLastReviewSearchNode.parameter_name}:"
+            ),
+        ),
+    )
+
+    return handled
+
+
+def store_browser_reference(browser_: Browser) -> None:
+    global browser
+
+    browser = browser_
 
 
 def setup() -> None:
-    def store_browser_reference(browser_: Browser) -> None:
-        global browser
-        browser = browser_
-
     browser_will_show.append(store_browser_reference)
+
     browser_did_fetch_columns.append(on_browser_did_fetch_columns)
     browser_did_fetch_row.append(on_browser_did_fetch_row)
     browser_will_search.append(on_browser_will_search)
     browser_did_search.append(on_browser_did_search)
 
     browser_will_show_context_menu.append(on_browser_will_show_context_menu)
+
+    browser_will_build_tree.append(on_browser_will_build_tree)
 
     browser_menus_did_init.append(on_browser_menus_did_init)
