@@ -132,7 +132,7 @@ def _check_ankihub_update_tags() -> None:
     LOGGER.debug("Notes with AnkiHub_Update tag found.")
 
     if not ask_user(
-        "The AnkiHub add-on has changed the way you can see which notes were updated (and for what reason). "
+        "The AnkiHub add-on has improved the way you can see which notes were updated (and for what reason). "
         "Previously, you could see this by looking at the <b>AnkiHub_Update</b> tags that were added to notes "
         "when they were updated.<br><br>"
         "Now, you can see this information in the left sidebar of the Anki browser when you click on the<br>"
