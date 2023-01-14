@@ -116,5 +116,5 @@ pytest tests/client --disable-vcr
 
 #### Type checking
 ```
-mypy ankihub
+mypy
 ```
