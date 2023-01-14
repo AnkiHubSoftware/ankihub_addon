@@ -269,7 +269,7 @@ def on_reset_local_changes_action(browser: Browser) -> None:
 
 
 def on_browser_menus_did_init(browser: Browser):
-    menu = browser._ankihub_menu = QMenu("AnkiHub")
+    menu = browser._ankihub_menu = QMenu("AnkiHub")  # type: ignore
     browser.form.menubar.addMenu(menu)
 
     reset_deck_action = QAction("Reset all local changes to a deck", browser)

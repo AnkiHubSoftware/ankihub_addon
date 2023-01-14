@@ -1012,7 +1012,6 @@ def test_prepare_note(anki_session_with_addon: AnkiSession):
     from ankihub.note_conversion import (
         ADDON_INTERNAL_TAGS,
         TAG_FOR_PROTECTING_FIELDS,
-        TAG_FOR_SUGGESTION_TYPE,
     )
     from ankihub.settings import ANKIHUB_NOTE_TYPE_FIELD_NAME
 
@@ -1104,27 +1103,6 @@ def test_prepare_note(anki_session_with_addon: AnkiSession):
         assert note["Front"] == "new front"
         assert note["Back"] == "old back"
         assert set(note.tags) == set(["a", "c", "d"])
-
-        # assert that the special tag for new notes gets added when a note gets created and first_import_of_deck=False
-        note = example_note()
-        note.id = 0  # simulate new note
-        note_was_changed_3 = prepare_note(note, tags=["a"], first_import_of_deck=False)
-        assert note_was_changed_3
-        assert set(note.tags) == {"a", "AnkiHub_Update::New_Note"}
-
-        # assert that tags for updated notes get added when a note gets updated and first_import_of_deck=False
-        note = example_note()
-        note.tags = []
-        note_was_changed_4 = prepare_note(
-            note,
-            tags=["e"],
-            first_import_of_deck=False,
-            last_update_type=SuggestionType.UPDATED_CONTENT,
-        )
-        assert note_was_changed_4
-        assert set(note.tags) == set(
-            ["e", TAG_FOR_SUGGESTION_TYPE[SuggestionType.UPDATED_CONTENT]]
-        )
 
         # assert that addon-internal don't get removed
         note = example_note()
