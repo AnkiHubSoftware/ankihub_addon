@@ -125,7 +125,7 @@ def flatten_deck(ankihub_did: uuid.UUID) -> None:
     # move cards that are in subdecks back to the root deck
     root_deck_id = config.deck_config(ankihub_did).anki_id
     root_deck_name = mw.col.decks.name(root_deck_id)
-    nids = mw.col.find_notes(f"deck:{root_deck_name}::*")
+    nids = mw.col.find_notes(f'"deck:{root_deck_name}::*"')
     for nid in nids:
         _set_deck_while_respecting_odid(nid, root_deck_id)
 
