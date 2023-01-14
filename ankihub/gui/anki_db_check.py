@@ -1,4 +1,5 @@
 import uuid
+
 from concurrent.futures import Future
 from typing import List
 
@@ -143,10 +144,22 @@ def _check_ankihub_update_tags() -> None:
         LOGGER.debug("User chose not to remove AnkiHub_Update tags.")
         return
 
-    for nid in nids:
-        note = mw.col.get_note(nid)
-        note.tags = [tag for tag in note.tags if not tag.startswith("AnkiHub_Update::")]
-        note.flush()
+    def on_done(future: Future):
+        future.result()
 
-    showInfo("AnkiHub_Update tags removed from all notes.")
-    LOGGER.debug("AnkiHub_Update tags removed from all notes.")
+        showInfo("AnkiHub_Update tags removed from all notes.")
+        LOGGER.debug("AnkiHub_Update tags removed from all notes.")
+
+    mw.taskman.with_progress(
+        task=_remove_ankihub_update_tags,
+        on_done=on_done,
+        label="Removing AnkiHub_Update tags...",
+    )
+
+
+def _remove_ankihub_update_tags():
+    tags_to_remove = [
+        tag for tag in mw.col.tags.all() if tag.startswith("AnkiHub_Update::")
+    ]
+    tags_to_remove_str = " ".join(tags_to_remove)
+    mw.col.tags.remove(tags_to_remove_str)
