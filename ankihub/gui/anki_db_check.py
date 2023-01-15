@@ -1,4 +1,5 @@
 import uuid
+
 from concurrent.futures import Future
 from typing import List
 
@@ -14,6 +15,12 @@ from .utils import ask_user
 
 
 def check_anki_db():
+    _check_missing_ankihub_nids()
+
+    _check_ankihub_update_tags()
+
+
+def _check_missing_ankihub_nids() -> None:
     # This is a fix for a bug in another add-on that removed the AnkiHub ID field from note types.
     # To restore the missing ankihub_ids this function resets local changes to the affected decks
     # when the user confirms the dialog.
@@ -108,3 +115,54 @@ def _reset_decks(ah_dids: List[uuid.UUID]):
     for ah_did in ah_dids:
         nids = ankihub_db.anki_nids_for_ankihub_deck(ah_did)
         reset_local_changes_to_notes(nids, ankihub_deck_uuid=ah_did)
+
+
+def _check_ankihub_update_tags() -> None:
+    """Check if the user has notes with AnkiHub_Update tags and ask if they want to remove them.
+    AnkiHub_Update tags were used in a previous version of the add-on and are not longer needed.
+    The purpose of this function is also to inform the user about the change and tell them how to
+    see which notes were updated and for what reason.
+    """
+
+    nids = mw.col.find_notes("tag:AnkiHub_Update::*")
+    if not nids:
+        LOGGER.debug("No notes with AnkiHub_Update tag found.")
+        return
+
+    LOGGER.debug("Notes with AnkiHub_Update tag found.")
+
+    if not ask_user(
+        "The AnkiHub add-on has improved the way you can see which notes were updated (and for what reason)! "
+        "<br><br>"
+        "Previously, you could see this by looking at the <b>AnkiHub_Update</b> tags that were added to notes "
+        "when they were updated. "
+        "<br><br>"
+        "Now, you can see this information in the left sidebar of the Anki browser when you click on the<br>"
+        "<b>AnkiHub -> Updated Today</b> category. "
+        "<br><br>"
+        "The <b>AnkiHub_Update</b> tags can be safely removed from all notes. "
+        "Do you want to remove the <b>AnkiHub_Update</b> tags from all notes now?",
+        title="AnkiHub",
+    ):
+        LOGGER.debug("User chose not to remove AnkiHub_Update tags.")
+        return
+
+    def on_done(future: Future):
+        future.result()
+
+        showInfo("AnkiHub_Update tags removed from all notes.")
+        LOGGER.debug("AnkiHub_Update tags removed from all notes.")
+
+    mw.taskman.with_progress(
+        task=_remove_ankihub_update_tags,
+        on_done=on_done,
+        label="Removing AnkiHub_Update tags...",
+    )
+
+
+def _remove_ankihub_update_tags():
+    tags_to_remove = [
+        tag for tag in mw.col.tags.all() if tag.startswith("AnkiHub_Update::")
+    ]
+    tags_to_remove_str = " ".join(tags_to_remove)
+    mw.col.tags.remove(tags_to_remove_str)
