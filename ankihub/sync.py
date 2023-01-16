@@ -39,6 +39,19 @@ class AnkiHubSync:
                     raise e
 
     def _sync_deck(self, ankihub_did: uuid.UUID) -> bool:
+        """Syncs a single deck with AnkiHub.
+        Returns True if the sync was successful, False if the user cancelled it."""
+        success = self._download_note_updates(ankihub_did)
+        if not success:
+            return False
+
+        self._add_optional_content_to_notes(ankihub_did)
+        return True
+        
+    def _download_note_updates(self, ankihub_did) -> bool:
+        """Downloads note updates from AnkiHub and imports them into Anki.
+        Returns True if the sync was successful, False if the user cancelled it."""
+        
         def download_progress_cb(notes_count: int):
             mw.taskman.run_on_main(
                 lambda: mw.progress.update(
@@ -88,12 +101,11 @@ class AnkiHubSync:
             config.save_latest_update(ankihub_did, latest_update)
         else:
             LOGGER.debug(f"No new updates to sync for {ankihub_did=}")
-        self._add_optional_content_to_notes(client, ankihub_did)
+
         return True
 
-    def _add_optional_content_to_notes(
-        self, client: AnkiHubClient, ankihub_did: uuid.UUID
-    ):
+    def _add_optional_content_to_notes(self, ankihub_did: uuid.UUID):
+        client = AnkiHubClient()
         result = client.get_deck_extensions_by_deck_id(ankihub_did)
         extensions = result.get("deck_extensions", [])
 
