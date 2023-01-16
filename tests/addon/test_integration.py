@@ -1858,7 +1858,6 @@ def test_sync_with_optional_content(
     anki_session = anki_session_with_addon
 
     from ankihub.settings import API_URL_BASE
-    from ankihub.ankihub_client import AnkiHubClient
     from ankihub.sync import AnkiHubSync
     from ankihub.db import ankihub_db
 
@@ -1910,10 +1909,8 @@ def test_sync_with_optional_content(
 
             assert set(note.tags) == set(["my::tag2", "my::tag"])
 
-            client = AnkiHubClient()
-
             sync = AnkiHubSync()
-            sync._add_optional_content_to_notes(client, ankihub_deck_uuid)
+            sync._add_optional_content_to_notes(ankihub_deck_uuid)
 
             updated_note = mw.col.get_note(note.id)
 

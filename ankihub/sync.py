@@ -47,11 +47,11 @@ class AnkiHubSync:
 
         self._add_optional_content_to_notes(ankihub_did)
         return True
-        
+
     def _download_note_updates(self, ankihub_did) -> bool:
         """Downloads note updates from AnkiHub and imports them into Anki.
         Returns True if the sync was successful, False if the user cancelled it."""
-        
+
         def download_progress_cb(notes_count: int):
             mw.taskman.run_on_main(
                 lambda: mw.progress.update(
