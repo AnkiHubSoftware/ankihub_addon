@@ -9,7 +9,7 @@ from anki.utils import ids2str, join_fields, split_fields
 from aqt import mw
 
 from . import LOGGER
-from .ankihub_client import Field, NoteInfo
+from .ankihub_client import Field, NoteInfo, suggestion_type_from_str
 from .settings import DB_PATH
 
 
@@ -45,6 +45,15 @@ def detach_ankihub_db_from_anki_db_connection() -> None:
         mw.col.db.begin()
 
         LOGGER.debug("Began new transaction.")
+
+
+@contextmanager
+def attached_ankihub_db():
+    attach_ankihub_db_to_anki_db_connection()
+    try:
+        yield
+    finally:
+        detach_ankihub_db_from_anki_db_connection()
 
 
 @contextmanager
@@ -134,6 +143,13 @@ class AnkiHubDB:
                 f"AnkiHub DB migrated to schema version {self.schema_version()}"
             )
 
+        if self.schema_version() <= 3:
+            self.execute("ALTER TABLE notes ADD COLUMN last_update_type TEXT")
+            self.execute("PRAGMA user_version = 4;")
+            LOGGER.debug(
+                f"AnkiHub DB migrated to schema version {self.schema_version()}"
+            )
+
     def schema_version(self) -> int:
         result = self.scalar("PRAGMA user_version;")
         return result
@@ -169,8 +185,9 @@ class AnkiHubDB:
                         mod,
                         fields,
                         tags,
-                        guid
-                    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+                        guid,
+                        last_update_type
+                    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
                     """,
                     (
                         str(note_data.ankihub_note_uuid),
@@ -181,6 +198,9 @@ class AnkiHubDB:
                         fields,
                         mw.col.tags.join(note_data.tags),
                         note_data.guid,
+                        note_data.last_update_type.value[0]
+                        if note_data.last_update_type is not None
+                        else None,
                     ),
                 )
 
@@ -209,7 +229,8 @@ class AnkiHubDB:
                 anki_note_type_id,
                 tags,
                 fields,
-                guid
+                guid,
+                last_update_type
             FROM notes
             WHERE anki_note_id = {anki_note_id}
             """,
@@ -217,7 +238,7 @@ class AnkiHubDB:
         if result is None:
             return None
 
-        ah_nid, anki_nid, mid, tags, flds, guid = result
+        ah_nid, anki_nid, mid, tags, flds, guid, last_update_type = result
         field_names = [
             field["name"] for field in mw.col.models.get(NotetypeId(mid))["flds"]
         ]
@@ -235,6 +256,9 @@ class AnkiHubDB:
                 for i, value in enumerate(split_fields(flds))
             ],
             guid=guid,
+            last_update_type=suggestion_type_from_str(last_update_type)
+            if last_update_type
+            else None,
         )
 
     def anki_nids_for_ankihub_deck(self, ankihub_did: uuid.UUID) -> List[NoteId]:

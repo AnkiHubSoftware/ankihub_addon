@@ -14,15 +14,13 @@ from aqt import mw
 
 from . import LOGGER, settings
 from .addon_ankihub_client import AddonAnkiHubClient as AnkiHubClient
-from .ankihub_client import Field, NoteInfo, SuggestionType
+from .ankihub_client import Field, NoteInfo
 from .db import ankihub_db
 from .subdecks import (
     build_subdecks_and_move_cards_to_them,
 )
 from .note_conversion import (
-    TAG_FOR_NEW_NOTE,
     TAG_FOR_PROTECTING_ALL_FIELDS,
-    TAG_FOR_SUGGESTION_TYPE,
     get_fields_protected_by_tags,
     is_internal_tag,
 )
@@ -326,13 +324,6 @@ class AnkiHubImporter:
             changed_guid or changed_ankihub_id_field or changed_fields or changed_tags
         )
 
-        self._prepare_internal_tags(
-            note=note,
-            first_import_of_deck=first_import_of_deck,
-            last_update_type=note_data.last_update_type,
-            note_changed=changed,
-        )
-
         LOGGER.debug(f"Prepared note. {changed=}")
         return changed
 
@@ -343,32 +334,6 @@ class AnkiHubImporter:
         LOGGER.debug(f"Changing guid of note {note.id} from {note.guid} to {guid}")
         note.guid = guid
         return True
-
-    def _prepare_internal_tags(
-        self,
-        note: Note,
-        first_import_of_deck: bool,
-        last_update_type: Optional[SuggestionType],
-        note_changed: bool,
-    ):
-        if (
-            first_import_of_deck
-            or not note_changed
-            or (note.id != 0 and not last_update_type)
-        ):
-            return
-
-        # add special tag if note is new
-        if note.id == 0:
-            update_tag = TAG_FOR_NEW_NOTE
-
-        # add special tag if note was updated
-        elif note.id != 0:
-            update_tag = TAG_FOR_SUGGESTION_TYPE[last_update_type]
-
-        if update_tag not in note.tags:
-            note.tags += [update_tag]
-            LOGGER.debug(f'Added "{update_tag}" to tags of note.')
 
     def _prepare_ankihub_id_field(self, note: Note, ankihub_nid: str) -> bool:
         if note[settings.ANKIHUB_NOTE_TYPE_FIELD_NAME] != ankihub_nid:
