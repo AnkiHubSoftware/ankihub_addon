@@ -177,10 +177,7 @@ def setup_profile_data_folder() -> bool:
         path.mkdir(parents=True)
 
     if profile_data_exists_at_old_location():
-        if migrate_profile_data_from_old_location():
-            return True
-        else:
-            return False
+        return migrate_profile_data_from_old_location()
 
     return True
 
