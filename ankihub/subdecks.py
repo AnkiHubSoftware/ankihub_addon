@@ -102,8 +102,8 @@ def _set_deck_while_respecting_odid(nid: NoteId, did: DeckId) -> None:
 
 
 def _subdeck_tag_to_deck_name(anki_root_deck_name: str, tag: str) -> str:
-    # the tag is of the form "AnkiHub_Subdeck::ankihub_deck_name::subdeck_name[::subsubdeck_name]+"
-    # we want to return "anki_root_deck_name::subdeck_name[::subsubdeck_name]+"
+    # the tag is of the form "AnkiHub_Subdeck::ankihub_deck_name::subdeck_name[::subsubdeck_name]*"
+    # we want to return "anki_root_deck_name::subdeck_name[::subsubdeck_name]*"
     return f"{anki_root_deck_name}::{tag.split('::', maxsplit=2)[2]}"
 
 
