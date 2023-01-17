@@ -22,7 +22,7 @@ from aqt.utils import askUser, showInfo
 from . import LOGGER, ankihub_client
 from .ankihub_client import ANKIHUB_DATETIME_FORMAT_STR
 
-ANKIHUB_DATABE_FILENAME = "ankihub.db"
+ANKIHUB_DB_FILENAME = "ankihub.db"
 PRIVATE_CONFIG_FILENAME = "private_config.json"
 
 # the id of the Anki profile is saved under this key in Anki's profile config
@@ -211,7 +211,7 @@ def profile_files_path() -> Path:
 
 
 def ankihub_db_path() -> Path:
-    result = profile_files_path() / ANKIHUB_DATABE_FILENAME
+    result = profile_files_path() / ANKIHUB_DB_FILENAME
     return result
 
 
