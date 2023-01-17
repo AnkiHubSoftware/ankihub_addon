@@ -492,6 +492,8 @@ def on_browser_will_build_tree(
             parsable_text="ankihub_id:*",
         ),
     )
+    ankihub_item.expanded = config.ui_config().ankihub_tree_expanded
+    ankihub_item.on_expanded = set_ah_tree_expanded_in_ui_config
 
     ankihub_item.add_simple(
         name="With AnkiHub ID",
@@ -536,6 +538,8 @@ def on_browser_will_build_tree(
             ),
         ),
     )
+    updated_today_item.expanded = config.ui_config().updated_today_tree_expanded
+    updated_today_item.on_expanded = set_updated_today_tree_expanded_in_ui_config
 
     for suggestion_type in SuggestionType:
         suggestion_value, suggestion_name = suggestion_type.value
@@ -556,7 +560,7 @@ def on_browser_will_build_tree(
             ),
         )
 
-    updated_today_item = ankihub_item.add_simple(
+    ankihub_item.add_simple(
         name="Updated Since Last Review",
         icon="Updated Since Last Review",
         type=SidebarItemType.SAVED_SEARCH_ROOT,
@@ -569,6 +573,18 @@ def on_browser_will_build_tree(
     )
 
     return handled
+
+
+def set_ah_tree_expanded_in_ui_config(expanded: bool):
+    ui_config = config.ui_config()
+    ui_config.ankihub_tree_expanded = expanded
+    config.set_ui_config(ui_config)
+
+
+def set_updated_today_tree_expanded_in_ui_config(expanded: bool):
+    ui_config = config.ui_config()
+    ui_config.updated_today_tree_expanded = expanded
+    config.set_ui_config(ui_config)
 
 
 def store_browser_reference(browser_: Browser) -> None:
