@@ -788,7 +788,7 @@ def test_update_ankihub_deck_with_subdecks(anki_session_with_addon: AnkiSession)
         # add a subdeck tag to a note
         notes_data = ankihub_sample_deck_notes_data()
         note_data = notes_data[0]
-        note_data.tags = [f"{SUBDECK_TAG}::A::B"]
+        note_data.tags = [f"{SUBDECK_TAG}::Testdeck::A::B"]
         note = mw.col.get_note(note_data.anki_nid)
 
         # import the deck again, now with the changed note data
@@ -1622,7 +1622,7 @@ def test_build_subdecks_and_move_cards_to_them(
         # add a subdeck tag to a note
         nids = mw.col.find_notes("deck:Testdeck")
         note = mw.col.get_note(nids[0])
-        note.tags = [f"{SUBDECK_TAG}::B::C"]
+        note.tags = [f"{SUBDECK_TAG}::Testdeck::B::C"]
         note.flush()
 
         # call the function that moves all cards in the deck to their subdecks
@@ -1699,7 +1699,7 @@ def test_build_subdecks_and_move_cards_to_them_with_filtered_decks(
         # assign a subdeck tag to a note
         nids = mw.col.find_notes("deck:Testdeck")
         note = mw.col.get_note(nids[0])
-        note.tags = [f"{SUBDECK_TAG}::B::C"]
+        note.tags = [f"{SUBDECK_TAG}::Testdeck::B::C"]
         note.flush()
 
         # assert that the note is in the filtered deck to be safe

@@ -34,12 +34,12 @@ def build_subdecks_and_move_cards_to_them(
     if mw.col.decks.name_if_exists(root_deck_id) is None:
         raise NotFoundError(f"Deck with id {root_deck_id} not found")
 
-    # the deck name name could be different from the deck name in the config
-    root_deck_name = mw.col.decks.name(root_deck_id)
+    # the anki root deck name name can be different from the ankihub deck name in the config
+    anki_root_deck_name = mw.col.decks.name(root_deck_id)
 
     # create mapping between notes and destination decks
     nid_to_dest_deck_name = _nid_to_destination_deck_name(
-        nids, root_deck_name=root_deck_name
+        nids, anki_root_deck_name=anki_root_deck_name
     )
 
     # create missing subdecks
@@ -69,7 +69,7 @@ def build_subdecks_and_move_cards_to_them(
 
 
 def _nid_to_destination_deck_name(
-    nids: List[NoteId], root_deck_name: str
+    nids: List[NoteId], anki_root_deck_name: str
 ) -> Dict[NoteId, str]:
     result = dict()
     for nid in nids:
@@ -77,9 +77,9 @@ def _nid_to_destination_deck_name(
         tags = mw.col.tags.split(tags_str)
         subdeck_tag_ = _subdeck_tag(tags)
         if subdeck_tag_ is None:
-            deck_name = root_deck_name
+            deck_name = anki_root_deck_name
         else:
-            deck_name = _subdeck_tag_to_deck_name(root_deck_name, subdeck_tag_)
+            deck_name = _subdeck_tag_to_deck_name(anki_root_deck_name, subdeck_tag_)
         result[nid] = deck_name
     return result
 
@@ -101,8 +101,10 @@ def _set_deck_while_respecting_odid(nid: NoteId, did: DeckId) -> None:
             mw.col.db.execute("UPDATE cards SET odid=?, usn=-1 WHERE id=?", did, cid)
 
 
-def _subdeck_tag_to_deck_name(top_level_deck_name: str, tag: str) -> str:
-    return f"{top_level_deck_name}::{tag.split('::', 1)[1]}"
+def _subdeck_tag_to_deck_name(anki_root_deck_name: str, tag: str) -> str:
+    # the tag is of the form "AnkiHub_Subdeck::ankihub_deck_name::subdeck_name[::subsubdeck_name]*"
+    # we want to return "anki_root_deck_name::subdeck_name[::subsubdeck_name]*"
+    return f"{anki_root_deck_name}::{tag.split('::', maxsplit=2)[2]}"
 
 
 def _create_decks(deck_names: Iterable[str]) -> None:
@@ -140,29 +142,36 @@ def flatten_deck(ankihub_did: uuid.UUID) -> None:
             pass
 
 
-def add_subdeck_tags_notes(deck_name: str, separator: str) -> None:
+def add_subdeck_tags_to_notes(anki_deck_name: str, ankihub_deck_name: str) -> None:
     """To every note in the deck a tags is added that indicates in which subdeck
     the note is located. For example, if the deck is called "A" and the note is in
-    the deck "A::B::C", the tag f"{TAG_FOR_SUBDECK}::B::C" is added to the note.
+    the deck "A::B::C", the tag f"{TAG_FOR_SUBDECK}::A::B::C" is added to the note.
     If the note is in deck "A" and not in a subdeck of A no tag is added.
+
+    The ankihub_deck_name is used to replace the root deck name in the subdeck tags.
+    We can't just use the root of the anki_deck_name, because the
+    deck name can be different from the ankihub deck name, as the user can change the
+    name of the deck in Anki, but the subdeck tag should always be based on the ankihub
+    deck name.
     """
 
-    assert "::" not in deck_name, "Deck must be a top level deck."
+    assert "::" not in anki_deck_name, "Deck must be a top level deck."
 
     LOGGER.debug("Adding subdeck tags to notes.")
 
-    deck = mw.col.decks.by_name(deck_name)
+    deck = mw.col.decks.by_name(anki_deck_name)
 
     # add tags to notes in subdecks
     # (mw.col.decks also returns children of children)
     for child_deck_name, _ in mw.col.decks.children(deck["id"]):
-        child_deck_name_wh_root = child_deck_name.split("::", 1)[1]
-        tag = _subdeck_name_to_tag(child_deck_name_wh_root, separator)
+        deck_name_wh_root = child_deck_name.split("::", maxsplit=1)[1]
+        deck_name_with_ankihub_root = f"{ankihub_deck_name}::{deck_name_wh_root}"
+        tag = _subdeck_name_to_tag(deck_name_with_ankihub_root)
         nids = nids_in_deck_but_not_in_subdeck(child_deck_name)
         mw.col.tags.bulk_add(nids, tag)
 
 
-def _subdeck_name_to_tag(deck_name: str, separator: str) -> str:
+def _subdeck_name_to_tag(deck_name: str) -> str:
     """Convert deck name with spaces to compatible and clean Anki tag name starting with
     TAG_FOR_SUBDECK."""
 
@@ -183,10 +192,10 @@ def _subdeck_name_to_tag(deck_name: str, separator: str) -> str:
     result = result.replace(" +", "+")
     result = result.replace("+ ", "+")
 
-    # Replace spaces with separator (dashes) to avoid making multiple tags
-    result = result.replace(" ", separator)
+    # Replace spaces with dashes to avoid making multiple tags
+    result = result.replace(" ", "_")
 
     # Remove duplicate separators
-    result = re.sub(f"{separator}+", separator, result)
+    result = re.sub("_+", "_", result)
 
     return result
