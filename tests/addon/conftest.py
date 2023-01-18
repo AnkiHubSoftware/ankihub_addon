@@ -1,11 +1,16 @@
 import json
 import shutil
+import uuid
 from pathlib import Path
 
 import pytest
 from pytest_anki import AnkiSession
 
-ROOT = Path(__file__).absolute().parent.parent.parent
+REPO_ROOT_PATH = Path(__file__).absolute().parent.parent.parent
+
+# id of the Anki profile used for testing
+# it is used as the name of the profile data folder in the user_files folder
+TEST_PROFILE_ID = uuid.UUID("11111111-1111-1111-1111-111111111111")
 
 
 @pytest.fixture(scope="function")
@@ -23,7 +28,7 @@ def anki_session_with_addon(
     PROFILE_DATA_PATH = USER_FILES_PATH / "test_profile_folder"
 
     # copy the addon to the addons folder
-    shutil.copytree(ROOT / "ankihub", ANKIHUB_PATH)
+    shutil.copytree(REPO_ROOT_PATH / "ankihub", ANKIHUB_PATH)
 
     # clear the user files folder at the destination - it might contain files from using the add-on
     for f in USER_FILES_PATH.glob("*"):
@@ -35,32 +40,22 @@ def anki_session_with_addon(
     # create the profile data folder
     PROFILE_DATA_PATH.mkdir(parents=True)
 
-    from ankihub.db import ankihub_db
-    from ankihub.settings import config
+    from ankihub.entry_point import profile_setup
 
-    # monkeypatch the paths to the user files and the profile data folder
-    monkeypatch.setattr(
-        "ankihub.settings.user_files_path",
-        lambda: USER_FILES_PATH,
-    )
-    monkeypatch.setattr(
-        "ankihub.settings.profile_files_path",
-        lambda: PROFILE_DATA_PATH,
-    )
-
-    # setup the config
-    config.setup()
-
-    # setup the database
-    ankihub_db.setup_and_migrate()
+    with monkeypatch.context() as m:
+        # monkeypatch the uuid4 function to always return the same value so
+        # the profile data folder is always the same
+        m.setattr("uuid.uuid4", lambda: TEST_PROFILE_ID)
+        with anki_session.profile_loaded():
+            profile_setup()
 
     yield anki_session
 
 
 @pytest.fixture(scope="function")
 def anki_session_with_config(anki_session: AnkiSession):
-    config = ROOT / "ankihub" / "config.json"
-    meta = ROOT / "ankihub" / "meta.json"
+    config = REPO_ROOT_PATH / "ankihub" / "config.json"
+    meta = REPO_ROOT_PATH / "ankihub" / "meta.json"
     with open(config) as f:
         config_dict = json.load(f)
     with open(meta) as f:
@@ -72,7 +67,10 @@ def anki_session_with_config(anki_session: AnkiSession):
 
 
 @pytest.fixture
-def anki_session_with_addon_before_profile_migration(anki_session_with_addon):
+def anki_session_with_addon_before_profile_support(anki_session_with_addon):
+    # previous versions of the add-on didn't support multiple Anki profiles and
+    # had one set of data for all profiles
+    # this fixtures simulates the data structure of such an add-on version
     anki_session: AnkiSession = anki_session_with_addon
     with anki_session.profile_loaded():
         mw = anki_session.mw
@@ -80,7 +78,8 @@ def anki_session_with_addon_before_profile_migration(anki_session_with_addon):
 
         shutil.rmtree(user_files_path)
         shutil.copytree(
-            ROOT / "tests" / "addon" / "profile_migration_test_data", user_files_path
+            REPO_ROOT_PATH / "tests" / "addon" / "profile_migration_test_data",
+            user_files_path,
         )
 
     yield anki_session
