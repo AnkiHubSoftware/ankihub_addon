@@ -22,8 +22,10 @@ from aqt.utils import askUser, showInfo
 from . import LOGGER, ankihub_client
 from .ankihub_client import ANKIHUB_DATETIME_FORMAT_STR
 
+ADDON_PATH = Path(__file__).parent.absolute()
+
 ANKIHUB_DB_FILENAME = "ankihub.db"
-PRIVATE_CONFIG_FILENAME = "private_config.json"
+PRIVATE_CONFIG_FILENAME = ".private_config.json"
 
 # the id of the Anki profile is saved under this key in Anki's profile config
 # (profile configs are stored by Anki in prefs21.db in the anki base directory)
@@ -51,7 +53,7 @@ class PrivateConfig:
 class Config:
     def __init__(self):
         # self.public_config is editable by the user using a built-in Anki feature.
-        self.public_config: Dict[str, Any] = mw.addonManager.getConfig(__name__)
+        self.public_config: Dict[str, Any] = mw.addonManager.getConfig(ADDON_PATH.name)
         self.token_change_hook: Optional[Callable[[], None]] = None
         self.subscriptions_change_hook: Optional[Callable[[], None]] = None
 
@@ -351,7 +353,6 @@ URL_DECKS = f"{ANKIHUB_APP_URL}/explore"
 URL_DECK_BASE = f"{ANKIHUB_APP_URL}/decks"
 ANKIHUB_NOTE_TYPE_FIELD_NAME = "ankihub_id"
 ANKIHUB_NOTE_TYPE_MODIFICATION_STRING = "ANKIHUB MODFICATIONS"
-ADDON_PATH = Path(__file__).parent.absolute()
 ADDON_PACKAGE = __name__.split(".")[0]
 ICONS_PATH = ADDON_PATH / "icons"
 
