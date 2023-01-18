@@ -1,6 +1,7 @@
 import sqlite3
 import uuid
 from contextlib import contextmanager
+from pathlib import Path
 from typing import Any, Iterable, List, Optional, Tuple
 
 from anki.models import NotetypeId
@@ -10,7 +11,7 @@ from aqt import mw
 
 from . import LOGGER
 from .ankihub_client import Field, NoteInfo, suggestion_type_from_str
-from .settings import DB_PATH
+from .settings import ankihub_db_path
 
 
 def attach_ankihub_db_to_anki_db_connection() -> None:
@@ -18,7 +19,8 @@ def attach_ankihub_db_to_anki_db_connection() -> None:
         name for _, name, _ in mw.col.db.all("PRAGMA database_list")
     ]:
         mw.col.db.execute(
-            f"ATTACH DATABASE ? AS {AnkiHubDB.database_name}", str(DB_PATH)
+            f"ATTACH DATABASE ? AS {AnkiHubDB.database_name}",
+            str(AnkiHubDB.database_path),
         )
         LOGGER.debug("Attached AnkiHub DB to Anki DB connection")
 
@@ -58,7 +60,7 @@ def attached_ankihub_db():
 
 @contextmanager
 def db_transaction():
-    with sqlite3.connect(DB_PATH) as conn:
+    with sqlite3.connect(AnkiHubDB.database_path) as conn:
         yield conn
     conn.close()
 
@@ -67,41 +69,11 @@ class AnkiHubDB:
 
     # name of the database when attached to the Anki DB connection
     database_name = "ankihub_db"
+    database_path: Optional[Path] = None
 
-    def __init__(self):
-        self._setup_tables_and_migrate()
+    def setup_and_migrate(self) -> None:
+        AnkiHubDB.database_path = ankihub_db_path()
 
-    def execute(self, sql: str, *args, first_row_only=False) -> List:
-        conn = sqlite3.connect(DB_PATH)
-        c = conn.cursor()
-        c.execute(sql, args)
-        if first_row_only:
-            result = c.fetchone()
-        else:
-            result = c.fetchall()
-        c.close()
-        conn.commit()
-        conn.close()
-        return result
-
-    def scalar(self, sql: str, *args) -> Any:
-        rows = self.execute(sql, *args, first_row_only=True)
-        if rows:
-            return rows[0]
-        else:
-            return None
-
-    def list(self, sql: str, *args) -> List:
-        return [x[0] for x in self.execute(sql, *args, first_row_only=False)]
-
-    def first(self, sql: str, *args) -> Optional[Tuple]:
-        rows = self.execute(sql, *args, first_row_only=True)
-        if rows:
-            return tuple(rows)
-        else:
-            return None
-
-    def _setup_tables_and_migrate(self) -> None:
         self.execute(
             """
             CREATE TABLE IF NOT EXISTS notes (
@@ -149,6 +121,36 @@ class AnkiHubDB:
             LOGGER.debug(
                 f"AnkiHub DB migrated to schema version {self.schema_version()}"
             )
+
+    def execute(self, sql: str, *args, first_row_only=False) -> List:
+        conn = sqlite3.connect(self.database_path)
+        c = conn.cursor()
+        c.execute(sql, args)
+        if first_row_only:
+            result = c.fetchone()
+        else:
+            result = c.fetchall()
+        c.close()
+        conn.commit()
+        conn.close()
+        return result
+
+    def scalar(self, sql: str, *args) -> Any:
+        rows = self.execute(sql, *args, first_row_only=True)
+        if rows:
+            return rows[0]
+        else:
+            return None
+
+    def list(self, sql: str, *args) -> List:
+        return [x[0] for x in self.execute(sql, *args, first_row_only=False)]
+
+    def first(self, sql: str, *args) -> Optional[Tuple]:
+        rows = self.execute(sql, *args, first_row_only=True)
+        if rows:
+            return tuple(rows)
+        else:
+            return None
 
     def schema_version(self) -> int:
         result = self.scalar("PRAGMA user_version;")
