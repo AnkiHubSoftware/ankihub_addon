@@ -13,6 +13,9 @@ from .ankihub_client import AnkiHubRequestError
 from .importing import AnkiHubImporter
 from .settings import ANKI_MINOR, ANKIHUB_DATETIME_FORMAT_STR, config
 from .utils import create_backup
+from .db import ankihub_db
+
+from anki.errors import NotFoundError
 
 
 class AnkiHubSync:
@@ -36,6 +39,19 @@ class AnkiHubSync:
                     raise e
 
     def _sync_deck(self, ankihub_did: uuid.UUID) -> bool:
+        """Syncs a single deck with AnkiHub.
+        Returns True if the sync was successful, False if the user cancelled it."""
+        success = self._download_note_updates(ankihub_did)
+        if not success:
+            return False
+
+        self._add_optional_content_to_notes(ankihub_did)
+        return True
+
+    def _download_note_updates(self, ankihub_did) -> bool:
+        """Downloads note updates from AnkiHub and imports them into Anki.
+        Returns True if the sync was successful, False if the user cancelled it."""
+
         def download_progress_cb(notes_count: int):
             mw.taskman.run_on_main(
                 lambda: mw.progress.update(
@@ -87,6 +103,38 @@ class AnkiHubSync:
             LOGGER.debug(f"No new updates to sync for {ankihub_did=}")
 
         return True
+
+    def _add_optional_content_to_notes(self, ankihub_did: uuid.UUID):
+        client = AnkiHubClient()
+        result = client.get_deck_extensions_by_deck_id(ankihub_did)
+        extensions = result.get("deck_extensions", [])
+
+        for extension in extensions:
+            result = client.get_note_customizations_by_deck_extension_id(
+                extension.get("id")
+            )
+            customizations = result.get("note_customizations", [])
+            updated_notes = []
+
+            for customization in customizations:
+                note_anki_id = ankihub_db.ankihub_id_to_anki_id(
+                    customization.get("note")
+                )
+                try:
+                    note = mw.col.get_note(note_anki_id)
+                    updated_notes.append(note)
+                except NotFoundError:
+                    LOGGER.warning(
+                        f"""Tried to apply customization #{customization.id}
+                        for note #{customization.get('note')} but note was not found"""
+                    )
+                    continue
+                else:
+                    note.tags = list(
+                        set(note.tags) | set(customization.get("tags", []))
+                    )
+
+            mw.col.update_notes(updated_notes)
 
     def _handle_exception(
         self, exc: AnkiHubRequestError, ankihub_did: uuid.UUID

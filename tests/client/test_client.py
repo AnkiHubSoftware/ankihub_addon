@@ -43,6 +43,9 @@ def client(vcr: VCR, request, marks):
 
     if not playback_mode:
         run_command_in_django_container("python manage.py runscript create_test_users")
+        run_command_in_django_container(
+            "python manage.py runscript create_fixture_data"
+        )
 
     client = AnkiHubClient()
     yield client
@@ -549,3 +552,66 @@ class TestGetDeckUpdates:
             protected_fields={},
             protected_tags=[],
         )
+
+
+@pytest.mark.vcr()
+def test_get_deck_extensions_by_deck_id(authorized_client_for_user_test1):
+    from ankihub.ankihub_client import AnkiHubClient
+
+    client: AnkiHubClient = authorized_client_for_user_test1
+
+    deck_id = uuid.UUID("100df7b9-7749-4fe0-b801-e3dec1decd72")
+
+    expected_response = {
+        "deck_extensions": [
+            {
+                "id": 999,
+                "owner": 1,
+                "deck": str(deck_id),
+                "name": "test100",
+                "tag_group_name": "test100",
+                "description": "",
+            }
+        ]
+    }
+
+    response = client.get_deck_extensions_by_deck_id(deck_id=deck_id)
+
+    assert response == expected_response
+
+
+@pytest.mark.vcr()
+def test_get_note_customizations_by_deck_extension_id(authorized_client_for_user_test1):
+    from ankihub.ankihub_client import AnkiHubClient
+
+    client: AnkiHubClient = authorized_client_for_user_test1
+
+    deck_extension_id = 999
+
+    expected_response = {
+        "next": None,
+        "note_customizations": [
+            {
+                "id": 2,
+                "note": "8645c6d6-4f3d-417e-8295-8f5009042b6e",
+                "tags": [
+                    "#AnkiHub_Optional::test100::test1",
+                    "#AnkiHub_Optional::test100::test2",
+                ],
+            },
+            {
+                "id": 1,
+                "note": "b2344a94-0ca6-44a1-87a1-1593558c10a9",
+                "tags": [
+                    "#AnkiHub_Optional::test100::test1",
+                    "#AnkiHub_Optional::test100::test2",
+                ],
+            },
+        ],
+    }
+
+    response = client.get_note_customizations_by_deck_extension_id(
+        deck_extension_id=deck_extension_id
+    )
+
+    assert response == expected_response
