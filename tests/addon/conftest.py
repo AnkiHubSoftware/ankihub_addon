@@ -1,11 +1,11 @@
 import json
-import pathlib
 import shutil
+from pathlib import Path
 
 import pytest
 from pytest_anki import AnkiSession
 
-ROOT = pathlib.Path(__file__).absolute().parent.parent.parent
+ROOT = Path(__file__).absolute().parent.parent.parent
 
 
 @pytest.fixture(scope="function")
@@ -18,7 +18,7 @@ def anki_session_with_addon(
     # the requests_mock argument is here to disallow real requests for all tests that use the fixture
     # to prevent hidden real requests
 
-    ANKIHUB_PATH = pathlib.Path(anki_session.mw.addonManager.addonsFolder()) / "ankihub"
+    ANKIHUB_PATH = Path(anki_session.mw.addonManager.addonsFolder()) / "ankihub"
     USER_FILES_PATH = ANKIHUB_PATH / "user_files"
     PROFILE_DATA_PATH = USER_FILES_PATH / "test_profile_folder"
 
@@ -35,8 +35,8 @@ def anki_session_with_addon(
     # create the profile data folder
     PROFILE_DATA_PATH.mkdir(parents=True)
 
-    from ankihub.settings import config
     from ankihub.db import ankihub_db
+    from ankihub.settings import config
 
     # monkeypatch the paths to the user files and the profile data folder
     monkeypatch.setattr(
@@ -68,4 +68,19 @@ def anki_session_with_config(anki_session: AnkiSession):
     anki_session.create_addon_config(
         package_name="ankihub", default_config=config_dict, user_config=meta_dict
     )
+    yield anki_session
+
+
+@pytest.fixture
+def anki_session_with_addon_before_profile_migration(anki_session_with_addon):
+    anki_session: AnkiSession = anki_session_with_addon
+    with anki_session.profile_loaded():
+        mw = anki_session.mw
+        user_files_path = Path(mw.addonManager.addonsFolder("ankihub")) / "user_files"
+
+        shutil.rmtree(user_files_path)
+        shutil.copytree(
+            ROOT / "tests" / "addon" / "profile_migration_test_data", user_files_path
+        )
+
     yield anki_session

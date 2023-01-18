@@ -1007,10 +1007,7 @@ def import_note_types_for_sample_deck(mw):
 def test_prepare_note(anki_session_with_addon: AnkiSession):
     from ankihub.ankihub_client import Field, NoteInfo, SuggestionType
     from ankihub.importing import AnkiHubImporter
-    from ankihub.note_conversion import (
-        ADDON_INTERNAL_TAGS,
-        TAG_FOR_PROTECTING_FIELDS,
-    )
+    from ankihub.note_conversion import ADDON_INTERNAL_TAGS, TAG_FOR_PROTECTING_FIELDS
     from ankihub.settings import ANKIHUB_NOTE_TYPE_FIELD_NAME
 
     anki_session = anki_session_with_addon
@@ -1847,3 +1844,36 @@ def test_reset_local_changes_to_notes(
         assert basic_note_2.cards()
         for card in basic_note_2.cards():
             assert mw.col.decks.name(card.did) == "Testdeck"
+
+
+def test_migrate_profile_data_from_old_location(
+    anki_session_with_addon_before_profile_migration: Path, monkeypatch
+):
+    from ankihub import entry_point
+
+    # mock the sync function so that it doesn't try to sync with AnkiHub
+    monkeypatch.setattr(
+        "ankihub.entry_point.sync_with_progress", lambda *args, **kwargs: None
+    )
+
+    anki_session: AnkiSession = anki_session_with_addon_before_profile_migration
+
+    # run the entrypoint to setup the migration
+    entry_point.run()
+    with anki_session.profile_loaded():
+        pass
+
+    user_files_path = Path(anki_session.base) / "addons21" / "ankihub" / "user_files"
+    profile_files_path = user_files_path / "test_profile_folder"
+
+    assert set([x.name for x in profile_files_path.glob("*")]) == {
+        "ankihub.db",
+        ".private_config.json",
+    }
+
+    assert set([x.name for x in user_files_path.glob("*")]) == {
+        "test_profile_folder",
+        "README.md",
+        "ankihub.log",
+        "ankihub.log.1",
+    }
