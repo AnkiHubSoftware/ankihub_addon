@@ -4,11 +4,7 @@ from pprint import pformat
 from typing import Callable
 
 from aqt import mw
-from aqt.gui_hooks import (
-    main_window_did_init,
-    profile_did_open,
-    sync_did_finish,
-)
+from aqt.gui_hooks import main_window_did_init, profile_did_open, sync_did_finish
 
 from . import LOGGER
 from .addons import setup_addons
@@ -17,7 +13,7 @@ from .errors import setup_error_handler
 from .gui import browser, editor
 from .gui.anki_db_check import check_anki_db
 from .gui.db_check import check_ankihub_db
-from .gui.menu import setup_ankihub_menu
+from .gui.menu import refresh_ankihub_menu, setup_ankihub_menu
 from .progress import setup_progress_manager
 from .settings import config, setup_profile_data_folder
 from .sync import sync_with_progress
@@ -60,6 +56,12 @@ def profile_setup() -> bool:
 
     ankihub_db.setup_and_migrate()
     LOGGER.debug("Set up and migrated AnkiHub DB for the current profile.")
+
+    from .gui.menu import ankihub_menu
+
+    if ankihub_menu:
+        refresh_ankihub_menu()
+        LOGGER.debug("Refreshed AnkiHub menu.")
 
     return True
 
