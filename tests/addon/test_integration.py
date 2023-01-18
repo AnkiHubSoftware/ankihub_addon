@@ -1943,3 +1943,75 @@ def test_profile_swap(anki_session_with_addon: AnkiSession, monkeypatch):
 
     # assert that the general_setup function was only called once
     assert general_setup_mock.call_count == 1
+
+
+def test_sync_with_optional_content(
+    anki_session_with_addon: AnkiSession, requests_mock, monkeypatch
+):
+    anki_session = anki_session_with_addon
+
+    from ankihub.settings import API_URL_BASE
+    from ankihub.sync import AnkiHubSync
+    from ankihub.db import ankihub_db
+
+    with anki_session.profile_loaded():
+        with anki_session.deck_installed(SAMPLE_DECK_APKG) as _:
+            mw = anki_session.mw
+
+            ankihub_deck_uuid = UUID_1
+            deck_extension_id = 31
+
+            requests_mock.get(
+                f"{API_URL_BASE}/users/deck_extensions?deck_id={str(ankihub_deck_uuid)}",
+                status_code=200,
+                json={
+                    "deck_extensions": [
+                        {
+                            "id": deck_extension_id,
+                            "owner": 1,
+                            "deck": str(ankihub_deck_uuid),
+                            "name": "test99",
+                            "tag_group_name": "test99",
+                            "description": "",
+                        }
+                    ]
+                },
+            )
+
+            notes_data = ankihub_sample_deck_notes_data()
+            ankihub_db.save_notes_data_and_mod_values(ankihub_deck_uuid, notes_data)
+            note_data = notes_data[0]
+            note = mw.col.get_note(note_data.anki_nid)
+
+            requests_mock.get(
+                f"{API_URL_BASE}/deck_extensions/{str(deck_extension_id)}/note_customizations/",
+                status_code=200,
+                json={
+                    "next": None,
+                    "note_customizations": [
+                        {
+                            "note": str(note_data.ankihub_note_uuid),
+                            "tags": [
+                                "#AnkiHub_Optional::test99::test1",
+                                "#AnkiHub_Optional::test99::test2",
+                            ],
+                        },
+                    ],
+                },
+            )
+
+            assert set(note.tags) == set(["my::tag2", "my::tag"])
+
+            sync = AnkiHubSync()
+            sync._add_optional_content_to_notes(ankihub_deck_uuid)
+
+            updated_note = mw.col.get_note(note.id)
+
+            expected_tags = [
+                "my::tag2",
+                "my::tag",
+                "#AnkiHub_Optional::test99::test2",
+                "#AnkiHub_Optional::test99::test1",
+            ]
+
+            assert set(updated_note.tags) == set(expected_tags)

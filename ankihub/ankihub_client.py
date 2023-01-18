@@ -596,6 +596,24 @@ class AnkiHubClient:
         if response.status_code != 201:
             raise AnkiHubRequestError(response)
 
+    def get_deck_extensions(self, params={}):
+        response = self._send_request("GET", "/users/deck_extensions", params=params)
+        if response.status_code != 200:
+            raise AnkiHubRequestError(response)
+        return response.json()
+
+    def get_deck_extensions_by_deck_id(self, deck_id: uuid.UUID):
+        return self.get_deck_extensions(params={"deck_id": str(deck_id)})
+
+    def get_note_customizations_by_deck_extension_id(self, deck_extension_id: int):
+        # TODO: Handle pagination
+        response = self._send_request(
+            "GET", f"/deck_extensions/{deck_extension_id}/note_customizations/"
+        )
+        if response.status_code != 200:
+            raise AnkiHubRequestError(response)
+        return response.json()
+
 
 def transform_notes_data(notes_data: List[Dict]) -> List[Dict]:
     # TODO Fix differences between csv (used when installing for the first time) vs.
