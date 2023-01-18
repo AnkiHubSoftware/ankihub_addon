@@ -233,7 +233,7 @@ def migrate_profile_data_from_old_location() -> bool:
     if len(mw.pm.profiles()) > 1:
         if not askUser(
             (
-                "The AnkiHub add-on now has support for multiple Anki profiles.<br><br>"
+                "The AnkiHub add-on now has support for multiple Anki profiles!<br><br>"
                 "Is this the profile that you were using AnkiHub with before?<br>"
             ),
             title="AnkiHub",
