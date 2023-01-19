@@ -1677,9 +1677,9 @@ def test_browser_treeview_contains_ankihub_tag_items(
             "Not Modified After Sync",
             "Updated Today",
             "Updated Since Last Review",
+            TAG_FOR_OPTIONAL_TAGS,
             TAG_FOR_PROTECTING_FIELDS,
             SUBDECK_TAG,
-            TAG_FOR_OPTIONAL_TAGS,
         ]
 
 
