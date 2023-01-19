@@ -60,6 +60,7 @@ from .suggestion_dialog import SuggestionDialog
 from .utils import ask_user, choose_list, choose_subset
 
 browser: Optional[Browser] = None
+ankihub_tree_item: Optional[SidebarItem] = None
 
 custom_columns = [
     AnkiHubIdColumn(),
@@ -481,10 +482,63 @@ def on_browser_will_build_tree(
     stage: SidebarStage,
     browser: Browser,
 ):
-    if stage != SidebarStage.ROOT:
+    global ankihub_tree_item
+
+    if stage == SidebarStage.ROOT:
+        ankihub_tree_item = add_ankihub_tree(tree)
+        return handled
+    elif stage == SidebarStage.TAGS:
+        move_ankihub_tags_to_ankihub_tree(tree, ankihub_tree_item, browser)
+        return True
+    else:
         return handled
 
-    ankihub_item = tree.add_simple(
+
+def move_ankihub_tags_to_ankihub_tree(
+    root_tree_item: SidebarItem, ankihub_tree_item: SidebarItem, browser: Browser
+):
+    # build the tag tree using the original function
+    browser.sidebar._tag_tree(root_tree_item)
+
+    # move the AnkiHub tags to the AnkiHub tree
+    tag_tree = next(
+        (item for item in root_tree_item.children if item.name == "Tags"), None
+    )
+
+    if tag_tree is None:
+        LOGGER.warning("AnkiHub: Could not find tag tree")
+        return
+
+    ankihub_tag_tree_items = [
+        item for item in tag_tree.children if item.name.startswith("AnkiHub_")
+    ]
+
+    for ah_tag_tree_item in ankihub_tag_tree_items:
+        tag_tree.children.remove(ah_tag_tree_item)
+        ankihub_tree_item.children.append(ah_tag_tree_item)
+
+        ah_tag_tree_item._parent_item = ankihub_tree_item
+        ah_tag_tree_item.item_type = SidebarItemType.CUSTOM
+
+        # remove tag icons because it looks better without them
+        ah_tag_tree_item.icon = ""
+        for descendant in _sidebar_item_descendants(ah_tag_tree_item):
+            descendant.icon = ""
+
+    LOGGER.debug("AnkiHub: Moved AnkiHub tag items to AnkiHub tree")
+
+
+def _sidebar_item_descendants(item: SidebarItem) -> List[SidebarItem]:
+    result = []
+    for child in item.children:
+        result.append(child)
+        result.extend(_sidebar_item_descendants(child))
+    return result
+
+
+def add_ankihub_tree(tree: SidebarItem) -> SidebarItem:
+
+    result = tree.add_simple(
         name="👑 AnkiHub",
         icon="AnkiHub",
         type=SidebarItemType.SAVED_SEARCH_ROOT,
@@ -492,24 +546,24 @@ def on_browser_will_build_tree(
             parsable_text="ankihub_id:*",
         ),
     )
-    ankihub_item.expanded = config.ui_config().ankihub_tree_expanded
-    ankihub_item.on_expanded = set_ah_tree_expanded_in_ui_config
+    result.expanded = config.ui_config().ankihub_tree_expanded
+    result.on_expanded = set_ah_tree_expanded_in_ui_config
 
-    ankihub_item.add_simple(
+    result.add_simple(
         name="With AnkiHub ID",
         icon="With AnkiHub ID",
         type=SidebarItemType.SAVED_SEARCH,
         search_node=SearchNode(parsable_text="ankihub_id:_*"),
     )
 
-    ankihub_item.add_simple(
+    result.add_simple(
         name="ID Pending",
         icon="ID Pending",
         type=SidebarItemType.SAVED_SEARCH,
         search_node=SearchNode(parsable_text="ankihub_id:"),
     )
 
-    ankihub_item.add_simple(
+    result.add_simple(
         name="Modified After Sync",
         icon="Modified After Sync",
         type=SidebarItemType.SAVED_SEARCH,
@@ -518,7 +572,7 @@ def on_browser_will_build_tree(
         ),
     )
 
-    ankihub_item.add_simple(
+    result.add_simple(
         name="Not Modified After Sync",
         icon="Not Modified After Sync",
         type=SidebarItemType.SAVED_SEARCH,
@@ -527,7 +581,7 @@ def on_browser_will_build_tree(
         ),
     )
 
-    updated_today_item = ankihub_item.add_simple(
+    updated_today_item = result.add_simple(
         name="Updated Today",
         icon="Updated Today",
         type=SidebarItemType.SAVED_SEARCH_ROOT,
@@ -560,7 +614,7 @@ def on_browser_will_build_tree(
             ),
         )
 
-    ankihub_item.add_simple(
+    result.add_simple(
         name="Updated Since Last Review",
         icon="Updated Since Last Review",
         type=SidebarItemType.SAVED_SEARCH_ROOT,
@@ -571,8 +625,7 @@ def on_browser_will_build_tree(
             ),
         ),
     )
-
-    return handled
+    return result
 
 
 def set_ah_tree_expanded_in_ui_config(expanded: bool):
