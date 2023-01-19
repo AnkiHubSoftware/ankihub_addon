@@ -1556,7 +1556,58 @@ def test_browser_treeview_ankihub_items(
         assert len(nids) == 3
 
 
-# without this mark the test fails on clean-up
+# without this mark the test sometime fails on clean-up
+@pytest.mark.qt_no_exception_capture
+def test_browser_treeview_contains_ankihub_tag_items(
+    anki_session_with_addon: AnkiSession, qtbot: QtBot
+):
+    from aqt import dialogs
+    from aqt.browser import Browser
+    from aqt.browser.sidebar.item import SidebarItem
+    from aqt.browser.sidebar.tree import SidebarTreeView
+
+    from ankihub import entry_point
+    from ankihub.note_conversion import TAG_FOR_PROTECTING_FIELDS
+    from ankihub.settings import config
+    from ankihub.subdecks import SUBDECK_TAG
+
+    config.public_config["sync_on_startup"] = False
+    entry_point.run()
+
+    with anki_session_with_addon.profile_loaded():
+        mw = anki_session_with_addon.mw
+
+        import_sample_ankihub_deck(mw)
+        notes = mw.col.find_notes("")
+        note = mw.col.get_note(notes[0])
+
+        # add ankihub tags to a note
+        # when no notes have the tag, the related ankihub tag tree item will not exist
+        note.tags = [TAG_FOR_PROTECTING_FIELDS, SUBDECK_TAG]
+        note.flush()
+
+        browser: Browser = dialogs.open("Browser", mw)
+
+        qtbot.wait(500)
+        sidebar: SidebarTreeView = browser.sidebar
+        ankihub_item: SidebarItem = sidebar.model().root.children[0]
+        assert "AnkiHub" in ankihub_item.name
+
+        # assert that all children of the ankihub_item exist
+        item_names = [item.name for item in ankihub_item.children]
+        assert item_names == [
+            "With AnkiHub ID",
+            "ID Pending",
+            "Modified After Sync",
+            "Not Modified After Sync",
+            "Updated Today",
+            "Updated Since Last Review",
+            TAG_FOR_PROTECTING_FIELDS,
+            SUBDECK_TAG,
+        ]
+
+
+# without this mark the test sometime fails on clean-up
 @pytest.mark.qt_no_exception_capture
 def test_browser_custom_columns(anki_session_with_addon: AnkiSession, qtbot: QtBot):
     from aqt import dialogs
@@ -1950,9 +2001,9 @@ def test_sync_with_optional_content(
 ):
     anki_session = anki_session_with_addon
 
+    from ankihub.db import ankihub_db
     from ankihub.settings import API_URL_BASE
     from ankihub.sync import AnkiHubSync
-    from ankihub.db import ankihub_db
 
     with anki_session.profile_loaded():
         with anki_session.deck_installed(SAMPLE_DECK_APKG) as _:
