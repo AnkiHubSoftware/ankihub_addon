@@ -28,6 +28,10 @@ def is_internal_tag(tag: str) -> bool:
     ) or any(tag == internal_tag for internal_tag in ANKI_INTERNAL_TAGS)
 
 
+def is_optional_tag(tag: str) -> bool:
+    return tag.startswith(TAG_FOR_OPTIONAL_TAGS)
+
+
 def get_fields_protected_by_tags(note: Note) -> List[str]:
     if TAG_FOR_PROTECTING_ALL_FIELDS in note.tags:
         return [
