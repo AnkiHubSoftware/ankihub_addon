@@ -21,7 +21,6 @@ from pytestqt.qtbot import QtBot
 
 from .conftest import TEST_PROFILE_ID
 
-
 SAMPLE_MODEL_ID = NotetypeId(1656968697414)
 TEST_DATA_PATH = Path(__file__).parent.parent / "test_data"
 SAMPLE_DECK_APKG = TEST_DATA_PATH / "small.apkg"
@@ -1643,7 +1642,7 @@ def test_browser_treeview_contains_ankihub_tag_items(
     from aqt.browser.sidebar.tree import SidebarTreeView
 
     from ankihub import entry_point
-    from ankihub.note_conversion import TAG_FOR_PROTECTING_FIELDS
+    from ankihub.note_conversion import TAG_FOR_OPTIONAL_TAGS, TAG_FOR_PROTECTING_FIELDS
     from ankihub.settings import config
     from ankihub.subdecks import SUBDECK_TAG
 
@@ -1659,7 +1658,7 @@ def test_browser_treeview_contains_ankihub_tag_items(
 
         # add ankihub tags to a note
         # when no notes have the tag, the related ankihub tag tree item will not exist
-        note.tags = [TAG_FOR_PROTECTING_FIELDS, SUBDECK_TAG]
+        note.tags = [TAG_FOR_PROTECTING_FIELDS, SUBDECK_TAG, TAG_FOR_OPTIONAL_TAGS]
         note.flush()
 
         browser: Browser = dialogs.open("Browser", mw)
@@ -1680,6 +1679,7 @@ def test_browser_treeview_contains_ankihub_tag_items(
             "Updated Since Last Review",
             TAG_FOR_PROTECTING_FIELDS,
             SUBDECK_TAG,
+            TAG_FOR_OPTIONAL_TAGS,
         ]
 
 
