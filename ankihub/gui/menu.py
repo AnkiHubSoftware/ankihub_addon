@@ -129,11 +129,16 @@ class AnkiHubLogin(QWidget):
             value,
         )
 
+    def clear_fields(self):
+        self.username_or_email_box_text.setText("")
+        self.password_box_text.setText("")
+
     @classmethod
     def display_login(cls):
         if cls._window is None:
             cls._window = cls()
         else:
+            cls._window.clear_fields()
             cls._window.activateWindow()
             cls._window.raise_()
             cls._window.show()
