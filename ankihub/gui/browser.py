@@ -488,26 +488,42 @@ def on_browser_will_build_tree(
         ankihub_tree_item = add_ankihub_tree(tree)
         return handled
     elif stage == SidebarStage.TAGS:
-        move_ankihub_tags_to_ankihub_tree(tree, ankihub_tree_item, browser)
-        return True
+        if build_tag_tree_and_copy_ah_tag_items_to_ah_tree(
+            tree, ankihub_tree_item, browser
+        ):
+            return True
+        else:
+            return handled
     else:
         return handled
 
 
-def move_ankihub_tags_to_ankihub_tree(
+def build_tag_tree_and_copy_ah_tag_items_to_ah_tree(
     root_tree_item: SidebarItem, ankihub_tree_item: SidebarItem, browser: Browser
-):
-    # build the tag tree using the original function
-    browser.sidebar._tag_tree(root_tree_item)
+) -> bool:
+    """Build the tag tree and copy AnkiHub tag items to the AnkiHub tree so
+    that all AnkiHub related sidebar items are grouped together.
+    The tag items should still be in the tag tree to avoid confusion and to
+    allow users to use the context menu actions on them.
+    Returns True if the tag tree was built successfully, False otherwise.
+    Building the tag tree can fail if related Anki functions change in the future.
+    """
 
-    # move the AnkiHub tags to the AnkiHub tree
+    # build the tag tree using the original function used by Anki
+    try:
+        browser.sidebar._tag_tree(root_tree_item)
+    except (AttributeError, ValueError):
+        LOGGER.warning("AnkiHub: Could not build tag tree")
+        return False
+
+    # move the AnkiHub tag items to the AnkiHub tree
     tag_tree = next(
         (item for item in root_tree_item.children if item.name == "Tags"), None
     )
 
     if tag_tree is None:
         LOGGER.warning("AnkiHub: Could not find tag tree")
-        return
+        return False
 
     ankihub_tag_tree_items = [
         item for item in tag_tree.children if item.name.startswith("AnkiHub_")
@@ -525,7 +541,14 @@ def move_ankihub_tags_to_ankihub_tree(
         for descendant in _sidebar_item_descendants(ah_tag_tree_item):
             descendant.icon = ""
 
-    LOGGER.debug("AnkiHub: Moved AnkiHub tag items to AnkiHub tree")
+    # remove and re-add the tag tree so that the AnkiHub tag items are under the AnkiHub tree
+    # and also under the tag tree
+    root_tree_item.children.remove(tag_tree)
+    browser.sidebar._tag_tree(root_tree_item)
+
+    LOGGER.debug("AnkiHub: Built tag tree and copied AnkiHub tag items to AnkiHub tree")
+
+    return True
 
 
 def _sidebar_item_descendants(item: SidebarItem) -> List[SidebarItem]:
