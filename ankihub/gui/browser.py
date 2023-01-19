@@ -52,6 +52,7 @@ from .custom_columns import (
 from .custom_search_nodes import (
     CustomSearchNode,
     ModifiedAfterSyncSearchNode,
+    NewNoteSearchNode,
     SuggestionTypeSearchNode,
     UpdatedInTheLastXDaysSearchNode,
     UpdatedSinceLastReviewSearchNode,
@@ -619,6 +620,19 @@ def _add_ankihub_tree(tree: SidebarItem) -> SidebarItem:
     )
     updated_today_item.expanded = config.ui_config().updated_today_tree_expanded
     updated_today_item.on_expanded = _set_updated_today_tree_expanded_in_ui_config
+
+    updated_today_item.add_simple(
+        name="New Note",
+        icon="New Note",
+        type=SidebarItemType.SAVED_SEARCH,
+        search_node=mw.col.group_searches(
+            SearchNode(parsable_text="ankihub_id:_*"),
+            SearchNode(
+                parsable_text=f"{UpdatedInTheLastXDaysSearchNode.parameter_name}:1"
+            ),
+            SearchNode(parsable_text=f"{NewNoteSearchNode.parameter_name}:"),
+        ),
+    )
 
     for suggestion_type in SuggestionType:
         suggestion_value, suggestion_name = suggestion_type.value
