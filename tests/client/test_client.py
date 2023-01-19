@@ -610,8 +610,7 @@ def test_get_note_customizations_by_deck_extension_id(authorized_client_for_user
         ],
     }
 
-    response = client.get_note_customizations_by_deck_extension_id(
+    for chunk in client.get_note_customizations_by_deck_extension_id(
         deck_extension_id=deck_extension_id
-    )
-
-    assert response == expected_response
+    ):
+        assert chunk == expected_response
