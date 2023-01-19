@@ -101,7 +101,6 @@ class AnkiHubSync:
             config.save_latest_update(ankihub_did, latest_update)
         else:
             LOGGER.debug(f"No new updates to sync for {ankihub_did=}")
-
         return True
 
     def _add_optional_content_to_notes(self, ankihub_did: uuid.UUID):
@@ -110,29 +109,28 @@ class AnkiHubSync:
         extensions = result.get("deck_extensions", [])
 
         for extension in extensions:
-            result = client.get_note_customizations_by_deck_extension_id(
-                extension.get("id")
-            )
-            customizations = result.get("note_customizations", [])
             updated_notes = []
-
-            for customization in customizations:
-                note_anki_id = ankihub_db.ankihub_id_to_anki_id(
-                    customization.get("note")
-                )
-                try:
-                    note = mw.col.get_note(note_anki_id)
-                    updated_notes.append(note)
-                except NotFoundError:
-                    LOGGER.warning(
-                        f"""Tried to apply customization #{customization.id}
-                        for note #{customization.get('note')} but note was not found"""
+            for chunk in client.get_note_customizations_by_deck_extension_id(
+                extension.get("id")
+            ):
+                customizations = chunk.get("note_customizations", [])
+                for customization in customizations:
+                    note_anki_id = ankihub_db.ankihub_id_to_anki_id(
+                        customization.get("note")
                     )
-                    continue
-                else:
-                    note.tags = list(
-                        set(note.tags) | set(customization.get("tags", []))
-                    )
+                    try:
+                        note = mw.col.get_note(note_anki_id)
+                        updated_notes.append(note)
+                    except NotFoundError:
+                        LOGGER.warning(
+                            f"""Tried to apply customization #{customization.id}
+                            for note #{customization.get('note')} but note was not found"""
+                        )
+                        continue
+                    else:
+                        note.tags = list(
+                            set(note.tags) | set(customization.get("tags", []))
+                        )
 
             mw.col.update_notes(updated_notes)
 

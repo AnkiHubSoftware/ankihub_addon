@@ -610,8 +610,10 @@ def test_get_note_customizations_by_deck_extension_id(authorized_client_for_user
         ],
     }
 
-    response = client.get_note_customizations_by_deck_extension_id(
-        deck_extension_id=deck_extension_id
+    chunks = list(
+        client.get_note_customizations_by_deck_extension_id(
+            deck_extension_id=deck_extension_id
+        )
     )
-
-    assert response == expected_response
+    assert len(chunks) == 1
+    assert chunks[0] == expected_response
