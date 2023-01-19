@@ -72,24 +72,24 @@ custom_columns = [
 custom_search_nodes: List[CustomSearchNode] = []
 
 
-def on_browser_will_show_context_menu(browser: Browser, context_menu: QMenu) -> None:
+def _on_browser_will_show_context_menu(browser: Browser, context_menu: QMenu) -> None:
     menu = context_menu
 
     menu.addSeparator()
 
     menu.addAction(
         "AnkiHub: Bulk suggest notes",
-        lambda: on_bulk_notes_suggest_action(browser),
+        lambda: _on_bulk_notes_suggest_action(browser),
     )
 
     menu.addAction(
         "AnkiHub: Protect fields",
-        lambda: on_protect_fields_action(browser),
+        lambda: _on_protect_fields_action(browser),
     )
 
     menu.addAction(
         "AnkiHub: Reset local changes",
-        lambda: on_reset_local_changes_action(browser),
+        lambda: _on_reset_local_changes_action(browser),
     )
 
     # setup copy ankihub_id to clipboard action
@@ -107,7 +107,7 @@ def on_browser_will_show_context_menu(browser: Browser, context_menu: QMenu) -> 
         copy_ankihub_id_action.setDisabled(True)
 
 
-def on_protect_fields_action(browser: Browser) -> None:
+def _on_protect_fields_action(browser: Browser) -> None:
     nids = browser.selected_notes()
     if len(nids) != 1:
         showInfo("Please select exactly one note.", parent=browser)
@@ -162,7 +162,7 @@ def on_protect_fields_action(browser: Browser) -> None:
     )
 
 
-def on_bulk_notes_suggest_action(browser: Browser) -> None:
+def _on_bulk_notes_suggest_action(browser: Browser) -> None:
     selected_nids = browser.selected_notes()
     notes = [mw.col.get_note(selected_nid) for selected_nid in selected_nids]
 
@@ -181,12 +181,12 @@ def on_bulk_notes_suggest_action(browser: Browser) -> None:
             change_type=dialog.change_type(),
             comment=dialog.comment(),
         ),
-        on_done=lambda future: on_suggest_notes_in_bulk_done(future, browser),
+        on_done=lambda future: _on_suggest_notes_in_bulk_done(future, browser),
         parent=browser,
     )
 
 
-def on_suggest_notes_in_bulk_done(future: Future, browser: Browser) -> None:
+def _on_suggest_notes_in_bulk_done(future: Future, browser: Browser) -> None:
     try:
         suggestions_result: BulkNoteSuggestionsResult = future.result()
     except AnkiHubRequestError as e:
@@ -231,7 +231,7 @@ def on_suggest_notes_in_bulk_done(future: Future, browser: Browser) -> None:
     showText(msg, parent=browser)
 
 
-def on_reset_local_changes_action(browser: Browser) -> None:
+def _on_reset_local_changes_action(browser: Browser) -> None:
     nids = browser.selected_notes()
 
     if not nids:
@@ -269,22 +269,24 @@ def on_reset_local_changes_action(browser: Browser) -> None:
     )
 
 
-def on_browser_menus_did_init(browser: Browser):
+def _on_browser_menus_did_init(browser: Browser):
     menu = browser._ankihub_menu = QMenu("AnkiHub")  # type: ignore
     browser.form.menubar.addMenu(menu)
 
     reset_deck_action = QAction("Reset all local changes to a deck", browser)
-    qconnect(reset_deck_action.triggered, lambda: on_reset_deck_action(browser))
+    qconnect(reset_deck_action.triggered, lambda: _on_reset_deck_action(browser))
     menu.addAction(reset_deck_action)
 
     reset_subdecks_action = QAction(
         "Rebuild subdecks and move cards into subdecks", browser
     )
-    qconnect(reset_subdecks_action.triggered, lambda: on_reset_subdecks_action(browser))
+    qconnect(
+        reset_subdecks_action.triggered, lambda: _on_reset_subdecks_action(browser)
+    )
     menu.addAction(reset_subdecks_action)
 
 
-def on_reset_deck_action(browser: Browser):
+def _on_reset_deck_action(browser: Browser):
     if not config.deck_ids():
         showInfo(
             "You don't have any AnkiHub decks configured yet.",
@@ -292,7 +294,7 @@ def on_reset_deck_action(browser: Browser):
         )
         return
 
-    ah_did, deck_config = choose_deck(
+    ah_did, deck_config = _choose_deck(
         "Choose the AnkiHub deck for which<br>you want to reset local changes"
     )
     if ah_did is None:
@@ -320,7 +322,7 @@ def on_reset_deck_action(browser: Browser):
     )
 
 
-def on_reset_subdecks_action(browser: Browser):
+def _on_reset_subdecks_action(browser: Browser):
     if not config.deck_ids():
         showInfo(
             "You don't have any AnkiHub decks configured yet.",
@@ -328,7 +330,7 @@ def on_reset_subdecks_action(browser: Browser):
         )
         return
 
-    ah_did, deck_config = choose_deck(
+    ah_did, deck_config = _choose_deck(
         "Choose the AnkiHub deck for which<br>"
         "you want to rebuild subdecks and move<br>"
         "cards to their original subdeck."
@@ -367,7 +369,7 @@ def on_reset_subdecks_action(browser: Browser):
     )
 
 
-def choose_deck(prompt: str) -> Tuple[Optional[uuid.UUID], Optional[DeckConfig]]:
+def _choose_deck(prompt: str) -> Tuple[Optional[uuid.UUID], Optional[DeckConfig]]:
     ah_dids = config.deck_ids()
     deck_configs = [config.deck_config(did) for did in ah_dids]
     chosen_deck_idx = choose_list(
@@ -384,12 +386,12 @@ def choose_deck(prompt: str) -> Tuple[Optional[uuid.UUID], Optional[DeckConfig]]
     return chosen_deck_ah_did, chosen_deck_config
 
 
-def on_browser_did_fetch_columns(columns: dict[str, Column]):
+def _on_browser_did_fetch_columns(columns: dict[str, Column]):
     for column in custom_columns:
         columns[column.key] = column.builtin_column
 
 
-def on_browser_did_fetch_row(
+def _on_browser_did_fetch_row(
     item_id: ItemId,
     is_notes_mode: bool,
     row: CellRow,
@@ -404,12 +406,12 @@ def on_browser_did_fetch_row(
         )
 
 
-def on_browser_will_search(ctx: SearchContext):
-    on_browser_will_search_handle_custom_column_ordering(ctx)
-    on_browser_will_search_handle_custom_search_parameters(ctx)
+def _on_browser_will_search(ctx: SearchContext):
+    _on_browser_will_search_handle_custom_column_ordering(ctx)
+    _on_browser_will_search_handle_custom_search_parameters(ctx)
 
 
-def on_browser_will_search_handle_custom_column_ordering(ctx: SearchContext):
+def _on_browser_will_search_handle_custom_column_ordering(ctx: SearchContext):
     if not isinstance(ctx.order, Column):
         return
 
@@ -424,7 +426,7 @@ def on_browser_will_search_handle_custom_column_ordering(ctx: SearchContext):
     ctx.order = custom_column.order_by_str()
 
 
-def on_browser_will_search_handle_custom_search_parameters(ctx: SearchContext):
+def _on_browser_will_search_handle_custom_search_parameters(ctx: SearchContext):
     if not ctx.search:
         return
 
@@ -450,16 +452,16 @@ def on_browser_will_search_handle_custom_search_parameters(ctx: SearchContext):
         ctx.search = ctx.search.replace(m.group(0), "")
 
 
-def on_browser_did_search(ctx: SearchContext):
+def _on_browser_did_search(ctx: SearchContext):
     # Detach the ankihub database in case it was attached in on_browser_will_search_handle_custom_column_ordering.
     # The attached_ankihub_db context manager can't be used for this because the database query happens
     # in the rust backend.
     detach_ankihub_db_from_anki_db_connection()
 
-    on_browser_did_search_handle_custom_search_parameters(ctx)
+    _on_browser_did_search_handle_custom_search_parameters(ctx)
 
 
-def on_browser_did_search_handle_custom_search_parameters(ctx: SearchContext):
+def _on_browser_did_search_handle_custom_search_parameters(ctx: SearchContext):
     global custom_search_nodes
 
     if not custom_search_nodes:
@@ -476,7 +478,7 @@ def on_browser_did_search_handle_custom_search_parameters(ctx: SearchContext):
             custom_search_nodes = []
 
 
-def on_browser_will_build_tree(
+def _on_browser_will_build_tree(
     handled: bool,
     tree: SidebarItem,
     stage: SidebarStage,
@@ -485,10 +487,10 @@ def on_browser_will_build_tree(
     global ankihub_tree_item
 
     if stage == SidebarStage.ROOT:
-        ankihub_tree_item = add_ankihub_tree(tree)
+        ankihub_tree_item = _add_ankihub_tree(tree)
         return handled
     elif stage == SidebarStage.TAGS:
-        if build_tag_tree_and_copy_ah_tag_items_to_ah_tree(
+        if _build_tag_tree_and_copy_ah_tag_items_to_ah_tree(
             tree, ankihub_tree_item, browser
         ):
             return True
@@ -498,7 +500,7 @@ def on_browser_will_build_tree(
         return handled
 
 
-def build_tag_tree_and_copy_ah_tag_items_to_ah_tree(
+def _build_tag_tree_and_copy_ah_tag_items_to_ah_tree(
     root_tree_item: SidebarItem, ankihub_tree_item: SidebarItem, browser: Browser
 ) -> bool:
     """Build the tag tree and copy AnkiHub tag items to the AnkiHub tree so
@@ -559,7 +561,7 @@ def _sidebar_item_descendants(item: SidebarItem) -> List[SidebarItem]:
     return result
 
 
-def add_ankihub_tree(tree: SidebarItem) -> SidebarItem:
+def _add_ankihub_tree(tree: SidebarItem) -> SidebarItem:
 
     result = tree.add_simple(
         name="👑 AnkiHub",
@@ -570,7 +572,7 @@ def add_ankihub_tree(tree: SidebarItem) -> SidebarItem:
         ),
     )
     result.expanded = config.ui_config().ankihub_tree_expanded
-    result.on_expanded = set_ah_tree_expanded_in_ui_config
+    result.on_expanded = _set_ah_tree_expanded_in_ui_config
 
     result.add_simple(
         name="With AnkiHub ID",
@@ -616,7 +618,7 @@ def add_ankihub_tree(tree: SidebarItem) -> SidebarItem:
         ),
     )
     updated_today_item.expanded = config.ui_config().updated_today_tree_expanded
-    updated_today_item.on_expanded = set_updated_today_tree_expanded_in_ui_config
+    updated_today_item.on_expanded = _set_updated_today_tree_expanded_in_ui_config
 
     for suggestion_type in SuggestionType:
         suggestion_value, suggestion_name = suggestion_type.value
@@ -651,34 +653,34 @@ def add_ankihub_tree(tree: SidebarItem) -> SidebarItem:
     return result
 
 
-def set_ah_tree_expanded_in_ui_config(expanded: bool):
+def _set_ah_tree_expanded_in_ui_config(expanded: bool):
     ui_config = config.ui_config()
     ui_config.ankihub_tree_expanded = expanded
     config.set_ui_config(ui_config)
 
 
-def set_updated_today_tree_expanded_in_ui_config(expanded: bool):
+def _set_updated_today_tree_expanded_in_ui_config(expanded: bool):
     ui_config = config.ui_config()
     ui_config.updated_today_tree_expanded = expanded
     config.set_ui_config(ui_config)
 
 
-def store_browser_reference(browser_: Browser) -> None:
+def _store_browser_reference(browser_: Browser) -> None:
     global browser
 
     browser = browser_
 
 
 def setup() -> None:
-    browser_will_show.append(store_browser_reference)
+    browser_will_show.append(_store_browser_reference)
 
-    browser_did_fetch_columns.append(on_browser_did_fetch_columns)
-    browser_did_fetch_row.append(on_browser_did_fetch_row)
-    browser_will_search.append(on_browser_will_search)
-    browser_did_search.append(on_browser_did_search)
+    browser_did_fetch_columns.append(_on_browser_did_fetch_columns)
+    browser_did_fetch_row.append(_on_browser_did_fetch_row)
+    browser_will_search.append(_on_browser_will_search)
+    browser_did_search.append(_on_browser_did_search)
 
-    browser_will_show_context_menu.append(on_browser_will_show_context_menu)
+    browser_will_show_context_menu.append(_on_browser_will_show_context_menu)
 
-    browser_will_build_tree.append(on_browser_will_build_tree)
+    browser_will_build_tree.append(_on_browser_will_build_tree)
 
-    browser_menus_did_init.append(on_browser_menus_did_init)
+    browser_menus_did_init.append(_on_browser_menus_did_init)
