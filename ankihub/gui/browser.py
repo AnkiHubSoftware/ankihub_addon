@@ -566,7 +566,7 @@ def _add_ankihub_tree(tree: SidebarItem) -> SidebarItem:
 
     result = tree.add_simple(
         name="👑 AnkiHub",
-        icon="AnkiHub",
+        icon="",
         type=SidebarItemType.SAVED_SEARCH_ROOT,
         search_node=SearchNode(
             parsable_text="ankihub_id:*",
@@ -577,21 +577,21 @@ def _add_ankihub_tree(tree: SidebarItem) -> SidebarItem:
 
     result.add_simple(
         name="With AnkiHub ID",
-        icon="With AnkiHub ID",
+        icon="",
         type=SidebarItemType.SAVED_SEARCH,
         search_node=SearchNode(parsable_text="ankihub_id:_*"),
     )
 
     result.add_simple(
         name="ID Pending",
-        icon="ID Pending",
+        icon="",
         type=SidebarItemType.SAVED_SEARCH,
         search_node=SearchNode(parsable_text="ankihub_id:"),
     )
 
     result.add_simple(
         name="Modified After Sync",
-        icon="Modified After Sync",
+        icon="",
         type=SidebarItemType.SAVED_SEARCH,
         search_node=SearchNode(
             parsable_text=f"{ModifiedAfterSyncSearchNode.parameter_name}:yes"
@@ -600,7 +600,7 @@ def _add_ankihub_tree(tree: SidebarItem) -> SidebarItem:
 
     result.add_simple(
         name="Not Modified After Sync",
-        icon="Not Modified After Sync",
+        icon="",
         type=SidebarItemType.SAVED_SEARCH,
         search_node=SearchNode(
             parsable_text=f"{ModifiedAfterSyncSearchNode.parameter_name}:no"
@@ -609,7 +609,7 @@ def _add_ankihub_tree(tree: SidebarItem) -> SidebarItem:
 
     updated_today_item = result.add_simple(
         name="Updated Today",
-        icon="Updated Today",
+        icon="",
         type=SidebarItemType.SAVED_SEARCH_ROOT,
         search_node=mw.col.group_searches(
             SearchNode(parsable_text="ankihub_id:_*"),
@@ -623,7 +623,7 @@ def _add_ankihub_tree(tree: SidebarItem) -> SidebarItem:
 
     updated_today_item.add_simple(
         name="New Note",
-        icon="New Note",
+        icon="",
         type=SidebarItemType.SAVED_SEARCH,
         search_node=mw.col.group_searches(
             SearchNode(parsable_text="ankihub_id:_*"),
@@ -640,7 +640,7 @@ def _add_ankihub_tree(tree: SidebarItem) -> SidebarItem:
         suggestion_value_escaped = suggestion_value.replace("/", "_slash_")
         updated_today_item.add_simple(
             name=suggestion_name,
-            icon=suggestion_name,
+            icon="",
             type=SidebarItemType.SAVED_SEARCH,
             search_node=mw.col.group_searches(
                 SearchNode(parsable_text="ankihub_id:_*"),
@@ -655,7 +655,7 @@ def _add_ankihub_tree(tree: SidebarItem) -> SidebarItem:
 
     result.add_simple(
         name="Updated Since Last Review",
-        icon="Updated Since Last Review",
+        icon="",
         type=SidebarItemType.SAVED_SEARCH_ROOT,
         search_node=mw.col.group_searches(
             SearchNode(parsable_text="ankihub_id:_*"),
