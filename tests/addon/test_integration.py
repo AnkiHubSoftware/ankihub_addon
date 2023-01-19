@@ -1849,7 +1849,6 @@ def test_reset_local_changes_to_notes(
             assert mw.col.decks.name(card.did) == "Testdeck"
 
 
-
 def test_migrate_profile_data_from_old_location(
     anki_session_with_addon_before_profile_support: AnkiSession, monkeypatch
 ):
@@ -2003,7 +2002,7 @@ def test_sync_with_optional_content(
             )
 
             assert set(note.tags) == set(["my::tag2", "my::tag"])
-            
+
             sync = AnkiHubSync()
             sync._add_optional_content_to_notes(ankihub_deck_uuid)
 
