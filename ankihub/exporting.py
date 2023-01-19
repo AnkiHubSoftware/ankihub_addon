@@ -7,12 +7,16 @@ from anki.notes import Note
 
 from .ankihub_client import Field, NoteInfo
 from .db import ankihub_db
-from .note_conversion import get_fields_protected_by_tags, is_internal_tag
+from .note_conversion import (
+    get_fields_protected_by_tags,
+    is_internal_tag,
+    is_optional_tag,
+)
 
 
 def to_note_data(note: Note, set_new_id: bool = False, diff: bool = False) -> NoteInfo:
     """Convert an Anki note to a NoteInfo object.
-    Tags and fields are altered (internal tags are removed, ankihub id field is removed, etc.).
+    Tags and fields are altered (internal and optional tags are removed, ankihub id field is removed, etc.).
     Protected fields are removed.
     If diff is True then only the fields that were changed since the last sync will be included.
     """
@@ -79,7 +83,11 @@ def _prepare_tags(note: Note, diff: bool) -> Optional[List[str]]:
     # returns None if diff=True and the tags didn't change since the last sync
 
     # removing empty tags is necessary because notes have empty tags in the editor sometimes
-    result = [tag for tag in note.tags if tag.strip() and not is_internal_tag(tag)]
+    result = [
+        tag
+        for tag in note.tags
+        if tag.strip() and not (is_internal_tag(tag) or is_optional_tag(tag))
+    ]
 
     if diff:
         note_data_from_ah = ankihub_db.note_data(note.id)
