@@ -11,7 +11,7 @@ from aqt import mw
 from . import LOGGER
 from .addon_ankihub_client import AddonAnkiHubClient as AnkiHubClient
 from .ankihub_client import AnkiHubRequestError
-from .settings import ADDON_VERSION, ANKI_VERSION, LOG_FILE, config
+from .settings import ADDON_VERSION, ANKI_VERSION, config, log_file_path
 
 SENTRY_ENV = "anki_desktop"
 # This prevents Sentry from trying to run a git command to infer the version.
@@ -126,7 +126,7 @@ def upload_logs_in_background(
         try:
             client = AnkiHubClient()
             client.upload_logs(
-                file=LOG_FILE,
+                file=log_file_path(),
                 key=key,
             )
             LOGGER.debug("Logs uploaded.")

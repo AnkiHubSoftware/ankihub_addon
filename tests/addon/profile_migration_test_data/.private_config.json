@@ -1,0 +1,13 @@
+{
+    "decks": {
+        "72db1f0d-e1d5-4dbb-bc7f-0402669d28c3": {
+            "anki_id": 1673963721005,
+            "creator": true,
+            "latest_update": "2023-01-17T13:56:50.525601+0000",
+            "name": "test",
+            "subdecks_enabled": false
+        }
+    },
+    "token": "b0f60e5fdcb84e28e953bfaa0cc8e299052c7434b6c0446edfa4d2505bb331c4",
+    "user": "user1"
+}

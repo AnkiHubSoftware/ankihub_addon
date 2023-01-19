@@ -19,6 +19,7 @@ from aqt.importing import AnkiPackageImporter
 from pytest_anki import AnkiSession
 from pytestqt.qtbot import QtBot
 
+from .conftest import TEST_PROFILE_ID
 
 
 SAMPLE_MODEL_ID = NotetypeId(1656968697414)
@@ -40,12 +41,10 @@ def ankihub_sample_deck_notes_data():
 
 
 def test_entry_point(anki_session_with_addon: AnkiSession):
-    from aqt.main import AnkiQt
-
     from ankihub import entry_point
 
-    mw = entry_point.run()
-    assert isinstance(mw, AnkiQt)
+    entry_point.run()
+    # this test is just to make sure the entry point doesn't crash
 
 
 def test_editor(anki_session_with_addon: AnkiSession, requests_mock, monkeypatch):
@@ -1032,10 +1031,7 @@ def import_note_types_for_sample_deck(mw):
 def test_prepare_note(anki_session_with_addon: AnkiSession):
     from ankihub.ankihub_client import Field, NoteInfo, SuggestionType
     from ankihub.importing import AnkiHubImporter
-    from ankihub.note_conversion import (
-        ADDON_INTERNAL_TAGS,
-        TAG_FOR_PROTECTING_FIELDS,
-    )
+    from ankihub.note_conversion import ADDON_INTERNAL_TAGS, TAG_FOR_PROTECTING_FIELDS
     from ankihub.settings import ANKIHUB_NOTE_TYPE_FIELD_NAME
 
     anki_session = anki_session_with_addon
@@ -1872,6 +1868,103 @@ def test_reset_local_changes_to_notes(
         assert basic_note_2.cards()
         for card in basic_note_2.cards():
             assert mw.col.decks.name(card.did) == "Testdeck"
+
+
+def test_migrate_profile_data_from_old_location(
+    anki_session_with_addon_before_profile_support: AnkiSession, monkeypatch
+):
+    from ankihub import entry_point
+
+    anki_session = anki_session_with_addon_before_profile_support
+
+    # mock the sync function so that the add-on doesn't try to sync with AnkiHub
+    monkeypatch.setattr(
+        "ankihub.entry_point.sync_with_progress", lambda *args, **kwargs: None
+    )
+
+    # run the entrypoint and load the profile to trigger the migration
+    entry_point.run()
+    with anki_session.profile_loaded():
+        pass
+
+    user_files_path = Path(anki_session.base) / "addons21" / "ankihub" / "user_files"
+    profile_files_path = user_files_path / str(TEST_PROFILE_ID)
+
+    assert set([x.name for x in profile_files_path.glob("*")]) == {
+        "ankihub.db",
+        ".private_config.json",
+    }
+
+    assert set([x.name for x in user_files_path.glob("*")]) == {
+        str(TEST_PROFILE_ID),
+        "README.md",
+        "ankihub.log",
+        "ankihub.log.1",
+    }
+
+
+def test_profile_swap(anki_session_with_addon: AnkiSession, monkeypatch):
+    from ankihub import entry_point
+    from ankihub.db import ankihub_db
+    from ankihub.settings import config, profile_files_path
+
+    anki_session = anki_session_with_addon
+
+    USER_FILES_PATH = Path(anki_session.base) / "addons21/ankihub/user_files"
+    # already exists
+    PROFILE_1_NAME = "User 1"
+    PROFILE_1_ID = TEST_PROFILE_ID
+    # will be created in the test
+    PROFILE_2_NAME = "User 2"
+    PROFILE_2_ID = uuid.UUID("22222222-2222-2222-2222-222222222222")
+
+    general_setup_mock = Mock()
+    monkeypatch.setattr("ankihub.entry_point.general_setup", general_setup_mock)
+
+    entry_point.run()
+
+    # load the first profile and import a deck
+    with anki_session.profile_loaded():
+        mw = anki_session.mw
+
+        assert profile_files_path() == USER_FILES_PATH / str(PROFILE_1_ID)
+
+        # import a deck and save the subscription
+        ah_did = UUID_1
+        anki_did = import_sample_ankihub_deck(mw, UUID_1)
+        config.save_subscription(name="Testdeck", ankihub_did=ah_did, anki_did=anki_did)
+
+        # the database should contain the imported deck
+        assert len(ankihub_db.ankihub_deck_ids()) == 1
+        # the config should contain the deck subscription
+        assert len(config.deck_ids()) == 1
+
+    # create the second profile
+    mw.pm.create(PROFILE_2_NAME)
+
+    # load the second profile
+    mw.pm.load(PROFILE_2_NAME)
+    # monkeypatch uuid4 so that the id of the second profile is known
+    with monkeypatch.context() as m:
+        m.setattr("uuid.uuid4", lambda: PROFILE_2_ID)
+        with anki_session.profile_loaded():
+            assert profile_files_path() == USER_FILES_PATH / str(PROFILE_2_ID)
+            # the database should be empty
+            assert len(ankihub_db.ankihub_deck_ids()) == 0
+            # the config should not conatin any deck subscriptions
+            assert len(config.deck_ids()) == 0
+
+    # load the first profile again
+    mw.pm.load(PROFILE_1_NAME)
+    with anki_session.profile_loaded():
+        assert profile_files_path() == USER_FILES_PATH / str(PROFILE_1_ID)
+        # the database should contain the imported deck
+        assert len(ankihub_db.ankihub_deck_ids()) == 1
+        # the config should contain the deck subscription
+        assert len(config.deck_ids()) == 1
+
+    # assert that the general_setup function was only called once
+    assert general_setup_mock.call_count == 1
 
 
 def test_sync_with_optional_content(
