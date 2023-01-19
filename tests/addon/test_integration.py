@@ -2018,8 +2018,8 @@ def test_sync_with_optional_content(
                         {
                             "note": str(note_data.ankihub_note_uuid),
                             "tags": [
-                                "#AnkiHub_Optional::test99::test1",
-                                "#AnkiHub_Optional::test99::test2",
+                                "AnkiHub_Optional::test99::test1",
+                                "AnkiHub_Optional::test99::test2",
                             ],
                         },
                     ],
@@ -2036,8 +2036,8 @@ def test_sync_with_optional_content(
             expected_tags = [
                 "my::tag2",
                 "my::tag",
-                "#AnkiHub_Optional::test99::test2",
-                "#AnkiHub_Optional::test99::test1",
+                "AnkiHub_Optional::test99::test2",
+                "AnkiHub_Optional::test99::test1",
             ]
 
             assert set(updated_note.tags) == set(expected_tags)
