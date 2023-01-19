@@ -21,7 +21,6 @@ from pytestqt.qtbot import QtBot
 
 from .conftest import TEST_PROFILE_ID
 
-
 SAMPLE_MODEL_ID = NotetypeId(1656968697414)
 TEST_DATA_PATH = Path(__file__).parent.parent / "test_data"
 SAMPLE_DECK_APKG = TEST_DATA_PATH / "small.apkg"
@@ -288,7 +287,7 @@ def test_suggest_note_update(anki_session_with_addon: AnkiSession, requests_mock
             comment="test",
         )
 
-        # ... assert that internal tags were filtered out
+        # ... assert that internal and optional tags were filtered out
         suggestion_data = adapter.last_request.json()
         assert set(suggestion_data["tags"]) == set(
             [
@@ -314,7 +313,11 @@ def test_suggest_note_update(anki_session_with_addon: AnkiSession, requests_mock
 
 def test_suggest_new_note(anki_session_with_addon: AnkiSession, requests_mock):
     from ankihub.ankihub_client import AnkiHubRequestError
-    from ankihub.note_conversion import ADDON_INTERNAL_TAGS, TAG_FOR_OPTIONAL_TAGS
+    from ankihub.note_conversion import (
+        ADDON_INTERNAL_TAGS,
+        ANKI_INTERNAL_TAGS,
+        TAG_FOR_OPTIONAL_TAGS,
+    )
     from ankihub.settings import API_URL_BASE
     from ankihub.suggestions import suggest_new_note
 
@@ -334,6 +337,7 @@ def test_suggest_new_note(anki_session_with_addon: AnkiSession, requests_mock):
         note.tags = [
             "a",
             *ADDON_INTERNAL_TAGS,
+            *ANKI_INTERNAL_TAGS,
             f"{TAG_FOR_OPTIONAL_TAGS}::TAG_GROUP::OptionalTag",
         ]
         suggest_new_note(
@@ -342,7 +346,7 @@ def test_suggest_new_note(anki_session_with_addon: AnkiSession, requests_mock):
             comment="test",
         )
 
-        # ... assert that add-on internal tags were filtered out
+        # ... assert that add-on internal and optional tags were filtered out
         suggestion_data = adapter.last_request.json()
         assert set(suggestion_data["tags"]) == set(
             [
@@ -376,8 +380,8 @@ def test_suggest_notes_in_bulk(anki_session_with_addon: AnkiSession, monkeypatch
         NewNoteSuggestion,
         SuggestionType,
     )
-    from ankihub.suggestions import suggest_notes_in_bulk
     from ankihub.note_conversion import TAG_FOR_OPTIONAL_TAGS
+    from ankihub.suggestions import suggest_notes_in_bulk
 
     anki_session = anki_session_with_addon
     bulk_suggestions_method_mock = MagicMock()
@@ -1972,9 +1976,9 @@ def test_sync_with_optional_content(
 ):
     anki_session = anki_session_with_addon
 
+    from ankihub.db import ankihub_db
     from ankihub.settings import API_URL_BASE
     from ankihub.sync import AnkiHubSync
-    from ankihub.db import ankihub_db
 
     with anki_session.profile_loaded():
         with anki_session.deck_installed(SAMPLE_DECK_APKG) as _:
