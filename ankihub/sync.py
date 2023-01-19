@@ -101,7 +101,6 @@ class AnkiHubSync:
             config.save_latest_update(ankihub_did, latest_update)
         else:
             LOGGER.debug(f"No new updates to sync for {ankihub_did=}")
-        self._add_optional_content_to_notes(client, ankihub_did)
         return True
 
     def _add_optional_content_to_notes(self, ankihub_did: uuid.UUID):
