@@ -92,7 +92,7 @@ class Config:
             private_config_dict["ui"] = UIConfig(**private_config_dict["ui"])
         else:
             # previous versions of the add-on did not have a ui config
-            self._private_config.ui = UIConfig()
+            private_config_dict["ui"] = UIConfig()
 
         result = PrivateConfig(**private_config_dict)
         return result
