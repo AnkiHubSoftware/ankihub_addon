@@ -21,7 +21,6 @@ from pytestqt.qtbot import QtBot
 
 from .conftest import TEST_PROFILE_ID
 
-
 SAMPLE_MODEL_ID = NotetypeId(1656968697414)
 TEST_DATA_PATH = Path(__file__).parent.parent / "test_data"
 SAMPLE_DECK_APKG = TEST_DATA_PATH / "small.apkg"
@@ -1434,6 +1433,44 @@ def test_UpdatedInTheLastXDaysSearchNode(anki_session_with_addon: AnkiSession):
             )
 
 
+def test_NewNoteSearchNode(anki_session_with_addon: AnkiSession):
+    from ankihub.ankihub_client import SuggestionType
+    from ankihub.db import attached_ankihub_db
+    from ankihub.gui.browser import NewNoteSearchNode
+    from ankihub.importing import AnkiHubImporter
+
+    with anki_session_with_addon.profile_loaded():
+        mw = anki_session_with_addon.mw
+
+        import_note_types_for_sample_deck(mw)
+        notes_data = ankihub_sample_deck_notes_data()
+        notes_data[0].last_update_type = None
+        notes_data[1].last_update_type = None
+        notes_data[2].last_update_type = SuggestionType.OTHER
+
+        ankihub_models = {m["id"]: m for m in mw.col.models.all() if "/" in m["name"]}
+        AnkiHubImporter()._import_ankihub_deck_inner(
+            str(UUID_1),
+            notes_data=notes_data,
+            remote_note_types=ankihub_models,
+            protected_fields={},
+            protected_tags=[],
+            deck_name="Test-Deck",
+        )
+
+        all_nids = mw.col.find_notes("")
+
+        browser = Mock()
+        browser.table.is_notes_mode.return_value = True
+
+        with attached_ankihub_db():
+            # notes without a last_update_type are new
+            assert NewNoteSearchNode(browser, "").filter_ids(all_nids) == [
+                notes_data[0].anki_nid,
+                notes_data[1].anki_nid,
+            ]
+
+
 def test_SuggestionTypeSearchNode(anki_session_with_addon: AnkiSession):
     from ankihub.ankihub_client import SuggestionType
     from ankihub.db import attached_ankihub_db
@@ -1544,6 +1581,7 @@ def test_browser_treeview_ankihub_items(
     from aqt.browser.sidebar.tree import SidebarTreeView
 
     from ankihub import entry_point
+    from ankihub.ankihub_client import SuggestionType
     from ankihub.settings import config
 
     config.public_config["sync_on_startup"] = False
@@ -1562,14 +1600,24 @@ def test_browser_treeview_ankihub_items(
         assert "AnkiHub" in ankihub_item.name
 
         # assert that all children of the ankihub_item exist
-        item_names = [item.name for item in ankihub_item.children]
-        assert item_names == [
+        ankihub_child_item_names = [item.name for item in ankihub_item.children]
+        assert ankihub_child_item_names == [
             "With AnkiHub ID",
             "ID Pending",
             "Modified After Sync",
             "Not Modified After Sync",
             "Updated Today",
             "Updated Since Last Review",
+        ]
+
+        updated_today_item = ankihub_item.children[4]
+        assert updated_today_item.name == "Updated Today"
+        updated_today_child_item_names = [
+            item.name for item in updated_today_item.children
+        ]
+        assert updated_today_child_item_names == [
+            "New Note",
+            *[x.value[1] for x in SuggestionType],
         ]
 
         # click on the first item
@@ -1583,7 +1631,59 @@ def test_browser_treeview_ankihub_items(
         assert len(nids) == 3
 
 
-# without this mark the test fails on clean-up
+# without this mark the test sometime fails on clean-up
+@pytest.mark.qt_no_exception_capture
+def test_browser_treeview_contains_ankihub_tag_items(
+    anki_session_with_addon: AnkiSession, qtbot: QtBot
+):
+    from aqt import dialogs
+    from aqt.browser import Browser
+    from aqt.browser.sidebar.item import SidebarItem
+    from aqt.browser.sidebar.tree import SidebarTreeView
+
+    from ankihub import entry_point
+    from ankihub.note_conversion import TAG_FOR_OPTIONAL_TAGS, TAG_FOR_PROTECTING_FIELDS
+    from ankihub.settings import config
+    from ankihub.subdecks import SUBDECK_TAG
+
+    config.public_config["sync_on_startup"] = False
+    entry_point.run()
+
+    with anki_session_with_addon.profile_loaded():
+        mw = anki_session_with_addon.mw
+
+        import_sample_ankihub_deck(mw)
+        notes = mw.col.find_notes("")
+        note = mw.col.get_note(notes[0])
+
+        # add ankihub tags to a note
+        # when no notes have the tag, the related ankihub tag tree item will not exist
+        note.tags = [TAG_FOR_PROTECTING_FIELDS, SUBDECK_TAG, TAG_FOR_OPTIONAL_TAGS]
+        note.flush()
+
+        browser: Browser = dialogs.open("Browser", mw)
+
+        qtbot.wait(500)
+        sidebar: SidebarTreeView = browser.sidebar
+        ankihub_item: SidebarItem = sidebar.model().root.children[0]
+        assert "AnkiHub" in ankihub_item.name
+
+        # assert that all children of the ankihub_item exist
+        item_names = [item.name for item in ankihub_item.children]
+        assert item_names == [
+            "With AnkiHub ID",
+            "ID Pending",
+            "Modified After Sync",
+            "Not Modified After Sync",
+            "Updated Today",
+            "Updated Since Last Review",
+            TAG_FOR_PROTECTING_FIELDS,
+            SUBDECK_TAG,
+            TAG_FOR_OPTIONAL_TAGS,
+        ]
+
+
+# without this mark the test sometime fails on clean-up
 @pytest.mark.qt_no_exception_capture
 def test_browser_custom_columns(anki_session_with_addon: AnkiSession, qtbot: QtBot):
     from aqt import dialogs

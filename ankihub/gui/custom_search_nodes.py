@@ -20,6 +20,7 @@ class CustomSearchNode(ABC):
             ModifiedAfterSyncSearchNode,
             UpdatedInTheLastXDaysSearchNode,
             SuggestionTypeSearchNode,
+            NewNoteSearchNode,
             UpdatedSinceLastReviewSearchNode,
         )
         for custom_search_node_type in custom_search_node_types:
@@ -111,6 +112,25 @@ class UpdatedInTheLastXDaysSearchNode(CustomSearchNode):
         return ids
 
 
+class NewNoteSearchNode(CustomSearchNode):
+
+    parameter_name = "ankihub_new_note"
+
+    def __init__(self, browser, value: str):
+        self.browser = browser
+        self.value = value
+
+    def filter_ids(self, ids: Sequence[ItemId]) -> Sequence[ItemId]:
+        if self.value.strip() != "":
+            raise ValueError(
+                f"Invalid value for {self.parameter_name}: {self.value}. This search parameter takes no values."
+            )
+
+        ids = self._retain_ids_where(ids, "ah_notes.last_update_type is NULL")
+
+        return ids
+
+
 class SuggestionTypeSearchNode(CustomSearchNode):
 
     parameter_name = "ankihub_suggestion_type"
@@ -142,19 +162,19 @@ class UpdatedSinceLastReviewSearchNode(CustomSearchNode):
         self.value = value
 
     def filter_ids(self, ids: Sequence[ItemId]) -> Sequence[ItemId]:
-        if self.value.strip() == "":
-            ids = self._retain_ids_where(
-                ids,
-                """
-                ah_notes.mod >= (
-                    SELECT max(revlog.id) FROM revlog, cards
-                    WHERE revlog.cid = cards.id AND cards.nid = notes.id
-                ) / 1000
-                """,
-            )
-        else:
+        if self.value.strip() != "":
             raise ValueError(
                 f"Invalid value for {self.parameter_name}: {self.value}. This search parameter takes no values."
             )
+
+        ids = self._retain_ids_where(
+            ids,
+            """
+            ah_notes.mod >= (
+                SELECT max(revlog.id) FROM revlog, cards
+                WHERE revlog.cid = cards.id AND cards.nid = notes.id
+            ) / 1000
+            """,
+        )
 
         return ids

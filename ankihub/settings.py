@@ -44,10 +44,18 @@ class DeckConfig:
 
 
 @dataclasses.dataclass
+class UIConfig:
+    # whether the trees in the browser sidebar are expanded or collapsed
+    ankihub_tree_expanded: bool = True
+    updated_today_tree_expanded: bool = False
+
+
+@dataclasses.dataclass
 class PrivateConfig:
     token: str = ""
     user: str = ""
     decks: Dict[uuid.UUID, DeckConfig] = dataclasses.field(default_factory=dict)
+    ui: UIConfig = dataclasses.field(default_factory=UIConfig)
 
 
 class Config:
@@ -63,17 +71,31 @@ class Config:
             self._private_config = self.new_config()
         else:
             try:
-                with open(self._private_config_path) as f:
-                    private_config_dict = json.load(f)
-                decks_dict = private_config_dict["decks"]
-                private_config_dict["decks"] = {
-                    uuid.UUID(k): DeckConfig(**v) for k, v in decks_dict.items()
-                }
-                self._private_config = PrivateConfig(**private_config_dict)
+                self._private_config = self._load_private_config()
             except JSONDecodeError:
                 # TODO Instead of overwriting, query AnkiHub for config values.
                 self._private_config = self.new_config()
         self._log_private_config()
+
+    def _load_private_config(self) -> PrivateConfig:
+        with open(self._private_config_path) as f:
+            private_config_dict = json.load(f)
+
+        # convert deck keys from strings to uuid.UUID
+        decks_dict = private_config_dict["decks"]
+        private_config_dict["decks"] = {
+            uuid.UUID(k): DeckConfig(**v) for k, v in decks_dict.items()
+        }
+
+        # parse ui config
+        if "ui" in private_config_dict:
+            private_config_dict["ui"] = UIConfig(**private_config_dict["ui"])
+        else:
+            # previous versions of the add-on did not have a ui config
+            self._private_config.ui = UIConfig()
+
+        result = PrivateConfig(**private_config_dict)
+        return result
 
     def new_config(self):
         private_config = PrivateConfig()
@@ -166,6 +188,13 @@ class Config:
 
     def user(self) -> Optional[str]:
         return self._private_config.user
+
+    def ui_config(self) -> UIConfig:
+        return self._private_config.ui
+
+    def set_ui_config(self, ui_config: UIConfig):
+        self._private_config.ui = ui_config
+        self._update_private_config()
 
 
 config = Config()
