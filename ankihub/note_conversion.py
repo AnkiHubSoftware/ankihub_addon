@@ -9,6 +9,7 @@ from . import settings
 
 TAG_FOR_PROTECTING_FIELDS = "AnkiHub_Protect"
 TAG_FOR_PROTECTING_ALL_FIELDS = f"{TAG_FOR_PROTECTING_FIELDS}::All"
+TAG_FOR_OPTIONAL_TAGS = "AnkiHub_Optional"
 
 
 # top-level tags that are only used by the add-on, but not by the web app
@@ -25,6 +26,10 @@ def is_internal_tag(tag: str) -> bool:
         tag == internal_tag or tag.startswith(f"{internal_tag}::")
         for internal_tag in [*ADDON_INTERNAL_TAGS]
     ) or any(tag == internal_tag for internal_tag in ANKI_INTERNAL_TAGS)
+
+
+def is_optional_tag(tag: str) -> bool:
+    return tag.startswith(TAG_FOR_OPTIONAL_TAGS)
 
 
 def get_fields_protected_by_tags(note: Note) -> List[str]:
