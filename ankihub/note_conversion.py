@@ -6,28 +6,14 @@ from typing import List
 from anki.notes import Note
 
 from . import settings
-from .ankihub_client import SuggestionType
 
 TAG_FOR_PROTECTING_FIELDS = "AnkiHub_Protect"
 TAG_FOR_PROTECTING_ALL_FIELDS = f"{TAG_FOR_PROTECTING_FIELDS}::All"
 
-TAG_FOR_UPDATES = "AnkiHub_Update"
-TAG_FOR_NEW_NOTE = f"{TAG_FOR_UPDATES}::New_Note"
-TAG_FOR_SUGGESTION_TYPE = {
-    SuggestionType.UPDATED_CONTENT: f"{TAG_FOR_UPDATES}::Content::Updated",
-    SuggestionType.NEW_CONTENT: f"{TAG_FOR_UPDATES}::Content::New",
-    SuggestionType.CONTENT_ERROR: f"{TAG_FOR_UPDATES}::Content::Error",
-    SuggestionType.SPELLING_GRAMMATICAL: f"{TAG_FOR_UPDATES}::Spelling/Grammar",
-    SuggestionType.NEW_TAGS: f"{TAG_FOR_UPDATES}::New_tags",
-    SuggestionType.UPDATED_TAGS: f"{TAG_FOR_UPDATES}::Updated_tags",
-    SuggestionType.NEW_CARD_TO_ADD: f"{TAG_FOR_UPDATES}::New_Card",
-    SuggestionType.OTHER: f"{TAG_FOR_UPDATES}::Other",
-}
 
 # top-level tags that are only used by the add-on, but not by the web app
 ADDON_INTERNAL_TAGS = [
     TAG_FOR_PROTECTING_FIELDS,
-    TAG_FOR_UPDATES,
 ]
 
 # tags that are used internally by Anki and should not be deleted or appear in suggestions

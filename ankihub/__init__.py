@@ -27,7 +27,7 @@ if not SKIP_INIT:
     try:
         from . import entry_point
 
-        mw = entry_point.run()
+        entry_point.run()
     except Exception as e:
         # should we show exceptions to the user too?
         LOGGER.exception(e)

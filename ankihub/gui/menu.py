@@ -25,11 +25,11 @@ from aqt.utils import openLink, showInfo, showText, tooltip
 from .. import LOGGER
 from ..addon_ankihub_client import AddonAnkiHubClient as AnkiHubClient
 from ..ankihub_client import AnkiHubRequestError
-from ..subdecks import SUBDECK_TAG
 from ..error_reporting import upload_logs_in_background
 from ..media_import.ui import open_import_dialog
 from ..register_decks import create_collaborative_deck
 from ..settings import ADDON_VERSION, URL_VIEW_DECK, config
+from ..subdecks import SUBDECK_TAG
 from ..sync import sync_with_progress
 from .decks import SubscribedDecksDialog
 from .utils import ask_user
@@ -402,7 +402,7 @@ def ankihub_logout_setup(parent):
     parent.addAction(q_action)
 
 
-ankihub_menu: QMenu
+ankihub_menu: Optional[QMenu] = None
 
 
 def setup_ankihub_menu() -> None:

@@ -1,6 +1,7 @@
 import sqlite3
 import uuid
 from contextlib import contextmanager
+from pathlib import Path
 from typing import Any, Iterable, List, Optional, Tuple
 
 from anki.models import NotetypeId
@@ -9,8 +10,8 @@ from anki.utils import ids2str, join_fields, split_fields
 from aqt import mw
 
 from . import LOGGER
-from .ankihub_client import Field, NoteInfo
-from .settings import DB_PATH
+from .ankihub_client import Field, NoteInfo, suggestion_type_from_str
+from .settings import ankihub_db_path
 
 
 def attach_ankihub_db_to_anki_db_connection() -> None:
@@ -18,7 +19,8 @@ def attach_ankihub_db_to_anki_db_connection() -> None:
         name for _, name, _ in mw.col.db.all("PRAGMA database_list")
     ]:
         mw.col.db.execute(
-            f"ATTACH DATABASE ? AS {AnkiHubDB.database_name}", str(DB_PATH)
+            f"ATTACH DATABASE ? AS {AnkiHubDB.database_name}",
+            str(AnkiHubDB.database_path),
         )
         LOGGER.debug("Attached AnkiHub DB to Anki DB connection")
 
@@ -48,8 +50,17 @@ def detach_ankihub_db_from_anki_db_connection() -> None:
 
 
 @contextmanager
+def attached_ankihub_db():
+    attach_ankihub_db_to_anki_db_connection()
+    try:
+        yield
+    finally:
+        detach_ankihub_db_from_anki_db_connection()
+
+
+@contextmanager
 def db_transaction():
-    with sqlite3.connect(DB_PATH) as conn:
+    with sqlite3.connect(AnkiHubDB.database_path) as conn:
         yield conn
     conn.close()
 
@@ -58,41 +69,11 @@ class AnkiHubDB:
 
     # name of the database when attached to the Anki DB connection
     database_name = "ankihub_db"
+    database_path: Optional[Path] = None
 
-    def __init__(self):
-        self._setup_tables_and_migrate()
+    def setup_and_migrate(self) -> None:
+        AnkiHubDB.database_path = ankihub_db_path()
 
-    def execute(self, sql: str, *args, first_row_only=False) -> List:
-        conn = sqlite3.connect(DB_PATH)
-        c = conn.cursor()
-        c.execute(sql, args)
-        if first_row_only:
-            result = c.fetchone()
-        else:
-            result = c.fetchall()
-        c.close()
-        conn.commit()
-        conn.close()
-        return result
-
-    def scalar(self, sql: str, *args) -> Any:
-        rows = self.execute(sql, *args, first_row_only=True)
-        if rows:
-            return rows[0]
-        else:
-            return None
-
-    def list(self, sql: str, *args) -> List:
-        return [x[0] for x in self.execute(sql, *args, first_row_only=False)]
-
-    def first(self, sql: str, *args) -> Optional[Tuple]:
-        rows = self.execute(sql, *args, first_row_only=True)
-        if rows:
-            return tuple(rows)
-        else:
-            return None
-
-    def _setup_tables_and_migrate(self) -> None:
         self.execute(
             """
             CREATE TABLE IF NOT EXISTS notes (
@@ -134,6 +115,43 @@ class AnkiHubDB:
                 f"AnkiHub DB migrated to schema version {self.schema_version()}"
             )
 
+        if self.schema_version() <= 3:
+            self.execute("ALTER TABLE notes ADD COLUMN last_update_type TEXT")
+            self.execute("PRAGMA user_version = 4;")
+            LOGGER.debug(
+                f"AnkiHub DB migrated to schema version {self.schema_version()}"
+            )
+
+    def execute(self, sql: str, *args, first_row_only=False) -> List:
+        conn = sqlite3.connect(self.database_path)
+        c = conn.cursor()
+        c.execute(sql, args)
+        if first_row_only:
+            result = c.fetchone()
+        else:
+            result = c.fetchall()
+        c.close()
+        conn.commit()
+        conn.close()
+        return result
+
+    def scalar(self, sql: str, *args) -> Any:
+        rows = self.execute(sql, *args, first_row_only=True)
+        if rows:
+            return rows[0]
+        else:
+            return None
+
+    def list(self, sql: str, *args) -> List:
+        return [x[0] for x in self.execute(sql, *args, first_row_only=False)]
+
+    def first(self, sql: str, *args) -> Optional[Tuple]:
+        rows = self.execute(sql, *args, first_row_only=True)
+        if rows:
+            return tuple(rows)
+        else:
+            return None
+
     def schema_version(self) -> int:
         result = self.scalar("PRAGMA user_version;")
         return result
@@ -169,8 +187,9 @@ class AnkiHubDB:
                         mod,
                         fields,
                         tags,
-                        guid
-                    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+                        guid,
+                        last_update_type
+                    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
                     """,
                     (
                         str(note_data.ankihub_note_uuid),
@@ -181,6 +200,9 @@ class AnkiHubDB:
                         fields,
                         mw.col.tags.join(note_data.tags),
                         note_data.guid,
+                        note_data.last_update_type.value[0]
+                        if note_data.last_update_type is not None
+                        else None,
                     ),
                 )
 
@@ -209,7 +231,8 @@ class AnkiHubDB:
                 anki_note_type_id,
                 tags,
                 fields,
-                guid
+                guid,
+                last_update_type
             FROM notes
             WHERE anki_note_id = {anki_note_id}
             """,
@@ -217,7 +240,7 @@ class AnkiHubDB:
         if result is None:
             return None
 
-        ah_nid, anki_nid, mid, tags, flds, guid = result
+        ah_nid, anki_nid, mid, tags, flds, guid, last_update_type = result
         field_names = [
             field["name"] for field in mw.col.models.get(NotetypeId(mid))["flds"]
         ]
@@ -235,6 +258,9 @@ class AnkiHubDB:
                 for i, value in enumerate(split_fields(flds))
             ],
             guid=guid,
+            last_update_type=suggestion_type_from_str(last_update_type)
+            if last_update_type
+            else None,
         )
 
     def anki_nids_for_ankihub_deck(self, ankihub_did: uuid.UUID) -> List[NoteId]:

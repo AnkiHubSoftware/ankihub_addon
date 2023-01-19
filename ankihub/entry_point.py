@@ -8,19 +8,66 @@ from aqt.gui_hooks import main_window_did_init, profile_did_open, sync_did_finis
 
 from . import LOGGER
 from .addons import setup_addons
+from .db import ankihub_db
 from .errors import setup_error_handler
 from .gui import browser, editor
-from .gui.db_check import check_ankihub_db
 from .gui.anki_db_check import check_anki_db
-from .gui.menu import setup_ankihub_menu
+from .gui.db_check import check_ankihub_db
+from .gui.menu import refresh_ankihub_menu, setup_ankihub_menu
 from .progress import setup_progress_manager
-from .settings import config
+from .settings import config, setup_profile_data_folder
 from .sync import sync_with_progress
+
+# some code needs to be run only once even if the Anki profile changes
+ATTEMPTED_GENERAL_SETUP_BEFORE = False
 
 
 def run():
     """Call this function in __init__.py when Anki starts."""
+    profile_did_open.append(on_profile_did_open)
 
+
+def on_profile_did_open():
+    if not profile_setup():
+        return
+
+    global ATTEMPTED_GENERAL_SETUP_BEFORE
+    if ATTEMPTED_GENERAL_SETUP_BEFORE:
+        return
+
+    # The variable is set to True here and not at the end of the function because
+    # the non_profile_setup should not be run if it has failed before.
+    # If it were to run again, there could be duplicated menus and other unwanted side effects.
+    ATTEMPTED_GENERAL_SETUP_BEFORE = True
+
+    general_setup()
+
+
+def profile_setup() -> bool:
+    """Set up profile data folder, config, and AnkiHub DB for the current profile.
+    Returns whether the profile setup was successful.
+    """
+    if not setup_profile_data_folder():
+        return False
+    LOGGER.debug(f"Set up profile data folder for the current profile: {mw.pm.name}")
+
+    config.setup()
+    LOGGER.debug("Setup config for the current profile.")
+
+    ankihub_db.setup_and_migrate()
+    LOGGER.debug("Set up and migrated AnkiHub DB for the current profile.")
+
+    from .gui.menu import ankihub_menu
+
+    if ankihub_menu:
+        refresh_ankihub_menu()
+        LOGGER.debug("Refreshed AnkiHub menu.")
+
+    return True
+
+
+def general_setup():
+    """Set up things that don't depend on the profile."""
     main_window_did_init.append(log_enabled_addons)
 
     mw.addonManager.setWebExports(__name__, r"gui/web/.*")
@@ -52,8 +99,6 @@ def run():
     from . import media_export  # noqa: F401
 
     LOGGER.debug("Loaded media_export.")
-
-    return mw
 
 
 def on_startup_syncs_done() -> None:
