@@ -124,12 +124,18 @@ def do_after_ankiweb_sync(callback: Callable[[], None]) -> None:
 
     def on_profile_open():
         if not mw.can_auto_sync():
+            LOGGER.debug(
+                "do_after_ankiweb_sync: Calling callback right away as mw.can_auto_sync() is False"
+            )
             callback()
         else:
 
             def on_sync_did_finish():
                 sync_did_finish.remove(on_sync_did_finish)
 
+                LOGGER.debug(
+                    "do_after_ankiweb_sync: Calling callback after AnkiWeb sync"
+                )
                 callback()
 
             sync_did_finish.append(on_sync_did_finish)
