@@ -15,7 +15,7 @@ from .gui.anki_db_check import check_anki_db
 from .gui.db_check import check_ankihub_db
 from .gui.menu import refresh_ankihub_menu, setup_ankihub_menu
 from .progress import setup_progress_manager
-from .settings import config, setup_profile_data_folder
+from .settings import ANKI_VERSION, config, setup_profile_data_folder
 from .sync import sync_with_progress
 
 # some code needs to be run only once even if the Anki profile changes
@@ -68,6 +68,8 @@ def profile_setup() -> bool:
 
 def general_setup():
     """Set up things that don't depend on the profile."""
+
+    LOGGER.debug(f"{ANKI_VERSION=}")
     main_window_did_init.append(log_enabled_addons)
 
     mw.addonManager.setWebExports(__name__, r"gui/web/.*")
