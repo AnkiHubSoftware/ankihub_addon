@@ -203,6 +203,7 @@ config = Config()
 def setup_profile_data_folder() -> bool:
     """Returns False if the migration from the old location needs yet to be done."""
     assign_id_to_profile_if_not_exists()
+    LOGGER.debug(f"Anki profile id: {mw.pm.profile[PROFILE_ID_FIELD_NAME]}")
 
     if not (path := profile_files_path()).exists():
         path.mkdir(parents=True)
@@ -220,6 +221,10 @@ def assign_id_to_profile_if_not_exists() -> None:
 
     mw.pm.profile[PROFILE_ID_FIELD_NAME] = str(uuid.uuid4())
     mw.pm.save()
+
+    LOGGER.debug(
+        f"Assigned new id to Anki profile: {mw.pm.profile[PROFILE_ID_FIELD_NAME]}"
+    )
 
 
 def user_files_path() -> Path:
