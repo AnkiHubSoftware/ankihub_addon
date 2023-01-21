@@ -2173,26 +2173,25 @@ def test_optional_tag_suggestion_dialog(
         notes[1].flush()
 
         # open the dialog
-        with monkeypatch.context() as m:
-            m.setattr(
-                "ankihub.ankihub_client.AnkiHubClient.prevalidate_tag_groups",
-                lambda *args, **kwargs: [
-                    TagGroupValidationResponse(
-                        tag_group_name="VALID",
-                        deck_extension_id=1,
-                        success=True,
-                        errors=[],
-                    ),
-                    TagGroupValidationResponse(
-                        tag_group_name="INVALID",
-                        deck_extension_id=2,
-                        success=False,
-                        errors=["error message"],
-                    ),
-                ],
-            )
-            dialog = OptionalTagsSuggestionDialog(parent=mw, nids=nids)
-            dialog.show()
+        monkeypatch.setattr(
+            "ankihub.ankihub_client.AnkiHubClient.prevalidate_tag_groups",
+            lambda *args, **kwargs: [
+                TagGroupValidationResponse(
+                    tag_group_name="VALID",
+                    deck_extension_id=1,
+                    success=True,
+                    errors=[],
+                ),
+                TagGroupValidationResponse(
+                    tag_group_name="INVALID",
+                    deck_extension_id=2,
+                    success=False,
+                    errors=["error message"],
+                ),
+            ],
+        )
+        dialog = OptionalTagsSuggestionDialog(parent=mw, nids=nids)
+        dialog.show()
 
         qtbot.wait(500)
 
@@ -2211,13 +2210,12 @@ def test_optional_tag_suggestion_dialog(
         assert dialog.submit_btn.isEnabled()
 
         suggest_optional_tags_mock = Mock()
-        with monkeypatch.context() as m:
-            m.setattr(
-                "ankihub.ankihub_client.AnkiHubClient.suggest_optional_tags",
-                suggest_optional_tags_mock,
-            )
-            qtbot.mouseClick(dialog.submit_btn, Qt.MouseButton.LeftButton)
-            qtbot.wait(500)
+        monkeypatch.setattr(
+            "ankihub.ankihub_client.AnkiHubClient.suggest_optional_tags",
+            suggest_optional_tags_mock,
+        )
+        qtbot.mouseClick(dialog.submit_btn, Qt.MouseButton.LeftButton)
+        qtbot.wait(500)
 
         assert suggest_optional_tags_mock.call_count == 1
 
