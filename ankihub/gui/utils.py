@@ -3,13 +3,16 @@ from typing import Any, List, Optional
 import aqt
 from aqt import mw
 from aqt.qt import (
+    QApplication,
     QDialog,
     QDialogButtonBox,
+    QIcon,
     QLabel,
     QListWidget,
     QListWidgetItem,
     QMessageBox,
     QPushButton,
+    QStyle,
     Qt,
     QVBoxLayout,
     QWidget,
@@ -163,3 +166,13 @@ def ask_user(
         return False
     else:
         return None
+
+
+def set_tooltip_icon(btn: QPushButton) -> None:
+    btn.setIcon(
+        QIcon(
+            QApplication.style().standardIcon(
+                QStyle.StandardPixmap.SP_MessageBoxInformation
+            )
+        )
+    )
