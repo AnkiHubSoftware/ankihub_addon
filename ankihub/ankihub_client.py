@@ -694,17 +694,13 @@ class AnkiHubClient:
                 "suggestions": [suggestion.to_dict() for suggestion in suggestions],
             },
         )
+
         if response.status_code != 201:
             raise AnkiHubRequestError(response)
 
         data = response.json()
-        if data.get("message"):
-            message = data["message"]
-            LOGGER.debug(f"suggest_optional_tags response message: {message}")
-        else:
-            errors = data.get("errors")
-            LOGGER.debug(f"suggest_optional_tags errors: {errors}")
-            raise AnkiHubRequestError(response)
+        message = data["message"]
+        LOGGER.debug(f"suggest_optional_tags response message: {message}")
 
 
 def transform_notes_data(notes_data: List[Dict]) -> List[Dict]:
