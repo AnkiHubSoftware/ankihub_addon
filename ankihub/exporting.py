@@ -24,7 +24,7 @@ def to_note_data(note: Note, set_new_id: bool = False, diff: bool = False) -> No
     if set_new_id:
         ankihub_note_uuid = uuid.uuid4()
     else:
-        ankihub_note_uuid = ankihub_db.ankihub_id_for_note(note.id)
+        ankihub_note_uuid = ankihub_db.ankihub_nid_for_anki_nid(note.id)
 
     tags = _prepare_tags(note, diff=diff)
     fields = _prepare_fields(note, diff=diff)
