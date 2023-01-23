@@ -227,7 +227,7 @@ def refresh_suggestion_button(editor: Editor) -> None:
         return
 
     set_label_script = "document.getElementById('ankihub-btn-label').textContent='{}';"
-    if ankihub_db.ankihub_id_for_note(note.id):
+    if ankihub_db.ankihub_nid_for_anki_nid(note.id):
         editor.web.eval(set_label_script.format(AnkiHubCommands.CHANGE.value))
         editor.ankihub_command = AnkiHubCommands.CHANGE.value  # type: ignore
     else:

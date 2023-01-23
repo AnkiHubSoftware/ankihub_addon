@@ -122,7 +122,7 @@ def _on_protect_fields_action(browser: Browser) -> None:
 
     nid = nids[0]
 
-    if ankihub_db.ankihub_id_for_note(nid) is None:
+    if ankihub_db.ankihub_nid_for_anki_nid(nid) is None:
         showInfo("This note is not an AnkiHub note.", parent=browser)
         return
 

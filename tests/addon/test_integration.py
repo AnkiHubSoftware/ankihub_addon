@@ -88,7 +88,7 @@ def test_editor(anki_session_with_addon: AnkiSession, requests_mock, monkeypatch
         # test a change note suggestion
         note = mw.col.get_note(mw.col.find_notes("")[0])
         editor.note = note
-        noes_2_ah_nid = ankihub_db.ankihub_id_for_note(note.id)
+        noes_2_ah_nid = ankihub_db.ankihub_nid_for_anki_nid(note.id)
 
         requests_mock.post(
             f"{API_URL_BASE}/notes/{noes_2_ah_nid}/suggestion/",

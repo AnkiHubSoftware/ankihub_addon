@@ -115,7 +115,7 @@ class AnkiHubSync:
             ):
                 customizations = chunk.get("note_customizations", [])
                 for customization in customizations:
-                    note_anki_id = ankihub_db.ankihub_id_to_anki_id(
+                    note_anki_id = ankihub_db.anki_nid_for_ankihub_nid(
                         customization.get("note")
                     )
                     try:
