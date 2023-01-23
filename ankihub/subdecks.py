@@ -107,9 +107,9 @@ def _set_deck_while_respecting_odid(nid: NoteId, did: DeckId) -> None:
 def _subdeck_tag_to_deck_name(anki_root_deck_name: str, tag: str) -> Optional[str]:
     """The tag should be of the form "AnkiHub_Subdeck::ankihub_deck_name::subdeck_name[::subsubdeck_name]*"
     and this returns "anki_root_deck_name::subdeck_name[::subsubdeck_name]*" in this case.
-    If the tag has less than two dividers (= less than 3 parts) the tag is invalid and this returns None."""
+    If the tag has less than 3 parts the tag is invalid and this returns None."""
 
-    if len(tag.split("::")) < 2:
+    if len(tag.split("::")) < 3:
         return None
 
     return f"{anki_root_deck_name}::{tag.split('::', maxsplit=2)[2]}"
