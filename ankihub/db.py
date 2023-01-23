@@ -313,7 +313,7 @@ class AnkiHubDB:
         )
         return notes_count == len(set(anki_nids))
 
-    def ankihub_id_for_note(self, anki_note_id: NoteId) -> Optional[uuid.UUID]:
+    def ankihub_nid_for_anki_nid(self, anki_note_id: NoteId) -> Optional[uuid.UUID]:
         nid_str = self.scalar(
             """
             SELECT ankihub_note_id FROM notes WHERE anki_note_id = ?
@@ -326,7 +326,7 @@ class AnkiHubDB:
         result = uuid.UUID(nid_str)
         return result
 
-    def ankihub_id_to_anki_id(self, ankihub_id: uuid.UUID) -> Optional[NoteId]:
+    def anki_nid_for_ankihub_nid(self, ankihub_id: uuid.UUID) -> Optional[NoteId]:
         note_id_str = self.scalar(
             """
             SELECT anki_note_id FROM notes WHERE ankihub_note_id = ?

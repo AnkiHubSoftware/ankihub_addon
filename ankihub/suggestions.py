@@ -53,7 +53,7 @@ def suggest_notes_in_bulk(
     notes_that_dont_exist_on_remote = []
     ankihub_notes = [note for note in notes if ankihub_did_for_mid.get(note.mid)]
     for note in ankihub_notes:
-        if ankihub_db.ankihub_id_for_note(note.id):
+        if ankihub_db.ankihub_nid_for_anki_nid(note.id):
             notes_that_exist_on_remote.append(note)
         else:
             notes_that_dont_exist_on_remote.append(note)
