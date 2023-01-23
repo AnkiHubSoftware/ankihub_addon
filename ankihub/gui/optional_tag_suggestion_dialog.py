@@ -16,6 +16,7 @@ from aqt.qt import (
 )
 from aqt.utils import showInfo, tooltip
 
+from .. import LOGGER
 from ..optional_tag_suggestions import OptionalTagsSuggestionHelper
 
 
@@ -144,6 +145,9 @@ class OptionalTagsSuggestionDialog(QDialog):
                 if response.errors:
                     item.setToolTip("\n".join(response.errors))
                 else:
+                    LOGGER.debug(
+                        f"Unknown error for tag group {item.text()}, {response=}"
+                    )
                     item.setToolTip("Unknown error")
 
         # enable/disable submit button depending on if there are valid suggestions
