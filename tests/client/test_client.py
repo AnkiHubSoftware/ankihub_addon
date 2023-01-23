@@ -670,6 +670,9 @@ def test_suggest_optional_tags(authorized_client_for_user_test2):
         ]
     )
 
+    # we have no easy way to check if the suggestion is created if it is not accepted,
+    # so this test just checks that the request is successful
+
 
 @pytest.mark.vcr()
 def test_suggest_auto_accepted_optional_tags(authorized_client_for_user_test1):
