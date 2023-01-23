@@ -35,7 +35,7 @@ from ..settings import URL_DECK_BASE, URL_DECKS, URL_HELP, URL_VIEW_DECK, config
 from ..subdecks import SUBDECK_TAG, build_subdecks_and_move_cards_to_them, flatten_deck
 from ..sync import AnkiHubImporter
 from ..utils import create_backup, undo_note_type_modfications
-from .utils import ask_user
+from .utils import ask_user, set_tooltip_icon
 
 
 class SubscribedDecksDialog(QDialog):
@@ -79,6 +79,7 @@ class SubscribedDecksDialog(QDialog):
 
         self.set_home_deck_btn = QPushButton("Set Home deck")
         self.set_home_deck_btn.setToolTip("New cards will be added to this deck.")
+        set_tooltip_icon(self.set_home_deck_btn)
         qconnect(self.set_home_deck_btn.clicked, self._on_set_home_deck)
         self.box_right.addWidget(self.set_home_deck_btn)
 
@@ -87,6 +88,7 @@ class SubscribedDecksDialog(QDialog):
             "Toggle between the deck being organized into subdecks or not.<br>"
             f"This will only have an effect if notes in the deck have <b>{SUBDECK_TAG}</b> tags."
         )
+        set_tooltip_icon(self.toggle_subdecks_btn)
         qconnect(self.toggle_subdecks_btn.clicked, self._on_toggle_subdecks)
         self.box_right.addWidget(self.toggle_subdecks_btn)
 
