@@ -54,6 +54,7 @@ jobs:
             ${{ runner.os }}-pip-
 
       - run: docker-compose pull
+      - run: echo "MONTH=$(date +%m)" >> $GITHUB_ENV
       - uses: satackey/action-docker-layer-caching@v0.0.11
         continue-on-error: true
         with:
