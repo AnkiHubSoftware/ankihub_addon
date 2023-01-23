@@ -73,7 +73,7 @@ class OptionalTagsSuggestionHelper:
                     OptionalTagSuggestion(
                         tag_group_name=tag_group,
                         deck_extension_id=self._extension_id_by_tag_group[tag_group],
-                        ankihub_note_uuid=ankihub_db.ankihub_id_for_note(nid),
+                        ankihub_note_uuid=ankihub_db.ankihub_nid_for_anki_nid(nid),
                         tags=tags_for_group,
                     ),
                 )
