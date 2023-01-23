@@ -56,6 +56,10 @@ jobs:
       - run: docker-compose pull
       - uses: satackey/action-docker-layer-caching@v0.0.11
         continue-on-error: true
+        with:
+          key: ${{ github.workflow }}-${{ env.MONTH }}-{hash}
+          restore-keys: |
+            ${{ github.workflow }}-${{ env.MONTH }}-
       - run: |
           docker-compose build
           docker-compose run --rm django python manage.py makemigrations
