@@ -732,5 +732,11 @@ def recursively_sorted(d):
     if isinstance(d, dict):
         return {k: recursively_sorted(v) for k, v in sorted(d.items())}
     if isinstance(d, list):
-        return [recursively_sorted(v) for v in d]
+        try:
+            return list(sorted([recursively_sorted(v) for v in d]))
+        except TypeError:
+            return list(
+                sorted((recursively_sorted(v) for v in d), key=lambda x: str(x))
+            )
+
     return d
