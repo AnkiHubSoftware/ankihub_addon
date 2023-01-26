@@ -229,6 +229,7 @@ def modify_fields(note_type: Dict) -> None:
 
 
 def modify_template(template: Dict) -> None:
+    # the order is important here, the end comment must be added last
     add_ankihub_snippet_to_template(template)
     add_ankihub_end_comment_to_template(template)
 
