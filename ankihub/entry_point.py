@@ -84,7 +84,6 @@ def general_setup():
     profile changes."""
 
     LOGGER.debug(f"{ANKI_VERSION=}")
-    profile_did_open.append(on_profile_did_open)
 
     mw.addonManager.setWebExports(__name__, r"gui/web/.*")
 
