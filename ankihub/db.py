@@ -122,6 +122,13 @@ class AnkiHubDB:
                 f"AnkiHub DB migrated to schema version {self.schema_version()}"
             )
 
+        if self.schema_version() <= 4:
+            self.execute("CREATE INDEX anki_note_type_id ON notes (anki_note_type_id)")
+            self.execute("PRAGMA user_version = 5;")
+            LOGGER.debug(
+                f"AnkiHub DB migrated to schema version {self.schema_version()}"
+            )
+
     def execute(self, sql: str, *args, first_row_only=False) -> List:
         conn = sqlite3.connect(self.database_path)
         c = conn.cursor()
@@ -337,6 +344,10 @@ class AnkiHubDB:
             return None
 
         result = NoteId(note_id_str)
+        return result
+
+    def ankihub_note_type_ids(self) -> List[NotetypeId]:
+        result = self.list("SELECT DISTINCT anki_note_type_id FROM notes")
         return result
 
     def is_ankihub_note_type(self, anki_note_type_id: NotetypeId) -> bool:
