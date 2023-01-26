@@ -272,7 +272,7 @@ def add_ankihub_end_comment_to_template(template: Dict) -> None:
             continue
 
         template[key] = (
-            template[key].rstrip("\n ") + f"\n\n<!-- {ANKIHUB_TEMPLATE_END_COMMENT} -->"
+            template[key].rstrip("\n ") + "\n\n" + ANKIHUB_TEMPLATE_END_COMMENT
         )
         LOGGER.debug(
             f"Added ANKIHUB_TEMPLATE_END_COMMENT to template {template['name']} on side {key}"
