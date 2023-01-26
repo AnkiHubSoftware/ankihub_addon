@@ -16,6 +16,7 @@ from .settings import (
     ANKIHUB_NOTE_TYPE_FIELD_NAME,
     ANKIHUB_NOTE_TYPE_MODIFICATION_STRING,
     URL_VIEW_NOTE,
+    ANKIHUB_TEMPLATE_END_COMMENT,
 )
 
 
@@ -196,18 +197,8 @@ ANKIHUB_TEMPLATE_SNIPPET_RE = (
 )
 
 
-def modify_note_types(note_type_ids: Iterable[NotetypeId]) -> None:
-    for mid in note_type_ids:
-        note_type = mw.col.models.get(mid)
-        modify_note_type(note_type)
-        mw.col.models.update_dict(note_type)
-
-
 def modify_note_type(note_type: NotetypeDict) -> None:
-    """Adds the AnkiHub Field to the Note Type and modifies the template to
-    display the field.
-    """
-    "Adds ankihub field. Adds link to ankihub in card template."
+    """Adds the AnkiHub ID Field to the Note Type and modifies the card templates."""
     LOGGER.debug(f"Modifying note type {note_type['name']}")
 
     modify_fields(note_type)
@@ -238,6 +229,11 @@ def modify_fields(note_type: Dict) -> None:
 
 
 def modify_template(template: Dict) -> None:
+    add_ankihub_snippet_to_template(template)
+    add_ankihub_end_comment_to_template(template)
+
+
+def add_ankihub_snippet_to_template(template: Dict) -> None:
     ankihub_snippet = (
         f"<!-- BEGIN {ANKIHUB_NOTE_TYPE_MODIFICATION_STRING} -->"
         "<br><br>"
@@ -257,15 +253,29 @@ def modify_template(template: Dict) -> None:
         f"<!-- END {ANKIHUB_NOTE_TYPE_MODIFICATION_STRING} -->"
     )
 
-    if re.search(snippet_pattern, template["afmt"]):
-        LOGGER.debug("Template modification was already present, updated it")
+    if not re.search(snippet_pattern, template["afmt"]):
+        template["afmt"] = template["afmt"].rstrip("\n ") + "\n\n" + ankihub_snippet
+    else:
+        # update existing snippet to make sure it is up to date
         template["afmt"] = re.sub(
             snippet_pattern,
             ankihub_snippet,
             template["afmt"],
         )
-    else:
-        template["afmt"] += "\n\n" + ankihub_snippet
+
+
+def add_ankihub_end_comment_to_template(template: Dict) -> None:
+    for key in ["qfmt", "afmt"]:
+        cur_side = template[key]
+        if re.search(ANKIHUB_TEMPLATE_END_COMMENT, cur_side):
+            continue
+
+        template[key] = (
+            template[key].rstrip("\n ") + f"\n\n<!-- {ANKIHUB_TEMPLATE_END_COMMENT} -->"
+        )
+        LOGGER.debug(
+            f"Added ANKIHUB_TEMPLATE_END_COMMENT to template {template['name']} on side {key}"
+        )
 
 
 # ... undo modifications
