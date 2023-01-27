@@ -216,6 +216,7 @@ def refresh_suggestion_button(editor: Editor) -> None:
     disable_btn_script = "document.getElementById('ankihub-btn').disabled={};"
 
     # not sure why editor or note can be None here, but it happens, there are reports on sentry
+    # see https://sentry.io/organizations/ankihub/issues/3788327661
     if editor is None:
         return
 
