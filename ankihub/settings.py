@@ -387,6 +387,13 @@ URL_DECKS = f"{ANKIHUB_APP_URL}/explore"
 URL_DECK_BASE = f"{ANKIHUB_APP_URL}/decks"
 ANKIHUB_NOTE_TYPE_FIELD_NAME = "ankihub_id"
 ANKIHUB_NOTE_TYPE_MODIFICATION_STRING = "ANKIHUB MODFICATIONS"
+ANKIHUB_TEMPLATE_END_COMMENT = (
+    "<!--\n"
+    "ANKIHUB_END\n"
+    "Text below this comment will not be modified by AnkiHub or AnKing add-ons.\n"
+    "Do not edit or remove this comment if you want to protect the content below.\n"
+    "-->"
+)
 ADDON_PACKAGE = __name__.split(".")[0]
 ICONS_PATH = ADDON_PATH / "icons"
 

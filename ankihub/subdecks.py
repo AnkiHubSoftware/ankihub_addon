@@ -72,8 +72,16 @@ def _nid_to_destination_deck_name(
     nids: List[NoteId], anki_root_deck_name: str
 ) -> Dict[NoteId, str]:
     result = dict()
+    missing_nids = []
     for nid in nids:
         tags_str = mw.col.db.scalar("SELECT tags FROM notes WHERE id = ?", nid)
+        if not tags_str:
+            # When this query returns None, that means that the note does not exist in the Anki database.
+            # (Notes without tags have an empty string in the tags field.)
+            # In this case we ignore the note.
+            missing_nids.append(nid)
+            continue
+
         tags = mw.col.tags.split(tags_str)
         subdeck_tag_ = _subdeck_tag(tags)
         if subdeck_tag_ is None:
@@ -84,6 +92,12 @@ def _nid_to_destination_deck_name(
                 # ignore invalid subdeck tag
                 continue
         result[nid] = deck_name
+
+    if missing_nids:
+        LOGGER.warning(
+            f"_nid_to_destination_deck_name: The following notes were not found in the Anki database: {missing_nids}"
+        )
+
     return result
 
 

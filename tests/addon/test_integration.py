@@ -1573,6 +1573,8 @@ def record_review(mw, cid: CardId):
     )
 
 
+# without this mark the test sometime fails on clean-up
+@pytest.mark.qt_no_exception_capture
 def test_browser_treeview_ankihub_items(
     anki_session_with_addon: AnkiSession, qtbot: QtBot
 ):

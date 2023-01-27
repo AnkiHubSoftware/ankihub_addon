@@ -4,7 +4,7 @@ from pprint import pformat
 from typing import Callable
 
 from aqt import mw
-from aqt.gui_hooks import main_window_did_init, profile_did_open, sync_did_finish
+from aqt.gui_hooks import profile_did_open, sync_did_finish
 
 from . import LOGGER
 from .addons import setup_addons
@@ -17,6 +17,7 @@ from .gui.menu import refresh_ankihub_menu, setup_ankihub_menu
 from .progress import setup_progress_manager
 from .settings import ANKI_VERSION, config, setup_profile_data_folder
 from .sync import sync_with_progress
+from .utils import modify_note_type_templates
 
 # some code needs to be run only once even if the Anki profile changes
 ATTEMPTED_GENERAL_SETUP_BEFORE = False
@@ -30,6 +31,8 @@ def run():
 def on_profile_did_open():
     if not profile_setup():
         return
+
+    after_profile_setup()
 
     global ATTEMPTED_GENERAL_SETUP_BEFORE
     if ATTEMPTED_GENERAL_SETUP_BEFORE:
@@ -66,11 +69,21 @@ def profile_setup() -> bool:
     return True
 
 
+def after_profile_setup():
+    log_enabled_addons()
+
+    # This adjusts note type templates of note types used by AnkiHub notes when the profile is opened.
+    # If this wouldn't be called here the templates would only be adjusted when syncing with AnkiHub.
+    # We want the modifications to be present even if the user doesn't sync with AnkiHub, so we call
+    # this here.
+    adjust_ankihub_note_type_templates()
+
+
 def general_setup():
-    """Set up things that don't depend on the profile."""
+    """Set up things that don't depend on the profile and should only be run once, even if the
+    profile changes."""
 
     LOGGER.debug(f"{ANKI_VERSION=}")
-    main_window_did_init.append(log_enabled_addons)
 
     mw.addonManager.setWebExports(__name__, r"gui/web/.*")
 
@@ -155,3 +168,12 @@ def trigger_addon_update_check():
     # for add-on updates every 24 hours, so this will trigger an add-on update check on Anki startup.
     # See https://github.com/ankitects/anki/blob/21812556a6a29c7da34561e58824219783a867e7/qt/aqt/main.py#L896-L916
     mw.pm.set_last_addon_update_check(int(time.time()) - (60 * 60 * 25))
+
+
+def adjust_ankihub_note_type_templates():
+    mids = ankihub_db.ankihub_note_type_ids()
+
+    # Filter out note types that don't exist in the Anki database to avoid errors.
+    mids_filtered = [mid for mid in mids if mw.col.models.get(mid)]
+
+    modify_note_type_templates(mids_filtered)
