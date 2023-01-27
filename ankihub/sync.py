@@ -52,15 +52,6 @@ class AnkiHubSync:
         """Downloads note updates from AnkiHub and imports them into Anki.
         Returns True if the sync was successful, False if the user cancelled it."""
 
-        def download_progress_cb(notes_count: int):
-            mw.taskman.run_on_main(
-                lambda: mw.progress.update(
-                    "Downloading updates\n"
-                    f"for {config.deck_config(ankihub_did).name}\n"
-                    f"Notes downloaded: {notes_count}"
-                )
-            )
-
         client = AnkiHubClient()
         notes_data = []
         latest_update: Optional[datetime] = None
@@ -72,7 +63,9 @@ class AnkiHubSync:
             )
             if deck_config.latest_update
             else None,
-            download_progress_cb=download_progress_cb,
+            download_progress_cb=lambda notes_count: _updates_download_progress_cb(
+                notes_count, ankihub_did=ankihub_did
+            ),
         ):
             if mw.progress.want_cancel():
                 LOGGER.debug("User cancelled sync.")
@@ -217,3 +210,35 @@ def sync_with_progress(on_done: Optional[Callable[[], None]] = None) -> None:
         )
     else:
         LOGGER.debug("Skipping sync due to no token.")
+
+
+def _updates_download_progress_cb(notes_count: int, ankihub_did: uuid.UUID):
+    mw.taskman.run_on_main(
+        lambda: _updates_download_progress_cb_inner(
+            notes_count=notes_count, ankihub_did=ankihub_did
+        )
+    )
+
+
+def _updates_download_progress_cb_inner(notes_count: int, ankihub_did: uuid.UUID):
+    try:
+        mw.progress.update(
+            "Downloading updates\n"
+            f"for {config.deck_config(ankihub_did).name}\n"
+            f"Notes downloaded: {notes_count}"
+        )
+    except AttributeError:
+        # There were sentry reports of this error:
+        # AttributeError: 'NoneType' object has no attribute 'form'
+        # See https://sentry.io/organizations/ankihub/issues/3655573546
+        # It seems that this happens when the progress dialog window is closed.
+        # It could be that this happens when AnkiHub syncs during an add-on update
+        # (which also uses the progress dialog).
+        # mw.progress.finish (which will be called when the sync is finished)
+        # does not cause this error, because it checks if the window is open before
+        # calling its methods (at least in Anki 2.1.54).
+        # It should be safe to ignore this error and let the sync continue.
+
+        LOGGER.exception(
+            "Unable to update progress bar to show download progress of deck updates."
+        )
