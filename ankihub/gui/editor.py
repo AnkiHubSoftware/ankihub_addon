@@ -215,8 +215,11 @@ def refresh_suggestion_button(editor: Editor) -> None:
     note = editor.note
     disable_btn_script = "document.getElementById('ankihub-btn').disabled={};"
 
+    # not sure why editor or note can be None here, but it happens, there are reports on sentry
+    if editor is None:
+        return
+
     if note is None:
-        # there were error reports where note was None, maybe because of some other add-on
         editor.web.eval(disable_btn_script.format("true"))
         return
 
@@ -243,7 +246,7 @@ def on_add_cards_init(add_cards: AddCards) -> None:
     editor = add_cards.editor
 
 
-def on_add_cards_change_notetype(old: NoteType, new: NoteType) -> None:
+def on_add_cards_did_change_notetype(old: NoteType, new: NoteType) -> None:
     global editor
     refresh_suggestion_button(editor)
 
@@ -274,7 +277,7 @@ def setup() -> None:
     gui_hooks.webview_did_receive_js_message.append(on_js_message)
     gui_hooks.editor_did_load_note.append(refresh_suggestion_button)
     gui_hooks.add_cards_did_init.append(on_add_cards_init)
-    gui_hooks.add_cards_did_change_note_type.append(on_add_cards_change_notetype)
+    gui_hooks.add_cards_did_change_note_type.append(on_add_cards_did_change_notetype)
 
     gui_hooks.editor_will_load_note.append(hide_ankihub_field_in_editor)
 
