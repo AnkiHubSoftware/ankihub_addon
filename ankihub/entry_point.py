@@ -173,7 +173,7 @@ def trigger_addon_update_check():
 def adjust_ankihub_note_type_templates():
     mids = ankihub_db.ankihub_note_type_ids()
 
-    # Filter out note types that don't in Anki database to avoid errors.
+    # Filter out note types that don't exist in the Anki database to avoid errors.
     mids_filtered = [mid for mid in mids if mw.col.models.get(mid)]
 
     modify_note_type_templates(mids_filtered)
