@@ -27,7 +27,7 @@ from aqt.gui_hooks import (
     browser_will_show_context_menu,
 )
 from aqt.qt import QAction, QMenu, qconnect
-from aqt.utils import showInfo, showText, showWarning, tooltip
+from aqt.utils import showInfo, showText, showWarning, tooltip, tr
 
 from .. import LOGGER
 from ..ankihub_client import AnkiHubRequestError, SuggestionType
@@ -552,7 +552,12 @@ def _build_tag_tree_and_copy_ah_tag_items_to_ah_tree(
 
     # move the AnkiHub tag items to the AnkiHub tree
     tag_tree = next(
-        (item for item in root_tree_item.children if item.name == "Tags"), None
+        (
+            item
+            for item in root_tree_item.children
+            if item.name == tr.browsing_sidebar_tags()
+        ),
+        None,
     )
 
     if tag_tree is None:
