@@ -193,6 +193,27 @@ class NewNoteSuggestion(NoteSuggestion):
     guid: str
 
 
+@dataclass
+class TagGroupValidationResponse(DataClassJSONMixinWithConfig):
+    tag_group_name: str
+    success: bool
+    deck_extension_id: Optional[int]
+    errors: List[str]
+
+
+@dataclass
+class OptionalTagSuggestion(DataClassJSONMixinWithConfig):
+    tag_group_name: str
+    deck_extension_id: int
+    ankihub_note_uuid: uuid.UUID = dataclasses.field(
+        metadata=field_options(
+            alias="related_note",
+            serialize=str,
+        ),
+    )
+    tags: List[str]
+
+
 class AnkiHubRequestError(Exception):
     def __init__(self, response: Response):
         self.response = response
@@ -616,6 +637,70 @@ class AnkiHubClient:
             url = data["next"].split("/api", maxsplit=1)[1] if data["next"] else None
 
             yield data
+
+    def prevalidate_tag_groups(
+        self, ankihub_deck_uuid: uuid.UUID, tag_group_names: List[str]
+    ) -> List[TagGroupValidationResponse]:
+        suggestions = [
+            {"tag_group_name": tag_group_name} for tag_group_name in tag_group_names
+        ]
+        response = self._send_request(
+            "POST",
+            "/deck_extensions/suggestions/prevalidate",
+            data={"deck_id": str(ankihub_deck_uuid), "suggestions": suggestions},
+        )
+        if response.status_code != 200:
+            raise AnkiHubRequestError(response)
+
+        data = response.json()
+        suggestions = data["suggestions"]
+        tag_group_validation_objects = [
+            TagGroupValidationResponse.from_dict(suggestion)
+            for suggestion in suggestions
+        ]
+        return tag_group_validation_objects
+
+    def suggest_optional_tags(
+        self,
+        suggestions: List[OptionalTagSuggestion],
+        auto_accept: bool = False,
+    ) -> None:
+        deck_extension_ids = set(
+            suggestion.deck_extension_id for suggestion in suggestions
+        )
+        for deck_extension_id in deck_extension_ids:
+            suggestions_for_deck_extension = [
+                suggestion
+                for suggestion in suggestions
+                if suggestion.deck_extension_id == deck_extension_id
+            ]
+            self._suggest_optional_tags_for_deck_extension(
+                deck_extension_id=deck_extension_id,
+                suggestions=suggestions_for_deck_extension,
+                auto_accept=auto_accept,
+            )
+
+    def _suggest_optional_tags_for_deck_extension(
+        self,
+        deck_extension_id: int,
+        suggestions: List[OptionalTagSuggestion],
+        auto_accept: bool = False,
+    ) -> None:
+        response = self._send_request(
+            "POST",
+            f"/deck_extensions/{deck_extension_id}/suggestions/",
+            data={
+                "auto_accept": auto_accept,
+                "suggestions": [suggestion.to_dict() for suggestion in suggestions],
+            },
+        )
+
+        if response.status_code != 201:
+            raise AnkiHubRequestError(response)
+
+        data = response.json()
+        message = data["message"]
+        LOGGER.debug(f"suggest_optional_tags response message: {message}")
 
 
 def transform_notes_data(notes_data: List[Dict]) -> List[Dict]:
