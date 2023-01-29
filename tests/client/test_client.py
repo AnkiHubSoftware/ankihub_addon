@@ -22,10 +22,6 @@ VCR_CASSETTES_PATH = Path(__file__).parent / "cassettes"
 UUID_1 = uuid.UUID("11111111-1111-1111-1111-111111111111")
 UUID_2 = uuid.UUID("22222222-2222-2222-2222-222222222222")
 
-# defined in create_fixture_data.py script in django app
-DECK_WITH_EXTENSION_UUID = uuid.UUID("100df7b9-7749-4fe0-b801-e3dec1decd72")
-DECK_EXTENSION_ID = 999
-
 
 @pytest.fixture(autouse=True)
 def set_ankihub_app_url():
@@ -80,7 +76,6 @@ def vcr_enabled(vcr: VCR):
 def run_command_in_django_container(command):
     subprocess.run(
         [
-            "sudo",
             "docker-compose",
             "-f",
             COMPOSE_FILE.absolute(),
@@ -565,12 +560,14 @@ def test_get_deck_extensions_by_deck_id(authorized_client_for_user_test1):
 
     client: AnkiHubClient = authorized_client_for_user_test1
 
+    deck_id = uuid.UUID("100df7b9-7749-4fe0-b801-e3dec1decd72")
+
     expected_response = {
         "deck_extensions": [
             {
                 "id": 999,
                 "owner": 1,
-                "deck": str(DECK_WITH_EXTENSION_UUID),
+                "deck": "100df7b9-7749-4fe0-b801-e3dec1decd72",
                 "name": "test100",
                 "tag_group_name": "test100",
                 "description": "",
@@ -578,9 +575,9 @@ def test_get_deck_extensions_by_deck_id(authorized_client_for_user_test1):
         ]
     }
 
-    response = client.get_deck_extensions_by_deck_id(deck_id=DECK_WITH_EXTENSION_UUID)
+    response = client.get_deck_extensions_by_deck_id(deck_id=deck_id)
 
-    assert recursively_sorted(response) == recursively_sorted(expected_response)
+    assert response == expected_response
 
 
 @pytest.mark.vcr()
@@ -619,124 +616,4 @@ def test_get_note_customizations_by_deck_extension_id(authorized_client_for_user
         )
     )
     assert len(chunks) == 1
-    assert recursively_sorted(chunks[0]) == recursively_sorted(expected_response)
-
-
-@pytest.mark.vcr()
-def test_prevalidate_tag_groups(authorized_client_for_user_test2):
-    from ankihub.ankihub_client import AnkiHubClient, TagGroupValidationResponse
-
-    client: AnkiHubClient = authorized_client_for_user_test2
-
-    tag_group_validation_responses = client.prevalidate_tag_groups(
-        ankihub_deck_uuid=DECK_WITH_EXTENSION_UUID,
-        tag_group_names=["test100", "invalid"],
-    )
-    assert tag_group_validation_responses == [
-        TagGroupValidationResponse(
-            tag_group_name="test100",
-            deck_extension_id=DECK_EXTENSION_ID,
-            success=True,
-            errors=[],
-        ),
-        TagGroupValidationResponse(
-            tag_group_name="invalid",
-            deck_extension_id=None,
-            success=False,
-            errors=[
-                "This Deck Extension does not exist. Please create one for this Deck on AnkiHub."
-            ],
-        ),
-    ]
-
-
-@pytest.mark.vcr()
-def test_suggest_optional_tags(authorized_client_for_user_test2):
-    from ankihub.ankihub_client import AnkiHubClient, OptionalTagSuggestion
-
-    client: AnkiHubClient = authorized_client_for_user_test2
-
-    client.suggest_optional_tags(
-        suggestions=[
-            OptionalTagSuggestion(
-                ankihub_note_uuid=uuid.UUID("8645c6d6-4f3d-417e-8295-8f5009042b6e"),
-                tag_group_name="test100",
-                deck_extension_id=999,
-                tags=[
-                    "AnkiHub_Optional::test100::test1",
-                    "AnkiHub_Optional::test100::test2",
-                ],
-            )
-        ]
-    )
-
-    # we have no easy way to check if the suggestion is created if it is not accepted,
-    # so this test just checks that the request is successful
-
-
-@pytest.mark.vcr()
-def test_suggest_auto_accepted_optional_tags(authorized_client_for_user_test1):
-    from ankihub.ankihub_client import AnkiHubClient, OptionalTagSuggestion
-
-    client: AnkiHubClient = authorized_client_for_user_test1
-
-    client.suggest_optional_tags(
-        auto_accept=True,
-        suggestions=[
-            OptionalTagSuggestion(
-                ankihub_note_uuid=uuid.UUID("8645c6d6-4f3d-417e-8295-8f5009042b6e"),
-                tag_group_name="test100",
-                deck_extension_id=DECK_EXTENSION_ID,
-                tags=[
-                    "AnkiHub_Optional::test100::new1",
-                    "AnkiHub_Optional::test100::new2",
-                ],
-            )
-        ],
-    )
-
-    # assert that the tags were updated
-    expected_response = {
-        "next": None,
-        "note_customizations": [
-            {
-                "id": 2,
-                "note": "8645c6d6-4f3d-417e-8295-8f5009042b6e",
-                "tags": [
-                    "AnkiHub_Optional::test100::new1",
-                    "AnkiHub_Optional::test100::new2",
-                ],
-            },
-            {
-                "id": 1,
-                "note": "b2344a94-0ca6-44a1-87a1-1593558c10a9",
-                "tags": [
-                    "AnkiHub_Optional::test100::test1",
-                    "AnkiHub_Optional::test100::test2",
-                ],
-            },
-        ],
-    }
-
-    chunks = list(
-        client.get_note_customizations_by_deck_extension_id(
-            deck_extension_id=DECK_EXTENSION_ID
-        )
-    )
-    assert len(chunks) == 1
-    assert recursively_sorted(chunks[0]) == recursively_sorted(expected_response)
-
-
-def recursively_sorted(d):
-    # https://stackoverflow.com/a/25851972/1123955
-    if isinstance(d, dict):
-        return {k: recursively_sorted(v) for k, v in sorted(d.items())}
-    if isinstance(d, list):
-        try:
-            return list(sorted([recursively_sorted(v) for v in d]))
-        except TypeError:
-            return list(
-                sorted((recursively_sorted(v) for v in d), key=lambda x: str(x))
-            )
-
-    return d
+    assert chunks[0] == expected_response

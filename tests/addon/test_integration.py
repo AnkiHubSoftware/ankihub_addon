@@ -16,7 +16,6 @@ from anki.decks import DeckId
 from anki.models import NotetypeDict, NotetypeId
 from anki.notes import Note, NoteId
 from aqt.importing import AnkiPackageImporter
-from aqt.qt import Qt
 from pytest_anki import AnkiSession
 from pytestqt.qtbot import QtBot
 
@@ -2148,94 +2147,3 @@ def test_sync_with_optional_content(
             ]
 
             assert set(updated_note.tags) == set(expected_tags)
-
-
-def test_optional_tag_suggestion_dialog(
-    anki_session_with_addon: AnkiSession, qtbot: QtBot, monkeypatch
-):
-    anki_session = anki_session_with_addon
-
-    from ankihub.ankihub_client import OptionalTagSuggestion, TagGroupValidationResponse
-    from ankihub.gui.optional_tag_suggestion_dialog import OptionalTagsSuggestionDialog
-    from ankihub.note_conversion import TAG_FOR_OPTIONAL_TAGS
-
-    with anki_session.profile_loaded():
-        mw = anki_session.mw
-
-        # import a sample deck and give notes optional tags
-        import_sample_ankihub_deck(mw)
-        nids = mw.col.find_notes("")
-        notes = [mw.col.get_note(nid) for nid in nids]
-
-        notes[0].tags = [
-            f"{TAG_FOR_OPTIONAL_TAGS}::VALID::tag1",
-        ]
-        notes[0].flush()
-
-        notes[1].tags = [
-            f"{TAG_FOR_OPTIONAL_TAGS}::INVALID::tag1",
-        ]
-        notes[1].flush()
-
-        # open the dialog
-        monkeypatch.setattr(
-            "ankihub.ankihub_client.AnkiHubClient.prevalidate_tag_groups",
-            lambda *args, **kwargs: [
-                TagGroupValidationResponse(
-                    tag_group_name="VALID",
-                    deck_extension_id=1,
-                    success=True,
-                    errors=[],
-                ),
-                TagGroupValidationResponse(
-                    tag_group_name="INVALID",
-                    deck_extension_id=2,
-                    success=False,
-                    errors=["error message"],
-                ),
-            ],
-        )
-        dialog = OptionalTagsSuggestionDialog(parent=mw, nids=nids)
-        dialog.show()
-
-        qtbot.wait(500)
-
-        # assert that the dialog is in the correct state
-        assert dialog.tag_group_list.count() == 2
-
-        # items are sorted alphabetically
-        assert dialog.tag_group_list.item(0).text() == "INVALID"
-        assert "error message" in dialog.tag_group_list.item(0).toolTip()
-
-        assert dialog.tag_group_list.item(1).text() == "VALID"
-        # empty tooltip means that the tag group is valid because invalid tag groups
-        # have a tooltip with the error message
-        assert dialog.tag_group_list.item(1).toolTip() == ""
-
-        assert dialog.submit_btn.isEnabled()
-
-        suggest_optional_tags_mock = Mock()
-        monkeypatch.setattr(
-            "ankihub.ankihub_client.AnkiHubClient.suggest_optional_tags",
-            suggest_optional_tags_mock,
-        )
-        qtbot.mouseClick(dialog.submit_btn, Qt.MouseButton.LeftButton)
-        qtbot.wait(500)
-
-        assert suggest_optional_tags_mock.call_count == 1
-
-        # assert that the suggest_optional_tags function was called with the correct arguments
-        assert suggest_optional_tags_mock.call_args.kwargs == {
-            "suggestions": [
-                OptionalTagSuggestion(
-                    tag_group_name="VALID",
-                    deck_extension_id=1,
-                    ankihub_note_uuid=uuid.UUID("e2857855-b414-4a2a-a0bf-2a0eac273f21"),
-                    tags=["AnkiHub_Optional::VALID::tag1"],
-                )
-            ],
-            "auto_accept": False,
-        }
-
-        # assert that the dialog was closed
-        assert dialog.isHidden()
