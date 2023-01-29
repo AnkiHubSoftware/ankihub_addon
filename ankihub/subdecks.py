@@ -85,7 +85,12 @@ def _nid_to_destination_deck_name(
         tags = mw.col.tags.split(tags_str)
         subdeck_tag_ = _subdeck_tag(tags)
         if subdeck_tag_ is None:
-            deck_name = anki_root_deck_name
+            # If the note does not have a subdeck tag, we don't move it.
+            # This is to avoid moving notes that don't have subdeck tags from the subdecks to the root deck.
+            # Users were unhappy about this behavior as their notes were moved to the root deck when
+            # they enabled the subdeck feature and they had to use a backup to restore their notes to their
+            # original subdecks.
+            continue
         else:
             deck_name = _subdeck_tag_to_deck_name(anki_root_deck_name, subdeck_tag_)
             if deck_name is None:
@@ -119,14 +124,18 @@ def _set_deck_while_respecting_odid(nid: NoteId, did: DeckId) -> None:
 
 
 def _subdeck_tag_to_deck_name(anki_root_deck_name: str, tag: str) -> Optional[str]:
-    """The tag should be of the form "AnkiHub_Subdeck::ankihub_deck_name::subdeck_name[::subsubdeck_name]*"
-    and this returns "anki_root_deck_name::subdeck_name[::subsubdeck_name]*" in this case.
-    If the tag has less than 3 parts the tag is invalid and this returns None."""
+    """The tag should be of the form "AnkiHub_Subdeck::ankihub_deck_name[::subdeck_name]*"
+    and this returns "anki_root_deck_name[::subdeck_name]*" in this case.
+    If the tag has less than 2 parts the tag is invalid and this returns None."""
 
-    if len(tag.split("::")) < 3:
+    if "::" not in tag:
         return None
 
-    return f"{anki_root_deck_name}::{tag.split('::', maxsplit=2)[2]}"
+    if tag.count("::") == 1:
+        return anki_root_deck_name
+    else:
+        _, _, subdeck_name = tag.split("::", maxsplit=2)
+        return f"{anki_root_deck_name}::{subdeck_name}"
 
 
 def _create_decks(deck_names: Iterable[str]) -> None:
@@ -165,10 +174,11 @@ def flatten_deck(ankihub_did: uuid.UUID) -> None:
 
 
 def add_subdeck_tags_to_notes(anki_deck_name: str, ankihub_deck_name: str) -> None:
-    """To every note in the deck a tags is added that indicates in which subdeck
+    """To every note in the deck a tag is added that indicates in which subdeck
     the note is located. For example, if the deck is called "A" and the note is in
     the deck "A::B::C", the tag f"{TAG_FOR_SUBDECK}::A::B::C" is added to the note.
-    If the note is in deck "A" and not in a subdeck of A no tag is added.
+    If the note is in deck "A" and not in a subdeck of A then f"{TAG_FOR_SUBDECK}::A"
+    is added to the note.
 
     The ankihub_deck_name is used to replace the root deck name in the subdeck tags.
     We can't just use the root of the anki_deck_name, because the
@@ -182,6 +192,11 @@ def add_subdeck_tags_to_notes(anki_deck_name: str, ankihub_deck_name: str) -> No
     LOGGER.debug("Adding subdeck tags to notes.")
 
     deck = mw.col.decks.by_name(anki_deck_name)
+
+    # add tags to notes in root deck
+    nids = nids_in_deck_but_not_in_subdeck(anki_deck_name)
+    tag = _subdeck_name_to_tag(ankihub_deck_name)
+    mw.col.tags.bulk_add(nids, tag)
 
     # add tags to notes in subdecks
     # (mw.col.decks also returns children of children)

@@ -146,7 +146,7 @@ def test_add_subdeck_tags_to_notes(anki_session_with_addon: AnkiSession):
         add_subdeck_tags_to_notes("A", ankihub_deck_name="Test")
 
         note1.load()
-        assert note1.tags == []
+        assert note1.tags == [f"{SUBDECK_TAG}::Test"]
 
         note2.load()
         assert note2.tags == [f"{SUBDECK_TAG}::Test::B"]
@@ -183,7 +183,7 @@ def test_add_subdeck_tags_to_notes_with_spaces_in_deck_name(
         add_subdeck_tags_to_notes(" a a ", ankihub_deck_name="AA")
 
         note1.load()
-        assert note1.tags == []
+        assert note1.tags == [f"{SUBDECK_TAG}::AA"]
 
         note2.load()
         assert note2.tags == [f"{SUBDECK_TAG}::AA::b_b"]
