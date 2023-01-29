@@ -217,12 +217,12 @@ class SubscribedDecksDialog(QDialog):
         )
 
     def _on_toggle_subdecks(self):
-        deck_names = self.decks_list.selectedItems()
-        if len(deck_names) == 0:
+        deck_items = self.decks_list.selectedItems()
+        if len(deck_items) == 0:
             return
 
-        deck_name = deck_names[0]
-        ankihub_id: UUID = deck_name.data(Qt.ItemDataRole.UserRole)
+        deck_item = deck_items[0]
+        ankihub_id: UUID = deck_item.data(Qt.ItemDataRole.UserRole)
         deck_config = config.deck_config(ankihub_id)
         using_subdecks = deck_config.subdecks_enabled
 
@@ -247,7 +247,13 @@ class SubscribedDecksDialog(QDialog):
                 browser.sidebar.refresh()
 
         if using_subdecks:
-            flatten = ask_user("Do you want to remove the subdecks?")
+            flatten = ask_user(
+                "Do you want to remove the subdecks of<br>"
+                f"<i>{deck_item.text()}</i>?<br><br>"
+                "<b>Warning:</b> This will remove all subdecks of this deck and move "
+                "all of its cards back to the main deck.</b>",
+                defaultno=True,
+            )
             if flatten is None:
                 return
             elif flatten:

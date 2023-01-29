@@ -1733,12 +1733,8 @@ def test_browser_custom_columns(anki_session_with_addon: AnkiSession, qtbot: QtB
 def test_build_subdecks_and_move_cards_to_them(
     anki_session_with_addon: AnkiSession,
 ):
-
     from ankihub.settings import config
     from ankihub.subdecks import SUBDECK_TAG, build_subdecks_and_move_cards_to_them
-
-    with anki_session_with_addon.profile_loaded():
-        mw = anki_session_with_addon.mw
 
     with anki_session_with_addon.profile_loaded():
         mw = anki_session_with_addon.mw
@@ -1748,18 +1744,26 @@ def test_build_subdecks_and_move_cards_to_them(
         # this would not be necessary if deck configs were saved in the AnkiHub DB
         config.save_subscription(name="Testdeck", ankihub_did=ah_did, anki_did=anki_did)
 
-        # add a subdeck tag to a note
+        # add subdeck tags to notes
         nids = mw.col.find_notes("deck:Testdeck")
-        note = mw.col.get_note(nids[0])
-        note.tags = [f"{SUBDECK_TAG}::Testdeck::B::C"]
-        note.flush()
+        note1 = mw.col.get_note(nids[0])
+        note1.tags = [f"{SUBDECK_TAG}::Testdeck"]
+        note1.flush()
+
+        note2 = mw.col.get_note(nids[1])
+        note2.tags = [f"{SUBDECK_TAG}::Testdeck::B::C"]
+        note2.flush()
 
         # call the function that moves all cards in the deck to their subdecks
         build_subdecks_and_move_cards_to_them(ah_did)
 
-        # assert that the decks were created and the cards of the note were moved to it
-        assert note.cards()
-        for card in note.cards():
+        # assert that the decks were created and the cards of the notes were moved to them
+        assert note1.cards()
+        for card in note1.cards():
+            assert mw.col.decks.name(card.did) == "Testdeck"
+
+        assert note2.cards()
+        for card in note2.cards():
             assert mw.col.decks.name(card.did) == "Testdeck::B::C"
 
 
@@ -1868,11 +1872,10 @@ def test_build_subdecks_and_move_cards_to_them_with_no_tag(
         # call the function that moves all cards in the deck to their subdecks
         build_subdecks_and_move_cards_to_them(ah_did)
 
-        # assert that the cards of the note were moved back to the root deck
-        # because the note has no subdeck tag
+        # assert that the cards of the note were not moved because the note has no subdeck tag
         assert note.cards()
         for card in note.cards():
-            assert mw.col.decks.name(card.did) == "Testdeck"
+            assert card.did == 1
 
 
 def test_flatten_deck(

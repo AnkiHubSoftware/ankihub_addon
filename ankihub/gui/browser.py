@@ -41,7 +41,7 @@ from ..importing import get_fields_protected_by_tags
 from ..note_conversion import TAG_FOR_PROTECTING_ALL_FIELDS, TAG_FOR_PROTECTING_FIELDS
 from ..reset_changes import reset_local_changes_to_notes
 from ..settings import ANKIHUB_NOTE_TYPE_FIELD_NAME, AnkiHubCommands, DeckConfig, config
-from ..subdecks import build_subdecks_and_move_cards_to_them
+from ..subdecks import SUBDECK_TAG, build_subdecks_and_move_cards_to_them
 from ..suggestions import BulkNoteSuggestionsResult, suggest_notes_in_bulk
 from .custom_columns import (
     AnkiHubIdColumn,
@@ -365,7 +365,10 @@ def _on_reset_subdecks_action(browser: Browser):
     ah_did, deck_config = _choose_deck(
         "Choose the AnkiHub deck for which<br>"
         "you want to rebuild subdecks and move<br>"
-        "cards to their original subdeck."
+        "cards to their original subdeck.<br><br>"
+        "<b>Note:</b> This will only move<br>"
+        "cards of notes that have subdeck tags<br>"
+        f"(tags starting with <b>{SUBDECK_TAG})</b>.",
     )
     if ah_did is None:
         return
