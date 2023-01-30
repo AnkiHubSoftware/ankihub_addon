@@ -48,7 +48,7 @@ def test_entry_point(anki_session_with_addon: AnkiSession):
 
 def test_editor(anki_session_with_addon: AnkiSession, requests_mock, monkeypatch):
     from ankihub.db import ankihub_db
-    from ankihub.gui.editor import on_suggestion_button_press, refresh_suggestion_button
+    from ankihub.gui.editor import _on_suggestion_button_press, _refresh_buttons
     from ankihub.settings import API_URL_BASE, AnkiHubCommands
 
     with anki_session_with_addon.profile_loaded():
@@ -80,9 +80,9 @@ def test_editor(anki_session_with_addon: AnkiSession, requests_mock, monkeypatch
             json={},
         )
 
-        refresh_suggestion_button(editor)
+        _refresh_buttons(editor)
         assert editor.ankihub_command == AnkiHubCommands.NEW.value
-        on_suggestion_button_press(editor)
+        _on_suggestion_button_press(editor)
 
         # test a change note suggestion
         note = mw.col.get_note(mw.col.find_notes("")[0])
@@ -96,11 +96,11 @@ def test_editor(anki_session_with_addon: AnkiSession, requests_mock, monkeypatch
             json={},
         )
 
-        refresh_suggestion_button(editor)
+        _refresh_buttons(editor)
         assert editor.ankihub_command == AnkiHubCommands.CHANGE.value
 
         # this should trigger a suggestion because the note has not been changed
-        on_suggestion_button_press(editor)
+        _on_suggestion_button_press(editor)
         assert requests_mock.call_count == 0
 
         # change the front of the note
@@ -108,7 +108,7 @@ def test_editor(anki_session_with_addon: AnkiSession, requests_mock, monkeypatch
         note.flush()
 
         # this should trigger a suggestion because the note has been changed
-        on_suggestion_button_press(editor)
+        _on_suggestion_button_press(editor)
 
         # assert that the requests_mock was called only once
         assert requests_mock.call_count == 1
