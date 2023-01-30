@@ -42,7 +42,11 @@ from ..note_conversion import TAG_FOR_PROTECTING_ALL_FIELDS, TAG_FOR_PROTECTING_
 from ..reset_changes import reset_local_changes_to_notes
 from ..settings import ANKIHUB_NOTE_TYPE_FIELD_NAME, AnkiHubCommands, DeckConfig, config
 from ..subdecks import SUBDECK_TAG, build_subdecks_and_move_cards_to_them
-from ..suggestions import BulkNoteSuggestionsResult, suggest_notes_in_bulk
+from ..suggestions import (
+    ANKIHUB_NO_CHANGE_ERROR,
+    BulkNoteSuggestionsResult,
+    suggest_notes_in_bulk,
+)
 from .custom_columns import (
     AnkiHubIdColumn,
     CustomColumn,
@@ -213,8 +217,7 @@ def _on_suggest_notes_in_bulk_done(future: Future, browser: Browser) -> None:
     notes_without_changes = [
         note
         for note, errors in suggestions_result.errors_by_nid.items()
-        if "Suggestion fields and tags don't have any changes to the original note"
-        in str(errors)
+        if ANKIHUB_NO_CHANGE_ERROR in str(errors)
     ]
     msg_about_failed_suggestions = (
         (
