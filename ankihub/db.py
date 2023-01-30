@@ -301,6 +301,15 @@ class AnkiHubDB:
         result = uuid.UUID(did_str)
         return result
 
+    def ankihub_did_for_anki_nid(self, anki_nid: NoteId) -> Optional[uuid.UUID]:
+        did_str = self.scalar(
+            f"""
+            SELECT ankihub_deck_id FROM notes WHERE anki_note_id = {anki_nid}
+            """
+        )
+        result = uuid.UUID(did_str)
+        return result
+
     def ankihub_dids_for_anki_nids(
         self, anki_nids: Iterable[NoteId]
     ) -> List[uuid.UUID]:

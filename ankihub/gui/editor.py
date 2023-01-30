@@ -7,19 +7,31 @@ from anki.models import NoteType
 from aqt import gui_hooks
 from aqt.addcards import AddCards
 from aqt.editor import Editor
-from aqt.utils import showInfo, showText, tooltip
+from aqt.utils import openLink, showInfo, showText, tooltip
 
 from .. import LOGGER, settings
 from ..ankihub_client import AnkiHubRequestError
 from ..db import ankihub_db
 from ..error_reporting import report_exception_and_upload_logs
-from ..settings import ANKI_MINOR, ICONS_PATH, AnkiHubCommands, config
+from ..settings import (
+    ANKI_MINOR,
+    ICONS_PATH,
+    URL_VIEW_NOTE,
+    URL_VIEW_NOTE_HISTORY,
+    AnkiHubCommands,
+    config,
+)
 from ..suggestions import suggest_new_note, suggest_note_update
 from .suggestion_dialog import SuggestionDialog
 from .utils import choose_list
 
+ANKIHUB_BTN_ID_PREFIX = "ankihub-btn"
+SUGGESTION_BTN_ID = f"{ANKIHUB_BTN_ID_PREFIX}-suggestion"
+VIEW_NOTE_BTN_ID = f"{ANKIHUB_BTN_ID_PREFIX}-view-note"
+VIEW_NOTE_HISTORY_BTN_ID = f"{ANKIHUB_BTN_ID_PREFIX}-view-note-history"
 
-def on_suggestion_button_press(editor: Editor) -> None:
+
+def _on_suggestion_button_press(editor: Editor) -> None:
     """
     Action to be performed when the AnkiHub icon button is clicked or when
     the hotkey is pressed.
@@ -126,42 +138,93 @@ def on_suggestion_button_press_inner(editor: Editor) -> None:
             tooltip("Submitted new note suggestion to AnkiHub.")
 
 
-def setup_editor_buttons(buttons: List[str], editor: Editor) -> None:
-
+def _setup_editor_buttons(buttons: List[str], editor: Editor) -> None:
     """Add buttons to Editor."""
     # TODO Figure out how to test this
+
     public_config = config.public_config
     hotkey = public_config["hotkey"]
     img = str(ICONS_PATH / "ankihub_button.png")
-    button = editor.addButton(
-        img,
-        "CH",
-        on_suggestion_button_press,
-        tip="Send your request to AnkiHub ({})".format(hotkey),
-        label='<span id="ankihub-btn-label" style="vertical-align: top;"></span>',
-        id="ankihub-btn",
+    suggestion_button = editor.addButton(
+        icon=img,
+        cmd=SUGGESTION_BTN_ID,
+        func=_on_suggestion_button_press,
+        tip=f"Send your request to AnkiHub ({hotkey})",
+        label=f'<span id="{SUGGESTION_BTN_ID}-label" style="vertical-align: top;"></span>',
+        id=SUGGESTION_BTN_ID,
         keys=hotkey,
     )
-    buttons.append(button)
+    buttons.append(suggestion_button)
+
+    view_on_ankihub_button = editor.addButton(
+        icon=None,
+        cmd=VIEW_NOTE_BTN_ID,
+        func=_on_view_note_button_press,
+        label="View on AnkiHub",
+        id=VIEW_NOTE_BTN_ID,
+    )
+    buttons.append(view_on_ankihub_button)
+
+    view_history_on_ankihub_button = editor.addButton(
+        icon=None,
+        cmd=VIEW_NOTE_HISTORY_BTN_ID,
+        func=_on_view_note_history_button_press,
+        label="View Note History",
+        id=VIEW_NOTE_HISTORY_BTN_ID,
+    )
+    buttons.append(view_history_on_ankihub_button)
+
+    # fix style of buttons
     if ANKI_MINOR >= 55:
         buttons.append(
             "<style> "
-            "   #ankihub-btn img { "
-            "     height: 100%; padding: 2px; position: relative; width: auto; top: -1px; right: 0; bottom: 0; left: 0;"
-            "}\n"
-            "   #ankihub-btn[disabled] { opacity:.4; pointer-events: none; }\n"
+            f"  [id^='{ANKIHUB_BTN_ID_PREFIX}'] img {{"
+            "       height: 100%!important; padding: 2px!important; position: relative!important; "
+            "       width: auto!important; top: -1px!important; right: 0!important; "
+            "       bottom: 0!important; left: 0!important;"
+            "       filter: invert(0)!important;"
+            "   }\n"
+            f"  [id^='{ANKIHUB_BTN_ID_PREFIX}'][disabled] {{ opacity:.4; pointer-events: none; }}\n"
             "</style>"
         )
     else:
         buttons.append(
             "<style> "
-            "    #ankihub-btn { width:auto; padding:1px; }\n"
-            "    #ankihub-btn[disabled] { opacity:.4; pointer-events: none; }\n"
+            f"  [id^='{ANKIHUB_BTN_ID_PREFIX}'] {{ width:auto; padding:1px; }}\n"
+            f"  [id^='{ANKIHUB_BTN_ID_PREFIX}'][disabled] {{ opacity:.4; pointer-events: none; }}\n"
+            f"  [id^='{ANKIHUB_BTN_ID_PREFIX}'] img  {{filter: invert(0)!important;}}"
             "</style>"
         )
 
 
-def hide_ankihub_field_in_editor(
+def _on_view_note_button_press(editor: Editor) -> None:
+    note = editor.note
+    if note is None:
+        return
+
+    if not (ankihub_nid := ankihub_db.ankihub_nid_for_anki_nid(note.id)):
+        tooltip("This note has no AnkiHub id.")
+        return
+
+    url = f"{URL_VIEW_NOTE}{ankihub_nid}"
+    openLink(url)
+
+
+def _on_view_note_history_button_press(editor: Editor) -> None:
+    note = editor.note
+    if note is None:
+        return
+
+    if not (ankihub_nid := ankihub_db.ankihub_nid_for_anki_nid(note.id)):
+        tooltip("This note has no AnkiHub id.")
+        return
+
+    ankihub_did = ankihub_db.ankihub_did_for_anki_nid(note.id)
+    url = URL_VIEW_NOTE_HISTORY.format(ankihub_did=ankihub_did, ankihub_nid=ankihub_nid)
+    openLink(url)
+
+
+def _hide_ankihub_field_in_editor(
     js: str, note: anki.notes.Note, _: aqt.editor.Editor
 ) -> str:
     if ANKI_MINOR >= 55:
@@ -212,49 +275,81 @@ def hide_ankihub_field_in_editor(
     return js
 
 
-def refresh_suggestion_button(editor: Editor) -> None:
-    """Set ankihub button label based on whether ankihub_id field is empty"""
+def _refresh_buttons(editor: Editor) -> None:
+    """Enables/Disables buttons depending on the note type and if the note is synced with AnkiHub.
+    Also changes the label of the suggestion button based on whether the note is already on AnkiHub."""
     note = editor.note
-    disable_btn_script = "document.getElementById('ankihub-btn').disabled={};"
 
     # not sure why editor or note can be None here, but it happens, there are reports on sentry
     # see https://sentry.io/organizations/ankihub/issues/3788327661
     if editor is None:
         return
 
-    if note is None:
-        editor.web.eval(disable_btn_script.format("true"))
+    all_button_ids = [SUGGESTION_BTN_ID, VIEW_NOTE_BTN_ID, VIEW_NOTE_HISTORY_BTN_ID]
+
+    if note is None or not ankihub_db.is_ankihub_note_type(note.mid):
+        _disable_buttons(editor, all_button_ids)
+        _set_suggestion_button_label(editor, "")
         return
 
-    if ankihub_db.is_ankihub_note_type(note.mid):
-        editor.web.eval(disable_btn_script.format("false"))
-    else:
-        editor.web.eval(disable_btn_script.format("true"))
-        return
-
-    set_label_script = "document.getElementById('ankihub-btn-label').textContent='{}';"
     if ankihub_db.ankihub_nid_for_anki_nid(note.id):
-        editor.web.eval(set_label_script.format(AnkiHubCommands.CHANGE.value))
-        editor.ankihub_command = AnkiHubCommands.CHANGE.value  # type: ignore
+        command = AnkiHubCommands.CHANGE.value
+        _enable_buttons(editor, all_button_ids)
     else:
-        editor.web.eval(set_label_script.format(AnkiHubCommands.NEW.value))
-        editor.ankihub_command = AnkiHubCommands.NEW.value  # type: ignore
+        command = AnkiHubCommands.NEW.value
+        _enable_buttons(editor, [SUGGESTION_BTN_ID])
+        _disable_buttons(editor, [VIEW_NOTE_BTN_ID, VIEW_NOTE_HISTORY_BTN_ID])
+
+    _set_suggestion_button_label(editor, command)
+    editor.ankihub_command = command  # type: ignore
+
+
+def _enable_buttons(editor: Editor, button_ids: List[ſtr]) -> None:
+    _set_enabled_states_of_buttons(editor, button_ids, True)
+
+
+def _disable_buttons(editor: Editor, button_ids: List[ſtr]) -> None:
+    _set_enabled_states_of_buttons(editor, button_ids, False)
+
+
+def _set_enabled_states_of_buttons(
+    editor: Editor, button_ids: list[str], enabled: bool
+) -> None:
+    if editor is None:
+        return
+
+    disable_btns_script = f"""
+        for (const btnId of {button_ids}) {{
+            document.getElementById(btnId).disabled={str(not enabled).lower()};
+        }}
+    """
+    editor.web.eval(disable_btns_script)
+
+
+def _set_suggestion_button_label(editor: Editor, label: str) -> None:
+    set_label_script = (
+        f"document.getElementById('{SUGGESTION_BTN_ID}-label').textContent='{{}}';"
+    )
+    if editor is None:
+        return
+
+    editor.web.eval(set_label_script.format(label))
 
 
 editor: Editor
 
 
-def on_add_cards_init(add_cards: AddCards) -> None:
+def _on_add_cards_init(add_cards: AddCards) -> None:
     global editor
     editor = add_cards.editor
 
 
-def on_add_cards_did_change_notetype(old: NoteType, new: NoteType) -> None:
+def _on_add_cards_did_change_notetype(old: NoteType, new: NoteType) -> None:
     global editor
-    refresh_suggestion_button(editor)
+    _refresh_buttons(editor)
 
 
-def setup_editor_did_load_js_message(editor: Editor) -> None:
+def _setup_editor_did_load_js_message(editor: Editor) -> None:
     script = (
         "require('anki/ui').loaded.then(() => setTimeout( () => {"
         "   pycmd('editor_did_load') "
@@ -263,11 +358,11 @@ def setup_editor_did_load_js_message(editor: Editor) -> None:
     editor.web.eval(script)
 
 
-def on_js_message(
+def _on_js_message(
     handled: tuple[bool, Any], message: str, context: Any
 ) -> Tuple[bool, Any]:
     if message == "editor_did_load":
-        refresh_suggestion_button(context)
+        _refresh_buttons(context)
         return (True, None)
 
     return handled
@@ -275,14 +370,14 @@ def on_js_message(
 
 def setup() -> None:
     # setup suggestion button
-    gui_hooks.editor_did_init_buttons.append(setup_editor_buttons)
-    gui_hooks.editor_did_init.append(setup_editor_did_load_js_message)
-    gui_hooks.webview_did_receive_js_message.append(on_js_message)
-    gui_hooks.editor_did_load_note.append(refresh_suggestion_button)
-    gui_hooks.add_cards_did_init.append(on_add_cards_init)
-    gui_hooks.add_cards_did_change_note_type.append(on_add_cards_did_change_notetype)
+    gui_hooks.editor_did_init_buttons.append(_setup_editor_buttons)
+    gui_hooks.editor_did_init.append(_setup_editor_did_load_js_message)
+    gui_hooks.webview_did_receive_js_message.append(_on_js_message)
+    gui_hooks.editor_did_load_note.append(_refresh_buttons)
+    gui_hooks.add_cards_did_init.append(_on_add_cards_init)
+    gui_hooks.add_cards_did_change_note_type.append(_on_add_cards_did_change_notetype)
 
-    gui_hooks.editor_will_load_note.append(hide_ankihub_field_in_editor)
+    gui_hooks.editor_will_load_note.append(_hide_ankihub_field_in_editor)
 
     Editor.ankihub_command = AnkiHubCommands.CHANGE.value  # type: ignore
     # We can wrap Editor.__init__ if more complicated logic is needed, such as

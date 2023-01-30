@@ -381,6 +381,7 @@ LOGGER.debug(f"Starting with URL_BASE {API_URL_BASE}")
 ankihub_client.API_URL_BASE = API_URL_BASE
 
 URL_VIEW_NOTE = f"{ANKIHUB_APP_URL}/decks/notes/"
+URL_VIEW_NOTE_HISTORY = f"{ANKIHUB_APP_URL}/decks/{{ankihub_did}}/suggestions/?search=note:{{ankihub_nid}} state:closed"
 URL_VIEW_DECK = f"{ANKIHUB_APP_URL}/decks/"
 URL_HELP = f"{ANKIHUB_APP_URL}/help"
 URL_DECKS = f"{ANKIHUB_APP_URL}/explore"
