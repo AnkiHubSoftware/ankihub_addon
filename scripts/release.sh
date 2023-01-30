@@ -17,7 +17,4 @@ find . -name __pycache__ -or -regex ".*.py[cod]" -or -name .DS_Store -or -name "
 # remove all files from user_files except for the README.md file
 find user_files ! -name "README.md" -type f -exec rm -f {} +
 
-# copy license
-cp ../../LICENSE .
-
 zip -r "../../ankihub.ankiaddon" . -x ./tests\*
