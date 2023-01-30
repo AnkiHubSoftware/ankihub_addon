@@ -140,8 +140,12 @@ def _on_browser_will_show_context_menu(browser: Browser, context_menu: QMenu) ->
 
 
 def _on_protect_fields_action(browser: Browser, nid: NoteId) -> None:
-    if ankihub_db.ankihub_nid_for_anki_nid(nid) is None:
-        showInfo("This note has no AnkiHub id.", parent=browser)
+    note = mw.col.get_note(nid)
+    if not ankihub_db.is_ankihub_note_type(note.mid):
+        showInfo(
+            "This note does not have a note type that is known by AnkiHub.",
+            parent=browser,
+        )
         return
 
     note = mw.col.get_note(nid)
