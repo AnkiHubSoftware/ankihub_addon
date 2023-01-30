@@ -89,8 +89,10 @@ custom_search_nodes: List[CustomSearchNode] = []
 def _on_browser_will_show_context_menu(browser: Browser, context_menu: QMenu) -> None:
     selected_nids = browser.selected_notes()
     selected_nid = None
+    ankihub_nid = None
     if len(selected_nids) == 1:
         selected_nid = selected_nids[0]
+        ankihub_nid = ankihub_db.ankihub_nid_for_anki_nid(selected_nid)
 
     menu = context_menu
 
@@ -117,25 +119,21 @@ def _on_browser_will_show_context_menu(browser: Browser, context_menu: QMenu) ->
         "AnkiHub: View Note on AnkiHub",
         lambda: _on_view_note_on_ankihub_action(browser, nid=selected_nid),
     )
-    if len(selected_nids) != 1:
+    if len(selected_nids) != 1 or not ankihub_nid:
         view_note_action.setDisabled(True)
 
     view_history_action = menu.addAction(
         "AnkiHub: View Note history on AnkiHub",
         lambda: _on_view_note_history_on_ankihub_action(browser, nid=selected_nid),
     )
-    if len(selected_nids) != 1:
+    if len(selected_nids) != 1 or not ankihub_nid:
         view_history_action.setDisabled(True)
 
-    # setup copy ankihub_id to clipboard action
-    notes = [mw.col.get_note(selected_nid) for selected_nid in selected_nids]
     copy_ankihub_id_action = menu.addAction(
         "AnkiHub: Copy AnkiHub ID to clipboard",
-        lambda: mw.app.clipboard().setText(notes[0]["ankihub_id"]),
+        lambda: mw.app.clipboard().setText(str(ankihub_nid)),
     )
-    if not (
-        len(notes) == 1 and "ankihub_id" in (note := notes[0]) and note["ankihub_id"]
-    ):
+    if len(selected_nids) != 1 or not ankihub_nid:
         copy_ankihub_id_action.setDisabled(True)
 
 
@@ -268,7 +266,7 @@ def _on_suggest_notes_in_bulk_done(future: Future, browser: Browser) -> None:
 def _on_reset_local_changes_action(browser: Browser, nids: Sequence[NoteId]) -> None:
     if not ankihub_db.are_ankihub_notes(list(nids)):
         showInfo(
-            "Please only select notes from an AnkiHub deck to reset local changes.",
+            "Please only select notes with AnkiHub ids to reset local changes.",
             parent=browser,
         )
         return
