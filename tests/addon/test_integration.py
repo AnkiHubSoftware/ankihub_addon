@@ -3,7 +3,7 @@ import gzip
 import json
 import re
 import uuid
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 from pathlib import Path
 from time import sleep
 from typing import Dict, List, Optional
@@ -49,7 +49,7 @@ def test_entry_point(anki_session_with_addon: AnkiSession):
 
 def test_editor(anki_session_with_addon: AnkiSession, requests_mock, monkeypatch):
     from ankihub.db import ankihub_db
-    from ankihub.gui.editor import on_suggestion_button_press, refresh_suggestion_button
+    from ankihub.gui.editor import _on_suggestion_button_press, _refresh_buttons
     from ankihub.settings import API_URL_BASE, AnkiHubCommands
 
     with anki_session_with_addon.profile_loaded():
@@ -81,13 +81,14 @@ def test_editor(anki_session_with_addon: AnkiSession, requests_mock, monkeypatch
             json={},
         )
 
-        refresh_suggestion_button(editor)
+        _refresh_buttons(editor)
         assert editor.ankihub_command == AnkiHubCommands.NEW.value
-        on_suggestion_button_press(editor)
+        _on_suggestion_button_press(editor)
 
         # test a change note suggestion
         note = mw.col.get_note(mw.col.find_notes("")[0])
         editor.note = note
+
         noes_2_ah_nid = ankihub_db.ankihub_nid_for_anki_nid(note.id)
 
         requests_mock.post(
@@ -96,9 +97,22 @@ def test_editor(anki_session_with_addon: AnkiSession, requests_mock, monkeypatch
             json={},
         )
 
-        refresh_suggestion_button(editor)
+        _refresh_buttons(editor)
         assert editor.ankihub_command == AnkiHubCommands.CHANGE.value
-        on_suggestion_button_press(editor)
+
+        # this should trigger a suggestion because the note has not been changed
+        _on_suggestion_button_press(editor)
+        assert requests_mock.call_count == 0
+
+        # change the front of the note
+        note["Front"] = "new front"
+        note.flush()
+
+        # this should trigger a suggestion because the note has been changed
+        _on_suggestion_button_press(editor)
+
+        # assert that the requests_mock was called only once
+        assert requests_mock.call_count == 1
 
 
 def test_get_note_types_in_deck(anki_session_with_addon: AnkiSession):
@@ -1423,7 +1437,10 @@ def test_UpdatedInTheLastXDaysSearchNode(anki_session_with_addon: AnkiSession):
                 == all_nids
             )
 
-            mw.col.db.execute("UPDATE ankihub_db.notes SET mod = mod - 24 * 60 * 60")
+            yesterday_timestamp = int((datetime.now() - timedelta(days=1)).timestamp())
+            mw.col.db.execute(
+                f"UPDATE ankihub_db.notes SET mod = {yesterday_timestamp}"
+            )
 
             assert (
                 UpdatedInTheLastXDaysSearchNode(browser, "1").filter_ids(all_nids) == []

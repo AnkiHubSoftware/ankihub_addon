@@ -1,5 +1,5 @@
 from abc import ABC, abstractmethod
-from datetime import datetime
+from datetime import datetime, timedelta
 from typing import Optional, Sequence
 
 from anki.utils import ids2str
@@ -106,8 +106,13 @@ class UpdatedInTheLastXDaysSearchNode(CustomSearchNode):
                 f"Invalid value for {self.parameter_name}: {self.value}. Must be a positive integer."
             )
 
-        threshold_timestamp = int(datetime.now().timestamp() - (days * 24 * 60 * 60))
-        ids = self._retain_ids_where(ids, f"ah_notes.mod > {threshold_timestamp}")
+        threshold_timestamp = int(
+            (
+                datetime.now().replace(hour=0, minute=0, second=0, microsecond=0)
+                - timedelta(days=days - 1)
+            ).timestamp()
+        )
+        ids = self._retain_ids_where(ids, f"ah_notes.mod >= {threshold_timestamp}")
 
         return ids
 

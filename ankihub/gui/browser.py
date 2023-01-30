@@ -5,6 +5,7 @@ from pprint import pformat
 from typing import List, Optional, Sequence, Tuple
 
 from anki.collection import SearchNode
+from anki.notes import NoteId
 from aqt import mw
 from aqt.browser import (
     Browser,
@@ -42,7 +43,11 @@ from ..note_conversion import TAG_FOR_PROTECTING_ALL_FIELDS, TAG_FOR_PROTECTING_
 from ..reset_changes import reset_local_changes_to_notes
 from ..settings import ANKIHUB_NOTE_TYPE_FIELD_NAME, AnkiHubCommands, DeckConfig, config
 from ..subdecks import SUBDECK_TAG, build_subdecks_and_move_cards_to_them
-from ..suggestions import BulkNoteSuggestionsResult, suggest_notes_in_bulk
+from ..suggestions import (
+    ANKIHUB_NO_CHANGE_ERROR,
+    BulkNoteSuggestionsResult,
+    suggest_notes_in_bulk,
+)
 from .custom_columns import (
     AnkiHubIdColumn,
     CustomColumn,
@@ -74,24 +79,34 @@ custom_columns = [
 custom_search_nodes: List[CustomSearchNode] = []
 
 
+# context menu
 def _on_browser_will_show_context_menu(browser: Browser, context_menu: QMenu) -> None:
+    selected_nids = browser.selected_notes()
+    selected_nid = None
+    ankihub_nid = None
+    if len(selected_nids) == 1:
+        selected_nid = selected_nids[0]
+        ankihub_nid = ankihub_db.ankihub_nid_for_anki_nid(selected_nid)
+
     menu = context_menu
 
     menu.addSeparator()
 
     menu.addAction(
         "AnkiHub: Bulk suggest notes",
-        lambda: _on_bulk_notes_suggest_action(browser),
+        lambda: _on_bulk_notes_suggest_action(browser, nids=selected_nids),
     )
 
-    menu.addAction(
+    protect_fields_action = menu.addAction(
         "AnkiHub: Protect fields",
-        lambda: _on_protect_fields_action(browser),
+        lambda: _on_protect_fields_action(browser, nid=selected_nid),
     )
+    if len(selected_nids) != 1:
+        protect_fields_action.setDisabled(True)
 
     menu.addAction(
         "AnkiHub: Reset local changes",
-        lambda: _on_reset_local_changes_action(browser),
+        lambda: _on_reset_local_changes_action(browser, nids=selected_nids),
     )
 
     menu.addAction(
@@ -99,31 +114,21 @@ def _on_browser_will_show_context_menu(browser: Browser, context_menu: QMenu) ->
         lambda: _on_suggest_optional_tags_action(browser),
     )
 
-    # setup copy ankihub_id to clipboard action
-    selected_nids = browser.selected_notes()
-    notes = [mw.col.get_note(selected_nid) for selected_nid in selected_nids]
-
     copy_ankihub_id_action = menu.addAction(
         "AnkiHub: Copy AnkiHub ID to clipboard",
-        lambda: mw.app.clipboard().setText(notes[0]["ankihub_id"]),
+        lambda: mw.app.clipboard().setText(str(ankihub_nid)),
     )
-
-    if not (
-        len(notes) == 1 and "ankihub_id" in (note := notes[0]) and note["ankihub_id"]
-    ):
+    if len(selected_nids) != 1 or not ankihub_nid:
         copy_ankihub_id_action.setDisabled(True)
 
 
-def _on_protect_fields_action(browser: Browser) -> None:
-    nids = browser.selected_notes()
-    if len(nids) != 1:
-        showInfo("Please select exactly one note.", parent=browser)
-        return
-
-    nid = nids[0]
-
-    if ankihub_db.ankihub_nid_for_anki_nid(nid) is None:
-        showInfo("This note is not an AnkiHub note.", parent=browser)
+def _on_protect_fields_action(browser: Browser, nid: NoteId) -> None:
+    note = mw.col.get_note(nid)
+    if not ankihub_db.is_ankihub_note_type(note.mid):
+        showInfo(
+            "This note does not have a note type that is known by AnkiHub.",
+            parent=browser,
+        )
         return
 
     note = mw.col.get_note(nid)
@@ -169,9 +174,15 @@ def _on_protect_fields_action(browser: Browser) -> None:
     )
 
 
-def _on_bulk_notes_suggest_action(browser: Browser) -> None:
-    selected_nids = browser.selected_notes()
-    notes = [mw.col.get_note(selected_nid) for selected_nid in selected_nids]
+def _on_bulk_notes_suggest_action(browser: Browser, nids: Sequence[NoteId]) -> None:
+    notes = [mw.col.get_note(nid) for nid in nids]
+
+    mids = set(note.mid for note in notes)
+    if not all(ankihub_db.is_ankihub_note_type(mid) for mid in mids):
+        showInfo(
+            "Some of the notes you selected are not of a note type that is known by AnkiHub."
+        )
+        return
 
     if len(notes) > 500:
         msg = "Please select less than 500 notes at a time for bulk suggestions.<br>"
@@ -219,8 +230,7 @@ def _on_suggest_notes_in_bulk_done(future: Future, browser: Browser) -> None:
     notes_without_changes = [
         note
         for note, errors in suggestions_result.errors_by_nid.items()
-        if "Suggestion fields and tags don't have any changes to the original note"
-        in str(errors)
+        if ANKIHUB_NO_CHANGE_ERROR in str(errors)
     ]
     msg_about_failed_suggestions = (
         (
@@ -238,15 +248,10 @@ def _on_suggest_notes_in_bulk_done(future: Future, browser: Browser) -> None:
     showText(msg, parent=browser)
 
 
-def _on_reset_local_changes_action(browser: Browser) -> None:
-    nids = browser.selected_notes()
-
-    if not nids:
-        return
-
+def _on_reset_local_changes_action(browser: Browser, nids: Sequence[NoteId]) -> None:
     if not ankihub_db.are_ankihub_notes(list(nids)):
         showInfo(
-            "Please only select notes from an AnkiHub deck to reset local changes.",
+            "Please only select notes with AnkiHub ids to reset local changes.",
             parent=browser,
         )
         return
@@ -301,6 +306,7 @@ def _on_suggest_optional_tags_action(browser: Browser) -> None:
     OptionalTagsSuggestionDialog(parent=browser, nids=nids).exec()
 
 
+# AnkiHub menu
 def _on_browser_menus_did_init(browser: Browser):
     menu = browser._ankihub_menu = QMenu("AnkiHub")  # type: ignore
     browser.form.menubar.addMenu(menu)
@@ -421,6 +427,7 @@ def _choose_deck(prompt: str) -> Tuple[Optional[uuid.UUID], Optional[DeckConfig]
     return chosen_deck_ah_did, chosen_deck_config
 
 
+# custom columns
 def _on_browser_did_fetch_columns(columns: dict[str, Column]):
     for column in custom_columns:
         columns[column.key] = column.builtin_column
@@ -441,6 +448,7 @@ def _on_browser_did_fetch_row(
         )
 
 
+# cutom search nodes
 def _on_browser_will_search(ctx: SearchContext):
     _on_browser_will_search_handle_custom_column_ordering(ctx)
     _on_browser_will_search_handle_custom_search_parameters(ctx)
@@ -513,6 +521,7 @@ def _on_browser_did_search_handle_custom_search_parameters(ctx: SearchContext):
             custom_search_nodes = []
 
 
+# sidebar
 def _on_browser_will_build_tree(
     handled: bool,
     tree: SidebarItem,
@@ -718,6 +727,7 @@ def _set_updated_today_tree_expanded_in_ui_config(expanded: bool):
     config.set_ui_config(ui_config)
 
 
+# setup
 def _store_browser_reference(browser_: Browser) -> None:
     global browser
 
