@@ -28,7 +28,7 @@ from aqt.gui_hooks import (
     browser_will_show_context_menu,
 )
 from aqt.qt import QAction, QMenu, qconnect
-from aqt.utils import openLink, showInfo, showText, showWarning, tooltip, tr
+from aqt.utils import showInfo, showText, showWarning, tooltip, tr
 
 from .. import LOGGER
 from ..ankihub_client import AnkiHubRequestError, SuggestionType
@@ -41,14 +41,7 @@ from ..db import (
 from ..importing import get_fields_protected_by_tags
 from ..note_conversion import TAG_FOR_PROTECTING_ALL_FIELDS, TAG_FOR_PROTECTING_FIELDS
 from ..reset_changes import reset_local_changes_to_notes
-from ..settings import (
-    ANKIHUB_NOTE_TYPE_FIELD_NAME,
-    URL_VIEW_NOTE,
-    URL_VIEW_NOTE_HISTORY,
-    AnkiHubCommands,
-    DeckConfig,
-    config,
-)
+from ..settings import ANKIHUB_NOTE_TYPE_FIELD_NAME, AnkiHubCommands, DeckConfig, config
 from ..subdecks import SUBDECK_TAG, build_subdecks_and_move_cards_to_them
 from ..suggestions import (
     ANKIHUB_NO_CHANGE_ERROR,
@@ -114,20 +107,6 @@ def _on_browser_will_show_context_menu(browser: Browser, context_menu: QMenu) ->
         "AnkiHub: Reset local changes",
         lambda: _on_reset_local_changes_action(browser, nids=selected_nids),
     )
-
-    view_note_action = menu.addAction(
-        "AnkiHub: View Note on AnkiHub",
-        lambda: _on_view_note_on_ankihub_action(browser, nid=selected_nid),
-    )
-    if len(selected_nids) != 1 or not ankihub_nid:
-        view_note_action.setDisabled(True)
-
-    view_history_action = menu.addAction(
-        "AnkiHub: View Note history on AnkiHub",
-        lambda: _on_view_note_history_on_ankihub_action(browser, nid=selected_nid),
-    )
-    if len(selected_nids) != 1 or not ankihub_nid:
-        view_history_action.setDisabled(True)
 
     copy_ankihub_id_action = menu.addAction(
         "AnkiHub: Copy AnkiHub ID to clipboard",
@@ -294,25 +273,6 @@ def _on_reset_local_changes_action(browser: Browser, nids: Sequence[NoteId]) -> 
         label="Resetting local changes...",
         parent=browser,
     )
-
-
-def _on_view_note_on_ankihub_action(browser: Browser, nid: NoteId) -> None:
-    if not (ankihub_nid := ankihub_db.ankihub_nid_for_anki_nid(nid)):
-        showInfo("This note has no AnkiHub id.", parent=browser)
-        return
-
-    url = f"{URL_VIEW_NOTE}{ankihub_nid}"
-    openLink(url)
-
-
-def _on_view_note_history_on_ankihub_action(browser: Browser, nid: NoteId) -> None:
-    if not (ankihub_nid := ankihub_db.ankihub_nid_for_anki_nid(nid)):
-        showInfo("This note has no AnkiHub id.", parent=browser)
-        return
-
-    ankihub_did = ankihub_db.ankihub_did_for_anki_nid(nid)
-    url = URL_VIEW_NOTE_HISTORY.format(ankihub_did=ankihub_did, ankihub_nid=ankihub_nid)
-    openLink(url)
 
 
 # AnkiHub menu
