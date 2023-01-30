@@ -1,6 +1,6 @@
 import uuid
 from dataclasses import dataclass
-from typing import Dict, List
+from typing import Any, Dict, List, Optional
 
 from anki.notes import Note, NoteId
 
@@ -9,20 +9,34 @@ from .ankihub_client import ChangeNoteSuggestion, NewNoteSuggestion, SuggestionT
 from .db import ankihub_db
 from .exporting import to_note_data
 
+# string that is contained in the errors returned from the AnkiHub API when
+# there are no changes to the note for a change note suggestion
+ANKIHUB_NO_CHANGE_ERROR = (
+    "Suggestion fields and tags don't have any changes to the original note"
+)
+
 
 def suggest_note_update(
     note: Note, change_type: SuggestionType, comment: str, auto_accept: bool = False
-):
+) -> bool:
+    """Returns True if the suggestion was created, False if the note has no changes
+    (and therefore no suggestion was created)"""
     client = AnkiHubClient()
+    suggestion = change_note_suggestion(note, change_type, comment)
+    if suggestion is None:
+        return False
+
     client.create_change_note_suggestion(
-        change_note_suggestion(note, change_type, comment),
+        change_note_suggestion=suggestion,
         auto_accept=auto_accept,
     )
+
+    return True
 
 
 def suggest_new_note(
     note: Note, comment: str, ankihub_deck_uuid: uuid.UUID, auto_accept: bool = False
-):
+) -> None:
     client = AnkiHubClient()
     client.create_new_note_suggestion(
         new_note_suggestion(note, ankihub_deck_uuid, comment), auto_accept=auto_accept
@@ -42,6 +56,12 @@ def suggest_notes_in_bulk(
     change_type: SuggestionType,
     comment: str,
 ) -> BulkNoteSuggestionsResult:
+    # Note: Notes that don't have any changes when compared to the local
+    # AnkiHub database will not be sent. This does not necessarily mean
+    # that the note has no changes when compared to the remote AnkiHub
+    # database. To create suggestions for notes that differ from the
+    # remote database but not from the local database, users have to
+    # sync first (so that the local database is up to date).
 
     ankihub_did_for_mid = {
         mid: ankihub_did
@@ -58,15 +78,28 @@ def suggest_notes_in_bulk(
         else:
             notes_that_dont_exist_on_remote.append(note)
 
-    change_note_suggestions = [
-        change_note_suggestion(
+    # Create change note suggestions for notes that exist on remote
+    change_note_suggestions_or_none_by_nid = {
+        note.id: change_note_suggestion(
             note=note,
             change_type=change_type,
             comment=comment,
         )
         for note in notes_that_exist_on_remote
+    }
+    change_note_suggestions = [
+        suggestion
+        for suggestion in change_note_suggestions_or_none_by_nid.values()
+        if suggestion is not None
+    ]
+    # nids of notes that exist on remote but have no changes
+    nids_without_changes = [
+        nid
+        for nid, suggestion in change_note_suggestions_or_none_by_nid.items()
+        if not suggestion
     ]
 
+    # Create new note suggestions for notes that don't exist on remote
     new_note_suggestions = [
         new_note_suggestion(
             note=note,
@@ -82,7 +115,17 @@ def suggest_notes_in_bulk(
         change_note_suggestions=change_note_suggestions,
         auto_accept=auto_accept,
     )
-    errors_by_nid = {NoteId(nid): errors for nid, errors in errors_by_nid_int.items()}
+    errors_by_nid_from_remote = {
+        NoteId(nid): errors for nid, errors in errors_by_nid_int.items()
+    }
+    errors_by_nid_from_local = {
+        nid: ANKIHUB_NO_CHANGE_ERROR for nid in nids_without_changes
+    }
+    errors_by_nid: Dict[NoteId, Any] = {
+        **errors_by_nid_from_remote,
+        **errors_by_nid_from_local,
+    }
+
     result = BulkNoteSuggestionsResult(
         errors_by_nid=errors_by_nid,
         change_note_suggestions_count=len(
@@ -97,9 +140,12 @@ def suggest_notes_in_bulk(
 
 def change_note_suggestion(
     note: Note, change_type: SuggestionType, comment: str
-) -> ChangeNoteSuggestion:
+) -> Optional[ChangeNoteSuggestion]:
     note_data = to_note_data(note, diff=True)
     assert note_data.ankihub_note_uuid is not None
+
+    if not note_data.fields and not note_data.tags:
+        return None
 
     return ChangeNoteSuggestion(
         ankihub_note_uuid=note_data.ankihub_note_uuid,

@@ -71,13 +71,15 @@ def on_suggestion_button_press_inner(editor: Editor) -> None:
         dialog.auto_accept(),
     )
     if command == AnkiHubCommands.CHANGE.value:
-        suggest_note_update(
+        if suggest_note_update(
             note=editor.note,
             change_type=change_type,
             comment=comment,
             auto_accept=auto_accept,
-        )
-        tooltip("Submitted change note suggestion to AnkiHub.")
+        ):
+            tooltip("Submitted change note suggestion to AnkiHub.")
+        else:
+            tooltip("No changes. Try syncing with AnkiHub first.")
         return
     elif command == AnkiHubCommands.NEW.value:
         subscribed_dids = config.deck_ids()
