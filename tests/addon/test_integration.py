@@ -88,11 +88,6 @@ def test_editor(anki_session_with_addon: AnkiSession, requests_mock, monkeypatch
         note = mw.col.get_note(mw.col.find_notes("")[0])
         editor.note = note
 
-        # ... change the front of the note
-        # ... (this is necessary because change note suggestion can only be created if the note has changed)
-        note["Front"] = "new front"
-        note.flush()
-
         noes_2_ah_nid = ankihub_db.ankihub_nid_for_anki_nid(note.id)
 
         requests_mock.post(
@@ -103,7 +98,20 @@ def test_editor(anki_session_with_addon: AnkiSession, requests_mock, monkeypatch
 
         refresh_suggestion_button(editor)
         assert editor.ankihub_command == AnkiHubCommands.CHANGE.value
+
+        # this should trigger a suggestion because the note has not been changed
         on_suggestion_button_press(editor)
+        assert requests_mock.call_count == 0
+
+        # change the front of the note
+        note["Front"] = "new front"
+        note.flush()
+
+        # this should trigger a suggestion because the note has been changed
+        on_suggestion_button_press(editor)
+
+        # assert that the requests_mock was called only once
+        assert requests_mock.call_count == 1
 
 
 def test_get_note_types_in_deck(anki_session_with_addon: AnkiSession):
