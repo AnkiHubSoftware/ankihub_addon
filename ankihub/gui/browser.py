@@ -5,6 +5,7 @@ from pprint import pformat
 from typing import List, Optional, Sequence, Tuple
 
 from anki.collection import SearchNode
+from anki.notes import NoteId
 from aqt import mw
 from aqt.browser import (
     Browser,
@@ -86,7 +87,10 @@ custom_search_nodes: List[CustomSearchNode] = []
 
 # context menu
 def _on_browser_will_show_context_menu(browser: Browser, context_menu: QMenu) -> None:
-    selected_one_note = len(browser.selected_notes()) == 1
+    selected_nids = browser.selected_notes()
+    selected_nid = None
+    if len(selected_nids) == 1:
+        selected_nid = selected_nids[0]
 
     menu = context_menu
 
@@ -94,56 +98,48 @@ def _on_browser_will_show_context_menu(browser: Browser, context_menu: QMenu) ->
 
     menu.addAction(
         "AnkiHub: Bulk suggest notes",
-        lambda: _on_bulk_notes_suggest_action(browser),
+        lambda: _on_bulk_notes_suggest_action(browser, nids=selected_nids),
     )
 
     protect_fields_action = menu.addAction(
         "AnkiHub: Protect fields",
-        lambda: _on_protect_fields_action(browser),
+        lambda: _on_protect_fields_action(browser, nid=selected_nid),
     )
-    if not selected_one_note:
+    if len(selected_nids) != 1:
         protect_fields_action.setDisabled(True)
 
     menu.addAction(
         "AnkiHub: Reset local changes",
-        lambda: _on_reset_local_changes_action(browser),
+        lambda: _on_reset_local_changes_action(browser, nids=selected_nids),
     )
 
     view_note_action = menu.addAction(
         "AnkiHub: View Note on AnkiHub",
-        lambda: _on_view_note_on_ankihub_action(browser),
+        lambda: _on_view_note_on_ankihub_action(browser, nid=selected_nid),
     )
-    if not selected_one_note:
+    if len(selected_nids) != 1:
         view_note_action.setDisabled(True)
 
     view_history_action = menu.addAction(
         "AnkiHub: View Note history on AnkiHub",
-        lambda: _on_view_note_history_on_ankihub_action(browser),
+        lambda: _on_view_note_history_on_ankihub_action(browser, nid=selected_nid),
     )
-    if not selected_one_note:
+    if len(selected_nids) != 1:
         view_history_action.setDisabled(True)
 
     # setup copy ankihub_id to clipboard action
-    selected_nids = browser.selected_notes()
     notes = [mw.col.get_note(selected_nid) for selected_nid in selected_nids]
-
     copy_ankihub_id_action = menu.addAction(
         "AnkiHub: Copy AnkiHub ID to clipboard",
         lambda: mw.app.clipboard().setText(notes[0]["ankihub_id"]),
     )
-
     if not (
         len(notes) == 1 and "ankihub_id" in (note := notes[0]) and note["ankihub_id"]
     ):
         copy_ankihub_id_action.setDisabled(True)
 
 
-def _on_protect_fields_action(browser: Browser) -> None:
-    nids = browser.selected_notes()
-    assert len(nids) == 1
-
-    nid = nids[0]
-
+def _on_protect_fields_action(browser: Browser, nid: NoteId) -> None:
     if ankihub_db.ankihub_nid_for_anki_nid(nid) is None:
         showInfo("This note has no AnkiHub id.", parent=browser)
         return
@@ -191,9 +187,8 @@ def _on_protect_fields_action(browser: Browser) -> None:
     )
 
 
-def _on_bulk_notes_suggest_action(browser: Browser) -> None:
-    selected_nids = browser.selected_notes()
-    notes = [mw.col.get_note(selected_nid) for selected_nid in selected_nids]
+def _on_bulk_notes_suggest_action(browser: Browser, nids: Sequence[NoteId]) -> None:
+    notes = [mw.col.get_note(nid) for nid in nids]
 
     if len(notes) > 500:
         msg = "Please select less than 500 notes at a time for bulk suggestions.<br>"
@@ -259,12 +254,7 @@ def _on_suggest_notes_in_bulk_done(future: Future, browser: Browser) -> None:
     showText(msg, parent=browser)
 
 
-def _on_reset_local_changes_action(browser: Browser) -> None:
-    nids = browser.selected_notes()
-
-    if not nids:
-        return
-
+def _on_reset_local_changes_action(browser: Browser, nids: Sequence[NoteId]) -> None:
     if not ankihub_db.are_ankihub_notes(list(nids)):
         showInfo(
             "Please only select notes from an AnkiHub deck to reset local changes.",
@@ -297,12 +287,7 @@ def _on_reset_local_changes_action(browser: Browser) -> None:
     )
 
 
-def _on_view_note_on_ankihub_action(browser: Browser) -> None:
-    nids = browser.selected_notes()
-    assert len(nids) == 1
-
-    nid = nids[0]
-
+def _on_view_note_on_ankihub_action(browser: Browser, nid: NoteId) -> None:
     if not (ankihub_nid := ankihub_db.ankihub_nid_for_anki_nid(nid)):
         showInfo("This note has no AnkiHub id.", parent=browser)
         return
@@ -311,12 +296,7 @@ def _on_view_note_on_ankihub_action(browser: Browser) -> None:
     openLink(url)
 
 
-def _on_view_note_history_on_ankihub_action(browser: Browser) -> None:
-    nids = browser.selected_notes()
-    assert len(nids) == 1
-
-    nid = nids[0]
-
+def _on_view_note_history_on_ankihub_action(browser: Browser, nid: NoteId) -> None:
     if not (ankihub_nid := ankihub_db.ankihub_nid_for_anki_nid(nid)):
         showInfo("This note has no AnkiHub id.", parent=browser)
         return
