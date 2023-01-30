@@ -3,7 +3,7 @@ import gzip
 import json
 import re
 import uuid
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 from pathlib import Path
 from time import sleep
 from typing import Dict, List, Optional
@@ -1422,7 +1422,10 @@ def test_UpdatedInTheLastXDaysSearchNode(anki_session_with_addon: AnkiSession):
                 == all_nids
             )
 
-            mw.col.db.execute("UPDATE ankihub_db.notes SET mod = mod - 24 * 60 * 60")
+            yesterday_timestamp = int((datetime.now() - timedelta(days=1)).timestamp())
+            mw.col.db.execute(
+                f"UPDATE ankihub_db.notes SET mod = {yesterday_timestamp}"
+            )
 
             assert (
                 UpdatedInTheLastXDaysSearchNode(browser, "1").filter_ids(all_nids) == []
