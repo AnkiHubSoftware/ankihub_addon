@@ -77,6 +77,7 @@ custom_columns = [
 custom_search_nodes: List[CustomSearchNode] = []
 
 
+# context menu
 def _on_browser_will_show_context_menu(browser: Browser, context_menu: QMenu) -> None:
     menu = context_menu
 
@@ -273,6 +274,7 @@ def _on_reset_local_changes_action(browser: Browser) -> None:
     )
 
 
+# AnkiHub menu
 def _on_browser_menus_did_init(browser: Browser):
     menu = browser._ankihub_menu = QMenu("AnkiHub")  # type: ignore
     browser.form.menubar.addMenu(menu)
@@ -393,6 +395,7 @@ def _choose_deck(prompt: str) -> Tuple[Optional[uuid.UUID], Optional[DeckConfig]
     return chosen_deck_ah_did, chosen_deck_config
 
 
+# custom columns
 def _on_browser_did_fetch_columns(columns: dict[str, Column]):
     for column in custom_columns:
         columns[column.key] = column.builtin_column
@@ -413,6 +416,7 @@ def _on_browser_did_fetch_row(
         )
 
 
+# cutom search nodes
 def _on_browser_will_search(ctx: SearchContext):
     _on_browser_will_search_handle_custom_column_ordering(ctx)
     _on_browser_will_search_handle_custom_search_parameters(ctx)
@@ -485,6 +489,7 @@ def _on_browser_did_search_handle_custom_search_parameters(ctx: SearchContext):
             custom_search_nodes = []
 
 
+# sidebar
 def _on_browser_will_build_tree(
     handled: bool,
     tree: SidebarItem,
@@ -690,6 +695,7 @@ def _set_updated_today_tree_expanded_in_ui_config(expanded: bool):
     config.set_ui_config(ui_config)
 
 
+# setup
 def _store_browser_reference(browser_: Browser) -> None:
     global browser
 
