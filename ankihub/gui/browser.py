@@ -27,7 +27,7 @@ from aqt.gui_hooks import (
     browser_will_show_context_menu,
 )
 from aqt.qt import QAction, QMenu, qconnect
-from aqt.utils import showInfo, showText, showWarning, tooltip, tr
+from aqt.utils import openLink, showInfo, showText, showWarning, tooltip, tr
 
 from .. import LOGGER
 from ..ankihub_client import AnkiHubRequestError, SuggestionType
@@ -40,7 +40,14 @@ from ..db import (
 from ..importing import get_fields_protected_by_tags
 from ..note_conversion import TAG_FOR_PROTECTING_ALL_FIELDS, TAG_FOR_PROTECTING_FIELDS
 from ..reset_changes import reset_local_changes_to_notes
-from ..settings import ANKIHUB_NOTE_TYPE_FIELD_NAME, AnkiHubCommands, DeckConfig, config
+from ..settings import (
+    ANKIHUB_NOTE_TYPE_FIELD_NAME,
+    URL_VIEW_NOTE,
+    URL_VIEW_NOTE_HISTORY,
+    AnkiHubCommands,
+    DeckConfig,
+    config,
+)
 from ..subdecks import SUBDECK_TAG, build_subdecks_and_move_cards_to_them
 from ..suggestions import (
     ANKIHUB_NO_CHANGE_ERROR,
@@ -79,6 +86,8 @@ custom_search_nodes: List[CustomSearchNode] = []
 
 # context menu
 def _on_browser_will_show_context_menu(browser: Browser, context_menu: QMenu) -> None:
+    selected_one_note = len(browser.selected_notes()) == 1
+
     menu = context_menu
 
     menu.addSeparator()
@@ -88,15 +97,31 @@ def _on_browser_will_show_context_menu(browser: Browser, context_menu: QMenu) ->
         lambda: _on_bulk_notes_suggest_action(browser),
     )
 
-    menu.addAction(
+    protect_fields_action = menu.addAction(
         "AnkiHub: Protect fields",
         lambda: _on_protect_fields_action(browser),
     )
+    if not selected_one_note:
+        protect_fields_action.setDisabled(True)
 
     menu.addAction(
         "AnkiHub: Reset local changes",
         lambda: _on_reset_local_changes_action(browser),
     )
+
+    view_note_action = menu.addAction(
+        "AnkiHub: View Note on AnkiHub",
+        lambda: _on_view_note_on_ankihub_action(browser),
+    )
+    if not selected_one_note:
+        view_note_action.setDisabled(True)
+
+    view_history_action = menu.addAction(
+        "AnkiHub: View Note history on AnkiHub",
+        lambda: _on_view_note_history_on_ankihub_action(browser),
+    )
+    if not selected_one_note:
+        view_history_action.setDisabled(True)
 
     # setup copy ankihub_id to clipboard action
     selected_nids = browser.selected_notes()
@@ -115,14 +140,12 @@ def _on_browser_will_show_context_menu(browser: Browser, context_menu: QMenu) ->
 
 def _on_protect_fields_action(browser: Browser) -> None:
     nids = browser.selected_notes()
-    if len(nids) != 1:
-        showInfo("Please select exactly one note.", parent=browser)
-        return
+    assert len(nids) == 1
 
     nid = nids[0]
 
     if ankihub_db.ankihub_nid_for_anki_nid(nid) is None:
-        showInfo("This note is not an AnkiHub note.", parent=browser)
+        showInfo("This note has no AnkiHub id.", parent=browser)
         return
 
     note = mw.col.get_note(nid)
@@ -272,6 +295,35 @@ def _on_reset_local_changes_action(browser: Browser) -> None:
         label="Resetting local changes...",
         parent=browser,
     )
+
+
+def _on_view_note_on_ankihub_action(browser: Browser) -> None:
+    nids = browser.selected_notes()
+    assert len(nids) == 1
+
+    nid = nids[0]
+
+    if not (ankihub_nid := ankihub_db.ankihub_nid_for_anki_nid(nid)):
+        showInfo("This note has no AnkiHub id.", parent=browser)
+        return
+
+    url = f"{URL_VIEW_NOTE}{ankihub_nid}"
+    openLink(url)
+
+
+def _on_view_note_history_on_ankihub_action(browser: Browser) -> None:
+    nids = browser.selected_notes()
+    assert len(nids) == 1
+
+    nid = nids[0]
+
+    if not (ankihub_nid := ankihub_db.ankihub_nid_for_anki_nid(nid)):
+        showInfo("This note has no AnkiHub id.", parent=browser)
+        return
+
+    ankihub_did = ankihub_db.ankihub_did_for_anki_nid(nid)
+    url = URL_VIEW_NOTE_HISTORY.format(ankihub_did=ankihub_did, ankihub_nid=ankihub_nid)
+    openLink(url)
 
 
 # AnkiHub menu
