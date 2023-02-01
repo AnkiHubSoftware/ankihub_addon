@@ -617,3 +617,56 @@ def test_get_note_customizations_by_deck_extension_id(authorized_client_for_user
 
     expected_response.latest_update = chunk.latest_update
     assert chunk == expected_response
+
+
+@pytest.mark.vcr()
+def test_get_note_customizations_by_deck_extension_id_in_multiple_chunks(
+    authorized_client_for_user_test1, monkeypatch
+):
+    from ankihub.ankihub_client import (
+        AnkiHubClient,
+        DeckExtensionUpdateChunk,
+        NoteCustomization,
+    )
+
+    client: AnkiHubClient = authorized_client_for_user_test1
+
+    deck_extension_id = 999
+
+    monkeypatch.setattr("ankihub.ankihub_client.DECK_EXTENSION_UPDATE_PAGE_SIZE", 1)
+
+    exepcted_chunk_1 = DeckExtensionUpdateChunk(
+        note_customizations=[
+            NoteCustomization(
+                ankihub_nid=uuid.UUID("8645c6d6-4f3d-417e-8295-8f5009042b6e"),
+                tags=[
+                    "AnkiHub_Optional::test100::test1",
+                    "AnkiHub_Optional::test100::test2",
+                ],
+            ),
+        ],
+    )
+    exepcted_chunk_2 = DeckExtensionUpdateChunk(
+        note_customizations=[
+            NoteCustomization(
+                ankihub_nid=uuid.UUID("b2344a94-0ca6-44a1-87a1-1593558c10a9"),
+                tags=[
+                    "AnkiHub_Optional::test100::test1",
+                    "AnkiHub_Optional::test100::test2",
+                ],
+            ),
+        ]
+    )
+
+    chunks = list(
+        client.get_deck_extension_updates(
+            deck_extension_id=deck_extension_id, since=None
+        )
+    )
+    assert len(chunks) == 2
+    chunk_1, chunk_2 = chunks
+
+    exepcted_chunk_1.latest_update = chunk_1.latest_update
+    exepcted_chunk_2.latest_update = chunk_2.latest_update
+    assert chunk_1 == exepcted_chunk_1
+    assert chunk_2 == exepcted_chunk_2
