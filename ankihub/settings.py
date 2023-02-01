@@ -63,7 +63,7 @@ class DeckConfig(DataClassJSONMixin):
 @dataclass
 class DeckExtensionConfig(DataClassJSONMixin):
     ankihub_deck_uuid: uuid.UUID
-    owner: int
+    owner_id: int
     name: str
     tag_group_name: str
     description: str
@@ -209,7 +209,7 @@ class Config:
         self._private_config.deck_extensions[extension.id] = DeckExtensionConfig(
             ankihub_deck_uuid=extension.ankihub_deck_uuid,
             name=extension.name,
-            owner=extension.owner,
+            owner_id=extension.owner_id,
             tag_group_name=extension.tag_group_name,
             description=extension.description,
         )

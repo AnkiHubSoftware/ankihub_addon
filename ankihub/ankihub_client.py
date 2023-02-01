@@ -210,7 +210,7 @@ class DeckExtension(DataClassJSONMixinWithConfig):
     ankihub_deck_uuid: uuid.UUID = dataclasses.field(
         metadata=field_options(alias="deck")
     )
-    owner: int
+    owner_id: int = dataclasses.field(metadata=field_options(alias="owner"))
     name: str
     tag_group_name: str
     description: str
