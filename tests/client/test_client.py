@@ -556,64 +556,63 @@ class TestGetDeckUpdates:
 
 @pytest.mark.vcr()
 def test_get_deck_extensions_by_deck_id(authorized_client_for_user_test1):
-    from ankihub.ankihub_client import AnkiHubClient
+    from ankihub.ankihub_client import AnkiHubClient, DeckExtension
 
     client: AnkiHubClient = authorized_client_for_user_test1
 
     deck_id = uuid.UUID("100df7b9-7749-4fe0-b801-e3dec1decd72")
 
-    expected_response = {
-        "deck_extensions": [
-            {
-                "id": 999,
-                "owner": 1,
-                "deck": "100df7b9-7749-4fe0-b801-e3dec1decd72",
-                "name": "test100",
-                "tag_group_name": "test100",
-                "description": "",
-            }
-        ]
-    }
-
     response = client.get_deck_extensions_by_deck_id(deck_id=deck_id)
-
-    assert response == expected_response
+    assert response == [
+        DeckExtension(
+            id=999,
+            owner=1,
+            ankihub_deck_uuid=uuid.UUID("100df7b9-7749-4fe0-b801-e3dec1decd72"),
+            name="test100",
+            tag_group_name="test100",
+            description="",
+        )
+    ]
 
 
 @pytest.mark.vcr()
 def test_get_note_customizations_by_deck_extension_id(authorized_client_for_user_test1):
-    from ankihub.ankihub_client import AnkiHubClient
+    from ankihub.ankihub_client import (
+        AnkiHubClient,
+        DeckExtensionUpdateChunk,
+        NoteCustomization,
+    )
 
     client: AnkiHubClient = authorized_client_for_user_test1
 
     deck_extension_id = 999
 
-    expected_response = {
-        "next": None,
-        "note_customizations": [
-            {
-                "id": 2,
-                "note": "8645c6d6-4f3d-417e-8295-8f5009042b6e",
-                "tags": [
+    expected_response = DeckExtensionUpdateChunk(
+        note_customizations=[
+            NoteCustomization(
+                ankihub_nid=uuid.UUID("8645c6d6-4f3d-417e-8295-8f5009042b6e"),
+                tags=[
                     "AnkiHub_Optional::test100::test1",
                     "AnkiHub_Optional::test100::test2",
                 ],
-            },
-            {
-                "id": 1,
-                "note": "b2344a94-0ca6-44a1-87a1-1593558c10a9",
-                "tags": [
+            ),
+            NoteCustomization(
+                ankihub_nid=uuid.UUID("b2344a94-0ca6-44a1-87a1-1593558c10a9"),
+                tags=[
                     "AnkiHub_Optional::test100::test1",
                     "AnkiHub_Optional::test100::test2",
                 ],
-            },
+            ),
         ],
-    }
+    )
 
     chunks = list(
-        client.get_note_customizations_by_deck_extension_id(
-            deck_extension_id=deck_extension_id
+        client.get_deck_extension_updates(
+            deck_extension_id=deck_extension_id, since=None
         )
     )
     assert len(chunks) == 1
-    assert chunks[0] == expected_response
+    chunk = chunks[0]
+
+    expected_response.latest_update = chunk.latest_update
+    assert chunk == expected_response
