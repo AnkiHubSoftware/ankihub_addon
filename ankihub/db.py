@@ -347,7 +347,7 @@ class AnkiHubDB:
             """
             SELECT anki_note_id FROM notes WHERE ankihub_note_id = ?
             """,
-            ankihub_id,
+            str(ankihub_id),
         )
         if note_id_str is None:
             return None
