@@ -76,7 +76,6 @@ def vcr_enabled(vcr: VCR):
 def run_command_in_django_container(command):
     subprocess.run(
         [
-            "sudo",
             "docker-compose",
             "-f",
             COMPOSE_FILE.absolute(),
