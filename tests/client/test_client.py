@@ -76,6 +76,7 @@ def vcr_enabled(vcr: VCR):
 def run_command_in_django_container(command):
     subprocess.run(
         [
+            "sudo",
             "docker-compose",
             "-f",
             COMPOSE_FILE.absolute(),
@@ -566,7 +567,7 @@ def test_get_deck_extensions_by_deck_id(authorized_client_for_user_test1):
     assert response == [
         DeckExtension(
             id=999,
-            owner=1,
+            owner_id=1,
             ankihub_deck_uuid=uuid.UUID("100df7b9-7749-4fe0-b801-e3dec1decd72"),
             name="test100",
             tag_group_name="test100",
