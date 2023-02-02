@@ -339,7 +339,7 @@ LOGGING = {
     "handlers": {
         "console": {
             "()": stdout_handler,
-            "level": "DEBUG",
+            "level": "INFO",
             "formatter": "verbose",
         },
         "file": {
