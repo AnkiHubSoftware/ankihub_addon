@@ -125,7 +125,8 @@ class AnkiHubSync:
             latest_update = max(
                 chunk.latest_update, latest_update or chunk.latest_update
             )
-            config.save_latest_extension_update(deck_extension.id, latest_update)
+
+        config.save_latest_extension_update(deck_extension.id, latest_update)
 
     def _handle_exception(
         self, exc: AnkiHubRequestError, ankihub_did: uuid.UUID
