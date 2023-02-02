@@ -129,6 +129,9 @@ class AnkiHubImporter:
             dids_for_note = set(c.did for c in note.cards())
             dids = dids | dids_for_note
 
+        LOGGER.info(f"Created {len(self.created_nids)} notes: {self.created_nids}")
+        LOGGER.info(f"Updated {len(self.updated_nids)} notes: {self.updated_nids}")
+
         if first_import_of_deck:
             local_did = self._cleanup_first_time_deck_import(dids, local_did)
 
