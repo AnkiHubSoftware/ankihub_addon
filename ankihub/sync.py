@@ -94,6 +94,8 @@ class AnkiHubSync:
     def _add_optional_content_to_notes(self, ankihub_did: uuid.UUID):
         client = AnkiHubClient()
         deck_extensions = client.get_deck_extensions_by_deck_id(ankihub_did)
+        if not deck_extensions:
+            return
         for deck_extension in deck_extensions:
             config.create_or_update_deck_extension_config(deck_extension)
             deck_extension_config = config.deck_extension_config(deck_extension.id)
