@@ -62,6 +62,7 @@ from .custom_search_nodes import (
     UpdatedInTheLastXDaysSearchNode,
     UpdatedSinceLastReviewSearchNode,
 )
+from .optional_tag_suggestion_dialog import OptionalTagsSuggestionDialog
 from .suggestion_dialog import SuggestionDialog
 from .utils import ask_user, choose_list, choose_subset
 
@@ -106,6 +107,11 @@ def _on_browser_will_show_context_menu(browser: Browser, context_menu: QMenu) ->
     menu.addAction(
         "AnkiHub: Reset local changes",
         lambda: _on_reset_local_changes_action(browser, nids=selected_nids),
+    )
+
+    menu.addAction(
+        "AnkiHub: Suggest Optional Tags",
+        lambda: _on_suggest_optional_tags_action(browser),
     )
 
     copy_ankihub_id_action = menu.addAction(
@@ -273,6 +279,31 @@ def _on_reset_local_changes_action(browser: Browser, nids: Sequence[NoteId]) -> 
         label="Resetting local changes...",
         parent=browser,
     )
+
+
+def _on_suggest_optional_tags_action(browser: Browser) -> None:
+    nids = browser.selected_notes()
+
+    if not nids:
+        return
+
+    if not ankihub_db.are_ankihub_notes(list(nids)):
+        showInfo(
+            "Please only select notes from an AnkiHub deck to suggest optional tags.",
+            parent=browser,
+        )
+        return
+
+    ankihub_dids = ankihub_db.ankihub_dids_for_anki_nids(nids)
+
+    if len(ankihub_dids) > 1:
+        showInfo(
+            "Please select notes from only one AnkiHub deck at a time.",
+            parent=browser,
+        )
+        return
+
+    OptionalTagsSuggestionDialog(parent=browser, nids=nids).exec()
 
 
 # AnkiHub menu
