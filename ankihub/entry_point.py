@@ -3,6 +3,7 @@ import time
 from pprint import pformat
 from typing import Callable
 
+from anki.errors import CardTypeError
 from aqt import mw
 from aqt.gui_hooks import profile_did_open, sync_did_finish
 
@@ -176,4 +177,9 @@ def adjust_ankihub_note_type_templates():
     # Filter out note types that don't exist in the Anki database to avoid errors.
     mids_filtered = [mid for mid in mids if mw.col.models.get(mid)]
 
-    modify_note_type_templates(mids_filtered)
+    # we don't want the setup to fail if there is a problem with the note type templates
+    # the CardTypeError can happen when the template has a problem (for example a missing field)
+    try:
+        modify_note_type_templates(mids_filtered)
+    except CardTypeError:
+        LOGGER.exception("Failed to adjust AnkiHub note type templates.")
