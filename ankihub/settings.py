@@ -344,7 +344,9 @@ LOGGING = {
         },
         "file": {
             "()": file_handler,
-            "level": "DEBUG",
+            "level": "DEBUG"
+            if config.public_config.get("debug_level_logs", False)
+            else "INFO",
             "formatter": "verbose",
         },
     },
