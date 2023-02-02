@@ -24,9 +24,9 @@ def logging_hook(response: Response, *args, **kwargs):
     )
     LOGGER.info(f"response status: {response.status_code}")
     try:
-        LOGGER.info(f"response content: {pformat(response.json())}")
+        LOGGER.debug(f"response content: {pformat(response.json())}")
     except JSONDecodeError:
-        LOGGER.info(f"response content: {str(response.content)}")
+        LOGGER.debug(f"response content: {str(response.content)}")
     else:
         LOGGER.info(f"response: {response}")
     return response
