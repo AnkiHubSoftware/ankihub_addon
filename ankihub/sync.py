@@ -96,12 +96,12 @@ class AnkiHubSync:
         deck_extensions = client.get_deck_extensions_by_deck_id(ankihub_did)
         if not deck_extensions:
             return
+        latest_update: Optional[datetime] = None
         for deck_extension in deck_extensions:
             config.create_or_update_deck_extension_config(deck_extension)
             deck_extension_config = config.deck_extension_config(deck_extension.id)
             since = deck_extension_config.latest_update
             updated_notes = []
-            latest_update: Optional[datetime] = None
             for chunk in client.get_deck_extension_updates(
                 deck_extension_id=deck_extension.id,
                 since=since,
