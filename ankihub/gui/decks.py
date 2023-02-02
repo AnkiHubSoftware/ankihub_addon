@@ -437,7 +437,7 @@ def download_and_install_deck(
             exc = e
 
         if exc is not None or not success:
-            LOGGER.debug("Error installing deck.")
+            LOGGER.info("Error installing deck.")
             if on_failure is not None:
                 on_failure()
 
@@ -525,7 +525,7 @@ def install_deck(
         creator=is_creator,
     )
 
-    LOGGER.debug("Importing deck was succesful.")
+    LOGGER.info("Importing deck was succesful.")
 
     return True
 

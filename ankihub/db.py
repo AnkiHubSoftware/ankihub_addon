@@ -22,7 +22,7 @@ def attach_ankihub_db_to_anki_db_connection() -> None:
             f"ATTACH DATABASE ? AS {AnkiHubDB.database_name}",
             str(AnkiHubDB.database_path),
         )
-        LOGGER.debug("Attached AnkiHub DB to Anki DB connection")
+        LOGGER.info("Attached AnkiHub DB to Anki DB connection")
 
 
 def detach_ankihub_db_from_anki_db_connection() -> None:
@@ -35,18 +35,18 @@ def detach_ankihub_db_from_anki_db_connection() -> None:
             # close the current transaction to avoid a "database is locked" error
             mw.col.save(trx=False)
         except Exception:
-            LOGGER.debug("Failed to close transaction.")
+            LOGGER.info("Failed to close transaction.")
 
         try:
             mw.col.db.execute(f"DETACH DATABASE {AnkiHubDB.database_name}")
-            LOGGER.debug("Detached AnkiHub DB from Anki DB connection")
+            LOGGER.info("Detached AnkiHub DB from Anki DB connection")
         except Exception:
-            LOGGER.debug("Failed to detach AnkiHub database.")
+            LOGGER.info("Failed to detach AnkiHub database.")
 
         # begin a new transaction because Anki expects one to be open
         mw.col.db.begin()
 
-        LOGGER.debug("Began new transaction.")
+        LOGGER.info("Began new transaction.")
 
 
 @contextmanager
@@ -85,7 +85,7 @@ class AnkiHubDB:
             """
         )
 
-        LOGGER.debug(f"AnkiHub DB schema version: {self.schema_version()}")
+        LOGGER.info(f"AnkiHub DB schema version: {self.schema_version()}")
 
         if self.schema_version() == 0:
             self.execute(
@@ -94,7 +94,7 @@ class AnkiHubDB:
                 """
             )
             self.execute("PRAGMA user_version = 1;")
-            LOGGER.debug(
+            LOGGER.info(
                 f"AnkiHub DB migrated to schema version {self.schema_version()}"
             )
 
@@ -102,7 +102,7 @@ class AnkiHubDB:
             self.execute("CREATE INDEX ankihub_deck_id_idx ON notes (ankihub_deck_id)")
             self.execute("CREATE INDEX anki_note_id_idx ON notes (anki_note_id)")
             self.execute("PRAGMA user_version = 2;")
-            LOGGER.debug(
+            LOGGER.info(
                 f"AnkiHub DB migrated to schema version {self.schema_version()}"
             )
 
@@ -111,21 +111,21 @@ class AnkiHubDB:
             self.execute("ALTER TABLE notes ADD COLUMN fields TEXT")
             self.execute("ALTER TABLE notes ADD COLUMN tags TEXT")
             self.execute("PRAGMA user_version = 3;")
-            LOGGER.debug(
+            LOGGER.info(
                 f"AnkiHub DB migrated to schema version {self.schema_version()}"
             )
 
         if self.schema_version() <= 3:
             self.execute("ALTER TABLE notes ADD COLUMN last_update_type TEXT")
             self.execute("PRAGMA user_version = 4;")
-            LOGGER.debug(
+            LOGGER.info(
                 f"AnkiHub DB migrated to schema version {self.schema_version()}"
             )
 
         if self.schema_version() <= 4:
             self.execute("CREATE INDEX anki_note_type_id ON notes (anki_note_type_id)")
             self.execute("PRAGMA user_version = 5;")
-            LOGGER.debug(
+            LOGGER.info(
                 f"AnkiHub DB migrated to schema version {self.schema_version()}"
             )
 

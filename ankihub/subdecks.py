@@ -60,7 +60,7 @@ def build_subdecks_and_move_cards_to_them(
         try:
             if mw.col.decks.card_count(did, include_subdecks=True) == 0:
                 mw.col.decks.remove([did])
-                LOGGER.debug(f"Removed empty subdeck with id {did}.")
+                LOGGER.info(f"Removed empty subdeck with id {did}.")
         except NotFoundError:
             # this can happen if a parent deck was deleted earlier in the loop
             pass
@@ -167,7 +167,7 @@ def flatten_deck(ankihub_did: uuid.UUID) -> None:
         _, did = name_and_did
         try:
             mw.col.decks.remove([did])
-            LOGGER.debug(f"Removed subdeck with id {did}.")
+            LOGGER.info(f"Removed subdeck with id {did}.")
         except NotFoundError:
             # this can happen if a parent deck was deleted earlier in the loop
             pass
@@ -189,7 +189,7 @@ def add_subdeck_tags_to_notes(anki_deck_name: str, ankihub_deck_name: str) -> No
 
     assert "::" not in anki_deck_name, "Deck must be a top level deck."
 
-    LOGGER.debug("Adding subdeck tags to notes.")
+    LOGGER.info("Adding subdeck tags to notes.")
 
     deck = mw.col.decks.by_name(anki_deck_name)
 

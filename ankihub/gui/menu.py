@@ -261,7 +261,7 @@ def create_collaborative_deck_action() -> None:
         ),
         success=on_success,
     ).failure(on_failure)
-    LOGGER.debug("Instantiated QueryOp for creating collaborative deck")
+    LOGGER.info("Instantiated QueryOp for creating collaborative deck")
     op.with_progress(label="Creating collaborative deck").run_in_background()
 
 
