@@ -181,7 +181,7 @@ class AnkiHubImporter:
         anki_did: Optional[DeckId] = None,
         first_import_of_deck: bool = False,
     ) -> Note:
-        LOGGER.info(
+        LOGGER.debug(
             f"Trying to update or create note: {note_data.anki_nid=}, {note_data.ankihub_note_uuid=}"
         )
 
@@ -267,9 +267,9 @@ class AnkiHubImporter:
             ):
                 note.flush()
                 self.updated_nids.append(note.id)
-                LOGGER.info(f"Updated note: {note_data.anki_nid=}")
+                LOGGER.debug(f"Updated note: {note_data.anki_nid=}")
             else:
-                LOGGER.info(f"No changes, skipping {note_data.anki_nid=}")
+                LOGGER.debug(f"No changes, skipping {note_data.anki_nid=}")
         except NotFoundError:
             if anki_did is None:
                 raise ValueError("anki_did must be set for new notes")
@@ -287,7 +287,7 @@ class AnkiHubImporter:
                 note, anki_id=NoteId(note_data.anki_nid), anki_did=anki_did
             )
             self.created_nids.append(note.id)
-            LOGGER.info(f"Created note: {note_data.anki_nid=}")
+            LOGGER.debug(f"Created note: {note_data.anki_nid=}")
         return note
 
     def prepare_note(
@@ -305,7 +305,7 @@ class AnkiHubImporter:
         Returns True if note was changed and False otherwise
         """
 
-        LOGGER.info("Preparing note...")
+        LOGGER.debug("Preparing note...")
 
         changed_guid = self._prepare_guid(note, note_data.guid)
 
@@ -324,20 +324,20 @@ class AnkiHubImporter:
             changed_guid or changed_ankihub_id_field or changed_fields or changed_tags
         )
 
-        LOGGER.info(f"Prepared note. {changed=}")
+        LOGGER.debug(f"Prepared note. {changed=}")
         return changed
 
     def _prepare_guid(self, note: Note, guid: str) -> bool:
         if note.guid == guid:
             return False
 
-        LOGGER.info(f"Changing guid of note {note.id} from {note.guid} to {guid}")
+        LOGGER.debug(f"Changing guid of note {note.id} from {note.guid} to {guid}")
         note.guid = guid
         return True
 
     def _prepare_ankihub_id_field(self, note: Note, ankihub_nid: str) -> bool:
         if note[settings.ANKIHUB_NOTE_TYPE_FIELD_NAME] != ankihub_nid:
-            LOGGER.info(
+            LOGGER.debug(
                 f"AnkiHub id of note {note.id} will be changed from {note[settings.ANKIHUB_NOTE_TYPE_FIELD_NAME]} "
                 f"to {ankihub_nid}",
             )
@@ -353,7 +353,7 @@ class AnkiHubImporter:
     ) -> bool:
 
         if TAG_FOR_PROTECTING_ALL_FIELDS in note.tags:
-            LOGGER.info(
+            LOGGER.debug(
                 "Skipping preparing fields because they are protected by a tag."
             )
             return False
@@ -365,17 +365,17 @@ class AnkiHubImporter:
                 mw.col.models.get(note.mid)["id"], []
             )
             if field.name in protected_fields_for_model:
-                LOGGER.info(
+                LOGGER.debug(
                     f"Field {field.name} is protected by the protected_fields for the model, skipping."
                 )
                 continue
 
             if field.name in fields_protected_by_tags:
-                LOGGER.info(f"Field {field.name} is protected by a tag, skipping.")
+                LOGGER.debug(f"Field {field.name} is protected by a tag, skipping.")
                 continue
 
             if note[field.name] != field.value:
-                LOGGER.info(
+                LOGGER.debug(
                     f'Field: "{field.name}" will be changed from:\n'
                     f"{note[field.name]}\n"
                     "to:\n"
@@ -397,7 +397,7 @@ class AnkiHubImporter:
             cur_tags=note.tags, incoming_tags=tags, protected_tags=protected_tags
         )
         if set(prev_tags) != set(note.tags):
-            LOGGER.info(
+            LOGGER.debug(
                 f"Tags were changed from {prev_tags} to {note.tags}.",
             )
             changed = True
