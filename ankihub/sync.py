@@ -58,7 +58,7 @@ class AnkiHubSync:
         for chunk in client.get_deck_updates(
             ankihub_did,
             since=deck_config.latest_update,
-            download_progress_cb=lambda notes_count: _updates_download_progress_cb(
+            download_progress_cb=lambda notes_count: _update_deck_download_progress_cb(
                 notes_count, ankihub_did=ankihub_did
             ),
         ):
@@ -103,6 +103,9 @@ class AnkiHubSync:
             for chunk in client.get_deck_extension_updates(
                 deck_extension_id=deck_extension.id,
                 since=since,
+                download_progress_cb=lambda note_customizations_count: _update_extension_download_progress_cb(
+                    note_customizations_count, deck_extension.id
+                ),
             ):
                 for customization in chunk.note_customizations:
                     anki_nid = ankihub_db.anki_nid_for_ankihub_nid(
@@ -122,11 +125,13 @@ class AnkiHubSync:
             mw.col.update_notes(updated_notes)
 
             # each chunk contains the latest update timestamp of the notes in it, we need the latest one
-            latest_update = max(
-                chunk.latest_update, latest_update or chunk.latest_update
-            )
+            if chunk.latest_update:
+                latest_update = max(
+                    chunk.latest_update, latest_update or chunk.latest_update
+                )
 
-        config.save_latest_extension_update(deck_extension.id, latest_update)
+        if latest_update:
+            config.save_latest_extension_update(deck_extension.id, latest_update)
 
     def _handle_exception(
         self, exc: AnkiHubRequestError, ankihub_did: uuid.UUID
@@ -213,15 +218,15 @@ def sync_with_progress(on_done: Optional[Callable[[], None]] = None) -> None:
         LOGGER.debug("Skipping sync due to no token.")
 
 
-def _updates_download_progress_cb(notes_count: int, ankihub_did: uuid.UUID):
+def _update_deck_download_progress_cb(notes_count: int, ankihub_did: uuid.UUID):
     mw.taskman.run_on_main(
-        lambda: _updates_download_progress_cb_inner(
+        lambda: _update_deck_download_progress_cb_inner(
             notes_count=notes_count, ankihub_did=ankihub_did
         )
     )
 
 
-def _updates_download_progress_cb_inner(notes_count: int, ankihub_did: uuid.UUID):
+def _update_deck_download_progress_cb_inner(notes_count: int, ankihub_did: uuid.UUID):
     try:
         mw.progress.update(
             "Downloading updates\n"
@@ -240,6 +245,31 @@ def _updates_download_progress_cb_inner(notes_count: int, ankihub_did: uuid.UUID
         # calling its methods (at least in Anki 2.1.54).
         # It should be safe to ignore this error and let the sync continue.
 
+        LOGGER.exception(
+            "Unable to update progress bar to show download progress of deck updates."
+        )
+
+
+def _update_extension_download_progress_cb(
+    note_customizations_count: int, deck_extension_id: int
+):
+    mw.taskman.run_on_main(
+        lambda: _update_extension_download_progress_cb_inner(
+            note_customizations_count, deck_extension_id
+        )
+    )
+
+
+def _update_extension_download_progress_cb_inner(
+    note_customizations_count: int, deck_extension_id: int
+):
+    try:
+        mw.progress.update(
+            "Downloading extension updates\n"
+            f"for {config.deck_extension_config(deck_extension_id).name}\n"
+            f"Note customizations downloaded: {note_customizations_count}"
+        )
+    except AttributeError:
         LOGGER.exception(
             "Unable to update progress bar to show download progress of deck updates."
         )
