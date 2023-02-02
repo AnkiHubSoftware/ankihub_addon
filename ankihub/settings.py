@@ -212,6 +212,10 @@ class Config:
             owner_id=extension.owner_id,
             tag_group_name=extension.tag_group_name,
             description=extension.description,
+            # retain the latest update value
+            latest_update=self._private_config.deck_extensions[
+                extension.id
+            ].latest_update,
         )
         self._update_private_config()
 
