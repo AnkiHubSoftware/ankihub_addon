@@ -5,7 +5,7 @@ from typing import Callable
 
 from anki.errors import CardTypeError
 from aqt import mw
-from aqt.gui_hooks import profile_did_open, sync_did_finish
+from aqt.gui_hooks import profile_did_open, profile_will_close, sync_did_finish
 
 from . import LOGGER
 from .addons import setup_addons
@@ -23,6 +23,8 @@ from .utils import modify_note_type_templates
 # some code needs to be run only once even if the Anki profile changes
 ATTEMPTED_GENERAL_SETUP_BEFORE = False
 
+PROFILE_WILL_CLOSE = False
+
 
 def run():
     """Call this function in __init__.py when Anki starts."""
@@ -30,6 +32,9 @@ def run():
 
 
 def on_profile_did_open():
+    global PROFILE_WILL_CLOSE
+    PROFILE_WILL_CLOSE = False
+
     if not profile_setup():
         return
 
@@ -116,6 +121,9 @@ def general_setup():
 
     LOGGER.debug("Loaded media_export.")
 
+    profile_will_close.append(on_profile_will_close)
+    LOGGER.debug("Set up profile_will_close hook.")
+
 
 def on_startup_syncs_done() -> None:
     # Called after AnkiWeb sync and AnkiHub sync are done after starting Anki.
@@ -143,6 +151,12 @@ def maybe_do_or_setup_ankihub_sync(after_startup_syncs: Callable[[], None]):
             LOGGER.info(
                 f"maybe_do_or_setup_ankihub_sync.wrapper was called with {wrapper.is_startup_sync=}"  # type: ignore
             )
+            if PROFILE_WILL_CLOSE:
+                # Syncing when the profile is about to close sometimes causes this error message to be shown:
+                # https://github.com/ankitects/anki/blob/14189a91ba3016a3f7c2d3fd7c1901ca96f12291/qt/aqt/main.py#L675-L676
+                LOGGER.info("Profile will close, so AnkiHub sync is not done.")
+                return
+
             if wrapper.is_startup_sync:  # type: ignore
                 wrapper.is_startup_sync = False  # type: ignore
                 sync_with_progress(on_done=after_startup_syncs)
@@ -209,3 +223,8 @@ def adjust_ankihub_note_type_templates():
         modify_note_type_templates(mids_filtered)
     except CardTypeError:
         LOGGER.exception("Failed to adjust AnkiHub note type templates.")
+
+
+def on_profile_will_close():
+    global PROFILE_WILL_CLOSE
+    PROFILE_WILL_CLOSE = True
