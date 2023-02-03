@@ -88,8 +88,8 @@ def general_setup():
 
     mw.addonManager.setWebExports(__name__, r"gui/web/.*")
 
-    do_after_ankiweb_sync(callback=on_startup_ankiweb_sync_done)
-    LOGGER.debug("Registered on_after_ankiweb_sync")
+    maybe_do_or_setup_ankihub_sync(after_startup_syncs=on_startup_syncs_done)
+    LOGGER.debug("Did or set up ankihub sync.")
 
     setup_ankihub_menu()
     LOGGER.debug("Set up AnkiHub menu.")
@@ -122,41 +122,67 @@ def on_startup_syncs_done() -> None:
     check_ankihub_db(on_success=check_anki_db)
 
 
-def on_startup_ankiweb_sync_done() -> None:
-    # Syncing with AnkiHub during sync with AnkiWeb causes an error,
-    # this is why we have to wait until the AnkiWeb sync is done if there is one.
-    # The database check should be done after the AnkiHub sync to not open all dialogs at once
-    # and the AnkiHub sync could also make the database check obsolete.
-    if config.public_config.get("sync_on_startup", True):
-        sync_with_progress(on_done=on_startup_syncs_done)
-    else:
-        on_startup_syncs_done()
+def maybe_do_or_setup_ankihub_sync(after_startup_syncs: Callable[[], None]):
+    # The AnkiHub sync can't happen during the AnkiWeb sync as this would cause errors.
+    # So the approach taken here is to call AnkiHub sync after AnkiWeb sync is done.
+    # It is possible for the AnkiWeb sync to be disabled / not possible, in this case
+    # the AnkiHub sync is done immediately (if it is enabled).
+    # after_startup_syncs is called after the startup syncs, or immediately if the syncs are not done.
+    LOGGER.info(
+        "Maybe do or set up AnkiHub sync. "
+        f"sync_on_startup={config.public_config['sync_on_startup']} "
+        f"sync_on_ankiweb_sync={config.public_config['sync_on_ankiweb_sync']} "
+    )
 
+    if config.public_config["sync_on_ankiweb_sync"]:
+        # for the first time after opening Anki, AnkiWeb sync is done, then AnkiHub sync, then after_startup_syncs
+        # (assuming AnkiWeb sync is possible, otherwise AnkiHub sync is done and then after_startup_syncs)
+        # for subsequent AnkiWeb syncs, AnkiHub sync is done
 
-def do_after_ankiweb_sync(callback: Callable[[], None]) -> None:
-    """The callback is called after the AnkiWeb sync is done if there is one, otherwise it is called
-    when the Anki profile is opened.
-    """
-
-    def on_profile_open():
-        if not mw.can_auto_sync():
-            LOGGER.debug(
-                "do_after_ankiweb_sync: Calling callback right away as mw.can_auto_sync() is False"
+        def wrapper():
+            LOGGER.info(
+                f"maybe_do_or_setup_ankihub_sync.wrapper was called with {wrapper.is_startup_sync=}"  # type: ignore
             )
-            callback()
-        else:
+            if wrapper.is_startup_sync:  # type: ignore
+                wrapper.is_startup_sync = False  # type: ignore
+                sync_with_progress(on_done=after_startup_syncs)
+            else:
+                sync_with_progress()
 
-            def on_sync_did_finish():
-                sync_did_finish.remove(on_sync_did_finish)
+        wrapper.is_startup_sync = True  # type: ignore
 
-                LOGGER.debug(
-                    "do_after_ankiweb_sync: Calling callback after AnkiWeb sync"
-                )
-                callback()
+        sync_did_finish.append(wrapper)
 
-            sync_did_finish.append(on_sync_did_finish)
+        if not mw.can_auto_sync() and config.public_config["sync_on_startup"]:
+            LOGGER.info("AnkiWeb sync is not possible, so AnkiHub sync is done now.")
+            wrapper.is_startup_sync = False  # type: ignore
+            sync_with_progress(after_startup_syncs)
 
-    profile_did_open.append(on_profile_open)
+    elif config.public_config["sync_on_startup"]:
+        # first AnkiWeb sync is attempted, then AnkiHub sync, then after_startup_syncs
+        _call_once_after_ankiweb_sync_or_now_if_cant_sync(
+            lambda: sync_with_progress(after_startup_syncs)
+        )
+    else:
+        # there is no ankihub sync on startup, so it is enough to call after_startup_sync after the AnkiWeb sync
+        _call_once_after_ankiweb_sync_or_now_if_cant_sync(after_startup_syncs)
+
+
+def _call_once_after_ankiweb_sync_or_now_if_cant_sync(
+    callback: Callable[[], None]
+) -> None:
+    """Call the callback once after the AnkiWeb sync is done if there will be a sync, otherwise call it
+    immediately."""
+
+    def wrapper():
+        sync_did_finish.remove(wrapper)
+        callback()
+
+    if mw.can_auto_sync():
+        sync_did_finish.append(wrapper)
+    else:
+        LOGGER.info("AnkiWeb sync is not possible, so callback is called now.")
+        callback()
 
 
 def log_enabled_addons():
