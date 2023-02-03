@@ -561,65 +561,120 @@ class TestGetDeckUpdates:
 
 @pytest.mark.vcr()
 def test_get_deck_extensions_by_deck_id(authorized_client_for_user_test1):
-    from ankihub.ankihub_client import AnkiHubClient
+    from ankihub.ankihub_client import AnkiHubClient, DeckExtension
 
     client: AnkiHubClient = authorized_client_for_user_test1
 
-    expected_response = {
-        "deck_extensions": [
-            {
-                "id": 999,
-                "owner": 1,
-                "deck": str(DECK_WITH_EXTENSION_UUID),
-                "name": "test100",
-                "tag_group_name": "test100",
-                "description": "",
-            }
-        ]
-    }
+    deck_id = uuid.UUID("100df7b9-7749-4fe0-b801-e3dec1decd72")
 
-    response = client.get_deck_extensions_by_deck_id(deck_id=DECK_WITH_EXTENSION_UUID)
-
-    assert recursively_sorted(response) == recursively_sorted(expected_response)
+    response = client.get_deck_extensions_by_deck_id(deck_id=deck_id)
+    assert response == [
+        DeckExtension(
+            id=999,
+            owner_id=1,
+            ankihub_deck_uuid=uuid.UUID("100df7b9-7749-4fe0-b801-e3dec1decd72"),
+            name="test100",
+            tag_group_name="test100",
+            description="",
+        )
+    ]
 
 
 @pytest.mark.vcr()
 def test_get_note_customizations_by_deck_extension_id(authorized_client_for_user_test1):
-    from ankihub.ankihub_client import AnkiHubClient
+    from ankihub.ankihub_client import (
+        AnkiHubClient,
+        DeckExtensionUpdateChunk,
+        NoteCustomization,
+    )
 
     client: AnkiHubClient = authorized_client_for_user_test1
 
     deck_extension_id = 999
 
-    expected_response = {
-        "next": None,
-        "note_customizations": [
-            {
-                "id": 2,
-                "note": "8645c6d6-4f3d-417e-8295-8f5009042b6e",
-                "tags": [
+    expected_response = DeckExtensionUpdateChunk(
+        note_customizations=[
+            NoteCustomization(
+                ankihub_nid=uuid.UUID("8645c6d6-4f3d-417e-8295-8f5009042b6e"),
+                tags=[
                     "AnkiHub_Optional::test100::test1",
                     "AnkiHub_Optional::test100::test2",
                 ],
-            },
-            {
-                "id": 1,
-                "note": "b2344a94-0ca6-44a1-87a1-1593558c10a9",
-                "tags": [
+            ),
+            NoteCustomization(
+                ankihub_nid=uuid.UUID("b2344a94-0ca6-44a1-87a1-1593558c10a9"),
+                tags=[
                     "AnkiHub_Optional::test100::test1",
                     "AnkiHub_Optional::test100::test2",
                 ],
-            },
+            ),
         ],
-    }
+    )
 
     chunks = list(
-        client.get_note_customizations_by_deck_extension_id(
-            deck_extension_id=deck_extension_id
+        client.get_deck_extension_updates(
+            deck_extension_id=deck_extension_id, since=None
         )
     )
     assert len(chunks) == 1
-    assert recursively_sorted(chunks[0]) == recursively_sorted(expected_response)
+    chunk = chunks[0]
+
+    expected_response.latest_update = chunk.latest_update
+    assert chunk == expected_response
+
+
+@pytest.mark.vcr()
+def test_get_note_customizations_by_deck_extension_id_in_multiple_chunks(
+    authorized_client_for_user_test1, monkeypatch
+):
+    from ankihub.ankihub_client import (
+        AnkiHubClient,
+        DeckExtensionUpdateChunk,
+        NoteCustomization,
+    )
+
+    client: AnkiHubClient = authorized_client_for_user_test1
+
+    deck_extension_id = 999
+
+    monkeypatch.setattr("ankihub.ankihub_client.DECK_EXTENSION_UPDATE_PAGE_SIZE", 1)
+
+    expected_chunk_1 = DeckExtensionUpdateChunk(
+        note_customizations=[
+            NoteCustomization(
+                ankihub_nid=uuid.UUID("8645c6d6-4f3d-417e-8295-8f5009042b6e"),
+                tags=[
+                    "AnkiHub_Optional::test100::test1",
+                    "AnkiHub_Optional::test100::test2",
+                ],
+            ),
+        ]
+    )
+
+    expected_chunk_2 = DeckExtensionUpdateChunk(
+        note_customizations=[
+            NoteCustomization(
+                ankihub_nid=uuid.UUID("b2344a94-0ca6-44a1-87a1-1593558c10a9"),
+                tags=[
+                    "AnkiHub_Optional::test100::test1",
+                    "AnkiHub_Optional::test100::test2",
+                ],
+            ),
+        ]
+    )
+
+    chunks = list(
+        client.get_deck_extension_updates(
+            deck_extension_id=deck_extension_id, since=None
+        )
+    )
+    assert len(chunks) == 2
+    chunk_1, chunk_2 = chunks
+
+    expected_chunk_1.latest_update = chunk_1.latest_update
+    expected_chunk_2.latest_update = chunk_2.latest_update
+    assert chunk_1 == expected_chunk_1
+    assert chunk_2 == expected_chunk_2
 
 
 @pytest.mark.vcr()
@@ -666,17 +721,21 @@ def test_suggest_optional_tags(authorized_client_for_user_test2):
                     "AnkiHub_Optional::test100::test1",
                     "AnkiHub_Optional::test100::test2",
                 ],
-            )
-        ]
+            ),
+        ],
     )
-
     # we have no easy way to check if the suggestion is created if it is not accepted,
     # so this test just checks that the request is successful
 
 
 @pytest.mark.vcr()
 def test_suggest_auto_accepted_optional_tags(authorized_client_for_user_test1):
-    from ankihub.ankihub_client import AnkiHubClient, OptionalTagSuggestion
+    from ankihub.ankihub_client import (
+        AnkiHubClient,
+        DeckExtensionUpdateChunk,
+        NoteCustomization,
+        OptionalTagSuggestion,
+    )
 
     client: AnkiHubClient = authorized_client_for_user_test1
 
@@ -696,47 +755,40 @@ def test_suggest_auto_accepted_optional_tags(authorized_client_for_user_test1):
     )
 
     # assert that the tags were updated
-    expected_response = {
-        "next": None,
-        "note_customizations": [
-            {
-                "id": 2,
-                "note": "8645c6d6-4f3d-417e-8295-8f5009042b6e",
-                "tags": [
+    expected_response = DeckExtensionUpdateChunk(
+        note_customizations=[
+            NoteCustomization(
+                ankihub_nid=uuid.UUID("8645c6d6-4f3d-417e-8295-8f5009042b6e"),
+                tags=[
                     "AnkiHub_Optional::test100::new1",
                     "AnkiHub_Optional::test100::new2",
                 ],
-            },
-            {
-                "id": 1,
-                "note": "b2344a94-0ca6-44a1-87a1-1593558c10a9",
-                "tags": [
+            ),
+            NoteCustomization(
+                ankihub_nid=uuid.UUID("b2344a94-0ca6-44a1-87a1-1593558c10a9"),
+                tags=[
                     "AnkiHub_Optional::test100::test1",
                     "AnkiHub_Optional::test100::test2",
                 ],
-            },
-        ],
-    }
+            ),
+        ]
+    )
 
     chunks = list(
-        client.get_note_customizations_by_deck_extension_id(
-            deck_extension_id=DECK_EXTENSION_ID
+        client.get_deck_extension_updates(
+            deck_extension_id=DECK_EXTENSION_ID, since=None
         )
     )
+
     assert len(chunks) == 1
-    assert recursively_sorted(chunks[0]) == recursively_sorted(expected_response)
+    chunk = chunks[0]
+    expected_response.latest_update = chunk.latest_update
 
+    # sort tags to make sure they are in the same order
+    for note_customization in chunk.note_customizations:
+        note_customization.tags = sorted(note_customization.tags)
 
-def recursively_sorted(d):
-    # https://stackoverflow.com/a/25851972/1123955
-    if isinstance(d, dict):
-        return {k: recursively_sorted(v) for k, v in sorted(d.items())}
-    if isinstance(d, list):
-        try:
-            return list(sorted([recursively_sorted(v) for v in d]))
-        except TypeError:
-            return list(
-                sorted((recursively_sorted(v) for v in d), key=lambda x: str(x))
-            )
+    for note_customization in expected_response.note_customizations:
+        note_customization.tags = sorted(note_customization.tags)
 
-    return d
+    assert chunk == expected_response

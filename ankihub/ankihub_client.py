@@ -24,6 +24,7 @@ API_URL_BASE = "https://app.ankihub.net/api"
 API_VERSION = 5.0
 
 DECK_UPDATE_PAGE_SIZE = 2000  # seems to work well in terms of speed
+DECK_EXTENSION_UPDATE_PAGE_SIZE = 2000
 
 CSV_DELIMITER = ";"
 
@@ -224,6 +225,37 @@ class AnkiHubRequestError(Exception):
         )
 
 
+@dataclass
+class DeckExtension(DataClassJSONMixinWithConfig):
+    id: int
+    ankihub_deck_uuid: uuid.UUID = dataclasses.field(
+        metadata=field_options(alias="deck")
+    )
+    owner_id: int = dataclasses.field(metadata=field_options(alias="owner"))
+    name: str
+    tag_group_name: str
+    description: str
+
+
+@dataclass
+class NoteCustomization(DataClassJSONMixinWithConfig):
+    ankihub_nid: uuid.UUID = dataclasses.field(metadata=field_options(alias="note"))
+    tags: List[str]
+
+
+@dataclass
+class DeckExtensionUpdateChunk(DataClassJSONMixinWithConfig):
+    note_customizations: List[NoteCustomization]
+    latest_update: Optional[datetime] = dataclasses.field(
+        metadata=field_options(
+            deserialize=lambda x: datetime.strptime(x, ANKIHUB_DATETIME_FORMAT_STR)
+            if x
+            else None,
+        ),
+        default=None,
+    )
+
+
 class AnkiHubClient:
     """Client for interacting with the AnkiHub API."""
 
@@ -417,7 +449,6 @@ class AnkiHubClient:
         # download_progress_cb gets passed the number of notes downloaded until now
 
         class Params(TypedDict, total=False):
-            page: int
             since: str
             size: int
 
@@ -617,26 +648,58 @@ class AnkiHubClient:
         if response.status_code != 201:
             raise AnkiHubRequestError(response)
 
-    def get_deck_extensions(self, params={}):
-        response = self._send_request("GET", "/users/deck_extensions", params=params)
+    def get_deck_extensions_by_deck_id(self, deck_id: uuid.UUID) -> List[DeckExtension]:
+        response = self._send_request(
+            "GET", "/users/deck_extensions", params={"deck_id": deck_id}
+        )
         if response.status_code != 200:
             raise AnkiHubRequestError(response)
-        return response.json()
 
-    def get_deck_extensions_by_deck_id(self, deck_id: uuid.UUID):
-        return self.get_deck_extensions(params={"deck_id": str(deck_id)})
+        data = response.json()
+        extension_dicts = data.get("deck_extensions", [])
+        result = [DeckExtension.from_dict(d) for d in extension_dicts]
+        return result
 
-    def get_note_customizations_by_deck_extension_id(self, deck_extension_id: int):
+    def get_deck_extension_updates(
+        self,
+        deck_extension_id: int,
+        since: datetime,
+        download_progress_cb: Optional[Callable[[int], None]] = None,
+    ) -> Iterator[DeckExtensionUpdateChunk]:
+        # download_progress_cb gets passed the number of note customizations downloaded until now
+
+        class Params(TypedDict, total=False):
+            since: str
+            size: int
+
+        params: Params = {
+            "since": since.strftime(ANKIHUB_DATETIME_FORMAT_STR) if since else None,
+            "size": DECK_EXTENSION_UPDATE_PAGE_SIZE,
+        }
         url = f"/deck_extensions/{deck_extension_id}/note_customizations/"
+
+        i = 0
+        customizations_count = 0
         while url is not None:
-            response = self._send_request("GET", url)
+            response = self._send_request(
+                "GET",
+                url,
+                params=params if i == 0 else None,
+            )
             if response.status_code != 200:
                 raise AnkiHubRequestError(response)
 
             data = response.json()
             url = data["next"].split("/api", maxsplit=1)[1] if data["next"] else None
 
-            yield data
+            note_updates = DeckExtensionUpdateChunk.from_dict(data)
+            yield note_updates
+
+            i += 1
+            customizations_count += len(note_updates.note_customizations)
+
+            if download_progress_cb:
+                download_progress_cb(customizations_count)
 
     def prevalidate_tag_groups(
         self, ankihub_deck_uuid: uuid.UUID, tag_group_names: List[str]

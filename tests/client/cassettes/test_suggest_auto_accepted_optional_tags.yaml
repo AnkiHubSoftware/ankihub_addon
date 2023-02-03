@@ -18,7 +18,7 @@ interactions:
     uri: http://localhost:8000/api/login/
   response:
     body:
-      string: '{"expiry":"2023-01-27T22:34:52.071677Z","token":"60f18ee07645f0bf5cbcd7f249426103aaa433e7ae9f74cf5d5b3c26cb5a0874"}'
+      string: '{"expiry":"2023-02-09T20:58:31.653600Z","token":"f8345bb1f643801a16281764c9c33156643584d1685303b929285031965e1abe"}'
     headers:
       Allow:
       - POST, OPTIONS
@@ -31,20 +31,20 @@ interactions:
       Cross-Origin-Opener-Policy:
       - same-origin
       Date:
-      - Fri, 20 Jan 2023 22:34:52 GMT
+      - Thu, 02 Feb 2023 20:58:31 GMT
       Referrer-Policy:
       - same-origin
       Server:
       - WSGIServer/0.2 CPython/3.8.16
       Server-Timing:
-      - TimerPanel_utime;dur=471.3450000000421;desc="User CPU time", TimerPanel_stime;dur=91.44899999999723;desc="System
-        CPU time", TimerPanel_total;dur=562.7940000000393;desc="Total CPU time", TimerPanel_total_time;dur=221.20976448059082;desc="Elapsed
-        time", SQLPanel_sql_time;dur=3.7217140197753906;desc="SQL 10 queries", CachePanel_total_time;dur=0;desc="Cache
-        0 Calls"
+      - TimerPanel_utime;dur=378.20499999999765;desc="User CPU time", TimerPanel_stime;dur=67.41300000000017;desc="System
+        CPU time", TimerPanel_total;dur=445.61799999999783;desc="Total CPU time",
+        TimerPanel_total_time;dur=187.18552589416504;desc="Elapsed time", SQLPanel_sql_time;dur=4.745721817016602;desc="SQL
+        10 queries", CachePanel_total_time;dur=0;desc="Cache 0 Calls"
       Set-Cookie:
-      - csrftoken=0gsuEJZ3BbdTAbD47WdgLElpDalbt8ZK; expires=Fri, 19 Jan 2024 22:34:52
+      - csrftoken=Ii1pxUUyuArYIaCNAUVuROaP6uB54qap; expires=Thu, 01 Feb 2024 20:58:31
         GMT; HttpOnly; Max-Age=31449600; Path=/; SameSite=Lax
-      - sessionid=ibo40hqsq3j3gs5e9leraskqug3cylxi; expires=Fri, 27 Jan 2023 22:34:52
+      - sessionid=hfk1xo2c1azhkrlfnmgtzpvpfkv11vap; expires=Thu, 09 Feb 2023 20:58:31
         GMT; HttpOnly; Max-Age=604800; Path=/; SameSite=Lax
       Vary:
       - Accept, Cookie, Accept-Language, Origin
@@ -53,7 +53,7 @@ interactions:
       X-Frame-Options:
       - DENY
       djdt-store-id:
-      - 8f46c943c4934a6c954ddda327ebbe4c
+      - 8355262fbbf3405c89b66471e9213453
     status:
       code: 200
       message: OK
@@ -67,7 +67,7 @@ interactions:
       Accept-Encoding:
       - gzip, deflate
       Authorization:
-      - Token 60f18ee07645f0bf5cbcd7f249426103aaa433e7ae9f74cf5d5b3c26cb5a0874
+      - Token f8345bb1f643801a16281764c9c33156643584d1685303b929285031965e1abe
       Connection:
       - keep-alive
       Content-Length:
@@ -93,16 +93,16 @@ interactions:
       Cross-Origin-Opener-Policy:
       - same-origin
       Date:
-      - Fri, 20 Jan 2023 22:34:52 GMT
+      - Thu, 02 Feb 2023 20:58:31 GMT
       Referrer-Policy:
       - same-origin
       Server:
       - WSGIServer/0.2 CPython/3.8.16
       Server-Timing:
-      - TimerPanel_utime;dur=161.59399999992274;desc="User CPU time", TimerPanel_stime;dur=0.13799999999974943;desc="System
-        CPU time", TimerPanel_total;dur=161.7319999999225;desc="Total CPU time", TimerPanel_total_time;dur=159.1665744781494;desc="Elapsed
-        time", SQLPanel_sql_time;dur=4.705190658569336;desc="SQL 15 queries", CachePanel_total_time;dur=0;desc="Cache
-        0 Calls"
+      - TimerPanel_utime;dur=103.32500000000167;desc="User CPU time", TimerPanel_stime;dur=0.25599999999981193;desc="System
+        CPU time", TimerPanel_total;dur=103.58100000000148;desc="Total CPU time",
+        TimerPanel_total_time;dur=111.20009422302246;desc="Elapsed time", SQLPanel_sql_time;dur=4.865169525146484;desc="SQL
+        15 queries", CachePanel_total_time;dur=0;desc="Cache 0 Calls"
       Vary:
       - Accept, Accept-Language, Cookie, Origin
       X-Content-Type-Options:
@@ -110,7 +110,7 @@ interactions:
       X-Frame-Options:
       - DENY
       djdt-store-id:
-      - 3a7aed1001c244ffb15741bfa8ada683
+      - dd79f2daaf89469db1ec3943a48e8772
     status:
       code: 201
       message: Created
@@ -122,7 +122,7 @@ interactions:
       Accept-Encoding:
       - gzip, deflate
       Authorization:
-      - Token 60f18ee07645f0bf5cbcd7f249426103aaa433e7ae9f74cf5d5b3c26cb5a0874
+      - Token f8345bb1f643801a16281764c9c33156643584d1685303b929285031965e1abe
       Connection:
       - keep-alive
       Content-Type:
@@ -130,32 +130,32 @@ interactions:
       User-Agent:
       - python-requests/2.28.1
     method: GET
-    uri: http://localhost:8000/api/deck_extensions/999/note_customizations/
+    uri: http://localhost:8000/api/deck_extensions/999/note_customizations/?size=2000
   response:
     body:
-      string: '{"next":null,"note_customizations":[{"id":2,"note":"8645c6d6-4f3d-417e-8295-8f5009042b6e","tags":["AnkiHub_Optional::test100::new1","AnkiHub_Optional::test100::new2"]},{"id":1,"note":"b2344a94-0ca6-44a1-87a1-1593558c10a9","tags":["AnkiHub_Optional::test100::test1","AnkiHub_Optional::test100::test2"]}]}'
+      string: '{"next":null,"note_customizations":[{"id":2,"note":"8645c6d6-4f3d-417e-8295-8f5009042b6e","tags":["AnkiHub_Optional::test100::new2","AnkiHub_Optional::test100::new1"]},{"id":1,"note":"b2344a94-0ca6-44a1-87a1-1593558c10a9","tags":["AnkiHub_Optional::test100::test1","AnkiHub_Optional::test100::test2"]}],"latest_update":"2023-02-02T20:58:31.125713Z"}'
     headers:
       Allow:
       - GET, HEAD, OPTIONS
       Content-Language:
       - en
       Content-Length:
-      - '303'
+      - '349'
       Content-Type:
       - application/json
       Cross-Origin-Opener-Policy:
       - same-origin
       Date:
-      - Fri, 20 Jan 2023 22:34:52 GMT
+      - Thu, 02 Feb 2023 20:58:31 GMT
       Referrer-Policy:
       - same-origin
       Server:
       - WSGIServer/0.2 CPython/3.8.16
       Server-Timing:
-      - TimerPanel_utime;dur=53.028000000040265;desc="User CPU time", TimerPanel_stime;dur=7.677999999998519;desc="System
-        CPU time", TimerPanel_total;dur=60.706000000038784;desc="Total CPU time",
-        TimerPanel_total_time;dur=60.12272834777832;desc="Elapsed time", SQLPanel_sql_time;dur=3.434419631958008;desc="SQL
-        9 queries", CachePanel_total_time;dur=0;desc="Cache 0 Calls"
+      - TimerPanel_utime;dur=42.47000000000156;desc="User CPU time", TimerPanel_stime;dur=0.0;desc="System
+        CPU time", TimerPanel_total;dur=42.47000000000156;desc="Total CPU time", TimerPanel_total_time;dur=46.84281349182129;desc="Elapsed
+        time", SQLPanel_sql_time;dur=3.2939910888671875;desc="SQL 8 queries", CachePanel_total_time;dur=0;desc="Cache
+        0 Calls"
       Vary:
       - Accept, Accept-Language, Cookie, Origin
       X-Content-Type-Options:
@@ -163,7 +163,7 @@ interactions:
       X-Frame-Options:
       - DENY
       djdt-store-id:
-      - 18470eca84a14e35bede967eb64840ad
+      - de5cc3fc704c4aeaabc187f13641fff0
     status:
       code: 200
       message: OK
