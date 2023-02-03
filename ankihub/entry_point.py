@@ -97,7 +97,7 @@ def general_setup():
 
     mw.addonManager.setWebExports(__name__, r"gui/web/.*")
 
-    maybe_do_or_setup_ankihub_sync(after_startup_syncs=on_startup_syncs_done)
+    do_or_setup_ankihub_sync(after_startup_syncs=on_startup_syncs_done)
     LOGGER.debug("Did or set up ankihub sync.")
 
     setup_ankihub_menu()
@@ -134,7 +134,13 @@ def on_startup_syncs_done() -> None:
     check_ankihub_db(on_success=check_anki_db)
 
 
-def maybe_do_or_setup_ankihub_sync(after_startup_syncs: Callable[[], None]):
+def do_or_setup_ankihub_sync(after_startup_syncs: Callable[[], None]):
+    """This will set up the AnkiHub sync to run before the AnkiWeb sync if the user has enabled
+    the "sync_on_startup" or "sync_on_ankiweb_sync" config options.
+    If Anki won't sync with AnkiWeb, the AnkiHub sync will be run immediately.
+    after_startup_syncs is called after the AnkiHub and AnkiWeb syncs are done if they are run,
+    or immediately if they aren't run.
+    """
     global DID_STARTUP_SYNC
 
     original_sync_collection_and_media = mw._sync_collection_and_media
@@ -160,6 +166,7 @@ def maybe_do_or_setup_ankihub_sync(after_startup_syncs: Callable[[], None]):
     )
 
     if not mw.can_auto_sync():
+        # The AnkiWeb sync won't be run on startup, so we run the AnkiHub sync immediately.
         LOGGER.info("Can't auto sync with AnkiWeb")
         if config.public_config["sync_on_startup"]:
             sync_with_progress(after_startup_syncs)
