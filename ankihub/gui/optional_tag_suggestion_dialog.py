@@ -19,12 +19,13 @@ from aqt.utils import showInfo, tooltip
 
 from .. import LOGGER
 from ..optional_tag_suggestions import OptionalTagsSuggestionHelper
+from ..addon_ankihub_client import AnkiHubRequestError
 
 
 class OptionalTagsSuggestionDialog(QDialog):
     def __init__(self, parent, nids: Sequence[NoteId]):
         super().__init__(parent)
-        self.parent_ = parent
+        self._parent = parent
         self.nids = nids
 
         self._optional_tags_helper = OptionalTagsSuggestionHelper(list(self.nids))
@@ -35,7 +36,7 @@ class OptionalTagsSuggestionDialog(QDialog):
 
     def exec(self):
         if self._optional_tags_helper.tag_group_names() == []:
-            showInfo("No optional tags found for these notes.", parent=self.parent_)
+            showInfo("No optional tags found for these notes.", parent=self._parent)
             return
 
         super().exec()
@@ -83,7 +84,7 @@ class OptionalTagsSuggestionDialog(QDialog):
             if self.tag_group_list.item(i).isSelected()
         ]
         if not selected_tag_groups:
-            showInfo("Please select at least one tag group.", parent=self.parent_)
+            showInfo("Please select at least one tag group.", parent=self._parent)
             return
 
         # if the selected tag groups are not a subset of the valid tag groups, then
@@ -92,7 +93,7 @@ class OptionalTagsSuggestionDialog(QDialog):
             showInfo(
                 "Some of the selected tag groups are not valid. "
                 "Please deselect them and try again.",
-                parent=self.parent_,
+                parent=self._parent,
             )
             return
 
@@ -106,9 +107,22 @@ class OptionalTagsSuggestionDialog(QDialog):
         )
 
     def _on_submit_finished(self, future: Future):
-        future.result()
-
-        tooltip("Optional tags suggestions submitted.", parent=self.parent_)
+        try:
+            future.result()
+        except AnkiHubRequestError as e:
+            if e.response.status_code == 403:
+                showInfo(
+                    "You are not allowed to submit suggestions for some of the selected tag groups."
+                    + (
+                        '\n\nTry unchecking the "Submit without review" checkbox.'
+                        if self.auto_accept_cb.isChecked()
+                        else ""
+                    ),
+                    parent=self._parent,
+                )
+                return
+        else:
+            tooltip("Optional tags suggestions submitted.", parent=self._parent)
 
     def _on_cancel(self):
         self.reject()
