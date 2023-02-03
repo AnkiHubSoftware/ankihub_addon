@@ -200,8 +200,10 @@ def _wrap_sync_collection_and_media(
         (config.public_config["sync_on_startup"] and not DID_STARTUP_SYNC)
         or config.public_config["sync_on_ankiweb_sync"]
     ):
+        LOGGER.info("Syncing with AnkiHub in _wrap_sync_collection_and_media")
         sync_with_progress(on_done=after_ankihub_sync)
     else:
+        LOGGER.info("Not syncing with AnkiHub in _wrap_sync_collection_and_media")
         old(old_after_sync)
 
 
