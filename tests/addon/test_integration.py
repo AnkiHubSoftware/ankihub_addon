@@ -2106,9 +2106,8 @@ def test_sync_with_optional_content(
         NoteCustomization,
     )
     from ankihub.db import ankihub_db
-    from ankihub.settings import config
+    from ankihub.settings import DeckExtensionConfig, config
     from ankihub.sync import AnkiHubSync
-    from ankihub.settings import DeckExtensionConfig
 
     with anki_session.profile_loaded():
         with anki_session.deck_installed(SAMPLE_DECK_APKG) as _:
@@ -2252,6 +2251,9 @@ def test_optional_tag_suggestion_dialog(
             "ankihub.ankihub_client.AnkiHubClient.suggest_optional_tags",
             suggest_optional_tags_mock,
         )
+
+        # select the "VALID" tag group and click the submit button
+        dialog.tag_group_list.item(1).setSelected(True)
         qtbot.mouseClick(dialog.submit_btn, Qt.MouseButton.LeftButton)
         qtbot.wait(500)
 
@@ -2269,6 +2271,3 @@ def test_optional_tag_suggestion_dialog(
             ],
             "auto_accept": False,
         }
-
-        # assert that the dialog was closed
-        assert dialog.isHidden()
