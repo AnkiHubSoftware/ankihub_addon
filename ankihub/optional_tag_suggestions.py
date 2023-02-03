@@ -25,6 +25,9 @@ class OptionalTagsSuggestionHelper:
         self._ankihub_did = ankihub_dids[0]
 
         self._optional_tags_by_nid = self._optional_tags_by_nid_dict()
+        self._nids_by_tag_group = self._nids_by_tag_group_dict(
+            self._optional_tags_by_nid
+        )
         self._tag_groups = self._extract_optional_tag_groups(self._optional_tags_by_nid)
         self._valid_tag_groups: Optional[List[str]] = None
         self._extension_id_by_tag_group: Optional[Dict[str, int]] = None
@@ -50,22 +53,19 @@ class OptionalTagsSuggestionHelper:
 
         return result
 
-    def suggest_valid_tags(self, auto_accept: bool) -> None:
+    def suggest_tags_for_groups(self, tag_groups: List[str], auto_accept: bool) -> None:
         # has to be called after self.prevalidate
         assert self._valid_tag_groups is not None
+        assert set(tag_groups).issubset(set(self._valid_tag_groups))
 
         suggestions: List[OptionalTagSuggestion] = []
-        for nid, optional_tags in self._optional_tags_by_nid.items():
-            tag_groups_for_note = self._extract_optional_tag_groups(
-                {nid: optional_tags}
-            )
-            for tag_group in tag_groups_for_note:
-                if tag_group not in self._valid_tag_groups:
-                    continue
 
+        for tag_group in tag_groups:
+            for nid in self._nids_by_tag_group[tag_group]:
+                optional_tags_for_nid = self._optional_tags_by_nid[nid]
                 tags_for_group = [
                     tag
-                    for tag in optional_tags
+                    for tag in optional_tags_for_nid
                     if tag.startswith(f"{TAG_FOR_OPTIONAL_TAGS}::{tag_group}::")
                 ]
 
@@ -104,14 +104,30 @@ class OptionalTagsSuggestionHelper:
 
         return result
 
+    def _nids_by_tag_group_dict(
+        self, optional_tags_by_nid: Dict[NoteId, List[str]]
+    ) -> Dict[str, List[NoteId]]:
+        result: Dict[str, List[NoteId]] = {}
+        for nid, tags in optional_tags_by_nid.items():
+            for tag in tags:
+                tag_group = self._optional_tag_to_tag_group(tag)
+                if tag_group not in result:
+                    result[tag_group] = []
+                result[tag_group].append(nid)
+
+        return result
+
     def _extract_optional_tag_groups(
         self, optional_tags_by_nid: Dict[NoteId, List[str]]
     ) -> List[str]:
         result = set()
         for _, optional_tags in optional_tags_by_nid.items():
             optional_tag_groups = [
-                tag.split("::", maxsplit=2)[1] for tag in optional_tags
+                self._optional_tag_to_tag_group(tag) for tag in optional_tags
             ]
             result.update(optional_tag_groups)
 
         return list(result)
+
+    def _optional_tag_to_tag_group(self, optional_tag: str) -> str:
+        return optional_tag.split("::", maxsplit=2)[1]

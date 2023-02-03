@@ -4,6 +4,7 @@ from typing import Sequence
 from anki.notes import NoteId
 from aqt import mw
 from aqt.qt import (
+    QAbstractItemView,
     QCheckBox,
     QDialog,
     QHBoxLayout,
@@ -27,6 +28,7 @@ class OptionalTagsSuggestionDialog(QDialog):
         self.nids = nids
 
         self._optional_tags_helper = OptionalTagsSuggestionHelper(list(self.nids))
+        self._valid_tag_groups: Sequence[str] = []
         self._setup_ui()
         self._setup_tag_group_list()
         self._validate_tag_groups_and_update_ui()
@@ -46,8 +48,12 @@ class OptionalTagsSuggestionDialog(QDialog):
         self.btn_bar = QVBoxLayout()
 
         self.tag_group_list = QListWidget()
+        # allow selecting multiple items at once
+        self.tag_group_list.setSelectionMode(
+            QAbstractItemView.SelectionMode.ExtendedSelection
+        )
 
-        self.submit_btn = QPushButton("Submit valid suggestions")
+        self.submit_btn = QPushButton("Submit suggestions")
         self.submit_btn.setDisabled(True)
         self.btn_bar.addWidget(self.submit_btn)
         qconnect(self.submit_btn.clicked, self._on_submit)
@@ -71,9 +77,29 @@ class OptionalTagsSuggestionDialog(QDialog):
         self.layout_.addWidget(self.auto_accept_cb)
 
     def _on_submit(self):
+        selected_tag_groups = [
+            self.tag_group_list.item(i).text()
+            for i in range(self.tag_group_list.count())
+            if self.tag_group_list.item(i).isSelected()
+        ]
+        if not selected_tag_groups:
+            showInfo("Please select at least one tag group.", parent=self.parent_)
+            return
+
+        # if the selected tag groups are not a subset of the valid tag groups, then
+        # show an error message
+        if not set(selected_tag_groups).issubset(self._valid_tag_groups):
+            showInfo(
+                "Some of the selected tag groups are not valid. "
+                "Please deselect them and try again.",
+                parent=self.parent_,
+            )
+            return
+
         mw.taskman.with_progress(
-            task=lambda: self._optional_tags_helper.suggest_valid_tags(
-                auto_accept=self.auto_accept_cb.isChecked()
+            task=lambda: self._optional_tags_helper.suggest_tags_for_groups(
+                tag_groups=selected_tag_groups,
+                auto_accept=self.auto_accept_cb.isChecked(),
             ),
             on_done=self._on_submit_finished,
             label="Submitting suggestions...",
@@ -83,7 +109,6 @@ class OptionalTagsSuggestionDialog(QDialog):
         future.result()
 
         tooltip("Optional tags suggestions submitted.", parent=self.parent_)
-        self.accept()
 
     def _on_cancel(self):
         self.reject()
@@ -117,6 +142,12 @@ class OptionalTagsSuggestionDialog(QDialog):
 
     def _on_validate_tag_groups_finished(self, future: Future):
         tag_group_validation_responses = future.result()
+
+        self._valid_tag_groups = [
+            response.tag_group_name
+            for response in tag_group_validation_responses
+            if response.success
+        ]
 
         # update icons and tooltips
         for i in range(self.tag_group_list.count()):
