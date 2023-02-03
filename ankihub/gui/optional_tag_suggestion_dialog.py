@@ -1,0 +1,206 @@
+from concurrent.futures import Future
+from typing import Sequence
+
+from anki.notes import NoteId
+from aqt import mw
+from aqt.qt import (
+    QAbstractItemView,
+    QCheckBox,
+    QDialog,
+    QHBoxLayout,
+    QListWidget,
+    QListWidgetItem,
+    QPushButton,
+    QStyle,
+    QVBoxLayout,
+    qconnect,
+)
+from aqt.utils import showInfo, tooltip
+
+from .. import LOGGER
+from ..optional_tag_suggestions import OptionalTagsSuggestionHelper
+from ..addon_ankihub_client import AnkiHubRequestError
+
+
+class OptionalTagsSuggestionDialog(QDialog):
+    def __init__(self, parent, nids: Sequence[NoteId]):
+        super().__init__(parent)
+        self._parent = parent
+        self.nids = nids
+
+        self._optional_tags_helper = OptionalTagsSuggestionHelper(list(self.nids))
+        self._valid_tag_groups: Sequence[str] = []
+        self._setup_ui()
+        self._setup_tag_group_list()
+        self._validate_tag_groups_and_update_ui()
+
+    def exec(self):
+        if self._optional_tags_helper.tag_group_names() == []:
+            showInfo("No optional tags found for these notes.", parent=self._parent)
+            return
+
+        super().exec()
+
+    def _setup_ui(self):
+        self.setWindowTitle("Optional Tag Suggestions")
+
+        self.layout_ = QVBoxLayout()
+        self.hlayout = QHBoxLayout()
+        self.btn_bar = QVBoxLayout()
+
+        self.tag_group_list = QListWidget()
+        # allow selecting multiple items at once
+        self.tag_group_list.setSelectionMode(
+            QAbstractItemView.SelectionMode.ExtendedSelection
+        )
+
+        self.submit_btn = QPushButton("Submit suggestions")
+        self.submit_btn.setDisabled(True)
+        self.btn_bar.addWidget(self.submit_btn)
+        qconnect(self.submit_btn.clicked, self._on_submit)
+
+        self.cancel_btn = QPushButton("Cancel")
+        self.btn_bar.addWidget(self.cancel_btn)
+        qconnect(self.cancel_btn.clicked, self._on_cancel)
+
+        self.btn_bar.addStretch(1)
+
+        self.auto_accept_cb = QCheckBox("Submit without review (maintainers only)")
+        self.auto_accept_cb.setToolTip(
+            "If checked, the suggestions will be automatically accepted. "
+            "This won't work if you are not a deck maintainer."
+        )
+
+        self.setLayout(self.layout_)
+        self.layout_.addLayout(self.hlayout)
+        self.hlayout.addWidget(self.tag_group_list)
+        self.hlayout.addLayout(self.btn_bar)
+        self.layout_.addWidget(self.auto_accept_cb)
+
+    def _on_submit(self):
+        selected_tag_groups = [
+            self.tag_group_list.item(i).text()
+            for i in range(self.tag_group_list.count())
+            if self.tag_group_list.item(i).isSelected()
+        ]
+        if not selected_tag_groups:
+            showInfo("Please select at least one tag group.", parent=self._parent)
+            return
+
+        if not set(selected_tag_groups).issubset(self._valid_tag_groups):
+            showInfo(
+                "Some of the selected tag groups have problems. Hover over them to see the reason.",
+                parent=self._parent,
+            )
+            return
+
+        mw.taskman.with_progress(
+            task=lambda: self._optional_tags_helper.suggest_tags_for_groups(
+                tag_groups=selected_tag_groups,
+                auto_accept=self.auto_accept_cb.isChecked(),
+            ),
+            on_done=self._on_submit_finished,
+            label="Submitting suggestions...",
+        )
+
+    def _on_submit_finished(self, future: Future):
+        try:
+            future.result()
+        except AnkiHubRequestError as e:
+            if e.response.status_code == 403:
+                showInfo(
+                    "You are not allowed to submit suggestions for some of the selected tag groups."
+                    + (
+                        '\n\nTry unchecking the "Submit without review" checkbox.'
+                        if self.auto_accept_cb.isChecked()
+                        else ""
+                    ),
+                    parent=self._parent,
+                )
+                return
+        else:
+            tooltip("Optional tags suggestions submitted.", parent=self._parent)
+
+    def _on_cancel(self):
+        self.reject()
+
+    def _setup_tag_group_list(self):
+        self.tag_group_list.clear()
+        for tag_group in sorted(self._optional_tags_helper.tag_group_names()):
+            item = QListWidgetItem(tag_group)
+            self.tag_group_list.addItem(item)
+
+        # add loading icons and tooltips to all items
+        for i in range(self.tag_group_list.count()):
+            item = self.tag_group_list.item(i)
+            item.setIcon(
+                self.style().standardIcon(
+                    # hourglass icon
+                    QStyle.StandardPixmap.SP_BrowserReload
+                )
+            )
+            item.setToolTip("Validating...")
+
+    def _validate_tag_groups_and_update_ui(self):
+        mw.taskman.run_in_background(
+            task=self._validate_tag_groups_in_background,
+            on_done=self._on_validate_tag_groups_finished,
+        )
+
+    def _validate_tag_groups_in_background(self):
+        result = self._optional_tags_helper.prevalidate()
+        return result
+
+    def _on_validate_tag_groups_finished(self, future: Future):
+        tag_group_validation_responses = future.result()
+
+        self._valid_tag_groups = [
+            response.tag_group_name
+            for response in tag_group_validation_responses
+            if response.success
+        ]
+
+        # update icons and tooltips
+        for i in range(self.tag_group_list.count()):
+            item = self.tag_group_list.item(i)
+            response = next(
+                response
+                for response in tag_group_validation_responses
+                if response.tag_group_name == item.text()
+            )
+
+            if response.success:
+                item.setIcon(
+                    self.style().standardIcon(
+                        # checkmark icon
+                        QStyle.StandardPixmap.SP_DialogApplyButton
+                    )
+                )
+                item.setToolTip("")
+            else:
+                item.setIcon(
+                    self.style().standardIcon(
+                        # warning icon
+                        QStyle.StandardPixmap.SP_MessageBoxWarning
+                    )
+                )
+                if response.errors:
+                    item.setToolTip("\n".join(response.errors))
+                else:
+                    LOGGER.debug(
+                        f"Unknown error for tag group {item.text()}, {response=}"
+                    )
+                    item.setToolTip("Unknown error")
+
+        # enable/disable submit button depending on if there are valid suggestions
+        valid_groups_exist = any(
+            response.success for response in tag_group_validation_responses
+        )
+
+        self.submit_btn.setEnabled(valid_groups_exist)
+        if not valid_groups_exist:
+            self.submit_btn.setToolTip(
+                "There are no valid suggestions. Please check the tooltips of the tag groups for more information."
+            )
+        else:
+            self.submit_btn.setToolTip("")

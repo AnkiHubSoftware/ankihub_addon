@@ -4,18 +4,17 @@ from datetime import datetime
 from time import sleep
 from typing import Callable, Optional
 
+from anki.errors import NotFoundError
 from aqt import mw
 from aqt.utils import showInfo, tooltip
 
 from . import LOGGER, settings
 from .addon_ankihub_client import AddonAnkiHubClient as AnkiHubClient
 from .ankihub_client import AnkiHubRequestError
-from .importing import AnkiHubImporter
-from .settings import ANKI_MINOR, ANKIHUB_DATETIME_FORMAT_STR, config
-from .utils import create_backup
 from .db import ankihub_db
-
-from anki.errors import NotFoundError
+from .importing import AnkiHubImporter
+from .settings import ANKI_MINOR, config
+from .utils import create_backup
 
 
 class AnkiHubSync:
@@ -58,12 +57,8 @@ class AnkiHubSync:
         deck_config = config.deck_config(ankihub_did)
         for chunk in client.get_deck_updates(
             ankihub_did,
-            since=datetime.strptime(
-                deck_config.latest_update, ANKIHUB_DATETIME_FORMAT_STR
-            )
-            if deck_config.latest_update
-            else None,
-            download_progress_cb=lambda notes_count: _updates_download_progress_cb(
+            since=deck_config.latest_update,
+            download_progress_cb=lambda notes_count: _update_deck_download_progress_cb(
                 notes_count, ankihub_did=ankihub_did
             ),
         ):
@@ -91,41 +86,54 @@ class AnkiHubSync:
                 protected_tags=chunk.protected_tags,
                 subdecks=deck_config.subdecks_enabled,
             )
-            config.save_latest_update(ankihub_did, latest_update)
+            config.save_latest_deck_update(ankihub_did, latest_update)
         else:
             LOGGER.info(f"No new updates to sync for {ankihub_did=}")
         return True
 
     def _add_optional_content_to_notes(self, ankihub_did: uuid.UUID):
         client = AnkiHubClient()
-        result = client.get_deck_extensions_by_deck_id(ankihub_did)
-        extensions = result.get("deck_extensions", [])
-
-        for extension in extensions:
+        deck_extensions = client.get_deck_extensions_by_deck_id(ankihub_did)
+        if not deck_extensions:
+            return
+        latest_update: Optional[datetime] = None
+        for deck_extension in deck_extensions:
+            config.create_or_update_deck_extension_config(deck_extension)
+            deck_extension_config = config.deck_extension_config(deck_extension.id)
+            since = deck_extension_config.latest_update
             updated_notes = []
-            for chunk in client.get_note_customizations_by_deck_extension_id(
-                extension.get("id")
+            for chunk in client.get_deck_extension_updates(
+                deck_extension_id=deck_extension.id,
+                since=since,
+                download_progress_cb=lambda note_customizations_count: _update_extension_download_progress_cb(
+                    note_customizations_count, deck_extension.id
+                ),
             ):
-                customizations = chunk.get("note_customizations", [])
-                for customization in customizations:
-                    note_anki_id = ankihub_db.anki_nid_for_ankihub_nid(
-                        customization.get("note")
+                for customization in chunk.note_customizations:
+                    anki_nid = ankihub_db.anki_nid_for_ankihub_nid(
+                        customization.ankihub_nid
                     )
                     try:
-                        note = mw.col.get_note(note_anki_id)
-                        updated_notes.append(note)
+                        note = mw.col.get_note(anki_nid)
                     except NotFoundError:
                         LOGGER.warning(
-                            f"""Tried to apply customization #{customization.id}
-                            for note #{customization.get('note')} but note was not found"""
+                            f"Tried to apply customization to note {customization.ankihub_nid} but note was not found"
                         )
                         continue
                     else:
-                        note.tags = list(
-                            set(note.tags) | set(customization.get("tags", []))
-                        )
+                        note.tags = list(set(note.tags) | set(customization.tags or []))
+                        updated_notes.append(note)
 
             mw.col.update_notes(updated_notes)
+
+            # each chunk contains the latest update timestamp of the notes in it, we need the latest one
+            if chunk.latest_update:
+                latest_update = max(
+                    chunk.latest_update, latest_update or chunk.latest_update
+                )
+
+        if latest_update:
+            config.save_latest_extension_update(deck_extension.id, latest_update)
 
     def _handle_exception(
         self, exc: AnkiHubRequestError, ankihub_did: uuid.UUID
@@ -212,15 +220,15 @@ def sync_with_progress(on_done: Optional[Callable[[], None]] = None) -> None:
         LOGGER.info("Skipping sync due to no token.")
 
 
-def _updates_download_progress_cb(notes_count: int, ankihub_did: uuid.UUID):
+def _update_deck_download_progress_cb(notes_count: int, ankihub_did: uuid.UUID):
     mw.taskman.run_on_main(
-        lambda: _updates_download_progress_cb_inner(
+        lambda: _update_deck_download_progress_cb_inner(
             notes_count=notes_count, ankihub_did=ankihub_did
         )
     )
 
 
-def _updates_download_progress_cb_inner(notes_count: int, ankihub_did: uuid.UUID):
+def _update_deck_download_progress_cb_inner(notes_count: int, ankihub_did: uuid.UUID):
     try:
         mw.progress.update(
             "Downloading updates\n"
@@ -239,6 +247,31 @@ def _updates_download_progress_cb_inner(notes_count: int, ankihub_did: uuid.UUID
         # calling its methods (at least in Anki 2.1.54).
         # It should be safe to ignore this error and let the sync continue.
 
+        LOGGER.exception(
+            "Unable to update progress bar to show download progress of deck updates."
+        )
+
+
+def _update_extension_download_progress_cb(
+    note_customizations_count: int, deck_extension_id: int
+):
+    mw.taskman.run_on_main(
+        lambda: _update_extension_download_progress_cb_inner(
+            note_customizations_count, deck_extension_id
+        )
+    )
+
+
+def _update_extension_download_progress_cb_inner(
+    note_customizations_count: int, deck_extension_id: int
+):
+    try:
+        mw.progress.update(
+            "Downloading extension updates\n"
+            f"for {config.deck_extension_config(deck_extension_id).name}\n"
+            f"Note customizations downloaded: {note_customizations_count}"
+        )
+    except AttributeError:
         LOGGER.exception(
             "Unable to update progress bar to show download progress of deck updates."
         )

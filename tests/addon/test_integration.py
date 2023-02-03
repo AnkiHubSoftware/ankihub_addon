@@ -16,6 +16,7 @@ from anki.decks import DeckId
 from anki.models import NotetypeDict, NotetypeId
 from anki.notes import Note, NoteId
 from aqt.importing import AnkiPackageImporter
+from aqt.qt import Qt
 from pytest_anki import AnkiSession
 from pytestqt.qtbot import QtBot
 
@@ -2099,8 +2100,13 @@ def test_sync_with_optional_content(
 ):
     anki_session = anki_session_with_addon
 
+    from ankihub.ankihub_client import (
+        DeckExtension,
+        DeckExtensionUpdateChunk,
+        NoteCustomization,
+    )
     from ankihub.db import ankihub_db
-    from ankihub.settings import API_URL_BASE
+    from ankihub.settings import DeckExtensionConfig, config
     from ankihub.sync import AnkiHubSync
 
     with anki_session.profile_loaded():
@@ -2110,49 +2116,47 @@ def test_sync_with_optional_content(
             ankihub_deck_uuid = UUID_1
             deck_extension_id = 31
 
-            requests_mock.get(
-                f"{API_URL_BASE}/users/deck_extensions?deck_id={str(ankihub_deck_uuid)}",
-                status_code=200,
-                json={
-                    "deck_extensions": [
-                        {
-                            "id": deck_extension_id,
-                            "owner": 1,
-                            "deck": str(ankihub_deck_uuid),
-                            "name": "test99",
-                            "tag_group_name": "test99",
-                            "description": "",
-                        }
-                    ]
-                },
-            )
-
             notes_data = ankihub_sample_deck_notes_data()
             ankihub_db.save_notes_data_and_mod_values(ankihub_deck_uuid, notes_data)
             note_data = notes_data[0]
             note = mw.col.get_note(note_data.anki_nid)
 
-            requests_mock.get(
-                f"{API_URL_BASE}/deck_extensions/{str(deck_extension_id)}/note_customizations/",
-                status_code=200,
-                json={
-                    "next": None,
-                    "note_customizations": [
-                        {
-                            "note": str(note_data.ankihub_note_uuid),
-                            "tags": [
-                                "AnkiHub_Optional::test99::test1",
-                                "AnkiHub_Optional::test99::test2",
-                            ],
-                        },
-                    ],
-                },
-            )
-
             assert set(note.tags) == set(["my::tag2", "my::tag"])
 
-            sync = AnkiHubSync()
-            sync._add_optional_content_to_notes(ankihub_deck_uuid)
+            latest_update = datetime.now()
+            with monkeypatch.context() as m:
+                m.setattr(
+                    "ankihub.ankihub_client.AnkiHubClient.get_deck_extensions_by_deck_id",
+                    lambda *args, **kwargs: [
+                        DeckExtension(
+                            id=deck_extension_id,
+                            owner_id=1,
+                            ankihub_deck_uuid=str(ankihub_deck_uuid),
+                            name="test99",
+                            tag_group_name="test99",
+                            description="",
+                        )
+                    ],
+                )
+                m.setattr(
+                    "ankihub.ankihub_client.AnkiHubClient.get_deck_extension_updates",
+                    lambda *args, **kwargs: [
+                        DeckExtensionUpdateChunk(
+                            note_customizations=[
+                                NoteCustomization(
+                                    ankihub_nid=note_data.ankihub_note_uuid,
+                                    tags=[
+                                        "AnkiHub_Optional::test99::test1",
+                                        "AnkiHub_Optional::test99::test2",
+                                    ],
+                                ),
+                            ],
+                            latest_update=latest_update,
+                        ),
+                    ],
+                )
+                sync = AnkiHubSync()
+                sync._add_optional_content_to_notes(ankihub_deck_uuid)
 
             updated_note = mw.col.get_note(note.id)
 
@@ -2164,3 +2168,106 @@ def test_sync_with_optional_content(
             ]
 
             assert set(updated_note.tags) == set(expected_tags)
+
+            # assert that the deck extension info was saved in the config
+            assert config.deck_extension_config(
+                extension_id=deck_extension_id
+            ) == DeckExtensionConfig(
+                ankihub_deck_uuid=str(ankihub_deck_uuid),
+                owner_id=1,
+                name="test99",
+                tag_group_name="test99",
+                description="",
+                latest_update=latest_update,
+            )
+
+
+def test_optional_tag_suggestion_dialog(
+    anki_session_with_addon: AnkiSession, qtbot: QtBot, monkeypatch
+):
+    anki_session = anki_session_with_addon
+
+    from ankihub.ankihub_client import OptionalTagSuggestion, TagGroupValidationResponse
+    from ankihub.gui.optional_tag_suggestion_dialog import OptionalTagsSuggestionDialog
+    from ankihub.note_conversion import TAG_FOR_OPTIONAL_TAGS
+
+    with anki_session.profile_loaded():
+        mw = anki_session.mw
+
+        # import a sample deck and give notes optional tags
+        import_sample_ankihub_deck(mw)
+        nids = mw.col.find_notes("")
+        notes = [mw.col.get_note(nid) for nid in nids]
+
+        notes[0].tags = [
+            f"{TAG_FOR_OPTIONAL_TAGS}::VALID::tag1",
+        ]
+        notes[0].flush()
+
+        notes[1].tags = [
+            f"{TAG_FOR_OPTIONAL_TAGS}::INVALID::tag1",
+        ]
+        notes[1].flush()
+
+        # open the dialog
+        monkeypatch.setattr(
+            "ankihub.ankihub_client.AnkiHubClient.prevalidate_tag_groups",
+            lambda *args, **kwargs: [
+                TagGroupValidationResponse(
+                    tag_group_name="VALID",
+                    deck_extension_id=1,
+                    success=True,
+                    errors=[],
+                ),
+                TagGroupValidationResponse(
+                    tag_group_name="INVALID",
+                    deck_extension_id=2,
+                    success=False,
+                    errors=["error message"],
+                ),
+            ],
+        )
+        dialog = OptionalTagsSuggestionDialog(parent=mw, nids=nids)
+        dialog.show()
+
+        qtbot.wait(500)
+
+        # assert that the dialog is in the correct state
+        assert dialog.tag_group_list.count() == 2
+
+        # items are sorted alphabetically
+        assert dialog.tag_group_list.item(0).text() == "INVALID"
+        assert "error message" in dialog.tag_group_list.item(0).toolTip()
+
+        assert dialog.tag_group_list.item(1).text() == "VALID"
+        # empty tooltip means that the tag group is valid because invalid tag groups
+        # have a tooltip with the error message
+        assert dialog.tag_group_list.item(1).toolTip() == ""
+
+        assert dialog.submit_btn.isEnabled()
+
+        suggest_optional_tags_mock = Mock()
+        monkeypatch.setattr(
+            "ankihub.ankihub_client.AnkiHubClient.suggest_optional_tags",
+            suggest_optional_tags_mock,
+        )
+
+        # select the "VALID" tag group and click the submit button
+        dialog.tag_group_list.item(1).setSelected(True)
+        qtbot.mouseClick(dialog.submit_btn, Qt.MouseButton.LeftButton)
+        qtbot.wait(500)
+
+        assert suggest_optional_tags_mock.call_count == 1
+
+        # assert that the suggest_optional_tags function was called with the correct arguments
+        assert suggest_optional_tags_mock.call_args.kwargs == {
+            "suggestions": [
+                OptionalTagSuggestion(
+                    tag_group_name="VALID",
+                    deck_extension_id=1,
+                    ankihub_note_uuid=uuid.UUID("e2857855-b414-4a2a-a0bf-2a0eac273f21"),
+                    tags=["AnkiHub_Optional::VALID::tag1"],
+                )
+            ],
+            "auto_accept": False,
+        }

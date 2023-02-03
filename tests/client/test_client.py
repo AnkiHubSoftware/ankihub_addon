@@ -22,6 +22,10 @@ VCR_CASSETTES_PATH = Path(__file__).parent / "cassettes"
 UUID_1 = uuid.UUID("11111111-1111-1111-1111-111111111111")
 UUID_2 = uuid.UUID("22222222-2222-2222-2222-222222222222")
 
+# defined in create_fixture_data.py script in django app
+DECK_WITH_EXTENSION_UUID = uuid.UUID("100df7b9-7749-4fe0-b801-e3dec1decd72")
+DECK_EXTENSION_ID = 999
+
 
 @pytest.fixture(autouse=True)
 def set_ankihub_app_url():
@@ -76,6 +80,7 @@ def vcr_enabled(vcr: VCR):
 def run_command_in_django_container(command):
     subprocess.run(
         [
+            "sudo",
             "docker-compose",
             "-f",
             COMPOSE_FILE.absolute(),
@@ -556,64 +561,234 @@ class TestGetDeckUpdates:
 
 @pytest.mark.vcr()
 def test_get_deck_extensions_by_deck_id(authorized_client_for_user_test1):
-    from ankihub.ankihub_client import AnkiHubClient
+    from ankihub.ankihub_client import AnkiHubClient, DeckExtension
 
     client: AnkiHubClient = authorized_client_for_user_test1
 
     deck_id = uuid.UUID("100df7b9-7749-4fe0-b801-e3dec1decd72")
 
-    expected_response = {
-        "deck_extensions": [
-            {
-                "id": 999,
-                "owner": 1,
-                "deck": "100df7b9-7749-4fe0-b801-e3dec1decd72",
-                "name": "test100",
-                "tag_group_name": "test100",
-                "description": "",
-            }
-        ]
-    }
-
     response = client.get_deck_extensions_by_deck_id(deck_id=deck_id)
-
-    assert response == expected_response
+    assert response == [
+        DeckExtension(
+            id=999,
+            owner_id=1,
+            ankihub_deck_uuid=uuid.UUID("100df7b9-7749-4fe0-b801-e3dec1decd72"),
+            name="test100",
+            tag_group_name="test100",
+            description="",
+        )
+    ]
 
 
 @pytest.mark.vcr()
 def test_get_note_customizations_by_deck_extension_id(authorized_client_for_user_test1):
-    from ankihub.ankihub_client import AnkiHubClient
+    from ankihub.ankihub_client import (
+        AnkiHubClient,
+        DeckExtensionUpdateChunk,
+        NoteCustomization,
+    )
 
     client: AnkiHubClient = authorized_client_for_user_test1
 
     deck_extension_id = 999
 
-    expected_response = {
-        "next": None,
-        "note_customizations": [
-            {
-                "id": 2,
-                "note": "8645c6d6-4f3d-417e-8295-8f5009042b6e",
-                "tags": [
+    expected_response = DeckExtensionUpdateChunk(
+        note_customizations=[
+            NoteCustomization(
+                ankihub_nid=uuid.UUID("8645c6d6-4f3d-417e-8295-8f5009042b6e"),
+                tags=[
                     "AnkiHub_Optional::test100::test1",
                     "AnkiHub_Optional::test100::test2",
                 ],
-            },
-            {
-                "id": 1,
-                "note": "b2344a94-0ca6-44a1-87a1-1593558c10a9",
-                "tags": [
+            ),
+            NoteCustomization(
+                ankihub_nid=uuid.UUID("b2344a94-0ca6-44a1-87a1-1593558c10a9"),
+                tags=[
                     "AnkiHub_Optional::test100::test1",
                     "AnkiHub_Optional::test100::test2",
                 ],
-            },
+            ),
         ],
-    }
+    )
 
     chunks = list(
-        client.get_note_customizations_by_deck_extension_id(
-            deck_extension_id=deck_extension_id
+        client.get_deck_extension_updates(
+            deck_extension_id=deck_extension_id, since=None
         )
     )
     assert len(chunks) == 1
-    assert chunks[0] == expected_response
+    chunk = chunks[0]
+
+    expected_response.latest_update = chunk.latest_update
+    assert chunk == expected_response
+
+
+@pytest.mark.vcr()
+def test_get_note_customizations_by_deck_extension_id_in_multiple_chunks(
+    authorized_client_for_user_test1, monkeypatch
+):
+    from ankihub.ankihub_client import (
+        AnkiHubClient,
+        DeckExtensionUpdateChunk,
+        NoteCustomization,
+    )
+
+    client: AnkiHubClient = authorized_client_for_user_test1
+
+    deck_extension_id = 999
+
+    monkeypatch.setattr("ankihub.ankihub_client.DECK_EXTENSION_UPDATE_PAGE_SIZE", 1)
+
+    expected_chunk_1 = DeckExtensionUpdateChunk(
+        note_customizations=[
+            NoteCustomization(
+                ankihub_nid=uuid.UUID("8645c6d6-4f3d-417e-8295-8f5009042b6e"),
+                tags=[
+                    "AnkiHub_Optional::test100::test1",
+                    "AnkiHub_Optional::test100::test2",
+                ],
+            ),
+        ]
+    )
+
+    expected_chunk_2 = DeckExtensionUpdateChunk(
+        note_customizations=[
+            NoteCustomization(
+                ankihub_nid=uuid.UUID("b2344a94-0ca6-44a1-87a1-1593558c10a9"),
+                tags=[
+                    "AnkiHub_Optional::test100::test1",
+                    "AnkiHub_Optional::test100::test2",
+                ],
+            ),
+        ]
+    )
+
+    chunks = list(
+        client.get_deck_extension_updates(
+            deck_extension_id=deck_extension_id, since=None
+        )
+    )
+    assert len(chunks) == 2
+    chunk_1, chunk_2 = chunks
+
+    expected_chunk_1.latest_update = chunk_1.latest_update
+    expected_chunk_2.latest_update = chunk_2.latest_update
+    assert chunk_1 == expected_chunk_1
+    assert chunk_2 == expected_chunk_2
+
+
+@pytest.mark.vcr()
+def test_prevalidate_tag_groups(authorized_client_for_user_test2):
+    from ankihub.ankihub_client import AnkiHubClient, TagGroupValidationResponse
+
+    client: AnkiHubClient = authorized_client_for_user_test2
+
+    tag_group_validation_responses = client.prevalidate_tag_groups(
+        ankihub_deck_uuid=DECK_WITH_EXTENSION_UUID,
+        tag_group_names=["test100", "invalid"],
+    )
+    assert tag_group_validation_responses == [
+        TagGroupValidationResponse(
+            tag_group_name="test100",
+            deck_extension_id=DECK_EXTENSION_ID,
+            success=True,
+            errors=[],
+        ),
+        TagGroupValidationResponse(
+            tag_group_name="invalid",
+            deck_extension_id=None,
+            success=False,
+            errors=[
+                "This Deck Extension does not exist. Please create one for this Deck on AnkiHub."
+            ],
+        ),
+    ]
+
+
+@pytest.mark.vcr()
+def test_suggest_optional_tags(authorized_client_for_user_test2):
+    from ankihub.ankihub_client import AnkiHubClient, OptionalTagSuggestion
+
+    client: AnkiHubClient = authorized_client_for_user_test2
+
+    client.suggest_optional_tags(
+        suggestions=[
+            OptionalTagSuggestion(
+                ankihub_note_uuid=uuid.UUID("8645c6d6-4f3d-417e-8295-8f5009042b6e"),
+                tag_group_name="test100",
+                deck_extension_id=999,
+                tags=[
+                    "AnkiHub_Optional::test100::test1",
+                    "AnkiHub_Optional::test100::test2",
+                ],
+            ),
+        ],
+    )
+    # we have no easy way to check if the suggestion is created if it is not accepted,
+    # so this test just checks that the request is successful
+
+
+@pytest.mark.vcr()
+def test_suggest_auto_accepted_optional_tags(authorized_client_for_user_test1):
+    from ankihub.ankihub_client import (
+        AnkiHubClient,
+        DeckExtensionUpdateChunk,
+        NoteCustomization,
+        OptionalTagSuggestion,
+    )
+
+    client: AnkiHubClient = authorized_client_for_user_test1
+
+    client.suggest_optional_tags(
+        auto_accept=True,
+        suggestions=[
+            OptionalTagSuggestion(
+                ankihub_note_uuid=uuid.UUID("8645c6d6-4f3d-417e-8295-8f5009042b6e"),
+                tag_group_name="test100",
+                deck_extension_id=DECK_EXTENSION_ID,
+                tags=[
+                    "AnkiHub_Optional::test100::new1",
+                    "AnkiHub_Optional::test100::new2",
+                ],
+            )
+        ],
+    )
+
+    # assert that the tags were updated
+    expected_response = DeckExtensionUpdateChunk(
+        note_customizations=[
+            NoteCustomization(
+                ankihub_nid=uuid.UUID("8645c6d6-4f3d-417e-8295-8f5009042b6e"),
+                tags=[
+                    "AnkiHub_Optional::test100::new1",
+                    "AnkiHub_Optional::test100::new2",
+                ],
+            ),
+            NoteCustomization(
+                ankihub_nid=uuid.UUID("b2344a94-0ca6-44a1-87a1-1593558c10a9"),
+                tags=[
+                    "AnkiHub_Optional::test100::test1",
+                    "AnkiHub_Optional::test100::test2",
+                ],
+            ),
+        ]
+    )
+
+    chunks = list(
+        client.get_deck_extension_updates(
+            deck_extension_id=DECK_EXTENSION_ID, since=None
+        )
+    )
+
+    assert len(chunks) == 1
+    chunk = chunks[0]
+    expected_response.latest_update = chunk.latest_update
+
+    # sort tags to make sure they are in the same order
+    for note_customization in chunk.note_customizations:
+        note_customization.tags = sorted(note_customization.tags)
+
+    for note_customization in expected_response.note_customizations:
+        note_customization.tags = sorted(note_customization.tags)
+
+    assert chunk == expected_response

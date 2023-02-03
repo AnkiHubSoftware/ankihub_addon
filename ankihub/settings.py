@@ -5,6 +5,7 @@ import os
 import re
 import sys
 import uuid
+from dataclasses import dataclass
 from datetime import datetime
 from enum import Enum
 from json import JSONDecodeError
@@ -20,7 +21,9 @@ from aqt import mw
 from aqt.utils import askUser, showInfo
 
 from . import LOGGER, ankihub_client
-from .ankihub_client import ANKIHUB_DATETIME_FORMAT_STR
+from .ankihub_client import ANKIHUB_DATETIME_FORMAT_STR, DeckExtension
+from .lib.mashumaro import field_options
+from .lib.mashumaro.mixins.json import DataClassJSONMixin
 
 ADDON_PATH = Path(__file__).parent.absolute()
 
@@ -32,29 +35,62 @@ PRIVATE_CONFIG_FILENAME = ".private_config.json"
 PROFILE_ID_FIELD_NAME = "ankihub_id"
 
 
-@dataclasses.dataclass
-class DeckConfig:
+def serialize_datetime(x: datetime) -> str:
+    return x.strftime(ANKIHUB_DATETIME_FORMAT_STR) if x else ""
+
+
+def deserialize_datetime(x: str) -> Optional[datetime]:
+    return datetime.strptime(x, ANKIHUB_DATETIME_FORMAT_STR) if x else None
+
+
+@dataclass
+class DeckConfig(DataClassJSONMixin):
     anki_id: DeckId
     creator: bool
     name: str
-    latest_update: Optional[str] = None
+    latest_update: Optional[datetime] = dataclasses.field(
+        metadata=field_options(
+            serialize=serialize_datetime,
+            deserialize=deserialize_datetime,
+        ),
+        default=None,
+    )
     subdecks_enabled: bool = (
         False  # whether deck is organized into subdecks by the add-on
     )
 
 
-@dataclasses.dataclass
-class UIConfig:
+@dataclass
+class DeckExtensionConfig(DataClassJSONMixin):
+    ankihub_deck_uuid: uuid.UUID
+    owner_id: int
+    name: str
+    tag_group_name: str
+    description: str
+    latest_update: Optional[datetime] = dataclasses.field(
+        metadata=field_options(
+            serialize=serialize_datetime,
+            deserialize=deserialize_datetime,
+        ),
+        default=None,
+    )
+
+
+@dataclass
+class UIConfig(DataClassJSONMixin):
     # whether the trees in the browser sidebar are expanded or collapsed
     ankihub_tree_expanded: bool = True
     updated_today_tree_expanded: bool = False
 
 
 @dataclasses.dataclass
-class PrivateConfig:
+class PrivateConfig(DataClassJSONMixin):
     token: str = ""
     user: str = ""
     decks: Dict[uuid.UUID, DeckConfig] = dataclasses.field(default_factory=dict)
+    deck_extensions: Dict[int, DeckExtensionConfig] = dataclasses.field(
+        default_factory=dict
+    )
     ui: UIConfig = dataclasses.field(default_factory=UIConfig)
 
 
@@ -68,48 +104,27 @@ class Config:
     def setup(self):
         self._private_config_path = private_config_path()
         if not self._private_config_path.exists():
-            self._private_config = self.new_config()
+            self._private_config = PrivateConfig()
+            self._update_private_config()
         else:
             try:
                 self._private_config = self._load_private_config()
             except JSONDecodeError:
                 # TODO Instead of overwriting, query AnkiHub for config values.
-                self._private_config = self.new_config()
+                self._private_config = PrivateConfig()
         self._log_private_config()
 
     def _load_private_config(self) -> PrivateConfig:
         with open(self._private_config_path) as f:
             private_config_dict = json.load(f)
 
-        # convert deck keys from strings to uuid.UUID
-        decks_dict = private_config_dict["decks"]
-        private_config_dict["decks"] = {
-            uuid.UUID(k): DeckConfig(**v) for k, v in decks_dict.items()
-        }
-
-        # parse ui config
-        if "ui" in private_config_dict:
-            private_config_dict["ui"] = UIConfig(**private_config_dict["ui"])
-        else:
-            # previous versions of the add-on did not have a ui config
-            private_config_dict["ui"] = UIConfig()
-
-        result = PrivateConfig(**private_config_dict)
+        result = PrivateConfig.from_dict(private_config_dict)
         return result
-
-    def new_config(self):
-        private_config = PrivateConfig()
-        config_dict = dataclasses.asdict(private_config)
-        with open(self._private_config_path, "w") as f:
-            f.write(json.dumps(config_dict, indent=4, sort_keys=True))
-        return private_config
 
     def _update_private_config(self):
         with open(self._private_config_path, "w") as f:
-            config_dict = dataclasses.asdict(self._private_config)
-            # convert uuid keys to strings
-            config_dict["decks"] = {str(k): v for k, v in config_dict["decks"].items()}
-            f.write(json.dumps(config_dict, indent=4, sort_keys=True))
+            config_json = self._private_config.to_json()
+            f.write(json.dumps(json.loads(config_json), indent=4, sort_keys=True))
         self._log_private_config()
 
     def save_token(self, token: str):
@@ -122,16 +137,10 @@ class Config:
         self._private_config.user = user_email
         self._update_private_config()
 
-    def save_latest_update(
+    def save_latest_deck_update(
         self, ankihub_did: uuid.UUID, latest_update: Optional[datetime]
     ):
-        if latest_update is None:
-            self.deck_config(ankihub_did).latest_update = None
-        else:
-            date_time_str = datetime.strftime(
-                latest_update, ANKIHUB_DATETIME_FORMAT_STR
-            )
-            self.deck_config(ankihub_did).latest_update = date_time_str
+        self.deck_config(ankihub_did).latest_update = latest_update
         self._update_private_config()
 
     def set_subdecks(self, ankihub_did: uuid.UUID, subdecks: bool):
@@ -154,7 +163,7 @@ class Config:
             subdecks_enabled=subdecks_enabled,
         )
         # remove duplicates
-        self.save_latest_update(ankihub_did, latest_udpate)
+        self.save_latest_deck_update(ankihub_did, latest_udpate)
         self._update_private_config()
 
         if self.subscriptions_change_hook:
@@ -195,6 +204,32 @@ class Config:
     def set_ui_config(self, ui_config: UIConfig):
         self._private_config.ui = ui_config
         self._update_private_config()
+
+    def create_or_update_deck_extension_config(self, extension: DeckExtension) -> None:
+        latest_update = (
+            extension_config.latest_update
+            if (extension_config := self.deck_extension_config(extension.id))
+            else None
+        )
+
+        self._private_config.deck_extensions[extension.id] = DeckExtensionConfig(
+            ankihub_deck_uuid=extension.ankihub_deck_uuid,
+            name=extension.name,
+            owner_id=extension.owner_id,
+            tag_group_name=extension.tag_group_name,
+            description=extension.description,
+            latest_update=latest_update,
+        )
+        self._update_private_config()
+
+    def save_latest_extension_update(
+        self, extension_id: int, latest_update: datetime
+    ) -> None:
+        self.deck_extension_config(extension_id).latest_update = latest_update
+        self._update_private_config()
+
+    def deck_extension_config(self, extension_id: int) -> Optional[DeckExtensionConfig]:
+        return self._private_config.deck_extensions.get(extension_id)
 
 
 config = Config()
