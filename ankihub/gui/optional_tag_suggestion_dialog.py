@@ -87,12 +87,9 @@ class OptionalTagsSuggestionDialog(QDialog):
             showInfo("Please select at least one tag group.", parent=self._parent)
             return
 
-        # if the selected tag groups are not a subset of the valid tag groups, then
-        # show an error message
         if not set(selected_tag_groups).issubset(self._valid_tag_groups):
             showInfo(
-                "Some of the selected tag groups are not valid. "
-                "Please deselect them and try again.",
+                "Some of the selected tag groups have problems. Hover over them to see the reason.",
                 parent=self._parent,
             )
             return
