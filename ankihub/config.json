@@ -3,5 +3,6 @@
     "hotkey": "Alt+u",
     "report_errors": true,
     "sync_on_startup": true,
+    "sync_shortcut": "Ctrl+Shift+h",
     "suspend_new_cards_of_existing_notes": "if_siblings_are_suspended"
 }
