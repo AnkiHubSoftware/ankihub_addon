@@ -120,6 +120,7 @@ class OptionalTagsSuggestionDialog(QDialog):
                 return
         else:
             tooltip("Optional tags suggestions submitted.", parent=self._parent)
+            self.accept()
 
     def _on_cancel(self):
         self.reject()
