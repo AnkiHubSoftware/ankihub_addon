@@ -40,12 +40,12 @@ class AnkiHubSync:
     def _sync_deck(self, ankihub_did: uuid.UUID) -> bool:
         """Syncs a single deck with AnkiHub.
         Returns True if the sync was successful, False if the user cancelled it."""
-        success = self._download_updates_for_deck(ankihub_did)
-        if not success:
+        result = self._download_updates_for_deck(ankihub_did)
+        if not result:
             return False
 
-        self._sync_deck_extensions(ankihub_did)
-        return True
+        result = self._sync_deck_extensions(ankihub_did)
+        return result
 
     def _download_updates_for_deck(self, ankihub_did) -> bool:
         """Downloads note updates from AnkiHub and imports them into Anki.
@@ -91,16 +91,21 @@ class AnkiHubSync:
             LOGGER.debug(f"No new updates to sync for {ankihub_did=}")
         return True
 
-    def _sync_deck_extensions(self, ankihub_did: uuid.UUID):
+    def _sync_deck_extensions(self, ankihub_did: uuid.UUID) -> bool:
+        # returns True if the sync was successful, False if the user cancelled it
         client = AnkiHubClient()
         if not (deck_extensions := client.get_deck_extensions_by_deck_id(ankihub_did)):
             LOGGER.info(f"No extensions to sync for {ankihub_did=}")
-            return
+            return True
 
         for deck_extension in deck_extensions:
-            self._download_updates_for_extension(deck_extension)
+            if not self._download_updates_for_extension(deck_extension):
+                return False
 
-    def _download_updates_for_extension(self, deck_extension: DeckExtension) -> None:
+        return True
+
+    def _download_updates_for_extension(self, deck_extension: DeckExtension) -> bool:
+        # returns True if the sync was successful, False if the user cancelled it
         config.create_or_update_deck_extension_config(deck_extension)
         deck_extension_config = config.deck_extension_config(deck_extension.id)
         latest_update: Optional[datetime] = None
@@ -115,6 +120,10 @@ class AnkiHubSync:
         ):
             if not chunk.note_customizations:
                 continue
+
+            if mw.progress.want_cancel():
+                LOGGER.debug("User cancelled sync.")
+                return False
 
             for customization in chunk.note_customizations:
                 anki_nid = ankihub_db.anki_nid_for_ankihub_nid(
@@ -141,6 +150,8 @@ class AnkiHubSync:
 
         if latest_update:
             config.save_latest_extension_update(deck_extension.id, latest_update)
+
+        return True
 
     def _handle_exception(
         self, exc: AnkiHubRequestError, ankihub_did: uuid.UUID
