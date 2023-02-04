@@ -109,8 +109,8 @@ class OptionalTagsSuggestionHelper:
     ) -> Dict[str, List[NoteId]]:
         result: Dict[str, List[NoteId]] = {}
         for nid, tags in optional_tags_by_nid.items():
-            for tag in tags:
-                tag_group = self._optional_tag_to_tag_group(tag)
+            tag_groups = set(self._optional_tag_to_tag_group(tag) for tag in tags)
+            for tag_group in tag_groups:
                 if tag_group not in result:
                     result[tag_group] = []
                 result[tag_group].append(nid)
