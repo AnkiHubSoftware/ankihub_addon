@@ -93,22 +93,25 @@ class AnkiHubSync:
 
     def _add_optional_content_to_notes(self, ankihub_did: uuid.UUID):
         client = AnkiHubClient()
-        deck_extensions = client.get_deck_extensions_by_deck_id(ankihub_did)
-        if not deck_extensions:
+        if not (deck_extensions := client.get_deck_extensions_by_deck_id(ankihub_did)):
+            LOGGER.info(f"No extensions to sync for {ankihub_did=}")
             return
-        latest_update: Optional[datetime] = None
+
         for deck_extension in deck_extensions:
             config.create_or_update_deck_extension_config(deck_extension)
             deck_extension_config = config.deck_extension_config(deck_extension.id)
-            since = deck_extension_config.latest_update
+            latest_update: Optional[datetime] = None
             updated_notes = []
             for chunk in client.get_deck_extension_updates(
                 deck_extension_id=deck_extension.id,
-                since=since,
+                since=deck_extension_config.latest_update,
                 download_progress_cb=lambda note_customizations_count: _update_extension_download_progress_cb(
                     note_customizations_count, deck_extension.id
                 ),
             ):
+                if not chunk.note_customizations:
+                    continue
+
                 for customization in chunk.note_customizations:
                     anki_nid = ankihub_db.anki_nid_for_ankihub_nid(
                         customization.ankihub_nid
@@ -124,16 +127,16 @@ class AnkiHubSync:
                         note.tags = list(set(note.tags) | set(customization.tags or []))
                         updated_notes.append(note)
 
-            mw.col.update_notes(updated_notes)
-
-            # each chunk contains the latest update timestamp of the notes in it, we need the latest one
-            if chunk.latest_update:
+                # each chunk contains the latest update timestamp of the notes in it, we need the latest one
                 latest_update = max(
                     chunk.latest_update, latest_update or chunk.latest_update
                 )
 
-        if latest_update:
-            config.save_latest_extension_update(deck_extension.id, latest_update)
+            if updated_notes:
+                mw.col.update_notes(updated_notes)
+
+            if latest_update:
+                config.save_latest_extension_update(deck_extension.id, latest_update)
 
     def _handle_exception(
         self, exc: AnkiHubRequestError, ankihub_did: uuid.UUID
