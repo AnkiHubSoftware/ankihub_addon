@@ -2156,7 +2156,7 @@ def test_sync_with_optional_content(
                     ],
                 )
                 sync = AnkiHubSync()
-                sync.sync_deck_extensions(ankihub_deck_uuid)
+                sync._sync_deck_extensions(ankihub_deck_uuid)
 
             updated_note = mw.col.get_note(note.id)
 
