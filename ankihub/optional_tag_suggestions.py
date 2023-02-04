@@ -7,7 +7,7 @@ from aqt import mw
 from .addon_ankihub_client import AddonAnkiHubClient as AnkiHubClient
 from .ankihub_client import OptionalTagSuggestion, TagGroupValidationResponse
 from .db import ankihub_db
-from .note_conversion import TAG_FOR_OPTIONAL_TAGS, is_optional_tag
+from .note_conversion import TAG_FOR_OPTIONAL_TAGS, is_optional_tag, is_tag_for_group
 
 
 class OptionalTagsSuggestionHelper:
@@ -66,7 +66,7 @@ class OptionalTagsSuggestionHelper:
                 tags_for_group = [
                     tag
                     for tag in optional_tags_for_nid
-                    if tag.startswith(f"{TAG_FOR_OPTIONAL_TAGS}::{tag_group}::")
+                    if is_tag_for_group(tag, tag_group)
                 ]
 
                 suggestions.append(
