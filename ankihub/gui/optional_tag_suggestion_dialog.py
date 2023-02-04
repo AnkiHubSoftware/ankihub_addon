@@ -18,8 +18,8 @@ from aqt.qt import (
 from aqt.utils import showInfo, tooltip
 
 from .. import LOGGER
-from ..optional_tag_suggestions import OptionalTagsSuggestionHelper
 from ..addon_ankihub_client import AnkiHubRequestError
+from ..optional_tag_suggestions import OptionalTagsSuggestionHelper
 
 
 class OptionalTagsSuggestionDialog(QDialog):
@@ -120,6 +120,7 @@ class OptionalTagsSuggestionDialog(QDialog):
                 return
         else:
             tooltip("Optional tags suggestions submitted.", parent=self._parent)
+            self.accept()
 
     def _on_cancel(self):
         self.reject()
@@ -192,15 +193,13 @@ class OptionalTagsSuggestionDialog(QDialog):
                     )
                     item.setToolTip("Unknown error")
 
-        # enable/disable submit button depending on if there are valid suggestions
-        valid_groups_exist = any(
-            response.success for response in tag_group_validation_responses
-        )
+        # pre-select all valid tag groups
+        for tag_group in self._valid_tag_groups:
+            for i in range(self.tag_group_list.count()):
+                item = self.tag_group_list.item(i)
+                if item.text() == tag_group:
+                    item.setSelected(True)
+                    break
 
-        self.submit_btn.setEnabled(valid_groups_exist)
-        if not valid_groups_exist:
-            self.submit_btn.setToolTip(
-                "There are no valid suggestions. Please check the tooltips of the tag groups for more information."
-            )
-        else:
-            self.submit_btn.setToolTip("")
+        # enable submit button (it was disabled while validating)
+        self.submit_btn.setDisabled(False)
