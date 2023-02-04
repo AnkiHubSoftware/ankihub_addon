@@ -10,7 +10,7 @@ from aqt.utils import showInfo, tooltip
 
 from . import LOGGER, settings
 from .addon_ankihub_client import AddonAnkiHubClient as AnkiHubClient
-from .ankihub_client import AnkiHubRequestError
+from .ankihub_client import AnkiHubRequestError, DeckExtension
 from .db import ankihub_db
 from .importing import AnkiHubImporter
 from .settings import ANKI_MINOR, config
@@ -40,14 +40,14 @@ class AnkiHubSync:
     def _sync_deck(self, ankihub_did: uuid.UUID) -> bool:
         """Syncs a single deck with AnkiHub.
         Returns True if the sync was successful, False if the user cancelled it."""
-        success = self._download_note_updates(ankihub_did)
+        success = self._download_updates_for_deck(ankihub_did)
         if not success:
             return False
 
-        self._add_optional_content_to_notes(ankihub_did)
+        self._sync_deck_extensions(ankihub_did)
         return True
 
-    def _download_note_updates(self, ankihub_did) -> bool:
+    def _download_updates_for_deck(self, ankihub_did) -> bool:
         """Downloads note updates from AnkiHub and imports them into Anki.
         Returns True if the sync was successful, False if the user cancelled it."""
 
@@ -91,52 +91,56 @@ class AnkiHubSync:
             LOGGER.debug(f"No new updates to sync for {ankihub_did=}")
         return True
 
-    def _add_optional_content_to_notes(self, ankihub_did: uuid.UUID):
+    def _sync_deck_extensions(self, ankihub_did: uuid.UUID):
         client = AnkiHubClient()
         if not (deck_extensions := client.get_deck_extensions_by_deck_id(ankihub_did)):
             LOGGER.info(f"No extensions to sync for {ankihub_did=}")
             return
 
         for deck_extension in deck_extensions:
-            config.create_or_update_deck_extension_config(deck_extension)
-            deck_extension_config = config.deck_extension_config(deck_extension.id)
-            latest_update: Optional[datetime] = None
-            updated_notes = []
-            for chunk in client.get_deck_extension_updates(
-                deck_extension_id=deck_extension.id,
-                since=deck_extension_config.latest_update,
-                download_progress_cb=lambda note_customizations_count: _update_extension_download_progress_cb(
-                    note_customizations_count, deck_extension.id
-                ),
-            ):
-                if not chunk.note_customizations:
-                    continue
+            self._download_updates_for_extension(deck_extension)
 
-                for customization in chunk.note_customizations:
-                    anki_nid = ankihub_db.anki_nid_for_ankihub_nid(
-                        customization.ankihub_nid
-                    )
-                    try:
-                        note = mw.col.get_note(anki_nid)
-                    except NotFoundError:
-                        LOGGER.warning(
-                            f"Tried to apply customization to note {customization.ankihub_nid} but note was not found"
-                        )
-                        continue
-                    else:
-                        note.tags = list(set(note.tags) | set(customization.tags or []))
-                        updated_notes.append(note)
+    def _download_updates_for_extension(self, deck_extension: DeckExtension) -> None:
+        config.create_or_update_deck_extension_config(deck_extension)
+        deck_extension_config = config.deck_extension_config(deck_extension.id)
+        latest_update: Optional[datetime] = None
+        updated_notes = []
+        client = AnkiHubClient()
+        for chunk in client.get_deck_extension_updates(
+            deck_extension_id=deck_extension.id,
+            since=deck_extension_config.latest_update,
+            download_progress_cb=lambda note_customizations_count: _update_extension_download_progress_cb(
+                note_customizations_count, deck_extension.id
+            ),
+        ):
+            if not chunk.note_customizations:
+                continue
 
-                # each chunk contains the latest update timestamp of the notes in it, we need the latest one
-                latest_update = max(
-                    chunk.latest_update, latest_update or chunk.latest_update
+            for customization in chunk.note_customizations:
+                anki_nid = ankihub_db.anki_nid_for_ankihub_nid(
+                    customization.ankihub_nid
                 )
+                try:
+                    note = mw.col.get_note(anki_nid)
+                except NotFoundError:
+                    LOGGER.warning(
+                        f"Tried to apply customization to note {customization.ankihub_nid} but note was not found"
+                    )
+                    continue
+                else:
+                    note.tags = list(set(note.tags) | set(customization.tags or []))
+                    updated_notes.append(note)
 
-            if updated_notes:
-                mw.col.update_notes(updated_notes)
+            # each chunk contains the latest update timestamp of the notes in it, we need the latest one
+            latest_update = max(
+                chunk.latest_update, latest_update or chunk.latest_update
+            )
 
-            if latest_update:
-                config.save_latest_extension_update(deck_extension.id, latest_update)
+        if updated_notes:
+            mw.col.update_notes(updated_notes)
+
+        if latest_update:
+            config.save_latest_extension_update(deck_extension.id, latest_update)
 
     def _handle_exception(
         self, exc: AnkiHubRequestError, ankihub_did: uuid.UUID
