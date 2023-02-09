@@ -10,9 +10,11 @@ from dataclasses import dataclass
 from datetime import datetime
 from enum import Enum
 from typing import Any, Callable, Dict, Iterator, List, Optional, Sequence, TypedDict
-
+from pathlib import Path
 import requests
 from requests import PreparedRequest, Request, Response, Session
+from anki.media import media_paths_from_col_path
+from aqt import mw
 
 from .lib.mashumaro import field_options
 from .lib.mashumaro.config import BaseConfig
@@ -20,7 +22,7 @@ from .lib.mashumaro.mixins.json import DataClassJSONMixin
 
 LOGGER = logging.getLogger(__name__)
 
-API_URL_BASE = "https://app.ankihub.net/api"
+API_URL_BASE = "http://localhost:8000/api"
 API_VERSION = 5.0
 
 DECK_UPDATE_PAGE_SIZE = 2000  # seems to work well in terms of speed
@@ -372,6 +374,19 @@ class AnkiHubClient:
         response_data = response.json()
         ankihub_did = uuid.UUID(response_data["deck_id"])
         return ankihub_did
+    
+    def upload_images(self, image_names: List[str], bucket_path: str):
+        # TODO: send all images at once instad of looping through each one
+        for image in image_names:
+            key = f"{bucket_path}/{image}"
+            s3_url = self.get_presigned_url(key=key, action="upload")
+            media_dir = media_paths_from_col_path(mw.col.path)[0]
+            image_path = Path(media_dir) / image
+            with open(image_path, "rb") as image_file:
+                s3_response = requests.put(s3_url, data=image_file)
+
+                if s3_response.status_code != 200:
+                    raise AnkiHubRequestError(s3_response)
 
     def _gzip_compress_string(self, string: str) -> bytes:
         result = gzip.compress(

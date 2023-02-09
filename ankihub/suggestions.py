@@ -3,11 +3,13 @@ from dataclasses import dataclass
 from typing import Any, Dict, List, Optional
 
 from anki.notes import Note, NoteId
+import re
 
 from .addon_ankihub_client import AddonAnkiHubClient as AnkiHubClient
 from .ankihub_client import ChangeNoteSuggestion, NewNoteSuggestion, SuggestionType
 from .db import ankihub_db
 from .exporting import to_note_data
+from .settings import config
 
 # string that is contained in the errors returned from the AnkiHub API when
 # there are no changes to the note for a change note suggestion
@@ -30,9 +32,35 @@ def suggest_note_update(
         change_note_suggestion=suggestion,
         auto_accept=auto_accept,
     )
+    
+    ankihub_deck_id = ankihub_db.ankihub_did_for_anki_nid(anki_nid=suggestion.anki_nid)
+    # TODO: This should be executed in background
+    if ankihub_deck_id is not None:
+        # Find images in suggestion fields and upload them to s3
+        images = get_images_from_suggestion(suggestion=suggestion)
+        
+        # TODO: User user_id instead of username, because username is subject to change
+        username = config.user()
+        bucket_path = f"deck_images/{ankihub_deck_id}/suggestions/{username}"
+        client.upload_images(images, bucket_path)
 
     return True
+    
 
+def get_images_from_suggestion(suggestion: ChangeNoteSuggestion) -> List[str]:
+    # find all images and put in a list
+    # iterate over images and get a pre-signed url for each one
+    images = []
+    for field_content in [f.value for f in suggestion.fields]:
+        found_images = _extract_images(field_content)
+        [images.append(image) for image in found_images]
+    
+    return images
+
+
+def _extract_images(field_content: str) -> List[str]:
+    # TODO: Filter out src attributes that are  URLs (e.g. start with http or https)
+    return re.findall(r'<img.*?src="(.*?)"', field_content)
 
 def suggest_new_note(
     note: Note, comment: str, ankihub_deck_uuid: uuid.UUID, auto_accept: bool = False
