@@ -32,17 +32,17 @@ def suggest_note_update(
         change_note_suggestion=suggestion,
         auto_accept=auto_accept,
     )
-    
-    ankihub_deck_id = ankihub_db.ankihub_did_for_anki_nid(anki_nid=suggestion.anki_nid)
-    # TODO: This should be executed in background
-    if ankihub_deck_id is not None:
-        # Find images in suggestion fields and upload them to s3
-        images = get_images_from_suggestion(suggestion=suggestion)
-        
-        # TODO: User user_id instead of username, because username is subject to change
-        username = config.user()
-        bucket_path = f"deck_images/{ankihub_deck_id}/suggestions/{username}"
-        client.upload_images(images, bucket_path)
+    if client.get_waffle_status()["flags"].get("image_support_enabled", {}).get("is_active", False):
+        ankihub_deck_id = ankihub_db.ankihub_did_for_anki_nid(anki_nid=suggestion.anki_nid)
+        # TODO: This should be executed in background
+        if ankihub_deck_id is not None:
+            # Find images in suggestion fields and upload them to s3
+            images = get_images_from_suggestion(suggestion=suggestion)
+            
+            # TODO: User user_id instead of username, because username is subject to change
+            username = config.user()
+            bucket_path = f"deck_images/{ankihub_deck_id}/suggestions/{username}"
+            client.upload_images(images, bucket_path)
 
     return True
     

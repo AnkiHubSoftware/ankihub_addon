@@ -779,6 +779,14 @@ class AnkiHubClient:
         data = response.json()
         message = data["message"]
         LOGGER.debug(f"suggest_optional_tags response message: {message}")
+        
+    def get_waffle_status(self):
+        response = self._send_request(
+            "GET",
+            f"/waffle/waffle_status",
+        )
+        data = response.json()
+        return data
 
 
 def transform_notes_data(notes_data: List[Dict]) -> List[Dict]:
