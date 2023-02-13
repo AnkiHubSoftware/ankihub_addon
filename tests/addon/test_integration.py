@@ -47,7 +47,7 @@ def test_entry_point(anki_session_with_addon: AnkiSession):
     # this test is just to make sure the entry point doesn't crash
 
 
-def test_editor(anki_session_with_addon: AnkiSession, requests_mock, monkeypatch):
+def test_editor(anki_session_with_addon: AnkiSession, requests_mock, monkeypatch, disable_image_support_feature_flag):
     from ankihub.db import ankihub_db
     from ankihub.gui.editor import _on_suggestion_button_press, _refresh_buttons
     from ankihub.settings import API_URL_BASE, AnkiHubCommands
@@ -111,8 +111,8 @@ def test_editor(anki_session_with_addon: AnkiSession, requests_mock, monkeypatch
         # this should trigger a suggestion because the note has been changed
         _on_suggestion_button_press(editor)
 
-        # assert that the requests_mock was called only once
-        assert requests_mock.call_count == 1
+        # mocked requests: f"{API_URL_BASE}/notes/{noes_2_ah_nid}/suggestion/" and request to check feature flags
+        assert requests_mock.call_count == 2
 
 
 def test_get_note_types_in_deck(anki_session_with_addon: AnkiSession):
@@ -266,7 +266,7 @@ def test_get_deck_by_id(anki_session_with_addon: AnkiSession, requests_mock):
     assert exc is not None and exc.response.status_code == 403
 
 
-def test_suggest_note_update(anki_session_with_addon: AnkiSession, requests_mock):
+def test_suggest_note_update(anki_session_with_addon: AnkiSession, requests_mock, disable_image_support_feature_flag):
     from ankihub.ankihub_client import AnkiHubRequestError, NoteInfo, SuggestionType
     from ankihub.note_conversion import (
         ADDON_INTERNAL_TAGS,
