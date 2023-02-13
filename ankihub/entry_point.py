@@ -62,19 +62,19 @@ def profile_setup() -> bool:
     """
     if not setup_profile_data_folder():
         return False
-    LOGGER.debug(f"Set up profile data folder for the current profile: {mw.pm.name}")
+    LOGGER.info(f"Set up profile data folder for the current profile: {mw.pm.name}")
 
     config.setup()
-    LOGGER.debug("Setup config for the current profile.")
+    LOGGER.info("Setup config for the current profile.")
 
     ankihub_db.setup_and_migrate()
-    LOGGER.debug("Set up and migrated AnkiHub DB for the current profile.")
+    LOGGER.info("Set up and migrated AnkiHub DB for the current profile.")
 
     from .gui.menu import ankihub_menu
 
     if ankihub_menu:
         refresh_ankihub_menu()
-        LOGGER.debug("Refreshed AnkiHub menu.")
+        LOGGER.info("Refreshed AnkiHub menu.")
 
     return True
 
@@ -93,37 +93,37 @@ def general_setup():
     """Set up things that don't depend on the profile and should only be run once, even if the
     profile changes."""
 
-    LOGGER.debug(f"{ANKI_VERSION=}")
+    LOGGER.info(f"{ANKI_VERSION=}")
 
     mw.addonManager.setWebExports(__name__, r"gui/web/.*")
 
     do_or_setup_ankihub_sync(after_startup_syncs=on_startup_syncs_done)
-    LOGGER.debug("Did or set up ankihub sync.")
+    LOGGER.info("Registered on_after_ankiweb_sync")
 
     setup_ankihub_menu()
-    LOGGER.debug("Set up AnkiHub menu.")
+    LOGGER.info("Set up AnkiHub menu.")
 
     editor.setup()
-    LOGGER.debug("Set up editor.")
+    LOGGER.info("Set up editor.")
 
     browser.setup()
-    LOGGER.debug("Set up browser.")
+    LOGGER.info("Set up browser.")
 
     setup_addons()
-    LOGGER.debug("Set up addons.")
+    LOGGER.info("Set up addons.")
 
     setup_error_handler()
-    LOGGER.debug("Set up error handler.")
+    LOGGER.info("Set up error handler.")
 
     setup_progress_manager()
-    LOGGER.debug("Set up progress manager.")
+    LOGGER.info("Set up progress manager.")
 
     trigger_addon_update_check()
-    LOGGER.debug("Triggered add-on update check.")
+    LOGGER.info("Triggered add-on update check.")
 
     from . import media_export  # noqa: F401
 
-    LOGGER.debug("Loaded media_export.")
+    LOGGER.info("Loaded media_export.")
 
     profile_will_close.append(on_profile_will_close)
     LOGGER.debug("Set up profile_will_close hook.")
@@ -209,7 +209,7 @@ def _wrap_sync_collection_and_media(
 
 def log_enabled_addons():
     enabled_addons = [x for x in mw.addonManager.all_addon_meta() if x.enabled]
-    LOGGER.debug(f"enabled addons:\n{pformat(enabled_addons)}")
+    LOGGER.info(f"enabled addons:\n{pformat(enabled_addons)}")
 
 
 def trigger_addon_update_check():

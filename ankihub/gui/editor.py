@@ -57,7 +57,7 @@ def _on_suggestion_button_press(editor: Editor) -> None:
                 ),
                 title="Problem with suggestion",
             )
-            LOGGER.debug(f"Can't submit suggestion due to: {pformat(error_message)}")
+            LOGGER.info(f"Can't submit suggestion due to: {pformat(error_message)}")
         elif e.response.status_code == 403:
             msg = (
                 "You are not allowed to create a suggestion for this note.<br>"

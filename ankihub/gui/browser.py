@@ -169,7 +169,7 @@ def _on_protect_fields_action(browser: Browser, nid: NoteId) -> None:
     # without this the tags in the browser editor are not updated until you switch away from the note
     browser.table.reset()
 
-    LOGGER.debug(
+    LOGGER.info(
         f"Updated tags for protecting fields for note {note.id} to protect these fields {new_fields_protected_by_tags}"
     )
 
@@ -219,8 +219,8 @@ def _on_suggest_notes_in_bulk_done(future: Future, browser: Browser) -> None:
         showInfo(msg, parent=browser)
         return
 
-    LOGGER.debug("Created note suggestions in bulk.")
-    LOGGER.debug(f"errors_by_nid:\n{pformat(suggestions_result.errors_by_nid)}")
+    LOGGER.info("Created note suggestions in bulk.")
+    LOGGER.info(f"errors_by_nid:\n{pformat(suggestions_result.errors_by_nid)}")
 
     msg_about_created_suggestions = (
         f"Submitted {suggestions_result.change_note_suggestions_count} change note suggestion(s).\n"
@@ -597,7 +597,7 @@ def _build_tag_tree_and_copy_ah_tag_items_to_ah_tree(
     root_tree_item.children.remove(tag_tree)
     browser.sidebar._tag_tree(root_tree_item)
 
-    LOGGER.debug("AnkiHub: Built tag tree and copied AnkiHub tag items to AnkiHub tree")
+    LOGGER.info("AnkiHub: Built tag tree and copied AnkiHub tag items to AnkiHub tree")
 
     return True
 

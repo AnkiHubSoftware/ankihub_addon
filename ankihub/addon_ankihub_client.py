@@ -19,16 +19,16 @@ def logging_hook(response: Response, *args, **kwargs):
     if "/login/" in endpoint:
         body.pop("password")  # type: ignore
     headers = response.request.headers
-    LOGGER.debug(
+    LOGGER.info(
         f"request: {method} {endpoint}\ndata={pformat(body)}\nheaders={headers}"
     )
-    LOGGER.debug(f"response status: {response.status_code}")
+    LOGGER.info(f"response status: {response.status_code}")
     try:
         LOGGER.debug(f"response content: {pformat(response.json())}")
     except JSONDecodeError:
         LOGGER.debug(f"response content: {str(response.content)}")
     else:
-        LOGGER.debug(f"response: {response}")
+        LOGGER.info(f"response: {response}")
     return response
 
 

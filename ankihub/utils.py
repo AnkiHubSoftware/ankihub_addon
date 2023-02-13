@@ -29,7 +29,7 @@ def create_deck_with_id(deck_name: str, deck_id: DeckId) -> None:
     mw.col.db.execute(f"UPDATE decks SET id={deck_id} WHERE id={source_did};")
     mw.col.db.execute(f"UPDATE cards SET did={deck_id} WHERE did={source_did};")
 
-    LOGGER.debug(f"Created deck {deck_name=} {deck_id=}")
+    LOGGER.info(f"Created deck {deck_name=} {deck_id=}")
 
 
 def all_dids() -> Set[DeckId]:
@@ -78,7 +78,7 @@ def highest_level_did(dids: Iterable[DeckId]) -> DeckId:
 def create_note_with_id(note: Note, anki_id: NoteId, anki_did: DeckId) -> Note:
     """Create a new note, add it to the appropriate deck and override the note id with
     the note id of the original note creator."""
-    LOGGER.debug(f"Trying to create note: {anki_id=}")
+    LOGGER.info(f"Trying to create note: {anki_id=}")
 
     mw.col.add_note(note, DeckId(anki_did))
 
@@ -121,8 +121,8 @@ def create_note_type_with_id(note_type: NotetypeDict, mid: NotetypeId) -> None:
     mw.col.db.execute(f"UPDATE fields SET ntid={mid} WHERE ntid={changes.id};")
     mw.col.models._clear_cache()  # TODO check if this is necessary
 
-    LOGGER.debug(f"Created note type: {mid}")
-    LOGGER.debug(f"Note type:\n {pformat(note_type)}")
+    LOGGER.info(f"Created note type: {mid}")
+    LOGGER.info(f"Note type:\n {pformat(note_type)}")
 
 
 def note_type_contains_field(
@@ -162,15 +162,15 @@ def reset_note_types_of_notes(nid_mid_pairs: List[Tuple[NoteId, NotetypeId]]) ->
             note_type_conflicts.add((note.id, mid, note.mid))
 
     for anki_nid, target_note_type_id, _ in note_type_conflicts:
-        LOGGER.debug(
+        LOGGER.info(
             f"Note types differ: anki_nid: {anki_nid} target_note_type_id {target_note_type_id}",
         )
         change_note_type_of_note(anki_nid, target_note_type_id)
-        LOGGER.debug(
+        LOGGER.info(
             f"Changed note type: anki_nid {anki_nid} target_note_type_id {target_note_type_id}",
         )
 
-    LOGGER.debug("Reset note types of notes.")
+    LOGGER.info("Reset note types of notes.")
 
 
 def change_note_type_of_note(nid: int, mid: int) -> None:
@@ -199,7 +199,7 @@ ANKIHUB_TEMPLATE_SNIPPET_RE = (
 
 def modify_note_type(note_type: NotetypeDict) -> None:
     """Adds the AnkiHub ID Field to the Note Type and modifies the card templates."""
-    LOGGER.debug(f"Modifying note type {note_type['name']}")
+    LOGGER.info(f"Modifying note type {note_type['name']}")
 
     modify_fields(note_type)
 
@@ -220,7 +220,7 @@ def modify_fields(note_type: Dict) -> None:
     fields = note_type["flds"]
     field_names = [field["name"] for field in fields]
     if settings.ANKIHUB_NOTE_TYPE_FIELD_NAME in field_names:
-        LOGGER.debug(f"{settings.ANKIHUB_NOTE_TYPE_FIELD_NAME} already exists.")
+        LOGGER.info(f"{settings.ANKIHUB_NOTE_TYPE_FIELD_NAME} already exists.")
         return
     ankihub_field = mw.col.models.new_field(ANKIHUB_NOTE_TYPE_FIELD_NAME)
     # Put AnkiHub field last
@@ -274,7 +274,7 @@ def add_ankihub_end_comment_to_template(template: Dict) -> None:
         template[key] = (
             template[key].rstrip("\n ") + "\n\n" + ANKIHUB_TEMPLATE_END_COMMENT + "\n\n"
         )
-        LOGGER.debug(
+        LOGGER.info(
             f"Added ANKIHUB_TEMPLATE_END_COMMENT to template {template['name']} on side {key}"
         )
 
@@ -294,7 +294,7 @@ def undo_note_type_modification(note_type: Dict) -> None:
     """Removes the AnkiHub Field from the Note Type and modifies the template to
     remove the field.
     """
-    LOGGER.debug(f"Undoing modification of note type {note_type['name']}")
+    LOGGER.info(f"Undoing modification of note type {note_type['name']}")
 
     undo_fields_modification(note_type)
 
@@ -322,7 +322,7 @@ def undo_template_modification(template: Dict) -> None:
 # backup
 def create_backup() -> None:
     # has to be called from a background thread
-    LOGGER.debug("Starting backup...")
+    LOGGER.info("Starting backup...")
     try:
         if ANKI_MINOR >= 50:
             mw.col.create_backup(
@@ -334,7 +334,7 @@ def create_backup() -> None:
             mw.col.close(downgrade=False)
             mw.backup()  # type: ignore
             mw.col.reopen(after_full_sync=False)
-        LOGGER.debug("Backup successful.")
+        LOGGER.info("Backup successful.")
     except Exception as exc:
-        LOGGER.debug("Backup failed")
+        LOGGER.info("Backup failed")
         raise exc
