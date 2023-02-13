@@ -328,9 +328,7 @@ def _on_browser_menus_did_init(browser: Browser):
     )
     menu.addAction(reset_subdecks_action)
 
-    reset_optional_tags_action = QAction(
-        "Reset optional tags for a deck extension", browser
-    )
+    reset_optional_tags_action = QAction("Reset an optional tag", browser)
     qconnect(
         reset_optional_tags_action.triggered,
         lambda: _on_reset_optional_tags_action(browser),
@@ -427,34 +425,33 @@ def _on_reset_subdecks_action(browser: Browser):
 def _on_reset_optional_tags_action(browser: Browser):
     if not (extension_ids := config.deck_extension_ids()):
         showInfo(
-            "You don't have any AnkiHub decks extensions configured yet.",
+            "You don't have any AnkiHub optional tag groups configured yet.",
             parent=browser,
         )
         return
 
     extension_configs = [config.deck_extension_config(eid) for eid in extension_ids]
-    extension_names = [c.name for c in extension_configs]
+    tag_group_names = [c.tag_group_name for c in extension_configs]
     deck_configs = [config.deck_config(c.ankihub_deck_uuid) for c in extension_configs]
-    extension_names_with_deck = [
+    tag_group_names_with_deck = [
         f"{extension_name} ({deck_config.name})"
-        for extension_name, deck_config in zip(extension_names, deck_configs)
+        for extension_name, deck_config in zip(tag_group_names, deck_configs)
     ]
 
     extension_idx = choose_list(
-        "Choose the AnkiHub deck extension for which<br>"
-        "you want to reset optional tags.",
-        choices=extension_names_with_deck,
+        "Choose the optional tag group which<br>" "you want to reset.",
+        choices=tag_group_names_with_deck,
     )
     if extension_idx is None:
         return
 
     extension_id = extension_ids[extension_idx]
     extension_config = extension_configs[extension_idx]
-    extension_name_with_deck = extension_names_with_deck[extension_idx]
+    tag_group_name_with_deck = tag_group_names_with_deck[extension_idx]
 
     if not ask_user(
-        "Are you sure you want to reset optional tags for "
-        f"<b>{extension_name_with_deck}</b>?<br><br>"
+        "Are you sure you want to reset the optional tag group "
+        f"<b>{tag_group_name_with_deck}</b>?<br><br>"
         "Note: This will sync all AnkiHub decks.",
         parent=browser,
         defaultno=True,
@@ -463,7 +460,7 @@ def _on_reset_optional_tags_action(browser: Browser):
 
     def _on_remove_tags_for_tag_group_done(future: Future) -> None:
         future.result()
-        LOGGER.info(f"Removed optional tags for {extension_name_with_deck}")
+        LOGGER.info(f"Removed optional tags for {tag_group_name_with_deck}")
 
         # reset the latest extension update to sync all content for the deck extension on the next sync
         config.save_latest_extension_update(
@@ -476,7 +473,7 @@ def _on_reset_optional_tags_action(browser: Browser):
         # and for showing a progress dialog and probably other things too
         sync_with_progress(
             on_done=lambda: tooltip(
-                f"Reset optional tags for {extension_name_with_deck}"
+                f"Reset optional tag group {tag_group_name_with_deck} successfully"
             ),
             parent=browser,
         )
@@ -485,7 +482,7 @@ def _on_reset_optional_tags_action(browser: Browser):
     mw.taskman.with_progress(
         task=lambda: _remove_tags_of_tag_group(tag_group),
         on_done=_on_remove_tags_for_tag_group_done,
-        label=f"Removing optional tags for {extension_name_with_deck}...",
+        label=f"Removing optional tags for {tag_group_name_with_deck}...",
     )
 
 
