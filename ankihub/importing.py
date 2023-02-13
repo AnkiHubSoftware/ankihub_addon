@@ -68,7 +68,7 @@ class AnkiHubImporter:
         subdecks_for_new_notes_only indicates whether only new notes should be moved into subdecks
         """
 
-        LOGGER.debug(f"Importing ankihub deck {deck_name=} {local_did=}")
+        LOGGER.info(f"Importing ankihub deck {deck_name=} {local_did=}")
 
         # this is not ideal, it would be probably better to fetch all note types associated with the deck each time
         if not notes_data:
@@ -129,6 +129,9 @@ class AnkiHubImporter:
             dids_for_note = set(c.did for c in note.cards())
             dids = dids | dids_for_note
 
+        LOGGER.info(f"Created {len(self.created_nids)} notes: {self.created_nids}")
+        LOGGER.info(f"Updated {len(self.updated_nids)} notes: {self.updated_nids}")
+
         if first_import_of_deck:
             local_did = self._cleanup_first_time_deck_import(dids, local_did)
 
@@ -163,12 +166,12 @@ class AnkiHubImporter:
         ) is not None:
             cids = mw.col.find_cards(f'deck:"{mw.col.decks.name(created_did)}"')
             mw.col.set_deck(cids, common_ancestor_did)
-            LOGGER.debug(
+            LOGGER.info(
                 f"Moved new cards to common ancestor deck {common_ancestor_did=}"
             )
 
             mw.col.decks.remove([created_did])
-            LOGGER.debug(f"Removed created deck {created_did=}")
+            LOGGER.info(f"Removed created deck {created_did=}")
             return common_ancestor_did
 
         return created_did
@@ -223,7 +226,7 @@ class AnkiHubImporter:
             if not (new_cards_ := new_cards()):
                 return
 
-            LOGGER.debug(f"Suspending new cards of note {note.id}")
+            LOGGER.info(f"Suspending new cards of note {note.id}")
             for card in new_cards_:
                 card.queue = QUEUE_TYPE_SUSPENDED
                 card.flush()
@@ -409,11 +412,11 @@ def adjust_deck(deck_name: str, local_did: Optional[DeckId] = None) -> DeckId:
     unique_name = get_unique_deck_name(deck_name)
     if local_did is None:
         local_did = DeckId(mw.col.decks.add_normal_deck_with_name(unique_name).id)
-        LOGGER.debug(f"Created deck {local_did=}")
+        LOGGER.info(f"Created deck {local_did=}")
     elif mw.col.decks.name_if_exists(local_did) is None:
         # recreate deck if it was deleted
         create_deck_with_id(unique_name, local_did)
-        LOGGER.debug(f"Recreated deck {local_did=}")
+        LOGGER.info(f"Recreated deck {local_did=}")
 
     return local_did
 
@@ -457,14 +460,14 @@ def fetch_remote_note_types(
 def adjust_note_types(remote_note_types: Dict[NotetypeId, NotetypeDict]) -> None:
     # can be called when installing a deck for the first time and when synchronizing with AnkiHub
 
-    LOGGER.debug("Beginning adjusting note types...")
+    LOGGER.info("Beginning adjusting note types...")
 
     create_missing_note_types(remote_note_types)
     rename_note_types(remote_note_types)
     ensure_local_and_remote_fields_are_same(remote_note_types)
     modify_note_type_templates(remote_note_types.keys())
 
-    LOGGER.debug("Adjusted note types.")
+    LOGGER.info("Adjusted note types.")
 
 
 def create_missing_note_types(
@@ -474,10 +477,10 @@ def create_missing_note_types(
         mid for mid in remote_note_types.keys() if mw.col.models.get(mid) is None
     )
     for mid in missings_mids:
-        LOGGER.debug(f"Missing note type {mid}")
+        LOGGER.info(f"Missing note type {mid}")
         new_note_type = remote_note_types[mid]
         create_note_type_with_id(new_note_type, mid)
-        LOGGER.debug(f"Created missing note type {mid}")
+        LOGGER.info(f"Created missing note type {mid}")
 
 
 def rename_note_types(remote_note_types: Dict[NotetypeId, NotetypeDict]) -> None:
@@ -487,7 +490,7 @@ def rename_note_types(remote_note_types: Dict[NotetypeId, NotetypeDict]) -> None
             local_note_type["name"] = remote_note_type["name"]
             mw.col.models.ensure_name_unique(local_note_type)
             mw.col.models.update_dict(local_note_type)
-            LOGGER.debug(f"Renamed note type {mid=} to {local_note_type['name']}")
+            LOGGER.info(f"Renamed note type {mid=} to {local_note_type['name']}")
 
 
 def ensure_local_and_remote_fields_are_same(
@@ -503,7 +506,7 @@ def ensure_local_and_remote_fields_are_same(
         if not field_tuples(local_note_type["flds"]) == field_tuples(
             remote_note_type["flds"]
         ):
-            LOGGER.debug(
+            LOGGER.info(
                 f'Fields of local note type "{local_note_type["name"]}" differ from remote note type.\n'
                 f"local:\n{pformat(field_tuples(local_note_type['flds']))}\n"
                 f"remote:\n{pformat(field_tuples(remote_note_type['flds']))}"
@@ -511,17 +514,17 @@ def ensure_local_and_remote_fields_are_same(
             note_types_with_field_conflicts.append((local_note_type, remote_note_type))
 
     for local_note_type, remote_note_type in note_types_with_field_conflicts:
-        LOGGER.debug(f"Adjusting fields of {local_note_type['name']}...")
+        LOGGER.info(f"Adjusting fields of {local_note_type['name']}...")
 
         local_note_type["flds"] = adjust_field_ords(
             local_note_type["flds"], remote_note_type["flds"]
         )
-        LOGGER.debug(
+        LOGGER.info(
             f"Fields after adjusting ords:\n{pformat(field_tuples(local_note_type['flds']))}"
         )
 
         mw.col.models.update_dict(local_note_type)
-        LOGGER.debug(
+        LOGGER.info(
             f"Fields after updating the model:\n"
             f"{pformat(field_tuples(mw.col.models.get(local_note_type['id'])['flds']))}"
         )

@@ -51,7 +51,7 @@ def report_exception(
             release=ADDON_VERSION,
             environment=SENTRY_ENV,
         )
-        LOGGER.debug("Sentry initialized.")
+        LOGGER.info("Sentry initialized.")
 
         with configure_scope() as scope:
             scope.level = "error"
@@ -91,14 +91,14 @@ def report_exception(
             event_id = capture_exception()
         else:
             event_id = capture_exception(exception)
-        LOGGER.debug(f"Sentry captured {event_id=}.")
+        LOGGER.info(f"Sentry captured {event_id=}.")
         sentry_sdk.flush()
     except Exception as e:
-        LOGGER.debug(f"Reporting to sentry failed: {e}")
+        LOGGER.info(f"Reporting to sentry failed: {e}")
         return None
     finally:
         sentry_sdk.init("")
-        LOGGER.debug("Sentry disabled.")
+        LOGGER.info("Sentry disabled.")
     return event_id
 
 
@@ -116,7 +116,7 @@ def normalize_url(url: str):
 def upload_logs_in_background(
     on_done: Optional[Callable[[Future], None]] = None, hide_username=False
 ) -> str:
-    LOGGER.debug("Uploading logs...")
+    LOGGER.info("Uploading logs...")
 
     # many users use their email address as their username and may not want to share it on a forum
     user_name = config.user() if not hide_username else checksum(config.user())[:5]
@@ -129,10 +129,10 @@ def upload_logs_in_background(
                 file=log_file_path(),
                 key=key,
             )
-            LOGGER.debug("Logs uploaded.")
+            LOGGER.info("Logs uploaded.")
             return key
         except AnkiHubRequestError as e:
-            LOGGER.debug("Logs upload failed.")
+            LOGGER.info("Logs upload failed.")
             raise e
 
     if on_done is not None:
