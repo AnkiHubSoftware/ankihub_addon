@@ -2280,3 +2280,34 @@ def test_optional_tag_suggestion_dialog(
             ],
             "auto_accept": False,
         }
+
+
+def test_upload_images(
+    anki_session_with_addon,
+    monkeypatch,
+    requests_mock,
+):
+    import tempfile
+
+    from ankihub.ankihub_client import AnkiHubClient
+
+    with anki_session_with_addon.profile_loaded():
+        fake_presigned_url = "https://fake_presigned_url.com"
+        monkeypatch.setattr(
+            "ankihub.ankihub_client.AnkiHubClient.get_presigned_url",
+            lambda *args, **kwargs: fake_presigned_url,
+        )
+
+        upload_request_mock = requests_mock.put(
+            fake_presigned_url,
+            json={"success": True},
+        )
+
+        with tempfile.NamedTemporaryFile(suffix=".png") as f:
+            file_path = Path(f.name)
+            fake_bucket_path = "fake_bucket_path"
+            client = AnkiHubClient()
+            client.upload_images([file_path], bucket_path=fake_bucket_path)
+
+        assert len(upload_request_mock.request_history) == 1
+        assert upload_request_mock.last_request.text.name == str(file_path.absolute())
