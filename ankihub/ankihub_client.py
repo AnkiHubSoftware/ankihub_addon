@@ -10,7 +10,7 @@ from dataclasses import dataclass
 from datetime import datetime
 from enum import Enum
 from typing import Any, Callable, Dict, Iterator, List, Optional, Sequence, TypedDict
-
+from pathlib import Path
 import requests
 from requests import PreparedRequest, Request, Response, Session
 
@@ -372,6 +372,17 @@ class AnkiHubClient:
         response_data = response.json()
         ankihub_did = uuid.UUID(response_data["deck_id"])
         return ankihub_did
+
+    def upload_images(self, image_paths: List[Path], bucket_path: str):
+        # TODO: send all images at once instad of looping through each one
+        for image_path in image_paths:
+            key = f"{bucket_path}/{image_path.name}"
+            s3_url = self.get_presigned_url(key=key, action="upload")
+            with open(image_path, "rb") as image_file:
+                s3_response = requests.put(s3_url, data=image_file)
+
+                if s3_response.status_code != 200:
+                    raise AnkiHubRequestError(s3_response)
 
     def _gzip_compress_string(self, string: str) -> bytes:
         result = gzip.compress(
@@ -764,6 +775,14 @@ class AnkiHubClient:
         data = response.json()
         message = data["message"]
         LOGGER.debug(f"suggest_optional_tags response message: {message}")
+
+    def get_waffle_status(self):
+        response = self._send_request(
+            "GET",
+            "/waffle/waffle_status",
+        )
+        data = response.json()
+        return data
 
 
 def transform_notes_data(notes_data: List[Dict]) -> List[Dict]:

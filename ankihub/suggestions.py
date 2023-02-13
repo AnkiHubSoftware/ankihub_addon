@@ -1,13 +1,22 @@
+import re
 import uuid
 from dataclasses import dataclass
+from pathlib import Path
 from typing import Any, Dict, List, Optional
 
 from anki.notes import Note, NoteId
+from aqt import mw
 
 from .addon_ankihub_client import AddonAnkiHubClient as AnkiHubClient
-from .ankihub_client import ChangeNoteSuggestion, NewNoteSuggestion, SuggestionType
+from .ankihub_client import (
+    ChangeNoteSuggestion,
+    NewNoteSuggestion,
+    NoteSuggestion,
+    SuggestionType,
+)
 from .db import ankihub_db
 from .exporting import to_note_data
+from .settings import config
 
 # string that is contained in the errors returned from the AnkiHub API when
 # there are no changes to the note for a change note suggestion
@@ -31,7 +40,48 @@ def suggest_note_update(
         auto_accept=auto_accept,
     )
 
+    upload_images_for_suggestion(suggestion)
+
     return True
+
+
+def upload_images_for_suggestion(suggestion: NoteSuggestion) -> None:
+    client = AnkiHubClient()
+
+    if not (
+        client.get_waffle_status()["flags"]
+        .get("image_support_enabled", {})
+        .get("is_active", False)
+    ):
+        return
+
+    # TODO: This should be executed in background
+
+    # Find images in suggestion fields and upload them to s3
+    image_paths = get_images_from_suggestion(suggestion=suggestion)
+
+    # TODO: User user_id instead of username, because username is subject to change
+    username = config.user()
+    ah_did = ankihub_db.ankihub_did_for_anki_nid(NoteId(suggestion.anki_nid))
+    bucket_path = f"deck_images/{ah_did}/suggestions/{username}"
+    client.upload_images(image_paths, bucket_path)
+
+
+def get_images_from_suggestion(suggestion: NoteSuggestion) -> List[Path]:
+    result = []
+    for field_content in [f.value for f in suggestion.fields]:
+        image_names = _extract_images(field_content)
+        image_paths = [
+            Path(mw.col.media.dir()) / image_name for image_name in image_names
+        ]
+        result.extend(image_paths)
+
+    return result
+
+
+def _extract_images(field_content: str) -> List[str]:
+    # TODO: Filter out src attributes that are  URLs (e.g. start with http or https)
+    return re.findall(r'<img.*?src="(.*?)"', field_content)
 
 
 def suggest_new_note(
@@ -144,7 +194,7 @@ def change_note_suggestion(
     note_data = to_note_data(note, diff=True)
     assert note_data.ankihub_note_uuid is not None
 
-    if not note_data.fields and not note_data.tags:
+    if not note_data.fields and note_data.tags is None:
         return None
 
     return ChangeNoteSuggestion(
