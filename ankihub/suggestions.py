@@ -42,29 +42,27 @@ def suggest_note_update(
         .get("image_support_enabled", {})
         .get("is_active", False)
     ):
-        ankihub_deck_id = ankihub_db.ankihub_did_for_anki_nid(
-            anki_nid=suggestion.anki_nid
-        )
         # TODO: This should be executed in background
-        if ankihub_deck_id is not None:
-            # Find images in suggestion fields and upload them to s3
-            images = get_images_from_suggestion(suggestion=suggestion)
 
-            # TODO: User user_id instead of username, because username is subject to change
-            username = config.user()
-            bucket_path = f"deck_images/{ankihub_deck_id}/suggestions/{username}"
-            client.upload_images(images, bucket_path)
+        # Find images in suggestion fields and upload them to s3
+        images = get_images_from_suggestion(suggestion=suggestion)
+
+        # TODO: User user_id instead of username, because username is subject to change
+        username = config.user()
+        bucket_path = (
+            f"deck_images/{suggestion.ankihub_note_uuid}/suggestions/{username}"
+        )
+        client.upload_images(images, bucket_path)
 
     return True
 
 
 def get_images_from_suggestion(suggestion: NoteSuggestion) -> List[str]:
     # find all images and put in a list
-    # iterate over images and get a pre-signed url for each one
     images = []
     for field_content in [f.value for f in suggestion.fields]:
         found_images = _extract_images(field_content)
-        [images.append(image) for image in found_images]
+        images.extend(found_images)
 
     return images
 
