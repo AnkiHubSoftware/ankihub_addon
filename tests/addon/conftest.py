@@ -6,7 +6,6 @@ from pathlib import Path
 import pytest
 from pytest_anki import AnkiSession
 
-
 REPO_ROOT_PATH = Path(__file__).absolute().parent.parent.parent
 
 # id of the Anki profile used for testing
@@ -84,25 +83,3 @@ def anki_session_with_addon_before_profile_support(anki_session_with_addon):
         )
 
     yield anki_session
-
-
-@pytest.fixture
-def enable_image_support_feature_flag(requests_mock):
-    from ankihub.ankihub_client import API_URL_BASE
-
-    requests_mock.get(
-        f"{API_URL_BASE}/waffle/waffle_status",
-        status_code=200,
-        json={"flags": {"image_support_enabled": {"is_active": True}}},
-    )
-
-
-@pytest.fixture
-def disable_image_support_feature_flag(requests_mock):
-    from ankihub.ankihub_client import API_URL_BASE
-
-    requests_mock.get(
-        f"{API_URL_BASE}/waffle/waffle_status",
-        status_code=200,
-        json={"flags": {"image_support_enabled": {"is_active": False}}},
-    )
