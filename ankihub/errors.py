@@ -23,17 +23,17 @@ def handle_exception(
 ) -> bool:
     # returns True if the exception was handled in such a way that it doesn't need to be handled further
 
-    LOGGER.debug(
+    LOGGER.info(
         f"From handle_exception:\n{''.join(traceback.format_exception(exc_type, value=exc, tb=tb))}"
     )
 
     if not this_addon_is_involved(tb):
-        LOGGER.debug("This addon is not involved.")
+        LOGGER.info("This addon is not involved.")
         return False
 
     if isinstance(exc, AnkiHubRequestError):
         if maybe_handle_ankihub_request_error(exc):
-            LOGGER.debug("AnkiHubRequestError was handled.")
+            LOGGER.info("AnkiHubRequestError was handled.")
             return True
 
         try:
@@ -62,11 +62,11 @@ def handle_exception(
         showWarning(
             "Could not finish because your hard drive is full.", title="AnkiHub"
         )
-        LOGGER.debug("Showing full disk warning.")
+        LOGGER.info("Showing full disk warning.")
         return True
 
     if not should_report_error():
-        LOGGER.debug("Reporting errors is disabled.")
+        LOGGER.info("Reporting errors is disabled.")
         return False
 
     sentry_id = report_exception_and_upload_logs(exception=exc)
