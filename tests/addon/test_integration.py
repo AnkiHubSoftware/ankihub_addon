@@ -47,12 +47,7 @@ def test_entry_point(anki_session_with_addon: AnkiSession):
     # this test is just to make sure the entry point doesn't crash
 
 
-def test_editor(
-    anki_session_with_addon: AnkiSession,
-    requests_mock,
-    monkeypatch,
-    disable_image_support_feature_flag,
-):
+def test_editor(anki_session_with_addon: AnkiSession, requests_mock, monkeypatch):
     from ankihub.db import ankihub_db
     from ankihub.gui.editor import _on_suggestion_button_press, _refresh_buttons
     from ankihub.settings import API_URL_BASE, AnkiHubCommands
@@ -116,8 +111,8 @@ def test_editor(
         # this should trigger a suggestion because the note has been changed
         _on_suggestion_button_press(editor)
 
-        # mocked requests: f"{API_URL_BASE}/notes/{noes_2_ah_nid}/suggestion/" and request to check feature flags
-        assert requests_mock.call_count == 2
+        # assert that the requests_mock was called only once
+        assert requests_mock.call_count == 1
 
 
 def test_get_note_types_in_deck(anki_session_with_addon: AnkiSession):
@@ -271,11 +266,7 @@ def test_get_deck_by_id(anki_session_with_addon: AnkiSession, requests_mock):
     assert exc is not None and exc.response.status_code == 403
 
 
-def test_suggest_note_update(
-    anki_session_with_addon: AnkiSession,
-    requests_mock,
-    disable_image_support_feature_flag,
-):
+def test_suggest_note_update(anki_session_with_addon: AnkiSession, requests_mock):
     from ankihub.ankihub_client import AnkiHubRequestError, NoteInfo, SuggestionType
     from ankihub.note_conversion import (
         ADDON_INTERNAL_TAGS,
@@ -2280,100 +2271,3 @@ def test_optional_tag_suggestion_dialog(
             ],
             "auto_accept": False,
         }
-
-
-def test_upload_images(
-    anki_session_with_addon,
-    monkeypatch,
-    requests_mock,
-):
-    import tempfile
-
-    from ankihub.ankihub_client import AnkiHubClient
-
-    with anki_session_with_addon.profile_loaded():
-        fake_presigned_url = "https://fake_presigned_url.com"
-        monkeypatch.setattr(
-            "ankihub.ankihub_client.AnkiHubClient.get_presigned_url",
-            lambda *args, **kwargs: fake_presigned_url,
-        )
-
-        upload_request_mock = requests_mock.put(
-            fake_presigned_url,
-            json={"success": True},
-        )
-
-        with tempfile.NamedTemporaryFile(suffix=".png") as f:
-            file_path = Path(f.name)
-            fake_bucket_path = "fake_bucket_path"
-            client = AnkiHubClient()
-            client.upload_images([file_path], bucket_path=fake_bucket_path)
-
-        assert len(upload_request_mock.request_history) == 1
-        assert upload_request_mock.last_request.text.name == str(file_path.absolute())
-
-
-def test_suggest_note_update_with_image(
-    anki_session_with_addon: AnkiSession,
-    requests_mock,
-    monkeypatch,
-    enable_image_support_feature_flag,
-):
-    import tempfile
-
-    from aqt.main import AnkiQt
-
-    from ankihub.ankihub_client import SuggestionType
-    from ankihub.db import ankihub_db
-    from ankihub.settings import API_URL_BASE
-    from ankihub.suggestions import suggest_note_update
-
-    anki_session = anki_session_with_addon
-    with anki_session.profile_loaded():
-        mw: AnkiQt = anki_session.mw
-
-        fake_presigned_url = "https://fake_presigned_url.com"
-        monkeypatch.setattr(
-            "ankihub.ankihub_client.AnkiHubClient.get_presigned_url",
-            lambda *args, **kwargs: fake_presigned_url,
-        )
-
-        upload_request_mock = requests_mock.put(
-            fake_presigned_url,
-            json={"success": True},
-        )
-
-        with tempfile.NamedTemporaryFile(suffix=".png") as f:
-            # add file to media folder
-            file_name_in_col = mw.col.media.add_file(f.name)
-            file_path_in_col = Path(mw.col.media.dir()) / file_name_in_col
-
-            import_sample_ankihub_deck(mw, str(UUID_1))
-            nids = mw.col.find_notes("")
-            note = mw.col.get_note(nids[0])
-
-            # add file reference to a note
-            file_name_in_col = Path(file_path_in_col.name).name
-            note["Front"] = f'<img src="{file_name_in_col}">'
-            note.flush()
-
-            ah_nid = ankihub_db.ankihub_nid_for_anki_nid(note.id)
-
-            # create a suggestion for the note
-            suggestion_request_mock = requests_mock.post(
-                f"{API_URL_BASE}/notes/{ah_nid}/suggestion/", status_code=201
-            )
-
-            suggest_note_update(
-                note=note,
-                change_type=SuggestionType.NEW_CONTENT,
-                comment="test",
-            )
-
-            assert len(suggestion_request_mock.request_history) == 1
-
-            # assert that the image was uploaded
-            assert len(upload_request_mock.request_history) == 1
-            assert upload_request_mock.last_request.text.name == str(
-                file_path_in_col.absolute()
-            )
