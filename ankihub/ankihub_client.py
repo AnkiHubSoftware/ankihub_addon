@@ -374,7 +374,7 @@ class AnkiHubClient:
         response_data = response.json()
         ankihub_did = uuid.UUID(response_data["deck_id"])
         return ankihub_did
-    
+
     def upload_images(self, image_names: List[str], bucket_path: str):
         # TODO: send all images at once instad of looping through each one
         for image in image_names:
@@ -779,11 +779,11 @@ class AnkiHubClient:
         data = response.json()
         message = data["message"]
         LOGGER.debug(f"suggest_optional_tags response message: {message}")
-        
+
     def get_waffle_status(self):
         response = self._send_request(
             "GET",
-            f"/waffle/waffle_status",
+            "/waffle/waffle_status",
         )
         data = response.json()
         return data
