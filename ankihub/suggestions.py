@@ -64,7 +64,7 @@ def get_images_from_suggestion(suggestion: NoteSuggestion) -> List[Path]:
     for field_content in [f.value for f in suggestion.fields]:
         image_names = _extract_images(field_content)
         image_paths = [
-            Path(mw.col.media.dir()) / image_names for image_names in image_names
+            Path(mw.col.media.dir()) / image_name for image_name in image_names
         ]
         result.extend(image_paths)
 
