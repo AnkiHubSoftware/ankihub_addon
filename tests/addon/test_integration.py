@@ -94,10 +94,10 @@ def test_editor(
         note = mw.col.get_note(mw.col.find_notes("")[0])
         editor.note = note
 
-        noes_2_ah_nid = ankihub_db.ankihub_nid_for_anki_nid(note.id)
+        note_2_ah_nid = ankihub_db.ankihub_nid_for_anki_nid(note.id)
 
         requests_mock.post(
-            f"{API_URL_BASE}/notes/{noes_2_ah_nid}/suggestion/",
+            f"{API_URL_BASE}/notes/{note_2_ah_nid}/suggestion/",
             status_code=201,
             json={},
         )
