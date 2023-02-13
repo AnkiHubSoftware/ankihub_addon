@@ -39,6 +39,7 @@ def suggest_note_update(
         change_note_suggestion=suggestion,
         auto_accept=auto_accept,
     )
+
     if (
         client.get_waffle_status()["flags"]
         .get("image_support_enabled", {})
@@ -51,9 +52,8 @@ def suggest_note_update(
 
         # TODO: User user_id instead of username, because username is subject to change
         username = config.user()
-        bucket_path = (
-            f"deck_images/{suggestion.ankihub_note_uuid}/suggestions/{username}"
-        )
+        ah_did = ankihub_db.ankihub_did_for_anki_nid(note.id)
+        bucket_path = f"deck_images/{ah_did}/suggestions/{username}"
         client.upload_images(image_paths, bucket_path)
 
     return True
