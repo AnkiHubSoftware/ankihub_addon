@@ -13,8 +13,6 @@ from typing import Any, Callable, Dict, Iterator, List, Optional, Sequence, Type
 from pathlib import Path
 import requests
 from requests import PreparedRequest, Request, Response, Session
-from anki.media import media_paths_from_col_path
-from aqt import mw
 
 from .lib.mashumaro import field_options
 from .lib.mashumaro.config import BaseConfig
@@ -375,13 +373,11 @@ class AnkiHubClient:
         ankihub_did = uuid.UUID(response_data["deck_id"])
         return ankihub_did
 
-    def upload_images(self, image_names: List[str], bucket_path: str):
+    def upload_images(self, image_paths: List[Path], bucket_path: str):
         # TODO: send all images at once instad of looping through each one
-        for image in image_names:
-            key = f"{bucket_path}/{image}"
+        for image_path in image_paths:
+            key = f"{bucket_path}/{image_path.name}"
             s3_url = self.get_presigned_url(key=key, action="upload")
-            media_dir = media_paths_from_col_path(mw.col.path)[0]
-            image_path = Path(media_dir) / image
             with open(image_path, "rb") as image_file:
                 s3_response = requests.put(s3_url, data=image_file)
 

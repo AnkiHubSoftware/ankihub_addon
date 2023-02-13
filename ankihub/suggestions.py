@@ -1,9 +1,11 @@
+import re
 import uuid
 from dataclasses import dataclass
+from pathlib import Path
 from typing import Any, Dict, List, Optional
 
 from anki.notes import Note, NoteId
-import re
+from aqt import mw
 
 from .addon_ankihub_client import AddonAnkiHubClient as AnkiHubClient
 from .ankihub_client import (
@@ -45,26 +47,28 @@ def suggest_note_update(
         # TODO: This should be executed in background
 
         # Find images in suggestion fields and upload them to s3
-        images = get_images_from_suggestion(suggestion=suggestion)
+        image_paths = get_images_from_suggestion(suggestion=suggestion)
 
         # TODO: User user_id instead of username, because username is subject to change
         username = config.user()
         bucket_path = (
             f"deck_images/{suggestion.ankihub_note_uuid}/suggestions/{username}"
         )
-        client.upload_images(images, bucket_path)
+        client.upload_images(image_paths, bucket_path)
 
     return True
 
 
-def get_images_from_suggestion(suggestion: NoteSuggestion) -> List[str]:
-    # find all images and put in a list
-    images = []
+def get_images_from_suggestion(suggestion: NoteSuggestion) -> List[Path]:
+    result = []
     for field_content in [f.value for f in suggestion.fields]:
-        found_images = _extract_images(field_content)
-        images.extend(found_images)
+        image_names = _extract_images(field_content)
+        image_paths = [
+            Path(mw.col.media.dir()) / image_names for image_names in image_names
+        ]
+        result.extend(image_paths)
 
-    return images
+    return result
 
 
 def _extract_images(field_content: str) -> List[str]:
