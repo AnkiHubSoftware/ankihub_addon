@@ -2271,3 +2271,72 @@ def test_optional_tag_suggestion_dialog(
             ],
             "auto_accept": False,
         }
+
+
+@pytest.mark.qt_no_exception_capture
+def test_reset_optional_tags_action(anki_session_with_addon, qtbot, monkeypatch):
+    from aqt import dialogs
+    from aqt.browser import Browser
+
+    from ankihub import entry_point
+    from ankihub.gui.browser import _on_reset_optional_tags_action
+    from ankihub.note_conversion import TAG_FOR_OPTIONAL_TAGS
+    from ankihub.settings import DeckExtension, config
+
+    entry_point.run()
+
+    with anki_session_with_addon.profile_loaded():
+        mw = anki_session_with_addon.mw
+
+        ah_did = UUID_1
+        anki_did = import_sample_ankihub_deck(mw, ankihub_did=ah_did)
+
+        config.save_subscription(name="Testdeck", ankihub_did=ah_did, anki_did=anki_did)
+
+        config.create_or_update_deck_extension_config(
+            DeckExtension(
+                id=1,
+                ankihub_deck_uuid=ah_did,
+                owner_id=1,
+                name="test99",
+                tag_group_name="test99",
+                description="",
+            )
+        )
+
+        nids = mw.col.find_notes("")
+        nid = nids[0]
+
+        note = mw.col.get_note(nid)
+        note.tags = [f"{TAG_FOR_OPTIONAL_TAGS}::test99::test1"]
+        note.flush()
+
+        # mock the choose_list function to always return the first item
+        choose_list_mock = Mock()
+        choose_list_mock.return_value = 0
+        monkeypatch.setattr("ankihub.gui.browser.choose_list", choose_list_mock)
+
+        # mock the ask_user function to always confirm the reset
+        monkeypatch.setattr(
+            "ankihub.gui.browser.ask_user", lambda *args, **kwargs: True
+        )
+
+        # mock the sync_with_progress function to do nothing
+        sync_with_progress_mock = Mock()
+        monkeypatch.setattr(
+            "ankihub.gui.browser.sync_with_progress", sync_with_progress_mock
+        )
+
+        browser: Browser = dialogs.open("Browser", mw)
+        qtbot.wait(300)
+
+        _on_reset_optional_tags_action(browser)
+        qtbot.wait(300)
+
+        assert choose_list_mock.call_count == 1
+        assert choose_list_mock.call_args.kwargs["choices"] == ["test99 (Testdeck)"]
+
+        note = mw.col.get_note(nid)
+        assert note.tags == []
+
+        assert sync_with_progress_mock.call_count == 1
