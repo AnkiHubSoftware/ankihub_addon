@@ -180,7 +180,7 @@ class Config:
         config_dict = dataclasses.asdict(self._private_config)
         if config_dict["token"]:
             config_dict["token"] = "REDACTED"
-        LOGGER.debug(f"private config:\n{pformat(config_dict)}")
+        LOGGER.info(f"private config:\n{pformat(config_dict)}")
 
     def set_home_deck(self, ankihub_did: uuid.UUID, anki_did: DeckId):
         self.deck_config(ankihub_did).anki_id = anki_did
@@ -241,7 +241,7 @@ config = Config()
 def setup_profile_data_folder() -> bool:
     """Returns False if the migration from the old location needs yet to be done."""
     assign_id_to_profile_if_not_exists()
-    LOGGER.debug(f"Anki profile id: {mw.pm.profile[PROFILE_ID_FIELD_NAME]}")
+    LOGGER.info(f"Anki profile id: {mw.pm.profile[PROFILE_ID_FIELD_NAME]}")
 
     if not (path := profile_files_path()).exists():
         path.mkdir(parents=True)
@@ -260,7 +260,7 @@ def assign_id_to_profile_if_not_exists() -> None:
     mw.pm.profile[PROFILE_ID_FIELD_NAME] = str(uuid.uuid4())
     mw.pm.save()
 
-    LOGGER.debug(
+    LOGGER.info(
         f"Assigned new id to Anki profile: {mw.pm.profile[PROFILE_ID_FIELD_NAME]}"
     )
 
@@ -299,7 +299,7 @@ def profile_data_exists_at_old_location() -> bool:
 def migrate_profile_data_from_old_location() -> bool:
     """Returns True if the data was migrated and False if it remains at the old location."""
     if not profile_data_exists_at_old_location():
-        LOGGER.debug("No data to migrate.")
+        LOGGER.info("No data to migrate.")
         return True
 
     if len(mw.pm.profiles()) > 1:
@@ -377,12 +377,14 @@ LOGGING = {
     "handlers": {
         "console": {
             "()": stdout_handler,
-            "level": "DEBUG",
+            "level": "INFO",
             "formatter": "verbose",
         },
         "file": {
             "()": file_handler,
-            "level": "DEBUG",
+            "level": "DEBUG"
+            if config.public_config.get("debug_level_logs", False)
+            else "INFO",
             "formatter": "verbose",
         },
     },
@@ -398,8 +400,8 @@ logging.config.dictConfig(LOGGING)
 version_file = Path(__file__).parent / "VERSION"
 with version_file.open() as f:
     ADDON_VERSION: str = f.read().strip()
-LOGGER.debug(f"version: {ADDON_VERSION}")
-LOGGER.debug(f"VERSION file: {version_file}")
+LOGGER.info(f"version: {ADDON_VERSION}")
+LOGGER.info(f"VERSION file: {version_file}")
 
 try:
     manifest = json.loads((Path(__file__).parent / "manifest.json").read_text())
@@ -413,7 +415,7 @@ if ANKIHUB_APP_URL is None:
     ANKIHUB_APP_URL = config.public_config.get("ankihub_url")
     ANKIHUB_APP_URL = ANKIHUB_APP_URL if ANKIHUB_APP_URL else "https://app.ankihub.net"
 API_URL_BASE = f"{ANKIHUB_APP_URL}/api"
-LOGGER.debug(f"Starting with URL_BASE {API_URL_BASE}")
+LOGGER.info(f"Starting with URL_BASE {API_URL_BASE}")
 
 # maybe override default API_URL_BASE of client
 ankihub_client.API_URL_BASE = API_URL_BASE

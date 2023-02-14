@@ -315,7 +315,7 @@ def create_note_on_ankihub_and_assert(client, new_note_suggestion, uuid_of_deck:
         ankihub_note_uuid=new_note_suggestion.ankihub_note_uuid
     )
     assert note.fields == new_note_suggestion.fields
-    assert note.tags == new_note_suggestion.tags
+    assert set(note.tags) == set(new_note_suggestion.tags)
 
 
 class TestCreateSuggestion:
@@ -489,7 +489,7 @@ class TestCreateSuggestionsInBulk:
         )
         assert errors_by_nid == {}
         assert note.fields == change_note_suggestion.fields
-        assert note.tags == change_note_suggestion.tags
+        assert set(note.tags) == set(change_note_suggestion.tags)
 
         # create a change note suggestion without any changes
         errors_by_nid = client.create_suggestions_in_bulk(

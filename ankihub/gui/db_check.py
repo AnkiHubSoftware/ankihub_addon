@@ -18,12 +18,12 @@ def check_ankihub_db(on_success: Optional[Callable[[], None]] = None):
     )
 
     if not ah_dids_with_something_missing:
-        LOGGER.debug("No decks with something missing found.")
+        LOGGER.info("No decks with something missing found.")
         on_success()
         return
 
-    LOGGER.debug(f"Decks with missing values found: {ah_dids_with_missing_values}")
-    LOGGER.debug(f"Decks missing from config found: {ah_dids_missing_from_config}")
+    LOGGER.info(f"Decks with missing values found: {ah_dids_with_missing_values}")
+    LOGGER.info(f"Decks missing from config found: {ah_dids_missing_from_config}")
 
     if ah_dids_missing_from_config:
         messsage_begin = "AnkiHub has detected that some decks have missing values in the database.<br><br>"

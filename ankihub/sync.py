@@ -22,7 +22,7 @@ class AnkiHubSync:
         self.importer = AnkiHubImporter()
 
     def sync_all_decks(self) -> None:
-        LOGGER.debug("Trying to sync with AnkiHub.")
+        LOGGER.info("Trying to sync with AnkiHub.")
 
         create_backup()
 
@@ -63,7 +63,7 @@ class AnkiHubSync:
             ),
         ):
             if mw.progress.want_cancel():
-                LOGGER.debug("User cancelled sync.")
+                LOGGER.info("User cancelled sync.")
                 return False
 
             if not chunk.notes:
@@ -88,7 +88,7 @@ class AnkiHubSync:
             )
             config.save_latest_deck_update(ankihub_did, latest_update)
         else:
-            LOGGER.debug(f"No new updates to sync for {ankihub_did=}")
+            LOGGER.info(f"No new updates to sync for {ankihub_did=}")
         return True
 
     def _sync_deck_extensions(self, ankihub_did: uuid.UUID) -> bool:
@@ -173,7 +173,7 @@ class AnkiHubSync:
                     f"Note that you also need an active AnkiHub subscription.",
                 )
             )
-            LOGGER.debug(
+            LOGGER.info(
                 "Unable to sync because of user not being subscribed to a deck."
             )
             return True
@@ -185,7 +185,7 @@ class AnkiHubSync:
                     f"deck id: <i>{ankihub_did}</i>",
                 )
             )
-            LOGGER.debug("Unable to sync because the deck doesn't exist on AnkiHub.")
+            LOGGER.info("Unable to sync because the deck doesn't exist on AnkiHub.")
             return True
         return False
 
@@ -212,7 +212,7 @@ def sync_with_progress(
 
     def on_syncing_done(future: Future):
         if exc := future.exception():
-            LOGGER.debug("Unable to sync.")
+            LOGGER.info("Unable to sync.")
             raise exc
 
         total = len(sync.importer.created_nids) + len(sync.importer.updated_nids)
@@ -237,7 +237,7 @@ def sync_with_progress(
             immediate=True,
         )
     else:
-        LOGGER.debug("Skipping sync due to no token.")
+        LOGGER.info("Skipping sync due to no token.")
 
 
 def _update_deck_download_progress_cb(notes_count: int, ankihub_did: uuid.UUID):

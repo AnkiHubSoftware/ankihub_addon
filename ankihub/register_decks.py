@@ -51,7 +51,7 @@ def upload_deck(did: DeckId, notes_data: List[NoteInfo], private: bool) -> uuid.
 def create_collaborative_deck(
     deck_name: str, private: bool, add_subdeck_tags: bool = False
 ) -> uuid.UUID:
-    LOGGER.debug("Creating collaborative deck")
+    LOGGER.info("Creating collaborative deck")
 
     create_backup()
 
@@ -103,23 +103,23 @@ def note_type_name_without_ankihub_modifications(name: str) -> str:
 def change_note_types_of_notes(
     note_ids: typing.List[NoteId], note_type_mapping: dict
 ) -> None:
-    LOGGER.debug(
+    LOGGER.info(
         f"Changing note types of notes according to mapping: {note_type_mapping}"
     )
     for note_id in note_ids:
         note = mw.col.get_note(id=note_id)
         target_note_type_id = note_type_mapping[note.mid]
         change_note_type_of_note(note_id, target_note_type_id)
-    LOGGER.debug("Changed note types of notes.")
+    LOGGER.info("Changed note types of notes.")
 
 
 def set_ankihub_id_fields_based_on_notes_data(notes_data: List[NoteInfo]) -> None:
     """Assign UUID to notes that have an AnkiHub ID field already."""
     updated_notes = []
-    LOGGER.debug("Assigning AnkiHub IDs to notes.")
+    LOGGER.info("Assigning AnkiHub IDs to notes.")
     for note_data in notes_data:
         note = mw.col.get_note(id=NoteId(note_data.anki_nid))
         note[ANKIHUB_NOTE_TYPE_FIELD_NAME] = str(note_data.ankihub_note_uuid)
         updated_notes.append(note)
     mw.col.update_notes(updated_notes)
-    LOGGER.debug(f"Updated notes: {', '.join(map(str, [n.id for n in updated_notes]))}")
+    LOGGER.info(f"Updated notes: {', '.join(map(str, [n.id for n in updated_notes]))}")

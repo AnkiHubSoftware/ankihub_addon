@@ -26,12 +26,10 @@ def _check_missing_ankihub_nids() -> None:
     # when the user confirms the dialog.
 
     if not (ah_dids_with_missing_ah_nids := _decks_with_missing_ankihub_nids()):
-        LOGGER.debug("No decks with missing ankihub_ids found.")
+        LOGGER.info("No decks with missing ankihub_ids found.")
         return
 
-    LOGGER.debug(
-        f"Decks with missing ankihub_ids found: {ah_dids_with_missing_ah_nids}"
-    )
+    LOGGER.info(f"Decks with missing ankihub_ids found: {ah_dids_with_missing_ah_nids}")
 
     deck_names = sorted(
         [config.deck_config(deck_id).name for deck_id in ah_dids_with_missing_ah_nids],
@@ -60,7 +58,7 @@ def _check_missing_ankihub_nids() -> None:
 def on_done(future: Future):
     future.result()
 
-    LOGGER.debug("Done resetting local changes.")
+    LOGGER.info("Done resetting local changes.")
     showInfo("Missing values have been restored.")
 
 
@@ -126,10 +124,10 @@ def _check_ankihub_update_tags() -> None:
 
     nids = mw.col.find_notes("tag:AnkiHub_Update::*")
     if not nids:
-        LOGGER.debug("No notes with AnkiHub_Update tag found.")
+        LOGGER.info("No notes with AnkiHub_Update tag found.")
         return
 
-    LOGGER.debug("Notes with AnkiHub_Update tag found.")
+    LOGGER.info("Notes with AnkiHub_Update tag found.")
 
     if not ask_user(
         "The AnkiHub add-on has improved the way you can see which notes were updated (and for what reason)! "
@@ -144,14 +142,14 @@ def _check_ankihub_update_tags() -> None:
         "Do you want to remove the <b>AnkiHub_Update</b> tags from all notes now?",
         title="AnkiHub",
     ):
-        LOGGER.debug("User chose not to remove AnkiHub_Update tags.")
+        LOGGER.info("User chose not to remove AnkiHub_Update tags.")
         return
 
     def on_done(future: Future):
         future.result()
 
         showInfo("AnkiHub_Update tags removed from all notes.")
-        LOGGER.debug("AnkiHub_Update tags removed from all notes.")
+        LOGGER.info("AnkiHub_Update tags removed from all notes.")
 
     mw.taskman.with_progress(
         task=_remove_ankihub_update_tags,

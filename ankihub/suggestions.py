@@ -144,7 +144,7 @@ def change_note_suggestion(
     note_data = to_note_data(note, diff=True)
     assert note_data.ankihub_note_uuid is not None
 
-    if not note_data.fields and not note_data.tags:
+    if not note_data.fields and note_data.tags is None:
         return None
 
     return ChangeNoteSuggestion(
