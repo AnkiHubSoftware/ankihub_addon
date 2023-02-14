@@ -2,13 +2,32 @@ image:
   file: .gitpod.Dockerfile
 
 tasks:
+  - name: Set up AnkiHub
+    env:
+      COMPOSE_FILE: "local.yml"
+    init: |
+      git clone https://github.com/ankipalace/ankihub /workspace
+      cd /workspace/ankihub
+      cp .env.dev .env
+      docker-compose up --build -d
+      docker-compose run --rm django bash -c ". release.sh"
+    command: docker-compose up
+
+  - name: AnkiHub shell
+    env:
+      COMPOSE_FILE: "local.yml"
+    command: |
+      gp ports await 8000
+      docker-compose run --rm django bash
+
+  - name: set up Anki
   - init: |
       pyenv local 3.9.13
       python3 scripts/build.py
       mkdir -p /home/gitpod/.local/share/Anki2/addons21/
       ln -sf /workspace/ankihub_addon/ankihub/ /home/gitpod/.local/share/Anki2/addons21/
     env:
-      ANKIHUB_APP_URL: "https://staging.ankihub.net"
+      ANKIHUB_APP_URL: "http://localhost:8000"
       ANKIDEV: 1
       DEVELOPMENT: True
     command: |
@@ -26,6 +45,24 @@ vscode:
 
 ports:
   - port: 6080
+    name: Anki Desktop
     visibility: public
+    onOpen: open-browser
   - port: 5900
+    onOpen: ignore
+  - name: AnkiHub
+    description: Web app
+    port: 8000
+    onOpen: open-browser
+  - name: postgres
+    port: 5432
+    onOpen: ignore
+  - name: redis
+    port: 6379
+    onOpen: ignore
+  - name: debugpy
+    port: 3000
+    onOpen: ignore
+  - name: mailhog
+    port: 8025
     onOpen: ignore
