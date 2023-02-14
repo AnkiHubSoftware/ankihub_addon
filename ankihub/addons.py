@@ -72,6 +72,7 @@ def check_future_for_exceptions(*args: Any, **kwargs: Any) -> None:
     if future is None:
         raise ValueError("Could not find future argument")
 
+    # throws exception if there was one in the future
     future.result()
 
 
