@@ -21,7 +21,7 @@ tasks:
       ANKIHUB_APP_URL: "http://localhost:8000"
       ANKIDEV: 1
       DEVELOPMENT: True
-  - init: |
+    init: |
       pyenv local 3.9.13
       python3 scripts/build.py
       mkdir -p /home/gitpod/.local/share/Anki2/addons21/
