@@ -89,6 +89,8 @@ def setup_addons():
         pos="before",
     )
 
+    # prevent the situation that the add-on update dialog is shown while the progress dialog is open which can
+    # lead to a deadlock when AnkiHub is syncing and there is an add-on update.
     addons.prompt_to_update = wrap(  # type: ignore
         old=addons.prompt_to_update,
         new=delay_when_progress_dialog_is_open,
@@ -108,8 +110,6 @@ def delay_when_progress_dialog_is_open(*args, **kwargs) -> Any:
         timer.deleteLater()
 
     # mw.progress.timer is there for creating "Custom timers which avoid firing while a progress dialog is active".
-    # This prevents the situation that the add-on update dialog is shown while the progress dialog is open which can
-    # lead to a deadlock when AnkiHub is syncing and there is an add-on update.
     timer = mw.progress.timer(
         ms=500,
         func=wrapper,
