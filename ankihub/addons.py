@@ -1,5 +1,6 @@
 import logging
 import os
+from concurrent.futures import Future
 from pathlib import Path
 from typing import Any, Callable
 
@@ -43,7 +44,7 @@ def detach_ankihub_db(*args: Any, **kwargs: Any) -> None:
     detach_ankihub_db_from_anki_db_connection()
 
 
-def on_deleteAddon(self, module: str) -> None:
+def on_deleteAddon(self: AddonManager, module: str) -> None:
     # without this Anki is not able to delete all contents of the media_import libs folder
     # on Windows
     ankihub_module = mw.addonManager.addonFromModule(__name__)
@@ -54,6 +55,24 @@ def on_deleteAddon(self, module: str) -> None:
     for file in addon_dir.rglob("*"):
         os.chmod(file, 0o777)
     LOGGER.info(f"On deleteAddon changed file permissions for all files in {addon_dir}")
+
+
+def check_future_for_exceptions(*args: Any, **kwargs: Any) -> None:
+    _old: Callable = kwargs["_old"]
+    del kwargs["_old"]
+
+    _old(*args, **kwargs)
+
+    # in future Anki version the argument could be passed differently
+    # so we check all arguments for a Future
+    future: Future = next((x for x in args if isinstance(x, Future)), None)
+    if future is None:
+        future = kwargs.get("future", None)
+
+    if future is None:
+        raise ValueError("Could not find future argument")
+
+    future.result()
 
 
 def setup_addons():
@@ -94,6 +113,15 @@ def setup_addons():
     addons.prompt_to_update = wrap(  # type: ignore
         old=addons.prompt_to_update,
         new=with_delay_when_progress_dialog_is_open,
+        pos="around",
+    )
+
+    # this prevents silent add-on update failures like the ones reported here:
+    # https://community.ankihub.net/t/bug-improve-ankihub-addon-update-process/557/5
+    # it changes the behavior of _download_done so that it checks if the future has an exception
+    DownloaderInstaller._download_done = wrap(  # type: ignore
+        old=DownloaderInstaller._download_done,
+        new=check_future_for_exceptions,
         pos="around",
     )
 
