@@ -24,8 +24,8 @@ tasks:
     init: |
       pyenv local 3.9.13
       python3 scripts/build.py
-      mkdir -p /home/gitpod/.local/share/Anki2/addons21/
-      ln -sf /workspace/ankihub_addon/ankihub/ /home/gitpod/.local/share/Anki2/addons21/
+      cp -r /workspace/ankihub_addon/tests/test_data/Anki2 /home/gitpod/.local/share/
+      ln -s /workspace/ankihub_addon/ankihub/ /home/gitpod/.local/share/Anki2/addons21/
     command: |
       anki
 
