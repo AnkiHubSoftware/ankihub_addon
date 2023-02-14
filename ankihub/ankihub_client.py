@@ -781,6 +781,9 @@ class AnkiHubClient:
             "GET",
             "/waffle/waffle_status",
         )
+        if response.status_code != 200:
+            raise AnkiHubRequestError(response)
+
         data = response.json()
         return data
 
