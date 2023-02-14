@@ -6,7 +6,7 @@ tasks:
     env:
       COMPOSE_FILE: "local.yml"
     init: |
-      git clone https://github.com/ankipalace/ankihub /workspace
+      git clone https://github.com/ankipalace/ankihub /workspace/ankihub
       cd /workspace/ankihub
       cp .env.dev .env
       docker-compose up --build -d
