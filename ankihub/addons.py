@@ -93,12 +93,12 @@ def setup_addons():
     # lead to a deadlock when AnkiHub is syncing and there is an add-on update.
     addons.prompt_to_update = wrap(  # type: ignore
         old=addons.prompt_to_update,
-        new=delay_when_progress_dialog_is_open,
+        new=with_delay_when_progress_dialog_is_open,
         pos="around",
     )
 
 
-def delay_when_progress_dialog_is_open(*args, **kwargs) -> Any:
+def with_delay_when_progress_dialog_is_open(*args, **kwargs) -> Any:
     _old: Callable = kwargs["_old"]
     del kwargs["_old"]
 
