@@ -9,9 +9,10 @@ tasks:
       git clone https://github.com/ankipalace/ankihub /workspace/ankihub
       cd /workspace/ankihub
       cp .env.dev .env
-      docker-compose up --build -d
+      docker-compose build
       docker-compose run --rm django bash -c ". release.sh"
-    command: docker-compose up
+    command: |
+      docker-compose up -d
 
   - name: AnkiHub shell
     env:
@@ -21,7 +22,7 @@ tasks:
       cd /workspace/ankihub
       docker-compose run --rm django bash
 
-  - name: set up Anki
+  - name: Set up Anki
   - init: |
       pyenv local 3.9.13
       python3 scripts/build.py
