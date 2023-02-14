@@ -9,7 +9,7 @@ from aqt.addons import AddonManager, DownloaderInstaller
 
 from . import LOGGER
 from .db import detach_ankihub_db_from_anki_db_connection
-from .settings import log_file_path, file_handler
+from .settings import file_handler, log_file_path
 
 
 def with_disabled_log_file_handler(*args: Any, **kwargs: Any) -> Any:
@@ -56,36 +56,6 @@ def on_deleteAddon(self, module: str) -> None:
     LOGGER.info(f"On deleteAddon changed file permissions for all files in {addon_dir}")
 
 
-def with_hidden_progress_dialog(*args, **kwargs) -> Any:
-    # When Anki checks for add-on updates and AnkiHub syncs at the same time there can be a UI "deadlock",
-    # because the progress dialog is blocking the ChooseAddonsToUpdateDialog (not really, see below)
-    # and the closure that shows the ChooseAddonsToUpdateDialog blocks the closure for closing the progress dialog
-    # in mw.taskman.
-    # It's not really a deadlock, because you can interact with the ChooseAddonsToUpdateDialog despite
-    # the busy mouse cursor, but it looks like one.
-
-    LOGGER.info("From with_hidden_progress_dialog")
-
-    did_hide_dialog = False
-    if mw.progress._win:
-        LOGGER.info("Hiding progress dialog")
-        mw.progress._win.hide()
-        mw.progress._restore_cursor()
-        did_hide_dialog = True
-
-    _old: Callable = kwargs["_old"]
-    del kwargs["_old"]
-
-    result = _old(*args, **kwargs)
-
-    if mw.progress._win and did_hide_dialog:
-        LOGGER.info("Restoring progress dialog")
-        mw.progress._win.show()
-        mw.progress._set_busy_cursor()
-
-    return result
-
-
 def setup_addons():
 
     # prevent errors when updating the add-on
@@ -119,7 +89,31 @@ def setup_addons():
         pos="before",
     )
 
-    # prevent UI "deadlock" when Anki checks for add-on updates and AnkiHub syncs at the same time
+    # prevent the situation that the add-on update dialog is shown while the progress dialog is open which can
+    # lead to a deadlock when AnkiHub is syncing and there is an add-on update.
     addons.prompt_to_update = wrap(  # type: ignore
-        old=addons.prompt_to_update, new=with_hidden_progress_dialog, pos="around"
+        old=addons.prompt_to_update,
+        new=with_delay_when_progress_dialog_is_open,
+        pos="around",
+    )
+
+
+def with_delay_when_progress_dialog_is_open(*args, **kwargs) -> Any:
+    _old: Callable = kwargs["_old"]
+    del kwargs["_old"]
+
+    def wrapper():
+        _old(*args, **kwargs)
+
+        # the documentation of mw.progress.timer says that the timer has to be deleted to
+        # prevent memory leaks
+        timer.deleteLater()
+
+    # mw.progress.timer is there for creating "Custom timers which avoid firing while a progress dialog is active".
+    timer = mw.progress.timer(
+        ms=500,
+        func=wrapper,
+        repeat=False,
+        requiresCollection=True,
+        parent=mw,
     )
