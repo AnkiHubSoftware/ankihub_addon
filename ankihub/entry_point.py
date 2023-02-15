@@ -22,12 +22,12 @@ from .sync import sync_with_progress
 from .utils import modify_note_type_templates
 
 # some code needs to be run only once even if the Anki profile changes
-ATTEMPTED_GENERAL_SETUP_BEFORE = False
+ATTEMPTED_GENERAL_SETUP = False
+
+# for determining if start up sync and  the database checks should be run
+ATTEMPTED_STARTUP_SYNC = False
 
 PROFILE_WILL_CLOSE = False
-
-# only has a defined value when using the "sync_on_startup" config option
-DID_STARTUP_SYNC = False
 
 
 def run():
@@ -44,14 +44,14 @@ def on_profile_did_open():
 
     after_profile_setup()
 
-    global ATTEMPTED_GENERAL_SETUP_BEFORE
-    if ATTEMPTED_GENERAL_SETUP_BEFORE:
+    global ATTEMPTED_GENERAL_SETUP
+    if ATTEMPTED_GENERAL_SETUP:
         return
 
     # The variable is set to True here and not at the end of the function because
     # the non_profile_setup should not be run if it has failed before.
     # If it were to run again, there could be duplicated menus and other unwanted side effects.
-    ATTEMPTED_GENERAL_SETUP_BEFORE = True
+    ATTEMPTED_GENERAL_SETUP = True
 
     general_setup()
 
@@ -134,30 +134,35 @@ def on_startup_syncs_done() -> None:
     check_ankihub_db(on_success=check_anki_db)
 
 
-def do_or_setup_ankihub_sync(after_startup_syncs: Callable[[], None]):
-    """This will set up the AnkiHub sync to run before the AnkiWeb sync if the user has enabled
-    the "sync_on_startup" or "sync_on_ankiweb_sync" config options.
-    If Anki won't sync with AnkiWeb, the AnkiHub sync will be run immediately.
-    after_startup_syncs is called after the AnkiHub and AnkiWeb syncs are done if they are run,
-    or immediately if they aren't run.
+def do_or_setup_ankihub_sync(after_startup_syncs: Callable[[], None]) -> None:
     """
-    global DID_STARTUP_SYNC
+    If the auto_sync config option is set to "never", this only calls after_startup_syncs.
+    If the user has the "auto_sync" config option set to "on_ankiweb_sync" or "on_startup",
+    this will set up the AnkiHub sync to run before the AnkiWeb sync.
+    In the case of "on_startup", the AnkiHub sync will be run only once after Anki starts.
+    If Anki won't sync with AnkiWeb, the AnkiHub sync will be run immediately.
+    after_startup_syncs is called in every case and after the syncs if they are run.
+    """
 
-    original_sync_collection_and_media = mw._sync_collection_and_media
+    if config.public_config["auto_sync"] == "never":
+        after_startup_syncs()
+        return
+
+    old_sync_collection_and_media = mw._sync_collection_and_media
 
     def wrapper(*args, **kwargs) -> None:
-        LOGGER.info("Running maybe_do_or_setup_ankihub_sync.wrapper")
+        LOGGER.info("Running do_or_setup_ankihub_sync.wrapper")
         try:
-            _wrap_sync_collection_and_media(
+            _new_sync_collection_and_media(
+                old_sync_collection_and_media=old_sync_collection_and_media,
                 old_after_sync=args[0],
-                old=kwargs.pop("_old"),
                 after_startup_syncs=after_startup_syncs,
             )
         except Exception as e:
             LOGGER.exception("Error in _wrap_sync_collection_and_media", exc_info=e)
 
             # call the original sync function if there was an error in the modified one
-            original_sync_collection_and_media(*args, **kwargs)
+            old_sync_collection_and_media(*args, **kwargs)
 
     mw._sync_collection_and_media = wrap(  # type: ignore
         mw._sync_collection_and_media,
@@ -168,43 +173,57 @@ def do_or_setup_ankihub_sync(after_startup_syncs: Callable[[], None]):
     if not mw.can_auto_sync():
         # The AnkiWeb sync won't be run on startup, so we run the AnkiHub sync immediately.
         LOGGER.info("Can't auto sync with AnkiWeb")
-        if config.public_config["sync_on_startup"]:
+        if config.public_config["auto_sync"] in ["on_ankiweb_sync", "on_startup"]:
             sync_with_progress(after_startup_syncs)
-            DID_STARTUP_SYNC = True
+            global ATTEMPTED_STARTUP_SYNC
+            ATTEMPTED_STARTUP_SYNC = True
         else:
             after_startup_syncs()
 
 
-def _wrap_sync_collection_and_media(
-    old: Callable[[Callable[[], None]], None],
+def _new_sync_collection_and_media(
+    old_sync_collection_and_media: Callable[[Callable[[], None]], None],
     old_after_sync: Callable[[], None],
     after_startup_syncs: Callable[[], None],
 ) -> None:
-    global DID_STARTUP_SYNC
-
-    def after_ankihub_sync() -> None:
-        global DID_STARTUP_SYNC
-        LOGGER.info(
-            f"Running maybe_do_or_setup_ankihub_sync.after_ankihub_sync, DID_STARTUP_SYNC={DID_STARTUP_SYNC}"
-        )
-        if not DID_STARTUP_SYNC:
-            old(after_startup_syncs)
-            DID_STARTUP_SYNC = True
+    def after_ankihub_sync(is_startup_sync: bool) -> None:
+        LOGGER.info("Running _new_sync_collection_and_media.after_ankihub_sync")
+        if is_startup_sync:
+            old_sync_collection_and_media(old_after_sync_and_after_startup_syncs)
         else:
-            old(old_after_sync)
+            old_sync_collection_and_media(old_after_sync)
 
-    LOGGER.info("Runnig _wrap_sync_collection_and_media")
+    def old_after_sync_and_after_startup_syncs() -> None:
+        old_after_sync()
+        after_startup_syncs()
 
-    # If the profile is being closed, don't sync with AnkiHub to avoid errors / delays.
-    if not PROFILE_WILL_CLOSE and (
-        (config.public_config["sync_on_startup"] and not DID_STARTUP_SYNC)
-        or config.public_config["sync_on_ankiweb_sync"]
-    ):
-        LOGGER.info("Syncing with AnkiHub in _wrap_sync_collection_and_media")
-        sync_with_progress(on_done=after_ankihub_sync)
+    # Sync with AnkiHub before syncing with AnkiWeb if the right conditions are met,
+    # otherwise just call the original sync function.
+    # In any case the old_after_sync function is called after the AnkiWeb sync,
+    # after_startup_syncs is called if syncing with AnkiHub and this is a startup sync.
+
+    # ... Don't sync with AnkiHub if the profile is being closed to avoid errors / delays.
+    LOGGER.info("Runnig _new_sync_collection_and_media")
+    if PROFILE_WILL_CLOSE:
+        LOGGER.info(
+            "Not syncing with AnkiHub in  _new_sync_collection_and_media because profile is being closed"
+        )
+        old_sync_collection_and_media(old_after_sync)
+        return
+
+    global ATTEMPTED_STARTUP_SYNC
+    is_startup_sync = not ATTEMPTED_STARTUP_SYNC
+    ATTEMPTED_STARTUP_SYNC = True
+    if (
+        config.public_config["auto_sync"] == "on_startup" and is_startup_sync
+    ) or config.public_config["auto_sync"] == "on_ankiweb_sync":
+        LOGGER.info("Syncing with AnkiHub in _new_sync_collection_and_media")
+        sync_with_progress(
+            on_done=lambda: after_ankihub_sync(is_startup_sync=is_startup_sync)
+        )
     else:
-        LOGGER.info("Not syncing with AnkiHub in _wrap_sync_collection_and_media")
-        old(old_after_sync)
+        LOGGER.info("Not syncing with AnkiHub in _new_sync_collection_and_media")
+        old_sync_collection_and_media(old_after_sync)
 
 
 def log_enabled_addons():
