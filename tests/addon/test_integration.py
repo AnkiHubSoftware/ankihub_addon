@@ -2390,7 +2390,6 @@ def test_suggest_new_note_with_image(
     enable_image_support_feature_flag,
 ):
     import tempfile
-    from ankihub.ankihub_client import AnkiHubRequestError
     from ankihub.note_conversion import (
         ADDON_INTERNAL_TAGS,
         ANKI_INTERNAL_TAGS,
