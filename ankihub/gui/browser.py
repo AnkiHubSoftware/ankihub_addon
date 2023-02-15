@@ -328,7 +328,7 @@ def _on_browser_menus_did_init(browser: Browser):
     )
     menu.addAction(reset_subdecks_action)
 
-    reset_optional_tags_action = QAction("Reset an optional tag", browser)
+    reset_optional_tags_action = QAction("Reset an Optional Tag Group", browser)
     qconnect(
         reset_optional_tags_action.triggered,
         lambda: _on_reset_optional_tags_action(browser),
