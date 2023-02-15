@@ -2390,11 +2390,7 @@ def test_suggest_new_note_with_image(
     enable_image_support_feature_flag,
 ):
     import tempfile
-    from ankihub.note_conversion import (
-        ADDON_INTERNAL_TAGS,
-        ANKI_INTERNAL_TAGS,
-        TAG_FOR_OPTIONAL_TAGS,
-    )
+
     from ankihub.settings import API_URL_BASE
     from ankihub.suggestions import suggest_new_note
 
@@ -2417,13 +2413,6 @@ def test_suggest_new_note_with_image(
             lambda *args, **kwargs: fake_presigned_url,
         )
 
-        note.tags = [
-            "a",
-            *ADDON_INTERNAL_TAGS,
-            *ANKI_INTERNAL_TAGS,
-            f"{TAG_FOR_OPTIONAL_TAGS}::TAG_GROUP::OptionalTag",
-        ]
-
         upload_request_mock = requests_mock.put(
             fake_presigned_url,
             json={"success": True},
@@ -2438,12 +2427,6 @@ def test_suggest_new_note_with_image(
             file_name_in_col = Path(file_path_in_col.name).name
             note["Front"] = f'<img src="{file_name_in_col}">'
 
-            note.tags = [
-                "a",
-                *ADDON_INTERNAL_TAGS,
-                *ANKI_INTERNAL_TAGS,
-                f"{TAG_FOR_OPTIONAL_TAGS}::TAG_GROUP::OptionalTag",
-            ]
             suggest_new_note(
                 note=note,
                 ankihub_deck_uuid=ankihub_deck_uuid,
