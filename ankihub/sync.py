@@ -190,7 +190,9 @@ class AnkiHubSync:
         return False
 
 
-def sync_with_progress(on_done: Optional[Callable[[], None]] = None) -> None:
+def sync_with_progress(
+    on_done: Optional[Callable[[], None]] = None, parent=None
+) -> None:
 
     sync = AnkiHubSync()
 
@@ -231,7 +233,7 @@ def sync_with_progress(on_done: Optional[Callable[[], None]] = None) -> None:
             sync_with_ankihub_after_delay,
             label="Synchronizing with AnkiHub",
             on_done=on_syncing_done,
-            parent=mw,
+            parent=mw if parent is None else parent,
             immediate=True,
         )
     else:
