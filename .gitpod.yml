@@ -18,7 +18,6 @@ tasks:
       COMPOSE_FILE: "local.yml"
     command: |
       gp ports await 8000
-      cd /workspace/ankihub
       docker-compose run --rm django bash
 
   - name: set up Anki
