@@ -14,7 +14,7 @@
 
 #### Configure environment variables
 
-- Copy `.envrc.dev` to `.envrc`:  `cp .enrc.dev .envrc`
+- Copy `.envrc.dev` to `.envrc`:  `cp .envrc.dev .envrc`
 - Modify the newly created `.envrc`:
   - Set `ANKI_EXEC` to the path of your `anki` executable.
     You can find this by activating your virtual environment and typing `which anki`.
