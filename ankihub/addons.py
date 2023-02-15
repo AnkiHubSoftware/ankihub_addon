@@ -1,5 +1,6 @@
 import logging
 import os
+from concurrent.futures import Future
 from pathlib import Path
 from typing import Any, Callable
 
@@ -9,7 +10,7 @@ from aqt.addons import AddonManager, DownloaderInstaller
 
 from . import LOGGER
 from .db import detach_ankihub_db_from_anki_db_connection
-from .settings import log_file_path, file_handler
+from .settings import file_handler, log_file_path
 
 
 def with_disabled_log_file_handler(*args: Any, **kwargs: Any) -> Any:
@@ -43,7 +44,7 @@ def detach_ankihub_db(*args: Any, **kwargs: Any) -> None:
     detach_ankihub_db_from_anki_db_connection()
 
 
-def on_deleteAddon(self, module: str) -> None:
+def on_deleteAddon(self: AddonManager, module: str) -> None:
     # without this Anki is not able to delete all contents of the media_import libs folder
     # on Windows
     ankihub_module = mw.addonManager.addonFromModule(__name__)
@@ -56,34 +57,23 @@ def on_deleteAddon(self, module: str) -> None:
     LOGGER.info(f"On deleteAddon changed file permissions for all files in {addon_dir}")
 
 
-def with_hidden_progress_dialog(*args, **kwargs) -> Any:
-    # When Anki checks for add-on updates and AnkiHub syncs at the same time there can be a UI "deadlock",
-    # because the progress dialog is blocking the ChooseAddonsToUpdateDialog (not really, see below)
-    # and the closure that shows the ChooseAddonsToUpdateDialog blocks the closure for closing the progress dialog
-    # in mw.taskman.
-    # It's not really a deadlock, because you can interact with the ChooseAddonsToUpdateDialog despite
-    # the busy mouse cursor, but it looks like one.
-
-    LOGGER.info("From with_hidden_progress_dialog")
-
-    did_hide_dialog = False
-    if mw.progress._win:
-        LOGGER.info("Hiding progress dialog")
-        mw.progress._win.hide()
-        mw.progress._restore_cursor()
-        did_hide_dialog = True
-
+def check_future_for_exceptions(*args: Any, **kwargs: Any) -> None:
     _old: Callable = kwargs["_old"]
     del kwargs["_old"]
 
-    result = _old(*args, **kwargs)
+    _old(*args, **kwargs)
 
-    if mw.progress._win and did_hide_dialog:
-        LOGGER.info("Restoring progress dialog")
-        mw.progress._win.show()
-        mw.progress._set_busy_cursor()
+    # in future Anki version the argument could be passed differently
+    # so we check all arguments for a Future
+    future: Future = next((x for x in args if isinstance(x, Future)), None)
+    if future is None:
+        future = kwargs.get("future", None)
 
-    return result
+    if future is None:
+        raise ValueError("Could not find future argument")
+
+    # throws exception if there was one in the future
+    future.result()
 
 
 def setup_addons():
@@ -119,7 +109,40 @@ def setup_addons():
         pos="before",
     )
 
-    # prevent UI "deadlock" when Anki checks for add-on updates and AnkiHub syncs at the same time
+    # prevent the situation that the add-on update dialog is shown while the progress dialog is open which can
+    # lead to a deadlock when AnkiHub is syncing and there is an add-on update.
     addons.prompt_to_update = wrap(  # type: ignore
-        old=addons.prompt_to_update, new=with_hidden_progress_dialog, pos="around"
+        old=addons.prompt_to_update,
+        new=with_delay_when_progress_dialog_is_open,
+        pos="around",
+    )
+
+    # this prevents silent add-on update failures like the ones reported here:
+    # https://community.ankihub.net/t/bug-improve-ankihub-addon-update-process/557/5
+    # it changes the behavior of _download_done so that it checks if the future has an exception
+    DownloaderInstaller._download_done = wrap(  # type: ignore
+        old=DownloaderInstaller._download_done,
+        new=check_future_for_exceptions,
+        pos="around",
+    )
+
+
+def with_delay_when_progress_dialog_is_open(*args, **kwargs) -> Any:
+    _old: Callable = kwargs["_old"]
+    del kwargs["_old"]
+
+    def wrapper():
+        _old(*args, **kwargs)
+
+        # the documentation of mw.progress.timer says that the timer has to be deleted to
+        # prevent memory leaks
+        timer.deleteLater()
+
+    # mw.progress.timer is there for creating "Custom timers which avoid firing while a progress dialog is active".
+    timer = mw.progress.timer(
+        ms=500,
+        func=wrapper,
+        repeat=False,
+        requiresCollection=True,
+        parent=mw,
     )
