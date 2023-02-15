@@ -26,7 +26,7 @@ tasks:
     init: |
       pyenv local 3.9.13
       python3 scripts/build.py
-      python scripts/create_tmp_anki_data_dir.py
+      python3 scripts/create_tmp_anki_data_dir.py
     command: |
       anki -p dev -b $ANKI_BASE_ROOT/Anki2
 
