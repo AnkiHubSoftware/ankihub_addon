@@ -5,6 +5,9 @@ ankihub/meta.json
 /ankihub/user_files/*
 !/ankihub/user_files/README.md
 /ankihub/logs
+# Anki data dir
+*.colpkg
+Anki2/
 
 
 # Byte-compiled / optimized / DLL files
