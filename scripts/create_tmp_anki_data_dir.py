@@ -7,7 +7,7 @@ def run():
     addon_repo = pathlib.Path(__file__).parent.parent.absolute()
     addon_code = addon_repo / "ankihub"
 
-    data_dir_dst = pathlib.Path(os.environ.get("ANKI_BASE_ROOT", "/tmp")) / "Anki2"
+    data_dir_dst = pathlib.Path(os.environ.get("ANKI_BASE", "/tmp")) / "Anki2"
     data_dir_src = addon_repo / "tests" / "test_data" / "Anki2"
 
     test_profile_id = "d1659f4e-4839-4498-8859-51d92576e1cc"
