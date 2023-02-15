@@ -21,14 +21,15 @@ tasks:
       ANKIHUB_APP_URL: "http://localhost:8000"
       ANKIDEV: 1
       DEVELOPMENT: True
-      ANKI_BASE_ROOT: "/tmp"
 
     init: |
       pyenv local 3.9.13
       python3 scripts/build.py
-      python scripts/create_tmp_anki_data_dir.py
+      cp -r /workspace/ankihub_addon/tests/test_data/Anki2 /home/gitpod/.local/share/
+      cp -r /workspace/ankihub_addon/tests/test_data/d1659f4e-4839-4498-8859-51d92576e1cc /workspace/ankihub_addon/ankihub/user_files
+      ln -s /workspace/ankihub_addon/ankihub/ /home/gitpod/.local/share/Anki2/addons21/
     command: |
-      anki -p dev -b $ANKI_BASE_ROOT/Anki2
+      anki
 
 github:
   prebuilds:
