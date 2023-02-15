@@ -589,7 +589,7 @@ class AnkiHubClient:
         :return:
         """
         method = "GET"
-        endpoint = "/decks/pre-signed-url"
+        endpoint = "/decks/generate-presigned-url"
         data = {"key": key, "type": action}
         response = self._send_request(method, endpoint, params=data)
         if response.status_code != 200:
