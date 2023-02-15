@@ -1,0 +1,27 @@
+{
+    "version": "0.2.0",
+    "configurations": [
+        {
+            "name": "Anki",
+            "type": "python",
+            "request": "launch",
+            "stopOnEntry": false,
+            "program": "${env:ANKI_EXEC}",
+            "cwd": "${workspaceRoot}",
+            "envFile": "${workspaceFolder}/.env",
+            "preLaunchTask": "Generate Anki Base",
+            "args": [
+                "-b",
+                "${env:ANKI_BASE}",
+                "-p",
+                "${env:ANKI_PROFILE}",
+            ],
+            "purpose": [
+                // with this setting tests will use justMyCode=false in debug mode
+                "debug-test",
+                "debug-in-terminal",
+            ],
+            "justMyCode": false,
+        },
+    ]
+}
