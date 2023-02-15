@@ -2,21 +2,41 @@
     "version": "0.2.0",
     "configurations": [
         {
-            "name": "Anki",
+            "name": "Run Anki with temporary data directory.",
             "type": "python",
             "request": "launch",
             "stopOnEntry": false,
             "program": "${env:ANKI_EXEC}",
             "cwd": "${workspaceRoot}",
-            "preLaunchTask": "Generate Anki Base",
+            "envFile": "${workspaceFolder}/.env",
+            "preLaunchTask": "Generate Temporary Anki Base",
             "args": [
                 "-b",
-                "${env:ANKI_BASE}",
+                "${env:TEMPORARY_ANKI_BASE}",
                 "-p",
                 "${env:ANKI_PROFILE}",
             ],
             "purpose": [
                 // with this setting tests will use justMyCode=false in debug mode
+                "debug-test",
+                "debug-in-terminal",
+            ],
+            "justMyCode": false,
+        },
+        {
+            "name": "Run Anki with ANKI_BASE.",
+            "type": "python",
+            "request": "launch",
+            "stopOnEntry": false,
+            "program": "${env:ANKI_EXEC}",
+            "cwd": "${workspaceRoot}",
+            "preLaunchTask": "Ensure Anki Base",
+            // "envFile": "${workspaceFolder}/.env",
+            "args": [
+                "-b",
+                "${env:ANKI_BASE}"
+            ],
+            "purpose": [
                 "debug-test",
                 "debug-in-terminal",
             ],
