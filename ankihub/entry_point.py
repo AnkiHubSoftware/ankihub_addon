@@ -174,9 +174,9 @@ def do_or_setup_ankihub_sync(after_startup_syncs: Callable[[], None]) -> None:
         # The AnkiWeb sync won't be run on startup, so we run the AnkiHub sync immediately.
         LOGGER.info("Can't auto sync with AnkiWeb")
         if config.public_config["auto_sync"] in ["on_ankiweb_sync", "on_startup"]:
-            sync_with_progress(after_startup_syncs)
             global ATTEMPTED_STARTUP_SYNC
             ATTEMPTED_STARTUP_SYNC = True
+            sync_with_progress(after_startup_syncs)
         else:
             after_startup_syncs()
 
