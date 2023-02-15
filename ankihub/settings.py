@@ -21,6 +21,7 @@ from aqt import mw
 from aqt.utils import askUser, showInfo
 
 from . import LOGGER, ankihub_client
+from .public_config_migrations import migrate_public_config
 from .ankihub_client import ANKIHUB_DATETIME_FORMAT_STR, DeckExtension
 from .lib.mashumaro import field_options
 from .lib.mashumaro.mixins.json import DataClassJSONMixin
@@ -97,6 +98,7 @@ class PrivateConfig(DataClassJSONMixin):
 class Config:
     def __init__(self):
         # self.public_config is editable by the user using a built-in Anki feature.
+        migrate_public_config()
         self.public_config: Dict[str, Any] = mw.addonManager.getConfig(ADDON_PATH.name)
         self.token_change_hook: Optional[Callable[[], None]] = None
         self.subscriptions_change_hook: Optional[Callable[[], None]] = None

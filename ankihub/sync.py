@@ -201,7 +201,7 @@ def sync_with_progress(on_done: Optional[Callable[[], None]] = None) -> None:
         # When other add-ons try to access the collection while it is closed they will get an error.
         # Many add-ons are added to the profile_did_open hook so we can wait until they will probably finish
         # and sync then.
-        # Another way to deal with that is to tell users to set the sync_on_startup option to false and
+        # Another way to deal with that is to tell users to set the auto_sync option to "never" and
         # to sync manually.
         if ANKI_MINOR < 50:
             sleep(3)
