@@ -2,43 +2,29 @@
 
 ## Development
 
-### Creating a development environment
+### Requirements for creating a development environment.
+#### Set up a virtual environment and VSCode
 
-To create a development environment, create a python virtual environment and
-install the dependencies:
+- Create a python virtual environment in your preferred manner.
+- Install the dependencies into that environment: `pip install -r ./requirements/dev.txt`
+- Open VSCode in this repo:  `code .`
+- Open the command palette in VSCode, type `Python: Select interpreter`, and set the Python interpreter to the one in virtual environment you created.
+- Install [`direnv`](https://direnv.net/docs/installation.html).
+- Install the `direnv` extension for VSCode: `code --install-extension Rubymaniac.vscode-direnv` (or from VSCode)
 
-```
-pip install -r ./requirements/dev.txt
-```
+#### Configure environment variables
 
-### Staging server
-
-To point the add-on to the staging server, modify add-on config to `"ankihub_url": "https://staging.ankihub.net"`
-
-### Environment variables
-
-- `ANKIHUB_APP_URL=url`
-
-Overrides `ankihub_url` add-on config.
-
-- `SKIP_INIT=1`
-
-See `./ankihub_addon/ankihub/__init__.py` for what this does.  You need to set this when running tests.
-
-Defining a `.envrc` with [`direnv`](https://direnv.net/) is great for managing env vars. Here is a sample
-`.envrc`:
-
-```
-export ADDONS_DIR=~/Library/Application\ Support/Anki2/addons21/
-export DEVELOPMENT=True
-export ANKIHUB_APP_URL=https://staging.ankihub.net
-export QTWEBENGINE_REMOTE_DEBUGGING=8080
-export ANKIDEV=1
-export LOGTERM=1
-export ANKI_BASE=tests/test_data/Anki2
-export ANKI_PROFILE=dev
-export LOGTERM=1
-```
+- Copy `.envrc.dev` to `.envrc`:  `cp .enrc.dev .envrc`
+- Modify the newly created `.envrc`:
+  - Set `ANKI_EXEC` to the path of your `anki` executable.
+    You can find this by activating your virtual environment and typing `which anki`.
+  - Set `GOOGLE_API_KEY`
+    - Get this value from the `.envrc` in BitWarden (ask if you don't have permission)
+- Change `ANKIHUB_APP_URL` from http://localhost:8000 to https://staging.ankihub.net/, for example, to point the add-on at a different AnkiHub instance.
+  - This environment variable overrides `ankihub_url` in the add-on config.
+- You can change `REPORT_ERRORS` from 0 to 1 if you want to capture Sentry errors.
+- `SKIP_INIT=1` (you don't need to add or change this)
+  - See `./ankihub_addon/ankihub/__init__.py` for what this does.  You need to set this when running tests.
 
 ### Development workflow
 
