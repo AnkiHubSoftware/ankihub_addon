@@ -21,7 +21,6 @@ tasks:
       ANKIHUB_APP_URL: "http://localhost:8000"
       ANKIDEV: 1
       DEVELOPMENT: True
-
     init: |
       pyenv local 3.9.13
       python3 scripts/build.py
@@ -51,7 +50,7 @@ ports:
   - name: AnkiHub
     description: Web app
     port: 8000
-    onOpen: ignore
+    onOpen: open-browser
   - name: postgres
     port: 5432
     onOpen: ignore
