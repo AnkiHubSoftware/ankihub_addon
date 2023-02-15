@@ -17,15 +17,15 @@ tasks:
       docker-compose run --rm django bash
 
   - name: Set up Anki
-    env:
-      ANKIHUB_APP_URL: "http://localhost:8000"
-      ANKIDEV: 1
-      DEVELOPMENT: True
   - init: |
       pyenv local 3.9.13
       python3 scripts/build.py
       mkdir -p /home/gitpod/.local/share/Anki2/addons21/
       ln -sf /workspace/ankihub_addon/ankihub/ /home/gitpod/.local/share/Anki2/addons21/
+    env:
+      ANKIHUB_APP_URL: "http://localhost:8000"
+      ANKIDEV: 1
+      DEVELOPMENT: True
     command: |
       anki
 
