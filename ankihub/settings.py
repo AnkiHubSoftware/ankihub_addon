@@ -207,6 +207,9 @@ class Config:
         self._private_config.ui = ui_config
         self._update_private_config()
 
+    def deck_extension_ids(self) -> List[int]:
+        return list(self._private_config.deck_extensions.keys())
+
     def create_or_update_deck_extension_config(self, extension: DeckExtension) -> None:
         latest_update = (
             extension_config.latest_update

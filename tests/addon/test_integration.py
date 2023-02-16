@@ -335,7 +335,11 @@ def test_suggest_note_update(
         assert exc is not None and exc.response.status_code == 403
 
 
-def test_suggest_new_note(anki_session_with_addon: AnkiSession, requests_mock):
+def test_suggest_new_note(
+    anki_session_with_addon: AnkiSession,
+    requests_mock,
+    disable_image_support_feature_flag,
+):
     from ankihub.ankihub_client import AnkiHubRequestError
     from ankihub.note_conversion import (
         ADDON_INTERNAL_TAGS,
@@ -2282,6 +2286,75 @@ def test_optional_tag_suggestion_dialog(
         }
 
 
+@pytest.mark.qt_no_exception_capture
+def test_reset_optional_tags_action(anki_session_with_addon, qtbot, monkeypatch):
+    from aqt import dialogs
+    from aqt.browser import Browser
+
+    from ankihub import entry_point
+    from ankihub.gui.browser import _on_reset_optional_tags_action
+    from ankihub.note_conversion import TAG_FOR_OPTIONAL_TAGS
+    from ankihub.settings import DeckExtension, config
+
+    entry_point.run()
+
+    with anki_session_with_addon.profile_loaded():
+        mw = anki_session_with_addon.mw
+
+        ah_did = UUID_1
+        anki_did = import_sample_ankihub_deck(mw, ankihub_did=ah_did)
+
+        config.save_subscription(name="Testdeck", ankihub_did=ah_did, anki_did=anki_did)
+
+        config.create_or_update_deck_extension_config(
+            DeckExtension(
+                id=1,
+                ankihub_deck_uuid=ah_did,
+                owner_id=1,
+                name="test99",
+                tag_group_name="test99",
+                description="",
+            )
+        )
+
+        nids = mw.col.find_notes("")
+        nid = nids[0]
+
+        note = mw.col.get_note(nid)
+        note.tags = [f"{TAG_FOR_OPTIONAL_TAGS}::test99::test1"]
+        note.flush()
+
+        # mock the choose_list function to always return the first item
+        choose_list_mock = Mock()
+        choose_list_mock.return_value = 0
+        monkeypatch.setattr("ankihub.gui.browser.choose_list", choose_list_mock)
+
+        # mock the ask_user function to always confirm the reset
+        monkeypatch.setattr(
+            "ankihub.gui.browser.ask_user", lambda *args, **kwargs: True
+        )
+
+        # mock the sync_with_progress function to do nothing
+        sync_with_progress_mock = Mock()
+        monkeypatch.setattr(
+            "ankihub.gui.browser.sync_with_progress", sync_with_progress_mock
+        )
+
+        browser: Browser = dialogs.open("Browser", mw)
+        qtbot.wait(300)
+
+        _on_reset_optional_tags_action(browser)
+        qtbot.wait(300)
+
+        assert choose_list_mock.call_count == 1
+        assert choose_list_mock.call_args.kwargs["choices"] == ["test99 (Testdeck)"]
+
+        note = mw.col.get_note(nid)
+        assert note.tags == []
+
+        assert sync_with_progress_mock.call_count == 1
+
+
 def test_upload_images(
     anki_session_with_addon,
     monkeypatch,
@@ -2371,6 +2444,63 @@ def test_suggest_note_update_with_image(
             )
 
             assert len(suggestion_request_mock.request_history) == 1
+
+            # assert that the image was uploaded
+            assert len(upload_request_mock.request_history) == 1
+            assert upload_request_mock.last_request.text.name == str(
+                file_path_in_col.absolute()
+            )
+
+
+def test_suggest_new_note_with_image(
+    anki_session_with_addon: AnkiSession,
+    requests_mock,
+    monkeypatch,
+    enable_image_support_feature_flag,
+):
+    import tempfile
+
+    from ankihub.settings import API_URL_BASE
+    from ankihub.suggestions import suggest_new_note
+
+    anki_session = anki_session_with_addon
+    with anki_session.profile_loaded():
+        mw = anki_session.mw
+
+        import_sample_ankihub_deck(mw, str(UUID_1))
+        note = mw.col.new_note(mw.col.models.by_name("Basic (Testdeck / user1)"))
+        ankihub_deck_uuid = UUID_1
+
+        requests_mock.post(
+            f"{API_URL_BASE}/decks/{ankihub_deck_uuid}/note-suggestion/",
+            status_code=201,
+        )
+
+        fake_presigned_url = "https://fake_presigned_url.com"
+        monkeypatch.setattr(
+            "ankihub.ankihub_client.AnkiHubClient.get_presigned_url",
+            lambda *args, **kwargs: fake_presigned_url,
+        )
+
+        upload_request_mock = requests_mock.put(
+            fake_presigned_url,
+            json={"success": True},
+        )
+
+        with tempfile.NamedTemporaryFile(suffix=".png") as f:
+            # add file to media folder
+            file_name_in_col = mw.col.media.add_file(f.name)
+            file_path_in_col = Path(mw.col.media.dir()) / file_name_in_col
+
+            # add file reference to a note
+            file_name_in_col = Path(file_path_in_col.name).name
+            note["Front"] = f'<img src="{file_name_in_col}">'
+
+            suggest_new_note(
+                note=note,
+                ankihub_deck_uuid=ankihub_deck_uuid,
+                comment="test",
+            )
 
             # assert that the image was uploaded
             assert len(upload_request_mock.request_history) == 1
