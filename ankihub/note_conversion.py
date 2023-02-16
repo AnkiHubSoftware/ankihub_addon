@@ -32,6 +32,10 @@ def is_optional_tag(tag: str) -> bool:
     return tag.startswith(TAG_FOR_OPTIONAL_TAGS)
 
 
+def is_tag_for_group(tag: str, group_name: str) -> bool:
+    return tag.startswith(f"{TAG_FOR_OPTIONAL_TAGS}::{group_name}::")
+
+
 def get_fields_protected_by_tags(note: Note) -> List[str]:
     if TAG_FOR_PROTECTING_ALL_FIELDS in note.tags:
         return [

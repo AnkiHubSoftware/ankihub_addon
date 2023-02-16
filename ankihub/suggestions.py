@@ -39,13 +39,13 @@ def suggest_note_update(
         change_note_suggestion=suggestion,
         auto_accept=auto_accept,
     )
-
-    upload_images_for_suggestion(suggestion)
+    ah_did = ankihub_db.ankihub_did_for_anki_nid(NoteId(suggestion.anki_nid))
+    upload_images_for_suggestion(suggestion, ah_did)
 
     return True
 
 
-def upload_images_for_suggestion(suggestion: NoteSuggestion) -> None:
+def upload_images_for_suggestion(suggestion: NoteSuggestion, ah_did: uuid.UUID) -> None:
     client = AnkiHubClient()
 
     if not (
@@ -62,7 +62,6 @@ def upload_images_for_suggestion(suggestion: NoteSuggestion) -> None:
 
     # TODO: User user_id instead of username, because username is subject to change
     username = config.user()
-    ah_did = ankihub_db.ankihub_did_for_anki_nid(NoteId(suggestion.anki_nid))
     bucket_path = f"deck_images/{ah_did}/suggestions/{username}"
     client.upload_images(image_paths, bucket_path)
 
@@ -88,8 +87,12 @@ def suggest_new_note(
     note: Note, comment: str, ankihub_deck_uuid: uuid.UUID, auto_accept: bool = False
 ) -> None:
     client = AnkiHubClient()
+    new_note_suggestion_created = new_note_suggestion(note, ankihub_deck_uuid, comment)
     client.create_new_note_suggestion(
-        new_note_suggestion(note, ankihub_deck_uuid, comment), auto_accept=auto_accept
+        new_note_suggestion_created, auto_accept=auto_accept
+    )
+    upload_images_for_suggestion(
+        new_note_suggestion_created, new_note_suggestion_created.ankihub_deck_uuid
     )
 
 
