@@ -191,8 +191,11 @@ class AnkiHubSync:
 
 
 def sync_with_progress(
-    on_done: Optional[Callable[[], None]] = None, parent=None
+    on_done: Optional[Callable[[bool], None]] = None, parent=None
 ) -> None:
+    # If the sync is successful this will show tooltips about the number of notes that were synced.
+    # on_done is called with a boolean indicating if the sync was successful.
+    # If there is an error during the sync it will be raised and on_done will not be called.
 
     sync = AnkiHubSync()
 
@@ -226,7 +229,7 @@ def sync_with_progress(
         mw.reset()
 
         if on_done is not None:
-            on_done()
+            on_done(True)
 
     if config.token():
         mw.taskman.with_progress(
@@ -238,6 +241,8 @@ def sync_with_progress(
         )
     else:
         LOGGER.info("Skipping sync due to no token.")
+        if on_done is not None:
+            on_done(False)
 
 
 def _update_deck_download_progress_cb(notes_count: int, ankihub_did: uuid.UUID):

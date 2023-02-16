@@ -458,7 +458,7 @@ def _on_reset_optional_tags_action(browser: Browser):
     ):
         return
 
-    def _on_remove_tags_for_tag_group_done(future: Future) -> None:
+    def on_remove_tags_for_tag_group_done(future: Future) -> None:
         future.result()
         LOGGER.info(f"Removed optional tags for {tag_group_name_with_deck}")
 
@@ -472,16 +472,26 @@ def _on_reset_optional_tags_action(browser: Browser):
         # not doing this now because it would require code for creating a backup before syncing
         # and for showing a progress dialog and probably other things too
         sync_with_progress(
-            on_done=lambda: tooltip(
-                f"Reset optional tag group {tag_group_name_with_deck} successfully"
-            ),
+            on_done=on_sync_done,
             parent=browser,
         )
+
+    def on_sync_done(success: bool):
+        if success:
+            tooltip(
+                f"Reset optional tag group {tag_group_name_with_deck} successfully.",
+                parent=browser,
+            )
+        else:
+            tooltip(
+                "Syncing with AnkiHub failed.",
+                parent=browser,
+            )
 
     tag_group = extension_config.tag_group_name
     mw.taskman.with_progress(
         task=lambda: _remove_tags_of_tag_group(tag_group),
-        on_done=_on_remove_tags_for_tag_group_done,
+        on_done=on_remove_tags_for_tag_group_done,
         label=f"Removing optional tags for {tag_group_name_with_deck}...",
     )
 
