@@ -182,7 +182,7 @@ def test_create_collaborative_deck_and_upload(
             deck_name = mw.col.decks.name(DeckId(deck_id))
 
             requests_mock.get(
-                f"{API_URL_BASE}/decks/pre-signed-url",
+                f"{API_URL_BASE}/decks/generate-presigned-url",
                 status_code=200,
                 json={"pre_signed_url": "http://fake_url"},
             )

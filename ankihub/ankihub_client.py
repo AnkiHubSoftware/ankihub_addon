@@ -21,7 +21,7 @@ from .lib.mashumaro.mixins.json import DataClassJSONMixin
 LOGGER = logging.getLogger(__name__)
 
 API_URL_BASE = "https://app.ankihub.net/api"
-API_VERSION = 5.0
+API_VERSION = 6.0
 
 DECK_UPDATE_PAGE_SIZE = 2000  # seems to work well in terms of speed
 DECK_EXTENSION_UPDATE_PAGE_SIZE = 2000
@@ -600,7 +600,7 @@ class AnkiHubClient:
         :return:
         """
         method = "GET"
-        endpoint = "/decks/pre-signed-url"
+        endpoint = "/decks/generate-presigned-url"
         data = {"key": key, "type": action}
         response = self._send_request(method, endpoint, params=data)
         if response.status_code != 200:
