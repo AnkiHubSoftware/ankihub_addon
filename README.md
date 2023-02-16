@@ -53,29 +53,6 @@ add-on code, restart the debug session and Anki will use the updated add-on code
   This means that the AnkiHub add-on configuration and Anki's decks, notes, settings etc. will be retained between launches.
 
 
-### Alternative development workflow with automatic reloading when source code is modified (without debugging)
-
-Follow the instructions below for:
-- Automatically restarting Anki when add-on source code is modified
-- To see both add-on and Anki source-code output in the console
-- Start Anki with the data dir specified by the `ANKI_BASE` env var and `ANKI_PROFILE`
-  - This runs Anki in an environment that is completely isolated from the default data directory.
-
-1. Install [watchexec](https://github.com/watchexec/watchexec), e.g.
-
-    ```
-    brew install watchexec
-    ```
-
-2. From the root of the this repo, run `anki` under watchexec:
-
-```bash
-ANKIHUB_APP_URL=http://localhost:8000 \
-    watchexec -r -d 3000 -w ankihub -- \
-    anki -p $ANKI_PROFILE
-```
-
-
 ## Tests and static checks
 
 The entire test suite and static code checks will be run automatically with
