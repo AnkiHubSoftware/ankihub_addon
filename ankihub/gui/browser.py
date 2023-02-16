@@ -39,7 +39,11 @@ from ..db import (
     detach_ankihub_db_from_anki_db_connection,
 )
 from ..importing import get_fields_protected_by_tags
-from ..note_conversion import TAG_FOR_PROTECTING_ALL_FIELDS, TAG_FOR_PROTECTING_FIELDS
+from ..note_conversion import (
+    TAG_FOR_PROTECTING_ALL_FIELDS,
+    TAG_FOR_PROTECTING_FIELDS,
+    is_tag_for_group,
+)
 from ..reset_changes import reset_local_changes_to_notes
 from ..settings import ANKIHUB_NOTE_TYPE_FIELD_NAME, AnkiHubCommands, DeckConfig, config
 from ..subdecks import SUBDECK_TAG, build_subdecks_and_move_cards_to_them
@@ -48,6 +52,7 @@ from ..suggestions import (
     BulkNoteSuggestionsResult,
     suggest_notes_in_bulk,
 )
+from ..sync import sync_with_progress
 from .custom_columns import (
     AnkiHubIdColumn,
     CustomColumn,
@@ -323,6 +328,13 @@ def _on_browser_menus_did_init(browser: Browser):
     )
     menu.addAction(reset_subdecks_action)
 
+    reset_optional_tags_action = QAction("Reset an Optional Tag Group", browser)
+    qconnect(
+        reset_optional_tags_action.triggered,
+        lambda: _on_reset_optional_tags_action(browser),
+    )
+    menu.addAction(reset_optional_tags_action)
+
 
 def _on_reset_deck_action(browser: Browser):
     if not config.deck_ids():
@@ -408,6 +420,78 @@ def _on_reset_subdecks_action(browser: Browser):
         on_done=on_done,
         label="Rebuilding subdecks and moving cards...",
     )
+
+
+def _on_reset_optional_tags_action(browser: Browser):
+    if not (extension_ids := config.deck_extension_ids()):
+        showInfo(
+            "You don't have any AnkiHub optional tag groups configured yet.",
+            parent=browser,
+        )
+        return
+
+    extension_configs = [config.deck_extension_config(eid) for eid in extension_ids]
+    tag_group_names = [c.tag_group_name for c in extension_configs]
+    deck_configs = [config.deck_config(c.ankihub_deck_uuid) for c in extension_configs]
+    tag_group_names_with_deck = [
+        f"{extension_name} ({deck_config.name})"
+        for extension_name, deck_config in zip(tag_group_names, deck_configs)
+    ]
+
+    extension_idx = choose_list(
+        "Choose the optional tag group which<br>" "you want to reset.",
+        choices=tag_group_names_with_deck,
+    )
+    if extension_idx is None:
+        return
+
+    extension_id = extension_ids[extension_idx]
+    extension_config = extension_configs[extension_idx]
+    tag_group_name_with_deck = tag_group_names_with_deck[extension_idx]
+
+    if not ask_user(
+        "Are you sure you want to reset the optional tag group "
+        f"<b>{tag_group_name_with_deck}</b>?<br><br>"
+        "Note: This will sync all AnkiHub decks.",
+        parent=browser,
+        defaultno=True,
+    ):
+        return
+
+    def _on_remove_tags_for_tag_group_done(future: Future) -> None:
+        future.result()
+        LOGGER.info(f"Removed optional tags for {tag_group_name_with_deck}")
+
+        # reset the latest extension update to sync all content for the deck extension on the next sync
+        config.save_latest_extension_update(
+            extension_id=extension_id, latest_update=None
+        )
+
+        # sync with ankihub
+        # TODO only sync the deck extension or the deck instead of all decks
+        # not doing this now because it would require code for creating a backup before syncing
+        # and for showing a progress dialog and probably other things too
+        sync_with_progress(
+            on_done=lambda: tooltip(
+                f"Reset optional tag group {tag_group_name_with_deck} successfully"
+            ),
+            parent=browser,
+        )
+
+    tag_group = extension_config.tag_group_name
+    mw.taskman.with_progress(
+        task=lambda: _remove_tags_of_tag_group(tag_group),
+        on_done=_on_remove_tags_for_tag_group_done,
+        label=f"Removing optional tags for {tag_group_name_with_deck}...",
+    )
+
+
+def _remove_tags_of_tag_group(tag_group_name: str) -> None:
+    tags_for_tag_group = [
+        tag for tag in mw.col.tags.all() if is_tag_for_group(tag, tag_group_name)
+    ]
+    for tag in tags_for_tag_group:
+        mw.col.tags.remove(tag)
 
 
 def _choose_deck(prompt: str) -> Tuple[Optional[uuid.UUID], Optional[DeckConfig]]:
