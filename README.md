@@ -26,6 +26,11 @@
 - `SKIP_INIT=1` (you don't need to add or change this)
   - See `./ankihub_addon/ankihub/__init__.py` for what this does.  You need to set this when running tests.
 
+#### Run the build script
+`python scripts/build.py`
+
+You only have to do this once.
+
 ### Development workflow
 
 Follow the instructions below for:
