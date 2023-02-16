@@ -31,8 +31,14 @@
 
 You only have to do this once.
 
+#### Set up VSCode workspace with Anki source code (optional)
+During development of the add-on it is convenient to be able to navigate and search in Anki's source code in addition to the add-on source code.
+This can be achieved using VSCode workspaces (https://code.visualstudio.com/docs/editor/workspaces).
+- Copy `ankihub.code-workspace.dev` to `ankihub.code-workspace`:  `cp ankihub.code-workspace.dev ankihub.code-workspace`
+- Replace the paths in `ankihub.code-workspace` as described by the comments in the file.
+
 ### Development workflow
-There are two VsCode debug launch configurations (defined in `launch.json`).
+There are two VSCode debug launch configurations (defined in `launch.json`).
 They both set up Anki's base directory on a path you can configure using an environment variable.
 They also create a symlink from the add-on directory to the add-on source - this way you can make changes to the
 add-on code, restart the debug session and Anki will use the updated add-on code.
