@@ -176,7 +176,7 @@ def do_or_setup_ankihub_sync(after_startup_syncs: Callable[[], None]) -> None:
         if config.public_config["auto_sync"] in ["on_ankiweb_sync", "on_startup"]:
             global ATTEMPTED_STARTUP_SYNC
             ATTEMPTED_STARTUP_SYNC = True
-            sync_with_progress(after_startup_syncs)
+            sync_with_progress(on_done=lambda _: after_startup_syncs())
         else:
             after_startup_syncs()
 
@@ -219,7 +219,7 @@ def _new_sync_collection_and_media(
     ) or config.public_config["auto_sync"] == "on_ankiweb_sync":
         LOGGER.info("Syncing with AnkiHub in _new_sync_collection_and_media")
         sync_with_progress(
-            on_done=lambda: after_ankihub_sync(is_startup_sync=is_startup_sync)
+            on_done=lambda _: after_ankihub_sync(is_startup_sync=is_startup_sync)
         )
     else:
         LOGGER.info("Not syncing with AnkiHub in _new_sync_collection_and_media")
