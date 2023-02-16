@@ -147,3 +147,6 @@ ankihub/media_import/*
 
 # media_export
 ankihub/media_export/*
+
+# envrc
+.envrc
