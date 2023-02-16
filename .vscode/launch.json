@@ -2,7 +2,7 @@
     "version": "0.2.0",
     "configurations": [
         {
-            "name": "Run Anki with temporary data directory.",
+            "name": "Run Anki with TEMPORARY_ANKI_BASE.",
             "type": "python",
             "request": "launch",
             "stopOnEntry": false,
