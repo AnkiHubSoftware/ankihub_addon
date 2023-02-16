@@ -34,7 +34,7 @@ You only have to do this once.
 ### Development workflow
 There are two VsCode debug launch configurations (defined in `launch.json`).
 They both set up Anki's base directory on a path you can configure using an environment variable.
-They also create a symlink from the add-on directory to the add-on source - this way you can make changes to the 
+They also create a symlink from the add-on directory to the add-on source - this way you can make changes to the
 add-on code, restart the debug session and Anki will use the updated add-on code.
 
 - Run Anki with TEMPORARY_ANKI_BASE.
