@@ -30,7 +30,6 @@
             "program": "${env:ANKI_EXEC}",
             "cwd": "${workspaceRoot}",
             "preLaunchTask": "Ensure Anki Base",
-            // "envFile": "${workspaceFolder}/.env",
             "args": [
                 "-b",
                 "${env:ANKI_BASE}"
