@@ -150,3 +150,4 @@ ankihub/media_export/*
 
 # envrc
 .envrc
+/ankihub.code-workspace
