@@ -8,7 +8,6 @@
             "stopOnEntry": false,
             "program": "${env:ANKI_EXEC}",
             "cwd": "${workspaceRoot}",
-            "envFile": "${workspaceFolder}/.env",
             "preLaunchTask": "Generate Temporary Anki Base",
             "args": [
                 "-b",
