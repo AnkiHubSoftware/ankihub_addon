@@ -2,65 +2,55 @@
 
 ## Development
 
-### Creating a development environment
+### Requirements for creating a development environment.
+#### Set up a virtual environment and VSCode
 
-To create a development environment, create a python virtual environment and
-install the dependencies:
+- Create a python virtual environment in your preferred manner.
+- Install the dependencies into that environment: `pip install -r ./requirements/dev.txt`
+- Open VSCode in this repo:  `code .`
+- Open the command palette in VSCode, type `Python: Select interpreter`, and set the Python interpreter to the one in virtual environment you created.
+- Install [`direnv`](https://direnv.net/docs/installation.html).
+- Install the `direnv` extension for VSCode: `code --install-extension Rubymaniac.vscode-direnv` (or from VSCode)
 
-```
-pip install -r ./requirements/dev.txt
-```
+#### Configure environment variables
 
-### Staging server
+- Copy `.envrc.dev` to `.envrc`:  `cp .envrc.dev .envrc`
+- Modify the newly created `.envrc`:
+  - Set `ANKI_EXEC` to the path of your `anki` executable.
+    You can find this by activating your virtual environment and typing `which anki`.
+- Set `GOOGLE_API_KEY`
+  - Get this value from the `.envrc` in BitWarden (ask if you don't have permission)
+- Change `ANKIHUB_APP_URL` from http://localhost:8000 to https://staging.ankihub.net/, for example, to point the add-on at a different AnkiHub instance.
+  - This environment variable overrides `ankihub_url` in the add-on config.
+- You can change `REPORT_ERRORS` from 0 to 1 if you want to capture Sentry errors.
+- `SKIP_INIT=1` (you don't need to add or change this)
+  - See `./ankihub_addon/ankihub/__init__.py` for what this does.  You need to set this when running tests.
 
-To point the add-on to the staging server, modify add-on config to `"ankihub_url": "https://staging.ankihub.net"`
+#### Run the build script
+`python scripts/build.py`
 
-### Environment variables
+You only have to do this once.
 
-- `ANKIHUB_APP_URL=url`
-
-Overrides `ankihub_url` add-on config.
-
-- `SKIP_INIT=1`
-
-See `./ankihub_addon/ankihub/__init__.py` for what this does.  You need to set this when running tests.
-
-Defining a `.envrc` with [`direnv`](https://direnv.net/) is great for managing env vars. Here is a sample
-`.envrc`:
-
-```
-export ADDONS_DIR=~/Library/Application\ Support/Anki2/addons21/
-export DEVELOPMENT=True
-export ANKIHUB_APP_URL=https://staging.ankihub.net
-export QTWEBENGINE_REMOTE_DEBUGGING=8080
-export ANKIDEV=1
-export LOGTERM=1
-export ANKI_BASE=tests/test_data/Anki2
-export ANKI_PROFILE=dev
-export LOGTERM=1
-```
+#### Set up VSCode workspace with Anki source code (optional)
+During development of the add-on it is convenient to be able to navigate and search in Anki's source code in addition to the add-on source code.
+This can be achieved using VSCode workspaces (https://code.visualstudio.com/docs/editor/workspaces).
+- Copy `ankihub.code-workspace.dev` to `ankihub.code-workspace`:  `cp ankihub.code-workspace.dev ankihub.code-workspace`
+- Replace the paths in `ankihub.code-workspace` as described by the comments in the file.
 
 ### Development workflow
+There are two VSCode debug launch configurations (defined in `launch.json`).
+They both set up Anki's base directory on a path you can configure using an environment variable.
+They also create a symlink from the add-on directory to the add-on source - this way you can make changes to the
+add-on code, restart the debug session and Anki will use the updated add-on code.
 
-Follow the instructions below for:
-- Automatically restarting Anki when add-on source code is modified
-- To see both add-on and Anki source-code output in the console
-- Start Anki with the data dir specified by the `ANKI_BASE` env var and `ANKI_PROFILE`
-  - This runs Anki in an environment that is completely isolated from the default data directory.
+- Run Anki with TEMPORARY_ANKI_BASE.
 
-1. Install [watchexec](https://github.com/watchexec/watchexec), e.g.
+  This launch configuration sets up a clean Anki base directory in `TEMPORARY_ANKI_BASE` every time it starts.
 
-    ```
-    brew install watchexec
-    ```
+- Run Anki with ANKI_BASE.
 
-2. From the root of the this repo, run `anki` under watchexec:
-
-```bash
-ANKIHUB_APP_URL=http://localhost:8000 \
-    watchexec -r -d 3000 -w ankihub -- \
-    anki -p $ANKI_PROFILE
-```
+  This launch configuration sets up an Anki base directory in `ANKI_BASE` if it doesn't exist yet and re-uses it otherwise.
+  This means that the AnkiHub add-on configuration and Anki's decks, notes, settings etc. will be retained between launches.
 
 
 ## Tests and static checks

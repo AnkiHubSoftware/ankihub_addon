@@ -1,0 +1,22 @@
+{
+    "folders": [
+        {
+            "path": "<path to this repo>"
+        },
+        {
+            // Change this to <path to your python installation>/site-packages/anki
+            "path": "<path to anki package in site-packages of your python installation>"
+        },
+        {
+            // Change this to <path to your python installation>/site-packages/aqt
+            "path": "<path to aqt package in site-packages of your python installation>"
+        }
+    ],
+    "settings": {
+        "search.exclude": {
+            "**/media_import": true,
+            "**/media_export": true,
+            "dist": true
+        }
+    }
+}
