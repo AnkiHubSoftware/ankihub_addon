@@ -139,8 +139,11 @@ def with_delay_when_progress_dialog_is_open(*args, **kwargs) -> Any:
         timer.deleteLater()
 
     # mw.progress.timer is there for creating "Custom timers which avoid firing while a progress dialog is active".
+    # It's better to use a large delay value because there is a 0.5 second time window in which
+    # the func can be called even if the progress dialog is not closed yet.
+    # See https://github.com/ankitects/anki/blob/d9f1e2264804481a2549b23dbc8a530857ad57fc/qt/aqt/progress.py#L261-L277
     timer = mw.progress.timer(
-        ms=500,
+        ms=2000,
         func=wrapper,
         repeat=False,
         requiresCollection=True,
