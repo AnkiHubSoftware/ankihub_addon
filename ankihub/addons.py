@@ -142,6 +142,7 @@ def with_delay_when_progress_dialog_is_open(*args, **kwargs) -> Any:
     del kwargs["_old"]
 
     def wrapper():
+        LOGGER.info("Calling with_delay_when_progress_dialog_is_open._old")
         _old(*args, **kwargs)
 
         # the documentation of mw.progress.timer says that the timer has to be deleted to
