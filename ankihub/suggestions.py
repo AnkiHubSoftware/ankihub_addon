@@ -2,7 +2,7 @@ import re
 import uuid
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, List, Optional, Tuple
 
 from anki.notes import Note, NoteId
 from aqt import mw
@@ -10,7 +10,9 @@ from aqt import mw
 from .addon_ankihub_client import AddonAnkiHubClient as AnkiHubClient
 from .ankihub_client import (
     ChangeNoteSuggestion,
+    Field,
     NewNoteSuggestion,
+    NoteInfo,
     NoteSuggestion,
     SuggestionType,
 )
@@ -194,20 +196,52 @@ def suggest_notes_in_bulk(
 def change_note_suggestion(
     note: Note, change_type: SuggestionType, comment: str
 ) -> Optional[ChangeNoteSuggestion]:
-    note_data = to_note_data(note, diff=True)
-    assert note_data.ankihub_note_uuid is not None
+    note_from_anki_db = to_note_data(note)
+    assert isinstance(note_from_anki_db, NoteInfo)
+    assert note_from_anki_db.ankihub_note_uuid is not None
+    assert note_from_anki_db.tags is not None
 
-    if not note_data.fields and note_data.tags is None:
+    note_from_ah_db = ankihub_db.note_data(note.id)
+
+    added_tags, removed_tags = _added_and_removed_tags(
+        prev_tags=note_from_ah_db.tags, cur_tags=note_from_anki_db.tags
+    )
+
+    fields_that_changed = _fields_that_changed(
+        prev_fields=note_from_ah_db.fields, cur_fields=note_from_anki_db.fields
+    )
+
+    if not added_tags and not removed_tags and not fields_that_changed:
         return None
 
     return ChangeNoteSuggestion(
-        ankihub_note_uuid=note_data.ankihub_note_uuid,
+        ankihub_note_uuid=note_from_anki_db.ankihub_note_uuid,
         anki_nid=note.id,
-        fields=note_data.fields,
-        tags=note_data.tags,
+        fields=fields_that_changed,
+        added_tags=added_tags,
+        removed_tags=removed_tags,
         change_type=change_type,
         comment=comment,
     )
+
+
+def _added_and_removed_tags(
+    prev_tags: List[str], cur_tags: List[str]
+) -> Tuple[List[str], List[str]]:
+    added_tags = [tag for tag in cur_tags if tag not in prev_tags]
+    removed_tags = [tag for tag in prev_tags if tag not in cur_tags]
+    return added_tags, removed_tags
+
+
+def _fields_that_changed(
+    prev_fields: List[Field], cur_fields: List[Field]
+) -> List[Field]:
+    result = [
+        cur_field
+        for cur_field, prev_field in zip(cur_fields, prev_fields)
+        if cur_field.value != prev_field.value
+    ]
+    return result
 
 
 def new_note_suggestion(

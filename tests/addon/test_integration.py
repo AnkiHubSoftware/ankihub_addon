@@ -105,7 +105,7 @@ def test_editor(
         _refresh_buttons(editor)
         assert editor.ankihub_command == AnkiHubCommands.CHANGE.value
 
-        # this should trigger a suggestion because the note has not been changed
+        # this should not trigger a suggestion because the note has not been changed
         _on_suggestion_button_press(editor)
         assert requests_mock.call_count == 0
 
@@ -273,66 +273,72 @@ def test_get_deck_by_id(anki_session_with_addon: AnkiSession, requests_mock):
 
 def test_suggest_note_update(
     anki_session_with_addon: AnkiSession,
-    requests_mock,
+    monkeypatch,
     disable_image_support_feature_flag,
 ):
-    from ankihub.ankihub_client import AnkiHubRequestError, NoteInfo, SuggestionType
+    from ankihub.ankihub_client import ChangeNoteSuggestion, Field, SuggestionType
+    from ankihub.db import ankihub_db
+    from ankihub.exporting import to_note_data
     from ankihub.note_conversion import (
         ADDON_INTERNAL_TAGS,
         ANKI_INTERNAL_TAGS,
         TAG_FOR_OPTIONAL_TAGS,
     )
-    from ankihub.settings import API_URL_BASE
     from ankihub.suggestions import suggest_note_update
 
     anki_session = anki_session_with_addon
     with anki_session.profile_loaded():
         mw = anki_session.mw
 
-        import_sample_ankihub_deck(mw, str(UUID_1))
-        notes_data: NoteInfo = ankihub_sample_deck_notes_data()
-        note = mw.col.get_note(notes_data[0].anki_nid)
-        ankihub_note_uuid = notes_data[0].ankihub_note_uuid
-
-        # test create change note suggestion
-        adapter = requests_mock.post(
-            f"{API_URL_BASE}/notes/{ankihub_note_uuid}/suggestion/", status_code=201
+        # create a new note and add it to the ankihub db
+        ankihub_did = UUID_1
+        ah_basic = create_ankihub_version_of_note_type(
+            mw=mw, note_type=mw.col.models.by_name("Basic")
         )
+        note = mw.col.new_note(ah_basic)
+        note["Front"] = "front"
+        note.tags = ["will_be_removed"]
+        ankihub_db.save_notes_data_and_mod_values(
+            ankihub_did=ankihub_did, notes_data=[to_note_data(note, set_new_id=True)]
+        )
+
+        # make changes to the note
+        note["Front"] = "updated"
 
         note.tags = [
             "a",
+            # internal and optional tags should be removed
             *ADDON_INTERNAL_TAGS,
             *ANKI_INTERNAL_TAGS,
             f"{TAG_FOR_OPTIONAL_TAGS}::TAG_GROUP::OptionalTag",
         ]
+
+        # suggest the changes
+        create_change_note_suggestion_mock = MagicMock()
+        monkeypatch.setattr(
+            "ankihub.ankihub_client.AnkiHubClient.create_change_note_suggestion",
+            create_change_note_suggestion_mock,
+        )
+
         suggest_note_update(
             note=note,
             change_type=SuggestionType.NEW_CONTENT,
             comment="test",
         )
 
-        # ... assert that internal and optional tags were filtered out
-        suggestion_data = adapter.last_request.json()
-        assert set(suggestion_data["tags"]) == set(
-            [
-                "a",
-            ]
-        )
-
-        # test create change note suggestion unauthenticated
-        requests_mock.post(
-            f"{API_URL_BASE}/notes/{ankihub_note_uuid}/suggestion/", status_code=403
-        )
-
-        try:
-            suggest_note_update(
-                note=note,
+        # check that the correct suggestion was created
+        create_change_note_suggestion_mock.assert_called_once_with(
+            change_note_suggestion=ChangeNoteSuggestion(
+                anki_nid=note.id,
+                ankihub_note_uuid=ankihub_db.ankihub_nid_for_anki_nid(note.id),
                 change_type=SuggestionType.NEW_CONTENT,
+                fields=[Field(name="Front", value="updated", order=0)],
+                added_tags=["a"],
+                removed_tags=["will_be_removed"],
                 comment="test",
-            )
-        except AnkiHubRequestError as e:
-            exc = e
-        assert exc is not None and exc.response.status_code == 403
+            ),
+            auto_accept=False,
+        )
 
 
 def test_suggest_new_note(
@@ -432,6 +438,7 @@ def test_suggest_notes_in_bulk(anki_session_with_addon: AnkiSession, monkeypatch
         CHANGED_NOTE_ID = 1608240057545
         changed_note = mw.col.get_note(CHANGED_NOTE_ID)
         changed_note["Front"] = "changed front"
+        changed_note.tags += ["a"]
         changed_note.flush()
 
         # suggest two notes, one new and one updated, check if the client method was called with the correct arguments
@@ -463,7 +470,8 @@ def test_suggest_notes_in_bulk(anki_session_with_addon: AnkiSession, monkeypatch
                             value="changed front",
                         ),
                     ],
-                    tags=None,
+                    added_tags=["a"],
+                    removed_tags=[],
                     comment="test",
                     change_type=SuggestionType.NEW_CONTENT,
                 ),

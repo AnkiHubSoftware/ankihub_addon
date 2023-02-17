@@ -154,12 +154,13 @@ class NoteSuggestion(DataClassJSONMixinWithConfig, ABC):
         )
     )
     fields: List[Field]
-    tags: Optional[List[str]]  # None means no tag changes
     comment: str
 
 
 @dataclass
 class ChangeNoteSuggestion(NoteSuggestion):
+    added_tags: List[str]
+    removed_tags: List[str]
     change_type: SuggestionType = dataclasses.field(
         metadata=field_options(
             serialize=lambda x: x.value[0],
@@ -191,6 +192,7 @@ class NewNoteSuggestion(NoteSuggestion):
             alias="note_type_id",
         )
     )
+    tags: Optional[List[str]]  # None means no tag changes
     guid: str
 
 
