@@ -17,7 +17,6 @@
             ],
             "purpose": [
                 // with this setting tests will use justMyCode=false in debug mode
-                "debug-test",
                 "debug-in-terminal",
             ],
             "justMyCode": false,
@@ -35,8 +34,19 @@
                 "${env:ANKI_BASE}"
             ],
             "purpose": [
-                "debug-test",
                 "debug-in-terminal",
+            ],
+            "justMyCode": false,
+        },
+        {
+            "name": "Tests",
+            "type": "python",
+            "request": "launch",
+            "stopOnEntry": false,
+            "program": "${env:ANKI_EXEC}",
+            "cwd": "${workspaceRoot}",
+            "purpose": [
+                "debug-test"
             ],
             "justMyCode": false,
         },
