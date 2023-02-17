@@ -23,7 +23,7 @@ def test_lowest_level_common_ancestor_deck_name(anki_session_with_addon: AnkiSes
 
 def test_updated_tags(anki_session_with_addon: AnkiSession):
     from ankihub.importing import updated_tags
-    from ankihub.note_conversion import ADDON_INTERNAL_TAGS
+    from ankihub.note_conversion import ADDON_INTERNAL_TAGS, TAG_FOR_OPTIONAL_TAGS
 
     assert set(
         updated_tags(
@@ -85,6 +85,16 @@ def test_updated_tags(anki_session_with_addon: AnkiSession):
         )
     ) == set(["marked", "leech"])
 
+    # keep optional tags
+    optional_tag = f"{TAG_FOR_OPTIONAL_TAGS}::tag_group::tag"
+    assert set(
+        updated_tags(
+            cur_tags=[optional_tag],
+            incoming_tags=[],
+            protected_tags=[],
+        )
+    ) == set([optional_tag])
+
 
 def test_normalize_url(anki_session_with_addon: AnkiSession):
     from ankihub.error_reporting import normalize_url
@@ -121,10 +131,7 @@ def test_remove_note_type_name_modifications(anki_session_with_addon: AnkiSessio
 
 
 def test_add_subdeck_tags_to_notes(anki_session_with_addon: AnkiSession):
-    from ankihub.subdecks import (
-        SUBDECK_TAG,
-        add_subdeck_tags_to_notes,
-    )
+    from ankihub.subdecks import SUBDECK_TAG, add_subdeck_tags_to_notes
 
     with anki_session_with_addon.profile_loaded():
         mw = anki_session_with_addon.mw
@@ -158,10 +165,7 @@ def test_add_subdeck_tags_to_notes(anki_session_with_addon: AnkiSession):
 def test_add_subdeck_tags_to_notes_with_spaces_in_deck_name(
     anki_session_with_addon: AnkiSession,
 ):
-    from ankihub.subdecks import (
-        SUBDECK_TAG,
-        add_subdeck_tags_to_notes,
-    )
+    from ankihub.subdecks import SUBDECK_TAG, add_subdeck_tags_to_notes
 
     with anki_session_with_addon.profile_loaded():
         mw = anki_session_with_addon.mw

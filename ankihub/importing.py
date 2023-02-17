@@ -23,6 +23,7 @@ from .note_conversion import (
     TAG_FOR_PROTECTING_ALL_FIELDS,
     get_fields_protected_by_tags,
     is_internal_tag,
+    is_optional_tag,
 )
 from .settings import config
 from .utils import (
@@ -437,7 +438,10 @@ def updated_tags(
     # keep addon internal tags
     internal = [tag for tag in cur_tags if is_internal_tag(tag)]
 
-    result = list(set(protected) | set(internal) | set(incoming_tags))
+    # keep optional tags
+    optional = [tag for tag in cur_tags if is_optional_tag(tag)]
+
+    result = list(set(protected) | set(internal) | set(optional) | set(incoming_tags))
     return result
 
 
