@@ -44,16 +44,17 @@ def detach_ankihub_db(*args: Any, **kwargs: Any) -> None:
     detach_ankihub_db_from_anki_db_connection()
 
 
-def on_deleteAddon(self: AddonManager, module: str) -> None:
-    # without this Anki is not able to delete all contents of the media_import libs folder
-    # on Windows
+def maybe_change_file_permissions_of_addon_files(module: str) -> None:
     ankihub_module = mw.addonManager.addonFromModule(__name__)
     if module != ankihub_module:
+        LOGGER.info(
+            f"Did not change file permissions because {module} is not {ankihub_module}"
+        )
         return
 
-    addon_dir = Path(self.addonsFolder(module))
+    addon_dir = Path(mw.addonManager.addonsFolder(ankihub_module))
     for file in addon_dir.rglob("*"):
-        os.chmod(file, 0o777)
+        os.chmod(file, 0o666)
     LOGGER.info(f"On deleteAddon changed file permissions for all files in {addon_dir}")
 
 
@@ -91,12 +92,21 @@ def setup_addons():
         pos="before",
     )
 
+    AddonManager._install = wrap(  # type: ignore
+        old=AddonManager._install,
+        new=lambda self, module, zfile: maybe_change_file_permissions_of_addon_files(
+            module
+        ),
+        pos="before",
+    )
+
     # prevent errors when deleting the add-on (AddonManager.deleteAddon also gets called during an update)
     AddonManager.deleteAddon = wrap(  # type: ignore
         old=AddonManager.deleteAddon,
-        new=on_deleteAddon,
+        new=lambda self, module: maybe_change_file_permissions_of_addon_files(module),
         pos="before",
     )
+
     AddonManager.deleteAddon = wrap(  # type: ignore
         old=AddonManager.deleteAddon,
         new=with_disabled_log_file_handler,
@@ -132,6 +142,7 @@ def with_delay_when_progress_dialog_is_open(*args, **kwargs) -> Any:
     del kwargs["_old"]
 
     def wrapper():
+        LOGGER.info("Calling with_delay_when_progress_dialog_is_open._old")
         _old(*args, **kwargs)
 
         # the documentation of mw.progress.timer says that the timer has to be deleted to
@@ -139,8 +150,11 @@ def with_delay_when_progress_dialog_is_open(*args, **kwargs) -> Any:
         timer.deleteLater()
 
     # mw.progress.timer is there for creating "Custom timers which avoid firing while a progress dialog is active".
+    # It's better to use a large delay value because there is a 0.5 second time window in which
+    # the func can be called even if the progress dialog is not closed yet.
+    # See https://github.com/ankitects/anki/blob/d9f1e2264804481a2549b23dbc8a530857ad57fc/qt/aqt/progress.py#L261-L277
     timer = mw.progress.timer(
-        ms=500,
+        ms=2000,
         func=wrapper,
         repeat=False,
         requiresCollection=True,

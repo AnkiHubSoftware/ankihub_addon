@@ -22,7 +22,7 @@ class AnkiHubSync:
         self.importer = AnkiHubImporter()
 
     def sync_all_decks(self) -> None:
-        LOGGER.info("Trying to sync with AnkiHub.")
+        LOGGER.info("Syncing all decks...")
 
         create_backup()
 
@@ -197,6 +197,7 @@ def sync_with_progress(
     # on_done is called with a boolean indicating if the sync was successful.
     # If there is an error during the sync it will be raised and on_done will not be called.
 
+    LOGGER.info("Starting sync.")
     sync = AnkiHubSync()
 
     def sync_with_ankihub_after_delay():
@@ -212,6 +213,7 @@ def sync_with_progress(
             sleep(3)
 
         sync.sync_all_decks()
+        LOGGER.info("Sync finished.")
 
     def on_syncing_done(future: Future):
         if exc := future.exception():

@@ -4,6 +4,8 @@ from anki.hooks import wrap
 from aqt import sip
 from aqt.progress import ProgressManager
 
+from . import LOGGER
+
 
 def with_patched_isdeleted(
     self: ProgressManager, _old: Callable[[ProgressManager], None]
@@ -12,6 +14,7 @@ def with_patched_isdeleted(
 
     def patched_isdeleted(x: Optional[sip.simplewrapper]) -> bool:
         if x is None:
+            LOGGER.warning("sip.isdeleted was called with None")
             return True
 
         return original_is_deleted(x)
