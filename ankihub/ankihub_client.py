@@ -21,7 +21,7 @@ from .lib.mashumaro.mixins.json import DataClassJSONMixin
 LOGGER = logging.getLogger(__name__)
 
 API_URL_BASE = "https://app.ankihub.net/api"
-API_VERSION = 6.0
+API_VERSION = 7.0
 
 DECK_UPDATE_PAGE_SIZE = 2000  # seems to work well in terms of speed
 DECK_EXTENSION_UPDATE_PAGE_SIZE = 2000
