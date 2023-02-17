@@ -93,6 +93,9 @@ def general_setup():
     """Set up things that don't depend on the profile and should only be run once, even if the
     profile changes."""
 
+    setup_error_handler()
+    LOGGER.info("Set up error handler.")
+
     LOGGER.info(f"{ANKI_VERSION=}")
 
     mw.addonManager.setWebExports(__name__, r"gui/web/.*")
@@ -111,9 +114,6 @@ def general_setup():
 
     browser.setup()
     LOGGER.info("Set up browser.")
-
-    setup_error_handler()
-    LOGGER.info("Set up error handler.")
 
     setup_progress_manager()
     LOGGER.info("Set up progress manager.")
