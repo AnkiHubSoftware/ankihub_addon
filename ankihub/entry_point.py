@@ -97,6 +97,9 @@ def general_setup():
 
     mw.addonManager.setWebExports(__name__, r"gui/web/.*")
 
+    setup_addons()
+    LOGGER.info("Set up addons.")
+
     do_or_setup_ankihub_sync(after_startup_syncs=on_startup_syncs_done)
     LOGGER.info("Registered on_after_ankiweb_sync")
 
@@ -108,9 +111,6 @@ def general_setup():
 
     browser.setup()
     LOGGER.info("Set up browser.")
-
-    setup_addons()
-    LOGGER.info("Set up addons.")
 
     setup_error_handler()
     LOGGER.info("Set up error handler.")
