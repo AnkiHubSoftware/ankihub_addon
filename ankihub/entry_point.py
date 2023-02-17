@@ -103,9 +103,6 @@ def general_setup():
     setup_addons()
     LOGGER.info("Set up addons.")
 
-    do_or_setup_ankihub_sync(after_startup_syncs=on_startup_syncs_done)
-    LOGGER.info("Registered on_after_ankiweb_sync")
-
     setup_ankihub_menu()
     LOGGER.info("Set up AnkiHub menu.")
 
@@ -128,13 +125,16 @@ def general_setup():
     profile_will_close.append(on_profile_will_close)
     LOGGER.debug("Set up profile_will_close hook.")
 
+    setup_ankihub_sync_and_maybe_sync(after_startup_syncs=on_startup_syncs_done)
+    LOGGER.info("Called setup_ankihub_sync_and_maybe_sync.")
+
 
 def on_startup_syncs_done() -> None:
     # Called after AnkiWeb sync and AnkiHub sync are done after starting Anki.
     check_ankihub_db(on_success=check_anki_db)
 
 
-def do_or_setup_ankihub_sync(after_startup_syncs: Callable[[], None]) -> None:
+def setup_ankihub_sync_and_maybe_sync(after_startup_syncs: Callable[[], None]) -> None:
     """
     If the auto_sync config option is set to "never", this only calls after_startup_syncs.
     If the user has the "auto_sync" config option set to "on_ankiweb_sync" or "on_startup",
