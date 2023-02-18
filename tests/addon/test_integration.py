@@ -16,6 +16,7 @@ from anki.decks import DeckId
 from anki.models import NotetypeDict, NotetypeId
 from anki.notes import Note, NoteId
 from aqt.importing import AnkiPackageImporter
+from aqt.main import AnkiQt
 from aqt.qt import Qt
 from pytest_anki import AnkiSession
 from pytestqt.qtbot import QtBot
@@ -2299,8 +2300,9 @@ def test_reset_optional_tags_action(anki_session_with_addon, qtbot, monkeypatch)
     entry_point.run()
 
     with anki_session_with_addon.profile_loaded():
-        mw = anki_session_with_addon.mw
+        mw: AnkiQt = anki_session_with_addon.mw
 
+        # setup the deck, subscription and deck extension
         ah_did = UUID_1
         anki_did = import_sample_ankihub_deck(mw, ankihub_did=ah_did)
 
@@ -2317,12 +2319,18 @@ def test_reset_optional_tags_action(anki_session_with_addon, qtbot, monkeypatch)
             )
         )
 
+        # add a note with an optional tag that should be reset
         nids = mw.col.find_notes("")
         nid = nids[0]
 
         note = mw.col.get_note(nid)
         note.tags = [f"{TAG_FOR_OPTIONAL_TAGS}::test99::test1"]
         note.flush()
+
+        # create other note that should not be affected by the reset
+        other_note = mw.col.new_note(mw.col.models.by_name("Basic"))
+        other_note.tags = [f"{TAG_FOR_OPTIONAL_TAGS}::test99::test2"]
+        mw.col.add_note(other_note, 1)
 
         # mock the choose_list function to always return the first item
         choose_list_mock = Mock()
@@ -2340,19 +2348,27 @@ def test_reset_optional_tags_action(anki_session_with_addon, qtbot, monkeypatch)
             "ankihub.gui.browser.sync_with_progress", sync_with_progress_mock
         )
 
+        # run the reset action
         browser: Browser = dialogs.open("Browser", mw)
         qtbot.wait(300)
 
         _on_reset_optional_tags_action(browser)
         qtbot.wait(300)
 
+        # assert that the ui behaved as expected
         assert choose_list_mock.call_count == 1
         assert choose_list_mock.call_args.kwargs["choices"] == ["test99 (Testdeck)"]
 
+        # assert that the note was reset
         note = mw.col.get_note(nid)
         assert note.tags == []
 
         assert sync_with_progress_mock.call_count == 1
+
+        # the other note should not be affected, because it is in a different deck
+        assert mw.col.get_note(other_note.id).tags == [
+            f"{TAG_FOR_OPTIONAL_TAGS}::test99::test2"
+        ]
 
 
 def test_upload_images(
