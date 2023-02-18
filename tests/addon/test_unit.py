@@ -1,4 +1,38 @@
+import uuid
+from typing import Callable
+
+import factory
+from pytest import fixture
 from pytest_anki import AnkiSession
+
+from ankihub.ankihub_client import Field, NoteInfo
+
+
+def _deterministic_uuid(x: int) -> uuid.UUID:
+    """Return a simple UUID with the given number in all places."""
+    return uuid.UUID("11111111-1111-1111-1111-111111111111".replace("1", str(x)))
+
+
+@fixture
+def next_deterministic_uuid() -> Callable[[], uuid.UUID]:
+    def get_next():
+        get_next.i += 1
+        return _deterministic_uuid(get_next.i)
+
+    get_next.i = 0
+    return get_next
+
+
+class NoteInfoFactory(factory.Factory):
+    class Meta:
+        model = NoteInfo
+
+    ankihub_note_uuid = _deterministic_uuid(1)
+    anki_nid = 1
+    mid = 1
+    fields = [Field(name="Front", value="front", order=0)]
+    tags = []
+    guid = "11111"
 
 
 def test_lowest_level_common_ancestor_deck_name(anki_session_with_addon: AnkiSession):
@@ -194,3 +228,54 @@ def test_add_subdeck_tags_to_notes_with_spaces_in_deck_name(
 
         note3.load()
         assert note3.tags == [f"{SUBDECK_TAG}::AA::b_b::c_c"]
+
+
+class TestAnkiNidConflicts:
+    def test_conflict_between_two_decks(
+        self,
+        anki_session_with_addon: AnkiSession,
+        next_deterministic_uuid: Callable[[], uuid.UUID],
+    ):
+        from ankihub.db import ankihub_db
+
+        with anki_session_with_addon.profile_loaded():
+            # save two notes for one deck
+            ah_did_1 = next_deterministic_uuid()
+            note_info_1 = NoteInfoFactory(
+                ankihub_note_uuid=next_deterministic_uuid(), anki_nid=1
+            )
+            note_info_2 = NoteInfoFactory(
+                ankihub_note_uuid=next_deterministic_uuid(), anki_nid=2
+            )
+            ankihub_db.save_notes_data_and_mod_values(
+                ankihub_did=ah_did_1, notes_data=[note_info_1, note_info_2]
+            )
+
+            # save one note for another deck with the same nid as the first note in the first deck
+            ah_did_2 = next_deterministic_uuid()
+            note_info_3 = NoteInfoFactory(
+                ankihub_note_uuid=next_deterministic_uuid(), anki_nid=1
+            )
+
+            ankihub_db.save_notes_data_and_mod_values(
+                ankihub_did=ah_did_2, notes_data=[note_info_3]
+            )
+
+            # check that the two decks are detected as conflicting
+            assert ankihub_db.conflicting_decks(ah_did_1) == [ah_did_2]
+            assert ankihub_db.conflicting_decks(ah_did_2) == [ah_did_1]
+
+            # check that the first note in the first deck is detected as conflicting
+            (
+                conflicting_ah_did,
+                conflicting_anki_nids,
+            ) = ankihub_db.next_conflict(ah_did_1)
+            assert conflicting_ah_did == ah_did_2
+            assert conflicting_anki_nids == [1]
+
+            (
+                conflicting_ah_did,
+                conflicting_anki_nids,
+            ) = ankihub_db.next_conflict(ah_did_2)
+            assert conflicting_ah_did == ah_did_1
+            assert conflicting_anki_nids == [1]

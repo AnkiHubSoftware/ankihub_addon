@@ -129,6 +129,13 @@ class AnkiHubDB:
                 f"AnkiHub DB migrated to schema version {self.schema_version()}"
             )
 
+        if self.schema_version() <= 5:
+            self.execute("ALTER TABLE notes ADD COLUMN active INTEGER DEFAULT 1")
+            self.execute("PRAGMA user_version = 6;")
+            LOGGER.info(
+                f"AnkiHub DB migrated to schema version {self.schema_version()}"
+            )
+
     def execute(self, sql: str, *args, first_row_only=False) -> List:
         conn = sqlite3.connect(self.database_path)
         c = conn.cursor()
@@ -228,6 +235,81 @@ class AnkiHubDB:
                 nid,
             )
 
+    def conflicting_decks(self, ankihub_did: uuid.UUID) -> List[uuid.UUID]:
+        """Returns a list of AnkiHub deck IDs that have notes that conflict with the notes in the given AnkiHub deck.
+        A conflict occurs when a note in one deck has the same Anki note ID as a note in another deck and
+        both notes are active.
+        """
+        conflicting_ah_did_strs = self.list(
+            f"""
+            SELECT ankihub_deck_id FROM notes
+            WHERE anki_note_id IN (
+                SELECT anki_note_id FROM notes
+                WHERE ankihub_deck_id = '{ankihub_did}'
+                AND active = 1
+            )
+            AND ankihub_deck_id != '{ankihub_did}'
+            AND active = 1
+            """
+        )
+        return [uuid.UUID(ah_did_str) for ah_did_str in conflicting_ah_did_strs]
+
+    def next_conflict(
+        self, ankihub_did: uuid.UUID
+    ) -> Optional[Tuple[uuid.UUID, List[NoteId]]]:
+        """Returns the next Anki note ID conflict in the AnkiHub DB between the notes in the given AnkiHub deck
+        and the notes in other AnkiHub decks.
+        If there are no conflicts, returns None.
+        The return value is a tuple of the AnkiHub deck ID and a list of Anki note IDs.
+        A note ID conflict occurs when an Anki note ID is used in more than one deck and
+        the notes are active in both decks.
+        This method can be used to find Anki note ID conflicts in the AnkiHub DB and solve them one by one.
+        """
+        conflicting_ah_did_str = self.scalar(
+            f"""
+            SELECT ankihub_deck_id FROM notes
+            WHERE anki_note_id IN (
+                SELECT anki_note_id FROM notes
+                WHERE ankihub_deck_id = '{ankihub_did}'
+                AND active = 1
+            )
+            AND ankihub_deck_id != '{ankihub_did}'
+            AND active = 1
+            """
+        )
+        if conflicting_ah_did_str is None:
+            return None
+
+        conflicting_anki_nids = self.list(
+            f"""
+            SELECT anki_note_id FROM notes
+            WHERE anki_note_id IN (
+                SELECT anki_note_id FROM notes
+                WHERE ankihub_deck_id = '{ankihub_did}'
+                AND active = 1
+            )
+            AND ankihub_deck_id = '{conflicting_ah_did_str}'
+            AND active = 1
+            """
+        )
+        assert conflicting_anki_nids
+
+        return uuid.UUID(conflicting_ah_did_str), conflicting_anki_nids
+
+    def deactivate_notes(self, ankihub_nids: List[uuid.UUID]) -> None:
+        self.execute(
+            f"""
+            UPDATE notes SET active = 0 WHERE ankihub_note_id IN {ids2str(ankihub_nids)}
+            """
+        )
+
+    def activate_all_notes_in_deck(self, ankihub_did: uuid.UUID) -> None:
+        self.execute(
+            f"""
+            UPDATE notes SET active = 1 WHERE ankihub_deck_id = '{ankihub_did}'
+            """
+        )
+
     def note_data(self, anki_note_id: NoteId) -> Optional[NoteInfo]:
         # The AnkiHub note type of the note has to exist in the Anki DB, otherwise this will fail.
         result = self.first(
@@ -241,7 +323,7 @@ class AnkiHubDB:
                 guid,
                 last_update_type
             FROM notes
-            WHERE anki_note_id = {anki_note_id}
+            WHERE anki_note_id = {anki_note_id} AND active = 1
             """,
         )
         if result is None:
@@ -273,7 +355,9 @@ class AnkiHubDB:
     def anki_nids_for_ankihub_deck(self, ankihub_did: uuid.UUID) -> List[NoteId]:
         result = self.list(
             """
-            SELECT anki_note_id FROM notes WHERE ankihub_deck_id = ?
+            SELECT anki_note_id FROM notes
+            WHERE ankihub_deck_id = ?
+            AND active = 1
             """,
             str(ankihub_did),
         )
@@ -304,7 +388,9 @@ class AnkiHubDB:
     def ankihub_did_for_anki_nid(self, anki_nid: NoteId) -> Optional[uuid.UUID]:
         did_str = self.scalar(
             f"""
-            SELECT ankihub_deck_id FROM notes WHERE anki_note_id = {anki_nid}
+            SELECT ankihub_deck_id FROM notes
+            WHERE anki_note_id = {anki_nid}
+            AND active = 1
             """
         )
         result = uuid.UUID(did_str)
@@ -315,7 +401,9 @@ class AnkiHubDB:
     ) -> List[uuid.UUID]:
         did_strs = self.list(
             f"""
-            SELECT DISTINCT ankihub_deck_id FROM notes WHERE anki_note_id IN {ids2str(anki_nids)}
+            SELECT DISTINCT ankihub_deck_id FROM notes
+            WHERE anki_note_id IN {ids2str(anki_nids)}
+            AND active = 1
             """
         )
         result = [uuid.UUID(did) for did in did_strs]
@@ -324,7 +412,7 @@ class AnkiHubDB:
     def are_ankihub_notes(self, anki_nids: List[NoteId]) -> bool:
         notes_count = self.scalar(
             f"""
-            SELECT COUNT(*) FROM notes WHERE anki_note_id IN {ids2str(anki_nids)}
+            SELECT COUNT(*) FROM notes WHERE anki_note_id IN {ids2str(anki_nids)} AND active = 1
             """
         )
         return notes_count == len(set(anki_nids))
@@ -332,7 +420,9 @@ class AnkiHubDB:
     def ankihub_nid_for_anki_nid(self, anki_note_id: NoteId) -> Optional[uuid.UUID]:
         nid_str = self.scalar(
             """
-            SELECT ankihub_note_id FROM notes WHERE anki_note_id = ?
+            SELECT ankihub_note_id FROM notes
+            WHERE anki_note_id = ?
+            AND active = 1
             """,
             anki_note_id,
         )

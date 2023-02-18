@@ -9,8 +9,9 @@ from abc import ABC
 from dataclasses import dataclass
 from datetime import datetime
 from enum import Enum
-from typing import Any, Callable, Dict, Iterator, List, Optional, Sequence, TypedDict
 from pathlib import Path
+from typing import Any, Callable, Dict, Iterator, List, Optional, Sequence, TypedDict
+
 import requests
 from requests import PreparedRequest, Request, Response, Session
 
