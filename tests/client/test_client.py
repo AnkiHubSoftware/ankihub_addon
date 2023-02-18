@@ -4,11 +4,12 @@ import uuid
 from copy import deepcopy
 from datetime import datetime, timezone
 from pathlib import Path
-from typing import List
+from typing import Callable, List
 from unittest.mock import MagicMock
 
 import pytest
 import requests_mock
+from pytest import MonkeyPatch
 from vcr import VCR
 
 COMPOSE_FILE = Path(os.getenv("COMPOSE_FILE")) if os.getenv("COMPOSE_FILE") else None
@@ -19,8 +20,6 @@ DECK_CSV_GZ = TEST_DATA_PATH / "deck_with_one_basic_note.csv.gz"
 
 VCR_CASSETTES_PATH = Path(__file__).parent / "cassettes"
 
-UUID_1 = uuid.UUID("11111111-1111-1111-1111-111111111111")
-UUID_2 = uuid.UUID("22222222-2222-2222-2222-222222222222")
 
 # defined in create_fixture_data.py script in django app
 DECK_WITH_EXTENSION_UUID = uuid.UUID("100df7b9-7749-4fe0-b801-e3dec1decd72")
@@ -125,11 +124,14 @@ def uuid_of_deck_of_user_test2():
 
 
 @pytest.fixture
-def new_note_suggestion():
+def new_note_suggestion(
+    next_deterministic_uuid: Callable[[], uuid.UUID],
+):
     from ankihub.ankihub_client import Field, NewNoteSuggestion
 
+    ah_nid = next_deterministic_uuid()
     return NewNoteSuggestion(
-        ankihub_note_uuid=UUID_1,
+        ankihub_note_uuid=ah_nid,
         anki_nid=1,
         fields=[
             Field(name="Front", value="front1", order=0),
@@ -138,18 +140,20 @@ def new_note_suggestion():
         tags=["tag1", "tag2"],
         guid="asdf",
         comment="comment1",
-        ankihub_deck_uuid=UUID_1,
+        ankihub_deck_uuid=ah_nid,
         note_type_name="Basic",
         anki_note_type_id=1,
     )
 
 
 @pytest.fixture
-def new_note_suggestion_note_info():
+def new_note_suggestion_note_info(
+    next_deterministic_uuid: Callable[[], uuid.UUID],
+):
     from ankihub.ankihub_client import Field, NoteInfo
 
     return NoteInfo(
-        ankihub_note_uuid=UUID_1,
+        ankihub_note_uuid=next_deterministic_uuid(),
         anki_nid=1,
         fields=[
             Field(name="Front", value="front1", order=0),
@@ -163,11 +167,13 @@ def new_note_suggestion_note_info():
 
 
 @pytest.fixture
-def change_note_suggestion():
+def change_note_suggestion(
+    next_deterministic_uuid: Callable[[], uuid.UUID],
+):
     from ankihub.ankihub_client import ChangeNoteSuggestion, Field, SuggestionType
 
     return ChangeNoteSuggestion(
-        ankihub_note_uuid=UUID_1,
+        ankihub_note_uuid=next_deterministic_uuid(),
         anki_nid=1,
         fields=[
             Field(name="Front", value="front2", order=0),
@@ -202,7 +208,7 @@ def test_client_login_and_signout_with_email(client):
 
 
 @pytest.mark.vcr()
-def test_download_deck(authorized_client_for_user_test1, monkeypatch):
+def test_download_deck(authorized_client_for_user_test1, monkeypatch: MonkeyPatch):
     from ankihub.ankihub_client import AnkiHubClient, Deck
 
     client: AnkiHubClient = authorized_client_for_user_test1
@@ -231,7 +237,9 @@ def test_download_deck(authorized_client_for_user_test1, monkeypatch):
 
 
 @pytest.mark.vcr()
-def test_download_compressed_deck(authorized_client_for_user_test1, monkeypatch):
+def test_download_compressed_deck(
+    authorized_client_for_user_test1, monkeypatch: MonkeyPatch
+):
     from ankihub.ankihub_client import AnkiHubClient, Deck
 
     client: AnkiHubClient = authorized_client_for_user_test1
@@ -260,7 +268,9 @@ def test_download_compressed_deck(authorized_client_for_user_test1, monkeypatch)
 
 
 @pytest.mark.vcr()
-def test_download_deck_with_progress(authorized_client_for_user_test1, monkeypatch):
+def test_download_deck_with_progress(
+    authorized_client_for_user_test1, monkeypatch: MonkeyPatch
+):
     from ankihub.ankihub_client import AnkiHubClient, Deck
     from ankihub.gui.decks import download_progress_cb
 
@@ -376,6 +386,7 @@ class TestCreateSuggestionsInBulk:
         authorized_client_for_user_test1,
         new_note_suggestion,
         uuid_of_deck_of_user_test1,
+        next_deterministic_uuid: Callable[[], uuid.UUID],
     ):
         from ankihub.ankihub_client import AnkiHubClient
 
@@ -385,7 +396,7 @@ class TestCreateSuggestionsInBulk:
         new_note_suggestion.ankihub_deck_uuid = uuid_of_deck_of_user_test1
 
         new_note_suggestion_2 = deepcopy(new_note_suggestion)
-        new_note_suggestion_2.ankihub_note_uuid = UUID_2
+        new_note_suggestion_2.ankihub_note_uuid = next_deterministic_uuid()
         new_note_suggestion_2.anki_nid = 2
 
         errors_by_nid = client.create_suggestions_in_bulk(

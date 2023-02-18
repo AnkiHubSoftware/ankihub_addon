@@ -3,7 +3,7 @@ interactions:
     body: '{"username": "test2", "password": "asdf"}'
     headers:
       Accept:
-      - application/json; version=4.0
+      - application/json; version=6.0
       Accept-Encoding:
       - gzip, deflate
       Connection:
@@ -13,12 +13,12 @@ interactions:
       Content-Type:
       - application/json
       User-Agent:
-      - python-requests/2.28.1
+      - python-requests/2.28.2
     method: POST
     uri: http://localhost:8000/api/login/
   response:
     body:
-      string: '{"expiry":"2022-11-30T16:49:03.485994Z","token":"295a36d153b919a31e4fdc86d1bfe3c4a88b88e96ed3104525a57696d3288c06"}'
+      string: '{"expiry":"2023-02-25T23:48:04.575239Z","token":"8dce8819e4285e667f839e5b08ebb15fa31c782523504ffe505105aab29d45b9"}'
     headers:
       Allow:
       - POST, OPTIONS
@@ -28,22 +28,23 @@ interactions:
       - '115'
       Content-Type:
       - application/json
+      Cross-Origin-Opener-Policy:
+      - same-origin
       Date:
-      - Wed, 23 Nov 2022 16:49:03 GMT
+      - Sat, 18 Feb 2023 23:48:04 GMT
       Referrer-Policy:
       - same-origin
       Server:
-      - WSGIServer/0.2 CPython/3.8.15
+      - WSGIServer/0.2 CPython/3.8.16
       Server-Timing:
-      - TimerPanel_utime;dur=438.99499999999847;desc="User CPU time", TimerPanel_stime;dur=50.13000000000023;desc="System
-        CPU time", TimerPanel_total;dur=489.1249999999987;desc="Total CPU time", TimerPanel_total_time;dur=333.88733863830566;desc="Elapsed
-        time", SQLPanel_sql_time;dur=7.0648193359375;desc="SQL 9 queries", CachePanel_total_time;dur=0;desc="Cache
-        0 Calls"
+      - TimerPanel_utime;dur=424.70199999999636;desc="User CPU time", TimerPanel_stime;dur=37.12699999999991;desc="System
+        CPU time", TimerPanel_total;dur=461.82899999999626;desc="Total CPU time",
+        TimerPanel_total_time;dur=268.39613914489746;desc="Elapsed time", SQLPanel_sql_time;dur=5.826711654663086;desc="SQL
+        10 queries", CachePanel_total_time;dur=0;desc="Cache 0 Calls"
       Set-Cookie:
-      - csrftoken=JToUV8Ry0RYMWalXzqg9gV0kbXaGn3kMtUDyOFVR7brGLAPycifhyZRnbFjueLqq;
-        expires=Wed, 22 Nov 2023 16:49:03 GMT; HttpOnly; Max-Age=31449600; Path=/;
-        SameSite=Lax
-      - sessionid=jpqsigtpas0txpswvzcq4mfnf2d55i2j; expires=Wed, 30 Nov 2022 16:49:03
+      - csrftoken=89iWtad51FYGnfZsWpbiwn4isNlTTQS0; expires=Sat, 17 Feb 2024 23:48:04
+        GMT; HttpOnly; Max-Age=31449600; Path=/; SameSite=Lax
+      - sessionid=jsykhcaoc7d0t5kp69j7919stbaumvq2; expires=Sat, 25 Feb 2023 23:48:04
         GMT; HttpOnly; Max-Age=604800; Path=/; SameSite=Lax
       Vary:
       - Accept, Cookie, Accept-Language, Origin
@@ -51,8 +52,8 @@ interactions:
       - nosniff
       X-Frame-Options:
       - DENY
-      X-XSS-Protection:
-      - 1; mode=block
+      djdt-store-id:
+      - 2adc97d60b4c4de9a937c05512e3e866
     status:
       code: 200
       message: OK
@@ -60,22 +61,22 @@ interactions:
     body: null
     headers:
       Accept:
-      - application/json; version=4.0
+      - application/json; version=6.0
       Accept-Encoding:
       - gzip, deflate
       Authorization:
-      - Token 295a36d153b919a31e4fdc86d1bfe3c4a88b88e96ed3104525a57696d3288c06
+      - Token 8dce8819e4285e667f839e5b08ebb15fa31c782523504ffe505105aab29d45b9
       Connection:
       - keep-alive
       Content-Type:
       - application/json
       User-Agent:
-      - python-requests/2.28.1
+      - python-requests/2.28.2
     method: GET
     uri: http://localhost:8000/api/decks/5528aef7-f7ac-406b-9b35-4eaf00de4b20/updates?size=5
   response:
     body:
-      string: '{"next":"http://localhost:8000/api/decks/5528aef7-f7ac-406b-9b35-4eaf00de4b20/updates?cursor=cD0yMDIyLTExLTIzKzE2JTNBNDklM0EwMi44NTI0NDMlMkIwMCUzQTAw&size=5","notes":[{"deck_id":"5528aef7-f7ac-406b-9b35-4eaf00de4b20","note_id":"0dcfbd56-6041-4da6-93f4-1bf669e8b12e","anki_id":3980069551,"guid":"X)7Y9D?U0b","fields":[{"name":"abc_0","order":0,"value":"abc"},{"name":"abc_1","order":1,"value":"abc"}],"note_type":"Basic","note_type_id":2,"last_update_type":"original_content","tags":["tag_0","tag_1","tag_2","tag_3","tag_4","tag_5","tag_6","tag_7","tag_8","tag_9"]},{"deck_id":"5528aef7-f7ac-406b-9b35-4eaf00de4b20","note_id":"a09b9816-c18f-4bb7-ab3f-e1c0901f8654","anki_id":2957856627,"guid":"X)7Y9D?U0b","fields":[{"name":"abc_0","order":0,"value":"abc"},{"name":"abc_1","order":1,"value":"abc"}],"note_type":"Basic","note_type_id":2,"last_update_type":"original_content","tags":["tag_0","tag_1","tag_2","tag_3","tag_4","tag_5","tag_6","tag_7","tag_8","tag_9"]},{"deck_id":"5528aef7-f7ac-406b-9b35-4eaf00de4b20","note_id":"dc89f525-4e79-449d-be78-d6691821deab","anki_id":2918044860,"guid":"X)7Y9D?U0b","fields":[{"name":"abc_0","order":0,"value":"abc"},{"name":"abc_1","order":1,"value":"abc"}],"note_type":"Basic","note_type_id":2,"last_update_type":"original_content","tags":["tag_0","tag_1","tag_2","tag_3","tag_4","tag_5","tag_6","tag_7","tag_8","tag_9"]},{"deck_id":"5528aef7-f7ac-406b-9b35-4eaf00de4b20","note_id":"57aaa413-c4da-4650-a8d7-fdf9c552d455","anki_id":2663960640,"guid":"X)7Y9D?U0b","fields":[{"name":"abc_0","order":0,"value":"abc"},{"name":"abc_1","order":1,"value":"abc"}],"note_type":"Basic","note_type_id":2,"last_update_type":"original_content","tags":["tag_0","tag_1","tag_2","tag_3","tag_4","tag_5","tag_6","tag_7","tag_8","tag_9"]},{"deck_id":"5528aef7-f7ac-406b-9b35-4eaf00de4b20","note_id":"a0370e77-1a99-4749-975c-9605b9edf534","anki_id":2421125776,"guid":"X)7Y9D?U0b","fields":[{"name":"abc_0","order":0,"value":"abc"},{"name":"abc_1","order":1,"value":"abc"}],"note_type":"Basic","note_type_id":2,"last_update_type":"original_content","tags":["tag_0","tag_1","tag_2","tag_3","tag_4","tag_5","tag_6","tag_7","tag_8","tag_9"]}],"protected_fields":{},"protected_tags":[],"latest_update":"2022-11-23T16:49:02.919906Z"}'
+      string: '{"next":"http://localhost:8000/api/decks/5528aef7-f7ac-406b-9b35-4eaf00de4b20/updates?cursor=cD0yMDIzLTAyLTE4KzIzJTNBNDglM0EwMi4wMjgwMjAlMkIwMCUzQTAw&size=5","notes":[{"deck_id":"5528aef7-f7ac-406b-9b35-4eaf00de4b20","note_id":"7adda69d-519a-4ff3-ac82-ab4af2d22631","anki_id":3308540950,"guid":"2Z5/~JvU&D","fields":[{"name":"abc_0","order":0,"value":"abc"},{"name":"abc_1","order":1,"value":"abc"}],"note_type":"Basic","note_type_id":2,"last_update_type":"original_content","tags":["tag_0","tag_1","tag_2","tag_3","tag_4","tag_5","tag_6","tag_7","tag_8","tag_9"]},{"deck_id":"5528aef7-f7ac-406b-9b35-4eaf00de4b20","note_id":"7bc92ca3-b454-4647-a82f-d181f8125fa5","anki_id":3233736291,"guid":"2Z5/~JvU&D","fields":[{"name":"abc_0","order":0,"value":"abc"},{"name":"abc_1","order":1,"value":"abc"}],"note_type":"Basic","note_type_id":2,"last_update_type":"original_content","tags":["tag_0","tag_1","tag_2","tag_3","tag_4","tag_5","tag_6","tag_7","tag_8","tag_9"]},{"deck_id":"5528aef7-f7ac-406b-9b35-4eaf00de4b20","note_id":"04c637e6-0162-44f1-8594-548b9ece5225","anki_id":2726174557,"guid":"2Z5/~JvU&D","fields":[{"name":"abc_0","order":0,"value":"abc"},{"name":"abc_1","order":1,"value":"abc"}],"note_type":"Basic","note_type_id":2,"last_update_type":"original_content","tags":["tag_0","tag_1","tag_2","tag_3","tag_4","tag_5","tag_6","tag_7","tag_8","tag_9"]},{"deck_id":"5528aef7-f7ac-406b-9b35-4eaf00de4b20","note_id":"c650ee49-b8e8-40fc-b66a-5ac6d19291f3","anki_id":2702014285,"guid":"2Z5/~JvU&D","fields":[{"name":"abc_0","order":0,"value":"abc"},{"name":"abc_1","order":1,"value":"abc"}],"note_type":"Basic","note_type_id":2,"last_update_type":"original_content","tags":["tag_0","tag_1","tag_2","tag_3","tag_4","tag_5","tag_6","tag_7","tag_8","tag_9"]},{"deck_id":"5528aef7-f7ac-406b-9b35-4eaf00de4b20","note_id":"78037257-cb97-4351-8738-2341e573c46c","anki_id":2617585964,"guid":"2Z5/~JvU&D","fields":[{"name":"abc_0","order":0,"value":"abc"},{"name":"abc_1","order":1,"value":"abc"}],"note_type":"Basic","note_type_id":2,"last_update_type":"original_content","tags":["tag_0","tag_1","tag_2","tag_3","tag_4","tag_5","tag_6","tag_7","tag_8","tag_9"]}],"protected_fields":{},"protected_tags":[],"latest_update":"2023-02-18T23:48:02.090841Z"}'
     headers:
       Allow:
       - GET, HEAD, OPTIONS
@@ -85,25 +86,27 @@ interactions:
       - '2246'
       Content-Type:
       - application/json
+      Cross-Origin-Opener-Policy:
+      - same-origin
       Date:
-      - Wed, 23 Nov 2022 16:49:04 GMT
+      - Sat, 18 Feb 2023 23:48:05 GMT
       Referrer-Policy:
       - same-origin
       Server:
-      - WSGIServer/0.2 CPython/3.8.15
+      - WSGIServer/0.2 CPython/3.8.16
       Server-Timing:
-      - TimerPanel_utime;dur=492.2600000000017;desc="User CPU time", TimerPanel_stime;dur=23.50799999999964;desc="System
-        CPU time", TimerPanel_total;dur=515.7680000000014;desc="Total CPU time", TimerPanel_total_time;dur=530.0331115722656;desc="Elapsed
-        time", SQLPanel_sql_time;dur=5.457162857055664;desc="SQL 9 queries", CachePanel_total_time;dur=0;desc="Cache
-        0 Calls"
+      - TimerPanel_utime;dur=386.25999999999294;desc="User CPU time", TimerPanel_stime;dur=3.1789999999993768;desc="System
+        CPU time", TimerPanel_total;dur=389.43899999999235;desc="Total CPU time",
+        TimerPanel_total_time;dur=386.0197067260742;desc="Elapsed time", SQLPanel_sql_time;dur=3.8368701934814453;desc="SQL
+        9 queries", CachePanel_total_time;dur=0;desc="Cache 0 Calls"
       Vary:
       - Accept, Accept-Language, Cookie, Origin
       X-Content-Type-Options:
       - nosniff
       X-Frame-Options:
       - DENY
-      X-XSS-Protection:
-      - 1; mode=block
+      djdt-store-id:
+      - 538a53f65e00475c9884c309ad5f0de1
     status:
       code: 200
       message: OK
@@ -111,22 +114,22 @@ interactions:
     body: null
     headers:
       Accept:
-      - application/json; version=4.0
+      - application/json; version=6.0
       Accept-Encoding:
       - gzip, deflate
       Authorization:
-      - Token 295a36d153b919a31e4fdc86d1bfe3c4a88b88e96ed3104525a57696d3288c06
+      - Token 8dce8819e4285e667f839e5b08ebb15fa31c782523504ffe505105aab29d45b9
       Connection:
       - keep-alive
       Content-Type:
       - application/json
       User-Agent:
-      - python-requests/2.28.1
+      - python-requests/2.28.2
     method: GET
-    uri: http://localhost:8000/api/decks/5528aef7-f7ac-406b-9b35-4eaf00de4b20/updates?cursor=cD0yMDIyLTExLTIzKzE2JTNBNDklM0EwMi44NTI0NDMlMkIwMCUzQTAw&size=5
+    uri: http://localhost:8000/api/decks/5528aef7-f7ac-406b-9b35-4eaf00de4b20/updates?cursor=cD0yMDIzLTAyLTE4KzIzJTNBNDglM0EwMi4wMjgwMjAlMkIwMCUzQTAw&size=5
   response:
     body:
-      string: '{"next":null,"notes":[{"deck_id":"5528aef7-f7ac-406b-9b35-4eaf00de4b20","note_id":"d899ca02-c040-40f8-9cfe-b87a3db94918","anki_id":2404413088,"guid":"X)7Y9D?U0b","fields":[{"name":"abc_0","order":0,"value":"abc"},{"name":"abc_1","order":1,"value":"abc"}],"note_type":"Basic","note_type_id":2,"last_update_type":"original_content","tags":["tag_0","tag_1","tag_2","tag_3","tag_4","tag_5","tag_6","tag_7","tag_8","tag_9"]},{"deck_id":"5528aef7-f7ac-406b-9b35-4eaf00de4b20","note_id":"5b10aebd-b3fb-41ee-ab36-f8fa9ff976f3","anki_id":1566791613,"guid":"X)7Y9D?U0b","fields":[{"name":"abc_0","order":0,"value":"abc"},{"name":"abc_1","order":1,"value":"abc"}],"note_type":"Basic","note_type_id":2,"last_update_type":"original_content","tags":["tag_0","tag_1","tag_2","tag_3","tag_4","tag_5","tag_6","tag_7","tag_8","tag_9"]},{"deck_id":"5528aef7-f7ac-406b-9b35-4eaf00de4b20","note_id":"f68e4660-e41e-43f9-8adc-a43be6e89c74","anki_id":1079469504,"guid":"X)7Y9D?U0b","fields":[{"name":"abc_0","order":0,"value":"abc"},{"name":"abc_1","order":1,"value":"abc"}],"note_type":"Basic","note_type_id":2,"last_update_type":"original_content","tags":["tag_0","tag_1","tag_2","tag_3","tag_4","tag_5","tag_6","tag_7","tag_8","tag_9"]},{"deck_id":"5528aef7-f7ac-406b-9b35-4eaf00de4b20","note_id":"6c32efd4-d73b-40a3-bff6-27e6b6507a8b","anki_id":755541605,"guid":"X)7Y9D?U0b","fields":[{"name":"abc_0","order":0,"value":"abc"},{"name":"abc_1","order":1,"value":"abc"}],"note_type":"Basic","note_type_id":2,"last_update_type":"original_content","tags":["tag_0","tag_1","tag_2","tag_3","tag_4","tag_5","tag_6","tag_7","tag_8","tag_9"]},{"deck_id":"5528aef7-f7ac-406b-9b35-4eaf00de4b20","note_id":"244201a3-eafd-4fef-9c37-3910c1084ffb","anki_id":190310644,"guid":"X)7Y9D?U0b","fields":[{"name":"abc_0","order":0,"value":"abc"},{"name":"abc_1","order":1,"value":"abc"}],"note_type":"Basic","note_type_id":2,"last_update_type":"original_content","tags":["tag_0","tag_1","tag_2","tag_3","tag_4","tag_5","tag_6","tag_7","tag_8","tag_9"]}],"protected_fields":{},"protected_tags":[],"latest_update":"2022-11-23T16:49:02.836899Z"}'
+      string: '{"next":null,"notes":[{"deck_id":"5528aef7-f7ac-406b-9b35-4eaf00de4b20","note_id":"98225fa9-cc4b-4572-8770-e9bed25cc0a0","anki_id":2347610422,"guid":"2Z5/~JvU&D","fields":[{"name":"abc_0","order":0,"value":"abc"},{"name":"abc_1","order":1,"value":"abc"}],"note_type":"Basic","note_type_id":2,"last_update_type":"original_content","tags":["tag_0","tag_1","tag_2","tag_3","tag_4","tag_5","tag_6","tag_7","tag_8","tag_9"]},{"deck_id":"5528aef7-f7ac-406b-9b35-4eaf00de4b20","note_id":"3865060b-987f-44e5-b755-89a0900f7f3e","anki_id":1982792611,"guid":"2Z5/~JvU&D","fields":[{"name":"abc_0","order":0,"value":"abc"},{"name":"abc_1","order":1,"value":"abc"}],"note_type":"Basic","note_type_id":2,"last_update_type":"original_content","tags":["tag_0","tag_1","tag_2","tag_3","tag_4","tag_5","tag_6","tag_7","tag_8","tag_9"]},{"deck_id":"5528aef7-f7ac-406b-9b35-4eaf00de4b20","note_id":"be24e0b6-16a0-4089-a6c4-815ad82bc59d","anki_id":1568394930,"guid":"2Z5/~JvU&D","fields":[{"name":"abc_0","order":0,"value":"abc"},{"name":"abc_1","order":1,"value":"abc"}],"note_type":"Basic","note_type_id":2,"last_update_type":"original_content","tags":["tag_0","tag_1","tag_2","tag_3","tag_4","tag_5","tag_6","tag_7","tag_8","tag_9"]},{"deck_id":"5528aef7-f7ac-406b-9b35-4eaf00de4b20","note_id":"560a9daa-7435-460f-92a3-9c58fb44d185","anki_id":487439106,"guid":"2Z5/~JvU&D","fields":[{"name":"abc_0","order":0,"value":"abc"},{"name":"abc_1","order":1,"value":"abc"}],"note_type":"Basic","note_type_id":2,"last_update_type":"original_content","tags":["tag_0","tag_1","tag_2","tag_3","tag_4","tag_5","tag_6","tag_7","tag_8","tag_9"]},{"deck_id":"5528aef7-f7ac-406b-9b35-4eaf00de4b20","note_id":"53b161b1-59ca-4799-9a6e-d0d3198b9eda","anki_id":185104887,"guid":"2Z5/~JvU&D","fields":[{"name":"abc_0","order":0,"value":"abc"},{"name":"abc_1","order":1,"value":"abc"}],"note_type":"Basic","note_type_id":2,"last_update_type":"original_content","tags":["tag_0","tag_1","tag_2","tag_3","tag_4","tag_5","tag_6","tag_7","tag_8","tag_9"]}],"protected_fields":{},"protected_tags":[],"latest_update":"2023-02-18T23:48:02.012280Z"}'
     headers:
       Allow:
       - GET, HEAD, OPTIONS
@@ -136,25 +139,27 @@ interactions:
       - '2099'
       Content-Type:
       - application/json
+      Cross-Origin-Opener-Policy:
+      - same-origin
       Date:
-      - Wed, 23 Nov 2022 16:49:04 GMT
+      - Sat, 18 Feb 2023 23:48:05 GMT
       Referrer-Policy:
       - same-origin
       Server:
-      - WSGIServer/0.2 CPython/3.8.15
+      - WSGIServer/0.2 CPython/3.8.16
       Server-Timing:
-      - TimerPanel_utime;dur=692.5319999999999;desc="User CPU time", TimerPanel_stime;dur=50.57899999999993;desc="System
-        CPU time", TimerPanel_total;dur=743.1109999999999;desc="Total CPU time", TimerPanel_total_time;dur=692.8765773773193;desc="Elapsed
-        time", SQLPanel_sql_time;dur=4.264593124389648;desc="SQL 9 queries", CachePanel_total_time;dur=0;desc="Cache
-        0 Calls"
+      - TimerPanel_utime;dur=127.15400000001864;desc="User CPU time", TimerPanel_stime;dur=12.290000000000134;desc="System
+        CPU time", TimerPanel_total;dur=139.44400000001878;desc="Total CPU time",
+        TimerPanel_total_time;dur=136.50202751159668;desc="Elapsed time", SQLPanel_sql_time;dur=4.763126373291016;desc="SQL
+        9 queries", CachePanel_total_time;dur=0;desc="Cache 0 Calls"
       Vary:
       - Accept, Accept-Language, Cookie, Origin
       X-Content-Type-Options:
       - nosniff
       X-Frame-Options:
       - DENY
-      X-XSS-Protection:
-      - 1; mode=block
+      djdt-store-id:
+      - f154d4d1773d4a57aa3765ade1e609f7
     status:
       code: 200
       message: OK

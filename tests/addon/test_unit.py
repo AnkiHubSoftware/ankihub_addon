@@ -35,7 +35,7 @@ class NoteInfoFactory(factory.Factory):
     guid = "11111"
 
 
-def test_lowest_level_common_ancestor_deck_name(anki_session_with_addon: AnkiSession):
+def test_lowest_level_common_ancestor_deck_name():
     from ankihub.utils import lowest_level_common_ancestor_deck_name
 
     deck_names = [
@@ -55,7 +55,7 @@ def test_lowest_level_common_ancestor_deck_name(anki_session_with_addon: AnkiSes
     assert lowest_level_common_ancestor_deck_name(deck_names) is None
 
 
-def test_updated_tags(anki_session_with_addon: AnkiSession):
+def test_updated_tags():
     from ankihub.importing import updated_tags
     from ankihub.note_conversion import ADDON_INTERNAL_TAGS, TAG_FOR_OPTIONAL_TAGS
 
@@ -130,7 +130,7 @@ def test_updated_tags(anki_session_with_addon: AnkiSession):
     ) == set([optional_tag])
 
 
-def test_normalize_url(anki_session_with_addon: AnkiSession):
+def test_normalize_url():
     from ankihub.error_reporting import normalize_url
 
     url = "https://app.ankihub.net/api/decks/fc39e7e7-9705-4102-a6ec-90d128c64ed3/updates?since=2022-08-01T1?6%3A32%3A2"
@@ -140,7 +140,7 @@ def test_normalize_url(anki_session_with_addon: AnkiSession):
     assert normalize_url(url) == "https://app.ankihub.net/api/note-types/<id>/"
 
 
-def test_prepared_field_html(anki_session_with_addon: AnkiSession):
+def test_prepared_field_html():
     from ankihub.exporting import _prepared_field_html
 
     assert _prepared_field_html('<img src="foo.jpg">') == '<img src="foo.jpg">'
@@ -151,7 +151,7 @@ def test_prepared_field_html(anki_session_with_addon: AnkiSession):
     )
 
 
-def test_remove_note_type_name_modifications(anki_session_with_addon: AnkiSession):
+def test_remove_note_type_name_modifications():
     from ankihub.register_decks import note_type_name_without_ankihub_modifications
 
     name = "Basic (deck_name / user_name)"
