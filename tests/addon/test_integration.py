@@ -19,6 +19,7 @@ from aqt.importing import AnkiPackageImporter
 from aqt.qt import Qt
 from pytest_anki import AnkiSession
 from pytestqt.qtbot import QtBot
+from requests_mock import Mocker
 
 from .conftest import TEST_PROFILE_ID
 
@@ -49,7 +50,7 @@ def test_entry_point(anki_session_with_addon: AnkiSession):
 
 def test_editor(
     anki_session_with_addon: AnkiSession,
-    requests_mock,
+    requests_mock: Mocker,
     monkeypatch,
     disable_image_support_feature_flag,
 ):
@@ -166,7 +167,7 @@ def test_modify_note_type(anki_session_with_addon: AnkiSession):
 
 
 def test_create_collaborative_deck_and_upload(
-    anki_session_with_addon: AnkiSession, requests_mock, monkeypatch
+    anki_session_with_addon: AnkiSession, requests_mock: Mocker, monkeypatch
 ):
     anki_session = anki_session_with_addon
 
@@ -273,7 +274,7 @@ def test_get_deck_by_id(anki_session_with_addon: AnkiSession, requests_mock):
 
 def test_suggest_note_update(
     anki_session_with_addon: AnkiSession,
-    requests_mock,
+    requests_mock: Mocker,
     disable_image_support_feature_flag,
 ):
     from ankihub.ankihub_client import AnkiHubRequestError, NoteInfo, SuggestionType
@@ -337,7 +338,7 @@ def test_suggest_note_update(
 
 def test_suggest_new_note(
     anki_session_with_addon: AnkiSession,
-    requests_mock,
+    requests_mock: Mocker,
     disable_image_support_feature_flag,
 ):
     from ankihub.ankihub_client import AnkiHubRequestError
@@ -2146,7 +2147,7 @@ def test_profile_swap(anki_session_with_addon: AnkiSession, monkeypatch):
 
 
 def test_sync_with_optional_content(
-    anki_session_with_addon: AnkiSession, requests_mock, monkeypatch
+    anki_session_with_addon: AnkiSession, requests_mock: Mocker, monkeypatch
 ):
     anki_session = anki_session_with_addon
 
@@ -2412,7 +2413,7 @@ def test_reset_optional_tags_action(
 def test_upload_images(
     anki_session_with_addon: AnkiSession,
     monkeypatch,
-    requests_mock,
+    requests_mock: Mocker,
 ):
     import tempfile
 
@@ -2444,7 +2445,7 @@ class TestSuggestionsWithImages:
     def test_suggest_note_update_with_image(
         self,
         anki_session_with_addon: AnkiSession,
-        requests_mock,
+        requests_mock: Mocker,
         monkeypatch,
         enable_image_support_feature_flag,
     ):
@@ -2508,7 +2509,7 @@ class TestSuggestionsWithImages:
     def test_suggest_new_note_with_image(
         self,
         anki_session_with_addon: AnkiSession,
-        requests_mock,
+        requests_mock: Mocker,
         monkeypatch,
         enable_image_support_feature_flag,
     ):
