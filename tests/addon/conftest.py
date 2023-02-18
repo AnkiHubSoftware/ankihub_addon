@@ -4,8 +4,11 @@ import uuid
 from pathlib import Path
 
 import pytest
+from pytest import MonkeyPatch
 from pytest_anki import AnkiSession
+from requests_mock import Mocker
 
+from ..fixtures import next_deterministic_id, next_deterministic_uuid  # noqa F401
 
 REPO_ROOT_PATH = Path(__file__).absolute().parent.parent.parent
 
@@ -14,9 +17,14 @@ REPO_ROOT_PATH = Path(__file__).absolute().parent.parent.parent
 TEST_PROFILE_ID = uuid.UUID("11111111-1111-1111-1111-111111111111")
 
 
-@pytest.fixture(scope="function")
+# autouse=True is set so that the tests don't fail because without it mw is None
+# when imported from aqt (from aqt import mw)
+# and some add-ons file use mw when you import them
+# this is a workaround for that
+# it might be good to change the add-ons file to not do that instead of using autouse=True
+@pytest.fixture(scope="function", autouse=True)
 def anki_session_with_addon(
-    anki_session: AnkiSession, requests_mock, monkeypatch
+    anki_session: AnkiSession, requests_mock: Mocker, monkeypatch: MonkeyPatch
 ) -> AnkiSession:
     """Sets up the add-on, config and database and returns the AnkiSession.
     Does similar setup like in profile_setup in entry_point.py.
@@ -87,7 +95,7 @@ def anki_session_with_addon_before_profile_support(anki_session_with_addon):
 
 
 @pytest.fixture
-def enable_image_support_feature_flag(requests_mock):
+def enable_image_support_feature_flag(requests_mock: Mocker):
     from ankihub.ankihub_client import API_URL_BASE
 
     requests_mock.get(
@@ -98,7 +106,7 @@ def enable_image_support_feature_flag(requests_mock):
 
 
 @pytest.fixture
-def disable_image_support_feature_flag(requests_mock):
+def disable_image_support_feature_flag(requests_mock: Mocker):
     from ankihub.ankihub_client import API_URL_BASE
 
     requests_mock.get(

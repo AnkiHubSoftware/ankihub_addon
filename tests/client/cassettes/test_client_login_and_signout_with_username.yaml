@@ -3,7 +3,7 @@ interactions:
     body: '{"username": "test1", "password": "asdf"}'
     headers:
       Accept:
-      - application/json; version=4.0
+      - application/json; version=6.0
       Accept-Encoding:
       - gzip, deflate
       Connection:
@@ -13,12 +13,12 @@ interactions:
       Content-Type:
       - application/json
       User-Agent:
-      - python-requests/2.28.1
+      - python-requests/2.28.2
     method: POST
     uri: http://localhost:8000/api/login/
   response:
     body:
-      string: '{"expiry":"2022-12-16T12:13:53.185221Z","token":"7eb847f89c2b46bdcad2af2202694af4679ca13b97ca1d64838294b3c05cec3c"}'
+      string: '{"expiry":"2023-02-25T23:46:13.613087Z","token":"920fd2e3dbff91ff415c70e678f3b088acb9117f53ee4d4bad15179c48538984"}'
     headers:
       Allow:
       - POST, OPTIONS
@@ -31,20 +31,20 @@ interactions:
       Cross-Origin-Opener-Policy:
       - same-origin
       Date:
-      - Fri, 09 Dec 2022 12:13:53 GMT
+      - Sat, 18 Feb 2023 23:46:13 GMT
       Referrer-Policy:
       - same-origin
       Server:
       - WSGIServer/0.2 CPython/3.8.16
       Server-Timing:
-      - TimerPanel_utime;dur=498.7200000000023;desc="User CPU time", TimerPanel_stime;dur=81.55200000000029;desc="System
-        CPU time", TimerPanel_total;dur=580.2720000000025;desc="Total CPU time", TimerPanel_total_time;dur=317.9597854614258;desc="Elapsed
-        time", SQLPanel_sql_time;dur=13.144254684448242;desc="SQL 10 queries", CachePanel_total_time;dur=0;desc="Cache
+      - TimerPanel_utime;dur=354.81299999999294;desc="User CPU time", TimerPanel_stime;dur=45.85800000000084;desc="System
+        CPU time", TimerPanel_total;dur=400.6709999999938;desc="Total CPU time", TimerPanel_total_time;dur=202.37112045288086;desc="Elapsed
+        time", SQLPanel_sql_time;dur=3.7322044372558594;desc="SQL 10 queries", CachePanel_total_time;dur=0;desc="Cache
         0 Calls"
       Set-Cookie:
-      - csrftoken=fx6FSc1pBup16dwAuMaT1t9zPpUDdg0G; expires=Fri, 08 Dec 2023 12:13:53
+      - csrftoken=QOO8R1PO3Fqw9DdJeAPOezhZEEpQdhNd; expires=Sat, 17 Feb 2024 23:46:13
         GMT; HttpOnly; Max-Age=31449600; Path=/; SameSite=Lax
-      - sessionid=10ttk15dphn7xh7gs9niiz2g9b814f54; expires=Fri, 16 Dec 2022 12:13:53
+      - sessionid=72df742jlpdvzt2jxys4iycj4vin32y0; expires=Sat, 25 Feb 2023 23:46:13
         GMT; HttpOnly; Max-Age=604800; Path=/; SameSite=Lax
       Vary:
       - Accept, Cookie, Accept-Language, Origin
@@ -53,7 +53,7 @@ interactions:
       X-Frame-Options:
       - DENY
       djdt-store-id:
-      - adb4d51fee134b128dcbb420be2546eb
+      - d809fd5bfe6f4e76ac8a1c56d69c687f
     status:
       code: 200
       message: OK
@@ -61,7 +61,7 @@ interactions:
     body: null
     headers:
       Accept:
-      - application/json; version=4.0
+      - application/json; version=6.0
       Accept-Encoding:
       - gzip, deflate
       Authorization:
@@ -73,7 +73,7 @@ interactions:
       Content-Type:
       - application/json
       User-Agent:
-      - python-requests/2.28.1
+      - python-requests/2.28.2
     method: POST
     uri: http://localhost:8000/api/logout/
   response:
@@ -91,15 +91,15 @@ interactions:
       Cross-Origin-Opener-Policy:
       - same-origin
       Date:
-      - Fri, 09 Dec 2022 12:13:53 GMT
+      - Sat, 18 Feb 2023 23:46:13 GMT
       Referrer-Policy:
       - same-origin
       Server:
       - WSGIServer/0.2 CPython/3.8.16
       Server-Timing:
-      - TimerPanel_utime;dur=26.709000000000316;desc="User CPU time", TimerPanel_stime;dur=0.22399999999977993;desc="System
-        CPU time", TimerPanel_total;dur=26.933000000000096;desc="Total CPU time",
-        TimerPanel_total_time;dur=29.095172882080078;desc="Elapsed time", SQLPanel_sql_time;dur=0;desc="SQL
+      - TimerPanel_utime;dur=20.296999999999343;desc="User CPU time", TimerPanel_stime;dur=0.007999999999341867;desc="System
+        CPU time", TimerPanel_total;dur=20.304999999998685;desc="Total CPU time",
+        TimerPanel_total_time;dur=21.670818328857422;desc="Elapsed time", SQLPanel_sql_time;dur=0;desc="SQL
         0 queries", CachePanel_total_time;dur=0;desc="Cache 0 Calls"
       Vary:
       - Accept, Accept-Language, Cookie, Origin
@@ -110,7 +110,7 @@ interactions:
       X-Frame-Options:
       - DENY
       djdt-store-id:
-      - f22195f307d64c118206a64d34660529
+      - 9d3cbede49414b1ba25cd4238177541d
     status:
       code: 401
       message: Unauthorized
