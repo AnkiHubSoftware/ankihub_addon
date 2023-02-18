@@ -1,14 +1,4 @@
-from pytest import fixture
 from pytest_anki import AnkiSession
-
-
-# is needed so that the tests don't fail because mw is None
-# and some add-ons file use mw when you import them
-# this is a workaround for that
-# it might be good to change the add-ons file to not do that
-@fixture(autouse=True)
-def anki_session_with_addon_auto_use(anki_session_with_addon: AnkiSession):
-    pass
 
 
 def test_lowest_level_common_ancestor_deck_name():

@@ -42,7 +42,7 @@ def ankihub_sample_deck_notes_data():
     return result
 
 
-def test_entry_point(anki_session_with_addon: AnkiSession):
+def test_entry_point():
     from ankihub import entry_point
 
     entry_point.run()
@@ -168,7 +168,7 @@ def test_modify_note_type(anki_session_with_addon: AnkiSession):
 
 
 def test_create_collaborative_deck_and_upload(
-    anki_session_with_addon: AnkiSession, requests_mock: Mocker, monkeypatch
+    anki_session_with_addon: AnkiSession, requests_mock: Mocker
 ):
     anki_session = anki_session_with_addon
 
@@ -229,7 +229,7 @@ def test_create_collaborative_deck_and_upload(
             )
 
 
-def test_get_deck_by_id(anki_session_with_addon: AnkiSession, requests_mock):
+def test_get_deck_by_id(requests_mock):
     from ankihub.addon_ankihub_client import AddonAnkiHubClient as AnkiHubClient
     from ankihub.ankihub_client import (
         ANKIHUB_DATETIME_FORMAT_STR,
@@ -876,7 +876,7 @@ class TestAnkiHubImporter:
                 assert card.did == mw.col.decks.id_for_name("Testdeck::A::B")
 
     def test_suspend_new_cards_of_existing_notes(
-        self, anki_session_with_addon: AnkiSession, monkeypatch
+        self, anki_session_with_addon: AnkiSession
     ):
         from anki.consts import QUEUE_TYPE_SUSPENDED
 
@@ -1699,7 +1699,7 @@ class TestBrowserTreeView:
     # without this mark the test sometime fails on clean-up
     @pytest.mark.qt_no_exception_capture
     def test_contains_ankihub_tag_items(
-        anki_session_with_addon: AnkiSession, qtbot: QtBot
+        self, anki_session_with_addon: AnkiSession, qtbot: QtBot
     ):
         from aqt import dialogs
         from aqt.browser import Browser
@@ -1990,7 +1990,7 @@ def test_flatten_deck(
 
 
 def test_reset_local_changes_to_notes(
-    anki_session_with_addon: AnkiSession, monkeypatch
+    anki_session_with_addon: AnkiSession, monkeypatch: MonkeyPatch
 ):
     from ankihub.db import ankihub_db
     from ankihub.importing import AnkiHubImporter
@@ -2154,7 +2154,7 @@ def test_profile_swap(anki_session_with_addon: AnkiSession, monkeypatch: MonkeyP
 
 
 def test_sync_with_optional_content(
-    anki_session_with_addon: AnkiSession, requests_mock: Mocker, monkeypatch
+    anki_session_with_addon: AnkiSession, monkeypatch: MonkeyPatch
 ):
     anki_session = anki_session_with_addon
 
@@ -2241,7 +2241,7 @@ def test_sync_with_optional_content(
 
 
 def test_optional_tag_suggestion_dialog(
-    anki_session_with_addon: AnkiSession, qtbot: QtBot, monkeypatch
+    anki_session_with_addon: AnkiSession, qtbot: QtBot, monkeypatch: MonkeyPatch
 ):
     anki_session = anki_session_with_addon
 
@@ -2333,7 +2333,7 @@ def test_optional_tag_suggestion_dialog(
 
 @pytest.mark.qt_no_exception_capture
 def test_reset_optional_tags_action(
-    anki_session_with_addon: AnkiSession, qtbot, monkeypatch
+    anki_session_with_addon: AnkiSession, qtbot: QtBot, monkeypatch: MonkeyPatch
 ):
     from aqt import dialogs
     from aqt.browser import Browser
