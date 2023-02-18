@@ -235,6 +235,25 @@ class AnkiHubDB:
                 nid,
             )
 
+    def all_conflicting_decks(self) -> List[uuid.UUID]:
+        """Returns a list of AnkiHub deck IDs that have notes that conflict with notes in other decks."""
+        conflicting_ah_did_pairs = self.execute(
+            """
+            SELECT GROUP_CONCAT(ankihub_deck_id) FROM notes
+            WHERE active = 1
+            GROUP BY anki_note_id
+            HAVING COUNT(*) > 1
+            """
+        )
+        result = set()
+        for pair in conflicting_ah_did_pairs:
+            conflicting_ah_did_strs = pair[0].split(",")
+            result.update(
+                [uuid.UUID(ah_did_str) for ah_did_str in conflicting_ah_did_strs]
+            )
+
+        return list(result)
+
     def conflicting_decks(self, ankihub_did: uuid.UUID) -> List[uuid.UUID]:
         """Returns a list of AnkiHub deck IDs that have notes that conflict with the notes in the given AnkiHub deck.
         A conflict occurs when a note in one deck has the same Anki note ID as a note in another deck and
@@ -296,10 +315,14 @@ class AnkiHubDB:
 
         return uuid.UUID(conflicting_ah_did_str), conflicting_anki_nids
 
-    def deactivate_notes(self, ankihub_nids: List[uuid.UUID]) -> None:
+    def deactivate_notes_for_deck(
+        self, ankihub_did: uuid.UUID, anki_nids: List[NoteId]
+    ) -> None:
         self.execute(
             f"""
-            UPDATE notes SET active = 0 WHERE ankihub_note_id IN {ids2str(ankihub_nids)}
+            UPDATE notes SET active = 0 
+            WHERE ankihub_deck_id = '{ankihub_did}'
+            AND anki_note_id IN {ids2str(anki_nids)}
             """
         )
 

@@ -262,6 +262,9 @@ class TestAnkiNidConflicts:
             )
 
             # check that the two decks are detected as conflicting
+            assert set(ankihub_db.all_conflicting_decks()) == set([ah_did_1, ah_did_2])
+
+            # check that the two decks are detected as conflicting
             assert ankihub_db.conflicting_decks(ah_did_1) == [ah_did_2]
             assert ankihub_db.conflicting_decks(ah_did_2) == [ah_did_1]
 
@@ -279,3 +282,13 @@ class TestAnkiNidConflicts:
             ) = ankihub_db.next_conflict(ah_did_2)
             assert conflicting_ah_did == ah_did_1
             assert conflicting_anki_nids == [1]
+
+            # deactivate conflicting note for the first deck
+            ankihub_db.deactivate_notes_for_deck(ankihub_did=ah_did_1, anki_nids=[1])
+
+            # check that the two decks are not longer detected as conflicting
+            assert not ankihub_db.all_conflicting_decks()
+            assert ankihub_db.conflicting_decks(ah_did_1) == []
+            assert ankihub_db.conflicting_decks(ah_did_2) == []
+            assert not ankihub_db.next_conflict(ah_did_1)
+            assert not ankihub_db.next_conflict(ah_did_2)
