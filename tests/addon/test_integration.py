@@ -16,7 +16,6 @@ from anki.decks import DeckId
 from anki.models import NotetypeDict, NotetypeId
 from anki.notes import Note, NoteId
 from aqt.importing import AnkiPackageImporter
-from aqt.main import AnkiQt
 from aqt.qt import Qt
 from pytest_anki import AnkiSession
 from pytestqt.qtbot import QtBot
@@ -2325,7 +2324,9 @@ def test_optional_tag_suggestion_dialog(
 
 
 @pytest.mark.qt_no_exception_capture
-def test_reset_optional_tags_action(anki_session_with_addon, qtbot, monkeypatch):
+def test_reset_optional_tags_action(
+    anki_session_with_addon: AnkiSession, qtbot, monkeypatch
+):
     from aqt import dialogs
     from aqt.browser import Browser
 
@@ -2337,7 +2338,7 @@ def test_reset_optional_tags_action(anki_session_with_addon, qtbot, monkeypatch)
     entry_point.run()
 
     with anki_session_with_addon.profile_loaded():
-        mw: AnkiQt = anki_session_with_addon.mw
+        mw = anki_session_with_addon.mw
 
         # setup the deck, subscription and deck extension
         ah_did = UUID_1
@@ -2409,7 +2410,7 @@ def test_reset_optional_tags_action(anki_session_with_addon, qtbot, monkeypatch)
 
 
 def test_upload_images(
-    anki_session_with_addon,
+    anki_session_with_addon: AnkiSession,
     monkeypatch,
     requests_mock,
 ):
