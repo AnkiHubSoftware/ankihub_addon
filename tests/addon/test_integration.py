@@ -555,85 +555,413 @@ def test_reset_note_types_of_notes(anki_session_with_addon: AnkiSession):
         assert mw.col.get_note(note.id).mid == cloze["id"]
 
 
-def test_import_new_ankihub_deck(anki_session_with_addon: AnkiSession):
-    from aqt import mw
+class TestAnkiHubImporter:
+    def test_import_new_deck(self, anki_session_with_addon: AnkiSession):
+        from aqt import mw
 
-    from ankihub.sync import AnkiHubImporter
-    from ankihub.utils import all_dids
+        from ankihub.sync import AnkiHubImporter
+        from ankihub.utils import all_dids
 
-    anki_session = anki_session_with_addon
-    with anki_session.profile_loaded():
+        anki_session = anki_session_with_addon
+        with anki_session.profile_loaded():
 
-        # import the apkg to get the note types, then delete the deck
-        file = str(ANKIHUB_SAMPLE_DECK_APKG.absolute())
-        importer = AnkiPackageImporter(mw.col, file)
-        importer.run()
-        mw.col.decks.remove([mw.col.decks.id_for_name("Testdeck")])
+            # import the apkg to get the note types, then delete the deck
+            file = str(ANKIHUB_SAMPLE_DECK_APKG.absolute())
+            importer = AnkiPackageImporter(mw.col, file)
+            importer.run()
+            mw.col.decks.remove([mw.col.decks.id_for_name("Testdeck")])
 
-        ankihub_deck_uuid = UUID_1
-        dids_before_import = all_dids()
-        ankihub_importer = AnkiHubImporter()
-        local_did = ankihub_importer._import_ankihub_deck_inner(
-            ankihub_did=str(ankihub_deck_uuid),
-            notes_data=ankihub_sample_deck_notes_data(),
-            deck_name="test",
-            remote_note_types={},
-            protected_fields={},
-            protected_tags=[],
-        )
-        new_dids = all_dids() - dids_before_import
+            ankihub_deck_uuid = UUID_1
+            dids_before_import = all_dids()
+            ankihub_importer = AnkiHubImporter()
+            local_did = ankihub_importer._import_ankihub_deck_inner(
+                ankihub_did=str(ankihub_deck_uuid),
+                notes_data=ankihub_sample_deck_notes_data(),
+                deck_name="test",
+                remote_note_types={},
+                protected_fields={},
+                protected_tags=[],
+            )
+            new_dids = all_dids() - dids_before_import
 
-        assert (
-            len(new_dids) == 1
-        )  # we have no mechanism for importing subdecks from a csv yet, so ti will be just onen deck
-        assert local_did == list(new_dids)[0]
+            assert (
+                len(new_dids) == 1
+            )  # we have no mechanism for importing subdecks from a csv yet, so ti will be just onen deck
+            assert local_did == list(new_dids)[0]
 
-        assert len(ankihub_importer.created_nids) == 3
-        assert len(ankihub_importer.updated_nids) == 0
+            assert len(ankihub_importer.created_nids) == 3
+            assert len(ankihub_importer.updated_nids) == 0
 
-        assert_that_only_ankihub_sample_deck_info_in_database(
-            ankihub_deck_uuid=ankihub_deck_uuid
-        )
+            assert_that_only_ankihub_sample_deck_info_in_database(
+                ankihub_deck_uuid=ankihub_deck_uuid
+            )
 
+    def test_import_existing_deck_1(self, anki_session_with_addon: AnkiSession):
+        from aqt import mw
 
-def test_import_existing_ankihub_deck(anki_session_with_addon: AnkiSession):
-    from aqt import mw
+        from ankihub.sync import AnkiHubImporter
+        from ankihub.utils import all_dids
 
-    from ankihub.sync import AnkiHubImporter
-    from ankihub.utils import all_dids
+        anki_session = anki_session_with_addon
+        with anki_session.profile_loaded():
 
-    anki_session = anki_session_with_addon
-    with anki_session.profile_loaded():
+            # import the apkg
+            file = str(ANKIHUB_SAMPLE_DECK_APKG.absolute())
+            importer = AnkiPackageImporter(mw.col, file)
+            importer.run()
+            existing_did = mw.col.decks.id_for_name("Testdeck")
 
-        # import the apkg
-        file = str(ANKIHUB_SAMPLE_DECK_APKG.absolute())
-        importer = AnkiPackageImporter(mw.col, file)
-        importer.run()
-        existing_did = mw.col.decks.id_for_name("Testdeck")
+            ankihub_deck_uuid = UUID_1
+            dids_before_import = all_dids()
+            ankihub_importer = AnkiHubImporter()
+            local_did = ankihub_importer._import_ankihub_deck_inner(
+                ankihub_did=str(ankihub_deck_uuid),
+                notes_data=ankihub_sample_deck_notes_data(),
+                deck_name="test",
+                remote_note_types={},
+                protected_fields={},
+                protected_tags=[],
+            )
+            new_dids = all_dids() - dids_before_import
 
-        ankihub_deck_uuid = UUID_1
-        dids_before_import = all_dids()
-        ankihub_importer = AnkiHubImporter()
-        local_did = ankihub_importer._import_ankihub_deck_inner(
-            ankihub_did=str(ankihub_deck_uuid),
-            notes_data=ankihub_sample_deck_notes_data(),
-            deck_name="test",
-            remote_note_types={},
-            protected_fields={},
-            protected_tags=[],
-        )
-        new_dids = all_dids() - dids_before_import
+            assert not new_dids
+            assert local_did == existing_did
 
-        assert not new_dids
-        assert local_did == existing_did
+            # no notes should be changed because they already exist
+            assert len(ankihub_importer.created_nids) == 0
+            assert len(ankihub_importer.updated_nids) == 0
 
-        # no notes should be changed because they already exist
-        assert len(ankihub_importer.created_nids) == 0
-        assert len(ankihub_importer.updated_nids) == 0
+            assert_that_only_ankihub_sample_deck_info_in_database(
+                ankihub_deck_uuid=ankihub_deck_uuid
+            )
 
-        assert_that_only_ankihub_sample_deck_info_in_database(
-            ankihub_deck_uuid=ankihub_deck_uuid
-        )
+    def test_import_existing_deck_2(self, anki_session_with_addon: AnkiSession):
+        from aqt import mw
+
+        from ankihub.sync import AnkiHubImporter
+        from ankihub.utils import all_dids
+
+        anki_session = anki_session_with_addon
+        with anki_session.profile_loaded():
+
+            # import the apkg
+            file = str(ANKIHUB_SAMPLE_DECK_APKG.absolute())
+            importer = AnkiPackageImporter(mw.col, file)
+            importer.run()
+
+            # move one card to another deck
+            other_deck_id = mw.col.decks.add_normal_deck_with_name("other deck").id
+            cids = mw.col.find_cards("deck:Testdeck")
+            assert len(cids) == 3
+            mw.col.set_deck([cids[0]], other_deck_id)
+
+            ankihub_deck_uuid = UUID_1
+            dids_before_import = all_dids()
+            ankihub_importer = AnkiHubImporter()
+            local_did = ankihub_importer._import_ankihub_deck_inner(
+                ankihub_did=str(ankihub_deck_uuid),
+                notes_data=ankihub_sample_deck_notes_data(),
+                deck_name="test",
+                remote_note_types={},
+                protected_fields={},
+                protected_tags=[],
+            )
+            new_dids = all_dids() - dids_before_import
+
+            # when the existing cards are in multiple seperate decks a new deck is created
+            assert len(new_dids) == 1
+            assert local_did == list(new_dids)[0]
+
+            # no notes should be changed because they already exist
+            assert len(ankihub_importer.created_nids) == 0
+            assert len(ankihub_importer.updated_nids) == 0
+
+            assert_that_only_ankihub_sample_deck_info_in_database(
+                ankihub_deck_uuid=ankihub_deck_uuid
+            )
+
+    def test_import_existing_deck_3(self, anki_session_with_addon: AnkiSession):
+        from aqt import mw
+
+        from ankihub.sync import AnkiHubImporter
+        from ankihub.utils import all_dids
+
+        anki_session = anki_session_with_addon
+        with anki_session.profile_loaded():
+
+            # import the apkg
+            file = str(ANKIHUB_SAMPLE_DECK_APKG.absolute())
+            importer = AnkiPackageImporter(mw.col, file)
+            importer.run()
+            existing_did = mw.col.decks.id_for_name("Testdeck")
+
+            # modify two notes
+            note_1 = mw.col.get_note(1608240057545)
+            note_1["Front"] = "new front"
+
+            note_2 = mw.col.get_note(1656968819662)
+            note_2.tags.append("foo")
+
+            mw.col.update_notes([note_1, note_2])
+
+            # delete one note
+            mw.col.remove_notes([1608240029527])
+
+            ankihub_deck_uuid = UUID_1
+            dids_before_import = all_dids()
+            ankihub_importer = AnkiHubImporter()
+            local_did = ankihub_importer._import_ankihub_deck_inner(
+                ankihub_did=str(ankihub_deck_uuid),
+                notes_data=ankihub_sample_deck_notes_data(),
+                deck_name="test",
+                remote_note_types={},
+                protected_fields={},
+                protected_tags=[],
+            )
+            new_dids = all_dids() - dids_before_import
+
+            assert not new_dids
+            assert local_did == existing_did
+
+            assert len(ankihub_importer.created_nids) == 1
+            assert len(ankihub_importer.updated_nids) == 2
+
+            assert_that_only_ankihub_sample_deck_info_in_database(
+                ankihub_deck_uuid=ankihub_deck_uuid
+            )
+
+    def test_update_deck(self, anki_session_with_addon: AnkiSession):
+        from aqt import mw
+
+        from ankihub.sync import AnkiHubImporter
+        from ankihub.utils import all_dids
+
+        anki_session = anki_session_with_addon
+        with anki_session.profile_loaded():
+
+            first_local_did = import_sample_ankihub_deck(mw)
+
+            ankihub_deck_uuid = UUID_1
+            dids_before_import = all_dids()
+            ankihub_importer = AnkiHubImporter()
+            second_local_did = ankihub_importer._import_ankihub_deck_inner(
+                ankihub_did=str(ankihub_deck_uuid),
+                notes_data=ankihub_sample_deck_notes_data(),
+                deck_name="test",
+                remote_note_types={},
+                protected_fields={},
+                protected_tags=[],
+                local_did=first_local_did,
+            )
+            new_dids = all_dids() - dids_before_import
+
+            assert len(new_dids) == 0
+            assert first_local_did == second_local_did
+
+            # no notes should be changed because they already exist
+            assert len(ankihub_importer.created_nids) == 0
+            assert len(ankihub_importer.updated_nids) == 0
+
+            assert_that_only_ankihub_sample_deck_info_in_database(
+                ankihub_deck_uuid=ankihub_deck_uuid
+            )
+
+    def test_update_deck_when_it_was_deleted(
+        self,
+        anki_session_with_addon: AnkiSession,
+    ):
+        from aqt import mw
+
+        from ankihub.sync import AnkiHubImporter
+        from ankihub.utils import all_dids
+
+        anki_session = anki_session_with_addon
+        with anki_session.profile_loaded():
+
+            first_local_did = import_sample_ankihub_deck(mw)
+
+            # move cards to another deck and remove the original one
+            other_deck = mw.col.decks.add_normal_deck_with_name("other deck").id
+            cids = mw.col.find_cards(f"deck:{mw.col.decks.name(first_local_did)}")
+            assert len(cids) == 3
+            mw.col.set_deck(cids, other_deck)
+            mw.col.decks.remove([first_local_did])
+
+            ankihub_deck_uuid = UUID_1
+            dids_before_import = all_dids()
+            ankihub_importer = AnkiHubImporter()
+            second_local_id = ankihub_importer._import_ankihub_deck_inner(
+                ankihub_did=str(ankihub_deck_uuid),
+                notes_data=ankihub_sample_deck_notes_data(),
+                deck_name="test",
+                remote_note_types={},
+                protected_fields={},
+                protected_tags=[],
+                local_did=first_local_did,
+            )
+            new_dids = all_dids() - dids_before_import
+
+            # deck with first_local_did should be recreated
+            assert len(new_dids) == 1
+            assert list(new_dids)[0] == first_local_did
+            assert second_local_id == first_local_did
+
+            # no notes should be changed because they already exist
+            assert len(ankihub_importer.created_nids) == 0
+            assert len(ankihub_importer.updated_nids) == 0
+
+            assert_that_only_ankihub_sample_deck_info_in_database(
+                ankihub_deck_uuid=ankihub_deck_uuid
+            )
+
+    def test_update_deck_with_subdecks(self, anki_session_with_addon: AnkiSession):
+        from aqt import mw
+
+        from ankihub.settings import config
+        from ankihub.subdecks import SUBDECK_TAG
+        from ankihub.sync import AnkiHubImporter
+        from ankihub.utils import all_dids
+
+        anki_session = anki_session_with_addon
+        with anki_session.profile_loaded():
+
+            ah_did = UUID_1
+            anki_did = import_sample_ankihub_deck(mw, ankihub_did=ah_did)
+            # this would not be necessary if deck configs were saved in the AnkiHub DB
+            config.save_subscription(
+                name="Testdeck", ankihub_did=ah_did, anki_did=anki_did
+            )
+
+            # add a subdeck tag to a note
+            notes_data = ankihub_sample_deck_notes_data()
+            note_data = notes_data[0]
+            note_data.tags = [f"{SUBDECK_TAG}::Testdeck::A::B"]
+            note = mw.col.get_note(note_data.anki_nid)
+
+            # import the deck again, now with the changed note data
+            dids_before_import = all_dids()
+            ankihub_importer = AnkiHubImporter()
+            second_local_did = ankihub_importer._import_ankihub_deck_inner(
+                ankihub_did=ah_did,
+                notes_data=notes_data,
+                deck_name="test",
+                remote_note_types={},
+                protected_fields={},
+                protected_tags=[],
+                local_did=anki_did,
+                subdecks=True,
+            )
+            new_dids = all_dids() - dids_before_import
+
+            # assert that two new decks were created
+            assert len(new_dids) == 2
+            assert anki_did == second_local_did
+            assert mw.col.decks.by_name("Testdeck::A::B") is not None
+
+            # one note should be updated
+            assert len(ankihub_importer.created_nids) == 0
+            assert len(ankihub_importer.updated_nids) == 1
+
+            assert_that_only_ankihub_sample_deck_info_in_database(
+                ankihub_deck_uuid=ah_did
+            )
+
+            # check that cards of the note were moved to the subdeck
+            assert note.cards()
+            for card in note.cards():
+                assert card.did == mw.col.decks.id_for_name("Testdeck::A::B")
+
+    def test_suspend_new_cards_of_existing_notes(
+        self, anki_session_with_addon: AnkiSession, monkeypatch
+    ):
+        from anki.consts import QUEUE_TYPE_SUSPENDED
+
+        from ankihub.ankihub_client import Field, NoteInfo
+        from ankihub.settings import config
+        from ankihub.sync import AnkiHubImporter
+
+        anki_session = anki_session_with_addon
+        with anki_session.profile_loaded():
+            mw = anki_session.mw
+
+            ankihub_cloze = create_ankihub_version_of_note_type(
+                mw, mw.col.models.by_name("Cloze")
+            )
+
+            def test_case(suspend_existing_card_before_update: bool):
+                # create a cloze note with one card, optionally suspend the existing card,
+                # then update the note using AnkiHubImporter adding a new cloze
+                # which results in a new card getting created for the added cloze
+
+                note = mw.col.new_note(ankihub_cloze)
+                note["Text"] = "{{c1::foo}}"
+                mw.col.add_note(note, 0)
+
+                if suspend_existing_card_before_update:
+                    # suspend the only card of the note
+                    card = note.cards()[0]
+                    card.queue = QUEUE_TYPE_SUSPENDED
+                    card.flush()
+
+                # update the note using the AnkiHub importer
+                note_data = NoteInfo(
+                    anki_nid=note.id,
+                    ankihub_note_uuid=UUID_1,
+                    fields=[
+                        Field(name="Text", value="{{c1::foo}} {{c2::bar}}", order=0)
+                    ],
+                    tags=[],
+                    mid=note.model()["id"],
+                    last_update_type=None,
+                    guid=note.guid,
+                )
+                importer = AnkiHubImporter()
+                updated_note = importer.update_or_create_note(
+                    note_data=note_data,
+                    anki_did=0,
+                    protected_fields={},
+                    protected_tags=[],
+                    first_import_of_deck=False,
+                )
+                assert len(updated_note.cards()) == 2
+                return updated_note
+
+            def new_card(note: Note):
+                # the card with the higher was created later
+                return max(note.cards(), key=lambda c: c.id)
+
+            # test "always" option
+            config.public_config["suspend_new_cards_of_existing_notes"] = "always"
+
+            updated_note = test_case(suspend_existing_card_before_update=False)
+            assert new_card(updated_note).queue == QUEUE_TYPE_SUSPENDED
+
+            updated_note = test_case(suspend_existing_card_before_update=True)
+            assert new_card(updated_note).queue == QUEUE_TYPE_SUSPENDED
+
+            # test "never" option
+            config.public_config["suspend_new_cards_of_existing_notes"] = "never"
+
+            updated_note = test_case(suspend_existing_card_before_update=False)
+            assert new_card(updated_note).queue != QUEUE_TYPE_SUSPENDED
+
+            updated_note = test_case(suspend_existing_card_before_update=True)
+            assert new_card(updated_note).queue != QUEUE_TYPE_SUSPENDED
+
+            # test "if_siblings_are_suspended" option
+            config.public_config[
+                "suspend_new_cards_of_existing_notes"
+            ] = "if_siblings_are_suspended"
+
+            updated_note = test_case(suspend_existing_card_before_update=False)
+            assert all(
+                card.queue != QUEUE_TYPE_SUSPENDED for card in updated_note.cards()
+            )
+
+            updated_note = test_case(suspend_existing_card_before_update=True)
+            assert all(
+                card.queue == QUEUE_TYPE_SUSPENDED for card in updated_note.cards()
+            )
 
 
 def assert_that_only_ankihub_sample_deck_info_in_database(ankihub_deck_uuid: uuid.UUID):
@@ -641,330 +969,6 @@ def assert_that_only_ankihub_sample_deck_info_in_database(ankihub_deck_uuid: uui
 
     assert ankihub_db.ankihub_deck_ids() == [ankihub_deck_uuid]
     assert len(ankihub_db.anki_nids_for_ankihub_deck(str(ankihub_deck_uuid))) == 3
-
-
-def test_import_existing_ankihub_deck_2(anki_session_with_addon: AnkiSession):
-    from aqt import mw
-
-    from ankihub.sync import AnkiHubImporter
-    from ankihub.utils import all_dids
-
-    anki_session = anki_session_with_addon
-    with anki_session.profile_loaded():
-
-        # import the apkg
-        file = str(ANKIHUB_SAMPLE_DECK_APKG.absolute())
-        importer = AnkiPackageImporter(mw.col, file)
-        importer.run()
-
-        # move one card to another deck
-        other_deck_id = mw.col.decks.add_normal_deck_with_name("other deck").id
-        cids = mw.col.find_cards("deck:Testdeck")
-        assert len(cids) == 3
-        mw.col.set_deck([cids[0]], other_deck_id)
-
-        ankihub_deck_uuid = UUID_1
-        dids_before_import = all_dids()
-        ankihub_importer = AnkiHubImporter()
-        local_did = ankihub_importer._import_ankihub_deck_inner(
-            ankihub_did=str(ankihub_deck_uuid),
-            notes_data=ankihub_sample_deck_notes_data(),
-            deck_name="test",
-            remote_note_types={},
-            protected_fields={},
-            protected_tags=[],
-        )
-        new_dids = all_dids() - dids_before_import
-
-        # when the existing cards are in multiple seperate decks a new deck is created
-        assert len(new_dids) == 1
-        assert local_did == list(new_dids)[0]
-
-        # no notes should be changed because they already exist
-        assert len(ankihub_importer.created_nids) == 0
-        assert len(ankihub_importer.updated_nids) == 0
-
-        assert_that_only_ankihub_sample_deck_info_in_database(
-            ankihub_deck_uuid=ankihub_deck_uuid
-        )
-
-
-def test_import_existing_ankihub_deck_3(anki_session_with_addon: AnkiSession):
-    from aqt import mw
-
-    from ankihub.sync import AnkiHubImporter
-    from ankihub.utils import all_dids
-
-    anki_session = anki_session_with_addon
-    with anki_session.profile_loaded():
-
-        # import the apkg
-        file = str(ANKIHUB_SAMPLE_DECK_APKG.absolute())
-        importer = AnkiPackageImporter(mw.col, file)
-        importer.run()
-        existing_did = mw.col.decks.id_for_name("Testdeck")
-
-        # modify two notes
-        note_1 = mw.col.get_note(1608240057545)
-        note_1["Front"] = "new front"
-
-        note_2 = mw.col.get_note(1656968819662)
-        note_2.tags.append("foo")
-
-        mw.col.update_notes([note_1, note_2])
-
-        # delete one note
-        mw.col.remove_notes([1608240029527])
-
-        ankihub_deck_uuid = UUID_1
-        dids_before_import = all_dids()
-        ankihub_importer = AnkiHubImporter()
-        local_did = ankihub_importer._import_ankihub_deck_inner(
-            ankihub_did=str(ankihub_deck_uuid),
-            notes_data=ankihub_sample_deck_notes_data(),
-            deck_name="test",
-            remote_note_types={},
-            protected_fields={},
-            protected_tags=[],
-        )
-        new_dids = all_dids() - dids_before_import
-
-        assert not new_dids
-        assert local_did == existing_did
-
-        assert len(ankihub_importer.created_nids) == 1
-        assert len(ankihub_importer.updated_nids) == 2
-
-        assert_that_only_ankihub_sample_deck_info_in_database(
-            ankihub_deck_uuid=ankihub_deck_uuid
-        )
-
-
-def test_update_ankihub_deck(anki_session_with_addon: AnkiSession):
-    from aqt import mw
-
-    from ankihub.sync import AnkiHubImporter
-    from ankihub.utils import all_dids
-
-    anki_session = anki_session_with_addon
-    with anki_session.profile_loaded():
-
-        first_local_did = import_sample_ankihub_deck(mw)
-
-        ankihub_deck_uuid = UUID_1
-        dids_before_import = all_dids()
-        ankihub_importer = AnkiHubImporter()
-        second_local_did = ankihub_importer._import_ankihub_deck_inner(
-            ankihub_did=str(ankihub_deck_uuid),
-            notes_data=ankihub_sample_deck_notes_data(),
-            deck_name="test",
-            remote_note_types={},
-            protected_fields={},
-            protected_tags=[],
-            local_did=first_local_did,
-        )
-        new_dids = all_dids() - dids_before_import
-
-        assert len(new_dids) == 0
-        assert first_local_did == second_local_did
-
-        # no notes should be changed because they already exist
-        assert len(ankihub_importer.created_nids) == 0
-        assert len(ankihub_importer.updated_nids) == 0
-
-        assert_that_only_ankihub_sample_deck_info_in_database(
-            ankihub_deck_uuid=ankihub_deck_uuid
-        )
-
-
-def test_update_ankihub_deck_when_deck_was_deleted(
-    anki_session_with_addon: AnkiSession,
-):
-    from aqt import mw
-
-    from ankihub.sync import AnkiHubImporter
-    from ankihub.utils import all_dids
-
-    anki_session = anki_session_with_addon
-    with anki_session.profile_loaded():
-
-        first_local_did = import_sample_ankihub_deck(mw)
-
-        # move cards to another deck and remove the original one
-        other_deck = mw.col.decks.add_normal_deck_with_name("other deck").id
-        cids = mw.col.find_cards(f"deck:{mw.col.decks.name(first_local_did)}")
-        assert len(cids) == 3
-        mw.col.set_deck(cids, other_deck)
-        mw.col.decks.remove([first_local_did])
-
-        ankihub_deck_uuid = UUID_1
-        dids_before_import = all_dids()
-        ankihub_importer = AnkiHubImporter()
-        second_local_id = ankihub_importer._import_ankihub_deck_inner(
-            ankihub_did=str(ankihub_deck_uuid),
-            notes_data=ankihub_sample_deck_notes_data(),
-            deck_name="test",
-            remote_note_types={},
-            protected_fields={},
-            protected_tags=[],
-            local_did=first_local_did,
-        )
-        new_dids = all_dids() - dids_before_import
-
-        # deck with first_local_did should be recreated
-        assert len(new_dids) == 1
-        assert list(new_dids)[0] == first_local_did
-        assert second_local_id == first_local_did
-
-        # no notes should be changed because they already exist
-        assert len(ankihub_importer.created_nids) == 0
-        assert len(ankihub_importer.updated_nids) == 0
-
-        assert_that_only_ankihub_sample_deck_info_in_database(
-            ankihub_deck_uuid=ankihub_deck_uuid
-        )
-
-
-def test_update_ankihub_deck_with_subdecks(anki_session_with_addon: AnkiSession):
-    from aqt import mw
-
-    from ankihub.settings import config
-    from ankihub.subdecks import SUBDECK_TAG
-    from ankihub.sync import AnkiHubImporter
-    from ankihub.utils import all_dids
-
-    anki_session = anki_session_with_addon
-    with anki_session.profile_loaded():
-
-        ah_did = UUID_1
-        anki_did = import_sample_ankihub_deck(mw, ankihub_did=ah_did)
-        # this would not be necessary if deck configs were saved in the AnkiHub DB
-        config.save_subscription(name="Testdeck", ankihub_did=ah_did, anki_did=anki_did)
-
-        # add a subdeck tag to a note
-        notes_data = ankihub_sample_deck_notes_data()
-        note_data = notes_data[0]
-        note_data.tags = [f"{SUBDECK_TAG}::Testdeck::A::B"]
-        note = mw.col.get_note(note_data.anki_nid)
-
-        # import the deck again, now with the changed note data
-        dids_before_import = all_dids()
-        ankihub_importer = AnkiHubImporter()
-        second_local_did = ankihub_importer._import_ankihub_deck_inner(
-            ankihub_did=ah_did,
-            notes_data=notes_data,
-            deck_name="test",
-            remote_note_types={},
-            protected_fields={},
-            protected_tags=[],
-            local_did=anki_did,
-            subdecks=True,
-        )
-        new_dids = all_dids() - dids_before_import
-
-        # assert that two new decks were created
-        assert len(new_dids) == 2
-        assert anki_did == second_local_did
-        assert mw.col.decks.by_name("Testdeck::A::B") is not None
-
-        # one note should be updated
-        assert len(ankihub_importer.created_nids) == 0
-        assert len(ankihub_importer.updated_nids) == 1
-
-        assert_that_only_ankihub_sample_deck_info_in_database(ankihub_deck_uuid=ah_did)
-
-        # check that cards of the note were moved to the subdeck
-        assert note.cards()
-        for card in note.cards():
-            assert card.did == mw.col.decks.id_for_name("Testdeck::A::B")
-
-
-def test_suspend_new_cards_of_existing_notes(
-    anki_session_with_addon: AnkiSession, monkeypatch
-):
-    from anki.consts import QUEUE_TYPE_SUSPENDED
-    from aqt import AnkiQt
-
-    from ankihub.ankihub_client import Field, NoteInfo
-    from ankihub.settings import config
-    from ankihub.sync import AnkiHubImporter
-
-    anki_session = anki_session_with_addon
-    with anki_session.profile_loaded():
-        mw: AnkiQt = anki_session.mw
-
-        ankihub_cloze = create_ankihub_version_of_note_type(
-            mw, mw.col.models.by_name("Cloze")
-        )
-
-        def test_case(suspend_existing_card_before_update: bool):
-            # create a cloze note with one card, optionally suspend the existing card,
-            # then update the note using AnkiHubImporter adding a new cloze
-            # which results in a new card getting created for the added cloze
-
-            note = mw.col.new_note(ankihub_cloze)
-            note["Text"] = "{{c1::foo}}"
-            mw.col.add_note(note, 0)
-
-            if suspend_existing_card_before_update:
-                # suspend the only card of the note
-                card = note.cards()[0]
-                card.queue = QUEUE_TYPE_SUSPENDED
-                card.flush()
-
-            # update the note using the AnkiHub importer
-            note_data = NoteInfo(
-                anki_nid=note.id,
-                ankihub_note_uuid=UUID_1,
-                fields=[Field(name="Text", value="{{c1::foo}} {{c2::bar}}", order=0)],
-                tags=[],
-                mid=note.model()["id"],
-                last_update_type=None,
-                guid=note.guid,
-            )
-            importer = AnkiHubImporter()
-            updated_note = importer.update_or_create_note(
-                note_data=note_data,
-                anki_did=0,
-                protected_fields={},
-                protected_tags=[],
-                first_import_of_deck=False,
-            )
-            assert len(updated_note.cards()) == 2
-            return updated_note
-
-        def new_card(note: Note):
-            # the card with the higher was created later
-            return max(note.cards(), key=lambda c: c.id)
-
-        # test "always" option
-        config.public_config["suspend_new_cards_of_existing_notes"] = "always"
-
-        updated_note = test_case(suspend_existing_card_before_update=False)
-        assert new_card(updated_note).queue == QUEUE_TYPE_SUSPENDED
-
-        updated_note = test_case(suspend_existing_card_before_update=True)
-        assert new_card(updated_note).queue == QUEUE_TYPE_SUSPENDED
-
-        # test "never" option
-        config.public_config["suspend_new_cards_of_existing_notes"] = "never"
-
-        updated_note = test_case(suspend_existing_card_before_update=False)
-        assert new_card(updated_note).queue != QUEUE_TYPE_SUSPENDED
-
-        updated_note = test_case(suspend_existing_card_before_update=True)
-        assert new_card(updated_note).queue != QUEUE_TYPE_SUSPENDED
-
-        # test "if_siblings_are_suspended" option
-        config.public_config[
-            "suspend_new_cards_of_existing_notes"
-        ] = "if_siblings_are_suspended"
-
-        updated_note = test_case(suspend_existing_card_before_update=False)
-        assert all(card.queue != QUEUE_TYPE_SUSPENDED for card in updated_note.cards())
-
-        updated_note = test_case(suspend_existing_card_before_update=True)
-        assert all(card.queue == QUEUE_TYPE_SUSPENDED for card in updated_note.cards())
 
 
 def create_ankihub_version_of_note_type(mw, note_type: NotetypeDict) -> NotetypeDict:
@@ -2394,8 +2398,6 @@ def test_suggest_note_update_with_image(
 ):
     import tempfile
 
-    from aqt.main import AnkiQt
-
     from ankihub.ankihub_client import SuggestionType
     from ankihub.db import ankihub_db
     from ankihub.settings import API_URL_BASE
@@ -2403,7 +2405,7 @@ def test_suggest_note_update_with_image(
 
     anki_session = anki_session_with_addon
     with anki_session.profile_loaded():
-        mw: AnkiQt = anki_session.mw
+        mw = anki_session.mw
 
         fake_presigned_url = "https://fake_presigned_url.com"
         monkeypatch.setattr(
