@@ -9,6 +9,7 @@ from unittest.mock import MagicMock
 
 import pytest
 import requests_mock
+from pytest import MonkeyPatch
 from vcr import VCR
 
 COMPOSE_FILE = Path(os.getenv("COMPOSE_FILE")) if os.getenv("COMPOSE_FILE") else None
@@ -202,7 +203,7 @@ def test_client_login_and_signout_with_email(client):
 
 
 @pytest.mark.vcr()
-def test_download_deck(authorized_client_for_user_test1, monkeypatch):
+def test_download_deck(authorized_client_for_user_test1, monkeypatch: MonkeyPatch):
     from ankihub.ankihub_client import AnkiHubClient, Deck
 
     client: AnkiHubClient = authorized_client_for_user_test1
@@ -231,7 +232,7 @@ def test_download_deck(authorized_client_for_user_test1, monkeypatch):
 
 
 @pytest.mark.vcr()
-def test_download_compressed_deck(authorized_client_for_user_test1, monkeypatch):
+def test_download_compressed_deck(authorized_client_for_user_test1, monkeypatch: MonkeyPatch):
     from ankihub.ankihub_client import AnkiHubClient, Deck
 
     client: AnkiHubClient = authorized_client_for_user_test1
@@ -260,7 +261,7 @@ def test_download_compressed_deck(authorized_client_for_user_test1, monkeypatch)
 
 
 @pytest.mark.vcr()
-def test_download_deck_with_progress(authorized_client_for_user_test1, monkeypatch):
+def test_download_deck_with_progress(authorized_client_for_user_test1, monkeypatch: MonkeyPatch):
     from ankihub.ankihub_client import AnkiHubClient, Deck
     from ankihub.gui.decks import download_progress_cb
 

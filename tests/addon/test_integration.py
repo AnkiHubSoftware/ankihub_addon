@@ -17,6 +17,7 @@ from anki.models import NotetypeDict, NotetypeId
 from anki.notes import Note, NoteId
 from aqt.importing import AnkiPackageImporter
 from aqt.qt import Qt
+from pytest import MonkeyPatch
 from pytest_anki import AnkiSession
 from pytestqt.qtbot import QtBot
 from requests_mock import Mocker
@@ -51,7 +52,7 @@ def test_entry_point(anki_session_with_addon: AnkiSession):
 def test_editor(
     anki_session_with_addon: AnkiSession,
     requests_mock: Mocker,
-    monkeypatch,
+    monkeypatch: MonkeyPatch,
     disable_image_support_feature_flag,
 ):
     from ankihub.db import ankihub_db
@@ -400,7 +401,9 @@ def test_suggest_new_note(
         assert exc is not None and exc.response.status_code == 403
 
 
-def test_suggest_notes_in_bulk(anki_session_with_addon: AnkiSession, monkeypatch):
+def test_suggest_notes_in_bulk(
+    anki_session_with_addon: AnkiSession, monkeypatch: MonkeyPatch
+):
     from uuid import UUID
 
     from ankihub.ankihub_client import (
@@ -2082,7 +2085,7 @@ def test_migrate_profile_data_from_old_location(
     }
 
 
-def test_profile_swap(anki_session_with_addon: AnkiSession, monkeypatch):
+def test_profile_swap(anki_session_with_addon: AnkiSession, monkeypatch: MonkeyPatch):
     from ankihub import entry_point
     from ankihub.db import ankihub_db
     from ankihub.settings import config, profile_files_path
@@ -2412,7 +2415,7 @@ def test_reset_optional_tags_action(
 
 def test_upload_images(
     anki_session_with_addon: AnkiSession,
-    monkeypatch,
+    monkeypatch: MonkeyPatch,
     requests_mock: Mocker,
 ):
     import tempfile
@@ -2446,7 +2449,7 @@ class TestSuggestionsWithImages:
         self,
         anki_session_with_addon: AnkiSession,
         requests_mock: Mocker,
-        monkeypatch,
+        monkeypatch: MonkeyPatch,
         enable_image_support_feature_flag,
     ):
         import tempfile
@@ -2510,7 +2513,7 @@ class TestSuggestionsWithImages:
         self,
         anki_session_with_addon: AnkiSession,
         requests_mock: Mocker,
-        monkeypatch,
+        monkeypatch: MonkeyPatch,
         enable_image_support_feature_flag,
     ):
         import tempfile

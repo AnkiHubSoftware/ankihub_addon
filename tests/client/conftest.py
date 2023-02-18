@@ -2,12 +2,13 @@ import pathlib
 from unittest.mock import MagicMock
 
 import pytest
+from pytest import MonkeyPatch
 
 ROOT = pathlib.Path(__file__).parent.parent.parent
 
 
 @pytest.fixture(autouse=True)
-def mw_mock(monkeypatch):
+def mw_mock(monkeypatch: MonkeyPatch):
     """Mock the AnkiQt object."""
 
     import aqt

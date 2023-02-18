@@ -4,6 +4,7 @@ import uuid
 from pathlib import Path
 
 import pytest
+from pytest import MonkeyPatch
 from pytest_anki import AnkiSession
 from requests_mock import Mocker
 
@@ -16,7 +17,7 @@ TEST_PROFILE_ID = uuid.UUID("11111111-1111-1111-1111-111111111111")
 
 @pytest.fixture(scope="function")
 def anki_session_with_addon(
-    anki_session: AnkiSession, requests_mock: Mocker, monkeypatch
+    anki_session: AnkiSession, requests_mock: Mocker, monkeypatch: MonkeyPatch
 ) -> AnkiSession:
     """Sets up the add-on, config and database and returns the AnkiSession.
     Does similar setup like in profile_setup in entry_point.py.
