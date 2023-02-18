@@ -1797,6 +1797,7 @@ def test_browser_custom_columns(anki_session_with_addon: AnkiSession, qtbot: QtB
 
 class TestBuildSubdecksAndMoveCardsToThem:
     def test_basic(
+        self,
         anki_session_with_addon: AnkiSession,
     ):
         from ankihub.settings import config
@@ -1835,6 +1836,7 @@ class TestBuildSubdecksAndMoveCardsToThem:
                 assert mw.col.decks.name(card.did) == "Testdeck::B::C"
 
     def test_empty_decks_get_deleted(
+        self,
         anki_session_with_addon: AnkiSession,
     ):
 
@@ -1865,6 +1867,7 @@ class TestBuildSubdecksAndMoveCardsToThem:
             assert mw.col.decks.id("Testdeck::empty::A", create=False) is None
 
     def test_notes_not_moved_out_filtered_decks(
+        self,
         anki_session_with_addon: AnkiSession,
     ):
         from anki.decks import FilteredDeckConfig
@@ -1920,6 +1923,7 @@ class TestBuildSubdecksAndMoveCardsToThem:
                 assert mw.col.decks.name(card.odid) == "Testdeck::B::C"
 
     def test_note_without_subdeck_tag_not_moved(
+        self,
         anki_session_with_addon: AnkiSession,
     ):
         from ankihub.settings import config
