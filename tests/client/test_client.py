@@ -232,7 +232,9 @@ def test_download_deck(authorized_client_for_user_test1, monkeypatch: MonkeyPatc
 
 
 @pytest.mark.vcr()
-def test_download_compressed_deck(authorized_client_for_user_test1, monkeypatch: MonkeyPatch):
+def test_download_compressed_deck(
+    authorized_client_for_user_test1, monkeypatch: MonkeyPatch
+):
     from ankihub.ankihub_client import AnkiHubClient, Deck
 
     client: AnkiHubClient = authorized_client_for_user_test1
@@ -261,7 +263,9 @@ def test_download_compressed_deck(authorized_client_for_user_test1, monkeypatch:
 
 
 @pytest.mark.vcr()
-def test_download_deck_with_progress(authorized_client_for_user_test1, monkeypatch: MonkeyPatch):
+def test_download_deck_with_progress(
+    authorized_client_for_user_test1, monkeypatch: MonkeyPatch
+):
     from ankihub.ankihub_client import AnkiHubClient, Deck
     from ankihub.gui.decks import download_progress_cb
 
