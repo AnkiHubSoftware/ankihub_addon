@@ -15,6 +15,7 @@ from anki.cards import CardId
 from anki.decks import DeckId
 from anki.models import NotetypeDict, NotetypeId
 from anki.notes import Note, NoteId
+from aqt import AnkiQt
 from aqt.importing import AnkiPackageImporter
 from aqt.qt import Qt
 from pytest import MonkeyPatch
@@ -224,9 +225,7 @@ def test_create_collaborative_deck_and_upload(
 
             # check that deck info is in db
             assert ankihub_db.ankihub_deck_ids() == [ankihub_deck_uuid]
-            assert (
-                len(ankihub_db.anki_nids_for_ankihub_deck(str(ankihub_deck_uuid))) == 3
-            )
+            assert len(ankihub_db.anki_nids_for_ankihub_deck(ankihub_deck_uuid)) == 3
 
 
 def test_get_deck_by_id(requests_mock):
@@ -291,7 +290,7 @@ def test_suggest_note_update(
     with anki_session.profile_loaded():
         mw = anki_session.mw
 
-        import_sample_ankihub_deck(mw, str(UUID_1))
+        import_sample_ankihub_deck(mw, ankihub_did=UUID_1)
         notes_data: NoteInfo = ankihub_sample_deck_notes_data()
         note = mw.col.get_note(notes_data[0].anki_nid)
         ankihub_note_uuid = notes_data[0].ankihub_note_uuid
@@ -355,7 +354,7 @@ def test_suggest_new_note(
     with anki_session.profile_loaded():
         mw = anki_session.mw
 
-        import_sample_ankihub_deck(mw, str(UUID_1))
+        import_sample_ankihub_deck(mw, ankihub_did=UUID_1)
         note = mw.col.new_note(mw.col.models.by_name("Basic (Testdeck / user1)"))
         ankihub_deck_uuid = UUID_1
 
@@ -424,7 +423,7 @@ def test_suggest_notes_in_bulk(
     with anki_session.profile_loaded():
         mw = anki_session.mw
 
-        anki_did = import_sample_ankihub_deck(mw, str(UUID_1))
+        anki_did = import_sample_ankihub_deck(mw, ankihub_did=UUID_1)
 
         # add a new note
         new_note = mw.col.new_note(mw.col.models.by_name("Basic (Testdeck / user1)"))
@@ -1028,7 +1027,9 @@ def assert_that_only_ankihub_sample_deck_info_in_database(ankihub_deck_uuid: uui
     assert len(ankihub_db.anki_nids_for_ankihub_deck(str(ankihub_deck_uuid))) == 3
 
 
-def create_ankihub_version_of_note_type(mw, note_type: NotetypeDict) -> NotetypeDict:
+def create_ankihub_version_of_note_type(
+    mw: AnkiQt, note_type: NotetypeDict
+) -> NotetypeDict:
     from ankihub.utils import modify_note_type
 
     note_type["id"] = 0
@@ -1105,7 +1106,7 @@ def import_sample_ankihub_deck(
     return local_did
 
 
-def import_note_types_for_sample_deck(mw):
+def import_note_types_for_sample_deck(mw: AnkiQt):
     from ankihub.utils import all_dids
 
     # import the apkg to get the note types, then delete created decks
@@ -1135,7 +1136,7 @@ class TestPrepareNote:
         with anki_session_with_addon.profile_loaded():
             mw = anki_session.mw
 
-            ankihub_nid = str(UUID_1)
+            ankihub_nid = UUID_1
 
             def prepare_note(
                 note,
@@ -1148,7 +1149,7 @@ class TestPrepareNote:
                 guid: Optional[str] = None,
             ):
                 note_data = NoteInfo(
-                    ankihub_note_uuid=str(UUID_1),
+                    ankihub_note_uuid=ankihub_nid,
                     anki_nid=note.id,
                     fields=fields or [],
                     tags=tags or [],
@@ -1159,7 +1160,7 @@ class TestPrepareNote:
 
                 ankihub_importer = AnkiHubImporter()
                 result = ankihub_importer.prepare_note(
-                    note,
+                    note=note,
                     note_data=note_data,
                     protected_fields=protected_fields,
                     protected_tags=protected_tags,
@@ -1178,7 +1179,7 @@ class TestPrepareNote:
                 note = mw.col.new_note(ankihub_basic)
                 note["Front"] = "old front"
                 note["Back"] = "old back"
-                note[ANKIHUB_NOTE_TYPE_FIELD_NAME] = ankihub_nid
+                note[ANKIHUB_NOTE_TYPE_FIELD_NAME] = str(ankihub_nid)
                 note.tags = []
                 note.id = 42  # to simulate an existing note
                 note.guid = "old guid"
@@ -1292,7 +1293,7 @@ class TestPrepareNote:
         with anki_session_with_addon.profile_loaded():
             mw = anki_session.mw
 
-            ankihub_nid = str(UUID_1)
+            ankihub_nid = UUID_1
 
             def prepare_note(
                 note,
@@ -1341,7 +1342,7 @@ class TestPrepareNote:
                 note = mw.col.new_note(ankihub_basic)
                 note[field_name_with_spaces] = "old front"
                 note["Back"] = "old back"
-                note[ANKIHUB_NOTE_TYPE_FIELD_NAME] = ankihub_nid
+                note[ANKIHUB_NOTE_TYPE_FIELD_NAME] = str(ankihub_nid)
                 note.tags = []
                 note.id = 42  # to simulate an existing note
                 return note
@@ -1506,7 +1507,7 @@ class TestCustomSearchNodes:
                 m["id"]: m for m in mw.col.models.all() if "/" in m["name"]
             }
             AnkiHubImporter()._import_ankihub_deck_inner(
-                str(UUID_1),
+                ankihub_did=UUID_1,
                 notes_data=notes_data,
                 remote_note_types=ankihub_models,
                 protected_fields={},
@@ -1545,7 +1546,7 @@ class TestCustomSearchNodes:
                 m["id"]: m for m in mw.col.models.all() if "/" in m["name"]
             }
             AnkiHubImporter()._import_ankihub_deck_inner(
-                str(UUID_1),
+                ankihub_did=UUID_1,
                 notes_data=notes_data,
                 remote_note_types=ankihub_models,
                 protected_fields={},
@@ -1620,7 +1621,7 @@ class TestCustomSearchNodes:
                 )
 
 
-def record_review(mw, cid: CardId):
+def record_review(mw: AnkiQt, cid: CardId):
     mw.col.db.execute(
         "INSERT INTO revlog VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)",
         int(datetime.now().timestamp()) * 1000,
@@ -2483,7 +2484,7 @@ class TestSuggestionsWithImages:
                 file_name_in_col = mw.col.media.add_file(f.name)
                 file_path_in_col = Path(mw.col.media.dir()) / file_name_in_col
 
-                import_sample_ankihub_deck(mw, str(UUID_1))
+                import_sample_ankihub_deck(mw, ankihub_did=UUID_1)
                 nids = mw.col.find_notes("")
                 note = mw.col.get_note(nids[0])
 
@@ -2529,7 +2530,7 @@ class TestSuggestionsWithImages:
         with anki_session.profile_loaded():
             mw = anki_session.mw
 
-            import_sample_ankihub_deck(mw, str(UUID_1))
+            import_sample_ankihub_deck(mw, ankihub_did=UUID_1)
             note = mw.col.new_note(mw.col.models.by_name("Basic (Testdeck / user1)"))
             ankihub_deck_uuid = UUID_1
 
