@@ -45,7 +45,13 @@ from ..note_conversion import (
     is_tag_for_group,
 )
 from ..reset_changes import reset_local_changes_to_notes
-from ..settings import ANKIHUB_NOTE_TYPE_FIELD_NAME, AnkiHubCommands, DeckConfig, config
+from ..settings import (
+    ANKIHUB_NOTE_TYPE_FIELD_NAME,
+    AnkiHubCommands,
+    DeckConfig,
+    DeckExtensionConfig,
+    config,
+)
 from ..subdecks import SUBDECK_TAG, build_subdecks_and_move_cards_to_them
 from ..suggestions import (
     ANKIHUB_NO_CHANGE_ERROR,
@@ -488,20 +494,25 @@ def _on_reset_optional_tags_action(browser: Browser):
                 parent=browser,
             )
 
-    tag_group = extension_config.tag_group_name
     mw.taskman.with_progress(
-        task=lambda: _remove_tags_of_tag_group(tag_group),
+        task=lambda: _remove_optional_tags_of_extension(
+            extension_config=extension_config
+        ),
         on_done=on_remove_tags_for_tag_group_done,
         label=f"Removing optional tags for {tag_group_name_with_deck}...",
     )
 
 
-def _remove_tags_of_tag_group(tag_group_name: str) -> None:
+def _remove_optional_tags_of_extension(extension_config: DeckExtensionConfig) -> None:
+    # only removes the tags for notes of the deck related to the deck extension,
+    # some people use the same tag group for multiple decks
     tags_for_tag_group = [
-        tag for tag in mw.col.tags.all() if is_tag_for_group(tag, tag_group_name)
+        tag
+        for tag in mw.col.tags.all()
+        if is_tag_for_group(tag, extension_config.tag_group_name)
     ]
-    for tag in tags_for_tag_group:
-        mw.col.tags.remove(tag)
+    nids = ankihub_db.anki_nids_for_ankihub_deck(extension_config.ankihub_deck_uuid)
+    mw.col.tags.bulk_remove(note_ids=nids, tags=" ".join(tags_for_tag_group))
 
 
 def _choose_deck(prompt: str) -> Tuple[Optional[uuid.UUID], Optional[DeckConfig]]:
