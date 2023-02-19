@@ -374,7 +374,7 @@ class AnkiHubClient:
         ankihub_did = uuid.UUID(response_data["deck_id"])
         return ankihub_did
 
-    def upload_images(self, image_paths: List[Path], bucket_path: str):
+    def upload_images(self, image_paths: List[Path], bucket_path: str) -> None:
         # TODO: send all images at once instad of looping through each one
         for image_path in image_paths:
             key = f"{bucket_path}/{image_path.name}"

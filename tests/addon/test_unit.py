@@ -1,37 +1,22 @@
 import uuid
-from typing import Callable
+from typing import Callable, List
 
 import factory
-from pytest import fixture
+from anki.notes import NoteId
 from pytest_anki import AnkiSession
 
 from ankihub.ankihub_client import Field, NoteInfo
-
-
-def _deterministic_uuid(x: int) -> uuid.UUID:
-    """Return a simple UUID with the given number in all places."""
-    return uuid.UUID("11111111-1111-1111-1111-111111111111".replace("1", str(x)))
-
-
-@fixture
-def next_deterministic_uuid() -> Callable[[], uuid.UUID]:
-    def get_next():
-        get_next.i += 1
-        return _deterministic_uuid(get_next.i)
-
-    get_next.i = 0
-    return get_next
 
 
 class NoteInfoFactory(factory.Factory):
     class Meta:
         model = NoteInfo
 
-    ankihub_note_uuid = _deterministic_uuid(1)
+    ankihub_note_uuid = factory.LazyFunction(uuid.uuid4)
     anki_nid = 1
     mid = 1
     fields = [Field(name="Front", value="front", order=0)]
-    tags = []
+    tags: List[str] = []
     guid = "11111"
 
 
@@ -241,10 +226,10 @@ class TestAnkiNidConflicts:
         with anki_session_with_addon.profile_loaded():
             # save two notes for one deck
             ah_did_1 = next_deterministic_uuid()
-            note_info_1 = NoteInfoFactory(
+            note_info_1 = NoteInfoFactory.build(
                 ankihub_note_uuid=next_deterministic_uuid(), anki_nid=1
             )
-            note_info_2 = NoteInfoFactory(
+            note_info_2 = NoteInfoFactory.build(
                 ankihub_note_uuid=next_deterministic_uuid(), anki_nid=2
             )
             ankihub_db.save_notes_data_and_mod_values(
@@ -253,7 +238,7 @@ class TestAnkiNidConflicts:
 
             # save one note for another deck with the same nid as the first note in the first deck
             ah_did_2 = next_deterministic_uuid()
-            note_info_3 = NoteInfoFactory(
+            note_info_3 = NoteInfoFactory.build(
                 ankihub_note_uuid=next_deterministic_uuid(), anki_nid=1
             )
 
@@ -284,7 +269,9 @@ class TestAnkiNidConflicts:
             assert conflicting_anki_nids == [1]
 
             # deactivate conflicting note for the first deck
-            ankihub_db.deactivate_notes_for_deck(ankihub_did=ah_did_1, anki_nids=[1])
+            ankihub_db.deactivate_notes_for_deck(
+                ankihub_did=ah_did_1, anki_nids=[NoteId(1)]
+            )
 
             # check that the two decks are not longer detected as conflicting
             assert not ankihub_db.all_conflicting_decks()
