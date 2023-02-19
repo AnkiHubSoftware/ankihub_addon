@@ -17,9 +17,9 @@ from . import LOGGER
 from .addon_ankihub_client import AddonAnkiHubClient as AnkiHubClient
 from .ankihub_client import NoteInfo
 from .db import ankihub_db
-from .subdecks import add_subdeck_tags_to_notes
 from .exporting import to_note_data
 from .settings import ANKIHUB_NOTE_TYPE_FIELD_NAME, config
+from .subdecks import add_subdeck_tags_to_notes
 from .utils import (
     change_note_type_of_note,
     create_backup,
@@ -72,9 +72,10 @@ def create_collaborative_deck(
     set_ankihub_id_fields_based_on_notes_data(notes_data)
 
     ankihub_did = upload_deck(deck_id, notes_data=notes_data, private=private)
-    ankihub_db.save_notes_data_and_mod_values(
+    ankihub_db.insert_or_update_notes_data(
         ankihub_did=ankihub_did, notes_data=notes_data
     )
+    ankihub_db.transfer_mod_values_from_anki_db(notes_data=notes_data)
     return ankihub_did
 
 

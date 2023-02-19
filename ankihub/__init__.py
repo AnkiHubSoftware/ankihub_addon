@@ -10,7 +10,7 @@ sys.path.insert(0, str(lib))
 
 LOGGER: logging.Logger = logging.getLogger("ankihub")
 
-SKIP_INIT = os.getenv("SKIP_INIT", False)
+SKIP_INIT = os.getenv("SKIP_INIT", True)
 LOGGER.info(f"SKIP_INIT: {SKIP_INIT}")
 
 

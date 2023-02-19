@@ -170,19 +170,25 @@ class AnkiHubDB:
         result = self.scalar("PRAGMA user_version;")
         return result
 
-    def save_notes_data_and_mod_values(
+    def insert_or_update_notes_data(
         self, ankihub_did: uuid.UUID, notes_data: List[NoteInfo]
     ):
-        """Save notes data in the AnkiHub DB.
-        It also takes mod values for the notes from the Anki DB and saves them to the AnkiHub DB.
-        This is why it should be be called after importing or exporting a deck.
-        (The mod values are used to determine if a note has been modified in Anki since it was last imported/exported.)
+        """Save notes data to the AnkiHub DB.
+        If a note with the same Anki nid already exists in the AnkiHub DB then the new note is marked as inactive.
         """
         with db_transaction() as conn:
             for note_data in notes_data:
-                mod = mw.col.db.scalar(
-                    f"SELECT mod FROM notes WHERE id = {note_data.anki_nid}",
+                conflicting_ah_nid = self.first(
+                    """
+                    SELECT ankihub_note_id FROM notes
+                    WHERE anki_note_id = ?
+                    AND ankihub_note_id != ?
+                    AND active = 1
+                    """,
+                    note_data.anki_nid,
+                    str(note_data.ankihub_note_uuid),
                 )
+
                 fields = join_fields(
                     [
                         field.value
@@ -198,11 +204,11 @@ class AnkiHubDB:
                         ankihub_deck_id,
                         anki_note_id,
                         anki_note_type_id,
-                        mod,
                         fields,
                         tags,
                         guid,
-                        last_update_type
+                        last_update_type,
+                        active
                     ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
                     """,
                     (
@@ -210,14 +216,36 @@ class AnkiHubDB:
                         str(ankihub_did),
                         note_data.anki_nid,
                         note_data.mid,
-                        mod,
                         fields,
                         mw.col.tags.join(note_data.tags),
                         note_data.guid,
                         note_data.last_update_type.value[0]
                         if note_data.last_update_type is not None
                         else None,
+                        # if there is another note with the same anki_note_id in the AnkiHub DB,
+                        # then this note is a duplicate and should be marked as inactive
+                        not bool(conflicting_ah_nid),
                     ),
+                )
+
+    def transfer_mod_values_from_anki_db(self, notes_data: List[NoteInfo]):
+        """Takes mod values for the notes from the Anki DB and saves them to the AnkiHub DB.
+        Should be be always called after importing notes or exporting notes after
+        the mod values in the Anki DB have been updated.
+        (The mod values are used to determine if a note has been modified in Anki since it was last imported/exported.)
+        """
+        with db_transaction() as conn:
+            for note_data in notes_data:
+                if not self.is_active(note_data.ankihub_note_uuid):
+                    continue
+
+                mod = mw.col.db.scalar(
+                    "SELECT mod FROM notes WHERE id = ?", note_data.anki_nid
+                )
+
+                conn.execute(
+                    "UPDATE notes SET mod = ? WHERE ankihub_note_id = ?",
+                    (mod, str(note_data.ankihub_note_uuid)),
                 )
 
     def reset_mod_values_in_anki_db(self, anki_nids: List[NoteId]) -> None:
@@ -320,7 +348,7 @@ class AnkiHubDB:
     ) -> None:
         self.execute(
             f"""
-            UPDATE notes SET active = 0 
+            UPDATE notes SET active = 0
             WHERE ankihub_deck_id = '{ankihub_did}'
             AND anki_note_id IN {ids2str(anki_nids)}
             """
@@ -332,6 +360,15 @@ class AnkiHubDB:
             UPDATE notes SET active = 1 WHERE ankihub_deck_id = '{ankihub_did}'
             """
         )
+
+    def is_active(self, ankihub_nid: uuid.UUID) -> bool:
+        result = self.scalar(
+            f"""
+            SELECT active FROM notes
+            WHERE ankihub_note_id = '{ankihub_nid}'
+            """
+        )
+        return bool(result)
 
     def note_data(self, anki_note_id: NoteId) -> Optional[NoteInfo]:
         # The AnkiHub note type of the note has to exist in the Anki DB, otherwise this will fail.

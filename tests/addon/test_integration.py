@@ -1029,6 +1029,7 @@ class TestAnkiHubImporter:
         from anki.consts import QUEUE_TYPE_SUSPENDED
 
         from ankihub.ankihub_client import Field, NoteInfo
+        from ankihub.db import ankihub_db
         from ankihub.settings import config
         from ankihub.sync import AnkiHubImporter
 
@@ -1039,6 +1040,9 @@ class TestAnkiHubImporter:
             ankihub_cloze = create_or_get_ah_version_of_note_type(
                 mw, mw.col.models.by_name("Cloze")
             )
+
+            ah_nid = next_deterministic_uuid()
+            ah_did = next_deterministic_uuid()
 
             def test_case(suspend_existing_card_before_update: bool):
                 # create a cloze note with one card, optionally suspend the existing card,
@@ -1058,7 +1062,7 @@ class TestAnkiHubImporter:
                 # update the note using the AnkiHub importer
                 note_data = NoteInfo(
                     anki_nid=note.id,
-                    ankihub_note_uuid=next_deterministic_uuid(),
+                    ankihub_note_uuid=ah_nid,
                     fields=[
                         Field(name="Text", value="{{c1::foo}} {{c2::bar}}", order=0)
                     ],
@@ -1067,8 +1071,14 @@ class TestAnkiHubImporter:
                     last_update_type=None,
                     guid=note.guid,
                 )
+
+                # note has to be active in the database or the importer won't update it
+                ankihub_db.insert_or_update_notes_data(
+                    ankihub_did=ah_did, notes_data=[note_data]
+                )
+
                 importer = AnkiHubImporter()
-                updated_note = importer.update_or_create_note(
+                updated_note = importer._update_or_create_note(
                     note_data=note_data,
                     anki_did=DeckId(0),
                     protected_fields={},
@@ -1078,27 +1088,27 @@ class TestAnkiHubImporter:
                 assert len(updated_note.cards()) == 2
                 return updated_note
 
-            def new_card(note: Note):
-                # the card with the higher was created later
+            def get_new_card(note: Note):
+                # the card with the higher id was created later
                 return max(note.cards(), key=lambda c: c.id)
 
             # test "always" option
             config.public_config["suspend_new_cards_of_existing_notes"] = "always"
 
             updated_note = test_case(suspend_existing_card_before_update=False)
-            assert new_card(updated_note).queue == QUEUE_TYPE_SUSPENDED
+            assert get_new_card(updated_note).queue == QUEUE_TYPE_SUSPENDED
 
             updated_note = test_case(suspend_existing_card_before_update=True)
-            assert new_card(updated_note).queue == QUEUE_TYPE_SUSPENDED
+            assert get_new_card(updated_note).queue == QUEUE_TYPE_SUSPENDED
 
             # test "never" option
             config.public_config["suspend_new_cards_of_existing_notes"] = "never"
 
             updated_note = test_case(suspend_existing_card_before_update=False)
-            assert new_card(updated_note).queue != QUEUE_TYPE_SUSPENDED
+            assert get_new_card(updated_note).queue != QUEUE_TYPE_SUSPENDED
 
             updated_note = test_case(suspend_existing_card_before_update=True)
-            assert new_card(updated_note).queue != QUEUE_TYPE_SUSPENDED
+            assert get_new_card(updated_note).queue != QUEUE_TYPE_SUSPENDED
 
             # test "if_siblings_are_suspended" option
             config.public_config[
@@ -1120,7 +1130,7 @@ class TestAnkiHubImporter:
         anki_session_with_addon: AnkiSession,
         install_sample_ah_deck: InstallSampleAHDeck,
     ):
-        from ankihub.db import AnkiHubDB
+        from ankihub.db import ankihub_db
         from ankihub.importing import AnkiHubImporter
 
         with anki_session_with_addon.profile_loaded():
@@ -1166,7 +1176,7 @@ class TestAnkiHubImporter:
             assert set(note.tags) == set(["tag1", "tag2", "protected_tag"])
 
             # assert that the note_data was saved correctly in the AnkiHub DB (without modifications)
-            note_data_from_db = AnkiHubDB().note_data(nid)
+            note_data_from_db = ankihub_db.note_data(nid)
             assert note_data_from_db == note_data
 
 
@@ -2276,7 +2286,7 @@ def test_sync_with_optional_content(
             deck_extension_id = 31
 
             notes_data = ankihub_sample_deck_notes_data()
-            ankihub_db.save_notes_data_and_mod_values(ankihub_deck_uuid, notes_data)
+            ankihub_db.insert_or_update_notes_data(ankihub_deck_uuid, notes_data)
             note_data = notes_data[0]
             note = mw.col.get_note(note_data.anki_nid)
 
