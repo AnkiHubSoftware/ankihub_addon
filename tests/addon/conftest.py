@@ -1,5 +1,6 @@
 import json
 import shutil
+from typing import Generator
 import uuid
 from pathlib import Path
 
@@ -25,7 +26,7 @@ TEST_PROFILE_ID = uuid.UUID("11111111-1111-1111-1111-111111111111")
 @pytest.fixture(scope="function", autouse=True)
 def anki_session_with_addon(
     anki_session: AnkiSession, requests_mock: Mocker, monkeypatch: MonkeyPatch
-) -> AnkiSession:
+) -> Generator[AnkiSession, None, None]:
     """Sets up the add-on, config and database and returns the AnkiSession.
     Does similar setup like in profile_setup in entry_point.py.
     """
