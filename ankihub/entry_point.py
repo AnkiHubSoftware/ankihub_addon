@@ -93,12 +93,15 @@ def general_setup():
     """Set up things that don't depend on the profile and should only be run once, even if the
     profile changes."""
 
+    setup_error_handler()
+    LOGGER.info("Set up error handler.")
+
     LOGGER.info(f"{ANKI_VERSION=}")
 
     mw.addonManager.setWebExports(__name__, r"gui/web/.*")
 
-    do_or_setup_ankihub_sync(after_startup_syncs=on_startup_syncs_done)
-    LOGGER.info("Registered on_after_ankiweb_sync")
+    setup_addons()
+    LOGGER.info("Set up addons.")
 
     setup_ankihub_menu()
     LOGGER.info("Set up AnkiHub menu.")
@@ -108,12 +111,6 @@ def general_setup():
 
     browser.setup()
     LOGGER.info("Set up browser.")
-
-    setup_addons()
-    LOGGER.info("Set up addons.")
-
-    setup_error_handler()
-    LOGGER.info("Set up error handler.")
 
     setup_progress_manager()
     LOGGER.info("Set up progress manager.")
@@ -128,13 +125,16 @@ def general_setup():
     profile_will_close.append(on_profile_will_close)
     LOGGER.debug("Set up profile_will_close hook.")
 
+    setup_ankihub_sync_and_maybe_sync(after_startup_syncs=on_startup_syncs_done)
+    LOGGER.info("Called setup_ankihub_sync_and_maybe_sync.")
+
 
 def on_startup_syncs_done() -> None:
     # Called after AnkiWeb sync and AnkiHub sync are done after starting Anki.
     check_ankihub_db(on_success=check_anki_db)
 
 
-def do_or_setup_ankihub_sync(after_startup_syncs: Callable[[], None]) -> None:
+def setup_ankihub_sync_and_maybe_sync(after_startup_syncs: Callable[[], None]) -> None:
     """
     If the auto_sync config option is set to "never", this only calls after_startup_syncs.
     If the user has the "auto_sync" config option set to "on_ankiweb_sync" or "on_startup",

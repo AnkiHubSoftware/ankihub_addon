@@ -33,7 +33,7 @@ def is_optional_tag(tag: str) -> bool:
 
 
 def is_tag_for_group(tag: str, group_name: str) -> bool:
-    return tag.startswith(f"{TAG_FOR_OPTIONAL_TAGS}::{group_name}::")
+    return tag.startswith(f"{TAG_FOR_OPTIONAL_TAGS}::{group_name.replace(' ', '_')}::")
 
 
 def get_fields_protected_by_tags(note: Note) -> List[str]:
