@@ -4,6 +4,7 @@ from aqt.utils import askUserDialog
 
 from . import LOGGER
 from .db import ankihub_db
+from .settings import config
 
 
 def resolve_conflicts_for_deck(ankihub_did: uuid.UUID) -> bool:
@@ -21,10 +22,10 @@ def resolve_conflicts_for_deck(ankihub_did: uuid.UUID) -> bool:
         dialog = askUserDialog(
             text=(
                 f"AnkiHub has detected that that there is a conflict between the following decks:<br>"
-                f"<b>{ankihub_db.deck_name(ankihub_did)}</b>"
-                f"<b>{ankihub_db.deck_name(conflicting_ah_did)}</b><br><br>"
+                f"<b>{config.deck_config(ankihub_did).name}</b>"
+                f"<b>{config.deck_config(conflicting_ah_did).name}</b><br><br>"
                 f"There are {len(conflicting_anki_nids)} note ids that are in both decks.<br><br>"
-                "Which deck do you want to sync these notes with?",
+                "Which deck do you want to sync these notes with?"
             ),
             title="AnkiHub - Deck Conflict",
             buttons=["Cancel", "Deck 1", "Deck 2"],
