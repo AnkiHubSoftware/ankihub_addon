@@ -1,23 +1,10 @@
 import uuid
-from typing import Callable, List
+from typing import Callable
 
-import factory
 from anki.notes import NoteId
 from pytest_anki import AnkiSession
 
-from ankihub.ankihub_client import Field, NoteInfo
-
-
-class NoteInfoFactory(factory.Factory):
-    class Meta:
-        model = NoteInfo
-
-    ankihub_note_uuid = factory.LazyFunction(uuid.uuid4)
-    anki_nid = 1
-    mid = 1
-    fields = [Field(name="Front", value="front", order=0)]
-    tags: List[str] = []
-    guid = "11111"
+from ..factories import NoteInfoFactory
 
 
 def test_lowest_level_common_ancestor_deck_name():
@@ -226,10 +213,10 @@ class TestAnkiNidConflicts:
         with anki_session_with_addon.profile_loaded():
             # save two notes for one deck
             ah_did_1 = next_deterministic_uuid()
-            note_info_1 = NoteInfoFactory.build(
+            note_info_1 = NoteInfoFactory(
                 ankihub_note_uuid=next_deterministic_uuid(), anki_nid=1
             )
-            note_info_2 = NoteInfoFactory.build(
+            note_info_2 = NoteInfoFactory(
                 ankihub_note_uuid=next_deterministic_uuid(), anki_nid=2
             )
             ankihub_db.insert_or_update_notes_data(
@@ -238,13 +225,17 @@ class TestAnkiNidConflicts:
 
             # save one note for another deck with the same nid as the first note in the first deck
             ah_did_2 = next_deterministic_uuid()
-            note_info_3 = NoteInfoFactory.build(
+            note_info_3 = NoteInfoFactory(
                 ankihub_note_uuid=next_deterministic_uuid(), anki_nid=1
             )
 
             ankihub_db.insert_or_update_notes_data(
                 ankihub_did=ah_did_2, notes_data=[note_info_3]
             )
+            assert not ankihub_db.is_active(note_info_3.ankihub_note_uuid)
+
+            # reactivate the deactivated note in the second deck to create a conflict
+            ankihub_db.activate_all_notes_in_deck(ah_did_2)
 
             # check that the two decks are detected as conflicting
             assert set(ankihub_db.all_conflicting_decks()) == set([ah_did_1, ah_did_2])

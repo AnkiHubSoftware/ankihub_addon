@@ -13,6 +13,12 @@ class NoteInfoFactory(factory.Factory):
     ankihub_note_uuid = factory.LazyFunction(uuid.uuid4)
     anki_nid = 1
     mid = 1
-    fields = [Field(name="Front", value="front", order=0)]
+    fields = [
+        Field(name="Front", value="front", order=0),
+        Field(name="Back", value="back", order=1),
+    ]
     tags: List[str] = []
     guid = "old guid"
+
+    def __new__(self, *args, **kwargs) -> NoteInfo:
+        return super().__new__(*args, **kwargs)

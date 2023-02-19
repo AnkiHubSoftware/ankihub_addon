@@ -342,7 +342,7 @@ def test_upload_deck(
 ):
     client = authorized_client_for_user_test1
 
-    note_data: NoteInfo = NoteInfoFactory.build()
+    note_data = NoteInfoFactory()
 
     # create the deck on AnkiHub
     # upload to s3 is mocked out, this will potentially cause errors on the locally running AnkiHub
