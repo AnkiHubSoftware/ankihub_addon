@@ -54,7 +54,10 @@ def maybe_change_file_permissions_of_addon_files(module: str) -> None:
 
     addon_dir = Path(mw.addonManager.addonsFolder(ankihub_module))
     for file in addon_dir.rglob("*"):
-        os.chmod(file, 0o666)
+        if file.is_dir():
+            os.chmod(file, 0o777)
+        else:
+            os.chmod(file, 0o666)
     LOGGER.info(f"On deleteAddon changed file permissions for all files in {addon_dir}")
 
 
