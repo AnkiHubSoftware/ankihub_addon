@@ -1,7 +1,7 @@
 import re
 import time
 from pprint import pformat
-from typing import Dict, Iterable, List, Optional, Sequence, Set, Tuple
+from typing import Any, Dict, Iterable, List, Optional, Sequence, Set, Tuple
 
 from anki.decks import DeckId
 from anki.errors import NotFoundError
@@ -15,8 +15,8 @@ from .settings import (
     ANKI_MINOR,
     ANKIHUB_NOTE_TYPE_FIELD_NAME,
     ANKIHUB_NOTE_TYPE_MODIFICATION_STRING,
-    URL_VIEW_NOTE,
     ANKIHUB_TEMPLATE_END_COMMENT,
+    URL_VIEW_NOTE,
 )
 
 
@@ -78,7 +78,7 @@ def highest_level_did(dids: Iterable[DeckId]) -> DeckId:
 def create_note_with_id(note: Note, anki_id: NoteId, anki_did: DeckId) -> Note:
     """Create a new note, add it to the appropriate deck and override the note id with
     the note id of the original note creator."""
-    LOGGER.info(f"Trying to create note: {anki_id=}")
+    LOGGER.debug(f"Trying to create note: {anki_id=}")
 
     mw.col.add_note(note, DeckId(anki_did))
 
@@ -338,3 +338,8 @@ def create_backup() -> None:
     except Exception as exc:
         LOGGER.info("Backup failed")
         raise exc
+
+
+def truncated_list(values: List[Any], limit: int) -> List[Any]:
+    assert limit > 0
+    return values[:limit] + ["..."] if len(values) > limit else values

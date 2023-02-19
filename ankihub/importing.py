@@ -1,5 +1,4 @@
 """Import NoteInfo objects into Anki, create/update decks and note types if necessary"""
-
 import uuid
 from pprint import pformat
 from typing import Dict, Iterable, List, Optional, Set, Tuple
@@ -16,9 +15,6 @@ from . import LOGGER, settings
 from .addon_ankihub_client import AddonAnkiHubClient as AnkiHubClient
 from .ankihub_client import Field, NoteInfo
 from .db import ankihub_db
-from .subdecks import (
-    build_subdecks_and_move_cards_to_them,
-)
 from .note_conversion import (
     TAG_FOR_PROTECTING_ALL_FIELDS,
     get_fields_protected_by_tags,
@@ -26,6 +22,7 @@ from .note_conversion import (
     is_optional_tag,
 )
 from .settings import config
+from .subdecks import build_subdecks_and_move_cards_to_them
 from .utils import (
     create_deck_with_id,
     create_note_type_with_id,
@@ -34,6 +31,7 @@ from .utils import (
     lowest_level_common_ancestor_did,
     modify_note_type_templates,
     reset_note_types_of_notes,
+    truncated_list,
 )
 
 
@@ -130,8 +128,12 @@ class AnkiHubImporter:
             dids_for_note = set(c.did for c in note.cards())
             dids = dids | dids_for_note
 
-        LOGGER.info(f"Created {len(self.created_nids)} notes: {self.created_nids}")
-        LOGGER.info(f"Updated {len(self.updated_nids)} notes: {self.updated_nids}")
+        LOGGER.info(
+            f"Created {len(self.created_nids)} notes: {truncated_list(self.created_nids, limit=50)}"
+        )
+        LOGGER.info(
+            f"Updated {len(self.updated_nids)} notes: {truncated_list(self.updated_nids, limit=50)}"
+        )
 
         if first_import_of_deck:
             local_did = self._cleanup_first_time_deck_import(dids, local_did)
