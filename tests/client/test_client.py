@@ -10,7 +10,7 @@ from unittest.mock import MagicMock
 import pytest
 import requests_mock
 from pytest import MonkeyPatch
-from vcr import VCR
+from vcr import VCR  # type: ignore
 
 COMPOSE_FILE = Path(os.getenv("COMPOSE_FILE")) if os.getenv("COMPOSE_FILE") else None
 
@@ -304,7 +304,9 @@ def test_download_deck_with_progress(
     assert notes_data[0].tags == ["asdf"]
 
 
-def create_note_on_ankihub_and_assert(client, new_note_suggestion, uuid_of_deck: uuid):
+def create_note_on_ankihub_and_assert(
+    client, new_note_suggestion, uuid_of_deck: uuid.UUID
+):
     # utility function meant to be used in tests for creating a note with known values on ankihub
     # asserts that the note was created correctly
 
