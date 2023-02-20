@@ -1095,9 +1095,7 @@ class TestAnkiHubImporter:
                 )
 
                 # note has to be active in the database or the importer won't update it
-                ankihub_db.upser_if_no_conflict(
-                    ankihub_did=ah_did, notes_data=[note_data]
-                )
+                ankihub_db.upsert_notes_data(ankihub_did=ah_did, notes_data=[note_data])
 
                 importer = AnkiHubImporter()
                 updated_note = importer._update_or_create_note(
@@ -2297,7 +2295,7 @@ def test_sync_with_optional_content(
             deck_extension_id = 31
 
             notes_data = ankihub_sample_deck_notes_data()
-            ankihub_db.upser_if_no_conflict(ankihub_deck_uuid, notes_data)
+            ankihub_db.upsert_notes_data(ankihub_deck_uuid, notes_data)
             note_data = notes_data[0]
             note = mw.col.get_note(note_data.anki_nid)
 
