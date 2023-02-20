@@ -1,6 +1,7 @@
 import copy
 import gzip
 import json
+import os
 import re
 import uuid
 from datetime import datetime, timedelta, timezone
@@ -23,9 +24,13 @@ from pytest_anki import AnkiSession
 from pytestqt.qtbot import QtBot  # type: ignore
 from requests_mock import Mocker
 
-from ankihub.ankihub_client import Field, SuggestionType
-
 from .conftest import TEST_PROFILE_ID
+
+# workaround for vscode test discovery not using pytest.ini which sets this env var
+# has to be set before importing ankihub
+os.environ["SKIP_INIT"] = "1"
+
+from ankihub.ankihub_client import Field, SuggestionType  # noqa: E402
 
 SAMPLE_MODEL_ID = NotetypeId(1656968697414)
 TEST_DATA_PATH = Path(__file__).parent.parent / "test_data"
