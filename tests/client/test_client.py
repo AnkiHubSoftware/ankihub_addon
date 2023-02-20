@@ -1,3 +1,5 @@
+import gzip
+import json
 import os
 import subprocess
 import uuid
@@ -5,12 +7,14 @@ from copy import deepcopy
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Callable, List
-from unittest.mock import MagicMock
+from unittest.mock import MagicMock, Mock
 
 import pytest
 import requests_mock
 from pytest import MonkeyPatch
 from vcr import VCR  # type: ignore
+
+from ..factories import NoteInfoFactory
 
 COMPOSE_FILE = Path(os.getenv("COMPOSE_FILE")) if os.getenv("COMPOSE_FILE") else None
 
@@ -328,6 +332,52 @@ def create_note_on_ankihub_and_assert(
     )
     assert note.fields == new_note_suggestion.fields
     assert set(note.tags) == set(new_note_suggestion.tags)
+
+
+@pytest.mark.vcr()
+def test_upload_deck(
+    authorized_client_for_user_test1,
+    next_deterministic_id: Callable[[], int],
+    monkeypatch: MonkeyPatch,
+):
+    from ankihub.ankihub_client import AnkiHubClient, NoteInfo
+
+    client: AnkiHubClient = authorized_client_for_user_test1
+
+    note_data: NoteInfo = NoteInfoFactory.build()
+
+    # create the deck on AnkiHub
+    # upload to s3 is mocked out, this will potentially cause errors on the locally running AnkiHub
+    # because the deck will not be uploaded to s3, but we don't care about that here
+    upload_to_s3_mock = Mock()
+    with monkeypatch.context() as m:
+        m.setattr(client, "_upload_to_s3", upload_to_s3_mock)
+        m.setattr(
+            client, "get_presigned_url", lambda *args, **kwargs: "https://fake_s3.com"
+        )
+
+        client.upload_deck(
+            deck_name="test deck",
+            notes_data=[note_data],
+            note_types_data=[],
+            anki_deck_id=next_deterministic_id(),
+            private=False,
+        )
+
+    # check that the deck would be uploaded to s3
+    assert upload_to_s3_mock.call_count == 1
+    payload = json.loads(
+        gzip.decompress(upload_to_s3_mock.call_args[0][1]).decode("utf-8")
+    )
+    assert len(payload["notes"]) == 1
+    note_from_payload = payload["notes"][0]
+    note_from_payload["note_id"] = note_from_payload["id"]
+    note_from_payload.pop("id")
+
+    note_data_dict = note_data.to_dict()
+    note_data_dict.pop("last_update_type")
+
+    assert note_from_payload == note_data_dict
 
 
 class TestCreateSuggestion:

@@ -232,7 +232,7 @@ class TestAnkiNidConflicts:
             note_info_2 = NoteInfoFactory.build(
                 ankihub_note_uuid=next_deterministic_uuid(), anki_nid=2
             )
-            ankihub_db.save_notes_data_and_mod_values(
+            ankihub_db.insert_or_update_notes_data(
                 ankihub_did=ah_did_1, notes_data=[note_info_1, note_info_2]
             )
 
@@ -242,7 +242,7 @@ class TestAnkiNidConflicts:
                 ankihub_note_uuid=next_deterministic_uuid(), anki_nid=1
             )
 
-            ankihub_db.save_notes_data_and_mod_values(
+            ankihub_db.insert_or_update_notes_data(
                 ankihub_did=ah_did_2, notes_data=[note_info_3]
             )
 
