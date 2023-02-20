@@ -31,6 +31,7 @@ from ..addon_ankihub_client import AddonAnkiHubClient as AnkiHubClient
 from ..addon_ankihub_client import AnkiHubRequestError
 from ..ankihub_client import NoteInfo
 from ..db import ankihub_db
+from ..importing import AnkiHubImportResult
 from ..settings import URL_DECK_BASE, URL_DECKS, URL_HELP, URL_VIEW_DECK, config
 from ..subdecks import SUBDECK_TAG, build_subdecks_and_move_cards_to_them, flatten_deck
 from ..sync import AnkiHubImporter
@@ -429,25 +430,19 @@ def download_and_install_deck(
     on_failure: Optional[Callable[[], None]] = None,
 ):
     def on_install_done(future: Future):
-        success = False
-        exc = None
         try:
-            success = future.result()
-        except Exception as e:
-            exc = e
-
-        if exc is not None or not success:
+            future.result()
+        except Exception as exc:
             LOGGER.info("Error installing deck.")
             if on_failure is not None:
                 on_failure()
 
-            if exc:
-                raise exc
-        else:
-            mw.reset()
+            raise exc
 
-            if on_success is not None:
-                on_success()
+        mw.reset()
+
+        if on_success is not None:
+            on_success()
 
     try:
         deck_info = AnkiHubClient().get_deck_by_id(ankihub_did)
@@ -501,7 +496,7 @@ def install_deck(
     ankihub_did: UUID,
     latest_update: datetime,
     is_creator: bool,
-) -> bool:
+) -> AnkiHubImportResult:
     """If we have a .csv, read data from the file and modify the user's note types
     and notes.
     :param: path to the .csv or .apkg file
@@ -511,7 +506,7 @@ def install_deck(
     create_backup()
 
     importer = AnkiHubImporter()
-    local_did = importer.import_ankihub_deck(
+    import_result = importer.import_ankihub_deck(
         ankihub_did=ankihub_did,
         notes_data=notes_data,
         deck_name=deck_name,
@@ -520,14 +515,14 @@ def install_deck(
     config.save_subscription(
         name=deck_name,
         ankihub_did=ankihub_did,
-        anki_did=local_did,
+        anki_did=import_result.anki_did,
         latest_udpate=latest_update,
         creator=is_creator,
     )
 
     LOGGER.info("Importing deck was succesful.")
 
-    return True
+    return import_result
 
 
 def download_progress_cb(percent: int):

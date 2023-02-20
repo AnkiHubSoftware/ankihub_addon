@@ -1,5 +1,6 @@
 """Import NoteInfo objects into Anki, create/update decks and note types if necessary"""
 import uuid
+from dataclasses import dataclass
 from pprint import pformat
 from typing import Dict, Iterable, List, Optional, Set, Tuple
 
@@ -35,11 +36,24 @@ from .utils import (
 )
 
 
+@dataclass
+class AnkiHubImportResult:
+    ankihub_did: uuid.UUID
+    anki_did: DeckId
+    updated_nids: List[NoteId]
+    created_nids: List[NoteId]
+    skippped_nids: List[NoteId]
+    first_import_of_deck: bool
+
+    def __repr__(self):
+        return pformat(self.__dict__)
+
+
 class AnkiHubImporter:
     def __init__(self):
-        self.updated_nids = []
-        self.created_nids = []
-        self.deactivated_nids = []
+        self.created_nids: List[NoteId] = []
+        self.updated_nids: List[NoteId] = []
+        self.skipped_nids: List[NoteId] = []
 
     def import_ankihub_deck(
         self,
@@ -57,7 +71,7 @@ class AnkiHubImporter:
         ] = None,  # will be fetched from api if not provided
         subdecks: bool = False,
         subdecks_for_new_notes_only: bool = False,
-    ) -> DeckId:
+    ) -> AnkiHubImportResult:
         """
         Used for importing an ankihub deck for the first time or updating it.
         When no local_did is provided this function assumes that the deck gets installed for the first time.
@@ -82,7 +96,7 @@ class AnkiHubImporter:
         if protected_tags is None:
             protected_tags = AnkiHubClient().get_protected_tags(ankihub_did)
 
-        anki_deck_id = self._import_ankihub_deck_inner(
+        return self._import_ankihub_deck_inner(
             ankihub_did=ankihub_did,
             notes_data=notes_data,
             deck_name=deck_name,
@@ -93,7 +107,6 @@ class AnkiHubImporter:
             subdecks=subdecks,
             subdecks_for_new_notes_only=subdecks_for_new_notes_only,
         )
-        return anki_deck_id
 
     def _import_ankihub_deck_inner(
         self,
@@ -106,13 +119,19 @@ class AnkiHubImporter:
         local_did: DeckId = None,  # did that new notes should be put into if importing not for the first time
         subdecks: bool = False,
         subdecks_for_new_notes_only: bool = False,
-    ) -> DeckId:
+    ) -> AnkiHubImportResult:
+        self.created_nids = []
+        self.updated_nids = []
+        self.skipped_nids = []
+
         first_import_of_deck = local_did is None
 
         local_did = adjust_deck(deck_name, local_did)
         adjust_note_types(remote_note_types)
         reset_note_types_of_notes_based_on_notes_data(notes_data)
 
+        # has to be called before updating notes in the anki db because
+        # it deactivates conflicting notes
         ankihub_db.insert_or_update_notes_data(
             ankihub_did=ankihub_did, notes_data=notes_data
         )
@@ -141,8 +160,8 @@ class AnkiHubImporter:
             f"Updated {len(self.updated_nids)} notes: {truncated_list(self.updated_nids, limit=50)}"
         )
         LOGGER.info(
-            f"Skippped {len(self.deactivated_nids)} deactivated notes: "
-            f"{truncated_list(self.deactivated_nids, limit=50)}"
+            f"Skippped {len(self.skipped_nids)} notes: "
+            f"{truncated_list(self.skipped_nids, limit=50)}"
         )
 
         if first_import_of_deck:
@@ -158,7 +177,15 @@ class AnkiHubImporter:
                 ankihub_did=ankihub_did, nids=anki_nids
             )
 
-        return local_did
+        result = AnkiHubImportResult(
+            ankihub_did=ankihub_did,
+            anki_did=local_did,
+            created_nids=self.created_nids,
+            updated_nids=self.updated_nids,
+            skippped_nids=self.skipped_nids,
+            first_import_of_deck=first_import_of_deck,
+        )
+        return result
 
     def _cleanup_first_time_deck_import(
         self, dids_cards_were_imported_to: Iterable[DeckId], created_did: DeckId
@@ -200,7 +227,7 @@ class AnkiHubImporter:
 
         if not ankihub_db.is_active(note_data.ankihub_note_uuid):
             LOGGER.debug(f"Note {note_data.ankihub_note_uuid} is not active, skipping")
-            self.deactivated_nids.append(note_data.anki_nid)
+            self.skipped_nids.append(NoteId(note_data.anki_nid))
             return None
 
         note_before_changes = None
