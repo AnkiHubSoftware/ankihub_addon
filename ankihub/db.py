@@ -163,11 +163,11 @@ class AnkiHubDB:
         result = self.scalar("PRAGMA user_version;")
         return result
 
-    def insert_or_update_notes_data(
+    def upsert_note_data_if_no_conflict(
         self, ankihub_did: uuid.UUID, notes_data: List[NoteInfo]
     ):
-        """Save notes data to the AnkiHub DB.
-        If a note with the same Anki nid already exists in the AnkiHub DB then the note will not be saved.
+        """Upsert notes data to the AnkiHub DB.
+        If a note with the same Anki nid already exists in the AnkiHub DB then the note will not be inserted.
         """
         with db_transaction() as conn:
             for note_data in notes_data:

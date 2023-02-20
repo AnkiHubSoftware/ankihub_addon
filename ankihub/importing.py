@@ -132,9 +132,7 @@ class AnkiHubImporter:
 
         # has to be called before updating notes in the anki db because notes should only
         # be imported into the anki db if they don't conflict
-        ankihub_db.insert_or_update_notes_data(
-            ankihub_did=ankihub_did, notes_data=notes_data
-        )
+        ankihub_db.upser_if_no_conflict(ankihub_did=ankihub_did, notes_data=notes_data)
 
         dids: Set[DeckId] = set()  # set of ids of decks notes were imported into
         for note_data in notes_data:
