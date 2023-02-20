@@ -28,7 +28,23 @@ from .conftest import TEST_PROFILE_ID
 # has to be set before importing ankihub
 os.environ["SKIP_INIT"] = "1"
 
-from ankihub.ankihub_client import Field, SuggestionType  # noqa: E402
+from ankihub.ankihub_client import (  # noqa: E402
+    ANKIHUB_DATETIME_FORMAT_STR,
+    AnkiHubClient,
+    AnkiHubRequestError,
+    ChangeNoteSuggestion,
+    Deck,
+    DeckExtension,
+    DeckExtensionUpdateChunk,
+    Field,
+    NewNoteSuggestion,
+    NoteCustomization,
+    NoteInfo,
+    OptionalTagSuggestion,
+    SuggestionType,
+    TagGroupValidationResponse,
+    transform_notes_data,
+)
 
 SAMPLE_MODEL_ID = NotetypeId(1656968697414)
 TEST_DATA_PATH = Path(__file__).parent.parent / "test_data"
@@ -158,8 +174,6 @@ def make_ah_note(
 
 
 def ankihub_sample_deck_notes_data():
-    from ankihub.ankihub_client import NoteInfo, transform_notes_data
-
     notes_data_raw = transform_notes_data(SAMPLE_NOTES_DATA)
     result = [NoteInfo.from_dict(x) for x in notes_data_raw]
     return result
@@ -291,14 +305,11 @@ def test_create_collaborative_deck_and_upload(
     monkeypatch: MonkeyPatch,
     next_deterministic_uuid: Callable[[], uuid.UUID],
 ):
-    anki_session = anki_session_with_addon
-
-    from ankihub.ankihub_client import Field, NoteInfo
     from ankihub.db import ankihub_db
     from ankihub.register_decks import create_collaborative_deck
 
-    with anki_session.profile_loaded():
-        mw = anki_session.mw
+    with anki_session_with_addon.profile_loaded():
+        mw = anki_session_with_addon.mw
 
         # create a new deck with one note
         deck_name = "New Deck"
@@ -363,12 +374,6 @@ def test_create_collaborative_deck_and_upload(
 def test_get_deck_by_id(
     requests_mock: Mocker, next_deterministic_uuid: Callable[[], uuid.UUID]
 ):
-    from ankihub.addon_ankihub_client import AddonAnkiHubClient as AnkiHubClient
-    from ankihub.ankihub_client import (
-        ANKIHUB_DATETIME_FORMAT_STR,
-        AnkiHubRequestError,
-        Deck,
-    )
     from ankihub.settings import API_URL_BASE
 
     client = AnkiHubClient(hooks=[])
@@ -412,7 +417,6 @@ def test_suggest_note_update(
     install_sample_ah_deck: InstallSampleAHDeck,
     disable_image_support_feature_flag,
 ):
-    from ankihub.ankihub_client import AnkiHubRequestError, NoteInfo, SuggestionType
     from ankihub.note_conversion import (
         ADDON_INTERNAL_TAGS,
         ANKI_INTERNAL_TAGS,
@@ -478,7 +482,6 @@ def test_suggest_new_note(
     install_sample_ah_deck: InstallSampleAHDeck,
     disable_image_support_feature_flag,
 ):
-    from ankihub.ankihub_client import AnkiHubRequestError
     from ankihub.note_conversion import (
         ADDON_INTERNAL_TAGS,
         ANKI_INTERNAL_TAGS,
@@ -544,12 +547,6 @@ def test_suggest_notes_in_bulk(
 ):
     from uuid import UUID
 
-    from ankihub.ankihub_client import (
-        ChangeNoteSuggestion,
-        Field,
-        NewNoteSuggestion,
-        SuggestionType,
-    )
     from ankihub.note_conversion import TAG_FOR_OPTIONAL_TAGS
     from ankihub.suggestions import suggest_notes_in_bulk
 
@@ -1043,7 +1040,6 @@ class TestAnkiHubImporter:
     ):
         from anki.consts import QUEUE_TYPE_SUSPENDED
 
-        from ankihub.ankihub_client import Field, NoteInfo
         from ankihub.settings import config
         from ankihub.sync import AnkiHubImporter
 
@@ -1270,7 +1266,6 @@ class TestPrepareNote:
         ankihub_basic_note_type: NotetypeDict,
         next_deterministic_uuid: Callable[[], uuid.UUID],
     ):
-        from ankihub.ankihub_client import Field
         from ankihub.note_conversion import (
             ADDON_INTERNAL_TAGS,
             TAG_FOR_PROTECTING_FIELDS,
@@ -1381,7 +1376,6 @@ class TestPrepareNote:
         ankihub_basic_note_type: Dict[str, Any],
         next_deterministic_uuid: Callable[[], uuid.UUID],
     ):
-        from ankihub.ankihub_client import Field
         from ankihub.note_conversion import TAG_FOR_PROTECTING_FIELDS
 
         anki_session = anki_session_with_addon
@@ -1447,7 +1441,6 @@ def prepare_note(
     guid: Optional[str] = None,
     last_update_type: SuggestionType = SuggestionType.NEW_CONTENT,
 ):
-    from ankihub.ankihub_client import NoteInfo
     from ankihub.importing import AnkiHubImporter
     from ankihub.settings import ANKIHUB_NOTE_TYPE_FIELD_NAME
 
@@ -1606,7 +1599,6 @@ class TestCustomSearchNodes:
         anki_session_with_addon: AnkiSession,
         next_deterministic_uuid: Callable[[], uuid.UUID],
     ):
-        from ankihub.ankihub_client import SuggestionType
         from ankihub.db import attached_ankihub_db
         from ankihub.gui.browser import NewNoteSearchNode
         from ankihub.importing import AnkiHubImporter
@@ -1649,7 +1641,6 @@ class TestCustomSearchNodes:
         anki_session_with_addon: AnkiSession,
         next_deterministic_uuid: Callable[[], uuid.UUID],
     ):
-        from ankihub.ankihub_client import SuggestionType
         from ankihub.db import attached_ankihub_db
         from ankihub.gui.browser import SuggestionTypeSearchNode
         from ankihub.importing import AnkiHubImporter
@@ -1776,7 +1767,6 @@ class TestBrowserTreeView:
         from aqt.browser.sidebar.tree import SidebarTreeView
 
         from ankihub import entry_point
-        from ankihub.ankihub_client import SuggestionType
         from ankihub.settings import config
 
         config.public_config["sync_on_startup"] = False
@@ -2274,11 +2264,6 @@ def test_sync_with_optional_content(
 ):
     anki_session = anki_session_with_addon
 
-    from ankihub.ankihub_client import (
-        DeckExtension,
-        DeckExtensionUpdateChunk,
-        NoteCustomization,
-    )
     from ankihub.db import ankihub_db
     from ankihub.settings import DeckExtensionConfig, config
     from ankihub.sync import AnkiHubSync
@@ -2364,7 +2349,6 @@ def test_optional_tag_suggestion_dialog(
 ):
     anki_session = anki_session_with_addon
 
-    from ankihub.ankihub_client import OptionalTagSuggestion, TagGroupValidationResponse
     from ankihub.gui.optional_tag_suggestion_dialog import OptionalTagsSuggestionDialog
     from ankihub.note_conversion import TAG_FOR_OPTIONAL_TAGS
 
@@ -2543,8 +2527,6 @@ def test_upload_images(
 ):
     import tempfile
 
-    from ankihub.ankihub_client import AnkiHubClient
-
     with anki_session_with_addon.profile_loaded():
         fake_presigned_url = "https://fake_presigned_url.com"
         monkeypatch.setattr(
@@ -2580,7 +2562,6 @@ class TestSuggestionsWithImages:
     ):
         import tempfile
 
-        from ankihub.ankihub_client import SuggestionType
         from ankihub.db import ankihub_db
         from ankihub.settings import API_URL_BASE
         from ankihub.suggestions import suggest_note_update
