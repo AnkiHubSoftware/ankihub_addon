@@ -2745,7 +2745,7 @@ class TestAddonUpdate:
             assert mw.addonManager.allAddons() == ["ankihub"]
             qtbot.wait(1000)
 
-    def test_that_changing_file_permissions_of_addons_folder_is_safe(
+    def test_that_changing_file_permissions_of_addons_folder_does_not_break_addon_load(
         self, anki_session_with_addon: AnkiSession, qtbot: QtBot
     ):
         from ankihub import entry_point
