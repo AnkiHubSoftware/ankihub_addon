@@ -53,7 +53,11 @@ SAMPLE_DECK_APKG = TEST_DATA_PATH / "small.apkg"
 ANKIHUB_SAMPLE_DECK_APKG = TEST_DATA_PATH / "small_ankihub.apkg"
 SAMPLE_NOTES_DATA = eval((TEST_DATA_PATH / "small_ankihub.txt").read_text())
 
-ANKI_ADDON_FILE = TEST_DATA_PATH / "ankihub.ankiaddon"
+# the package name in the manifest is "ankihub"
+# the package name is used during the add-on installation process
+# to determine the path to the add-on files which also determines if an existing add-on is updated
+# or if a new add-on is installed
+ANKIHUB_ANKIADDON_FILE = TEST_DATA_PATH / "ankihub.ankiaddon"
 
 
 class InstallSampleAHDeck(Protocol):
@@ -182,11 +186,15 @@ def ankihub_sample_deck_notes_data():
     return result
 
 
-def test_entry_point():
+def test_entry_point(anki_session_with_addon: AnkiSession, qtbot: QtBot):
     from ankihub import entry_point
 
     entry_point.run()
+    with anki_session_with_addon.profile_loaded():
+        qtbot.wait(1000)
+
     # this test is just to make sure the entry point doesn't crash
+    # and that the add-on doesn't crash on Anki startup
 
 
 def test_editor(
@@ -2680,16 +2688,77 @@ class TestSuggestionsWithImages:
 
 class TestAddonUpdate:
     def test_addon_update(
-        self, anki_session_with_addon: AnkiSession, monkeypatch: MonkeyPatch
+        self,
+        anki_session_with_addon: AnkiSession,
+        monkeypatch: MonkeyPatch,
+        qtbot: QtBot,
     ):
-        # unset SKIP_INIT so that the add-on installed from the add-on file is loaded
-        del os.environ["SKIP_INIT"]
+        from ankihub import entry_point
+        from ankihub.addons import (
+            _maybe_change_file_permissions_of_addon_files,
+            _with_disabled_log_file_handler,
+        )
+
+        # The purpose of this mocks is to test whether our modifications to the add-on update process
+        # (defined in ankihub.addons) are used.
+        # The original functions will still be called because this sets the side effect to be the original functions,
+        # but this way we can check if they were called.
+        maybe_change_file_permissions_of_addon_files_mock = Mock()
+        maybe_change_file_permissions_of_addon_files_mock.side_effect = (
+            _maybe_change_file_permissions_of_addon_files
+        )
+        monkeypatch.setattr(
+            "ankihub.addons._maybe_change_file_permissions_of_addon_files",
+            maybe_change_file_permissions_of_addon_files_mock,
+        )
+
+        with_disabled_log_file_handler_mock = Mock()
+        with_disabled_log_file_handler_mock.side_effect = _with_disabled_log_file_handler  # type: ignore
+        monkeypatch.setattr(
+            "ankihub.addons._with_disabled_log_file_handler",
+            with_disabled_log_file_handler_mock,
+        )
+
+        # udpate the AnkiHub add-on
+        # entry point has to be run so that the add-on is loaded and the patches to the
+        # update process are applied
+        entry_point.run()
+        with anki_session_with_addon.profile_loaded():
+            mw = anki_session_with_addon.mw
+
+            result = mw.addonManager.install(file=str(ANKIHUB_ANKIADDON_FILE))
+            assert isinstance(result, InstallOk)
+
+            assert mw.addonManager.allAddons() == ["ankihub"]
+
+        with_disabled_log_file_handler_mock.assert_called_once()
+
+        # this is called twice because because multiple functions were wrapped with the
+        # with_disabled_log_file_handler wrapper, this is ok
+        maybe_change_file_permissions_of_addon_files_mock.call_count == 2
+
+        # start Anki
+        entry_point.run()
+        with anki_session_with_addon.profile_loaded():
+            mw = anki_session_with_addon.mw
+
+            assert mw.addonManager.allAddons() == ["ankihub"]
+            qtbot.wait(1000)
+
+    def test_that_changing_file_permissions_of_addons_folder_is_safe(
+        self, anki_session_with_addon: AnkiSession, qtbot: QtBot
+    ):
+        from ankihub import entry_point
+        from ankihub.addons import _change_file_permissions_of_addon_files
 
         with anki_session_with_addon.profile_loaded():
             mw = anki_session_with_addon.mw
 
-            result = mw.addonManager.install(file=str(ANKI_ADDON_FILE))
-            assert isinstance(result, InstallOk)
+            addon_dir = Path(mw.addonManager.addonsFolder("ankihub"))
+            _change_file_permissions_of_addon_files(addon_dir=addon_dir)
 
+        entry_point.run()
         with anki_session_with_addon.profile_loaded():
-            assert len(mw.addonManager.allAddons()) == 2
+            mw = anki_session_with_addon.mw
+
+            qtbot.wait(1000)
