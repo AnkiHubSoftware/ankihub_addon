@@ -16,6 +16,26 @@ from vcr import VCR  # type: ignore
 
 from ..factories import NoteInfoFactory
 
+# workaround for vscode test discovery not using pytest.ini which sets this env var
+# has to be set before importing ankihub
+os.environ["SKIP_INIT"] = "1"
+
+from ankihub.ankihub_client import (  # noqa: E402
+    AnkiHubClient,
+    ChangeNoteSuggestion,
+    Deck,
+    DeckExtension,
+    DeckExtensionUpdateChunk,
+    DeckUpdateChunk,
+    Field,
+    NewNoteSuggestion,
+    NoteCustomization,
+    NoteInfo,
+    OptionalTagSuggestion,
+    SuggestionType,
+    TagGroupValidationResponse,
+)
+
 COMPOSE_FILE = Path(os.getenv("COMPOSE_FILE")) if os.getenv("COMPOSE_FILE") else None
 
 TEST_DATA_PATH = Path(__file__).parent.parent / "test_data"
@@ -39,8 +59,6 @@ def set_ankihub_app_url():
 
 @pytest.fixture
 def client(vcr: VCR, request, marks):
-    from ankihub.ankihub_client import AnkiHubClient
-
     if "skipifvcr" in marks and vcr_enabled(vcr):
         pytest.skip("Skipping test because test has skipifvcr mark and VCR is enabled")
 
@@ -98,20 +116,14 @@ def run_command_in_django_container(command):
 
 
 @pytest.fixture
-def authorized_client_for_user_test1(client):
-    from ankihub.ankihub_client import AnkiHubClient
-
-    client: AnkiHubClient = client
+def authorized_client_for_user_test1(client: AnkiHubClient):
     credentials_data = {"username": "test1", "password": "asdf"}
     client.login(credentials=credentials_data)
     yield client
 
 
 @pytest.fixture
-def authorized_client_for_user_test2(client, request):
-    from ankihub.ankihub_client import AnkiHubClient
-
-    client: AnkiHubClient = client
+def authorized_client_for_user_test2(client: AnkiHubClient, request):
     credentials_data = {"username": "test2", "password": "asdf"}
     client.login(credentials=credentials_data)
     yield client
@@ -131,8 +143,6 @@ def uuid_of_deck_of_user_test2():
 def new_note_suggestion(
     next_deterministic_uuid: Callable[[], uuid.UUID],
 ):
-    from ankihub.ankihub_client import Field, NewNoteSuggestion
-
     ah_nid = next_deterministic_uuid()
     return NewNoteSuggestion(
         ankihub_note_uuid=ah_nid,
@@ -154,8 +164,6 @@ def new_note_suggestion(
 def new_note_suggestion_note_info(
     next_deterministic_uuid: Callable[[], uuid.UUID],
 ):
-    from ankihub.ankihub_client import Field, NoteInfo
-
     return NoteInfo(
         ankihub_note_uuid=next_deterministic_uuid(),
         anki_nid=1,
@@ -174,8 +182,6 @@ def new_note_suggestion_note_info(
 def change_note_suggestion(
     next_deterministic_uuid: Callable[[], uuid.UUID],
 ):
-    from ankihub.ankihub_client import ChangeNoteSuggestion, Field, SuggestionType
-
     return ChangeNoteSuggestion(
         ankihub_note_uuid=next_deterministic_uuid(),
         anki_nid=1,
@@ -212,10 +218,10 @@ def test_client_login_and_signout_with_email(client):
 
 
 @pytest.mark.vcr()
-def test_download_deck(authorized_client_for_user_test1, monkeypatch: MonkeyPatch):
-    from ankihub.ankihub_client import AnkiHubClient, Deck
-
-    client: AnkiHubClient = authorized_client_for_user_test1
+def test_download_deck(
+    authorized_client_for_user_test1: AnkiHubClient, monkeypatch: MonkeyPatch
+):
+    client = authorized_client_for_user_test1
     deck_id = uuid.UUID("dda0d3ad-89cd-45fb-8ddc-fabad93c2d7b")
 
     get_presigned_url = MagicMock()
@@ -242,11 +248,9 @@ def test_download_deck(authorized_client_for_user_test1, monkeypatch: MonkeyPatc
 
 @pytest.mark.vcr()
 def test_download_compressed_deck(
-    authorized_client_for_user_test1, monkeypatch: MonkeyPatch
+    authorized_client_for_user_test1: AnkiHubClient, monkeypatch: MonkeyPatch
 ):
-    from ankihub.ankihub_client import AnkiHubClient, Deck
-
-    client: AnkiHubClient = authorized_client_for_user_test1
+    client = authorized_client_for_user_test1
     deck_id = uuid.UUID("dda0d3ad-89cd-45fb-8ddc-fabad93c2d7b")
 
     get_presigned_url = MagicMock()
@@ -273,12 +277,11 @@ def test_download_compressed_deck(
 
 @pytest.mark.vcr()
 def test_download_deck_with_progress(
-    authorized_client_for_user_test1, monkeypatch: MonkeyPatch
+    authorized_client_for_user_test1: AnkiHubClient, monkeypatch: MonkeyPatch
 ):
-    from ankihub.ankihub_client import AnkiHubClient, Deck
     from ankihub.gui.decks import download_progress_cb
 
-    client: AnkiHubClient = authorized_client_for_user_test1
+    client = authorized_client_for_user_test1
     deck_id = uuid.UUID("dda0d3ad-89cd-45fb-8ddc-fabad93c2d7b")
 
     get_presigned_url = MagicMock()
@@ -313,9 +316,6 @@ def create_note_on_ankihub_and_assert(
 ):
     # utility function meant to be used in tests for creating a note with known values on ankihub
     # asserts that the note was created correctly
-
-    from ankihub.ankihub_client import AnkiHubClient, NewNoteSuggestion
-
     assert isinstance(client, AnkiHubClient)
     assert isinstance(new_note_suggestion, NewNoteSuggestion)
 
@@ -336,13 +336,11 @@ def create_note_on_ankihub_and_assert(
 
 @pytest.mark.vcr()
 def test_upload_deck(
-    authorized_client_for_user_test1,
+    authorized_client_for_user_test1: AnkiHubClient,
     next_deterministic_id: Callable[[], int],
     monkeypatch: MonkeyPatch,
 ):
-    from ankihub.ankihub_client import AnkiHubClient, NoteInfo
-
-    client: AnkiHubClient = authorized_client_for_user_test1
+    client = authorized_client_for_user_test1
 
     note_data: NoteInfo = NoteInfoFactory.build()
 
@@ -384,14 +382,12 @@ class TestCreateSuggestion:
     @pytest.mark.vcr()
     def test_create_change_note_suggestion_without_all_fields(
         self,
-        authorized_client_for_user_test1,
-        uuid_of_deck_of_user_test1,
-        new_note_suggestion,
-        change_note_suggestion,
+        authorized_client_for_user_test1: AnkiHubClient,
+        uuid_of_deck_of_user_test1: uuid.UUID,
+        new_note_suggestion: NewNoteSuggestion,
+        change_note_suggestion: ChangeNoteSuggestion,
     ):
-        from ankihub.ankihub_client import AnkiHubClient, ChangeNoteSuggestion, Field
-
-        client: AnkiHubClient = authorized_client_for_user_test1
+        client = authorized_client_for_user_test1
 
         create_note_on_ankihub_and_assert(
             authorized_client_for_user_test1,
@@ -417,13 +413,11 @@ class TestCreateSuggestionsInBulk:
     @pytest.mark.vcr()
     def test_create_one_new_note_suggestion(
         self,
-        authorized_client_for_user_test1,
-        new_note_suggestion,
-        uuid_of_deck_of_user_test1,
+        authorized_client_for_user_test1: AnkiHubClient,
+        new_note_suggestion: NewNoteSuggestion,
+        uuid_of_deck_of_user_test1: uuid.UUID,
     ):
-        from ankihub.ankihub_client import AnkiHubClient
-
-        client: AnkiHubClient = authorized_client_for_user_test1
+        client = authorized_client_for_user_test1
 
         new_note_suggestion.ankihub_deck_uuid = uuid_of_deck_of_user_test1
         errors_by_nid = client.create_suggestions_in_bulk(
@@ -435,14 +429,12 @@ class TestCreateSuggestionsInBulk:
     @pytest.mark.vcr()
     def test_create_two_new_note_suggestions(
         self,
-        authorized_client_for_user_test1,
-        new_note_suggestion,
-        uuid_of_deck_of_user_test1,
+        authorized_client_for_user_test1: AnkiHubClient,
+        new_note_suggestion: NewNoteSuggestion,
+        uuid_of_deck_of_user_test1: uuid.UUID,
         next_deterministic_uuid: Callable[[], uuid.UUID],
     ):
-        from ankihub.ankihub_client import AnkiHubClient
-
-        client: AnkiHubClient = authorized_client_for_user_test1
+        client = authorized_client_for_user_test1
 
         # create two new note suggestions at once
         new_note_suggestion.ankihub_deck_uuid = uuid_of_deck_of_user_test1
@@ -460,13 +452,11 @@ class TestCreateSuggestionsInBulk:
     @pytest.mark.vcr()
     def test_use_same_ankihub_id_for_new_note_suggestion(
         self,
-        authorized_client_for_user_test1,
-        new_note_suggestion,
-        uuid_of_deck_of_user_test1,
+        authorized_client_for_user_test1: AnkiHubClient,
+        new_note_suggestion: NewNoteSuggestion,
+        uuid_of_deck_of_user_test1: uuid.UUID,
     ):
-        from ankihub.ankihub_client import AnkiHubClient
-
-        client: AnkiHubClient = authorized_client_for_user_test1
+        client = authorized_client_for_user_test1
 
         # create a new note suggestion
         new_note_suggestion.ankihub_deck_uuid = uuid_of_deck_of_user_test1
@@ -501,14 +491,12 @@ class TestCreateSuggestionsInBulk:
     @pytest.mark.vcr()
     def test_create_change_note_suggestion(
         self,
-        authorized_client_for_user_test1,
-        new_note_suggestion,
-        change_note_suggestion,
-        uuid_of_deck_of_user_test1,
+        authorized_client_for_user_test1: AnkiHubClient,
+        new_note_suggestion: NewNoteSuggestion,
+        change_note_suggestion: ChangeNoteSuggestion,
+        uuid_of_deck_of_user_test1: uuid.UUID,
     ):
-        from ankihub.ankihub_client import AnkiHubClient
-
-        client: AnkiHubClient = authorized_client_for_user_test1
+        client = authorized_client_for_user_test1
 
         new_note_suggestion.ankihub_deck_uuid = uuid_of_deck_of_user_test1
         create_note_on_ankihub_and_assert(
@@ -527,14 +515,12 @@ class TestCreateSuggestionsInBulk:
     @pytest.mark.vcr()
     def test_create_auto_accepted_change_note_suggestion(
         self,
-        authorized_client_for_user_test1,
-        new_note_suggestion,
-        change_note_suggestion,
-        uuid_of_deck_of_user_test1,
+        authorized_client_for_user_test1: AnkiHubClient,
+        new_note_suggestion: NewNoteSuggestion,
+        change_note_suggestion: ChangeNoteSuggestion,
+        uuid_of_deck_of_user_test1: uuid.UUID,
     ):
-        from ankihub.ankihub_client import AnkiHubClient
-
-        client: AnkiHubClient = authorized_client_for_user_test1
+        client = authorized_client_for_user_test1
 
         create_note_on_ankihub_and_assert(
             authorized_client_for_user_test1,
@@ -568,11 +554,12 @@ class TestCreateSuggestionsInBulk:
 class TestGetDeckUpdates:
     @pytest.mark.vcr()
     def test_get_deck_updates(
-        self, authorized_client_for_user_test2, uuid_of_deck_of_user_test2, monkeypatch
+        self,
+        authorized_client_for_user_test2: AnkiHubClient,
+        uuid_of_deck_of_user_test2: uuid.UUID,
+        monkeypatch: MonkeyPatch,
     ):
-        from ankihub.ankihub_client import AnkiHubClient, DeckUpdateChunk
-
-        client: AnkiHubClient = authorized_client_for_user_test2
+        client = authorized_client_for_user_test2
 
         page_size = 5
         monkeypatch.setattr("ankihub.ankihub_client.DECK_UPDATE_PAGE_SIZE", page_size)
@@ -585,15 +572,12 @@ class TestGetDeckUpdates:
     @pytest.mark.skipifvcr()
     def test_get_deck_updates_since(
         self,
-        authorized_client_for_user_test1,
-        uuid_of_deck_of_user_test1,
-        new_note_suggestion,
-        new_note_suggestion_note_info,
-        vcr,
+        authorized_client_for_user_test1: AnkiHubClient,
+        uuid_of_deck_of_user_test1: uuid.UUID,
+        new_note_suggestion: NewNoteSuggestion,
+        new_note_suggestion_note_info: NoteInfo,
     ):
-        from ankihub.ankihub_client import AnkiHubClient, DeckUpdateChunk, NoteInfo
-
-        client: AnkiHubClient = authorized_client_for_user_test1
+        client = authorized_client_for_user_test1
 
         since_time = datetime.now(timezone.utc)
 
@@ -623,10 +607,10 @@ class TestGetDeckUpdates:
 
 
 @pytest.mark.vcr()
-def test_get_deck_extensions_by_deck_id(authorized_client_for_user_test1):
-    from ankihub.ankihub_client import AnkiHubClient, DeckExtension
-
-    client: AnkiHubClient = authorized_client_for_user_test1
+def test_get_deck_extensions_by_deck_id(
+    authorized_client_for_user_test1: AnkiHubClient,
+):
+    client = authorized_client_for_user_test1
 
     deck_id = uuid.UUID("100df7b9-7749-4fe0-b801-e3dec1decd72")
 
@@ -644,14 +628,10 @@ def test_get_deck_extensions_by_deck_id(authorized_client_for_user_test1):
 
 
 @pytest.mark.vcr()
-def test_get_note_customizations_by_deck_extension_id(authorized_client_for_user_test1):
-    from ankihub.ankihub_client import (
-        AnkiHubClient,
-        DeckExtensionUpdateChunk,
-        NoteCustomization,
-    )
-
-    client: AnkiHubClient = authorized_client_for_user_test1
+def test_get_note_customizations_by_deck_extension_id(
+    authorized_client_for_user_test1: AnkiHubClient,
+):
+    client = authorized_client_for_user_test1
 
     deck_extension_id = 999
 
@@ -688,15 +668,9 @@ def test_get_note_customizations_by_deck_extension_id(authorized_client_for_user
 
 @pytest.mark.vcr()
 def test_get_note_customizations_by_deck_extension_id_in_multiple_chunks(
-    authorized_client_for_user_test1, monkeypatch
+    authorized_client_for_user_test1: AnkiHubClient, monkeypatch: MonkeyPatch
 ):
-    from ankihub.ankihub_client import (
-        AnkiHubClient,
-        DeckExtensionUpdateChunk,
-        NoteCustomization,
-    )
-
-    client: AnkiHubClient = authorized_client_for_user_test1
+    client = authorized_client_for_user_test1
 
     deck_extension_id = 999
 
@@ -741,10 +715,8 @@ def test_get_note_customizations_by_deck_extension_id_in_multiple_chunks(
 
 
 @pytest.mark.vcr()
-def test_prevalidate_tag_groups(authorized_client_for_user_test2):
-    from ankihub.ankihub_client import AnkiHubClient, TagGroupValidationResponse
-
-    client: AnkiHubClient = authorized_client_for_user_test2
+def test_prevalidate_tag_groups(authorized_client_for_user_test2: AnkiHubClient):
+    client = authorized_client_for_user_test2
 
     tag_group_validation_responses = client.prevalidate_tag_groups(
         ankihub_deck_uuid=DECK_WITH_EXTENSION_UUID,
@@ -769,10 +741,8 @@ def test_prevalidate_tag_groups(authorized_client_for_user_test2):
 
 
 @pytest.mark.vcr()
-def test_suggest_optional_tags(authorized_client_for_user_test2):
-    from ankihub.ankihub_client import AnkiHubClient, OptionalTagSuggestion
-
-    client: AnkiHubClient = authorized_client_for_user_test2
+def test_suggest_optional_tags(authorized_client_for_user_test2: AnkiHubClient):
+    client = authorized_client_for_user_test2
 
     client.suggest_optional_tags(
         suggestions=[
@@ -792,15 +762,10 @@ def test_suggest_optional_tags(authorized_client_for_user_test2):
 
 
 @pytest.mark.vcr()
-def test_suggest_auto_accepted_optional_tags(authorized_client_for_user_test1):
-    from ankihub.ankihub_client import (
-        AnkiHubClient,
-        DeckExtensionUpdateChunk,
-        NoteCustomization,
-        OptionalTagSuggestion,
-    )
-
-    client: AnkiHubClient = authorized_client_for_user_test1
+def test_suggest_auto_accepted_optional_tags(
+    authorized_client_for_user_test1: AnkiHubClient,
+):
+    client = authorized_client_for_user_test1
 
     client.suggest_optional_tags(
         auto_accept=True,
