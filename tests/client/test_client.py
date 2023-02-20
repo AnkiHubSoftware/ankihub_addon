@@ -32,6 +32,7 @@ from ankihub.ankihub_client import (  # noqa: E402
     NoteCustomization,
     NoteInfo,
     OptionalTagSuggestion,
+    SuggestionType,
     TagGroupValidationResponse,
 )
 
@@ -142,8 +143,6 @@ def uuid_of_deck_of_user_test2():
 def new_note_suggestion(
     next_deterministic_uuid: Callable[[], uuid.UUID],
 ):
-    from ankihub.ankihub_client import Field, NewNoteSuggestion
-
     ah_nid = next_deterministic_uuid()
     return NewNoteSuggestion(
         ankihub_note_uuid=ah_nid,
@@ -165,8 +164,6 @@ def new_note_suggestion(
 def new_note_suggestion_note_info(
     next_deterministic_uuid: Callable[[], uuid.UUID],
 ):
-    from ankihub.ankihub_client import Field, NoteInfo
-
     return NoteInfo(
         ankihub_note_uuid=next_deterministic_uuid(),
         anki_nid=1,
@@ -185,8 +182,6 @@ def new_note_suggestion_note_info(
 def change_note_suggestion(
     next_deterministic_uuid: Callable[[], uuid.UUID],
 ):
-    from ankihub.ankihub_client import ChangeNoteSuggestion, Field, SuggestionType
-
     return ChangeNoteSuggestion(
         ankihub_note_uuid=next_deterministic_uuid(),
         anki_nid=1,
@@ -321,9 +316,6 @@ def create_note_on_ankihub_and_assert(
 ):
     # utility function meant to be used in tests for creating a note with known values on ankihub
     # asserts that the note was created correctly
-
-    from ankihub.ankihub_client import AnkiHubClient, NewNoteSuggestion
-
     assert isinstance(client, AnkiHubClient)
     assert isinstance(new_note_suggestion, NewNoteSuggestion)
 
@@ -344,13 +336,11 @@ def create_note_on_ankihub_and_assert(
 
 @pytest.mark.vcr()
 def test_upload_deck(
-    authorized_client_for_user_test1,
+    authorized_client_for_user_test1: AnkiHubClient,
     next_deterministic_id: Callable[[], int],
     monkeypatch: MonkeyPatch,
 ):
-    from ankihub.ankihub_client import AnkiHubClient, NoteInfo
-
-    client: AnkiHubClient = authorized_client_for_user_test1
+    client = authorized_client_for_user_test1
 
     note_data: NoteInfo = NoteInfoFactory.build()
 
@@ -423,13 +413,11 @@ class TestCreateSuggestionsInBulk:
     @pytest.mark.vcr()
     def test_create_one_new_note_suggestion(
         self,
-        authorized_client_for_user_test1,
-        new_note_suggestion,
-        uuid_of_deck_of_user_test1,
+        authorized_client_for_user_test1: AnkiHubClient,
+        new_note_suggestion: NewNoteSuggestion,
+        uuid_of_deck_of_user_test1: uuid.UUID,
     ):
-        from ankihub.ankihub_client import AnkiHubClient
-
-        client: AnkiHubClient = authorized_client_for_user_test1
+        client = authorized_client_for_user_test1
 
         new_note_suggestion.ankihub_deck_uuid = uuid_of_deck_of_user_test1
         errors_by_nid = client.create_suggestions_in_bulk(
@@ -589,9 +577,7 @@ class TestGetDeckUpdates:
         new_note_suggestion: NewNoteSuggestion,
         new_note_suggestion_note_info: NoteInfo,
     ):
-        from ankihub.ankihub_client import AnkiHubClient, DeckUpdateChunk, NoteInfo
-
-        client: AnkiHubClient = authorized_client_for_user_test1
+        client = authorized_client_for_user_test1
 
         since_time = datetime.now(timezone.utc)
 
