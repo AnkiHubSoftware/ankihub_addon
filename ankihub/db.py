@@ -129,13 +129,6 @@ class AnkiHubDB:
                 f"AnkiHub DB migrated to schema version {self.schema_version()}"
             )
 
-        if self.schema_version() <= 5:
-            self.execute("ALTER TABLE notes ADD COLUMN active INTEGER DEFAULT 1")
-            self.execute("PRAGMA user_version = 6;")
-            LOGGER.info(
-                f"AnkiHub DB migrated to schema version {self.schema_version()}"
-            )
-
     def execute(self, sql: str, *args, first_row_only=False) -> List:
         conn = sqlite3.connect(self.database_path)
         c = conn.cursor()
@@ -174,7 +167,7 @@ class AnkiHubDB:
         self, ankihub_did: uuid.UUID, notes_data: List[NoteInfo]
     ):
         """Save notes data to the AnkiHub DB.
-        If a note with the same Anki nid already exists in the AnkiHub DB then the new note is marked as inactive.
+        If a note with the same Anki nid already exists in the AnkiHub DB then the note will not be saved.
         """
         with db_transaction() as conn:
             for note_data in notes_data:
@@ -183,11 +176,12 @@ class AnkiHubDB:
                     SELECT ankihub_note_id FROM notes
                     WHERE anki_note_id = ?
                     AND ankihub_note_id != ?
-                    AND active = 1
                     """,
                     note_data.anki_nid,
                     str(note_data.ankihub_note_uuid),
                 )
+                if conflicting_ah_nid:
+                    continue
 
                 fields = join_fields(
                     [
@@ -207,9 +201,8 @@ class AnkiHubDB:
                         fields,
                         tags,
                         guid,
-                        last_update_type,
-                        active
-                    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+                        last_update_type
+                    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?)
                     """,
                     (
                         str(note_data.ankihub_note_uuid),
@@ -222,9 +215,6 @@ class AnkiHubDB:
                         note_data.last_update_type.value[0]
                         if note_data.last_update_type is not None
                         else None,
-                        # if there is another note with the same anki_note_id in the AnkiHub DB,
-                        # then this note is a duplicate and should be marked as inactive
-                        not bool(conflicting_ah_nid),
                     ),
                 )
 
@@ -236,9 +226,6 @@ class AnkiHubDB:
         """
         with db_transaction() as conn:
             for note_data in notes_data:
-                if not self.is_active(note_data.ankihub_note_uuid):
-                    continue
-
                 mod = mw.col.db.scalar(
                     "SELECT mod FROM notes WHERE id = ?", note_data.anki_nid
                 )
@@ -253,7 +240,8 @@ class AnkiHubDB:
         # mod values stored in the AnkiHub DB
         nid_mod_tuples = self.execute(
             f"""
-            SELECT anki_note_id, mod from notes WHERE anki_note_id IN {ids2str(anki_nids)}
+            SELECT anki_note_id, mod from notes
+            WHERE anki_note_id IN {ids2str(anki_nids)}
             """
         )
         for nid, mod in nid_mod_tuples:
@@ -263,110 +251,15 @@ class AnkiHubDB:
                 nid,
             )
 
-    def all_conflicting_decks(self) -> List[uuid.UUID]:
-        """Returns a list of AnkiHub deck IDs that have notes that conflict with notes in other decks."""
-        conflicting_ah_did_pairs = self.execute(
-            """
-            SELECT GROUP_CONCAT(ankihub_deck_id) FROM notes
-            WHERE active = 1
-            GROUP BY anki_note_id
-            HAVING COUNT(*) > 1
-            """
-        )
-        result = set()
-        for pair in conflicting_ah_did_pairs:
-            conflicting_ah_did_strs = pair[0].split(",")
-            result.update(
-                [uuid.UUID(ah_did_str) for ah_did_str in conflicting_ah_did_strs]
-            )
-
-        return list(result)
-
-    def conflicting_decks(self, ankihub_did: uuid.UUID) -> List[uuid.UUID]:
-        """Returns a list of AnkiHub deck IDs that have notes that conflict with the notes in the given AnkiHub deck.
-        A conflict occurs when a note in one deck has the same Anki note ID as a note in another deck and
-        both notes are active.
-        """
-        conflicting_ah_did_strs = self.list(
-            f"""
-            SELECT ankihub_deck_id FROM notes
-            WHERE anki_note_id IN (
-                SELECT anki_note_id FROM notes
-                WHERE ankihub_deck_id = '{ankihub_did}'
-                AND active = 1
-            )
-            AND ankihub_deck_id != '{ankihub_did}'
-            AND active = 1
-            """
-        )
-        return [uuid.UUID(ah_did_str) for ah_did_str in conflicting_ah_did_strs]
-
-    def next_conflict(
-        self, ankihub_did: uuid.UUID
-    ) -> Optional[Tuple[uuid.UUID, List[NoteId]]]:
-        """Returns the next Anki note ID conflict in the AnkiHub DB between the notes in the given AnkiHub deck
-        and the notes in other AnkiHub decks.
-        If there are no conflicts, returns None.
-        The return value is a tuple of the AnkiHub deck ID and a list of Anki note IDs.
-        A note ID conflict occurs when an Anki note ID is used in more than one deck and
-        the notes are active in both decks.
-        This method can be used to find Anki note ID conflicts in the AnkiHub DB and solve them one by one.
-        """
-        conflicting_ah_did_str = self.scalar(
-            f"""
-            SELECT ankihub_deck_id FROM notes
-            WHERE anki_note_id IN (
-                SELECT anki_note_id FROM notes
-                WHERE ankihub_deck_id = '{ankihub_did}'
-                AND active = 1
-            )
-            AND ankihub_deck_id != '{ankihub_did}'
-            AND active = 1
-            """
-        )
-        if conflicting_ah_did_str is None:
-            return None
-
-        conflicting_anki_nids = self.list(
-            f"""
-            SELECT anki_note_id FROM notes
-            WHERE anki_note_id IN (
-                SELECT anki_note_id FROM notes
-                WHERE ankihub_deck_id = '{ankihub_did}'
-                AND active = 1
-            )
-            AND ankihub_deck_id = '{conflicting_ah_did_str}'
-            AND active = 1
-            """
-        )
-        assert conflicting_anki_nids
-
-        return uuid.UUID(conflicting_ah_did_str), conflicting_anki_nids
-
-    def deactivate_notes_for_deck(
-        self, ankihub_did: uuid.UUID, anki_nids: List[NoteId]
-    ) -> None:
-        self.execute(
-            f"""
-            UPDATE notes SET active = 0
-            WHERE ankihub_deck_id = '{ankihub_did}'
-            AND anki_note_id IN {ids2str(anki_nids)}
-            """
-        )
-
-    def activate_all_notes_in_deck(self, ankihub_did: uuid.UUID) -> None:
-        self.execute(
-            f"""
-            UPDATE notes SET active = 1 WHERE ankihub_deck_id = '{ankihub_did}'
-            """
-        )
-
-    def is_active(self, ankihub_nid: uuid.UUID) -> bool:
+    def ankihub_nid_exists(self, ankihub_nid: uuid.UUID) -> bool:
+        # It's possible that an AnkiHub nid does not exists after calling insert_or_update_notes_data
+        # with a NoteInfo that has the AnkkiHub nid if a note with the same Anki nid already exists
+        # in the AnkiHub DB but in different deck.
         result = self.scalar(
-            f"""
-            SELECT active FROM notes
-            WHERE ankihub_note_id = '{ankihub_nid}'
             """
+            SELECT 1 FROM notes WHERE ankihub_note_id = ? LIMIT 1
+            """,
+            str(ankihub_nid),
         )
         return bool(result)
 
@@ -383,7 +276,7 @@ class AnkiHubDB:
                 guid,
                 last_update_type
             FROM notes
-            WHERE anki_note_id = {anki_note_id} AND active = 1
+            WHERE anki_note_id = {anki_note_id}
             """,
         )
         if result is None:
@@ -417,7 +310,6 @@ class AnkiHubDB:
             """
             SELECT anki_note_id FROM notes
             WHERE ankihub_deck_id = ?
-            AND active = 1
             """,
             str(ankihub_did),
         )
@@ -450,7 +342,6 @@ class AnkiHubDB:
             f"""
             SELECT ankihub_deck_id FROM notes
             WHERE anki_note_id = {anki_nid}
-            AND active = 1
             """
         )
         result = uuid.UUID(did_str)
@@ -463,7 +354,6 @@ class AnkiHubDB:
             f"""
             SELECT DISTINCT ankihub_deck_id FROM notes
             WHERE anki_note_id IN {ids2str(anki_nids)}
-            AND active = 1
             """
         )
         result = [uuid.UUID(did) for did in did_strs]
@@ -472,7 +362,7 @@ class AnkiHubDB:
     def are_ankihub_notes(self, anki_nids: List[NoteId]) -> bool:
         notes_count = self.scalar(
             f"""
-            SELECT COUNT(*) FROM notes WHERE anki_note_id IN {ids2str(anki_nids)} AND active = 1
+            SELECT COUNT(*) FROM notes WHERE anki_note_id IN {ids2str(anki_nids)}
             """
         )
         return notes_count == len(set(anki_nids))
@@ -482,7 +372,6 @@ class AnkiHubDB:
             """
             SELECT ankihub_note_id FROM notes
             WHERE anki_note_id = ?
-            AND active = 1
             """,
             anki_note_id,
         )

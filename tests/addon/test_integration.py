@@ -23,7 +23,6 @@ from pytest_anki import AnkiSession
 from pytestqt.qtbot import QtBot  # type: ignore
 from requests_mock import Mocker
 
-from ..factories import NoteInfoFactory
 from .conftest import TEST_PROFILE_ID
 
 # workaround for vscode test discovery not using pytest.ini which sets this env var
@@ -1201,55 +1200,6 @@ class TestAnkiHubImporter:
             # assert that the note_data was saved correctly in the AnkiHub DB (without modifications)
             note_data_from_db = ankihub_db.note_data(nid)
             assert note_data_from_db == note_data
-
-    def test_conflicting_new_notes_get_deactivated(
-        self,
-        anki_session_with_addon: AnkiSession,
-        next_deterministic_uuid: Callable[[], uuid.UUID],
-        ankihub_basic_note_type: NotetypeDict,
-    ):
-        from ankihub.db import ankihub_db
-        from ankihub.exporting import to_note_data
-        from ankihub.importing import AnkiHubImporter
-
-        with anki_session_with_addon.profile_loaded():
-            mw = anki_session_with_addon.mw
-
-            # import two notes with the same nid into two different decks
-            anki_nid = NoteId(1)
-            mid = NotetypeId(ankihub_basic_note_type["id"])
-
-            ah_did_1 = next_deterministic_uuid()
-            note_data_1 = NoteInfoFactory(anki_nid=anki_nid, tags=["tag1"], mid=mid)
-            importer_1 = AnkiHubImporter()
-            importer_1._import_ankihub_deck_inner(
-                ankihub_did=ah_did_1,
-                notes_data=[note_data_1],
-                deck_name="deck 1",
-            )
-            assert not importer_1.skipped_nids
-            assert importer_1.created_nids == [anki_nid]
-            assert not importer_1.updated_nids
-
-            ah_did_2 = next_deterministic_uuid()
-            note_data_2 = NoteInfoFactory(anki_nid=anki_nid, tags=["tag2"], mid=mid)
-            importer_2 = AnkiHubImporter()
-            importer_2._import_ankihub_deck_inner(
-                ankihub_did=ah_did_2,
-                notes_data=[note_data_2],
-                deck_name="deck 2",
-            )
-            assert importer_2.skipped_nids == [anki_nid]
-            assert not importer_2.created_nids
-            assert not importer_2.updated_nids
-
-            # assert that the first note is active and the second is not
-            assert ankihub_db.is_active(note_data_1.ankihub_note_uuid)
-            assert not ankihub_db.is_active(note_data_2.ankihub_note_uuid)
-
-            # assert that the data in the Anki database is the data of the first note
-            assert to_note_data(mw.col.get_note(anki_nid)) == note_data_1
-            assert mw.col.get_note(anki_nid).tags == ["tag1"]
 
 
 def assert_that_only_ankihub_sample_deck_info_in_database(ankihub_deck_uuid: uuid.UUID):

@@ -1,10 +1,4 @@
-import uuid
-from typing import Callable
-
-from anki.notes import NoteId
 from pytest_anki import AnkiSession
-
-from ..factories import NoteInfoFactory
 
 
 def test_lowest_level_common_ancestor_deck_name():
@@ -200,73 +194,3 @@ def test_add_subdeck_tags_to_notes_with_spaces_in_deck_name(
 
         note3.load()
         assert note3.tags == [f"{SUBDECK_TAG}::AA::b_b::c_c"]
-
-
-class TestAnkiNidConflicts:
-    def test_conflict_between_two_decks(
-        self,
-        anki_session_with_addon: AnkiSession,
-        next_deterministic_uuid: Callable[[], uuid.UUID],
-    ):
-        from ankihub.db import ankihub_db
-
-        with anki_session_with_addon.profile_loaded():
-            # save two notes for one deck
-            ah_did_1 = next_deterministic_uuid()
-            note_info_1 = NoteInfoFactory(
-                ankihub_note_uuid=next_deterministic_uuid(), anki_nid=1
-            )
-            note_info_2 = NoteInfoFactory(
-                ankihub_note_uuid=next_deterministic_uuid(), anki_nid=2
-            )
-            ankihub_db.insert_or_update_notes_data(
-                ankihub_did=ah_did_1, notes_data=[note_info_1, note_info_2]
-            )
-
-            # save one note for another deck with the same nid as the first note in the first deck
-            ah_did_2 = next_deterministic_uuid()
-            note_info_3 = NoteInfoFactory(
-                ankihub_note_uuid=next_deterministic_uuid(), anki_nid=1
-            )
-
-            ankihub_db.insert_or_update_notes_data(
-                ankihub_did=ah_did_2, notes_data=[note_info_3]
-            )
-            assert not ankihub_db.is_active(note_info_3.ankihub_note_uuid)
-
-            # reactivate the deactivated note in the second deck to create a conflict
-            ankihub_db.activate_all_notes_in_deck(ah_did_2)
-
-            # check that the two decks are detected as conflicting
-            assert set(ankihub_db.all_conflicting_decks()) == set([ah_did_1, ah_did_2])
-
-            # check that the two decks are detected as conflicting
-            assert ankihub_db.conflicting_decks(ah_did_1) == [ah_did_2]
-            assert ankihub_db.conflicting_decks(ah_did_2) == [ah_did_1]
-
-            # check that the first note in the first deck is detected as conflicting
-            (
-                conflicting_ah_did,
-                conflicting_anki_nids,
-            ) = ankihub_db.next_conflict(ah_did_1)
-            assert conflicting_ah_did == ah_did_2
-            assert conflicting_anki_nids == [1]
-
-            (
-                conflicting_ah_did,
-                conflicting_anki_nids,
-            ) = ankihub_db.next_conflict(ah_did_2)
-            assert conflicting_ah_did == ah_did_1
-            assert conflicting_anki_nids == [1]
-
-            # deactivate conflicting note for the first deck
-            ankihub_db.deactivate_notes_for_deck(
-                ankihub_did=ah_did_1, anki_nids=[NoteId(1)]
-            )
-
-            # check that the two decks are not longer detected as conflicting
-            assert not ankihub_db.all_conflicting_decks()
-            assert ankihub_db.conflicting_decks(ah_did_1) == []
-            assert ankihub_db.conflicting_decks(ah_did_2) == []
-            assert not ankihub_db.next_conflict(ah_did_1)
-            assert not ankihub_db.next_conflict(ah_did_2)

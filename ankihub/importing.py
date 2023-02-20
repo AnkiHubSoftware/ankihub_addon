@@ -130,8 +130,8 @@ class AnkiHubImporter:
         adjust_note_types(remote_note_types)
         reset_note_types_of_notes_based_on_notes_data(notes_data)
 
-        # has to be called before updating notes in the anki db because
-        # it deactivates conflicting notes
+        # has to be called before updating notes in the anki db because notes should only
+        # be imported into the anki db if they don't conflict
         ankihub_db.insert_or_update_notes_data(
             ankihub_did=ankihub_did, notes_data=notes_data
         )
@@ -225,8 +225,10 @@ class AnkiHubImporter:
             f"Trying to update or create note: {note_data.anki_nid=}, {note_data.ankihub_note_uuid=}"
         )
 
-        if not ankihub_db.is_active(note_data.ankihub_note_uuid):
-            LOGGER.debug(f"Note {note_data.ankihub_note_uuid} is not active, skipping")
+        if not ankihub_db.ankihub_nid_exists(note_data.ankihub_note_uuid):
+            LOGGER.debug(
+                f"Note {note_data.ankihub_note_uuid} does not exist in AnkiHub DB, skipping"
+            )
             self.skipped_nids.append(NoteId(note_data.anki_nid))
             return None
 

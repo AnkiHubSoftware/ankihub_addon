@@ -5,37 +5,12 @@ from aqt.utils import showInfo, showWarning
 
 from .. import LOGGER
 from ..db import ankihub_db
-from ..note_conflicts import resolve_conflicts_for_deck
 from ..settings import config
 from .decks import cleanup_after_deck_install, download_and_install_deck
 from .utils import ask_user
 
 
 def check_ankihub_db(on_success: Optional[Callable[[], None]] = None):
-    _check_anki_nid_conflicts()
-
-    _check_missing_values(on_success)
-
-
-def _check_anki_nid_conflicts() -> None:
-    LOGGER.info("Checking for Anki nid conflicts...")
-
-    if not (conflicting_ah_dids := ankihub_db.all_conflicting_decks()):
-        LOGGER.info("No Anki nid conflicts found.")
-        return
-
-    LOGGER.info(f"Anki nid conflicts found. {conflicting_ah_dids=}")
-
-    for ah_did in conflicting_ah_dids:
-        success = resolve_conflicts_for_deck(ah_did)
-        if not success:
-            LOGGER.error(f"Didn't resolve conflicts for deck {ah_did}")
-            return
-
-    LOGGER.info("Anki nid conflicts resolved.")
-
-
-def _check_missing_values(on_success: Optional[Callable[[], None]] = None) -> None:
     ah_dids_with_missing_values = ankihub_db.ankihub_dids_of_decks_with_missing_values()
     ah_dids_missing_from_config = decks_missing_from_config()
     ah_dids_with_something_missing = list(
