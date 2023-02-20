@@ -55,7 +55,6 @@ class AnkiHubImporter:
         protected_tags: Optional[
             List[str]
         ] = None,  # will be fetched from api if not provided
-        save_to_ankihub_db: bool = True,
         subdecks: bool = False,
         subdecks_for_new_notes_only: bool = False,
     ) -> DeckId:
@@ -91,7 +90,6 @@ class AnkiHubImporter:
             protected_fields=protected_fields,
             protected_tags=protected_tags,
             local_did=local_did,
-            save_to_ankihub_db=save_to_ankihub_db,
             subdecks=subdecks,
             subdecks_for_new_notes_only=subdecks_for_new_notes_only,
         )
@@ -106,7 +104,6 @@ class AnkiHubImporter:
         protected_fields: Dict[int, List[str]] = {},
         protected_tags: List[str] = [],
         local_did: DeckId = None,  # did that new notes should be put into if importing not for the first time
-        save_to_ankihub_db: bool = True,
         subdecks: bool = False,
         subdecks_for_new_notes_only: bool = False,
     ) -> DeckId:
@@ -116,13 +113,9 @@ class AnkiHubImporter:
         adjust_note_types(remote_note_types)
         reset_note_types_of_notes_based_on_notes_data(notes_data)
 
-        if save_to_ankihub_db:
-            # TODO: remove save_to_ankihub_db parameter and always save to ankihub_db
-            # also move the reset code to this class or make it re-save the data
-            # resetting notes is the only place where save_to_ankihub_db is used
-            ankihub_db.insert_or_update_notes_data(
-                ankihub_did=ankihub_did, notes_data=notes_data
-            )
+        ankihub_db.insert_or_update_notes_data(
+            ankihub_did=ankihub_did, notes_data=notes_data
+        )
 
         dids: Set[DeckId] = set()  # set of ids of decks notes were imported into
         for note_data in notes_data:
@@ -139,8 +132,7 @@ class AnkiHubImporter:
             dids_for_note = set(c.did for c in note.cards())
             dids = dids | dids_for_note
 
-        if save_to_ankihub_db:
-            ankihub_db.transfer_mod_values_from_anki_db(notes_data=notes_data)
+        ankihub_db.transfer_mod_values_from_anki_db(notes_data=notes_data)
 
         LOGGER.info(
             f"Created {len(self.created_nids)} notes: {truncated_list(self.created_nids, limit=50)}"
