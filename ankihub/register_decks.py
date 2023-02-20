@@ -72,7 +72,7 @@ def create_collaborative_deck(
     set_ankihub_id_fields_based_on_notes_data(notes_data)
 
     ankihub_did = upload_deck(deck_id, notes_data=notes_data, private=private)
-    ankihub_db.upser_if_no_conflict(ankihub_did=ankihub_did, notes_data=notes_data)
+    ankihub_db.upsert_notes_data(ankihub_did=ankihub_did, notes_data=notes_data)
     ankihub_db.transfer_mod_values_from_anki_db(notes_data=notes_data)
     return ankihub_did
 

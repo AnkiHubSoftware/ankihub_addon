@@ -22,7 +22,7 @@ def attach_ankihub_db_to_anki_db_connection() -> None:
             f"ATTACH DATABASE ? AS {AnkiHubDB.database_name}",
             str(AnkiHubDB.database_path),
         )
-        LOGGER.info("Attached AnkiHub DB to Anki DB connection")
+        LOGGER.info("Attached AnkiHu DB to Anki DB connection")
 
 
 def detach_ankihub_db_from_anki_db_connection() -> None:
@@ -163,9 +163,7 @@ class AnkiHubDB:
         result = self.scalar("PRAGMA user_version;")
         return result
 
-    def upsert_note_data_if_no_conflict(
-        self, ankihub_did: uuid.UUID, notes_data: List[NoteInfo]
-    ):
+    def upsert_notes_data(self, ankihub_did: uuid.UUID, notes_data: List[NoteInfo]):
         """Upsert notes data to the AnkiHub DB.
         If a note with the same Anki nid already exists in the AnkiHub DB then the note will not be inserted.
         """
