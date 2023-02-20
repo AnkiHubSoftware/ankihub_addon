@@ -1,6 +1,5 @@
 import copy
-import gzip
-import json
+import os
 import re
 import uuid
 from datetime import datetime, timedelta, timezone
@@ -16,6 +15,7 @@ from anki.decks import DeckId
 from anki.models import NotetypeDict, NotetypeId
 from anki.notes import Note, NoteId
 from aqt import AnkiQt
+from aqt.addons import InstallOk
 from aqt.importing import AnkiPackageImporter
 from aqt.qt import Qt
 from pytest import MonkeyPatch, fixture
@@ -23,15 +23,42 @@ from pytest_anki import AnkiSession
 from pytestqt.qtbot import QtBot  # type: ignore
 from requests_mock import Mocker
 
-from ankihub.ankihub_client import API_URL_BASE, Field, NoteInfo, SuggestionType
-
 from .conftest import TEST_PROFILE_ID
+
+# workaround for vscode test discovery not using pytest.ini which sets this env var
+# has to be set before importing ankihub
+os.environ["SKIP_INIT"] = "1"
+
+from ankihub.ankihub_client import (  # noqa: E402
+    ANKIHUB_DATETIME_FORMAT_STR,
+    API_URL_BASE,
+    AnkiHubClient,
+    AnkiHubRequestError,
+    ChangeNoteSuggestion,
+    Deck,
+    DeckExtension,
+    DeckExtensionUpdateChunk,
+    Field,
+    NewNoteSuggestion,
+    NoteCustomization,
+    NoteInfo,
+    OptionalTagSuggestion,
+    SuggestionType,
+    TagGroupValidationResponse,
+    transform_notes_data,
+)
 
 SAMPLE_MODEL_ID = NotetypeId(1656968697414)
 TEST_DATA_PATH = Path(__file__).parent.parent / "test_data"
 SAMPLE_DECK_APKG = TEST_DATA_PATH / "small.apkg"
 ANKIHUB_SAMPLE_DECK_APKG = TEST_DATA_PATH / "small_ankihub.apkg"
 SAMPLE_NOTES_DATA = eval((TEST_DATA_PATH / "small_ankihub.txt").read_text())
+
+# the package name in the manifest is "ankihub"
+# the package name is used during the add-on installation process
+# to determine the path to the add-on files which also determines if an existing add-on is updated
+# or if a new add-on is installed
+ANKIHUB_ANKIADDON_FILE = TEST_DATA_PATH / "ankihub.ankiaddon"
 
 
 class InstallSampleAHDeck(Protocol):
@@ -155,18 +182,20 @@ def make_ah_note(
 
 
 def ankihub_sample_deck_notes_data():
-    from ankihub.ankihub_client import NoteInfo, transform_notes_data
-
     notes_data_raw = transform_notes_data(SAMPLE_NOTES_DATA)
     result = [NoteInfo.from_dict(x) for x in notes_data_raw]
     return result
 
 
-def test_entry_point():
+def test_entry_point(anki_session_with_addon: AnkiSession, qtbot: QtBot):
     from ankihub import entry_point
 
     entry_point.run()
+    with anki_session_with_addon.profile_loaded():
+        qtbot.wait(1000)
+
     # this test is just to make sure the entry point doesn't crash
+    # and that the add-on doesn't crash on Anki startup
 
 
 def test_editor(
@@ -285,75 +314,78 @@ def test_modify_note_type(anki_session_with_addon: AnkiSession):
 
 def test_create_collaborative_deck_and_upload(
     anki_session_with_addon: AnkiSession,
-    requests_mock: Mocker,
+    monkeypatch: MonkeyPatch,
     next_deterministic_uuid: Callable[[], uuid.UUID],
 ):
-    anki_session = anki_session_with_addon
-
     from ankihub.db import ankihub_db
-    from ankihub.settings import API_URL_BASE
+    from ankihub.register_decks import create_collaborative_deck
 
-    with anki_session.profile_loaded():
-        with anki_session.deck_installed(SAMPLE_DECK_APKG) as deck_id:
-            mw = anki_session.mw
+    with anki_session_with_addon.profile_loaded():
+        mw = anki_session_with_addon.mw
 
-            from ankihub.register_decks import create_collaborative_deck
+        # create a new deck with one note
+        deck_name = "New Deck"
+        mw.col.decks.add_normal_deck_with_name(deck_name)
+        anki_did = mw.col.decks.id_for_name(deck_name)
 
-            deck_name = mw.col.decks.name(DeckId(deck_id))
+        note = mw.col.new_note(mw.col.models.by_name("Basic"))
+        note["Front"] = "front"
+        note["Back"] = "back"
+        mw.col.add_note(note, anki_did)
 
-            requests_mock.get(
-                f"{API_URL_BASE}/decks/generate-presigned-url",
-                status_code=200,
-                json={"pre_signed_url": "http://fake_url"},
+        # upload deck
+        ah_did = next_deterministic_uuid()
+        upload_deck_mock = Mock()
+        upload_deck_mock.return_value = ah_did
+        ah_nid = next_deterministic_uuid()
+        with monkeypatch.context() as m:
+            m.setattr(
+                "ankihub.ankihub_client.AnkiHubClient.upload_deck", upload_deck_mock
             )
-            requests_mock.put(
-                "http://fake_url/",
-                status_code=200,
-            )
-            ankihub_deck_uuid = next_deterministic_uuid()
-            requests_mock.post(
-                f"{API_URL_BASE}/decks/",
-                status_code=201,
-                json={"deck_id": str(ankihub_deck_uuid)},
-            )
-
+            m.setattr("uuid.uuid4", lambda: ah_nid)
             create_collaborative_deck(deck_name, private=False)
 
-            # check that the deck payload is correct
-            assert requests_mock.request_history[-2].url == "http://fake_url/"
-            payload = json.loads(
-                gzip.decompress(requests_mock.request_history[-2].body).decode("utf-8")
-            )
-            notes_in_deck = [
-                mw.col.get_note(nid) for nid in mw.col.find_notes(f"deck:{deck_name}")
-            ]
-            assert len(payload["notes"]) == len(notes_in_deck)
-            assert len(payload["note_types"]) == len(
-                set([note.mid for note in notes_in_deck])
-            )
+        # re-load note to get updated note.mid
+        note.load()
 
-            # check that the request to the create deck endpoint is correct
-            assert requests_mock.last_request.json() == {
-                "key": requests_mock.last_request.json()["key"],
-                "name": deck_name,
-                "anki_id": deck_id,
-                "is_private": False,
-            }
+        # check that the client method was called with the correct data
+        expected_note_types_data = [mw.col.models.get(note.mid)]
+        expected_note_data = NoteInfo(
+            ankihub_note_uuid=ah_nid,
+            anki_nid=note.id,
+            fields=[
+                Field(name="Front", value="front", order=0),
+                Field(name="Back", value="back", order=1),
+            ],
+            tags=[],
+            mid=note.mid,
+            guid=note.guid,
+            last_update_type=None,
+        )
 
-            # check that deck info is in db
-            assert ankihub_db.ankihub_deck_ids() == [ankihub_deck_uuid]
-            assert len(ankihub_db.anki_nids_for_ankihub_deck(ankihub_deck_uuid)) == 3
+        upload_deck_mock.assert_called_once_with(
+            deck_name=deck_name,
+            notes_data=[expected_note_data],
+            note_types_data=expected_note_types_data,
+            anki_deck_id=anki_did,
+            private=False,
+        )
+
+        # check that note data is in db
+        assert ankihub_db.note_data(note.id) == expected_note_data
+
+        # check that note mod value is in database
+        assert (
+            ankihub_db.scalar(
+                "SELECT mod from notes WHERE ankihub_note_id = ?", str(ah_nid)
+            )
+            == note.mod
+        )
 
 
 def test_get_deck_by_id(
     requests_mock: Mocker, next_deterministic_uuid: Callable[[], uuid.UUID]
 ):
-    from ankihub.addon_ankihub_client import AddonAnkiHubClient as AnkiHubClient
-    from ankihub.ankihub_client import (
-        ANKIHUB_DATETIME_FORMAT_STR,
-        AnkiHubRequestError,
-        Deck,
-    )
     from ankihub.settings import API_URL_BASE
 
     client = AnkiHubClient(hooks=[])
@@ -399,7 +431,6 @@ def test_suggest_note_update(
     ankihub_basic_note_type: NotetypeDict,
     disable_image_support_feature_flag,
 ):
-    from ankihub.ankihub_client import ChangeNoteSuggestion, Field, SuggestionType
     from ankihub.db import ankihub_db
     from ankihub.exporting import to_note_data
     from ankihub.note_conversion import (
@@ -475,7 +506,6 @@ def test_suggest_new_note(
     install_sample_ah_deck: InstallSampleAHDeck,
     disable_image_support_feature_flag,
 ):
-    from ankihub.ankihub_client import AnkiHubRequestError
     from ankihub.note_conversion import (
         ADDON_INTERNAL_TAGS,
         ANKI_INTERNAL_TAGS,
@@ -541,12 +571,6 @@ def test_suggest_notes_in_bulk(
 ):
     from uuid import UUID
 
-    from ankihub.ankihub_client import (
-        ChangeNoteSuggestion,
-        Field,
-        NewNoteSuggestion,
-        SuggestionType,
-    )
     from ankihub.note_conversion import TAG_FOR_OPTIONAL_TAGS
     from ankihub.suggestions import suggest_notes_in_bulk
 
@@ -1042,7 +1066,6 @@ class TestAnkiHubImporter:
     ):
         from anki.consts import QUEUE_TYPE_SUSPENDED
 
-        from ankihub.ankihub_client import Field, NoteInfo
         from ankihub.settings import config
         from ankihub.sync import AnkiHubImporter
 
@@ -1269,7 +1292,6 @@ class TestPrepareNote:
         ankihub_basic_note_type: NotetypeDict,
         next_deterministic_uuid: Callable[[], uuid.UUID],
     ):
-        from ankihub.ankihub_client import Field
         from ankihub.note_conversion import (
             ADDON_INTERNAL_TAGS,
             TAG_FOR_PROTECTING_FIELDS,
@@ -1380,7 +1402,6 @@ class TestPrepareNote:
         ankihub_basic_note_type: Dict[str, Any],
         next_deterministic_uuid: Callable[[], uuid.UUID],
     ):
-        from ankihub.ankihub_client import Field
         from ankihub.note_conversion import TAG_FOR_PROTECTING_FIELDS
 
         anki_session = anki_session_with_addon
@@ -1446,7 +1467,6 @@ def prepare_note(
     guid: Optional[str] = None,
     last_update_type: SuggestionType = SuggestionType.NEW_CONTENT,
 ):
-    from ankihub.ankihub_client import NoteInfo
     from ankihub.importing import AnkiHubImporter
     from ankihub.settings import ANKIHUB_NOTE_TYPE_FIELD_NAME
 
@@ -1605,7 +1625,6 @@ class TestCustomSearchNodes:
         anki_session_with_addon: AnkiSession,
         next_deterministic_uuid: Callable[[], uuid.UUID],
     ):
-        from ankihub.ankihub_client import SuggestionType
         from ankihub.db import attached_ankihub_db
         from ankihub.gui.browser import NewNoteSearchNode
         from ankihub.importing import AnkiHubImporter
@@ -1648,7 +1667,6 @@ class TestCustomSearchNodes:
         anki_session_with_addon: AnkiSession,
         next_deterministic_uuid: Callable[[], uuid.UUID],
     ):
-        from ankihub.ankihub_client import SuggestionType
         from ankihub.db import attached_ankihub_db
         from ankihub.gui.browser import SuggestionTypeSearchNode
         from ankihub.importing import AnkiHubImporter
@@ -1775,7 +1793,6 @@ class TestBrowserTreeView:
         from aqt.browser.sidebar.tree import SidebarTreeView
 
         from ankihub import entry_point
-        from ankihub.ankihub_client import SuggestionType
         from ankihub.settings import config
 
         config.public_config["sync_on_startup"] = False
@@ -2273,11 +2290,6 @@ def test_sync_with_optional_content(
 ):
     anki_session = anki_session_with_addon
 
-    from ankihub.ankihub_client import (
-        DeckExtension,
-        DeckExtensionUpdateChunk,
-        NoteCustomization,
-    )
     from ankihub.db import ankihub_db
     from ankihub.settings import DeckExtensionConfig, config
     from ankihub.sync import AnkiHubSync
@@ -2363,7 +2375,6 @@ def test_optional_tag_suggestion_dialog(
 ):
     anki_session = anki_session_with_addon
 
-    from ankihub.ankihub_client import OptionalTagSuggestion, TagGroupValidationResponse
     from ankihub.gui.optional_tag_suggestion_dialog import OptionalTagsSuggestionDialog
     from ankihub.note_conversion import TAG_FOR_OPTIONAL_TAGS
 
@@ -2542,8 +2553,6 @@ def test_upload_images(
 ):
     import tempfile
 
-    from ankihub.ankihub_client import AnkiHubClient
-
     with anki_session_with_addon.profile_loaded():
         fake_presigned_url = "https://fake_presigned_url.com"
         monkeypatch.setattr(
@@ -2579,7 +2588,6 @@ class TestSuggestionsWithImages:
     ):
         import tempfile
 
-        from ankihub.ankihub_client import SuggestionType
         from ankihub.db import ankihub_db
         from ankihub.settings import API_URL_BASE
         from ankihub.suggestions import suggest_note_update
@@ -2691,3 +2699,81 @@ class TestSuggestionsWithImages:
                 assert upload_request_mock.last_request.text.name == str(  # type: ignore
                     file_path_in_col.absolute()
                 )
+
+
+class TestAddonUpdate:
+    def test_addon_update(
+        self,
+        anki_session_with_addon: AnkiSession,
+        monkeypatch: MonkeyPatch,
+        qtbot: QtBot,
+    ):
+        from ankihub import entry_point
+        from ankihub.addons import (
+            _maybe_change_file_permissions_of_addon_files,
+            _with_disabled_log_file_handler,
+        )
+
+        # The purpose of this mocks is to test whether our modifications to the add-on update process
+        # (defined in ankihub.addons) are used.
+        # The original functions will still be called because this sets the side effect to be the original functions,
+        # but this way we can check if they were called.
+        maybe_change_file_permissions_of_addon_files_mock = Mock()
+        maybe_change_file_permissions_of_addon_files_mock.side_effect = (
+            _maybe_change_file_permissions_of_addon_files
+        )
+        monkeypatch.setattr(
+            "ankihub.addons._maybe_change_file_permissions_of_addon_files",
+            maybe_change_file_permissions_of_addon_files_mock,
+        )
+
+        with_disabled_log_file_handler_mock = Mock()
+        with_disabled_log_file_handler_mock.side_effect = _with_disabled_log_file_handler  # type: ignore
+        monkeypatch.setattr(
+            "ankihub.addons._with_disabled_log_file_handler",
+            with_disabled_log_file_handler_mock,
+        )
+
+        # udpate the AnkiHub add-on
+        # entry point has to be run so that the add-on is loaded and the patches to the
+        # update process are applied
+        entry_point.run()
+        with anki_session_with_addon.profile_loaded():
+            mw = anki_session_with_addon.mw
+
+            result = mw.addonManager.install(file=str(ANKIHUB_ANKIADDON_FILE))
+            assert isinstance(result, InstallOk)
+
+            assert mw.addonManager.allAddons() == ["ankihub"]
+
+        with_disabled_log_file_handler_mock.assert_called_once()
+
+        # this is called twice because because multiple functions were wrapped with the
+        # with_disabled_log_file_handler wrapper, this is ok
+        maybe_change_file_permissions_of_addon_files_mock.call_count == 2
+
+        # start Anki
+        entry_point.run()
+        with anki_session_with_addon.profile_loaded():
+            mw = anki_session_with_addon.mw
+
+            assert mw.addonManager.allAddons() == ["ankihub"]
+            qtbot.wait(1000)
+
+    def test_that_changing_file_permissions_of_addons_folder_does_not_break_addon_load(
+        self, anki_session_with_addon: AnkiSession, qtbot: QtBot
+    ):
+        from ankihub import entry_point
+        from ankihub.addons import _change_file_permissions_of_addon_files
+
+        with anki_session_with_addon.profile_loaded():
+            mw = anki_session_with_addon.mw
+
+            addon_dir = Path(mw.addonManager.addonsFolder("ankihub"))
+            _change_file_permissions_of_addon_files(addon_dir=addon_dir)
+
+        entry_point.run()
+        with anki_session_with_addon.profile_loaded():
+            mw = anki_session_with_addon.mw
+
+            qtbot.wait(1000)
