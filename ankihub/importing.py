@@ -102,9 +102,9 @@ class AnkiHubImporter:
         ankihub_did: uuid.UUID,
         notes_data: List[NoteInfo],
         deck_name: str,  # name that will be used for a deck if a new one gets created
-        remote_note_types: Dict[NotetypeId, NotetypeDict],
-        protected_fields: Dict[int, List[str]],
-        protected_tags: List[str],
+        remote_note_types: Dict[NotetypeId, NotetypeDict] = {},
+        protected_fields: Dict[int, List[str]] = {},
+        protected_tags: List[str] = [],
         local_did: DeckId = None,  # did that new notes should be put into if importing not for the first time
         save_to_ankihub_db: bool = True,
         subdecks: bool = False,
