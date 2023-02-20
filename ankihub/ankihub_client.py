@@ -9,8 +9,20 @@ from abc import ABC
 from dataclasses import dataclass
 from datetime import datetime
 from enum import Enum
-from typing import Any, Callable, Dict, Iterator, List, Optional, Sequence, TypedDict
+from io import BufferedReader
 from pathlib import Path
+from typing import (
+    Any,
+    Callable,
+    Dict,
+    Iterator,
+    List,
+    Optional,
+    Sequence,
+    TypedDict,
+    Union,
+)
+
 import requests
 from requests import PreparedRequest, Request, Response, Session
 
@@ -349,12 +361,8 @@ class AnkiHubClient:
                 }
             ),
         )
-        s3_response = requests.put(
-            s3_url,
-            data=data,
-        )
-        if s3_response.status_code != 200:
-            raise AnkiHubRequestError(s3_response)
+
+        self._upload_to_s3(s3_url, data)
 
         response = self._send_request(
             "POST",
@@ -373,16 +381,21 @@ class AnkiHubClient:
         ankihub_did = uuid.UUID(response_data["deck_id"])
         return ankihub_did
 
+    def _upload_to_s3(self, s3_url: str, data: Union[bytes, BufferedReader]) -> None:
+        s3_response = requests.put(
+            s3_url,
+            data=data,
+        )
+        if s3_response.status_code != 200:
+            raise AnkiHubRequestError(s3_response)
+
     def upload_images(self, image_paths: List[Path], bucket_path: str) -> None:
         # TODO: send all images at once instad of looping through each one
         for image_path in image_paths:
             key = f"{bucket_path}/{image_path.name}"
             s3_url = self.get_presigned_url(key=key, action="upload")
             with open(image_path, "rb") as image_file:
-                s3_response = requests.put(s3_url, data=image_file)
-
-                if s3_response.status_code != 200:
-                    raise AnkiHubRequestError(s3_response)
+                self._upload_to_s3(s3_url, image_file)
 
     def _gzip_compress_string(self, string: str) -> bytes:
         result = gzip.compress(

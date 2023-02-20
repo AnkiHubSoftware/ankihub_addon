@@ -1,6 +1,4 @@
 import copy
-import gzip
-import json
 import os
 import re
 import uuid
@@ -290,64 +288,76 @@ def test_modify_note_type(anki_session_with_addon: AnkiSession):
 
 def test_create_collaborative_deck_and_upload(
     anki_session_with_addon: AnkiSession,
-    requests_mock: Mocker,
+    monkeypatch: MonkeyPatch,
     next_deterministic_uuid: Callable[[], uuid.UUID],
 ):
     anki_session = anki_session_with_addon
 
+    from ankihub.ankihub_client import Field, NoteInfo
     from ankihub.db import ankihub_db
-    from ankihub.settings import API_URL_BASE
+    from ankihub.register_decks import create_collaborative_deck
 
     with anki_session.profile_loaded():
-        with anki_session.deck_installed(SAMPLE_DECK_APKG) as deck_id:
-            mw = anki_session.mw
+        mw = anki_session.mw
 
-            from ankihub.register_decks import create_collaborative_deck
+        # create a new deck with one note
+        deck_name = "New Deck"
+        mw.col.decks.add_normal_deck_with_name(deck_name)
+        anki_did = mw.col.decks.id_for_name(deck_name)
 
-            deck_name = mw.col.decks.name(DeckId(deck_id))
+        note = mw.col.new_note(mw.col.models.by_name("Basic"))
+        note["Front"] = "front"
+        note["Back"] = "back"
+        mw.col.add_note(note, anki_did)
 
-            requests_mock.get(
-                f"{API_URL_BASE}/decks/generate-presigned-url",
-                status_code=200,
-                json={"pre_signed_url": "http://fake_url"},
+        # upload deck
+        ah_did = next_deterministic_uuid()
+        upload_deck_mock = Mock()
+        upload_deck_mock.return_value = ah_did
+        ah_nid = next_deterministic_uuid()
+        with monkeypatch.context() as m:
+            m.setattr(
+                "ankihub.ankihub_client.AnkiHubClient.upload_deck", upload_deck_mock
             )
-            requests_mock.put(
-                "http://fake_url/",
-                status_code=200,
-            )
-            ankihub_deck_uuid = next_deterministic_uuid()
-            requests_mock.post(
-                f"{API_URL_BASE}/decks/",
-                status_code=201,
-                json={"deck_id": str(ankihub_deck_uuid)},
-            )
-
+            m.setattr("uuid.uuid4", lambda: ah_nid)
             create_collaborative_deck(deck_name, private=False)
 
-            # check that the deck payload is correct
-            assert requests_mock.request_history[-2].url == "http://fake_url/"
-            payload = json.loads(
-                gzip.decompress(requests_mock.request_history[-2].body).decode("utf-8")
-            )
-            notes_in_deck = [
-                mw.col.get_note(nid) for nid in mw.col.find_notes(f"deck:{deck_name}")
-            ]
-            assert len(payload["notes"]) == len(notes_in_deck)
-            assert len(payload["note_types"]) == len(
-                set([note.mid for note in notes_in_deck])
-            )
+        # re-load note to get updated note.mid
+        note.load()
 
-            # check that the request to the create deck endpoint is correct
-            assert requests_mock.last_request.json() == {
-                "key": requests_mock.last_request.json()["key"],
-                "name": deck_name,
-                "anki_id": deck_id,
-                "is_private": False,
-            }
+        # check that the client method was called with the correct data
+        expected_note_types_data = [mw.col.models.get(note.mid)]
+        expected_note_data = NoteInfo(
+            ankihub_note_uuid=ah_nid,
+            anki_nid=note.id,
+            fields=[
+                Field(name="Front", value="front", order=0),
+                Field(name="Back", value="back", order=1),
+            ],
+            tags=[],
+            mid=note.mid,
+            guid=note.guid,
+            last_update_type=None,
+        )
 
-            # check that deck info is in db
-            assert ankihub_db.ankihub_deck_ids() == [ankihub_deck_uuid]
-            assert len(ankihub_db.anki_nids_for_ankihub_deck(ankihub_deck_uuid)) == 3
+        upload_deck_mock.assert_called_once_with(
+            deck_name=deck_name,
+            notes_data=[expected_note_data],
+            note_types_data=expected_note_types_data,
+            anki_deck_id=anki_did,
+            private=False,
+        )
+
+        # check that note data is in db
+        assert ankihub_db.note_data(note.id) == expected_note_data
+
+        # check that note mod value is in database
+        assert (
+            ankihub_db.scalar(
+                "SELECT mod from notes WHERE ankihub_note_id = ?", str(ah_nid)
+            )
+            == note.mod
+        )
 
 
 def test_get_deck_by_id(
