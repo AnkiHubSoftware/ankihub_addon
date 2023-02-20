@@ -163,19 +163,26 @@ class AnkiHubDB:
         result = self.scalar("PRAGMA user_version;")
         return result
 
-    def save_notes_data_and_mod_values(
+    def upsert_note_data_if_no_conflict(
         self, ankihub_did: uuid.UUID, notes_data: List[NoteInfo]
     ):
-        """Save notes data in the AnkiHub DB.
-        It also takes mod values for the notes from the Anki DB and saves them to the AnkiHub DB.
-        This is why it should be be called after importing or exporting a deck.
-        (The mod values are used to determine if a note has been modified in Anki since it was last imported/exported.)
+        """Upsert notes data to the AnkiHub DB.
+        If a note with the same Anki nid already exists in the AnkiHub DB then the note will not be inserted.
         """
         with db_transaction() as conn:
             for note_data in notes_data:
-                mod = mw.col.db.scalar(
-                    f"SELECT mod FROM notes WHERE id = {note_data.anki_nid}",
+                conflicting_ah_nid = self.first(
+                    """
+                    SELECT ankihub_note_id FROM notes
+                    WHERE anki_note_id = ?
+                    AND ankihub_note_id != ?
+                    """,
+                    note_data.anki_nid,
+                    str(note_data.ankihub_note_uuid),
                 )
+                if conflicting_ah_nid:
+                    continue
+
                 fields = join_fields(
                     [
                         field.value
@@ -191,19 +198,17 @@ class AnkiHubDB:
                         ankihub_deck_id,
                         anki_note_id,
                         anki_note_type_id,
-                        mod,
                         fields,
                         tags,
                         guid,
                         last_update_type
-                    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+                    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?)
                     """,
                     (
                         str(note_data.ankihub_note_uuid),
                         str(ankihub_did),
                         note_data.anki_nid,
                         note_data.mid,
-                        mod,
                         fields,
                         mw.col.tags.join(note_data.tags),
                         note_data.guid,
@@ -213,12 +218,30 @@ class AnkiHubDB:
                     ),
                 )
 
+    def transfer_mod_values_from_anki_db(self, notes_data: List[NoteInfo]):
+        """Takes mod values for the notes from the Anki DB and saves them to the AnkiHub DB.
+        Should be be always called after importing notes or exporting notes after
+        the mod values in the Anki DB have been updated.
+        (The mod values are used to determine if a note has been modified in Anki since it was last imported/exported.)
+        """
+        with db_transaction() as conn:
+            for note_data in notes_data:
+                mod = mw.col.db.scalar(
+                    "SELECT mod FROM notes WHERE id = ?", note_data.anki_nid
+                )
+
+                conn.execute(
+                    "UPDATE notes SET mod = ? WHERE ankihub_note_id = ?",
+                    (mod, str(note_data.ankihub_note_uuid)),
+                )
+
     def reset_mod_values_in_anki_db(self, anki_nids: List[NoteId]) -> None:
         # resets the mod values of the notes in the Anki DB to the
         # mod values stored in the AnkiHub DB
         nid_mod_tuples = self.execute(
             f"""
-            SELECT anki_note_id, mod from notes WHERE anki_note_id IN {ids2str(anki_nids)}
+            SELECT anki_note_id, mod from notes
+            WHERE anki_note_id IN {ids2str(anki_nids)}
             """
         )
         for nid, mod in nid_mod_tuples:
@@ -227,6 +250,18 @@ class AnkiHubDB:
                 mod,
                 nid,
             )
+
+    def ankihub_nid_exists(self, ankihub_nid: uuid.UUID) -> bool:
+        # It's possible that an AnkiHub nid does not exists after calling insert_or_update_notes_data
+        # with a NoteInfo that has the AnkkiHub nid if a note with the same Anki nid already exists
+        # in the AnkiHub DB but in different deck.
+        result = self.scalar(
+            """
+            SELECT 1 FROM notes WHERE ankihub_note_id = ? LIMIT 1
+            """,
+            str(ankihub_nid),
+        )
+        return bool(result)
 
     def note_data(self, anki_note_id: NoteId) -> Optional[NoteInfo]:
         # The AnkiHub note type of the note has to exist in the Anki DB, otherwise this will fail.
@@ -273,7 +308,8 @@ class AnkiHubDB:
     def anki_nids_for_ankihub_deck(self, ankihub_did: uuid.UUID) -> List[NoteId]:
         result = self.list(
             """
-            SELECT anki_note_id FROM notes WHERE ankihub_deck_id = ?
+            SELECT anki_note_id FROM notes
+            WHERE ankihub_deck_id = ?
             """,
             str(ankihub_did),
         )
@@ -304,7 +340,8 @@ class AnkiHubDB:
     def ankihub_did_for_anki_nid(self, anki_nid: NoteId) -> Optional[uuid.UUID]:
         did_str = self.scalar(
             f"""
-            SELECT ankihub_deck_id FROM notes WHERE anki_note_id = {anki_nid}
+            SELECT ankihub_deck_id FROM notes
+            WHERE anki_note_id = {anki_nid}
             """
         )
         result = uuid.UUID(did_str)
@@ -315,7 +352,8 @@ class AnkiHubDB:
     ) -> List[uuid.UUID]:
         did_strs = self.list(
             f"""
-            SELECT DISTINCT ankihub_deck_id FROM notes WHERE anki_note_id IN {ids2str(anki_nids)}
+            SELECT DISTINCT ankihub_deck_id FROM notes
+            WHERE anki_note_id IN {ids2str(anki_nids)}
             """
         )
         result = [uuid.UUID(did) for did in did_strs]
@@ -332,7 +370,8 @@ class AnkiHubDB:
     def ankihub_nid_for_anki_nid(self, anki_note_id: NoteId) -> Optional[uuid.UUID]:
         nid_str = self.scalar(
             """
-            SELECT ankihub_note_id FROM notes WHERE anki_note_id = ?
+            SELECT ankihub_note_id FROM notes
+            WHERE anki_note_id = ?
             """,
             anki_note_id,
         )

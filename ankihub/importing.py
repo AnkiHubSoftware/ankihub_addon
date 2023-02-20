@@ -1,5 +1,6 @@
 """Import NoteInfo objects into Anki, create/update decks and note types if necessary"""
 import uuid
+from dataclasses import dataclass
 from pprint import pformat
 from typing import Dict, Iterable, List, Optional, Set, Tuple
 
@@ -35,10 +36,24 @@ from .utils import (
 )
 
 
+@dataclass
+class AnkiHubImportResult:
+    ankihub_did: uuid.UUID
+    anki_did: DeckId
+    updated_nids: List[NoteId]
+    created_nids: List[NoteId]
+    skippped_nids: List[NoteId]
+    first_import_of_deck: bool
+
+    def __repr__(self):
+        return pformat(self.__dict__)
+
+
 class AnkiHubImporter:
     def __init__(self):
-        self.updated_nids = []
-        self.created_nids = []
+        self.created_nids: List[NoteId] = []
+        self.updated_nids: List[NoteId] = []
+        self.skipped_nids: List[NoteId] = []
 
     def import_ankihub_deck(
         self,
@@ -54,10 +69,9 @@ class AnkiHubImporter:
         protected_tags: Optional[
             List[str]
         ] = None,  # will be fetched from api if not provided
-        save_to_ankihub_db: bool = True,
         subdecks: bool = False,
         subdecks_for_new_notes_only: bool = False,
-    ) -> DeckId:
+    ) -> AnkiHubImportResult:
         """
         Used for importing an ankihub deck for the first time or updating it.
         When no local_did is provided this function assumes that the deck gets installed for the first time.
@@ -82,7 +96,7 @@ class AnkiHubImporter:
         if protected_tags is None:
             protected_tags = AnkiHubClient().get_protected_tags(ankihub_did)
 
-        anki_deck_id = self._import_ankihub_deck_inner(
+        return self._import_ankihub_deck_inner(
             ankihub_did=ankihub_did,
             notes_data=notes_data,
             deck_name=deck_name,
@@ -90,43 +104,52 @@ class AnkiHubImporter:
             protected_fields=protected_fields,
             protected_tags=protected_tags,
             local_did=local_did,
-            save_to_ankihub_db=save_to_ankihub_db,
             subdecks=subdecks,
             subdecks_for_new_notes_only=subdecks_for_new_notes_only,
         )
-        return anki_deck_id
 
     def _import_ankihub_deck_inner(
         self,
         ankihub_did: uuid.UUID,
         notes_data: List[NoteInfo],
         deck_name: str,  # name that will be used for a deck if a new one gets created
-        remote_note_types: Dict[NotetypeId, NotetypeDict],
-        protected_fields: Dict[int, List[str]],
-        protected_tags: List[str],
+        remote_note_types: Dict[NotetypeId, NotetypeDict] = {},
+        protected_fields: Dict[int, List[str]] = {},
+        protected_tags: List[str] = [],
         local_did: DeckId = None,  # did that new notes should be put into if importing not for the first time
-        save_to_ankihub_db: bool = True,
         subdecks: bool = False,
         subdecks_for_new_notes_only: bool = False,
-    ) -> DeckId:
+    ) -> AnkiHubImportResult:
+        self.created_nids = []
+        self.updated_nids = []
+        self.skipped_nids = []
+
         first_import_of_deck = local_did is None
 
         local_did = adjust_deck(deck_name, local_did)
         adjust_note_types(remote_note_types)
         reset_note_types_of_notes_based_on_notes_data(notes_data)
 
+        # has to be called before updating notes in the anki db because notes should only
+        # be imported into the anki db if they don't conflict
+        ankihub_db.upser_if_no_conflict(ankihub_did=ankihub_did, notes_data=notes_data)
+
         dids: Set[DeckId] = set()  # set of ids of decks notes were imported into
         for note_data in notes_data:
-            note: Note = self.update_or_create_note(
+            note = self._update_or_create_note(
                 note_data=note_data,
                 anki_did=local_did,
                 protected_fields=protected_fields,
                 protected_tags=protected_tags,
                 first_import_of_deck=first_import_of_deck,
             )
+            if note is None:
+                continue
 
             dids_for_note = set(c.did for c in note.cards())
             dids = dids | dids_for_note
+
+        ankihub_db.transfer_mod_values_from_anki_db(notes_data=notes_data)
 
         LOGGER.info(
             f"Created {len(self.created_nids)} notes: {truncated_list(self.created_nids, limit=50)}"
@@ -134,24 +157,33 @@ class AnkiHubImporter:
         LOGGER.info(
             f"Updated {len(self.updated_nids)} notes: {truncated_list(self.updated_nids, limit=50)}"
         )
+        LOGGER.info(
+            f"Skippped {len(self.skipped_nids)} notes: "
+            f"{truncated_list(self.skipped_nids, limit=50)}"
+        )
 
         if first_import_of_deck:
             local_did = self._cleanup_first_time_deck_import(dids, local_did)
 
-        if save_to_ankihub_db:
-            ankihub_db.save_notes_data_and_mod_values(
-                ankihub_did=ankihub_did, notes_data=notes_data
-            )
-
         if subdecks or subdecks_for_new_notes_only:
             if subdecks_for_new_notes_only:
-                nids = list(self.created_nids)
+                anki_nids = list(self.created_nids)
             else:
-                nids = list(self.created_nids + self.updated_nids)
+                anki_nids = list(self.created_nids + self.updated_nids)
 
-            build_subdecks_and_move_cards_to_them(ankihub_did=ankihub_did, nids=nids)
+            build_subdecks_and_move_cards_to_them(
+                ankihub_did=ankihub_did, nids=anki_nids
+            )
 
-        return local_did
+        result = AnkiHubImportResult(
+            ankihub_did=ankihub_did,
+            anki_did=local_did,
+            created_nids=self.created_nids,
+            updated_nids=self.updated_nids,
+            skippped_nids=self.skipped_nids,
+            first_import_of_deck=first_import_of_deck,
+        )
+        return result
 
     def _cleanup_first_time_deck_import(
         self, dids_cards_were_imported_to: Iterable[DeckId], created_did: DeckId
@@ -179,17 +211,24 @@ class AnkiHubImporter:
 
         return created_did
 
-    def update_or_create_note(
+    def _update_or_create_note(
         self,
         note_data: NoteInfo,
         protected_fields: Dict[int, List[str]],
         protected_tags: List[str],
         anki_did: Optional[DeckId] = None,
         first_import_of_deck: bool = False,
-    ) -> Note:
+    ) -> Optional[Note]:
         LOGGER.debug(
             f"Trying to update or create note: {note_data.anki_nid=}, {note_data.ankihub_note_uuid=}"
         )
+
+        if not ankihub_db.ankihub_nid_exists(note_data.ankihub_note_uuid):
+            LOGGER.debug(
+                f"Note {note_data.ankihub_note_uuid} does not exist in AnkiHub DB, skipping"
+            )
+            self.skipped_nids.append(NoteId(note_data.anki_nid))
+            return None
 
         note_before_changes = None
         try:
@@ -253,7 +292,7 @@ class AnkiHubImporter:
         anki_did: Optional[DeckId],  # only relevant for newly created notes
         first_import_of_deck: bool,
     ) -> Note:
-        fields = note_data.fields
+        fields = note_data.fields.copy()
 
         try:
             note = mw.col.get_note(id=NoteId(note_data.anki_nid))
