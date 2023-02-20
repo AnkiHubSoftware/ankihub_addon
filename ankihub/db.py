@@ -22,7 +22,7 @@ def attach_ankihub_db_to_anki_db_connection() -> None:
             f"ATTACH DATABASE ? AS {AnkiHubDB.database_name}",
             str(AnkiHubDB.database_path),
         )
-        LOGGER.info("Attached AnkiHu DB to Anki DB connection")
+        LOGGER.info("Attached AnkiHub DB to Anki DB connection")
 
 
 def detach_ankihub_db_from_anki_db_connection() -> None:
