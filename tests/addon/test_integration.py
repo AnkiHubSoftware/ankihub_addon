@@ -1,4 +1,5 @@
 import copy
+import os
 import re
 import uuid
 from datetime import datetime, timedelta, timezone
@@ -14,6 +15,7 @@ from anki.decks import DeckId
 from anki.models import NotetypeDict, NotetypeId
 from anki.notes import Note, NoteId
 from aqt import AnkiQt
+from aqt.addons import InstallOk
 from aqt.importing import AnkiPackageImporter
 from aqt.qt import Qt
 from pytest import MonkeyPatch, fixture
@@ -30,6 +32,8 @@ TEST_DATA_PATH = Path(__file__).parent.parent / "test_data"
 SAMPLE_DECK_APKG = TEST_DATA_PATH / "small.apkg"
 ANKIHUB_SAMPLE_DECK_APKG = TEST_DATA_PATH / "small_ankihub.apkg"
 SAMPLE_NOTES_DATA = eval((TEST_DATA_PATH / "small_ankihub.txt").read_text())
+
+ANKI_ADDON_FILE = TEST_DATA_PATH / "ankihub.ankiaddon"
 
 
 class InstallSampleAHDeck(Protocol):
@@ -288,9 +292,9 @@ def test_create_collaborative_deck_and_upload(
 ):
     anki_session = anki_session_with_addon
 
+    from ankihub.ankihub_client import Field, NoteInfo
     from ankihub.db import ankihub_db
     from ankihub.register_decks import create_collaborative_deck
-    from ankihub.ankihub_client import NoteInfo, Field
 
     with anki_session.profile_loaded():
         mw = anki_session.mw
@@ -2687,3 +2691,20 @@ class TestSuggestionsWithImages:
                 assert upload_request_mock.last_request.text.name == str(  # type: ignore
                     file_path_in_col.absolute()
                 )
+
+
+class TestAddonUpdate:
+    def test_addon_update(
+        self, anki_session_with_addon: AnkiSession, monkeypatch: MonkeyPatch
+    ):
+        # unset SKIP_INIT so that the add-on installed from the add-on file is loaded
+        del os.environ["SKIP_INIT"]
+
+        with anki_session_with_addon.profile_loaded():
+            mw = anki_session_with_addon.mw
+
+            result = mw.addonManager.install(file=str(ANKI_ADDON_FILE))
+            assert isinstance(result, InstallOk)
+
+        with anki_session_with_addon.profile_loaded():
+            assert len(mw.addonManager.allAddons()) == 2

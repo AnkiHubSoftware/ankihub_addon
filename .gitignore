@@ -1,6 +1,6 @@
 # Anki related
 ankihub/meta.json
-*.ankiaddon
+
 # Ignore everything except the README.
 /ankihub/user_files/*
 !/ankihub/user_files/README.md
@@ -34,6 +34,7 @@ share/python-wheels/
 .installed.cfg
 *.egg
 MANIFEST
+ankihub.ankiaddon
 
 # PyInstaller
 #  Usually these files are written by a python script from a template
