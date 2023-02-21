@@ -4,10 +4,10 @@ from contextlib import contextmanager
 from pathlib import Path
 from typing import Any, Iterable, List, Optional, Tuple
 
+import aqt
 from anki.models import NotetypeId
 from anki.notes import NoteId
 from anki.utils import ids2str, join_fields, split_fields
-import aqt
 
 from . import LOGGER
 from .ankihub_client import Field, NoteInfo, suggestion_type_from_str
@@ -74,60 +74,36 @@ class AnkiHubDB:
     def setup_and_migrate(self) -> None:
         AnkiHubDB.database_path = ankihub_db_path()
 
-        self.execute(
+        notes_table_exists = self.scalar(
             """
-            CREATE TABLE IF NOT EXISTS notes (
-                ankihub_note_id STRING PRIMARY KEY,
-                ankihub_deck_id STRING,
-                anki_note_id INTEGER,
-                anki_note_type_id INTEGER
-            )
+            SELECT name FROM sqlite_master WHERE type='table' AND name='notes';
             """
         )
 
-        LOGGER.info(f"AnkiHub DB schema version: {self.schema_version()}")
-
-        if self.schema_version() == 0:
+        if not notes_table_exists:
             self.execute(
                 """
-                ALTER TABLE notes ADD COLUMN mod INTEGER
+                CREATE TABLE notes (
+                    ankihub_note_id STRING PRIMARY KEY,
+                    ankihub_deck_id STRING,
+                    anki_note_id INTEGER,
+                    anki_note_type_id INTEGER,
+                    mod INTEGER,
+                    guid TEXT,
+                    fields TEXT,
+                    tags TEXT,
+                    last_update_type TEXT
+                );
                 """
             )
-            self.execute("PRAGMA user_version = 1;")
-            LOGGER.info(
-                f"AnkiHub DB migrated to schema version {self.schema_version()}"
-            )
+            self.execute("CREATE INDEX ankihub_deck_id_idx ON notes (ankihub_deck_id);")
+            self.execute("CREATE INDEX anki_note_id_idx ON notes (anki_note_id);")
+            self.execute("CREATE INDEX anki_note_type_id ON notes (anki_note_type_id);")
+            self.execute("PRAGMA user_version = 5")
+        else:
+            from .db_migrations import migrate_ankihub_db
 
-        if self.schema_version() <= 1:
-            self.execute("CREATE INDEX ankihub_deck_id_idx ON notes (ankihub_deck_id)")
-            self.execute("CREATE INDEX anki_note_id_idx ON notes (anki_note_id)")
-            self.execute("PRAGMA user_version = 2;")
-            LOGGER.info(
-                f"AnkiHub DB migrated to schema version {self.schema_version()}"
-            )
-
-        if self.schema_version() <= 2:
-            self.execute("ALTER TABLE notes ADD COLUMN guid TEXT")
-            self.execute("ALTER TABLE notes ADD COLUMN fields TEXT")
-            self.execute("ALTER TABLE notes ADD COLUMN tags TEXT")
-            self.execute("PRAGMA user_version = 3;")
-            LOGGER.info(
-                f"AnkiHub DB migrated to schema version {self.schema_version()}"
-            )
-
-        if self.schema_version() <= 3:
-            self.execute("ALTER TABLE notes ADD COLUMN last_update_type TEXT")
-            self.execute("PRAGMA user_version = 4;")
-            LOGGER.info(
-                f"AnkiHub DB migrated to schema version {self.schema_version()}"
-            )
-
-        if self.schema_version() <= 4:
-            self.execute("CREATE INDEX anki_note_type_id ON notes (anki_note_type_id)")
-            self.execute("PRAGMA user_version = 5;")
-            LOGGER.info(
-                f"AnkiHub DB migrated to schema version {self.schema_version()}"
-            )
+            migrate_ankihub_db()
 
     def execute(self, sql: str, *args, first_row_only=False) -> List:
         conn = sqlite3.connect(self.database_path)
