@@ -130,11 +130,11 @@ def test_remove_note_type_name_modifications():
     assert note_type_name_without_ankihub_modifications(name) == name
 
 
-def test_add_subdeck_tags_to_notes(anki_session_with_addon: AnkiSession):
+def test_add_subdeck_tags_to_notes(anki_session_with_addon_data: AnkiSession):
     from ankihub.subdecks import SUBDECK_TAG, add_subdeck_tags_to_notes
 
-    with anki_session_with_addon.profile_loaded():
-        mw = anki_session_with_addon.mw
+    with anki_session_with_addon_data.profile_loaded():
+        mw = anki_session_with_addon_data.mw
 
         mw.col.decks.add_normal_deck_with_name("A::B::C")
 
@@ -163,12 +163,12 @@ def test_add_subdeck_tags_to_notes(anki_session_with_addon: AnkiSession):
 
 
 def test_add_subdeck_tags_to_notes_with_spaces_in_deck_name(
-    anki_session_with_addon: AnkiSession,
+    anki_session_with_addon_data: AnkiSession,
 ):
     from ankihub.subdecks import SUBDECK_TAG, add_subdeck_tags_to_notes
 
-    with anki_session_with_addon.profile_loaded():
-        mw = anki_session_with_addon.mw
+    with anki_session_with_addon_data.profile_loaded():
+        mw = anki_session_with_addon_data.mw
 
         mw.col.decks.add_normal_deck_with_name(" a a :: b b :: c c ")
 

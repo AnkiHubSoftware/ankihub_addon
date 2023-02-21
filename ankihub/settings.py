@@ -98,12 +98,18 @@ class PrivateConfig(DataClassJSONMixin):
 class Config:
     def __init__(self):
         # self.public_config is editable by the user using a built-in Anki feature.
-        migrate_public_config()
-        self.public_config: Dict[str, Any] = mw.addonManager.getConfig(ADDON_PATH.name)
+        self.public_config: Optional[Dict[str, Any]] = None
+        self._private_config: Optional[PrivateConfig] = None
+        self._private_config_path: Optional[Path] = None
         self.token_change_hook: Optional[Callable[[], None]] = None
         self.subscriptions_change_hook: Optional[Callable[[], None]] = None
 
-    def setup(self):
+    def setup_public_config(self):
+        migrate_public_config()
+        self.public_config = mw.addonManager.getConfig(ADDON_PATH.name)
+
+    def setup_private_config(self):
+        # requires the profile setup to be completed unlike self.setup_pbulic_config
         self._private_config_path = private_config_path()
         if not self._private_config_path.exists():
             self._private_config = PrivateConfig()
@@ -367,36 +373,39 @@ def file_handler():
     )
 
 
-LOGGING = {
-    "version": 1,
-    "disable_existing_loggers": False,
-    "formatters": {
-        "verbose": {
-            "format": "%(levelname)s %(asctime)s %(module)s "
-            "%(process)d %(thread)d %(message)s"
-        }
-    },
-    "handlers": {
-        "console": {
-            "()": stdout_handler,
-            "level": "INFO",
-            "formatter": "verbose",
-        },
-        "file": {
-            "()": file_handler,
-            "level": "DEBUG"
-            if config.public_config.get("debug_level_logs", False)
-            else "INFO",
-            "formatter": "verbose",
-        },
-    },
-    "root": {
-        "level": "DEBUG",
-        "handlers": ["console", "file"],
-    },
-}
+def setup_logger():
+    log_file_path().parent.mkdir(parents=True, exist_ok=True)
 
-logging.config.dictConfig(LOGGING)
+    LOGGING = {
+        "version": 1,
+        "disable_existing_loggers": False,
+        "formatters": {
+            "verbose": {
+                "format": "%(levelname)s %(asctime)s %(module)s "
+                "%(process)d %(thread)d %(message)s"
+            }
+        },
+        "handlers": {
+            "console": {
+                "()": stdout_handler,
+                "level": "INFO",
+                "formatter": "verbose",
+            },
+            "file": {
+                "()": file_handler,
+                "level": "DEBUG"
+                if config.public_config.get("debug_level_logs", False)
+                else "INFO",
+                "formatter": "verbose",
+            },
+        },
+        "root": {
+            "level": "DEBUG",
+            "handlers": ["console", "file"],
+        },
+    }
+
+    logging.config.dictConfig(LOGGING)
 
 
 version_file = Path(__file__).parent / "VERSION"

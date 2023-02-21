@@ -1,8 +1,8 @@
 import json
 import shutil
-from typing import Generator
 import uuid
 from pathlib import Path
+from typing import Generator
 
 import pytest
 from pytest import MonkeyPatch
@@ -23,34 +23,32 @@ TEST_PROFILE_ID = uuid.UUID("11111111-1111-1111-1111-111111111111")
 # and some add-ons file use mw when you import them
 # this is a workaround for that
 # it might be good to change the add-ons file to not do that instead of using autouse=True
+# the requests_mock argument is here to disallow real requests for all tests that use the fixture
+# to prevent hidden real requests
 @pytest.fixture(scope="function", autouse=True)
-def anki_session_with_addon(
+def anki_session_with_addon_data(
     anki_session: AnkiSession, requests_mock: Mocker, monkeypatch: MonkeyPatch
 ) -> Generator[AnkiSession, None, None]:
-    """Sets up the add-on, config and database and returns the AnkiSession.
-    Does similar setup like in profile_setup in entry_point.py.
+    """Sets up a temporary anki_base folder with the ankihub add-ons data (config, contents of profile_data_folder)
+    in it's add-on folder. This is a replacement for running the whole initialization process of the add-on
+    which is not needed for most tests (test can call entrypoint.run manually if they need to).
+    It also makes it so that the profile_data_folder always has the same name (TEST_PROFILE_ID) to make this
+    aspect of the tests deterministic.
+    The add-ons code is not copied into the add-on's folder in the temporary anki_base folder.
+    Instead the tests run the code in the ankihub folder of the repo.
     """
-    # the requests_mock argument is here to disallow real requests for all tests that use the fixture
-    # to prevent hidden real requests
-
-    ANKIHUB_PATH = Path(anki_session.mw.addonManager.addonsFolder()) / "ankihub"
-    USER_FILES_PATH = ANKIHUB_PATH / "user_files"
-    PROFILE_DATA_PATH = USER_FILES_PATH / "test_profile_folder"
-
-    # copy the addon to the addons folder
-    shutil.copytree(REPO_ROOT_PATH / "ankihub", ANKIHUB_PATH)
-
-    # clear the user files folder at the destination - it might contain files from using the add-on
-    for f in USER_FILES_PATH.glob("*"):
-        if f.is_file():
-            f.unlink()
-        elif f.is_dir():
-            shutil.rmtree(f)
-
-    # create the profile data folder
-    PROFILE_DATA_PATH.mkdir(parents=True)
 
     from ankihub.entry_point import profile_setup
+    from ankihub.settings import config, setup_logger
+
+    config_path = REPO_ROOT_PATH / "ankihub" / "config.json"
+    with open(config_path) as f:
+        config_dict = json.load(f)
+    anki_session.create_addon_config(package_name="ankihub", default_config=config_dict)
+
+    config.setup_public_config()
+
+    setup_logger()
 
     with monkeypatch.context() as m:
         # monkeypatch the uuid4 function to always return the same value so
@@ -62,26 +60,12 @@ def anki_session_with_addon(
     yield anki_session
 
 
-@pytest.fixture(scope="function")
-def anki_session_with_config(anki_session: AnkiSession):
-    config = REPO_ROOT_PATH / "ankihub" / "config.json"
-    meta = REPO_ROOT_PATH / "ankihub" / "meta.json"
-    with open(config) as f:
-        config_dict = json.load(f)
-    with open(meta) as f:
-        meta_dict = json.load(f)
-    anki_session.create_addon_config(
-        package_name="ankihub", default_config=config_dict, user_config=meta_dict
-    )
-    yield anki_session
-
-
 @pytest.fixture
-def anki_session_with_addon_before_profile_support(anki_session_with_addon):
+def anki_session_with_addon_before_profile_support(anki_session_with_addon_data):
     # previous versions of the add-on didn't support multiple Anki profiles and
     # had one set of data for all profiles
     # this fixtures simulates the data structure of such an add-on version
-    anki_session: AnkiSession = anki_session_with_addon
+    anki_session: AnkiSession = anki_session_with_addon_data
     with anki_session.profile_loaded():
         mw = anki_session.mw
         user_files_path = Path(mw.addonManager.addonsFolder("ankihub")) / "user_files"

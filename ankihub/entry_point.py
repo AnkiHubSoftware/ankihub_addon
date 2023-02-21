@@ -17,7 +17,7 @@ from .gui.anki_db_check import check_anki_db
 from .gui.db_check import check_ankihub_db
 from .gui.menu import refresh_ankihub_menu, setup_ankihub_menu
 from .progress import setup_progress_manager
-from .settings import ANKI_VERSION, config, setup_profile_data_folder
+from .settings import ANKI_VERSION, config, setup_logger, setup_profile_data_folder
 from .sync import sync_with_progress
 from .utils import modify_note_type_templates
 
@@ -32,6 +32,11 @@ PROFILE_WILL_CLOSE = False
 
 def run():
     """Call this function in __init__.py when Anki starts."""
+
+    config.setup_public_config()
+    setup_logger()
+    LOGGER.info("Set up logger.")
+
     profile_did_open.append(on_profile_did_open)
 
 
@@ -64,8 +69,8 @@ def profile_setup() -> bool:
         return False
     LOGGER.info(f"Set up profile data folder for the current profile: {mw.pm.name}")
 
-    config.setup()
-    LOGGER.info("Setup config for the current profile.")
+    config.setup_private_config()
+    LOGGER.info("Set up config for the current profile.")
 
     ankihub_db.setup_and_migrate()
     LOGGER.info("Set up and migrated AnkiHub DB for the current profile.")
