@@ -33,7 +33,6 @@ PROFILE_WILL_CLOSE = False
 def run():
     """Call this function in __init__.py when Anki starts."""
 
-    config.setup_public_config()
     setup_logger()
     LOGGER.info("Set up logger.")
 

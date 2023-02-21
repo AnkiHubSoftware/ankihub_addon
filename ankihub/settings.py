@@ -98,15 +98,12 @@ class PrivateConfig(DataClassJSONMixin):
 class Config:
     def __init__(self):
         # self.public_config is editable by the user using a built-in Anki feature.
-        self.public_config: Optional[Dict[str, Any]] = None
+        migrate_public_config()
+        self.public_config: Dict[str, Any] = mw.addonManager.getConfig(ADDON_PATH.name)
         self._private_config: Optional[PrivateConfig] = None
         self._private_config_path: Optional[Path] = None
         self.token_change_hook: Optional[Callable[[], None]] = None
         self.subscriptions_change_hook: Optional[Callable[[], None]] = None
-
-    def setup_public_config(self):
-        migrate_public_config()
-        self.public_config = mw.addonManager.getConfig(ADDON_PATH.name)
 
     def setup_private_config(self):
         # requires the profile setup to be completed unlike self.setup_pbulic_config
