@@ -1213,7 +1213,7 @@ class TestAnkiHubImporter:
             assert import_result.skipped_nids == []
 
             mod_1 = ankihub_db.scalar("SELECT mod FROM notes WHERE anki_note_id = ?", 1)
-            sleep(0.1)
+            sleep(0.1)  # sleep to test for mod value changes
 
             # import the second note with the same nid
             ah_did_2 = next_deterministic_uuid()
