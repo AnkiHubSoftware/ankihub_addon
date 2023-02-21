@@ -458,7 +458,7 @@ def download_and_install_deck(
         elif e.response.status_code == 403:
             deck_url = f"{url_view_deck()}{ankihub_did}"
             showInfo(
-                f"Please first subscribe to the deck on the AnkiHub website.<br><br>"
+                f"Please first subscribe to the deck on the AnkiHub website.<br>"
                 f"Link to the deck: <a href='{deck_url}'>{deck_url}</a><br>"
                 "<br>"
                 "Note that you also need an active AnkiHub subscription.<br>"
