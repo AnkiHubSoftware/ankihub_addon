@@ -152,7 +152,7 @@ class SubscribedDecksDialog(QDialog):
                     "<br>"
                     f"Skipped {len(import_result.skipped_nids)} note(s). <br>"
                     "<br>"
-                    "Notes were skipped because they have the same anki note id as a note in a different AnkiHub deck "
+                    "Notes were skipped because they have the same anki note ids as notes in a different AnkiHub deck "
                     "you have installed."
                     if import_result.skipped_nids
                     else ""
