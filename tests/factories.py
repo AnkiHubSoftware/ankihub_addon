@@ -1,15 +1,14 @@
+import os
 import uuid
 from typing import List
 
 import factory
 
-import os
-
 # workaround for vscode test discovery not using pytest.ini which sets this env var
 # has to be set before importing ankihub
 os.environ["SKIP_INIT"] = "1"
 
-from ankihub.ankihub_client import Field, NoteInfo  # noqa: E402
+from ankihub.ankihub_client import Field, NoteInfo
 
 
 class NoteInfoFactory(factory.Factory):
