@@ -78,7 +78,8 @@ def migrate_ankihub_db():
                     ),
                 )
 
-                # add an unique constraint to the anki_note_id column by making an unique index
+                # Add an unique constraint to the anki_note_id column by making an unique index.
+                # You can't add a unique constraint to an existing table in sqlite and
                 # this is equlivalent, see https://www.sqlite.org/lang_createtable.html#constraints
                 conn.execute("DROP INDEX anki_note_id_idx")
                 conn.execute(
