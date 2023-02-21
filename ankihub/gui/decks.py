@@ -33,7 +33,7 @@ from ..addon_ankihub_client import AnkiHubRequestError
 from ..ankihub_client import NoteInfo
 from ..db import ankihub_db
 from ..importing import AnkiHubImportResult
-from ..settings import url_deck_base, url_decks, url_help, url_view_deck, config
+from ..settings import config, url_deck_base, url_decks, url_help, url_view_deck
 from ..subdecks import SUBDECK_TAG, build_subdecks_and_move_cards_to_them, flatten_deck
 from ..sync import AnkiHubImporter
 from ..utils import create_backup, undo_note_type_modfications
@@ -118,9 +118,11 @@ class SubscribedDecksDialog(QDialog):
         gui_hooks.operation_did_execute(op, handler=None)
 
     def _on_add(self) -> None:
-        ah_did = SubscribeDialog().run()
-        if ah_did is None:
+        import_result = SubscribeDialog().run()
+        if import_result is None:
             return
+
+        ah_did = import_result.ankihub_did
 
         self._refresh_decks_list()
         self._refresh_anki()
@@ -136,6 +138,29 @@ class SubscribedDecksDialog(QDialog):
                 self._on_toggle_subdecks()
 
         cleanup_after_deck_install()
+
+        showInfo(
+            text=(
+                f"Deck successfully imported from AnkiHub!<br>"
+                "<br>"
+                "The imported notes are in the deck<br>"
+                f"<b>{deck_name}</b>.<br>"
+                "<br>"
+                f"Added {len(import_result.created_nids)} note(s). <br>"
+                f"Updated {len(import_result.updated_nids)} note(s)."
+                + (
+                    "<br>"
+                    f"Skipped {len(import_result.skipped_nids)} note(s). <br>"
+                    "<br>"
+                    "Notes were skipped because they have the same anki note id as a note in a different AnkiHub deck "
+                    "you have installed."
+                    if import_result.skipped_nids
+                    else ""
+                )
+            ),
+            parent=self,
+            title="AnkiHub Deck Import Summary",
+        )
 
     def _select_deck(self, ah_did: uuid.UUID):
         deck_item = next(
@@ -326,7 +351,7 @@ class SubscribeDialog(QDialog):
     def __init__(self):
         super(SubscribeDialog, self).__init__()
 
-        self.ah_did = None
+        self.import_result: Optional[AnkiHubImportResult] = None
 
         self.results = None
         self.thread = None  # type: ignore
@@ -380,12 +405,11 @@ class SubscribeDialog(QDialog):
         else:
             self.show()
 
-    def run(self) -> uuid.UUID:
-        """Returns the ankihub deck id of the newly subscribed deck or None if no deck was subscribed to"""
+    def run(self) -> Optional[AnkiHubImportResult]:
         self.exec()
-        return self.ah_did
+        return self.import_result
 
-    def _subscribe(self):
+    def _subscribe(self) -> None:
         ah_did_str = self.deck_id_box_text.text().strip()
 
         try:
@@ -404,7 +428,7 @@ class SubscribeDialog(QDialog):
                 f"menu. See {url_help()} for more details."
             )
             self.close()
-            return self.ah_did
+            return
 
         confirmed = ask_user(
             f"Would you like to proceed with downloading and installing the deck? "
@@ -415,8 +439,8 @@ class SubscribeDialog(QDialog):
         if not confirmed:
             return
 
-        def on_success():
-            self.ah_did = ah_did
+        def on_success(import_result: AnkiHubImportResult):
+            self.import_result = import_result
             self.accept()
 
         download_and_install_deck(ah_did, on_success=on_success, on_failure=self.reject)
@@ -427,12 +451,12 @@ class SubscribeDialog(QDialog):
 
 def download_and_install_deck(
     ankihub_did: uuid.UUID,
-    on_success: Optional[Callable[[], None]] = None,
+    on_success: Optional[Callable[[AnkiHubImportResult], None]] = None,
     on_failure: Optional[Callable[[], None]] = None,
 ):
     def on_install_done(future: Future):
         try:
-            future.result()
+            import_result: AnkiHubImportResult = future.result()
         except Exception as exc:
             LOGGER.info("Error installing deck.")
             if on_failure is not None:
@@ -443,7 +467,7 @@ def download_and_install_deck(
         aqt.mw.reset()
 
         if on_success is not None:
-            on_success()
+            on_success(import_result)
 
     try:
         deck_info = AnkiHubClient().get_deck_by_id(ankihub_did)
@@ -545,7 +569,7 @@ def cleanup_after_deck_install(multiple_decks: bool = False) -> None:
             if not multiple_decks
             else ""
         )
-        + "Do you want to clear unused tags and empty cards from your collection? (It is recommended.)"
+        + "Do you want to clear unused tags and empty cards from your collection? (recommended)"
     )
     if ask_user(message, title="AnkiHub"):
         clear_unused_tags(parent=aqt.mw).run_in_background()

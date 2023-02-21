@@ -42,7 +42,7 @@ class AnkiHubImportResult:
     anki_did: DeckId
     updated_nids: List[NoteId]
     created_nids: List[NoteId]
-    skippped_nids: List[NoteId]
+    skipped_nids: List[NoteId]
     first_import_of_deck: bool
 
     def __repr__(self):
@@ -180,7 +180,7 @@ class AnkiHubImporter:
             anki_did=local_did,
             created_nids=self.created_nids,
             updated_nids=self.updated_nids,
-            skippped_nids=self.skipped_nids,
+            skipped_nids=self.skipped_nids,
             first_import_of_deck=first_import_of_deck,
         )
         return result
