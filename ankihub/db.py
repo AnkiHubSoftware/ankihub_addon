@@ -81,6 +81,7 @@ class AnkiHubDB:
         )
 
         if not notes_table_exists:
+            LOGGER.info("Creating AnkiHub DB")
             self.execute(
                 """
                 CREATE TABLE notes (
@@ -100,6 +101,7 @@ class AnkiHubDB:
             self.execute("CREATE INDEX anki_note_id_idx ON notes (anki_note_id);")
             self.execute("CREATE INDEX anki_note_type_id ON notes (anki_note_type_id);")
             self.execute("PRAGMA user_version = 5")
+            LOGGER.info("Created AnkiHub DB")
         else:
             from .db_migrations import migrate_ankihub_db
 
