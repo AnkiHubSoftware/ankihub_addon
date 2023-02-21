@@ -6,7 +6,7 @@ from concurrent.futures import Future
 from typing import Callable, Optional
 
 from anki.utils import checksum
-from aqt import mw
+import aqt
 
 from . import LOGGER
 from .addon_ankihub_client import AddonAnkiHubClient as AnkiHubClient
@@ -136,7 +136,7 @@ def upload_logs_in_background(
             raise e
 
     if on_done is not None:
-        mw.taskman.run_in_background(task=upload_logs, on_done=on_done)
+        aqt.mw.taskman.run_in_background(task=upload_logs, on_done=on_done)
     else:
 
         def on_upload_logs_done(future: Future) -> None:
@@ -145,6 +145,6 @@ def upload_logs_in_background(
             except Exception:
                 report_exception()
 
-        mw.taskman.run_in_background(task=upload_logs, on_done=on_upload_logs_done)
+        aqt.mw.taskman.run_in_background(task=upload_logs, on_done=on_upload_logs_done)
 
     return key

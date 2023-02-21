@@ -2,7 +2,7 @@ from typing import Dict, List, Optional
 
 from anki.notes import NoteId
 from anki.utils import ids2str
-from aqt import mw
+import aqt
 
 from .addon_ankihub_client import AddonAnkiHubClient as AnkiHubClient
 from .ankihub_client import OptionalTagSuggestion, TagGroupValidationResponse
@@ -85,14 +85,14 @@ class OptionalTagsSuggestionHelper:
         )
 
     def _optional_tags_by_nid_dict(self) -> Dict[NoteId, List[str]]:
-        nid_tags_string_tuples = mw.col.db.all(
+        nid_tags_string_tuples = aqt.mw.col.db.all(
             f"SELECT DISTINCT id, tags FROM NOTES WHERE id IN {ids2str(self._nids)} "
             f"AND tags LIKE '%{TAG_FOR_OPTIONAL_TAGS}%'"
         )
 
         result = {}
         for nid, tags_string in nid_tags_string_tuples:
-            tags = mw.col.tags.split(tags_string)
+            tags = aqt.mw.col.tags.split(tags_string)
             optional_tags = [
                 tag
                 for tag in tags

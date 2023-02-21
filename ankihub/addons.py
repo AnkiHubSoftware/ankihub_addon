@@ -1,11 +1,12 @@
 import logging
+import aqt
 import os
 from concurrent.futures import Future
 from pathlib import Path
 from typing import Any, Callable
 
 from anki.hooks import wrap
-from aqt import addons, mw
+from aqt import addons
 from aqt.addons import AddonManager, DownloaderInstaller
 
 from . import LOGGER
@@ -45,14 +46,14 @@ def _detach_ankihub_db(*args: Any, **kwargs: Any) -> None:
 
 
 def _maybe_change_file_permissions_of_addon_files(module: str) -> None:
-    ankihub_module = mw.addonManager.addonFromModule(__name__)
+    ankihub_module = aqt.mw.addonManager.addonFromModule(__name__)
     if module != ankihub_module:
         LOGGER.info(
             f"Did not change file permissions because {module} is not {ankihub_module}"
         )
         return
 
-    addon_dir = Path(mw.addonManager.addonsFolder(module))
+    addon_dir = Path(aqt.mw.addonManager.addonsFolder(module))
     _change_file_permissions_of_addon_files(addon_dir=addon_dir)
 
 
@@ -92,20 +93,20 @@ def _with_delay_when_progress_dialog_is_open(*args, **kwargs) -> Any:
         LOGGER.info("Calling with_delay_when_progress_dialog_is_open._old")
         _old(*args, **kwargs)
 
-        # the documentation of mw.progress.timer says that the timer has to be deleted to
+        # the documentation of aqt.mw.progress.timer says that the timer has to be deleted to
         # prevent memory leaks
         timer.deleteLater()
 
-    # mw.progress.timer is there for creating "Custom timers which avoid firing while a progress dialog is active".
+    # aqt.mw.progress.timer is there for creating "Custom timers which avoid firing while a progress dialog is active".
     # It's better to use a large delay value because there is a 0.5 second time window in which
     # the func can be called even if the progress dialog is not closed yet.
     # See https://github.com/ankitects/anki/blob/d9f1e2264804481a2549b23dbc8a530857ad57fc/qt/aqt/progress.py#L261-L277
-    timer = mw.progress.timer(
+    timer = aqt.mw.progress.timer(
         ms=2000,
         func=wrapper,
         repeat=False,
         requiresCollection=True,
-        parent=mw,
+        parent=aqt.mw,
     )
 
 

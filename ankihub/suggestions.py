@@ -5,7 +5,7 @@ from pathlib import Path
 from typing import Any, Dict, List, Optional
 
 from anki.notes import Note, NoteId
-from aqt import mw
+import aqt
 
 from .addon_ankihub_client import AddonAnkiHubClient as AnkiHubClient
 from .ankihub_client import (
@@ -71,7 +71,7 @@ def get_images_from_suggestion(suggestion: NoteSuggestion) -> List[Path]:
     for field_content in [f.value for f in suggestion.fields]:
         image_names = _extract_images(field_content)
         image_paths = [
-            Path(mw.col.media.dir()) / image_name for image_name in image_names
+            Path(aqt.mw.col.media.dir()) / image_name for image_name in image_names
         ]
         result.extend(image_paths)
 

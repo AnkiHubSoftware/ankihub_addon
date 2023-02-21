@@ -6,7 +6,7 @@ from typing import List, Optional, Sequence, Tuple
 
 from anki.collection import SearchNode
 from anki.notes import NoteId
-from aqt import mw
+import aqt
 from aqt.browser import (
     Browser,
     CellRow,
@@ -127,14 +127,14 @@ def _on_browser_will_show_context_menu(browser: Browser, context_menu: QMenu) ->
 
     copy_ankihub_id_action = menu.addAction(
         "AnkiHub: Copy AnkiHub ID to clipboard",
-        lambda: mw.app.clipboard().setText(str(ankihub_nid)),
+        lambda: aqt.mw.app.clipboard().setText(str(ankihub_nid)),
     )
     if len(selected_nids) != 1 or not ankihub_nid:
         copy_ankihub_id_action.setDisabled(True)
 
 
 def _on_protect_fields_action(browser: Browser, nid: NoteId) -> None:
-    note = mw.col.get_note(nid)
+    note = aqt.mw.col.get_note(nid)
     if not ankihub_db.is_ankihub_note_type(note.mid):
         showInfo(
             "This note does not have a note type that is known by AnkiHub.",
@@ -142,7 +142,7 @@ def _on_protect_fields_action(browser: Browser, nid: NoteId) -> None:
         )
         return
 
-    note = mw.col.get_note(nid)
+    note = aqt.mw.col.get_note(nid)
 
     fields: List[str] = [
         field for field in note.keys() if field != ANKIHUB_NOTE_TYPE_FIELD_NAME
@@ -186,7 +186,7 @@ def _on_protect_fields_action(browser: Browser, nid: NoteId) -> None:
 
 
 def _on_bulk_notes_suggest_action(browser: Browser, nids: Sequence[NoteId]) -> None:
-    notes = [mw.col.get_note(nid) for nid in nids]
+    notes = [aqt.mw.col.get_note(nid) for nid in nids]
 
     mids = set(note.mid for note in notes)
     if not all(ankihub_db.is_ankihub_note_type(mid) for mid in mids):
@@ -203,7 +203,7 @@ def _on_bulk_notes_suggest_action(browser: Browser, nids: Sequence[NoteId]) -> N
     if not (dialog := SuggestionDialog(command=AnkiHubCommands.CHANGE)).exec():
         return
 
-    mw.taskman.with_progress(
+    aqt.mw.taskman.with_progress(
         task=lambda: suggest_notes_in_bulk(
             notes,
             auto_accept=dialog.auto_accept(),
@@ -284,7 +284,7 @@ def _on_reset_local_changes_action(browser: Browser, nids: Sequence[NoteId]) -> 
         browser.table.reset()
         tooltip("Reset local changes for selected notes.", parent=browser)
 
-    mw.taskman.with_progress(
+    aqt.mw.taskman.with_progress(
         task=lambda: reset_local_changes_to_notes(nids, ankihub_deck_uuid=ankihub_did),
         on_done=on_done,
         label="Resetting local changes...",
@@ -370,7 +370,7 @@ def _on_reset_deck_action(browser: Browser):
         browser.model.reset()
         tooltip(f"Reset local changes to deck <b>{deck_config.name}</b>")
 
-    mw.taskman.with_progress(
+    aqt.mw.taskman.with_progress(
         lambda: reset_local_changes_to_notes(nids, ankihub_deck_uuid=ah_did),
         on_done=on_done,
         label="Resetting local changes...",
@@ -397,7 +397,7 @@ def _on_reset_subdecks_action(browser: Browser):
     if ah_did is None:
         return
 
-    if mw.col.decks.name_if_exists(deck_config.anki_id) is None:
+    if aqt.mw.col.decks.name_if_exists(deck_config.anki_id) is None:
         showInfo(
             (
                 f"Anki deck <b>{deck_config.name}</b> doesn't exist in your Anki collection.<br>"
@@ -418,10 +418,10 @@ def _on_reset_subdecks_action(browser: Browser):
     def on_done(future: Future) -> None:
         future.result()
         browser.sidebar.refresh()
-        mw.deckBrowser.refresh()
+        aqt.mw.deckBrowser.refresh()
         tooltip("Rebuilt subdecks and moved cards.")
 
-    mw.taskman.with_progress(
+    aqt.mw.taskman.with_progress(
         task=lambda: build_subdecks_and_move_cards_to_them(ankihub_did=ah_did),
         on_done=on_done,
         label="Rebuilding subdecks and moving cards...",
@@ -494,7 +494,7 @@ def _on_reset_optional_tags_action(browser: Browser):
                 parent=browser,
             )
 
-    mw.taskman.with_progress(
+    aqt.mw.taskman.with_progress(
         task=lambda: _remove_optional_tags_of_extension(
             extension_config=extension_config
         ),
@@ -508,11 +508,11 @@ def _remove_optional_tags_of_extension(extension_config: DeckExtensionConfig) ->
     # some people use the same tag group for multiple decks
     tags_for_tag_group = [
         tag
-        for tag in mw.col.tags.all()
+        for tag in aqt.mw.col.tags.all()
         if is_tag_for_group(tag, extension_config.tag_group_name)
     ]
     nids = ankihub_db.anki_nids_for_ankihub_deck(extension_config.ankihub_deck_uuid)
-    mw.col.tags.bulk_remove(note_ids=nids, tags=" ".join(tags_for_tag_group))
+    aqt.mw.col.tags.bulk_remove(note_ids=nids, tags=" ".join(tags_for_tag_group))
 
 
 def _choose_deck(prompt: str) -> Tuple[Optional[uuid.UUID], Optional[DeckConfig]]:
@@ -764,7 +764,7 @@ def _add_ankihub_tree(tree: SidebarItem) -> SidebarItem:
         name="Updated Today",
         icon="",
         type=SidebarItemType.SAVED_SEARCH_ROOT,
-        search_node=mw.col.group_searches(
+        search_node=aqt.mw.col.group_searches(
             SearchNode(parsable_text="ankihub_id:_*"),
             SearchNode(
                 parsable_text=f"{UpdatedInTheLastXDaysSearchNode.parameter_name}:1"
@@ -778,7 +778,7 @@ def _add_ankihub_tree(tree: SidebarItem) -> SidebarItem:
         name="New Note",
         icon="",
         type=SidebarItemType.SAVED_SEARCH,
-        search_node=mw.col.group_searches(
+        search_node=aqt.mw.col.group_searches(
             SearchNode(parsable_text="ankihub_id:_*"),
             SearchNode(
                 parsable_text=f"{UpdatedInTheLastXDaysSearchNode.parameter_name}:1"
@@ -795,7 +795,7 @@ def _add_ankihub_tree(tree: SidebarItem) -> SidebarItem:
             name=suggestion_name,
             icon="",
             type=SidebarItemType.SAVED_SEARCH,
-            search_node=mw.col.group_searches(
+            search_node=aqt.mw.col.group_searches(
                 SearchNode(parsable_text="ankihub_id:_*"),
                 SearchNode(
                     parsable_text=f"{UpdatedInTheLastXDaysSearchNode.parameter_name}:1"
@@ -810,7 +810,7 @@ def _add_ankihub_tree(tree: SidebarItem) -> SidebarItem:
         name="Updated Since Last Review",
         icon="",
         type=SidebarItemType.SAVED_SEARCH_ROOT,
-        search_node=mw.col.group_searches(
+        search_node=aqt.mw.col.group_searches(
             SearchNode(parsable_text="ankihub_id:_*"),
             SearchNode(
                 parsable_text=f"{UpdatedSinceLastReviewSearchNode.parameter_name}:"

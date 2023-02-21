@@ -15,16 +15,16 @@ from pprint import pformat
 from shutil import copyfile, rmtree
 from typing import Any, Callable, Dict, List, Optional
 
+import aqt
 from anki.buildinfo import version as ANKI_VERSION
 from anki.decks import DeckId
-from aqt import mw
 from aqt.utils import askUser, showInfo
 
 from . import LOGGER, ankihub_client
-from .public_config_migrations import migrate_public_config
 from .ankihub_client import ANKIHUB_DATETIME_FORMAT_STR, DeckExtension
 from .lib.mashumaro import field_options
 from .lib.mashumaro.mixins.json import DataClassJSONMixin
+from .public_config_migrations import migrate_public_config
 
 ADDON_PATH = Path(__file__).parent.absolute()
 
@@ -99,7 +99,9 @@ class Config:
     def __init__(self):
         # self.public_config is editable by the user using a built-in Anki feature.
         migrate_public_config()
-        self.public_config: Dict[str, Any] = mw.addonManager.getConfig(ADDON_PATH.name)
+        self.public_config: Dict[str, Any] = aqt.mw.addonManager.getConfig(
+            ADDON_PATH.name
+        )
         self._private_config: Optional[PrivateConfig] = None
         self._private_config_path: Optional[Path] = None
         self.token_change_hook: Optional[Callable[[], None]] = None
@@ -246,7 +248,7 @@ config = Config()
 def setup_profile_data_folder() -> bool:
     """Returns False if the migration from the old location needs yet to be done."""
     assign_id_to_profile_if_not_exists()
-    LOGGER.info(f"Anki profile id: {mw.pm.profile[PROFILE_ID_FIELD_NAME]}")
+    LOGGER.info(f"Anki profile id: {aqt.mw.pm.profile[PROFILE_ID_FIELD_NAME]}")
 
     if not (path := profile_files_path()).exists():
         path.mkdir(parents=True)
@@ -259,29 +261,29 @@ def setup_profile_data_folder() -> bool:
 
 def assign_id_to_profile_if_not_exists() -> None:
     """Assigns an id to the currently open profile if it doesn't have one."""
-    if mw.pm.profile.get("ankihub_id") is not None:
+    if aqt.mw.pm.profile.get("ankihub_id") is not None:
         return
 
-    mw.pm.profile[PROFILE_ID_FIELD_NAME] = str(uuid.uuid4())
-    mw.pm.save()
+    aqt.mw.pm.profile[PROFILE_ID_FIELD_NAME] = str(uuid.uuid4())
+    aqt.mw.pm.save()
 
     LOGGER.info(
-        f"Assigned new id to Anki profile: {mw.pm.profile[PROFILE_ID_FIELD_NAME]}"
+        f"Assigned new id to Anki profile: {aqt.mw.pm.profile[PROFILE_ID_FIELD_NAME]}"
     )
 
 
 def user_files_path() -> Path:
     # The contents of the user_files folder are retained during updates.
     # See https://addon-docs.ankiweb.net/addon-config.html#user-files
-    addon_dir_name = mw.addonManager.addonFromModule(__name__)
-    result = Path(mw.addonManager.addonsFolder(addon_dir_name)) / "user_files"
+    addon_dir_name = aqt.mw.addonManager.addonFromModule(__name__)
+    result = Path(aqt.mw.addonManager.addonsFolder(addon_dir_name)) / "user_files"
     return result
 
 
 def profile_files_path() -> Path:
     """Path to the add-on data for this Anki profile."""
     # we need an id instead of using the profile name because profiles can be renamed
-    cur_profile_id = mw.pm.profile[PROFILE_ID_FIELD_NAME]
+    cur_profile_id = aqt.mw.pm.profile[PROFILE_ID_FIELD_NAME]
     result = user_files_path() / cur_profile_id
     return result
 
@@ -307,7 +309,7 @@ def migrate_profile_data_from_old_location() -> bool:
         LOGGER.info("No data to migrate.")
         return True
 
-    if len(mw.pm.profiles()) > 1:
+    if len(aqt.mw.pm.profiles()) > 1:
         if not askUser(
             (
                 "The AnkiHub add-on now has support for multiple Anki profiles!<br><br>"
