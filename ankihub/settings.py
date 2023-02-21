@@ -433,14 +433,14 @@ except (FileNotFoundError, KeyError):
 
 api_url_base = lambda: f"{config.ankihub_app_url}/api"  # noqa: E731
 
-url_view_note = lambda: f"{api_url_base()}/decks/notes/"  # noqa: E731
+url_view_note = lambda: f"{config.ankihub_app_url}/decks/notes/"  # noqa: E731
 url_view_note_history = (
-    lambda: f"{api_url_base()}/decks/{{ankihub_did}}/suggestions/?search=note:{{ankihub_nid}} state:closed"
+    lambda: f"{config.ankihub_app_url}/decks/{{ankihub_did}}/suggestions/?search=note:{{ankihub_nid}} state:closed"
 )  # noqa: E731
-url_view_deck = lambda: f"{api_url_base()}/decks/"  # noqa: E731
-url_help = lambda: f"{api_url_base()}/help"  # noqa: E731
-url_decks = lambda: f"{api_url_base()}/explore"  # noqa: E731
-url_deck_base = lambda: f"{api_url_base()}/decks"  # noqa: E731
+url_view_deck = lambda: f"{config.ankihub_app_url}/decks/"  # noqa: E731
+url_help = lambda: f"{config.ankihub_app_url}/help"  # noqa: E731
+url_decks = lambda: f"{config.ankihub_app_url}/explore"  # noqa: E731
+url_deck_base = lambda: f"{config.ankihub_app_url}/decks"  # noqa: E731
 
 
 ANKIHUB_NOTE_TYPE_FIELD_NAME = "ankihub_id"
