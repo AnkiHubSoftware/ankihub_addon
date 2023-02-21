@@ -1,8 +1,8 @@
-from aqt import mw
+import aqt
 
 
 def migrate_public_config() -> None:
-    addon_config = mw.addonManager.getConfig(__name__)
+    addon_config = aqt.mw.addonManager.getConfig(__name__)
 
     # Migrate the "sync_on_startup" config option to the "auto_sync" config option.
     if (sync_on_startup := addon_config.get("sync_on_startup")) is not None:
@@ -16,4 +16,4 @@ def migrate_public_config() -> None:
             # the "auto_sync" config option.
             addon_config["auto_sync"] = "never"
         addon_config.pop("sync_on_startup")
-        mw.addonManager.writeConfig(__name__, addon_config)
+        aqt.mw.addonManager.writeConfig(__name__, addon_config)

@@ -5,7 +5,7 @@ from typing import Dict, Iterable, List, Optional
 from anki.decks import DeckId
 from anki.errors import NotFoundError
 from anki.notes import NoteId
-from aqt import mw
+import aqt
 
 from . import LOGGER
 from .db import ankihub_db
@@ -31,11 +31,11 @@ def build_subdecks_and_move_cards_to_them(
         nids = ankihub_db.anki_nids_for_ankihub_deck(ankihub_did)
 
     root_deck_id = config.deck_config(ankihub_did).anki_id
-    if mw.col.decks.name_if_exists(root_deck_id) is None:
+    if aqt.mw.col.decks.name_if_exists(root_deck_id) is None:
         raise NotFoundError(f"Deck with id {root_deck_id} not found")
 
     # the anki root deck name name can be different from the ankihub deck name in the config
-    anki_root_deck_name = mw.col.decks.name(root_deck_id)
+    anki_root_deck_name = aqt.mw.col.decks.name(root_deck_id)
 
     # create mapping between notes and destination decks
     nid_to_dest_deck_name = _nid_to_destination_deck_name(
@@ -48,18 +48,18 @@ def build_subdecks_and_move_cards_to_them(
 
     # move cards to their destination decks
     for nid, dest_deck_name in nid_to_dest_deck_name.items():
-        dest_did = mw.col.decks.id_for_name(dest_deck_name)
+        dest_did = aqt.mw.col.decks.id_for_name(dest_deck_name)
         _set_deck_while_respecting_odid(nid=nid, did=dest_did)
 
     # remove empty subdecks
-    for name_and_did in mw.col.decks.children(root_deck_id):
+    for name_and_did in aqt.mw.col.decks.children(root_deck_id):
         _, did = name_and_did
         # The card count includes cards in subdecks and in filtered decks.
         # This is good, as we don't want to delete a deck which is an original deck of cards which are
         # currently in filtered decks.
         try:
-            if mw.col.decks.card_count(did, include_subdecks=True) == 0:
-                mw.col.decks.remove([did])
+            if aqt.mw.col.decks.card_count(did, include_subdecks=True) == 0:
+                aqt.mw.col.decks.remove([did])
                 LOGGER.info(f"Removed empty subdeck with id {did}.")
         except NotFoundError:
             # this can happen if a parent deck was deleted earlier in the loop
@@ -74,7 +74,7 @@ def _nid_to_destination_deck_name(
     result = dict()
     missing_nids = []
     for nid in nids:
-        tags_str = mw.col.db.scalar("SELECT tags FROM notes WHERE id = ?", nid)
+        tags_str = aqt.mw.col.db.scalar("SELECT tags FROM notes WHERE id = ?", nid)
         if not tags_str:
             # When this query returns None, that means that the note does not exist in the Anki database.
             # (Notes without tags have an empty string in the tags field.)
@@ -82,7 +82,7 @@ def _nid_to_destination_deck_name(
             missing_nids.append(nid)
             continue
 
-        tags = mw.col.tags.split(tags_str)
+        tags = aqt.mw.col.tags.split(tags_str)
         subdeck_tag_ = _subdeck_tag(tags)
         if subdeck_tag_ is None:
             # If the note does not have a subdeck tag, we don't move it.
@@ -111,16 +111,18 @@ def _set_deck_while_respecting_odid(nid: NoteId, did: DeckId) -> None:
     it is not moved and only its original deck id value gets changed."""
 
     # using database operations for performance reasons
-    cids = mw.col.db.list("SELECT id FROM cards WHERE nid = ?", nid)
+    cids = aqt.mw.col.db.list("SELECT id FROM cards WHERE nid = ?", nid)
     for cid in cids:
-        odid = mw.col.db.scalar("SELECT odid FROM cards WHERE id=?", cid)
+        odid = aqt.mw.col.db.scalar("SELECT odid FROM cards WHERE id=?", cid)
         # if the card is in a filtered deck, we only change the original deck id
         if odid == 0:
             # setting usn to -1 so that this change is synced to AnkiWeb
             # see https://github.com/ankidroid/Anki-Android/wiki/Database-Structure#cards
-            mw.col.db.execute("UPDATE cards SET did=?, usn=-1 WHERE id=?", did, cid)
+            aqt.mw.col.db.execute("UPDATE cards SET did=?, usn=-1 WHERE id=?", did, cid)
         else:
-            mw.col.db.execute("UPDATE cards SET odid=?, usn=-1 WHERE id=?", did, cid)
+            aqt.mw.col.db.execute(
+                "UPDATE cards SET odid=?, usn=-1 WHERE id=?", did, cid
+            )
 
 
 def _subdeck_tag_to_deck_name(anki_root_deck_name: str, tag: str) -> Optional[str]:
@@ -140,7 +142,7 @@ def _subdeck_tag_to_deck_name(anki_root_deck_name: str, tag: str) -> Optional[st
 
 def _create_decks(deck_names: Iterable[str]) -> None:
     for deck_name in deck_names:
-        mw.col.decks.add_normal_deck_with_name(deck_name)
+        aqt.mw.col.decks.add_normal_deck_with_name(deck_name)
 
 
 def _subdeck_tag(tags: List[str]) -> Optional[str]:
@@ -157,16 +159,16 @@ def flatten_deck(ankihub_did: uuid.UUID) -> None:
 
     # move cards that are in subdecks back to the root deck
     root_deck_id = config.deck_config(ankihub_did).anki_id
-    root_deck_name = mw.col.decks.name(root_deck_id)
-    nids = mw.col.find_notes(f'"deck:{root_deck_name}::*"')
+    root_deck_name = aqt.mw.col.decks.name(root_deck_id)
+    nids = aqt.mw.col.find_notes(f'"deck:{root_deck_name}::*"')
     for nid in nids:
         _set_deck_while_respecting_odid(nid, root_deck_id)
 
     # remove subdecks
-    for name_and_did in mw.col.decks.children(root_deck_id):
+    for name_and_did in aqt.mw.col.decks.children(root_deck_id):
         _, did = name_and_did
         try:
-            mw.col.decks.remove([did])
+            aqt.mw.col.decks.remove([did])
             LOGGER.info(f"Removed subdeck with id {did}.")
         except NotFoundError:
             # this can happen if a parent deck was deleted earlier in the loop
@@ -191,21 +193,21 @@ def add_subdeck_tags_to_notes(anki_deck_name: str, ankihub_deck_name: str) -> No
 
     LOGGER.info("Adding subdeck tags to notes.")
 
-    deck = mw.col.decks.by_name(anki_deck_name)
+    deck = aqt.mw.col.decks.by_name(anki_deck_name)
 
     # add tags to notes in root deck
     nids = nids_in_deck_but_not_in_subdeck(anki_deck_name)
     tag = _subdeck_name_to_tag(ankihub_deck_name)
-    mw.col.tags.bulk_add(nids, tag)
+    aqt.mw.col.tags.bulk_add(nids, tag)
 
     # add tags to notes in subdecks
-    # (mw.col.decks also returns children of children)
-    for child_deck_name, _ in mw.col.decks.children(deck["id"]):
+    # (aqt.mw.col.decks also returns children of children)
+    for child_deck_name, _ in aqt.mw.col.decks.children(deck["id"]):
         deck_name_wh_root = child_deck_name.split("::", maxsplit=1)[1]
         deck_name_with_ankihub_root = f"{ankihub_deck_name}::{deck_name_wh_root}"
         tag = _subdeck_name_to_tag(deck_name_with_ankihub_root)
         nids = nids_in_deck_but_not_in_subdeck(child_deck_name)
-        mw.col.tags.bulk_add(nids, tag)
+        aqt.mw.col.tags.bulk_add(nids, tag)
 
 
 def _subdeck_name_to_tag(deck_name: str) -> str:

@@ -37,16 +37,15 @@ def anki_session_with_addon_data(
     The add-ons code is not copied into the add-on's folder in the temporary anki_base folder.
     Instead the tests run the code in the ankihub folder of the repo.
     """
+    from ankihub.entry_point import profile_setup
+    from ankihub.settings import config, setup_logger
 
     config_path = REPO_ROOT_PATH / "ankihub" / "config.json"
     with open(config_path) as f:
         config_dict = json.load(f)
     anki_session.create_addon_config(package_name="ankihub", default_config=config_dict)
 
-    # code in settings.py depends on the public config being initialized
-    from ankihub.entry_point import profile_setup
-    from ankihub.settings import setup_logger
-
+    config.setup_public_config_and_ankihub_app_url()
     setup_logger()
 
     with monkeypatch.context() as m:

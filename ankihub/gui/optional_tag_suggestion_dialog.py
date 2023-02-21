@@ -2,7 +2,7 @@ from concurrent.futures import Future
 from typing import Sequence
 
 from anki.notes import NoteId
-from aqt import mw
+import aqt
 from aqt.qt import (
     QAbstractItemView,
     QCheckBox,
@@ -94,7 +94,7 @@ class OptionalTagsSuggestionDialog(QDialog):
             )
             return
 
-        mw.taskman.with_progress(
+        aqt.mw.taskman.with_progress(
             task=lambda: self._optional_tags_helper.suggest_tags_for_groups(
                 tag_groups=selected_tag_groups,
                 auto_accept=self.auto_accept_cb.isChecked(),
@@ -143,7 +143,7 @@ class OptionalTagsSuggestionDialog(QDialog):
             item.setToolTip("Validating...")
 
     def _validate_tag_groups_and_update_ui(self):
-        mw.taskman.run_in_background(
+        aqt.mw.taskman.run_in_background(
             task=self._validate_tag_groups_in_background,
             on_done=self._on_validate_tag_groups_finished,
         )

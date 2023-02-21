@@ -4,8 +4,9 @@ from datetime import datetime
 from typing import Callable, List, Optional
 from uuid import UUID
 
+import aqt
 from anki.collection import OpChanges
-from aqt import dialogs, gui_hooks, mw
+from aqt import dialogs, gui_hooks
 from aqt.browser import Browser
 from aqt.emptycards import show_empty_cards
 from aqt.operations.tag import clear_unused_tags
@@ -32,7 +33,7 @@ from ..addon_ankihub_client import AnkiHubRequestError
 from ..ankihub_client import NoteInfo
 from ..db import ankihub_db
 from ..importing import AnkiHubImportResult
-from ..settings import URL_DECK_BASE, URL_DECKS, URL_HELP, URL_VIEW_DECK, config
+from ..settings import url_deck_base, url_decks, url_help, url_view_deck, config
 from ..subdecks import SUBDECK_TAG, build_subdecks_and_move_cards_to_them, flatten_deck
 from ..sync import AnkiHubImporter
 from ..utils import create_backup, undo_note_type_modfications
@@ -125,8 +126,8 @@ class SubscribedDecksDialog(QDialog):
         self._refresh_anki()
 
         anki_did = config.deck_config(ah_did).anki_id
-        deck_name = mw.col.decks.name(anki_did)
-        if mw.col.find_notes(f'"deck:{deck_name}" "tag:{SUBDECK_TAG}*"'):
+        deck_name = aqt.mw.col.decks.name(anki_did)
+        if aqt.mw.col.find_notes(f'"deck:{deck_name}" "tag:{SUBDECK_TAG}*"'):
             if ask_user(
                 "The deck you subscribed to contains subdeck tags.<br>"
                 "Do you want to enable subdecks for this deck?"
@@ -168,7 +169,7 @@ class SubscribedDecksDialog(QDialog):
             config.unsubscribe_deck(ankihub_did)
             self.unsubscribe_from_deck(ankihub_did)
 
-        tooltip("Unsubscribed from AnkiHub Deck.", parent=mw)
+        tooltip("Unsubscribed from AnkiHub Deck.", parent=aqt.mw)
         self._refresh_decks_list()
 
     @staticmethod
@@ -184,7 +185,7 @@ class SubscribedDecksDialog(QDialog):
 
         for item in items:
             ankihub_id: UUID = item.data(Qt.ItemDataRole.UserRole)
-            openLink(f"{URL_DECK_BASE}/{ankihub_id}")
+            openLink(f"{url_deck_base()}/{ankihub_id}")
 
     def _on_set_home_deck(self):
         deck_names = self.decks_list.selectedItems()
@@ -193,7 +194,7 @@ class SubscribedDecksDialog(QDialog):
 
         deck_name = deck_names[0]
         ankihub_id: UUID = deck_name.data(Qt.ItemDataRole.UserRole)
-        current_home_deck = mw.col.decks.get(config.deck_config(ankihub_id).anki_id)
+        current_home_deck = aqt.mw.col.decks.get(config.deck_config(ankihub_id).anki_id)
         if current_home_deck is None:
             current = None
         else:
@@ -203,13 +204,13 @@ class SubscribedDecksDialog(QDialog):
             if not ret.name:
                 return
 
-            anki_did = mw.col.decks.id(ret.name)
+            anki_did = aqt.mw.col.decks.id(ret.name)
             config.set_home_deck(ankihub_did=ankihub_id, anki_did=anki_did)
             tooltip("Home deck updated.", parent=self)
 
         # this lets the user pick a deck
         StudyDeckWithoutHelpButton(
-            mw,
+            aqt.mw,
             current=current,
             accept="Set Home Deck",
             title="Change Home Deck",
@@ -227,7 +228,7 @@ class SubscribedDecksDialog(QDialog):
         deck_config = config.deck_config(ankihub_id)
         using_subdecks = deck_config.subdecks_enabled
 
-        if mw.col.decks.name_if_exists(deck_config.anki_id) is None:
+        if aqt.mw.col.decks.name_if_exists(deck_config.anki_id) is None:
             showInfo(
                 (
                     f"Anki deck <b>{deck_config.name}</b> doesn't exist in your Anki collection.<br>"
@@ -242,7 +243,7 @@ class SubscribedDecksDialog(QDialog):
             future.result()
 
             tooltip("Subdecks updated.", parent=self)
-            mw.deckBrowser.refresh()
+            aqt.mw.deckBrowser.refresh()
             browser: Optional[Browser] = dialogs._dialogs["Browser"][1]
             if browser is not None:
                 browser.sidebar.refresh()
@@ -258,13 +259,13 @@ class SubscribedDecksDialog(QDialog):
             if flatten is None:
                 return
             elif flatten:
-                mw.taskman.with_progress(
+                aqt.mw.taskman.with_progress(
                     label="Removing subdecks and moving cards...",
                     task=lambda: flatten_deck(ankihub_id),
                     on_done=on_done,
                 )
         else:
-            mw.taskman.with_progress(
+            aqt.mw.taskman.with_progress(
                 label="Building subdecks and moving cards...",
                 task=lambda: build_subdecks_and_move_cards_to_them(ankihub_id),
                 on_done=on_done,
@@ -400,7 +401,7 @@ class SubscribeDialog(QDialog):
                 f"You've already subscribed to deck {ah_did}. "
                 "Syncing with AnkiHub will happen automatically everytime you "
                 "restart Anki. You can manually sync with AnkiHub from the AnkiHub "
-                f"menu. See {URL_HELP} for more details."
+                f"menu. See {url_help()} for more details."
             )
             self.close()
             return self.ah_did
@@ -408,7 +409,7 @@ class SubscribeDialog(QDialog):
         confirmed = ask_user(
             f"Would you like to proceed with downloading and installing the deck? "
             f"Your personal collection will be modified.<br><br>"
-            f"See <a href='{URL_HELP}'>{URL_HELP}</a> for details.",
+            f"See <a href='{url_help()}'>{url_help()}</a> for details.",
             title="Please confirm to proceed.",
         )
         if not confirmed:
@@ -421,7 +422,7 @@ class SubscribeDialog(QDialog):
         download_and_install_deck(ah_did, on_success=on_success, on_failure=self.reject)
 
     def _on_browse_deck(self) -> None:
-        openLink(URL_DECKS)
+        openLink(url_decks())
 
 
 def download_and_install_deck(
@@ -439,7 +440,7 @@ def download_and_install_deck(
 
             raise exc
 
-        mw.reset()
+        aqt.mw.reset()
 
         if on_success is not None:
             on_success()
@@ -455,10 +456,10 @@ def download_and_install_deck(
             )
             return
         elif e.response.status_code == 403:
-            url_view_deck = f"{URL_VIEW_DECK}{ankihub_did}"
+            url = f"{url_view_deck()}{ankihub_did}"
             showInfo(
                 f"Please first subscribe to the deck on the AnkiHub website.<br><br>"
-                f'Link to the deck: <a href="{url_view_deck}">{url_view_deck}</a>',
+                f'Link to the deck: <a href="{url}">{url}</a>',
             )
             return
         else:
@@ -467,7 +468,7 @@ def download_and_install_deck(
     def on_download_done(future: Future) -> None:
         notes_data: List[NoteInfo] = future.result()
 
-        mw.taskman.with_progress(
+        aqt.mw.taskman.with_progress(
             lambda: install_deck(
                 notes_data=notes_data,
                 deck_name=deck_info.name,
@@ -476,16 +477,16 @@ def download_and_install_deck(
                 is_creator=deck_info.owner,
             ),
             on_done=on_install_done,
-            parent=mw,
+            parent=aqt.mw,
             label="Installing deck...",
         )
 
-    mw.taskman.with_progress(
+    aqt.mw.taskman.with_progress(
         lambda: AnkiHubClient().download_deck(
             deck_info.ankihub_deck_uuid, download_progress_cb=download_progress_cb
         ),
         on_done=on_download_done,
-        parent=mw,
+        parent=aqt.mw,
         label="Downloading deck...",
     )
 
@@ -527,9 +528,9 @@ def install_deck(
 
 def download_progress_cb(percent: int):
     # adding +1 to avoid progress increasing while at 0% progress
-    # (the mw.progress.update function does that)
-    mw.taskman.run_on_main(
-        lambda: mw.progress.update(
+    # (the aqt.mw.progress.update function does that)
+    aqt.mw.taskman.run_on_main(
+        lambda: aqt.mw.progress.update(
             label="Downloading deck...",
             value=percent + 1,
             max=101,
@@ -547,5 +548,5 @@ def cleanup_after_deck_install(multiple_decks: bool = False) -> None:
         + "Do you want to clear unused tags and empty cards from your collection? (It is recommended.)"
     )
     if ask_user(message, title="AnkiHub"):
-        clear_unused_tags(parent=mw).run_in_background()
-        show_empty_cards(mw)
+        clear_unused_tags(parent=aqt.mw).run_in_background()
+        show_empty_cards(aqt.mw)

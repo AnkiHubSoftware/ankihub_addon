@@ -5,7 +5,7 @@ from typing import Optional, Sequence
 from anki.collection import BrowserColumns
 from anki.notes import Note
 from anki.utils import ids2str
-from aqt import mw
+import aqt
 from aqt.browser import Browser, CellRow, Column, ItemId
 
 from ..db import ankihub_db
@@ -136,7 +136,7 @@ class UpdatedSinceLastReviewColumn(CustomColumn):
             # The sync_mod value can be None if the note was synced with an early version of the AnkiHub add-on
             return "Unknown"
 
-        last_review_ms = mw.col.db.scalar(
+        last_review_ms = aqt.mw.col.db.scalar(
             f"""
             SELECT max(revlog.id) FROM revlog, cards
             WHERE {note.id} = cards.nid AND cards.id = revlog.cid

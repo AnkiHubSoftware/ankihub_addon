@@ -10,7 +10,7 @@ from anki.decks import DeckId
 from anki.errors import NotFoundError
 from anki.models import NotetypeDict, NotetypeId
 from anki.notes import Note, NoteId
-from aqt import mw
+import aqt
 
 from . import LOGGER, settings
 from .addon_ankihub_client import AddonAnkiHubClient as AnkiHubClient
@@ -191,7 +191,7 @@ class AnkiHubImporter:
         dids = set(dids_cards_were_imported_to)
 
         # remove "Custom Study" decks from dids
-        dids = {did for did in dids if not mw.col.decks.is_filtered(did)}
+        dids = {did for did in dids if not aqt.mw.col.decks.is_filtered(did)}
 
         # if there is a single deck where all the existing cards were before the import,
         # move the new cards there (from the newly created deck) and remove the created deck
@@ -199,13 +199,13 @@ class AnkiHubImporter:
         if (dids_wh_created := dids - set([created_did])) and (
             (common_ancestor_did := lowest_level_common_ancestor_did(dids_wh_created))
         ) is not None:
-            cids = mw.col.find_cards(f'deck:"{mw.col.decks.name(created_did)}"')
-            mw.col.set_deck(cids, common_ancestor_did)
+            cids = aqt.mw.col.find_cards(f'deck:"{aqt.mw.col.decks.name(created_did)}"')
+            aqt.mw.col.set_deck(cids, common_ancestor_did)
             LOGGER.info(
                 f"Moved new cards to common ancestor deck {common_ancestor_did=}"
             )
 
-            mw.col.decks.remove([created_did])
+            aqt.mw.col.decks.remove([created_did])
             LOGGER.info(f"Removed created deck {created_did=}")
             return common_ancestor_did
 
@@ -232,7 +232,7 @@ class AnkiHubImporter:
 
         note_before_changes = None
         try:
-            note_before_changes = mw.col.get_note(NoteId(note_data.anki_nid))
+            note_before_changes = aqt.mw.col.get_note(NoteId(note_data.anki_nid))
         except NotFoundError:
             pass
         cards_before_changes = (
@@ -295,7 +295,7 @@ class AnkiHubImporter:
         fields = note_data.fields.copy()
 
         try:
-            note = mw.col.get_note(id=NoteId(note_data.anki_nid))
+            note = aqt.mw.col.get_note(id=NoteId(note_data.anki_nid))
             fields.append(
                 Field(
                     name=settings.ANKIHUB_NOTE_TYPE_FIELD_NAME,
@@ -319,8 +319,8 @@ class AnkiHubImporter:
             if anki_did is None:
                 raise ValueError("anki_did must be set for new notes")
 
-            note_type = mw.col.models.get(NotetypeId(note_data.mid))
-            note = mw.col.new_note(note_type)
+            note_type = aqt.mw.col.models.get(NotetypeId(note_data.mid))
+            note = aqt.mw.col.new_note(note_type)
             self.prepare_note(
                 note,
                 note_data,
@@ -407,7 +407,7 @@ class AnkiHubImporter:
         fields_protected_by_tags = get_fields_protected_by_tags(note)
         for field in fields:
             protected_fields_for_model = protected_fields.get(
-                mw.col.models.get(note.mid)["id"], []
+                aqt.mw.col.models.get(note.mid)["id"], []
             )
             if field.name in protected_fields_for_model:
                 LOGGER.debug(
@@ -453,9 +453,9 @@ class AnkiHubImporter:
 def adjust_deck(deck_name: str, local_did: Optional[DeckId] = None) -> DeckId:
     unique_name = get_unique_deck_name(deck_name)
     if local_did is None:
-        local_did = DeckId(mw.col.decks.add_normal_deck_with_name(unique_name).id)
+        local_did = DeckId(aqt.mw.col.decks.add_normal_deck_with_name(unique_name).id)
         LOGGER.info(f"Created deck {local_did=}")
-    elif mw.col.decks.name_if_exists(local_did) is None:
+    elif aqt.mw.col.decks.name_if_exists(local_did) is None:
         # recreate deck if it was deleted
         create_deck_with_id(unique_name, local_did)
         LOGGER.info(f"Recreated deck {local_did=}")
@@ -519,7 +519,7 @@ def create_missing_note_types(
     remote_note_types: Dict[NotetypeId, NotetypeDict]
 ) -> None:
     missings_mids = set(
-        mid for mid in remote_note_types.keys() if mw.col.models.get(mid) is None
+        mid for mid in remote_note_types.keys() if aqt.mw.col.models.get(mid) is None
     )
     for mid in missings_mids:
         LOGGER.info(f"Missing note type {mid}")
@@ -530,11 +530,11 @@ def create_missing_note_types(
 
 def rename_note_types(remote_note_types: Dict[NotetypeId, NotetypeDict]) -> None:
     for mid, remote_note_type in remote_note_types.items():
-        local_note_type = mw.col.models.get(mid)
+        local_note_type = aqt.mw.col.models.get(mid)
         if local_note_type["name"] != remote_note_type["name"]:
             local_note_type["name"] = remote_note_type["name"]
-            mw.col.models.ensure_name_unique(local_note_type)
-            mw.col.models.update_dict(local_note_type)
+            aqt.mw.col.models.ensure_name_unique(local_note_type)
+            aqt.mw.col.models.update_dict(local_note_type)
             LOGGER.info(f"Renamed note type {mid=} to {local_note_type['name']}")
 
 
@@ -546,7 +546,7 @@ def ensure_local_and_remote_fields_are_same(
 
     note_types_with_field_conflicts: List[Tuple[NotetypeDict, NotetypeDict]] = []
     for mid, remote_note_type in remote_note_types.items():
-        local_note_type = mw.col.models.get(mid)
+        local_note_type = aqt.mw.col.models.get(mid)
 
         if not field_tuples(local_note_type["flds"]) == field_tuples(
             remote_note_type["flds"]
@@ -568,10 +568,10 @@ def ensure_local_and_remote_fields_are_same(
             f"Fields after adjusting ords:\n{pformat(field_tuples(local_note_type['flds']))}"
         )
 
-        mw.col.models.update_dict(local_note_type)
+        aqt.mw.col.models.update_dict(local_note_type)
         LOGGER.info(
             f"Fields after updating the model:\n"
-            f"{pformat(field_tuples(mw.col.models.get(local_note_type['id'])['flds']))}"
+            f"{pformat(field_tuples(aqt.mw.col.models.get(local_note_type['id'])['flds']))}"
         )
 
 

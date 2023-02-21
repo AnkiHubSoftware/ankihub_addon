@@ -7,7 +7,7 @@ from typing import Any, Iterable, List, Optional, Tuple
 from anki.models import NotetypeId
 from anki.notes import NoteId
 from anki.utils import ids2str, join_fields, split_fields
-from aqt import mw
+import aqt
 
 from . import LOGGER
 from .ankihub_client import Field, NoteInfo, suggestion_type_from_str
@@ -16,9 +16,9 @@ from .settings import ankihub_db_path
 
 def attach_ankihub_db_to_anki_db_connection() -> None:
     if AnkiHubDB.database_name not in [
-        name for _, name, _ in mw.col.db.all("PRAGMA database_list")
+        name for _, name, _ in aqt.mw.col.db.all("PRAGMA database_list")
     ]:
-        mw.col.db.execute(
+        aqt.mw.col.db.execute(
             f"ATTACH DATABASE ? AS {AnkiHubDB.database_name}",
             str(AnkiHubDB.database_path),
         )
@@ -27,24 +27,24 @@ def attach_ankihub_db_to_anki_db_connection() -> None:
 
 def detach_ankihub_db_from_anki_db_connection() -> None:
     if AnkiHubDB.database_name in [
-        name for _, name, _ in mw.col.db.all("PRAGMA database_list")
+        name for _, name, _ in aqt.mw.col.db.all("PRAGMA database_list")
     ]:
         # Liberal use of try/except to ensure we always try to detach and begin a new
         # transaction.
         try:
             # close the current transaction to avoid a "database is locked" error
-            mw.col.save(trx=False)
+            aqt.mw.col.save(trx=False)
         except Exception:
             LOGGER.info("Failed to close transaction.")
 
         try:
-            mw.col.db.execute(f"DETACH DATABASE {AnkiHubDB.database_name}")
+            aqt.mw.col.db.execute(f"DETACH DATABASE {AnkiHubDB.database_name}")
             LOGGER.info("Detached AnkiHub DB from Anki DB connection")
         except Exception:
             LOGGER.info("Failed to detach AnkiHub database.")
 
         # begin a new transaction because Anki expects one to be open
-        mw.col.db.begin()
+        aqt.mw.col.db.begin()
 
         LOGGER.info("Began new transaction.")
 
@@ -208,7 +208,7 @@ class AnkiHubDB:
                         note_data.anki_nid,
                         note_data.mid,
                         fields,
-                        mw.col.tags.join(note_data.tags),
+                        aqt.mw.col.tags.join(note_data.tags),
                         note_data.guid,
                         note_data.last_update_type.value[0]
                         if note_data.last_update_type is not None
@@ -224,7 +224,7 @@ class AnkiHubDB:
         """
         with db_transaction() as conn:
             for note_data in notes_data:
-                mod = mw.col.db.scalar(
+                mod = aqt.mw.col.db.scalar(
                     "SELECT mod FROM notes WHERE id = ?", note_data.anki_nid
                 )
 
@@ -243,7 +243,7 @@ class AnkiHubDB:
             """
         )
         for nid, mod in nid_mod_tuples:
-            mw.col.db.execute(
+            aqt.mw.col.db.execute(
                 "UPDATE notes SET mod = ? WHERE id = ?",
                 mod,
                 nid,
@@ -282,13 +282,13 @@ class AnkiHubDB:
 
         ah_nid, anki_nid, mid, tags, flds, guid, last_update_type = result
         field_names = [
-            field["name"] for field in mw.col.models.get(NotetypeId(mid))["flds"]
+            field["name"] for field in aqt.mw.col.models.get(NotetypeId(mid))["flds"]
         ]
         return NoteInfo(
             ankihub_note_uuid=uuid.UUID(ah_nid),
             anki_nid=anki_nid,
             mid=mid,
-            tags=mw.col.tags.split(tags),
+            tags=aqt.mw.col.tags.split(tags),
             fields=[
                 Field(
                     name=field_names[i],

@@ -3,12 +3,12 @@ import time
 from pprint import pformat
 from typing import Callable
 
+import aqt
 from anki.errors import CardTypeError
 from anki.hooks import wrap
-from aqt import mw
 from aqt.gui_hooks import profile_did_open, profile_will_close
 
-from . import LOGGER
+from . import LOGGER, ankihub_client
 from .addons import setup_addons
 from .db import ankihub_db
 from .errors import setup_error_handler
@@ -17,7 +17,13 @@ from .gui.anki_db_check import check_anki_db
 from .gui.db_check import check_ankihub_db
 from .gui.menu import refresh_ankihub_menu, setup_ankihub_menu
 from .progress import setup_progress_manager
-from .settings import ANKI_VERSION, config, setup_logger, setup_profile_data_folder
+from .settings import (
+    ANKI_VERSION,
+    api_url_base,
+    config,
+    setup_logger,
+    setup_profile_data_folder,
+)
 from .sync import sync_with_progress
 from .utils import modify_note_type_templates
 
@@ -32,6 +38,11 @@ PROFILE_WILL_CLOSE = False
 
 def run():
     """Call this function in __init__.py when Anki starts."""
+
+    config.setup_public_config_and_ankihub_app_url()
+
+    ankihub_client.API_URL_BASE = api_url_base()
+    LOGGER.info(f"Set AnkiHub API URL base to: {ankihub_client.API_URL_BASE}")
 
     setup_logger()
     LOGGER.info("Set up logger.")
@@ -66,7 +77,7 @@ def profile_setup() -> bool:
     """
     if not setup_profile_data_folder():
         return False
-    LOGGER.info(f"Set up profile data folder for the current profile: {mw.pm.name}")
+    LOGGER.info(f"Set up profile data folder for the current profile: {aqt.mw.pm.name}")
 
     config.setup_private_config()
     LOGGER.info("Set up config for the current profile.")
@@ -102,7 +113,7 @@ def general_setup():
 
     LOGGER.info(f"{ANKI_VERSION=}")
 
-    mw.addonManager.setWebExports(__name__, r"gui/web/.*")
+    aqt.mw.addonManager.setWebExports(__name__, r"gui/web/.*")
 
     setup_addons()
     LOGGER.info("Set up addons.")
@@ -152,7 +163,7 @@ def setup_ankihub_sync_and_maybe_sync(after_startup_syncs: Callable[[], None]) -
         after_startup_syncs()
         return
 
-    old_sync_collection_and_media = mw._sync_collection_and_media
+    old_sync_collection_and_media = aqt.mw._sync_collection_and_media
 
     def wrapper(*args, **kwargs) -> None:
         LOGGER.info("Running do_or_setup_ankihub_sync.wrapper")
@@ -168,13 +179,13 @@ def setup_ankihub_sync_and_maybe_sync(after_startup_syncs: Callable[[], None]) -
             # call the original sync function if there was an error in the modified one
             old_sync_collection_and_media(*args, **kwargs)
 
-    mw._sync_collection_and_media = wrap(  # type: ignore
-        mw._sync_collection_and_media,
+    aqt.mw._sync_collection_and_media = wrap(  # type: ignore
+        aqt.mw._sync_collection_and_media,
         wrapper,
         "around",
     )
 
-    if not mw.can_auto_sync():
+    if not aqt.mw.can_auto_sync():
         # The AnkiWeb sync won't be run on startup, so we run the AnkiHub sync immediately.
         LOGGER.info("Can't auto sync with AnkiWeb")
         if config.public_config["auto_sync"] in ["on_ankiweb_sync", "on_startup"]:
@@ -231,7 +242,7 @@ def _new_sync_collection_and_media(
 
 
 def log_enabled_addons():
-    enabled_addons = [x for x in mw.addonManager.all_addon_meta() if x.enabled]
+    enabled_addons = [x for x in aqt.mw.addonManager.all_addon_meta() if x.enabled]
     LOGGER.info(f"enabled addons:\n{pformat(enabled_addons)}")
 
 
@@ -239,14 +250,14 @@ def trigger_addon_update_check():
     # This sets the last_addon_update_check time to 25 hours before now and Anki usually checks
     # for add-on updates every 24 hours, so this will trigger an add-on update check on Anki startup.
     # See https://github.com/ankitects/anki/blob/21812556a6a29c7da34561e58824219783a867e7/qt/aqt/main.py#L896-L916
-    mw.pm.set_last_addon_update_check(int(time.time()) - (60 * 60 * 25))
+    aqt.mw.pm.set_last_addon_update_check(int(time.time()) - (60 * 60 * 25))
 
 
 def adjust_ankihub_note_type_templates():
     mids = ankihub_db.ankihub_note_type_ids()
 
     # Filter out note types that don't exist in the Anki database to avoid errors.
-    mids_filtered = [mid for mid in mids if mw.col.models.get(mid)]
+    mids_filtered = [mid for mid in mids if aqt.mw.col.models.get(mid)]
 
     # we don't want the setup to fail if there is a problem with the note type templates
     # the CardTypeError can happen when the template has a problem (for example a missing field)
