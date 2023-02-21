@@ -6,7 +6,7 @@ from types import TracebackType
 from typing import Any, Optional, Type
 
 from anki.errors import BackendIOError, DBError
-from aqt import mw
+import aqt
 from aqt.utils import showText, showWarning, tooltip
 from requests.exceptions import ConnectionError
 
@@ -52,7 +52,7 @@ def handle_exception(
     if isinstance(exc, ConnectionError):
         tooltip(
             "Could not connect to AnkiHub (no internet or the site is down for maintenance)",
-            parent=mw,
+            parent=aqt.mw,
         )
         return True
 

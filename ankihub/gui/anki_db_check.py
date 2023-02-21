@@ -4,7 +4,7 @@ from concurrent.futures import Future
 from typing import List
 
 from anki.utils import ids2str
-from aqt import mw
+import aqt
 from aqt.utils import showInfo
 
 from .. import LOGGER
@@ -48,7 +48,7 @@ def _check_missing_ankihub_nids() -> None:
         ),
         title="AnkiHub Database Check",
     ):
-        mw.taskman.with_progress(
+        aqt.mw.taskman.with_progress(
             lambda: _reset_decks(ah_dids_with_missing_ah_nids),
             on_done=on_done,
             label="Resetting local changes...",
@@ -70,7 +70,7 @@ def _decks_with_missing_ankihub_nids():
         # add ah_did to results if for any note type of the deck the AnkiHub ID field does not exist
         mids = ankihub_db.note_types_for_ankihub_deck(ah_did)
         for mid in mids:
-            note_type = mw.col.models.get(mid)
+            note_type = aqt.mw.col.models.get(mid)
 
             if note_type is None:
                 continue
@@ -95,7 +95,7 @@ def _decks_with_missing_ankihub_nids():
             # This is much faster than loading all notes and checking the AnkiHub ID field. The speed
             # matters because this function is called on every startup.
             note_with_empty_last_field_exists = bool(
-                mw.col.db.scalar(
+                aqt.mw.col.db.scalar(
                     "SELECT EXISTS("
                     "   SELECT 1 FROM notes "
                     f"  WHERE id in {ids2str(nids)} AND SUBSTR(flds, -1) == '{field_seperator}'"
@@ -122,7 +122,7 @@ def _check_ankihub_update_tags() -> None:
     see which notes were updated and for what reason.
     """
 
-    nids = mw.col.find_notes("tag:AnkiHub_Update::*")
+    nids = aqt.mw.col.find_notes("tag:AnkiHub_Update::*")
     if not nids:
         LOGGER.info("No notes with AnkiHub_Update tag found.")
         return
@@ -151,7 +151,7 @@ def _check_ankihub_update_tags() -> None:
         showInfo("AnkiHub_Update tags removed from all notes.")
         LOGGER.info("AnkiHub_Update tags removed from all notes.")
 
-    mw.taskman.with_progress(
+    aqt.mw.taskman.with_progress(
         task=_remove_ankihub_update_tags,
         on_done=on_done,
         label="Removing AnkiHub_Update tags...",
@@ -160,7 +160,7 @@ def _check_ankihub_update_tags() -> None:
 
 def _remove_ankihub_update_tags():
     tags_to_remove = [
-        tag for tag in mw.col.tags.all() if tag.startswith("AnkiHub_Update::")
+        tag for tag in aqt.mw.col.tags.all() if tag.startswith("AnkiHub_Update::")
     ]
     tags_to_remove_str = " ".join(tags_to_remove)
-    mw.col.tags.remove(tags_to_remove_str)
+    aqt.mw.col.tags.remove(tags_to_remove_str)

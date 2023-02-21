@@ -8,7 +8,7 @@ from anki.errors import NotFoundError
 from anki.models import ChangeNotetypeRequest, NoteType, NotetypeDict, NotetypeId
 from anki.notes import Note, NoteId
 from anki.utils import checksum, ids2str
-from aqt import mw
+import aqt
 
 from . import LOGGER, settings
 from .settings import (
@@ -16,29 +16,31 @@ from .settings import (
     ANKIHUB_NOTE_TYPE_FIELD_NAME,
     ANKIHUB_NOTE_TYPE_MODIFICATION_STRING,
     ANKIHUB_TEMPLATE_END_COMMENT,
-    URL_VIEW_NOTE,
+    url_view_note,
 )
 
 
 # decks
 def create_deck_with_id(deck_name: str, deck_id: DeckId) -> None:
 
-    source_did = mw.col.decks.add_normal_deck_with_name(
+    source_did = aqt.mw.col.decks.add_normal_deck_with_name(
         get_unique_deck_name(deck_name)
     ).id
-    mw.col.db.execute(f"UPDATE decks SET id={deck_id} WHERE id={source_did};")
-    mw.col.db.execute(f"UPDATE cards SET did={deck_id} WHERE did={source_did};")
+    aqt.mw.col.db.execute(f"UPDATE decks SET id={deck_id} WHERE id={source_did};")
+    aqt.mw.col.db.execute(f"UPDATE cards SET did={deck_id} WHERE did={source_did};")
 
     LOGGER.info(f"Created deck {deck_name=} {deck_id=}")
 
 
 def all_dids() -> Set[DeckId]:
-    return {DeckId(x.id) for x in mw.col.decks.all_names_and_ids()}
+    return {DeckId(x.id) for x in aqt.mw.col.decks.all_names_and_ids()}
 
 
 def lowest_level_common_ancestor_did(dids: Iterable[DeckId]) -> Optional[DeckId]:
-    return mw.col.decks.id_for_name(
-        lowest_level_common_ancestor_deck_name([mw.col.decks.name(did) for did in dids])
+    return aqt.mw.col.decks.id_for_name(
+        lowest_level_common_ancestor_deck_name(
+            [aqt.mw.col.decks.name(did) for did in dids]
+        )
     )
 
 
@@ -59,7 +61,7 @@ def lowest_level_common_ancestor_deck_name(deck_names: Iterable[str]) -> Optiona
 
 
 def get_unique_deck_name(deck_name: str) -> str:
-    if not mw.col.decks.by_name(deck_name):
+    if not aqt.mw.col.decks.by_name(deck_name):
         return deck_name
 
     suffix = " (AnkiHub)"
@@ -71,7 +73,7 @@ def get_unique_deck_name(deck_name: str) -> str:
 
 
 def highest_level_did(dids: Iterable[DeckId]) -> DeckId:
-    return min(dids, key=lambda did: mw.col.decks.name(did).count("::"))
+    return min(dids, key=lambda did: aqt.mw.col.decks.name(did).count("::"))
 
 
 # notes
@@ -80,11 +82,11 @@ def create_note_with_id(note: Note, anki_id: NoteId, anki_did: DeckId) -> Note:
     the note id of the original note creator."""
     LOGGER.debug(f"Trying to create note: {anki_id=}")
 
-    mw.col.add_note(note, DeckId(anki_did))
+    aqt.mw.col.add_note(note, DeckId(anki_did))
 
     # Swap out the note id that Anki assigns to the new note with our own id.
-    mw.col.db.execute(f"UPDATE notes SET id={anki_id} WHERE id={note.id};")
-    mw.col.db.execute(f"UPDATE cards SET nid={anki_id} WHERE nid={note.id};")
+    aqt.mw.col.db.execute(f"UPDATE notes SET id={anki_id} WHERE id={note.id};")
+    aqt.mw.col.db.execute(f"UPDATE cards SET nid={anki_id} WHERE nid={note.id};")
 
     note.id = anki_id
     return note
@@ -93,8 +95,8 @@ def create_note_with_id(note: Note, anki_id: NoteId, anki_did: DeckId) -> Note:
 def note_types_with_ankihub_id_field() -> List[NotetypeId]:
     return [
         mid
-        for mid in mw.col.models.ids()
-        if has_ankihub_id_field(mw.col.models.get(mid))
+        for mid in aqt.mw.col.models.ids()
+        if has_ankihub_id_field(aqt.mw.col.models.get(mid))
     ]
 
 
@@ -106,20 +108,20 @@ def nids_in_deck_but_not_in_subdeck(deck_name: str) -> Sequence[NoteId]:
     """Return note IDs of notes that are in the deck but not also in a subdeck of the deck.
     For example if a notes is in the deck "A" but not in "A::B" or "A::C" then it is returned.
     """
-    return mw.col.find_notes(f'deck:"{deck_name}" -deck:"{deck_name}::*"')
+    return aqt.mw.col.find_notes(f'deck:"{deck_name}" -deck:"{deck_name}::*"')
 
 
 # note types
 def create_note_type_with_id(note_type: NotetypeDict, mid: NotetypeId) -> None:
     note_type["id"] = 0
-    changes = mw.col.models.add_dict(note_type)
+    changes = aqt.mw.col.models.add_dict(note_type)
 
     # Swap out the note type id that Anki assigns to the new note type with our own id.
     # TODO check if seperate statements are necessary
-    mw.col.db.execute(f"UPDATE notetypes SET id={mid} WHERE id={changes.id};")
-    mw.col.db.execute(f"UPDATE templates SET ntid={mid} WHERE ntid={changes.id};")
-    mw.col.db.execute(f"UPDATE fields SET ntid={mid} WHERE ntid={changes.id};")
-    mw.col.models._clear_cache()  # TODO check if this is necessary
+    aqt.mw.col.db.execute(f"UPDATE notetypes SET id={mid} WHERE id={changes.id};")
+    aqt.mw.col.db.execute(f"UPDATE templates SET ntid={mid} WHERE ntid={changes.id};")
+    aqt.mw.col.db.execute(f"UPDATE fields SET ntid={mid} WHERE ntid={changes.id};")
+    aqt.mw.col.models._clear_cache()  # TODO check if this is necessary
 
     LOGGER.info(f"Created note type: {mid}")
     LOGGER.info(f"Note type:\n {pformat(note_type)}")
@@ -137,7 +139,7 @@ def note_type_contains_field(
 def get_note_types_in_deck(did: DeckId) -> List[NotetypeId]:
     """Returns list of note model ids in the given deck."""
     dids = [did]
-    dids += [child[1] for child in mw.col.decks.children(did)]
+    dids += [child[1] for child in aqt.mw.col.decks.children(did)]
     dids_str = ids2str(dids)
     # odid is the original did for cards in filtered decks
     query = (
@@ -145,7 +147,7 @@ def get_note_types_in_deck(did: DeckId) -> List[NotetypeId]:
         "INNER JOIN notes ON cards.nid = notes.id "
         f"WHERE did in {dids_str} or odid in {dids_str}"
     )
-    return mw.col.db.list(query)
+    return aqt.mw.col.db.list(query)
 
 
 def reset_note_types_of_notes(nid_mid_pairs: List[Tuple[NoteId, NotetypeId]]) -> None:
@@ -153,7 +155,7 @@ def reset_note_types_of_notes(nid_mid_pairs: List[Tuple[NoteId, NotetypeId]]) ->
     note_type_conflicts: Set[Tuple[NoteId, NotetypeId, NotetypeId]] = set()
     for nid, mid in nid_mid_pairs:
         try:
-            note = mw.col.get_note(nid)
+            note = aqt.mw.col.get_note(nid)
         except NotFoundError:
             # we don't care about missing notes here
             continue
@@ -175,9 +177,9 @@ def reset_note_types_of_notes(nid_mid_pairs: List[Tuple[NoteId, NotetypeId]]) ->
 
 def change_note_type_of_note(nid: int, mid: int) -> None:
 
-    current_schema: int = mw.col.db.scalar("select scm from col")
-    note = mw.col.get_note(NoteId(nid))
-    target_note_type = mw.col.models.get(NotetypeId(mid))
+    current_schema: int = aqt.mw.col.db.scalar("select scm from col")
+    note = aqt.mw.col.get_note(NoteId(nid))
+    target_note_type = aqt.mw.col.models.get(NotetypeId(mid))
     request = ChangeNotetypeRequest(
         note_ids=[note.id],
         old_notetype_id=note.mid,
@@ -185,7 +187,7 @@ def change_note_type_of_note(nid: int, mid: int) -> None:
         current_schema=current_schema,
         new_fields=list(range(0, len(target_note_type["flds"]))),
     )
-    mw.col.models.change_notetype_of_notes(request)
+    aqt.mw.col.models.change_notetype_of_notes(request)
 
 
 # ... note type modifications
@@ -210,10 +212,10 @@ def modify_note_type(note_type: NotetypeDict) -> None:
 
 def modify_note_type_templates(note_type_ids: Iterable[NotetypeId]) -> None:
     for mid in note_type_ids:
-        note_type = mw.col.models.get(mid)
+        note_type = aqt.mw.col.models.get(mid)
         for template in note_type["tmpls"]:
             modify_template(template)
-        mw.col.models.update_dict(note_type)
+        aqt.mw.col.models.update_dict(note_type)
 
 
 def modify_fields(note_type: Dict) -> None:
@@ -222,7 +224,7 @@ def modify_fields(note_type: Dict) -> None:
     if settings.ANKIHUB_NOTE_TYPE_FIELD_NAME in field_names:
         LOGGER.info(f"{settings.ANKIHUB_NOTE_TYPE_FIELD_NAME} already exists.")
         return
-    ankihub_field = mw.col.models.new_field(ANKIHUB_NOTE_TYPE_FIELD_NAME)
+    ankihub_field = aqt.mw.col.models.new_field(ANKIHUB_NOTE_TYPE_FIELD_NAME)
     # Put AnkiHub field last
     ankihub_field["ord"] = len(fields)
     note_type["flds"].append(ankihub_field)
@@ -240,7 +242,7 @@ def add_ankihub_snippet_to_template(template: Dict) -> None:
         "<br><br>"
         f"\n{{{{#{ANKIHUB_NOTE_TYPE_FIELD_NAME}}}}}\n"
         "<a class='ankihub' "
-        f"href='{URL_VIEW_NOTE}{{{{{ANKIHUB_NOTE_TYPE_FIELD_NAME}}}}}'>"
+        f"href='{url_view_note()}{{{{{ANKIHUB_NOTE_TYPE_FIELD_NAME}}}}}'>"
         "\nView Note on AnkiHub\n"
         "</a>"
         f"\n{{{{/{ANKIHUB_NOTE_TYPE_FIELD_NAME}}}}}\n"
@@ -282,12 +284,12 @@ def add_ankihub_end_comment_to_template(template: Dict) -> None:
 # ... undo modifications
 def undo_note_type_modfications(note_type_ids: Iterable[NotetypeId]) -> None:
     for mid in note_type_ids:
-        note_type = mw.col.models.get(mid)
+        note_type = aqt.mw.col.models.get(mid)
         if note_type is None:
             continue
 
         undo_note_type_modification(note_type)
-        mw.col.models.update_dict(note_type)
+        aqt.mw.col.models.update_dict(note_type)
 
 
 def undo_note_type_modification(note_type: Dict) -> None:
@@ -325,15 +327,15 @@ def create_backup() -> None:
     LOGGER.info("Starting backup...")
     try:
         if ANKI_MINOR >= 50:
-            mw.col.create_backup(
-                backup_folder=mw.pm.backupFolder(),
+            aqt.mw.col.create_backup(
+                backup_folder=aqt.mw.pm.backupFolder(),
                 force=True,
                 wait_for_completion=True,
             )
         else:
-            mw.col.close(downgrade=False)
-            mw.backup()  # type: ignore
-            mw.col.reopen(after_full_sync=False)
+            aqt.mw.col.close(downgrade=False)
+            aqt.mw.backup()  # type: ignore
+            aqt.mw.col.reopen(after_full_sync=False)
         LOGGER.info("Backup successful.")
     except Exception as exc:
         LOGGER.info("Backup failed")

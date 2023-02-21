@@ -1,7 +1,6 @@
 from typing import Any, List, Optional
 
 import aqt
-from aqt import mw
 from aqt.qt import (
     QApplication,
     QDialog,
@@ -30,7 +29,7 @@ def choose_subset(
     parent: Any = None,
 ) -> List[str]:
     if not parent:
-        parent = mw.app.activeWindow()
+        parent = aqt.mw.app.activeWindow()
 
     dialog = QDialog(parent)
     disable_help_button(dialog)

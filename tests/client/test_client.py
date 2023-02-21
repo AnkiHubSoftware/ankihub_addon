@@ -20,7 +20,8 @@ from ..factories import NoteInfoFactory
 # has to be set before importing ankihub
 os.environ["SKIP_INIT"] = "1"
 
-from ankihub.ankihub_client import (  # noqa: E402
+from ankihub import ankihub_client
+from ankihub.ankihub_client import (
     AnkiHubClient,
     ChangeNoteSuggestion,
     Deck,
@@ -35,6 +36,7 @@ from ankihub.ankihub_client import (  # noqa: E402
     SuggestionType,
     TagGroupValidationResponse,
 )
+from ankihub.gui.decks import download_progress_cb
 
 COMPOSE_FILE = Path(os.getenv("COMPOSE_FILE")) if os.getenv("COMPOSE_FILE") else None
 
@@ -52,8 +54,6 @@ DECK_EXTENSION_ID = 999
 
 @pytest.fixture(autouse=True)
 def set_ankihub_app_url():
-    from ankihub import ankihub_client
-
     ankihub_client.API_URL_BASE = "http://localhost:8000/api"
 
 
@@ -279,8 +279,6 @@ def test_download_compressed_deck(
 def test_download_deck_with_progress(
     authorized_client_for_user_test1: AnkiHubClient, monkeypatch: MonkeyPatch
 ):
-    from ankihub.gui.decks import download_progress_cb
-
     client = authorized_client_for_user_test1
     deck_id = uuid.UUID("dda0d3ad-89cd-45fb-8ddc-fabad93c2d7b")
 
@@ -342,7 +340,7 @@ def test_upload_deck(
 ):
     client = authorized_client_for_user_test1
 
-    note_data: NoteInfo = NoteInfoFactory.build()
+    note_data = NoteInfoFactory()
 
     # create the deck on AnkiHub
     # upload to s3 is mocked out, this will potentially cause errors on the locally running AnkiHub

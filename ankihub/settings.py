@@ -15,16 +15,16 @@ from pprint import pformat
 from shutil import copyfile, rmtree
 from typing import Any, Callable, Dict, List, Optional
 
+import aqt
 from anki.buildinfo import version as ANKI_VERSION
 from anki.decks import DeckId
-from aqt import mw
 from aqt.utils import askUser, showInfo
 
-from . import LOGGER, ankihub_client
-from .public_config_migrations import migrate_public_config
+from . import LOGGER
 from .ankihub_client import ANKIHUB_DATETIME_FORMAT_STR, DeckExtension
 from .lib.mashumaro import field_options
 from .lib.mashumaro.mixins.json import DataClassJSONMixin
+from .public_config_migrations import migrate_public_config
 
 ADDON_PATH = Path(__file__).parent.absolute()
 
@@ -98,12 +98,28 @@ class PrivateConfig(DataClassJSONMixin):
 class Config:
     def __init__(self):
         # self.public_config is editable by the user using a built-in Anki feature.
-        migrate_public_config()
-        self.public_config: Dict[str, Any] = mw.addonManager.getConfig(ADDON_PATH.name)
+        self.public_config: Optional[Dict[str, Any]] = None
+        self._private_config: Optional[PrivateConfig] = None
+        self._private_config_path: Optional[Path] = None
         self.token_change_hook: Optional[Callable[[], None]] = None
         self.subscriptions_change_hook: Optional[Callable[[], None]] = None
+        self.ankihub_app_url: Optional[str] = None
 
-    def setup(self):
+    def setup_public_config_and_ankihub_app_url(self):
+        migrate_public_config()
+        self.public_config = aqt.mw.addonManager.getConfig(ADDON_PATH.name)
+
+        self.ankihub_app_url = os.getenv("ANKIHUB_APP_URL")
+        if self.ankihub_app_url is None:
+            self.ankihub_app_url = self.public_config.get("ankihub_url")
+            self.ankihub_app_url = (
+                self.ankihub_app_url
+                if self.ankihub_app_url
+                else "https://app.ankihub.net"
+            )
+
+    def setup_private_config(self):
+        # requires the profile setup to be completed unlike self.setup_pbulic_config
         self._private_config_path = private_config_path()
         if not self._private_config_path.exists():
             self._private_config = PrivateConfig()
@@ -243,7 +259,7 @@ config = Config()
 def setup_profile_data_folder() -> bool:
     """Returns False if the migration from the old location needs yet to be done."""
     assign_id_to_profile_if_not_exists()
-    LOGGER.info(f"Anki profile id: {mw.pm.profile[PROFILE_ID_FIELD_NAME]}")
+    LOGGER.info(f"Anki profile id: {aqt.mw.pm.profile[PROFILE_ID_FIELD_NAME]}")
 
     if not (path := profile_files_path()).exists():
         path.mkdir(parents=True)
@@ -256,29 +272,29 @@ def setup_profile_data_folder() -> bool:
 
 def assign_id_to_profile_if_not_exists() -> None:
     """Assigns an id to the currently open profile if it doesn't have one."""
-    if mw.pm.profile.get("ankihub_id") is not None:
+    if aqt.mw.pm.profile.get("ankihub_id") is not None:
         return
 
-    mw.pm.profile[PROFILE_ID_FIELD_NAME] = str(uuid.uuid4())
-    mw.pm.save()
+    aqt.mw.pm.profile[PROFILE_ID_FIELD_NAME] = str(uuid.uuid4())
+    aqt.mw.pm.save()
 
     LOGGER.info(
-        f"Assigned new id to Anki profile: {mw.pm.profile[PROFILE_ID_FIELD_NAME]}"
+        f"Assigned new id to Anki profile: {aqt.mw.pm.profile[PROFILE_ID_FIELD_NAME]}"
     )
 
 
 def user_files_path() -> Path:
     # The contents of the user_files folder are retained during updates.
     # See https://addon-docs.ankiweb.net/addon-config.html#user-files
-    addon_dir_name = mw.addonManager.addonFromModule(__name__)
-    result = Path(mw.addonManager.addonsFolder(addon_dir_name)) / "user_files"
+    addon_dir_name = aqt.mw.addonManager.addonFromModule(__name__)
+    result = Path(aqt.mw.addonManager.addonsFolder(addon_dir_name)) / "user_files"
     return result
 
 
 def profile_files_path() -> Path:
     """Path to the add-on data for this Anki profile."""
     # we need an id instead of using the profile name because profiles can be renamed
-    cur_profile_id = mw.pm.profile[PROFILE_ID_FIELD_NAME]
+    cur_profile_id = aqt.mw.pm.profile[PROFILE_ID_FIELD_NAME]
     result = user_files_path() / cur_profile_id
     return result
 
@@ -304,7 +320,7 @@ def migrate_profile_data_from_old_location() -> bool:
         LOGGER.info("No data to migrate.")
         return True
 
-    if len(mw.pm.profiles()) > 1:
+    if len(aqt.mw.pm.profiles()) > 1:
         if not askUser(
             (
                 "The AnkiHub add-on now has support for multiple Anki profiles!<br><br>"
@@ -367,36 +383,39 @@ def file_handler():
     )
 
 
-LOGGING = {
-    "version": 1,
-    "disable_existing_loggers": False,
-    "formatters": {
-        "verbose": {
-            "format": "%(levelname)s %(asctime)s %(module)s "
-            "%(process)d %(thread)d %(message)s"
-        }
-    },
-    "handlers": {
-        "console": {
-            "()": stdout_handler,
-            "level": "INFO",
-            "formatter": "verbose",
-        },
-        "file": {
-            "()": file_handler,
-            "level": "DEBUG"
-            if config.public_config.get("debug_level_logs", False)
-            else "INFO",
-            "formatter": "verbose",
-        },
-    },
-    "root": {
-        "level": "DEBUG",
-        "handlers": ["console", "file"],
-    },
-}
+def setup_logger():
+    log_file_path().parent.mkdir(parents=True, exist_ok=True)
 
-logging.config.dictConfig(LOGGING)
+    LOGGING = {
+        "version": 1,
+        "disable_existing_loggers": False,
+        "formatters": {
+            "verbose": {
+                "format": "%(levelname)s %(asctime)s %(module)s "
+                "%(process)d %(thread)d %(message)s"
+            }
+        },
+        "handlers": {
+            "console": {
+                "()": stdout_handler,
+                "level": "INFO",
+                "formatter": "verbose",
+            },
+            "file": {
+                "()": file_handler,
+                "level": "DEBUG"
+                if config.public_config.get("debug_level_logs", False)
+                else "INFO",
+                "formatter": "verbose",
+            },
+        },
+        "root": {
+            "level": "DEBUG",
+            "handlers": ["console", "file"],
+        },
+    }
+
+    logging.config.dictConfig(LOGGING)
 
 
 version_file = Path(__file__).parent / "VERSION"
@@ -412,22 +431,18 @@ except (FileNotFoundError, KeyError):
     ANKIWEB_ID = 1322529746
 
 
-ANKIHUB_APP_URL = os.getenv("ANKIHUB_APP_URL")
-if ANKIHUB_APP_URL is None:
-    ANKIHUB_APP_URL = config.public_config.get("ankihub_url")
-    ANKIHUB_APP_URL = ANKIHUB_APP_URL if ANKIHUB_APP_URL else "https://app.ankihub.net"
-API_URL_BASE = f"{ANKIHUB_APP_URL}/api"
-LOGGER.info(f"Starting with URL_BASE {API_URL_BASE}")
+api_url_base = lambda: f"{config.ankihub_app_url}/api"  # noqa: E731
 
-# maybe override default API_URL_BASE of client
-ankihub_client.API_URL_BASE = API_URL_BASE
+url_view_note = lambda: f"{config.ankihub_app_url}/decks/notes/"  # noqa: E731
+url_view_note_history = (
+    lambda: f"{config.ankihub_app_url}/decks/{{ankihub_did}}/suggestions/?search=note:{{ankihub_nid}} state:closed"
+)  # noqa: E731
+url_view_deck = lambda: f"{config.ankihub_app_url}/decks/"  # noqa: E731
+url_help = lambda: f"{config.ankihub_app_url}/help"  # noqa: E731
+url_decks = lambda: f"{config.ankihub_app_url}/explore"  # noqa: E731
+url_deck_base = lambda: f"{config.ankihub_app_url}/decks"  # noqa: E731
 
-URL_VIEW_NOTE = f"{ANKIHUB_APP_URL}/decks/notes/"
-URL_VIEW_NOTE_HISTORY = f"{ANKIHUB_APP_URL}/decks/{{ankihub_did}}/suggestions/?search=note:{{ankihub_nid}} state:closed"
-URL_VIEW_DECK = f"{ANKIHUB_APP_URL}/decks/"
-URL_HELP = f"{ANKIHUB_APP_URL}/help"
-URL_DECKS = f"{ANKIHUB_APP_URL}/explore"
-URL_DECK_BASE = f"{ANKIHUB_APP_URL}/decks"
+
 ANKIHUB_NOTE_TYPE_FIELD_NAME = "ankihub_id"
 ANKIHUB_NOTE_TYPE_MODIFICATION_STRING = "ANKIHUB MODFICATIONS"
 ANKIHUB_TEMPLATE_END_COMMENT = (

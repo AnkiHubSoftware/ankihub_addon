@@ -4,6 +4,7 @@ from concurrent.futures import Future
 from datetime import datetime, timezone
 from typing import Optional
 
+import aqt
 from aqt import (
     AnkiApp,
     QCheckBox,
@@ -15,7 +16,6 @@ from aqt import (
     QSizePolicy,
     QVBoxLayout,
     QWidget,
-    mw,
 )
 from aqt.operations import QueryOp
 from aqt.qt import QAction, QDialog, QKeySequence, QMenu, Qt, qconnect
@@ -28,7 +28,7 @@ from ..ankihub_client import AnkiHubRequestError
 from ..error_reporting import upload_logs_in_background
 from ..media_import.ui import open_import_dialog
 from ..register_decks import create_collaborative_deck
-from ..settings import ADDON_VERSION, URL_VIEW_DECK, config
+from ..settings import ADDON_VERSION, url_view_deck, config
 from ..subdecks import SUBDECK_TAG
 from ..sync import sync_with_progress
 from .decks import SubscribedDecksDialog
@@ -112,7 +112,7 @@ class AnkiHubLogin(QWidget):
             config.save_token("")
 
             if e.response.status_code == 400:
-                tooltip("Wrong credentials.", parent=mw)
+                tooltip("Wrong credentials.", parent=aqt.mw)
                 return
 
             raise e
@@ -120,7 +120,7 @@ class AnkiHubLogin(QWidget):
         config.save_token(token)
         config.save_user_email(username_or_email)
 
-        tooltip("Signed into AnkiHub!", parent=mw)
+        tooltip("Signed into AnkiHub!", parent=aqt.mw)
         self.close()
 
     def _is_email(self, value):
@@ -147,7 +147,7 @@ class AnkiHubLogin(QWidget):
 
 class DeckCreationConfirmationDialog(QMessageBox):
     def __init__(self):
-        super().__init__(parent=mw)
+        super().__init__(parent=aqt.mw)
 
         self.setWindowTitle("Confirm AnkiHub Deck Creation")
         self.setIcon(QMessageBox.Icon.Question)
@@ -184,14 +184,14 @@ def create_collaborative_deck_action() -> None:
         return
 
     deck_chooser = StudyDeck(
-        mw,
+        aqt.mw,
         title="AnkiHub",
         accept="Upload",
         # Removes the "Add" button
         buttons=[],
         names=lambda: [
             d.name
-            for d in mw.col.decks.all_names_and_ids(include_filtered=False)
+            for d in aqt.mw.col.decks.all_names_and_ids(include_filtered=False)
             if "::" not in d.name and d.id != 1
         ],
     )
@@ -199,7 +199,7 @@ def create_collaborative_deck_action() -> None:
     if not deck_name:
         return
 
-    if len(mw.col.find_cards(f'deck:"{deck_name}"')) == 0:
+    if len(aqt.mw.col.find_cards(f'deck:"{deck_name}"')) == 0:
         showText("You can't upload an empty deck.")
         return
 
@@ -214,7 +214,7 @@ def create_collaborative_deck_action() -> None:
     private = public is False
 
     add_subdeck_tags = False
-    if mw.col.decks.children(mw.col.decks.id_for_name(deck_name)):
+    if aqt.mw.col.decks.children(aqt.mw.col.decks.id_for_name(deck_name)):
         add_subdeck_tags = ask_user(
             "Would you like to add a tag to each note in the deck that indicates which subdeck it belongs to?<br><br>"
             "For example, if you have a deck named <b>My Deck</b> with a subdeck named <b>My Deck::Subdeck</b>, "
@@ -234,7 +234,7 @@ def create_collaborative_deck_action() -> None:
         return
 
     def on_success(ankihub_did: uuid.UUID) -> None:
-        anki_did = mw.col.decks.id_for_name(deck_name)
+        anki_did = aqt.mw.col.decks.id_for_name(deck_name)
         creation_time = datetime.now(tz=timezone.utc)
         config.save_subscription(
             deck_name,
@@ -243,7 +243,7 @@ def create_collaborative_deck_action() -> None:
             creator=True,
             latest_udpate=creation_time,
         )
-        deck_url = f"{URL_VIEW_DECK}{ankihub_did}"
+        deck_url = f"{url_view_deck()}{ankihub_did}"
         showInfo(
             "🎉 Deck upload successful!<br><br>"
             "Link to the deck on AnkiHub:<br>"
@@ -251,11 +251,11 @@ def create_collaborative_deck_action() -> None:
         )
 
     def on_failure(exc: Exception):
-        mw.progress.finish()
+        aqt.mw.progress.finish()
         raise exc
 
     op = QueryOp(
-        parent=mw,
+        parent=aqt.mw,
         op=lambda col: create_collaborative_deck(
             deck_name, private=private, add_subdeck_tags=add_subdeck_tags
         ),
@@ -288,12 +288,12 @@ def sign_out_action():
         AnkiHubClient().signout()
     finally:
         config.save_token("")
-        tooltip("Signed out of AnkiHub!", parent=mw)
+        tooltip("Signed out of AnkiHub!", parent=aqt.mw)
 
 
 class LogUploadResultDialog(QDialog):
     def __init__(self, log_file_name: str):
-        super().__init__(parent=mw)
+        super().__init__(parent=aqt.mw)
 
         self.setWindowTitle("AnkiHub")
 
@@ -325,16 +325,16 @@ def upload_logs_action():
         return
 
     def on_done(future: Future):
-        mw.progress.finish()
+        aqt.mw.progress.finish()
         log_file_name = future.result()
         LogUploadResultDialog(log_file_name=log_file_name).exec()
 
-    mw.progress.start(label="Uploading logs...", parent=mw, immediate=True)
+    aqt.mw.progress.start(label="Uploading logs...", parent=aqt.mw, immediate=True)
     upload_logs_in_background(on_done=on_done, hide_username=True)
 
 
 def ankihub_login_setup(parent):
-    sign_in_button = QAction("🔑 Sign into AnkiHub", mw)
+    sign_in_button = QAction("🔑 Sign into AnkiHub", aqt.mw)
     qconnect(sign_in_button.triggered, AnkiHubLogin.display_login)
     parent.addAction(sign_in_button)
 
@@ -348,20 +348,20 @@ def upload_suggestions_setup(parent):
 
 def subscribe_to_deck_setup(parent):
     """Set up the menu item for uploading suggestions in bulk."""
-    q_action = QAction("📚 Subscribed Decks", mw)
+    q_action = QAction("📚 Subscribed Decks", aqt.mw)
     qconnect(q_action.triggered, SubscribedDecksDialog.display_subscribe_window)
     parent.addAction(q_action)
 
 
 def import_media_setup(parent):
-    q_action = QAction("🖼️ Import media", mw)
+    q_action = QAction("🖼️ Import media", aqt.mw)
     qconnect(q_action.triggered, open_import_dialog)
     parent.addAction(q_action)
 
 
 def sync_with_ankihub_setup(parent):
     """Set up the menu item for uploading suggestions in bulk."""
-    q_action = QAction("🔃️ Sync with AnkiHub", mw)
+    q_action = QAction("🔃️ Sync with AnkiHub", aqt.mw)
     qconnect(q_action.triggered, sync_with_ankihub_action)
     if sync_hotkey := config.public_config["sync_hotkey"]:
         try:
@@ -407,7 +407,7 @@ def ankihub_help_setup(parent):
 
 
 def ankihub_logout_setup(parent):
-    q_action = QAction("🔑 Sign out", mw)
+    q_action = QAction("🔑 Sign out", aqt.mw)
     qconnect(q_action.triggered, sign_out_action)
     parent.addAction(q_action)
 
@@ -417,11 +417,11 @@ ankihub_menu: Optional[QMenu] = None
 
 def setup_ankihub_menu() -> None:
     global ankihub_menu
-    ankihub_menu = QMenu("&AnkiHub", parent=mw)
-    mw.form.menubar.addMenu(ankihub_menu)
+    ankihub_menu = QMenu("&AnkiHub", parent=aqt.mw)
+    aqt.mw.form.menubar.addMenu(ankihub_menu)
     refresh_ankihub_menu()
-    config.token_change_hook = lambda: mw.taskman.run_on_main(refresh_ankihub_menu)
-    config.subscriptions_change_hook = lambda: mw.taskman.run_on_main(
+    config.token_change_hook = lambda: aqt.mw.taskman.run_on_main(refresh_ankihub_menu)
+    config.subscriptions_change_hook = lambda: aqt.mw.taskman.run_on_main(
         refresh_ankihub_menu
     )
 

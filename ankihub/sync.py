@@ -5,7 +5,7 @@ from time import sleep
 from typing import Callable, Optional
 
 from anki.errors import NotFoundError
-from aqt import mw
+import aqt
 from aqt.utils import showInfo, tooltip
 
 from . import LOGGER, settings
@@ -62,7 +62,7 @@ class AnkiHubSync:
                 notes_count, ankihub_did=ankihub_did
             ),
         ):
-            if mw.progress.want_cancel():
+            if aqt.mw.progress.want_cancel():
                 LOGGER.info("User cancelled sync.")
                 return False
 
@@ -121,7 +121,7 @@ class AnkiHubSync:
             if not chunk.note_customizations:
                 continue
 
-            if mw.progress.want_cancel():
+            if aqt.mw.progress.want_cancel():
                 LOGGER.debug("User cancelled sync.")
                 return False
 
@@ -130,7 +130,7 @@ class AnkiHubSync:
                     customization.ankihub_nid
                 )
                 try:
-                    note = mw.col.get_note(anki_nid)
+                    note = aqt.mw.col.get_note(anki_nid)
                 except NotFoundError:
                     LOGGER.warning(
                         f"Tried to apply customization to note {customization.ankihub_nid} but note was not found"
@@ -146,7 +146,7 @@ class AnkiHubSync:
             )
 
         if updated_notes:
-            mw.col.update_notes(updated_notes)
+            aqt.mw.col.update_notes(updated_notes)
 
         if latest_update:
             config.save_latest_extension_update(deck_extension.id, latest_update)
@@ -164,12 +164,12 @@ class AnkiHubSync:
         deck_config = config.deck_config(ankihub_did)
 
         if exc.response.status_code == 403:
-            url_view_deck = f"{settings.URL_VIEW_DECK}{ankihub_did}"
-            mw.taskman.run_on_main(
+            url = f"{settings.url_view_deck()}{ankihub_did}"
+            aqt.mw.taskman.run_on_main(
                 lambda: showInfo(  # type: ignore
                     f"Please subscribe to the deck <br><b>{deck_config.name}</b><br>on the AnkiHub website to "
                     "be able to sync.<br><br>"
-                    f'Link to the deck: <a href="{url_view_deck}">{url_view_deck}</a><br><br>'
+                    f'Link to the deck: <a href="{url}">{url}</a><br><br>'
                     f"Note that you also need an active AnkiHub subscription.",
                 )
             )
@@ -178,7 +178,7 @@ class AnkiHubSync:
             )
             return True
         elif exc.response.status_code == 404:
-            mw.taskman.run_on_main(
+            aqt.mw.taskman.run_on_main(
                 lambda: showInfo(  # type: ignore
                     f"The deck <b>{deck_config.name}</b> does not exist on the AnkiHub website. "
                     f"Remove it from the subscribed decks to be able to sync.<br><br>"
@@ -226,19 +226,19 @@ def sync_with_progress(
         else:
             tooltip(
                 f"AnkiHub: Synced {total} note{'' if total == 1 else 's'}.",
-                parent=mw,
+                parent=aqt.mw,
             )
-        mw.reset()
+        aqt.mw.reset()
 
         if on_done is not None:
             on_done(True)
 
     if config.token():
-        mw.taskman.with_progress(
+        aqt.mw.taskman.with_progress(
             sync_with_ankihub_after_delay,
             label="Synchronizing with AnkiHub",
             on_done=on_syncing_done,
-            parent=mw if parent is None else parent,
+            parent=aqt.mw if parent is None else parent,
             immediate=True,
         )
     else:
@@ -248,7 +248,7 @@ def sync_with_progress(
 
 
 def _update_deck_download_progress_cb(notes_count: int, ankihub_did: uuid.UUID):
-    mw.taskman.run_on_main(
+    aqt.mw.taskman.run_on_main(
         lambda: _update_deck_download_progress_cb_inner(
             notes_count=notes_count, ankihub_did=ankihub_did
         )
@@ -257,7 +257,7 @@ def _update_deck_download_progress_cb(notes_count: int, ankihub_did: uuid.UUID):
 
 def _update_deck_download_progress_cb_inner(notes_count: int, ankihub_did: uuid.UUID):
     try:
-        mw.progress.update(
+        aqt.mw.progress.update(
             "Downloading updates\n"
             f"for {config.deck_config(ankihub_did).name}\n"
             f"Notes downloaded: {notes_count}"
@@ -269,7 +269,7 @@ def _update_deck_download_progress_cb_inner(notes_count: int, ankihub_did: uuid.
         # It seems that this happens when the progress dialog window is closed.
         # It could be that this happens when AnkiHub syncs during an add-on update
         # (which also uses the progress dialog).
-        # mw.progress.finish (which will be called when the sync is finished)
+        # aqt.mw.progress.finish (which will be called when the sync is finished)
         # does not cause this error, because it checks if the window is open before
         # calling its methods (at least in Anki 2.1.54).
         # It should be safe to ignore this error and let the sync continue.
@@ -282,7 +282,7 @@ def _update_deck_download_progress_cb_inner(notes_count: int, ankihub_did: uuid.
 def _update_extension_download_progress_cb(
     note_customizations_count: int, deck_extension_id: int
 ):
-    mw.taskman.run_on_main(
+    aqt.mw.taskman.run_on_main(
         lambda: _update_extension_download_progress_cb_inner(
             note_customizations_count, deck_extension_id
         )
@@ -293,7 +293,7 @@ def _update_extension_download_progress_cb_inner(
     note_customizations_count: int, deck_extension_id: int
 ):
     try:
-        mw.progress.update(
+        aqt.mw.progress.update(
             "Downloading extension updates\n"
             f"for {config.deck_extension_config(deck_extension_id).name}\n"
             f"Note customizations downloaded: {note_customizations_count}"
