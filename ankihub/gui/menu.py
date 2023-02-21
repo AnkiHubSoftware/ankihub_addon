@@ -243,7 +243,7 @@ def create_collaborative_deck_action() -> None:
             creator=True,
             latest_udpate=creation_time,
         )
-        deck_url = f"{url_view_deck}{ankihub_did}"
+        deck_url = f"{url_view_deck()}{ankihub_did}"
         showInfo(
             "🎉 Deck upload successful!<br><br>"
             "Link to the deck on AnkiHub:<br>"
