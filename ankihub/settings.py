@@ -20,7 +20,7 @@ from anki.buildinfo import version as ANKI_VERSION
 from anki.decks import DeckId
 from aqt.utils import askUser, showInfo
 
-from . import LOGGER, ankihub_client
+from . import LOGGER
 from .ankihub_client import ANKIHUB_DATETIME_FORMAT_STR, DeckExtension
 from .lib.mashumaro import field_options
 from .lib.mashumaro.mixins.json import DataClassJSONMixin
@@ -98,14 +98,25 @@ class PrivateConfig(DataClassJSONMixin):
 class Config:
     def __init__(self):
         # self.public_config is editable by the user using a built-in Anki feature.
-        migrate_public_config()
-        self.public_config: Dict[str, Any] = aqt.mw.addonManager.getConfig(
-            ADDON_PATH.name
-        )
+        self.public_config: Optional[Dict[str, Any]] = None
         self._private_config: Optional[PrivateConfig] = None
         self._private_config_path: Optional[Path] = None
         self.token_change_hook: Optional[Callable[[], None]] = None
         self.subscriptions_change_hook: Optional[Callable[[], None]] = None
+        self.ankihub_app_url: Optional[str] = None
+
+    def setup_public_config_and_ankihub_app_url(self):
+        migrate_public_config()
+        self.public_config = aqt.mw.addonManager.getConfig(ADDON_PATH.name)
+
+        self.ankihub_app_url = os.getenv("ANKIHUB_APP_URL")
+        if self.ankihub_app_url is None:
+            self.ankihub_app_url = self.public_config.get("ankihub_url")
+            self.ankihub_app_url = (
+                self.ankihub_app_url
+                if self.ankihub_app_url
+                else "https://app.ankihub.net"
+            )
 
     def setup_private_config(self):
         # requires the profile setup to be completed unlike self.setup_pbulic_config
@@ -420,22 +431,18 @@ except (FileNotFoundError, KeyError):
     ANKIWEB_ID = 1322529746
 
 
-ANKIHUB_APP_URL = os.getenv("ANKIHUB_APP_URL")
-if ANKIHUB_APP_URL is None:
-    ANKIHUB_APP_URL = config.public_config.get("ankihub_url")
-    ANKIHUB_APP_URL = ANKIHUB_APP_URL if ANKIHUB_APP_URL else "https://app.ankihub.net"
-API_URL_BASE = f"{ANKIHUB_APP_URL}/api"
-LOGGER.info(f"Starting with URL_BASE {API_URL_BASE}")
+api_url_base = lambda: f"{config.ankihub_app_url}/api"  # noqa: E731
 
-# maybe override default API_URL_BASE of client
-ankihub_client.API_URL_BASE = API_URL_BASE
+url_view_note = lambda: f"{api_url_base()}/decks/notes/"  # noqa: E731
+url_view_note_history = (
+    lambda: f"{api_url_base()}/decks/{{ankihub_did}}/suggestions/?search=note:{{ankihub_nid}} state:closed"
+)  # noqa: E731
+url_view_deck = lambda: f"{api_url_base()}/decks/"  # noqa: E731
+url_help = lambda: f"{api_url_base()}/help"  # noqa: E731
+url_decks = lambda: f"{api_url_base()}/explore"  # noqa: E731
+url_deck_base = lambda: f"{api_url_base()}/decks"  # noqa: E731
 
-URL_VIEW_NOTE = f"{ANKIHUB_APP_URL}/decks/notes/"
-URL_VIEW_NOTE_HISTORY = f"{ANKIHUB_APP_URL}/decks/{{ankihub_did}}/suggestions/?search=note:{{ankihub_nid}} state:closed"
-URL_VIEW_DECK = f"{ANKIHUB_APP_URL}/decks/"
-URL_HELP = f"{ANKIHUB_APP_URL}/help"
-URL_DECKS = f"{ANKIHUB_APP_URL}/explore"
-URL_DECK_BASE = f"{ANKIHUB_APP_URL}/decks"
+
 ANKIHUB_NOTE_TYPE_FIELD_NAME = "ankihub_id"
 ANKIHUB_NOTE_TYPE_MODIFICATION_STRING = "ANKIHUB MODFICATIONS"
 ANKIHUB_TEMPLATE_END_COMMENT = (

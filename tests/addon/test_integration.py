@@ -207,7 +207,7 @@ def test_editor(
 ):
     from ankihub.db import ankihub_db
     from ankihub.gui.editor import _on_suggestion_button_press, _refresh_buttons
-    from ankihub.settings import API_URL_BASE, AnkiHubCommands
+    from ankihub.settings import api_url_base, AnkiHubCommands
 
     with anki_session_with_addon_data.profile_loaded():
         mw = anki_session_with_addon_data.mw
@@ -227,7 +227,7 @@ def test_editor(
         monkeypatch.setattr("ankihub.exporting.uuid.uuid4", lambda: note_1_ah_nid)
 
         requests_mock.post(
-            f"{API_URL_BASE}/notes/{note_1_ah_nid}/suggestion/",
+            f"{api_url_base()}/notes/{note_1_ah_nid}/suggestion/",
             status_code=201,
             json={},
         )
@@ -243,7 +243,7 @@ def test_editor(
         note_2_ah_nid = ankihub_db.ankihub_nid_for_anki_nid(note.id)
 
         requests_mock.post(
-            f"{API_URL_BASE}/notes/{note_2_ah_nid}/suggestion/",
+            f"{api_url_base()}/notes/{note_2_ah_nid}/suggestion/",
             status_code=201,
             json={},
         )
@@ -262,7 +262,7 @@ def test_editor(
         # this should trigger a suggestion because the note has been changed
         _on_suggestion_button_press(editor)
 
-        # mocked requests: f"{API_URL_BASE}/notes/{noes_2_ah_nid}/suggestion/" and request to check feature flags
+        # mocked requests: f"{api_url_base()}/notes/{notes_2_ah_nid}/suggestion/" and request to check feature flags
         assert requests_mock.call_count == 2
 
 
@@ -385,7 +385,7 @@ def test_create_collaborative_deck_and_upload(
 def test_get_deck_by_id(
     requests_mock: Mocker, next_deterministic_uuid: Callable[[], uuid.UUID]
 ):
-    from ankihub.settings import API_URL_BASE
+    from ankihub.settings import api_url_base
 
     client = AnkiHubClient(hooks=[])
 
@@ -401,7 +401,9 @@ def test_get_deck_by_id(
         "csv_notes_filename": "test.csv",
     }
 
-    requests_mock.get(f"{API_URL_BASE}/decks/{ankihub_deck_uuid}/", json=expected_data)
+    requests_mock.get(
+        f"{api_url_base()}/decks/{ankihub_deck_uuid}/", json=expected_data
+    )
     deck_info = client.get_deck_by_id(ankihub_deck_uuid=ankihub_deck_uuid)  # type: ignore
     assert deck_info == Deck(
         ankihub_deck_uuid=ankihub_deck_uuid,
@@ -413,7 +415,7 @@ def test_get_deck_by_id(
     )
 
     # test get deck by id unauthenticated
-    requests_mock.get(f"{API_URL_BASE}/decks/{ankihub_deck_uuid}/", status_code=403)
+    requests_mock.get(f"{api_url_base()}/decks/{ankihub_deck_uuid}/", status_code=403)
 
     try:
         client.get_deck_by_id(ankihub_deck_uuid=ankihub_deck_uuid)  # type: ignore
@@ -433,7 +435,7 @@ def test_suggest_note_update(
         ANKI_INTERNAL_TAGS,
         TAG_FOR_OPTIONAL_TAGS,
     )
-    from ankihub.settings import API_URL_BASE
+    from ankihub.settings import api_url_base
     from ankihub.suggestions import suggest_note_update
 
     anki_session = anki_session_with_addon_data
@@ -448,7 +450,7 @@ def test_suggest_note_update(
 
         # test create change note suggestion
         adapter = requests_mock.post(
-            f"{API_URL_BASE}/notes/{ankihub_note_uuid}/suggestion/", status_code=201
+            f"{api_url_base()}/notes/{ankihub_note_uuid}/suggestion/", status_code=201
         )
 
         note.tags = [
@@ -473,7 +475,7 @@ def test_suggest_note_update(
 
         # test create change note suggestion unauthenticated
         requests_mock.post(
-            f"{API_URL_BASE}/notes/{ankihub_note_uuid}/suggestion/", status_code=403
+            f"{api_url_base()}/notes/{ankihub_note_uuid}/suggestion/", status_code=403
         )
 
         try:
@@ -498,7 +500,7 @@ def test_suggest_new_note(
         ANKI_INTERNAL_TAGS,
         TAG_FOR_OPTIONAL_TAGS,
     )
-    from ankihub.settings import API_URL_BASE
+    from ankihub.settings import api_url_base
     from ankihub.suggestions import suggest_new_note
 
     anki_session = anki_session_with_addon_data
@@ -509,7 +511,7 @@ def test_suggest_new_note(
         note = mw.col.new_note(mw.col.models.by_name("Basic (Testdeck / user1)"))
 
         adapter = requests_mock.post(
-            f"{API_URL_BASE}/decks/{ah_did}/note-suggestion/",
+            f"{api_url_base()}/decks/{ah_did}/note-suggestion/",
             status_code=201,
         )
 
@@ -534,11 +536,13 @@ def test_suggest_new_note(
         )
 
         # test create change note suggestion unauthenticated
+        url = f"{api_url_base()}/decks/{ah_did}/note-suggestion/"
         requests_mock.post(
-            f"{API_URL_BASE}/decks/{ah_did}/note-suggestion/",
+            url,
             status_code=403,
         )
 
+        exc = None
         try:
             suggest_new_note(
                 note=note,
@@ -2582,7 +2586,7 @@ class TestSuggestionsWithImages:
         import tempfile
 
         from ankihub.db import ankihub_db
-        from ankihub.settings import API_URL_BASE
+        from ankihub.settings import api_url_base
         from ankihub.suggestions import suggest_note_update
 
         anki_session = anki_session_with_addon_data
@@ -2619,7 +2623,7 @@ class TestSuggestionsWithImages:
 
                 # create a suggestion for the note
                 suggestion_request_mock = requests_mock.post(
-                    f"{API_URL_BASE}/notes/{ah_nid}/suggestion/", status_code=201
+                    f"{api_url_base()}/notes/{ah_nid}/suggestion/", status_code=201
                 )
 
                 suggest_note_update(
@@ -2646,7 +2650,7 @@ class TestSuggestionsWithImages:
     ):
         import tempfile
 
-        from ankihub.settings import API_URL_BASE
+        from ankihub.settings import api_url_base
         from ankihub.suggestions import suggest_new_note
 
         anki_session = anki_session_with_addon_data
@@ -2657,7 +2661,7 @@ class TestSuggestionsWithImages:
             note = mw.col.new_note(mw.col.models.by_name("Basic (Testdeck / user1)"))
 
             requests_mock.post(
-                f"{API_URL_BASE}/decks/{ah_did}/note-suggestion/",
+                f"{api_url_base()}/decks/{ah_did}/note-suggestion/",
                 status_code=201,
             )
 

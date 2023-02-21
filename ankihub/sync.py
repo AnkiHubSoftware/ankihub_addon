@@ -164,12 +164,12 @@ class AnkiHubSync:
         deck_config = config.deck_config(ankihub_did)
 
         if exc.response.status_code == 403:
-            url_view_deck = f"{settings.URL_VIEW_DECK}{ankihub_did}"
+            url = f"{settings.url_view_deck()}{ankihub_did}"
             aqt.mw.taskman.run_on_main(
                 lambda: showInfo(  # type: ignore
                     f"Please subscribe to the deck <br><b>{deck_config.name}</b><br>on the AnkiHub website to "
                     "be able to sync.<br><br>"
-                    f'Link to the deck: <a href="{url_view_deck}">{url_view_deck}</a><br><br>'
+                    f'Link to the deck: <a href="{url}">{url}</a><br><br>'
                     f"Note that you also need an active AnkiHub subscription.",
                 )
             )

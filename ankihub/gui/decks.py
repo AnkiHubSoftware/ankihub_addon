@@ -33,7 +33,7 @@ from ..addon_ankihub_client import AnkiHubRequestError
 from ..ankihub_client import NoteInfo
 from ..db import ankihub_db
 from ..importing import AnkiHubImportResult
-from ..settings import URL_DECK_BASE, URL_DECKS, URL_HELP, URL_VIEW_DECK, config
+from ..settings import url_deck_base, url_decks, url_help, url_view_deck, config
 from ..subdecks import SUBDECK_TAG, build_subdecks_and_move_cards_to_them, flatten_deck
 from ..sync import AnkiHubImporter
 from ..utils import create_backup, undo_note_type_modfications
@@ -185,7 +185,7 @@ class SubscribedDecksDialog(QDialog):
 
         for item in items:
             ankihub_id: UUID = item.data(Qt.ItemDataRole.UserRole)
-            openLink(f"{URL_DECK_BASE}/{ankihub_id}")
+            openLink(f"{url_deck_base()}/{ankihub_id}")
 
     def _on_set_home_deck(self):
         deck_names = self.decks_list.selectedItems()
@@ -401,7 +401,7 @@ class SubscribeDialog(QDialog):
                 f"You've already subscribed to deck {ah_did}. "
                 "Syncing with AnkiHub will happen automatically everytime you "
                 "restart Anki. You can manually sync with AnkiHub from the AnkiHub "
-                f"menu. See {URL_HELP} for more details."
+                f"menu. See {url_help()} for more details."
             )
             self.close()
             return self.ah_did
@@ -409,7 +409,7 @@ class SubscribeDialog(QDialog):
         confirmed = ask_user(
             f"Would you like to proceed with downloading and installing the deck? "
             f"Your personal collection will be modified.<br><br>"
-            f"See <a href='{URL_HELP}'>{URL_HELP}</a> for details.",
+            f"See <a href='{url_help()}'>{url_help()}</a> for details.",
             title="Please confirm to proceed.",
         )
         if not confirmed:
@@ -422,7 +422,7 @@ class SubscribeDialog(QDialog):
         download_and_install_deck(ah_did, on_success=on_success, on_failure=self.reject)
 
     def _on_browse_deck(self) -> None:
-        openLink(URL_DECKS)
+        openLink(url_decks())
 
 
 def download_and_install_deck(
@@ -456,10 +456,10 @@ def download_and_install_deck(
             )
             return
         elif e.response.status_code == 403:
-            url_view_deck = f"{URL_VIEW_DECK}{ankihub_did}"
+            url = f"{url_view_deck()}{ankihub_did}"
             showInfo(
                 f"Please first subscribe to the deck on the AnkiHub website.<br><br>"
-                f'Link to the deck: <a href="{url_view_deck}">{url_view_deck}</a>',
+                f'Link to the deck: <a href="{url}">{url}</a>',
             )
             return
         else:

@@ -28,7 +28,7 @@ from ..ankihub_client import AnkiHubRequestError
 from ..error_reporting import upload_logs_in_background
 from ..media_import.ui import open_import_dialog
 from ..register_decks import create_collaborative_deck
-from ..settings import ADDON_VERSION, URL_VIEW_DECK, config
+from ..settings import ADDON_VERSION, url_view_deck, config
 from ..subdecks import SUBDECK_TAG
 from ..sync import sync_with_progress
 from .decks import SubscribedDecksDialog
@@ -243,7 +243,7 @@ def create_collaborative_deck_action() -> None:
             creator=True,
             latest_udpate=creation_time,
         )
-        deck_url = f"{URL_VIEW_DECK}{ankihub_did}"
+        deck_url = f"{url_view_deck}{ankihub_did}"
         showInfo(
             "🎉 Deck upload successful!<br><br>"
             "Link to the deck on AnkiHub:<br>"

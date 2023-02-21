@@ -16,8 +16,8 @@ from ..error_reporting import report_exception_and_upload_logs
 from ..settings import (
     ANKI_MINOR,
     ICONS_PATH,
-    URL_VIEW_NOTE,
-    URL_VIEW_NOTE_HISTORY,
+    url_view_note,
+    url_view_note_history,
     AnkiHubCommands,
     config,
 )
@@ -206,7 +206,7 @@ def _on_view_note_button_press(editor: Editor) -> None:
         tooltip("This note has no AnkiHub id.")
         return
 
-    url = f"{URL_VIEW_NOTE}{ankihub_nid}"
+    url = f"{url_view_note()}{ankihub_nid}"
     openLink(url)
 
 
@@ -220,7 +220,9 @@ def _on_view_note_history_button_press(editor: Editor) -> None:
         return
 
     ankihub_did = ankihub_db.ankihub_did_for_anki_nid(note.id)
-    url = URL_VIEW_NOTE_HISTORY.format(ankihub_did=ankihub_did, ankihub_nid=ankihub_nid)
+    url = url_view_note_history().format(
+        ankihub_did=ankihub_did, ankihub_nid=ankihub_nid
+    )
     openLink(url)
 
 

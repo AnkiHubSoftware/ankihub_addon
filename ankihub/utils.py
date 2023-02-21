@@ -16,7 +16,7 @@ from .settings import (
     ANKIHUB_NOTE_TYPE_FIELD_NAME,
     ANKIHUB_NOTE_TYPE_MODIFICATION_STRING,
     ANKIHUB_TEMPLATE_END_COMMENT,
-    URL_VIEW_NOTE,
+    url_view_note,
 )
 
 
@@ -242,7 +242,7 @@ def add_ankihub_snippet_to_template(template: Dict) -> None:
         "<br><br>"
         f"\n{{{{#{ANKIHUB_NOTE_TYPE_FIELD_NAME}}}}}\n"
         "<a class='ankihub' "
-        f"href='{URL_VIEW_NOTE}{{{{{ANKIHUB_NOTE_TYPE_FIELD_NAME}}}}}'>"
+        f"href='{url_view_note()}{{{{{ANKIHUB_NOTE_TYPE_FIELD_NAME}}}}}'>"
         "\nView Note on AnkiHub\n"
         "</a>"
         f"\n{{{{/{ANKIHUB_NOTE_TYPE_FIELD_NAME}}}}}\n"

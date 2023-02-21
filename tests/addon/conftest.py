@@ -45,8 +45,9 @@ def anki_session_with_addon_data(
 
     # code in settings.py depends on the public config being initialized
     from ankihub.entry_point import profile_setup
-    from ankihub.settings import setup_logger
+    from ankihub.settings import config, setup_logger
 
+    config.setup_public_config_and_ankihub_app_url()
     setup_logger()
 
     with monkeypatch.context() as m:
