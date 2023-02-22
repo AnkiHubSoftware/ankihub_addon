@@ -326,8 +326,9 @@ def create_backup() -> None:
     # has to be called from a background thread
     LOGGER.info("Starting backup...")
     try:
+        created: Optional[bool] = None
         if ANKI_MINOR >= 50:
-            aqt.mw.col.create_backup(
+            created = aqt.mw.col.create_backup(
                 backup_folder=aqt.mw.pm.backupFolder(),
                 force=True,
                 wait_for_completion=True,
@@ -336,7 +337,9 @@ def create_backup() -> None:
             aqt.mw.col.close(downgrade=False)
             aqt.mw.backup()  # type: ignore
             aqt.mw.col.reopen(after_full_sync=False)
-        LOGGER.info("Backup successful.")
+            # here we don't know if the backup was created
+        # if there were no changes, no backup is created
+        LOGGER.info(f"Backup successful. {created=}")
     except Exception as exc:
         LOGGER.info("Backup failed")
         raise exc
