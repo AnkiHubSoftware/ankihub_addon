@@ -2101,9 +2101,9 @@ def test_migrate_profile_data_from_old_location(
 ):
     anki_session = anki_session_with_addon_before_profile_support
 
-    # mock the sync function so that the add-on doesn't try to sync with AnkiHub
+    # mock the ah_sync object so that the add-on doesn't try to sync with AnkiHub
     monkeypatch.setattr(
-        "ankihub.entry_point.sync_with_progress", lambda *args, **kwargs: None
+        "ankihub.sync.ah_sync.sync_all_decks", lambda *args, **kwargs: None
     )
 
     # run the entrypoint and load the profile to trigger the migration
@@ -2409,10 +2409,14 @@ def test_reset_optional_tags_action(
             "ankihub.gui.browser.ask_user", lambda *args, **kwargs: True
         )
 
-        # mock the sync_with_progress function to do nothing
-        sync_with_progress_mock = Mock()
+        # mock methods of ah_sync
+        is_logged_in_mock = Mock()
         monkeypatch.setattr(
-            "ankihub.gui.browser.sync_with_progress", sync_with_progress_mock
+            "ankihub.gui.browser.ah_sync.is_logged_in", is_logged_in_mock
+        )
+        sync_all_decks_mock = Mock()
+        monkeypatch.setattr(
+            "ankihub.gui.browser.ah_sync.sync_all_decks", sync_all_decks_mock
         )
 
         # run the reset action
@@ -2430,7 +2434,8 @@ def test_reset_optional_tags_action(
         note = mw.col.get_note(nid)
         assert note.tags == []
 
-        assert sync_with_progress_mock.call_count == 1
+        assert is_logged_in_mock.call_count == 1
+        assert sync_all_decks_mock.call_count == 1
 
         # the other note should not be affected, because it is in a different deck
         assert mw.col.get_note(other_note.id).tags == [
