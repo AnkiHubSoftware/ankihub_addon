@@ -4,9 +4,9 @@ from concurrent.futures import Future
 from pprint import pformat
 from typing import List, Optional, Sequence, Tuple
 
+import aqt
 from anki.collection import SearchNode
 from anki.notes import NoteId
-import aqt
 from aqt.browser import (
     Browser,
     CellRow,
@@ -58,7 +58,7 @@ from ..suggestions import (
     BulkNoteSuggestionsResult,
     suggest_notes_in_bulk,
 )
-from ..sync import sync_with_progress
+from ..sync import ah_sync
 from .custom_columns import (
     AnkiHubIdColumn,
     CustomColumn,
@@ -436,6 +436,13 @@ def _on_reset_optional_tags_action(browser: Browser):
         )
         return
 
+    if not ah_sync.is_logged_in():
+        showInfo(
+            "You need to be logged in to AnkiHub to reset optional tag groups.",
+            parent=browser,
+        )
+        return
+
     extension_configs = [config.deck_extension_config(eid) for eid in extension_ids]
     tag_group_names = [c.tag_group_name for c in extension_configs]
     deck_configs = [config.deck_config(c.ankihub_deck_uuid) for c in extension_configs]
@@ -452,7 +459,6 @@ def _on_reset_optional_tags_action(browser: Browser):
         return
 
     extension_id = extension_ids[extension_idx]
-    extension_config = extension_configs[extension_idx]
     tag_group_name_with_deck = tag_group_names_with_deck[extension_idx]
 
     if not ask_user(
@@ -464,43 +470,32 @@ def _on_reset_optional_tags_action(browser: Browser):
     ):
         return
 
-    def on_remove_tags_for_tag_group_done(future: Future) -> None:
+    def on_done(future: Future) -> None:
         future.result()
-        LOGGER.info(f"Removed optional tags for {tag_group_name_with_deck}")
 
-        # reset the latest extension update to sync all content for the deck extension on the next sync
-        config.save_latest_extension_update(
-            extension_id=extension_id, latest_update=None
-        )
-
-        # sync with ankihub
-        # TODO only sync the deck extension or the deck instead of all decks
-        # not doing this now because it would require code for creating a backup before syncing
-        # and for showing a progress dialog and probably other things too
-        sync_with_progress(
-            on_done=on_sync_done,
+        tooltip(
+            f"Reset optional tag group {tag_group_name_with_deck} successfully.",
             parent=browser,
         )
 
-    def on_sync_done(success: bool):
-        if success:
-            tooltip(
-                f"Reset optional tag group {tag_group_name_with_deck} successfully.",
-                parent=browser,
-            )
-        else:
-            tooltip(
-                "Syncing with AnkiHub failed.",
-                parent=browser,
-            )
-
     aqt.mw.taskman.with_progress(
-        task=lambda: _remove_optional_tags_of_extension(
-            extension_config=extension_config
-        ),
-        on_done=on_remove_tags_for_tag_group_done,
+        task=lambda: _reset_optional_tag_group(extension_id=extension_id),
+        on_done=on_done,
         label=f"Removing optional tags for {tag_group_name_with_deck}...",
     )
+
+
+def _reset_optional_tag_group(extension_id: int) -> None:
+
+    extension_config = config.deck_extension_config(extension_id)
+    _remove_optional_tags_of_extension(extension_config)
+
+    # reset the latest extension update to sync all content for the deck extension on the next sync
+    config.save_latest_extension_update(extension_id=extension_id, latest_update=None)
+
+    # sync with ankihub to re-download the deck extension
+    # TODO only sync the deck extension or the related deck instead of all decks
+    ah_sync.sync_all_decks()
 
 
 def _remove_optional_tags_of_extension(extension_config: DeckExtensionConfig) -> None:
@@ -513,6 +508,7 @@ def _remove_optional_tags_of_extension(extension_config: DeckExtensionConfig) ->
     ]
     nids = ankihub_db.anki_nids_for_ankihub_deck(extension_config.ankihub_deck_uuid)
     aqt.mw.col.tags.bulk_remove(note_ids=nids, tags=" ".join(tags_for_tag_group))
+    LOGGER.info(f"Removed optional tags for {extension_config.tag_group_name}")
 
 
 def _choose_deck(prompt: str) -> Tuple[Optional[uuid.UUID], Optional[DeckConfig]]:

@@ -1,11 +1,12 @@
 import re
+import threading
 import time
 from pprint import pformat
 from typing import Any, Dict, Iterable, List, Optional, Sequence, Set, Tuple
 
 import aqt
 from anki.decks import DeckId
-from anki.errors import DBError, NotFoundError
+from anki.errors import NotFoundError
 from anki.models import ChangeNotetypeRequest, NoteType, NotetypeDict, NotetypeId
 from anki.notes import Note, NoteId
 from anki.utils import checksum, ids2str
@@ -328,7 +329,11 @@ def create_backup() -> None:
     try:
         created: Optional[bool] = None
         if ANKI_MINOR >= 50:
-            created = _create_backup()
+            created = aqt.mw.col.create_backup(
+                backup_folder=aqt.mw.pm.backupFolder(),
+                force=True,
+                wait_for_completion=True,
+            )
         else:
             aqt.mw.col.close(downgrade=False)
             aqt.mw.backup()  # type: ignore
@@ -341,27 +346,24 @@ def create_backup() -> None:
         raise exc
 
 
-def _create_backup() -> bool:
-    # adapted from anki.collection.create_backup
-    aqt.mw.col.save(trx=False)
-    created = aqt.mw.col._backend.create_backup(
-        backup_folder=aqt.mw.pm.backupFolder(),
-        force=True,
-        wait_for_completion=True,
-    )
-    try:
-        aqt.mw.col.db.begin()
-    except DBError as e:
-        if "cannot start a transaction within a transaction" in str(e).lower():
-            LOGGER.exception(
-                "Tried to start a transaction within a transaction after creating a backup."
-            )
-        else:
-            raise e
-
-    return created
-
-
 def truncated_list(values: List[Any], limit: int) -> List[Any]:
     assert limit > 0
     return values[:limit] + ["..."] if len(values) > limit else values
+
+
+class OneTimeLock:
+    def __init__(self):
+        self._semaphore = threading.Semaphore(value=1)
+        self._value = False
+
+    def aquire(self) -> bool:
+        """Returns true the first time it is called, false otherwise.
+        Does not block in either case."""
+        result = False
+        if self._semaphore.acquire(blocking=False):
+            if not self._value:
+                self._value = True
+                result = True
+            self._semaphore.release()
+
+        return result

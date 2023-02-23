@@ -28,9 +28,9 @@ from ..ankihub_client import AnkiHubRequestError
 from ..error_reporting import upload_logs_in_background
 from ..media_import.ui import open_import_dialog
 from ..register_decks import create_collaborative_deck
-from ..settings import ADDON_VERSION, url_view_deck, config
+from ..settings import ADDON_VERSION, config, url_view_deck
 from ..subdecks import SUBDECK_TAG
-from ..sync import sync_with_progress
+from ..sync import ah_sync, show_tooltip_about_last_sync_results
 from .decks import SubscribedDecksDialog
 from .utils import ask_user
 
@@ -280,7 +280,18 @@ def upload_suggestions_action():
 
 
 def sync_with_ankihub_action():
-    sync_with_progress()
+    aqt.mw.taskman.with_progress(
+        task=lambda: ah_sync.sync_all_decks(),
+        immediate=True,
+        label="Syncing with AnkiHub",
+        on_done=on_sync_done,
+    )
+
+
+def on_sync_done(future: Future) -> None:
+    future.result()
+
+    show_tooltip_about_last_sync_results()
 
 
 def sign_out_action():
