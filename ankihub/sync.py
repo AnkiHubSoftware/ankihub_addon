@@ -2,26 +2,27 @@ import uuid
 from concurrent.futures import Future
 from datetime import datetime
 from time import sleep
-from typing import Callable, Optional
+from typing import Callable, List, Optional
 
-from anki.errors import NotFoundError
 import aqt
+from anki.errors import NotFoundError
 from aqt.utils import showInfo, tooltip
 
 from . import LOGGER, settings
 from .addon_ankihub_client import AddonAnkiHubClient as AnkiHubClient
 from .ankihub_client import AnkiHubRequestError, DeckExtension
 from .db import ankihub_db
-from .importing import AnkiHubImporter
+from .importing import AnkiHubImporter, AnkiHubImportResult
 from .settings import ANKI_MINOR, config
 from .utils import create_backup
 
 
 class AnkiHubSync:
     def __init__(self):
-        self.importer = AnkiHubImporter()
+        self._importer = AnkiHubImporter()
+        self._import_results: List[AnkiHubImportResult] = []
 
-    def sync_all_decks(self) -> None:
+    def sync_all_decks(self) -> List[AnkiHubImportResult]:
         LOGGER.info("Syncing all decks...")
 
         create_backup()
@@ -30,12 +31,14 @@ class AnkiHubSync:
             try:
                 should_continue = self._sync_deck(ah_did)
                 if not should_continue:
-                    return
+                    return self._import_results
             except AnkiHubRequestError as e:
                 if self._handle_exception(e, ah_did):
-                    return
+                    return self._import_results
                 else:
                     raise e
+
+        return self._import_results
 
     def _sync_deck(self, ankihub_did: uuid.UUID) -> bool:
         """Syncs a single deck with AnkiHub.
@@ -77,7 +80,7 @@ class AnkiHubSync:
             )
 
         if notes_data:
-            self.importer.import_ankihub_deck(
+            import_result = self._importer.import_ankihub_deck(
                 ankihub_did=ankihub_did,
                 notes_data=notes_data,
                 deck_name=deck_config.name,
@@ -86,6 +89,8 @@ class AnkiHubSync:
                 protected_tags=chunk.protected_tags,
                 subdecks=deck_config.subdecks_enabled,
             )
+            self._import_results.append(import_result)
+
             config.save_latest_deck_update(ankihub_did, latest_update)
         else:
             LOGGER.info(f"No new updates to sync for {ankihub_did=}")
@@ -190,6 +195,9 @@ class AnkiHubSync:
         return False
 
 
+sync = AnkiHubSync()
+
+
 def sync_with_progress(
     on_done: Optional[Callable[[bool], None]] = None, parent=None
 ) -> None:
@@ -198,9 +206,8 @@ def sync_with_progress(
     # If there is an error during the sync it will be raised and on_done will not be called.
 
     LOGGER.info("Starting sync.")
-    sync = AnkiHubSync()
 
-    def sync_with_ankihub_after_delay():
+    def sync_with_ankihub_after_delay() -> List[AnkiHubImportResult]:
 
         # sync_with_ankihub creates a backup before syncing and creating a backup requires to close
         # the collection in Anki versions lower than 2.1.50.
@@ -212,15 +219,21 @@ def sync_with_progress(
         if ANKI_MINOR < 50:
             sleep(3)
 
-        sync.sync_all_decks()
+        result = sync.sync_all_decks()
         LOGGER.info("Sync finished.")
+        return result
 
     def on_syncing_done(future: Future):
-        if exc := future.exception():
+        try:
+            import_results: List[AnkiHubImportResult] = future.result()
+        except Exception as exc:
             LOGGER.info("Unable to sync.")
             raise exc
 
-        total = len(sync.importer.created_nids) + len(sync.importer.updated_nids)
+        created_nids_amount = sum([len(r.created_nids) for r in import_results])
+        updated_nids_amount = sum([len(r.updated_nids) for r in import_results])
+        total = created_nids_amount + updated_nids_amount
+
         if total == 0:
             tooltip("AnkiHub: No new updates")
         else:
