@@ -8,6 +8,10 @@ from aqt.gui_hooks import profile_did_open
 
 from . import LOGGER, ankihub_client
 from .addons import setup_addons
+from .auto_sync_setup import (
+    maybe_sync_with_ankihub_on_startup,
+    setup_ankihub_sync_on_ankiweb_sync,
+)
 from .db import ankihub_db
 from .errors import setup_error_handler
 from .gui import browser, editor
@@ -21,10 +25,6 @@ from .settings import (
     config,
     setup_logger,
     setup_profile_data_folder,
-)
-from .sync_setup import (
-    maybe_sync_with_ankihub_on_startup,
-    setup_ankihub_sync_on_ankiweb_sync,
 )
 from .utils import OneTimeLock, modify_note_type_templates
 
