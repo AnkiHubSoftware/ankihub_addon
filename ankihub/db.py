@@ -197,13 +197,12 @@ class AnkiHubDB:
     def reset_mod_values_in_anki_db(self, anki_nids: List[NoteId]) -> None:
         # resets the mod values of the notes in the Anki DB to the
         # mod values stored in the AnkiHub DB
-        with self.connection() as conn:
-            nid_mod_tuples = conn.execute(
-                f"""
-                SELECT anki_note_id, mod from notes
-                WHERE anki_note_id IN {ids2str(anki_nids)}
-                """
-            )
+        nid_mod_tuples = self.execute(
+            f"""
+            SELECT anki_note_id, mod from notes
+            WHERE anki_note_id IN {ids2str(anki_nids)}
+            """
+        )
 
         for nid, mod in nid_mod_tuples:
             aqt.mw.col.db.execute(
@@ -277,11 +276,10 @@ class AnkiHubDB:
         return result
 
     def ankihub_dids(self) -> List[uuid.UUID]:
-        with self.connection() as conn:
-            result = [
-                uuid.UUID(did)
-                for did in conn.list("SELECT DISTINCT ankihub_deck_id FROM notes")
-            ]
+        result = [
+            uuid.UUID(did)
+            for did in self.list("SELECT DISTINCT ankihub_deck_id FROM notes")
+        ]
         return result
 
     def ankihub_did_for_note_type(
