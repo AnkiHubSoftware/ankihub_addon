@@ -742,14 +742,15 @@ class TestAnkiHubImporter:
             ankihub_deck_uuid = next_deterministic_uuid()
             dids_before_import = all_dids()
             ankihub_importer = AnkiHubImporter()
-            anki_did = ankihub_importer._import_ankihub_deck_inner(
+            import_result = ankihub_importer._import_ankihub_deck_inner(
                 ankihub_did=ankihub_deck_uuid,
                 notes_data=ankihub_sample_deck_notes_data(),
                 deck_name="test",
                 remote_note_types={},
                 protected_fields={},
                 protected_tags=[],
-            ).anki_did
+            )
+            anki_did = import_result.anki_did
             new_dids = all_dids() - dids_before_import
 
             assert (
@@ -757,8 +758,8 @@ class TestAnkiHubImporter:
             )  # we have no mechanism for importing subdecks from a csv yet, so ti will be just onen deck
             assert anki_did == list(new_dids)[0]
 
-            assert len(ankihub_importer.created_nids) == 3
-            assert len(ankihub_importer.updated_nids) == 0
+            assert len(import_result.created_nids) == 3
+            assert len(import_result.updated_nids) == 0
 
             assert_that_only_ankihub_sample_deck_info_in_database(
                 ankihub_deck_uuid=ankihub_deck_uuid
@@ -783,22 +784,23 @@ class TestAnkiHubImporter:
             ankihub_deck_uuid = next_deterministic_uuid()
             dids_before_import = all_dids()
             ankihub_importer = AnkiHubImporter()
-            anki_did = ankihub_importer._import_ankihub_deck_inner(
+            import_result = ankihub_importer._import_ankihub_deck_inner(
                 ankihub_did=ankihub_deck_uuid,
                 notes_data=ankihub_sample_deck_notes_data(),
                 deck_name="test",
                 remote_note_types={},
                 protected_fields={},
                 protected_tags=[],
-            ).anki_did
+            )
+            anki_did = import_result.anki_did
             new_dids = all_dids() - dids_before_import
 
             assert not new_dids
             assert anki_did == existing_did
 
             # no notes should be changed because they already exist
-            assert len(ankihub_importer.created_nids) == 0
-            assert len(ankihub_importer.updated_nids) == 0
+            assert len(import_result.created_nids) == 0
+            assert len(import_result.updated_nids) == 0
 
             assert_that_only_ankihub_sample_deck_info_in_database(
                 ankihub_deck_uuid=ankihub_deck_uuid
@@ -828,14 +830,15 @@ class TestAnkiHubImporter:
             ankihub_deck_uuid = next_deterministic_uuid()
             dids_before_import = all_dids()
             ankihub_importer = AnkiHubImporter()
-            anki_did = ankihub_importer._import_ankihub_deck_inner(
+            import_result = ankihub_importer._import_ankihub_deck_inner(
                 ankihub_did=ankihub_deck_uuid,
                 notes_data=ankihub_sample_deck_notes_data(),
                 deck_name="test",
                 remote_note_types={},
                 protected_fields={},
                 protected_tags=[],
-            ).anki_did
+            )
+            anki_did = import_result.anki_did
             new_dids = all_dids() - dids_before_import
 
             # when the existing cards are in multiple seperate decks a new deck is created
@@ -843,8 +846,8 @@ class TestAnkiHubImporter:
             assert anki_did == list(new_dids)[0]
 
             # no notes should be changed because they already exist
-            assert len(ankihub_importer.created_nids) == 0
-            assert len(ankihub_importer.updated_nids) == 0
+            assert len(import_result.created_nids) == 0
+            assert len(import_result.updated_nids) == 0
 
             assert_that_only_ankihub_sample_deck_info_in_database(
                 ankihub_deck_uuid=ankihub_deck_uuid
@@ -881,21 +884,22 @@ class TestAnkiHubImporter:
             ankihub_deck_uuid = next_deterministic_uuid()
             dids_before_import = all_dids()
             ankihub_importer = AnkiHubImporter()
-            anki_did = ankihub_importer._import_ankihub_deck_inner(
+            import_result = ankihub_importer._import_ankihub_deck_inner(
                 ankihub_did=ankihub_deck_uuid,
                 notes_data=ankihub_sample_deck_notes_data(),
                 deck_name="test",
                 remote_note_types={},
                 protected_fields={},
                 protected_tags=[],
-            ).anki_did
+            )
+            anki_did = import_result.anki_did
             new_dids = all_dids() - dids_before_import
 
             assert not new_dids
             assert anki_did == existing_did
 
-            assert len(ankihub_importer.created_nids) == 1
-            assert len(ankihub_importer.updated_nids) == 2
+            assert len(import_result.created_nids) == 1
+            assert len(import_result.updated_nids) == 2
 
             assert_that_only_ankihub_sample_deck_info_in_database(
                 ankihub_deck_uuid=ankihub_deck_uuid
@@ -916,7 +920,7 @@ class TestAnkiHubImporter:
             ankihub_deck_uuid = next_deterministic_uuid()
             dids_before_import = all_dids()
             ankihub_importer = AnkiHubImporter()
-            second_anki_did = ankihub_importer._import_ankihub_deck_inner(
+            import_result = ankihub_importer._import_ankihub_deck_inner(
                 ankihub_did=ankihub_deck_uuid,
                 notes_data=ankihub_sample_deck_notes_data(),
                 deck_name="test",
@@ -924,15 +928,16 @@ class TestAnkiHubImporter:
                 protected_fields={},
                 protected_tags=[],
                 local_did=first_local_did,
-            ).anki_did
+            )
+            second_anki_did = import_result.anki_did
             new_dids = all_dids() - dids_before_import
 
             assert len(new_dids) == 0
             assert first_local_did == second_anki_did
 
             # no notes should be changed because they already exist
-            assert len(ankihub_importer.created_nids) == 0
-            assert len(ankihub_importer.updated_nids) == 0
+            assert len(import_result.created_nids) == 0
+            assert len(import_result.updated_nids) == 0
 
             assert_that_only_ankihub_sample_deck_info_in_database(
                 ankihub_deck_uuid=ankihub_deck_uuid
@@ -962,7 +967,7 @@ class TestAnkiHubImporter:
             ankihub_deck_uuid = next_deterministic_uuid()
             dids_before_import = all_dids()
             ankihub_importer = AnkiHubImporter()
-            second_anki_did = ankihub_importer._import_ankihub_deck_inner(
+            import_result = ankihub_importer._import_ankihub_deck_inner(
                 ankihub_did=ankihub_deck_uuid,
                 notes_data=ankihub_sample_deck_notes_data(),
                 deck_name="test",
@@ -970,7 +975,8 @@ class TestAnkiHubImporter:
                 protected_fields={},
                 protected_tags=[],
                 local_did=first_local_did,
-            ).anki_did
+            )
+            second_anki_did = import_result.anki_did
             new_dids = all_dids() - dids_before_import
 
             # deck with first_local_did should be recreated
@@ -979,8 +985,8 @@ class TestAnkiHubImporter:
             assert second_anki_did == first_local_did
 
             # no notes should be changed because they already exist
-            assert len(ankihub_importer.created_nids) == 0
-            assert len(ankihub_importer.updated_nids) == 0
+            assert len(import_result.created_nids) == 0
+            assert len(import_result.updated_nids) == 0
 
             assert_that_only_ankihub_sample_deck_info_in_database(
                 ankihub_deck_uuid=ankihub_deck_uuid
@@ -1007,7 +1013,7 @@ class TestAnkiHubImporter:
             # import the deck again, now with the changed note data
             dids_before_import = all_dids()
             ankihub_importer = AnkiHubImporter()
-            second_anki_did = ankihub_importer._import_ankihub_deck_inner(
+            import_result = ankihub_importer._import_ankihub_deck_inner(
                 ankihub_did=ah_did,
                 notes_data=notes_data,
                 deck_name="test",
@@ -1016,7 +1022,8 @@ class TestAnkiHubImporter:
                 protected_tags=[],
                 local_did=anki_did,
                 subdecks=True,
-            ).anki_did
+            )
+            second_anki_did = import_result.anki_did
             new_dids = all_dids() - dids_before_import
 
             # assert that two new decks were created
@@ -1025,8 +1032,8 @@ class TestAnkiHubImporter:
             assert mw.col.decks.by_name("Testdeck::A::B") is not None
 
             # one note should be updated
-            assert len(ankihub_importer.created_nids) == 0
-            assert len(ankihub_importer.updated_nids) == 1
+            assert len(import_result.created_nids) == 0
+            assert len(import_result.updated_nids) == 1
 
             assert_that_only_ankihub_sample_deck_info_in_database(
                 ankihub_deck_uuid=ah_did

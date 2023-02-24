@@ -4,13 +4,13 @@ from dataclasses import dataclass
 from pprint import pformat
 from typing import Dict, Iterable, List, Optional, Set, Tuple
 
+import aqt
 from anki.cards import Card
 from anki.consts import QUEUE_TYPE_SUSPENDED
 from anki.decks import DeckId
 from anki.errors import NotFoundError
 from anki.models import NotetypeDict, NotetypeId
 from anki.notes import Note, NoteId
-import aqt
 
 from . import LOGGER, settings
 from .addon_ankihub_client import AddonAnkiHubClient as AnkiHubClient
@@ -36,7 +36,7 @@ from .utils import (
 )
 
 
-@dataclass
+@dataclass(frozen=True)
 class AnkiHubImportResult:
     ankihub_did: uuid.UUID
     anki_did: DeckId
@@ -51,9 +51,9 @@ class AnkiHubImportResult:
 
 class AnkiHubImporter:
     def __init__(self):
-        self.created_nids: List[NoteId] = []
-        self.updated_nids: List[NoteId] = []
-        self.skipped_nids: List[NoteId] = []
+        self._created_nids: List[NoteId] = []
+        self._updated_nids: List[NoteId] = []
+        self._skipped_nids: List[NoteId] = []
 
     def import_ankihub_deck(
         self,
@@ -120,9 +120,9 @@ class AnkiHubImporter:
         subdecks: bool = False,
         subdecks_for_new_notes_only: bool = False,
     ) -> AnkiHubImportResult:
-        self.created_nids = []
-        self.updated_nids = []
-        self.skipped_nids = []
+        self._created_nids = []
+        self._updated_nids = []
+        self._skipped_nids = []
 
         first_import_of_deck = local_did is None
 
@@ -152,14 +152,14 @@ class AnkiHubImporter:
         ankihub_db.transfer_mod_values_from_anki_db(notes_data=notes_data)
 
         LOGGER.info(
-            f"Created {len(self.created_nids)} notes: {truncated_list(self.created_nids, limit=50)}"
+            f"Created {len(self._created_nids)} notes: {truncated_list(self._created_nids, limit=50)}"
         )
         LOGGER.info(
-            f"Updated {len(self.updated_nids)} notes: {truncated_list(self.updated_nids, limit=50)}"
+            f"Updated {len(self._updated_nids)} notes: {truncated_list(self._updated_nids, limit=50)}"
         )
         LOGGER.info(
-            f"Skippped {len(self.skipped_nids)} notes: "
-            f"{truncated_list(self.skipped_nids, limit=50)}"
+            f"Skippped {len(self._skipped_nids)} notes: "
+            f"{truncated_list(self._skipped_nids, limit=50)}"
         )
 
         if first_import_of_deck:
@@ -167,9 +167,9 @@ class AnkiHubImporter:
 
         if subdecks or subdecks_for_new_notes_only:
             if subdecks_for_new_notes_only:
-                anki_nids = list(self.created_nids)
+                anki_nids = list(self._created_nids)
             else:
-                anki_nids = list(self.created_nids + self.updated_nids)
+                anki_nids = list(self._created_nids + self._updated_nids)
 
             build_subdecks_and_move_cards_to_them(
                 ankihub_did=ankihub_did, nids=anki_nids
@@ -178,9 +178,9 @@ class AnkiHubImporter:
         result = AnkiHubImportResult(
             ankihub_did=ankihub_did,
             anki_did=local_did,
-            created_nids=self.created_nids,
-            updated_nids=self.updated_nids,
-            skipped_nids=self.skipped_nids,
+            created_nids=self._created_nids,
+            updated_nids=self._updated_nids,
+            skipped_nids=self._skipped_nids,
             first_import_of_deck=first_import_of_deck,
         )
         return result
@@ -227,7 +227,7 @@ class AnkiHubImporter:
             LOGGER.debug(
                 f"Note {note_data.ankihub_note_uuid} does not exist in AnkiHub DB, skipping"
             )
-            self.skipped_nids.append(NoteId(note_data.anki_nid))
+            self._skipped_nids.append(NoteId(note_data.anki_nid))
             return None
 
         note_before_changes = None
@@ -311,7 +311,7 @@ class AnkiHubImporter:
                 first_import_of_deck,
             ):
                 note.flush()
-                self.updated_nids.append(note.id)
+                self._updated_nids.append(note.id)
                 LOGGER.debug(f"Updated note: {note_data.anki_nid=}")
             else:
                 LOGGER.debug(f"No changes, skipping {note_data.anki_nid=}")
@@ -331,7 +331,7 @@ class AnkiHubImporter:
             note = create_note_with_id(
                 note, anki_id=NoteId(note_data.anki_nid), anki_did=anki_did
             )
-            self.created_nids.append(note.id)
+            self._created_nids.append(note.id)
             LOGGER.debug(f"Created note: {note_data.anki_nid=}")
         return note
 
