@@ -1,3 +1,5 @@
+"""Code for setting up auto-syncing with AnkiHub on startup and/or on AnkiWeb sync.
+Depends on the auto_sync setting in the public config."""
 from concurrent.futures import Future
 from time import sleep
 from typing import Callable, Optional
