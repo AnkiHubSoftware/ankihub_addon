@@ -33,6 +33,7 @@ from ..addon_ankihub_client import AnkiHubRequestError
 from ..ankihub_client import NoteInfo
 from ..db import ankihub_db
 from ..importing import AnkiHubImportResult
+from ..messages import messages
 from ..settings import config, url_deck_base, url_decks, url_help, url_view_deck
 from ..subdecks import SUBDECK_TAG, build_subdecks_and_move_cards_to_them, flatten_deck
 from ..sync import AnkiHubImporter
@@ -140,24 +141,7 @@ class SubscribedDecksDialog(QDialog):
         cleanup_after_deck_install()
 
         showInfo(
-            text=(
-                f"Deck successfully imported from AnkiHub!<br>"
-                "<br>"
-                "The imported notes are in the deck<br>"
-                f"<b>{deck_name}</b>.<br>"
-                "<br>"
-                f"Added {len(import_result.created_nids)} note(s). <br>"
-                f"Updated {len(import_result.updated_nids)} note(s)."
-                + (
-                    "<br>"
-                    f"Skipped {len(import_result.skipped_nids)} note(s). <br>"
-                    "<br>"
-                    "Notes were skipped because they have the same anki note ids as notes in a different AnkiHub deck "
-                    "you have installed."
-                    if import_result.skipped_nids
-                    else ""
-                )
-            ),
+            text=messages.deck_import_summary(deck_name, import_result),
             parent=self,
             title="AnkiHub Deck Import Summary",
         )

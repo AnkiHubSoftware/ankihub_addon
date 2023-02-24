@@ -1,0 +1,14 @@
+Deck successfully imported from AnkiHub!<br>
+<br>
+The imported notes are in the deck<br>
+<b>{{deck_name}}</b>.<br>
+<br>
+Added {{import_result.created_nids|length}} note(s).<br>
+Updated {{import_result.updated_nids|length}} note(s).<br>
+Skipped {{import_result.skipped_nids|length}} note(s).<br>
+
+{% if import_result.skipped_notes %}
+<br>
+Notes were skipped because they have the same anki note ids as notes in a different AnkiHub deck
+you have installed.
+{% endif %}
