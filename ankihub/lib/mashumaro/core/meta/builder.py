@@ -85,11 +85,11 @@ if PY_39_MIN:
     import zoneinfo
 
 try:
-    import ciso8601
+    import ciso8601 # type: ignore
 except ImportError:  # pragma no cover
     ciso8601: typing.Optional[types.ModuleType] = None  # type: ignore
 try:
-    import pendulum
+    import pendulum # type: ignore
 except ImportError:  # pragma no cover
     pendulum: typing.Optional[types.ModuleType] = None  # type: ignore
 
@@ -1098,7 +1098,7 @@ class CodeBuilder:
                 return f"encodebytes({value_name}).decode()"
             elif issubclass(origin_type, str):
                 return value_name
-            elif issubclass(origin_type, typing.Tuple):
+            elif issubclass(origin_type, typing.Tuple): # type: ignore
                 if is_named_tuple(ftype):
                     return self._pack_named_tuple(
                         fname,
@@ -1488,7 +1488,7 @@ class CodeBuilder:
                     raise UnserializableField(
                         fname, ftype, parent, "Use typing.Deque[T] instead"
                     )
-            elif issubclass(origin_type, typing.Tuple):
+            elif issubclass(origin_type, typing.Tuple): # type: ignore
                 if is_named_tuple(ftype):
                     return self._unpack_named_tuple(
                         fname,

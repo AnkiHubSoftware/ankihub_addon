@@ -5,7 +5,7 @@ def patch_fromisoformat():
     if PY_36:
         # noinspection PyPackageRequirements
         # noinspection PyUnresolvedReferences
-        from backports.datetime_fromisoformat import MonkeyPatch
+        from backports.datetime_fromisoformat import MonkeyPatch # type: ignore
 
         MonkeyPatch.patch_fromisoformat()
 

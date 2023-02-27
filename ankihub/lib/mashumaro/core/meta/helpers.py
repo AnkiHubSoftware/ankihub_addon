@@ -198,16 +198,16 @@ def is_special_typing_primitive(t) -> bool:
 def is_generic(t):
     if PY_36:
         # noinspection PyUnresolvedReferences
-        return issubclass(t.__class__, typing.GenericMeta)
+        return issubclass(t.__class__, typing.GenericMeta) # type: ignore
     elif PY_37 or PY_38:
         # noinspection PyProtectedMember
         # noinspection PyUnresolvedReferences
-        return issubclass(t.__class__, typing._GenericAlias)
+        return issubclass(t.__class__, typing._GenericAlias) # type: ignore
     elif PY_39_MIN:
         # noinspection PyProtectedMember
         # noinspection PyUnresolvedReferences
         if (
-            issubclass(t.__class__, typing._BaseGenericAlias)
+            issubclass(t.__class__, typing._BaseGenericAlias) # type: ignore
             or type(t) is types.GenericAlias
         ):
             return True
@@ -382,7 +382,7 @@ def get_orig_bases(cls, is_created=True):
             if (
                 record.filename.endswith("typing.py")
                 and record.function == "__new__"
-                and record.frame.f_locals.get("cls") is typing.GenericMeta
+                and record.frame.f_locals.get("cls") is typing.GenericMeta # type: ignore
                 and record.frame.f_locals.get("initial_bases")
                 and record.frame.f_locals.get("namespace", {}).get(
                     "__qualname__"
@@ -395,7 +395,7 @@ def get_orig_bases(cls, is_created=True):
 
 def resolve_type_vars(cls, arg_types=(), is_cls_created=False):
     arg_types = iter(arg_types)
-    type_vars = {}
+    type_vars = {} # type: ignore
     result = {cls: type_vars}
     orig_bases = {
         get_type_origin(orig_base): orig_base
