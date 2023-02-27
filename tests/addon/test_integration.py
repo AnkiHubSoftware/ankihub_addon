@@ -471,8 +471,8 @@ def test_suggest_note_update(
 
         install_sample_ah_deck()
 
-        notes_data: NoteInfo = ankihub_sample_deck_notes_data()
-        note = mw.col.get_note(notes_data[0].anki_nid)
+        notes_data: List[NoteInfo] = ankihub_sample_deck_notes_data()
+        note = mw.col.get_note(NoteId(notes_data[0].anki_nid))
         ankihub_note_uuid = notes_data[0].ankihub_note_uuid
 
         # test create change note suggestion
