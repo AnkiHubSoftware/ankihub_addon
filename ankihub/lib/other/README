@@ -1,0 +1,4 @@
+The typing_extensions package is in this folder so that the _vendor directory can be
+provided to the mypy_path config variable in mypy.ini.
+Else an `A user-defined top-level module with name "typing_extensions" is not supported`
+error is raised when running mypy.
