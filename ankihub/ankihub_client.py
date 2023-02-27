@@ -26,9 +26,9 @@ from typing import (
 import requests
 from requests import PreparedRequest, Request, Response, Session
 
-from .lib.mashumaro import field_options
-from .lib.mashumaro.config import BaseConfig
-from .lib.mashumaro.mixins.json import DataClassJSONMixin
+from mashumaro import field_options
+from mashumaro.config import BaseConfig
+from mashumaro.mixins.json import DataClassJSONMixin
 
 LOGGER = logging.getLogger(__name__)
 
