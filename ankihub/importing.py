@@ -306,6 +306,8 @@ class AnkiHubImporter:
         anki_did: Optional[DeckId],  # only relevant for newly created notes
         first_import_of_deck: bool,
     ) -> Note:
+        # Create a copy to avoid mutating note_data.fields.
+        # TODO it seems that fields is not used and we can remove it.
         fields = note_data.fields.copy()
 
         try:
@@ -317,13 +319,15 @@ class AnkiHubImporter:
                     value=str(note_data.ankihub_note_uuid),
                 )
             )
-            if self.prepare_note(
+            # TODO Refactor so that self.prepare_note is not called in two places.
+            note_prepared = self.prepare_note(
                 note,
                 note_data,
                 protected_fields,
                 protected_tags,
                 first_import_of_deck,
-            ):
+            )
+            if note_prepared:
                 note.flush()
                 self._updated_nids.append(note.id)
                 LOGGER.debug(f"Updated note: {note_data.anki_nid=}")
@@ -358,10 +362,17 @@ class AnkiHubImporter:
         first_import_of_deck: bool,
     ) -> bool:
         """
-        Updates the note with the given fields and tags (taking protected fields and tags into account)
-        Sets the ankihub_id field to the given ankihub_id
-        Sets the guid to the given guid
-        Returns True if note was changed and False otherwise
+        Updates the note with the given fields and tags.
+
+        Takes protected fields and tags into account.
+        Sets the ankihub_id field to the given ankihub_id.
+        Sets the guid to the given guid.
+
+        Returns True if anything about the Note was changed and False otherwise.
+
+        If the Note was changed we will flush the Note.  Keeping track of this allows us
+        to avoid flushing unnecessarily, which is better for performance.
+        We also keep track of which notes were updated and return them in the AnkiHubImportResult.
         """
 
         LOGGER.debug("Preparing note...")
