@@ -208,14 +208,21 @@ class AnkiHubImporter:
     def _cleanup_first_time_deck_import(
         self, dids_cards_were_imported_to: Iterable[DeckId], created_did: DeckId
     ) -> DeckId:
+        """Remove newly created deck if the subset of local notes were in a single deck before subscribing.
+
+        I.e., if the user has a subset of the remote deck and the entire
+        subset exists in a single local deck, that deck will be used as the home deck.
+
+        If the newly created deck is removed, move all the cards to their original deck.
+        """
         dids = set(dids_cards_were_imported_to)
 
         # remove "Custom Study" decks from dids
         dids = {did for did in dids if not aqt.mw.col.decks.is_filtered(did)}
 
-        # if there is a single deck where all the existing cards were before the import,
-        # move the new cards there (from the newly created deck) and remove the created deck
-        # takes subdecks into account
+        # If the subset of local notes were in a single deck before the import,
+        # move the new cards there (from the newly created deck) and remove the created deck.
+        # Subdecks are taken into account below.
         if (dids_wh_created := dids - set([created_did])) and (
             (common_ancestor_did := lowest_level_common_ancestor_did(dids_wh_created))
         ) is not None:
@@ -481,7 +488,7 @@ def adjust_deck(deck_name: str, local_did: Optional[DeckId] = None) -> DeckId:
         local_did = DeckId(aqt.mw.col.decks.add_normal_deck_with_name(unique_name).id)
         LOGGER.info(f"Created deck {local_did=}")
     elif aqt.mw.col.decks.name_if_exists(local_did) is None:
-        # recreate deck if it was deleted
+        # The deck created here may be removed later.
         create_deck_with_id(unique_name, local_did)
         LOGGER.info(f"Recreated deck {local_did=}")
 
