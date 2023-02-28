@@ -148,8 +148,8 @@ class AnkiHubDB:
         If a note with the same Anki nid already exists in the AnkiHub DB then the note will not be inserted
         Returns a tuple of (NoteInfo objects that were insert / updated, NoteInfo objects that were skipped)
         """
-        used_notes_data: List[NoteInfo] = []
-        skipped_notes_data: List[NoteInfo] = []
+        updated_notes: List[NoteInfo] = []
+        skipped_notes: List[NoteInfo] = []
         with db_transaction() as conn:
             for note_data in notes_data:
                 conflicting_ah_nid = self.first(
@@ -162,7 +162,7 @@ class AnkiHubDB:
                     str(note_data.ankihub_note_uuid),
                 )
                 if conflicting_ah_nid:
-                    skipped_notes_data.append(note_data)
+                    skipped_notes.append(note_data)
                     continue
 
                 fields = join_fields(
@@ -199,9 +199,9 @@ class AnkiHubDB:
                         else None,
                     ),
                 )
-                used_notes_data.append(note_data)
+                updated_notes.append(note_data)
 
-        return (tuple(used_notes_data), tuple(skipped_notes_data))
+        return (tuple(updated_notes), tuple(skipped_notes))
 
     def transfer_mod_values_from_anki_db(self, notes_data: Sequence[NoteInfo]):
         """Takes mod values for the notes from the Anki DB and saves them to the AnkiHub DB.
