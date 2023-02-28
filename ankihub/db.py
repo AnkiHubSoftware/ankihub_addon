@@ -2,7 +2,7 @@ import sqlite3
 import uuid
 from contextlib import contextmanager
 from pathlib import Path
-from typing import Any, Iterable, List, Optional, Tuple
+from typing import Any, Iterable, List, Optional, Sequence, Tuple
 
 import aqt
 from anki.models import NotetypeId
@@ -125,10 +125,15 @@ class AnkiHubDB:
     def connection(self) -> DBConnection:
         return DBConnection(conn=sqlite3.connect(AnkiHubDB.database_path))
 
-    def upsert_notes_data(self, ankihub_did: uuid.UUID, notes_data: List[NoteInfo]):
+    def upsert_notes_data(
+        self, ankihub_did: uuid.UUID, notes_data: List[NoteInfo]
+    ) -> Tuple[Tuple[NoteInfo, ...], Tuple[NoteInfo, ...]]:
         """Upsert notes data to the AnkiHub DB.
-        If a note with the same Anki nid already exists in the AnkiHub DB then the note will not be inserted.
+        If a note with the same Anki nid already exists in the AnkiHub DB then the note will not be inserted
+        Returns a tuple of (NoteInfo objects that were insert / updated, NoteInfo objects that were skipped)
         """
+        upserted_notes: List[NoteInfo] = []
+        skipped_notes: List[NoteInfo] = []
         with self.connection() as conn:
             for note_data in notes_data:
                 conflicting_ah_nid = conn.execute(
@@ -141,6 +146,7 @@ class AnkiHubDB:
                     str(note_data.ankihub_note_uuid),
                 )
                 if conflicting_ah_nid:
+                    skipped_notes.append(note_data)
                     continue
 
                 fields = join_fields(
@@ -175,10 +181,14 @@ class AnkiHubDB:
                     if note_data.last_update_type is not None
                     else None,
                 )
+                upserted_notes.append(note_data)
 
-    def transfer_mod_values_from_anki_db(self, notes_data: List[NoteInfo]):
+        return (tuple(upserted_notes), tuple(skipped_notes))
+
+    def transfer_mod_values_from_anki_db(self, notes_data: Sequence[NoteInfo]):
         """Takes mod values for the notes from the Anki DB and saves them to the AnkiHub DB.
-        Should be be always called after importing notes or exporting notes after
+
+        Should always be called after importing notes or exporting notes after
         the mod values in the Anki DB have been updated.
         (The mod values are used to determine if a note has been modified in Anki since it was last imported/exported.)
         """
