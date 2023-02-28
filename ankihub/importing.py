@@ -122,7 +122,7 @@ class AnkiHubImporter:
         subdecks_for_new_notes_only: bool = False,
     ) -> AnkiHubImportResult:
         """ """
-        # This instance attributes are reset here so that the results returned are only for the current deck.
+        # Instance attributes are reset here so that the results returned are only for the current deck.
         self._created_nids = []
         self._updated_nids = []
         self._skipped_nids = []
@@ -243,11 +243,12 @@ class AnkiHubImporter:
             f"Trying to update or create note: {note_data.anki_nid=}, {note_data.ankihub_note_uuid=}"
         )
 
-        note_before_changes = None
         try:
+            # Get the note before changes are made below so that we can check if new
+            # were created and suspend them below if necessary.
             note_before_changes = aqt.mw.col.get_note(NoteId(note_data.anki_nid))
         except NotFoundError:
-            pass
+            note_before_changes = None
         cards_before_changes = (
             note_before_changes.cards() if note_before_changes else []
         )
