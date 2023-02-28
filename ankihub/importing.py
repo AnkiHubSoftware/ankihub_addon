@@ -171,17 +171,15 @@ class AnkiHubImporter:
     ) -> Set[DeckId]:
         # returns set of ids of decks notes were imported into
 
-        notes_data_used, notes_data_skipped = ankihub_db.upsert_notes_data(
+        upserted_notes, skipped_notes = ankihub_db.upsert_notes_data(
             ankihub_did=ankihub_did, notes_data=notes_data
         )
-        self._skipped_nids = [
-            NoteId(note_data.anki_nid) for note_data in notes_data_skipped
-        ]
+        self._skipped_nids = [NoteId(note_data.anki_nid) for note_data in skipped_notes]
 
-        reset_note_types_of_notes_based_on_notes_data(notes_data_used)
+        reset_note_types_of_notes_based_on_notes_data(upserted_notes)
 
         dids: Set[DeckId] = set()  # set of ids of decks notes were imported into
-        for note_data in notes_data_used:
+        for note_data in upserted_notes:
             note = self._update_or_create_note(
                 note_data=note_data,
                 anki_did=self._local_did,
@@ -192,7 +190,7 @@ class AnkiHubImporter:
             dids_for_note = set(c.did for c in note.cards())
             dids = dids | dids_for_note
 
-        ankihub_db.transfer_mod_values_from_anki_db(notes_data=notes_data_used)
+        ankihub_db.transfer_mod_values_from_anki_db(notes_data=upserted_notes)
 
         LOGGER.info(
             f"Created {len(self._created_nids)} notes: {truncated_list(self._created_nids, limit=50)}"

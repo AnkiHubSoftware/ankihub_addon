@@ -148,7 +148,7 @@ class AnkiHubDB:
         If a note with the same Anki nid already exists in the AnkiHub DB then the note will not be inserted
         Returns a tuple of (NoteInfo objects that were insert / updated, NoteInfo objects that were skipped)
         """
-        updated_notes: List[NoteInfo] = []
+        upserted_notes: List[NoteInfo] = []
         skipped_notes: List[NoteInfo] = []
         with db_transaction() as conn:
             for note_data in notes_data:
@@ -199,9 +199,9 @@ class AnkiHubDB:
                         else None,
                     ),
                 )
-                updated_notes.append(note_data)
+                upserted_notes.append(note_data)
 
-        return (tuple(updated_notes), tuple(skipped_notes))
+        return (tuple(upserted_notes), tuple(skipped_notes))
 
     def transfer_mod_values_from_anki_db(self, notes_data: Sequence[NoteInfo]):
         """Takes mod values for the notes from the Anki DB and saves them to the AnkiHub DB.
