@@ -205,7 +205,8 @@ class AnkiHubDB:
 
     def transfer_mod_values_from_anki_db(self, notes_data: Sequence[NoteInfo]):
         """Takes mod values for the notes from the Anki DB and saves them to the AnkiHub DB.
-        Should be be always called after importing notes or exporting notes after
+
+        Should always be called after importing notes or exporting notes after
         the mod values in the Anki DB have been updated.
         (The mod values are used to determine if a note has been modified in Anki since it was last imported/exported.)
         """
