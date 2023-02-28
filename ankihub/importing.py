@@ -73,7 +73,8 @@ class AnkiHubImporter:
         subdecks_for_new_notes_only: bool = False,
     ) -> AnkiHubImportResult:
         """
-        Used for importing an ankihub deck for the first time or updating it.
+        Used for importing an AnkiHub deck for the first time or syncing.
+
         When no local_did is provided this function assumes that the deck gets installed for the first time.
         Returns id of the deck future cards should be imported into - the local_did - if the import was sucessful,
         else it returns None.
@@ -120,6 +121,8 @@ class AnkiHubImporter:
         subdecks: bool = False,
         subdecks_for_new_notes_only: bool = False,
     ) -> AnkiHubImportResult:
+        """ """
+        # This instance attributes are reset here so that the results returned are only for the current deck.
         self._created_nids = []
         self._updated_nids = []
         self._skipped_nids = []
