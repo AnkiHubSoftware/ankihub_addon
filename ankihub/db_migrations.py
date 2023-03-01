@@ -1,7 +1,7 @@
 from typing import List
 
 from . import LOGGER
-from .db import ankihub_db, db_transaction
+from .db import ankihub_db
 
 
 def migrate_ankihub_db():
@@ -56,7 +56,7 @@ def migrate_ankihub_db():
 
     if ankihub_db.schema_version() <= 5:
 
-        with db_transaction() as conn:
+        with ankihub_db.connection() as conn:
             # find conflicting notes - notes that have the same anki_note_id
             anki_nids_with_conflicts: List[str] = ankihub_db.list(
                 "SELECT anki_note_id FROM notes GROUP BY anki_note_id HAVING COUNT(*) > 1"
