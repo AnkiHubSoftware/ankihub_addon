@@ -94,7 +94,7 @@ class AnkiHubDB:
                     CREATE TABLE notes (
                         ankihub_note_id STRING PRIMARY KEY,
                         ankihub_deck_id STRING,
-                        anki_note_id INTEGER,
+                        anki_note_id INTEGER UNIQUE,
                         anki_note_type_id INTEGER,
                         mod INTEGER,
                         guid TEXT,
@@ -111,7 +111,7 @@ class AnkiHubDB:
                 conn.execute(
                     "CREATE INDEX anki_note_type_id ON notes (anki_note_type_id);"
                 )
-                conn.execute("PRAGMA user_version = 5")
+                conn.execute("PRAGMA user_version = 6")
             LOGGER.info("Created AnkiHub DB")
         else:
             from .db_migrations import migrate_ankihub_db
