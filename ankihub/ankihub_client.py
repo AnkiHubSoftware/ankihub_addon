@@ -22,6 +22,7 @@ from typing import (
     TypedDict,
     Union,
 )
+import aqt
 
 import requests
 from requests import PreparedRequest, Request, Response, Session
@@ -396,6 +397,34 @@ class AnkiHubClient:
             s3_url = self.get_presigned_url(key=key, action="upload")
             with open(image_path, "rb") as image_file:
                 self._upload_to_s3(s3_url, image_file)
+                
+    def download_note_images(self, notes_data: List[NoteInfo], deck_id: uuid.UUID):
+        from ankihub.utils import extract_local_image_paths_from_html
+        image_names = []
+        
+        for note in notes_data:
+            for field in note.fields:
+                image_names += extract_local_image_paths_from_html(field.value)
+                
+        for img_name in image_names:
+            S3_BUCKET_URL = "https://ankihubbucket.s3.us-east-2.amazonaws.com"
+            DECK_IMAGES_REMOTE_DIR = f"{S3_BUCKET_URL}/deck_images/{deck_id}/notes/"
+            
+            # download the image from bucket
+            # and store the image locally
+            with open(Path(aqt.mw.col.media.dir()) / img_name, 'wb') as handle:
+                img_remote_path = DECK_IMAGES_REMOTE_DIR + img_name
+                response = requests.get(img_remote_path, stream=True)
+
+                if not response.ok:
+                    LOGGER.debug(f"Unable to download image [{img_remote_path}]. Response status code: {response.status_code}")
+
+                for block in response.iter_content(1024):
+                    if not block:
+                        break
+
+                    handle.write(block)
+            
 
     def _gzip_compress_string(self, string: str) -> bytes:
         result = gzip.compress(
