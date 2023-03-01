@@ -136,7 +136,7 @@ class AnkiHubDB:
         skipped_notes: List[NoteInfo] = []
         with self.connection() as conn:
             for note_data in notes_data:
-                conflicting_ah_nid = conn.execute(
+                conflicting_ah_nid = conn.first(
                     """
                     SELECT ankihub_note_id FROM notes
                     WHERE anki_note_id = ?
