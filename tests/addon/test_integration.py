@@ -1200,14 +1200,16 @@ class TestAnkiHubImporter:
             mw = anki_session_with_addon_data.mw
 
             anki_nid = NoteId(1)
-            mid = ankihub_basic_note_type["id"]
+
+            mid_1 = ankihub_basic_note_type["id"]
+            mid_2 = create_copy_of_note_type(mw, ankihub_basic_note_type)["id"]
 
             # import the first note
             ah_did_1 = next_deterministic_uuid()
             note_info_1 = NoteInfoFactory(
                 anki_nid=anki_nid,
                 tags=["tag1"],
-                mid=mid,
+                mid=mid_1,
             )
             importer = AnkiHubImporter()
             import_result = importer._import_ankihub_deck_inner(
@@ -1227,7 +1229,7 @@ class TestAnkiHubImporter:
             note_info_2 = NoteInfoFactory(
                 anki_nid=anki_nid,
                 tags=["tag2"],
-                mid=mid,
+                mid=mid_2,
             )
             importer = AnkiHubImporter()
             import_result = importer._import_ankihub_deck_inner(
@@ -1239,22 +1241,30 @@ class TestAnkiHubImporter:
             assert import_result.updated_nids == []
             assert import_result.skipped_nids == [anki_nid]
 
-            # check that only the first note was imported
+            # Check that the first note wasn't changed by the second import.
             assert ankihub_db.note_data(anki_nid) == note_info_1
             assert ankihub_db.ankihub_deck_ids() == [ah_did_1]
 
-            # check that the mod value of the note was not changed
+            # Check that the mod value of the first note was not changed.
             mod_2 = ankihub_db.scalar("SELECT mod FROM notes WHERE anki_note_id = ?", 1)
             assert mod_2 == mod_1
 
-            # check that the note in the Anki database has the data from the first note info
+            # Check that the note in the Anki database wasn't changed by the second import.
             assert mw.col.get_note(anki_nid).tags == ["tag1"]
+            assert mw.col.get_note(anki_nid).mid == mid_1
             assert to_note_data(mw.col.get_note(anki_nid)) == note_info_1
 
 
 def assert_that_only_ankihub_sample_deck_info_in_database(ankihub_deck_uuid: uuid.UUID):
     assert ankihub_db.ankihub_deck_ids() == [ankihub_deck_uuid]
     assert len(ankihub_db.anki_nids_for_ankihub_deck(ankihub_deck_uuid)) == 3
+
+
+def create_copy_of_note_type(mw: AnkiQt, note_type: NotetypeDict) -> NotetypeDict:
+    new_model = copy.deepcopy(note_type)
+    new_model["id"] = 0
+    mw.col.models.add_dict(new_model)
+    return new_model
 
 
 def create_or_get_ah_version_of_note_type(
