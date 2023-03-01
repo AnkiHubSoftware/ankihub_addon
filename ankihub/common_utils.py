@@ -1,5 +1,7 @@
 """This module groups utility functions used by both ankihub addon and by ankihub client."""
 import re
+from typing import List
+
 
 def extract_local_image_paths_from_html(html_content: str) -> List[str]:
     image_paths = re.findall(r'<img.*?src="(.*?)"', html_content)
