@@ -30,6 +30,7 @@ from requests import PreparedRequest, Request, Response, Session
 from .lib.mashumaro import field_options
 from .lib.mashumaro.config import BaseConfig
 from .lib.mashumaro.mixins.json import DataClassJSONMixin
+from .common_utils import extract_local_image_paths_from_html
 
 LOGGER = logging.getLogger(__name__)
 
@@ -399,8 +400,6 @@ class AnkiHubClient:
                 self._upload_to_s3(s3_url, image_file)
 
     def download_note_images(self, notes_data: List[NoteInfo], deck_id: uuid.UUID):
-        from ankihub.utils import extract_local_image_paths_from_html
-
         image_names = []
 
         for note in notes_data:

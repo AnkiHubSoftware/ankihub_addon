@@ -6,8 +6,6 @@ from typing import Any, Dict, List, Optional
 from anki.notes import Note, NoteId
 import aqt
 
-from ankihub.utils import extract_local_image_paths_from_html
-
 from .addon_ankihub_client import AddonAnkiHubClient as AnkiHubClient
 from .ankihub_client import (
     ChangeNoteSuggestion,
@@ -18,6 +16,7 @@ from .ankihub_client import (
 from .db import ankihub_db
 from .exporting import to_note_data
 from .settings import config
+from .common_utils import extract_local_image_paths_from_html
 
 # string that is contained in the errors returned from the AnkiHub API when
 # there are no changes to the note for a change note suggestion
