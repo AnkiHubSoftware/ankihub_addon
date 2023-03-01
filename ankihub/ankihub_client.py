@@ -22,7 +22,6 @@ from typing import (
     TypedDict,
     Union,
 )
-import aqt
 
 import requests
 from requests import PreparedRequest, Request, Response, Session
@@ -273,8 +272,9 @@ class DeckExtensionUpdateChunk(DataClassJSONMixinWithConfig):
 class AnkiHubClient:
     """Client for interacting with the AnkiHub API."""
 
-    def __init__(self, hooks=None, token=None):
+    def __init__(self, hooks=None, token=None, local_media_dir_path=None):
         self.session = Session()
+        self.local_media_dir_path = local_media_dir_path
 
         if hooks is not None:
             self.session.hooks["response"] = hooks
@@ -412,7 +412,7 @@ class AnkiHubClient:
 
             # download the image from bucket
             # and store the image locally
-            with open(Path(aqt.mw.col.media.dir()) / img_name, "wb") as handle:
+            with open(self.local_media_dir_path / img_name, "wb") as handle:
                 img_remote_path = DECK_IMAGES_REMOTE_DIR + img_name
                 response = requests.get(img_remote_path, stream=True)
 
