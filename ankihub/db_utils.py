@@ -13,13 +13,13 @@ class DBConnection:
         *args,
         first_row_only=False,
     ) -> List:
-        c = self._conn.cursor()
-        c.execute(sql, args)
+        cur = self._conn.cursor()
+        cur.execute(sql, args)
         if first_row_only:
-            result = c.fetchone()
+            result = cur.fetchone()
         else:
-            result = c.fetchall()
-        c.close()
+            result = cur.fetchall()
+        cur.close()
 
         if not self._is_used_as_context_manager:
             self._conn.commit()
