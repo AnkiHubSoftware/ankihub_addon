@@ -73,10 +73,8 @@ def migrate_ankihub_db():
                 # delete all notes with the same anki_note_id except the one with the highest mod value
                 conn.execute(
                     "DELETE FROM notes WHERE anki_note_id = ? AND ankihub_note_id != ?",
-                    (
-                        anki_nid,
-                        ah_nid_with_highest_mod,
-                    ),
+                    anki_nid,
+                    ah_nid_with_highest_mod,
                 )
 
             # Add an unique constraint to the anki_note_id column by making an unique index.
