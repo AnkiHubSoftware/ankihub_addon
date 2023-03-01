@@ -415,14 +415,20 @@ class AnkiHubClient:
                 image_names += extract_local_image_paths_from_html(field.value)
 
         for img_name in image_names:
-            # download the image from bucket
+            img_path = self.local_media_dir_path / img_name
+            # First we check if the image already exists.
+            # If yes, we skip this iteration.
+            if os.path.isfile(img_path):
+                continue
+
+            # If not, download the image from bucket
             # and store the image locally
-            with open(self.local_media_dir_path / img_name, "wb") as handle:
+            with open(img_path, "wb") as handle:
                 img_remote_path = deck_images_remote_dir + img_name
                 response = requests.get(img_remote_path, stream=True)
 
                 if not response.ok:
-                    LOGGER.debug(
+                    LOGGER.info(
                         f"Unable to download image [{img_remote_path}]. Response status code: {response.status_code}"
                     )
 
