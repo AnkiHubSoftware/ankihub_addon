@@ -1,3 +1,4 @@
+import os
 import csv
 import dataclasses
 import gzip
@@ -32,6 +33,12 @@ from .lib.mashumaro.mixins.json import DataClassJSONMixin
 from .common_utils import extract_local_image_paths_from_html
 
 LOGGER = logging.getLogger(__name__)
+
+S3_BUCKET_URL = (
+    "https://ankihubbucket.s3.us-east-2.amazonaws.com"
+    if bool(os.getenv("DEVELOPMENT", True))
+    else "https://ankihub-decks-assets.s3.amazonaws.com/"
+)
 
 API_URL_BASE = "https://app.ankihub.net/api"
 API_VERSION = 6.0
@@ -407,7 +414,6 @@ class AnkiHubClient:
                 image_names += extract_local_image_paths_from_html(field.value)
 
         for img_name in image_names:
-            S3_BUCKET_URL = "https://ankihubbucket.s3.us-east-2.amazonaws.com"
             DECK_IMAGES_REMOTE_DIR = f"{S3_BUCKET_URL}/deck_images/{deck_id}/notes/"
 
             # download the image from bucket
