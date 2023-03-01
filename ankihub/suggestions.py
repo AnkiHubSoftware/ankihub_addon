@@ -7,6 +7,8 @@ from typing import Any, Dict, List, Optional
 from anki.notes import Note, NoteId
 import aqt
 
+from ankihub.utils import extract_local_image_paths_from_html
+
 from .addon_ankihub_client import AddonAnkiHubClient as AnkiHubClient
 from .ankihub_client import (
     ChangeNoteSuggestion,
@@ -69,18 +71,13 @@ def upload_images_for_suggestion(suggestion: NoteSuggestion, ah_did: uuid.UUID) 
 def get_images_from_suggestion(suggestion: NoteSuggestion) -> List[Path]:
     result = []
     for field_content in [f.value for f in suggestion.fields]:
-        image_names = _extract_images(field_content)
+        image_names = extract_local_image_paths_from_html(field_content)
         image_paths = [
             Path(aqt.mw.col.media.dir()) / image_name for image_name in image_names
         ]
         result.extend(image_paths)
 
     return result
-
-
-def _extract_images(field_content: str) -> List[str]:
-    # TODO: Filter out src attributes that are  URLs (e.g. start with http or https)
-    return re.findall(r'<img.*?src="(.*?)"', field_content)
 
 
 def suggest_new_note(

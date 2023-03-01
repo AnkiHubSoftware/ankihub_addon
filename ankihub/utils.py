@@ -345,3 +345,9 @@ def create_backup() -> None:
 def truncated_list(values: List[Any], limit: int) -> List[Any]:
     assert limit > 0
     return values[:limit] + ["..."] if len(values) > limit else values
+
+def extract_local_image_paths_from_html(html_content: str) -> List[str]:
+    image_paths = re.findall(r'<img.*?src="(.*?)"', html_content)
+    
+    # Filter out src attributes that are  URLs (e.g. start with http or https)
+    return [path for path in image_paths if not any([http_prefix in path for http_prefix in ['http://', 'https://']])]
