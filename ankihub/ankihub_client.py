@@ -407,6 +407,7 @@ class AnkiHubClient:
                 self._upload_to_s3(s3_url, image_file)
 
     def download_note_images(self, notes_data: List[NoteInfo], deck_id: uuid.UUID):
+        deck_images_remote_dir = f"{S3_BUCKET_URL}/deck_images/{deck_id}/notes/"
         image_names = []
 
         for note in notes_data:
@@ -414,12 +415,10 @@ class AnkiHubClient:
                 image_names += extract_local_image_paths_from_html(field.value)
 
         for img_name in image_names:
-            DECK_IMAGES_REMOTE_DIR = f"{S3_BUCKET_URL}/deck_images/{deck_id}/notes/"
-
             # download the image from bucket
             # and store the image locally
             with open(self.local_media_dir_path / img_name, "wb") as handle:
-                img_remote_path = DECK_IMAGES_REMOTE_DIR + img_name
+                img_remote_path = deck_images_remote_dir + img_name
                 response = requests.get(img_remote_path, stream=True)
 
                 if not response.ok:
