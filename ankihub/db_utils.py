@@ -1,6 +1,8 @@
 import sqlite3
 from typing import Any, List, Optional, Tuple
 
+from . import LOGGER
+
 
 class DBConnection:
     def __init__(self, conn: sqlite3.Connection):
@@ -13,17 +15,21 @@ class DBConnection:
         *args,
         first_row_only=False,
     ) -> List:
-        cur = self._conn.cursor()
-        cur.execute(sql, args)
-        if first_row_only:
-            result = cur.fetchone()
-        else:
-            result = cur.fetchall()
-        cur.close()
-
-        if not self._is_used_as_context_manager:
-            self._conn.commit()
-            self._conn.close()
+        try:
+            cur = self._conn.cursor()
+            cur.execute(sql, args)
+            if first_row_only:
+                result = cur.fetchone()
+            else:
+                result = cur.fetchall()
+            cur.close()
+        except Exception as e:
+            LOGGER.info(f"Error while executing SQL: {sql}")
+            raise e
+        finally:
+            if not self._is_used_as_context_manager:
+                self._conn.commit()
+                self._conn.close()
 
         return result
 
