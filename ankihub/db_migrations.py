@@ -79,21 +79,19 @@ def migrate_ankihub_db():
                     ),
                 )
 
-                # Add an unique constraint to the anki_note_id column by making an unique index.
-                # You can't add a unique constraint to an existing table in sqlite and
-                # this is equlivalent, see https://www.sqlite.org/lang_createtable.html#constraints
-                conn.execute("DROP INDEX anki_note_id_idx")
-                conn.execute(
-                    "CREATE UNIQUE INDEX anki_note_id_idx ON notes (anki_note_id)"
-                )
+            # Add an unique constraint to the anki_note_id column by making an unique index.
+            # You can't add a unique constraint to an existing table in sqlite and
+            # this is equlivalent, see https://www.sqlite.org/lang_createtable.html#constraints
+            conn.execute("DROP INDEX anki_note_id_idx")
+            conn.execute("CREATE UNIQUE INDEX anki_note_id_idx ON notes (anki_note_id)")
 
-                # rename anki_note_type_id index to anki_note_type_id_idx to be consistent with other indexes
-                conn.execute("DROP INDEX anki_note_type_id")
-                conn.execute(
-                    "CREATE INDEX anki_note_type_id_idx ON notes (anki_note_type_id)"
-                )
+            # rename anki_note_type_id index to anki_note_type_id_idx to be consistent with other indexes
+            conn.execute("DROP INDEX anki_note_type_id")
+            conn.execute(
+                "CREATE INDEX anki_note_type_id_idx ON notes (anki_note_type_id)"
+            )
 
-                conn.execute("PRAGMA user_version = 6;")
+            conn.execute("PRAGMA user_version = 6;")
 
         LOGGER.info(
             f"AnkiHub DB migrated to schema version {ankihub_db.schema_version()}"
