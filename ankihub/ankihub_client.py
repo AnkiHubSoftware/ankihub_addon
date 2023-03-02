@@ -1,9 +1,9 @@
-import os
 import csv
 import dataclasses
 import gzip
 import json
 import logging
+import os
 import re
 import uuid
 from abc import ABC
@@ -30,7 +30,6 @@ from requests import PreparedRequest, Request, Response, Session
 from .lib.mashumaro import field_options
 from .lib.mashumaro.config import BaseConfig
 from .lib.mashumaro.mixins.json import DataClassJSONMixin
-from .common_utils import extract_local_image_paths_from_html
 
 LOGGER = logging.getLogger(__name__)
 
@@ -406,15 +405,10 @@ class AnkiHubClient:
             with open(image_path, "rb") as image_file:
                 self._upload_to_s3(s3_url, image_file)
 
-    def download_note_images(self, notes_data: List[NoteInfo], deck_id: uuid.UUID):
+    def download_images(self, img_names: List[str], deck_id: uuid.UUID):
         deck_images_remote_dir = f"{S3_BUCKET_URL}/deck_images/{deck_id}/notes/"
-        image_names = []
 
-        for note in notes_data:
-            for field in note.fields:
-                image_names += extract_local_image_paths_from_html(field.value)
-
-        for img_name in image_names:
+        for img_name in img_names:
             img_path = self.local_media_dir_path / img_name
             # First we check if the image already exists.
             # If yes, we skip this iteration.
@@ -431,6 +425,7 @@ class AnkiHubClient:
                     LOGGER.info(
                         f"Unable to download image [{img_remote_path}]. Response status code: {response.status_code}"
                     )
+                    continue
 
                 for block in response.iter_content(1024):
                     if not block:
