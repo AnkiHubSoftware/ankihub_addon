@@ -28,6 +28,7 @@ class AnkiHubMediaDownloader:
         LOGGER.info("Starting media download...")
         self._syncing = True
 
+        # TODO Refactor this to not have to import from gui.menu here.
         from .gui.menu import media_download_status_action
 
         media_download_status_action.setText("Media download: In progress...")
@@ -63,8 +64,11 @@ class AnkiHubMediaDownloader:
 
         self._syncing = False
 
+        # TODO Refactor this to not have to import from gui.menu here.
         from .gui.menu import media_download_status_action
 
+        # TODO Refactor this so that the status is not hardcoded here.
+        # Not sure yet if showing the status in the menu is a good idea.
         media_download_status_action.setText("Media download: Idle.")
 
 
