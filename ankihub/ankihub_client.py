@@ -425,14 +425,14 @@ class AnkiHubClient:
             # and store the image locally
             img_remote_path = deck_images_remote_dir + img_name
             response = requests.get(img_remote_path, stream=True)
-            
+
             # Log and skip this iteration if the response is not 200 OK
             if not response.ok:
                 LOGGER.info(
                     f"Unable to download image [{img_remote_path}]. Response status code: {response.status_code}"
                 )
                 continue
-            
+
             # If we get a valid response, open the file and write the content
             with open(img_path, "wb") as handle:
                 for block in response.iter_content(1024):
