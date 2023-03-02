@@ -21,6 +21,7 @@ from aqt.operations import QueryOp
 from aqt.qt import QAction, QDialog, QKeySequence, QMenu, Qt, qconnect
 from aqt.studydeck import StudyDeck
 from aqt.utils import openLink, showInfo, showText, tooltip
+from requests.exceptions import ConnectionError
 
 from .. import LOGGER
 from ..addon_ankihub_client import AddonAnkiHubClient as AnkiHubClient
@@ -413,6 +414,16 @@ def ankihub_logout_setup(parent):
 
 
 def media_download_status_setup(parent: QMenu):
+    image_support_enabled = False
+    try:
+        image_support_enabled = AnkiHubClient().is_feature_flag_enabled("image_support")
+    except ConnectionError:
+        # It's ok to not setup the menu when the feature flag status can't be retrieved.
+        return
+
+    if not image_support_enabled:
+        return
+
     global media_download_status_action
     media_download_status_action = QAction("Media download: Idle.", parent)
     parent.addAction(media_download_status_action)
