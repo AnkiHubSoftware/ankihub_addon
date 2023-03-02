@@ -39,7 +39,7 @@ class AnkiHubMediaDownloader:
 
     def _download_misssing_media(self):
         for ah_did in ankihub_db.ankihub_deck_ids():
-            missing_image_names = self.missing_images_for_ah_deck(ah_did)
+            missing_image_names = self._missing_images_for_ah_deck(ah_did)
             if not missing_image_names:
                 continue
             AddonAnkiHubClient().download_images(missing_image_names, ah_did)
