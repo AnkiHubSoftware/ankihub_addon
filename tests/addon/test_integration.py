@@ -101,7 +101,7 @@ from ankihub.suggestions import (
     suggest_note_update,
     suggest_notes_in_bulk,
 )
-from ankihub.sync import AnkiHubSync
+from ankihub.sync import AnkiHubSync, sync
 from ankihub.utils import (
     ANKIHUB_TEMPLATE_SNIPPET_RE,
     all_dids,
@@ -2510,6 +2510,52 @@ def test_reset_optional_tags_action(
         assert mw.col.get_note(other_note.id).tags == [
             f"{TAG_FOR_OPTIONAL_TAGS}::test99::test2"
         ]
+
+
+def test_download_images_on_sync(
+    anki_session_with_addon_data: AnkiSession,
+    install_sample_ah_deck: InstallSampleAHDeck,
+    monkeypatch: MonkeyPatch,
+    qtbot: QtBot,
+    enable_image_support_feature_flag,
+):
+    with anki_session_with_addon_data.profile_loaded():
+        mw = anki_session_with_addon_data.mw
+
+        _, ah_did = install_sample_ah_deck()
+
+        # Add a reference to a local image to a note.
+        nids = mw.col.find_notes("")
+        nid = nids[0]
+        note = mw.col.get_note(nid)
+        note.fields[0] = "Some text. <img src='image.png'>"
+        note.flush()
+
+        # Mock the client to simulate that there are no deck updates and extensions.
+        monkeypatch.setattr(
+            AnkiHubClient,
+            "get_deck_updates",
+            lambda *args, **kwargs: [],
+        )
+        monkeypatch.setattr(
+            AnkiHubClient,
+            "get_deck_extensions_by_deck_id",
+            lambda *args, **kwargs: [],
+        )
+
+        # Mock the client method for downloading images.
+        download_images_mock = Mock()
+        download_images_mock.return_value = []
+        monkeypatch.setattr(AnkiHubClient, "download_images", download_images_mock)
+
+        # Run the sync.
+        sync.sync_all_decks_and_media()
+
+        # Let the background thread (which downloads missing media) finish.
+        qtbot.wait(200)
+
+        # Assert that the client method for downloading images was called with the correct arguments.
+        download_images_mock.assert_called_once_with(["image.png"], ah_did)
 
 
 def test_upload_images(
