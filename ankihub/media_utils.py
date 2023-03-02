@@ -12,14 +12,11 @@ def get_img_names_from_notes(nids: Sequence[NoteId]) -> Set[str]:
     )
 
     imgs = set()
-    # TODO: check if we should use a different regex.
-    img_re = re.compile(r'<img.*?src="(.*?)"')
+    img_re = re.compile(r"<img.*?src=[\"'](.*?)[\"']")
     for flds in flds_with_imgs:
-        for match in re.finditer(img_re, flds):
-            img = match.group(1)
-            # TODO Maybe move the prefix check to the regex for better performance.
-            if not any([http_prefix in img for http_prefix in ["http://", "https://"]]):
-                imgs.add(img)
+        for img in re.findall(img_re, flds):
+            if img.startswith("http://") or img.startswith("https://"):
+                continue
             imgs.add(img)
 
     return imgs
