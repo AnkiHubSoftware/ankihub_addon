@@ -2171,6 +2171,7 @@ def test_reset_local_changes_to_notes(
 def test_migrate_profile_data_from_old_location(
     anki_session_with_addon_before_profile_support: AnkiSession,
     monkeypatch: MonkeyPatch,
+    disable_image_support_feature_flag,
 ):
     anki_session = anki_session_with_addon_before_profile_support
 
