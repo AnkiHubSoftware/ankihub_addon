@@ -27,7 +27,6 @@ from typing import (
 import requests
 from requests import PreparedRequest, Request, Response, Session
 
-from .common_utils import extract_local_image_paths_from_html
 from .lib.mashumaro import field_options
 from .lib.mashumaro.config import BaseConfig
 from .lib.mashumaro.mixins.json import DataClassJSONMixin
@@ -406,15 +405,10 @@ class AnkiHubClient:
             with open(image_path, "rb") as image_file:
                 self._upload_to_s3(s3_url, image_file)
 
-    def download_note_images(self, notes_data: List[NoteInfo], deck_id: uuid.UUID):
+    def download_images(self, img_names: List[str], deck_id: uuid.UUID):
         deck_images_remote_dir = f"{S3_BUCKET_URL}/deck_images/{deck_id}/notes/"
-        image_names = []
 
-        for note in notes_data:
-            for field in note.fields:
-                image_names += extract_local_image_paths_from_html(field.value)
-
-        for img_name in image_names:
+        for img_name in img_names:
             img_path = self.local_media_dir_path / img_name
             # First we check if the image already exists.
             # If yes, we skip this iteration.

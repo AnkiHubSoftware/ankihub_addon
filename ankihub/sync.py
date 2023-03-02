@@ -39,7 +39,8 @@ class AnkiHubSync:
                 else:
                     raise e
 
-        media_downloader.start_media_download()
+        if AnkiHubClient().is_feature_flag_enabled("image_support_enabled"):
+            media_downloader.start_media_download()
 
         return self._import_results
 
@@ -95,9 +96,6 @@ class AnkiHubSync:
             self._import_results.append(import_result)
 
             config.save_latest_deck_update(ankihub_did, latest_update)
-
-            if client.is_feature_flag_enabled("image_support_enabled"):
-                client.download_note_images(notes_data, ankihub_did)
         else:
             LOGGER.info(f"No new updates to sync for {ankihub_did=}")
         return True
