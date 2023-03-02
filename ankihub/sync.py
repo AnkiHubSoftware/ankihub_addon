@@ -24,7 +24,7 @@ class AnkiHubSync:
         self._import_results: List[AnkiHubImportResult] = []
 
     def sync_all_decks_and_media(self) -> List[AnkiHubImportResult]:
-        LOGGER.info("Syncing all decks...")
+        LOGGER.info("Syncing all decks and media...")
 
         create_backup()
 

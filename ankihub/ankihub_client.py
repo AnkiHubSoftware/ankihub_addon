@@ -405,7 +405,7 @@ class AnkiHubClient:
             with open(image_path, "rb") as image_file:
                 self._upload_to_s3(s3_url, image_file)
 
-    def download_images(self, img_names: List[str], deck_id: uuid.UUID):
+    def download_images(self, img_names: List[str], deck_id: uuid.UUID) -> None:
         deck_images_remote_dir = f"{S3_BUCKET_URL}/deck_images/{deck_id}/notes/"
 
         for img_name in img_names:
