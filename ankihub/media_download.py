@@ -13,7 +13,7 @@ from .media_utils import get_img_names_from_notes
 
 class AnkiHubMediaDownloader:
     def __init__(self) -> None:
-        self._syncing: bool = False
+        self._in_progress: bool = False
 
     def start_media_download(self):
         """Download missing media for all subscribed decks from AnkiHub in the background.
@@ -21,12 +21,12 @@ class AnkiHubMediaDownloader:
         The download status can be checked in the AnkiHub menu.
         """
 
-        if self._syncing:
+        if self._in_progress:
             LOGGER.info("Media download already in progress, skipping...")
             return
 
         LOGGER.info("Starting media download...")
-        self._syncing = True
+        self._in_progress = True
 
         # TODO Refactor this to not have to import from gui.menu here.
         from .gui.menu import media_download_status_action
@@ -65,7 +65,7 @@ class AnkiHubMediaDownloader:
 
         LOGGER.info("Media download finished.")
 
-        self._syncing = False
+        self._in_progress = False
 
         # TODO Refactor this to not have to import from gui.menu here.
         from .gui.menu import media_download_status_action
