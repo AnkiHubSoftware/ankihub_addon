@@ -252,6 +252,9 @@ class Config:
     def deck_extension_config(self, extension_id: int) -> Optional[DeckExtensionConfig]:
         return self._private_config.deck_extensions.get(extension_id)
 
+    def is_logged_in(self) -> bool:
+        return bool(self.token())
+
 
 config = Config()
 

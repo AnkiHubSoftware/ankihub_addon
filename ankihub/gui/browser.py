@@ -436,7 +436,7 @@ def _on_reset_optional_tags_action(browser: Browser):
         )
         return
 
-    if not ah_sync.is_logged_in():
+    if not config.is_logged_in():
         showInfo(
             "You need to be logged in to AnkiHub to reset optional tag groups.",
             parent=browser,

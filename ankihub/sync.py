@@ -24,12 +24,9 @@ class AnkiHubSync:
         self._importer = AnkiHubImporter()
         self._import_results: List[AnkiHubImportResult] = []
 
-    def is_logged_in(self) -> bool:
-        return bool(config.token())
-
     def sync_all_decks(self) -> List[AnkiHubImportResult]:
         LOGGER.info("Starting sync.")
-        if not config.token():
+        if not config.is_logged_in():
             raise NotLoggedInError()
 
         import_results = self._sync_all_decks()

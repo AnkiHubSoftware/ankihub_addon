@@ -88,8 +88,8 @@ def _sync_with_ankihub_and_ankiweb(auth: SyncAuth, _old: Callable) -> None:
 def _maybe_sync_with_ankihub(is_startup_sync: bool) -> bool:
     LOGGER.info("Running _maybe_sync_with_ankihub")
 
-    if not ah_sync.is_logged_in():
-        LOGGER.info("Not syncing with AnkiHub because ah_syn.is_logged_in() is False")
+    if not config.is_logged_in():
+        LOGGER.info("Not syncing with AnkiHub because user is not logged in.")
         return False
 
     if config.public_config["auto_sync"] != "never" and (

@@ -442,7 +442,7 @@ def refresh_ankihub_menu() -> None:
     global ankihub_menu
     ankihub_menu.clear()
 
-    if config.token():
+    if config.is_logged_in():
         create_collaborative_deck_setup(parent=ankihub_menu)
         subscribe_to_deck_setup(parent=ankihub_menu)
         import_media_setup(parent=ankihub_menu)
