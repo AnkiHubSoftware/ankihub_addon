@@ -93,7 +93,8 @@ class AnkiHubSync:
 
             config.save_latest_deck_update(ankihub_did, latest_update)
 
-            client.download_note_images(notes_data, ankihub_did)
+            if client.is_feature_flag_enabled("image_support_enabled"):
+                client.download_note_images(notes_data, ankihub_did)
         else:
             LOGGER.info(f"No new updates to sync for {ankihub_did=}")
         return True
