@@ -824,7 +824,6 @@ def test_suggest_auto_accepted_optional_tags(
 
 
 def test_download_images(
-    monkeypatch: MonkeyPatch,
     requests_mock: Mocker,
     next_deterministic_uuid: Callable[[], uuid.UUID],
 ):
