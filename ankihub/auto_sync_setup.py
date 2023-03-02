@@ -1,6 +1,5 @@
 """Code for setting up auto-syncing with AnkiHub on startup and/or on AnkiWeb sync.
 Depends on the auto_sync setting in the public config."""
-from concurrent.futures import Future
 from time import sleep
 from typing import Callable, Optional
 
@@ -16,7 +15,7 @@ from .utils import OneTimeLock
 
 # TODO these things should happen once per profile lifetime, for now they happen once per Anki start
 # which is probably fine for now
-start_up_sync_lock = OneTimeLock()
+ATTEMPTED_STARTUP_SYNC = False
 db_check_lock = OneTimeLock()
 
 # Variable for storing the exception that was raised during the last sync with AnkiHub.
@@ -42,43 +41,6 @@ def setup_ankihub_sync_on_ankiweb_sync(
     )
 
 
-def maybe_sync_with_ankihub_on_startup(
-    on_startup_syncs_done: Callable[[], None]
-) -> None:
-    if aqt.mw.can_auto_sync():
-        return
-
-    LOGGER.info(
-        "Can't auto sync with AnkiWeb, so trying to sync with AnkiHub immediately."
-    )
-
-    if not start_up_sync_lock.aquire():
-        LOGGER.info("Already synced with AnkiHub on startup.")
-        return
-
-    if not ah_sync.is_logged_in():
-        LOGGER.info("Not syncing with AnkiHub because ah_syn.is_logged_in() is False")
-        return
-
-    _workaround_for_addon_compatibility_on_startup_sync()
-
-    if not config.public_config["auto_sync"] in ["on_ankiweb_sync", "on_startup"]:
-        LOGGER.info(
-            f"Not syncing with AnkiHub because auto_sync setting is set to {config.public_config['auto_sync']}"
-        )
-
-    def on_done(future: Future):
-        future.result()
-        lambda: _on_sync_did_finish(on_startup_syncs_done=on_startup_syncs_done)
-
-    LOGGER.info("Syncing with AnkiHub on startup.")
-    aqt.mw.taskman.with_progress(
-        task=ah_sync.sync_all_decks,
-        label="Syncing with AnkiHub",
-        on_done=on_done,
-    )
-
-
 def _on_sync_did_finish(on_startup_syncs_done: Callable[[], None]) -> None:
     if EXCEPTION_ON_LAST_AH_SYNC:
         # append the hook again, because it will be removed by Anki when the exception is raised
@@ -94,7 +56,9 @@ def _on_sync_did_finish(on_startup_syncs_done: Callable[[], None]) -> None:
 def _sync_with_ankihub_and_ankiweb(auth: SyncAuth, _old: Callable) -> None:
     LOGGER.info("Running _sync_with_ankihub_and_ankiweb")
 
-    is_startup_sync = start_up_sync_lock.aquire()
+    global ATTEMPTED_STARTUP_SYNC
+    is_startup_sync = not ATTEMPTED_STARTUP_SYNC
+    ATTEMPTED_STARTUP_SYNC = True
 
     if is_startup_sync:
         _workaround_for_addon_compatibility_on_startup_sync()
