@@ -2,6 +2,7 @@ import gzip
 import json
 import os
 import subprocess
+import tempfile
 import uuid
 from copy import deepcopy
 from datetime import datetime, timezone
@@ -12,6 +13,7 @@ from unittest.mock import MagicMock, Mock
 import pytest
 import requests_mock
 from pytest import MonkeyPatch
+from requests_mock import Mocker
 from vcr import VCR  # type: ignore
 
 from ..factories import NoteInfoFactory
@@ -22,6 +24,7 @@ os.environ["SKIP_INIT"] = "1"
 
 from ankihub import ankihub_client
 from ankihub.ankihub_client import (
+    S3_BUCKET_URL,
     AnkiHubClient,
     ChangeNoteSuggestion,
     Deck,
@@ -818,3 +821,23 @@ def test_suggest_auto_accepted_optional_tags(
         note_customization.tags = sorted(note_customization.tags)
 
     assert chunk == expected_response
+
+
+def test_download_images(
+    monkeypatch: MonkeyPatch,
+    requests_mock: Mocker,
+    next_deterministic_uuid: Callable[[], uuid.UUID],
+):
+    with tempfile.TemporaryDirectory() as temp_dir:
+
+        client = AnkiHubClient(local_media_dir_path=Path(temp_dir))
+
+        deck_id = next_deterministic_uuid()
+        requests_mock.get(
+            f"{S3_BUCKET_URL}/deck_images/{deck_id}/notes/" + "imgage.png",
+            content=b"image data",
+        )
+        client.download_images(img_names=["imgage.png"], deck_id=deck_id)
+
+        assert (Path(temp_dir) / "imgage.png").exists()
+        assert (Path(temp_dir) / "imgage.png").read_bytes() == b"image data"
