@@ -31,7 +31,10 @@ class AnkiHubMediaDownloader:
         # TODO Refactor this to not have to import from gui.menu here.
         from .gui.menu import media_download_status_action
 
-        media_download_status_action.setText("Media download: In progress...")
+        if media_download_status_action is not None:
+            # The action can be None if the image support feature flag is disabled.
+            media_download_status_action.setText("Media download: In progress...")
+
         aqt.mw.taskman.run_in_background(
             task=self._download_misssing_media,
             on_done=self._on_finished,
@@ -69,7 +72,9 @@ class AnkiHubMediaDownloader:
 
         # TODO Refactor this so that the status is not hardcoded here.
         # Not sure yet if showing the status in the menu is a good idea.
-        media_download_status_action.setText("Media download: Idle.")
+        if media_download_status_action is not None:
+            # The action can be None if the image support feature flag is disabled.
+            media_download_status_action.setText("Media download: Idle.")
 
 
 media_downloader = AnkiHubMediaDownloader()
