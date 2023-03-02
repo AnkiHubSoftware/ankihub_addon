@@ -2545,7 +2545,6 @@ def test_download_images_on_sync(
 
         # Mock the client method for downloading images.
         download_images_mock = Mock()
-        download_images_mock.return_value = []
         monkeypatch.setattr(AnkiHubClient, "download_images", download_images_mock)
 
         # Run the sync.
