@@ -5,6 +5,7 @@ from pprint import pformat
 
 import requests
 from requests import Response
+import aqt
 
 from . import LOGGER
 from .ankihub_client import AnkiHubClient, AnkiHubRequestError
@@ -42,6 +43,7 @@ class AddonAnkiHubClient(AnkiHubClient):
         super().__init__(
             hooks=hooks if hooks is not None else DEFAULT_RESPONSE_HOOKS,
             token=config.token(),
+            local_media_dir_path=Path(aqt.mw.col.media.dir()),
         )
 
     def upload_logs(self, file: Path, key: str) -> None:
