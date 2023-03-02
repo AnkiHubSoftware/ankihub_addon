@@ -830,7 +830,14 @@ class AnkiHubClient:
         message = data["message"]
         LOGGER.debug(f"suggest_optional_tags response message: {message}")
 
-    def get_waffle_status(self):
+    def is_feature_flag_enabled(self, flag_name: str) -> bool:
+        return (
+            self._get_waffle_status()["flags"]
+            .get(flag_name, {})
+            .get("is_active", False)
+        )
+
+    def _get_waffle_status(self):
         response = self._send_request(
             "GET",
             "/waffle/waffle_status",
