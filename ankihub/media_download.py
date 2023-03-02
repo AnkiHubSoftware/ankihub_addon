@@ -44,7 +44,7 @@ class AnkiHubMediaDownloader:
                 continue
             AddonAnkiHubClient().download_images(missing_image_names, ah_did)
 
-    def missing_images_for_ah_deck(self, ah_did: uuid.UUID) -> List[str]:
+    def _missing_images_for_ah_deck(self, ah_did: uuid.UUID) -> List[str]:
         nids = ankihub_db.anki_nids_for_ankihub_deck(ah_did)
         img_names = get_img_names_from_notes(nids)
 
