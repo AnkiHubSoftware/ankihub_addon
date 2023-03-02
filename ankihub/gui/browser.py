@@ -58,7 +58,7 @@ from ..suggestions import (
     BulkNoteSuggestionsResult,
     suggest_notes_in_bulk,
 )
-from ..sync import ah_sync
+from ..sync import ah_sync, NotLoggedInError
 from .custom_columns import (
     AnkiHubIdColumn,
     CustomColumn,
@@ -437,11 +437,7 @@ def _on_reset_optional_tags_action(browser: Browser):
         return
 
     if not config.is_logged_in():
-        showInfo(
-            "You need to be logged in to AnkiHub to reset optional tag groups.",
-            parent=browser,
-        )
-        return
+        raise NotLoggedInError()
 
     extension_configs = [config.deck_extension_config(eid) for eid in extension_ids]
     tag_group_names = [c.tag_group_name for c in extension_configs]
