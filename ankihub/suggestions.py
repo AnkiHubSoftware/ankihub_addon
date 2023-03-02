@@ -48,11 +48,7 @@ def suggest_note_update(
 def upload_images_for_suggestion(suggestion: NoteSuggestion, ah_did: uuid.UUID) -> None:
     client = AnkiHubClient()
 
-    if not (
-        client.get_waffle_status()["flags"]
-        .get("image_support_enabled", {})
-        .get("is_active", False)
-    ):
+    if not client.is_feature_flag_enabled("image_support_enabled"):
         return
 
     # TODO: This should be executed in background
