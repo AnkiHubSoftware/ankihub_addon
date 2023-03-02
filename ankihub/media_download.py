@@ -61,11 +61,11 @@ class AnkiHubMediaDownloader:
         return result
 
     def _on_finished(self, future: Future) -> None:
+        self._in_progress = False
+
         future.result()
 
         LOGGER.info("Media download finished.")
-
-        self._in_progress = False
 
         # TODO Refactor this to not have to import from gui.menu here.
         from .gui.menu import media_download_status_action
