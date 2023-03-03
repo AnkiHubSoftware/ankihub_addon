@@ -12,8 +12,6 @@ from .auto_sync_setup import setup_ankihub_sync_on_ankiweb_sync
 from .db import ankihub_db
 from .errors import setup_error_handler
 from .gui import browser, editor
-from .gui.anki_db_check import check_anki_db
-from .gui.db_check import check_ankihub_db
 from .gui.menu import refresh_ankihub_menu, setup_ankihub_menu
 from .progress import setup_progress_manager
 from .settings import (
@@ -23,10 +21,12 @@ from .settings import (
     setup_logger,
     setup_profile_data_folder,
 )
-from .utils import OneTimeLock, modify_note_type_templates
+from .utils import modify_note_type_templates
 
-# some code needs to be run only once even if the Anki profile changes
-general_setup_lock = OneTimeLock()
+# The general setup should be only once, because it sets up menu items, hooks, etc.
+# We don't want to set them up multiple times when the profile is opened multiple times,
+# because that would cause multiple menu items, hooks, etc.
+ATTEMPTED_GENERAL_SETUP = False
 
 
 def run():
@@ -49,7 +49,9 @@ def on_profile_did_open():
 
     after_profile_setup()
 
-    if general_setup_lock.aquire():
+    global ATTEMPTED_GENERAL_SETUP
+    if not ATTEMPTED_GENERAL_SETUP:
+        ATTEMPTED_GENERAL_SETUP = True
         general_setup()
 
 
@@ -119,12 +121,8 @@ def general_setup():
 
     LOGGER.info("Loaded media_export.")
 
-    setup_ankihub_sync_on_ankiweb_sync(on_startup_syncs_done=on_startup_sync_done)
+    setup_ankihub_sync_on_ankiweb_sync()
     LOGGER.info("Called setup_ankihub_sync_on_ankiweb_sync.")
-
-
-def on_startup_sync_done():
-    check_ankihub_db(on_success=check_anki_db)
 
 
 def log_enabled_addons():

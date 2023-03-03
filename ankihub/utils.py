@@ -1,5 +1,4 @@
 import re
-import threading
 import time
 from pprint import pformat
 from typing import Any, Dict, Iterable, List, Optional, Sequence, Set, Tuple
@@ -349,21 +348,3 @@ def create_backup() -> None:
 def truncated_list(values: List[Any], limit: int) -> List[Any]:
     assert limit > 0
     return values[:limit] + ["..."] if len(values) > limit else values
-
-
-class OneTimeLock:
-    def __init__(self):
-        self._semaphore = threading.Semaphore(value=1)
-        self._value = False
-
-    def aquire(self) -> bool:
-        """Returns true the first time it is called, false otherwise.
-        Does not block in either case."""
-        result = False
-        if self._semaphore.acquire(blocking=False):
-            if not self._value:
-                self._value = True
-                result = True
-            self._semaphore.release()
-
-        return result

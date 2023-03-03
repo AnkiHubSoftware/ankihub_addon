@@ -31,6 +31,7 @@ from ..register_decks import create_collaborative_deck
 from ..settings import ADDON_VERSION, config, url_view_deck
 from ..subdecks import SUBDECK_TAG
 from ..sync import ah_sync, show_tooltip_about_last_sync_results
+from .db_check import maybe_check_databases
 from .decks import SubscribedDecksDialog
 from .utils import ask_user
 
@@ -292,6 +293,8 @@ def on_sync_done(future: Future) -> None:
     future.result()
 
     show_tooltip_about_last_sync_results()
+
+    maybe_check_databases()
 
 
 def sign_out_action():

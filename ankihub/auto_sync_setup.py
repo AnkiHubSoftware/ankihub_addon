@@ -9,14 +9,13 @@ from anki.sync import SyncAuth
 from aqt.gui_hooks import sync_did_finish
 
 from . import LOGGER
+from .gui.db_check import maybe_check_databases
 from .settings import ANKI_MINOR, config
 from .sync import ah_sync, show_tooltip_about_last_sync_results
-from .utils import OneTimeLock
 
-# TODO these things should happen once per profile lifetime, for now they happen once per Anki start
-# which is probably fine for now
+# TODO The startup sync should happen once per profile lifetime, for now it is run once per Anki start
+# which is fine for now.
 ATTEMPTED_STARTUP_SYNC = False
-db_check_lock = OneTimeLock()
 
 # Variable for storing the exception that was raised during the last sync with AnkiHub.
 # It can't be raised directly, because the AnkiHub sync happens in the background task
@@ -25,9 +24,7 @@ db_check_lock = OneTimeLock()
 EXCEPTION_ON_LAST_AH_SYNC: Optional[Exception] = None
 
 
-def setup_ankihub_sync_on_ankiweb_sync(
-    on_startup_syncs_done: Callable[[], None]
-) -> None:
+def setup_ankihub_sync_on_ankiweb_sync() -> None:
     # aqt.mw.col.sync_collection is called in a background task with a progress dialog.
     # This adds the AnkiHub sync to the beginning of this background task.
     aqt.mw.col.sync_collection = wrap(  # type: ignore
@@ -36,21 +33,18 @@ def setup_ankihub_sync_on_ankiweb_sync(
         "around",
     )
 
-    sync_did_finish.append(
-        lambda: _on_sync_did_finish(on_startup_syncs_done=on_startup_syncs_done)
-    )
+    sync_did_finish.append(_on_sync_did_finish)
 
 
-def _on_sync_did_finish(on_startup_syncs_done: Callable[[], None]) -> None:
+def _on_sync_did_finish() -> None:
     if EXCEPTION_ON_LAST_AH_SYNC:
         # append the hook again, because it will be removed by Anki when the exception is raised
-        sync_did_finish.append(lambda: _on_sync_did_finish(on_startup_syncs_done))
+        sync_did_finish.append(_on_sync_did_finish)
         raise EXCEPTION_ON_LAST_AH_SYNC
 
     show_tooltip_about_last_sync_results()
 
-    if db_check_lock.aquire():
-        on_startup_syncs_done()
+    maybe_check_databases()
 
 
 def _sync_with_ankihub_and_ankiweb(auth: SyncAuth, _old: Callable) -> None:
