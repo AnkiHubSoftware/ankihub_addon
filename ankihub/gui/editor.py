@@ -232,15 +232,19 @@ def _hide_ankihub_field_in_editor(
     """Add JS to the JS code of the editor to hide the ankihub_id field if it is present."""
     hide_last_field = settings.ANKIHUB_NOTE_TYPE_FIELD_NAME in note
     if ANKI_MINOR >= 50:
-        refresh_fields_js = _refresh_editor_fields_for_anki_v50_and_up(hide_last_field)
+        refresh_fields_js = _refresh_editor_fields_for_anki_v50_and_up_js(
+            hide_last_field
+        )
     else:
-        refresh_fields_js = _refresh_editor_fields_for_anki_below_v50(hide_last_field)
+        refresh_fields_js = _refresh_editor_fields_for_anki_below_v50_js(
+            hide_last_field
+        )
 
     result = js + refresh_fields_js
     return result
 
 
-def _refresh_editor_fields_for_anki_v50_and_up(hide_last_field) -> str:
+def _refresh_editor_fields_for_anki_v50_and_up_js(hide_last_field: bool) -> str:
     if ANKI_MINOR >= 55:
         change_visiblility_js = """
             function changeVisibilityOfField(field_idx, visible) {
@@ -285,9 +289,9 @@ def _refresh_editor_fields_for_anki_v50_and_up(hide_last_field) -> str:
     return result
 
 
-def _refresh_editor_fields_for_anki_below_v50(hide_last_field: bool):
+def _refresh_editor_fields_for_anki_below_v50_js(hide_last_field: bool) -> str:
     if hide_last_field:
-        result = """
+        return """
             (() => {
                 let fields = document.getElementById("fields").children;
                 // This condition is here for compatibility with the multi column editor add-on
@@ -301,7 +305,7 @@ def _refresh_editor_fields_for_anki_below_v50(hide_last_field: bool):
             })()
             """
     else:
-        result = """
+        return """
             (() => {
                 const field = document.querySelector("#fields *[data-ankihub-hidden]");
                 if (field) {
@@ -310,7 +314,6 @@ def _refresh_editor_fields_for_anki_below_v50(hide_last_field: bool):
                 }
             })()
             """
-    return result
 
 
 def _refresh_buttons(editor: Editor) -> None:
