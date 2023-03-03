@@ -8,7 +8,7 @@ from aqt.gui_hooks import profile_did_open
 
 from . import LOGGER, ankihub_client
 from .addons import setup_addons
-from .auto_sync_setup import setup_ankihub_sync_on_ankiweb_sync
+from .auto_sync import setup_ankihub_sync_on_ankiweb_sync
 from .db import ankihub_db
 from .errors import setup_error_handler
 from .gui import browser, editor
