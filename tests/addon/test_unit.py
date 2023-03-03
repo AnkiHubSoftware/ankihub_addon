@@ -5,8 +5,7 @@ from pytest import MonkeyPatch
 import pytest
 
 from pytest_anki import AnkiSession
-from ankihub.ankihub_client import AnkiHubClient
-from tests.client.test_client import change_note_suggestion  # noqa
+from ankihub.ankihub_client import AnkiHubClient, ChangeNoteSuggestion
 
 # workaround for vscode test discovery not using pytest.ini which sets this env var
 # has to be set before importing ankihub
@@ -43,7 +42,7 @@ class TestUploadImagesForSuggestion:
         self,
         mocked_get_images_from_suggestion,
         monkeypatch: MonkeyPatch,
-        change_note_suggestion,  # noqa
+        change_note_suggestion: ChangeNoteSuggestion,
         anki_session_with_addon_data: AnkiSession,
         enable_image_support_feature_flag,
     ):
@@ -65,8 +64,9 @@ class TestUploadImagesForSuggestion:
                 change_note_suggestion, fake_deck_id
             )
 
+        bucket_path = f"deck_images/{fake_deck_id}/suggestions/"
         upload_images_mock.assert_called_once_with(
-            expected_image_path_list, fake_deck_id
+            expected_image_path_list, bucket_path
         )
 
     def test_generate_asset_files_with_hashed_names(self, setup_and_teardown):

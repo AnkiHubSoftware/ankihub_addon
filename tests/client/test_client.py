@@ -833,7 +833,7 @@ def test_download_images(
 
         deck_id = next_deterministic_uuid()
         requests_mock.get(
-            f"{S3_BUCKET_URL}/deck_assets/{deck_id}" + "imgage.png",
+            f"{S3_BUCKET_URL}/deck_images/{deck_id}/notes/" + "imgage.png",
             content=b"image data",
         )
         client.download_images(img_names=["imgage.png"], deck_id=deck_id)
