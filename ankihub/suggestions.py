@@ -1,3 +1,5 @@
+import hashlib
+import shutil
 import uuid
 from dataclasses import dataclass
 from pathlib import Path
@@ -5,6 +7,8 @@ from typing import Any, Dict, List, Optional
 
 from anki.notes import Note, NoteId
 import aqt
+
+from .media_utils import find_and_replace_text_in_fields
 
 from .addon_ankihub_client import AddonAnkiHubClient as AnkiHubClient
 from .ankihub_client import (
@@ -15,7 +19,6 @@ from .ankihub_client import (
 )
 from .db import ankihub_db
 from .exporting import to_note_data
-from .settings import config
 from .common_utils import extract_local_image_paths_from_html
 
 # string that is contained in the errors returned from the AnkiHub API when
@@ -55,7 +58,6 @@ def upload_images_for_suggestion(suggestion: NoteSuggestion, ah_did: uuid.UUID) 
         return
 
     # TODO: This should be executed in background
-
     # Find images in suggestion fields and upload them to s3
     image_paths = get_images_from_suggestion(suggestion=suggestion)
 
