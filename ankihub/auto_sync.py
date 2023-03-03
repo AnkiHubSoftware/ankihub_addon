@@ -91,7 +91,7 @@ def _maybe_sync_with_ankihub(is_startup_sync: bool) -> bool:
         or config.public_config["auto_sync"] == "on_ankiweb_sync"
     ):
         LOGGER.info("Syncing with AnkiHub in _new_sync_collection")
-        ah_sync.sync_all_decks()
+        ah_sync.sync_all_decks_and_media()
         return True
     else:
         LOGGER.info("Not syncing with AnkiHub")

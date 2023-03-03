@@ -11,6 +11,7 @@ from .addon_ankihub_client import AddonAnkiHubClient as AnkiHubClient
 from .ankihub_client import AnkiHubRequestError, DeckExtension
 from .db import ankihub_db
 from .importing import AnkiHubImporter, AnkiHubImportResult
+from .media_download import media_downloader
 from .settings import config
 from .utils import create_backup
 
@@ -24,14 +25,24 @@ class AnkiHubSync:
         self._importer = AnkiHubImporter()
         self._import_results: List[AnkiHubImportResult] = []
 
-    def sync_all_decks(self) -> List[AnkiHubImportResult]:
-        """Syncs all decks with AnkiHub. Should be called from a background thread with a progress dialog
-        to avoid blocking the UI."""
-        LOGGER.info("Starting sync.")
+    def sync_all_decks_and_media(
+        self, start_media_sync: bool = True
+    ) -> List[AnkiHubImportResult]:
+        """Syncs all decks with AnkiHub and starts the media download.
+        Should be called from a background thread with a progress dialog to avoid blocking the UI."""
+        LOGGER.info("Syncing all decks and media...")
         if not config.is_logged_in():
             raise NotLoggedInError()
 
         import_results = self._sync_all_decks()
+
+        # The media sync should be started after the import because the import might have added new
+        # media references to notes.
+        if start_media_sync and AnkiHubClient().is_feature_flag_enabled(
+            "image_support_enabled"
+        ):
+            media_downloader.start_media_download()
+
         LOGGER.info("Sync finished.")
         return import_results
 
@@ -108,9 +119,6 @@ class AnkiHubSync:
             self._import_results.append(import_result)
 
             config.save_latest_deck_update(ankihub_did, latest_update)
-
-            if client.is_feature_flag_enabled("image_support_enabled"):
-                client.download_note_images(notes_data, ankihub_did)
         else:
             LOGGER.info(f"No new updates to sync for {ankihub_did=}")
         return True

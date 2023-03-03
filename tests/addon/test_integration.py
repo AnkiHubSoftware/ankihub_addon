@@ -2176,12 +2176,13 @@ def test_reset_local_changes_to_notes(
 def test_migrate_profile_data_from_old_location(
     anki_session_with_addon_before_profile_support: AnkiSession,
     monkeypatch: MonkeyPatch,
+    disable_image_support_feature_flag,
 ):
     anki_session = anki_session_with_addon_before_profile_support
 
     # mock the ah_sync object so that the add-on doesn't try to sync with AnkiHub
     monkeypatch.setattr(
-        "ankihub.sync.ah_sync.sync_all_decks", lambda *args, **kwargs: None
+        "ankihub.sync.ah_sync.sync_all_decks_and_media", lambda *args, **kwargs: None
     )
 
     # run the entrypoint and load the profile to trigger the migration
@@ -2281,7 +2282,9 @@ class TestAutoSync:
             mw = anki_session_with_addon_data.mw
 
             patch_ankiweb_sync_to_do_nothing(mw, monkeypatch)
-            sync_all_decks_mock = self._mock_sync_all_decks(mw, monkeypatch)
+            sync_all_decks_and_media_mock = self._mock_sync_all_decks_and_media(
+                monkeypatch
+            )
 
             setup_ankihub_sync_on_ankiweb_sync()
 
@@ -2290,7 +2293,7 @@ class TestAutoSync:
             # Trigger the AnkiWeb sync and assert that the AnkiHub sync is invoked.
             sync_collection(mw, on_done=lambda: None)
             qtbot.wait(200)
-            assert sync_all_decks_mock.call_count == 1
+            assert sync_all_decks_and_media_mock.call_count == 1
 
     def test_with_never_option(
         self,
@@ -2302,7 +2305,7 @@ class TestAutoSync:
             mw = anki_session_with_addon_data.mw
 
             patch_ankiweb_sync_to_do_nothing(mw, monkeypatch)
-            sync_all_decks_mock = self._mock_sync_all_decks(mw, monkeypatch)
+            sync_all_decks_mock = self._mock_sync_all_decks_and_media(monkeypatch)
 
             setup_ankihub_sync_on_ankiweb_sync()
 
@@ -2323,7 +2326,7 @@ class TestAutoSync:
             mw = anki_session_with_addon_data.mw
 
             patch_ankiweb_sync_to_do_nothing(mw, monkeypatch)
-            sync_all_decks_mock = self._mock_sync_all_decks(mw, monkeypatch)
+            sync_all_decks_mock = self._mock_sync_all_decks_and_media(monkeypatch)
 
             setup_ankihub_sync_on_ankiweb_sync()
 
@@ -2339,10 +2342,10 @@ class TestAutoSync:
             qtbot.wait(200)
             assert sync_all_decks_mock.call_count == 1
 
-    def _mock_sync_all_decks(self, mw: AnkiQt, monkeypatch: MonkeyPatch) -> Mock:
+    def _mock_sync_all_decks_and_media(self, monkeypatch: MonkeyPatch) -> Mock:
         # Mock the sync with AnkiHub so that it doesn't actually sync.
         sync_all_decks_mock = Mock()
-        monkeypatch.setattr(ah_sync, "sync_all_decks", sync_all_decks_mock)
+        monkeypatch.setattr(ah_sync, "sync_all_decks_and_media", sync_all_decks_mock)
         return sync_all_decks_mock
 
 
@@ -2604,8 +2607,10 @@ def test_reset_optional_tags_action(
         monkeypatch.setattr(config, "is_logged_in", is_logged_in_mock)
 
         # mock method of ah_sync
-        sync_all_decks_mock = Mock()
-        monkeypatch.setattr(ah_sync, "sync_all_decks", sync_all_decks_mock)
+        sync_all_decks_and_media_mock = Mock()
+        monkeypatch.setattr(
+            ah_sync, "sync_all_decks_and_media", sync_all_decks_and_media_mock
+        )
 
         # run the reset action
         browser: Browser = dialogs.open("Browser", mw)
@@ -2623,12 +2628,60 @@ def test_reset_optional_tags_action(
         assert note.tags == []
 
         assert is_logged_in_mock.call_count == 1
-        assert sync_all_decks_mock.call_count == 1
+        assert sync_all_decks_and_media_mock.call_count == 1
 
         # the other note should not be affected, because it is in a different deck
         assert mw.col.get_note(other_note.id).tags == [
             f"{TAG_FOR_OPTIONAL_TAGS}::test99::test2"
         ]
+
+
+def test_download_images_on_sync(
+    anki_session_with_addon_data: AnkiSession,
+    install_sample_ah_deck: InstallSampleAHDeck,
+    monkeypatch: MonkeyPatch,
+    qtbot: QtBot,
+    enable_image_support_feature_flag,
+):
+    with anki_session_with_addon_data.profile_loaded():
+        mw = anki_session_with_addon_data.mw
+
+        _, ah_did = install_sample_ah_deck()
+
+        # Add a reference to a local image to a note.
+        nids = mw.col.find_notes("")
+        nid = nids[0]
+        note = mw.col.get_note(nid)
+        note.fields[0] = "Some text. <img src='image.png'>"
+        note.flush()
+
+        # Mock the token to simulate that the user is logged in.
+        monkeypatch.setattr(config, "token", lambda: "test token")
+
+        # Mock the client to simulate that there are no deck updates and extensions.
+        monkeypatch.setattr(
+            AnkiHubClient,
+            "get_deck_updates",
+            lambda *args, **kwargs: [],
+        )
+        monkeypatch.setattr(
+            AnkiHubClient,
+            "get_deck_extensions_by_deck_id",
+            lambda *args, **kwargs: [],
+        )
+
+        # Mock the client method for downloading images.
+        download_images_mock = Mock()
+        monkeypatch.setattr(AnkiHubClient, "download_images", download_images_mock)
+
+        # Run the sync.
+        ah_sync.sync_all_decks_and_media()
+
+        # Let the background thread (which downloads missing media) finish.
+        qtbot.wait(200)
+
+        # Assert that the client method for downloading images was called with the correct arguments.
+        download_images_mock.assert_called_once_with(["image.png"], ah_did)
 
 
 def test_upload_images(

@@ -78,7 +78,7 @@ def anki_session_with_addon_before_profile_support(anki_session_with_addon_data)
 
 
 @pytest.fixture
-def enable_image_support_feature_flag(requests_mock: Mocker):
+def enable_image_support_feature_flag(requests_mock: Mocker) -> None:
     from ankihub.ankihub_client import API_URL_BASE
 
     requests_mock.get(
@@ -89,7 +89,7 @@ def enable_image_support_feature_flag(requests_mock: Mocker):
 
 
 @pytest.fixture
-def disable_image_support_feature_flag(requests_mock: Mocker):
+def disable_image_support_feature_flag(requests_mock: Mocker) -> None:
     from ankihub.ankihub_client import API_URL_BASE
 
     requests_mock.get(

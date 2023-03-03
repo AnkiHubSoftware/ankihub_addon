@@ -491,7 +491,7 @@ def _reset_optional_tag_group(extension_id: int) -> None:
 
     # sync with ankihub to re-download the deck extension
     # TODO only sync the deck extension or the related deck instead of all decks
-    ah_sync.sync_all_decks()
+    ah_sync.sync_all_decks_and_media(start_media_sync=False)
 
 
 def _remove_optional_tags_of_extension(extension_config: DeckExtensionConfig) -> None:
