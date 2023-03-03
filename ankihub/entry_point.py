@@ -147,5 +147,5 @@ def adjust_ankihub_note_type_templates():
     # the CardTypeError can happen when the template has a problem (for example a missing field)
     try:
         modify_note_type_templates(mids_filtered)
-    except CardTypeError:
+    except CardTypeError:  # noqa: E722
         LOGGER.exception("Failed to adjust AnkiHub note type templates.")
