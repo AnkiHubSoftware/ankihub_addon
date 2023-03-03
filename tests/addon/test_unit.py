@@ -1,6 +1,11 @@
 import os
+from pathlib import Path
+from unittest.mock import Mock, patch
+from pytest import MonkeyPatch
+import pytest
 
 from pytest_anki import AnkiSession
+from ankihub.ankihub_client import AnkiHubClient, ChangeNoteSuggestion
 
 # workaround for vscode test discovery not using pytest.ini which sets this env var
 # has to be set before importing ankihub
@@ -13,6 +18,112 @@ from ankihub.note_conversion import ADDON_INTERNAL_TAGS, TAG_FOR_OPTIONAL_TAGS
 from ankihub.register_decks import note_type_name_without_ankihub_modifications
 from ankihub.subdecks import SUBDECK_TAG, add_subdeck_tags_to_notes
 from ankihub.utils import lowest_level_common_ancestor_deck_name
+from ankihub import suggestions
+
+
+def remove_generated_files():
+    test_media_path = Path("tests/addon/test_media")
+    for _, _, filenames in os.walk(test_media_path):
+        for filename in filenames:
+            if not filename.lower().startswith("testfile_"):
+                os.remove(test_media_path / filename)
+
+
+@pytest.fixture
+def setup_and_teardown():
+    remove_generated_files()
+    yield
+    remove_generated_files()
+
+
+class TestUploadImagesForSuggestion:
+    @patch("ankihub.suggestions.get_images_from_suggestion")
+    def test_should_call_upload_images_with_correct_params(
+        self,
+        mocked_get_images_from_suggestion,
+        monkeypatch: MonkeyPatch,
+        change_note_suggestion: ChangeNoteSuggestion,
+        anki_session_with_addon_data: AnkiSession,
+        enable_image_support_feature_flag,
+    ):
+        fake_deck_id = "e232efae-7451-4a9f-b8e4-25d4ae4185ca"
+        change_note_suggestion.fields[0].value = '<img src="mario.jpg" width="150">'
+        change_note_suggestion.fields[1].value = "<img src='random.png'>"
+
+        upload_images_mock = Mock()
+        monkeypatch.setattr(AnkiHubClient, "upload_images", upload_images_mock)
+
+        expected_image_path_list = [
+            Path("/tmp/anki_base_4pod1tq8/User 1/collection.media/mario.jpg"),
+            Path("/tmp/anki_base_4pod1tq8/User 1/collection.media/random.png"),
+        ]
+        mocked_get_images_from_suggestion.return_value = expected_image_path_list
+
+        with anki_session_with_addon_data.profile_loaded():
+            suggestions.upload_images_for_suggestion(
+                change_note_suggestion, fake_deck_id
+            )
+
+        bucket_path = f"deck_images/{fake_deck_id}/suggestions/"
+        upload_images_mock.assert_called_once_with(
+            expected_image_path_list, bucket_path
+        )
+
+    def test_generate_asset_files_with_hashed_names(self, setup_and_teardown):
+        filenames = [
+            Path("tests/addon/test_media/testfile_mario.png"),
+            Path("tests/addon/test_media/testfile_anki.gif"),
+            Path("tests/addon/test_media/testfile_test.jpeg"),
+        ]
+
+        expected_result = {
+            "testfile_mario.png": "156ca948cd1356b1a2c1c790f0855ad9.png",
+            "testfile_anki.gif": "87617b1d58967eb86b9e0e5dc92d91ee.gif",
+            "testfile_test.jpeg": "a61eab59692d17a2adf4d1c5e9049ee4.jpeg",
+        }
+
+        hashed_asset_map = suggestions.generate_asset_files_with_hashed_names(filenames)
+        assert hashed_asset_map == expected_result
+
+    def test_update_asset_names_on_notes(
+        self, anki_session_with_addon_data: AnkiSession
+    ):
+        with anki_session_with_addon_data.profile_loaded():
+            mw = anki_session_with_addon_data.mw
+
+            note_contents = [
+                'Sample Text <div> abc <img src="test.png"> </div>',
+                "<span> a</span><img src='other_test.gif' width='250'><div></div>",
+                '<span> <p>this note will not have is image replaced </p> <img src="will_not_replace.jpeg"> </span>',
+            ]
+            notes = []
+
+            mw.col.decks.add_normal_deck_with_name("MediaTestDeck")
+            for content in note_contents:
+                note = mw.col.new_note(mw.col.models.by_name("Basic"))
+                notes.append(note)
+                note["Front"] = content
+                mw.col.add_note(note, mw.col.decks.by_name("MediaTestDeck")["id"])
+
+            hashed_name_map = {
+                "test.png": "fueriwhfvureivhnaowuyiegrofuaywwqg.png",
+                "other_test.gif": "fWJKERDVNMOWIKJCIWJefgjnverf.gif",
+            }
+
+            suggestions.update_asset_names_on_notes(hashed_name_map)
+
+            notes[0].load()
+            notes[1].load()
+            notes[2].load()
+
+            assert f'<img src="{hashed_name_map["test.png"]}">' in " ".join(
+                notes[0].fields
+            )
+            assert (
+                f"<img src='{hashed_name_map['other_test.gif']}' width='250'>"
+                in " ".join(notes[1].fields)
+            )
+            assert '<img src="will_not_replace.jpeg">' in " ".join(notes[2].fields)
 
 
 def test_lowest_level_common_ancestor_deck_name():
