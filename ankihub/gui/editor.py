@@ -229,50 +229,73 @@ def _on_view_note_history_button_press(editor: Editor) -> None:
 def _hide_ankihub_field_in_editor(
     js: str, note: anki.notes.Note, _: aqt.editor.Editor
 ) -> str:
+    """Add JS to the JS code of the editor to hide the ankihub_id field if it is present."""
+
     if ANKI_MINOR >= 55:
         if settings.ANKIHUB_NOTE_TYPE_FIELD_NAME not in note:
             return js
-        extra = (
-            'require("svelte/internal").tick().then(() => '
-            "{{ require('anki/NoteEditor').instances[0].fields["
-            "require('anki/NoteEditor').instances[0].fields.length -1"
-            "].element.then((element) "
-            "=> {{ element.parentElement.parentElement.hidden = true; }}); }});"
-        )
+
+        extra = """
+            function changeVisibilityOfField(field_idx, visible) {
+                require('anki/NoteEditor').instances[0].fields[field_idx].element.then(
+                    (element) => { element.parentElement.parentElement.hidden = !visible; }
+                );
+            }
+            require("svelte/internal").tick().then(() => {
+                let num_fields = require('anki/NoteEditor').instances[0].fields.length;
+                // show all fields except the last one
+                for (let i = 0; i < num_fields - 1; i++) {
+                    changeVisibilityOfField(i, true);
+                }
+                // hide the last field
+                changeVisibilityOfField(num_fields - 1, false);
+            });
+            """
     elif ANKI_MINOR >= 50:
         if settings.ANKIHUB_NOTE_TYPE_FIELD_NAME not in note:
             return js
-        extra = (
-            'require("svelte/internal").tick().then(() => '
-            "{{ require('anki/NoteEditor').instances[0].fields["
-            "require('anki/NoteEditor').instances[0].fields.length -1"
-            "].element.then((element) "
-            "=> {{ element.hidden = true; }}); }});"
-        )
+
+        extra = """
+            function changeVisibilityOfField(field_idx, visible) {
+                require('anki/NoteEditor').instances[0].fields[field_idx].element.then(
+                    (element) => { element.hidden = !visible; }
+                );
+            }
+            require("svelte/internal").tick().then(() => {
+                let num_fields = require('anki/NoteEditor').instances[0].fields.length;
+                // show all fields except the last one
+                for (let i = 0; i < num_fields - 1; i++) {
+                    changeVisibilityOfField(i, true);
+                }
+                // hide the last field
+                changeVisibilityOfField(num_fields - 1, false);
+            });
+            """
     else:
-        if settings.ANKIHUB_NOTE_TYPE_FIELD_NAME not in note:
-            extra = (
-                "(() => {"
-                'const field = document.querySelector("#fields *[data-ankihub-hidden]");'
-                "if (field) {"
-                "delete field.dataset.ankihubHidden;"
-                "field.hidden = false;"
-                "}"
-                "})()"
-            )
+        if settings.ANKIHUB_NOTE_TYPE_FIELD_NAME in note:
+            extra = """
+                (() => {
+                    let fields = document.getElementById("fields").children;
+                    // This condition is here for compatibility with the multi column editor add-on
+                    // https://ankiweb.net/shared/info/3491767031
+                    if(fields[0].nodeName == "TABLE") {
+                       fields = fields[0].children;
+                    }
+                    const field = fields[fields.length -1];
+                    field.dataset.ankihubHidden = true;
+                    field.hidden = true;
+                })()
+                """
         else:
-            extra = (
-                "(() => {"
-                'let fields = document.getElementById("fields").children;'
-                # For compatibility with the multi column editor add-on https://ankiweb.net/shared/info/3491767031
-                'if(fields[0].nodeName == "TABLE") {'
-                "   fields = fields[0].children;"
-                "}"
-                "const field = fields[fields.length -1];"
-                "field.dataset.ankihubHidden = true;"
-                "field.hidden = true;"
-                "})()"
-            )
+            extra = """
+                (() => {
+                    const field = document.querySelector("#fields *[data-ankihub-hidden]");
+                    if (field) {
+                        delete field.dataset.ankihubHidden;
+                        field.hidden = false;
+                    }
+                })()
+                """
     js += extra
     return js
 
