@@ -36,7 +36,7 @@ LOGGER = logging.getLogger(__name__)
 S3_BUCKET_URL = (
     "https://ankihubbucket.s3.us-east-2.amazonaws.com"
     if bool(os.getenv("DEVELOPMENT", True))
-    else "https://ankihub.s3.amazonaws.com"
+    else "https://ankihub-decks-assets.s3.amazonaws.com/"
 )
 
 API_URL_BASE = "https://app.ankihub.net/api"
@@ -397,18 +397,16 @@ class AnkiHubClient:
         if s3_response.status_code != 200:
             raise AnkiHubRequestError(s3_response)
 
-    def upload_images(self, image_paths: List[Path], deck_id: uuid.UUID) -> None:
-        # deck_id is used to namespace the images within each deck.
-
+    def upload_images(self, image_paths: List[Path], bucket_path: str) -> None:
         # TODO: send all images at once instad of looping through each one
         for image_path in image_paths:
-            key = f"deck_assets/{deck_id}/{image_path.name}"
+            key = f"{bucket_path}/{image_path.name}"
             s3_url = self.get_presigned_url(key=key, action="upload")
             with open(image_path, "rb") as image_file:
                 self._upload_to_s3(s3_url, image_file)
 
     def download_images(self, img_names: List[str], deck_id: uuid.UUID) -> None:
-        deck_images_remote_dir = f"{S3_BUCKET_URL}/deck_assets/{deck_id}"
+        deck_images_remote_dir = f"{S3_BUCKET_URL}/deck_images/{deck_id}/notes/"
 
         for img_name in img_names:
             img_path = self.local_media_dir_path / img_name
