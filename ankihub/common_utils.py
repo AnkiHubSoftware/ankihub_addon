@@ -2,9 +2,11 @@
 import re
 from typing import List
 
+IMG_NAME_IN_IMG_TAG_REGEX = re.compile(r"<img.*?src=[\"'](.*?)[\"']")
+
 
 def extract_local_image_paths_from_html(html_content: str) -> List[str]:
-    image_paths = re.findall(r'<img.*?src="(.*?)"', html_content)
+    image_paths = re.findall(IMG_NAME_IN_IMG_TAG_REGEX, html_content)
 
     # Filter out src attributes that are  URLs (e.g. start with http or https)
     return [
