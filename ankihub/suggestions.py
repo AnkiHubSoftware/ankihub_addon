@@ -56,10 +56,18 @@ def upload_images_for_suggestion(suggestion: NoteSuggestion, ah_did: uuid.UUID) 
     # Find images in suggestion fields and upload them to s3
     image_paths = get_images_from_suggestion(suggestion=suggestion)
 
-    # TODO: User user_id instead of username, because username is subject to change
-    username = config.user()
-    bucket_path = f"deck_images/{ah_did}/suggestions/{username}"
-    client.upload_images(image_paths, bucket_path)
+    # TODO: We are currently hashing and updating the names of all images,
+    # but we should only do that for images that were added in the suggestion.
+    # Unchanged images must keep their original names.
+
+    # First, generate the hashed filenames (asset name will be the hash of the file content)
+    # Remember to rename the local files
+    hashed_asset_map = generate_asset_files_with_hashed_names(image_paths)
+
+    # Then, update all notes using the provided {'original_filename': 'new_filename'} map
+    update_asset_names_on_notes(hashed_asset_map)
+
+    client.upload_images(hashed_asset_map.values(), ah_did)
 
 
 def get_images_from_suggestion(suggestion: NoteSuggestion) -> List[Path]:
@@ -72,6 +80,46 @@ def get_images_from_suggestion(suggestion: NoteSuggestion) -> List[Path]:
         result.extend(image_paths)
 
     return result
+
+
+def generate_asset_files_with_hashed_names(paths: List[str]) -> dict:
+    original_hashed_name_mapping = dict()
+
+    for asset_path in paths:
+        # First we check if the image already exists.
+        # If yes, we skip this iteration.
+        if not asset_path.is_file():
+            continue
+
+        # Generate a hash from the file's content
+        with asset_path.open("rb") as asset:
+            file_content_hash = hashlib.md5(asset.read())
+
+        # Store the new filename under the old filename key in the dict
+        # that will be returned
+        new_filepath = asset_path.parent / (file_content_hash.hexdigest() + asset_path.suffix)
+        original_hashed_name_mapping[asset_path.name] = new_filepath
+
+        # Copy the file with the new name at the same location of the
+        # original file
+        try:
+            shutil.copyfile(asset_path, new_filepath)
+        except shutil.SameFileError:
+            continue
+
+    return original_hashed_name_mapping
+
+
+def update_asset_names_on_notes(asset_hashed_name_map: dict):
+    for original_filename, new_filepath in asset_hashed_name_map.items():
+        # TODO: Think of a better way of doing that. Currently we need to call it twice,
+        # one for single quotes and other for double quotes around the src attribute.
+        find_and_replace_text_in_fields(
+            f'src="{original_filename}"', f'src="{new_filepath.name}"'
+        )
+        find_and_replace_text_in_fields(
+            f"src='{original_filename}'", f"src='{new_filepath.name}'"
+        )
 
 
 def suggest_new_note(
