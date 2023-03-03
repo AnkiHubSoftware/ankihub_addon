@@ -101,7 +101,7 @@ from ankihub.suggestions import (
     suggest_note_update,
     suggest_notes_in_bulk,
 )
-from ankihub.sync import AnkiHubSync
+from ankihub.sync import AnkiHubSync, ah_sync
 from ankihub.utils import (
     ANKIHUB_TEMPLATE_SNIPPET_RE,
     all_dids,
@@ -2482,15 +2482,14 @@ def test_reset_optional_tags_action(
             "ankihub.gui.browser.ask_user", lambda *args, **kwargs: True
         )
 
-        # mock methods of ah_sync
+        # mock the is_logged_in function to always return True
         is_logged_in_mock = Mock()
-        monkeypatch.setattr(
-            "ankihub.gui.browser.ah_sync.is_logged_in", is_logged_in_mock
-        )
+        is_logged_in_mock.return_value = True
+        monkeypatch.setattr(config, "is_logged_in", is_logged_in_mock)
+
+        # mock method of ah_sync
         sync_all_decks_mock = Mock()
-        monkeypatch.setattr(
-            "ankihub.gui.browser.ah_sync.sync_all_decks", sync_all_decks_mock
-        )
+        monkeypatch.setattr(ah_sync, "sync_all_decks", sync_all_decks_mock)
 
         # run the reset action
         browser: Browser = dialogs.open("Browser", mw)
