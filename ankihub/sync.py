@@ -36,8 +36,8 @@ class AnkiHubSync:
 
         import_results = self._sync_all_decks()
 
-        # The media sync should be started after the import because the import might have added new
-        # media references to notes.
+        # The media sync should be started after the deck updates are imported,
+        # because the import can add new media references to notes.
         if start_media_sync and AnkiHubClient().is_feature_flag_enabled(
             "image_support_enabled"
         ):
