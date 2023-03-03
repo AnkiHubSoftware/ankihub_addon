@@ -35,12 +35,15 @@ def suggest_note_update(
     if suggestion is None:
         return False
 
+    # TODO: We need to upload images before creating the suggestion so the replaced img src values are sent to ankihub
+    ah_did = ankihub_db.ankihub_did_for_anki_nid(NoteId(suggestion.anki_nid))
+    # TODO: Move this inside client.create_change_note_suggestion maybe?
+    upload_images_for_suggestion(suggestion, ah_did)
+
     client.create_change_note_suggestion(
         change_note_suggestion=suggestion,
         auto_accept=auto_accept,
     )
-    ah_did = ankihub_db.ankihub_did_for_anki_nid(NoteId(suggestion.anki_nid))
-    upload_images_for_suggestion(suggestion, ah_did)
 
     return True
 
@@ -66,6 +69,11 @@ def upload_images_for_suggestion(suggestion: NoteSuggestion, ah_did: uuid.UUID) 
 
     # Then, update all notes using the provided {'original_filename': 'new_filename'} map
     update_asset_names_on_notes(hashed_asset_map)
+    
+    # Update the suggestion instance since it was created with the note
+    # before the replacement of the image names
+    # TODO: THIS IS NOT WORKING
+    update_note_inside_suggestion_instance(suggestion)
 
     client.upload_images(hashed_asset_map.values(), ah_did)
 
@@ -121,17 +129,30 @@ def update_asset_names_on_notes(asset_hashed_name_map: dict):
             f"src='{original_filename}'", f"src='{new_filepath.name}'"
         )
 
+def update_note_inside_suggestion_instance(suggestion: NoteSuggestion):
+    # TODO: THIS IS NOT WORKING
+    # FOR NEW NOTE SUGGESTIONS THE NOTE IS NOT FOUND
+    # FOR CHANGE SUGGESTIONS, THE SUGGESTION BECOMES EMPTY
+    
+    note_data = ankihub_db.note_data(anki_note_id=suggestion.anki_nid)
+    if not note_data:
+        return
+    
+    suggestion.fields = note_data.fields
 
 def suggest_new_note(
     note: Note, comment: str, ankihub_deck_uuid: uuid.UUID, auto_accept: bool = False
 ) -> None:
     client = AnkiHubClient()
     new_note_suggestion_created = new_note_suggestion(note, ankihub_deck_uuid, comment)
-    client.create_new_note_suggestion(
-        new_note_suggestion_created, auto_accept=auto_accept
-    )
+    
+    # TODO: Move this inside client.create_new_note_suggestion
     upload_images_for_suggestion(
         new_note_suggestion_created, new_note_suggestion_created.ankihub_deck_uuid
+    )
+    
+    client.create_new_note_suggestion(
+        new_note_suggestion_created, auto_accept=auto_accept
     )
 
 
