@@ -5,6 +5,8 @@ import aqt
 from anki.notes import NoteId
 from anki.utils import ids2str
 
+from .common_utils import IMG_NAME_IN_IMG_TAG_REGEX
+
 
 def get_img_names_from_notes(nids: Sequence[NoteId]) -> Set[str]:
     """Return the names of all images on the given notes.
@@ -15,9 +17,8 @@ def get_img_names_from_notes(nids: Sequence[NoteId]) -> Set[str]:
     )
 
     imgs = set()
-    img_re = re.compile(r"<img.*?src=[\"'](.*?)[\"']")
     for flds in flds_with_imgs:
-        for img in re.findall(img_re, flds):
+        for img in re.findall(IMG_NAME_IN_IMG_TAG_REGEX, flds):
             if img.startswith("http://") or img.startswith("https://"):
                 continue
             imgs.add(img)
