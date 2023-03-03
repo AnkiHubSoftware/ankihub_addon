@@ -6,5 +6,4 @@
     ],
     "python.testing.unittestEnabled": false,
     "python.testing.pytestEnabled": true,
-    "python.testing.autoTestDiscoverOnSaveEnabled": false
 }
