@@ -2578,9 +2578,9 @@ def test_upload_images(
 
         with tempfile.NamedTemporaryFile(suffix=".png") as f:
             file_path = Path(f.name)
-            fake_deck_id = "111-222-333-444-555"
+            fake_bucket_path = "fake_bucket_path"
             client = AnkiHubClient()
-            client.upload_images([file_path], deck_id=fake_deck_id)
+            client.upload_images([file_path], bucket_path=fake_bucket_path)
 
         assert len(upload_request_mock.request_history) == 1  # type: ignore
 
