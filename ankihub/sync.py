@@ -25,6 +25,8 @@ class AnkiHubSync:
         self._import_results: List[AnkiHubImportResult] = []
 
     def sync_all_decks(self) -> List[AnkiHubImportResult]:
+        """Syncs all decks with AnkiHub. Should be called from a background thread with a progress dialog
+        to avoid blocking the UI."""
         LOGGER.info("Starting sync.")
         if not config.is_logged_in():
             raise NotLoggedInError()
