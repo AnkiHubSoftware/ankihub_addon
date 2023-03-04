@@ -1,4 +1,3 @@
-import re
 import uuid
 from dataclasses import dataclass
 from pathlib import Path
@@ -17,6 +16,7 @@ from .ankihub_client import (
 from .db import ankihub_db
 from .exporting import to_note_data
 from .settings import config
+from .common_utils import extract_local_image_paths_from_html
 
 # string that is contained in the errors returned from the AnkiHub API when
 # there are no changes to the note for a change note suggestion
@@ -48,11 +48,7 @@ def suggest_note_update(
 def upload_images_for_suggestion(suggestion: NoteSuggestion, ah_did: uuid.UUID) -> None:
     client = AnkiHubClient()
 
-    if not (
-        client.get_waffle_status()["flags"]
-        .get("image_support_enabled", {})
-        .get("is_active", False)
-    ):
+    if not client.is_feature_flag_enabled("image_support_enabled"):
         return
 
     # TODO: This should be executed in background
@@ -69,18 +65,13 @@ def upload_images_for_suggestion(suggestion: NoteSuggestion, ah_did: uuid.UUID) 
 def get_images_from_suggestion(suggestion: NoteSuggestion) -> List[Path]:
     result = []
     for field_content in [f.value for f in suggestion.fields]:
-        image_names = _extract_images(field_content)
+        image_names = extract_local_image_paths_from_html(field_content)
         image_paths = [
             Path(aqt.mw.col.media.dir()) / image_name for image_name in image_names
         ]
         result.extend(image_paths)
 
     return result
-
-
-def _extract_images(field_content: str) -> List[str]:
-    # TODO: Filter out src attributes that are  URLs (e.g. start with http or https)
-    return re.findall(r'<img.*?src="(.*?)"', field_content)
 
 
 def suggest_new_note(

@@ -2,7 +2,7 @@ import sqlite3
 import uuid
 from contextlib import contextmanager
 from pathlib import Path
-from typing import Any, Iterable, List, Optional, Tuple
+from typing import Any, Iterable, List, Optional, Sequence, Tuple
 
 import aqt
 from anki.models import NotetypeId
@@ -11,6 +11,7 @@ from anki.utils import ids2str, join_fields, split_fields
 
 from . import LOGGER
 from .ankihub_client import Field, NoteInfo, suggestion_type_from_str
+from .db_utils import DBConnection
 from .settings import ankihub_db_path
 
 
@@ -58,18 +59,23 @@ def attached_ankihub_db():
         detach_ankihub_db_from_anki_db_connection()
 
 
-@contextmanager
-def db_transaction():
-    with sqlite3.connect(AnkiHubDB.database_path) as conn:
-        yield conn
-    conn.close()
-
-
 class AnkiHubDB:
 
     # name of the database when attached to the Anki DB connection
     database_name = "ankihub_db"
     database_path: Optional[Path] = None
+
+    def execute(self, *args, **kwargs) -> List:
+        return self.connection().execute(*args, **kwargs)
+
+    def list(self, *args, **kwargs) -> List:
+        return self.connection().list(*args, **kwargs)
+
+    def scalar(self, *args, **kwargs) -> Any:
+        return self.connection().scalar(*args, **kwargs)
+
+    def first(self, *args, **kwargs) -> Optional[Tuple]:
+        return self.connection().first(*args, **kwargs)
 
     def setup_and_migrate(self) -> None:
         AnkiHubDB.database_path = ankihub_db_path()
@@ -82,72 +88,55 @@ class AnkiHubDB:
 
         if not notes_table_exists:
             LOGGER.info("Creating AnkiHub DB")
-            self.execute(
-                """
-                CREATE TABLE notes (
-                    ankihub_note_id STRING PRIMARY KEY,
-                    ankihub_deck_id STRING,
-                    anki_note_id INTEGER,
-                    anki_note_type_id INTEGER,
-                    mod INTEGER,
-                    guid TEXT,
-                    fields TEXT,
-                    tags TEXT,
-                    last_update_type TEXT
-                );
-                """
-            )
-            self.execute("CREATE INDEX ankihub_deck_id_idx ON notes (ankihub_deck_id);")
-            self.execute("CREATE INDEX anki_note_id_idx ON notes (anki_note_id);")
-            self.execute("CREATE INDEX anki_note_type_id ON notes (anki_note_type_id);")
-            self.execute("PRAGMA user_version = 5")
+            with self.connection() as conn:
+                conn.execute(
+                    """
+                    CREATE TABLE notes (
+                        ankihub_note_id STRING PRIMARY KEY,
+                        ankihub_deck_id STRING,
+                        anki_note_id INTEGER UNIQUE,
+                        anki_note_type_id INTEGER,
+                        mod INTEGER,
+                        guid TEXT,
+                        fields TEXT,
+                        tags TEXT,
+                        last_update_type TEXT
+                    );
+                    """
+                )
+                conn.execute(
+                    "CREATE INDEX ankihub_deck_id_idx ON notes (ankihub_deck_id);"
+                )
+                conn.execute("CREATE INDEX anki_note_id_idx ON notes (anki_note_id);")
+                conn.execute(
+                    "CREATE INDEX anki_note_type_id ON notes (anki_note_type_id);"
+                )
+                conn.execute("PRAGMA user_version = 6")
             LOGGER.info("Created AnkiHub DB")
         else:
             from .db_migrations import migrate_ankihub_db
 
             migrate_ankihub_db()
 
-    def execute(self, sql: str, *args, first_row_only=False) -> List:
-        conn = sqlite3.connect(self.database_path)
-        c = conn.cursor()
-        c.execute(sql, args)
-        if first_row_only:
-            result = c.fetchone()
-        else:
-            result = c.fetchall()
-        c.close()
-        conn.commit()
-        conn.close()
-        return result
-
-    def scalar(self, sql: str, *args) -> Any:
-        rows = self.execute(sql, *args, first_row_only=True)
-        if rows:
-            return rows[0]
-        else:
-            return None
-
-    def list(self, sql: str, *args) -> List:
-        return [x[0] for x in self.execute(sql, *args, first_row_only=False)]
-
-    def first(self, sql: str, *args) -> Optional[Tuple]:
-        rows = self.execute(sql, *args, first_row_only=True)
-        if rows:
-            return tuple(rows)
-        else:
-            return None
-
     def schema_version(self) -> int:
         result = self.scalar("PRAGMA user_version;")
         return result
 
-    def upsert_notes_data(self, ankihub_did: uuid.UUID, notes_data: List[NoteInfo]):
+    def connection(self) -> DBConnection:
+        return DBConnection(conn=sqlite3.connect(AnkiHubDB.database_path))
+
+    def upsert_notes_data(
+        self, ankihub_did: uuid.UUID, notes_data: List[NoteInfo]
+    ) -> Tuple[Tuple[NoteInfo, ...], Tuple[NoteInfo, ...]]:
         """Upsert notes data to the AnkiHub DB.
-        If a note with the same Anki nid already exists in the AnkiHub DB then the note will not be inserted.
+        If a note with the same Anki nid already exists in the AnkiHub DB then the note will not be inserted
+        Returns a tuple of (NoteInfo objects that were insert / updated, NoteInfo objects that were skipped)
         """
-        with db_transaction() as conn:
+        upserted_notes: List[NoteInfo] = []
+        skipped_notes: List[NoteInfo] = []
+        with self.connection() as conn:
             for note_data in notes_data:
-                conflicting_ah_nid = self.first(
+                conflicting_ah_nid = conn.first(
                     """
                     SELECT ankihub_note_id FROM notes
                     WHERE anki_note_id = ?
@@ -157,6 +146,7 @@ class AnkiHubDB:
                     str(note_data.ankihub_note_uuid),
                 )
                 if conflicting_ah_nid:
+                    skipped_notes.append(note_data)
                     continue
 
                 fields = join_fields(
@@ -180,27 +170,29 @@ class AnkiHubDB:
                         last_update_type
                     ) VALUES (?, ?, ?, ?, ?, ?, ?, ?)
                     """,
-                    (
-                        str(note_data.ankihub_note_uuid),
-                        str(ankihub_did),
-                        note_data.anki_nid,
-                        note_data.mid,
-                        fields,
-                        aqt.mw.col.tags.join(note_data.tags),
-                        note_data.guid,
-                        note_data.last_update_type.value[0]
-                        if note_data.last_update_type is not None
-                        else None,
-                    ),
+                    str(note_data.ankihub_note_uuid),
+                    str(ankihub_did),
+                    note_data.anki_nid,
+                    note_data.mid,
+                    fields,
+                    aqt.mw.col.tags.join(note_data.tags),
+                    note_data.guid,
+                    note_data.last_update_type.value[0]
+                    if note_data.last_update_type is not None
+                    else None,
                 )
+                upserted_notes.append(note_data)
 
-    def transfer_mod_values_from_anki_db(self, notes_data: List[NoteInfo]):
+        return (tuple(upserted_notes), tuple(skipped_notes))
+
+    def transfer_mod_values_from_anki_db(self, notes_data: Sequence[NoteInfo]):
         """Takes mod values for the notes from the Anki DB and saves them to the AnkiHub DB.
-        Should be be always called after importing notes or exporting notes after
+
+        Should always be called after importing notes or exporting notes after
         the mod values in the Anki DB have been updated.
         (The mod values are used to determine if a note has been modified in Anki since it was last imported/exported.)
         """
-        with db_transaction() as conn:
+        with self.connection() as conn:
             for note_data in notes_data:
                 mod = aqt.mw.col.db.scalar(
                     "SELECT mod FROM notes WHERE id = ?", note_data.anki_nid
@@ -208,7 +200,8 @@ class AnkiHubDB:
 
                 conn.execute(
                     "UPDATE notes SET mod = ? WHERE ankihub_note_id = ?",
-                    (mod, str(note_data.ankihub_note_uuid)),
+                    mod,
+                    str(note_data.ankihub_note_uuid),
                 )
 
     def reset_mod_values_in_anki_db(self, anki_nids: List[NoteId]) -> None:
@@ -220,6 +213,7 @@ class AnkiHubDB:
             WHERE anki_note_id IN {ids2str(anki_nids)}
             """
         )
+
         for nid, mod in nid_mod_tuples:
             aqt.mw.col.db.execute(
                 "UPDATE notes SET mod = ? WHERE id = ?",

@@ -13,6 +13,7 @@ from .addon_ankihub_client import AddonAnkiHubClient as AnkiHubClient
 from .ankihub_client import AnkiHubRequestError, DeckExtension
 from .db import ankihub_db
 from .importing import AnkiHubImporter, AnkiHubImportResult
+from .media_download import media_downloader
 from .settings import ANKI_MINOR, config
 from .utils import create_backup
 
@@ -22,8 +23,8 @@ class AnkiHubSync:
         self._importer = AnkiHubImporter()
         self._import_results: List[AnkiHubImportResult] = []
 
-    def sync_all_decks(self) -> List[AnkiHubImportResult]:
-        LOGGER.info("Syncing all decks...")
+    def sync_all_decks_and_media(self) -> List[AnkiHubImportResult]:
+        LOGGER.info("Syncing all decks and media...")
 
         create_backup()
 
@@ -37,6 +38,9 @@ class AnkiHubSync:
                     return self._import_results
                 else:
                     raise e
+
+        if AnkiHubClient().is_feature_flag_enabled("image_support_enabled"):
+            media_downloader.start_media_download()
 
         return self._import_results
 
@@ -219,7 +223,7 @@ def sync_with_progress(
         if ANKI_MINOR < 50:
             sleep(3)
 
-        result = sync.sync_all_decks()
+        result = sync.sync_all_decks_and_media()
         LOGGER.info("Sync finished.")
         return result
 

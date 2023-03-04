@@ -26,6 +26,7 @@ from pytest_anki import AnkiSession
 from pytestqt.qtbot import QtBot  # type: ignore
 from requests_mock import Mocker
 
+from ..factories import NoteInfoFactory
 from .conftest import TEST_PROFILE_ID
 
 # workaround for vscode test discovery not using pytest.ini which sets this env var
@@ -55,6 +56,7 @@ from ankihub.ankihub_client import (
     transform_notes_data,
 )
 from ankihub.db import ankihub_db, attached_ankihub_db
+from ankihub.exporting import to_note_data
 from ankihub.gui.browser import (
     ModifiedAfterSyncSearchNode,
     NewNoteSearchNode,
@@ -99,7 +101,7 @@ from ankihub.suggestions import (
     suggest_note_update,
     suggest_notes_in_bulk,
 )
-from ankihub.sync import AnkiHubSync
+from ankihub.sync import AnkiHubSync, sync
 from ankihub.utils import (
     ANKIHUB_TEMPLATE_SNIPPET_RE,
     all_dids,
@@ -1188,10 +1190,81 @@ class TestAnkiHubImporter:
             note_data_from_db = ankihub_db.note_data(nid)
             assert note_data_from_db == note_data
 
+    def test_conflicting_notes_dont_get_imported(
+        self,
+        anki_session_with_addon_data: AnkiSession,
+        ankihub_basic_note_type: NotetypeDict,
+        next_deterministic_uuid: Callable[[], uuid.UUID],
+    ):
+        with anki_session_with_addon_data.profile_loaded():
+            mw = anki_session_with_addon_data.mw
+
+            anki_nid = NoteId(1)
+
+            mid_1 = ankihub_basic_note_type["id"]
+            mid_2 = create_copy_of_note_type(mw, ankihub_basic_note_type)["id"]
+
+            # import the first note
+            ah_did_1 = next_deterministic_uuid()
+            note_info_1 = NoteInfoFactory(
+                anki_nid=anki_nid,
+                tags=["tag1"],
+                mid=mid_1,
+            )
+            importer = AnkiHubImporter()
+            import_result = importer._import_ankihub_deck_inner(
+                ankihub_did=ah_did_1,
+                notes_data=[note_info_1],
+                deck_name="test",
+            )
+            assert import_result.created_nids == [anki_nid]
+            assert import_result.updated_nids == []
+            assert import_result.skipped_nids == []
+
+            mod_1 = ankihub_db.scalar("SELECT mod FROM notes WHERE anki_note_id = ?", 1)
+            sleep(0.1)  # sleep to test for mod value changes
+
+            # import the second note with the same nid
+            ah_did_2 = next_deterministic_uuid()
+            note_info_2 = NoteInfoFactory(
+                anki_nid=anki_nid,
+                tags=["tag2"],
+                mid=mid_2,
+            )
+            importer = AnkiHubImporter()
+            import_result = importer._import_ankihub_deck_inner(
+                ankihub_did=ah_did_2,
+                notes_data=[note_info_2],
+                deck_name="test",
+            )
+            assert import_result.created_nids == []
+            assert import_result.updated_nids == []
+            assert import_result.skipped_nids == [anki_nid]
+
+            # Check that the first note wasn't changed by the second import.
+            assert ankihub_db.note_data(anki_nid) == note_info_1
+            assert ankihub_db.ankihub_deck_ids() == [ah_did_1]
+
+            # Check that the mod value of the first note was not changed.
+            mod_2 = ankihub_db.scalar("SELECT mod FROM notes WHERE anki_note_id = ?", 1)
+            assert mod_2 == mod_1
+
+            # Check that the note in the Anki database wasn't changed by the second import.
+            assert mw.col.get_note(anki_nid).tags == ["tag1"]
+            assert mw.col.get_note(anki_nid).mid == mid_1
+            assert to_note_data(mw.col.get_note(anki_nid)) == note_info_1
+
 
 def assert_that_only_ankihub_sample_deck_info_in_database(ankihub_deck_uuid: uuid.UUID):
     assert ankihub_db.ankihub_deck_ids() == [ankihub_deck_uuid]
     assert len(ankihub_db.anki_nids_for_ankihub_deck(ankihub_deck_uuid)) == 3
+
+
+def create_copy_of_note_type(mw: AnkiQt, note_type: NotetypeDict) -> NotetypeDict:
+    new_model = copy.deepcopy(note_type)
+    new_model["id"] = 0
+    mw.col.models.add_dict(new_model)
+    return new_model
 
 
 def create_or_get_ah_version_of_note_type(
@@ -2098,6 +2171,7 @@ def test_reset_local_changes_to_notes(
 def test_migrate_profile_data_from_old_location(
     anki_session_with_addon_before_profile_support: AnkiSession,
     monkeypatch: MonkeyPatch,
+    disable_image_support_feature_flag,
 ):
     anki_session = anki_session_with_addon_before_profile_support
 
@@ -2436,6 +2510,51 @@ def test_reset_optional_tags_action(
         assert mw.col.get_note(other_note.id).tags == [
             f"{TAG_FOR_OPTIONAL_TAGS}::test99::test2"
         ]
+
+
+def test_download_images_on_sync(
+    anki_session_with_addon_data: AnkiSession,
+    install_sample_ah_deck: InstallSampleAHDeck,
+    monkeypatch: MonkeyPatch,
+    qtbot: QtBot,
+    enable_image_support_feature_flag,
+):
+    with anki_session_with_addon_data.profile_loaded():
+        mw = anki_session_with_addon_data.mw
+
+        _, ah_did = install_sample_ah_deck()
+
+        # Add a reference to a local image to a note.
+        nids = mw.col.find_notes("")
+        nid = nids[0]
+        note = mw.col.get_note(nid)
+        note.fields[0] = "Some text. <img src='image.png'>"
+        note.flush()
+
+        # Mock the client to simulate that there are no deck updates and extensions.
+        monkeypatch.setattr(
+            AnkiHubClient,
+            "get_deck_updates",
+            lambda *args, **kwargs: [],
+        )
+        monkeypatch.setattr(
+            AnkiHubClient,
+            "get_deck_extensions_by_deck_id",
+            lambda *args, **kwargs: [],
+        )
+
+        # Mock the client method for downloading images.
+        download_images_mock = Mock()
+        monkeypatch.setattr(AnkiHubClient, "download_images", download_images_mock)
+
+        # Run the sync.
+        sync.sync_all_decks_and_media()
+
+        # Let the background thread (which downloads missing media) finish.
+        qtbot.wait(200)
+
+        # Assert that the client method for downloading images was called with the correct arguments.
+        download_images_mock.assert_called_once_with(["image.png"], ah_did)
 
 
 def test_upload_images(
