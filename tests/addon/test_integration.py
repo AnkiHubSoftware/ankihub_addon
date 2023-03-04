@@ -33,6 +33,7 @@ from .conftest import TEST_PROFILE_ID
 # has to be set before importing ankihub
 os.environ["SKIP_INIT"] = "1"
 
+from ankihub.media_utils import IMG_NAME_IN_IMG_TAG_REGEX
 from ankihub import entry_point
 from ankihub.addons import (
     _change_file_permissions_of_addon_files,
@@ -2644,9 +2645,16 @@ class TestSuggestionsWithImages:
 
                 # assert that the image was uploaded
                 assert len(upload_request_mock.request_history) == 1  # type: ignore
-                assert upload_request_mock.last_request.text.name == str(  # type: ignore
-                    file_path_in_col.absolute()
-                )
+
+                img_path_in_request: str = upload_request_mock.last_request.text.name
+                img_name_in_request = Path(img_path_in_request).name
+
+                note.load()
+                img_name_in_note = re.search(
+                    IMG_NAME_IN_IMG_TAG_REGEX, note["Front"]
+                ).group(1)
+
+                assert img_name_in_request == img_name_in_note
 
     def test_suggest_new_note_with_image(
         self,
