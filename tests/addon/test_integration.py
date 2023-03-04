@@ -1206,7 +1206,7 @@ class TestAnkiHubImporter:
 
             # import the first note
             ah_did_1 = next_deterministic_uuid()
-            note_info_1 = NoteInfoFactory(
+            note_info_1 = NoteInfoFactory.create(
                 anki_nid=anki_nid,
                 tags=["tag1"],
                 mid=mid_1,
@@ -1226,7 +1226,7 @@ class TestAnkiHubImporter:
 
             # import the second note with the same nid
             ah_did_2 = next_deterministic_uuid()
-            note_info_2 = NoteInfoFactory(
+            note_info_2 = NoteInfoFactory.create(
                 anki_nid=anki_nid,
                 tags=["tag2"],
                 mid=mid_2,
