@@ -77,7 +77,7 @@ def upload_images_for_suggestion(suggestion: NoteSuggestion, ah_did: uuid.UUID) 
     # TODO: THIS IS NOT WORKING
     update_note_inside_suggestion_instance(suggestion)
 
-    client.upload_images(hashed_asset_map.values(), ah_did)
+    client.upload_images(list(hashed_asset_map.values()), ah_did)
 
 
 def get_images_from_suggestion(suggestion: NoteSuggestion) -> List[Path]:
@@ -92,7 +92,7 @@ def get_images_from_suggestion(suggestion: NoteSuggestion) -> List[Path]:
     return result
 
 
-def generate_asset_files_with_hashed_names(paths: List[str]) -> dict:
+def generate_asset_files_with_hashed_names(paths: List[Path]) -> Dict[str, str]:
     original_hashed_name_mapping = dict()
 
     for asset_path in paths:
@@ -119,23 +119,28 @@ def generate_asset_files_with_hashed_names(paths: List[str]) -> dict:
         except shutil.SameFileError:
             continue
 
-    return original_hashed_name_mapping
+    result = {
+        original_filename: new_filepath.name
+        for original_filename, new_filepath in original_hashed_name_mapping.items()
+    }
+
+    return result
 
 
 def update_asset_names_on_notes(asset_hashed_name_map: dict):
-    for original_filename, new_filepath in asset_hashed_name_map.items():
+    for original_filename, new_filename in asset_hashed_name_map.items():
         # TODO: Think of a better way of doing that. Currently we need to call it twice,
         # one for single quotes and other for double quotes around the src attribute.
         find_and_replace_text_in_fields(
-            f'src="{original_filename}"', f'src="{new_filepath.name}"'
+            f'src="{original_filename}"', f'src="{new_filename}"'
         )
         find_and_replace_text_in_fields(
-            f"src='{original_filename}'", f"src='{new_filepath.name}'"
+            f"src='{original_filename}'", f"src='{new_filename}'"
         )
 
 
 def update_note_inside_suggestion_instance(suggestion: NoteSuggestion) -> None:
-    note = aqt.mw.col.get_note(suggestion.anki_nid)
+    note = aqt.mw.col.get_note(NoteId(suggestion.anki_nid))
     note_data = to_note_data(note)
     suggestion.fields = note_data.fields
 

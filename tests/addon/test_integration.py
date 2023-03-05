@@ -2560,6 +2560,7 @@ def test_download_images_on_sync(
 
 def test_upload_images(
     anki_session_with_addon_data: AnkiSession,
+    next_deterministic_uuid: Callable[[], uuid.UUID],
     monkeypatch: MonkeyPatch,
     requests_mock: Mocker,
 ):
@@ -2579,9 +2580,9 @@ def test_upload_images(
 
         with tempfile.NamedTemporaryFile(suffix=".png") as f:
             file_path = Path(f.name)
-            fake_deck_id = "111-222-333-444-555"
+            fake_deck_id = next_deterministic_uuid()
             client = AnkiHubClient()
-            client.upload_images([file_path], deck_id=fake_deck_id)
+            client.upload_images([file_path.name], deck_id=fake_deck_id)
 
         assert len(upload_request_mock.request_history) == 1  # type: ignore
 
@@ -2646,7 +2647,7 @@ class TestSuggestionsWithImages:
                 # assert that the image was uploaded
                 assert len(upload_request_mock.request_history) == 1  # type: ignore
 
-                img_path_in_request: str = upload_request_mock.last_request.text.name
+                img_path_in_request: str = upload_request_mock.last_request.text.name  # type: ignore
                 img_name_in_request = Path(img_path_in_request).name
 
                 note.load()
@@ -2706,7 +2707,7 @@ class TestSuggestionsWithImages:
                 # assert that the image was uploaded
                 assert len(upload_request_mock.request_history) == 1  # type: ignore
 
-                img_path_in_request: str = upload_request_mock.last_request.text.name
+                img_path_in_request: str = upload_request_mock.last_request.text.name  # type: ignore
                 img_name_in_request = Path(img_path_in_request).name
 
                 note.load()

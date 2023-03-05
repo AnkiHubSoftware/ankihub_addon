@@ -11,7 +11,6 @@ from dataclasses import dataclass
 from datetime import datetime
 from enum import Enum
 from io import BufferedReader
-from pathlib import Path
 from typing import (
     Any,
     Callable,
@@ -397,14 +396,14 @@ class AnkiHubClient:
         if s3_response.status_code != 200:
             raise AnkiHubRequestError(s3_response)
 
-    def upload_images(self, image_paths: List[Path], deck_id: uuid.UUID) -> None:
+    def upload_images(self, image_paths: List[str], deck_id: uuid.UUID) -> None:
         # deck_id is used to namespace the images within each deck.
 
         # TODO: send all images at once instad of looping through each one
-        for image_path in image_paths:
-            key = f"deck_assets/{deck_id}/{image_path.name}"
+        for image_name in image_paths:
+            key = f"deck_assets/{deck_id}/{image_name}"
             s3_url = self.get_presigned_url(key=key, action="upload")
-            with open(image_path, "rb") as image_file:
+            with open(self.local_media_dir_path / image_name, "rb") as image_file:
                 self._upload_to_s3(s3_url, image_file)
 
     def download_images(self, img_names: List[str], deck_id: uuid.UUID) -> None:

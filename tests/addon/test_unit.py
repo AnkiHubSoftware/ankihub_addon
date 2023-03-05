@@ -1,10 +1,13 @@
 import os
+import uuid
 from pathlib import Path
+from typing import Callable
 from unittest.mock import Mock, patch
-from pytest import MonkeyPatch
-import pytest
 
+import pytest
+from pytest import MonkeyPatch
 from pytest_anki import AnkiSession
+
 from ankihub.ankihub_client import AnkiHubClient
 from tests.client.test_client import change_note_suggestion  # noqa
 
@@ -12,6 +15,7 @@ from tests.client.test_client import change_note_suggestion  # noqa
 # has to be set before importing ankihub
 os.environ["SKIP_INIT"] = "1"
 
+from ankihub import suggestions
 from ankihub.error_reporting import normalize_url
 from ankihub.exporting import _prepared_field_html
 from ankihub.importing import updated_tags
@@ -19,7 +23,6 @@ from ankihub.note_conversion import ADDON_INTERNAL_TAGS, TAG_FOR_OPTIONAL_TAGS
 from ankihub.register_decks import note_type_name_without_ankihub_modifications
 from ankihub.subdecks import SUBDECK_TAG, add_subdeck_tags_to_notes
 from ankihub.utils import lowest_level_common_ancestor_deck_name
-from ankihub import suggestions
 
 
 def remove_generated_files():
@@ -42,12 +45,13 @@ class TestUploadImagesForSuggestion:
     def test_should_call_upload_images_with_correct_params(
         self,
         mocked_get_images_from_suggestion,
+        next_deterministic_uuid: Callable[[], uuid.UUID],
         monkeypatch: MonkeyPatch,
         change_note_suggestion,  # noqa
         anki_session_with_addon_data: AnkiSession,
         enable_image_support_feature_flag,
     ):
-        fake_deck_id = "e232efae-7451-4a9f-b8e4-25d4ae4185ca"
+        fake_deck_id = next_deterministic_uuid()
         change_note_suggestion.fields[0].value = '<img src="mario.jpg" width="150">'
         change_note_suggestion.fields[1].value = "<img src='random.png'>"
 
