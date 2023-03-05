@@ -2695,6 +2695,7 @@ class TestSuggestionsWithImages:
                 # add file reference to a note
                 file_name_in_col = Path(file_path_in_col.name).name
                 note["Front"] = f'<img src="{file_name_in_col}">'
+                mw.col.add_note(note, DeckId(1))
 
                 suggest_new_note(
                     note=note,
@@ -2704,9 +2705,16 @@ class TestSuggestionsWithImages:
 
                 # assert that the image was uploaded
                 assert len(upload_request_mock.request_history) == 1  # type: ignore
-                assert upload_request_mock.last_request.text.name == str(  # type: ignore
-                    file_path_in_col.absolute()
-                )
+
+                img_path_in_request: str = upload_request_mock.last_request.text.name
+                img_name_in_request = Path(img_path_in_request).name
+
+                note.load()
+                img_name_in_note = re.search(
+                    IMG_NAME_IN_IMG_TAG_REGEX, note["Front"]
+                ).group(1)
+
+                assert img_name_in_request == img_name_in_note
 
 
 class TestAddonUpdate:

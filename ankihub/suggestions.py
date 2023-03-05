@@ -135,8 +135,6 @@ def update_asset_names_on_notes(asset_hashed_name_map: dict):
 
 
 def update_note_inside_suggestion_instance(suggestion: NoteSuggestion) -> None:
-    # TODO: THIS IS NOT WORKING
-    # FOR NEW NOTE SUGGESTIONS THE NOTE IS NOT FOUND
     note = aqt.mw.col.get_note(suggestion.anki_nid)
     note_data = to_note_data(note)
     suggestion.fields = note_data.fields
