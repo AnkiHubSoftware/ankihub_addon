@@ -23,7 +23,7 @@ class NotLoggedInError(Exception):
 class AnkiHubSync:
     def __init__(self):
         self._importer = AnkiHubImporter()
-        self._import_results: List[AnkiHubImportResult] = []
+        self._import_results: Optional[List[AnkiHubImportResult]] = None
 
     def sync_all_decks_and_media(
         self, start_media_sync: bool = True
@@ -31,10 +31,14 @@ class AnkiHubSync:
         """Syncs all decks with AnkiHub and starts the media download.
         Should be called from a background thread with a progress dialog to avoid blocking the UI."""
         LOGGER.info("Syncing all decks and media...")
+
+        self._import_results = None
+
         if not config.is_logged_in():
             raise NotLoggedInError()
 
-        import_results = self._sync_all_decks()
+        self._import_results = []
+        self._sync_all_decks()
 
         # The media sync should be started after the deck updates are imported,
         # because the import can add new media references to notes.
@@ -44,15 +48,13 @@ class AnkiHubSync:
             media_downloader.start_media_download()
 
         LOGGER.info("Sync finished.")
-        return import_results
-
-    def last_sync_results(self) -> List[AnkiHubImportResult]:
         return self._import_results
 
-    def _sync_all_decks(self) -> List[AnkiHubImportResult]:
-        LOGGER.info("Syncing all decks...")
+    def last_sync_results(self) -> Optional[List[AnkiHubImportResult]]:
+        return self._import_results
 
-        self._import_results = []
+    def _sync_all_decks(self) -> None:
+        LOGGER.info("Syncing all decks...")
 
         create_backup()
 
@@ -60,14 +62,12 @@ class AnkiHubSync:
             try:
                 should_continue = self._sync_deck(ah_did)
                 if not should_continue:
-                    return self._import_results
+                    return
             except AnkiHubRequestError as e:
                 if self._handle_exception(e, ah_did):
-                    return self._import_results
+                    return
                 else:
                     raise e
-
-        return self._import_results
 
     def _sync_deck(self, ankihub_did: uuid.UUID) -> bool:
         """Syncs a single deck with AnkiHub.
@@ -229,6 +229,9 @@ ah_sync = AnkiHubSync()
 
 def show_tooltip_about_last_sync_results() -> None:
     sync_results = ah_sync.last_sync_results()
+    if sync_results is None:
+        return
+
     created_nids_amount = sum([len(r.created_nids) for r in sync_results])
     updated_nids_amount = sum([len(r.updated_nids) for r in sync_results])
     total = created_nids_amount + updated_nids_amount
