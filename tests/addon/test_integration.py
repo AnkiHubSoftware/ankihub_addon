@@ -545,7 +545,7 @@ def test_suggest_new_note(
         ]
         suggest_new_note(
             note=note,
-            ankihub_deck_uuid=ah_did,
+            ankihub_did=ah_did,
             comment="test",
         )
 
@@ -568,7 +568,7 @@ def test_suggest_new_note(
         try:
             suggest_new_note(
                 note=note,
-                ankihub_deck_uuid=ah_did,
+                ankihub_did=ah_did,
                 comment="test",
             )
         except AnkiHubRequestError as e:
@@ -2700,7 +2700,7 @@ class TestSuggestionsWithImages:
 
                 suggest_new_note(
                     note=note,
-                    ankihub_deck_uuid=ah_did,
+                    ankihub_did=ah_did,
                     comment="test",
                 )
 

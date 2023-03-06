@@ -33,8 +33,10 @@ def suggest_note_update(
     if suggestion is None:
         return False
 
+    ah_did = ankihub_db.ankihub_did_for_anki_nid(NoteId(suggestion.anki_nid))
+    suggestion = rename_and_upload_assets(suggestion, ah_did)
+
     client = AnkiHubClient()
-    suggestion = rename_and_upload_assets(suggestion)
     client.create_change_note_suggestion(
         change_note_suggestion=suggestion,
         auto_accept=auto_accept,
@@ -44,23 +46,25 @@ def suggest_note_update(
 
 
 def suggest_new_note(
-    note: Note, comment: str, ankihub_deck_uuid: uuid.UUID, auto_accept: bool = False
+    note: Note, comment: str, ankihub_did: uuid.UUID, auto_accept: bool = False
 ) -> None:
-    suggestion = new_note_suggestion(note, ankihub_deck_uuid, comment)
+    suggestion = new_note_suggestion(note, ankihub_did, comment)
+
+    suggestion = rename_and_upload_assets(suggestion, ankihub_did)
 
     client = AnkiHubClient()
-    suggestion = rename_and_upload_assets(suggestion)
     client.create_new_note_suggestion(suggestion, auto_accept=auto_accept)
 
 
-def rename_and_upload_assets(suggestion: NoteSuggestion) -> NoteSuggestion:
+def rename_and_upload_assets(
+    suggestion: NoteSuggestion, ankihub_did: uuid.UUID
+) -> NoteSuggestion:
     """Renames assets in the Anki collection and the media folder and uploads them to AnkiHub.
     Returns a suggestion with updated asset names."""
     suggestion = copy.deepcopy(suggestion)
 
     client = AnkiHubClient()
-    ah_did = ankihub_db.ankihub_did_for_anki_nid(NoteId(suggestion.anki_nid))
-    asset_name_map = client.upload_images_for_suggestion(suggestion, ah_did)
+    asset_name_map = client.upload_images_for_suggestion(suggestion, ankihub_did)
 
     if asset_name_map:
         replace_asset_names_in_suggestion(suggestion, asset_name_map)
