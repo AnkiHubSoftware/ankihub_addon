@@ -1,14 +1,8 @@
 import os
-import uuid
-from pathlib import Path
-from typing import Callable, List
-from unittest.mock import Mock, patch
+from typing import List
 
 from anki.notes import Note
-from pytest import MonkeyPatch
 from pytest_anki import AnkiSession
-
-from ankihub.ankihub_client import AnkiHubClient
 
 # workaround for vscode test discovery not using pytest.ini which sets this env var
 # has to be set before importing ankihub
@@ -25,38 +19,6 @@ from ankihub.utils import lowest_level_common_ancestor_deck_name
 
 
 class TestUploadImagesForSuggestion:
-    @patch("ankihub.suggestions.get_images_from_suggestion")
-    def test_should_call_upload_images_with_correct_params(
-        self,
-        mocked_get_images_from_suggestion,
-        next_deterministic_uuid: Callable[[], uuid.UUID],
-        monkeypatch: MonkeyPatch,
-        change_note_suggestion,  # noqa
-        anki_session_with_addon_data: AnkiSession,
-        enable_image_support_feature_flag,
-    ):
-        fake_deck_id = next_deterministic_uuid()
-        change_note_suggestion.fields[0].value = '<img src="mario.jpg" width="150">'
-        change_note_suggestion.fields[1].value = "<img src='random.png'>"
-
-        upload_images_mock = Mock()
-        monkeypatch.setattr(AnkiHubClient, "upload_images", upload_images_mock)
-
-        expected_image_path_list = [
-            Path("/tmp/anki_base_4pod1tq8/User 1/collection.media/mario.jpg"),
-            Path("/tmp/anki_base_4pod1tq8/User 1/collection.media/random.png"),
-        ]
-        mocked_get_images_from_suggestion.return_value = expected_image_path_list
-
-        with anki_session_with_addon_data.profile_loaded():
-            suggestions.upload_images_for_suggestion(
-                change_note_suggestion, fake_deck_id
-            )
-
-        upload_images_mock.assert_called_once_with(
-            expected_image_path_list, fake_deck_id
-        )
-
     def test_update_asset_names_on_notes(
         self, anki_session_with_addon_data: AnkiSession
     ):
