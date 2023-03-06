@@ -51,6 +51,8 @@ class AnkiHubSync:
         return self._import_results
 
     def last_sync_results(self) -> Optional[List[AnkiHubImportResult]]:
+        """Returns the results of the last sync. Returns None if no sync has been performed yet or
+        if the last sync failed."""
         return self._import_results
 
     def _sync_all_decks(self) -> None:
