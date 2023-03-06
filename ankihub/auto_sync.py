@@ -17,6 +17,9 @@ from .sync import ah_sync, show_tooltip_about_last_sync_results
 # which is fine for now.
 ATTEMPTED_STARTUP_SYNC = False
 
+# The tooltip about the last sync results should only be shown if we synced with AnkiHub on the last AnkiWeb sync.
+SYNCED_WITH_ANKIHUB_ON_LAST_ANKIWEB_SYNC = False
+
 # Variable for storing the exception that was raised during the last sync with AnkiHub.
 # It can't be raised directly, because the AnkiHub sync happens in the background task
 # that syncs with AnkiWeb and the Anki code that calls the AnkiWeb sync should not
@@ -42,7 +45,8 @@ def _on_sync_did_finish() -> None:
         sync_did_finish.append(_on_sync_did_finish)
         raise EXCEPTION_ON_LAST_AH_SYNC
 
-    show_tooltip_about_last_sync_results()
+    if SYNCED_WITH_ANKIHUB_ON_LAST_ANKIWEB_SYNC:
+        show_tooltip_about_last_sync_results()
 
     maybe_check_databases()
 
@@ -86,14 +90,17 @@ def _maybe_sync_with_ankihub(is_startup_sync: bool) -> bool:
         LOGGER.info("Not syncing with AnkiHub because user is not logged in.")
         return False
 
+    global SYNCED_WITH_ANKIHUB_ON_LAST_ANKIWEB_SYNC
     if config.public_config["auto_sync"] != "never" and (
         (config.public_config["auto_sync"] == "on_startup" and is_startup_sync)
         or config.public_config["auto_sync"] == "on_ankiweb_sync"
     ):
         LOGGER.info("Syncing with AnkiHub in _new_sync_collection")
         ah_sync.sync_all_decks_and_media()
+        SYNCED_WITH_ANKIHUB_ON_LAST_ANKIWEB_SYNC = True
         return True
     else:
+        SYNCED_WITH_ANKIHUB_ON_LAST_ANKIWEB_SYNC = False
         LOGGER.info("Not syncing with AnkiHub")
         return False
 
