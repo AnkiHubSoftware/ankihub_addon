@@ -52,6 +52,8 @@ class AnkiHubSync:
     def _sync_all_decks(self) -> List[AnkiHubImportResult]:
         LOGGER.info("Syncing all decks...")
 
+        self._import_results = []
+
         create_backup()
 
         for ah_did in config.deck_ids():
