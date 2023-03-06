@@ -47,6 +47,8 @@ TEST_DATA_PATH = Path(__file__).parent.parent / "test_data"
 DECK_CSV = TEST_DATA_PATH / "deck_with_one_basic_note.csv"
 DECK_CSV_GZ = TEST_DATA_PATH / "deck_with_one_basic_note.csv.gz"
 
+TEST_MEDIA_PATH = TEST_DATA_PATH / "media"
+
 VCR_CASSETTES_PATH = Path(__file__).parent / "cassettes"
 
 
@@ -196,6 +198,21 @@ def change_note_suggestion(
         comment="comment1",
         change_type=SuggestionType.UPDATED_CONTENT,
     )
+
+
+@pytest.fixture
+def remove_generated_asset_files():
+    _remove_generated_asset_files()
+    yield
+    _remove_generated_asset_files()
+
+
+def _remove_generated_asset_files():
+    for file in TEST_MEDIA_PATH.glob("*"):
+        if not file.is_file():
+            continue
+        if not file.name.lower().startswith("testfile_"):
+            file.unlink()
 
 
 @pytest.mark.vcr()
@@ -840,3 +857,22 @@ def test_download_images(
 
         assert (Path(temp_dir) / "imgage.png").exists()
         assert (Path(temp_dir) / "imgage.png").read_bytes() == b"image data"
+
+
+class TestUploadImagesForSuggestion:
+    def test_generate_asset_files_with_hashed_names(self, remove_generated_asset_files):
+        client = AnkiHubClient()
+        filenames = [
+            TEST_MEDIA_PATH / "testfile_mario.png",
+            TEST_MEDIA_PATH / "testfile_anki.gif",
+            TEST_MEDIA_PATH / "testfile_test.jpeg",
+        ]
+
+        expected_result = {
+            "testfile_mario.png": "156ca948cd1356b1a2c1c790f0855ad9.png",
+            "testfile_anki.gif": "87617b1d58967eb86b9e0e5dc92d91ee.gif",
+            "testfile_test.jpeg": "a61eab59692d17a2adf4d1c5e9049ee4.jpeg",
+        }
+
+        asset_name_map = client._generate_asset_files_with_hashed_names(filenames)
+        assert asset_name_map == expected_result

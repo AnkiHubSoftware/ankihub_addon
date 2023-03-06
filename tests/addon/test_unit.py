@@ -1,15 +1,14 @@
 import os
 import uuid
 from pathlib import Path
-from typing import Callable
+from typing import Callable, List
 from unittest.mock import Mock, patch
 
-import pytest
+from anki.notes import Note
 from pytest import MonkeyPatch
 from pytest_anki import AnkiSession
 
 from ankihub.ankihub_client import AnkiHubClient
-from tests.client.test_client import change_note_suggestion  # noqa
 
 # workaround for vscode test discovery not using pytest.ini which sets this env var
 # has to be set before importing ankihub
@@ -23,21 +22,6 @@ from ankihub.note_conversion import ADDON_INTERNAL_TAGS, TAG_FOR_OPTIONAL_TAGS
 from ankihub.register_decks import note_type_name_without_ankihub_modifications
 from ankihub.subdecks import SUBDECK_TAG, add_subdeck_tags_to_notes
 from ankihub.utils import lowest_level_common_ancestor_deck_name
-
-
-def remove_generated_files():
-    test_media_path = Path("tests/addon/test_media")
-    for _, _, filenames in os.walk(test_media_path):
-        for filename in filenames:
-            if not filename.lower().startswith("testfile_"):
-                os.remove(test_media_path / filename)
-
-
-@pytest.fixture
-def setup_and_teardown():
-    remove_generated_files()
-    yield
-    remove_generated_files()
 
 
 class TestUploadImagesForSuggestion:
@@ -73,22 +57,6 @@ class TestUploadImagesForSuggestion:
             expected_image_path_list, fake_deck_id
         )
 
-    def test_generate_asset_files_with_hashed_names(self, setup_and_teardown):
-        filenames = [
-            Path("tests/addon/test_media/testfile_mario.png"),
-            Path("tests/addon/test_media/testfile_anki.gif"),
-            Path("tests/addon/test_media/testfile_test.jpeg"),
-        ]
-
-        expected_result = {
-            "testfile_mario.png": "156ca948cd1356b1a2c1c790f0855ad9.png",
-            "testfile_anki.gif": "87617b1d58967eb86b9e0e5dc92d91ee.gif",
-            "testfile_test.jpeg": "a61eab59692d17a2adf4d1c5e9049ee4.jpeg",
-        }
-
-        hashed_asset_map = suggestions.generate_asset_files_with_hashed_names(filenames)
-        assert hashed_asset_map == expected_result
-
     def test_update_asset_names_on_notes(
         self, anki_session_with_addon_data: AnkiSession
     ):
@@ -98,10 +66,10 @@ class TestUploadImagesForSuggestion:
             note_contents = [
                 'Sample Text <div> abc <img src="test.png"> </div>',
                 "<span> a</span><img src='other_test.gif' width='250'><div></div>",
-                '<span> <p>this note will not have is image replaced </p> <img src="will_not_replace.jpeg"> </span>',
+                '<span> <p>this note will not have its image replaced </p> <img src="will_not_replace.jpeg"> </span>',
             ]
-            notes = []
 
+            notes: List[Note] = []
             mw.col.decks.add_normal_deck_with_name("MediaTestDeck")
             for content in note_contents:
                 note = mw.col.new_note(mw.col.models.by_name("Basic"))
