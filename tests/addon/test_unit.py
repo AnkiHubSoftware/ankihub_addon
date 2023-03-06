@@ -44,7 +44,7 @@ class TestUploadImagesForSuggestion:
                 "other_test.gif": "fWJKERDVNMOWIKJCIWJefgjnverf.gif",
             }
 
-            suggestions.update_asset_names_on_notes(hashed_name_map)
+            suggestions._update_asset_names_on_notes(hashed_name_map)
 
             notes[0].load()
             notes[1].load()

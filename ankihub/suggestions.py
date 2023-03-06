@@ -34,7 +34,7 @@ def suggest_note_update(
         return False
 
     ah_did = ankihub_db.ankihub_did_for_anki_nid(NoteId(suggestion.anki_nid))
-    suggestion = rename_and_upload_assets(suggestion, ah_did)
+    suggestion = _rename_and_upload_assets(suggestion, ah_did)
 
     client = AnkiHubClient()
     client.create_change_note_suggestion(
@@ -50,13 +50,13 @@ def suggest_new_note(
 ) -> None:
     suggestion = new_note_suggestion(note, ankihub_did, comment)
 
-    suggestion = rename_and_upload_assets(suggestion, ankihub_did)
+    suggestion = _rename_and_upload_assets(suggestion, ankihub_did)
 
     client = AnkiHubClient()
     client.create_new_note_suggestion(suggestion, auto_accept=auto_accept)
 
 
-def rename_and_upload_assets(
+def _rename_and_upload_assets(
     suggestion: NoteSuggestion, ankihub_did: uuid.UUID
 ) -> NoteSuggestion:
     """Renames assets in the Anki collection and the media folder and uploads them to AnkiHub.
@@ -67,28 +67,29 @@ def rename_and_upload_assets(
     asset_name_map = client.upload_images_for_suggestion(suggestion, ankihub_did)
 
     if asset_name_map:
-        replace_asset_names_in_suggestion(suggestion, asset_name_map)
-        update_asset_names_on_notes(asset_name_map)
+        _replace_asset_names_in_suggestion(suggestion, asset_name_map)
+        _update_asset_names_on_notes(asset_name_map)
 
     return suggestion
 
 
-def replace_asset_names_in_suggestion(
+def _replace_asset_names_in_suggestion(
     suggestion: NoteSuggestion, asset_map: Dict[str, str]
 ):
     suggestion.fields = [
-        field_with_replaced_asset_names(field, asset_map) for field in suggestion.fields
+        _field_with_replaced_asset_names(field, asset_map)
+        for field in suggestion.fields
     ]
 
 
-def field_with_replaced_asset_names(field: Field, asset_map: Dict[str, str]) -> Field:
+def _field_with_replaced_asset_names(field: Field, asset_map: Dict[str, str]) -> Field:
     result = copy.deepcopy(field)
     for old_name, new_name in asset_map.items():
         result.value = field.value.replace(old_name, new_name)
     return result
 
 
-def update_asset_names_on_notes(asset_name_map: Dict[str, str]):
+def _update_asset_names_on_notes(asset_name_map: Dict[str, str]):
     for original_filename, new_filename in asset_name_map.items():
         # TODO: Think of a better way of doing that. Currently we need to call it twice,
         # one for single quotes and other for double quotes around the src attribute.
