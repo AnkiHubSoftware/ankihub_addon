@@ -1,25 +1,21 @@
-import hashlib
-import shutil
+import copy
 import uuid
 from dataclasses import dataclass
-from pathlib import Path
 from typing import Any, Dict, List, Optional
 
 from anki.notes import Note, NoteId
-import aqt
-
-from .media_utils import find_and_replace_text_in_fields
 
 from .addon_ankihub_client import AddonAnkiHubClient as AnkiHubClient
 from .ankihub_client import (
     ChangeNoteSuggestion,
+    Field,
     NewNoteSuggestion,
     NoteSuggestion,
     SuggestionType,
 )
 from .db import ankihub_db
 from .exporting import to_note_data
-from .common_utils import extract_local_image_paths_from_html
+from .media_utils import find_and_replace_text_in_fields
 
 # string that is contained in the errors returned from the AnkiHub API when
 # there are no changes to the note for a change note suggestion
@@ -33,16 +29,12 @@ def suggest_note_update(
 ) -> bool:
     """Returns True if the suggestion was created, False if the note has no changes
     (and therefore no suggestion was created)"""
-    client = AnkiHubClient()
     suggestion = change_note_suggestion(note, change_type, comment)
     if suggestion is None:
         return False
 
-    # TODO: We need to upload images before creating the suggestion so the replaced img src values are sent to ankihub
-    ah_did = ankihub_db.ankihub_did_for_anki_nid(NoteId(suggestion.anki_nid))
-    # TODO: Move this inside client.create_change_note_suggestion maybe?
-    upload_images_for_suggestion(suggestion, ah_did)
-
+    client = AnkiHubClient()
+    suggestion = rename_and_upload_assets(suggestion)
     client.create_change_note_suggestion(
         change_note_suggestion=suggestion,
         auto_accept=auto_accept,
@@ -51,84 +43,49 @@ def suggest_note_update(
     return True
 
 
-def upload_images_for_suggestion(suggestion: NoteSuggestion, ah_did: uuid.UUID) -> None:
+def suggest_new_note(
+    note: Note, comment: str, ankihub_deck_uuid: uuid.UUID, auto_accept: bool = False
+) -> None:
+    suggestion = new_note_suggestion(note, ankihub_deck_uuid, comment)
+
     client = AnkiHubClient()
-
-    if not client.is_feature_flag_enabled("image_support_enabled"):
-        return
-
-    # TODO: This should be executed in background
-    # Find images in suggestion fields and upload them to s3
-    image_paths = get_images_from_suggestion(suggestion=suggestion)
-
-    # TODO: We are currently hashing and updating the names of all images,
-    # but we should only do that for images that were added in the suggestion.
-    # Unchanged images must keep their original names.
-
-    # First, generate the hashed filenames (asset name will be the hash of the file content)
-    # Remember to rename the local files
-    hashed_asset_map = generate_asset_files_with_hashed_names(image_paths)
-
-    # Then, update all notes using the provided {'original_filename': 'new_filename'} map
-    update_asset_names_on_notes(hashed_asset_map)
-
-    # Update the suggestion instance since it was created with the note
-    # before the replacement of the image names
-    # TODO: THIS IS NOT WORKING
-    update_note_inside_suggestion_instance(suggestion)
-
-    client.upload_images(list(hashed_asset_map.values()), ah_did)
+    suggestion = rename_and_upload_assets(suggestion)
+    client.create_new_note_suggestion(suggestion, auto_accept=auto_accept)
 
 
-def get_images_from_suggestion(suggestion: NoteSuggestion) -> List[Path]:
-    result = []
-    for field_content in [f.value for f in suggestion.fields]:
-        image_names = extract_local_image_paths_from_html(field_content)
-        image_paths = [
-            Path(aqt.mw.col.media.dir()) / image_name for image_name in image_names
-        ]
-        result.extend(image_paths)
+def rename_and_upload_assets(suggestion: NoteSuggestion) -> NoteSuggestion:
+    """Renames assets in the Anki collection and the media folder and uploads them to AnkiHub.
+    Returns a suggestion with updated asset names."""
+    suggestion = copy.deepcopy(suggestion)
 
+    client = AnkiHubClient()
+    ah_did = ankihub_db.ankihub_did_for_anki_nid(NoteId(suggestion.anki_nid))
+    asset_name_map = client.upload_images_for_suggestion(suggestion, ah_did)
+
+    if asset_name_map:
+        replace_asset_names_in_suggestion(suggestion, asset_name_map)
+        update_asset_names_on_notes(asset_name_map)
+
+    return suggestion
+
+
+def replace_asset_names_in_suggestion(
+    suggestion: NoteSuggestion, asset_map: Dict[str, str]
+):
+    suggestion.fields = [
+        field_with_replaced_asset_names(field, asset_map) for field in suggestion.fields
+    ]
+
+
+def field_with_replaced_asset_names(field: Field, asset_map: Dict[str, str]) -> Field:
+    result = copy.deepcopy(field)
+    for old_name, new_name in asset_map.items():
+        result.value = field.value.replace(old_name, new_name)
     return result
 
 
-def generate_asset_files_with_hashed_names(paths: List[Path]) -> Dict[str, str]:
-    original_hashed_name_mapping = dict()
-
-    for asset_path in paths:
-        # First we check if the image already exists.
-        # If yes, we skip this iteration.
-        if not asset_path.is_file():
-            continue
-
-        # Generate a hash from the file's content
-        with asset_path.open("rb") as asset:
-            file_content_hash = hashlib.md5(asset.read())
-
-        # Store the new filename under the old filename key in the dict
-        # that will be returned
-        new_filepath = asset_path.parent / (
-            file_content_hash.hexdigest() + asset_path.suffix
-        )
-        original_hashed_name_mapping[asset_path.name] = new_filepath
-
-        # Copy the file with the new name at the same location of the
-        # original file
-        try:
-            shutil.copyfile(asset_path, new_filepath)
-        except shutil.SameFileError:
-            continue
-
-    result = {
-        original_filename: new_filepath.name
-        for original_filename, new_filepath in original_hashed_name_mapping.items()
-    }
-
-    return result
-
-
-def update_asset_names_on_notes(asset_hashed_name_map: dict):
-    for original_filename, new_filename in asset_hashed_name_map.items():
+def update_asset_names_on_notes(asset_name_map: Dict[str, str]):
+    for original_filename, new_filename in asset_name_map.items():
         # TODO: Think of a better way of doing that. Currently we need to call it twice,
         # one for single quotes and other for double quotes around the src attribute.
         find_and_replace_text_in_fields(
@@ -137,28 +94,6 @@ def update_asset_names_on_notes(asset_hashed_name_map: dict):
         find_and_replace_text_in_fields(
             f"src='{original_filename}'", f"src='{new_filename}'"
         )
-
-
-def update_note_inside_suggestion_instance(suggestion: NoteSuggestion) -> None:
-    note = aqt.mw.col.get_note(NoteId(suggestion.anki_nid))
-    note_data = to_note_data(note)
-    suggestion.fields = note_data.fields
-
-
-def suggest_new_note(
-    note: Note, comment: str, ankihub_deck_uuid: uuid.UUID, auto_accept: bool = False
-) -> None:
-    client = AnkiHubClient()
-    new_note_suggestion_created = new_note_suggestion(note, ankihub_deck_uuid, comment)
-
-    # TODO: Move this inside client.create_new_note_suggestion
-    upload_images_for_suggestion(
-        new_note_suggestion_created, new_note_suggestion_created.ankihub_deck_uuid
-    )
-
-    client.create_new_note_suggestion(
-        new_note_suggestion_created, auto_accept=auto_accept
-    )
 
 
 @dataclass
