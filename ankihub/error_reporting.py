@@ -5,8 +5,8 @@ import time
 from concurrent.futures import Future
 from typing import Callable, Optional
 
-from anki.utils import checksum
 import aqt
+from anki.utils import checksum
 
 from . import LOGGER
 from .addon_ankihub_client import AddonAnkiHubClient as AnkiHubClient
@@ -41,8 +41,9 @@ def report_exception(
     exception: Optional[BaseException] = None, context: dict = dict()
 ) -> Optional[str]:
     try:
-        from .lib import sentry_sdk  # type: ignore
-        from .lib.sentry_sdk import capture_exception, configure_scope  # type: ignore
+        import sentry_sdk
+        from sentry_sdk import capture_exception, configure_scope
+
         from .settings import config
 
         sentry_sdk.init(

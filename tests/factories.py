@@ -1,6 +1,6 @@
 import os
 import uuid
-from typing import List
+from typing import Generic, List, TypeVar
 
 import factory
 
@@ -10,8 +10,18 @@ os.environ["SKIP_INIT"] = "1"
 
 from ankihub.ankihub_client import Field, NoteInfo
 
+T = TypeVar("T")
 
-class NoteInfoFactory(factory.Factory):
+
+# Workaround to get type hints for factory.create(),
+# see https://github.com/FactoryBoy/factory_boy/issues/468#issuecomment-759452373
+class BaseFactory(factory.Factory, Generic[T]):
+    @classmethod
+    def create(cls, **kwargs) -> T:
+        return super().create(**kwargs)
+
+
+class NoteInfoFactory(BaseFactory[NoteInfo]):
     class Meta:
         model = NoteInfo
 
@@ -24,6 +34,3 @@ class NoteInfoFactory(factory.Factory):
     ]
     tags: List[str] = []
     guid = "old guid"
-
-    def __new__(self, *args, **kwargs) -> NoteInfo:
-        return super().__new__(*args, **kwargs)
