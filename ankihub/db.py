@@ -27,6 +27,10 @@ def attach_ankihub_db_to_anki_db_connection() -> None:
 
 
 def detach_ankihub_db_from_anki_db_connection() -> None:
+    if aqt.mw.col is None:
+        LOGGER.info("The collection is not open. Not detaching AnkiHub DB.")
+        return
+
     if AnkiHubDB.database_name in [
         name for _, name, _ in aqt.mw.col.db.all("PRAGMA database_list")
     ]:

@@ -3,6 +3,7 @@ import dataclasses
 import gzip
 import json
 import logging
+import os
 import re
 import uuid
 from abc import ABC
@@ -31,6 +32,12 @@ from .lib.mashumaro.config import BaseConfig
 from .lib.mashumaro.mixins.json import DataClassJSONMixin
 
 LOGGER = logging.getLogger(__name__)
+
+S3_BUCKET_URL = (
+    "https://ankihubbucket.s3.us-east-2.amazonaws.com"
+    if bool(os.getenv("DEVELOPMENT", True))
+    else "https://ankihub-decks-assets.s3.amazonaws.com/"
+)
 
 API_URL_BASE = "https://app.ankihub.net/api"
 API_VERSION = 6.0
@@ -271,8 +278,9 @@ class DeckExtensionUpdateChunk(DataClassJSONMixinWithConfig):
 class AnkiHubClient:
     """Client for interacting with the AnkiHub API."""
 
-    def __init__(self, hooks=None, token=None):
+    def __init__(self, hooks=None, token=None, local_media_dir_path=None):
         self.session = Session()
+        self.local_media_dir_path = local_media_dir_path
 
         if hooks is not None:
             self.session.hooks["response"] = hooks
@@ -396,6 +404,36 @@ class AnkiHubClient:
             s3_url = self.get_presigned_url(key=key, action="upload")
             with open(image_path, "rb") as image_file:
                 self._upload_to_s3(s3_url, image_file)
+
+    def download_images(self, img_names: List[str], deck_id: uuid.UUID) -> None:
+        deck_images_remote_dir = f"{S3_BUCKET_URL}/deck_images/{deck_id}/notes/"
+
+        for img_name in img_names:
+            img_path = self.local_media_dir_path / img_name
+            # First we check if the image already exists.
+            # If yes, we skip this iteration.
+            if os.path.isfile(img_path):
+                continue
+
+            # If not, download the image from bucket
+            # and store the image locally
+            img_remote_path = deck_images_remote_dir + img_name
+            response = requests.get(img_remote_path, stream=True)
+
+            # Log and skip this iteration if the response is not 200 OK
+            if not response.ok:
+                LOGGER.info(
+                    f"Unable to download image [{img_remote_path}]. Response status code: {response.status_code}"
+                )
+                continue
+
+            # If we get a valid response, open the file and write the content
+            with open(img_path, "wb") as handle:
+                for block in response.iter_content(1024):
+                    if not block:
+                        break
+
+                    handle.write(block)
 
     def _gzip_compress_string(self, string: str) -> bytes:
         result = gzip.compress(
@@ -789,7 +827,14 @@ class AnkiHubClient:
         message = data["message"]
         LOGGER.debug(f"suggest_optional_tags response message: {message}")
 
-    def get_waffle_status(self):
+    def is_feature_flag_enabled(self, flag_name: str) -> bool:
+        return (
+            self._get_waffle_status()["flags"]
+            .get(flag_name, {})
+            .get("is_active", False)
+        )
+
+    def _get_waffle_status(self):
         response = self._send_request(
             "GET",
             "/waffle/waffle_status",
