@@ -17,6 +17,7 @@ from anki.decks import DeckId, FilteredDeckConfig
 from anki.models import NotetypeDict, NotetypeId
 from anki.notes import Note, NoteId
 from aqt import AnkiQt
+from aqt.addcards import AddCards
 from aqt.addons import InstallOk
 from aqt.browser import Browser
 from aqt.importing import AnkiPackageImporter
@@ -2075,6 +2076,39 @@ class TestBuildSubdecksAndMoveCardsToThem:
             assert note.cards()
             for card in note.cards():
                 assert card.did == 1
+
+
+def test_create_copy_browser_action_does_not_copy_ah_nid(
+    anki_session_with_addon_data: AnkiSession,
+    ankihub_basic_note_type: Dict[str, Any],
+    next_deterministic_uuid: Callable[[], uuid.UUID],
+    qtbot: QtBot,
+):
+    # Run the entry point so that the changes to the create copy action are applied.
+    entry_point.run()
+    with anki_session_with_addon_data.profile_loaded():
+        mw = anki_session_with_addon_data.mw
+
+        # Create a note.
+        note = mw.col.new_note(ankihub_basic_note_type)
+        note["Front"] = "front"
+        note["Back"] = "back"
+        note[ANKIHUB_NOTE_TYPE_FIELD_NAME] = str(next_deterministic_uuid())
+        mw.col.add_note(note, DeckId(1))
+
+        # Use the browser context menu action to create a copy of the note.
+        browser = Browser(mw)
+        qtbot.addWidget(browser)
+        browser.show()
+        # ... Select the note.
+        browser.form.tableView.selectRow(0)
+        # ... And call the action.
+        browser.on_create_copy()
+
+        # Check that the ANKIHUB_NOTE_TYPE_FIELD_NAME field is empty.
+        add_cards_dialog: AddCards = aqt.dialogs._dialogs["AddCards"][1]
+        note = add_cards_dialog.editor.note
+        assert note.fields == ["front", "back", ""]
 
 
 def test_flatten_deck(
