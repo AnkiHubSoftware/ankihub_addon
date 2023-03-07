@@ -6,7 +6,9 @@ from typing import List, Optional, Sequence, Tuple
 
 import aqt
 from anki.collection import SearchNode
+from anki.hooks import wrap
 from anki.notes import NoteId
+from aqt.addcards import AddCards
 from aqt.browser import (
     Browser,
     CellRow,
@@ -58,7 +60,7 @@ from ..suggestions import (
     BulkNoteSuggestionsResult,
     suggest_notes_in_bulk,
 )
-from ..sync import ah_sync, NotLoggedInError
+from ..sync import NotLoggedInError, ah_sync
 from .custom_columns import (
     AnkiHubIdColumn,
     CustomColumn,
@@ -831,6 +833,29 @@ def _store_browser_reference(browser_: Browser) -> None:
     browser = browser_
 
 
+def _make_copy_note_action_not_copy_ankihub_id() -> None:
+    """Make the Create Copy note context menu action not copy the AnkiHub ID field."""
+    original_on_create_copy = Browser.on_create_copy
+    Browser.on_create_copy = wrap(  # type: ignore
+        old=lambda self, *args: original_on_create_copy(self),
+        new=_after_create_copy,
+        pos="after",
+    )
+
+
+def _after_create_copy(*args, **kwargs) -> None:
+    """Clear the AnkiHub ID field of the new note in the AddCards dialog that was opened
+    when the Create Copy note context menu action was clicked."""
+    add_cards_dialog: AddCards
+    if not (add_cards_dialog := aqt.dialogs._dialogs.get("AddCards", [None, None])[1]):
+        return
+
+    note = add_cards_dialog.editor.note
+    if ANKIHUB_NOTE_TYPE_FIELD_NAME in note.keys():
+        note[ANKIHUB_NOTE_TYPE_FIELD_NAME] = ""
+        add_cards_dialog.editor.loadNote()
+
+
 def setup() -> None:
     browser_will_show.append(_store_browser_reference)
 
@@ -844,3 +869,5 @@ def setup() -> None:
     browser_will_build_tree.append(_on_browser_will_build_tree)
 
     browser_menus_did_init.append(_on_browser_menus_did_init)
+
+    _make_copy_note_action_not_copy_ankihub_id()
