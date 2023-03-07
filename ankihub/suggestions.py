@@ -89,7 +89,10 @@ def _replace_asset_names_in_suggestion(
 def _field_with_replaced_asset_names(field: Field, asset_map: Dict[str, str]) -> Field:
     result = copy.deepcopy(field)
     for old_name, new_name in asset_map.items():
-        result.value = field.value.replace(old_name, new_name)
+        # TODO: Think of a better way of doing that. Currently we need to call it twice,
+        # one for single quotes and other for double quotes around the src attribute.
+        result.value = field.value.replace(f'src="{old_name}"', f'src="{new_name}"')
+        result.value = field.value.replace(f"src='{old_name}'", f"src='{new_name}'")
     return result
 
 
