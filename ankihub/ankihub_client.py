@@ -33,6 +33,9 @@ from mashumaro.mixins.json import DataClassJSONMixin
 from requests import PreparedRequest, Request, Response, Session
 
 from .common_utils import extract_local_image_paths_from_html
+from mashumaro import field_options
+from mashumaro.config import BaseConfig
+from mashumaro.mixins.json import DataClassJSONMixin
 
 LOGGER = logging.getLogger(__name__)
 
