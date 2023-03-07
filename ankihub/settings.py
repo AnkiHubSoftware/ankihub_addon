@@ -19,11 +19,11 @@ import aqt
 from anki.buildinfo import version as ANKI_VERSION
 from anki.decks import DeckId
 from aqt.utils import askUser, showInfo
+from mashumaro import field_options
+from mashumaro.mixins.json import DataClassJSONMixin
 
 from . import LOGGER
 from .ankihub_client import ANKIHUB_DATETIME_FORMAT_STR, DeckExtension
-from .lib.mashumaro import field_options
-from .lib.mashumaro.mixins.json import DataClassJSONMixin
 from .public_config_migrations import migrate_public_config
 
 ADDON_PATH = Path(__file__).parent.absolute()
