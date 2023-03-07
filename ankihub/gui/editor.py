@@ -229,52 +229,92 @@ def _on_view_note_history_button_press(editor: Editor) -> None:
 def _hide_ankihub_field_in_editor(
     js: str, note: anki.notes.Note, _: aqt.editor.Editor
 ) -> str:
-    if ANKI_MINOR >= 55:
-        if settings.ANKIHUB_NOTE_TYPE_FIELD_NAME not in note:
-            return js
-        extra = (
-            'require("svelte/internal").tick().then(() => '
-            "{{ require('anki/NoteEditor').instances[0].fields["
-            "require('anki/NoteEditor').instances[0].fields.length -1"
-            "].element.then((element) "
-            "=> {{ element.parentElement.parentElement.hidden = true; }}); }});"
-        )
-    elif ANKI_MINOR >= 50:
-        if settings.ANKIHUB_NOTE_TYPE_FIELD_NAME not in note:
-            return js
-        extra = (
-            'require("svelte/internal").tick().then(() => '
-            "{{ require('anki/NoteEditor').instances[0].fields["
-            "require('anki/NoteEditor').instances[0].fields.length -1"
-            "].element.then((element) "
-            "=> {{ element.hidden = true; }}); }});"
+    """Add JS to the JS code of the editor to hide the ankihub_id field if it is present."""
+    hide_last_field = settings.ANKIHUB_NOTE_TYPE_FIELD_NAME in note
+    if ANKI_MINOR >= 50:
+        refresh_fields_js = _refresh_editor_fields_for_anki_v50_and_up_js(
+            hide_last_field
         )
     else:
-        if settings.ANKIHUB_NOTE_TYPE_FIELD_NAME not in note:
-            extra = (
-                "(() => {"
-                'const field = document.querySelector("#fields *[data-ankihub-hidden]");'
-                "if (field) {"
-                "delete field.dataset.ankihubHidden;"
-                "field.hidden = false;"
-                "}"
-                "})()"
-            )
-        else:
-            extra = (
-                "(() => {"
-                'let fields = document.getElementById("fields").children;'
-                # For compatibility with the multi column editor add-on https://ankiweb.net/shared/info/3491767031
-                'if(fields[0].nodeName == "TABLE") {'
-                "   fields = fields[0].children;"
-                "}"
-                "const field = fields[fields.length -1];"
-                "field.dataset.ankihubHidden = true;"
-                "field.hidden = true;"
-                "})()"
-            )
-    js += extra
-    return js
+        refresh_fields_js = _refresh_editor_fields_for_anki_below_v50_js(
+            hide_last_field
+        )
+
+    result = js + refresh_fields_js
+    return result
+
+
+def _refresh_editor_fields_for_anki_v50_and_up_js(hide_last_field: bool) -> str:
+    if ANKI_MINOR >= 55:
+        change_visiblility_js = """
+            function changeVisibilityOfField(field_idx, visible) {
+                require('anki/NoteEditor').instances[0].fields[field_idx].element.then(
+                    (element) => { element.parentElement.parentElement.hidden = !visible; }
+                );
+            }
+        """
+    elif ANKI_MINOR >= 50:
+        change_visiblility_js = """
+            function changeVisibilityOfField(field_idx, visible) {
+                require('anki/NoteEditor').instances[0].fields[field_idx].element.then(
+                    (element) => { element.hidden = !visible; }
+                );
+            }
+        """
+    else:
+        # We don't expect this condition to occur, but adding this here to be sure we are notified if it does.
+        raise RuntimeError("Function should not be called for Anki < 2.1.50")
+
+    # This is the common part of the JS code for refreshing the fields.
+    # (using an old-style format string here to avoid having to escape braces)
+    refresh_fields_js = """
+        require("svelte/internal").tick().then(() => {
+            let hide_last_field = %s;
+            let num_fields = require('anki/NoteEditor').instances[0].fields.length;
+
+            // show all fields
+            for (let i = 0; i < num_fields; i++) {
+                changeVisibilityOfField(i, true);
+            }
+
+            // maybe hide last field
+            if (hide_last_field) {
+                changeVisibilityOfField(num_fields - 1, false);
+            }
+        });
+        """ % (
+        "true" if hide_last_field else "false"
+    )
+
+    result = change_visiblility_js + refresh_fields_js
+    return result
+
+
+def _refresh_editor_fields_for_anki_below_v50_js(hide_last_field: bool) -> str:
+    if hide_last_field:
+        return """
+            (() => {
+                let fields = document.getElementById("fields").children;
+                // This condition is here for compatibility with the multi column editor add-on
+                // https://ankiweb.net/shared/info/3491767031
+                if(fields[0].nodeName == "TABLE") {
+                   fields = fields[0].children;
+                }
+                const field = fields[fields.length -1];
+                field.dataset.ankihubHidden = true;
+                field.hidden = true;
+            })()
+            """
+    else:
+        return """
+            (() => {
+                const field = document.querySelector("#fields *[data-ankihub-hidden]");
+                if (field) {
+                    delete field.dataset.ankihubHidden;
+                    field.hidden = false;
+                }
+            })()
+            """
 
 
 def _refresh_buttons(editor: Editor) -> None:

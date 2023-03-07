@@ -1,7 +1,7 @@
 import copy
 import uuid
 from dataclasses import dataclass
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, List, Optional, cast
 
 from anki.notes import Note, NoteId
 
@@ -34,7 +34,9 @@ def suggest_note_update(
         return False
 
     ah_did = ankihub_db.ankihub_did_for_anki_nid(NoteId(suggestion.anki_nid))
-    suggestion = _rename_and_upload_assets(suggestion, ah_did)
+    suggestion = cast(
+        ChangeNoteSuggestion, _rename_and_upload_assets(suggestion, ah_did)
+    )
 
     client = AnkiHubClient()
     client.create_change_note_suggestion(
@@ -50,7 +52,9 @@ def suggest_new_note(
 ) -> None:
     suggestion = new_note_suggestion(note, ankihub_did, comment)
 
-    suggestion = _rename_and_upload_assets(suggestion, ankihub_did)
+    suggestion = cast(
+        NewNoteSuggestion, _rename_and_upload_assets(suggestion, ankihub_did)
+    )
 
     client = AnkiHubClient()
     client.create_new_note_suggestion(suggestion, auto_accept=auto_accept)

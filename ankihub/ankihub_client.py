@@ -27,12 +27,12 @@ from typing import (
 )
 
 import requests
+from mashumaro import field_options
+from mashumaro.config import BaseConfig
+from mashumaro.mixins.json import DataClassJSONMixin
 from requests import PreparedRequest, Request, Response, Session
 
 from .common_utils import extract_local_image_paths_from_html
-from .lib.mashumaro import field_options
-from .lib.mashumaro.config import BaseConfig
-from .lib.mashumaro.mixins.json import DataClassJSONMixin
 
 LOGGER = logging.getLogger(__name__)
 

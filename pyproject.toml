@@ -1,5 +1,5 @@
 [tool.isort]
-profile = "black"
+profile = 'black'
 
 [tool.black]
 extend-exclude = '''
@@ -7,3 +7,37 @@ extend-exclude = '''
   lib/
 )
 '''
+
+[tool.mypy]
+files=[
+  'ankihub',
+  'tests/addon',
+  'tests/client'
+]
+
+exclude = [
+  'ankihub/media_import',
+  'ankihub/media_export',
+  'ankihub/lib/certifi',
+  'ankihub/lib/sentry_sd',
+  'ankihub/lib/urllib',
+  'ankihub/lib/other/typing_extension'
+]
+
+no_strict_optional = true
+
+[[tool.mypy.overrides]]
+module = 'ankihub.*'
+check_untyped_defs = true
+
+[[tool.mypy.overrides]]
+module = 'mashumaro.*'
+ignore_errors = true
+
+[[tool.mypy.overrides]]
+module = [
+  'sentry_sdk.*',
+  'certifi.*',
+  'urllib3.*'
+]
+follow_imports = 'skip'
