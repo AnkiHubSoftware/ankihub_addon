@@ -262,6 +262,7 @@ def _refresh_editor_fields_for_anki_v50_and_up_js(hide_last_field: bool) -> str:
             }
         """
     else:
+        # We don't expect this condition to occur, but adding this here to be sure we are notified if it does.
         raise RuntimeError("Function should not be called for Anki < 2.1.50")
 
     # This is the common part of the JS code for refreshing the fields.
