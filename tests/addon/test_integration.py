@@ -17,6 +17,7 @@ from anki.decks import DeckId, FilteredDeckConfig
 from anki.models import NotetypeDict, NotetypeId
 from anki.notes import Note, NoteId
 from aqt import AnkiQt
+from aqt.addcards import AddCards
 from aqt.addons import InstallOk
 from aqt.browser import Browser
 from aqt.importing import AnkiPackageImporter
@@ -101,7 +102,7 @@ from ankihub.suggestions import (
     suggest_note_update,
     suggest_notes_in_bulk,
 )
-from ankihub.sync import AnkiHubSync
+from ankihub.sync import AnkiHubSync, sync
 from ankihub.utils import (
     ANKIHUB_TEMPLATE_SNIPPET_RE,
     all_dids,
@@ -2084,6 +2085,39 @@ class TestBuildSubdecksAndMoveCardsToThem:
                 assert card.did == 1
 
 
+def test_create_copy_browser_action_does_not_copy_ah_nid(
+    anki_session_with_addon_data: AnkiSession,
+    ankihub_basic_note_type: Dict[str, Any],
+    next_deterministic_uuid: Callable[[], uuid.UUID],
+    qtbot: QtBot,
+):
+    # Run the entry point so that the changes to the create copy action are applied.
+    entry_point.run()
+    with anki_session_with_addon_data.profile_loaded():
+        mw = anki_session_with_addon_data.mw
+
+        # Create a note.
+        note = mw.col.new_note(ankihub_basic_note_type)
+        note["Front"] = "front"
+        note["Back"] = "back"
+        note[ANKIHUB_NOTE_TYPE_FIELD_NAME] = str(next_deterministic_uuid())
+        mw.col.add_note(note, DeckId(1))
+
+        # Use the browser context menu action to create a copy of the note.
+        browser = Browser(mw)
+        qtbot.addWidget(browser)
+        browser.show()
+        # ... Select the note.
+        browser.form.tableView.selectRow(0)
+        # ... And call the action.
+        browser.on_create_copy()
+
+        # Check that the ANKIHUB_NOTE_TYPE_FIELD_NAME field is empty.
+        add_cards_dialog: AddCards = aqt.dialogs._dialogs["AddCards"][1]
+        note = add_cards_dialog.editor.note
+        assert note.fields == ["front", "back", ""]
+
+
 def test_flatten_deck(
     anki_session_with_addon_data: AnkiSession,
     install_sample_ah_deck: InstallSampleAHDeck,
@@ -2179,6 +2213,7 @@ def test_reset_local_changes_to_notes(
 def test_migrate_profile_data_from_old_location(
     anki_session_with_addon_before_profile_support: AnkiSession,
     monkeypatch: MonkeyPatch,
+    disable_image_support_feature_flag,
 ):
     anki_session = anki_session_with_addon_before_profile_support
 
@@ -2517,6 +2552,51 @@ def test_reset_optional_tags_action(
         assert mw.col.get_note(other_note.id).tags == [
             f"{TAG_FOR_OPTIONAL_TAGS}::test99::test2"
         ]
+
+
+def test_download_images_on_sync(
+    anki_session_with_addon_data: AnkiSession,
+    install_sample_ah_deck: InstallSampleAHDeck,
+    monkeypatch: MonkeyPatch,
+    qtbot: QtBot,
+    enable_image_support_feature_flag,
+):
+    with anki_session_with_addon_data.profile_loaded():
+        mw = anki_session_with_addon_data.mw
+
+        _, ah_did = install_sample_ah_deck()
+
+        # Add a reference to a local image to a note.
+        nids = mw.col.find_notes("")
+        nid = nids[0]
+        note = mw.col.get_note(nid)
+        note.fields[0] = "Some text. <img src='image.png'>"
+        note.flush()
+
+        # Mock the client to simulate that there are no deck updates and extensions.
+        monkeypatch.setattr(
+            AnkiHubClient,
+            "get_deck_updates",
+            lambda *args, **kwargs: [],
+        )
+        monkeypatch.setattr(
+            AnkiHubClient,
+            "get_deck_extensions_by_deck_id",
+            lambda *args, **kwargs: [],
+        )
+
+        # Mock the client method for downloading images.
+        download_images_mock = Mock()
+        monkeypatch.setattr(AnkiHubClient, "download_images", download_images_mock)
+
+        # Run the sync.
+        sync.sync_all_decks_and_media()
+
+        # Let the background thread (which downloads missing media) finish.
+        qtbot.wait(200)
+
+        # Assert that the client method for downloading images was called with the correct arguments.
+        download_images_mock.assert_called_once_with(["image.png"], ah_did)
 
 
 def test_upload_images(
