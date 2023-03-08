@@ -868,6 +868,7 @@ class TestUploadImagesForSuggestion:
         suggestion: ChangeNoteSuggestion | NewNoteSuggestion,
         requests_mock: Mocker,
         monkeypatch,
+        next_deterministic_uuid: Callable[[], uuid.UUID],
         remove_generated_asset_files,
         enable_image_support_feature_flag,
         request,
@@ -916,7 +917,7 @@ class TestUploadImagesForSuggestion:
             client.create_new_note_suggestion(new_note_suggestion=suggestion)
 
         result = client.upload_images_for_suggestion(
-            suggestion, ah_did="1111-22222-3333-4444"
+            suggestion, ah_did=next_deterministic_uuid()
         )
 
         # assert that the suggestion was made
