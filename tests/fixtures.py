@@ -1,7 +1,9 @@
 import uuid
 from typing import Callable
 
+import pytest
 from pytest import fixture
+from requests_mock import Mocker
 
 
 @fixture
@@ -32,3 +34,25 @@ def next_deterministic_id() -> Callable[[], int]:
         return counter
 
     return _next_deterministic_id
+
+
+@pytest.fixture
+def enable_image_support_feature_flag(requests_mock: Mocker) -> None:
+    from ankihub.ankihub_client import API_URL_BASE
+
+    requests_mock.get(
+        f"{API_URL_BASE}/waffle/waffle_status",
+        status_code=200,
+        json={"flags": {"image_support_enabled": {"is_active": True}}},
+    )
+
+
+@pytest.fixture
+def disable_image_support_feature_flag(requests_mock: Mocker) -> None:
+    from ankihub.ankihub_client import API_URL_BASE
+
+    requests_mock.get(
+        f"{API_URL_BASE}/waffle/waffle_status",
+        status_code=200,
+        json={"flags": {"image_support_enabled": {"is_active": False}}},
+    )
