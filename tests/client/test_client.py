@@ -14,7 +14,7 @@ import pytest
 import requests_mock
 from pytest import MonkeyPatch
 from requests_mock import Mocker
-from vcr import VCR  # type: ignore
+from vcr import VCR
 
 from ..factories import NoteInfoFactory
 
@@ -860,6 +860,78 @@ def test_download_images(
 
 
 class TestUploadImagesForSuggestion:
+    @pytest.mark.parametrize(
+        "suggestion", ["new_note_suggestion", "change_note_suggestion"]
+    )
+    def test_upload_images_for_suggestion(
+        self,
+        suggestion: ChangeNoteSuggestion | NewNoteSuggestion,
+        requests_mock: Mocker,
+        monkeypatch,
+        remove_generated_asset_files,
+        enable_image_support_feature_flag,
+        request,
+    ):
+        suggestion = request.getfixturevalue(suggestion)
+        suggestion.fields[0].value = (
+            '<img src="testfile_mario.png" width="100" alt="its-a me!">'
+            '<div> something here <img src="testfile_test.jpeg" height="50" alt="just a test"> </div>'
+        )
+
+        fake_presigned_url = "https://fake_presigned_url.com"
+        # monkeypatch.setattr(
+        #     "ankihub.ankihub_client.AnkiHubClient.get_presigned_url",
+        #     lambda *args, **kwargs: fake_presigned_url,
+        # )
+
+        s3_upload_request_mock = requests_mock.put(
+            fake_presigned_url,
+            json={"success": True},
+        )
+
+        expected_result = {
+            "testfile_mario.png": "156ca948cd1356b1a2c1c790f0855ad9.png",
+            "testfile_test.jpeg": "a61eab59692d17a2adf4d1c5e9049ee4.jpeg",
+        }
+
+        suggestion_request_mock = None
+        result = None
+
+        monkeypatch.setattr(
+            AnkiHubClient,
+            "get_presigned_url",
+            lambda *args, **kwargs: fake_presigned_url,
+        )
+
+        client = AnkiHubClient(local_media_dir_path=TEST_MEDIA_PATH)
+
+        if isinstance(suggestion, ChangeNoteSuggestion):
+            suggestion_request_mock = requests_mock.post(
+                f"{ankihub_client.API_URL_BASE}/notes/{suggestion.ankihub_note_uuid}/suggestion/",
+                status_code=201,
+            )
+
+            client.create_change_note_suggestion(change_note_suggestion=suggestion)
+        else:
+            suggestion_request_mock = requests_mock.post(
+                f"{ankihub_client.API_URL_BASE}/decks/{suggestion.ankihub_deck_uuid}/note-suggestion/",
+                status_code=201,
+            )
+            client.create_new_note_suggestion(new_note_suggestion=suggestion)
+
+        result = client.upload_images_for_suggestion(
+            suggestion, ah_did="1111-22222-3333-4444"
+        )
+
+        # assert that the suggestion was made
+        assert len(suggestion_request_mock.request_history) == 1  # type: ignore
+
+        # assert that the images were uploaded
+        assert len(s3_upload_request_mock.request_history) == 2  # type: ignore
+
+        # assert that the asset name map was returned correctly
+        assert result == expected_result
+
     def test_generate_asset_files_with_hashed_names(self, remove_generated_asset_files):
         client = AnkiHubClient()
         filenames = [
