@@ -2751,6 +2751,64 @@ class TestSuggestionsWithImages:
 
                 assert img_name_in_request == img_name_in_note
 
+    def test_should_ignore_asset_file_names_not_present_at_local_collection(
+        self,
+        anki_session_with_addon_data: AnkiSession,
+        requests_mock: Mocker,
+        monkeypatch: MonkeyPatch,
+        install_sample_ah_deck: Callable[[], Tuple[uuid.UUID, int]],
+        enable_image_support_feature_flag,
+    ):
+        anki_session = anki_session_with_addon_data
+        with anki_session.profile_loaded():
+            mw = anki_session.mw
+
+            install_sample_ah_deck()
+
+            fake_presigned_url = "https://fake_presigned_url.com"
+            monkeypatch.setattr(
+                "ankihub.ankihub_client.AnkiHubClient.get_presigned_url",
+                lambda *args, **kwargs: fake_presigned_url,
+            )
+
+            upload_request_mock = requests_mock.put(
+                fake_presigned_url,
+                json={"success": True},
+            )
+
+            # grab a note from the deck
+            nids = mw.col.find_notes("")
+            note = mw.col.get_note(nids[0])
+
+            # add reference to a note of an asset that does not exist locally
+            note_content = '<img src="this_image_is_not_on_local_collection.png">'
+            note["Front"] = note_content
+            note.flush()
+
+            ah_nid = ankihub_db.ankihub_nid_for_anki_nid(note.id)
+
+            # create a suggestion for the note
+            suggestion_request_mock = requests_mock.post(
+                f"{api_url_base()}/notes/{ah_nid}/suggestion/", status_code=201
+            )
+
+            suggest_note_update(
+                note=note,
+                change_type=SuggestionType.NEW_CONTENT,
+                comment="test",
+            )
+
+            # assert that the suggestion is made
+            assert len(suggestion_request_mock.request_history) == 1  # type: ignore
+
+            # assert that the image was NOT uploaded
+            assert len(upload_request_mock.request_history) == 0  # type: ignore
+
+            note.load()
+
+            # Assert note content is unchanged
+            assert note_content == note["Front"]
+
 
 class TestAddonUpdate:
     def test_addon_update(
