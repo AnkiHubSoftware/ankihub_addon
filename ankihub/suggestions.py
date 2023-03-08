@@ -104,8 +104,8 @@ def _field_with_replaced_asset_names(field: Field, asset_map: Dict[str, str]) ->
     for old_name, new_name in asset_map.items():
         # TODO: Think of a better way of doing that. Currently we need to call it twice,
         # one for single quotes and other for double quotes around the src attribute.
-        result.value = field.value.replace(f'src="{old_name}"', f'src="{new_name}"')
-        result.value = field.value.replace(f"src='{old_name}'", f"src='{new_name}'")
+        result.value = result.value.replace(f'src="{old_name}"', f'src="{new_name}"')
+        result.value = result.value.replace(f"src='{old_name}'", f"src='{new_name}'")
     return result
 
 
