@@ -6,5 +6,8 @@
     ],
     "python.testing.unittestEnabled": false,
     "python.testing.pytestEnabled": true,
-    "python.testing.autoTestDiscoverOnSaveEnabled": false
+    "python.testing.autoTestDiscoverOnSaveEnabled": false,
+    "python.analysis.extraPaths": [
+        "./ankihub/lib"
+    ],
 }

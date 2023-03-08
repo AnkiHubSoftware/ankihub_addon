@@ -237,7 +237,7 @@ def make_ah_note(
     return _make_ah_note
 
 
-def ankihub_sample_deck_notes_data():
+def ankihub_sample_deck_notes_data() -> List[NoteInfo]:
     notes_data_raw = transform_notes_data(SAMPLE_NOTES_DATA)
     result = [NoteInfo.from_dict(x) for x in notes_data_raw]
     return result
@@ -475,8 +475,8 @@ def test_suggest_note_update(
 
         _, ah_did = install_sample_ah_deck()
 
-        notes_data: NoteInfo = ankihub_sample_deck_notes_data()
-        note = mw.col.get_note(notes_data[0].anki_nid)
+        notes_data = ankihub_sample_deck_notes_data()
+        note = mw.col.get_note(NoteId(notes_data[0].anki_nid))
 
         # test create change note suggestion
         note = mw.col.new_note(ankihub_basic_note_type)
@@ -1017,7 +1017,7 @@ class TestAnkiHubImporter:
             notes_data = ankihub_sample_deck_notes_data()
             note_data = notes_data[0]
             note_data.tags = [f"{SUBDECK_TAG}::Testdeck::A::B"]
-            note = mw.col.get_note(note_data.anki_nid)
+            note = mw.col.get_note(NoteId(note_data.anki_nid))
 
             # import the deck again, now with the changed note data
             dids_before_import = all_dids()
@@ -1169,7 +1169,7 @@ class TestAnkiHubImporter:
 
             note_data.tags = ["tag1", "tag2"]
 
-            nid = note_data.anki_nid
+            nid = NoteId(note_data.anki_nid)
             note = mw.col.get_note(nid)
             note.tags = ["protected_tag"]
 
@@ -1215,7 +1215,7 @@ class TestAnkiHubImporter:
 
             # import the first note
             ah_did_1 = next_deterministic_uuid()
-            note_info_1 = NoteInfoFactory(
+            note_info_1 = NoteInfoFactory.create(
                 anki_nid=anki_nid,
                 tags=["tag1"],
                 mid=mid_1,
@@ -1235,7 +1235,7 @@ class TestAnkiHubImporter:
 
             # import the second note with the same nid
             ah_did_2 = next_deterministic_uuid()
-            note_info_2 = NoteInfoFactory(
+            note_info_2 = NoteInfoFactory.create(
                 anki_nid=anki_nid,
                 tags=["tag2"],
                 mid=mid_2,
@@ -2321,7 +2321,7 @@ def test_sync_with_optional_content(
             notes_data = ankihub_sample_deck_notes_data()
             ankihub_db.upsert_notes_data(ankihub_deck_uuid, notes_data)
             note_data = notes_data[0]
-            note = mw.col.get_note(note_data.anki_nid)
+            note = mw.col.get_note(NoteId(note_data.anki_nid))
 
             assert set(note.tags) == set(["my::tag2", "my::tag"])
 
