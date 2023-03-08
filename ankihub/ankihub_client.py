@@ -468,11 +468,11 @@ class AnkiHubClient:
 
         return result
 
-    def upload_images(self, image_paths: List[str], deck_id: uuid.UUID) -> None:
+    def upload_images(self, image_names: List[str], deck_id: uuid.UUID) -> None:
         # deck_id is used to namespace the images within each deck.
 
         # TODO: send all images at once instad of looping through each one
-        for image_name in image_paths:
+        for image_name in image_names:
             key = f"deck_assets/{deck_id}/{image_name}"
             s3_url = self.get_presigned_url(key=key, action="upload")
             with open(self.local_media_dir_path / image_name, "rb") as image_file:
