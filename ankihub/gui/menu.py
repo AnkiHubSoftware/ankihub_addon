@@ -31,7 +31,8 @@ from ..media_import.ui import open_import_dialog
 from ..register_decks import create_collaborative_deck
 from ..settings import ADDON_VERSION, config, url_view_deck
 from ..subdecks import SUBDECK_TAG
-from ..sync import sync_with_progress
+from ..sync import ah_sync, show_tooltip_about_last_sync_results
+from .db_check import maybe_check_databases
 from .decks import SubscribedDecksDialog
 from .utils import ask_user
 
@@ -281,7 +282,20 @@ def upload_suggestions_action():
 
 
 def sync_with_ankihub_action():
-    sync_with_progress()
+    aqt.mw.taskman.with_progress(
+        task=ah_sync.sync_all_decks_and_media,
+        immediate=True,
+        label="Syncing with AnkiHub",
+        on_done=on_sync_done,
+    )
+
+
+def on_sync_done(future: Future) -> None:
+    future.result()
+
+    show_tooltip_about_last_sync_results()
+
+    maybe_check_databases()
 
 
 def sign_out_action():
@@ -451,7 +465,7 @@ def refresh_ankihub_menu() -> None:
     global ankihub_menu
     ankihub_menu.clear()
 
-    if config.token():
+    if config.is_logged_in():
         create_collaborative_deck_setup(parent=ankihub_menu)
         subscribe_to_deck_setup(parent=ankihub_menu)
         import_media_setup(parent=ankihub_menu)

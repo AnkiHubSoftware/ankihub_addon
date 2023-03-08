@@ -2,11 +2,11 @@
 
 options:
 
-- `"on_startup"`
-
 - `"on_ankiweb_sync"`
 
-    This will also sync on startup when not syncing with AnkiWeb.
+- `"on_startup"`
+
+    Requires to be logged into AnkiWeb.
 
 -  `"never"`
 
