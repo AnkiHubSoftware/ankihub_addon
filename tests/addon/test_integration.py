@@ -11,17 +11,20 @@ from unittest.mock import MagicMock, Mock, PropertyMock
 
 import aqt
 import pytest
+from anki._backend import RustBackendGenerated
 from anki.cards import CardId
 from anki.consts import QUEUE_TYPE_SUSPENDED
 from anki.decks import DeckId, FilteredDeckConfig
 from anki.models import NotetypeDict, NotetypeId
 from anki.notes import Note, NoteId
+from anki.sync import SyncOutput
 from aqt import AnkiQt
 from aqt.addcards import AddCards
 from aqt.addons import InstallOk
 from aqt.browser import Browser
 from aqt.importing import AnkiPackageImporter
 from aqt.qt import Qt
+from aqt.sync import sync_collection
 from pytest import MonkeyPatch, fixture
 from pytest_anki import AnkiSession
 from pytestqt.qtbot import QtBot  # type: ignore
@@ -34,9 +37,6 @@ from .conftest import TEST_PROFILE_ID
 # has to be set before importing ankihub
 os.environ["SKIP_INIT"] = "1"
 
-from anki._backend import RustBackendGenerated
-from anki.sync import SyncOutput
-from aqt.sync import sync_collection
 
 from ankihub import entry_point
 from ankihub.addons import (
@@ -80,6 +80,7 @@ from ankihub.importing import (
     adjust_note_types,
     reset_note_types_of_notes,
 )
+from ankihub.media_utils import IMG_NAME_IN_IMG_TAG_REGEX
 from ankihub.note_conversion import (
     ADDON_INTERNAL_TAGS,
     ANKI_INTERNAL_TAGS,
@@ -550,7 +551,7 @@ def test_suggest_new_note(
         ]
         suggest_new_note(
             note=note,
-            ankihub_deck_uuid=ah_did,
+            ankihub_did=ah_did,
             comment="test",
         )
 
@@ -573,7 +574,7 @@ def test_suggest_new_note(
         try:
             suggest_new_note(
                 note=note,
-                ankihub_deck_uuid=ah_did,
+                ankihub_did=ah_did,
                 comment="test",
             )
         except AnkiHubRequestError as e:
@@ -2720,6 +2721,7 @@ def test_download_images_on_sync(
 
 def test_upload_images(
     anki_session_with_addon_data: AnkiSession,
+    next_deterministic_uuid: Callable[[], uuid.UUID],
     monkeypatch: MonkeyPatch,
     requests_mock: Mocker,
 ):
@@ -2739,9 +2741,9 @@ def test_upload_images(
 
         with tempfile.NamedTemporaryFile(suffix=".png") as f:
             file_path = Path(f.name)
-            fake_bucket_path = "fake_bucket_path"
-            client = AnkiHubClient()
-            client.upload_images([file_path], bucket_path=fake_bucket_path)
+            fake_deck_id = next_deterministic_uuid()
+            client = AnkiHubClient(local_media_dir_path=file_path.parent)
+            client.upload_images([file_path.name], deck_id=fake_deck_id)
 
         assert len(upload_request_mock.request_history) == 1  # type: ignore
 
@@ -2789,12 +2791,11 @@ class TestSuggestionsWithImages:
                 note.flush()
 
                 ah_nid = ankihub_db.ankihub_nid_for_anki_nid(note.id)
-
-                # create a suggestion for the note
                 suggestion_request_mock = requests_mock.post(
                     f"{api_url_base()}/notes/{ah_nid}/suggestion/", status_code=201
                 )
 
+                # create a suggestion for the note
                 suggest_note_update(
                     note=note,
                     change_type=SuggestionType.NEW_CONTENT,
@@ -2805,8 +2806,11 @@ class TestSuggestionsWithImages:
 
                 # assert that the image was uploaded
                 assert len(upload_request_mock.request_history) == 1  # type: ignore
-                assert upload_request_mock.last_request.text.name == str(  # type: ignore
-                    file_path_in_col.absolute()
+
+                self._assert_img_names_as_expected(
+                    note=note,
+                    upload_request_mock=upload_request_mock,  # type: ignore
+                    suggestion_request_mock=suggestion_request_mock,  # type: ignore
                 )
 
     def test_suggest_new_note_with_image(
@@ -2822,12 +2826,6 @@ class TestSuggestionsWithImages:
             mw = anki_session.mw
 
             _, ah_did = install_sample_ah_deck()
-            note = mw.col.new_note(mw.col.models.by_name("Basic (Testdeck / user1)"))
-
-            requests_mock.post(
-                f"{api_url_base()}/decks/{ah_did}/note-suggestion/",
-                status_code=201,
-            )
 
             fake_presigned_url = "https://fake_presigned_url.com"
             monkeypatch.setattr(
@@ -2840,6 +2838,11 @@ class TestSuggestionsWithImages:
                 json={"success": True},
             )
 
+            suggestion_request_mock = requests_mock.post(
+                f"{api_url_base()}/decks/{ah_did}/note-suggestion/",
+                status_code=201,
+            )
+
             with tempfile.NamedTemporaryFile(suffix=".png") as f:
                 # add file to media folder
                 file_name_in_col = mw.col.media.add_file(f.name)
@@ -2847,19 +2850,103 @@ class TestSuggestionsWithImages:
 
                 # add file reference to a note
                 file_name_in_col = Path(file_path_in_col.name).name
+                note = mw.col.new_note(
+                    mw.col.models.by_name("Basic (Testdeck / user1)")
+                )
                 note["Front"] = f'<img src="{file_name_in_col}">'
+                mw.col.add_note(note, DeckId(1))
 
                 suggest_new_note(
                     note=note,
-                    ankihub_deck_uuid=ah_did,
+                    ankihub_did=ah_did,
                     comment="test",
                 )
 
-                # assert that the image was uploaded
-                assert len(upload_request_mock.request_history) == 1  # type: ignore
-                assert upload_request_mock.last_request.text.name == str(  # type: ignore
-                    file_path_in_col.absolute()
+                self._assert_img_names_as_expected(
+                    note=note,
+                    upload_request_mock=upload_request_mock,  # type: ignore
+                    suggestion_request_mock=suggestion_request_mock,  # type: ignore
                 )
+
+    def _assert_img_names_as_expected(
+        self, note: Note, upload_request_mock: Mocker, suggestion_request_mock: Mocker
+    ):
+        # Assert that the image names in the suggestion, the note and the uploaded image are as expected.
+        note.load()
+        img_name_in_note = re.search(IMG_NAME_IN_IMG_TAG_REGEX, note["Front"]).group(1)
+
+        name_of_uploaded_image = Path(upload_request_mock.last_request.text.name).name  # type: ignore
+
+        suggestion_dict = suggestion_request_mock.last_request.json()  # type: ignore
+        first_field_value = suggestion_dict["fields"][0]["value"]
+        img_name_in_suggestion = re.search(
+            IMG_NAME_IN_IMG_TAG_REGEX, first_field_value
+        ).group(1)
+
+        # The expected_img_name will be the same on each test run because the file is empty and thus
+        # the hash will be the same each time.
+        expected_img_name = "d41d8cd98f00b204e9800998ecf8427e.png"
+        assert img_name_in_suggestion == expected_img_name
+        assert img_name_in_note == expected_img_name
+        assert name_of_uploaded_image == expected_img_name
+
+    def test_should_ignore_asset_file_names_not_present_at_local_collection(
+        self,
+        anki_session_with_addon_data: AnkiSession,
+        requests_mock: Mocker,
+        monkeypatch: MonkeyPatch,
+        install_sample_ah_deck: Callable[[], Tuple[uuid.UUID, int]],
+        enable_image_support_feature_flag,
+    ):
+        anki_session = anki_session_with_addon_data
+        with anki_session.profile_loaded():
+            mw = anki_session.mw
+
+            install_sample_ah_deck()
+
+            fake_presigned_url = "https://fake_presigned_url.com"
+            monkeypatch.setattr(
+                "ankihub.ankihub_client.AnkiHubClient.get_presigned_url",
+                lambda *args, **kwargs: fake_presigned_url,
+            )
+
+            upload_request_mock = requests_mock.put(
+                fake_presigned_url,
+                json={"success": True},
+            )
+
+            # grab a note from the deck
+            nids = mw.col.find_notes("")
+            note = mw.col.get_note(nids[0])
+
+            # add reference to a note of an asset that does not exist locally
+            note_content = '<img src="this_image_is_not_in_the_local_collection.png">'
+            note["Front"] = note_content
+            note.flush()
+
+            ah_nid = ankihub_db.ankihub_nid_for_anki_nid(note.id)
+
+            # create a suggestion for the note
+            suggestion_request_mock = requests_mock.post(
+                f"{api_url_base()}/notes/{ah_nid}/suggestion/", status_code=201
+            )
+
+            suggest_note_update(
+                note=note,
+                change_type=SuggestionType.NEW_CONTENT,
+                comment="test",
+            )
+
+            # assert that the suggestion is made
+            assert len(suggestion_request_mock.request_history) == 1  # type: ignore
+
+            # assert that the image was NOT uploaded
+            assert len(upload_request_mock.request_history) == 0  # type: ignore
+
+            note.load()
+
+            # Assert note content is unchanged
+            assert note_content == note["Front"]
 
 
 class TestAddonUpdate:

@@ -89,6 +89,10 @@ def on_suggestion_button_press_inner(editor: Editor) -> None:
             comment=comment,
             auto_accept=auto_accept,
         ):
+            # Reload note because media files might have been renamed.
+            if editor.note:
+                editor.note.load()
+                editor.loadNote()
             tooltip("Submitted change note suggestion to AnkiHub.")
         else:
             tooltip("No changes. Try syncing with AnkiHub first.")
@@ -118,7 +122,7 @@ def on_suggestion_button_press_inner(editor: Editor) -> None:
             def on_add(note: anki.notes.Note) -> None:
                 suggest_new_note(
                     note=note,
-                    ankihub_deck_uuid=ankihub_did,
+                    ankihub_did=ankihub_did,
                     comment=comment,
                     auto_accept=auto_accept,
                 )
@@ -131,10 +135,14 @@ def on_suggestion_button_press_inner(editor: Editor) -> None:
         else:
             suggest_new_note(
                 note=editor.note,
-                ankihub_deck_uuid=ankihub_did,
+                ankihub_did=ankihub_did,
                 comment=comment,
                 auto_accept=auto_accept,
             )
+            # Reload note because media files might have been renamed.
+            if editor.note:
+                editor.note.load()
+                editor.loadNote()
             tooltip("Submitted new note suggestion to AnkiHub.")
 
 
