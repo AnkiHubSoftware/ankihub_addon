@@ -34,6 +34,7 @@ from .conftest import TEST_PROFILE_ID
 # has to be set before importing ankihub
 os.environ["SKIP_INIT"] = "1"
 
+from ankihub.gui import utils
 from ankihub import entry_point
 from ankihub.addons import (
     _change_file_permissions_of_addon_files,
@@ -2810,3 +2811,12 @@ class TestAddonUpdate:
             mw = anki_session_with_addon_data.mw
 
             qtbot.wait(1000)
+
+
+def test_check_and_prompt_for_updates_on_main_window(
+    anki_session: AnkiSession,
+):
+    # Just check that the function did not change between Anki versions and that it does not throw an exception
+    # when called.
+    with anki_session.profile_loaded():
+        utils.check_and_prompt_for_updates_on_main_window()

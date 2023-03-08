@@ -1,6 +1,7 @@
 from typing import Any, List, Optional
 
 import aqt
+from aqt.addons import check_and_prompt_for_updates
 from aqt.qt import (
     QApplication,
     QDialog,
@@ -174,4 +175,13 @@ def set_tooltip_icon(btn: QPushButton) -> None:
                 QStyle.StandardPixmap.SP_MessageBoxInformation
             )
         )
+    )
+
+
+def check_and_prompt_for_updates_on_main_window():
+    check_and_prompt_for_updates(
+        parent=aqt.mw,
+        mgr=aqt.mw.addonManager,
+        on_done=aqt.mw.on_updates_installed,
+        requested_by_user=True,
     )
