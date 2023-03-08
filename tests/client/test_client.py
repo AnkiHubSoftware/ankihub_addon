@@ -911,6 +911,7 @@ class TestUploadImagesForSuggestion:
 
             client.create_change_note_suggestion(change_note_suggestion=suggestion)
         else:
+            assert isinstance(suggestion, NewNoteSuggestion)
             suggestion_request_mock = requests_mock.post(
                 f"{ankihub_client.API_URL_BASE}/decks/{suggestion.ankihub_deck_uuid}/note-suggestion/",
                 status_code=201,
