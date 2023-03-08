@@ -41,7 +41,7 @@ def enable_image_support_feature_flag(requests_mock: Mocker) -> None:
     from ankihub.ankihub_client import API_URL_BASE
 
     requests_mock.get(
-        f"{API_URL_BASE}/waffle/waffle_status",
+        f"{API_URL_BASE}/feature-flags",
         status_code=200,
         json={"flags": {"image_support_enabled": {"is_active": True}}},
     )
@@ -52,7 +52,7 @@ def disable_image_support_feature_flag(requests_mock: Mocker) -> None:
     from ankihub.ankihub_client import API_URL_BASE
 
     requests_mock.get(
-        f"{API_URL_BASE}/waffle/waffle_status",
+        f"{API_URL_BASE}/feature-flags",
         status_code=200,
         json={"flags": {"image_support_enabled": {"is_active": False}}},
     )
