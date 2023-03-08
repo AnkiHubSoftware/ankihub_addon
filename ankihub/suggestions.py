@@ -15,7 +15,7 @@ from .ankihub_client import (
 )
 from .db import ankihub_db
 from .exporting import to_note_data
-from .media_utils import find_and_replace_text_in_fields
+from .media_utils import find_and_replace_text_in_fields_on_all_notes
 
 # string that is contained in the errors returned from the AnkiHub API when
 # there are no changes to the note for a change note suggestion
@@ -104,10 +104,10 @@ def _update_asset_names_on_notes(asset_name_map: Dict[str, str]):
     for original_filename, new_filename in asset_name_map.items():
         # TODO: Think of a better way of doing that. Currently we need to call it twice,
         # one for single quotes and other for double quotes around the src attribute.
-        find_and_replace_text_in_fields(
+        find_and_replace_text_in_fields_on_all_notes(
             f'src="{original_filename}"', f'src="{new_filename}"'
         )
-        find_and_replace_text_in_fields(
+        find_and_replace_text_in_fields_on_all_notes(
             f"src='{original_filename}'", f"src='{new_filename}'"
         )
 

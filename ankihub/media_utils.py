@@ -26,7 +26,7 @@ def get_img_names_from_notes(nids: Sequence[NoteId]) -> Set[str]:
     return imgs
 
 
-def find_and_replace_text_in_fields(old: str, new: str) -> None:
+def find_and_replace_text_in_fields_on_all_notes(old: str, new: str) -> None:
     # Used to rename images across all notes in the collection.
 
     aqt.mw.col.db.execute(
