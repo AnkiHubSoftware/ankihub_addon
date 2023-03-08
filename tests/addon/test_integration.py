@@ -2910,7 +2910,7 @@ class TestSuggestionsWithImages:
             note = mw.col.get_note(nids[0])
 
             # add reference to a note of an asset that does not exist locally
-            note_content = '<img src="this_image_is_not_on_local_collection.png">'
+            note_content = '<img src="this_image_is_not_in_the_local_collection.png">'
             note["Front"] = note_content
             note.flush()
 
