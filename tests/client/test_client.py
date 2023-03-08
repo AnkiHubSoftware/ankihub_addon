@@ -879,10 +879,6 @@ class TestUploadImagesForSuggestion:
         )
 
         fake_presigned_url = "https://fake_presigned_url.com"
-        # monkeypatch.setattr(
-        #     "ankihub.ankihub_client.AnkiHubClient.get_presigned_url",
-        #     lambda *args, **kwargs: fake_presigned_url,
-        # )
 
         s3_upload_request_mock = requests_mock.put(
             fake_presigned_url,
