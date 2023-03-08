@@ -14,7 +14,7 @@ import pytest
 import requests_mock
 from pytest import MonkeyPatch
 from requests_mock import Mocker
-from vcr import VCR
+from vcr import VCR  # type: ignore
 
 from ..factories import NoteInfoFactory
 
