@@ -2831,7 +2831,6 @@ class TestSuggestionsWithImages:
             mw = anki_session.mw
 
             _, ah_did = install_sample_ah_deck()
-            note = mw.col.new_note(mw.col.models.by_name("Basic (Testdeck / user1)"))
 
             requests_mock.post(
                 f"{api_url_base()}/decks/{ah_did}/note-suggestion/",
@@ -2856,6 +2855,9 @@ class TestSuggestionsWithImages:
 
                 # add file reference to a note
                 file_name_in_col = Path(file_path_in_col.name).name
+                note = mw.col.new_note(
+                    mw.col.models.by_name("Basic (Testdeck / user1)")
+                )
                 note["Front"] = f'<img src="{file_name_in_col}">'
                 mw.col.add_note(note, DeckId(1))
 
