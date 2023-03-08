@@ -12,7 +12,7 @@ from unittest.mock import MagicMock, Mock
 
 import pytest
 import requests_mock
-from pytest import MonkeyPatch
+from pytest import FixtureRequest, MonkeyPatch
 from requests_mock import Mocker
 from vcr import VCR  # type: ignore
 
@@ -35,6 +35,7 @@ from ankihub.ankihub_client import (
     NewNoteSuggestion,
     NoteCustomization,
     NoteInfo,
+    NoteSuggestion,
     OptionalTagSuggestion,
     SuggestionType,
     TagGroupValidationResponse,
@@ -861,19 +862,19 @@ def test_download_images(
 
 class TestUploadImagesForSuggestion:
     @pytest.mark.parametrize(
-        "suggestion", ["new_note_suggestion", "change_note_suggestion"]
+        "suggestion_type", ["new_note_suggestion", "change_note_suggestion"]
     )
     def test_upload_images_for_suggestion(
         self,
-        suggestion: ChangeNoteSuggestion | NewNoteSuggestion,
+        suggestion_type: str,
         requests_mock: Mocker,
         monkeypatch,
         next_deterministic_uuid: Callable[[], uuid.UUID],
         remove_generated_asset_files,
         enable_image_support_feature_flag,
-        request,
+        request: FixtureRequest,
     ):
-        suggestion = request.getfixturevalue(suggestion)
+        suggestion: NoteSuggestion = request.getfixturevalue(suggestion_type)
         suggestion.fields[0].value = (
             '<img src="testfile_mario.png" width="100" alt="its-a me!">'
             '<div> something here <img src="testfile_test.jpeg" height="50" alt="just a test"> </div>'
