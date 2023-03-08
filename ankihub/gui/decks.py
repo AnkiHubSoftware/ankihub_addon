@@ -54,7 +54,7 @@ class SubscribedDecksDialog(QDialog):
         self._on_item_selection_changed()
         self._refresh_decks_list()
 
-        if not self.client.has_token():
+        if not config.is_logged_in():
             showText("Oops! Please make sure you are logged into AnkiHub!")
             self.close()
         else:
@@ -383,7 +383,7 @@ class SubscribeDialog(QDialog):
         self.setWindowTitle("Subscribe to AnkiHub Deck")
 
         self.client = AnkiHubClient()
-        if not self.client.has_token():
+        if not config.is_logged_in():
             showText("Oops! Please make sure you are logged into AnkiHub!")
             self.close()
         else:

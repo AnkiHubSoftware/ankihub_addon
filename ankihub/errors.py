@@ -5,8 +5,8 @@ import traceback
 from types import TracebackType
 from typing import Any, Optional, Type
 
-from anki.errors import BackendIOError, DBError
 import aqt
+from anki.errors import BackendIOError, DBError
 from aqt.utils import showText, showWarning, tooltip
 from requests.exceptions import ConnectionError
 
@@ -16,6 +16,7 @@ from .error_reporting import report_exception_and_upload_logs
 from .gui.error_feedback import ErrorFeedbackDialog
 from .gui.menu import AnkiHubLogin
 from .settings import ANKIWEB_ID, config
+from .sync import NotLoggedInError
 
 
 def handle_exception(
@@ -63,6 +64,11 @@ def handle_exception(
             "Could not finish because your hard drive is full.", title="AnkiHub"
         )
         LOGGER.info("Showing full disk warning.")
+        return True
+
+    if isinstance(exc, NotLoggedInError):
+        AnkiHubLogin.display_login()
+        LOGGER.info("NotLoggedInError was handled.")
         return True
 
     if not should_report_error():
