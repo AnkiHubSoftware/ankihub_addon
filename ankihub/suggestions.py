@@ -65,9 +65,13 @@ def _rename_and_upload_assets(
 ) -> NoteSuggestion:
     """Renames assets in the Anki collection and the media folder and uploads them to AnkiHub.
     Returns a suggestion with updated asset names."""
-    suggestion = copy.deepcopy(suggestion)
 
     client = AnkiHubClient()
+    if not client.is_feature_flag_enabled("image_support_enabled"):
+        return suggestion
+
+    suggestion = copy.deepcopy(suggestion)
+
     asset_name_map = client.upload_images_for_suggestion(suggestion, ankihub_did)
 
     if asset_name_map:
