@@ -43,7 +43,7 @@ S3_BUCKET_URL = (
 )
 
 API_URL_BASE = "https://app.ankihub.net/api"
-API_VERSION = 6.0
+API_VERSION = 7.0
 
 DECK_UPDATE_PAGE_SIZE = 2000  # seems to work well in terms of speed
 DECK_EXTENSION_UPDATE_PAGE_SIZE = 2000
@@ -902,15 +902,15 @@ class AnkiHubClient:
 
     def is_feature_flag_enabled(self, flag_name: str) -> bool:
         return (
-            self._get_waffle_status()["flags"]
+            self._get_feature_flags_status()["flags"]
             .get(flag_name, {})
             .get("is_active", False)
         )
 
-    def _get_waffle_status(self):
+    def _get_feature_flags_status(self):
         response = self._send_request(
             "GET",
-            "/waffle/waffle_status",
+            "/feature-flags",
         )
         if response.status_code != 200:
             raise AnkiHubRequestError(response)
