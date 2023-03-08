@@ -2791,12 +2791,11 @@ class TestSuggestionsWithImages:
                 note.flush()
 
                 ah_nid = ankihub_db.ankihub_nid_for_anki_nid(note.id)
-
-                # create a suggestion for the note
                 suggestion_request_mock = requests_mock.post(
                     f"{api_url_base()}/notes/{ah_nid}/suggestion/", status_code=201
                 )
 
+                # create a suggestion for the note
                 suggest_note_update(
                     note=note,
                     change_type=SuggestionType.NEW_CONTENT,
@@ -2808,15 +2807,11 @@ class TestSuggestionsWithImages:
                 # assert that the image was uploaded
                 assert len(upload_request_mock.request_history) == 1  # type: ignore
 
-                img_path_in_request: str = upload_request_mock.last_request.text.name  # type: ignore
-                img_name_in_request = Path(img_path_in_request).name
-
-                note.load()
-                img_name_in_note = re.search(
-                    IMG_NAME_IN_IMG_TAG_REGEX, note["Front"]
-                ).group(1)
-
-                assert img_name_in_request == img_name_in_note
+                self._assert_img_names_as_expected(
+                    note=note,
+                    upload_request_mock=upload_request_mock,  # type: ignore
+                    suggestion_request_mock=suggestion_request_mock,  # type: ignore
+                )
 
     def test_suggest_new_note_with_image(
         self,
@@ -2832,11 +2827,6 @@ class TestSuggestionsWithImages:
 
             _, ah_did = install_sample_ah_deck()
 
-            requests_mock.post(
-                f"{api_url_base()}/decks/{ah_did}/note-suggestion/",
-                status_code=201,
-            )
-
             fake_presigned_url = "https://fake_presigned_url.com"
             monkeypatch.setattr(
                 "ankihub.ankihub_client.AnkiHubClient.get_presigned_url",
@@ -2846,6 +2836,11 @@ class TestSuggestionsWithImages:
             upload_request_mock = requests_mock.put(
                 fake_presigned_url,
                 json={"success": True},
+            )
+
+            suggestion_request_mock = requests_mock.post(
+                f"{api_url_base()}/decks/{ah_did}/note-suggestion/",
+                status_code=201,
             )
 
             with tempfile.NamedTemporaryFile(suffix=".png") as f:
@@ -2867,18 +2862,33 @@ class TestSuggestionsWithImages:
                     comment="test",
                 )
 
-                # assert that the image was uploaded
-                assert len(upload_request_mock.request_history) == 1  # type: ignore
+                self._assert_img_names_as_expected(
+                    note=note,
+                    upload_request_mock=upload_request_mock,  # type: ignore
+                    suggestion_request_mock=suggestion_request_mock,  # type: ignore
+                )
 
-                img_path_in_request: str = upload_request_mock.last_request.text.name  # type: ignore
-                img_name_in_request = Path(img_path_in_request).name
+    def _assert_img_names_as_expected(
+        self, note: Note, upload_request_mock: Mocker, suggestion_request_mock: Mocker
+    ):
+        # Assert that the image names in the suggestion, the note and the uploaded image are as expected.
+        note.load()
+        img_name_in_note = re.search(IMG_NAME_IN_IMG_TAG_REGEX, note["Front"]).group(1)
 
-                note.load()
-                img_name_in_note = re.search(
-                    IMG_NAME_IN_IMG_TAG_REGEX, note["Front"]
-                ).group(1)
+        name_of_uploaded_image = Path(upload_request_mock.last_request.text.name).name  # type: ignore
 
-                assert img_name_in_request == img_name_in_note
+        suggestion_dict = suggestion_request_mock.last_request.json()  # type: ignore
+        first_field_value = suggestion_dict["fields"][0]["value"]
+        img_name_in_suggestion = re.search(
+            IMG_NAME_IN_IMG_TAG_REGEX, first_field_value
+        ).group(1)
+
+        # The expected_img_name will be the same on each test run because the file is empty and thus
+        # the hash will be the same each time.
+        expected_img_name = "d41d8cd98f00b204e9800998ecf8427e.png"
+        assert img_name_in_suggestion == expected_img_name
+        assert img_name_in_note == expected_img_name
+        assert name_of_uploaded_image == expected_img_name
 
     def test_should_ignore_asset_file_names_not_present_at_local_collection(
         self,
