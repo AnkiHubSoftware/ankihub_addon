@@ -27,8 +27,13 @@ ANKIHUB_NO_CHANGE_ERROR = (
 def suggest_note_update(
     note: Note, change_type: SuggestionType, comment: str, auto_accept: bool = False
 ) -> bool:
-    """Returns True if the suggestion was created, False if the note has no changes
-    (and therefore no suggestion was created)"""
+    """Sends a ChangeNoteSuggestion to AnkiHub if the passed note has changes.
+    Returns True if the suggestion was created, False if the note has no changes
+    (and therefore no suggestion was created).
+    Also renames assets in the Anki collection and the media folder and uploads them to AnkiHub.
+    If calling this function from the editor, the note should be reloaded after this function is called,
+    because the note's assets will possibly have been renamed.
+    """
     suggestion = change_note_suggestion(note, change_type, comment)
     if suggestion is None:
         return False
@@ -50,6 +55,10 @@ def suggest_note_update(
 def suggest_new_note(
     note: Note, comment: str, ankihub_did: uuid.UUID, auto_accept: bool = False
 ) -> None:
+    """Sends a NewNoteSuggestion to AnkiHub.
+    Also renames assets in the Anki collection and the media folder and uploads them to AnkiHub.
+    If calling this function from the editor, the note should be reloaded after this function is called,
+    because the note's assets will possibly have been renamed."""
     suggestion = new_note_suggestion(note, ankihub_did, comment)
 
     suggestion = cast(

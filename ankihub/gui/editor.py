@@ -89,6 +89,10 @@ def on_suggestion_button_press_inner(editor: Editor) -> None:
             comment=comment,
             auto_accept=auto_accept,
         ):
+            # Reload note because media files might have been renamed.
+            if editor.note:
+                editor.note.load()
+                editor.loadNote()
             tooltip("Submitted change note suggestion to AnkiHub.")
         else:
             tooltip("No changes. Try syncing with AnkiHub first.")
@@ -135,6 +139,10 @@ def on_suggestion_button_press_inner(editor: Editor) -> None:
                 comment=comment,
                 auto_accept=auto_accept,
             )
+            # Reload note because media files might have been renamed.
+            if editor.note:
+                editor.note.load()
+                editor.loadNote()
             tooltip("Submitted new note suggestion to AnkiHub.")
 
 
