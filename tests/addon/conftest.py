@@ -9,7 +9,12 @@ from pytest import MonkeyPatch
 from pytest_anki import AnkiSession
 from requests_mock import Mocker
 
-from ..fixtures import next_deterministic_id, next_deterministic_uuid  # noqa F401
+from ..fixtures import (  # noqa F401
+    disable_image_support_feature_flag,
+    enable_image_support_feature_flag,
+    next_deterministic_id,
+    next_deterministic_uuid,
+)
 
 REPO_ROOT_PATH = Path(__file__).absolute().parent.parent.parent
 
@@ -75,25 +80,3 @@ def anki_session_with_addon_before_profile_support(anki_session_with_addon_data)
         )
 
     yield anki_session
-
-
-@pytest.fixture
-def enable_image_support_feature_flag(requests_mock: Mocker) -> None:
-    from ankihub.ankihub_client import API_URL_BASE
-
-    requests_mock.get(
-        f"{API_URL_BASE}/waffle/waffle_status",
-        status_code=200,
-        json={"flags": {"image_support_enabled": {"is_active": True}}},
-    )
-
-
-@pytest.fixture
-def disable_image_support_feature_flag(requests_mock: Mocker) -> None:
-    from ankihub.ankihub_client import API_URL_BASE
-
-    requests_mock.get(
-        f"{API_URL_BASE}/waffle/waffle_status",
-        status_code=200,
-        json={"flags": {"image_support_enabled": {"is_active": False}}},
-    )
