@@ -409,7 +409,7 @@ class AnkiHubClient:
         if not self.is_feature_flag_enabled("image_support_enabled"):
             return {}
 
-        image_paths = self._get_images_from_suggestion(suggestion=suggestion)
+        image_paths = self._get_images_from_fields(fields=suggestion.fields)
         asset_name_map = self._generate_asset_files_with_hashed_names(image_paths)
 
         # TODO: We are currently uploading all images for a suggestion,
@@ -418,9 +418,12 @@ class AnkiHubClient:
 
         return asset_name_map
 
-    def _get_images_from_suggestion(self, suggestion: NoteSuggestion) -> List[Path]:
+    def _get_images_from_fields(self, fields: List[Field]) -> List[Path]:
+        """Extracts image names from inside src attributes of HTML image tags
+        present on each field and builds the full local image path 
+        for each one (pointing to the local anki media folder)"""
         result = []
-        for field_content in [f.value for f in suggestion.fields]:
+        for field_content in [f.value for f in fields]:
             image_names = extract_local_image_paths_from_html(field_content)
             image_paths = [
                 self.local_media_dir_path / image_name for image_name in image_names
