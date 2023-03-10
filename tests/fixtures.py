@@ -38,10 +38,10 @@ def next_deterministic_id() -> Callable[[], int]:
 
 @pytest.fixture
 def enable_image_support_feature_flag(requests_mock: Mocker) -> None:
-    from ankihub.ankihub_client import API_URL_BASE
+    from ankihub.ankihub_client import DEFAULT_API_URL_BASE
 
     requests_mock.get(
-        f"{API_URL_BASE}/feature-flags",
+        f"{DEFAULT_API_URL_BASE}/feature-flags",
         status_code=200,
         json={"flags": {"image_support_enabled": {"is_active": True}}},
     )
@@ -49,10 +49,10 @@ def enable_image_support_feature_flag(requests_mock: Mocker) -> None:
 
 @pytest.fixture
 def disable_image_support_feature_flag(requests_mock: Mocker) -> None:
-    from ankihub.ankihub_client import API_URL_BASE
+    from ankihub.ankihub_client import DEFAULT_API_URL_BASE
 
     requests_mock.get(
-        f"{API_URL_BASE}/feature-flags",
+        f"{DEFAULT_API_URL_BASE}/feature-flags",
         status_code=200,
         json={"flags": {"image_support_enabled": {"is_active": False}}},
     )

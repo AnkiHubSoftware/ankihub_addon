@@ -3,13 +3,13 @@ from json import JSONDecodeError
 from pathlib import Path
 from pprint import pformat
 
+import aqt
 import requests
 from requests import Response
-import aqt
 
 from . import LOGGER
 from .ankihub_client import AnkiHubClient, AnkiHubRequestError
-from .settings import config
+from .settings import api_url_base, config
 
 
 def logging_hook(response: Response, *args, **kwargs):
@@ -41,6 +41,7 @@ DEFAULT_RESPONSE_HOOKS = [
 class AddonAnkiHubClient(AnkiHubClient):
     def __init__(self, hooks=None) -> None:
         super().__init__(
+            api_url_base=api_url_base(),
             hooks=hooks if hooks is not None else DEFAULT_RESPONSE_HOOKS,
             token=config.token(),
             local_media_dir_path=Path(aqt.mw.col.media.dir()),

@@ -60,7 +60,7 @@ DECK_EXTENSION_ID = 999
 
 @pytest.fixture(autouse=True)
 def set_ankihub_app_url():
-    ankihub_client.API_URL_BASE = "http://localhost:8000/api"
+    ankihub_client.DEFAULT_API_URL_BASE = "http://localhost:8000/api"
 
 
 @pytest.fixture
@@ -905,7 +905,7 @@ class TestUploadImagesForSuggestion:
 
         if isinstance(suggestion, ChangeNoteSuggestion):
             suggestion_request_mock = requests_mock.post(
-                f"{ankihub_client.API_URL_BASE}/notes/{suggestion.ankihub_note_uuid}/suggestion/",
+                f"{ankihub_client.DEFAULT_API_URL_BASE}/notes/{suggestion.ankihub_note_uuid}/suggestion/",
                 status_code=201,
             )
 
@@ -913,7 +913,7 @@ class TestUploadImagesForSuggestion:
         else:
             assert isinstance(suggestion, NewNoteSuggestion)
             suggestion_request_mock = requests_mock.post(
-                f"{ankihub_client.API_URL_BASE}/decks/{suggestion.ankihub_deck_uuid}/note-suggestion/",
+                f"{ankihub_client.DEFAULT_API_URL_BASE}/decks/{suggestion.ankihub_deck_uuid}/note-suggestion/",
                 status_code=201,
             )
             client.create_new_note_suggestion(new_note_suggestion=suggestion)

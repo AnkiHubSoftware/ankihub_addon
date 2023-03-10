@@ -39,7 +39,7 @@ LOGGER = logging.getLogger(__name__)
 # TODO make configurable
 S3_BUCKET_URL = "https://ankihub-staging.s3.amazonaws.com"
 
-API_URL_BASE = "https://app.ankihub.net/api"
+DEFAULT_API_URL_BASE = "https://app.ankihub.net/api"
 API_VERSION = 7.0
 
 DECK_UPDATE_PAGE_SIZE = 2000  # seems to work well in terms of speed
@@ -278,9 +278,17 @@ class DeckExtensionUpdateChunk(DataClassJSONMixinWithConfig):
 class AnkiHubClient:
     """Client for interacting with the AnkiHub API."""
 
-    def __init__(self, hooks=None, token=None, local_media_dir_path=None):
-        self.session = Session()
+    def __init__(
+        self,
+        hooks=None,
+        token: Optional[str] = None,
+        local_media_dir_path: Optional[Path] = None,
+        api_url_base: str = DEFAULT_API_URL_BASE,
+    ):
+        self.api_url_base = api_url_base
         self.local_media_dir_path = local_media_dir_path
+
+        self.session = Session()
 
         if hooks is not None:
             self.session.hooks["response"] = hooks
@@ -302,7 +310,7 @@ class AnkiHubClient:
         data=None,
         params=None,
     ) -> PreparedRequest:
-        url = f"{API_URL_BASE}{endpoint}"
+        url = f"{self.api_url_base}{endpoint}"
         request = Request(
             method=method,
             url=url,
