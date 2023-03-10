@@ -110,13 +110,13 @@ class Config:
         self.public_config = aqt.mw.addonManager.getConfig(ADDON_PATH.name)
 
         self.ankihub_app_url = os.getenv("ANKIHUB_APP_URL")
-        if self.ankihub_app_url is None:
-            self.ankihub_app_url = self.public_config.get("ankihub_url")
-            self.ankihub_app_url = (
-                self.ankihub_app_url
-                if self.ankihub_app_url
-                else "https://app.ankihub.net"
-            )
+        if self.ankihub_app_url:
+            return
+
+        if self.public_config.get("use_staging"):
+            self.ankihub_app_url = "https://staging.ankihub.net"
+        else:
+            self.ankihub_app_url = "https://app.ankihub.net"
 
     def setup_private_config(self):
         # requires the profile setup to be completed unlike self.setup_pbulic_config
