@@ -104,19 +104,25 @@ class Config:
         self.token_change_hook: Optional[Callable[[], None]] = None
         self.subscriptions_change_hook: Optional[Callable[[], None]] = None
         self.ankihub_app_url: Optional[str] = None
+        self.s3_bucket_url: Optional[str] = None
 
     def setup_public_config_and_ankihub_app_url(self):
         migrate_public_config()
         self.public_config = aqt.mw.addonManager.getConfig(ADDON_PATH.name)
 
-        self.ankihub_app_url = os.getenv("ANKIHUB_APP_URL")
-        if self.ankihub_app_url:
-            return
-
         if self.public_config.get("use_staging"):
             self.ankihub_app_url = "https://staging.ankihub.net"
+            self.s3_bucket_url = "https://ankihub-staging.s3.amazonaws.com"
         else:
             self.ankihub_app_url = "https://app.ankihub.net"
+            self.s3_bucket_url = "https://ankihub.s3.amazonaws.com"
+
+        # Override urls with environment variables if they are set.
+        if app_url_from_env_var := os.getenv("ANKIHUB_APP_URL"):
+            self.ankihub_app_url = app_url_from_env_var
+
+        if s3_url_from_env_var := os.getenv("S3_BUCKET_URL"):
+            self.s3_bucket_url = s3_url_from_env_var
 
     def setup_private_config(self):
         # requires the profile setup to be completed unlike self.setup_pbulic_config
@@ -131,6 +137,10 @@ class Config:
                 # TODO Instead of overwriting, query AnkiHub for config values.
                 self._private_config = PrivateConfig()
         self._log_private_config()
+
+    @property
+    def api_url_base(self) -> str:
+        return f"{self.ankihub_app_url}/api"
 
     def _load_private_config(self) -> PrivateConfig:
         with open(self._private_config_path) as f:
@@ -433,8 +443,6 @@ try:
 except (FileNotFoundError, KeyError):
     ANKIWEB_ID = 1322529746
 
-
-api_url_base = lambda: f"{config.ankihub_app_url}/api"  # noqa: E731
 
 url_view_note = lambda: f"{config.ankihub_app_url}/decks/notes/"  # noqa: E731
 url_view_note_history = (

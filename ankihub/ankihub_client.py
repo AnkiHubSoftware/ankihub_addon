@@ -36,10 +36,8 @@ from .common_utils import extract_local_image_paths_from_html
 
 LOGGER = logging.getLogger(__name__)
 
-# TODO make configurable
-S3_BUCKET_URL = "https://ankihub-staging.s3.amazonaws.com"
-
 DEFAULT_API_URL_BASE = "https://app.ankihub.net/api"
+DEFAULT_S3_BUCKET_URL = "https://ankihub.s3.amazonaws.com"
 API_VERSION = 7.0
 
 DECK_UPDATE_PAGE_SIZE = 2000  # seems to work well in terms of speed
@@ -284,8 +282,10 @@ class AnkiHubClient:
         token: Optional[str] = None,
         local_media_dir_path: Optional[Path] = None,
         api_url_base: str = DEFAULT_API_URL_BASE,
+        s3_bucket_url: str = DEFAULT_S3_BUCKET_URL,
     ):
         self.api_url_base = api_url_base
+        self.s3_bucket_url = s3_bucket_url
         self.local_media_dir_path = local_media_dir_path
 
         self.session = Session()
@@ -484,7 +484,7 @@ class AnkiHubClient:
                 self._upload_to_s3(s3_url, image_file)
 
     def download_images(self, img_names: List[str], deck_id: uuid.UUID) -> None:
-        deck_images_remote_dir = f"{S3_BUCKET_URL}/deck_assets/{deck_id}"
+        deck_images_remote_dir = f"{self.s3_bucket_url}/deck_assets/{deck_id}"
 
         for img_name in img_names:
             img_path = self.local_media_dir_path / img_name

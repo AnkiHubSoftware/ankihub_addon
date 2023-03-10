@@ -24,7 +24,7 @@ os.environ["SKIP_INIT"] = "1"
 
 from ankihub import ankihub_client
 from ankihub.ankihub_client import (
-    S3_BUCKET_URL,
+    DEFAULT_S3_BUCKET_URL,
     AnkiHubClient,
     ChangeNoteSuggestion,
     Deck,
@@ -58,11 +58,6 @@ DECK_WITH_EXTENSION_UUID = uuid.UUID("100df7b9-7749-4fe0-b801-e3dec1decd72")
 DECK_EXTENSION_ID = 999
 
 
-@pytest.fixture(autouse=True)
-def set_ankihub_app_url():
-    ankihub_client.DEFAULT_API_URL_BASE = "http://localhost:8000/api"
-
-
 @pytest.fixture
 def client(vcr: VCR, request, marks):
     if "skipifvcr" in marks and vcr_enabled(vcr):
@@ -78,7 +73,7 @@ def client(vcr: VCR, request, marks):
             "python manage.py runscript create_fixture_data"
         )
 
-    client = AnkiHubClient()
+    client = AnkiHubClient(api_url_base="http://localhost:8000/api")
     yield client
 
     if not playback_mode:
@@ -851,7 +846,7 @@ def test_download_images(
 
         deck_id = next_deterministic_uuid()
         requests_mock.get(
-            f"{S3_BUCKET_URL}/deck_assets/{deck_id}" + "imgage.png",
+            f"{DEFAULT_S3_BUCKET_URL}/deck_assets/{deck_id}" + "imgage.png",
             content=b"image data",
         )
         client.download_images(img_names=["imgage.png"], deck_id=deck_id)
