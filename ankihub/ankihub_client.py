@@ -25,6 +25,7 @@ from typing import (
     TypedDict,
     Union,
 )
+from zipfile import ZipFile
 
 import requests
 from mashumaro import field_options
@@ -399,6 +400,28 @@ class AnkiHubClient:
         )
         if s3_response.status_code != 200:
             raise AnkiHubRequestError(s3_response)
+
+    def upload_assets_for_deck(self, ah_did: uuid.UUID, notes_data: List[NoteInfo]) -> None:
+        # Get all image names from the fields from notes_data
+        # Use self.local_media_dir_path to create a zip with all the files
+        # Remove the zipped file from local storage
+        
+        all_notes_fields = []
+        for note in notes_data:
+            all_notes_fields.extend(note.fields)
+            
+        image_paths = self._get_images_from_fields(all_notes_fields)
+        
+        if not image_paths:
+            return None
+        
+        # Alternate flow: if less than 10 images, call self.upload_images passing the array of image names
+        
+        with ZipFile(Path(self.local_media_dir_path / f'{ah_did}.zip'), 'w') as img_zip:
+            for img_path in image_paths:
+                img_zip.write(img_path)
+        
+        pass
 
     def upload_images_for_suggestion(
         self, suggestion: NoteSuggestion, ah_did: uuid.UUID

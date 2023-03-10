@@ -947,3 +947,21 @@ class TestUploadImagesForSuggestion:
 
         asset_name_map = client._generate_asset_files_with_hashed_names(filenames)
         assert asset_name_map == expected_result
+
+class TestUploadAssetsForDeck:
+    def test_gets_only_images_from_deck_being_uploaded(self, next_deterministic_uuid: Callable[[], uuid.UUID]):
+        client = AnkiHubClient(local_media_dir_path=TEST_MEDIA_PATH)
+        
+        notes_data = [NoteInfoFactory.create(), NoteInfoFactory.create()]
+        
+        client.upload_assets_for_deck(next_deterministic_uuid(), notes_data)
+        assert 0
+    
+    def test_zips_images_from_deck(self):
+        assert 0
+        
+    def test_removes_zipped_file_after_upload(self):
+        assert 0
+        
+    def test_uploads_directly_without_zipping_when_there_are_few_images(self):
+        assert 0
