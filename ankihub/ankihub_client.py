@@ -36,11 +36,8 @@ from .common_utils import extract_local_image_paths_from_html
 
 LOGGER = logging.getLogger(__name__)
 
-S3_BUCKET_URL = (
-    "https://ankihubbucket.s3.us-east-2.amazonaws.com"
-    if bool(os.getenv("DEVELOPMENT", True))
-    else "https://ankihub.s3.amazonaws.com"
-)
+# TODO make configurable
+S3_BUCKET_URL = "https://ankihub-staging.s3.amazonaws.com"
 
 API_URL_BASE = "https://app.ankihub.net/api"
 API_VERSION = 7.0
