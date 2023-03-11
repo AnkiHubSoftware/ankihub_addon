@@ -106,7 +106,7 @@ class Config:
         self.ankihub_app_url: Optional[str] = None
         self.s3_bucket_url: Optional[str] = None
 
-    def setup_public_config_and_ankihub_app_url(self):
+    def setup_public_config_and_urls(self):
         migrate_public_config()
         self.public_config = aqt.mw.addonManager.getConfig(ADDON_PATH.name)
 

@@ -26,10 +26,13 @@ ATTEMPTED_GENERAL_SETUP = False
 def run():
     """Call this function in __init__.py when Anki starts."""
 
-    config.setup_public_config_and_ankihub_app_url()
+    config.setup_public_config_and_urls()
 
     setup_logger()
     LOGGER.info("Set up logger.")
+
+    LOGGER.info(f"AnkiHub app url: {config.ankihub_app_url}")
+    LOGGER.info(f"S3 bucket url: {config.s3_bucket_url}")
 
     profile_did_open.append(on_profile_did_open)
 

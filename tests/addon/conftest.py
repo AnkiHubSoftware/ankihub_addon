@@ -50,7 +50,7 @@ def anki_session_with_addon_data(
         config_dict = json.load(f)
     anki_session.create_addon_config(package_name="ankihub", default_config=config_dict)
 
-    config.setup_public_config_and_ankihub_app_url()
+    config.setup_public_config_and_urls()
     setup_logger()
 
     with monkeypatch.context() as m:
