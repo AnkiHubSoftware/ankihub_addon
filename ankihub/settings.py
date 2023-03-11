@@ -95,7 +95,7 @@ class PrivateConfig(DataClassJSONMixin):
     ui: UIConfig = dataclasses.field(default_factory=UIConfig)
 
 
-class Config:
+class _Config:
     def __init__(self):
         # self.public_config is editable by the user using a built-in Anki feature.
         self.public_config: Optional[Dict[str, Any]] = None
@@ -256,7 +256,7 @@ class Config:
         return bool(self.token())
 
 
-config = Config()
+config = _Config()
 
 
 def setup_profile_data_folder() -> bool:
