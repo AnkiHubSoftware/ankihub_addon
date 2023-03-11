@@ -1,5 +1,6 @@
 """Code for setting up auto-syncing with AnkiHub on startup and/or on AnkiWeb sync.
 Depends on the auto_sync setting in the public config."""
+from dataclasses import dataclass
 from time import sleep
 from typing import Callable, Optional
 
@@ -13,18 +14,15 @@ from .gui.db_check import maybe_check_databases
 from .settings import ANKI_MINOR, config
 from .sync import ah_sync, show_tooltip_about_last_sync_results
 
-# TODO The startup sync should happen once per profile lifetime, for now it is run once per Anki start
-# which is fine for now.
-ATTEMPTED_STARTUP_SYNC = False
 
-# The tooltip about the last sync results should only be shown if we synced with AnkiHub on the last AnkiWeb sync.
-SYNCED_WITH_ANKIHUB_ON_LAST_ANKIWEB_SYNC = False
+@dataclass
+class _AutoSyncState:
+    attempted_startup_sync = False
+    synced_with_ankihub_on_last_ankiweb_sync = False
+    exception_on_last_ah_sync: Optional[Exception] = None
 
-# Variable for storing the exception that was raised during the last sync with AnkiHub.
-# It can't be raised directly, because the AnkiHub sync happens in the background task
-# that syncs with AnkiWeb and the Anki code that calls the AnkiWeb sync should not
-# have to handle AnkiHub sync exceptions.
-EXCEPTION_ON_LAST_AH_SYNC: Optional[Exception] = None
+
+auto_sync_state = _AutoSyncState()
 
 
 def setup_ankihub_sync_on_ankiweb_sync() -> None:
@@ -40,12 +38,12 @@ def setup_ankihub_sync_on_ankiweb_sync() -> None:
 
 
 def _on_sync_did_finish() -> None:
-    if EXCEPTION_ON_LAST_AH_SYNC:
+    if auto_sync_state.exception_on_last_ah_sync:
         # append the hook again, because it will be removed by Anki when the exception is raised
         sync_did_finish.append(_on_sync_did_finish)
-        raise EXCEPTION_ON_LAST_AH_SYNC
+        raise auto_sync_state.exception_on_last_ah_sync
 
-    if SYNCED_WITH_ANKIHUB_ON_LAST_ANKIWEB_SYNC:
+    if auto_sync_state.synced_with_ankihub_on_last_ankiweb_sync:
         show_tooltip_about_last_sync_results()
 
     maybe_check_databases()
@@ -54,9 +52,8 @@ def _on_sync_did_finish() -> None:
 def _sync_with_ankihub_and_ankiweb(auth: SyncAuth, _old: Callable) -> None:
     LOGGER.info("Running _sync_with_ankihub_and_ankiweb")
 
-    global ATTEMPTED_STARTUP_SYNC
-    is_startup_sync = not ATTEMPTED_STARTUP_SYNC
-    ATTEMPTED_STARTUP_SYNC = True
+    is_startup_sync = not auto_sync_state.attempted_startup_sync
+    auto_sync_state.attempted_startup_sync = True
 
     if is_startup_sync:
         _workaround_for_addon_compatibility_on_startup_sync()
@@ -64,14 +61,13 @@ def _sync_with_ankihub_and_ankiweb(auth: SyncAuth, _old: Callable) -> None:
     # Anki code that runs before syncing with AnkiWeb ends the database transaction so we start a new one
     # here and end it after syncing with AnkiHub.
     aqt.mw.col.db.begin()
-    global EXCEPTION_ON_LAST_AH_SYNC
     try:
         _maybe_sync_with_ankihub(is_startup_sync=is_startup_sync)
     except Exception as e:
         LOGGER.exception("Error in _maybe_sync_with_ankihub", exc_info=e)
-        EXCEPTION_ON_LAST_AH_SYNC = e
+        auto_sync_state.exception_on_last_ah_sync
     else:
-        EXCEPTION_ON_LAST_AH_SYNC = None
+        auto_sync_state.exception_on_last_ah_sync = None
     finally:
         # ... ending the transaction here
         aqt.mw.col.save(trx=False)
@@ -90,17 +86,16 @@ def _maybe_sync_with_ankihub(is_startup_sync: bool) -> bool:
         LOGGER.info("Not syncing with AnkiHub because user is not logged in.")
         return False
 
-    global SYNCED_WITH_ANKIHUB_ON_LAST_ANKIWEB_SYNC
     if config.public_config["auto_sync"] != "never" and (
         (config.public_config["auto_sync"] == "on_startup" and is_startup_sync)
         or config.public_config["auto_sync"] == "on_ankiweb_sync"
     ):
         LOGGER.info("Syncing with AnkiHub in _new_sync_collection")
         ah_sync.sync_all_decks_and_media()
-        SYNCED_WITH_ANKIHUB_ON_LAST_ANKIWEB_SYNC = True
+        auto_sync_state.synced_with_ankihub_on_last_ankiweb_sync = True
         return True
     else:
-        SYNCED_WITH_ANKIHUB_ON_LAST_ANKIWEB_SYNC = False
+        auto_sync_state.synced_with_ankihub_on_last_ankiweb_sync = False
         LOGGER.info("Not syncing with AnkiHub")
         return False
 
