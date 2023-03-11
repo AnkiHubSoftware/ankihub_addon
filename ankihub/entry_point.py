@@ -22,6 +22,7 @@ from .settings import (
     setup_profile_data_folder,
 )
 from .utils import modify_note_type_templates
+from .debug import setup as setup_debug
 
 # The general setup should be only once, because it sets up menu items, hooks, etc.
 # We don't want to set them up multiple times when the profile is opened multiple times,
@@ -98,6 +99,9 @@ def general_setup():
     LOGGER.info(f"{ANKI_VERSION=}")
 
     aqt.mw.addonManager.setWebExports(__name__, r"gui/web/.*")
+
+    setup_debug()
+    LOGGER.info("Set up debug.")
 
     setup_addons()
     LOGGER.info("Set up addons.")
