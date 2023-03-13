@@ -3,11 +3,11 @@ from typing import Callable, List, Optional
 
 from aqt.utils import showInfo, showWarning
 
-from .. import LOGGER
-from ..db import ankihub_db
-from ..settings import config
-from .decks import cleanup_after_deck_install, download_and_install_deck
-from .utils import ask_user
+from ... import LOGGER
+from ...db import ankihub_db
+from ...settings import config
+from ..decks import cleanup_after_deck_install, download_and_install_deck
+from ..utils import ask_user
 
 
 def check_ankihub_db(on_success: Optional[Callable[[], None]] = None):
@@ -73,7 +73,9 @@ def download_and_install_decks(
 
     download_and_install_deck(
         cur_did,
-        on_success=lambda: download_and_install_decks(ankihub_dids, on_success),
+        on_success=lambda import_result: download_and_install_decks(
+            ankihub_dids, on_success
+        ),
         on_failure=show_failure_message,
     )
 

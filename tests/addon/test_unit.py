@@ -1,11 +1,14 @@
 import os
+from typing import List
 
+from anki.notes import Note
 from pytest_anki import AnkiSession
 
 # workaround for vscode test discovery not using pytest.ini which sets this env var
 # has to be set before importing ankihub
 os.environ["SKIP_INIT"] = "1"
 
+from ankihub import suggestions
 from ankihub.error_reporting import normalize_url
 from ankihub.exporting import _prepared_field_html
 from ankihub.importing import updated_tags
@@ -13,6 +16,48 @@ from ankihub.note_conversion import ADDON_INTERNAL_TAGS, TAG_FOR_OPTIONAL_TAGS
 from ankihub.register_decks import note_type_name_without_ankihub_modifications
 from ankihub.subdecks import SUBDECK_TAG, add_subdeck_tags_to_notes
 from ankihub.utils import lowest_level_common_ancestor_deck_name
+
+
+class TestUploadImagesForSuggestion:
+    def test_update_asset_names_on_notes(
+        self, anki_session_with_addon_data: AnkiSession
+    ):
+        with anki_session_with_addon_data.profile_loaded():
+            mw = anki_session_with_addon_data.mw
+
+            note_contents = [
+                'Sample Text <div> abc <img src="test.png"> </div>',
+                "<span> a</span><img src='other_test.gif' width='250'><div></div>",
+                '<span> <p>this note will not have its image replaced </p> <img src="will_not_replace.jpeg"> </span>',
+            ]
+
+            notes: List[Note] = []
+            mw.col.decks.add_normal_deck_with_name("MediaTestDeck")
+            for content in note_contents:
+                note = mw.col.new_note(mw.col.models.by_name("Basic"))
+                notes.append(note)
+                note["Front"] = content
+                mw.col.add_note(note, mw.col.decks.by_name("MediaTestDeck")["id"])
+
+            hashed_name_map = {
+                "test.png": "fueriwhfvureivhnaowuyiegrofuaywwqg.png",
+                "other_test.gif": "fWJKERDVNMOWIKJCIWJefgjnverf.gif",
+            }
+
+            suggestions._update_asset_names_on_notes(hashed_name_map)
+
+            notes[0].load()
+            notes[1].load()
+            notes[2].load()
+
+            assert f'<img src="{hashed_name_map["test.png"]}">' in " ".join(
+                notes[0].fields
+            )
+            assert (
+                f"<img src='{hashed_name_map['other_test.gif']}' width='250'>"
+                in " ".join(notes[1].fields)
+            )
+            assert '<img src="will_not_replace.jpeg">' in " ".join(notes[2].fields)
 
 
 def test_lowest_level_common_ancestor_deck_name():

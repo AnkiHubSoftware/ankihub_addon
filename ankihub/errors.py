@@ -17,6 +17,7 @@ from .gui.error_feedback import ErrorFeedbackDialog
 from .gui.menu import AnkiHubLogin
 from .gui.utils import check_and_prompt_for_updates_on_main_window
 from .settings import ANKIWEB_ID, config
+from .sync import NotLoggedInError
 
 
 def handle_exception(
@@ -64,6 +65,11 @@ def handle_exception(
             "Could not finish because your hard drive is full.", title="AnkiHub"
         )
         LOGGER.info("Showing full disk warning.")
+        return True
+
+    if isinstance(exc, NotLoggedInError):
+        AnkiHubLogin.display_login()
+        LOGGER.info("NotLoggedInError was handled.")
         return True
 
     if not should_report_error():
