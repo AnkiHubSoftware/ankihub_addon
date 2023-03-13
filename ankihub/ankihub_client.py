@@ -412,17 +412,16 @@ class AnkiHubClient:
             
         image_paths = self._get_images_from_fields(all_notes_fields)
         
+        # If notes have no images, abort uploading
         if not image_paths:
             return None
         
-        # Alternate flow: if less than 10 images, call self.upload_images passing the array of image names
+        # TODO: Alternate flow: if less than 10 images, call self.upload_images passing the array of image names
         
         with ZipFile(Path(self.local_media_dir_path / f'{ah_did}.zip'), 'w') as img_zip:
             for img_path in image_paths:
-                img_zip.write(img_path)
+                img_zip.write(img_path, arcname=img_path.name)
         
-        pass
-
     def upload_images_for_suggestion(
         self, suggestion: NoteSuggestion, ah_did: uuid.UUID
     ) -> Dict[str, str]:
