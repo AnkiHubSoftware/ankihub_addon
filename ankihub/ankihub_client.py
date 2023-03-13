@@ -432,7 +432,9 @@ class AnkiHubClient:
             for img_path in image_paths:
                 img_zip.write(img_path, arcname=img_path.name)
 
-        # TODO: Upload to S3
+        # Upload to S3
+        s3_url = self.get_presigned_url(key=zip_filepath.name, action="upload")
+        self._upload_file_to_s3(s3_presigned_url=s3_url, filepath=zip_filepath)
 
         # Remove the zip file from the local machine after the upload
         os.remove(zip_filepath)
@@ -517,8 +519,17 @@ class AnkiHubClient:
         for image_name in image_names:
             key = f"deck_assets/{deck_id}/{image_name}"
             s3_url = self.get_presigned_url(key=key, action="upload")
-            with open(self.local_media_dir_path / image_name, "rb") as image_file:
-                self._upload_to_s3(s3_url, image_file)
+            self._upload_file_to_s3(
+                s3_presigned_url=s3_url,
+                file_path=self.local_media_dir_path / image_name,
+            )
+
+    def _upload_file_to_s3(self, s3_presigned_url: str, filepath: Path) -> None:
+        """Opens the file at the 'file_path' location and uploads it to
+        S3 using the 's3_presigned_url'."""
+
+        with open(filepath, "rb") as file_ref:
+            self._upload_to_s3(s3_presigned_url, file_ref)
 
     def download_images(self, img_names: List[str], deck_id: uuid.UUID) -> None:
         deck_images_remote_dir = f"{S3_BUCKET_URL}/deck_assets/{deck_id}"
