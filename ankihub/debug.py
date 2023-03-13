@@ -34,13 +34,12 @@ def _report_user_files_debug_info_to_sentry(e: Exception) -> None:
         if is_win and not _file_is_accessible(file):
             problematic_files.append(file)
 
-    all_file_paths = [str(file) for file in all_file_paths]
     problematic_file_paths = [str(file) for file in problematic_files]
     report_exception_and_upload_logs(
         e,
         context={
             "Add-on update debug info": {
-                "all files": all_file_paths,
+                "all files": [str(file) for file in all_file_paths],
                 "inaccessible files": problematic_file_paths,
                 "Is ankihub database attached to anki database?": is_ankihub_db_attached_to_anki_db(),
             },
@@ -48,7 +47,7 @@ def _report_user_files_debug_info_to_sentry(e: Exception) -> None:
     )
 
 
-def _file_is_accessible(f: str) -> None:
+def _file_is_accessible(f: Path) -> bool:
     # Only works on Windows.
     # Checks if a file is accessible (and not e.g. open by another process) by trying to rename it to itself.
     # See https://stackoverflow.com/a/37256114.
