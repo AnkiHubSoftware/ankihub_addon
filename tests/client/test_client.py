@@ -1039,6 +1039,10 @@ class TestUploadAssetsForDeck:
         os_remove_mock = MagicMock()
         monkeypatch.setattr(os, "remove", os_remove_mock)
 
+        # Mock upload-related stuff
+        monkeypatch.setattr(client, "get_presigned_url", MagicMock())
+        monkeypatch.setattr(client, "_upload_file_to_s3", MagicMock())
+
         deck_id = next_deterministic_uuid()
         client.upload_assets_for_deck(deck_id, notes_data)
 
@@ -1055,12 +1059,33 @@ class TestUploadAssetsForDeck:
         assert path_to_created_zip_file.is_file() is False
 
     def test_uploads_generated_zipped_file(
-        self, next_deterministic_uuid: Callable[[], uuid.UUID]
+        self, next_deterministic_uuid: Callable[[], uuid.UUID], monkeypatch
     ):
-        assert 0
+        client = AnkiHubClient(local_media_dir_path=TEST_MEDIA_PATH)
+
+        notes_data = self.notes_data_with_many_images()
+        deck_id = next_deterministic_uuid()
+        path_to_created_zip_file = Path(TEST_MEDIA_PATH / f"{deck_id}.zip")
+
+        get_presigned_url_mock = MagicMock()
+        get_presigned_url_mock.return_value = "https://fake_s3.com"
+        monkeypatch.setattr(client, "get_presigned_url", get_presigned_url_mock)
+
+        mocked_upload_file_to_s3 = MagicMock()
+        monkeypatch.setattr(client, "_upload_file_to_s3", mocked_upload_file_to_s3)
+
+        client.upload_assets_for_deck(deck_id, notes_data)
+
+        get_presigned_url_mock.assert_called_once_with(
+            key=path_to_created_zip_file.name, action="upload"
+        )
+        mocked_upload_file_to_s3.assert_called_once_with(
+            s3_presigned_url="https://fake_s3.com",
+            filepath=Path(TEST_MEDIA_PATH / f"{deck_id}.zip"),
+        )
 
     def test_removes_zipped_file_after_upload(
-        self, next_deterministic_uuid: Callable[[], uuid.UUID]
+        self, next_deterministic_uuid: Callable[[], uuid.UUID], monkeypatch
     ):
         client = AnkiHubClient(local_media_dir_path=TEST_MEDIA_PATH)
 
@@ -1069,6 +1094,10 @@ class TestUploadAssetsForDeck:
         all_notes_fields = []
         for note in notes_data:
             all_notes_fields.extend(note.fields)
+
+        # Mock upload-related stuff
+        monkeypatch.setattr(client, "get_presigned_url", MagicMock())
+        monkeypatch.setattr(client, "_upload_file_to_s3", MagicMock())
 
         deck_id = next_deterministic_uuid()
         client.upload_assets_for_deck(deck_id, notes_data)
@@ -1095,9 +1124,14 @@ class TestUploadAssetsForDeck:
         mocked_upload_images = MagicMock()
         monkeypatch.setattr(client, "upload_images", mocked_upload_images)
 
+        mocked_upload_file_to_s3 = MagicMock()
+        monkeypatch.setattr(client, "_upload_file_to_s3", mocked_upload_file_to_s3)
+
         deck_id = next_deterministic_uuid()
         client.upload_assets_for_deck(deck_id, notes_data)
 
         mocked_upload_images.assert_called_once_with(
             image_names=all_image_names_in_notes, deck_id=deck_id
         )
+
+        mocked_upload_file_to_s3.assert_not_called
