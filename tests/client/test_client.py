@@ -1106,6 +1106,10 @@ class TestUploadAssetsForDeck:
         os_remove_mock = MagicMock()
         monkeypatch.setattr(os, "remove", os_remove_mock)
 
+        # Mock upload-related stuff
+        monkeypatch.setattr(client, "get_presigned_url", MagicMock())
+        monkeypatch.setattr(client, "_upload_file_to_s3", MagicMock())
+
         deck_id = next_deterministic_uuid()
         client.upload_assets_for_deck(deck_id, notes_data)
 
@@ -1122,6 +1126,9 @@ class TestUploadAssetsForDeck:
 
         mocked_upload_assets = MagicMock()
         monkeypatch.setattr(client, "upload_assets", mocked_upload_assets)
+
+        mocked_upload_file_to_s3 = MagicMock()
+        monkeypatch.setattr(client, "_upload_file_to_s3", mocked_upload_file_to_s3)
 
         mocked_upload_file_to_s3 = MagicMock()
         monkeypatch.setattr(client, "_upload_file_to_s3", mocked_upload_file_to_s3)
