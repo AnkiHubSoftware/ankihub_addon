@@ -103,7 +103,7 @@ def maybe_handle_ankihub_request_error(error: AnkiHubRequestError) -> bool:
         and response.reason == "Outdated client, please update the AnkiHub add-on."
     ):
         if askUser(
-            "The AnkiHub add-on needs to be updated.<br>"
+            "The AnkiHub add-on needs to be updated to continue working.<br>"
             "Do you want to open the add-on update dialog now?"
         ):
             check_and_prompt_for_updates_on_main_window()
