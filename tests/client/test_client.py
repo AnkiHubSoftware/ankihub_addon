@@ -9,6 +9,7 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Callable, List
 from unittest.mock import MagicMock, Mock
+import zipfile
 
 import pytest
 import requests_mock
@@ -948,37 +949,71 @@ class TestUploadImagesForSuggestion:
         asset_name_map = client._generate_asset_files_with_hashed_names(filenames)
         assert asset_name_map == expected_result
 
+
 class TestUploadAssetsForDeck:
-    def test_gets_images_from_deck_being_uploaded(self, next_deterministic_uuid: Callable[[], uuid.UUID], monkeypatch):
+    def test_gets_images_from_deck_being_uploaded(
+        self, next_deterministic_uuid: Callable[[], uuid.UUID], monkeypatch
+    ):
         client = AnkiHubClient(local_media_dir_path=TEST_MEDIA_PATH)
-        
+
         notes_data = [NoteInfoFactory.create(), NoteInfoFactory.create()]
         notes_data[0].fields[0].value = (
             '<img src="testfile_mario.png" width="100" alt="its-a me!">'
             '<div> something here <img src="testfile_test.jpeg" height="50" alt="just a test"> </div>'
         )
-        notes_data[1].fields[0].value = (
-            '<span> <p> <img src="testfile_anki.gif" width="100""> test text </p> <span>'
-        )
+        notes_data[1].fields[
+            0
+        ].value = '<span> <p> <img src="testfile_anki.gif" width="100""> test text </p> <span>'
         all_notes_fields = []
         for note in notes_data:
             all_notes_fields.extend(note.fields)
-            
+
         mocked_get_images_from_fields = MagicMock()
-        monkeypatch.setattr(client, "_get_images_from_fields", mocked_get_images_from_fields)
-        
+        monkeypatch.setattr(
+            client, "_get_images_from_fields", mocked_get_images_from_fields
+        )
+
         client.upload_assets_for_deck(next_deterministic_uuid(), notes_data)
-        
+
         mocked_get_images_from_fields.assert_called_once_with(all_notes_fields)
-    
-    def test_zips_images_from_deck(self):
+
+    def test_zips_images_from_deck_notes(
+        self, next_deterministic_uuid: Callable[[], uuid.UUID]
+    ):
+        client = AnkiHubClient(local_media_dir_path=TEST_MEDIA_PATH)
+
+        notes_data = [NoteInfoFactory.create(), NoteInfoFactory.create()]
+        notes_data[0].fields[0].value = (
+            '<img src="testfile_mario.png" width="100" alt="its-a me!">'
+            '<div> something here <img src="testfile_test.jpeg" height="50" alt="just a test"> </div>'
+        )
+        notes_data[1].fields[
+            0
+        ].value = '<span> <p> <img src="testfile_anki.gif" width="100""> test text </p> <span>'
+
+        all_notes_fields = []
+        for note in notes_data:
+            all_notes_fields.extend(note.fields)
+
+        all_image_names_in_notes = [
+            path.name for path in client._get_images_from_fields(all_notes_fields)
+        ]
+
+        deck_id = next_deterministic_uuid()
+        client.upload_assets_for_deck(deck_id, notes_data)
+
+        path_to_created_zip_file = Path(TEST_MEDIA_PATH / f"{deck_id}.zip")
+
+        assert path_to_created_zip_file.is_file()
+        assert len(set(all_image_names_in_notes)) == 3
+        with zipfile.ZipFile(path_to_created_zip_file, "r") as zip_ref:
+            assert set(zip_ref.namelist()) == set(all_image_names_in_notes)
+
+    def test_uploads_generated_zipped_file(self):
         assert 0
-    
-    def test_uploads_generated_zipped_file(self):        
-        assert 0
-        
+
     def test_removes_zipped_file_after_upload(self):
         assert 0
-        
+
     def test_uploads_directly_without_zipping_when_there_are_few_images(self):
         assert 0
