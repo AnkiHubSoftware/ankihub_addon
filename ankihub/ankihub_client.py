@@ -24,6 +24,7 @@ from typing import (
     Sequence,
     TypedDict,
     Union,
+    Set,
 )
 from zipfile import ZipFile
 
@@ -418,7 +419,13 @@ class AnkiHubClient:
         if not image_paths:
             return None
 
-        # TODO: Alternate flow: if less than 10 images, call self.upload_images passing the array of image names
+        # Alternate flow: if less than 10 images, call self.upload_images
+        # passing the array of image names
+        if not len(image_paths) > 10:
+            self.upload_images(
+                image_names=[path.name for path in image_paths], deck_id=ah_did
+            )
+            return None
 
         zip_filepath = Path(self.local_media_dir_path / f"{ah_did}.zip")
         with ZipFile(zip_filepath, "w") as img_zip:
@@ -448,10 +455,12 @@ class AnkiHubClient:
 
         return asset_name_map
 
-    def _get_images_from_fields(self, fields: List[Field]) -> List[Path]:
+    def _get_images_from_fields(self, fields: List[Field]) -> Set[Path]:
         """Extracts image names from inside src attributes of HTML image tags
         present on each field and builds the full local image path
-        for each one (pointing to the local anki media folder)"""
+        for each one (pointing to the local anki media folder). Filters out
+        duplicate images, if any, since fields that use the same image share
+        the same reference to the local media folder"""
         result = []
         for field_content in [f.value for f in fields]:
             image_names = extract_local_image_paths_from_html(field_content)
@@ -460,10 +469,10 @@ class AnkiHubClient:
             ]
             result.extend(image_paths)
 
-        return result
+        return set(result)
 
     def _generate_asset_files_with_hashed_names(
-        self, paths: List[Path]
+        self, paths: Set[Path]
     ) -> Dict[str, str]:
         """Generates a filename for each file in the list of paths by hashing the file.
         The file is copied to the new name. If the file already exists, it is skipped.
