@@ -47,9 +47,9 @@ def upload_deck(did: DeckId, notes_data: List[NoteInfo], private: bool) -> uuid.
         anki_deck_id=did,
         private=private,
     )
-    
+
     client.upload_assets_for_deck(ankihub_did, notes_data)
-    
+
     return ankihub_did
 
 

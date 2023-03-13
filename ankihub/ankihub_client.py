@@ -401,27 +401,29 @@ class AnkiHubClient:
         if s3_response.status_code != 200:
             raise AnkiHubRequestError(s3_response)
 
-    def upload_assets_for_deck(self, ah_did: uuid.UUID, notes_data: List[NoteInfo]) -> None:
+    def upload_assets_for_deck(
+        self, ah_did: uuid.UUID, notes_data: List[NoteInfo]
+    ) -> None:
         # Get all image names from the fields from notes_data
         # Use self.local_media_dir_path to create a zip with all the files
         # Remove the zipped file from local storage
-        
+
         all_notes_fields = []
         for note in notes_data:
             all_notes_fields.extend(note.fields)
-            
+
         image_paths = self._get_images_from_fields(all_notes_fields)
-        
+
         # If notes have no images, abort uploading
         if not image_paths:
             return None
-        
+
         # TODO: Alternate flow: if less than 10 images, call self.upload_images passing the array of image names
-        
-        with ZipFile(Path(self.local_media_dir_path / f'{ah_did}.zip'), 'w') as img_zip:
+
+        with ZipFile(Path(self.local_media_dir_path / f"{ah_did}.zip"), "w") as img_zip:
             for img_path in image_paths:
                 img_zip.write(img_path, arcname=img_path.name)
-        
+
     def upload_images_for_suggestion(
         self, suggestion: NoteSuggestion, ah_did: uuid.UUID
     ) -> Dict[str, str]:
@@ -442,7 +444,7 @@ class AnkiHubClient:
 
     def _get_images_from_fields(self, fields: List[Field]) -> List[Path]:
         """Extracts image names from inside src attributes of HTML image tags
-        present on each field and builds the full local image path 
+        present on each field and builds the full local image path
         for each one (pointing to the local anki media folder)"""
         result = []
         for field_content in [f.value for f in fields]:
