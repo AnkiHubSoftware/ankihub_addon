@@ -454,7 +454,7 @@ class AnkiHubClient:
                 file_content_hash.hexdigest() + old_asset_path.suffix
             )
 
-            # If the file with the hashed name does not exist already, we 
+            # If the file with the hashed name does not exist already, we
             # try to create it.
             if not new_asset_path.is_file():
                 try:
