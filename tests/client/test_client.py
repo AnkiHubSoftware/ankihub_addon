@@ -951,11 +951,44 @@ class TestUploadImagesForSuggestion:
 
 
 class TestUploadAssetsForDeck:
-    def test_gets_images_from_deck_being_uploaded(
-        self, next_deterministic_uuid: Callable[[], uuid.UUID], monkeypatch
-    ):
-        client = AnkiHubClient(local_media_dir_path=TEST_MEDIA_PATH)
+    def notes_data_with_many_images(self):
+        notes_data = [
+            NoteInfoFactory.create(),
+            NoteInfoFactory.create(),
+            NoteInfoFactory.create(),
+            NoteInfoFactory.create(),
+        ]
+        
+        notes_data[0].fields[0].value = (
+            '<img src="testfile_mario.png" width="100" alt="its-a me!">'
+            '<div> something here <img src="testfile_test.jpeg" height="50" alt="just a test"> </div>'
+        )
+        notes_data[1].fields[
+            0
+        ].value = '<span> <p> <img src="testfile_anki.gif" width="100""> test text </p> <span>'
 
+        notes_data[2].fields[1].value = (
+            '<img src="testfile_1.jpeg" width="100" alt="test file 1">'
+            '<div> something here <img src="testfile_2.jpeg" height="50" alt="test file 2"> </div>'
+            '<img src="testfile_3.jpeg" width="100" alt="test file 3">'
+            '<div> something here <img src="testfile_4.jpeg" height="50" alt="test file 4"> </div>'
+            '<img src="testfile_5.jpeg" width="100" alt="test file 5">'
+        )
+
+        notes_data[3].fields[0].value = (
+            '<img src="testfile_6.jpeg" width="100" alt="test file 6">'
+            '<div> something here <img src="testfile_7.jpeg" height="50" alt="test file 7"> </div>'
+        )
+
+        notes_data[3].fields[1].value = (
+            '<img src="testfile_8.jpeg" width="100" alt="test file 8">'
+            '<div> something here <img src="testfile_9.jpeg" height="50" alt="test file 9"> </div>'
+            '<img src="testfile_10.jpeg" width="100" alt="test file 10">'
+        )
+        
+        return notes_data
+    
+    def notes_data_with_a_few_images(self):
         notes_data = [NoteInfoFactory.create(), NoteInfoFactory.create()]
         notes_data[0].fields[0].value = (
             '<img src="testfile_mario.png" width="100" alt="its-a me!">'
@@ -964,6 +997,16 @@ class TestUploadAssetsForDeck:
         notes_data[1].fields[
             0
         ].value = '<span> <p> <img src="testfile_anki.gif" width="100""> test text </p> <span>'
+        
+        return notes_data
+    
+    def test_gets_images_from_deck_being_uploaded(
+        self, next_deterministic_uuid: Callable[[], uuid.UUID], monkeypatch
+    ):
+        client = AnkiHubClient(local_media_dir_path=TEST_MEDIA_PATH)
+
+        notes_data = self.notes_data_with_many_images()
+        
         all_notes_fields = []
         for note in notes_data:
             all_notes_fields.extend(note.fields)
@@ -982,15 +1025,8 @@ class TestUploadAssetsForDeck:
     ):
         client = AnkiHubClient(local_media_dir_path=TEST_MEDIA_PATH)
 
-        notes_data = [NoteInfoFactory.create(), NoteInfoFactory.create()]
-        notes_data[0].fields[0].value = (
-            '<img src="testfile_mario.png" width="100" alt="its-a me!">'
-            '<div> something here <img src="testfile_test.jpeg" height="50" alt="just a test"> </div>'
-        )
-        notes_data[1].fields[
-            0
-        ].value = '<span> <p> <img src="testfile_anki.gif" width="100""> test text </p> <span>'
-
+        notes_data = self.notes_data_with_many_images()
+        
         all_notes_fields = []
         for note in notes_data:
             all_notes_fields.extend(note.fields)
@@ -1009,7 +1045,7 @@ class TestUploadAssetsForDeck:
         path_to_created_zip_file = Path(TEST_MEDIA_PATH / f"{deck_id}.zip")
 
         assert path_to_created_zip_file.is_file()
-        assert len(set(all_image_names_in_notes)) == 3
+        assert len(all_image_names_in_notes) == 13
         with zipfile.ZipFile(path_to_created_zip_file, "r") as zip_ref:
             assert set(zip_ref.namelist()) == set(all_image_names_in_notes)
 
@@ -1028,14 +1064,7 @@ class TestUploadAssetsForDeck:
     ):
         client = AnkiHubClient(local_media_dir_path=TEST_MEDIA_PATH)
 
-        notes_data = [NoteInfoFactory.create(), NoteInfoFactory.create()]
-        notes_data[0].fields[0].value = (
-            '<img src="testfile_mario.png" width="100" alt="its-a me!">'
-            '<div> something here <img src="testfile_test.jpeg" height="50" alt="just a test"> </div>'
-        )
-        notes_data[1].fields[
-            0
-        ].value = '<span> <p> <img src="testfile_anki.gif" width="100""> test text </p> <span>'
+        notes_data = self.notes_data_with_many_images()
 
         all_notes_fields = []
         for note in notes_data:
@@ -1048,5 +1077,25 @@ class TestUploadAssetsForDeck:
 
         assert not path_to_created_zip_file.is_file()
 
-    def test_uploads_directly_without_zipping_when_there_are_few_images(self):
-        assert 0
+    def test_uploads_directly_without_zipping_when_there_are_few_images(self, next_deterministic_uuid: Callable[[], uuid.UUID], monkeypatch):
+        client = AnkiHubClient(local_media_dir_path=TEST_MEDIA_PATH)
+
+        notes_data = self.notes_data_with_a_few_images()
+
+        all_notes_fields = []
+        for note in notes_data:
+            all_notes_fields.extend(note.fields)
+            
+        all_image_names_in_notes = [
+            path.name for path in client._get_images_from_fields(all_notes_fields)
+        ]
+
+        mocked_upload_images = MagicMock()
+        monkeypatch.setattr(
+            client, "upload_images", mocked_upload_images
+        )
+        
+        deck_id = next_deterministic_uuid()
+        client.upload_assets_for_deck(deck_id, notes_data)
+        
+        mocked_upload_images.assert_called_once_with(image_names=all_image_names_in_notes, deck_id=deck_id)
