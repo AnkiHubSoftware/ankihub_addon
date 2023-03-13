@@ -1014,6 +1014,7 @@ class TestUploadAssetsForDeck:
             assert set(zip_ref.namelist()) == set(all_image_names_in_notes)
 
         # Remove the zipped file at the end of the test
+        monkeypatch.undo()
         os.remove(path_to_created_zip_file)
         assert path_to_created_zip_file.is_file() is False
 
