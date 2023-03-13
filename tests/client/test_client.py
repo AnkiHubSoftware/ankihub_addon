@@ -978,7 +978,7 @@ class TestUploadAssetsForDeck:
         mocked_get_images_from_fields.assert_called_once_with(all_notes_fields)
 
     def test_zips_images_from_deck_notes(
-        self, next_deterministic_uuid: Callable[[], uuid.UUID]
+        self, next_deterministic_uuid: Callable[[], uuid.UUID], monkeypatch
     ):
         client = AnkiHubClient(local_media_dir_path=TEST_MEDIA_PATH)
 
@@ -999,6 +999,10 @@ class TestUploadAssetsForDeck:
             path.name for path in client._get_images_from_fields(all_notes_fields)
         ]
 
+        # Mock os.remove so the zip is not deleted
+        os_remove_mock = MagicMock()
+        monkeypatch.setattr(os, "remove", os_remove_mock)
+
         deck_id = next_deterministic_uuid()
         client.upload_assets_for_deck(deck_id, notes_data)
 
@@ -1009,11 +1013,39 @@ class TestUploadAssetsForDeck:
         with zipfile.ZipFile(path_to_created_zip_file, "r") as zip_ref:
             assert set(zip_ref.namelist()) == set(all_image_names_in_notes)
 
-    def test_uploads_generated_zipped_file(self):
+        # Remove the zipped file at the end of the test
+        os.remove(path_to_created_zip_file)
+        assert path_to_created_zip_file.is_file() is False
+
+    def test_uploads_generated_zipped_file(
+        self, next_deterministic_uuid: Callable[[], uuid.UUID]
+    ):
         assert 0
 
-    def test_removes_zipped_file_after_upload(self):
-        assert 0
+    def test_removes_zipped_file_after_upload(
+        self, next_deterministic_uuid: Callable[[], uuid.UUID]
+    ):
+        client = AnkiHubClient(local_media_dir_path=TEST_MEDIA_PATH)
+
+        notes_data = [NoteInfoFactory.create(), NoteInfoFactory.create()]
+        notes_data[0].fields[0].value = (
+            '<img src="testfile_mario.png" width="100" alt="its-a me!">'
+            '<div> something here <img src="testfile_test.jpeg" height="50" alt="just a test"> </div>'
+        )
+        notes_data[1].fields[
+            0
+        ].value = '<span> <p> <img src="testfile_anki.gif" width="100""> test text </p> <span>'
+
+        all_notes_fields = []
+        for note in notes_data:
+            all_notes_fields.extend(note.fields)
+
+        deck_id = next_deterministic_uuid()
+        client.upload_assets_for_deck(deck_id, notes_data)
+
+        path_to_created_zip_file = Path(TEST_MEDIA_PATH / f"{deck_id}.zip")
+
+        assert not path_to_created_zip_file.is_file()
 
     def test_uploads_directly_without_zipping_when_there_are_few_images(self):
         assert 0

@@ -420,9 +420,15 @@ class AnkiHubClient:
 
         # TODO: Alternate flow: if less than 10 images, call self.upload_images passing the array of image names
 
-        with ZipFile(Path(self.local_media_dir_path / f"{ah_did}.zip"), "w") as img_zip:
+        zip_filepath = Path(self.local_media_dir_path / f"{ah_did}.zip")
+        with ZipFile(zip_filepath, "w") as img_zip:
             for img_path in image_paths:
                 img_zip.write(img_path, arcname=img_path.name)
+
+        # TODO: Upload to S3
+
+        # Remove the zip file from the local machine after the upload
+        os.remove(zip_filepath)
 
     def upload_images_for_suggestion(
         self, suggestion: NoteSuggestion, ah_did: uuid.UUID
