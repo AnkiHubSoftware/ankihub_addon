@@ -1102,6 +1102,10 @@ class TestUploadAssetsForDeck:
             client, "_upload_file_to_s3_with_reusable_presigned_url", MagicMock()
         )
 
+        # Mock os.remove so the zip is not deleted
+        os_remove_mock = MagicMock()
+        monkeypatch.setattr(os, "remove", os_remove_mock)
+
         deck_id = next_deterministic_uuid()
         client.upload_assets_for_deck(deck_id, notes_data)
 
