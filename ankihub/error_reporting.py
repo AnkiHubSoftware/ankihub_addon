@@ -140,12 +140,25 @@ def upload_logs_in_background(
         aqt.mw.taskman.run_in_background(task=upload_logs, on_done=on_done)
     else:
 
-        def on_upload_logs_done(future: Future) -> None:
-            try:
-                future.result()
-            except Exception:
-                report_exception()
-
-        aqt.mw.taskman.run_in_background(task=upload_logs, on_done=on_upload_logs_done)
+        aqt.mw.taskman.run_in_background(task=upload_logs, on_done=_on_upload_logs_done)
 
     return key
+
+
+def _on_upload_logs_done(future: Future) -> None:
+    try:
+        future.result()
+    except AnkiHubRequestError as e:
+        from .errors import OUTDATED_CLIENT_ERROR_REASON
+
+        # Don't report outdated client errors that happen when uploading logs,
+        # because they are handled by the add-on when they happen in other places
+        # and we don't want to see them in Sentry.
+        if (
+            e.response.status_code == 406
+            and e.response.reason == OUTDATED_CLIENT_ERROR_REASON
+        ):
+            return
+        report_exception()
+    except Exception:
+        report_exception()

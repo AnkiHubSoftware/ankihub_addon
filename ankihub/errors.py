@@ -19,6 +19,8 @@ from .gui.utils import check_and_prompt_for_updates_on_main_window
 from .settings import ANKIWEB_ID, config
 from .sync import NotLoggedInError
 
+OUTDATED_CLIENT_ERROR_REASON = "Outdated client, please update the AnkiHub add-on."
+
 
 def handle_exception(
     exc_type: Type[BaseException], exc: BaseException, tb: TracebackType
@@ -105,8 +107,7 @@ def maybe_handle_ankihub_request_error(error: AnkiHubRequestError) -> bool:
         AnkiHubLogin.display_login()
         return True
     elif (
-        response.status_code == 406
-        and response.reason == "Outdated client, please update the AnkiHub add-on."
+        response.status_code == 406 and response.reason == OUTDATED_CLIENT_ERROR_REASON
     ):
         if askUser(
             "The AnkiHub add-on needs to be updated to continue working.<br>"
