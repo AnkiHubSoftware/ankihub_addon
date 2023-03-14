@@ -67,7 +67,8 @@ def handle_exception(
         or (isinstance(exc, SyncError) and "no space left" in str(exc).lower())
     ):
         showWarning(
-            "Could not finish because your hard drive is full.", title="AnkiHub"
+            "Could not finish because your hard drive does not have enough space.",
+            title="AnkiHub",
         )
         LOGGER.info("Showing full disk warning.")
         return True
