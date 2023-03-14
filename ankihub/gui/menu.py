@@ -34,7 +34,7 @@ from ..subdecks import SUBDECK_TAG
 from ..sync import ah_sync, show_tooltip_about_last_sync_results
 from .db_check import maybe_check_databases
 from .decks import SubscribedDecksDialog
-from .utils import ask_user
+from .utils import ask_user, check_and_prompt_for_updates_on_main_window
 
 
 class AnkiHubLogin(QWidget):
@@ -412,13 +412,38 @@ def ankihub_help_setup(parent):
     qconnect(q_upload_logs_action.triggered, upload_logs_action)
     help_menu.addAction(q_upload_logs_action)
 
+    q_downgrade_from_beta_version_action = QAction(
+        "Downgrade from add-on beta version", help_menu
+    )
+    qconnect(
+        q_downgrade_from_beta_version_action.triggered, trigger_install_release_version
+    )
+    help_menu.addAction(q_downgrade_from_beta_version_action)
+
     q_version_action = QAction(f"Version {ADDON_VERSION}", help_menu)
     q_version_action.setEnabled(False)
     help_menu.addAction(q_version_action)
-
     help_menu.setMinimumWidth(250)
 
     parent.addMenu(help_menu)
+
+
+def trigger_install_release_version():
+    showInfo(
+        "When you click OK, the add-on update dialog will open in a couple of seconds "
+        "and you will be able to install the version of the add-on that is available on AnkiWeb.<br><br>"
+        "If it doesn't show up (which can happen when you e.g. have no internet connection), "
+        "try checking for add-on updates manually later."
+    )
+
+    # Set the installed_at timestamp to make Anki think that the add-on has an older version
+    # installed than the one that is available on AnkiWeb.
+    addon_module = aqt.mw.addonManager.addonFromModule(__name__)
+    addon_meta = aqt.mw.addonManager.addon_meta(addon_module)
+    addon_meta.installed_at = 0
+    aqt.mw.addonManager.write_addon_meta(addon_meta)
+
+    check_and_prompt_for_updates_on_main_window()
 
 
 def ankihub_logout_setup(parent):

@@ -37,7 +37,6 @@ from .conftest import TEST_PROFILE_ID
 # has to be set before importing ankihub
 os.environ["SKIP_INIT"] = "1"
 
-
 from ankihub import entry_point
 from ankihub.addons import (
     _change_file_permissions_of_addon_files,
@@ -63,6 +62,7 @@ from ankihub.ankihub_client import (
 from ankihub.auto_sync import setup_ankihub_sync_on_ankiweb_sync
 from ankihub.db import ankihub_db, attached_ankihub_db
 from ankihub.exporting import to_note_data
+from ankihub.gui import utils
 from ankihub.gui.browser import (
     ModifiedAfterSyncSearchNode,
     NewNoteSearchNode,
@@ -3028,3 +3028,12 @@ class TestAddonUpdate:
             mw = anki_session_with_addon_data.mw
 
             qtbot.wait(1000)
+
+
+def test_check_and_prompt_for_updates_on_main_window(
+    anki_session: AnkiSession,
+):
+    # Just check that the function did not change between Anki versions and that it does not throw an exception
+    # when called.
+    with anki_session.profile_loaded():
+        utils.check_and_prompt_for_updates_on_main_window()

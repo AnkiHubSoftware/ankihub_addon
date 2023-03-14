@@ -438,7 +438,8 @@ class AnkiHubClient:
         self, paths: List[Path]
     ) -> Dict[str, str]:
         """Generates a filename for each file in the list of paths by hashing the file.
-        The file is copied to the new name. If the file already exists, it is skipped.
+        The file is copied to the new name. If the file already exists, it is skipped,
+        but the mapping still will be made with the existing filename.
         Returns a map of the old filename to the new filename.
         """
         result: Dict[str, str] = {}
@@ -458,16 +459,15 @@ class AnkiHubClient:
                 file_content_hash.hexdigest() + old_asset_path.suffix
             )
 
-            # If the new file already exists, we skip this iteration.
-            if new_asset_path.is_file():
-                continue
-
-            # Copy the file with the new name at the same location of the
-            # original file
-            try:
-                shutil.copyfile(old_asset_path, new_asset_path)
-            except shutil.SameFileError:
-                continue
+            # If the file with the hashed name does not exist already, we
+            # try to create it.
+            if not new_asset_path.is_file():
+                try:
+                    # Copy the file with the new name at the same location of the
+                    # original file
+                    shutil.copyfile(old_asset_path, new_asset_path)
+                except shutil.SameFileError:
+                    continue
 
             result[old_asset_path.name] = new_asset_path.name
 
