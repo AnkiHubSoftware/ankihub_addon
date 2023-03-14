@@ -51,7 +51,7 @@ def handle_exception(
         if details:
             showText(f"Error while communicating with AnkiHub:\n{details}")
 
-    if isinstance(exc, exceptions.ConnectionError, ConnectionError):
+    if isinstance(exc, (exceptions.ConnectionError, ConnectionError)):
         tooltip(
             "Could not connect to AnkiHub (no internet or the site is down for maintenance)",
             parent=aqt.mw,
