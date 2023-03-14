@@ -8,7 +8,7 @@ from typing import Any, Optional, Type
 import aqt
 from anki.errors import BackendIOError, DBError, SyncError
 from aqt.utils import askUser, showText, showWarning, tooltip
-from requests.exceptions import ConnectionError
+from requests import exceptions
 
 from . import LOGGER
 from .addon_ankihub_client import AnkiHubRequestError
@@ -51,7 +51,7 @@ def handle_exception(
         if details:
             showText(f"Error while communicating with AnkiHub:\n{details}")
 
-    if isinstance(exc, ConnectionError):
+    if isinstance(exc, (exceptions.ConnectionError, ConnectionError)):
         tooltip(
             "Could not connect to AnkiHub (no internet or the site is down for maintenance)",
             parent=aqt.mw,
