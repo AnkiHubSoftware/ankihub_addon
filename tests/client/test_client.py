@@ -1086,7 +1086,7 @@ class TestUploadAssetsForDeck:
         )
 
     def test_removes_zipped_file_after_upload(
-        self, next_deterministic_uuid: Callable[[], uuid.UUID], monkeypatch
+        self, next_deterministic_uuid: Callable[[], uuid.UUID], monkeypatch: MonkeyPatch
     ):
         client = AnkiHubClient(local_media_dir_path=TEST_MEDIA_PATH)
 
@@ -1108,7 +1108,7 @@ class TestUploadAssetsForDeck:
         assert not path_to_created_zip_file.is_file()
 
     def test_uploads_directly_without_zipping_when_there_are_few_images(
-        self, next_deterministic_uuid: Callable[[], uuid.UUID], monkeypatch
+        self, next_deterministic_uuid: Callable[[], uuid.UUID], monkeypatch: MonkeyPatch
     ):
         client = AnkiHubClient(local_media_dir_path=TEST_MEDIA_PATH)
 
