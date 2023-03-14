@@ -1027,14 +1027,6 @@ class TestUploadAssetsForDeck:
 
         notes_data = self.notes_data_with_many_images()
 
-        all_notes_fields = []
-        for note in notes_data:
-            all_notes_fields.extend(note.fields)
-
-        all_image_names_in_notes = [
-            path.name for path in client._get_images_from_fields(all_notes_fields)
-        ]
-
         # Mock os.remove so the zip is not deleted
         os_remove_mock = MagicMock()
         monkeypatch.setattr(os, "remove", os_remove_mock)
@@ -1048,10 +1040,11 @@ class TestUploadAssetsForDeck:
 
         path_to_created_zip_file = Path(TEST_MEDIA_PATH / f"{deck_id}.zip")
 
+        all_img_names_in_notes = self._all_image_names_in_notes(notes_data)
         assert path_to_created_zip_file.is_file()
-        assert len(all_image_names_in_notes) == 13
+        assert len(all_img_names_in_notes) == 13
         with zipfile.ZipFile(path_to_created_zip_file, "r") as zip_ref:
-            assert set(zip_ref.namelist()) == set(all_image_names_in_notes)
+            assert set(zip_ref.namelist()) == set(all_img_names_in_notes)
 
         # Remove the zipped file at the end of the test
         monkeypatch.undo()
@@ -1092,10 +1085,6 @@ class TestUploadAssetsForDeck:
 
         notes_data = self.notes_data_with_many_images()
 
-        all_notes_fields = []
-        for note in notes_data:
-            all_notes_fields.extend(note.fields)
-
         # Mock upload-related stuff
         monkeypatch.setattr(client, "get_presigned_url", MagicMock())
         monkeypatch.setattr(client, "_upload_file_to_s3", MagicMock())
@@ -1114,14 +1103,6 @@ class TestUploadAssetsForDeck:
 
         notes_data = self.notes_data_with_a_few_images()
 
-        all_notes_fields = []
-        for note in notes_data:
-            all_notes_fields.extend(note.fields)
-
-        all_image_names_in_notes = [
-            path.name for path in client._get_images_from_fields(all_notes_fields)
-        ]
-
         mocked_upload_images = MagicMock()
         monkeypatch.setattr(client, "upload_images", mocked_upload_images)
 
@@ -1131,8 +1112,19 @@ class TestUploadAssetsForDeck:
         deck_id = next_deterministic_uuid()
         client.upload_assets_for_deck(deck_id, notes_data)
 
+        all_img_names_in_notes = self._all_image_names_in_notes(notes_data)
         mocked_upload_images.assert_called_once_with(
-            image_names=all_image_names_in_notes, deck_id=deck_id
+            image_names=all_img_names_in_notes, deck_id=deck_id
         )
 
-        mocked_upload_file_to_s3.assert_not_called
+        mocked_upload_file_to_s3.assert_not_called()
+
+    def _all_image_names_in_notes(self, notes_data: List[NoteInfo]):
+        all_notes_fields = []
+        for note in notes_data:
+            all_notes_fields.extend(note.fields)
+
+        result = [
+            path.name for path in client._get_images_from_fields(all_notes_fields)
+        ]
+        return result
