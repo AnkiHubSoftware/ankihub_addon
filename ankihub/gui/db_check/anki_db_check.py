@@ -7,11 +7,11 @@ from anki.utils import ids2str
 import aqt
 from aqt.utils import showInfo
 
-from .. import LOGGER
-from ..db import ankihub_db
-from ..reset_changes import reset_local_changes_to_notes
-from ..settings import ANKIHUB_NOTE_TYPE_FIELD_NAME, config
-from .utils import ask_user
+from ... import LOGGER
+from ...db import ankihub_db
+from ...reset_changes import reset_local_changes_to_notes
+from ...settings import ANKIHUB_NOTE_TYPE_FIELD_NAME, config
+from ..utils import ask_user
 
 
 def check_anki_db():

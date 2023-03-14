@@ -5,9 +5,9 @@ import traceback
 from types import TracebackType
 from typing import Any, Optional, Type
 
-from anki.errors import BackendIOError, DBError
 import aqt
-from aqt.utils import showText, showWarning, tooltip
+from anki.errors import BackendIOError, DBError
+from aqt.utils import askUser, showText, showWarning, tooltip
 from requests.exceptions import ConnectionError
 
 from . import LOGGER
@@ -15,7 +15,9 @@ from .addon_ankihub_client import AnkiHubRequestError
 from .error_reporting import report_exception_and_upload_logs
 from .gui.error_feedback import ErrorFeedbackDialog
 from .gui.menu import AnkiHubLogin
+from .gui.utils import check_and_prompt_for_updates_on_main_window
 from .settings import ANKIWEB_ID, config
+from .sync import NotLoggedInError
 
 
 def handle_exception(
@@ -65,6 +67,11 @@ def handle_exception(
         LOGGER.info("Showing full disk warning.")
         return True
 
+    if isinstance(exc, NotLoggedInError):
+        AnkiHubLogin.display_login()
+        LOGGER.info("NotLoggedInError was handled.")
+        return True
+
     if not should_report_error():
         LOGGER.info("Reporting errors is disabled.")
         return False
@@ -101,10 +108,11 @@ def maybe_handle_ankihub_request_error(error: AnkiHubRequestError) -> bool:
         response.status_code == 406
         and response.reason == "Outdated client, please update the AnkiHub add-on."
     ):
-        showWarning(
-            "Please update the AnkiHub add-on to the latest version.",
-            title="AnkiHub",
-        )
+        if askUser(
+            "The AnkiHub add-on needs to be updated to continue working.<br>"
+            "Do you want to open the add-on update dialog now?"
+        ):
+            check_and_prompt_for_updates_on_main_window()
         return True
     return False
 

@@ -1,10 +1,12 @@
 import csv
 import dataclasses
 import gzip
+import hashlib
 import json
 import logging
 import os
 import re
+import shutil
 import uuid
 from abc import ABC
 from dataclasses import dataclass
@@ -25,18 +27,19 @@ from typing import (
 )
 
 import requests
-from requests import PreparedRequest, Request, Response, Session
-
 from mashumaro import field_options
 from mashumaro.config import BaseConfig
 from mashumaro.mixins.json import DataClassJSONMixin
+from requests import PreparedRequest, Request, Response, Session
+
+from .common_utils import extract_local_image_paths_from_html
 
 LOGGER = logging.getLogger(__name__)
 
 S3_BUCKET_URL = (
     "https://ankihubbucket.s3.us-east-2.amazonaws.com"
     if bool(os.getenv("DEVELOPMENT", True))
-    else "https://ankihub-decks-assets.s3.amazonaws.com/"
+    else "https://ankihub.s3.amazonaws.com"
 )
 
 API_URL_BASE = "https://app.ankihub.net/api"
@@ -399,16 +402,86 @@ class AnkiHubClient:
         if s3_response.status_code != 200:
             raise AnkiHubRequestError(s3_response)
 
-    def upload_images(self, image_paths: List[Path], bucket_path: str) -> None:
+    def upload_images_for_suggestion(
+        self, suggestion: NoteSuggestion, ah_did: uuid.UUID
+    ) -> Dict[str, str]:
+        """Uploads images for a suggestion to AnkiHub and returns a map of
+        the original image names to the new names on AnkiHub."""
+
+        if not self.is_feature_flag_enabled("image_support_enabled"):
+            return {}
+
+        image_paths = self._get_images_from_suggestion(suggestion=suggestion)
+        asset_name_map = self._generate_asset_files_with_hashed_names(image_paths)
+
+        # TODO: We are currently uploading all images for a suggestion,
+        # but we should only upload images that are not already on s3.
+        self.upload_images(list(asset_name_map.values()), ah_did)
+
+        return asset_name_map
+
+    def _get_images_from_suggestion(self, suggestion: NoteSuggestion) -> List[Path]:
+        result = []
+        for field_content in [f.value for f in suggestion.fields]:
+            image_names = extract_local_image_paths_from_html(field_content)
+            image_paths = [
+                self.local_media_dir_path / image_name for image_name in image_names
+            ]
+            result.extend(image_paths)
+
+        return result
+
+    def _generate_asset_files_with_hashed_names(
+        self, paths: List[Path]
+    ) -> Dict[str, str]:
+        """Generates a filename for each file in the list of paths by hashing the file.
+        The file is copied to the new name. If the file already exists, it is skipped,
+        but the mapping still will be made with the existing filename.
+        Returns a map of the old filename to the new filename.
+        """
+        result: Dict[str, str] = {}
+        for old_asset_path in paths:
+            # First we check if the image exists locally.
+            # If no, we skip this iteration.
+            if not old_asset_path.is_file():
+                continue
+
+            # Generate a hash from the file's content
+            with old_asset_path.open("rb") as asset:
+                file_content_hash = hashlib.md5(asset.read())
+
+            # Store the new filename under the old filename key in the dict
+            # that will be returned
+            new_asset_path = old_asset_path.parent / (
+                file_content_hash.hexdigest() + old_asset_path.suffix
+            )
+
+            # If the file with the hashed name does not exist already, we
+            # try to create it.
+            if not new_asset_path.is_file():
+                try:
+                    # Copy the file with the new name at the same location of the
+                    # original file
+                    shutil.copyfile(old_asset_path, new_asset_path)
+                except shutil.SameFileError:
+                    continue
+
+            result[old_asset_path.name] = new_asset_path.name
+
+        return result
+
+    def upload_images(self, image_names: List[str], deck_id: uuid.UUID) -> None:
+        # deck_id is used to namespace the images within each deck.
+
         # TODO: send all images at once instad of looping through each one
-        for image_path in image_paths:
-            key = f"{bucket_path}/{image_path.name}"
+        for image_name in image_names:
+            key = f"deck_assets/{deck_id}/{image_name}"
             s3_url = self.get_presigned_url(key=key, action="upload")
-            with open(image_path, "rb") as image_file:
+            with open(self.local_media_dir_path / image_name, "rb") as image_file:
                 self._upload_to_s3(s3_url, image_file)
 
     def download_images(self, img_names: List[str], deck_id: uuid.UUID) -> None:
-        deck_images_remote_dir = f"{S3_BUCKET_URL}/deck_images/{deck_id}/notes/"
+        deck_images_remote_dir = f"{S3_BUCKET_URL}/deck_assets/{deck_id}"
 
         for img_name in img_names:
             img_path = self.local_media_dir_path / img_name
@@ -831,15 +904,15 @@ class AnkiHubClient:
 
     def is_feature_flag_enabled(self, flag_name: str) -> bool:
         return (
-            self._get_waffle_status()["flags"]
+            self._get_feature_flags_status()["flags"]
             .get(flag_name, {})
             .get("is_active", False)
         )
 
-    def _get_waffle_status(self):
+    def _get_feature_flags_status(self):
         response = self._send_request(
             "GET",
-            "/waffle/waffle_status",
+            "/feature-flags",
         )
         if response.status_code != 200:
             raise AnkiHubRequestError(response)

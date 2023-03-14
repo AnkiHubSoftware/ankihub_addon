@@ -1,8 +1,6 @@
 import uuid
-from concurrent.futures import Future
 from datetime import datetime
-from time import sleep
-from typing import Callable, List, Optional
+from typing import List, Optional
 
 import aqt
 from anki.errors import NotFoundError
@@ -14,17 +12,51 @@ from .ankihub_client import AnkiHubRequestError, DeckExtension
 from .db import ankihub_db
 from .importing import AnkiHubImporter, AnkiHubImportResult
 from .media_download import media_downloader
-from .settings import ANKI_MINOR, config
+from .settings import config
 from .utils import create_backup
+
+
+class NotLoggedInError(Exception):
+    pass
 
 
 class AnkiHubSync:
     def __init__(self):
         self._importer = AnkiHubImporter()
-        self._import_results: List[AnkiHubImportResult] = []
+        self._import_results: Optional[List[AnkiHubImportResult]] = None
 
-    def sync_all_decks_and_media(self) -> List[AnkiHubImportResult]:
+    def sync_all_decks_and_media(
+        self, start_media_sync: bool = True
+    ) -> List[AnkiHubImportResult]:
+        """Syncs all decks with AnkiHub and starts the media download.
+        Should be called from a background thread with a progress dialog to avoid blocking the UI."""
         LOGGER.info("Syncing all decks and media...")
+
+        self._import_results = None
+
+        if not config.is_logged_in():
+            raise NotLoggedInError()
+
+        self._import_results = []
+        self._sync_all_decks()
+
+        # The media sync should be started after the deck updates are imported,
+        # because the import can add new media references to notes.
+        if start_media_sync and AnkiHubClient().is_feature_flag_enabled(
+            "image_support_enabled"
+        ):
+            media_downloader.start_media_download()
+
+        LOGGER.info("Sync finished.")
+        return self._import_results
+
+    def last_sync_results(self) -> Optional[List[AnkiHubImportResult]]:
+        """Returns the results of the last sync. Returns None if no sync has been performed yet or
+        if the last sync failed."""
+        return self._import_results
+
+    def _sync_all_decks(self) -> None:
+        LOGGER.info("Syncing all decks...")
 
         create_backup()
 
@@ -32,17 +64,12 @@ class AnkiHubSync:
             try:
                 should_continue = self._sync_deck(ah_did)
                 if not should_continue:
-                    return self._import_results
+                    return
             except AnkiHubRequestError as e:
                 if self._handle_exception(e, ah_did):
-                    return self._import_results
+                    return
                 else:
                     raise e
-
-        if AnkiHubClient().is_feature_flag_enabled("image_support_enabled"):
-            media_downloader.start_media_download()
-
-        return self._import_results
 
     def _sync_deck(self, ankihub_did: uuid.UUID) -> bool:
         """Syncs a single deck with AnkiHub.
@@ -199,69 +226,25 @@ class AnkiHubSync:
         return False
 
 
-sync = AnkiHubSync()
+ah_sync = AnkiHubSync()
 
 
-def sync_with_progress(
-    on_done: Optional[Callable[[bool], None]] = None, parent=None
-) -> None:
-    # If the sync is successful this will show tooltips about the number of notes that were synced.
-    # on_done is called with a boolean indicating if the sync was successful.
-    # If there is an error during the sync it will be raised and on_done will not be called.
+def show_tooltip_about_last_sync_results() -> None:
+    sync_results = ah_sync.last_sync_results()
+    if sync_results is None:
+        return
 
-    LOGGER.info("Starting sync.")
+    created_nids_amount = sum([len(r.created_nids) for r in sync_results])
+    updated_nids_amount = sum([len(r.updated_nids) for r in sync_results])
+    total = created_nids_amount + updated_nids_amount
 
-    def sync_with_ankihub_after_delay() -> List[AnkiHubImportResult]:
-
-        # sync_with_ankihub creates a backup before syncing and creating a backup requires to close
-        # the collection in Anki versions lower than 2.1.50.
-        # When other add-ons try to access the collection while it is closed they will get an error.
-        # Many add-ons are added to the profile_did_open hook so we can wait until they will probably finish
-        # and sync then.
-        # Another way to deal with that is to tell users to set the auto_sync option to "never" and
-        # to sync manually.
-        if ANKI_MINOR < 50:
-            sleep(3)
-
-        result = sync.sync_all_decks_and_media()
-        LOGGER.info("Sync finished.")
-        return result
-
-    def on_syncing_done(future: Future):
-        try:
-            import_results: List[AnkiHubImportResult] = future.result()
-        except Exception as exc:
-            LOGGER.info("Unable to sync.")
-            raise exc
-
-        created_nids_amount = sum([len(r.created_nids) for r in import_results])
-        updated_nids_amount = sum([len(r.updated_nids) for r in import_results])
-        total = created_nids_amount + updated_nids_amount
-
-        if total == 0:
-            tooltip("AnkiHub: No new updates")
-        else:
-            tooltip(
-                f"AnkiHub: Synced {total} note{'' if total == 1 else 's'}.",
-                parent=aqt.mw,
-            )
-        aqt.mw.reset()
-
-        if on_done is not None:
-            on_done(True)
-
-    if config.token():
-        aqt.mw.taskman.with_progress(
-            sync_with_ankihub_after_delay,
-            label="Synchronizing with AnkiHub",
-            on_done=on_syncing_done,
-            parent=aqt.mw if parent is None else parent,
-            immediate=True,
-        )
+    if total == 0:
+        tooltip("AnkiHub: No new updates")
     else:
-        LOGGER.info("Skipping sync due to no token.")
-        if on_done is not None:
-            on_done(False)
+        tooltip(
+            f"AnkiHub: Synced {total} note{'' if total == 1 else 's'}.",
+            parent=aqt.mw,
+        )
 
 
 def _update_deck_download_progress_cb(notes_count: int, ankihub_did: uuid.UUID):
