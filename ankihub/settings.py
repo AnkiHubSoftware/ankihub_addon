@@ -26,6 +26,13 @@ from . import LOGGER
 from .ankihub_client import ANKIHUB_DATETIME_FORMAT_STR, DeckExtension
 from .public_config_migrations import migrate_public_config
 
+
+PRODUCTION_APP_URL = "https://app.ankihub.net"
+PRODUCTION_S3_BUCKET_URL = "https://ankihub.s3.amazonaws.com"
+
+STAGING_APP_URL = "https://staging.ankihub.net"
+STAGING_S3_BUCKET_URL = "https://ankihub-staging.s3.amazonaws.com"
+
 ADDON_PATH = Path(__file__).parent.absolute()
 
 ANKIHUB_DB_FILENAME = "ankihub.db"
@@ -111,11 +118,11 @@ class Config:
         self.public_config = aqt.mw.addonManager.getConfig(ADDON_PATH.name)
 
         if self.public_config.get("use_staging"):
-            self.ankihub_app_url = "https://staging.ankihub.net"
-            self.s3_bucket_url = "https://ankihub-staging.s3.amazonaws.com"
+            self.ankihub_app_url = STAGING_APP_URL
+            self.s3_bucket_url = STAGING_S3_BUCKET_URL
         else:
-            self.ankihub_app_url = "https://app.ankihub.net"
-            self.s3_bucket_url = "https://ankihub.s3.amazonaws.com"
+            self.ankihub_app_url = PRODUCTION_APP_URL
+            self.s3_bucket_url = PRODUCTION_S3_BUCKET_URL
 
         # Override urls with environment variables if they are set.
         if app_url_from_env_var := os.getenv("ANKIHUB_APP_URL"):
