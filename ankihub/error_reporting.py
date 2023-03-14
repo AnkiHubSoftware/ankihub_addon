@@ -123,26 +123,28 @@ def upload_logs_in_background(
     user_name = config.user() if not hide_username else checksum(config.user())[:5]
     key = f"ankihub_addon_logs_{user_name}_{int(time.time())}.log"
 
-    def upload_logs() -> str:
-        try:
-            client = AnkiHubClient()
-            client.upload_logs(
-                file=log_file_path(),
-                key=key,
-            )
-            LOGGER.info("Logs uploaded.")
-            return key
-        except AnkiHubRequestError as e:
-            LOGGER.info("Logs upload failed.")
-            raise e
-
     if on_done is not None:
-        aqt.mw.taskman.run_in_background(task=upload_logs, on_done=on_done)
+        aqt.mw.taskman.run_in_background(task=lambda: upload_logs(key), on_done=on_done)
     else:
-
-        aqt.mw.taskman.run_in_background(task=upload_logs, on_done=_on_upload_logs_done)
+        aqt.mw.taskman.run_in_background(
+            task=lambda: upload_logs(key), on_done=_on_upload_logs_done
+        )
 
     return key
+
+
+def upload_logs(key: str) -> str:
+    try:
+        client = AnkiHubClient()
+        client.upload_logs(
+            file=log_file_path(),
+            key=key,
+        )
+        LOGGER.info("Logs uploaded.")
+        return key
+    except AnkiHubRequestError as e:
+        LOGGER.info("Logs upload failed.")
+        raise e
 
 
 def _on_upload_logs_done(future: Future) -> None:
