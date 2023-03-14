@@ -6,7 +6,7 @@ import aqt
 from anki.errors import CardTypeError
 from aqt.gui_hooks import profile_did_open
 
-from . import LOGGER, ankihub_client
+from . import LOGGER
 from .addons import setup_addons
 from .auto_sync import setup_ankihub_sync_on_ankiweb_sync
 from .db import ankihub_db
@@ -14,13 +14,7 @@ from .errors import setup_error_handler
 from .gui import browser, editor
 from .gui.menu import refresh_ankihub_menu, setup_ankihub_menu
 from .progress import setup_progress_manager
-from .settings import (
-    ANKI_VERSION,
-    api_url_base,
-    config,
-    setup_logger,
-    setup_profile_data_folder,
-)
+from .settings import ANKI_VERSION, config, setup_logger, setup_profile_data_folder
 from .utils import modify_note_type_templates
 
 # The general setup should be only once, because it sets up menu items, hooks, etc.
@@ -32,13 +26,13 @@ ATTEMPTED_GENERAL_SETUP = False
 def run():
     """Call this function in __init__.py when Anki starts."""
 
-    config.setup_public_config_and_ankihub_app_url()
-
-    ankihub_client.API_URL_BASE = api_url_base()
-    LOGGER.info(f"Set AnkiHub API URL base to: {ankihub_client.API_URL_BASE}")
+    config.setup_public_config_and_urls()
 
     setup_logger()
     LOGGER.info("Set up logger.")
+
+    LOGGER.info(f"AnkiHub app url: {config.app_url}")
+    LOGGER.info(f"S3 bucket url: {config.s3_bucket_url}")
 
     profile_did_open.append(on_profile_did_open)
 

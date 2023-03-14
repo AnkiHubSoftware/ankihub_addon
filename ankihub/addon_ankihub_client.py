@@ -3,9 +3,9 @@ from json import JSONDecodeError
 from pathlib import Path
 from pprint import pformat
 
+import aqt
 import requests
 from requests import Response
-import aqt
 
 from . import LOGGER
 from .ankihub_client import AnkiHubClient, AnkiHubRequestError
@@ -41,6 +41,8 @@ DEFAULT_RESPONSE_HOOKS = [
 class AddonAnkiHubClient(AnkiHubClient):
     def __init__(self, hooks=None) -> None:
         super().__init__(
+            api_url=config.api_url,
+            s3_bucket_url=config.s3_bucket_url,
             hooks=hooks if hooks is not None else DEFAULT_RESPONSE_HOOKS,
             token=config.token(),
             local_media_dir_path=Path(aqt.mw.col.media.dir()),
