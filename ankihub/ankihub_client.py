@@ -434,7 +434,8 @@ class AnkiHubClient:
 
         # Upload to S3
         s3_url = self.get_presigned_url(
-            key=f"deck_assets/{ah_did}/{zip_filepath.name}", action="upload"
+            key=f"deck_assets/{ah_did}/{zip_filepath.name}", 
+            action="upload"
         )
         self._upload_file_to_s3(s3_presigned_url=s3_url, filepath=zip_filepath)
 
