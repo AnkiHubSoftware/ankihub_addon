@@ -322,13 +322,15 @@ def _refresh_buttons(editor: Editor) -> None:
     Also changes the label of the suggestion button based on whether the note is already on AnkiHub."""
     note = editor.note
 
-    # not sure why editor or note can be None here, but it happens, there are reports on sentry
-    # see https://sentry.io/organizations/ankihub/issues/3788327661
-    if editor is None:
+    # Not sure why editor or editor.web can be None here, but it happens, there are reports on sentry
+    # see https://sentry.io/organizations/ankihub/issues/3788327661.
+    # It probably happens when the editor is closing / loading.
+    if editor is None or editor.web is None:
         return
 
     all_button_ids = [SUGGESTION_BTN_ID, VIEW_NOTE_BTN_ID, VIEW_NOTE_HISTORY_BTN_ID]
 
+    # Note can also be None here. See comment above.
     if note is None or not ankihub_db.is_ankihub_note_type(note.mid):
         _disable_buttons(editor, all_button_ids)
         _set_suggestion_button_label(editor, "")
@@ -357,9 +359,6 @@ def _disable_buttons(editor: Editor, button_ids: List[ſtr]) -> None:
 def _set_enabled_states_of_buttons(
     editor: Editor, button_ids: list[str], enabled: bool
 ) -> None:
-    if editor is None:
-        return
-
     disable_btns_script = f"""
         for (const btnId of {button_ids}) {{
             document.getElementById(btnId).disabled={str(not enabled).lower()};
@@ -372,9 +371,6 @@ def _set_suggestion_button_label(editor: Editor, label: str) -> None:
     set_label_script = (
         f"document.getElementById('{SUGGESTION_BTN_ID}-label').textContent='{{}}';"
     )
-    if editor is None:
-        return
-
     editor.web.eval(set_label_script.format(label))
 
 
