@@ -61,7 +61,7 @@ LOCAL_API_URL = "http://localhost:8000/api"
 
 
 @pytest.fixture
-def client(vcr: VCR, request, marks):
+def client_with_server_setup(vcr: VCR, request, marks):
     if "skipifvcr" in marks and vcr_enabled(vcr):
         pytest.skip("Skipping test because test has skipifvcr mark and VCR is enabled")
 
@@ -119,17 +119,17 @@ def run_command_in_django_container(command):
 
 
 @pytest.fixture
-def authorized_client_for_user_test1(client: AnkiHubClient):
+def authorized_client_for_user_test1(client_with_server_setup: AnkiHubClient):
     credentials_data = {"username": "test1", "password": "asdf"}
-    client.login(credentials=credentials_data)
-    yield client
+    client_with_server_setup.login(credentials=credentials_data)
+    yield client_with_server_setup
 
 
 @pytest.fixture
-def authorized_client_for_user_test2(client: AnkiHubClient, request):
+def authorized_client_for_user_test2(client_with_server_setup: AnkiHubClient, request):
     credentials_data = {"username": "test2", "password": "asdf"}
-    client.login(credentials=credentials_data)
-    yield client
+    client_with_server_setup.login(credentials=credentials_data)
+    yield client_with_server_setup
 
 
 @pytest.fixture
@@ -214,25 +214,25 @@ def _remove_generated_asset_files():
 
 
 @pytest.mark.vcr()
-def test_client_login_and_signout_with_username(client):
+def test_client_login_and_signout_with_username(client_with_server_setup):
     credentials_data = {"username": "test1", "password": "asdf"}
-    token = client.login(credentials=credentials_data)
+    token = client_with_server_setup.login(credentials=credentials_data)
     assert len(token) == 64
-    assert client.session.headers["Authorization"] == f"Token {token}"
+    assert client_with_server_setup.session.headers["Authorization"] == f"Token {token}"
 
-    client.signout()
-    assert client.session.headers["Authorization"] == ""
+    client_with_server_setup.signout()
+    assert client_with_server_setup.session.headers["Authorization"] == ""
 
 
 @pytest.mark.vcr()
-def test_client_login_and_signout_with_email(client):
+def test_client_login_and_signout_with_email(client_with_server_setup):
     credentials_data = {"email": "test1@email.com", "password": "asdf"}
-    token = client.login(credentials=credentials_data)
+    token = client_with_server_setup.login(credentials=credentials_data)
     assert len(token) == 64
-    assert client.session.headers["Authorization"] == f"Token {token}"
+    assert client_with_server_setup.session.headers["Authorization"] == f"Token {token}"
 
-    client.signout()
-    assert client.session.headers["Authorization"] == ""
+    client_with_server_setup.signout()
+    assert client_with_server_setup.session.headers["Authorization"] == ""
 
 
 @pytest.mark.vcr()
