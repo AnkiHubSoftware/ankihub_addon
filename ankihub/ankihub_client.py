@@ -521,7 +521,7 @@ class AnkiHubClient:
             s3_url = self.get_presigned_url(key=key, action="upload")
             self._upload_file_to_s3(
                 s3_presigned_url=s3_url,
-                file_path=self.local_media_dir_path / image_name,
+                filepath=self.local_media_dir_path / image_name,
             )
 
     def _upload_file_to_s3(self, s3_presigned_url: str, filepath: Path) -> None:
