@@ -1077,7 +1077,8 @@ class TestUploadAssetsForDeck:
         client.upload_assets_for_deck(deck_id, notes_data)
 
         get_presigned_url_mock.assert_called_once_with(
-            key=path_to_created_zip_file.name, action="upload"
+            key=f"deck_assets/{deck_id}/{path_to_created_zip_file.name}",
+            action="upload",
         )
         mocked_upload_file_to_s3.assert_called_once_with(
             s3_presigned_url="https://fake_s3.com",
