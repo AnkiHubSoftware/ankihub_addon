@@ -6,7 +6,7 @@ from types import TracebackType
 from typing import Any, Optional, Type
 
 import aqt
-from anki.errors import BackendIOError, DBError
+from anki.errors import BackendIOError, DBError, SyncError
 from aqt.utils import askUser, showText, showWarning, tooltip
 from requests.exceptions import ConnectionError
 
@@ -58,8 +58,13 @@ def handle_exception(
         )
         return True
 
-    if (isinstance(exc, DBError) and "is full" in str(exc).lower()) or (
-        isinstance(exc, BackendIOError) and "no space left" in str(exc).lower()
+    if (
+        (isinstance(exc, DBError) and "is full" in str(exc).lower())
+        or (isinstance(exc, BackendIOError) and "not enough space" in str(exc).lower())
+        or (isinstance(exc, BackendIOError) and "not enough memory" in str(exc).lower())
+        or (isinstance(exc, BackendIOError) and "no space left" in str(exc).lower())
+        or (isinstance(exc, OSError) and "no space left" in str(exc).lower())
+        or (isinstance(exc, SyncError) and "no space left" in str(exc).lower())
     ):
         showWarning(
             "Could not finish because your hard drive is full.", title="AnkiHub"
