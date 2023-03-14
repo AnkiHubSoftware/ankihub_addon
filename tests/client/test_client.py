@@ -1120,6 +1120,7 @@ class TestUploadAssetsForDeck:
         mocked_upload_file_to_s3.assert_not_called()
 
     def _all_image_names_in_notes(self, notes_data: List[NoteInfo]):
+        client = AnkiHubClient(local_media_dir_path=TEST_MEDIA_PATH)
         all_notes_fields = []
         for note in notes_data:
             all_notes_fields.extend(note.fields)
