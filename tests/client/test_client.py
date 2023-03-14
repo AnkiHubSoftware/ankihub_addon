@@ -951,7 +951,7 @@ class TestUploadImagesForSuggestion:
 
 
 class TestUploadAssetsForDeck:
-    def notes_data_with_many_images(self):
+    def notes_data_with_many_images(self) -> List[NoteInfo]:
         notes_data = [
             NoteInfoFactory.create(),
             NoteInfoFactory.create(),
@@ -988,7 +988,7 @@ class TestUploadAssetsForDeck:
 
         return notes_data
 
-    def notes_data_with_a_few_images(self):
+    def notes_data_with_a_few_images(self) -> List[NoteInfo]:
         notes_data = [NoteInfoFactory.create(), NoteInfoFactory.create()]
         notes_data[0].fields[0].value = (
             '<img src="testfile_mario.png" width="100" alt="its-a me!">'
@@ -1001,7 +1001,7 @@ class TestUploadAssetsForDeck:
         return notes_data
 
     def test_gets_images_from_deck_being_uploaded(
-        self, next_deterministic_uuid: Callable[[], uuid.UUID], monkeypatch
+        self, next_deterministic_uuid: Callable[[], uuid.UUID], monkeypatch: MonkeyPatch
     ):
         client = AnkiHubClient(local_media_dir_path=TEST_MEDIA_PATH)
 
@@ -1021,7 +1021,7 @@ class TestUploadAssetsForDeck:
         mocked_get_images_from_fields.assert_called_once_with(all_notes_fields)
 
     def test_zips_images_from_deck_notes(
-        self, next_deterministic_uuid: Callable[[], uuid.UUID], monkeypatch
+        self, next_deterministic_uuid: Callable[[], uuid.UUID], monkeypatch: MonkeyPatch
     ):
         client = AnkiHubClient(local_media_dir_path=TEST_MEDIA_PATH)
 
@@ -1059,7 +1059,7 @@ class TestUploadAssetsForDeck:
         assert path_to_created_zip_file.is_file() is False
 
     def test_uploads_generated_zipped_file(
-        self, next_deterministic_uuid: Callable[[], uuid.UUID], monkeypatch
+        self, next_deterministic_uuid: Callable[[], uuid.UUID], monkeypatch: MonkeyPatch
     ):
         client = AnkiHubClient(local_media_dir_path=TEST_MEDIA_PATH)
 
