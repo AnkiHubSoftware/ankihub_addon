@@ -16,14 +16,13 @@ from ..error_reporting import report_exception_and_upload_logs
 from ..settings import (
     ANKI_MINOR,
     ICONS_PATH,
-    url_view_note,
-    url_view_note_history,
     AnkiHubCommands,
     config,
+    url_view_note,
+    url_view_note_history,
 )
 from ..suggestions import suggest_new_note, suggest_note_update
 from .suggestion_dialog import SuggestionDialog
-from .utils import choose_list
 
 ANKIHUB_BTN_ID_PREFIX = "ankihub-btn"
 SUGGESTION_BTN_ID = f"{ANKIHUB_BTN_ID_PREFIX}-suggestion"
@@ -105,17 +104,10 @@ def on_suggestion_button_press_inner(editor: Editor) -> None:
                 "Please subscribe to an AnkiHub deck first."
             )
             return
-        elif len(subscribed_dids) == 1:
-            ankihub_did = subscribed_dids[0]
-        else:
-            choice = choose_list(
-                "Which AnKiHub deck would you like to add this note to?",
-                choices=[config.deck_config(did).name for did in subscribed_dids],
-            )
-            if choice is None:
-                return
 
-            ankihub_did = subscribed_dids[choice]
+        # We can assume that the note type is associated with an AnkiHub deck.
+        # If it was not, the "Suggest new note" button would not be visible for the note.
+        ankihub_did = ankihub_db.ankihub_did_for_note_type(editor.note.mid)
 
         if editor.addMode:
 
