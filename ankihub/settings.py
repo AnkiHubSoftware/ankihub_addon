@@ -23,15 +23,17 @@ from mashumaro import field_options
 from mashumaro.mixins.json import DataClassJSONMixin
 
 from . import LOGGER
-from .ankihub_client import ANKIHUB_DATETIME_FORMAT_STR, DeckExtension
+from .ankihub_client import (
+    ANKIHUB_DATETIME_FORMAT_STR,
+    DEFAULT_API_URL,
+    DEFAULT_APP_URL,
+    DEFAULT_S3_BUCKET_URL,
+    STAGING_API_URL,
+    STAGING_APP_URL,
+    STAGING_S3_BUCKET_URL,
+    DeckExtension,
+)
 from .public_config_migrations import migrate_public_config
-
-
-PRODUCTION_APP_URL = "https://app.ankihub.net"
-PRODUCTION_S3_BUCKET_URL = "https://ankihub.s3.amazonaws.com"
-
-STAGING_APP_URL = "https://staging.ankihub.net"
-STAGING_S3_BUCKET_URL = "https://ankihub-staging.s3.amazonaws.com"
 
 ADDON_PATH = Path(__file__).parent.absolute()
 
@@ -110,7 +112,7 @@ class Config:
         self._private_config_path: Optional[Path] = None
         self.token_change_hook: Optional[Callable[[], None]] = None
         self.subscriptions_change_hook: Optional[Callable[[], None]] = None
-        self.ankihub_app_url: Optional[str] = None
+        self.app_url: Optional[str] = None
         self.s3_bucket_url: Optional[str] = None
 
     def setup_public_config_and_urls(self):
@@ -118,15 +120,18 @@ class Config:
         self.public_config = aqt.mw.addonManager.getConfig(ADDON_PATH.name)
 
         if self.public_config.get("use_staging"):
-            self.ankihub_app_url = STAGING_APP_URL
+            self.app_url = STAGING_APP_URL
+            self.api_url = STAGING_API_URL
             self.s3_bucket_url = STAGING_S3_BUCKET_URL
         else:
-            self.ankihub_app_url = PRODUCTION_APP_URL
-            self.s3_bucket_url = PRODUCTION_S3_BUCKET_URL
+            self.app_url = DEFAULT_APP_URL
+            self.api_url = DEFAULT_API_URL
+            self.s3_bucket_url = DEFAULT_S3_BUCKET_URL
 
         # Override urls with environment variables if they are set.
         if app_url_from_env_var := os.getenv("ANKIHUB_APP_URL"):
-            self.ankihub_app_url = app_url_from_env_var
+            self.app_url = app_url_from_env_var
+            self.api_url = f"{app_url_from_env_var}/api"
 
         if s3_url_from_env_var := os.getenv("S3_BUCKET_URL"):
             self.s3_bucket_url = s3_url_from_env_var
@@ -144,10 +149,6 @@ class Config:
                 # TODO Instead of overwriting, query AnkiHub for config values.
                 self._private_config = PrivateConfig()
         self._log_private_config()
-
-    @property
-    def api_url_base(self) -> str:
-        return f"{self.ankihub_app_url}/api"
 
     def _load_private_config(self) -> PrivateConfig:
         with open(self._private_config_path) as f:
@@ -451,14 +452,14 @@ except (FileNotFoundError, KeyError):
     ANKIWEB_ID = 1322529746
 
 
-url_view_note = lambda: f"{config.ankihub_app_url}/decks/notes/"  # noqa: E731
+url_view_note = lambda: f"{config.app_url}/decks/notes/"  # noqa: E731
 url_view_note_history = (
-    lambda: f"{config.ankihub_app_url}/decks/{{ankihub_did}}/suggestions/?search=note:{{ankihub_nid}} state:closed"
+    lambda: f"{config.app_url}/decks/{{ankihub_did}}/suggestions/?search=note:{{ankihub_nid}} state:closed"
 )  # noqa: E731
-url_view_deck = lambda: f"{config.ankihub_app_url}/decks/"  # noqa: E731
-url_help = lambda: f"{config.ankihub_app_url}/help"  # noqa: E731
-url_decks = lambda: f"{config.ankihub_app_url}/explore"  # noqa: E731
-url_deck_base = lambda: f"{config.ankihub_app_url}/decks"  # noqa: E731
+url_view_deck = lambda: f"{config.app_url}/decks/"  # noqa: E731
+url_help = lambda: f"{config.app_url}/help"  # noqa: E731
+url_decks = lambda: f"{config.app_url}/explore"  # noqa: E731
+url_deck_base = lambda: f"{config.app_url}/decks"  # noqa: E731
 
 
 ANKIHUB_NOTE_TYPE_FIELD_NAME = "ankihub_id"

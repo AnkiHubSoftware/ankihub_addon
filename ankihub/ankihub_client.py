@@ -36,8 +36,14 @@ from .common_utils import extract_local_image_paths_from_html
 
 LOGGER = logging.getLogger(__name__)
 
-DEFAULT_API_URL_BASE = "https://app.ankihub.net/api"
+DEFAULT_APP_URL = "https://app.ankihub.net"
+DEFAULT_API_URL = f"{DEFAULT_APP_URL}/api"
 DEFAULT_S3_BUCKET_URL = "https://ankihub.s3.amazonaws.com"
+
+STAGING_APP_URL = "https://staging.ankihub.net"
+STAGING_API_URL = f"{STAGING_APP_URL}/api"
+STAGING_S3_BUCKET_URL = "https://ankihub-staging.s3.amazonaws.com"
+
 API_VERSION = 7.0
 
 DECK_UPDATE_PAGE_SIZE = 2000  # seems to work well in terms of speed
@@ -278,15 +284,15 @@ class AnkiHubClient:
 
     def __init__(
         self,
+        local_media_dir_path: Path,
         hooks=None,
         token: Optional[str] = None,
-        local_media_dir_path: Optional[Path] = None,
-        api_url_base: str = DEFAULT_API_URL_BASE,
+        api_url: str = DEFAULT_API_URL,
         s3_bucket_url: str = DEFAULT_S3_BUCKET_URL,
     ):
-        self.api_url_base = api_url_base
-        self.s3_bucket_url = s3_bucket_url
         self.local_media_dir_path = local_media_dir_path
+        self.api_url = api_url
+        self.s3_bucket_url = s3_bucket_url
 
         self.session = Session()
 
@@ -310,7 +316,7 @@ class AnkiHubClient:
         data=None,
         params=None,
     ) -> PreparedRequest:
-        url = f"{self.api_url_base}{endpoint}"
+        url = f"{self.api_url}{endpoint}"
         request = Request(
             method=method,
             url=url,

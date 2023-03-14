@@ -31,7 +31,7 @@ def run():
     setup_logger()
     LOGGER.info("Set up logger.")
 
-    LOGGER.info(f"AnkiHub app url: {config.ankihub_app_url}")
+    LOGGER.info(f"AnkiHub app url: {config.app_url}")
     LOGGER.info(f"S3 bucket url: {config.s3_bucket_url}")
 
     profile_did_open.append(on_profile_did_open)

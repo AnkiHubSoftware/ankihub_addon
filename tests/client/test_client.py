@@ -22,8 +22,8 @@ from ..factories import NoteInfoFactory
 # has to be set before importing ankihub
 os.environ["SKIP_INIT"] = "1"
 
-from ankihub import ankihub_client
 from ankihub.ankihub_client import (
+    DEFAULT_API_URL,
     DEFAULT_S3_BUCKET_URL,
     AnkiHubClient,
     ChangeNoteSuggestion,
@@ -57,6 +57,8 @@ VCR_CASSETTES_PATH = Path(__file__).parent / "cassettes"
 DECK_WITH_EXTENSION_UUID = uuid.UUID("100df7b9-7749-4fe0-b801-e3dec1decd72")
 DECK_EXTENSION_ID = 999
 
+LOCAL_API_URL = "http://localhost:8000/api"
+
 
 @pytest.fixture
 def client(vcr: VCR, request, marks):
@@ -73,7 +75,7 @@ def client(vcr: VCR, request, marks):
             "python manage.py runscript create_fixture_data"
         )
 
-    client = AnkiHubClient(api_url_base="http://localhost:8000/api")
+    client = AnkiHubClient(api_url=LOCAL_API_URL, local_media_dir_path=TEST_MEDIA_PATH)
     yield client
 
     if not playback_mode:
@@ -869,6 +871,8 @@ class TestUploadImagesForSuggestion:
         enable_image_support_feature_flag,
         request: FixtureRequest,
     ):
+        client = AnkiHubClient(local_media_dir_path=TEST_MEDIA_PATH)
+
         suggestion: NoteSuggestion = request.getfixturevalue(suggestion_type)
         suggestion.fields[0].value = (
             '<img src="testfile_mario.png" width="100" alt="its-a me!">'
@@ -876,7 +880,6 @@ class TestUploadImagesForSuggestion:
         )
 
         fake_presigned_url = "https://fake_presigned_url.com"
-
         s3_upload_request_mock = requests_mock.put(
             fake_presigned_url,
             json={"success": True},
@@ -896,11 +899,9 @@ class TestUploadImagesForSuggestion:
             lambda *args, **kwargs: fake_presigned_url,
         )
 
-        client = AnkiHubClient(local_media_dir_path=TEST_MEDIA_PATH)
-
         if isinstance(suggestion, ChangeNoteSuggestion):
             suggestion_request_mock = requests_mock.post(
-                f"{ankihub_client.DEFAULT_API_URL_BASE}/notes/{suggestion.ankihub_note_uuid}/suggestion/",
+                f"{DEFAULT_API_URL}/notes/{suggestion.ankihub_note_uuid}/suggestion/",
                 status_code=201,
             )
 
@@ -908,7 +909,7 @@ class TestUploadImagesForSuggestion:
         else:
             assert isinstance(suggestion, NewNoteSuggestion)
             suggestion_request_mock = requests_mock.post(
-                f"{ankihub_client.DEFAULT_API_URL_BASE}/decks/{suggestion.ankihub_deck_uuid}/note-suggestion/",
+                f"{DEFAULT_API_URL}/decks/{suggestion.ankihub_deck_uuid}/note-suggestion/",
                 status_code=201,
             )
             client.create_new_note_suggestion(new_note_suggestion=suggestion)
@@ -927,7 +928,8 @@ class TestUploadImagesForSuggestion:
         assert result == expected_result
 
     def test_generate_asset_files_with_hashed_names(self, remove_generated_asset_files):
-        client = AnkiHubClient()
+        client = AnkiHubClient(local_media_dir_path=TEST_MEDIA_PATH)
+
         filenames = [
             TEST_MEDIA_PATH / "testfile_mario.png",
             TEST_MEDIA_PATH / "testfile_anki.gif",

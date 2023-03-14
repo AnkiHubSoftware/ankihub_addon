@@ -283,7 +283,7 @@ def test_editor(
         monkeypatch.setattr("ankihub.exporting.uuid.uuid4", lambda: note_1_ah_nid)
 
         requests_mock.post(
-            f"{config.api_url_base}/notes/{note_1_ah_nid}/suggestion/",
+            f"{config.api_url}/notes/{note_1_ah_nid}/suggestion/",
             status_code=201,
             json={},
         )
@@ -299,7 +299,7 @@ def test_editor(
         note_2_ah_nid = ankihub_db.ankihub_nid_for_anki_nid(note.id)
 
         requests_mock.post(
-            f"{config.api_url_base}/notes/{note_2_ah_nid}/suggestion/",
+            f"{config.api_url}/notes/{note_2_ah_nid}/suggestion/",
             status_code=201,
             json={},
         )
@@ -431,7 +431,7 @@ def test_create_collaborative_deck_and_upload(
 def test_get_deck_by_id(
     requests_mock: Mocker, next_deterministic_uuid: Callable[[], uuid.UUID]
 ):
-    client = AnkiHubClient(hooks=[])
+    client = AnkiHubClient(local_media_dir_path=Path("/tmp/ankihub_media"))
 
     # test get deck by id
     ankihub_deck_uuid = next_deterministic_uuid()
@@ -446,7 +446,7 @@ def test_get_deck_by_id(
     }
 
     requests_mock.get(
-        f"{config.api_url_base}/decks/{ankihub_deck_uuid}/", json=expected_data
+        f"{config.api_url}/decks/{ankihub_deck_uuid}/", json=expected_data
     )
     deck_info = client.get_deck_by_id(ankihub_deck_uuid=ankihub_deck_uuid)  # type: ignore
     assert deck_info == Deck(
@@ -459,9 +459,7 @@ def test_get_deck_by_id(
     )
 
     # test get deck by id unauthenticated
-    requests_mock.get(
-        f"{config.api_url_base}/decks/{ankihub_deck_uuid}/", status_code=403
-    )
+    requests_mock.get(f"{config.api_url}/decks/{ankihub_deck_uuid}/", status_code=403)
 
     try:
         client.get_deck_by_id(ankihub_deck_uuid=ankihub_deck_uuid)  # type: ignore
@@ -488,7 +486,7 @@ def test_suggest_note_update(
 
         # test create change note suggestion
         adapter = requests_mock.post(
-            f"{config.api_url_base}/notes/{ankihub_note_uuid}/suggestion/",
+            f"{config.api_url}/notes/{ankihub_note_uuid}/suggestion/",
             status_code=201,
         )
 
@@ -514,7 +512,7 @@ def test_suggest_note_update(
 
         # test create change note suggestion unauthenticated
         requests_mock.post(
-            f"{config.api_url_base}/notes/{ankihub_note_uuid}/suggestion/",
+            f"{config.api_url}/notes/{ankihub_note_uuid}/suggestion/",
             status_code=403,
         )
 
@@ -543,7 +541,7 @@ def test_suggest_new_note(
         note = mw.col.new_note(mw.col.models.by_name("Basic (Testdeck / user1)"))
 
         adapter = requests_mock.post(
-            f"{config.api_url_base}/decks/{ah_did}/note-suggestion/",
+            f"{config.api_url}/decks/{ah_did}/note-suggestion/",
             status_code=201,
         )
 
@@ -568,7 +566,7 @@ def test_suggest_new_note(
         )
 
         # test create change note suggestion unauthenticated
-        url = f"{config.api_url_base}/decks/{ah_did}/note-suggestion/"
+        url = f"{config.api_url}/decks/{ah_did}/note-suggestion/"
         requests_mock.post(
             url,
             status_code=403,
@@ -2796,7 +2794,7 @@ class TestSuggestionsWithImages:
 
                 ah_nid = ankihub_db.ankihub_nid_for_anki_nid(note.id)
                 suggestion_request_mock = requests_mock.post(
-                    f"{config.api_url_base}/notes/{ah_nid}/suggestion/", status_code=201
+                    f"{config.api_url}/notes/{ah_nid}/suggestion/", status_code=201
                 )
 
                 # create a suggestion for the note
@@ -2843,7 +2841,7 @@ class TestSuggestionsWithImages:
             )
 
             suggestion_request_mock = requests_mock.post(
-                f"{config.api_url_base}/decks/{ah_did}/note-suggestion/",
+                f"{config.api_url}/decks/{ah_did}/note-suggestion/",
                 status_code=201,
             )
 
@@ -2932,7 +2930,7 @@ class TestSuggestionsWithImages:
 
             # create a suggestion for the note
             suggestion_request_mock = requests_mock.post(
-                f"{config.api_url_base}/notes/{ah_nid}/suggestion/", status_code=201
+                f"{config.api_url}/notes/{ah_nid}/suggestion/", status_code=201
             )
 
             suggest_note_update(
