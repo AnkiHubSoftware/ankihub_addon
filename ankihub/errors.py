@@ -7,14 +7,15 @@ from typing import Any, Optional, Type
 
 import aqt
 from anki.errors import BackendIOError, DBError
-from aqt.utils import showText, showWarning, tooltip
-from requests.exceptions import ConnectionError
+from aqt.utils import askUser, showText, showWarning, tooltip
+from requests import exceptions
 
 from . import LOGGER
 from .addon_ankihub_client import AnkiHubRequestError
 from .error_reporting import report_exception_and_upload_logs
 from .gui.error_feedback import ErrorFeedbackDialog
 from .gui.menu import AnkiHubLogin
+from .gui.utils import check_and_prompt_for_updates_on_main_window
 from .settings import ANKIWEB_ID, config
 from .sync import NotLoggedInError
 
@@ -50,7 +51,7 @@ def handle_exception(
         if details:
             showText(f"Error while communicating with AnkiHub:\n{details}")
 
-    if isinstance(exc, ConnectionError):
+    if isinstance(exc, (exceptions.ConnectionError, ConnectionError)):
         tooltip(
             "Could not connect to AnkiHub (no internet or the site is down for maintenance)",
             parent=aqt.mw,
@@ -107,10 +108,11 @@ def maybe_handle_ankihub_request_error(error: AnkiHubRequestError) -> bool:
         response.status_code == 406
         and response.reason == "Outdated client, please update the AnkiHub add-on."
     ):
-        showWarning(
-            "Please update the AnkiHub add-on to the latest version.",
-            title="AnkiHub",
-        )
+        if askUser(
+            "The AnkiHub add-on needs to be updated to continue working.<br>"
+            "Do you want to open the add-on update dialog now?"
+        ):
+            check_and_prompt_for_updates_on_main_window()
         return True
     return False
 
