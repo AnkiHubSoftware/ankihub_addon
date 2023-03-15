@@ -19,3 +19,7 @@ options:
 - `"never"`
 
 - `"always"`
+
+**use_staging**
+
+Connect to the AnkiHub staging server instead of production. Used for testing the add-on.
