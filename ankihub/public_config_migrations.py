@@ -17,3 +17,8 @@ def migrate_public_config() -> None:
             addon_config["auto_sync"] = "never"
         addon_config.pop("sync_on_startup")
         aqt.mw.addonManager.writeConfig(__name__, addon_config)
+
+    # Remove the "ankihub_url" config option to remove unnecessary clutter.
+    if "ankihub_url" in addon_config:
+        addon_config.pop("ankihub_url")
+        aqt.mw.addonManager.writeConfig(__name__, addon_config)

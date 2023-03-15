@@ -1,9 +1,16 @@
+import os
 import uuid
 from typing import Callable
 
 import pytest
 from pytest import fixture
 from requests_mock import Mocker
+
+# workaround for vscode test discovery not using pytest.ini which sets this env var
+# has to be set before importing ankihub
+os.environ["SKIP_INIT"] = "1"
+
+from ankihub.ankihub_client import DEFAULT_API_URL
 
 
 @fixture
@@ -38,10 +45,8 @@ def next_deterministic_id() -> Callable[[], int]:
 
 @pytest.fixture
 def enable_image_support_feature_flag(requests_mock: Mocker) -> None:
-    from ankihub.ankihub_client import API_URL_BASE
-
     requests_mock.get(
-        f"{API_URL_BASE}/feature-flags",
+        f"{DEFAULT_API_URL}/feature-flags",
         status_code=200,
         json={"flags": {"image_support_enabled": {"is_active": True}}},
     )
@@ -49,10 +54,8 @@ def enable_image_support_feature_flag(requests_mock: Mocker) -> None:
 
 @pytest.fixture
 def disable_image_support_feature_flag(requests_mock: Mocker) -> None:
-    from ankihub.ankihub_client import API_URL_BASE
-
     requests_mock.get(
-        f"{API_URL_BASE}/feature-flags",
+        f"{DEFAULT_API_URL}/feature-flags",
         status_code=200,
         json={"flags": {"image_support_enabled": {"is_active": False}}},
     )
