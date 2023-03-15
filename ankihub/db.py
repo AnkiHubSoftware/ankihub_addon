@@ -16,12 +16,12 @@ from .settings import ankihub_db_path
 
 
 def attach_ankihub_db_to_anki_db_connection() -> None:
-    if _AnkiHubDB.database_name not in [
+    if ankihub_db.database_name not in [
         name for _, name, _ in aqt.mw.col.db.all("PRAGMA database_list")
     ]:
         aqt.mw.col.db.execute(
-            f"ATTACH DATABASE ? AS {_AnkiHubDB.database_name}",
-            str(_AnkiHubDB.database_path),
+            f"ATTACH DATABASE ? AS {ankihub_db.database_name}",
+            str(ankihub_db.database_path),
         )
         LOGGER.info("Attached AnkiHub DB to Anki DB connection")
 
@@ -31,7 +31,7 @@ def detach_ankihub_db_from_anki_db_connection() -> None:
         LOGGER.info("The collection is not open. Not detaching AnkiHub DB.")
         return
 
-    if _AnkiHubDB.database_name in [
+    if ankihub_db.database_name in [
         name for _, name, _ in aqt.mw.col.db.all("PRAGMA database_list")
     ]:
         # Liberal use of try/except to ensure we always try to detach and begin a new
@@ -43,7 +43,7 @@ def detach_ankihub_db_from_anki_db_connection() -> None:
             LOGGER.info("Failed to close transaction.")
 
         try:
-            aqt.mw.col.db.execute(f"DETACH DATABASE {_AnkiHubDB.database_name}")
+            aqt.mw.col.db.execute(f"DETACH DATABASE {ankihub_db.database_name}")
             LOGGER.info("Detached AnkiHub DB from Anki DB connection")
         except Exception:
             LOGGER.info("Failed to detach AnkiHub database.")
@@ -82,7 +82,7 @@ class _AnkiHubDB:
         return self.connection().first(*args, **kwargs)
 
     def setup_and_migrate(self) -> None:
-        _AnkiHubDB.database_path = ankihub_db_path()
+        self.database_path = ankihub_db_path()
 
         notes_table_exists = self.scalar(
             """
@@ -127,7 +127,7 @@ class _AnkiHubDB:
         return result
 
     def connection(self) -> DBConnection:
-        return DBConnection(conn=sqlite3.connect(_AnkiHubDB.database_path))
+        return DBConnection(conn=sqlite3.connect(ankihub_db.database_path))
 
     def upsert_notes_data(
         self, ankihub_did: uuid.UUID, notes_data: List[NoteInfo]
