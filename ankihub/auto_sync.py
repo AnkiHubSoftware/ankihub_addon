@@ -65,7 +65,7 @@ def _sync_with_ankihub_and_ankiweb(auth: SyncAuth, _old: Callable) -> None:
         _maybe_sync_with_ankihub(is_startup_sync=is_startup_sync)
     except Exception as e:
         LOGGER.exception("Error in _maybe_sync_with_ankihub", exc_info=e)
-        auto_sync_state.exception_on_last_ah_sync
+        auto_sync_state.exception_on_last_ah_sync = e
     else:
         auto_sync_state.exception_on_last_ah_sync = None
     finally:
