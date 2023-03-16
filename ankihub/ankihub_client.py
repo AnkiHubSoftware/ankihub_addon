@@ -441,7 +441,8 @@ class AnkiHubClient:
         zip_filepath = Path(self.local_media_dir_path / f"{ah_did}.zip")
         with ZipFile(zip_filepath, "w") as img_zip:
             for img_path in image_paths:
-                img_zip.write(img_path, arcname=img_path.name)
+                if img_path.is_file():
+                    img_zip.write(img_path, arcname=img_path.name)
 
         # Upload to S3
         s3_url = self.get_presigned_url(
