@@ -256,7 +256,7 @@ def add_ankihub_snippet_to_template(template: Dict) -> None:
             padding: 0.5rem;
             border-radius: 50px;
             background-color: #cde3f8;
-            font-size: 0.8rem;
+            font-size: 12px;
             color: black;
         }}
         .ankihub-view-note:hover,
