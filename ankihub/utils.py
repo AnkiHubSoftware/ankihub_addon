@@ -263,7 +263,8 @@ def add_ankihub_snippet_to_template(template: Dict) -> None:
         .ankihub-view-note:active {{
             background-color: #ebf3fa;
         }}
-        <style>
+        </style>
+
         {{{{/{ANKIHUB_NOTE_TYPE_FIELD_NAME}}}}}
         <!-- END {ANKIHUB_NOTE_TYPE_MODIFICATION_STRING} -->
         """
