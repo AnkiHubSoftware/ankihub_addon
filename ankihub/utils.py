@@ -256,6 +256,7 @@ def add_ankihub_snippet_to_template(template: Dict) -> None:
         }}
 
         .ankihub-view-note {{
+            text-decoration: none;
             position: fixed;
             left: 50%;
             margin-right: -50%;
