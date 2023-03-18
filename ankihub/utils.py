@@ -248,6 +248,14 @@ def add_ankihub_snippet_to_template(template: Dict) -> None:
 
         <style>
         .ankihub-view-note {{
+            display: none;
+        }}
+
+        .mobile .ankihub-view-note {{
+            display: block;
+        }}
+
+        .ankihub-view-note {{
             position: fixed;
             left: 50%;
             margin-right: -50%;
@@ -259,6 +267,7 @@ def add_ankihub_snippet_to_template(template: Dict) -> None:
             font-size: 12px;
             color: black;
         }}
+
         .ankihub-view-note:hover,
         .ankihub-view-note:active {{
             background-color: #ebf3fa;
