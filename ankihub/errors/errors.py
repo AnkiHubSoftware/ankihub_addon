@@ -10,14 +10,14 @@ from anki.errors import BackendIOError, DBError, SyncError
 from aqt.utils import askUser, showText, showWarning, tooltip
 from requests import exceptions
 
-from . import LOGGER
-from .addon_ankihub_client import AnkiHubRequestError
+from .. import LOGGER
+from ..addon_ankihub_client import AnkiHubRequestError
+from ..gui.error_feedback import ErrorFeedbackDialog
+from ..gui.menu import AnkiHubLogin
+from ..gui.utils import check_and_prompt_for_updates_on_main_window
+from ..settings import ANKIWEB_ID, config
+from ..sync import NotLoggedInError
 from .error_reporting import report_exception_and_upload_logs
-from .gui.error_feedback import ErrorFeedbackDialog
-from .gui.menu import AnkiHubLogin
-from .gui.utils import check_and_prompt_for_updates_on_main_window
-from .settings import ANKIWEB_ID, config
-from .sync import NotLoggedInError
 
 
 def handle_exception(

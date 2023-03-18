@@ -25,7 +25,7 @@ def debug() -> None:
 
 
 if not SKIP_INIT:
-    from .error_reporting import report_exception_and_upload_logs
+    from .errors import report_exception_and_upload_logs
 
     try:
         from . import entry_point

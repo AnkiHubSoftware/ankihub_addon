@@ -9,7 +9,7 @@ from pytest_anki import AnkiSession
 os.environ["SKIP_INIT"] = "1"
 
 from ankihub import suggestions
-from ankihub.error_reporting import normalize_url
+from ankihub.errors.error_reporting import normalize_url
 from ankihub.exporting import _prepared_field_html
 from ankihub.importing import updated_tags
 from ankihub.note_conversion import ADDON_INTERNAL_TAGS, TAG_FOR_OPTIONAL_TAGS

@@ -8,10 +8,10 @@ from typing import Callable, Optional
 import aqt
 from anki.utils import checksum
 
-from . import LOGGER
-from .addon_ankihub_client import AddonAnkiHubClient as AnkiHubClient
-from .ankihub_client import AnkiHubRequestError
-from .settings import ADDON_VERSION, ANKI_VERSION, config, log_file_path
+from .. import LOGGER
+from ..addon_ankihub_client import AddonAnkiHubClient as AnkiHubClient
+from ..ankihub_client import AnkiHubRequestError
+from ..settings import ADDON_VERSION, ANKI_VERSION, config, log_file_path
 
 SENTRY_ENV = "anki_desktop"
 # This prevents Sentry from trying to run a git command to infer the version.
@@ -44,7 +44,7 @@ def report_exception(
         import sentry_sdk
         from sentry_sdk import capture_exception, configure_scope
 
-        from .settings import config
+        from ..settings import config
 
         sentry_sdk.init(
             dsn="https://715325d30fa44ecd939d12edda720f91@o1184291.ingest.sentry.io/6546414",
