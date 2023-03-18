@@ -14,7 +14,10 @@ VIEW_NOTE_PYCMD = "ankihub_view_note"
 VIEW_NOTE_BUTTON_ID = "ankihub-view-note-button"
 
 
-def _add_view_note_button_to_toolbar(card: Card):
+def _add_or_refresh_view_note_button(card: Card):
+    """Adds the "View on AnkiHub" button to the reviewer toolbar if it doesn't exist yet,
+    or refreshes it if it does exist already."""
+
     if (
         not aqt.mw.reviewer
         or not aqt.mw.reviewer.bottom
@@ -71,6 +74,7 @@ def _add_view_note_button_to_toolbar(card: Card):
 
 
 def _on_js_message(handled: Tuple[bool, Any], message: str, context: Any) -> Any:
+    """Handles the "View on AnkiHub" button click by opening the AnkiHub note in the browser."""
     if message == VIEW_NOTE_PYCMD:
         assert isinstance(context, ReviewerBottomBar)
         anki_nid = context.reviewer.card.nid
@@ -84,6 +88,6 @@ def _on_js_message(handled: Tuple[bool, Any], message: str, context: Any) -> Any
 
 
 def setup():
-    reviewer_did_show_question.append(_add_view_note_button_to_toolbar)
-
+    """Adds the "View on AnkiHub" button to the reviewer toolbar."""
+    reviewer_did_show_question.append(_add_or_refresh_view_note_button)
     webview_did_receive_js_message.append(_on_js_message)
