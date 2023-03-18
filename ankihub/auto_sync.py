@@ -7,7 +7,7 @@ from typing import Callable, Optional
 import aqt
 from anki.hooks import wrap
 from anki.sync import SyncAuth
-from aqt.gui_hooks import profile_will_close, sync_did_finish
+from aqt.gui_hooks import profile_did_open, profile_will_close, sync_did_finish
 
 from . import LOGGER
 from .gui.db_check import maybe_check_databases
@@ -20,7 +20,7 @@ class _AutoSyncState:
     attempted_startup_sync = False
     synced_with_ankihub_on_last_ankiweb_sync = False
     exception_on_last_ah_sync: Optional[Exception] = None
-    profile_will_close = False
+    profile_is_closing = False
 
 
 auto_sync_state = _AutoSyncState()
@@ -38,17 +38,22 @@ def setup_ankihub_sync_on_ankiweb_sync() -> None:
     sync_did_finish.append(_on_sync_did_finish)
 
     profile_will_close.append(_on_profile_will_close)
+    profile_did_open.append(_on_profile_did_open)
 
 
 def _on_profile_will_close() -> None:
-    auto_sync_state.profile_will_close = True
+    auto_sync_state.profile_is_closing = True
+
+
+def _on_profile_did_open() -> None:
+    auto_sync_state.profile_is_closing = False
 
 
 def _on_sync_did_finish() -> None:
     if auto_sync_state.exception_on_last_ah_sync:
         # If the profile is getting closed, we don't want to raise the exception, because it would
         # disrupt the profile closing process.
-        if auto_sync_state.profile_will_close:
+        if auto_sync_state.profile_is_closing:
             return
 
         # append the hook again, because it will be removed by Anki when the exception is raised
