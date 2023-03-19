@@ -63,7 +63,8 @@ def _on_sync_did_finish() -> None:
     if auto_sync_state.synced_with_ankihub_on_last_ankiweb_sync:
         show_tooltip_about_last_sync_results()
 
-    maybe_check_databases()
+    if not auto_sync_state.profile_is_closing:
+        maybe_check_databases()
 
 
 def _sync_with_ankihub_and_ankiweb(auth: SyncAuth, _old: Callable) -> None:
