@@ -123,29 +123,44 @@ def upload_logs_in_background(
     user_name = config.user() if not hide_username else checksum(config.user())[:5]
     key = f"ankihub_addon_logs_{user_name}_{int(time.time())}.log"
 
-    def upload_logs() -> str:
-        try:
-            client = AnkiHubClient()
-            client.upload_logs(
-                file=log_file_path(),
-                key=key,
-            )
-            LOGGER.info("Logs uploaded.")
-            return key
-        except AnkiHubRequestError as e:
-            LOGGER.info("Logs upload failed.")
-            raise e
-
     if on_done is not None:
-        aqt.mw.taskman.run_in_background(task=upload_logs, on_done=on_done)
+        aqt.mw.taskman.run_in_background(task=lambda: upload_logs(key), on_done=on_done)
     else:
-
-        def on_upload_logs_done(future: Future) -> None:
-            try:
-                future.result()
-            except Exception:
-                report_exception()
-
-        aqt.mw.taskman.run_in_background(task=upload_logs, on_done=on_upload_logs_done)
+        aqt.mw.taskman.run_in_background(
+            task=lambda: upload_logs(key), on_done=_on_upload_logs_done
+        )
 
     return key
+
+
+def upload_logs(key: str) -> str:
+    try:
+        client = AnkiHubClient()
+        client.upload_logs(
+            file=log_file_path(),
+            key=key,
+        )
+        LOGGER.info("Logs uploaded.")
+        return key
+    except AnkiHubRequestError as e:
+        LOGGER.info("Logs upload failed.")
+        raise e
+
+
+def _on_upload_logs_done(future: Future) -> None:
+    try:
+        future.result()
+    except AnkiHubRequestError as e:
+        from .errors import OUTDATED_CLIENT_ERROR_REASON
+
+        # Don't report outdated client errors that happen when uploading logs,
+        # because they are handled by the add-on when they happen in other places
+        # and we don't want to see them in Sentry.
+        if (
+            e.response.status_code == 406
+            and e.response.reason == OUTDATED_CLIENT_ERROR_REASON
+        ):
+            return
+        report_exception()
+    except Exception:
+        report_exception()
