@@ -16,6 +16,7 @@ from aqt.qt import (
     Qt,
     QVBoxLayout,
     QWidget,
+    pyqtSignal,
     qconnect,
 )
 from aqt.utils import showInfo, showText, tooltip
@@ -23,7 +24,7 @@ from aqt.utils import showInfo, showText, tooltip
 from .. import LOGGER
 from ..ankihub_client import AnkiHubRequestError, SuggestionType
 from ..db import ankihub_db
-from ..settings import RATIONALE_FOR_CHANGE_MAX_LENGTH
+from ..settings import ANKING_DECK_ID, RATIONALE_FOR_CHANGE_MAX_LENGTH
 from ..suggestions import (
     ANKIHUB_NO_CHANGE_ERROR,
     BulkNoteSuggestionsResult,
@@ -45,8 +46,12 @@ def open_suggestion_dialog_for_note(note: Note, parent: QWidget) -> None:
     ), f"Note type {note.mid} is not associated with an AnkiHub deck."
 
     ah_nid = ankihub_db.ankihub_nid_for_anki_nid(note.id)
+    ah_did = ankihub_db.ankihub_did_for_note_type(note.mid)
 
-    suggestion_meta = SuggestionDialog(is_new_note_suggestion=ah_nid is None).run()
+    suggestion_meta = SuggestionDialog(
+        is_new_note_suggestion=ah_nid is None,
+        is_for_ankihub_deck=ah_did == ANKING_DECK_ID,
+    ).run()
     if suggestion_meta is None:
         return
 
@@ -61,7 +66,6 @@ def open_suggestion_dialog_for_note(note: Note, parent: QWidget) -> None:
         else:
             tooltip("No changes. Try syncing with AnkiHub first.", parent=parent)
     else:
-        ah_did = ankihub_db.ankihub_did_for_note_type(note.mid)
         suggest_new_note(
             note=note,
             ankihub_did=ah_did,
@@ -84,7 +88,14 @@ def open_suggestion_dialog_for_bulk_suggestion(
         ankihub_db.is_ankihub_note_type(mid) for mid in mids
     ), "Some of the note types of the notes are not associated with an AnkiHub deck."
 
-    suggestion_meta = SuggestionDialog(is_new_note_suggestion=False).run()
+    ah_dids = set(ankihub_db.ankihub_did_for_note_type(mid) for mid in mids)
+    assert len(ah_dids) == 1, "All notes have to be from the same AnkiHub deck."
+
+    ah_did = ah_dids.pop()
+
+    suggestion_meta = SuggestionDialog(
+        is_new_note_suggestion=False, is_for_ankihub_deck=ah_did == ANKING_DECK_ID
+    ).run()
     if not suggestion_meta:
         return
 
@@ -154,9 +165,12 @@ class SuggestionMetadata:
 class SuggestionDialog(QDialog):
     silentlyClose = True
 
-    def __init__(self, is_new_note_suggestion: bool) -> None:
+    validation_slot = pyqtSignal(bool)
+
+    def __init__(self, is_new_note_suggestion: bool, is_for_ankihub_deck: bool) -> None:
         super().__init__()
         self._is_new_note_suggestion = is_new_note_suggestion
+        self._is_for_ankihub_deck = is_for_ankihub_deck
 
         self._setup_ui()
 
@@ -167,48 +181,48 @@ class SuggestionDialog(QDialog):
         layout = QVBoxLayout()
         self.setLayout(layout)
 
-        self.select = select = CustomListWidget()
-        select.addItems([x.value[1] for x in SuggestionType])
-        select.setCurrentRow(0)
+        self.select = CustomListWidget()
+        self.select.addItems([x.value[1] for x in SuggestionType])
+        qconnect(self.select.selectionModel().selectionChanged, self._validate)
+
+        if not self._is_for_ankihub_deck:
+            # We want it to be mandatory to manually select a change type for the AnKing deck,
+            # but not for other decks.
+            self.select.setCurrentRow(0)
 
         if not self._is_new_note_suggestion:
             # change type select
             label = QLabel("Change Type")
             layout.addWidget(label)
-            layout.addWidget(select)
+            layout.addWidget(self.select)
 
         # comment field
         label = QLabel("Rationale for Change (Required)")
         layout.addWidget(label)
 
-        self.edit = edit = QPlainTextEdit()
+        self.edit = QPlainTextEdit()
 
         def limit_length():
-            while len(edit.toPlainText()) >= RATIONALE_FOR_CHANGE_MAX_LENGTH:
-                edit.textCursor().deletePreviousChar()
+            while len(self.edit.toPlainText()) >= RATIONALE_FOR_CHANGE_MAX_LENGTH:
+                self.edit.textCursor().deletePreviousChar()
 
-        edit.textChanged.connect(limit_length)  # type: ignore
-        layout.addWidget(edit)
+        qconnect(self.edit.textChanged, limit_length)
+        qconnect(self.edit.textChanged, self._validate)
+
+        layout.addWidget(self.edit)
 
         # "auto-accept" checkbox
         self.auto_accept_cb = QCheckBox("Submit without review (maintainers only).")
         layout.addWidget(self.auto_accept_cb)
 
         # button box
-        button_box = QDialogButtonBox(QDialogButtonBox.StandardButton.Ok)
-        qconnect(button_box.accepted, self.accept)
-        layout.addWidget(button_box)
+        self.button_box = QDialogButtonBox(QDialogButtonBox.StandardButton.Ok)
+        qconnect(self.button_box.accepted, self.accept)
+        layout.addWidget(self.button_box)
 
-        # disable save button when rationale for change field is empty
-        button_box.setDisabled(True)
-
-        def toggle_save_button_disabled_state():
-            if len(edit.toPlainText().strip()) == 0:
-                button_box.setDisabled(True)
-            else:
-                button_box.setDisabled(False)
-
-        edit.textChanged.connect(toggle_save_button_disabled_state)  # type: ignore
+        # Disable submit button until validation passes
+        self._set_submit_button_enabled_state(False)
+        qconnect(self.validation_slot, self._set_submit_button_enabled_state)
 
     def run(self) -> Optional[SuggestionMetadata]:
         if not self.exec():
@@ -219,6 +233,20 @@ class SuggestionDialog(QDialog):
             comment=self._comment(),
             auto_accept=self._auto_accept(),
         )
+
+    def _set_submit_button_enabled_state(self, enabled: bool) -> None:
+        self.button_box.button(QDialogButtonBox.StandardButton.Ok).setEnabled(enabled)
+
+    def _validate(self) -> None:
+        if len(self.edit.toPlainText().strip()) == 0:
+            self.validation_slot.emit(False)
+            return
+
+        if not self._is_new_note_suggestion and not self.select.selectedItems():
+            self.validation_slot.emit(False)
+            return
+
+        self.validation_slot.emit(True)
 
     def _comment(self) -> str:
         return self.edit.toPlainText()
