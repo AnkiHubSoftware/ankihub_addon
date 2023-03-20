@@ -1,6 +1,9 @@
+from concurrent.futures import Future
 from dataclasses import dataclass
-from typing import Optional
+from pprint import pformat
+from typing import List, Optional
 
+import aqt
 from anki.notes import Note
 from aqt.qt import (
     QCheckBox,
@@ -12,14 +15,22 @@ from aqt.qt import (
     QSize,
     Qt,
     QVBoxLayout,
+    QWidget,
     qconnect,
 )
-from aqt.utils import tooltip
+from aqt.utils import showInfo, showText, tooltip
 
-from ..ankihub_client import SuggestionType
+from .. import LOGGER
+from ..ankihub_client import AnkiHubRequestError, SuggestionType
 from ..db import ankihub_db
 from ..settings import RATIONALE_FOR_CHANGE_MAX_LENGTH
-from ..suggestions import suggest_new_note, suggest_note_update
+from ..suggestions import (
+    ANKIHUB_NO_CHANGE_ERROR,
+    BulkNoteSuggestionsResult,
+    suggest_new_note,
+    suggest_note_update,
+    suggest_notes_in_bulk,
+)
 
 
 def open_suggestion_dialog_for_note(
@@ -65,6 +76,91 @@ def open_suggestion_dialog_for_note(
         )
         tooltip("Submitted suggestion to AnkiHub.")
         return True
+
+
+def open_suggestion_dialog_for_bulk_suggestion(
+    notes: List[Note], parent: QWidget
+) -> None:
+    """Opens a dialog for creating a bulk suggestion for the given notes.
+    The suggestions are created in the background and the on_done callback is called
+    when the suggestions have been created."""
+
+    mids = set(note.mid for note in notes)
+    if not all(ankihub_db.is_ankihub_note_type(mid) for mid in mids):
+        showInfo(
+            "Some of the notes you selected are not of a note type that is known by AnkiHub."
+        )
+        return
+
+    if len(notes) > 500:
+        msg = "Please select less than 500 notes at a time for bulk suggestions.<br>"
+        showInfo(msg, parent=parent)
+        return
+
+    ah_dids = set(ankihub_db.ankihub_did_for_note_type(mid) for mid in mids)
+    if len(ah_dids) > 1:
+        msg = "You can only bulk suggest notes from one AnkiHub deck at a time.<br>"
+        showInfo(msg, parent=parent)
+        return
+
+    suggestion_meta = SuggestionDialog(is_new_note_suggestion=False).run()
+    if not suggestion_meta:
+        return
+
+    aqt.mw.taskman.with_progress(
+        task=lambda: suggest_notes_in_bulk(
+            notes,
+            auto_accept=suggestion_meta.auto_accept,
+            change_type=suggestion_meta.change_type,
+            comment=suggestion_meta.comment,
+        ),
+        on_done=lambda future: _on_suggest_notes_in_bulk_done(future, parent),
+        parent=parent,
+    )
+
+
+def _on_suggest_notes_in_bulk_done(future: Future, parent: QWidget) -> None:
+    try:
+        suggestions_result: BulkNoteSuggestionsResult = future.result()
+    except AnkiHubRequestError as e:
+        if e.response.status_code != 403:
+            raise e
+
+        msg = (
+            "You are not allowed to create suggestion for all selected notes.<br>"
+            "Are you subscribed to the AnkiHub deck(s) these notes are from?<br><br>"
+            "You can only submit changes without a review if you are an owner or maintainer of the deck."
+        )
+        showInfo(msg, parent=parent)
+        return
+
+    LOGGER.info("Created note suggestions in bulk.")
+    LOGGER.info(f"errors_by_nid:\n{pformat(suggestions_result.errors_by_nid)}")
+
+    msg_about_created_suggestions = (
+        f"Submitted {suggestions_result.change_note_suggestions_count} change note suggestion(s).\n"
+        f"Submitted {suggestions_result.new_note_suggestions_count} new note suggestion(s) to.\n\n\n"
+    )
+
+    notes_without_changes = [
+        note
+        for note, errors in suggestions_result.errors_by_nid.items()
+        if ANKIHUB_NO_CHANGE_ERROR in str(errors)
+    ]
+    msg_about_failed_suggestions = (
+        (
+            f"Failed to submit suggestions for {len(suggestions_result.errors_by_nid)} note(s).\n"
+            "All notes with failed suggestions:\n"
+            f'{", ".join(str(nid) for nid in suggestions_result.errors_by_nid.keys())}\n\n'
+            f"Notes without changes ({len(notes_without_changes)}):\n"
+            f'{", ".join(str(nid) for nid in notes_without_changes)}\n'
+        )
+        if suggestions_result.errors_by_nid
+        else ""
+    )
+
+    msg = msg_about_created_suggestions + msg_about_failed_suggestions
+    showText(msg, parent=parent)
 
 
 @dataclass

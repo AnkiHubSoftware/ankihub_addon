@@ -1,7 +1,6 @@
 import re
 import uuid
 from concurrent.futures import Future
-from pprint import pformat
 from typing import List, Optional, Sequence, Tuple
 
 import aqt
@@ -30,10 +29,10 @@ from aqt.gui_hooks import (
     browser_will_show_context_menu,
 )
 from aqt.qt import QAction, QMenu, qconnect
-from aqt.utils import showInfo, showText, showWarning, tooltip, tr
+from aqt.utils import showInfo, showWarning, tooltip, tr
 
 from .. import LOGGER
-from ..ankihub_client import AnkiHubRequestError, SuggestionType
+from ..ankihub_client import SuggestionType
 from ..db import (
     ankihub_db,
     attach_ankihub_db_to_anki_db_connection,
@@ -54,11 +53,6 @@ from ..settings import (
     config,
 )
 from ..subdecks import SUBDECK_TAG, build_subdecks_and_move_cards_to_them
-from ..suggestions import (
-    ANKIHUB_NO_CHANGE_ERROR,
-    BulkNoteSuggestionsResult,
-    suggest_notes_in_bulk,
-)
 from ..sync import NotLoggedInError, ah_sync
 from .custom_columns import (
     AnkiHubIdColumn,
@@ -75,7 +69,7 @@ from .custom_search_nodes import (
     UpdatedSinceLastReviewSearchNode,
 )
 from .optional_tag_suggestion_dialog import OptionalTagsSuggestionDialog
-from .suggestion_dialog import SuggestionDialog
+from .suggestion_dialog import open_suggestion_dialog_for_bulk_suggestion
 from .utils import ask_user, choose_list, choose_subset
 
 browser: Optional[Browser] = None
@@ -189,76 +183,7 @@ def _on_protect_fields_action(browser: Browser, nid: NoteId) -> None:
 def _on_bulk_notes_suggest_action(browser: Browser, nids: Sequence[NoteId]) -> None:
     notes = [aqt.mw.col.get_note(nid) for nid in nids]
 
-    mids = set(note.mid for note in notes)
-    if not all(ankihub_db.is_ankihub_note_type(mid) for mid in mids):
-        showInfo(
-            "Some of the notes you selected are not of a note type that is known by AnkiHub."
-        )
-        return
-
-    if len(notes) > 500:
-        msg = "Please select less than 500 notes at a time for bulk suggestions.<br>"
-        showInfo(msg, parent=browser)
-        return
-
-    suggestion_meta = SuggestionDialog(is_new_note_suggestion=False).run()
-    if not suggestion_meta:
-        return
-
-    aqt.mw.taskman.with_progress(
-        task=lambda: suggest_notes_in_bulk(
-            notes,
-            auto_accept=suggestion_meta.auto_accept,
-            change_type=suggestion_meta.change_type,
-            comment=suggestion_meta.comment,
-        ),
-        on_done=lambda future: _on_suggest_notes_in_bulk_done(future, browser),
-        parent=browser,
-    )
-
-
-def _on_suggest_notes_in_bulk_done(future: Future, browser: Browser) -> None:
-    try:
-        suggestions_result: BulkNoteSuggestionsResult = future.result()
-    except AnkiHubRequestError as e:
-        if e.response.status_code != 403:
-            raise e
-
-        msg = (
-            "You are not allowed to create suggestion for all selected notes.<br>"
-            "Are you subscribed to the AnkiHub deck(s) these notes are from?<br><br>"
-            "You can only submit changes without a review if you are an owner or maintainer of the deck."
-        )
-        showInfo(msg, parent=browser)
-        return
-
-    LOGGER.info("Created note suggestions in bulk.")
-    LOGGER.info(f"errors_by_nid:\n{pformat(suggestions_result.errors_by_nid)}")
-
-    msg_about_created_suggestions = (
-        f"Submitted {suggestions_result.change_note_suggestions_count} change note suggestion(s).\n"
-        f"Submitted {suggestions_result.new_note_suggestions_count} new note suggestion(s) to.\n\n\n"
-    )
-
-    notes_without_changes = [
-        note
-        for note, errors in suggestions_result.errors_by_nid.items()
-        if ANKIHUB_NO_CHANGE_ERROR in str(errors)
-    ]
-    msg_about_failed_suggestions = (
-        (
-            f"Failed to submit suggestions for {len(suggestions_result.errors_by_nid)} note(s).\n"
-            "All notes with failed suggestions:\n"
-            f'{", ".join(str(nid) for nid in suggestions_result.errors_by_nid.keys())}\n\n'
-            f"Notes without changes ({len(notes_without_changes)}):\n"
-            f'{", ".join(str(nid) for nid in notes_without_changes)}\n'
-        )
-        if suggestions_result.errors_by_nid
-        else ""
-    )
-
-    msg = msg_about_created_suggestions + msg_about_failed_suggestions
-    showText(msg, parent=browser)
+    open_suggestion_dialog_for_bulk_suggestion(notes, parent=browser)
 
 
 def _on_reset_local_changes_action(browser: Browser, nids: Sequence[NoteId]) -> None:
