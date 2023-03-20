@@ -57,6 +57,8 @@ ANKIHUB_DATETIME_FORMAT_STR = "%Y-%m-%dT%H:%M:%S.%f%z"
 
 IMAGES_CHUNK_SIZE = 2000
 
+CHUNK_BYTES_THRESHOLD = 67108864  # 60 megabytes
+
 
 # TODO Make sure these match up with SuggestionType.choices on AnkiHub
 class SuggestionType(Enum):
@@ -490,12 +492,21 @@ class AnkiHubClient:
             )
             return None
 
-        # Create chunks of image paths to zip and upload each chunk individually
-        # TODO: Create chunks of similar size (check the amount of bytes in the image file)
-        image_path_chunks = [
-            list(image_paths)[i : i + IMAGES_CHUNK_SIZE]
-            for i in range(0, len(image_paths), IMAGES_CHUNK_SIZE)
-        ]
+        # Create chunks of image paths to zip and upload each chunk individually.
+        # Each chunk is divided based on the size of all images on that chunk to
+        # create chunks of similar size.
+        image_path_chunks: List[List[Path]] = []
+        chunk: List[Path] = []
+        current_chunk_size_bytes = 0
+        for image_path in image_paths:
+            if image_path.is_file():
+                current_chunk_size_bytes += image_path.stat().st_size
+                chunk.append(image_path)
+
+            if current_chunk_size_bytes > CHUNK_BYTES_THRESHOLD:
+                image_path_chunks.append(chunk)
+                current_chunk_size_bytes = 0
+                chunk = []
 
         # Get a S3 presigned URL that allows uploading multiple files with a given prefix
         s3_presigned_info = self.get_presigned_url_for_multiple_uploads(
