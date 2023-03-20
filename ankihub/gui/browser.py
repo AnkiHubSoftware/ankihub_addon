@@ -49,7 +49,6 @@ from ..note_conversion import (
 from ..reset_changes import reset_local_changes_to_notes
 from ..settings import (
     ANKIHUB_NOTE_TYPE_FIELD_NAME,
-    AnkiHubCommands,
     DeckConfig,
     DeckExtensionConfig,
     config,
@@ -202,7 +201,7 @@ def _on_bulk_notes_suggest_action(browser: Browser, nids: Sequence[NoteId]) -> N
         showInfo(msg, parent=browser)
         return
 
-    suggestion_meta = SuggestionDialog(command=AnkiHubCommands.CHANGE).run()
+    suggestion_meta = SuggestionDialog(is_new_note_suggestion=False).run()
     if not suggestion_meta:
         return
 

@@ -1,6 +1,7 @@
 from dataclasses import dataclass
 from typing import Optional
 
+from anki.notes import Note
 from aqt.qt import (
     QCheckBox,
     QDialog,
@@ -13,9 +14,57 @@ from aqt.qt import (
     QVBoxLayout,
     qconnect,
 )
+from aqt.utils import tooltip
 
 from ..ankihub_client import SuggestionType
-from ..settings import RATIONALE_FOR_CHANGE_MAX_LENGTH, AnkiHubCommands
+from ..db import ankihub_db
+from ..settings import RATIONALE_FOR_CHANGE_MAX_LENGTH
+from ..suggestions import suggest_new_note, suggest_note_update
+
+
+def open_suggestion_dialog_for_note(
+    note: Note,
+) -> bool:
+    """Opens a dialog for creating a note suggestion for the given note.
+    Returns True if the suggestion was created, False if the user cancelled the dialog,
+    or if the note has no changes (and therefore no suggestion was created).
+    The note has to saved to the Anki collection before calling this function.
+    May change the notes contents (e.g. by renaming media files) and therefore the
+    note might need to be reloaded after this function is called.
+    """
+
+    assert ankihub_db.is_ankihub_note_type(
+        note.mid
+    ), f"Note type {note.mid} is not associated with an AnkiHub deck."
+
+    ah_nid = ankihub_db.ankihub_nid_for_anki_nid(note.id)
+
+    suggestion_meta = SuggestionDialog(is_new_note_suggestion=ah_nid is None).run()
+    if suggestion_meta is None:
+        return False
+
+    if ah_nid:
+        if suggest_note_update(
+            note=note,
+            change_type=suggestion_meta.change_type,
+            comment=suggestion_meta.comment,
+            auto_accept=suggestion_meta.auto_accept,
+        ):
+            tooltip("Submitted suggestion to AnkiHub.")
+            return True
+        else:
+            tooltip("No changes. Try syncing with AnkiHub first.")
+            return False
+    else:
+        ah_did = ankihub_db.ankihub_did_for_note_type(note.mid)
+        suggest_new_note(
+            note=note,
+            ankihub_did=ah_did,
+            comment=suggestion_meta.comment,
+            auto_accept=suggestion_meta.auto_accept,
+        )
+        tooltip("Submitted suggestion to AnkiHub.")
+        return True
 
 
 @dataclass
@@ -28,9 +77,9 @@ class SuggestionMetadata:
 class SuggestionDialog(QDialog):
     silentlyClose = True
 
-    def __init__(self, command):
+    def __init__(self, is_new_note_suggestion: bool) -> None:
         super().__init__()
-        self.command = command
+        self._is_new_note_suggestion = is_new_note_suggestion
 
         self._setup_ui()
 
@@ -44,8 +93,8 @@ class SuggestionDialog(QDialog):
         self.select = select = CustomListWidget()
         select.addItems([x.value[1] for x in SuggestionType])
         select.setCurrentRow(0)
-        # Hide the change type options if it's a new card.
-        if self.command != AnkiHubCommands.NEW.value:
+
+        if not self._is_new_note_suggestion:
             # change type select
             label = QLabel("Change Type")
             layout.addWidget(label)
@@ -98,7 +147,7 @@ class SuggestionDialog(QDialog):
         return self.edit.toPlainText()
 
     def _change_type(self) -> Optional[SuggestionType]:
-        if self.command == AnkiHubCommands.NEW.value:
+        if self._is_new_note_suggestion:
             return None
         else:
             return next(

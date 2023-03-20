@@ -271,7 +271,9 @@ def test_editor(
         install_sample_ah_deck()
 
         # mock the dialog so it doesn't block the testq
-        monkeypatch.setattr("ankihub.gui.editor.SuggestionDialog.exec", Mock())
+        monkeypatch.setattr(
+            "ankihub.gui.suggestion_dialog.SuggestionDialog.exec", Mock()
+        )
 
         editor = MagicMock()
 
