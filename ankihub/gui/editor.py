@@ -37,7 +37,7 @@ def _on_suggestion_button_press(editor: Editor) -> None:
     """
 
     try:
-        on_suggestion_button_press_inner(editor)
+        _on_suggestion_button_press_inner(editor)
     except AnkiHubRequestError as e:
         if "suggestion" not in e.response.url:
             raise e
@@ -68,7 +68,7 @@ def _on_suggestion_button_press(editor: Editor) -> None:
             raise e
 
 
-def on_suggestion_button_press_inner(editor: Editor) -> None:
+def _on_suggestion_button_press_inner(editor: Editor) -> None:
     # The command is expected to have been set at this point already, either by
     # fetching the default or by selecting a command from the dropdown menu.
     command = editor.ankihub_command  # type: ignore
