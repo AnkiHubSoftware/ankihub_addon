@@ -76,6 +76,9 @@ def _on_suggestion_button_press_inner(editor: Editor) -> None:
         open_suggestion_dialog_for_note(note, parent=editor.widget)
         gui_hooks.add_cards_did_add_note.remove(on_did_add_note)
 
+    # If the user is adding a new note, it is not yet in the Anki database.
+    # Therefore, we call add_current_note() to add the note to the database,
+    # and then open the suggestion dialog.
     if command == AnkiHubCommands.NEW.value and editor.addMode:
         gui_hooks.add_cards_did_add_note.append(on_did_add_note)
         add_note_window: AddCards = editor.parentWindow  # type: ignore
