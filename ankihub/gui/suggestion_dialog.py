@@ -1,3 +1,4 @@
+from dataclasses import dataclass
 from typing import Optional
 
 from aqt.qt import (
@@ -15,6 +16,13 @@ from aqt.qt import (
 
 from ..ankihub_client import SuggestionType
 from ..settings import RATIONALE_FOR_CHANGE_MAX_LENGTH, AnkiHubCommands
+
+
+@dataclass
+class SuggestionMetadata:
+    comment: str
+    auto_accept: bool
+    change_type: SuggestionType
 
 
 class SuggestionDialog(QDialog):
@@ -76,13 +84,20 @@ class SuggestionDialog(QDialog):
 
         edit.textChanged.connect(toggle_save_button_disabled_state)  # type: ignore
 
-    def accept(self) -> None:
-        return super().accept()
+    def run(self) -> Optional[SuggestionMetadata]:
+        if not self.exec():
+            return None
 
-    def comment(self) -> str:
+        return SuggestionMetadata(
+            change_type=self._change_type(),
+            comment=self._comment(),
+            auto_accept=self._auto_accept(),
+        )
+
+    def _comment(self) -> str:
         return self.edit.toPlainText()
 
-    def change_type(self) -> Optional[SuggestionType]:
+    def _change_type(self) -> Optional[SuggestionType]:
         if self.command == AnkiHubCommands.NEW.value:
             return None
         else:
@@ -92,7 +107,7 @@ class SuggestionDialog(QDialog):
                 if x.value[1] == self.select.currentItem().text()
             )
 
-    def auto_accept(self) -> bool:
+    def _auto_accept(self) -> bool:
         return self.auto_accept_cb.isChecked()
 
 

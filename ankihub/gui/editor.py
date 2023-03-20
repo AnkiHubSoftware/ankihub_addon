@@ -72,21 +72,17 @@ def on_suggestion_button_press_inner(editor: Editor) -> None:
     # The command is expected to have been set at this point already, either by
     # fetching the default or by selecting a command from the dropdown menu.
     command = editor.ankihub_command  # type: ignore
-    dialog = SuggestionDialog(command)
-    if not dialog.exec():
+
+    suggestion_meta = SuggestionDialog(command).run()
+    if not suggestion_meta:
         return
 
-    change_type, comment, auto_accept = (
-        dialog.change_type(),
-        dialog.comment(),
-        dialog.auto_accept(),
-    )
     if command == AnkiHubCommands.CHANGE.value:
         if suggest_note_update(
             note=editor.note,
-            change_type=change_type,
-            comment=comment,
-            auto_accept=auto_accept,
+            change_type=suggestion_meta.change_type,
+            comment=suggestion_meta.comment,
+            auto_accept=suggestion_meta.auto_accept,
         ):
             # Reload note because media files might have been renamed.
             if editor.note:
@@ -115,8 +111,8 @@ def on_suggestion_button_press_inner(editor: Editor) -> None:
                 suggest_new_note(
                     note=note,
                     ankihub_did=ankihub_did,
-                    comment=comment,
-                    auto_accept=auto_accept,
+                    comment=suggestion_meta.comment,
+                    auto_accept=suggestion_meta.auto_accept,
                 )
                 tooltip("Submitted new note suggestion to AnkiHub.")
                 gui_hooks.add_cards_did_add_note.remove(on_add)
@@ -128,8 +124,8 @@ def on_suggestion_button_press_inner(editor: Editor) -> None:
             suggest_new_note(
                 note=editor.note,
                 ankihub_did=ankihub_did,
-                comment=comment,
-                auto_accept=auto_accept,
+                comment=suggestion_meta.comment,
+                auto_accept=suggestion_meta.auto_accept,
             )
             # Reload note because media files might have been renamed.
             if editor.note:

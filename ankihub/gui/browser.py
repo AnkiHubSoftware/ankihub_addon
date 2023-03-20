@@ -202,15 +202,16 @@ def _on_bulk_notes_suggest_action(browser: Browser, nids: Sequence[NoteId]) -> N
         showInfo(msg, parent=browser)
         return
 
-    if not (dialog := SuggestionDialog(command=AnkiHubCommands.CHANGE)).exec():
+    suggestion_meta = SuggestionDialog(command=AnkiHubCommands.CHANGE).run()
+    if not suggestion_meta:
         return
 
     aqt.mw.taskman.with_progress(
         task=lambda: suggest_notes_in_bulk(
             notes,
-            auto_accept=dialog.auto_accept(),
-            change_type=dialog.change_type(),
-            comment=dialog.comment(),
+            auto_accept=suggestion_meta.auto_accept,
+            change_type=suggestion_meta.change_type,
+            comment=suggestion_meta.comment,
         ),
         on_done=lambda future: _on_suggest_notes_in_bulk_done(future, browser),
         parent=browser,
