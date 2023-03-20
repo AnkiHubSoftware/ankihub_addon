@@ -73,7 +73,7 @@ def _on_suggestion_button_press_inner(editor: Editor) -> None:
     command = editor.ankihub_command  # type: ignore
 
     def on_add(note: anki.notes.Note) -> None:
-        open_suggestion_dialog_for_note(note)
+        open_suggestion_dialog_for_note(note, parent=editor.widget)
 
         # Needed because the note might have been modified when the suggestion was created.
         _reload_note_in_editor(editor)
@@ -85,7 +85,7 @@ def _on_suggestion_button_press_inner(editor: Editor) -> None:
         add_note_window: AddCards = editor.parentWindow  # type: ignore
         add_note_window.add_current_note()
     else:
-        open_suggestion_dialog_for_note(editor.note)
+        open_suggestion_dialog_for_note(editor.note, parent=editor.widget)
 
         # Needed because the note might have been modified when the suggestion was created.
         _reload_note_in_editor(editor)

@@ -33,13 +33,9 @@ from ..suggestions import (
 )
 
 
-def open_suggestion_dialog_for_note(
-    note: Note,
-) -> bool:
+def open_suggestion_dialog_for_note(note: Note, parent: QWidget) -> None:
     """Opens a dialog for creating a note suggestion for the given note.
-    Returns True if the suggestion was created, False if the user cancelled the dialog,
-    or if the note has no changes (and therefore no suggestion was created).
-    The note has to saved to the Anki collection before calling this function.
+    The note has to be present in the Anki collection before calling this function.
     May change the notes contents (e.g. by renaming media files) and therefore the
     note might need to be reloaded after this function is called.
     """
@@ -52,7 +48,7 @@ def open_suggestion_dialog_for_note(
 
     suggestion_meta = SuggestionDialog(is_new_note_suggestion=ah_nid is None).run()
     if suggestion_meta is None:
-        return False
+        return
 
     if ah_nid:
         if suggest_note_update(
@@ -61,11 +57,9 @@ def open_suggestion_dialog_for_note(
             comment=suggestion_meta.comment,
             auto_accept=suggestion_meta.auto_accept,
         ):
-            tooltip("Submitted suggestion to AnkiHub.")
-            return True
+            tooltip("Submitted suggestion to AnkiHub.", parent=parent)
         else:
-            tooltip("No changes. Try syncing with AnkiHub first.")
-            return False
+            tooltip("No changes. Try syncing with AnkiHub first.", parent=parent)
     else:
         ah_did = ankihub_db.ankihub_did_for_note_type(note.mid)
         suggest_new_note(
@@ -74,34 +68,21 @@ def open_suggestion_dialog_for_note(
             comment=suggestion_meta.comment,
             auto_accept=suggestion_meta.auto_accept,
         )
-        tooltip("Submitted suggestion to AnkiHub.")
-        return True
+        tooltip("Submitted suggestion to AnkiHub.", parent=parent)
 
 
 def open_suggestion_dialog_for_bulk_suggestion(
     notes: List[Note], parent: QWidget
 ) -> None:
     """Opens a dialog for creating a bulk suggestion for the given notes.
-    The suggestions are created in the background and the on_done callback is called
-    when the suggestions have been created."""
+    The notes have to be present in the Anki collection before calling this function.
+    May change the notes contents (e.g. by renaming media files) and therefore the
+    notes might need to be reloaded after this function is called."""
 
     mids = set(note.mid for note in notes)
-    if not all(ankihub_db.is_ankihub_note_type(mid) for mid in mids):
-        showInfo(
-            "Some of the notes you selected are not of a note type that is known by AnkiHub."
-        )
-        return
-
-    if len(notes) > 500:
-        msg = "Please select less than 500 notes at a time for bulk suggestions.<br>"
-        showInfo(msg, parent=parent)
-        return
-
-    ah_dids = set(ankihub_db.ankihub_did_for_note_type(mid) for mid in mids)
-    if len(ah_dids) > 1:
-        msg = "You can only bulk suggest notes from one AnkiHub deck at a time.<br>"
-        showInfo(msg, parent=parent)
-        return
+    assert (
+        ankihub_db.is_ankihub_note_type(mid) for mid in mids
+    ), "Some of the note types of the notes are not associated with an AnkiHub deck."
 
     suggestion_meta = SuggestionDialog(is_new_note_suggestion=False).run()
     if not suggestion_meta:

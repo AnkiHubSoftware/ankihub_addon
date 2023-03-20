@@ -18,7 +18,7 @@ from anki.decks import DeckId, FilteredDeckConfig
 from anki.models import NotetypeDict, NotetypeId
 from anki.notes import Note, NoteId
 from anki.sync import SyncOutput
-from aqt import AnkiQt
+from aqt import AnkiQt, dialogs
 from aqt.addcards import AddCards
 from aqt.addons import InstallOk
 from aqt.browser import Browser
@@ -275,7 +275,8 @@ def test_editor(
             "ankihub.gui.suggestion_dialog.SuggestionDialog.exec", Mock()
         )
 
-        editor = MagicMock()
+        add_cards_dialog: AddCards = dialogs.open("AddCards", mw)
+        editor = add_cards_dialog.editor
 
         # test a new note suggestion
         editor.note = mw.col.new_note(mw.col.models.by_name("Basic (Testdeck / user1)"))
@@ -291,7 +292,7 @@ def test_editor(
         )
 
         _refresh_buttons(editor)
-        assert editor.ankihub_command == AnkiHubCommands.NEW.value
+        assert editor.ankihub_command == AnkiHubCommands.NEW.value  # type: ignore
         _on_suggestion_button_press(editor)
 
         # test a change note suggestion
@@ -307,7 +308,7 @@ def test_editor(
         )
 
         _refresh_buttons(editor)
-        assert editor.ankihub_command == AnkiHubCommands.CHANGE.value
+        assert editor.ankihub_command == AnkiHubCommands.CHANGE.value  # type: ignore
 
         # this should trigger a suggestion because the note has not been changed
         _on_suggestion_button_press(editor)

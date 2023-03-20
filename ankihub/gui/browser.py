@@ -183,6 +183,25 @@ def _on_protect_fields_action(browser: Browser, nid: NoteId) -> None:
 def _on_bulk_notes_suggest_action(browser: Browser, nids: Sequence[NoteId]) -> None:
     notes = [aqt.mw.col.get_note(nid) for nid in nids]
 
+    mids = set(note.mid for note in notes)
+    if not all(ankihub_db.is_ankihub_note_type(mid) for mid in mids):
+        showInfo(
+            "Some of the notes you selected are not of a note type that is known by AnkiHub.",
+            parent=browser,
+        )
+        return
+
+    if len(notes) > 500:
+        msg = "Please select less than 500 notes at a time for bulk suggestions.<br>"
+        showInfo(msg, parent=browser)
+        return
+
+    ah_dids = set(ankihub_db.ankihub_did_for_note_type(mid) for mid in mids)
+    if len(ah_dids) > 1:
+        msg = "You can only bulk suggest notes from one AnkiHub deck at a time.<br>"
+        showInfo(msg, parent=browser)
+        return
+
     open_suggestion_dialog_for_bulk_suggestion(notes, parent=browser)
 
 
