@@ -24,9 +24,9 @@ class SuggestionDialog(QDialog):
         super().__init__()
         self.command = command
 
-        self.setup_ui()
+        self._setup_ui()
 
-    def setup_ui(self) -> None:
+    def _setup_ui(self) -> None:
         self.setWindowModality(Qt.WindowModality.WindowModal)
         self.setWindowTitle("Note Suggestion(s)")
 
