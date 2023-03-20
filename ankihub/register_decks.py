@@ -48,7 +48,14 @@ def upload_deck(did: DeckId, notes_data: List[NoteInfo], private: bool) -> uuid.
         private=private,
     )
 
-    client.upload_assets_for_deck(ankihub_did, notes_data)
+    # Upload all existing local assets for this deck 
+    # (assets that are referenced on Deck's notes)
+    aqt.mw.taskman.run_in_background(
+        task=client.upload_assets_for_deck,
+        args={"ah_did": ankihub_did, "notes_data": notes_data},
+        on_done=lambda future: LOGGER.info(f"Finished uploading assets for deck {ankihub_did}")
+    )
+    # client.upload_assets_for_deck(ankihub_did, notes_data)
 
     return ankihub_did
 
