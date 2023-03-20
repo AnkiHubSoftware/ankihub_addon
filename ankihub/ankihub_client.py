@@ -443,7 +443,7 @@ class AnkiHubClient:
         ah_did: uuid.UUID,
         s3_presigned_info: dict,
     ):
-        # TODO: Error logging/handling 
+        # TODO: Error logging/handling
 
         # Zip the images found locally
         zip_filepath = Path(
@@ -464,7 +464,7 @@ class AnkiHubClient:
         # Remove the zip file from the local machine after the upload
         LOGGER.info(f"Removing file [{zip_filepath.name}] from local files")
         os.remove(zip_filepath)
-        
+
         LOGGER.info(f"Successfully uploaded [{zip_filepath.name}]")
 
     def upload_assets_for_deck(
