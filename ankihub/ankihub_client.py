@@ -467,7 +467,7 @@ class AnkiHubClient:
         # Remove the zip file from the local machine after the upload
         LOGGER.info(f"Removing file [{zip_filepath.name}] from local files")
         os.remove(zip_filepath)
-        
+
         LOGGER.info(f"Successfully uploaded [{zip_filepath.name}]")
 
         LOGGER.info(f"Successfully uploaded [{zip_filepath.name}]")
