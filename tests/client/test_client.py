@@ -862,7 +862,7 @@ class TestUploadImagesForSuggestion:
     @pytest.mark.parametrize(
         "suggestion_type", ["new_note_suggestion", "change_note_suggestion"]
     )
-    def test_upload_images_for_suggestion(
+    def test_upload_assets_for_suggestion(
         self,
         suggestion_type: str,
         requests_mock: Mocker,
@@ -915,7 +915,7 @@ class TestUploadImagesForSuggestion:
             )
             client.create_new_note_suggestion(new_note_suggestion=suggestion)
 
-        result = client.upload_images_for_suggestion(
+        result = client.upload_assets_for_suggestion(
             suggestion, ah_did=next_deterministic_uuid()
         )
 
@@ -1100,8 +1100,8 @@ class TestUploadAssetsForDeck:
 
         notes_data = self.notes_data_with_a_few_images()
 
-        mocked_upload_images = MagicMock()
-        monkeypatch.setattr(client, "upload_images", mocked_upload_images)
+        mocked_upload_assets = MagicMock()
+        monkeypatch.setattr(client, "upload_assets", mocked_upload_assets)
 
         mocked_upload_file_to_s3 = MagicMock()
         monkeypatch.setattr(client, "_upload_file_to_s3", mocked_upload_file_to_s3)
@@ -1110,7 +1110,7 @@ class TestUploadAssetsForDeck:
         client.upload_assets_for_deck(deck_id, notes_data)
 
         all_img_names_in_notes = self._all_image_names_in_notes(notes_data)
-        mocked_upload_images.assert_called_once_with(
+        mocked_upload_assets.assert_called_once_with(
             image_names=all_img_names_in_notes, deck_id=deck_id
         )
 

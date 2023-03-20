@@ -27,7 +27,7 @@ from typing import (
     Set,
 )
 from zipfile import ZipFile
-
+from concurrent.futures import ThreadPoolExecutor
 import requests
 from mashumaro import field_options
 from mashumaro.config import BaseConfig
@@ -54,6 +54,8 @@ DECK_EXTENSION_UPDATE_PAGE_SIZE = 2000
 CSV_DELIMITER = ";"
 
 ANKIHUB_DATETIME_FORMAT_STR = "%Y-%m-%dT%H:%M:%S.%f%z"
+
+IMAGES_CHUNK_SIZE = 2000
 
 
 # TODO Make sure these match up with SuggestionType.choices on AnkiHub
@@ -413,6 +415,51 @@ class AnkiHubClient:
         if s3_response.status_code != 200:
             raise AnkiHubRequestError(s3_response)
 
+    def _upload_file_to_s3_with_reusable_presigned_url(
+        self, s3_presigned_info: dict, filepath: Path
+    ) -> None:
+        """Opens and uploads the file data to S3 using a reusable presigned URL. Useful when uploading
+        multiple assets to the same path while keeping the original filename.
+        :param s3_presigned_info: dict with the reusable presigned URL info.
+                                  Obtained as the return of 'get_presigned_url_for_multiple_uploads'
+        :param filepath: the Path object with the location of the file in the system
+        -"""
+        with open(filepath, "rb") as data:
+            s3_response = requests.post(
+                s3_presigned_info["url"],
+                data=s3_presigned_info["fields"],
+                files={"file": (filepath.name, data)},
+            )
+
+        if s3_response.status_code != 204:
+            raise AnkiHubRequestError(s3_response)
+
+    def _zip_and_upload_assets_chunk(
+        self,
+        chunk: List[Path],
+        chunk_number: int,
+        ah_did: uuid.UUID,
+        s3_presigned_info: dict,
+    ):
+        # TODO: Add logging
+
+        # Zip the images found locally
+        zip_filepath = Path(
+            self.local_media_dir_path / f"{ah_did}_{chunk_number}_deck_assets_part.zip"
+        )
+        with ZipFile(zip_filepath, "w") as img_zip:
+            for img_path in chunk:
+                if img_path.is_file():
+                    img_zip.write(img_path, arcname=img_path.name)
+
+        # Upload to S3
+        self._upload_file_to_s3_with_reusable_presigned_url(
+            s3_presigned_info=s3_presigned_info, filepath=zip_filepath
+        )
+
+        # Remove the zip file from the local machine after the upload
+        os.remove(zip_filepath)
+
     def upload_assets_for_deck(
         self, ah_did: uuid.UUID, notes_data: List[NoteInfo]
     ) -> None:
@@ -430,30 +477,45 @@ class AnkiHubClient:
         if not image_paths:
             return None
 
-        # Alternate flow: if less than 10 images, call self.upload_images
+        # Alternate flow: if less than 10 images, call self.upload_assets
         # passing the array of image names
         if not len(image_paths) > 10:
-            self.upload_images(
+            self.upload_assets(
                 image_names=[path.name for path in image_paths], deck_id=ah_did
             )
             return None
 
-        zip_filepath = Path(self.local_media_dir_path / f"{ah_did}.zip")
-        with ZipFile(zip_filepath, "w") as img_zip:
-            for img_path in image_paths:
-                if img_path.is_file():
-                    img_zip.write(img_path, arcname=img_path.name)
+        # Create chunks of image paths to zip and upload each chunk individually
+        # TODO: Create chunks of similar size (check the amount of bytes in the image file)
+        image_path_chunks = [
+            list(image_paths)[i : i + IMAGES_CHUNK_SIZE]
+            for i in range(0, len(image_paths), IMAGES_CHUNK_SIZE)
+        ]
 
-        # Upload to S3
-        s3_url = self.get_presigned_url(
-            key=f"deck_assets/{ah_did}/{zip_filepath.name}", action="upload"
+        # Get a S3 presigned URL that allows uploading multiple files with a given prefix
+        s3_presigned_info = self.get_presigned_url_for_multiple_uploads(
+            prefix=f"deck_assets/{ah_did}"
         )
-        self._upload_file_to_s3(s3_presigned_url=s3_url, filepath=zip_filepath)
 
-        # Remove the zip file from the local machine after the upload
-        os.remove(zip_filepath)
+        # Use ThreadPoolExecutor to zip & upload assets
+        tasks = []
+        with ThreadPoolExecutor() as executor:
+            contador = 1
+            for chunk_number, chunk in enumerate(image_path_chunks):
+                if contador == 10:
+                    break
+                contador += 1
+                tasks.append(
+                    executor.submit(
+                        self._zip_and_upload_assets_chunk,
+                        chunk,
+                        chunk_number,
+                        ah_did,
+                        s3_presigned_info,
+                    )
+                )
 
-    def upload_images_for_suggestion(
+    def upload_assets_for_suggestion(
         self, suggestion: NoteSuggestion, ah_did: uuid.UUID
     ) -> Dict[str, str]:
         """Uploads images for a suggestion to AnkiHub and returns a map of
@@ -467,7 +529,7 @@ class AnkiHubClient:
 
         # TODO: We are currently uploading all images for a suggestion,
         # but we should only upload images that are not already on s3.
-        self.upload_images(list(asset_name_map.values()), ah_did)
+        self.upload_assets(list(asset_name_map.values()), ah_did)
 
         return asset_name_map
 
@@ -526,20 +588,21 @@ class AnkiHubClient:
 
         return result
 
-    def upload_images(self, image_names: List[str], deck_id: uuid.UUID) -> None:
+    def upload_assets(self, image_names: List[str], deck_id: uuid.UUID) -> None:
         # deck_id is used to namespace the images within each deck.
 
         # TODO: send all images at once instad of looping through each one
+        s3_presigned_info = self.get_presigned_url_for_multiple_uploads(
+            prefix=f"deck_assets/{deck_id}"
+        )
         for image_name in image_names:
-            key = f"deck_assets/{deck_id}/{image_name}"
-            s3_url = self.get_presigned_url(key=key, action="upload")
-            self._upload_file_to_s3(
-                s3_presigned_url=s3_url,
+            self._upload_file_to_s3_with_reusable_presigned_url(
+                s3_presigned_info=s3_presigned_info,
                 filepath=self.local_media_dir_path / image_name,
             )
 
     def _upload_file_to_s3(self, s3_presigned_url: str, filepath: Path) -> None:
-        """Opens the file at the 'file_path' location and uploads it to
+        """Opens the file at the 'filepath' location and uploads it to
         S3 using the 's3_presigned_url'."""
 
         with open(filepath, "rb") as file_ref:
@@ -785,14 +848,31 @@ class AnkiHubClient:
 
     def get_presigned_url(self, key: str, action: str) -> str:
         """
-        Get URL for s3.
+        Get presigned URL for S3 to upload a single file
         :param key: deck name
         :param action: upload or download
-        :return:
+        :return: the pre signed url as a string
         """
         method = "GET"
         endpoint = "/decks/generate-presigned-url"
-        data = {"key": key, "type": action}
+        data = {"key": key, "type": action, "many": "false"}
+        response = self._send_request(method, endpoint, params=data)
+        if response.status_code != 200:
+            raise AnkiHubRequestError(response)
+
+        result = response.json()["pre_signed_url"]
+        return result
+
+    def get_presigned_url_for_multiple_uploads(self, prefix: str) -> dict:
+        """
+        Get presigned URL for S3 to upload multiple files. Useful when uploading
+        multiple assets to the same path while keeping the original filename.
+        :param prefix: the path in S3 where the files will be uploaded
+        :return: a dict with the required data to build the upload request
+        """
+        method = "GET"
+        endpoint = "/decks/generate-presigned-url"
+        data = {"key": prefix, "type": "upload", "many": "true"}
         response = self._send_request(method, endpoint, params=data)
         if response.status_code != 200:
             raise AnkiHubRequestError(response)
