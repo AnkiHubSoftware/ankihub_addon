@@ -185,11 +185,6 @@ class SuggestionDialog(QDialog):
         self.select.addItems([x.value[1] for x in SuggestionType])
         qconnect(self.select.selectionModel().selectionChanged, self._validate)
 
-        if not self._is_for_ankihub_deck:
-            # We want it to be mandatory to manually select a change type for the AnKing deck,
-            # but not for other decks.
-            self.select.setCurrentRow(0)
-
         if not self._is_new_note_suggestion:
             # change type select
             label = QLabel("Change Type")
@@ -223,6 +218,10 @@ class SuggestionDialog(QDialog):
         # Disable submit button until validation passes
         self._set_submit_button_enabled_state(False)
         qconnect(self.validation_slot, self._set_submit_button_enabled_state)
+
+        # Set initial focus in change type select to the first option, if the suggestion is not for the AnKing deck.
+        if not self._is_for_ankihub_deck:
+            self.select.setCurrentRow(0)
 
     def run(self) -> Optional[SuggestionMetadata]:
         if not self.exec():
