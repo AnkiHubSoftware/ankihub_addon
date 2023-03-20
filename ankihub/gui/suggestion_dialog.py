@@ -181,36 +181,39 @@ class SuggestionDialog(QDialog):
         layout = QVBoxLayout()
         self.setLayout(layout)
 
+        # Set up change type select
         self.select = CustomListWidget()
         self.select.addItems([x.value[1] for x in SuggestionType])
         qconnect(self.select.selectionModel().selectionChanged, self._validate)
 
         if not self._is_new_note_suggestion:
-            # change type select
             label = QLabel("Change Type")
             layout.addWidget(label)
             layout.addWidget(self.select)
 
-        # comment field
+        # Set up rationale field
         label = QLabel("Rationale for Change (Required)")
         layout.addWidget(label)
 
-        self.edit = QPlainTextEdit()
+        self.rationale_edit = QPlainTextEdit()
 
         def limit_length():
-            while len(self.edit.toPlainText()) >= RATIONALE_FOR_CHANGE_MAX_LENGTH:
-                self.edit.textCursor().deletePreviousChar()
+            while (
+                len(self.rationale_edit.toPlainText())
+                >= RATIONALE_FOR_CHANGE_MAX_LENGTH
+            ):
+                self.rationale_edit.textCursor().deletePreviousChar()
 
-        qconnect(self.edit.textChanged, limit_length)
-        qconnect(self.edit.textChanged, self._validate)
+        qconnect(self.rationale_edit.textChanged, limit_length)
+        qconnect(self.rationale_edit.textChanged, self._validate)
 
-        layout.addWidget(self.edit)
+        layout.addWidget(self.rationale_edit)
 
-        # "auto-accept" checkbox
+        # Set up "auto-accept" checkbox
         self.auto_accept_cb = QCheckBox("Submit without review (maintainers only).")
         layout.addWidget(self.auto_accept_cb)
 
-        # button box
+        # Set up button box
         self.button_box = QDialogButtonBox(QDialogButtonBox.StandardButton.Ok)
         qconnect(self.button_box.accepted, self.accept)
         layout.addWidget(self.button_box)
@@ -237,7 +240,7 @@ class SuggestionDialog(QDialog):
         self.button_box.button(QDialogButtonBox.StandardButton.Ok).setEnabled(enabled)
 
     def _validate(self) -> None:
-        if len(self.edit.toPlainText().strip()) == 0:
+        if len(self.rationale_edit.toPlainText().strip()) == 0:
             self.validation_slot.emit(False)
             return
 
@@ -246,9 +249,6 @@ class SuggestionDialog(QDialog):
             return
 
         self.validation_slot.emit(True)
-
-    def _comment(self) -> str:
-        return self.edit.toPlainText()
 
     def _change_type(self) -> Optional[SuggestionType]:
         if self._is_new_note_suggestion:
@@ -259,6 +259,9 @@ class SuggestionDialog(QDialog):
                 for x in SuggestionType
                 if x.value[1] == self.select.currentItem().text()
             )
+
+    def _comment(self) -> str:
+        return self.rationale_edit.toPlainText()
 
     def _auto_accept(self) -> bool:
         return self.auto_accept_cb.isChecked()
