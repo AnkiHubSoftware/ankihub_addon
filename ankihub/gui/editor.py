@@ -72,28 +72,20 @@ def _on_suggestion_button_press_inner(editor: Editor) -> None:
     # fetching the default or by selecting a command from the dropdown menu.
     command = editor.ankihub_command  # type: ignore
 
-    def on_add(note: anki.notes.Note) -> None:
+    def on_did_add_note(note: anki.notes.Note) -> None:
         open_suggestion_dialog_for_note(note, parent=editor.widget)
-
-        # Needed because the note might have been modified when the suggestion was created.
-        _reload_note_in_editor(editor)
-
-        gui_hooks.add_cards_did_add_note.remove(on_add)
+        gui_hooks.add_cards_did_add_note.remove(on_did_add_note)
 
     if command == AnkiHubCommands.NEW.value and editor.addMode:
-        gui_hooks.add_cards_did_add_note.append(on_add)
+        gui_hooks.add_cards_did_add_note.append(on_did_add_note)
         add_note_window: AddCards = editor.parentWindow  # type: ignore
         add_note_window.add_current_note()
     else:
         open_suggestion_dialog_for_note(editor.note, parent=editor.widget)
 
         # Needed because the note might have been modified when the suggestion was created.
-        _reload_note_in_editor(editor)
-
-
-def _reload_note_in_editor(editor: Editor) -> None:
-    editor.note.load()
-    editor.loadNote()
+        editor.note.load()
+        editor.loadNote()
 
 
 def _setup_editor_buttons(buttons: List[str], editor: Editor) -> None:
