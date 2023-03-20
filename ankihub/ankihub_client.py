@@ -505,11 +505,7 @@ class AnkiHubClient:
         # Use ThreadPoolExecutor to zip & upload assets
         tasks = []
         with ThreadPoolExecutor() as executor:
-            contador = 1
             for chunk_number, chunk in enumerate(image_path_chunks):
-                if contador == 10:
-                    break
-                contador += 1
                 tasks.append(
                     executor.submit(
                         self._zip_and_upload_assets_chunk,
