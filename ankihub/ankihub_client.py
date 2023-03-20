@@ -631,6 +631,8 @@ class AnkiHubClient:
         s3_presigned_info = self.get_presigned_url_for_multiple_uploads(
             prefix=f"deck_assets/{deck_id}"
         )
+
+        # TODO: send all images at once instad of looping through each one
         for image_name in image_names:
             self._upload_file_to_s3_with_reusable_presigned_url(
                 s3_presigned_info=s3_presigned_info,
