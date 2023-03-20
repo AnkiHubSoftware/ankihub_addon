@@ -441,24 +441,29 @@ class AnkiHubClient:
         ah_did: uuid.UUID,
         s3_presigned_info: dict,
     ):
-        # TODO: Add logging
+        # TODO: Error logging/handling 
 
         # Zip the images found locally
         zip_filepath = Path(
             self.local_media_dir_path / f"{ah_did}_{chunk_number}_deck_assets_part.zip"
         )
+        LOGGER.info(f"Creating zipped asset file [{zip_filepath.name}]")
         with ZipFile(zip_filepath, "w") as img_zip:
             for img_path in chunk:
                 if img_path.is_file():
                     img_zip.write(img_path, arcname=img_path.name)
 
         # Upload to S3
+        LOGGER.info(f"Uploading file [{zip_filepath.name}] to S3")
         self._upload_file_to_s3_with_reusable_presigned_url(
             s3_presigned_info=s3_presigned_info, filepath=zip_filepath
         )
 
         # Remove the zip file from the local machine after the upload
+        LOGGER.info(f"Removing file [{zip_filepath.name}] from local files")
         os.remove(zip_filepath)
+        
+        LOGGER.info(f"Successfully uploaded [{zip_filepath.name}]")
 
     def upload_assets_for_deck(
         self, ah_did: uuid.UUID, notes_data: List[NoteInfo]
