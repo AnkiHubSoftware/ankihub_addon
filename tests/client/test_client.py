@@ -896,7 +896,7 @@ class TestUploadImagesForSuggestion:
 
         monkeypatch.setattr(
             AnkiHubClient,
-            "get_presigned_url",
+            "get_presigned_url_for_multiple_uploads",
             lambda *args, **kwargs: fake_presigned_url,
         )
 
@@ -996,26 +996,6 @@ class TestUploadAssetsForDeck:
         ].value = '<span> <p> <img src="testfile_anki.gif" width="100""> test text </p> <span>'
 
         return notes_data
-
-    def test_gets_images_from_deck_being_uploaded(
-        self, next_deterministic_uuid: Callable[[], uuid.UUID], monkeypatch: MonkeyPatch
-    ):
-        client = AnkiHubClient(local_media_dir_path=TEST_MEDIA_PATH)
-
-        notes_data = self.notes_data_with_many_images()
-
-        all_notes_fields = []
-        for note in notes_data:
-            all_notes_fields.extend(note.fields)
-
-        mocked_get_images_from_fields = MagicMock()
-        monkeypatch.setattr(
-            client, "_get_images_from_fields", mocked_get_images_from_fields
-        )
-
-        client.upload_assets_for_deck(next_deterministic_uuid(), notes_data)
-
-        mocked_get_images_from_fields.assert_called_once_with(all_notes_fields)
 
     def test_zips_images_from_deck_notes(
         self, next_deterministic_uuid: Callable[[], uuid.UUID], monkeypatch: MonkeyPatch

@@ -470,9 +470,12 @@ class AnkiHubClient:
     def upload_assets_for_deck(
         self, ah_did: uuid.UUID, notes_data: List[NoteInfo]
     ) -> None:
-        # Get all image names from the fields from notes_data
-        # Use self.local_media_dir_path to create a zip with all the files
-        # Remove the zipped file from local storage
+        # - Get all image names from the fields from notes_data
+        # - Use self.local_media_dir_path to create a zip with all the files
+        # - Remove the zipped file from local storage
+        # Note that unlike we do for suggestions, Image names can be kept as
+        # they are because we don't have to care about image file name conflicts
+        # for new decks.
 
         all_notes_fields = []
         for note in notes_data:
@@ -551,15 +554,15 @@ class AnkiHubClient:
         for each one (pointing to the local anki media folder). Filters out
         duplicate images, if any, since fields that use the same image share
         the same reference to the local media folder"""
-        result = []
+        result = set()
         for field_content in [f.value for f in fields]:
             image_names = extract_local_image_paths_from_html(field_content)
             image_paths = [
                 self.local_media_dir_path / image_name for image_name in image_names
             ]
-            result.extend(image_paths)
+            result.update(image_paths)
 
-        return set(result)
+        return result
 
     def _generate_asset_files_with_hashed_names(
         self, paths: Set[Path]
