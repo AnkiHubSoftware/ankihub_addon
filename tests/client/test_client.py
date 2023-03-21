@@ -1051,10 +1051,23 @@ class TestUploadAssetsForDeck:
 
         notes_data = self.notes_data_with_many_images()
         deck_id = next_deterministic_uuid()
-        path_to_created_zip_file = Path(TEST_MEDIA_PATH / f"{deck_id}.zip")
+        path_to_created_zip_file = Path(
+            TEST_MEDIA_PATH / f"{deck_id}_0_deck_assets_part.zip"
+        )
 
+        s3_info_mocked_value = {
+            "url": "https://fake_s3.com",
+            "fields": {
+                "key": "deck_images/test/${filename}",
+                "x-amz-algorithm": "XXXXXX",
+                "x-amz-credential": "XXXXXX",
+                "x-amz-date": "20230321T162818Z",
+                "policy": "test_asuiHGIUWEHF78Y4QFBY24UIWBFV22FV428Y",
+                "x-amz-signature": "test_822ac386d1ece605db8cfca",
+            },
+        }
         get_presigned_url_mock = MagicMock()
-        get_presigned_url_mock.return_value = "https://fake_s3.com"
+        get_presigned_url_mock.return_value = s3_info_mocked_value
         monkeypatch.setattr(
             client, "get_presigned_url_for_multiple_uploads", get_presigned_url_mock
         )
@@ -1068,13 +1081,10 @@ class TestUploadAssetsForDeck:
 
         client.upload_assets_for_deck(deck_id, notes_data)
 
-        get_presigned_url_mock.assert_called_once_with(
-            key=f"deck_assets/{deck_id}/{path_to_created_zip_file.name}",
-            action="upload",
-        )
+        get_presigned_url_mock.assert_called_once_with(prefix=f"deck_assets/{deck_id}")
         mocked_upload_file_to_s3.assert_called_once_with(
-            s3_presigned_url="https://fake_s3.com",
-            filepath=Path(TEST_MEDIA_PATH / f"{deck_id}.zip"),
+            s3_presigned_info=s3_info_mocked_value,
+            filepath=path_to_created_zip_file,
         )
 
     def test_removes_zipped_file_after_upload(
@@ -1085,8 +1095,12 @@ class TestUploadAssetsForDeck:
         notes_data = self.notes_data_with_many_images()
 
         # Mock upload-related stuff
-        monkeypatch.setattr(client, "get_presigned_url", MagicMock())
-        monkeypatch.setattr(client, "_upload_file_to_s3", MagicMock())
+        monkeypatch.setattr(
+            client, "get_presigned_url_for_multiple_uploads", MagicMock()
+        )
+        monkeypatch.setattr(
+            client, "_upload_file_to_s3_with_reusable_presigned_url", MagicMock()
+        )
 
         deck_id = next_deterministic_uuid()
         client.upload_assets_for_deck(deck_id, notes_data)
