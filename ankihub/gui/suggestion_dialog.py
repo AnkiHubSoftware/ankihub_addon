@@ -1,5 +1,6 @@
 from concurrent.futures import Future
 from dataclasses import dataclass
+from enum import Enum
 from pprint import pformat
 from typing import List, Optional
 
@@ -10,7 +11,9 @@ from aqt.qt import (
     QComboBox,
     QDialog,
     QDialogButtonBox,
+    QGroupBox,
     QLabel,
+    QLineEdit,
     QPlainTextEdit,
     Qt,
     QVBoxLayout,
@@ -154,11 +157,25 @@ def _on_suggest_notes_in_bulk_done(future: Future, parent: QWidget) -> None:
     showText(msg, parent=parent)
 
 
+class SourceType(Enum):
+    AMBOSS = "AMBOSS"
+    UWORLD = "UWorld"
+    SOCIETY_GUIDELINES = "Society Guidelines"
+    OTHER = "Other"
+
+
+@dataclass
+class SuggestionSource:
+    source_type: SourceType
+    source: str
+
+
 @dataclass
 class SuggestionMetadata:
+    change_type: SuggestionType
     comment: str
     auto_accept: bool
-    change_type: SuggestionType
+    source: Optional[SuggestionSource] = None
 
 
 class SuggestionDialog(QDialog):
@@ -181,13 +198,31 @@ class SuggestionDialog(QDialog):
         self.setLayout(self.layout_)
 
         # Set up change type dropdown
-        self.change_type_select = QComboBox()
-        self.change_type_select.addItems([x.value[1] for x in SuggestionType])
-
+        self.change_type_select = None
         if not self._is_new_note_suggestion:
+            self.change_type_select = QComboBox()
+            self.change_type_select.addItems([x.value[1] for x in SuggestionType])
             label = QLabel("Change Type")
             self.layout_.addWidget(label)
             self.layout_.addWidget(self.change_type_select)
+            qconnect(
+                self.change_type_select.currentTextChanged,
+                self._set_source_widget_visibility,
+            )
+            self.layout_.addSpacing(10)
+
+        # Set up source widget in a group box (group box is for styling purposes)
+        self.source_widget = None
+        if not self._is_new_note_suggestion and self._is_for_ankihub_deck:
+            self.source_widget_group_box = QGroupBox("Source")
+            self.layout_.addWidget(self.source_widget_group_box)
+
+            self.source_widget_group_box_layout = QVBoxLayout()
+            self.source_widget_group_box.setLayout(self.source_widget_group_box_layout)
+
+            self.source_widget = SourceWidget()
+            self.source_widget_group_box_layout.addWidget(self.source_widget)
+            self.layout_.addSpacing(10)
 
         # Set up rationale field
         label = QLabel("Rationale for Change (Required)")
@@ -206,6 +241,7 @@ class SuggestionDialog(QDialog):
         qconnect(self.rationale_edit.textChanged, self._validate)
 
         self.layout_.addWidget(self.rationale_edit)
+        self.layout_.addSpacing(10)
 
         # Set up "auto-accept" checkbox
         self.auto_accept_cb = QCheckBox("Submit without review (maintainers only).")
@@ -220,10 +256,6 @@ class SuggestionDialog(QDialog):
         self._set_submit_button_enabled_state(False)
         qconnect(self.validation_slot, self._set_submit_button_enabled_state)
 
-        # Set initial focus in change type select to the first option, if the suggestion is not for the AnKing deck.
-        if not self._is_for_ankihub_deck:
-            self.change_type_select.setCurrentRow(0)
-
     def run(self) -> Optional[SuggestionMetadata]:
         if not self.exec():
             return None
@@ -232,7 +264,22 @@ class SuggestionDialog(QDialog):
             change_type=self._change_type(),
             comment=self._comment(),
             auto_accept=self._auto_accept(),
+            source=self.source_widget.suggestion_source()
+            if self.source_widget
+            else None,
         )
+
+    def _set_source_widget_visibility(self) -> None:
+        if not self.source_widget:
+            return
+
+        if self._change_type() in [
+            SuggestionType.NEW_CONTENT,
+            SuggestionType.UPDATED_CONTENT,
+        ]:
+            self.source_widget_group_box.setHidden(False)
+        else:
+            self.source_widget_group_box.setHidden(True)
 
     def _set_submit_button_enabled_state(self, enabled: bool) -> None:
         self.button_box.button(QDialogButtonBox.StandardButton.Ok).setEnabled(enabled)
@@ -251,7 +298,7 @@ class SuggestionDialog(QDialog):
             return next(
                 x
                 for x in SuggestionType
-                if x.value[1] == self.change_type_select.currentItem().text()
+                if x.value[1] == self.change_type_select.currentText()
             )
 
     def _comment(self) -> str:
@@ -259,3 +306,54 @@ class SuggestionDialog(QDialog):
 
     def _auto_accept(self) -> bool:
         return self.auto_accept_cb.isChecked()
+
+
+source_type_to_source_label = {
+    SourceType.AMBOSS: "Link",
+    SourceType.UWORLD: "UWorld Question ID",
+    SourceType.SOCIETY_GUIDELINES: "Link",
+    SourceType.OTHER: "",
+}
+
+
+class SourceWidget(QWidget):
+    def __init__(self) -> None:
+        super().__init__()
+        self._setup_ui()
+
+    def _setup_ui(self) -> None:
+        self.layout_ = QVBoxLayout()
+        self.setLayout(self.layout_)
+
+        # add a source type dropdown
+        self.source_type_select = QComboBox()
+        self.source_type_select.addItems([x.value for x in SourceType])
+        self.layout_.addWidget(self.source_type_select)
+        qconnect(
+            self.source_type_select.currentTextChanged, self._update_source_input_label
+        )
+        self.layout_.addSpacing(10)
+
+        # add a source field
+        self.source_input_label = QLabel()
+        self.layout_.addWidget(self.source_input_label)
+
+        self.source_edit = QLineEdit()
+        self.layout_.addWidget(self.source_edit)
+
+        # set initial state
+        self._update_source_input_label()
+
+    def suggestion_source(self) -> SuggestionSource:
+        source_type = self._source_type()
+        source = self.source_edit.text()
+        return SuggestionSource(source_type=source_type, source=source)
+
+    def _update_source_input_label(self) -> None:
+        source_type = self._source_type()
+        self.source_input_label.setText(source_type_to_source_label[source_type])
+
+    def _source_type(self) -> SourceType:
+        return next(
+            x for x in SourceType if x.value == self.source_type_select.currentText()
+        )
