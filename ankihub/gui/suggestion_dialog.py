@@ -354,6 +354,4 @@ class SourceWidget(QWidget):
         self.source_input_label.setText(source_type_to_source_label[source_type])
 
     def _source_type(self) -> SourceType:
-        return next(
-            x for x in SourceType if x.value == self.source_type_select.currentText()
-        )
+        return SourceType(self.source_type_select.currentText())
