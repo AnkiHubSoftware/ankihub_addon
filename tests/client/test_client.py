@@ -881,9 +881,8 @@ class TestUploadImagesForSuggestion:
         )
 
         fake_presigned_url = "https://fake_presigned_url.com"
-        s3_upload_request_mock = requests_mock.put(
-            fake_presigned_url,
-            json={"success": True},
+        s3_upload_request_mock = requests_mock.post(
+            fake_presigned_url, json={"success": True}, status_code=204
         )
 
         expected_result = {
@@ -897,7 +896,17 @@ class TestUploadImagesForSuggestion:
         monkeypatch.setattr(
             AnkiHubClient,
             "get_presigned_url_for_multiple_uploads",
-            lambda *args, **kwargs: fake_presigned_url,
+            lambda *args, **kwargs: {
+                "url": fake_presigned_url,
+                "fields": {
+                    "key": "deck_images/test/${filename}",
+                    "x-amz-algorithm": "XXXXXX",
+                    "x-amz-credential": "XXXXXX",
+                    "x-amz-date": "20230321T162818Z",
+                    "policy": "test_asuiHGIUWEHF78Y4QFBY24UIWBFV22FV428Y",
+                    "x-amz-signature": "test_822ac386d1ece605db8cfca",
+                },
+            },
         )
 
         if isinstance(suggestion, ChangeNoteSuggestion):
@@ -1009,13 +1018,20 @@ class TestUploadAssetsForDeck:
         monkeypatch.setattr(os, "remove", os_remove_mock)
 
         # Mock upload-related stuff
-        monkeypatch.setattr(client, "get_presigned_url", MagicMock())
-        monkeypatch.setattr(client, "_upload_file_to_s3", MagicMock())
+        monkeypatch.setattr(
+            client, "get_presigned_url_for_multiple_uploads", MagicMock()
+        )
+        monkeypatch.setattr(
+            client, "_upload_file_to_s3_with_reusable_presigned_url", MagicMock()
+        )
 
         deck_id = next_deterministic_uuid()
         client.upload_assets_for_deck(deck_id, notes_data)
 
-        path_to_created_zip_file = Path(TEST_MEDIA_PATH / f"{deck_id}.zip")
+        # We will create and check for just one chunk in this test
+        path_to_created_zip_file = Path(
+            TEST_MEDIA_PATH / f"{deck_id}_0_deck_assets_part.zip"
+        )
 
         all_img_names_in_notes = self._all_image_names_in_notes(notes_data)
         assert path_to_created_zip_file.is_file()
@@ -1039,10 +1055,16 @@ class TestUploadAssetsForDeck:
 
         get_presigned_url_mock = MagicMock()
         get_presigned_url_mock.return_value = "https://fake_s3.com"
-        monkeypatch.setattr(client, "get_presigned_url", get_presigned_url_mock)
+        monkeypatch.setattr(
+            client, "get_presigned_url_for_multiple_uploads", get_presigned_url_mock
+        )
 
         mocked_upload_file_to_s3 = MagicMock()
-        monkeypatch.setattr(client, "_upload_file_to_s3", mocked_upload_file_to_s3)
+        monkeypatch.setattr(
+            client,
+            "_upload_file_to_s3_with_reusable_presigned_url",
+            mocked_upload_file_to_s3,
+        )
 
         client.upload_assets_for_deck(deck_id, notes_data)
 

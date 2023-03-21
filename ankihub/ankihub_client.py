@@ -27,7 +27,7 @@ from typing import (
     Set,
 )
 from zipfile import ZipFile
-from concurrent.futures import ThreadPoolExecutor
+from concurrent.futures import ThreadPoolExecutor, as_completed
 import requests
 from mashumaro import field_options
 from mashumaro.config import BaseConfig
@@ -510,6 +510,16 @@ class AnkiHubClient:
                 image_path_chunks.append(chunk)
                 current_chunk_size_bytes = 0
                 chunk = []
+            else:
+                # We need this so we don't lose chunks of smaller size
+                # that didn't reach the threshold (usually the "tail"
+                # of the image list, but can also happen if we have just
+                # a few images and all of them sum up to less than the threshold
+                # right on the first chunk)
+                if image_path == list(image_paths)[-1]:
+                    # Check if we're leaving the loop (last iteration) - if yes,
+                    # just close this small chunk before leaving.
+                    image_path_chunks.append(chunk)
 
         # Get a S3 presigned URL that allows uploading multiple files with a given prefix
         s3_presigned_info = self.get_presigned_url_for_multiple_uploads(
@@ -529,6 +539,9 @@ class AnkiHubClient:
                         s3_presigned_info,
                     )
                 )
+
+            for _ in as_completed(tasks):
+                pass
 
     def upload_assets_for_suggestion(
         self, suggestion: NoteSuggestion, ah_did: uuid.UUID
