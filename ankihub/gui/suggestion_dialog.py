@@ -7,12 +7,11 @@ import aqt
 from anki.notes import Note
 from aqt.qt import (
     QCheckBox,
+    QComboBox,
     QDialog,
     QDialogButtonBox,
     QLabel,
-    QListWidget,
     QPlainTextEdit,
-    QSize,
     Qt,
     QVBoxLayout,
     QWidget,
@@ -178,22 +177,21 @@ class SuggestionDialog(QDialog):
         self.setWindowModality(Qt.WindowModality.WindowModal)
         self.setWindowTitle("Note Suggestion(s)")
 
-        layout = QVBoxLayout()
-        self.setLayout(layout)
+        self.layout_ = QVBoxLayout()
+        self.setLayout(self.layout_)
 
-        # Set up change type select
-        self.select = CustomListWidget()
-        self.select.addItems([x.value[1] for x in SuggestionType])
-        qconnect(self.select.selectionModel().selectionChanged, self._validate)
+        # Set up change type dropdown
+        self.change_type_select = QComboBox()
+        self.change_type_select.addItems([x.value[1] for x in SuggestionType])
 
         if not self._is_new_note_suggestion:
             label = QLabel("Change Type")
-            layout.addWidget(label)
-            layout.addWidget(self.select)
+            self.layout_.addWidget(label)
+            self.layout_.addWidget(self.change_type_select)
 
         # Set up rationale field
         label = QLabel("Rationale for Change (Required)")
-        layout.addWidget(label)
+        self.layout_.addWidget(label)
 
         self.rationale_edit = QPlainTextEdit()
 
@@ -207,16 +205,16 @@ class SuggestionDialog(QDialog):
         qconnect(self.rationale_edit.textChanged, limit_length)
         qconnect(self.rationale_edit.textChanged, self._validate)
 
-        layout.addWidget(self.rationale_edit)
+        self.layout_.addWidget(self.rationale_edit)
 
         # Set up "auto-accept" checkbox
         self.auto_accept_cb = QCheckBox("Submit without review (maintainers only).")
-        layout.addWidget(self.auto_accept_cb)
+        self.layout_.addWidget(self.auto_accept_cb)
 
         # Set up button box
         self.button_box = QDialogButtonBox(QDialogButtonBox.StandardButton.Ok)
         qconnect(self.button_box.accepted, self.accept)
-        layout.addWidget(self.button_box)
+        self.layout_.addWidget(self.button_box)
 
         # Disable submit button until validation passes
         self._set_submit_button_enabled_state(False)
@@ -224,7 +222,7 @@ class SuggestionDialog(QDialog):
 
         # Set initial focus in change type select to the first option, if the suggestion is not for the AnKing deck.
         if not self._is_for_ankihub_deck:
-            self.select.setCurrentRow(0)
+            self.change_type_select.setCurrentRow(0)
 
     def run(self) -> Optional[SuggestionMetadata]:
         if not self.exec():
@@ -244,10 +242,6 @@ class SuggestionDialog(QDialog):
             self.validation_slot.emit(False)
             return
 
-        if not self._is_new_note_suggestion and not self.select.selectedItems():
-            self.validation_slot.emit(False)
-            return
-
         self.validation_slot.emit(True)
 
     def _change_type(self) -> Optional[SuggestionType]:
@@ -257,7 +251,7 @@ class SuggestionDialog(QDialog):
             return next(
                 x
                 for x in SuggestionType
-                if x.value[1] == self.select.currentItem().text()
+                if x.value[1] == self.change_type_select.currentItem().text()
             )
 
     def _comment(self) -> str:
@@ -265,11 +259,3 @@ class SuggestionDialog(QDialog):
 
     def _auto_accept(self) -> bool:
         return self.auto_accept_cb.isChecked()
-
-
-class CustomListWidget(QListWidget):
-    def sizeHint(self) -> QSize:
-        # adjusts height to content
-        size = QSize()
-        size.setHeight(self.sizeHintForRow(0) * self.count() + 2 * self.frameWidth())
-        return size
