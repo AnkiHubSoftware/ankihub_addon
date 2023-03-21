@@ -15,6 +15,8 @@ from aqt.qt import (
     QLabel,
     QLineEdit,
     QPlainTextEdit,
+    QRegularExpression,
+    QRegularExpressionValidator,
     Qt,
     QVBoxLayout,
     QWidget,
@@ -181,7 +183,7 @@ class SuggestionMetadata:
 class SuggestionDialog(QDialog):
     silentlyClose = True
 
-    validation_slot = pyqtSignal(bool)
+    validation_signal = pyqtSignal(bool)
 
     def __init__(self, is_new_note_suggestion: bool, is_for_ankihub_deck: bool) -> None:
         super().__init__()
@@ -212,7 +214,7 @@ class SuggestionDialog(QDialog):
             self.layout_.addSpacing(10)
 
         # Set up source widget in a group box (group box is for styling purposes)
-        self.source_widget = None
+        self.source_widget = SourceWidget()
         if not self._is_new_note_suggestion and self._is_for_ankihub_deck:
             self.source_widget_group_box = QGroupBox("Source")
             self.layout_.addWidget(self.source_widget_group_box)
@@ -220,8 +222,8 @@ class SuggestionDialog(QDialog):
             self.source_widget_group_box_layout = QVBoxLayout()
             self.source_widget_group_box.setLayout(self.source_widget_group_box_layout)
 
-            self.source_widget = SourceWidget()
             self.source_widget_group_box_layout.addWidget(self.source_widget)
+            qconnect(self.source_widget.validation_signal, self._validate)
             self.layout_.addSpacing(10)
 
         # Set up rationale field
@@ -254,7 +256,7 @@ class SuggestionDialog(QDialog):
 
         # Disable submit button until validation passes
         self._set_submit_button_enabled_state(False)
-        qconnect(self.validation_slot, self._set_submit_button_enabled_state)
+        qconnect(self.validation_signal, self._set_submit_button_enabled_state)
 
     def run(self) -> Optional[SuggestionMetadata]:
         if not self.exec():
@@ -286,10 +288,14 @@ class SuggestionDialog(QDialog):
 
     def _validate(self) -> None:
         if len(self.rationale_edit.toPlainText().strip()) == 0:
-            self.validation_slot.emit(False)
+            self.validation_signal.emit(False)
             return
 
-        self.validation_slot.emit(True)
+        if not self.source_widget.is_valid():
+            self.validation_signal.emit(False)
+            return
+
+        self.validation_signal.emit(True)
 
     def _change_type(self) -> Optional[SuggestionType]:
         if self._is_new_note_suggestion:
@@ -317,6 +323,9 @@ source_type_to_source_label = {
 
 
 class SourceWidget(QWidget):
+
+    validation_signal = pyqtSignal(bool)
+
     def __init__(self) -> None:
         super().__init__()
         self._setup_ui()
@@ -339,6 +348,10 @@ class SourceWidget(QWidget):
         self.layout_.addWidget(self.source_input_label)
 
         self.source_edit = QLineEdit()
+        self.source_edit.setValidator(
+            QRegularExpressionValidator(QRegularExpression(r".+"))
+        )
+        qconnect(self.source_edit.textChanged, self._validate)
         self.layout_.addWidget(self.source_edit)
 
         # set initial state
@@ -348,6 +361,15 @@ class SourceWidget(QWidget):
         source_type = self._source_type()
         source = self.source_edit.text()
         return SuggestionSource(source_type=source_type, source=source)
+
+    def is_valid(self) -> bool:
+        return self.source_edit.hasAcceptableInput()
+
+    def _validate(self) -> None:
+        if not self.is_valid():
+            self.validation_signal.emit(False)
+        else:
+            self.validation_signal.emit(True)
 
     def _update_source_input_label(self) -> None:
         source_type = self._source_type()
