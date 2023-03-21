@@ -580,7 +580,7 @@ class AnkiHubClient:
             ]
             result.update(image_paths)
 
-        return set(result)
+        return result
 
     def _generate_asset_files_with_hashed_names(
         self, paths: Set[Path]
