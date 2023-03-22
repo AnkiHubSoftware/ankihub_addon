@@ -1,5 +1,4 @@
 from concurrent.futures import Future
-from textwrap import dedent
 from dataclasses import dataclass
 from enum import Enum
 from pprint import pformat
@@ -210,9 +209,8 @@ class SuggestionDialog(QDialog):
         self.setLayout(self.layout_)
 
         # Set up change type dropdown
-        self.change_type_select = None
+        self.change_type_select = QComboBox()
         if not self._is_new_note_suggestion:
-            self.change_type_select = QComboBox()
             self.change_type_select.addItems([x.value[1] for x in SuggestionType])
             label = QLabel("Change Type")
             self.layout_.addWidget(label)
@@ -225,22 +223,22 @@ class SuggestionDialog(QDialog):
 
         # Set up source widget in a group box (group box is for styling purposes)
         self.source_widget = SourceWidget()
-        if not self._is_new_note_suggestion and self._is_for_ankihub_deck:
-            self.source_widget_group_box = QGroupBox("Source")
-            self.layout_.addWidget(self.source_widget_group_box)
+        self.source_widget_group_box = QGroupBox("Source")
+        self.layout_.addWidget(self.source_widget_group_box)
+        self.source_widget_group_box_layout = QVBoxLayout()
+        self.source_widget_group_box.setLayout(self.source_widget_group_box_layout)
 
-            self.source_widget_group_box_layout = QVBoxLayout()
-            self.source_widget_group_box.setLayout(self.source_widget_group_box_layout)
-
-            self.source_widget_group_box_layout.addWidget(self.source_widget)
-            qconnect(self.source_widget.validation_signal, self._validate)
-            self.layout_.addSpacing(10)
+        self.source_widget_group_box_layout.addWidget(self.source_widget)
+        qconnect(self.source_widget.validation_signal, self._validate)
+        self._set_source_widget_visibility()
+        self.layout_.addSpacing(10)
 
         # Set up rationale field
         label = QLabel("Rationale for Change (Required)")
         self.layout_.addWidget(label)
 
         self.rationale_edit = QPlainTextEdit()
+        self.layout_.addWidget(self.rationale_edit)
 
         def limit_length():
             while (
@@ -252,7 +250,6 @@ class SuggestionDialog(QDialog):
         qconnect(self.rationale_edit.textChanged, limit_length)
         qconnect(self.rationale_edit.textChanged, self._validate)
 
-        self.layout_.addWidget(self.rationale_edit)
         self.layout_.addSpacing(10)
 
         # Set up "auto-accept" checkbox
@@ -264,7 +261,6 @@ class SuggestionDialog(QDialog):
         qconnect(self.button_box.accepted, self.accept)
         self.layout_.addWidget(self.button_box)
 
-        # Disable submit button until validation passes
         self._set_submit_button_enabled_state(False)
         qconnect(self.validation_signal, self._set_submit_button_enabled_state)
 
@@ -277,21 +273,26 @@ class SuggestionDialog(QDialog):
             comment=self._comment(),
             auto_accept=self._auto_accept(),
             source=self.source_widget.suggestion_source()
-            if self.source_widget
+            if self._source_needed()
             else None,
         )
 
     def _set_source_widget_visibility(self) -> None:
-        if not self.source_widget:
-            return
-
-        if self._change_type() in [
-            SuggestionType.NEW_CONTENT,
-            SuggestionType.UPDATED_CONTENT,
-        ]:
+        if self._source_needed():
             self.source_widget_group_box.show()
         else:
             self.source_widget_group_box.hide()
+
+    def _source_needed(self) -> bool:
+        result = (
+            self._change_type()
+            in [
+                SuggestionType.NEW_CONTENT,
+                SuggestionType.UPDATED_CONTENT,
+            ]
+            and self._is_for_ankihub_deck
+        )
+        return result
 
     def _set_submit_button_enabled_state(self, enabled: bool) -> None:
         self.button_box.button(QDialogButtonBox.StandardButton.Ok).setEnabled(enabled)
