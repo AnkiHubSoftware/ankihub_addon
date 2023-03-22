@@ -3,6 +3,7 @@ from typing import List
 
 import pytest
 from anki.notes import Note
+from aqt.qt import QDialogButtonBox
 from pytest_anki import AnkiSession
 
 # workaround for vscode test discovery not using pytest.ini which sets this env var
@@ -278,27 +279,32 @@ class TestSuggestionDialog:
         dialog.show()
 
         # Fill in the form
-        dialog.change_type_select.setCurrentText(suggestion_type.value[1])
-
-        expected_uworld_step = "Step 1"
-        dialog.source_widget.source_type_select.setCurrentText(source_type.value)
-        if source_type == SourceType.UWORLD:
-            dialog.source_widget.uworld_step_select.setCurrentText(expected_uworld_step)
-
-        expected_source = "https://test_url.com"
-        dialog.source_widget.source_edit.setText(expected_source)
-
-        dialog.rationale_edit.setPlainText("test")
-
-        # Assert that correct form elements are shown
-        assert dialog.isVisible()
-
         change_type_needed = not is_new_note_suggestion
         source_needed = not is_new_note_suggestion and (
             suggestion_type
             in [SuggestionType.UPDATED_CONTENT, SuggestionType.NEW_CONTENT]
             and is_for_ankihub_deck
         )
+
+        if change_type_needed:
+            dialog.change_type_select.setCurrentText(suggestion_type.value[1])
+
+        expected_source = ""
+        if source_needed:
+            dialog.source_widget.source_type_select.setCurrentText(source_type.value)
+            if source_type == SourceType.UWORLD:
+                expected_uworld_step = "Step 1"
+                dialog.source_widget.uworld_step_select.setCurrentText(
+                    expected_uworld_step
+                )
+
+            expected_source = "https://test_url.com"
+            dialog.source_widget.source_edit.setText(expected_source)
+
+        dialog.rationale_edit.setPlainText("test")
+
+        # Assert that correct form elements are shown
+        assert dialog.isVisible()
 
         if change_type_needed:
             assert dialog.change_type_select.isVisible()
@@ -310,6 +316,10 @@ class TestSuggestionDialog:
         else:
             assert not dialog.source_widget_group_box.isVisible()
 
+        # Assert that the form submit button is enabled (it is disabled if the form input is invalid)
+        assert dialog.button_box.button(QDialogButtonBox.StandardButton.Ok).isEnabled()
+
+        # Assert that the form result is correct
         expected_source_text = (
             f"{expected_uworld_step} {expected_source}"
             if source_type == SourceType.UWORLD
@@ -321,7 +331,6 @@ class TestSuggestionDialog:
             else None
         )
 
-        # Assert that the form result is correct
         assert dialog.suggestion_meta() == SuggestionMetadata(
             comment="test",
             change_type=suggestion_type if change_type_needed else None,
