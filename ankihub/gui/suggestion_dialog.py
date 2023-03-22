@@ -54,9 +54,9 @@ class SuggestionSource:
 
 @dataclass
 class SuggestionMetadata:
-    change_type: SuggestionType
     comment: str
-    auto_accept: bool
+    auto_accept: bool = False
+    change_type: Optional[SuggestionType] = None
     source: Optional[SuggestionSource] = None
 
 
@@ -268,6 +268,9 @@ class SuggestionDialog(QDialog):
         if not self.exec():
             return None
 
+        return self.suggestion_meta()
+
+    def suggestion_meta(self) -> Optional[SuggestionMetadata]:
         return SuggestionMetadata(
             change_type=self._change_type(),
             comment=self._comment(),
