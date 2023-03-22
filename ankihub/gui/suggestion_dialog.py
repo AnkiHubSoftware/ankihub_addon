@@ -17,6 +17,7 @@ from aqt.qt import (
     QPlainTextEdit,
     QRegularExpression,
     QRegularExpressionValidator,
+    QSpacerItem,
     Qt,
     QVBoxLayout,
     QWidget,
@@ -353,7 +354,8 @@ class SourceWidget(QWidget):
         self.uworld_step_select = QComboBox()
         self.uworld_step_select.addItems(UWORLD_STEP_OPTIONS)
         self.layout_.addWidget(self.uworld_step_select)
-        self.layout_.addSpacing(10)
+        self.space_after_uworld_step_select = QSpacerItem(0, 10)
+        self.layout_.addSpacerItem(self.space_after_uworld_step_select)
 
         # Setup source field
         self.source_input_label = QLabel()
@@ -388,12 +390,23 @@ class SourceWidget(QWidget):
 
         if self._source_type() == SourceType.UWORLD:
             self.uworld_step_select.show()
+            self.space_after_uworld_step_select.changeSize(0, 10)
+            self.layout_.invalidate()
         else:
             self.uworld_step_select.hide()
+            self.space_after_uworld_step_select.changeSize(0, 0)
+            self.layout_.invalidate()
 
     def _refresh_source_input_label(self) -> None:
         source_type = self._source_type()
-        self.source_input_label.setText(source_type_to_source_label[source_type])
+        text = source_type_to_source_label[source_type]
+
+        self.source_input_label.setText(text)
+
+        if not text:
+            self.source_input_label.hide()
+        else:
+            self.source_input_label.show()
 
     def _source_type(self) -> SourceType:
         return SourceType(self.source_type_select.currentText())
