@@ -49,7 +49,7 @@ class SourceType(Enum):
 @dataclass
 class SuggestionSource:
     source_type: SourceType
-    source: str
+    source_text: str
 
 
 @dataclass
@@ -140,7 +140,7 @@ def open_suggestion_dialog_for_bulk_suggestion(
 def _comment_with_source(suggestion_meta: SuggestionMetadata) -> str:
     result = suggestion_meta.comment
     if suggestion_meta.source:
-        result += f"Source: {suggestion_meta.source.source_type.value} - {suggestion_meta.source.source}"
+        result += f"Source: {suggestion_meta.source.source_type.value} - {suggestion_meta.source.source_text}"
 
     return result
 
@@ -396,7 +396,7 @@ class SourceWidget(QWidget):
             step = self.uworld_step_select.currentText()
             source = f"{step} {source}"
 
-        return SuggestionSource(source_type=source_type, source=source)
+        return SuggestionSource(source_type=source_type, source_text=source)
 
     def is_valid(self) -> bool:
         return self.source_edit.hasAcceptableInput()

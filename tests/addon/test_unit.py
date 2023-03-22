@@ -1,6 +1,7 @@
 import os
 from typing import List
 
+import pytest
 from anki.notes import Note
 from pytest_anki import AnkiSession
 
@@ -9,8 +10,15 @@ from pytest_anki import AnkiSession
 os.environ["SKIP_INIT"] = "1"
 
 from ankihub import suggestions
+from ankihub.ankihub_client import SuggestionType
 from ankihub.error_reporting import normalize_url
 from ankihub.exporting import _prepared_field_html
+from ankihub.gui.suggestion_dialog import (
+    SourceType,
+    SuggestionDialog,
+    SuggestionMetadata,
+    SuggestionSource,
+)
 from ankihub.importing import updated_tags
 from ankihub.note_conversion import ADDON_INTERNAL_TAGS, TAG_FOR_OPTIONAL_TAGS
 from ankihub.register_decks import note_type_name_without_ankihub_modifications
@@ -239,3 +247,83 @@ def test_add_subdeck_tags_to_notes_with_spaces_in_deck_name(
 
         note3.load()
         assert note3.tags == [f"{SUBDECK_TAG}::AA::b_b::c_c"]
+
+
+class TestSuggestionDialog:
+    @pytest.mark.parametrize(
+        "is_new_note_suggestion,is_for_ankihub_deck,suggestion_type,source_type",
+        [
+            (True, True, SuggestionType.NEW_CONTENT, SourceType.AMBOSS),
+            (True, True, SuggestionType.OTHER, SourceType.AMBOSS),
+            (True, False, SuggestionType.NEW_CONTENT, SourceType.AMBOSS),
+            (True, False, SuggestionType.OTHER, SourceType.AMBOSS),
+            (False, True, SuggestionType.NEW_CONTENT, SourceType.AMBOSS),
+            (False, True, SuggestionType.OTHER, SourceType.AMBOSS),
+            (False, False, SuggestionType.NEW_CONTENT, SourceType.AMBOSS),
+            (False, False, SuggestionType.OTHER, SourceType.AMBOSS),
+            (False, True, SuggestionType.NEW_CONTENT, SourceType.UWORLD),
+        ],
+    )
+    def test_visibility_of_form_elements_and_form_result(
+        self,
+        is_new_note_suggestion: bool,
+        is_for_ankihub_deck: bool,
+        suggestion_type: SuggestionType,
+        source_type: SourceType,
+    ):
+        dialog = SuggestionDialog(
+            is_for_ankihub_deck=is_for_ankihub_deck,
+            is_new_note_suggestion=is_new_note_suggestion,
+        )
+        dialog.show()
+
+        # Fill in the form
+        dialog.change_type_select.setCurrentText(suggestion_type.value[1])
+
+        expected_uworld_step = "Step 1"
+        dialog.source_widget.source_type_select.setCurrentText(source_type.value)
+        if source_type == SourceType.UWORLD:
+            dialog.source_widget.uworld_step_select.setCurrentText(expected_uworld_step)
+
+        expected_source = "https://test_url.com"
+        dialog.source_widget.source_edit.setText(expected_source)
+
+        dialog.rationale_edit.setPlainText("test")
+
+        # Assert that correct form elements are shown
+        assert dialog.isVisible()
+
+        change_type_needed = not is_new_note_suggestion
+        source_needed = not is_new_note_suggestion and (
+            suggestion_type
+            in [SuggestionType.UPDATED_CONTENT, SuggestionType.NEW_CONTENT]
+            and is_for_ankihub_deck
+        )
+
+        if change_type_needed:
+            assert dialog.change_type_select.isVisible()
+        else:
+            assert not dialog.change_type_select.isVisible()
+
+        if source_needed:
+            assert dialog.source_widget_group_box.isVisible()
+        else:
+            assert not dialog.source_widget_group_box.isVisible()
+
+        expected_source_text = (
+            f"{expected_uworld_step} {expected_source}"
+            if source_type == SourceType.UWORLD
+            else expected_source
+        )
+        expected_source = (
+            SuggestionSource(source_type=source_type, source_text=expected_source_text)
+            if source_needed
+            else None
+        )
+
+        # Assert that the form result is correct
+        assert dialog.suggestion_meta() == SuggestionMetadata(
+            comment="test",
+            change_type=suggestion_type if change_type_needed else None,
+            source=expected_source,
+        )
