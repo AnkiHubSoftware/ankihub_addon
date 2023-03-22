@@ -312,7 +312,7 @@ class SuggestionDialog(QDialog):
         if len(self.rationale_edit.toPlainText().strip()) == 0:
             return False
 
-        if not self.source_widget.is_valid():
+        if self._source_needed() and not self.source_widget.is_valid():
             return False
 
         return True
