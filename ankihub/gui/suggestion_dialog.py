@@ -279,9 +279,9 @@ class SuggestionDialog(QDialog):
             SuggestionType.NEW_CONTENT,
             SuggestionType.UPDATED_CONTENT,
         ]:
-            self.source_widget_group_box.setHidden(False)
+            self.source_widget_group_box.show()
         else:
-            self.source_widget_group_box.setHidden(True)
+            self.source_widget_group_box.hide()
 
     def _set_submit_button_enabled_state(self, enabled: bool) -> None:
         self.button_box.button(QDialogButtonBox.StandardButton.Ok).setEnabled(enabled)
@@ -321,6 +321,12 @@ source_type_to_source_label = {
     SourceType.OTHER: "",
 }
 
+UWORLD_STEP_OPTIONS = [
+    "Step 1",
+    "Step 2",
+    "Step 3",
+]
+
 
 class SourceWidget(QWidget):
 
@@ -334,16 +340,22 @@ class SourceWidget(QWidget):
         self.layout_ = QVBoxLayout()
         self.setLayout(self.layout_)
 
-        # add a source type dropdown
+        # Setup source type dropdown
         self.source_type_select = QComboBox()
         self.source_type_select.addItems([x.value for x in SourceType])
         self.layout_.addWidget(self.source_type_select)
         qconnect(
-            self.source_type_select.currentTextChanged, self._update_source_input_label
+            self.source_type_select.currentTextChanged, self._on_source_type_change
         )
         self.layout_.addSpacing(10)
 
-        # add a source field
+        # Setup UWorld step select
+        self.uworld_step_select = QComboBox()
+        self.uworld_step_select.addItems(UWORLD_STEP_OPTIONS)
+        self.layout_.addWidget(self.uworld_step_select)
+        self.layout_.addSpacing(10)
+
+        # Setup source field
         self.source_input_label = QLabel()
         self.layout_.addWidget(self.source_input_label)
 
@@ -354,8 +366,8 @@ class SourceWidget(QWidget):
         qconnect(self.source_edit.textChanged, self._validate)
         self.layout_.addWidget(self.source_edit)
 
-        # set initial state
-        self._update_source_input_label()
+        # Set initial state
+        self._on_source_type_change()
 
     def suggestion_source(self) -> SuggestionSource:
         source_type = self._source_type()
@@ -371,7 +383,15 @@ class SourceWidget(QWidget):
         else:
             self.validation_signal.emit(True)
 
-    def _update_source_input_label(self) -> None:
+    def _on_source_type_change(self) -> None:
+        self._refresh_source_input_label()
+
+        if self._source_type() == SourceType.UWORLD:
+            self.uworld_step_select.show()
+        else:
+            self.uworld_step_select.hide()
+
+    def _refresh_source_input_label(self) -> None:
         source_type = self._source_type()
         self.source_input_label.setText(source_type_to_source_label[source_type])
 
