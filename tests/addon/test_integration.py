@@ -364,6 +364,7 @@ def test_create_collaborative_deck_and_upload(
     anki_session_with_addon_data: AnkiSession,
     monkeypatch: MonkeyPatch,
     next_deterministic_uuid: Callable[[], uuid.UUID],
+    enable_image_support_feature_flag,
 ):
     with anki_session_with_addon_data.profile_loaded():
         mw = anki_session_with_addon_data.mw
@@ -2732,13 +2733,18 @@ def test_upload_assets(
     with anki_session_with_addon_data.profile_loaded():
         fake_presigned_url = "https://fake_presigned_url.com"
         monkeypatch.setattr(
-            "ankihub.ankihub_client.AnkiHubClient.get_presigned_url",
-            lambda *args, **kwargs: fake_presigned_url,
+            AnkiHubClient,
+            "get_presigned_url_for_multiple_uploads",
+            lambda *args, **kwargs: {
+                "url": fake_presigned_url,
+                "fields": {
+                    "key": "deck_images/test/${filename}",
+                },
+            },
         )
 
-        upload_request_mock = requests_mock.put(
-            fake_presigned_url,
-            json={"success": True},
+        s3_upload_request_mock = requests_mock.post(
+            fake_presigned_url, json={"success": True}, status_code=204
         )
 
         with tempfile.NamedTemporaryFile(suffix=".png") as f:
@@ -2747,10 +2753,12 @@ def test_upload_assets(
             client = AnkiHubClient(local_media_dir_path=file_path.parent)
             client.upload_assets([file_path.name], deck_id=fake_deck_id)
 
-        assert len(upload_request_mock.request_history) == 1  # type: ignore
+        assert len(s3_upload_request_mock.request_history) == 1  # type: ignore
 
-        file_path_from_request = upload_request_mock.last_request.text.name  # type: ignore
-        assert file_path_from_request == str(file_path.absolute())
+        file_name_from_request = re.findall(
+            r'filename="(.*?)"', s3_upload_request_mock.last_request.text
+        )[0]
+        assert file_name_from_request == file_path.name
 
 
 class TestSuggestionsWithImages:
