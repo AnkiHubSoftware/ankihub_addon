@@ -288,15 +288,19 @@ class SuggestionDialog(QDialog):
         self.button_box.button(QDialogButtonBox.StandardButton.Ok).setEnabled(enabled)
 
     def _validate(self) -> None:
-        if len(self.rationale_edit.toPlainText().strip()) == 0:
+        if self._is_valid():
+            self.validation_signal.emit(True)
+        else:
             self.validation_signal.emit(False)
-            return
+
+    def _is_valid(self) -> bool:
+        if len(self.rationale_edit.toPlainText().strip()) == 0:
+            return False
 
         if not self.source_widget.is_valid():
-            self.validation_signal.emit(False)
-            return
+            return False
 
-        self.validation_signal.emit(True)
+        return True
 
     def _change_type(self) -> Optional[SuggestionType]:
         if self._is_new_note_suggestion:
