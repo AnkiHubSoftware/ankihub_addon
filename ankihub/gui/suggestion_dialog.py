@@ -192,6 +192,8 @@ def _on_suggest_notes_in_bulk_done(future: Future, parent: QWidget) -> None:
 class SuggestionDialog(QDialog):
     silentlyClose = True
 
+    # Emitted when the validation result was determined after self._validate was called.
+    # The _validate method is called when the user changes the input in form elements that get validated.
     validation_signal = pyqtSignal(bool)
 
     def __init__(self, is_new_note_suggestion: bool, is_for_ankihub_deck: bool) -> None:
@@ -348,6 +350,8 @@ UWORLD_STEP_OPTIONS = [
 
 class SourceWidget(QWidget):
 
+    # Emitted when the validation result was determined after self._validate was called.
+    # The _validate method is called when the user changes the input in form elements that get validated.
     validation_signal = pyqtSignal(bool)
 
     def __init__(self) -> None:
