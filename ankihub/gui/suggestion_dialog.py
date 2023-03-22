@@ -378,6 +378,11 @@ class SourceWidget(QWidget):
     def suggestion_source(self) -> SuggestionSource:
         source_type = self._source_type()
         source = self.source_edit.text()
+
+        if source_type == SourceType.UWORLD:
+            step = self.uworld_step_select.currentText()
+            source = f"{step} {source}"
+
         return SuggestionSource(source_type=source_type, source=source)
 
     def is_valid(self) -> bool:
