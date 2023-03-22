@@ -1,4 +1,5 @@
 from concurrent.futures import Future
+from textwrap import dedent
 from dataclasses import dataclass
 from enum import Enum
 from pprint import pformat
@@ -39,6 +40,27 @@ from ..suggestions import (
 )
 
 
+class SourceType(Enum):
+    AMBOSS = "AMBOSS"
+    UWORLD = "UWorld"
+    SOCIETY_GUIDELINES = "Society Guidelines"
+    OTHER = "Other"
+
+
+@dataclass
+class SuggestionSource:
+    source_type: SourceType
+    source: str
+
+
+@dataclass
+class SuggestionMetadata:
+    change_type: SuggestionType
+    comment: str
+    auto_accept: bool
+    source: Optional[SuggestionSource] = None
+
+
 def open_suggestion_dialog_for_note(note: Note, parent: QWidget) -> None:
     """Opens a dialog for creating a note suggestion for the given note.
     The note has to be present in the Anki collection before calling this function.
@@ -64,7 +86,7 @@ def open_suggestion_dialog_for_note(note: Note, parent: QWidget) -> None:
         if suggest_note_update(
             note=note,
             change_type=suggestion_meta.change_type,
-            comment=suggestion_meta.comment,
+            comment=_comment_with_source(suggestion_meta),
             auto_accept=suggestion_meta.auto_accept,
         ):
             tooltip("Submitted suggestion to AnkiHub.", parent=parent)
@@ -109,11 +131,19 @@ def open_suggestion_dialog_for_bulk_suggestion(
             notes,
             auto_accept=suggestion_meta.auto_accept,
             change_type=suggestion_meta.change_type,
-            comment=suggestion_meta.comment,
+            comment=_comment_with_source(suggestion_meta),
         ),
         on_done=lambda future: _on_suggest_notes_in_bulk_done(future, parent),
         parent=parent,
     )
+
+
+def _comment_with_source(suggestion_meta: SuggestionMetadata) -> str:
+    result = suggestion_meta.comment
+    if suggestion_meta.source:
+        result += f"Source: {suggestion_meta.source.source_type.value} - {suggestion_meta.source.source}"
+
+    return result
 
 
 def _on_suggest_notes_in_bulk_done(future: Future, parent: QWidget) -> None:
@@ -158,27 +188,6 @@ def _on_suggest_notes_in_bulk_done(future: Future, parent: QWidget) -> None:
 
     msg = msg_about_created_suggestions + msg_about_failed_suggestions
     showText(msg, parent=parent)
-
-
-class SourceType(Enum):
-    AMBOSS = "AMBOSS"
-    UWORLD = "UWorld"
-    SOCIETY_GUIDELINES = "Society Guidelines"
-    OTHER = "Other"
-
-
-@dataclass
-class SuggestionSource:
-    source_type: SourceType
-    source: str
-
-
-@dataclass
-class SuggestionMetadata:
-    change_type: SuggestionType
-    comment: str
-    auto_accept: bool
-    source: Optional[SuggestionSource] = None
 
 
 class SuggestionDialog(QDialog):
