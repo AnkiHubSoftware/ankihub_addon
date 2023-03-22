@@ -31,6 +31,8 @@ from mashumaro import field_options
 from mashumaro.config import BaseConfig
 from mashumaro.mixins.json import DataClassJSONMixin
 from requests import PreparedRequest, Request, Response, Session
+from concurrent.futures import ThreadPoolExecutor, as_completed
+import urllib.parse
 
 from .common_utils import extract_local_image_paths_from_html
 
@@ -489,28 +491,10 @@ class AnkiHubClient:
             with open(self.local_media_dir_path / image_name, "rb") as image_file:
                 self._upload_to_s3(s3_url, image_file)
 
-    def download_images(self, img_names: List[str], deck_id: uuid.UUID) -> None:
-        deck_images_remote_dir = f"{self.s3_bucket_url}/deck_assets/{deck_id}"
-
-        for img_name in img_names:
-            img_path = self.local_media_dir_path / img_name
-            # First we check if the image already exists.
-            # If yes, we skip this iteration.
-            if os.path.isfile(img_path):
-                continue
-
-            # If not, download the image from bucket
-            # and store the image locally
-            img_remote_path = deck_images_remote_dir + img_name
-            response = requests.get(img_remote_path, stream=True)
-
-            # Log and skip this iteration if the response is not 200 OK
-            if not response.ok:
-                LOGGER.info(
-                    f"Unable to download image [{img_remote_path}]. Response status code: {response.status_code}"
-                )
-                continue
-
+    def download_image(self, img_path, img_remote_path):
+        response = requests.get(img_remote_path, stream=True)
+        # Log and skip this iteration if the response is not 200 OK
+        if response.ok:
             # If we get a valid response, open the file and write the content
             with open(img_path, "wb") as handle:
                 for block in response.iter_content(1024):
@@ -518,6 +502,33 @@ class AnkiHubClient:
                         break
 
                     handle.write(block)
+        else:
+            LOGGER.info(
+                f"Unable to download image [{img_remote_path}]. Response status code: {response.status_code}"
+            )
+
+    def download_images(self, img_names: List[str], deck_id: uuid.UUID) -> None:
+        deck_images_remote_dir = f"{self.s3_bucket_url}/deck_assets/{deck_id}/"
+        tasks = []
+        with ThreadPoolExecutor() as executor:
+            for img_name in img_names:
+                img_path = self.local_media_dir_path / img_name
+
+                img_remote_path = deck_images_remote_dir + urllib.parse.quote_plus(
+                    img_name
+                )
+
+                # First we check if the image already exists.
+                # If yes, we skip this iteration.
+                if os.path.isfile(img_path):
+                    continue
+
+                tasks.append(
+                    executor.submit(self.download_image, img_path, img_remote_path)
+                )
+
+            for _ in as_completed(tasks):
+                pass
 
     def _gzip_compress_string(self, string: str) -> bytes:
         result = gzip.compress(
