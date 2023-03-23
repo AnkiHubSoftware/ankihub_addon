@@ -543,7 +543,7 @@ class AnkiHubClient:
         if not image_paths:
             return None
 
-        self.upload_assets(image_paths, ah_did)
+        self.upload_assets(image_paths=image_paths, ah_did=ah_did)
 
     def upload_assets_for_suggestion(
         self, suggestion: NoteSuggestion, ah_did: uuid.UUID

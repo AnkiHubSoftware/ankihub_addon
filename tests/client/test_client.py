@@ -886,8 +886,8 @@ class TestUploadImagesForSuggestion:
         )
 
         expected_result = {
-            "testfile_mario.png": "156ca948cd1356b1a2c1c790f0855ad9.png",
-            "testfile_test.jpeg": "a61eab59692d17a2adf4d1c5e9049ee4.jpeg",
+            "testfile_mario.png": TEST_MEDIA_PATH / "156ca948cd1356b1a2c1c790f0855ad9.png",
+            "testfile_test.jpeg": TEST_MEDIA_PATH / "a61eab59692d17a2adf4d1c5e9049ee4.jpeg",
         }
 
         suggestion_request_mock = None
@@ -947,9 +947,9 @@ class TestUploadImagesForSuggestion:
         ]
 
         expected_result = {
-            "testfile_mario.png": "156ca948cd1356b1a2c1c790f0855ad9.png",
-            "testfile_anki.gif": "87617b1d58967eb86b9e0e5dc92d91ee.gif",
-            "testfile_test.jpeg": "a61eab59692d17a2adf4d1c5e9049ee4.jpeg",
+            "testfile_mario.png": TEST_MEDIA_PATH / "156ca948cd1356b1a2c1c790f0855ad9.png",
+            "testfile_anki.gif": TEST_MEDIA_PATH / "87617b1d58967eb86b9e0e5dc92d91ee.gif",
+            "testfile_test.jpeg": TEST_MEDIA_PATH / "a61eab59692d17a2adf4d1c5e9049ee4.jpeg",
         }
 
         asset_name_map = client._generate_asset_files_with_hashed_names(filenames)
@@ -1032,12 +1032,11 @@ class TestUploadAssetsForDeck:
         path_to_created_zip_file = Path(
             TEST_MEDIA_PATH / f"{deck_id}_0_deck_assets_part.zip"
         )
-
-        all_img_names_in_notes = self._all_image_names_in_notes(notes_data)
+        all_image_paths_in_notes = self._all_image_paths_in_notes(notes_data)
         assert path_to_created_zip_file.is_file()
-        assert len(all_img_names_in_notes) == 13
+        assert len(all_image_paths_in_notes) == 13
         with zipfile.ZipFile(path_to_created_zip_file, "r") as zip_ref:
-            assert set(zip_ref.namelist()) == set(all_img_names_in_notes)
+            assert set(zip_ref.namelist()) == set([path.name for path in all_image_paths_in_notes])
 
         # Remove the zipped file at the end of the test
         monkeypatch.undo()
@@ -1124,8 +1123,8 @@ class TestUploadAssetsForDeck:
 
         notes_data = self.notes_data_with_a_few_images()
 
-        mocked_upload_assets = MagicMock()
-        monkeypatch.setattr(client, "upload_assets_individually", mocked_upload_assets)
+        mocked_upload_assets_individually = MagicMock()
+        monkeypatch.setattr(client, "upload_assets_individually", mocked_upload_assets_individually)
 
         mocked_upload_file_to_s3 = MagicMock()
         monkeypatch.setattr(client, "_upload_file_to_s3", mocked_upload_file_to_s3)
@@ -1136,20 +1135,21 @@ class TestUploadAssetsForDeck:
         deck_id = next_deterministic_uuid()
         client.upload_assets_for_deck(deck_id, notes_data)
 
-        all_img_names_in_notes = self._all_image_names_in_notes(notes_data)
-        mocked_upload_assets.assert_called_once_with(
-            image_names=all_img_names_in_notes, deck_id=deck_id
+        all_img_paths_in_notes = set(self._all_image_paths_in_notes(notes_data))
+        
+        mocked_upload_assets_individually.assert_called_once_with(
+            image_paths=all_img_paths_in_notes, deck_id=deck_id
         )
 
         mocked_upload_file_to_s3.assert_not_called()
 
-    def _all_image_names_in_notes(self, notes_data: List[NoteInfo]):
+    def _all_image_paths_in_notes(self, notes_data: List[NoteInfo]):
         client = AnkiHubClient(local_media_dir_path=TEST_MEDIA_PATH)
         all_notes_fields = []
         for note in notes_data:
             all_notes_fields.extend(note.fields)
 
         result = [
-            path.name for path in client._get_images_from_fields(all_notes_fields)
+            path for path in client._get_images_from_fields(all_notes_fields)
         ]
         return result
