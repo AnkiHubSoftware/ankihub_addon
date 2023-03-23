@@ -470,7 +470,7 @@ class AnkiHubClient:
         LOGGER.info(f"Successfully uploaded [{zip_filepath.name}]")
 
     def upload_assets_for_deck(
-        self, ah_did: uuid.UUID, notes_data: List[NoteInfo | None]
+        self, ah_did: uuid.UUID, notes_data: List[Union[NoteInfo, None]]
     ) -> None:
         # - Get all image names from the fields from notes_data
         # - Use self.local_media_dir_path to create a zip with all the files
