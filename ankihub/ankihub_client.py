@@ -34,8 +34,6 @@ from mashumaro import field_options
 from mashumaro.config import BaseConfig
 from mashumaro.mixins.json import DataClassJSONMixin
 from requests import PreparedRequest, Request, Response, Session
-from concurrent.futures import ThreadPoolExecutor, as_completed
-import urllib.parse
 
 from .common_utils import extract_local_image_paths_from_html
 
@@ -470,34 +468,11 @@ class AnkiHubClient:
 
         LOGGER.info(f"Successfully uploaded [{zip_filepath.name}]")
 
-        LOGGER.info(f"Successfully uploaded [{zip_filepath.name}]")
-
-    def upload_assets_for_deck(
-        self, ah_did: uuid.UUID, notes_data: List[NoteInfo]
-    ) -> None:
-        # - Get all image names from the fields from notes_data
-        # - Use self.local_media_dir_path to create a zip with all the files
-        # - Remove the zipped file from local storage
-        # Note that unlike we do for suggestions, Image names can be kept as
-        # they are because we don't have to care about image file name conflicts
-        # for new decks.
-
-        all_notes_fields = []
-        for note in notes_data:
-            all_notes_fields.extend(note.fields)
-
-        image_paths = self._get_images_from_fields(all_notes_fields)
-
-        # If notes have no images, abort uploading
-        if not image_paths:
-            return None
-
-        # Alternate flow: if less than 10 images, call self.upload_assets
+    def upload_assets(self, image_paths: List[Path], ah_did: uuid.UUID):
+        # Alternate flow: if less than 10 images, call self.upload_assets_individually
         # passing the array of image names
         if not len(image_paths) > 10:
-            self.upload_assets(
-                image_names=[path.name for path in image_paths], deck_id=ah_did
-            )
+            self.upload_assets_individually(image_paths=image_paths, deck_id=ah_did)
             return None
 
         # Create chunks of image paths to zip and upload each chunk individually.
@@ -548,6 +523,28 @@ class AnkiHubClient:
             for future in as_completed(futures):
                 future.result()
 
+    def upload_assets_for_deck(
+        self, ah_did: uuid.UUID, notes_data: List[NoteInfo]
+    ) -> None:
+        # - Get all image names from the fields from notes_data
+        # - Use self.local_media_dir_path to create a zip with all the files
+        # - Remove the zipped file from local storage
+        # Note that unlike we do for suggestions, Image names can be kept as
+        # they are because we don't have to care about image file name conflicts
+        # for new decks.
+
+        all_notes_fields = []
+        for note in notes_data:
+            all_notes_fields.extend(note.fields)
+
+        image_paths = self._get_images_from_fields(all_notes_fields)
+
+        # If notes have no images, abort uploading
+        if not image_paths:
+            return None
+
+        self.upload_assets(image_paths, ah_did)
+
     def upload_assets_for_suggestion(
         self, suggestion: NoteSuggestion, ah_did: uuid.UUID
     ) -> Dict[str, str]:
@@ -562,7 +559,7 @@ class AnkiHubClient:
 
         # TODO: We are currently uploading all images for a suggestion,
         # but we should only upload images that are not already on s3.
-        self.upload_assets(list(asset_name_map.values()), ah_did)
+        self.upload_assets_individually(list(asset_name_map.values()), ah_did)
 
         return asset_name_map
 
@@ -584,7 +581,7 @@ class AnkiHubClient:
 
     def _generate_asset_files_with_hashed_names(
         self, paths: Set[Path]
-    ) -> Dict[str, str]:
+    ) -> Dict[str, Path]:
         """Generates a filename for each file in the list of paths by hashing the file.
         The file is copied to the new name. If the file already exists, it is skipped,
         but the mapping still will be made with the existing filename.
@@ -617,26 +614,23 @@ class AnkiHubClient:
                 except shutil.SameFileError:
                     continue
 
-            result[old_asset_path.name] = new_asset_path.name
+            result[old_asset_path.name] = new_asset_path
 
         return result
 
-    def upload_assets(self, image_names: List[str], deck_id: uuid.UUID) -> None:
+    def upload_assets_individually(
+        self, image_paths: List[Path], deck_id: uuid.UUID
+    ) -> None:
         # deck_id is used to namespace the images within each deck.
         s3_presigned_info = self.get_presigned_url_for_multiple_uploads(
             prefix=f"deck_assets/{deck_id}"
         )
 
         # TODO: send all images at once instad of looping through each one
-        s3_presigned_info = self.get_presigned_url_for_multiple_uploads(
-            prefix=f"deck_assets/{deck_id}"
-        )
-
-        # TODO: send all images at once instad of looping through each one
-        for image_name in image_names:
+        for image_path in image_paths:
             self._upload_file_to_s3_with_reusable_presigned_url(
                 s3_presigned_info=s3_presigned_info,
-                filepath=self.local_media_dir_path / image_name,
+                filepath=self.local_media_dir_path / image_path.name,
             )
 
     def _upload_file_to_s3(self, s3_presigned_url: str, filepath: Path) -> None:

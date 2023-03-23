@@ -1,7 +1,8 @@
 import copy
+from itertools import groupby
 import uuid
 from dataclasses import dataclass
-from typing import Any, Dict, List, Optional, cast
+from typing import Any, Dict, List, Optional, cast, Callable
 
 from anki.notes import Note, NoteId
 
@@ -16,6 +17,11 @@ from .ankihub_client import (
 from .db import ankihub_db
 from .exporting import to_note_data
 from .media_utils import find_and_replace_text_in_fields_on_all_notes
+from pathlib import Path
+import aqt
+import logging
+
+LOGGER = logging.getLogger(__name__)
 
 # string that is contained in the errors returned from the AnkiHub API when
 # there are no changes to the note for a change note suggestion
@@ -39,6 +45,7 @@ def suggest_note_update(
         return False
 
     ah_did = ankihub_db.ankihub_did_for_anki_nid(NoteId(suggestion.anki_nid))
+    # This came before because we need change the image name before sending the suggestion
     suggestion = cast(
         ChangeNoteSuggestion, _rename_and_upload_assets(suggestion, ah_did)
     )
@@ -61,6 +68,7 @@ def suggest_new_note(
     because the note's assets will possibly have been renamed."""
     suggestion = new_note_suggestion(note, ankihub_did, comment)
 
+    # This came before because we need change the image name before sending the suggestion
     suggestion = cast(
         NewNoteSuggestion, _rename_and_upload_assets(suggestion, ankihub_did)
     )
@@ -91,7 +99,7 @@ def _rename_and_upload_assets(
 
 
 def _replace_asset_names_in_suggestion(
-    suggestion: NoteSuggestion, asset_map: Dict[str, str]
+    suggestion: NoteSuggestion, asset_map: Dict[str, Path]
 ):
     suggestion.fields = [
         _field_with_replaced_asset_names(field, asset_map)
@@ -99,26 +107,45 @@ def _replace_asset_names_in_suggestion(
     ]
 
 
-def _field_with_replaced_asset_names(field: Field, asset_map: Dict[str, str]) -> Field:
+def _field_with_replaced_asset_names(field: Field, asset_map: Dict[str, Path]) -> Field:
     result = copy.deepcopy(field)
-    for old_name, new_name in asset_map.items():
+    for old_name, new_name_path in asset_map.items():
         # TODO: Think of a better way of doing that. Currently we need to call it twice,
         # one for single quotes and other for double quotes around the src attribute.
-        result.value = result.value.replace(f'src="{old_name}"', f'src="{new_name}"')
-        result.value = result.value.replace(f"src='{old_name}'", f"src='{new_name}'")
+        result.value = result.value.replace(
+            f'src="{old_name}"', f'src="{new_name_path.name}"'
+        )
+        result.value = result.value.replace(
+            f"src='{old_name}'", f"src='{new_name_path.name}'"
+        )
     return result
 
 
-def _update_asset_names_on_notes(asset_name_map: Dict[str, str]):
-    for original_filename, new_filename in asset_name_map.items():
+def _update_asset_names_on_notes(asset_name_map: Dict[str, Path]):
+    for original_filename, new_filename_path in asset_name_map.items():
         # TODO: Think of a better way of doing that. Currently we need to call it twice,
         # one for single quotes and other for double quotes around the src attribute.
         find_and_replace_text_in_fields_on_all_notes(
-            f'src="{original_filename}"', f'src="{new_filename}"'
+            f'src="{original_filename}"', f'src="{new_filename_path.name}"'
         )
         find_and_replace_text_in_fields_on_all_notes(
-            f"src='{original_filename}'", f"src='{new_filename}'"
+            f"src='{original_filename}'", f"src='{new_filename_path.name}'"
         )
+
+
+def _get_image_paths_from_suggestions_with_hash(
+    client: AnkiHubClient, suggestions: List[NoteSuggestion]
+) -> List[Path]:
+    all_image_paths = []
+    for suggestion in suggestions:
+        image_paths = client._get_images_from_fields(suggestion.fields)
+        asset_name_map = client._generate_asset_files_with_hashed_names(image_paths)
+        all_image_paths.extend(asset_name_map.values())
+        if asset_name_map:
+            _replace_asset_names_in_suggestion(suggestion, asset_name_map)
+            _update_asset_names_on_notes(asset_name_map)
+
+    return all_image_paths
 
 
 @dataclass
@@ -126,6 +153,21 @@ class BulkNoteSuggestionsResult:
     errors_by_nid: Dict[NoteId, Dict[str, List[str]]]  # dict of errors by anki_nid
     new_note_suggestions_count: int
     change_note_suggestions_count: int
+
+
+def _group_suggestions_by_deck_id(
+    suggestions: List[NoteSuggestion], filter_key_lambda: Callable
+) -> Dict[str, List[NoteSuggestion]]:
+    suggestions_by_deck_id = {}
+    for key, group in groupby(
+        sorted(
+            suggestions,
+            key=filter_key_lambda,
+        ),
+        filter_key_lambda,
+    ):
+        suggestions_by_deck_id[str(key)] = list(group)
+    return suggestions_by_deck_id
 
 
 def suggest_notes_in_bulk(
@@ -186,8 +228,49 @@ def suggest_notes_in_bulk(
         )
         for note in notes_that_dont_exist_on_remote
     ]
-
     client = AnkiHubClient()
+
+    if change_note_suggestions:
+        suggestions_by_deck_id = _group_suggestions_by_deck_id(
+            change_note_suggestions,
+            lambda s: ankihub_db.ankihub_did_for_anki_nid(NoteId(s.anki_nid)),
+        )
+        if len(suggestions_by_deck_id.keys()) > 1:
+            LOGGER.warning("User created bulk suggestions for more than one deck")
+
+        ah_did = list(suggestions_by_deck_id.keys())[0]
+        image_paths = _get_image_paths_from_suggestions_with_hash(
+            client=client, suggestions=suggestions_by_deck_id[ah_did]
+        )
+
+        aqt.mw.taskman.run_in_background(
+            client.upload_assets,
+            args={"image_paths": image_paths, "ah_did": ah_did},
+            on_done=lambda future: LOGGER.info(
+                f"Finished uploading assets for deck {ah_did}"
+            ),
+        )
+
+    if new_note_suggestions:
+        suggestions_by_deck_id = _group_suggestions_by_deck_id(
+            new_note_suggestions, lambda s: s.ankihub_deck_uuid
+        )
+        if len(suggestions_by_deck_id.keys()) > 1:
+            LOGGER.warning("User created bulk suggestions for more than one deck")
+
+        ah_did = list(suggestions_by_deck_id.keys())[0]
+        image_paths = _get_image_paths_from_suggestions_with_hash(
+            client=client, suggestions=suggestions_by_deck_id[ah_did]
+        )
+
+        aqt.mw.taskman.run_in_background(
+            client.upload_assets,
+            args={"image_paths": image_paths, "ah_did": ah_did},
+            on_done=lambda future: LOGGER.info(
+                f"Finished uploading assets for deck {ah_did}"
+            ),
+        )
+
     errors_by_nid_int = client.create_suggestions_in_bulk(
         new_note_suggestions=new_note_suggestions,
         change_note_suggestions=change_note_suggestions,

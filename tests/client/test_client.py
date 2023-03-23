@@ -1125,7 +1125,7 @@ class TestUploadAssetsForDeck:
         notes_data = self.notes_data_with_a_few_images()
 
         mocked_upload_assets = MagicMock()
-        monkeypatch.setattr(client, "upload_assets", mocked_upload_assets)
+        monkeypatch.setattr(client, "upload_assets_individually", mocked_upload_assets)
 
         mocked_upload_file_to_s3 = MagicMock()
         monkeypatch.setattr(client, "_upload_file_to_s3", mocked_upload_file_to_s3)
