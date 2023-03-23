@@ -4,7 +4,7 @@ from anki.hooks import wrap
 from aqt import sip
 from aqt.progress import ProgressManager
 
-from . import LOGGER
+from .. import LOGGER
 
 
 def with_patched_isdeleted(
@@ -26,7 +26,7 @@ def with_patched_isdeleted(
         sip.isdeleted = original_is_deleted
 
 
-def setup_progress_manager():
+def setup():
 
     # This patch prevents some unnecessary errors when Anki
     # tries to close the progress window when it is already closed.
