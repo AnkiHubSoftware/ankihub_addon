@@ -219,7 +219,7 @@ def _initialize_sentry():
         traces_sample_rate=1.0,
         release=ADDON_VERSION,
         environment=SENTRY_ENV,
-        # We probably want most default integrations, but we don't want the ExcepthookIntegration
+        # We probably want most default integrations, but we don't want e.g. the ExcepthookIntegration
         # because we set up our own excepthook.
         default_integrations=False,
         integrations=[
