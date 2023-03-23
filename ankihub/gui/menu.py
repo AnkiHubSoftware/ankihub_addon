@@ -26,7 +26,7 @@ from requests.exceptions import ConnectionError
 from .. import LOGGER
 from ..addon_ankihub_client import AddonAnkiHubClient as AnkiHubClient
 from ..ankihub_client import AnkiHubRequestError
-from ..error_reporting import upload_logs_in_background
+from ..errors import upload_logs_in_background
 from ..media_import.ui import open_import_dialog
 from ..register_decks import create_collaborative_deck
 from ..settings import ADDON_VERSION, config, url_view_deck

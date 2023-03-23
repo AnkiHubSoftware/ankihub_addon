@@ -12,7 +12,7 @@ from aqt.utils import openLink, showInfo, showText, tooltip
 from .. import LOGGER, settings
 from ..ankihub_client import AnkiHubRequestError
 from ..db import ankihub_db
-from ..error_reporting import report_exception_and_upload_logs
+from ..errors import report_exception_and_upload_logs
 from ..settings import (
     ANKI_MINOR,
     ICONS_PATH,
