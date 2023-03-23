@@ -29,7 +29,6 @@ from typing import (
     Set,
 )
 from zipfile import ZipFile
-from concurrent.futures import ThreadPoolExecutor, as_completed
 import requests
 from mashumaro import field_options
 from mashumaro.config import BaseConfig
