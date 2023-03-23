@@ -364,6 +364,7 @@ def test_create_collaborative_deck_and_upload(
     anki_session_with_addon_data: AnkiSession,
     monkeypatch: MonkeyPatch,
     next_deterministic_uuid: Callable[[], uuid.UUID],
+    enable_image_support_feature_flag,
 ):
     with anki_session_with_addon_data.profile_loaded():
         mw = anki_session_with_addon_data.mw
@@ -2721,7 +2722,7 @@ def test_download_images_on_sync(
         download_images_mock.assert_called_once_with(["image.png"], ah_did)
 
 
-def test_upload_images(
+def test_upload_assets(
     anki_session_with_addon_data: AnkiSession,
     next_deterministic_uuid: Callable[[], uuid.UUID],
     monkeypatch: MonkeyPatch,
@@ -2732,25 +2733,32 @@ def test_upload_images(
     with anki_session_with_addon_data.profile_loaded():
         fake_presigned_url = "https://fake_presigned_url.com"
         monkeypatch.setattr(
-            "ankihub.ankihub_client.AnkiHubClient.get_presigned_url",
-            lambda *args, **kwargs: fake_presigned_url,
+            AnkiHubClient,
+            "get_presigned_url_for_multiple_uploads",
+            lambda *args, **kwargs: {
+                "url": fake_presigned_url,
+                "fields": {
+                    "key": "deck_images/test/${filename}",
+                },
+            },
         )
 
-        upload_request_mock = requests_mock.put(
-            fake_presigned_url,
-            json={"success": True},
+        s3_upload_request_mock = requests_mock.post(
+            fake_presigned_url, json={"success": True}, status_code=204
         )
 
         with tempfile.NamedTemporaryFile(suffix=".png") as f:
             file_path = Path(f.name)
             fake_deck_id = next_deterministic_uuid()
             client = AnkiHubClient(local_media_dir_path=file_path.parent)
-            client.upload_images([file_path.name], deck_id=fake_deck_id)
+            client.upload_assets([file_path.name], deck_id=fake_deck_id)
 
-        assert len(upload_request_mock.request_history) == 1  # type: ignore
+        assert len(s3_upload_request_mock.request_history) == 1  # type: ignore
 
-        file_path_from_request = upload_request_mock.last_request.text.name  # type: ignore
-        assert file_path_from_request == str(file_path.absolute())
+        file_name_from_request = re.findall(
+            r'filename="(.*?)"', s3_upload_request_mock.last_request.text
+        )[0]
+        assert file_name_from_request == file_path.name
 
 
 class TestSuggestionsWithImages:
@@ -2769,14 +2777,19 @@ class TestSuggestionsWithImages:
             install_sample_ah_deck()
 
             fake_presigned_url = "https://fake_presigned_url.com"
-            monkeypatch.setattr(
-                "ankihub.ankihub_client.AnkiHubClient.get_presigned_url",
-                lambda *args, **kwargs: fake_presigned_url,
+            s3_upload_request_mock = requests_mock.post(
+                fake_presigned_url, json={"success": True}, status_code=204
             )
 
-            upload_request_mock = requests_mock.put(
-                fake_presigned_url,
-                json={"success": True},
+            monkeypatch.setattr(
+                AnkiHubClient,
+                "get_presigned_url_for_multiple_uploads",
+                lambda *args, **kwargs: {
+                    "url": fake_presigned_url,
+                    "fields": {
+                        "key": "deck_images/test/${filename}",
+                    },
+                },
             )
 
             with tempfile.NamedTemporaryFile(suffix=".png") as f:
@@ -2807,11 +2820,11 @@ class TestSuggestionsWithImages:
                 assert len(suggestion_request_mock.request_history) == 1  # type: ignore
 
                 # assert that the image was uploaded
-                assert len(upload_request_mock.request_history) == 1  # type: ignore
+                assert len(s3_upload_request_mock.request_history) == 1  # type: ignore
 
                 self._assert_img_names_as_expected(
                     note=note,
-                    upload_request_mock=upload_request_mock,  # type: ignore
+                    upload_request_mock=s3_upload_request_mock,  # type: ignore
                     suggestion_request_mock=suggestion_request_mock,  # type: ignore
                 )
 
@@ -2830,14 +2843,19 @@ class TestSuggestionsWithImages:
             _, ah_did = install_sample_ah_deck()
 
             fake_presigned_url = "https://fake_presigned_url.com"
-            monkeypatch.setattr(
-                "ankihub.ankihub_client.AnkiHubClient.get_presigned_url",
-                lambda *args, **kwargs: fake_presigned_url,
+            s3_upload_request_mock = requests_mock.post(
+                fake_presigned_url, json={"success": True}, status_code=204
             )
 
-            upload_request_mock = requests_mock.put(
-                fake_presigned_url,
-                json={"success": True},
+            monkeypatch.setattr(
+                AnkiHubClient,
+                "get_presigned_url_for_multiple_uploads",
+                lambda *args, **kwargs: {
+                    "url": fake_presigned_url,
+                    "fields": {
+                        "key": "deck_images/test/${filename}",
+                    },
+                },
             )
 
             suggestion_request_mock = requests_mock.post(
@@ -2866,7 +2884,7 @@ class TestSuggestionsWithImages:
 
                 self._assert_img_names_as_expected(
                     note=note,
-                    upload_request_mock=upload_request_mock,  # type: ignore
+                    upload_request_mock=s3_upload_request_mock,  # type: ignore
                     suggestion_request_mock=suggestion_request_mock,  # type: ignore
                 )
 
@@ -2877,7 +2895,11 @@ class TestSuggestionsWithImages:
         note.load()
         img_name_in_note = re.search(IMG_NAME_IN_IMG_TAG_REGEX, note["Front"]).group(1)
 
-        name_of_uploaded_image = Path(upload_request_mock.last_request.text.name).name  # type: ignore
+        name_of_uploaded_image = re.findall(
+            r'filename="(.*?)"', upload_request_mock.last_request.text
+        )[
+            0
+        ]  # type: ignore
 
         suggestion_dict = suggestion_request_mock.last_request.json()  # type: ignore
         first_field_value = suggestion_dict["fields"][0]["value"]
@@ -2907,14 +2929,19 @@ class TestSuggestionsWithImages:
             install_sample_ah_deck()
 
             fake_presigned_url = "https://fake_presigned_url.com"
-            monkeypatch.setattr(
-                "ankihub.ankihub_client.AnkiHubClient.get_presigned_url",
-                lambda *args, **kwargs: fake_presigned_url,
+            s3_upload_request_mock = requests_mock.post(
+                fake_presigned_url, json={"success": True}, status_code=204
             )
 
-            upload_request_mock = requests_mock.put(
-                fake_presigned_url,
-                json={"success": True},
+            monkeypatch.setattr(
+                AnkiHubClient,
+                "get_presigned_url_for_multiple_uploads",
+                lambda *args, **kwargs: {
+                    "url": fake_presigned_url,
+                    "fields": {
+                        "key": "deck_images/test/${filename}",
+                    },
+                },
             )
 
             # grab a note from the deck
@@ -2943,7 +2970,7 @@ class TestSuggestionsWithImages:
             assert len(suggestion_request_mock.request_history) == 1  # type: ignore
 
             # assert that the image was NOT uploaded
-            assert len(upload_request_mock.request_history) == 0  # type: ignore
+            assert len(s3_upload_request_mock.request_history) == 0  # type: ignore
 
             note.load()
 

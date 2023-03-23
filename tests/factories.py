@@ -28,9 +28,11 @@ class NoteInfoFactory(BaseFactory[NoteInfo]):
     ankihub_note_uuid = factory.LazyFunction(uuid.uuid4)
     anki_nid = 1
     mid = 1
-    fields = [
-        Field(name="Front", value="front", order=0),
-        Field(name="Back", value="back", order=1),
-    ]
+    fields: List[Field] = factory.LazyAttribute(  # type: ignore
+        lambda _: [
+            Field(name="Front", value="front", order=0),
+            Field(name="Back", value="back", order=1),
+        ]
+    )
     tags: List[str] = []
     guid = "old guid"
