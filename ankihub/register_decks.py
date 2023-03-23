@@ -8,10 +8,10 @@ import uuid
 from copy import deepcopy
 from typing import Dict, List
 
+import aqt
 from anki.decks import DeckId
 from anki.models import NotetypeId
 from anki.notes import NoteId
-import aqt
 
 from . import LOGGER
 from .addon_ankihub_client import AddonAnkiHubClient as AnkiHubClient

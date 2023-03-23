@@ -26,6 +26,7 @@ from requests.exceptions import ConnectionError
 from .. import LOGGER
 from ..addon_ankihub_client import AddonAnkiHubClient as AnkiHubClient
 from ..ankihub_client import AnkiHubRequestError
+from ..db import ankihub_db
 from ..error_reporting import upload_logs_in_background
 from ..media_import.ui import open_import_dialog
 from ..register_decks import create_collaborative_deck
@@ -35,7 +36,6 @@ from ..sync import ah_sync, show_tooltip_about_last_sync_results
 from .db_check import maybe_check_databases
 from .decks import SubscribedDecksDialog
 from .utils import ask_user, check_and_prompt_for_updates_on_main_window
-from ..db import ankihub_db
 
 
 class AnkiHubLogin(QWidget):
