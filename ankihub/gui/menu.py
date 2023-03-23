@@ -408,7 +408,7 @@ def upload_deck_assets_setup(parent):
     of all the assets for a given deck (logged user MUST be the
     deck owner)"""
 
-    q_action = QAction("📸 Upload Deck assets", aqt.mw)
+    q_action = QAction("📸 Upload images for deck", aqt.mw)
     qconnect(q_action.triggered, upload_deck_assets_action)
     if not config.deck_ids(creator_only=True):
         q_action.setDisabled(True)
@@ -419,7 +419,7 @@ def upload_deck_assets_action() -> None:
     client = AnkiHubClient()
     deck_chooser = StudyDeck(
         aqt.mw,
-        title="Choose the Deck you want to upload assets",
+        title="Choose the deck for which you want to upload images",
         accept="Upload",
         # Removes the "Add" button
         buttons=[],
@@ -457,29 +457,27 @@ def upload_deck_assets_action() -> None:
     # Check if the deck references any local asset, if it does
     # not, no point on trying to upload it
     if not image_paths:
-        showText(
-            "You can't upload assets for a Deck that is not using any assets from your local media folder"
-        )
+        showText("This deck has no images to upload.")
         return
 
     # Check if the files referenced by the deck exists locally, if none exist, no point in uploading.
     if not any([image_path.is_file() for image_path in image_paths]):
         showText(
-            "You can't upload assets for this Deck because none of the assets it uses are present on your "
+            "You can't upload images for this deck because none of the referenced images are present in your "
             "local media folder."
         )
         return
 
     confirm = ask_user(
-        f"Uploading all assets for the deck <b>{deck_name}</b> to AnkiHub "
-        "might take a while depending on the number of assets that the Deck uses.<br><br>"
+        f"Uploading all images for the deck <b>{deck_name}</b> to AnkiHub "
+        "might take a while depending on the number of images that the deck uses.<br><br>"
         "Would you like to continue?",
     )
     if not confirm:
         return
 
     def on_success(_: None) -> None:
-        showInfo("🎉 Successfuly uploaded all Deck assets!")
+        showInfo("🎉 Successfuly uploaded all images for the deck!")
 
     def on_failure(exc: Exception):
         aqt.mw.progress.finish()
@@ -496,7 +494,7 @@ def upload_deck_assets_action() -> None:
     ).failure(on_failure)
     LOGGER.info(f"Instantiated QueryOp for uploading Deck [{deck_name}] assets")
     op.with_progress(
-        label=f"Uploading assets for deck [{deck_name}]"
+        label=f"Uploading images for deck <b>{deck_name}</b>"
     ).run_in_background()
 
 
