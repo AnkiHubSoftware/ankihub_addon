@@ -527,10 +527,10 @@ class AnkiHubClient:
         )
 
         # Use ThreadPoolExecutor to zip & upload assets
-        tasks = []
+        futures = []
         with ThreadPoolExecutor() as executor:
             for chunk_number, chunk in enumerate(image_path_chunks):
-                tasks.append(
+                futures.append(
                     executor.submit(
                         self._zip_and_upload_assets_chunk,
                         chunk,
@@ -540,8 +540,8 @@ class AnkiHubClient:
                     )
                 )
 
-            for _ in as_completed(tasks):
-                pass
+            for future in as_completed(futures):
+                future.result()
 
     def upload_assets_for_suggestion(
         self, suggestion: NoteSuggestion, ah_did: uuid.UUID
