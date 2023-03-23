@@ -9,10 +9,10 @@ from anki.models import NotetypeId
 from anki.notes import NoteId
 from anki.utils import ids2str, join_fields, split_fields
 
-from . import LOGGER
-from .ankihub_client import Field, NoteInfo, suggestion_type_from_str
+from .. import LOGGER
+from ..ankihub_client import Field, NoteInfo, suggestion_type_from_str
+from ..settings import ankihub_db_path
 from .db_utils import DBConnection
-from .settings import ankihub_db_path
 
 
 def attach_ankihub_db_to_anki_db_connection() -> None:

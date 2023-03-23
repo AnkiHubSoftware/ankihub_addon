@@ -11,9 +11,8 @@ from .addons import setup_addons
 from .auto_sync import setup_ankihub_sync_on_ankiweb_sync
 from .db import ankihub_db
 from .errors import setup_error_handler
-from .gui import browser, editor
+from .gui import browser, editor, progress
 from .gui.menu import refresh_ankihub_menu, setup_ankihub_menu
-from .progress import setup_progress_manager
 from .settings import ANKI_VERSION, config, setup_logger, setup_profile_data_folder
 from .utils import modify_note_type_templates
 from .debug import setup as setup_debug
@@ -109,7 +108,7 @@ def general_setup():
     browser.setup()
     LOGGER.info("Set up browser.")
 
-    setup_progress_manager()
+    progress.setup()
     LOGGER.info("Set up progress manager.")
 
     trigger_addon_update_check()
