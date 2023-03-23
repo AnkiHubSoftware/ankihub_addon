@@ -433,13 +433,12 @@ def upload_deck_assets_action() -> None:
     if not deck_name:
         return
 
-    if len(aqt.mw.col.find_cards(f'deck:"{deck_name}"')) == 0:
-        showText("You can't upload assets for an empty Deck.")
+    nids = aqt.mw.col.find_notes(f'deck:"{deck_name}"')
+    if not nids:
+        showText("You can't upload images for an empty deck.")
         return
 
     nids = aqt.mw.col.find_notes(f'deck:"{deck_name}"')
-    # Extract the AnkiHub deck ID using a sample note id
-    ah_did = ankihub_db.ankihub_did_for_anki_nid(nids[0])
     # Obtain a list of NoteInfo objects from nids
     # TODO: Would be good to ensure at this point that the resulting
     # list didn't contain 'None' values.
@@ -482,6 +481,9 @@ def upload_deck_assets_action() -> None:
     def on_failure(exc: Exception):
         aqt.mw.progress.finish()
         raise exc
+
+    # Extract the AnkiHub deck ID using a sample note id
+    ah_did = ankihub_db.ankihub_did_for_anki_nid(nids[0])
 
     # TODO: Before starting the upload operation, have to confirm with the backend
     # if the user is really the deck owner
