@@ -235,6 +235,17 @@ def create_collaborative_deck_action() -> None:
     if not confirm:
         return
 
+    should_upload_assets = False
+    if AnkiHubClient().is_feature_flag_enabled("image_support_enabled"):
+        confirm = ask_user(
+            "Do you want to upload the local media assets for this Deck as well? "
+            "This will take some extra time but it is required to display the assets "
+            "at AnkiHub and also for subscribers that download your deck to download the "
+            "assets alongside it. "
+        )
+        if confirm:
+            should_upload_assets = True
+
     def on_success(ankihub_did: uuid.UUID) -> None:
         anki_did = aqt.mw.col.decks.id_for_name(deck_name)
         creation_time = datetime.now(tz=timezone.utc)
@@ -259,7 +270,10 @@ def create_collaborative_deck_action() -> None:
     op = QueryOp(
         parent=aqt.mw,
         op=lambda col: create_collaborative_deck(
-            deck_name, private=private, add_subdeck_tags=add_subdeck_tags
+            deck_name,
+            private=private,
+            add_subdeck_tags=add_subdeck_tags,
+            should_upload_assets=should_upload_assets,
         ),
         success=on_success,
     ).failure(on_failure)
