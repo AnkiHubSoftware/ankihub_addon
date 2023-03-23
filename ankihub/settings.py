@@ -222,8 +222,21 @@ class _Config:
         self.deck_config(ankihub_did).anki_id = anki_did
         self._update_private_config()
 
-    def deck_ids(self) -> List[uuid.UUID]:
-        return list(self._private_config.decks.keys())
+    def deck_ids(self, creator_only=False) -> List[uuid.UUID]:
+        """Return the ankihub deck ids of the currently locally
+        installed decks.
+
+        :param only_created: If set to 'True', returns only the
+        deck_ids of decks created by the logged user. Defaults
+        to 'False'."""
+        if creator_only:
+            return [
+                deck_id
+                for deck_id in self._private_config.decks.keys()
+                if self._private_config.decks[deck_id].creator
+            ]
+        else:
+            return list(self._private_config.decks.keys())
 
     def deck_config(self, ankihub_did: uuid.UUID) -> DeckConfig:
         return self._private_config.decks[ankihub_did]

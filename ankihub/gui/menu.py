@@ -35,6 +35,7 @@ from ..sync import ah_sync, show_tooltip_about_last_sync_results
 from .db_check import maybe_check_databases
 from .decks import SubscribedDecksDialog
 from .utils import ask_user, check_and_prompt_for_updates_on_main_window
+from ..db import ankihub_db
 
 
 class AnkiHubLogin(QWidget):
@@ -402,6 +403,103 @@ def sync_with_ankihub_setup(parent):
     parent.addAction(q_action)
 
 
+def upload_deck_assets_setup(parent):
+    """Set up the menu item for manually triggering the upload
+    of all the assets for a given deck (logged user MUST be the
+    deck owner)"""
+
+    q_action = QAction("📸 Upload Deck assets", aqt.mw)
+    qconnect(q_action.triggered, upload_deck_assets_action)
+    if not config.deck_ids(creator_only=True):
+        q_action.setDisabled(True)
+    parent.addAction(q_action)
+
+
+def upload_deck_assets_action() -> None:
+    client = AnkiHubClient()
+    deck_chooser = StudyDeck(
+        aqt.mw,
+        title="Choose the Deck you want to upload assets",
+        accept="Upload",
+        # Removes the "Add" button
+        buttons=[],
+        names=lambda: [
+            d.name
+            for d in aqt.mw.col.decks.all_names_and_ids(include_filtered=False)
+            if "::" not in d.name and d.id != 1
+        ],
+    )
+    deck_name = deck_chooser.name
+    if not deck_name:
+        return
+
+    if len(aqt.mw.col.find_cards(f'deck:"{deck_name}"')) == 0:
+        showText("You can't upload assets for an empty Deck.")
+        return
+
+    nids = aqt.mw.col.find_notes(f'deck:"{deck_name}"')
+    # Extract the AnkiHub deck ID using a sample note id
+    ah_did = ankihub_db.ankihub_did_for_anki_nid(nids[0])
+    # Obtain a list of NoteInfo objects from nids
+    # TODO: Would be good to ensure at this point that the resulting
+    # list didn't contain 'None' values.
+    notes_data = [ankihub_db.note_data(nid) for nid in nids]
+
+    # Get all notes, then get all fields, and extract the asset
+    # references from the fields.
+    all_notes_fields = []
+    for note in notes_data:
+        if note:
+            all_notes_fields.extend(note.fields)
+
+    image_paths = client._get_images_from_fields(all_notes_fields)
+
+    # Check if the deck references any local asset, if it does
+    # not, no point on trying to upload it
+    if not image_paths:
+        showText(
+            "You can't upload assets for a Deck that is not using any assets from your local media folder"
+        )
+        return
+
+    # Check if the files referenced by the deck exists locally, if none exist, no point in uploading.
+    if not any([image_path.is_file() for image_path in image_paths]):
+        showText(
+            "You can't upload assets for this Deck because none of the assets it uses are present on your "
+            "local media folder."
+        )
+        return
+
+    confirm = ask_user(
+        f"Uploading all assets for the deck <b>{deck_name}</b> to AnkiHub "
+        "might take a while depending on the number of assets that the Deck uses.<br><br>"
+        "Would you like to continue?",
+    )
+    if not confirm:
+        return
+
+    def on_success(_: None) -> None:
+        showInfo("🎉 Successfuly uploaded all Deck assets!")
+
+    def on_failure(exc: Exception):
+        aqt.mw.progress.finish()
+        raise exc
+
+    # TODO: Before starting the upload operation, have to confirm with the backend
+    # if the user is really the deck owner
+    op = QueryOp(
+        parent=aqt.mw,
+        op=lambda col: client.upload_assets_for_deck(
+            ah_did=ah_did, notes_data=notes_data
+        ),
+        success=on_success,
+    ).failure(on_failure)
+    LOGGER.info(f"Instantiated QueryOp for uploading Deck [{deck_name}] assets")
+    op.with_progress(
+        label=f"Uploading assets for deck [{deck_name}]"
+    ).run_in_background()
+
+
 def ankihub_help_setup(parent):
     """Set up the sub menu for help related items."""
     help_menu = QMenu("🆘 Help", parent)
@@ -509,6 +607,7 @@ def refresh_ankihub_menu() -> None:
         subscribe_to_deck_setup(parent=ankihub_menu)
         import_media_setup(parent=ankihub_menu)
         sync_with_ankihub_setup(parent=ankihub_menu)
+        upload_deck_assets_setup(parent=ankihub_menu)
         ankihub_logout_setup(parent=ankihub_menu)
         media_download_status_setup(parent=ankihub_menu)
         # upload_suggestions_setup(parent=ankihub_menu)
