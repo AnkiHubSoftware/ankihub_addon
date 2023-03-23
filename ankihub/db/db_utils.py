@@ -1,7 +1,7 @@
 import sqlite3
 from typing import Any, List, Optional, Tuple
 
-from . import LOGGER
+from .. import LOGGER
 
 
 class DBConnection:
