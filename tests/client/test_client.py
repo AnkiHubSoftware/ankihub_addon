@@ -886,8 +886,10 @@ class TestUploadImagesForSuggestion:
         )
 
         expected_result = {
-            "testfile_mario.png": TEST_MEDIA_PATH / "156ca948cd1356b1a2c1c790f0855ad9.png",
-            "testfile_test.jpeg": TEST_MEDIA_PATH / "a61eab59692d17a2adf4d1c5e9049ee4.jpeg",
+            "testfile_mario.png": TEST_MEDIA_PATH
+            / "156ca948cd1356b1a2c1c790f0855ad9.png",
+            "testfile_test.jpeg": TEST_MEDIA_PATH
+            / "a61eab59692d17a2adf4d1c5e9049ee4.jpeg",
         }
 
         suggestion_request_mock = None
@@ -947,9 +949,12 @@ class TestUploadImagesForSuggestion:
         ]
 
         expected_result = {
-            "testfile_mario.png": TEST_MEDIA_PATH / "156ca948cd1356b1a2c1c790f0855ad9.png",
-            "testfile_anki.gif": TEST_MEDIA_PATH / "87617b1d58967eb86b9e0e5dc92d91ee.gif",
-            "testfile_test.jpeg": TEST_MEDIA_PATH / "a61eab59692d17a2adf4d1c5e9049ee4.jpeg",
+            "testfile_mario.png": TEST_MEDIA_PATH
+            / "156ca948cd1356b1a2c1c790f0855ad9.png",
+            "testfile_anki.gif": TEST_MEDIA_PATH
+            / "87617b1d58967eb86b9e0e5dc92d91ee.gif",
+            "testfile_test.jpeg": TEST_MEDIA_PATH
+            / "a61eab59692d17a2adf4d1c5e9049ee4.jpeg",
         }
 
         asset_name_map = client._generate_asset_files_with_hashed_names(filenames)
@@ -1036,7 +1041,9 @@ class TestUploadAssetsForDeck:
         assert path_to_created_zip_file.is_file()
         assert len(all_image_paths_in_notes) == 13
         with zipfile.ZipFile(path_to_created_zip_file, "r") as zip_ref:
-            assert set(zip_ref.namelist()) == set([path.name for path in all_image_paths_in_notes])
+            assert set(zip_ref.namelist()) == set(
+                [path.name for path in all_image_paths_in_notes]
+            )
 
         # Remove the zipped file at the end of the test
         monkeypatch.undo()
@@ -1124,7 +1131,9 @@ class TestUploadAssetsForDeck:
         notes_data = self.notes_data_with_a_few_images()
 
         mocked_upload_assets_individually = MagicMock()
-        monkeypatch.setattr(client, "upload_assets_individually", mocked_upload_assets_individually)
+        monkeypatch.setattr(
+            client, "upload_assets_individually", mocked_upload_assets_individually
+        )
 
         mocked_upload_file_to_s3 = MagicMock()
         monkeypatch.setattr(client, "_upload_file_to_s3", mocked_upload_file_to_s3)
@@ -1136,7 +1145,7 @@ class TestUploadAssetsForDeck:
         client.upload_assets_for_deck(deck_id, notes_data)
 
         all_img_paths_in_notes = set(self._all_image_paths_in_notes(notes_data))
-        
+
         mocked_upload_assets_individually.assert_called_once_with(
             image_paths=all_img_paths_in_notes, deck_id=deck_id
         )
@@ -1149,7 +1158,5 @@ class TestUploadAssetsForDeck:
         for note in notes_data:
             all_notes_fields.extend(note.fields)
 
-        result = [
-            path for path in client._get_images_from_fields(all_notes_fields)
-        ]
+        result = [path for path in client._get_images_from_fields(all_notes_fields)]
         return result
