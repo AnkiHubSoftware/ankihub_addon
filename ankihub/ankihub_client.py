@@ -7,8 +7,10 @@ import logging
 import os
 import re
 import shutil
+import urllib.parse
 import uuid
 from abc import ABC
+from concurrent.futures import ThreadPoolExecutor, as_completed
 from dataclasses import dataclass
 from datetime import datetime
 from enum import Enum
@@ -31,8 +33,6 @@ from mashumaro import field_options
 from mashumaro.config import BaseConfig
 from mashumaro.mixins.json import DataClassJSONMixin
 from requests import PreparedRequest, Request, Response, Session
-from concurrent.futures import ThreadPoolExecutor, as_completed
-import urllib.parse
 
 from .common_utils import extract_local_image_paths_from_html
 
