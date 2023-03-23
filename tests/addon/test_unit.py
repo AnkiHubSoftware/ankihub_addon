@@ -3,6 +3,7 @@ from typing import List
 
 from anki.notes import Note
 from pytest_anki import AnkiSession
+from pathlib import Path
 
 # workaround for vscode test discovery not using pytest.ini which sets this env var
 # has to be set before importing ankihub
@@ -40,8 +41,8 @@ class TestUploadImagesForSuggestion:
                 mw.col.add_note(note, mw.col.decks.by_name("MediaTestDeck")["id"])
 
             hashed_name_map = {
-                "test.png": "fueriwhfvureivhnaowuyiegrofuaywwqg.png",
-                "other_test.gif": "fWJKERDVNMOWIKJCIWJefgjnverf.gif",
+                "test.png": Path("fueriwhfvureivhnaowuyiegrofuaywwqg.png"),
+                "other_test.gif": Path("fWJKERDVNMOWIKJCIWJefgjnverf.gif"),
             }
 
             suggestions._update_asset_names_on_notes(hashed_name_map)
