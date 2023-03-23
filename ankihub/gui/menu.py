@@ -239,10 +239,10 @@ def create_collaborative_deck_action() -> None:
     should_upload_assets = False
     if AnkiHubClient().is_feature_flag_enabled("image_support_enabled"):
         confirm = ask_user(
-            "Do you want to upload the local media assets for this Deck as well? "
-            "This will take some extra time but it is required to display the assets "
-            "at AnkiHub and also for subscribers that download your deck to download the "
-            "assets alongside it. "
+            "Do you want to upload images for this deck as well? "
+            "This will take some extra time but it is required to display the images "
+            "on AnkiHub and this way subscribers will be able to download the images "
+            "when installing the deck. "
         )
         if confirm:
             should_upload_assets = True
