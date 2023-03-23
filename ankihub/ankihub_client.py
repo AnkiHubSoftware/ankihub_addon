@@ -509,7 +509,7 @@ class AnkiHubClient:
 
     def download_images(self, img_names: List[str], deck_id: uuid.UUID) -> None:
         deck_images_remote_dir = f"{self.s3_bucket_url}/deck_assets/{deck_id}/"
-        tasks = []
+        futures = []
         with ThreadPoolExecutor() as executor:
             for img_name in img_names:
                 img_path = self.local_media_dir_path / img_name
@@ -523,12 +523,12 @@ class AnkiHubClient:
                 if os.path.isfile(img_path):
                     continue
 
-                tasks.append(
+                futures.append(
                     executor.submit(self.download_image, img_path, img_remote_path)
                 )
 
-            for _ in as_completed(tasks):
-                pass
+            for future in as_completed(futures):
+                future.result()
 
     def _gzip_compress_string(self, string: str) -> bytes:
         result = gzip.compress(
