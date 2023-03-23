@@ -10,12 +10,12 @@ from . import LOGGER
 from .addons import setup_addons
 from .auto_sync import setup_ankihub_sync_on_ankiweb_sync
 from .db import ankihub_db
+from .debug import setup as setup_debug
 from .errors import setup_error_handler
 from .gui import browser, editor, progress
 from .gui.menu import refresh_ankihub_menu, setup_ankihub_menu
 from .settings import ANKI_VERSION, config, setup_logger, setup_profile_data_folder
 from .utils import modify_note_type_templates
-from .debug import setup as setup_debug
 
 # The general setup should be only once, because it sets up menu items, hooks, etc.
 # We don't want to set them up multiple times when the profile is opened multiple times,
