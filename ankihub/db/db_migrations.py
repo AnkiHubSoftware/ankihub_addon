@@ -1,6 +1,6 @@
 from typing import List
 
-from . import LOGGER
+from .. import LOGGER
 from .db import ankihub_db
 
 
