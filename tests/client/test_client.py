@@ -1126,15 +1126,15 @@ class TestUploadAssetsForDeck:
 
 
 @pytest.mark.vcr()
-class TestIsDeckOwner:
-    def test_is_deck_owner_for_owned_deck(
+class TestOwnedDeckIds:
+    def test_owned_deck_ids_for_user_test1(
         self, authorized_client_for_user_test1: AnkiHubClient
     ):
         client = authorized_client_for_user_test1
-        assert client.is_deck_owner(ID_OF_DECK_OF_USER_TEST1)
+        assert [ID_OF_DECK_OF_USER_TEST1] == client.owned_deck_ids()
 
-    def test_is_deck_owner_for_not_owned_deck(
-        self, authorized_client_for_user_test1: AnkiHubClient
+    def test_owned_deck_ids_for_user_test2(
+        self, authorized_client_for_user_test2: AnkiHubClient
     ):
-        client = authorized_client_for_user_test1
-        assert not client.is_deck_owner(ID_OF_DECK_OF_USER_TEST2)
+        client = authorized_client_for_user_test2
+        assert [ID_OF_DECK_OF_USER_TEST2] == client.owned_deck_ids()

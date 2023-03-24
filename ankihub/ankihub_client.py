@@ -1103,13 +1103,13 @@ class AnkiHubClient:
         data = response.json()
         return data
 
-    def is_deck_owner(self, deck_id: uuid.UUID) -> bool:
+    def owned_deck_ids(self) -> List[uuid.UUID]:
         response = self._send_request("GET", "/users/me")
         if response.status_code != 200:
             raise AnkiHubRequestError(response)
 
         data = response.json()
-        result = any(deck["id"] == str(deck_id) for deck in data["created_decks"])
+        result = [uuid.UUID(deck["id"]) for deck in data["created_decks"]]
         return result
 
 
