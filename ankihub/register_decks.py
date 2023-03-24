@@ -55,7 +55,7 @@ def upload_deck(
 
     # Upload all existing local assets for this deck
     # (assets that are referenced on Deck's notes)
-    if client.is_feature_flag_enabled("image_support_enabled") and should_upload_assets:
+    if should_upload_assets and client.is_feature_flag_enabled("image_support_enabled"):
         aqt.mw.taskman.run_in_background(
             task=client.upload_assets_for_deck,
             args={"ah_did": ankihub_did, "notes_data": notes_data},
