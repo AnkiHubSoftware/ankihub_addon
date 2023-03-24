@@ -10,6 +10,7 @@ from . import LOGGER
 from .addons import setup_addons
 from .auto_sync import setup_ankihub_sync_on_ankiweb_sync
 from .db import ankihub_db
+from .debug import setup as setup_debug
 from .errors import setup_error_handler
 from .gui import browser, editor, progress
 from .gui.menu import refresh_ankihub_menu, setup_ankihub_menu
@@ -91,6 +92,9 @@ def general_setup():
     LOGGER.info(f"{ANKI_VERSION=}")
 
     aqt.mw.addonManager.setWebExports(__name__, r"gui/web/.*")
+
+    setup_debug()
+    LOGGER.info("Set up debug.")
 
     setup_addons()
     LOGGER.info("Set up addons.")
