@@ -36,7 +36,7 @@ from mashumaro.config import BaseConfig
 from mashumaro.mixins.json import DataClassJSONMixin
 from requests import PreparedRequest, Request, Response, Session
 
-from .common_utils import extract_local_image_paths_from_html
+from .common_utils import local_image_names_from_html
 
 LOGGER = logging.getLogger(__name__)
 
@@ -479,11 +479,8 @@ class AnkiHubClient:
         # they are because we don't have to care about image file name conflicts
         # for new decks.
 
-        all_notes_fields = []
-        for note in notes_data:
-            all_notes_fields.extend(note.fields)
-
-        image_paths = self._get_images_from_fields(all_notes_fields)
+        image_names = get_image_names_from_notes_data(notes_data)
+        image_paths = [self.local_media_dir_path / name for name in image_names]
 
         # If notes have no images, abort uploading
         if not image_paths:
@@ -554,7 +551,9 @@ class AnkiHubClient:
         if not self.is_feature_flag_enabled("image_support_enabled"):
             return {}
 
-        image_paths = self._get_images_from_fields(fields=suggestion.fields)
+        image_names = get_image_names_from_suggestion(suggestion)
+        image_paths = {self.local_media_dir_path / name for name in image_names}
+
         asset_name_map = self._generate_asset_files_with_hashed_names(image_paths)
 
         # TODO: We are currently uploading all images for a suggestion,
@@ -562,22 +561,6 @@ class AnkiHubClient:
         self.upload_assets(list(asset_name_map.values()), ah_did)
 
         return asset_name_map
-
-    def _get_images_from_fields(self, fields: List[Field]) -> Set[Path]:
-        """Extracts image names from inside src attributes of HTML image tags
-        present on each field and builds the full local image path
-        for each one (pointing to the local anki media folder). Filters out
-        duplicate images, if any, since fields that use the same image share
-        the same reference to the local media folder"""
-        result = set()
-        for field_content in [f.value for f in fields]:
-            image_names = extract_local_image_paths_from_html(field_content)
-            image_paths = [
-                self.local_media_dir_path / image_name for image_name in image_names
-            ]
-            result.update(image_paths)
-
-        return result
 
     def _generate_asset_files_with_hashed_names(
         self, paths: Set[Path]
@@ -1135,3 +1118,37 @@ def to_anki_note_type(note_type_data: Dict) -> Dict[str, Any]:
     note_type_data["tmpls"] = note_type_data.pop("templates")
     note_type_data["flds"] = note_type_data.pop("fields")
     return note_type_data
+
+
+# Media related functions
+
+
+def get_image_names_from_notes_data(notes_data: List[NoteInfo]) -> Set[str]:
+    """Return the names of all images on the given notes. Only returns names of local images, not remote images."""
+    return {
+        name for note in notes_data for name in _get_image_names_from_note_info(note)
+    }
+
+
+def get_image_names_from_suggestion(suggestion: NoteSuggestion) -> Set[str]:
+    result = {
+        name
+        for field in suggestion.fields
+        for name in _get_image_names_from_field(field)
+    }
+    return result
+
+
+def _get_image_names_from_note_info(note_info: NoteInfo) -> Set[str]:
+    result = {
+        name
+        for field in note_info.fields
+        for name in _get_image_names_from_field(field)
+    }
+    return result
+
+
+def _get_image_names_from_field(field: Field) -> Set[str]:
+    """Return the names of all images on the given field. Only returns names of local images, not remote images."""
+    result = local_image_names_from_html(field.value)
+    return result

@@ -2,6 +2,7 @@ import re
 import uuid
 from concurrent.futures import Future
 from datetime import datetime, timezone
+from pathlib import Path
 from typing import Optional
 
 import aqt
@@ -25,7 +26,7 @@ from requests.exceptions import ConnectionError
 
 from .. import LOGGER
 from ..addon_ankihub_client import AddonAnkiHubClient as AnkiHubClient
-from ..ankihub_client import AnkiHubRequestError
+from ..ankihub_client import AnkiHubRequestError, get_image_names_from_notes_data
 from ..db import ankihub_db
 from ..error_reporting import upload_logs_in_background
 from ..media_import.ui import open_import_dialog
@@ -439,14 +440,10 @@ def upload_deck_assets_action() -> None:
     # Obtain a list of NoteInfo objects from nids
     notes_data = [ankihub_db.note_data(nid) for nid in nids]
 
-    # Get all notes, then get all fields, and extract the asset
-    # references from the fields.
-    all_notes_fields = []
-    for note in notes_data:
-        if note:
-            all_notes_fields.extend(note.fields)
-
-    image_paths = client._get_images_from_fields(all_notes_fields)
+    image_names = get_image_names_from_notes_data(notes_data)
+    image_paths = [
+        Path(aqt.mw.col.media.dir()) / image_name for image_name in image_names
+    ]
 
     # Check if the deck references any local asset, if it does
     # not, no point on trying to upload it

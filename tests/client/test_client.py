@@ -4,12 +4,12 @@ import os
 import subprocess
 import tempfile
 import uuid
+import zipfile
 from copy import deepcopy
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Callable, List
 from unittest.mock import MagicMock, Mock
-import zipfile
 
 import pytest
 import requests_mock
@@ -40,6 +40,7 @@ from ankihub.ankihub_client import (
     OptionalTagSuggestion,
     SuggestionType,
     TagGroupValidationResponse,
+    get_image_names_from_notes_data,
 )
 from ankihub.gui.decks import download_progress_cb
 
@@ -1033,7 +1034,7 @@ class TestUploadAssetsForDeck:
             TEST_MEDIA_PATH / f"{deck_id}_0_deck_assets_part.zip"
         )
 
-        all_img_names_in_notes = self._all_image_names_in_notes(notes_data)
+        all_img_names_in_notes = get_image_names_from_notes_data(notes_data)
         assert path_to_created_zip_file.is_file()
         assert len(all_img_names_in_notes) == 13
         with zipfile.ZipFile(path_to_created_zip_file, "r") as zip_ref:
@@ -1125,20 +1126,9 @@ class TestUploadAssetsForDeck:
         deck_id = next_deterministic_uuid()
         client.upload_assets_for_deck(deck_id, notes_data)
 
-        all_img_names_in_notes = self._all_image_names_in_notes(notes_data)
+        all_img_names_in_notes = get_image_names_from_notes_data(notes_data)
         mocked_upload_assets.assert_called_once_with(
             image_names=all_img_names_in_notes, deck_id=deck_id
         )
 
         mocked_upload_file_to_s3.assert_not_called()
-
-    def _all_image_names_in_notes(self, notes_data: List[NoteInfo]):
-        client = AnkiHubClient(local_media_dir_path=TEST_MEDIA_PATH)
-        all_notes_fields = []
-        for note in notes_data:
-            all_notes_fields.extend(note.fields)
-
-        result = [
-            path.name for path in client._get_images_from_fields(all_notes_fields)
-        ]
-        return result
