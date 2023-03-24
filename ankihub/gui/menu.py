@@ -35,7 +35,11 @@ from ..subdecks import SUBDECK_TAG
 from ..sync import ah_sync, show_tooltip_about_last_sync_results
 from .db_check import maybe_check_databases
 from .decks import SubscribedDecksDialog
-from .utils import ask_user, check_and_prompt_for_updates_on_main_window
+from .utils import (
+    ask_user,
+    check_and_prompt_for_updates_on_main_window,
+    choose_ankihub_deck,
+)
 
 
 class AnkiHubLogin(QWidget):
@@ -417,31 +421,22 @@ def upload_deck_assets_setup(parent):
 
 def upload_deck_assets_action() -> None:
     client = AnkiHubClient()
-    deck_chooser = StudyDeck(
-        aqt.mw,
-        title="Choose the deck for which you want to upload images",
-        accept="Upload",
-        # Removes the "Add" button
-        buttons=[],
-        names=lambda: [
-            d.name
-            for d in aqt.mw.col.decks.all_names_and_ids(include_filtered=False)
-            if "::" not in d.name and d.id != 1
-        ],
+
+    ah_did = choose_ankihub_deck(
+        "Choose the AnkiHub deck for which<br>you want to upload images.", parent=aqt.mw
     )
-    deck_name = deck_chooser.name
-    if not deck_name:
+    if ah_did is None:
         return
 
-    nids = aqt.mw.col.find_notes(f'deck:"{deck_name}"')
+    deck_config = config.deck_config(ah_did)
+    deck_name = deck_config.name
+
+    nids = ankihub_db.anki_nids_for_ankihub_deck(ah_did)
     if not nids:
         showText("You can't upload images for an empty deck.")
         return
 
-    nids = aqt.mw.col.find_notes(f'deck:"{deck_name}"')
     # Obtain a list of NoteInfo objects from nids
-    # TODO: Would be good to ensure at this point that the resulting
-    # list didn't contain 'None' values.
     notes_data = [ankihub_db.note_data(nid) for nid in nids]
 
     # Get all notes, then get all fields, and extract the asset

@@ -1,3 +1,4 @@
+import uuid
 from typing import Any, List, Optional
 
 import aqt
@@ -19,6 +20,8 @@ from aqt.qt import (
     qconnect,
 )
 from aqt.utils import disable_help_button
+
+from ..settings import config
 
 
 def choose_subset(
@@ -128,6 +131,24 @@ def choose_list(
         return c.currentRow()
     else:
         return None
+
+
+def choose_ankihub_deck(prompt: str, parent: QWidget) -> Optional[uuid.UUID]:
+    """Ask the user to choose a deck from the list of decks that the user subscribed to from the add-on.
+    Returns the deck ID of the chosen deck, or None if none"""
+    ah_dids = config.deck_ids()
+    deck_configs = [config.deck_config(did) for did in ah_dids]
+    chosen_deck_idx = choose_list(
+        prompt=prompt,
+        choices=[deck.name for deck in deck_configs],
+        parent=parent,
+    )
+
+    if chosen_deck_idx is None:
+        return None
+
+    chosen_deck_ah_did = ah_dids[chosen_deck_idx]
+    return chosen_deck_ah_did
 
 
 def ask_user(
