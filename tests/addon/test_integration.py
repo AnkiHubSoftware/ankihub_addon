@@ -2756,7 +2756,7 @@ def test_upload_assets(
         assert len(s3_upload_request_mock.request_history) == 1  # type: ignore
 
         file_name_from_request = re.findall(
-            r'filename="(.*?)"', s3_upload_request_mock.last_request.text
+            r'filename="(.*?)"', s3_upload_request_mock.last_request.text  # type: ignore
         )[0]
         assert file_name_from_request == file_path.name
 
