@@ -423,6 +423,13 @@ def upload_deck_assets_setup(parent):
 def upload_deck_assets_action() -> None:
     client = AnkiHubClient()
 
+    if not client.is_feature_flag_enabled("image_support_enabled"):
+        showText(
+            "The image support feature is not enabled yet for your account.<br>"
+            "We are working on it and it will be available soon.<br>"
+        )
+        return
+
     ah_did = choose_ankihub_deck(
         "Choose the AnkiHub deck for which<br>you want to upload images.", parent=aqt.mw
     )
