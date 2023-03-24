@@ -468,7 +468,7 @@ class AnkiHubClient:
 
         LOGGER.info(f"Successfully uploaded [{zip_filepath.name}]")
 
-    def upload_assets(self, image_paths: List[Path], ah_did: uuid.UUID):
+    def upload_assets(self, image_paths: Set[Path], ah_did: uuid.UUID):
         # Alternate flow: if less than 10 images, call self.upload_assets_individually
         # passing the array of image names
         if not len(image_paths) > 10:
@@ -547,7 +547,7 @@ class AnkiHubClient:
 
     def upload_assets_for_suggestion(
         self, suggestion: NoteSuggestion, ah_did: uuid.UUID
-    ) -> Dict[str, str]:
+    ) -> Dict[str, Path]:
         """Uploads images for a suggestion to AnkiHub and returns a map of
         the original image names to the new names on AnkiHub."""
 
@@ -559,7 +559,7 @@ class AnkiHubClient:
 
         # TODO: We are currently uploading all images for a suggestion,
         # but we should only upload images that are not already on s3.
-        self.upload_assets_individually(list(asset_name_map.values()), ah_did)
+        self.upload_assets_individually(set(asset_name_map.values()), ah_did)
 
         return asset_name_map
 
@@ -587,7 +587,7 @@ class AnkiHubClient:
         but the mapping still will be made with the existing filename.
         Returns a map of the old filename to the new filename.
         """
-        result: Dict[str, str] = {}
+        result: Dict[str, Path] = {}
         for old_asset_path in paths:
             # First we check if the image exists locally.
             # If no, we skip this iteration.
@@ -619,7 +619,7 @@ class AnkiHubClient:
         return result
 
     def upload_assets_individually(
-        self, image_paths: List[Path], deck_id: uuid.UUID
+        self, image_paths: Set[Path], deck_id: uuid.UUID
     ) -> None:
         # deck_id is used to namespace the images within each deck.
         s3_presigned_info = self.get_presigned_url_for_multiple_uploads(

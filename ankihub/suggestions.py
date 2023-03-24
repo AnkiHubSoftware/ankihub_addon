@@ -136,7 +136,7 @@ def _update_asset_names_on_notes(asset_name_map: Dict[str, Path]):
 def _get_image_paths_from_suggestions_with_hash(
     client: AnkiHubClient, suggestions: List[NoteSuggestion]
 ) -> List[Path]:
-    all_image_paths = []
+    all_image_paths: List[Path] = []
     for suggestion in suggestions:
         image_paths = client._get_images_from_fields(suggestion.fields)
         asset_name_map = client._generate_asset_files_with_hashed_names(image_paths)
@@ -230,46 +230,47 @@ def suggest_notes_in_bulk(
     ]
     client = AnkiHubClient()
 
-    if change_note_suggestions:
-        suggestions_by_deck_id = _group_suggestions_by_deck_id(
-            change_note_suggestions,
-            lambda s: ankihub_db.ankihub_did_for_anki_nid(NoteId(s.anki_nid)),
-        )
-        if len(suggestions_by_deck_id.keys()) > 1:
-            LOGGER.warning("User created bulk suggestions for more than one deck")
+    if client.is_feature_flag_enabled("image_support_enabled"):
+        if change_note_suggestions:
+            suggestions_by_deck_id = _group_suggestions_by_deck_id(
+                list(change_note_suggestions),
+                lambda s: ankihub_db.ankihub_did_for_anki_nid(NoteId(s.anki_nid)),
+            )
+            if len(suggestions_by_deck_id.keys()) > 1:
+                LOGGER.warning("User created bulk suggestions for more than one deck")
 
-        ah_did = list(suggestions_by_deck_id.keys())[0]
-        image_paths = _get_image_paths_from_suggestions_with_hash(
-            client=client, suggestions=suggestions_by_deck_id[ah_did]
-        )
+            ah_did = list(suggestions_by_deck_id.keys())[0]
+            image_paths = _get_image_paths_from_suggestions_with_hash(
+                client=client, suggestions=suggestions_by_deck_id[ah_did]
+            )
 
-        aqt.mw.taskman.run_in_background(
-            client.upload_assets,
-            args={"image_paths": image_paths, "ah_did": ah_did},
-            on_done=lambda future: LOGGER.info(
-                f"Finished uploading assets for deck {ah_did}"
-            ),
-        )
+            aqt.mw.taskman.run_in_background(
+                client.upload_assets,
+                args={"image_paths": image_paths, "ah_did": ah_did},
+                on_done=lambda future: LOGGER.info(
+                    f"Finished uploading assets for deck {ah_did}"
+                ),
+            )
 
-    if new_note_suggestions:
-        suggestions_by_deck_id = _group_suggestions_by_deck_id(
-            new_note_suggestions, lambda s: s.ankihub_deck_uuid
-        )
-        if len(suggestions_by_deck_id.keys()) > 1:
-            LOGGER.warning("User created bulk suggestions for more than one deck")
+        if new_note_suggestions:
+            suggestions_by_deck_id = _group_suggestions_by_deck_id(
+                list(new_note_suggestions), lambda s: s.ankihub_deck_uuid
+            )
+            if len(suggestions_by_deck_id.keys()) > 1:
+                LOGGER.warning("User created bulk suggestions for more than one deck")
 
-        ah_did = list(suggestions_by_deck_id.keys())[0]
-        image_paths = _get_image_paths_from_suggestions_with_hash(
-            client=client, suggestions=suggestions_by_deck_id[ah_did]
-        )
+            ah_did = list(suggestions_by_deck_id.keys())[0]
+            image_paths = _get_image_paths_from_suggestions_with_hash(
+                client=client, suggestions=suggestions_by_deck_id[ah_did]
+            )
 
-        aqt.mw.taskman.run_in_background(
-            client.upload_assets,
-            args={"image_paths": image_paths, "ah_did": ah_did},
-            on_done=lambda future: LOGGER.info(
-                f"Finished uploading assets for deck {ah_did}"
-            ),
-        )
+            aqt.mw.taskman.run_in_background(
+                client.upload_assets,
+                args={"image_paths": image_paths, "ah_did": ah_did},
+                on_done=lambda future: LOGGER.info(
+                    f"Finished uploading assets for deck {ah_did}"
+                ),
+            )
 
     errors_by_nid_int = client.create_suggestions_in_bulk(
         new_note_suggestions=new_note_suggestions,
