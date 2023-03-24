@@ -11,14 +11,13 @@ from unittest.mock import MagicMock, Mock, PropertyMock
 
 import aqt
 import pytest
-from anki._backend import RustBackendGenerated
 from anki.cards import CardId
 from anki.consts import QUEUE_TYPE_SUSPENDED
 from anki.decks import DeckId, FilteredDeckConfig
 from anki.models import NotetypeDict, NotetypeId
 from anki.notes import Note, NoteId
 from anki.sync import SyncOutput
-from aqt import AnkiQt
+from aqt import AnkiQt, gui_hooks
 from aqt.addcards import AddCards
 from aqt.addons import InstallOk
 from aqt.browser import Browser
@@ -61,6 +60,12 @@ from ankihub.ankihub_client import (
 )
 from ankihub.auto_sync import setup_ankihub_sync_on_ankiweb_sync
 from ankihub.db import ankihub_db, attached_ankihub_db
+from ankihub.debug import (
+    _log_stack,
+    _setup_logging_for_sync_collection_and_media,
+    _setup_sentry_reporting_for_error_on_addon_update,
+    _user_files_context_dict,
+)
 from ankihub.exporting import to_note_data
 from ankihub.gui import utils
 from ankihub.gui.browser import (
@@ -2407,12 +2412,12 @@ def patch_ankiweb_sync_to_do_nothing(mw: AnkiQt, monkeypatch: MonkeyPatch):
         NO_CHANGES=SyncOutput.NO_CHANGES,
     )
     monkeypatch.setattr(
-        RustBackendGenerated, "sync_collection", lambda *args: sync_output_mock
+        mw.col._backend, "sync_collection", lambda *args: sync_output_mock
     )
 
     # Mock the latest_progress function because it is called by a timer during the sync
     # and would otherwise open an error message dialog.
-    monkeypatch.setattr(aqt.mw.col, "latest_progress", lambda *args, **kwargs: Mock())
+    monkeypatch.setattr(mw.col, "latest_progress", lambda *args, **kwargs: Mock())
 
     # Mock the can_auto_sync function so that no sync is triggered when Anki is closed.
     monkeypatch.setattr(mw, "can_auto_sync", lambda *args, **kwargs: False)
@@ -2756,7 +2761,7 @@ def test_upload_assets(
         assert len(s3_upload_request_mock.request_history) == 1  # type: ignore
 
         file_name_from_request = re.findall(
-            r'filename="(.*?)"', s3_upload_request_mock.last_request.text
+            r'filename="(.*?)"', s3_upload_request_mock.last_request.text  # type: ignore
         )[0]
         assert file_name_from_request == file_path.name
 
@@ -3062,3 +3067,56 @@ def test_check_and_prompt_for_updates_on_main_window(
     # when called.
     with anki_session.profile_loaded():
         utils.check_and_prompt_for_updates_on_main_window()
+
+
+class TestDebugModule:
+    def test_setup_logging_for_sync_collection_and_media(
+        self, anki_session: AnkiSession, monkeypatch: MonkeyPatch, qtbot: QtBot
+    ):
+        # Test that the original AnkiQt._sync_collection_and_media method gets called
+        # despite the monkeypatching we do in debug.py.
+        with anki_session.profile_loaded():
+            mw = anki_session.mw
+
+            # Mock the sync fuction so that it does not throw errors when called.
+            # It expects to be authenticated with AnkiWeb among other things.
+            patch_ankiweb_sync_to_do_nothing(mw, monkeypatch)
+            monkeypatch.setattr(mw.col, "_backend", Mock())
+            monkeypatch.setattr(mw.taskman, "with_progress", Mock())
+
+            # Mock the sync_will_start hook so that we can check if it was called when the sync starts.
+            sync_will_start_mock = Mock()
+            monkeypatch.setattr(gui_hooks, "sync_will_start", sync_will_start_mock)
+
+            _setup_logging_for_sync_collection_and_media()
+
+            mw._sync_collection_and_media(after_sync=lambda: None)
+
+            sync_will_start_mock.assert_called_once()
+
+    def test_setup_sentry_reporting_for_error_on_addon_update(
+        self, anki_session: AnkiSession, monkeypatch: MonkeyPatch
+    ):
+        # Test that the original AddonManager._install method gets called despite the monkeypatching we do in debug.py
+        with anki_session.profile_loaded():
+
+            # Mock the _install function so that it does not throw errors when called.
+            install_mock = Mock()
+            monkeypatch.setattr(aqt.mw.addonManager, "_install", install_mock)
+
+            _setup_sentry_reporting_for_error_on_addon_update()
+
+            # Using fake arguments just to make sure that the original function (which is now mocked)
+            # is called with the same arguments.
+            aqt.mw.addonManager._install("arg1", "arg2")  # type: ignore
+
+            install_mock.assert_called_once_with("arg1", "arg2")
+
+    def test_user_files_context_dict(self, anki_session: AnkiSession):
+        # Test that the user_files_context_dict function does not throw an exception when called.
+        with anki_session.profile_loaded():
+            _user_files_context_dict()
+
+    def test_log_stack(self):
+        # Test that the _log_stack function does not throw an exception when called.
+        _log_stack("test")
