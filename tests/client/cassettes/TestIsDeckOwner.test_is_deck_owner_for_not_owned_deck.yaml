@@ -1,0 +1,114 @@
+interactions:
+- request:
+    body: '{"username": "test1", "password": "asdf"}'
+    headers:
+      Accept:
+      - application/json; version=7.0
+      Accept-Encoding:
+      - gzip, deflate
+      Connection:
+      - keep-alive
+      Content-Length:
+      - '41'
+      Content-Type:
+      - application/json
+      User-Agent:
+      - python-requests/2.28.2
+    method: POST
+    uri: http://localhost:8000/api/login/
+  response:
+    body:
+      string: '{"expiry":"2023-03-31T12:45:16.276241Z","token":"8ab0dc8b730e1da9fec6b78582fbd1f37251870f73b201a575f101a3a066904e"}'
+    headers:
+      Allow:
+      - POST, OPTIONS
+      Content-Language:
+      - en
+      Content-Length:
+      - '115'
+      Content-Type:
+      - application/json
+      Cross-Origin-Opener-Policy:
+      - same-origin
+      Date:
+      - Fri, 24 Mar 2023 12:45:16 GMT
+      Referrer-Policy:
+      - same-origin
+      Server:
+      - WSGIServer/0.2 CPython/3.8.16
+      Server-Timing:
+      - TimerPanel_utime;dur=405.8920000000086;desc="User CPU time", TimerPanel_stime;dur=72.32400000000005;desc="System
+        CPU time", TimerPanel_total;dur=478.21600000000865;desc="Total CPU time",
+        TimerPanel_total_time;dur=248.76976013183594;desc="Elapsed time", SQLPanel_sql_time;dur=6.346940994262695;desc="SQL
+        10 queries", CachePanel_total_time;dur=0;desc="Cache 0 Calls"
+      Set-Cookie:
+      - csrftoken=mig7yHmMVf6Cm3vp183Dwz2muWIZWBp5; expires=Fri, 22 Mar 2024 12:45:16
+        GMT; HttpOnly; Max-Age=31449600; Path=/; SameSite=Lax
+      - sessionid=y7zg0ewueenp58e5qzwwaqct43eendnn; expires=Fri, 31 Mar 2023 12:45:16
+        GMT; HttpOnly; Max-Age=604800; Path=/; SameSite=Lax
+      Vary:
+      - Accept, Cookie, Accept-Language, Origin
+      X-Content-Type-Options:
+      - nosniff
+      X-Frame-Options:
+      - DENY
+      djdt-store-id:
+      - 095403efab7741a3b25915475f8a70f3
+    status:
+      code: 200
+      message: OK
+- request:
+    body: null
+    headers:
+      Accept:
+      - application/json; version=7.0
+      Accept-Encoding:
+      - gzip, deflate
+      Authorization:
+      - Token 8ab0dc8b730e1da9fec6b78582fbd1f37251870f73b201a575f101a3a066904e
+      Connection:
+      - keep-alive
+      Content-Type:
+      - application/json
+      User-Agent:
+      - python-requests/2.28.2
+    method: GET
+    uri: http://localhost:8000/api/users/me
+  response:
+    body:
+      string: '{"username":"test1","email":"test1@email.com","name":"","subscribed_decks":[],"created_decks":[{"id":"dda0d3ad-89cd-45fb-8ddc-fabad93c2d7b","name":"Michael
+        Nicholson","anki_id":4099816654,"is_private":false,"notes_count":10,"subscribers_count":0,"description":"","updates_count":0}],"maintained_decks":[],"memberships":[{"start_date":null,"end_date":null,"status":"active","issuer":null}]}'
+    headers:
+      Allow:
+      - GET, HEAD, OPTIONS
+      Content-Language:
+      - en
+      Content-Length:
+      - '389'
+      Content-Type:
+      - application/json
+      Cross-Origin-Opener-Policy:
+      - same-origin
+      Date:
+      - Fri, 24 Mar 2023 12:45:16 GMT
+      Referrer-Policy:
+      - same-origin
+      Server:
+      - WSGIServer/0.2 CPython/3.8.16
+      Server-Timing:
+      - TimerPanel_utime;dur=75.07999999999981;desc="User CPU time", TimerPanel_stime;dur=0.0;desc="System
+        CPU time", TimerPanel_total;dur=75.07999999999981;desc="Total CPU time", TimerPanel_total_time;dur=78.59683036804199;desc="Elapsed
+        time", SQLPanel_sql_time;dur=2.566099166870117;desc="SQL 7 queries", CachePanel_total_time;dur=0;desc="Cache
+        0 Calls"
+      Vary:
+      - Accept, Accept-Language, Cookie, Origin
+      X-Content-Type-Options:
+      - nosniff
+      X-Frame-Options:
+      - DENY
+      djdt-store-id:
+      - 390bc2485ae5454d9932120dab1e69c1
+    status:
+      code: 200
+      message: OK
+version: 1

@@ -1103,6 +1103,15 @@ class AnkiHubClient:
         data = response.json()
         return data
 
+    def is_deck_owner(self, deck_id: uuid.UUID) -> bool:
+        response = self._send_request("GET", "/users/me")
+        if response.status_code != 200:
+            raise AnkiHubRequestError(response)
+
+        data = response.json()
+        result = any(deck["id"] == str(deck_id) for deck in data["created_decks"])
+        return result
+
 
 def transform_notes_data(notes_data: List[Dict]) -> List[Dict]:
     # TODO Fix differences between csv (used when installing for the first time) vs.
