@@ -415,8 +415,6 @@ def upload_deck_assets_setup(parent):
 
     q_action = QAction("📸 Upload images for deck", aqt.mw)
     qconnect(q_action.triggered, upload_deck_assets_action)
-    if not config.deck_ids(creator_only=True):
-        q_action.setDisabled(True)
     parent.addAction(q_action)
 
 
@@ -430,6 +428,11 @@ def upload_deck_assets_action() -> None:
         )
         return
 
+    # TODO: Get list of decks from AnkiHub which are owned by the user and let the
+    # user choose one of them instead of what we have below.
+    # We only want to allow the user to upload images for decks that they own.
+    # If the user has no owned decks, we should show a message informing them
+    # about this and not allow them to upload images.
     ah_did = choose_ankihub_deck(
         "Choose the AnkiHub deck for which<br>you want to upload images.", parent=aqt.mw
     )
@@ -484,8 +487,6 @@ def upload_deck_assets_action() -> None:
     # Extract the AnkiHub deck ID using a sample note id
     ah_did = ankihub_db.ankihub_did_for_anki_nid(nids[0])
 
-    # TODO: Before starting the upload operation, have to confirm with the backend
-    # if the user is really the deck owner
     op = QueryOp(
         parent=aqt.mw,
         op=lambda col: client.upload_assets_for_deck(
