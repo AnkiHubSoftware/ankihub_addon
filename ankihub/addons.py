@@ -1,10 +1,10 @@
 import logging
-import aqt
 import os
 from concurrent.futures import Future
 from pathlib import Path
 from typing import Any, Callable
 
+import aqt
 from anki.hooks import wrap
 from aqt import addons
 from aqt.addons import AddonManager, DownloaderInstaller

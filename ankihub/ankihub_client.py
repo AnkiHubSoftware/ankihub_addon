@@ -7,8 +7,10 @@ import logging
 import os
 import re
 import shutil
+import urllib.parse
 import uuid
 from abc import ABC
+from concurrent.futures import ThreadPoolExecutor, as_completed
 from dataclasses import dataclass
 from datetime import datetime
 from enum import Enum
@@ -27,7 +29,6 @@ from typing import (
     Set,
 )
 from zipfile import ZipFile
-from concurrent.futures import ThreadPoolExecutor, as_completed
 import requests
 from mashumaro import field_options
 from mashumaro.config import BaseConfig
@@ -636,28 +637,10 @@ class AnkiHubClient:
         with open(filepath, "rb") as file_ref:
             self._upload_to_s3(s3_presigned_url, file_ref)
 
-    def download_images(self, img_names: List[str], deck_id: uuid.UUID) -> None:
-        deck_images_remote_dir = f"{self.s3_bucket_url}/deck_assets/{deck_id}"
-
-        for img_name in img_names:
-            img_path = self.local_media_dir_path / img_name
-            # First we check if the image already exists.
-            # If yes, we skip this iteration.
-            if os.path.isfile(img_path):
-                continue
-
-            # If not, download the image from bucket
-            # and store the image locally
-            img_remote_path = deck_images_remote_dir + img_name
-            response = requests.get(img_remote_path, stream=True)
-
-            # Log and skip this iteration if the response is not 200 OK
-            if not response.ok:
-                LOGGER.info(
-                    f"Unable to download image [{img_remote_path}]. Response status code: {response.status_code}"
-                )
-                continue
-
+    def download_image(self, img_path, img_remote_path):
+        response = requests.get(img_remote_path, stream=True)
+        # Log and skip this iteration if the response is not 200 OK
+        if response.ok:
             # If we get a valid response, open the file and write the content
             with open(img_path, "wb") as handle:
                 for block in response.iter_content(1024):
@@ -665,6 +648,33 @@ class AnkiHubClient:
                         break
 
                     handle.write(block)
+        else:
+            LOGGER.info(
+                f"Unable to download image [{img_remote_path}]. Response status code: {response.status_code}"
+            )
+
+    def download_images(self, img_names: List[str], deck_id: uuid.UUID) -> None:
+        deck_images_remote_dir = f"{self.s3_bucket_url}/deck_assets/{deck_id}/"
+        futures = []
+        with ThreadPoolExecutor() as executor:
+            for img_name in img_names:
+                img_path = self.local_media_dir_path / img_name
+
+                img_remote_path = deck_images_remote_dir + urllib.parse.quote_plus(
+                    img_name
+                )
+
+                # First we check if the image already exists.
+                # If yes, we skip this iteration.
+                if os.path.isfile(img_path):
+                    continue
+
+                futures.append(
+                    executor.submit(self.download_image, img_path, img_remote_path)
+                )
+
+            for future in as_completed(futures):
+                future.result()
 
     def _gzip_compress_string(self, string: str) -> bytes:
         result = gzip.compress(
