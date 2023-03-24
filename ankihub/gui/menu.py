@@ -21,7 +21,7 @@ from aqt import (
 from aqt.operations import QueryOp
 from aqt.qt import QAction, QDialog, QKeySequence, QMenu, Qt, qconnect
 from aqt.studydeck import StudyDeck
-from aqt.utils import openLink, showInfo, showText, tooltip
+from aqt.utils import openLink, showInfo, tooltip
 from requests.exceptions import ConnectionError
 
 from .. import LOGGER
@@ -104,7 +104,7 @@ class AnkiHubLogin(QWidget):
         username_or_email = self.username_or_email_box_text.text()
         password = self.password_box_text.text()
         if not all([username_or_email, password]):
-            showText("Oops! You forgot to put in a username or password!")
+            showInfo("Oops! You forgot to put in a username or password!")
             return
         ankihub_client = AnkiHubClient()
 
@@ -208,7 +208,7 @@ def create_collaborative_deck_action() -> None:
         return
 
     if len(aqt.mw.col.find_cards(f'deck:"{deck_name}"')) == 0:
-        showText("You can't upload an empty deck.")
+        showInfo("You can't upload an empty deck.")
         return
 
     public = ask_user(
@@ -422,7 +422,7 @@ def upload_deck_assets_action() -> None:
     client = AnkiHubClient()
 
     if not client.is_feature_flag_enabled("image_support_enabled"):
-        showText(
+        showInfo(
             "The image support feature is not enabled yet for your account.<br>"
             "We are working on it and it will be available soon.<br>"
         )
@@ -444,7 +444,7 @@ def upload_deck_assets_action() -> None:
 
     nids = ankihub_db.anki_nids_for_ankihub_deck(ah_did)
     if not nids:
-        showText("You can't upload images for an empty deck.")
+        showInfo("You can't upload images for an empty deck.")
         return
 
     # Obtain a list of NoteInfo objects from nids
@@ -458,12 +458,12 @@ def upload_deck_assets_action() -> None:
     # Check if the deck references any local asset, if it does
     # not, no point on trying to upload it
     if not image_paths:
-        showText("This deck has no images to upload.")
+        showInfo("This deck has no images to upload.")
         return
 
     # Check if the files referenced by the deck exists locally, if none exist, no point in uploading.
     if not any([image_path.is_file() for image_path in image_paths]):
-        showText(
+        showInfo(
             "You can't upload images for this deck because none of the referenced images are present in your "
             "local media folder."
         )
