@@ -11,7 +11,7 @@ from aqt.addons import AddonManager
 
 from . import LOGGER
 from .db import is_ankihub_db_attached_to_anki_db
-from .error_reporting import report_exception_and_upload_logs
+from .errors import report_exception_and_upload_logs
 
 
 def _with_sentry_report_about_user_files_on_error(*args: Any, **kwargs: Any) -> Any:
