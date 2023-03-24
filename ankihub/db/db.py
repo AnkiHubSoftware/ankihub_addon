@@ -16,9 +16,7 @@ from .db_utils import DBConnection
 
 
 def attach_ankihub_db_to_anki_db_connection() -> None:
-    if ankihub_db.database_name not in [
-        name for _, name, _ in aqt.mw.col.db.all("PRAGMA database_list")
-    ]:
+    if not is_ankihub_db_attached_to_anki_db():
         aqt.mw.col.db.execute(
             f"ATTACH DATABASE ? AS {ankihub_db.database_name}",
             str(ankihub_db.database_path),
@@ -31,9 +29,7 @@ def detach_ankihub_db_from_anki_db_connection() -> None:
         LOGGER.info("The collection is not open. Not detaching AnkiHub DB.")
         return
 
-    if ankihub_db.database_name in [
-        name for _, name, _ in aqt.mw.col.db.all("PRAGMA database_list")
-    ]:
+    if is_ankihub_db_attached_to_anki_db():
         # Liberal use of try/except to ensure we always try to detach and begin a new
         # transaction.
         try:
@@ -52,6 +48,12 @@ def detach_ankihub_db_from_anki_db_connection() -> None:
         aqt.mw.col.db.begin()
 
         LOGGER.info("Began new transaction.")
+
+
+def is_ankihub_db_attached_to_anki_db() -> bool:
+    return ankihub_db.database_name in [
+        name for _, name, _ in aqt.mw.col.db.all("PRAGMA database_list")
+    ]
 
 
 @contextmanager
