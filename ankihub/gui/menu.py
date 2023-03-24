@@ -424,7 +424,7 @@ def upload_deck_assets_action() -> None:
     if not client.is_feature_flag_enabled("image_support_enabled"):
         showInfo(
             "The image support feature is not enabled yet for your account.<br>"
-            "We are working on it and it will be available soon.<br>"
+            "We are working on it and it will be available soon."
         )
         return
 
