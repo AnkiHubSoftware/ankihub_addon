@@ -1128,7 +1128,7 @@ class TestUploadAssetsForDeck:
 
         all_img_names_in_notes = get_image_names_from_notes_data(notes_data)
         mocked_upload_assets.assert_called_once_with(
-            image_names=all_img_names_in_notes, deck_id=deck_id
+            image_names=list(all_img_names_in_notes), deck_id=deck_id
         )
 
         mocked_upload_file_to_s3.assert_not_called()
