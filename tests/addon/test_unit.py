@@ -289,7 +289,7 @@ class TestSuggestionDialog:
         if change_type_needed:
             dialog.change_type_select.setCurrentText(suggestion_type.value[1])
 
-        expected_source = ""
+        expected_source_text = ""
         if source_needed:
             dialog.source_widget.source_type_select.setCurrentText(source_type.value)
             if source_type == SourceType.UWORLD:
@@ -298,8 +298,8 @@ class TestSuggestionDialog:
                     expected_uworld_step
                 )
 
-            expected_source = "https://test_url.com"
-            dialog.source_widget.source_edit.setText(expected_source)
+            expected_source_text = "https://test_url.com"
+            dialog.source_widget.source_edit.setText(expected_source_text)
 
         dialog.rationale_edit.setPlainText("test")
 
@@ -321,9 +321,9 @@ class TestSuggestionDialog:
 
         # Assert that the form result is correct
         expected_source_text = (
-            f"{expected_uworld_step} {expected_source}"
+            f"{expected_uworld_step} {expected_source_text}"
             if source_type == SourceType.UWORLD
-            else expected_source
+            else expected_source_text
         )
         expected_source = (
             SuggestionSource(source_type=source_type, source_text=expected_source_text)

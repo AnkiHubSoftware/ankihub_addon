@@ -457,7 +457,7 @@ except (FileNotFoundError, KeyError):
 
 url_view_note = lambda: f"{config.app_url}/decks/notes/"  # noqa: E731
 url_view_note_history = (
-    lambda: f"{config.app_url}/decks/{{ankihub_did}}/suggestions/?search=note:{{ankihub_nid}} state:closed"
+    lambda: f"{config.app_url}/decks/{{ankihub_did}}/suggestions/?search=note:{{ankihub_nid}},state:closed"
 )  # noqa: E731
 url_view_deck = lambda: f"{config.app_url}/decks/"  # noqa: E731
 url_help = lambda: f"{config.app_url}/help"  # noqa: E731
