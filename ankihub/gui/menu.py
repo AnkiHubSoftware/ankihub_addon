@@ -590,11 +590,11 @@ def setup_ankihub_menu() -> None:
     global ankihub_menu
     ankihub_menu = QMenu("&AnkiHub", parent=aqt.mw)
     aqt.mw.form.menubar.addMenu(ankihub_menu)
-    refresh_ankihub_menu()
     config.token_change_hook = lambda: aqt.mw.taskman.run_on_main(refresh_ankihub_menu)
     config.subscriptions_change_hook = lambda: aqt.mw.taskman.run_on_main(
         refresh_ankihub_menu
     )
+    refresh_ankihub_menu()
 
 
 def refresh_ankihub_menu() -> None:
