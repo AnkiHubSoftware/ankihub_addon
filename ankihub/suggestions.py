@@ -34,7 +34,7 @@ def suggest_note_update(
     If calling this function from the editor, the note should be reloaded after this function is called,
     because the note's assets will possibly have been renamed.
     """
-    suggestion = change_note_suggestion(note, change_type, comment)
+    suggestion = _change_note_suggestion(note, change_type, comment)
     if suggestion is None:
         return False
 
@@ -60,7 +60,7 @@ def suggest_new_note(
     Also renames assets in the Anki collection and the media folder and uploads them to AnkiHub.
     If calling this function from the editor, the note should be reloaded after this function is called,
     because the note's assets will possibly have been renamed."""
-    suggestion = new_note_suggestion(note, ankihub_did, comment)
+    suggestion = _new_note_suggestion(note, ankihub_did, comment)
 
     suggestion = cast(
         NewNoteSuggestion,
@@ -181,7 +181,7 @@ def _suggestions_for_notes(
 
     # Create change note suggestions for notes that exist on remote
     change_note_suggestions_or_none_by_nid = {
-        note.id: change_note_suggestion(
+        note.id: _change_note_suggestion(
             note=note,
             change_type=change_type,
             comment=comment,
@@ -202,7 +202,7 @@ def _suggestions_for_notes(
 
     # Create new note suggestions for notes that don't exist on remote
     new_note_suggestions = [
-        new_note_suggestion(
+        _new_note_suggestion(
             note=note,
             ankihub_deck_uuid=ankihub_did,
             comment=comment,
@@ -213,7 +213,7 @@ def _suggestions_for_notes(
     return new_note_suggestions, change_note_suggestions, nids_without_changes
 
 
-def change_note_suggestion(
+def _change_note_suggestion(
     note: Note, change_type: SuggestionType, comment: str
 ) -> Optional[ChangeNoteSuggestion]:
     note_data = to_note_data(note, diff=True)
@@ -232,7 +232,7 @@ def change_note_suggestion(
     )
 
 
-def new_note_suggestion(
+def _new_note_suggestion(
     note: Note, ankihub_deck_uuid: uuid.UUID, comment: str
 ) -> NewNoteSuggestion:
     note_data = to_note_data(note, set_new_id=True)
