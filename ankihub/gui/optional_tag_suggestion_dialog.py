@@ -1,8 +1,8 @@
 from concurrent.futures import Future
 from typing import Sequence
 
-from anki.notes import NoteId
 import aqt
+from anki.notes import NoteId
 from aqt.qt import (
     QAbstractItemView,
     QCheckBox,
