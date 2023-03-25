@@ -11,7 +11,6 @@ from anki.utils import ids2str, join_fields, split_fields
 
 from .. import LOGGER
 from ..ankihub_client import Field, NoteInfo, suggestion_type_from_str
-from ..settings import ankihub_db_path
 from .db_utils import DBConnection
 
 
@@ -83,8 +82,8 @@ class _AnkiHubDB:
     def first(self, *args, **kwargs) -> Optional[Tuple]:
         return self.connection().first(*args, **kwargs)
 
-    def setup_and_migrate(self) -> None:
-        self.database_path = ankihub_db_path()
+    def setup_and_migrate(self, db_path: Path) -> None:
+        self.database_path = db_path
 
         notes_table_exists = self.scalar(
             """
