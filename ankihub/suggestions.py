@@ -71,67 +71,6 @@ def suggest_new_note(
     client.create_new_note_suggestion(suggestion, auto_accept=auto_accept)
 
 
-def _rename_and_upload_assets_for_suggestion(
-    suggestion: NoteSuggestion, ankihub_did: uuid.UUID
-) -> NoteSuggestion:
-    suggestion = _rename_and_upload_assets_for_suggestions([suggestion], ankihub_did)[0]
-    return suggestion
-
-
-def _rename_and_upload_assets_for_suggestions(
-    suggestions: Sequence[NoteSuggestion], ankihub_did: uuid.UUID
-) -> Sequence[NoteSuggestion]:
-    """Renames assets referenced on the suggestions in the Anki collection and the media folder and
-    uploads them to AnkiHub.
-    Returns suggestion with updated asset names."""
-
-    client = AnkiHubClient()
-    if not client.is_feature_flag_enabled("image_support_enabled"):
-        return suggestions
-
-    suggestions = copy.deepcopy(suggestions)
-    asset_name_map = client.upload_assets_for_suggestions(suggestions, ankihub_did)
-
-    if asset_name_map:
-        for suggestion in suggestions:
-            _replace_asset_names_in_suggestion(suggestion, asset_name_map)
-
-        _update_asset_names_on_notes(asset_name_map)
-
-    return suggestions
-
-
-def _replace_asset_names_in_suggestion(
-    suggestion: NoteSuggestion, asset_name_map: Dict[str, str]
-):
-    suggestion.fields = [
-        _field_with_replaced_asset_names(field, asset_name_map)
-        for field in suggestion.fields
-    ]
-
-
-def _field_with_replaced_asset_names(field: Field, asset_map: Dict[str, str]) -> Field:
-    result = copy.deepcopy(field)
-    for old_name, new_name in asset_map.items():
-        # TODO: Think of a better way of doing that. Currently we need to call it twice,
-        # one for single quotes and other for double quotes around the src attribute.
-        result.value = result.value.replace(f'src="{old_name}"', f'src="{new_name}"')
-        result.value = result.value.replace(f"src='{old_name}'", f"src='{new_name}'")
-    return result
-
-
-def _update_asset_names_on_notes(asset_name_map: Dict[str, str]):
-    for original_filename, new_filename in asset_name_map.items():
-        # TODO: Think of a better way of doing that. Currently we need to call it twice,
-        # one for single quotes and other for double quotes around the src attribute.
-        find_and_replace_text_in_fields_on_all_notes(
-            f'src="{original_filename}"', f'src="{new_filename}"'
-        )
-        find_and_replace_text_in_fields_on_all_notes(
-            f"src='{original_filename}'", f"src='{new_filename}'"
-        )
-
-
 @dataclass
 class BulkNoteSuggestionsResult:
     errors_by_nid: Dict[NoteId, Dict[str, List[str]]]  # dict of errors by anki_nid
@@ -309,3 +248,64 @@ def new_note_suggestion(
         guid=note.guid,
         comment=comment,
     )
+
+
+def _rename_and_upload_assets_for_suggestion(
+    suggestion: NoteSuggestion, ankihub_did: uuid.UUID
+) -> NoteSuggestion:
+    suggestion = _rename_and_upload_assets_for_suggestions([suggestion], ankihub_did)[0]
+    return suggestion
+
+
+def _rename_and_upload_assets_for_suggestions(
+    suggestions: Sequence[NoteSuggestion], ankihub_did: uuid.UUID
+) -> Sequence[NoteSuggestion]:
+    """Renames assets referenced on the suggestions in the Anki collection and the media folder and
+    uploads them to AnkiHub.
+    Returns suggestion with updated asset names."""
+
+    client = AnkiHubClient()
+    if not client.is_feature_flag_enabled("image_support_enabled"):
+        return suggestions
+
+    suggestions = copy.deepcopy(suggestions)
+    asset_name_map = client.upload_assets_for_suggestions(suggestions, ankihub_did)
+
+    if asset_name_map:
+        for suggestion in suggestions:
+            _replace_asset_names_in_suggestion(suggestion, asset_name_map)
+
+        _update_asset_names_on_notes(asset_name_map)
+
+    return suggestions
+
+
+def _replace_asset_names_in_suggestion(
+    suggestion: NoteSuggestion, asset_name_map: Dict[str, str]
+):
+    suggestion.fields = [
+        _field_with_replaced_asset_names(field, asset_name_map)
+        for field in suggestion.fields
+    ]
+
+
+def _field_with_replaced_asset_names(field: Field, asset_map: Dict[str, str]) -> Field:
+    result = copy.deepcopy(field)
+    for old_name, new_name in asset_map.items():
+        # TODO: Think of a better way of doing that. Currently we need to call it twice,
+        # one for single quotes and other for double quotes around the src attribute.
+        result.value = result.value.replace(f'src="{old_name}"', f'src="{new_name}"')
+        result.value = result.value.replace(f"src='{old_name}'", f"src='{new_name}'")
+    return result
+
+
+def _update_asset_names_on_notes(asset_name_map: Dict[str, str]):
+    for original_filename, new_filename in asset_name_map.items():
+        # TODO: Think of a better way of doing that. Currently we need to call it twice,
+        # one for single quotes and other for double quotes around the src attribute.
+        find_and_replace_text_in_fields_on_all_notes(
+            f'src="{original_filename}"', f'src="{new_filename}"'
+        )
+        find_and_replace_text_in_fields_on_all_notes(
+            f"src='{original_filename}'", f"src='{new_filename}'"
+        )
