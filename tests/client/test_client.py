@@ -183,7 +183,7 @@ def new_note_suggestion_note_info(
 
 
 @pytest.fixture
-def _change_note_suggestion(
+def change_note_suggestion(
     next_deterministic_uuid: Callable[[], uuid.UUID],
 ):
     return ChangeNoteSuggestion(
