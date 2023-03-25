@@ -2,7 +2,7 @@ import sqlite3
 import uuid
 from contextlib import contextmanager
 from pathlib import Path
-from typing import Any, Iterable, List, Optional, Sequence, Tuple
+from typing import Any, Dict, Iterable, List, Optional, Sequence, Tuple
 
 import aqt
 from anki.models import NotetypeId
@@ -81,6 +81,11 @@ class _AnkiHubDB:
 
     def first(self, *args, **kwargs) -> Optional[Tuple]:
         return self.connection().first(*args, **kwargs)
+
+    def dict(self, *args, **kwargs) -> Dict[Any, Any]:
+        rows = self.connection().execute(*args, **kwargs, first_row_only=False)
+        result = {row[0]: row[1] for row in rows}
+        return result
 
     def setup_and_migrate(self, db_path: Path) -> None:
         self.database_path = db_path
@@ -180,7 +185,7 @@ class _AnkiHubDB:
                     note_data.anki_nid,
                     note_data.mid,
                     fields,
-                    aqt.mw.col.tags.join(note_data.tags),
+                    " ".join(note_data.tags),
                     note_data.guid,
                     note_data.last_update_type.value[0]
                     if note_data.last_update_type is not None
@@ -354,6 +359,22 @@ class _AnkiHubDB:
             return None
 
         result = uuid.UUID(nid_str)
+        return result
+
+    def anki_nids_to_ankihub_nids(
+        self, anki_nids: List[NoteId]
+    ) -> Dict[NoteId, uuid.UUID]:
+        ah_nid_for_anki_nid = self.dict(
+            f"""
+            SELECT anki_note_id, ankihub_note_id FROM notes
+            WHERE anki_note_id IN {ids2str(anki_nids)}
+            """
+        )
+        result = {NoteId(k): uuid.UUID(v) for k, v in ah_nid_for_anki_nid.items()}
+
+        not_existing = set(anki_nids) - set(result.keys())
+        result.update({nid: None for nid in not_existing})
+
         return result
 
     def anki_nid_for_ankihub_nid(self, ankihub_id: uuid.UUID) -> Optional[NoteId]:
