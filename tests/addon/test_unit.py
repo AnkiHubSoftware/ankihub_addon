@@ -1,9 +1,9 @@
 import os
+from pathlib import Path
 from typing import List
 
 from anki.notes import Note
 from pytest_anki import AnkiSession
-from pathlib import Path
 
 # workaround for vscode test discovery not using pytest.ini which sets this env var
 # has to be set before importing ankihub

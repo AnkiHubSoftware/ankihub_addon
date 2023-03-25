@@ -1,9 +1,12 @@
 import copy
-from itertools import groupby
+import logging
 import uuid
 from dataclasses import dataclass
-from typing import Any, Dict, List, Optional, cast, Callable
+from itertools import groupby
+from pathlib import Path
+from typing import Any, Callable, Dict, List, Optional, cast
 
+import aqt
 from anki.notes import Note, NoteId
 
 from .addon_ankihub_client import AddonAnkiHubClient as AnkiHubClient
@@ -17,9 +20,6 @@ from .ankihub_client import (
 from .db import ankihub_db
 from .exporting import to_note_data
 from .media_utils import find_and_replace_text_in_fields_on_all_notes
-from pathlib import Path
-import aqt
-import logging
 
 LOGGER = logging.getLogger(__name__)
 
