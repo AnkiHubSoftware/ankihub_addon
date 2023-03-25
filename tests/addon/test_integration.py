@@ -595,6 +595,7 @@ def test_suggest_notes_in_bulk(
     monkeypatch: MonkeyPatch,
     install_sample_ah_deck: InstallSampleAHDeck,
     next_deterministic_uuid: Callable[[], uuid.UUID],
+    disable_image_support_feature_flag,
 ):
     anki_session = anki_session_with_addon_data
     bulk_suggestions_method_mock = MagicMock()

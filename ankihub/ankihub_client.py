@@ -24,11 +24,12 @@ from typing import (
     List,
     Optional,
     Sequence,
+    Set,
     TypedDict,
     Union,
-    Set,
 )
 from zipfile import ZipFile
+
 import requests
 from mashumaro import field_options
 from mashumaro.config import BaseConfig
@@ -544,8 +545,8 @@ class AnkiHubClient:
             for future in as_completed(futures):
                 future.result()
 
-    def upload_assets_for_suggestion(
-        self, suggestion: NoteSuggestion, ah_did: uuid.UUID
+    def upload_assets_for_suggestions(
+        self, suggestions: Sequence[NoteSuggestion], ah_did: uuid.UUID
     ) -> Dict[str, str]:
         """Uploads images for a suggestion to AnkiHub and returns a map of
         the original image names to the new names on AnkiHub."""
@@ -553,7 +554,13 @@ class AnkiHubClient:
         if not self.is_feature_flag_enabled("image_support_enabled"):
             return {}
 
-        image_paths = self._get_images_from_fields(fields=suggestion.fields)
+        image_paths = set()
+        for suggestion in suggestions:
+            image_paths_for_suggestion = self._get_images_from_fields(
+                fields=suggestion.fields
+            )
+            image_paths.update(image_paths_for_suggestion)
+
         asset_name_map = self._generate_asset_files_with_hashed_names(image_paths)
 
         # TODO: We are currently uploading all images for a suggestion,
@@ -836,8 +843,8 @@ class AnkiHubClient:
 
     def create_suggestions_in_bulk(
         self,
-        new_note_suggestions: List[NewNoteSuggestion] = [],
-        change_note_suggestions: List[ChangeNoteSuggestion] = [],
+        new_note_suggestions: Sequence[NewNoteSuggestion] = [],
+        change_note_suggestions: Sequence[ChangeNoteSuggestion] = [],
         auto_accept: bool = False,
     ) -> Dict[int, Dict[str, List[str]]]:
         # returns a dict of errors by anki_nid

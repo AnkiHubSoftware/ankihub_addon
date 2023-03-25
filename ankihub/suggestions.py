@@ -1,7 +1,7 @@
 import copy
 import uuid
 from dataclasses import dataclass
-from typing import Any, Dict, List, Optional, Tuple, cast
+from typing import Any, Dict, List, Optional, Sequence, Tuple, cast
 
 from anki.notes import Note, NoteId
 
@@ -40,7 +40,8 @@ def suggest_note_update(
 
     ah_did = ankihub_db.ankihub_did_for_anki_nid(NoteId(suggestion.anki_nid))
     suggestion = cast(
-        ChangeNoteSuggestion, _rename_and_upload_assets(suggestion, ah_did)
+        ChangeNoteSuggestion,
+        _rename_and_upload_assets_for_suggestion(suggestion, ah_did),
     )
 
     client = AnkiHubClient()
@@ -62,39 +63,49 @@ def suggest_new_note(
     suggestion = new_note_suggestion(note, ankihub_did, comment)
 
     suggestion = cast(
-        NewNoteSuggestion, _rename_and_upload_assets(suggestion, ankihub_did)
+        NewNoteSuggestion,
+        _rename_and_upload_assets_for_suggestion(suggestion, ankihub_did),
     )
 
     client = AnkiHubClient()
     client.create_new_note_suggestion(suggestion, auto_accept=auto_accept)
 
 
-def _rename_and_upload_assets(
+def _rename_and_upload_assets_for_suggestion(
     suggestion: NoteSuggestion, ankihub_did: uuid.UUID
 ) -> NoteSuggestion:
-    """Renames assets in the Anki collection and the media folder and uploads them to AnkiHub.
-    Returns a suggestion with updated asset names."""
-
-    client = AnkiHubClient()
-    if not client.is_feature_flag_enabled("image_support_enabled"):
-        return suggestion
-
-    suggestion = copy.deepcopy(suggestion)
-
-    asset_name_map = client.upload_assets_for_suggestion(suggestion, ankihub_did)
-
-    if asset_name_map:
-        _replace_asset_names_in_suggestion(suggestion, asset_name_map)
-        _update_asset_names_on_notes(asset_name_map)
-
+    suggestion = _rename_and_upload_assets_for_suggestions([suggestion], ankihub_did)[0]
     return suggestion
 
 
+def _rename_and_upload_assets_for_suggestions(
+    suggestions: Sequence[NoteSuggestion], ankihub_did: uuid.UUID
+) -> Sequence[NoteSuggestion]:
+    """Renames assets referenced on the suggestions in the Anki collection and the media folder and
+    uploads them to AnkiHub.
+    Returns suggestion with updated asset names."""
+
+    client = AnkiHubClient()
+    if not client.is_feature_flag_enabled("image_support_enabled"):
+        return suggestions
+
+    suggestions = copy.deepcopy(suggestions)
+    asset_name_map = client.upload_assets_for_suggestions(suggestions, ankihub_did)
+
+    if asset_name_map:
+        for suggestion in suggestions:
+            _replace_asset_names_in_suggestion(suggestion, asset_name_map)
+
+        _update_asset_names_on_notes(asset_name_map)
+
+    return suggestions
+
+
 def _replace_asset_names_in_suggestion(
-    suggestion: NoteSuggestion, asset_map: Dict[str, str]
+    suggestion: NoteSuggestion, asset_name_map: Dict[str, str]
 ):
     suggestion.fields = [
-        _field_with_replaced_asset_names(field, asset_map)
+        _field_with_replaced_asset_names(field, asset_name_map)
         for field in suggestion.fields
     ]
 
@@ -155,6 +166,19 @@ def suggest_notes_in_bulk(
         nids_without_changes,
     ) = _suggestions_for_notes(notes, ankihub_did, change_type, comment)
 
+    new_note_suggestions = cast(
+        Sequence[NewNoteSuggestion],
+        _rename_and_upload_assets_for_suggestions(
+            suggestions=new_note_suggestions, ankihub_did=ankihub_did
+        ),
+    )
+    change_note_suggestions = cast(
+        Sequence[ChangeNoteSuggestion],
+        _rename_and_upload_assets_for_suggestions(
+            suggestions=change_note_suggestions, ankihub_did=ankihub_did
+        ),
+    )
+
     client = AnkiHubClient()
     errors_by_nid_int = client.create_suggestions_in_bulk(
         new_note_suggestions=new_note_suggestions,
@@ -186,13 +210,15 @@ def suggest_notes_in_bulk(
 
 def _suggestions_for_notes(
     notes: List[Note], ankihub_did: uuid.UUID, change_type: SuggestionType, comment: str
-) -> Tuple[List[NewNoteSuggestion], List[ChangeNoteSuggestion], List[NoteId]]:
+) -> Tuple[
+    Sequence[NewNoteSuggestion], Sequence[ChangeNoteSuggestion], Sequence[NoteId]
+]:
     """
     Splits the list of notes into three categories:
     - notes that should be sent as NewNoteSuggestions
     - notes that should be sent as ChangeNoteSuggestions
     - notes that should not be sent because they don't have any changes
-    Returns a tuple of three lists:
+    Returns a tuple of three sequences:
     - new_note_suggestions
     - change_note_suggestions
     - nids_without_changes

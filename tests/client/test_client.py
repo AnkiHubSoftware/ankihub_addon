@@ -924,8 +924,8 @@ class TestUploadImagesForSuggestion:
             )
             client.create_new_note_suggestion(new_note_suggestion=suggestion)
 
-        result = client.upload_assets_for_suggestion(
-            suggestion, ah_did=next_deterministic_uuid()
+        result = client.upload_assets_for_suggestions(
+            [suggestion], ah_did=next_deterministic_uuid()
         )
 
         # assert that the suggestion was made
