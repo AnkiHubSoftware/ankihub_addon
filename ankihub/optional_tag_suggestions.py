@@ -1,8 +1,8 @@
 from typing import Dict, List, Optional
 
+import aqt
 from anki.notes import NoteId
 from anki.utils import ids2str
-import aqt
 
 from .addon_ankihub_client import AddonAnkiHubClient as AnkiHubClient
 from .ankihub_client import OptionalTagSuggestion, TagGroupValidationResponse

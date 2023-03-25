@@ -1,10 +1,9 @@
 import uuid
-
 from concurrent.futures import Future
 from typing import List
 
-from anki.utils import ids2str
 import aqt
+from anki.utils import ids2str
 from aqt.utils import showInfo
 
 from ... import LOGGER
