@@ -4,12 +4,12 @@ import os
 import subprocess
 import tempfile
 import uuid
+import zipfile
 from copy import deepcopy
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Callable, List
 from unittest.mock import MagicMock, Mock
-import zipfile
 
 import pytest
 import requests_mock

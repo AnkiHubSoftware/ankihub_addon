@@ -24,11 +24,12 @@ from typing import (
     List,
     Optional,
     Sequence,
+    Set,
     TypedDict,
     Union,
-    Set,
 )
 from zipfile import ZipFile
+
 import requests
 from mashumaro import field_options
 from mashumaro.config import BaseConfig

@@ -2,8 +2,8 @@ from abc import ABC, abstractmethod
 from datetime import datetime, timedelta
 from typing import Optional, Sequence
 
-from anki.utils import ids2str
 import aqt
+from anki.utils import ids2str
 from aqt.browser import Browser, ItemId
 
 from ..ankihub_client import suggestion_type_from_str
