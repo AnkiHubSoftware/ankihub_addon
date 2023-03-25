@@ -3069,6 +3069,8 @@ def test_check_and_prompt_for_updates_on_main_window(
         utils.check_and_prompt_for_updates_on_main_window()
 
 
+# without this mark the test sometimes fails on cleanup
+@pytest.mark.qt_no_exception_capture
 class TestDebugModule:
     def test_setup_logging_for_sync_collection_and_media(
         self, anki_session: AnkiSession, monkeypatch: MonkeyPatch, qtbot: QtBot
