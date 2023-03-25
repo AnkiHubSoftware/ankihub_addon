@@ -1,6 +1,6 @@
 import os
-import shutil
 import pathlib
+import shutil
 
 
 def run():
