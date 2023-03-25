@@ -2,10 +2,10 @@ import uuid
 from abc import abstractmethod
 from typing import Optional, Sequence
 
+import aqt
 from anki.collection import BrowserColumns
 from anki.notes import Note
 from anki.utils import ids2str
-import aqt
 from aqt.browser import Browser, CellRow, Column, ItemId
 
 from ..db import ankihub_db

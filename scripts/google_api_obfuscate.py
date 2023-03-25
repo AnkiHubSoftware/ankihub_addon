@@ -3,9 +3,9 @@
 # Not intended to prevent manual grabbing.
 # Never use this for important api keys!
 
-from pathlib import Path
 import random
 import sys
+from pathlib import Path
 
 
 def obfuscate_google_api_key(google_api_key: str, dest_path: Path) -> None:

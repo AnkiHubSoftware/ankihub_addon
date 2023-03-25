@@ -2,10 +2,10 @@ import re
 import uuid
 from typing import Dict, Iterable, List, Optional
 
+import aqt
 from anki.decks import DeckId
 from anki.errors import NotFoundError
 from anki.notes import NoteId
-import aqt
 
 from . import LOGGER
 from .db import ankihub_db
