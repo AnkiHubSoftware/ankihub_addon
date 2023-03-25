@@ -11,14 +11,13 @@ from unittest.mock import MagicMock, Mock, PropertyMock
 
 import aqt
 import pytest
-from anki._backend import RustBackendGenerated
 from anki.cards import CardId
 from anki.consts import QUEUE_TYPE_SUSPENDED
 from anki.decks import DeckId, FilteredDeckConfig
 from anki.models import NotetypeDict, NotetypeId
 from anki.notes import Note, NoteId
 from anki.sync import SyncOutput
-from aqt import AnkiQt
+from aqt import AnkiQt, gui_hooks
 from aqt.addcards import AddCards
 from aqt.addons import InstallOk
 from aqt.browser import Browser
@@ -61,6 +60,12 @@ from ankihub.ankihub_client import (
 )
 from ankihub.auto_sync import setup_ankihub_sync_on_ankiweb_sync
 from ankihub.db import ankihub_db, attached_ankihub_db
+from ankihub.debug import (
+    _log_stack,
+    _setup_logging_for_sync_collection_and_media,
+    _setup_sentry_reporting_for_error_on_addon_update,
+    _user_files_context_dict,
+)
 from ankihub.exporting import to_note_data
 from ankihub.gui import utils
 from ankihub.gui.browser import (
@@ -94,7 +99,6 @@ from ankihub.settings import (
     AnkiHubCommands,
     DeckExtension,
     DeckExtensionConfig,
-    api_url_base,
     config,
     profile_files_path,
 )
@@ -284,7 +288,7 @@ def test_editor(
         monkeypatch.setattr("ankihub.exporting.uuid.uuid4", lambda: note_1_ah_nid)
 
         requests_mock.post(
-            f"{api_url_base()}/notes/{note_1_ah_nid}/suggestion/",
+            f"{config.api_url}/notes/{note_1_ah_nid}/suggestion/",
             status_code=201,
             json={},
         )
@@ -300,7 +304,7 @@ def test_editor(
         note_2_ah_nid = ankihub_db.ankihub_nid_for_anki_nid(note.id)
 
         requests_mock.post(
-            f"{api_url_base()}/notes/{note_2_ah_nid}/suggestion/",
+            f"{config.api_url}/notes/{note_2_ah_nid}/suggestion/",
             status_code=201,
             json={},
         )
@@ -319,7 +323,8 @@ def test_editor(
         # this should trigger a suggestion because the note has been changed
         _on_suggestion_button_press(editor)
 
-        # mocked requests: f"{api_url_base()}/notes/{notes_2_ah_nid}/suggestion/" and request to check feature flags
+        # mocked requests: f"{config.api_url_base}/notes/{notes_2_ah_nid}/suggestion/" and
+        # request to check feature flags
         assert requests_mock.call_count == 2
 
 
@@ -364,6 +369,7 @@ def test_create_collaborative_deck_and_upload(
     anki_session_with_addon_data: AnkiSession,
     monkeypatch: MonkeyPatch,
     next_deterministic_uuid: Callable[[], uuid.UUID],
+    enable_image_support_feature_flag,
 ):
     with anki_session_with_addon_data.profile_loaded():
         mw = anki_session_with_addon_data.mw
@@ -431,7 +437,7 @@ def test_create_collaborative_deck_and_upload(
 def test_get_deck_by_id(
     requests_mock: Mocker, next_deterministic_uuid: Callable[[], uuid.UUID]
 ):
-    client = AnkiHubClient(hooks=[])
+    client = AnkiHubClient(local_media_dir_path=Path("/tmp/ankihub_media"))
 
     # test get deck by id
     ankihub_deck_uuid = next_deterministic_uuid()
@@ -446,7 +452,7 @@ def test_get_deck_by_id(
     }
 
     requests_mock.get(
-        f"{api_url_base()}/decks/{ankihub_deck_uuid}/", json=expected_data
+        f"{config.api_url}/decks/{ankihub_deck_uuid}/", json=expected_data
     )
     deck_info = client.get_deck_by_id(ankihub_deck_uuid=ankihub_deck_uuid)  # type: ignore
     assert deck_info == Deck(
@@ -459,7 +465,7 @@ def test_get_deck_by_id(
     )
 
     # test get deck by id unauthenticated
-    requests_mock.get(f"{api_url_base()}/decks/{ankihub_deck_uuid}/", status_code=403)
+    requests_mock.get(f"{config.api_url}/decks/{ankihub_deck_uuid}/", status_code=403)
 
     try:
         client.get_deck_by_id(ankihub_deck_uuid=ankihub_deck_uuid)  # type: ignore
@@ -472,7 +478,6 @@ def test_suggest_note_update(
     anki_session_with_addon_data: AnkiSession,
     install_sample_ah_deck: InstallSampleAHDeck,
     monkeypatch: MonkeyPatch,
-    ankihub_basic_note_type: NotetypeDict,
     disable_image_support_feature_flag,
 ):
     anki_session = anki_session_with_addon_data
@@ -481,29 +486,35 @@ def test_suggest_note_update(
 
         _, ah_did = install_sample_ah_deck()
 
-        notes_data = ankihub_sample_deck_notes_data()
-        note = mw.col.get_note(NoteId(notes_data[0].anki_nid))
+        nid = mw.col.find_notes("")[0]
+        note = mw.col.get_note(nid)
 
-        # test create change note suggestion
-        note = mw.col.new_note(ankihub_basic_note_type)
-        note["Front"] = "front"
-        note.tags = ["will_be_removed"]
-        ankihub_db.upsert_notes_data(
-            ankihub_did=ah_did, notes_data=[to_note_data(note, set_new_id=True)]
-        )
-
-        # make changes to the note
-        note["Front"] = "updated"
-
-        note.tags = [
-            "a",
-            # internal and optional tags should be removed
+        # Set up tags on the note
+        tags_that_shouldnt_be_sent = [
+            # internal and optional tags should be ignored
             *ADDON_INTERNAL_TAGS,
             *ANKI_INTERNAL_TAGS,
             f"{TAG_FOR_OPTIONAL_TAGS}::TAG_GROUP::OptionalTag",
         ]
 
-        # suggest the changes
+        note.tags = [
+            "stays",
+            "removed",
+            *tags_that_shouldnt_be_sent,
+        ]
+
+        # Update the note in the database to match the note in the collection
+        # so that the changes are detected relative to this state of the note.
+        ankihub_db.upsert_notes_data(
+            ankihub_did=ah_did, notes_data=[to_note_data(note)]
+        )
+
+        # Make some changes to the note
+        note["Front"] = "updated"
+        note.tags.append("added")
+        note.tags.remove("removed")
+
+        # Suggest the changes
         create_change_note_suggestion_mock = MagicMock()
         monkeypatch.setattr(
             "ankihub.ankihub_client.AnkiHubClient.create_change_note_suggestion",
@@ -516,15 +527,15 @@ def test_suggest_note_update(
             comment="test",
         )
 
-        # check that the correct suggestion was created
+        # Check that the correct suggestion was created
         create_change_note_suggestion_mock.assert_called_once_with(
             change_note_suggestion=ChangeNoteSuggestion(
                 anki_nid=note.id,
                 ankihub_note_uuid=ankihub_db.ankihub_nid_for_anki_nid(note.id),
                 change_type=SuggestionType.NEW_CONTENT,
                 fields=[Field(name="Front", value="updated", order=0)],
-                added_tags=["a"],
-                removed_tags=["will_be_removed"],
+                added_tags=["added"],
+                removed_tags=["removed"],
                 comment="test",
             ),
             auto_accept=False,
@@ -545,7 +556,7 @@ def test_suggest_new_note(
         note = mw.col.new_note(mw.col.models.by_name("Basic (Testdeck / user1)"))
 
         adapter = requests_mock.post(
-            f"{api_url_base()}/decks/{ah_did}/note-suggestion/",
+            f"{config.api_url}/decks/{ah_did}/note-suggestion/",
             status_code=201,
         )
 
@@ -570,7 +581,7 @@ def test_suggest_new_note(
         )
 
         # test create change note suggestion unauthenticated
-        url = f"{api_url_base()}/decks/{ah_did}/note-suggestion/"
+        url = f"{config.api_url}/decks/{ah_did}/note-suggestion/"
         requests_mock.post(
             url,
             status_code=403,
@@ -2412,12 +2423,12 @@ def patch_ankiweb_sync_to_do_nothing(mw: AnkiQt, monkeypatch: MonkeyPatch):
         NO_CHANGES=SyncOutput.NO_CHANGES,
     )
     monkeypatch.setattr(
-        RustBackendGenerated, "sync_collection", lambda *args: sync_output_mock
+        mw.col._backend, "sync_collection", lambda *args: sync_output_mock
     )
 
     # Mock the latest_progress function because it is called by a timer during the sync
     # and would otherwise open an error message dialog.
-    monkeypatch.setattr(aqt.mw.col, "latest_progress", lambda *args, **kwargs: Mock())
+    monkeypatch.setattr(mw.col, "latest_progress", lambda *args, **kwargs: Mock())
 
     # Mock the can_auto_sync function so that no sync is triggered when Anki is closed.
     monkeypatch.setattr(mw, "can_auto_sync", lambda *args, **kwargs: False)
@@ -2727,7 +2738,7 @@ def test_download_images_on_sync(
         download_images_mock.assert_called_once_with(["image.png"], ah_did)
 
 
-def test_upload_images(
+def test_upload_assets(
     anki_session_with_addon_data: AnkiSession,
     next_deterministic_uuid: Callable[[], uuid.UUID],
     monkeypatch: MonkeyPatch,
@@ -2738,25 +2749,32 @@ def test_upload_images(
     with anki_session_with_addon_data.profile_loaded():
         fake_presigned_url = "https://fake_presigned_url.com"
         monkeypatch.setattr(
-            "ankihub.ankihub_client.AnkiHubClient.get_presigned_url",
-            lambda *args, **kwargs: fake_presigned_url,
+            AnkiHubClient,
+            "get_presigned_url_for_multiple_uploads",
+            lambda *args, **kwargs: {
+                "url": fake_presigned_url,
+                "fields": {
+                    "key": "deck_images/test/${filename}",
+                },
+            },
         )
 
-        upload_request_mock = requests_mock.put(
-            fake_presigned_url,
-            json={"success": True},
+        s3_upload_request_mock = requests_mock.post(
+            fake_presigned_url, json={"success": True}, status_code=204
         )
 
         with tempfile.NamedTemporaryFile(suffix=".png") as f:
             file_path = Path(f.name)
             fake_deck_id = next_deterministic_uuid()
             client = AnkiHubClient(local_media_dir_path=file_path.parent)
-            client.upload_images([file_path.name], deck_id=fake_deck_id)
+            client.upload_assets([file_path.name], deck_id=fake_deck_id)
 
-        assert len(upload_request_mock.request_history) == 1  # type: ignore
+        assert len(s3_upload_request_mock.request_history) == 1  # type: ignore
 
-        file_path_from_request = upload_request_mock.last_request.text.name  # type: ignore
-        assert file_path_from_request == str(file_path.absolute())
+        file_name_from_request = re.findall(
+            r'filename="(.*?)"', s3_upload_request_mock.last_request.text  # type: ignore
+        )[0]
+        assert file_name_from_request == file_path.name
 
 
 class TestSuggestionsWithImages:
@@ -2775,14 +2793,19 @@ class TestSuggestionsWithImages:
             install_sample_ah_deck()
 
             fake_presigned_url = "https://fake_presigned_url.com"
-            monkeypatch.setattr(
-                "ankihub.ankihub_client.AnkiHubClient.get_presigned_url",
-                lambda *args, **kwargs: fake_presigned_url,
+            s3_upload_request_mock = requests_mock.post(
+                fake_presigned_url, json={"success": True}, status_code=204
             )
 
-            upload_request_mock = requests_mock.put(
-                fake_presigned_url,
-                json={"success": True},
+            monkeypatch.setattr(
+                AnkiHubClient,
+                "get_presigned_url_for_multiple_uploads",
+                lambda *args, **kwargs: {
+                    "url": fake_presigned_url,
+                    "fields": {
+                        "key": "deck_images/test/${filename}",
+                    },
+                },
             )
 
             with tempfile.NamedTemporaryFile(suffix=".png") as f:
@@ -2800,7 +2823,7 @@ class TestSuggestionsWithImages:
 
                 ah_nid = ankihub_db.ankihub_nid_for_anki_nid(note.id)
                 suggestion_request_mock = requests_mock.post(
-                    f"{api_url_base()}/notes/{ah_nid}/suggestion/", status_code=201
+                    f"{config.api_url}/notes/{ah_nid}/suggestion/", status_code=201
                 )
 
                 # create a suggestion for the note
@@ -2813,11 +2836,11 @@ class TestSuggestionsWithImages:
                 assert len(suggestion_request_mock.request_history) == 1  # type: ignore
 
                 # assert that the image was uploaded
-                assert len(upload_request_mock.request_history) == 1  # type: ignore
+                assert len(s3_upload_request_mock.request_history) == 1  # type: ignore
 
                 self._assert_img_names_as_expected(
                     note=note,
-                    upload_request_mock=upload_request_mock,  # type: ignore
+                    upload_request_mock=s3_upload_request_mock,  # type: ignore
                     suggestion_request_mock=suggestion_request_mock,  # type: ignore
                 )
 
@@ -2836,18 +2859,23 @@ class TestSuggestionsWithImages:
             _, ah_did = install_sample_ah_deck()
 
             fake_presigned_url = "https://fake_presigned_url.com"
-            monkeypatch.setattr(
-                "ankihub.ankihub_client.AnkiHubClient.get_presigned_url",
-                lambda *args, **kwargs: fake_presigned_url,
+            s3_upload_request_mock = requests_mock.post(
+                fake_presigned_url, json={"success": True}, status_code=204
             )
 
-            upload_request_mock = requests_mock.put(
-                fake_presigned_url,
-                json={"success": True},
+            monkeypatch.setattr(
+                AnkiHubClient,
+                "get_presigned_url_for_multiple_uploads",
+                lambda *args, **kwargs: {
+                    "url": fake_presigned_url,
+                    "fields": {
+                        "key": "deck_images/test/${filename}",
+                    },
+                },
             )
 
             suggestion_request_mock = requests_mock.post(
-                f"{api_url_base()}/decks/{ah_did}/note-suggestion/",
+                f"{config.api_url}/decks/{ah_did}/note-suggestion/",
                 status_code=201,
             )
 
@@ -2872,7 +2900,7 @@ class TestSuggestionsWithImages:
 
                 self._assert_img_names_as_expected(
                     note=note,
-                    upload_request_mock=upload_request_mock,  # type: ignore
+                    upload_request_mock=s3_upload_request_mock,  # type: ignore
                     suggestion_request_mock=suggestion_request_mock,  # type: ignore
                 )
 
@@ -2883,7 +2911,11 @@ class TestSuggestionsWithImages:
         note.load()
         img_name_in_note = re.search(IMG_NAME_IN_IMG_TAG_REGEX, note["Front"]).group(1)
 
-        name_of_uploaded_image = Path(upload_request_mock.last_request.text.name).name  # type: ignore
+        name_of_uploaded_image = re.findall(
+            r'filename="(.*?)"', upload_request_mock.last_request.text
+        )[
+            0
+        ]  # type: ignore
 
         suggestion_dict = suggestion_request_mock.last_request.json()  # type: ignore
         first_field_value = suggestion_dict["fields"][0]["value"]
@@ -2913,14 +2945,19 @@ class TestSuggestionsWithImages:
             install_sample_ah_deck()
 
             fake_presigned_url = "https://fake_presigned_url.com"
-            monkeypatch.setattr(
-                "ankihub.ankihub_client.AnkiHubClient.get_presigned_url",
-                lambda *args, **kwargs: fake_presigned_url,
+            s3_upload_request_mock = requests_mock.post(
+                fake_presigned_url, json={"success": True}, status_code=204
             )
 
-            upload_request_mock = requests_mock.put(
-                fake_presigned_url,
-                json={"success": True},
+            monkeypatch.setattr(
+                AnkiHubClient,
+                "get_presigned_url_for_multiple_uploads",
+                lambda *args, **kwargs: {
+                    "url": fake_presigned_url,
+                    "fields": {
+                        "key": "deck_images/test/${filename}",
+                    },
+                },
             )
 
             # grab a note from the deck
@@ -2936,7 +2973,7 @@ class TestSuggestionsWithImages:
 
             # create a suggestion for the note
             suggestion_request_mock = requests_mock.post(
-                f"{api_url_base()}/notes/{ah_nid}/suggestion/", status_code=201
+                f"{config.api_url}/notes/{ah_nid}/suggestion/", status_code=201
             )
 
             suggest_note_update(
@@ -2949,7 +2986,7 @@ class TestSuggestionsWithImages:
             assert len(suggestion_request_mock.request_history) == 1  # type: ignore
 
             # assert that the image was NOT uploaded
-            assert len(upload_request_mock.request_history) == 0  # type: ignore
+            assert len(s3_upload_request_mock.request_history) == 0  # type: ignore
 
             note.load()
 
@@ -3041,3 +3078,56 @@ def test_check_and_prompt_for_updates_on_main_window(
     # when called.
     with anki_session.profile_loaded():
         utils.check_and_prompt_for_updates_on_main_window()
+
+
+class TestDebugModule:
+    def test_setup_logging_for_sync_collection_and_media(
+        self, anki_session: AnkiSession, monkeypatch: MonkeyPatch, qtbot: QtBot
+    ):
+        # Test that the original AnkiQt._sync_collection_and_media method gets called
+        # despite the monkeypatching we do in debug.py.
+        with anki_session.profile_loaded():
+            mw = anki_session.mw
+
+            # Mock the sync fuction so that it does not throw errors when called.
+            # It expects to be authenticated with AnkiWeb among other things.
+            patch_ankiweb_sync_to_do_nothing(mw, monkeypatch)
+            monkeypatch.setattr(mw.col, "_backend", Mock())
+            monkeypatch.setattr(mw.taskman, "with_progress", Mock())
+
+            # Mock the sync_will_start hook so that we can check if it was called when the sync starts.
+            sync_will_start_mock = Mock()
+            monkeypatch.setattr(gui_hooks, "sync_will_start", sync_will_start_mock)
+
+            _setup_logging_for_sync_collection_and_media()
+
+            mw._sync_collection_and_media(after_sync=lambda: None)
+
+            sync_will_start_mock.assert_called_once()
+
+    def test_setup_sentry_reporting_for_error_on_addon_update(
+        self, anki_session: AnkiSession, monkeypatch: MonkeyPatch
+    ):
+        # Test that the original AddonManager._install method gets called despite the monkeypatching we do in debug.py
+        with anki_session.profile_loaded():
+
+            # Mock the _install function so that it does not throw errors when called.
+            install_mock = Mock()
+            monkeypatch.setattr(aqt.mw.addonManager, "_install", install_mock)
+
+            _setup_sentry_reporting_for_error_on_addon_update()
+
+            # Using fake arguments just to make sure that the original function (which is now mocked)
+            # is called with the same arguments.
+            aqt.mw.addonManager._install("arg1", "arg2")  # type: ignore
+
+            install_mock.assert_called_once_with("arg1", "arg2")
+
+    def test_user_files_context_dict(self, anki_session: AnkiSession):
+        # Test that the user_files_context_dict function does not throw an exception when called.
+        with anki_session.profile_loaded():
+            _user_files_context_dict()
+
+    def test_log_stack(self):
+        # Test that the _log_stack function does not throw an exception when called.
+        _log_stack("test")

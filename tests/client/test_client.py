@@ -9,6 +9,7 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Callable, List
 from unittest.mock import MagicMock, Mock
+import zipfile
 
 import pytest
 import requests_mock
@@ -22,9 +23,9 @@ from ..factories import NoteInfoFactory
 # has to be set before importing ankihub
 os.environ["SKIP_INIT"] = "1"
 
-from ankihub import ankihub_client
 from ankihub.ankihub_client import (
-    S3_BUCKET_URL,
+    DEFAULT_API_URL,
+    DEFAULT_S3_BUCKET_URL,
     AnkiHubClient,
     ChangeNoteSuggestion,
     Deck,
@@ -57,14 +58,11 @@ VCR_CASSETTES_PATH = Path(__file__).parent / "cassettes"
 DECK_WITH_EXTENSION_UUID = uuid.UUID("100df7b9-7749-4fe0-b801-e3dec1decd72")
 DECK_EXTENSION_ID = 999
 
-
-@pytest.fixture(autouse=True)
-def set_ankihub_app_url():
-    ankihub_client.API_URL_BASE = "http://localhost:8000/api"
+LOCAL_API_URL = "http://localhost:8000/api"
 
 
 @pytest.fixture
-def client(vcr: VCR, request, marks):
+def client_with_server_setup(vcr: VCR, request, marks):
     if "skipifvcr" in marks and vcr_enabled(vcr):
         pytest.skip("Skipping test because test has skipifvcr mark and VCR is enabled")
 
@@ -78,7 +76,7 @@ def client(vcr: VCR, request, marks):
             "python manage.py runscript create_fixture_data"
         )
 
-    client = AnkiHubClient()
+    client = AnkiHubClient(api_url=LOCAL_API_URL, local_media_dir_path=TEST_MEDIA_PATH)
     yield client
 
     if not playback_mode:
@@ -122,17 +120,17 @@ def run_command_in_django_container(command):
 
 
 @pytest.fixture
-def authorized_client_for_user_test1(client: AnkiHubClient):
+def authorized_client_for_user_test1(client_with_server_setup: AnkiHubClient):
     credentials_data = {"username": "test1", "password": "asdf"}
-    client.login(credentials=credentials_data)
-    yield client
+    client_with_server_setup.login(credentials=credentials_data)
+    yield client_with_server_setup
 
 
 @pytest.fixture
-def authorized_client_for_user_test2(client: AnkiHubClient, request):
+def authorized_client_for_user_test2(client_with_server_setup: AnkiHubClient, request):
     credentials_data = {"username": "test2", "password": "asdf"}
-    client.login(credentials=credentials_data)
-    yield client
+    client_with_server_setup.login(credentials=credentials_data)
+    yield client_with_server_setup
 
 
 @pytest.fixture
@@ -218,25 +216,25 @@ def _remove_generated_asset_files():
 
 
 @pytest.mark.vcr()
-def test_client_login_and_signout_with_username(client):
+def test_client_login_and_signout_with_username(client_with_server_setup):
     credentials_data = {"username": "test1", "password": "asdf"}
-    token = client.login(credentials=credentials_data)
+    token = client_with_server_setup.login(credentials=credentials_data)
     assert len(token) == 64
-    assert client.session.headers["Authorization"] == f"Token {token}"
+    assert client_with_server_setup.session.headers["Authorization"] == f"Token {token}"
 
-    client.signout()
-    assert client.session.headers["Authorization"] == ""
+    client_with_server_setup.signout()
+    assert client_with_server_setup.session.headers["Authorization"] == ""
 
 
 @pytest.mark.vcr()
-def test_client_login_and_signout_with_email(client):
+def test_client_login_and_signout_with_email(client_with_server_setup):
     credentials_data = {"email": "test1@email.com", "password": "asdf"}
-    token = client.login(credentials=credentials_data)
+    token = client_with_server_setup.login(credentials=credentials_data)
     assert len(token) == 64
-    assert client.session.headers["Authorization"] == f"Token {token}"
+    assert client_with_server_setup.session.headers["Authorization"] == f"Token {token}"
 
-    client.signout()
-    assert client.session.headers["Authorization"] == ""
+    client_with_server_setup.signout()
+    assert client_with_server_setup.session.headers["Authorization"] == ""
 
 
 @pytest.mark.vcr()
@@ -852,7 +850,7 @@ def test_download_images(
 
         deck_id = next_deterministic_uuid()
         requests_mock.get(
-            f"{S3_BUCKET_URL}/deck_assets/{deck_id}" + "imgage.png",
+            f"{DEFAULT_S3_BUCKET_URL}/deck_assets/{deck_id}/" + "imgage.png",
             content=b"image data",
         )
         client.download_images(img_names=["imgage.png"], deck_id=deck_id)
@@ -865,7 +863,7 @@ class TestUploadImagesForSuggestion:
     @pytest.mark.parametrize(
         "suggestion_type", ["new_note_suggestion", "change_note_suggestion"]
     )
-    def test_upload_images_for_suggestion(
+    def test_upload_assets_for_suggestion(
         self,
         suggestion_type: str,
         requests_mock: Mocker,
@@ -875,6 +873,8 @@ class TestUploadImagesForSuggestion:
         enable_image_support_feature_flag,
         request: FixtureRequest,
     ):
+        client = AnkiHubClient(local_media_dir_path=TEST_MEDIA_PATH)
+
         suggestion: NoteSuggestion = request.getfixturevalue(suggestion_type)
         suggestion.fields[0].value = (
             '<img src="testfile_mario.png" width="100" alt="its-a me!">'
@@ -882,10 +882,8 @@ class TestUploadImagesForSuggestion:
         )
 
         fake_presigned_url = "https://fake_presigned_url.com"
-
-        s3_upload_request_mock = requests_mock.put(
-            fake_presigned_url,
-            json={"success": True},
+        s3_upload_request_mock = requests_mock.post(
+            fake_presigned_url, json={"success": True}, status_code=204
         )
 
         expected_result = {
@@ -898,15 +896,23 @@ class TestUploadImagesForSuggestion:
 
         monkeypatch.setattr(
             AnkiHubClient,
-            "get_presigned_url",
-            lambda *args, **kwargs: fake_presigned_url,
+            "get_presigned_url_for_multiple_uploads",
+            lambda *args, **kwargs: {
+                "url": fake_presigned_url,
+                "fields": {
+                    "key": "deck_images/test/${filename}",
+                    "x-amz-algorithm": "XXXXXX",
+                    "x-amz-credential": "XXXXXX",
+                    "x-amz-date": "20230321T162818Z",
+                    "policy": "test_asuiHGIUWEHF78Y4QFBY24UIWBFV22FV428Y",
+                    "x-amz-signature": "test_822ac386d1ece605db8cfca",
+                },
+            },
         )
-
-        client = AnkiHubClient(local_media_dir_path=TEST_MEDIA_PATH)
 
         if isinstance(suggestion, ChangeNoteSuggestion):
             suggestion_request_mock = requests_mock.post(
-                f"{ankihub_client.API_URL_BASE}/notes/{suggestion.ankihub_note_uuid}/suggestion/",
+                f"{DEFAULT_API_URL}/notes/{suggestion.ankihub_note_uuid}/suggestion/",
                 status_code=201,
             )
 
@@ -914,12 +920,12 @@ class TestUploadImagesForSuggestion:
         else:
             assert isinstance(suggestion, NewNoteSuggestion)
             suggestion_request_mock = requests_mock.post(
-                f"{ankihub_client.API_URL_BASE}/decks/{suggestion.ankihub_deck_uuid}/note-suggestion/",
+                f"{DEFAULT_API_URL}/decks/{suggestion.ankihub_deck_uuid}/note-suggestion/",
                 status_code=201,
             )
             client.create_new_note_suggestion(new_note_suggestion=suggestion)
 
-        result = client.upload_images_for_suggestion(
+        result = client.upload_assets_for_suggestion(
             suggestion, ah_did=next_deterministic_uuid()
         )
 
@@ -933,7 +939,8 @@ class TestUploadImagesForSuggestion:
         assert result == expected_result
 
     def test_generate_asset_files_with_hashed_names(self, remove_generated_asset_files):
-        client = AnkiHubClient()
+        client = AnkiHubClient(local_media_dir_path=TEST_MEDIA_PATH)
+
         filenames = [
             TEST_MEDIA_PATH / "testfile_mario.png",
             TEST_MEDIA_PATH / "testfile_anki.gif",
@@ -948,3 +955,191 @@ class TestUploadImagesForSuggestion:
 
         asset_name_map = client._generate_asset_files_with_hashed_names(filenames)
         assert asset_name_map == expected_result
+
+
+class TestUploadAssetsForDeck:
+    def notes_data_with_many_images(self) -> List[NoteInfo]:
+        notes_data = [
+            NoteInfoFactory.create(),
+            NoteInfoFactory.create(),
+            NoteInfoFactory.create(),
+            NoteInfoFactory.create(),
+        ]
+
+        notes_data[0].fields[0].value = (
+            '<img src="testfile_mario.png" width="100" alt="its-a me!">'
+            '<div> something here <img src="testfile_test.jpeg" height="50" alt="just a test"> </div>'
+        )
+        notes_data[1].fields[
+            0
+        ].value = '<span> <p> <img src="testfile_anki.gif" width="100""> test text </p> <span>'
+
+        notes_data[2].fields[1].value = (
+            '<img src="testfile_1.jpeg" width="100" alt="test file 1">'
+            '<div> something here <img src="testfile_2.jpeg" height="50" alt="test file 2"> </div>'
+            '<img src="testfile_3.jpeg" width="100" alt="test file 3">'
+            '<div> something here <img src="testfile_4.jpeg" height="50" alt="test file 4"> </div>'
+            '<img src="testfile_5.jpeg" width="100" alt="test file 5">'
+        )
+
+        notes_data[3].fields[0].value = (
+            '<img src="testfile_6.jpeg" width="100" alt="test file 6">'
+            '<div> something here <img src="testfile_7.jpeg" height="50" alt="test file 7"> </div>'
+        )
+
+        notes_data[3].fields[1].value = (
+            '<img src="testfile_8.jpeg" width="100" alt="test file 8">'
+            '<div> something here <img src="testfile_9.jpeg" height="50" alt="test file 9"> </div>'
+            '<img src="testfile_10.jpeg" width="100" alt="test file 10">'
+        )
+
+        return notes_data
+
+    def notes_data_with_a_few_images(self) -> List[NoteInfo]:
+        notes_data = [NoteInfoFactory.create(), NoteInfoFactory.create()]
+        notes_data[0].fields[0].value = (
+            '<img src="testfile_mario.png" width="100" alt="its-a me!">'
+            '<div> something here <img src="testfile_test.jpeg" height="50" alt="just a test"> </div>'
+        )
+        notes_data[1].fields[
+            0
+        ].value = '<span> <p> <img src="testfile_anki.gif" width="100""> test text </p> <span>'
+
+        return notes_data
+
+    def test_zips_images_from_deck_notes(
+        self, next_deterministic_uuid: Callable[[], uuid.UUID], monkeypatch: MonkeyPatch
+    ):
+        client = AnkiHubClient(local_media_dir_path=TEST_MEDIA_PATH)
+
+        notes_data = self.notes_data_with_many_images()
+
+        # Mock os.remove so the zip is not deleted
+        os_remove_mock = MagicMock()
+        monkeypatch.setattr(os, "remove", os_remove_mock)
+
+        # Mock upload-related stuff
+        monkeypatch.setattr(
+            client, "get_presigned_url_for_multiple_uploads", MagicMock()
+        )
+        monkeypatch.setattr(
+            client, "_upload_file_to_s3_with_reusable_presigned_url", MagicMock()
+        )
+
+        deck_id = next_deterministic_uuid()
+        client.upload_assets_for_deck(deck_id, notes_data)
+
+        # We will create and check for just one chunk in this test
+        path_to_created_zip_file = Path(
+            TEST_MEDIA_PATH / f"{deck_id}_0_deck_assets_part.zip"
+        )
+
+        all_img_names_in_notes = self._all_image_names_in_notes(notes_data)
+        assert path_to_created_zip_file.is_file()
+        assert len(all_img_names_in_notes) == 13
+        with zipfile.ZipFile(path_to_created_zip_file, "r") as zip_ref:
+            assert set(zip_ref.namelist()) == set(all_img_names_in_notes)
+
+        # Remove the zipped file at the end of the test
+        monkeypatch.undo()
+        os.remove(path_to_created_zip_file)
+        assert path_to_created_zip_file.is_file() is False
+
+    def test_uploads_generated_zipped_file(
+        self, next_deterministic_uuid: Callable[[], uuid.UUID], monkeypatch: MonkeyPatch
+    ):
+        client = AnkiHubClient(local_media_dir_path=TEST_MEDIA_PATH)
+
+        notes_data = self.notes_data_with_many_images()
+        deck_id = next_deterministic_uuid()
+        path_to_created_zip_file = Path(
+            TEST_MEDIA_PATH / f"{deck_id}_0_deck_assets_part.zip"
+        )
+
+        s3_info_mocked_value = {
+            "url": "https://fake_s3.com",
+            "fields": {
+                "key": "deck_images/test/${filename}",
+                "x-amz-algorithm": "XXXXXX",
+                "x-amz-credential": "XXXXXX",
+                "x-amz-date": "20230321T162818Z",
+                "policy": "test_asuiHGIUWEHF78Y4QFBY24UIWBFV22FV428Y",
+                "x-amz-signature": "test_822ac386d1ece605db8cfca",
+            },
+        }
+        get_presigned_url_mock = MagicMock()
+        get_presigned_url_mock.return_value = s3_info_mocked_value
+        monkeypatch.setattr(
+            client, "get_presigned_url_for_multiple_uploads", get_presigned_url_mock
+        )
+
+        mocked_upload_file_to_s3 = MagicMock()
+        monkeypatch.setattr(
+            client,
+            "_upload_file_to_s3_with_reusable_presigned_url",
+            mocked_upload_file_to_s3,
+        )
+
+        client.upload_assets_for_deck(deck_id, notes_data)
+
+        get_presigned_url_mock.assert_called_once_with(prefix=f"deck_assets/{deck_id}")
+        mocked_upload_file_to_s3.assert_called_once_with(
+            s3_presigned_info=s3_info_mocked_value,
+            filepath=path_to_created_zip_file,
+        )
+
+    def test_removes_zipped_file_after_upload(
+        self, next_deterministic_uuid: Callable[[], uuid.UUID], monkeypatch: MonkeyPatch
+    ):
+        client = AnkiHubClient(local_media_dir_path=TEST_MEDIA_PATH)
+
+        notes_data = self.notes_data_with_many_images()
+
+        # Mock upload-related stuff
+        monkeypatch.setattr(
+            client, "get_presigned_url_for_multiple_uploads", MagicMock()
+        )
+        monkeypatch.setattr(
+            client, "_upload_file_to_s3_with_reusable_presigned_url", MagicMock()
+        )
+
+        deck_id = next_deterministic_uuid()
+        client.upload_assets_for_deck(deck_id, notes_data)
+
+        path_to_created_zip_file = Path(TEST_MEDIA_PATH / f"{deck_id}.zip")
+
+        assert not path_to_created_zip_file.is_file()
+
+    def test_uploads_directly_without_zipping_when_there_are_few_images(
+        self, next_deterministic_uuid: Callable[[], uuid.UUID], monkeypatch: MonkeyPatch
+    ):
+        client = AnkiHubClient(local_media_dir_path=TEST_MEDIA_PATH)
+
+        notes_data = self.notes_data_with_a_few_images()
+
+        mocked_upload_assets = MagicMock()
+        monkeypatch.setattr(client, "upload_assets", mocked_upload_assets)
+
+        mocked_upload_file_to_s3 = MagicMock()
+        monkeypatch.setattr(client, "_upload_file_to_s3", mocked_upload_file_to_s3)
+
+        deck_id = next_deterministic_uuid()
+        client.upload_assets_for_deck(deck_id, notes_data)
+
+        all_img_names_in_notes = self._all_image_names_in_notes(notes_data)
+        mocked_upload_assets.assert_called_once_with(
+            image_names=all_img_names_in_notes, deck_id=deck_id
+        )
+
+        mocked_upload_file_to_s3.assert_not_called()
+
+    def _all_image_names_in_notes(self, notes_data: List[NoteInfo]):
+        client = AnkiHubClient(local_media_dir_path=TEST_MEDIA_PATH)
+        all_notes_fields = []
+        for note in notes_data:
+            all_notes_fields.extend(note.fields)
+
+        result = [
+            path.name for path in client._get_images_from_fields(all_notes_fields)
+        ]
+        return result

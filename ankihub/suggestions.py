@@ -82,7 +82,7 @@ def _rename_and_upload_assets(
 
     suggestion = copy.deepcopy(suggestion)
 
-    asset_name_map = client.upload_images_for_suggestion(suggestion, ankihub_did)
+    asset_name_map = client.upload_assets_for_suggestion(suggestion, ankihub_did)
 
     if asset_name_map:
         _replace_asset_names_in_suggestion(suggestion, asset_name_map)

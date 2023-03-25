@@ -6,9 +6,9 @@ from types import TracebackType
 from typing import Any, Optional, Type
 
 import aqt
-from anki.errors import BackendIOError, DBError
+from anki.errors import BackendIOError, DBError, SyncError
 from aqt.utils import askUser, showText, showWarning, tooltip
-from requests.exceptions import ConnectionError
+from requests import exceptions
 
 from . import LOGGER
 from .addon_ankihub_client import AnkiHubRequestError
@@ -18,6 +18,8 @@ from .gui.menu import AnkiHubLogin
 from .gui.utils import check_and_prompt_for_updates_on_main_window
 from .settings import ANKIWEB_ID, config
 from .sync import NotLoggedInError
+
+OUTDATED_CLIENT_ERROR_REASON = "Outdated client, please update the AnkiHub add-on."
 
 
 def handle_exception(
@@ -51,18 +53,24 @@ def handle_exception(
         if details:
             showText(f"Error while communicating with AnkiHub:\n{details}")
 
-    if isinstance(exc, ConnectionError):
+    if isinstance(exc, (exceptions.ConnectionError, ConnectionError)):
         tooltip(
             "Could not connect to AnkiHub (no internet or the site is down for maintenance)",
             parent=aqt.mw,
         )
         return True
 
-    if (isinstance(exc, DBError) and "is full" in str(exc).lower()) or (
-        isinstance(exc, BackendIOError) and "no space left" in str(exc).lower()
+    if (
+        (isinstance(exc, DBError) and "is full" in str(exc).lower())
+        or (isinstance(exc, BackendIOError) and "not enough space" in str(exc).lower())
+        or (isinstance(exc, BackendIOError) and "not enough memory" in str(exc).lower())
+        or (isinstance(exc, BackendIOError) and "no space left" in str(exc).lower())
+        or (isinstance(exc, OSError) and "no space left" in str(exc).lower())
+        or (isinstance(exc, SyncError) and "no space left" in str(exc).lower())
     ):
         showWarning(
-            "Could not finish because your hard drive is full.", title="AnkiHub"
+            "Could not finish because your hard drive does not have enough space.",
+            title="AnkiHub",
         )
         LOGGER.info("Showing full disk warning.")
         return True
@@ -105,8 +113,7 @@ def maybe_handle_ankihub_request_error(error: AnkiHubRequestError) -> bool:
         AnkiHubLogin.display_login()
         return True
     elif (
-        response.status_code == 406
-        and response.reason == "Outdated client, please update the AnkiHub add-on."
+        response.status_code == 406 and response.reason == OUTDATED_CLIENT_ERROR_REASON
     ):
         if askUser(
             "The AnkiHub add-on needs to be updated to continue working.<br>"
