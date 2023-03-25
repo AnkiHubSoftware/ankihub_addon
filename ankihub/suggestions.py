@@ -1,7 +1,7 @@
 import copy
 import uuid
 from dataclasses import dataclass
-from typing import Any, Dict, List, Optional, cast
+from typing import Any, Dict, List, Optional, Tuple, cast
 
 from anki.notes import Note, NoteId
 
@@ -134,58 +134,26 @@ def suggest_notes_in_bulk(
     change_type: SuggestionType,
     comment: str,
 ) -> BulkNoteSuggestionsResult:
-    # Note: Notes that don't have any changes when compared to the local
-    # AnkiHub database will not be sent. This does not necessarily mean
-    # that the note has no changes when compared to the remote AnkiHub
-    # database. To create suggestions for notes that differ from the
-    # remote database but not from the local database, users have to
-    # sync first (so that the local database is up to date).
+    """
+    Sends a NewNoteSuggestion or a ChangeNoteSuggestion to AnkiHub for each note in the list.
+    All notes have to be from one AnkiHub deck. If a note does not belong to any
+    AnkiHub deck, it will be ignored.
+    Note: Notes that don't have any changes when compared to the local
+    AnkiHub database will not be sent. This does not necessarily mean
+    that the note has no changes when compared to the remote AnkiHub
+    database. To create suggestions for notes that differ from the
+    remote database but not from the local database, users have to
+    sync first (so that the local database is up to date)."""
 
-    ankihub_did_for_mid = {
-        mid: ankihub_did
-        for mid in set(note.mid for note in notes)
-        if (ankihub_did := ankihub_db.ankihub_did_for_note_type(mid))
-    }
+    ankihub_dids = ankihub_db.ankihub_dids_for_anki_nids([note.id for note in notes])
+    assert len(ankihub_dids) == 1, "All notes must belong to the same AnkiHub deck"
+    ankihub_did = ankihub_dids[0]
 
-    notes_that_exist_on_remote = []
-    notes_that_dont_exist_on_remote = []
-    ankihub_notes = [note for note in notes if ankihub_did_for_mid.get(note.mid)]
-    for note in ankihub_notes:
-        if ankihub_db.ankihub_nid_for_anki_nid(note.id):
-            notes_that_exist_on_remote.append(note)
-        else:
-            notes_that_dont_exist_on_remote.append(note)
-
-    # Create change note suggestions for notes that exist on remote
-    change_note_suggestions_or_none_by_nid = {
-        note.id: change_note_suggestion(
-            note=note,
-            change_type=change_type,
-            comment=comment,
-        )
-        for note in notes_that_exist_on_remote
-    }
-    change_note_suggestions = [
-        suggestion
-        for suggestion in change_note_suggestions_or_none_by_nid.values()
-        if suggestion is not None
-    ]
-    # nids of notes that exist on remote but have no changes
-    nids_without_changes = [
-        nid
-        for nid, suggestion in change_note_suggestions_or_none_by_nid.items()
-        if not suggestion
-    ]
-
-    # Create new note suggestions for notes that don't exist on remote
-    new_note_suggestions = [
-        new_note_suggestion(
-            note=note,
-            ankihub_deck_uuid=ankihub_did_for_mid[note.mid],
-            comment=comment,
-        )
-        for note in notes_that_dont_exist_on_remote
-    ]
+    (
+        new_note_suggestions,
+        change_note_suggestions,
+        nids_without_changes,
+    ) = _suggestions_for_notes(notes, ankihub_did, change_type, comment)
 
     client = AnkiHubClient()
     errors_by_nid_int = client.create_suggestions_in_bulk(
@@ -214,6 +182,70 @@ def suggest_notes_in_bulk(
         ),
     )
     return result
+
+
+def _suggestions_for_notes(
+    notes: List[Note], ankihub_did: uuid.UUID, change_type: SuggestionType, comment: str
+) -> Tuple[List[NewNoteSuggestion], List[ChangeNoteSuggestion], List[NoteId]]:
+    """
+    Splits the list of notes into three categories:
+    - notes that should be sent as NewNoteSuggestions
+    - notes that should be sent as ChangeNoteSuggestions
+    - notes that should not be sent because they don't have any changes
+    Returns a tuple of three lists:
+    - new_note_suggestions
+    - change_note_suggestions
+    - nids_without_changes
+    """
+    anki_nids_to_ankihub_nids = ankihub_db.anki_nids_to_ankihub_nids(
+        [note.id for note in notes]
+    )
+    note_by_anki_id = {note.id: note for note in notes}
+
+    notes_that_exist_on_remote = [
+        note_by_anki_id[anki_nid]
+        for anki_nid, ah_nid in anki_nids_to_ankihub_nids.items()
+        if ah_nid
+    ]
+
+    notes_that_dont_exist_on_remote = [
+        note_by_anki_id[anki_nid]
+        for anki_nid, ah_nid in anki_nids_to_ankihub_nids.items()
+        if ah_nid is None
+    ]
+
+    # Create change note suggestions for notes that exist on remote
+    change_note_suggestions_or_none_by_nid = {
+        note.id: change_note_suggestion(
+            note=note,
+            change_type=change_type,
+            comment=comment,
+        )
+        for note in notes_that_exist_on_remote
+    }
+    change_note_suggestions = [
+        suggestion
+        for suggestion in change_note_suggestions_or_none_by_nid.values()
+        if suggestion
+    ]
+    # nids of notes that exist on remote but have no changes
+    nids_without_changes = [
+        nid
+        for nid, suggestion in change_note_suggestions_or_none_by_nid.items()
+        if not suggestion
+    ]
+
+    # Create new note suggestions for notes that don't exist on remote
+    new_note_suggestions = [
+        new_note_suggestion(
+            note=note,
+            ankihub_deck_uuid=ankihub_did,
+            comment=comment,
+        )
+        for note in notes_that_dont_exist_on_remote
+    ]
+
+    return new_note_suggestions, change_note_suggestions, nids_without_changes
 
 
 def change_note_suggestion(
