@@ -70,11 +70,20 @@ def _log_stack(title: str):
 
 def _setup_logging_for_sync_collection_and_media():
     # Log stack trace when mw._sync_collection_and_media is called to debug the
-    # "Cannot start transaction within transaction" error that occurs when two syncs
-    # are started at the same time.
+    # "Cannot start transaction within transaction" error.
     aqt.mw._sync_collection_and_media = wrap(  # type: ignore
         aqt.mw._sync_collection_and_media,
         lambda *args, **kwargs: _log_stack("mw._sync_collection_and_media"),
+        "before",
+    )
+
+
+def _setup_logging_for_db_begin():
+    # Log stack trace when db.begin is called to debug the
+    # "Cannot start transaction within transaction" error.
+    aqt.mw.col.db.begin = wrap(  # type: ignore
+        aqt.mw.col.db.begin,
+        lambda *args, **kwargs: _log_stack("db.begin"),
         "before",
     )
 
@@ -95,4 +104,6 @@ def _setup_sentry_reporting_for_error_on_addon_update():
 
 def setup():
     _setup_logging_for_sync_collection_and_media()
+    _setup_logging_for_db_begin()
+
     _setup_sentry_reporting_for_error_on_addon_update()
