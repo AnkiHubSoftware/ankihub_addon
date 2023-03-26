@@ -8,6 +8,7 @@ import aqt
 from anki.hooks import wrap
 from anki.utils import is_win
 from aqt.addons import AddonManager
+from aqt.main import AnkiQt
 
 from . import LOGGER
 from .db import is_ankihub_db_attached_to_anki_db
@@ -72,8 +73,8 @@ def _setup_logging_for_sync_collection_and_media():
     # Log stack trace when mw._sync_collection_and_media is called to debug the
     # "Cannot start transaction within transaction" error that occurs when two syncs
     # are started at the same time.
-    aqt.mw._sync_collection_and_media = wrap(  # type: ignore
-        aqt.mw._sync_collection_and_media,
+    AnkiQt._sync_collection_and_media = wrap(  # type: ignore
+        AnkiQt._sync_collection_and_media,
         lambda *args, **kwargs: _log_stack("mw._sync_collection_and_media"),
         "before",
     )
