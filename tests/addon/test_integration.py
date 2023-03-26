@@ -2420,6 +2420,10 @@ def patch_ankiweb_sync_to_do_nothing(mw: AnkiQt, monkeypatch: MonkeyPatch):
     # and would otherwise open an error message dialog.
     monkeypatch.setattr(mw.col, "latest_progress", lambda *args, **kwargs: Mock())
 
+    # Mock the progress.set_title function because it is called by a timer during the sync
+    # (with the latest_progress as argument).
+    monkeypatch.setattr(mw.progress, "set_title", lambda *args, **kwargs: False)
+
     # Mock the can_auto_sync function so that no sync is triggered when Anki is closed.
     monkeypatch.setattr(mw, "can_auto_sync", lambda *args, **kwargs: False)
 
