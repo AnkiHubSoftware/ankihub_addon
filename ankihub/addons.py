@@ -132,13 +132,14 @@ def _with_disabled_log_file_handler(*args: Any, **kwargs: Any) -> Any:
             LOGGER.root.removeHandler(handler)
             handler.close()
 
-    result = _old(*args, **kwargs)
-
-    # If a log file handler already exists, we don't need to add it again.
-    # If the add-on was deleted it makes no sense to re-add the FileHandler (and it throws an error).
-    if not _log_file_handlers() and log_file_path().parent.exists():
-        LOGGER.root.addHandler(file_handler())
-        LOGGER.info("Re-added FileHandler")
+    try:
+        result = _old(*args, **kwargs)
+    finally:
+        # If a log file handler already exists, we don't need to add it again.
+        # If the add-on was deleted it makes no sense to re-add the FileHandler (and it throws an error).
+        if not _log_file_handlers() and log_file_path().parent.exists():
+            LOGGER.root.addHandler(file_handler())
+            LOGGER.info(f"Re-added FileHandler after {_old.__name__} was called.")
 
     return result
 
