@@ -2991,8 +2991,8 @@ class TestAddonUpdate:
         monkeypatch: MonkeyPatch,
         qtbot: QtBot,
     ):
-        # install the add-on so that all files are in the add-on folder
-        # the anki_session fixture does not setup the add-ons code in the add-ons folder
+        # Install the add-on so that all files are in the add-on folder.
+        # The anki_session fixture does not setup the add-ons code in the add-ons folder.
         with anki_session_with_addon_data.profile_loaded():
             mw = anki_session_with_addon_data.mw
 
@@ -3019,9 +3019,8 @@ class TestAddonUpdate:
             with_disabled_log_file_handler_mock,
         )
 
-        # udpate the AnkiHub add-on
-        # entry point has to be run so that the add-on is loaded and the patches to the
-        # update process are applied
+        # Udpate the AnkiHub add-on entry point has to be run so that the add-on is loaded and
+        # the patches to the update process are applied
         entry_point.run()
         with anki_session_with_addon_data.profile_loaded():
             mw = anki_session_with_addon_data.mw
@@ -3031,11 +3030,11 @@ class TestAddonUpdate:
 
             assert mw.addonManager.allAddons() == ["ankihub"]
 
-        with_disabled_log_file_handler_mock.assert_called_once()
+        # This is called tree times: for backupUserFiles, deleteAddon, and restoreUserFiles.
+        assert with_disabled_log_file_handler_mock.call_count == 3
 
-        # this is called twice because because multiple functions were wrapped with the
-        # with_disabled_log_file_handler wrapper, this is ok
-        maybe_change_file_permissions_of_addon_files_mock.call_count == 2
+        # This is called twice: for backupUserFiles and for deleteAddon.
+        assert maybe_change_file_permissions_of_addon_files_mock.call_count == 2
 
         # start Anki
         entry_point.run()
