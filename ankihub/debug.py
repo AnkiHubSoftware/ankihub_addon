@@ -5,9 +5,11 @@ from pathlib import Path
 from typing import Any, Callable, Dict
 
 import aqt
+from anki.dbproxy import DBProxy
 from anki.hooks import wrap
 from anki.utils import is_win
 from aqt.addons import AddonManager
+from aqt.main import AnkiQt
 
 from . import LOGGER
 from .db import is_ankihub_db_attached_to_anki_db
@@ -71,8 +73,8 @@ def _log_stack(title: str):
 def _setup_logging_for_sync_collection_and_media():
     # Log stack trace when mw._sync_collection_and_media is called to debug the
     # "Cannot start transaction within transaction" error.
-    aqt.mw._sync_collection_and_media = wrap(  # type: ignore
-        aqt.mw._sync_collection_and_media,
+    AnkiQt._sync_collection_and_media = wrap(  # type: ignore
+        AnkiQt._sync_collection_and_media,
         lambda *args, **kwargs: _log_stack("mw._sync_collection_and_media"),
         "before",
     )
@@ -81,8 +83,8 @@ def _setup_logging_for_sync_collection_and_media():
 def _setup_logging_for_db_begin():
     # Log stack trace when db.begin is called to debug the
     # "Cannot start transaction within transaction" error.
-    aqt.mw.col.db.begin = wrap(  # type: ignore
-        aqt.mw.col.db.begin,
+    DBProxy.begin = wrap(  # type: ignore
+        DBProxy.begin,
         lambda *args, **kwargs: _log_stack("db.begin"),
         "before",
     )
