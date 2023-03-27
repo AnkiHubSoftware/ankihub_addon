@@ -480,11 +480,11 @@ def upload_deck_assets_action() -> None:
     def on_done(future: Future) -> None:
         future.result()
         showInfo("🎉 Successfuly uploaded all images for the deck!")
-        LOGGER.info(f"Finished uploading assets for deck"),
+        LOGGER.info("Finished uploading assets for deck"),
 
     # Extract the AnkiHub deck ID using a sample note id
     ah_did = ankihub_db.ankihub_did_for_anki_nid(nids[0])
-    
+
     aqt.mw.taskman.run_in_background(
         task=client.upload_assets_for_deck,
         args={"ah_did": ah_did, "notes_data": notes_data},
