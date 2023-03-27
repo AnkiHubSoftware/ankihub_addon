@@ -557,18 +557,25 @@ class AnkiHubClient:
         if not self.is_feature_flag_enabled("image_support_enabled"):
             return {}
 
-        image_paths = set()
+        original_image_paths = set()
         for suggestion in suggestions:
             image_paths_for_suggestion = self._get_images_from_fields(
                 fields=suggestion.fields
             )
-            image_paths.update(image_paths_for_suggestion)
+            original_image_paths.update(image_paths_for_suggestion)
 
-        asset_name_map = self._generate_asset_files_with_hashed_names(image_paths)
+        asset_name_map = self._generate_asset_files_with_hashed_names(
+            original_image_paths
+        )
+
+        new_image_paths = [
+            self.local_media_dir_path / new_asset_name
+            for new_asset_name in asset_name_map.values()
+        ]
 
         # TODO: We are currently uploading all images for a suggestion,
         # but we should only upload images that are not already on s3.
-        self._upload_images_to_s3(list(image_paths), ah_did)
+        self._upload_images_to_s3(new_image_paths, ah_did)
 
         return asset_name_map
 
