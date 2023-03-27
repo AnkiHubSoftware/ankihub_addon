@@ -477,27 +477,19 @@ def upload_deck_assets_action() -> None:
     if not confirm:
         return
 
-    def on_success(_: None) -> None:
+    def on_done(future: Future) -> None:
+        future.result()
         showInfo("🎉 Successfuly uploaded all images for the deck!")
-
-    def on_failure(exc: Exception):
-        aqt.mw.progress.finish()
-        raise exc
+        LOGGER.info(f"Finished uploading assets for deck"),
 
     # Extract the AnkiHub deck ID using a sample note id
     ah_did = ankihub_db.ankihub_did_for_anki_nid(nids[0])
-
-    op = QueryOp(
-        parent=aqt.mw,
-        op=lambda col: client.upload_assets_for_deck(
-            ah_did=ah_did, notes_data=notes_data
-        ),
-        success=on_success,
-    ).failure(on_failure)
-    LOGGER.info(f"Instantiated QueryOp for uploading Deck [{deck_name}] assets")
-    op.with_progress(
-        label=f"Uploading images for deck <b>{deck_name}</b>"
-    ).run_in_background()
+    
+    aqt.mw.taskman.run_in_background(
+        task=client.upload_assets_for_deck,
+        args={"ah_did": ah_did, "notes_data": notes_data},
+        on_done=on_done,
+    )
 
 
 def ankihub_help_setup(parent):
