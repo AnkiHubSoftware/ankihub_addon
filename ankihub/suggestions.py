@@ -1,10 +1,14 @@
 import copy
 import uuid
+from concurrent.futures import Future
 from dataclasses import dataclass
+from pathlib import Path
 from typing import Any, Dict, List, Optional, Sequence, Tuple, cast
 
+import aqt
 from anki.notes import Note, NoteId
 
+from . import LOGGER
 from .addon_ankihub_client import AddonAnkiHubClient as AnkiHubClient
 from .ankihub_client import (
     ChangeNoteSuggestion,
@@ -261,23 +265,45 @@ def _rename_and_upload_assets_for_suggestions(
     suggestions: Sequence[NoteSuggestion], ankihub_did: uuid.UUID
 ) -> Sequence[NoteSuggestion]:
     """Renames assets referenced on the suggestions in the Anki collection and the media folder and
-    uploads them to AnkiHub.
+    uploads them to AnkiHub in another thread.
     Returns suggestion with updated asset names."""
 
     client = AnkiHubClient()
     if not client.is_feature_flag_enabled("image_support_enabled"):
         return suggestions
 
-    suggestions = copy.deepcopy(suggestions)
-    asset_name_map = client.upload_assets_for_suggestions(suggestions, ankihub_did)
+    original_image_paths = set()
+    for suggestion in suggestions:
+        image_paths_for_suggestion = client.get_images_from_fields(
+            fields=suggestion.fields
+        )
+        original_image_paths.update(image_paths_for_suggestion)
+
+    asset_name_map = client.generate_asset_files_with_hashed_names(original_image_paths)
+
+    new_image_paths = [
+        Path(aqt.mw.col.media.dir()) / new_asset_name
+        for new_asset_name in asset_name_map.values()
+    ]
+
+    aqt.mw.taskman.run_in_background(
+        lambda: client.upload_images_to_s3(new_image_paths, ankihub_did),
+        on_done=_on_uploaded_images,
+    )
 
     if asset_name_map:
+        suggestions = copy.deepcopy(suggestions)
         for suggestion in suggestions:
             _replace_asset_names_in_suggestion(suggestion, asset_name_map)
 
         _update_asset_names_on_notes(asset_name_map)
 
     return suggestions
+
+
+def _on_uploaded_images(future: Future):
+    future.result()
+    LOGGER.info("Uploaded images to AnkiHub.")
 
 
 def _replace_asset_names_in_suggestion(

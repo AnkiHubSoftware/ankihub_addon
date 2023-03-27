@@ -483,15 +483,15 @@ class AnkiHubClient:
         for note in notes_data:
             all_notes_fields.extend(note.fields)
 
-        image_paths = self._get_images_from_fields(all_notes_fields)
+        image_paths = self.get_images_from_fields(all_notes_fields)
 
         # If notes have no images, abort uploading
         if not image_paths:
             return None
 
-        self._upload_images_to_s3(list(image_paths), ah_did)
+        self.upload_images_to_s3(list(image_paths), ah_did)
 
-    def _upload_images_to_s3(self, image_paths: List[Path], ah_did: uuid.UUID):
+    def upload_images_to_s3(self, image_paths: List[Path], ah_did: uuid.UUID):
         # Alternate flow: if less than 10 images, call self.upload_assets
         # passing the array of image names
         if not len(image_paths) > 10:
@@ -548,38 +548,7 @@ class AnkiHubClient:
             for future in as_completed(futures):
                 future.result()
 
-    def upload_assets_for_suggestions(
-        self, suggestions: Sequence[NoteSuggestion], ah_did: uuid.UUID
-    ) -> Dict[str, str]:
-        """Uploads images for a suggestion to AnkiHub and returns a map of
-        the original image names to the new names on AnkiHub."""
-
-        if not self.is_feature_flag_enabled("image_support_enabled"):
-            return {}
-
-        original_image_paths = set()
-        for suggestion in suggestions:
-            image_paths_for_suggestion = self._get_images_from_fields(
-                fields=suggestion.fields
-            )
-            original_image_paths.update(image_paths_for_suggestion)
-
-        asset_name_map = self._generate_asset_files_with_hashed_names(
-            original_image_paths
-        )
-
-        new_image_paths = [
-            self.local_media_dir_path / new_asset_name
-            for new_asset_name in asset_name_map.values()
-        ]
-
-        # TODO: We are currently uploading all images for a suggestion,
-        # but we should only upload images that are not already on s3.
-        self._upload_images_to_s3(new_image_paths, ah_did)
-
-        return asset_name_map
-
-    def _get_images_from_fields(self, fields: List[Field]) -> Set[Path]:
+    def get_images_from_fields(self, fields: List[Field]) -> Set[Path]:
         """Extracts image names from inside src attributes of HTML image tags
         present on each field and builds the full local image path
         for each one (pointing to the local anki media folder). Filters out
@@ -595,7 +564,7 @@ class AnkiHubClient:
 
         return result
 
-    def _generate_asset_files_with_hashed_names(
+    def generate_asset_files_with_hashed_names(
         self, paths: Set[Path]
     ) -> Dict[str, str]:
         """Generates a filename for each file in the list of paths by hashing the file.

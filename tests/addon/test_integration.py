@@ -2775,6 +2775,7 @@ class TestSuggestionsWithImages:
         requests_mock: Mocker,
         monkeypatch: MonkeyPatch,
         install_sample_ah_deck: Callable[[], Tuple[uuid.UUID, int]],
+        qtbot: QtBot,
         enable_image_support_feature_flag,
     ):
         anki_session = anki_session_with_addon_data
@@ -2824,6 +2825,9 @@ class TestSuggestionsWithImages:
                     comment="test",
                 )
 
+                # Wait for the background thread that uploads the images to finish.
+                qtbot.wait(200)
+
                 assert len(suggestion_request_mock.request_history) == 1  # type: ignore
 
                 # assert that the image was uploaded
@@ -2841,6 +2845,7 @@ class TestSuggestionsWithImages:
         requests_mock: Mocker,
         monkeypatch: MonkeyPatch,
         install_sample_ah_deck: InstallSampleAHDeck,
+        qtbot: QtBot,
         enable_image_support_feature_flag,
     ):
         anki_session = anki_session_with_addon_data
@@ -2889,6 +2894,9 @@ class TestSuggestionsWithImages:
                     comment="test",
                 )
 
+                # Wait for the background thread that uploads the images to finish.
+                qtbot.wait(200)
+
                 self._assert_img_names_as_expected(
                     note=note,
                     upload_request_mock=s3_upload_request_mock,  # type: ignore
@@ -2903,10 +2911,8 @@ class TestSuggestionsWithImages:
         img_name_in_note = re.search(IMG_NAME_IN_IMG_TAG_REGEX, note["Front"]).group(1)
 
         name_of_uploaded_image = re.findall(
-            r'filename="(.*?)"', upload_request_mock.last_request.text
-        )[
-            0
-        ]  # type: ignore
+            r'filename="(.*?)"', upload_request_mock.last_request.text  # type: ignore
+        )[0]
 
         suggestion_dict = suggestion_request_mock.last_request.json()  # type: ignore
         first_field_value = suggestion_dict["fields"][0]["value"]
