@@ -489,6 +489,9 @@ class AnkiHubClient:
         if not image_paths:
             return None
 
+        self._upload_images_to_s3(image_paths, ah_did)
+
+    def _upload_images_to_s3(self, image_paths: List[Path], ah_did: uuid.UUID):
         # Alternate flow: if less than 10 images, call self.upload_assets
         # passing the array of image names
         if not len(image_paths) > 10:
@@ -565,7 +568,7 @@ class AnkiHubClient:
 
         # TODO: We are currently uploading all images for a suggestion,
         # but we should only upload images that are not already on s3.
-        self.upload_assets(list(asset_name_map.values()), ah_did)
+        self._upload_images_to_s3(image_paths, ah_did)
 
         return asset_name_map
 
