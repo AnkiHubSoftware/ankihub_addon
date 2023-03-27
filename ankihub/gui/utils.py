@@ -133,11 +133,20 @@ def choose_list(
         return None
 
 
-def choose_ankihub_deck(prompt: str, parent: QWidget) -> Optional[uuid.UUID]:
+def choose_ankihub_deck(
+    prompt: str, parent: QWidget, filter_ah_dids: List[uuid.UUID] = None
+) -> Optional[uuid.UUID]:
     """Ask the user to choose a deck from the list of decks that the user subscribed to from the add-on.
-    Returns the deck ID of the chosen deck, or None if none"""
-    ah_dids = config.deck_ids()
-    deck_configs = [config.deck_config(did) for did in ah_dids]
+    Returns the deck ID of the chosen deck, or None if none.
+
+    If 'ah_dids' param is provided, only the decks with those UUIDS will be listed.
+    When left as None (default value), all subscribed decks will be displayed.
+    """
+
+    ah_dids = filter_ah_dids or config.deck_ids()
+    deck_configs = [
+        config.deck_config(did) for did in ah_dids if did in config.deck_ids()
+    ]
     chosen_deck_idx = choose_list(
         prompt=prompt,
         choices=[deck.name for deck in deck_configs],
