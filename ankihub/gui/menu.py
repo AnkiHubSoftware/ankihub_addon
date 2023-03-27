@@ -490,6 +490,10 @@ def upload_deck_assets_action() -> None:
         args={"ah_did": ah_did, "notes_data": notes_data},
         on_done=on_done,
     )
+    showInfo(
+        "🖼️ Upload started! You can continue using Anki in the meantime."
+        "<br><br>We'll notify you when the upload process finishes 👍"
+    )
 
 
 def ankihub_help_setup(parent):
