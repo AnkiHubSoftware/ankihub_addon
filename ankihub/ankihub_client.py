@@ -559,7 +559,7 @@ class AnkiHubClient:
         the same reference to the local media folder"""
         result = set()
         for field_content in [f.value for f in fields]:
-            image_names = extract_local_image_paths_from_html(field_content)
+            image_names = local_image_names_from_html(field_content)
             image_paths = [
                 self.local_media_dir_path / image_name for image_name in image_names
             ]
