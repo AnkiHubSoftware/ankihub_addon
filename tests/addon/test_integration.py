@@ -62,6 +62,7 @@ from ankihub.auto_sync import setup_ankihub_sync_on_ankiweb_sync
 from ankihub.db import ankihub_db, attached_ankihub_db
 from ankihub.debug import (
     _log_stack,
+    _setup_logging_for_db_begin,
     _setup_logging_for_sync_collection_and_media,
     _setup_sentry_reporting_for_error_on_addon_update,
     _user_files_context_dict,
@@ -3098,6 +3099,21 @@ class TestDebugModule:
             mw._sync_collection_and_media(after_sync=lambda: None)
 
             sync_will_start_mock.assert_called_once()
+
+    def test_setup_logging_for_db_begin(
+        self, anki_session: AnkiSession, monkeypatch: MonkeyPatch
+    ):
+        with anki_session.profile_loaded():
+            mw = anki_session.mw
+
+            db_begin_mock = Mock()
+            monkeypatch.setattr(mw.col._backend, "db_begin", db_begin_mock)
+
+            _setup_logging_for_db_begin()
+
+            mw.col.db.begin()
+
+            db_begin_mock.assert_called_once()
 
     def test_setup_sentry_reporting_for_error_on_addon_update(
         self, anki_session: AnkiSession, monkeypatch: MonkeyPatch
