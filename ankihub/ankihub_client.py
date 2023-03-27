@@ -483,20 +483,26 @@ class AnkiHubClient:
         for note in notes_data:
             all_notes_fields.extend(note.fields)
 
-        image_paths = self._get_images_from_fields(all_notes_fields)
+        image_paths = self.get_images_from_fields(all_notes_fields)
 
         # If notes have no images, abort uploading
         if not image_paths:
             return None
 
+        self.upload_assets(list(image_paths), ah_did)
+
+    def upload_assets(self, image_paths: List[Path], ah_did: uuid.UUID):
         # Alternate flow: if less than 10 images, call self.upload_assets
         # passing the array of image names
         if not len(image_paths) > 10:
-            self.upload_assets(
-                image_names=[path.name for path in image_paths], deck_id=ah_did
+            self._upload_assets_individually(
+                image_names=[path.name for path in image_paths], ah_did=ah_did
             )
             return None
 
+        self._upload_assets_in_chunks(image_paths=image_paths, ah_did=ah_did)
+
+    def _upload_assets_in_chunks(self, image_paths: List[Path], ah_did: uuid.UUID):
         # Create chunks of image paths to zip and upload each chunk individually.
         # Each chunk is divided based on the size of all images on that chunk to
         # create chunks of similar size.
@@ -545,25 +551,7 @@ class AnkiHubClient:
             for future in as_completed(futures):
                 future.result()
 
-    def upload_assets_for_suggestion(
-        self, suggestion: NoteSuggestion, ah_did: uuid.UUID
-    ) -> Dict[str, str]:
-        """Uploads images for a suggestion to AnkiHub and returns a map of
-        the original image names to the new names on AnkiHub."""
-
-        if not self.is_feature_flag_enabled("image_support_enabled"):
-            return {}
-
-        image_paths = self._get_images_from_fields(fields=suggestion.fields)
-        asset_name_map = self._generate_asset_files_with_hashed_names(image_paths)
-
-        # TODO: We are currently uploading all images for a suggestion,
-        # but we should only upload images that are not already on s3.
-        self.upload_assets(list(asset_name_map.values()), ah_did)
-
-        return asset_name_map
-
-    def _get_images_from_fields(self, fields: List[Field]) -> Set[Path]:
+    def get_images_from_fields(self, fields: List[Field]) -> Set[Path]:
         """Extracts image names from inside src attributes of HTML image tags
         present on each field and builds the full local image path
         for each one (pointing to the local anki media folder). Filters out
@@ -579,7 +567,7 @@ class AnkiHubClient:
 
         return result
 
-    def _generate_asset_files_with_hashed_names(
+    def generate_asset_files_with_hashed_names(
         self, paths: Set[Path]
     ) -> Dict[str, str]:
         """Generates a filename for each file in the list of paths by hashing the file.
@@ -618,10 +606,12 @@ class AnkiHubClient:
 
         return result
 
-    def upload_assets(self, image_names: List[str], deck_id: uuid.UUID) -> None:
+    def _upload_assets_individually(
+        self, image_names: List[str], ah_did: uuid.UUID
+    ) -> None:
         # deck_id is used to namespace the images within each deck.
         s3_presigned_info = self.get_presigned_url_for_multiple_uploads(
-            prefix=f"deck_assets/{deck_id}"
+            prefix=f"deck_assets/{ah_did}"
         )
 
         # TODO: send all images at once instad of looping through each one
@@ -837,8 +827,8 @@ class AnkiHubClient:
 
     def create_suggestions_in_bulk(
         self,
-        new_note_suggestions: List[NewNoteSuggestion] = [],
-        change_note_suggestions: List[ChangeNoteSuggestion] = [],
+        new_note_suggestions: Sequence[NewNoteSuggestion] = [],
+        change_note_suggestions: Sequence[ChangeNoteSuggestion] = [],
         auto_accept: bool = False,
     ) -> Dict[int, Dict[str, List[str]]]:
         # returns a dict of errors by anki_nid

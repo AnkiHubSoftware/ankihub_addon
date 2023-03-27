@@ -866,13 +866,12 @@ class TestUploadImagesForSuggestion:
             fake_presigned_url, json={"success": True}, status_code=204
         )
 
-        expected_result = {
+        expected_asset_name_map = {
             "testfile_mario.png": "156ca948cd1356b1a2c1c790f0855ad9.png",
             "testfile_test.jpeg": "a61eab59692d17a2adf4d1c5e9049ee4.jpeg",
         }
 
         suggestion_request_mock = None
-        result = None
 
         monkeypatch.setattr(
             AnkiHubClient,
@@ -905,9 +904,16 @@ class TestUploadImagesForSuggestion:
             )
             client.create_new_note_suggestion(new_note_suggestion=suggestion)
 
-        result = client.upload_assets_for_suggestion(
-            suggestion, ah_did=next_deterministic_uuid()
+        original_image_paths = client.get_images_from_fields(suggestion.fields)
+        asset_name_map = client.generate_asset_files_with_hashed_names(
+            original_image_paths
         )
+        new_image_paths = [
+            TEST_MEDIA_PATH / asset_name_map[original_image_path.name]
+            for original_image_path in original_image_paths
+        ]
+
+        client.upload_assets(new_image_paths, ah_did=next_deterministic_uuid())
 
         # assert that the suggestion was made
         assert len(suggestion_request_mock.request_history) == 1  # type: ignore
@@ -916,7 +922,7 @@ class TestUploadImagesForSuggestion:
         assert len(s3_upload_request_mock.request_history) == 2  # type: ignore
 
         # assert that the asset name map was returned correctly
-        assert result == expected_result
+        assert asset_name_map == expected_asset_name_map
 
     def test_generate_asset_files_with_hashed_names(self, remove_generated_asset_files):
         client = AnkiHubClient(local_media_dir_path=TEST_MEDIA_PATH)
@@ -933,7 +939,7 @@ class TestUploadImagesForSuggestion:
             "testfile_test.jpeg": "a61eab59692d17a2adf4d1c5e9049ee4.jpeg",
         }
 
-        asset_name_map = client._generate_asset_files_with_hashed_names(filenames)
+        asset_name_map = client.generate_asset_files_with_hashed_names(filenames)
         assert asset_name_map == expected_result
 
 
@@ -1097,8 +1103,10 @@ class TestUploadAssetsForDeck:
 
         notes_data = self.notes_data_with_a_few_images()
 
-        mocked_upload_assets = MagicMock()
-        monkeypatch.setattr(client, "upload_assets", mocked_upload_assets)
+        mocked_upload_assets_individually = MagicMock()
+        monkeypatch.setattr(
+            client, "_upload_assets_individually", mocked_upload_assets_individually
+        )
 
         mocked_upload_file_to_s3 = MagicMock()
         monkeypatch.setattr(client, "_upload_file_to_s3", mocked_upload_file_to_s3)
@@ -1107,8 +1115,8 @@ class TestUploadAssetsForDeck:
         client.upload_assets_for_deck(deck_id, notes_data)
 
         all_img_names_in_notes = self._all_image_names_in_notes(notes_data)
-        mocked_upload_assets.assert_called_once_with(
-            image_names=all_img_names_in_notes, deck_id=deck_id
+        mocked_upload_assets_individually.assert_called_once_with(
+            image_names=all_img_names_in_notes, ah_did=deck_id
         )
 
         mocked_upload_file_to_s3.assert_not_called()
@@ -1119,9 +1127,7 @@ class TestUploadAssetsForDeck:
         for note in notes_data:
             all_notes_fields.extend(note.fields)
 
-        result = [
-            path.name for path in client._get_images_from_fields(all_notes_fields)
-        ]
+        result = [path.name for path in client.get_images_from_fields(all_notes_fields)]
         return result
 
 
