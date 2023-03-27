@@ -287,7 +287,7 @@ def _rename_and_upload_assets_for_suggestions(
     ]
 
     aqt.mw.taskman.run_in_background(
-        lambda: client.upload_images_to_s3(new_image_paths, ankihub_did),
+        lambda: client.upload_assets(new_image_paths, ankihub_did),
         on_done=_on_uploaded_images,
     )
 

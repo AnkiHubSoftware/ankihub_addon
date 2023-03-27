@@ -489,17 +489,20 @@ class AnkiHubClient:
         if not image_paths:
             return None
 
-        self.upload_images_to_s3(list(image_paths), ah_did)
+        self.upload_assets(list(image_paths), ah_did)
 
-    def upload_images_to_s3(self, image_paths: List[Path], ah_did: uuid.UUID):
+    def upload_assets(self, image_paths: List[Path], ah_did: uuid.UUID):
         # Alternate flow: if less than 10 images, call self.upload_assets
         # passing the array of image names
         if not len(image_paths) > 10:
-            self.upload_assets(
-                image_names=[path.name for path in image_paths], deck_id=ah_did
+            self._upload_assets_individually(
+                image_names=[path.name for path in image_paths], ah_did=ah_did
             )
             return None
 
+        self._upload_assets_in_chunks(image_paths=image_paths, ah_did=ah_did)
+
+    def _upload_assets_in_chunks(self, image_paths: List[Path], ah_did: uuid.UUID):
         # Create chunks of image paths to zip and upload each chunk individually.
         # Each chunk is divided based on the size of all images on that chunk to
         # create chunks of similar size.
@@ -603,10 +606,12 @@ class AnkiHubClient:
 
         return result
 
-    def upload_assets(self, image_names: List[str], deck_id: uuid.UUID) -> None:
+    def _upload_assets_individually(
+        self, image_names: List[str], ah_did: uuid.UUID
+    ) -> None:
         # deck_id is used to namespace the images within each deck.
         s3_presigned_info = self.get_presigned_url_for_multiple_uploads(
-            prefix=f"deck_assets/{deck_id}"
+            prefix=f"deck_assets/{ah_did}"
         )
 
         # TODO: send all images at once instad of looping through each one

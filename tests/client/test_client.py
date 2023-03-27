@@ -913,7 +913,7 @@ class TestUploadImagesForSuggestion:
             for original_image_path in original_image_paths
         ]
 
-        client.upload_images_to_s3(new_image_paths, ah_did=next_deterministic_uuid())
+        client.upload_assets(new_image_paths, ah_did=next_deterministic_uuid())
 
         # assert that the suggestion was made
         assert len(suggestion_request_mock.request_history) == 1  # type: ignore
@@ -1103,8 +1103,10 @@ class TestUploadAssetsForDeck:
 
         notes_data = self.notes_data_with_a_few_images()
 
-        mocked_upload_assets = MagicMock()
-        monkeypatch.setattr(client, "upload_assets", mocked_upload_assets)
+        mocked_upload_assets_individually = MagicMock()
+        monkeypatch.setattr(
+            client, "_upload_assets_individually", mocked_upload_assets_individually
+        )
 
         mocked_upload_file_to_s3 = MagicMock()
         monkeypatch.setattr(client, "_upload_file_to_s3", mocked_upload_file_to_s3)
@@ -1113,8 +1115,8 @@ class TestUploadAssetsForDeck:
         client.upload_assets_for_deck(deck_id, notes_data)
 
         all_img_names_in_notes = self._all_image_names_in_notes(notes_data)
-        mocked_upload_assets.assert_called_once_with(
-            image_names=all_img_names_in_notes, deck_id=deck_id
+        mocked_upload_assets_individually.assert_called_once_with(
+            image_names=all_img_names_in_notes, ah_did=deck_id
         )
 
         mocked_upload_file_to_s3.assert_not_called()

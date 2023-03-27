@@ -2729,7 +2729,7 @@ def test_download_images_on_sync(
         download_images_mock.assert_called_once_with(["image.png"], ah_did)
 
 
-def test_upload_assets(
+def test_upload_assets_individually(
     anki_session_with_addon_data: AnkiSession,
     next_deterministic_uuid: Callable[[], uuid.UUID],
     monkeypatch: MonkeyPatch,
@@ -2758,7 +2758,7 @@ def test_upload_assets(
             file_path = Path(f.name)
             fake_deck_id = next_deterministic_uuid()
             client = AnkiHubClient(local_media_dir_path=file_path.parent)
-            client.upload_assets([file_path.name], deck_id=fake_deck_id)
+            client._upload_assets_individually([file_path.name], ah_did=fake_deck_id)
 
         assert len(s3_upload_request_mock.request_history) == 1  # type: ignore
 
