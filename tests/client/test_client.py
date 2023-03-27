@@ -62,6 +62,10 @@ DECK_EXTENSION_ID = 999
 LOCAL_API_URL = "http://localhost:8000/api"
 
 
+ID_OF_DECK_OF_USER_TEST1 = uuid.UUID("dda0d3ad-89cd-45fb-8ddc-fabad93c2d7b")
+ID_OF_DECK_OF_USER_TEST2 = uuid.UUID("5528aef7-f7ac-406b-9b35-4eaf00de4b20")
+
+
 @pytest.fixture
 def client_with_server_setup(vcr: VCR, request, marks):
     if "skipifvcr" in marks and vcr_enabled(vcr):
@@ -132,16 +136,6 @@ def authorized_client_for_user_test2(client_with_server_setup: AnkiHubClient, re
     credentials_data = {"username": "test2", "password": "asdf"}
     client_with_server_setup.login(credentials=credentials_data)
     yield client_with_server_setup
-
-
-@pytest.fixture
-def uuid_of_deck_of_user_test1():
-    return uuid.UUID("dda0d3ad-89cd-45fb-8ddc-fabad93c2d7b")
-
-
-@pytest.fixture
-def uuid_of_deck_of_user_test2():
-    return uuid.UUID("5528aef7-f7ac-406b-9b35-4eaf00de4b20")
 
 
 @pytest.fixture
@@ -242,7 +236,6 @@ def test_download_deck(
     authorized_client_for_user_test1: AnkiHubClient, monkeypatch: MonkeyPatch
 ):
     client = authorized_client_for_user_test1
-    deck_id = uuid.UUID("dda0d3ad-89cd-45fb-8ddc-fabad93c2d7b")
 
     get_presigned_url = MagicMock()
     get_presigned_url.return_value = "https://fake_s3.com"
@@ -261,7 +254,7 @@ def test_download_deck(
         m.register_uri(
             "GET", get_presigned_url.return_value, content=DECK_CSV.read_bytes()
         )
-        notes_data = client.download_deck(ankihub_deck_uuid=deck_id)
+        notes_data = client.download_deck(ankihub_deck_uuid=ID_OF_DECK_OF_USER_TEST1)
     assert len(notes_data) == 1
     assert notes_data[0].tags == ["asdf"]
 
@@ -271,7 +264,6 @@ def test_download_compressed_deck(
     authorized_client_for_user_test1: AnkiHubClient, monkeypatch: MonkeyPatch
 ):
     client = authorized_client_for_user_test1
-    deck_id = uuid.UUID("dda0d3ad-89cd-45fb-8ddc-fabad93c2d7b")
 
     get_presigned_url = MagicMock()
     get_presigned_url.return_value = "https://fake_s3.com"
@@ -290,7 +282,7 @@ def test_download_compressed_deck(
         m.register_uri(
             "GET", get_presigned_url.return_value, content=DECK_CSV_GZ.read_bytes()
         )
-        notes_data = client.download_deck(ankihub_deck_uuid=deck_id)
+        notes_data = client.download_deck(ankihub_deck_uuid=ID_OF_DECK_OF_USER_TEST1)
     assert len(notes_data) == 1
     assert notes_data[0].tags == ["asdf"]
 
@@ -300,7 +292,6 @@ def test_download_deck_with_progress(
     authorized_client_for_user_test1: AnkiHubClient, monkeypatch: MonkeyPatch
 ):
     client = authorized_client_for_user_test1
-    deck_id = uuid.UUID("dda0d3ad-89cd-45fb-8ddc-fabad93c2d7b")
 
     get_presigned_url = MagicMock()
     get_presigned_url.return_value = "https://fake_s3.com"
@@ -323,7 +314,8 @@ def test_download_deck_with_progress(
             headers={"content-length": "1000000"},
         )
         notes_data = client.download_deck(
-            ankihub_deck_uuid=deck_id, download_progress_cb=download_progress_cb
+            ankihub_deck_uuid=ID_OF_DECK_OF_USER_TEST1,
+            download_progress_cb=download_progress_cb,
         )
     assert len(notes_data) == 1
     assert notes_data[0].tags == ["asdf"]
@@ -401,7 +393,6 @@ class TestCreateSuggestion:
     def test_create_change_note_suggestion_without_all_fields(
         self,
         authorized_client_for_user_test1: AnkiHubClient,
-        uuid_of_deck_of_user_test1: uuid.UUID,
         new_note_suggestion: NewNoteSuggestion,
         change_note_suggestion: ChangeNoteSuggestion,
     ):
@@ -410,7 +401,7 @@ class TestCreateSuggestion:
         create_note_on_ankihub_and_assert(
             authorized_client_for_user_test1,
             new_note_suggestion,
-            uuid_of_deck_of_user_test1,
+            ID_OF_DECK_OF_USER_TEST1,
         )
 
         # create a change note suggestion without all fields (for the same note)
@@ -433,11 +424,10 @@ class TestCreateSuggestionsInBulk:
         self,
         authorized_client_for_user_test1: AnkiHubClient,
         new_note_suggestion: NewNoteSuggestion,
-        uuid_of_deck_of_user_test1: uuid.UUID,
     ):
         client = authorized_client_for_user_test1
 
-        new_note_suggestion.ankihub_deck_uuid = uuid_of_deck_of_user_test1
+        new_note_suggestion.ankihub_deck_uuid = ID_OF_DECK_OF_USER_TEST1
         errors_by_nid = client.create_suggestions_in_bulk(
             new_note_suggestions=[new_note_suggestion],
             auto_accept=False,
@@ -449,13 +439,12 @@ class TestCreateSuggestionsInBulk:
         self,
         authorized_client_for_user_test1: AnkiHubClient,
         new_note_suggestion: NewNoteSuggestion,
-        uuid_of_deck_of_user_test1: uuid.UUID,
         next_deterministic_uuid: Callable[[], uuid.UUID],
     ):
         client = authorized_client_for_user_test1
 
         # create two new note suggestions at once
-        new_note_suggestion.ankihub_deck_uuid = uuid_of_deck_of_user_test1
+        new_note_suggestion.ankihub_deck_uuid = ID_OF_DECK_OF_USER_TEST1
 
         new_note_suggestion_2 = deepcopy(new_note_suggestion)
         new_note_suggestion_2.ankihub_note_uuid = next_deterministic_uuid()
@@ -472,12 +461,11 @@ class TestCreateSuggestionsInBulk:
         self,
         authorized_client_for_user_test1: AnkiHubClient,
         new_note_suggestion: NewNoteSuggestion,
-        uuid_of_deck_of_user_test1: uuid.UUID,
     ):
         client = authorized_client_for_user_test1
 
         # create a new note suggestion
-        new_note_suggestion.ankihub_deck_uuid = uuid_of_deck_of_user_test1
+        new_note_suggestion.ankihub_deck_uuid = ID_OF_DECK_OF_USER_TEST1
         errors_by_nid = client.create_suggestions_in_bulk(
             new_note_suggestions=[new_note_suggestion], auto_accept=False
         )
@@ -498,12 +486,11 @@ class TestCreateSuggestionsInBulk:
         self,
         authorized_client_for_user_test1,
         new_note_suggestion,
-        uuid_of_deck_of_user_test1,
     ):
         create_note_on_ankihub_and_assert(
             authorized_client_for_user_test1,
             new_note_suggestion,
-            uuid_of_deck_of_user_test1,
+            ID_OF_DECK_OF_USER_TEST1,
         )
 
     @pytest.mark.vcr()
@@ -512,15 +499,14 @@ class TestCreateSuggestionsInBulk:
         authorized_client_for_user_test1: AnkiHubClient,
         new_note_suggestion: NewNoteSuggestion,
         change_note_suggestion: ChangeNoteSuggestion,
-        uuid_of_deck_of_user_test1: uuid.UUID,
     ):
         client = authorized_client_for_user_test1
 
-        new_note_suggestion.ankihub_deck_uuid = uuid_of_deck_of_user_test1
+        new_note_suggestion.ankihub_deck_uuid = ID_OF_DECK_OF_USER_TEST1
         create_note_on_ankihub_and_assert(
             authorized_client_for_user_test1,
             new_note_suggestion,
-            uuid_of_deck_of_user_test1,
+            ID_OF_DECK_OF_USER_TEST1,
         )
 
         # create a change note suggestion
@@ -536,14 +522,13 @@ class TestCreateSuggestionsInBulk:
         authorized_client_for_user_test1: AnkiHubClient,
         new_note_suggestion: NewNoteSuggestion,
         change_note_suggestion: ChangeNoteSuggestion,
-        uuid_of_deck_of_user_test1: uuid.UUID,
     ):
         client = authorized_client_for_user_test1
 
         create_note_on_ankihub_and_assert(
             authorized_client_for_user_test1,
             new_note_suggestion,
-            uuid_of_deck_of_user_test1,
+            ID_OF_DECK_OF_USER_TEST1,
         )
 
         # create an auto-accepted change note suggestion and assert that note was changed
@@ -574,7 +559,6 @@ class TestGetDeckUpdates:
     def test_get_deck_updates(
         self,
         authorized_client_for_user_test2: AnkiHubClient,
-        uuid_of_deck_of_user_test2: uuid.UUID,
         monkeypatch: MonkeyPatch,
     ):
         client = authorized_client_for_user_test2
@@ -582,7 +566,7 @@ class TestGetDeckUpdates:
         page_size = 5
         monkeypatch.setattr("ankihub.ankihub_client.DECK_UPDATE_PAGE_SIZE", page_size)
         update_chunks: List[DeckUpdateChunk] = list(
-            client.get_deck_updates(uuid_of_deck_of_user_test2, since=None)
+            client.get_deck_updates(ID_OF_DECK_OF_USER_TEST2, since=None)
         )
         assert len(update_chunks) == 2
         assert all(len(chunk.notes) == page_size for chunk in update_chunks)
@@ -591,7 +575,6 @@ class TestGetDeckUpdates:
     def test_get_deck_updates_since(
         self,
         authorized_client_for_user_test1: AnkiHubClient,
-        uuid_of_deck_of_user_test1: uuid.UUID,
         new_note_suggestion: NewNoteSuggestion,
         new_note_suggestion_note_info: NoteInfo,
     ):
@@ -600,13 +583,13 @@ class TestGetDeckUpdates:
         since_time = datetime.now(timezone.utc)
 
         # create a new note
-        new_note_suggestion.ankihub_deck_uuid = uuid_of_deck_of_user_test1
+        new_note_suggestion.ankihub_deck_uuid = ID_OF_DECK_OF_USER_TEST1
         client.create_new_note_suggestion(new_note_suggestion, auto_accept=True)
 
         # get deck updates since the time of the new note creation
         chunks = list(
             client.get_deck_updates(
-                ankihub_deck_uuid=uuid_of_deck_of_user_test1, since=since_time
+                ankihub_deck_uuid=ID_OF_DECK_OF_USER_TEST1, since=since_time
             )
         )
 
@@ -630,14 +613,12 @@ def test_get_deck_extensions_by_deck_id(
 ):
     client = authorized_client_for_user_test1
 
-    deck_id = uuid.UUID("100df7b9-7749-4fe0-b801-e3dec1decd72")
-
-    response = client.get_deck_extensions_by_deck_id(deck_id=deck_id)
+    response = client.get_deck_extensions_by_deck_id(deck_id=DECK_WITH_EXTENSION_UUID)
     assert response == [
         DeckExtension(
             id=999,
             owner_id=1,
-            ankihub_deck_uuid=uuid.UUID("100df7b9-7749-4fe0-b801-e3dec1decd72"),
+            ankihub_deck_uuid=DECK_WITH_EXTENSION_UUID,
             name="test100",
             tag_group_name="test100",
             description="",
@@ -886,13 +867,12 @@ class TestUploadImagesForSuggestion:
             fake_presigned_url, json={"success": True}, status_code=204
         )
 
-        expected_result = {
+        expected_asset_name_map = {
             "testfile_mario.png": "156ca948cd1356b1a2c1c790f0855ad9.png",
             "testfile_test.jpeg": "a61eab59692d17a2adf4d1c5e9049ee4.jpeg",
         }
 
         suggestion_request_mock = None
-        result = None
 
         monkeypatch.setattr(
             AnkiHubClient,
@@ -925,9 +905,16 @@ class TestUploadImagesForSuggestion:
             )
             client.create_new_note_suggestion(new_note_suggestion=suggestion)
 
-        result = client.upload_assets_for_suggestion(
-            suggestion, ah_did=next_deterministic_uuid()
+        original_image_paths = client.get_images_from_fields(suggestion.fields)
+        asset_name_map = client.generate_asset_files_with_hashed_names(
+            original_image_paths
         )
+        new_image_paths = [
+            TEST_MEDIA_PATH / asset_name_map[original_image_path.name]
+            for original_image_path in original_image_paths
+        ]
+
+        client.upload_assets(new_image_paths, ah_did=next_deterministic_uuid())
 
         # assert that the suggestion was made
         assert len(suggestion_request_mock.request_history) == 1  # type: ignore
@@ -936,7 +923,7 @@ class TestUploadImagesForSuggestion:
         assert len(s3_upload_request_mock.request_history) == 2  # type: ignore
 
         # assert that the asset name map was returned correctly
-        assert result == expected_result
+        assert asset_name_map == expected_asset_name_map
 
     def test_generate_asset_files_with_hashed_names(self, remove_generated_asset_files):
         client = AnkiHubClient(local_media_dir_path=TEST_MEDIA_PATH)
@@ -953,7 +940,7 @@ class TestUploadImagesForSuggestion:
             "testfile_test.jpeg": "a61eab59692d17a2adf4d1c5e9049ee4.jpeg",
         }
 
-        asset_name_map = client._generate_asset_files_with_hashed_names(filenames)
+        asset_name_map = client.generate_asset_files_with_hashed_names(filenames)
         assert asset_name_map == expected_result
 
 
@@ -1117,8 +1104,10 @@ class TestUploadAssetsForDeck:
 
         notes_data = self.notes_data_with_a_few_images()
 
-        mocked_upload_assets = MagicMock()
-        monkeypatch.setattr(client, "upload_assets", mocked_upload_assets)
+        mocked_upload_assets_individually = MagicMock()
+        monkeypatch.setattr(
+            client, "_upload_assets_individually", mocked_upload_assets_individually
+        )
 
         mocked_upload_file_to_s3 = MagicMock()
         monkeypatch.setattr(client, "_upload_file_to_s3", mocked_upload_file_to_s3)
@@ -1126,9 +1115,33 @@ class TestUploadAssetsForDeck:
         deck_id = next_deterministic_uuid()
         client.upload_assets_for_deck(deck_id, notes_data)
 
-        all_img_names_in_notes = get_image_names_from_notes_data(notes_data)
-        mocked_upload_assets.assert_called_once_with(
-            image_names=list(all_img_names_in_notes), deck_id=deck_id
+        all_img_names_in_notes = self._all_image_names_in_notes(notes_data)
+        mocked_upload_assets_individually.assert_called_once_with(
+            image_names=all_img_names_in_notes, ah_did=deck_id
         )
 
         mocked_upload_file_to_s3.assert_not_called()
+
+    def _all_image_names_in_notes(self, notes_data: List[NoteInfo]):
+        client = AnkiHubClient(local_media_dir_path=TEST_MEDIA_PATH)
+        all_notes_fields = []
+        for note in notes_data:
+            all_notes_fields.extend(note.fields)
+
+        result = [path.name for path in client.get_images_from_fields(all_notes_fields)]
+        return result
+
+
+@pytest.mark.vcr()
+class TestOwnedDeckIds:
+    def test_owned_deck_ids_for_user_test1(
+        self, authorized_client_for_user_test1: AnkiHubClient
+    ):
+        client = authorized_client_for_user_test1
+        assert [ID_OF_DECK_OF_USER_TEST1] == client.owned_deck_ids()
+
+    def test_owned_deck_ids_for_user_test2(
+        self, authorized_client_for_user_test2: AnkiHubClient
+    ):
+        client = authorized_client_for_user_test2
+        assert [ID_OF_DECK_OF_USER_TEST2] == client.owned_deck_ids()
