@@ -40,6 +40,7 @@ from ankihub.ankihub_client import (
     OptionalTagSuggestion,
     SuggestionType,
     TagGroupValidationResponse,
+    get_image_names_from_notes_data,
 )
 from ankihub.gui.decks import download_progress_cb
 
@@ -1020,7 +1021,7 @@ class TestUploadAssetsForDeck:
             TEST_MEDIA_PATH / f"{deck_id}_0_deck_assets_part.zip"
         )
 
-        all_img_names_in_notes = self._all_image_names_in_notes(notes_data)
+        all_img_names_in_notes = get_image_names_from_notes_data(notes_data)
         assert path_to_created_zip_file.is_file()
         assert len(all_img_names_in_notes) == 13
         with zipfile.ZipFile(path_to_created_zip_file, "r") as zip_ref:
