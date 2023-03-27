@@ -5,8 +5,8 @@ from time import sleep
 from typing import Callable, Optional
 
 import aqt
+from anki.collection import Collection
 from anki.hooks import wrap
-from anki.sync import SyncAuth
 from aqt.gui_hooks import profile_did_open, profile_will_close, sync_did_finish
 
 from . import LOGGER
@@ -29,8 +29,8 @@ auto_sync_state = _AutoSyncState()
 def setup_ankihub_sync_on_ankiweb_sync() -> None:
     # aqt.mw.col.sync_collection is called in a background task with a progress dialog.
     # This adds the AnkiHub sync to the beginning of this background task.
-    aqt.mw.col.sync_collection = wrap(  # type: ignore
-        aqt.mw.col.sync_collection,
+    Collection.sync_collection = wrap(  # type: ignore
+        Collection.sync_collection,
         _sync_with_ankihub_and_ankiweb,
         "around",
     )
@@ -67,8 +67,11 @@ def _on_sync_did_finish() -> None:
         maybe_check_databases()
 
 
-def _sync_with_ankihub_and_ankiweb(auth: SyncAuth, _old: Callable) -> None:
+def _sync_with_ankihub_and_ankiweb(*args, **kwargs) -> None:
     LOGGER.info("Running _sync_with_ankihub_and_ankiweb")
+
+    _old: Callable = kwargs["_old"]
+    del kwargs["_old"]
 
     is_startup_sync = not auto_sync_state.attempted_startup_sync
     auto_sync_state.attempted_startup_sync = True
@@ -91,7 +94,7 @@ def _sync_with_ankihub_and_ankiweb(auth: SyncAuth, _old: Callable) -> None:
         aqt.mw.col.save(trx=False)
 
         LOGGER.info("Syncing with AnkiWeb in _sync_with_ankihub_and_ankiweb")
-        result = _old(auth=auth)
+        result = _old(*args, **kwargs)
         LOGGER.info("Finished syncing with AnkiWeb in _sync_with_ankihub_and_ankiweb")
 
         return result
