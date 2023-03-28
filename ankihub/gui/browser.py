@@ -207,7 +207,7 @@ def _on_bulk_notes_suggest_action(browser: Browser, nids: Sequence[NoteId]) -> N
         ankihub_db.ankihub_did_for_note_type(note.mid) for note in notes
     )
 
-    ah_dids = change_note_ah_dids | new_note_ah_dids
+    ah_dids = list(change_note_ah_dids | new_note_ah_dids)
     ah_dids = [did for did in ah_dids if did is not None]
 
     if len(ah_dids) > 1:

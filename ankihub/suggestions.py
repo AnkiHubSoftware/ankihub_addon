@@ -107,7 +107,7 @@ def suggest_notes_in_bulk(
         ankihub_db.ankihub_did_for_note_type(note.mid) for note in notes
     )
 
-    ankihub_dids = change_note_ah_dids | new_note_ah_dids
+    ankihub_dids = list(change_note_ah_dids | new_note_ah_dids)
     ankihub_dids = [did for did in ankihub_dids if did is not None]
 
     assert len(ankihub_dids) == 1, "All notes must belong to the same AnkiHub deck"
