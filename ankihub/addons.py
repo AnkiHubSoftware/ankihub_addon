@@ -1,10 +1,8 @@
 import logging
 import os
 from concurrent.futures import Future
-from dataclasses import dataclass
-from logging import FileHandler
 from pathlib import Path
-from typing import Any, Callable, List, Optional
+from typing import Any, Callable, List
 
 import aqt
 from anki.hooks import wrap
@@ -13,17 +11,7 @@ from aqt.addons import AddonManager, DownloaderInstaller
 
 from . import LOGGER
 from .db import detach_ankihub_db_from_anki_db_connection
-from .settings import log_file_path
-
-
-@dataclass
-class _AddonsManagmentState:
-    log_file_handler: Optional[FileHandler] = None
-
-
-# Stores the log file handler so that we can disable it during add-on updates and deletions and
-# re-enable it afterwards.
-addons_managment_state = _AddonsManagmentState()
+from .settings import log_file_path, setup_logger
 
 
 def setup_addons():
@@ -129,38 +117,30 @@ def _prevent_errors_during_addon_updates_and_deletions():
 
 
 def _with_disabled_log_file_handler(*args: Any, **kwargs: Any) -> Any:
-    # Temporarily removes the FileHandler from the logger.
-    # The FileHandler is added again after the operation is finished if right conditions are met.
+    """Disables the log FileHandler while the wrapped method is running.
+    Only enables it again if the user files folder still exists after the wrapped method was called.
+    """
 
     _old: Callable = kwargs["_old"]
     del kwargs["_old"]
 
-    LOGGER.info(f"Disabling log FileHandlers because {_old.__name__} was called.")
-
+    LOGGER.info(f"Maybe disabling log FileHandler because {_old.__name__} was called.")
     file_handlers = _log_file_handlers()
     assert len(file_handlers) <= 1
-    handler = file_handlers[0] if file_handlers else None
-    if handler:
-        LOGGER.info(
-            f"Removing handler: {handler}",
-        )
-        addons_managment_state.log_file_handler = handler
-        LOGGER.root.removeHandler(handler)
+    if file_handlers:
+        handler = file_handlers[0]
+        LOGGER.info(f"Disabling FileHandler: {handler}.")
         handler.close()
+        LOGGER.root.removeHandler(handler)
 
     try:
         result = _old(*args, **kwargs)
     finally:
-        # If a log file handler already exists, we don't need to add it again.
-        # If the the add-on was deleted it makes no sense to re-add the FileHandler (and it throws an error).
-        if (
-            addons_managment_state.log_file_handler
-            and not _log_file_handlers()
-            and log_file_path().parent.exists()
-        ):
-            LOGGER.root.addHandler(addons_managment_state.log_file_handler)
-            LOGGER.info(f"Re-added FileHandler after {_old.__name__} was called.")
-
+        assert len(file_handlers) <= 1
+        # Only re-enable the log FileHandler if the user files folder still exists.
+        if log_file_path().parent.exists() and not file_handlers:
+            setup_logger()
+            LOGGER.info(f"Re-enabled FileHandler after {_old.__name__} was called.")
     return result
 
 
