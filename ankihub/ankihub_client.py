@@ -479,11 +479,8 @@ class AnkiHubClient:
         # they are because we don't have to care about image file name conflicts
         # for new decks.
 
-        all_notes_fields = []
-        for note in notes_data:
-            all_notes_fields.extend(note.fields)
-
-        image_paths = self.get_images_from_fields(all_notes_fields)
+        image_names = get_image_names_from_notes_data(notes_data)
+        image_paths = self._image_names_to_image_paths(image_names)
 
         # If notes have no images, abort uploading
         if not image_paths:
@@ -491,12 +488,15 @@ class AnkiHubClient:
 
         self.upload_assets(list(image_paths), ah_did)
 
+    def _image_names_to_image_paths(self, image_names: Set[str]) -> Set[Path]:
+        return {self.local_media_dir_path / image_name for image_name in image_names}
+
     def upload_assets(self, image_paths: List[Path], ah_did: uuid.UUID):
         # Alternate flow: if less than 10 images, call self.upload_assets
         # passing the array of image names
         if not len(image_paths) > 10:
             self._upload_assets_individually(
-                image_names=[path.name for path in image_paths], ah_did=ah_did
+                image_names={path.name for path in image_paths}, ah_did=ah_did
             )
             return None
 
@@ -551,24 +551,8 @@ class AnkiHubClient:
             for future in as_completed(futures):
                 future.result()
 
-    def get_images_from_fields(self, fields: List[Field]) -> Set[Path]:
-        """Extracts image names from inside src attributes of HTML image tags
-        present on each field and builds the full local image path
-        for each one (pointing to the local anki media folder). Filters out
-        duplicate images, if any, since fields that use the same image share
-        the same reference to the local media folder"""
-        result = set()
-        for field_content in [f.value for f in fields]:
-            image_names = local_image_names_from_html(field_content)
-            image_paths = [
-                self.local_media_dir_path / image_name for image_name in image_names
-            ]
-            result.update(image_paths)
-
-        return result
-
     def generate_asset_files_with_hashed_names(
-        self, paths: Set[Path]
+        self, paths: Sequence[Path]
     ) -> Dict[str, str]:
         """Generates a filename for each file in the list of paths by hashing the file.
         The file is copied to the new name. If the file already exists, it is skipped,
@@ -607,7 +591,7 @@ class AnkiHubClient:
         return result
 
     def _upload_assets_individually(
-        self, image_names: List[str], ah_did: uuid.UUID
+        self, image_names: Set[str], ah_did: uuid.UUID
     ) -> None:
         # deck_id is used to namespace the images within each deck.
         s3_presigned_info = self.get_presigned_url_for_multiple_uploads(
@@ -1139,10 +1123,23 @@ def to_anki_note_type(note_type_data: Dict) -> Dict[str, Any]:
 # Media related functions
 
 
-def get_image_names_from_notes_data(notes_data: List[NoteInfo]) -> Set[str]:
-    """Return the names of all images on the given notes. Only returns names of local images, not remote images."""
+def get_image_names_from_notes_data(notes_data: Sequence[NoteInfo]) -> Set[str]:
+    """Return the names of all images on the given notes.
+    The image names are taken from inside src attributes of HTML image tags that are on the note's fields.
+    Only returns names of local images, not remote images."""
     return {
         name for note in notes_data for name in _get_image_names_from_note_info(note)
+    }
+
+
+def get_image_names_from_suggestions(suggestions: Sequence[NoteSuggestion]) -> Set[str]:
+    """Return the names of all images on the given suggestions.
+    The image names are taken from inside src attributes of HTML image tags that are on the suggestion's fields.
+    Only returns names of local images, not remote images."""
+    return {
+        name
+        for suggestion in suggestions
+        for name in get_image_names_from_suggestion(suggestion)
     }
 
 

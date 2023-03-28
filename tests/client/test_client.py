@@ -41,6 +41,7 @@ from ankihub.ankihub_client import (
     SuggestionType,
     TagGroupValidationResponse,
     get_image_names_from_notes_data,
+    get_image_names_from_suggestion,
 )
 from ankihub.gui.decks import download_progress_cb
 
@@ -905,7 +906,11 @@ class TestUploadImagesForSuggestion:
             )
             client.create_new_note_suggestion(new_note_suggestion=suggestion)
 
-        original_image_paths = client.get_images_from_fields(suggestion.fields)
+        original_image_names = get_image_names_from_suggestion(suggestion)
+        original_image_paths = [
+            TEST_MEDIA_PATH / original_image_name
+            for original_image_name in original_image_names
+        ]
         asset_name_map = client.generate_asset_files_with_hashed_names(
             original_image_paths
         )
@@ -1115,21 +1120,12 @@ class TestUploadAssetsForDeck:
         deck_id = next_deterministic_uuid()
         client.upload_assets_for_deck(deck_id, notes_data)
 
-        all_img_names_in_notes = self._all_image_names_in_notes(notes_data)
+        all_img_names_in_notes = get_image_names_from_notes_data(notes_data)
         mocked_upload_assets_individually.assert_called_once_with(
             image_names=all_img_names_in_notes, ah_did=deck_id
         )
 
         mocked_upload_file_to_s3.assert_not_called()
-
-    def _all_image_names_in_notes(self, notes_data: List[NoteInfo]):
-        client = AnkiHubClient(local_media_dir_path=TEST_MEDIA_PATH)
-        all_notes_fields = []
-        for note in notes_data:
-            all_notes_fields.extend(note.fields)
-
-        result = [path.name for path in client.get_images_from_fields(all_notes_fields)]
-        return result
 
 
 @pytest.mark.vcr()
