@@ -436,19 +436,19 @@ def upload_deck_assets_action() -> None:
     if not owned_ah_dids:
         showInfo(
             "<b>Oh no!</b> 🙁<br>"
-            "You do not own any Decks. You can only perform a full image upload for Decks that you own.<br><br>"
-            "Maybe try creating a new deck for yourself, or do a Note suggestion instead? 🙂"
+            "You do not own any AnkiHub decks. You can only perform a full image upload for decks that you own.<br><br>"
+            "Maybe try creating a new AnkiHub deck for yourself, or create a note suggestion instead? 🙂"
         )
         return
 
     # The user owns one or more Decks but they are not installed locally
     if owned_ah_dids and not any(
-        [dids for dids in owned_ah_dids if dids in config.deck_ids()]
+        [did for did in owned_ah_dids if did in config.deck_ids()]
     ):
         showInfo(
             "<b>Oh no!</b> 🙁<br>"
-            "It seems that you have Deck(s) that you own at AnkiHub, but none of them are installed locally.<br><br>"
-            "Plase sync them to your local machine before trying to upload images for it 🙂"
+            "It seems that you have deck(s) that you own at AnkiHub, but none of them are installed locally.<br><br>"
+            "Plase subscribe to the deck from the add-on before trying to upload images for it 🙂"
         )
         return
 
