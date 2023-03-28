@@ -145,18 +145,18 @@ def choose_ankihub_deck(
 
     ah_dids = ah_dids or config.deck_ids()
     deck_configs = [
-        config.deck_config(did) for did in ah_dids if did in config.deck_ids()
+        (config.deck_config(did), did) for did in ah_dids if did in config.deck_ids()
     ]
     chosen_deck_idx = choose_list(
         prompt=prompt,
-        choices=[deck.name for deck in deck_configs],
+        choices=[deck.name for deck, _ in deck_configs],
         parent=parent,
     )
 
     if chosen_deck_idx is None:
         return None
 
-    chosen_deck_ah_did = ah_dids[chosen_deck_idx]
+    chosen_deck_ah_did = deck_configs[chosen_deck_idx][1]
     return chosen_deck_ah_did
 
 
