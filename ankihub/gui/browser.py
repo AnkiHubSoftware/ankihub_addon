@@ -200,7 +200,16 @@ def _on_bulk_notes_suggest_action(browser: Browser, nids: Sequence[NoteId]) -> N
         showInfo(msg, parent=browser)
         return
 
-    ah_dids = set(ankihub_db.ankihub_did_for_anki_nid(note.id) for note in notes)
+    change_note_ah_dids = set(
+        ankihub_db.ankihub_did_for_anki_nid(note.id) for note in notes
+    )
+    new_note_ah_dids = set(
+        ankihub_db.ankihub_did_for_note_type(note.mid) for note in notes
+    )
+
+    ah_dids = change_note_ah_dids | new_note_ah_dids
+    ah_dids = [did for did in ah_dids if did is not None]
+
     if len(ah_dids) > 1:
         msg = (
             "You can only create suggestions for notes from one AnkiHub deck at a time.<br>"
