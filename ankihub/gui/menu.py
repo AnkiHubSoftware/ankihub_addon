@@ -424,17 +424,41 @@ def upload_deck_assets_action() -> None:
     if not client.is_feature_flag_enabled("image_support_enabled"):
         showInfo(
             "The image support feature is not enabled yet for your account.<br>"
-            "We are working on it and it will be available soon."
+            "We are working on it and it will be available soon for everyone 📸"
         )
         return
 
-    # TODO: Get list of decks from AnkiHub which are owned by the user and let the
-    # user choose one of them instead of what we have below.
-    # We only want to allow the user to upload images for decks that they own.
+    # Fetch the ankihub deck ids of all decks the user owns
+    owned_ah_dids = client.owned_deck_ids()
+
     # If the user has no owned decks, we should show a message informing them
     # about this and not allow them to upload images.
+    if not owned_ah_dids:
+        showInfo(
+            "<b>Oh no!</b> 🙁<br>"
+            "You do not own any AnkiHub decks. You can only perform a full image upload for decks that you own.<br><br>"
+            "Maybe try creating a new AnkiHub deck for yourself, or create a note suggestion instead? 🙂"
+        )
+        return
+
+    # The user owns one or more Decks but they are not installed locally
+    if owned_ah_dids and not any(
+        [did for did in owned_ah_dids if did in config.deck_ids()]
+    ):
+        showInfo(
+            "<b>Oh no!</b> 🙁<br>"
+            "It seems that you have deck(s) that you own at AnkiHub, but none of them are installed locally.<br><br>"
+            "Plase subscribe to the deck from the add-on before trying to upload images for it 🙂"
+        )
+        return
+
+    # Displays a window for the user to select which Deck they want to upload images for.
+    # This will only display Decks that the user owns AND are installed locally. Maintainers
+    # and subscribers should not be able to upload images for Decks they maintain/subscribe.
     ah_did = choose_ankihub_deck(
-        "Choose the AnkiHub deck for which<br>you want to upload images.", parent=aqt.mw
+        "Choose the AnkiHub deck for which<br>you want to upload images.",
+        parent=aqt.mw,
+        ah_dids=owned_ah_dids,
     )
     if ah_did is None:
         return

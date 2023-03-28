@@ -100,7 +100,16 @@ def suggest_notes_in_bulk(
     remote database but not from the local database, users have to
     sync first (so that the local database is up to date)."""
 
-    ankihub_dids = ankihub_db.ankihub_dids_for_anki_nids([note.id for note in notes])
+    change_note_ah_dids = set(
+        ankihub_db.ankihub_dids_for_anki_nids([note.id for note in notes])
+    )
+    new_note_ah_dids = set(
+        ankihub_db.ankihub_did_for_note_type(note.mid) for note in notes
+    )
+
+    ankihub_dids = list(change_note_ah_dids | new_note_ah_dids)
+    ankihub_dids = [did for did in ankihub_dids if did is not None]
+
     assert len(ankihub_dids) == 1, "All notes must belong to the same AnkiHub deck"
     ankihub_did = ankihub_dids[0]
 
