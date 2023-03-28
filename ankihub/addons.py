@@ -137,7 +137,8 @@ def _with_disabled_log_file_handler(*args: Any, **kwargs: Any) -> Any:
         result = _old(*args, **kwargs)
     finally:
         assert len(file_handlers) <= 1
-        # Only re-enable the log FileHandler if the user files folder still exists.
+        # Only re-enable the log FileHandler if the user files folder still exists and
+        # the FileHandler is disabled.
         if log_file_path().parent.exists() and not file_handlers:
             setup_logger()
             LOGGER.info(f"Re-enabled FileHandler after {_old.__name__} was called.")
