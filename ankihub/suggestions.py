@@ -1,10 +1,14 @@
 import copy
 import uuid
+from concurrent.futures import Future
 from dataclasses import dataclass
-from typing import Any, Dict, List, Optional, cast
+from pathlib import Path
+from typing import Any, Dict, List, Optional, Sequence, Tuple, cast
 
+import aqt
 from anki.notes import Note, NoteId
 
+from . import LOGGER
 from .addon_ankihub_client import AddonAnkiHubClient as AnkiHubClient
 from .ankihub_client import (
     ChangeNoteSuggestion,
@@ -34,13 +38,14 @@ def suggest_note_update(
     If calling this function from the editor, the note should be reloaded after this function is called,
     because the note's assets will possibly have been renamed.
     """
-    suggestion = change_note_suggestion(note, change_type, comment)
+    suggestion = _change_note_suggestion(note, change_type, comment)
     if suggestion is None:
         return False
 
     ah_did = ankihub_db.ankihub_did_for_anki_nid(NoteId(suggestion.anki_nid))
     suggestion = cast(
-        ChangeNoteSuggestion, _rename_and_upload_assets(suggestion, ah_did)
+        ChangeNoteSuggestion,
+        _rename_and_upload_assets_for_suggestion(suggestion, ah_did),
     )
 
     client = AnkiHubClient()
@@ -59,66 +64,15 @@ def suggest_new_note(
     Also renames assets in the Anki collection and the media folder and uploads them to AnkiHub.
     If calling this function from the editor, the note should be reloaded after this function is called,
     because the note's assets will possibly have been renamed."""
-    suggestion = new_note_suggestion(note, ankihub_did, comment)
+    suggestion = _new_note_suggestion(note, ankihub_did, comment)
 
     suggestion = cast(
-        NewNoteSuggestion, _rename_and_upload_assets(suggestion, ankihub_did)
+        NewNoteSuggestion,
+        _rename_and_upload_assets_for_suggestion(suggestion, ankihub_did),
     )
 
     client = AnkiHubClient()
     client.create_new_note_suggestion(suggestion, auto_accept=auto_accept)
-
-
-def _rename_and_upload_assets(
-    suggestion: NoteSuggestion, ankihub_did: uuid.UUID
-) -> NoteSuggestion:
-    """Renames assets in the Anki collection and the media folder and uploads them to AnkiHub.
-    Returns a suggestion with updated asset names."""
-
-    client = AnkiHubClient()
-    if not client.is_feature_flag_enabled("image_support_enabled"):
-        return suggestion
-
-    suggestion = copy.deepcopy(suggestion)
-
-    asset_name_map = client.upload_assets_for_suggestion(suggestion, ankihub_did)
-
-    if asset_name_map:
-        _replace_asset_names_in_suggestion(suggestion, asset_name_map)
-        _update_asset_names_on_notes(asset_name_map)
-
-    return suggestion
-
-
-def _replace_asset_names_in_suggestion(
-    suggestion: NoteSuggestion, asset_map: Dict[str, str]
-):
-    suggestion.fields = [
-        _field_with_replaced_asset_names(field, asset_map)
-        for field in suggestion.fields
-    ]
-
-
-def _field_with_replaced_asset_names(field: Field, asset_map: Dict[str, str]) -> Field:
-    result = copy.deepcopy(field)
-    for old_name, new_name in asset_map.items():
-        # TODO: Think of a better way of doing that. Currently we need to call it twice,
-        # one for single quotes and other for double quotes around the src attribute.
-        result.value = result.value.replace(f'src="{old_name}"', f'src="{new_name}"')
-        result.value = result.value.replace(f"src='{old_name}'", f"src='{new_name}'")
-    return result
-
-
-def _update_asset_names_on_notes(asset_name_map: Dict[str, str]):
-    for original_filename, new_filename in asset_name_map.items():
-        # TODO: Think of a better way of doing that. Currently we need to call it twice,
-        # one for single quotes and other for double quotes around the src attribute.
-        find_and_replace_text_in_fields_on_all_notes(
-            f'src="{original_filename}"', f'src="{new_filename}"'
-        )
-        find_and_replace_text_in_fields_on_all_notes(
-            f"src='{original_filename}'", f"src='{new_filename}'"
-        )
 
 
 @dataclass
@@ -134,58 +88,39 @@ def suggest_notes_in_bulk(
     change_type: SuggestionType,
     comment: str,
 ) -> BulkNoteSuggestionsResult:
-    # Note: Notes that don't have any changes when compared to the local
-    # AnkiHub database will not be sent. This does not necessarily mean
-    # that the note has no changes when compared to the remote AnkiHub
-    # database. To create suggestions for notes that differ from the
-    # remote database but not from the local database, users have to
-    # sync first (so that the local database is up to date).
+    """
+    Sends a NewNoteSuggestion or a ChangeNoteSuggestion to AnkiHub for each note in the list.
+    All notes have to be from one AnkiHub deck. If a note does not belong to any
+    AnkiHub deck, it will be ignored.
+    Note: Notes that don't have any changes when compared to the local
+    AnkiHub database will not be sent. This does not necessarily mean
+    that the note has no changes when compared to the remote AnkiHub
+    database. To create suggestions for notes that differ from the
+    remote database but not from the local database, users have to
+    sync first (so that the local database is up to date)."""
 
-    ankihub_did_for_mid = {
-        mid: ankihub_did
-        for mid in set(note.mid for note in notes)
-        if (ankihub_did := ankihub_db.ankihub_did_for_note_type(mid))
-    }
+    ankihub_dids = ankihub_db.ankihub_dids_for_anki_nids([note.id for note in notes])
+    assert len(ankihub_dids) == 1, "All notes must belong to the same AnkiHub deck"
+    ankihub_did = ankihub_dids[0]
 
-    notes_that_exist_on_remote = []
-    notes_that_dont_exist_on_remote = []
-    ankihub_notes = [note for note in notes if ankihub_did_for_mid.get(note.mid)]
-    for note in ankihub_notes:
-        if ankihub_db.ankihub_nid_for_anki_nid(note.id):
-            notes_that_exist_on_remote.append(note)
-        else:
-            notes_that_dont_exist_on_remote.append(note)
+    (
+        new_note_suggestions,
+        change_note_suggestions,
+        nids_without_changes,
+    ) = _suggestions_for_notes(notes, ankihub_did, change_type, comment)
 
-    # Create change note suggestions for notes that exist on remote
-    change_note_suggestions_or_none_by_nid = {
-        note.id: change_note_suggestion(
-            note=note,
-            change_type=change_type,
-            comment=comment,
-        )
-        for note in notes_that_exist_on_remote
-    }
-    change_note_suggestions = [
-        suggestion
-        for suggestion in change_note_suggestions_or_none_by_nid.values()
-        if suggestion is not None
-    ]
-    # nids of notes that exist on remote but have no changes
-    nids_without_changes = [
-        nid
-        for nid, suggestion in change_note_suggestions_or_none_by_nid.items()
-        if not suggestion
-    ]
-
-    # Create new note suggestions for notes that don't exist on remote
-    new_note_suggestions = [
-        new_note_suggestion(
-            note=note,
-            ankihub_deck_uuid=ankihub_did_for_mid[note.mid],
-            comment=comment,
-        )
-        for note in notes_that_dont_exist_on_remote
-    ]
+    new_note_suggestions = cast(
+        Sequence[NewNoteSuggestion],
+        _rename_and_upload_assets_for_suggestions(
+            suggestions=new_note_suggestions, ankihub_did=ankihub_did
+        ),
+    )
+    change_note_suggestions = cast(
+        Sequence[ChangeNoteSuggestion],
+        _rename_and_upload_assets_for_suggestions(
+            suggestions=change_note_suggestions, ankihub_did=ankihub_did
+        ),
+    )
 
     client = AnkiHubClient()
     errors_by_nid_int = client.create_suggestions_in_bulk(
@@ -216,7 +151,73 @@ def suggest_notes_in_bulk(
     return result
 
 
-def change_note_suggestion(
+def _suggestions_for_notes(
+    notes: List[Note], ankihub_did: uuid.UUID, change_type: SuggestionType, comment: str
+) -> Tuple[
+    Sequence[NewNoteSuggestion], Sequence[ChangeNoteSuggestion], Sequence[NoteId]
+]:
+    """
+    Splits the list of notes into three categories:
+    - notes that should be sent as NewNoteSuggestions
+    - notes that should be sent as ChangeNoteSuggestions
+    - notes that should not be sent because they don't have any changes
+    Returns a tuple of three sequences:
+    - new_note_suggestions
+    - change_note_suggestions
+    - nids_without_changes
+    """
+    anki_nids_to_ankihub_nids = ankihub_db.anki_nids_to_ankihub_nids(
+        [note.id for note in notes]
+    )
+    note_by_anki_id = {note.id: note for note in notes}
+
+    notes_that_exist_on_remote = [
+        note_by_anki_id[anki_nid]
+        for anki_nid, ah_nid in anki_nids_to_ankihub_nids.items()
+        if ah_nid
+    ]
+
+    notes_that_dont_exist_on_remote = [
+        note_by_anki_id[anki_nid]
+        for anki_nid, ah_nid in anki_nids_to_ankihub_nids.items()
+        if ah_nid is None
+    ]
+
+    # Create change note suggestions for notes that exist on remote
+    change_note_suggestions_or_none_by_nid = {
+        note.id: _change_note_suggestion(
+            note=note,
+            change_type=change_type,
+            comment=comment,
+        )
+        for note in notes_that_exist_on_remote
+    }
+    change_note_suggestions = [
+        suggestion
+        for suggestion in change_note_suggestions_or_none_by_nid.values()
+        if suggestion
+    ]
+    # nids of notes that exist on remote but have no changes
+    nids_without_changes = [
+        nid
+        for nid, suggestion in change_note_suggestions_or_none_by_nid.items()
+        if not suggestion
+    ]
+
+    # Create new note suggestions for notes that don't exist on remote
+    new_note_suggestions = [
+        _new_note_suggestion(
+            note=note,
+            ankihub_deck_uuid=ankihub_did,
+            comment=comment,
+        )
+        for note in notes_that_dont_exist_on_remote
+    ]
+
+    return new_note_suggestions, change_note_suggestions, nids_without_changes
+
+
+def _change_note_suggestion(
     note: Note, change_type: SuggestionType, comment: str
 ) -> Optional[ChangeNoteSuggestion]:
     note_data = to_note_data(note, diff=True)
@@ -235,7 +236,7 @@ def change_note_suggestion(
     )
 
 
-def new_note_suggestion(
+def _new_note_suggestion(
     note: Note, ankihub_deck_uuid: uuid.UUID, comment: str
 ) -> NewNoteSuggestion:
     note_data = to_note_data(note, set_new_id=True)
@@ -251,3 +252,88 @@ def new_note_suggestion(
         guid=note.guid,
         comment=comment,
     )
+
+
+def _rename_and_upload_assets_for_suggestion(
+    suggestion: NoteSuggestion, ankihub_did: uuid.UUID
+) -> NoteSuggestion:
+    suggestion = _rename_and_upload_assets_for_suggestions([suggestion], ankihub_did)[0]
+    return suggestion
+
+
+def _rename_and_upload_assets_for_suggestions(
+    suggestions: Sequence[NoteSuggestion], ankihub_did: uuid.UUID
+) -> Sequence[NoteSuggestion]:
+    """Renames assets referenced on the suggestions in the Anki collection and the media folder and
+    uploads them to AnkiHub in another thread.
+    Returns suggestion with updated asset names."""
+
+    client = AnkiHubClient()
+    if not client.is_feature_flag_enabled("image_support_enabled"):
+        return suggestions
+
+    original_image_paths = set()
+    for suggestion in suggestions:
+        image_paths_for_suggestion = client.get_images_from_fields(
+            fields=suggestion.fields
+        )
+        original_image_paths.update(image_paths_for_suggestion)
+
+    asset_name_map = client.generate_asset_files_with_hashed_names(original_image_paths)
+
+    new_image_paths = [
+        Path(aqt.mw.col.media.dir()) / new_asset_name
+        for new_asset_name in asset_name_map.values()
+    ]
+
+    aqt.mw.taskman.run_in_background(
+        lambda: client.upload_assets(new_image_paths, ankihub_did),
+        on_done=_on_uploaded_images,
+    )
+
+    if asset_name_map:
+        suggestions = copy.deepcopy(suggestions)
+        for suggestion in suggestions:
+            _replace_asset_names_in_suggestion(suggestion, asset_name_map)
+
+        _update_asset_names_on_notes(asset_name_map)
+
+    return suggestions
+
+
+def _on_uploaded_images(future: Future):
+    future.result()
+    LOGGER.info("Uploaded images to AnkiHub.")
+
+
+def _replace_asset_names_in_suggestion(
+    suggestion: NoteSuggestion, asset_name_map: Dict[str, str]
+):
+    suggestion.fields = [
+        _field_with_replaced_asset_names(field, asset_name_map)
+        for field in suggestion.fields
+    ]
+
+
+def _field_with_replaced_asset_names(
+    field: Field, asset_name_map: Dict[str, str]
+) -> Field:
+    result = copy.deepcopy(field)
+    for old_name, new_name in asset_name_map.items():
+        # TODO: Think of a better way of doing that. Currently we need to call it twice,
+        # one for single quotes and other for double quotes around the src attribute.
+        result.value = result.value.replace(f'src="{old_name}"', f'src="{new_name}"')
+        result.value = result.value.replace(f"src='{old_name}'", f"src='{new_name}'")
+    return result
+
+
+def _update_asset_names_on_notes(asset_name_map: Dict[str, str]):
+    for original_filename, new_filename in asset_name_map.items():
+        # TODO: Think of a better way of doing that. Currently we need to call it twice,
+        # one for single quotes and other for double quotes around the src attribute.
+        find_and_replace_text_in_fields_on_all_notes(
+            f'src="{original_filename}"', f'src="{new_filename}"'
+        )
+        find_and_replace_text_in_fields_on_all_notes(
+            f"src='{original_filename}'", f"src='{new_filename}'"
+        )

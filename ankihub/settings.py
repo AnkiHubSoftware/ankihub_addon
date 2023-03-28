@@ -223,6 +223,8 @@ class _Config:
         self._update_private_config()
 
     def deck_ids(self) -> List[uuid.UUID]:
+        """Return the ankihub deck ids of the currently locally
+        installed decks."""
         return list(self._private_config.decks.keys())
 
     def deck_config(self, ankihub_did: uuid.UUID) -> DeckConfig:
