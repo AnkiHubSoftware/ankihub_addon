@@ -16,6 +16,7 @@ from .ankihub_client import (
     NewNoteSuggestion,
     NoteSuggestion,
     SuggestionType,
+    get_image_names_from_suggestions,
 )
 from .db import ankihub_db
 from .exporting import to_note_data
@@ -99,7 +100,16 @@ def suggest_notes_in_bulk(
     remote database but not from the local database, users have to
     sync first (so that the local database is up to date)."""
 
-    ankihub_dids = ankihub_db.ankihub_dids_for_anki_nids([note.id for note in notes])
+    change_note_ah_dids = set(
+        ankihub_db.ankihub_dids_for_anki_nids([note.id for note in notes])
+    )
+    new_note_ah_dids = set(
+        ankihub_db.ankihub_did_for_note_type(note.mid) for note in notes
+    )
+
+    ankihub_dids = list(change_note_ah_dids | new_note_ah_dids)
+    ankihub_dids = [did for did in ankihub_dids if did is not None]
+
     assert len(ankihub_dids) == 1, "All notes must belong to the same AnkiHub deck"
     ankihub_did = ankihub_dids[0]
 
@@ -272,12 +282,10 @@ def _rename_and_upload_assets_for_suggestions(
     if not client.is_feature_flag_enabled("image_support_enabled"):
         return suggestions
 
-    original_image_paths = set()
-    for suggestion in suggestions:
-        image_paths_for_suggestion = client.get_images_from_fields(
-            fields=suggestion.fields
-        )
-        original_image_paths.update(image_paths_for_suggestion)
+    original_image_names = get_image_names_from_suggestions(suggestions)
+    original_image_paths = [
+        Path(aqt.mw.col.media.dir()) / image_name for image_name in original_image_names
+    ]
 
     asset_name_map = client.generate_asset_files_with_hashed_names(original_image_paths)
 

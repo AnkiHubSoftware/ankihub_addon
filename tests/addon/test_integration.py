@@ -2762,7 +2762,9 @@ def test_upload_assets_individually(
             file_path = Path(f.name)
             fake_deck_id = next_deterministic_uuid()
             client = AnkiHubClient(local_media_dir_path=file_path.parent)
-            client._upload_assets_individually([file_path.name], ah_did=fake_deck_id)
+            client._upload_assets_individually(
+                set([file_path.name]), ah_did=fake_deck_id
+            )
 
         assert len(s3_upload_request_mock.request_history) == 1  # type: ignore
 

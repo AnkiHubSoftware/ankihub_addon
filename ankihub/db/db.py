@@ -324,6 +324,10 @@ class _AnkiHubDB:
             WHERE anki_note_id = {anki_nid}
             """
         )
+
+        if not did_str:
+            return None
+
         result = uuid.UUID(did_str)
         return result
 
