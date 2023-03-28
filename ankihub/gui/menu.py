@@ -458,7 +458,7 @@ def upload_deck_assets_action() -> None:
     ah_did = choose_ankihub_deck(
         "Choose the AnkiHub deck for which<br>you want to upload images.",
         parent=aqt.mw,
-        filter_ah_dids=owned_ah_dids,
+        ah_dids=owned_ah_dids,
     )
     if ah_did is None:
         return
