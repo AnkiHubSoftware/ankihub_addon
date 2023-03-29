@@ -88,7 +88,7 @@ def open_suggestion_dialog_for_bulk_suggestion(
     if not suggestion_meta:
         return
 
-    aqt.mw.taskman.with_progress(
+    aqt.mw.taskman.run_in_background(
         task=lambda: suggest_notes_in_bulk(
             notes,
             auto_accept=suggestion_meta.auto_accept,
@@ -96,7 +96,6 @@ def open_suggestion_dialog_for_bulk_suggestion(
             comment=suggestion_meta.comment,
         ),
         on_done=lambda future: _on_suggest_notes_in_bulk_done(future, parent),
-        parent=parent,
     )
 
 
