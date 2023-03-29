@@ -596,6 +596,7 @@ def test_suggest_notes_in_bulk(
     monkeypatch: MonkeyPatch,
     install_sample_ah_deck: InstallSampleAHDeck,
     next_deterministic_uuid: Callable[[], uuid.UUID],
+    disable_image_support_feature_flag,
 ):
     anki_session = anki_session_with_addon_data
     bulk_suggestions_method_mock = MagicMock()
@@ -2728,7 +2729,7 @@ def test_download_images_on_sync(
         download_images_mock.assert_called_once_with(["image.png"], ah_did)
 
 
-def test_upload_assets(
+def test_upload_assets_individually(
     anki_session_with_addon_data: AnkiSession,
     next_deterministic_uuid: Callable[[], uuid.UUID],
     monkeypatch: MonkeyPatch,
@@ -2757,7 +2758,9 @@ def test_upload_assets(
             file_path = Path(f.name)
             fake_deck_id = next_deterministic_uuid()
             client = AnkiHubClient(local_media_dir_path=file_path.parent)
-            client.upload_assets([file_path.name], deck_id=fake_deck_id)
+            client._upload_assets_individually(
+                set([file_path.name]), ah_did=fake_deck_id
+            )
 
         assert len(s3_upload_request_mock.request_history) == 1  # type: ignore
 
@@ -2774,6 +2777,7 @@ class TestSuggestionsWithImages:
         requests_mock: Mocker,
         monkeypatch: MonkeyPatch,
         install_sample_ah_deck: Callable[[], Tuple[uuid.UUID, int]],
+        qtbot: QtBot,
         enable_image_support_feature_flag,
     ):
         anki_session = anki_session_with_addon_data
@@ -2823,6 +2827,9 @@ class TestSuggestionsWithImages:
                     comment="test",
                 )
 
+                # Wait for the background thread that uploads the images to finish.
+                qtbot.wait(200)
+
                 assert len(suggestion_request_mock.request_history) == 1  # type: ignore
 
                 # assert that the image was uploaded
@@ -2840,6 +2847,7 @@ class TestSuggestionsWithImages:
         requests_mock: Mocker,
         monkeypatch: MonkeyPatch,
         install_sample_ah_deck: InstallSampleAHDeck,
+        qtbot: QtBot,
         enable_image_support_feature_flag,
     ):
         anki_session = anki_session_with_addon_data
@@ -2888,6 +2896,9 @@ class TestSuggestionsWithImages:
                     comment="test",
                 )
 
+                # Wait for the background thread that uploads the images to finish.
+                qtbot.wait(200)
+
                 self._assert_img_names_as_expected(
                     note=note,
                     upload_request_mock=s3_upload_request_mock,  # type: ignore
@@ -2902,10 +2913,8 @@ class TestSuggestionsWithImages:
         img_name_in_note = re.search(IMG_NAME_IN_IMG_TAG_REGEX, note["Front"]).group(1)
 
         name_of_uploaded_image = re.findall(
-            r'filename="(.*?)"', upload_request_mock.last_request.text
-        )[
-            0
-        ]  # type: ignore
+            r'filename="(.*?)"', upload_request_mock.last_request.text  # type: ignore
+        )[0]
 
         suggestion_dict = suggestion_request_mock.last_request.json()  # type: ignore
         first_field_value = suggestion_dict["fields"][0]["value"]

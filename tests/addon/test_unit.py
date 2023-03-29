@@ -1,14 +1,21 @@
 import os
-from typing import List
+import tempfile
+import uuid
+from pathlib import Path
+from typing import Callable, Generator, List
 
-from anki.notes import Note
+import pytest
+from anki.notes import Note, NoteId
 from pytest_anki import AnkiSession
+
+from ..factories import NoteInfoFactory
 
 # workaround for vscode test discovery not using pytest.ini which sets this env var
 # has to be set before importing ankihub
 os.environ["SKIP_INIT"] = "1"
 
 from ankihub import suggestions
+from ankihub.db.db import _AnkiHubDB
 from ankihub.errors import _normalize_url
 from ankihub.exporting import _prepared_field_html
 from ankihub.importing import updated_tags
@@ -16,6 +23,15 @@ from ankihub.note_conversion import ADDON_INTERNAL_TAGS, TAG_FOR_OPTIONAL_TAGS
 from ankihub.register_decks import note_type_name_without_ankihub_modifications
 from ankihub.subdecks import SUBDECK_TAG, add_subdeck_tags_to_notes
 from ankihub.utils import lowest_level_common_ancestor_deck_name
+
+
+@pytest.fixture
+def ankihub_db() -> Generator[_AnkiHubDB, None, None]:
+    with tempfile.TemporaryDirectory() as temp_dir:
+        db = _AnkiHubDB()
+        db_path = Path(temp_dir) / "ankihub.db"
+        db.setup_and_migrate(db_path)
+        yield db
 
 
 class TestUploadImagesForSuggestion:
@@ -239,3 +255,34 @@ def test_add_subdeck_tags_to_notes_with_spaces_in_deck_name(
 
         note3.load()
         assert note3.tags == [f"{SUBDECK_TAG}::AA::b_b::c_c"]
+
+
+class TestAnkiHubDB:
+    def test_anki_nids_to_ankihub_nids(
+        self,
+        ankihub_db: _AnkiHubDB,
+        next_deterministic_uuid: Callable[[], uuid.UUID],
+    ):
+        existing_anki_nid = 1
+        non_existing_anki_nid = 2
+
+        note = NoteInfoFactory.create(
+            anki_nid=existing_anki_nid,
+        )
+
+        # Add a note to the DB.
+        ah_did = next_deterministic_uuid()
+        ankihub_db.upsert_notes_data(
+            ankihub_did=ah_did,
+            notes_data=[note],
+        )
+
+        # Retrieve a dict of anki_nid -> ankihub_note_uuid for two anki_nids.
+        ah_nids_for_anki_nids = ankihub_db.anki_nids_to_ankihub_nids(
+            anki_nids=[NoteId(existing_anki_nid), NoteId(non_existing_anki_nid)]
+        )
+
+        assert ah_nids_for_anki_nids == {
+            existing_anki_nid: note.ankihub_note_uuid,
+            non_existing_anki_nid: None,
+        }
