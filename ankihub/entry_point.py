@@ -14,7 +14,13 @@ from .debug import setup as setup_debug
 from .errors import setup_error_handler
 from .gui import browser, editor, progress, reviewer
 from .gui.menu import refresh_ankihub_menu, setup_ankihub_menu
-from .settings import ANKI_VERSION, config, setup_logger, setup_profile_data_folder
+from .settings import (
+    ANKI_VERSION,
+    ankihub_db_path,
+    config,
+    setup_logger,
+    setup_profile_data_folder,
+)
 from .utils import modify_note_type_templates
 
 # The general setup should be only once, because it sets up menu items, hooks, etc.
@@ -60,7 +66,7 @@ def profile_setup() -> bool:
     config.setup_private_config()
     LOGGER.info("Set up config for the current profile.")
 
-    ankihub_db.setup_and_migrate()
+    ankihub_db.setup_and_migrate(ankihub_db_path())
     LOGGER.info("Set up and migrated AnkiHub DB for the current profile.")
 
     from .gui.menu import ankihub_menu
