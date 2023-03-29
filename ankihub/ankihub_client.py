@@ -1152,7 +1152,10 @@ def get_image_names_from_suggestion(suggestion: NoteSuggestion) -> Set[str]:
     return result
 
 
-def _get_image_names_from_note_info(note_info: NoteInfo) -> Set[str]:
+def _get_image_names_from_note_info(note_info: NoteInfo | None) -> Set[str]:
+    if note_info is None:
+        return set([])
+
     result = {
         name
         for field in note_info.fields
