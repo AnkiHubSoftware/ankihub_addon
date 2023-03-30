@@ -1,9 +1,11 @@
 import re
-from typing import Sequence, Set
+from typing import List, Sequence, Set
 
 import aqt
 from anki.notes import NoteId
 from anki.utils import ids2str
+
+from .ankihub_client import NoteInfo
 
 from .common_utils import IMG_NAME_IN_IMG_TAG_REGEX
 
@@ -34,3 +36,16 @@ def find_and_replace_text_in_fields_on_all_notes(old: str, new: str) -> None:
         old,
         new,
     )
+
+
+def get_img_names_from_note_info(note_info: NoteInfo) -> List[str]:
+    """Return the names of all images on the given note info.
+    Does only return names of local images, not remote images."""
+    imgs = []
+    for field in note_info.fields:
+        for img in re.findall(IMG_NAME_IN_IMG_TAG_REGEX, field):
+            if img.startswith("http://") or img.startswith("https://"):
+                continue
+            imgs.append(img)
+
+    return imgs

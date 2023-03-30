@@ -29,6 +29,8 @@ from aqt.utils import showInfo, showText, tooltip
 from .. import LOGGER
 from ..ankihub_client import AnkiHubRequestError, SuggestionType
 from ..db import ankihub_db
+from ..exporting import to_note_data
+from ..media_utils import get_img_names_from_note_info
 from ..settings import ANKING_DECK_ID, RATIONALE_FOR_CHANGE_MAX_LENGTH
 from ..suggestions import (
     ANKIHUB_NO_CHANGE_ERROR,
@@ -77,6 +79,7 @@ def open_suggestion_dialog_for_note(note: Note, parent: QWidget) -> None:
     suggestion_meta = SuggestionDialog(
         is_new_note_suggestion=ah_nid is None,
         is_for_ankihub_deck=ah_did == ANKING_DECK_ID,
+        image_was_added=image_was_added(note),
     ).run()
     if suggestion_meta is None:
         return
@@ -99,6 +102,19 @@ def open_suggestion_dialog_for_note(note: Note, parent: QWidget) -> None:
             auto_accept=suggestion_meta.auto_accept,
         )
         tooltip("Submitted suggestion to AnkiHub.", parent=parent)
+
+
+def image_was_added(note: Note) -> bool:
+    """Returns True if an image was added when comparing with the ankihub database.""" ""
+    note_info_anki = to_note_data(note)
+    img_names_anki = get_img_names_from_note_info(note_info_anki)
+
+    note_info_ah = ankihub_db.note_data(note.id)
+    img_names_ah = get_img_names_from_note_info(note_info_ah)
+
+    added_img_names = set(img_names_anki) - set(img_names_ah)
+    result = len(added_img_names) > 0
+    return result
 
 
 def open_suggestion_dialog_for_bulk_suggestion(
@@ -196,10 +212,16 @@ class SuggestionDialog(QDialog):
     # The _validate method is called when the user changes the input in form elements that get validated.
     validation_signal = pyqtSignal(bool)
 
-    def __init__(self, is_new_note_suggestion: bool, is_for_ankihub_deck: bool) -> None:
+    def __init__(
+        self,
+        is_new_note_suggestion: bool,
+        is_for_ankihub_deck: bool,
+        image_was_added: bool,
+    ) -> None:
         super().__init__()
         self._is_new_note_suggestion = is_new_note_suggestion
         self._is_for_ankihub_deck = is_for_ankihub_deck
+        self._image_was_added = image_was_added
 
         self._setup_ui()
 
@@ -234,6 +256,37 @@ class SuggestionDialog(QDialog):
         qconnect(self.source_widget.validation_signal, self._validate)
         self._set_source_widget_visibility()
         self.layout_.addSpacing(10)
+
+        # Set up image source input fields in a group box
+        self.image_source_group_box = QGroupBox("Image Source")
+        self.image_source_group_box_layout = QVBoxLayout()
+        self.image_source_group_box.setLayout(self.image_source_group_box_layout)
+        self.layout_.addWidget(self.image_source_group_box)
+
+        self.image_source_edit = QLineEdit()
+        self.image_source_edit.setPlaceholderText("Link to source of the image.")
+        self.image_source_edit.setValidator(
+            QRegularExpressionValidator(QRegularExpression(r".+"))
+        )
+        self.image_source_group_box_layout.addWidget(self.image_source_edit)
+        qconnect(self.image_source_edit.textChanged, self._validate)
+        self.layout_.addSpacing(10)
+
+        # ... Set up a field for proof that the image is public domain
+        self.image_proof_edit = QLineEdit()
+        self.image_proof_edit.setPlaceholderText(
+            "Link to proof the image is public domain."
+        )
+        self.image_proof_edit.setValidator(
+            QRegularExpressionValidator(QRegularExpression(r".+"))
+        )
+        self.image_source_group_box_layout.addWidget(self.image_proof_edit)
+        qconnect(self.image_proof_edit.textChanged, self._validate)
+
+        if not self._image_was_added:
+            self.image_source_group_box.hide()
+        else:
+            self.layout_.addSpacing(10)
 
         # Set up rationale field
         label = QLabel("Rationale for Change (Required)")
@@ -313,6 +366,12 @@ class SuggestionDialog(QDialog):
             return False
 
         if self._source_needed() and not self.source_widget.is_valid():
+            return False
+
+        if self._image_was_added and (
+            not self.image_source_edit.hasAcceptableInput()
+            or not self.image_proof_edit.hasAcceptableInput()
+        ):
             return False
 
         return True
