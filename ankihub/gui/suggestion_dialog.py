@@ -1,5 +1,6 @@
 from concurrent.futures import Future
 from dataclasses import dataclass
+from enum import Enum
 from pprint import pformat
 from typing import List, Optional
 
@@ -7,15 +8,20 @@ import aqt
 from anki.notes import Note
 from aqt.qt import (
     QCheckBox,
+    QComboBox,
     QDialog,
     QDialogButtonBox,
+    QGroupBox,
     QLabel,
-    QListWidget,
+    QLineEdit,
     QPlainTextEdit,
-    QSize,
+    QRegularExpression,
+    QRegularExpressionValidator,
+    QSpacerItem,
     Qt,
     QVBoxLayout,
     QWidget,
+    pyqtSignal,
     qconnect,
 )
 from aqt.utils import showInfo, showText, tooltip
@@ -23,7 +29,7 @@ from aqt.utils import showInfo, showText, tooltip
 from .. import LOGGER
 from ..ankihub_client import AnkiHubRequestError, SuggestionType
 from ..db import ankihub_db
-from ..settings import RATIONALE_FOR_CHANGE_MAX_LENGTH
+from ..settings import ANKING_DECK_ID, RATIONALE_FOR_CHANGE_MAX_LENGTH
 from ..suggestions import (
     ANKIHUB_NO_CHANGE_ERROR,
     BulkNoteSuggestionsResult,
@@ -31,6 +37,27 @@ from ..suggestions import (
     suggest_note_update,
     suggest_notes_in_bulk,
 )
+
+
+class SourceType(Enum):
+    AMBOSS = "AMBOSS"
+    UWORLD = "UWorld"
+    SOCIETY_GUIDELINES = "Society Guidelines"
+    OTHER = "Other"
+
+
+@dataclass
+class SuggestionSource:
+    source_type: SourceType
+    source_text: str
+
+
+@dataclass
+class SuggestionMetadata:
+    comment: str
+    auto_accept: bool = False
+    change_type: Optional[SuggestionType] = None
+    source: Optional[SuggestionSource] = None
 
 
 def open_suggestion_dialog_for_note(note: Note, parent: QWidget) -> None:
@@ -45,8 +72,12 @@ def open_suggestion_dialog_for_note(note: Note, parent: QWidget) -> None:
     ), f"Note type {note.mid} is not associated with an AnkiHub deck."
 
     ah_nid = ankihub_db.ankihub_nid_for_anki_nid(note.id)
+    ah_did = ankihub_db.ankihub_did_for_note_type(note.mid)
 
-    suggestion_meta = SuggestionDialog(is_new_note_suggestion=ah_nid is None).run()
+    suggestion_meta = SuggestionDialog(
+        is_new_note_suggestion=ah_nid is None,
+        is_for_ankihub_deck=ah_did == ANKING_DECK_ID,
+    ).run()
     if suggestion_meta is None:
         return
 
@@ -54,14 +85,13 @@ def open_suggestion_dialog_for_note(note: Note, parent: QWidget) -> None:
         if suggest_note_update(
             note=note,
             change_type=suggestion_meta.change_type,
-            comment=suggestion_meta.comment,
+            comment=_comment_with_source(suggestion_meta),
             auto_accept=suggestion_meta.auto_accept,
         ):
             tooltip("Submitted suggestion to AnkiHub.", parent=parent)
         else:
             tooltip("No changes. Try syncing with AnkiHub first.", parent=parent)
     else:
-        ah_did = ankihub_db.ankihub_did_for_note_type(note.mid)
         suggest_new_note(
             note=note,
             ankihub_did=ah_did,
@@ -84,19 +114,35 @@ def open_suggestion_dialog_for_bulk_suggestion(
         ankihub_db.is_ankihub_note_type(mid) for mid in mids
     ), "Some of the note types of the notes are not associated with an AnkiHub deck."
 
-    suggestion_meta = SuggestionDialog(is_new_note_suggestion=False).run()
+    ah_dids = set(ankihub_db.ankihub_did_for_note_type(mid) for mid in mids)
+    assert len(ah_dids) == 1, "All notes have to be from the same AnkiHub deck."
+
+    ah_did = ah_dids.pop()
+
+    suggestion_meta = SuggestionDialog(
+        is_new_note_suggestion=False, is_for_ankihub_deck=ah_did == ANKING_DECK_ID
+    ).run()
     if not suggestion_meta:
         return
 
-    aqt.mw.taskman.run_in_background(
+    aqt.mw.taskman.with_progress(
         task=lambda: suggest_notes_in_bulk(
             notes,
             auto_accept=suggestion_meta.auto_accept,
             change_type=suggestion_meta.change_type,
-            comment=suggestion_meta.comment,
+            comment=_comment_with_source(suggestion_meta),
         ),
         on_done=lambda future: _on_suggest_notes_in_bulk_done(future, parent),
+        parent=parent,
     )
+
+
+def _comment_with_source(suggestion_meta: SuggestionMetadata) -> str:
+    result = suggestion_meta.comment
+    if suggestion_meta.source:
+        result += f"\nSource: {suggestion_meta.source.source_type.value} - {suggestion_meta.source.source_text}"
+
+    return result
 
 
 def _on_suggest_notes_in_bulk_done(future: Future, parent: QWidget) -> None:
@@ -143,19 +189,17 @@ def _on_suggest_notes_in_bulk_done(future: Future, parent: QWidget) -> None:
     showText(msg, parent=parent)
 
 
-@dataclass
-class SuggestionMetadata:
-    comment: str
-    auto_accept: bool
-    change_type: SuggestionType
-
-
 class SuggestionDialog(QDialog):
     silentlyClose = True
 
-    def __init__(self, is_new_note_suggestion: bool) -> None:
+    # Emitted when the validation result was determined after self._validate was called.
+    # The _validate method is called when the user changes the input in form elements that get validated.
+    validation_signal = pyqtSignal(bool)
+
+    def __init__(self, is_new_note_suggestion: bool, is_for_ankihub_deck: bool) -> None:
         super().__init__()
         self._is_new_note_suggestion = is_new_note_suggestion
+        self._is_for_ankihub_deck = is_for_ankihub_deck
 
         self._setup_ui()
 
@@ -163,64 +207,115 @@ class SuggestionDialog(QDialog):
         self.setWindowModality(Qt.WindowModality.WindowModal)
         self.setWindowTitle("Note Suggestion(s)")
 
-        layout = QVBoxLayout()
-        self.setLayout(layout)
+        self.layout_ = QVBoxLayout()
+        self.setLayout(self.layout_)
 
-        self.select = select = CustomListWidget()
-        select.addItems([x.value[1] for x in SuggestionType])
-        select.setCurrentRow(0)
-
+        # Set up change type dropdown
+        self.change_type_select = QComboBox()
         if not self._is_new_note_suggestion:
-            # change type select
+            self.change_type_select.addItems([x.value[1] for x in SuggestionType])
             label = QLabel("Change Type")
-            layout.addWidget(label)
-            layout.addWidget(select)
+            self.layout_.addWidget(label)
+            self.layout_.addWidget(self.change_type_select)
+            qconnect(
+                self.change_type_select.currentTextChanged,
+                self._set_source_widget_visibility,
+            )
+            self.layout_.addSpacing(10)
 
-        # comment field
+        # Set up source widget in a group box (group box is for styling purposes)
+        self.source_widget = SourceWidget()
+        self.source_widget_group_box = QGroupBox("Source")
+        self.layout_.addWidget(self.source_widget_group_box)
+        self.source_widget_group_box_layout = QVBoxLayout()
+        self.source_widget_group_box.setLayout(self.source_widget_group_box_layout)
+
+        self.source_widget_group_box_layout.addWidget(self.source_widget)
+        qconnect(self.source_widget.validation_signal, self._validate)
+        self._set_source_widget_visibility()
+        self.layout_.addSpacing(10)
+
+        # Set up rationale field
         label = QLabel("Rationale for Change (Required)")
-        layout.addWidget(label)
+        self.layout_.addWidget(label)
 
-        self.edit = edit = QPlainTextEdit()
+        self.rationale_edit = QPlainTextEdit()
+        self.layout_.addWidget(self.rationale_edit)
 
         def limit_length():
-            while len(edit.toPlainText()) >= RATIONALE_FOR_CHANGE_MAX_LENGTH:
-                edit.textCursor().deletePreviousChar()
+            while (
+                len(self.rationale_edit.toPlainText())
+                >= RATIONALE_FOR_CHANGE_MAX_LENGTH
+            ):
+                self.rationale_edit.textCursor().deletePreviousChar()
 
-        edit.textChanged.connect(limit_length)  # type: ignore
-        layout.addWidget(edit)
+        qconnect(self.rationale_edit.textChanged, limit_length)
+        qconnect(self.rationale_edit.textChanged, self._validate)
 
-        # "auto-accept" checkbox
+        self.layout_.addSpacing(10)
+
+        # Set up "auto-accept" checkbox
         self.auto_accept_cb = QCheckBox("Submit without review (maintainers only).")
-        layout.addWidget(self.auto_accept_cb)
+        self.layout_.addWidget(self.auto_accept_cb)
 
-        # button box
-        button_box = QDialogButtonBox(QDialogButtonBox.StandardButton.Ok)
-        qconnect(button_box.accepted, self.accept)
-        layout.addWidget(button_box)
+        # Set up button box
+        self.button_box = QDialogButtonBox(QDialogButtonBox.StandardButton.Ok)
+        qconnect(self.button_box.accepted, self.accept)
+        self.layout_.addWidget(self.button_box)
 
-        # disable save button when rationale for change field is empty
-        button_box.setDisabled(True)
-
-        def toggle_save_button_disabled_state():
-            if len(edit.toPlainText().strip()) == 0:
-                button_box.setDisabled(True)
-            else:
-                button_box.setDisabled(False)
-
-        edit.textChanged.connect(toggle_save_button_disabled_state)  # type: ignore
+        self._set_submit_button_enabled_state(False)
+        qconnect(self.validation_signal, self._set_submit_button_enabled_state)
 
     def run(self) -> Optional[SuggestionMetadata]:
         if not self.exec():
             return None
 
+        return self.suggestion_meta()
+
+    def suggestion_meta(self) -> Optional[SuggestionMetadata]:
         return SuggestionMetadata(
             change_type=self._change_type(),
             comment=self._comment(),
             auto_accept=self._auto_accept(),
+            source=self.source_widget.suggestion_source()
+            if self._source_needed()
+            else None,
         )
 
-    def _comment(self) -> str:
-        return self.edit.toPlainText()
+    def _set_source_widget_visibility(self) -> None:
+        if self._source_needed():
+            self.source_widget_group_box.show()
+        else:
+            self.source_widget_group_box.hide()
+
+    def _source_needed(self) -> bool:
+        result = (
+            self._change_type()
+            in [
+                SuggestionType.NEW_CONTENT,
+                SuggestionType.UPDATED_CONTENT,
+            ]
+            and self._is_for_ankihub_deck
+        )
+        return result
+
+    def _set_submit_button_enabled_state(self, enabled: bool) -> None:
+        self.button_box.button(QDialogButtonBox.StandardButton.Ok).setEnabled(enabled)
+
+    def _validate(self) -> None:
+        if self._is_valid():
+            self.validation_signal.emit(True)
+        else:
+            self.validation_signal.emit(False)
+
+    def _is_valid(self) -> bool:
+        if len(self.rationale_edit.toPlainText().strip()) == 0:
+            return False
+
+        if self._source_needed() and not self.source_widget.is_valid():
+            return False
+
+        return True
 
     def _change_type(self) -> Optional[SuggestionType]:
         if self._is_new_note_suggestion:
@@ -229,16 +324,115 @@ class SuggestionDialog(QDialog):
             return next(
                 x
                 for x in SuggestionType
-                if x.value[1] == self.select.currentItem().text()
+                if x.value[1] == self.change_type_select.currentText()
             )
+
+    def _comment(self) -> str:
+        return self.rationale_edit.toPlainText()
 
     def _auto_accept(self) -> bool:
         return self.auto_accept_cb.isChecked()
 
 
-class CustomListWidget(QListWidget):
-    def sizeHint(self) -> QSize:
-        # adjusts height to content
-        size = QSize()
-        size.setHeight(self.sizeHintForRow(0) * self.count() + 2 * self.frameWidth())
-        return size
+source_type_to_source_label = {
+    SourceType.AMBOSS: "Link",
+    SourceType.UWORLD: "UWorld Question ID",
+    SourceType.SOCIETY_GUIDELINES: "Link",
+    SourceType.OTHER: "",
+}
+
+UWORLD_STEP_OPTIONS = [
+    "Step 1",
+    "Step 2",
+    "Step 3",
+]
+
+
+class SourceWidget(QWidget):
+
+    # Emitted when the validation result was determined after self._validate was called.
+    # The _validate method is called when the user changes the input in form elements that get validated.
+    validation_signal = pyqtSignal(bool)
+
+    def __init__(self) -> None:
+        super().__init__()
+        self._setup_ui()
+
+    def _setup_ui(self) -> None:
+        self.layout_ = QVBoxLayout()
+        self.setLayout(self.layout_)
+
+        # Setup source type dropdown
+        self.source_type_select = QComboBox()
+        self.source_type_select.addItems([x.value for x in SourceType])
+        self.layout_.addWidget(self.source_type_select)
+        qconnect(
+            self.source_type_select.currentTextChanged, self._on_source_type_change
+        )
+        self.layout_.addSpacing(10)
+
+        # Setup UWorld step select
+        self.uworld_step_select = QComboBox()
+        self.uworld_step_select.addItems(UWORLD_STEP_OPTIONS)
+        self.layout_.addWidget(self.uworld_step_select)
+        self.space_after_uworld_step_select = QSpacerItem(0, 10)
+        self.layout_.addSpacerItem(self.space_after_uworld_step_select)
+
+        # Setup source field
+        self.source_input_label = QLabel()
+        self.layout_.addWidget(self.source_input_label)
+
+        self.source_edit = QLineEdit()
+        self.source_edit.setValidator(
+            QRegularExpressionValidator(QRegularExpression(r".+"))
+        )
+        qconnect(self.source_edit.textChanged, self._validate)
+        self.layout_.addWidget(self.source_edit)
+
+        # Set initial state
+        self._on_source_type_change()
+
+    def suggestion_source(self) -> SuggestionSource:
+        source_type = self._source_type()
+        source = self.source_edit.text()
+
+        if source_type == SourceType.UWORLD:
+            step = self.uworld_step_select.currentText()
+            source = f"{step} {source}"
+
+        return SuggestionSource(source_type=source_type, source_text=source)
+
+    def is_valid(self) -> bool:
+        return self.source_edit.hasAcceptableInput()
+
+    def _validate(self) -> None:
+        if not self.is_valid():
+            self.validation_signal.emit(False)
+        else:
+            self.validation_signal.emit(True)
+
+    def _on_source_type_change(self) -> None:
+        self._refresh_source_input_label()
+
+        if self._source_type() == SourceType.UWORLD:
+            self.uworld_step_select.show()
+            self.space_after_uworld_step_select.changeSize(0, 10)
+            self.layout_.invalidate()
+        else:
+            self.uworld_step_select.hide()
+            self.space_after_uworld_step_select.changeSize(0, 0)
+            self.layout_.invalidate()
+
+    def _refresh_source_input_label(self) -> None:
+        source_type = self._source_type()
+        text = source_type_to_source_label[source_type]
+
+        self.source_input_label.setText(text)
+
+        if not text:
+            self.source_input_label.hide()
+        else:
+            self.source_input_label.show()
+
+    def _source_type(self) -> SourceType:
+        return SourceType(self.source_type_select.currentText())
