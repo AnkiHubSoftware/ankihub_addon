@@ -31,6 +31,7 @@ from ..ankihub_client import AnkiHubRequestError, get_image_names_from_notes_dat
 from ..db import ankihub_db
 from ..error_reporting import upload_logs_in_background
 from ..media_import.ui import open_import_dialog
+from ..media_sync import media_sync
 from ..register_decks import create_collaborative_deck
 from ..settings import ADDON_VERSION, config, url_view_deck
 from ..subdecks import SUBDECK_TAG
@@ -519,11 +520,9 @@ def upload_deck_assets_action() -> None:
     # Extract the AnkiHub deck ID using a sample note id
     ah_did = ankihub_db.ankihub_did_for_anki_nid(nids[0])
 
-    aqt.mw.taskman.run_in_background(
-        task=client.upload_assets_for_deck,
-        args={"ah_did": ah_did, "notes_data": notes_data},
-        on_done=on_done,
-    )
+    media_names = get_image_names_from_notes_data(notes_data)
+    media_sync.start_media_upload(media_names, ah_did, on_done=on_done)
+
     showInfo(
         "🖼️ Upload started! You can continue using Anki in the meantime."
         "<br><br>We'll notify you when the upload process finishes 👍"

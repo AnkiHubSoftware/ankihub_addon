@@ -288,12 +288,9 @@ def _rename_and_upload_assets_for_suggestions(
 
     asset_name_map = client.generate_asset_files_with_hashed_names(original_image_paths)
 
-    new_image_paths = [
-        Path(aqt.mw.col.media.dir()) / new_asset_name
-        for new_asset_name in asset_name_map.values()
-    ]
-
-    media_sync.start_media_upload(media_files=new_image_paths, ankihub_did=ankihub_did)
+    media_sync.start_media_upload(
+        media_names=asset_name_map.values(), ankihub_did=ankihub_did
+    )
 
     if asset_name_map:
         suggestions = copy.deepcopy(suggestions)
