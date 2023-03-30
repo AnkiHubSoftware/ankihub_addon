@@ -511,12 +511,11 @@ def install_deck(
     latest_update: datetime,
     is_creator: bool,
 ) -> AnkiHubImportResult:
-    """If we have a .csv, read data from the file and modify the user's note types
-    and notes.
-    :param: path to the .csv or .apkg file
-    :return: True if successful, False if not
+    """Imports the notes_data into the Anki collection.
+    Saves the deck subscription to the config file.
+    Starts the media download.
+    Returns information about the import.
     """
-
     create_backup()
 
     importer = AnkiHubImporter()
