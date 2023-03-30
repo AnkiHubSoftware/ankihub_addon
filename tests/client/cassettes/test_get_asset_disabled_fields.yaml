@@ -1,0 +1,113 @@
+interactions:
+- request:
+    body: '{"username": "test1", "password": "asdf"}'
+    headers:
+      Accept:
+      - application/json; version=7.0
+      Accept-Encoding:
+      - gzip, deflate
+      Connection:
+      - keep-alive
+      Content-Length:
+      - '41'
+      Content-Type:
+      - application/json
+      User-Agent:
+      - python-requests/2.28.2
+    method: POST
+    uri: http://localhost:8000/api/login/
+  response:
+    body:
+      string: '{"expiry":"2023-04-06T21:38:02.123938Z","token":"2872ce6f303404655f1938fccb3fb598f45246bc0b44d8e611349672983430b3"}'
+    headers:
+      Allow:
+      - POST, OPTIONS
+      Content-Language:
+      - en
+      Content-Length:
+      - '115'
+      Content-Type:
+      - application/json
+      Cross-Origin-Opener-Policy:
+      - same-origin
+      Date:
+      - Thu, 30 Mar 2023 21:38:02 GMT
+      Referrer-Policy:
+      - same-origin
+      Server:
+      - WSGIServer/0.2 CPython/3.8.16
+      Server-Timing:
+      - TimerPanel_utime;dur=390.3670000000048;desc="User CPU time", TimerPanel_stime;dur=39.29300000000025;desc="System
+        CPU time", TimerPanel_total;dur=429.660000000005;desc="Total CPU time", TimerPanel_total_time;dur=278.6524295806885;desc="Elapsed
+        time", SQLPanel_sql_time;dur=5.224704742431641;desc="SQL 11 queries", CachePanel_total_time;dur=0;desc="Cache
+        0 Calls"
+      Set-Cookie:
+      - csrftoken=BZ697LgKGnrwhbX5UM5R8d8eEudEfVs5; expires=Thu, 28 Mar 2024 21:38:02
+        GMT; HttpOnly; Max-Age=31449600; Path=/; SameSite=Lax
+      - sessionid=tgyun7zqe2evhan1qkr2eo8zq7p4rzue; expires=Thu, 06 Apr 2023 21:38:02
+        GMT; HttpOnly; Max-Age=604800; Path=/; SameSite=Lax
+      Vary:
+      - Accept, Cookie, Accept-Language, Origin
+      X-Content-Type-Options:
+      - nosniff
+      X-Frame-Options:
+      - DENY
+      djdt-store-id:
+      - 722f309254664ae99208e5897a5c9f23
+    status:
+      code: 200
+      message: OK
+- request:
+    body: null
+    headers:
+      Accept:
+      - application/json; version=7.0
+      Accept-Encoding:
+      - gzip, deflate
+      Authorization:
+      - Token 2872ce6f303404655f1938fccb3fb598f45246bc0b44d8e611349672983430b3
+      Connection:
+      - keep-alive
+      Content-Type:
+      - application/json
+      User-Agent:
+      - python-requests/2.28.2
+    method: GET
+    uri: http://localhost:8000/api/decks/dda0d3ad-89cd-45fb-8ddc-fabad93c2d7b/asset-disabled-fields/
+  response:
+    body:
+      string: '{"detail":"Not found."}'
+    headers:
+      Allow:
+      - GET, HEAD, OPTIONS
+      Content-Language:
+      - en
+      Content-Length:
+      - '23'
+      Content-Type:
+      - application/json
+      Cross-Origin-Opener-Policy:
+      - same-origin
+      Date:
+      - Thu, 30 Mar 2023 21:38:02 GMT
+      Referrer-Policy:
+      - same-origin
+      Server:
+      - WSGIServer/0.2 CPython/3.8.16
+      Server-Timing:
+      - TimerPanel_utime;dur=126.80100000000039;desc="User CPU time", TimerPanel_stime;dur=0.0;desc="System
+        CPU time", TimerPanel_total;dur=126.80100000000039;desc="Total CPU time",
+        TimerPanel_total_time;dur=130.25784492492676;desc="Elapsed time", SQLPanel_sql_time;dur=1.9207000732421875;desc="SQL
+        5 queries", CachePanel_total_time;dur=0;desc="Cache 0 Calls"
+      Vary:
+      - Accept, Accept-Language, Cookie, Origin
+      X-Content-Type-Options:
+      - nosniff
+      X-Frame-Options:
+      - DENY
+      djdt-store-id:
+      - ba7d88768caa4e43b6a2423a44dc10ee
+    status:
+      code: 404
+      message: Not Found
+version: 1
