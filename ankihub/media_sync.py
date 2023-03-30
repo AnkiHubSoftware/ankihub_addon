@@ -1,0 +1,105 @@
+import uuid
+from concurrent.futures import Future
+from pathlib import Path
+from typing import List, Optional
+
+import aqt
+from aqt.qt import QAction
+
+from . import LOGGER
+from .addon_ankihub_client import AddonAnkiHubClient
+from .db import ankihub_db
+from .media_utils import get_img_names_from_notes
+
+
+class _AnkiHubMediaSync:
+    """This class is responsible for synchronizing media between Anki and AnkiHub.
+    The operations are performed in the background.
+    This class keeps track of the status of the operations and shows it as text on
+    the QAction that is passed to the setup method.
+    """
+
+    def __init__(self) -> None:
+        self._download_in_progress = False
+        self._amount_uploads_in_progress = 0
+        self._media_sync_status_action: Optional[QAction] = None
+
+    def setup(self, media_download_status_action: QAction):
+        self._media_sync_status_action = media_download_status_action
+
+    def start_media_download(self):
+        """Download missing media for all subscribed decks from AnkiHub in the background.
+        Does nothing if a download is already in progress.
+        """
+        if self._download_in_progress:
+            LOGGER.info("Media download already in progress, skipping...")
+            return
+
+        LOGGER.info("Starting media download...")
+
+        self._download_in_progress = True
+        self._refresh_media_download_status()
+
+        aqt.mw.taskman.run_in_background(
+            self._download_missing_media, on_done=self._on_download_finished
+        )
+
+    def start_media_upload(self, media_files: List[Path], ankihub_did: uuid.UUID):
+        """Upload the given media files to AnkiHub in the background."""
+        self._amount_uploads_in_progress += 1
+        self._refresh_media_download_status()
+
+        aqt.mw.taskman.run_in_background(
+            lambda: AddonAnkiHubClient().upload_assets(media_files, ankihub_did),
+            on_done=self._on_upload_finished,
+        )
+
+    def _on_upload_finished(self, future: Future):
+        self._amount_uploads_in_progress -= 1
+        future.result()
+        LOGGER.info("Uploaded images to AnkiHub.")
+        self._refresh_media_download_status()
+
+    def _download_missing_media(self):
+        for ah_did in ankihub_db.ankihub_deck_ids():
+            missing_image_names = self._missing_images_for_ah_deck(ah_did)
+            if not missing_image_names:
+                continue
+            AddonAnkiHubClient().download_images(missing_image_names, ah_did)
+
+    def _missing_images_for_ah_deck(self, ah_did: uuid.UUID) -> List[str]:
+        nids = ankihub_db.anki_nids_for_ankihub_deck(ah_did)
+        img_names = get_img_names_from_notes(nids)
+
+        media_dir_path = Path(aqt.mw.col.media.dir())
+
+        result = [
+            img_name
+            for img_name in img_names
+            if not (media_dir_path / img_name).exists()
+        ]
+        return result
+
+    def _on_download_finished(self, future: Future) -> None:
+        self._download_in_progress = False
+        future.result()
+        LOGGER.info("Downloaded images from AnkiHub.")
+        self._refresh_media_download_status()
+
+    def _refresh_media_download_status(self):
+        aqt.mw.taskman.run_on_main(self._refresh_media_download_status_inner)
+
+    def _refresh_media_download_status_inner(self):
+        if self._download_in_progress:
+            self._set_status_text("Downloading...")
+        elif self._amount_uploads_in_progress > 0:
+            self._set_status_text("Uploading...")
+        else:
+            self._set_status_text("Idle")
+
+    def _set_status_text(self, text: str):
+        if self._media_sync_status_action is not None:
+            self._media_sync_status_action.setText(f"Media Sync: {text}")
+
+
+media_sync = _AnkiHubMediaSync()
