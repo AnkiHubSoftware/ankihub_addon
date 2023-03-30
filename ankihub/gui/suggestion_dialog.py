@@ -1,5 +1,10 @@
-from typing import Optional
+from concurrent.futures import Future
+from dataclasses import dataclass
+from pprint import pformat
+from typing import List, Optional
 
+import aqt
+from anki.notes import Note
 from aqt.qt import (
     QCheckBox,
     QDialog,
@@ -10,23 +15,151 @@ from aqt.qt import (
     QSize,
     Qt,
     QVBoxLayout,
+    QWidget,
     qconnect,
 )
+from aqt.utils import showInfo, showText, tooltip
 
-from ..ankihub_client import SuggestionType
-from ..settings import RATIONALE_FOR_CHANGE_MAX_LENGTH, AnkiHubCommands
+from .. import LOGGER
+from ..ankihub_client import AnkiHubRequestError, SuggestionType
+from ..db import ankihub_db
+from ..settings import RATIONALE_FOR_CHANGE_MAX_LENGTH
+from ..suggestions import (
+    ANKIHUB_NO_CHANGE_ERROR,
+    BulkNoteSuggestionsResult,
+    suggest_new_note,
+    suggest_note_update,
+    suggest_notes_in_bulk,
+)
+
+
+def open_suggestion_dialog_for_note(note: Note, parent: QWidget) -> None:
+    """Opens a dialog for creating a note suggestion for the given note.
+    The note has to be present in the Anki collection before calling this function.
+    May change the notes contents (e.g. by renaming media files) and therefore the
+    note might need to be reloaded after this function is called.
+    """
+
+    assert ankihub_db.is_ankihub_note_type(
+        note.mid
+    ), f"Note type {note.mid} is not associated with an AnkiHub deck."
+
+    ah_nid = ankihub_db.ankihub_nid_for_anki_nid(note.id)
+
+    suggestion_meta = SuggestionDialog(is_new_note_suggestion=ah_nid is None).run()
+    if suggestion_meta is None:
+        return
+
+    if ah_nid:
+        if suggest_note_update(
+            note=note,
+            change_type=suggestion_meta.change_type,
+            comment=suggestion_meta.comment,
+            auto_accept=suggestion_meta.auto_accept,
+        ):
+            tooltip("Submitted suggestion to AnkiHub.", parent=parent)
+        else:
+            tooltip("No changes. Try syncing with AnkiHub first.", parent=parent)
+    else:
+        ah_did = ankihub_db.ankihub_did_for_note_type(note.mid)
+        suggest_new_note(
+            note=note,
+            ankihub_did=ah_did,
+            comment=suggestion_meta.comment,
+            auto_accept=suggestion_meta.auto_accept,
+        )
+        tooltip("Submitted suggestion to AnkiHub.", parent=parent)
+
+
+def open_suggestion_dialog_for_bulk_suggestion(
+    notes: List[Note], parent: QWidget
+) -> None:
+    """Opens a dialog for creating a bulk suggestion for the given notes.
+    The notes have to be present in the Anki collection before calling this function.
+    May change the notes contents (e.g. by renaming media files) and therefore the
+    notes might need to be reloaded after this function is called."""
+
+    mids = set(note.mid for note in notes)
+    assert (
+        ankihub_db.is_ankihub_note_type(mid) for mid in mids
+    ), "Some of the note types of the notes are not associated with an AnkiHub deck."
+
+    suggestion_meta = SuggestionDialog(is_new_note_suggestion=False).run()
+    if not suggestion_meta:
+        return
+
+    aqt.mw.taskman.run_in_background(
+        task=lambda: suggest_notes_in_bulk(
+            notes,
+            auto_accept=suggestion_meta.auto_accept,
+            change_type=suggestion_meta.change_type,
+            comment=suggestion_meta.comment,
+        ),
+        on_done=lambda future: _on_suggest_notes_in_bulk_done(future, parent),
+    )
+
+
+def _on_suggest_notes_in_bulk_done(future: Future, parent: QWidget) -> None:
+    try:
+        suggestions_result: BulkNoteSuggestionsResult = future.result()
+    except AnkiHubRequestError as e:
+        if e.response.status_code != 403:
+            raise e
+
+        msg = (
+            "You are not allowed to create suggestion for all selected notes.<br>"
+            "Are you subscribed to the AnkiHub deck(s) these notes are from?<br><br>"
+            "You can only submit changes without a review if you are an owner or maintainer of the deck."
+        )
+        showInfo(msg, parent=parent)
+        return
+
+    LOGGER.info("Created note suggestions in bulk.")
+    LOGGER.info(f"errors_by_nid:\n{pformat(suggestions_result.errors_by_nid)}")
+
+    msg_about_created_suggestions = (
+        f"Submitted {suggestions_result.change_note_suggestions_count} change note suggestion(s).\n"
+        f"Submitted {suggestions_result.new_note_suggestions_count} new note suggestion(s) to.\n\n\n"
+    )
+
+    notes_without_changes = [
+        note
+        for note, errors in suggestions_result.errors_by_nid.items()
+        if ANKIHUB_NO_CHANGE_ERROR in str(errors)
+    ]
+    msg_about_failed_suggestions = (
+        (
+            f"Failed to submit suggestions for {len(suggestions_result.errors_by_nid)} note(s).\n"
+            "All notes with failed suggestions:\n"
+            f'{", ".join(str(nid) for nid in suggestions_result.errors_by_nid.keys())}\n\n'
+            f"Notes without changes ({len(notes_without_changes)}):\n"
+            f'{", ".join(str(nid) for nid in notes_without_changes)}\n'
+        )
+        if suggestions_result.errors_by_nid
+        else ""
+    )
+
+    msg = msg_about_created_suggestions + msg_about_failed_suggestions
+    showText(msg, parent=parent)
+
+
+@dataclass
+class SuggestionMetadata:
+    comment: str
+    auto_accept: bool
+    change_type: SuggestionType
 
 
 class SuggestionDialog(QDialog):
     silentlyClose = True
 
-    def __init__(self, command):
+    def __init__(self, is_new_note_suggestion: bool) -> None:
         super().__init__()
-        self.command = command
+        self._is_new_note_suggestion = is_new_note_suggestion
 
-        self.setup_ui()
+        self._setup_ui()
 
-    def setup_ui(self) -> None:
+    def _setup_ui(self) -> None:
         self.setWindowModality(Qt.WindowModality.WindowModal)
         self.setWindowTitle("Note Suggestion(s)")
 
@@ -36,8 +169,8 @@ class SuggestionDialog(QDialog):
         self.select = select = CustomListWidget()
         select.addItems([x.value[1] for x in SuggestionType])
         select.setCurrentRow(0)
-        # Hide the change type options if it's a new card.
-        if self.command != AnkiHubCommands.NEW.value:
+
+        if not self._is_new_note_suggestion:
             # change type select
             label = QLabel("Change Type")
             layout.addWidget(label)
@@ -76,14 +209,21 @@ class SuggestionDialog(QDialog):
 
         edit.textChanged.connect(toggle_save_button_disabled_state)  # type: ignore
 
-    def accept(self) -> None:
-        return super().accept()
+    def run(self) -> Optional[SuggestionMetadata]:
+        if not self.exec():
+            return None
 
-    def comment(self) -> str:
+        return SuggestionMetadata(
+            change_type=self._change_type(),
+            comment=self._comment(),
+            auto_accept=self._auto_accept(),
+        )
+
+    def _comment(self) -> str:
         return self.edit.toPlainText()
 
-    def change_type(self) -> Optional[SuggestionType]:
-        if self.command == AnkiHubCommands.NEW.value:
+    def _change_type(self) -> Optional[SuggestionType]:
+        if self._is_new_note_suggestion:
             return None
         else:
             return next(
@@ -92,7 +232,7 @@ class SuggestionDialog(QDialog):
                 if x.value[1] == self.select.currentItem().text()
             )
 
-    def auto_accept(self) -> bool:
+    def _auto_accept(self) -> bool:
         return self.auto_accept_cb.isChecked()
 
 
