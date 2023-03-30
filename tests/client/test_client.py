@@ -672,7 +672,7 @@ def test_get_asset_disabled_fields(
 ):
     client = authorized_client_for_user_test1
     
-    deck_uuid = ID_OF_DECK_OF_USER_TEST2
+    deck_uuid = ID_OF_DECK_OF_USER_TEST1
     
     response = client.get_asset_disabled_fields(deck_uuid)
 
