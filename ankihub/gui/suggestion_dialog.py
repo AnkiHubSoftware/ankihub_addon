@@ -140,7 +140,7 @@ def open_suggestion_dialog_for_bulk_suggestion(
 def _comment_with_source(suggestion_meta: SuggestionMetadata) -> str:
     result = suggestion_meta.comment
     if suggestion_meta.source:
-        result += f"Source: {suggestion_meta.source.source_type.value} - {suggestion_meta.source.source_text}"
+        result += f" Source: {suggestion_meta.source.source_type.value} - {suggestion_meta.source.source_text}"
 
     return result
 
