@@ -1,6 +1,7 @@
 import re
 import uuid
 from concurrent.futures import Future
+from dataclasses import dataclass
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Optional
@@ -41,6 +42,15 @@ from .utils import (
     check_and_prompt_for_updates_on_main_window,
     choose_ankihub_deck,
 )
+
+
+@dataclass
+class _MenuState:
+    ankihub_menu: Optional[QMenu] = None
+    media_download_status_action: Optional[QAction] = None
+
+
+menu_state = _MenuState()
 
 
 class AnkiHubLogin(QWidget):
@@ -597,19 +607,13 @@ def media_download_status_setup(parent: QMenu):
     if not image_support_enabled:
         return
 
-    global media_download_status_action
-    media_download_status_action = QAction("Media download: Idle.", parent)
-    parent.addAction(media_download_status_action)
-
-
-ankihub_menu: Optional[QMenu] = None
-media_download_status_action: Optional[QAction] = None
+    menu_state.media_download_status_action = QAction("Media download: Idle.", parent)
+    parent.addAction(menu_state.media_download_status_action)
 
 
 def setup_ankihub_menu() -> None:
-    global ankihub_menu
-    ankihub_menu = QMenu("&AnkiHub", parent=aqt.mw)
-    aqt.mw.form.menubar.addMenu(ankihub_menu)
+    menu_state.ankihub_menu = QMenu("&AnkiHub", parent=aqt.mw)
+    aqt.mw.form.menubar.addMenu(menu_state.ankihub_menu)
     config.token_change_hook = lambda: aqt.mw.taskman.run_on_main(refresh_ankihub_menu)
     config.subscriptions_change_hook = lambda: aqt.mw.taskman.run_on_main(
         refresh_ankihub_menu
@@ -619,19 +623,17 @@ def setup_ankihub_menu() -> None:
 
 def refresh_ankihub_menu() -> None:
     """Add top-level AnkiHub menu."""
-    global ankihub_menu
-    ankihub_menu.clear()
+    menu_state.ankihub_menu.clear()
 
     if config.is_logged_in():
-        create_collaborative_deck_setup(parent=ankihub_menu)
-        subscribe_to_deck_setup(parent=ankihub_menu)
-        import_media_setup(parent=ankihub_menu)
-        sync_with_ankihub_setup(parent=ankihub_menu)
-        upload_deck_assets_setup(parent=ankihub_menu)
-        ankihub_logout_setup(parent=ankihub_menu)
-        media_download_status_setup(parent=ankihub_menu)
-        # upload_suggestions_setup(parent=ankihub_menu)
+        create_collaborative_deck_setup(parent=menu_state.ankihub_menu)
+        subscribe_to_deck_setup(parent=menu_state.ankihub_menu)
+        import_media_setup(parent=menu_state.ankihub_menu)
+        sync_with_ankihub_setup(parent=menu_state.ankihub_menu)
+        upload_deck_assets_setup(parent=menu_state.ankihub_menu)
+        ankihub_logout_setup(parent=menu_state.ankihub_menu)
+        media_download_status_setup(parent=menu_state.ankihub_menu)
     else:
-        ankihub_login_setup(parent=ankihub_menu)
+        ankihub_login_setup(parent=menu_state.ankihub_menu)
 
-    ankihub_help_setup(parent=ankihub_menu)
+    ankihub_help_setup(parent=menu_state.ankihub_menu)
