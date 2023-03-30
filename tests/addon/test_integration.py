@@ -1775,6 +1775,10 @@ class TestCustomSearchNodes:
 
             record_review(mw, cid)
 
+            # sleep to make sure the timestamp of the review entry is different from the
+            # timestamp of the note
+            sleep(1.1)
+
             # import the deck again, this counts as an update
             import_sample_ankihub_deck(
                 mw, ankihub_did=ah_did, assert_created_deck=False
@@ -1786,6 +1790,8 @@ class TestCustomSearchNodes:
                     all_nids
                 ) == [nid]
 
+            # sleep to make sure the timestamp of the review entry is different from the
+            # timestamp of the note
             sleep(1.1)
 
             # add another review entry for the card to the database
