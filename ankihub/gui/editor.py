@@ -7,7 +7,7 @@ from anki.models import NoteType
 from aqt import gui_hooks
 from aqt.addcards import AddCards
 from aqt.editor import Editor
-from aqt.utils import openLink, showInfo, showText, tooltip
+from aqt.utils import openLink, showInfo, tooltip
 
 from .. import LOGGER, settings
 from ..ankihub_client import AnkiHubRequestError
@@ -21,8 +21,7 @@ from ..settings import (
     url_view_note,
     url_view_note_history,
 )
-from ..suggestions import suggest_new_note, suggest_note_update
-from .suggestion_dialog import SuggestionDialog
+from .suggestion_dialog import open_suggestion_dialog_for_note
 
 ANKIHUB_BTN_ID_PREFIX = "ankihub-btn"
 SUGGESTION_BTN_ID = f"{ANKIHUB_BTN_ID_PREFIX}-suggestion"
@@ -37,7 +36,7 @@ def _on_suggestion_button_press(editor: Editor) -> None:
     """
 
     try:
-        on_suggestion_button_press_inner(editor)
+        _on_suggestion_button_press_inner(editor)
     except AnkiHubRequestError as e:
         if "suggestion" not in e.response.url:
             raise e
@@ -68,74 +67,28 @@ def _on_suggestion_button_press(editor: Editor) -> None:
             raise e
 
 
-def on_suggestion_button_press_inner(editor: Editor) -> None:
+def _on_suggestion_button_press_inner(editor: Editor) -> None:
     # The command is expected to have been set at this point already, either by
     # fetching the default or by selecting a command from the dropdown menu.
     command = editor.ankihub_command  # type: ignore
-    dialog = SuggestionDialog(command)
-    if not dialog.exec():
-        return
 
-    change_type, comment, auto_accept = (
-        dialog.change_type(),
-        dialog.comment(),
-        dialog.auto_accept(),
-    )
-    if command == AnkiHubCommands.CHANGE.value:
-        if suggest_note_update(
-            note=editor.note,
-            change_type=change_type,
-            comment=comment,
-            auto_accept=auto_accept,
-        ):
-            # Reload note because media files might have been renamed.
-            if editor.note:
-                editor.note.load()
-                editor.loadNote()
-            tooltip("Submitted change note suggestion to AnkiHub.")
-        else:
-            tooltip("No changes. Try syncing with AnkiHub first.")
-        return
-    elif command == AnkiHubCommands.NEW.value:
-        subscribed_dids = config.deck_ids()
-        if len(subscribed_dids) == 0:
-            showText(
-                "You aren't currently subscribed to any AnkiHub decks. "
-                "Please subscribe to an AnkiHub deck first."
-            )
-            return
+    def on_did_add_note(note: anki.notes.Note) -> None:
+        open_suggestion_dialog_for_note(note, parent=editor.widget)
+        gui_hooks.add_cards_did_add_note.remove(on_did_add_note)
 
-        # We can assume that the note type is associated with an AnkiHub deck.
-        # If it was not, the "Suggest new note" button would not be visible for the note.
-        ankihub_did = ankihub_db.ankihub_did_for_note_type(editor.note.mid)
+    # If the user is adding a new note, it is not yet in the Anki database.
+    # Therefore, we call add_current_note() to add the note to the database,
+    # and then open the suggestion dialog.
+    if command == AnkiHubCommands.NEW.value and editor.addMode:
+        gui_hooks.add_cards_did_add_note.append(on_did_add_note)
+        add_note_window: AddCards = editor.parentWindow  # type: ignore
+        add_note_window.add_current_note()
+    else:
+        open_suggestion_dialog_for_note(editor.note, parent=editor.widget)
 
-        if editor.addMode:
-
-            def on_add(note: anki.notes.Note) -> None:
-                suggest_new_note(
-                    note=note,
-                    ankihub_did=ankihub_did,
-                    comment=comment,
-                    auto_accept=auto_accept,
-                )
-                tooltip("Submitted new note suggestion to AnkiHub.")
-                gui_hooks.add_cards_did_add_note.remove(on_add)
-
-            gui_hooks.add_cards_did_add_note.append(on_add)
-            add_note_window: AddCards = editor.parentWindow  # type: ignore
-            add_note_window.add_current_note()
-        else:
-            suggest_new_note(
-                note=editor.note,
-                ankihub_did=ankihub_did,
-                comment=comment,
-                auto_accept=auto_accept,
-            )
-            # Reload note because media files might have been renamed.
-            if editor.note:
-                editor.note.load()
-                editor.loadNote()
-            tooltip("Submitted new note suggestion to AnkiHub.")
+        # Needed because the note might have been modified when the suggestion was created.
+        editor.note.load()
+        editor.loadNote()
 
 
 def _setup_editor_buttons(buttons: List[str], editor: Editor) -> None:

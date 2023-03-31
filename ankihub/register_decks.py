@@ -15,9 +15,10 @@ from anki.notes import NoteId
 
 from . import LOGGER
 from .addon_ankihub_client import AddonAnkiHubClient as AnkiHubClient
-from .ankihub_client import NoteInfo
+from .ankihub_client import NoteInfo, get_image_names_from_notes_data
 from .db import ankihub_db
 from .exporting import to_note_data
+from .media_sync import media_sync
 from .settings import ANKIHUB_NOTE_TYPE_FIELD_NAME, config
 from .subdecks import add_subdeck_tags_to_notes
 from .utils import (
@@ -56,13 +57,8 @@ def upload_deck(
     # Upload all existing local assets for this deck
     # (assets that are referenced on Deck's notes)
     if should_upload_assets and client.is_feature_flag_enabled("image_support_enabled"):
-        aqt.mw.taskman.run_in_background(
-            task=client.upload_assets_for_deck,
-            args={"ah_did": ankihub_did, "notes_data": notes_data},
-            on_done=lambda future: LOGGER.info(
-                f"Finished uploading assets for deck {ankihub_did}"
-            ),
-        )
+        image_names = get_image_names_from_notes_data(notes_data)
+        media_sync.start_media_upload(image_names, ankihub_did)
 
     return ankihub_did
 

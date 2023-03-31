@@ -17,7 +17,7 @@ from anki.decks import DeckId, FilteredDeckConfig
 from anki.models import NotetypeDict, NotetypeId
 from anki.notes import Note, NoteId
 from anki.sync import SyncOutput
-from aqt import AnkiQt, gui_hooks
+from aqt import AnkiQt, dialogs, gui_hooks
 from aqt.addcards import AddCards
 from aqt.addons import InstallOk
 from aqt.browser import Browser
@@ -59,6 +59,7 @@ from ankihub.ankihub_client import (
     transform_notes_data,
 )
 from ankihub.auto_sync import setup_ankihub_sync_on_ankiweb_sync
+from ankihub.common_utils import IMG_NAME_IN_IMG_TAG_REGEX
 from ankihub.db import ankihub_db, attached_ankihub_db
 from ankihub.debug import (
     _log_stack,
@@ -86,7 +87,6 @@ from ankihub.importing import (
     adjust_note_types,
     reset_note_types_of_notes,
 )
-from ankihub.media_utils import IMG_NAME_IN_IMG_TAG_REGEX
 from ankihub.note_conversion import (
     ADDON_INTERNAL_TAGS,
     ANKI_INTERNAL_TAGS,
@@ -277,9 +277,12 @@ def test_editor(
         install_sample_ah_deck()
 
         # mock the dialog so it doesn't block the testq
-        monkeypatch.setattr("ankihub.gui.editor.SuggestionDialog.exec", Mock())
+        monkeypatch.setattr(
+            "ankihub.gui.suggestion_dialog.SuggestionDialog.exec", Mock()
+        )
 
-        editor = MagicMock()
+        add_cards_dialog: AddCards = dialogs.open("AddCards", mw)
+        editor = add_cards_dialog.editor
 
         # test a new note suggestion
         editor.note = mw.col.new_note(mw.col.models.by_name("Basic (Testdeck / user1)"))
@@ -295,7 +298,7 @@ def test_editor(
         )
 
         _refresh_buttons(editor)
-        assert editor.ankihub_command == AnkiHubCommands.NEW.value
+        assert editor.ankihub_command == AnkiHubCommands.NEW.value  # type: ignore
         _on_suggestion_button_press(editor)
 
         # test a change note suggestion
@@ -311,7 +314,7 @@ def test_editor(
         )
 
         _refresh_buttons(editor)
-        assert editor.ankihub_command == AnkiHubCommands.CHANGE.value
+        assert editor.ankihub_command == AnkiHubCommands.CHANGE.value  # type: ignore
 
         # this should trigger a suggestion because the note has not been changed
         _on_suggestion_button_press(editor)
@@ -1752,7 +1755,7 @@ class TestCustomSearchNodes:
         with anki_session_with_addon_data.profile_loaded():
             mw = anki_session_with_addon_data.mw
 
-            _, ah_did = install_sample_ah_deck()
+            install_sample_ah_deck()
 
             all_nids = mw.col.find_notes("")
 
@@ -1765,30 +1768,30 @@ class TestCustomSearchNodes:
                     == []
                 )
 
-            # add a review entry for a card to the database
+            # Add a review entry for a card to the database.
             nid = all_nids[0]
             note = mw.col.get_note(nid)
             cid = note.card_ids()[0]
 
-            record_review(mw, cid)
+            record_review(mw, cid, mod_seconds=1)
 
-            # import the deck again, this counts as an update
-            import_sample_ankihub_deck(
-                mw, ankihub_did=ah_did, assert_created_deck=False
+            # Update the mod time in the ankihub database to simulate a note update.
+            ankihub_db.execute(
+                "UPDATE notes SET mod = ? WHERE anki_note_id = ?",
+                2,
+                nid,
             )
 
-            # check that the note of the card is now included in the search results
+            # Check that the note of the card is now included in the search results.
             with attached_ankihub_db():
                 assert UpdatedSinceLastReviewSearchNode(browser, "").filter_ids(
                     all_nids
                 ) == [nid]
 
-            sleep(1.1)
+            # Add another review entry for the card to the database.
+            record_review(mw, cid, mod_seconds=3)
 
-            # add another review entry for the card to the database
-            record_review(mw, cid)
-
-            # check that the note of the card is not included in the search results anymore
+            # Check that the note of the card is not included in the search results anymore.
             with attached_ankihub_db():
                 assert (
                     UpdatedSinceLastReviewSearchNode(browser, "").filter_ids(all_nids)
@@ -1796,10 +1799,11 @@ class TestCustomSearchNodes:
                 )
 
 
-def record_review(mw: AnkiQt, cid: CardId):
+def record_review(mw: AnkiQt, cid: CardId, mod_seconds: int):
     mw.col.db.execute(
         "INSERT INTO revlog VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)",
-        int(datetime.now().timestamp()) * 1000,
+        # the revlog table stores the timestamp in milliseconds
+        mod_seconds * 1000,
         cid,
         1,
         1,
@@ -2695,10 +2699,9 @@ def test_download_images_on_sync(
 
         # Add a reference to a local image to a note.
         nids = mw.col.find_notes("")
-        nid = nids[0]
-        note = mw.col.get_note(nid)
-        note.fields[0] = "Some text. <img src='image.png'>"
-        note.flush()
+        notes = [ankihub_db.note_data(nid) for nid in nids]
+        notes[0].fields[0].value = "Some text. <img src='image.png'>"
+        ankihub_db.upsert_notes_data(ah_did, notes)
 
         # Mock the token to simulate that the user is logged in.
         monkeypatch.setattr(config, "token", lambda: "test token")
@@ -2713,6 +2716,11 @@ def test_download_images_on_sync(
             AnkiHubClient,
             "get_deck_extensions_by_deck_id",
             lambda *args, **kwargs: [],
+        )
+        monkeypatch.setattr(
+            AnkiHubClient,
+            "get_asset_disabled_fields",
+            lambda *args, **kwargs: {},
         )
 
         # Mock the client method for downloading images.
