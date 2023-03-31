@@ -469,32 +469,11 @@ class AnkiHubClient:
 
         LOGGER.info(f"Successfully uploaded [{zip_filepath.name}]")
 
-    def upload_assets_for_deck(
-        self, ah_did: uuid.UUID, notes_data: List[NoteInfo]
-    ) -> None:
-        # - Get all image names from the fields from notes_data
-        # - Use self.local_media_dir_path to create a zip with all the files
-        # - Remove the zipped file from local storage
-        # Note that unlike we do for suggestions, Image names can be kept as
-        # they are because we don't have to care about image file name conflicts
-        # for new decks.
-
-        image_names = get_image_names_from_notes_data(notes_data)
-        image_paths = self._image_names_to_image_paths(image_names)
-
-        # If notes have no images, abort uploading
-        if not image_paths:
-            return None
-
-        self.upload_assets(list(image_paths), ah_did)
-
-    def _image_names_to_image_paths(self, image_names: Set[str]) -> Set[Path]:
-        return {self.local_media_dir_path / image_name for image_name in image_names}
-
     def upload_assets(self, image_paths: List[Path], ah_did: uuid.UUID):
-        # Alternate flow: if less than 10 images, call self.upload_assets
+
+        # Alternate flow: if at most 10 images, call self.upload_assets
         # passing the array of image names
-        if not len(image_paths) > 10:
+        if len(image_paths) <= 10:
             self._upload_assets_individually(
                 image_names={path.name for path in image_paths}, ah_did=ah_did
             )

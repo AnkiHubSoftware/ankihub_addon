@@ -2697,8 +2697,6 @@ def test_download_images_on_sync(
     enable_image_support_feature_flag,
 ):
     with anki_session_with_addon_data.profile_loaded():
-        from ankihub.db import ankihub_db
-
         mw = anki_session_with_addon_data.mw
 
         _, ah_did = install_sample_ah_deck()
