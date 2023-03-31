@@ -1,28 +1,23 @@
-import re
-from typing import Sequence, Set
+from typing import Dict, List, Sequence, Set
 
 import aqt
-from anki.notes import NoteId
-from anki.utils import ids2str
 
-from .common_utils import IMG_NAME_IN_IMG_TAG_REGEX
+from .ankihub_client import NoteInfo
+from .common_utils import local_image_names_from_html
 
 
-def get_img_names_from_notes(nids: Sequence[NoteId]) -> Set[str]:
+def get_img_names_from_notes(
+    notes: Sequence[NoteInfo], asset_disabled_fields: Dict[int, List[str]] = {}
+) -> Set[str]:
     """Return the names of all images on the given notes.
     Does only return names of local images, not remote images."""
-
-    flds_with_imgs = aqt.mw.col.db.list(
-        f"SELECT flds FROM notes WHERE id IN {ids2str(nids)} AND flds LIKE '%<img%'",
-    )
-
-    imgs = set()
-    for flds in flds_with_imgs:
-        for img in re.findall(IMG_NAME_IN_IMG_TAG_REGEX, flds):
-            if img.startswith("http://") or img.startswith("https://"):
+    imgs: Set[str] = set()
+    for note in notes:
+        disabled_fields = asset_disabled_fields.get(note.mid, [])
+        for field in note.fields:
+            if field.name in disabled_fields:
                 continue
-            imgs.add(img)
-
+            imgs = imgs.union(local_image_names_from_html(field.value))
     return imgs
 
 
