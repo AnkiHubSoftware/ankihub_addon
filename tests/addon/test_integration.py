@@ -59,6 +59,7 @@ from ankihub.ankihub_client import (
     transform_notes_data,
 )
 from ankihub.auto_sync import setup_ankihub_sync_on_ankiweb_sync
+from ankihub.common_utils import IMG_NAME_IN_IMG_TAG_REGEX
 from ankihub.db import ankihub_db, attached_ankihub_db
 from ankihub.debug import (
     _log_stack,
@@ -86,7 +87,6 @@ from ankihub.importing import (
     adjust_note_types,
     reset_note_types_of_notes,
 )
-from ankihub.media_utils import IMG_NAME_IN_IMG_TAG_REGEX
 from ankihub.note_conversion import (
     ADDON_INTERNAL_TAGS,
     ANKI_INTERNAL_TAGS,
