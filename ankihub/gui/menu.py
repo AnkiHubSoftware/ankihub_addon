@@ -590,7 +590,7 @@ def media_download_status_setup(parent: QMenu):
         image_support_enabled = AnkiHubClient().is_feature_flag_enabled(
             "image_support_enabled"
         )
-    except ConnectionError:
+    except (ConnectionError, AnkiHubRequestError):
         # It's ok to not setup the menu when the feature flag status can't be retrieved.
         return
 
