@@ -59,6 +59,7 @@ from ankihub.ankihub_client import (
     transform_notes_data,
 )
 from ankihub.auto_sync import setup_ankihub_sync_on_ankiweb_sync
+from ankihub.common_utils import IMG_NAME_IN_IMG_TAG_REGEX
 from ankihub.db import ankihub_db, attached_ankihub_db
 from ankihub.debug import (
     _log_stack,
@@ -86,7 +87,6 @@ from ankihub.importing import (
     adjust_note_types,
     reset_note_types_of_notes,
 )
-from ankihub.media_utils import IMG_NAME_IN_IMG_TAG_REGEX
 from ankihub.note_conversion import (
     ADDON_INTERNAL_TAGS,
     ANKI_INTERNAL_TAGS,
@@ -2693,16 +2693,17 @@ def test_download_images_on_sync(
     enable_image_support_feature_flag,
 ):
     with anki_session_with_addon_data.profile_loaded():
+        from ankihub.db import ankihub_db
+
         mw = anki_session_with_addon_data.mw
 
         _, ah_did = install_sample_ah_deck()
 
         # Add a reference to a local image to a note.
         nids = mw.col.find_notes("")
-        nid = nids[0]
-        note = mw.col.get_note(nid)
-        note.fields[0] = "Some text. <img src='image.png'>"
-        note.flush()
+        notes = [ankihub_db.note_data(nid) for nid in nids]
+        notes[0].fields[0].value = "Some text. <img src='image.png'>"
+        ankihub_db.upsert_notes_data(ah_did, notes)
 
         # Mock the token to simulate that the user is logged in.
         monkeypatch.setattr(config, "token", lambda: "test token")
@@ -2717,6 +2718,11 @@ def test_download_images_on_sync(
             AnkiHubClient,
             "get_deck_extensions_by_deck_id",
             lambda *args, **kwargs: [],
+        )
+        monkeypatch.setattr(
+            AnkiHubClient,
+            "get_asset_disabled_fields",
+            lambda *args, **kwargs: {},
         )
 
         # Mock the client method for downloading images.
