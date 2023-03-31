@@ -108,7 +108,6 @@ def _prevent_errors_during_addon_updates_and_deletions():
         pos="before",
     )
 
-    #
     AddonManager.deleteAddon = wrap(  # type: ignore
         old=AddonManager.deleteAddon,
         new=lambda self, module: _maybe_change_file_permissions_of_addon_files(module),
