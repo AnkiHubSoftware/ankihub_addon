@@ -88,8 +88,8 @@ class _AnkiHubMediaSync:
 
     def _missing_images_for_ah_deck(self, ah_did: uuid.UUID) -> List[str]:
         nids = ankihub_db.anki_nids_for_ankihub_deck(ah_did)
-        img_names = get_img_names_from_notes(nids)
-
+        notes_data = [ankihub_db.note_data(nid) for nid in nids]
+        img_names = get_img_names_from_notes(notes_data)
         media_dir_path = Path(aqt.mw.col.media.dir())
 
         result = [

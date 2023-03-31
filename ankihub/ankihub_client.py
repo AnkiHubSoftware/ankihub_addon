@@ -48,7 +48,7 @@ STAGING_APP_URL = "https://staging.ankihub.net"
 STAGING_API_URL = f"{STAGING_APP_URL}/api"
 STAGING_S3_BUCKET_URL = "https://ankihub-staging.s3.amazonaws.com"
 
-API_VERSION = 7.0
+API_VERSION = 8.0
 
 DECK_UPDATE_PAGE_SIZE = 2000  # seems to work well in terms of speed
 DECK_EXTENSION_UPDATE_PAGE_SIZE = 2000
@@ -912,6 +912,25 @@ class AnkiHubClient:
 
         result = response.json()["tags"]
         result = [x for x in result if x.strip()]
+        return result
+
+    def get_asset_disabled_fields(
+        self, ankihub_deck_uuid: uuid.UUID
+    ) -> Dict[int, List[str]]:
+        response = self._send_request(
+            "GET",
+            f"/decks/{ankihub_deck_uuid}/asset-disabled-fields/",
+        )
+        if response.status_code == 404:
+            return {}
+        elif response.status_code != 200:
+            raise AnkiHubRequestError(response)
+
+        protected_fields_raw = response.json()["fields"]
+        result = {
+            int(field_id): field_names
+            for field_id, field_names in protected_fields_raw.items()
+        }
         return result
 
     def bulk_suggest_tags(

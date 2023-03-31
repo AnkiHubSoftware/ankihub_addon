@@ -667,6 +667,21 @@ def test_get_note_customizations_by_deck_extension_id(
 
 
 @pytest.mark.vcr()
+def test_get_asset_disabled_fields(
+    authorized_client_for_user_test1: AnkiHubClient, monkeypatch: MonkeyPatch
+):
+    client = authorized_client_for_user_test1
+
+    deck_uuid = ID_OF_DECK_OF_USER_TEST1
+
+    response = client.get_asset_disabled_fields(deck_uuid)
+
+    expected_response = {1: ["abc_1"], 32738523: ["Text", "Pixorize", "First Aid"]}
+
+    assert response == expected_response
+
+
+@pytest.mark.vcr()
 def test_get_note_customizations_by_deck_extension_id_in_multiple_chunks(
     authorized_client_for_user_test1: AnkiHubClient, monkeypatch: MonkeyPatch
 ):

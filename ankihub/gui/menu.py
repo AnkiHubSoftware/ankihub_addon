@@ -48,7 +48,7 @@ from .utils import (
 @dataclass
 class _MenuState:
     ankihub_menu: Optional[QMenu] = None
-    media_download_status_action: Optional[QAction] = None
+    media_sync_status_action: Optional[QAction] = None
 
 
 menu_state = _MenuState()
@@ -604,8 +604,8 @@ def media_download_status_setup(parent: QMenu):
     if not image_support_enabled:
         return
 
-    menu_state.media_download_status_action = QAction("Media download: Idle.", parent)
-    parent.addAction(menu_state.media_download_status_action)
+    menu_state.media_sync_status_action = QAction("Media download: Idle.", parent)
+    parent.addAction(menu_state.media_sync_status_action)
 
 
 def setup_ankihub_menu() -> None:

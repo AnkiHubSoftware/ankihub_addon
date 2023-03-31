@@ -107,7 +107,7 @@ def general_setup():
     setup_ankihub_menu()
     LOGGER.info("Set up AnkiHub menu.")
 
-    media_sync.setup(menu_state.media_download_status_action)
+    media_sync.setup(menu_state.media_sync_status_action)
     LOGGER.info("Set up media sync.")
 
     editor.setup()
