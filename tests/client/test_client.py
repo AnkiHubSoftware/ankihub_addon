@@ -86,8 +86,7 @@ def client_with_server_setup(vcr: VCR, request, marks):
     yield client
 
     if not playback_mode:
-        # run_command_in_django_container("python manage.py flush --no-input")
-        pass
+        run_command_in_django_container("python manage.py flush --no-input")
 
 
 @pytest.fixture
