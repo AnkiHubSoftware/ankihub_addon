@@ -284,7 +284,7 @@ class SuggestionDialog(QDialog):
         # Add note about image source if an image was added
         if self._image_was_added:
             label = QLabel(
-                "Please provide the source of the image <br>"
+                "Please provide the source of the image(s)<br>"
                 "in the rationale field. For example:<br>"
                 "Photo credit: The AnKing [www.ankingmed.com]"
             )
