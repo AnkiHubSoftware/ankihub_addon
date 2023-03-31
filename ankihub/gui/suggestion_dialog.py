@@ -82,7 +82,7 @@ def open_suggestion_dialog_for_note(note: Note, parent: QWidget) -> None:
     suggestion_meta = SuggestionDialog(
         is_new_note_suggestion=ah_nid is None,
         is_for_ankihub_deck=ah_did == ANKING_DECK_ID,
-        image_was_added=_image_was_added(note),
+        added_new_images=_added_new_images(note),
     ).run()
     if suggestion_meta is None:
         return
@@ -107,8 +107,9 @@ def open_suggestion_dialog_for_note(note: Note, parent: QWidget) -> None:
         tooltip("Submitted suggestion to AnkiHub.", parent=parent)
 
 
-def _image_was_added(note: Note) -> bool:
-    """Returns True if an image was added when comparing with the ankihub database, else False."""
+def _added_new_images(note: Note) -> bool:
+    """Returns True if images were added to the note when comparing with
+    the note in the ankihub database, else False."""
     note_info_anki = to_note_data(note)
     img_names_anki = get_image_names_from_note_info(note_info_anki)
 
@@ -141,7 +142,7 @@ def open_suggestion_dialog_for_bulk_suggestion(
     suggestion_meta = SuggestionDialog(
         is_new_note_suggestion=False,
         is_for_ankihub_deck=ah_did == ANKING_DECK_ID,
-        image_was_added=False,
+        added_new_images=False,
     ).run()
     if not suggestion_meta:
         return
@@ -221,12 +222,12 @@ class SuggestionDialog(QDialog):
         self,
         is_new_note_suggestion: bool,
         is_for_ankihub_deck: bool,
-        image_was_added: bool,
+        added_new_images: bool,
     ) -> None:
         super().__init__()
         self._is_new_note_suggestion = is_new_note_suggestion
         self._is_for_ankihub_deck = is_for_ankihub_deck
-        self._image_was_added = image_was_added
+        self._added_new_images = added_new_images
 
         self._setup_ui()
 
@@ -282,7 +283,7 @@ class SuggestionDialog(QDialog):
         self.layout_.addSpacing(10)
 
         # Add note about image source if an image was added
-        if self._image_was_added:
+        if self._added_new_images:
             label = QLabel(
                 "Please provide the source of the image(s)<br>"
                 "in the rationale field. For example:<br>"
