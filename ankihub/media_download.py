@@ -1,9 +1,10 @@
 import uuid
 from concurrent.futures import Future
 from pathlib import Path
-from typing import Dict, List
+from typing import Dict, List, Optional
 
 import aqt
+from aqt.qt import QAction
 
 from . import LOGGER
 from .addon_ankihub_client import AddonAnkiHubClient
@@ -14,6 +15,10 @@ from .media_utils import get_img_names_from_notes
 class AnkiHubMediaDownloader:
     def __init__(self) -> None:
         self._in_progress: bool = False
+        self._media_download_status_action: Optional[QAction] = None
+
+    def setup(self, media_download_status_action):
+        self._media_download_status_action = media_download_status_action
 
     def start_media_download(self):
         """Download missing media for all subscribed decks from AnkiHub in the background.
@@ -28,12 +33,8 @@ class AnkiHubMediaDownloader:
         LOGGER.info("Starting media download...")
         self._in_progress = True
 
-        # TODO Refactor this to not have to import from gui.menu here.
-        from .gui.menu import media_download_status_action
-
-        if media_download_status_action is not None:
-            # The action can be None if the image support feature flag is disabled.
-            media_download_status_action.setText("Media download: In progress...")
+        if self._media_download_status_action is not None:
+            self._media_download_status_action.setText("Media download: In progress...")
 
         aqt.mw.taskman.run_in_background(
             task=self._download_missing_media,
@@ -73,14 +74,10 @@ class AnkiHubMediaDownloader:
 
         LOGGER.info("Media download finished.")
 
-        # TODO Refactor this to not have to import from gui.menu here.
-        from .gui.menu import media_download_status_action
-
         # TODO Refactor this so that the status is not hardcoded here.
         # Not sure yet if showing the status in the menu is a good idea.
-        if media_download_status_action is not None:
-            # The action can be None if the image support feature flag is disabled.
-            media_download_status_action.setText("Media download: Idle.")
+        if self._media_download_status_action is not None:
+            self._media_download_status_action.setText("Media download: Idle.")
 
 
 media_downloader = AnkiHubMediaDownloader()
