@@ -82,7 +82,7 @@ def open_suggestion_dialog_for_note(note: Note, parent: QWidget) -> None:
     suggestion_meta = SuggestionDialog(
         is_new_note_suggestion=ah_nid is None,
         is_for_ankihub_deck=ah_did == ANKING_DECK_ID,
-        image_was_added=image_was_added(note),
+        image_was_added=_image_was_added(note),
     ).run()
     if suggestion_meta is None:
         return
@@ -107,7 +107,7 @@ def open_suggestion_dialog_for_note(note: Note, parent: QWidget) -> None:
         tooltip("Submitted suggestion to AnkiHub.", parent=parent)
 
 
-def image_was_added(note: Note) -> bool:
+def _image_was_added(note: Note) -> bool:
     """Returns True if an image was added when comparing with the ankihub database, else False."""
     note_info_anki = to_note_data(note)
     img_names_anki = get_image_names_from_note_info(note_info_anki)
