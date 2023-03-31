@@ -1,6 +1,5 @@
 import copy
 import uuid
-from concurrent.futures import Future
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Any, Dict, List, Optional, Sequence, Tuple, cast
@@ -8,7 +7,6 @@ from typing import Any, Dict, List, Optional, Sequence, Tuple, cast
 import aqt
 from anki.notes import Note, NoteId
 
-from . import LOGGER
 from .addon_ankihub_client import AddonAnkiHubClient as AnkiHubClient
 from .ankihub_client import (
     ChangeNoteSuggestion,
@@ -20,6 +18,7 @@ from .ankihub_client import (
 )
 from .db import ankihub_db
 from .exporting import to_note_data
+from .media_sync import media_sync
 from .media_utils import find_and_replace_text_in_fields_on_all_notes
 
 # string that is contained in the errors returned from the AnkiHub API when
@@ -289,14 +288,8 @@ def _rename_and_upload_assets_for_suggestions(
 
     asset_name_map = client.generate_asset_files_with_hashed_names(original_image_paths)
 
-    new_image_paths = [
-        Path(aqt.mw.col.media.dir()) / new_asset_name
-        for new_asset_name in asset_name_map.values()
-    ]
-
-    aqt.mw.taskman.run_in_background(
-        lambda: client.upload_assets(new_image_paths, ankihub_did),
-        on_done=_on_uploaded_images,
+    media_sync.start_media_upload(
+        media_names=asset_name_map.values(), ankihub_did=ankihub_did
     )
 
     if asset_name_map:
@@ -307,11 +300,6 @@ def _rename_and_upload_assets_for_suggestions(
         _update_asset_names_on_notes(asset_name_map)
 
     return suggestions
-
-
-def _on_uploaded_images(future: Future):
-    future.result()
-    LOGGER.info("Uploaded images to AnkiHub.")
 
 
 def _replace_asset_names_in_suggestion(
