@@ -33,7 +33,7 @@ from ..addon_ankihub_client import AnkiHubRequestError
 from ..ankihub_client import NoteInfo
 from ..db import ankihub_db
 from ..importing import AnkiHubImportResult
-from ..media_download import media_downloader
+from ..media_sync import media_sync
 from ..messages import messages
 from ..settings import config, url_deck_base, url_decks, url_help, url_view_deck
 from ..subdecks import SUBDECK_TAG, build_subdecks_and_move_cards_to_them, flatten_deck
@@ -533,7 +533,7 @@ def install_deck(
         creator=is_creator,
     )
 
-    media_downloader.start_media_download()
+    media_sync.start_media_download()
 
     LOGGER.info("Importing deck was succesful.")
 

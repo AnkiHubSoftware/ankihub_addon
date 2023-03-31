@@ -9,7 +9,7 @@ from .common_utils import local_image_names_from_html
 def get_img_names_from_notes(
     notes: Sequence[NoteInfo], asset_disabled_fields: Dict[int, List[str]] = {}
 ) -> Set[str]:
-    """Return the names of all images on the given notes.
+    """Return the names of all images on the given notes which are not in asset-disabled fields.
     Does only return names of local images, not remote images."""
     imgs: Set[str] = set()
     for note in notes:
