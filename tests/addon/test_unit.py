@@ -292,7 +292,7 @@ class TestSuggestionDialog:
         dialog = SuggestionDialog(
             is_for_ankihub_deck=is_for_ankihub_deck,
             is_new_note_suggestion=is_new_note_suggestion,
-            image_was_added=image_was_added,
+            added_new_images=image_was_added,
         )
         dialog.show()
 
