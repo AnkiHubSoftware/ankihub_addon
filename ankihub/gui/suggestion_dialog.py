@@ -107,20 +107,6 @@ def open_suggestion_dialog_for_note(note: Note, parent: QWidget) -> None:
         tooltip("Submitted suggestion to AnkiHub.", parent=parent)
 
 
-def _added_new_images(note: Note) -> bool:
-    """Returns True if images were added to the note when comparing with
-    the note in the ankihub database, else False."""
-    note_info_anki = to_note_data(note)
-    img_names_anki = get_image_names_from_note_info(note_info_anki)
-
-    note_info_ah = ankihub_db.note_data(note.id)
-    img_names_ah = get_image_names_from_note_info(note_info_ah)
-
-    added_img_names = set(img_names_anki) - set(img_names_ah)
-    result = len(added_img_names) > 0
-    return result
-
-
 def open_suggestion_dialog_for_bulk_suggestion(
     notes: List[Note], parent: QWidget
 ) -> None:
@@ -157,6 +143,20 @@ def open_suggestion_dialog_for_bulk_suggestion(
         on_done=lambda future: _on_suggest_notes_in_bulk_done(future, parent),
         parent=parent,
     )
+
+
+def _added_new_images(note: Note) -> bool:
+    """Returns True if images were added to the notes when comparing with
+    the notes in the ankihub database, else False."""
+    note_info_anki = to_note_data(note)
+    img_names_anki = get_image_names_from_note_info(note_info_anki)
+
+    note_info_ah = ankihub_db.note_data(note.id)
+    img_names_ah = get_image_names_from_note_info(note_info_ah)
+
+    added_img_names = set(img_names_anki) - set(img_names_ah)
+    result = len(added_img_names) > 0
+    return result
 
 
 def _comment_with_source(suggestion_meta: SuggestionMetadata) -> str:
