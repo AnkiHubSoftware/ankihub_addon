@@ -106,6 +106,7 @@ class _AnkiHubMediaSync:
         self._refresh_media_download_status()
 
     def _refresh_media_download_status(self):
+        # GUI operations must be performed on the main thread.
         aqt.mw.taskman.run_on_main(self._refresh_media_download_status_inner)
 
     def _refresh_media_download_status_inner(self):
