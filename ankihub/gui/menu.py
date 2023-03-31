@@ -31,6 +31,7 @@ from ..ankihub_client import AnkiHubRequestError, get_image_names_from_notes_dat
 from ..db import ankihub_db
 from ..error_reporting import upload_logs_in_background
 from ..media_import.ui import open_import_dialog
+from ..media_sync import media_sync
 from ..register_decks import create_collaborative_deck
 from ..settings import ADDON_VERSION, config, url_view_deck
 from ..subdecks import SUBDECK_TAG
@@ -47,7 +48,7 @@ from .utils import (
 @dataclass
 class _MenuState:
     ankihub_menu: Optional[QMenu] = None
-    media_download_status_action: Optional[QAction] = None
+    media_sync_status_action: Optional[QAction] = None
 
 
 menu_state = _MenuState()
@@ -511,19 +512,15 @@ def upload_deck_assets_action() -> None:
     if not confirm:
         return
 
-    def on_done(future: Future) -> None:
-        future.result()
-        showInfo("🎉 Successfuly uploaded all images for the deck!")
-        LOGGER.info("Finished uploading assets for deck")
+    def on_success() -> None:
+        showInfo(f"🎉 Successfuly uploaded all images for<br><b>{deck_config.name}</b>!")
 
     # Extract the AnkiHub deck ID using a sample note id
     ah_did = ankihub_db.ankihub_did_for_anki_nid(nids[0])
 
-    aqt.mw.taskman.run_in_background(
-        task=client.upload_assets_for_deck,
-        args={"ah_did": ah_did, "notes_data": notes_data},
-        on_done=on_done,
-    )
+    media_names = get_image_names_from_notes_data(notes_data)
+    media_sync.start_media_upload(media_names, ah_did, on_success=on_success)
+
     showInfo(
         "🖼️ Upload started! You can continue using Anki in the meantime."
         "<br><br>We'll notify you when the upload process finishes 👍"
@@ -607,8 +604,8 @@ def media_download_status_setup(parent: QMenu):
     if not image_support_enabled:
         return
 
-    menu_state.media_download_status_action = QAction("Media download: Idle.", parent)
-    parent.addAction(menu_state.media_download_status_action)
+    menu_state.media_sync_status_action = QAction("Media download: Idle.", parent)
+    parent.addAction(menu_state.media_sync_status_action)
 
 
 def setup_ankihub_menu() -> None:

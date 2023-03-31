@@ -11,7 +11,7 @@ from .addon_ankihub_client import AddonAnkiHubClient as AnkiHubClient
 from .ankihub_client import AnkiHubRequestError, DeckExtension
 from .db import ankihub_db
 from .importing import AnkiHubImporter, AnkiHubImportResult
-from .media_download import media_downloader
+from .media_sync import media_sync
 from .settings import config
 from .utils import create_backup
 
@@ -45,7 +45,7 @@ class AnkiHubSync:
         if start_media_sync and AnkiHubClient().is_feature_flag_enabled(
             "image_support_enabled"
         ):
-            media_downloader.start_media_download()
+            media_sync.start_media_download()
 
         LOGGER.info("Sync finished.")
         return self._import_results
