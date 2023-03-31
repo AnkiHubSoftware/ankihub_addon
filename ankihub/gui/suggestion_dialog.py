@@ -108,7 +108,7 @@ def open_suggestion_dialog_for_note(note: Note, parent: QWidget) -> None:
 
 
 def image_was_added(note: Note) -> bool:
-    """Returns True if an image was added when comparing with the ankihub database."""
+    """Returns True if an image was added when comparing with the ankihub database, else False."""
     note_info_anki = to_note_data(note)
     img_names_anki = get_image_names_from_note_info(note_info_anki)
 
