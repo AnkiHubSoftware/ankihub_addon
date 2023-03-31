@@ -128,7 +128,9 @@ def open_suggestion_dialog_for_bulk_suggestion(
     suggestion_meta = SuggestionDialog(
         is_new_note_suggestion=False,
         is_for_ankihub_deck=ah_did == ANKING_DECK_ID,
-        added_new_images=False,
+        # We currently have a limit of 500 notes per bulk suggestion, so we don't have to worry
+        # about performance here.
+        added_new_images=any(_added_new_images(note) for note in notes),
     ).run()
     if not suggestion_meta:
         return
