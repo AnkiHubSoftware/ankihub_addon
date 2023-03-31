@@ -1,7 +1,7 @@
 import uuid
 from concurrent.futures import Future
 from pathlib import Path
-from typing import List
+from typing import Dict, List
 
 import aqt
 
@@ -42,15 +42,21 @@ class AnkiHubMediaDownloader:
 
     def _download_missing_media(self):
         for ah_did in ankihub_db.ankihub_deck_ids():
-            missing_image_names = self._missing_images_for_ah_deck(ah_did)
+            client = AddonAnkiHubClient()
+            asset_disabled_fields = client.get_asset_disabled_fields(ah_did)
+            missing_image_names = self._missing_images_for_ah_deck(
+                ah_did, asset_disabled_fields
+            )
             if not missing_image_names:
                 continue
-            AddonAnkiHubClient().download_images(missing_image_names, ah_did)
+            client.download_images(missing_image_names, ah_did)
 
-    def _missing_images_for_ah_deck(self, ah_did: uuid.UUID) -> List[str]:
+    def _missing_images_for_ah_deck(
+        self, ah_did: uuid.UUID, asset_disabled_fields: Dict[int, List[str]] = {}
+    ) -> List[str]:
         nids = ankihub_db.anki_nids_for_ankihub_deck(ah_did)
-        img_names = get_img_names_from_notes(nids)
-
+        notes = [ankihub_db.note_data(nid) for nid in nids]
+        img_names = get_img_names_from_notes(notes, asset_disabled_fields)
         media_dir_path = Path(aqt.mw.col.media.dir())
 
         result = [
