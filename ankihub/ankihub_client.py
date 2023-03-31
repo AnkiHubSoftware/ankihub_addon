@@ -935,6 +935,25 @@ class AnkiHubClient:
         result = [x for x in result if x.strip()]
         return result
 
+    def get_asset_disabled_fields(
+        self, ankihub_deck_uuid: uuid.UUID
+    ) -> Dict[int, List[str]]:
+        response = self._send_request(
+            "GET",
+            f"/decks/{ankihub_deck_uuid}/asset-disabled-fields/",
+        )
+        if response.status_code == 404:
+            return {}
+        elif response.status_code != 200:
+            raise AnkiHubRequestError(response)
+
+        protected_fields_raw = response.json()["fields"]
+        result = {
+            int(field_id): field_names
+            for field_id, field_names in protected_fields_raw.items()
+        }
+        return result
+
     def bulk_suggest_tags(
         self, ankihub_note_uuids: List[uuid.UUID], tags: List[str]
     ) -> None:
