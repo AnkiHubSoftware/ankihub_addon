@@ -262,37 +262,6 @@ class SuggestionDialog(QDialog):
         self._set_source_widget_visibility()
         self.layout_.addSpacing(10)
 
-        # Set up image source input fields in a group box
-        self.image_source_group_box = QGroupBox("Image Source")
-        self.image_source_group_box_layout = QVBoxLayout()
-        self.image_source_group_box.setLayout(self.image_source_group_box_layout)
-        self.layout_.addWidget(self.image_source_group_box)
-
-        self.image_source_edit = QLineEdit()
-        self.image_source_edit.setPlaceholderText("Link to source of the image.")
-        self.image_source_edit.setValidator(
-            QRegularExpressionValidator(QRegularExpression(r".+"))
-        )
-        self.image_source_group_box_layout.addWidget(self.image_source_edit)
-        qconnect(self.image_source_edit.textChanged, self._validate)
-        self.layout_.addSpacing(10)
-
-        # ... Set up a field for proof that the image is public domain
-        self.image_proof_edit = QLineEdit()
-        self.image_proof_edit.setPlaceholderText(
-            "Link to proof the image is public domain."
-        )
-        self.image_proof_edit.setValidator(
-            QRegularExpressionValidator(QRegularExpression(r".+"))
-        )
-        self.image_source_group_box_layout.addWidget(self.image_proof_edit)
-        qconnect(self.image_proof_edit.textChanged, self._validate)
-
-        if not self._image_was_added:
-            self.image_source_group_box.hide()
-        else:
-            self.layout_.addSpacing(10)
-
         # Set up rationale field
         label = QLabel("Rationale for Change (Required)")
         self.layout_.addWidget(label)
@@ -311,6 +280,16 @@ class SuggestionDialog(QDialog):
         qconnect(self.rationale_edit.textChanged, self._validate)
 
         self.layout_.addSpacing(10)
+
+        # Add note about image source if an image was added
+        if self._image_was_added:
+            label = QLabel(
+                "Please provide the source of the image <br>"
+                "in the rationale field. For example:<br>"
+                "Photo credit: The AnKing [www.ankingmed.com]"
+            )
+            self.layout_.addWidget(label)
+            self.layout_.addSpacing(10)
 
         # Set up "auto-accept" checkbox
         self.auto_accept_cb = QCheckBox("Submit without review (maintainers only).")
@@ -371,12 +350,6 @@ class SuggestionDialog(QDialog):
             return False
 
         if self._source_needed() and not self.source_widget.is_valid():
-            return False
-
-        if self._image_was_added and (
-            not self.image_source_edit.hasAcceptableInput()
-            or not self.image_proof_edit.hasAcceptableInput()
-        ):
             return False
 
         return True
