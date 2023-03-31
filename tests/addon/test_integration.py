@@ -1755,7 +1755,7 @@ class TestCustomSearchNodes:
         with anki_session_with_addon_data.profile_loaded():
             mw = anki_session_with_addon_data.mw
 
-            _, ah_did = install_sample_ah_deck()
+            install_sample_ah_deck()
 
             all_nids = mw.col.find_notes("")
 
@@ -1768,36 +1768,30 @@ class TestCustomSearchNodes:
                     == []
                 )
 
-            # add a review entry for a card to the database
+            # Add a review entry for a card to the database.
             nid = all_nids[0]
             note = mw.col.get_note(nid)
             cid = note.card_ids()[0]
 
-            record_review(mw, cid)
+            record_review(mw, cid, mod_seconds=1)
 
-            # sleep to make sure the timestamp of the review entry is different from the
-            # timestamp of the note
-            sleep(1.1)
-
-            # import the deck again, this counts as an update
-            import_sample_ankihub_deck(
-                mw, ankihub_did=ah_did, assert_created_deck=False
+            # Update the mod time in the ankihub database to simulate a note update.
+            ankihub_db.execute(
+                "UPDATE notes SET mod = ? WHERE anki_note_id = ?",
+                2,
+                nid,
             )
 
-            # check that the note of the card is now included in the search results
+            # Check that the note of the card is now included in the search results.
             with attached_ankihub_db():
                 assert UpdatedSinceLastReviewSearchNode(browser, "").filter_ids(
                     all_nids
                 ) == [nid]
 
-            # sleep to make sure the timestamp of the review entry is different from the
-            # timestamp of the note
-            sleep(1.1)
+            # Add another review entry for the card to the database.
+            record_review(mw, cid, mod_seconds=3)
 
-            # add another review entry for the card to the database
-            record_review(mw, cid)
-
-            # check that the note of the card is not included in the search results anymore
+            # Check that the note of the card is not included in the search results anymore.
             with attached_ankihub_db():
                 assert (
                     UpdatedSinceLastReviewSearchNode(browser, "").filter_ids(all_nids)
@@ -1805,10 +1799,11 @@ class TestCustomSearchNodes:
                 )
 
 
-def record_review(mw: AnkiQt, cid: CardId):
+def record_review(mw: AnkiQt, cid: CardId, mod_seconds: int):
     mw.col.db.execute(
         "INSERT INTO revlog VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)",
-        int(datetime.now().timestamp()) * 1000,
+        # the revlog table stores the timestamp in milliseconds
+        mod_seconds * 1000,
         cid,
         1,
         1,
