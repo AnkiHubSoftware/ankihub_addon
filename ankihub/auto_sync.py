@@ -5,9 +5,9 @@ from time import sleep
 from typing import Callable, Optional
 
 import aqt
+from anki.collection import Collection
 from anki.hooks import wrap
-from anki.sync import SyncAuth
-from aqt.gui_hooks import sync_did_finish
+from aqt.gui_hooks import profile_did_open, profile_will_close, sync_did_finish
 
 from . import LOGGER
 from .gui.db_check import maybe_check_databases
@@ -20,6 +20,7 @@ class _AutoSyncState:
     attempted_startup_sync = False
     synced_with_ankihub_on_last_ankiweb_sync = False
     exception_on_last_ah_sync: Optional[Exception] = None
+    profile_is_closing = False
 
 
 auto_sync_state = _AutoSyncState()
@@ -28,17 +29,33 @@ auto_sync_state = _AutoSyncState()
 def setup_ankihub_sync_on_ankiweb_sync() -> None:
     # aqt.mw.col.sync_collection is called in a background task with a progress dialog.
     # This adds the AnkiHub sync to the beginning of this background task.
-    aqt.mw.col.sync_collection = wrap(  # type: ignore
-        aqt.mw.col.sync_collection,
+    Collection.sync_collection = wrap(  # type: ignore
+        Collection.sync_collection,
         _sync_with_ankihub_and_ankiweb,
         "around",
     )
 
     sync_did_finish.append(_on_sync_did_finish)
 
+    profile_will_close.append(_on_profile_will_close)
+    profile_did_open.append(_on_profile_did_open)
+
+
+def _on_profile_will_close() -> None:
+    auto_sync_state.profile_is_closing = True
+
+
+def _on_profile_did_open() -> None:
+    auto_sync_state.profile_is_closing = False
+
 
 def _on_sync_did_finish() -> None:
     if auto_sync_state.exception_on_last_ah_sync:
+        # If the profile is getting closed, we don't want to raise the exception, because it would
+        # disrupt the profile closing process.
+        if auto_sync_state.profile_is_closing:
+            return
+
         # append the hook again, because it will be removed by Anki when the exception is raised
         sync_did_finish.append(_on_sync_did_finish)
         raise auto_sync_state.exception_on_last_ah_sync
@@ -46,11 +63,15 @@ def _on_sync_did_finish() -> None:
     if auto_sync_state.synced_with_ankihub_on_last_ankiweb_sync:
         show_tooltip_about_last_sync_results()
 
-    maybe_check_databases()
+    if not auto_sync_state.profile_is_closing:
+        maybe_check_databases()
 
 
-def _sync_with_ankihub_and_ankiweb(auth: SyncAuth, _old: Callable) -> None:
+def _sync_with_ankihub_and_ankiweb(*args, **kwargs) -> None:
     LOGGER.info("Running _sync_with_ankihub_and_ankiweb")
+
+    _old: Callable = kwargs["_old"]
+    del kwargs["_old"]
 
     is_startup_sync = not auto_sync_state.attempted_startup_sync
     auto_sync_state.attempted_startup_sync = True
@@ -73,7 +94,7 @@ def _sync_with_ankihub_and_ankiweb(auth: SyncAuth, _old: Callable) -> None:
         aqt.mw.col.save(trx=False)
 
         LOGGER.info("Syncing with AnkiWeb in _sync_with_ankihub_and_ankiweb")
-        result = _old(auth=auth)
+        result = _old(*args, **kwargs)
         LOGGER.info("Finished syncing with AnkiWeb in _sync_with_ankihub_and_ankiweb")
 
         return result

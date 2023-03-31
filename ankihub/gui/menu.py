@@ -2,6 +2,7 @@ import re
 import uuid
 from concurrent.futures import Future
 from datetime import datetime, timezone
+from pathlib import Path
 from typing import Optional
 
 import aqt
@@ -20,12 +21,13 @@ from aqt import (
 from aqt.operations import QueryOp
 from aqt.qt import QAction, QDialog, QKeySequence, QMenu, Qt, qconnect
 from aqt.studydeck import StudyDeck
-from aqt.utils import openLink, showInfo, showText, tooltip
+from aqt.utils import openLink, showInfo, tooltip
 from requests.exceptions import ConnectionError
 
 from .. import LOGGER
 from ..addon_ankihub_client import AddonAnkiHubClient as AnkiHubClient
-from ..ankihub_client import AnkiHubRequestError
+from ..ankihub_client import AnkiHubRequestError, get_image_names_from_notes_data
+from ..db import ankihub_db
 from ..error_reporting import upload_logs_in_background
 from ..media_import.ui import open_import_dialog
 from ..register_decks import create_collaborative_deck
@@ -34,7 +36,11 @@ from ..subdecks import SUBDECK_TAG
 from ..sync import ah_sync, show_tooltip_about_last_sync_results
 from .db_check import maybe_check_databases
 from .decks import SubscribedDecksDialog
-from .utils import ask_user, check_and_prompt_for_updates_on_main_window
+from .utils import (
+    ask_user,
+    check_and_prompt_for_updates_on_main_window,
+    choose_ankihub_deck,
+)
 
 
 class AnkiHubLogin(QWidget):
@@ -98,7 +104,7 @@ class AnkiHubLogin(QWidget):
         username_or_email = self.username_or_email_box_text.text()
         password = self.password_box_text.text()
         if not all([username_or_email, password]):
-            showText("Oops! You forgot to put in a username or password!")
+            showInfo("Oops! You forgot to put in a username or password!")
             return
         ankihub_client = AnkiHubClient()
 
@@ -202,7 +208,7 @@ def create_collaborative_deck_action() -> None:
         return
 
     if len(aqt.mw.col.find_cards(f'deck:"{deck_name}"')) == 0:
-        showText("You can't upload an empty deck.")
+        showInfo("You can't upload an empty deck.")
         return
 
     public = ask_user(
@@ -235,6 +241,17 @@ def create_collaborative_deck_action() -> None:
     if not confirm:
         return
 
+    should_upload_assets = False
+    if AnkiHubClient().is_feature_flag_enabled("image_support_enabled"):
+        confirm = ask_user(
+            "Do you want to upload images for this deck as well? "
+            "This will take some extra time but it is required to display the images "
+            "on AnkiHub and this way subscribers will be able to download the images "
+            "when installing the deck. "
+        )
+        if confirm:
+            should_upload_assets = True
+
     def on_success(ankihub_did: uuid.UUID) -> None:
         anki_did = aqt.mw.col.decks.id_for_name(deck_name)
         creation_time = datetime.now(tz=timezone.utc)
@@ -259,7 +276,10 @@ def create_collaborative_deck_action() -> None:
     op = QueryOp(
         parent=aqt.mw,
         op=lambda col: create_collaborative_deck(
-            deck_name, private=private, add_subdeck_tags=add_subdeck_tags
+            deck_name,
+            private=private,
+            add_subdeck_tags=add_subdeck_tags,
+            should_upload_assets=should_upload_assets,
         ),
         success=on_success,
     ).failure(on_failure)
@@ -388,6 +408,118 @@ def sync_with_ankihub_setup(parent):
     parent.addAction(q_action)
 
 
+def upload_deck_assets_setup(parent):
+    """Set up the menu item for manually triggering the upload
+    of all the assets for a given deck (logged user MUST be the
+    deck owner)"""
+
+    q_action = QAction("📸 Upload images for deck", aqt.mw)
+    qconnect(q_action.triggered, upload_deck_assets_action)
+    parent.addAction(q_action)
+
+
+def upload_deck_assets_action() -> None:
+    client = AnkiHubClient()
+
+    if not client.is_feature_flag_enabled("image_support_enabled"):
+        showInfo(
+            "The image support feature is not enabled yet for your account.<br>"
+            "We are working on it and it will be available soon for everyone 📸"
+        )
+        return
+
+    # Fetch the ankihub deck ids of all decks the user owns
+    owned_ah_dids = client.owned_deck_ids()
+
+    # If the user has no owned decks, we should show a message informing them
+    # about this and not allow them to upload images.
+    if not owned_ah_dids:
+        showInfo(
+            "<b>Oh no!</b> 🙁<br>"
+            "You do not own any AnkiHub decks. You can only perform a full image upload for decks that you own.<br><br>"
+            "Maybe try creating a new AnkiHub deck for yourself, or create a note suggestion instead? 🙂"
+        )
+        return
+
+    # The user owns one or more Decks but they are not installed locally
+    if owned_ah_dids and not any(
+        [did for did in owned_ah_dids if did in config.deck_ids()]
+    ):
+        showInfo(
+            "<b>Oh no!</b> 🙁<br>"
+            "It seems that you have deck(s) that you own at AnkiHub, but none of them are installed locally.<br><br>"
+            "Plase subscribe to the deck from the add-on before trying to upload images for it 🙂"
+        )
+        return
+
+    # Displays a window for the user to select which Deck they want to upload images for.
+    # This will only display Decks that the user owns AND are installed locally. Maintainers
+    # and subscribers should not be able to upload images for Decks they maintain/subscribe.
+    ah_did = choose_ankihub_deck(
+        "Choose the AnkiHub deck for which<br>you want to upload images.",
+        parent=aqt.mw,
+        ah_dids=owned_ah_dids,
+    )
+    if ah_did is None:
+        return
+
+    deck_config = config.deck_config(ah_did)
+    deck_name = deck_config.name
+
+    nids = ankihub_db.anki_nids_for_ankihub_deck(ah_did)
+    if not nids:
+        showInfo("You can't upload images for an empty deck.")
+        return
+
+    # Obtain a list of NoteInfo objects from nids
+    notes_data = [ankihub_db.note_data(nid) for nid in nids]
+
+    image_names = get_image_names_from_notes_data(notes_data)
+    image_paths = [
+        Path(aqt.mw.col.media.dir()) / image_name for image_name in image_names
+    ]
+
+    # Check if the deck references any local asset, if it does
+    # not, no point on trying to upload it
+    if not image_paths:
+        showInfo("This deck has no images to upload.")
+        return
+
+    # Check if the files referenced by the deck exists locally, if none exist, no point in uploading.
+    if not any([image_path.is_file() for image_path in image_paths]):
+        showInfo(
+            "You can't upload images for this deck because none of the referenced images are present in your "
+            "local media folder."
+        )
+        return
+
+    confirm = ask_user(
+        f"Uploading all images for the deck <b>{deck_name}</b> to AnkiHub "
+        "might take a while depending on the number of images that the deck uses.<br><br>"
+        "Would you like to continue?",
+    )
+    if not confirm:
+        return
+
+    def on_done(future: Future) -> None:
+        future.result()
+        showInfo("🎉 Successfuly uploaded all images for the deck!")
+        LOGGER.info("Finished uploading assets for deck")
+
+    # Extract the AnkiHub deck ID using a sample note id
+    ah_did = ankihub_db.ankihub_did_for_anki_nid(nids[0])
+
+    aqt.mw.taskman.run_in_background(
+        task=client.upload_assets_for_deck,
+        args={"ah_did": ah_did, "notes_data": notes_data},
+        on_done=on_done,
+    )
+    showInfo(
+        "🖼️ Upload started! You can continue using Anki in the meantime."
+        "<br><br>We'll notify you when the upload process finishes 👍"
+    )
+
+
 def ankihub_help_setup(parent):
     """Set up the sub menu for help related items."""
     help_menu = QMenu("🆘 Help", parent)
@@ -478,11 +610,11 @@ def setup_ankihub_menu() -> None:
     global ankihub_menu
     ankihub_menu = QMenu("&AnkiHub", parent=aqt.mw)
     aqt.mw.form.menubar.addMenu(ankihub_menu)
-    refresh_ankihub_menu()
     config.token_change_hook = lambda: aqt.mw.taskman.run_on_main(refresh_ankihub_menu)
     config.subscriptions_change_hook = lambda: aqt.mw.taskman.run_on_main(
         refresh_ankihub_menu
     )
+    refresh_ankihub_menu()
 
 
 def refresh_ankihub_menu() -> None:
@@ -495,6 +627,7 @@ def refresh_ankihub_menu() -> None:
         subscribe_to_deck_setup(parent=ankihub_menu)
         import_media_setup(parent=ankihub_menu)
         sync_with_ankihub_setup(parent=ankihub_menu)
+        upload_deck_assets_setup(parent=ankihub_menu)
         ankihub_logout_setup(parent=ankihub_menu)
         media_download_status_setup(parent=ankihub_menu)
         # upload_suggestions_setup(parent=ankihub_menu)

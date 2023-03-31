@@ -7,8 +7,10 @@ import logging
 import os
 import re
 import shutil
+import urllib.parse
 import uuid
 from abc import ABC
+from concurrent.futures import ThreadPoolExecutor, as_completed
 from dataclasses import dataclass
 from datetime import datetime
 from enum import Enum
@@ -22,9 +24,11 @@ from typing import (
     List,
     Optional,
     Sequence,
+    Set,
     TypedDict,
     Union,
 )
+from zipfile import ZipFile
 
 import requests
 from mashumaro import field_options
@@ -32,7 +36,7 @@ from mashumaro.config import BaseConfig
 from mashumaro.mixins.json import DataClassJSONMixin
 from requests import PreparedRequest, Request, Response, Session
 
-from .common_utils import extract_local_image_paths_from_html
+from .common_utils import local_image_names_from_html
 
 LOGGER = logging.getLogger(__name__)
 
@@ -52,6 +56,10 @@ DECK_EXTENSION_UPDATE_PAGE_SIZE = 2000
 CSV_DELIMITER = ";"
 
 ANKIHUB_DATETIME_FORMAT_STR = "%Y-%m-%dT%H:%M:%S.%f%z"
+
+IMAGES_CHUNK_SIZE = 2000
+
+CHUNK_BYTES_THRESHOLD = 67108864  # 60 megabytes
 
 
 # TODO Make sure these match up with SuggestionType.choices on AnkiHub
@@ -411,37 +419,140 @@ class AnkiHubClient:
         if s3_response.status_code != 200:
             raise AnkiHubRequestError(s3_response)
 
-    def upload_images_for_suggestion(
-        self, suggestion: NoteSuggestion, ah_did: uuid.UUID
-    ) -> Dict[str, str]:
-        """Uploads images for a suggestion to AnkiHub and returns a map of
-        the original image names to the new names on AnkiHub."""
+    def _upload_file_to_s3_with_reusable_presigned_url(
+        self, s3_presigned_info: dict, filepath: Path
+    ) -> None:
+        """Opens and uploads the file data to S3 using a reusable presigned URL. Useful when uploading
+        multiple assets to the same path while keeping the original filename.
+        :param s3_presigned_info: dict with the reusable presigned URL info.
+                                  Obtained as the return of 'get_presigned_url_for_multiple_uploads'
+        :param filepath: the Path object with the location of the file in the system
+        -"""
+        with open(filepath, "rb") as data:
+            s3_response = requests.post(
+                s3_presigned_info["url"],
+                data=s3_presigned_info["fields"],
+                files={"file": (filepath.name, data)},
+            )
 
-        if not self.is_feature_flag_enabled("image_support_enabled"):
-            return {}
+        if s3_response.status_code != 204:
+            raise AnkiHubRequestError(s3_response)
 
-        image_paths = self._get_images_from_suggestion(suggestion=suggestion)
-        asset_name_map = self._generate_asset_files_with_hashed_names(image_paths)
+    def _zip_and_upload_assets_chunk(
+        self,
+        chunk: List[Path],
+        chunk_number: int,
+        ah_did: uuid.UUID,
+        s3_presigned_info: dict,
+    ):
+        # TODO: Error logging/handling
 
-        # TODO: We are currently uploading all images for a suggestion,
-        # but we should only upload images that are not already on s3.
-        self.upload_images(list(asset_name_map.values()), ah_did)
+        # Zip the images found locally
+        zip_filepath = Path(
+            self.local_media_dir_path / f"{ah_did}_{chunk_number}_deck_assets_part.zip"
+        )
+        LOGGER.info(f"Creating zipped asset file [{zip_filepath.name}]")
+        with ZipFile(zip_filepath, "w") as img_zip:
+            for img_path in chunk:
+                if img_path.is_file():
+                    img_zip.write(img_path, arcname=img_path.name)
 
-        return asset_name_map
+        # Upload to S3
+        LOGGER.info(f"Uploading file [{zip_filepath.name}] to S3")
+        self._upload_file_to_s3_with_reusable_presigned_url(
+            s3_presigned_info=s3_presigned_info, filepath=zip_filepath
+        )
 
-    def _get_images_from_suggestion(self, suggestion: NoteSuggestion) -> List[Path]:
-        result = []
-        for field_content in [f.value for f in suggestion.fields]:
-            image_names = extract_local_image_paths_from_html(field_content)
-            image_paths = [
-                self.local_media_dir_path / image_name for image_name in image_names
-            ]
-            result.extend(image_paths)
+        # Remove the zip file from the local machine after the upload
+        LOGGER.info(f"Removing file [{zip_filepath.name}] from local files")
+        os.remove(zip_filepath)
 
-        return result
+        LOGGER.info(f"Successfully uploaded [{zip_filepath.name}]")
 
-    def _generate_asset_files_with_hashed_names(
-        self, paths: List[Path]
+    def upload_assets_for_deck(
+        self, ah_did: uuid.UUID, notes_data: List[NoteInfo]
+    ) -> None:
+        # - Get all image names from the fields from notes_data
+        # - Use self.local_media_dir_path to create a zip with all the files
+        # - Remove the zipped file from local storage
+        # Note that unlike we do for suggestions, Image names can be kept as
+        # they are because we don't have to care about image file name conflicts
+        # for new decks.
+
+        image_names = get_image_names_from_notes_data(notes_data)
+        image_paths = self._image_names_to_image_paths(image_names)
+
+        # If notes have no images, abort uploading
+        if not image_paths:
+            return None
+
+        self.upload_assets(list(image_paths), ah_did)
+
+    def _image_names_to_image_paths(self, image_names: Set[str]) -> Set[Path]:
+        return {self.local_media_dir_path / image_name for image_name in image_names}
+
+    def upload_assets(self, image_paths: List[Path], ah_did: uuid.UUID):
+        # Alternate flow: if less than 10 images, call self.upload_assets
+        # passing the array of image names
+        if not len(image_paths) > 10:
+            self._upload_assets_individually(
+                image_names={path.name for path in image_paths}, ah_did=ah_did
+            )
+            return None
+
+        self._upload_assets_in_chunks(image_paths=image_paths, ah_did=ah_did)
+
+    def _upload_assets_in_chunks(self, image_paths: List[Path], ah_did: uuid.UUID):
+        # Create chunks of image paths to zip and upload each chunk individually.
+        # Each chunk is divided based on the size of all images on that chunk to
+        # create chunks of similar size.
+        image_path_chunks: List[List[Path]] = []
+        chunk: List[Path] = []
+        current_chunk_size_bytes = 0
+        for image_path in image_paths:
+            if image_path.is_file():
+                current_chunk_size_bytes += image_path.stat().st_size
+                chunk.append(image_path)
+
+            if current_chunk_size_bytes > CHUNK_BYTES_THRESHOLD:
+                image_path_chunks.append(chunk)
+                current_chunk_size_bytes = 0
+                chunk = []
+            else:
+                # We need this so we don't lose chunks of smaller size
+                # that didn't reach the threshold (usually the "tail"
+                # of the image list, but can also happen if we have just
+                # a few images and all of them sum up to less than the threshold
+                # right on the first chunk)
+                if image_path == list(image_paths)[-1]:
+                    # Check if we're leaving the loop (last iteration) - if yes,
+                    # just close this small chunk before leaving.
+                    image_path_chunks.append(chunk)
+
+        # Get a S3 presigned URL that allows uploading multiple files with a given prefix
+        s3_presigned_info = self.get_presigned_url_for_multiple_uploads(
+            prefix=f"deck_assets/{ah_did}"
+        )
+
+        # Use ThreadPoolExecutor to zip & upload assets
+        futures = []
+        with ThreadPoolExecutor() as executor:
+            for chunk_number, chunk in enumerate(image_path_chunks):
+                futures.append(
+                    executor.submit(
+                        self._zip_and_upload_assets_chunk,
+                        chunk,
+                        chunk_number,
+                        ah_did,
+                        s3_presigned_info,
+                    )
+                )
+
+            for future in as_completed(futures):
+                future.result()
+
+    def generate_asset_files_with_hashed_names(
+        self, paths: Sequence[Path]
     ) -> Dict[str, str]:
         """Generates a filename for each file in the list of paths by hashing the file.
         The file is copied to the new name. If the file already exists, it is skipped,
@@ -479,38 +590,32 @@ class AnkiHubClient:
 
         return result
 
-    def upload_images(self, image_names: List[str], deck_id: uuid.UUID) -> None:
+    def _upload_assets_individually(
+        self, image_names: Set[str], ah_did: uuid.UUID
+    ) -> None:
         # deck_id is used to namespace the images within each deck.
+        s3_presigned_info = self.get_presigned_url_for_multiple_uploads(
+            prefix=f"deck_assets/{ah_did}"
+        )
 
         # TODO: send all images at once instad of looping through each one
         for image_name in image_names:
-            key = f"deck_assets/{deck_id}/{image_name}"
-            s3_url = self.get_presigned_url(key=key, action="upload")
-            with open(self.local_media_dir_path / image_name, "rb") as image_file:
-                self._upload_to_s3(s3_url, image_file)
+            self._upload_file_to_s3_with_reusable_presigned_url(
+                s3_presigned_info=s3_presigned_info,
+                filepath=self.local_media_dir_path / image_name,
+            )
 
-    def download_images(self, img_names: List[str], deck_id: uuid.UUID) -> None:
-        deck_images_remote_dir = f"{self.s3_bucket_url}/deck_assets/{deck_id}"
+    def _upload_file_to_s3(self, s3_presigned_url: str, filepath: Path) -> None:
+        """Opens the file at the 'filepath' location and uploads it to
+        S3 using the 's3_presigned_url'."""
 
-        for img_name in img_names:
-            img_path = self.local_media_dir_path / img_name
-            # First we check if the image already exists.
-            # If yes, we skip this iteration.
-            if os.path.isfile(img_path):
-                continue
+        with open(filepath, "rb") as file_ref:
+            self._upload_to_s3(s3_presigned_url, file_ref)
 
-            # If not, download the image from bucket
-            # and store the image locally
-            img_remote_path = deck_images_remote_dir + img_name
-            response = requests.get(img_remote_path, stream=True)
-
-            # Log and skip this iteration if the response is not 200 OK
-            if not response.ok:
-                LOGGER.info(
-                    f"Unable to download image [{img_remote_path}]. Response status code: {response.status_code}"
-                )
-                continue
-
+    def download_image(self, img_path, img_remote_path):
+        response = requests.get(img_remote_path, stream=True)
+        # Log and skip this iteration if the response is not 200 OK
+        if response.ok:
             # If we get a valid response, open the file and write the content
             with open(img_path, "wb") as handle:
                 for block in response.iter_content(1024):
@@ -518,6 +623,33 @@ class AnkiHubClient:
                         break
 
                     handle.write(block)
+        else:
+            LOGGER.info(
+                f"Unable to download image [{img_remote_path}]. Response status code: {response.status_code}"
+            )
+
+    def download_images(self, img_names: List[str], deck_id: uuid.UUID) -> None:
+        deck_images_remote_dir = f"{self.s3_bucket_url}/deck_assets/{deck_id}/"
+        futures = []
+        with ThreadPoolExecutor() as executor:
+            for img_name in img_names:
+                img_path = self.local_media_dir_path / img_name
+
+                img_remote_path = deck_images_remote_dir + urllib.parse.quote_plus(
+                    img_name
+                )
+
+                # First we check if the image already exists.
+                # If yes, we skip this iteration.
+                if os.path.isfile(img_path):
+                    continue
+
+                futures.append(
+                    executor.submit(self.download_image, img_path, img_remote_path)
+                )
+
+            for future in as_completed(futures):
+                future.result()
 
     def _gzip_compress_string(self, string: str) -> bytes:
         result = gzip.compress(
@@ -679,8 +811,8 @@ class AnkiHubClient:
 
     def create_suggestions_in_bulk(
         self,
-        new_note_suggestions: List[NewNoteSuggestion] = [],
-        change_note_suggestions: List[ChangeNoteSuggestion] = [],
+        new_note_suggestions: Sequence[NewNoteSuggestion] = [],
+        change_note_suggestions: Sequence[ChangeNoteSuggestion] = [],
         auto_accept: bool = False,
     ) -> Dict[int, Dict[str, List[str]]]:
         # returns a dict of errors by anki_nid
@@ -729,14 +861,31 @@ class AnkiHubClient:
 
     def get_presigned_url(self, key: str, action: str) -> str:
         """
-        Get URL for s3.
+        Get presigned URL for S3 to upload a single file
         :param key: deck name
         :param action: upload or download
-        :return:
+        :return: the pre signed url as a string
         """
         method = "GET"
         endpoint = "/decks/generate-presigned-url"
-        data = {"key": key, "type": action}
+        data = {"key": key, "type": action, "many": "false"}
+        response = self._send_request(method, endpoint, params=data)
+        if response.status_code != 200:
+            raise AnkiHubRequestError(response)
+
+        result = response.json()["pre_signed_url"]
+        return result
+
+    def get_presigned_url_for_multiple_uploads(self, prefix: str) -> dict:
+        """
+        Get presigned URL for S3 to upload multiple files. Useful when uploading
+        multiple assets to the same path while keeping the original filename.
+        :param prefix: the path in S3 where the files will be uploaded
+        :return: a dict with the required data to build the upload request
+        """
+        method = "GET"
+        endpoint = "/decks/generate-presigned-url"
+        data = {"key": prefix, "type": "upload", "many": "true"}
         response = self._send_request(method, endpoint, params=data)
         if response.status_code != 200:
             raise AnkiHubRequestError(response)
@@ -929,6 +1078,15 @@ class AnkiHubClient:
         data = response.json()
         return data
 
+    def owned_deck_ids(self) -> List[uuid.UUID]:
+        response = self._send_request("GET", "/users/me")
+        if response.status_code != 200:
+            raise AnkiHubRequestError(response)
+
+        data = response.json()
+        result = [uuid.UUID(deck["id"]) for deck in data["created_decks"]]
+        return result
+
 
 def transform_notes_data(notes_data: List[Dict]) -> List[Dict]:
     # TODO Fix differences between csv (used when installing for the first time) vs.
@@ -960,3 +1118,50 @@ def to_anki_note_type(note_type_data: Dict) -> Dict[str, Any]:
     note_type_data["tmpls"] = note_type_data.pop("templates")
     note_type_data["flds"] = note_type_data.pop("fields")
     return note_type_data
+
+
+# Media related functions
+
+
+def get_image_names_from_notes_data(notes_data: Sequence[NoteInfo]) -> Set[str]:
+    """Return the names of all images on the given notes.
+    The image names are taken from inside src attributes of HTML image tags that are on the note's fields.
+    Only returns names of local images, not remote images."""
+    return {
+        name for note in notes_data for name in get_image_names_from_note_info(note)
+    }
+
+
+def get_image_names_from_suggestions(suggestions: Sequence[NoteSuggestion]) -> Set[str]:
+    """Return the names of all images on the given suggestions.
+    The image names are taken from inside src attributes of HTML image tags that are on the suggestion's fields.
+    Only returns names of local images, not remote images."""
+    return {
+        name
+        for suggestion in suggestions
+        for name in get_image_names_from_suggestion(suggestion)
+    }
+
+
+def get_image_names_from_suggestion(suggestion: NoteSuggestion) -> Set[str]:
+    result = {
+        name
+        for field in suggestion.fields
+        for name in _get_image_names_from_field(field)
+    }
+    return result
+
+
+def get_image_names_from_note_info(note_info: NoteInfo) -> Set[str]:
+    result = {
+        name
+        for field in note_info.fields
+        for name in _get_image_names_from_field(field)
+    }
+    return result
+
+
+def _get_image_names_from_field(field: Field) -> Set[str]:
+    """Return the names of all images on the given field. Only returns names of local images, not remote images."""
+    result = local_image_names_from_html(field.value)
+    return result

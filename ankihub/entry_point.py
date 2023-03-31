@@ -10,11 +10,17 @@ from . import LOGGER
 from .addons import setup_addons
 from .auto_sync import setup_ankihub_sync_on_ankiweb_sync
 from .db import ankihub_db
+from .debug import setup as setup_debug
 from .errors import setup_error_handler
-from .gui import browser, editor
+from .gui import browser, editor, progress
 from .gui.menu import refresh_ankihub_menu, setup_ankihub_menu
-from .progress import setup_progress_manager
-from .settings import ANKI_VERSION, config, setup_logger, setup_profile_data_folder
+from .settings import (
+    ANKI_VERSION,
+    ankihub_db_path,
+    config,
+    setup_logger,
+    setup_profile_data_folder,
+)
 from .utils import modify_note_type_templates
 
 # The general setup should be only once, because it sets up menu items, hooks, etc.
@@ -60,7 +66,7 @@ def profile_setup() -> bool:
     config.setup_private_config()
     LOGGER.info("Set up config for the current profile.")
 
-    ankihub_db.setup_and_migrate()
+    ankihub_db.setup_and_migrate(ankihub_db_path())
     LOGGER.info("Set up and migrated AnkiHub DB for the current profile.")
 
     from .gui.menu import ankihub_menu
@@ -93,6 +99,9 @@ def general_setup():
 
     aqt.mw.addonManager.setWebExports(__name__, r"gui/web/.*")
 
+    setup_debug()
+    LOGGER.info("Set up debug.")
+
     setup_addons()
     LOGGER.info("Set up addons.")
 
@@ -105,7 +114,7 @@ def general_setup():
     browser.setup()
     LOGGER.info("Set up browser.")
 
-    setup_progress_manager()
+    progress.setup()
     LOGGER.info("Set up progress manager.")
 
     trigger_addon_update_check()

@@ -27,10 +27,13 @@ from aqt.qt import (
 from aqt.utils import showInfo, showText, tooltip
 
 from .. import LOGGER
-from ..ankihub_client import AnkiHubRequestError, SuggestionType
+from ..ankihub_client import (
+    AnkiHubRequestError,
+    SuggestionType,
+    get_image_names_from_note_info,
+)
 from ..db import ankihub_db
 from ..exporting import to_note_data
-from ..media_utils import get_img_names_from_note_info
 from ..settings import ANKING_DECK_ID, RATIONALE_FOR_CHANGE_MAX_LENGTH
 from ..suggestions import (
     ANKIHUB_NO_CHANGE_ERROR,
@@ -105,12 +108,12 @@ def open_suggestion_dialog_for_note(note: Note, parent: QWidget) -> None:
 
 
 def image_was_added(note: Note) -> bool:
-    """Returns True if an image was added when comparing with the ankihub database.""" ""
+    """Returns True if an image was added when comparing with the ankihub database."""
     note_info_anki = to_note_data(note)
-    img_names_anki = get_img_names_from_note_info(note_info_anki)
+    img_names_anki = get_image_names_from_note_info(note_info_anki)
 
     note_info_ah = ankihub_db.note_data(note.id)
-    img_names_ah = get_img_names_from_note_info(note_info_ah)
+    img_names_ah = get_image_names_from_note_info(note_info_ah)
 
     added_img_names = set(img_names_anki) - set(img_names_ah)
     result = len(added_img_names) > 0
@@ -136,7 +139,9 @@ def open_suggestion_dialog_for_bulk_suggestion(
     ah_did = ah_dids.pop()
 
     suggestion_meta = SuggestionDialog(
-        is_new_note_suggestion=False, is_for_ankihub_deck=ah_did == ANKING_DECK_ID
+        is_new_note_suggestion=False,
+        is_for_ankihub_deck=ah_did == ANKING_DECK_ID,
+        image_was_added=False,
     ).run()
     if not suggestion_meta:
         return
@@ -156,7 +161,7 @@ def open_suggestion_dialog_for_bulk_suggestion(
 def _comment_with_source(suggestion_meta: SuggestionMetadata) -> str:
     result = suggestion_meta.comment
     if suggestion_meta.source:
-        result += f"Source: {suggestion_meta.source.source_type.value} - {suggestion_meta.source.source_text}"
+        result += f"\nSource: {suggestion_meta.source.source_type.value} - {suggestion_meta.source.source_text}"
 
     return result
 

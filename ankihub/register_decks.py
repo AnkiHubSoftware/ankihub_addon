@@ -8,10 +8,10 @@ import uuid
 from copy import deepcopy
 from typing import Dict, List
 
+import aqt
 from anki.decks import DeckId
 from anki.models import NotetypeId
 from anki.notes import NoteId
-import aqt
 
 from . import LOGGER
 from .addon_ankihub_client import AddonAnkiHubClient as AnkiHubClient
@@ -30,7 +30,12 @@ from .utils import (
 DIR_PATH = os.path.dirname(os.path.abspath(__file__))
 
 
-def upload_deck(did: DeckId, notes_data: List[NoteInfo], private: bool) -> uuid.UUID:
+def upload_deck(
+    did: DeckId,
+    notes_data: List[NoteInfo],
+    private: bool,
+    should_upload_assets: bool = False,
+) -> uuid.UUID:
     """Upload the deck to AnkiHub."""
 
     deck_name = aqt.mw.col.decks.name(did)
@@ -47,11 +52,26 @@ def upload_deck(did: DeckId, notes_data: List[NoteInfo], private: bool) -> uuid.
         anki_deck_id=did,
         private=private,
     )
+
+    # Upload all existing local assets for this deck
+    # (assets that are referenced on Deck's notes)
+    if should_upload_assets and client.is_feature_flag_enabled("image_support_enabled"):
+        aqt.mw.taskman.run_in_background(
+            task=client.upload_assets_for_deck,
+            args={"ah_did": ankihub_did, "notes_data": notes_data},
+            on_done=lambda future: LOGGER.info(
+                f"Finished uploading assets for deck {ankihub_did}"
+            ),
+        )
+
     return ankihub_did
 
 
 def create_collaborative_deck(
-    deck_name: str, private: bool, add_subdeck_tags: bool = False
+    deck_name: str,
+    private: bool,
+    add_subdeck_tags: bool = False,
+    should_upload_assets: bool = False,
 ) -> uuid.UUID:
     LOGGER.info("Creating collaborative deck")
 
@@ -75,7 +95,12 @@ def create_collaborative_deck(
 
     set_ankihub_id_fields_based_on_notes_data(notes_data)
 
-    ankihub_did = upload_deck(deck_id, notes_data=notes_data, private=private)
+    ankihub_did = upload_deck(
+        deck_id,
+        notes_data=notes_data,
+        private=private,
+        should_upload_assets=should_upload_assets,
+    )
     ankihub_db.upsert_notes_data(ankihub_did=ankihub_did, notes_data=notes_data)
     ankihub_db.transfer_mod_values_from_anki_db(notes_data=notes_data)
     return ankihub_did

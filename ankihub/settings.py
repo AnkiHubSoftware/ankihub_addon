@@ -226,6 +226,8 @@ class _Config:
         self._update_private_config()
 
     def deck_ids(self) -> List[uuid.UUID]:
+        """Return the ankihub deck ids of the currently locally
+        installed decks."""
         return list(self._private_config.decks.keys())
 
     def deck_config(self, ankihub_did: uuid.UUID) -> DeckConfig:
@@ -457,7 +459,7 @@ except (FileNotFoundError, KeyError):
 
 url_view_note = lambda: f"{config.app_url}/decks/notes/"  # noqa: E731
 url_view_note_history = (
-    lambda: f"{config.app_url}/decks/{{ankihub_did}}/suggestions/?search=note:{{ankihub_nid}} state:closed"
+    lambda: f"{config.app_url}/decks/{{ankihub_did}}/suggestions/?search=note:{{ankihub_nid}},state:closed"
 )  # noqa: E731
 url_view_deck = lambda: f"{config.app_url}/decks/"  # noqa: E731
 url_help = lambda: f"{config.app_url}/help"  # noqa: E731

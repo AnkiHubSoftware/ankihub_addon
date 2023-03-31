@@ -1,7 +1,6 @@
 import re
-import uuid
 from concurrent.futures import Future
-from typing import List, Optional, Sequence, Tuple
+from typing import List, Optional, Sequence
 
 import aqt
 from anki.collection import SearchNode
@@ -46,12 +45,7 @@ from ..note_conversion import (
     is_tag_for_group,
 )
 from ..reset_changes import reset_local_changes_to_notes
-from ..settings import (
-    ANKIHUB_NOTE_TYPE_FIELD_NAME,
-    DeckConfig,
-    DeckExtensionConfig,
-    config,
-)
+from ..settings import ANKIHUB_NOTE_TYPE_FIELD_NAME, DeckExtensionConfig, config
 from ..subdecks import SUBDECK_TAG, build_subdecks_and_move_cards_to_them
 from ..sync import NotLoggedInError, ah_sync
 from .custom_columns import (
@@ -70,7 +64,7 @@ from .custom_search_nodes import (
 )
 from .optional_tag_suggestion_dialog import OptionalTagsSuggestionDialog
 from .suggestion_dialog import open_suggestion_dialog_for_bulk_suggestion
-from .utils import ask_user, choose_list, choose_subset
+from .utils import ask_user, choose_ankihub_deck, choose_list, choose_subset
 
 browser: Optional[Browser] = None
 ankihub_tree_item: Optional[SidebarItem] = None
@@ -198,11 +192,14 @@ def _on_bulk_notes_suggest_action(browser: Browser, nids: Sequence[NoteId]) -> N
 
     ah_dids = set(ankihub_db.ankihub_did_for_note_type(mid) for mid in mids)
     if len(ah_dids) > 1:
-        msg = "You can only bulk suggest notes from one AnkiHub deck at a time.<br>"
+        msg = (
+            "You can only create suggestions for notes from one AnkiHub deck at a time.<br>"
+            "Please select notes from only one AnkiHub deck."
+        )
         showInfo(msg, parent=browser)
         return
 
-    open_suggestion_dialog_for_bulk_suggestion(notes, parent=browser)
+    open_suggestion_dialog_for_bulk_suggestion(notes=notes, parent=browser)
 
 
 def _on_reset_local_changes_action(browser: Browser, nids: Sequence[NoteId]) -> None:
@@ -296,11 +293,14 @@ def _on_reset_deck_action(browser: Browser):
         )
         return
 
-    ah_did, deck_config = _choose_deck(
-        "Choose the AnkiHub deck for which<br>you want to reset local changes"
+    ah_did = choose_ankihub_deck(
+        "Choose the AnkiHub deck for which<br>you want to reset local changes",
+        parent=browser,
     )
     if ah_did is None:
         return
+
+    deck_config = config.deck_config(ah_did)
 
     if not ask_user(
         f"Are you sure you want to reset all local changes to the deck <b>{deck_config.name}</b>?",
@@ -332,16 +332,19 @@ def _on_reset_subdecks_action(browser: Browser):
         )
         return
 
-    ah_did, deck_config = _choose_deck(
+    ah_did = choose_ankihub_deck(
         "Choose the AnkiHub deck for which<br>"
         "you want to rebuild subdecks and move<br>"
         "cards to their original subdeck.<br><br>"
         "<b>Note:</b> This will only move<br>"
         "cards of notes that have subdeck tags<br>"
         f"(tags starting with <b>{SUBDECK_TAG})</b>.",
+        parent=browser,
     )
     if ah_did is None:
         return
+
+    deck_config = config.deck_config(ah_did)
 
     if aqt.mw.col.decks.name_if_exists(deck_config.anki_id) is None:
         showInfo(
@@ -451,23 +454,6 @@ def _remove_optional_tags_of_extension(extension_config: DeckExtensionConfig) ->
     nids = ankihub_db.anki_nids_for_ankihub_deck(extension_config.ankihub_deck_uuid)
     aqt.mw.col.tags.bulk_remove(note_ids=nids, tags=" ".join(tags_for_tag_group))
     LOGGER.info(f"Removed optional tags for {extension_config.tag_group_name}")
-
-
-def _choose_deck(prompt: str) -> Tuple[Optional[uuid.UUID], Optional[DeckConfig]]:
-    ah_dids = config.deck_ids()
-    deck_configs = [config.deck_config(did) for did in ah_dids]
-    chosen_deck_idx = choose_list(
-        prompt=prompt,
-        choices=[deck.name for deck in deck_configs],
-        parent=browser,
-    )
-
-    if chosen_deck_idx is None:
-        return None, None
-
-    chosen_deck_ah_did = ah_dids[chosen_deck_idx]
-    chosen_deck_config = deck_configs[chosen_deck_idx]
-    return chosen_deck_ah_did, chosen_deck_config
 
 
 # custom columns
