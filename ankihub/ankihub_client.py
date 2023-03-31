@@ -471,9 +471,9 @@ class AnkiHubClient:
 
     def upload_assets(self, image_paths: List[Path], ah_did: uuid.UUID):
 
-        # Alternate flow: if less than 10 images, call self.upload_assets
+        # Alternate flow: if at most 10 images, call self.upload_assets
         # passing the array of image names
-        if not len(image_paths) > 10:
+        if len(image_paths) <= 10:
             self._upload_assets_individually(
                 image_names={path.name for path in image_paths}, ah_did=ah_did
             )
