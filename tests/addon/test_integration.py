@@ -17,7 +17,7 @@ from anki.decks import DeckId, FilteredDeckConfig
 from anki.models import NotetypeDict, NotetypeId
 from anki.notes import Note, NoteId
 from anki.sync import SyncOutput
-from aqt import AnkiQt, gui_hooks
+from aqt import AnkiQt, dialogs, gui_hooks
 from aqt.addcards import AddCards
 from aqt.addons import InstallOk
 from aqt.browser import Browser
@@ -277,9 +277,12 @@ def test_editor(
         install_sample_ah_deck()
 
         # mock the dialog so it doesn't block the testq
-        monkeypatch.setattr("ankihub.gui.editor.SuggestionDialog.exec", Mock())
+        monkeypatch.setattr(
+            "ankihub.gui.suggestion_dialog.SuggestionDialog.exec", Mock()
+        )
 
-        editor = MagicMock()
+        add_cards_dialog: AddCards = dialogs.open("AddCards", mw)
+        editor = add_cards_dialog.editor
 
         # test a new note suggestion
         editor.note = mw.col.new_note(mw.col.models.by_name("Basic (Testdeck / user1)"))
@@ -295,7 +298,7 @@ def test_editor(
         )
 
         _refresh_buttons(editor)
-        assert editor.ankihub_command == AnkiHubCommands.NEW.value
+        assert editor.ankihub_command == AnkiHubCommands.NEW.value  # type: ignore
         _on_suggestion_button_press(editor)
 
         # test a change note suggestion
@@ -311,7 +314,7 @@ def test_editor(
         )
 
         _refresh_buttons(editor)
-        assert editor.ankihub_command == AnkiHubCommands.CHANGE.value
+        assert editor.ankihub_command == AnkiHubCommands.CHANGE.value  # type: ignore
 
         # this should trigger a suggestion because the note has not been changed
         _on_suggestion_button_press(editor)
@@ -1772,6 +1775,10 @@ class TestCustomSearchNodes:
 
             record_review(mw, cid)
 
+            # sleep to make sure the timestamp of the review entry is different from the
+            # timestamp of the note
+            sleep(1.1)
+
             # import the deck again, this counts as an update
             import_sample_ankihub_deck(
                 mw, ankihub_did=ah_did, assert_created_deck=False
@@ -1783,6 +1790,8 @@ class TestCustomSearchNodes:
                     all_nids
                 ) == [nid]
 
+            # sleep to make sure the timestamp of the review entry is different from the
+            # timestamp of the note
             sleep(1.1)
 
             # add another review entry for the card to the database
