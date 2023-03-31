@@ -514,7 +514,7 @@ def upload_deck_assets_action() -> None:
 
     def on_done(future: Future) -> None:
         future.result()
-        showInfo("🎉 Successfuly uploaded all images for the deck!")
+        showInfo(f"🎉 Successfuly uploaded all images for<br><b>{deck_config.name}</b>!")
         LOGGER.info("Finished uploading assets for deck")
 
     # Extract the AnkiHub deck ID using a sample note id
