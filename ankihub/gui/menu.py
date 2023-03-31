@@ -512,16 +512,14 @@ def upload_deck_assets_action() -> None:
     if not confirm:
         return
 
-    def on_done(future: Future) -> None:
-        future.result()
+    def on_success() -> None:
         showInfo(f"🎉 Successfuly uploaded all images for<br><b>{deck_config.name}</b>!")
-        LOGGER.info("Finished uploading assets for deck")
 
     # Extract the AnkiHub deck ID using a sample note id
     ah_did = ankihub_db.ankihub_did_for_anki_nid(nids[0])
 
     media_names = get_image_names_from_notes_data(notes_data)
-    media_sync.start_media_upload(media_names, ah_did, on_done=on_done)
+    media_sync.start_media_upload(media_names, ah_did, on_success=on_success)
 
     showInfo(
         "🖼️ Upload started! You can continue using Anki in the meantime."

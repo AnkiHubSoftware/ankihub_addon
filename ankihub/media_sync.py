@@ -48,7 +48,7 @@ class _AnkiHubMediaSync:
         self,
         media_names: Iterable[str],
         ankihub_did: uuid.UUID,
-        on_done: Optional[Callable] = None,
+        on_success: Optional[Callable[[], None]] = None,
     ):
         """Upload the referenced media files to AnkiHub in the background."""
         self._amount_uploads_in_progress += 1
@@ -57,7 +57,9 @@ class _AnkiHubMediaSync:
         media_paths = list(self._media_paths_for_media_names(media_names))
         aqt.mw.taskman.run_in_background(
             lambda: AddonAnkiHubClient().upload_assets(media_paths, ankihub_did),
-            on_done=lambda future: self._on_upload_finished(future, on_done=on_done),
+            on_done=lambda future: self._on_upload_finished(
+                future, on_success=on_success
+            ),
         )
 
     def _media_paths_for_media_names(
@@ -66,14 +68,16 @@ class _AnkiHubMediaSync:
         media_dir_path = Path(aqt.mw.col.media.dir())
         return {media_dir_path / media_name for media_name in media_names}
 
-    def _on_upload_finished(self, future: Future, on_done: Optional[Callable] = None):
+    def _on_upload_finished(
+        self, future: Future, on_success: Optional[Callable[[], None]] = None
+    ):
         self._amount_uploads_in_progress -= 1
         future.result()
         LOGGER.info("Uploaded images to AnkiHub.")
         self._refresh_media_download_status()
 
-        if on_done is not None:
-            on_done()
+        if on_success is not None:
+            on_success()
 
     def _download_missing_media(self):
         for ah_did in ankihub_db.ankihub_deck_ids():
