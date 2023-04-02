@@ -129,8 +129,8 @@ def _with_disabled_log_file_handler(*args: Any, **kwargs: Any) -> Any:
     if file_handlers:
         handler = file_handlers[0]
         LOGGER.info(f"Disabling FileHandler: {handler}.")
-        handler.close()
         LOGGER.root.removeHandler(handler)
+        handler.close()
 
     try:
         result = _old(*args, **kwargs)
