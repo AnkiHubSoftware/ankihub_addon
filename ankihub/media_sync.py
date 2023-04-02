@@ -9,7 +9,6 @@ from aqt.qt import QAction
 from . import LOGGER
 from .addon_ankihub_client import AddonAnkiHubClient
 from .db import ankihub_db
-from .media_utils import get_img_names_from_notes
 
 
 class _AnkiHubMediaSync:
