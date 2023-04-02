@@ -473,6 +473,9 @@ class _AnkiHubDB:
         self, mid: NotetypeId, disabled_field_names: List[str]
     ) -> Set[str]:
         """Returns the names of all media files used in the notes of the given note type."""
+        if aqt.mw.col.models.get(NotetypeId(mid)) is None:
+            return set()
+
         field_names_for_mid = [
             field["name"] for field in aqt.mw.col.models.get(NotetypeId(mid))["flds"]
         ]
