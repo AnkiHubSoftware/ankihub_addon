@@ -125,9 +125,7 @@ def _with_disabled_log_file_handler(*args: Any, **kwargs: Any) -> Any:
 
     LOGGER.info(f"Maybe disabling log FileHandler because {_old.__name__} was called.")
     file_handlers = _log_file_handlers()
-    assert len(file_handlers) <= 1
-    if file_handlers:
-        handler = file_handlers[0]
+    for handler in file_handlers:
         LOGGER.info(f"Disabling FileHandler: {handler}.")
         LOGGER.root.removeHandler(handler)
         handler.close()
@@ -135,7 +133,6 @@ def _with_disabled_log_file_handler(*args: Any, **kwargs: Any) -> Any:
     try:
         result = _old(*args, **kwargs)
     finally:
-        assert len(file_handlers) <= 1
         # Only re-enable the log FileHandler if the user files folder still exists and
         # the FileHandler is disabled.
         if log_file_path().parent.exists() and not file_handlers:
