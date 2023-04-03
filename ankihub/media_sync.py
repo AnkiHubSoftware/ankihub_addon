@@ -62,6 +62,11 @@ class _AnkiHubMediaSync:
             ),
         )
 
+    def refresh_sync_status_text(self):
+        """Refresh the status text on the status action."""
+        # GUI operations must be performed on the main thread.
+        aqt.mw.taskman.run_on_main(self._refresh_media_download_status_inner)
+
     def _media_paths_for_media_names(
         self, media_names: Iterable[str]
     ) -> Iterable[Path]:
@@ -110,11 +115,6 @@ class _AnkiHubMediaSync:
         future.result()
         LOGGER.info("Downloaded images from AnkiHub.")
         self.refresh_sync_status_text()
-
-    def refresh_sync_status_text(self):
-        """Refresh the status text on the status action."""
-        # GUI operations must be performed on the main thread.
-        aqt.mw.taskman.run_on_main(self._refresh_media_download_status_inner)
 
     def _refresh_media_download_status_inner(self):
         if self._download_in_progress:
