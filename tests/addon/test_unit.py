@@ -389,7 +389,8 @@ class TestAnkiHubDBAnkiNidsToAnkiHubNids:
 
 
 class TestAnkiHubDBMediaNamesForAnkiHubDeck:
-    def setup_method(
+    @pytest.fixture(autouse=True)
+    def setup_method_fixture(
         self,
         ankihub_db: _AnkiHubDB,
         ankihub_basic_note_type: NotetypeDict,
