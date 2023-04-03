@@ -484,7 +484,7 @@ class _AnkiHubDB:
         ]
         fields_with_images = self.list(
             f"""
-            SELECT fields FROM notes 
+            SELECT fields FROM notes
             WHERE anki_note_type_id = {mid}
             AND fields LIKE '%<img%'
             """,
