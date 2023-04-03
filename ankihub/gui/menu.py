@@ -48,7 +48,6 @@ from .utils import (
 @dataclass
 class _MenuState:
     ankihub_menu: Optional[QMenu] = None
-    media_sync_status_action: Optional[QAction] = None
 
 
 menu_state = _MenuState()
@@ -604,9 +603,9 @@ def media_sync_status_setup(parent: QMenu):
     if not image_support_enabled:
         return
 
-    menu_state.media_sync_status_action = QAction("", parent)
-    parent.addAction(menu_state.media_sync_status_action)
-    media_sync.set_status_action(menu_state.media_sync_status_action)
+    media_sync_status_action = QAction("", parent)
+    parent.addAction(media_sync_status_action)
+    media_sync.set_status_action(media_sync_status_action)
     media_sync.refresh_sync_status_text()
 
 
