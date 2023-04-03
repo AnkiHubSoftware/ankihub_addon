@@ -44,11 +44,12 @@ class CustomSearchNode(ABC):
         # cards can be accessed as "cards" and the ankihub notes
         # table can be accessed as "ah_notes".
         if self.browser.table.is_notes_mode():
-            nids = aqt.mw.col.db.list(
+            query = (
                 "SELECT id FROM notes, ankihub_db.notes as ah_notes "
                 "WHERE notes.id = ah_notes.anki_note_id AND "
                 f"notes.id IN {ids2str(ids)} AND " + where
             )
+            nids = aqt.mw.col.db.list(query)
             return nids
         else:
             # this approach is faster than joining notes with cards in the query,

@@ -33,6 +33,7 @@ from ..addon_ankihub_client import AnkiHubRequestError
 from ..ankihub_client import NoteInfo
 from ..db import ankihub_db
 from ..importing import AnkiHubImportResult
+from ..media_sync import media_sync
 from ..messages import messages
 from ..settings import config, url_deck_base, url_decks, url_help, url_view_deck
 from ..subdecks import SUBDECK_TAG, build_subdecks_and_move_cards_to_them, flatten_deck
@@ -510,12 +511,11 @@ def install_deck(
     latest_update: datetime,
     is_creator: bool,
 ) -> AnkiHubImportResult:
-    """If we have a .csv, read data from the file and modify the user's note types
-    and notes.
-    :param: path to the .csv or .apkg file
-    :return: True if successful, False if not
+    """Imports the notes_data into the Anki collection.
+    Saves the deck subscription to the config file.
+    Starts the media download.
+    Returns information about the import.
     """
-
     create_backup()
 
     importer = AnkiHubImporter()
@@ -532,6 +532,9 @@ def install_deck(
         latest_udpate=latest_update,
         creator=is_creator,
     )
+
+    if AnkiHubClient().is_feature_flag_enabled("image_support_enabled"):
+        media_sync.start_media_download()
 
     LOGGER.info("Importing deck was succesful.")
 
