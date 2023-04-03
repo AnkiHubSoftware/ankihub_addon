@@ -131,7 +131,12 @@ class _AnkiHubMediaSync:
         if self._status_action is None:
             return
 
-        self._status_action.setText(f"🔃️ Media Sync: {text}")
+        try:
+            self._status_action.setText(f"🔃️ Media Sync: {text}")
+        except RuntimeError:
+            LOGGER.warning(
+                "Could not set media sync status text, the action was deleted."
+            )
 
 
 media_sync = _AnkiHubMediaSync()
