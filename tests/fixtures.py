@@ -1,9 +1,13 @@
+import copy
 import os
 import uuid
 from typing import Callable
 
 import pytest
+from anki.models import NotetypeDict
+from aqt.main import AnkiQt
 from pytest import fixture
+from pytest_anki import AnkiSession
 from requests_mock import Mocker
 
 # workaround for vscode test discovery not using pytest.ini which sets this env var
@@ -11,6 +15,7 @@ from requests_mock import Mocker
 os.environ["SKIP_INIT"] = "1"
 
 from ankihub.ankihub_client import DEFAULT_API_URL
+from ankihub.utils import modify_note_type
 
 
 @fixture
@@ -59,3 +64,28 @@ def disable_image_support_feature_flag(requests_mock: Mocker) -> None:
         status_code=200,
         json={"flags": {"image_support_enabled": {"is_active": False}}},
     )
+
+
+@fixture
+def ankihub_basic_note_type(anki_session_with_addon_data: AnkiSession) -> NotetypeDict:
+    with anki_session_with_addon_data.profile_loaded():
+        mw = anki_session_with_addon_data.mw
+        result = create_or_get_ah_version_of_note_type(
+            mw, mw.col.models.by_name("Basic")
+        )
+        return result
+
+
+def create_or_get_ah_version_of_note_type(
+    mw: AnkiQt, note_type: NotetypeDict
+) -> NotetypeDict:
+    note_type = copy.deepcopy(note_type)
+    note_type["id"] = 0
+    note_type["name"] = note_type["name"] + " (AnkiHub)"
+
+    if model := mw.col.models.by_name(note_type["name"]):
+        return model
+
+    modify_note_type(note_type)
+    mw.col.models.add_dict(note_type)
+    return mw.col.models.by_name(note_type["name"])
