@@ -30,6 +30,7 @@ from pytestqt.qtbot import QtBot  # type: ignore
 from requests_mock import Mocker
 
 from ..factories import NoteInfoFactory
+from ..fixtures import create_or_get_ah_version_of_note_type
 from .conftest import TEST_PROFILE_ID
 
 # workaround for vscode test discovery not using pytest.ini which sets this env var
@@ -179,16 +180,6 @@ def import_sample_ankihub_deck(
         assert local_did == list(new_dids)[0]
 
     return local_did
-
-
-@fixture
-def ankihub_basic_note_type(anki_session_with_addon_data: AnkiSession) -> NotetypeDict:
-    with anki_session_with_addon_data.profile_loaded():
-        mw = anki_session_with_addon_data.mw
-        result = create_or_get_ah_version_of_note_type(
-            mw, mw.col.models.by_name("Basic")
-        )
-        return result
 
 
 class MakeAHNote(Protocol):
@@ -1285,21 +1276,6 @@ def create_copy_of_note_type(mw: AnkiQt, note_type: NotetypeDict) -> NotetypeDic
     new_model["id"] = 0
     mw.col.models.add_dict(new_model)
     return new_model
-
-
-def create_or_get_ah_version_of_note_type(
-    mw: AnkiQt, note_type: NotetypeDict
-) -> NotetypeDict:
-    note_type = copy.deepcopy(note_type)
-    note_type["id"] = 0
-    note_type["name"] = note_type["name"] + " (AnkiHub)"
-
-    if model := mw.col.models.by_name(note_type["name"]):
-        return model
-
-    modify_note_type(note_type)
-    mw.col.models.add_dict(note_type)
-    return mw.col.models.by_name(note_type["name"])
 
 
 def test_unsubsribe_from_deck(
