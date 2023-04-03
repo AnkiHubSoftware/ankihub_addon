@@ -1126,7 +1126,7 @@ def get_image_names_from_notes_data(notes_data: Sequence[NoteInfo]) -> Set[str]:
     The image names are taken from inside src attributes of HTML image tags that are on the note's fields.
     Only returns names of local images, not remote images."""
     return {
-        name for note in notes_data for name in _get_image_names_from_note_info(note)
+        name for note in notes_data for name in get_image_names_from_note_info(note)
     }
 
 
@@ -1150,7 +1150,7 @@ def get_image_names_from_suggestion(suggestion: NoteSuggestion) -> Set[str]:
     return result
 
 
-def _get_image_names_from_note_info(note_info: NoteInfo) -> Set[str]:
+def get_image_names_from_note_info(note_info: NoteInfo) -> Set[str]:
     result = {
         name
         for field in note_info.fields
