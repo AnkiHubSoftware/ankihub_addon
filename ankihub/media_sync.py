@@ -9,7 +9,6 @@ from aqt.qt import QAction
 from . import LOGGER
 from .addon_ankihub_client import AddonAnkiHubClient
 from .db import ankihub_db
-from .media_utils import get_img_names_from_notes
 
 
 class _AnkiHubMediaSync:
@@ -94,10 +93,8 @@ class _AnkiHubMediaSync:
     def _missing_images_for_ah_deck(
         self, ah_did: uuid.UUID, asset_disabled_fields: Dict[int, List[str]]
     ) -> List[str]:
-        nids = ankihub_db.anki_nids_for_ankihub_deck(ah_did)
-        notes_data = [ankihub_db.note_data(nid) for nid in nids]
-        img_names = get_img_names_from_notes(
-            notes_data, asset_disabled_fields=asset_disabled_fields
+        img_names = ankihub_db.media_names_for_ankihub_deck(
+            ah_did, asset_disabled_fields=asset_disabled_fields
         )
         media_dir_path = Path(aqt.mw.col.media.dir())
 
