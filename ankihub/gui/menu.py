@@ -591,7 +591,7 @@ def ankihub_logout_setup(parent):
     parent.addAction(q_action)
 
 
-def media_download_status_setup(parent: QMenu):
+def media_sync_status_setup(parent: QMenu):
     image_support_enabled = False
     try:
         image_support_enabled = AnkiHubClient().is_feature_flag_enabled(
@@ -604,8 +604,10 @@ def media_download_status_setup(parent: QMenu):
     if not image_support_enabled:
         return
 
-    menu_state.media_sync_status_action = QAction("Media download: Idle.", parent)
+    menu_state.media_sync_status_action = QAction("", parent)
     parent.addAction(menu_state.media_sync_status_action)
+    media_sync.set_status_action(menu_state.media_sync_status_action)
+    media_sync.refresh_sync_status_text()
 
 
 def setup_ankihub_menu() -> None:
@@ -627,9 +629,9 @@ def refresh_ankihub_menu() -> None:
         subscribe_to_deck_setup(parent=menu_state.ankihub_menu)
         import_media_setup(parent=menu_state.ankihub_menu)
         sync_with_ankihub_setup(parent=menu_state.ankihub_menu)
+        media_sync_status_setup(parent=menu_state.ankihub_menu)
         upload_deck_assets_setup(parent=menu_state.ankihub_menu)
         ankihub_logout_setup(parent=menu_state.ankihub_menu)
-        media_download_status_setup(parent=menu_state.ankihub_menu)
     else:
         ankihub_login_setup(parent=menu_state.ankihub_menu)
 
