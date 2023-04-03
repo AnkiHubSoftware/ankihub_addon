@@ -533,7 +533,8 @@ def install_deck(
         creator=is_creator,
     )
 
-    media_sync.start_media_download()
+    if AnkiHubClient().is_feature_flag_enabled("image_support_enabled"):
+        media_sync.start_media_download()
 
     LOGGER.info("Importing deck was succesful.")
 
