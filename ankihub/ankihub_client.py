@@ -476,7 +476,8 @@ class AnkiHubClient:
         # passing the array of image names
         if len(image_paths) <= 10:
             self._upload_assets_individually(
-                image_names={path.name for path in image_paths if path.is_file()}, ah_did=ah_did
+                image_names={path.name for path in image_paths if path.is_file()},
+                ah_did=ah_did,
             )
             return None
 
