@@ -631,7 +631,7 @@ class AnkiHubClient:
 
             for future in as_completed(futures):
                 future.result()
-                LOGGER.info("Downloaded images from AnkiHub.")
+            LOGGER.info("Downloaded images from AnkiHub.")
 
     def _gzip_compress_string(self, string: str) -> bytes:
         result = gzip.compress(
