@@ -2,7 +2,7 @@ import copy
 import uuid
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Any, Dict, List, Optional, Sequence, Tuple, cast
+from typing import Any, Dict, List, Optional, Sequence, Set, Tuple, cast
 
 import aqt
 from anki.notes import Note, NoteId
@@ -15,6 +15,7 @@ from .ankihub_client import (
     NoteInfo,
     NoteSuggestion,
     SuggestionType,
+    get_image_names_from_notes_data,
     get_image_names_from_suggestions,
 )
 from .db import ankihub_db
@@ -46,7 +47,9 @@ def suggest_note_update(
     ah_did = ankihub_db.ankihub_did_for_anki_nid(NoteId(suggestion.anki_nid))
     suggestion = cast(
         ChangeNoteSuggestion,
-        _rename_and_upload_assets_for_suggestion(suggestion, ah_did),
+        _rename_and_upload_assets_for_suggestion(
+            suggestion=suggestion, ankihub_did=ah_did
+        ),
     )
 
     client = AnkiHubClient()
@@ -69,7 +72,9 @@ def suggest_new_note(
 
     suggestion = cast(
         NewNoteSuggestion,
-        _rename_and_upload_assets_for_suggestion(suggestion, ankihub_did),
+        _rename_and_upload_assets_for_suggestion(
+            suggestion=suggestion, ankihub_did=ankihub_did
+        ),
     )
 
     client = AnkiHubClient()
@@ -122,13 +127,15 @@ def suggest_notes_in_bulk(
     new_note_suggestions = cast(
         Sequence[NewNoteSuggestion],
         _rename_and_upload_assets_for_suggestions(
-            suggestions=new_note_suggestions, ankihub_did=ankihub_did
+            suggestions=new_note_suggestions,
+            ankihub_did=ankihub_did,
         ),
     )
     change_note_suggestions = cast(
         Sequence[ChangeNoteSuggestion],
         _rename_and_upload_assets_for_suggestions(
-            suggestions=change_note_suggestions, ankihub_did=ankihub_did
+            suggestions=change_note_suggestions,
+            ankihub_did=ankihub_did,
         ),
     )
 
@@ -304,7 +311,8 @@ def _rename_and_upload_assets_for_suggestion(
 
 
 def _rename_and_upload_assets_for_suggestions(
-    suggestions: Sequence[NoteSuggestion], ankihub_did: uuid.UUID
+    suggestions: Sequence[NoteSuggestion],
+    ankihub_did: uuid.UUID,
 ) -> Sequence[NoteSuggestion]:
     """Renames assets referenced on the suggestions in the Anki collection and the media folder and
     uploads them to AnkiHub in another thread.
@@ -314,12 +322,30 @@ def _rename_and_upload_assets_for_suggestions(
     if not client.is_feature_flag_enabled("image_support_enabled"):
         return suggestions
 
-    original_image_names = get_image_names_from_suggestions(suggestions)
-    original_image_paths = [
-        Path(aqt.mw.col.media.dir()) / image_name for image_name in original_image_names
+    # TODO: remove this method 'get_image_names_from_notes_data' from ankihub client
+    original_notes_data = [
+        note_info
+        for suggestion in suggestions
+        if (note_info := ankihub_db.note_data(NoteId(suggestion.anki_nid)))
+    ]
+    original_notes_image_names: Set[str] = get_image_names_from_notes_data(
+        original_notes_data
+    )
+    suggestion_image_names: Set[str] = get_image_names_from_suggestions(suggestions)
+
+    # Filter out unchanged image names so we don't hash and upload images that aren't part of the suggestion
+    added_image_names = suggestion_image_names.difference(original_notes_image_names)
+
+    if not added_image_names:
+        # No images added, nothing to do here. Return
+        # the original suggestions object
+        return suggestions
+
+    added_image_paths = [
+        Path(aqt.mw.col.media.dir()) / image_name for image_name in added_image_names
     ]
 
-    asset_name_map = client.generate_asset_files_with_hashed_names(original_image_paths)
+    asset_name_map = client.generate_asset_files_with_hashed_names(added_image_paths)
 
     media_sync.start_media_upload(
         media_names=asset_name_map.values(), ankihub_did=ankihub_did
