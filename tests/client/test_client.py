@@ -543,7 +543,9 @@ class TestCreateSuggestionsInBulk:
         )
         assert errors_by_nid == {}
         assert note.fields == change_note_suggestion.fields
-        assert set(note.tags) == set(change_note_suggestion.added_tags)
+        assert set(note.tags) == set(change_note_suggestion.added_tags) | set(
+            new_note_suggestion.tags
+        )
 
         # create a change note suggestion without any changes
         errors_by_nid = client.create_suggestions_in_bulk(
