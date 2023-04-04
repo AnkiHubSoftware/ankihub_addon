@@ -444,6 +444,7 @@ def test_get_deck_by_id(
         "anki_id": 1,
         "csv_last_upload": date_time.strftime(ANKIHUB_DATETIME_FORMAT_STR),
         "csv_notes_filename": "test.csv",
+        "image_upload_finished": False,
     }
 
     requests_mock.get(
@@ -457,6 +458,7 @@ def test_get_deck_by_id(
         name="test",
         csv_last_upload=date_time,
         csv_notes_filename="test.csv",
+        image_upload_finished=False,
     )
 
     # test get deck by id unauthenticated
