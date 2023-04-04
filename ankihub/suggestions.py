@@ -293,7 +293,7 @@ def _rename_and_upload_assets_for_suggestions(
     original_notes_data = [
         note_info
         for suggestion in suggestions
-        if (note_info := ankihub_db.note_data(suggestion.anki_nid))
+        if (note_info := ankihub_db.note_data(NoteId(suggestion.anki_nid)))
     ]
     original_notes_image_names: Set[str] = get_image_names_from_notes_data(
         original_notes_data
