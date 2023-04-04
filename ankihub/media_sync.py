@@ -21,10 +21,11 @@ class _AnkiHubMediaSync:
     def __init__(self) -> None:
         self._download_in_progress = False
         self._amount_uploads_in_progress = 0
-        self._media_sync_status_action: Optional[QAction] = None
+        self._status_action: Optional[QAction] = None
 
-    def setup(self, media_download_status_action: QAction):
-        self._media_sync_status_action = media_download_status_action
+    def set_status_action(self, status_action: QAction):
+        """Set the QAction that should be used to show the status of the media sync."""
+        self._status_action = status_action
 
     def start_media_download(self):
         """Download missing media for all subscribed decks from AnkiHub in the background.
@@ -37,7 +38,7 @@ class _AnkiHubMediaSync:
         LOGGER.info("Starting media download...")
 
         self._download_in_progress = True
-        self._refresh_media_download_status()
+        self.refresh_sync_status_text()
 
         aqt.mw.taskman.run_in_background(
             self._download_missing_media, on_done=self._on_download_finished
@@ -51,7 +52,7 @@ class _AnkiHubMediaSync:
     ):
         """Upload the referenced media files to AnkiHub in the background."""
         self._amount_uploads_in_progress += 1
-        self._refresh_media_download_status()
+        self.refresh_sync_status_text()
 
         media_paths = list(self._media_paths_for_media_names(media_names))
         aqt.mw.taskman.run_in_background(
@@ -60,6 +61,11 @@ class _AnkiHubMediaSync:
                 future, on_success=on_success
             ),
         )
+
+    def refresh_sync_status_text(self):
+        """Refresh the status text on the status action."""
+        # GUI operations must be performed on the main thread.
+        aqt.mw.taskman.run_on_main(self._refresh_media_download_status_inner)
 
     def _media_paths_for_media_names(
         self, media_names: Iterable[str]
@@ -73,7 +79,7 @@ class _AnkiHubMediaSync:
         self._amount_uploads_in_progress -= 1
         future.result()
         LOGGER.info("Uploaded images to AnkiHub.")
-        self._refresh_media_download_status()
+        self.refresh_sync_status_text()
 
         if on_success is not None:
             on_success()
@@ -108,11 +114,7 @@ class _AnkiHubMediaSync:
         self._download_in_progress = False
         future.result()
         LOGGER.info("Downloaded images from AnkiHub.")
-        self._refresh_media_download_status()
-
-    def _refresh_media_download_status(self):
-        # GUI operations must be performed on the main thread.
-        aqt.mw.taskman.run_on_main(self._refresh_media_download_status_inner)
+        self.refresh_sync_status_text()
 
     def _refresh_media_download_status_inner(self):
         if self._download_in_progress:
@@ -123,8 +125,10 @@ class _AnkiHubMediaSync:
             self._set_status_text("Idle")
 
     def _set_status_text(self, text: str):
-        if self._media_sync_status_action is not None:
-            self._media_sync_status_action.setText(f"Media Sync: {text}")
+        if self._status_action is None:
+            return
+
+        self._status_action.setText(f"🔃️ Media Sync: {text}")
 
 
 media_sync = _AnkiHubMediaSync()
