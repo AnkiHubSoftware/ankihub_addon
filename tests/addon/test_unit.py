@@ -5,6 +5,7 @@ from pathlib import Path
 from typing import Callable, Generator, List
 
 import pytest
+from anki.models import NotetypeDict
 from anki.notes import Note, NoteId
 from aqt.qt import QDialogButtonBox
 from pytest_anki import AnkiSession
@@ -16,7 +17,7 @@ from ..factories import NoteInfoFactory
 os.environ["SKIP_INIT"] = "1"
 
 from ankihub import suggestions
-from ankihub.ankihub_client import SuggestionType
+from ankihub.ankihub_client import Field, SuggestionType
 from ankihub.db.db import _AnkiHubDB
 from ankihub.error_reporting import normalize_url
 from ankihub.exporting import _prepared_field_html
@@ -267,17 +268,18 @@ def test_add_subdeck_tags_to_notes_with_spaces_in_deck_name(
 
 class TestSuggestionDialog:
     @pytest.mark.parametrize(
-        "is_new_note_suggestion,is_for_ankihub_deck,suggestion_type,source_type",
+        "is_new_note_suggestion,is_for_ankihub_deck,suggestion_type,source_type,image_was_added",
         [
-            (True, True, SuggestionType.NEW_CONTENT, SourceType.AMBOSS),
-            (True, True, SuggestionType.OTHER, SourceType.AMBOSS),
-            (True, False, SuggestionType.NEW_CONTENT, SourceType.AMBOSS),
-            (True, False, SuggestionType.OTHER, SourceType.AMBOSS),
-            (False, True, SuggestionType.NEW_CONTENT, SourceType.AMBOSS),
-            (False, True, SuggestionType.OTHER, SourceType.AMBOSS),
-            (False, False, SuggestionType.NEW_CONTENT, SourceType.AMBOSS),
-            (False, False, SuggestionType.OTHER, SourceType.AMBOSS),
-            (False, True, SuggestionType.NEW_CONTENT, SourceType.UWORLD),
+            (True, True, SuggestionType.NEW_CONTENT, SourceType.AMBOSS, False),
+            (True, True, SuggestionType.OTHER, SourceType.AMBOSS, False),
+            (True, False, SuggestionType.NEW_CONTENT, SourceType.AMBOSS, False),
+            (True, False, SuggestionType.OTHER, SourceType.AMBOSS, False),
+            (False, True, SuggestionType.NEW_CONTENT, SourceType.AMBOSS, False),
+            (False, True, SuggestionType.OTHER, SourceType.AMBOSS, False),
+            (False, False, SuggestionType.NEW_CONTENT, SourceType.AMBOSS, False),
+            (False, False, SuggestionType.OTHER, SourceType.AMBOSS, False),
+            (False, True, SuggestionType.NEW_CONTENT, SourceType.UWORLD, False),
+            (False, True, SuggestionType.NEW_CONTENT, SourceType.UWORLD, True),
         ],
     )
     def test_visibility_of_form_elements_and_form_result(
@@ -286,10 +288,12 @@ class TestSuggestionDialog:
         is_for_ankihub_deck: bool,
         suggestion_type: SuggestionType,
         source_type: SourceType,
+        image_was_added: bool,
     ):
         dialog = SuggestionDialog(
             is_for_ankihub_deck=is_for_ankihub_deck,
             is_new_note_suggestion=is_new_note_suggestion,
+            added_new_images=image_was_added,
         )
         dialog.show()
 
@@ -353,7 +357,7 @@ class TestSuggestionDialog:
         )
 
 
-class TestAnkiHubDB:
+class TestAnkiHubDBAnkiNidsToAnkiHubNids:
     def test_anki_nids_to_ankihub_nids(
         self,
         ankihub_db: _AnkiHubDB,
@@ -382,3 +386,54 @@ class TestAnkiHubDB:
             existing_anki_nid: note.ankihub_note_uuid,
             non_existing_anki_nid: None,
         }
+
+
+class TestAnkiHubDBMediaNamesForAnkiHubDeck:
+    @pytest.fixture(autouse=True)
+    def setup_method_fixture(
+        self,
+        ankihub_db: _AnkiHubDB,
+        ankihub_basic_note_type: NotetypeDict,
+        next_deterministic_uuid: Callable[[], uuid.UUID],
+    ):
+        self.mid = ankihub_basic_note_type["id"]
+        note_info = NoteInfoFactory.create(
+            mid=self.mid,
+            fields=[
+                Field(value="test <img src='test1.jpg'>", order=0, name="Front"),
+                Field(value="test <img src='test2.jpg'>", order=1, name="Back"),
+            ],
+        )
+        self.ah_did = next_deterministic_uuid()
+        ankihub_db.upsert_notes_data(self.ah_did, [note_info])
+
+    def test_basic(
+        self,
+        anki_session: AnkiSession,
+        ankihub_db: _AnkiHubDB,
+    ):
+        with anki_session.profile_loaded():
+            # Assert that the media name is returned for the field that is not disabled
+            # and the media name is not returned for the field that is disabled.
+            assert ankihub_db.media_names_for_ankihub_deck(
+                self.ah_did, asset_disabled_fields={self.mid: ["Front"]}
+            ) == {"test2.jpg"}
+
+    def test_with_notetype_missing_from_anki_db(
+        self,
+        anki_session: AnkiSession,
+        ankihub_db: _AnkiHubDB,
+    ):
+        with anki_session.profile_loaded():
+            mw = anki_session.mw
+            mw.col.models.remove(self.mid)
+
+            # Without the notetype in the Anki DB, the AnkiHub DB currently doesn't know the
+            # names of the fields, so it just returns an empty set.
+            # Assert that no error is raised and an empty set is returned.
+            assert (
+                ankihub_db.media_names_for_ankihub_deck(
+                    self.ah_did, asset_disabled_fields={}
+                )
+                == set()
+            )

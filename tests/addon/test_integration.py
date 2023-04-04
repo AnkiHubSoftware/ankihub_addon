@@ -30,6 +30,7 @@ from pytestqt.qtbot import QtBot  # type: ignore
 from requests_mock import Mocker
 
 from ..factories import NoteInfoFactory
+from ..fixtures import create_or_get_ah_version_of_note_type
 from .conftest import TEST_PROFILE_ID
 
 # workaround for vscode test discovery not using pytest.ini which sets this env var
@@ -179,16 +180,6 @@ def import_sample_ankihub_deck(
         assert local_did == list(new_dids)[0]
 
     return local_did
-
-
-@fixture
-def ankihub_basic_note_type(anki_session_with_addon_data: AnkiSession) -> NotetypeDict:
-    with anki_session_with_addon_data.profile_loaded():
-        mw = anki_session_with_addon_data.mw
-        result = create_or_get_ah_version_of_note_type(
-            mw, mw.col.models.by_name("Basic")
-        )
-        return result
 
 
 class MakeAHNote(Protocol):
@@ -1296,21 +1287,6 @@ def create_copy_of_note_type(mw: AnkiQt, note_type: NotetypeDict) -> NotetypeDic
     new_model["id"] = 0
     mw.col.models.add_dict(new_model)
     return new_model
-
-
-def create_or_get_ah_version_of_note_type(
-    mw: AnkiQt, note_type: NotetypeDict
-) -> NotetypeDict:
-    note_type = copy.deepcopy(note_type)
-    note_type["id"] = 0
-    note_type["name"] = note_type["name"] + " (AnkiHub)"
-
-    if model := mw.col.models.by_name(note_type["name"]):
-        return model
-
-    modify_note_type(note_type)
-    mw.col.models.add_dict(note_type)
-    return mw.col.models.by_name(note_type["name"])
 
 
 def test_unsubsribe_from_deck(
@@ -2436,6 +2412,10 @@ def patch_ankiweb_sync_to_do_nothing(mw: AnkiQt, monkeypatch: MonkeyPatch):
     # and would otherwise open an error message dialog.
     monkeypatch.setattr(mw.col, "latest_progress", lambda *args, **kwargs: Mock())
 
+    # Mock the progress.set_title function because it is called by a timer during the sync
+    # (with the latest_progress as argument).
+    monkeypatch.setattr(mw.progress, "set_title", lambda *args, **kwargs: False)
+
     # Mock the can_auto_sync function so that no sync is triggered when Anki is closed.
     monkeypatch.setattr(mw, "can_auto_sync", lambda *args, **kwargs: False)
 
@@ -3019,8 +2999,8 @@ class TestAddonUpdate:
         monkeypatch: MonkeyPatch,
         qtbot: QtBot,
     ):
-        # install the add-on so that all files are in the add-on folder
-        # the anki_session fixture does not setup the add-ons code in the add-ons folder
+        # Install the add-on so that all files are in the add-on folder.
+        # The anki_session fixture does not setup the add-ons code in the add-ons folder.
         with anki_session_with_addon_data.profile_loaded():
             mw = anki_session_with_addon_data.mw
 
@@ -3047,9 +3027,8 @@ class TestAddonUpdate:
             with_disabled_log_file_handler_mock,
         )
 
-        # udpate the AnkiHub add-on
-        # entry point has to be run so that the add-on is loaded and the patches to the
-        # update process are applied
+        # Udpate the AnkiHub add-on entry point has to be run so that the add-on is loaded and
+        # the patches to the update process are applied
         entry_point.run()
         with anki_session_with_addon_data.profile_loaded():
             mw = anki_session_with_addon_data.mw
@@ -3059,11 +3038,11 @@ class TestAddonUpdate:
 
             assert mw.addonManager.allAddons() == ["ankihub"]
 
-        with_disabled_log_file_handler_mock.assert_called_once()
+        # This is called tree times: for backupUserFiles, deleteAddon, and restoreUserFiles.
+        assert with_disabled_log_file_handler_mock.call_count == 3
 
-        # this is called twice because because multiple functions were wrapped with the
-        # with_disabled_log_file_handler wrapper, this is ok
-        maybe_change_file_permissions_of_addon_files_mock.call_count == 2
+        # This is called twice: for backupUserFiles and for deleteAddon.
+        assert maybe_change_file_permissions_of_addon_files_mock.call_count == 2
 
         # start Anki
         entry_point.run()
