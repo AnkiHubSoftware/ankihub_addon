@@ -47,14 +47,14 @@ jobs:
           python -m pip install -r ./requirements/dev.txt
           python -m pip install smokeshow
 
+      - name: Run pre-commit
+        run: pre-commit run --all-files
+
       - name: Build
         run: |
           python ./scripts/build.py
         env:
           GOOGLE_API_KEY: ${{ secrets.GOOGLE_API_KEY }}
-
-      - name: Run pre-commit
-        run: pre-commit run --all-files
 
       - name: Run mypy
         run: mypy ankihub
