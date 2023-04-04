@@ -30,6 +30,7 @@ from pytestqt.qtbot import QtBot  # type: ignore
 from requests_mock import Mocker
 
 from ..factories import NoteInfoFactory
+from ..fixtures import create_or_get_ah_version_of_note_type
 from .conftest import TEST_PROFILE_ID
 
 # workaround for vscode test discovery not using pytest.ini which sets this env var
@@ -59,6 +60,7 @@ from ankihub.ankihub_client import (
     transform_notes_data,
 )
 from ankihub.auto_sync import setup_ankihub_sync_on_ankiweb_sync
+from ankihub.common_utils import IMG_NAME_IN_IMG_TAG_REGEX
 from ankihub.db import ankihub_db, attached_ankihub_db
 from ankihub.debug import (
     _log_stack,
@@ -86,7 +88,6 @@ from ankihub.importing import (
     adjust_note_types,
     reset_note_types_of_notes,
 )
-from ankihub.media_utils import IMG_NAME_IN_IMG_TAG_REGEX
 from ankihub.note_conversion import (
     ADDON_INTERNAL_TAGS,
     ANKI_INTERNAL_TAGS,
@@ -179,16 +180,6 @@ def import_sample_ankihub_deck(
         assert local_did == list(new_dids)[0]
 
     return local_did
-
-
-@fixture
-def ankihub_basic_note_type(anki_session_with_addon_data: AnkiSession) -> NotetypeDict:
-    with anki_session_with_addon_data.profile_loaded():
-        mw = anki_session_with_addon_data.mw
-        result = create_or_get_ah_version_of_note_type(
-            mw, mw.col.models.by_name("Basic")
-        )
-        return result
 
 
 class MakeAHNote(Protocol):
@@ -1287,21 +1278,6 @@ def create_copy_of_note_type(mw: AnkiQt, note_type: NotetypeDict) -> NotetypeDic
     return new_model
 
 
-def create_or_get_ah_version_of_note_type(
-    mw: AnkiQt, note_type: NotetypeDict
-) -> NotetypeDict:
-    note_type = copy.deepcopy(note_type)
-    note_type["id"] = 0
-    note_type["name"] = note_type["name"] + " (AnkiHub)"
-
-    if model := mw.col.models.by_name(note_type["name"]):
-        return model
-
-    modify_note_type(note_type)
-    mw.col.models.add_dict(note_type)
-    return mw.col.models.by_name(note_type["name"])
-
-
 def test_unsubsribe_from_deck(
     anki_session_with_addon_data: AnkiSession,
     install_sample_ah_deck: InstallSampleAHDeck,
@@ -1755,7 +1731,7 @@ class TestCustomSearchNodes:
         with anki_session_with_addon_data.profile_loaded():
             mw = anki_session_with_addon_data.mw
 
-            _, ah_did = install_sample_ah_deck()
+            install_sample_ah_deck()
 
             all_nids = mw.col.find_notes("")
 
@@ -1768,36 +1744,30 @@ class TestCustomSearchNodes:
                     == []
                 )
 
-            # add a review entry for a card to the database
+            # Add a review entry for a card to the database.
             nid = all_nids[0]
             note = mw.col.get_note(nid)
             cid = note.card_ids()[0]
 
-            record_review(mw, cid)
+            record_review(mw, cid, mod_seconds=1)
 
-            # sleep to make sure the timestamp of the review entry is different from the
-            # timestamp of the note
-            sleep(1.1)
-
-            # import the deck again, this counts as an update
-            import_sample_ankihub_deck(
-                mw, ankihub_did=ah_did, assert_created_deck=False
+            # Update the mod time in the ankihub database to simulate a note update.
+            ankihub_db.execute(
+                "UPDATE notes SET mod = ? WHERE anki_note_id = ?",
+                2,
+                nid,
             )
 
-            # check that the note of the card is now included in the search results
+            # Check that the note of the card is now included in the search results.
             with attached_ankihub_db():
                 assert UpdatedSinceLastReviewSearchNode(browser, "").filter_ids(
                     all_nids
                 ) == [nid]
 
-            # sleep to make sure the timestamp of the review entry is different from the
-            # timestamp of the note
-            sleep(1.1)
+            # Add another review entry for the card to the database.
+            record_review(mw, cid, mod_seconds=3)
 
-            # add another review entry for the card to the database
-            record_review(mw, cid)
-
-            # check that the note of the card is not included in the search results anymore
+            # Check that the note of the card is not included in the search results anymore.
             with attached_ankihub_db():
                 assert (
                     UpdatedSinceLastReviewSearchNode(browser, "").filter_ids(all_nids)
@@ -1805,10 +1775,11 @@ class TestCustomSearchNodes:
                 )
 
 
-def record_review(mw: AnkiQt, cid: CardId):
+def record_review(mw: AnkiQt, cid: CardId, mod_seconds: int):
     mw.col.db.execute(
         "INSERT INTO revlog VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)",
-        int(datetime.now().timestamp()) * 1000,
+        # the revlog table stores the timestamp in milliseconds
+        mod_seconds * 1000,
         cid,
         1,
         1,
@@ -2430,6 +2401,10 @@ def patch_ankiweb_sync_to_do_nothing(mw: AnkiQt, monkeypatch: MonkeyPatch):
     # and would otherwise open an error message dialog.
     monkeypatch.setattr(mw.col, "latest_progress", lambda *args, **kwargs: Mock())
 
+    # Mock the progress.set_title function because it is called by a timer during the sync
+    # (with the latest_progress as argument).
+    monkeypatch.setattr(mw.progress, "set_title", lambda *args, **kwargs: False)
+
     # Mock the can_auto_sync function so that no sync is triggered when Anki is closed.
     monkeypatch.setattr(mw, "can_auto_sync", lambda *args, **kwargs: False)
 
@@ -2704,10 +2679,9 @@ def test_download_images_on_sync(
 
         # Add a reference to a local image to a note.
         nids = mw.col.find_notes("")
-        nid = nids[0]
-        note = mw.col.get_note(nid)
-        note.fields[0] = "Some text. <img src='image.png'>"
-        note.flush()
+        notes = [ankihub_db.note_data(nid) for nid in nids]
+        notes[0].fields[0].value = "Some text. <img src='image.png'>"
+        ankihub_db.upsert_notes_data(ah_did, notes)
 
         # Mock the token to simulate that the user is logged in.
         monkeypatch.setattr(config, "token", lambda: "test token")
@@ -2722,6 +2696,11 @@ def test_download_images_on_sync(
             AnkiHubClient,
             "get_deck_extensions_by_deck_id",
             lambda *args, **kwargs: [],
+        )
+        monkeypatch.setattr(
+            AnkiHubClient,
+            "get_asset_disabled_fields",
+            lambda *args, **kwargs: {},
         )
 
         # Mock the client method for downloading images.
@@ -3009,8 +2988,8 @@ class TestAddonUpdate:
         monkeypatch: MonkeyPatch,
         qtbot: QtBot,
     ):
-        # install the add-on so that all files are in the add-on folder
-        # the anki_session fixture does not setup the add-ons code in the add-ons folder
+        # Install the add-on so that all files are in the add-on folder.
+        # The anki_session fixture does not setup the add-ons code in the add-ons folder.
         with anki_session_with_addon_data.profile_loaded():
             mw = anki_session_with_addon_data.mw
 
@@ -3037,9 +3016,8 @@ class TestAddonUpdate:
             with_disabled_log_file_handler_mock,
         )
 
-        # udpate the AnkiHub add-on
-        # entry point has to be run so that the add-on is loaded and the patches to the
-        # update process are applied
+        # Udpate the AnkiHub add-on entry point has to be run so that the add-on is loaded and
+        # the patches to the update process are applied
         entry_point.run()
         with anki_session_with_addon_data.profile_loaded():
             mw = anki_session_with_addon_data.mw
@@ -3049,11 +3027,11 @@ class TestAddonUpdate:
 
             assert mw.addonManager.allAddons() == ["ankihub"]
 
-        with_disabled_log_file_handler_mock.assert_called_once()
+        # This is called tree times: for backupUserFiles, deleteAddon, and restoreUserFiles.
+        assert with_disabled_log_file_handler_mock.call_count == 3
 
-        # this is called twice because because multiple functions were wrapped with the
-        # with_disabled_log_file_handler wrapper, this is ok
-        maybe_change_file_permissions_of_addon_files_mock.call_count == 2
+        # This is called twice: for backupUserFiles and for deleteAddon.
+        assert maybe_change_file_permissions_of_addon_files_mock.call_count == 2
 
         # start Anki
         entry_point.run()

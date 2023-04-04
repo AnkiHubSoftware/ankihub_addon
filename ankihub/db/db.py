@@ -1,8 +1,9 @@
+import re
 import sqlite3
 import uuid
 from contextlib import contextmanager
 from pathlib import Path
-from typing import Any, Dict, Iterable, List, Optional, Sequence, Tuple
+from typing import Any, Dict, Iterable, List, Optional, Sequence, Set, Tuple
 
 import aqt
 from anki.models import NotetypeId
@@ -11,6 +12,7 @@ from anki.utils import ids2str, join_fields, split_fields
 
 from .. import LOGGER
 from ..ankihub_client import Field, NoteInfo, suggestion_type_from_str
+from ..common_utils import IMG_NAME_IN_IMG_TAG_REGEX
 from .db_utils import DBConnection
 
 
@@ -447,6 +449,58 @@ class _AnkiHubDB:
             "tags IS NULL"
         )
         result = [uuid.UUID(did) for did in did_strs]
+        return result
+
+    def media_names_for_ankihub_deck(
+        self, ah_did: uuid.UUID, asset_disabled_fields: Dict[int, List[str]]
+    ) -> Set[str]:
+        """Returns the names of all media files used in the notes of the given deck.
+        param asset_disabled_fields: a dict mapping note type ids to a list of field names
+            that should be ignored when looking for media files.
+        """
+        result = set()
+        # We get the media names for each note type separately, because
+        # the disabled fields are note type specific.
+        # Note: One note type is always only used in one deck.
+        for mid in self.note_types_for_ankihub_deck(ah_did):
+            disabled_field_names = asset_disabled_fields.get(int(mid), [])
+            result.update(
+                self._media_names_on_notes_of_note_type(mid, disabled_field_names)
+            )
+        return result
+
+    def _media_names_on_notes_of_note_type(
+        self, mid: NotetypeId, disabled_field_names: List[str]
+    ) -> Set[str]:
+        """Returns the names of all media files used in the notes of the given note type."""
+        if aqt.mw.col.models.get(NotetypeId(mid)) is None:
+            return set()
+
+        field_names_for_mid = [
+            field["name"] for field in aqt.mw.col.models.get(NotetypeId(mid))["flds"]
+        ]
+        disabled_field_ords = [
+            field_names_for_mid.index(name) for name in disabled_field_names
+        ]
+        fields_with_images = self.list(
+            f"""
+            SELECT fields FROM notes
+            WHERE anki_note_type_id = {mid}
+            AND fields LIKE '%<img%'
+            """,
+        )
+
+        result = set()
+        for fields_string in fields_with_images:
+            fields = split_fields(fields_string)
+            for field_idx, field_text in enumerate(fields):
+                if field_idx in disabled_field_ords:
+                    continue
+                for img in re.findall(IMG_NAME_IN_IMG_TAG_REGEX, field_text):
+                    if img.startswith("http://") or img.startswith("https://"):
+                        continue
+                    result.add(img)
+
         return result
 
 

@@ -13,7 +13,7 @@ from .db import ankihub_db
 from .debug import setup as setup_debug
 from .errors import setup_error_handler
 from .gui import browser, editor, progress
-from .gui.menu import refresh_ankihub_menu, setup_ankihub_menu
+from .gui.menu import menu_state, refresh_ankihub_menu, setup_ankihub_menu
 from .settings import (
     ANKI_VERSION,
     ankihub_db_path,
@@ -69,9 +69,7 @@ def profile_setup() -> bool:
     ankihub_db.setup_and_migrate(ankihub_db_path())
     LOGGER.info("Set up and migrated AnkiHub DB for the current profile.")
 
-    from .gui.menu import ankihub_menu
-
-    if ankihub_menu:
+    if menu_state.ankihub_menu:
         refresh_ankihub_menu()
         LOGGER.info("Refreshed AnkiHub menu.")
 

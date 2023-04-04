@@ -667,6 +667,21 @@ def test_get_note_customizations_by_deck_extension_id(
 
 
 @pytest.mark.vcr()
+def test_get_asset_disabled_fields(
+    authorized_client_for_user_test1: AnkiHubClient, monkeypatch: MonkeyPatch
+):
+    client = authorized_client_for_user_test1
+
+    deck_uuid = ID_OF_DECK_OF_USER_TEST1
+
+    response = client.get_asset_disabled_fields(deck_uuid)
+
+    expected_response = {1: ["abc_1"], 32738523: ["Text", "Pixorize", "First Aid"]}
+
+    assert response == expected_response
+
+
+@pytest.mark.vcr()
 def test_get_note_customizations_by_deck_extension_id_in_multiple_chunks(
     authorized_client_for_user_test1: AnkiHubClient, monkeypatch: MonkeyPatch
 ):
@@ -1019,7 +1034,7 @@ class TestUploadAssetsForDeck:
         )
 
         deck_id = next_deterministic_uuid()
-        client.upload_assets_for_deck(deck_id, notes_data)
+        self._upload_images_for_notes_data(client, notes_data, deck_id)
 
         # We will create and check for just one chunk in this test
         path_to_created_zip_file = Path(
@@ -1072,7 +1087,7 @@ class TestUploadAssetsForDeck:
             mocked_upload_file_to_s3,
         )
 
-        client.upload_assets_for_deck(deck_id, notes_data)
+        self._upload_images_for_notes_data(client, notes_data, deck_id)
 
         get_presigned_url_mock.assert_called_once_with(prefix=f"deck_assets/{deck_id}")
         mocked_upload_file_to_s3.assert_called_once_with(
@@ -1096,7 +1111,7 @@ class TestUploadAssetsForDeck:
         )
 
         deck_id = next_deterministic_uuid()
-        client.upload_assets_for_deck(deck_id, notes_data)
+        self._upload_images_for_notes_data(client, notes_data, deck_id)
 
         path_to_created_zip_file = Path(TEST_MEDIA_PATH / f"{deck_id}.zip")
 
@@ -1118,7 +1133,7 @@ class TestUploadAssetsForDeck:
         monkeypatch.setattr(client, "_upload_file_to_s3", mocked_upload_file_to_s3)
 
         deck_id = next_deterministic_uuid()
-        client.upload_assets_for_deck(deck_id, notes_data)
+        self._upload_images_for_notes_data(client, notes_data, deck_id)
 
         all_img_names_in_notes = get_image_names_from_notes_data(notes_data)
         mocked_upload_assets_individually.assert_called_once_with(
@@ -1126,6 +1141,13 @@ class TestUploadAssetsForDeck:
         )
 
         mocked_upload_file_to_s3.assert_not_called()
+
+    def _upload_images_for_notes_data(
+        self, client: AnkiHubClient, notes_data: List[NoteInfo], ah_did: uuid.UUID
+    ):
+        image_names = get_image_names_from_notes_data(notes_data)
+        image_paths = [TEST_MEDIA_PATH / image_name for image_name in image_names]
+        client.upload_assets(image_paths, ah_did)
 
 
 @pytest.mark.vcr()
