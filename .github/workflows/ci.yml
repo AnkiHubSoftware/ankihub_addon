@@ -84,7 +84,7 @@ jobs:
           python ./scripts/build.py
         env:
           GOOGLE_API_KEY: ${{ secrets.GOOGLE_API_KEY }}
-        
+
       - name: Run pre-commit
         run: pre-commit run --all-files
 
