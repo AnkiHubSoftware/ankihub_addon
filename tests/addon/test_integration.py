@@ -444,6 +444,7 @@ def test_get_deck_by_id(
         "anki_id": 1,
         "csv_last_upload": date_time.strftime(ANKIHUB_DATETIME_FORMAT_STR),
         "csv_notes_filename": "test.csv",
+        "image_upload_finished": False,
     }
 
     requests_mock.get(
@@ -457,6 +458,7 @@ def test_get_deck_by_id(
         name="test",
         csv_last_upload=date_time,
         csv_notes_filename="test.csv",
+        image_upload_finished=False,
     )
 
     # test get deck by id unauthenticated
@@ -2699,6 +2701,11 @@ def test_download_images_on_sync(
         )
         monkeypatch.setattr(
             AnkiHubClient,
+            "is_image_upload_finished",
+            lambda *args, **kwargs: True,
+        )
+        monkeypatch.setattr(
+            AnkiHubClient,
             "get_asset_disabled_fields",
             lambda *args, **kwargs: {},
         )
@@ -2781,6 +2788,18 @@ class TestSuggestionsWithImages:
 
             monkeypatch.setattr(
                 AnkiHubClient,
+                "is_image_upload_finished",
+                lambda *args, **kwargs: True,
+            )
+
+            monkeypatch.setattr(
+                AnkiHubClient,
+                "image_upload_finished",
+                lambda *args, **kwargs: None,
+            )
+
+            monkeypatch.setattr(
+                AnkiHubClient,
                 "get_presigned_url_for_multiple_uploads",
                 lambda *args, **kwargs: {
                     "url": fake_presigned_url,
@@ -2847,6 +2866,18 @@ class TestSuggestionsWithImages:
             fake_presigned_url = "https://fake_presigned_url.com"
             s3_upload_request_mock = requests_mock.post(
                 fake_presigned_url, json={"success": True}, status_code=204
+            )
+
+            monkeypatch.setattr(
+                AnkiHubClient,
+                "is_image_upload_finished",
+                lambda *args, **kwargs: True,
+            )
+
+            monkeypatch.setattr(
+                AnkiHubClient,
+                "image_upload_finished",
+                lambda *args, **kwargs: None,
             )
 
             monkeypatch.setattr(
@@ -2934,6 +2965,18 @@ class TestSuggestionsWithImages:
             fake_presigned_url = "https://fake_presigned_url.com"
             s3_upload_request_mock = requests_mock.post(
                 fake_presigned_url, json={"success": True}, status_code=204
+            )
+
+            monkeypatch.setattr(
+                AnkiHubClient,
+                "is_image_upload_finished",
+                lambda *args, **kwargs: True,
+            )
+
+            monkeypatch.setattr(
+                AnkiHubClient,
+                "image_upload_finished",
+                lambda *args, **kwargs: None,
             )
 
             monkeypatch.setattr(
