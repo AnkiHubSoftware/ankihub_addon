@@ -1065,6 +1065,25 @@ class AnkiHubClient:
             .get("is_active", False)
         )
 
+    def is_image_upload_finished(self, ankihub_deck_uuid: uuid.UUID) -> bool:
+        response = self._send_request(
+            "GET",
+            f"/decks/{ankihub_deck_uuid}/",
+        )
+        if response.status_code != 200:
+            raise AnkiHubRequestError(response)
+
+        image_upload_finished = response.json()["image_upload_finished"]
+        return image_upload_finished
+
+    def image_upload_finished(self, ankihub_deck_uuid: uuid.UUID) -> None:
+        response = self._send_request(
+            "PATCH",
+            f"/decks/{ankihub_deck_uuid}/image-upload-finished",
+        )
+        if response.status_code != 204:
+            raise AnkiHubRequestError(response)
+
     def _get_feature_flags_status(self):
         response = self._send_request(
             "GET",
