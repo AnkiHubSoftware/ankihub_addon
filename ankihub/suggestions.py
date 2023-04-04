@@ -47,7 +47,7 @@ def suggest_note_update(
     suggestion = cast(
         ChangeNoteSuggestion,
         _rename_and_upload_assets_for_suggestion(
-            suggestion=suggestion, original_note=note, ankihub_did=ah_did
+            suggestion=suggestion, ankihub_did=ah_did
         ),
     )
 
@@ -72,7 +72,7 @@ def suggest_new_note(
     suggestion = cast(
         NewNoteSuggestion,
         _rename_and_upload_assets_for_suggestion(
-            suggestion=suggestion, original_note=note, ankihub_did=ankihub_did
+            suggestion=suggestion, ankihub_did=ankihub_did
         ),
     )
 
@@ -127,7 +127,6 @@ def suggest_notes_in_bulk(
         Sequence[NewNoteSuggestion],
         _rename_and_upload_assets_for_suggestions(
             suggestions=new_note_suggestions,
-            original_notes=notes,
             ankihub_did=ankihub_did,
         ),
     )
@@ -135,7 +134,6 @@ def suggest_notes_in_bulk(
         Sequence[ChangeNoteSuggestion],
         _rename_and_upload_assets_for_suggestions(
             suggestions=change_note_suggestions,
-            original_notes=notes,
             ankihub_did=ankihub_did,
         ),
     )
