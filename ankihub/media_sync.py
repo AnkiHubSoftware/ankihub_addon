@@ -119,7 +119,6 @@ class _AnkiHubMediaSync:
     def _on_download_finished(self, future: Future) -> None:
         self._download_in_progress = False
         future.result()
-        LOGGER.info("Downloaded images from AnkiHub.")
         self.refresh_sync_status_text()
 
     def _refresh_media_download_status_inner(self):
