@@ -84,6 +84,12 @@ jobs:
           python ./scripts/build.py
         env:
           GOOGLE_API_KEY: ${{ secrets.GOOGLE_API_KEY }}
+        
+      - name: Run pre-commit
+        run: pre-commit run --all-files
+
+      - name: Run mypy
+        run: mypy ankihub
 
       - name: Run pytest with coverage
         run: |
@@ -117,9 +123,3 @@ jobs:
         with:
           name: ankihub_addon_${{ github.sha }}
           path: ankihub.ankiaddon
-
-      - name: Run pre-commit
-        run: pre-commit run --all-files
-
-      - name: Run mypy
-        run: mypy ankihub
