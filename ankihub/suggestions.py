@@ -273,17 +273,14 @@ def _new_note_suggestion(
 
 
 def _rename_and_upload_assets_for_suggestion(
-    suggestion: NoteSuggestion, original_note: Note, ankihub_did: uuid.UUID
+    suggestion: NoteSuggestion, ankihub_did: uuid.UUID
 ) -> NoteSuggestion:
-    suggestion = _rename_and_upload_assets_for_suggestions(
-        [suggestion], [original_note], ankihub_did
-    )[0]
+    suggestion = _rename_and_upload_assets_for_suggestions([suggestion], ankihub_did)[0]
     return suggestion
 
 
 def _rename_and_upload_assets_for_suggestions(
     suggestions: Sequence[NoteSuggestion],
-    original_notes: Sequence[Note],
     ankihub_did: uuid.UUID,
 ) -> Sequence[NoteSuggestion]:
     """Renames assets referenced on the suggestions in the Anki collection and the media folder and
@@ -295,24 +292,29 @@ def _rename_and_upload_assets_for_suggestions(
         return suggestions
 
     # TODO: remove this method 'get_image_names_from_notes_data' from ankihub client
+    original_notes_data = [
+        note_info
+        for suggestion in suggestions
+        if (note_info := ankihub_db.note_data(suggestion.anki_nid))
+    ]
     original_notes_image_names: Set[str] = get_image_names_from_notes_data(
-        [ankihub_db.note_data(note.id) for note in original_notes]
+        original_notes_data
     )
     suggestion_image_names: Set[str] = get_image_names_from_suggestions(suggestions)
 
     # Filter out unchanged image names so we don't hash and upload images that aren't part of the suggestion
-    changed_image_names = suggestion_image_names.difference(original_notes_image_names)
+    added_image_names = suggestion_image_names.difference(original_notes_image_names)
 
-    if not changed_image_names:
-        # No images changed, nothing to do here. Return
+    if not added_image_names:
+        # No images added, nothing to do here. Return
         # the original suggestions object
         return suggestions
 
-    changed_image_paths = [
-        Path(aqt.mw.col.media.dir()) / image_name for image_name in changed_image_names
+    added_image_paths = [
+        Path(aqt.mw.col.media.dir()) / image_name for image_name in added_image_names
     ]
 
-    asset_name_map = client.generate_asset_files_with_hashed_names(changed_image_paths)
+    asset_name_map = client.generate_asset_files_with_hashed_names(added_image_paths)
 
     media_sync.start_media_upload(
         media_names=asset_name_map.values(), ankihub_did=ankihub_did
