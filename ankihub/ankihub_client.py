@@ -169,6 +169,7 @@ class Deck(DataClassJSONMixinWithConfig):
         )
     )
     csv_notes_filename: str
+    image_upload_finished: bool
 
 
 @dataclass
@@ -477,7 +478,8 @@ class AnkiHubClient:
         # passing the array of image names
         if len(image_paths) <= 10:
             self._upload_assets_individually(
-                image_names={path.name for path in image_paths}, ah_did=ah_did
+                image_names={path.name for path in image_paths if path.is_file()},
+                ah_did=ah_did,
             )
             return None
 
@@ -631,6 +633,7 @@ class AnkiHubClient:
 
             for future in as_completed(futures):
                 future.result()
+            LOGGER.info("Downloaded images from AnkiHub.")
 
     def _gzip_compress_string(self, string: str) -> bytes:
         result = gzip.compress(
@@ -1066,6 +1069,18 @@ class AnkiHubClient:
             .get(flag_name, {})
             .get("is_active", False)
         )
+
+    def is_image_upload_finished(self, ankihub_deck_uuid: uuid.UUID) -> bool:
+        deck_info = self.get_deck_by_id(ankihub_deck_uuid)
+        return deck_info.image_upload_finished
+
+    def image_upload_finished(self, ankihub_deck_uuid: uuid.UUID) -> None:
+        response = self._send_request(
+            "PATCH",
+            f"/decks/{ankihub_deck_uuid}/image-upload-finished",
+        )
+        if response.status_code != 204:
+            raise AnkiHubRequestError(response)
 
     def _get_feature_flags_status(self):
         response = self._send_request(

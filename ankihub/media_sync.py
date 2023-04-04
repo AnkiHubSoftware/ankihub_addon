@@ -58,7 +58,7 @@ class _AnkiHubMediaSync:
         aqt.mw.taskman.run_in_background(
             lambda: AddonAnkiHubClient().upload_assets(media_paths, ankihub_did),
             on_done=lambda future: self._on_upload_finished(
-                future, on_success=on_success
+                future, ankihub_deck_id=ankihub_did, on_success=on_success
             ),
         )
 
@@ -74,7 +74,10 @@ class _AnkiHubMediaSync:
         return {media_dir_path / media_name for media_name in media_names}
 
     def _on_upload_finished(
-        self, future: Future, on_success: Optional[Callable[[], None]] = None
+        self,
+        future: Future,
+        ankihub_deck_id: uuid.UUID,
+        on_success: Optional[Callable[[], None]] = None,
     ):
         self._amount_uploads_in_progress -= 1
         future.result()
@@ -83,17 +86,20 @@ class _AnkiHubMediaSync:
 
         if on_success is not None:
             on_success()
+        AddonAnkiHubClient().image_upload_finished(ankihub_deck_id)
 
     def _download_missing_media(self):
         client = AddonAnkiHubClient()
         for ah_did in ankihub_db.ankihub_deck_ids():
+            if not client.is_image_upload_finished(ah_did):
+                continue
             asset_disabled_fields = client.get_asset_disabled_fields(ah_did)
             missing_image_names = self._missing_images_for_ah_deck(
                 ah_did, asset_disabled_fields
             )
             if not missing_image_names:
                 continue
-            AddonAnkiHubClient().download_images(missing_image_names, ah_did)
+            client.download_images(missing_image_names, ah_did)
 
     def _missing_images_for_ah_deck(
         self, ah_did: uuid.UUID, asset_disabled_fields: Dict[int, List[str]]
@@ -113,7 +119,6 @@ class _AnkiHubMediaSync:
     def _on_download_finished(self, future: Future) -> None:
         self._download_in_progress = False
         future.result()
-        LOGGER.info("Downloaded images from AnkiHub.")
         self.refresh_sync_status_text()
 
     def _refresh_media_download_status_inner(self):
