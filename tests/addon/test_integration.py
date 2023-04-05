@@ -307,7 +307,7 @@ def test_editor(
         _refresh_buttons(editor)
         assert editor.ankihub_command == AnkiHubCommands.CHANGE.value  # type: ignore
 
-        # this should trigger a suggestion because the note has not been changed
+        # this should not trigger a suggestion because the note has not been changed
         _on_suggestion_button_press(editor)
         assert requests_mock.call_count == 0
 
@@ -473,61 +473,70 @@ def test_get_deck_by_id(
 
 def test_suggest_note_update(
     anki_session_with_addon_data: AnkiSession,
-    requests_mock: Mocker,
     install_sample_ah_deck: InstallSampleAHDeck,
+    monkeypatch: MonkeyPatch,
     disable_image_support_feature_flag,
 ):
     anki_session = anki_session_with_addon_data
     with anki_session.profile_loaded():
         mw = anki_session.mw
 
-        install_sample_ah_deck()
+        _, ah_did = install_sample_ah_deck()
 
-        notes_data = ankihub_sample_deck_notes_data()
-        note = mw.col.get_note(NoteId(notes_data[0].anki_nid))
-        ankihub_note_uuid = notes_data[0].ankihub_note_uuid
+        nid = mw.col.find_notes("")[0]
+        note = mw.col.get_note(nid)
 
-        # test create change note suggestion
-        adapter = requests_mock.post(
-            f"{config.api_url}/notes/{ankihub_note_uuid}/suggestion/",
-            status_code=201,
-        )
-
-        note.tags = [
-            "a",
+        # Set up tags on the note
+        tags_that_shouldnt_be_sent = [
+            # internal and optional tags should be ignored
             *ADDON_INTERNAL_TAGS,
             *ANKI_INTERNAL_TAGS,
             f"{TAG_FOR_OPTIONAL_TAGS}::TAG_GROUP::OptionalTag",
         ]
+
+        note.tags = [
+            "stays",
+            "removed",
+            *tags_that_shouldnt_be_sent,
+        ]
+
+        # Update the note in the database to match the note in the collection
+        # so that the changes are detected relative to this state of the note.
+        ankihub_db.upsert_notes_data(
+            ankihub_did=ah_did, notes_data=[to_note_data(note)]
+        )
+
+        # Make some changes to the note
+        note["Front"] = "updated"
+        note.tags.append("added")
+        note.tags.remove("removed")
+
+        # Suggest the changes
+        create_change_note_suggestion_mock = MagicMock()
+        monkeypatch.setattr(
+            "ankihub.ankihub_client.AnkiHubClient.create_change_note_suggestion",
+            create_change_note_suggestion_mock,
+        )
+
         suggest_note_update(
             note=note,
             change_type=SuggestionType.NEW_CONTENT,
             comment="test",
         )
 
-        # ... assert that internal and optional tags were filtered out
-        suggestion_data = adapter.last_request.json()  # type: ignore
-        assert set(suggestion_data["tags"]) == set(
-            [
-                "a",
-            ]
-        )
-
-        # test create change note suggestion unauthenticated
-        requests_mock.post(
-            f"{config.api_url}/notes/{ankihub_note_uuid}/suggestion/",
-            status_code=403,
-        )
-
-        try:
-            suggest_note_update(
-                note=note,
+        # Check that the correct suggestion was created
+        create_change_note_suggestion_mock.assert_called_once_with(
+            change_note_suggestion=ChangeNoteSuggestion(
+                anki_nid=note.id,
+                ankihub_note_uuid=ankihub_db.ankihub_nid_for_anki_nid(note.id),
                 change_type=SuggestionType.NEW_CONTENT,
+                fields=[Field(name="Front", value="updated", order=0)],
+                added_tags=["added"],
+                removed_tags=["removed"],
                 comment="test",
-            )
-        except AnkiHubRequestError as e:
-            exc = e
-        assert exc is not None and exc.response.status_code == 403
+            ),
+            auto_accept=False,
+        )
 
 
 def test_suggest_new_note(
@@ -612,6 +621,7 @@ def test_suggest_notes_in_bulk(
         CHANGED_NOTE_ID = NoteId(1608240057545)
         changed_note = mw.col.get_note(CHANGED_NOTE_ID)
         changed_note["Front"] = "changed front"
+        changed_note.tags += ["a"]
         changed_note.flush()
 
         # suggest two notes, one new and one updated, check if the client method was called with the correct arguments
@@ -648,7 +658,8 @@ def test_suggest_notes_in_bulk(
                             value="changed front",
                         ),
                     ],
-                    tags=None,
+                    added_tags=["a"],
+                    removed_tags=[],
                     comment="test",
                     change_type=SuggestionType.NEW_CONTENT,
                 ),

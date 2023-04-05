@@ -154,6 +154,9 @@ def _added_new_images(note: Note) -> bool:
     img_names_anki = get_image_names_from_note_info(note_info_anki)
 
     note_info_ah = ankihub_db.note_data(note.id)
+    if note_info_ah is None:
+        return bool(img_names_anki)
+
     img_names_ah = get_image_names_from_note_info(note_info_ah)
 
     added_img_names = set(img_names_anki) - set(img_names_ah)
