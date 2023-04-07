@@ -27,8 +27,13 @@ from aqt.qt import (
 from aqt.utils import showInfo, showText, tooltip
 
 from .. import LOGGER
-from ..ankihub_client import AnkiHubRequestError, SuggestionType
+from ..ankihub_client import (
+    AnkiHubRequestError,
+    SuggestionType,
+    get_image_names_from_note_info,
+)
 from ..db import ankihub_db
+from ..exporting import to_note_data
 from ..settings import ANKING_DECK_ID, RATIONALE_FOR_CHANGE_MAX_LENGTH
 from ..suggestions import (
     ANKIHUB_NO_CHANGE_ERROR,
@@ -77,6 +82,7 @@ def open_suggestion_dialog_for_note(note: Note, parent: QWidget) -> None:
     suggestion_meta = SuggestionDialog(
         is_new_note_suggestion=ah_nid is None,
         is_for_ankihub_deck=ah_did == ANKING_DECK_ID,
+        added_new_images=_added_new_images(note),
     ).run()
     if suggestion_meta is None:
         return
@@ -120,7 +126,11 @@ def open_suggestion_dialog_for_bulk_suggestion(
     ah_did = ah_dids.pop()
 
     suggestion_meta = SuggestionDialog(
-        is_new_note_suggestion=False, is_for_ankihub_deck=ah_did == ANKING_DECK_ID
+        is_new_note_suggestion=False,
+        is_for_ankihub_deck=ah_did == ANKING_DECK_ID,
+        # We currently have a limit of 500 notes per bulk suggestion, so we don't have to worry
+        # about performance here.
+        added_new_images=any(_added_new_images(note) for note in notes),
     ).run()
     if not suggestion_meta:
         return
@@ -135,6 +145,23 @@ def open_suggestion_dialog_for_bulk_suggestion(
         on_done=lambda future: _on_suggest_notes_in_bulk_done(future, parent),
         parent=parent,
     )
+
+
+def _added_new_images(note: Note) -> bool:
+    """Returns True if images were added to the notes when comparing with
+    the notes in the ankihub database, else False."""
+    note_info_anki = to_note_data(note)
+    img_names_anki = get_image_names_from_note_info(note_info_anki)
+
+    note_info_ah = ankihub_db.note_data(note.id)
+    if note_info_ah is None:
+        return bool(img_names_anki)
+
+    img_names_ah = get_image_names_from_note_info(note_info_ah)
+
+    added_img_names = set(img_names_anki) - set(img_names_ah)
+    result = len(added_img_names) > 0
+    return result
 
 
 def _comment_with_source(suggestion_meta: SuggestionMetadata) -> str:
@@ -196,10 +223,16 @@ class SuggestionDialog(QDialog):
     # The _validate method is called when the user changes the input in form elements that get validated.
     validation_signal = pyqtSignal(bool)
 
-    def __init__(self, is_new_note_suggestion: bool, is_for_ankihub_deck: bool) -> None:
+    def __init__(
+        self,
+        is_new_note_suggestion: bool,
+        is_for_ankihub_deck: bool,
+        added_new_images: bool,
+    ) -> None:
         super().__init__()
         self._is_new_note_suggestion = is_new_note_suggestion
         self._is_for_ankihub_deck = is_for_ankihub_deck
+        self._added_new_images = added_new_images
 
         self._setup_ui()
 
@@ -253,6 +286,16 @@ class SuggestionDialog(QDialog):
         qconnect(self.rationale_edit.textChanged, self._validate)
 
         self.layout_.addSpacing(10)
+
+        # Add note about image source if an image was added
+        if self._added_new_images:
+            label = QLabel(
+                "Please provide the source of the image(s)<br>"
+                "in the rationale field. For example:<br>"
+                "Photo credit: The AnKing [www.ankingmed.com]"
+            )
+            self.layout_.addWidget(label)
+            self.layout_.addSpacing(10)
 
         # Set up "auto-accept" checkbox
         self.auto_accept_cb = QCheckBox("Submit without review (maintainers only).")

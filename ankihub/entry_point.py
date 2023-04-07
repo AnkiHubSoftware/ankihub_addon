@@ -14,7 +14,6 @@ from .debug import setup as setup_debug
 from .errors import setup_error_handler
 from .gui import browser, editor, progress, reviewer
 from .gui.menu import menu_state, refresh_ankihub_menu, setup_ankihub_menu
-from .media_sync import media_sync
 from .settings import (
     ANKI_VERSION,
     ankihub_db_path,
@@ -106,9 +105,6 @@ def general_setup():
 
     setup_ankihub_menu()
     LOGGER.info("Set up AnkiHub menu.")
-
-    media_sync.setup(menu_state.media_sync_status_action)
-    LOGGER.info("Set up media sync.")
 
     editor.setup()
     LOGGER.info("Set up editor.")

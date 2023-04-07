@@ -14,11 +14,10 @@ from .note_conversion import (
 )
 
 
-def to_note_data(note: Note, set_new_id: bool = False, diff: bool = False) -> NoteInfo:
+def to_note_data(note: Note, set_new_id: bool = False) -> NoteInfo:
     """Convert an Anki note to a NoteInfo object.
     Tags and fields are altered (internal and optional tags are removed, ankihub id field is removed, etc.).
     Protected fields are removed.
-    If diff is True then only the fields that were changed since the last sync will be included.
     """
 
     if set_new_id:
@@ -26,8 +25,8 @@ def to_note_data(note: Note, set_new_id: bool = False, diff: bool = False) -> No
     else:
         ankihub_note_uuid = ankihub_db.ankihub_nid_for_anki_nid(note.id)
 
-    tags = _prepare_tags(note, diff=diff)
-    fields = _prepare_fields(note, diff=diff)
+    tags = _prepare_tags(note)
+    fields = _prepare_fields(note)
 
     return NoteInfo(
         ankihub_note_uuid=ankihub_note_uuid,
@@ -39,7 +38,7 @@ def to_note_data(note: Note, set_new_id: bool = False, diff: bool = False) -> No
     )
 
 
-def _prepare_fields(note: Note, diff: bool) -> List[Field]:
+def _prepare_fields(note: Note) -> List[Field]:
 
     # Exclude the AnkiHub ID field since we don't want to expose this as an
     # editable field in AnkiHub suggestion forms.
@@ -51,24 +50,11 @@ def _prepare_fields(note: Note, diff: bool) -> List[Field]:
         for field_metadata, val in zip(fields_metadata, field_vals)
     ]
 
-    if diff:
-        result = _fields_that_changed(note, result)
-
     for field in result:
         field.value = _prepared_field_html(field.value)
 
     fields_protected_by_tags = get_fields_protected_by_tags(note)
     result = [field for field in result if field.name not in fields_protected_by_tags]
-    return result
-
-
-def _fields_that_changed(note: Note, fields: List[Field]) -> List[Field]:
-    note_data_from_ah = ankihub_db.note_data(note.id)
-    result = [
-        field_anki
-        for field_anki, field_ah in zip(fields, note_data_from_ah.fields)
-        if field_anki.value != field_ah.value
-    ]
     return result
 
 
@@ -79,8 +65,7 @@ def _prepared_field_html(html: str) -> str:
     return result
 
 
-def _prepare_tags(note: Note, diff: bool) -> Optional[List[str]]:
-    # returns None if diff=True and the tags didn't change since the last sync
+def _prepare_tags(note: Note) -> Optional[List[str]]:
 
     # removing empty tags is necessary because notes have empty tags in the editor sometimes
     result = [
@@ -88,10 +73,5 @@ def _prepare_tags(note: Note, diff: bool) -> Optional[List[str]]:
         for tag in note.tags
         if tag.strip() and not (is_internal_tag(tag) or is_optional_tag(tag))
     ]
-
-    if diff:
-        note_data_from_ah = ankihub_db.note_data(note.id)
-        if set(note_data_from_ah.tags) == set(result):
-            return None
 
     return result

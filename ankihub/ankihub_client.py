@@ -169,6 +169,7 @@ class Deck(DataClassJSONMixinWithConfig):
         )
     )
     csv_notes_filename: str
+    image_upload_finished: bool
 
 
 @dataclass
@@ -185,12 +186,13 @@ class NoteSuggestion(DataClassJSONMixinWithConfig, ABC):
         )
     )
     fields: List[Field]
-    tags: Optional[List[str]]  # None means no tag changes
     comment: str
 
 
 @dataclass
 class ChangeNoteSuggestion(NoteSuggestion):
+    added_tags: List[str]
+    removed_tags: List[str]
     change_type: SuggestionType = dataclasses.field(
         metadata=field_options(
             serialize=lambda x: x.value[0],
@@ -222,6 +224,7 @@ class NewNoteSuggestion(NoteSuggestion):
             alias="note_type_id",
         )
     )
+    tags: Optional[List[str]]  # None means no tag changes
     guid: str
 
 
@@ -475,7 +478,8 @@ class AnkiHubClient:
         # passing the array of image names
         if len(image_paths) <= 10:
             self._upload_assets_individually(
-                image_names={path.name for path in image_paths}, ah_did=ah_did
+                image_names={path.name for path in image_paths if path.is_file()},
+                ah_did=ah_did,
             )
             return None
 
@@ -629,6 +633,7 @@ class AnkiHubClient:
 
             for future in as_completed(futures):
                 future.result()
+            LOGGER.info("Downloaded images from AnkiHub.")
 
     def _gzip_compress_string(self, string: str) -> bytes:
         result = gzip.compress(
@@ -1065,6 +1070,18 @@ class AnkiHubClient:
             .get("is_active", False)
         )
 
+    def is_image_upload_finished(self, ankihub_deck_uuid: uuid.UUID) -> bool:
+        deck_info = self.get_deck_by_id(ankihub_deck_uuid)
+        return deck_info.image_upload_finished
+
+    def image_upload_finished(self, ankihub_deck_uuid: uuid.UUID) -> None:
+        response = self._send_request(
+            "PATCH",
+            f"/decks/{ankihub_deck_uuid}/image-upload-finished",
+        )
+        if response.status_code != 204:
+            raise AnkiHubRequestError(response)
+
     def _get_feature_flags_status(self):
         response = self._send_request(
             "GET",
@@ -1126,7 +1143,7 @@ def get_image_names_from_notes_data(notes_data: Sequence[NoteInfo]) -> Set[str]:
     The image names are taken from inside src attributes of HTML image tags that are on the note's fields.
     Only returns names of local images, not remote images."""
     return {
-        name for note in notes_data for name in _get_image_names_from_note_info(note)
+        name for note in notes_data for name in get_image_names_from_note_info(note)
     }
 
 
@@ -1150,7 +1167,7 @@ def get_image_names_from_suggestion(suggestion: NoteSuggestion) -> Set[str]:
     return result
 
 
-def _get_image_names_from_note_info(note_info: NoteInfo) -> Set[str]:
+def get_image_names_from_note_info(note_info: NoteInfo) -> Set[str]:
     result = {
         name
         for field in note_info.fields

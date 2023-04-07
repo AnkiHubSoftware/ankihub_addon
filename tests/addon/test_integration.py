@@ -30,6 +30,7 @@ from pytestqt.qtbot import QtBot  # type: ignore
 from requests_mock import Mocker
 
 from ..factories import NoteInfoFactory
+from ..fixtures import create_or_get_ah_version_of_note_type
 from .conftest import TEST_PROFILE_ID
 
 # workaround for vscode test discovery not using pytest.ini which sets this env var
@@ -181,16 +182,6 @@ def import_sample_ankihub_deck(
     return local_did
 
 
-@fixture
-def ankihub_basic_note_type(anki_session_with_addon_data: AnkiSession) -> NotetypeDict:
-    with anki_session_with_addon_data.profile_loaded():
-        mw = anki_session_with_addon_data.mw
-        result = create_or_get_ah_version_of_note_type(
-            mw, mw.col.models.by_name("Basic")
-        )
-        return result
-
-
 class MakeAHNote(Protocol):
     def __call__(
         self,
@@ -316,7 +307,7 @@ def test_editor(
         _refresh_buttons(editor)
         assert editor.ankihub_command == AnkiHubCommands.CHANGE.value  # type: ignore
 
-        # this should trigger a suggestion because the note has not been changed
+        # this should not trigger a suggestion because the note has not been changed
         _on_suggestion_button_press(editor)
         assert requests_mock.call_count == 0
 
@@ -453,6 +444,7 @@ def test_get_deck_by_id(
         "anki_id": 1,
         "csv_last_upload": date_time.strftime(ANKIHUB_DATETIME_FORMAT_STR),
         "csv_notes_filename": "test.csv",
+        "image_upload_finished": False,
     }
 
     requests_mock.get(
@@ -466,6 +458,7 @@ def test_get_deck_by_id(
         name="test",
         csv_last_upload=date_time,
         csv_notes_filename="test.csv",
+        image_upload_finished=False,
     )
 
     # test get deck by id unauthenticated
@@ -480,61 +473,70 @@ def test_get_deck_by_id(
 
 def test_suggest_note_update(
     anki_session_with_addon_data: AnkiSession,
-    requests_mock: Mocker,
     install_sample_ah_deck: InstallSampleAHDeck,
+    monkeypatch: MonkeyPatch,
     disable_image_support_feature_flag,
 ):
     anki_session = anki_session_with_addon_data
     with anki_session.profile_loaded():
         mw = anki_session.mw
 
-        install_sample_ah_deck()
+        _, ah_did = install_sample_ah_deck()
 
-        notes_data = ankihub_sample_deck_notes_data()
-        note = mw.col.get_note(NoteId(notes_data[0].anki_nid))
-        ankihub_note_uuid = notes_data[0].ankihub_note_uuid
+        nid = mw.col.find_notes("")[0]
+        note = mw.col.get_note(nid)
 
-        # test create change note suggestion
-        adapter = requests_mock.post(
-            f"{config.api_url}/notes/{ankihub_note_uuid}/suggestion/",
-            status_code=201,
-        )
-
-        note.tags = [
-            "a",
+        # Set up tags on the note
+        tags_that_shouldnt_be_sent = [
+            # internal and optional tags should be ignored
             *ADDON_INTERNAL_TAGS,
             *ANKI_INTERNAL_TAGS,
             f"{TAG_FOR_OPTIONAL_TAGS}::TAG_GROUP::OptionalTag",
         ]
+
+        note.tags = [
+            "stays",
+            "removed",
+            *tags_that_shouldnt_be_sent,
+        ]
+
+        # Update the note in the database to match the note in the collection
+        # so that the changes are detected relative to this state of the note.
+        ankihub_db.upsert_notes_data(
+            ankihub_did=ah_did, notes_data=[to_note_data(note)]
+        )
+
+        # Make some changes to the note
+        note["Front"] = "updated"
+        note.tags.append("added")
+        note.tags.remove("removed")
+
+        # Suggest the changes
+        create_change_note_suggestion_mock = MagicMock()
+        monkeypatch.setattr(
+            "ankihub.ankihub_client.AnkiHubClient.create_change_note_suggestion",
+            create_change_note_suggestion_mock,
+        )
+
         suggest_note_update(
             note=note,
             change_type=SuggestionType.NEW_CONTENT,
             comment="test",
         )
 
-        # ... assert that internal and optional tags were filtered out
-        suggestion_data = adapter.last_request.json()  # type: ignore
-        assert set(suggestion_data["tags"]) == set(
-            [
-                "a",
-            ]
-        )
-
-        # test create change note suggestion unauthenticated
-        requests_mock.post(
-            f"{config.api_url}/notes/{ankihub_note_uuid}/suggestion/",
-            status_code=403,
-        )
-
-        try:
-            suggest_note_update(
-                note=note,
+        # Check that the correct suggestion was created
+        create_change_note_suggestion_mock.assert_called_once_with(
+            change_note_suggestion=ChangeNoteSuggestion(
+                anki_nid=note.id,
+                ankihub_note_uuid=ankihub_db.ankihub_nid_for_anki_nid(note.id),
                 change_type=SuggestionType.NEW_CONTENT,
+                fields=[Field(name="Front", value="updated", order=0)],
+                added_tags=["added"],
+                removed_tags=["removed"],
                 comment="test",
-            )
-        except AnkiHubRequestError as e:
-            exc = e
-        assert exc is not None and exc.response.status_code == 403
+            ),
+            auto_accept=False,
+        )
 
 
 def test_suggest_new_note(
@@ -619,6 +621,7 @@ def test_suggest_notes_in_bulk(
         CHANGED_NOTE_ID = NoteId(1608240057545)
         changed_note = mw.col.get_note(CHANGED_NOTE_ID)
         changed_note["Front"] = "changed front"
+        changed_note.tags += ["a"]
         changed_note.flush()
 
         # suggest two notes, one new and one updated, check if the client method was called with the correct arguments
@@ -655,7 +658,8 @@ def test_suggest_notes_in_bulk(
                             value="changed front",
                         ),
                     ],
-                    tags=None,
+                    added_tags=["a"],
+                    removed_tags=[],
                     comment="test",
                     change_type=SuggestionType.NEW_CONTENT,
                 ),
@@ -1285,21 +1289,6 @@ def create_copy_of_note_type(mw: AnkiQt, note_type: NotetypeDict) -> NotetypeDic
     new_model["id"] = 0
     mw.col.models.add_dict(new_model)
     return new_model
-
-
-def create_or_get_ah_version_of_note_type(
-    mw: AnkiQt, note_type: NotetypeDict
-) -> NotetypeDict:
-    note_type = copy.deepcopy(note_type)
-    note_type["id"] = 0
-    note_type["name"] = note_type["name"] + " (AnkiHub)"
-
-    if model := mw.col.models.by_name(note_type["name"]):
-        return model
-
-    modify_note_type(note_type)
-    mw.col.models.add_dict(note_type)
-    return mw.col.models.by_name(note_type["name"])
 
 
 def test_unsubsribe_from_deck(
@@ -2425,6 +2414,10 @@ def patch_ankiweb_sync_to_do_nothing(mw: AnkiQt, monkeypatch: MonkeyPatch):
     # and would otherwise open an error message dialog.
     monkeypatch.setattr(mw.col, "latest_progress", lambda *args, **kwargs: Mock())
 
+    # Mock the progress.set_title function because it is called by a timer during the sync
+    # (with the latest_progress as argument).
+    monkeypatch.setattr(mw.progress, "set_title", lambda *args, **kwargs: False)
+
     # Mock the can_auto_sync function so that no sync is triggered when Anki is closed.
     monkeypatch.setattr(mw, "can_auto_sync", lambda *args, **kwargs: False)
 
@@ -2719,6 +2712,11 @@ def test_download_images_on_sync(
         )
         monkeypatch.setattr(
             AnkiHubClient,
+            "is_image_upload_finished",
+            lambda *args, **kwargs: True,
+        )
+        monkeypatch.setattr(
+            AnkiHubClient,
             "get_asset_disabled_fields",
             lambda *args, **kwargs: {},
         )
@@ -2801,6 +2799,18 @@ class TestSuggestionsWithImages:
 
             monkeypatch.setattr(
                 AnkiHubClient,
+                "is_image_upload_finished",
+                lambda *args, **kwargs: True,
+            )
+
+            monkeypatch.setattr(
+                AnkiHubClient,
+                "image_upload_finished",
+                lambda *args, **kwargs: None,
+            )
+
+            monkeypatch.setattr(
+                AnkiHubClient,
                 "get_presigned_url_for_multiple_uploads",
                 lambda *args, **kwargs: {
                     "url": fake_presigned_url,
@@ -2867,6 +2877,18 @@ class TestSuggestionsWithImages:
             fake_presigned_url = "https://fake_presigned_url.com"
             s3_upload_request_mock = requests_mock.post(
                 fake_presigned_url, json={"success": True}, status_code=204
+            )
+
+            monkeypatch.setattr(
+                AnkiHubClient,
+                "is_image_upload_finished",
+                lambda *args, **kwargs: True,
+            )
+
+            monkeypatch.setattr(
+                AnkiHubClient,
+                "image_upload_finished",
+                lambda *args, **kwargs: None,
             )
 
             monkeypatch.setattr(
@@ -2958,6 +2980,18 @@ class TestSuggestionsWithImages:
 
             monkeypatch.setattr(
                 AnkiHubClient,
+                "is_image_upload_finished",
+                lambda *args, **kwargs: True,
+            )
+
+            monkeypatch.setattr(
+                AnkiHubClient,
+                "image_upload_finished",
+                lambda *args, **kwargs: None,
+            )
+
+            monkeypatch.setattr(
+                AnkiHubClient,
                 "get_presigned_url_for_multiple_uploads",
                 lambda *args, **kwargs: {
                     "url": fake_presigned_url,
@@ -3008,8 +3042,8 @@ class TestAddonUpdate:
         monkeypatch: MonkeyPatch,
         qtbot: QtBot,
     ):
-        # install the add-on so that all files are in the add-on folder
-        # the anki_session fixture does not setup the add-ons code in the add-ons folder
+        # Install the add-on so that all files are in the add-on folder.
+        # The anki_session fixture does not setup the add-ons code in the add-ons folder.
         with anki_session_with_addon_data.profile_loaded():
             mw = anki_session_with_addon_data.mw
 
@@ -3036,9 +3070,8 @@ class TestAddonUpdate:
             with_disabled_log_file_handler_mock,
         )
 
-        # udpate the AnkiHub add-on
-        # entry point has to be run so that the add-on is loaded and the patches to the
-        # update process are applied
+        # Udpate the AnkiHub add-on entry point has to be run so that the add-on is loaded and
+        # the patches to the update process are applied
         entry_point.run()
         with anki_session_with_addon_data.profile_loaded():
             mw = anki_session_with_addon_data.mw
@@ -3048,11 +3081,11 @@ class TestAddonUpdate:
 
             assert mw.addonManager.allAddons() == ["ankihub"]
 
-        with_disabled_log_file_handler_mock.assert_called_once()
+        # This is called tree times: for backupUserFiles, deleteAddon, and restoreUserFiles.
+        assert with_disabled_log_file_handler_mock.call_count == 3
 
-        # this is called twice because because multiple functions were wrapped with the
-        # with_disabled_log_file_handler wrapper, this is ok
-        maybe_change_file_permissions_of_addon_files_mock.call_count == 2
+        # This is called twice: for backupUserFiles and for deleteAddon.
+        assert maybe_change_file_permissions_of_addon_files_mock.call_count == 2
 
         # start Anki
         entry_point.run()
