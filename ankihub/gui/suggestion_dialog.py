@@ -24,7 +24,7 @@ from aqt.qt import (
     pyqtSignal,
     qconnect,
 )
-from aqt.utils import showInfo, showText, tooltip
+from aqt.utils import showInfo, showText
 
 from .. import LOGGER
 from ..ankihub_client import (
@@ -42,6 +42,7 @@ from ..suggestions import (
     suggest_note_update,
     suggest_notes_in_bulk,
 )
+from .utils import show_tooltip
 
 
 class SourceType(Enum):
@@ -94,9 +95,9 @@ def open_suggestion_dialog_for_note(note: Note, parent: QWidget) -> None:
             comment=_comment_with_source(suggestion_meta),
             auto_accept=suggestion_meta.auto_accept,
         ):
-            tooltip("Submitted suggestion to AnkiHub.", parent=parent)
+            show_tooltip("Submitted suggestion to AnkiHub.", parent=parent)
         else:
-            tooltip("No changes. Try syncing with AnkiHub first.", parent=parent)
+            show_tooltip("No changes. Try syncing with AnkiHub first.", parent=parent)
     else:
         suggest_new_note(
             note=note,
@@ -104,7 +105,7 @@ def open_suggestion_dialog_for_note(note: Note, parent: QWidget) -> None:
             comment=suggestion_meta.comment,
             auto_accept=suggestion_meta.auto_accept,
         )
-        tooltip("Submitted suggestion to AnkiHub.", parent=parent)
+        show_tooltip("Submitted suggestion to AnkiHub.", parent=parent)
 
 
 def open_suggestion_dialog_for_bulk_suggestion(
