@@ -52,9 +52,13 @@ def detach_ankihub_db_from_anki_db_connection() -> None:
 
 
 def is_ankihub_db_attached_to_anki_db() -> bool:
-    return ankihub_db.database_name in [
+    if aqt.mw.col is None:
+        return False
+
+    result = ankihub_db.database_name in [
         name for _, name, _ in aqt.mw.col.db.all("PRAGMA database_list")
     ]
+    return result
 
 
 @contextmanager
