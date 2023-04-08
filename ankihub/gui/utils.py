@@ -19,7 +19,7 @@ from aqt.qt import (
     QWidget,
     qconnect,
 )
-from aqt.utils import disable_help_button
+from aqt.utils import disable_help_button, tooltip
 
 from ..settings import config
 
@@ -196,6 +196,22 @@ def ask_user(
         return False
     else:
         return None
+
+
+def show_tooltip(
+    msg: str,
+    period: int = 3000,
+    parent: QWidget | None = None,
+):
+    """Safer version of tooltip that doesn't cause an error if the parent widget is deleted and
+    instead shows the tooltip on the active or main window."""
+    try:
+        tooltip(msg, period, parent)
+    except RuntimeError as e:
+        if "wrapped C/C++ object of type" in str(e) and "has been deleted" in str(e):
+            tooltip(msg, period)
+        else:
+            raise e
 
 
 def set_tooltip_icon(btn: QPushButton) -> None:
