@@ -17,6 +17,10 @@ from .db_utils import DBConnection
 
 
 def attach_ankihub_db_to_anki_db_connection() -> None:
+    if aqt.mw.col is None:
+        LOGGER.info("The collection is not open. Not attaching AnkiHub DB.")
+        return
+
     if not is_ankihub_db_attached_to_anki_db():
         aqt.mw.col.db.execute(
             f"ATTACH DATABASE ? AS {ankihub_db.database_name}",
