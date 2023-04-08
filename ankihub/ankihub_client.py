@@ -295,15 +295,15 @@ class AnkiHubClient:
 
     def __init__(
         self,
-        local_media_dir_path: Path,
         hooks=None,
         token: Optional[str] = None,
         api_url: str = DEFAULT_API_URL,
         s3_bucket_url: str = DEFAULT_S3_BUCKET_URL,
+        local_media_dir_path: Optional[Path] = None,
     ):
-        self.local_media_dir_path = local_media_dir_path
         self.api_url = api_url
         self.s3_bucket_url = s3_bucket_url
+        self.local_media_dir_path = local_media_dir_path
 
         self.session = Session()
 
