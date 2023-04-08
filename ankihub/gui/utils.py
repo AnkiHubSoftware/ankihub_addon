@@ -201,7 +201,7 @@ def ask_user(
 def show_tooltip(
     msg: str,
     period: int = 3000,
-    parent: QWidget | None = None,
+    parent: Optional[QWidget] = None,
 ):
     """Safer version of tooltip that doesn't cause an error if the parent widget is deleted and
     instead shows the tooltip on the active or main window."""
