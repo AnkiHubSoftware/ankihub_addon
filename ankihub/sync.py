@@ -277,6 +277,11 @@ def _update_deck_download_progress_cb_inner(notes_count: int, ankihub_did: uuid.
         LOGGER.exception(
             "Unable to update progress bar to show download progress of deck updates."
         )
+    except RuntimeError as e:
+        if "wrapped C/C++ object of type" in str(e) and "has been deleted" in str(e):
+            return
+        else:
+            raise e
 
 
 def _update_extension_download_progress_cb(
