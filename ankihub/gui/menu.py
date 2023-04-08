@@ -603,9 +603,9 @@ def media_sync_status_setup(parent: QMenu):
     if not image_support_enabled:
         return
 
-    parent._media_sync_status_action = QAction("", parent)
-    parent.addAction(parent._media_sync_status_action)
-    media_sync.set_status_action(parent._media_sync_status_action)
+    parent._media_sync_status_action = QAction("", parent)  # type: ignore
+    parent.addAction(parent._media_sync_status_action)  # type: ignore
+    media_sync.set_status_action(parent._media_sync_status_action)  # type: ignore
     media_sync.refresh_sync_status_text()
 
 
