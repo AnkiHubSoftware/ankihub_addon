@@ -11,7 +11,7 @@ from aqt.addons import AddonManager, DownloaderInstaller
 
 from . import LOGGER
 from .db import detach_ankihub_db_from_anki_db_connection
-from .settings import log_file_path, setup_logger
+from .settings import log_file_path, setup_file_handler
 
 
 def setup_addons():
@@ -127,7 +127,7 @@ def _with_disabled_log_file_handler(*args: Any, **kwargs: Any) -> Any:
     file_handlers = _log_file_handlers()
     for handler in file_handlers:
         LOGGER.info(f"Disabling FileHandler: {handler}.")
-        LOGGER.root.removeHandler(handler)
+        LOGGER.removeHandler(handler)
         handler.close()
 
     try:
@@ -135,8 +135,8 @@ def _with_disabled_log_file_handler(*args: Any, **kwargs: Any) -> Any:
     finally:
         # Only re-enable the log FileHandler if the user files folder still exists and
         # the FileHandler is disabled.
-        if log_file_path().parent.exists() and not file_handlers:
-            setup_logger()
+        if log_file_path().parent.exists() and not _log_file_handlers():
+            setup_file_handler()
             LOGGER.info(f"Re-enabled FileHandler after {_old.__name__} was called.")
     return result
 
@@ -144,7 +144,7 @@ def _with_disabled_log_file_handler(*args: Any, **kwargs: Any) -> Any:
 def _log_file_handlers() -> List[logging.FileHandler]:
     return [
         handler
-        for handler in LOGGER.root.handlers
+        for handler in LOGGER.handlers
         if isinstance(handler, logging.FileHandler)
     ]
 
