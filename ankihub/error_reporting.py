@@ -133,7 +133,11 @@ def upload_logs_in_background(
     return key
 
 
-def upload_logs(key: str) -> str:
+def upload_logs(key: str) -> Optional[str]:
+    if not log_file_path().exists():
+        LOGGER.info("No logs to upload.")
+        return None
+
     try:
         client = AnkiHubClient()
         client.upload_logs(
