@@ -399,49 +399,47 @@ def log_file_path() -> Path:
     return user_files_path() / "ankihub.log"
 
 
-def stdout_handler():
+def stdout_handler() -> logging.Handler:
     return logging.StreamHandler(stream=sys.stdout)
 
 
-def file_handler():
+def file_handler() -> logging.Handler:
     return RotatingFileHandler(
         log_file_path(), maxBytes=3000000, backupCount=5, encoding="utf-8"
     )
 
 
+def formatter() -> logging.Formatter:
+    return logging.Formatter(
+        "%(levelname)s %(asctime)s %(module)s %(process)d %(thread)d %(message)s"
+    )
+
+
 def setup_logger():
     log_file_path().parent.mkdir(parents=True, exist_ok=True)
+    LOGGER.propagate = False
+    LOGGER.setLevel(logging.DEBUG)
 
-    LOGGING = {
-        "version": 1,
-        "disable_existing_loggers": False,
-        "formatters": {
-            "verbose": {
-                "format": "%(levelname)s %(asctime)s %(module)s "
-                "%(process)d %(thread)d %(message)s"
-            }
-        },
-        "handlers": {
-            "console": {
-                "()": stdout_handler,
-                "level": "INFO",
-                "formatter": "verbose",
-            },
-            "file": {
-                "()": file_handler,
-                "level": "DEBUG"
-                if config.public_config.get("debug_level_logs", False)
-                else "INFO",
-                "formatter": "verbose",
-            },
-        },
-        "root": {
-            "level": "DEBUG",
-            "handlers": ["console", "file"],
-        },
-    }
+    setup_stdout_handler()
+    setup_file_handler()
 
-    logging.config.dictConfig(LOGGING)
+
+def setup_stdout_handler() -> None:
+    stdout_handler_ = stdout_handler()
+    stdout_handler_.setLevel(logging.INFO)
+    stdout_handler_.setFormatter(formatter())
+    LOGGER.addHandler(stdout_handler_)
+
+
+def setup_file_handler() -> None:
+    file_handler_ = file_handler()
+    file_handler_.setLevel(
+        logging.DEBUG
+        if config.public_config.get("debug_level_logs", False)
+        else logging.INFO
+    )
+    file_handler_.setFormatter(formatter())
+    LOGGER.addHandler(file_handler_)
 
 
 version_file = Path(__file__).parent / "VERSION"
