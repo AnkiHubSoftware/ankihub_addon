@@ -80,6 +80,19 @@ def handle_exception(
         LOGGER.info("NotLoggedInError was handled.")
         return True
 
+    if (
+        isinstance(exc, AttributeError)
+        and "NoneType" in str(exc)
+        and "has no attribute" in str(exc)
+        and "mw.col" in "".join(traceback.format_tb(tb))
+        and aqt.mw.col is None
+    ):
+        # Ignore errors that occur when the collection is None.
+        # This can e.g happen when a background task is running
+        # and the user switches to a different Anki profile.
+        LOGGER.exception("Collection is None was handled")
+        return True
+
     if not should_report_error():
         LOGGER.info("Reporting errors is disabled.")
         return False
