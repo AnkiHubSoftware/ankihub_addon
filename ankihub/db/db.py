@@ -17,6 +17,10 @@ from .db_utils import DBConnection
 
 
 def attach_ankihub_db_to_anki_db_connection() -> None:
+    if aqt.mw.col is None:
+        LOGGER.info("The collection is not open. Not attaching AnkiHub DB.")
+        return
+
     if not is_ankihub_db_attached_to_anki_db():
         aqt.mw.col.db.execute(
             f"ATTACH DATABASE ? AS {ankihub_db.database_name}",
@@ -52,9 +56,13 @@ def detach_ankihub_db_from_anki_db_connection() -> None:
 
 
 def is_ankihub_db_attached_to_anki_db() -> bool:
-    return ankihub_db.database_name in [
+    if aqt.mw.col is None:
+        return False
+
+    result = ankihub_db.database_name in [
         name for _, name, _ in aqt.mw.col.db.all("PRAGMA database_list")
     ]
+    return result
 
 
 @contextmanager
@@ -473,7 +481,7 @@ class _AnkiHubDB:
         self, mid: NotetypeId, disabled_field_names: List[str]
     ) -> Set[str]:
         """Returns the names of all media files used in the notes of the given note type."""
-        if aqt.mw.col.models.get(NotetypeId(mid)) is None:
+        if aqt.mw.col is None or aqt.mw.col.models.get(NotetypeId(mid)) is None:
             return set()
 
         field_names_for_mid = [
