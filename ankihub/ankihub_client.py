@@ -473,10 +473,7 @@ class AnkiHubClient:
 
         LOGGER.info(f"Successfully uploaded [{zip_filepath.name}]")
 
-    def upload_assets(self, image_paths: List[Path], ah_did: uuid.UUID):
-        self._upload_assets_in_chunks(image_paths=image_paths, ah_did=ah_did)
-
-    def _upload_assets_in_chunks(self, image_paths: List[Path], ah_did: uuid.UUID):
+    def upload_assets(self, image_paths: List[Path], ah_did: uuid.UUID) -> None:
         # Create chunks of image paths to zip and upload each chunk individually.
         # Each chunk is divided based on the size of all images on that chunk to
         # create chunks of similar size.
