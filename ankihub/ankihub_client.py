@@ -474,16 +474,6 @@ class AnkiHubClient:
         LOGGER.info(f"Successfully uploaded [{zip_filepath.name}]")
 
     def upload_assets(self, image_paths: List[Path], ah_did: uuid.UUID):
-
-        # Alternate flow: if at most 10 images, call self.upload_assets
-        # passing the array of image names
-        if len(image_paths) <= 10:
-            self._upload_assets_individually(
-                image_names={path.name for path in image_paths if path.is_file()},
-                ah_did=ah_did,
-            )
-            return None
-
         self._upload_assets_in_chunks(image_paths=image_paths, ah_did=ah_did)
 
     def _upload_assets_in_chunks(self, image_paths: List[Path], ah_did: uuid.UUID):
