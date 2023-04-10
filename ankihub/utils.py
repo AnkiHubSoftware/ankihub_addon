@@ -278,7 +278,7 @@ def add_ankihub_snippet_to_template(template: Dict) -> None:
         {{{{/{ANKIHUB_NOTE_TYPE_FIELD_NAME}}}}}
         <!-- END {ANKIHUB_NOTE_TYPE_MODIFICATION_STRING} -->
         """
-    )
+    ).strip("\n")
 
     snippet_pattern = (
         f"<!-- BEGIN {ANKIHUB_NOTE_TYPE_MODIFICATION_STRING} -->"
