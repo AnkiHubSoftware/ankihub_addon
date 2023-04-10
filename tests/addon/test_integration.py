@@ -8,6 +8,7 @@ from pathlib import Path
 from time import sleep
 from typing import Any, Callable, Dict, List, Optional, Protocol, Tuple
 from unittest.mock import MagicMock, Mock, PropertyMock
+from zipfile import ZipFile
 
 import aqt
 import pytest
@@ -2724,47 +2725,6 @@ def test_download_images_on_sync(
         download_images_mock.assert_called_once_with(["image.png"], ah_did)
 
 
-def test_upload_assets_individually(
-    anki_session_with_addon_data: AnkiSession,
-    next_deterministic_uuid: Callable[[], uuid.UUID],
-    monkeypatch: MonkeyPatch,
-    requests_mock: Mocker,
-):
-    import tempfile
-
-    with anki_session_with_addon_data.profile_loaded():
-        fake_presigned_url = "https://fake_presigned_url.com"
-        monkeypatch.setattr(
-            AnkiHubClient,
-            "get_presigned_url_for_multiple_uploads",
-            lambda *args, **kwargs: {
-                "url": fake_presigned_url,
-                "fields": {
-                    "key": "deck_images/test/${filename}",
-                },
-            },
-        )
-
-        s3_upload_request_mock = requests_mock.post(
-            fake_presigned_url, json={"success": True}, status_code=204
-        )
-
-        with tempfile.NamedTemporaryFile(suffix=".png") as f:
-            file_path = Path(f.name)
-            fake_deck_id = next_deterministic_uuid()
-            client = AnkiHubClient(local_media_dir_path=file_path.parent)
-            client._upload_assets_individually(
-                set([file_path.name]), ah_did=fake_deck_id
-            )
-
-        assert len(s3_upload_request_mock.request_history) == 1  # type: ignore
-
-        file_name_from_request = re.findall(
-            r'filename="(.*?)"', s3_upload_request_mock.last_request.text  # type: ignore
-        )[0]
-        assert file_name_from_request == file_path.name
-
-
 class TestSuggestionsWithImages:
     def test_suggest_note_update_with_image(
         self,
@@ -2778,6 +2738,9 @@ class TestSuggestionsWithImages:
         anki_session = anki_session_with_addon_data
         with anki_session.profile_loaded():
             mw = anki_session.mw
+            monkeypatch.setattr(
+                mw.col.media, "dir", lambda *args, **kwargs: TEST_DATA_PATH
+            )
 
             install_sample_ah_deck()
 
@@ -2809,7 +2772,11 @@ class TestSuggestionsWithImages:
                 },
             )
 
-            with tempfile.NamedTemporaryFile(suffix=".png") as f:
+            # Mock os.remove so the zip is not deleted
+            os_remove_mock = MagicMock()
+            monkeypatch.setattr(os, "remove", os_remove_mock)
+
+            with tempfile.NamedTemporaryFile(dir=TEST_DATA_PATH, suffix=".png") as f:
                 # add file to media folder
                 file_name_in_col = mw.col.media.add_file(f.name)
                 file_path_in_col = Path(mw.col.media.dir()) / file_name_in_col
@@ -2846,6 +2813,7 @@ class TestSuggestionsWithImages:
                     note=note,
                     upload_request_mock=s3_upload_request_mock,  # type: ignore
                     suggestion_request_mock=suggestion_request_mock,  # type: ignore
+                    monkeypatch=monkeypatch,
                 )
 
     def test_suggest_new_note_with_image(
@@ -2860,6 +2828,9 @@ class TestSuggestionsWithImages:
         anki_session = anki_session_with_addon_data
         with anki_session.profile_loaded():
             mw = anki_session.mw
+            monkeypatch.setattr(
+                mw.col.media, "dir", lambda *args, **kwargs: TEST_DATA_PATH
+            )
 
             _, ah_did = install_sample_ah_deck()
 
@@ -2896,7 +2867,11 @@ class TestSuggestionsWithImages:
                 status_code=201,
             )
 
-            with tempfile.NamedTemporaryFile(suffix=".png") as f:
+            # Mock os.remove so the zip is not deleted
+            os_remove_mock = MagicMock()
+            monkeypatch.setattr(os, "remove", os_remove_mock)
+
+            with tempfile.NamedTemporaryFile(dir=TEST_DATA_PATH, suffix=".png") as f:
                 # add file to media folder
                 file_name_in_col = mw.col.media.add_file(f.name)
                 file_path_in_col = Path(mw.col.media.dir()) / file_name_in_col
@@ -2922,18 +2897,28 @@ class TestSuggestionsWithImages:
                     note=note,
                     upload_request_mock=s3_upload_request_mock,  # type: ignore
                     suggestion_request_mock=suggestion_request_mock,  # type: ignore
+                    monkeypatch=monkeypatch,
                 )
 
     def _assert_img_names_as_expected(
-        self, note: Note, upload_request_mock: Mocker, suggestion_request_mock: Mocker
+        self,
+        note: Note,
+        upload_request_mock: Mocker,
+        suggestion_request_mock: Mocker,
+        monkeypatch,
     ):
         # Assert that the image names in the suggestion, the note and the uploaded image are as expected.
         note.load()
         img_name_in_note = re.search(IMG_NAME_IN_IMG_TAG_REGEX, note["Front"]).group(1)
 
-        name_of_uploaded_image = re.findall(
-            r'filename="(.*?)"', upload_request_mock.last_request.text  # type: ignore
+        zipfile_name = re.findall(
+            r'filename="(.*?)"', str(upload_request_mock.last_request.body)
         )[0]
+
+        path_to_created_zip_file = TEST_DATA_PATH / zipfile_name
+        with ZipFile(path_to_created_zip_file, "r") as zfile:
+            namelist = zfile.namelist()
+            name_of_uploaded_image = namelist[0]
 
         suggestion_dict = suggestion_request_mock.last_request.json()  # type: ignore
         first_field_value = suggestion_dict["fields"][0]["value"]
@@ -2947,6 +2932,12 @@ class TestSuggestionsWithImages:
         assert img_name_in_suggestion == expected_img_name
         assert img_name_in_note == expected_img_name
         assert name_of_uploaded_image == expected_img_name
+
+        # Remove the zipped file and the hashed image at the end of the test
+        monkeypatch.undo()
+        os.remove(path_to_created_zip_file)
+        os.remove(TEST_DATA_PATH / "d41d8cd98f00b204e9800998ecf8427e.png")
+        assert path_to_created_zip_file.is_file() is False
 
     def test_should_ignore_asset_file_names_not_present_at_local_collection(
         self,

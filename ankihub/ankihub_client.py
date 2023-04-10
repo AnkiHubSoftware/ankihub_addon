@@ -473,20 +473,7 @@ class AnkiHubClient:
 
         LOGGER.info(f"Successfully uploaded [{zip_filepath.name}]")
 
-    def upload_assets(self, image_paths: List[Path], ah_did: uuid.UUID):
-
-        # Alternate flow: if at most 10 images, call self.upload_assets
-        # passing the array of image names
-        if len(image_paths) <= 10:
-            self._upload_assets_individually(
-                image_names={path.name for path in image_paths if path.is_file()},
-                ah_did=ah_did,
-            )
-            return None
-
-        self._upload_assets_in_chunks(image_paths=image_paths, ah_did=ah_did)
-
-    def _upload_assets_in_chunks(self, image_paths: List[Path], ah_did: uuid.UUID):
+    def upload_assets(self, image_paths: List[Path], ah_did: uuid.UUID) -> None:
         # Create chunks of image paths to zip and upload each chunk individually.
         # Each chunk is divided based on the size of all images on that chunk to
         # create chunks of similar size.
@@ -573,21 +560,6 @@ class AnkiHubClient:
             result[old_asset_path.name] = new_asset_path.name
 
         return result
-
-    def _upload_assets_individually(
-        self, image_names: Set[str], ah_did: uuid.UUID
-    ) -> None:
-        # deck_id is used to namespace the images within each deck.
-        s3_presigned_info = self.get_presigned_url_for_multiple_uploads(
-            prefix=f"deck_assets/{ah_did}"
-        )
-
-        # TODO: send all images at once instad of looping through each one
-        for image_name in image_names:
-            self._upload_file_to_s3_with_reusable_presigned_url(
-                s3_presigned_info=s3_presigned_info,
-                filepath=self.local_media_dir_path / image_name,
-            )
 
     def _upload_file_to_s3(self, s3_presigned_url: str, filepath: Path) -> None:
         """Opens the file at the 'filepath' location and uploads it to

@@ -966,8 +966,8 @@ class TestUploadImagesForSuggestion:
         # assert that the suggestion was made
         assert len(suggestion_request_mock.request_history) == 1  # type: ignore
 
-        # assert that the images were uploaded
-        assert len(s3_upload_request_mock.request_history) == 2  # type: ignore
+        # assert that the zipfile with the images was uploaded
+        assert len(s3_upload_request_mock.request_history) == 1  # type: ignore
 
         # assert that the asset name map was returned correctly
         assert asset_name_map == expected_asset_name_map
@@ -1143,31 +1143,6 @@ class TestUploadAssetsForDeck:
         path_to_created_zip_file = Path(TEST_MEDIA_PATH / f"{deck_id}.zip")
 
         assert not path_to_created_zip_file.is_file()
-
-    def test_uploads_directly_without_zipping_when_there_are_few_images(
-        self, next_deterministic_uuid: Callable[[], uuid.UUID], monkeypatch: MonkeyPatch
-    ):
-        client = AnkiHubClient(local_media_dir_path=TEST_MEDIA_PATH)
-
-        notes_data = self.notes_data_with_a_few_images()
-
-        mocked_upload_assets_individually = MagicMock()
-        monkeypatch.setattr(
-            client, "_upload_assets_individually", mocked_upload_assets_individually
-        )
-
-        mocked_upload_file_to_s3 = MagicMock()
-        monkeypatch.setattr(client, "_upload_file_to_s3", mocked_upload_file_to_s3)
-
-        deck_id = next_deterministic_uuid()
-        self._upload_images_for_notes_data(client, notes_data, deck_id)
-
-        all_img_names_in_notes = get_image_names_from_notes_data(notes_data)
-        mocked_upload_assets_individually.assert_called_once_with(
-            image_names=all_img_names_in_notes, ah_did=deck_id
-        )
-
-        mocked_upload_file_to_s3.assert_not_called()
 
     def _upload_images_for_notes_data(
         self, client: AnkiHubClient, notes_data: List[NoteInfo], ah_did: uuid.UUID
