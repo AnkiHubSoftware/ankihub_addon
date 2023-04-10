@@ -185,7 +185,6 @@ class AnkiHubImporter:
                 anki_did=self._local_did,
                 protected_fields=self._protected_fields,
                 protected_tags=self._protected_tags,
-                first_import_of_deck=self._first_import_of_deck,
             )
             dids_for_note = set(c.did for c in note.cards())
             dids = dids | dids_for_note
@@ -244,7 +243,6 @@ class AnkiHubImporter:
         protected_fields: Dict[int, List[str]],
         protected_tags: List[str],
         anki_did: Optional[DeckId] = None,
-        first_import_of_deck: bool = False,
     ) -> Note:
         LOGGER.debug(
             f"Trying to update or create note: {note_data.anki_nid=}, {note_data.ankihub_note_uuid=}"
@@ -265,7 +263,6 @@ class AnkiHubImporter:
             protected_fields=protected_fields,
             protected_tags=protected_tags,
             anki_did=anki_did,
-            first_import_of_deck=first_import_of_deck,
         )
 
         self._maybe_suspend_new_cards(note, cards_before_changes)
@@ -311,7 +308,6 @@ class AnkiHubImporter:
         protected_fields: Dict[int, List[str]],
         protected_tags: List[str],
         anki_did: Optional[DeckId],  # only relevant for newly created notes
-        first_import_of_deck: bool,
     ) -> Note:
         # Create a copy to avoid mutating note_data.fields.
         # TODO it seems that fields is not used and we can remove it.
@@ -332,7 +328,6 @@ class AnkiHubImporter:
                 note_data,
                 protected_fields,
                 protected_tags,
-                first_import_of_deck,
             )
             if note_prepared:
                 note.flush()
@@ -351,7 +346,6 @@ class AnkiHubImporter:
                 note_data,
                 protected_fields,
                 protected_tags,
-                first_import_of_deck,
             )
             note = create_note_with_id(
                 note, anki_id=NoteId(note_data.anki_nid), anki_did=anki_did
@@ -366,7 +360,6 @@ class AnkiHubImporter:
         note_data: NoteInfo,
         protected_fields: Dict[int, List[str]],
         protected_tags: List[str],
-        first_import_of_deck: bool,
     ) -> bool:
         """
         Updates the note with the given fields and tags.
