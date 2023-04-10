@@ -1121,7 +1121,6 @@ class TestAnkiHubImporter:
                     anki_did=DeckId(0),
                     protected_fields={},
                     protected_tags=[],
-                    first_import_of_deck=False,
                 )
                 assert len(updated_note.cards()) == 2
                 return updated_note
@@ -1360,7 +1359,6 @@ class TestPrepareNote:
             note.tags = ["a", "b"]
             note_was_changed_1 = prepare_note(
                 note,
-                first_import_of_deck=True,
                 fields=new_fields,
                 tags=new_tags,
                 protected_fields={ankihub_basic_note_type["id"]: ["Back"]},
@@ -1375,7 +1373,6 @@ class TestPrepareNote:
             # assert that the note was not modified because the same arguments were used on the same note
             note_was_changed_2 = prepare_note(
                 note,
-                first_import_of_deck=True,
                 fields=new_fields,
                 tags=new_tags,
                 protected_fields={ankihub_basic_note_type["id"]: ["Back"]},
@@ -1389,7 +1386,7 @@ class TestPrepareNote:
             # assert that addon-internal tags don't get removed
             note = make_ah_note(ankihub_nid=ankihub_nid, generate_anki_id=True)
             note.tags = list(ADDON_INTERNAL_TAGS)
-            note_was_changed_5 = prepare_note(note, tags=[], first_import_of_deck=True)
+            note_was_changed_5 = prepare_note(note, tags=[])
             assert not note_was_changed_5
             assert set(note.tags) == set(ADDON_INTERNAL_TAGS)
 
@@ -1400,7 +1397,6 @@ class TestPrepareNote:
             note_was_changed_6 = prepare_note(
                 note,
                 fields=[Field(name="Front", value="new front", order=0)],
-                first_import_of_deck=True,
             )
             assert not note_was_changed_6
             assert note["Front"] == "old front"
@@ -1414,7 +1410,6 @@ class TestPrepareNote:
                     Field(name="Front", value="new front", order=0),
                     Field(name="Back", value="new back", order=1),
                 ],
-                first_import_of_deck=True,
             )
             assert not note_was_changed_7
             assert note["Front"] == "old front"
@@ -1429,7 +1424,6 @@ class TestPrepareNote:
                     Field(name="Front", value="new front", order=0),
                     Field(name="Back", value="new back", order=1),
                 ],
-                first_import_of_deck=True,
             )
             assert not note_was_changed_7
             assert note["Front"] == "old front"
@@ -1440,7 +1434,6 @@ class TestPrepareNote:
             note_was_changed_8 = prepare_note(
                 note,
                 guid="new guid",
-                first_import_of_deck=True,
             )
             assert note_was_changed_8
             assert note.guid == "new guid"
@@ -1483,7 +1476,6 @@ class TestPrepareNote:
                 note=note,
                 ankihub_nid=ankihub_nid,
                 fields=[Field(name=field_name_with_spaces, value="new front", order=0)],
-                first_import_of_deck=True,
             )
             assert not note_changed
             assert note[field_name_with_spaces] == "old field name with spaces"
@@ -1498,7 +1490,6 @@ class TestPrepareNote:
                 note=note,
                 ankihub_nid=ankihub_nid,
                 fields=[Field(name=field_name_with_spaces, value="new front", order=0)],
-                first_import_of_deck=True,
             )
             assert note_changed
             assert note[field_name_with_spaces] == "new front"
@@ -1506,7 +1497,6 @@ class TestPrepareNote:
 
 def prepare_note(
     note,
-    first_import_of_deck: bool,
     ankihub_nid: Optional[uuid.UUID] = None,
     tags: List[str] = [],
     fields: Optional[List[Field]] = [],
@@ -1537,7 +1527,6 @@ def prepare_note(
         note_data=note_data,
         protected_fields=protected_fields,
         protected_tags=protected_tags,
-        first_import_of_deck=first_import_of_deck,
     )
     return result
 
