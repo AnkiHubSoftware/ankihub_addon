@@ -289,7 +289,7 @@ class SuggestionDialog(QDialog):
         self.layout_.addSpacing(10)
 
         # Add note about image source if an image was added
-        if self._added_new_images:
+        if self._added_new_images and self._is_for_ankihub_deck:
             label = QLabel(
                 "Please provide the source of the image(s)<br>"
                 "in the rationale field. For example:<br>"
