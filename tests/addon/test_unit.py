@@ -28,7 +28,13 @@ from ankihub.gui.suggestion_dialog import (
     SuggestionSource,
 )
 from ankihub.importing import updated_tags
-from ankihub.note_conversion import ADDON_INTERNAL_TAGS, TAG_FOR_OPTIONAL_TAGS
+from ankihub.note_conversion import (
+    ADDON_INTERNAL_TAGS,
+    TAG_FOR_OPTIONAL_TAGS,
+    TAG_FOR_PROTECTING_ALL_FIELDS,
+    TAG_FOR_PROTECTING_FIELDS,
+    _get_fields_protected_by_tags,
+)
 from ankihub.register_decks import note_type_name_without_ankihub_modifications
 from ankihub.subdecks import SUBDECK_TAG, add_subdeck_tags_to_notes
 from ankihub.utils import lowest_level_common_ancestor_deck_name
@@ -174,6 +180,39 @@ def test_updated_tags():
             protected_tags=[],
         )
     ) == set([optional_tag])
+
+
+class TestGetFieldsProtectedByTags:
+    def test_protecting_single_fields(self):
+        assert set(
+            _get_fields_protected_by_tags(
+                tags=[
+                    f"{TAG_FOR_PROTECTING_FIELDS}::Text",
+                    f"{TAG_FOR_PROTECTING_FIELDS}::Missed_Questions",
+                ],
+                field_names=["Text", "Extra", "Missed Questions", "Lecture Notes"],
+            )
+        ) == set(["Text", "Missed Questions"])
+
+    def test_trying_to_protect_not_existing_field(self):
+        # When trying to protect a field that does not exist, it should be ignored.
+        assert set(
+            _get_fields_protected_by_tags(
+                tags=[
+                    f"{TAG_FOR_PROTECTING_FIELDS}::Text",
+                    f"{TAG_FOR_PROTECTING_FIELDS}::Front",
+                ],
+                field_names=["Text", "Extra", "Missed Questions", "Lecture Notes"],
+            )
+        ) == set(["Text"])
+
+    def test_protecting_all_fields(self):
+        assert set(
+            _get_fields_protected_by_tags(
+                tags=[TAG_FOR_PROTECTING_ALL_FIELDS],
+                field_names=["Text", "Extra", "Missed Questions", "Lecture Notes"],
+            )
+        ) == set(["Text", "Extra", "Missed Questions", "Lecture Notes"])
 
 
 def test_normalize_url():
