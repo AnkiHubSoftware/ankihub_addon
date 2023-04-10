@@ -2736,47 +2736,6 @@ def test_download_images_on_sync(
         download_images_mock.assert_called_once_with(["image.png"], ah_did)
 
 
-def test_upload_assets_individually(
-    anki_session_with_addon_data: AnkiSession,
-    next_deterministic_uuid: Callable[[], uuid.UUID],
-    monkeypatch: MonkeyPatch,
-    requests_mock: Mocker,
-):
-    import tempfile
-
-    with anki_session_with_addon_data.profile_loaded():
-        fake_presigned_url = "https://fake_presigned_url.com"
-        monkeypatch.setattr(
-            AnkiHubClient,
-            "get_presigned_url_for_multiple_uploads",
-            lambda *args, **kwargs: {
-                "url": fake_presigned_url,
-                "fields": {
-                    "key": "deck_images/test/${filename}",
-                },
-            },
-        )
-
-        s3_upload_request_mock = requests_mock.post(
-            fake_presigned_url, json={"success": True}, status_code=204
-        )
-
-        with tempfile.NamedTemporaryFile(suffix=".png") as f:
-            file_path = Path(f.name)
-            fake_deck_id = next_deterministic_uuid()
-            client = AnkiHubClient(local_media_dir_path=file_path.parent)
-            client._upload_assets_individually(
-                set([file_path.name]), ah_did=fake_deck_id
-            )
-
-        assert len(s3_upload_request_mock.request_history) == 1  # type: ignore
-
-        file_name_from_request = re.findall(
-            r'filename="(.*?)"', s3_upload_request_mock.last_request.text  # type: ignore
-        )[0]
-        assert file_name_from_request == file_path.name
-
-
 class TestSuggestionsWithImages:
     def test_suggest_note_update_with_image(
         self,

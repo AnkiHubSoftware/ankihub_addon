@@ -564,21 +564,6 @@ class AnkiHubClient:
 
         return result
 
-    def _upload_assets_individually(
-        self, image_names: Set[str], ah_did: uuid.UUID
-    ) -> None:
-        # deck_id is used to namespace the images within each deck.
-        s3_presigned_info = self.get_presigned_url_for_multiple_uploads(
-            prefix=f"deck_assets/{ah_did}"
-        )
-
-        # TODO: send all images at once instad of looping through each one
-        for image_name in image_names:
-            self._upload_file_to_s3_with_reusable_presigned_url(
-                s3_presigned_info=s3_presigned_info,
-                filepath=self.local_media_dir_path / image_name,
-            )
-
     def _upload_file_to_s3(self, s3_presigned_url: str, filepath: Path) -> None:
         """Opens the file at the 'filepath' location and uploads it to
         S3 using the 's3_presigned_url'."""
