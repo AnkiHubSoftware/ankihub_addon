@@ -268,7 +268,7 @@ def test_add_subdeck_tags_to_notes_with_spaces_in_deck_name(
 
 class TestSuggestionDialog:
     @pytest.mark.parametrize(
-        "is_new_note_suggestion,is_for_ankihub_deck,suggestion_type,source_type,image_was_added",
+        "is_new_note_suggestion,is_for_anking_deck,suggestion_type,source_type,image_was_added",
         [
             (True, True, SuggestionType.NEW_CONTENT, SourceType.AMBOSS, False),
             (True, True, SuggestionType.OTHER, SourceType.AMBOSS, False),
@@ -285,13 +285,13 @@ class TestSuggestionDialog:
     def test_visibility_of_form_elements_and_form_result(
         self,
         is_new_note_suggestion: bool,
-        is_for_ankihub_deck: bool,
+        is_for_anking_deck: bool,
         suggestion_type: SuggestionType,
         source_type: SourceType,
         image_was_added: bool,
     ):
         dialog = SuggestionDialog(
-            is_for_ankihub_deck=is_for_ankihub_deck,
+            is_for_anking_deck=is_for_anking_deck,
             is_new_note_suggestion=is_new_note_suggestion,
             added_new_images=image_was_added,
         )
@@ -302,7 +302,7 @@ class TestSuggestionDialog:
         source_needed = not is_new_note_suggestion and (
             suggestion_type
             in [SuggestionType.UPDATED_CONTENT, SuggestionType.NEW_CONTENT]
-            and is_for_ankihub_deck
+            and is_for_anking_deck
         )
 
         if change_type_needed:
