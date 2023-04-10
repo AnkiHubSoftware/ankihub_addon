@@ -2,7 +2,7 @@ import logging
 import os
 from concurrent.futures import Future
 from pathlib import Path
-from typing import Any, Callable
+from typing import Any, Callable, List
 
 import aqt
 from anki.hooks import wrap
@@ -11,34 +11,142 @@ from aqt.addons import AddonManager, DownloaderInstaller
 
 from . import LOGGER
 from .db import detach_ankihub_db_from_anki_db_connection
-from .settings import file_handler, log_file_path
+from .settings import log_file_path, setup_file_handler
+
+
+def setup_addons():
+    _raise_exceptions_on_otherwise_silent_addon_update_failures()
+
+    _prevent_errors_during_addon_updates_and_deletions()
+
+    _prevent_ui_deadlock_of_update_dialog_with_progress_dialog()
+
+
+def _raise_exceptions_on_otherwise_silent_addon_update_failures():
+    # this prevents silent add-on update failures like the ones reported here:
+    # https://community.ankihub.net/t/bug-improve-ankihub-addon-update-process/557/5
+    # it changes the behavior of _download_done so that it checks if the future has an exception
+    DownloaderInstaller._download_done = wrap(  # type: ignore
+        old=DownloaderInstaller._download_done,
+        new=_check_future_for_exceptions,
+        pos="around",
+    )
+
+
+def _check_future_for_exceptions(*args: Any, **kwargs: Any) -> None:
+    _old: Callable = kwargs["_old"]
+    del kwargs["_old"]
+
+    _old(*args, **kwargs)
+
+    # in future Anki version the argument could be passed differently
+    # so we check all arguments for a Future
+    future: Future = next((x for x in args if isinstance(x, Future)), None)
+    if future is None:
+        future = kwargs.get("future", None)
+
+    if future is None:
+        raise ValueError("Could not find future argument")
+
+    # throws exception if there was one in the future
+    future.result()
+
+
+def _prevent_errors_during_addon_updates_and_deletions():
+    """Prevents errors during add-on updates and deletions on Windows.
+
+    AddonManager calls these methods during an update:
+    - backupUserFiles
+    - deleteAddon
+    - restoreUserFiles
+    We need to disable the log file handler while these methods are running because they operate on files
+    in the user files directory and there will be permission errors on Windows if we have open file handles
+    for files in the user files directory during these operations.
+
+    We also detach the AnkiHub database from the Anki database connection and change the file permissions
+    of the files in the user files directory for the same reason.
+    """
+
+    # Add _with_disabled_log_file_handler to all methods that operate on files in the user files directory.
+    AddonManager.backupUserFiles = wrap(  # type: ignore
+        old=AddonManager.backupUserFiles,
+        new=_with_disabled_log_file_handler,
+        pos="around",
+    )
+
+    AddonManager.deleteAddon = wrap(  # type: ignore
+        old=AddonManager.deleteAddon,
+        new=_with_disabled_log_file_handler,
+        pos="around",
+    )
+
+    AddonManager.restoreUserFiles = wrap(  # type: ignore
+        old=AddonManager.restoreUserFiles,
+        new=_with_disabled_log_file_handler,
+        pos="around",
+    )
+
+    # Add _detach_ankihub_db to backupUserFiles and deleteAddon.
+    # We don't need to add it to restoreUserFiles because backupUserFiles is always called before restoreUserFiles.
+    AddonManager.backupUserFiles = wrap(  # type: ignore
+        old=AddonManager.backupUserFiles,
+        new=_detach_ankihub_db,
+        pos="before",
+    )
+
+    AddonManager.deleteAddon = wrap(  # type: ignore
+        old=AddonManager.deleteAddon,
+        new=_detach_ankihub_db,
+        pos="before",
+    )
+
+    # Add _maybe_change_file_permissions_of_addon_files to backupUserFiles and deleteAddon.
+    # We don't need to add it to restoreUserFiles because backupUserFiles is always called before restoreUserFiles.
+    AddonManager.backupUserFiles = wrap(  # type: ignore
+        old=AddonManager.backupUserFiles,
+        new=lambda self, sid: _maybe_change_file_permissions_of_addon_files(sid),
+        pos="before",
+    )
+
+    AddonManager.deleteAddon = wrap(  # type: ignore
+        old=AddonManager.deleteAddon,
+        new=lambda self, module: _maybe_change_file_permissions_of_addon_files(module),
+        pos="before",
+    )
 
 
 def _with_disabled_log_file_handler(*args: Any, **kwargs: Any) -> Any:
-    # This is done to prevent "Cannot access file being used by another process" errors
-    # when Anki operates on files of the add-on
+    """Disables the log FileHandler while the wrapped method is running.
+    Only enables it again if the user files folder still exists after the wrapped method was called.
+    """
 
     _old: Callable = kwargs["_old"]
     del kwargs["_old"]
 
-    LOGGER.info(f"Disabling log FileHandlers because {_old.__name__} was called.")
-    handlers = LOGGER.root.handlers[:]
-    for handler in handlers:
-        if isinstance(handler, logging.FileHandler):
-            LOGGER.info(
-                f"Removing handler: {handler}",
-            )
-            LOGGER.root.removeHandler(handler)
-            handler.close()
+    LOGGER.info(f"Maybe disabling log FileHandler because {_old.__name__} was called.")
+    file_handlers = _log_file_handlers()
+    for handler in file_handlers:
+        LOGGER.info(f"Disabling FileHandler: {handler}.")
+        LOGGER.removeHandler(handler)
+        handler.close()
 
-    result = _old(*args, **kwargs)
-
-    # if the add-on was deleted it makes no sense to re-add the FileHandler (and it throws an error)
-    if log_file_path().parent.exists():
-        LOGGER.root.addHandler(file_handler())
-        LOGGER.info("Re-added FileHandler")
-
+    try:
+        result = _old(*args, **kwargs)
+    finally:
+        # Only re-enable the log FileHandler if the user files folder still exists and
+        # the FileHandler is disabled.
+        if log_file_path().parent.exists() and not _log_file_handlers():
+            setup_file_handler()
+            LOGGER.info(f"Re-enabled FileHandler after {_old.__name__} was called.")
     return result
+
+
+def _log_file_handlers() -> List[logging.FileHandler]:
+    return [
+        handler
+        for handler in LOGGER.handlers
+        if isinstance(handler, logging.FileHandler)
+    ]
 
 
 def _detach_ankihub_db(*args: Any, **kwargs: Any) -> None:
@@ -66,23 +174,14 @@ def _change_file_permissions_of_addon_files(addon_dir: Path) -> None:
     LOGGER.info(f"On deleteAddon changed file permissions for all files in {addon_dir}")
 
 
-def _check_future_for_exceptions(*args: Any, **kwargs: Any) -> None:
-    _old: Callable = kwargs["_old"]
-    del kwargs["_old"]
-
-    _old(*args, **kwargs)
-
-    # in future Anki version the argument could be passed differently
-    # so we check all arguments for a Future
-    future: Future = next((x for x in args if isinstance(x, Future)), None)
-    if future is None:
-        future = kwargs.get("future", None)
-
-    if future is None:
-        raise ValueError("Could not find future argument")
-
-    # throws exception if there was one in the future
-    future.result()
+def _prevent_ui_deadlock_of_update_dialog_with_progress_dialog():
+    # prevent the situation that the add-on update dialog is shown while the progress dialog is open which can
+    # lead to a deadlock when AnkiHub is syncing and there is an add-on update.
+    addons.prompt_to_update = wrap(  # type: ignore
+        old=addons.prompt_to_update,
+        new=_with_delay_when_progress_dialog_is_open,
+        pos="around",
+    )
 
 
 def _with_delay_when_progress_dialog_is_open(*args, **kwargs) -> Any:
@@ -107,67 +206,4 @@ def _with_delay_when_progress_dialog_is_open(*args, **kwargs) -> Any:
         repeat=False,
         requiresCollection=True,
         parent=aqt.mw,
-    )
-
-
-def setup_addons():
-
-    # prevent errors when updating the add-on
-    DownloaderInstaller._download_all = wrap(  # type: ignore
-        old=DownloaderInstaller._download_all,
-        new=_with_disabled_log_file_handler,
-        pos="around",
-    )
-
-    DownloaderInstaller._download_all = wrap(  # type: ignore
-        old=DownloaderInstaller._download_all,
-        new=_detach_ankihub_db,
-        pos="before",
-    )
-
-    # prevent errors when user files are backed up
-    # See https://ankihub.sentry.io/issues/3942021163/?project=6546414
-    AddonManager._install = wrap(  # type: ignore
-        old=AddonManager._install,
-        new=lambda self, module, zfile: _maybe_change_file_permissions_of_addon_files(
-            module
-        ),
-        pos="before",
-    )
-
-    # prevent errors when deleting the add-on (AddonManager.deleteAddon also gets called during an update) on Windows
-    # See https://ankihub.sentry.io/issues/3942021163/?project=6546414
-    AddonManager.deleteAddon = wrap(  # type: ignore
-        old=AddonManager.deleteAddon,
-        new=lambda self, module: _maybe_change_file_permissions_of_addon_files(module),
-        pos="before",
-    )
-
-    AddonManager.deleteAddon = wrap(  # type: ignore
-        old=AddonManager.deleteAddon,
-        new=_with_disabled_log_file_handler,
-        pos="around",
-    )
-
-    AddonManager.deleteAddon = wrap(  # type: ignore
-        old=AddonManager.deleteAddon,
-        new=_detach_ankihub_db,
-        pos="before",
-    )
-
-    # prevent the situation that the add-on update dialog is shown while the progress dialog is open which can
-    # lead to a deadlock when AnkiHub is syncing and there is an add-on update.
-    addons.prompt_to_update = wrap(  # type: ignore
-        old=addons.prompt_to_update,
-        new=_with_delay_when_progress_dialog_is_open,
-        pos="around",
-    )
-
-    # this prevents silent add-on update failures like the ones reported here:
-    # https://community.ankihub.net/t/bug-improve-ankihub-addon-update-process/557/5
-    # it changes the behavior of _download_done so that it checks if the future has an exception
-    DownloaderInstaller._download_done = wrap(  # type: ignore
-        old=DownloaderInstaller._download_done,
-        new=_check_future_for_exceptions,
-        pos="around",
     )

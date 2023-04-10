@@ -92,11 +92,13 @@ def _setup_excepthook():
             # catching all exceptions here prevents a potential exception loop
             LOGGER.exception("The exception handler threw an exception.")
         finally:
-            if not handled:
-                # This opens Anki's error dialog.
-                original_except_hook(etype, val, tb)
+            if handled:
+                return
 
-            if not handled and _error_reporting_enabled():
+            # This opens Anki's error dialog.
+            original_except_hook(etype, val, tb)
+
+            if _error_reporting_enabled():
                 try:
                     sentry_id = report_exception_and_upload_logs(exception=val)
                     ErrorFeedbackDialog(exception=val, event_id=sentry_id)
@@ -179,6 +181,19 @@ def _try_handle_exception(
 
         AnkiHubLogin.display_login()
         LOGGER.info("NotLoggedInError was handled.")
+        return True
+
+    if (
+        isinstance(exc_value, AttributeError)
+        and "NoneType" in str(exc_value)
+        and "has no attribute" in str(exc_value)
+        and "mw.col" in "".join(traceback.format_tb(tb))
+        and aqt.mw.col is None
+    ):
+        # Ignore errors that occur when the collection is None.
+        # This can e.g happen when a background task is running
+        # and the user switches to a different Anki profile.
+        LOGGER.exception("Collection is None was handled")
         return True
 
     return False
@@ -297,6 +312,10 @@ def _error_reporting_enabled() -> bool:
 
 
 def _upload_logs(key: str) -> str:
+    if not log_file_path().exists():
+        LOGGER.info("No logs to upload.")
+        return None
+
     try:
         client = AnkiHubClient()
         client.upload_logs(

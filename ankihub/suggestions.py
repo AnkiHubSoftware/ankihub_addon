@@ -2,7 +2,7 @@ import copy
 import uuid
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Any, Dict, List, Optional, Sequence, Tuple, cast
+from typing import Any, Dict, List, Optional, Sequence, Set, Tuple, cast
 
 import aqt
 from anki.notes import Note, NoteId
@@ -12,8 +12,10 @@ from .ankihub_client import (
     ChangeNoteSuggestion,
     Field,
     NewNoteSuggestion,
+    NoteInfo,
     NoteSuggestion,
     SuggestionType,
+    get_image_names_from_notes_data,
     get_image_names_from_suggestions,
 )
 from .db import ankihub_db
@@ -45,7 +47,9 @@ def suggest_note_update(
     ah_did = ankihub_db.ankihub_did_for_anki_nid(NoteId(suggestion.anki_nid))
     suggestion = cast(
         ChangeNoteSuggestion,
-        _rename_and_upload_assets_for_suggestion(suggestion, ah_did),
+        _rename_and_upload_assets_for_suggestion(
+            suggestion=suggestion, ankihub_did=ah_did
+        ),
     )
 
     client = AnkiHubClient()
@@ -68,7 +72,9 @@ def suggest_new_note(
 
     suggestion = cast(
         NewNoteSuggestion,
-        _rename_and_upload_assets_for_suggestion(suggestion, ankihub_did),
+        _rename_and_upload_assets_for_suggestion(
+            suggestion=suggestion, ankihub_did=ankihub_did
+        ),
     )
 
     client = AnkiHubClient()
@@ -121,13 +127,15 @@ def suggest_notes_in_bulk(
     new_note_suggestions = cast(
         Sequence[NewNoteSuggestion],
         _rename_and_upload_assets_for_suggestions(
-            suggestions=new_note_suggestions, ankihub_did=ankihub_did
+            suggestions=new_note_suggestions,
+            ankihub_did=ankihub_did,
         ),
     )
     change_note_suggestions = cast(
         Sequence[ChangeNoteSuggestion],
         _rename_and_upload_assets_for_suggestions(
-            suggestions=change_note_suggestions, ankihub_did=ankihub_did
+            suggestions=change_note_suggestions,
+            ankihub_did=ankihub_did,
         ),
     )
 
@@ -226,25 +234,6 @@ def _suggestions_for_notes(
     return new_note_suggestions, change_note_suggestions, nids_without_changes
 
 
-def _change_note_suggestion(
-    note: Note, change_type: SuggestionType, comment: str
-) -> Optional[ChangeNoteSuggestion]:
-    note_data = to_note_data(note, diff=True)
-    assert note_data.ankihub_note_uuid is not None
-
-    if not note_data.fields and note_data.tags is None:
-        return None
-
-    return ChangeNoteSuggestion(
-        ankihub_note_uuid=note_data.ankihub_note_uuid,
-        anki_nid=note.id,
-        fields=note_data.fields,
-        tags=note_data.tags,
-        change_type=change_type,
-        comment=comment,
-    )
-
-
 def _new_note_suggestion(
     note: Note, ankihub_deck_uuid: uuid.UUID, comment: str
 ) -> NewNoteSuggestion:
@@ -263,6 +252,57 @@ def _new_note_suggestion(
     )
 
 
+def _change_note_suggestion(
+    note: Note, change_type: SuggestionType, comment: str
+) -> Optional[ChangeNoteSuggestion]:
+    note_from_anki_db = to_note_data(note)
+    assert isinstance(note_from_anki_db, NoteInfo)
+    assert note_from_anki_db.ankihub_note_uuid is not None
+    assert note_from_anki_db.tags is not None
+
+    note_from_ah_db = ankihub_db.note_data(note.id)
+
+    added_tags, removed_tags = _added_and_removed_tags(
+        prev_tags=note_from_ah_db.tags, cur_tags=note_from_anki_db.tags
+    )
+
+    fields_that_changed = _fields_that_changed(
+        prev_fields=note_from_ah_db.fields, cur_fields=note_from_anki_db.fields
+    )
+
+    if not added_tags and not removed_tags and not fields_that_changed:
+        return None
+
+    return ChangeNoteSuggestion(
+        ankihub_note_uuid=note_from_anki_db.ankihub_note_uuid,
+        anki_nid=note.id,
+        fields=fields_that_changed,
+        added_tags=added_tags,
+        removed_tags=removed_tags,
+        change_type=change_type,
+        comment=comment,
+    )
+
+
+def _added_and_removed_tags(
+    prev_tags: List[str], cur_tags: List[str]
+) -> Tuple[List[str], List[str]]:
+    added_tags = [tag for tag in cur_tags if tag not in prev_tags]
+    removed_tags = [tag for tag in prev_tags if tag not in cur_tags]
+    return added_tags, removed_tags
+
+
+def _fields_that_changed(
+    prev_fields: List[Field], cur_fields: List[Field]
+) -> List[Field]:
+    result = [
+        cur_field
+        for cur_field, prev_field in zip(cur_fields, prev_fields)
+        if cur_field.value != prev_field.value
+    ]
+    return result
+
+
 def _rename_and_upload_assets_for_suggestion(
     suggestion: NoteSuggestion, ankihub_did: uuid.UUID
 ) -> NoteSuggestion:
@@ -271,7 +311,8 @@ def _rename_and_upload_assets_for_suggestion(
 
 
 def _rename_and_upload_assets_for_suggestions(
-    suggestions: Sequence[NoteSuggestion], ankihub_did: uuid.UUID
+    suggestions: Sequence[NoteSuggestion],
+    ankihub_did: uuid.UUID,
 ) -> Sequence[NoteSuggestion]:
     """Renames assets referenced on the suggestions in the Anki collection and the media folder and
     uploads them to AnkiHub in another thread.
@@ -281,12 +322,30 @@ def _rename_and_upload_assets_for_suggestions(
     if not client.is_feature_flag_enabled("image_support_enabled"):
         return suggestions
 
-    original_image_names = get_image_names_from_suggestions(suggestions)
-    original_image_paths = [
-        Path(aqt.mw.col.media.dir()) / image_name for image_name in original_image_names
+    # TODO: remove this method 'get_image_names_from_notes_data' from ankihub client
+    original_notes_data = [
+        note_info
+        for suggestion in suggestions
+        if (note_info := ankihub_db.note_data(NoteId(suggestion.anki_nid)))
+    ]
+    original_notes_image_names: Set[str] = get_image_names_from_notes_data(
+        original_notes_data
+    )
+    suggestion_image_names: Set[str] = get_image_names_from_suggestions(suggestions)
+
+    # Filter out unchanged image names so we don't hash and upload images that aren't part of the suggestion
+    added_image_names = suggestion_image_names.difference(original_notes_image_names)
+
+    if not added_image_names:
+        # No images added, nothing to do here. Return
+        # the original suggestions object
+        return suggestions
+
+    added_image_paths = [
+        Path(aqt.mw.col.media.dir()) / image_name for image_name in added_image_names
     ]
 
-    asset_name_map = client.generate_asset_files_with_hashed_names(original_image_paths)
+    asset_name_map = client.generate_asset_files_with_hashed_names(added_image_paths)
 
     media_sync.start_media_upload(
         media_names=asset_name_map.values(), ankihub_did=ankihub_did
