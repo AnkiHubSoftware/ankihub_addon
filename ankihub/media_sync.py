@@ -8,6 +8,7 @@ from aqt.qt import QAction
 
 from . import LOGGER
 from .addon_ankihub_client import AddonAnkiHubClient
+from .ankihub_client import AnkiHubRequestError
 from .db import ankihub_db
 
 
@@ -91,8 +92,17 @@ class _AnkiHubMediaSync:
     def _download_missing_media(self):
         client = AddonAnkiHubClient()
         for ah_did in ankihub_db.ankihub_deck_ids():
-            if not client.is_image_upload_finished(ah_did):
-                continue
+            try:
+                if not client.is_image_upload_finished(ah_did):
+                    continue
+            except AnkiHubRequestError as e:
+                if e.response.status_code in (403, 404):
+                    LOGGER.warning(
+                        f"Could not check if image upload is finished for AnkiHub deck {ah_did}."
+                    )
+                    continue
+                else:
+                    raise e
             asset_disabled_fields = client.get_asset_disabled_fields(ah_did)
             missing_image_names = self._missing_images_for_ah_deck(
                 ah_did, asset_disabled_fields

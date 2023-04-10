@@ -133,7 +133,11 @@ def upload_logs_in_background(
     return key
 
 
-def upload_logs(key: str) -> str:
+def upload_logs(key: str) -> Optional[str]:
+    if not log_file_path().exists():
+        LOGGER.info("No logs to upload.")
+        return None
+
     try:
         client = AnkiHubClient()
         client.upload_logs(
@@ -156,7 +160,7 @@ def _on_upload_logs_done(future: Future) -> None:
         # Don't report outdated client errors that happen when uploading logs,
         # because they are handled by the add-on when they happen in other places
         # and we don't want to see them in Sentry.
-        if (
+        if e.response.status_code == 401 or (
             e.response.status_code == 406
             and e.response.reason == OUTDATED_CLIENT_ERROR_REASON
         ):

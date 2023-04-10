@@ -45,7 +45,7 @@ class AddonAnkiHubClient(AnkiHubClient):
             s3_bucket_url=config.s3_bucket_url,
             hooks=hooks if hooks is not None else DEFAULT_RESPONSE_HOOKS,
             token=config.token(),
-            local_media_dir_path=Path(aqt.mw.col.media.dir()),
+            local_media_dir_path=Path(aqt.mw.col.media.dir()) if aqt.mw.col else None,
         )
 
     def upload_logs(self, file: Path, key: str) -> None:
