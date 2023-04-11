@@ -37,16 +37,21 @@ def is_tag_for_group(tag: str, group_name: str) -> bool:
 
 
 def get_fields_protected_by_tags(note: Note) -> List[str]:
-    if TAG_FOR_PROTECTING_ALL_FIELDS in note.tags:
+    result = _get_fields_protected_by_tags(note.tags, note.keys())
+    return result
+
+
+def _get_fields_protected_by_tags(tags: List[str], field_names: List[str]) -> List[str]:
+    if TAG_FOR_PROTECTING_ALL_FIELDS in tags:
         return [
             field_name
-            for field_name in note.keys()
+            for field_name in field_names
             if field_name != settings.ANKIHUB_NOTE_TYPE_FIELD_NAME
         ]
 
     field_names_from_tags = [
         tag[len(prefix) :]
-        for tag in note.tags
+        for tag in tags
         if tag.startswith((prefix := f"{TAG_FOR_PROTECTING_FIELDS}::"))
     ]
 
@@ -56,12 +61,12 @@ def get_fields_protected_by_tags(note: Note) -> List[str]:
         field.replace("_", " ") for field in field_names_from_tags
     ]
     standardized_field_names_from_note = [
-        field.replace("_", " ") for field in note.keys()
+        field.replace("_", " ") for field in field_names
     ]
 
     result = [
         field
-        for field, field_std in zip(note.keys(), standardized_field_names_from_note)
+        for field, field_std in zip(field_names, standardized_field_names_from_note)
         if field_std in standardized_field_names_from_tags
     ]
 
