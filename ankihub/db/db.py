@@ -15,6 +15,8 @@ from ..ankihub_client import Field, NoteInfo, suggestion_type_from_str
 from ..common_utils import IMG_NAME_IN_IMG_TAG_REGEX
 from .db_utils import DBConnection
 
+ANKIHUB_ASSET_DISABLED_FIELD_BYPASS_TAG = "AnkiHub::ImageReady"
+
 
 def attach_ankihub_db_to_anki_db_connection() -> None:
     if aqt.mw.col is None:
@@ -490,20 +492,27 @@ class _AnkiHubDB:
         disabled_field_ords = [
             field_names_for_mid.index(name) for name in disabled_field_names
         ]
-        fields_with_images = self.list(
+        fields_with_images = self.execute(
             f"""
-            SELECT fields FROM notes
+            SELECT fields, tags FROM notes
             WHERE anki_note_type_id = {mid}
             AND fields LIKE '%<img%'
-            """,
+            """
         )
 
         result = set()
-        for fields_string in fields_with_images:
+        for fields_string, tags in fields_with_images:
             fields = split_fields(fields_string)
             for field_idx, field_text in enumerate(fields):
-                if field_idx in disabled_field_ords:
+                # TODO: This ANKIHUB_ASSET_ENABLED_TAG bypass is used to allow fields with
+                # this specific tag to have the assets downloaded, despite the field being
+                # marked as an asset-disabled field. This will be removed in the future.
+                if (
+                    ANKIHUB_ASSET_DISABLED_FIELD_BYPASS_TAG not in tags
+                    and field_idx in disabled_field_ords
+                ):
                     continue
+
                 for img in re.findall(IMG_NAME_IN_IMG_TAG_REGEX, field_text):
                     if img.startswith("http://") or img.startswith("https://"):
                         continue
