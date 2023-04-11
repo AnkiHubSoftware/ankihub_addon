@@ -507,11 +507,24 @@ class _AnkiHubDB:
                 # TODO: This ANKIHUB_ASSET_ENABLED_TAG bypass is used to allow fields with
                 # this specific tag to have the assets downloaded, despite the field being
                 # marked as an asset-disabled field. This will be removed in the future.
+                field_name = field_names_for_mid[field_idx]
+                bypass_asset_disabled_tag = (
+                    f"{ANKIHUB_ASSET_DISABLED_FIELD_BYPASS_TAG}::{field_name}"
+                )
+
                 if (
-                    ANKIHUB_ASSET_DISABLED_FIELD_BYPASS_TAG not in tags
+                    bypass_asset_disabled_tag not in tags
                     and field_idx in disabled_field_ords
                 ):
+                    LOGGER.info(
+                        f"Blocking asset download in [{field_name}] field without the tag [{bypass_asset_disabled_tag}]"
+                    )
                     continue
+
+                if bypass_asset_disabled_tag in tags:
+                    LOGGER.info(
+                        f"Allowing asset download in [{field_name}] field - note has tag [{bypass_asset_disabled_tag}]",
+                    )
 
                 for img in re.findall(IMG_NAME_IN_IMG_TAG_REGEX, field_text):
                     if img.startswith("http://") or img.startswith("https://"):
