@@ -318,9 +318,8 @@ def test_editor(
         # this should trigger a suggestion because the note has been changed
         _on_suggestion_button_press(editor)
 
-        # mocked requests: f"{config.api_url_base}/notes/{notes_2_ah_nid}/suggestion/" and
-        # request to check feature flags
-        assert requests_mock.call_count == 2
+        # mocked requests: f"{config.api_url_base}/notes/{notes_2_ah_nid}/suggestion/"
+        assert requests_mock.call_count == 1
 
 
 def test_get_note_types_in_deck(anki_session_with_addon_data: AnkiSession):

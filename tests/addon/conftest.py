@@ -9,6 +9,12 @@ from pytest import MonkeyPatch
 from pytest_anki import AnkiSession
 from requests_mock import Mocker
 
+from ..fixtures import (  # noqa F401
+    ankihub_basic_note_type,
+    next_deterministic_id,
+    next_deterministic_uuid,
+)
+
 REPO_ROOT_PATH = Path(__file__).absolute().parent.parent.parent
 
 # id of the Anki profile used for testing

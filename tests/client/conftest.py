@@ -3,6 +3,8 @@ from unittest.mock import MagicMock
 
 from pytest import MonkeyPatch, fixture
 
+from ..fixtures import next_deterministic_id, next_deterministic_uuid  # noqa F401
+
 ROOT = pathlib.Path(__file__).parent.parent.parent
 
 
