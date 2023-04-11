@@ -261,7 +261,6 @@ def test_editor(
     monkeypatch: MonkeyPatch,
     next_deterministic_uuid: Callable[[], uuid.UUID],
     install_sample_ah_deck: InstallSampleAHDeck,
-    disable_image_support_feature_flag,
 ):
     with anki_session_with_addon_data.profile_loaded():
         mw = anki_session_with_addon_data.mw
@@ -365,7 +364,6 @@ def test_create_collaborative_deck_and_upload(
     anki_session_with_addon_data: AnkiSession,
     monkeypatch: MonkeyPatch,
     next_deterministic_uuid: Callable[[], uuid.UUID],
-    enable_image_support_feature_flag,
 ):
     with anki_session_with_addon_data.profile_loaded():
         mw = anki_session_with_addon_data.mw
@@ -476,7 +474,6 @@ def test_suggest_note_update(
     anki_session_with_addon_data: AnkiSession,
     install_sample_ah_deck: InstallSampleAHDeck,
     monkeypatch: MonkeyPatch,
-    disable_image_support_feature_flag,
 ):
     anki_session = anki_session_with_addon_data
     with anki_session.profile_loaded():
@@ -544,7 +541,6 @@ def test_suggest_new_note(
     anki_session_with_addon_data: AnkiSession,
     requests_mock: Mocker,
     install_sample_ah_deck: InstallSampleAHDeck,
-    disable_image_support_feature_flag,
 ):
     anki_session = anki_session_with_addon_data
     with anki_session.profile_loaded():
@@ -602,7 +598,6 @@ def test_suggest_notes_in_bulk(
     monkeypatch: MonkeyPatch,
     install_sample_ah_deck: InstallSampleAHDeck,
     next_deterministic_uuid: Callable[[], uuid.UUID],
-    disable_image_support_feature_flag,
 ):
     anki_session = anki_session_with_addon_data
     bulk_suggestions_method_mock = MagicMock()
@@ -2204,7 +2199,6 @@ def test_reset_local_changes_to_notes(
 def test_migrate_profile_data_from_old_location(
     anki_session_with_addon_before_profile_support: AnkiSession,
     monkeypatch: MonkeyPatch,
-    disable_image_support_feature_flag,
 ):
     anki_session = anki_session_with_addon_before_profile_support
 
@@ -2673,7 +2667,6 @@ def test_download_images_on_sync(
     install_sample_ah_deck: InstallSampleAHDeck,
     monkeypatch: MonkeyPatch,
     qtbot: QtBot,
-    enable_image_support_feature_flag,
 ):
     with anki_session_with_addon_data.profile_loaded():
         mw = anki_session_with_addon_data.mw
@@ -2733,7 +2726,6 @@ class TestSuggestionsWithImages:
         monkeypatch: MonkeyPatch,
         install_sample_ah_deck: Callable[[], Tuple[uuid.UUID, int]],
         qtbot: QtBot,
-        enable_image_support_feature_flag,
     ):
         anki_session = anki_session_with_addon_data
         with anki_session.profile_loaded():
@@ -2823,7 +2815,6 @@ class TestSuggestionsWithImages:
         monkeypatch: MonkeyPatch,
         install_sample_ah_deck: InstallSampleAHDeck,
         qtbot: QtBot,
-        enable_image_support_feature_flag,
     ):
         anki_session = anki_session_with_addon_data
         with anki_session.profile_loaded():
@@ -2945,7 +2936,6 @@ class TestSuggestionsWithImages:
         requests_mock: Mocker,
         monkeypatch: MonkeyPatch,
         install_sample_ah_deck: Callable[[], Tuple[uuid.UUID, int]],
-        enable_image_support_feature_flag,
     ):
         anki_session = anki_session_with_addon_data
         with anki_session.profile_loaded():

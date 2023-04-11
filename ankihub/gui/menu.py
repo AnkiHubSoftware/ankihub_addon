@@ -23,7 +23,6 @@ from aqt.operations import QueryOp
 from aqt.qt import QAction, QDialog, QKeySequence, QMenu, Qt, qconnect
 from aqt.studydeck import StudyDeck
 from aqt.utils import openLink, showInfo, tooltip
-from requests.exceptions import ConnectionError
 
 from .. import LOGGER
 from ..addon_ankihub_client import AddonAnkiHubClient as AnkiHubClient
@@ -252,15 +251,14 @@ def create_collaborative_deck_action() -> None:
         return
 
     should_upload_assets = False
-    if AnkiHubClient().is_feature_flag_enabled("image_support_enabled"):
-        confirm = ask_user(
-            "Do you want to upload images for this deck as well? "
-            "This will take some extra time but it is required to display the images "
-            "on AnkiHub and this way subscribers will be able to download the images "
-            "when installing the deck. "
-        )
-        if confirm:
-            should_upload_assets = True
+    confirm = ask_user(
+        "Do you want to upload images for this deck as well? "
+        "This will take some extra time but it is required to display the images "
+        "on AnkiHub and this way subscribers will be able to download the images "
+        "when installing the deck. "
+    )
+    if confirm:
+        should_upload_assets = True
 
     def on_success(ankihub_did: uuid.UUID) -> None:
         anki_did = aqt.mw.col.decks.id_for_name(deck_name)
@@ -431,13 +429,6 @@ def upload_deck_assets_setup(parent):
 def upload_deck_assets_action() -> None:
     client = AnkiHubClient()
 
-    if not client.is_feature_flag_enabled("image_support_enabled"):
-        showInfo(
-            "The image support feature is not enabled yet for your account.<br>"
-            "We are working on it and it will be available soon for everyone 📸"
-        )
-        return
-
     # Fetch the ankihub deck ids of all decks the user owns
     owned_ah_dids = client.owned_deck_ids()
 
@@ -591,18 +582,6 @@ def ankihub_logout_setup(parent):
 
 
 def media_sync_status_setup(parent: QMenu):
-    image_support_enabled = False
-    try:
-        image_support_enabled = AnkiHubClient().is_feature_flag_enabled(
-            "image_support_enabled"
-        )
-    except (ConnectionError, AnkiHubRequestError):
-        # If we can't get the feature flags, we assume that the feature is disabled.
-        return
-
-    if not image_support_enabled:
-        return
-
     parent._media_sync_status_action = QAction("", parent)  # type: ignore
     parent.addAction(parent._media_sync_status_action)  # type: ignore
     media_sync.set_status_action(parent._media_sync_status_action)  # type: ignore

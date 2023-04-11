@@ -894,7 +894,6 @@ class TestUploadImagesForSuggestion:
         monkeypatch,
         next_deterministic_uuid: Callable[[], uuid.UUID],
         remove_generated_asset_files,
-        enable_image_support_feature_flag,
         request: FixtureRequest,
     ):
         client = AnkiHubClient(local_media_dir_path=TEST_MEDIA_PATH)
