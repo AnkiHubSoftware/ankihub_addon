@@ -250,9 +250,6 @@ def create_collaborative_deck_action() -> None:
     if not confirm:
         return
 
-    should_upload_assets = False
-    confirm = ask_user(
-        "Do you want to upload images for this deck as well? "
     should_upload_assets = ask_user(
         "Do you want to upload images for this deck as well? "
         "This will take some extra time but it is required to display the images "
