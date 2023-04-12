@@ -15,7 +15,7 @@ from ..ankihub_client import Field, NoteInfo, suggestion_type_from_str
 from ..common_utils import IMG_NAME_IN_IMG_TAG_REGEX
 from .db_utils import DBConnection
 
-ANKIHUB_ASSET_DISABLED_FIELD_BYPASS_TAG = "AnkiHub::ImageReady"
+ASSET_DISABLED_FIELD_BYPASS_TAG = "AnkiHub_ImageReady"
 
 
 def attach_ankihub_db_to_anki_db_connection() -> None:
