@@ -458,7 +458,7 @@ class TestAnkiHubDBMediaNamesForAnkiHubDeck:
                 self.ah_did, asset_disabled_fields={self.mid: ["Front"]}
             ) == {"test2.jpg"}
 
-    def test_bypass_by_ankihub_asset_disabled_bypass_tag(
+    def test_bypass_by_asset_disabled_bypass_tag(
         self,
         anki_session: AnkiSession,
         ankihub_db: _AnkiHubDB,
