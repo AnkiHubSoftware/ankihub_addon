@@ -167,10 +167,14 @@ def _maybe_change_file_permissions_of_addon_files(module: str) -> None:
 
 def _change_file_permissions_of_addon_files(addon_dir: Path) -> None:
     for file in addon_dir.rglob("*"):
-        if file.is_dir():
-            os.chmod(file, 0o777)
-        else:
-            os.chmod(file, 0o666)
+        try:
+            if file.is_dir():
+                os.chmod(file, 0o777)
+            else:
+                os.chmod(file, 0o666)
+        except FileNotFoundError:
+            # This can happen if the file was deleted in the meantime (e.g. __pychache__ files)
+            pass
     LOGGER.info(f"On deleteAddon changed file permissions for all files in {addon_dir}")
 
 
