@@ -18,7 +18,7 @@ os.environ["SKIP_INIT"] = "1"
 
 from ankihub import suggestions
 from ankihub.ankihub_client import Field, SuggestionType
-from ankihub.db.db import _AnkiHubDB
+from ankihub.db.db import ANKIHUB_ASSET_DISABLED_FIELD_BYPASS_TAG, _AnkiHubDB
 from ankihub.error_reporting import normalize_url
 from ankihub.exporting import _prepared_field_html
 from ankihub.gui.suggestion_dialog import (
@@ -457,6 +457,18 @@ class TestAnkiHubDBMediaNamesForAnkiHubDeck:
             assert ankihub_db.media_names_for_ankihub_deck(
                 self.ah_did, asset_disabled_fields={self.mid: ["Front"]}
             ) == {"test2.jpg"}
+            
+    def test_bypass_by_bypass_asset_disabled_tag(self,
+        anki_session: AnkiSession,
+        ankihub_db: _AnkiHubDB,):
+        with anki_session.profile_loaded():
+            # Set bypass tag
+            ankihub_db.execute(sql=f"UPDATE notes set tags = '{ANKIHUB_ASSET_DISABLED_FIELD_BYPASS_TAG}::Front WHERE ankihub_deck_id = {self.ah_did}';")
+
+            assert ankihub_db.media_names_for_ankihub_deck(
+                self.ah_did, asset_disabled_fields={self.mid: ["Front"]}
+            ) == {"test1.jpg", "test2.jpg"}
+            
 
     def test_with_notetype_missing_from_anki_db(
         self,
