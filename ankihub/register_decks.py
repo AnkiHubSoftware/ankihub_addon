@@ -56,8 +56,9 @@ def upload_deck(
 
     # Upload all existing local assets for this deck
     # (assets that are referenced on Deck's notes)
-    image_names = get_image_names_from_notes_data(notes_data)
-    media_sync.start_media_upload(image_names, ankihub_did)
+    if should_upload_assets:
+        image_names = get_image_names_from_notes_data(notes_data)
+        media_sync.start_media_upload(image_names, ankihub_did)
 
     return ankihub_did
 
