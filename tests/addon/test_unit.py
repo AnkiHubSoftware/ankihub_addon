@@ -18,7 +18,7 @@ os.environ["SKIP_INIT"] = "1"
 
 from ankihub import suggestions
 from ankihub.ankihub_client import Field, SuggestionType
-from ankihub.db.db import ANKIHUB_ASSET_DISABLED_FIELD_BYPASS_TAG, _AnkiHubDB
+from ankihub.db.db import ASSET_DISABLED_FIELD_BYPASS_TAG, _AnkiHubDB
 from ankihub.error_reporting import normalize_url
 from ankihub.exporting import _prepared_field_html
 from ankihub.gui.suggestion_dialog import (
@@ -465,7 +465,7 @@ class TestAnkiHubDBMediaNamesForAnkiHubDeck:
     ):
         with anki_session.profile_loaded():
             # Set bypass tag
-            bypass_tag = f"{ANKIHUB_ASSET_DISABLED_FIELD_BYPASS_TAG}::Front"
+            bypass_tag = f"{ASSET_DISABLED_FIELD_BYPASS_TAG}::Front"
             sql = f"UPDATE notes SET tags = '{bypass_tag}' WHERE ankihub_deck_id = '{str(self.ah_did)}';"
             ankihub_db.execute(sql=sql)
 

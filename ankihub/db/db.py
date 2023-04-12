@@ -507,7 +507,9 @@ class _AnkiHubDB:
                 field_name = field_names_for_mid[field_idx]
                 # Tags cant have spaces, so we replace spaces with underscores to make it possible to
                 # reference a field name with spaces using a tag.
-                bypass_asset_disabled_tag = f"{ANKIHUB_ASSET_DISABLED_FIELD_BYPASS_TAG}::{field_name.replace(' ', '_')}"
+                bypass_asset_disabled_tag = (
+                    f"{ASSET_DISABLED_FIELD_BYPASS_TAG}::{field_name.replace(' ', '_')}"
+                )
 
                 bypass = bypass_asset_disabled_tag in tags
                 if not bypass and field_idx in disabled_field_ords:
