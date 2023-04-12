@@ -493,13 +493,9 @@ class _AnkiHubDB:
             field_names_for_mid.index(name) for name in disabled_field_names
         ]
         fields_tags_pairs = self.execute(
-	            f"""
-	            SELECT fields, tags FROM notes
-	            WHERE anki_note_type_id = {mid}
-	            AND fields LIKE '%<img%'
-	            """
-	        )
-	
+            f"""SELECT fields, tags FROM notes WHERE anki_note_type_id = {mid} AND fields LIKE '%<img%'"""
+        )
+
         result = set()
         for fields_string, tags_string in fields_tags_pairs:
             fields = split_fields(fields_string)

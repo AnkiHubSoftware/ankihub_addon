@@ -457,18 +457,21 @@ class TestAnkiHubDBMediaNamesForAnkiHubDeck:
             assert ankihub_db.media_names_for_ankihub_deck(
                 self.ah_did, asset_disabled_fields={self.mid: ["Front"]}
             ) == {"test2.jpg"}
-            
-    def test_bypass_by_bypass_asset_disabled_tag(self,
+
+    def test_bypass_by_ankihub_asset_disabled_bypass_tag(
+        self,
         anki_session: AnkiSession,
-        ankihub_db: _AnkiHubDB,):
+        ankihub_db: _AnkiHubDB,
+    ):
         with anki_session.profile_loaded():
             # Set bypass tag
-            ankihub_db.execute(sql=f"UPDATE notes set tags = '{ANKIHUB_ASSET_DISABLED_FIELD_BYPASS_TAG}::Front WHERE ankihub_deck_id = {self.ah_did}';")
+            bypass_tag = f"{ANKIHUB_ASSET_DISABLED_FIELD_BYPASS_TAG}::Front"
+            sql = f"UPDATE notes SET tags = '{bypass_tag}' WHERE ankihub_deck_id = '{str(self.ah_did)}';"
+            ankihub_db.execute(sql=sql)
 
             assert ankihub_db.media_names_for_ankihub_deck(
                 self.ah_did, asset_disabled_fields={self.mid: ["Front"]}
             ) == {"test1.jpg", "test2.jpg"}
-            
 
     def test_with_notetype_missing_from_anki_db(
         self,
