@@ -56,7 +56,7 @@ def upload_deck(
 
     # Upload all existing local assets for this deck
     # (assets that are referenced on Deck's notes)
-    if should_upload_assets and client.is_feature_flag_enabled("image_support_enabled"):
+    if should_upload_assets:
         image_names = get_image_names_from_notes_data(notes_data)
         media_sync.start_media_upload(image_names, ankihub_did)
 

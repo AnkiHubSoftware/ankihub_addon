@@ -3,18 +3,15 @@ import os
 import uuid
 from typing import Callable
 
-import pytest
 from anki.models import NotetypeDict
 from aqt.main import AnkiQt
 from pytest import fixture
 from pytest_anki import AnkiSession
-from requests_mock import Mocker
 
 # workaround for vscode test discovery not using pytest.ini which sets this env var
 # has to be set before importing ankihub
 os.environ["SKIP_INIT"] = "1"
 
-from ankihub.ankihub_client import DEFAULT_API_URL
 from ankihub.utils import modify_note_type
 
 
@@ -46,24 +43,6 @@ def next_deterministic_id() -> Callable[[], int]:
         return counter
 
     return _next_deterministic_id
-
-
-@pytest.fixture
-def enable_image_support_feature_flag(requests_mock: Mocker) -> None:
-    requests_mock.get(
-        f"{DEFAULT_API_URL}/feature-flags",
-        status_code=200,
-        json={"flags": {"image_support_enabled": {"is_active": True}}},
-    )
-
-
-@pytest.fixture
-def disable_image_support_feature_flag(requests_mock: Mocker) -> None:
-    requests_mock.get(
-        f"{DEFAULT_API_URL}/feature-flags",
-        status_code=200,
-        json={"flags": {"image_support_enabled": {"is_active": False}}},
-    )
 
 
 @fixture
