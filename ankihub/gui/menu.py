@@ -253,12 +253,12 @@ def create_collaborative_deck_action() -> None:
     should_upload_assets = False
     confirm = ask_user(
         "Do you want to upload images for this deck as well? "
+    should_upload_assets = ask_user(
+        "Do you want to upload images for this deck as well? "
         "This will take some extra time but it is required to display the images "
         "on AnkiHub and this way subscribers will be able to download the images "
         "when installing the deck. "
     )
-    if confirm:
-        should_upload_assets = True
 
     def on_success(ankihub_did: uuid.UUID) -> None:
         anki_did = aqt.mw.col.decks.id_for_name(deck_name)
