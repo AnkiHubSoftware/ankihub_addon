@@ -503,7 +503,7 @@ class _AnkiHubDB:
             for field_idx, field_text in enumerate(fields):
                 # TODO: This ANKIHUB_ASSET_ENABLED_TAG bypass is used to allow fields with
                 # this specific tag to have the assets downloaded, despite the field being
-                # marked as an asset-disabled field. This will be removed in the future.
+                # marked as an asset-disabled field. Decide whether to remove this.
                 field_name = field_names_for_mid[field_idx]
                 # Tags cant have spaces, so we replace spaces with underscores to make it possible to
                 # reference a field name with spaces using a tag.
