@@ -16,6 +16,33 @@ from .db import is_ankihub_db_attached_to_anki_db
 from .errors import report_exception_and_upload_logs
 
 
+def setup():
+    _setup_logging_for_sync_collection_and_media()
+    _setup_logging_for_db_begin()
+
+    _setup_sentry_reporting_for_error_on_addon_update()
+
+
+def user_files_context_dict() -> Dict[str, Any]:
+    """Return a dict with information about the user files of the AnkiHub add-on to be sent as
+    context to Sentry."""
+    ankihub_module = aqt.mw.addonManager.addonFromModule(__name__)
+    user_files_path = Path(aqt.mw.addonManager._userFilesPath(ankihub_module))
+    all_file_paths = [user_files_path, *list(user_files_path.rglob("*"))]
+    problematic_file_paths = []
+    if is_win:
+        problematic_file_paths = [
+            file for file in all_file_paths if not _file_is_accessible(file)
+        ]
+
+    result = {
+        "all files": [str(file) for file in all_file_paths],
+        "inaccessible files": [str(file) for file in problematic_file_paths],
+        "Is ankihub database attached to anki database?": is_ankihub_db_attached_to_anki_db(),
+    }
+    return result
+
+
 def _with_sentry_report_about_user_files_on_error(*args: Any, **kwargs: Any) -> Any:
     _old: Callable = kwargs["_old"]
     del kwargs["_old"]
@@ -28,28 +55,9 @@ def _with_sentry_report_about_user_files_on_error(*args: Any, **kwargs: Any) -> 
 
 
 def _report_user_files_debug_info_to_sentry(e: Exception) -> None:
-    report_exception_and_upload_logs(e, context=_user_files_context_dict())
-
-
-def _user_files_context_dict() -> Dict[str, Dict[str, Any]]:
-    """Return a dict with information about the user files of the AnkiHub add-on."""
-    ankihub_module = aqt.mw.addonManager.addonFromModule(__name__)
-    user_files_path = Path(aqt.mw.addonManager._userFilesPath(ankihub_module))
-    all_file_paths = [user_files_path, *list(user_files_path.rglob("*"))]
-    problematic_file_paths = []
-    if is_win:
-        problematic_file_paths = [
-            file for file in all_file_paths if not _file_is_accessible(file)
-        ]
-
-    result = {
-        "Add-on update debug info": {
-            "all files": [str(file) for file in all_file_paths],
-            "inaccessible files": [str(file) for file in problematic_file_paths],
-            "Is ankihub database attached to anki database?": is_ankihub_db_attached_to_anki_db(),
-        },
-    }
-    return result
+    report_exception_and_upload_logs(
+        e, context={"User files debug info": user_files_context_dict()}
+    )
 
 
 def _file_is_accessible(f: Path) -> bool:
@@ -102,10 +110,3 @@ def _setup_sentry_reporting_for_error_on_addon_update():
         new=_with_sentry_report_about_user_files_on_error,
         pos="around",
     )
-
-
-def setup():
-    _setup_logging_for_sync_collection_and_media()
-    _setup_logging_for_db_begin()
-
-    _setup_sentry_reporting_for_error_on_addon_update()

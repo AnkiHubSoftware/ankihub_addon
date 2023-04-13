@@ -145,7 +145,19 @@ class _AnkiHubDB:
         return result
 
     def connection(self) -> DBConnection:
-        return DBConnection(conn=sqlite3.connect(ankihub_db.database_path))
+        try:
+            result = DBConnection(conn=sqlite3.connect(ankihub_db.database_path))
+        except Exception as e:
+            from sentry_sdk import push_scope
+
+            from ..debug import user_files_context_dict
+
+            with push_scope() as scope:
+                scope.set_context("AnkiHub DB path", {"path": ankihub_db.database_path})
+                scope.set_context("User files debug info", user_files_context_dict())
+                raise e
+
+        return result
 
     def upsert_notes_data(
         self, ankihub_did: uuid.UUID, notes_data: List[NoteInfo]
