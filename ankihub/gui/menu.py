@@ -28,7 +28,7 @@ from .. import LOGGER
 from ..addon_ankihub_client import AddonAnkiHubClient as AnkiHubClient
 from ..ankihub_client import AnkiHubRequestError, get_image_names_from_notes_data
 from ..db import ankihub_db
-from ..error_reporting import upload_logs_in_background
+from ..errors import upload_logs_in_background
 from ..media_import.ui import open_import_dialog
 from ..media_sync import media_sync
 from ..register_decks import create_collaborative_deck

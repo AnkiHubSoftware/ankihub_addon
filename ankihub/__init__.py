@@ -25,13 +25,6 @@ def debug() -> None:
 
 
 if not SKIP_INIT:
-    from .error_reporting import report_exception_and_upload_logs
+    from . import entry_point
 
-    try:
-        from . import entry_point
-
-        entry_point.run()
-    except Exception as e:
-        # should we show exceptions to the user too?
-        LOGGER.exception(e)
-        report_exception_and_upload_logs()
+    entry_point.run()
