@@ -373,7 +373,8 @@ def create_backup() -> None:
 
 def _create_backup_with_retry_anki_50() -> bool:
     """Create a backup and retry once if it raises an exception."""
-    # The backup can fail with an exception when aqt.mw.autosave() is called while the backup is running.
+    # The backup can fail with DBError("Cannot start transaction within a transaction")
+    # when aqt.mw.autosave() is called while the backup is running.
     # This can happen for example when an aqt.operations.CollectionOp is executed in another thread. After the
     # CollectionOp is finished, autosave is called, which calls mw.db.begin().
     # When the backup is finished, it also calls mw.db.begin() which raises an exception
