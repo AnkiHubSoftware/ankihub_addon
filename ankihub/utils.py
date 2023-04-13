@@ -358,11 +358,7 @@ def create_backup() -> None:
     try:
         created: Optional[bool] = None
         if ANKI_MINOR >= 50:
-            created = aqt.mw.col.create_backup(
-                backup_folder=aqt.mw.pm.backupFolder(),
-                force=True,
-                wait_for_completion=True,
-            )
+            _create_backup_with_retry_anki_50()
         else:
             aqt.mw.col.close(downgrade=False)
             aqt.mw.backup()  # type: ignore
@@ -373,6 +369,45 @@ def create_backup() -> None:
     except Exception as exc:
         LOGGER.info("Backup failed")
         raise exc
+
+
+def _create_backup_with_retry_anki_50() -> bool:
+    """Create a backup and retry once if it raises an exception."""
+    # The backup can fail with DBError("Cannot start transaction within a transaction")
+    # when aqt.mw.autosave() is called while the backup is running.
+    # This can happen for example when an aqt.operations.CollectionOp is executed in another thread. After the
+    # CollectionOp is finished, autosave is called, which calls mw.db.begin().
+    # When the backup is finished, it also calls mw.db.begin() which raises an exception
+    # if begin() was already called and no mw.db.commit() or mw.db.rollback() was called in between.
+    # See https://ankihub.sentry.io/issues/3801328076/?project=6546414.
+    # There are other ways to handle this problem, but this seems like a safe one in the sense that it doesn't
+    # rely on the implementation of the backup function staying the same.
+    try:
+        created = _create_backup_anki_50()
+    except Exception as exc:
+        LOGGER.info(f"Backup failed on the first attempt. {exc=}")
+
+        # retry once
+        LOGGER.info("Retrying backup...")
+        try:
+            created = _create_backup_anki_50()
+        except Exception as exc:
+            LOGGER.info("Backup failed second time")
+            raise exc
+
+    LOGGER.info(f"Backup successful. {created=}")
+    return created
+
+
+def _create_backup_anki_50() -> bool:
+    """Create a backup and return whether it was created or not.
+    Works for Anki 2.1.50 and newer."""
+    created = aqt.mw.col.create_backup(
+        backup_folder=aqt.mw.pm.backupFolder(),
+        force=True,
+        wait_for_completion=True,
+    )
+    return created
 
 
 def truncated_list(values: List[Any], limit: int) -> List[Any]:
