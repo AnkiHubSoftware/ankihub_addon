@@ -18,7 +18,7 @@ os.environ["SKIP_INIT"] = "1"
 
 from ankihub import suggestions
 from ankihub.ankihub_client import Field, SuggestionType
-from ankihub.db.db import _AnkiHubDB
+from ankihub.db.db import ASSET_DISABLED_FIELD_BYPASS_TAG, _AnkiHubDB
 from ankihub.error_reporting import normalize_url
 from ankihub.exporting import _prepared_field_html
 from ankihub.gui.suggestion_dialog import (
@@ -28,7 +28,13 @@ from ankihub.gui.suggestion_dialog import (
     SuggestionSource,
 )
 from ankihub.importing import updated_tags
-from ankihub.note_conversion import ADDON_INTERNAL_TAGS, TAG_FOR_OPTIONAL_TAGS
+from ankihub.note_conversion import (
+    ADDON_INTERNAL_TAGS,
+    TAG_FOR_OPTIONAL_TAGS,
+    TAG_FOR_PROTECTING_ALL_FIELDS,
+    TAG_FOR_PROTECTING_FIELDS,
+    _get_fields_protected_by_tags,
+)
 from ankihub.register_decks import note_type_name_without_ankihub_modifications
 from ankihub.subdecks import SUBDECK_TAG, add_subdeck_tags_to_notes
 from ankihub.utils import lowest_level_common_ancestor_deck_name
@@ -174,6 +180,39 @@ def test_updated_tags():
             protected_tags=[],
         )
     ) == set([optional_tag])
+
+
+class TestGetFieldsProtectedByTags:
+    def test_protecting_single_fields(self):
+        assert set(
+            _get_fields_protected_by_tags(
+                tags=[
+                    f"{TAG_FOR_PROTECTING_FIELDS}::Text",
+                    f"{TAG_FOR_PROTECTING_FIELDS}::Missed_Questions",
+                ],
+                field_names=["Text", "Extra", "Missed Questions", "Lecture Notes"],
+            )
+        ) == set(["Text", "Missed Questions"])
+
+    def test_trying_to_protect_not_existing_field(self):
+        # When trying to protect a field that does not exist, it should be ignored.
+        assert set(
+            _get_fields_protected_by_tags(
+                tags=[
+                    f"{TAG_FOR_PROTECTING_FIELDS}::Text",
+                    f"{TAG_FOR_PROTECTING_FIELDS}::Front",
+                ],
+                field_names=["Text", "Extra", "Missed Questions", "Lecture Notes"],
+            )
+        ) == set(["Text"])
+
+    def test_protecting_all_fields(self):
+        assert set(
+            _get_fields_protected_by_tags(
+                tags=[TAG_FOR_PROTECTING_ALL_FIELDS],
+                field_names=["Text", "Extra", "Missed Questions", "Lecture Notes"],
+            )
+        ) == set(["Text", "Extra", "Missed Questions", "Lecture Notes"])
 
 
 def test_normalize_url():
@@ -418,6 +457,21 @@ class TestAnkiHubDBMediaNamesForAnkiHubDeck:
             assert ankihub_db.media_names_for_ankihub_deck(
                 self.ah_did, asset_disabled_fields={self.mid: ["Front"]}
             ) == {"test2.jpg"}
+
+    def test_bypass_by_asset_disabled_bypass_tag(
+        self,
+        anki_session: AnkiSession,
+        ankihub_db: _AnkiHubDB,
+    ):
+        with anki_session.profile_loaded():
+            # Set bypass tag
+            bypass_tag = f"{ASSET_DISABLED_FIELD_BYPASS_TAG}::Front"
+            sql = f"UPDATE notes SET tags = '{bypass_tag}' WHERE ankihub_deck_id = '{str(self.ah_did)}';"
+            ankihub_db.execute(sql=sql)
+
+            assert ankihub_db.media_names_for_ankihub_deck(
+                self.ah_did, asset_disabled_fields={self.mid: ["Front"]}
+            ) == {"test1.jpg", "test2.jpg"}
 
     def test_with_notetype_missing_from_anki_db(
         self,

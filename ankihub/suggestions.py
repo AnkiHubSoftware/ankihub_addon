@@ -319,8 +319,6 @@ def _rename_and_upload_assets_for_suggestions(
     Returns suggestion with updated asset names."""
 
     client = AnkiHubClient()
-    if not client.is_feature_flag_enabled("image_support_enabled"):
-        return suggestions
 
     # TODO: remove this method 'get_image_names_from_notes_data' from ankihub client
     original_notes_data = [
