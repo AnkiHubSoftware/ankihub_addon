@@ -522,9 +522,7 @@ def ankihub_help_setup(parent):
     q_notion_action = QAction("Instructions && Changelog", help_menu)
     qconnect(
         q_notion_action.triggered,
-        lambda: openLink(
-            "https://www.notion.so/ankipalace/AnkiHub-Documentation-dd8584f3e6c04068ab47e072c17b3a0a"
-        ),
+        lambda: openLink("http://docs.ankihub.net/"),
     )
     help_menu.addAction(q_notion_action)
 
