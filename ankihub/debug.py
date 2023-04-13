@@ -23,7 +23,24 @@ def setup():
     _setup_sentry_reporting_for_error_on_addon_update()
 
 
-def user_files_context_dict() -> Dict[str, Any]:
+def _with_sentry_report_about_user_files_on_error(*args: Any, **kwargs: Any) -> Any:
+    _old: Callable = kwargs["_old"]
+    del kwargs["_old"]
+
+    try:
+        return _old(*args, **kwargs)
+    except Exception as e:
+        report_user_files_debug_info_to_sentry(e)
+        raise e
+
+
+def report_user_files_debug_info_to_sentry(e: Exception) -> None:
+    report_exception_and_upload_logs(
+        e, context={"User files debug info": _user_files_context_dict()}
+    )
+
+
+def _user_files_context_dict() -> Dict[str, Any]:
     """Return a dict with information about the user files of the AnkiHub add-on to be sent as
     context to Sentry."""
     ankihub_module = aqt.mw.addonManager.addonFromModule(__name__)
@@ -41,23 +58,6 @@ def user_files_context_dict() -> Dict[str, Any]:
         "Is ankihub database attached to anki database?": is_ankihub_db_attached_to_anki_db(),
     }
     return result
-
-
-def _with_sentry_report_about_user_files_on_error(*args: Any, **kwargs: Any) -> Any:
-    _old: Callable = kwargs["_old"]
-    del kwargs["_old"]
-
-    try:
-        return _old(*args, **kwargs)
-    except Exception as e:
-        _report_user_files_debug_info_to_sentry(e)
-        raise e
-
-
-def _report_user_files_debug_info_to_sentry(e: Exception) -> None:
-    report_exception_and_upload_logs(
-        e, context={"User files debug info": user_files_context_dict()}
-    )
 
 
 def _file_is_accessible(f: Path) -> bool:

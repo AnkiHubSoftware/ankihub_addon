@@ -68,7 +68,7 @@ from ankihub.debug import (
     _setup_logging_for_db_begin,
     _setup_logging_for_sync_collection_and_media,
     _setup_sentry_reporting_for_error_on_addon_update,
-    user_files_context_dict,
+    _user_files_context_dict,
 )
 from ankihub.exporting import to_note_data
 from ankihub.gui import utils
@@ -3152,7 +3152,7 @@ class TestDebugModule:
     def test_user_files_context_dict(self, anki_session: AnkiSession):
         # Test that the user_files_context_dict function does not throw an exception when called.
         with anki_session.profile_loaded():
-            user_files_context_dict()
+            _user_files_context_dict()
 
     def test_log_stack(self):
         # Test that the _log_stack function does not throw an exception when called.

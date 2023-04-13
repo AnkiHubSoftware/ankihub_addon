@@ -148,14 +148,13 @@ class _AnkiHubDB:
         try:
             result = DBConnection(conn=sqlite3.connect(ankihub_db.database_path))
         except Exception as e:
-            from sentry_sdk import push_scope
+            from ..debug import report_user_files_debug_info_to_sentry
 
-            from ..debug import user_files_context_dict
-
-            with push_scope() as scope:
-                scope.set_context("AnkiHub DB path", {"path": ankihub_db.database_path})
-                scope.set_context("User files debug info", user_files_context_dict())
-                raise e
+            LOGGER.error(
+                f"Failed to connect to AnkiHub DB at {ankihub_db.database_path}"
+            )
+            report_user_files_debug_info_to_sentry(e)
+            raise e
 
         return result
 
