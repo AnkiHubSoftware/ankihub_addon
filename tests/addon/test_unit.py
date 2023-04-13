@@ -1,13 +1,17 @@
+import importlib
 import os
 import tempfile
 import uuid
 from pathlib import Path
 from typing import Callable, Generator, List
+from unittest.mock import Mock
 
 import pytest
 from anki.models import NotetypeDict
 from anki.notes import Note, NoteId
+from aqt import utils
 from aqt.qt import QDialogButtonBox
+from pytest import MonkeyPatch, fixture
 from pytest_anki import AnkiSession
 
 from ..factories import NoteInfoFactory
@@ -16,11 +20,17 @@ from ..factories import NoteInfoFactory
 # has to be set before importing ankihub
 os.environ["SKIP_INIT"] = "1"
 
-from ankihub import suggestions
-from ankihub.ankihub_client import Field, SuggestionType
+from ankihub import errors, suggestions
+from ankihub.ankihub_client import AnkiHubRequestError, Field, SuggestionType
 from ankihub.db.db import ASSET_DISABLED_FIELD_BYPASS_TAG, _AnkiHubDB
-from ankihub.errors import _normalize_url
+from ankihub.errors import (
+    OUTDATED_CLIENT_ERROR_REASON,
+    _contains_path_to_this_addon,
+    _normalize_url,
+    _try_handle_exception,
+)
 from ankihub.exporting import _prepared_field_html
+from ankihub.gui.menu import AnkiHubLogin
 from ankihub.gui.suggestion_dialog import (
     SourceType,
     SuggestionDialog,
@@ -36,6 +46,7 @@ from ankihub.note_conversion import (
     _get_fields_protected_by_tags,
 )
 from ankihub.register_decks import note_type_name_without_ankihub_modifications
+from ankihub.settings import ANKIWEB_ID
 from ankihub.subdecks import SUBDECK_TAG, add_subdeck_tags_to_notes
 from ankihub.utils import lowest_level_common_ancestor_deck_name
 
@@ -491,3 +502,95 @@ class TestAnkiHubDBMediaNamesForAnkiHubDeck:
                 )
                 == set()
             )
+
+
+class TestErrorHandling:
+    def test_contains_path_to_this_addon(self):
+        # Assert that the function returns True when the input string contains the
+        # path to this addon.
+        assert _contains_path_to_this_addon("/addons21/ankihub/src/ankihub/errors.py")
+        assert _contains_path_to_this_addon(
+            f"/addons21/{ANKIWEB_ID}/src/ankihub/errors.py"
+        )
+
+        # Same as above, but with Windows path separators.
+        assert _contains_path_to_this_addon(
+            "\\addons21\\ankihub\\src\\ankihub\\errors.py"
+        )
+        assert _contains_path_to_this_addon(
+            f"\\addons21\\{ANKIWEB_ID}\\src\\ankihub\\errors.py"
+        )
+
+        # Assert that the function returns False when the input string does not contain
+        # the path to this addon.
+        assert not _contains_path_to_this_addon(
+            "/addons21/other_addon/src/ankihub/errors.py"
+        )
+        assert not _contains_path_to_this_addon(
+            "/addons21/12345789/src/ankihub/errors.py"
+        )
+
+        # Same as above, but with Windows path separators.
+        assert not _contains_path_to_this_addon(
+            "\\addons21\\other_addon\\src\\ankihub\\errors.py"
+        )
+        assert not _contains_path_to_this_addon(
+            "\\addons21\\12345789\\src\\ankihub\\errors.py"
+        )
+
+    def test_handle_ankihub_401(
+        self,
+        monkeypatch: MonkeyPatch,
+    ):
+        # Set up mock for AnkiHub login dialog.
+        display_login_mock = Mock()
+        monkeypatch.setattr(AnkiHubLogin, "display_login", display_login_mock)
+
+        # Mock _this_addon_is_involved to return True.
+        monkeypatch.setattr(errors, "_this_addon_is_involved", lambda *args: True)
+
+        handled = _try_handle_exception(
+            exc_type=AnkiHubRequestError,
+            exc_value=AnkiHubRequestError(response=Mock(status_code=401)),
+            tb=None,
+        )
+        assert handled
+        display_login_mock.assert_called_once()
+
+    def test_handle_ankihub_406(
+        self,
+        monkeypatch: MonkeyPatch,
+        _mock_ask_user_to_return_false: Mock,
+    ):
+        # Mock _this_addon_is_involved to return True.
+        monkeypatch.setattr(errors, "_this_addon_is_involved", lambda *args: True)
+
+        handled = _try_handle_exception(
+            exc_type=AnkiHubRequestError,
+            exc_value=AnkiHubRequestError(
+                response=Mock(status_code=406, reason=OUTDATED_CLIENT_ERROR_REASON)
+            ),
+            tb=None,
+        )
+        assert handled
+        _mock_ask_user_to_return_false.assert_called_once()
+
+    @fixture
+    def _mock_ask_user_to_return_false(
+        self,
+        monkeypatch: MonkeyPatch,
+    ) -> Generator[Mock, None, None]:
+        # Simply monkeypatching askUser to return False doesn't work because the errors module
+        # already imported the original askUser function when this fixture is called.
+        # So we need to reload the errors module after monkeypatching askUser.
+        try:
+            with monkeypatch.context() as m:
+                askUser_mock = Mock(return_value=False)
+                m.setattr(utils, "askUser", askUser_mock)
+                # Reload the errors module so that the monkeypatched askUser function is used.
+                importlib.reload(errors)
+
+                yield askUser_mock
+        finally:
+            #  Reload the errors module again so that the original askUser function is used for other tests.
+            importlib.reload(errors)

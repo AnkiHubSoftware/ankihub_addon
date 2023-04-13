@@ -245,8 +245,13 @@ def _is_memory_full_error(exc_value: BaseException) -> bool:
     return result
 
 
-def _this_addon_is_involved(tb) -> bool:
+def _this_addon_is_involved(tb: TracebackType) -> bool:
     tb_str = "".join(traceback.format_tb(tb))
+    result = _contains_path_to_this_addon(tb_str)
+    return result
+
+
+def _contains_path_to_this_addon(tb_str: str) -> bool:
     result = (
         ANKIWEB_ID is not None
         and re.search(rf"(/|\\)addons21(/|\\)(ankihub|{ANKIWEB_ID})(/|\\)", tb_str)
