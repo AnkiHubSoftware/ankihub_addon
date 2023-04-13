@@ -358,7 +358,7 @@ def create_backup() -> None:
     try:
         created: Optional[bool] = None
         if ANKI_MINOR >= 50:
-            _create_backup_with_retry_anki_50()
+            created = _create_backup_with_retry_anki_50()
         else:
             aqt.mw.col.close(downgrade=False)
             aqt.mw.backup()  # type: ignore
