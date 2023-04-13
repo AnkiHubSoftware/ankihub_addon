@@ -145,7 +145,18 @@ class _AnkiHubDB:
         return result
 
     def connection(self) -> DBConnection:
-        return DBConnection(conn=sqlite3.connect(ankihub_db.database_path))
+        try:
+            result = DBConnection(conn=sqlite3.connect(ankihub_db.database_path))
+        except Exception as e:
+            from ..debug import report_user_files_debug_info_to_sentry
+
+            LOGGER.error(
+                f"Failed to connect to AnkiHub DB at {ankihub_db.database_path}"
+            )
+            report_user_files_debug_info_to_sentry(e)
+            raise e
+
+        return result
 
     def upsert_notes_data(
         self, ankihub_did: uuid.UUID, notes_data: List[NoteInfo]

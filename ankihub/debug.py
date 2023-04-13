@@ -16,6 +16,13 @@ from .db import is_ankihub_db_attached_to_anki_db
 from .errors import report_exception_and_upload_logs
 
 
+def setup():
+    _setup_logging_for_sync_collection_and_media()
+    _setup_logging_for_db_begin()
+
+    _setup_sentry_reporting_for_error_on_addon_update()
+
+
 def _with_sentry_report_about_user_files_on_error(*args: Any, **kwargs: Any) -> Any:
     _old: Callable = kwargs["_old"]
     del kwargs["_old"]
@@ -23,16 +30,19 @@ def _with_sentry_report_about_user_files_on_error(*args: Any, **kwargs: Any) -> 
     try:
         return _old(*args, **kwargs)
     except Exception as e:
-        _report_user_files_debug_info_to_sentry(e)
+        report_user_files_debug_info_to_sentry(e)
         raise e
 
 
-def _report_user_files_debug_info_to_sentry(e: Exception) -> None:
-    report_exception_and_upload_logs(e, context=_user_files_context_dict())
+def report_user_files_debug_info_to_sentry(e: Exception) -> None:
+    report_exception_and_upload_logs(
+        e, context={"User files debug info": _user_files_context_dict()}
+    )
 
 
-def _user_files_context_dict() -> Dict[str, Dict[str, Any]]:
-    """Return a dict with information about the user files of the AnkiHub add-on."""
+def _user_files_context_dict() -> Dict[str, Any]:
+    """Return a dict with information about the user files of the AnkiHub add-on to be sent as
+    context to Sentry."""
     ankihub_module = aqt.mw.addonManager.addonFromModule(__name__)
     user_files_path = Path(aqt.mw.addonManager._userFilesPath(ankihub_module))
     all_file_paths = [user_files_path, *list(user_files_path.rglob("*"))]
@@ -43,11 +53,9 @@ def _user_files_context_dict() -> Dict[str, Dict[str, Any]]:
         ]
 
     result = {
-        "Add-on update debug info": {
-            "all files": [str(file) for file in all_file_paths],
-            "inaccessible files": [str(file) for file in problematic_file_paths],
-            "Is ankihub database attached to anki database?": is_ankihub_db_attached_to_anki_db(),
-        },
+        "all files": [str(file) for file in all_file_paths],
+        "inaccessible files": [str(file) for file in problematic_file_paths],
+        "Is ankihub database attached to anki database?": is_ankihub_db_attached_to_anki_db(),
     }
     return result
 
@@ -102,10 +110,3 @@ def _setup_sentry_reporting_for_error_on_addon_update():
         new=_with_sentry_report_about_user_files_on_error,
         pos="around",
     )
-
-
-def setup():
-    _setup_logging_for_sync_collection_and_media()
-    _setup_logging_for_db_begin()
-
-    _setup_sentry_reporting_for_error_on_addon_update()
