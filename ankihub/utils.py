@@ -1,6 +1,7 @@
 import re
 import time
 from pprint import pformat
+from textwrap import dedent
 from typing import Any, Dict, Iterable, List, Optional, Sequence, Set, Tuple
 
 import aqt
@@ -237,18 +238,47 @@ def modify_template(template: Dict) -> None:
 
 
 def add_ankihub_snippet_to_template(template: Dict) -> None:
-    ankihub_snippet = (
-        f"<!-- BEGIN {ANKIHUB_NOTE_TYPE_MODIFICATION_STRING} -->"
-        "<br><br>"
-        f"\n{{{{#{ANKIHUB_NOTE_TYPE_FIELD_NAME}}}}}\n"
-        "<a class='ankihub' "
-        f"href='{url_view_note()}{{{{{ANKIHUB_NOTE_TYPE_FIELD_NAME}}}}}'>"
-        "\nView Note on AnkiHub\n"
-        "</a>"
-        f"\n{{{{/{ANKIHUB_NOTE_TYPE_FIELD_NAME}}}}}\n"
-        "<br>"
-        f"<!-- END {ANKIHUB_NOTE_TYPE_MODIFICATION_STRING} -->"
-    )
+    ankihub_snippet = dedent(
+        f"""
+        <!-- BEGIN {ANKIHUB_NOTE_TYPE_MODIFICATION_STRING} -->
+        {{{{#{ANKIHUB_NOTE_TYPE_FIELD_NAME}}}}}
+        <a class='ankihub-view-note' href='{url_view_note()}{{{{{ANKIHUB_NOTE_TYPE_FIELD_NAME}}}}}'>
+            View Note on AnkiHub
+        </a>
+
+        <style>
+        .ankihub-view-note {{
+            display: none;
+        }}
+
+        .mobile .ankihub-view-note {{
+            display: block;
+        }}
+
+        .ankihub-view-note {{
+            text-decoration: none;
+            position: fixed;
+            left: 50%;
+            margin-right: -50%;
+            transform: translate(-50%, -50%);
+            bottom: 0;
+            padding: 0.5rem;
+            border-radius: 50px;
+            background-color: #cde3f8;
+            font-size: 12px;
+            color: black;
+        }}
+
+        .ankihub-view-note:hover,
+        .ankihub-view-note:active {{
+            background-color: #ebf3fa;
+        }}
+        </style>
+
+        {{{{/{ANKIHUB_NOTE_TYPE_FIELD_NAME}}}}}
+        <!-- END {ANKIHUB_NOTE_TYPE_MODIFICATION_STRING} -->
+        """
+    ).strip("\n")
 
     snippet_pattern = (
         f"<!-- BEGIN {ANKIHUB_NOTE_TYPE_MODIFICATION_STRING} -->"

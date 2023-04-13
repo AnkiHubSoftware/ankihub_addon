@@ -12,7 +12,7 @@ from .auto_sync import setup_ankihub_sync_on_ankiweb_sync
 from .db import ankihub_db
 from .debug import setup as setup_debug
 from .errors import setup_error_handler
-from .gui import browser, editor, progress
+from .gui import browser, editor, progress, reviewer
 from .gui.menu import menu_state, refresh_ankihub_menu, setup_ankihub_menu
 from .settings import (
     ANKI_VERSION,
@@ -111,6 +111,9 @@ def general_setup():
 
     browser.setup()
     LOGGER.info("Set up browser.")
+
+    reviewer.setup()
+    LOGGER.info("Set up reviewer.")
 
     progress.setup()
     LOGGER.info("Set up progress manager.")

@@ -15,6 +15,8 @@ from ..ankihub_client import Field, NoteInfo, suggestion_type_from_str
 from ..common_utils import IMG_NAME_IN_IMG_TAG_REGEX
 from .db_utils import DBConnection
 
+ASSET_DISABLED_FIELD_BYPASS_TAG = "AnkiHub_ImageReady"
+
 
 def attach_ankihub_db_to_anki_db_connection() -> None:
     if aqt.mw.col is None:
@@ -490,20 +492,37 @@ class _AnkiHubDB:
         disabled_field_ords = [
             field_names_for_mid.index(name) for name in disabled_field_names
         ]
-        fields_with_images = self.list(
-            f"""
-            SELECT fields FROM notes
-            WHERE anki_note_type_id = {mid}
-            AND fields LIKE '%<img%'
-            """,
+        fields_tags_pairs = self.execute(
+            f"SELECT fields, tags FROM notes WHERE anki_note_type_id = {mid} AND fields LIKE '%<img%'"
         )
 
         result = set()
-        for fields_string in fields_with_images:
+        for fields_string, tags_string in fields_tags_pairs:
             fields = split_fields(fields_string)
+            tags = set(tags_string.split(" "))
             for field_idx, field_text in enumerate(fields):
-                if field_idx in disabled_field_ords:
+                # TODO: This ANKIHUB_ASSET_ENABLED_TAG bypass is used to allow fields with
+                # this specific tag to have the assets downloaded, despite the field being
+                # marked as an asset-disabled field. Decide whether to remove this.
+                field_name = field_names_for_mid[field_idx]
+                # Tags cant have spaces, so we replace spaces with underscores to make it possible to
+                # reference a field name with spaces using a tag.
+                bypass_asset_disabled_tag = (
+                    f"{ASSET_DISABLED_FIELD_BYPASS_TAG}::{field_name.replace(' ', '_')}"
+                )
+
+                bypass = bypass_asset_disabled_tag in tags
+                if not bypass and field_idx in disabled_field_ords:
+                    LOGGER.debug(
+                        f"Blocking asset download in [{field_name}] field without the tag [{bypass_asset_disabled_tag}]"
+                    )
                     continue
+
+                if bypass:
+                    LOGGER.debug(
+                        f"Allowing asset download in [{field_name}] field - note has tag [{bypass_asset_disabled_tag}]",
+                    )
+
                 for img in re.findall(IMG_NAME_IN_IMG_TAG_REGEX, field_text):
                     if img.startswith("http://") or img.startswith("https://"):
                         continue
