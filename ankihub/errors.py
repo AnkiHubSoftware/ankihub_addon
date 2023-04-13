@@ -127,18 +127,7 @@ def _try_handle_exception(
             LOGGER.info("AnkiHubRequestError was handled.")
             return True
 
-        try:
-            response_data = exc_value.response.json()
-            details = (
-                response_data.get("detail")
-                or response_data.get("details")
-                or response_data.get("errors")
-            )
-        except:
-            details = None
-
-        if details:
-            showText(f"Error while communicating with AnkiHub:\n{details}")
+        _show_warning_for_ankihub_request_error(exc_value)
 
     if isinstance(exc_value, (exceptions.ConnectionError, ConnectionError)):
         tooltip(
@@ -147,28 +136,7 @@ def _try_handle_exception(
         )
         return True
 
-    if (
-        (isinstance(exc_value, DBError) and "is full" in str(exc_value).lower())
-        or (
-            isinstance(exc_value, BackendIOError)
-            and "not enough space" in str(exc_value).lower()
-        )
-        or (
-            isinstance(exc_value, BackendIOError)
-            and "not enough memory" in str(exc_value).lower()
-        )
-        or (
-            isinstance(exc_value, BackendIOError)
-            and "no space left" in str(exc_value).lower()
-        )
-        or (
-            isinstance(exc_value, OSError) and "no space left" in str(exc_value).lower()
-        )
-        or (
-            isinstance(exc_value, SyncError)
-            and "no space left" in str(exc_value).lower()
-        )
-    ):
+    if _is_memory_full_error(exc_value):
         showWarning(
             "Could not finish because your hard drive does not have enough space.",
             title="AnkiHub",
@@ -217,6 +185,47 @@ def _maybe_handle_ankihub_request_error(error: AnkiHubRequestError) -> bool:
             check_and_prompt_for_updates_on_main_window()
         return True
     return False
+
+
+def _show_warning_for_ankihub_request_error(exc_value: AnkiHubRequestError) -> None:
+    try:
+        response_data = exc_value.response.json()
+        details = (
+            response_data.get("detail")
+            or response_data.get("details")
+            or response_data.get("errors")
+        )
+    except:
+        details = None
+
+    if details:
+        showText(f"Error while communicating with AnkiHub:\n{details}")
+
+
+def _is_memory_full_error(exc_value: BaseException) -> bool:
+    result = (
+        (isinstance(exc_value, DBError) and "is full" in str(exc_value).lower())
+        or (
+            isinstance(exc_value, BackendIOError)
+            and "not enough space" in str(exc_value).lower()
+        )
+        or (
+            isinstance(exc_value, BackendIOError)
+            and "not enough memory" in str(exc_value).lower()
+        )
+        or (
+            isinstance(exc_value, BackendIOError)
+            and "no space left" in str(exc_value).lower()
+        )
+        or (
+            isinstance(exc_value, OSError) and "no space left" in str(exc_value).lower()
+        )
+        or (
+            isinstance(exc_value, SyncError)
+            and "no space left" in str(exc_value).lower()
+        )
+    )
+    return result
 
 
 def _this_addon_is_involved(tb) -> bool:
