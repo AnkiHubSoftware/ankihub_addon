@@ -345,6 +345,9 @@ def _error_reporting_enabled() -> bool:
     # using sentry_sdk. We therefore check the version here and disable error reporting if the
     # version is too old to avoid problems.
     if obsolete_version_of_sentry_sdk():
+        LOGGER.info(
+            "Obsolete version of sentry-sdk detected. Error reporting disabled."
+        )
         return False
 
     result = (
