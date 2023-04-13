@@ -490,7 +490,11 @@ class _AnkiHubDB:
             field["name"] for field in aqt.mw.col.models.get(NotetypeId(mid))["flds"]
         ]
         disabled_field_ords = [
-            field_names_for_mid.index(name) for name in disabled_field_names
+            field_names_for_mid.index(name)
+            for name in disabled_field_names
+            # We ignore fields that are not present in the note type.
+            # This can happen if the user has remove the fields from the note type.
+            if name in field_names_for_mid
         ]
         fields_tags_pairs = self.execute(
             f"SELECT fields, tags FROM notes WHERE anki_note_type_id = {mid} AND fields LIKE '%<img%'"
