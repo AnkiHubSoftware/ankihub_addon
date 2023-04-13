@@ -338,10 +338,24 @@ def _normalize_url(url: str):
 
 
 def _error_reporting_enabled() -> bool:
+
+    # Not sure if this is really necessary, but HyperTTS does it:
+    # https://github.com/Language-Tools/anki-hyper-tts/blob/a73785eb43068db08f073809c74c4dd1f236a557/__init__.py#L34-L37
+    # Some other add-ons package an obsolete version of sentry-sdk, which causes problems(?) when
+    # using sentry_sdk. We therefore check the version here and disable error reporting if the
+    # version is too old to avoid problems.
+    if obsolete_version_of_sentry_sdk():
+        return False
+
     result = (
         config.public_config.get("report_errors")
         and not os.getenv("REPORT_ERRORS", None) == "0"
     )
+    return result
+
+
+def obsolete_version_of_sentry_sdk() -> bool:
+    result = [int(x) for x in sentry_sdk.VERSION.split(".")] < [1, 5, 5]
     return result
 
 
