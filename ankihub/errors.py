@@ -40,6 +40,8 @@ OUTDATED_CLIENT_ERROR_REASON = "Outdated client, please update the AnkiHub add-o
 
 
 def setup_error_handler():
+    """Set up centralized exception handling and initialize Sentry."""
+
     _setup_excepthook()
     LOGGER.info("Set up excepthook.")
 
@@ -53,6 +55,9 @@ def setup_error_handler():
 def report_exception_and_upload_logs(
     exception: BaseException, context: Dict[str, Any] = {}
 ) -> str:
+    """Report the exception to Sentry and upload the logs.
+    Returns the Sentry event ID."""
+
     logs_key = upload_logs_in_background()
     sentry_id = _report_exception(
         exception=exception, context={**context, "logs": {"filename": logs_key}}
@@ -63,6 +68,9 @@ def report_exception_and_upload_logs(
 def upload_logs_in_background(
     on_done: Optional[Callable[[Future], None]] = None, hide_username=False
 ) -> str:
+    """Upload the logs to S3 in the background.
+    Returns the S3 key of the uploaded logs."""
+
     LOGGER.info("Uploading logs...")
 
     # many users use their email address as their username and may not want to share it on a forum
@@ -82,6 +90,13 @@ def upload_logs_in_background(
 
 
 def _setup_excepthook():
+    """Set up centralized exception handling.
+    Exceptions are are either handled by our excepthook or passed to the original
+    excepthook which opens Anki's error dialog.
+    If error reporting is enabled, exceptions are also reported to Sentry
+    and the user is prompted to send feedback (in addition to Anki's error dialog opening).
+    """
+
     def excepthook(
         etype: Type[BaseException], val: BaseException, tb: Optional[TracebackType]
     ) -> Any:
@@ -114,6 +129,7 @@ def _setup_excepthook():
 def _try_handle_exception(
     exc_type: Type[BaseException], exc_value: BaseException, tb: Optional[TracebackType]
 ) -> bool:
+    """Try to handle the exception. Return True if the exception was handled, False otherwise."""
     LOGGER.info(
         f"From _try_handle_exception:\n{''.join(traceback.format_exception(exc_type, value=exc_value, tb=tb))}"
     )
@@ -168,6 +184,7 @@ def _try_handle_exception(
 
 
 def _maybe_handle_ankihub_request_error(error: AnkiHubRequestError) -> bool:
+    """Return True if the error was handled, False otherwise."""
     response = error.response
     if response.status_code == 401:
         config.save_token("")
@@ -261,6 +278,7 @@ def _initialize_sentry():
 def _report_exception(
     exception: BaseException, context: Dict[str, Dict[str, Any]] = {}
 ) -> Optional[str]:
+    """Report an exception to Sentry."""
     if not _error_reporting_enabled():
         return None
 
@@ -282,6 +300,8 @@ def _report_exception(
                     "content": exception.response.content,
                 },
             )
+            # The url in the fingerprint is normalized so that sentry can group errors by url in a
+            # more meaningful way.
             scope.fingerprint = [
                 "{{ default }}",
                 _normalize_url(exception.response.url),
@@ -313,7 +333,7 @@ def _normalize_url(url: str):
 
 
 def _error_reporting_enabled() -> bool:
-    result = bool(
+    result = (
         config.public_config.get("report_errors")
         and not os.getenv("REPORT_ERRORS", None) == "0"
     )
