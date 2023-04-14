@@ -1,5 +1,4 @@
 """Code for creating an AnkiHub deck from an existing deck in Anki."""
-import os
 import re
 import typing
 import uuid
@@ -25,8 +24,6 @@ from .utils import (
     get_note_types_in_deck,
     modify_note_type,
 )
-
-DIR_PATH = os.path.dirname(os.path.abspath(__file__))
 
 
 def create_ankihub_deck(
