@@ -125,7 +125,7 @@ class AnkiHubLogin(QWidget):
                 credentials.update({"username": username_or_email})
             token = ankihub_client.login(credentials=credentials)
         except AnkiHubRequestError as e:
-            LOGGER.exception("AnkiHub login failed.")
+            LOGGER.info("AnkiHub login failed.")
             config.save_token("")
 
             if e.response.status_code == 400:

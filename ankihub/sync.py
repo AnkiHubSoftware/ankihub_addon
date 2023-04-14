@@ -272,7 +272,7 @@ def _update_deck_download_progress_cb_inner(notes_count: int, ankihub_did: uuid.
         # calling its methods (at least in Anki 2.1.54).
         # It should be safe to ignore this error and let the sync continue.
 
-        LOGGER.exception(
+        LOGGER.warning(
             "Unable to update progress bar to show download progress of deck updates."
         )
     except RuntimeError as e:
@@ -302,6 +302,6 @@ def _update_extension_download_progress_cb_inner(
             f"Note customizations downloaded: {note_customizations_count}"
         )
     except AttributeError:
-        LOGGER.exception(
+        LOGGER.warning(
             "Unable to update progress bar to show download progress of deck updates."
         )

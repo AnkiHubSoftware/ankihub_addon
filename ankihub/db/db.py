@@ -148,12 +148,17 @@ class _AnkiHubDB:
         try:
             result = DBConnection(conn=sqlite3.connect(ankihub_db.database_path))
         except Exception as e:
-            from ..debug import report_user_files_debug_info_to_sentry
+            from ..debug import user_files_context_dict
+            from ..errors import report_exception_and_upload_logs
 
-            LOGGER.error(
-                f"Failed to connect to AnkiHub DB at {ankihub_db.database_path}"
+            report_exception_and_upload_logs(
+                e,
+                context={
+                    "db path": {"path": ankihub_db.database_path},
+                    "user files": user_files_context_dict(),
+                },
             )
-            report_user_files_debug_info_to_sentry(e)
+
             raise e
 
         return result
