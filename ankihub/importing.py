@@ -533,7 +533,7 @@ def _adjust_note_types(remote_note_types: Dict[NotetypeId, NotetypeDict]) -> Non
     LOGGER.info("Beginning adjusting note types...")
 
     _create_missing_note_types(remote_note_types)
-    rename_note_types(remote_note_types)
+    _rename_note_types(remote_note_types)
     _ensure_local_and_remote_fields_are_same(remote_note_types)
     modify_note_type_templates(remote_note_types.keys())
 
@@ -553,7 +553,7 @@ def _create_missing_note_types(
         LOGGER.info(f"Created missing note type {mid}")
 
 
-def rename_note_types(remote_note_types: Dict[NotetypeId, NotetypeDict]) -> None:
+def _rename_note_types(remote_note_types: Dict[NotetypeId, NotetypeDict]) -> None:
     for mid, remote_note_type in remote_note_types.items():
         local_note_type = aqt.mw.col.models.get(mid)
         if local_note_type["name"] != remote_note_type["name"]:
