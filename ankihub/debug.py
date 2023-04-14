@@ -50,14 +50,10 @@ def _with_sentry_report_about_user_files_on_error(*args: Any, **kwargs: Any) -> 
     try:
         return _old(*args, **kwargs)
     except Exception as e:
-        _report_user_files_debug_info_to_sentry(e)
+        report_exception_and_upload_logs(
+            e, context={"User files debug info": user_files_context_dict()}
+        )
         raise e
-
-
-def _report_user_files_debug_info_to_sentry(e: Exception) -> None:
-    report_exception_and_upload_logs(
-        e, context={"User files debug info": user_files_context_dict()}
-    )
 
 
 def _file_is_accessible(f: Path) -> bool:
