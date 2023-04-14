@@ -1,3 +1,5 @@
+"""Defines classes that represent data returned by the AnkiHub API or sent to it.
+Also defines some helper functions."""
 import dataclasses
 import uuid
 from abc import ABC
