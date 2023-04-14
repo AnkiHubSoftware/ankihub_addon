@@ -27,11 +27,11 @@ from aqt.utils import openLink, showInfo, tooltip
 from .. import LOGGER
 from ..addon_ankihub_client import AddonAnkiHubClient as AnkiHubClient
 from ..ankihub_client import AnkiHubRequestError, get_image_names_from_notes_data
+from ..create_deck import create_ankihub_deck
 from ..db import ankihub_db
 from ..errors import upload_logs_in_background
 from ..media_import.ui import open_import_dialog
 from ..media_sync import media_sync
-from ..register_decks import create_collaborative_deck
 from ..settings import ADDON_VERSION, config, url_view_deck
 from ..subdecks import SUBDECK_TAG
 from ..sync import ah_sync, show_tooltip_about_last_sync_results
@@ -308,7 +308,7 @@ def _create_collaborative_deck_action() -> None:
 
     op = QueryOp(
         parent=aqt.mw,
-        op=lambda col: create_collaborative_deck(
+        op=lambda col: create_ankihub_deck(
             deck_name,
             private=private,
             add_subdeck_tags=add_subdeck_tags,

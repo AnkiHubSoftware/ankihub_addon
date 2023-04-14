@@ -62,6 +62,7 @@ from ankihub.ankihub_client import (
 )
 from ankihub.auto_sync import setup_ankihub_sync_on_ankiweb_sync
 from ankihub.common_utils import IMG_NAME_IN_IMG_TAG_REGEX
+from ankihub.create_deck import create_ankihub_deck, modify_note_type
 from ankihub.db import ankihub_db, attached_ankihub_db
 from ankihub.debug import (
     _log_stack,
@@ -95,7 +96,6 @@ from ankihub.note_conversion import (
     TAG_FOR_OPTIONAL_TAGS,
     TAG_FOR_PROTECTING_FIELDS,
 )
-from ankihub.register_decks import create_collaborative_deck, modify_note_type
 from ankihub.reset_changes import reset_local_changes_to_notes
 from ankihub.settings import (
     ANKIHUB_NOTE_TYPE_FIELD_NAME,
@@ -387,7 +387,7 @@ def test_create_collaborative_deck_and_upload(
                 "ankihub.ankihub_client.AnkiHubClient.upload_deck", upload_deck_mock
             )
             m.setattr("uuid.uuid4", lambda: ah_nid)
-            create_collaborative_deck(deck_name, private=False)
+            create_ankihub_deck(deck_name, private=False)
 
         # re-load note to get updated note.mid
         note.load()

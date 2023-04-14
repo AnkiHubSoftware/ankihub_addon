@@ -31,7 +31,7 @@ from .utils import (
 DIR_PATH = os.path.dirname(os.path.abspath(__file__))
 
 
-def create_collaborative_deck(
+def create_ankihub_deck(
     deck_name: str,
     private: bool,
     add_subdeck_tags: bool = False,
