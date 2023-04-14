@@ -79,6 +79,23 @@ custom_columns = [
 custom_search_nodes: List[CustomSearchNode] = []
 
 
+def setup() -> None:
+    browser_will_show.append(_store_browser_reference)
+
+    browser_did_fetch_columns.append(_on_browser_did_fetch_columns)
+    browser_did_fetch_row.append(_on_browser_did_fetch_row)
+    browser_will_search.append(_on_browser_will_search)
+    browser_did_search.append(_on_browser_did_search)
+
+    browser_will_show_context_menu.append(_on_browser_will_show_context_menu)
+
+    browser_will_build_tree.append(_on_browser_will_build_tree)
+
+    browser_menus_did_init.append(_on_browser_menus_did_init)
+
+    _make_copy_note_action_not_copy_ankihub_id()
+
+
 # context menu
 def _on_browser_will_show_context_menu(browser: Browser, context_menu: QMenu) -> None:
     selected_nids = browser.selected_notes()
@@ -784,20 +801,3 @@ def _after_create_copy(*args, **kwargs) -> None:
     if ANKIHUB_NOTE_TYPE_FIELD_NAME in note.keys():
         note[ANKIHUB_NOTE_TYPE_FIELD_NAME] = ""
         add_cards_dialog.editor.loadNote()
-
-
-def setup() -> None:
-    browser_will_show.append(_store_browser_reference)
-
-    browser_did_fetch_columns.append(_on_browser_did_fetch_columns)
-    browser_did_fetch_row.append(_on_browser_did_fetch_row)
-    browser_will_search.append(_on_browser_will_search)
-    browser_did_search.append(_on_browser_did_search)
-
-    browser_will_show_context_menu.append(_on_browser_will_show_context_menu)
-
-    browser_will_build_tree.append(_on_browser_will_build_tree)
-
-    browser_menus_did_init.append(_on_browser_menus_did_init)
-
-    _make_copy_note_action_not_copy_ankihub_id()

@@ -29,6 +29,25 @@ VIEW_NOTE_BTN_ID = f"{ANKIHUB_BTN_ID_PREFIX}-view-note"
 VIEW_NOTE_HISTORY_BTN_ID = f"{ANKIHUB_BTN_ID_PREFIX}-view-note-history"
 
 
+def setup() -> None:
+    # setup suggestion button
+    gui_hooks.editor_did_init_buttons.append(_setup_editor_buttons)
+    gui_hooks.editor_did_init.append(_setup_editor_did_load_js_message)
+    gui_hooks.webview_did_receive_js_message.append(_on_js_message)
+    gui_hooks.editor_did_load_note.append(_refresh_buttons)
+    gui_hooks.add_cards_did_init.append(_on_add_cards_init)
+    gui_hooks.add_cards_did_change_note_type.append(_on_add_cards_did_change_notetype)
+
+    gui_hooks.editor_will_load_note.append(_hide_ankihub_field_in_editor)
+
+    Editor.ankihub_command = AnkiHubCommands.CHANGE.value  # type: ignore
+    # We can wrap Editor.__init__ if more complicated logic is needed, such as
+    # pulling a default command from a config option.  E.g.,
+    # Editor.__init__ = wrap(Editor.__init__, init_editor)
+    # See Syntax Highlighting add-on code for an example. For now, just setting
+    # an instance attribute above will suffice.
+
+
 def _on_suggestion_button_press(editor: Editor) -> None:
     """
     Action to be performed when the AnkiHub icon button is clicked or when
@@ -357,22 +376,3 @@ def _on_js_message(
         return (True, None)
 
     return handled
-
-
-def setup() -> None:
-    # setup suggestion button
-    gui_hooks.editor_did_init_buttons.append(_setup_editor_buttons)
-    gui_hooks.editor_did_init.append(_setup_editor_did_load_js_message)
-    gui_hooks.webview_did_receive_js_message.append(_on_js_message)
-    gui_hooks.editor_did_load_note.append(_refresh_buttons)
-    gui_hooks.add_cards_did_init.append(_on_add_cards_init)
-    gui_hooks.add_cards_did_change_note_type.append(_on_add_cards_did_change_notetype)
-
-    gui_hooks.editor_will_load_note.append(_hide_ankihub_field_in_editor)
-
-    Editor.ankihub_command = AnkiHubCommands.CHANGE.value  # type: ignore
-    # We can wrap Editor.__init__ if more complicated logic is needed, such as
-    # pulling a default command from a config option.  E.g.,
-    # Editor.__init__ = wrap(Editor.__init__, init_editor)
-    # See Syntax Highlighting add-on code for an example. For now, just setting
-    # an instance attribute above will suffice.

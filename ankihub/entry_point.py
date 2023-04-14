@@ -40,22 +40,22 @@ def run():
     LOGGER.info(f"AnkiHub app url: {config.app_url}")
     LOGGER.info(f"S3 bucket url: {config.s3_bucket_url}")
 
-    profile_did_open.append(on_profile_did_open)
+    profile_did_open.append(_on_profile_did_open)
 
 
-def on_profile_did_open():
-    if not profile_setup():
+def _on_profile_did_open():
+    if not _profile_setup():
         return
 
-    after_profile_setup()
+    _after_profile_setup()
 
     global ATTEMPTED_GENERAL_SETUP
     if not ATTEMPTED_GENERAL_SETUP:
         ATTEMPTED_GENERAL_SETUP = True
-        general_setup()
+        _general_setup()
 
 
-def profile_setup() -> bool:
+def _profile_setup() -> bool:
     """Set up profile data folder, config, and AnkiHub DB for the current profile.
     Returns whether the profile setup was successful.
     """
@@ -76,17 +76,17 @@ def profile_setup() -> bool:
     return True
 
 
-def after_profile_setup():
-    log_enabled_addons()
+def _after_profile_setup():
+    _log_enabled_addons()
 
     # This adjusts note type templates of note types used by AnkiHub notes when the profile is opened.
     # If this wouldn't be called here the templates would only be adjusted when syncing with AnkiHub.
     # We want the modifications to be present even if the user doesn't sync with AnkiHub, so we call
     # this here.
-    adjust_ankihub_note_type_templates()
+    _adjust_ankihub_note_type_templates()
 
 
-def general_setup():
+def _general_setup():
     """Set up things that don't depend on the profile and should only be run once, even if the
     profile changes."""
 
@@ -118,7 +118,7 @@ def general_setup():
     progress.setup()
     LOGGER.info("Set up progress manager.")
 
-    trigger_addon_update_check()
+    _trigger_addon_update_check()
     LOGGER.info("Triggered add-on update check.")
 
     from . import media_export  # noqa: F401
@@ -129,19 +129,19 @@ def general_setup():
     LOGGER.info("Called setup_ankihub_sync_on_ankiweb_sync.")
 
 
-def log_enabled_addons():
+def _log_enabled_addons():
     enabled_addons = [x for x in aqt.mw.addonManager.all_addon_meta() if x.enabled]
     LOGGER.info(f"enabled addons:\n{pformat(enabled_addons)}")
 
 
-def trigger_addon_update_check():
+def _trigger_addon_update_check():
     # This sets the last_addon_update_check time to 25 hours before now and Anki usually checks
     # for add-on updates every 24 hours, so this will trigger an add-on update check on Anki startup.
     # See https://github.com/ankitects/anki/blob/21812556a6a29c7da34561e58824219783a867e7/qt/aqt/main.py#L896-L916
     aqt.mw.pm.set_last_addon_update_check(int(time.time()) - (60 * 60 * 25))
 
 
-def adjust_ankihub_note_type_templates():
+def _adjust_ankihub_note_type_templates():
     mids = ankihub_db.ankihub_note_type_ids()
 
     # Filter out note types that don't exist in the Anki database to avoid errors.

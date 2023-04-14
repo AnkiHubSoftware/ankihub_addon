@@ -86,7 +86,7 @@ from ankihub.gui.editor import _on_suggestion_button_press, _refresh_buttons
 from ankihub.gui.optional_tag_suggestion_dialog import OptionalTagsSuggestionDialog
 from ankihub.importing import (
     AnkiHubImporter,
-    adjust_note_types,
+    _adjust_note_types,
     reset_note_types_of_notes,
 )
 from ankihub.note_conversion import (
@@ -709,7 +709,7 @@ def test_adjust_note_types(anki_session_with_addon_data: AnkiSession):
             ankihub_basic_1["id"]: ankihub_basic_1,
             ankihub_basic_2["id"]: ankihub_basic_2,
         }
-        adjust_note_types(remote_note_types)
+        _adjust_note_types(remote_note_types)
 
         assert mw.col.models.by_name("AnkiHub Basic 1") is not None
         assert mw.col.models.get(ankihub_basic_2["id"])["flds"][3]["name"] == "foo"
@@ -2243,7 +2243,7 @@ def test_profile_swap(
     PROFILE_2_ID = uuid.UUID("22222222-2222-2222-2222-222222222222")
 
     general_setup_mock = Mock()
-    monkeypatch.setattr("ankihub.entry_point.general_setup", general_setup_mock)
+    monkeypatch.setattr("ankihub.entry_point._general_setup", general_setup_mock)
 
     entry_point.run()
 

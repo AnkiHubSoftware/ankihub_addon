@@ -42,6 +42,20 @@ from ..utils import create_backup, undo_note_type_modfications
 from .utils import ask_user, set_tooltip_icon
 
 
+def cleanup_after_deck_install(multiple_decks: bool = False) -> None:
+    message = (
+        (
+            "The deck has been successfully installed!<br><br>"
+            if not multiple_decks
+            else ""
+        )
+        + "Do you want to clear unused tags and empty cards from your collection? (recommended)"
+    )
+    if ask_user(message, title="AnkiHub"):
+        clear_unused_tags(parent=aqt.mw).run_in_background()
+        show_empty_cards(aqt.mw)
+
+
 class SubscribedDecksDialog(QDialog):
     _window: Optional["SubscribedDecksDialog"] = None
     silentlyClose = True
@@ -482,7 +496,7 @@ def download_and_install_deck(
         notes_data: List[NoteInfo] = future.result()
 
         aqt.mw.taskman.with_progress(
-            lambda: install_deck(
+            lambda: _install_deck(
                 notes_data=notes_data,
                 deck_name=deck_info.name,
                 ankihub_did=ankihub_did,
@@ -496,7 +510,7 @@ def download_and_install_deck(
 
     aqt.mw.taskman.with_progress(
         lambda: AnkiHubClient().download_deck(
-            deck_info.ankihub_deck_uuid, download_progress_cb=download_progress_cb
+            deck_info.ankihub_deck_uuid, download_progress_cb=_download_progress_cb
         ),
         on_done=on_download_done,
         parent=aqt.mw,
@@ -504,7 +518,7 @@ def download_and_install_deck(
     )
 
 
-def install_deck(
+def _install_deck(
     notes_data: List[NoteInfo],
     deck_name: str,
     ankihub_did: UUID,
@@ -540,7 +554,7 @@ def install_deck(
     return import_result
 
 
-def download_progress_cb(percent: int):
+def _download_progress_cb(percent: int):
     # adding +1 to avoid progress increasing while at 0% progress
     # (the aqt.mw.progress.update function does that)
     aqt.mw.taskman.run_on_main(
@@ -550,17 +564,3 @@ def download_progress_cb(percent: int):
             max=101,
         )
     )
-
-
-def cleanup_after_deck_install(multiple_decks: bool = False) -> None:
-    message = (
-        (
-            "The deck has been successfully installed!<br><br>"
-            if not multiple_decks
-            else ""
-        )
-        + "Do you want to clear unused tags and empty cards from your collection? (recommended)"
-    )
-    if ask_user(message, title="AnkiHub"):
-        clear_unused_tags(parent=aqt.mw).run_in_background()
-        show_empty_cards(aqt.mw)

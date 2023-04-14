@@ -41,7 +41,7 @@ def anki_session_with_addon_data(
     The add-ons code is not copied into the add-on's folder in the temporary anki_base folder.
     Instead the tests run the code in the ankihub folder of the repo.
     """
-    from ankihub.entry_point import profile_setup
+    from ankihub.entry_point import _profile_setup
     from ankihub.settings import config, setup_logger
 
     config_path = REPO_ROOT_PATH / "ankihub" / "config.json"
@@ -57,7 +57,7 @@ def anki_session_with_addon_data(
         # the profile data folder is always the same
         m.setattr("uuid.uuid4", lambda: TEST_PROFILE_ID)
         with anki_session.profile_loaded():
-            profile_setup()
+            _profile_setup()
 
     yield anki_session
 

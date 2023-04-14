@@ -37,7 +37,7 @@ from ankihub.gui.suggestion_dialog import (
     SuggestionMetadata,
     SuggestionSource,
 )
-from ankihub.importing import updated_tags
+from ankihub.importing import _updated_tags
 from ankihub.note_conversion import (
     ADDON_INTERNAL_TAGS,
     TAG_FOR_OPTIONAL_TAGS,
@@ -45,7 +45,7 @@ from ankihub.note_conversion import (
     TAG_FOR_PROTECTING_FIELDS,
     _get_fields_protected_by_tags,
 )
-from ankihub.register_decks import note_type_name_without_ankihub_modifications
+from ankihub.register_decks import _note_type_name_without_ankihub_modifications
 from ankihub.settings import ANKIWEB_ID
 from ankihub.subdecks import SUBDECK_TAG, add_subdeck_tags_to_notes
 from ankihub.utils import lowest_level_common_ancestor_deck_name
@@ -123,7 +123,7 @@ def test_lowest_level_common_ancestor_deck_name():
 
 def test_updated_tags():
     assert set(
-        updated_tags(
+        _updated_tags(
             cur_tags=[],
             incoming_tags=["A", "B"],
             protected_tags=[],
@@ -132,7 +132,7 @@ def test_updated_tags():
 
     # dont delete protected tags
     assert set(
-        updated_tags(
+        _updated_tags(
             cur_tags=["A", "B"],
             incoming_tags=[],
             protected_tags=["A"],
@@ -141,7 +141,7 @@ def test_updated_tags():
 
     # dont delete tags that contain protected tags
     assert set(
-        updated_tags(
+        _updated_tags(
             cur_tags=["A::B::C"],
             incoming_tags=[],
             protected_tags=["A"],
@@ -149,7 +149,7 @@ def test_updated_tags():
     ) == set(["A::B::C"])
 
     assert set(
-        updated_tags(
+        _updated_tags(
             cur_tags=["A::B::C"],
             incoming_tags=[],
             protected_tags=["B"],
@@ -157,7 +157,7 @@ def test_updated_tags():
     ) == set(["A::B::C"])
 
     assert set(
-        updated_tags(
+        _updated_tags(
             cur_tags=["A::B::C"],
             incoming_tags=[],
             protected_tags=["C"],
@@ -166,7 +166,7 @@ def test_updated_tags():
 
     # keep add-on internal tags
     assert set(
-        updated_tags(
+        _updated_tags(
             cur_tags=ADDON_INTERNAL_TAGS,
             incoming_tags=[],
             protected_tags=[],
@@ -175,7 +175,7 @@ def test_updated_tags():
 
     # keep Anki internal tags
     assert set(
-        updated_tags(
+        _updated_tags(
             cur_tags=["marked", "leech"],
             incoming_tags=[],
             protected_tags=[],
@@ -185,7 +185,7 @@ def test_updated_tags():
     # keep optional tags
     optional_tag = f"{TAG_FOR_OPTIONAL_TAGS}::tag_group::tag"
     assert set(
-        updated_tags(
+        _updated_tags(
             cur_tags=[optional_tag],
             incoming_tags=[],
             protected_tags=[],
@@ -245,13 +245,13 @@ def test_prepared_field_html():
 
 def test_remove_note_type_name_modifications():
     name = "Basic (deck_name / user_name)"
-    assert note_type_name_without_ankihub_modifications(name) == "Basic"
+    assert _note_type_name_without_ankihub_modifications(name) == "Basic"
 
     name = "Basic (deck_name / user_name) (deck_name2 / user_name2)"
-    assert note_type_name_without_ankihub_modifications(name) == "Basic"
+    assert _note_type_name_without_ankihub_modifications(name) == "Basic"
 
     name = "Basic (deck_name/user_name)"
-    assert note_type_name_without_ankihub_modifications(name) == name
+    assert _note_type_name_without_ankihub_modifications(name) == name
 
 
 def test_add_subdeck_tags_to_notes(anki_session_with_addon_data: AnkiSession):
