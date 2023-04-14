@@ -1,3 +1,6 @@
+"""Code for resetting notes to the state they have in the AnkiHub database.
+(This is the state that the notes had on AnkiHub when the add-on synced with AnkiHub last time.)
+"""
 import uuid
 from typing import Sequence
 
