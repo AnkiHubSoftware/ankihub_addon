@@ -1,6 +1,4 @@
-"""Logic for the initial steps of registering local decks with collaborative
-decks for deck creators.
-"""
+"""Code for creating an AnkiHub deck from an existing deck in Anki."""
 import os
 import re
 import typing
