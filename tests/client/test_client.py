@@ -243,7 +243,7 @@ def test_download_deck(
 
     get_presigned_url = MagicMock()
     get_presigned_url.return_value = "https://fake_s3.com"
-    monkeypatch.setattr(client, "get_presigned_url", get_presigned_url)
+    monkeypatch.setattr(client, "_get_presigned_url", get_presigned_url)
 
     original_get_deck_by_id = client.get_deck_by_id
 
@@ -271,7 +271,7 @@ def test_download_compressed_deck(
 
     get_presigned_url = MagicMock()
     get_presigned_url.return_value = "https://fake_s3.com"
-    monkeypatch.setattr(client, "get_presigned_url", get_presigned_url)
+    monkeypatch.setattr(client, "_get_presigned_url", get_presigned_url)
 
     original_get_deck_by_id = client.get_deck_by_id
 
@@ -299,7 +299,7 @@ def test_download_deck_with_progress(
 
     get_presigned_url = MagicMock()
     get_presigned_url.return_value = "https://fake_s3.com"
-    monkeypatch.setattr(client, "get_presigned_url", get_presigned_url)
+    monkeypatch.setattr(client, "_get_presigned_url", get_presigned_url)
 
     original_get_deck_by_id = client.get_deck_by_id
 
@@ -365,7 +365,7 @@ def test_upload_deck(
     with monkeypatch.context() as m:
         m.setattr(client, "_upload_to_s3", upload_to_s3_mock)
         m.setattr(
-            client, "get_presigned_url", lambda *args, **kwargs: "https://fake_s3.com"
+            client, "_get_presigned_url", lambda *args, **kwargs: "https://fake_s3.com"
         )
 
         client.upload_deck(
@@ -924,7 +924,7 @@ class TestUploadImagesForSuggestion:
 
         monkeypatch.setattr(
             AnkiHubClient,
-            "get_presigned_url_for_multiple_uploads",
+            "_get_presigned_url_for_multiple_uploads",
             lambda *args, **kwargs: {
                 "url": fake_presigned_url,
                 "fields": {
@@ -1059,7 +1059,7 @@ class TestUploadAssetsForDeck:
 
         # Mock upload-related stuff
         monkeypatch.setattr(
-            client, "get_presigned_url_for_multiple_uploads", MagicMock()
+            client, "_get_presigned_url_for_multiple_uploads", MagicMock()
         )
         monkeypatch.setattr(
             client, "_upload_file_to_s3_with_reusable_presigned_url", MagicMock()
@@ -1109,7 +1109,7 @@ class TestUploadAssetsForDeck:
         get_presigned_url_mock = MagicMock()
         get_presigned_url_mock.return_value = s3_info_mocked_value
         monkeypatch.setattr(
-            client, "get_presigned_url_for_multiple_uploads", get_presigned_url_mock
+            client, "_get_presigned_url_for_multiple_uploads", get_presigned_url_mock
         )
 
         mocked_upload_file_to_s3 = MagicMock()
@@ -1136,7 +1136,7 @@ class TestUploadAssetsForDeck:
 
         # Mock upload-related stuff
         monkeypatch.setattr(
-            client, "get_presigned_url_for_multiple_uploads", MagicMock()
+            client, "_get_presigned_url_for_multiple_uploads", MagicMock()
         )
         monkeypatch.setattr(
             client, "_upload_file_to_s3_with_reusable_presigned_url", MagicMock()

@@ -2756,7 +2756,7 @@ class TestSuggestionsWithImages:
 
             monkeypatch.setattr(
                 AnkiHubClient,
-                "get_presigned_url_for_multiple_uploads",
+                "_get_presigned_url_for_multiple_uploads",
                 lambda *args, **kwargs: {
                     "url": fake_presigned_url,
                     "fields": {
@@ -2845,7 +2845,7 @@ class TestSuggestionsWithImages:
 
             monkeypatch.setattr(
                 AnkiHubClient,
-                "get_presigned_url_for_multiple_uploads",
+                "_get_presigned_url_for_multiple_uploads",
                 lambda *args, **kwargs: {
                     "url": fake_presigned_url,
                     "fields": {
@@ -2963,7 +2963,7 @@ class TestSuggestionsWithImages:
 
             monkeypatch.setattr(
                 AnkiHubClient,
-                "get_presigned_url_for_multiple_uploads",
+                "_get_presigned_url_for_multiple_uploads",
                 lambda *args, **kwargs: {
                     "url": fake_presigned_url,
                     "fields": {
