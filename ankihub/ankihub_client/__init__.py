@@ -1,3 +1,8 @@
+"""The AnkiHub client module. It should not import from other modules in the add-on to
+make it possible to use it in other projects.
+The ankihub.common_utils module is an exception.
+"""
+
 from .ankihub_client import (  # noqa: F401
     DEFAULT_API_URL,
     DEFAULT_APP_URL,
