@@ -8,7 +8,7 @@ from aqt.utils import showInfo
 
 from ... import LOGGER
 from ...db import ankihub_db
-from ...notes_reset import reset_local_changes_to_notes
+from ...reset_local_changes import reset_local_changes_to_notes
 from ...settings import ANKIHUB_NOTE_TYPE_FIELD_NAME, config
 from ..utils import ask_user
 

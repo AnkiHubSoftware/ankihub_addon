@@ -98,7 +98,7 @@ from ankihub.note_conversion import (
     TAG_FOR_OPTIONAL_TAGS,
     TAG_FOR_PROTECTING_FIELDS,
 )
-from ankihub.notes_reset import reset_local_changes_to_notes
+from ankihub.reset_local_changes import reset_local_changes_to_notes
 from ankihub.settings import (
     ANKIHUB_NOTE_TYPE_FIELD_NAME,
     AnkiHubCommands,

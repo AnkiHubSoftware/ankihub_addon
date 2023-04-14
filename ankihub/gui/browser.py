@@ -44,7 +44,7 @@ from ..note_conversion import (
     TAG_FOR_PROTECTING_FIELDS,
     is_tag_for_group,
 )
-from ..notes_reset import reset_local_changes_to_notes
+from ..reset_local_changes import reset_local_changes_to_notes
 from ..settings import ANKIHUB_NOTE_TYPE_FIELD_NAME, DeckExtensionConfig, config
 from ..subdecks import SUBDECK_TAG, build_subdecks_and_move_cards_to_them
 from ..sync import NotLoggedInError, ah_sync
