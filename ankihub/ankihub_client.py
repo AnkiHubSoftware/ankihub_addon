@@ -648,7 +648,7 @@ class AnkiHubClient:
         )
         # TODO Validate .csv
         notes_data_raw = [row for row in reader]
-        notes_data_raw = transform_notes_data(notes_data_raw)
+        notes_data_raw = _transform_notes_data(notes_data_raw)
         notes_data = [NoteInfo.from_dict(row) for row in notes_data_raw]
 
         return notes_data
@@ -706,7 +706,7 @@ class AnkiHubClient:
             data = response.json()
             url = data["next"].split("/api", maxsplit=1)[1] if data["next"] else None
 
-            data["notes"] = transform_notes_data(data["notes"])
+            data["notes"] = _transform_notes_data(data["notes"])
             note_updates = DeckUpdateChunk.from_dict(data)
             yield note_updates
 
@@ -856,7 +856,7 @@ class AnkiHubClient:
             raise AnkiHubRequestError(response)
 
         data = response.json()
-        result = to_anki_note_type(data)
+        result = _to_anki_note_type(data)
         return result
 
     def get_protected_fields(
@@ -1076,7 +1076,7 @@ class AnkiHubClient:
         return result
 
 
-def transform_notes_data(notes_data: List[Dict]) -> List[Dict]:
+def _transform_notes_data(notes_data: List[Dict]) -> List[Dict]:
     # TODO Fix differences between csv (used when installing for the first time) vs.
     # json in responses (used when getting updates).
     # For example for one a field is named "note_id" and for the other "id"
@@ -1100,7 +1100,7 @@ def transform_notes_data(notes_data: List[Dict]) -> List[Dict]:
     return result
 
 
-def to_anki_note_type(note_type_data: Dict) -> Dict[str, Any]:
+def _to_anki_note_type(note_type_data: Dict) -> Dict[str, Any]:
     """Turn JSON response from AnkiHubClient.get_note_type into NotetypeDict."""
     del note_type_data["anki_id"]
     note_type_data["tmpls"] = note_type_data.pop("templates")

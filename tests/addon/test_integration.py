@@ -58,7 +58,7 @@ from ankihub.ankihub_client import (
     OptionalTagSuggestion,
     SuggestionType,
     TagGroupValidationResponse,
-    transform_notes_data,
+    _transform_notes_data,
 )
 from ankihub.auto_sync import setup_ankihub_sync_on_ankiweb_sync
 from ankihub.common_utils import IMG_NAME_IN_IMG_TAG_REGEX
@@ -241,7 +241,7 @@ def make_ah_note(
 
 
 def ankihub_sample_deck_notes_data() -> List[NoteInfo]:
-    notes_data_raw = transform_notes_data(SAMPLE_NOTES_DATA)
+    notes_data_raw = _transform_notes_data(SAMPLE_NOTES_DATA)
     result = [NoteInfo.from_dict(x) for x in notes_data_raw]
     return result
 
