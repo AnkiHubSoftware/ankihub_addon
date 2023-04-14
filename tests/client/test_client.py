@@ -30,8 +30,6 @@ from ankihub.ankihub_client import (
     ChangeNoteSuggestion,
     Deck,
     DeckExtension,
-    DeckExtensionUpdateChunk,
-    DeckUpdateChunk,
     Field,
     NewNoteSuggestion,
     NoteCustomization,
@@ -42,6 +40,10 @@ from ankihub.ankihub_client import (
     TagGroupValidationResponse,
     get_image_names_from_notes_data,
     get_image_names_from_suggestion,
+)
+from ankihub.ankihub_client.ankihub_client import (
+    DeckExtensionUpdateChunk,
+    DeckUpdateChunk,
 )
 from ankihub.gui.decks import _download_progress_cb
 
@@ -568,7 +570,9 @@ class TestGetDeckUpdates:
         client = authorized_client_for_user_test2
 
         page_size = 5
-        monkeypatch.setattr("ankihub.ankihub_client.DECK_UPDATE_PAGE_SIZE", page_size)
+        monkeypatch.setattr(
+            "ankihub.ankihub_client.ankihub_client.DECK_UPDATE_PAGE_SIZE", page_size
+        )
         update_chunks: List[DeckUpdateChunk] = list(
             client.get_deck_updates(ID_OF_DECK_OF_USER_TEST2, since=None)
         )
@@ -716,7 +720,9 @@ def test_get_note_customizations_by_deck_extension_id_in_multiple_chunks(
 
     deck_extension_id = 999
 
-    monkeypatch.setattr("ankihub.ankihub_client.DECK_EXTENSION_UPDATE_PAGE_SIZE", 1)
+    monkeypatch.setattr(
+        "ankihub.ankihub_client.ankihub_client.DECK_EXTENSION_UPDATE_PAGE_SIZE", 1
+    )
 
     expected_chunk_1 = DeckExtensionUpdateChunk(
         note_customizations=[

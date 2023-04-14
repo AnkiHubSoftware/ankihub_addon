@@ -45,12 +45,10 @@ from ankihub.addons import (
     _with_disabled_log_file_handler,
 )
 from ankihub.ankihub_client import (
-    ANKIHUB_DATETIME_FORMAT_STR,
     AnkiHubClient,
     AnkiHubRequestError,
     ChangeNoteSuggestion,
     Deck,
-    DeckExtensionUpdateChunk,
     Field,
     NewNoteSuggestion,
     NoteCustomization,
@@ -58,6 +56,10 @@ from ankihub.ankihub_client import (
     OptionalTagSuggestion,
     SuggestionType,
     TagGroupValidationResponse,
+)
+from ankihub.ankihub_client.ankihub_client import (
+    ANKIHUB_DATETIME_FORMAT_STR,
+    DeckExtensionUpdateChunk,
     _transform_notes_data,
 )
 from ankihub.auto_sync import setup_ankihub_sync_on_ankiweb_sync
