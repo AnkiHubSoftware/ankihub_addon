@@ -27,8 +27,8 @@ from aqt.utils import openLink, showInfo, tooltip
 from .. import LOGGER
 from ..addon_ankihub_client import AddonAnkiHubClient as AnkiHubClient
 from ..ankihub_client import AnkiHubRequestError, get_image_names_from_notes_data
-from ..create_deck import create_ankihub_deck
 from ..db import ankihub_db
+from ..deck_creation import create_ankihub_deck
 from ..errors import upload_logs_in_background
 from ..media_import.ui import open_import_dialog
 from ..media_sync import media_sync

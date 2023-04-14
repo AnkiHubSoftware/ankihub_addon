@@ -22,8 +22,8 @@ os.environ["SKIP_INIT"] = "1"
 
 from ankihub import errors, suggestions
 from ankihub.ankihub_client import AnkiHubRequestError, Field, SuggestionType
-from ankihub.create_deck import _note_type_name_without_ankihub_modifications
 from ankihub.db.db import ASSET_DISABLED_FIELD_BYPASS_TAG, _AnkiHubDB
+from ankihub.deck_creation import _note_type_name_without_ankihub_modifications
 from ankihub.errors import (
     OUTDATED_CLIENT_ERROR_REASON,
     _contains_path_to_this_addon,

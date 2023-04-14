@@ -64,7 +64,6 @@ from ankihub.ankihub_client.ankihub_client import (
 )
 from ankihub.auto_sync import setup_ankihub_sync_on_ankiweb_sync
 from ankihub.common_utils import IMG_NAME_IN_IMG_TAG_REGEX
-from ankihub.create_deck import create_ankihub_deck, modify_note_type
 from ankihub.db import ankihub_db, attached_ankihub_db
 from ankihub.debug import (
     _log_stack,
@@ -73,6 +72,7 @@ from ankihub.debug import (
     _setup_sentry_reporting_for_error_on_addon_update,
     user_files_context_dict,
 )
+from ankihub.deck_creation import create_ankihub_deck, modify_note_type
 from ankihub.exporting import to_note_data
 from ankihub.gui import utils
 from ankihub.gui.browser import (
