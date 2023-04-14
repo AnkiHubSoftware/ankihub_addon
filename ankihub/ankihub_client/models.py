@@ -15,7 +15,6 @@ from ..common_utils import local_image_names_from_html
 ANKIHUB_DATETIME_FORMAT_STR = "%Y-%m-%dT%H:%M:%S.%f%z"
 
 
-# TODO Make sure these match up with SuggestionType.choices on AnkiHub
 class SuggestionType(Enum):
     UPDATED_CONTENT = "updated_content", "Updated content"
     NEW_CONTENT = "new_content", "New content"
