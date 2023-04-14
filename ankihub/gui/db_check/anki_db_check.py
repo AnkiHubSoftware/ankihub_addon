@@ -49,12 +49,12 @@ def _check_missing_ankihub_nids() -> None:
     ):
         aqt.mw.taskman.with_progress(
             lambda: _reset_decks(ah_dids_with_missing_ah_nids),
-            on_done=on_done,
+            on_done=_on_done,
             label="Resetting local changes...",
         )
 
 
-def on_done(future: Future):
+def _on_done(future: Future):
     future.result()
 
     LOGGER.info("Done resetting local changes.")

@@ -87,9 +87,9 @@ class AnkiHubImporter:
         # this is not ideal, it would be probably better to fetch all note types associated with the deck each time
         if not notes_data:
             mids = ankihub_db.note_types_for_ankihub_deck(ankihub_did)
-            remote_note_types = fetch_remote_note_types(mids)
+            remote_note_types = _fetch_remote_note_types(mids)
         else:
-            remote_note_types = fetch_remote_note_types_based_on_notes_data(notes_data)
+            remote_note_types = _fetch_remote_note_types_based_on_notes_data(notes_data)
 
         if protected_fields is None:
             protected_fields = AnkiHubClient().get_protected_fields(ankihub_did)
@@ -130,9 +130,9 @@ class AnkiHubImporter:
         self._first_import_of_deck = local_did is None
         self._protected_fields = protected_fields
         self._protected_tags = protected_tags
-        self._local_did = adjust_deck(deck_name, local_did)
+        self._local_did = _adjust_deck(deck_name, local_did)
 
-        adjust_note_types(remote_note_types)
+        _adjust_note_types(remote_note_types)
 
         dids = self._import_notes(
             ankihub_did=ankihub_did,
@@ -176,7 +176,7 @@ class AnkiHubImporter:
         )
         self._skipped_nids = [NoteId(note_data.anki_nid) for note_data in skipped_notes]
 
-        reset_note_types_of_notes_based_on_notes_data(upserted_notes)
+        _reset_note_types_of_notes_based_on_notes_data(upserted_notes)
 
         dids: Set[DeckId] = set()  # set of ids of decks notes were imported into
         for note_data in upserted_notes:
@@ -463,7 +463,7 @@ class AnkiHubImporter:
     ) -> bool:
         changed = False
         prev_tags = note.tags
-        note.tags = updated_tags(
+        note.tags = _updated_tags(
             cur_tags=note.tags, incoming_tags=tags, protected_tags=protected_tags
         )
         if set(prev_tags) != set(note.tags):
@@ -475,7 +475,7 @@ class AnkiHubImporter:
         return changed
 
 
-def adjust_deck(deck_name: str, local_did: Optional[DeckId] = None) -> DeckId:
+def _adjust_deck(deck_name: str, local_did: Optional[DeckId] = None) -> DeckId:
     unique_name = get_unique_deck_name(deck_name)
     if local_did is None:
         local_did = DeckId(aqt.mw.col.decks.add_normal_deck_with_name(unique_name).id)
@@ -488,7 +488,7 @@ def adjust_deck(deck_name: str, local_did: Optional[DeckId] = None) -> DeckId:
     return local_did
 
 
-def updated_tags(
+def _updated_tags(
     cur_tags: List[str], incoming_tags: List[str], protected_tags: List[str]
 ) -> List[str]:
 
@@ -511,15 +511,15 @@ def updated_tags(
     return result
 
 
-def fetch_remote_note_types_based_on_notes_data(
+def _fetch_remote_note_types_based_on_notes_data(
     notes_data: List[NoteInfo],
 ) -> Dict[NotetypeId, NotetypeDict]:
     remote_mids = set(NotetypeId(note_data.mid) for note_data in notes_data)
-    result = fetch_remote_note_types(remote_mids)
+    result = _fetch_remote_note_types(remote_mids)
     return result
 
 
-def fetch_remote_note_types(
+def _fetch_remote_note_types(
     mids: Iterable[NotetypeId],
 ) -> Dict[NotetypeId, NotetypeDict]:
     client = AnkiHubClient()
@@ -527,20 +527,20 @@ def fetch_remote_note_types(
     return result
 
 
-def adjust_note_types(remote_note_types: Dict[NotetypeId, NotetypeDict]) -> None:
+def _adjust_note_types(remote_note_types: Dict[NotetypeId, NotetypeDict]) -> None:
     # can be called when installing a deck for the first time and when synchronizing with AnkiHub
 
     LOGGER.info("Beginning adjusting note types...")
 
-    create_missing_note_types(remote_note_types)
+    _create_missing_note_types(remote_note_types)
     rename_note_types(remote_note_types)
-    ensure_local_and_remote_fields_are_same(remote_note_types)
+    _ensure_local_and_remote_fields_are_same(remote_note_types)
     modify_note_type_templates(remote_note_types.keys())
 
     LOGGER.info("Adjusted note types.")
 
 
-def create_missing_note_types(
+def _create_missing_note_types(
     remote_note_types: Dict[NotetypeId, NotetypeDict]
 ) -> None:
     missings_mids = set(
@@ -563,7 +563,7 @@ def rename_note_types(remote_note_types: Dict[NotetypeId, NotetypeDict]) -> None
             LOGGER.info(f"Renamed note type {mid=} to {local_note_type['name']}")
 
 
-def ensure_local_and_remote_fields_are_same(
+def _ensure_local_and_remote_fields_are_same(
     remote_note_types: Dict[NotetypeId, NotetypeDict]
 ) -> None:
     def field_tuples(flds: List[Dict]) -> List[Tuple[int, str]]:
@@ -586,7 +586,7 @@ def ensure_local_and_remote_fields_are_same(
     for local_note_type, remote_note_type in note_types_with_field_conflicts:
         LOGGER.info(f"Adjusting fields of {local_note_type['name']}...")
 
-        local_note_type["flds"] = adjust_field_ords(
+        local_note_type["flds"] = _adjust_field_ords(
             local_note_type["flds"], remote_note_type["flds"]
         )
         LOGGER.info(
@@ -600,7 +600,7 @@ def ensure_local_and_remote_fields_are_same(
         )
 
 
-def adjust_field_ords(
+def _adjust_field_ords(
     cur_model_flds: List[Dict], new_model_flds: List[Dict]
 ) -> List[Dict]:
     # This makes sure that when fields get added or are moved field contents end up
@@ -623,7 +623,7 @@ def adjust_field_ords(
     return new_model_flds
 
 
-def reset_note_types_of_notes_based_on_notes_data(
+def _reset_note_types_of_notes_based_on_notes_data(
     notes_data: Sequence[NoteInfo],
 ) -> None:
     """Set the note type of notes back to the note type they have in the remote deck if they have a different one"""

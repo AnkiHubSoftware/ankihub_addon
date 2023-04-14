@@ -48,11 +48,11 @@ PROFILE_ID_FIELD_NAME = "ankihub_id"
 ANKING_DECK_ID = uuid.UUID("e77aedfe-a636-40e2-8169-2fce2673187e")
 
 
-def serialize_datetime(x: datetime) -> str:
+def _serialize_datetime(x: datetime) -> str:
     return x.strftime(ANKIHUB_DATETIME_FORMAT_STR) if x else ""
 
 
-def deserialize_datetime(x: str) -> Optional[datetime]:
+def _deserialize_datetime(x: str) -> Optional[datetime]:
     return datetime.strptime(x, ANKIHUB_DATETIME_FORMAT_STR) if x else None
 
 
@@ -63,8 +63,8 @@ class DeckConfig(DataClassJSONMixin):
     name: str
     latest_update: Optional[datetime] = dataclasses.field(
         metadata=field_options(
-            serialize=serialize_datetime,
-            deserialize=deserialize_datetime,
+            serialize=_serialize_datetime,
+            deserialize=_deserialize_datetime,
         ),
         default=None,
     )
@@ -82,8 +82,8 @@ class DeckExtensionConfig(DataClassJSONMixin):
     description: str
     latest_update: Optional[datetime] = dataclasses.field(
         metadata=field_options(
-            serialize=serialize_datetime,
-            deserialize=deserialize_datetime,
+            serialize=_serialize_datetime,
+            deserialize=_deserialize_datetime,
         ),
         default=None,
     )
@@ -284,19 +284,19 @@ config = _Config()
 
 def setup_profile_data_folder() -> bool:
     """Returns False if the migration from the old location needs yet to be done."""
-    assign_id_to_profile_if_not_exists()
+    _assign_id_to_profile_if_not_exists()
     LOGGER.info(f"Anki profile id: {aqt.mw.pm.profile[PROFILE_ID_FIELD_NAME]}")
 
     if not (path := profile_files_path()).exists():
         path.mkdir(parents=True)
 
-    if profile_data_exists_at_old_location():
-        return migrate_profile_data_from_old_location()
+    if _profile_data_exists_at_old_location():
+        return _migrate_profile_data_from_old_location()
 
     return True
 
 
-def assign_id_to_profile_if_not_exists() -> None:
+def _assign_id_to_profile_if_not_exists() -> None:
     """Assigns an id to the currently open profile if it doesn't have one."""
     if aqt.mw.pm.profile.get("ankihub_id") is not None:
         return
@@ -335,14 +335,14 @@ def private_config_path() -> Path:
     return result
 
 
-def profile_data_exists_at_old_location() -> bool:
+def _profile_data_exists_at_old_location() -> bool:
     result = (user_files_path() / PRIVATE_CONFIG_FILENAME).exists()
     return result
 
 
-def migrate_profile_data_from_old_location() -> bool:
+def _migrate_profile_data_from_old_location() -> bool:
     """Returns True if the data was migrated and False if it remains at the old location."""
-    if not profile_data_exists_at_old_location():
+    if not _profile_data_exists_at_old_location():
         LOGGER.info("No data to migrate.")
         return True
 
@@ -364,7 +364,7 @@ def migrate_profile_data_from_old_location() -> bool:
     # move database, config and log files to profile folder
     try:
         for file in user_files_path().glob("*"):
-            if not file_should_be_migrated(file):
+            if not _file_should_be_migrated(file):
                 continue
 
             copyfile(file, profile_files_path() / file.name)
@@ -378,7 +378,7 @@ def migrate_profile_data_from_old_location() -> bool:
 
     # delete old files after all files have been copied successfully
     for file in user_files_path().glob("*"):
-        if not file_should_be_migrated(file):
+        if not _file_should_be_migrated(file):
             continue
 
         file.unlink()
@@ -386,7 +386,7 @@ def migrate_profile_data_from_old_location() -> bool:
     return True
 
 
-def file_should_be_migrated(file_path: Path) -> bool:
+def _file_should_be_migrated(file_path: Path) -> bool:
     result = (
         file_path.is_file()
         and not str(file_path.name).startswith("README")
@@ -399,17 +399,17 @@ def log_file_path() -> Path:
     return user_files_path() / "ankihub.log"
 
 
-def stdout_handler() -> logging.Handler:
+def _stdout_handler() -> logging.Handler:
     return logging.StreamHandler(stream=sys.stdout)
 
 
-def file_handler() -> logging.Handler:
+def _file_handler() -> logging.Handler:
     return RotatingFileHandler(
         log_file_path(), maxBytes=3000000, backupCount=5, encoding="utf-8"
     )
 
 
-def formatter() -> logging.Formatter:
+def _formatter() -> logging.Formatter:
     return logging.Formatter(
         "%(levelname)s %(asctime)s %(module)s %(process)d %(thread)d %(message)s"
     )
@@ -425,20 +425,20 @@ def setup_logger():
 
 
 def setup_stdout_handler() -> None:
-    stdout_handler_ = stdout_handler()
+    stdout_handler_ = _stdout_handler()
     stdout_handler_.setLevel(logging.INFO)
-    stdout_handler_.setFormatter(formatter())
+    stdout_handler_.setFormatter(_formatter())
     LOGGER.addHandler(stdout_handler_)
 
 
 def setup_file_handler() -> None:
-    file_handler_ = file_handler()
+    file_handler_ = _file_handler()
     file_handler_.setLevel(
         logging.DEBUG
         if config.public_config.get("debug_level_logs", False)
         else logging.INFO
     )
-    file_handler_.setFormatter(formatter())
+    file_handler_.setFormatter(_formatter())
     LOGGER.addHandler(file_handler_)
 
 

@@ -12,7 +12,7 @@ from ..utils import ask_user
 
 def check_ankihub_db(on_success: Optional[Callable[[], None]] = None):
     ah_dids_with_missing_values = ankihub_db.ankihub_dids_of_decks_with_missing_values()
-    ah_dids_missing_from_config = decks_missing_from_config()
+    ah_dids_missing_from_config = _decks_missing_from_config()
     ah_dids_with_something_missing = list(
         set(ah_dids_with_missing_values) | set(ah_dids_missing_from_config)
     )
@@ -50,12 +50,12 @@ def check_ankihub_db(on_success: Optional[Callable[[], None]] = None):
         ),
         title="AnkiHub Database Check",
     ):
-        download_and_install_decks(
+        _download_and_install_decks(
             ah_dids_with_something_missing, on_success=on_success
         )
 
 
-def download_and_install_decks(
+def _download_and_install_decks(
     ankihub_dids: List[uuid.UUID], on_success: Optional[Callable[[], None]] = None
 ):
     # Installs decks one by one and then cleans up.
@@ -73,21 +73,21 @@ def download_and_install_decks(
 
     download_and_install_deck(
         cur_did,
-        on_success=lambda import_result: download_and_install_decks(
+        on_success=lambda import_result: _download_and_install_decks(
             ankihub_dids, on_success
         ),
-        on_failure=show_failure_message,
+        on_failure=_show_failure_message,
     )
 
 
-def show_failure_message() -> None:
+def _show_failure_message() -> None:
     showWarning(
         "AnkiHub was unable to download and import all deck(s).",
         title="AnkiHub",
     )
 
 
-def decks_missing_from_config() -> List[uuid.UUID]:
+def _decks_missing_from_config() -> List[uuid.UUID]:
     ah_dids_from_ankihub_db = ankihub_db.ankihub_deck_ids()
     ah_dids_from_config = config.deck_ids()
     return list(set(ah_dids_from_ankihub_db) - set(ah_dids_from_config))

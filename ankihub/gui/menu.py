@@ -52,6 +52,34 @@ class _MenuState:
 menu_state = _MenuState()
 
 
+def setup_ankihub_menu() -> None:
+    menu_state.ankihub_menu = QMenu("&AnkiHub", parent=aqt.mw)
+    aqt.mw.form.menubar.addMenu(menu_state.ankihub_menu)
+    config.token_change_hook = lambda: aqt.mw.taskman.run_on_main(refresh_ankihub_menu)
+    config.subscriptions_change_hook = lambda: aqt.mw.taskman.run_on_main(
+        refresh_ankihub_menu
+    )
+    refresh_ankihub_menu()
+
+
+def refresh_ankihub_menu() -> None:
+    """Add top-level AnkiHub menu."""
+    menu_state.ankihub_menu.clear()
+
+    if config.is_logged_in():
+        _create_collaborative_deck_setup(parent=menu_state.ankihub_menu)
+        _subscribe_to_deck_setup(parent=menu_state.ankihub_menu)
+        _import_media_setup(parent=menu_state.ankihub_menu)
+        _sync_with_ankihub_setup(parent=menu_state.ankihub_menu)
+        _media_sync_status_setup(parent=menu_state.ankihub_menu)
+        _upload_deck_assets_setup(parent=menu_state.ankihub_menu)
+        _ankihub_logout_setup(parent=menu_state.ankihub_menu)
+    else:
+        _ankihub_login_setup(parent=menu_state.ankihub_menu)
+
+    _ankihub_help_setup(parent=menu_state.ankihub_menu)
+
+
 class AnkiHubLogin(QWidget):
     _window: Optional["AnkiHubLogin"] = None
     silentlyClose = True
@@ -194,7 +222,7 @@ class DeckCreationConfirmationDialog(QMessageBox):
         return True
 
 
-def create_collaborative_deck_action() -> None:
+def _create_collaborative_deck_action() -> None:
 
     confirm = DeckCreationConfirmationDialog().run()
     if not confirm:
@@ -292,30 +320,22 @@ def create_collaborative_deck_action() -> None:
     op.with_progress(label="Creating collaborative deck").run_in_background()
 
 
-def create_collaborative_deck_setup(parent):
+def _create_collaborative_deck_setup(parent):
     q_action = QAction("🛠️ Create Collaborative Deck", parent=parent)
-    qconnect(q_action.triggered, create_collaborative_deck_action)
+    qconnect(q_action.triggered, _create_collaborative_deck_action)
     parent.addAction(q_action)
 
 
-def upload_suggestions_action():
-    """Action for uploading suggestions in bulk."""
-    # TODO Instantiate AnkiHubClient.
-    # TODO Query the the note table for mod times that are later than the time
-    #  the last sync.
-    # TODO Send a request to AnkiHub with the list of modified notes.
-
-
-def sync_with_ankihub_action():
+def _sync_with_ankihub_action():
     aqt.mw.taskman.with_progress(
         task=ah_sync.sync_all_decks_and_media,
         immediate=True,
         label="Syncing with AnkiHub",
-        on_done=on_sync_done,
+        on_done=_on_sync_done,
     )
 
 
-def on_sync_done(future: Future) -> None:
+def _on_sync_done(future: Future) -> None:
     future.result()
 
     show_tooltip_about_last_sync_results()
@@ -323,7 +343,7 @@ def on_sync_done(future: Future) -> None:
     maybe_check_databases()
 
 
-def sign_out_action():
+def _sign_out_action():
     try:
         AnkiHubClient().signout()
     finally:
@@ -358,7 +378,7 @@ class LogUploadResultDialog(QDialog):
         self.layout_.addWidget(self.button)
 
 
-def upload_logs_action():
+def _upload_logs_action():
     if not ask_user(
         "Do you want to upload the add-on's logs to AnkiHub to go along a bug report?"
     ):
@@ -373,36 +393,29 @@ def upload_logs_action():
     upload_logs_in_background(on_done=on_done, hide_username=True)
 
 
-def ankihub_login_setup(parent):
+def _ankihub_login_setup(parent):
     sign_in_button = QAction("🔑 Sign into AnkiHub", aqt.mw)
     qconnect(sign_in_button.triggered, AnkiHubLogin.display_login)
     parent.addAction(sign_in_button)
 
 
-def upload_suggestions_setup(parent):
-    """Set up the menu item for uploading suggestions in bulk."""
-    q_action = QAction("⬆️ Upload suggestions to AnkiHub", parent=parent)
-    qconnect(q_action.triggered, upload_suggestions_action)
-    parent.addAction(q_action)
-
-
-def subscribe_to_deck_setup(parent):
+def _subscribe_to_deck_setup(parent):
     """Set up the menu item for uploading suggestions in bulk."""
     q_action = QAction("📚 Subscribed Decks", aqt.mw)
     qconnect(q_action.triggered, SubscribedDecksDialog.display_subscribe_window)
     parent.addAction(q_action)
 
 
-def import_media_setup(parent):
+def _import_media_setup(parent):
     q_action = QAction("🖼️ Import media", aqt.mw)
     qconnect(q_action.triggered, open_import_dialog)
     parent.addAction(q_action)
 
 
-def sync_with_ankihub_setup(parent):
+def _sync_with_ankihub_setup(parent):
     """Set up the menu item for uploading suggestions in bulk."""
     q_action = QAction("🔃️ Sync with AnkiHub", aqt.mw)
-    qconnect(q_action.triggered, sync_with_ankihub_action)
+    qconnect(q_action.triggered, _sync_with_ankihub_action)
     if sync_hotkey := config.public_config["sync_hotkey"]:
         try:
             q_action.setShortcut(QKeySequence(sync_hotkey))
@@ -413,17 +426,17 @@ def sync_with_ankihub_setup(parent):
     parent.addAction(q_action)
 
 
-def upload_deck_assets_setup(parent):
+def _upload_deck_assets_setup(parent):
     """Set up the menu item for manually triggering the upload
     of all the assets for a given deck (logged user MUST be the
     deck owner)"""
 
     q_action = QAction("📸 Upload images for deck", aqt.mw)
-    qconnect(q_action.triggered, upload_deck_assets_action)
+    qconnect(q_action.triggered, _upload_deck_assets_action)
     parent.addAction(q_action)
 
 
-def upload_deck_assets_action() -> None:
+def _upload_deck_assets_action() -> None:
     client = AnkiHubClient()
 
     # Fetch the ankihub deck ids of all decks the user owns
@@ -514,7 +527,7 @@ def upload_deck_assets_action() -> None:
     )
 
 
-def ankihub_help_setup(parent):
+def _ankihub_help_setup(parent):
     """Set up the sub menu for help related items."""
     help_menu = QMenu("🆘 Help", parent)
 
@@ -533,14 +546,14 @@ def ankihub_help_setup(parent):
     help_menu.addAction(q_get_help_action)
 
     q_upload_logs_action = QAction("Upload logs", help_menu)
-    qconnect(q_upload_logs_action.triggered, upload_logs_action)
+    qconnect(q_upload_logs_action.triggered, _upload_logs_action)
     help_menu.addAction(q_upload_logs_action)
 
     q_downgrade_from_beta_version_action = QAction(
         "Downgrade from add-on beta version", help_menu
     )
     qconnect(
-        q_downgrade_from_beta_version_action.triggered, trigger_install_release_version
+        q_downgrade_from_beta_version_action.triggered, _trigger_install_release_version
     )
     help_menu.addAction(q_downgrade_from_beta_version_action)
 
@@ -552,7 +565,7 @@ def ankihub_help_setup(parent):
     parent.addMenu(help_menu)
 
 
-def trigger_install_release_version():
+def _trigger_install_release_version():
     showInfo(
         "When you click OK, the add-on update dialog will open in a couple of seconds "
         "and you will be able to install the version of the add-on that is available on AnkiWeb.<br><br>"
@@ -570,42 +583,14 @@ def trigger_install_release_version():
     check_and_prompt_for_updates_on_main_window()
 
 
-def ankihub_logout_setup(parent):
+def _ankihub_logout_setup(parent):
     q_action = QAction("🔑 Sign out", aqt.mw)
-    qconnect(q_action.triggered, sign_out_action)
+    qconnect(q_action.triggered, _sign_out_action)
     parent.addAction(q_action)
 
 
-def media_sync_status_setup(parent: QMenu):
+def _media_sync_status_setup(parent: QMenu):
     parent._media_sync_status_action = QAction("", parent)  # type: ignore
     parent.addAction(parent._media_sync_status_action)  # type: ignore
     media_sync.set_status_action(parent._media_sync_status_action)  # type: ignore
     media_sync.refresh_sync_status_text()
-
-
-def setup_ankihub_menu() -> None:
-    menu_state.ankihub_menu = QMenu("&AnkiHub", parent=aqt.mw)
-    aqt.mw.form.menubar.addMenu(menu_state.ankihub_menu)
-    config.token_change_hook = lambda: aqt.mw.taskman.run_on_main(refresh_ankihub_menu)
-    config.subscriptions_change_hook = lambda: aqt.mw.taskman.run_on_main(
-        refresh_ankihub_menu
-    )
-    refresh_ankihub_menu()
-
-
-def refresh_ankihub_menu() -> None:
-    """Add top-level AnkiHub menu."""
-    menu_state.ankihub_menu.clear()
-
-    if config.is_logged_in():
-        create_collaborative_deck_setup(parent=menu_state.ankihub_menu)
-        subscribe_to_deck_setup(parent=menu_state.ankihub_menu)
-        import_media_setup(parent=menu_state.ankihub_menu)
-        sync_with_ankihub_setup(parent=menu_state.ankihub_menu)
-        media_sync_status_setup(parent=menu_state.ankihub_menu)
-        upload_deck_assets_setup(parent=menu_state.ankihub_menu)
-        ankihub_logout_setup(parent=menu_state.ankihub_menu)
-    else:
-        ankihub_login_setup(parent=menu_state.ankihub_menu)
-
-    ankihub_help_setup(parent=menu_state.ankihub_menu)

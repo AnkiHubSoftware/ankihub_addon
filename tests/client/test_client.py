@@ -43,7 +43,7 @@ from ankihub.ankihub_client import (
     get_image_names_from_notes_data,
     get_image_names_from_suggestion,
 )
-from ankihub.gui.decks import download_progress_cb
+from ankihub.gui.decks import _download_progress_cb
 
 COMPOSE_FILE = Path(os.getenv("COMPOSE_FILE")) if os.getenv("COMPOSE_FILE") else None
 
@@ -317,7 +317,7 @@ def test_download_deck_with_progress(
         )
         notes_data = client.download_deck(
             ankihub_deck_uuid=ID_OF_DECK_OF_USER_TEST1,
-            download_progress_cb=download_progress_cb,
+            download_progress_cb=_download_progress_cb,
         )
     assert len(notes_data) == 1
     assert notes_data[0].tags == ["asdf"]
