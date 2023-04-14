@@ -252,7 +252,7 @@ def add_ankihub_snippet_to_template(template: Dict) -> None:
             display: none;
         }}
 
-        .android .ankihub-view-note, .iphone .ankihub-view-note, .ipad .ankihub-view-note {{
+        .mobile .ankihub-view-note {{
             display: block;
         }}
 
