@@ -242,7 +242,8 @@ def add_ankihub_snippet_to_template(template: Dict) -> None:
         f"""
         <!-- BEGIN {ANKIHUB_NOTE_TYPE_MODIFICATION_STRING} -->
         {{{{#{ANKIHUB_NOTE_TYPE_FIELD_NAME}}}}}
-        <a class='ankihub-view-note' href='{url_view_note()}{{{{{ANKIHUB_NOTE_TYPE_FIELD_NAME}}}}}'>
+        <a class='ankihub-view-note'
+            href='{url_view_note()}{{{{{ANKIHUB_NOTE_TYPE_FIELD_NAME}}}}}'>
             View Note on AnkiHub
         </a>
 
@@ -251,11 +252,11 @@ def add_ankihub_snippet_to_template(template: Dict) -> None:
             display: none;
         }}
 
-        .mobile .ankihub-view-note {{
+        .android .ankihub-view-note, .iphone .ankihub-view-note, .ipad .ankihub-view-note {{
             display: block;
         }}
 
-        .ankihub-view-note {{
+        .android .ankihub-view-note {{
             text-decoration: none;
             position: fixed;
             left: 50%;
@@ -269,8 +270,8 @@ def add_ankihub_snippet_to_template(template: Dict) -> None:
             color: black;
         }}
 
-        .ankihub-view-note:hover,
-        .ankihub-view-note:active {{
+        .android ankihub-view-note:hover,
+        .android ankihub-view-note:active {{
             background-color: #ebf3fa;
         }}
         </style>
