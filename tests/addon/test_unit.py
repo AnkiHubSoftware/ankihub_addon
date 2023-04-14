@@ -23,6 +23,7 @@ os.environ["SKIP_INIT"] = "1"
 from ankihub import errors, suggestions
 from ankihub.ankihub_client import AnkiHubRequestError, Field, SuggestionType
 from ankihub.db.db import ASSET_DISABLED_FIELD_BYPASS_TAG, _AnkiHubDB
+from ankihub.deck_creation import _note_type_name_without_ankihub_modifications
 from ankihub.errors import (
     OUTDATED_CLIENT_ERROR_REASON,
     _contains_path_to_this_addon,
@@ -45,7 +46,6 @@ from ankihub.note_conversion import (
     TAG_FOR_PROTECTING_FIELDS,
     _get_fields_protected_by_tags,
 )
-from ankihub.register_decks import _note_type_name_without_ankihub_modifications
 from ankihub.settings import ANKIWEB_ID
 from ankihub.subdecks import SUBDECK_TAG, add_subdeck_tags_to_notes
 from ankihub.utils import lowest_level_common_ancestor_deck_name

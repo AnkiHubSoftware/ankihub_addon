@@ -72,6 +72,7 @@ from ankihub.debug import (
     _setup_sentry_reporting_for_error_on_addon_update,
     user_files_context_dict,
 )
+from ankihub.deck_creation import create_ankihub_deck, modify_note_type
 from ankihub.exporting import to_note_data
 from ankihub.gui import utils
 from ankihub.gui.browser import (
@@ -97,8 +98,7 @@ from ankihub.note_conversion import (
     TAG_FOR_OPTIONAL_TAGS,
     TAG_FOR_PROTECTING_FIELDS,
 )
-from ankihub.register_decks import create_collaborative_deck, modify_note_type
-from ankihub.reset_changes import reset_local_changes_to_notes
+from ankihub.reset_local_changes import reset_local_changes_to_notes
 from ankihub.settings import (
     ANKIHUB_NOTE_TYPE_FIELD_NAME,
     AnkiHubCommands,
@@ -389,7 +389,7 @@ def test_create_collaborative_deck_and_upload(
                 "ankihub.ankihub_client.AnkiHubClient.upload_deck", upload_deck_mock
             )
             m.setattr("uuid.uuid4", lambda: ah_nid)
-            create_collaborative_deck(deck_name, private=False)
+            create_ankihub_deck(deck_name, private=False)
 
         # re-load note to get updated note.mid
         note.load()
