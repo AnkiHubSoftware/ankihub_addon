@@ -5,6 +5,8 @@ from .db import ankihub_db
 
 
 def migrate_ankihub_db():
+    """Migrate the AnkiHub DB to the latest schema version."""
+
     LOGGER.info(f"AnkiHub DB schema version: {ankihub_db.schema_version()}")
 
     if ankihub_db.schema_version() == 0:

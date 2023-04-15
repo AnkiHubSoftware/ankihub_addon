@@ -5,6 +5,8 @@ from .. import LOGGER
 
 
 class DBConnection:
+    """A wrapper around a sqlite3.Connection that provides some convenience methods."""
+
     def __init__(self, conn: sqlite3.Connection):
         self._conn = conn
         self._is_used_as_context_manager = False

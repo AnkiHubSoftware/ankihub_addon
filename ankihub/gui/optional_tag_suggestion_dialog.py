@@ -1,3 +1,4 @@
+"""Dialog for suggesting optional tags for notes."""
 from concurrent.futures import Future
 from typing import Sequence
 

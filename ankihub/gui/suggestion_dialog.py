@@ -1,3 +1,4 @@
+"""Dialog for creating a suggestion for a note or a bulk suggestion for multiple notes."""
 from concurrent.futures import Future
 from dataclasses import dataclass
 from enum import Enum

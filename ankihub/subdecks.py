@@ -1,3 +1,9 @@
+"""This module contains code for adding subdeck-tags to notes that indicate which subdeck they belong to.
+AnkiHub does not store subdeck information in the database and subdeck-tags are used to store this information instead.
+Then there is code to create decks based on these tags and move cards to the correct subdeck.
+It also contains code to flatten the subdecks of a deck and move all cards to the root deck in order to
+revert the changes made by moving cards to their subdecks.
+"""
 import re
 import uuid
 from typing import Dict, Iterable, List, Optional

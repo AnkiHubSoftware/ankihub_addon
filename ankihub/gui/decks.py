@@ -1,3 +1,4 @@
+"""Dialog for managing subscriptions to AnkiHub decks and deck-specific settings."""
 import uuid
 from concurrent.futures import Future
 from datetime import datetime

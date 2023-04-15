@@ -1,3 +1,6 @@
+"""Code for the config of the add-on. This file also defines paths to files and directories used by the add-on
+as well as some constants and code for setting up the profile folder and logger.
+"""
 import dataclasses
 import json
 import logging
@@ -341,7 +344,9 @@ def _profile_data_exists_at_old_location() -> bool:
 
 
 def _migrate_profile_data_from_old_location() -> bool:
-    """Returns True if the data was migrated and False if it remains at the old location."""
+    """Migration of add-on files from before the add-on added support for multiple Anki profiles was added
+    into a profile-specific folder.
+    Returns True if the data was migrated and False if it remains at the old location."""
     if not _profile_data_exists_at_old_location():
         LOGGER.info("No data to migrate.")
         return True

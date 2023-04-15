@@ -1,3 +1,5 @@
+"""Error feedback dialog that is used to collect feedback from the user when an error occurs to
+send it to Sentry."""
 from aqt.qt import QDialog, Qt, QVBoxLayout
 from aqt.utils import disable_help_button, restoreGeom, saveGeom
 from aqt.webview import AnkiWebView

@@ -1,3 +1,5 @@
+"""AddonAnkiHubClient is a wrapper around AnkiHubClient that is adapted to the AnkiHub add-on.
+It should be used instead of AnkiHubClient in the AnkiHub add-on."""
 import json
 from json import JSONDecodeError
 from pathlib import Path
