@@ -1,4 +1,5 @@
 """Downloads updates to decks from AnkiHub and imports them into Anki."""
+import threading
 import uuid
 from datetime import datetime
 from typing import List, Optional
@@ -25,26 +26,37 @@ class AnkiHubSync:
     def __init__(self):
         self._importer = AnkiHubImporter()
         self._import_results: Optional[List[AnkiHubImportResult]] = None
+        self._sync_lock = threading.Lock()
 
     def sync_all_decks_and_media(
         self, start_media_sync: bool = True
     ) -> List[AnkiHubImportResult]:
         """Syncs all decks with AnkiHub and starts the media download.
-        Should be called from a background thread with a progress dialog to avoid blocking the UI."""
+        Should be called from a background thread with a progress dialog to avoid blocking the UI.
+        If the sync is already in progress, this method will return immediately.
+        Returns the results of the sync."""
         LOGGER.info("Syncing all decks and media...")
 
-        self._import_results = None
+        if not self._sync_lock.acquire(blocking=False):
+            LOGGER.info("Sync already in progress, skipping.")
+            return []
 
-        if not config.is_logged_in():
-            raise NotLoggedInError()
+        try:
+            self._import_results = None
 
-        self._import_results = []
-        self._sync_all_decks()
+            if not config.is_logged_in():
+                raise NotLoggedInError()
 
-        # The media sync should be started after the deck updates are imported,
-        # because the import can add new media references to notes.
-        if start_media_sync:
-            media_sync.start_media_download()
+            self._import_results = []
+            self._sync_all_decks()
+
+            # The media sync should be started after the deck updates are imported,
+            # because the import can add new media references to notes.
+            if start_media_sync:
+                media_sync.start_media_download()
+
+        finally:
+            self._sync_lock.release()
 
         LOGGER.info("Sync finished.")
         return self._import_results
