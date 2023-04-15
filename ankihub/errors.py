@@ -54,9 +54,12 @@ def setup_error_handler():
 
 def report_exception_and_upload_logs(
     exception: BaseException, context: Dict[str, Any] = {}
-) -> str:
+) -> Optional[str]:
     """Report the exception to Sentry and upload the logs.
     Returns the Sentry event ID."""
+    if not _error_reporting_enabled():
+        LOGGER.info("Not reporting exception because error reporting is disabled.")
+        return None
 
     logs_key = upload_logs_in_background()
     sentry_id = _report_exception(
@@ -91,15 +94,19 @@ def upload_logs_in_background(
 
 def _setup_excepthook():
     """Set up centralized exception handling.
-    Exceptions are are either handled by our excepthook or passed to the original
-    excepthook which opens Anki's error dialog.
-    If error reporting is enabled, exceptions are also reported to Sentry
-    and the user is prompted to send feedback (in addition to Anki's error dialog opening).
+    Exceptions are are either handled by our exception handler or passed to the original excepthook
+    which opens Anki's error dialog.
+    If error reporting is enabled, unhandled exceptions (in which the ankihub add-on is innvolved)
+    are reported to Sentry and the user is prompted to provide feedback (in addition to Anki's error dialog opening).
     """
 
     def excepthook(
         etype: Type[BaseException], val: BaseException, tb: Optional[TracebackType]
     ) -> Any:
+        LOGGER.info(
+            f"This addon is mentioned in traceback: {_this_addon_mentioned_in_tb(tb)}",
+        )
+
         handled = False
         try:
             handled = _try_handle_exception(exc_type=etype, exc_value=val, tb=tb)
@@ -110,20 +117,27 @@ def _setup_excepthook():
             if handled:
                 return
 
+            try:
+                _maybe_report_exception_and_show_feedback_dialog(exception=val)
+            except Exception:
+                LOGGER.warning(
+                    "There was an error while reporting the exception or showing the feedback dialog."
+                )
+
             # This opens Anki's error dialog.
             original_except_hook(etype, val, tb)
 
-            if _error_reporting_enabled():
-                try:
-                    sentry_id = report_exception_and_upload_logs(exception=val)
-                    ErrorFeedbackDialog(exception=val, event_id=sentry_id)
-                except Exception:
-                    LOGGER.exception(
-                        "There was an error while reporting the exception."
-                    )
-
     original_except_hook = sys.excepthook
     sys.excepthook = excepthook
+
+
+def _maybe_report_exception_and_show_feedback_dialog(exception: BaseException) -> None:
+    if not _error_reporting_enabled():
+        return
+
+    sentry_id = report_exception_and_upload_logs(exception=exception)
+    if _this_addon_mentioned_in_tb(exception.__traceback__):
+        ErrorFeedbackDialog(exception=exception, event_id=sentry_id)
 
 
 def _try_handle_exception(
@@ -133,10 +147,6 @@ def _try_handle_exception(
     LOGGER.info(
         f"From _try_handle_exception:\n{''.join(traceback.format_exception(exc_type, value=exc_value, tb=tb))}"
     )
-
-    if not _this_addon_is_involved(tb):
-        LOGGER.info("This addon is not involved.")
-        return False
 
     if isinstance(exc_value, AnkiHubRequestError):
         if _maybe_handle_ankihub_request_error(exc_value):
@@ -177,7 +187,8 @@ def _try_handle_exception(
         # Ignore errors that occur when the collection is None.
         # This can e.g happen when a background task is running
         # and the user switches to a different Anki profile.
-        LOGGER.exception("Collection is None was handled")
+        LOGGER.warning("Collection is None was handled")
+        report_exception_and_upload_logs(exception=exc_value)
         return True
 
     return False
@@ -245,7 +256,7 @@ def _is_memory_full_error(exc_value: BaseException) -> bool:
     return result
 
 
-def _this_addon_is_involved(tb: TracebackType) -> bool:
+def _this_addon_mentioned_in_tb(tb: TracebackType) -> bool:
     tb_str = "".join(traceback.format_tb(tb))
     result = _contains_path_to_this_addon(tb_str)
     return result
@@ -295,6 +306,14 @@ def _report_exception(
         scope.set_context("anki version", {"version": ANKI_VERSION})
         for key, value in context.items():
             scope.set_context(key, value)
+
+        if exception.__traceback__:
+            scope.set_tag(
+                "ankihub_in_traceback",
+                str(_this_addon_mentioned_in_tb(exception.__traceback__)),
+            )
+        else:
+            LOGGER.warning("Exception has no traceback.")
 
         if isinstance(exception, AnkiHubRequestError):
             scope.set_context(
