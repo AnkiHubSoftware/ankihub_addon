@@ -359,14 +359,15 @@ def create_backup() -> None:
     try:
         created: Optional[bool] = None
         if ANKI_MINOR >= 50:
+            # if there were no changes since the last backup, no backup is created
             created = _create_backup_with_retry_anki_50()
+            LOGGER.info(f"Backup successful. {created=}")
         else:
             aqt.mw.col.close(downgrade=False)
             aqt.mw.backup()  # type: ignore
             aqt.mw.col.reopen(after_full_sync=False)
             # here we don't know if the backup was created
-        # if there were no changes, no backup is created
-        LOGGER.info(f"Backup successful. {created=}")
+            LOGGER.info("Backup successful.")
     except Exception as exc:
         LOGGER.info("Backup failed")
         raise exc
@@ -396,7 +397,6 @@ def _create_backup_with_retry_anki_50() -> bool:
             LOGGER.info("Backup failed second time")
             raise exc
 
-    LOGGER.info(f"Backup successful. {created=}")
     return created
 
 
