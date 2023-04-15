@@ -1,3 +1,4 @@
+"""Modifies the Anki editor (aqt.editor) to add AnkiHub buttons and functionality."""
 from pprint import pformat
 from typing import Any, List, Tuple
 

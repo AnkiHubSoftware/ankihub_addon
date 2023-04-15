@@ -2,6 +2,10 @@ import aqt
 
 
 def migrate_public_config() -> None:
+    """Migrate the public config of the add-on to the new format.
+    This function should be updated when the public config of the add-on is changed and
+    old config options need to be migrated to the new format.
+    """
     addon_config = aqt.mw.addonManager.getConfig(__name__)
 
     # Migrate the "sync_on_startup" config option to the "auto_sync" config option.

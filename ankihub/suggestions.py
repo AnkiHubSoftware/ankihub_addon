@@ -1,3 +1,7 @@
+"""Code for creating note suggestions based on changes to notes in the Anki collection relative
+to the version stored in the AnkiHub database. Suggestions are sent to AnkiHub.
+(The AnkiHub database is the source of truth for the notes in the AnkiHub deck and is updated
+when syncing with AnkiHub.)"""
 import copy
 import uuid
 from dataclasses import dataclass

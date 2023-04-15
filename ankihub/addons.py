@@ -1,3 +1,5 @@
+"""Code that modifies Anki's add-ons module.
+Handles problems with add-on updates and deletions."""
 import logging
 import os
 from concurrent.futures import Future

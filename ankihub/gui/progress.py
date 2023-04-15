@@ -1,3 +1,4 @@
+"""Modifies to Anki's progress dialog (aqt.progress)."""
 from typing import Callable, Optional
 
 from anki.hooks import wrap

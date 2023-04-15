@@ -1,3 +1,5 @@
+"""Custom search nodes for the browser.
+Search nodes are used to define search parameters for the Anki browser search bar."""
 from abc import ABC, abstractmethod
 from datetime import datetime, timedelta
 from typing import Optional, Sequence

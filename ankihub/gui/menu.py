@@ -1,3 +1,4 @@
+"""AnkiHub menu on Anki's main window."""
 import re
 import uuid
 from concurrent.futures import Future

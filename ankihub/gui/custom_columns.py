@@ -1,3 +1,4 @@
+"""Custom Anki browser columns."""
 import uuid
 from abc import abstractmethod
 from typing import Optional, Sequence

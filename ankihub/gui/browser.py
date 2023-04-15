@@ -1,3 +1,4 @@
+"""Modifies the Anki browser (aqt.browser) to add AnkiHub features."""
 import re
 from concurrent.futures import Future
 from typing import List, Optional, Sequence

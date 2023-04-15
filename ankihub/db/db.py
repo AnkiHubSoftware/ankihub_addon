@@ -1,3 +1,15 @@
+"""Code for managing the AnkiHub database. The AnkiHub database stores the state of AnkiHub decks
+as they are on AnkiHub, unlike the Anki database which can contain local changes to the deck.
+It is updated when syncing with AnkiHub.
+The purpose is for the add-on to have knowledge of the state of the decks on AnkiHub without having to
+request this data from AnkiHub every time we need it. This e.g.g enables the add-on to partially work offline and
+to only send the necessary data to AnkiHub when syncing.
+
+Some differences between data stored in the AnkiHub database and the Anki database:
+- The type of stored objects is different, e.g. the Anki database stores anki.notes.Note objects,
+    while the AnkiHub database stores ankihub_client.NoteInfo objects.
+- decks, notes and note types can be missing from the Anki database or be modified.
+"""
 import re
 import sqlite3
 import uuid
