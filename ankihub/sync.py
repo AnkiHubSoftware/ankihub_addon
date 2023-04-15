@@ -42,24 +42,26 @@ class _AnkiHubSync:
             return []
 
         try:
-            self._import_results = None
-
-            if not config.is_logged_in():
-                raise NotLoggedInError()
-
-            self._import_results = []
-            self._sync_all_decks()
-
-            # The media sync should be started after the deck updates are imported,
-            # because the import can add new media references to notes.
-            if start_media_sync:
-                media_sync.start_media_download()
-
+            self._sync_all_decks_and_media_inner(start_media_sync)
         finally:
             self._sync_lock.release()
 
         LOGGER.info("Sync finished.")
         return self._import_results
+
+    def _sync_all_decks_and_media_inner(self, start_media_sync: bool) -> None:
+        self._import_results = None
+
+        if not config.is_logged_in():
+            raise NotLoggedInError()
+
+        self._import_results = []
+        self._sync_all_decks()
+
+        # The media sync should be started after the deck updates are imported,
+        # because the import can add new media references to notes.
+        if start_media_sync:
+            media_sync.start_media_download()
 
     def last_sync_results(self) -> Optional[List[AnkiHubImportResult]]:
         """Returns the results of the last sync. Returns None if no sync has been performed yet or
