@@ -1,5 +1,6 @@
 """Code for setting up auto-syncing with AnkiHub on startup and/or on AnkiWeb sync.
 Depends on the auto_sync setting in the public config."""
+import threading
 from dataclasses import dataclass
 from time import sleep
 from typing import Callable, Optional
@@ -23,6 +24,7 @@ class _AutoSyncState:
     synced_with_ankihub_on_last_ankiweb_sync = False
     exception_on_last_ah_sync: Optional[Exception] = None
     profile_is_closing = False
+    sync_lock = threading.Lock()
 
 
 auto_sync_state = _AutoSyncState()
@@ -70,6 +72,11 @@ def _on_sync_did_finish() -> None:
 
 
 def _sync_with_ankihub_and_ankiweb(*args, **kwargs) -> None:
+    with auto_sync_state.sync_lock:
+        return _sync_with_ankihub_and_ankiweb_inner(*args, **kwargs)
+
+
+def _sync_with_ankihub_and_ankiweb_inner(*args, **kwargs) -> None:
     LOGGER.info("Running _sync_with_ankihub_and_ankiweb")
 
     _old: Callable = kwargs["_old"]
