@@ -22,7 +22,7 @@ class NotLoggedInError(Exception):
     pass
 
 
-class AnkiHubSync:
+class _AnkiHubSync:
     def __init__(self):
         self._importer = AnkiHubImporter()
         self._import_results: Optional[List[AnkiHubImportResult]] = None
@@ -237,7 +237,7 @@ class AnkiHubSync:
         return False
 
 
-ah_sync = AnkiHubSync()
+ah_sync = _AnkiHubSync()
 
 
 def show_tooltip_about_last_sync_results() -> None:
