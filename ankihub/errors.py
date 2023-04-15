@@ -178,7 +178,8 @@ def _try_handle_exception(
         # Ignore errors that occur when the collection is None.
         # This can e.g happen when a background task is running
         # and the user switches to a different Anki profile.
-        LOGGER.exception("Collection is None was handled")
+        LOGGER.warning("Collection is None was handled")
+        report_exception_and_upload_logs(exception=exc_value)
         return True
 
     return False
