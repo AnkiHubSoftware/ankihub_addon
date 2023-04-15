@@ -91,15 +91,20 @@ def upload_logs_in_background(
 
 def _setup_excepthook():
     """Set up centralized exception handling.
-    Exceptions are are either handled by our excepthook or passed to the original
-    excepthook which opens Anki's error dialog.
-    If error reporting is enabled, exceptions are also reported to Sentry
-    and the user is prompted to send feedback (in addition to Anki's error dialog opening).
+    Exceptions are are either handled by our exception handler or passed to the original excepthook
+    which opens Anki's error dialog.
+    If error reporting is enabled, unhandled exceptions (in which the ankihub add-on is innvolved)
+    are reported to Sentry and the user is prompted to provide feedback (in addition to Anki's error dialog opening).
     """
 
     def excepthook(
         etype: Type[BaseException], val: BaseException, tb: Optional[TracebackType]
     ) -> Any:
+        if not _this_addon_is_involved(tb):
+            LOGGER.info("This addon is not involved.")
+            original_except_hook(etype, val, tb)
+            return
+
         handled = False
         try:
             handled = _try_handle_exception(exc_type=etype, exc_value=val, tb=tb)
@@ -133,10 +138,6 @@ def _try_handle_exception(
     LOGGER.info(
         f"From _try_handle_exception:\n{''.join(traceback.format_exception(exc_type, value=exc_value, tb=tb))}"
     )
-
-    if not _this_addon_is_involved(tb):
-        LOGGER.info("This addon is not involved.")
-        return False
 
     if isinstance(exc_value, AnkiHubRequestError):
         if _maybe_handle_ankihub_request_error(exc_value):
