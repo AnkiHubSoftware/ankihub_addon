@@ -103,10 +103,9 @@ def _setup_excepthook():
     def excepthook(
         etype: Type[BaseException], val: BaseException, tb: Optional[TracebackType]
     ) -> Any:
-        if not _this_addon_is_involved(tb):
-            LOGGER.info("This addon is not involved.")
-            original_except_hook(etype, val, tb)
-            return
+        LOGGER.info(
+            f"This addon is mentioned in traceback: {_this_addon_mentioned_in_tb(tb)}",
+        )
 
         handled = False
         try:
@@ -118,20 +117,27 @@ def _setup_excepthook():
             if handled:
                 return
 
+            try:
+                _maybe_report_exception_and_show_feedback_dialog(exception=val)
+            except Exception:
+                LOGGER.warning(
+                    "There was an error while reporting the exception or showing the feedback dialog."
+                )
+
             # This opens Anki's error dialog.
             original_except_hook(etype, val, tb)
 
-            if _error_reporting_enabled():
-                try:
-                    sentry_id = report_exception_and_upload_logs(exception=val)
-                    ErrorFeedbackDialog(exception=val, event_id=sentry_id)
-                except Exception:
-                    LOGGER.exception(
-                        "There was an error while reporting the exception."
-                    )
-
     original_except_hook = sys.excepthook
     sys.excepthook = excepthook
+
+
+def _maybe_report_exception_and_show_feedback_dialog(exception: BaseException) -> None:
+    if not _error_reporting_enabled():
+        return
+
+    sentry_id = report_exception_and_upload_logs(exception=exception)
+    if _this_addon_mentioned_in_tb(exception.__traceback__):
+        ErrorFeedbackDialog(exception=exception, event_id=sentry_id)
 
 
 def _try_handle_exception(
@@ -250,7 +256,7 @@ def _is_memory_full_error(exc_value: BaseException) -> bool:
     return result
 
 
-def _this_addon_is_involved(tb: TracebackType) -> bool:
+def _this_addon_mentioned_in_tb(tb: TracebackType) -> bool:
     tb_str = "".join(traceback.format_tb(tb))
     result = _contains_path_to_this_addon(tb_str)
     return result
@@ -300,6 +306,14 @@ def _report_exception(
         scope.set_context("anki version", {"version": ANKI_VERSION})
         for key, value in context.items():
             scope.set_context(key, value)
+
+        if exception.__traceback__:
+            scope.set_tag(
+                "this addon is mentioned in traceback",
+                _this_addon_mentioned_in_tb(exception.__traceback__),
+            )
+        else:
+            LOGGER.warning("Exception has no traceback.")
 
         if isinstance(exception, AnkiHubRequestError):
             scope.set_context(
