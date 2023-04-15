@@ -547,7 +547,7 @@ class TestErrorHandling:
         monkeypatch.setattr(AnkiHubLogin, "display_login", display_login_mock)
 
         # Mock _this_addon_is_involved to return True.
-        monkeypatch.setattr(errors, "_this_addon_is_involved", lambda *args: True)
+        monkeypatch.setattr(errors, "_this_addon_mentioned_in_tb", lambda *args: True)
 
         handled = _try_handle_exception(
             exc_type=AnkiHubRequestError,
@@ -563,7 +563,7 @@ class TestErrorHandling:
         _mock_ask_user_to_return_false: Mock,
     ):
         # Mock _this_addon_is_involved to return True.
-        monkeypatch.setattr(errors, "_this_addon_is_involved", lambda *args: True)
+        monkeypatch.setattr(errors, "_this_addon_mentioned_in_tb", lambda *args: True)
 
         handled = _try_handle_exception(
             exc_type=AnkiHubRequestError,
