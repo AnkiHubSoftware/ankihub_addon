@@ -82,21 +82,25 @@ custom_search_nodes: List[CustomSearchNode] = []
 def setup() -> None:
     browser_will_show.append(_store_browser_reference)
 
-    browser_did_fetch_columns.append(_on_browser_did_fetch_columns)
-    browser_did_fetch_row.append(_on_browser_did_fetch_row)
-    browser_will_search.append(_on_browser_will_search)
-    browser_did_search.append(_on_browser_did_search)
-
-    browser_will_show_context_menu.append(_on_browser_will_show_context_menu)
-
-    browser_will_build_tree.append(_on_browser_will_build_tree)
-
-    browser_menus_did_init.append(_on_browser_menus_did_init)
-
+    _setup_custom_columns()
+    _setup_search()
+    _setup_context_menu()
+    _setup_ankihub_sidebar_tree()
+    _setup_ankihub_menu()
     _make_copy_note_action_not_copy_ankihub_id()
 
 
+def _store_browser_reference(browser_: Browser) -> None:
+    global browser
+
+    browser = browser_
+
+
 # context menu
+def _setup_context_menu():
+    browser_will_show_context_menu.append(_on_browser_will_show_context_menu)
+
+
 def _on_browser_will_show_context_menu(browser: Browser, context_menu: QMenu) -> None:
     selected_nids = browser.selected_notes()
     selected_nid = None
@@ -278,6 +282,10 @@ def _on_suggest_optional_tags_action(browser: Browser) -> None:
 
 
 # AnkiHub menu
+def _setup_ankihub_menu():
+    browser_menus_did_init.append(_on_browser_menus_did_init)
+
+
 def _on_browser_menus_did_init(browser: Browser):
     menu = browser._ankihub_menu = QMenu("AnkiHub")  # type: ignore
     browser.form.menubar.addMenu(menu)
@@ -474,6 +482,11 @@ def _remove_optional_tags_of_extension(extension_config: DeckExtensionConfig) ->
 
 
 # custom columns
+def _setup_custom_columns():
+    browser_did_fetch_columns.append(_on_browser_did_fetch_columns)
+    browser_did_fetch_row.append(_on_browser_did_fetch_row)
+
+
 def _on_browser_did_fetch_columns(columns: dict[str, Column]):
     for column in custom_columns:
         columns[column.key] = column.builtin_column
@@ -495,6 +508,11 @@ def _on_browser_did_fetch_row(
 
 
 # cutom search nodes
+def _setup_search():
+    browser_will_search.append(_on_browser_will_search)
+    browser_did_search.append(_on_browser_did_search)
+
+
 def _on_browser_will_search(ctx: SearchContext):
     _on_browser_will_search_handle_custom_column_ordering(ctx)
     _on_browser_will_search_handle_custom_search_parameters(ctx)
@@ -568,6 +586,10 @@ def _on_browser_did_search_handle_custom_search_parameters(ctx: SearchContext):
 
 
 # sidebar
+def _setup_ankihub_sidebar_tree():
+    browser_will_build_tree.append(_on_browser_will_build_tree)
+
+
 def _on_browser_will_build_tree(
     handled: bool,
     tree: SidebarItem,
@@ -773,13 +795,7 @@ def _set_updated_today_tree_expanded_in_ui_config(expanded: bool):
     config.set_ui_config(ui_config)
 
 
-# setup
-def _store_browser_reference(browser_: Browser) -> None:
-    global browser
-
-    browser = browser_
-
-
+# copy note action
 def _make_copy_note_action_not_copy_ankihub_id() -> None:
     """Make the Create Copy note context menu action not copy the AnkiHub ID field."""
     original_on_create_copy = Browser.on_create_copy
