@@ -54,9 +54,12 @@ def setup_error_handler():
 
 def report_exception_and_upload_logs(
     exception: BaseException, context: Dict[str, Any] = {}
-) -> str:
+) -> Optional[str]:
     """Report the exception to Sentry and upload the logs.
     Returns the Sentry event ID."""
+    if not _error_reporting_enabled():
+        LOGGER.info("Not reporting exception because error reporting is disabled.")
+        return None
 
     logs_key = upload_logs_in_background()
     sentry_id = _report_exception(
