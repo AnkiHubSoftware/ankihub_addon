@@ -309,8 +309,8 @@ def _report_exception(
 
         if exception.__traceback__:
             scope.set_tag(
-                "this addon is mentioned in traceback",
-                _this_addon_mentioned_in_tb(exception.__traceback__),
+                "ankihub_in_traceback",
+                str(_this_addon_mentioned_in_tb(exception.__traceback__)),
             )
         else:
             LOGGER.warning("Exception has no traceback.")
