@@ -1,6 +1,5 @@
 """Code for setting up auto-syncing with AnkiHub on startup and/or on AnkiWeb sync.
 Depends on the auto_sync setting in the public config."""
-import threading
 from dataclasses import dataclass
 from time import sleep
 from typing import Callable, Optional
@@ -8,6 +7,7 @@ from typing import Callable, Optional
 import aqt
 from anki.collection import Collection
 from anki.hooks import wrap
+from aqt import AnkiQt
 from aqt.gui_hooks import profile_did_open, profile_will_close, sync_did_finish
 
 from . import LOGGER
@@ -16,6 +16,7 @@ from .errors import report_exception_and_upload_logs
 from .gui.db_check import maybe_check_databases
 from .settings import ANKI_MINOR, config
 from .sync import ah_sync, show_tooltip_about_last_sync_results
+from .threading_utils import rate_limited
 
 
 @dataclass
@@ -24,7 +25,6 @@ class _AutoSyncState:
     synced_with_ankihub_on_last_ankiweb_sync = False
     exception_on_last_ah_sync: Optional[Exception] = None
     profile_is_closing = False
-    sync_lock = threading.Lock()
 
 
 auto_sync_state = _AutoSyncState()
@@ -41,6 +41,12 @@ def setup_ankihub_sync_on_ankiweb_sync() -> None:
 
     sync_did_finish.append(_on_sync_did_finish)
 
+    _setup_profile_state_hooks()
+
+    _rate_limit_syncincg()
+
+
+def _setup_profile_state_hooks() -> None:
     profile_will_close.append(_on_profile_will_close)
     profile_did_open.append(_on_profile_did_open)
 
@@ -51,6 +57,30 @@ def _on_profile_will_close() -> None:
 
 def _on_profile_did_open() -> None:
     auto_sync_state.profile_is_closing = False
+
+
+def _rate_limit_syncincg():
+    """Rate limit AnkiQt._sync_collection_and_media to avoid
+    "Cannot start transaction within a transaction" DBErrors.
+    Syncing is not thread safe and from Sentry reports you can see that the DBErrors are raised when
+    the sync is called multiple times in a short time frame (< 0.2 seconds). Not sure why this happens.
+    """
+    AnkiQt._sync_collection_and_media = wrap(  # type: ignore
+        AnkiQt._sync_collection_and_media,
+        _rate_limited,
+        "around",
+    )
+
+
+@rate_limited(1, "after_sync")
+def _rate_limited(*args, **kwargs):
+    """Wrapper for AnkiQt._sync_collection_and_media that is rate limited to 1 sync per second.
+    The `after_sync` callable passed to the _sync_collection_and_media function is called immediately
+    if the sync is rate limited."""
+    _old = kwargs["_old"]
+    del kwargs["_old"]
+
+    return _old(*args, **kwargs)
 
 
 def _on_sync_did_finish() -> None:
@@ -72,11 +102,6 @@ def _on_sync_did_finish() -> None:
 
 
 def _sync_with_ankihub_and_ankiweb(*args, **kwargs) -> None:
-    with auto_sync_state.sync_lock:
-        return _sync_with_ankihub_and_ankiweb_inner(*args, **kwargs)
-
-
-def _sync_with_ankihub_and_ankiweb_inner(*args, **kwargs) -> None:
     LOGGER.info("Running _sync_with_ankihub_and_ankiweb")
 
     _old: Callable = kwargs["_old"]
