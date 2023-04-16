@@ -59,7 +59,7 @@ def _on_profile_did_open() -> None:
     auto_sync_state.profile_is_closing = False
 
 
-def _rate_limit_syncincg():
+def _rate_limit_syncincg() -> None:
     """Rate limit AnkiQt._sync_collection_and_media to avoid
     "Cannot start transaction within a transaction" DBErrors.
     Syncing is not thread safe and from Sentry reports you can see that the DBErrors are raised when
@@ -73,14 +73,14 @@ def _rate_limit_syncincg():
 
 
 @rate_limited(1, "after_sync")
-def _rate_limited(*args, **kwargs):
+def _rate_limited(*args, **kwargs) -> None:
     """Wrapper for AnkiQt._sync_collection_and_media that is rate limited to 1 sync per second.
     The `after_sync` callable passed to the _sync_collection_and_media function is called immediately
     if the sync is rate limited."""
     _old = kwargs["_old"]
     del kwargs["_old"]
 
-    return _old(*args, **kwargs)
+    _old(*args, **kwargs)
 
 
 def _on_sync_did_finish() -> None:
