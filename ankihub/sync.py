@@ -37,14 +37,14 @@ class _AnkiHubSync:
         Returns the results of the sync."""
         LOGGER.info("Syncing all decks and media...")
 
-        if not self._sync_lock.acquire(blocking=False):
+        if self._sync_lock.acquire(blocking=False):
+            try:
+                self._sync_all_decks_and_media_inner(start_media_sync)
+            finally:
+                self._sync_lock.release()
+        else:
             LOGGER.info("Sync already in progress, skipping.")
             return []
-
-        try:
-            self._sync_all_decks_and_media_inner(start_media_sync)
-        finally:
-            self._sync_lock.release()
 
         LOGGER.info("Sync finished.")
         return self._import_results
