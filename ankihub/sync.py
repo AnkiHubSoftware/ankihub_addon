@@ -1,5 +1,4 @@
 """Downloads updates to decks from AnkiHub and imports them into Anki."""
-import threading
 import uuid
 from datetime import datetime
 from typing import List, Optional
@@ -26,30 +25,15 @@ class _AnkiHubSync:
     def __init__(self):
         self._importer = AnkiHubImporter()
         self._import_results: Optional[List[AnkiHubImportResult]] = None
-        self._sync_lock = threading.Lock()
 
     def sync_all_decks_and_media(
         self, start_media_sync: bool = True
     ) -> List[AnkiHubImportResult]:
         """Syncs all decks with AnkiHub and starts the media download.
         Should be called from a background thread with a progress dialog to avoid blocking the UI.
-        If the sync is already in progress, this method will return immediately.
         Returns the results of the sync."""
         LOGGER.info("Syncing all decks and media...")
 
-        if self._sync_lock.acquire(blocking=False):
-            try:
-                self._sync_all_decks_and_media_inner(start_media_sync)
-            finally:
-                self._sync_lock.release()
-        else:
-            LOGGER.info("Sync already in progress, skipping.")
-            return []
-
-        LOGGER.info("Sync finished.")
-        return self._import_results
-
-    def _sync_all_decks_and_media_inner(self, start_media_sync: bool) -> None:
         self._import_results = None
 
         if not config.is_logged_in():
@@ -62,6 +46,9 @@ class _AnkiHubSync:
         # because the import can add new media references to notes.
         if start_media_sync:
             media_sync.start_media_download()
+
+        LOGGER.info("Sync finished.")
+        return self._import_results
 
     def last_sync_results(self) -> Optional[List[AnkiHubImportResult]]:
         """Returns the results of the last sync. Returns None if no sync has been performed yet or
