@@ -256,6 +256,11 @@ def add_ankihub_snippet_to_template(template: Dict) -> None:
             display: block;
         }}
 
+        .ipad .ankihub-view-note, .iphone .ankihub-view-note {{
+            width: fit-content;
+            margin: 0 auto;
+        }}
+
         .android .ankihub-view-note {{
             text-decoration: none;
             position: fixed;
