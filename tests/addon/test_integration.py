@@ -117,7 +117,7 @@ from ankihub.suggestions import (
     suggest_note_update,
     suggest_notes_in_bulk,
 )
-from ankihub.sync import AnkiHubSync, ah_sync
+from ankihub.sync import _AnkiHubSync, ah_sync
 from ankihub.utils import (
     ANKIHUB_TEMPLATE_SNIPPET_RE,
     all_dids,
@@ -2460,7 +2460,7 @@ def test_sync_with_optional_content(
                         ),
                     ],
                 )
-                sync = AnkiHubSync()
+                sync = _AnkiHubSync()
                 sync._sync_deck_extensions(ankihub_deck_uuid)
 
             updated_note = mw.col.get_note(note.id)

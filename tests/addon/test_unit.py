@@ -1,6 +1,7 @@
 import importlib
 import os
 import tempfile
+import time
 import uuid
 from pathlib import Path
 from typing import Callable, Generator, List
@@ -48,6 +49,7 @@ from ankihub.note_conversion import (
 )
 from ankihub.settings import ANKIWEB_ID
 from ankihub.subdecks import SUBDECK_TAG, add_subdeck_tags_to_notes
+from ankihub.threading_utils import rate_limited
 from ankihub.utils import lowest_level_common_ancestor_deck_name
 
 
@@ -594,3 +596,41 @@ class TestErrorHandling:
         finally:
             #  Reload the errors module again so that the original askUser function is used for other tests.
             importlib.reload(errors)
+
+
+class TestRateLimitedDecorator:
+    def test_rate_limited_decorator(self):
+        # Create a counter to keep track of how many times foo is executed
+        execution_counter = 0
+
+        @rate_limited(1)
+        def foo():
+            nonlocal execution_counter
+            execution_counter += 1
+
+        for _ in range(11):
+            foo()
+            time.sleep(0.1)
+
+        # Given the 1-second rate limit and the 11 calls with 0.1-second intervals,
+        # we expect foo to be executed 2 times.
+        assert execution_counter == 2
+
+    def test_rate_limited_decorator_with_on_done_arg_name(self):
+        # Create a counter to keep track of how many times on_done is executed
+        execution_counter = 0
+
+        def on_done() -> None:
+            nonlocal execution_counter
+            execution_counter += 1
+
+        @rate_limited(1, on_done_arg_name="on_done")
+        def foo(on_done: Callable[[], None]) -> None:
+            on_done()
+
+        for _ in range(11):
+            foo(on_done=on_done)
+            time.sleep(0.1)
+
+        # The on_done callback should be executed every time foo is called.
+        assert execution_counter == 11

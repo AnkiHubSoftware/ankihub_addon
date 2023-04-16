@@ -21,7 +21,7 @@ class NotLoggedInError(Exception):
     pass
 
 
-class AnkiHubSync:
+class _AnkiHubSync:
     def __init__(self):
         self._importer = AnkiHubImporter()
         self._import_results: Optional[List[AnkiHubImportResult]] = None
@@ -30,7 +30,8 @@ class AnkiHubSync:
         self, start_media_sync: bool = True
     ) -> List[AnkiHubImportResult]:
         """Syncs all decks with AnkiHub and starts the media download.
-        Should be called from a background thread with a progress dialog to avoid blocking the UI."""
+        Should be called from a background thread with a progress dialog to avoid blocking the UI.
+        Returns the results of the sync."""
         LOGGER.info("Syncing all decks and media...")
 
         self._import_results = None
@@ -225,7 +226,7 @@ class AnkiHubSync:
         return False
 
 
-ah_sync = AnkiHubSync()
+ah_sync = _AnkiHubSync()
 
 
 def show_tooltip_about_last_sync_results() -> None:
