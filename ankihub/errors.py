@@ -6,13 +6,14 @@ import sys
 import time
 import traceback
 from concurrent.futures import Future
+from pathlib import Path
 from types import TracebackType
 from typing import Any, Callable, Dict, Optional, Type
 
 import aqt
 import sentry_sdk
 from anki.errors import BackendIOError, DBError, SyncError
-from anki.utils import checksum
+from anki.utils import checksum, is_win
 from aqt.utils import askUser, showText, showWarning, tooltip
 from requests import exceptions
 from sentry_sdk import capture_exception, push_scope
@@ -25,6 +26,7 @@ from sentry_sdk.integrations.threading import ThreadingIntegration
 from . import LOGGER
 from .addon_ankihub_client import AddonAnkiHubClient as AnkiHubClient
 from .addon_ankihub_client import AnkiHubRequestError
+from .db import is_ankihub_db_attached_to_anki_db
 from .gui.error_feedback import ErrorFeedbackDialog
 from .gui.utils import check_and_prompt_for_updates_on_main_window
 from .settings import ADDON_VERSION, ANKI_VERSION, ANKIWEB_ID, config, log_file_path
@@ -304,6 +306,12 @@ def _report_exception(
         scope.set_context("add-on config", dataclasses.asdict(config._private_config))
         scope.set_context("addon version", {"version": ADDON_VERSION})
         scope.set_context("anki version", {"version": ANKI_VERSION})
+
+        try:
+            scope.set_context("user files", _user_files_context_dict())
+        except Exception as e:
+            LOGGER.warning(f"Could not get user files context: {e}")
+
         for key, value in context.items():
             scope.set_context(key, value)
 
@@ -343,6 +351,39 @@ def _report_exception(
         sentry_id = capture_exception(exception)
 
     return sentry_id
+
+
+def _user_files_context_dict() -> Dict[str, Any]:
+    """Return a dict with information about the user files of the AnkiHub add-on to be sent as
+    context to Sentry."""
+    ankihub_module = aqt.mw.addonManager.addonFromModule(__name__)
+    user_files_path = Path(aqt.mw.addonManager._userFilesPath(ankihub_module))
+    all_file_paths = [user_files_path, *list(user_files_path.rglob("*"))]
+    problematic_file_paths = []
+    if is_win:
+        problematic_file_paths = [
+            file for file in all_file_paths if not _file_is_accessible(file)
+        ]
+
+    result = {
+        "all files": [str(file) for file in all_file_paths],
+        "inaccessible files": [str(file) for file in problematic_file_paths],
+        "Is ankihub database attached to anki database?": is_ankihub_db_attached_to_anki_db(),
+    }
+    return result
+
+
+def _file_is_accessible(f: Path) -> bool:
+    # Only works on Windows.
+    # Checks if a file is accessible (and not e.g. open by another process) by trying to rename it to itself.
+    # See https://stackoverflow.com/a/37256114.
+    assert is_win
+    try:
+        os.rename(f, f)
+    except (OSError, PermissionError):
+        return False
+    else:
+        return True
 
 
 def _normalize_url(url: str):

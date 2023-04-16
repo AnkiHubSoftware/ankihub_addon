@@ -157,22 +157,7 @@ class _AnkiHubDB:
         return result
 
     def connection(self) -> DBConnection:
-        try:
-            result = DBConnection(conn=sqlite3.connect(ankihub_db.database_path))
-        except Exception as e:
-            from ..debug import user_files_context_dict
-            from ..errors import report_exception_and_upload_logs
-
-            report_exception_and_upload_logs(
-                e,
-                context={
-                    "db path": {"path": ankihub_db.database_path},
-                    "user files": user_files_context_dict(),
-                },
-            )
-
-            raise e
-
+        result = DBConnection(conn=sqlite3.connect(ankihub_db.database_path))
         return result
 
     def upsert_notes_data(

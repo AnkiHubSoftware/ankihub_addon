@@ -69,8 +69,6 @@ from ankihub.debug import (
     _log_stack,
     _setup_logging_for_db_begin,
     _setup_logging_for_sync_collection_and_media,
-    _setup_sentry_reporting_for_error_on_addon_update,
-    user_files_context_dict,
 )
 from ankihub.deck_creation import create_ankihub_deck, modify_note_type
 from ankihub.exporting import to_note_data
@@ -3132,29 +3130,6 @@ class TestDebugModule:
             mw.col.db.begin()
 
             db_begin_mock.assert_called_once()
-
-    def test_setup_sentry_reporting_for_error_on_addon_update(
-        self, anki_session: AnkiSession, monkeypatch: MonkeyPatch
-    ):
-        # Test that the original AddonManager._install method gets called despite the monkeypatching we do in debug.py
-        with anki_session.profile_loaded():
-
-            # Mock the _install function so that it does not throw errors when called.
-            install_mock = Mock()
-            monkeypatch.setattr(aqt.mw.addonManager, "_install", install_mock)
-
-            _setup_sentry_reporting_for_error_on_addon_update()
-
-            # Using fake arguments just to make sure that the original function (which is now mocked)
-            # is called with the same arguments.
-            aqt.mw.addonManager._install("arg1", "arg2")  # type: ignore
-
-            install_mock.assert_called_once_with("arg1", "arg2")
-
-    def test_user_files_context_dict(self, anki_session: AnkiSession):
-        # Test that the user_files_context_dict function does not throw an exception when called.
-        with anki_session.profile_loaded():
-            user_files_context_dict()
 
     def test_log_stack(self):
         # Test that the _log_stack function does not throw an exception when called.
