@@ -1,7 +1,6 @@
 import gzip
 import json
 import os
-import subprocess
 import tempfile
 import uuid
 import zipfile
@@ -15,13 +14,17 @@ import pytest
 import requests_mock
 from pytest import FixtureRequest, MonkeyPatch
 from requests_mock import Mocker
-from vcr import VCR  # type: ignore
+from vcr import VCR
+
+from tests.fixtures import next_deterministic_id  # type: ignore
 
 from ..factories import NoteInfoFactory
 
 # workaround for vscode test discovery not using pytest.ini which sets this env var
 # has to be set before importing ankihub
 os.environ["SKIP_INIT"] = "1"
+
+import random
 
 from ankihub.ankihub_client import (
     DEFAULT_API_URL,
@@ -71,24 +74,8 @@ ID_OF_DECK_OF_USER_TEST2 = uuid.UUID("5528aef7-f7ac-406b-9b35-4eaf00de4b20")
 
 @pytest.fixture
 def client_with_server_setup(vcr: VCR, request, marks):
-    if "skipifvcr" in marks and vcr_enabled(vcr):
-        pytest.skip("Skipping test because test has skipifvcr mark and VCR is enabled")
-
-    cassette_name = ".".join(request.node.nodeid.split("::")[1:]) + ".yaml"
-    cassette_path = VCR_CASSETTES_PATH / cassette_name
-    playback_mode = vcr_enabled(vcr) and cassette_path.exists()
-
-    if not playback_mode:
-        run_command_in_django_container("python manage.py runscript create_test_users")
-        run_command_in_django_container(
-            "python manage.py runscript create_fixture_data"
-        )
-
     client = AnkiHubClient(api_url=LOCAL_API_URL, local_media_dir_path=TEST_MEDIA_PATH)
     yield client
-
-    if not playback_mode:
-        run_command_in_django_container("python manage.py flush --no-input")
 
 
 @pytest.fixture
@@ -110,23 +97,6 @@ def vcr_enabled(vcr: VCR):
     )
 
 
-def run_command_in_django_container(command):
-    subprocess.run(
-        [
-            "sudo",
-            "docker-compose",
-            "-f",
-            COMPOSE_FILE.absolute(),
-            "run",
-            "--rm",
-            "django",
-            "bash",
-            "-c",
-            command,
-        ]
-    )
-
-
 @pytest.fixture
 def authorized_client_for_user_test1(client_with_server_setup: AnkiHubClient):
     credentials_data = {"username": "test1", "password": "asdf"}
@@ -142,12 +112,9 @@ def authorized_client_for_user_test2(client_with_server_setup: AnkiHubClient, re
 
 
 @pytest.fixture
-def new_note_suggestion(
-    next_deterministic_uuid: Callable[[], uuid.UUID],
-):
-    ah_nid = next_deterministic_uuid()
+def new_note_suggestion():
     return NewNoteSuggestion(
-        ankihub_note_uuid=ah_nid,
+        ankihub_note_uuid=uuid.uuid4(),
         anki_nid=1,
         fields=[
             Field(name="Front", value="front1", order=0),
@@ -156,7 +123,7 @@ def new_note_suggestion(
         tags=["tag1", "tag2"],
         guid="asdf",
         comment="comment1",
-        ankihub_deck_uuid=ah_nid,
+        ankihub_deck_uuid=None,
         note_type_name="Basic",
         anki_note_type_id=1,
     )
@@ -335,6 +302,7 @@ def create_note_on_ankihub_and_assert(
 
     # create an auto-accepted new note suggestion
     new_note_suggestion.ankihub_deck_uuid = uuid_of_deck
+    new_note_suggestion.anki_nid = random.randint(1, 99999)
     errors_by_nid = client.create_suggestions_in_bulk(
         new_note_suggestions=[new_note_suggestion], auto_accept=True
     )
@@ -351,7 +319,6 @@ def create_note_on_ankihub_and_assert(
 @pytest.mark.vcr()
 def test_upload_deck(
     authorized_client_for_user_test1: AnkiHubClient,
-    next_deterministic_id: Callable[[], int],
     monkeypatch: MonkeyPatch,
 ):
     client = authorized_client_for_user_test1
@@ -369,7 +336,7 @@ def test_upload_deck(
         )
 
         client.upload_deck(
-            deck_name="test deck",
+            deck_name="test deck x",
             notes_data=[note_data],
             note_types_data=[],
             anki_deck_id=next_deterministic_id(),
@@ -432,6 +399,8 @@ class TestCreateSuggestionsInBulk:
         client = authorized_client_for_user_test1
 
         new_note_suggestion.ankihub_deck_uuid = ID_OF_DECK_OF_USER_TEST1
+        new_note_suggestion.ankihub_note_uuid = uuid.uuid4()
+        new_note_suggestion.anki_nid = random.randint(1, 9999999)
         errors_by_nid = client.create_suggestions_in_bulk(
             new_note_suggestions=[new_note_suggestion],
             auto_accept=False,
@@ -449,10 +418,11 @@ class TestCreateSuggestionsInBulk:
 
         # create two new note suggestions at once
         new_note_suggestion.ankihub_deck_uuid = ID_OF_DECK_OF_USER_TEST1
+        new_note_suggestion.anki_nid = random.randint(1, 9999999)
 
         new_note_suggestion_2 = deepcopy(new_note_suggestion)
-        new_note_suggestion_2.ankihub_note_uuid = next_deterministic_uuid()
-        new_note_suggestion_2.anki_nid = 2
+        new_note_suggestion_2.ankihub_note_uuid = uuid.uuid4()
+        new_note_suggestion_2.anki_nid = random.randint(1, 9999999)
 
         errors_by_nid = client.create_suggestions_in_bulk(
             new_note_suggestions=[new_note_suggestion, new_note_suggestion_2],
@@ -470,6 +440,7 @@ class TestCreateSuggestionsInBulk:
 
         # create a new note suggestion
         new_note_suggestion.ankihub_deck_uuid = ID_OF_DECK_OF_USER_TEST1
+        new_note_suggestion.anki_nid = random.randint(1, 9999999)
         errors_by_nid = client.create_suggestions_in_bulk(
             new_note_suggestions=[new_note_suggestion], auto_accept=False
         )
@@ -592,6 +563,7 @@ class TestGetDeckUpdates:
 
         # create a new note
         new_note_suggestion.ankihub_deck_uuid = ID_OF_DECK_OF_USER_TEST1
+        new_note_suggestion.anki_nid = random.randint(1, 9999999)
         client.create_new_note_suggestion(new_note_suggestion, auto_accept=True)
 
         # get deck updates since the time of the new note creation
@@ -1163,10 +1135,10 @@ class TestOwnedDeckIds:
         self, authorized_client_for_user_test1: AnkiHubClient
     ):
         client = authorized_client_for_user_test1
-        assert [ID_OF_DECK_OF_USER_TEST1] == client.owned_deck_ids()
+        assert ID_OF_DECK_OF_USER_TEST1 in client.owned_deck_ids()
 
     def test_owned_deck_ids_for_user_test2(
         self, authorized_client_for_user_test2: AnkiHubClient
     ):
         client = authorized_client_for_user_test2
-        assert [ID_OF_DECK_OF_USER_TEST2] == client.owned_deck_ids()
+        assert ID_OF_DECK_OF_USER_TEST2 in client.owned_deck_ids()

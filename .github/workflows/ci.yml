@@ -91,11 +91,20 @@ jobs:
           docker-compose run --rm django python manage.py print_settings
           docker-compose up -d
 
+      - name: Populate ankihub instance with fixtures file
+        run: |
+          docker cp ./ankihub_fixtures.json django:/app/fixtures.json
+          docker-compose run --rm django python manage.py runscript create_fixtures_from_file
+
       - name: Run pytest with coverage
         run: |
           pytest ./tests/addon --cov --cov-report=xml
           pytest ./tests/client --disable-vcr --cov --cov-report=xml --cov-append
           coverage html
+
+      - name: Clear ankihub instance DB
+        run: |
+          docker-compose run --rm django python manage.py flush --no-input
 
       - name: Upload coverage report with smokeshow
         run: smokeshow upload coverage_html_report
