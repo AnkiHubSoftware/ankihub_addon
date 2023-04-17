@@ -144,10 +144,11 @@ class AnkiHubClient:
         """Send a request, retrying if necessary.
         If the request fails after all retries, the last attempt's response is returned.
         If the last request failed because of an exception, that exception is raised.
-        In any case no RetryError is raised to make the usage of tenacity transparent to the caller."""
+        """
         try:
             response = self._send_request_with_retry_inner(request)
         except RetryError as e:
+            # Catch RetryErrors to make the usage of tenacity transparent to the caller.
             last_attempt = cast(Future, e.last_attempt)
             # If the last attempt failed because of an exception, this will raise that exception.
             response = last_attempt.result()
