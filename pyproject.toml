@@ -21,7 +21,8 @@ exclude = [
   'ankihub/lib/certifi',
   'ankihub/lib/sentry_sd',
   'ankihub/lib/urllib',
-  'ankihub/lib/other/typing_extension'
+  'ankihub/lib/other/typing_extension',
+  'ankihub/lib/tenacity',
 ]
 
 no_strict_optional = true
@@ -38,6 +39,7 @@ ignore_errors = true
 module = [
   'sentry_sdk.*',
   'certifi.*',
-  'urllib3.*'
+  'urllib3.*',
+  'tenacity.*',
 ]
 follow_imports = 'skip'

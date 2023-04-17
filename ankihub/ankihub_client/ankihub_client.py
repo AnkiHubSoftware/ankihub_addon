@@ -6,11 +6,13 @@ import logging
 import os
 import re
 import shutil
+import socket
 import urllib.parse
 import uuid
-from concurrent.futures import ThreadPoolExecutor, as_completed
+from concurrent.futures import Future, ThreadPoolExecutor, as_completed
 from datetime import datetime
 from io import BufferedReader
+from json.decoder import JSONDecodeError
 from pathlib import Path
 from typing import (
     Any,
@@ -22,11 +24,21 @@ from typing import (
     Sequence,
     TypedDict,
     Union,
+    cast,
 )
 from zipfile import ZipFile
 
 import requests
 from requests import PreparedRequest, Request, Response, Session
+from requests.exceptions import ChunkedEncodingError, SSLError, Timeout
+from tenacity import (
+    RetryError,
+    retry,
+    retry_if_exception_type,
+    retry_if_result,
+    stop_after_attempt,
+    wait_exponential,
+)
 
 from .models import (
     ANKIHUB_DATETIME_FORMAT_STR,
@@ -61,6 +73,27 @@ DECK_EXTENSION_UPDATE_PAGE_SIZE = 2000
 CSV_DELIMITER = ";"
 
 CHUNK_BYTES_THRESHOLD = 67108864  # 60 megabytes
+
+# Exceptions for which we should retry the request.
+REQUEST_RETRY_EXCEPTION_TYPES = (
+    JSONDecodeError,
+    SSLError,
+    ConnectionError,
+    Timeout,
+    ChunkedEncodingError,
+    socket.gaierror,
+)
+
+# Status codes for which we should retry the request.
+RETRY_STATUS_CODES = {429}
+
+
+def _should_retry(response: Response) -> bool:
+    """Return True if the request should be retried for the given Response, False otherwise."""
+    result = response.status_code in RETRY_STATUS_CODES or (
+        500 <= response.status_code < 600
+    )
+    return result
 
 
 class AnkiHubRequestError(Exception):
@@ -101,6 +134,38 @@ class AnkiHubClient:
         if token:
             self.session.headers["Authorization"] = f"Token {token}"
 
+    def _send_request(self, method, endpoint, data=None, params=None) -> Response:
+        request = self._build_request(method, endpoint, data, params)
+        response = self._send_request_with_retry(request)
+        self.session.close()
+        return response
+
+    def _send_request_with_retry(self, request: PreparedRequest) -> Response:
+        """Send a request, retrying if necessary.
+        If the request fails after all retries, the last attempt's response is returned.
+        If the last request failed because of an exception, that exception is raised.
+        """
+        try:
+            response = self._send_request_with_retry_inner(request)
+        except RetryError as e:
+            # Catch RetryErrors to make the usage of tenacity transparent to the caller.
+            last_attempt = cast(Future, e.last_attempt)
+            # If the last attempt failed because of an exception, this will raise that exception.
+            response = last_attempt.result()
+        return response
+
+    @retry(
+        stop=stop_after_attempt(3),
+        wait=wait_exponential(multiplier=1, max=10),
+        retry=(
+            retry_if_result(_should_retry)
+            | retry_if_exception_type(REQUEST_RETRY_EXCEPTION_TYPES)
+        ),
+    )
+    def _send_request_with_retry_inner(self, request: PreparedRequest) -> Response:
+        response = self.session.send(request)
+        return response
+
     def _build_request(
         self,
         method,
@@ -119,18 +184,6 @@ class AnkiHubClient:
         )
         prepped = request.prepare()
         return prepped
-
-    def _send_request(
-        self,
-        method,
-        endpoint,
-        data=None,
-        params=None,
-    ) -> Response:
-        request = self._build_request(method, endpoint, data, params)
-        response = self.session.send(request)
-        self.session.close()
-        return response
 
     def login(self, credentials: dict) -> str:
         response = self._send_request("POST", "/login/", credentials)
