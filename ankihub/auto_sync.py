@@ -70,7 +70,7 @@ def _rate_limit_syncincg() -> None:
     )
 
 
-@rate_limited(1, "after_sync")
+@rate_limited(2, "after_sync")
 def _rate_limited(*args, **kwargs) -> None:
     """Wrapper for AnkiQt._sync_collection_and_media that is rate limited to 1 sync per second.
     The `after_sync` callable passed to the _sync_collection_and_media function is called immediately
