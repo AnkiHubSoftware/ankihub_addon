@@ -11,8 +11,6 @@ from aqt import AnkiQt
 from aqt.gui_hooks import profile_did_open, profile_will_close, sync_did_finish
 
 from . import LOGGER
-from .ankihub_client import AnkiHubRequestError
-from .errors import report_exception_and_upload_logs
 from .gui.db_check import maybe_check_databases
 from .settings import ANKI_MINOR, config
 from .sync import ah_sync, show_tooltip_about_last_sync_results
@@ -121,10 +119,6 @@ def _sync_with_ankihub_and_ankiweb(*args, **kwargs) -> None:
     except Exception as e:
         LOGGER.warning("Error in _maybe_sync_with_ankihub")
         auto_sync_state.exception_on_last_ah_sync = e
-
-        # Maybe report the exception to sentry right away for the case that the exception stored in
-        # auto_sync_state.exception_on_last_ah_sync variable is not raised for some reason.
-        _maybe_report_exception_to_sentry(e)
     else:
         auto_sync_state.exception_on_last_ah_sync = None
     finally:
@@ -136,18 +130,6 @@ def _sync_with_ankihub_and_ankiweb(*args, **kwargs) -> None:
         LOGGER.info("Finished syncing with AnkiWeb in _sync_with_ankihub_and_ankiweb")
 
         return result
-
-
-def _maybe_report_exception_to_sentry(e: Exception) -> None:
-    """Report the exception to sentry if it is not expected."""
-    is_expected = isinstance(e, AnkiHubRequestError) and e.response.status_code in [
-        401,
-        406,
-    ]
-    # Dont send the exception to sentry if the error is expected to happen occasionally
-    # during normal useage. These errors are handled by the central error handler.
-    if not is_expected:
-        report_exception_and_upload_logs(e)
 
 
 def _maybe_sync_with_ankihub(is_startup_sync: bool) -> bool:
