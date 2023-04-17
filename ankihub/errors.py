@@ -367,7 +367,7 @@ def _user_files_context_dict() -> Dict[str, Any]:
 
     result = {
         "all files": [str(file) for file in all_file_paths],
-        "inaccessible files": [str(file) for file in problematic_file_paths],
+        "inaccessible files (Windows)": [str(file) for file in problematic_file_paths],
         "Is ankihub database attached to anki database?": is_ankihub_db_attached_to_anki_db(),
     }
     return result
