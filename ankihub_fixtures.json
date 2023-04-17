@@ -1,0 +1,1002 @@
+[
+    {
+        "model": "users.user",
+        "pk": 1,
+        "fields": {
+            "password": "asdf",
+            "username": "test1",
+            "email": "test1@email.com"
+        }
+    },
+    {
+        "model": "users.user",
+        "pk": 2,
+        "fields": {
+            "password": "asdf",
+            "username": "test2",
+            "email": "test2@email.com"
+        }
+    },
+    {
+        "model": "authtoken.token",
+        "pk": "aklOQrspAFNXuFaRiNYGMUQDEygmZLiOgeJCnGsr",
+        "fields": {
+            "user_id": 2
+        }
+    },
+    {
+        "model": "authtoken.token",
+        "pk": "mToyAYCgiNCVdAKdwvxPEhxWIAfuaFoVaWzvHSGj",
+        "fields": {
+            "user_id": 1
+        }
+    },
+    {
+        "model": "decks.deck",
+        "pk": "5528aef7-f7ac-406b-9b35-4eaf00de4b20",
+        "fields": {
+            "name": "Stephanie Smith",
+            "anki_id": 517132782,
+            "owner_id": 2
+        }
+    },
+    {
+        "model": "decks.deck",
+        "pk": "100df7b9-7749-4fe0-b801-e3dec1decd72",
+        "fields": {
+            "name": "Stephanie Smith 2",
+            "anki_id": 517132782
+        }
+    },
+    {
+        "model": "decks.deck",
+        "pk": "dda0d3ad-89cd-45fb-8ddc-fabad93c2d7b",
+        "fields": {
+            "name": "Jonathon Weeks",
+            "anki_id": 2456281836,
+            "owner_id": 1
+        }
+    },
+    {
+        "model": "decks.notetype",
+        "pk": 1,
+        "fields": {
+            "anki_id": 1,
+            "name": "Basic",
+            "type": 1,
+            "mod": 3842977041,
+            "usn": -1,
+            "sortf": 0,
+            "did": 3223305276,
+            "fields": [
+                {
+                    "ord": 0,
+                    "rtl": false,
+                    "font": "Arial",
+                    "meta": null,
+                    "name": "abc",
+                    "size": 16,
+                    "media": [],
+                    "value": "abc",
+                    "sticky": false,
+                    "collapsibleFieldsCollapseByDefault": false
+                }
+            ],
+            "css": "",
+            "latexPre": "",
+            "latexPost": "",
+            "latexsvg": false,
+            "templates": [
+                {
+                    "did": null,
+                    "ord": 0,
+                    "amft": "<script>console.log('test')</script>",
+                    "name": "Test",
+                    "qmft": "<div>test</div>",
+                    "bafmt": "{{cloze:Text}}",
+                    "bqfmt": "{{cloze:Text}}",
+                    "bsize": 12,
+                    "scratchPad": false
+                }
+            ],
+            "req": [],
+            "vers": []
+        }
+    },
+    {
+        "model": "decks.note",
+        "pk": "0985a15c-74aa-4343-89bd-f70c7118abeb",
+        "fields": {
+            "anki_id": 2494365947,
+            "guid": "!I~!b,|k;H",
+            "tags_cache": [
+                "tag_0",
+                "tag_1",
+                "tag_2",
+                "tag_3",
+                "tag_4",
+                "tag_5",
+                "tag_6",
+                "tag_7",
+                "tag_8",
+                "tag_9"
+            ],
+            "deck_id": "dda0d3ad-89cd-45fb-8ddc-fabad93c2d7b",
+            "last_sync": "2023-04-04T19:13:43.146Z",
+            "fields": [
+                {
+                    "name": "abc_0",
+                    "order": 0,
+                    "value": "abc"
+                },
+                {
+                    "name": "abc_1",
+                    "order": 1,
+                    "value": "abc"
+                }
+            ],
+            "note_type": "Basic",
+            "note_type_id": 1,
+            "last_update_type": "original_content",
+            "corpus": "abc abc"
+        }
+    },
+    {
+        "model": "decks.note",
+        "pk": "1baad5c1-5038-4408-a5eb-9a4645450fd5",
+        "fields": {
+            "anki_id": 3292191908,
+            "guid": "!I~!b,|k;H",
+            "tags_cache": [
+                "tag_0",
+                "tag_1",
+                "tag_2",
+                "tag_3",
+                "tag_4",
+                "tag_5",
+                "tag_6",
+                "tag_7",
+                "tag_8",
+                "tag_9"
+            ],
+            "deck_id": "dda0d3ad-89cd-45fb-8ddc-fabad93c2d7b",
+            "last_sync": "2023-04-04T19:13:43.290Z",
+            "fields": [
+                {
+                    "name": "abc_0",
+                    "order": 0,
+                    "value": "abc"
+                },
+                {
+                    "name": "abc_1",
+                    "order": 1,
+                    "value": "abc"
+                }
+            ],
+            "note_type": "Basic",
+            "note_type_id": 1,
+            "last_update_type": "original_content",
+            "corpus": "abc abc"
+        }
+    },
+    {
+        "model": "decks.note",
+        "pk": "2cd36741-102e-499e-899a-d50fc5ef1e31",
+        "fields": {
+            "anki_id": 2454420965,
+            "guid": "!I~!b,|k;H",
+            "tags_cache": [
+                "tag_0",
+                "tag_1",
+                "tag_2",
+                "tag_3",
+                "tag_4",
+                "tag_5",
+                "tag_6",
+                "tag_7",
+                "tag_8",
+                "tag_9"
+            ],
+            "deck_id": "5528aef7-f7ac-406b-9b35-4eaf00de4b20",
+            "last_sync": "2023-04-04T19:13:44.118Z",
+            "fields": [
+                {
+                    "name": "abc_0",
+                    "order": 0,
+                    "value": "abc"
+                },
+                {
+                    "name": "abc_1",
+                    "order": 1,
+                    "value": "abc"
+                }
+            ],
+            "note_type": "Basic",
+            "note_type_id": 2,
+            "last_update_type": "original_content",
+            "corpus": "abc abc"
+        }
+    },
+    {
+        "model": "decks.note",
+        "pk": "4bb8088e-61c1-4813-af48-9f8c8b8502c9",
+        "fields": {
+            "anki_id": 421922749,
+            "guid": "!I~!b,|k;H",
+            "tags_cache": [
+                "tag_0",
+                "tag_1",
+                "tag_2",
+                "tag_3",
+                "tag_4",
+                "tag_5",
+                "tag_6",
+                "tag_7",
+                "tag_8",
+                "tag_9"
+            ],
+            "deck_id": "dda0d3ad-89cd-45fb-8ddc-fabad93c2d7b",
+            "last_sync": "2023-04-04T19:13:42.609Z",
+            "fields": [
+                {
+                    "name": "abc_0",
+                    "order": 0,
+                    "value": "abc"
+                },
+                {
+                    "name": "abc_1",
+                    "order": 1,
+                    "value": "abc"
+                }
+            ],
+            "note_type": "Basic",
+            "note_type_id": 1,
+            "last_update_type": "original_content",
+            "corpus": "abc abc"
+        }
+    },
+    {
+        "model": "decks.note",
+        "pk": "4f0bade2-452e-4a5f-9b9e-fb4cf3ea6515",
+        "fields": {
+            "anki_id": 2402553617,
+            "guid": "!I~!b,|k;H",
+            "tags_cache": [
+                "tag_0",
+                "tag_1",
+                "tag_2",
+                "tag_3",
+                "tag_4",
+                "tag_5",
+                "tag_6",
+                "tag_7",
+                "tag_8",
+                "tag_9"
+            ],
+            "deck_id": "dda0d3ad-89cd-45fb-8ddc-fabad93c2d7b",
+            "last_sync": "2023-04-04T19:13:43.077Z",
+            "fields": [
+                {
+                    "name": "abc_0",
+                    "order": 0,
+                    "value": "abc"
+                },
+                {
+                    "name": "abc_1",
+                    "order": 1,
+                    "value": "abc"
+                }
+            ],
+            "note_type": "Basic",
+            "note_type_id": 1,
+            "last_update_type": "original_content",
+            "corpus": "abc abc"
+        }
+    },
+    {
+        "model": "decks.note",
+        "pk": "52655b3c-9522-41d1-a69a-f0d03b8a69c3",
+        "fields": {
+            "anki_id": 1537343017,
+            "guid": "!I~!b,|k;H",
+            "tags_cache": [
+                "tag_0",
+                "tag_1",
+                "tag_2",
+                "tag_3",
+                "tag_4",
+                "tag_5",
+                "tag_6",
+                "tag_7",
+                "tag_8",
+                "tag_9"
+            ],
+            "deck_id": "dda0d3ad-89cd-45fb-8ddc-fabad93c2d7b",
+            "last_sync": "2023-04-04T19:13:42.934Z",
+            "fields": [
+                {
+                    "name": "abc_0",
+                    "order": 0,
+                    "value": "abc"
+                },
+                {
+                    "name": "abc_1",
+                    "order": 1,
+                    "value": "abc"
+                }
+            ],
+            "note_type": "Basic",
+            "note_type_id": 1,
+            "last_update_type": "original_content",
+            "corpus": "abc abc"
+        }
+    },
+    {
+        "model": "decks.note",
+        "pk": "6853bcf1-8e92-4342-a7cc-8f7416ddc843",
+        "fields": {
+            "anki_id": 3017917850,
+            "guid": "!I~!b,|k;H",
+            "tags_cache": [
+                "tag_0",
+                "tag_1",
+                "tag_2",
+                "tag_3",
+                "tag_4",
+                "tag_5",
+                "tag_6",
+                "tag_7",
+                "tag_8",
+                "tag_9"
+            ],
+            "deck_id": "5528aef7-f7ac-406b-9b35-4eaf00de4b20",
+            "last_sync": "2023-04-04T19:13:44.165Z",
+            "fields": [
+                {
+                    "name": "abc_0",
+                    "order": 0,
+                    "value": "abc"
+                },
+                {
+                    "name": "abc_1",
+                    "order": 1,
+                    "value": "abc"
+                }
+            ],
+            "note_type": "Basic",
+            "note_type_id": 2,
+            "last_update_type": "original_content",
+            "corpus": "abc abc"
+        }
+    },
+    {
+        "model": "decks.note",
+        "pk": "6af5327c-ed61-4100-9332-d2640af7065b",
+        "fields": {
+            "anki_id": 515533968,
+            "guid": "!I~!b,|k;H",
+            "tags_cache": [
+                "tag_0",
+                "tag_1",
+                "tag_2",
+                "tag_3",
+                "tag_4",
+                "tag_5",
+                "tag_6",
+                "tag_7",
+                "tag_8",
+                "tag_9"
+            ],
+            "deck_id": "dda0d3ad-89cd-45fb-8ddc-fabad93c2d7b",
+            "last_sync": "2023-04-04T19:13:42.720Z",
+            "fields": [
+                {
+                    "name": "abc_0",
+                    "order": 0,
+                    "value": "abc"
+                },
+                {
+                    "name": "abc_1",
+                    "order": 1,
+                    "value": "abc"
+                }
+            ],
+            "note_type": "Basic",
+            "note_type_id": 1,
+            "last_update_type": "original_content",
+            "corpus": "abc abc"
+        }
+    },
+    {
+        "model": "decks.note",
+        "pk": "71dfc3bb-0b00-4617-9906-a543124168f2",
+        "fields": {
+            "anki_id": 1680546952,
+            "guid": "!I~!b,|k;H",
+            "tags_cache": [
+                "tag_0",
+                "tag_1",
+                "tag_2",
+                "tag_3",
+                "tag_4",
+                "tag_5",
+                "tag_6",
+                "tag_7",
+                "tag_8",
+                "tag_9"
+            ],
+            "deck_id": "5528aef7-f7ac-406b-9b35-4eaf00de4b20",
+            "last_sync": "2023-04-04T19:13:44.031Z",
+            "fields": [
+                {
+                    "name": "abc_0",
+                    "order": 0,
+                    "value": "abc"
+                },
+                {
+                    "name": "abc_1",
+                    "order": 1,
+                    "value": "abc"
+                }
+            ],
+            "note_type": "Basic",
+            "note_type_id": 2,
+            "last_update_type": "original_content",
+            "corpus": "abc abc"
+        }
+    },
+    {
+        "model": "decks.note",
+        "pk": "7ee7447e-1a67-4537-a798-ae3c28f69374",
+        "fields": {
+            "anki_id": 441170851,
+            "guid": "!I~!b,|k;H",
+            "tags_cache": [
+                "tag_0",
+                "tag_1",
+                "tag_2",
+                "tag_3",
+                "tag_4",
+                "tag_5",
+                "tag_6",
+                "tag_7",
+                "tag_8",
+                "tag_9"
+            ],
+            "deck_id": "5528aef7-f7ac-406b-9b35-4eaf00de4b20",
+            "last_sync": "2023-04-04T19:13:43.942Z",
+            "fields": [
+                {
+                    "name": "abc_0",
+                    "order": 0,
+                    "value": "abc"
+                },
+                {
+                    "name": "abc_1",
+                    "order": 1,
+                    "value": "abc"
+                }
+            ],
+            "note_type": "Basic",
+            "note_type_id": 2,
+            "last_update_type": "original_content",
+            "corpus": "abc abc"
+        }
+    },
+    {
+        "model": "decks.note",
+        "pk": "7f014353-56ae-431f-9dad-6917ceaeebcd",
+        "fields": {
+            "anki_id": 2390774769,
+            "guid": "!I~!b,|k;H",
+            "tags_cache": [
+                "tag_0",
+                "tag_1",
+                "tag_2",
+                "tag_3",
+                "tag_4",
+                "tag_5",
+                "tag_6",
+                "tag_7",
+                "tag_8",
+                "tag_9"
+            ],
+            "deck_id": "5528aef7-f7ac-406b-9b35-4eaf00de4b20",
+            "last_sync": "2023-04-04T19:13:44.076Z",
+            "fields": [
+                {
+                    "name": "abc_0",
+                    "order": 0,
+                    "value": "abc"
+                },
+                {
+                    "name": "abc_1",
+                    "order": 1,
+                    "value": "abc"
+                }
+            ],
+            "note_type": "Basic",
+            "note_type_id": 2,
+            "last_update_type": "original_content",
+            "corpus": "abc abc"
+        }
+    },
+    {
+        "model": "decks.note",
+        "pk": "b60622ad-abf1-46a8-ba48-b2d110612a35",
+        "fields": {
+            "anki_id": 1380383706,
+            "guid": "!I~!b,|k;H",
+            "tags_cache": [
+                "tag_0",
+                "tag_1",
+                "tag_2",
+                "tag_3",
+                "tag_4",
+                "tag_5",
+                "tag_6",
+                "tag_7",
+                "tag_8",
+                "tag_9"
+            ],
+            "deck_id": "dda0d3ad-89cd-45fb-8ddc-fabad93c2d7b",
+            "last_sync": "2023-04-04T19:13:42.791Z",
+            "fields": [
+                {
+                    "name": "abc_0",
+                    "order": 0,
+                    "value": "abc"
+                },
+                {
+                    "name": "abc_1",
+                    "order": 1,
+                    "value": "abc"
+                }
+            ],
+            "note_type": "Basic",
+            "note_type_id": 1,
+            "last_update_type": "original_content",
+            "corpus": "abc abc"
+        }
+    },
+    {
+        "model": "decks.note",
+        "pk": "b7353bb2-836a-4f88-bc8c-9ae41d6e65b3",
+        "fields": {
+            "anki_id": 2250164027,
+            "guid": "!I~!b,|k;H",
+            "tags_cache": [
+                "tag_0",
+                "tag_1",
+                "tag_2",
+                "tag_3",
+                "tag_4",
+                "tag_5",
+                "tag_6",
+                "tag_7",
+                "tag_8",
+                "tag_9"
+            ],
+            "deck_id": "dda0d3ad-89cd-45fb-8ddc-fabad93c2d7b",
+            "last_sync": "2023-04-04T19:13:43.006Z",
+            "fields": [
+                {
+                    "name": "abc_0",
+                    "order": 0,
+                    "value": "abc"
+                },
+                {
+                    "name": "abc_1",
+                    "order": 1,
+                    "value": "abc"
+                }
+            ],
+            "note_type": "Basic",
+            "note_type_id": 1,
+            "last_update_type": "original_content",
+            "corpus": "abc abc"
+        }
+    },
+    {
+        "model": "decks.note",
+        "pk": "b7a2bc56-0374-4c23-9e9a-f5066209b3f7",
+        "fields": {
+            "anki_id": 3138670658,
+            "guid": "!I~!b,|k;H",
+            "tags_cache": [
+                "tag_0",
+                "tag_1",
+                "tag_2",
+                "tag_3",
+                "tag_4",
+                "tag_5",
+                "tag_6",
+                "tag_7",
+                "tag_8",
+                "tag_9"
+            ],
+            "deck_id": "dda0d3ad-89cd-45fb-8ddc-fabad93c2d7b",
+            "last_sync": "2023-04-04T19:13:43.221Z",
+            "fields": [
+                {
+                    "name": "abc_0",
+                    "order": 0,
+                    "value": "abc"
+                },
+                {
+                    "name": "abc_1",
+                    "order": 1,
+                    "value": "abc"
+                }
+            ],
+            "note_type": "Basic",
+            "note_type_id": 1,
+            "last_update_type": "original_content",
+            "corpus": "abc abc"
+        }
+    },
+    {
+        "model": "decks.note",
+        "pk": "ca907c76-e26d-44d5-a7b4-321d6bd0ea64",
+        "fields": {
+            "anki_id": 1414273564,
+            "guid": "!I~!b,|k;H",
+            "tags_cache": [
+                "tag_0",
+                "tag_1",
+                "tag_2",
+                "tag_3",
+                "tag_4",
+                "tag_5",
+                "tag_6",
+                "tag_7",
+                "tag_8",
+                "tag_9"
+            ],
+            "deck_id": "5528aef7-f7ac-406b-9b35-4eaf00de4b20",
+            "last_sync": "2023-04-04T19:13:43.992Z",
+            "fields": [
+                {
+                    "name": "abc_0",
+                    "order": 0,
+                    "value": "abc"
+                },
+                {
+                    "name": "abc_1",
+                    "order": 1,
+                    "value": "abc"
+                }
+            ],
+            "note_type": "Basic",
+            "note_type_id": 2,
+            "last_update_type": "original_content",
+            "corpus": "abc abc"
+        }
+    },
+    {
+        "model": "decks.note",
+        "pk": "cc193a6c-e25e-43f7-b321-24858dcbfe93",
+        "fields": {
+            "anki_id": 48938572,
+            "guid": "!I~!b,|k;H",
+            "tags_cache": [
+                "tag_0",
+                "tag_1",
+                "tag_2",
+                "tag_3",
+                "tag_4",
+                "tag_5",
+                "tag_6",
+                "tag_7",
+                "tag_8",
+                "tag_9"
+            ],
+            "deck_id": "5528aef7-f7ac-406b-9b35-4eaf00de4b20",
+            "last_sync": "2023-04-04T19:13:43.833Z",
+            "fields": [
+                {
+                    "name": "abc_0",
+                    "order": 0,
+                    "value": "abc"
+                },
+                {
+                    "name": "abc_1",
+                    "order": 1,
+                    "value": "abc"
+                }
+            ],
+            "note_type": "Basic",
+            "note_type_id": 2,
+            "last_update_type": "original_content",
+            "corpus": "abc abc"
+        }
+    },
+    {
+        "model": "decks.note",
+        "pk": "cc95e3f0-8ca1-49ee-b53e-ac96add04e3f",
+        "fields": {
+            "anki_id": 3826238823,
+            "guid": "!I~!b,|k;H",
+            "tags_cache": [
+                "tag_0",
+                "tag_1",
+                "tag_2",
+                "tag_3",
+                "tag_4",
+                "tag_5",
+                "tag_6",
+                "tag_7",
+                "tag_8",
+                "tag_9"
+            ],
+            "deck_id": "5528aef7-f7ac-406b-9b35-4eaf00de4b20",
+            "last_sync": "2023-04-04T19:13:44.250Z",
+            "fields": [
+                {
+                    "name": "abc_0",
+                    "order": 0,
+                    "value": "abc"
+                },
+                {
+                    "name": "abc_1",
+                    "order": 1,
+                    "value": "abc"
+                }
+            ],
+            "note_type": "Basic",
+            "note_type_id": 2,
+            "last_update_type": "original_content",
+            "corpus": "abc abc"
+        }
+    },
+    {
+        "model": "decks.note",
+        "pk": "e49a8ae4-5458-448a-9fee-b4104b72dd28",
+        "fields": {
+            "anki_id": 1532341654,
+            "guid": "!I~!b,|k;H",
+            "tags_cache": [
+                "tag_0",
+                "tag_1",
+                "tag_2",
+                "tag_3",
+                "tag_4",
+                "tag_5",
+                "tag_6",
+                "tag_7",
+                "tag_8",
+                "tag_9"
+            ],
+            "deck_id": "dda0d3ad-89cd-45fb-8ddc-fabad93c2d7b",
+            "last_sync": "2023-04-04T19:13:42.859Z",
+            "fields": [
+                {
+                    "name": "abc_0",
+                    "order": 0,
+                    "value": "abc"
+                },
+                {
+                    "name": "abc_1",
+                    "order": 1,
+                    "value": "abc"
+                }
+            ],
+            "note_type": "Basic",
+            "note_type_id": 1,
+            "last_update_type": "original_content",
+            "corpus": "abc abc"
+        }
+    },
+    {
+        "model": "decks.note",
+        "pk": "f9eda5fa-e2cc-44c7-89dc-7e0f808a729f",
+        "fields": {
+            "anki_id": 3071792354,
+            "guid": "!I~!b,|k;H",
+            "tags_cache": [
+                "tag_0",
+                "tag_1",
+                "tag_2",
+                "tag_3",
+                "tag_4",
+                "tag_5",
+                "tag_6",
+                "tag_7",
+                "tag_8",
+                "tag_9"
+            ],
+            "deck_id": "5528aef7-f7ac-406b-9b35-4eaf00de4b20",
+            "last_sync": "2023-04-04T19:13:44.209Z",
+            "fields": [
+                {
+                    "name": "abc_0",
+                    "order": 0,
+                    "value": "abc"
+                },
+                {
+                    "name": "abc_1",
+                    "order": 1,
+                    "value": "abc"
+                }
+            ],
+            "note_type": "Basic",
+            "note_type_id": 2,
+            "last_update_type": "original_content",
+            "corpus": "abc abc"
+        }
+    },
+    {
+        "model": "decks.note",
+        "pk": "ffa2eeb5-288a-4932-a550-e79b553fdd55",
+        "fields": {
+            "anki_id": 3966500573,
+            "guid": "!I~!b,|k;H",
+            "tags_cache": [
+                "tag_0",
+                "tag_1",
+                "tag_2",
+                "tag_3",
+                "tag_4",
+                "tag_5",
+                "tag_6",
+                "tag_7",
+                "tag_8",
+                "tag_9"
+            ],
+            "deck_id": "5528aef7-f7ac-406b-9b35-4eaf00de4b20",
+            "last_sync": "2023-04-04T19:13:44.290Z",
+            "fields": [
+                {
+                    "name": "abc_0",
+                    "order": 0,
+                    "value": "abc"
+                },
+                {
+                    "name": "abc_1",
+                    "order": 1,
+                    "value": "abc"
+                }
+            ],
+            "note_type": "Basic",
+            "note_type_id": 2,
+            "last_update_type": "original_content",
+            "corpus": "abc abc"
+        }
+    },
+    {
+        "model": "decks.note",
+        "pk": "b2344a94-0ca6-44a1-87a1-1593558c10a9",
+        "fields": {
+            "anki_id": 6974544201265072389,
+            "guid": "MkZxcGPtVKFbtvtE",
+            "tags_cache": [],
+            "deck_id": "100df7b9-7749-4fe0-b801-e3dec1decd72",
+            "last_sync": "2023-04-04T19:13:57.169Z",
+            "fields": [
+                {
+                    "name": "Front",
+                    "order": 0,
+                    "value": "Front Test"
+                },
+                {
+                    "name": "Back",
+                    "order": 1,
+                    "value": "Back Test"
+                }
+            ],
+            "note_type": "",
+            "note_type_id": null,
+            "last_update_type": "original_content",
+            "corpus": "Front Test Back Test"
+        }
+    },
+    {
+        "model": "decks.note",
+        "pk": "8645c6d6-4f3d-417e-8295-8f5009042b6e",
+        "fields": {
+            "anki_id": 404545025697988324,
+            "guid": "GWLYnjkTEnugoOcq",
+            "tags_cache": [],
+            "deck_id": "100df7b9-7749-4fe0-b801-e3dec1decd72",
+            "last_sync": "2023-04-04T19:13:57.178Z",
+            "fields": [
+                {
+                    "name": "Front",
+                    "order": 0,
+                    "value": "Front Test"
+                },
+                {
+                    "name": "Back",
+                    "order": 1,
+                    "value": "Back Test"
+                }
+            ],
+            "note_type": "",
+            "note_type_id": null,
+            "last_update_type": "original_content",
+            "corpus": "Front Test Back Test"
+        }
+    },
+    {
+        "model": "decks.assetdisabledfieldsset",
+        "pk": 1,
+        "fields": {
+            "deck_id": "dda0d3ad-89cd-45fb-8ddc-fabad93c2d7b",
+            "fields": {
+                "1": [
+                    "abc_1"
+                ],
+                "32738523": [
+                    "Text",
+                    "Pixorize",
+                    "First Aid"
+                ]
+            }
+        }
+    },
+    {
+        "model": "memberships.membership",
+        "pk": 1,
+        "fields": {
+            "user_id": 1,
+            "revenue": "0.00",
+            "status": "active",
+            "membership_type": "regular",
+            "metadata": {
+                "customer": {}
+            },
+            "events": {
+                "should_send_welcome_email": false
+            }
+        }
+    },
+    {
+        "model": "memberships.membership",
+        "pk": 2,
+        "fields": {
+            "user_id": 2,
+            "revenue": "0.00",
+            "status": "active",
+            "membership_type": "regular",
+            "metadata": {
+                "customer": {}
+            },
+            "events": {
+                "should_send_welcome_email": false
+            }
+        }
+    },
+    {
+        "model": "deck_extensions.deckextension",
+        "pk": 999,
+        "fields": {
+            "owner_id": 1,
+            "deck_id": "100df7b9-7749-4fe0-b801-e3dec1decd72",
+            "name": "test100",
+            "tag_group_name": "test100",
+            "description": "",
+            "maintainers_m2m": [],
+            "subscribers_m2m": [
+                2
+            ]
+        }
+    },
+    {
+        "model": "deck_extensions.notecustomization",
+        "pk": 1,
+        "fields": {
+            "deck_extension_id": 999,
+            "note_id": "b2344a94-0ca6-44a1-87a1-1593558c10a9",
+            "tags": ["AnkiHub_Optional::test100::test1", "AnkiHub_Optional::test100::test2"]
+        }
+    },
+    {
+        "model": "deck_extensions.notecustomization",
+        "pk": 2,
+        "fields": {
+            "deck_extension_id": 999,
+            "note_id": "8645c6d6-4f3d-417e-8295-8f5009042b6e",
+            "tags": ["AnkiHub_Optional::test100::test1", "AnkiHub_Optional::test100::test2"]
+        }
+    }
+]
