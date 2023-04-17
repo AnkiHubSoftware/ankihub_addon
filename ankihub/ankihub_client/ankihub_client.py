@@ -9,7 +9,7 @@ import shutil
 import socket
 import urllib.parse
 import uuid
-from concurrent.futures import ThreadPoolExecutor, as_completed
+from concurrent.futures import Future, ThreadPoolExecutor, as_completed
 from datetime import datetime
 from io import BufferedReader
 from json.decoder import JSONDecodeError
@@ -24,6 +24,7 @@ from typing import (
     Sequence,
     TypedDict,
     Union,
+    cast,
 )
 from zipfile import ZipFile
 
@@ -31,6 +32,7 @@ import requests
 from requests import PreparedRequest, Request, Response, Session
 from requests.exceptions import ChunkedEncodingError, SSLError, Timeout
 from tenacity import (
+    RetryError,
     retry,
     retry_if_exception_type,
     retry_if_result,
@@ -138,6 +140,19 @@ class AnkiHubClient:
         self.session.close()
         return response
 
+    def _send_request_with_retry(self, request: PreparedRequest) -> Response:
+        """Send a request, retrying if necessary.
+        If the request fails after all retries, the last attempt's response is returned.
+        If the last request failed because of an exception, that exception is raised.
+        In any case no RetryError is raised to make the usage of retry logic transparent to the caller."""
+        try:
+            response = self._send_request_with_retry_inner(request)
+        except RetryError as e:
+            last_attempt = cast(Future, e.last_attempt)
+            # If the last attempt failed because of an exception, this will raise that exception.
+            response = last_attempt.result()
+        return response
+
     @retry(
         stop=stop_after_attempt(3),
         wait=wait_exponential(multiplier=1, max=10),
@@ -146,7 +161,7 @@ class AnkiHubClient:
             | retry_if_exception_type(REQUEST_RETRY_EXCEPTION_TYPES)
         ),
     )
-    def _send_request_with_retry(self, request: PreparedRequest) -> Response:
+    def _send_request_with_retry_inner(self, request: PreparedRequest) -> Response:
         response = self.session.send(request)
         return response
 
