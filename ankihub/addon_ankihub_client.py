@@ -4,6 +4,7 @@ import json
 from json import JSONDecodeError
 from pathlib import Path
 from pprint import pformat
+from typing import Dict, Optional
 
 import aqt
 import requests
@@ -18,12 +19,20 @@ def logging_hook(response: Response, *args, **kwargs):
     endpoint = response.request.url
     method = response.request.method
     body = response.request.body
-    body = json.loads(body) if body else body
+
+    body_dict: Optional[Dict] = None
+    try:
+        body_dict = json.loads(body) if body else None
+    except ValueError:
+        pass
+
     if "/login/" in endpoint:
-        body.pop("password")  # type: ignore
+        body_dict.pop("password")
+
     headers = response.request.headers
     LOGGER.info(
-        f"request: {method} {endpoint}\ndata={pformat(body)}\nheaders={headers}"
+        f"request: {method} {endpoint}\nheaders={headers}"
+        + (f"\ndata={pformat(body_dict)}" if body_dict else "")
     )
     LOGGER.info(f"response status: {response.status_code}")
     try:
@@ -55,7 +64,7 @@ class AddonAnkiHubClient(AnkiHubClient):
         with open(file, "rb") as f:
             log_data = f.read()
 
-        s3_url = self._get_presigned_url(key=key, action="upload")
+        s3_url = self._get_presigned_url_suffix(key=key, action="upload")
         s3_response = requests.put(s3_url, data=log_data)
         if s3_response.status_code != 200:
             raise AnkiHubRequestError(s3_response)
