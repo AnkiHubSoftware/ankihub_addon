@@ -694,7 +694,7 @@ class AnkiHubClient:
         The suffix is the part of the URL after the base url.
         :param key: s3 key
         :param action: upload or download
-        :return: the presigned url path
+        :return: the presigned url suffix
         """
         response = self._send_request(
             "GET",
