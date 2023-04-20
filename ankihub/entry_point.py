@@ -6,7 +6,7 @@ import aqt
 from anki.errors import CardTypeError
 from aqt.gui_hooks import profile_did_open
 
-from . import LOGGER
+from . import LOGGER, taskman
 from .addons import setup_addons
 from .auto_sync import setup_ankihub_sync_on_ankiweb_sync
 from .db import ankihub_db
@@ -117,6 +117,9 @@ def _general_setup():
 
     progress.setup()
     LOGGER.info("Set up progress manager.")
+
+    taskman.setup()
+    LOGGER.info("Set up task manager.")
 
     _trigger_addon_update_check()
     LOGGER.info("Triggered add-on update check.")
