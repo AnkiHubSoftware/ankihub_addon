@@ -27,7 +27,6 @@ from . import LOGGER
 from .addon_ankihub_client import AddonAnkiHubClient as AnkiHubClient
 from .addon_ankihub_client import AnkiHubRequestError
 from .db import is_ankihub_db_attached_to_anki_db
-from .gui.error_feedback import ErrorFeedbackDialog
 from .gui.utils import check_and_prompt_for_updates_on_main_window
 from .settings import ADDON_VERSION, ANKI_VERSION, ANKIWEB_ID, config, log_file_path
 from .sync import NotLoggedInError
@@ -139,7 +138,7 @@ def _maybe_report_exception_and_show_feedback_dialog(exception: BaseException) -
 
     sentry_id = report_exception_and_upload_logs(exception=exception)
     if _this_addon_mentioned_in_tb(exception.__traceback__):
-        ErrorFeedbackDialog(exception=exception, event_id=sentry_id)
+        pass
 
 
 def _try_handle_exception(
