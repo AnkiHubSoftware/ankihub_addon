@@ -44,7 +44,7 @@ def show_error_dialog(exception: BaseException, sentry_event_id: Optional[str]) 
     layout.addWidget(message_widget)
 
     exception_text = "".join(
-        format_exception(type(exception), exception, exception.__traceback__)
+        format_exception(None, value=exception, tb=exception.__traceback__)
     )
     exception_widget = QTextBrowser()
     exception_widget.setOpenExternalLinks(True)
@@ -73,7 +73,9 @@ def show_error_dialog(exception: BaseException, sentry_event_id: Optional[str]) 
 
 
 def _forum_url(exception: BaseException, sentry_event_id: Optional[str]):
-    exception_html = "<br>".join(format_exception(exception))
+    exception_html = "<br>".join(
+        format_exception(None, value=exception, tb=exception.__traceback__)
+    )
     forum_post_text = (
         dedent(
             """
