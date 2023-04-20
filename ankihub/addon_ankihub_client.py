@@ -34,13 +34,13 @@ def logging_hook(response: Response, *args, **kwargs):
         f"request: {method} {endpoint}\nheaders={headers}"
         + (f"\ndata={pformat(body_dict)}" if body_dict else "")
     )
-    LOGGER.info(f"response status: {response.status_code}")
+    LOGGER.info(f"response: {response}")
     try:
         LOGGER.debug(f"response content: {pformat(response.json())}")
     except JSONDecodeError:
-        LOGGER.debug(f"response content: {str(response.content)}")
-    else:
-        LOGGER.info(f"response: {response}")
+        # We don't want to log the content of the response if it's not JSON
+        pass
+
     return response
 
 
