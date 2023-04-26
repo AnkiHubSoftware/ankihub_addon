@@ -112,18 +112,19 @@ def _setup_excepthook():
         handled = False
         try:
             handled = _try_handle_exception(exc_type=etype, exc_value=val, tb=tb)
-        except Exception:
+        except Exception as e:
             # catching all exceptions here prevents a potential exception loop
-            LOGGER.exception("The exception handler threw an exception.")
+            LOGGER.exception("The exception handler threw an exception.", exc_info=e)
         finally:
             if handled:
                 return
 
             try:
                 _maybe_report_exception_and_show_feedback_dialog(exception=val)
-            except Exception:
+            except Exception as e:
                 LOGGER.warning(
-                    "There was an error while reporting the exception or showing the feedback dialog."
+                    "There was an error while reporting the exception or showing the feedback dialog.",
+                    exc_info=e,
                 )
 
             # This opens Anki's error dialog.
