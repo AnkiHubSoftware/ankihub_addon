@@ -18,7 +18,7 @@ jobs:
       - name: Setup git config
         run: |
           git config user.name "ankihub-addon-bot"
-          git config user.email "jakub.fidler@proton.me"
+          git config user.email "gh@users.noreply.github.com"
 
       - name: Setup Python
         uses: actions/setup-python@v2.2.1
