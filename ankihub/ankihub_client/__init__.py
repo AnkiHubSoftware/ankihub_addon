@@ -12,6 +12,7 @@ from .ankihub_client import (  # noqa: F401
     STAGING_S3_BUCKET_URL,
     AnkiHubClient,
     AnkiHubRequestError,
+    AnkiHubRequestException,
 )
 from .models import (  # noqa: F401
     ANKIHUB_DATETIME_FORMAT_STR,

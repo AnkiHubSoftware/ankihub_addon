@@ -102,6 +102,8 @@ RETRY_CONDITION = retry_if_result(_should_retry_for_response) | retry_if_excepti
 
 
 class AnkiHubRequestError(Exception):
+    """An unexpected HTTP code was returned in response to a request by the AnkiHub client."""
+
     def __init__(self, response: Response):
         self.response = response
 
@@ -109,6 +111,16 @@ class AnkiHubRequestError(Exception):
         return (
             f"AnkiHub request error: {self.response.status_code} {self.response.reason}"
         )
+
+
+class AnkiHubRequestException(Exception):
+    """An exception occurred while the AnkiHub client was making a request."""
+
+    def __init__(self, original_exception):
+        self.original_exception = original_exception
+
+    def __str__(self):
+        return f"AnkiHub request exception: {self.original_exception}"
 
 
 class API(Enum):
@@ -198,7 +210,10 @@ class AnkiHubClient:
             # Catch RetryErrors to make the usage of tenacity transparent to the caller.
             last_attempt = cast(Future, e.last_attempt)
             # If the last attempt failed because of an exception, this will raise that exception.
-            response = last_attempt.result()
+            try:
+                response = last_attempt.result()
+            except Exception as e:
+                raise AnkiHubRequestException(e) from e
         return response
 
     @retry(
