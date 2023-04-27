@@ -25,7 +25,7 @@ from sentry_sdk.integrations.threading import ThreadingIntegration
 
 from . import LOGGER
 from .addon_ankihub_client import AddonAnkiHubClient as AnkiHubClient
-from .addon_ankihub_client import AnkiHubRequestError
+from .ankihub_client import AnkiHubRequestError, AnkiHubRequestException
 from .db import is_ankihub_db_attached_to_anki_db
 from .gui.error_feedback import ErrorFeedbackDialog
 from .gui.utils import check_and_prompt_for_updates_on_main_window
@@ -158,12 +158,15 @@ def _try_handle_exception(
 
         _show_warning_for_ankihub_request_error(exc_value)
 
-    if isinstance(exc_value, (exceptions.ConnectionError, ConnectionError)):
-        tooltip(
-            "Could not connect to AnkiHub (no internet or the site is down for maintenance)",
-            parent=aqt.mw,
-        )
-        return True
+    if isinstance(exc_value, AnkiHubRequestException):
+        if isinstance(
+            exc_value.original_exception, (exceptions.ConnectionError, ConnectionError)
+        ):
+            tooltip(
+                "Could not connect to AnkiHub (no internet or the site is down for maintenance)",
+                parent=aqt.mw,
+            )
+            return True
 
     if _is_memory_full_error(exc_value):
         showWarning(
