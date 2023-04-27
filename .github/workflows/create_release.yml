@@ -52,7 +52,9 @@ jobs:
   upload-to-ankiweb:
     needs: create-release
     uses: ./.github/workflows/upload_to_ankiweb.yml
+    secrets: inherit
 
   upload_to-s3:
     needs: create-release
     uses: ./.github/workflows/upload_to_s3.yml
+    secrets: inherit

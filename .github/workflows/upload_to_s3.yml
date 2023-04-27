@@ -3,6 +3,13 @@ name: Upload to S3
 on:
   workflow_dispatch:
   workflow_call:
+    secrets:
+      GOOGLE_API_KEY:
+        required: true
+      AWS_ACCESS_KEY_ID:
+        required: true
+      AWS_SECRET_ACCESS_KEY:
+        required: true
 
 jobs:
   upload_to_s3:
