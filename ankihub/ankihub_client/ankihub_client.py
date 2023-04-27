@@ -13,7 +13,6 @@ from concurrent.futures import Future, ThreadPoolExecutor, as_completed
 from datetime import datetime
 from enum import Enum
 from io import BufferedReader
-from json.decoder import JSONDecodeError
 from pathlib import Path
 from typing import (
     Any,
@@ -29,8 +28,8 @@ from typing import (
 )
 from zipfile import ZipFile
 
+import requests
 from requests import PreparedRequest, Request, Response, Session
-from requests.exceptions import ChunkedEncodingError, SSLError, Timeout
 from tenacity import (
     RetryError,
     retry,
@@ -76,11 +75,12 @@ CHUNK_BYTES_THRESHOLD = 67108864  # 60 megabytes
 
 # Exceptions for which we should retry the request.
 REQUEST_RETRY_EXCEPTION_TYPES = (
-    JSONDecodeError,
-    SSLError,
+    requests.exceptions.JSONDecodeError,
+    requests.exceptions.SSLError,
+    requests.exceptions.ConnectionError,
+    requests.exceptions.Timeout,
+    requests.exceptions.ChunkedEncodingError,
     ConnectionError,
-    Timeout,
-    ChunkedEncodingError,
     socket.gaierror,
 )
 
