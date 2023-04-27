@@ -25,7 +25,7 @@ from sentry_sdk.integrations.threading import ThreadingIntegration
 
 from . import LOGGER
 from .addon_ankihub_client import AddonAnkiHubClient as AnkiHubClient
-from .ankihub_client import AnkiHubRequestError, AnkiHubRequestException
+from .ankihub_client import AnkiHubHTTPError, AnkiHubRequestException
 from .db import is_ankihub_db_attached_to_anki_db
 from .gui.error_feedback import ErrorFeedbackDialog
 from .gui.utils import check_and_prompt_for_updates_on_main_window
@@ -151,7 +151,7 @@ def _try_handle_exception(
         f"From _try_handle_exception:\n{''.join(traceback.format_exception(exc_type, value=exc_value, tb=tb))}"
     )
 
-    if isinstance(exc_value, AnkiHubRequestError):
+    if isinstance(exc_value, AnkiHubHTTPError):
         if _maybe_handle_ankihub_request_error(exc_value):
             LOGGER.info("AnkiHubRequestError was handled.")
             return True
@@ -199,7 +199,7 @@ def _try_handle_exception(
     return False
 
 
-def _maybe_handle_ankihub_request_error(error: AnkiHubRequestError) -> bool:
+def _maybe_handle_ankihub_request_error(error: AnkiHubHTTPError) -> bool:
     """Return True if the error was handled, False otherwise."""
     response = error.response
     if response.status_code == 401:
@@ -220,7 +220,7 @@ def _maybe_handle_ankihub_request_error(error: AnkiHubRequestError) -> bool:
     return False
 
 
-def _show_warning_for_ankihub_request_error(exc_value: AnkiHubRequestError) -> None:
+def _show_warning_for_ankihub_request_error(exc_value: AnkiHubHTTPError) -> None:
     try:
         response_data = exc_value.response.json()
         details = (
@@ -326,7 +326,7 @@ def _report_exception(
         else:
             LOGGER.warning("Exception has no traceback.")
 
-        if isinstance(exception, AnkiHubRequestError):
+        if isinstance(exception, AnkiHubHTTPError):
             scope.set_context(
                 "response",
                 {
@@ -438,7 +438,7 @@ def _upload_logs(key: str) -> str:
         )
         LOGGER.info("Logs uploaded.")
         return key
-    except AnkiHubRequestError as e:
+    except AnkiHubHTTPError as e:
         LOGGER.info("Logs upload failed.")
         raise e
 
@@ -446,7 +446,7 @@ def _upload_logs(key: str) -> str:
 def _on_upload_logs_done(future: Future) -> None:
     try:
         future.result()
-    except AnkiHubRequestError as e:
+    except AnkiHubHTTPError as e:
         from .errors import OUTDATED_CLIENT_ERROR_REASON
 
         # Don't report outdated client errors that happen when uploading logs,

@@ -101,7 +101,7 @@ RETRY_CONDITION = retry_if_result(_should_retry_for_response) | retry_if_excepti
 )
 
 
-class AnkiHubRequestError(Exception):
+class AnkiHubHTTPError(Exception):
     """An unexpected HTTP code was returned in response to a request by the AnkiHub client."""
 
     def __init__(self, response: Response):
@@ -230,7 +230,7 @@ class AnkiHubClient:
     def login(self, credentials: dict) -> str:
         response = self._send_request("POST", API.ANKIHUB, "/login/", json=credentials)
         if response.status_code != 200:
-            raise AnkiHubRequestError(response)
+            raise AnkiHubHTTPError(response)
 
         token = response.json().get("token") if response else ""
         if token:
@@ -244,7 +244,7 @@ class AnkiHubClient:
         self.session.headers["Authorization"] = ""
         response = self._send_request("POST", API.ANKIHUB, "/logout/")
         if response.status_code not in [204, 401]:
-            raise AnkiHubRequestError(response)
+            raise AnkiHubHTTPError(response)
 
     def upload_deck(
         self,
@@ -287,7 +287,7 @@ class AnkiHubClient:
             },
         )
         if response.status_code != 201:
-            raise AnkiHubRequestError(response)
+            raise AnkiHubHTTPError(response)
 
         response_data = response.json()
         ankihub_did = uuid.UUID(response_data["deck_id"])
@@ -312,7 +312,7 @@ class AnkiHubClient:
             data=data,
         )
         if s3_response.status_code != 200:
-            raise AnkiHubRequestError(s3_response)
+            raise AnkiHubHTTPError(s3_response)
 
     def generate_asset_files_with_hashed_names(
         self, paths: Sequence[Path]
@@ -454,7 +454,7 @@ class AnkiHubClient:
             )
 
         if s3_response.status_code != 204:
-            raise AnkiHubRequestError(s3_response)
+            raise AnkiHubHTTPError(s3_response)
 
     def download_images(self, img_names: List[str], deck_id: uuid.UUID) -> None:
         deck_images_remote_dir = f"/deck_assets/{deck_id}/"
@@ -514,7 +514,7 @@ class AnkiHubClient:
         else:
             s3_response = self._send_request("GET", API.S3, s3_url_suffix)
             if s3_response.status_code != 200:
-                raise AnkiHubRequestError(s3_response)
+                raise AnkiHubHTTPError(s3_response)
             s3_response_content = s3_response.content
 
         if deck_info.csv_notes_filename.endswith(".gz"):
@@ -537,7 +537,7 @@ class AnkiHubClient:
     ) -> bytes:
         with self._send_request("GET", API.S3, s3_url_suffix, stream=True) as response:
             if response.status_code != 200:
-                raise AnkiHubRequestError(response)
+                raise AnkiHubHTTPError(response)
 
             total_size = int(response.headers.get("content-length"))
             if total_size == 0:
@@ -581,7 +581,7 @@ class AnkiHubClient:
                 params=params if i == 0 else None,
             )
             if response.status_code != 200:
-                raise AnkiHubRequestError(response)
+                raise AnkiHubHTTPError(response)
 
             data = response.json()
             url_suffix = (
@@ -605,7 +605,7 @@ class AnkiHubClient:
             f"/decks/{ankihub_deck_uuid}/",
         )
         if response.status_code != 200:
-            raise AnkiHubRequestError(response)
+            raise AnkiHubHTTPError(response)
 
         data = response.json()
         result = Deck.from_dict(data)
@@ -618,7 +618,7 @@ class AnkiHubClient:
             f"/notes/{ankihub_note_uuid}",
         )
         if response.status_code != 200:
-            raise AnkiHubRequestError(response)
+            raise AnkiHubHTTPError(response)
 
         data = response.json()
         result = NoteInfo.from_dict(data)
@@ -636,7 +636,7 @@ class AnkiHubClient:
             json={**change_note_suggestion.to_dict(), "auto_accept": auto_accept},
         )
         if response.status_code != 201:
-            raise AnkiHubRequestError(response)
+            raise AnkiHubHTTPError(response)
 
     def create_new_note_suggestion(
         self,
@@ -650,7 +650,7 @@ class AnkiHubClient:
             json={**new_note_suggestion.to_dict(), "auto_accept": auto_accept},
         )
         if response.status_code != 201:
-            raise AnkiHubRequestError(response)
+            raise AnkiHubHTTPError(response)
 
     def create_suggestions_in_bulk(
         self,
@@ -693,7 +693,7 @@ class AnkiHubClient:
             },
         )
         if response.status_code != 200:
-            raise AnkiHubRequestError(response)
+            raise AnkiHubHTTPError(response)
 
         data = response.json()
         errors_by_anki_nid = {
@@ -718,7 +718,7 @@ class AnkiHubClient:
             params={"key": key, "type": action, "many": "false"},
         )
         if response.status_code != 200:
-            raise AnkiHubRequestError(response)
+            raise AnkiHubHTTPError(response)
 
         url = response.json()["pre_signed_url"]
         result = url.split(self.s3_bucket_url)[1]
@@ -738,7 +738,7 @@ class AnkiHubClient:
             params={"key": prefix, "type": "upload", "many": "true"},
         )
         if response.status_code != 200:
-            raise AnkiHubRequestError(response)
+            raise AnkiHubHTTPError(response)
 
         result = response.json()["pre_signed_url"]
         return result
@@ -748,7 +748,7 @@ class AnkiHubClient:
             "GET", API.ANKIHUB, f"/note-types/{anki_note_type_id}/"
         )
         if response.status_code != 200:
-            raise AnkiHubRequestError(response)
+            raise AnkiHubHTTPError(response)
 
         data = response.json()
         result = _to_anki_note_type(data)
@@ -765,7 +765,7 @@ class AnkiHubClient:
         if response.status_code == 404:
             return {}
         elif response.status_code != 200:
-            raise AnkiHubRequestError(response)
+            raise AnkiHubHTTPError(response)
 
         protected_fields_raw = response.json()["fields"]
         result = {
@@ -783,7 +783,7 @@ class AnkiHubClient:
         if response.status_code == 404:
             return []
         elif response.status_code != 200:
-            raise AnkiHubRequestError(response)
+            raise AnkiHubHTTPError(response)
 
         result = response.json()["tags"]
         result = [x for x in result if x.strip()]
@@ -800,7 +800,7 @@ class AnkiHubClient:
         if response.status_code == 404:
             return {}
         elif response.status_code != 200:
-            raise AnkiHubRequestError(response)
+            raise AnkiHubHTTPError(response)
 
         protected_fields_raw = response.json()["fields"]
         result = {
@@ -814,7 +814,7 @@ class AnkiHubClient:
             "GET", API.ANKIHUB, "/users/deck_extensions", params={"deck_id": deck_id}
         )
         if response.status_code != 200:
-            raise AnkiHubRequestError(response)
+            raise AnkiHubHTTPError(response)
 
         data = response.json()
         extension_dicts = data.get("deck_extensions", [])
@@ -849,7 +849,7 @@ class AnkiHubClient:
                 params=params if i == 0 else None,
             )
             if response.status_code != 200:
-                raise AnkiHubRequestError(response)
+                raise AnkiHubHTTPError(response)
 
             data = response.json()
             url = data["next"].split("/api", maxsplit=1)[1] if data["next"] else None
@@ -876,7 +876,7 @@ class AnkiHubClient:
             json={"deck_id": str(ankihub_deck_uuid), "suggestions": suggestions},
         )
         if response.status_code != 200:
-            raise AnkiHubRequestError(response)
+            raise AnkiHubHTTPError(response)
 
         data = response.json()
         suggestions = data["suggestions"]
@@ -923,7 +923,7 @@ class AnkiHubClient:
         )
 
         if response.status_code != 201:
-            raise AnkiHubRequestError(response)
+            raise AnkiHubHTTPError(response)
 
         data = response.json()
         message = data["message"]
@@ -943,7 +943,7 @@ class AnkiHubClient:
             "/feature-flags",
         )
         if response.status_code != 200:
-            raise AnkiHubRequestError(response)
+            raise AnkiHubHTTPError(response)
 
         data = response.json()
         return data
@@ -959,12 +959,12 @@ class AnkiHubClient:
             f"/decks/{ankihub_deck_uuid}/image-upload-finished",
         )
         if response.status_code != 204:
-            raise AnkiHubRequestError(response)
+            raise AnkiHubHTTPError(response)
 
     def owned_deck_ids(self) -> List[uuid.UUID]:
         response = self._send_request("GET", API.ANKIHUB, "/users/me")
         if response.status_code != 200:
-            raise AnkiHubRequestError(response)
+            raise AnkiHubHTTPError(response)
 
         data = response.json()
         result = [uuid.UUID(deck["id"]) for deck in data["created_decks"]]

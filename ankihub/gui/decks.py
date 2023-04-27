@@ -30,7 +30,7 @@ from aqt.utils import openLink, showInfo, showText, tooltip
 
 from .. import LOGGER
 from ..addon_ankihub_client import AddonAnkiHubClient as AnkiHubClient
-from ..addon_ankihub_client import AnkiHubRequestError
+from ..addon_ankihub_client import AnkiHubHTTPError
 from ..ankihub_client import NoteInfo
 from ..db import ankihub_db
 from ..importing import AnkiHubImportResult
@@ -471,7 +471,7 @@ def download_and_install_deck(
 
     try:
         deck_info = AnkiHubClient().get_deck_by_id(ankihub_did)
-    except AnkiHubRequestError as e:
+    except AnkiHubHTTPError as e:
         if e.response.status_code == 404:
             showText(
                 f"Deck {ankihub_did} doesn't exist. Please make sure to copy/paste "

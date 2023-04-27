@@ -11,7 +11,7 @@ import requests
 from requests import Response
 
 from . import LOGGER
-from .ankihub_client import AnkiHubClient, AnkiHubRequestError
+from .ankihub_client import AnkiHubClient, AnkiHubHTTPError
 from .settings import config
 
 
@@ -67,4 +67,4 @@ class AddonAnkiHubClient(AnkiHubClient):
         s3_url = self._get_presigned_url_suffix(key=key, action="upload")
         s3_response = requests.put(s3_url, data=log_data)
         if s3_response.status_code != 200:
-            raise AnkiHubRequestError(s3_response)
+            raise AnkiHubHTTPError(s3_response)

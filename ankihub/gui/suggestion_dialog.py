@@ -29,7 +29,7 @@ from aqt.utils import showInfo, showText
 
 from .. import LOGGER
 from ..ankihub_client import (
-    AnkiHubRequestError,
+    AnkiHubHTTPError,
     SuggestionType,
     get_image_names_from_note_info,
 )
@@ -177,7 +177,7 @@ def _comment_with_source(suggestion_meta: SuggestionMetadata) -> str:
 def _on_suggest_notes_in_bulk_done(future: Future, parent: QWidget) -> None:
     try:
         suggestions_result: BulkNoteSuggestionsResult = future.result()
-    except AnkiHubRequestError as e:
+    except AnkiHubHTTPError as e:
         if e.response.status_code != 403:
             raise e
 

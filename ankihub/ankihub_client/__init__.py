@@ -11,7 +11,7 @@ from .ankihub_client import (  # noqa: F401
     STAGING_APP_URL,
     STAGING_S3_BUCKET_URL,
     AnkiHubClient,
-    AnkiHubRequestError,
+    AnkiHubHTTPError,
     AnkiHubRequestException,
 )
 from .models import (  # noqa: F401
