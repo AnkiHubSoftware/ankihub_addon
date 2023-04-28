@@ -46,7 +46,7 @@ from ankihub.addons import (
     _with_disabled_log_file_handler,
 )
 from ankihub.ankihub_client import (
-    AnkiHubRequestError,
+    AnkiHubHTTPError,
     ChangeNoteSuggestion,
     Deck,
     Field,
@@ -465,7 +465,7 @@ def test_get_deck_by_id(
 
     try:
         client.get_deck_by_id(ankihub_deck_uuid=ankihub_deck_uuid)  # type: ignore
-    except AnkiHubRequestError as e:
+    except AnkiHubHTTPError as e:
         exc = e
     assert exc is not None and exc.response.status_code == 403
 
@@ -588,7 +588,7 @@ def test_suggest_new_note(
                 ankihub_did=ah_did,
                 comment="test",
             )
-        except AnkiHubRequestError as e:
+        except AnkiHubHTTPError as e:
             exc = e
         assert exc is not None and exc.response.status_code == 403
 

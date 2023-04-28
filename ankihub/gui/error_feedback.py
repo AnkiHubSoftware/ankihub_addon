@@ -4,7 +4,7 @@ from aqt.qt import QDialog, Qt, QVBoxLayout
 from aqt.utils import disable_help_button, restoreGeom, saveGeom
 from aqt.webview import AnkiWebView
 
-from ..addon_ankihub_client import AnkiHubRequestError
+from ..addon_ankihub_client import AnkiHubHTTPError
 from ..messages import messages
 
 
@@ -16,7 +16,7 @@ class ErrorFeedbackDialog(QDialog):
         self.exception = exception
         self.event_id = event_id
 
-        if isinstance(exception, AnkiHubRequestError):
+        if isinstance(exception, AnkiHubHTTPError):
             self.body = messages.request_error(event_id=self.event_id)
         else:
             self.body = messages.other_error(event_id=self.event_id)

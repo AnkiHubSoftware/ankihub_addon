@@ -19,7 +19,7 @@ from aqt.qt import (
 from aqt.utils import showInfo, tooltip
 
 from .. import LOGGER
-from ..addon_ankihub_client import AnkiHubRequestError
+from ..addon_ankihub_client import AnkiHubHTTPError
 from ..optional_tag_suggestions import OptionalTagsSuggestionHelper
 
 
@@ -107,7 +107,7 @@ class OptionalTagsSuggestionDialog(QDialog):
     def _on_submit_finished(self, future: Future):
         try:
             future.result()
-        except AnkiHubRequestError as e:
+        except AnkiHubHTTPError as e:
             if e.response.status_code == 403:
                 showInfo(
                     "You are not allowed to submit suggestions for some of the selected tag groups."

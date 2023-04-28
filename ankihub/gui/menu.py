@@ -27,7 +27,7 @@ from aqt.utils import openLink, showInfo, tooltip
 
 from .. import LOGGER
 from ..addon_ankihub_client import AddonAnkiHubClient as AnkiHubClient
-from ..ankihub_client import AnkiHubRequestError, get_image_names_from_notes_data
+from ..ankihub_client import AnkiHubHTTPError, get_image_names_from_notes_data
 from ..db import ankihub_db
 from ..deck_creation import create_ankihub_deck
 from ..errors import upload_logs_in_background
@@ -153,7 +153,7 @@ class AnkiHubLogin(QWidget):
             else:
                 credentials.update({"username": username_or_email})
             token = ankihub_client.login(credentials=credentials)
-        except AnkiHubRequestError as e:
+        except AnkiHubHTTPError as e:
             LOGGER.info("AnkiHub login failed.")
             config.save_token("")
 

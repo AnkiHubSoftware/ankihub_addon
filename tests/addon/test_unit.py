@@ -22,7 +22,7 @@ from ..factories import NoteInfoFactory
 os.environ["SKIP_INIT"] = "1"
 
 from ankihub import errors, suggestions
-from ankihub.ankihub_client import AnkiHubRequestError, Field, SuggestionType
+from ankihub.ankihub_client import AnkiHubHTTPError, Field, SuggestionType
 from ankihub.db.db import ASSET_DISABLED_FIELD_BYPASS_TAG, _AnkiHubDB
 from ankihub.deck_creation import _note_type_name_without_ankihub_modifications
 from ankihub.errors import (
@@ -552,8 +552,8 @@ class TestErrorHandling:
         monkeypatch.setattr(errors, "_this_addon_mentioned_in_tb", lambda *args: True)
 
         handled = _try_handle_exception(
-            exc_type=AnkiHubRequestError,
-            exc_value=AnkiHubRequestError(response=Mock(status_code=401)),
+            exc_type=AnkiHubHTTPError,
+            exc_value=AnkiHubHTTPError(response=Mock(status_code=401)),
             tb=None,
         )
         assert handled
@@ -568,8 +568,8 @@ class TestErrorHandling:
         monkeypatch.setattr(errors, "_this_addon_mentioned_in_tb", lambda *args: True)
 
         handled = _try_handle_exception(
-            exc_type=AnkiHubRequestError,
-            exc_value=AnkiHubRequestError(
+            exc_type=AnkiHubHTTPError,
+            exc_value=AnkiHubHTTPError(
                 response=Mock(status_code=406, reason=OUTDATED_CLIENT_ERROR_REASON)
             ),
             tb=None,

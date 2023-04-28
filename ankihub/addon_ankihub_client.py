@@ -10,7 +10,7 @@ import aqt
 from requests import Response
 
 from . import LOGGER
-from .ankihub_client import AnkiHubClient, AnkiHubRequestError
+from .ankihub_client import AnkiHubClient, AnkiHubHTTPError
 from .ankihub_client.ankihub_client import API
 from .settings import config
 
@@ -67,4 +67,4 @@ class AddonAnkiHubClient(AnkiHubClient):
         s3_url_suffix = self._get_presigned_url_suffix(key=key, action="upload")
         s3_response = self._send_request("PUT", API.S3, s3_url_suffix, data=log_data)
         if s3_response.status_code != 200:
-            raise AnkiHubRequestError(s3_response)
+            raise AnkiHubHTTPError(s3_response)
