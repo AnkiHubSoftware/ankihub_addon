@@ -121,7 +121,7 @@ class AnkiHubClient:
 
     def __init__(
         self,
-        hooks=None,
+        response_hooks=None,
         token: Optional[str] = None,
         api_url: str = DEFAULT_API_URL,
         s3_bucket_url: str = DEFAULT_S3_BUCKET_URL,
@@ -132,7 +132,7 @@ class AnkiHubClient:
         self.s3_bucket_url = s3_bucket_url
         self.local_media_dir_path = local_media_dir_path
         self.token = token
-        self.hooks = hooks
+        self.response_hooks = response_hooks
 
     def _send_request(
         self,
@@ -148,17 +148,22 @@ class AnkiHubClient:
         """Send a request to an API. This method should be used for all requests.
         Logs the request and response.
         Retries the request if necessary.
-        Uses appropriate session headers for the given API.
+        Uses appropriate headers for the given API.
         (The url_suffix is the part of the url after the base url.)
         """
-        session = self._create_session(api)
-
         if api == API.ANKIHUB:
             url = f"{self.api_url}{url_suffix}"
         elif api == API.S3:
             url = f"{self.s3_bucket_url}{url_suffix}"
         else:
             raise ValueError(f"Unknown API: {api}")
+
+        headers = {}
+        if api == API.ANKIHUB:
+            headers["Content-Type"] = "application/json"
+            headers["Accept"] = f"application/json; version={API_VERSION}"
+            if self.token:
+                headers["Authorization"] = f"Token {self.token}"
 
         request = Request(
             method=method,
@@ -167,33 +172,16 @@ class AnkiHubClient:
             data=data,
             files=files,
             params=params,
-            headers=session.headers,
-            hooks=session.hooks,
+            headers=headers,
+            hooks={"response": self.response_hooks},
         )
         prepped = request.prepare()
-        response = self._send_request_with_retry(prepped, session, stream=stream)
-        session.close()
+        response = self._send_request_with_retry(prepped, stream=stream)
+
         return response
 
-    def _create_session(self, api: API) -> Session:
-        """Create a session with appropriate headers for the given API."""
-        session = Session()
-
-        if self.hooks is not None:
-            session.hooks["response"] = self.hooks
-
-        if api == API.ANKIHUB:
-            session.headers.update({"Content-Type": "application/json"})
-            session.headers.update(
-                {"Accept": f"application/json; version={API_VERSION}"}
-            )
-            if self.token:
-                session.headers["Authorization"] = f"Token {self.token}"
-
-        return session
-
     def _send_request_with_retry(
-        self, request: PreparedRequest, session: Session, stream=False
+        self, request: PreparedRequest, stream=False
     ) -> Response:
         """
         This method is only used in the _send_request method.
@@ -202,9 +190,7 @@ class AnkiHubClient:
         If the last request failed because of an exception, that exception is raised.
         """
         try:
-            response = self._send_request_with_retry_inner(
-                request, session, stream=stream
-            )
+            response = self._send_request_with_retry_inner(request, stream=stream)
         except RetryError as e:
             # Catch RetryErrors to make the usage of tenacity transparent to the caller.
             last_attempt = cast(Future, e.last_attempt)
@@ -218,9 +204,13 @@ class AnkiHubClient:
         retry=RETRY_CONDITION,
     )
     def _send_request_with_retry_inner(
-        self, request: PreparedRequest, session: Session, stream=False
+        self, request: PreparedRequest, stream=False
     ) -> Response:
-        response = session.send(request, stream=stream)
+        session = Session()
+        try:
+            response = session.send(request, stream=stream)
+        finally:
+            session.close()
         return response
 
     def login(self, credentials: dict) -> str:
