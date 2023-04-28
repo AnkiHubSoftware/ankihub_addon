@@ -218,10 +218,10 @@ def test_client_login_and_signout_with_username(client_with_server_setup):
     credentials_data = {"username": "test1", "password": "asdf"}
     token = client_with_server_setup.login(credentials=credentials_data)
     assert len(token) == 64
-    assert client_with_server_setup.session.headers["Authorization"] == f"Token {token}"
+    assert client_with_server_setup.token == token
 
     client_with_server_setup.signout()
-    assert client_with_server_setup.session.headers["Authorization"] == ""
+    assert client_with_server_setup.token is None
 
 
 @pytest.mark.vcr()
@@ -229,10 +229,10 @@ def test_client_login_and_signout_with_email(client_with_server_setup):
     credentials_data = {"email": "test1@email.com", "password": "asdf"}
     token = client_with_server_setup.login(credentials=credentials_data)
     assert len(token) == 64
-    assert client_with_server_setup.session.headers["Authorization"] == f"Token {token}"
+    assert client_with_server_setup.token == token
 
     client_with_server_setup.signout()
-    assert client_with_server_setup.session.headers["Authorization"] == ""
+    assert client_with_server_setup.token is None
 
 
 @pytest.mark.vcr()

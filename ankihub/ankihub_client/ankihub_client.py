@@ -131,18 +131,8 @@ class AnkiHubClient:
         self.api_url = api_url
         self.s3_bucket_url = s3_bucket_url
         self.local_media_dir_path = local_media_dir_path
-
-        self.session = Session()
-
-        if hooks is not None:
-            self.session.hooks["response"] = hooks
-
-        self.session.headers.update({"Content-Type": "application/json"})
-        self.session.headers.update(
-            {"Accept": f"application/json; version={API_VERSION}"}
-        )
-        if token:
-            self.session.headers["Authorization"] = f"Token {token}"
+        self.token = token
+        self.hooks = hooks
 
     def _send_request(
         self,
@@ -158,9 +148,11 @@ class AnkiHubClient:
         """Send a request to an API. This method should be used for all requests.
         Logs the request and response.
         Retries the request if necessary.
-        Uses the session's headers if the API is ANKIHUB.
+        Uses appropriate session headers for the given API.
         (The url_suffix is the part of the url after the base url.)
         """
+        session = self._create_session(api)
+
         if api == API.ANKIHUB:
             url = f"{self.api_url}{url_suffix}"
         elif api == API.S3:
@@ -175,16 +167,31 @@ class AnkiHubClient:
             data=data,
             files=files,
             params=params,
-            headers=self.session.headers if api == API.ANKIHUB else None,
-            hooks=self.session.hooks,
         )
         prepped = request.prepare()
-        response = self._send_request_with_retry(prepped, stream=stream)
-        self.session.close()
+        response = self._send_request_with_retry(prepped, session, stream=stream)
+        session.close()
         return response
 
+    def _create_session(self, api: API) -> Session:
+        """Create a session with appropriate headers for the given API."""
+        session = Session()
+
+        if self.hooks is not None:
+            session.hooks["response"] = self.hooks
+
+        if api == API.ANKIHUB:
+            session.headers.update({"Content-Type": "application/json"})
+            session.headers.update(
+                {"Accept": f"application/json; version={API_VERSION}"}
+            )
+            if self.token:
+                session.headers["Authorization"] = f"Token {self.token}"
+
+        return session
+
     def _send_request_with_retry(
-        self, request: PreparedRequest, stream=False
+        self, request: PreparedRequest, session: Session, stream=False
     ) -> Response:
         """
         This method is only used in the _send_request method.
@@ -193,7 +200,9 @@ class AnkiHubClient:
         If the last request failed because of an exception, that exception is raised.
         """
         try:
-            response = self._send_request_with_retry_inner(request, stream=stream)
+            response = self._send_request_with_retry_inner(
+                request, session, stream=stream
+            )
         except RetryError as e:
             # Catch RetryErrors to make the usage of tenacity transparent to the caller.
             last_attempt = cast(Future, e.last_attempt)
@@ -207,9 +216,9 @@ class AnkiHubClient:
         retry=RETRY_CONDITION,
     )
     def _send_request_with_retry_inner(
-        self, request: PreparedRequest, stream=False
+        self, request: PreparedRequest, session: Session, stream=False
     ) -> Response:
-        response = self.session.send(request, stream=stream)
+        response = session.send(request, stream=stream)
         return response
 
     def login(self, credentials: dict) -> str:
@@ -219,14 +228,12 @@ class AnkiHubClient:
 
         token = response.json().get("token") if response else ""
         if token:
-            self.session.headers["Authorization"] = f"Token {token}"
+            self.token = token
 
-        data = response.json()
-        token = data.get("token")
         return token
 
-    def signout(self):
-        self.session.headers["Authorization"] = ""
+    def signout(self) -> None:
+        self.token = None
         response = self._send_request("POST", API.ANKIHUB, "/logout/")
         if response.status_code not in [204, 401]:
             raise AnkiHubRequestError(response)
