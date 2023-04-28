@@ -152,7 +152,7 @@ def _try_handle_exception(
     )
 
     if isinstance(exc_value, AnkiHubHTTPError):
-        if _maybe_handle_ankihub_request_error(exc_value):
+        if _maybe_handle_ankihub_http_error(exc_value):
             LOGGER.info("AnkiHubRequestError was handled.")
             return True
 
@@ -199,7 +199,7 @@ def _try_handle_exception(
     return False
 
 
-def _maybe_handle_ankihub_request_error(error: AnkiHubHTTPError) -> bool:
+def _maybe_handle_ankihub_http_error(error: AnkiHubHTTPError) -> bool:
     """Return True if the error was handled, False otherwise."""
     response = error.response
     if response.status_code == 401:
