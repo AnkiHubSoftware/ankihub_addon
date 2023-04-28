@@ -167,6 +167,8 @@ class AnkiHubClient:
             data=data,
             files=files,
             params=params,
+            headers=session.headers,
+            hooks=session.hooks,
         )
         prepped = request.prepare()
         response = self._send_request_with_retry(prepped, session, stream=stream)
