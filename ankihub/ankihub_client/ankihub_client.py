@@ -173,7 +173,7 @@ class AnkiHubClient:
             files=files,
             params=params,
             headers=headers,
-            hooks={"response": self.response_hooks},
+            hooks={"response": self.response_hooks} if self.response_hooks else None,
         )
         prepped = request.prepare()
         response = self._send_request_with_retry(prepped, stream=stream)
