@@ -1,6 +1,7 @@
 """AddonAnkiHubClient is a wrapper around AnkiHubClient that is adapted to the AnkiHub add-on.
 It should be used instead of AnkiHubClient in the AnkiHub add-on."""
 import json
+from copy import deepcopy
 from json import JSONDecodeError
 from pathlib import Path
 from pprint import pformat
@@ -29,9 +30,12 @@ def logging_hook(response: Response, *args, **kwargs):
     if "/login/" in endpoint:
         body_dict.pop("password")
 
-    headers = response.request.headers
+    headers_copy = deepcopy(response.request.headers)
+    if headers_copy.get("Authorization"):
+        headers_copy["Authorization"] = "<redacted>"
+
     LOGGER.info(
-        f"request: {method} {endpoint}\nheaders={headers}"
+        f"request: {method} {endpoint}\nheaders={headers_copy}"
         + (f"\ndata={pformat(body_dict)}" if body_dict else "")
     )
     LOGGER.info(f"response: {response}")
