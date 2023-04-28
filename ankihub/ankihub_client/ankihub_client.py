@@ -121,7 +121,7 @@ class AnkiHubClient:
 
     def __init__(
         self,
-        hooks=None,
+        response_hooks=None,
         token: Optional[str] = None,
         api_url: str = DEFAULT_API_URL,
         s3_bucket_url: str = DEFAULT_S3_BUCKET_URL,
@@ -131,18 +131,8 @@ class AnkiHubClient:
         self.api_url = api_url
         self.s3_bucket_url = s3_bucket_url
         self.local_media_dir_path = local_media_dir_path
-
-        self.session = Session()
-
-        if hooks is not None:
-            self.session.hooks["response"] = hooks
-
-        self.session.headers.update({"Content-Type": "application/json"})
-        self.session.headers.update(
-            {"Accept": f"application/json; version={API_VERSION}"}
-        )
-        if token:
-            self.session.headers["Authorization"] = f"Token {token}"
+        self.token = token
+        self.response_hooks = response_hooks
 
     def _send_request(
         self,
@@ -158,7 +148,7 @@ class AnkiHubClient:
         """Send a request to an API. This method should be used for all requests.
         Logs the request and response.
         Retries the request if necessary.
-        Uses the session's headers if the API is ANKIHUB.
+        Uses appropriate headers for the given API.
         (The url_suffix is the part of the url after the base url.)
         """
         if api == API.ANKIHUB:
@@ -168,6 +158,13 @@ class AnkiHubClient:
         else:
             raise ValueError(f"Unknown API: {api}")
 
+        headers = {}
+        if api == API.ANKIHUB:
+            headers["Content-Type"] = "application/json"
+            headers["Accept"] = f"application/json; version={API_VERSION}"
+            if self.token:
+                headers["Authorization"] = f"Token {self.token}"
+
         request = Request(
             method=method,
             url=url,
@@ -175,12 +172,12 @@ class AnkiHubClient:
             data=data,
             files=files,
             params=params,
-            headers=self.session.headers if api == API.ANKIHUB else None,
-            hooks=self.session.hooks,
+            headers=headers,
+            hooks={"response": self.response_hooks} if self.response_hooks else None,
         )
         prepped = request.prepare()
         response = self._send_request_with_retry(prepped, stream=stream)
-        self.session.close()
+
         return response
 
     def _send_request_with_retry(
@@ -209,7 +206,11 @@ class AnkiHubClient:
     def _send_request_with_retry_inner(
         self, request: PreparedRequest, stream=False
     ) -> Response:
-        response = self.session.send(request, stream=stream)
+        session = Session()
+        try:
+            response = session.send(request, stream=stream)
+        finally:
+            session.close()
         return response
 
     def login(self, credentials: dict) -> str:
@@ -219,14 +220,12 @@ class AnkiHubClient:
 
         token = response.json().get("token") if response else ""
         if token:
-            self.session.headers["Authorization"] = f"Token {token}"
+            self.token = token
 
-        data = response.json()
-        token = data.get("token")
         return token
 
-    def signout(self):
-        self.session.headers["Authorization"] = ""
+    def signout(self) -> None:
+        self.token = None
         response = self._send_request("POST", API.ANKIHUB, "/logout/")
         if response.status_code not in [204, 401]:
             raise AnkiHubRequestError(response)
