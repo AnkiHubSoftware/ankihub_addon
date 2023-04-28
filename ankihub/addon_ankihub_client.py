@@ -7,11 +7,11 @@ from pprint import pformat
 from typing import Dict, Optional
 
 import aqt
-import requests
 from requests import Response
 
 from . import LOGGER
 from .ankihub_client import AnkiHubClient, AnkiHubHTTPError
+from .ankihub_client.ankihub_client import API
 from .settings import config
 
 
@@ -64,7 +64,7 @@ class AddonAnkiHubClient(AnkiHubClient):
         with open(file, "rb") as f:
             log_data = f.read()
 
-        s3_url = self._get_presigned_url_suffix(key=key, action="upload")
-        s3_response = requests.put(s3_url, data=log_data)
+        s3_url_suffix = self._get_presigned_url_suffix(key=key, action="upload")
+        s3_response = self._send_request("PUT", API.S3, s3_url_suffix, data=log_data)
         if s3_response.status_code != 200:
             raise AnkiHubHTTPError(s3_response)
