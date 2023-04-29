@@ -1,4 +1,5 @@
-"""Import NoteInfo objects into Anki, create/update decks and note types if necessary"""
+"""Import NoteInfo objects into Anki and the AnkiHub database,
+create/update decks and note types in the Anki collection if necessary"""
 import uuid
 from dataclasses import dataclass
 from pprint import pformat
@@ -73,7 +74,7 @@ class AnkiHubImporter:
         subdecks_for_new_notes_only: bool = False,
     ) -> AnkiHubImportResult:
         """
-        Used for importing an AnkiHub deck for the first time or syncing.
+        Used for importing an AnkiHub deck for the first time or when updating it.
 
         When no local_did is provided this function assumes that the deck gets installed for the first time.
         Returns id of the deck future cards should be imported into - the local_did - if the import was sucessful,

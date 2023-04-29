@@ -1,4 +1,5 @@
-"""Convert Anki notes to NoteInfo objects"""
+"""Convert Anki notes to NoteInfo objects.
+This is used for exporting notes from Anki to AnkiHub, e.g. when creating suggestions or creating new AnkiHub decks."""
 import re
 import uuid
 from typing import List, Optional

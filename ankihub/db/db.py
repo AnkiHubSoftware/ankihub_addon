@@ -1,6 +1,6 @@
 """Code for managing the AnkiHub database. The AnkiHub database stores the state of AnkiHub decks
 as they are on AnkiHub, unlike the Anki database which can contain local changes to the deck.
-It is updated when syncing with AnkiHub.
+It should be updated when downloading updates from AnkiHub (this is done by the AnkiHubImporter).
 The purpose is for the add-on to have knowledge of the state of the decks on AnkiHub without having to
 request this data from AnkiHub every time we need it. This e.g.g enables the add-on to partially work offline and
 to only send the necessary data to AnkiHub when syncing.
@@ -165,7 +165,7 @@ class _AnkiHubDB:
     ) -> Tuple[Tuple[NoteInfo, ...], Tuple[NoteInfo, ...]]:
         """Upsert notes data to the AnkiHub DB.
         If a note with the same Anki nid already exists in the AnkiHub DB then the note will not be inserted
-        Returns a tuple of (NoteInfo objects that were insert / updated, NoteInfo objects that were skipped)
+        Returns a tuple of (NoteInfo objects that were inserted / updated, NoteInfo objects that were skipped)
         """
         upserted_notes: List[NoteInfo] = []
         skipped_notes: List[NoteInfo] = []
