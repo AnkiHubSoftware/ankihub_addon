@@ -82,6 +82,7 @@ REQUEST_RETRY_EXCEPTION_TYPES = (
     requests.exceptions.ChunkedEncodingError,
     ConnectionError,
     socket.gaierror,
+    socket.timeout,
 )
 
 # Status codes for which we should retry the request.
