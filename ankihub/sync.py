@@ -1,4 +1,4 @@
-"""Downloads updates to decks from AnkiHub and imports them into Anki."""
+"""Downloads updates to decks from AnkiHub and imports them."""
 import uuid
 from datetime import datetime
 from typing import List, Optional
