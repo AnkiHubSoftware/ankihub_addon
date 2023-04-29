@@ -7,6 +7,7 @@ import time
 import traceback
 from concurrent.futures import Future
 from pathlib import Path
+from sqlite3 import OperationalError
 from types import TracebackType
 from typing import Any, Callable, Dict, Optional, Type
 
@@ -256,6 +257,10 @@ def _is_memory_full_error(exc_value: BaseException) -> bool:
         or (
             isinstance(exc_value, SyncError)
             and "no space left" in str(exc_value).lower()
+        )
+        or (
+            isinstance(exc_value, OperationalError)
+            and "database or disk is full" in str(exc_value).lower()
         )
     )
     return result
