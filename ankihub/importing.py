@@ -122,7 +122,13 @@ class AnkiHubImporter:
         subdecks: bool = False,
         subdecks_for_new_notes_only: bool = False,
     ) -> AnkiHubImportResult:
-        """ """
+        LOGGER.info(f"Notes data: {pformat(truncated_list(notes_data, 2))}")
+        LOGGER.info(f"Protected fields: {pformat(protected_fields)}")
+        LOGGER.info(f"Protected tags: {pformat(protected_tags)}")
+        LOGGER.info(
+            f"Subdecks: {subdecks}, Subdecks for new notes only: {subdecks_for_new_notes_only}"
+        )
+
         # Instance attributes are reset here so that the results returned are only for the current deck.
         self._created_nids = []
         self._updated_nids = []
