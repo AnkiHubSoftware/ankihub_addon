@@ -8,7 +8,7 @@ from aqt.qt import QAction
 
 from . import LOGGER
 from .addon_ankihub_client import AddonAnkiHubClient
-from .ankihub_client import AnkiHubRequestError
+from .ankihub_client import AnkiHubHTTPError
 from .db import ankihub_db
 
 
@@ -95,7 +95,7 @@ class _AnkiHubMediaSync:
             try:
                 if not client.is_image_upload_finished(ah_did):
                     continue
-            except AnkiHubRequestError as e:
+            except AnkiHubHTTPError as e:
                 if e.response.status_code in (403, 404):
                     LOGGER.warning(
                         f"Could not check if image upload is finished for AnkiHub deck {ah_did}."

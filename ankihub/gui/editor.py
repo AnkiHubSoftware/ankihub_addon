@@ -11,7 +11,7 @@ from aqt.editor import Editor
 from aqt.utils import openLink, showInfo, tooltip
 
 from .. import LOGGER, settings
-from ..ankihub_client import AnkiHubRequestError
+from ..ankihub_client import AnkiHubHTTPError
 from ..db import ankihub_db
 from ..errors import report_exception_and_upload_logs
 from ..settings import (
@@ -58,7 +58,7 @@ def _on_suggestion_button_press(editor: Editor) -> None:
 
     try:
         _on_suggestion_button_press_inner(editor)
-    except AnkiHubRequestError as e:
+    except AnkiHubHTTPError as e:
         if "suggestion" not in e.response.url:
             raise e
 

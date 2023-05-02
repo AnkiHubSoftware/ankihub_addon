@@ -4,6 +4,8 @@ on:
   workflow_dispatch:
   workflow_call:
     secrets:
+      GOOGLE_API_KEY:
+        required: true
       ANKIWEB_PASSWORD:
         required: true
 

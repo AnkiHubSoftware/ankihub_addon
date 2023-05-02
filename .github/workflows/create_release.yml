@@ -9,15 +9,16 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
-        uses: actions/checkout@v2
+        uses: actions/checkout@v3
         with:
           submodules: recursive
           fetch-depth: 0
+          token: ${{ secrets.GH_BOT_ACCESS_TOKEN }}
 
       - name: Setup git config
         run: |
-          git config user.name "GitHub Actions Bot"
-          git config user.email "<>"
+          git config user.name "ankihub-addon-bot"
+          git config user.email "ankihub-addon-bot@noreply.github.com"
 
       - name: Setup Python
         uses: actions/setup-python@v2.2.1
@@ -51,4 +52,9 @@ jobs:
   upload-to-ankiweb:
     needs: create-release
     uses: ./.github/workflows/upload_to_ankiweb.yml
+    secrets: inherit
+
+  upload_to-s3:
+    needs: create-release
+    uses: ./.github/workflows/upload_to_s3.yml
     secrets: inherit

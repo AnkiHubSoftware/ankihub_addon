@@ -39,14 +39,14 @@ from .conftest import TEST_PROFILE_ID
 os.environ["SKIP_INIT"] = "1"
 
 from ankihub import entry_point
+from ankihub.addon_ankihub_client import AddonAnkiHubClient as AnkiHubClient
 from ankihub.addons import (
     _change_file_permissions_of_addon_files,
     _maybe_change_file_permissions_of_addon_files,
     _with_disabled_log_file_handler,
 )
 from ankihub.ankihub_client import (
-    AnkiHubClient,
-    AnkiHubRequestError,
+    AnkiHubHTTPError,
     ChangeNoteSuggestion,
     Deck,
     Field,
@@ -430,7 +430,8 @@ def test_create_collaborative_deck_and_upload(
 def test_get_deck_by_id(
     requests_mock: Mocker, next_deterministic_uuid: Callable[[], uuid.UUID]
 ):
-    client = AnkiHubClient(local_media_dir_path=Path("/tmp/ankihub_media"))
+    client = AnkiHubClient()
+    client.local_media_dir_path = Path("/tmp/ankihub_media")
 
     # test get deck by id
     ankihub_deck_uuid = next_deterministic_uuid()
@@ -464,7 +465,7 @@ def test_get_deck_by_id(
 
     try:
         client.get_deck_by_id(ankihub_deck_uuid=ankihub_deck_uuid)  # type: ignore
-    except AnkiHubRequestError as e:
+    except AnkiHubHTTPError as e:
         exc = e
     assert exc is not None and exc.response.status_code == 403
 
@@ -587,7 +588,7 @@ def test_suggest_new_note(
                 ankihub_did=ah_did,
                 comment="test",
             )
-        except AnkiHubRequestError as e:
+        except AnkiHubHTTPError as e:
             exc = e
         assert exc is not None and exc.response.status_code == 403
 
@@ -2735,7 +2736,7 @@ class TestSuggestionsWithImages:
 
             install_sample_ah_deck()
 
-            fake_presigned_url = "https://fake_presigned_url.com"
+            fake_presigned_url = AnkiHubClient().s3_bucket_url + "/fake_key"
             s3_upload_request_mock = requests_mock.post(
                 fake_presigned_url, json={"success": True}, status_code=204
             )
@@ -2824,7 +2825,7 @@ class TestSuggestionsWithImages:
 
             _, ah_did = install_sample_ah_deck()
 
-            fake_presigned_url = "https://fake_presigned_url.com"
+            fake_presigned_url = f"{AnkiHubClient().s3_bucket_url}/fake_key"
             s3_upload_request_mock = requests_mock.post(
                 fake_presigned_url, json={"success": True}, status_code=204
             )

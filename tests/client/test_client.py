@@ -218,10 +218,10 @@ def test_client_login_and_signout_with_username(client_with_server_setup):
     credentials_data = {"username": "test1", "password": "asdf"}
     token = client_with_server_setup.login(credentials=credentials_data)
     assert len(token) == 64
-    assert client_with_server_setup.session.headers["Authorization"] == f"Token {token}"
+    assert client_with_server_setup.token == token
 
     client_with_server_setup.signout()
-    assert client_with_server_setup.session.headers["Authorization"] == ""
+    assert client_with_server_setup.token is None
 
 
 @pytest.mark.vcr()
@@ -229,10 +229,10 @@ def test_client_login_and_signout_with_email(client_with_server_setup):
     credentials_data = {"email": "test1@email.com", "password": "asdf"}
     token = client_with_server_setup.login(credentials=credentials_data)
     assert len(token) == 64
-    assert client_with_server_setup.session.headers["Authorization"] == f"Token {token}"
+    assert client_with_server_setup.token == token
 
     client_with_server_setup.signout()
-    assert client_with_server_setup.session.headers["Authorization"] == ""
+    assert client_with_server_setup.token is None
 
 
 @pytest.mark.vcr()
@@ -241,9 +241,9 @@ def test_download_deck(
 ):
     client = authorized_client_for_user_test1
 
-    get_presigned_url = MagicMock()
-    get_presigned_url.return_value = "https://fake_s3.com"
-    monkeypatch.setattr(client, "_get_presigned_url", get_presigned_url)
+    get_presigned_url_suffix = MagicMock()
+    get_presigned_url_suffix.return_value = "/fake_key"
+    monkeypatch.setattr(client, "_get_presigned_url_suffix", get_presigned_url_suffix)
 
     original_get_deck_by_id = client.get_deck_by_id
 
@@ -255,8 +255,9 @@ def test_download_deck(
     monkeypatch.setattr(client, "get_deck_by_id", get_deck_by_id)
 
     with requests_mock.Mocker(real_http=True) as m:
-        m.register_uri(
-            "GET", get_presigned_url.return_value, content=DECK_CSV.read_bytes()
+        m.get(
+            f"{client.s3_bucket_url}{get_presigned_url_suffix.return_value}",
+            content=DECK_CSV.read_bytes(),
         )
         notes_data = client.download_deck(ankihub_deck_uuid=ID_OF_DECK_OF_USER_TEST1)
     assert len(notes_data) == 1
@@ -269,9 +270,9 @@ def test_download_compressed_deck(
 ):
     client = authorized_client_for_user_test1
 
-    get_presigned_url = MagicMock()
-    get_presigned_url.return_value = "https://fake_s3.com"
-    monkeypatch.setattr(client, "_get_presigned_url", get_presigned_url)
+    get_presigned_url_suffix = MagicMock()
+    get_presigned_url_suffix.return_value = "/fake_key"
+    monkeypatch.setattr(client, "_get_presigned_url_suffix", get_presigned_url_suffix)
 
     original_get_deck_by_id = client.get_deck_by_id
 
@@ -283,8 +284,9 @@ def test_download_compressed_deck(
     monkeypatch.setattr(client, "get_deck_by_id", get_deck_by_id)
 
     with requests_mock.Mocker(real_http=True) as m:
-        m.register_uri(
-            "GET", get_presigned_url.return_value, content=DECK_CSV_GZ.read_bytes()
+        m.get(
+            f"{client.s3_bucket_url}{get_presigned_url_suffix.return_value}",
+            content=DECK_CSV_GZ.read_bytes(),
         )
         notes_data = client.download_deck(ankihub_deck_uuid=ID_OF_DECK_OF_USER_TEST1)
     assert len(notes_data) == 1
@@ -297,9 +299,9 @@ def test_download_deck_with_progress(
 ):
     client = authorized_client_for_user_test1
 
-    get_presigned_url = MagicMock()
-    get_presigned_url.return_value = "https://fake_s3.com"
-    monkeypatch.setattr(client, "_get_presigned_url", get_presigned_url)
+    get_presigned_url_suffix = MagicMock()
+    get_presigned_url_suffix.return_value = "/fake_key"
+    monkeypatch.setattr(client, "_get_presigned_url_suffix", get_presigned_url_suffix)
 
     original_get_deck_by_id = client.get_deck_by_id
 
@@ -311,9 +313,8 @@ def test_download_deck_with_progress(
     monkeypatch.setattr(client, "get_deck_by_id", get_deck_by_id)
 
     with requests_mock.Mocker(real_http=True) as m:
-        m.register_uri(
-            "GET",
-            get_presigned_url.return_value,
+        m.get(
+            f"{client.s3_bucket_url}{get_presigned_url_suffix.return_value}",
             content=DECK_CSV.read_bytes(),
             headers={"content-length": "1000000"},
         )
@@ -365,7 +366,7 @@ def test_upload_deck(
     with monkeypatch.context() as m:
         m.setattr(client, "_upload_to_s3", upload_to_s3_mock)
         m.setattr(
-            client, "_get_presigned_url", lambda *args, **kwargs: "https://fake_s3.com"
+            client, "_get_presigned_url_suffix", lambda *args, **kwargs: "fake_key"
         )
 
         client.upload_deck(
@@ -910,7 +911,7 @@ class TestUploadImagesForSuggestion:
             '<div> something here <img src="testfile_test.jpeg" height="50" alt="just a test"> </div>'
         )
 
-        fake_presigned_url = "https://fake_presigned_url.com"
+        fake_presigned_url = f"{client.s3_bucket_url}/fake_key"
         s3_upload_request_mock = requests_mock.post(
             fake_presigned_url, json={"success": True}, status_code=204
         )

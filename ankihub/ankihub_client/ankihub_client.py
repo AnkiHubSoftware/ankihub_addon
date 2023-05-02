@@ -11,8 +11,8 @@ import urllib.parse
 import uuid
 from concurrent.futures import Future, ThreadPoolExecutor, as_completed
 from datetime import datetime
+from enum import Enum
 from io import BufferedReader
-from json.decoder import JSONDecodeError
 from pathlib import Path
 from typing import (
     Any,
@@ -30,7 +30,6 @@ from zipfile import ZipFile
 
 import requests
 from requests import PreparedRequest, Request, Response, Session
-from requests.exceptions import ChunkedEncodingError, SSLError, Timeout
 from tenacity import (
     RetryError,
     retry,
@@ -76,19 +75,21 @@ CHUNK_BYTES_THRESHOLD = 67108864  # 60 megabytes
 
 # Exceptions for which we should retry the request.
 REQUEST_RETRY_EXCEPTION_TYPES = (
-    JSONDecodeError,
-    SSLError,
+    requests.exceptions.JSONDecodeError,
+    requests.exceptions.SSLError,
+    requests.exceptions.ConnectionError,
+    requests.exceptions.Timeout,
+    requests.exceptions.ChunkedEncodingError,
     ConnectionError,
-    Timeout,
-    ChunkedEncodingError,
     socket.gaierror,
+    socket.timeout,
 )
 
 # Status codes for which we should retry the request.
 RETRY_STATUS_CODES = {429}
 
 
-def _should_retry(response: Response) -> bool:
+def _should_retry_for_response(response: Response) -> bool:
     """Return True if the request should be retried for the given Response, False otherwise."""
     result = response.status_code in RETRY_STATUS_CODES or (
         500 <= response.status_code < 600
@@ -96,7 +97,14 @@ def _should_retry(response: Response) -> bool:
     return result
 
 
-class AnkiHubRequestError(Exception):
+RETRY_CONDITION = retry_if_result(_should_retry_for_response) | retry_if_exception_type(
+    REQUEST_RETRY_EXCEPTION_TYPES
+)
+
+
+class AnkiHubHTTPError(Exception):
+    """An unexpected HTTP code was returned in response to a request by the AnkiHub client."""
+
     def __init__(self, response: Response):
         self.response = response
 
@@ -106,12 +114,27 @@ class AnkiHubRequestError(Exception):
         )
 
 
+class AnkiHubRequestException(Exception):
+    """An exception occurred while the AnkiHub client was making a request."""
+
+    def __init__(self, original_exception):
+        self.original_exception = original_exception
+
+    def __str__(self):
+        return f"AnkiHub request exception: {self.original_exception}"
+
+
+class API(Enum):
+    ANKIHUB = "ankihub"
+    S3 = "s3"
+
+
 class AnkiHubClient:
     """Client for interacting with the AnkiHub API."""
 
     def __init__(
         self,
-        hooks=None,
+        response_hooks=None,
         token: Optional[str] = None,
         api_url: str = DEFAULT_API_URL,
         s3_bucket_url: str = DEFAULT_S3_BUCKET_URL,
@@ -121,88 +144,107 @@ class AnkiHubClient:
         self.api_url = api_url
         self.s3_bucket_url = s3_bucket_url
         self.local_media_dir_path = local_media_dir_path
+        self.token = token
+        self.response_hooks = response_hooks
 
-        self.session = Session()
+    def _send_request(
+        self,
+        method: str,
+        api: API,
+        url_suffix: str,
+        json=None,
+        data=None,
+        files=None,
+        params=None,
+        stream=False,
+    ) -> Response:
+        """Send a request to an API. This method should be used for all requests.
+        Logs the request and response.
+        Retries the request if necessary.
+        Uses appropriate headers for the given API.
+        (The url_suffix is the part of the url after the base url.)
+        """
+        if api == API.ANKIHUB:
+            url = f"{self.api_url}{url_suffix}"
+        elif api == API.S3:
+            url = f"{self.s3_bucket_url}{url_suffix}"
+        else:
+            raise ValueError(f"Unknown API: {api}")
 
-        if hooks is not None:
-            self.session.hooks["response"] = hooks
+        headers = {}
+        if api == API.ANKIHUB:
+            headers["Content-Type"] = "application/json"
+            headers["Accept"] = f"application/json; version={API_VERSION}"
+            if self.token:
+                headers["Authorization"] = f"Token {self.token}"
 
-        self.session.headers.update({"Content-Type": "application/json"})
-        self.session.headers.update(
-            {"Accept": f"application/json; version={API_VERSION}"}
+        request = Request(
+            method=method,
+            url=url,
+            json=json,
+            data=data,
+            files=files,
+            params=params,
+            headers=headers,
+            hooks={"response": self.response_hooks} if self.response_hooks else None,
         )
-        if token:
-            self.session.headers["Authorization"] = f"Token {token}"
+        prepped = request.prepare()
+        response = self._send_request_with_retry(prepped, stream=stream)
 
-    def _send_request(self, method, endpoint, data=None, params=None) -> Response:
-        request = self._build_request(method, endpoint, data, params)
-        response = self._send_request_with_retry(request)
-        self.session.close()
         return response
 
-    def _send_request_with_retry(self, request: PreparedRequest) -> Response:
-        """Send a request, retrying if necessary.
+    def _send_request_with_retry(
+        self, request: PreparedRequest, stream=False
+    ) -> Response:
+        """
+        This method is only used in the _send_request method.
+        Send a request, retrying if necessary.
         If the request fails after all retries, the last attempt's response is returned.
         If the last request failed because of an exception, that exception is raised.
         """
         try:
-            response = self._send_request_with_retry_inner(request)
+            response = self._send_request_with_retry_inner(request, stream=stream)
         except RetryError as e:
             # Catch RetryErrors to make the usage of tenacity transparent to the caller.
             last_attempt = cast(Future, e.last_attempt)
             # If the last attempt failed because of an exception, this will raise that exception.
-            response = last_attempt.result()
+            try:
+                response = last_attempt.result()
+            except Exception as e:
+                raise AnkiHubRequestException(e) from e
         return response
 
     @retry(
         stop=stop_after_attempt(3),
         wait=wait_exponential(multiplier=1, max=10),
-        retry=(
-            retry_if_result(_should_retry)
-            | retry_if_exception_type(REQUEST_RETRY_EXCEPTION_TYPES)
-        ),
+        retry=RETRY_CONDITION,
     )
-    def _send_request_with_retry_inner(self, request: PreparedRequest) -> Response:
-        response = self.session.send(request)
+    def _send_request_with_retry_inner(
+        self, request: PreparedRequest, stream=False
+    ) -> Response:
+        session = Session()
+        try:
+            response = session.send(request, stream=stream)
+        finally:
+            session.close()
         return response
 
-    def _build_request(
-        self,
-        method,
-        endpoint,
-        data=None,
-        params=None,
-    ) -> PreparedRequest:
-        url = f"{self.api_url}{endpoint}"
-        request = Request(
-            method=method,
-            url=url,
-            json=data,
-            params=params,
-            headers=self.session.headers,
-            hooks=self.session.hooks,
-        )
-        prepped = request.prepare()
-        return prepped
-
     def login(self, credentials: dict) -> str:
-        response = self._send_request("POST", "/login/", credentials)
+        response = self._send_request("POST", API.ANKIHUB, "/login/", json=credentials)
         if response.status_code != 200:
-            raise AnkiHubRequestError(response)
+            raise AnkiHubHTTPError(response)
 
         token = response.json().get("token") if response else ""
         if token:
-            self.session.headers["Authorization"] = f"Token {token}"
+            self.token = token
 
-        data = response.json()
-        token = data.get("token")
         return token
 
-    def signout(self):
-        self.session.headers["Authorization"] = ""
-        response = self._send_request("POST", "/logout/")
+    def signout(self) -> None:
+        self.token = None
+        response = self._send_request("POST", API.ANKIHUB, "/logout/")
         if response.status_code not in [204, 401]:
-            raise AnkiHubRequestError(response)
+            raise AnkiHubHTTPError(response)
 
     def upload_deck(
         self,
@@ -215,7 +257,9 @@ class AnkiHubClient:
         deck_name_normalized = re.sub('[\\\\/?<>:*|"^]', "_", deck_name)
         deck_file_name = f"{deck_name_normalized}-{uuid.uuid4()}.json.gz"
 
-        s3_url = self._get_presigned_url(key=deck_file_name, action="upload")
+        s3_url_suffix = self._get_presigned_url_suffix(
+            key=deck_file_name, action="upload"
+        )
 
         notes_data_transformed = [
             note_info_for_upload(note_data).to_dict() for note_data in notes_data
@@ -229,12 +273,13 @@ class AnkiHubClient:
             ),
         )
 
-        self._upload_to_s3(s3_url, data)
+        self._upload_to_s3(s3_url_suffix, data)
 
         response = self._send_request(
             "POST",
+            API.ANKIHUB,
             "/decks/",
-            data={
+            json={
                 "key": deck_file_name,
                 "name": deck_name,
                 "anki_id": anki_deck_id,
@@ -242,7 +287,7 @@ class AnkiHubClient:
             },
         )
         if response.status_code != 201:
-            raise AnkiHubRequestError(response)
+            raise AnkiHubHTTPError(response)
 
         response_data = response.json()
         ankihub_did = uuid.UUID(response_data["deck_id"])
@@ -257,13 +302,17 @@ class AnkiHubClient:
         )
         return result
 
-    def _upload_to_s3(self, s3_url: str, data: Union[bytes, BufferedReader]) -> None:
-        s3_response = requests.put(
-            s3_url,
+    def _upload_to_s3(
+        self, s3_url_suffix: str, data: Union[bytes, BufferedReader]
+    ) -> None:
+        s3_response = self._send_request(
+            "PUT",
+            API.S3,
+            s3_url_suffix,
             data=data,
         )
         if s3_response.status_code != 200:
-            raise AnkiHubRequestError(s3_response)
+            raise AnkiHubHTTPError(s3_response)
 
     def generate_asset_files_with_hashed_names(
         self, paths: Sequence[Path]
@@ -394,17 +443,21 @@ class AnkiHubClient:
         :param filepath: the Path object with the location of the file in the system
         -"""
         with open(filepath, "rb") as data:
-            s3_response = requests.post(
-                s3_presigned_info["url"],
+            url: str = s3_presigned_info["url"]
+            url_suffix = url.split(self.s3_bucket_url)[1]
+            s3_response = self._send_request(
+                "POST",
+                API.S3,
+                url_suffix=url_suffix,
                 data=s3_presigned_info["fields"],
                 files={"file": (filepath.name, data)},
             )
 
         if s3_response.status_code != 204:
-            raise AnkiHubRequestError(s3_response)
+            raise AnkiHubHTTPError(s3_response)
 
     def download_images(self, img_names: List[str], deck_id: uuid.UUID) -> None:
-        deck_images_remote_dir = f"{self.s3_bucket_url}/deck_assets/{deck_id}/"
+        deck_images_remote_dir = f"/deck_assets/{deck_id}/"
         futures = []
         with ThreadPoolExecutor() as executor:
             for img_name in img_names:
@@ -427,8 +480,8 @@ class AnkiHubClient:
                 future.result()
             LOGGER.info("Downloaded images from AnkiHub.")
 
-    def _download_image(self, img_path, img_remote_path):
-        response = requests.get(img_remote_path, stream=True)
+    def _download_image(self, img_path: Path, img_remote_path: str):
+        response = self._send_request("GET", API.S3, img_remote_path, stream=True)
         # Log and skip this iteration if the response is not 200 OK
         if response.ok:
             # If we get a valid response, open the file and write the content
@@ -450,18 +503,18 @@ class AnkiHubClient:
     ) -> List[NoteInfo]:
         deck_info = self.get_deck_by_id(ankihub_deck_uuid)
 
-        s3_url = self._get_presigned_url(
+        s3_url_suffix = self._get_presigned_url_suffix(
             key=deck_info.csv_notes_filename, action="download"
         )
 
         if download_progress_cb:
             s3_response_content = self._download_with_progress_cb(
-                s3_url, download_progress_cb
+                s3_url_suffix, download_progress_cb
             )
         else:
-            s3_response = requests.get(s3_url)
+            s3_response = self._send_request("GET", API.S3, s3_url_suffix)
             if s3_response.status_code != 200:
-                raise AnkiHubRequestError(s3_response)
+                raise AnkiHubHTTPError(s3_response)
             s3_response_content = s3_response.content
 
         if deck_info.csv_notes_filename.endswith(".gz"):
@@ -480,11 +533,11 @@ class AnkiHubClient:
         return notes_data
 
     def _download_with_progress_cb(
-        self, url: str, progress_cb: Callable[[int], None]
+        self, s3_url_suffix: str, progress_cb: Callable[[int], None]
     ) -> bytes:
-        with requests.get(url, stream=True) as response:
+        with self._send_request("GET", API.S3, s3_url_suffix, stream=True) as response:
             if response.status_code != 200:
-                raise AnkiHubRequestError(response)
+                raise AnkiHubHTTPError(response)
 
             total_size = int(response.headers.get("content-length"))
             if total_size == 0:
@@ -517,20 +570,23 @@ class AnkiHubClient:
             "since": since.strftime(ANKIHUB_DATETIME_FORMAT_STR) if since else None,
             "size": DECK_UPDATE_PAGE_SIZE,
         }
-        url = f"/decks/{ankihub_deck_uuid}/updates"
+        url_suffix = f"/decks/{ankihub_deck_uuid}/updates"
         i = 0
         notes_count = 0
-        while url is not None:
+        while url_suffix is not None:
             response = self._send_request(
                 "GET",
-                url,
+                API.ANKIHUB,
+                url_suffix,
                 params=params if i == 0 else None,
             )
             if response.status_code != 200:
-                raise AnkiHubRequestError(response)
+                raise AnkiHubHTTPError(response)
 
             data = response.json()
-            url = data["next"].split("/api", maxsplit=1)[1] if data["next"] else None
+            url_suffix = (
+                data["next"].split("/api", maxsplit=1)[1] if data["next"] else None
+            )
 
             data["notes"] = _transform_notes_data(data["notes"])
             note_updates = DeckUpdateChunk.from_dict(data)
@@ -545,10 +601,11 @@ class AnkiHubClient:
     def get_deck_by_id(self, ankihub_deck_uuid: uuid.UUID) -> Deck:
         response = self._send_request(
             "GET",
+            API.ANKIHUB,
             f"/decks/{ankihub_deck_uuid}/",
         )
         if response.status_code != 200:
-            raise AnkiHubRequestError(response)
+            raise AnkiHubHTTPError(response)
 
         data = response.json()
         result = Deck.from_dict(data)
@@ -557,10 +614,11 @@ class AnkiHubClient:
     def get_note_by_id(self, ankihub_note_uuid: uuid.UUID) -> NoteInfo:
         response = self._send_request(
             "GET",
+            API.ANKIHUB,
             f"/notes/{ankihub_note_uuid}",
         )
         if response.status_code != 200:
-            raise AnkiHubRequestError(response)
+            raise AnkiHubHTTPError(response)
 
         data = response.json()
         result = NoteInfo.from_dict(data)
@@ -573,11 +631,12 @@ class AnkiHubClient:
     ) -> None:
         response = self._send_request(
             "POST",
+            API.ANKIHUB,
             f"/notes/{change_note_suggestion.ankihub_note_uuid}/suggestion/",
-            data={**change_note_suggestion.to_dict(), "auto_accept": auto_accept},
+            json={**change_note_suggestion.to_dict(), "auto_accept": auto_accept},
         )
         if response.status_code != 201:
-            raise AnkiHubRequestError(response)
+            raise AnkiHubHTTPError(response)
 
     def create_new_note_suggestion(
         self,
@@ -586,11 +645,12 @@ class AnkiHubClient:
     ):
         response = self._send_request(
             "POST",
+            API.ANKIHUB,
             f"/decks/{new_note_suggestion.ankihub_deck_uuid}/note-suggestion/",
-            data={**new_note_suggestion.to_dict(), "auto_accept": auto_accept},
+            json={**new_note_suggestion.to_dict(), "auto_accept": auto_accept},
         )
         if response.status_code != 201:
-            raise AnkiHubRequestError(response)
+            raise AnkiHubHTTPError(response)
 
     def create_suggestions_in_bulk(
         self,
@@ -625,14 +685,15 @@ class AnkiHubClient:
 
         response = self._send_request(
             "POST",
-            endpoint=url,
-            data={
+            API.ANKIHUB,
+            url_suffix=url,
+            json={
                 "suggestions": [d.to_dict() for d in suggestions],
                 "auto_accept": auto_accept,
             },
         )
         if response.status_code != 200:
-            raise AnkiHubRequestError(response)
+            raise AnkiHubHTTPError(response)
 
         data = response.json()
         errors_by_anki_nid = {
@@ -642,21 +703,25 @@ class AnkiHubClient:
         }
         return errors_by_anki_nid
 
-    def _get_presigned_url(self, key: str, action: str) -> str:
+    def _get_presigned_url_suffix(self, key: str, action: str) -> str:
         """
-        Get presigned URL for S3 to upload a single file
-        :param key: deck name
+        Get presigned URL suffix for S3 to upload a single file.
+        The suffix is the part of the URL after the base url.
+        :param key: s3 key
         :param action: upload or download
-        :return: the pre signed url as a string
+        :return: the presigned url suffix
         """
-        method = "GET"
-        endpoint = "/decks/generate-presigned-url"
-        data = {"key": key, "type": action, "many": "false"}
-        response = self._send_request(method, endpoint, params=data)
+        response = self._send_request(
+            "GET",
+            API.ANKIHUB,
+            "/decks/generate-presigned-url",
+            params={"key": key, "type": action, "many": "false"},
+        )
         if response.status_code != 200:
-            raise AnkiHubRequestError(response)
+            raise AnkiHubHTTPError(response)
 
-        result = response.json()["pre_signed_url"]
+        url = response.json()["pre_signed_url"]
+        result = url.split(self.s3_bucket_url)[1]
         return result
 
     def _get_presigned_url_for_multiple_uploads(self, prefix: str) -> dict:
@@ -666,20 +731,24 @@ class AnkiHubClient:
         :param prefix: the path in S3 where the files will be uploaded
         :return: a dict with the required data to build the upload request
         """
-        method = "GET"
-        endpoint = "/decks/generate-presigned-url"
-        data = {"key": prefix, "type": "upload", "many": "true"}
-        response = self._send_request(method, endpoint, params=data)
+        response = self._send_request(
+            "GET",
+            API.ANKIHUB,
+            "/decks/generate-presigned-url",
+            params={"key": prefix, "type": "upload", "many": "true"},
+        )
         if response.status_code != 200:
-            raise AnkiHubRequestError(response)
+            raise AnkiHubHTTPError(response)
 
         result = response.json()["pre_signed_url"]
         return result
 
     def get_note_type(self, anki_note_type_id: int) -> Dict[str, Any]:
-        response = self._send_request("GET", f"/note-types/{anki_note_type_id}/")
+        response = self._send_request(
+            "GET", API.ANKIHUB, f"/note-types/{anki_note_type_id}/"
+        )
         if response.status_code != 200:
-            raise AnkiHubRequestError(response)
+            raise AnkiHubHTTPError(response)
 
         data = response.json()
         result = _to_anki_note_type(data)
@@ -690,12 +759,13 @@ class AnkiHubClient:
     ) -> Dict[int, List[str]]:
         response = self._send_request(
             "GET",
+            API.ANKIHUB,
             f"/decks/{ankihub_deck_uuid}/protected-fields/",
         )
         if response.status_code == 404:
             return {}
         elif response.status_code != 200:
-            raise AnkiHubRequestError(response)
+            raise AnkiHubHTTPError(response)
 
         protected_fields_raw = response.json()["fields"]
         result = {
@@ -707,12 +777,13 @@ class AnkiHubClient:
     def get_protected_tags(self, ankihub_deck_uuid: uuid.UUID) -> List[str]:
         response = self._send_request(
             "GET",
+            API.ANKIHUB,
             f"/decks/{ankihub_deck_uuid}/protected-tags/",
         )
         if response.status_code == 404:
             return []
         elif response.status_code != 200:
-            raise AnkiHubRequestError(response)
+            raise AnkiHubHTTPError(response)
 
         result = response.json()["tags"]
         result = [x for x in result if x.strip()]
@@ -723,12 +794,13 @@ class AnkiHubClient:
     ) -> Dict[int, List[str]]:
         response = self._send_request(
             "GET",
+            API.ANKIHUB,
             f"/decks/{ankihub_deck_uuid}/asset-disabled-fields/",
         )
         if response.status_code == 404:
             return {}
         elif response.status_code != 200:
-            raise AnkiHubRequestError(response)
+            raise AnkiHubHTTPError(response)
 
         protected_fields_raw = response.json()["fields"]
         result = {
@@ -739,10 +811,10 @@ class AnkiHubClient:
 
     def get_deck_extensions_by_deck_id(self, deck_id: uuid.UUID) -> List[DeckExtension]:
         response = self._send_request(
-            "GET", "/users/deck_extensions", params={"deck_id": deck_id}
+            "GET", API.ANKIHUB, "/users/deck_extensions", params={"deck_id": deck_id}
         )
         if response.status_code != 200:
-            raise AnkiHubRequestError(response)
+            raise AnkiHubHTTPError(response)
 
         data = response.json()
         extension_dicts = data.get("deck_extensions", [])
@@ -772,11 +844,12 @@ class AnkiHubClient:
         while url is not None:
             response = self._send_request(
                 "GET",
+                API.ANKIHUB,
                 url,
                 params=params if i == 0 else None,
             )
             if response.status_code != 200:
-                raise AnkiHubRequestError(response)
+                raise AnkiHubHTTPError(response)
 
             data = response.json()
             url = data["next"].split("/api", maxsplit=1)[1] if data["next"] else None
@@ -798,11 +871,12 @@ class AnkiHubClient:
         ]
         response = self._send_request(
             "POST",
+            API.ANKIHUB,
             "/deck_extensions/suggestions/prevalidate",
-            data={"deck_id": str(ankihub_deck_uuid), "suggestions": suggestions},
+            json={"deck_id": str(ankihub_deck_uuid), "suggestions": suggestions},
         )
         if response.status_code != 200:
-            raise AnkiHubRequestError(response)
+            raise AnkiHubHTTPError(response)
 
         data = response.json()
         suggestions = data["suggestions"]
@@ -840,15 +914,16 @@ class AnkiHubClient:
     ) -> None:
         response = self._send_request(
             "POST",
+            API.ANKIHUB,
             f"/deck_extensions/{deck_extension_id}/suggestions/",
-            data={
+            json={
                 "auto_accept": auto_accept,
                 "suggestions": [suggestion.to_dict() for suggestion in suggestions],
             },
         )
 
         if response.status_code != 201:
-            raise AnkiHubRequestError(response)
+            raise AnkiHubHTTPError(response)
 
         data = response.json()
         message = data["message"]
@@ -864,10 +939,11 @@ class AnkiHubClient:
     def _get_feature_flags_status(self):
         response = self._send_request(
             "GET",
+            API.ANKIHUB,
             "/feature-flags",
         )
         if response.status_code != 200:
-            raise AnkiHubRequestError(response)
+            raise AnkiHubHTTPError(response)
 
         data = response.json()
         return data
@@ -879,15 +955,16 @@ class AnkiHubClient:
     def image_upload_finished(self, ankihub_deck_uuid: uuid.UUID) -> None:
         response = self._send_request(
             "PATCH",
+            API.ANKIHUB,
             f"/decks/{ankihub_deck_uuid}/image-upload-finished",
         )
         if response.status_code != 204:
-            raise AnkiHubRequestError(response)
+            raise AnkiHubHTTPError(response)
 
     def owned_deck_ids(self) -> List[uuid.UUID]:
-        response = self._send_request("GET", "/users/me")
+        response = self._send_request("GET", API.ANKIHUB, "/users/me")
         if response.status_code != 200:
-            raise AnkiHubRequestError(response)
+            raise AnkiHubHTTPError(response)
 
         data = response.json()
         result = [uuid.UUID(deck["id"]) for deck in data["created_decks"]]

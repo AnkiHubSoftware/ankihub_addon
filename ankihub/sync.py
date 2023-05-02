@@ -1,4 +1,4 @@
-"""Downloads updates to decks from AnkiHub and imports them into Anki."""
+"""Downloads updates to decks from AnkiHub and imports them."""
 import uuid
 from datetime import datetime
 from typing import List, Optional
@@ -9,7 +9,7 @@ from aqt.utils import showInfo, tooltip
 
 from . import LOGGER, settings
 from .addon_ankihub_client import AddonAnkiHubClient as AnkiHubClient
-from .ankihub_client import AnkiHubRequestError, DeckExtension
+from .ankihub_client import AnkiHubHTTPError, DeckExtension
 from .db import ankihub_db
 from .importing import AnkiHubImporter, AnkiHubImportResult
 from .media_sync import media_sync
@@ -65,7 +65,7 @@ class _AnkiHubSync:
                 should_continue = self._sync_deck(ah_did)
                 if not should_continue:
                     return
-            except AnkiHubRequestError as e:
+            except AnkiHubHTTPError as e:
                 if self._handle_exception(e, ah_did):
                     return
                 else:
@@ -189,9 +189,7 @@ class _AnkiHubSync:
 
         return True
 
-    def _handle_exception(
-        self, exc: AnkiHubRequestError, ankihub_did: uuid.UUID
-    ) -> bool:
+    def _handle_exception(self, exc: AnkiHubHTTPError, ankihub_did: uuid.UUID) -> bool:
         # returns True if the exception was handled
 
         if "/updates" not in exc.response.url:
