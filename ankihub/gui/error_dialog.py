@@ -78,15 +78,14 @@ def _forum_url(exception: BaseException, sentry_event_id: Optional[str]):
     forum_post_text = (
         dedent(
             """
-            **What did you do when the error happended?**
-            Replace this text.
+            **Before the error happened, I was...**
+            [Replace this text.]
 
 
 
 
 
-            **Error information (don't change this)**
-            <details><summary>Error message</summary>
+            <details><summary>Error message (don't change this)</summary>
             """.strip("\n")  # fmt: skip
         )
         + exception_html
