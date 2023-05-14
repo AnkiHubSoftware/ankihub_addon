@@ -30,11 +30,10 @@ def show_error_dialog(exception: BaseException, sentry_event_id: Optional[str]) 
 
     message = dedent(
         """
-        An error related to the AnkiHub add-on has occurred.
-        Do you want to provide feedback about this error on the AnkiHub forum?
-
-        When you click "Yes", the AnkiHub forum will be opened in your browser
-        with a pre-filled post.
+        🐛 Oh no! An AnkiHub add-on error has occurred.
+        Click "Yes," to provide feedback or request help on the AnkiHub forum.
+        
+        The AnkiHub team will respond ASAP!
 
         Debug info:
         """.strip("\n")  # fmt: skip
