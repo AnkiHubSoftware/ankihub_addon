@@ -9,6 +9,7 @@ pytest-cov==4.0.0
 pre-commit==2.20.0
 requests-mock==1.9.3
 types-requests==2.28.9
+urllib3==1.26.14
 pytest-env==0.6.2
 typeguard==2.13.3
 pdbpp==0.10.3
