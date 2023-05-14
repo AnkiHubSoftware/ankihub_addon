@@ -9,8 +9,13 @@ from aqt.qt import (
     QDialog,
     QDialogButtonBox,
     QLabel,
+    QScrollArea,
+    QSizePolicy,
+    Qt,
     QTextBrowser,
+    QToolButton,
     QVBoxLayout,
+    QWidget,
     qconnect,
 )
 from aqt.utils import disable_help_button, openLink
@@ -32,23 +37,15 @@ def show_error_dialog(exception: BaseException, sentry_event_id: Optional[str]) 
         """
         🐛 Oh no! An AnkiHub add-on error has occurred.
         Click "Yes," to provide feedback or request help on the AnkiHub forum.
-        
-        The AnkiHub team will respond ASAP!
 
-        Debug info:
+        The AnkiHub team will respond ASAP!
         """.strip("\n")  # fmt: skip
     )
     message_widget = QLabel(message)
     message_widget.setWordWrap(True)
     layout.addWidget(message_widget)
 
-    exception_text = "".join(
-        format_exception(None, value=exception, tb=exception.__traceback__)
-    )
-    exception_widget = QTextBrowser()
-    exception_widget.setOpenExternalLinks(True)
-    exception_widget.setPlainText(exception_text)
-    layout.addWidget(exception_widget)
+    setup_debug_info(layout, exception)
 
     box = QDialogButtonBox(
         QDialogButtonBox.StandardButton.No | QDialogButtonBox.StandardButton.Yes  # type: ignore
@@ -69,6 +66,49 @@ def show_error_dialog(exception: BaseException, sentry_event_id: Optional[str]) 
     diag.setMinimumHeight(400)
     diag.setMinimumWidth(500)
     diag.exec()
+
+
+def setup_debug_info(layout: QVBoxLayout, exception: BaseException) -> None:
+    """Setup the debug info text browser which contains the exception traceback.
+    The debug info is hidden by default, but can be toggled by clicking a button."""
+    debug_info_button = layout.debug_info_toggle_button = QToolButton()  # type: ignore
+    layout.addWidget(debug_info_button)
+
+    debug_info_area = layout.scroll_area = QScrollArea()  # type: ignore
+    layout.addWidget(layout.scroll_area)  # type: ignore
+
+    exception_widget = QTextBrowser()
+    exception_widget.setOpenExternalLinks(True)
+    exception_text = "".join(
+        format_exception(None, value=exception, tb=exception.__traceback__)
+    )
+    exception_widget.setPlainText(exception_text)
+
+    debug_info_area.setWidget(exception_widget)
+    debug_info_area.setWidgetResizable(True)
+    debug_info_area.setHorizontalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
+
+    # ... the spacer widget keeps the layout intact when the debug info is hidden.
+    spacer_widget = layout.spacer_widget = QWidget()  # type: ignore
+    spacer_widget.setSizePolicy(
+        QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Expanding
+    )
+    layout.addWidget(spacer_widget)
+
+    def toggle_debug_info() -> None:
+        if debug_info_area.isHidden():
+            debug_info_button.setText("Hide Debug Info")
+            debug_info_area.show()
+            spacer_widget.hide()
+        else:
+            debug_info_button.setText("Show Debug Info")
+            debug_info_area.hide()
+            spacer_widget.show()
+
+    qconnect(debug_info_button.clicked, toggle_debug_info)
+
+    # ... hide debug info by default
+    toggle_debug_info()
 
 
 def _forum_url(exception: BaseException, sentry_event_id: Optional[str]):
