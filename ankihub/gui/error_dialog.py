@@ -5,6 +5,7 @@ from typing import Optional
 from urllib.parse import quote
 
 import aqt
+from aqt import utils
 from aqt.qt import (
     QDialog,
     QDialogButtonBox,
@@ -18,7 +19,6 @@ from aqt.qt import (
     QWidget,
     qconnect,
 )
-from aqt.utils import openLink
 
 
 class ErrorDialog(QDialog):
@@ -54,7 +54,7 @@ class ErrorDialog(QDialog):
         )
 
         def on_accepted() -> None:
-            openLink(_forum_url(exception, sentry_event_id))
+            utils.openLink(_forum_url(exception, sentry_event_id))
             self.accept()
 
         qconnect(self.button_box.accepted, on_accepted)

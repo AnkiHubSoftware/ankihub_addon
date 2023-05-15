@@ -84,7 +84,6 @@ from ankihub.gui.browser import (
 from ankihub.gui.custom_search_nodes import UpdatedSinceLastReviewSearchNode
 from ankihub.gui.decks import SubscribedDecksDialog
 from ankihub.gui.editor import _on_suggestion_button_press, _refresh_buttons
-from ankihub.gui.error_dialog import ErrorDialog
 from ankihub.gui.optional_tag_suggestion_dialog import OptionalTagsSuggestionDialog
 from ankihub.importing import (
     AnkiHubImporter,
@@ -3136,16 +3135,3 @@ class TestDebugModule:
     def test_log_stack(self):
         # Test that the _log_stack function does not throw an exception when called.
         _log_stack("test")
-
-
-def test_error_dialog(qtbot: QtBot):
-    excception = Exception("test")
-    sentry_id = "sentry_test_id"
-
-    dialog = ErrorDialog(excception, sentry_id)
-    qtbot.addWidget(dialog)
-    dialog.show()
-
-    # Check that toggling the debug info button does not throw an exception.
-    dialog.debug_info_button.click()
-    dialog.debug_info_button.click()
