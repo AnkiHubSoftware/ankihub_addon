@@ -14,6 +14,7 @@ from aqt import utils
 from aqt.qt import QDialogButtonBox
 from pytest import MonkeyPatch, fixture
 from pytest_anki import AnkiSession
+from pytestqt.qtbot import QtBot  # type: ignore
 
 from ..factories import NoteInfoFactory
 
@@ -32,6 +33,7 @@ from ankihub.errors import (
     _try_handle_exception,
 )
 from ankihub.exporting import _prepared_field_html
+from ankihub.gui.error_dialog import ErrorDialog
 from ankihub.gui.menu import AnkiHubLogin
 from ankihub.gui.suggestion_dialog import (
     SourceType,
@@ -634,3 +636,25 @@ class TestRateLimitedDecorator:
 
         # The on_done callback should be executed every time foo is called.
         assert execution_counter == 11
+
+
+def test_error_dialog(qtbot: QtBot, monkeypatch: MonkeyPatch):
+    excception = Exception("test")
+    sentry_id = "sentry_test_id"
+
+    dialog = ErrorDialog(excception, sentry_id)
+    qtbot.addWidget(dialog)
+    dialog.show()
+
+    # Check that toggling the debug info button does not throw an exception.
+    dialog.debug_info_button.click()
+    dialog.debug_info_button.click()
+
+    # Check that the Yes button opens a link (to the AnkiHub forum).
+    open_link_mock = Mock()
+    monkeypatch.setattr(utils, "openLink", open_link_mock)
+    dialog.button_box.button(QDialogButtonBox.StandardButton.Yes).click()
+    open_link_mock.assert_called_once()
+
+    # Check that clicking the No button does not throw an exception.
+    dialog.button_box.button(QDialogButtonBox.StandardButton.No).click()

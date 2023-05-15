@@ -28,7 +28,7 @@ from . import LOGGER
 from .addon_ankihub_client import AddonAnkiHubClient as AnkiHubClient
 from .ankihub_client import AnkiHubHTTPError, AnkiHubRequestException
 from .db import is_ankihub_db_attached_to_anki_db
-from .gui.error_feedback import ErrorFeedbackDialog
+from .gui.error_dialog import ErrorDialog
 from .gui.utils import check_and_prompt_for_updates_on_main_window
 from .settings import ADDON_VERSION, ANKI_VERSION, ANKIWEB_ID, config, log_file_path
 from .sync import NotLoggedInError
@@ -128,20 +128,16 @@ def _setup_excepthook():
                     exc_info=e,
                 )
 
-            # This opens Anki's error dialog.
-            original_except_hook(etype, val, tb)
-
-    original_except_hook = sys.excepthook
     sys.excepthook = excepthook
 
 
 def _maybe_report_exception_and_show_feedback_dialog(exception: BaseException) -> None:
-    if not _error_reporting_enabled():
-        return
+    sentry_event_id: Optional[str] = None
+    if _error_reporting_enabled():
+        sentry_event_id = report_exception_and_upload_logs(exception=exception)
 
-    sentry_id = report_exception_and_upload_logs(exception=exception)
     if _this_addon_mentioned_in_tb(exception.__traceback__):
-        ErrorFeedbackDialog(exception=exception, event_id=sentry_id)
+        ErrorDialog(exception, sentry_event_id=sentry_event_id).exec()
 
 
 def _try_handle_exception(
