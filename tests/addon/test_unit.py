@@ -639,10 +639,11 @@ class TestRateLimitedDecorator:
 
 
 def test_error_dialog(qtbot: QtBot, monkeypatch: MonkeyPatch):
-    excception = Exception("test")
-    sentry_id = "sentry_test_id"
+    try:
+        raise Exception("test")
+    except Exception as e:
+        dialog = ErrorDialog(e, sentry_event_id="sentry_test_id")
 
-    dialog = ErrorDialog(excception, sentry_id)
     qtbot.addWidget(dialog)
     dialog.show()
 

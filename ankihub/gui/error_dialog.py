@@ -76,14 +76,11 @@ class ErrorDialog(QDialog):
         self.debug_info_area = QScrollArea()  # type: ignore
         layout.addWidget(self.debug_info_area)  # type: ignore
 
-        self.exception_widget = QTextBrowser()
-        self.exception_widget.setOpenExternalLinks(True)
-        exception_text = "".join(
-            format_exception(None, value=exception, tb=exception.__traceback__)
-        )
-        self.exception_widget.setPlainText(exception_text)
+        self.debug_info_widget = QTextBrowser()
+        self.debug_info_widget.setOpenExternalLinks(True)
+        self.debug_info_widget.setPlainText(_debug_info(exception))
 
-        self.debug_info_area.setWidget(self.exception_widget)
+        self.debug_info_area.setWidget(self.debug_info_widget)
         self.debug_info_area.setWidgetResizable(True)
         self.debug_info_area.setHorizontalScrollBarPolicy(
             Qt.ScrollBarPolicy.ScrollBarAlwaysOff
@@ -109,12 +106,17 @@ class ErrorDialog(QDialog):
             self.spacer_widget.show()
 
 
+def _debug_info(exception: BaseException) -> str:
+    exception_text = "\n".join(
+        format_exception(None, value=exception, tb=exception.__traceback__)
+    )
+    result = f"{utils.supportText()}\n{exception_text}"
+    return result
+
+
 def _forum_url(exception: BaseException, sentry_event_id: Optional[str]):
     """Return a URL to the AnkiHub forum with a new topic pre-filled with the exception
     traceback and a link to the Sentry event (if available)."""
-    exception_html = "<br>".join(
-        format_exception(None, value=exception, tb=exception.__traceback__)
-    )
     forum_post_text = (
         dedent(
             """
@@ -128,7 +130,7 @@ def _forum_url(exception: BaseException, sentry_event_id: Optional[str]):
             <details><summary>Error message (don't change this)</summary>
             """.strip("\n")  # fmt: skip
         )
-        + exception_html
+        + f"\n```\n{_debug_info(exception)}```"
         + "\n</details>"
     )
 
