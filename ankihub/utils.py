@@ -253,32 +253,35 @@ def add_view_on_ankihub_snippet_to_template(template: Dict) -> None:
             display: none;
         }}
 
-        .mobile .ankihub-view-note {{
+        .mobile .ankihub-view-note
+          {{
             display: block;
-        }}
-
-        .ipad .ankihub-view-note, .iphone .ankihub-view-note {{
-            width: fit-content;
-            margin: 0 auto;
-        }}
-
-        .android .ankihub-view-note {{
-            text-decoration: none;
-            position: fixed;
             left: 50%;
             margin-right: -50%;
-            transform: translate(-50%, -50%);
-            bottom: 0;
-            padding: 0.5rem;
+            padding: 8px;
             border-radius: 50px;
             background-color: #cde3f8;
             font-size: 12px;
             color: black;
+            text-decoration: none;
         }}
 
-        .android ankihub-view-note:hover,
-        .android ankihub-view-note:active {{
-            background-color: #ebf3fa;
+        /* AnkiDroid (Android)
+        The button is fixed to the bottom of the screen. */
+        .android .ankihub-view-note {{
+            position: fixed;
+            bottom: 0;
+            transform: translate(-50%, -50%);
+        }}
+
+        /* AnkiMobile (IPhone)
+        position: fixed doesn't work on AnkiMobile, so the button is just below the content instead. */
+        .iphone .ankihub-view-note,
+        .ipad .ankihub-view-note {{
+            position: relative;
+            transform: translate(-50%, 0);
+            width: fit-content;
+            margin-top: 20px;
         }}
         </style>
 
