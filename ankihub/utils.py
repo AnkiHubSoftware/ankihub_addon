@@ -233,12 +233,13 @@ def modify_fields(note_type: Dict) -> None:
 
 def modify_template(template: Dict) -> None:
     # the order is important here, the end comment must be added last
-    add_ankihub_snippet_to_template(template)
+    add_view_on_ankihub_snippet_to_template(template)
     add_ankihub_end_comment_to_template(template)
 
 
-def add_ankihub_snippet_to_template(template: Dict) -> None:
-    ankihub_snippet = dedent(
+def add_view_on_ankihub_snippet_to_template(template: Dict) -> None:
+    """Adds a View on AnkiHub button/link to the template."""
+    snippet = dedent(
         f"""
         <!-- BEGIN {ANKIHUB_NOTE_TYPE_MODIFICATION_STRING} -->
         {{{{#{ANKIHUB_NOTE_TYPE_FIELD_NAME}}}}}
@@ -303,12 +304,12 @@ def add_ankihub_snippet_to_template(template: Dict) -> None:
     )
 
     if not re.search(snippet_pattern, template["afmt"]):
-        template["afmt"] = template["afmt"].rstrip("\n ") + "\n\n" + ankihub_snippet
+        template["afmt"] = template["afmt"].rstrip("\n ") + "\n\n" + snippet
     else:
         # update existing snippet to make sure it is up to date
         template["afmt"] = re.sub(
             snippet_pattern,
-            ankihub_snippet,
+            snippet,
             template["afmt"],
         )
 
