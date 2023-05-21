@@ -270,7 +270,7 @@ def add_view_on_ankihub_snippet_to_template(template: Dict) -> None:
         The button is fixed to the bottom of the screen. */
         .android .ankihub-view-note {{
             position: fixed;
-            bottom: 0;
+            bottom: 5px;
             transform: translate(-50%, -50%);
         }}
 
