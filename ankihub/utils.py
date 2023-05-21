@@ -281,6 +281,16 @@ def add_ankihub_snippet_to_template(template: Dict) -> None:
         }}
         </style>
 
+        <script>
+            if(document.querySelector("html").classList.contains("android")) {{
+                // Add a margin to the bottom of the card content so that the button doesn't
+                // overlap the content.
+                var container = document.querySelector('#qa');
+                var button = document.querySelector('.ankihub-view-note');
+                container.style.marginBottom = 2 * button.offsetHeight + "px";
+            }}
+        </script>
+
         {{{{/{ANKIHUB_NOTE_TYPE_FIELD_NAME}}}}}
         <!-- END {ANKIHUB_NOTE_TYPE_MODIFICATION_STRING} -->
         """
