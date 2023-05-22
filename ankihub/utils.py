@@ -233,12 +233,13 @@ def modify_fields(note_type: Dict) -> None:
 
 def modify_template(template: Dict) -> None:
     # the order is important here, the end comment must be added last
-    add_ankihub_snippet_to_template(template)
+    add_view_on_ankihub_snippet_to_template(template)
     add_ankihub_end_comment_to_template(template)
 
 
-def add_ankihub_snippet_to_template(template: Dict) -> None:
-    ankihub_snippet = dedent(
+def add_view_on_ankihub_snippet_to_template(template: Dict) -> None:
+    """Adds a View on AnkiHub button/link to the template."""
+    snippet = dedent(
         f"""
         <!-- BEGIN {ANKIHUB_NOTE_TYPE_MODIFICATION_STRING} -->
         {{{{#{ANKIHUB_NOTE_TYPE_FIELD_NAME}}}}}
@@ -252,34 +253,47 @@ def add_ankihub_snippet_to_template(template: Dict) -> None:
             display: none;
         }}
 
-        .mobile .ankihub-view-note {{
+        .mobile .ankihub-view-note
+          {{
             display: block;
-        }}
-
-        .ipad .ankihub-view-note, .iphone .ankihub-view-note {{
-            width: fit-content;
-            margin: 0 auto;
-        }}
-
-        .android .ankihub-view-note {{
-            text-decoration: none;
-            position: fixed;
             left: 50%;
             margin-right: -50%;
-            transform: translate(-50%, -50%);
-            bottom: 0;
-            padding: 0.5rem;
+            padding: 8px;
             border-radius: 50px;
             background-color: #cde3f8;
             font-size: 12px;
             color: black;
+            text-decoration: none;
         }}
 
-        .android ankihub-view-note:hover,
-        .android ankihub-view-note:active {{
-            background-color: #ebf3fa;
+        /* AnkiDroid (Android)
+        The button is fixed to the bottom of the screen. */
+        .android .ankihub-view-note {{
+            position: fixed;
+            bottom: 5px;
+            transform: translate(-50%, -50%);
+        }}
+
+        /* AnkiMobile (IPhone)
+        position: fixed doesn't work on AnkiMobile, so the button is just below the content instead. */
+        .iphone .ankihub-view-note,
+        .ipad .ankihub-view-note {{
+            position: relative;
+            transform: translate(-50%, 0);
+            width: fit-content;
+            margin-top: 20px;
         }}
         </style>
+
+        <script>
+            if(document.querySelector("html").classList.contains("android")) {{
+                // Add a margin to the bottom of the card content so that the button doesn't
+                // overlap the content.
+                var container = document.querySelector('#qa');
+                var button = document.querySelector('.ankihub-view-note');
+                container.style.marginBottom = 2 * button.offsetHeight + "px";
+            }}
+        </script>
 
         {{{{/{ANKIHUB_NOTE_TYPE_FIELD_NAME}}}}}
         <!-- END {ANKIHUB_NOTE_TYPE_MODIFICATION_STRING} -->
@@ -293,12 +307,12 @@ def add_ankihub_snippet_to_template(template: Dict) -> None:
     )
 
     if not re.search(snippet_pattern, template["afmt"]):
-        template["afmt"] = template["afmt"].rstrip("\n ") + "\n\n" + ankihub_snippet
+        template["afmt"] = template["afmt"].rstrip("\n ") + "\n\n" + snippet
     else:
         # update existing snippet to make sure it is up to date
         template["afmt"] = re.sub(
             snippet_pattern,
-            ankihub_snippet,
+            snippet,
             template["afmt"],
         )
 
