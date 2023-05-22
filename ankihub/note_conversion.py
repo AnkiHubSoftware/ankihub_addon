@@ -15,6 +15,7 @@ TAG_FOR_OPTIONAL_TAGS = "AnkiHub_Optional"
 # top-level tags that are only used by the add-on, but not by the web app
 ADDON_INTERNAL_TAGS = [
     TAG_FOR_PROTECTING_FIELDS,
+    "autoopen",  # Used by AnKing note types
 ]
 
 # tags that are used internally by Anki and should not be deleted or appear in suggestions
