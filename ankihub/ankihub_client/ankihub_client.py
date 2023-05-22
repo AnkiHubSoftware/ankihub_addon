@@ -496,6 +496,13 @@ class AnkiHubClient:
                 f"Unable to download image [{img_remote_path}]. Response status code: {response.status_code}"
             )
 
+    def unsubscribe_from_deck(self, deck_id: uuid.UUID) -> None:
+        response = self._send_request(
+            "DELETE", API.ANKIHUB, f"/decks/{deck_id}/subscriptions/"
+        )
+        if response.status_code != 204:
+            raise AnkiHubHTTPError(response)
+
     def download_deck(
         self,
         ankihub_deck_uuid: uuid.UUID,
