@@ -496,6 +496,20 @@ class AnkiHubClient:
                 f"Unable to download image [{img_remote_path}]. Response status code: {response.status_code}"
             )
 
+    def get_deck_subscriptions(self) -> List[uuid.UUID]:
+        response = self._send_request("GET", API.ANKIHUB, "/decks/subscriptions/")
+        if response.status_code != 200:
+            raise AnkiHubHTTPError(response)
+
+        return [uuid.UUID(deck_info["deck"]) for deck_info in response.json()]
+
+    def subscribe_to_deck(self, deck_id: uuid.UUID) -> None:
+        response = self._send_request(
+            "POST", API.ANKIHUB, "/decks/subscriptions/", json={"deck": str(deck_id)}
+        )
+        if response.status_code != 201:
+            raise AnkiHubHTTPError(response)
+
     def download_deck(
         self,
         ankihub_deck_uuid: uuid.UUID,

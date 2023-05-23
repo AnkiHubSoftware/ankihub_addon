@@ -1,0 +1,197 @@
+interactions:
+- request:
+    body: '{"username": "test1", "password": "asdf"}'
+    headers:
+      Accept:
+      - application/json; version=9.0
+      Content-Length:
+      - '41'
+      Content-Type:
+      - application/json
+    method: POST
+    uri: http://localhost:8000/api/login/
+  response:
+    body:
+      string: '{"expiry":"2023-05-30T15:57:17.635515Z","token":"1df7c32e7a63b93c718e3eb21a530242b164d0f46d66f4e70ada4ff4b0127cdc"}'
+    headers:
+      Allow:
+      - POST, OPTIONS
+      Content-Language:
+      - en
+      Content-Length:
+      - '115'
+      Content-Type:
+      - application/json
+      Cross-Origin-Opener-Policy:
+      - same-origin
+      Date:
+      - Tue, 23 May 2023 15:57:17 GMT
+      Referrer-Policy:
+      - same-origin
+      Server:
+      - WSGIServer/0.2 CPython/3.8.16
+      Server-Timing:
+      - TimerPanel_utime;dur=338.321999999998;desc="User CPU time", TimerPanel_stime;dur=55.59000000000047;desc="System
+        CPU time", TimerPanel_total;dur=393.9119999999985;desc="Total CPU time", TimerPanel_total_time;dur=221.5101718902588;desc="Elapsed
+        time", SQLPanel_sql_time;dur=4.478216171264648;desc="SQL 10 queries", CachePanel_total_time;dur=0;desc="Cache
+        0 Calls"
+      Set-Cookie:
+      - csrftoken=RoRkeVzTT6WbKjGFnfo1XumzTBru4YhW; expires=Tue, 21 May 2024 15:57:17
+        GMT; HttpOnly; Max-Age=31449600; Path=/; SameSite=Lax
+      - sessionid=1tnforgv1lu34u59wzjedj2lj732j80n; expires=Tue, 30 May 2023 15:57:17
+        GMT; HttpOnly; Max-Age=604800; Path=/; SameSite=Lax
+      Vary:
+      - Accept, Cookie, Accept-Language, Origin
+      X-Content-Type-Options:
+      - nosniff
+      X-Frame-Options:
+      - DENY
+      djdt-store-id:
+      - 3bc95a9206ea437ebeeafe8ccd59dbe6
+    status:
+      code: 200
+      message: OK
+- request:
+    body: null
+    headers:
+      Accept:
+      - application/json; version=9.0
+      Authorization:
+      - Token 1df7c32e7a63b93c718e3eb21a530242b164d0f46d66f4e70ada4ff4b0127cdc
+      Content-Type:
+      - application/json
+    method: GET
+    uri: http://localhost:8000/api/decks/subscriptions/
+  response:
+    body:
+      string: '[]'
+    headers:
+      Allow:
+      - GET, POST, HEAD, OPTIONS
+      Content-Language:
+      - en
+      Content-Length:
+      - '2'
+      Content-Type:
+      - application/json
+      Cross-Origin-Opener-Policy:
+      - same-origin
+      Date:
+      - Tue, 23 May 2023 15:57:17 GMT
+      Referrer-Policy:
+      - same-origin
+      Server:
+      - WSGIServer/0.2 CPython/3.8.16
+      Server-Timing:
+      - TimerPanel_utime;dur=67.12900000000133;desc="User CPU time", TimerPanel_stime;dur=0.0;desc="System
+        CPU time", TimerPanel_total;dur=67.12900000000133;desc="Total CPU time", TimerPanel_total_time;dur=73.31442832946777;desc="Elapsed
+        time", SQLPanel_sql_time;dur=3.187894821166992;desc="SQL 5 queries", CachePanel_total_time;dur=0;desc="Cache
+        0 Calls"
+      Vary:
+      - Accept, Accept-Language, Cookie, Origin
+      X-Content-Type-Options:
+      - nosniff
+      X-Frame-Options:
+      - DENY
+      djdt-store-id:
+      - ea6a8f4701764c9eb9854d45aafb26e3
+    status:
+      code: 200
+      message: OK
+- request:
+    body: '{"deck": "dda0d3ad-89cd-45fb-8ddc-fabad93c2d7b"}'
+    headers:
+      Accept:
+      - application/json; version=9.0
+      Authorization:
+      - Token 1df7c32e7a63b93c718e3eb21a530242b164d0f46d66f4e70ada4ff4b0127cdc
+      Content-Length:
+      - '48'
+      Content-Type:
+      - application/json
+    method: POST
+    uri: http://localhost:8000/api/decks/subscriptions/
+  response:
+    body:
+      string: '{"deck":"dda0d3ad-89cd-45fb-8ddc-fabad93c2d7b"}'
+    headers:
+      Allow:
+      - GET, POST, HEAD, OPTIONS
+      Content-Language:
+      - en
+      Content-Length:
+      - '47'
+      Content-Type:
+      - application/json
+      Cross-Origin-Opener-Policy:
+      - same-origin
+      Date:
+      - Tue, 23 May 2023 15:57:18 GMT
+      Referrer-Policy:
+      - same-origin
+      Server:
+      - WSGIServer/0.2 CPython/3.8.16
+      Server-Timing:
+      - TimerPanel_utime;dur=115.6649999999999;desc="User CPU time", TimerPanel_stime;dur=0.0;desc="System
+        CPU time", TimerPanel_total;dur=115.6649999999999;desc="Total CPU time", TimerPanel_total_time;dur=133.82387161254883;desc="Elapsed
+        time", SQLPanel_sql_time;dur=5.385637283325195;desc="SQL 12 queries", CachePanel_total_time;dur=0;desc="Cache
+        0 Calls"
+      Vary:
+      - Accept, Accept-Language, Cookie, Origin
+      X-Content-Type-Options:
+      - nosniff
+      X-Frame-Options:
+      - DENY
+      djdt-store-id:
+      - 30ff46d4b71244dc8a7ee67684b7dde0
+    status:
+      code: 201
+      message: Created
+- request:
+    body: null
+    headers:
+      Accept:
+      - application/json; version=9.0
+      Authorization:
+      - Token 1df7c32e7a63b93c718e3eb21a530242b164d0f46d66f4e70ada4ff4b0127cdc
+      Content-Type:
+      - application/json
+    method: GET
+    uri: http://localhost:8000/api/decks/subscriptions/
+  response:
+    body:
+      string: '[{"deck":"dda0d3ad-89cd-45fb-8ddc-fabad93c2d7b"}]'
+    headers:
+      Allow:
+      - GET, POST, HEAD, OPTIONS
+      Content-Language:
+      - en
+      Content-Length:
+      - '49'
+      Content-Type:
+      - application/json
+      Cross-Origin-Opener-Policy:
+      - same-origin
+      Date:
+      - Tue, 23 May 2023 15:57:18 GMT
+      Referrer-Policy:
+      - same-origin
+      Server:
+      - WSGIServer/0.2 CPython/3.8.16
+      Server-Timing:
+      - TimerPanel_utime;dur=45.89899999999858;desc="User CPU time", TimerPanel_stime;dur=0.0;desc="System
+        CPU time", TimerPanel_total;dur=45.89899999999858;desc="Total CPU time", TimerPanel_total_time;dur=49.60966110229492;desc="Elapsed
+        time", SQLPanel_sql_time;dur=2.485513687133789;desc="SQL 5 queries", CachePanel_total_time;dur=0;desc="Cache
+        0 Calls"
+      Vary:
+      - Accept, Accept-Language, Cookie, Origin
+      X-Content-Type-Options:
+      - nosniff
+      X-Frame-Options:
+      - DENY
+      djdt-store-id:
+      - fba04df37cf843858552c44cb791f78e
+    status:
+      code: 200
+      message: OK
+version: 1
