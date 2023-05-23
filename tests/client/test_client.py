@@ -561,6 +561,27 @@ class TestCreateSuggestionsInBulk:
         )
 
 
+class TestDeckSubscriptions:
+    @pytest.mark.vcr()
+    def test_get_empty_subscriptions(
+        self,
+        authorized_client_for_user_test1: AnkiHubClient,
+    ):
+        client = authorized_client_for_user_test1
+        assert client.get_deck_subscriptions() == []
+
+    @pytest.mark.vcr()
+    def test_subscribe_and_get_list_of_subscriptions(
+        self,
+        authorized_client_for_user_test1: AnkiHubClient,
+    ):
+        client = authorized_client_for_user_test1
+        assert client.get_deck_subscriptions() == []
+
+        client.subscribe_to_deck(ID_OF_DECK_OF_USER_TEST1)
+        assert client.get_deck_subscriptions() == [ID_OF_DECK_OF_USER_TEST1]
+
+
 class TestGetDeckUpdates:
     @pytest.mark.vcr()
     def test_get_deck_updates(
