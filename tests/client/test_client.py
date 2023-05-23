@@ -27,6 +27,7 @@ from ankihub.ankihub_client import (
     DEFAULT_API_URL,
     DEFAULT_S3_BUCKET_URL,
     AnkiHubClient,
+    AnkiHubHTTPError,
     ChangeNoteSuggestion,
     Deck,
     DeckExtension,
@@ -135,9 +136,16 @@ def authorized_client_for_user_test1(client_with_server_setup: AnkiHubClient):
 
 
 @pytest.fixture
-def authorized_client_for_user_test2(client_with_server_setup: AnkiHubClient, request):
+def authorized_client_for_user_test2(client_with_server_setup: AnkiHubClient):
     credentials_data = {"username": "test2", "password": "asdf"}
     client_with_server_setup.login(credentials=credentials_data)
+    yield client_with_server_setup
+
+
+@pytest.fixture
+def unauthorized_client(client_with_server_setup: AnkiHubClient):
+    """Client that is not logged in. Yields the same client as client_with_server_setup fixture,
+    but the name is more descriptive."""
     yield client_with_server_setup
 
 
@@ -571,6 +579,19 @@ class TestDeckSubscriptions:
         assert client.get_deck_subscriptions() == []
 
     @pytest.mark.vcr()
+    def test_get_deck_subscriptions_with_unauthorized_client(
+        self,
+        unauthorized_client: AnkiHubClient,
+    ):
+        client = unauthorized_client
+        try:
+            client.get_deck_subscriptions()
+        except AnkiHubHTTPError:
+            pass
+        else:
+            assert False, "AnkiHubHTTPError was not raised"
+
+    @pytest.mark.vcr()
     def test_subscribe_and_get_list_of_subscriptions(
         self,
         authorized_client_for_user_test1: AnkiHubClient,
@@ -580,6 +601,19 @@ class TestDeckSubscriptions:
 
         client.subscribe_to_deck(ID_OF_DECK_OF_USER_TEST1)
         assert client.get_deck_subscriptions() == [ID_OF_DECK_OF_USER_TEST1]
+
+    @pytest.mark.vcr()
+    def test_subscribe_with_unauthorized_client(
+        self,
+        unauthorized_client: AnkiHubClient,
+    ):
+        client = unauthorized_client
+        try:
+            client.subscribe_to_deck(ID_OF_DECK_OF_USER_TEST1)
+        except AnkiHubHTTPError:
+            pass
+        else:
+            assert False, "AnkiHubHTTPError was not raised"
 
 
 class TestGetDeckUpdates:
