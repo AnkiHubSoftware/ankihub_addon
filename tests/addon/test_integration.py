@@ -7,7 +7,7 @@ from datetime import datetime, timedelta, timezone
 from pathlib import Path
 from time import sleep
 from typing import Any, Callable, Dict, List, Optional, Protocol, Tuple
-from unittest.mock import MagicMock, Mock, PropertyMock
+from unittest.mock import MagicMock, Mock
 from zipfile import ZipFile
 
 import aqt
@@ -2292,7 +2292,7 @@ def test_profile_swap(
 class TestAutoSync:
     def setup_method(self):
         # Mock the token so that the AnkiHub sync is not aborted.
-        config.token = PropertyMock(return_value=lambda: "test_token")
+        config.token = MagicMock(return_value=lambda: "test_token")
 
     def test_with_on_ankiweb_sync_config_option(
         self,
@@ -2371,6 +2371,11 @@ class TestAutoSync:
         return sync_all_decks_mock
 
 
+class PickableMock(Mock):
+    def __reduce__(self):
+        return (Mock, ())
+
+
 def patch_ankiweb_sync_to_do_nothing(mw: AnkiQt, monkeypatch: MonkeyPatch):
     """Patch AnkiWeb sync so that when this is called:
     https://github.com/ankitects/anki/blob/e5d5d1d4bdecfac326353d154c933e477c4e3eb8/qt/aqt/sync.py#L87
@@ -2384,7 +2389,9 @@ def patch_ankiweb_sync_to_do_nothing(mw: AnkiQt, monkeypatch: MonkeyPatch):
 
     # Mock the sync with AnkiWeb so that it doesn't actually sync.
     # Also mock the sync output so that Anki doesn't trigger a full sync or show a message.
-    sync_output_mock = Mock(
+    # The PicakbleMock is needed because the sync output is pickled by Anki in some Anki versions (e.g. 2.1.63)
+    # during the tests. Without using the PickableMock, the test fails with an error in these versions.
+    sync_output_mock = PickableMock(
         host_number=1,
         server_message=[],
         required=SyncOutput.NO_CHANGES,
