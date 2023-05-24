@@ -84,9 +84,14 @@ class SubscribedDecksDialog(QDialog):
         self.decks_list = QListWidget()
         qconnect(self.decks_list.itemSelectionChanged, self._on_item_selection_changed)
 
-        self.add_btn = QPushButton("Add")
-        self.box_right.addWidget(self.add_btn)
-        qconnect(self.add_btn.clicked, self._on_add)
+        if self.client.is_feature_flag_enabled("new_subscription_workflow_enabled"):
+            self.add_btn = QPushButton("Browse Decks")
+            self.box_right.addWidget(self.add_btn)
+            qconnect(self.add_btn.clicked, lambda: openLink(url_decks()))
+        else:
+            self.add_btn = QPushButton("Add")
+            self.box_right.addWidget(self.add_btn)
+            qconnect(self.add_btn.clicked, self._on_add)
 
         self.unsubscribe_btn = QPushButton("Unsubscribe")
         self.box_right.addWidget(self.unsubscribe_btn)
@@ -191,14 +196,17 @@ class SubscribedDecksDialog(QDialog):
 
         for item in items:
             ankihub_did: UUID = item.data(Qt.ItemDataRole.UserRole)
-            config.unsubscribe_deck(ankihub_did)
-            self.unsubscribe_from_deck(ankihub_did)
+            if self.client.is_feature_flag_enabled("new_subscription_workflow_enabled"):
+                # TODO: Call usubscribe method from client
+                self._clear_deck_changes(ankihub_did)
+            else:
+                config.unsubscribe_deck(ankihub_did)
+                self._clear_deck_changes(ankihub_did)
 
         tooltip("Unsubscribed from AnkiHub Deck.", parent=aqt.mw)
         self._refresh_decks_list()
 
-    @staticmethod
-    def unsubscribe_from_deck(ankihub_did: UUID) -> None:
+    def _clear_deck_changes(self, ankihub_did: UUID) -> None:
         mids = ankihub_db.note_types_for_ankihub_deck(ankihub_did)
         undo_note_type_modfications(mids)
         ankihub_db.remove_deck(ankihub_did)

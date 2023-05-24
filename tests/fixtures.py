@@ -7,6 +7,8 @@ from anki.models import NotetypeDict
 from aqt.main import AnkiQt
 from pytest import fixture
 from pytest_anki import AnkiSession
+from ankihub.ankihub_client.ankihub_client import DEFAULT_API_URL
+from requests_mock import Mocker
 
 # workaround for vscode test discovery not using pytest.ini which sets this env var
 # has to be set before importing ankihub
@@ -68,3 +70,14 @@ def create_or_get_ah_version_of_note_type(
     modify_note_type(note_type)
     mw.col.models.add_dict(note_type)
     return mw.col.models.by_name(note_type["name"])
+
+@fixture
+def set_feature_flag_state(requests_mock: Mocker):
+    def set_feature_flag_state_inner(feature_flag_name, is_active=True):
+        requests_mock.get(
+            f"{DEFAULT_API_URL}/feature-flags",
+            status_code=200,
+            json={"flags": {feature_flag_name: {"is_active": is_active}}}
+        )
+
+    return set_feature_flag_state_inner

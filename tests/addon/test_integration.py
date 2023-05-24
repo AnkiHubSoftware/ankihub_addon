@@ -1286,24 +1286,44 @@ def create_copy_of_note_type(mw: AnkiQt, note_type: NotetypeDict) -> NotetypeDic
     return new_model
 
 
-def test_unsubsribe_from_deck(
+def test_unsubscribe_from_deck(
     anki_session_with_addon_data: AnkiSession,
     install_sample_ah_deck: InstallSampleAHDeck,
+    qtbot: QtBot,
+    set_feature_flag_state,
+    monkeypatch: MonkeyPatch
+    
 ):
     from aqt import mw
 
     anki_session = anki_session_with_addon_data
+    set_feature_flag_state(feature_flag_name="new_subscription_workflow_enabled", is_active=False)
     with anki_session.profile_loaded():
         _, ah_did = install_sample_ah_deck()
 
         mids = ankihub_db.note_types_for_ankihub_deck(ah_did)
         assert len(mids) == 2
-
-        SubscribedDecksDialog.unsubscribe_from_deck(ah_did)
-
+        
+        monkeypatch.setattr(
+            "ankihub.settings._Config.is_logged_in",
+            lambda *args, **kwargs: True,
+        )
+        dialog = SubscribedDecksDialog()
+        qtbot.wait(500)
+        
+        decks_list = dialog.decks_list
+        deck_item_index = 0
+        deck_item = decks_list.item(deck_item_index)
+        deck_item.setSelected(True)
+        monkeypatch.setattr(
+            "ankihub.gui.decks.ask_user",
+            lambda *args, **kwargs: True,
+        )
+        qtbot.mouseClick(dialog.unsubscribe_btn, Qt.MouseButton.LeftButton)
+        #TODO: Check if the client method was called
+        
         # check if note type modifications were removed
         assert all(not note_type_contains_field(mw.col.models.get(mid)) for mid in mids)
-
         assert all(
             not re.search(
                 ANKIHUB_TEMPLATE_SNIPPET_RE, mw.col.models.get(mid)["tmpls"][0]["afmt"]
@@ -1317,6 +1337,7 @@ def test_unsubsribe_from_deck(
 
         nids = ankihub_db.anki_nids_for_ankihub_deck(ah_did)
         assert len(nids) == 0
+        assert dialog.decks_list.count() == 0
 
 
 def import_note_types_for_sample_deck(mw: AnkiQt):
