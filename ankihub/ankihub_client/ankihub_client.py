@@ -514,7 +514,7 @@ class AnkiHubClient:
         response = self._send_request(
             "DELETE", API.ANKIHUB, f"/decks/{deck_id}/subscriptions/"
         )
-        if response.status_code != 204:
+        if response.status_code not in (204, 404):
             raise AnkiHubHTTPError(response)
 
     def download_deck(
