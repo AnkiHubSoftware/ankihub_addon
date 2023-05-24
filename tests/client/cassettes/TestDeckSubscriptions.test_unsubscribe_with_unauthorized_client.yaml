@@ -1,0 +1,51 @@
+interactions:
+- request:
+    body: null
+    headers:
+      Accept:
+      - application/json; version=9.0
+      Content-Length:
+      - '0'
+      Content-Type:
+      - application/json
+    method: DELETE
+    uri: http://localhost:8000/api/decks/dda0d3ad-89cd-45fb-8ddc-fabad93c2d7b/subscriptions/
+  response:
+    body:
+      string: '{"detail":"Authentication credentials were not provided."}'
+    headers:
+      Allow:
+      - DELETE, OPTIONS
+      Content-Language:
+      - en
+      Content-Length:
+      - '58'
+      Content-Type:
+      - application/json
+      Cross-Origin-Opener-Policy:
+      - same-origin
+      Date:
+      - Wed, 24 May 2023 20:46:46 GMT
+      Referrer-Policy:
+      - same-origin
+      Server:
+      - WSGIServer/0.2 CPython/3.8.16
+      Server-Timing:
+      - TimerPanel_utime;dur=22.652000000000783;desc="User CPU time", TimerPanel_stime;dur=0.0;desc="System
+        CPU time", TimerPanel_total;dur=22.652000000000783;desc="Total CPU time",
+        TimerPanel_total_time;dur=24.296283721923828;desc="Elapsed time", SQLPanel_sql_time;dur=0;desc="SQL
+        0 queries", CachePanel_total_time;dur=0;desc="Cache 0 Calls"
+      Vary:
+      - Accept, Accept-Language, Cookie, Origin
+      WWW-Authenticate:
+      - Token
+      X-Content-Type-Options:
+      - nosniff
+      X-Frame-Options:
+      - DENY
+      djdt-store-id:
+      - 5debd25cf4454b998f21b75c7d99f733
+    status:
+      code: 401
+      message: Unauthorized
+version: 1
