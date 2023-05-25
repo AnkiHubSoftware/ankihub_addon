@@ -212,9 +212,9 @@ class _Config:
             self.subscriptions_change_hook()
 
     def unsubscribe_deck(self, ankihub_did: uuid.UUID) -> None:
-        self._private_config.decks.pop(ankihub_did)
-        self._update_private_config()
-
+        if self._private_config.decks.get(ankihub_did):
+            self._private_config.decks.pop(ankihub_did)
+            self._update_private_config()
         if self.subscriptions_change_hook:
             self.subscriptions_change_hook()
 
@@ -233,8 +233,8 @@ class _Config:
         installed decks."""
         return list(self._private_config.decks.keys())
 
-    def deck_config(self, ankihub_did: uuid.UUID) -> DeckConfig:
-        return self._private_config.decks[ankihub_did]
+    def deck_config(self, ankihub_did: uuid.UUID) -> Optional[DeckConfig]:
+        return self._private_config.decks.get(ankihub_did)
 
     def token(self) -> Optional[str]:
         return self._private_config.token

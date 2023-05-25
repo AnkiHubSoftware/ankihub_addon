@@ -125,11 +125,18 @@ class SubscribedDecksDialog(QDialog):
 
     def _refresh_decks_list(self) -> None:
         self.decks_list.clear()
-        for ah_did in config.deck_ids():
-            name = config.deck_config(ah_did).name
-            item = QListWidgetItem(name)
-            item.setData(Qt.ItemDataRole.UserRole, ah_did)
-            self.decks_list.addItem(item)
+        if self.client.is_feature_flag_enabled("new_subscription_workflow_enabled"):
+            for deck in self.client.get_deck_subscriptions():
+                name = deck.name
+                item = QListWidgetItem(name)
+                item.setData(Qt.ItemDataRole.UserRole, deck.ankihub_deck_uuid)
+                self.decks_list.addItem(item)
+        else:
+            for ah_did in config.deck_ids():
+                name = config.deck_config(ah_did).name
+                item = QListWidgetItem(name)
+                item.setData(Qt.ItemDataRole.UserRole, ah_did)
+                self.decks_list.addItem(item)
 
     def _refresh_anki(self) -> None:
         op = OpChanges()
@@ -198,10 +205,8 @@ class SubscribedDecksDialog(QDialog):
             ankihub_did: UUID = item.data(Qt.ItemDataRole.UserRole)
             if self.client.is_feature_flag_enabled("new_subscription_workflow_enabled"):
                 self.client.unsubscribe_from_deck(ankihub_did)
-                self._clear_deck_changes(ankihub_did)
-            else:
-                config.unsubscribe_deck(ankihub_did)
-                self._clear_deck_changes(ankihub_did)
+            config.unsubscribe_deck(ankihub_did)
+            self._clear_deck_changes(ankihub_did)
 
         tooltip("Unsubscribed from AnkiHub Deck.", parent=aqt.mw)
         self._refresh_decks_list()
@@ -317,7 +322,9 @@ class SubscribedDecksDialog(QDialog):
             return
 
         ankihub_did: UUID = selection[0].data(Qt.ItemDataRole.UserRole)
-        using_subdecks = config.deck_config(ankihub_did).subdecks_enabled
+        using_subdecks = False
+        if deck_from_config := config.deck_config(ankihub_did):
+            using_subdecks = deck_from_config.subdecks_enabled
         self.toggle_subdecks_btn.setText(
             "Disable Subdecks" if using_subdecks else "Enable Subdecks"
         )

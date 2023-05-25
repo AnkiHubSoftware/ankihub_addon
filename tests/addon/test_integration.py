@@ -59,6 +59,7 @@ from ankihub.ankihub_client import (
 )
 from ankihub.ankihub_client.ankihub_client import (
     ANKIHUB_DATETIME_FORMAT_STR,
+    DEFAULT_API_URL,
     DeckExtensionUpdateChunk,
     _transform_notes_data,
 )
@@ -1294,6 +1295,7 @@ def test_unsubscribe_from_deck(
     set_feature_flag_state,
     monkeypatch: MonkeyPatch,
     is_flag_active: bool,
+    requests_mock: Mocker
 ):
     from aqt import mw
 
@@ -1302,7 +1304,7 @@ def test_unsubscribe_from_deck(
         feature_flag_name="new_subscription_workflow_enabled", is_active=is_flag_active
     )
     with anki_session.profile_loaded():
-        _, ah_did = install_sample_ah_deck()
+        anki_deck_id, ah_did = install_sample_ah_deck()
 
         mids = ankihub_db.note_types_for_ankihub_deck(ah_did)
         assert len(mids) == 2
@@ -1311,6 +1313,25 @@ def test_unsubscribe_from_deck(
             "ankihub.settings._Config.is_logged_in",
             lambda *args, **kwargs: True,
         )
+        if is_flag_active:
+            deck = mw.col.decks.get(anki_deck_id)
+            requests_mock.get(
+                f"{DEFAULT_API_URL}/decks/subscriptions/",
+                status_code=200,
+                json=[
+                    {
+                      "deck": {
+                          "id": str(ah_did),
+                          "name": deck["name"],
+                          "owner": 1,
+                          "anki_id": anki_deck_id,
+                          "csv_last_upload": None,
+                          "csv_notes_filename": "",
+                          "image_upload_finished": True
+                      }  
+                    }
+                ],
+            )
         dialog = SubscribedDecksDialog()
         qtbot.wait(500)
 
@@ -1323,6 +1344,11 @@ def test_unsubscribe_from_deck(
             lambda *args, **kwargs: True,
         )
         if is_flag_active:
+            requests_mock.get(
+                f"{DEFAULT_API_URL}/decks/subscriptions/",
+                status_code=200,
+                json=[]
+            )
             with patch.object(
                 AnkiHubClient, "unsubscribe_from_deck"
             ) as unsubscribe_from_deck_mock:
