@@ -510,6 +510,13 @@ class AnkiHubClient:
         if response.status_code != 201:
             raise AnkiHubHTTPError(response)
 
+    def unsubscribe_from_deck(self, deck_id: uuid.UUID) -> None:
+        response = self._send_request(
+            "DELETE", API.ANKIHUB, f"/decks/{deck_id}/subscriptions/"
+        )
+        if response.status_code not in (204, 404):
+            raise AnkiHubHTTPError(response)
+
     def download_deck(
         self,
         ankihub_deck_uuid: uuid.UUID,
