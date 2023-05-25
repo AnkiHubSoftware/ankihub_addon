@@ -69,7 +69,7 @@ def refresh_ankihub_menu() -> None:
 
     if config.is_logged_in():
         _create_collaborative_deck_setup(parent=menu_state.ankihub_menu)
-        _subscribe_to_deck_setup(parent=menu_state.ankihub_menu)
+        _subscribed_decks_setup(parent=menu_state.ankihub_menu)
         _import_media_setup(parent=menu_state.ankihub_menu)
         _sync_with_ankihub_setup(parent=menu_state.ankihub_menu)
         _media_sync_status_setup(parent=menu_state.ankihub_menu)
@@ -400,8 +400,7 @@ def _ankihub_login_setup(parent):
     parent.addAction(sign_in_button)
 
 
-def _subscribe_to_deck_setup(parent):
-    """Set up the menu item for uploading suggestions in bulk."""
+def _subscribed_decks_setup(parent):
     q_action = QAction("📚 Subscribed Decks", aqt.mw)
     qconnect(q_action.triggered, SubscribedDecksDialog.display_subscribe_window)
     parent.addAction(q_action)
