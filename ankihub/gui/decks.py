@@ -197,7 +197,7 @@ class SubscribedDecksDialog(QDialog):
         for item in items:
             ankihub_did: UUID = item.data(Qt.ItemDataRole.UserRole)
             if self.client.is_feature_flag_enabled("new_subscription_workflow_enabled"):
-                # TODO: Call usubscribe method from client
+                self.client.unsubscribe_from_deck(ankihub_did)
                 self._clear_deck_changes(ankihub_did)
             else:
                 config.unsubscribe_deck(ankihub_did)
