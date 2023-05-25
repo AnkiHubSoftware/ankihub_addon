@@ -600,7 +600,11 @@ class TestDeckSubscriptions:
         assert client.get_deck_subscriptions() == []
 
         client.subscribe_to_deck(ID_OF_DECK_OF_USER_TEST1)
-        assert client.get_deck_subscriptions() == [ID_OF_DECK_OF_USER_TEST1]
+
+        decks = client.get_deck_subscriptions()
+        assert len(decks) == 1
+        deck: Deck = decks[0]
+        assert deck.ankihub_deck_uuid == ID_OF_DECK_OF_USER_TEST1
 
     @pytest.mark.vcr()
     def test_subscribe_with_unauthorized_client(
