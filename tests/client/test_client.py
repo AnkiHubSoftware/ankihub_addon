@@ -619,6 +619,41 @@ class TestDeckSubscriptions:
         else:
             assert False, "AnkiHubHTTPError was not raised"
 
+    @pytest.mark.vcr()
+    def test_subscribe_and_unsubscribe(
+        self,
+        authorized_client_for_user_test1: AnkiHubClient,
+    ):
+        client = authorized_client_for_user_test1
+        assert client.get_deck_subscriptions() == []
+
+        client.subscribe_to_deck(ID_OF_DECK_OF_USER_TEST1)
+        assert client.get_deck_subscriptions() == [ID_OF_DECK_OF_USER_TEST1]
+
+        client.unsubscribe_from_deck(ID_OF_DECK_OF_USER_TEST1)
+        assert client.get_deck_subscriptions() == []
+
+    @pytest.mark.vcr()
+    def test_unsubscribe_from_deck_that_user_is_not_subscribed_to(
+        self,
+        authorized_client_for_user_test1: AnkiHubClient,
+    ):
+        client = authorized_client_for_user_test1
+        client.unsubscribe_from_deck(ID_OF_DECK_OF_USER_TEST1)
+
+    @pytest.mark.vcr()
+    def test_unsubscribe_with_unauthorized_client(
+        self,
+        unauthorized_client: AnkiHubClient,
+    ):
+        client = unauthorized_client
+        try:
+            client.unsubscribe_from_deck(ID_OF_DECK_OF_USER_TEST1)
+        except AnkiHubHTTPError:
+            pass
+        else:
+            assert False, "AnkiHubHTTPError was not raised"
+
 
 class TestGetDeckUpdates:
     @pytest.mark.vcr()
