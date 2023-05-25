@@ -1,0 +1,103 @@
+interactions:
+- request:
+    body: '{"username": "test1", "password": "asdf"}'
+    headers:
+      Accept:
+      - application/json; version=9.0
+      Content-Length:
+      - '41'
+      Content-Type:
+      - application/json
+    method: POST
+    uri: http://localhost:8000/api/login/
+  response:
+    body:
+      string: '{"expiry":"2023-06-21T20:46:33.906396Z","token":"e6d03ce9aad4d586aa2b317386b31f546cefd1b1961ce0090dd214a8d2d4af86"}'
+    headers:
+      Allow:
+      - POST, OPTIONS
+      Content-Language:
+      - en
+      Content-Length:
+      - '115'
+      Content-Type:
+      - application/json
+      Cross-Origin-Opener-Policy:
+      - same-origin
+      Date:
+      - Wed, 24 May 2023 20:46:34 GMT
+      Referrer-Policy:
+      - same-origin
+      Server:
+      - WSGIServer/0.2 CPython/3.8.16
+      Server-Timing:
+      - TimerPanel_utime;dur=351.9289999999984;desc="User CPU time", TimerPanel_stime;dur=49.88500000000062;desc="System
+        CPU time", TimerPanel_total;dur=401.813999999999;desc="Total CPU time", TimerPanel_total_time;dur=210.75916290283203;desc="Elapsed
+        time", SQLPanel_sql_time;dur=5.746126174926758;desc="SQL 10 queries", CachePanel_total_time;dur=0;desc="Cache
+        0 Calls"
+      Set-Cookie:
+      - csrftoken=3pUOnhy9rkuU0vgBxUz9RWSIYv0H7hIe; expires=Wed, 22 May 2024 20:46:34
+        GMT; HttpOnly; Max-Age=31449600; Path=/; SameSite=Lax
+      - sessionid=7lv4g0dydmraqjcdrmqp7fb7gy2w6gl0; expires=Wed, 31 May 2023 20:46:34
+        GMT; HttpOnly; Max-Age=604800; Path=/; SameSite=Lax
+      Vary:
+      - Accept, Cookie, Accept-Language, Origin
+      X-Content-Type-Options:
+      - nosniff
+      X-Frame-Options:
+      - DENY
+      djdt-store-id:
+      - 1cfda30a562f4e2f80617dba1a573467
+    status:
+      code: 200
+      message: OK
+- request:
+    body: null
+    headers:
+      Accept:
+      - application/json; version=9.0
+      Authorization:
+      - Token e6d03ce9aad4d586aa2b317386b31f546cefd1b1961ce0090dd214a8d2d4af86
+      Content-Length:
+      - '0'
+      Content-Type:
+      - application/json
+    method: DELETE
+    uri: http://localhost:8000/api/decks/dda0d3ad-89cd-45fb-8ddc-fabad93c2d7b/subscriptions/
+  response:
+    body:
+      string: '{"detail":"Not found."}'
+    headers:
+      Allow:
+      - DELETE, OPTIONS
+      Content-Language:
+      - en
+      Content-Length:
+      - '23'
+      Content-Type:
+      - application/json
+      Cross-Origin-Opener-Policy:
+      - same-origin
+      Date:
+      - Wed, 24 May 2023 20:46:34 GMT
+      Referrer-Policy:
+      - same-origin
+      Server:
+      - WSGIServer/0.2 CPython/3.8.16
+      Server-Timing:
+      - TimerPanel_utime;dur=68.4529999999981;desc="User CPU time", TimerPanel_stime;dur=0.0;desc="System
+        CPU time", TimerPanel_total;dur=68.4529999999981;desc="Total CPU time", TimerPanel_total_time;dur=72.36647605895996;desc="Elapsed
+        time", SQLPanel_sql_time;dur=2.635955810546875;desc="SQL 5 queries", CachePanel_total_time;dur=0;desc="Cache
+        0 Calls"
+      Vary:
+      - Accept, Accept-Language, Cookie, Origin
+      X-Content-Type-Options:
+      - nosniff
+      X-Frame-Options:
+      - DENY
+      djdt-store-id:
+      - 59def7f25cba455f9e768434507cab79
+    status:
+      code: 404
+      message: Not Found
+version: 1
