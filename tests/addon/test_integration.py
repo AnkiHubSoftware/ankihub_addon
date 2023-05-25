@@ -7,7 +7,7 @@ from datetime import datetime, timedelta, timezone
 from pathlib import Path
 from time import sleep
 from typing import Any, Callable, Dict, List, Optional, Protocol, Tuple
-from unittest.mock import MagicMock, Mock
+from unittest.mock import MagicMock, Mock, patch
 from zipfile import ZipFile
 
 import aqt
@@ -1286,31 +1286,34 @@ def create_copy_of_note_type(mw: AnkiQt, note_type: NotetypeDict) -> NotetypeDic
     return new_model
 
 
+@pytest.mark.parametrize("is_flag_active", [True, False])
 def test_unsubscribe_from_deck(
     anki_session_with_addon_data: AnkiSession,
     install_sample_ah_deck: InstallSampleAHDeck,
     qtbot: QtBot,
     set_feature_flag_state,
-    monkeypatch: MonkeyPatch
-    
+    monkeypatch: MonkeyPatch,
+    is_flag_active: bool,
 ):
     from aqt import mw
 
     anki_session = anki_session_with_addon_data
-    set_feature_flag_state(feature_flag_name="new_subscription_workflow_enabled", is_active=False)
+    set_feature_flag_state(
+        feature_flag_name="new_subscription_workflow_enabled", is_active=is_flag_active
+    )
     with anki_session.profile_loaded():
         _, ah_did = install_sample_ah_deck()
 
         mids = ankihub_db.note_types_for_ankihub_deck(ah_did)
         assert len(mids) == 2
-        
+
         monkeypatch.setattr(
             "ankihub.settings._Config.is_logged_in",
             lambda *args, **kwargs: True,
         )
         dialog = SubscribedDecksDialog()
         qtbot.wait(500)
-        
+
         decks_list = dialog.decks_list
         deck_item_index = 0
         deck_item = decks_list.item(deck_item_index)
@@ -1319,9 +1322,15 @@ def test_unsubscribe_from_deck(
             "ankihub.gui.decks.ask_user",
             lambda *args, **kwargs: True,
         )
-        qtbot.mouseClick(dialog.unsubscribe_btn, Qt.MouseButton.LeftButton)
-        #TODO: Check if the client method was called
-        
+        if is_flag_active:
+            with patch.object(
+                AnkiHubClient, "unsubscribe_from_deck"
+            ) as unsubscribe_from_deck_mock:
+                qtbot.mouseClick(dialog.unsubscribe_btn, Qt.MouseButton.LeftButton)
+                unsubscribe_from_deck_mock.assert_called_once()
+        else:
+            qtbot.mouseClick(dialog.unsubscribe_btn, Qt.MouseButton.LeftButton)
+
         # check if note type modifications were removed
         assert all(not note_type_contains_field(mw.col.models.get(mid)) for mid in mids)
         assert all(
