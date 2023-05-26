@@ -68,9 +68,10 @@ def _prepared_field_html(html: str) -> str:
 
 def _prepare_tags(note: Note) -> Optional[List[str]]:
 
-    # removing empty tags is necessary because notes have empty tags in the editor sometimes
+    # Removing empty tags is necessary because notes have empty tags in the editor sometimes.
+    # Stripping tags is necessary because Anki leaves whitespace at the end of tags sometimes.
     result = [
-        tag
+        tag.strip()
         for tag in note.tags
         if tag.strip() and not (is_internal_tag(tag) or is_optional_tag(tag))
     ]
