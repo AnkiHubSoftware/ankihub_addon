@@ -39,12 +39,12 @@ from .subdecks import confirm_and_toggle_subdecks
 from .utils import ask_user, set_tooltip_icon
 
 
-def cleanup_after_deck_install(multiple_decks: bool = False) -> None:
+def cleanup_after_deck_install(multiple_decks: bool) -> None:
     message = (
         (
             "The deck has been successfully installed!<br><br>"
             if not multiple_decks
-            else ""
+            else "The decks have been successfully installed!<br><br>"
         )
         + "Do you want to clear unused tags and empty cards from your collection? (recommended)"
     )
@@ -287,7 +287,7 @@ def download_and_install_decks(
         import_results: List[AnkiHubImportResult] = future.result()
 
         # Clean up after deck installations
-        cleanup_after_deck_install()
+        cleanup_after_deck_install(multiple_decks=len(import_results) > 1)
 
         # Reset the main window
         aqt.mw.reset()
