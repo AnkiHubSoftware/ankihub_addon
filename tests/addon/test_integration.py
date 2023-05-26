@@ -1295,7 +1295,7 @@ def test_unsubscribe_from_deck(
     set_feature_flag_state,
     monkeypatch: MonkeyPatch,
     is_flag_active: bool,
-    requests_mock: Mocker
+    requests_mock: Mocker,
 ):
     from aqt import mw
 
@@ -1320,15 +1320,15 @@ def test_unsubscribe_from_deck(
                 status_code=200,
                 json=[
                     {
-                      "deck": {
-                          "id": str(ah_did),
-                          "name": deck["name"],
-                          "owner": 1,
-                          "anki_id": anki_deck_id,
-                          "csv_last_upload": None,
-                          "csv_notes_filename": "",
-                          "image_upload_finished": True
-                      }  
+                        "deck": {
+                            "id": str(ah_did),
+                            "name": deck["name"],
+                            "owner": 1,
+                            "anki_id": anki_deck_id,
+                            "csv_last_upload": None,
+                            "csv_notes_filename": "",
+                            "image_upload_finished": True,
+                        }
                     }
                 ],
             )
@@ -1345,9 +1345,7 @@ def test_unsubscribe_from_deck(
         )
         if is_flag_active:
             requests_mock.get(
-                f"{DEFAULT_API_URL}/decks/subscriptions/",
-                status_code=200,
-                json=[]
+                f"{DEFAULT_API_URL}/decks/subscriptions/", status_code=200, json=[]
             )
             with patch.object(
                 AnkiHubClient, "unsubscribe_from_deck"
