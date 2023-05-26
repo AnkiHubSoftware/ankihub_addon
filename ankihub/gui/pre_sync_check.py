@@ -2,6 +2,7 @@ from typing import Callable, List
 
 from ..addon_ankihub_client import AddonAnkiHubClient as AnkiHubClient
 from ..ankihub_client import Deck
+from ..messages import messages
 from ..settings import config
 from .decks import download_and_install_decks
 from .utils import ask_user
@@ -19,22 +20,8 @@ def check_and_install_new_subscriptions(on_success: Callable[[], None]):
 
     # Ask user to confirm the installations.
     if not ask_user(
-        """
-        These decks were found for installation:<br>
-        """
-        + "<ul>"
-        + "\n".join([f"<li><b>{deck.name}</b></li>" for deck in decks])
-        + """
-        </ul>
-        <br><br>
-        Would you like to proceed with downloading and installing these decks?
-        Your personal collection will be modified.<br><br>
-
-        If you press \"Cancel\", we will just continue with deck updates.<br>
-
-        See <a href='https://docs.ankihub.net/user_docs/.html'>https://docs.ankihub.net/user_docs/</a> for more details.
-        """,
         title="AnkiHub Deck Installation",
+        text=messages.deck_install_confirmation(decks),
     ):
         on_success()
         return
