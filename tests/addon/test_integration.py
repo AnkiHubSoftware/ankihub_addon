@@ -30,7 +30,7 @@ from pytest_anki import AnkiSession
 from pytestqt.qtbot import QtBot  # type: ignore
 from requests_mock import Mocker
 
-from ..factories import NoteInfoFactory
+from ..factories import DeckFactory, NoteInfoFactory
 from ..fixtures import create_or_get_ah_version_of_note_type
 from .conftest import TEST_PROFILE_ID
 
@@ -38,7 +38,7 @@ from .conftest import TEST_PROFILE_ID
 # has to be set before importing ankihub
 os.environ["SKIP_INIT"] = "1"
 
-from ankihub import entry_point
+from ankihub import entry_point, gui
 from ankihub.addon_ankihub_client import AddonAnkiHubClient as AnkiHubClient
 from ankihub.addons import (
     _change_file_permissions_of_addon_files,
@@ -82,7 +82,7 @@ from ankihub.gui.browser import (
     custom_columns,
 )
 from ankihub.gui.custom_search_nodes import UpdatedSinceLastReviewSearchNode
-from ankihub.gui.decks import SubscribedDecksDialog
+from ankihub.gui.decks import SubscribedDecksDialog, download_and_install_decks
 from ankihub.gui.editor import _on_suggestion_button_press, _refresh_buttons
 from ankihub.gui.optional_tag_suggestion_dialog import OptionalTagsSuggestionDialog
 from ankihub.importing import (
@@ -425,6 +425,61 @@ def test_create_collaborative_deck_and_upload(
             )
             == note.mod
         )
+
+
+def test_download_and_install_decks(
+    anki_session_with_addon_data: AnkiSession,
+    monkeypatch: MonkeyPatch,
+    qtbot: QtBot,
+):
+    anki_session = anki_session_with_addon_data
+    with anki_session.profile_loaded():
+        mw = anki_session.mw
+
+        # Mock the client functions
+        note_type = create_or_get_ah_version_of_note_type(
+            mw, aqt.mw.col.models.by_name("Basic")
+        )
+        notes_data = [NoteInfoFactory.create(mid=note_type["id"])]
+        deck = DeckFactory.create()
+
+        mocks: Dict[str, Mock] = dict()
+
+        def add_mock(object, func_name: str, return_value: Any = None):
+            mocks[func_name] = Mock()
+            mocks[func_name].return_value = return_value
+            monkeypatch.setattr(object, func_name, mocks[func_name])
+
+        add_mock(AnkiHubClient, "get_note_type", note_type)
+        add_mock(AnkiHubClient, "get_deck_by_id", deck)
+        add_mock(AnkiHubClient, "download_deck", notes_data)
+        add_mock(AnkiHubClient, "get_protected_fields", {})
+        add_mock(AnkiHubClient, "get_protected_tags", [])
+
+        # Patch away gui functions which would otherwise block the test
+        add_mock(gui.decks, "showInfo")
+        add_mock(gui.decks, "cleanup_after_deck_install")
+
+        # Download and install the deck
+        mocks["on_success"] = Mock()
+        download_and_install_decks([deck], on_success=mocks["on_success"])
+        qtbot.wait(500)
+
+        # Assert that the deck was installed
+        # ... in the Anki database
+        assert deck.anki_did in [x.id for x in mw.col.decks.all_names_and_ids()]
+        assert mw.col.get_note(notes_data[0].anki_nid) is not None
+
+        # ... in the AnkiHub database
+        ankihub_db.ankihub_deck_ids() == [deck.ankihub_deck_uuid]
+        assert ankihub_db.note_data(notes_data[0].anki_nid) == notes_data[0]
+
+        # ... in the config
+        assert config.deck_ids() == [deck.ankihub_deck_uuid]
+
+        # Assert that the mocked functions were called
+        for mock in mocks.values():
+            mock.assert_called_once()
 
 
 def test_get_deck_by_id(

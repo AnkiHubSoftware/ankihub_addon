@@ -321,24 +321,22 @@ def download_and_install_decks(
 
     # Install decks in background
     aqt.mw.taskman.with_progress(
-        task=lambda: download_and_install_decks_inner(
-            [deck.ankihub_deck_uuid for deck in ankihub_decks]
-        ),
+        task=lambda: download_and_install_decks_inner(ankihub_decks),
         on_done=on_install_done,
         label="Downloading decks from AnkiHub",
     )
 
 
 def download_and_install_decks_inner(
-    ankihub_dids: List[uuid.UUID],
+    decks: List[Deck],
 ) -> List[AnkiHubImportResult]:
     """Downloads and installs the given decks.
     Attempts to install all decks even if some fail."""
     result = []
     exceptions = []
-    for ah_did in ankihub_dids:
+    for deck in decks:
         try:
-            result.append(download_and_install_deck(ah_did))
+            result.append(download_and_install_deck(deck))
         except Exception as e:
             exceptions.append(e)
 
@@ -349,19 +347,17 @@ def download_and_install_decks_inner(
     return result
 
 
-def download_and_install_deck(ankihub_did: uuid.UUID) -> AnkiHubImportResult:
-    deck_info = AnkiHubClient().get_deck_by_id(ankihub_did)
-
+def download_and_install_deck(deck: Deck) -> AnkiHubImportResult:
     notes_data: List[NoteInfo] = AnkiHubClient().download_deck(
-        deck_info.ankihub_deck_uuid, download_progress_cb=_download_progress_cb
+        deck.ankihub_deck_uuid, download_progress_cb=_download_progress_cb
     )
 
     result = _install_deck(
         notes_data=notes_data,
-        deck_name=deck_info.name,
-        ankihub_did=ankihub_did,
-        latest_update=deck_info.csv_last_upload,
-        is_creator=deck_info.owner,
+        deck_name=deck.name,
+        ankihub_did=deck.ankihub_deck_uuid,
+        latest_update=deck.csv_last_upload,
+        is_creator=deck.owner,
     )
 
     return result
