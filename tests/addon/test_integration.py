@@ -468,11 +468,11 @@ def test_download_and_install_decks(
         # Assert that the deck was installed
         # ... in the Anki database
         assert deck.anki_did in [x.id for x in mw.col.decks.all_names_and_ids()]
-        assert mw.col.get_note(notes_data[0].anki_nid) is not None
+        assert mw.col.get_note(NoteId(notes_data[0].anki_nid)) is not None
 
         # ... in the AnkiHub database
         ankihub_db.ankihub_deck_ids() == [deck.ankihub_deck_uuid]
-        assert ankihub_db.note_data(notes_data[0].anki_nid) == notes_data[0]
+        assert ankihub_db.note_data(NoteId(notes_data[0].anki_nid)) == notes_data[0]
 
         # ... in the config
         assert config.deck_ids() == [deck.ankihub_deck_uuid]
