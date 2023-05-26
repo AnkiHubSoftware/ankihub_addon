@@ -31,6 +31,7 @@ from ..ankihub_client import AnkiHubHTTPError, get_image_names_from_notes_data
 from ..db import ankihub_db
 from ..deck_creation import create_ankihub_deck
 from ..errors import upload_logs_in_background
+from ..gui.pre_sync_check import check_and_install_new_subscriptions
 from ..media_import.ui import open_import_dialog
 from ..media_sync import media_sync
 from ..settings import ADDON_VERSION, config, url_view_deck
@@ -328,12 +329,16 @@ def _create_collaborative_deck_setup(parent):
 
 
 def _sync_with_ankihub_action():
-    aqt.mw.taskman.with_progress(
-        task=ah_sync.sync_all_decks_and_media,
-        immediate=True,
-        label="Syncing with AnkiHub",
-        on_done=_on_sync_done,
-    )
+    # Check and install new subscriptions, then sync all decks and media
+
+    def sync_decks_and_media():
+        aqt.mw.taskman.with_progress(
+            task=ah_sync.sync_all_decks_and_media,
+            immediate=True,
+            on_done=_on_sync_done,
+        )
+
+    check_and_install_new_subscriptions(on_success=sync_decks_and_media)
 
 
 def _on_sync_done(future: Future) -> None:
@@ -421,8 +426,6 @@ def _sync_with_ankihub_setup(parent):
             q_action.setShortcut(QKeySequence(sync_hotkey))
         except Exception:
             LOGGER.exception(f"Failed to set sync hotkey to {sync_hotkey}")
-    if not config.deck_ids():
-        q_action.setDisabled(True)
     parent.addAction(q_action)
 
 

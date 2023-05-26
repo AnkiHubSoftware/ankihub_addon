@@ -1,12 +1,13 @@
 import uuid
 from typing import Callable, List, Optional
 
-from aqt.utils import showInfo, showWarning
+from aqt.utils import showWarning
 
 from ... import LOGGER
+from ...addon_ankihub_client import AddonAnkiHubClient as AnkiHubClient
 from ...db import ankihub_db
 from ...settings import config
-from ..decks import cleanup_after_deck_install, download_and_install_deck
+from ..decks import download_and_install_decks
 from ..utils import ask_user
 
 
@@ -50,34 +51,11 @@ def check_ankihub_db(on_success: Optional[Callable[[], None]] = None):
         ),
         title="AnkiHub Database Check",
     ):
-        _download_and_install_decks(
-            ah_dids_with_something_missing, on_success=on_success
-        )
-
-
-def _download_and_install_decks(
-    ankihub_dids: List[uuid.UUID], on_success: Optional[Callable[[], None]] = None
-):
-    # Installs decks one by one and then cleans up.
-    # If a deck install fails, the other deck installs and the cleanup are **not** executed.
-    # (The cleanup is not essential, it's just nice to have.)
-    if not ankihub_dids:
-        showInfo("All decks have been downloaded and imported.", title="AnkiHub")
-        cleanup_after_deck_install(multiple_decks=True)
-
-        if on_success:
-            on_success()
-        return
-
-    cur_did = ankihub_dids.pop()
-
-    download_and_install_deck(
-        cur_did,
-        on_success=lambda import_result: _download_and_install_decks(
-            ankihub_dids, on_success
-        ),
-        on_failure=_show_failure_message,
-    )
+        client = AnkiHubClient()
+        decks = [
+            client.get_deck_by_id(deck_id) for deck_id in ah_dids_with_something_missing
+        ]
+        download_and_install_decks(decks, on_success=on_success)
 
 
 def _show_failure_message() -> None:

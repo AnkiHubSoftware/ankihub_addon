@@ -15,12 +15,9 @@ from aqt.qt import (
     QDialog,
     QDialogButtonBox,
     QHBoxLayout,
-    QLabel,
-    QLineEdit,
     QListWidget,
     QListWidgetItem,
     QPushButton,
-    QSizePolicy,
     Qt,
     QVBoxLayout,
     qconnect,
@@ -30,13 +27,12 @@ from aqt.utils import openLink, showInfo, showText, tooltip
 
 from .. import LOGGER
 from ..addon_ankihub_client import AddonAnkiHubClient as AnkiHubClient
-from ..addon_ankihub_client import AnkiHubHTTPError
-from ..ankihub_client import NoteInfo
+from ..ankihub_client import Deck, NoteInfo
 from ..db import ankihub_db
 from ..importing import AnkiHubImportResult
 from ..media_sync import media_sync
 from ..messages import messages
-from ..settings import config, url_deck_base, url_decks, url_help, url_view_deck
+from ..settings import config, url_deck_base
 from ..subdecks import SUBDECK_TAG, build_subdecks_and_move_cards_to_them, flatten_deck
 from ..sync import AnkiHubImporter
 from ..utils import create_backup, undo_note_type_modfications
@@ -134,33 +130,8 @@ class SubscribedDecksDialog(QDialog):
         op.study_queues = True
         gui_hooks.operation_did_execute(op, handler=None)
 
-    def _on_add(self) -> None:
-        import_result = SubscribeDialog().run()
-        if import_result is None:
-            return
-
-        ah_did = import_result.ankihub_did
-
         self._refresh_decks_list()
         self._refresh_anki()
-
-        anki_did = config.deck_config(ah_did).anki_id
-        deck_name = aqt.mw.col.decks.name(anki_did)
-        if aqt.mw.col.find_notes(f'"deck:{deck_name}" "tag:{SUBDECK_TAG}*"'):
-            if ask_user(
-                "The deck you subscribed to contains subdeck tags.<br>"
-                "Do you want to enable subdecks for this deck?"
-            ):
-                self._select_deck(ah_did)
-                self._on_toggle_subdecks()
-
-        cleanup_after_deck_install()
-
-        showInfo(
-            text=messages.deck_import_summary(deck_name, import_result),
-            parent=self,
-            title="AnkiHub Deck Import Summary",
-        )
 
     def _select_deck(self, ah_did: uuid.UUID):
         deck_item = next(
@@ -345,178 +316,87 @@ class StudyDeckWithoutHelpButton(StudyDeck):
         )
 
 
-class SubscribeDialog(QDialog):
-    silentlyClose = True
+def download_and_install_decks(
+    ankihub_decks: List[Deck], on_success: Callable[[], None]
+) -> None:
+    """Downloads and installs the given decks in the background. Calls on_success when done."""
 
-    def __init__(self):
-        super(SubscribeDialog, self).__init__()
-
-        self.import_result: Optional[AnkiHubImportResult] = None
-
-        self.results = None
-        self.thread = None  # type: ignore
-        self.box_top = QVBoxLayout()
-        self.box_mid = QHBoxLayout()
-        self.box_left = QVBoxLayout()
-        self.box_right = QVBoxLayout()
-
-        self.deck_id_box = QHBoxLayout()
-        self.deck_id_box_label = QLabel("Deck ID:")
-        self.deck_id_box_text = QLineEdit("", self)
-        self.deck_id_box_text.setMinimumWidth(300)
-        self.deck_id_box.addWidget(self.deck_id_box_label)
-        self.deck_id_box.addWidget(self.deck_id_box_text)
-        self.box_left.addLayout(self.deck_id_box)
-
-        self.box_mid.addLayout(self.box_left)
-        self.box_mid.addSpacing(20)
-        self.box_mid.addLayout(self.box_right)
-
-        self.buttonbox = QDialogButtonBox(
-            QDialogButtonBox.StandardButton.Ok | QDialogButtonBox.StandardButton.Cancel  # type: ignore
-        )
-        self.buttonbox.button(QDialogButtonBox.StandardButton.Ok).setText("Subscribe")
-        self.browse_btn = self.buttonbox.addButton(
-            "Browse Decks", QDialogButtonBox.ButtonRole.ActionRole
-        )
-        qconnect(self.browse_btn.clicked, self._on_browse_deck)
-        qconnect(self.buttonbox.accepted, self._subscribe)
-        self.buttonbox.rejected.connect(self.close)
-
-        self.instructions_label = QLabel(
-            "<center>Copy/Paste a Deck ID from AnkiHub.net/decks to subscribe.</center>"
-        )
-        # Add all widgets to top layout.
-        self.box_top.addWidget(self.instructions_label)
-        self.box_top.addSpacing(10)
-        self.box_top.addLayout(self.box_mid)
-        self.box_top.addStretch(1)
-        self.box_top.addWidget(self.buttonbox)
-        self.setLayout(self.box_top)
-
-        self.setMinimumWidth(500)
-        self.setSizePolicy(QSizePolicy.Policy.Minimum, QSizePolicy.Policy.Minimum)
-        self.setWindowTitle("Subscribe to AnkiHub Deck")
-
-        self.client = AnkiHubClient()
-        if not config.is_logged_in():
-            showText("Oops! Please make sure you are logged into AnkiHub!")
-            self.close()
-        else:
-            self.show()
-
-    def run(self) -> Optional[AnkiHubImportResult]:
-        self.exec()
-        return self.import_result
-
-    def _subscribe(self) -> None:
-        ah_did_str = self.deck_id_box_text.text().strip()
-
-        try:
-            ah_did = uuid.UUID(ah_did_str)
-        except ValueError:
-            showInfo(
-                "The format of the Deck ID is invalid. Please make sure you copied the Deck ID correctly."
-            )
-            return
-
-        if ah_did in config.deck_ids():
-            showText(
-                f"You've already subscribed to deck {ah_did}. "
-                "Syncing with AnkiHub will happen automatically everytime you "
-                "restart Anki. You can manually sync with AnkiHub from the AnkiHub "
-                f"menu. See {url_help()} for more details."
-            )
-            self.close()
-            return
-
-        confirmed = ask_user(
-            f"Would you like to proceed with downloading and installing the deck? "
-            f"Your personal collection will be modified.<br><br>"
-            f"See <a href='{url_help()}'>{url_help()}</a> for details.",
-            title="Please confirm to proceed.",
-        )
-        if not confirmed:
-            return
-
-        def on_success(import_result: AnkiHubImportResult):
-            self.import_result = import_result
-            self.accept()
-
-        download_and_install_deck(ah_did, on_success=on_success, on_failure=self.reject)
-
-    def _on_browse_deck(self) -> None:
-        openLink(url_decks())
-
-
-def download_and_install_deck(
-    ankihub_did: uuid.UUID,
-    on_success: Optional[Callable[[AnkiHubImportResult], None]] = None,
-    on_failure: Optional[Callable[[], None]] = None,
-):
     def on_install_done(future: Future):
-        try:
-            import_result: AnkiHubImportResult = future.result()
-        except Exception as exc:
-            LOGGER.info("Error installing deck.")
-            if on_failure is not None:
-                on_failure()
+        import_results: List[AnkiHubImportResult] = future.result()
 
-            raise exc
+        # Clean up after deck installations
+        cleanup_after_deck_install()
 
+        # Reset the main window
         aqt.mw.reset()
 
-        if on_success is not None:
-            on_success(import_result)
+        # Ask user to enable subdecks if necessary for each deck that was installed.
+        for import_result in import_results:
+            ah_did = import_result.ankihub_did
+            anki_did = config.deck_config(ah_did).anki_id
+            deck_name = aqt.mw.col.decks.name(anki_did)
+            if aqt.mw.col.find_notes(f'"deck:{deck_name}" "tag:{SUBDECK_TAG}*"'):
+                if ask_user(
+                    "The deck you subscribed to contains subdeck tags.<br>"
+                    "Do you want to enable subdecks for this deck?"
+                ):
+                    # TODO implement this somehow
+                    raise NotImplementedError
+                    # self._select_deck(ah_did)
+                    # self._on_toggle_subdecks()
 
-    try:
-        deck_info = AnkiHubClient().get_deck_by_id(ankihub_did)
-    except AnkiHubHTTPError as e:
-        if e.response.status_code == 404:
-            showText(
-                f"Deck {ankihub_did} doesn't exist. Please make sure to copy/paste "
-                f"the correct ID. If you believe this is an error, please reach "
-                f"out to user support at help@ankipalace.com."
+        # Show import result message
+        import_summaries = [
+            messages.deck_import_summary(
+                deck_name=config.deck_config(import_result.ankihub_did).name,
+                import_result=import_result,
             )
-            return
-        elif e.response.status_code == 403:
-            deck_url = f"{url_view_deck()}{ankihub_did}"
-            showInfo(
-                f"Please first subscribe to the deck on the AnkiHub website.<br>"
-                f"Link to the deck: <a href='{deck_url}'>{deck_url}</a><br>"
-                "<br>"
-                "Note that you also need an active AnkiHub subscription.<br>"
-                "You can get a subscription at<br>"
-                "<a href='https://www.ankihub.net/'>https://www.ankihub.net/</a>",
-            )
-            return
-        else:
-            raise e
-
-    def on_download_done(future: Future) -> None:
-        notes_data: List[NoteInfo] = future.result()
-
-        aqt.mw.taskman.with_progress(
-            lambda: _install_deck(
-                notes_data=notes_data,
-                deck_name=deck_info.name,
-                ankihub_did=ankihub_did,
-                latest_update=deck_info.csv_last_upload,
-                is_creator=deck_info.owner,
-            ),
-            on_done=on_install_done,
-            parent=aqt.mw,
-            label="Installing deck...",
+            for import_result in import_results
+        ]
+        text = "<br><hr><br>".join(import_summaries)
+        showInfo(
+            title="AnkiHub Deck Import Summary",
+            text=text,
         )
 
+        on_success()
+
+    # Install decks in background
     aqt.mw.taskman.with_progress(
-        lambda: AnkiHubClient().download_deck(
-            deck_info.ankihub_deck_uuid, download_progress_cb=_download_progress_cb
+        task=lambda: download_and_install_decks_inner(
+            [deck.ankihub_deck_uuid for deck in ankihub_decks]
         ),
-        on_done=on_download_done,
-        parent=aqt.mw,
-        label="Downloading deck...",
+        on_done=on_install_done,
+        label="Downloading decks from AnkiHub",
     )
+
+
+def download_and_install_decks_inner(
+    ankihub_dids: List[uuid.UUID],
+) -> List[AnkiHubImportResult]:
+    # TODO should we install other decks if one fails?
+    result = []
+    for ah_did in ankihub_dids:
+        result.append(download_and_install_deck(ah_did))
+    return result
+
+
+def download_and_install_deck(ankihub_did: uuid.UUID) -> AnkiHubImportResult:
+    deck_info = AnkiHubClient().get_deck_by_id(ankihub_did)
+
+    notes_data: List[NoteInfo] = AnkiHubClient().download_deck(
+        deck_info.ankihub_deck_uuid, download_progress_cb=_download_progress_cb
+    )
+
+    result = _install_deck(
+        notes_data=notes_data,
+        deck_name=deck_info.name,
+        ankihub_did=ankihub_did,
+        latest_update=deck_info.csv_last_upload,
+        is_creator=deck_info.owner,
+    )
+
+    return result
 
 
 def _install_deck(
