@@ -329,10 +329,20 @@ def download_and_install_decks(
 def download_and_install_decks_inner(
     ankihub_dids: List[uuid.UUID],
 ) -> List[AnkiHubImportResult]:
-    # TODO should we install other decks if one fails?
+    """Downloads and installs the given decks.
+    Attempts to install all decks even if some fail."""
     result = []
+    exceptions = []
     for ah_did in ankihub_dids:
-        result.append(download_and_install_deck(ah_did))
+        try:
+            result.append(download_and_install_deck(ah_did))
+        except Exception as e:
+            exceptions.append(e)
+
+    if exceptions:
+        # Raise the first exception that occurred
+        raise exceptions[0]
+
     return result
 
 
