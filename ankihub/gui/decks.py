@@ -80,10 +80,6 @@ class SubscribedDecksDialog(QDialog):
         self.decks_list = QListWidget()
         qconnect(self.decks_list.itemSelectionChanged, self._on_item_selection_changed)
 
-        self.add_btn = QPushButton("Add")
-        self.box_right.addWidget(self.add_btn)
-        qconnect(self.add_btn.clicked, self._on_add)
-
         self.unsubscribe_btn = QPushButton("Unsubscribe")
         self.box_right.addWidget(self.unsubscribe_btn)
         qconnect(self.unsubscribe_btn.clicked, self._on_unsubscribe)
