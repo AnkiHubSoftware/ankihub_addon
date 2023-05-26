@@ -1,14 +1,27 @@
-Deck successfully imported from AnkiHub!<br>
+{% if decks|length > 1 %}
+Decks successfully imported from AnkiHub!
+{% else %}
+Deck successfully imported from AnkiHub!
+{% endif %}
+
+{% for deck, import_result, anki_deck_name in zip(decks, import_results, anki_deck_names) %}
+<hr>
 <br>
-The imported notes are in the deck<br>
-<b>{{deck_name}}</b>.<br>
+<b>{{deck.name}}</b><br>
 <br>
 Added {{import_result.created_nids|length}} note(s).<br>
 Updated {{import_result.updated_nids|length}} note(s).<br>
 Skipped {{import_result.skipped_nids|length}} note(s).<br>
 
-{% if import_result.skipped_nids %}
-<br>
-Notes with the same ID as notes in another AnkiHub deck you have installed were skipped.<be>
-If you have any questions about this, see <a href='https://community.ankihub.net/t/draft-why-are-notes-skipped-after-subscribing-to-a-deck/934'>this forum topic</a> for details.
+{% if deck.name != anki_deck_name %}
+The imported notes are in the deck <b>{{anki_deck_name}}</b>.<br>
 {% endif %}
+
+{% if import_result.skipped_nids %}
+Notes with the same ID as notes in another AnkiHub deck you have installed were skipped.<br>
+If you have any questions about this, see <a
+    href='https://community.ankihub.net/t/draft-why-are-notes-skipped-after-subscribing-to-a-deck/934'>this forum
+    topic</a> for details.
+{% endif %}
+
+{% endfor %}

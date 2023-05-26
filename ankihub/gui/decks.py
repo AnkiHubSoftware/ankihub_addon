@@ -301,17 +301,20 @@ def download_and_install_decks(
                 confirm_and_toggle_subdecks(ah_did)
 
         # Show import result message
-        import_summaries = [
-            messages.deck_import_summary(
-                deck_name=config.deck_config(import_result.ankihub_did).name,
-                import_result=import_result,
-            )
-            for import_result in import_results
+        # ... Anki deck names can be different from AnkiHub deck names, so we need to look them up.
+        anki_deck_names = [
+            aqt.mw.col.decks.name(config.deck_config(deck.ankihub_deck_uuid).anki_id)
+            for deck in ankihub_decks
         ]
-        text = "<br><hr><br>".join(import_summaries)
+        message = messages.deck_import_summary(
+            decks=ankihub_decks,
+            import_results=import_results,
+            anki_deck_names=anki_deck_names,
+        )
         showInfo(
             title="AnkiHub Deck Import Summary",
-            text=text,
+            text=message,
+            textFormat="rich",
         )
 
         on_success()
