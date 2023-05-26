@@ -7,8 +7,7 @@ from uuid import UUID
 
 import aqt
 from anki.collection import OpChanges
-from aqt import dialogs, gui_hooks
-from aqt.browser import Browser
+from aqt import gui_hooks
 from aqt.emptycards import show_empty_cards
 from aqt.operations.tag import clear_unused_tags
 from aqt.qt import (
@@ -33,9 +32,10 @@ from ..importing import AnkiHubImportResult
 from ..media_sync import media_sync
 from ..messages import messages
 from ..settings import config, url_deck_base
-from ..subdecks import SUBDECK_TAG, build_subdecks_and_move_cards_to_them, flatten_deck
+from ..subdecks import SUBDECK_TAG
 from ..sync import AnkiHubImporter
 from ..utils import create_backup, undo_note_type_modfications
+from .subdecks import confirm_and_toggle_subdecks
 from .utils import ask_user, set_tooltip_icon
 
 
@@ -221,9 +221,8 @@ class SubscribedDecksDialog(QDialog):
 
         deck_item = deck_items[0]
         ankihub_id: UUID = deck_item.data(Qt.ItemDataRole.UserRole)
-        deck_config = config.deck_config(ankihub_id)
-        using_subdecks = deck_config.subdecks_enabled
 
+        deck_config = config.deck_config(ankihub_id)
         if aqt.mw.col.decks.name_if_exists(deck_config.anki_id) is None:
             showInfo(
                 (
@@ -231,43 +230,10 @@ class SubscribedDecksDialog(QDialog):
                     "It might help to reset local changes to the deck first.<br>"
                     "(You can do that from the AnkiHub menu in the Anki browser.)"
                 ),
-                parent=self,
             )
             return
 
-        def on_done(future: Future):
-            future.result()
-
-            tooltip("Subdecks updated.", parent=self)
-            aqt.mw.deckBrowser.refresh()
-            browser: Optional[Browser] = dialogs._dialogs["Browser"][1]
-            if browser is not None:
-                browser.sidebar.refresh()
-
-        if using_subdecks:
-            flatten = ask_user(
-                "Do you want to remove the subdecks of<br>"
-                f"<i>{deck_item.text()}</i>?<br><br>"
-                "<b>Warning:</b> This will remove all subdecks of this deck and move "
-                "all of its cards back to the main deck.</b>",
-                defaultno=True,
-            )
-            if flatten is None:
-                return
-            elif flatten:
-                aqt.mw.taskman.with_progress(
-                    label="Removing subdecks and moving cards...",
-                    task=lambda: flatten_deck(ankihub_id),
-                    on_done=on_done,
-                )
-        else:
-            aqt.mw.taskman.with_progress(
-                label="Building subdecks and moving cards...",
-                task=lambda: build_subdecks_and_move_cards_to_them(ankihub_id),
-                on_done=on_done,
-            )
-
-        config.set_subdecks(ankihub_id, not using_subdecks)
+        confirm_and_toggle_subdecks(ankihub_id)
 
         self._refresh_subdecks_button()
 
@@ -336,14 +302,7 @@ def download_and_install_decks(
             anki_did = config.deck_config(ah_did).anki_id
             deck_name = aqt.mw.col.decks.name(anki_did)
             if aqt.mw.col.find_notes(f'"deck:{deck_name}" "tag:{SUBDECK_TAG}*"'):
-                if ask_user(
-                    "The deck you subscribed to contains subdeck tags.<br>"
-                    "Do you want to enable subdecks for this deck?"
-                ):
-                    # TODO implement this somehow
-                    raise NotImplementedError
-                    # self._select_deck(ah_did)
-                    # self._on_toggle_subdecks()
+                confirm_and_toggle_subdecks(ah_did)
 
         # Show import result message
         import_summaries = [
