@@ -96,3 +96,13 @@ def migrate_ankihub_db():
         LOGGER.info(
             f"AnkiHub DB migrated to schema version {ankihub_db.schema_version()}"
         )
+
+    if ankihub_db.schema_version() <= 6:
+        with ankihub_db.connection() as conn:
+            # Remove newlines from tags
+            conn.execute("UPDATE notes SET tags = REPLACE(tags, '\n', '')")
+            conn.execute("PRAGMA user_version = 7;")
+
+        LOGGER.info(
+            f"AnkiHub DB migrated to schema version {ankihub_db.schema_version()}"
+        )
