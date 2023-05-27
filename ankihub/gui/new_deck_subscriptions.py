@@ -1,3 +1,4 @@
+"""Check if the user is subscribed to any decks that are not installed and install them if the user agrees."""
 from typing import List
 
 from ..addon_ankihub_client import AddonAnkiHubClient as AnkiHubClient
