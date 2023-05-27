@@ -31,7 +31,6 @@ from ..ankihub_client import AnkiHubHTTPError, get_image_names_from_notes_data
 from ..db import ankihub_db
 from ..deck_creation import create_ankihub_deck
 from ..errors import upload_logs_in_background
-from ..gui.pre_sync_check import check_and_install_new_subscriptions
 from ..media_import.ui import open_import_dialog
 from ..media_sync import media_sync
 from ..settings import ADDON_VERSION, config, url_view_deck
@@ -39,6 +38,7 @@ from ..subdecks import SUBDECK_TAG
 from ..sync import ah_sync, show_tooltip_about_last_sync_results
 from .db_check import maybe_check_databases
 from .decks import SubscribedDecksDialog
+from .new_deck_subscriptions import check_and_install_new_subscriptions
 from .utils import (
     ask_user,
     check_and_prompt_for_updates_on_main_window,
@@ -329,24 +329,20 @@ def _create_collaborative_deck_setup(parent):
 
 
 def _sync_with_ankihub_action():
-    # Check and install new subscriptions, then sync all decks and media
+    # Sync all decks and media, then check for new subscriptions
 
-    def sync_decks_and_media():
-        aqt.mw.taskman.with_progress(
-            task=ah_sync.sync_all_decks_and_media,
-            immediate=True,
-            on_done=_on_sync_done,
-        )
+    def on_sync_done(future: Future) -> None:
+        future.result()
 
-    check_and_install_new_subscriptions(on_success=sync_decks_and_media)
+        show_tooltip_about_last_sync_results()
+        check_and_install_new_subscriptions(on_success=lambda: None)
+        maybe_check_databases()
 
-
-def _on_sync_done(future: Future) -> None:
-    future.result()
-
-    show_tooltip_about_last_sync_results()
-
-    maybe_check_databases()
+    aqt.mw.taskman.with_progress(
+        task=ah_sync.sync_all_decks_and_media,
+        immediate=True,
+        on_done=on_sync_done,
+    )
 
 
 def _sign_out_action():
