@@ -1,8 +1,6 @@
 import uuid
 from typing import Callable, List, Optional
 
-from aqt.utils import showWarning
-
 from ... import LOGGER
 from ...addon_ankihub_client import AddonAnkiHubClient as AnkiHubClient
 from ...db import ankihub_db
@@ -56,13 +54,6 @@ def check_ankihub_db(on_success: Optional[Callable[[], None]] = None):
             client.get_deck_by_id(deck_id) for deck_id in ah_dids_with_something_missing
         ]
         download_and_install_decks(decks, on_success=on_success)
-
-
-def _show_failure_message() -> None:
-    showWarning(
-        "AnkiHub was unable to download and import all deck(s).",
-        title="AnkiHub",
-    )
 
 
 def _decks_missing_from_config() -> List[uuid.UUID]:
