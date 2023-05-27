@@ -479,8 +479,10 @@ def test_download_and_install_decks(
         assert config.deck_ids() == [deck.ankihub_deck_uuid]
 
         # Assert that the mocked functions were called
-        for mock in mocks.values():
-            mock.assert_called_once()
+        for name, mock in mocks.items():
+            assert (
+                mock.call_count == 1
+            ), f"Mock {name} was not called once, but {mock.call_count} times"
 
 
 def test_get_deck_by_id(
