@@ -1,4 +1,4 @@
-from typing import Callable, List
+from typing import List
 
 from ..addon_ankihub_client import AddonAnkiHubClient as AnkiHubClient
 from ..ankihub_client import Deck
@@ -8,14 +8,13 @@ from .decks import download_and_install_decks
 from .utils import ask_user
 
 
-def check_and_install_new_subscriptions(on_success: Callable[[], None]):
+def check_and_install_new_subscriptions():
     """Check if there are any new deck subscriptions and install them if the user agrees.
     on_success is called when this process is finished (even if no new decks are installed)."""
 
     # Check if there are any new subscriptions
     decks = _not_installed_ah_decks()
     if not decks:
-        on_success()
         return
 
     # Ask user to confirm the installations.
@@ -23,11 +22,10 @@ def check_and_install_new_subscriptions(on_success: Callable[[], None]):
         title="AnkiHub Deck Installation",
         text=messages.deck_install_confirmation(decks),
     ):
-        on_success()
         return
 
     # Download the new decks
-    download_and_install_decks(decks, on_success=on_success)
+    download_and_install_decks(decks, on_success=lambda: None)
 
 
 def _not_installed_ah_decks() -> List[Deck]:

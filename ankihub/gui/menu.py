@@ -335,7 +335,7 @@ def _sync_with_ankihub_action():
         future.result()
 
         show_tooltip_about_last_sync_results()
-        check_and_install_new_subscriptions(on_success=lambda: None)
+        check_and_install_new_subscriptions()
         maybe_check_databases()
 
     aqt.mw.taskman.with_progress(
