@@ -8,9 +8,12 @@ from .decks import download_and_install_decks
 from .utils import ask_user
 
 
-def check_and_install_new_subscriptions():
+def check_and_install_new_subscriptions() -> None:
     """Check if there are any new deck subscriptions and install them if the user agrees.
     on_success is called when this process is finished (even if no new decks are installed)."""
+
+    if not AnkiHubClient().is_feature_flag_enabled("new_subscription_workflow_enabled"):
+        return
 
     # Check if there are any new subscriptions
     decks = _not_installed_ah_decks()
