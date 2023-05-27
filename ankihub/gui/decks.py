@@ -401,7 +401,9 @@ class StudyDeckWithoutHelpButton(StudyDeck):
 def download_and_install_decks(
     ankihub_decks: List[Deck], on_success: Callable[[], None]
 ) -> None:
-    """Downloads and installs the given decks in the background. Calls on_success when done."""
+    """Downloads and installs the given decks in the background.
+    Shows an import summary once the decks are installed.
+    Calls on_success when done."""
 
     def on_install_done(future: Future):
         import_results: List[AnkiHubImportResult] = future.result()
