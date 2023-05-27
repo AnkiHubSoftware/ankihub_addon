@@ -294,6 +294,15 @@ class SubscribedDecksDialog(QDialog):
         return cls._window
 
 
+class StudyDeckWithoutHelpButton(StudyDeck):
+    def __init__(self, *args, **kwargs) -> None:
+        super().__init__(*args, **kwargs)
+
+        self.form.buttonBox.removeButton(
+            self.form.buttonBox.button(QDialogButtonBox.StandardButton.Help)
+        )
+
+
 class SubscribeDialog(QDialog):
     silentlyClose = True
 
@@ -387,15 +396,6 @@ class SubscribeDialog(QDialog):
 
     def _on_browse_deck(self) -> None:
         openLink(url_decks())
-
-
-class StudyDeckWithoutHelpButton(StudyDeck):
-    def __init__(self, *args, **kwargs) -> None:
-        super().__init__(*args, **kwargs)
-
-        self.form.buttonBox.removeButton(
-            self.form.buttonBox.button(QDialogButtonBox.StandardButton.Help)
-        )
 
 
 def download_and_install_decks(
