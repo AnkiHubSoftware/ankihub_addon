@@ -412,7 +412,7 @@ def download_and_install_decks(
         # Reset the main window
         aqt.mw.reset()
 
-        # Ask user to enable subdecks if necessary for each deck that was installed.
+        # Ask user to enable subdecks if available for each deck that was installed.
         for import_result in import_results:
             ah_did = import_result.ankihub_did
             anki_did = config.deck_config(ah_did).anki_id
