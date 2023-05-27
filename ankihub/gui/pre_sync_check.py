@@ -9,7 +9,7 @@ from .utils import ask_user
 
 
 def check_and_install_new_subscriptions(on_success: Callable[[], None]):
-    """Check if there are any new subscriptions and install them if the user agrees.
+    """Check if there are any new deck subscriptions and install them if the user agrees.
     on_success is called when this process is finished (even if no new decks are installed)."""
 
     # Check if there are any new subscriptions
