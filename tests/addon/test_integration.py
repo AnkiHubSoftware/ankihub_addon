@@ -7,7 +7,7 @@ from datetime import datetime, timedelta, timezone
 from pathlib import Path
 from time import sleep
 from typing import Any, Callable, Dict, List, Optional, Protocol, Tuple
-from unittest.mock import MagicMock, Mock
+from unittest.mock import MagicMock, Mock, patch
 from zipfile import ZipFile
 
 import aqt
@@ -59,6 +59,7 @@ from ankihub.ankihub_client import (
 )
 from ankihub.ankihub_client.ankihub_client import (
     ANKIHUB_DATETIME_FORMAT_STR,
+    DEFAULT_API_URL,
     DeckExtensionUpdateChunk,
     _transform_notes_data,
 )
@@ -1341,24 +1342,76 @@ def create_copy_of_note_type(mw: AnkiQt, note_type: NotetypeDict) -> NotetypeDic
     return new_model
 
 
-def test_unsubsribe_from_deck(
+@pytest.mark.parametrize("is_flag_active", [True, False])
+def test_unsubscribe_from_deck(
     anki_session_with_addon_data: AnkiSession,
     install_sample_ah_deck: InstallSampleAHDeck,
+    qtbot: QtBot,
+    set_feature_flag_state,
+    monkeypatch: MonkeyPatch,
+    is_flag_active: bool,
+    requests_mock: Mocker,
 ):
     from aqt import mw
 
     anki_session = anki_session_with_addon_data
+    set_feature_flag_state(
+        feature_flag_name="new_subscription_workflow_enabled", is_active=is_flag_active
+    )
     with anki_session.profile_loaded():
-        _, ah_did = install_sample_ah_deck()
+        anki_deck_id, ah_did = install_sample_ah_deck()
 
         mids = ankihub_db.note_types_for_ankihub_deck(ah_did)
         assert len(mids) == 2
 
-        SubscribedDecksDialog.unsubscribe_from_deck(ah_did)
+        monkeypatch.setattr(
+            "ankihub.settings._Config.is_logged_in",
+            lambda *args, **kwargs: True,
+        )
+        if is_flag_active:
+            deck = mw.col.decks.get(anki_deck_id)
+            requests_mock.get(
+                f"{DEFAULT_API_URL}/decks/subscriptions/",
+                status_code=200,
+                json=[
+                    {
+                        "deck": {
+                            "id": str(ah_did),
+                            "name": deck["name"],
+                            "owner": 1,
+                            "anki_id": anki_deck_id,
+                            "csv_last_upload": None,
+                            "csv_notes_filename": "",
+                            "image_upload_finished": True,
+                        }
+                    }
+                ],
+            )
+        dialog = SubscribedDecksDialog()
+        qtbot.wait(500)
+
+        decks_list = dialog.decks_list
+        deck_item_index = 0
+        deck_item = decks_list.item(deck_item_index)
+        deck_item.setSelected(True)
+        monkeypatch.setattr(
+            "ankihub.gui.decks.ask_user",
+            lambda *args, **kwargs: True,
+        )
+        if is_flag_active:
+            requests_mock.get(
+                f"{DEFAULT_API_URL}/decks/subscriptions/", status_code=200, json=[]
+            )
+            with patch.object(
+                AnkiHubClient, "unsubscribe_from_deck"
+            ) as unsubscribe_from_deck_mock:
+                qtbot.mouseClick(dialog.unsubscribe_btn, Qt.MouseButton.LeftButton)
+                unsubscribe_from_deck_mock.assert_called_once()
+        else:
+            qtbot.mouseClick(dialog.unsubscribe_btn, Qt.MouseButton.LeftButton)
 
         # check if note type modifications were removed
         assert all(not note_type_contains_field(mw.col.models.get(mid)) for mid in mids)
-
         assert all(
             not re.search(
                 ANKIHUB_TEMPLATE_SNIPPET_RE, mw.col.models.get(mid)["tmpls"][0]["afmt"]
@@ -1372,6 +1425,7 @@ def test_unsubsribe_from_deck(
 
         nids = ankihub_db.anki_nids_for_ankihub_deck(ah_did)
         assert len(nids) == 0
+        assert dialog.decks_list.count() == 0
 
 
 def import_note_types_for_sample_deck(mw: AnkiQt):

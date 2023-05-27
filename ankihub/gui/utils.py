@@ -174,6 +174,7 @@ def ask_user(
     msg = QMessageBox(parent=parent)
     msg.setWindowTitle(title)
     msg.setText(text)
+    msg.setTextFormat(Qt.TextFormat.RichText)
 
     buttons = (
         QMessageBox.StandardButton.Yes
