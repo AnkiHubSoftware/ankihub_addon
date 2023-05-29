@@ -85,6 +85,7 @@ from ankihub.gui.browser import (
 from ankihub.gui.custom_search_nodes import UpdatedSinceLastReviewSearchNode
 from ankihub.gui.decks import SubscribedDecksDialog, download_and_install_decks
 from ankihub.gui.editor import _on_suggestion_button_press, _refresh_buttons
+from ankihub.gui.new_deck_subscriptions import check_and_install_new_deck_subscriptions
 from ankihub.gui.optional_tag_suggestion_dialog import OptionalTagsSuggestionDialog
 from ankihub.importing import (
     AnkiHubImporter,
@@ -483,6 +484,53 @@ def test_download_and_install_decks(
             assert (
                 mock.call_count == 1
             ), f"Mock {name} was not called once, but {mock.call_count} times"
+
+
+def test_check_and_install_new_deck_subscriptions(
+    anki_session_with_addon_data: AnkiSession,
+    monkeypatch: MonkeyPatch,
+    qtbot: QtBot,
+    set_feature_flag_state: Callable[[str, bool], None],
+):
+    set_feature_flag_state(
+        feature_flag_name="new_subscription_workflow_enabled", is_active=True
+    )
+
+    anki_session = anki_session_with_addon_data
+    with anki_session.profile_loaded():
+
+        # Mock get_deck_subscriptions function to return a deck
+        deck = DeckFactory.create()
+        get_deck_subscription_mock = Mock()
+        monkeypatch.setattr(
+            AnkiHubClient, "get_deck_subscriptions", get_deck_subscription_mock
+        )
+        get_deck_subscription_mock.return_value = [deck]
+
+        # Mock ask_user function to return True
+        ask_user_mock = Mock()
+        monkeypatch.setattr(gui.new_deck_subscriptions, "ask_user", ask_user_mock)
+        ask_user_mock.return_value = True
+
+        # Mock download and install function to do nothing (we only want to check that it is called)
+        download_and_install_decks_mock = Mock()
+        monkeypatch.setattr(
+            gui.new_deck_subscriptions,
+            "download_and_install_decks",
+            download_and_install_decks_mock,
+        )
+
+        # Call the function
+        check_and_install_new_deck_subscriptions()
+
+        qtbot.wait(500)
+
+        # Assert that the mocked functions were called
+        assert get_deck_subscription_mock.call_count == 1
+        assert ask_user_mock.call_count == 1
+
+        assert download_and_install_decks_mock.call_count == 1
+        assert download_and_install_decks_mock.call_args[0][0] == [deck]
 
 
 def test_get_deck_by_id(
