@@ -261,6 +261,7 @@ class SubscribedDecksDialog(QDialog):
         one_selected: bool = len(selection) == 1
 
         if not one_selected:
+            self.toggle_subdecks_btn.setEnabled(False)
             return
 
         ankihub_did: UUID = selection[0].data(Qt.ItemDataRole.UserRole)
