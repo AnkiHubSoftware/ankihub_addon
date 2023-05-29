@@ -9,12 +9,11 @@ from pytest import fixture
 from pytest_anki import AnkiSession
 from requests_mock import Mocker
 
-from ankihub.ankihub_client.ankihub_client import DEFAULT_API_URL
-
 # workaround for vscode test discovery not using pytest.ini which sets this env var
 # has to be set before importing ankihub
 os.environ["SKIP_INIT"] = "1"
 
+from ankihub.ankihub_client.ankihub_client import DEFAULT_API_URL
 from ankihub.utils import modify_note_type
 
 
