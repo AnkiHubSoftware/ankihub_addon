@@ -466,6 +466,9 @@ def _download_and_install_deck(deck: Deck) -> AnkiHubImportResult:
         deck.ankihub_deck_uuid, download_progress_cb=_download_progress_cb
     )
 
+    aqt.mw.taskman.run_on_main(
+        lambda: aqt.mw.progress.update(label="Installing deck...", max=0, value=0)
+    )
     result = _install_deck(
         notes_data=notes_data,
         deck_name=deck.name,
