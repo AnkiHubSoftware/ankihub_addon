@@ -1412,6 +1412,8 @@ def test_unsubscribe_from_deck(
         else:
             qtbot.mouseClick(dialog.unsubscribe_btn, Qt.MouseButton.LeftButton)
 
+        assert dialog.decks_list.count() == 0
+
         # check if note type modifications were removed
         assert all(not note_type_contains_field(mw.col.models.get(mid)) for mid in mids)
         assert all(
@@ -1427,7 +1429,6 @@ def test_unsubscribe_from_deck(
 
         nids = ankihub_db.anki_nids_for_ankihub_deck(ah_did)
         assert len(nids) == 0
-        assert dialog.decks_list.count() == 0
 
 
 def import_note_types_for_sample_deck(mw: AnkiQt):
