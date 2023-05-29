@@ -15,7 +15,7 @@ import aqt
 import sentry_sdk
 from anki.errors import BackendIOError, DBError, SyncError
 from anki.utils import checksum, is_win
-from aqt.utils import askUser, showText, showWarning, tooltip
+from aqt.utils import askUser, showWarning, tooltip
 from requests import exceptions
 from sentry_sdk import capture_exception, push_scope
 from sentry_sdk.integrations.argv import ArgvIntegration
@@ -153,8 +153,6 @@ def _try_handle_exception(
             LOGGER.info("AnkiHubRequestError was handled.")
             return True
 
-        _show_warning_for_ankihub_request_error(exc_value)
-
     if isinstance(exc_value, AnkiHubRequestException):
         if isinstance(
             exc_value.original_exception, (exceptions.ConnectionError, ConnectionError)
@@ -214,10 +212,16 @@ def _maybe_handle_ankihub_http_error(error: AnkiHubHTTPError) -> bool:
         ):
             check_and_prompt_for_updates_on_main_window()
         return True
+    elif response.status_code == 403:
+        _show_warning_for_no_ankihub_membership_request_error(error)
+        return True
+
     return False
 
 
-def _show_warning_for_ankihub_request_error(exc_value: AnkiHubHTTPError) -> None:
+def _show_warning_for_no_ankihub_membership_request_error(
+    exc_value: AnkiHubHTTPError,
+) -> None:
     try:
         response_data = exc_value.response.json()
         details = (
@@ -229,7 +233,19 @@ def _show_warning_for_ankihub_request_error(exc_value: AnkiHubHTTPError) -> None
         details = None
 
     if details:
-        showText(f"Error while communicating with AnkiHub:\n{details}")
+        aqt.mw.taskman.run_on_main(
+            lambda: showWarning(  # type: ignore
+                "The action you are trying to perform requires an active membership."
+                "<br><br>"
+                'Unlock a membership here: <a href="https://app.ankihub.net/memberships/plans/">AnkiHub Plans</a>.'
+                "<br><br>"
+                "Or if you prefer, reach out for support at our "
+                '<a href="https://community.ankihub.net/">AnkiHub Community</a>.',
+            )
+        )
+        LOGGER.info(
+            "Unable to perform operation because user does not have an active AnkiHub membership."
+        )
 
 
 def _is_memory_full_error(exc_value: BaseException) -> bool:
