@@ -35,7 +35,7 @@ from ..importing import AnkiHubImportResult
 from ..media_sync import media_sync
 from ..messages import messages
 from ..settings import config, url_deck_base, url_decks, url_help
-from ..subdecks import SUBDECK_TAG
+from ..subdecks import SUBDECK_TAG, deck_contains_subdeck_tags
 from ..sync import AnkiHubImporter
 from ..utils import create_backup, undo_note_type_modfications
 from .subdecks import confirm_and_toggle_subdecks
@@ -425,9 +425,7 @@ def download_and_install_decks(
         # Ask user to enable subdecks if available for each deck that was installed.
         for import_result in import_results:
             ah_did = import_result.ankihub_did
-            anki_did = config.deck_config(ah_did).anki_id
-            deck_name = aqt.mw.col.decks.name(anki_did)
-            if aqt.mw.col.find_notes(f'"deck:{deck_name}" "tag:{SUBDECK_TAG}*"'):
+            if deck_contains_subdeck_tags(ah_did):
                 confirm_and_toggle_subdecks(ah_did)
 
         # Show import result message
