@@ -21,7 +21,11 @@ def confirm_and_toggle_subdecks(ankihub_id: uuid.UUID) -> None:
             "Do you want to remove the subdecks of<br>"
             f"<b>{config.deck_config(ankihub_id).name}</b>?<br><br>"
             "<b>Warning:</b> This will remove all subdecks of this deck and move "
-            "all of its cards back to the main deck.</b>",
+            "all of its cards back to the main deck.</b>"
+            "<br><br>"
+            "See <a href='https://docs.ankihub.net/user_docs/advanced.html#subdecks-and-subdeck-tags'>"
+            "the AnkiHub docs</a> "
+            "for details.",
             defaultno=True,
         ):
             return
@@ -33,8 +37,12 @@ def confirm_and_toggle_subdecks(ankihub_id: uuid.UUID) -> None:
         )
     else:
         if not ask_user(
-            "Do you want to enable subdecks for this deck?<br><br>"
-            f"<b>{config.deck_config(ankihub_id).name}</b>"
+            "Do you want to enable subdecks for<br>"
+            f"<b>{config.deck_config(ankihub_id).name}</b>?"
+            "<br><br>"
+            "See <a href='https://docs.ankihub.net/user_docs/advanced.html#subdecks-and-subdeck-tags'>"
+            "the AnkiHub docs</a> "
+            "for details."
         ):
             return
 
