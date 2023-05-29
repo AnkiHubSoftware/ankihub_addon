@@ -25,6 +25,7 @@ def check_and_install_new_subscriptions() -> None:
     if not ask_user(
         title="AnkiHub Deck Installation",
         text=messages.deck_install_confirmation(decks),
+        show_cancel_button=False,
     ):
         return
 

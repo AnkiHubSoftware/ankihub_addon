@@ -51,7 +51,7 @@ def cleanup_after_deck_install(multiple_decks: bool) -> None:
         )
         + "Do you want to clear unused tags and empty cards from your collection? (recommended)"
     )
-    if ask_user(message, title="AnkiHub"):
+    if ask_user(message, title="AnkiHub", show_cancel_button=False):
         clear_unused_tags(parent=aqt.mw).run_in_background()
         show_empty_cards(aqt.mw)
 

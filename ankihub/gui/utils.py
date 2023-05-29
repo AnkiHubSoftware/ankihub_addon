@@ -165,6 +165,7 @@ def ask_user(
     parent: QWidget = None,
     defaultno: bool = False,
     title: str = "Anki",
+    show_cancel_button: bool = True,
 ) -> Optional[bool]:
     "Show a yes/no question. Return true if yes. Return false if no. Return None if cancelled."
 
@@ -179,7 +180,7 @@ def ask_user(
     buttons = (
         QMessageBox.StandardButton.Yes
         | QMessageBox.StandardButton.No
-        | QMessageBox.StandardButton.Cancel
+        | (QMessageBox.StandardButton.Cancel if show_cancel_button else 0)
     )
     msg.setStandardButtons(buttons)  # type: ignore
     msg.setIcon(QMessageBox.Icon.Question)
