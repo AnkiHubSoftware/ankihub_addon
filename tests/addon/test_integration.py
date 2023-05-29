@@ -490,7 +490,7 @@ def test_check_and_install_new_deck_subscriptions(
     anki_session_with_addon_data: AnkiSession,
     monkeypatch: MonkeyPatch,
     qtbot: QtBot,
-    set_feature_flag_state: Callable[[str, bool], None],
+    set_feature_flag_state,
 ):
     set_feature_flag_state(
         feature_flag_name="new_subscription_workflow_enabled", is_active=True
