@@ -84,9 +84,14 @@ class SubscribedDecksDialog(QDialog):
         self.decks_list = QListWidget()
         qconnect(self.decks_list.itemSelectionChanged, self._on_item_selection_changed)
 
-        self.add_btn = QPushButton("Add")
-        self.box_right.addWidget(self.add_btn)
-        qconnect(self.add_btn.clicked, self._on_add)
+        if self.client.is_feature_flag_enabled("new_subscription_workflow_enabled"):
+            self.browse_btn = QPushButton("Browse Decks")
+            self.box_right.addWidget(self.browse_btn)
+            qconnect(self.browse_btn.clicked, lambda: openLink(url_decks()))
+        else:
+            self.add_btn = QPushButton("Add")
+            self.box_right.addWidget(self.add_btn)
+            qconnect(self.add_btn.clicked, self._on_add)
 
         self.unsubscribe_btn = QPushButton("Unsubscribe")
         self.box_right.addWidget(self.unsubscribe_btn)
@@ -120,11 +125,18 @@ class SubscribedDecksDialog(QDialog):
 
     def _refresh_decks_list(self) -> None:
         self.decks_list.clear()
-        for ah_did in config.deck_ids():
-            name = config.deck_config(ah_did).name
-            item = QListWidgetItem(name)
-            item.setData(Qt.ItemDataRole.UserRole, ah_did)
-            self.decks_list.addItem(item)
+        if self.client.is_feature_flag_enabled("new_subscription_workflow_enabled"):
+            for deck in self.client.get_deck_subscriptions():
+                name = deck.name
+                item = QListWidgetItem(name)
+                item.setData(Qt.ItemDataRole.UserRole, deck.ankihub_deck_uuid)
+                self.decks_list.addItem(item)
+        else:
+            for ah_did in config.deck_ids():
+                name = config.deck_config(ah_did).name
+                item = QListWidgetItem(name)
+                item.setData(Qt.ItemDataRole.UserRole, ah_did)
+                self.decks_list.addItem(item)
 
     def _refresh_anki(self) -> None:
         op = OpChanges()
@@ -191,14 +203,15 @@ class SubscribedDecksDialog(QDialog):
 
         for item in items:
             ankihub_did: UUID = item.data(Qt.ItemDataRole.UserRole)
+            if self.client.is_feature_flag_enabled("new_subscription_workflow_enabled"):
+                self.client.unsubscribe_from_deck(ankihub_did)
             config.unsubscribe_deck(ankihub_did)
-            self.unsubscribe_from_deck(ankihub_did)
+            self._clear_deck_changes(ankihub_did)
 
         tooltip("Unsubscribed from AnkiHub Deck.", parent=aqt.mw)
         self._refresh_decks_list()
 
-    @staticmethod
-    def unsubscribe_from_deck(ankihub_did: UUID) -> None:
+    def _clear_deck_changes(self, ankihub_did: UUID) -> None:
         mids = ankihub_db.note_types_for_ankihub_deck(ankihub_did)
         undo_note_type_modfications(mids)
         ankihub_db.remove_deck(ankihub_did)
@@ -304,12 +317,17 @@ class SubscribedDecksDialog(QDialog):
         selection = self.decks_list.selectedItems()
         one_selected: bool = len(selection) == 1
 
-        self.toggle_subdecks_btn.setEnabled(one_selected)
         if not one_selected:
+            self.toggle_subdecks_btn.setEnabled(False)
             return
 
         ankihub_did: UUID = selection[0].data(Qt.ItemDataRole.UserRole)
-        using_subdecks = config.deck_config(ankihub_did).subdecks_enabled
+        using_subdecks = False
+        if deck_from_config := config.deck_config(ankihub_did):
+            using_subdecks = deck_from_config.subdecks_enabled
+            self.toggle_subdecks_btn.setEnabled(True)
+        else:
+            self.toggle_subdecks_btn.setEnabled(False)
         self.toggle_subdecks_btn.setText(
             "Disable Subdecks" if using_subdecks else "Enable Subdecks"
         )
@@ -317,10 +335,15 @@ class SubscribedDecksDialog(QDialog):
     def _on_item_selection_changed(self) -> None:
         selection = self.decks_list.selectedItems()
         one_selected: bool = len(selection) == 1
+        is_deck_installed = False
+        if one_selected:
+            selected = selection[0]
+            ankihub_did: UUID = selected.data(Qt.ItemDataRole.UserRole)
+            is_deck_installed = bool(config.deck_config(ankihub_did))
 
         self.unsubscribe_btn.setEnabled(one_selected)
         self.open_web_btn.setEnabled(one_selected)
-        self.set_home_deck_btn.setEnabled(one_selected)
+        self.set_home_deck_btn.setEnabled(one_selected and is_deck_installed)
 
         self._refresh_subdecks_button()
 
