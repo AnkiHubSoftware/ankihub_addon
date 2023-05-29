@@ -85,9 +85,9 @@ class SubscribedDecksDialog(QDialog):
         qconnect(self.decks_list.itemSelectionChanged, self._on_item_selection_changed)
 
         if self.client.is_feature_flag_enabled("new_subscription_workflow_enabled"):
-            self.add_btn = QPushButton("Browse Decks")
-            self.box_right.addWidget(self.add_btn)
-            qconnect(self.add_btn.clicked, lambda: openLink(url_decks()))
+            self.browse_btn = QPushButton("Browse Decks")
+            self.box_right.addWidget(self.browse_btn)
+            qconnect(self.browse_btn.clicked, lambda: openLink(url_decks()))
         else:
             self.add_btn = QPushButton("Add")
             self.box_right.addWidget(self.add_btn)
@@ -317,7 +317,6 @@ class SubscribedDecksDialog(QDialog):
         selection = self.decks_list.selectedItems()
         one_selected: bool = len(selection) == 1
 
-        self.toggle_subdecks_btn.setEnabled(one_selected)
         if not one_selected:
             return
 
@@ -325,6 +324,9 @@ class SubscribedDecksDialog(QDialog):
         using_subdecks = False
         if deck_from_config := config.deck_config(ankihub_did):
             using_subdecks = deck_from_config.subdecks_enabled
+            self.toggle_subdecks_btn.setEnabled(True)
+        else:
+            self.toggle_subdecks_btn.setEnabled(False)
         self.toggle_subdecks_btn.setText(
             "Disable Subdecks" if using_subdecks else "Enable Subdecks"
         )
@@ -332,10 +334,15 @@ class SubscribedDecksDialog(QDialog):
     def _on_item_selection_changed(self) -> None:
         selection = self.decks_list.selectedItems()
         one_selected: bool = len(selection) == 1
+        is_deck_installed = False
+        if one_selected:
+            selected = selection[0]
+            ankihub_did: UUID = selected.data(Qt.ItemDataRole.UserRole)
+            is_deck_installed = bool(config.deck_config(ankihub_did))
 
         self.unsubscribe_btn.setEnabled(one_selected)
         self.open_web_btn.setEnabled(one_selected)
-        self.set_home_deck_btn.setEnabled(one_selected)
+        self.set_home_deck_btn.setEnabled(one_selected and is_deck_installed)
 
         self._refresh_subdecks_button()
 
