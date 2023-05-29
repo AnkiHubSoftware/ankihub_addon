@@ -12,7 +12,7 @@ from aqt.gui_hooks import profile_did_open, profile_will_close, sync_did_finish
 
 from . import LOGGER
 from .gui.db_check import maybe_check_databases
-from .gui.new_deck_subscriptions import check_and_install_new_subscriptions
+from .gui.new_deck_subscriptions import check_and_install_new_deck_subscriptions
 from .settings import ANKI_MINOR, config
 from .sync import ah_sync, show_tooltip_about_last_sync_results
 from .threading_utils import rate_limited
@@ -97,7 +97,7 @@ def _on_sync_did_finish() -> None:
     if auto_sync_state.synced_with_ankihub_on_last_ankiweb_sync:
         show_tooltip_about_last_sync_results()
         if not auto_sync_state.profile_is_closing:
-            check_and_install_new_subscriptions()
+            check_and_install_new_deck_subscriptions()
 
     if not auto_sync_state.profile_is_closing:
         maybe_check_databases()

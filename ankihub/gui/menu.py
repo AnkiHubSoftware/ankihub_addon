@@ -38,7 +38,7 @@ from ..subdecks import SUBDECK_TAG
 from ..sync import ah_sync, show_tooltip_about_last_sync_results
 from .db_check import maybe_check_databases
 from .decks import SubscribedDecksDialog
-from .new_deck_subscriptions import check_and_install_new_subscriptions
+from .new_deck_subscriptions import check_and_install_new_deck_subscriptions
 from .utils import (
     ask_user,
     check_and_prompt_for_updates_on_main_window,
@@ -335,7 +335,7 @@ def _sync_with_ankihub_action():
         future.result()
 
         show_tooltip_about_last_sync_results()
-        check_and_install_new_subscriptions()
+        check_and_install_new_deck_subscriptions()
         maybe_check_databases()
 
     aqt.mw.taskman.with_progress(
