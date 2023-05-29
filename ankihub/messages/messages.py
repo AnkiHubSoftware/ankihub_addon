@@ -11,13 +11,13 @@ env = Environment(loader=FileSystemLoader(templates), autoescape=select_autoesca
 
 
 def deck_import_summary(
-    decks: List[Deck],
-    import_results: List[AnkiHubImportResult],
+    ankihub_deck_names: List[str],
     anki_deck_names: List[str],
+    import_results: List[AnkiHubImportResult],
 ):
     template = env.get_template("deck_import_summary.html")
     return template.render(
-        decks=decks,
+        ankihub_deck_names=ankihub_deck_names,
         import_results=import_results,
         anki_deck_names=anki_deck_names,
         zip=zip,

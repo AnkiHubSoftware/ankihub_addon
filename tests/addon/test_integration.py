@@ -38,7 +38,7 @@ from .conftest import TEST_PROFILE_ID
 # has to be set before importing ankihub
 os.environ["SKIP_INIT"] = "1"
 
-from ankihub import entry_point, gui
+from ankihub import entry_point, gui, media_sync
 from ankihub.addon_ankihub_client import AddonAnkiHubClient as AnkiHubClient
 from ankihub.addons import (
     _change_file_permissions_of_addon_files,
@@ -433,7 +433,12 @@ def test_download_and_install_decks(
     anki_session_with_addon_data: AnkiSession,
     monkeypatch: MonkeyPatch,
     qtbot: QtBot,
+    set_feature_flag_state,
 ):
+    set_feature_flag_state(
+        feature_flag_name="new_subscription_workflow_enabled", is_active=True
+    )
+
     anki_session = anki_session_with_addon_data
     with anki_session.profile_loaded():
         mw = anki_session.mw
@@ -462,10 +467,13 @@ def test_download_and_install_decks(
         add_mock(gui.decks, "showInfo")
         add_mock(gui.decks, "_cleanup_after_deck_install")
 
+        # Mock media sync
+        add_mock(media_sync._AnkiHubMediaSync, "start_media_download")
+
         # Download and install the deck
         on_success_mock = Mock()
-        download_and_install_decks([deck], on_success=on_success_mock)
-        qtbot.wait(500)
+        download_and_install_decks([deck.ankihub_deck_uuid], on_success=on_success_mock)
+        qtbot.wait(200)
 
         # Assert that the deck was installed
         # ... in the Anki database
@@ -530,7 +538,9 @@ def test_check_and_install_new_deck_subscriptions(
         assert ask_user_mock.call_count == 1
 
         assert download_and_install_decks_mock.call_count == 1
-        assert download_and_install_decks_mock.call_args[0][0] == [deck]
+        assert download_and_install_decks_mock.call_args[0][0] == [
+            deck.ankihub_deck_uuid
+        ]
 
 
 def test_get_deck_by_id(

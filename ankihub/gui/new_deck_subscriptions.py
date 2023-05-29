@@ -30,7 +30,8 @@ def check_and_install_new_deck_subscriptions() -> None:
         return
 
     # Download the new decks
-    download_and_install_decks(decks, on_success=lambda: None)
+    ah_dids = [deck.ankihub_deck_uuid for deck in decks]
+    download_and_install_decks(ah_dids, on_success=lambda: None)
 
 
 def _not_installed_ah_decks() -> List[Deck]:
