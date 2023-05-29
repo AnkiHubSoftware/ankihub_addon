@@ -462,8 +462,8 @@ def test_download_and_install_decks(
         add_mock(gui.decks, "cleanup_after_deck_install")
 
         # Download and install the deck
-        mocks["on_success"] = Mock()
-        download_and_install_decks([deck], on_success=mocks["on_success"])
+        on_success_mock = Mock()
+        download_and_install_decks([deck], on_success=on_success_mock)
         qtbot.wait(500)
 
         # Assert that the deck was installed
