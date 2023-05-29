@@ -96,7 +96,8 @@ def _on_sync_did_finish() -> None:
 
     if auto_sync_state.synced_with_ankihub_on_last_ankiweb_sync:
         show_tooltip_about_last_sync_results()
-        check_and_install_new_subscriptions()
+        if not auto_sync_state.profile_is_closing:
+            check_and_install_new_subscriptions()
 
     if not auto_sync_state.profile_is_closing:
         maybe_check_databases()
