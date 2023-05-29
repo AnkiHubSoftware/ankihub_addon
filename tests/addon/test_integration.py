@@ -460,7 +460,7 @@ def test_download_and_install_decks(
 
         # Patch away gui functions which would otherwise block the test
         add_mock(gui.decks, "showInfo")
-        add_mock(gui.decks, "cleanup_after_deck_install")
+        add_mock(gui.decks, "_cleanup_after_deck_install")
 
         # Download and install the deck
         on_success_mock = Mock()

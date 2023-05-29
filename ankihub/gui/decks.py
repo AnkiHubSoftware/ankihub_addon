@@ -42,20 +42,6 @@ from .subdecks import confirm_and_toggle_subdecks
 from .utils import ask_user, set_tooltip_icon
 
 
-def cleanup_after_deck_install(multiple_decks: bool) -> None:
-    message = (
-        (
-            "The deck has been successfully installed!<br><br>"
-            if not multiple_decks
-            else "The decks have been successfully installed!<br><br>"
-        )
-        + "Do you want to clear unused tags and empty cards from your collection? (recommended)"
-    )
-    if ask_user(message, title="AnkiHub", show_cancel_button=False):
-        clear_unused_tags(parent=aqt.mw).run_in_background()
-        show_empty_cards(aqt.mw)
-
-
 class SubscribedDecksDialog(QDialog):
     _window: Optional["SubscribedDecksDialog"] = None
     silentlyClose = True
@@ -417,7 +403,7 @@ def download_and_install_decks(
         import_results: List[AnkiHubImportResult] = future.result()
 
         # Clean up after deck installations
-        cleanup_after_deck_install(multiple_decks=len(import_results) > 1)
+        _cleanup_after_deck_install(multiple_decks=len(import_results) > 1)
 
         # Reset the main window
         aqt.mw.reset()
@@ -449,13 +435,13 @@ def download_and_install_decks(
 
     # Install decks in background
     aqt.mw.taskman.with_progress(
-        task=lambda: download_and_install_decks_inner(ankihub_decks),
+        task=lambda: _download_and_install_decks_inner(ankihub_decks),
         on_done=on_install_done,
         label="Downloading decks from AnkiHub",
     )
 
 
-def download_and_install_decks_inner(
+def _download_and_install_decks_inner(
     decks: List[Deck],
 ) -> List[AnkiHubImportResult]:
     """Downloads and installs the given decks.
@@ -464,7 +450,7 @@ def download_and_install_decks_inner(
     exceptions = []
     for deck in decks:
         try:
-            result.append(download_and_install_deck(deck))
+            result.append(_download_and_install_deck(deck))
         except Exception as e:
             exceptions.append(e)
 
@@ -475,7 +461,7 @@ def download_and_install_decks_inner(
     return result
 
 
-def download_and_install_deck(deck: Deck) -> AnkiHubImportResult:
+def _download_and_install_deck(deck: Deck) -> AnkiHubImportResult:
     notes_data: List[NoteInfo] = AnkiHubClient().download_deck(
         deck.ankihub_deck_uuid, download_progress_cb=_download_progress_cb
     )
@@ -537,3 +523,17 @@ def _download_progress_cb(percent: int):
             max=101,
         )
     )
+
+
+def _cleanup_after_deck_install(multiple_decks: bool) -> None:
+    message = (
+        (
+            "The deck has been successfully installed!<br><br>"
+            if not multiple_decks
+            else "The decks have been successfully installed!<br><br>"
+        )
+        + "Do you want to clear unused tags and empty cards from your collection? (recommended)"
+    )
+    if ask_user(message, title="AnkiHub", show_cancel_button=False):
+        clear_unused_tags(parent=aqt.mw).run_in_background()
+        show_empty_cards(aqt.mw)
