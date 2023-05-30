@@ -429,27 +429,112 @@ def test_create_collaborative_deck_and_upload(
         )
 
 
-def test_download_and_install_decks(
-    anki_session_with_addon_data: AnkiSession,
-    monkeypatch: MonkeyPatch,
-    qtbot: QtBot,
-    set_feature_flag_state,
-):
-    set_feature_flag_state(
-        feature_flag_name="new_subscription_workflow_enabled", is_active=True
-    )
-
-    anki_session = anki_session_with_addon_data
-    with anki_session.profile_loaded():
-        mw = anki_session.mw
-
-        # Mock the client functions
-        note_type = create_or_get_ah_version_of_note_type(
-            mw, aqt.mw.col.models.by_name("Basic")
+class TestDownloadAndInstallDecks:
+    def test_download_and_install_deck(
+        self,
+        anki_session_with_addon_data: AnkiSession,
+        monkeypatch: MonkeyPatch,
+        qtbot: QtBot,
+        set_feature_flag_state,
+    ):
+        set_feature_flag_state(
+            feature_flag_name="new_subscription_workflow_enabled", is_active=True
         )
-        notes_data = [NoteInfoFactory.create(mid=note_type["id"])]
-        deck = DeckFactory.create()
 
+        anki_session = anki_session_with_addon_data
+        with anki_session.profile_loaded():
+            mw = anki_session.mw
+
+            note_type = create_or_get_ah_version_of_note_type(
+                mw, aqt.mw.col.models.by_name("Basic")
+            )
+            notes_data = [NoteInfoFactory.create(mid=note_type["id"])]
+            deck = DeckFactory.create()
+
+            mocks = self._mock_client_and_gui_and_media_sync(
+                monkeypatch, deck, notes_data, note_type
+            )
+
+            # Download and install the deck
+            on_success_mock = Mock()
+            download_and_install_decks(
+                [deck.ankihub_deck_uuid], on_success=on_success_mock
+            )
+            qtbot.wait(300)
+
+            # Assert that the deck was installed
+            # ... in the Anki database
+            assert deck.anki_did in [x.id for x in mw.col.decks.all_names_and_ids()]
+            assert mw.col.get_note(NoteId(notes_data[0].anki_nid)) is not None
+
+            # ... in the AnkiHub database
+            ankihub_db.ankihub_deck_ids() == [deck.ankihub_deck_uuid]
+            assert ankihub_db.note_data(NoteId(notes_data[0].anki_nid)) == notes_data[0]
+
+            # ... in the config
+            assert config.deck_ids() == [deck.ankihub_deck_uuid]
+
+            # Assert that the mocked functions were called
+            for name, mock in mocks.items():
+                assert (
+                    mock.call_count == 1
+                ), f"Mock {name} was not called once, but {mock.call_count} times"
+
+    def test_error_handling(
+        self,
+        anki_session_with_addon_data: AnkiSession,
+        monkeypatch: MonkeyPatch,
+        qtbot: QtBot,
+        set_feature_flag_state,
+    ):
+        # The error handling is only used in the old subscription workflow
+        set_feature_flag_state(
+            feature_flag_name="new_subscription_workflow_enabled", is_active=False
+        )
+
+        anki_session = anki_session_with_addon_data
+        with anki_session.profile_loaded():
+            mw = anki_session.mw
+
+            note_type = create_or_get_ah_version_of_note_type(
+                mw, aqt.mw.col.models.by_name("Basic")
+            )
+            notes_data = [NoteInfoFactory.create(mid=note_type["id"])]
+            deck = DeckFactory.create()
+
+            self._mock_client_and_gui_and_media_sync(
+                monkeypatch, deck, notes_data, note_type
+            )
+
+            def raise_http_403(*args, **kwargs):
+                raise AnkiHubHTTPError(response=Mock(status_code=403))
+
+            # Mock get_deck_by_id to raise an exception
+            get_deck_by_id_mock = Mock()
+            get_deck_by_id_mock.side_effect = raise_http_403
+            monkeypatch.setattr(
+                AnkiHubClient,
+                "get_deck_by_id",
+                get_deck_by_id_mock,
+            )
+
+            # Try to download and install the deck
+            on_success_mock = Mock()
+            download_and_install_decks(
+                [deck.ankihub_deck_uuid], on_success=on_success_mock
+            )
+            qtbot.wait(300)
+
+            # Assert that the on_success callback was not called
+            assert on_success_mock.call_count == 0
+
+    def _mock_client_and_gui_and_media_sync(
+        self,
+        monkeypatch: MonkeyPatch,
+        deck: Deck,
+        notes_data: List[NoteInfo],
+        note_type: NotetypeDict,
+    ) -> Dict[str, Mock]:
         mocks: Dict[str, Mock] = dict()
 
         def add_mock(object, func_name: str, return_value: Any = None):
@@ -457,6 +542,7 @@ def test_download_and_install_decks(
             mocks[func_name].return_value = return_value
             monkeypatch.setattr(object, func_name, mocks[func_name])
 
+        # Mock client functions
         add_mock(AnkiHubClient, "get_note_type", note_type)
         add_mock(AnkiHubClient, "get_deck_by_id", deck)
         add_mock(AnkiHubClient, "download_deck", notes_data)
@@ -465,33 +551,13 @@ def test_download_and_install_decks(
 
         # Patch away gui functions which would otherwise block the test
         add_mock(gui.decks, "showInfo")
-        add_mock(gui.decks, "_cleanup_after_deck_install")
+        add_mock(gui.decks, "ask_user", return_value=True)
+        add_mock(gui.decks, "show_empty_cards")
 
         # Mock media sync
         add_mock(media_sync._AnkiHubMediaSync, "start_media_download")
 
-        # Download and install the deck
-        on_success_mock = Mock()
-        download_and_install_decks([deck.ankihub_deck_uuid], on_success=on_success_mock)
-        qtbot.wait(200)
-
-        # Assert that the deck was installed
-        # ... in the Anki database
-        assert deck.anki_did in [x.id for x in mw.col.decks.all_names_and_ids()]
-        assert mw.col.get_note(NoteId(notes_data[0].anki_nid)) is not None
-
-        # ... in the AnkiHub database
-        ankihub_db.ankihub_deck_ids() == [deck.ankihub_deck_uuid]
-        assert ankihub_db.note_data(NoteId(notes_data[0].anki_nid)) == notes_data[0]
-
-        # ... in the config
-        assert config.deck_ids() == [deck.ankihub_deck_uuid]
-
-        # Assert that the mocked functions were called
-        for name, mock in mocks.items():
-            assert (
-                mock.call_count == 1
-            ), f"Mock {name} was not called once, but {mock.call_count} times"
+        return mocks
 
 
 def test_check_and_install_new_deck_subscriptions(
