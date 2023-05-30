@@ -475,6 +475,9 @@ class TestDownloadAndInstallDecks:
             # ... in the config
             assert config.deck_ids() == [deck.ankihub_deck_uuid]
 
+            # Assert that the on_success callback was called
+            on_success_mock.assert_called_once()
+
             # Assert that the mocked functions were called
             for name, mock in mocks.items():
                 assert (
