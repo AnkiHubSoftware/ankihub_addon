@@ -153,6 +153,8 @@ def _try_handle_exception(
             LOGGER.info("AnkiHubRequestError was handled.")
             return True
 
+        _show_warning_for_ankihub_request_error(exc_value)
+
     if isinstance(exc_value, AnkiHubRequestException):
         if isinstance(
             exc_value.original_exception, (exceptions.ConnectionError, ConnectionError)
@@ -212,16 +214,10 @@ def _maybe_handle_ankihub_http_error(error: AnkiHubHTTPError) -> bool:
         ):
             check_and_prompt_for_updates_on_main_window()
         return True
-    elif response.status_code == 403:
-        _show_warning_for_no_ankihub_membership_request_error(error)
-        return True
-
     return False
 
 
-def _show_warning_for_no_ankihub_membership_request_error(
-    exc_value: AnkiHubHTTPError,
-) -> None:
+def _show_warning_for_ankihub_request_error(exc_value: AnkiHubHTTPError) -> None:
     try:
         response_data = exc_value.response.json()
         details = (
@@ -235,12 +231,11 @@ def _show_warning_for_no_ankihub_membership_request_error(
     if details:
         aqt.mw.taskman.run_on_main(
             lambda: showWarning(  # type: ignore
-                "The action you are trying to perform requires an active membership."
+                "Error while communicating with AnkiHub."
                 "<br><br>"
-                'Unlock a membership here: <a href="https://app.ankihub.net/memberships/plans/">AnkiHub Plans</a>.'
-                "<br><br>"
-                "Or if you prefer, reach out for support at our "
-                '<a href="https://community.ankihub.net/">AnkiHub Community</a>.',
+                'Details:'
+                "<br>"
+                f"{details}",
             )
         )
         LOGGER.info(
