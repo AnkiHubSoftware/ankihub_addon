@@ -430,6 +430,7 @@ def test_create_collaborative_deck_and_upload(
 
 
 class TestDownloadAndInstallDecks:
+    @pytest.mark.qt_no_exception_capture
     def test_download_and_install_deck(
         self,
         anki_session_with_addon_data: AnkiSession,
@@ -480,6 +481,7 @@ class TestDownloadAndInstallDecks:
                     mock.call_count == 1
                 ), f"Mock {name} was not called once, but {mock.call_count} times"
 
+    @pytest.mark.qt_no_exception_capture
     def test_error_handling(
         self,
         anki_session_with_addon_data: AnkiSession,
