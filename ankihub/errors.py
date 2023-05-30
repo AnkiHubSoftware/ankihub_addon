@@ -233,7 +233,7 @@ def _show_warning_for_ankihub_request_error(exc_value: AnkiHubHTTPError) -> None
             lambda: showWarning(  # type: ignore
                 "Error while communicating with AnkiHub."
                 "<br><br>"
-                'Details:'
+                "Details:"
                 "<br>"
                 f"{details}",
             )
