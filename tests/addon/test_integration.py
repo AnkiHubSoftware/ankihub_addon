@@ -43,7 +43,6 @@ from ankihub.addon_ankihub_client import AddonAnkiHubClient as AnkiHubClient
 from ankihub.addons import (
     _change_file_permissions_of_addon_files,
     _maybe_change_file_permissions_of_addon_files,
-    _with_disabled_log_file_handler,
 )
 from ankihub.ankihub_client import (
     AnkiHubHTTPError,
@@ -3373,13 +3372,6 @@ class TestAddonUpdate:
             maybe_change_file_permissions_of_addon_files_mock,
         )
 
-        with_disabled_log_file_handler_mock = Mock()
-        with_disabled_log_file_handler_mock.side_effect = _with_disabled_log_file_handler  # type: ignore
-        monkeypatch.setattr(
-            "ankihub.addons._with_disabled_log_file_handler",
-            with_disabled_log_file_handler_mock,
-        )
-
         # Udpate the AnkiHub add-on entry point has to be run so that the add-on is loaded and
         # the patches to the update process are applied
         entry_point.run()
@@ -3390,9 +3382,6 @@ class TestAddonUpdate:
             assert isinstance(result, InstallOk)
 
             assert mw.addonManager.allAddons() == ["ankihub"]
-
-        # This is called tree times: for backupUserFiles, deleteAddon, and restoreUserFiles.
-        assert with_disabled_log_file_handler_mock.call_count == 3
 
         # This is called twice: for backupUserFiles and for deleteAddon.
         assert maybe_change_file_permissions_of_addon_files_mock.call_count == 2

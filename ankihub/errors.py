@@ -15,7 +15,7 @@ import aqt
 import sentry_sdk
 from anki.errors import BackendIOError, DBError, SyncError
 from anki.utils import checksum, is_win
-from aqt.utils import askUser, showText, showWarning, tooltip
+from aqt.utils import askUser, showWarning, tooltip
 from requests import exceptions
 from sentry_sdk import capture_exception, push_scope
 from sentry_sdk.integrations.argv import ArgvIntegration
@@ -229,7 +229,15 @@ def _show_warning_for_ankihub_request_error(exc_value: AnkiHubHTTPError) -> None
         details = None
 
     if details:
-        showText(f"Error while communicating with AnkiHub:\n{details}")
+        aqt.mw.taskman.run_on_main(
+            lambda: showWarning(  # type: ignore
+                "Error while communicating with AnkiHub."
+                "<br><br>"
+                "Details:"
+                "<br>"
+                f"{details}",
+            )
+        )
 
 
 def _is_memory_full_error(exc_value: BaseException) -> bool:
