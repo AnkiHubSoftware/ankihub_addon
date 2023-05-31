@@ -41,6 +41,7 @@ from ..settings import config, url_deck_base, url_decks, url_help, url_view_deck
 from ..subdecks import SUBDECK_TAG, deck_contains_subdeck_tags
 from ..sync import AnkiHubImporter
 from ..utils import create_backup, undo_note_type_modfications
+from .exceptions import DeckDownloadAndInstallError
 from .subdecks import confirm_and_toggle_subdecks
 from .utils import ask_user, set_tooltip_icon
 
@@ -391,17 +392,6 @@ class SubscribeDialog(QDialog):
 
     def _on_browse_deck(self) -> None:
         openLink(url_decks())
-
-
-class DeckDownloadAndInstallError(Exception):
-    """Raised when an error occurs while downloading and installing a deck."""
-
-    def __init__(self, original_exception: Exception, ankihub_did: UUID):
-        super().__init__(
-            f"Error while downloading and installing deck {ankihub_did}: {original_exception}"
-        )
-        self.original_exception = original_exception
-        self.ankihub_did = ankihub_did
 
 
 def download_and_install_decks(
