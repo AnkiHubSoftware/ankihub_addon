@@ -659,6 +659,23 @@ class TestDeckSubscriptions:
             assert False, "AnkiHubHTTPError was not raised"
 
 
+class TestDecksWithUserRelation:
+    @pytest.mark.vcr()
+    def test_subscribe_and_get_list_of_decks_with_user_relation(
+        self,
+        authorized_client_for_user_test1: AnkiHubClient,
+    ):
+        client = authorized_client_for_user_test1
+        assert client.get_decks_with_user_relation() == []
+
+        client.subscribe_to_deck(ID_OF_DECK_OF_USER_TEST1)
+
+        decks = client.get_decks_with_user_relation()
+        assert len(decks) == 1
+        deck: Deck = decks[0]
+        assert deck.ankihub_deck_uuid == ID_OF_DECK_OF_USER_TEST1
+
+
 class TestGetDeckUpdates:
     @pytest.mark.vcr()
     def test_get_deck_updates(
