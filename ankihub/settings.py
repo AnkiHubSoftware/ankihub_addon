@@ -288,7 +288,7 @@ config = _Config()
 def setup_profile_data_folder() -> bool:
     """Returns False if the migration from the old location needs yet to be done."""
     _assign_id_to_profile_if_not_exists()
-    LOGGER.info(f"Anki profile id: {aqt.mw.pm.profile[PROFILE_ID_FIELD_NAME]}")
+    LOGGER.info(f"Anki profile id: {_get_anki_profile_id()}")
 
     if not (path := profile_files_path()).exists():
         path.mkdir(parents=True)
@@ -304,12 +304,21 @@ def _assign_id_to_profile_if_not_exists() -> None:
     if aqt.mw.pm.profile.get("ankihub_id") is not None:
         return
 
-    aqt.mw.pm.profile[PROFILE_ID_FIELD_NAME] = str(uuid.uuid4())
-    aqt.mw.pm.save()
+    new_profile_id = uuid.uuid4()
+    _set_anki_profile_id(str(new_profile_id))
 
-    LOGGER.info(
-        f"Assigned new id to Anki profile: {aqt.mw.pm.profile[PROFILE_ID_FIELD_NAME]}"
-    )
+    LOGGER.info(f"Assigned new id to Anki profile: {_get_anki_profile_id()}")
+
+
+def _get_anki_profile_id() -> str:
+    """Returns the id of the currently open Anki profile."""
+    return aqt.mw.pm.profile[PROFILE_ID_FIELD_NAME]
+
+
+def _set_anki_profile_id(profile_id: str) -> None:
+    """Sets the id of the currently open Anki profile."""
+    aqt.mw.pm.profile[PROFILE_ID_FIELD_NAME] = profile_id
+    aqt.mw.pm.save()
 
 
 def user_files_path() -> Path:
@@ -323,7 +332,7 @@ def user_files_path() -> Path:
 def profile_files_path() -> Path:
     """Path to the add-on data for this Anki profile."""
     # we need an id instead of using the profile name because profiles can be renamed
-    cur_profile_id = aqt.mw.pm.profile[PROFILE_ID_FIELD_NAME]
+    cur_profile_id = _get_anki_profile_id()
     result = user_files_path() / cur_profile_id
     return result
 
