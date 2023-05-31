@@ -39,7 +39,6 @@ class ErrorDialog(QDialog):
             🐛 Oh no! An AnkiHub add-on error has occurred.
 
             Click 'Report Error' if you'd like to report this on https://community.ankihub.net/.
-
             """.strip("\n")  # fmt: skip
         )
 
