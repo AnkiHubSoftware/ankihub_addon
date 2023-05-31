@@ -238,9 +238,6 @@ def _show_warning_for_ankihub_request_error(exc_value: AnkiHubHTTPError) -> None
                 f"{details}",
             )
         )
-        LOGGER.info(
-            "Unable to perform operation because user does not have an active AnkiHub membership."
-        )
 
 
 def _is_memory_full_error(exc_value: BaseException) -> bool:

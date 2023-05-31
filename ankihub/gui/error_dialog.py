@@ -40,7 +40,6 @@ class ErrorDialog(QDialog):
 
             Click 'Report Error' if you'd like to report this on https://community.ankihub.net/.
 
-            Error details:
             """.strip("\n")  # fmt: skip
         )
 
