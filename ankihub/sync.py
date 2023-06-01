@@ -56,11 +56,23 @@ class _AnkiHubSync:
         return self._import_results
 
     def _sync_all_decks(self) -> None:
-        LOGGER.info("Syncing all decks...")
+        LOGGER.info("Syncing decks...")
 
         create_backup()
 
-        for ah_did in config.deck_ids():
+        client = AnkiHubClient()
+        if client.is_feature_flag_enabled("new_subscription_workflow_enabled"):
+            subscribed_deck_ah_ids = [
+                deck.ankihub_deck_uuid for deck in client.get_deck_subscriptions()
+            ]
+            installed_deck_ah_ids = config.deck_ids()
+            decks_to_sync_ah_ids = set(subscribed_deck_ah_ids).intersection(
+                installed_deck_ah_ids
+            )
+        else:
+            decks_to_sync_ah_ids = config.deck_ids()
+
+        for ah_did in decks_to_sync_ah_ids:
             try:
                 should_continue = self._sync_deck(ah_did)
                 if not should_continue:

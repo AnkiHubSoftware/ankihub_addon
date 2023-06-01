@@ -3006,7 +3006,12 @@ def test_download_images_on_sync(
     install_sample_ah_deck: InstallSampleAHDeck,
     monkeypatch: MonkeyPatch,
     qtbot: QtBot,
+    set_feature_flag_state,
 ):
+    set_feature_flag_state(
+        feature_flag_name="new_subscription_workflow_enabled", is_active=True
+    )
+
     with anki_session_with_addon_data.profile_loaded():
         mw = anki_session_with_addon_data.mw
 
@@ -3022,6 +3027,11 @@ def test_download_images_on_sync(
         monkeypatch.setattr(config, "token", lambda: "test token")
 
         # Mock the client to simulate that there are no deck updates and extensions.
+        monkeypatch.setattr(
+            AnkiHubClient,
+            "get_deck_subscriptions",
+            lambda *args, **kwargs: [],
+        )
         monkeypatch.setattr(
             AnkiHubClient,
             "get_deck_updates",
