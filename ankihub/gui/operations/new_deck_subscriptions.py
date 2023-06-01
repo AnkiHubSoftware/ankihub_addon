@@ -3,9 +3,9 @@ from typing import List
 
 from ...addon_ankihub_client import AddonAnkiHubClient as AnkiHubClient
 from ...ankihub_client import Deck
-from ...messages import messages
 from ...settings import config
 from ..decks_dialog import download_and_install_decks
+from ..messages import messages
 from ..utils import ask_user
 
 

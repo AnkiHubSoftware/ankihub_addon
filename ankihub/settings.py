@@ -496,7 +496,7 @@ ANKIHUB_TEMPLATE_END_COMMENT = (
     "-->"
 )
 ADDON_PACKAGE = __name__.split(".")[0]
-ICONS_PATH = ADDON_PATH / "icons"
+ICONS_PATH = ADDON_PATH / "gui/icons"
 
 TOKEN_SLUG = "token"
 USER_EMAIL_SLUG = "user_email"
