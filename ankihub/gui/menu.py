@@ -38,6 +38,7 @@ from ..subdecks import SUBDECK_TAG
 from ..sync import ah_sync, show_tooltip_about_last_sync_results
 from .db_check import maybe_check_databases
 from .decks import SubscribedDecksDialog
+from .new_deck_subscriptions import check_and_install_new_deck_subscriptions
 from .utils import (
     ask_user,
     check_and_prompt_for_updates_on_main_window,
@@ -69,10 +70,10 @@ def refresh_ankihub_menu() -> None:
 
     if config.is_logged_in():
         _create_collaborative_deck_setup(parent=menu_state.ankihub_menu)
-        _subscribe_to_deck_setup(parent=menu_state.ankihub_menu)
-        _import_media_setup(parent=menu_state.ankihub_menu)
+        _subscribed_decks_setup(parent=menu_state.ankihub_menu)
         _sync_with_ankihub_setup(parent=menu_state.ankihub_menu)
         _media_sync_status_setup(parent=menu_state.ankihub_menu)
+        _import_media_setup(parent=menu_state.ankihub_menu)
         _upload_deck_assets_setup(parent=menu_state.ankihub_menu)
         _ankihub_logout_setup(parent=menu_state.ankihub_menu)
     else:
@@ -328,20 +329,20 @@ def _create_collaborative_deck_setup(parent):
 
 
 def _sync_with_ankihub_action():
+    # Sync all decks and media, then check for new subscriptions
+
+    def on_sync_done(future: Future) -> None:
+        future.result()
+
+        show_tooltip_about_last_sync_results()
+        check_and_install_new_deck_subscriptions()
+        maybe_check_databases()
+
     aqt.mw.taskman.with_progress(
         task=ah_sync.sync_all_decks_and_media,
         immediate=True,
-        label="Syncing with AnkiHub",
-        on_done=_on_sync_done,
+        on_done=on_sync_done,
     )
-
-
-def _on_sync_done(future: Future) -> None:
-    future.result()
-
-    show_tooltip_about_last_sync_results()
-
-    maybe_check_databases()
 
 
 def _sign_out_action():
@@ -400,8 +401,7 @@ def _ankihub_login_setup(parent):
     parent.addAction(sign_in_button)
 
 
-def _subscribe_to_deck_setup(parent):
-    """Set up the menu item for uploading suggestions in bulk."""
+def _subscribed_decks_setup(parent):
     q_action = QAction("📚 Subscribed Decks", aqt.mw)
     qconnect(q_action.triggered, SubscribedDecksDialog.display_subscribe_window)
     parent.addAction(q_action)
@@ -422,8 +422,6 @@ def _sync_with_ankihub_setup(parent):
             q_action.setShortcut(QKeySequence(sync_hotkey))
         except Exception:
             LOGGER.exception(f"Failed to set sync hotkey to {sync_hotkey}")
-    if not config.deck_ids():
-        q_action.setDisabled(True)
     parent.addAction(q_action)
 
 

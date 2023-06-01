@@ -1,10 +1,9 @@
 """Code that modifies Anki's add-ons module.
 Handles problems with add-on updates and deletions."""
-import logging
 import os
 from concurrent.futures import Future
 from pathlib import Path
-from typing import Any, Callable, List
+from typing import Any, Callable
 
 import aqt
 from anki.hooks import wrap
@@ -13,7 +12,6 @@ from aqt.addons import AddonManager, DownloaderInstaller
 
 from . import LOGGER
 from .db import detach_ankihub_db_from_anki_db_connection
-from .settings import log_file_path, setup_file_handler
 
 
 def setup_addons():
@@ -56,37 +54,9 @@ def _check_future_for_exceptions(*args: Any, **kwargs: Any) -> None:
 
 def _prevent_errors_during_addon_updates_and_deletions():
     """Prevents errors during add-on updates and deletions on Windows.
-
-    AddonManager calls these methods during an update:
-    - backupUserFiles
-    - deleteAddon
-    - restoreUserFiles
-    We need to disable the log file handler while these methods are running because they operate on files
-    in the user files directory and there will be permission errors on Windows if we have open file handles
-    for files in the user files directory during these operations.
-
-    We also detach the AnkiHub database from the Anki database connection and change the file permissions
-    of the files in the user files directory for the same reason.
+    Detaches the AnkiHub database from the Anki database connection and changes the file permissions
+    of the files in the user files directory.
     """
-
-    # Add _with_disabled_log_file_handler to all methods that operate on files in the user files directory.
-    AddonManager.backupUserFiles = wrap(  # type: ignore
-        old=AddonManager.backupUserFiles,
-        new=_with_disabled_log_file_handler,
-        pos="around",
-    )
-
-    AddonManager.deleteAddon = wrap(  # type: ignore
-        old=AddonManager.deleteAddon,
-        new=_with_disabled_log_file_handler,
-        pos="around",
-    )
-
-    AddonManager.restoreUserFiles = wrap(  # type: ignore
-        old=AddonManager.restoreUserFiles,
-        new=_with_disabled_log_file_handler,
-        pos="around",
-    )
 
     # Add _detach_ankihub_db to backupUserFiles and deleteAddon.
     # We don't need to add it to restoreUserFiles because backupUserFiles is always called before restoreUserFiles.
@@ -115,40 +85,6 @@ def _prevent_errors_during_addon_updates_and_deletions():
         new=lambda self, module: _maybe_change_file_permissions_of_addon_files(module),
         pos="before",
     )
-
-
-def _with_disabled_log_file_handler(*args: Any, **kwargs: Any) -> Any:
-    """Disables the log FileHandler while the wrapped method is running.
-    Only enables it again if the user files folder still exists after the wrapped method was called.
-    """
-
-    _old: Callable = kwargs["_old"]
-    del kwargs["_old"]
-
-    LOGGER.info(f"Maybe disabling log FileHandler because {_old.__name__} was called.")
-    file_handlers = _log_file_handlers()
-    for handler in file_handlers:
-        LOGGER.info(f"Disabling FileHandler: {handler}.")
-        LOGGER.removeHandler(handler)
-        handler.close()
-
-    try:
-        result = _old(*args, **kwargs)
-    finally:
-        # Only re-enable the log FileHandler if the user files folder still exists and
-        # the FileHandler is disabled.
-        if log_file_path().parent.exists() and not _log_file_handlers():
-            setup_file_handler()
-            LOGGER.info(f"Re-enabled FileHandler after {_old.__name__} was called.")
-    return result
-
-
-def _log_file_handlers() -> List[logging.FileHandler]:
-    return [
-        handler
-        for handler in LOGGER.handlers
-        if isinstance(handler, logging.FileHandler)
-    ]
 
 
 def _detach_ankihub_db(*args: Any, **kwargs: Any) -> None:

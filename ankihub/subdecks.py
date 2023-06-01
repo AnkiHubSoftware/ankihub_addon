@@ -22,6 +22,14 @@ from .utils import nids_in_deck_but_not_in_subdeck
 SUBDECK_TAG = "AnkiHub_Subdeck"
 
 
+def deck_contains_subdeck_tags(ah_did: uuid.UUID) -> bool:
+    """Return whether the given deck contains any notes which have subdeck tags."""
+    anki_did = config.deck_config(ah_did).anki_id
+    deck_name = aqt.mw.col.decks.name(anki_did)
+    result = bool(aqt.mw.col.find_notes(f'"deck:{deck_name}" "tag:{SUBDECK_TAG}*"'))
+    return result
+
+
 def build_subdecks_and_move_cards_to_them(
     ankihub_did: uuid.UUID, nids: Optional[List[NoteId]] = None
 ) -> None:
