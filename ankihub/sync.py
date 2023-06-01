@@ -67,8 +67,8 @@ class _AnkiHubSync:
                 deck.ankihub_deck_uuid for deck in client.get_deck_subscriptions()
             ]
             installed_deck_ah_ids = config.deck_ids()
-            decks_to_sync_ah_ids = set(subscribed_deck_ah_ids).intersection(
-                installed_deck_ah_ids
+            decks_to_sync_ah_ids = list(
+                set(subscribed_deck_ah_ids).intersection(installed_deck_ah_ids)
             )
         else:
             decks_to_sync_ah_ids = config.deck_ids()
