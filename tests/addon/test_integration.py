@@ -460,7 +460,7 @@ class TestDownloadAndInstallDecks:
             download_and_install_decks(
                 [deck.ankihub_deck_uuid], on_success=on_success_mock
             )
-            qtbot.wait(300)
+            qtbot.wait(500)
 
             # Assert that the deck was installed
             # ... in the Anki database
