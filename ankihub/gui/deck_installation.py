@@ -20,19 +20,9 @@ from ..messages import messages
 from ..settings import config, url_view_deck
 from ..subdecks import deck_contains_subdeck_tags
 from ..utils import create_backup
+from .exceptions import DeckDownloadAndInstallError
 from .subdecks import confirm_and_toggle_subdecks
 from .utils import ask_user
-
-
-class DeckDownloadAndInstallError(Exception):
-    """Raised when an error occurs while downloading and installing a deck."""
-
-    def __init__(self, original_exception: Exception, ankihub_did: uuid.UUID):
-        super().__init__(
-            f"Error while downloading and installing deck {ankihub_did}: {original_exception}"
-        )
-        self.original_exception = original_exception
-        self.ankihub_did = ankihub_did
 
 
 def download_and_install_decks(
