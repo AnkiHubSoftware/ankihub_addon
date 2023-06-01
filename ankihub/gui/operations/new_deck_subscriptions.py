@@ -1,12 +1,12 @@
 """Check if the user is subscribed to any decks that are not installed and install them if the user agrees."""
 from typing import List
 
-from ..addon_ankihub_client import AddonAnkiHubClient as AnkiHubClient
-from ..ankihub_client import Deck
-from ..settings import config
-from .decks_dialog import download_and_install_decks
-from .messages import messages
-from .utils import ask_user
+from ...addon_ankihub_client import AddonAnkiHubClient as AnkiHubClient
+from ...ankihub_client import Deck
+from ...settings import config
+from ..decks_dialog import download_and_install_decks
+from ..messages import messages
+from ..utils import ask_user
 
 
 def check_and_install_new_deck_subscriptions() -> None:

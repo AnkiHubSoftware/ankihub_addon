@@ -28,8 +28,8 @@ from ..db import ankihub_db
 from ..settings import config, url_deck_base, url_decks, url_help
 from ..subdecks import SUBDECK_TAG
 from ..utils import undo_note_type_modfications
-from .deck_installation import download_and_install_decks
-from .subdecks import confirm_and_toggle_subdecks
+from .operations.deck_installation import download_and_install_decks
+from .operations.subdecks import confirm_and_toggle_subdecks
 from .utils import ask_user, set_tooltip_icon
 
 

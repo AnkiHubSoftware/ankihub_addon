@@ -11,8 +11,10 @@ from aqt import AnkiQt
 from aqt.gui_hooks import profile_did_open, profile_will_close, sync_did_finish
 
 from . import LOGGER
-from .gui.db_check import maybe_check_databases
-from .gui.new_deck_subscriptions import check_and_install_new_deck_subscriptions
+from .gui.operations.db_check import maybe_check_databases
+from .gui.operations.new_deck_subscriptions import (
+    check_and_install_new_deck_subscriptions,
+)
 from .settings import ANKI_MINOR, config
 from .sync import ah_sync, show_tooltip_about_last_sync_results
 from .threading_utils import rate_limited

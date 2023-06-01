@@ -46,7 +46,7 @@ from ankihub.ankihub_client.ankihub_client import (
     DeckExtensionUpdateChunk,
     DeckUpdateChunk,
 )
-from ankihub.gui.deck_installation import _download_progress_cb
+from ankihub.gui.operations.deck_installation import _download_progress_cb
 
 COMPOSE_FILE = Path(os.getenv("COMPOSE_FILE")) if os.getenv("COMPOSE_FILE") else None
 
