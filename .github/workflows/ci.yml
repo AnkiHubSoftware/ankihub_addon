@@ -93,7 +93,7 @@ jobs:
 
       - name: Run pytest with coverage
         run: |
-          pytest ./tests/addon --cov --cov-report=xml
+          pytest ./tests/addon --cov --cov-report=xml -n 2
           pytest ./tests/client --disable-vcr --cov --cov-report=xml --cov-append
           coverage html
 
