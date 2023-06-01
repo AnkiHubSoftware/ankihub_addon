@@ -30,7 +30,7 @@ from pytest_anki import AnkiSession
 from pytestqt.qtbot import QtBot  # type: ignore
 from requests_mock import Mocker
 
-from ..factories import NoteInfoFactory
+from ..factories import DeckFactory, NoteInfoFactory
 from ..fixtures import create_or_get_ah_version_of_note_type
 from .conftest import TEST_PROFILE_ID
 
@@ -38,7 +38,7 @@ from .conftest import TEST_PROFILE_ID
 # has to be set before importing ankihub
 os.environ["SKIP_INIT"] = "1"
 
-from ankihub import entry_point
+from ankihub import entry_point, gui, media_sync
 from ankihub.addon_ankihub_client import AddonAnkiHubClient as AnkiHubClient
 from ankihub.addons import (
     _change_file_permissions_of_addon_files,
@@ -82,8 +82,9 @@ from ankihub.gui.browser import (
     custom_columns,
 )
 from ankihub.gui.custom_search_nodes import UpdatedSinceLastReviewSearchNode
-from ankihub.gui.decks import SubscribedDecksDialog
+from ankihub.gui.decks import SubscribedDecksDialog, download_and_install_decks
 from ankihub.gui.editor import _on_suggestion_button_press, _refresh_buttons
+from ankihub.gui.new_deck_subscriptions import check_and_install_new_deck_subscriptions
 from ankihub.gui.optional_tag_suggestion_dialog import OptionalTagsSuggestionDialog
 from ankihub.importing import (
     AnkiHubImporter,
@@ -425,6 +426,191 @@ def test_create_collaborative_deck_and_upload(
             )
             == note.mod
         )
+
+
+class TestDownloadAndInstallDecks:
+    @pytest.mark.qt_no_exception_capture
+    def test_download_and_install_deck(
+        self,
+        anki_session_with_addon_data: AnkiSession,
+        monkeypatch: MonkeyPatch,
+        qtbot: QtBot,
+        set_feature_flag_state,
+    ):
+        set_feature_flag_state(
+            feature_flag_name="new_subscription_workflow_enabled", is_active=True
+        )
+
+        anki_session = anki_session_with_addon_data
+        with anki_session.profile_loaded():
+            mw = anki_session.mw
+
+            note_type = create_or_get_ah_version_of_note_type(
+                mw, aqt.mw.col.models.by_name("Basic")
+            )
+            notes_data = [NoteInfoFactory.create(mid=note_type["id"])]
+            deck = DeckFactory.create()
+
+            mocks = self._mock_client_and_gui_and_media_sync(
+                monkeypatch, deck, notes_data, note_type
+            )
+
+            # Download and install the deck
+            on_success_mock = Mock()
+            download_and_install_decks(
+                [deck.ankihub_deck_uuid], on_success=on_success_mock
+            )
+            qtbot.wait(500)
+
+            # Assert that the deck was installed
+            # ... in the Anki database
+            assert deck.anki_did in [x.id for x in mw.col.decks.all_names_and_ids()]
+            assert mw.col.get_note(NoteId(notes_data[0].anki_nid)) is not None
+
+            # ... in the AnkiHub database
+            ankihub_db.ankihub_deck_ids() == [deck.ankihub_deck_uuid]
+            assert ankihub_db.note_data(NoteId(notes_data[0].anki_nid)) == notes_data[0]
+
+            # ... in the config
+            assert config.deck_ids() == [deck.ankihub_deck_uuid]
+
+            # Assert that the on_success callback was called
+            on_success_mock.assert_called_once()
+
+            # Assert that the mocked functions were called
+            for name, mock in mocks.items():
+                assert (
+                    mock.call_count == 1
+                ), f"Mock {name} was not called once, but {mock.call_count} times"
+
+    @pytest.mark.qt_no_exception_capture
+    def test_error_handling(
+        self,
+        anki_session_with_addon_data: AnkiSession,
+        monkeypatch: MonkeyPatch,
+        qtbot: QtBot,
+        set_feature_flag_state,
+    ):
+        # The error handling is only used in the old subscription workflow
+        set_feature_flag_state(
+            feature_flag_name="new_subscription_workflow_enabled", is_active=False
+        )
+
+        anki_session = anki_session_with_addon_data
+        with anki_session.profile_loaded():
+            mw = anki_session.mw
+
+            note_type = create_or_get_ah_version_of_note_type(
+                mw, aqt.mw.col.models.by_name("Basic")
+            )
+            notes_data = [NoteInfoFactory.create(mid=note_type["id"])]
+            deck = DeckFactory.create()
+
+            self._mock_client_and_gui_and_media_sync(
+                monkeypatch, deck, notes_data, note_type
+            )
+
+            def raise_http_403(*args, **kwargs):
+                raise AnkiHubHTTPError(response=Mock(status_code=403))
+
+            # Mock get_deck_by_id to raise an exception
+            get_deck_by_id_mock = Mock()
+            get_deck_by_id_mock.side_effect = raise_http_403
+            monkeypatch.setattr(
+                AnkiHubClient,
+                "get_deck_by_id",
+                get_deck_by_id_mock,
+            )
+
+            # Try to download and install the deck
+            on_success_mock = Mock()
+            download_and_install_decks(
+                [deck.ankihub_deck_uuid], on_success=on_success_mock
+            )
+            qtbot.wait(300)
+
+            # Assert that the on_success callback was not called
+            assert on_success_mock.call_count == 0
+
+    def _mock_client_and_gui_and_media_sync(
+        self,
+        monkeypatch: MonkeyPatch,
+        deck: Deck,
+        notes_data: List[NoteInfo],
+        note_type: NotetypeDict,
+    ) -> Dict[str, Mock]:
+        mocks: Dict[str, Mock] = dict()
+
+        def add_mock(object, func_name: str, return_value: Any = None):
+            mocks[func_name] = Mock()
+            mocks[func_name].return_value = return_value
+            monkeypatch.setattr(object, func_name, mocks[func_name])
+
+        # Mock client functions
+        add_mock(AnkiHubClient, "get_note_type", note_type)
+        add_mock(AnkiHubClient, "get_deck_by_id", deck)
+        add_mock(AnkiHubClient, "download_deck", notes_data)
+        add_mock(AnkiHubClient, "get_protected_fields", {})
+        add_mock(AnkiHubClient, "get_protected_tags", [])
+
+        # Patch away gui functions which would otherwise block the test
+        add_mock(gui.decks, "showInfo")
+        add_mock(gui.decks, "ask_user", return_value=True)
+        add_mock(gui.decks, "show_empty_cards")
+
+        # Mock media sync
+        add_mock(media_sync._AnkiHubMediaSync, "start_media_download")
+
+        return mocks
+
+
+def test_check_and_install_new_deck_subscriptions(
+    anki_session_with_addon_data: AnkiSession,
+    monkeypatch: MonkeyPatch,
+    qtbot: QtBot,
+    set_feature_flag_state,
+):
+    set_feature_flag_state(
+        feature_flag_name="new_subscription_workflow_enabled", is_active=True
+    )
+
+    anki_session = anki_session_with_addon_data
+    with anki_session.profile_loaded():
+
+        # Mock get_deck_subscriptions function to return a deck
+        deck = DeckFactory.create()
+        get_deck_subscription_mock = Mock()
+        monkeypatch.setattr(
+            AnkiHubClient, "get_deck_subscriptions", get_deck_subscription_mock
+        )
+        get_deck_subscription_mock.return_value = [deck]
+
+        # Mock ask_user function to return True
+        ask_user_mock = Mock()
+        monkeypatch.setattr(gui.new_deck_subscriptions, "ask_user", ask_user_mock)
+        ask_user_mock.return_value = True
+
+        # Mock download and install function to do nothing (we only want to check that it is called)
+        download_and_install_decks_mock = Mock()
+        monkeypatch.setattr(
+            gui.new_deck_subscriptions,
+            "download_and_install_decks",
+            download_and_install_decks_mock,
+        )
+
+        # Call the function
+        check_and_install_new_deck_subscriptions()
+
+        qtbot.wait(500)
+
+        # Assert that the mocked functions were called
+        assert get_deck_subscription_mock.call_count == 1
+        assert ask_user_mock.call_count == 1
+
+        assert download_and_install_decks_mock.call_count == 1
+        assert download_and_install_decks_mock.call_args[0][0] == [
+            deck.ankihub_deck_uuid
+        ]
 
 
 def test_get_deck_by_id(
@@ -1998,6 +2184,98 @@ def test_browser_custom_columns(
         ]
 
 
+class TestSubscribedDecksDialog:
+    def test_toggle_subdecks(
+        self,
+        anki_session_with_addon_data: AnkiSession,
+        qtbot: QtBot,
+        install_sample_ah_deck: InstallSampleAHDeck,
+        monkeypatch: MonkeyPatch,
+        set_feature_flag_state,
+    ):
+        set_feature_flag_state(
+            feature_flag_name="new_subscription_workflow_enabled", is_active=True
+        )
+
+        anki_session = anki_session_with_addon_data
+        with anki_session.profile_loaded():
+            mw = anki_session.mw
+
+            # Mock the config to return that the user is logged in
+            monkeypatch.setattr(config, "is_logged_in", lambda: True)
+
+            # Mock the ask_user function to always return True
+            monkeypatch.setattr(gui.subdecks, "ask_user", lambda *args, **kwargs: True)
+
+            # Mock get_deck_subscriptions to return an empty list
+            monkeypatch.setattr(
+                AnkiHubClient, "get_deck_subscriptions", lambda *args, **kwargs: []
+            )
+
+            # Open the dialog
+            dialog = SubscribedDecksDialog()
+            qtbot.add_widget(dialog)
+            dialog.display_subscribe_window()
+            qtbot.wait(200)
+
+            # The toggle subdecks button should be disabled because there are no decks
+            assert dialog.toggle_subdecks_btn.isEnabled() is False
+
+            # Install a deck with subdeck tags
+            subdeck_name, anki_did, ah_did = self._install_deck_with_subdeck_tag(
+                install_sample_ah_deck
+            )
+            # ... The subdeck should not exist yet
+            assert aqt.mw.col.decks.by_name(subdeck_name) is None
+
+            # Mock get_deck_subscriptions to return the deck
+            monkeypatch.setattr(
+                AnkiHubClient,
+                "get_deck_subscriptions",
+                lambda *args: [
+                    DeckFactory.create(ankihub_deck_uuid=ah_did, anki_did=anki_did)
+                ],
+            )
+
+            # Refresh the dialog
+            dialog = SubscribedDecksDialog()
+            qtbot.add_widget(dialog)
+            dialog.display_subscribe_window()
+            qtbot.wait(200)
+
+            # Select the deck and click the toggle subdeck button
+            assert dialog.decks_list.count() == 1
+            dialog.decks_list.setCurrentRow(0)
+            qtbot.wait(200)
+
+            assert dialog.toggle_subdecks_btn.isEnabled() is True
+            dialog.toggle_subdecks_btn.click()
+            qtbot.wait(200)
+
+            # The subdeck should now exist
+            assert mw.col.decks.by_name(subdeck_name) is not None
+
+            # Click the toggle subdeck button again
+            dialog.toggle_subdecks_btn.click()
+            qtbot.wait(200)
+
+            # The subdeck should not exist anymore
+            assert mw.col.decks.by_name(subdeck_name) is None
+
+    def _install_deck_with_subdeck_tag(
+        self,
+        install_sample_ah_deck: InstallSampleAHDeck,
+    ) -> Tuple[str, int, uuid.UUID]:
+        anki_did, ah_did = install_sample_ah_deck()
+        deck_name = aqt.mw.col.decks.get(anki_did)["name"]
+        subdeck_name = f"{deck_name}::Subdeck-1"
+        notes = aqt.mw.col.find_notes(f"did:{anki_did}")
+        note = aqt.mw.col.get_note(notes[0])
+        note.tags = [f"{SUBDECK_TAG}::{subdeck_name}"]
+        note.flush()
+        return subdeck_name, anki_did, ah_did
+
+
 class TestBuildSubdecksAndMoveCardsToThem:
     def test_basic(
         self,
@@ -2728,7 +3006,12 @@ def test_download_images_on_sync(
     install_sample_ah_deck: InstallSampleAHDeck,
     monkeypatch: MonkeyPatch,
     qtbot: QtBot,
+    set_feature_flag_state,
 ):
+    set_feature_flag_state(
+        feature_flag_name="new_subscription_workflow_enabled", is_active=True
+    )
+
     with anki_session_with_addon_data.profile_loaded():
         mw = anki_session_with_addon_data.mw
 
@@ -2744,6 +3027,11 @@ def test_download_images_on_sync(
         monkeypatch.setattr(config, "token", lambda: "test token")
 
         # Mock the client to simulate that there are no deck updates and extensions.
+        monkeypatch.setattr(
+            AnkiHubClient,
+            "get_deck_subscriptions",
+            lambda *args, **kwargs: [],
+        )
         monkeypatch.setattr(
             AnkiHubClient,
             "get_deck_updates",

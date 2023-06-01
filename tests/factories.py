@@ -1,5 +1,7 @@
+import datetime
 import os
 import uuid
+from datetime import timezone
 from typing import Generic, List, TypeVar
 
 import factory
@@ -8,7 +10,7 @@ import factory
 # has to be set before importing ankihub
 os.environ["SKIP_INIT"] = "1"
 
-from ankihub.ankihub_client import Field, NoteInfo
+from ankihub.ankihub_client import Deck, Field, NoteInfo
 
 T = TypeVar("T")
 
@@ -36,3 +38,16 @@ class NoteInfoFactory(BaseFactory[NoteInfo]):
     )
     tags: List[str] = []
     guid = "old guid"
+
+
+class DeckFactory(BaseFactory[Deck]):
+    class Meta:
+        model = Deck
+
+    ankihub_deck_uuid = uuid.uuid4()
+    name = "Test Deck"
+    owner = False
+    anki_did = 1
+    csv_last_upload = datetime.datetime.now(tz=timezone.utc)
+    csv_notes_filename = "test.csv"
+    image_upload_finished = False
