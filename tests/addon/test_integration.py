@@ -81,7 +81,7 @@ from ankihub.gui.browser import (
     _on_reset_optional_tags_action,
     custom_columns,
 )
-from ankihub.gui.custom_search_nodes import UpdatedSinceLastReviewSearchNode
+from ankihub.gui.browser.custom_search_nodes import UpdatedSinceLastReviewSearchNode
 from ankihub.gui.decks_dialog import SubscribedDecksDialog, download_and_install_decks
 from ankihub.gui.editor import _on_suggestion_button_press, _refresh_buttons
 from ankihub.gui.new_deck_subscriptions import check_and_install_new_deck_subscriptions

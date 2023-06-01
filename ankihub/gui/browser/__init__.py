@@ -31,24 +31,27 @@ from aqt.gui_hooks import (
 from aqt.qt import QAction, QMenu, qconnect
 from aqt.utils import showInfo, showWarning, tooltip, tr
 
-from .. import LOGGER
-from ..ankihub_client import SuggestionType
-from ..db import (
+from ... import LOGGER
+from ...ankihub_client import SuggestionType
+from ...db import (
     ankihub_db,
     attach_ankihub_db_to_anki_db_connection,
     attached_ankihub_db,
     detach_ankihub_db_from_anki_db_connection,
 )
-from ..importing import get_fields_protected_by_tags
-from ..note_conversion import (
+from ...importing import get_fields_protected_by_tags
+from ...note_conversion import (
     TAG_FOR_PROTECTING_ALL_FIELDS,
     TAG_FOR_PROTECTING_FIELDS,
     is_tag_for_group,
 )
-from ..reset_local_changes import reset_local_changes_to_notes
-from ..settings import ANKIHUB_NOTE_TYPE_FIELD_NAME, DeckExtensionConfig, config
-from ..subdecks import SUBDECK_TAG, build_subdecks_and_move_cards_to_them
-from ..sync import NotLoggedInError, ah_sync
+from ...reset_local_changes import reset_local_changes_to_notes
+from ...settings import ANKIHUB_NOTE_TYPE_FIELD_NAME, DeckExtensionConfig, config
+from ...subdecks import SUBDECK_TAG, build_subdecks_and_move_cards_to_them
+from ...sync import NotLoggedInError, ah_sync
+from ..optional_tag_suggestion_dialog import OptionalTagsSuggestionDialog
+from ..suggestion_dialog import open_suggestion_dialog_for_bulk_suggestion
+from ..utils import ask_user, choose_ankihub_deck, choose_list, choose_subset
 from .custom_columns import (
     AnkiHubIdColumn,
     CustomColumn,
@@ -63,9 +66,6 @@ from .custom_search_nodes import (
     UpdatedInTheLastXDaysSearchNode,
     UpdatedSinceLastReviewSearchNode,
 )
-from .optional_tag_suggestion_dialog import OptionalTagsSuggestionDialog
-from .suggestion_dialog import open_suggestion_dialog_for_bulk_suggestion
-from .utils import ask_user, choose_ankihub_deck, choose_list, choose_subset
 
 browser: Optional[Browser] = None
 ankihub_tree_item: Optional[SidebarItem] = None
