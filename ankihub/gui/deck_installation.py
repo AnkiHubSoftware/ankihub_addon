@@ -140,7 +140,7 @@ def _download_and_install_decks_inner(
     exceptions = []
     for ah_did in ankihub_dids:
         try:
-            result.append(_download_and_install_deck(ah_did))
+            result.append(_download_and_install_single_deck(ah_did))
         except Exception as e:
             exceptions.append(
                 DeckDownloadAndInstallError(
@@ -156,7 +156,7 @@ def _download_and_install_decks_inner(
     return result
 
 
-def _download_and_install_deck(ankihub_did: uuid.UUID) -> AnkiHubImportResult:
+def _download_and_install_single_deck(ankihub_did: uuid.UUID) -> AnkiHubImportResult:
     deck = AnkiHubClient().get_deck_by_id(ankihub_did)
     notes_data: List[NoteInfo] = AnkiHubClient().download_deck(
         deck.ankihub_deck_uuid, download_progress_cb=_download_progress_cb
