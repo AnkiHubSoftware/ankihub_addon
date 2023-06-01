@@ -77,13 +77,9 @@ jobs:
           echo DEPLOYMENT_ENVIRONMENT=local >> ${{ github.workspace }}/ankihub_web/.env
 
       - run: docker-compose pull
-      - run: echo "MONTH=$(date +%m)" >> $GITHUB_ENV
       - uses: satackey/action-docker-layer-caching@v0.0.11
         continue-on-error: true
-        with:
-          key: ${{ github.workflow }}-${{ env.MONTH }}-{hash}
-          restore-keys: |
-            ${{ github.workflow }}-${{ env.MONTH }}-
+
       - run: |
           docker-compose build
           docker-compose run --rm django python manage.py makemigrations
@@ -123,3 +119,7 @@ jobs:
         with:
           name: ankihub_addon_${{ github.sha }}
           path: ankihub.ankiaddon
+
+      # Clean up cache every week.
+      - run: docker image prune --all --force --filter "until=168h"
+        if: always()
