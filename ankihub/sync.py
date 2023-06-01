@@ -62,6 +62,7 @@ class _AnkiHubSync:
 
         client = AnkiHubClient()
         if client.is_feature_flag_enabled("new_subscription_workflow_enabled"):
+            # TODO use get_decks_with_user_relation instead of get_deck_subscriptions()
             subscribed_deck_ah_ids = [
                 deck.ankihub_deck_uuid for deck in client.get_deck_subscriptions()
             ]
