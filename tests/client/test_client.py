@@ -666,14 +666,22 @@ class TestDecksWithUserRelation:
         authorized_client_for_user_test1: AnkiHubClient,
     ):
         client = authorized_client_for_user_test1
-        assert client.get_decks_with_user_relation() == []
-
-        client.subscribe_to_deck(ID_OF_DECK_OF_USER_TEST1)
 
         decks = client.get_decks_with_user_relation()
         assert len(decks) == 1
         deck: Deck = decks[0]
         assert deck.ankihub_deck_uuid == ID_OF_DECK_OF_USER_TEST1
+
+        client.subscribe_to_deck(ID_OF_DECK_OF_USER_TEST2)
+
+        decks = client.get_decks_with_user_relation()
+        assert len(decks) == 2
+        assert set(deck.ankihub_deck_uuid for deck in decks) == set(
+            [
+                ID_OF_DECK_OF_USER_TEST1,
+                ID_OF_DECK_OF_USER_TEST2,
+            ]
+        )
 
 
 class TestGetDeckUpdates:
