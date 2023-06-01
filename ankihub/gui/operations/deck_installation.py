@@ -10,19 +10,19 @@ from aqt.emptycards import show_empty_cards
 from aqt.operations.tag import clear_unused_tags
 from aqt.utils import showInfo, showText
 
-from .. import LOGGER
-from ..addon_ankihub_client import AddonAnkiHubClient as AnkiHubClient
-from ..ankihub_client import NoteInfo
-from ..ankihub_client.ankihub_client import AnkiHubHTTPError
-from ..importing import AnkiHubImporter, AnkiHubImportResult
-from ..media_sync import media_sync
-from ..messages import messages
-from ..settings import config, url_view_deck
-from ..subdecks import deck_contains_subdeck_tags
-from ..utils import create_backup
-from .exceptions import DeckDownloadAndInstallError
+from ... import LOGGER
+from ...addon_ankihub_client import AddonAnkiHubClient as AnkiHubClient
+from ...ankihub_client import NoteInfo
+from ...ankihub_client.ankihub_client import AnkiHubHTTPError
+from ...importing import AnkiHubImporter, AnkiHubImportResult
+from ...media_sync import media_sync
+from ...messages import messages
+from ...settings import config, url_view_deck
+from ...subdecks import deck_contains_subdeck_tags
+from ...utils import create_backup
+from ..exceptions import DeckDownloadAndInstallError
+from ..utils import ask_user
 from .subdecks import confirm_and_toggle_subdecks
-from .utils import ask_user
 
 
 def download_and_install_decks(

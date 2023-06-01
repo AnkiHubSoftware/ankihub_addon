@@ -1,4 +1,4 @@
-from ... import LOGGER
+from .... import LOGGER
 from .ah_db_check import check_ankihub_db
 from .anki_db_check import check_anki_db
 

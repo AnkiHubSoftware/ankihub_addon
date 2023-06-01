@@ -38,7 +38,7 @@ from .conftest import TEST_PROFILE_ID
 # has to be set before importing ankihub
 os.environ["SKIP_INIT"] = "1"
 
-from ankihub import entry_point, gui, media_sync
+from ankihub import entry_point, media_sync
 from ankihub.addon_ankihub_client import AddonAnkiHubClient as AnkiHubClient
 from ankihub.addons import (
     _change_file_permissions_of_addon_files,
@@ -72,7 +72,7 @@ from ankihub.debug import (
 )
 from ankihub.deck_creation import create_ankihub_deck, modify_note_type
 from ankihub.exporting import to_note_data
-from ankihub.gui import utils
+from ankihub.gui import operations, utils
 from ankihub.gui.browser import (
     ModifiedAfterSyncSearchNode,
     NewNoteSearchNode,
@@ -84,7 +84,9 @@ from ankihub.gui.browser import (
 from ankihub.gui.custom_search_nodes import UpdatedSinceLastReviewSearchNode
 from ankihub.gui.decks_dialog import SubscribedDecksDialog, download_and_install_decks
 from ankihub.gui.editor import _on_suggestion_button_press, _refresh_buttons
-from ankihub.gui.new_deck_subscriptions import check_and_install_new_deck_subscriptions
+from ankihub.gui.operations.new_deck_subscriptions import (
+    check_and_install_new_deck_subscriptions,
+)
 from ankihub.gui.optional_tag_suggestion_dialog import OptionalTagsSuggestionDialog
 from ankihub.importing import (
     AnkiHubImporter,
@@ -554,9 +556,9 @@ class TestDownloadAndInstallDecks:
         add_mock(AnkiHubClient, "get_protected_tags", [])
 
         # Patch away gui functions which would otherwise block the test
-        add_mock(gui.deck_installation, "showInfo")
-        add_mock(gui.deck_installation, "ask_user", return_value=True)
-        add_mock(gui.deck_installation, "show_empty_cards")
+        add_mock(operations.deck_installation, "showInfo")
+        add_mock(operations.deck_installation, "ask_user", return_value=True)
+        add_mock(operations.deck_installation, "show_empty_cards")
 
         # Mock media sync
         add_mock(media_sync._AnkiHubMediaSync, "start_media_download")
@@ -587,13 +589,15 @@ def test_check_and_install_new_deck_subscriptions(
 
         # Mock ask_user function to return True
         ask_user_mock = Mock()
-        monkeypatch.setattr(gui.new_deck_subscriptions, "ask_user", ask_user_mock)
+        monkeypatch.setattr(
+            operations.new_deck_subscriptions, "ask_user", ask_user_mock
+        )
         ask_user_mock.return_value = True
 
         # Mock download and install function to do nothing (we only want to check that it is called)
         download_and_install_decks_mock = Mock()
         monkeypatch.setattr(
-            gui.new_deck_subscriptions,
+            operations.new_deck_subscriptions,
             "download_and_install_decks",
             download_and_install_decks_mock,
         )
@@ -2205,7 +2209,9 @@ class TestSubscribedDecksDialog:
             monkeypatch.setattr(config, "is_logged_in", lambda: True)
 
             # Mock the ask_user function to always return True
-            monkeypatch.setattr(gui.subdecks, "ask_user", lambda *args, **kwargs: True)
+            monkeypatch.setattr(
+                operations.subdecks, "ask_user", lambda *args, **kwargs: True
+            )
 
             # Mock get_deck_subscriptions to return an empty list
             monkeypatch.setattr(

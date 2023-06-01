@@ -6,9 +6,9 @@ import aqt
 from aqt import dialogs
 from aqt.browser import Browser
 
-from ..settings import config
-from ..subdecks import build_subdecks_and_move_cards_to_them, flatten_deck
-from .utils import ask_user, tooltip
+from ...settings import config
+from ...subdecks import build_subdecks_and_move_cards_to_them, flatten_deck
+from ..utils import ask_user, tooltip
 
 
 def confirm_and_toggle_subdecks(ankihub_id: uuid.UUID) -> None:
