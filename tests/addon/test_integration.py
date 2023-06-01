@@ -82,7 +82,7 @@ from ankihub.gui.browser import (
     custom_columns,
 )
 from ankihub.gui.custom_search_nodes import UpdatedSinceLastReviewSearchNode
-from ankihub.gui.decks import SubscribedDecksDialog, download_and_install_decks
+from ankihub.gui.decks_dialog import SubscribedDecksDialog, download_and_install_decks
 from ankihub.gui.editor import _on_suggestion_button_press, _refresh_buttons
 from ankihub.gui.new_deck_subscriptions import check_and_install_new_deck_subscriptions
 from ankihub.gui.optional_tag_suggestion_dialog import OptionalTagsSuggestionDialog
@@ -554,9 +554,9 @@ class TestDownloadAndInstallDecks:
         add_mock(AnkiHubClient, "get_protected_tags", [])
 
         # Patch away gui functions which would otherwise block the test
-        add_mock(gui.decks, "showInfo")
-        add_mock(gui.decks, "ask_user", return_value=True)
-        add_mock(gui.decks, "show_empty_cards")
+        add_mock(gui.deck_installation, "showInfo")
+        add_mock(gui.deck_installation, "ask_user", return_value=True)
+        add_mock(gui.deck_installation, "show_empty_cards")
 
         # Mock media sync
         add_mock(media_sync._AnkiHubMediaSync, "start_media_download")
@@ -1525,7 +1525,7 @@ def test_unsubscribe_from_deck(
         deck_item = decks_list.item(deck_item_index)
         deck_item.setSelected(True)
         monkeypatch.setattr(
-            "ankihub.gui.decks.ask_user",
+            "ankihub.gui.decks_dialog.ask_user",
             lambda *args, **kwargs: True,
         )
         if is_flag_active:

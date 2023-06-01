@@ -4,7 +4,7 @@ from typing import Callable, List, Optional
 from ... import LOGGER
 from ...db import ankihub_db
 from ...settings import config
-from ..decks import download_and_install_decks
+from ..decks_dialog import download_and_install_decks
 from ..utils import ask_user
 
 
