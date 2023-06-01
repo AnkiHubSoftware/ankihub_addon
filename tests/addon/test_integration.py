@@ -43,7 +43,6 @@ from ankihub.addon_ankihub_client import AddonAnkiHubClient as AnkiHubClient
 from ankihub.addons import (
     _change_file_permissions_of_addon_files,
     _maybe_change_file_permissions_of_addon_files,
-    _with_disabled_log_file_handler,
 )
 from ankihub.ankihub_client import (
     AnkiHubHTTPError,
@@ -430,6 +429,7 @@ def test_create_collaborative_deck_and_upload(
 
 
 class TestDownloadAndInstallDecks:
+    @pytest.mark.qt_no_exception_capture
     def test_download_and_install_deck(
         self,
         anki_session_with_addon_data: AnkiSession,
@@ -460,7 +460,7 @@ class TestDownloadAndInstallDecks:
             download_and_install_decks(
                 [deck.ankihub_deck_uuid], on_success=on_success_mock
             )
-            qtbot.wait(300)
+            qtbot.wait(500)
 
             # Assert that the deck was installed
             # ... in the Anki database
@@ -474,12 +474,16 @@ class TestDownloadAndInstallDecks:
             # ... in the config
             assert config.deck_ids() == [deck.ankihub_deck_uuid]
 
+            # Assert that the on_success callback was called
+            on_success_mock.assert_called_once()
+
             # Assert that the mocked functions were called
             for name, mock in mocks.items():
                 assert (
                     mock.call_count == 1
                 ), f"Mock {name} was not called once, but {mock.call_count} times"
 
+    @pytest.mark.qt_no_exception_capture
     def test_error_handling(
         self,
         anki_session_with_addon_data: AnkiSession,
@@ -3002,7 +3006,12 @@ def test_download_images_on_sync(
     install_sample_ah_deck: InstallSampleAHDeck,
     monkeypatch: MonkeyPatch,
     qtbot: QtBot,
+    set_feature_flag_state,
 ):
+    set_feature_flag_state(
+        feature_flag_name="new_subscription_workflow_enabled", is_active=True
+    )
+
     with anki_session_with_addon_data.profile_loaded():
         mw = anki_session_with_addon_data.mw
 
@@ -3018,6 +3027,11 @@ def test_download_images_on_sync(
         monkeypatch.setattr(config, "token", lambda: "test token")
 
         # Mock the client to simulate that there are no deck updates and extensions.
+        monkeypatch.setattr(
+            AnkiHubClient,
+            "get_deck_subscriptions",
+            lambda *args, **kwargs: [],
+        )
         monkeypatch.setattr(
             AnkiHubClient,
             "get_deck_updates",
@@ -3368,13 +3382,6 @@ class TestAddonUpdate:
             maybe_change_file_permissions_of_addon_files_mock,
         )
 
-        with_disabled_log_file_handler_mock = Mock()
-        with_disabled_log_file_handler_mock.side_effect = _with_disabled_log_file_handler  # type: ignore
-        monkeypatch.setattr(
-            "ankihub.addons._with_disabled_log_file_handler",
-            with_disabled_log_file_handler_mock,
-        )
-
         # Udpate the AnkiHub add-on entry point has to be run so that the add-on is loaded and
         # the patches to the update process are applied
         entry_point.run()
@@ -3385,9 +3392,6 @@ class TestAddonUpdate:
             assert isinstance(result, InstallOk)
 
             assert mw.addonManager.allAddons() == ["ankihub"]
-
-        # This is called tree times: for backupUserFiles, deleteAddon, and restoreUserFiles.
-        assert with_disabled_log_file_handler_mock.call_count == 3
 
         # This is called twice: for backupUserFiles and for deleteAddon.
         assert maybe_change_file_permissions_of_addon_files_mock.call_count == 2

@@ -1,4 +1,7 @@
-"""Dialog for managing subscriptions to AnkiHub decks and deck-specific settings."""
+"""Dialog for managing subscriptions to AnkiHub decks and deck-specific settings.
+Also contains the `download_and_install_decks` function which
+downloads and installs decks in the background and shows the required related dialogs
+(install confirmation dialog, import summary dialog, etc.)."""
 import uuid
 from typing import Optional
 from uuid import UUID

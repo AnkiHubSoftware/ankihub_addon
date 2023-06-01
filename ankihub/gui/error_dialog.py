@@ -37,9 +37,8 @@ class ErrorDialog(QDialog):
         message = dedent(
             """
             🐛 Oh no! An AnkiHub add-on error has occurred.
-            Click "Yes," to provide feedback or request help on the AnkiHub forum.
 
-            The AnkiHub team will respond ASAP!
+            Click 'Report Error' if you'd like to report this on https://community.ankihub.net/.
             """.strip("\n")  # fmt: skip
         )
 
@@ -52,6 +51,13 @@ class ErrorDialog(QDialog):
         self.button_box = QDialogButtonBox(
             QDialogButtonBox.StandardButton.No | QDialogButtonBox.StandardButton.Yes  # type: ignore
         )
+
+        # Changing text of the default yes/no buttons
+        yes_button = self.button_box.button(QDialogButtonBox.StandardButton.Yes)  # type: ignore
+        yes_button.setText("Report error")
+
+        no_button = self.button_box.button(QDialogButtonBox.StandardButton.No)  # type: ignore
+        no_button.setText("Cancel")
 
         def on_accepted() -> None:
             utils.openLink(_forum_url(exception, sentry_event_id))
@@ -97,11 +103,11 @@ class ErrorDialog(QDialog):
 
     def _toggle_debug_info(self) -> None:
         if self.debug_info_area.isHidden():
-            self.debug_info_button.setText("Hide Debug Info")
+            self.debug_info_button.setText("Hide error details")
             self.debug_info_area.show()
             self.spacer_widget.hide()
         else:
-            self.debug_info_button.setText("Show Debug Info")
+            self.debug_info_button.setText("Show error details")
             self.debug_info_area.hide()
             self.spacer_widget.show()
 
