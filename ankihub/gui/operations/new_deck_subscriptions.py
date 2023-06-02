@@ -36,7 +36,7 @@ def check_and_install_new_deck_subscriptions() -> None:
 
 def _not_installed_ah_decks() -> List[Deck]:
     client = AnkiHubClient()
-    remote_decks = client.get_deck_subscriptions()
+    remote_decks = client.get_decks_with_user_relation()
     remote_deck_ids = [deck.ankihub_deck_uuid for deck in remote_decks]
 
     local_deck_ids = config.deck_ids()
