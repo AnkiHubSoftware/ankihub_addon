@@ -36,6 +36,7 @@ from .ankihub_client import (
     STAGING_S3_BUCKET_URL,
     DeckExtension,
 )
+from .ankihub_client.models import UserDeckRelation
 from .public_config_migrations import migrate_public_config
 
 ADDON_PATH = Path(__file__).parent.absolute()
@@ -62,8 +63,8 @@ def _deserialize_datetime(x: str) -> Optional[datetime]:
 @dataclass
 class DeckConfig(DataClassJSONMixin):
     anki_id: DeckId
-    creator: bool
     name: str
+    user_relation: UserDeckRelation = UserDeckRelation.SUBSCRIBER
     latest_update: Optional[datetime] = dataclasses.field(
         metadata=field_options(
             serialize=_serialize_datetime,
@@ -194,14 +195,14 @@ class _Config:
         name: str,
         ankihub_did: uuid.UUID,
         anki_did: DeckId,
-        creator: bool = False,
+        user_relation: UserDeckRelation,
         latest_udpate: Optional[datetime] = None,
         subdecks_enabled: bool = False,
     ) -> None:
         self._private_config.decks[ankihub_did] = DeckConfig(
             name=name,
             anki_id=DeckId(anki_did),
-            creator=creator,
+            user_relation=user_relation,
             subdecks_enabled=subdecks_enabled,
         )
         # remove duplicates

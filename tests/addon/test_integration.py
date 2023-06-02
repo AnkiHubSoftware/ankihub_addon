@@ -156,7 +156,12 @@ def install_sample_ah_deck(
         ah_did = next_deterministic_uuid()
         mw = anki_session_with_addon_data.mw
         anki_did = import_sample_ankihub_deck(mw, ankihub_did=ah_did)
-        config.save_subscription(name="Testdeck", ankihub_did=ah_did, anki_did=anki_did)
+        config.save_subscription(
+            name="Testdeck",
+            ankihub_did=ah_did,
+            anki_did=anki_did,
+            user_relation=UserDeckRelation.SUBSCRIBER,
+        )
         return anki_did, ah_did
 
     return _install_sample_ah_deck
@@ -630,12 +635,11 @@ def test_get_deck_by_id(
     expected_data = {
         "id": str(ankihub_deck_uuid),
         "name": "test",
-        "owner": 1,
         "anki_id": 1,
         "csv_last_upload": date_time.strftime(ANKIHUB_DATETIME_FORMAT_STR),
         "csv_notes_filename": "test.csv",
         "image_upload_finished": False,
-        "user_deck_relation": "subscriber",
+        "user_relation": "subscriber",
     }
 
     requests_mock.get(
@@ -645,7 +649,6 @@ def test_get_deck_by_id(
     assert deck_info == Deck(
         ankihub_deck_uuid=ankihub_deck_uuid,
         anki_did=1,
-        owner=True,
         name="test",
         csv_last_upload=date_time,
         csv_notes_filename="test.csv",
@@ -1520,6 +1523,7 @@ def test_unsubscribe_from_deck(
                             "csv_last_upload": None,
                             "csv_notes_filename": "",
                             "image_upload_finished": True,
+                            "user_relation": "subscriber",
                         }
                     }
                 ],

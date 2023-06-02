@@ -100,12 +100,6 @@ class UserDeckRelation(Enum):
 @dataclass
 class Deck(DataClassJSONMixinWithConfig):
     ankihub_deck_uuid: uuid.UUID = dataclasses.field(metadata=field_options(alias="id"))
-    owner: bool = dataclasses.field(
-        metadata=field_options(
-            serialize=lambda b: 1 if b else 0,
-            deserialize=lambda i: bool(i),
-        )
-    )
     anki_did: int = dataclasses.field(metadata=field_options(alias="anki_id"))
     name: str
     csv_last_upload: datetime = dataclasses.field(
