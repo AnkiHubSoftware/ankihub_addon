@@ -55,6 +55,7 @@ from ankihub.ankihub_client import (
     OptionalTagSuggestion,
     SuggestionType,
     TagGroupValidationResponse,
+    UserDeckRelation,
 )
 from ankihub.ankihub_client.ankihub_client import (
     ANKIHUB_DATETIME_FORMAT_STR,
@@ -634,6 +635,7 @@ def test_get_deck_by_id(
         "csv_last_upload": date_time.strftime(ANKIHUB_DATETIME_FORMAT_STR),
         "csv_notes_filename": "test.csv",
         "image_upload_finished": False,
+        "user_deck_relation": "subscriber",
     }
 
     requests_mock.get(
@@ -648,6 +650,7 @@ def test_get_deck_by_id(
         csv_last_upload=date_time,
         csv_notes_filename="test.csv",
         image_upload_finished=False,
+        user_relation=UserDeckRelation.SUBSCRIBER,
     )
 
     # test get deck by id unauthenticated

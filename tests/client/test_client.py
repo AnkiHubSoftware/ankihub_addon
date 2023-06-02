@@ -39,6 +39,7 @@ from ankihub.ankihub_client import (
     OptionalTagSuggestion,
     SuggestionType,
     TagGroupValidationResponse,
+    UserDeckRelation,
     get_image_names_from_notes_data,
     get_image_names_from_suggestion,
 )
@@ -671,6 +672,7 @@ class TestDecksWithUserRelation:
         assert len(decks) == 1
         deck: Deck = decks[0]
         assert deck.ankihub_deck_uuid == ID_OF_DECK_OF_USER_TEST1
+        assert deck.user_relation == UserDeckRelation.OWNER
 
         client.subscribe_to_deck(ID_OF_DECK_OF_USER_TEST2)
 
@@ -682,6 +684,10 @@ class TestDecksWithUserRelation:
                 ID_OF_DECK_OF_USER_TEST2,
             ]
         )
+        deck_of_user_test2 = next(
+            deck for deck in decks if deck.ankihub_deck_uuid == ID_OF_DECK_OF_USER_TEST2
+        )
+        assert deck_of_user_test2.user_relation == UserDeckRelation.SUBSCRIBER
 
 
 class TestGetDeckUpdates:
