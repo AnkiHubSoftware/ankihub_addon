@@ -25,7 +25,7 @@ from aqt.qt import (
     pyqtSignal,
     qconnect,
 )
-from aqt.utils import showInfo, showText
+from aqt.utils import showText
 
 from .. import LOGGER
 from ..ankihub_client import (
@@ -43,7 +43,7 @@ from ..suggestions import (
     suggest_note_update,
     suggest_notes_in_bulk,
 )
-from .utils import show_tooltip
+from .utils import show_error_dialog, show_tooltip
 
 
 class SourceType(Enum):
@@ -181,12 +181,8 @@ def _on_suggest_notes_in_bulk_done(future: Future, parent: QWidget) -> None:
         if e.response.status_code != 403:
             raise e
 
-        msg = (
-            "You are not allowed to create suggestion for all selected notes.<br>"
-            "Are you subscribed to the AnkiHub deck(s) these notes are from?<br><br>"
-            "You can only submit changes without a review if you are an owner or maintainer of the deck."
-        )
-        showInfo(msg, parent=parent)
+        error_message = e.response.json().get("detail")
+        show_error_dialog(error_message, parent=parent)
         return
 
     LOGGER.info("Created note suggestions in bulk.")
