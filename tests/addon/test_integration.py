@@ -581,11 +581,13 @@ def test_check_and_install_new_deck_subscriptions(
 
         # Mock get_deck_subscriptions function to return a deck
         deck = DeckFactory.create()
-        get_deck_subscription_mock = Mock()
+        get_decks_with_user_relation_mock = Mock()
         monkeypatch.setattr(
-            AnkiHubClient, "get_deck_subscriptions", get_deck_subscription_mock
+            AnkiHubClient,
+            "get_decks_with_user_relation",
+            get_decks_with_user_relation_mock,
         )
-        get_deck_subscription_mock.return_value = [deck]
+        get_decks_with_user_relation_mock.return_value = [deck]
 
         # Mock ask_user function to return True
         ask_user_mock = Mock()
@@ -608,7 +610,7 @@ def test_check_and_install_new_deck_subscriptions(
         qtbot.wait(500)
 
         # Assert that the mocked functions were called
-        assert get_deck_subscription_mock.call_count == 1
+        assert get_decks_with_user_relation_mock.call_count == 1
         assert ask_user_mock.call_count == 1
 
         assert download_and_install_decks_mock.call_count == 1
