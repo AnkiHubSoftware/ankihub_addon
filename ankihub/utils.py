@@ -10,6 +10,7 @@ from anki.errors import NotFoundError
 from anki.models import ChangeNotetypeRequest, NoteType, NotetypeDict, NotetypeId
 from anki.notes import Note, NoteId
 from anki.utils import checksum, ids2str
+from aqt.utils import showWarning
 
 from . import LOGGER, settings
 from .settings import (
@@ -19,6 +20,10 @@ from .settings import (
     ANKIHUB_TEMPLATE_END_COMMENT,
     url_view_note,
 )
+
+
+def show_error_dialog(message, *args, **kwargs):
+    aqt.mw.taskman.run_on_main(lambda: showWarning(message, *args, **kwargs))
 
 
 # decks
