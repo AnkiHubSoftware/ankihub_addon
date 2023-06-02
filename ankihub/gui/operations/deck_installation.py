@@ -139,6 +139,7 @@ def _download_and_install_decks_inner(
                     ankihub_did=ah_did,
                 )
             )
+            LOGGER.warning(f"Failed to download and install deck {ah_did}.", exc_info=e)
 
     if exceptions:
         # Raise the first exception that occurred
