@@ -1,11 +1,11 @@
 import uuid
 from typing import Callable, List, Optional
 
-from ... import LOGGER
-from ...db import ankihub_db
-from ...settings import config
-from ..decks import download_and_install_decks
-from ..utils import ask_user
+from .... import LOGGER
+from ....db import ankihub_db
+from ....settings import config
+from ...decks_dialog import download_and_install_decks
+from ...utils import ask_user
 
 
 def check_ankihub_db(on_success: Optional[Callable[[], None]] = None):

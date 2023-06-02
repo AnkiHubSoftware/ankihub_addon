@@ -503,6 +503,13 @@ class AnkiHubClient:
 
         return [Deck.from_dict(deck["deck"]) for deck in response.json()]
 
+    def get_decks_with_user_relation(self) -> List[Deck]:
+        response = self._send_request("GET", API.ANKIHUB, "/users/decks/")
+        if response.status_code != 200:
+            raise AnkiHubHTTPError(response)
+
+        return [Deck.from_dict(deck) for deck in response.json()]
+
     def subscribe_to_deck(self, deck_id: uuid.UUID) -> None:
         response = self._send_request(
             "POST", API.ANKIHUB, "/decks/subscriptions/", json={"deck": str(deck_id)}

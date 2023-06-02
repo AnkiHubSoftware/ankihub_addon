@@ -46,7 +46,7 @@ from ankihub.ankihub_client.ankihub_client import (
     DeckExtensionUpdateChunk,
     DeckUpdateChunk,
 )
-from ankihub.gui.decks import _download_progress_cb
+from ankihub.gui.operations.deck_installation import _download_progress_cb
 
 COMPOSE_FILE = Path(os.getenv("COMPOSE_FILE")) if os.getenv("COMPOSE_FILE") else None
 
@@ -657,6 +657,31 @@ class TestDeckSubscriptions:
             pass
         else:
             assert False, "AnkiHubHTTPError was not raised"
+
+
+class TestDecksWithUserRelation:
+    @pytest.mark.vcr()
+    def test_subscribe_and_get_list_of_decks_with_user_relation(
+        self,
+        authorized_client_for_user_test1: AnkiHubClient,
+    ):
+        client = authorized_client_for_user_test1
+
+        decks = client.get_decks_with_user_relation()
+        assert len(decks) == 1
+        deck: Deck = decks[0]
+        assert deck.ankihub_deck_uuid == ID_OF_DECK_OF_USER_TEST1
+
+        client.subscribe_to_deck(ID_OF_DECK_OF_USER_TEST2)
+
+        decks = client.get_decks_with_user_relation()
+        assert len(decks) == 2
+        assert set(deck.ankihub_deck_uuid for deck in decks) == set(
+            [
+                ID_OF_DECK_OF_USER_TEST1,
+                ID_OF_DECK_OF_USER_TEST2,
+            ]
+        )
 
 
 class TestGetDeckUpdates:
