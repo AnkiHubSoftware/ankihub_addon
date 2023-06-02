@@ -118,7 +118,7 @@ def run_command_in_django_container(command):
             "sudo",
             "docker-compose",
             "-f",
-            "/home/pedro/labcodes/ankihub/local.yml",
+            COMPOSE_FILE.absolute(),
             "run",
             "--rm",
             "django",
