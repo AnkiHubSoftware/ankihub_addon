@@ -90,15 +90,16 @@ def note_info_for_upload(note_info: NoteInfo) -> NoteInfoForUpload:
     )
 
 
+class UserDeckRelation(Enum):
+    SUBSCRIBER = "subscriber"
+    OWNER = "owner"
+    MAINTAINER = "maintainer"
+    NONE = None
+
+
 @dataclass
 class Deck(DataClassJSONMixinWithConfig):
     ankihub_deck_uuid: uuid.UUID = dataclasses.field(metadata=field_options(alias="id"))
-    owner: bool = dataclasses.field(
-        metadata=field_options(
-            serialize=lambda b: 1 if b else 0,
-            deserialize=lambda i: bool(i),
-        )
-    )
     anki_did: int = dataclasses.field(metadata=field_options(alias="anki_id"))
     name: str
     csv_last_upload: datetime = dataclasses.field(
@@ -110,6 +111,12 @@ class Deck(DataClassJSONMixinWithConfig):
     )
     csv_notes_filename: str
     image_upload_finished: bool
+    user_relation: UserDeckRelation = dataclasses.field(
+        metadata=field_options(
+            serialize=lambda x: x.value,
+            deserialize=lambda s: UserDeckRelation(s),
+        )
+    )
 
 
 @dataclass

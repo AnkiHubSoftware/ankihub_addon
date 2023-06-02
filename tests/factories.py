@@ -11,6 +11,7 @@ import factory
 os.environ["SKIP_INIT"] = "1"
 
 from ankihub.ankihub_client import Deck, Field, NoteInfo
+from ankihub.ankihub_client.models import UserDeckRelation
 
 T = TypeVar("T")
 
@@ -46,8 +47,8 @@ class DeckFactory(BaseFactory[Deck]):
 
     ankihub_deck_uuid = uuid.uuid4()
     name = "Test Deck"
-    owner = False
     anki_did = 1
     csv_last_upload = datetime.datetime.now(tz=timezone.utc)
     csv_notes_filename = "test.csv"
     image_upload_finished = False
+    user_relation = UserDeckRelation.SUBSCRIBER

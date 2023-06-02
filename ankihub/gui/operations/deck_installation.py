@@ -14,6 +14,7 @@ from ... import LOGGER
 from ...addon_ankihub_client import AddonAnkiHubClient as AnkiHubClient
 from ...ankihub_client import NoteInfo
 from ...ankihub_client.ankihub_client import AnkiHubHTTPError
+from ...ankihub_client.models import UserDeckRelation
 from ...importing import AnkiHubImporter, AnkiHubImportResult
 from ...media_sync import media_sync
 from ...settings import config, url_view_deck
@@ -160,8 +161,8 @@ def _download_and_install_single_deck(ankihub_did: uuid.UUID) -> AnkiHubImportRe
         notes_data=notes_data,
         deck_name=deck.name,
         ankihub_did=deck.ankihub_deck_uuid,
+        user_relation=deck.user_relation,
         latest_update=deck.csv_last_upload,
-        is_creator=deck.owner,
     )
 
     return result
@@ -171,8 +172,8 @@ def _install_deck(
     notes_data: List[NoteInfo],
     deck_name: str,
     ankihub_did: uuid.UUID,
+    user_relation: UserDeckRelation,
     latest_update: datetime,
-    is_creator: bool,
 ) -> AnkiHubImportResult:
     """Imports the notes_data into the Anki collection.
     Saves the deck subscription to the config file.
@@ -192,8 +193,8 @@ def _install_deck(
         name=deck_name,
         ankihub_did=ankihub_did,
         anki_did=import_result.anki_did,
+        user_relation=user_relation,
         latest_udpate=latest_update,
-        creator=is_creator,
     )
 
     media_sync.start_media_download()
