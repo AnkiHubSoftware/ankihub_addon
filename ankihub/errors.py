@@ -15,7 +15,7 @@ import aqt
 import sentry_sdk
 from anki.errors import BackendIOError, DBError, SyncError
 from anki.utils import checksum, is_win
-from aqt.utils import askUser, showWarning, tooltip
+from aqt.utils import askUser, tooltip
 from requests import exceptions
 from sentry_sdk import capture_exception, push_scope
 from sentry_sdk.integrations.argv import ArgvIntegration
@@ -32,6 +32,7 @@ from .gui.error_dialog import ErrorDialog
 from .gui.utils import check_and_prompt_for_updates_on_main_window
 from .settings import ADDON_VERSION, ANKI_VERSION, ANKIWEB_ID, config, log_file_path
 from .sync import NotLoggedInError
+from .utils import show_error_dialog
 
 SENTRY_ENV = "anki_desktop"
 os.environ["SENTRY_ENVIRONMENT"] = SENTRY_ENV
@@ -166,7 +167,7 @@ def _try_handle_exception(
             return True
 
     if _is_memory_full_error(exc_value):
-        showWarning(
+        show_error_dialog(
             "Could not finish because your hard drive does not have enough space.",
             title="AnkiHub",
         )
@@ -229,15 +230,8 @@ def _show_warning_for_ankihub_request_error(exc_value: AnkiHubHTTPError) -> None
         details = None
 
     if details:
-        aqt.mw.taskman.run_on_main(
-            lambda: showWarning(  # type: ignore
-                "Error while communicating with AnkiHub."
-                "<br><br>"
-                "Details:"
-                "<br>"
-                f"{details}",
-            )
-        )
+        show_error_dialog(details)
+        # should we add an "else" clause here to show a generic error message?
 
 
 def _is_memory_full_error(exc_value: BaseException) -> bool:
