@@ -62,18 +62,17 @@ class _AnkiHubSync:
 
         client = AnkiHubClient()
         if client.is_feature_flag_enabled("new_subscription_workflow_enabled"):
-            # TODO use get_decks_with_user_relation instead of get_deck_subscriptions()
-            subscribed_deck_ah_ids = [
-                deck.ankihub_deck_uuid for deck in client.get_deck_subscriptions()
+            with_user_relation_ah_dids = [
+                deck.ankihub_deck_uuid for deck in client.get_decks_with_user_relation()
             ]
-            installed_deck_ah_ids = config.deck_ids()
-            decks_to_sync_ah_ids = list(
-                set(subscribed_deck_ah_ids).intersection(installed_deck_ah_ids)
+            installed_ah_dids = config.deck_ids()
+            to_sync_ah_dids = list(
+                set(with_user_relation_ah_dids).intersection(installed_ah_dids)
             )
         else:
-            decks_to_sync_ah_ids = config.deck_ids()
+            to_sync_ah_dids = config.deck_ids()
 
-        for ah_did in decks_to_sync_ah_ids:
+        for ah_did in to_sync_ah_dids:
             try:
                 should_continue = self._sync_deck(ah_did)
                 if not should_continue:

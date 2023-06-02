@@ -3035,7 +3035,7 @@ def test_download_images_on_sync(
         # Mock the client to simulate that there are no deck updates and extensions.
         monkeypatch.setattr(
             AnkiHubClient,
-            "get_deck_subscriptions",
+            "get_decks_with_user_relation",
             lambda *args, **kwargs: [],
         )
         monkeypatch.setattr(
