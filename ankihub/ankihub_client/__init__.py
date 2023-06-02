@@ -27,6 +27,7 @@ from .models import (  # noqa: F401
     OptionalTagSuggestion,
     SuggestionType,
     TagGroupValidationResponse,
+    UserDeckRelation,
     get_image_names_from_note_info,
     get_image_names_from_notes_data,
     get_image_names_from_suggestion,

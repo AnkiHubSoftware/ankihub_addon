@@ -28,6 +28,7 @@ from aqt.utils import openLink, showInfo, tooltip
 from .. import LOGGER
 from ..addon_ankihub_client import AddonAnkiHubClient as AnkiHubClient
 from ..ankihub_client import AnkiHubHTTPError, get_image_names_from_notes_data
+from ..ankihub_client.models import UserDeckRelation
 from ..db import ankihub_db
 from ..deck_creation import create_ankihub_deck
 from ..errors import upload_logs_in_background
@@ -294,7 +295,7 @@ def _create_collaborative_deck_action() -> None:
             deck_name,
             ankihub_did,
             anki_did,
-            creator=True,
+            user_relation=UserDeckRelation.OWNER,
             latest_udpate=creation_time,
         )
         deck_url = f"{url_view_deck()}{ankihub_did}"
