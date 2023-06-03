@@ -110,9 +110,9 @@ class SubscribedDecksDialog(QDialog):
             for deck in self._decks_with_user_relation:
                 name = deck.name
                 if deck.is_user_relation_owner:
-                    item = QListWidgetItem(f"{name} (Owner)")
+                    item = QListWidgetItem(f"{name} (Created by you)")
                 elif deck.is_user_relation_maintainer:
-                    item = QListWidgetItem(f"{name} (Maintaining)")
+                    item = QListWidgetItem(f"{name} (Maintained by you)")
                 else:
                     item = QListWidgetItem(name)
                 item.setData(Qt.ItemDataRole.UserRole, deck.ankihub_deck_uuid)
