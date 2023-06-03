@@ -118,6 +118,25 @@ class Deck(DataClassJSONMixinWithConfig):
         )
     )
 
+    @property
+    def is_user_relation_owner_or_maintainer(self):
+        return (
+            self.user_relation == UserDeckRelation.OWNER
+            or self.user_relation == UserDeckRelation.MAINTAINER
+        )
+
+    @property
+    def is_user_relation_subscriber(self):
+        return self.user_relation == UserDeckRelation.SUBSCRIBER
+
+    @property
+    def is_user_relation_maintainer(self):
+        return self.user_relation == UserDeckRelation.MAINTAINER
+
+    @property
+    def is_user_relation_owner(self):
+        return self.user_relation == UserDeckRelation.OWNER
+
 
 @dataclass
 class DeckUpdateChunk(DataClassJSONMixinWithConfig):
