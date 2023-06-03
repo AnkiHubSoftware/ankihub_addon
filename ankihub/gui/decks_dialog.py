@@ -1,6 +1,6 @@
 """Dialog for managing subscriptions to AnkiHub decks and deck-specific settings."""
 import uuid
-from typing import Optional
+from typing import List, Optional
 from uuid import UUID
 
 import aqt
@@ -24,6 +24,7 @@ from aqt.studydeck import StudyDeck
 from aqt.utils import openLink, showInfo, showText, tooltip
 
 from ..addon_ankihub_client import AddonAnkiHubClient as AnkiHubClient
+from ..ankihub_client.models import Deck
 from ..db import ankihub_db
 from ..settings import config, url_deck_base, url_decks, url_help
 from ..subdecks import SUBDECK_TAG
@@ -40,10 +41,11 @@ class SubscribedDecksDialog(QDialog):
     def __init__(self):
         super(SubscribedDecksDialog, self).__init__()
         self.client = AnkiHubClient()
-        self.setWindowTitle("Subscribed AnkiHub Decks")
         self.new_subscription_workflow_enabled = self.client.is_feature_flag_enabled(
             "new_subscription_workflow_enabled"
         )
+        self._decks_with_user_relation: Optional[List[Deck]] = None
+        self.setWindowTitle("Subscribed AnkiHub Decks")
         self._setup_ui()
         self._on_item_selection_changed()
         self._refresh_decks_list()
@@ -104,8 +106,8 @@ class SubscribedDecksDialog(QDialog):
     def _refresh_decks_list(self) -> None:
         self.decks_list.clear()
         if self.new_subscription_workflow_enabled:
-            self.decks_with_user_relation = self.client.get_decks_with_user_relation()
-            for deck in self.decks_with_user_relation:
+            self._decks_with_user_relation = self.client.get_decks_with_user_relation()
+            for deck in self._decks_with_user_relation:
                 name = deck.name
                 if deck.is_user_relation_owner:
                     item = QListWidgetItem(f"{name} (Owner)")
@@ -272,7 +274,7 @@ class SubscribedDecksDialog(QDialog):
                 deck_obj = next(
                     (
                         deck
-                        for deck in self.decks_with_user_relation
+                        for deck in self._decks_with_user_relation
                         if deck.ankihub_deck_uuid == ankihub_did
                     ),
                     None,
