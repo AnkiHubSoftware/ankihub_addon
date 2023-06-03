@@ -1,5 +1,5 @@
 """Check if the user is subscribed to any decks that are not installed and install them if the user agrees."""
-from typing import List
+from typing import Callable, List
 
 from ...addon_ankihub_client import AddonAnkiHubClient as AnkiHubClient
 from ...ankihub_client import Deck
@@ -9,16 +9,18 @@ from ..messages import messages
 from ..utils import ask_user
 
 
-def check_and_install_new_deck_subscriptions() -> None:
+def check_and_install_new_deck_subscriptions(on_success: Callable[[], None]) -> None:
     """Check if there are any new deck subscriptions and install them if the user agrees.
     on_success is called when this process is finished (even if no new decks are installed)."""
 
     if not AnkiHubClient().is_feature_flag_enabled("new_subscription_workflow_enabled"):
+        on_success()
         return
 
     # Check if there are any new subscriptions
     decks = _not_installed_ah_decks()
     if not decks:
+        on_success()
         return
 
     # Ask user to confirm the installations.
@@ -27,11 +29,12 @@ def check_and_install_new_deck_subscriptions() -> None:
         text=messages.deck_install_confirmation(decks),
         show_cancel_button=False,
     ):
+        on_success()
         return
 
     # Download the new decks
     ah_dids = [deck.ankihub_deck_uuid for deck in decks]
-    download_and_install_decks(ah_dids, on_success=lambda: None)
+    download_and_install_decks(ah_dids, on_success=on_success)
 
 
 def _not_installed_ah_decks() -> List[Deck]:

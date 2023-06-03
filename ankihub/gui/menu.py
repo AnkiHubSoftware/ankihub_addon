@@ -36,10 +36,8 @@ from ..media_import.ui import open_import_dialog
 from ..media_sync import media_sync
 from ..settings import ADDON_VERSION, config, url_view_deck
 from ..subdecks import SUBDECK_TAG
-from ..sync import ah_sync, show_tooltip_about_last_sync_results
 from .decks_dialog import SubscribedDecksDialog
-from .operations.db_check import maybe_check_databases
-from .operations.new_deck_subscriptions import check_and_install_new_deck_subscriptions
+from .operations.ankihub_sync import sync_with_ankihub
 from .utils import (
     ask_user,
     check_and_prompt_for_updates_on_main_window,
@@ -329,23 +327,6 @@ def _create_collaborative_deck_setup(parent):
     parent.addAction(q_action)
 
 
-def _sync_with_ankihub_action():
-    # Sync all decks and media, then check for new subscriptions
-
-    def on_sync_done(future: Future) -> None:
-        future.result()
-
-        show_tooltip_about_last_sync_results()
-        check_and_install_new_deck_subscriptions()
-        maybe_check_databases()
-
-    aqt.mw.taskman.with_progress(
-        task=ah_sync.sync_all_decks_and_media,
-        immediate=True,
-        on_done=on_sync_done,
-    )
-
-
 def _sign_out_action():
     try:
         AnkiHubClient().signout()
@@ -417,7 +398,7 @@ def _import_media_setup(parent):
 def _sync_with_ankihub_setup(parent):
     """Set up the menu item for uploading suggestions in bulk."""
     q_action = QAction("🔃️ Sync with AnkiHub", aqt.mw)
-    qconnect(q_action.triggered, _sync_with_ankihub_action)
+    qconnect(q_action.triggered, sync_with_ankihub)
     if sync_hotkey := config.public_config["sync_hotkey"]:
         try:
             q_action.setShortcut(QKeySequence(sync_hotkey))
