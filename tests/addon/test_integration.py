@@ -609,7 +609,7 @@ def test_check_and_install_new_deck_subscriptions(
         )
 
         # Call the function
-        check_and_install_new_deck_subscriptions()
+        check_and_install_new_deck_subscriptions(on_success=lambda: None)
 
         qtbot.wait(500)
 
