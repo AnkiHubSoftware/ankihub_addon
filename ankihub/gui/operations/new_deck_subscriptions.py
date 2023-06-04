@@ -28,6 +28,8 @@ def check_and_install_new_deck_subscriptions(on_success: Callable[[], None]) -> 
         title="AnkiHub Deck Installation",
         text=messages.deck_install_confirmation(decks),
         show_cancel_button=False,
+        yes_button_label="Install",
+        no_button_label="Skip",
     ):
         on_success()
         return
