@@ -27,10 +27,9 @@ def sync_with_ankihub(on_done: Callable[[Future], None]) -> None:
         if future.exception():
             on_done(future_with_exception(future.exception()))
             return
-        else:
-            show_tooltip_about_last_sync_results()
-            maybe_check_databases()
 
+        show_tooltip_about_last_sync_results()
+        maybe_check_databases()
         on_done(future_with_result(None))
 
     try:
