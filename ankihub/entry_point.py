@@ -8,7 +8,7 @@ from aqt.gui_hooks import profile_did_open
 
 from . import LOGGER, taskman
 from .addons import setup_addons
-from .auto_sync import setup_ankihub_sync_on_ankiweb_sync
+from .auto_sync import setup_auto_sync
 from .db import ankihub_db
 from .debug import setup as setup_debug
 from .errors import setup_error_handler
@@ -128,7 +128,7 @@ def _general_setup():
 
     LOGGER.info("Loaded media_export.")
 
-    setup_ankihub_sync_on_ankiweb_sync()
+    setup_auto_sync()
     LOGGER.info("Called setup_ankihub_sync_on_ankiweb_sync.")
 
 

@@ -1,4 +1,5 @@
 import copy
+import importlib
 import os
 import re
 import tempfile
@@ -62,6 +63,7 @@ from ankihub.ankihub_client.ankihub_client import (
     DeckExtensionUpdateChunk,
     _transform_notes_data,
 )
+from ankihub.auto_sync import _setup_ankihub_sync_on_ankiweb_sync
 from ankihub.common_utils import IMG_NAME_IN_IMG_TAG_REGEX
 from ankihub.db import ankihub_db, attached_ankihub_db
 from ankihub.debug import (
@@ -2632,6 +2634,134 @@ def test_profile_swap(
 
     # assert that the general_setup function was only called once
     assert general_setup_mock.call_count == 1
+
+
+class TestAutoSync:
+    def test_with_on_ankiweb_sync_config_option(
+        self,
+        anki_session_with_addon_data: AnkiSession,
+        monkeypatch: MonkeyPatch,
+        qtbot: QtBot,
+    ):
+        with anki_session_with_addon_data.profile_loaded():
+            mw = anki_session_with_addon_data.mw
+
+            # Mock the syncs.
+            self._mock_syncs_and_check_new_subscriptions(monkeypatch)
+
+            # Setup the auto sync.
+            _setup_ankihub_sync_on_ankiweb_sync()
+
+            # Set the auto sync config option.
+            config.public_config["auto_sync"] = "on_ankiweb_sync"
+
+            # Trigger the AnkiWeb sync.
+            mw._sync_collection_and_media(after_sync=Mock())
+            qtbot.wait(500)
+
+            # Assert that both syncs were called.
+            assert self.ankihub_sync_mock.call_count == 1
+            assert self.ankiweb_sync_mock.call_count == 1
+
+            assert self.check_and_install_new_deck_subscriptions_mock.call_count == 1
+
+    def test_with_never_option(
+        self,
+        anki_session_with_addon_data: AnkiSession,
+        monkeypatch: MonkeyPatch,
+        qtbot: QtBot,
+    ):
+        with anki_session_with_addon_data.profile_loaded():
+            mw = anki_session_with_addon_data.mw
+
+            # Mock the syncs.
+            self._mock_syncs_and_check_new_subscriptions(monkeypatch)
+
+            # Setup the auto sync.
+            _setup_ankihub_sync_on_ankiweb_sync()
+
+            # Set the auto sync config option.
+            config.public_config["auto_sync"] = "never"
+
+            # Trigger the AnkiWeb sync.
+            mw._sync_collection_and_media(after_sync=Mock())
+            qtbot.wait(500)
+
+            # Assert that only the AnkiWeb sync was called.
+            assert self.ankihub_sync_mock.call_count == 0
+            assert self.ankiweb_sync_mock.call_count == 1
+
+            assert self.check_and_install_new_deck_subscriptions_mock.call_count == 0
+
+    def test_with_on_startup_option(
+        self,
+        anki_session_with_addon_data: AnkiSession,
+        monkeypatch: MonkeyPatch,
+        qtbot: QtBot,
+    ):
+        with anki_session_with_addon_data.profile_loaded():
+            mw = anki_session_with_addon_data.mw
+
+            # Mock the syncs.
+            self._mock_syncs_and_check_new_subscriptions(monkeypatch)
+
+            # Setup the auto sync.
+            _setup_ankihub_sync_on_ankiweb_sync()
+
+            # Set the auto sync config option.
+            config.public_config["auto_sync"] = "on_startup"
+
+            # Trigger the AnkiWeb sync.
+            mw._sync_collection_and_media(after_sync=Mock())
+            qtbot.wait(500)
+
+            # Assert that both syncs were called.
+            assert self.ankihub_sync_mock.call_count == 1
+            assert self.ankiweb_sync_mock.call_count == 1
+
+            # Assert that the new deck subscriptions operation was called.
+            self.check_and_install_new_deck_subscriptions_mock.call_count == 1
+
+            # Trigger the AnkiWeb sync again.
+            mw._sync_collection_and_media(after_sync=Mock())
+            qtbot.wait(500)
+
+            # Assert that only the AnkiWeb sync was called the second time.
+            assert self.ankihub_sync_mock.call_count == 1
+            assert self.ankiweb_sync_mock.call_count == 2
+
+            assert self.check_and_install_new_deck_subscriptions_mock.call_count == 1
+
+    def _mock_syncs_and_check_new_subscriptions(self, monkeypatch: MonkeyPatch):
+        # Mock the token so that the AnkiHub sync is not skipped.
+        monkeypatch.setattr(
+            config, "token", MagicMock(return_value=lambda: "test_token")
+        )
+
+        # Mock the AnkiHub sync so it does nothing.
+        self.ankihub_sync_mock = Mock()
+        monkeypatch.setattr(ah_sync, "sync_all_decks_and_media", self.ankihub_sync_mock)
+
+        # Mock the AnkiWeb sync so it does nothing.
+        self.ankiweb_sync_mock = Mock()
+        monkeypatch.setattr(
+            aqt.sync,
+            "sync_collection",
+            self.ankiweb_sync_mock,
+        )
+        # ... and reload aqt.main so the mock is used.
+        importlib.reload(aqt.main)
+
+        # Mock the new deck subscriptions operation to just call its callback.
+        self.check_and_install_new_deck_subscriptions_mock = Mock()
+        monkeypatch.setattr(
+            operations.ankihub_sync,
+            "check_and_install_new_deck_subscriptions",
+            self.check_and_install_new_deck_subscriptions_mock,
+        )
+        self.check_and_install_new_deck_subscriptions_mock.side_effect = (
+            lambda *args, **kwargs: kwargs["on_success"]()
+        )
 
 
 class PickableMock(Mock):

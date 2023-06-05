@@ -21,9 +21,12 @@ class _AutoSyncState:
 auto_sync_state = _AutoSyncState()
 
 
-def setup_ankihub_sync_on_ankiweb_sync() -> None:
+def setup_auto_sync() -> None:
     _rate_limit_syncincg()
+    _setup_ankihub_sync_on_ankiweb_sync()
 
+
+def _setup_ankihub_sync_on_ankiweb_sync() -> None:
     AnkiQt._sync_collection_and_media = wrap(  # type: ignore
         AnkiQt._sync_collection_and_media,
         _on_ankiweb_sync,
