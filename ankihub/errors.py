@@ -215,6 +215,9 @@ def _maybe_handle_ankihub_http_error(error: AnkiHubHTTPError) -> bool:
         ):
             check_and_prompt_for_updates_on_main_window()
         return True
+    elif response.status_code == 403:
+        _show_warning_for_ankihub_request_error(error)
+        return True
     return False
 
 
