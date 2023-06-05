@@ -9,7 +9,7 @@ from .new_deck_subscriptions import check_and_install_new_deck_subscriptions
 
 
 def sync_with_ankihub(on_done: Callable[[], None]) -> None:
-    """Check for (and maybe install) new deck subscriptions, then download updates to decks.."""
+    """Check for (and maybe install) new deck subscriptions, then download updates to decks."""
 
     def on_new_deck_subscriptions_done() -> None:
         aqt.mw.taskman.with_progress(
