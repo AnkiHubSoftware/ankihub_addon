@@ -18,7 +18,6 @@ from anki.consts import QUEUE_TYPE_SUSPENDED
 from anki.decks import DeckId, FilteredDeckConfig
 from anki.models import NotetypeDict, NotetypeId
 from anki.notes import Note, NoteId
-from anki.sync import SyncOutput
 from aqt import AnkiQt, dialogs, gui_hooks
 from aqt.addcards import AddCards
 from aqt.addons import InstallOk
@@ -2769,43 +2768,6 @@ class PickableMock(Mock):
         return (Mock, ())
 
 
-def patch_ankiweb_sync_to_do_nothing(mw: AnkiQt, monkeypatch: MonkeyPatch):
-    """Patch AnkiWeb sync so that when this is called:
-    https://github.com/ankitects/anki/blob/e5d5d1d4bdecfac326353d154c933e477c4e3eb8/qt/aqt/sync.py#L87
-    this runs:
-    https://github.com/ankitects/anki/blob/e5d5d1d4bdecfac326353d154c933e477c4e3eb8/qt/aqt/sync.py#L122-L127
-    but the AnkiWeb sync does nothing and no error dialogs show show up.
-    """
-
-    # Mock the sync_auth function so that the sync is not aborted.
-    monkeypatch.setattr(mw.pm, "sync_auth", lambda: True)
-
-    # Mock the sync with AnkiWeb so that it doesn't actually sync.
-    # Also mock the sync output so that Anki doesn't trigger a full sync or show a message.
-    # The PicakbleMock is needed because the sync output is pickled by Anki in some Anki versions (e.g. 2.1.63)
-    # during the tests. Without using the PickableMock, the test fails with an error in these versions.
-    sync_output_mock = PickableMock(
-        host_number=1,
-        server_message=[],
-        required=SyncOutput.NO_CHANGES,
-        NO_CHANGES=SyncOutput.NO_CHANGES,
-    )
-    monkeypatch.setattr(
-        mw.col._backend, "sync_collection", lambda *args: sync_output_mock
-    )
-
-    # Mock the latest_progress function because it is called by a timer during the sync
-    # and would otherwise open an error message dialog.
-    monkeypatch.setattr(mw.col, "latest_progress", lambda *args, **kwargs: Mock())
-
-    # Mock the progress.set_title function because it is called by a timer during the sync
-    # (with the latest_progress as argument).
-    monkeypatch.setattr(mw.progress, "set_title", lambda *args, **kwargs: False)
-
-    # Mock the can_auto_sync function so that no sync is triggered when Anki is closed.
-    monkeypatch.setattr(mw, "can_auto_sync", lambda *args, **kwargs: False)
-
-
 def test_sync_with_optional_content(
     anki_session_with_addon_data: AnkiSession,
     monkeypatch: MonkeyPatch,
@@ -3494,18 +3456,17 @@ def test_check_and_prompt_for_updates_on_main_window(
 @pytest.mark.qt_no_exception_capture
 class TestDebugModule:
     def test_setup_logging_for_sync_collection_and_media(
-        self, anki_session: AnkiSession, monkeypatch: MonkeyPatch, qtbot: QtBot
+        self, anki_session: AnkiSession, monkeypatch: MonkeyPatch
     ):
         # Test that the original AnkiQt._sync_collection_and_media method gets called
         # despite the monkeypatching we do in debug.py.
         with anki_session.profile_loaded():
             mw = anki_session.mw
 
-            # Mock the sync fuction so that it does not throw errors when called.
-            # It expects to be authenticated with AnkiWeb among other things.
-            patch_ankiweb_sync_to_do_nothing(mw, monkeypatch)
-            monkeypatch.setattr(mw.col, "_backend", Mock())
-            monkeypatch.setattr(mw.taskman, "with_progress", Mock())
+            # Mock the AnkiWeb sync to do nothing
+            monkeypatch.setattr(aqt.sync, "sync_collection", Mock())
+            # ... and reload the main module so that the mock is used.
+            importlib.reload(aqt.main)
 
             # Mock the sync_will_start hook so that we can check if it was called when the sync starts.
             sync_will_start_mock = Mock()
