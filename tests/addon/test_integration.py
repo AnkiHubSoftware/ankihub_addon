@@ -1513,20 +1513,18 @@ def test_unsubscribe_from_deck(
         if is_flag_active:
             deck = mw.col.decks.get(anki_deck_id)
             requests_mock.get(
-                f"{DEFAULT_API_URL}/decks/subscriptions/",
+                f"{DEFAULT_API_URL}/users/decks/",
                 status_code=200,
                 json=[
                     {
-                        "deck": {
-                            "id": str(ah_did),
-                            "name": deck["name"],
-                            "owner": 1,
-                            "anki_id": anki_deck_id,
-                            "csv_last_upload": None,
-                            "csv_notes_filename": "",
-                            "image_upload_finished": True,
-                            "user_relation": "subscriber",
-                        }
+                        "id": str(ah_did),
+                        "name": deck["name"],
+                        "owner": 1,
+                        "anki_id": anki_deck_id,
+                        "csv_last_upload": None,
+                        "csv_notes_filename": "",
+                        "image_upload_finished": True,
+                        "user_relation": "subscriber",
                     }
                 ],
             )
@@ -1543,7 +1541,7 @@ def test_unsubscribe_from_deck(
         )
         if is_flag_active:
             requests_mock.get(
-                f"{DEFAULT_API_URL}/decks/subscriptions/", status_code=200, json=[]
+                f"{DEFAULT_API_URL}/users/decks/", status_code=200, json=[]
             )
             with patch.object(
                 AnkiHubClient, "unsubscribe_from_deck"
@@ -2222,9 +2220,11 @@ class TestSubscribedDecksDialog:
                 operations.subdecks, "ask_user", lambda *args, **kwargs: True
             )
 
-            # Mock get_deck_subscriptions to return an empty list
+            # Mock get_decks_with_user_relation to return an empty list
             monkeypatch.setattr(
-                AnkiHubClient, "get_deck_subscriptions", lambda *args, **kwargs: []
+                AnkiHubClient,
+                "get_decks_with_user_relation",
+                lambda *args, **kwargs: [],
             )
 
             # Open the dialog
@@ -2243,10 +2243,10 @@ class TestSubscribedDecksDialog:
             # ... The subdeck should not exist yet
             assert aqt.mw.col.decks.by_name(subdeck_name) is None
 
-            # Mock get_deck_subscriptions to return the deck
+            # Mock get_decks_with_user_relation to return the deck
             monkeypatch.setattr(
                 AnkiHubClient,
-                "get_deck_subscriptions",
+                "get_decks_with_user_relation",
                 lambda *args: [
                     DeckFactory.create(ankihub_deck_uuid=ah_did, anki_did=anki_did)
                 ],

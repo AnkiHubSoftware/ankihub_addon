@@ -166,7 +166,7 @@ def new_note_suggestion(
         guid="asdf",
         comment="comment1",
         ankihub_deck_uuid=ah_nid,
-        note_type_name="Basic",
+        note_type_name="Cloze",
         anki_note_type_id=1,
     )
 
@@ -813,7 +813,7 @@ def test_get_asset_disabled_fields(
 
     response = client.get_asset_disabled_fields(deck_uuid)
 
-    expected_response = {1: ["abc_1"], 32738523: ["Text", "Pixorize", "First Aid"]}
+    expected_response = {1: ["Extra"], 32738523: ["Text", "Pixorize", "First Aid"]}
 
     assert response == expected_response
 
