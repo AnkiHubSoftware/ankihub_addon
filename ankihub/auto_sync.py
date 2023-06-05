@@ -2,65 +2,39 @@
 Depends on the auto_sync setting in the public config."""
 from dataclasses import dataclass
 from time import sleep
-from typing import Callable, Optional
+from typing import Callable
 
-import aqt
-from anki.collection import Collection
 from anki.hooks import wrap
 from aqt import AnkiQt
-from aqt.gui_hooks import profile_did_open, profile_will_close, sync_did_finish
 
 from . import LOGGER
-from .gui.operations.db_check import maybe_check_databases
-from .gui.operations.new_deck_subscriptions import (
-    check_and_install_new_deck_subscriptions,
-)
+from .gui.operations.ankihub_sync import sync_with_ankihub
 from .settings import ANKI_MINOR, config
-from .sync import ah_sync, show_tooltip_about_last_sync_results
 from .threading_utils import rate_limited
 
 
 @dataclass
 class _AutoSyncState:
     attempted_startup_sync = False
-    synced_with_ankihub_on_last_ankiweb_sync = False
-    exception_on_last_ah_sync: Optional[Exception] = None
-    profile_is_closing = False
 
 
 auto_sync_state = _AutoSyncState()
 
 
-def setup_ankihub_sync_on_ankiweb_sync() -> None:
-    # aqt.mw.col.sync_collection is called in a background task with a progress dialog.
-    # This adds the AnkiHub sync to the beginning of this background task.
-    Collection.sync_collection = wrap(  # type: ignore
-        Collection.sync_collection,
-        _sync_with_ankihub_and_ankiweb,
+def setup_auto_sync() -> None:
+    _rate_limit_syncing()
+    _setup_ankihub_sync_on_ankiweb_sync()
+
+
+def _setup_ankihub_sync_on_ankiweb_sync() -> None:
+    AnkiQt._sync_collection_and_media = wrap(  # type: ignore
+        AnkiQt._sync_collection_and_media,
+        _on_ankiweb_sync,
         "around",
     )
 
-    sync_did_finish.append(_on_sync_did_finish)
 
-    _setup_profile_state_hooks()
-
-    _rate_limit_syncincg()
-
-
-def _setup_profile_state_hooks() -> None:
-    profile_will_close.append(_on_profile_will_close)
-    profile_did_open.append(_on_profile_did_open)
-
-
-def _on_profile_will_close() -> None:
-    auto_sync_state.profile_is_closing = True
-
-
-def _on_profile_did_open() -> None:
-    auto_sync_state.profile_is_closing = False
-
-
-def _rate_limit_syncincg() -> None:
+def _rate_limit_syncing() -> None:
     """Rate limit AnkiQt._sync_collection_and_media to avoid
     "Cannot start transaction within a transaction" DBErrors.
     Syncing is not thread safe and from Sentry reports you can see that the DBErrors are raised when
@@ -84,79 +58,47 @@ def _rate_limited(*args, **kwargs) -> None:
     _old(*args, **kwargs)
 
 
-def _on_sync_did_finish() -> None:
-    """Called from the main thread when the sync is finished."""
-    if auto_sync_state.exception_on_last_ah_sync:
-        # If the profile is getting closed, we don't want to raise the exception, because it would
-        # disrupt the profile closing process.
-        if auto_sync_state.profile_is_closing:
-            return
-
-        # append the hook again, because it will be removed by Anki when the exception is raised
-        sync_did_finish.append(_on_sync_did_finish)
-        raise auto_sync_state.exception_on_last_ah_sync
-
-    if auto_sync_state.synced_with_ankihub_on_last_ankiweb_sync:
-        show_tooltip_about_last_sync_results()
-        if not auto_sync_state.profile_is_closing:
-            check_and_install_new_deck_subscriptions()
-
-    if not auto_sync_state.profile_is_closing:
-        maybe_check_databases()
-
-
-def _sync_with_ankihub_and_ankiweb(*args, **kwargs) -> None:
-    LOGGER.info("Running _sync_with_ankihub_and_ankiweb")
-
-    _old: Callable = kwargs["_old"]
+def _on_ankiweb_sync(*args, **kwargs) -> None:
+    _old = kwargs["_old"]
     del kwargs["_old"]
 
-    is_startup_sync = not auto_sync_state.attempted_startup_sync
-    auto_sync_state.attempted_startup_sync = True
+    # This function has to be called, because it could have a callback that Anki needs to run,
+    # for example to close the Anki profile once the sync is done.
+    def sync_with_ankiweb() -> None:
+        _old(*args, **kwargs)
 
-    if is_startup_sync:
+    if not auto_sync_state.attempted_startup_sync:
         _workaround_for_addon_compatibility_on_startup_sync()
 
-    # Anki code that runs before syncing with AnkiWeb ends the database transaction so we start a new one
-    # here and end it after syncing with AnkiHub.
-    aqt.mw.col.db.begin()
     try:
-        _maybe_sync_with_ankihub(is_startup_sync=is_startup_sync)
-    except Exception as e:
-        LOGGER.warning("Error in _maybe_sync_with_ankihub")
-        auto_sync_state.exception_on_last_ah_sync = e
-    else:
-        auto_sync_state.exception_on_last_ah_sync = None
-    finally:
-        # ... ending the transaction here
-        aqt.mw.col.save(trx=False)
-
-        LOGGER.info("Syncing with AnkiWeb in _sync_with_ankihub_and_ankiweb")
-        result = _old(*args, **kwargs)
-        LOGGER.info("Finished syncing with AnkiWeb in _sync_with_ankihub_and_ankiweb")
-
-        return result
+        _maybe_sync_with_ankihub(on_done=sync_with_ankiweb)
+    except Exception:
+        LOGGER.exception("Error syncing with AnkiHub")
+        sync_with_ankiweb()
 
 
-def _maybe_sync_with_ankihub(is_startup_sync: bool) -> bool:
+def _maybe_sync_with_ankihub(on_done: Callable[[], None]) -> None:
     LOGGER.info("Running _maybe_sync_with_ankihub")
 
     if not config.is_logged_in():
         LOGGER.info("Not syncing with AnkiHub because user is not logged in.")
-        return False
+        on_done()
+        return
 
     if config.public_config["auto_sync"] != "never" and (
-        (config.public_config["auto_sync"] == "on_startup" and is_startup_sync)
+        (
+            config.public_config["auto_sync"] == "on_startup"
+            and not auto_sync_state.attempted_startup_sync
+        )
         or config.public_config["auto_sync"] == "on_ankiweb_sync"
     ):
+        auto_sync_state.attempted_startup_sync = True
         LOGGER.info("Syncing with AnkiHub in _new_sync_collection")
-        ah_sync.sync_all_decks_and_media()
-        auto_sync_state.synced_with_ankihub_on_last_ankiweb_sync = True
-        return True
+        # TODO Change how the operation callbacks work to ensure that on_done is called in all cases.
+        sync_with_ankihub(on_done=on_done)
     else:
-        auto_sync_state.synced_with_ankihub_on_last_ankiweb_sync = False
         LOGGER.info("Not syncing with AnkiHub")
-        return False
+        on_done()
 
 
 def _workaround_for_addon_compatibility_on_startup_sync() -> None:
