@@ -62,13 +62,19 @@ def _on_ankiweb_sync(*args, **kwargs) -> None:
     _old = kwargs["_old"]
     del kwargs["_old"]
 
+    # This function has to be called, because it could have a callback that Anki needs to run,
+    # for example to close the Anki profile once the sync is done.
     def sync_with_ankiweb() -> None:
         _old(*args, **kwargs)
 
     if not auto_sync_state.attempted_startup_sync:
         _workaround_for_addon_compatibility_on_startup_sync()
 
-    _maybe_sync_with_ankihub(on_done=sync_with_ankiweb)
+    try:
+        _maybe_sync_with_ankihub(on_done=sync_with_ankiweb)
+    except Exception:
+        LOGGER.exception("Error syncing with AnkiHub")
+        sync_with_ankiweb()
 
 
 def _maybe_sync_with_ankihub(on_done: Callable[[], None]) -> None:
@@ -88,6 +94,7 @@ def _maybe_sync_with_ankihub(on_done: Callable[[], None]) -> None:
     ):
         auto_sync_state.attempted_startup_sync = True
         LOGGER.info("Syncing with AnkiHub in _new_sync_collection")
+        # TODO Change how the operation callbacks work to ensure that on_done is called in all cases.
         sync_with_ankihub(on_done=on_done)
     else:
         LOGGER.info("Not syncing with AnkiHub")
