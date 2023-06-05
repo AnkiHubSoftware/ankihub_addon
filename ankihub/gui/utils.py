@@ -163,7 +163,7 @@ def choose_ankihub_deck(
 def ask_user(
     text: str,
     parent: Optional[QWidget] = None,
-    defaultno: bool = False,
+    default_no: bool = False,
     title: str = "Anki",
     show_cancel_button: bool = True,
     yes_button_label: str = "Yes",
@@ -193,7 +193,7 @@ def ask_user(
             QMessageBox.ButtonRole.RejectRole,
         )
 
-    msg.setDefaultButton(no_button if defaultno else yes_button)
+    msg.setDefaultButton(no_button if default_no else yes_button)
     msg.setIcon(QMessageBox.Icon.Question)
 
     msg.exec()
