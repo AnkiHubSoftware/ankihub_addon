@@ -12,8 +12,7 @@ from .utils import future_with_exception, future_with_result
 
 
 def check_and_install_new_deck_subscriptions(on_done: Callable[[Future], None]) -> None:
-    """Check if there are any new deck subscriptions and install them if the user agrees.
-    on_success is called when this process is finished (even if no new decks are installed)."""
+    """Check if there are any new deck subscriptions and install them if the user agrees."""
     try:
         if not AnkiHubClient().is_feature_flag_enabled(
             "new_subscription_workflow_enabled"
