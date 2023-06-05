@@ -1,11 +1,13 @@
 import copy
 import os
 import uuid
-from typing import Callable
+from typing import Any, Callable, Optional, Protocol
+from unittest.mock import Mock
 
+import pytest
 from anki.models import NotetypeDict
 from aqt.main import AnkiQt
-from pytest import fixture
+from pytest import MonkeyPatch, fixture
 from pytest_anki import AnkiSession
 from requests_mock import Mocker
 
@@ -82,3 +84,37 @@ def set_feature_flag_state(requests_mock: Mocker):
         )
 
     return set_feature_flag_state_inner
+
+
+class MockFunctionProtocol(Protocol):
+    def __call__(
+        self,
+        target_object: Any,
+        target_function_name: str,
+        return_value: Optional[Any] = None,
+        side_effect: Optional[Callable] = None,
+    ) -> Mock:
+        ...
+
+
+@pytest.fixture
+def mock_function(
+    monkeypatch: MonkeyPatch,
+) -> MockFunctionProtocol:
+    def _mock_function(
+        target_object: Any,
+        target_function_name: str,
+        return_value: Optional[Any] = None,
+        side_effect: Optional[Callable] = None,
+    ) -> Mock:
+        mock = Mock()
+        mock.return_value = return_value
+        monkeypatch.setattr(
+            target_object,
+            target_function_name,
+            mock,
+        )
+        mock.side_effect = side_effect
+        return mock
+
+    return _mock_function

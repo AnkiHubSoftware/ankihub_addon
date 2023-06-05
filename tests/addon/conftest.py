@@ -11,6 +11,7 @@ from requests_mock import Mocker
 
 from ..fixtures import (  # noqa F401
     ankihub_basic_note_type,
+    mock_function,
     next_deterministic_id,
     next_deterministic_uuid,
     set_feature_flag_state,
