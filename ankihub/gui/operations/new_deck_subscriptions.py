@@ -5,9 +5,9 @@ from typing import Callable, List
 from ...addon_ankihub_client import AddonAnkiHubClient as AnkiHubClient
 from ...ankihub_client import Deck
 from ...settings import config
-from ..decks_dialog import download_and_install_decks
 from ..messages import messages
 from ..utils import ask_user
+from .deck_installation import download_and_install_decks
 from .utils import future_with_exception, future_with_result
 
 

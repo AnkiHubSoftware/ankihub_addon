@@ -24,7 +24,7 @@ auto_sync_state = _AutoSyncState()
 
 
 def setup_auto_sync() -> None:
-    _rate_limit_syncincg()
+    _rate_limit_syncing()
     _setup_ankihub_sync_on_ankiweb_sync()
 
 
@@ -36,7 +36,7 @@ def _setup_ankihub_sync_on_ankiweb_sync() -> None:
     )
 
 
-def _rate_limit_syncincg() -> None:
+def _rate_limit_syncing() -> None:
     """Rate limit AnkiQt._sync_collection_and_media to avoid
     "Cannot start transaction within a transaction" DBErrors.
     Syncing is not thread safe and from Sentry reports you can see that the DBErrors are raised when
