@@ -49,7 +49,7 @@ def check_ankihub_db(on_success: Optional[Callable[[], None]] = None):
         title="AnkiHub Database Check",
     ):
         download_and_install_decks(
-            ah_dids_with_something_missing, on_success=on_success
+            ah_dids_with_something_missing, on_done=lambda _: on_success()
         )
 
 

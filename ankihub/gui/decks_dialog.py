@@ -1,5 +1,6 @@
 """Dialog for managing subscriptions to AnkiHub decks and deck-specific settings."""
 import uuid
+from concurrent.futures import Future
 from typing import List, Optional
 from uuid import UUID
 
@@ -400,7 +401,10 @@ class SubscribeDialog(QDialog):
         if not confirmed:
             return
 
-        download_and_install_decks([ah_did], on_success=self.accept)
+        def on_done(future: Future) -> None:
+            self.accept()
+
+        download_and_install_decks([ah_did], on_done=on_done)
 
     def _on_browse_deck(self) -> None:
         openLink(url_decks())

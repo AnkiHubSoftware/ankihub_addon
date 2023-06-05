@@ -4,6 +4,7 @@ import os
 import re
 import tempfile
 import uuid
+from concurrent.futures import Future
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
 from time import sleep
@@ -88,6 +89,7 @@ from ankihub.gui.editor import _on_suggestion_button_press, _refresh_buttons
 from ankihub.gui.operations.new_deck_subscriptions import (
     check_and_install_new_deck_subscriptions,
 )
+from ankihub.gui.operations.utils import future_with_result
 from ankihub.gui.optional_tag_suggestion_dialog import OptionalTagsSuggestionDialog
 from ankihub.importing import (
     AnkiHubImporter,
@@ -466,7 +468,7 @@ class TestDownloadAndInstallDecks:
             # Download and install the deck
             on_success_mock = Mock()
             download_and_install_decks(
-                [deck.ankihub_deck_uuid], on_success=on_success_mock
+                [deck.ankihub_deck_uuid], on_done=on_success_mock
             )
             qtbot.wait(500)
 
@@ -531,14 +533,14 @@ class TestDownloadAndInstallDecks:
             )
 
             # Try to download and install the deck
-            on_success_mock = Mock()
-            download_and_install_decks(
-                [deck.ankihub_deck_uuid], on_success=on_success_mock
-            )
+            on_done_mock = Mock()
+            download_and_install_decks([deck.ankihub_deck_uuid], on_done=on_done_mock)
             qtbot.wait(300)
 
-            # Assert that the on_success callback was not called
-            assert on_success_mock.call_count == 0
+            # Assert that the on_done callback was called
+            on_done_mock.assert_called_once()
+            future: Future = on_done_mock.call_args[0][0]
+            assert future.exception() is None
 
     def _mock_client_and_gui_and_media_sync(
         self,
@@ -611,7 +613,7 @@ def test_check_and_install_new_deck_subscriptions(
         )
 
         # Call the function
-        check_and_install_new_deck_subscriptions(on_success=lambda: None)
+        check_and_install_new_deck_subscriptions(on_done=Mock())
 
         qtbot.wait(500)
 
@@ -2760,7 +2762,7 @@ class TestAutoSync:
             self.check_and_install_new_deck_subscriptions_mock,
         )
         self.check_and_install_new_deck_subscriptions_mock.side_effect = (
-            lambda *args, **kwargs: kwargs["on_success"]()
+            lambda *args, **kwargs: kwargs["on_done"](future_with_result(None))
         )
 
 

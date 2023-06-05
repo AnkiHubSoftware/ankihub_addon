@@ -1,5 +1,6 @@
 """Code for setting up auto-syncing with AnkiHub on startup and/or on AnkiWeb sync.
 Depends on the auto_sync setting in the public config."""
+from concurrent.futures import Future
 from dataclasses import dataclass
 from time import sleep
 from typing import Callable
@@ -9,6 +10,7 @@ from aqt import AnkiQt
 
 from . import LOGGER
 from .gui.operations.ankihub_sync import sync_with_ankihub
+from .gui.operations.utils import future_with_result
 from .settings import ANKI_MINOR, config
 from .threading_utils import rate_limited
 
@@ -64,8 +66,12 @@ def _on_ankiweb_sync(*args, **kwargs) -> None:
 
     # This function has to be called, because it could have a callback that Anki needs to run,
     # for example to close the Anki profile once the sync is done.
-    def sync_with_ankiweb() -> None:
+    def sync_with_ankiweb(future: Future) -> None:
+        # The original function should be called even if the sync with AnkiHub fails, so we run it
+        # this before future.result() (which can raise an exception)
         _old(*args, **kwargs)
+
+        future.result()
 
     if not auto_sync_state.attempted_startup_sync:
         _workaround_for_addon_compatibility_on_startup_sync()
@@ -74,15 +80,15 @@ def _on_ankiweb_sync(*args, **kwargs) -> None:
         _maybe_sync_with_ankihub(on_done=sync_with_ankiweb)
     except Exception:
         LOGGER.exception("Error syncing with AnkiHub")
-        sync_with_ankiweb()
+        sync_with_ankiweb(future_with_result(None))
 
 
-def _maybe_sync_with_ankihub(on_done: Callable[[], None]) -> None:
+def _maybe_sync_with_ankihub(on_done: Callable[[Future], None]) -> None:
     LOGGER.info("Running _maybe_sync_with_ankihub")
 
     if not config.is_logged_in():
         LOGGER.info("Not syncing with AnkiHub because user is not logged in.")
-        on_done()
+        on_done(future_with_result(None))
         return
 
     if config.public_config["auto_sync"] != "never" and (
@@ -94,11 +100,10 @@ def _maybe_sync_with_ankihub(on_done: Callable[[], None]) -> None:
     ):
         auto_sync_state.attempted_startup_sync = True
         LOGGER.info("Syncing with AnkiHub in _new_sync_collection")
-        # TODO Change how the operation callbacks work to ensure that on_done is called in all cases.
         sync_with_ankihub(on_done=on_done)
     else:
         LOGGER.info("Not syncing with AnkiHub")
-        on_done()
+        on_done(future_with_result(None))
 
 
 def _workaround_for_addon_compatibility_on_startup_sync() -> None:
