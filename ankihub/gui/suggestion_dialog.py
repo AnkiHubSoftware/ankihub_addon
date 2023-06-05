@@ -43,7 +43,8 @@ from ..suggestions import (
     suggest_note_update,
     suggest_notes_in_bulk,
 )
-from .utils import show_error_dialog, show_tooltip
+from ..utils import show_error_dialog
+from .utils import show_tooltip
 
 
 class SourceType(Enum):
