@@ -23,7 +23,7 @@ from .settings import (
 
 
 def show_error_dialog(message, *args, **kwargs):
-    aqt.mw.taskman.run_on_main(lambda: showWarning(message, *args, **kwargs))
+    aqt.mw.taskman.run_on_main(lambda: showWarning(message, *args, **kwargs)) # type: ignore
 
 
 # decks
