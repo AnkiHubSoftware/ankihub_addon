@@ -230,8 +230,8 @@ def _show_warning_for_ankihub_request_error(exc_value: AnkiHubHTTPError) -> None
         details = None
 
     if details:
-        show_error_dialog(details)
-        # should we add an "else" clause here to show a generic error message?
+        show_error_dialog(details, title="Oh no!")
+        # TODO: should we add an "else" clause here to show a generic error message?
 
 
 def _is_memory_full_error(exc_value: BaseException) -> bool:

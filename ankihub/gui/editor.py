@@ -80,7 +80,7 @@ def _on_suggestion_button_press(editor: Editor) -> None:
             LOGGER.info(f"Can't submit suggestion due to: {pformat(error_message)}")
         elif e.response.status_code == 403:
             error_message = e.response.json().get("detail")
-            show_error_dialog(error_message, parent=editor.parentWindow)
+            show_error_dialog(error_message, parent=editor.parentWindow, title="Oh no!")
         else:
             raise e
 
