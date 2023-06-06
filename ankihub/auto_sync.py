@@ -10,7 +10,7 @@ from aqt import AnkiQt
 
 from . import LOGGER
 from .gui.operations.ankihub_sync import sync_with_ankihub
-from .gui.operations.utils import future_with_result
+from .gui.operations.utils import future_with_exception, future_with_result
 from .settings import ANKI_MINOR, config
 from .threading_utils import rate_limited
 
@@ -78,9 +78,9 @@ def _on_ankiweb_sync(*args, **kwargs) -> None:
 
     try:
         _maybe_sync_with_ankihub(on_done=sync_with_ankiweb)
-    except Exception:
+    except Exception as e:
         LOGGER.exception("Error syncing with AnkiHub")
-        sync_with_ankiweb(future_with_result(None))
+        sync_with_ankiweb(future_with_exception(e))
 
 
 def _maybe_sync_with_ankihub(on_done: Callable[[Future], None]) -> None:
