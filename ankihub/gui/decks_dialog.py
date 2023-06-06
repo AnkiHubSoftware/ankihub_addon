@@ -402,6 +402,8 @@ class SubscribeDialog(QDialog):
             return
 
         def on_done(future: Future) -> None:
+            future.result()
+
             self.accept()
 
         download_and_install_decks([ah_did], on_done=on_done)
