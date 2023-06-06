@@ -43,7 +43,6 @@ from ..suggestions import (
     suggest_note_update,
     suggest_notes_in_bulk,
 )
-from ..utils import show_error_dialog
 from .utils import show_tooltip
 
 
@@ -176,15 +175,7 @@ def _comment_with_source(suggestion_meta: SuggestionMetadata) -> str:
 
 
 def _on_suggest_notes_in_bulk_done(future: Future, parent: QWidget) -> None:
-    try:
-        suggestions_result: BulkNoteSuggestionsResult = future.result()
-    except AnkiHubHTTPError as e:
-        if e.response.status_code != 403:
-            raise e
-
-        error_message = e.response.json().get("detail")
-        show_error_dialog(error_message, parent=parent)
-        return
+    suggestions_result: BulkNoteSuggestionsResult = future.result()
 
     LOGGER.info("Created note suggestions in bulk.")
     LOGGER.info(f"errors_by_nid:\n{pformat(suggestions_result.errors_by_nid)}")
