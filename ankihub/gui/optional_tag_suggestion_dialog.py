@@ -19,7 +19,6 @@ from aqt.qt import (
 from aqt.utils import showInfo, tooltip
 
 from .. import LOGGER
-from ..addon_ankihub_client import AnkiHubHTTPError
 from ..optional_tag_suggestions import OptionalTagsSuggestionHelper
 
 

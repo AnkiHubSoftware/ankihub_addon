@@ -28,11 +28,7 @@ from aqt.qt import (
 from aqt.utils import showText
 
 from .. import LOGGER
-from ..ankihub_client import (
-    AnkiHubHTTPError,
-    SuggestionType,
-    get_image_names_from_note_info,
-)
+from ..ankihub_client import SuggestionType, get_image_names_from_note_info
 from ..db import ankihub_db
 from ..exporting import to_note_data
 from ..settings import ANKING_DECK_ID, RATIONALE_FOR_CHANGE_MAX_LENGTH
