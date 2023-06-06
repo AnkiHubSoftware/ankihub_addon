@@ -19,7 +19,7 @@ from ...importing import AnkiHubImporter, AnkiHubImportResult
 from ...media_sync import media_sync
 from ...settings import config
 from ...subdecks import deck_contains_subdeck_tags
-from ...utils import create_backup, show_error_dialog
+from ...utils import create_backup
 from ..exceptions import DeckDownloadAndInstallError
 from ..messages import messages
 from ..utils import ask_user
@@ -106,10 +106,6 @@ def _maybe_handle_deck_download_and_install_error(
             f"the correct ID. If you believe this is an error, please reach "
             f"out to user support at help@ankipalace.com."
         )
-        return True
-    elif http_error.response.status_code == 403:
-        error_message = http_error.response.json().get("detail")
-        show_error_dialog(error_message)
         return True
 
     return False
