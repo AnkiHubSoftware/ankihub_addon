@@ -22,7 +22,6 @@ from ..settings import (
     url_view_note,
     url_view_note_history,
 )
-from ..utils import show_error_dialog
 from .suggestion_dialog import open_suggestion_dialog_for_note
 
 ANKIHUB_BTN_ID_PREFIX = "ankihub-btn"
@@ -78,9 +77,6 @@ def _on_suggestion_button_press(editor: Editor) -> None:
                 title="Problem with suggestion",
             )
             LOGGER.info(f"Can't submit suggestion due to: {pformat(error_message)}")
-        elif e.response.status_code == 403:
-            error_message = e.response.json().get("detail")
-            show_error_dialog(error_message, parent=editor.parentWindow, title="Oh no!")
         else:
             raise e
 
