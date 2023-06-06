@@ -162,10 +162,12 @@ def choose_ankihub_deck(
 
 def ask_user(
     text: str,
-    parent: QWidget = None,
-    defaultno: bool = False,
+    parent: Optional[QWidget] = None,
+    default_no: bool = False,
     title: str = "Anki",
     show_cancel_button: bool = True,
+    yes_button_label: str = "Yes",
+    no_button_label: str = "No",
 ) -> Optional[bool]:
     "Show a yes/no question. Return true if yes. Return false if no. Return None if cancelled."
 
@@ -177,24 +179,28 @@ def ask_user(
     msg.setText(text)
     msg.setTextFormat(Qt.TextFormat.RichText)
 
-    buttons = (
-        QMessageBox.StandardButton.Yes
-        | QMessageBox.StandardButton.No
-        | (QMessageBox.StandardButton.Cancel if show_cancel_button else 0)
+    yes_button = msg.addButton(
+        yes_button_label,
+        QMessageBox.ButtonRole.YesRole,
     )
-    msg.setStandardButtons(buttons)  # type: ignore
+    no_button = msg.addButton(
+        no_button_label,
+        QMessageBox.ButtonRole.NoRole,
+    )
+    if show_cancel_button:
+        msg.addButton(
+            "Cancel",
+            QMessageBox.ButtonRole.RejectRole,
+        )
+
+    msg.setDefaultButton(no_button if default_no else yes_button)
     msg.setIcon(QMessageBox.Icon.Question)
 
-    if defaultno:
-        msg.setDefaultButton(QMessageBox.StandardButton.No)
-    else:
-        msg.setDefaultButton(QMessageBox.StandardButton.Yes)
+    msg.exec()
 
-    response = msg.exec()
-
-    if response == QMessageBox.StandardButton.Yes:
+    if msg.clickedButton() == yes_button:
         return True
-    elif response == QMessageBox.StandardButton.No:
+    elif msg.clickedButton() == no_button:
         return False
     else:
         return None

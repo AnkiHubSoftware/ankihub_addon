@@ -1,4 +1,5 @@
 import copy
+import importlib
 import os
 import re
 import tempfile
@@ -17,14 +18,12 @@ from anki.consts import QUEUE_TYPE_SUSPENDED
 from anki.decks import DeckId, FilteredDeckConfig
 from anki.models import NotetypeDict, NotetypeId
 from anki.notes import Note, NoteId
-from anki.sync import SyncOutput
 from aqt import AnkiQt, dialogs, gui_hooks
 from aqt.addcards import AddCards
 from aqt.addons import InstallOk
 from aqt.browser import Browser
 from aqt.importing import AnkiPackageImporter
 from aqt.qt import Qt
-from aqt.sync import sync_collection
 from pytest import MonkeyPatch, fixture
 from pytest_anki import AnkiSession
 from pytestqt.qtbot import QtBot  # type: ignore
@@ -63,7 +62,7 @@ from ankihub.ankihub_client.ankihub_client import (
     DeckExtensionUpdateChunk,
     _transform_notes_data,
 )
-from ankihub.auto_sync import setup_ankihub_sync_on_ankiweb_sync
+from ankihub.auto_sync import _setup_ankihub_sync_on_ankiweb_sync
 from ankihub.common_utils import IMG_NAME_IN_IMG_TAG_REGEX
 from ankihub.db import ankihub_db, attached_ankihub_db
 from ankihub.debug import (
@@ -611,7 +610,7 @@ def test_check_and_install_new_deck_subscriptions(
         )
 
         # Call the function
-        check_and_install_new_deck_subscriptions()
+        check_and_install_new_deck_subscriptions(on_success=lambda: None)
 
         qtbot.wait(500)
 
@@ -2637,10 +2636,6 @@ def test_profile_swap(
 
 
 class TestAutoSync:
-    def setup_method(self):
-        # Mock the token so that the AnkiHub sync is not aborted.
-        config.token = MagicMock(return_value=lambda: "test_token")
-
     def test_with_on_ankiweb_sync_config_option(
         self,
         anki_session_with_addon_data: AnkiSession,
@@ -2650,19 +2645,24 @@ class TestAutoSync:
         with anki_session_with_addon_data.profile_loaded():
             mw = anki_session_with_addon_data.mw
 
-            patch_ankiweb_sync_to_do_nothing(mw, monkeypatch)
-            sync_all_decks_and_media_mock = self._mock_sync_all_decks_and_media(
-                monkeypatch
-            )
+            # Mock the syncs.
+            self._mock_syncs_and_check_new_subscriptions(monkeypatch)
 
-            setup_ankihub_sync_on_ankiweb_sync()
+            # Setup the auto sync.
+            _setup_ankihub_sync_on_ankiweb_sync()
 
+            # Set the auto sync config option.
             config.public_config["auto_sync"] = "on_ankiweb_sync"
 
-            # Trigger the AnkiWeb sync and assert that the AnkiHub sync is invoked.
-            sync_collection(mw, on_done=lambda: None)
-            qtbot.wait(200)
-            assert sync_all_decks_and_media_mock.call_count == 1
+            # Trigger the AnkiWeb sync.
+            mw._sync_collection_and_media(after_sync=Mock())
+            qtbot.wait(500)
+
+            # Assert that both syncs were called.
+            assert self.ankihub_sync_mock.call_count == 1
+            assert self.ankiweb_sync_mock.call_count == 1
+
+            assert self.check_and_install_new_deck_subscriptions_mock.call_count == 1
 
     def test_with_never_option(
         self,
@@ -2673,17 +2673,24 @@ class TestAutoSync:
         with anki_session_with_addon_data.profile_loaded():
             mw = anki_session_with_addon_data.mw
 
-            patch_ankiweb_sync_to_do_nothing(mw, monkeypatch)
-            sync_all_decks_mock = self._mock_sync_all_decks_and_media(monkeypatch)
+            # Mock the syncs.
+            self._mock_syncs_and_check_new_subscriptions(monkeypatch)
 
-            setup_ankihub_sync_on_ankiweb_sync()
+            # Setup the auto sync.
+            _setup_ankihub_sync_on_ankiweb_sync()
 
+            # Set the auto sync config option.
             config.public_config["auto_sync"] = "never"
 
-            # Trigger the AnkiWeb sync and assert that the AnkiHub sync is invoked.
-            sync_collection(mw, on_done=lambda: None)
-            qtbot.wait(200)
-            assert sync_all_decks_mock.call_count == 0
+            # Trigger the AnkiWeb sync.
+            mw._sync_collection_and_media(after_sync=Mock())
+            qtbot.wait(500)
+
+            # Assert that only the AnkiWeb sync was called.
+            assert self.ankihub_sync_mock.call_count == 0
+            assert self.ankiweb_sync_mock.call_count == 1
+
+            assert self.check_and_install_new_deck_subscriptions_mock.call_count == 0
 
     def test_with_on_startup_option(
         self,
@@ -2694,70 +2701,71 @@ class TestAutoSync:
         with anki_session_with_addon_data.profile_loaded():
             mw = anki_session_with_addon_data.mw
 
-            patch_ankiweb_sync_to_do_nothing(mw, monkeypatch)
-            sync_all_decks_mock = self._mock_sync_all_decks_and_media(monkeypatch)
+            # Mock the syncs.
+            self._mock_syncs_and_check_new_subscriptions(monkeypatch)
 
-            setup_ankihub_sync_on_ankiweb_sync()
+            # Setup the auto sync.
+            _setup_ankihub_sync_on_ankiweb_sync()
 
+            # Set the auto sync config option.
             config.public_config["auto_sync"] = "on_startup"
 
-            # Trigger the AnkiWeb sync and assert that the AnkiHub sync is invoked.
-            sync_collection(mw, on_done=lambda: None)
-            qtbot.wait(200)
-            assert sync_all_decks_mock.call_count == 1
+            # Trigger the AnkiWeb sync.
+            mw._sync_collection_and_media(after_sync=Mock())
+            qtbot.wait(500)
 
-            # Trigger the AnkiWeb sync again and assert that the AnkiHub sync is not invoked this time.
-            sync_collection(mw, on_done=lambda: None)
-            qtbot.wait(200)
-            assert sync_all_decks_mock.call_count == 1
+            # Assert that both syncs were called.
+            assert self.ankihub_sync_mock.call_count == 1
+            assert self.ankiweb_sync_mock.call_count == 1
 
-    def _mock_sync_all_decks_and_media(self, monkeypatch: MonkeyPatch) -> Mock:
-        # Mock the sync with AnkiHub so that it doesn't actually sync.
-        sync_all_decks_mock = Mock()
-        monkeypatch.setattr(ah_sync, "sync_all_decks_and_media", sync_all_decks_mock)
-        return sync_all_decks_mock
+            # Assert that the new deck subscriptions operation was called.
+            self.check_and_install_new_deck_subscriptions_mock.call_count == 1
+
+            # Trigger the AnkiWeb sync again.
+            mw._sync_collection_and_media(after_sync=Mock())
+            qtbot.wait(500)
+
+            # Assert that only the AnkiWeb sync was called the second time.
+            assert self.ankihub_sync_mock.call_count == 1
+            assert self.ankiweb_sync_mock.call_count == 2
+
+            assert self.check_and_install_new_deck_subscriptions_mock.call_count == 1
+
+    def _mock_syncs_and_check_new_subscriptions(self, monkeypatch: MonkeyPatch):
+        # Mock the token so that the AnkiHub sync is not skipped.
+        monkeypatch.setattr(
+            config, "token", MagicMock(return_value=lambda: "test_token")
+        )
+
+        # Mock the AnkiHub sync so it does nothing.
+        self.ankihub_sync_mock = Mock()
+        monkeypatch.setattr(ah_sync, "sync_all_decks_and_media", self.ankihub_sync_mock)
+
+        # Mock the AnkiWeb sync so it does nothing.
+        self.ankiweb_sync_mock = Mock()
+        monkeypatch.setattr(
+            aqt.sync,
+            "sync_collection",
+            self.ankiweb_sync_mock,
+        )
+        # ... and reload aqt.main so the mock is used.
+        importlib.reload(aqt.main)
+
+        # Mock the new deck subscriptions operation to just call its callback.
+        self.check_and_install_new_deck_subscriptions_mock = Mock()
+        monkeypatch.setattr(
+            operations.ankihub_sync,
+            "check_and_install_new_deck_subscriptions",
+            self.check_and_install_new_deck_subscriptions_mock,
+        )
+        self.check_and_install_new_deck_subscriptions_mock.side_effect = (
+            lambda *args, **kwargs: kwargs["on_success"]()
+        )
 
 
 class PickableMock(Mock):
     def __reduce__(self):
         return (Mock, ())
-
-
-def patch_ankiweb_sync_to_do_nothing(mw: AnkiQt, monkeypatch: MonkeyPatch):
-    """Patch AnkiWeb sync so that when this is called:
-    https://github.com/ankitects/anki/blob/e5d5d1d4bdecfac326353d154c933e477c4e3eb8/qt/aqt/sync.py#L87
-    this runs:
-    https://github.com/ankitects/anki/blob/e5d5d1d4bdecfac326353d154c933e477c4e3eb8/qt/aqt/sync.py#L122-L127
-    but the AnkiWeb sync does nothing and no error dialogs show show up.
-    """
-
-    # Mock the sync_auth function so that the sync is not aborted.
-    monkeypatch.setattr(mw.pm, "sync_auth", lambda: True)
-
-    # Mock the sync with AnkiWeb so that it doesn't actually sync.
-    # Also mock the sync output so that Anki doesn't trigger a full sync or show a message.
-    # The PicakbleMock is needed because the sync output is pickled by Anki in some Anki versions (e.g. 2.1.63)
-    # during the tests. Without using the PickableMock, the test fails with an error in these versions.
-    sync_output_mock = PickableMock(
-        host_number=1,
-        server_message=[],
-        required=SyncOutput.NO_CHANGES,
-        NO_CHANGES=SyncOutput.NO_CHANGES,
-    )
-    monkeypatch.setattr(
-        mw.col._backend, "sync_collection", lambda *args: sync_output_mock
-    )
-
-    # Mock the latest_progress function because it is called by a timer during the sync
-    # and would otherwise open an error message dialog.
-    monkeypatch.setattr(mw.col, "latest_progress", lambda *args, **kwargs: Mock())
-
-    # Mock the progress.set_title function because it is called by a timer during the sync
-    # (with the latest_progress as argument).
-    monkeypatch.setattr(mw.progress, "set_title", lambda *args, **kwargs: False)
-
-    # Mock the can_auto_sync function so that no sync is triggered when Anki is closed.
-    monkeypatch.setattr(mw, "can_auto_sync", lambda *args, **kwargs: False)
 
 
 def test_sync_with_optional_content(
@@ -3448,18 +3456,17 @@ def test_check_and_prompt_for_updates_on_main_window(
 @pytest.mark.qt_no_exception_capture
 class TestDebugModule:
     def test_setup_logging_for_sync_collection_and_media(
-        self, anki_session: AnkiSession, monkeypatch: MonkeyPatch, qtbot: QtBot
+        self, anki_session: AnkiSession, monkeypatch: MonkeyPatch
     ):
         # Test that the original AnkiQt._sync_collection_and_media method gets called
         # despite the monkeypatching we do in debug.py.
         with anki_session.profile_loaded():
             mw = anki_session.mw
 
-            # Mock the sync fuction so that it does not throw errors when called.
-            # It expects to be authenticated with AnkiWeb among other things.
-            patch_ankiweb_sync_to_do_nothing(mw, monkeypatch)
-            monkeypatch.setattr(mw.col, "_backend", Mock())
-            monkeypatch.setattr(mw.taskman, "with_progress", Mock())
+            # Mock the AnkiWeb sync to do nothing
+            monkeypatch.setattr(aqt.sync, "sync_collection", Mock())
+            # ... and reload the main module so that the mock is used.
+            importlib.reload(aqt.main)
 
             # Mock the sync_will_start hook so that we can check if it was called when the sync starts.
             sync_will_start_mock = Mock()

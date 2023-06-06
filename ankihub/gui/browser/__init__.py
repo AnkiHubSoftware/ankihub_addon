@@ -437,7 +437,7 @@ def _on_reset_optional_tags_action(browser: Browser):
         f"<b>{tag_group_name_with_deck}</b>?<br><br>"
         "Note: This will sync all AnkiHub decks.",
         parent=browser,
-        defaultno=True,
+        default_no=True,
     ):
         return
 

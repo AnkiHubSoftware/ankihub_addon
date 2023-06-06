@@ -26,7 +26,7 @@ def confirm_and_toggle_subdecks(ankihub_id: uuid.UUID) -> None:
             "See <a href='https://docs.ankihub.net/user_docs/advanced.html#subdecks-and-subdeck-tags'>"
             "the AnkiHub docs</a> "
             "for details.",
-            defaultno=True,
+            default_no=True,
         ):
             return
 
