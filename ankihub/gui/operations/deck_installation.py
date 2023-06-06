@@ -50,7 +50,6 @@ def download_and_install_decks(
             on_done(future_with_result(None))
         except Exception as e:
             on_done(future_with_exception(e))
-            return
 
     def on_install_done_inner(import_results: List[AnkiHubImportResult]):
 
