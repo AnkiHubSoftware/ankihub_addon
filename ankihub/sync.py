@@ -14,7 +14,7 @@ from .db import ankihub_db
 from .importing import AnkiHubImporter, AnkiHubImportResult
 from .media_sync import media_sync
 from .settings import config
-from .utils import create_backup, show_error_dialog
+from .utils import create_backup
 
 
 class NotLoggedInError(Exception):
@@ -209,15 +209,7 @@ class _AnkiHubSync:
 
         deck_config = config.deck_config(ankihub_did)
 
-        if exc.response.status_code == 403:
-            error_message = exc.response.json().get("detail")
-            show_error_dialog(error_message)
-
-            LOGGER.info(
-                "Unable to sync because of user not being subscribed to a deck."
-            )
-            return True
-        elif exc.response.status_code == 404:
+        if exc.response.status_code == 404:
             aqt.mw.taskman.run_on_main(
                 lambda: showInfo(  # type: ignore
                     f"The deck <b>{deck_config.name}</b> does not exist on the AnkiHub website. "
