@@ -214,25 +214,13 @@ def _maybe_handle_ankihub_http_error(error: AnkiHubHTTPError) -> bool:
             check_and_prompt_for_updates_on_main_window()
         return True
     elif response.status_code == 403:
-        _show_warning_for_ankihub_request_error(error)
-        return True
+        response_data = response.json()
+        error_message = response_data.get("detail")
+        if error_message:
+            show_error_dialog(error_message, title="Oh no!")
+            return True
+
     return False
-
-
-def _show_warning_for_ankihub_request_error(exc_value: AnkiHubHTTPError) -> None:
-    try:
-        response_data = exc_value.response.json()
-        details = (
-            response_data.get("detail")
-            or response_data.get("details")
-            or response_data.get("errors")
-        )
-    except:
-        details = None
-
-    if details:
-        show_error_dialog(details, title="Oh no!")
-        # TODO: should we add an "else" clause here to show a generic error message?
 
 
 def _is_memory_full_error(exc_value: BaseException) -> bool:
