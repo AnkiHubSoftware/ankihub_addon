@@ -21,7 +21,6 @@ from aqt.utils import showInfo, tooltip
 from .. import LOGGER
 from ..addon_ankihub_client import AnkiHubHTTPError
 from ..optional_tag_suggestions import OptionalTagsSuggestionHelper
-from ..utils import show_error_dialog
 
 
 class OptionalTagsSuggestionDialog(QDialog):
@@ -106,16 +105,9 @@ class OptionalTagsSuggestionDialog(QDialog):
         )
 
     def _on_submit_finished(self, future: Future):
-        try:
-            future.result()
-        except AnkiHubHTTPError as e:
-            if e.response.status_code == 403:
-                error_message = e.response.json().get("detail")
-                show_error_dialog(error_message, parent=self._parent)
-                return
-        else:
-            tooltip("Optional tags suggestions submitted.", parent=self._parent)
-            self.accept()
+        future.result()
+        tooltip("Optional tags suggestions submitted.", parent=self._parent)
+        self.accept()
 
     def _on_cancel(self):
         self.reject()
