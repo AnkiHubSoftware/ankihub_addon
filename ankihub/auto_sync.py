@@ -91,12 +91,9 @@ def _maybe_sync_with_ankihub(on_done: Callable[[Future], None]) -> None:
         on_done(future_with_result(None))
         return
 
-    if config.public_config["auto_sync"] != "never" and (
-        (
-            config.public_config["auto_sync"] == "on_startup"
-            and not auto_sync_state.attempted_startup_sync
-        )
-        or config.public_config["auto_sync"] == "on_ankiweb_sync"
+    if (config.public_config["auto_sync"] == "on_ankiweb_sync") or (
+        config.public_config["auto_sync"] == "on_startup"
+        and not auto_sync_state.attempted_startup_sync
     ):
         auto_sync_state.attempted_startup_sync = True
         LOGGER.info("Syncing with AnkiHub in _new_sync_collection")
