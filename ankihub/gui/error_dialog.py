@@ -144,5 +144,8 @@ def _forum_url(exception: BaseException, sentry_event_id: Optional[str]):
         sentry_url = f"https://ankihub.sentry.io/issues/?project=6546414&query=id:{sentry_event_id}"
         forum_post_text += f"\n\n[Sentry link (for developers)]({sentry_url})"
 
-    result = f"https://community.ankihub.net/new-topic?category=support&tags=bug&body={quote(forum_post_text, safe='')}"
+    result = (
+        "https://community.ankihub.net/new-topic?category=bug&tags=add-on-error&body="
+        + quote(forum_post_text, safe="")
+    )
     return result
