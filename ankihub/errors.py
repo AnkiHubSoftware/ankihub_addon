@@ -154,8 +154,6 @@ def _try_handle_exception(
             LOGGER.info("AnkiHubRequestError was handled.")
             return True
 
-        _show_warning_for_ankihub_request_error(exc_value)
-
     if isinstance(exc_value, AnkiHubRequestException):
         if isinstance(
             exc_value.original_exception, (exceptions.ConnectionError, ConnectionError)
