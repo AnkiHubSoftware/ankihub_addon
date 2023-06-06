@@ -79,7 +79,7 @@ def _on_ankiweb_sync(*args, **kwargs) -> None:
     try:
         _maybe_sync_with_ankihub(on_done=sync_with_ankiweb)
     except Exception as e:
-        LOGGER.exception("Error syncing with AnkiHub")
+        LOGGER.warning("Error while syncing with AnkiHub", exc_info=True)
         sync_with_ankiweb(future_with_exception(e))
 
 
