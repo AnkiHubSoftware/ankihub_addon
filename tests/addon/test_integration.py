@@ -155,7 +155,7 @@ def install_sample_ah_deck(
         ah_did = next_deterministic_uuid()
         mw = anki_session_with_addon_data.mw
         anki_did = import_sample_ankihub_deck(mw, ankihub_did=ah_did)
-        config.save_subscription(
+        config.add_deck(
             name="Testdeck",
             ankihub_did=ah_did,
             anki_did=anki_did,

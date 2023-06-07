@@ -190,7 +190,7 @@ class _Config:
         self.deck_config(ankihub_did).subdecks_enabled = subdecks
         self._update_private_config()
 
-    def save_subscription(
+    def add_deck(
         self,
         name: str,
         ankihub_did: uuid.UUID,
@@ -212,7 +212,7 @@ class _Config:
         if self.subscriptions_change_hook:
             self.subscriptions_change_hook()
 
-    def unsubscribe_deck(self, ankihub_did: uuid.UUID) -> None:
+    def remove_deck(self, ankihub_did: uuid.UUID) -> None:
         if self._private_config.decks.get(ankihub_did):
             self._private_config.decks.pop(ankihub_did)
             self._update_private_config()
