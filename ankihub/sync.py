@@ -7,10 +7,11 @@ import aqt
 from anki.errors import NotFoundError
 from aqt.utils import showInfo, tooltip
 
-from . import LOGGER, settings
+from . import LOGGER
 from .addon_ankihub_client import AddonAnkiHubClient as AnkiHubClient
 from .ankihub_client import AnkiHubHTTPError, DeckExtension
 from .db import ankihub_db
+from .gui.utils import show_error_dialog
 from .importing import AnkiHubImporter, AnkiHubImportResult
 from .media_sync import media_sync
 from .settings import config
@@ -210,19 +211,16 @@ class _AnkiHubSync:
         deck_config = config.deck_config(ankihub_did)
 
         if exc.response.status_code == 403:
-            url = f"{settings.url_view_deck()}{ankihub_did}"
-            aqt.mw.taskman.run_on_main(
-                lambda: showInfo(  # type: ignore
-                    f"Please subscribe to the deck <br><b>{deck_config.name}</b><br>on the AnkiHub website to "
-                    "be able to sync.<br><br>"
-                    f'Link to the deck: <a href="{url}">{url}</a><br><br>'
-                    f"Note that you also need an active AnkiHub subscription.",
+            response_data = exc.response.json()
+            error_message = response_data.get("detail")
+            if error_message:
+                show_error_dialog(
+                    error_message,
+                    title="Error syncing Deck :(",
                 )
-            )
-            LOGGER.info(
-                "Unable to sync because of user not being subscribed to a deck."
-            )
-            return True
+                return True
+            else:
+                raise exc
         elif exc.response.status_code == 404:
             aqt.mw.taskman.run_on_main(
                 lambda: showInfo(  # type: ignore

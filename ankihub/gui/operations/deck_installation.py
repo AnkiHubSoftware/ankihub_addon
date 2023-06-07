@@ -17,12 +17,12 @@ from ...ankihub_client.ankihub_client import AnkiHubHTTPError
 from ...ankihub_client.models import UserDeckRelation
 from ...importing import AnkiHubImporter, AnkiHubImportResult
 from ...media_sync import media_sync
-from ...settings import config, url_view_deck
+from ...settings import config
 from ...subdecks import deck_contains_subdeck_tags
 from ...utils import create_backup
 from ..exceptions import DeckDownloadAndInstallError
 from ..messages import messages
-from ..utils import ask_user
+from ..utils import ask_user, show_error_dialog
 from .subdecks import confirm_and_toggle_subdecks
 from .utils import future_with_exception, future_with_result
 
@@ -120,16 +120,11 @@ def _maybe_handle_deck_download_and_install_error(
         )
         return True
     elif http_error.response.status_code == 403:
-        deck_url = f"{url_view_deck()}{e.ankihub_did}"
-        showInfo(
-            f"Please first subscribe to the deck on the AnkiHub website.<br>"
-            f"Link to the deck: <a href='{deck_url}'>{deck_url}</a><br>"
-            "<br>"
-            "Note that you also need an active AnkiHub subscription.<br>"
-            "You can get a subscription at<br>"
-            "<a href='https://www.ankihub.net/'>https://www.ankihub.net/</a>",
-        )
-        return True
+        response_data = http_error.response.json()
+        error_message = response_data.get("detail")
+        if error_message:
+            show_error_dialog(error_message, title="Error downloading Deck :(")
+            return True
 
     return False
 

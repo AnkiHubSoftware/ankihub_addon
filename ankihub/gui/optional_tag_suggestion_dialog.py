@@ -19,8 +19,9 @@ from aqt.qt import (
 from aqt.utils import showInfo, tooltip
 
 from .. import LOGGER
-from ..addon_ankihub_client import AnkiHubHTTPError
+from ..ankihub_client import AnkiHubHTTPError
 from ..optional_tag_suggestions import OptionalTagsSuggestionHelper
+from .utils import show_error_dialog
 
 
 class OptionalTagsSuggestionDialog(QDialog):
@@ -109,16 +110,16 @@ class OptionalTagsSuggestionDialog(QDialog):
             future.result()
         except AnkiHubHTTPError as e:
             if e.response.status_code == 403:
-                showInfo(
-                    "You are not allowed to submit suggestions for some of the selected tag groups."
-                    + (
-                        '\n\nTry unchecking the "Submit without review" checkbox.'
-                        if self.auto_accept_cb.isChecked()
-                        else ""
-                    ),
-                    parent=self._parent,
-                )
-                return
+                response_data = e.response.json()
+                error_message = response_data.get("detail")
+                if error_message:
+                    show_error_dialog(
+                        error_message,
+                        parent=self._parent,
+                        title="Error submitting Optional Tags suggestion :(",
+                    )
+                else:
+                    raise e
         else:
             tooltip("Optional tags suggestions submitted.", parent=self._parent)
             self.accept()
