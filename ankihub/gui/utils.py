@@ -19,9 +19,13 @@ from aqt.qt import (
     QWidget,
     qconnect,
 )
-from aqt.utils import disable_help_button, tooltip
+from aqt.utils import disable_help_button, showWarning, tooltip
 
 from ..settings import config
+
+
+def show_error_dialog(message, *args, **kwargs):
+    aqt.mw.taskman.run_on_main(lambda: showWarning(message, *args, **kwargs))  # type: ignore
 
 
 def choose_subset(
