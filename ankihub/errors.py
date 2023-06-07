@@ -15,7 +15,7 @@ import aqt
 import sentry_sdk
 from anki.errors import BackendIOError, DBError, SyncError
 from anki.utils import checksum, is_win
-from aqt.utils import askUser, showWarning, tooltip
+from aqt.utils import askUser, tooltip
 from requests import exceptions
 from sentry_sdk import capture_exception, push_scope
 from sentry_sdk.integrations.argv import ArgvIntegration
@@ -29,7 +29,7 @@ from .addon_ankihub_client import AddonAnkiHubClient as AnkiHubClient
 from .ankihub_client import AnkiHubHTTPError, AnkiHubRequestException
 from .db import is_ankihub_db_attached_to_anki_db
 from .gui.error_dialog import ErrorDialog
-from .gui.utils import check_and_prompt_for_updates_on_main_window
+from .gui.utils import check_and_prompt_for_updates_on_main_window, show_error_dialog
 from .settings import ADDON_VERSION, ANKI_VERSION, ANKIWEB_ID, config, log_file_path
 from .sync import NotLoggedInError
 
@@ -153,8 +153,6 @@ def _try_handle_exception(
             LOGGER.info("AnkiHubRequestError was handled.")
             return True
 
-        _show_warning_for_ankihub_request_error(exc_value)
-
     if isinstance(exc_value, AnkiHubRequestException):
         if isinstance(
             exc_value.original_exception, (exceptions.ConnectionError, ConnectionError)
@@ -166,7 +164,7 @@ def _try_handle_exception(
             return True
 
     if _is_memory_full_error(exc_value):
-        showWarning(
+        show_error_dialog(
             "Could not finish because your hard drive does not have enough space.",
             title="AnkiHub",
         )
@@ -214,30 +212,14 @@ def _maybe_handle_ankihub_http_error(error: AnkiHubHTTPError) -> bool:
         ):
             check_and_prompt_for_updates_on_main_window()
         return True
+    elif response.status_code == 403:
+        response_data = response.json()
+        error_message = response_data.get("detail")
+        if error_message:
+            show_error_dialog(error_message, title="Oh no!")
+            return True
+
     return False
-
-
-def _show_warning_for_ankihub_request_error(exc_value: AnkiHubHTTPError) -> None:
-    try:
-        response_data = exc_value.response.json()
-        details = (
-            response_data.get("detail")
-            or response_data.get("details")
-            or response_data.get("errors")
-        )
-    except:
-        details = None
-
-    if details:
-        aqt.mw.taskman.run_on_main(
-            lambda: showWarning(  # type: ignore
-                "Error while communicating with AnkiHub."
-                "<br><br>"
-                "Details:"
-                "<br>"
-                f"{details}",
-            )
-        )
 
 
 def _is_memory_full_error(exc_value: BaseException) -> bool:
