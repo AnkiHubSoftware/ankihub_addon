@@ -62,12 +62,12 @@ class _AnkiHubSync:
 
         client = AnkiHubClient()
         if client.is_feature_flag_enabled("new_subscription_workflow_enabled"):
-            with_user_relation_ah_dids = [
-                deck.ankihub_deck_uuid for deck in client.get_decks_with_user_relation()
+            subscribed_ah_dids = [
+                deck.ankihub_deck_uuid for deck in client.get_deck_subscriptions()
             ]
             installed_ah_dids = config.deck_ids()
             to_sync_ah_dids = list(
-                set(with_user_relation_ah_dids).intersection(installed_ah_dids)
+                set(subscribed_ah_dids).intersection(installed_ah_dids)
             )
         else:
             to_sync_ah_dids = config.deck_ids()
