@@ -289,7 +289,7 @@ def _create_collaborative_deck_action() -> None:
     def on_success(ankihub_did: uuid.UUID) -> None:
         anki_did = aqt.mw.col.decks.id_for_name(deck_name)
         creation_time = datetime.now(tz=timezone.utc)
-        config.save_subscription(
+        config.add_deck(
             deck_name,
             ankihub_did,
             anki_did,
