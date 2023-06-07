@@ -169,7 +169,7 @@ class SubscribedDecksDialog(QDialog):
             ankihub_did: UUID = item.data(Qt.ItemDataRole.UserRole)
             if self.new_subscription_workflow_enabled:
                 self.client.unsubscribe_from_deck(ankihub_did)
-            config.unsubscribe_deck(ankihub_did)
+            config.remove_deck(ankihub_did)
             self._clear_deck_changes(ankihub_did)
 
         tooltip("Unsubscribed from AnkiHub Deck.", parent=aqt.mw)

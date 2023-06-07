@@ -184,7 +184,7 @@ def _install_deck(
         deck_name=deck_name,
     )
 
-    config.save_subscription(
+    config.add_deck(
         name=deck_name,
         ankihub_did=ankihub_did,
         anki_did=import_result.anki_did,
