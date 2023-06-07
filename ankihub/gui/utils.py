@@ -24,7 +24,7 @@ from aqt.utils import disable_help_button, showWarning, tooltip
 from ..settings import config
 
 
-def show_error_dialog(message, *args, **kwargs):
+def show_error_dialog(message: str, *args, **kwargs):
     aqt.mw.taskman.run_on_main(lambda: showWarning(message, *args, **kwargs))  # type: ignore
 
 

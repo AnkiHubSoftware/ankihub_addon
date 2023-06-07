@@ -29,10 +29,9 @@ from .addon_ankihub_client import AddonAnkiHubClient as AnkiHubClient
 from .ankihub_client import AnkiHubHTTPError, AnkiHubRequestException
 from .db import is_ankihub_db_attached_to_anki_db
 from .gui.error_dialog import ErrorDialog
-from .gui.utils import check_and_prompt_for_updates_on_main_window
+from .gui.utils import check_and_prompt_for_updates_on_main_window, show_error_dialog
 from .settings import ADDON_VERSION, ANKI_VERSION, ANKIWEB_ID, config, log_file_path
 from .sync import NotLoggedInError
-from .utils import show_error_dialog
 
 SENTRY_ENV = "anki_desktop"
 os.environ["SENTRY_ENVIRONMENT"] = SENTRY_ENV

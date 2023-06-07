@@ -22,7 +22,7 @@ from ...subdecks import deck_contains_subdeck_tags
 from ...utils import create_backup
 from ..exceptions import DeckDownloadAndInstallError
 from ..messages import messages
-from ..utils import ask_user
+from ..utils import ask_user, show_error_dialog
 from .subdecks import confirm_and_toggle_subdecks
 
 
@@ -107,6 +107,12 @@ def _maybe_handle_deck_download_and_install_error(
             f"out to user support at help@ankipalace.com."
         )
         return True
+    elif http_error.response.status_code == 403:
+        response_data = http_error.response.json()
+        error_message = response_data.get("detail")
+        if error_message:
+            show_error_dialog(error_message, title="Error downloading Deck :(")
+            return True
 
     return False
 

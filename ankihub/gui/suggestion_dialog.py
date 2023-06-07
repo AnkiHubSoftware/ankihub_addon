@@ -28,7 +28,11 @@ from aqt.qt import (
 from aqt.utils import showText
 
 from .. import LOGGER
-from ..ankihub_client import SuggestionType, get_image_names_from_note_info
+from ..ankihub_client import (
+    AnkiHubHTTPError,
+    SuggestionType,
+    get_image_names_from_note_info,
+)
 from ..db import ankihub_db
 from ..exporting import to_note_data
 from ..settings import ANKING_DECK_ID, RATIONALE_FOR_CHANGE_MAX_LENGTH
@@ -39,7 +43,7 @@ from ..suggestions import (
     suggest_note_update,
     suggest_notes_in_bulk,
 )
-from .utils import show_tooltip
+from .utils import show_error_dialog, show_tooltip
 
 
 class SourceType(Enum):
@@ -171,7 +175,24 @@ def _comment_with_source(suggestion_meta: SuggestionMetadata) -> str:
 
 
 def _on_suggest_notes_in_bulk_done(future: Future, parent: QWidget) -> None:
-    suggestions_result: BulkNoteSuggestionsResult = future.result()
+    try:
+        suggestions_result: BulkNoteSuggestionsResult = future.result()
+    except AnkiHubHTTPError as e:
+        if e.response.status_code == 403:
+            response_data = e.response.json()
+            error_message = response_data.get("detail")
+            if error_message:
+                show_error_dialog(
+                    error_message,
+                    parent=parent,
+                    title="Error submitting bulk suggestion :(",
+                )
+            else:
+                raise e
+        else:
+            raise e
+
+        return
 
     LOGGER.info("Created note suggestions in bulk.")
     LOGGER.info(f"errors_by_nid:\n{pformat(suggestions_result.errors_by_nid)}")
