@@ -23,6 +23,7 @@ from ..settings import (
     url_view_note_history,
 )
 from .suggestion_dialog import open_suggestion_dialog_for_note
+from .utils import show_error_dialog
 
 ANKIHUB_BTN_ID_PREFIX = "ankihub-btn"
 SUGGESTION_BTN_ID = f"{ANKIHUB_BTN_ID_PREFIX}-suggestion"
@@ -78,12 +79,16 @@ def _on_suggestion_button_press(editor: Editor) -> None:
             )
             LOGGER.info(f"Can't submit suggestion due to: {pformat(error_message)}")
         elif e.response.status_code == 403:
-            msg = (
-                "You are not allowed to create a suggestion for this note.<br>"
-                "Are you subscribed to the AnkiHub deck this notes is from?<br><br>"
-                "You can only submit changes without a review if you are an owner or maintainer of the deck."
-            )
-            showInfo(msg, parent=editor.parentWindow)
+            response_data = e.response.json()
+            error_message = response_data.get("detail")
+            if error_message:
+                show_error_dialog(
+                    error_message,
+                    parent=editor.parentWindow,
+                    title="Error submitting suggestion :(",
+                )
+            else:
+                raise e
         else:
             raise e
 
