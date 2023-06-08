@@ -4,6 +4,7 @@ import os
 import re
 import tempfile
 import uuid
+from concurrent.futures import Future
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
 from time import sleep
@@ -30,7 +31,7 @@ from pytestqt.qtbot import QtBot  # type: ignore
 from requests_mock import Mocker
 
 from ..factories import DeckFactory, NoteInfoFactory
-from ..fixtures import create_or_get_ah_version_of_note_type
+from ..fixtures import MockFunctionProtocol, create_or_get_ah_version_of_note_type
 from .conftest import TEST_PROFILE_ID
 
 # workaround for vscode test discovery not using pytest.ini which sets this env var
@@ -87,6 +88,7 @@ from ankihub.gui.editor import _on_suggestion_button_press, _refresh_buttons
 from ankihub.gui.operations.new_deck_subscriptions import (
     check_and_install_new_deck_subscriptions,
 )
+from ankihub.gui.operations.utils import future_with_result
 from ankihub.gui.optional_tag_suggestion_dialog import OptionalTagsSuggestionDialog
 from ankihub.importing import (
     AnkiHubImporter,
@@ -465,7 +467,7 @@ class TestDownloadAndInstallDecks:
             # Download and install the deck
             on_success_mock = Mock()
             download_and_install_decks(
-                [deck.ankihub_deck_uuid], on_success=on_success_mock
+                [deck.ankihub_deck_uuid], on_done=on_success_mock
             )
             qtbot.wait(500)
 
@@ -530,14 +532,14 @@ class TestDownloadAndInstallDecks:
             )
 
             # Try to download and install the deck
-            on_success_mock = Mock()
-            download_and_install_decks(
-                [deck.ankihub_deck_uuid], on_success=on_success_mock
-            )
+            on_done_mock = Mock()
+            download_and_install_decks([deck.ankihub_deck_uuid], on_done=on_done_mock)
             qtbot.wait(300)
 
-            # Assert that the on_success callback was not called
-            assert on_success_mock.call_count == 0
+            # Assert that the on_done callback was called
+            on_done_mock.assert_called_once()
+            future: Future = on_done_mock.call_args[0][0]
+            assert future.exception() is None
 
     def _mock_client_and_gui_and_media_sync(
         self,
@@ -571,57 +573,182 @@ class TestDownloadAndInstallDecks:
         return mocks
 
 
-def test_check_and_install_new_deck_subscriptions(
-    anki_session_with_addon_data: AnkiSession,
-    monkeypatch: MonkeyPatch,
-    qtbot: QtBot,
-    set_feature_flag_state,
-):
-    set_feature_flag_state(
-        feature_flag_name="new_subscription_workflow_enabled", is_active=True
-    )
-
-    anki_session = anki_session_with_addon_data
-    with anki_session.profile_loaded():
-
-        # Mock get_deck_subscriptions function to return a deck
-        deck = DeckFactory.create()
-        get_deck_subscriptions_mock = Mock()
-        monkeypatch.setattr(
-            AnkiHubClient,
-            "get_deck_subscriptions",
-            get_deck_subscriptions_mock,
-        )
-        get_deck_subscriptions_mock.return_value = [deck]
-
-        # Mock ask_user function to return True
-        ask_user_mock = Mock()
-        monkeypatch.setattr(
-            operations.new_deck_subscriptions, "ask_user", ask_user_mock
-        )
-        ask_user_mock.return_value = True
-
-        # Mock download and install function to do nothing (we only want to check that it is called)
-        download_and_install_decks_mock = Mock()
-        monkeypatch.setattr(
-            operations.new_deck_subscriptions,
-            "download_and_install_decks",
-            download_and_install_decks_mock,
+class TestCheckAndInstallNewDeckSubscriptions:
+    def test_one_new_subscription(
+        self,
+        anki_session_with_addon_data: AnkiSession,
+        qtbot: QtBot,
+        mock_function: MockFunctionProtocol,
+        set_feature_flag_state,
+    ):
+        set_feature_flag_state(
+            feature_flag_name="new_subscription_workflow_enabled", is_active=True
         )
 
-        # Call the function
-        check_and_install_new_deck_subscriptions(on_success=lambda: None)
+        anki_session = anki_session_with_addon_data
+        with anki_session.profile_loaded():
 
-        qtbot.wait(500)
+            # Mock get_deck_subscriptions function to return a deck
+            deck = DeckFactory.create()
+            get_decks_with_user_relation_mock = mock_function(
+                AnkiHubClient, "get_deck_subscriptions", return_value=[deck]
+            )
 
-        # Assert that the mocked functions were called
-        assert get_deck_subscriptions_mock.call_count == 1
-        assert ask_user_mock.call_count == 1
+            # Mock ask_user function to return True
+            ask_user_mock = mock_function(
+                operations.new_deck_subscriptions, "ask_user", return_value=True
+            )
 
-        assert download_and_install_decks_mock.call_count == 1
-        assert download_and_install_decks_mock.call_args[0][0] == [
-            deck.ankihub_deck_uuid
-        ]
+            # Mock download and install operation to only call the on_done callback
+            download_and_install_decks_mock = mock_function(
+                operations.new_deck_subscriptions,
+                "download_and_install_decks",
+                side_effect=lambda *args, **kwargs: kwargs["on_done"](
+                    future_with_result(None)
+                ),
+            )
+
+            # Call the function
+            on_done_mock = Mock()
+            check_and_install_new_deck_subscriptions(on_done_mock)
+
+            qtbot.wait(500)
+
+            # Assert that the on_done callback was called with a future with a result of None
+            assert on_done_mock.call_count == 1
+            assert on_done_mock.call_args[0][0].result() is None
+
+            # Assert that the mocked functions were called
+            assert get_decks_with_user_relation_mock.call_count == 1
+            assert ask_user_mock.call_count == 1
+
+            assert download_and_install_decks_mock.call_count == 1
+            assert download_and_install_decks_mock.call_args[0][0] == [
+                deck.ankihub_deck_uuid
+            ]
+
+    def test_user_declines(
+        self,
+        anki_session_with_addon_data: AnkiSession,
+        qtbot: QtBot,
+        mock_function: MockFunctionProtocol,
+        set_feature_flag_state,
+    ):
+        set_feature_flag_state(
+            feature_flag_name="new_subscription_workflow_enabled", is_active=True
+        )
+
+        anki_session = anki_session_with_addon_data
+        with anki_session.profile_loaded():
+
+            # Mock get_deck_subscriptions function to return a deck
+            deck = DeckFactory.create()
+            get_decks_with_user_relation_mock = mock_function(
+                AnkiHubClient, "get_deck_subscriptions", return_value=[deck]
+            )
+
+            # Mock ask_user function to return False
+            ask_user_mock = mock_function(
+                operations.new_deck_subscriptions, "ask_user", return_value=False
+            )
+
+            # Call the function
+            on_done_mock = Mock()
+            check_and_install_new_deck_subscriptions(on_done_mock)
+
+            qtbot.wait(500)
+
+            # Assert that the on_done callback was called with a future with a result of None
+            assert on_done_mock.call_count == 1
+            assert on_done_mock.call_args[0][0].result() is None
+
+            # Assert that the mocked functions were called
+            assert get_decks_with_user_relation_mock.call_count == 1
+            assert ask_user_mock.call_count == 1
+
+    def test_no_new_subscriptions(
+        self,
+        anki_session_with_addon_data: AnkiSession,
+        qtbot: QtBot,
+        mock_function: MockFunctionProtocol,
+        set_feature_flag_state,
+    ):
+        set_feature_flag_state(
+            feature_flag_name="new_subscription_workflow_enabled", is_active=True
+        )
+
+        anki_session = anki_session_with_addon_data
+        with anki_session.profile_loaded():
+
+            # Mock get_deck_subscriptions function to return an empty list
+            get_decks_with_user_relation_mock = mock_function(
+                AnkiHubClient,
+                "get_deck_subscriptions",
+                return_value=[],
+            )
+
+            # Call the function
+            on_done_mock = Mock()
+            check_and_install_new_deck_subscriptions(on_done_mock)
+
+            qtbot.wait(500)
+
+            # Assert that the on_done callback was called with a future with a result of None
+            assert on_done_mock.call_count == 1
+            assert on_done_mock.call_args[0][0].result() is None
+
+            # Assert that the mocked functions were called
+            assert get_decks_with_user_relation_mock.call_count == 1
+
+    def test_install_operation_raises_exception(
+        self,
+        anki_session_with_addon_data: AnkiSession,
+        qtbot: QtBot,
+        mock_function: MockFunctionProtocol,
+        set_feature_flag_state,
+    ):
+        set_feature_flag_state(
+            feature_flag_name="new_subscription_workflow_enabled", is_active=True
+        )
+
+        anki_session = anki_session_with_addon_data
+        with anki_session.profile_loaded():
+
+            # Mock get_deck_subscriptions function to return a deck
+            deck = DeckFactory.create()
+            get_decks_with_user_relation_mock = mock_function(
+                AnkiHubClient, "get_deck_subscriptions", return_value=[deck]
+            )
+
+            # Mock ask_user function to return True
+            ask_user_mock = mock_function(
+                operations.new_deck_subscriptions, "ask_user", return_value=True
+            )
+
+            # Mock download and install operation to raise an exception
+            def raise_exception(*args, **kwargs):
+                raise Exception("Something went wrong")
+
+            download_and_install_decks_mock = mock_function(
+                operations.new_deck_subscriptions,
+                "download_and_install_decks",
+                side_effect=raise_exception,
+            )
+
+            # Call the function
+            on_done_mock = Mock()
+            check_and_install_new_deck_subscriptions(on_done_mock)
+
+            qtbot.wait(500)
+
+            # Assert that the on_done callback was called with a future with an exception
+            assert on_done_mock.call_count == 1
+            assert on_done_mock.call_args[0][0].exception() is not None
+
+            # Assert that the mocked functions were called
+            assert get_decks_with_user_relation_mock.call_count == 1
+            assert ask_user_mock.call_count == 1
+            assert download_and_install_decks_mock.call_count == 1
 
 
 def test_get_deck_by_id(
@@ -2761,7 +2888,7 @@ class TestAutoSync:
             self.check_and_install_new_deck_subscriptions_mock,
         )
         self.check_and_install_new_deck_subscriptions_mock.side_effect = (
-            lambda *args, **kwargs: kwargs["on_success"]()
+            lambda *args, **kwargs: kwargs["on_done"](future_with_result(None))
         )
 
 

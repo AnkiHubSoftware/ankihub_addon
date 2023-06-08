@@ -24,23 +24,34 @@ from ..exceptions import DeckDownloadAndInstallError
 from ..messages import messages
 from ..utils import ask_user, show_error_dialog
 from .subdecks import confirm_and_toggle_subdecks
+from .utils import future_with_exception, future_with_result
 
 
 def download_and_install_decks(
-    ankihub_dids: List[uuid.UUID], on_success: Callable[[], None]
+    ankihub_dids: List[uuid.UUID], on_done: Callable[[Future], None]
 ) -> None:
     """Downloads and installs the given decks in the background.
-    Shows an import summary once the decks are installed.
-    Calls on_success when done."""
+    Shows an import summary once the decks are installed."""
 
     def on_install_done(future: Future):
         try:
             import_results: List[AnkiHubImportResult] = future.result()
-        except DeckDownloadAndInstallError as e:
-            if _maybe_handle_deck_download_and_install_error(e):
-                return
+        except Exception as e:
+            if isinstance(
+                e, DeckDownloadAndInstallError
+            ) and _maybe_handle_deck_download_and_install_error(e):
+                on_done(future_with_result(None))
             else:
-                raise e
+                on_done(future_with_exception(e))
+            return
+
+        try:
+            on_install_done_inner(import_results)
+            on_done(future_with_result(None))
+        except Exception as e:
+            on_done(future_with_exception(e))
+
+    def on_install_done_inner(import_results: List[AnkiHubImportResult]):
 
         # Clean up after deck installations
         _cleanup_after_deck_install(multiple_decks=len(import_results) > 1)
@@ -74,14 +85,15 @@ def download_and_install_decks(
             textFormat="rich",
         )
 
-        on_success()
-
-    # Install decks in background
-    aqt.mw.taskman.with_progress(
-        task=lambda: _download_and_install_decks_inner(ankihub_dids),
-        on_done=on_install_done,
-        label="Downloading decks from AnkiHub",
-    )
+    try:
+        # Install decks in background
+        aqt.mw.taskman.with_progress(
+            task=lambda: _download_and_install_decks_inner(ankihub_dids),
+            on_done=on_install_done,
+            label="Downloading decks from AnkiHub",
+        )
+    except Exception as e:
+        on_done(future_with_exception(e))
 
 
 def _maybe_handle_deck_download_and_install_error(

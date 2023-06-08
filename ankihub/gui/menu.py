@@ -399,7 +399,10 @@ def _sync_with_ankihub_setup(parent):
     """Set up the menu item for uploading suggestions in bulk."""
     q_action = QAction("🔃️ Sync with AnkiHub", aqt.mw)
 
-    qconnect(q_action.triggered, lambda: sync_with_ankihub(on_done=lambda: None))
+    def on_done(future: Future):
+        future.result()
+
+    qconnect(q_action.triggered, lambda: sync_with_ankihub(on_done=on_done))
     if sync_hotkey := config.public_config["sync_hotkey"]:
         try:
             q_action.setShortcut(QKeySequence(sync_hotkey))
