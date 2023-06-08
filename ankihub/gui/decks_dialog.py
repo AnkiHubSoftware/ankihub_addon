@@ -1,7 +1,7 @@
 """Dialog for managing subscriptions to AnkiHub decks and deck-specific settings."""
 import uuid
 from concurrent.futures import Future
-from typing import List, Optional
+from typing import Optional
 from uuid import UUID
 
 import aqt
@@ -25,7 +25,6 @@ from aqt.studydeck import StudyDeck
 from aqt.utils import openLink, showInfo, showText, tooltip
 
 from ..addon_ankihub_client import AddonAnkiHubClient as AnkiHubClient
-from ..ankihub_client.models import Deck
 from ..db import ankihub_db
 from ..settings import config, url_deck_base, url_decks, url_help
 from ..subdecks import SUBDECK_TAG
@@ -45,7 +44,6 @@ class SubscribedDecksDialog(QDialog):
         self.new_subscription_workflow_enabled = self.client.is_feature_flag_enabled(
             "new_subscription_workflow_enabled"
         )
-        self._decks_with_user_relation: Optional[List[Deck]] = None
         self.setWindowTitle("Subscribed AnkiHub Decks")
         self._setup_ui()
         self._on_item_selection_changed()
@@ -107,8 +105,7 @@ class SubscribedDecksDialog(QDialog):
     def _refresh_decks_list(self) -> None:
         self.decks_list.clear()
         if self.new_subscription_workflow_enabled:
-            self._decks_with_user_relation = self.client.get_decks_with_user_relation()
-            for deck in self._decks_with_user_relation:
+            for deck in self.client.get_deck_subscriptions():
                 name = deck.name
                 if deck.is_user_relation_owner:
                     item = QListWidgetItem(f"{name} (Created by you)")
@@ -271,23 +268,8 @@ class SubscribedDecksDialog(QDialog):
             selected = selection[0]
             ankihub_did: UUID = selected.data(Qt.ItemDataRole.UserRole)
             is_deck_installed = bool(config.deck_config(ankihub_did))
-            if self.new_subscription_workflow_enabled:
-                deck_obj = next(
-                    (
-                        deck
-                        for deck in self._decks_with_user_relation
-                        if deck.ankihub_deck_uuid == ankihub_did
-                    ),
-                    None,
-                )
 
-        if self.new_subscription_workflow_enabled:
-            self.unsubscribe_btn.setEnabled(
-                one_selected and not deck_obj.is_user_relation_owner_or_maintainer
-            )
-        else:
-            self.unsubscribe_btn.setEnabled(one_selected)
-
+        self.unsubscribe_btn.setEnabled(one_selected)
         self.open_web_btn.setEnabled(one_selected)
         self.set_home_deck_btn.setEnabled(one_selected and is_deck_installed)
 
