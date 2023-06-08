@@ -586,13 +586,13 @@ def test_check_and_install_new_deck_subscriptions(
 
         # Mock get_deck_subscriptions function to return a deck
         deck = DeckFactory.create()
-        get_decks_with_user_relation_mock = Mock()
+        get_deck_subscriptions_mock = Mock()
         monkeypatch.setattr(
             AnkiHubClient,
-            "get_decks_with_user_relation",
-            get_decks_with_user_relation_mock,
+            "get_deck_subscriptions",
+            get_deck_subscriptions_mock,
         )
-        get_decks_with_user_relation_mock.return_value = [deck]
+        get_deck_subscriptions_mock.return_value = [deck]
 
         # Mock ask_user function to return True
         ask_user_mock = Mock()
@@ -615,7 +615,7 @@ def test_check_and_install_new_deck_subscriptions(
         qtbot.wait(500)
 
         # Assert that the mocked functions were called
-        assert get_decks_with_user_relation_mock.call_count == 1
+        assert get_deck_subscriptions_mock.call_count == 1
         assert ask_user_mock.call_count == 1
 
         assert download_and_install_decks_mock.call_count == 1
@@ -1512,18 +1512,20 @@ def test_unsubscribe_from_deck(
         if is_flag_active:
             deck = mw.col.decks.get(anki_deck_id)
             requests_mock.get(
-                f"{DEFAULT_API_URL}/users/decks/",
+                f"{DEFAULT_API_URL}/decks/subscriptions/",
                 status_code=200,
                 json=[
                     {
-                        "id": str(ah_did),
-                        "name": deck["name"],
-                        "owner": 1,
-                        "anki_id": anki_deck_id,
-                        "csv_last_upload": None,
-                        "csv_notes_filename": "",
-                        "image_upload_finished": True,
-                        "user_relation": "subscriber",
+                        "deck": {
+                            "id": str(ah_did),
+                            "name": deck["name"],
+                            "owner": 1,
+                            "anki_id": anki_deck_id,
+                            "csv_last_upload": None,
+                            "csv_notes_filename": "",
+                            "image_upload_finished": True,
+                            "user_relation": "subscriber",
+                        }
                     }
                 ],
             )
@@ -1540,7 +1542,7 @@ def test_unsubscribe_from_deck(
         )
         if is_flag_active:
             requests_mock.get(
-                f"{DEFAULT_API_URL}/users/decks/", status_code=200, json=[]
+                f"{DEFAULT_API_URL}/decks/subscriptions/", status_code=200, json=[]
             )
             with patch.object(
                 AnkiHubClient, "unsubscribe_from_deck"
@@ -2219,10 +2221,10 @@ class TestSubscribedDecksDialog:
                 operations.subdecks, "ask_user", lambda *args, **kwargs: True
             )
 
-            # Mock get_decks_with_user_relation to return an empty list
+            # Mock get_deck_subscriptions to return an empty list
             monkeypatch.setattr(
                 AnkiHubClient,
-                "get_decks_with_user_relation",
+                "get_deck_subscriptions",
                 lambda *args, **kwargs: [],
             )
 
@@ -2242,10 +2244,10 @@ class TestSubscribedDecksDialog:
             # ... The subdeck should not exist yet
             assert aqt.mw.col.decks.by_name(subdeck_name) is None
 
-            # Mock get_decks_with_user_relation to return the deck
+            # Mock get_deck_subscriptions to return the deck
             monkeypatch.setattr(
                 AnkiHubClient,
-                "get_decks_with_user_relation",
+                "get_deck_subscriptions",
                 lambda *args: [
                     DeckFactory.create(ankihub_deck_uuid=ah_did, anki_did=anki_did)
                 ],
@@ -3052,7 +3054,7 @@ def test_download_images_on_sync(
         # Mock the client to simulate that there are no deck updates and extensions.
         monkeypatch.setattr(
             AnkiHubClient,
-            "get_decks_with_user_relation",
+            "get_deck_subscriptions",
             lambda *args, **kwargs: [],
         )
         monkeypatch.setattr(
