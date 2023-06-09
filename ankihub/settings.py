@@ -416,7 +416,7 @@ def log_file_path() -> Path:
     """Path to the add-on log file.
     The log file is outside of the user files folder because it caused problems when updating the add-on."""
     # _defaultBase is the Anki data folder, we create a sibling folder to it, where we store the log file.
-    anki_base = Path(aqt.mw.pm._defaultBase())
+    anki_base = Path(aqt.mw.pm._default_base())
     ankihub_base = anki_base.parent / "AnkiHub"
     result = ankihub_base / "ankihub.log"
     result.parent.mkdir(parents=True, exist_ok=True)
