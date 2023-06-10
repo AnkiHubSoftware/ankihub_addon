@@ -5,7 +5,7 @@ from typing import Optional
 from uuid import UUID
 
 import aqt
-from anki.collection import OpChanges
+from anki import collection
 from aqt import gui_hooks
 from aqt.qt import (
     QDialog,
@@ -123,7 +123,7 @@ class SubscribedDecksDialog(QDialog):
                 self.decks_list.addItem(item)
 
     def _refresh_anki(self) -> None:
-        op = OpChanges()
+        op = collection.OpChanges()
         op.deck = True
         op.browser_table = True
         op.browser_sidebar = True

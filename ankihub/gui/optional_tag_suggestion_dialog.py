@@ -3,7 +3,7 @@ from concurrent.futures import Future
 from typing import Sequence
 
 import aqt
-from anki.notes import NoteId
+from anki import notes
 from aqt.qt import (
     QAbstractItemView,
     QCheckBox,
@@ -25,7 +25,7 @@ from .utils import show_error_dialog
 
 
 class OptionalTagsSuggestionDialog(QDialog):
-    def __init__(self, parent, nids: Sequence[NoteId]):
+    def __init__(self, parent, nids: Sequence[notes.NoteId]):
         super().__init__(parent)
         self._parent = parent
         self.nids = nids

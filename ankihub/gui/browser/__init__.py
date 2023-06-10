@@ -4,9 +4,7 @@ from concurrent.futures import Future
 from typing import List, Optional, Sequence
 
 import aqt
-from anki.collection import SearchNode
-from anki.hooks import wrap
-from anki.notes import NoteId
+from anki import collection, hooks, notes
 from aqt.addcards import AddCards
 from aqt.browser import (
     Browser,
@@ -144,7 +142,7 @@ def _on_browser_will_show_context_menu(browser: Browser, context_menu: QMenu) ->
         copy_ankihub_id_action.setDisabled(True)
 
 
-def _on_protect_fields_action(browser: Browser, nid: NoteId) -> None:
+def _on_protect_fields_action(browser: Browser, nid: notes.NoteId) -> None:
     note = aqt.mw.col.get_note(nid)
     if not ankihub_db.is_ankihub_note_type(note.mid):
         showInfo(
@@ -196,7 +194,9 @@ def _on_protect_fields_action(browser: Browser, nid: NoteId) -> None:
     )
 
 
-def _on_bulk_notes_suggest_action(browser: Browser, nids: Sequence[NoteId]) -> None:
+def _on_bulk_notes_suggest_action(
+    browser: Browser, nids: Sequence[notes.NoteId]
+) -> None:
     notes = [aqt.mw.col.get_note(nid) for nid in nids]
 
     mids = set(note.mid for note in notes)
@@ -224,7 +224,9 @@ def _on_bulk_notes_suggest_action(browser: Browser, nids: Sequence[NoteId]) -> N
     open_suggestion_dialog_for_bulk_suggestion(notes=notes, parent=browser)
 
 
-def _on_reset_local_changes_action(browser: Browser, nids: Sequence[NoteId]) -> None:
+def _on_reset_local_changes_action(
+    browser: Browser, nids: Sequence[notes.NoteId]
+) -> None:
     if not ankihub_db.are_ankihub_notes(list(nids)):
         showInfo(
             "Please only select notes with AnkiHub ids to reset local changes.",
@@ -685,7 +687,7 @@ def _add_ankihub_tree(tree: SidebarItem) -> SidebarItem:
         name="👑 AnkiHub",
         icon="",
         type=SidebarItemType.SAVED_SEARCH_ROOT,
-        search_node=SearchNode(
+        search_node=collection.SearchNode(
             parsable_text="ankihub_id:*",
         ),
     )
@@ -696,21 +698,21 @@ def _add_ankihub_tree(tree: SidebarItem) -> SidebarItem:
         name="With AnkiHub ID",
         icon="",
         type=SidebarItemType.SAVED_SEARCH,
-        search_node=SearchNode(parsable_text="ankihub_id:_*"),
+        search_node=collection.SearchNode(parsable_text="ankihub_id:_*"),
     )
 
     result.add_simple(
         name="ID Pending",
         icon="",
         type=SidebarItemType.SAVED_SEARCH,
-        search_node=SearchNode(parsable_text="ankihub_id:"),
+        search_node=collection.SearchNode(parsable_text="ankihub_id:"),
     )
 
     result.add_simple(
         name="Modified After Sync",
         icon="",
         type=SidebarItemType.SAVED_SEARCH,
-        search_node=SearchNode(
+        search_node=collection.SearchNode(
             parsable_text=f"{ModifiedAfterSyncSearchNode.parameter_name}:yes"
         ),
     )
@@ -719,7 +721,7 @@ def _add_ankihub_tree(tree: SidebarItem) -> SidebarItem:
         name="Not Modified After Sync",
         icon="",
         type=SidebarItemType.SAVED_SEARCH,
-        search_node=SearchNode(
+        search_node=collection.SearchNode(
             parsable_text=f"{ModifiedAfterSyncSearchNode.parameter_name}:no"
         ),
     )
@@ -729,8 +731,8 @@ def _add_ankihub_tree(tree: SidebarItem) -> SidebarItem:
         icon="",
         type=SidebarItemType.SAVED_SEARCH_ROOT,
         search_node=aqt.mw.col.group_searches(
-            SearchNode(parsable_text="ankihub_id:_*"),
-            SearchNode(
+            collection.SearchNode(parsable_text="ankihub_id:_*"),
+            collection.SearchNode(
                 parsable_text=f"{UpdatedInTheLastXDaysSearchNode.parameter_name}:1"
             ),
         ),
@@ -743,11 +745,11 @@ def _add_ankihub_tree(tree: SidebarItem) -> SidebarItem:
         icon="",
         type=SidebarItemType.SAVED_SEARCH,
         search_node=aqt.mw.col.group_searches(
-            SearchNode(parsable_text="ankihub_id:_*"),
-            SearchNode(
+            collection.SearchNode(parsable_text="ankihub_id:_*"),
+            collection.SearchNode(
                 parsable_text=f"{UpdatedInTheLastXDaysSearchNode.parameter_name}:1"
             ),
-            SearchNode(parsable_text=f"{NewNoteSearchNode.parameter_name}:"),
+            collection.SearchNode(parsable_text=f"{NewNoteSearchNode.parameter_name}:"),
         ),
     )
 
@@ -760,11 +762,11 @@ def _add_ankihub_tree(tree: SidebarItem) -> SidebarItem:
             icon="",
             type=SidebarItemType.SAVED_SEARCH,
             search_node=aqt.mw.col.group_searches(
-                SearchNode(parsable_text="ankihub_id:_*"),
-                SearchNode(
+                collection.SearchNode(parsable_text="ankihub_id:_*"),
+                collection.SearchNode(
                     parsable_text=f"{UpdatedInTheLastXDaysSearchNode.parameter_name}:1"
                 ),
-                SearchNode(
+                collection.SearchNode(
                     parsable_text=f"{SuggestionTypeSearchNode.parameter_name}:{suggestion_value_escaped}"
                 ),
             ),
@@ -775,8 +777,8 @@ def _add_ankihub_tree(tree: SidebarItem) -> SidebarItem:
         icon="",
         type=SidebarItemType.SAVED_SEARCH_ROOT,
         search_node=aqt.mw.col.group_searches(
-            SearchNode(parsable_text="ankihub_id:_*"),
-            SearchNode(
+            collection.SearchNode(parsable_text="ankihub_id:_*"),
+            collection.SearchNode(
                 parsable_text=f"{UpdatedSinceLastReviewSearchNode.parameter_name}:"
             ),
         ),
@@ -800,7 +802,7 @@ def _set_updated_today_tree_expanded_in_ui_config(expanded: bool):
 def _make_copy_note_action_not_copy_ankihub_id() -> None:
     """Make the Create Copy note context menu action not copy the AnkiHub ID field."""
     original_on_create_copy = Browser.on_create_copy
-    Browser.on_create_copy = wrap(  # type: ignore
+    Browser.on_create_copy = hooks.wrap(  # type: ignore
         old=lambda self, *args: original_on_create_copy(self),
         new=_after_create_copy,
         pos="after",

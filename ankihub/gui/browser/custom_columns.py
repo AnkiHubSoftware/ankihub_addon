@@ -4,9 +4,7 @@ from abc import abstractmethod
 from typing import Optional, Sequence
 
 import aqt
-from anki.collection import BrowserColumns
-from anki.notes import Note
-from anki.utils import ids2str
+from anki import collection, notes, utils
 from aqt.browser import Browser, CellRow, Column, ItemId
 
 from ...db import ankihub_db
@@ -44,7 +42,7 @@ class CustomColumn:
     @abstractmethod
     def _display_value(
         self,
-        note: Note,
+        note: notes.Note,
     ) -> str:
         raise NotImplementedError
 
@@ -59,14 +57,14 @@ class AnkiHubIdColumn(CustomColumn):
         key="ankihub_id",
         cards_mode_label="AnkiHub ID",
         notes_mode_label="AnkiHub ID",
-        sorting=BrowserColumns.SORTING_NONE,
+        sorting=collection.BrowserColumns.SORTING_NONE,
         uses_cell_font=False,
-        alignment=BrowserColumns.ALIGNMENT_CENTER,
+        alignment=collection.BrowserColumns.ALIGNMENT_CENTER,
     )
 
     def _display_value(
         self,
-        note: Note,
+        note: notes.Note,
     ) -> str:
         if "ankihub_id" in note:
             if note["ankihub_id"]:
@@ -74,7 +72,7 @@ class AnkiHubIdColumn(CustomColumn):
             else:
                 return "ID Pending"
         else:
-            return "Not AnkiHub Note Type"
+            return "Not AnkiHub notes.Note Type"
 
 
 class EditedAfterSyncColumn(CustomColumn):
@@ -82,14 +80,14 @@ class EditedAfterSyncColumn(CustomColumn):
         key="edited_after_sync",
         cards_mode_label="AnkiHub: Modified After Sync",
         notes_mode_label="AnkiHub: Modified After Sync",
-        sorting=BrowserColumns.SORTING_DESCENDING,
+        sorting=collection.BrowserColumns.SORTING_DESCENDING,
         uses_cell_font=False,
-        alignment=BrowserColumns.ALIGNMENT_CENTER,
+        alignment=collection.BrowserColumns.ALIGNMENT_CENTER,
     )
 
     def _display_value(
         self,
-        note: Note,
+        note: notes.Note,
     ) -> str:
         if "ankihub_id" not in note or not note["ankihub_id"]:
             return "N/A"
@@ -111,7 +109,7 @@ class EditedAfterSyncColumn(CustomColumn):
                 SELECT n.mod > ah_n.mod from {ankihub_db.database_name}.notes AS ah_n
                 WHERE ah_n.anki_note_id = n.id LIMIT 1
             ) DESC,
-            (n.mid IN {ids2str(mids)}) DESC
+            (n.mid IN {utils.ids2str(mids)}) DESC
             """
 
 
@@ -120,14 +118,14 @@ class UpdatedSinceLastReviewColumn(CustomColumn):
         key="updated_since_last_review",
         cards_mode_label="AnkiHub: Updated Since Last Review",
         notes_mode_label="AnkiHub: Updated Since Last Review",
-        sorting=BrowserColumns.SORTING_NONE,
+        sorting=collection.BrowserColumns.SORTING_NONE,
         uses_cell_font=False,
-        alignment=BrowserColumns.ALIGNMENT_CENTER,
+        alignment=collection.BrowserColumns.ALIGNMENT_CENTER,
     )
 
     def _display_value(
         self,
-        note: Note,
+        note: notes.Note,
     ) -> str:
         if "ankihub_id" not in note or not note["ankihub_id"]:
             return "N/A"

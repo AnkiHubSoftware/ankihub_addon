@@ -3,7 +3,7 @@ from textwrap import dedent
 from typing import Any, Tuple
 
 import aqt
-from anki.cards import Card
+from anki import cards
 from aqt.gui_hooks import reviewer_did_show_question, webview_did_receive_js_message
 from aqt.reviewer import ReviewerBottomBar
 from aqt.utils import openLink
@@ -21,7 +21,7 @@ def setup():
     webview_did_receive_js_message.append(_on_js_message)
 
 
-def _add_or_refresh_view_note_button(card: Card):
+def _add_or_refresh_view_note_button(card: cards.Card):
     """Adds the "View on AnkiHub" button to the reviewer toolbar if it doesn't exist yet,
     or refreshes it if it does exist already."""
 

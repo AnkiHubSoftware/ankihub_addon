@@ -5,7 +5,7 @@ from datetime import datetime, timedelta
 from typing import Optional, Sequence
 
 import aqt
-from anki.utils import ids2str
+from anki import utils
 from aqt.browser import Browser, ItemId
 
 from ...ankihub_client import suggestion_type_from_str
@@ -49,7 +49,7 @@ class CustomSearchNode(ABC):
             query = (
                 "SELECT id FROM notes, ankihub_db.notes as ah_notes "
                 "WHERE notes.id = ah_notes.anki_note_id AND "
-                f"notes.id IN {ids2str(ids)} AND " + where
+                f"notes.id IN {utils.ids2str(ids)} AND " + where
             )
             nids = aqt.mw.col.db.list(query)
             return nids
@@ -57,15 +57,15 @@ class CustomSearchNode(ABC):
             # this approach is faster than joining notes with cards in the query,
             # but maybe this wouldn't be the case if the query were written better
             nids = aqt.mw.col.db.list(
-                "SELECT DISTINCT nid FROM cards WHERE id IN " + ids2str(ids)
+                "SELECT DISTINCT nid FROM cards WHERE id IN " + utils.ids2str(ids)
             )
             selected_note_ids = aqt.mw.col.db.list(
                 "SELECT id FROM notes, ankihub_db.notes as ah_notes "
                 "WHERE notes.id = ah_notes.anki_note_id AND "
-                f"notes.id IN {ids2str(nids)} AND " + where
+                f"notes.id IN {utils.ids2str(nids)} AND " + where
             )
             cids = aqt.mw.col.db.list(
-                "SELECT id FROM cards WHERE nid IN " + ids2str(selected_note_ids)
+                "SELECT id FROM cards WHERE nid IN " + utils.ids2str(selected_note_ids)
             )
             return cids
 

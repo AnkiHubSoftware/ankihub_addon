@@ -3,7 +3,7 @@ from concurrent.futures import Future
 from typing import List
 
 import aqt
-from anki.utils import ids2str
+from anki import utils
 from aqt.utils import showInfo
 
 from .... import LOGGER
@@ -97,7 +97,7 @@ def _decks_with_missing_ankihub_nids():
                 aqt.mw.col.db.scalar(
                     "SELECT EXISTS("
                     "   SELECT 1 FROM notes "
-                    f"  WHERE id in {ids2str(nids)} AND SUBSTR(flds, -1) == '{field_seperator}'"
+                    f"  WHERE id in {utils.ids2str(nids)} AND SUBSTR(flds, -1) == '{field_seperator}'"
                     ")",
                 )
             )

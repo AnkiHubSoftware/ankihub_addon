@@ -6,7 +6,7 @@ from pprint import pformat
 from typing import List, Optional
 
 import aqt
-from anki.notes import Note
+from anki import notes
 from aqt.qt import (
     QCheckBox,
     QComboBox,
@@ -67,7 +67,7 @@ class SuggestionMetadata:
     source: Optional[SuggestionSource] = None
 
 
-def open_suggestion_dialog_for_note(note: Note, parent: QWidget) -> None:
+def open_suggestion_dialog_for_note(note: notes.Note, parent: QWidget) -> None:
     """Opens a dialog for creating a note suggestion for the given note.
     The note has to be present in the Anki collection before calling this function.
     May change the notes contents (e.g. by renaming media files) and therefore the
@@ -76,7 +76,7 @@ def open_suggestion_dialog_for_note(note: Note, parent: QWidget) -> None:
 
     assert ankihub_db.is_ankihub_note_type(
         note.mid
-    ), f"Note type {note.mid} is not associated with an AnkiHub deck."
+    ), f"notes.Note type {note.mid} is not associated with an AnkiHub deck."
 
     ah_nid = ankihub_db.ankihub_nid_for_anki_nid(note.id)
     ah_did = ankihub_db.ankihub_did_for_note_type(note.mid)
@@ -110,7 +110,7 @@ def open_suggestion_dialog_for_note(note: Note, parent: QWidget) -> None:
 
 
 def open_suggestion_dialog_for_bulk_suggestion(
-    notes: List[Note], parent: QWidget
+    notes: List[notes.Note], parent: QWidget
 ) -> None:
     """Opens a dialog for creating a bulk suggestion for the given notes.
     The notes have to be present in the Anki collection before calling this function.
@@ -149,7 +149,7 @@ def open_suggestion_dialog_for_bulk_suggestion(
     )
 
 
-def _added_new_images(note: Note) -> bool:
+def _added_new_images(note: notes.Note) -> bool:
     """Returns True if images were added to the notes when comparing with
     the notes in the ankihub database, else False."""
     note_info_anki = to_note_data(note)
@@ -212,7 +212,7 @@ def _on_suggest_notes_in_bulk_done(future: Future, parent: QWidget) -> None:
             f"Failed to submit suggestions for {len(suggestions_result.errors_by_nid)} note(s).\n"
             "All notes with failed suggestions:\n"
             f'{", ".join(str(nid) for nid in suggestions_result.errors_by_nid.keys())}\n\n'
-            f"Notes without changes ({len(notes_without_changes)}):\n"
+            f"notes.Notes without changes ({len(notes_without_changes)}):\n"
             f'{", ".join(str(nid) for nid in notes_without_changes)}\n'
         )
         if suggestions_result.errors_by_nid
@@ -245,7 +245,7 @@ class SuggestionDialog(QDialog):
 
     def _setup_ui(self) -> None:
         self.setWindowModality(Qt.WindowModality.WindowModal)
-        self.setWindowTitle("Note Suggestion(s)")
+        self.setWindowTitle("notes.Note Suggestion(s)")
 
         self.layout_ = QVBoxLayout()
         self.setLayout(self.layout_)

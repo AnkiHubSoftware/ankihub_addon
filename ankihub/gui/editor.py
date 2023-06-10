@@ -4,7 +4,7 @@ from typing import Any, List, Tuple
 
 import anki
 import aqt
-from anki.models import NoteType
+from anki import models
 from aqt import gui_hooks
 from aqt.addcards import AddCards
 from aqt.editor import Editor
@@ -359,7 +359,9 @@ def _on_add_cards_init(add_cards: AddCards) -> None:
     editor = add_cards.editor
 
 
-def _on_add_cards_did_change_notetype(old: NoteType, new: NoteType) -> None:
+def _on_add_cards_did_change_notetype(
+    old: models.NoteType, new: models.NoteType
+) -> None:
     global editor
     _refresh_buttons(editor)
 
