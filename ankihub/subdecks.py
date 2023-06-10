@@ -9,9 +9,7 @@ import uuid
 from typing import Dict, Iterable, List, Optional
 
 import aqt
-from anki.decks import DeckId
-from anki.errors import NotFoundError
-from anki.notes import NoteId
+from anki import decks, errors, notes
 
 from . import LOGGER
 from .db import ankihub_db
@@ -31,7 +29,7 @@ def deck_contains_subdeck_tags(ah_did: uuid.UUID) -> bool:
 
 
 def build_subdecks_and_move_cards_to_them(
-    ankihub_did: uuid.UUID, nids: Optional[List[NoteId]] = None
+    ankihub_did: uuid.UUID, nids: Optional[List[notes.NoteId]] = None
 ) -> None:
     """Move cards belonging to the ankihub deck into their subdeck based on the subdeck tags of the notes.
     If notes is None, all of the cards belonging to the deck will be moved.
@@ -46,7 +44,7 @@ def build_subdecks_and_move_cards_to_them(
 
     root_deck_id = config.deck_config(ankihub_did).anki_id
     if aqt.mw.col.decks.name_if_exists(root_deck_id) is None:
-        raise NotFoundError(f"Deck with id {root_deck_id} not found")
+        raise errors.NotFoundError(f"Deck with id {root_deck_id} not found")
 
     # the anki root deck name name can be different from the ankihub deck name in the config
     anki_root_deck_name = aqt.mw.col.decks.name(root_deck_id)
@@ -75,7 +73,7 @@ def build_subdecks_and_move_cards_to_them(
             if aqt.mw.col.decks.card_count(did, include_subdecks=True) == 0:
                 aqt.mw.col.decks.remove([did])
                 LOGGER.info(f"Removed empty subdeck with id {did}.")
-        except NotFoundError:
+        except errors.NotFoundError:
             # this can happen if a parent deck was deleted earlier in the loop
             pass
 
@@ -83,8 +81,8 @@ def build_subdecks_and_move_cards_to_them(
 
 
 def _nid_to_destination_deck_name(
-    nids: List[NoteId], anki_root_deck_name: str
-) -> Dict[NoteId, str]:
+    nids: List[notes.NoteId], anki_root_deck_name: str
+) -> Dict[notes.NoteId, str]:
     result = dict()
     missing_nids = []
     for nid in nids:
@@ -120,7 +118,7 @@ def _nid_to_destination_deck_name(
     return result
 
 
-def _set_deck_while_respecting_odid(nid: NoteId, did: DeckId) -> None:
+def _set_deck_while_respecting_odid(nid: notes.NoteId, did: decks.DeckId) -> None:
     """Moves the cards of the note to the deck. If a card is in a filtered deck
     it is not moved and only its original deck id value gets changed."""
 
@@ -184,7 +182,7 @@ def flatten_deck(ankihub_did: uuid.UUID) -> None:
         try:
             aqt.mw.col.decks.remove([did])
             LOGGER.info(f"Removed subdeck with id {did}.")
-        except NotFoundError:
+        except errors.NotFoundError:
             # this can happen if a parent deck was deleted earlier in the loop
             pass
 

@@ -5,7 +5,7 @@ from typing import Any, Callable, Optional, Protocol
 from unittest.mock import Mock
 
 import pytest
-from anki.models import NotetypeDict
+from anki import models
 from aqt.main import AnkiQt
 from pytest import MonkeyPatch, fixture
 from pytest_anki import AnkiSession
@@ -50,7 +50,9 @@ def next_deterministic_id() -> Callable[[], int]:
 
 
 @fixture
-def ankihub_basic_note_type(anki_session_with_addon_data: AnkiSession) -> NotetypeDict:
+def ankihub_basic_note_type(
+    anki_session_with_addon_data: AnkiSession,
+) -> models.NotetypeDict:
     with anki_session_with_addon_data.profile_loaded():
         mw = anki_session_with_addon_data.mw
         result = create_or_get_ah_version_of_note_type(
@@ -60,8 +62,8 @@ def ankihub_basic_note_type(anki_session_with_addon_data: AnkiSession) -> Notety
 
 
 def create_or_get_ah_version_of_note_type(
-    mw: AnkiQt, note_type: NotetypeDict
-) -> NotetypeDict:
+    mw: AnkiQt, note_type: models.NotetypeDict
+) -> models.NotetypeDict:
     note_type = copy.deepcopy(note_type)
     note_type["id"] = 0
     note_type["name"] = note_type["name"] + " (AnkiHub)"

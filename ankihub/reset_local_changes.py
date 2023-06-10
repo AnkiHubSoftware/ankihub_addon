@@ -4,7 +4,7 @@
 import uuid
 from typing import Sequence
 
-from anki.notes import NoteId
+from anki import notes
 
 from .db import ankihub_db
 from .importing import AnkiHubImporter
@@ -12,7 +12,7 @@ from .settings import config
 
 
 def reset_local_changes_to_notes(
-    nids: Sequence[NoteId],
+    nids: Sequence[notes.NoteId],
     ankihub_deck_uuid: uuid.UUID,
 ) -> None:
     # all notes have to be from the ankihub deck with the given uuid

@@ -3,8 +3,8 @@ import time
 from pprint import pformat
 
 import aqt
-from anki.errors import CardTypeError
-from aqt.gui_hooks import profile_did_open
+from anki import errors
+from aqt import gui_hooks
 
 from . import LOGGER, taskman
 from .addons import setup_addons
@@ -40,7 +40,7 @@ def run():
     LOGGER.info(f"AnkiHub app url: {config.app_url}")
     LOGGER.info(f"S3 bucket url: {config.s3_bucket_url}")
 
-    profile_did_open.append(_on_profile_did_open)
+    gui_hooks.profile_did_open.append(_on_profile_did_open)
 
 
 def _on_profile_did_open():
@@ -151,8 +151,8 @@ def _adjust_ankihub_note_type_templates():
     mids_filtered = [mid for mid in mids if aqt.mw.col.models.get(mid)]
 
     # we don't want the setup to fail if there is a problem with the note type templates
-    # the CardTypeError can happen when the template has a problem (for example a missing field)
+    # the errors.CardTypeError can happen when the template has a problem (for example a missing field)
     try:
         modify_note_type_templates(mids_filtered)
-    except CardTypeError:  # noqa: E722
+    except errors.CardTypeError:  # noqa: E722
         LOGGER.exception("Failed to adjust AnkiHub note type templates.")

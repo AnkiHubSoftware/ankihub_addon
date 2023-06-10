@@ -4,8 +4,8 @@ from datetime import datetime
 from typing import List, Optional
 
 import aqt
-from anki.errors import NotFoundError
-from aqt.utils import showInfo, tooltip
+from anki import errors
+from aqt import utils
 
 from . import LOGGER
 from .addon_ankihub_client import AddonAnkiHubClient as AnkiHubClient
@@ -180,7 +180,7 @@ class _AnkiHubSync:
                 )
                 try:
                     note = aqt.mw.col.get_note(anki_nid)
-                except NotFoundError:
+                except errors.NotFoundError:
                     LOGGER.warning(
                         f"Tried to apply customization to note {customization.ankihub_nid} but note was not found"
                     )
@@ -223,7 +223,7 @@ class _AnkiHubSync:
                 raise exc
         elif exc.response.status_code == 404:
             aqt.mw.taskman.run_on_main(
-                lambda: showInfo(  # type: ignore
+                lambda: utils.showInfo(  # type: ignore
                     f"The deck <b>{deck_config.name}</b> does not exist on the AnkiHub website. "
                     f"Remove it from the subscribed decks to be able to sync.<br><br>"
                     f"deck id: <i>{ankihub_did}</i>",
@@ -247,9 +247,9 @@ def show_tooltip_about_last_sync_results() -> None:
     total = created_nids_amount + updated_nids_amount
 
     if total == 0:
-        tooltip("AnkiHub: No new updates")
+        utils.tooltip("AnkiHub: No new updates")
     else:
-        tooltip(
+        utils.tooltip(
             f"AnkiHub: Synced {total} note{'' if total == 1 else 's'}.",
             parent=aqt.mw,
         )

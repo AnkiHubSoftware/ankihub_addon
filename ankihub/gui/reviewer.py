@@ -4,9 +4,7 @@ from typing import Any, Tuple
 
 import aqt
 from anki import cards
-from aqt.gui_hooks import reviewer_did_show_question, webview_did_receive_js_message
-from aqt.reviewer import ReviewerBottomBar
-from aqt.utils import openLink
+from aqt import gui_hooks, reviewer, utils
 
 from ..db import ankihub_db
 from ..settings import url_view_note
@@ -17,8 +15,8 @@ VIEW_NOTE_BUTTON_ID = "ankihub-view-note-button"
 
 def setup():
     """Adds the "View on AnkiHub" button to the reviewer toolbar."""
-    reviewer_did_show_question.append(_add_or_refresh_view_note_button)
-    webview_did_receive_js_message.append(_on_js_message)
+    gui_hooks.reviewer_did_show_question.append(_add_or_refresh_view_note_button)
+    gui_hooks.webview_did_receive_js_message.append(_on_js_message)
 
 
 def _add_or_refresh_view_note_button(card: cards.Card):
@@ -83,11 +81,11 @@ def _add_or_refresh_view_note_button(card: cards.Card):
 def _on_js_message(handled: Tuple[bool, Any], message: str, context: Any) -> Any:
     """Handles the "View on AnkiHub" button click by opening the AnkiHub note in the browser."""
     if message == VIEW_NOTE_PYCMD:
-        assert isinstance(context, ReviewerBottomBar)
+        assert isinstance(context, reviewer.ReviewerBottomBar)
         anki_nid = context.reviewer.card.nid
         ankihub_nid = ankihub_db.ankihub_nid_for_anki_nid(anki_nid)
         view_note_url = f"{url_view_note()}{ankihub_nid}"
-        openLink(view_note_url)
+        utils.openLink(view_note_url)
 
         return (True, None)
 

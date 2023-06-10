@@ -19,11 +19,11 @@ from aqt import (
     QSizePolicy,
     QVBoxLayout,
     QWidget,
+    operations,
+    qt,
+    studydeck,
+    utils,
 )
-from aqt.operations import QueryOp
-from aqt.qt import QAction, QDialog, QKeySequence, QMenu, Qt, qconnect
-from aqt.studydeck import StudyDeck
-from aqt.utils import openLink, showInfo, tooltip
 
 from .. import LOGGER
 from ..addon_ankihub_client import AddonAnkiHubClient as AnkiHubClient
@@ -47,14 +47,14 @@ from .utils import (
 
 @dataclass
 class _MenuState:
-    ankihub_menu: Optional[QMenu] = None
+    ankihub_menu: Optional[qt.QMenu] = None
 
 
 menu_state = _MenuState()
 
 
 def setup_ankihub_menu() -> None:
-    menu_state.ankihub_menu = QMenu("&AnkiHub", parent=aqt.mw)
+    menu_state.ankihub_menu = qt.QMenu("&AnkiHub", parent=aqt.mw)
     aqt.mw.form.menubar.addMenu(menu_state.ankihub_menu)
     config.token_change_hook = lambda: aqt.mw.taskman.run_on_main(refresh_ankihub_menu)
     config.subscriptions_change_hook = lambda: aqt.mw.taskman.run_on_main(
@@ -110,7 +110,7 @@ class AnkiHubLogin(QWidget):
         self.password_box_text = QLineEdit("", self)
         self.password_box_text.setEchoMode(QLineEdit.EchoMode.Password)
         self.password_box_text.setMinimumWidth(300)
-        qconnect(self.password_box_text.returnPressed, self.login)
+        qt.qconnect(self.password_box_text.returnPressed, self.login)
         self.password_box.addWidget(self.password_box_label)
         self.password_box.addWidget(self.password_box_text)
         self.box_left.addLayout(self.password_box)
@@ -118,7 +118,7 @@ class AnkiHubLogin(QWidget):
         # Login
         self.login_button = QPushButton("Login", self)
         self.bottom_box_section.addWidget(self.login_button)
-        qconnect(self.login_button.clicked, self.login)
+        qt.qconnect(self.login_button.clicked, self.login)
         self.login_button.setDefault(True)
 
         self.box_left.addLayout(self.bottom_box_section)
@@ -142,7 +142,7 @@ class AnkiHubLogin(QWidget):
         username_or_email = self.username_or_email_box_text.text()
         password = self.password_box_text.text()
         if not all([username_or_email, password]):
-            showInfo("Oops! You forgot to put in a username or password!")
+            utils.showInfo("Oops! You forgot to put in a username or password!")
             return
         ankihub_client = AnkiHubClient()
 
@@ -158,7 +158,7 @@ class AnkiHubLogin(QWidget):
             config.save_token("")
 
             if e.response.status_code == 400:
-                tooltip("Wrong credentials.", parent=aqt.mw)
+                utils.tooltip("Wrong credentials.", parent=aqt.mw)
                 return
 
             raise e
@@ -166,7 +166,7 @@ class AnkiHubLogin(QWidget):
         config.save_token(token)
         config.save_user_email(username_or_email)
 
-        tooltip("Signed into AnkiHub!", parent=aqt.mw)
+        utils.tooltip("Signed into AnkiHub!", parent=aqt.mw)
         self.close()
 
     def _is_email(self, value):
@@ -217,7 +217,7 @@ class DeckCreationConfirmationDialog(QMessageBox):
             return False
 
         if not self.confirmation_cb.isChecked():
-            tooltip("You didn't agree to the terms of use.")
+            utils.tooltip("You didn't agree to the terms of use.")
             return False
 
         return True
@@ -229,7 +229,7 @@ def _create_collaborative_deck_action() -> None:
     if not confirm:
         return
 
-    deck_chooser = StudyDeck(
+    deck_chooser = studydeck.StudyDeck(
         aqt.mw,
         title="AnkiHub",
         accept="Upload",
@@ -246,7 +246,7 @@ def _create_collaborative_deck_action() -> None:
         return
 
     if len(aqt.mw.col.find_cards(f'deck:"{deck_name}"')) == 0:
-        showInfo("You can't upload an empty deck.")
+        utils.showInfo("You can't upload an empty deck.")
         return
 
     public = ask_user(
@@ -297,7 +297,7 @@ def _create_collaborative_deck_action() -> None:
             latest_udpate=creation_time,
         )
         deck_url = f"{url_view_deck()}{ankihub_did}"
-        showInfo(
+        utils.showInfo(
             "🎉 Deck upload successful!<br><br>"
             "Link to the deck on AnkiHub:<br>"
             f"<a href={deck_url}>{deck_url}</a>"
@@ -307,7 +307,7 @@ def _create_collaborative_deck_action() -> None:
         aqt.mw.progress.finish()
         raise exc
 
-    op = QueryOp(
+    op = operations.QueryOp(
         parent=aqt.mw,
         op=lambda col: create_ankihub_deck(
             deck_name,
@@ -317,13 +317,13 @@ def _create_collaborative_deck_action() -> None:
         ),
         success=on_success,
     ).failure(on_failure)
-    LOGGER.info("Instantiated QueryOp for creating collaborative deck")
+    LOGGER.info("Instantiated operations.QueryOp for creating collaborative deck")
     op.with_progress(label="Creating collaborative deck").run_in_background()
 
 
 def _create_collaborative_deck_setup(parent):
-    q_action = QAction("🛠️ Create Collaborative Deck", parent=parent)
-    qconnect(q_action.triggered, _create_collaborative_deck_action)
+    q_action = qt.QAction("🛠️ Create Collaborative Deck", parent=parent)
+    qt.qconnect(q_action.triggered, _create_collaborative_deck_action)
     parent.addAction(q_action)
 
 
@@ -332,10 +332,10 @@ def _sign_out_action():
         AnkiHubClient().signout()
     finally:
         config.save_token("")
-        tooltip("Signed out of AnkiHub!", parent=aqt.mw)
+        utils.tooltip("Signed out of AnkiHub!", parent=aqt.mw)
 
 
-class LogUploadResultDialog(QDialog):
+class LogUploadResultDialog(qt.QDialog):
     def __init__(self, log_file_name: str):
         super().__init__(parent=aqt.mw)
 
@@ -349,7 +349,7 @@ class LogUploadResultDialog(QDialog):
             " Please copy this file name and include it in your bug report:<br><br>"
             f"<b>{log_file_name}</b>",
         )
-        self.label.setTextFormat(Qt.TextFormat.RichText)
+        self.label.setTextFormat(qt.Qt.TextFormat.RichText)
         self.layout_.addWidget(self.label)
 
         self.layout_.addSpacing(8)
@@ -378,34 +378,34 @@ def _upload_logs_action():
 
 
 def _ankihub_login_setup(parent):
-    sign_in_button = QAction("🔑 Sign into AnkiHub", aqt.mw)
-    qconnect(sign_in_button.triggered, AnkiHubLogin.display_login)
+    sign_in_button = qt.QAction("🔑 Sign into AnkiHub", aqt.mw)
+    qt.qconnect(sign_in_button.triggered, AnkiHubLogin.display_login)
     parent.addAction(sign_in_button)
 
 
 def _subscribed_decks_setup(parent):
-    q_action = QAction("📚 Subscribed Decks", aqt.mw)
-    qconnect(q_action.triggered, SubscribedDecksDialog.display_subscribe_window)
+    q_action = qt.QAction("📚 Subscribed Decks", aqt.mw)
+    qt.qconnect(q_action.triggered, SubscribedDecksDialog.display_subscribe_window)
     parent.addAction(q_action)
 
 
 def _import_media_setup(parent):
-    q_action = QAction("🖼️ Import media", aqt.mw)
-    qconnect(q_action.triggered, open_import_dialog)
+    q_action = qt.QAction("🖼️ Import media", aqt.mw)
+    qt.qconnect(q_action.triggered, open_import_dialog)
     parent.addAction(q_action)
 
 
 def _sync_with_ankihub_setup(parent):
     """Set up the menu item for uploading suggestions in bulk."""
-    q_action = QAction("🔃️ Sync with AnkiHub", aqt.mw)
+    q_action = qt.QAction("🔃️ Sync with AnkiHub", aqt.mw)
 
     def on_done(future: Future):
         future.result()
 
-    qconnect(q_action.triggered, lambda: sync_with_ankihub(on_done=on_done))
+    qt.qconnect(q_action.triggered, lambda: sync_with_ankihub(on_done=on_done))
     if sync_hotkey := config.public_config["sync_hotkey"]:
         try:
-            q_action.setShortcut(QKeySequence(sync_hotkey))
+            q_action.setShortcut(qt.QKeySequence(sync_hotkey))
         except Exception:
             LOGGER.exception(f"Failed to set sync hotkey to {sync_hotkey}")
     parent.addAction(q_action)
@@ -416,8 +416,8 @@ def _upload_deck_assets_setup(parent):
     of all the assets for a given deck (logged user MUST be the
     deck owner)"""
 
-    q_action = QAction("📸 Upload images for deck", aqt.mw)
-    qconnect(q_action.triggered, _upload_deck_assets_action)
+    q_action = qt.QAction("📸 Upload images for deck", aqt.mw)
+    qt.qconnect(q_action.triggered, _upload_deck_assets_action)
     parent.addAction(q_action)
 
 
@@ -430,7 +430,7 @@ def _upload_deck_assets_action() -> None:
     # If the user has no owned decks, we should show a message informing them
     # about this and not allow them to upload images.
     if not owned_ah_dids:
-        showInfo(
+        utils.showInfo(
             "<b>Oh no!</b> 🙁<br>"
             "You do not own any AnkiHub decks. You can only perform a full image upload for decks that you own.<br><br>"
             "Maybe try creating a new AnkiHub deck for yourself, or create a note suggestion instead? 🙂"
@@ -441,7 +441,7 @@ def _upload_deck_assets_action() -> None:
     if owned_ah_dids and not any(
         [did for did in owned_ah_dids if did in config.deck_ids()]
     ):
-        showInfo(
+        utils.showInfo(
             "<b>Oh no!</b> 🙁<br>"
             "It seems that you have deck(s) that you own at AnkiHub, but none of them are installed locally.<br><br>"
             "Plase subscribe to the deck from the add-on before trying to upload images for it 🙂"
@@ -464,7 +464,7 @@ def _upload_deck_assets_action() -> None:
 
     nids = ankihub_db.anki_nids_for_ankihub_deck(ah_did)
     if not nids:
-        showInfo("You can't upload images for an empty deck.")
+        utils.showInfo("You can't upload images for an empty deck.")
         return
 
     # Obtain a list of NoteInfo objects from nids
@@ -478,12 +478,12 @@ def _upload_deck_assets_action() -> None:
     # Check if the deck references any local asset, if it does
     # not, no point on trying to upload it
     if not image_paths:
-        showInfo("This deck has no images to upload.")
+        utils.showInfo("This deck has no images to upload.")
         return
 
     # Check if the files referenced by the deck exists locally, if none exist, no point in uploading.
     if not any([image_path.is_file() for image_path in image_paths]):
-        showInfo(
+        utils.showInfo(
             "You can't upload images for this deck because none of the referenced images are present in your "
             "local media folder."
         )
@@ -498,7 +498,9 @@ def _upload_deck_assets_action() -> None:
         return
 
     def on_success() -> None:
-        showInfo(f"🎉 Successfuly uploaded all images for<br><b>{deck_config.name}</b>!")
+        utils.showInfo(
+            f"🎉 Successfuly uploaded all images for<br><b>{deck_config.name}</b>!"
+        )
 
     # Extract the AnkiHub deck ID using a sample note id
     ah_did = ankihub_db.ankihub_did_for_anki_nid(nids[0])
@@ -506,7 +508,7 @@ def _upload_deck_assets_action() -> None:
     media_names = get_image_names_from_notes_data(notes_data)
     media_sync.start_media_upload(media_names, ah_did, on_success=on_success)
 
-    showInfo(
+    utils.showInfo(
         "🖼️ Upload started! You can continue using Anki in the meantime."
         "<br><br>We'll notify you when the upload process finishes 👍"
     )
@@ -514,35 +516,36 @@ def _upload_deck_assets_action() -> None:
 
 def _ankihub_help_setup(parent):
     """Set up the sub menu for help related items."""
-    help_menu = QMenu("🆘 Help", parent)
+    help_menu = qt.QMenu("🆘 Help", parent)
 
     # && is an escaped & in qt
-    q_notion_action = QAction("Instructions && Changelog", help_menu)
-    qconnect(
+    q_notion_action = qt.QAction("Instructions && Changelog", help_menu)
+    qt.qconnect(
         q_notion_action.triggered,
-        lambda: openLink("http://docs.ankihub.net/"),
+        lambda: utils.openLink("http://docs.ankihub.net/"),
     )
     help_menu.addAction(q_notion_action)
 
-    q_get_help_action = QAction("Get Help", help_menu)
-    qconnect(
-        q_get_help_action.triggered, lambda: openLink("https://www.ankihub.net/support")
+    q_get_help_action = qt.QAction("Get Help", help_menu)
+    qt.qconnect(
+        q_get_help_action.triggered,
+        lambda: utils.openLink("https://www.ankihub.net/support"),
     )
     help_menu.addAction(q_get_help_action)
 
-    q_upload_logs_action = QAction("Upload logs", help_menu)
-    qconnect(q_upload_logs_action.triggered, _upload_logs_action)
+    q_upload_logs_action = qt.QAction("Upload logs", help_menu)
+    qt.qconnect(q_upload_logs_action.triggered, _upload_logs_action)
     help_menu.addAction(q_upload_logs_action)
 
-    q_downgrade_from_beta_version_action = QAction(
+    q_downgrade_from_beta_version_action = qt.QAction(
         "Downgrade from add-on beta version", help_menu
     )
-    qconnect(
+    qt.qconnect(
         q_downgrade_from_beta_version_action.triggered, _trigger_install_release_version
     )
     help_menu.addAction(q_downgrade_from_beta_version_action)
 
-    q_version_action = QAction(f"Version {ADDON_VERSION}", help_menu)
+    q_version_action = qt.QAction(f"Version {ADDON_VERSION}", help_menu)
     q_version_action.setEnabled(False)
     help_menu.addAction(q_version_action)
     help_menu.setMinimumWidth(250)
@@ -551,7 +554,7 @@ def _ankihub_help_setup(parent):
 
 
 def _trigger_install_release_version():
-    showInfo(
+    utils.showInfo(
         "When you click OK, the add-on update dialog will open in a couple of seconds "
         "and you will be able to install the version of the add-on that is available on AnkiWeb.<br><br>"
         "If it doesn't show up (which can happen when you e.g. have no internet connection), "
@@ -569,13 +572,13 @@ def _trigger_install_release_version():
 
 
 def _ankihub_logout_setup(parent):
-    q_action = QAction("🔑 Sign out", aqt.mw)
-    qconnect(q_action.triggered, _sign_out_action)
+    q_action = qt.QAction("🔑 Sign out", aqt.mw)
+    qt.qconnect(q_action.triggered, _sign_out_action)
     parent.addAction(q_action)
 
 
-def _media_sync_status_setup(parent: QMenu):
-    parent._media_sync_status_action = QAction("", parent)  # type: ignore
+def _media_sync_status_setup(parent: qt.QMenu):
+    parent._media_sync_status_action = qt.QAction("", parent)  # type: ignore
     parent.addAction(parent._media_sync_status_action)  # type: ignore
     media_sync.set_status_action(parent._media_sync_status_action)  # type: ignore
     media_sync.refresh_sync_status_text()

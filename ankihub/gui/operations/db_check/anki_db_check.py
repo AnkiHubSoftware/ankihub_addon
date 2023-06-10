@@ -3,8 +3,8 @@ from concurrent.futures import Future
 from typing import List
 
 import aqt
-from anki import utils
-from aqt.utils import showInfo
+from anki import utils as anki_utils
+from aqt import utils as aqt_utils
 
 from .... import LOGGER
 from ....db import ankihub_db
@@ -58,7 +58,7 @@ def _on_done(future: Future):
     future.result()
 
     LOGGER.info("Done resetting local changes.")
-    showInfo("Missing values have been restored.")
+    aqt_utils.showInfo("Missing values have been restored.")
 
 
 def _decks_with_missing_ankihub_nids():
@@ -97,7 +97,7 @@ def _decks_with_missing_ankihub_nids():
                 aqt.mw.col.db.scalar(
                     "SELECT EXISTS("
                     "   SELECT 1 FROM notes "
-                    f"  WHERE id in {utils.ids2str(nids)} AND SUBSTR(flds, -1) == '{field_seperator}'"
+                    f"  WHERE id in {anki_utils.ids2str(nids)} AND SUBSTR(flds, -1) == '{field_seperator}'"
                     ")",
                 )
             )
@@ -147,7 +147,7 @@ def _check_ankihub_update_tags() -> None:
     def on_done(future: Future):
         future.result()
 
-        showInfo("AnkiHub_Update tags removed from all notes.")
+        aqt_utils.showInfo("AnkiHub_Update tags removed from all notes.")
         LOGGER.info("AnkiHub_Update tags removed from all notes.")
 
     aqt.mw.taskman.with_progress(

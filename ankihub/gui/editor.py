@@ -5,10 +5,7 @@ from typing import Any, List, Tuple
 import anki
 import aqt
 from anki import models
-from aqt import gui_hooks
-from aqt.addcards import AddCards
-from aqt.editor import Editor
-from aqt.utils import openLink, showInfo, tooltip
+from aqt import addcards, editor, gui_hooks, utils
 
 from .. import LOGGER, settings
 from ..ankihub_client import AnkiHubHTTPError
@@ -44,14 +41,14 @@ def _setup_additional_editor_buttons():
     gui_hooks.editor_did_load_note.append(_refresh_buttons)
     gui_hooks.add_cards_did_change_note_type.append(_on_add_cards_did_change_notetype)
 
-    Editor.ankihub_command = AnkiHubCommands.CHANGE.value  # type: ignore
+    editor_.Editor.ankihub_command = AnkiHubCommands.CHANGE.value  # type: ignore
 
 
 def _setup_hide_ankihub_field():
     gui_hooks.editor_will_load_note.append(_hide_ankihub_field_in_editor)
 
 
-def _on_suggestion_button_press(editor: Editor) -> None:
+def _on_suggestion_button_press(editor: editor.Editor) -> None:
     """
     Action to be performed when the AnkiHub icon button is clicked or when
     the hotkey is pressed.
@@ -70,7 +67,7 @@ def _on_suggestion_button_press(editor: Editor) -> None:
                 error_message = pformat(e.response.json())
                 # these errors are not expected and should be reported
                 report_exception_and_upload_logs(e)
-            showInfo(
+            utils.showInfo(
                 text=(
                     "There are some problems with this suggestion:<br><br>"
                     f"<b>{error_message}</b>"
@@ -93,7 +90,7 @@ def _on_suggestion_button_press(editor: Editor) -> None:
             raise e
 
 
-def _on_suggestion_button_press_inner(editor: Editor) -> None:
+def _on_suggestion_button_press_inner(editor: editor.Editor) -> None:
     # The command is expected to have been set at this point already, either by
     # fetching the default or by selecting a command from the dropdown menu.
     command = editor.ankihub_command  # type: ignore
@@ -107,7 +104,7 @@ def _on_suggestion_button_press_inner(editor: Editor) -> None:
     # and then open the suggestion dialog.
     if command == AnkiHubCommands.NEW.value and editor.addMode:
         gui_hooks.add_cards_did_add_note.append(on_did_add_note)
-        add_note_window: AddCards = editor.parentWindow  # type: ignore
+        add_note_window: addcards.AddCards = editor.parentWindow  # type: ignore
         add_note_window.add_current_note()
     else:
         open_suggestion_dialog_for_note(editor.note, parent=editor.widget)
@@ -117,8 +114,8 @@ def _on_suggestion_button_press_inner(editor: Editor) -> None:
         editor.loadNote()
 
 
-def _setup_editor_buttons(buttons: List[str], editor: Editor) -> None:
-    """Add buttons to Editor."""
+def _setup_editor_buttons(buttons: List[str], editor: editor.Editor) -> None:
+    """Add buttons to editor.Editor."""
     public_config = config.public_config
     hotkey = public_config["hotkey"]
     img = str(ICONS_PATH / "ankihub_button.png")
@@ -174,33 +171,33 @@ def _setup_editor_buttons(buttons: List[str], editor: Editor) -> None:
         )
 
 
-def _on_view_note_button_press(editor: Editor) -> None:
+def _on_view_note_button_press(editor: editor.Editor) -> None:
     note = editor.note
     if note is None:
         return
 
     if not (ankihub_nid := ankihub_db.ankihub_nid_for_anki_nid(note.id)):
-        tooltip("This note has no AnkiHub id.")
+        utils.tooltip("This note has no AnkiHub id.")
         return
 
     url = f"{url_view_note()}{ankihub_nid}"
-    openLink(url)
+    utils.openLink(url)
 
 
-def _on_view_note_history_button_press(editor: Editor) -> None:
+def _on_view_note_history_button_press(editor: editor.Editor) -> None:
     note = editor.note
     if note is None:
         return
 
     if not (ankihub_nid := ankihub_db.ankihub_nid_for_anki_nid(note.id)):
-        tooltip("This note has no AnkiHub id.")
+        utils.tooltip("This note has no AnkiHub id.")
         return
 
     ankihub_did = ankihub_db.ankihub_did_for_anki_nid(note.id)
     url = url_view_note_history().format(
         ankihub_did=ankihub_did, ankihub_nid=ankihub_nid
     )
-    openLink(url)
+    utils.openLink(url)
 
 
 def _hide_ankihub_field_in_editor(
@@ -294,7 +291,7 @@ def _refresh_editor_fields_for_anki_below_v50_js(hide_last_field: bool) -> str:
             """
 
 
-def _refresh_buttons(editor: Editor) -> None:
+def _refresh_buttons(editor: editor.Editor) -> None:
     """Enables/Disables buttons depending on the note type and if the note is synced with AnkiHub.
     Also changes the label of the suggestion button based on whether the note is already on AnkiHub."""
     note = editor.note
@@ -325,16 +322,16 @@ def _refresh_buttons(editor: Editor) -> None:
     editor.ankihub_command = command  # type: ignore
 
 
-def _enable_buttons(editor: Editor, button_ids: List[ſtr]) -> None:
+def _enable_buttons(editor: editor.Editor, button_ids: List[ſtr]) -> None:
     _set_enabled_states_of_buttons(editor, button_ids, True)
 
 
-def _disable_buttons(editor: Editor, button_ids: List[ſtr]) -> None:
+def _disable_buttons(editor: editor.Editor, button_ids: List[ſtr]) -> None:
     _set_enabled_states_of_buttons(editor, button_ids, False)
 
 
 def _set_enabled_states_of_buttons(
-    editor: Editor, button_ids: list[str], enabled: bool
+    editor: editor.Editor, button_ids: list[str], enabled: bool
 ) -> None:
     disable_btns_script = f"""
         for (const btnId of {button_ids}) {{
@@ -344,29 +341,29 @@ def _set_enabled_states_of_buttons(
     editor.web.eval(disable_btns_script)
 
 
-def _set_suggestion_button_label(editor: Editor, label: str) -> None:
+def _set_suggestion_button_label(editor: editor.Editor, label: str) -> None:
     set_label_script = (
         f"document.getElementById('{SUGGESTION_BTN_ID}-label').textContent='{{}}';"
     )
     editor.web.eval(set_label_script.format(label))
 
 
-editor: Editor
+editor_: editor.Editor
 
 
-def _on_add_cards_init(add_cards: AddCards) -> None:
-    global editor
-    editor = add_cards.editor
+def _on_add_cards_init(add_cards: addcards.AddCards) -> None:
+    global editor_
+    editor_ = add_cards.editor
 
 
 def _on_add_cards_did_change_notetype(
     old: models.NoteType, new: models.NoteType
 ) -> None:
-    global editor
-    _refresh_buttons(editor)
+    global editor_
+    _refresh_buttons(editor_)
 
 
-def _setup_editor_did_load_js_message(editor: Editor) -> None:
+def _setup_editor_did_load_js_message(editor: editor.Editor) -> None:
     script = (
         "require('anki/ui').loaded.then(() => setTimeout( () => {"
         "   pycmd('editor_did_load') "

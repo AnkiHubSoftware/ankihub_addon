@@ -18,9 +18,9 @@ LOGGER.info(f"SKIP_INIT: {SKIP_INIT}")
 
 
 def debug() -> None:
-    from aqt.qt import pyqtRemoveInputHook
+    from aqt import qt
 
-    pyqtRemoveInputHook()
+    qt.pyqtRemoveInputHook()
     breakpoint()
 
 

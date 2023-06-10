@@ -18,9 +18,7 @@ from pathlib import Path
 from typing import Any, Dict, Iterable, List, Optional, Sequence, Set, Tuple
 
 import aqt
-from anki.models import NotetypeId
-from anki.notes import NoteId
-from anki.utils import ids2str, join_fields, split_fields
+from anki import models, notes, utils
 
 from .. import LOGGER
 from ..ankihub_client import Field, NoteInfo, suggestion_type_from_str
@@ -184,7 +182,7 @@ class _AnkiHubDB:
                     skipped_notes.append(note_data)
                     continue
 
-                fields = join_fields(
+                fields = utils.join_fields(
                     [
                         field.value
                         for field in sorted(
@@ -239,13 +237,13 @@ class _AnkiHubDB:
                     str(note_data.ankihub_note_uuid),
                 )
 
-    def reset_mod_values_in_anki_db(self, anki_nids: List[NoteId]) -> None:
+    def reset_mod_values_in_anki_db(self, anki_nids: List[notes.NoteId]) -> None:
         # resets the mod values of the notes in the Anki DB to the
         # mod values stored in the AnkiHub DB
         nid_mod_tuples = self.execute(
             f"""
             SELECT anki_note_id, mod from notes
-            WHERE anki_note_id IN {ids2str(anki_nids)}
+            WHERE anki_note_id IN {utils.ids2str(anki_nids)}
             """
         )
 
@@ -268,7 +266,7 @@ class _AnkiHubDB:
         )
         return bool(result)
 
-    def note_data(self, anki_note_id: NoteId) -> Optional[NoteInfo]:
+    def note_data(self, anki_note_id: notes.NoteId) -> Optional[NoteInfo]:
         # The AnkiHub note type of the note has to exist in the Anki DB, otherwise this will fail.
         result = self.first(
             f"""
@@ -289,7 +287,8 @@ class _AnkiHubDB:
 
         ah_nid, anki_nid, mid, tags, flds, guid, last_update_type = result
         field_names = [
-            field["name"] for field in aqt.mw.col.models.get(NotetypeId(mid))["flds"]
+            field["name"]
+            for field in aqt.mw.col.models.get(models.NotetypeId(mid))["flds"]
         ]
         return NoteInfo(
             ankihub_note_uuid=uuid.UUID(ah_nid),
@@ -302,7 +301,7 @@ class _AnkiHubDB:
                     value=value,
                     order=i,
                 )
-                for i, value in enumerate(split_fields(flds))
+                for i, value in enumerate(utils.split_fields(flds))
             ],
             guid=guid,
             last_update_type=suggestion_type_from_str(last_update_type)
@@ -310,7 +309,7 @@ class _AnkiHubDB:
             else None,
         )
 
-    def anki_nids_for_ankihub_deck(self, ankihub_did: uuid.UUID) -> List[NoteId]:
+    def anki_nids_for_ankihub_deck(self, ankihub_did: uuid.UUID) -> List[notes.NoteId]:
         result = self.list(
             """
             SELECT anki_note_id FROM notes
@@ -328,7 +327,7 @@ class _AnkiHubDB:
         return result
 
     def ankihub_did_for_note_type(
-        self, anki_note_type_id: NotetypeId
+        self, anki_note_type_id: models.NotetypeId
     ) -> Optional[uuid.UUID]:
         did_str = self.scalar(
             """
@@ -342,7 +341,7 @@ class _AnkiHubDB:
         result = uuid.UUID(did_str)
         return result
 
-    def ankihub_did_for_anki_nid(self, anki_nid: NoteId) -> Optional[uuid.UUID]:
+    def ankihub_did_for_anki_nid(self, anki_nid: notes.NoteId) -> Optional[uuid.UUID]:
         did_str = self.scalar(
             f"""
             SELECT ankihub_deck_id FROM notes
@@ -357,26 +356,28 @@ class _AnkiHubDB:
         return result
 
     def ankihub_dids_for_anki_nids(
-        self, anki_nids: Iterable[NoteId]
+        self, anki_nids: Iterable[notes.NoteId]
     ) -> List[uuid.UUID]:
         did_strs = self.list(
             f"""
             SELECT DISTINCT ankihub_deck_id FROM notes
-            WHERE anki_note_id IN {ids2str(anki_nids)}
+            WHERE anki_note_id IN {utils.ids2str(anki_nids)}
             """
         )
         result = [uuid.UUID(did) for did in did_strs]
         return result
 
-    def are_ankihub_notes(self, anki_nids: List[NoteId]) -> bool:
+    def are_ankihub_notes(self, anki_nids: List[notes.NoteId]) -> bool:
         notes_count = self.scalar(
             f"""
-            SELECT COUNT(*) FROM notes WHERE anki_note_id IN {ids2str(anki_nids)}
+            SELECT COUNT(*) FROM notes WHERE anki_note_id IN {utils.ids2str(anki_nids)}
             """
         )
         return notes_count == len(set(anki_nids))
 
-    def ankihub_nid_for_anki_nid(self, anki_note_id: NoteId) -> Optional[uuid.UUID]:
+    def ankihub_nid_for_anki_nid(
+        self, anki_note_id: notes.NoteId
+    ) -> Optional[uuid.UUID]:
         nid_str = self.scalar(
             """
             SELECT ankihub_note_id FROM notes
@@ -391,22 +392,22 @@ class _AnkiHubDB:
         return result
 
     def anki_nids_to_ankihub_nids(
-        self, anki_nids: List[NoteId]
-    ) -> Dict[NoteId, uuid.UUID]:
+        self, anki_nids: List[notes.NoteId]
+    ) -> Dict[notes.NoteId, uuid.UUID]:
         ah_nid_for_anki_nid = self.dict(
             f"""
             SELECT anki_note_id, ankihub_note_id FROM notes
-            WHERE anki_note_id IN {ids2str(anki_nids)}
+            WHERE anki_note_id IN {utils.ids2str(anki_nids)}
             """
         )
-        result = {NoteId(k): uuid.UUID(v) for k, v in ah_nid_for_anki_nid.items()}
+        result = {notes.NoteId(k): uuid.UUID(v) for k, v in ah_nid_for_anki_nid.items()}
 
         not_existing = set(anki_nids) - set(result.keys())
         result.update({nid: None for nid in not_existing})
 
         return result
 
-    def anki_nid_for_ankihub_nid(self, ankihub_id: uuid.UUID) -> Optional[NoteId]:
+    def anki_nid_for_ankihub_nid(self, ankihub_id: uuid.UUID) -> Optional[notes.NoteId]:
         note_id_str = self.scalar(
             """
             SELECT anki_note_id FROM notes WHERE ankihub_note_id = ?
@@ -416,14 +417,14 @@ class _AnkiHubDB:
         if note_id_str is None:
             return None
 
-        result = NoteId(note_id_str)
+        result = notes.NoteId(note_id_str)
         return result
 
-    def ankihub_note_type_ids(self) -> List[NotetypeId]:
+    def ankihub_note_type_ids(self) -> List[models.NotetypeId]:
         result = self.list("SELECT DISTINCT anki_note_type_id FROM notes")
         return result
 
-    def is_ankihub_note_type(self, anki_note_type_id: NotetypeId) -> bool:
+    def is_ankihub_note_type(self, anki_note_type_id: models.NotetypeId) -> bool:
         result = self.scalar(
             """
             SELECT EXISTS(SELECT 1 FROM notes WHERE anki_note_type_id = ?)
@@ -432,7 +433,9 @@ class _AnkiHubDB:
         )
         return result
 
-    def note_types_for_ankihub_deck(self, ankihub_did: uuid.UUID) -> List[NotetypeId]:
+    def note_types_for_ankihub_deck(
+        self, ankihub_did: uuid.UUID
+    ) -> List[models.NotetypeId]:
         result = self.list(
             """
             SELECT DISTINCT anki_note_type_id FROM notes WHERE ankihub_deck_id = ?
@@ -493,14 +496,15 @@ class _AnkiHubDB:
         return result
 
     def _media_names_on_notes_of_note_type(
-        self, mid: NotetypeId, disabled_field_names: List[str]
+        self, mid: models.NotetypeId, disabled_field_names: List[str]
     ) -> Set[str]:
         """Returns the names of all media files used in the notes of the given note type."""
-        if aqt.mw.col is None or aqt.mw.col.models.get(NotetypeId(mid)) is None:
+        if aqt.mw.col is None or aqt.mw.col.models.get(models.NotetypeId(mid)) is None:
             return set()
 
         field_names_for_mid = [
-            field["name"] for field in aqt.mw.col.models.get(NotetypeId(mid))["flds"]
+            field["name"]
+            for field in aqt.mw.col.models.get(models.NotetypeId(mid))["flds"]
         ]
         disabled_field_ords = [
             field_names_for_mid.index(name)
@@ -515,7 +519,7 @@ class _AnkiHubDB:
 
         result = set()
         for fields_string, tags_string in fields_tags_pairs:
-            fields = split_fields(fields_string)
+            fields = utils.split_fields(fields_string)
             tags = set(tags_string.split(" "))
             for field_idx, field_text in enumerate(fields):
                 # TODO: This ANKIHUB_ASSET_ENABLED_TAG bypass is used to allow fields with

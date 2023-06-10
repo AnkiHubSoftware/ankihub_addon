@@ -6,9 +6,8 @@ from pathlib import Path
 from typing import Any, Callable
 
 import aqt
-from anki.hooks import wrap
+from anki import hooks
 from aqt import addons
-from aqt.addons import AddonManager, DownloaderInstaller
 
 from . import LOGGER
 from .db import detach_ankihub_db_from_anki_db_connection
@@ -26,8 +25,8 @@ def _raise_exceptions_on_otherwise_silent_addon_update_failures():
     # this prevents silent add-on update failures like the ones reported here:
     # https://community.ankihub.net/t/bug-improve-ankihub-addon-update-process/557/5
     # it changes the behavior of _download_done so that it checks if the future has an exception
-    DownloaderInstaller._download_done = wrap(  # type: ignore
-        old=DownloaderInstaller._download_done,
+    addons.DownloaderInstaller._download_done = hooks.wrap(  # type: ignore
+        old=addons.DownloaderInstaller._download_done,
         new=_check_future_for_exceptions,
         pos="around",
     )
@@ -60,28 +59,28 @@ def _prevent_errors_during_addon_updates_and_deletions():
 
     # Add _detach_ankihub_db to backupUserFiles and deleteAddon.
     # We don't need to add it to restoreUserFiles because backupUserFiles is always called before restoreUserFiles.
-    AddonManager.backupUserFiles = wrap(  # type: ignore
-        old=AddonManager.backupUserFiles,
+    addons.AddonManager.backupUserFiles = hooks.wrap(  # type: ignore
+        old=addons.AddonManager.backupUserFiles,
         new=_detach_ankihub_db,
         pos="before",
     )
 
-    AddonManager.deleteAddon = wrap(  # type: ignore
-        old=AddonManager.deleteAddon,
+    addons.AddonManager.deleteAddon = hooks.wrap(  # type: ignore
+        old=addons.AddonManager.deleteAddon,
         new=_detach_ankihub_db,
         pos="before",
     )
 
     # Add _maybe_change_file_permissions_of_addon_files to backupUserFiles and deleteAddon.
     # We don't need to add it to restoreUserFiles because backupUserFiles is always called before restoreUserFiles.
-    AddonManager.backupUserFiles = wrap(  # type: ignore
-        old=AddonManager.backupUserFiles,
+    addons.AddonManager.backupUserFiles = hooks.wrap(  # type: ignore
+        old=addons.AddonManager.backupUserFiles,
         new=lambda self, sid: _maybe_change_file_permissions_of_addon_files(sid),
         pos="before",
     )
 
-    AddonManager.deleteAddon = wrap(  # type: ignore
-        old=AddonManager.deleteAddon,
+    addons.AddonManager.deleteAddon = hooks.wrap(  # type: ignore
+        old=addons.AddonManager.deleteAddon,
         new=lambda self, module: _maybe_change_file_permissions_of_addon_files(module),
         pos="before",
     )
@@ -119,7 +118,7 @@ def _change_file_permissions_of_addon_files(addon_dir: Path) -> None:
 def _prevent_ui_deadlock_of_update_dialog_with_progress_dialog():
     # prevent the situation that the add-on update dialog is shown while the progress dialog is open which can
     # lead to a deadlock when AnkiHub is syncing and there is an add-on update.
-    addons.prompt_to_update = wrap(  # type: ignore
+    addons.prompt_to_update = hooks.wrap(  # type: ignore
         old=addons.prompt_to_update,
         new=_with_delay_when_progress_dialog_is_open,
         pos="around",

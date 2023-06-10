@@ -6,9 +6,8 @@ from datetime import datetime
 from typing import Callable, List
 
 import aqt
-from aqt.emptycards import show_empty_cards
+from aqt import emptycards, utils
 from aqt.operations.tag import clear_unused_tags
-from aqt.utils import showInfo, showText
 
 from ... import LOGGER
 from ...addon_ankihub_client import AddonAnkiHubClient as AnkiHubClient
@@ -79,7 +78,7 @@ def download_and_install_decks(
             anki_deck_names=anki_deck_names,
             import_results=import_results,
         )
-        showInfo(
+        utils.showInfo(
             title="AnkiHub Deck Import Summary",
             text=message,
             textFormat="rich",
@@ -113,7 +112,7 @@ def _maybe_handle_deck_download_and_install_error(
     http_error: AnkiHubHTTPError = e.original_exception
 
     if http_error.response.status_code == 404:
-        showText(
+        utils.showText(
             f"Deck {e.ankihub_did} doesn't exist. Please make sure to copy/paste "
             f"the correct ID. If you believe this is an error, please reach "
             f"out to user support at help@ankipalace.com."
@@ -234,4 +233,4 @@ def _cleanup_after_deck_install(multiple_decks: bool) -> None:
     )
     if ask_user(message, title="AnkiHub", show_cancel_button=False):
         clear_unused_tags(parent=aqt.mw).run_in_background()
-        show_empty_cards(aqt.mw)
+        emptycards.show_empty_cards(aqt.mw)

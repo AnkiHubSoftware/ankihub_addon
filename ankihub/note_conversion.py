@@ -1,9 +1,9 @@
-"""Contains code that is used for converting Anki Note objects to NoteInfo objects (export)
+"""Contains code that is used for converting Anki notes.Note objects to NoteInfo objects (export)
 and from NoteInfo objects to Anki note objects (import)."""
 
 from typing import List
 
-from anki.notes import Note
+from anki import notes
 
 from . import settings
 
@@ -37,7 +37,7 @@ def is_tag_for_group(tag: str, group_name: str) -> bool:
     return tag.startswith(f"{TAG_FOR_OPTIONAL_TAGS}::{group_name.replace(' ', '_')}::")
 
 
-def get_fields_protected_by_tags(note: Note) -> List[str]:
+def get_fields_protected_by_tags(note: notes.Note) -> List[str]:
     result = _get_fields_protected_by_tags(note.tags, note.keys())
     return result
 

@@ -2,7 +2,7 @@ import uuid
 from typing import Any, List, Optional
 
 import aqt
-from aqt.addons import check_and_prompt_for_updates
+from aqt import addons, utils
 from aqt.qt import (
     QApplication,
     QDialog,
@@ -19,13 +19,12 @@ from aqt.qt import (
     QWidget,
     qconnect,
 )
-from aqt.utils import disable_help_button, showWarning, tooltip
 
 from ..settings import config
 
 
 def show_error_dialog(message: str, *args, **kwargs):
-    aqt.mw.taskman.run_on_main(lambda: showWarning(message, *args, **kwargs))  # type: ignore
+    aqt.mw.taskman.run_on_main(lambda: utils.showWarning(message, *args, **kwargs))  # type: ignore
 
 
 def choose_subset(
@@ -40,7 +39,7 @@ def choose_subset(
         parent = aqt.mw.app.activeWindow()
 
     dialog = QDialog(parent)
-    disable_help_button(dialog)
+    utils.disable_help_button(dialog)
 
     dialog.setWindowModality(Qt.WindowModality.WindowModal)
     layout = QVBoxLayout()
@@ -118,7 +117,7 @@ def choose_list(
     if not parent:
         parent = aqt.mw.app.activeWindow()
     d = QDialog(parent)
-    disable_help_button(d)
+    utils.disable_help_button(d)
     d.setWindowModality(Qt.WindowModality.WindowModal)
     layout = QVBoxLayout()
     d.setLayout(layout)
@@ -215,13 +214,13 @@ def show_tooltip(
     period: int = 3000,
     parent: Optional[QWidget] = None,
 ):
-    """Safer version of tooltip that doesn't cause an error if the parent widget is deleted and
-    instead shows the tooltip on the active or main window."""
+    """Safer version of utils.tooltip that doesn't cause an error if the parent widget is deleted and
+    instead shows the utils.tooltip on the active or main window."""
     try:
-        tooltip(msg, period, parent)
+        utils.tooltip(msg, period, parent)
     except RuntimeError as e:
         if "wrapped C/C++ object of type" in str(e) and "has been deleted" in str(e):
-            tooltip(msg, period)
+            utils.tooltip(msg, period)
         else:
             raise e
 
@@ -237,7 +236,7 @@ def set_tooltip_icon(btn: QPushButton) -> None:
 
 
 def check_and_prompt_for_updates_on_main_window():
-    check_and_prompt_for_updates(
+    addons.check_and_prompt_for_updates(
         parent=aqt.mw,
         mgr=aqt.mw.addonManager,
         on_done=aqt.mw.on_updates_installed,

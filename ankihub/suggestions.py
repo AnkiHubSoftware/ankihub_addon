@@ -9,7 +9,7 @@ from pathlib import Path
 from typing import Any, Dict, List, Optional, Sequence, Set, Tuple, cast
 
 import aqt
-from anki.notes import Note, NoteId
+from anki import notes
 
 from .addon_ankihub_client import AddonAnkiHubClient as AnkiHubClient
 from .ankihub_client import (
@@ -35,7 +35,10 @@ ANKIHUB_NO_CHANGE_ERROR = (
 
 
 def suggest_note_update(
-    note: Note, change_type: SuggestionType, comment: str, auto_accept: bool = False
+    note: notes.Note,
+    change_type: SuggestionType,
+    comment: str,
+    auto_accept: bool = False,
 ) -> bool:
     """Sends a ChangeNoteSuggestion to AnkiHub if the passed note has changes.
     Returns True if the suggestion was created, False if the note has no changes
@@ -48,7 +51,7 @@ def suggest_note_update(
     if suggestion is None:
         return False
 
-    ah_did = ankihub_db.ankihub_did_for_anki_nid(NoteId(suggestion.anki_nid))
+    ah_did = ankihub_db.ankihub_did_for_anki_nid(notes.NoteId(suggestion.anki_nid))
     suggestion = cast(
         ChangeNoteSuggestion,
         _rename_and_upload_assets_for_suggestion(
@@ -66,7 +69,7 @@ def suggest_note_update(
 
 
 def suggest_new_note(
-    note: Note, comment: str, ankihub_did: uuid.UUID, auto_accept: bool = False
+    note: notes.Note, comment: str, ankihub_did: uuid.UUID, auto_accept: bool = False
 ) -> None:
     """Sends a NewNoteSuggestion to AnkiHub.
     Also renames assets in the Anki collection and the media folder and uploads them to AnkiHub.
@@ -87,13 +90,15 @@ def suggest_new_note(
 
 @dataclass
 class BulkNoteSuggestionsResult:
-    errors_by_nid: Dict[NoteId, Dict[str, List[str]]]  # dict of errors by anki_nid
+    errors_by_nid: Dict[
+        notes.NoteId, Dict[str, List[str]]
+    ]  # dict of errors by anki_nid
     new_note_suggestions_count: int
     change_note_suggestions_count: int
 
 
 def suggest_notes_in_bulk(
-    notes: List[Note],
+    notes_: List[notes.Note],
     auto_accept: bool,
     change_type: SuggestionType,
     comment: str,
@@ -102,7 +107,7 @@ def suggest_notes_in_bulk(
     Sends a NewNoteSuggestion or a ChangeNoteSuggestion to AnkiHub for each note in the list.
     All notes have to be from one AnkiHub deck. If a note does not belong to any
     AnkiHub deck, it will be ignored.
-    Note: Notes that don't have any changes when compared to the local
+    notes.Note: Notes that don't have any changes when compared to the local
     AnkiHub database will not be sent. This does not necessarily mean
     that the note has no changes when compared to the remote AnkiHub
     database. To create suggestions for notes that differ from the
@@ -110,10 +115,10 @@ def suggest_notes_in_bulk(
     sync first (so that the local database is up to date)."""
 
     change_note_ah_dids = set(
-        ankihub_db.ankihub_dids_for_anki_nids([note.id for note in notes])
+        ankihub_db.ankihub_dids_for_anki_nids([note.id for note in notes_])
     )
     new_note_ah_dids = set(
-        ankihub_db.ankihub_did_for_note_type(note.mid) for note in notes
+        ankihub_db.ankihub_did_for_note_type(note.mid) for note in notes_
     )
 
     ankihub_dids = list(change_note_ah_dids | new_note_ah_dids)
@@ -126,7 +131,7 @@ def suggest_notes_in_bulk(
         new_note_suggestions,
         change_note_suggestions,
         nids_without_changes,
-    ) = _suggestions_for_notes(notes, ankihub_did, change_type, comment)
+    ) = _suggestions_for_notes(notes_, ankihub_did, change_type, comment)
 
     new_note_suggestions = cast(
         Sequence[NewNoteSuggestion],
@@ -150,12 +155,12 @@ def suggest_notes_in_bulk(
         auto_accept=auto_accept,
     )
     errors_by_nid_from_remote = {
-        NoteId(nid): errors for nid, errors in errors_by_nid_int.items()
+        notes.NoteId(nid): errors for nid, errors in errors_by_nid_int.items()
     }
     errors_by_nid_from_local = {
         nid: ANKIHUB_NO_CHANGE_ERROR for nid in nids_without_changes
     }
-    errors_by_nid: Dict[NoteId, Any] = {
+    errors_by_nid: Dict[notes.NoteId, Any] = {
         **errors_by_nid_from_remote,
         **errors_by_nid_from_local,
     }
@@ -173,9 +178,12 @@ def suggest_notes_in_bulk(
 
 
 def _suggestions_for_notes(
-    notes: List[Note], ankihub_did: uuid.UUID, change_type: SuggestionType, comment: str
+    notes: List[notes.Note],
+    ankihub_did: uuid.UUID,
+    change_type: SuggestionType,
+    comment: str,
 ) -> Tuple[
-    Sequence[NewNoteSuggestion], Sequence[ChangeNoteSuggestion], Sequence[NoteId]
+    Sequence[NewNoteSuggestion], Sequence[ChangeNoteSuggestion], Sequence[notes.NoteId]
 ]:
     """
     Splits the list of notes into three categories:
@@ -239,7 +247,7 @@ def _suggestions_for_notes(
 
 
 def _new_note_suggestion(
-    note: Note, ankihub_deck_uuid: uuid.UUID, comment: str
+    note: notes.Note, ankihub_deck_uuid: uuid.UUID, comment: str
 ) -> NewNoteSuggestion:
     note_data = to_note_data(note, set_new_id=True)
 
@@ -257,7 +265,7 @@ def _new_note_suggestion(
 
 
 def _change_note_suggestion(
-    note: Note, change_type: SuggestionType, comment: str
+    note: notes.Note, change_type: SuggestionType, comment: str
 ) -> Optional[ChangeNoteSuggestion]:
     note_from_anki_db = to_note_data(note)
     assert isinstance(note_from_anki_db, NoteInfo)
@@ -328,7 +336,7 @@ def _rename_and_upload_assets_for_suggestions(
     original_notes_data = [
         note_info
         for suggestion in suggestions
-        if (note_info := ankihub_db.note_data(NoteId(suggestion.anki_nid)))
+        if (note_info := ankihub_db.note_data(notes.NoteId(suggestion.anki_nid)))
     ]
     original_notes_image_names: Set[str] = get_image_names_from_notes_data(
         original_notes_data

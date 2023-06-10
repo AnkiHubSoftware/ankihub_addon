@@ -3,12 +3,11 @@ from concurrent.futures import Future
 from typing import Optional
 
 import aqt
-from aqt import dialogs
-from aqt.browser import Browser
+from aqt import browser, dialogs
 
 from ...settings import config
 from ...subdecks import build_subdecks_and_move_cards_to_them, flatten_deck
-from ..utils import ask_user, tooltip
+from ..utils import ask_user, show_tooltip
 
 
 def confirm_and_toggle_subdecks(ankihub_id: uuid.UUID) -> None:
@@ -58,8 +57,8 @@ def confirm_and_toggle_subdecks(ankihub_id: uuid.UUID) -> None:
 def _on_subdecks_updated(future: Future):
     future.result()
 
-    tooltip("Subdecks updated.")
+    show_tooltip("Subdecks updated.")
     aqt.mw.deckBrowser.refresh()
-    browser: Optional[Browser] = dialogs._dialogs["Browser"][1]
-    if browser is not None:
-        browser.sidebar.refresh()
+    browser_: Optional[browser.Browser] = dialogs._dialogs["browser.Browser"][1]
+    if browser_ is not None:
+        browser_.sidebar.refresh()

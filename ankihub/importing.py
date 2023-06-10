@@ -6,12 +6,7 @@ from pprint import pformat
 from typing import Dict, Iterable, List, Optional, Sequence, Set, Tuple
 
 import aqt
-from anki.cards import Card
-from anki.consts import QUEUE_TYPE_SUSPENDED
-from anki.decks import DeckId
-from anki.errors import NotFoundError
-from anki.models import NotetypeDict, NotetypeId
-from anki.notes import Note, NoteId
+from anki import cards, consts, decks, errors, models, notes
 
 from . import LOGGER, settings
 from .addon_ankihub_client import AddonAnkiHubClient as AnkiHubClient
@@ -40,10 +35,10 @@ from .utils import (
 @dataclass(frozen=True)
 class AnkiHubImportResult:
     ankihub_did: uuid.UUID
-    anki_did: DeckId
-    updated_nids: List[NoteId]
-    created_nids: List[NoteId]
-    skipped_nids: List[NoteId]
+    anki_did: decks.DeckId
+    updated_nids: List[notes.NoteId]
+    created_nids: List[notes.NoteId]
+    skipped_nids: List[notes.NoteId]
     first_import_of_deck: bool
 
     def __repr__(self):
@@ -52,9 +47,9 @@ class AnkiHubImportResult:
 
 class AnkiHubImporter:
     def __init__(self):
-        self._created_nids: List[NoteId] = []
-        self._updated_nids: List[NoteId] = []
-        self._skipped_nids: List[NoteId] = []
+        self._created_nids: List[notes.NoteId] = []
+        self._updated_nids: List[notes.NoteId] = []
+        self._skipped_nids: List[notes.NoteId] = []
 
     def import_ankihub_deck(
         self,
@@ -62,7 +57,7 @@ class AnkiHubImporter:
         notes_data: List[NoteInfo],
         deck_name: str,  # name that will be used for a deck if a new one gets created
         local_did: Optional[  # did that new notes should be put into if importing not for the first time
-            DeckId
+            decks.DeckId
         ] = None,
         protected_fields: Optional[
             Dict[int, List[str]]
@@ -115,10 +110,10 @@ class AnkiHubImporter:
         ankihub_did: uuid.UUID,
         notes_data: List[NoteInfo],
         deck_name: str,  # name that will be used for a deck if a new one gets created
-        remote_note_types: Dict[NotetypeId, NotetypeDict] = {},
+        remote_note_types: Dict[models.NotetypeId, models.NotetypeDict] = {},
         protected_fields: Dict[int, List[str]] = {},
         protected_tags: List[str] = [],
-        local_did: DeckId = None,  # did that new notes should be put into if importing not for the first time
+        local_did: decks.DeckId = None,  # did that new notes should be put into if importing not for the first time
         subdecks: bool = False,
         subdecks_for_new_notes_only: bool = False,
     ) -> AnkiHubImportResult:
@@ -175,17 +170,19 @@ class AnkiHubImporter:
         self,
         ankihub_did: uuid.UUID,
         notes_data: List[NoteInfo],
-    ) -> Set[DeckId]:
+    ) -> Set[decks.DeckId]:
         # returns set of ids of decks notes were imported into
 
         upserted_notes, skipped_notes = ankihub_db.upsert_notes_data(
             ankihub_did=ankihub_did, notes_data=notes_data
         )
-        self._skipped_nids = [NoteId(note_data.anki_nid) for note_data in skipped_notes]
+        self._skipped_nids = [
+            notes.NoteId(note_data.anki_nid) for note_data in skipped_notes
+        ]
 
         _reset_note_types_of_notes_based_on_notes_data(upserted_notes)
 
-        dids: Set[DeckId] = set()  # set of ids of decks notes were imported into
+        dids: Set[decks.DeckId] = set()  # set of ids of decks notes were imported into
         for note_data in upserted_notes:
             note = self._update_or_create_note(
                 note_data=note_data,
@@ -212,8 +209,10 @@ class AnkiHubImporter:
         return dids
 
     def _cleanup_first_time_deck_import(
-        self, dids_cards_were_imported_to: Iterable[DeckId], created_did: DeckId
-    ) -> DeckId:
+        self,
+        dids_cards_were_imported_to: Iterable[decks.DeckId],
+        created_did: decks.DeckId,
+    ) -> decks.DeckId:
         """Remove newly created deck if the subset of local notes were in a single deck before subscribing.
 
         I.e., if the user has a subset of the remote deck and the entire
@@ -249,8 +248,8 @@ class AnkiHubImporter:
         note_data: NoteInfo,
         protected_fields: Dict[int, List[str]],
         protected_tags: List[str],
-        anki_did: Optional[DeckId] = None,
-    ) -> Note:
+        anki_did: Optional[decks.DeckId] = None,
+    ) -> notes.Note:
         LOGGER.debug(
             f"Trying to update or create note: {note_data.anki_nid=}, {note_data.ankihub_note_uuid=}"
         )
@@ -258,8 +257,8 @@ class AnkiHubImporter:
         try:
             # Get the note before changes are made below so that we can check if new
             # were created and suspend them below if necessary.
-            note_before_changes = aqt.mw.col.get_note(NoteId(note_data.anki_nid))
-        except NotFoundError:
+            note_before_changes = aqt.mw.col.get_note(notes.NoteId(note_data.anki_nid))
+        except errors.NotFoundError:
             note_before_changes = None
         cards_before_changes = (
             note_before_changes.cards() if note_before_changes else []
@@ -277,7 +276,7 @@ class AnkiHubImporter:
         return note
 
     def _maybe_suspend_new_cards(
-        self, note: Note, cards_before_changes: List[Card]
+        self, note: notes.Note, cards_before_changes: List[cards.Card]
     ) -> None:
         if not cards_before_changes:
             return
@@ -295,7 +294,7 @@ class AnkiHubImporter:
 
             LOGGER.info(f"Suspending new cards of note {note.id}")
             for card in new_cards_:
-                card.queue = QUEUE_TYPE_SUSPENDED
+                card.queue = consts.QUEUE_TYPE_SUSPENDED
                 card.flush()
 
         config_value = config.public_config["suspend_new_cards_of_existing_notes"]
@@ -304,7 +303,10 @@ class AnkiHubImporter:
         elif config_value == "always":
             suspend_new_cards()
         elif config_value == "if_siblings_are_suspended":
-            if all(card.queue == QUEUE_TYPE_SUSPENDED for card in cards_before_changes):
+            if all(
+                card.queue == consts.QUEUE_TYPE_SUSPENDED
+                for card in cards_before_changes
+            ):
                 suspend_new_cards()
         else:
             raise ValueError("Invalid suspend_new_cards config value")
@@ -314,14 +316,14 @@ class AnkiHubImporter:
         note_data: NoteInfo,
         protected_fields: Dict[int, List[str]],
         protected_tags: List[str],
-        anki_did: Optional[DeckId],  # only relevant for newly created notes
-    ) -> Note:
+        anki_did: Optional[decks.DeckId],  # only relevant for newly created notes
+    ) -> notes.Note:
         # Create a copy to avoid mutating note_data.fields.
         # TODO it seems that fields is not used and we can remove it.
         fields = note_data.fields.copy()
 
         try:
-            note = aqt.mw.col.get_note(id=NoteId(note_data.anki_nid))
+            note = aqt.mw.col.get_note(id=notes.NoteId(note_data.anki_nid))
             fields.append(
                 Field(
                     name=settings.ANKIHUB_NOTE_TYPE_FIELD_NAME,
@@ -342,11 +344,11 @@ class AnkiHubImporter:
                 LOGGER.debug(f"Updated note: {note_data.anki_nid=}")
             else:
                 LOGGER.debug(f"No changes, skipping {note_data.anki_nid=}")
-        except NotFoundError:
+        except errors.NotFoundError:
             if anki_did is None:
                 raise ValueError("anki_did must be set for new notes")
 
-            note_type = aqt.mw.col.models.get(NotetypeId(note_data.mid))
+            note_type = aqt.mw.col.models.get(models.NotetypeId(note_data.mid))
             note = aqt.mw.col.new_note(note_type)
             self.prepare_note(
                 note,
@@ -355,7 +357,7 @@ class AnkiHubImporter:
                 protected_tags,
             )
             note = create_note_with_id(
-                note, anki_id=NoteId(note_data.anki_nid), anki_did=anki_did
+                note, anki_id=notes.NoteId(note_data.anki_nid), anki_did=anki_did
             )
             self._created_nids.append(note.id)
             LOGGER.debug(f"Created note: {note_data.anki_nid=}")
@@ -363,7 +365,7 @@ class AnkiHubImporter:
 
     def prepare_note(
         self,
-        note: Note,
+        note: notes.Note,
         note_data: NoteInfo,
         protected_fields: Dict[int, List[str]],
         protected_tags: List[str],
@@ -375,9 +377,9 @@ class AnkiHubImporter:
         Sets the ankihub_id field to the given ankihub_id.
         Sets the guid to the given guid.
 
-        Returns True if anything about the Note was changed and False otherwise.
+        Returns True if anything about the notes.Note was changed and False otherwise.
 
-        If the Note was changed we will flush the Note.  Keeping track of this allows us
+        If the notes.Note was changed we will flush the notes.Note.  Keeping track of this allows us
         to avoid flushing unnecessarily, which is better for performance.
         We also keep track of which notes were updated and return them in the AnkiHubImportResult.
         """
@@ -404,7 +406,7 @@ class AnkiHubImporter:
         LOGGER.debug(f"Prepared note. {changed=}")
         return changed
 
-    def _prepare_guid(self, note: Note, guid: str) -> bool:
+    def _prepare_guid(self, note: notes.Note, guid: str) -> bool:
         if note.guid == guid:
             return False
 
@@ -412,7 +414,7 @@ class AnkiHubImporter:
         note.guid = guid
         return True
 
-    def _prepare_ankihub_id_field(self, note: Note, ankihub_nid: str) -> bool:
+    def _prepare_ankihub_id_field(self, note: notes.Note, ankihub_nid: str) -> bool:
         if note[settings.ANKIHUB_NOTE_TYPE_FIELD_NAME] != ankihub_nid:
             LOGGER.debug(
                 f"AnkiHub id of note {note.id} will be changed from {note[settings.ANKIHUB_NOTE_TYPE_FIELD_NAME]} "
@@ -424,7 +426,7 @@ class AnkiHubImporter:
 
     def _prepare_fields(
         self,
-        note: Note,
+        note: notes.Note,
         fields: List[Field],
         protected_fields: Dict[int, List[str]],
     ) -> bool:
@@ -464,7 +466,7 @@ class AnkiHubImporter:
 
     def _prepare_tags(
         self,
-        note: Note,
+        note: notes.Note,
         tags: List[str],
         protected_tags: List[str],
     ) -> bool:
@@ -482,10 +484,14 @@ class AnkiHubImporter:
         return changed
 
 
-def _adjust_deck(deck_name: str, local_did: Optional[DeckId] = None) -> DeckId:
+def _adjust_deck(
+    deck_name: str, local_did: Optional[decks.DeckId] = None
+) -> decks.DeckId:
     unique_name = get_unique_deck_name(deck_name)
     if local_did is None:
-        local_did = DeckId(aqt.mw.col.decks.add_normal_deck_with_name(unique_name).id)
+        local_did = decks.DeckId(
+            aqt.mw.col.decks.add_normal_deck_with_name(unique_name).id
+        )
         LOGGER.info(f"Created deck {local_did=}")
     elif aqt.mw.col.decks.name_if_exists(local_did) is None:
         # The deck created here may be removed later.
@@ -520,21 +526,23 @@ def _updated_tags(
 
 def _fetch_remote_note_types_based_on_notes_data(
     notes_data: List[NoteInfo],
-) -> Dict[NotetypeId, NotetypeDict]:
-    remote_mids = set(NotetypeId(note_data.mid) for note_data in notes_data)
+) -> Dict[models.NotetypeId, models.NotetypeDict]:
+    remote_mids = set(models.NotetypeId(note_data.mid) for note_data in notes_data)
     result = _fetch_remote_note_types(remote_mids)
     return result
 
 
 def _fetch_remote_note_types(
-    mids: Iterable[NotetypeId],
-) -> Dict[NotetypeId, NotetypeDict]:
+    mids: Iterable[models.NotetypeId],
+) -> Dict[models.NotetypeId, models.NotetypeDict]:
     client = AnkiHubClient()
     result = {mid: client.get_note_type(mid) for mid in mids}
     return result
 
 
-def _adjust_note_types(remote_note_types: Dict[NotetypeId, NotetypeDict]) -> None:
+def _adjust_note_types(
+    remote_note_types: Dict[models.NotetypeId, models.NotetypeDict]
+) -> None:
     # can be called when installing a deck for the first time and when synchronizing with AnkiHub
 
     LOGGER.info("Beginning adjusting note types...")
@@ -548,7 +556,7 @@ def _adjust_note_types(remote_note_types: Dict[NotetypeId, NotetypeDict]) -> Non
 
 
 def _create_missing_note_types(
-    remote_note_types: Dict[NotetypeId, NotetypeDict]
+    remote_note_types: Dict[models.NotetypeId, models.NotetypeDict]
 ) -> None:
     missings_mids = set(
         mid for mid in remote_note_types.keys() if aqt.mw.col.models.get(mid) is None
@@ -560,7 +568,9 @@ def _create_missing_note_types(
         LOGGER.info(f"Created missing note type {mid}")
 
 
-def _rename_note_types(remote_note_types: Dict[NotetypeId, NotetypeDict]) -> None:
+def _rename_note_types(
+    remote_note_types: Dict[models.NotetypeId, models.NotetypeDict]
+) -> None:
     for mid, remote_note_type in remote_note_types.items():
         local_note_type = aqt.mw.col.models.get(mid)
         if local_note_type["name"] != remote_note_type["name"]:
@@ -571,12 +581,14 @@ def _rename_note_types(remote_note_types: Dict[NotetypeId, NotetypeDict]) -> Non
 
 
 def _ensure_local_and_remote_fields_are_same(
-    remote_note_types: Dict[NotetypeId, NotetypeDict]
+    remote_note_types: Dict[models.NotetypeId, models.NotetypeDict]
 ) -> None:
     def field_tuples(flds: List[Dict]) -> List[Tuple[int, str]]:
         return [(field["ord"], field["name"]) for field in flds]
 
-    note_types_with_field_conflicts: List[Tuple[NotetypeDict, NotetypeDict]] = []
+    note_types_with_field_conflicts: List[
+        Tuple[models.NotetypeDict, models.NotetypeDict]
+    ] = []
     for mid, remote_note_type in remote_note_types.items():
         local_note_type = aqt.mw.col.models.get(mid)
 
@@ -613,7 +625,7 @@ def _adjust_field_ords(
     # This makes sure that when fields get added or are moved field contents end up
     # in the field with the same name as before.
     # This is relevant because people can protect fields.
-    # Note that the result will have exactly the same set of field names as the new_model,
+    # notes.Note that the result will have exactly the same set of field names as the new_model,
     # just the ords will be adjusted.
     for fld in new_model_flds:
         if (
@@ -635,7 +647,7 @@ def _reset_note_types_of_notes_based_on_notes_data(
 ) -> None:
     """Set the note type of notes back to the note type they have in the remote deck if they have a different one"""
     nid_mid_pairs = [
-        (NoteId(note_data.anki_nid), NotetypeId(note_data.mid))
+        (notes.NoteId(note_data.anki_nid), models.NotetypeId(note_data.mid))
         for note_data in notes_data
     ]
     reset_note_types_of_notes(nid_mid_pairs)

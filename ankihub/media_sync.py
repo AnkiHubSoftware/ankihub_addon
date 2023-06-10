@@ -4,7 +4,7 @@ from pathlib import Path
 from typing import Callable, Dict, Iterable, List, Optional
 
 import aqt
-from aqt.qt import QAction
+from aqt import qt
 
 from . import LOGGER
 from .addon_ankihub_client import AddonAnkiHubClient
@@ -16,16 +16,16 @@ class _AnkiHubMediaSync:
     """This class is responsible for synchronizing media between Anki and AnkiHub.
     The operations are performed in the background.
     This class keeps track of the status of the operations and shows it as text on
-    the QAction that is passed to the setup method.
+    the qt.QAction that is passed to the setup method.
     """
 
     def __init__(self) -> None:
         self._download_in_progress = False
         self._amount_uploads_in_progress = 0
-        self._status_action: Optional[QAction] = None
+        self._status_action: Optional[qt.QAction] = None
 
-    def set_status_action(self, status_action: QAction):
-        """Set the QAction that should be used to show the status of the media sync."""
+    def set_status_action(self, status_action: qt.QAction):
+        """Set the qt.QAction that should be used to show the status of the media sync."""
         self._status_action = status_action
 
     def start_media_download(self):

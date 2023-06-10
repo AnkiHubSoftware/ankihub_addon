@@ -19,9 +19,8 @@ from shutil import copyfile, rmtree
 from typing import Any, Callable, Dict, List, Optional
 
 import aqt
-from anki.buildinfo import version as ANKI_VERSION
-from anki.decks import DeckId
-from aqt.utils import askUser, showInfo
+from anki import buildinfo, decks
+from aqt import utils
 from mashumaro import field_options
 from mashumaro.mixins.json import DataClassJSONMixin
 
@@ -39,6 +38,7 @@ from .ankihub_client import (
 from .ankihub_client.models import UserDeckRelation
 from .public_config_migrations import migrate_public_config
 
+ANKI_VERSION = buildinfo.version
 ADDON_PATH = Path(__file__).parent.absolute()
 
 ANKIHUB_DB_FILENAME = "ankihub.db"
@@ -62,7 +62,7 @@ def _deserialize_datetime(x: str) -> Optional[datetime]:
 
 @dataclass
 class DeckConfig(DataClassJSONMixin):
-    anki_id: DeckId
+    anki_id: decks.DeckId
     name: str
     user_relation: UserDeckRelation = UserDeckRelation.SUBSCRIBER
     latest_update: Optional[datetime] = dataclasses.field(
@@ -194,7 +194,7 @@ class _Config:
         self,
         name: str,
         ankihub_did: uuid.UUID,
-        anki_did: DeckId,
+        anki_did: decks.DeckId,
         user_relation: UserDeckRelation,
         latest_udpate: Optional[datetime] = None,
         subdecks_enabled: bool = False,
@@ -202,7 +202,7 @@ class _Config:
         """Add deck to the list of installed decks."""
         self._private_config.decks[ankihub_did] = DeckConfig(
             name=name,
-            anki_id=DeckId(anki_did),
+            anki_id=decks.DeckId(anki_did),
             user_relation=user_relation,
             subdecks_enabled=subdecks_enabled,
         )
@@ -227,7 +227,7 @@ class _Config:
             config_dict["token"] = "REDACTED"
         LOGGER.info(f"private config:\n{pformat(config_dict)}")
 
-    def set_home_deck(self, ankihub_did: uuid.UUID, anki_did: DeckId):
+    def set_home_deck(self, ankihub_did: uuid.UUID, anki_did: decks.DeckId):
         self.deck_config(ankihub_did).anki_id = anki_did
         self._update_private_config()
 
@@ -364,14 +364,14 @@ def _migrate_profile_data_from_old_location() -> bool:
         return True
 
     if len(aqt.mw.pm.profiles()) > 1:
-        if not askUser(
+        if not utils.askUser(
             (
                 "The AnkiHub add-on now has support for multiple Anki profiles!<br><br>"
                 "Is this the profile that you were using AnkiHub with before?<br>"
             ),
             title="AnkiHub",
         ):
-            showInfo(
+            utils.showInfo(
                 "Please switch to the profile that you were using AnkiHub with before (File -> Switch Profile)."
                 "The add-on will then again ask you if this is the correct profile.<br><br>"
                 "<b>Note that you won't be able to use the AnkiHub add-on until you do this.</b>"
@@ -416,7 +416,7 @@ def log_file_path() -> Path:
     """Path to the add-on log file.
     The log file is outside of the user files folder because it caused problems when updating the add-on."""
     # _defaultBase is the Anki data folder, we create a sibling folder to it, where we store the log file.
-    anki_base = Path(aqt.mw.pm._defaultBase())
+    anki_base = Path(aqt.mw.pm._default_base())
     ankihub_base = anki_base.parent / "AnkiHub"
     result = ankihub_base / "ankihub.log"
     result.parent.mkdir(parents=True, exist_ok=True)

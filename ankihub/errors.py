@@ -13,9 +13,9 @@ from typing import Any, Callable, Dict, Optional, Type
 
 import aqt
 import sentry_sdk
-from anki.errors import BackendIOError, DBError, SyncError
-from anki.utils import checksum, is_win
-from aqt.utils import askUser, tooltip
+from anki import errors
+from anki import utils as anki_utils
+from aqt import utils as aqt_utils
 from requests import exceptions
 from sentry_sdk import capture_exception, push_scope
 from sentry_sdk.integrations.argv import ArgvIntegration
@@ -80,7 +80,9 @@ def upload_logs_in_background(
     LOGGER.info("Uploading logs...")
 
     # many users use their email address as their username and may not want to share it on a forum
-    user_name = config.user() if not hide_username else checksum(config.user())[:5]
+    user_name = (
+        config.user() if not hide_username else anki_utils.checksum(config.user())[:5]
+    )
     key = f"ankihub_addon_logs_{user_name}_{int(time.time())}.log"
 
     if on_done is not None:
@@ -157,7 +159,7 @@ def _try_handle_exception(
         if isinstance(
             exc_value.original_exception, (exceptions.ConnectionError, ConnectionError)
         ):
-            tooltip(
+            aqt_utils.tooltip(
                 "Could not connect to AnkiHub (no internet or the site is down for maintenance)",
                 parent=aqt.mw,
             )
@@ -206,7 +208,7 @@ def _maybe_handle_ankihub_http_error(error: AnkiHubHTTPError) -> bool:
     elif (
         response.status_code == 406 and response.reason == OUTDATED_CLIENT_ERROR_REASON
     ):
-        if askUser(
+        if aqt_utils.askUser(
             "The AnkiHub add-on needs to be updated to continue working.<br>"
             "Do you want to open the add-on update dialog now?"
         ):
@@ -224,24 +226,24 @@ def _maybe_handle_ankihub_http_error(error: AnkiHubHTTPError) -> bool:
 
 def _is_memory_full_error(exc_value: BaseException) -> bool:
     result = (
-        (isinstance(exc_value, DBError) and "is full" in str(exc_value).lower())
+        (isinstance(exc_value, errors.DBError) and "is full" in str(exc_value).lower())
         or (
-            isinstance(exc_value, BackendIOError)
+            isinstance(exc_value, errors.BackendIOError)
             and "not enough space" in str(exc_value).lower()
         )
         or (
-            isinstance(exc_value, BackendIOError)
+            isinstance(exc_value, errors.BackendIOError)
             and "not enough memory" in str(exc_value).lower()
         )
         or (
-            isinstance(exc_value, BackendIOError)
+            isinstance(exc_value, errors.BackendIOError)
             and "no space left" in str(exc_value).lower()
         )
         or (
             isinstance(exc_value, OSError) and "no space left" in str(exc_value).lower()
         )
         or (
-            isinstance(exc_value, SyncError)
+            isinstance(exc_value, errors.SyncError)
             and "no space left" in str(exc_value).lower()
         )
         or (
@@ -354,7 +356,7 @@ def _user_files_context_dict() -> Dict[str, Any]:
     user_files_path = Path(aqt.mw.addonManager._userFilesPath(ankihub_module))
     all_file_paths = [user_files_path, *list(user_files_path.rglob("*"))]
     problematic_file_paths = []
-    if is_win:
+    if aqt_utils.is_win:
         problematic_file_paths = [
             file for file in all_file_paths if not _file_is_accessible(file)
         ]
@@ -371,7 +373,7 @@ def _file_is_accessible(f: Path) -> bool:
     # Only works on Windows.
     # Checks if a file is accessible (and not e.g. open by another process) by trying to rename it to itself.
     # See https://stackoverflow.com/a/37256114.
-    assert is_win
+    assert aqt_utils.is_win
     try:
         os.rename(f, f)
     except (OSError, PermissionError):

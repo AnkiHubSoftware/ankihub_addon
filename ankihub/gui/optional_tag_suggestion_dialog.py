@@ -4,6 +4,7 @@ from typing import Sequence
 
 import aqt
 from anki import notes
+from aqt import utils
 from aqt.qt import (
     QAbstractItemView,
     QCheckBox,
@@ -16,7 +17,6 @@ from aqt.qt import (
     QVBoxLayout,
     qconnect,
 )
-from aqt.utils import showInfo, tooltip
 
 from .. import LOGGER
 from ..ankihub_client import AnkiHubHTTPError
@@ -38,7 +38,9 @@ class OptionalTagsSuggestionDialog(QDialog):
 
     def exec(self):
         if self._optional_tags_helper.tag_group_names() == []:
-            showInfo("No optional tags found for these notes.", parent=self._parent)
+            utils.showInfo(
+                "No optional tags found for these notes.", parent=self._parent
+            )
             return
 
         super().exec()
@@ -86,11 +88,11 @@ class OptionalTagsSuggestionDialog(QDialog):
             if self.tag_group_list.item(i).isSelected()
         ]
         if not selected_tag_groups:
-            showInfo("Please select at least one tag group.", parent=self._parent)
+            utils.showInfo("Please select at least one tag group.", parent=self._parent)
             return
 
         if not set(selected_tag_groups).issubset(self._valid_tag_groups):
-            showInfo(
+            utils.showInfo(
                 "Some of the selected tag groups have problems. Hover over them to see the reason.",
                 parent=self._parent,
             )
@@ -121,7 +123,7 @@ class OptionalTagsSuggestionDialog(QDialog):
                 else:
                     raise e
         else:
-            tooltip("Optional tags suggestions submitted.", parent=self._parent)
+            utils.tooltip("Optional tags suggestions submitted.", parent=self._parent)
             self.accept()
 
     def _on_cancel(self):

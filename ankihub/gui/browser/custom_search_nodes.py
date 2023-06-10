@@ -6,7 +6,7 @@ from typing import Optional, Sequence
 
 import aqt
 from anki import utils
-from aqt.browser import Browser, ItemId
+from aqt import browser
 
 from ...ankihub_client import suggestion_type_from_str
 
@@ -14,10 +14,10 @@ from ...ankihub_client import suggestion_type_from_str
 class CustomSearchNode(ABC):
 
     parameter_name: Optional[str] = None
-    browser: Optional[Browser] = None
+    browser_: Optional[browser.Browser] = None
 
     @classmethod
-    def from_parameter_type_and_value(cls, browser, parameter_name, value):
+    def from_parameter_type_and_value(cls, browser_, parameter_name, value):
         custom_search_node_types = (
             ModifiedAfterSyncSearchNode,
             UpdatedInTheLastXDaysSearchNode,
@@ -27,25 +27,27 @@ class CustomSearchNode(ABC):
         )
         for custom_search_node_type in custom_search_node_types:
             if custom_search_node_type.parameter_name == parameter_name:
-                return custom_search_node_type(browser, value)  # type: ignore
+                return custom_search_node_type(browser_, value)  # type: ignore
 
         raise ValueError(f"Unknown custom search parameter: {parameter_name}")
 
     @abstractmethod
-    def filter_ids(self, ids: Sequence[ItemId]) -> Sequence[ItemId]:
+    def filter_ids(self, ids: Sequence[browser.ItemId]) -> Sequence[browser.ItemId]:
         # Filters the given ids to only those that match the custom search node.
         # Expects the ankihub database to be attached to the anki database connection.
         # Ids can be either note ids or card ids.
         pass
 
-    def _retain_ids_where(self, ids: Sequence[ItemId], where: str) -> Sequence[ItemId]:
+    def _retain_ids_where(
+        self, ids: Sequence[browser.ItemId], where: str
+    ) -> Sequence[browser.ItemId]:
         # Returns these ids that match the given where clause
         # while joining notes with their corresponding information from the ankihub database.
         # The provided ids can be either note ids or card ids.
         # The anki notes table can be accessed with the table name "notes",
         # cards can be accessed as "cards" and the ankihub notes
         # table can be accessed as "ah_notes".
-        if self.browser.table.is_notes_mode():
+        if self.browser_.table.is_notes_mode():
             query = (
                 "SELECT id FROM notes, ankihub_db.notes as ah_notes "
                 "WHERE notes.id = ah_notes.anki_note_id AND "
@@ -74,11 +76,11 @@ class ModifiedAfterSyncSearchNode(CustomSearchNode):
 
     parameter_name = "ankihub_modified_after_sync"
 
-    def __init__(self, browser, value: str):
-        self.browser = browser
+    def __init__(self, browser_, value: str):
+        self.browser_ = browser_
         self.value = value
 
-    def filter_ids(self, ids: Sequence[ItemId]) -> Sequence[ItemId]:
+    def filter_ids(self, ids: Sequence[browser.ItemId]) -> Sequence[browser.ItemId]:
         if self.value == "yes":
             ids = self._retain_ids_where(ids, "notes.mod > ah_notes.mod")
         elif self.value == "no":
@@ -96,10 +98,10 @@ class UpdatedInTheLastXDaysSearchNode(CustomSearchNode):
     parameter_name = "ankihub_updated"
 
     def __init__(self, browser, value: str):
-        self.browser = browser
+        self.browser_ = browser
         self.value = value
 
-    def filter_ids(self, ids: Sequence[ItemId]) -> Sequence[ItemId]:
+    def filter_ids(self, ids: Sequence[browser.ItemId]) -> Sequence[browser.ItemId]:
         try:
             days = int(self.value)
             if days <= 0:
@@ -125,10 +127,10 @@ class NewNoteSearchNode(CustomSearchNode):
     parameter_name = "ankihub_new_note"
 
     def __init__(self, browser, value: str):
-        self.browser = browser
+        self.browser_ = browser
         self.value = value
 
-    def filter_ids(self, ids: Sequence[ItemId]) -> Sequence[ItemId]:
+    def filter_ids(self, ids: Sequence[browser.ItemId]) -> Sequence[browser.ItemId]:
         if self.value.strip() != "":
             raise ValueError(
                 f"Invalid value for {self.parameter_name}: {self.value}. This search parameter takes no values."
@@ -144,10 +146,10 @@ class SuggestionTypeSearchNode(CustomSearchNode):
     parameter_name = "ankihub_suggestion_type"
 
     def __init__(self, browser, value: str):
-        self.browser = browser
+        self.browser_ = browser
         self.value = value
 
-    def filter_ids(self, ids: Sequence[ItemId]) -> Sequence[ItemId]:
+    def filter_ids(self, ids: Sequence[browser.ItemId]) -> Sequence[browser.ItemId]:
         value = self.value.replace("_slash_", "/")
         try:
             suggestion_type_from_str(value)
@@ -166,10 +168,10 @@ class UpdatedSinceLastReviewSearchNode(CustomSearchNode):
     parameter_name = "ankihub_updated_since_last_review"
 
     def __init__(self, browser, value: str):
-        self.browser = browser
+        self.browser_ = browser
         self.value = value
 
-    def filter_ids(self, ids: Sequence[ItemId]) -> Sequence[ItemId]:
+    def filter_ids(self, ids: Sequence[browser.ItemId]) -> Sequence[browser.ItemId]:
         if self.value.strip() != "":
             raise ValueError(
                 f"Invalid value for {self.parameter_name}: {self.value}. This search parameter takes no values."

@@ -5,7 +5,7 @@ from typing import List, Optional, Sequence
 
 import aqt
 from anki import collection, hooks, notes
-from aqt.addcards import AddCards
+from aqt import addcards, qt, utils
 from aqt.browser import (
     Browser,
     CellRow,
@@ -26,8 +26,6 @@ from aqt.gui_hooks import (
     browser_will_show,
     browser_will_show_context_menu,
 )
-from aqt.qt import QAction, QMenu, qconnect
-from aqt.utils import showInfo, showWarning, tooltip, tr
 
 from ... import LOGGER
 from ...ankihub_client import SuggestionType
@@ -100,7 +98,9 @@ def _setup_context_menu():
     browser_will_show_context_menu.append(_on_browser_will_show_context_menu)
 
 
-def _on_browser_will_show_context_menu(browser: Browser, context_menu: QMenu) -> None:
+def _on_browser_will_show_context_menu(
+    browser: Browser, context_menu: qt.QMenu
+) -> None:
     selected_nids = browser.selected_notes()
     selected_nid = None
     ankihub_nid = None
@@ -145,7 +145,7 @@ def _on_browser_will_show_context_menu(browser: Browser, context_menu: QMenu) ->
 def _on_protect_fields_action(browser: Browser, nid: notes.NoteId) -> None:
     note = aqt.mw.col.get_note(nid)
     if not ankihub_db.is_ankihub_note_type(note.mid):
-        showInfo(
+        utils.showInfo(
             "This note does not have a note type that is known by AnkiHub.",
             parent=browser,
         )
@@ -201,7 +201,7 @@ def _on_bulk_notes_suggest_action(
 
     mids = set(note.mid for note in notes)
     if not all(ankihub_db.is_ankihub_note_type(mid) for mid in mids):
-        showInfo(
+        utils.showInfo(
             "Some of the notes you selected are not of a note type that is known by AnkiHub.",
             parent=browser,
         )
@@ -209,7 +209,7 @@ def _on_bulk_notes_suggest_action(
 
     if len(notes) > 500:
         msg = "Please select less than 500 notes at a time for bulk suggestions.<br>"
-        showInfo(msg, parent=browser)
+        utils.showInfo(msg, parent=browser)
         return
 
     ah_dids = set(ankihub_db.ankihub_did_for_note_type(mid) for mid in mids)
@@ -218,7 +218,7 @@ def _on_bulk_notes_suggest_action(
             "You can only create suggestions for notes from one AnkiHub deck at a time.<br>"
             "Please select notes from only one AnkiHub deck."
         )
-        showInfo(msg, parent=browser)
+        utils.showInfo(msg, parent=browser)
         return
 
     open_suggestion_dialog_for_bulk_suggestion(notes=notes, parent=browser)
@@ -228,7 +228,7 @@ def _on_reset_local_changes_action(
     browser: Browser, nids: Sequence[notes.NoteId]
 ) -> None:
     if not ankihub_db.are_ankihub_notes(list(nids)):
-        showInfo(
+        utils.showInfo(
             "Please only select notes with AnkiHub ids to reset local changes.",
             parent=browser,
         )
@@ -237,7 +237,7 @@ def _on_reset_local_changes_action(
     ankihub_dids = ankihub_db.ankihub_dids_for_anki_nids(nids)
 
     if len(ankihub_dids) > 1:
-        showInfo(
+        utils.showInfo(
             "Please select notes from only one AnkiHub deck at a time.",
             parent=browser,
         )
@@ -249,7 +249,7 @@ def _on_reset_local_changes_action(
         future.result()  # raise exception if there was one
 
         browser.table.reset()
-        tooltip("Reset local changes for selected notes.", parent=browser)
+        utils.tooltip("Reset local changes for selected notes.", parent=browser)
 
     aqt.mw.taskman.with_progress(
         task=lambda: reset_local_changes_to_notes(nids, ankihub_deck_uuid=ankihub_did),
@@ -266,7 +266,7 @@ def _on_suggest_optional_tags_action(browser: Browser) -> None:
         return
 
     if not ankihub_db.are_ankihub_notes(list(nids)):
-        showInfo(
+        utils.showInfo(
             "Please only select notes from an AnkiHub deck to suggest optional tags.",
             parent=browser,
         )
@@ -275,7 +275,7 @@ def _on_suggest_optional_tags_action(browser: Browser) -> None:
     ankihub_dids = ankihub_db.ankihub_dids_for_anki_nids(nids)
 
     if len(ankihub_dids) > 1:
-        showInfo(
+        utils.showInfo(
             "Please select notes from only one AnkiHub deck at a time.",
             parent=browser,
         )
@@ -290,23 +290,23 @@ def _setup_ankihub_menu():
 
 
 def _on_browser_menus_did_init(browser: Browser):
-    menu = browser._ankihub_menu = QMenu("AnkiHub")  # type: ignore
+    menu = browser._ankihub_menu = qt.QMenu("AnkiHub")  # type: ignore
     browser.form.menubar.addMenu(menu)
 
-    reset_deck_action = QAction("Reset all local changes to a deck", browser)
-    qconnect(reset_deck_action.triggered, lambda: _on_reset_deck_action(browser))
+    reset_deck_action = qt.QAction("Reset all local changes to a deck", browser)
+    qt.qconnect(reset_deck_action.triggered, lambda: _on_reset_deck_action(browser))
     menu.addAction(reset_deck_action)
 
-    reset_subdecks_action = QAction(
+    reset_subdecks_action = qt.QAction(
         "Rebuild subdecks and move cards into subdecks", browser
     )
-    qconnect(
+    qt.qconnect(
         reset_subdecks_action.triggered, lambda: _on_reset_subdecks_action(browser)
     )
     menu.addAction(reset_subdecks_action)
 
-    reset_optional_tags_action = QAction("Reset an Optional Tag Group", browser)
-    qconnect(
+    reset_optional_tags_action = qt.QAction("Reset an Optional Tag Group", browser)
+    qt.qconnect(
         reset_optional_tags_action.triggered,
         lambda: _on_reset_optional_tags_action(browser),
     )
@@ -315,7 +315,7 @@ def _on_browser_menus_did_init(browser: Browser):
 
 def _on_reset_deck_action(browser: Browser):
     if not config.deck_ids():
-        showInfo(
+        utils.showInfo(
             "You don't have any AnkiHub decks configured yet.",
             parent=browser,
         )
@@ -342,7 +342,7 @@ def _on_reset_deck_action(browser: Browser):
         future.result()
 
         browser.model.reset()
-        tooltip(f"Reset local changes to deck <b>{deck_config.name}</b>")
+        utils.tooltip(f"Reset local changes to deck <b>{deck_config.name}</b>")
 
     aqt.mw.taskman.with_progress(
         lambda: reset_local_changes_to_notes(nids, ankihub_deck_uuid=ah_did),
@@ -354,7 +354,7 @@ def _on_reset_deck_action(browser: Browser):
 
 def _on_reset_subdecks_action(browser: Browser):
     if not config.deck_ids():
-        showInfo(
+        utils.showInfo(
             "You don't have any AnkiHub decks configured yet.",
             parent=browser,
         )
@@ -375,7 +375,7 @@ def _on_reset_subdecks_action(browser: Browser):
     deck_config = config.deck_config(ah_did)
 
     if aqt.mw.col.decks.name_if_exists(deck_config.anki_id) is None:
-        showInfo(
+        utils.showInfo(
             (
                 f"Anki deck <b>{deck_config.name}</b> doesn't exist in your Anki collection.<br>"
                 "It might help to reset local changes to the deck first.<br>"
@@ -396,7 +396,7 @@ def _on_reset_subdecks_action(browser: Browser):
         future.result()
         browser.sidebar.refresh()
         aqt.mw.deckBrowser.refresh()
-        tooltip("Rebuilt subdecks and moved cards.")
+        utils.tooltip("Rebuilt subdecks and moved cards.")
 
     aqt.mw.taskman.with_progress(
         task=lambda: build_subdecks_and_move_cards_to_them(ankihub_did=ah_did),
@@ -407,7 +407,7 @@ def _on_reset_subdecks_action(browser: Browser):
 
 def _on_reset_optional_tags_action(browser: Browser):
     if not (extension_ids := config.deck_extension_ids()):
-        showInfo(
+        utils.showInfo(
             "You don't have any AnkiHub optional tag groups configured yet.",
             parent=browser,
         )
@@ -446,7 +446,7 @@ def _on_reset_optional_tags_action(browser: Browser):
     def on_done(future: Future) -> None:
         future.result()
 
-        tooltip(
+        utils.tooltip(
             f"Reset optional tag group {tag_group_name_with_deck} successfully.",
             parent=browser,
         )
@@ -555,7 +555,7 @@ def _on_browser_will_search_handle_custom_search_parameters(ctx: SearchContext):
                 )
             )
         except ValueError as e:
-            showWarning(f"AnkiHub search error: {e}")
+            utils.showWarning(f"AnkiHub search error: {e}")
             return
 
         # remove the custom search parameter from the search string
@@ -582,7 +582,7 @@ def _on_browser_did_search_handle_custom_search_parameters(ctx: SearchContext):
             for node in custom_search_nodes:
                 ctx.ids = node.filter_ids(ctx.ids)
         except ValueError as e:
-            showWarning(f"AnkiHub search error: {e}")
+            utils.showWarning(f"AnkiHub search error: {e}")
             return
         finally:
             custom_search_nodes = []
@@ -638,7 +638,7 @@ def _build_tag_tree_and_copy_ah_tag_items_to_ah_tree(
         (
             item
             for item in root_tree_item.children
-            if item.name == tr.browsing_sidebar_tags()
+            if item.name == utils.tr.browsing_sidebar_tags()
         ),
         None,
     )
@@ -810,10 +810,14 @@ def _make_copy_note_action_not_copy_ankihub_id() -> None:
 
 
 def _after_create_copy(*args, **kwargs) -> None:
-    """Clear the AnkiHub ID field of the new note in the AddCards dialog that was opened
+    """Clear the AnkiHub ID field of the new note in the addcards.AddCards dialog that was opened
     when the Create Copy note context menu action was clicked."""
-    add_cards_dialog: AddCards
-    if not (add_cards_dialog := aqt.dialogs._dialogs.get("AddCards", [None, None])[1]):
+    add_cards_dialog: addcards.AddCards
+    if not (
+        add_cards_dialog := aqt.dialogs._dialogs.get("addcards.AddCards", [None, None])[
+            1
+        ]
+    ):
         return
 
     note = add_cards_dialog.editor.note

@@ -6,9 +6,7 @@ from copy import deepcopy
 from typing import Dict, List
 
 import aqt
-from anki.decks import DeckId
-from anki.models import NotetypeId
-from anki.notes import NoteId
+from anki import decks, models, notes
 
 from . import LOGGER
 from .addon_ankihub_client import AddonAnkiHubClient as AnkiHubClient
@@ -39,7 +37,7 @@ def create_ankihub_deck(
     aqt.mw.col.models._clear_cache()
 
     deck_id = aqt.mw.col.decks.id(deck_name)
-    note_ids = list(map(NoteId, aqt.mw.col.find_notes(f'deck:"{deck_name}"')))
+    note_ids = list(map(notes.NoteId, aqt.mw.col.find_notes(f'deck:"{deck_name}"')))
 
     note_type_mapping = _create_note_types_for_deck(deck_id)
     _change_note_types_of_notes(note_ids, note_type_mapping)
@@ -65,8 +63,10 @@ def create_ankihub_deck(
     return ankihub_did
 
 
-def _create_note_types_for_deck(deck_id: DeckId) -> Dict[NotetypeId, NotetypeId]:
-    result: Dict[NotetypeId, NotetypeId] = {}
+def _create_note_types_for_deck(
+    deck_id: decks.DeckId,
+) -> Dict[models.NotetypeId, models.NotetypeId]:
+    result: Dict[models.NotetypeId, models.NotetypeId] = {}
     model_ids = get_note_types_in_deck(deck_id)
     for mid in model_ids:
         new_model = deepcopy(aqt.mw.col.models.get(mid))
@@ -88,7 +88,7 @@ def _note_type_name_without_ankihub_modifications(name: str) -> str:
 
 
 def _change_note_types_of_notes(
-    note_ids: typing.List[NoteId], note_type_mapping: dict
+    note_ids: typing.List[notes.NoteId], note_type_mapping: dict
 ) -> None:
     LOGGER.info(
         f"Changing note types of notes according to mapping: {note_type_mapping}"
@@ -105,7 +105,7 @@ def _set_ankihub_id_fields_based_on_notes_data(notes_data: List[NoteInfo]) -> No
     updated_notes = []
     LOGGER.info("Assigning AnkiHub IDs to notes.")
     for note_data in notes_data:
-        note = aqt.mw.col.get_note(id=NoteId(note_data.anki_nid))
+        note = aqt.mw.col.get_note(id=notes.NoteId(note_data.anki_nid))
         note[ANKIHUB_NOTE_TYPE_FIELD_NAME] = str(note_data.ankihub_note_uuid)
         updated_notes.append(note)
     aqt.mw.col.update_notes(updated_notes)
@@ -113,7 +113,7 @@ def _set_ankihub_id_fields_based_on_notes_data(notes_data: List[NoteInfo]) -> No
 
 
 def _upload_deck(
-    did: DeckId,
+    did: decks.DeckId,
     notes_data: List[NoteInfo],
     private: bool,
     should_upload_assets: bool = False,

@@ -7,6 +7,7 @@ from typing import List, Optional
 
 import aqt
 from anki import notes
+from aqt import utils
 from aqt.qt import (
     QCheckBox,
     QComboBox,
@@ -25,7 +26,6 @@ from aqt.qt import (
     pyqtSignal,
     qconnect,
 )
-from aqt.utils import showText
 
 from .. import LOGGER
 from ..ankihub_client import (
@@ -220,7 +220,7 @@ def _on_suggest_notes_in_bulk_done(future: Future, parent: QWidget) -> None:
     )
 
     msg = msg_about_created_suggestions + msg_about_failed_suggestions
-    showText(msg, parent=parent)
+    utils.showText(msg, parent=parent)
 
 
 class SuggestionDialog(QDialog):

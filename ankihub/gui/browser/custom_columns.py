@@ -5,20 +5,20 @@ from typing import Optional, Sequence
 
 import aqt
 from anki import collection, notes, utils
-from aqt.browser import Browser, CellRow, Column, ItemId
+from aqt import browser
 
 from ...db import ankihub_db
 from ...utils import note_types_with_ankihub_id_field
 
 
 class CustomColumn:
-    builtin_column: Column
+    builtin_column: browser.Column
 
     def on_browser_did_fetch_row(
         self,
-        browser: Browser,
-        item_id: ItemId,
-        row: CellRow,
+        browser: browser.Browser,
+        item_id: browser.ItemId,
+        row: browser.CellRow,
         active_columns: Sequence[str],
     ) -> None:
         if (
@@ -53,7 +53,7 @@ class CustomColumn:
 
 
 class AnkiHubIdColumn(CustomColumn):
-    builtin_column = Column(
+    builtin_column = browser.Column(
         key="ankihub_id",
         cards_mode_label="AnkiHub ID",
         notes_mode_label="AnkiHub ID",
@@ -76,7 +76,7 @@ class AnkiHubIdColumn(CustomColumn):
 
 
 class EditedAfterSyncColumn(CustomColumn):
-    builtin_column = Column(
+    builtin_column = browser.Column(
         key="edited_after_sync",
         cards_mode_label="AnkiHub: Modified After Sync",
         notes_mode_label="AnkiHub: Modified After Sync",
@@ -114,7 +114,7 @@ class EditedAfterSyncColumn(CustomColumn):
 
 
 class UpdatedSinceLastReviewColumn(CustomColumn):
-    builtin_column = Column(
+    builtin_column = browser.Column(
         key="updated_since_last_review",
         cards_mode_label="AnkiHub: Updated Since Last Review",
         notes_mode_label="AnkiHub: Updated Since Last Review",

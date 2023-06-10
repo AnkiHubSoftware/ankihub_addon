@@ -959,7 +959,7 @@ def test_suggest_notes_in_bulk(
         with monkeypatch.context() as m:
             m.setattr("uuid.uuid4", lambda: new_note_ah_id)
             suggest_notes_in_bulk(
-                notes=notes,
+                notes_=notes,
                 auto_accept=False,
                 change_type=SuggestionType.NEW_CONTENT,
                 comment="test",

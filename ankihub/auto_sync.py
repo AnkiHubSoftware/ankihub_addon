@@ -5,7 +5,7 @@ from dataclasses import dataclass
 from time import sleep
 from typing import Callable
 
-from anki.hooks import wrap
+from anki import hooks
 from aqt import AnkiQt
 
 from . import LOGGER
@@ -29,7 +29,7 @@ def setup_auto_sync() -> None:
 
 
 def _setup_ankihub_sync_on_ankiweb_sync() -> None:
-    AnkiQt._sync_collection_and_media = wrap(  # type: ignore
+    AnkiQt._sync_collection_and_media = hooks.wrap(  # type: ignore
         AnkiQt._sync_collection_and_media,
         _on_ankiweb_sync,
         "around",
@@ -42,7 +42,7 @@ def _rate_limit_syncing() -> None:
     Syncing is not thread safe and from Sentry reports you can see that the DBErrors are raised when
     the sync is called multiple times in a short time frame (< 0.2 seconds). Not sure why this happens.
     """
-    AnkiQt._sync_collection_and_media = wrap(  # type: ignore
+    AnkiQt._sync_collection_and_media = hooks.wrap(  # type: ignore
         AnkiQt._sync_collection_and_media,
         _rate_limited,
         "around",

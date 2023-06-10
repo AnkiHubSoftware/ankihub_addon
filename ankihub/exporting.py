@@ -4,7 +4,7 @@ import re
 import uuid
 from typing import List, Optional
 
-from anki.notes import Note
+from anki import notes
 
 from .ankihub_client import Field, NoteInfo
 from .db import ankihub_db
@@ -15,7 +15,7 @@ from .note_conversion import (
 )
 
 
-def to_note_data(note: Note, set_new_id: bool = False) -> NoteInfo:
+def to_note_data(note: notes.Note, set_new_id: bool = False) -> NoteInfo:
     """Convert an Anki note to a NoteInfo object.
     Tags and fields are altered (internal and optional tags are removed, ankihub id field is removed, etc.).
     Protected fields are removed.
@@ -39,7 +39,7 @@ def to_note_data(note: Note, set_new_id: bool = False) -> NoteInfo:
     )
 
 
-def _prepare_fields(note: Note) -> List[Field]:
+def _prepare_fields(note: notes.Note) -> List[Field]:
 
     # Exclude the AnkiHub ID field since we don't want to expose this as an
     # editable field in AnkiHub suggestion forms.
@@ -66,7 +66,7 @@ def _prepared_field_html(html: str) -> str:
     return result
 
 
-def _prepare_tags(note: Note) -> Optional[List[str]]:
+def _prepare_tags(note: notes.Note) -> Optional[List[str]]:
 
     # Removing empty tags is necessary because notes have empty tags in the editor sometimes.
     # Stripping tags is necessary because Anki leaves whitespace at the end of tags sometimes.
