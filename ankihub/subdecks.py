@@ -45,8 +45,6 @@ def build_subdecks_and_move_cards_to_them(
         nids = ankihub_db.anki_nids_for_ankihub_deck(ankihub_did)
 
     root_deck_id = config.deck_config(ankihub_did).anki_id
-    if aqt.mw.col.decks.name_if_exists(root_deck_id) is None:
-        raise NotFoundError(f"Deck with id {root_deck_id} not found")
 
     # the anki root deck name name can be different from the ankihub deck name in the config
     anki_root_deck_name = aqt.mw.col.decks.name(root_deck_id)
