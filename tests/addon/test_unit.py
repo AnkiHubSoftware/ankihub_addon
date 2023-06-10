@@ -8,10 +8,8 @@ from typing import Callable, Generator, List
 from unittest.mock import Mock
 
 import pytest
-from anki.models import NotetypeDict
-from anki.notes import Note, NoteId
-from aqt import utils
-from aqt.qt import QDialogButtonBox
+from anki import models, notes
+from aqt import qt, utils
 from pytest import MonkeyPatch, fixture
 from pytest_anki import AnkiSession
 from pytestqt.qtbot import QtBot  # type: ignore
@@ -77,11 +75,11 @@ class TestUploadImagesForSuggestion:
                 '<span> <p>this note will not have its image replaced </p> <img src="will_not_replace.jpeg"> </span>',
             ]
 
-            notes: List[Note] = []
+            notes_: List[notes.Note] = []
             mw.col.decks.add_normal_deck_with_name("MediaTestDeck")
             for content in note_contents:
                 note = mw.col.new_note(mw.col.models.by_name("Basic"))
-                notes.append(note)
+                notes_.append(note)
                 note["Front"] = content
                 mw.col.add_note(note, mw.col.decks.by_name("MediaTestDeck")["id"])
 
@@ -92,18 +90,18 @@ class TestUploadImagesForSuggestion:
 
             suggestions._update_asset_names_on_notes(hashed_name_map)
 
-            notes[0].load()
-            notes[1].load()
-            notes[2].load()
+            notes_[0].load()
+            notes_[1].load()
+            notes_[2].load()
 
             assert f'<img src="{hashed_name_map["test.png"]}">' in " ".join(
-                notes[0].fields
+                notes_[0].fields
             )
             assert (
                 f"<img src='{hashed_name_map['other_test.gif']}' width='250'>"
-                in " ".join(notes[1].fields)
+                in " ".join(notes_[1].fields)
             )
-            assert '<img src="will_not_replace.jpeg">' in " ".join(notes[2].fields)
+            assert '<img src="will_not_replace.jpeg">' in " ".join(notes_[2].fields)
 
 
 def test_lowest_level_common_ancestor_deck_name():
@@ -390,7 +388,9 @@ class TestSuggestionDialog:
             assert not dialog.source_widget_group_box.isVisible()
 
         # Assert that the form submit button is enabled (it is disabled if the form input is invalid)
-        assert dialog.button_box.button(QDialogButtonBox.StandardButton.Ok).isEnabled()
+        assert dialog.button_box.button(
+            qt.QDialogButtonBox.StandardButton.Ok
+        ).isEnabled()
 
         # Assert that the form result is correct
         expected_source_text = (
@@ -433,7 +433,10 @@ class TestAnkiHubDBAnkiNidsToAnkiHubNids:
 
         # Retrieve a dict of anki_nid -> ankihub_note_uuid for two anki_nids.
         ah_nids_for_anki_nids = ankihub_db.anki_nids_to_ankihub_nids(
-            anki_nids=[NoteId(existing_anki_nid), NoteId(non_existing_anki_nid)]
+            anki_nids=[
+                notes.NoteId(existing_anki_nid),
+                notes.NoteId(non_existing_anki_nid),
+            ]
         )
 
         assert ah_nids_for_anki_nids == {
@@ -447,7 +450,7 @@ class TestAnkiHubDBMediaNamesForAnkiHubDeck:
     def setup_method_fixture(
         self,
         ankihub_db: _AnkiHubDB,
-        ankihub_basic_note_type: NotetypeDict,
+        ankihub_basic_note_type: models.NotetypeDict,
         next_deterministic_uuid: Callable[[], uuid.UUID],
     ):
         self.mid = ankihub_basic_note_type["id"]
@@ -654,8 +657,8 @@ def test_error_dialog(qtbot: QtBot, monkeypatch: MonkeyPatch):
     # Check that the Yes button opens a link (to the AnkiHub forum).
     open_link_mock = Mock()
     monkeypatch.setattr(utils, "openLink", open_link_mock)
-    dialog.button_box.button(QDialogButtonBox.StandardButton.Yes).click()
+    dialog.button_box.button(qt.QDialogButtonBox.StandardButton.Yes).click()
     open_link_mock.assert_called_once()
 
     # Check that clicking the No button does not throw an exception.
-    dialog.button_box.button(QDialogButtonBox.StandardButton.No).click()
+    dialog.button_box.button(qt.QDialogButtonBox.StandardButton.No).click()

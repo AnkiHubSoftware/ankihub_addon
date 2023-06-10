@@ -6,7 +6,7 @@ from unittest.mock import Mock
 
 import pytest
 from anki import models
-from aqt.main import AnkiQt
+from aqt import main
 from pytest import MonkeyPatch, fixture
 from pytest_anki import AnkiSession
 from requests_mock import Mocker
@@ -62,7 +62,7 @@ def ankihub_basic_note_type(
 
 
 def create_or_get_ah_version_of_note_type(
-    mw: AnkiQt, note_type: models.NotetypeDict
+    mw: main.AnkiQt, note_type: models.NotetypeDict
 ) -> models.NotetypeDict:
     note_type = copy.deepcopy(note_type)
     note_type["id"] = 0
