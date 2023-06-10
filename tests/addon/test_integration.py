@@ -557,9 +557,9 @@ class TestDownloadAndInstallDecks:
         add_mock(AnkiHubClient, "get_protected_tags", [])
 
         # Patch away gui functions which would otherwise block the test
-        add_mock(operations.deck_installation, "showInfo")
+        add_mock(operations.deck_installation.utils, "showInfo")
+        add_mock(operations.deck_installation.emptycards, "show_empty_cards")
         add_mock(operations.deck_installation, "ask_user", return_value=True)
-        add_mock(operations.deck_installation, "show_empty_cards")
 
         # Mock media sync
         add_mock(media_sync._AnkiHubMediaSync, "start_media_download")
