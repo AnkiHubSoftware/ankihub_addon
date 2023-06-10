@@ -1427,7 +1427,7 @@ class TestAnkiHubImporter:
                         Field(name="Text", value="{{c1::foo}} {{c2::bar}}", order=0)
                     ],
                     tags=[],
-                    mid=note.model()["id"],
+                    mid=note.note_type()["id"],
                     last_update_type=None,
                     guid=note.guid,
                 )
