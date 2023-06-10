@@ -127,7 +127,7 @@ def create_note_type_with_id(
     aqt.mw.col.models._clear_cache()  # TODO check if this is necessary
 
     LOGGER.info(f"Created note type: {mid}")
-    LOGGER.info(f"notes.Note type:\n {pformat(note_type)}")
+    LOGGER.info(f"Note type:\n {pformat(note_type)}")
 
 
 def note_type_contains_field(
@@ -172,7 +172,7 @@ def reset_note_types_of_notes(
 
     for anki_nid, target_note_type_id, _ in note_type_conflicts:
         LOGGER.info(
-            f"notes.Note types differ: anki_nid: {anki_nid} target_note_type_id {target_note_type_id}",
+            f"Note types differ: anki_nid: {anki_nid} target_note_type_id {target_note_type_id}",
         )
         change_note_type_of_note(anki_nid, target_note_type_id)
         LOGGER.info(
@@ -207,7 +207,7 @@ ANKIHUB_TEMPLATE_SNIPPET_RE = (
 
 
 def modify_note_type(note_type: models.NotetypeDict) -> None:
-    """Adds the AnkiHub ID Field to the notes.Note Type and modifies the card templates."""
+    """Adds the AnkiHub ID Field to the Note Type and modifies the card templates."""
     LOGGER.info(f"Modifying note type {note_type['name']}")
 
     modify_fields(note_type)
@@ -251,7 +251,7 @@ def add_view_on_ankihub_snippet_to_template(template: Dict) -> None:
         {{{{#{ANKIHUB_NOTE_TYPE_FIELD_NAME}}}}}
         <a class='ankihub-view-note'
             href='{url_view_note()}{{{{{ANKIHUB_NOTE_TYPE_FIELD_NAME}}}}}'>
-            View notes.Note on AnkiHub
+            View Note on AnkiHub
         </a>
 
         <style>
@@ -349,7 +349,7 @@ def undo_note_type_modfications(note_type_ids: Iterable[models.NotetypeId]) -> N
 
 
 def undo_note_type_modification(note_type: Dict) -> None:
-    """Removes the AnkiHub Field from the notes.Note Type and modifies the template to
+    """Removes the AnkiHub Field from the Note Type and modifies the template to
     remove the field.
     """
     LOGGER.info(f"Undoing modification of note type {note_type['name']}")

@@ -59,6 +59,6 @@ def _on_subdecks_updated(future: Future):
 
     show_tooltip("Subdecks updated.")
     aqt.mw.deckBrowser.refresh()
-    browser_: Optional[browser.Browser] = dialogs._dialogs["browser.Browser"][1]
+    browser_: Optional[browser.Browser] = dialogs._dialogs["Browser"][1]
     if browser_ is not None:
         browser_.sidebar.refresh()

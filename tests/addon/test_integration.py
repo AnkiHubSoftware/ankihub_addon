@@ -273,7 +273,7 @@ def test_editor(
             "ankihub.gui.suggestion_dialog.SuggestionDialog.exec", Mock()
         )
 
-        add_cards_dialog: addcards.AddCards = dialogs.open("addcards.AddCards", mw)
+        add_cards_dialog: addcards.AddCards = dialogs.open("AddCards", mw)
         editor = add_cards_dialog.editor
 
         # test a new note suggestion
@@ -953,7 +953,7 @@ def test_suggest_notes_in_bulk(
         with monkeypatch.context() as m:
             m.setattr("uuid.uuid4", lambda: new_note_ah_id)
             suggest_notes_in_bulk(
-                notes_=notes,
+                notes_=notes_,
                 auto_accept=False,
                 change_type=SuggestionType.NEW_CONTENT,
                 comment="test",
@@ -2186,9 +2186,7 @@ class TestBrowserTreeView:
 
             install_sample_ah_deck()
 
-            browser_: browser.Browser = dialogs.open(
-                "browser.browser.browser.Browser", mw
-            )
+            browser_: browser.Browser = dialogs.open("Browser", mw)
 
             qtbot.wait(500)
             sidebar: SidebarTreeView = browser_.sidebar
@@ -2212,7 +2210,7 @@ class TestBrowserTreeView:
                 item.name for item in updated_today_item.children
             ]
             assert updated_today_child_item_names == [
-                "New notes.Note",
+                "New Note",
                 *[x.value[1] for x in SuggestionType],
             ]
 
@@ -2254,9 +2252,7 @@ class TestBrowserTreeView:
             note.tags = [TAG_FOR_PROTECTING_FIELDS, SUBDECK_TAG, TAG_FOR_OPTIONAL_TAGS]
             note.flush()
 
-            browser_: browser.Browser = dialogs.open(
-                "browser.browser.browser.Browser", mw
-            )
+            browser_: browser.Browser = dialogs.open("Browser", mw)
 
             qtbot.wait(500)
             sidebar: SidebarTreeView = browser_.sidebar
@@ -2297,7 +2293,7 @@ def test_browser_custom_columns(
 
         notes_data = ankihub_sample_deck_notes_data()
 
-        browser_: browser.Browser = dialogs.open("browser.browser.browser.Browser", mw)
+        browser_: browser.Browser = dialogs.open("Browser", mw)
         browser_.search_for("")
         qtbot.wait(500)
 
@@ -2573,9 +2569,7 @@ def test_create_copy_browser_action_does_not_copy_ah_nid(
         browser_.on_create_copy()
 
         # Check that the ANKIHUB_NOTE_TYPE_FIELD_NAME field is empty.
-        add_cards_dialog: addcards.AddCards = aqt.dialogs._dialogs["addcards.AddCards"][
-            1
-        ]
+        add_cards_dialog: addcards.AddCards = aqt.dialogs._dialogs["AddCards"][1]
         note = add_cards_dialog.editor.note
         assert note.fields == ["front", "back", ""]
 
@@ -3131,7 +3125,7 @@ def test_reset_optional_tags_action(
         )
 
         # run the reset action
-        browser_: browser.Browser = dialogs.open("browser.browser.browser.Browser", mw)
+        browser_: browser.Browser = dialogs.open("Browser", mw)
         qtbot.wait(300)
 
         _on_reset_optional_tags_action(browser_)

@@ -813,11 +813,7 @@ def _after_create_copy(*args, **kwargs) -> None:
     """Clear the AnkiHub ID field of the new note in the addcards.AddCards dialog that was opened
     when the Create Copy note context menu action was clicked."""
     add_cards_dialog: addcards.AddCards
-    if not (
-        add_cards_dialog := aqt.dialogs._dialogs.get("addcards.AddCards", [None, None])[
-            1
-        ]
-    ):
+    if not (add_cards_dialog := aqt.dialogs._dialogs.get("AddCards", [None, None])[1]):
         return
 
     note = add_cards_dialog.editor.note

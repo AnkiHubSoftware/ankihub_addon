@@ -76,7 +76,7 @@ def open_suggestion_dialog_for_note(note: notes.Note, parent: QWidget) -> None:
 
     assert ankihub_db.is_ankihub_note_type(
         note.mid
-    ), f"notes.Note type {note.mid} is not associated with an AnkiHub deck."
+    ), f"Note type {note.mid} is not associated with an AnkiHub deck."
 
     ah_nid = ankihub_db.ankihub_nid_for_anki_nid(note.id)
     ah_did = ankihub_db.ankihub_did_for_note_type(note.mid)
@@ -212,7 +212,7 @@ def _on_suggest_notes_in_bulk_done(future: Future, parent: QWidget) -> None:
             f"Failed to submit suggestions for {len(suggestions_result.errors_by_nid)} note(s).\n"
             "All notes with failed suggestions:\n"
             f'{", ".join(str(nid) for nid in suggestions_result.errors_by_nid.keys())}\n\n'
-            f"notes.Notes without changes ({len(notes_without_changes)}):\n"
+            f"Notes without changes ({len(notes_without_changes)}):\n"
             f'{", ".join(str(nid) for nid in notes_without_changes)}\n'
         )
         if suggestions_result.errors_by_nid
@@ -245,7 +245,7 @@ class SuggestionDialog(QDialog):
 
     def _setup_ui(self) -> None:
         self.setWindowModality(Qt.WindowModality.WindowModal)
-        self.setWindowTitle("notes.Note Suggestion(s)")
+        self.setWindowTitle("Note Suggestion(s)")
 
         self.layout_ = QVBoxLayout()
         self.setLayout(self.layout_)

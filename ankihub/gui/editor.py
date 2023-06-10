@@ -41,7 +41,7 @@ def _setup_additional_editor_buttons():
     gui_hooks.editor_did_load_note.append(_refresh_buttons)
     gui_hooks.add_cards_did_change_note_type.append(_on_add_cards_did_change_notetype)
 
-    editor_.Editor.ankihub_command = AnkiHubCommands.CHANGE.value  # type: ignore
+    editor.Editor.ankihub_command = AnkiHubCommands.CHANGE.value  # type: ignore
 
 
 def _setup_hide_ankihub_field():

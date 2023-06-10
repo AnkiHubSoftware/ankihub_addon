@@ -72,7 +72,7 @@ class AnkiHubIdColumn(CustomColumn):
             else:
                 return "ID Pending"
         else:
-            return "Not AnkiHub notes.Note Type"
+            return "Not AnkiHub Note Type"
 
 
 class EditedAfterSyncColumn(CustomColumn):
