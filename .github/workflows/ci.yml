@@ -57,7 +57,7 @@ jobs:
           GOOGLE_API_KEY: ${{ secrets.GOOGLE_API_KEY }}
 
       - name: Run mypy
-        run: mypy ankihub
+        run: mypy
 
       - name: Enable cloning web app repo
         uses: webfactory/ssh-agent@v0.5.4
