@@ -58,7 +58,6 @@ jobs:
 
       - name: Run mypy
         run: mypy ankihub
-        continue-on-error: true
 
       - name: Enable cloning web app repo
         uses: webfactory/ssh-agent@v0.5.4
