@@ -4,7 +4,6 @@ import os
 import re
 import tempfile
 import uuid
-from concurrent.futures import Future
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
 from time import sleep
@@ -444,12 +443,7 @@ class TestDownloadAndInstallDecks:
         anki_session_with_addon_data: AnkiSession,
         monkeypatch: MonkeyPatch,
         qtbot: QtBot,
-        set_feature_flag_state,
     ):
-        set_feature_flag_state(
-            feature_flag_name="new_subscription_workflow_enabled", is_active=True
-        )
-
         anki_session = anki_session_with_addon_data
         with anki_session.profile_loaded():
             mw = anki_session.mw
@@ -492,55 +486,6 @@ class TestDownloadAndInstallDecks:
                     mock.call_count == 1
                 ), f"Mock {name} was not called once, but {mock.call_count} times"
 
-    @pytest.mark.qt_no_exception_capture
-    def test_error_handling(
-        self,
-        anki_session_with_addon_data: AnkiSession,
-        monkeypatch: MonkeyPatch,
-        qtbot: QtBot,
-        set_feature_flag_state,
-    ):
-        # The error handling is only used in the old subscription workflow
-        set_feature_flag_state(
-            feature_flag_name="new_subscription_workflow_enabled", is_active=False
-        )
-
-        anki_session = anki_session_with_addon_data
-        with anki_session.profile_loaded():
-            mw = anki_session.mw
-
-            note_type = create_or_get_ah_version_of_note_type(
-                mw, aqt.mw.col.models.by_name("Basic")
-            )
-            notes_data = [NoteInfoFactory.create(mid=note_type["id"])]
-            deck = DeckFactory.create()
-
-            self._mock_client_and_gui_and_media_sync(
-                monkeypatch, deck, notes_data, note_type
-            )
-
-            def raise_http_403(*args, **kwargs):
-                raise AnkiHubHTTPError(response=Mock(status_code=403))
-
-            # Mock get_deck_by_id to raise an exception
-            get_deck_by_id_mock = Mock()
-            get_deck_by_id_mock.side_effect = raise_http_403
-            monkeypatch.setattr(
-                AnkiHubClient,
-                "get_deck_by_id",
-                get_deck_by_id_mock,
-            )
-
-            # Try to download and install the deck
-            on_done_mock = Mock()
-            download_and_install_decks([deck.ankihub_deck_uuid], on_done=on_done_mock)
-            qtbot.wait(300)
-
-            # Assert that the on_done callback was called
-            on_done_mock.assert_called_once()
-            future: Future = on_done_mock.call_args[0][0]
-            assert future.exception() is None
-
     def _mock_client_and_gui_and_media_sync(
         self,
         monkeypatch: MonkeyPatch,
@@ -579,12 +524,7 @@ class TestCheckAndInstallNewDeckSubscriptions:
         anki_session_with_addon_data: AnkiSession,
         qtbot: QtBot,
         mock_function: MockFunctionProtocol,
-        set_feature_flag_state,
     ):
-        set_feature_flag_state(
-            feature_flag_name="new_subscription_workflow_enabled", is_active=True
-        )
-
         anki_session = anki_session_with_addon_data
         with anki_session.profile_loaded():
 
@@ -632,12 +572,7 @@ class TestCheckAndInstallNewDeckSubscriptions:
         anki_session_with_addon_data: AnkiSession,
         qtbot: QtBot,
         mock_function: MockFunctionProtocol,
-        set_feature_flag_state,
     ):
-        set_feature_flag_state(
-            feature_flag_name="new_subscription_workflow_enabled", is_active=True
-        )
-
         anki_session = anki_session_with_addon_data
         with anki_session.profile_loaded():
 
@@ -671,12 +606,7 @@ class TestCheckAndInstallNewDeckSubscriptions:
         anki_session_with_addon_data: AnkiSession,
         qtbot: QtBot,
         mock_function: MockFunctionProtocol,
-        set_feature_flag_state,
     ):
-        set_feature_flag_state(
-            feature_flag_name="new_subscription_workflow_enabled", is_active=True
-        )
-
         anki_session = anki_session_with_addon_data
         with anki_session.profile_loaded():
 
@@ -705,12 +635,7 @@ class TestCheckAndInstallNewDeckSubscriptions:
         anki_session_with_addon_data: AnkiSession,
         qtbot: QtBot,
         mock_function: MockFunctionProtocol,
-        set_feature_flag_state,
     ):
-        set_feature_flag_state(
-            feature_flag_name="new_subscription_workflow_enabled", is_active=True
-        )
-
         anki_session = anki_session_with_addon_data
         with anki_session.profile_loaded():
 
@@ -1610,12 +1535,10 @@ def create_copy_of_note_type(mw: AnkiQt, note_type: NotetypeDict) -> NotetypeDic
     return new_model
 
 
-@pytest.mark.parametrize("is_flag_active", [True, False])
 def test_unsubscribe_from_deck(
     anki_session_with_addon_data: AnkiSession,
     install_sample_ah_deck: InstallSampleAHDeck,
     qtbot: QtBot,
-    set_feature_flag_state,
     monkeypatch: MonkeyPatch,
     is_flag_active: bool,
     requests_mock: Mocker,
@@ -1623,9 +1546,6 @@ def test_unsubscribe_from_deck(
     from aqt import mw
 
     anki_session = anki_session_with_addon_data
-    set_feature_flag_state(
-        feature_flag_name="new_subscription_workflow_enabled", is_active=is_flag_active
-    )
     with anki_session.profile_loaded():
         anki_deck_id, ah_did = install_sample_ah_deck()
 
@@ -2330,12 +2250,7 @@ class TestSubscribedDecksDialog:
         qtbot: QtBot,
         install_sample_ah_deck: InstallSampleAHDeck,
         monkeypatch: MonkeyPatch,
-        set_feature_flag_state,
     ):
-        set_feature_flag_state(
-            feature_flag_name="new_subscription_workflow_enabled", is_active=True
-        )
-
         anki_session = anki_session_with_addon_data
         with anki_session.profile_loaded():
             mw = anki_session.mw
@@ -3158,12 +3073,7 @@ def test_download_images_on_sync(
     install_sample_ah_deck: InstallSampleAHDeck,
     monkeypatch: MonkeyPatch,
     qtbot: QtBot,
-    set_feature_flag_state,
 ):
-    set_feature_flag_state(
-        feature_flag_name="new_subscription_workflow_enabled", is_active=True
-    )
-
     with anki_session_with_addon_data.profile_loaded():
         mw = anki_session_with_addon_data.mw
 

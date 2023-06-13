@@ -8,12 +8,11 @@ from typing import Callable, List
 import aqt
 from aqt.emptycards import show_empty_cards
 from aqt.operations.tag import clear_unused_tags
-from aqt.utils import showInfo, showText
+from aqt.utils import showInfo
 
 from ... import LOGGER
 from ...addon_ankihub_client import AddonAnkiHubClient as AnkiHubClient
 from ...ankihub_client import NoteInfo
-from ...ankihub_client.ankihub_client import AnkiHubHTTPError
 from ...ankihub_client.models import UserDeckRelation
 from ...importing import AnkiHubImporter, AnkiHubImportResult
 from ...media_sync import media_sync
@@ -22,7 +21,7 @@ from ...subdecks import deck_contains_subdeck_tags
 from ...utils import create_backup
 from ..exceptions import DeckDownloadAndInstallError
 from ..messages import messages
-from ..utils import ask_user, show_error_dialog
+from ..utils import ask_user
 from .subdecks import confirm_and_toggle_subdecks
 from .utils import future_with_exception, future_with_result
 
@@ -104,28 +103,6 @@ def _maybe_handle_deck_download_and_install_error(
     This function is only used for the old subscription workflow.
     In the new workflow this is not needed, because users can't try to install deck that they
     are not subscribed to."""
-    if AnkiHubClient().is_feature_flag_enabled("new_subscription_workflow_enabled"):
-        return False
-
-    if not isinstance(e.original_exception, AnkiHubHTTPError):
-        return False
-
-    http_error: AnkiHubHTTPError = e.original_exception
-
-    if http_error.response.status_code == 404:
-        showText(
-            f"Deck {e.ankihub_did} doesn't exist. Please make sure to copy/paste "
-            f"the correct ID. If you believe this is an error, please reach "
-            f"out to user support at help@ankipalace.com."
-        )
-        return True
-    elif http_error.response.status_code == 403:
-        response_data = http_error.response.json()
-        error_message = response_data.get("detail")
-        if error_message:
-            show_error_dialog(error_message, title="Error downloading Deck :(")
-            return True
-
     return False
 
 

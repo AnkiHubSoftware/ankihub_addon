@@ -41,9 +41,6 @@ class SubscribedDecksDialog(QDialog):
     def __init__(self):
         super(SubscribedDecksDialog, self).__init__()
         self.client = AnkiHubClient()
-        self.new_subscription_workflow_enabled = self.client.is_feature_flag_enabled(
-            "new_subscription_workflow_enabled"
-        )
         self.setWindowTitle("Subscribed AnkiHub Decks")
         self._setup_ui()
         self._on_item_selection_changed()
@@ -63,14 +60,9 @@ class SubscribedDecksDialog(QDialog):
         self.decks_list = QListWidget()
         qconnect(self.decks_list.itemSelectionChanged, self._on_item_selection_changed)
 
-        if self.new_subscription_workflow_enabled:
-            self.browse_btn = QPushButton("Browse Decks")
-            self.box_right.addWidget(self.browse_btn)
-            qconnect(self.browse_btn.clicked, lambda: openLink(url_decks()))
-        else:
-            self.add_btn = QPushButton("Add")
-            self.box_right.addWidget(self.add_btn)
-            qconnect(self.add_btn.clicked, self._on_add)
+        self.browse_btn = QPushButton("Browse Decks")
+        self.box_right.addWidget(self.browse_btn)
+        qconnect(self.browse_btn.clicked, lambda: openLink(url_decks()))
 
         self.unsubscribe_btn = QPushButton("Unsubscribe")
         self.box_right.addWidget(self.unsubscribe_btn)
@@ -104,23 +96,16 @@ class SubscribedDecksDialog(QDialog):
 
     def _refresh_decks_list(self) -> None:
         self.decks_list.clear()
-        if self.new_subscription_workflow_enabled:
-            for deck in self.client.get_deck_subscriptions():
-                name = deck.name
-                if deck.is_user_relation_owner:
-                    item = QListWidgetItem(f"{name} (Created by you)")
-                elif deck.is_user_relation_maintainer:
-                    item = QListWidgetItem(f"{name} (Maintained by you)")
-                else:
-                    item = QListWidgetItem(name)
-                item.setData(Qt.ItemDataRole.UserRole, deck.ankihub_deck_uuid)
-                self.decks_list.addItem(item)
-        else:
-            for ah_did in config.deck_ids():
-                name = config.deck_config(ah_did).name
+        for deck in self.client.get_deck_subscriptions():
+            name = deck.name
+            if deck.is_user_relation_owner:
+                item = QListWidgetItem(f"{name} (Created by you)")
+            elif deck.is_user_relation_maintainer:
+                item = QListWidgetItem(f"{name} (Maintained by you)")
+            else:
                 item = QListWidgetItem(name)
-                item.setData(Qt.ItemDataRole.UserRole, ah_did)
-                self.decks_list.addItem(item)
+            item.setData(Qt.ItemDataRole.UserRole, deck.ankihub_deck_uuid)
+            self.decks_list.addItem(item)
 
     def _refresh_anki(self) -> None:
         op = OpChanges()
@@ -165,8 +150,7 @@ class SubscribedDecksDialog(QDialog):
 
         for item in items:
             ankihub_did: UUID = item.data(Qt.ItemDataRole.UserRole)
-            if self.new_subscription_workflow_enabled:
-                self.client.unsubscribe_from_deck(ankihub_did)
+            self.client.unsubscribe_from_deck(ankihub_did)
             config.remove_deck(ankihub_did)
             self._clear_deck_changes(ankihub_did)
 
