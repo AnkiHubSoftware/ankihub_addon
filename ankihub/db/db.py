@@ -192,6 +192,7 @@ class _AnkiHubDB:
                         )
                     ]
                 )
+                note_data.tags = [tag for tag in note_data.tags if tag is not None]
                 conn.execute(
                     """
                     INSERT OR REPLACE INTO notes (
