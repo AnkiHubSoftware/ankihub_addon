@@ -71,8 +71,8 @@ def refresh_ankihub_menu() -> None:
         _create_collaborative_deck_setup(parent=menu_state.ankihub_menu)
         _subscribed_decks_setup(parent=menu_state.ankihub_menu)
         _sync_with_ankihub_setup(parent=menu_state.ankihub_menu)
-        _import_media_setup(parent=menu_state.ankihub_menu)
         _media_sync_status_setup(parent=menu_state.ankihub_menu)
+        _import_media_setup(parent=menu_state.ankihub_menu)
         _upload_deck_assets_setup(parent=menu_state.ankihub_menu)
         _ankihub_logout_setup(parent=menu_state.ankihub_menu)
     else:
