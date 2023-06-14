@@ -36,12 +36,7 @@ def download_and_install_decks(
         try:
             import_results: List[AnkiHubImportResult] = future.result()
         except Exception as e:
-            if isinstance(
-                e, DeckDownloadAndInstallError
-            ) and _maybe_handle_deck_download_and_install_error(e):
-                on_done(future_with_result(None))
-            else:
-                on_done(future_with_exception(e))
+            on_done(future_with_exception(e))
             return
 
         try:
@@ -93,17 +88,6 @@ def download_and_install_decks(
         )
     except Exception as e:
         on_done(future_with_exception(e))
-
-
-def _maybe_handle_deck_download_and_install_error(
-    e: DeckDownloadAndInstallError,
-) -> bool:
-    """Checks the given exception and handles it if it's a known error. Returns True if the error
-    was handled, False otherwise.
-    This function is only used for the old subscription workflow.
-    In the new workflow this is not needed, because users can't try to install deck that they
-    are not subscribed to."""
-    return False
 
 
 def _download_and_install_decks_inner(
