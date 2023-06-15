@@ -1540,7 +1540,6 @@ def test_unsubscribe_from_deck(
     install_sample_ah_deck: InstallSampleAHDeck,
     qtbot: QtBot,
     monkeypatch: MonkeyPatch,
-    is_flag_active: bool,
     requests_mock: Mocker,
 ):
     from aqt import mw
@@ -1556,26 +1555,25 @@ def test_unsubscribe_from_deck(
             "ankihub.settings._Config.is_logged_in",
             lambda *args, **kwargs: True,
         )
-        if is_flag_active:
-            deck = mw.col.decks.get(anki_deck_id)
-            requests_mock.get(
-                f"{DEFAULT_API_URL}/decks/subscriptions/",
-                status_code=200,
-                json=[
-                    {
-                        "deck": {
-                            "id": str(ah_did),
-                            "name": deck["name"],
-                            "owner": 1,
-                            "anki_id": anki_deck_id,
-                            "csv_last_upload": None,
-                            "csv_notes_filename": "",
-                            "image_upload_finished": True,
-                            "user_relation": "subscriber",
-                        }
+        deck = mw.col.decks.get(anki_deck_id)
+        requests_mock.get(
+            f"{DEFAULT_API_URL}/decks/subscriptions/",
+            status_code=200,
+            json=[
+                {
+                    "deck": {
+                        "id": str(ah_did),
+                        "name": deck["name"],
+                        "owner": 1,
+                        "anki_id": anki_deck_id,
+                        "csv_last_upload": None,
+                        "csv_notes_filename": "",
+                        "image_upload_finished": True,
+                        "user_relation": "subscriber",
                     }
-                ],
-            )
+                }
+            ],
+        )
         dialog = SubscribedDecksDialog()
         qtbot.wait(500)
 
@@ -1587,17 +1585,15 @@ def test_unsubscribe_from_deck(
             "ankihub.gui.decks_dialog.ask_user",
             lambda *args, **kwargs: True,
         )
-        if is_flag_active:
-            requests_mock.get(
-                f"{DEFAULT_API_URL}/decks/subscriptions/", status_code=200, json=[]
-            )
-            with patch.object(
-                AnkiHubClient, "unsubscribe_from_deck"
-            ) as unsubscribe_from_deck_mock:
-                qtbot.mouseClick(dialog.unsubscribe_btn, Qt.MouseButton.LeftButton)
-                unsubscribe_from_deck_mock.assert_called_once()
-        else:
+
+        requests_mock.get(
+            f"{DEFAULT_API_URL}/decks/subscriptions/", status_code=200, json=[]
+        )
+        with patch.object(
+            AnkiHubClient, "unsubscribe_from_deck"
+        ) as unsubscribe_from_deck_mock:
             qtbot.mouseClick(dialog.unsubscribe_btn, Qt.MouseButton.LeftButton)
+            unsubscribe_from_deck_mock.assert_called_once()
 
         assert dialog.decks_list.count() == 0
 
