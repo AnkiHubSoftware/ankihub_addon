@@ -21,9 +21,13 @@ jobs:
           git config user.email "ankihub-addon-bot@noreply.github.com"
 
       - name: Setup Python
-        uses: actions/setup-python@v2.2.1
+        uses: actions/setup-python@v4
         with:
-          python-version: 3.8
+          python-version: "3.9"
+
+      - name: Install deps
+        run: |
+          python -m pip install -r ./requirements/base.txt
 
       - name: Create ankiaddon file
         run: |
