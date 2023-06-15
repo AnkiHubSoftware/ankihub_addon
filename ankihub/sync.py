@@ -62,16 +62,11 @@ class _AnkiHubSync:
         create_backup()
 
         client = AnkiHubClient()
-        if client.is_feature_flag_enabled("new_subscription_workflow_enabled"):
-            subscribed_ah_dids = [
-                deck.ankihub_deck_uuid for deck in client.get_deck_subscriptions()
-            ]
-            installed_ah_dids = config.deck_ids()
-            to_sync_ah_dids = list(
-                set(subscribed_ah_dids).intersection(installed_ah_dids)
-            )
-        else:
-            to_sync_ah_dids = config.deck_ids()
+        subscribed_ah_dids = [
+            deck.ankihub_deck_uuid for deck in client.get_deck_subscriptions()
+        ]
+        installed_ah_dids = config.deck_ids()
+        to_sync_ah_dids = list(set(subscribed_ah_dids).intersection(installed_ah_dids))
 
         for ah_did in to_sync_ah_dids:
             try:
