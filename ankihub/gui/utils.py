@@ -180,8 +180,8 @@ def ask_user(
 
     msg = QMessageBox(parent=parent)
     msg.setWindowTitle(title)
-    msg.setText(text)
     msg.setTextFormat(Qt.TextFormat.RichText)
+    msg.setText(text)
 
     yes_button = msg.addButton(
         yes_button_label,
