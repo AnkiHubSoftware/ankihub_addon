@@ -53,7 +53,10 @@ def upload(
 
     with open(description_file_path) as f:
         description = f.read()
-    web.type(description, id="desc")
+
+    # web.type doesn't handle unicode characters correctly
+    driver = web.driver
+    driver.execute_script(f'document.getElementById("desc").value = "{description}"')
 
     # optional values
     def enter_optional_value(dict_, key, into="", id=""):
