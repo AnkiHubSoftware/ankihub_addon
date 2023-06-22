@@ -56,7 +56,7 @@ def upload(
 
     # web.type doesn't handle unicode characters correctly
     driver = web.driver
-    driver.execute_script(f'document.getElementById("desc").value = "{description}"')
+    driver.find_element_by_id("desc").send_keys(description)
 
     # optional values
     def enter_optional_value(dict_, key, into="", id=""):
