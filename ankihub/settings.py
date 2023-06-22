@@ -504,7 +504,7 @@ ICONS_PATH = ADDON_PATH / "gui/icons"
 TOKEN_SLUG = "token"
 USER_EMAIL_SLUG = "user_email"
 
-USER_SUPPORT_EMAIL_SLUG = "help@ankipalace.com"
+USER_SUPPORT_EMAIL_SLUG = "support@ankihub.net"
 
 ANKI_MINOR = int(ANKI_VERSION.split(".")[2])
 
