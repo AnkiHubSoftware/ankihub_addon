@@ -6,6 +6,8 @@ on:
     secrets:
       GOOGLE_API_KEY:
         required: true
+      ANKIWEB_USERNAME:
+        required: true
       ANKIWEB_PASSWORD:
         required: true
 
@@ -45,5 +47,5 @@ jobs:
         run: |
           python scripts/upload_to_ankiweb.py ankihub.ankiaddon ankiweb_description.html https://ankihub.net/support
         env:
-          ANKI_USERNAME: hub@ankipalace.com
+          ANKI_USERNAME: ${{ secrets.ANKIWEB_USERNAME }}
           ANKI_PASSWORD: ${{ secrets.ANKIWEB_PASSWORD }}
