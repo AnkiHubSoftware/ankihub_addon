@@ -1,3 +1,4 @@
+"""Code for handling notes that were deleted on the webapp."""
 import json
 import uuid
 from pathlib import Path
@@ -28,8 +29,10 @@ def handle_notes_deleted_from_webapp() -> None:
 
 
 def _mark_notes_in_anki_and_delete_from_db(ah_nids: List[uuid.UUID]) -> None:
-    """Clear ankihub id fields and add a ankihub-deleted tag for the notes in Anki and
-    delete notes from the AnkiHub DB."""
+    """Clear ankihub id fields and add a special tag for the notes in Anki.
+    Delete the notes from the AnkiHub DB.
+    We don't delete the notes from the Anki collection because we don't want to
+    delete notes that people have studied."""
 
     anki_nids = [x for x in ankihub_db.ankihub_nids_to_anki_nids(ah_nids).values() if x]
     anki_nids_which_exist_in_anki_db = aqt.mw.col.db.list(
