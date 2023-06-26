@@ -20,7 +20,7 @@ DELETED_NOTES_FILE = (
 
 
 def handle_notes_deleted_from_webapp() -> None:
-    """Delete notes locally which were deleted from the webapp from the AnKing deck.
+    """Handle notes which were deleted from the webapp from the AnKing deck.
     This is a temporary solution just for these notes. In the future, we should
     handle note deletion during sync."""
     ah_nids_strings = json.loads(DELETED_NOTES_FILE.read_text())["ankihub_note_ids"]
