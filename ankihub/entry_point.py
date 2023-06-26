@@ -88,7 +88,7 @@ def _after_profile_setup():
 
     # This deletes notes that were deleted from the web app. This is not a general solution,
     # just a temporary fix for notes that were already manually deleted on the webapp.
-    # Later we should have handle note deletion in the sync process.
+    # Later we should handle note deletion in the sync process.
     handle_notes_deleted_from_webapp()
 
 
