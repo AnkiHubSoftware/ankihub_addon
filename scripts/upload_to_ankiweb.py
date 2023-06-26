@@ -5,6 +5,7 @@ from argparse import ArgumentParser
 from pathlib import Path
 from zipfile import ZipFile
 
+from selenium.webdriver.common.by import By
 from webbot import Browser
 from webdriver_manager.chrome import ChromeDriverManager
 
@@ -30,8 +31,8 @@ def upload(
     # use webbot to upload the add-on
     web = Browser(showWindow=show_window, driverPath=webdriver_path)
     web.go_to("https://ankiweb.net/shared/upload")
-    web.type(ankiweb_username, into="username")
-    web.type(ankiweb_password, into="password")
+    web.type(ankiweb_username, into="Email")
+    web.type(ankiweb_password, into="Password")
     web.press(web.Key.ENTER)
 
     time.sleep(2)
@@ -54,9 +55,13 @@ def upload(
     with open(description_file_path) as f:
         description = f.read()
 
-    # web.type doesn't handle unicode characters correctly
+    # web.type doesn't handle unicode characters correctly, so we use javascript
     driver = web.driver
-    driver.find_element_by_id("desc").send_keys(description)
+    description_field = driver.find_element(By.ID, "desc")
+    escaped_description = json.dumps(description)
+    driver.execute_script(
+        "arguments[0].value = " + escaped_description, description_field
+    )
 
     # optional values
     def enter_optional_value(dict_, key, into="", id=""):
