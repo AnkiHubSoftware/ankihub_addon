@@ -24,12 +24,12 @@ def handle_notes_deleted_from_webapp() -> None:
     handle note deletion during sync."""
     ah_nids_strings = json.loads(DELETED_NOTES_FILE.read_text())["ankihub_note_ids"]
     ah_nids = [uuid.UUID(ah_nid_string) for ah_nid_string in ah_nids_strings]
-    _delete_notes(ah_nids)
+    _mark_notes_in_anki_and_delete_from_db(ah_nids)
 
 
-def _delete_notes(ah_nids: List[uuid.UUID]) -> None:
-    """Delete notes from the AnkiHub DB, clear their ankihub id field and
-    add a ankihub-deleted tag to them."""
+def _mark_notes_in_anki_and_delete_from_db(ah_nids: List[uuid.UUID]) -> None:
+    """Clear ankihub id fields and add a ankihub-deleted tag for the notes in Anki and
+    delete notes from the AnkiHub DB."""
 
     anki_nids = [x for x in ankihub_db.ankihub_nids_to_anki_nids(ah_nids).values() if x]
     anki_nids_which_exist_in_anki_db = aqt.mw.col.db.list(
