@@ -318,14 +318,13 @@ class AnkiHubImporter:
     ) -> Note:
         try:
             note = aqt.mw.col.get_note(id=NoteId(note_data.anki_nid))
-            # TODO Refactor so that self.prepare_note is not called in two places.
-            note_prepared = self.prepare_note(
+            changed = self.prepare_note(
                 note,
                 note_data,
                 protected_fields,
                 protected_tags,
             )
-            if note_prepared:
+            if changed:
                 note.flush()
                 self._updated_nids.append(note.id)
                 LOGGER.debug(f"Updated note: {note_data.anki_nid=}")
