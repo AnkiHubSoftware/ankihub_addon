@@ -12,7 +12,7 @@ from .db import ankihub_db
 from .settings import ANKIHUB_NOTE_TYPE_FIELD_NAME
 
 # tag for notes which were deleted from the webapp
-DELETED_TAG = "AnkiHub_Deleted"
+TAG_FOR_DELETED_NOTES = "AnkiHub_Deleted"
 
 DELETED_NOTES_FILE = (
     Path(__file__).parent / "resources/deleted_notes_from_anking_deck.json"
@@ -50,8 +50,8 @@ def _mark_notes_in_anki_and_delete_from_db(ah_nids: List[uuid.UUID]) -> None:
         if ANKIHUB_NOTE_TYPE_FIELD_NAME in note:
             note[ANKIHUB_NOTE_TYPE_FIELD_NAME] = ""
 
-        if DELETED_TAG not in note.tags:
-            note.tags.append(DELETED_TAG)
+        if TAG_FOR_DELETED_NOTES not in note.tags:
+            note.tags.append(TAG_FOR_DELETED_NOTES)
 
         notes.append(note)
 

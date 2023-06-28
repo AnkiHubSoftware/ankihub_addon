@@ -29,8 +29,6 @@ from pytest_anki import AnkiSession
 from pytestqt.qtbot import QtBot  # type: ignore
 from requests_mock import Mocker
 
-from ankihub.note_deletion import DELETED_TAG
-
 from ..factories import DeckFactory, NoteInfoFactory
 from ..fixtures import MockFunctionProtocol, create_or_get_ah_version_of_note_type
 from .conftest import TEST_PROFILE_ID
@@ -102,6 +100,7 @@ from ankihub.note_conversion import (
     TAG_FOR_OPTIONAL_TAGS,
     TAG_FOR_PROTECTING_FIELDS,
 )
+from ankihub.note_deletion import TAG_FOR_DELETED_NOTES
 from ankihub.reset_local_changes import reset_local_changes_to_notes
 from ankihub.settings import (
     ANKIHUB_NOTE_TYPE_FIELD_NAME,
@@ -3646,4 +3645,4 @@ def test_handle_notes_deleted_from_webapp(
         assert (note[ANKIHUB_NOTE_TYPE_FIELD_NAME] == "") == was_deleted_from_webapp
 
         # Assert that the note has a ankihub deleted tag if it was deleted from the webapp
-        assert (DELETED_TAG in note.tags) == was_deleted_from_webapp
+        assert (TAG_FOR_DELETED_NOTES in note.tags) == was_deleted_from_webapp
