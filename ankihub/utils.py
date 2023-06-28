@@ -191,6 +191,15 @@ def change_note_type_of_note(nid: int, mid: int) -> None:
     aqt.mw.col.models.change_notetype_of_notes(request)
 
 
+def mids_of_notes(nids: List[NoteId]) -> Set[NotetypeId]:
+    """Returns the note type ids of the given notes."""
+    return set(
+        aqt.mw.col.db.list(
+            f"SELECT DISTINCT mid FROM notes WHERE id in {ids2str(nids)}"
+        )
+    )
+
+
 # ... note type modifications
 
 ANKIHUB_TEMPLATE_SNIPPET_RE = (

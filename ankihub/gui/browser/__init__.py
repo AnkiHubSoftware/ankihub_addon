@@ -49,6 +49,7 @@ from ...reset_local_changes import reset_local_changes_to_notes
 from ...settings import ANKIHUB_NOTE_TYPE_FIELD_NAME, DeckExtensionConfig, config
 from ...subdecks import SUBDECK_TAG, build_subdecks_and_move_cards_to_them
 from ...sync import NotLoggedInError, ah_sync
+from ...utils import mids_of_notes
 from ..optional_tag_suggestion_dialog import OptionalTagsSuggestionDialog
 from ..suggestion_dialog import open_suggestion_dialog_for_bulk_suggestion
 from ..utils import ask_user, choose_ankihub_deck, choose_list, choose_subset
@@ -121,9 +122,9 @@ def _on_browser_will_show_context_menu(browser: Browser, context_menu: QMenu) ->
 
     protect_fields_action = menu.addAction(
         "AnkiHub: Protect fields",
-        lambda: _on_protect_fields_action(browser, nid=selected_nid),
+        lambda: _on_protect_fields_action(browser, nids=selected_nids),
     )
-    if len(selected_nids) != 1:
+    if len(selected_nids) < 1:
         protect_fields_action.setDisabled(True)
 
     menu.addAction(
@@ -144,55 +145,89 @@ def _on_browser_will_show_context_menu(browser: Browser, context_menu: QMenu) ->
         copy_ankihub_id_action.setDisabled(True)
 
 
-def _on_protect_fields_action(browser: Browser, nid: NoteId) -> None:
-    note = aqt.mw.col.get_note(nid)
-    if not ankihub_db.is_ankihub_note_type(note.mid):
+def _on_protect_fields_action(browser: Browser, nids: Sequence[NoteId]) -> None:
+    mids = mids_of_notes(nids)
+    if len(mids) != 1:
         showInfo(
-            "This note does not have a note type that is known by AnkiHub.",
+            "Please select notes of only one note type.",
             parent=browser,
         )
         return
 
-    note = aqt.mw.col.get_note(nid)
-
-    fields: List[str] = [
-        field for field in note.keys() if field != ANKIHUB_NOTE_TYPE_FIELD_NAME
+    note = aqt.mw.col.get_note(nids[0])
+    field_names: List[str] = [
+        field_name
+        for field_name in note.keys()
+        if field_name != ANKIHUB_NOTE_TYPE_FIELD_NAME
     ]
-    old_fields_protected_by_tags: List[str] = get_fields_protected_by_tags(note)
+    if len(nids) == 1:
+        old_fields_protected_by_tags: List[str] = get_fields_protected_by_tags(note)
+    else:
+        old_fields_protected_by_tags = []
+
     new_fields_protected_by_tags = choose_subset(
         "Choose which fields of this note should be protected<br>"
         "from updates.<br><br>"
         "Note: Fields you have protected for the note type<br>"
         "on AnkiHub will be protected automatically.",
-        choices=fields,
+        choices=field_names,
         current=old_fields_protected_by_tags,
         description_html="This will edit the AnkiHub_Protect tags of the note.",
         parent=browser,
     )
+    if new_fields_protected_by_tags is None:
+        return
 
-    if set(new_fields_protected_by_tags) == set(fields):
+    if set(new_fields_protected_by_tags) == set(field_names):
+        # if all fields are protected, we can just use the tag for protecting all fields
         new_tags_for_protecting_fields = [TAG_FOR_PROTECTING_ALL_FIELDS]
     else:
+        # otherwise we need to create a tag for each field.
+        # spaces are not allowed in tags, so we replace them with underscores
         new_tags_for_protecting_fields = [
             f"{TAG_FOR_PROTECTING_FIELDS}::{field.replace(' ', '_')}"
             for field in new_fields_protected_by_tags
         ]
 
-    # remove old tags for protecting fields
-    note.tags = [
-        tag for tag in note.tags if not tag.startswith(TAG_FOR_PROTECTING_FIELDS)
-    ]
+    def update_note_tags() -> None:
+        notes = [aqt.mw.col.get_note(nid) for nid in nids]
+        for note in notes:
+            # remove old tags for protecting fields
+            note.tags = [
+                tag
+                for tag in note.tags
+                if not tag.startswith(TAG_FOR_PROTECTING_FIELDS)
+            ]
 
-    # add new tags for protecting fields
-    note.tags += new_tags_for_protecting_fields
+            # add new tags for protecting fields
+            note.tags += new_tags_for_protecting_fields
 
-    note.flush()
+        # update the notes and add an undo entry
+        undo_entry_id = aqt.mw.col.add_custom_undo_entry(
+            "Protect fields of note(s) using tags"
+        )
+        aqt.mw.col.update_notes(notes)
+        aqt.mw.col.merge_undo_entries(undo_entry_id)
 
-    # without this the tags in the browser editor are not updated until you switch away from the note
-    browser.table.reset()
+    def on_done(future: Future) -> None:
+        future.result()
 
-    LOGGER.info(
-        f"Updated tags for protecting fields for note {note.id} to protect these fields {new_fields_protected_by_tags}"
+        aqt.mw.update_undo_actions()
+
+        # without this the tags in the browser editor are not updated until you switch away from the note
+        browser.table.reset()
+        tooltip("Updated tags for protecting fields")
+
+        LOGGER.info(
+            f"Updated tags for protecting fields for notes\n"
+            f"\t{nids=}\n"
+            f"\t{new_fields_protected_by_tags=}\n"
+        )
+
+    aqt.mw.taskman.with_progress(
+        task=update_note_tags,
+        on_done=on_done,
+        label="Updating tags for protecting fields",
     )
 
 

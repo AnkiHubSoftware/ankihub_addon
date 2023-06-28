@@ -35,7 +35,7 @@ def choose_subset(
     adjust_height_to_content=True,
     description_html: Optional[str] = None,
     parent: Any = None,
-) -> List[str]:
+) -> Optional[List[str]]:
     if not parent:
         parent = aqt.mw.app.activeWindow()
 
@@ -101,7 +101,8 @@ def choose_subset(
             list_widget.sizeHintForRow(0) * list_widget.count() + 20
         )
 
-    dialog.exec()
+    if dialog.exec() != QDialog.DialogCode.Accepted:
+        return None
 
     result = [
         list_widget.item(i).text()
