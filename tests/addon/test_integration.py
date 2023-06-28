@@ -197,7 +197,6 @@ class MakeAHNote(Protocol):
         self,
         ankihub_nid: uuid.UUID = None,
         note_type_id: Optional[NotetypeId] = None,
-        generate_anki_id: bool = False,
     ) -> Note:
         ...
 
@@ -208,12 +207,16 @@ def make_ah_note(
     next_deterministic_uuid: Callable[[], uuid.UUID],
     next_deterministic_id: Callable[[], int],
 ) -> MakeAHNote:
-    # Can only be used in an anki_session_with_addon.profile_loaded() context
+    """This fixture returns a new Anki Note that has a AnkiHub note type by default and
+    # the fields of the note are pre-filled with deterministic values.
+    # If the note type has an ankihub_id field, it will be set to the given ankihub_nid.
+    # The note is not saved in any database.
+    Can only be used in an anki_session_with_addon.profile_loaded() context.
+    """
 
     def _make_ah_note(
         ankihub_nid: uuid.UUID = None,
         note_type_id: Optional[NotetypeId] = None,
-        generate_anki_id: bool = False,
     ) -> Note:
         mw = anki_session_with_addon_data.mw
 
@@ -229,11 +232,10 @@ def make_ah_note(
             assert note_type is not None
 
         note = mw.col.new_note(note_type)
-        if generate_anki_id:
-            note.id = NoteId(next_deterministic_id())
+        note.id = NoteId(next_deterministic_id())
 
         # fields of the note will be set to "old <field_name>"
-        # except for the ankihub note _type field (if it exists) which will be set to the ankihub nid
+        # except for the ankihub note_type field (if it exists) which will be set to the ankihub nid
         for field_cfg in note_type["flds"]:
             field_name: str = field_cfg["name"]
             note[field_name] = f"old {field_name.lower()}"
@@ -1646,7 +1648,7 @@ class TestPrepareNote:
             ]
             new_tags = ["c", "d"]
 
-            note = make_ah_note(ankihub_nid=ankihub_nid, generate_anki_id=True)
+            note = make_ah_note(ankihub_nid=ankihub_nid)
             note.tags = ["a", "b"]
             note_was_changed_1 = prepare_note(
                 note,
@@ -1675,14 +1677,14 @@ class TestPrepareNote:
             assert set(note.tags) == set(["a", "c", "d"])
 
             # assert that addon-internal tags don't get removed
-            note = make_ah_note(ankihub_nid=ankihub_nid, generate_anki_id=True)
+            note = make_ah_note(ankihub_nid=ankihub_nid)
             note.tags = list(ADDON_INTERNAL_TAGS)
             note_was_changed_5 = prepare_note(note, tags=[])
             assert not note_was_changed_5
             assert set(note.tags) == set(ADDON_INTERNAL_TAGS)
 
             # assert that fields protected by tags are in fact protected
-            note = make_ah_note(ankihub_nid=ankihub_nid, generate_anki_id=True)
+            note = make_ah_note(ankihub_nid=ankihub_nid)
             note.tags = [f"{TAG_FOR_PROTECTING_FIELDS}::Front"]
             note["Front"] = "old front"
             note_was_changed_6 = prepare_note(
@@ -1693,7 +1695,7 @@ class TestPrepareNote:
             assert note["Front"] == "old front"
 
             # assert that fields protected by tags are in fact protected
-            note = make_ah_note(ankihub_nid=ankihub_nid, generate_anki_id=True)
+            note = make_ah_note(ankihub_nid=ankihub_nid)
             note.tags = [f"{TAG_FOR_PROTECTING_FIELDS}::All"]
             note_was_changed_7 = prepare_note(
                 note,
@@ -1707,7 +1709,7 @@ class TestPrepareNote:
             assert note["Back"] == "old back"
 
             # assert that the tag for protecting all fields works
-            note = make_ah_note(ankihub_nid=ankihub_nid, generate_anki_id=True)
+            note = make_ah_note(ankihub_nid=ankihub_nid)
             note.tags = [f"{TAG_FOR_PROTECTING_FIELDS}::All"]
             note_was_changed_7 = prepare_note(
                 note,
@@ -1721,7 +1723,7 @@ class TestPrepareNote:
             assert note["Back"] == "old back"
 
             # assert that the note guid is changed
-            note = make_ah_note(ankihub_nid=ankihub_nid, generate_anki_id=True)
+            note = make_ah_note(ankihub_nid=ankihub_nid)
             note_was_changed_8 = prepare_note(
                 note,
                 guid="new guid",
@@ -1758,7 +1760,6 @@ class TestPrepareNote:
             note = make_ah_note(
                 ankihub_nid=ankihub_nid,
                 note_type_id=ah_basic_variation_id,
-                generate_anki_id=True,
             )
             note.tags = [
                 f"{TAG_FOR_PROTECTING_FIELDS}::{field_name_with_spaces.replace(' ', '_')}"
@@ -1775,7 +1776,6 @@ class TestPrepareNote:
             note = make_ah_note(
                 ankihub_nid=ankihub_nid,
                 note_type_id=ah_basic_variation_id,
-                generate_anki_id=True,
             )
             note_changed = prepare_note(
                 note=note,
