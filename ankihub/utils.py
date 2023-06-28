@@ -191,7 +191,7 @@ def change_note_type_of_note(nid: int, mid: int) -> None:
     aqt.mw.col.models.change_notetype_of_notes(request)
 
 
-def mids_of_notes(nids: List[NoteId]) -> Set[NotetypeId]:
+def mids_of_notes(nids: Sequence[NoteId]) -> Set[NotetypeId]:
     """Returns the note type ids of the given notes."""
     return set(
         aqt.mw.col.db.list(
