@@ -316,27 +316,15 @@ class AnkiHubImporter:
         protected_tags: List[str],
         anki_did: Optional[DeckId],  # only relevant for newly created notes
     ) -> Note:
-        # Create a copy to avoid mutating note_data.fields.
-        # TODO it seems that fields is not used and we can remove it.
-        fields = note_data.fields.copy()
-
         try:
             note = aqt.mw.col.get_note(id=NoteId(note_data.anki_nid))
-            fields.append(
-                Field(
-                    name=settings.ANKIHUB_NOTE_TYPE_FIELD_NAME,
-                    order=len(fields),
-                    value=str(note_data.ankihub_note_uuid),
-                )
-            )
-            # TODO Refactor so that self.prepare_note is not called in two places.
-            note_prepared = self.prepare_note(
+            changed = self.prepare_note(
                 note,
                 note_data,
                 protected_fields,
                 protected_tags,
             )
-            if note_prepared:
+            if changed:
                 note.flush()
                 self._updated_nids.append(note.id)
                 LOGGER.debug(f"Updated note: {note_data.anki_nid=}")
