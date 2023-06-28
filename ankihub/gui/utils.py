@@ -46,6 +46,7 @@ def choose_subset(
     layout = QVBoxLayout()
     dialog.setLayout(layout)
     label = QLabel(prompt)
+    label.setOpenExternalLinks(True)
     layout.addWidget(label)
     list_widget = CustomListWidget()
     layout.addWidget(list_widget)

@@ -168,8 +168,9 @@ def _on_protect_fields_action(browser: Browser, nids: Sequence[NoteId]) -> None:
     new_fields_protected_by_tags = choose_subset(
         "Choose which fields of this note should be protected<br>"
         "from updates.<br><br>"
-        "Note: Fields you have protected for the note type<br>"
-        "on AnkiHub will be protected automatically.",
+        "Tip: If you want to protect a field on every note, <br>"
+        "consider using the "
+        "<a href='https://docs.ankihub.net/known_issues.html#protected-fields'>protected fields feature</a>.",
         choices=field_names,
         current=old_fields_protected_by_tags,
         description_html="This will edit the AnkiHub_Protect tags of the note.",
