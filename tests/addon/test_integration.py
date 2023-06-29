@@ -7,7 +7,7 @@ import uuid
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
 from time import sleep
-from typing import Any, Callable, Dict, List, Optional, Protocol, Tuple
+from typing import Any, Callable, Dict, List, Optional, Protocol, Set, Tuple
 from unittest.mock import MagicMock, Mock, patch
 from zipfile import ZipFile
 
@@ -22,6 +22,8 @@ from aqt import AnkiQt, dialogs, gui_hooks
 from aqt.addcards import AddCards
 from aqt.addons import InstallOk
 from aqt.browser import Browser
+from aqt.browser.sidebar.item import SidebarItem
+from aqt.browser.sidebar.tree import SidebarTreeView
 from aqt.importing import AnkiPackageImporter
 from aqt.qt import Qt
 from pytest import MonkeyPatch, fixture
@@ -78,6 +80,7 @@ from ankihub.gui.browser import (
     NewNoteSearchNode,
     SuggestionTypeSearchNode,
     UpdatedInTheLastXDaysSearchNode,
+    _on_protect_fields_action,
     _on_reset_optional_tags_action,
     custom_columns,
 )
@@ -98,6 +101,7 @@ from ankihub.note_conversion import (
     ADDON_INTERNAL_TAGS,
     ANKI_INTERNAL_TAGS,
     TAG_FOR_OPTIONAL_TAGS,
+    TAG_FOR_PROTECTING_ALL_FIELDS,
     TAG_FOR_PROTECTING_FIELDS,
 )
 from ankihub.reset_local_changes import reset_local_changes_to_notes
@@ -2093,11 +2097,6 @@ class TestBrowserTreeView:
         qtbot: QtBot,
         install_sample_ah_deck: InstallSampleAHDeck,
     ):
-        from aqt import dialogs
-        from aqt.browser import Browser
-        from aqt.browser.sidebar.item import SidebarItem
-        from aqt.browser.sidebar.tree import SidebarTreeView
-
         config.public_config["sync_on_startup"] = False
         entry_point.run()
 
@@ -2237,6 +2236,49 @@ def test_browser_custom_columns(
             "No",
             "No",
         ]
+
+
+@pytest.mark.qt_no_exception_capture
+@pytest.mark.parametrize(
+    "field_names_to_protect, expected_tag",
+    [
+        ({"Front"}, f"{TAG_FOR_PROTECTING_FIELDS}::Front"),
+        ({"Front", "Back"}, f"{TAG_FOR_PROTECTING_ALL_FIELDS}"),
+    ],
+)
+def test_protect_fields_action(
+    anki_session_with_addon_data: AnkiSession,
+    install_sample_ah_deck: InstallSampleAHDeck,
+    monkeypatch: MonkeyPatch,
+    qtbot: QtBot,
+    field_names_to_protect: Set[str],
+    expected_tag: str,
+):
+    with anki_session_with_addon_data.profile_loaded():
+        mw = anki_session_with_addon_data.mw
+
+        install_sample_ah_deck()
+
+        # Open the browser
+        browser: Browser = dialogs.open("Browser", mw)
+
+        # Patch gui function choose_subset to return the fields to protect
+        monkeypatch.setattr(
+            "ankihub.gui.browser.choose_subset",
+            lambda *args, **kwargs: field_names_to_protect,
+        )
+
+        # Call the action for a note
+        nids = mw.col.find_notes("Front:*")
+        nid = nids[0]
+        _on_protect_fields_action(browser, [nid])
+
+        # Assert that the note has the expected tag
+        def note_has_expected_tag():
+            note = mw.col.get_note(nid)
+            return expected_tag in note.tags
+
+        qtbot.wait_until(note_has_expected_tag)
 
 
 class TestSubscribedDecksDialog:
