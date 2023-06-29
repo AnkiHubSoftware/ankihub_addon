@@ -77,13 +77,13 @@ jobs:
           echo DEPLOYMENT_ENVIRONMENT=local >> ${{ github.workspace }}/ankihub_web/.env
 
       - run: docker-compose pull
-      - run: echo "MONTH=$(date +%m)" >> $GITHUB_ENV
+      - run: echo "WEEK=$(date +%U)" >> $GITHUB_ENV
       - uses: satackey/action-docker-layer-caching@v0.0.11
         continue-on-error: true
         with:
-          key: ${{ github.workflow }}-${{ env.MONTH }}-{hash}
+          key: ${{ github.workflow }}-${{ env.WEEK }}-{hash}
           restore-keys: |
-            ${{ github.workflow }}-${{ env.MONTH }}-
+            ${{ github.workflow }}-${{ env.WEEK }}-
       - run: |
           docker-compose build
           docker-compose run --rm django python manage.py makemigrations
