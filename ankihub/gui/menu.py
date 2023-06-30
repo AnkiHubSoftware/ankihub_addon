@@ -503,8 +503,7 @@ def _upload_deck_assets_action() -> None:
     # Extract the AnkiHub deck ID using a sample note id
     ah_did = ankihub_db.ankihub_did_for_anki_nid(nids[0])
 
-    media_names = get_media_names_from_notes_data(notes_data)
-    media_sync.start_media_upload(media_names, ah_did, on_success=on_success)
+    media_sync.start_media_upload(asset_names, ah_did, on_success=on_success)
 
     showInfo(
         "🖼️ Upload started! You can continue using Anki in the meantime."
