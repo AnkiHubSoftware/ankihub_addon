@@ -57,7 +57,7 @@ class _AnkiHubMediaSync:
 
         media_paths = list(self._media_paths_for_media_names(media_names))
         aqt.mw.taskman.run_in_background(
-            lambda: AddonAnkiHubClient().upload_assets(media_paths, ankihub_did),
+            lambda: AddonAnkiHubClient().upload_media(media_paths, ankihub_did),
             on_done=lambda future: self._on_upload_finished(
                 future, ankihub_deck_id=ankihub_did, on_success=on_success
             ),
@@ -103,19 +103,19 @@ class _AnkiHubMediaSync:
                     continue
                 else:
                     raise e
-            asset_disabled_fields = client.get_asset_disabled_fields(ah_did)
+            media_disabled_fields = client.get_media_disabled_fields(ah_did)
             missing_media_names = self._missing_media_for_ah_deck(
-                ah_did, asset_disabled_fields
+                ah_did, media_disabled_fields
             )
             if not missing_media_names:
                 continue
             client.download_media(missing_media_names, ah_did)
 
     def _missing_media_for_ah_deck(
-        self, ah_did: uuid.UUID, asset_disabled_fields: Dict[int, List[str]]
+        self, ah_did: uuid.UUID, media_disabled_fields: Dict[int, List[str]]
     ) -> List[str]:
         media_names = ankihub_db.media_names_for_ankihub_deck(
-            ah_did, asset_disabled_fields=asset_disabled_fields
+            ah_did, media_disabled_fields=media_disabled_fields
         )
         media_dir_path = Path(aqt.mw.col.media.dir())
 

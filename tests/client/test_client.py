@@ -208,13 +208,13 @@ def change_note_suggestion(
 
 
 @pytest.fixture
-def remove_generated_asset_files():
-    _remove_generated_asset_files()
+def remove_generated_media_files():
+    _remove_generated_media_files()
     yield
-    _remove_generated_asset_files()
+    _remove_generated_media_files()
 
 
-def _remove_generated_asset_files():
+def _remove_generated_media_files():
     for file in TEST_MEDIA_PATH.glob("*"):
         if not file.is_file():
             continue
@@ -804,14 +804,14 @@ def test_get_note_customizations_by_deck_extension_id(
 
 
 @pytest.mark.vcr()
-def test_get_asset_disabled_fields(
+def test_get_media_disabled_fields(
     authorized_client_for_user_test1: AnkiHubClient, monkeypatch: MonkeyPatch
 ):
     client = authorized_client_for_user_test1
 
     deck_uuid = ID_OF_DECK_OF_USER_TEST1
 
-    response = client.get_asset_disabled_fields(deck_uuid)
+    response = client.get_media_disabled_fields(deck_uuid)
 
     expected_response = {1: ["Extra"], 32738523: ["Text", "Pixorize", "First Aid"]}
 
@@ -1023,13 +1023,13 @@ class TestUploadMediaForSuggestion:
     @pytest.mark.parametrize(
         "suggestion_type", ["new_note_suggestion", "change_note_suggestion"]
     )
-    def test_upload_assets_for_suggestion(
+    def test_upload_media_for_suggestion(
         self,
         suggestion_type: str,
         requests_mock: Mocker,
         monkeypatch,
         next_deterministic_uuid: Callable[[], uuid.UUID],
-        remove_generated_asset_files,
+        remove_generated_media_files,
         request: FixtureRequest,
     ):
         client = AnkiHubClient(local_media_dir_path=TEST_MEDIA_PATH)
@@ -1045,7 +1045,7 @@ class TestUploadMediaForSuggestion:
             fake_presigned_url, json={"success": True}, status_code=204
         )
 
-        expected_asset_name_map = {
+        expected_media_name_map = {
             "testfile_mario.png": "156ca948cd1356b1a2c1c790f0855ad9.png",
             "testfile_test.jpeg": "a61eab59692d17a2adf4d1c5e9049ee4.jpeg",
         }
@@ -1088,15 +1088,15 @@ class TestUploadMediaForSuggestion:
             TEST_MEDIA_PATH / original_media_name
             for original_media_name in original_media_names
         ]
-        asset_name_map = client.generate_asset_files_with_hashed_names(
+        media_name_map = client.generate_media_files_with_hashed_names(
             original_media_paths
         )
         new_media_paths = [
-            TEST_MEDIA_PATH / asset_name_map[original_media_path.name]
+            TEST_MEDIA_PATH / media_name_map[original_media_path.name]
             for original_media_path in original_media_paths
         ]
 
-        client.upload_assets(new_media_paths, ah_did=next_deterministic_uuid())
+        client.upload_media(new_media_paths, ah_did=next_deterministic_uuid())
 
         # assert that the suggestion was made
         assert len(suggestion_request_mock.request_history) == 1  # type: ignore
@@ -1104,10 +1104,10 @@ class TestUploadMediaForSuggestion:
         # assert that the zipfile with the media files was uploaded
         assert len(s3_upload_request_mock.request_history) == 1  # type: ignore
 
-        # assert that the asset name map was returned correctly
-        assert asset_name_map == expected_asset_name_map
+        # assert that the media name map was returned correctly
+        assert media_name_map == expected_media_name_map
 
-    def test_generate_asset_files_with_hashed_names(self, remove_generated_asset_files):
+    def test_generate_media_files_with_hashed_names(self, remove_generated_media_files):
         client = AnkiHubClient(local_media_dir_path=TEST_MEDIA_PATH)
 
         filenames = [
@@ -1124,12 +1124,12 @@ class TestUploadMediaForSuggestion:
             "testfile_sound.mp3": "ae9120835f658f1ae57e5754811a9475.mp3",
         }
 
-        asset_name_map = client.generate_asset_files_with_hashed_names(filenames)
-        assert asset_name_map == expected_result
+        media_name_map = client.generate_media_files_with_hashed_names(filenames)
+        assert media_name_map == expected_result
 
 
-class TestUploadAssetsForDeck:
-    def notes_data_with_many_assets(self) -> List[NoteInfo]:
+class TestUploadMediaForDeck:
+    def notes_data_with_many_media_files(self) -> List[NoteInfo]:
         notes_data = [
             NoteInfoFactory.create(),
             NoteInfoFactory.create(),
@@ -1167,12 +1167,12 @@ class TestUploadAssetsForDeck:
 
         return notes_data
 
-    def test_zips_assets_from_deck_notes(
+    def test_zips_media_files_from_deck_notes(
         self, next_deterministic_uuid: Callable[[], uuid.UUID], monkeypatch: MonkeyPatch
     ):
         client = AnkiHubClient(local_media_dir_path=TEST_MEDIA_PATH)
 
-        notes_data = self.notes_data_with_many_assets()
+        notes_data = self.notes_data_with_many_media_files()
 
         # Mock os.remove so the zip is not deleted
         os_remove_mock = MagicMock()
@@ -1210,7 +1210,7 @@ class TestUploadAssetsForDeck:
     ):
         client = AnkiHubClient(local_media_dir_path=TEST_MEDIA_PATH)
 
-        notes_data = self.notes_data_with_many_assets()
+        notes_data = self.notes_data_with_many_media_files()
         deck_id = next_deterministic_uuid()
         path_to_created_zip_file = Path(
             TEST_MEDIA_PATH / f"{deck_id}_0_deck_assets_part.zip"
@@ -1253,7 +1253,7 @@ class TestUploadAssetsForDeck:
     ):
         client = AnkiHubClient(local_media_dir_path=TEST_MEDIA_PATH)
 
-        notes_data = self.notes_data_with_many_assets()
+        notes_data = self.notes_data_with_many_media_files()
 
         # Mock upload-related stuff
         monkeypatch.setattr(
@@ -1275,7 +1275,7 @@ class TestUploadAssetsForDeck:
     ):
         media_names = get_media_names_from_notes_data(notes_data)
         media_paths = [TEST_MEDIA_PATH / media_name for media_name in media_names]
-        client.upload_assets(media_paths, ah_did)
+        client.upload_media(media_paths, ah_did)
 
 
 @pytest.mark.vcr()

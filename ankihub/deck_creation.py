@@ -30,7 +30,7 @@ def create_ankihub_deck(
     deck_name: str,
     private: bool,
     add_subdeck_tags: bool = False,
-    should_upload_assets: bool = False,
+    should_upload_media: bool = False,
 ) -> uuid.UUID:
     LOGGER.info("Creating collaborative deck")
 
@@ -58,7 +58,7 @@ def create_ankihub_deck(
         deck_id,
         notes_data=notes_data,
         private=private,
-        should_upload_assets=should_upload_assets,
+        should_upload_media=should_upload_media,
     )
     ankihub_db.upsert_notes_data(ankihub_did=ankihub_did, notes_data=notes_data)
     ankihub_db.transfer_mod_values_from_anki_db(notes_data=notes_data)
@@ -116,7 +116,7 @@ def _upload_deck(
     did: DeckId,
     notes_data: List[NoteInfo],
     private: bool,
-    should_upload_assets: bool = False,
+    should_upload_media: bool = False,
 ) -> uuid.UUID:
     """Upload the deck to AnkiHub."""
 
@@ -135,9 +135,9 @@ def _upload_deck(
         private=private,
     )
 
-    # Upload all existing local assets for this deck
-    # (assets that are referenced on Deck's notes)
-    if should_upload_assets:
+    # Upload all existing local media for this deck
+    # (media files that are referenced on Deck's notes)
+    if should_upload_media:
         media_names = get_media_names_from_notes_data(notes_data)
         media_sync.start_media_upload(media_names, ankihub_did)
 

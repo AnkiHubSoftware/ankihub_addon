@@ -3107,7 +3107,7 @@ def test_download_media_on_sync(
         )
         monkeypatch.setattr(
             AnkiHubClient,
-            "get_asset_disabled_fields",
+            "get_media_disabled_fields",
             lambda *args, **kwargs: {},
         )
 
@@ -3208,7 +3208,7 @@ class TestSuggestionsWithMedia:
                 # assert that the media file was uploaded
                 assert len(s3_upload_request_mock.request_history) == 1  # type: ignore
 
-                self._assert_asset_names_as_expected(
+                self._assert_media_names_as_expected(
                     note=note,
                     upload_request_mock=s3_upload_request_mock,  # type: ignore
                     suggestion_request_mock=suggestion_request_mock,  # type: ignore
@@ -3291,23 +3291,23 @@ class TestSuggestionsWithMedia:
                 # Wait for the background thread that uploads the media to finish.
                 qtbot.wait(200)
 
-                self._assert_asset_names_as_expected(
+                self._assert_media_names_as_expected(
                     note=note,
                     upload_request_mock=s3_upload_request_mock,  # type: ignore
                     suggestion_request_mock=suggestion_request_mock,  # type: ignore
                     monkeypatch=monkeypatch,
                 )
 
-    def _assert_asset_names_as_expected(
+    def _assert_media_names_as_expected(
         self,
         note: Note,
         upload_request_mock: Mocker,
         suggestion_request_mock: Mocker,
         monkeypatch,
     ):
-        # Assert that the asset names in the suggestion, the note and the uploaded file are as expected.
+        # Assert that the media names in the suggestion, the note and the uploaded file are as expected.
         note.load()
-        asset_name_in_note = list(local_media_names_from_html(note["Front"]))[0]
+        media_name_in_note = list(local_media_names_from_html(note["Front"]))[0]
         zipfile_name = re.findall(
             r'filename="(.*?)"', str(upload_request_mock.last_request.body)
         )[0]
@@ -3315,28 +3315,28 @@ class TestSuggestionsWithMedia:
         path_to_created_zip_file: Path = TEST_DATA_PATH / zipfile_name
         with ZipFile(path_to_created_zip_file, "r") as zfile:
             namelist = zfile.namelist()
-            name_of_uploaded_asset = namelist[0]
+            name_of_uploaded_media = namelist[0]
 
         suggestion_dict = suggestion_request_mock.last_request.json()  # type: ignore
         first_field_value = suggestion_dict["fields"][0]["value"]
-        asset_name_in_suggestion = list(local_media_names_from_html(first_field_value))[
+        media_name_in_suggestion = list(local_media_names_from_html(first_field_value))[
             0
         ]
 
         # The expected_img_name will be the same on each test run because the file is empty and thus
         # the hash will be the same each time.
-        expected_asset_name = "d41d8cd98f00b204e9800998ecf8427e.png"
-        assert asset_name_in_suggestion == expected_asset_name
-        assert asset_name_in_note == expected_asset_name
-        assert name_of_uploaded_asset == expected_asset_name
+        expected_media_name = "d41d8cd98f00b204e9800998ecf8427e.png"
+        assert media_name_in_suggestion == expected_media_name
+        assert media_name_in_note == expected_media_name
+        assert name_of_uploaded_media == expected_media_name
 
-        # Remove the zipped file and the hashed asset at the end of the test
+        # Remove the zipped file and the media file at the end of the test
         monkeypatch.undo()
         os.remove(path_to_created_zip_file)
         os.remove(TEST_DATA_PATH / "d41d8cd98f00b204e9800998ecf8427e.png")
         assert path_to_created_zip_file.is_file() is False
 
-    def test_should_ignore_asset_file_names_not_present_in_local_collection(
+    def test_should_ignore_media_file_names_not_present_in_local_collection(
         self,
         anki_session_with_addon_data: AnkiSession,
         requests_mock: Mocker,
@@ -3381,7 +3381,7 @@ class TestSuggestionsWithMedia:
             nids = mw.col.find_notes("")
             note = mw.col.get_note(nids[0])
 
-            # add reference to a note of an asset that does not exist locally
+            # add reference to a media file that does not exist locally to the note
             note_content = '<img src="this_file_is_not_in_the_local_collection.png">'
             note["Front"] = note_content
             note.flush()

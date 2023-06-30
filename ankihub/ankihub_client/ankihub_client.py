@@ -314,8 +314,8 @@ class AnkiHubClient:
         if s3_response.status_code != 200:
             raise AnkiHubHTTPError(s3_response)
 
-    def generate_asset_files_with_hashed_names(
-        self, paths: Sequence[Path]
+    def generate_media_files_with_hashed_names(
+        self, media_file_paths: Sequence[Path]
     ) -> Dict[str, str]:
         """Generates a filename for each file in the list of paths by hashing the file.
         The file is copied to the new name. If the file already exists, it is skipped,
@@ -323,75 +323,75 @@ class AnkiHubClient:
         Returns a map of the old filename to the new filename.
         """
         result: Dict[str, str] = {}
-        for old_asset_path in paths:
+        for for_old_media_path in media_file_paths:
             # First we check if the media file exists locally.
             # If no, we skip this iteration.
-            if not old_asset_path.is_file():
+            if not for_old_media_path.is_file():
                 continue
 
             # Generate a hash from the file's content
-            with old_asset_path.open("rb") as asset:
-                file_content_hash = hashlib.md5(asset.read())
+            with for_old_media_path.open("rb") as media_file:
+                file_content_hash = hashlib.md5(media_file.read())
 
             # Store the new filename under the old filename key in the dict
             # that will be returned
-            new_asset_path = old_asset_path.parent / (
-                file_content_hash.hexdigest() + old_asset_path.suffix
+            new_media_path = for_old_media_path.parent / (
+                file_content_hash.hexdigest() + for_old_media_path.suffix
             )
 
             # If the file with the hashed name does not exist already, we
             # try to create it.
-            if not new_asset_path.is_file():
+            if not new_media_path.is_file():
                 try:
                     # Copy the file with the new name at the same location of the
                     # original file
-                    shutil.copyfile(old_asset_path, new_asset_path)
+                    shutil.copyfile(for_old_media_path, new_media_path)
                 except shutil.SameFileError:
                     continue
 
-            result[old_asset_path.name] = new_asset_path.name
+            result[for_old_media_path.name] = new_media_path.name
 
         return result
 
-    def upload_assets(self, asset_paths: List[Path], ah_did: uuid.UUID) -> None:
-        # Create chunks of asset paths to zip and upload each chunk individually.
-        # Each chunk is divided based on the size of all assets on that chunk to
+    def upload_media(self, media_paths: List[Path], ah_did: uuid.UUID) -> None:
+        # Create chunks of media paths to zip and upload each chunk individually.
+        # Each chunk is divided based on the size of all media files in that chunk to
         # create chunks of similar size.
-        asset_path_chunks: List[List[Path]] = []
+        media_path_chunks: List[List[Path]] = []
         chunk: List[Path] = []
         current_chunk_size_bytes = 0
-        for asset_path in asset_paths:
-            if asset_path.is_file():
-                current_chunk_size_bytes += asset_path.stat().st_size
-                chunk.append(asset_path)
+        for media_path in media_paths:
+            if media_path.is_file():
+                current_chunk_size_bytes += media_path.stat().st_size
+                chunk.append(media_path)
 
             if current_chunk_size_bytes > CHUNK_BYTES_THRESHOLD:
-                asset_path_chunks.append(chunk)
+                media_path_chunks.append(chunk)
                 current_chunk_size_bytes = 0
                 chunk = []
             else:
                 # We need this so we don't lose chunks of smaller size
                 # that didn't reach the threshold (usually the "tail"
-                # of the asset list, but can also happen if we have just
-                # a few assets and all of them sum up to less than the threshold
+                # of the list, but it can also happen if we have just
+                # a few media files and all of them sum up to less than the threshold
                 # right on the first chunk)
-                if asset_path == list(asset_paths)[-1]:
+                if media_path == list(media_paths)[-1]:
                     # Check if we're leaving the loop (last iteration) - if yes,
                     # just close this small chunk before leaving.
-                    asset_path_chunks.append(chunk)
+                    media_path_chunks.append(chunk)
 
         # Get a S3 presigned URL that allows uploading multiple files with a given prefix
         s3_presigned_info = self._get_presigned_url_for_multiple_uploads(
             prefix=f"deck_assets/{ah_did}"
         )
 
-        # Use ThreadPoolExecutor to zip & upload assets
+        # Use ThreadPoolExecutor to zip & upload media files
         futures = []
         with ThreadPoolExecutor() as executor:
-            for chunk_number, chunk in enumerate(asset_path_chunks):
+            for chunk_number, chunk in enumerate(media_path_chunks):
                 futures.append(
                     executor.submit(
-                        self._zip_and_upload_assets_chunk,
+                        self._zip_and_upload_media_chunk,
                         chunk,
                         chunk_number,
                         ah_did,
@@ -402,7 +402,7 @@ class AnkiHubClient:
             for future in as_completed(futures):
                 future.result()
 
-    def _zip_and_upload_assets_chunk(
+    def _zip_and_upload_media_chunk(
         self,
         chunk: List[Path],
         chunk_number: int,
@@ -411,11 +411,11 @@ class AnkiHubClient:
     ):
         # TODO: Error logging/handling
 
-        # Zip the assets found locally
+        # Zip the media files found locally
         zip_filepath = Path(
             self.local_media_dir_path / f"{ah_did}_{chunk_number}_deck_assets_part.zip"
         )
-        LOGGER.info(f"Creating zipped asset file [{zip_filepath.name}]")
+        LOGGER.info(f"Creating zipped media file [{zip_filepath.name}]")
         with ZipFile(zip_filepath, "w") as media_zip:
             for media_path in chunk:
                 if media_path.is_file():
@@ -437,7 +437,7 @@ class AnkiHubClient:
         self, s3_presigned_info: dict, filepath: Path
     ) -> None:
         """Opens and uploads the file data to S3 using a reusable presigned URL. Useful when uploading
-        multiple assets to the same path while keeping the original filename.
+        multiple media files to the same path while keeping the original filename.
         :param s3_presigned_info: dict with the reusable presigned URL info.
                                   Obtained as the return of 'get_presigned_url_for_multiple_uploads'
         :param filepath: the Path object with the location of the file in the system
@@ -457,36 +457,34 @@ class AnkiHubClient:
             raise AnkiHubHTTPError(s3_response)
 
     def download_media(self, media_names: List[str], deck_id: uuid.UUID) -> None:
-        deck_assets_remote_dir = f"/deck_assets/{deck_id}/"
+        deck_media_remote_dir = f"/deck_assets/{deck_id}/"
         futures = []
         with ThreadPoolExecutor() as executor:
             for media_name in media_names:
                 media_path = self.local_media_dir_path / media_name
-                media_remote_path = deck_assets_remote_dir + urllib.parse.quote_plus(
+                media_remote_path = deck_media_remote_dir + urllib.parse.quote_plus(
                     media_name
                 )
 
-                # First we check if the assets already exists.
+                # First we check if the media file already exists.
                 # If yes, we skip this iteration.
                 if os.path.isfile(media_path):
                     continue
 
                 futures.append(
-                    executor.submit(
-                        self._download_assets, media_path, media_remote_path
-                    )
+                    executor.submit(self._download_media, media_path, media_remote_path)
                 )
 
             for future in as_completed(futures):
                 future.result()
             LOGGER.info("Downloaded media from AnkiHub.")
 
-    def _download_assets(self, asset_path: Path, media_remote_path: str):
+    def _download_media(self, media_file_path: Path, media_remote_path: str):
         response = self._send_request("GET", API.S3, media_remote_path, stream=True)
         # Log and skip this iteration if the response is not 200 OK
         if response.ok:
             # If we get a valid response, open the file and write the content
-            with open(asset_path, "wb") as handle:
+            with open(media_file_path, "wb") as handle:
                 for block in response.iter_content(1024):
                     if not block:
                         break
@@ -756,7 +754,7 @@ class AnkiHubClient:
     def _get_presigned_url_for_multiple_uploads(self, prefix: str) -> dict:
         """
         Get presigned URL for S3 to upload multiple files. Useful when uploading
-        multiple assets to the same path while keeping the original filename.
+        multiple media files to the same path while keeping the original filename.
         :param prefix: the path in S3 where the files will be uploaded
         :return: a dict with the required data to build the upload request
         """
@@ -818,7 +816,7 @@ class AnkiHubClient:
         result = [x for x in result if x.strip()]
         return result
 
-    def get_asset_disabled_fields(
+    def get_media_disabled_fields(
         self, ankihub_deck_uuid: uuid.UUID
     ) -> Dict[int, List[str]]:
         response = self._send_request(

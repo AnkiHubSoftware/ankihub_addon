@@ -73,7 +73,7 @@ def refresh_ankihub_menu() -> None:
         _sync_with_ankihub_setup(parent=menu_state.ankihub_menu)
         _media_sync_status_setup(parent=menu_state.ankihub_menu)
         _import_media_setup(parent=menu_state.ankihub_menu)
-        _upload_deck_assets_setup(parent=menu_state.ankihub_menu)
+        _upload_deck_media_setup(parent=menu_state.ankihub_menu)
         _ankihub_logout_setup(parent=menu_state.ankihub_menu)
     else:
         _ankihub_login_setup(parent=menu_state.ankihub_menu)
@@ -279,7 +279,7 @@ def _create_collaborative_deck_action() -> None:
     if not confirm:
         return
 
-    should_upload_assets = ask_user(
+    should_upload_media = ask_user(
         "Do you want to upload media for this deck as well? "
         "This will take some extra time but it is required to display images "
         "on AnkiHub and this way subscribers will be able to download media files "
@@ -313,7 +313,7 @@ def _create_collaborative_deck_action() -> None:
             deck_name,
             private=private,
             add_subdeck_tags=add_subdeck_tags,
-            should_upload_assets=should_upload_assets,
+            should_upload_media=should_upload_media,
         ),
         success=on_success,
     ).failure(on_failure)
@@ -411,17 +411,17 @@ def _sync_with_ankihub_setup(parent):
     parent.addAction(q_action)
 
 
-def _upload_deck_assets_setup(parent):
+def _upload_deck_media_setup(parent):
     """Set up the menu item for manually triggering the upload
-    of all the assets for a given deck (logged user MUST be the
+    of all the media files for a given deck (logged user MUST be the
     deck owner)"""
 
     q_action = QAction("📸 Upload media for deck", aqt.mw)
-    qconnect(q_action.triggered, _upload_deck_assets_action)
+    qconnect(q_action.triggered, _upload_deck_media_action)
     parent.addAction(q_action)
 
 
-def _upload_deck_assets_action() -> None:
+def _upload_deck_media_action() -> None:
     client = AnkiHubClient()
 
     # Fetch the ankihub deck ids of all decks the user owns
@@ -470,19 +470,19 @@ def _upload_deck_assets_action() -> None:
     # Obtain a list of NoteInfo objects from nids
     notes_data = [ankihub_db.note_data(nid) for nid in nids]
 
-    asset_names = get_media_names_from_notes_data(notes_data)
-    asset_paths = [
-        Path(aqt.mw.col.media.dir()) / asset_name for asset_name in asset_names
+    media_names = get_media_names_from_notes_data(notes_data)
+    media_paths = [
+        Path(aqt.mw.col.media.dir()) / media_name for media_name in media_names
     ]
 
-    # Check if the deck references any local asset, if it does
+    # Check if the deck references any local media file, if it does
     # not, no point on trying to upload it
-    if not asset_paths:
+    if not media_paths:
         showInfo("This deck has no media to upload.")
         return
 
     # Check if the files referenced by the deck exists locally, if none exist, no point in uploading.
-    if not any([asset_path.is_file() for asset_path in asset_paths]):
+    if not any([media_path.is_file() for media_path in media_paths]):
         showInfo(
             "You can't upload media for this deck because none of the referenced media files are present in your "
             "local media folder."
@@ -503,7 +503,7 @@ def _upload_deck_assets_action() -> None:
     # Extract the AnkiHub deck ID using a sample note id
     ah_did = ankihub_db.ankihub_did_for_anki_nid(nids[0])
 
-    media_sync.start_media_upload(asset_names, ah_did, on_success=on_success)
+    media_sync.start_media_upload(media_names, ah_did, on_success=on_success)
 
     showInfo(
         "🖼️ Upload started! You can continue using Anki in the meantime."
