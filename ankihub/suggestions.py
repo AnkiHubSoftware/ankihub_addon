@@ -377,20 +377,22 @@ def _field_with_replaced_asset_names(
 ) -> Field:
     result = copy.deepcopy(field)
     for old_name, new_name in asset_name_map.items():
-        # TODO: Think of a better way of doing that. Currently we need to call it twice,
-        # one for single quotes and other for double quotes around the src attribute.
         result.value = result.value.replace(f'src="{old_name}"', f'src="{new_name}"')
         result.value = result.value.replace(f"src='{old_name}'", f"src='{new_name}'")
+        result.value = result.value.replace(
+            f"[sound:{old_name}]", f"[sound:{new_name}]"
+        )
     return result
 
 
 def _update_asset_names_on_notes(asset_name_map: Dict[str, str]):
     for original_filename, new_filename in asset_name_map.items():
-        # TODO: Think of a better way of doing that. Currently we need to call it twice,
-        # one for single quotes and other for double quotes around the src attribute.
         find_and_replace_text_in_fields_on_all_notes(
             f'src="{original_filename}"', f'src="{new_filename}"'
         )
         find_and_replace_text_in_fields_on_all_notes(
             f"src='{original_filename}'", f"src='{new_filename}'"
+        )
+        find_and_replace_text_in_fields_on_all_notes(
+            f"[sound:{original_filename}]", f"[sound:{new_filename}]"
         )

@@ -10,7 +10,6 @@ Some differences between data stored in the AnkiHub database and the Anki databa
     while the AnkiHub database stores ankihub_client.NoteInfo objects.
 - decks, notes and note types can be missing from the Anki database or be modified.
 """
-import re
 import sqlite3
 import uuid
 from contextlib import contextmanager
@@ -24,7 +23,7 @@ from anki.utils import ids2str, join_fields, split_fields
 
 from .. import LOGGER
 from ..ankihub_client import Field, NoteInfo, suggestion_type_from_str
-from ..common_utils import IMG_NAME_IN_IMG_TAG_REGEX
+from ..common_utils import local_image_names_from_html
 from .db_utils import DBConnection
 
 ASSET_DISABLED_FIELD_BYPASS_TAG = "AnkiHub_ImageReady"
@@ -511,7 +510,13 @@ class _AnkiHubDB:
             if name in field_names_for_mid
         ]
         fields_tags_pairs = self.execute(
-            f"SELECT fields, tags FROM notes WHERE anki_note_type_id = {mid} AND fields LIKE '%<img%'"
+            f"""
+            SELECT fields, tags FROM notes
+            WHERE (
+                anki_note_type_id = {mid} AND
+                (fields LIKE '%<img%' OR fields LIKE '%[sound:%')
+            )
+            """
         )
 
         result = set()
@@ -541,10 +546,7 @@ class _AnkiHubDB:
                         f"Allowing asset download in [{field_name}] field - note has tag [{bypass_asset_disabled_tag}]",
                     )
 
-                for img in re.findall(IMG_NAME_IN_IMG_TAG_REGEX, field_text):
-                    if img.startswith("http://") or img.startswith("https://"):
-                        continue
-                    result.add(img)
+                result.update(local_image_names_from_html(field_text))
 
         return result
 
