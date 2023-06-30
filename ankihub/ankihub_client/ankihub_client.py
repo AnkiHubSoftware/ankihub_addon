@@ -979,13 +979,13 @@ class AnkiHubClient:
 
     def is_media_upload_finished(self, ankihub_deck_uuid: uuid.UUID) -> bool:
         deck_info = self.get_deck_by_id(ankihub_deck_uuid)
-        return deck_info.image_upload_finished
+        return deck_info.media_upload_finished
 
     def media_upload_finished(self, ankihub_deck_uuid: uuid.UUID) -> None:
         response = self._send_request(
             "PATCH",
             API.ANKIHUB,
-            f"/decks/{ankihub_deck_uuid}/image-upload-finished",
+            f"/decks/{ankihub_deck_uuid}/media-upload-finished",
         )
         if response.status_code != 204:
             raise AnkiHubHTTPError(response)

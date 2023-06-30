@@ -693,7 +693,7 @@ def test_get_deck_by_id(
         "anki_id": 1,
         "csv_last_upload": date_time.strftime(ANKIHUB_DATETIME_FORMAT_STR),
         "csv_notes_filename": "test.csv",
-        "image_upload_finished": False,
+        "media_upload_finished": False,
         "user_relation": "subscriber",
     }
 
@@ -707,7 +707,7 @@ def test_get_deck_by_id(
         name="test",
         csv_last_upload=date_time,
         csv_notes_filename="test.csv",
-        image_upload_finished=False,
+        media_upload_finished=False,
         user_relation=UserDeckRelation.SUBSCRIBER,
     )
 
@@ -1570,7 +1570,7 @@ def test_unsubscribe_from_deck(
                         "anki_id": anki_deck_id,
                         "csv_last_upload": None,
                         "csv_notes_filename": "",
-                        "image_upload_finished": True,
+                        "media_upload_finished": True,
                         "user_relation": "subscriber",
                     }
                 }

@@ -110,7 +110,7 @@ class Deck(DataClassJSONMixinWithConfig):
         )
     )
     csv_notes_filename: str
-    image_upload_finished: bool
+    media_upload_finished: bool
     user_relation: UserDeckRelation = dataclasses.field(
         metadata=field_options(
             serialize=lambda x: x.value,

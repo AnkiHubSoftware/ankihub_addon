@@ -50,5 +50,5 @@ class DeckFactory(BaseFactory[Deck]):
     anki_did = 1
     csv_last_upload = datetime.datetime.now(tz=timezone.utc)
     csv_notes_filename = "test.csv"
-    image_upload_finished = False
+    media_upload_finished = False
     user_relation = UserDeckRelation.SUBSCRIBER
