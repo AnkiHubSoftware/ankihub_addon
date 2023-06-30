@@ -324,7 +324,7 @@ class AnkiHubClient:
         """
         result: Dict[str, str] = {}
         for old_asset_path in paths:
-            # First we check if the image exists locally.
+            # First we check if the media file exists locally.
             # If no, we skip this iteration.
             if not old_asset_path.is_file():
                 continue
@@ -353,32 +353,32 @@ class AnkiHubClient:
 
         return result
 
-    def upload_assets(self, image_paths: List[Path], ah_did: uuid.UUID) -> None:
-        # Create chunks of image paths to zip and upload each chunk individually.
-        # Each chunk is divided based on the size of all images on that chunk to
+    def upload_assets(self, asset_paths: List[Path], ah_did: uuid.UUID) -> None:
+        # Create chunks of asset paths to zip and upload each chunk individually.
+        # Each chunk is divided based on the size of all assets on that chunk to
         # create chunks of similar size.
-        image_path_chunks: List[List[Path]] = []
+        asset_path_chunks: List[List[Path]] = []
         chunk: List[Path] = []
         current_chunk_size_bytes = 0
-        for image_path in image_paths:
-            if image_path.is_file():
-                current_chunk_size_bytes += image_path.stat().st_size
-                chunk.append(image_path)
+        for asset_path in asset_paths:
+            if asset_path.is_file():
+                current_chunk_size_bytes += asset_path.stat().st_size
+                chunk.append(asset_path)
 
             if current_chunk_size_bytes > CHUNK_BYTES_THRESHOLD:
-                image_path_chunks.append(chunk)
+                asset_path_chunks.append(chunk)
                 current_chunk_size_bytes = 0
                 chunk = []
             else:
                 # We need this so we don't lose chunks of smaller size
                 # that didn't reach the threshold (usually the "tail"
-                # of the image list, but can also happen if we have just
-                # a few images and all of them sum up to less than the threshold
+                # of the asset list, but can also happen if we have just
+                # a few assets and all of them sum up to less than the threshold
                 # right on the first chunk)
-                if image_path == list(image_paths)[-1]:
+                if asset_path == list(asset_paths)[-1]:
                     # Check if we're leaving the loop (last iteration) - if yes,
                     # just close this small chunk before leaving.
-                    image_path_chunks.append(chunk)
+                    asset_path_chunks.append(chunk)
 
         # Get a S3 presigned URL that allows uploading multiple files with a given prefix
         s3_presigned_info = self._get_presigned_url_for_multiple_uploads(
@@ -388,7 +388,7 @@ class AnkiHubClient:
         # Use ThreadPoolExecutor to zip & upload assets
         futures = []
         with ThreadPoolExecutor() as executor:
-            for chunk_number, chunk in enumerate(image_path_chunks):
+            for chunk_number, chunk in enumerate(asset_path_chunks):
                 futures.append(
                     executor.submit(
                         self._zip_and_upload_assets_chunk,
@@ -411,15 +411,15 @@ class AnkiHubClient:
     ):
         # TODO: Error logging/handling
 
-        # Zip the images found locally
+        # Zip the assets found locally
         zip_filepath = Path(
             self.local_media_dir_path / f"{ah_did}_{chunk_number}_deck_assets_part.zip"
         )
         LOGGER.info(f"Creating zipped asset file [{zip_filepath.name}]")
-        with ZipFile(zip_filepath, "w") as img_zip:
-            for img_path in chunk:
-                if img_path.is_file():
-                    img_zip.write(img_path, arcname=img_path.name)
+        with ZipFile(zip_filepath, "w") as media_zip:
+            for media_path in chunk:
+                if media_path.is_file():
+                    media_zip.write(media_path, arcname=media_path.name)
 
         # Upload to S3
         LOGGER.info(f"Uploading file [{zip_filepath.name}] to S3")
@@ -456,36 +456,37 @@ class AnkiHubClient:
         if s3_response.status_code != 204:
             raise AnkiHubHTTPError(s3_response)
 
-    def download_images(self, img_names: List[str], deck_id: uuid.UUID) -> None:
-        deck_images_remote_dir = f"/deck_assets/{deck_id}/"
+    def download_media(self, media_names: List[str], deck_id: uuid.UUID) -> None:
+        deck_assets_remote_dir = f"/deck_assets/{deck_id}/"
         futures = []
         with ThreadPoolExecutor() as executor:
-            for img_name in img_names:
-                img_path = self.local_media_dir_path / img_name
-
-                img_remote_path = deck_images_remote_dir + urllib.parse.quote_plus(
-                    img_name
+            for media_name in media_names:
+                media_path = self.local_media_dir_path / media_name
+                media_remote_path = deck_assets_remote_dir + urllib.parse.quote_plus(
+                    media_name
                 )
 
-                # First we check if the image already exists.
+                # First we check if the assets already exists.
                 # If yes, we skip this iteration.
-                if os.path.isfile(img_path):
+                if os.path.isfile(media_path):
                     continue
 
                 futures.append(
-                    executor.submit(self._download_image, img_path, img_remote_path)
+                    executor.submit(
+                        self._download_assets, media_path, media_remote_path
+                    )
                 )
 
             for future in as_completed(futures):
                 future.result()
-            LOGGER.info("Downloaded images from AnkiHub.")
+            LOGGER.info("Downloaded media from AnkiHub.")
 
-    def _download_image(self, img_path: Path, img_remote_path: str):
-        response = self._send_request("GET", API.S3, img_remote_path, stream=True)
+    def _download_assets(self, asset_path: Path, media_remote_path: str):
+        response = self._send_request("GET", API.S3, media_remote_path, stream=True)
         # Log and skip this iteration if the response is not 200 OK
         if response.ok:
             # If we get a valid response, open the file and write the content
-            with open(img_path, "wb") as handle:
+            with open(asset_path, "wb") as handle:
                 for block in response.iter_content(1024):
                     if not block:
                         break
@@ -493,7 +494,7 @@ class AnkiHubClient:
                     handle.write(block)
         else:
             LOGGER.info(
-                f"Unable to download image [{img_remote_path}]. Response status code: {response.status_code}"
+                f"Unable to download media file [{media_remote_path}]. Response status code: {response.status_code}"
             )
 
     def get_deck_subscriptions(self) -> List[Deck]:
@@ -976,11 +977,11 @@ class AnkiHubClient:
         data = response.json()
         return data
 
-    def is_image_upload_finished(self, ankihub_deck_uuid: uuid.UUID) -> bool:
+    def is_media_upload_finished(self, ankihub_deck_uuid: uuid.UUID) -> bool:
         deck_info = self.get_deck_by_id(ankihub_deck_uuid)
         return deck_info.image_upload_finished
 
-    def image_upload_finished(self, ankihub_deck_uuid: uuid.UUID) -> None:
+    def media_upload_finished(self, ankihub_deck_uuid: uuid.UUID) -> None:
         response = self._send_request(
             "PATCH",
             API.ANKIHUB,

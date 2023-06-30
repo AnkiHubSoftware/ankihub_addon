@@ -64,7 +64,7 @@ def ankihub_db() -> Generator[_AnkiHubDB, None, None]:
         yield db
 
 
-class TestUploadImagesForSuggestion:
+class TestUploadMediaForSuggestion:
     def test_update_asset_names_on_notes(
         self, anki_session_with_addon_data: AnkiSession
     ):
@@ -322,7 +322,7 @@ def test_add_subdeck_tags_to_notes_with_spaces_in_deck_name(
 
 class TestSuggestionDialog:
     @pytest.mark.parametrize(
-        "is_new_note_suggestion,is_for_anking_deck,suggestion_type,source_type,image_was_added",
+        "is_new_note_suggestion,is_for_anking_deck,suggestion_type,source_type,media_was_added",
         [
             (True, True, SuggestionType.NEW_CONTENT, SourceType.AMBOSS, False),
             (True, True, SuggestionType.OTHER, SourceType.AMBOSS, False),
@@ -342,12 +342,12 @@ class TestSuggestionDialog:
         is_for_anking_deck: bool,
         suggestion_type: SuggestionType,
         source_type: SourceType,
-        image_was_added: bool,
+        media_was_added: bool,
     ):
         dialog = SuggestionDialog(
             is_for_anking_deck=is_for_anking_deck,
             is_new_note_suggestion=is_new_note_suggestion,
-            added_new_images=image_was_added,
+            added_new_media=media_was_added,
         )
         dialog.show()
 

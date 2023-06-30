@@ -12,7 +12,7 @@ from mashumaro import field_options
 from mashumaro.config import BaseConfig
 from mashumaro.mixins.json import DataClassJSONMixin
 
-from ..common_utils import local_image_names_from_html
+from ..common_utils import local_media_names_from_html
 
 ANKIHUB_DATETIME_FORMAT_STR = "%Y-%m-%dT%H:%M:%S.%f%z"
 
@@ -263,45 +263,43 @@ class DeckExtensionUpdateChunk(DataClassJSONMixinWithConfig):
 # Media related functions
 
 
-def get_image_names_from_notes_data(notes_data: Sequence[NoteInfo]) -> Set[str]:
-    """Return the names of all images on the given notes.
-    The image names are taken from inside src attributes of HTML image tags that are on the note's fields.
-    Only returns names of local images, not remote images."""
+def get_media_names_from_notes_data(notes_data: Sequence[NoteInfo]) -> Set[str]:
+    """Return the names of all media files on the given notes.
+    Only returns names of local files, not remote files."""
     return {
-        name for note in notes_data for name in get_image_names_from_note_info(note)
+        name for note in notes_data for name in get_media_names_from_note_info(note)
     }
 
 
-def get_image_names_from_suggestions(suggestions: Sequence[NoteSuggestion]) -> Set[str]:
-    """Return the names of all images on the given suggestions.
-    The image names are taken from inside src attributes of HTML image tags that are on the suggestion's fields.
-    Only returns names of local images, not remote images."""
+def get_media_names_from_suggestions(suggestions: Sequence[NoteSuggestion]) -> Set[str]:
+    """Return the names of all media files on the given suggestions.
+    Only returns names of local files, not remote files."""
     return {
         name
         for suggestion in suggestions
-        for name in get_image_names_from_suggestion(suggestion)
+        for name in get_media_names_from_suggestion(suggestion)
     }
 
 
-def get_image_names_from_suggestion(suggestion: NoteSuggestion) -> Set[str]:
+def get_media_names_from_suggestion(suggestion: NoteSuggestion) -> Set[str]:
     result = {
         name
         for field in suggestion.fields
-        for name in _get_image_names_from_field(field)
+        for name in _get_media_names_from_field(field)
     }
     return result
 
 
-def get_image_names_from_note_info(note_info: NoteInfo) -> Set[str]:
+def get_media_names_from_note_info(note_info: NoteInfo) -> Set[str]:
     result = {
         name
         for field in note_info.fields
-        for name in _get_image_names_from_field(field)
+        for name in _get_media_names_from_field(field)
     }
     return result
 
 
-def _get_image_names_from_field(field: Field) -> Set[str]:
-    """Return the names of all images on the given field. Only returns names of local images, not remote images."""
-    result = local_image_names_from_html(field.value)
+def _get_media_names_from_field(field: Field) -> Set[str]:
+    """Return the names of all media files on the given field. Only returns names of local files, not remote files."""
+    result = local_media_names_from_html(field.value)
     return result

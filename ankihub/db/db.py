@@ -23,9 +23,12 @@ from anki.utils import ids2str, join_fields, split_fields
 
 from .. import LOGGER
 from ..ankihub_client import Field, NoteInfo, suggestion_type_from_str
-from ..common_utils import local_image_names_from_html
+from ..common_utils import local_media_names_from_html
 from .db_utils import DBConnection
 
+# This tag can be added to a note to cause media files to be synced even if the
+# media file is in an asset disabled field.
+# It does NOT only work for images, but the name is kept for backwards compatibility.
 ASSET_DISABLED_FIELD_BYPASS_TAG = "AnkiHub_ImageReady"
 
 
@@ -546,7 +549,7 @@ class _AnkiHubDB:
                         f"Allowing asset download in [{field_name}] field - note has tag [{bypass_asset_disabled_tag}]",
                     )
 
-                result.update(local_image_names_from_html(field_text))
+                result.update(local_media_names_from_html(field_text))
 
         return result
 

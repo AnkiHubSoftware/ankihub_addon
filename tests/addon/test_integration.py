@@ -63,7 +63,7 @@ from ankihub.ankihub_client.ankihub_client import (
     _transform_notes_data,
 )
 from ankihub.auto_sync import _setup_ankihub_sync_on_ankiweb_sync
-from ankihub.common_utils import IMG_NAME_IN_IMG_TAG_REGEX
+from ankihub.common_utils import local_media_names_from_html
 from ankihub.db import ankihub_db, attached_ankihub_db
 from ankihub.debug import (
     _log_stack,
@@ -3064,7 +3064,7 @@ def test_reset_optional_tags_action(
         ]
 
 
-def test_download_images_on_sync(
+def test_download_media_on_sync(
     anki_session_with_addon_data: AnkiSession,
     install_sample_ah_deck: InstallSampleAHDeck,
     monkeypatch: MonkeyPatch,
@@ -3075,7 +3075,7 @@ def test_download_images_on_sync(
 
         _, ah_did = install_sample_ah_deck()
 
-        # Add a reference to a local image to a note.
+        # Add a reference to a local media file to a note.
         nids = mw.col.find_notes("")
         notes = [ankihub_db.note_data(nid) for nid in nids]
         notes[0].fields[0].value = "Some text. <img src='image.png'>"
@@ -3102,7 +3102,7 @@ def test_download_images_on_sync(
         )
         monkeypatch.setattr(
             AnkiHubClient,
-            "is_image_upload_finished",
+            "is_media_upload_finished",
             lambda *args, **kwargs: True,
         )
         monkeypatch.setattr(
@@ -3111,9 +3111,9 @@ def test_download_images_on_sync(
             lambda *args, **kwargs: {},
         )
 
-        # Mock the client method for downloading images.
-        download_images_mock = Mock()
-        monkeypatch.setattr(AnkiHubClient, "download_images", download_images_mock)
+        # Mock the client method for downloading media.
+        download_media_mock = Mock()
+        monkeypatch.setattr(AnkiHubClient, "download_media", download_media_mock)
 
         # Run the sync.
         ah_sync.sync_all_decks_and_media()
@@ -3121,12 +3121,12 @@ def test_download_images_on_sync(
         # Let the background thread (which downloads missing media) finish.
         qtbot.wait(200)
 
-        # Assert that the client method for downloading images was called with the correct arguments.
-        download_images_mock.assert_called_once_with(["image.png"], ah_did)
+        # Assert that the client method for downloading media was called with the correct arguments.
+        download_media_mock.assert_called_once_with(["image.png"], ah_did)
 
 
-class TestSuggestionsWithImages:
-    def test_suggest_note_update_with_image(
+class TestSuggestionsWithMedia:
+    def test_suggest_note_update_with_media(
         self,
         anki_session_with_addon_data: AnkiSession,
         requests_mock: Mocker,
@@ -3150,13 +3150,13 @@ class TestSuggestionsWithImages:
 
             monkeypatch.setattr(
                 AnkiHubClient,
-                "is_image_upload_finished",
+                "is_media_upload_finished",
                 lambda *args, **kwargs: True,
             )
 
             monkeypatch.setattr(
                 AnkiHubClient,
-                "image_upload_finished",
+                "media_upload_finished",
                 lambda *args, **kwargs: None,
             )
 
@@ -3200,22 +3200,22 @@ class TestSuggestionsWithImages:
                     comment="test",
                 )
 
-                # Wait for the background thread that uploads the images to finish.
+                # Wait for the background thread that uploads the media to finish.
                 qtbot.wait(200)
 
                 assert len(suggestion_request_mock.request_history) == 1  # type: ignore
 
-                # assert that the image was uploaded
+                # assert that the media file was uploaded
                 assert len(s3_upload_request_mock.request_history) == 1  # type: ignore
 
-                self._assert_img_names_as_expected(
+                self._assert_asset_names_as_expected(
                     note=note,
                     upload_request_mock=s3_upload_request_mock,  # type: ignore
                     suggestion_request_mock=suggestion_request_mock,  # type: ignore
                     monkeypatch=monkeypatch,
                 )
 
-    def test_suggest_new_note_with_image(
+    def test_suggest_new_note_with_media(
         self,
         anki_session_with_addon_data: AnkiSession,
         requests_mock: Mocker,
@@ -3239,13 +3239,13 @@ class TestSuggestionsWithImages:
 
             monkeypatch.setattr(
                 AnkiHubClient,
-                "is_image_upload_finished",
+                "is_media_upload_finished",
                 lambda *args, **kwargs: True,
             )
 
             monkeypatch.setattr(
                 AnkiHubClient,
-                "image_upload_finished",
+                "media_upload_finished",
                 lambda *args, **kwargs: None,
             )
 
@@ -3288,56 +3288,55 @@ class TestSuggestionsWithImages:
                     comment="test",
                 )
 
-                # Wait for the background thread that uploads the images to finish.
+                # Wait for the background thread that uploads the media to finish.
                 qtbot.wait(200)
 
-                self._assert_img_names_as_expected(
+                self._assert_asset_names_as_expected(
                     note=note,
                     upload_request_mock=s3_upload_request_mock,  # type: ignore
                     suggestion_request_mock=suggestion_request_mock,  # type: ignore
                     monkeypatch=monkeypatch,
                 )
 
-    def _assert_img_names_as_expected(
+    def _assert_asset_names_as_expected(
         self,
         note: Note,
         upload_request_mock: Mocker,
         suggestion_request_mock: Mocker,
         monkeypatch,
     ):
-        # Assert that the image names in the suggestion, the note and the uploaded image are as expected.
+        # Assert that the asset names in the suggestion, the note and the uploaded file are as expected.
         note.load()
-        img_name_in_note = re.search(IMG_NAME_IN_IMG_TAG_REGEX, note["Front"]).group(1)
-
+        asset_name_in_note = list(local_media_names_from_html(note["Front"]))[0]
         zipfile_name = re.findall(
             r'filename="(.*?)"', str(upload_request_mock.last_request.body)
         )[0]
 
-        path_to_created_zip_file = TEST_DATA_PATH / zipfile_name
+        path_to_created_zip_file: Path = TEST_DATA_PATH / zipfile_name
         with ZipFile(path_to_created_zip_file, "r") as zfile:
             namelist = zfile.namelist()
-            name_of_uploaded_image = namelist[0]
+            name_of_uploaded_asset = namelist[0]
 
         suggestion_dict = suggestion_request_mock.last_request.json()  # type: ignore
         first_field_value = suggestion_dict["fields"][0]["value"]
-        img_name_in_suggestion = re.search(
-            IMG_NAME_IN_IMG_TAG_REGEX, first_field_value
-        ).group(1)
+        asset_name_in_suggestion = list(local_media_names_from_html(first_field_value))[
+            0
+        ]
 
         # The expected_img_name will be the same on each test run because the file is empty and thus
         # the hash will be the same each time.
-        expected_img_name = "d41d8cd98f00b204e9800998ecf8427e.png"
-        assert img_name_in_suggestion == expected_img_name
-        assert img_name_in_note == expected_img_name
-        assert name_of_uploaded_image == expected_img_name
+        expected_asset_name = "d41d8cd98f00b204e9800998ecf8427e.png"
+        assert asset_name_in_suggestion == expected_asset_name
+        assert asset_name_in_note == expected_asset_name
+        assert name_of_uploaded_asset == expected_asset_name
 
-        # Remove the zipped file and the hashed image at the end of the test
+        # Remove the zipped file and the hashed asset at the end of the test
         monkeypatch.undo()
         os.remove(path_to_created_zip_file)
         os.remove(TEST_DATA_PATH / "d41d8cd98f00b204e9800998ecf8427e.png")
         assert path_to_created_zip_file.is_file() is False
 
-    def test_should_ignore_asset_file_names_not_present_at_local_collection(
+    def test_should_ignore_asset_file_names_not_present_in_local_collection(
         self,
         anki_session_with_addon_data: AnkiSession,
         requests_mock: Mocker,
@@ -3357,13 +3356,13 @@ class TestSuggestionsWithImages:
 
             monkeypatch.setattr(
                 AnkiHubClient,
-                "is_image_upload_finished",
+                "is_media_upload_finished",
                 lambda *args, **kwargs: True,
             )
 
             monkeypatch.setattr(
                 AnkiHubClient,
-                "image_upload_finished",
+                "media_upload_finished",
                 lambda *args, **kwargs: None,
             )
 
@@ -3383,7 +3382,7 @@ class TestSuggestionsWithImages:
             note = mw.col.get_note(nids[0])
 
             # add reference to a note of an asset that does not exist locally
-            note_content = '<img src="this_image_is_not_in_the_local_collection.png">'
+            note_content = '<img src="this_file_is_not_in_the_local_collection.png">'
             note["Front"] = note_content
             note.flush()
 
@@ -3403,7 +3402,7 @@ class TestSuggestionsWithImages:
             # assert that the suggestion is made
             assert len(suggestion_request_mock.request_history) == 1  # type: ignore
 
-            # assert that the image was NOT uploaded
+            # assert that the media file was NOT uploaded
             assert len(s3_upload_request_mock.request_history) == 0  # type: ignore
 
             note.load()

@@ -27,7 +27,7 @@ from aqt.utils import openLink, showInfo, tooltip
 
 from .. import LOGGER
 from ..addon_ankihub_client import AddonAnkiHubClient as AnkiHubClient
-from ..ankihub_client import AnkiHubHTTPError, get_image_names_from_notes_data
+from ..ankihub_client import AnkiHubHTTPError, get_media_names_from_notes_data
 from ..ankihub_client.models import UserDeckRelation
 from ..db import ankihub_db
 from ..deck_creation import create_ankihub_deck
@@ -280,9 +280,9 @@ def _create_collaborative_deck_action() -> None:
         return
 
     should_upload_assets = ask_user(
-        "Do you want to upload images for this deck as well? "
-        "This will take some extra time but it is required to display the images "
-        "on AnkiHub and this way subscribers will be able to download the images "
+        "Do you want to upload media for this deck as well? "
+        "This will take some extra time but it is required to display images "
+        "on AnkiHub and this way subscribers will be able to download media files "
         "when installing the deck. "
     )
 
@@ -416,7 +416,7 @@ def _upload_deck_assets_setup(parent):
     of all the assets for a given deck (logged user MUST be the
     deck owner)"""
 
-    q_action = QAction("📸 Upload images for deck", aqt.mw)
+    q_action = QAction("📸 Upload media for deck", aqt.mw)
     qconnect(q_action.triggered, _upload_deck_assets_action)
     parent.addAction(q_action)
 
@@ -428,11 +428,11 @@ def _upload_deck_assets_action() -> None:
     owned_ah_dids = client.owned_deck_ids()
 
     # If the user has no owned decks, we should show a message informing them
-    # about this and not allow them to upload images.
+    # about this and not allow them to upload media.
     if not owned_ah_dids:
         showInfo(
             "<b>Oh no!</b> 🙁<br>"
-            "You do not own any AnkiHub decks. You can only perform a full image upload for decks that you own.<br><br>"
+            "You do not own any AnkiHub decks. You can only perform upload media for decks that you own.<br><br>"
             "Maybe try creating a new AnkiHub deck for yourself, or create a note suggestion instead? 🙂"
         )
         return
@@ -444,15 +444,15 @@ def _upload_deck_assets_action() -> None:
         showInfo(
             "<b>Oh no!</b> 🙁<br>"
             "It seems that you have deck(s) that you own at AnkiHub, but none of them are installed locally.<br><br>"
-            "Plase subscribe to the deck from the add-on before trying to upload images for it 🙂"
+            "Plase subscribe to the deck from the add-on before trying to upload media for it 🙂"
         )
         return
 
-    # Displays a window for the user to select which Deck they want to upload images for.
+    # Displays a window for the user to select which Deck they want to upload media for.
     # This will only display Decks that the user owns AND are installed locally. Maintainers
-    # and subscribers should not be able to upload images for Decks they maintain/subscribe.
+    # and subscribers should not be able to upload media for Decks they maintain/subscribe to.
     ah_did = choose_ankihub_deck(
-        "Choose the AnkiHub deck for which<br>you want to upload images.",
+        "Choose the AnkiHub deck for which<br>you want to upload media.",
         parent=aqt.mw,
         ah_dids=owned_ah_dids,
     )
@@ -464,46 +464,46 @@ def _upload_deck_assets_action() -> None:
 
     nids = ankihub_db.anki_nids_for_ankihub_deck(ah_did)
     if not nids:
-        showInfo("You can't upload images for an empty deck.")
+        showInfo("You can't upload media for an empty deck.")
         return
 
     # Obtain a list of NoteInfo objects from nids
     notes_data = [ankihub_db.note_data(nid) for nid in nids]
 
-    image_names = get_image_names_from_notes_data(notes_data)
-    image_paths = [
-        Path(aqt.mw.col.media.dir()) / image_name for image_name in image_names
+    asset_names = get_media_names_from_notes_data(notes_data)
+    asset_paths = [
+        Path(aqt.mw.col.media.dir()) / asset_name for asset_name in asset_names
     ]
 
     # Check if the deck references any local asset, if it does
     # not, no point on trying to upload it
-    if not image_paths:
-        showInfo("This deck has no images to upload.")
+    if not asset_paths:
+        showInfo("This deck has no media to upload.")
         return
 
     # Check if the files referenced by the deck exists locally, if none exist, no point in uploading.
-    if not any([image_path.is_file() for image_path in image_paths]):
+    if not any([asset_path.is_file() for asset_path in asset_paths]):
         showInfo(
-            "You can't upload images for this deck because none of the referenced images are present in your "
+            "You can't upload media for this deck because none of the referenced media files are present in your "
             "local media folder."
         )
         return
 
     confirm = ask_user(
-        f"Uploading all images for the deck <b>{deck_name}</b> to AnkiHub "
-        "might take a while depending on the number of images that the deck uses.<br><br>"
+        f"Uploading all media files for the deck <b>{deck_name}</b> to AnkiHub "
+        "might take a while depending on the number of media files that the deck uses.<br><br>"
         "Would you like to continue?",
     )
     if not confirm:
         return
 
     def on_success() -> None:
-        showInfo(f"🎉 Successfuly uploaded all images for<br><b>{deck_config.name}</b>!")
+        showInfo(f"🎉 Successfuly uploaded all media for<br><b>{deck_config.name}</b>!")
 
     # Extract the AnkiHub deck ID using a sample note id
     ah_did = ankihub_db.ankihub_did_for_anki_nid(nids[0])
 
-    media_names = get_image_names_from_notes_data(notes_data)
+    media_names = get_media_names_from_notes_data(notes_data)
     media_sync.start_media_upload(media_names, ah_did, on_success=on_success)
 
     showInfo(

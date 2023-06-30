@@ -82,47 +82,47 @@ class _AnkiHubMediaSync:
     ):
         self._amount_uploads_in_progress -= 1
         future.result()
-        LOGGER.info("Uploaded images to AnkiHub.")
+        LOGGER.info("Uploaded media to AnkiHub.")
         self.refresh_sync_status_text()
 
         if on_success is not None:
             on_success()
-        AddonAnkiHubClient().image_upload_finished(ankihub_deck_id)
+        AddonAnkiHubClient().media_upload_finished(ankihub_deck_id)
 
     def _download_missing_media(self):
         client = AddonAnkiHubClient()
         for ah_did in ankihub_db.ankihub_deck_ids():
             try:
-                if not client.is_image_upload_finished(ah_did):
+                if not client.is_media_upload_finished(ah_did):
                     continue
             except AnkiHubHTTPError as e:
                 if e.response.status_code in (403, 404):
                     LOGGER.warning(
-                        f"Could not check if image upload is finished for AnkiHub deck {ah_did}."
+                        f"Could not check if media upload is finished for AnkiHub deck {ah_did}."
                     )
                     continue
                 else:
                     raise e
             asset_disabled_fields = client.get_asset_disabled_fields(ah_did)
-            missing_image_names = self._missing_images_for_ah_deck(
+            missing_media_names = self._missing_media_for_ah_deck(
                 ah_did, asset_disabled_fields
             )
-            if not missing_image_names:
+            if not missing_media_names:
                 continue
-            client.download_images(missing_image_names, ah_did)
+            client.download_media(missing_media_names, ah_did)
 
-    def _missing_images_for_ah_deck(
+    def _missing_media_for_ah_deck(
         self, ah_did: uuid.UUID, asset_disabled_fields: Dict[int, List[str]]
     ) -> List[str]:
-        img_names = ankihub_db.media_names_for_ankihub_deck(
+        media_names = ankihub_db.media_names_for_ankihub_deck(
             ah_did, asset_disabled_fields=asset_disabled_fields
         )
         media_dir_path = Path(aqt.mw.col.media.dir())
 
         result = [
-            img_name
-            for img_name in img_names
-            if not (media_dir_path / img_name).exists()
+            media_name
+            for media_name in media_names
+            if not (media_dir_path / media_name).exists()
         ]
         return result
 

@@ -19,8 +19,8 @@ from .ankihub_client import (
     NoteInfo,
     NoteSuggestion,
     SuggestionType,
-    get_image_names_from_notes_data,
-    get_image_names_from_suggestions,
+    get_media_names_from_notes_data,
+    get_media_names_from_suggestions,
 )
 from .db import ankihub_db
 from .exporting import to_note_data
@@ -323,31 +323,29 @@ def _rename_and_upload_assets_for_suggestions(
     Returns suggestion with updated asset names."""
 
     client = AnkiHubClient()
-
-    # TODO: remove this method 'get_image_names_from_notes_data' from ankihub client
     original_notes_data = [
         note_info
         for suggestion in suggestions
         if (note_info := ankihub_db.note_data(NoteId(suggestion.anki_nid)))
     ]
-    original_notes_image_names: Set[str] = get_image_names_from_notes_data(
+    original_asset_names: Set[str] = get_media_names_from_notes_data(
         original_notes_data
     )
-    suggestion_image_names: Set[str] = get_image_names_from_suggestions(suggestions)
+    suggestion_asset_names: Set[str] = get_media_names_from_suggestions(suggestions)
 
-    # Filter out unchanged image names so we don't hash and upload images that aren't part of the suggestion
-    added_image_names = suggestion_image_names.difference(original_notes_image_names)
+    # Filter out unchanged asset names so we don't hash and upload assets that aren't part of the suggestion
+    added_asset_names = suggestion_asset_names.difference(original_asset_names)
 
-    if not added_image_names:
-        # No images added, nothing to do here. Return
+    if not added_asset_names:
+        # No assets added, nothing to do here. Return
         # the original suggestions object
         return suggestions
 
-    added_image_paths = [
-        Path(aqt.mw.col.media.dir()) / image_name for image_name in added_image_names
+    added_asset_paths = [
+        Path(aqt.mw.col.media.dir()) / asset_name for asset_name in added_asset_names
     ]
 
-    asset_name_map = client.generate_asset_files_with_hashed_names(added_image_paths)
+    asset_name_map = client.generate_asset_files_with_hashed_names(added_asset_paths)
 
     media_sync.start_media_upload(
         media_names=asset_name_map.values(), ankihub_did=ankihub_did

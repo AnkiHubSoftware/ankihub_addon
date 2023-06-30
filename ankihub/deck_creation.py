@@ -12,7 +12,7 @@ from anki.notes import NoteId
 
 from . import LOGGER
 from .addon_ankihub_client import AddonAnkiHubClient as AnkiHubClient
-from .ankihub_client import NoteInfo, get_image_names_from_notes_data
+from .ankihub_client import NoteInfo, get_media_names_from_notes_data
 from .db import ankihub_db
 from .exporting import to_note_data
 from .media_sync import media_sync
@@ -138,7 +138,7 @@ def _upload_deck(
     # Upload all existing local assets for this deck
     # (assets that are referenced on Deck's notes)
     if should_upload_assets:
-        image_names = get_image_names_from_notes_data(notes_data)
-        media_sync.start_media_upload(image_names, ankihub_did)
+        media_names = get_media_names_from_notes_data(notes_data)
+        media_sync.start_media_upload(media_names, ankihub_did)
 
     return ankihub_did
