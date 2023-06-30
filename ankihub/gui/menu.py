@@ -432,7 +432,7 @@ def _upload_deck_assets_action() -> None:
     if not owned_ah_dids:
         showInfo(
             "<b>Oh no!</b> 🙁<br>"
-            "You do not own any AnkiHub decks. You can only perform upload media for decks that you own.<br><br>"
+            "You do not own any AnkiHub decks. You can only upload media for decks that you own.<br><br>"
             "Maybe try creating a new AnkiHub deck for yourself, or create a note suggestion instead? 🙂"
         )
         return
