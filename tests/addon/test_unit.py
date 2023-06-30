@@ -455,7 +455,11 @@ class TestAnkiHubDBMediaNamesForAnkiHubDeck:
             mid=self.mid,
             fields=[
                 Field(value="test <img src='test1.jpg'>", order=0, name="Front"),
-                Field(value="test <img src='test2.jpg'>", order=1, name="Back"),
+                Field(
+                    value="test <img src='test2.jpg'> [sound:test3.mp3]",
+                    order=1,
+                    name="Back",
+                ),
             ],
         )
         self.ah_did = next_deterministic_uuid()
@@ -470,10 +474,26 @@ class TestAnkiHubDBMediaNamesForAnkiHubDeck:
             # Assert that the media name is returned for the field that is not disabled
             # and the media name is not returned for the field that is disabled.
             assert ankihub_db.media_names_for_ankihub_deck(
-                self.ah_did, asset_disabled_fields={self.mid: ["Front"]}
-            ) == {"test2.jpg"}
+                self.ah_did, asset_disabled_fields={}
+            ) == {
+                "test1.jpg",
+                "test2.jpg",
+                "test3.mp3",
+            }
 
-    def test_bypass_by_asset_disabled_bypass_tag(
+    def test_with_asset_disabled_field(
+        self,
+        anki_session: AnkiSession,
+        ankihub_db: _AnkiHubDB,
+    ):
+        with anki_session.profile_loaded():
+            # Assert that the media name is returned for the field that is not disabled
+            # and the media name is not returned for the field that is disabled.
+            assert ankihub_db.media_names_for_ankihub_deck(
+                self.ah_did, asset_disabled_fields={self.mid: ["Front"]}
+            ) == {"test2.jpg", "test3.mp3"}
+
+    def test_bypass_using_asset_disabled_bypass_tag(
         self,
         anki_session: AnkiSession,
         ankihub_db: _AnkiHubDB,
@@ -485,8 +505,8 @@ class TestAnkiHubDBMediaNamesForAnkiHubDeck:
             ankihub_db.execute(sql=sql)
 
             assert ankihub_db.media_names_for_ankihub_deck(
-                self.ah_did, asset_disabled_fields={self.mid: ["Front"]}
-            ) == {"test1.jpg", "test2.jpg"}
+                self.ah_did, asset_disabled_fields={self.mid: ["Front", "Back"]}
+            ) == {"test1.jpg"}
 
     def test_with_notetype_missing_from_anki_db(
         self,
