@@ -822,7 +822,7 @@ class AnkiHubClient:
         response = self._send_request(
             "GET",
             API.ANKIHUB,
-            f"/decks/{ankihub_deck_uuid}/asset-disabled-fields/",
+            f"/decks/{ankihub_deck_uuid}/media-disabled-fields/",
         )
         if response.status_code == 404:
             return {}
