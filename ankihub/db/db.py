@@ -223,6 +223,16 @@ class _AnkiHubDB:
 
         return (tuple(upserted_notes), tuple(skipped_notes))
 
+    def remove_notes(self, ankihub_note_uuids: Sequence[uuid.UUID]) -> None:
+        """Removes notes from the AnkiHub DB"""
+        with self.connection() as conn:
+            conn.execute(
+                f"""
+                DELETE FROM notes WHERE ankihub_note_id IN
+                {uuids2str(ankihub_note_uuids)}
+                """,
+            )
+
     def transfer_mod_values_from_anki_db(self, notes_data: Sequence[NoteInfo]):
         """Takes mod values for the notes from the Anki DB and saves them to the AnkiHub DB.
 
@@ -409,6 +419,22 @@ class _AnkiHubDB:
 
         return result
 
+    def ankihub_nids_to_anki_nids(
+        self, ankihub_nids: List[uuid.UUID]
+    ) -> Dict[uuid.UUID, NoteId]:
+        anki_nid_for_ah_nid = self.dict(
+            f"""
+            SELECT ankihub_note_id, anki_note_id FROM notes
+            WHERE ankihub_note_id IN {uuids2str(ankihub_nids)}
+            """
+        )
+        result = {uuid.UUID(k): NoteId(v) for k, v in anki_nid_for_ah_nid.items()}
+
+        not_existing = set(ankihub_nids) - set(result.keys())
+        result.update({nid: None for nid in not_existing})
+
+        return result
+
     def anki_nid_for_ankihub_nid(self, ankihub_id: uuid.UUID) -> Optional[NoteId]:
         note_id_str = self.scalar(
             """
@@ -555,3 +581,9 @@ class _AnkiHubDB:
 
 
 ankihub_db = _AnkiHubDB()
+
+
+def uuids2str(ankihub_nids: Sequence[uuid.UUID]) -> str:
+    result = ", ".join(f"'{nid}'" for nid in ankihub_nids)
+    result = f"({result})"
+    return result
