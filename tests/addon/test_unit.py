@@ -464,6 +464,63 @@ class TestAnkiHubDBAnkiNidsToAnkiHubNids:
         }
 
 
+class TestAnkiHubDBAnkiHubNidsToAnkiIds:
+    def test_ankihub_nids_to_anki_ids(
+        self,
+        ankihub_db: _AnkiHubDB,
+        next_deterministic_uuid: Callable[[], uuid.UUID],
+    ):
+        anki_nid = 1
+
+        existing_ah_nid = next_deterministic_uuid()
+        note = NoteInfoFactory.create(
+            anki_nid=anki_nid,
+            ankihub_note_uuid=existing_ah_nid,
+        )
+        ankihub_db.upsert_notes_data(
+            ankihub_did=next_deterministic_uuid(),
+            notes_data=[note],
+        )
+
+        not_exiisting_ah_nid = next_deterministic_uuid()
+
+        # Retrieve a dict of anki_nid -> ankihub_note_uuid for two anki_nids.
+        ah_nids_for_anki_nids = ankihub_db.ankihub_nids_to_anki_nids(
+            ankihub_nids=[existing_ah_nid, not_exiisting_ah_nid]
+        )
+
+        assert ah_nids_for_anki_nids == {
+            existing_ah_nid: anki_nid,
+            not_exiisting_ah_nid: None,
+        }
+
+
+class TestAnkiHubDBRemoveNotes:
+    def test_remove_notes(
+        self,
+        ankihub_db: _AnkiHubDB,
+        next_deterministic_uuid: Callable[[], uuid.UUID],
+    ):
+        ankihub_note_uuid = next_deterministic_uuid()
+        note = NoteInfoFactory.create(
+            ankihub_note_uuid=ankihub_note_uuid,
+        )
+
+        ah_did = next_deterministic_uuid()
+        ankihub_db.upsert_notes_data(
+            ankihub_did=ah_did,
+            notes_data=[note],
+        )
+
+        assert ankihub_db.anki_nids_for_ankihub_deck(ah_did) == [note.anki_nid]
+
+        ankihub_db.remove_notes(
+            ankihub_note_uuids=[ankihub_note_uuid],
+        )
+
+        assert ankihub_db.anki_nids_for_ankihub_deck(ankihub_did=ah_did) == []
+
+
 class TestAnkiHubDBMediaNamesForAnkiHubDeck:
     @pytest.fixture(autouse=True)
     def setup_method_fixture(

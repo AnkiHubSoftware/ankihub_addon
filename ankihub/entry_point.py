@@ -14,6 +14,7 @@ from .debug import setup as setup_debug
 from .errors import setup_error_handler
 from .gui import browser, editor, progress, reviewer
 from .gui.menu import menu_state, refresh_ankihub_menu, setup_ankihub_menu
+from .note_deletion import handle_notes_deleted_from_webapp
 from .settings import (
     ANKI_VERSION,
     ankihub_db_path,
@@ -84,6 +85,11 @@ def _after_profile_setup():
     # We want the modifications to be present even if the user doesn't sync with AnkiHub, so we call
     # this here.
     _adjust_ankihub_note_type_templates()
+
+    # This deletes notes that were deleted from the web app. This is not a general solution,
+    # just a temporary fix for notes that were already manually deleted on the webapp.
+    # Later we should handle note deletion in the sync process.
+    handle_notes_deleted_from_webapp()
 
 
 def _general_setup():

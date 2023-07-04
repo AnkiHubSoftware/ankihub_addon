@@ -104,6 +104,7 @@ from ankihub.note_conversion import (
     TAG_FOR_PROTECTING_ALL_FIELDS,
     TAG_FOR_PROTECTING_FIELDS,
 )
+from ankihub.note_deletion import TAG_FOR_DELETED_NOTES
 from ankihub.reset_local_changes import reset_local_changes_to_notes
 from ankihub.settings import (
     ANKIHUB_NOTE_TYPE_FIELD_NAME,
@@ -194,6 +195,75 @@ def import_sample_ankihub_deck(
         assert local_did == list(new_dids)[0]
 
     return local_did
+
+
+class ImportAHNote(Protocol):
+    def __call__(
+        self,
+        note_data: Optional[NoteInfo] = None,
+        ah_nid: Optional[uuid.UUID] = None,
+        mid: Optional[NotetypeId] = None,
+    ) -> NoteInfo:
+        ...
+
+
+@fixture
+def import_ah_note(next_deterministic_id: Callable[[], uuid.UUID]) -> ImportAHNote:
+    """Import a note into the Anki and AnkiHub databases and return the note info.
+    The note type of the note is created in the Anki database if it does not exist yet.
+    The default value for the note type is an AnkiHub version of the Basic note type.
+    Can only be used in an anki_session_with_addon.profile_loaded() context.
+
+    Parameters:
+    Can be passed to override the default values of the note. When certain
+    parameters are overwritten, the note type can become incompatible with the
+    note, in this case an exception is raised.
+
+    Purpose:
+    Easily create notes in the Anki and AnkiHub databases without
+    having to worry about creating note types, decks and the import process.
+    """
+    # All notes created by this fixture will be created in the same deck.
+    ah_did = next_deterministic_id()
+    deck_name = "test"
+
+    def _import_ah_note(
+        note_data: Optional[NoteInfo] = None,
+        ah_nid: Optional[uuid.UUID] = None,
+        mid: Optional[NotetypeId] = None,
+    ):
+        if mid is None:
+            ah_basic_note_type = create_or_get_ah_version_of_note_type(
+                aqt.mw, aqt.mw.col.models.by_name("Basic")
+            )
+            mid = ah_basic_note_type["id"]
+
+        if note_data is None:
+            note_data = NoteInfoFactory.create()
+
+        note_data.mid = mid
+
+        if ah_nid:
+            note_data.ankihub_note_uuid = ah_nid
+
+        # Check if note data is compatible with the note type.
+        # For each field in note_data, check if there is a field in the note type with the same name.
+        note_type = aqt.mw.col.models.get(mid)
+        field_names_of_note_type = set(field["name"] for field in note_type["flds"])
+        fields_are_compatible = all(
+            field.name in field_names_of_note_type for field in note_data.fields
+        )
+        assert fields_are_compatible, (
+            f"Note data is not compatible with the note type.\n"
+            f"\tNote data: {note_data.fields}, note type: {field_names_of_note_type}"
+        )
+
+        AnkiHubImporter()._import_ankihub_deck_inner(
+            ankihub_did=ah_did, notes_data=[note_data], deck_name=deck_name
+        )
+        return note_data
+
+    return _import_ah_note
 
 
 class CreateAnkiAHNote(Protocol):
@@ -3573,3 +3643,48 @@ class TestDebugModule:
     def test_log_stack(self):
         # Test that the _log_stack function does not throw an exception when called.
         _log_stack("test")
+
+
+@pytest.mark.parametrize(
+    "ah_nid, was_deleted_from_webapp",
+    [
+        (
+            # This note was deleted from the webapp and is the first from the list of notes
+            # in deleted_notes_from_anking_deck.json
+            uuid.UUID("66973dbb-3a7a-4153-a944-4aa1f77ebc02"),
+            True,
+        ),
+        (
+            uuid.UUID("00000000-0000-0000-0000-000000000000"),
+            False,
+        ),
+    ],
+)
+def test_handle_notes_deleted_from_webapp(
+    anki_session_with_addon_data: AnkiSession,
+    import_ah_note: ImportAHNote,
+    ah_nid: uuid.UUID,
+    was_deleted_from_webapp: bool,
+):
+    with anki_session_with_addon_data.profile_loaded():
+        mw = anki_session_with_addon_data.mw
+
+        # Import the note
+        note_data = import_ah_note(ah_nid=ah_nid)
+
+        # Make sure that the note has been added to the ankihub db
+        assert ankihub_db.ankihub_nid_exists(ah_nid)
+
+    # Run the entry point and load the profile to trigger the handling of the deleted notes.
+    entry_point.run()
+    with anki_session_with_addon_data.profile_loaded():
+
+        # Assert that the note has been deleted from the ankihub db if it was deleted from the webapp
+        assert not ankihub_db.ankihub_nid_exists(ah_nid) == was_deleted_from_webapp
+
+        # Assert that ankihub_id field of the note has been cleared if the note was deleted from the webapp
+        note = mw.col.get_note(NoteId(note_data.anki_nid))
+        assert (note[ANKIHUB_NOTE_TYPE_FIELD_NAME] == "") == was_deleted_from_webapp
+
+        # Assert that the note has a ankihub deleted tag if it was deleted from the webapp
+        assert (TAG_FOR_DELETED_NOTES in note.tags) == was_deleted_from_webapp
