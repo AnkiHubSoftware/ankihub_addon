@@ -10,7 +10,6 @@ Some differences between data stored in the AnkiHub database and the Anki databa
     while the AnkiHub database stores ankihub_client.NoteInfo objects.
 - decks, notes and note types can be missing from the Anki database or be modified.
 """
-import re
 import sqlite3
 import uuid
 from contextlib import contextmanager
@@ -24,10 +23,13 @@ from anki.utils import ids2str, join_fields, split_fields
 
 from .. import LOGGER
 from ..ankihub_client import Field, NoteInfo, suggestion_type_from_str
-from ..common_utils import IMG_NAME_IN_IMG_TAG_REGEX
+from ..common_utils import local_media_names_from_html
 from .db_utils import DBConnection
 
-ASSET_DISABLED_FIELD_BYPASS_TAG = "AnkiHub_ImageReady"
+# This tag can be added to a note to cause media files to be synced even if the
+# media file is in an media disabled field.
+# It does NOT only work for images, but the name is kept for backwards compatibility.
+MEDIA_DISABLED_FIELD_BYPASS_TAG = "AnkiHub_ImageReady"
 
 
 def attach_ankihub_db_to_anki_db_connection() -> None:
@@ -502,10 +504,10 @@ class _AnkiHubDB:
         return result
 
     def media_names_for_ankihub_deck(
-        self, ah_did: uuid.UUID, asset_disabled_fields: Dict[int, List[str]]
+        self, ah_did: uuid.UUID, media_disabled_fields: Dict[int, List[str]]
     ) -> Set[str]:
         """Returns the names of all media files used in the notes of the given deck.
-        param asset_disabled_fields: a dict mapping note type ids to a list of field names
+        param media_disabled_fields: a dict mapping note type ids to a list of field names
             that should be ignored when looking for media files.
         """
         result = set()
@@ -513,7 +515,7 @@ class _AnkiHubDB:
         # the disabled fields are note type specific.
         # Note: One note type is always only used in one deck.
         for mid in self.note_types_for_ankihub_deck(ah_did):
-            disabled_field_names = asset_disabled_fields.get(int(mid), [])
+            disabled_field_names = media_disabled_fields.get(int(mid), [])
             result.update(
                 self._media_names_on_notes_of_note_type(mid, disabled_field_names)
             )
@@ -537,7 +539,13 @@ class _AnkiHubDB:
             if name in field_names_for_mid
         ]
         fields_tags_pairs = self.execute(
-            f"SELECT fields, tags FROM notes WHERE anki_note_type_id = {mid} AND fields LIKE '%<img%'"
+            f"""
+            SELECT fields, tags FROM notes
+            WHERE (
+                anki_note_type_id = {mid} AND
+                (fields LIKE '%<img%' OR fields LIKE '%[sound:%')
+            )
+            """
         )
 
         result = set()
@@ -545,32 +553,29 @@ class _AnkiHubDB:
             fields = split_fields(fields_string)
             tags = set(tags_string.split(" "))
             for field_idx, field_text in enumerate(fields):
-                # TODO: This ANKIHUB_ASSET_ENABLED_TAG bypass is used to allow fields with
-                # this specific tag to have the assets downloaded, despite the field being
-                # marked as an asset-disabled field. Decide whether to remove this.
+                # TODO: This ANKIHUB_MEDIA_ENABLED_TAG bypass is used to allow fields with
+                # this specific tag to have the media files downloaded, despite the field being
+                # marked as an media-disabled field. Decide whether to remove this.
                 field_name = field_names_for_mid[field_idx]
                 # Tags cant have spaces, so we replace spaces with underscores to make it possible to
                 # reference a field name with spaces using a tag.
-                bypass_asset_disabled_tag = (
-                    f"{ASSET_DISABLED_FIELD_BYPASS_TAG}::{field_name.replace(' ', '_')}"
+                bypass_media_disabled_tag = (
+                    f"{MEDIA_DISABLED_FIELD_BYPASS_TAG}::{field_name.replace(' ', '_')}"
                 )
 
-                bypass = bypass_asset_disabled_tag in tags
+                bypass = bypass_media_disabled_tag in tags
                 if not bypass and field_idx in disabled_field_ords:
                     LOGGER.debug(
-                        f"Blocking asset download in [{field_name}] field without the tag [{bypass_asset_disabled_tag}]"
+                        f"Blocking media download in [{field_name}] field without the tag [{bypass_media_disabled_tag}]"
                     )
                     continue
 
                 if bypass:
                     LOGGER.debug(
-                        f"Allowing asset download in [{field_name}] field - note has tag [{bypass_asset_disabled_tag}]",
+                        f"Allowing media download in [{field_name}] field - note has tag [{bypass_media_disabled_tag}]",
                     )
 
-                for img in re.findall(IMG_NAME_IN_IMG_TAG_REGEX, field_text):
-                    if img.startswith("http://") or img.startswith("https://"):
-                        continue
-                    result.add(img)
+                result.update(local_media_names_from_html(field_text))
 
         return result
 

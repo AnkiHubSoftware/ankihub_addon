@@ -24,7 +24,7 @@ os.environ["SKIP_INIT"] = "1"
 
 from ankihub import errors, suggestions
 from ankihub.ankihub_client import AnkiHubHTTPError, Field, SuggestionType
-from ankihub.db.db import ASSET_DISABLED_FIELD_BYPASS_TAG, _AnkiHubDB
+from ankihub.db.db import MEDIA_DISABLED_FIELD_BYPASS_TAG, _AnkiHubDB
 from ankihub.deck_creation import _note_type_name_without_ankihub_modifications
 from ankihub.errors import (
     OUTDATED_CLIENT_ERROR_REASON,
@@ -64,8 +64,8 @@ def ankihub_db() -> Generator[_AnkiHubDB, None, None]:
         yield db
 
 
-class TestUploadImagesForSuggestion:
-    def test_update_asset_names_on_notes(
+class TestUploadMediaForSuggestion:
+    def test_update_media_names_on_notes(
         self, anki_session_with_addon_data: AnkiSession
     ):
         with anki_session_with_addon_data.profile_loaded():
@@ -90,7 +90,7 @@ class TestUploadImagesForSuggestion:
                 "other_test.gif": "fWJKERDVNMOWIKJCIWJefgjnverf.gif",
             }
 
-            suggestions._update_asset_names_on_notes(hashed_name_map)
+            suggestions._update_media_names_on_notes(hashed_name_map)
 
             notes[0].load()
             notes[1].load()
@@ -322,7 +322,7 @@ def test_add_subdeck_tags_to_notes_with_spaces_in_deck_name(
 
 class TestSuggestionDialog:
     @pytest.mark.parametrize(
-        "is_new_note_suggestion,is_for_anking_deck,suggestion_type,source_type,image_was_added",
+        "is_new_note_suggestion,is_for_anking_deck,suggestion_type,source_type,media_was_added",
         [
             (True, True, SuggestionType.NEW_CONTENT, SourceType.AMBOSS, False),
             (True, True, SuggestionType.OTHER, SourceType.AMBOSS, False),
@@ -342,12 +342,12 @@ class TestSuggestionDialog:
         is_for_anking_deck: bool,
         suggestion_type: SuggestionType,
         source_type: SourceType,
-        image_was_added: bool,
+        media_was_added: bool,
     ):
         dialog = SuggestionDialog(
             is_for_anking_deck=is_for_anking_deck,
             is_new_note_suggestion=is_new_note_suggestion,
-            added_new_images=image_was_added,
+            added_new_media=media_was_added,
         )
         dialog.show()
 
@@ -512,7 +512,11 @@ class TestAnkiHubDBMediaNamesForAnkiHubDeck:
             mid=self.mid,
             fields=[
                 Field(value="test <img src='test1.jpg'>", order=0, name="Front"),
-                Field(value="test <img src='test2.jpg'>", order=1, name="Back"),
+                Field(
+                    value="test <img src='test2.jpg'> [sound:test3.mp3]",
+                    order=1,
+                    name="Back",
+                ),
             ],
         )
         self.ah_did = next_deterministic_uuid()
@@ -527,23 +531,39 @@ class TestAnkiHubDBMediaNamesForAnkiHubDeck:
             # Assert that the media name is returned for the field that is not disabled
             # and the media name is not returned for the field that is disabled.
             assert ankihub_db.media_names_for_ankihub_deck(
-                self.ah_did, asset_disabled_fields={self.mid: ["Front"]}
-            ) == {"test2.jpg"}
+                self.ah_did, media_disabled_fields={}
+            ) == {
+                "test1.jpg",
+                "test2.jpg",
+                "test3.mp3",
+            }
 
-    def test_bypass_by_asset_disabled_bypass_tag(
+    def test_with_media_disabled_field(
+        self,
+        anki_session: AnkiSession,
+        ankihub_db: _AnkiHubDB,
+    ):
+        with anki_session.profile_loaded():
+            # Assert that the media name is returned for the field that is not disabled
+            # and the media name is not returned for the field that is disabled.
+            assert ankihub_db.media_names_for_ankihub_deck(
+                self.ah_did, media_disabled_fields={self.mid: ["Front"]}
+            ) == {"test2.jpg", "test3.mp3"}
+
+    def test_bypass_using_media_disabled_bypass_tag(
         self,
         anki_session: AnkiSession,
         ankihub_db: _AnkiHubDB,
     ):
         with anki_session.profile_loaded():
             # Set bypass tag
-            bypass_tag = f"{ASSET_DISABLED_FIELD_BYPASS_TAG}::Front"
+            bypass_tag = f"{MEDIA_DISABLED_FIELD_BYPASS_TAG}::Front"
             sql = f"UPDATE notes SET tags = '{bypass_tag}' WHERE ankihub_deck_id = '{str(self.ah_did)}';"
             ankihub_db.execute(sql=sql)
 
             assert ankihub_db.media_names_for_ankihub_deck(
-                self.ah_did, asset_disabled_fields={self.mid: ["Front"]}
-            ) == {"test1.jpg", "test2.jpg"}
+                self.ah_did, media_disabled_fields={self.mid: ["Front", "Back"]}
+            ) == {"test1.jpg"}
 
     def test_with_notetype_missing_from_anki_db(
         self,
@@ -559,7 +579,7 @@ class TestAnkiHubDBMediaNamesForAnkiHubDeck:
             # Assert that no error is raised and an empty set is returned.
             assert (
                 ankihub_db.media_names_for_ankihub_deck(
-                    self.ah_did, asset_disabled_fields={}
+                    self.ah_did, media_disabled_fields={}
                 )
                 == set()
             )
