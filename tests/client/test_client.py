@@ -93,6 +93,51 @@ def client_with_server_setup(vcr: VCR, request, marks):
         run_command_in_django_container("python manage.py flush --no-input")
 
 
+@pytest.fixture(scope="session", autouse=True)
+def docker_setup_teardown():
+    # Start Docker container
+    subprocess.run(
+        [
+            "sudo",
+            "docker-compose",
+            "-f",
+            COMPOSE_FILE.absolute(),
+            "up",
+            "-d",
+            "django",
+        ]
+    )
+
+    yield
+
+    # Stop Docker container
+    subprocess.run(
+        [
+            "sudo",
+            "docker-compose",
+            "-f",
+            COMPOSE_FILE.absolute(),
+            "down",
+        ]
+    )
+
+
+def run_command_in_django_container(command):
+    subprocess.run(
+        [
+            "sudo",
+            "docker-compose",
+            "-f",
+            COMPOSE_FILE.absolute(),
+            "exec",
+            "django",
+            "bash",
+            "-c",
+            command,
+        ]
+    )
+
+
 @pytest.fixture
 def marks(request):
     # Yields a list of all marks on the current test
@@ -109,23 +154,6 @@ def vcr_enabled(vcr: VCR):
         vcr.record_mode == "new_episodes"
         and vcr.before_record_response
         and vcr.before_record_response() is None
-    )
-
-
-def run_command_in_django_container(command):
-    subprocess.run(
-        [
-            "sudo",
-            "docker-compose",
-            "-f",
-            COMPOSE_FILE.absolute(),
-            "run",
-            "--rm",
-            "django",
-            "bash",
-            "-c",
-            command,
-        ]
     )
 
 
