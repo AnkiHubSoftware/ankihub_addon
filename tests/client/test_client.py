@@ -87,11 +87,12 @@ def client_with_server_setup(vcr: VCR, request, marks):
         )
 
     client = AnkiHubClient(api_url=LOCAL_API_URL, local_media_dir_path=TEST_MEDIA_PATH)
-    yield client
     print_docker_logs()
+    yield client
 
     if not playback_mode:
         run_command_in_django_container("python manage.py flush --no-input")
+        print_docker_logs()
 
 
 def print_docker_logs():

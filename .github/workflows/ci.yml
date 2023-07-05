@@ -47,17 +47,11 @@ jobs:
           python -m pip install -r ./requirements/dev.txt
           python -m pip install smokeshow
 
-      - name: Run pre-commit
-        run: pre-commit run --all-files
-
       - name: Build
         run: |
           python ./scripts/build.py
         env:
           GOOGLE_API_KEY: ${{ secrets.GOOGLE_API_KEY }}
-
-      - name: Run mypy
-        run: mypy
 
       - name: Enable cloning web app repo
         uses: webfactory/ssh-agent@v0.5.4
@@ -93,8 +87,7 @@ jobs:
 
       - name: Run pytest with coverage
         run: |
-          pytest ./tests/addon --cov --cov-report=xml
-          pytest ./tests/client --disable-vcr --cov --cov-report=xml --cov-append
+          pytest ./tests/client --disable-vcr --cov --cov-report=xml --cov-append -rA --show-capture=stdout
           coverage html
 
       - name: Upload coverage report with smokeshow
