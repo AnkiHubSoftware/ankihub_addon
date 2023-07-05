@@ -87,10 +87,24 @@ def client_with_server_setup(vcr: VCR, request, marks):
         )
 
     client = AnkiHubClient(api_url=LOCAL_API_URL, local_media_dir_path=TEST_MEDIA_PATH)
-    yield client
+    try:
+        yield client
+    except Exception:
+        print_docker_logs()
+        raise  # re-raises the exception after logging
 
     if not playback_mode:
         run_command_in_django_container("python manage.py flush --no-input")
+
+
+def print_docker_logs():
+    result = subprocess.run(
+        ["sudo", "docker-compose", "-f", COMPOSE_FILE.absolute(), "logs", "django"],
+        text=True,
+        stdout=subprocess.PIPE,
+        stderr=subprocess.PIPE,
+    )
+    print(f"Docker Logs:\n{result.stdout}")
 
 
 @pytest.fixture(scope="session", autouse=True)
