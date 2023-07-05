@@ -27,7 +27,7 @@ from aqt.utils import openLink, showInfo, tooltip
 
 from .. import LOGGER
 from ..addon_ankihub_client import AddonAnkiHubClient as AnkiHubClient
-from ..ankihub_client import AnkiHubHTTPError, get_media_names_from_notes_data
+from ..ankihub_client import AnkiHubHTTPError
 from ..ankihub_client.models import UserDeckRelation
 from ..db import ankihub_db
 from ..deck_creation import create_ankihub_deck
