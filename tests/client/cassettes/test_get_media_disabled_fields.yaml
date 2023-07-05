@@ -12,7 +12,7 @@ interactions:
     uri: http://localhost:8000/api/login/
   response:
     body:
-      string: '{"expiry":"2023-08-02T17:05:01.745080Z","token":"47578ad8795b6f25a1845aabf1492b1b46e9d5c397a8ca521ba45b780fb63728"}'
+      string: '{"expiry":"2023-08-02T16:08:14.263879Z","token":"ff9232ee5743f6dd5586c89113800fb29e03b5213b7cad9571f0271736b68653"}'
     headers:
       Allow:
       - POST, OPTIONS
@@ -27,20 +27,20 @@ interactions:
       Cross-Origin-Opener-Policy:
       - same-origin
       Date:
-      - Wed, 05 Jul 2023 17:05:01 GMT
+      - Wed, 05 Jul 2023 16:08:15 GMT
       Referrer-Policy:
       - same-origin
       Server:
-      - Werkzeug/2.3.6 Python/3.8.17
+      - WSGIServer/0.2 CPython/3.8.17
       Server-Timing:
-      - TimerPanel_utime;dur=433.8859999999998;desc="User CPU time", TimerPanel_stime;dur=147.42;desc="System
-        CPU time", TimerPanel_total;dur=581.3059999999998;desc="Total CPU time", TimerPanel_total_time;dur=353.40710899981786;desc="Elapsed
-        time", SQLPanel_sql_time;dur=11.190343000635039;desc="SQL 17 queries", CachePanel_total_time;dur=0.043590000132098794;desc="Cache
+      - TimerPanel_utime;dur=3700.0739999999973;desc="User CPU time", TimerPanel_stime;dur=499.714;desc="System
+        CPU time", TimerPanel_total;dur=4199.787999999998;desc="Total CPU time", TimerPanel_total_time;dur=3711.796272000356;desc="Elapsed
+        time", SQLPanel_sql_time;dur=18.69499500753591;desc="SQL 17 queries", CachePanel_total_time;dur=0.29799600088153966;desc="Cache
         2 Calls"
       Set-Cookie:
-      - csrftoken=lC35bSB8iG4G7CFGWcPQmpQFSY25uh0G; expires=Wed, 03 Jul 2024 17:05:01
+      - csrftoken=xdTKrMrEeB5IUcImn6F3LUrfiVVmWt1Y; expires=Wed, 03 Jul 2024 16:08:15
         GMT; HttpOnly; Max-Age=31449600; Path=/; SameSite=Lax
-      - sessionid=y2hcu3sa2s9yhj0g1s1z2eee5fbzhmek; expires=Wed, 12 Jul 2023 17:05:01
+      - sessionid=7v9lk0j07pz90eoln0c2dtx2mugcmegq; expires=Wed, 12 Jul 2023 16:08:15
         GMT; HttpOnly; Max-Age=604800; Path=/; SameSite=Lax
       Vary:
       - Accept, Cookie, Accept-Language, Origin
@@ -49,7 +49,7 @@ interactions:
       X-Frame-Options:
       - DENY
       djdt-store-id:
-      - 6f945e71f83f457cbb45da36e3827092
+      - cf4acc3ff4bd4568908a16357610c0aa
     status:
       code: 200
       message: OK
@@ -59,7 +59,7 @@ interactions:
       Accept:
       - application/json; version=11.0
       Authorization:
-      - Token 47578ad8795b6f25a1845aabf1492b1b46e9d5c397a8ca521ba45b780fb63728
+      - Token ff9232ee5743f6dd5586c89113800fb29e03b5213b7cad9571f0271736b68653
       Content-Type:
       - application/json
     method: GET
@@ -81,16 +81,16 @@ interactions:
       Cross-Origin-Opener-Policy:
       - same-origin
       Date:
-      - Wed, 05 Jul 2023 17:05:01 GMT
+      - Wed, 05 Jul 2023 16:08:16 GMT
       Referrer-Policy:
       - same-origin
       Server:
-      - Werkzeug/2.3.6 Python/3.8.17
+      - WSGIServer/0.2 CPython/3.8.17
       Server-Timing:
-      - TimerPanel_utime;dur=35.384000000000086;desc="User CPU time", TimerPanel_stime;dur=3.230999999999984;desc="System
-        CPU time", TimerPanel_total;dur=38.615000000000066;desc="Total CPU time",
-        TimerPanel_total_time;dur=44.54423599963775;desc="Elapsed time", SQLPanel_sql_time;dur=3.080276004766347;desc="SQL
-        5 queries", CachePanel_total_time;dur=0;desc="Cache 0 Calls"
+      - TimerPanel_utime;dur=420.98800000000125;desc="User CPU time", TimerPanel_stime;dur=0.7649999999999046;desc="System
+        CPU time", TimerPanel_total;dur=421.7530000000012;desc="Total CPU time", TimerPanel_total_time;dur=413.7846769990574;desc="Elapsed
+        time", SQLPanel_sql_time;dur=4.941111998050474;desc="SQL 5 queries", CachePanel_total_time;dur=0;desc="Cache
+        0 Calls"
       Vary:
       - Accept, Accept-Language, Cookie, Origin
       X-Content-Type-Options:
@@ -98,7 +98,7 @@ interactions:
       X-Frame-Options:
       - DENY
       djdt-store-id:
-      - 707a01f1552047aab73b8451d626b5f6
+      - 2c874afa71fc4d6b9eb22c3e7c28251c
     status:
       code: 200
       message: OK
