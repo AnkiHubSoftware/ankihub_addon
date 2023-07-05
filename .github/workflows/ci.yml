@@ -37,7 +37,7 @@ jobs:
             ${{ runner.os }}-pip-
 
       - name: Install Qt
-        uses: jurplel/install-qt-action@v2
+        uses: jurplel/install-qt-action@v3
         with:
           version: "5.15.2"
           setup-python: "false"
