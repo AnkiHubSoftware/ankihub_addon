@@ -31,7 +31,7 @@ from .. import LOGGER
 from ..ankihub_client import (
     AnkiHubHTTPError,
     SuggestionType,
-    get_image_names_from_note_info,
+    get_media_names_from_note_info,
 )
 from ..db import ankihub_db
 from ..exporting import to_note_data
@@ -84,7 +84,7 @@ def open_suggestion_dialog_for_note(note: Note, parent: QWidget) -> None:
     suggestion_meta = SuggestionDialog(
         is_new_note_suggestion=ah_nid is None,
         is_for_anking_deck=ah_did == ANKING_DECK_ID,
-        added_new_images=_added_new_images(note),
+        added_new_media=_added_new_media(note),
     ).run()
     if suggestion_meta is None:
         return
@@ -132,7 +132,7 @@ def open_suggestion_dialog_for_bulk_suggestion(
         is_for_anking_deck=ah_did == ANKING_DECK_ID,
         # We currently have a limit of 500 notes per bulk suggestion, so we don't have to worry
         # about performance here.
-        added_new_images=any(_added_new_images(note) for note in notes),
+        added_new_media=any(_added_new_media(note) for note in notes),
     ).run()
     if not suggestion_meta:
         return
@@ -149,20 +149,20 @@ def open_suggestion_dialog_for_bulk_suggestion(
     )
 
 
-def _added_new_images(note: Note) -> bool:
-    """Returns True if images were added to the notes when comparing with
+def _added_new_media(note: Note) -> bool:
+    """Returns True if media files were added to the notes when comparing with
     the notes in the ankihub database, else False."""
     note_info_anki = to_note_data(note)
-    img_names_anki = get_image_names_from_note_info(note_info_anki)
+    media_names_anki = get_media_names_from_note_info(note_info_anki)
 
     note_info_ah = ankihub_db.note_data(note.id)
     if note_info_ah is None:
-        return bool(img_names_anki)
+        return bool(media_names_anki)
 
-    img_names_ah = get_image_names_from_note_info(note_info_ah)
+    media_names_ah = get_media_names_from_note_info(note_info_ah)
 
-    added_img_names = set(img_names_anki) - set(img_names_ah)
-    result = len(added_img_names) > 0
+    added_media_names = set(media_names_anki) - set(media_names_ah)
+    result = len(added_media_names) > 0
     return result
 
 
@@ -234,12 +234,12 @@ class SuggestionDialog(QDialog):
         self,
         is_new_note_suggestion: bool,
         is_for_anking_deck: bool,
-        added_new_images: bool,
+        added_new_media: bool,
     ) -> None:
         super().__init__()
         self._is_new_note_suggestion = is_new_note_suggestion
         self._is_for_anking_deck = is_for_anking_deck
-        self._added_new_images = added_new_images
+        self._added_new_media = added_new_media
 
         self._setup_ui()
 
@@ -294,10 +294,10 @@ class SuggestionDialog(QDialog):
 
         self.layout_.addSpacing(10)
 
-        # Add note about image source if an image was added
-        if self._added_new_images and self._is_for_anking_deck:
+        # Add note about media source if a media file was added
+        if self._added_new_media and self._is_for_anking_deck:
             label = QLabel(
-                "Please provide the source of the image(s)<br>"
+                "Please provide the source of images or audio files<br>"
                 "in the rationale field. For example:<br>"
                 "Photo credit: The AnKing [www.ankingmed.com]"
             )
