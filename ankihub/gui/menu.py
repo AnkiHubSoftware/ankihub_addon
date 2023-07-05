@@ -467,13 +467,14 @@ def _upload_deck_media_action() -> None:
         showInfo("You can't upload media for an empty deck.")
         return
 
-    # Obtain a list of NoteInfo objects from nids
-    notes_data = [ankihub_db.note_data(nid) for nid in nids]
-
-    media_names = get_media_names_from_notes_data(notes_data)
+    media_disabled_fields = client.get_media_disabled_fields(ah_did)
+    media_names = ankihub_db.media_names_for_ankihub_deck(
+        ah_did=ah_did, media_disabled_fields=media_disabled_fields
+    )
     media_paths = [
         Path(aqt.mw.col.media.dir()) / media_name for media_name in media_names
     ]
+
 
     # Check if the deck references any local media file, if it does
     # not, no point on trying to upload it
