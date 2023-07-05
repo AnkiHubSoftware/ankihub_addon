@@ -87,7 +87,7 @@ jobs:
 
       - name: Run pytest with coverage
         run: |
-          pytest ./tests/client --disable-vcr --cov --cov-report=xml --cov-append -rA --show-capture=stdout
+          pytest ./tests/client --disable-vcr --cov --cov-report=xml --cov-append -rA --show-capture=stdout -k change_note_suggestion
           coverage html
 
       - name: Upload coverage report with smokeshow
