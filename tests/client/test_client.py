@@ -116,7 +116,6 @@ def docker_setup_teardown():
             COMPOSE_FILE.absolute(),
             "up",
             "-d",
-            "django",
         ]
     )
 
