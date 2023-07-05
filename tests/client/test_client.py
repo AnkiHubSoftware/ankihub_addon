@@ -130,6 +130,7 @@ def run_command_in_django_container(command):
             "-f",
             COMPOSE_FILE.absolute(),
             "exec",
+            "-T",
             "django",
             "bash",
             "-c",
