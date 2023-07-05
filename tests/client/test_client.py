@@ -123,7 +123,7 @@ def docker_setup_teardown():
 
 
 def run_command_in_django_container(command):
-    subprocess.run(
+    result = subprocess.run(
         [
             "sudo",
             "docker-compose",
@@ -134,8 +134,21 @@ def run_command_in_django_container(command):
             "bash",
             "-c",
             command,
-        ]
+        ],
+        text=True,
+        stdout=subprocess.PIPE,
+        stderr=subprocess.PIPE,
     )
+
+    if result.returncode != 0:
+        print(f"Command '{command}' failed with error code {result.returncode}")
+        print(f"Stdout: {result.stdout}")
+        print(f"Stderr: {result.stderr}")
+    else:
+        print(f"Command '{command}' executed successfully.")
+        print(f"Stdout: {result.stdout}")
+
+    return result
 
 
 @pytest.fixture
