@@ -80,10 +80,10 @@ jobs:
             ${{ github.workflow }}-${{ env.WEEK }}-
       - run: |
           docker-compose build
-          docker-compose run --rm django python manage.py makemigrations
-          docker-compose run --rm django bash release.sh
-          docker-compose run --rm django python manage.py print_settings
           docker-compose up -d
+          docker-compose exec -T django python manage.py makemigrations
+          docker-compose exec -T django bash release.sh
+          docker-compose exec -T django python manage.py print_settings
 
       - name: Run pytest with coverage
         run: |
