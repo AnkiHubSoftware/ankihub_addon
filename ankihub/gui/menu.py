@@ -471,19 +471,20 @@ def _upload_deck_media_action() -> None:
     media_names = ankihub_db.media_names_for_ankihub_deck(
         ah_did=ah_did, media_disabled_fields=media_disabled_fields
     )
-    media_paths = [
-        Path(aqt.mw.col.media.dir()) / media_name for media_name in media_names
-    ]
 
-
-    # Check if the deck references any local media file, if it does
+    # Check if the deck references any media files, if it does
     # not, no point on trying to upload it
-    if not media_paths:
+    if not media_names:
         showInfo("This deck has no media to upload.")
         return
 
+    media_dir = Path(aqt.mw.col.media.dir())
+    media_names_with_existing_files = [
+        media_name for media_name in media_names if (media_dir / media_name).is_file()
+    ]
+
     # Check if the files referenced by the deck exists locally, if none exist, no point in uploading.
-    if not any([media_path.is_file() for media_path in media_paths]):
+    if not media_names_with_existing_files:
         showInfo(
             "You can't upload media for this deck because none of the referenced media files are present in your "
             "local media folder."
@@ -504,7 +505,9 @@ def _upload_deck_media_action() -> None:
     # Extract the AnkiHub deck ID using a sample note id
     ah_did = ankihub_db.ankihub_did_for_anki_nid(nids[0])
 
-    media_sync.start_media_upload(media_names, ah_did, on_success=on_success)
+    media_sync.start_media_upload(
+        media_names_with_existing_files, ah_did, on_success=on_success
+    )
 
     showInfo(
         "🖼️ Upload started! You can continue using Anki in the meantime."
