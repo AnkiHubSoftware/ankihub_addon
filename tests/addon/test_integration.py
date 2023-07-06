@@ -2344,11 +2344,11 @@ def test_protect_fields_action(
         _on_protect_fields_action(browser, [nid])
 
         # Assert that the note has the expected tag
-        def note_has_expected_tag():
+        def assert_note_has_expected_tag():
             note = mw.col.get_note(nid)
-            return expected_tag in note.tags
+            assert expected_tag in note.tags
 
-        qtbot.wait_until(note_has_expected_tag)
+        qtbot.wait_until(assert_note_has_expected_tag)
 
 
 class TestSubscribedDecksDialog:
