@@ -81,6 +81,7 @@ jobs:
       - run: |
           docker-compose build
           docker-compose up -d
+          sleep 20
           docker-compose exec -T django python manage.py makemigrations
           docker-compose exec -T django bash release.sh
           docker-compose exec -T django python manage.py print_settings
