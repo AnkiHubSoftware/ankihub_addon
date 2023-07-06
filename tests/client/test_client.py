@@ -3,7 +3,6 @@ import json
 import os
 import subprocess
 import tempfile
-import time
 import uuid
 import zipfile
 from copy import deepcopy
@@ -81,21 +80,15 @@ def client_with_server_setup(vcr: VCR, request, marks):
     cassette_path = VCR_CASSETTES_PATH / cassette_name
     playback_mode = vcr_enabled(vcr) and cassette_path.exists()
 
-    wait_for_postgres()
-
     if not playback_mode:
-        run_command_in_django_container("python manage.py runscript create_test_users")
         run_command_in_django_container(
+            "python manage.py flush --no-input && "
+            "python manage.py runscript create_test_users && "
             "python manage.py runscript create_fixture_data"
         )
 
     client = AnkiHubClient(api_url=LOCAL_API_URL, local_media_dir_path=TEST_MEDIA_PATH)
-    print_docker_logs()
     yield client
-
-    if not playback_mode:
-        run_command_in_django_container("python manage.py flush --no-input")
-        print_docker_logs()
 
 
 def print_docker_logs():
@@ -116,22 +109,6 @@ def print_docker_logs():
         print(f"{container.capitalize()} Docker Logs:\n{result.stdout}")
 
 
-def wait_for_postgres():
-    retries = 30
-    for i in range(retries):
-        try:
-            result = run_command_in_django_container("python manage.py migrate --plan")
-            if result.returncode == 0:
-                print("Postgres is ready!")
-                return
-        except Exception as e:
-            print(
-                f"Postgres is not ready, exception occurred: {e}, retrying in 5 seconds..."
-            )
-            time.sleep(5)
-    raise Exception("Could not connect to Postgres within retry limit")
-
-
 def run_command_in_django_container(command):
     result = subprocess.run(
         [
@@ -139,8 +116,8 @@ def run_command_in_django_container(command):
             "docker-compose",
             "-f",
             COMPOSE_FILE.absolute(),
-            "exec",
-            "-T",
+            "run",
+            "--rm",
             "django",
             "bash",
             "-c",
