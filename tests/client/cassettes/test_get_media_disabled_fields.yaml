@@ -16,6 +16,8 @@ interactions:
     headers:
       Allow:
       - POST, OPTIONS
+      Connection:
+      - close
       Content-Language:
       - en
       Content-Length:
@@ -68,6 +70,8 @@ interactions:
     headers:
       Allow:
       - GET, HEAD, OPTIONS
+      Connection:
+      - close
       Content-Language:
       - en
       Content-Length:
