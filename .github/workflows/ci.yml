@@ -83,7 +83,6 @@ jobs:
           docker-compose run --rm django python manage.py makemigrations
           docker-compose run --rm django bash release.sh
           docker-compose run --rm django python manage.py print_settings
-          docker-compose up -d
 
       - name: Run pytest with coverage
         run: |
