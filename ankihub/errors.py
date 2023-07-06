@@ -15,7 +15,7 @@ import aqt
 import sentry_sdk
 from anki.errors import BackendIOError, DBError, SyncError
 from anki.utils import checksum, is_win
-from aqt.utils import askUser, tooltip
+from aqt.utils import askUser, showInfo, tooltip
 from requests import exceptions
 from sentry_sdk import capture_exception, push_scope
 from sentry_sdk.integrations.argv import ArgvIntegration
@@ -189,6 +189,13 @@ def _try_handle_exception(
         # This can e.g. happen when a background task is running
         # and the user switches to a different Anki profile.
         LOGGER.warning("Collection is None was handled")
+        return True
+
+    if isinstance(
+        exc_value, OSError
+    ) and "Could not find a suitable TLS CA certificate bundle" in str(exc_value):
+        showInfo("Please restart Anki.", title="AnkiHub")
+        LOGGER.warning("TLS CA certificate bundle error was handled", exc_value)
         return True
 
     return False
