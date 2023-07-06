@@ -3,6 +3,7 @@ import json
 import os
 import subprocess
 import tempfile
+import time
 import uuid
 import zipfile
 from copy import deepcopy
@@ -119,6 +120,7 @@ def docker_setup_teardown():
         ]
     )
 
+    wait_for_postgres()
     yield
 
     # Stop Docker container
@@ -131,6 +133,22 @@ def docker_setup_teardown():
             "down",
         ]
     )
+
+
+def wait_for_postgres():
+    retries = 30
+    for i in range(retries):
+        try:
+            result = run_command_in_django_container("python manage.py migrate --plan")
+            if result.returncode == 0:
+                print("Postgres is ready!")
+                return
+        except Exception as e:
+            print(
+                f"Postgres is not ready, exception occurred: {e}, retrying in 5 seconds..."
+            )
+            time.sleep(5)
+    raise Exception("Could not connect to Postgres within retry limit")
 
 
 def run_command_in_django_container(command):
