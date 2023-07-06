@@ -35,7 +35,7 @@ def choose_subset(
     adjust_height_to_content=True,
     description_html: Optional[str] = None,
     parent: Any = None,
-) -> List[str]:
+) -> Optional[List[str]]:
     if not parent:
         parent = aqt.mw.app.activeWindow()
 
@@ -46,10 +46,10 @@ def choose_subset(
     layout = QVBoxLayout()
     dialog.setLayout(layout)
     label = QLabel(prompt)
+    label.setOpenExternalLinks(True)
     layout.addWidget(label)
-    list_widget = QListWidget()
+    list_widget = CustomListWidget()
     layout.addWidget(list_widget)
-
     layout.addSpacing(5)
 
     # add a "select all" button
@@ -76,16 +76,6 @@ def choose_subset(
         )
         list_widget.addItem(item)
 
-    # toggle item check state when clicked
-    qconnect(
-        list_widget.itemClicked,
-        lambda item: item.setCheckState(
-            Qt.CheckState.Checked
-            if item.checkState() == Qt.CheckState.Unchecked
-            else Qt.CheckState.Unchecked
-        ),
-    )
-
     if description_html:
         label = QLabel(f"<i>{description_html}</i>")
         layout.addWidget(label)
@@ -101,7 +91,8 @@ def choose_subset(
             list_widget.sizeHintForRow(0) * list_widget.count() + 20
         )
 
-    dialog.exec()
+    if dialog.exec() != QDialog.DialogCode.Accepted:
+        return None
 
     result = [
         list_widget.item(i).text()
@@ -109,6 +100,36 @@ def choose_subset(
         if list_widget.item(i).checkState() == Qt.CheckState.Checked
     ]
     return result
+
+
+class CustomListWidget(QListWidget):
+    """A QListWidget that allows the user to toggle the checkbox by clicking anywhere on the item.
+    Its ListWidget items are also not highlighted when selected."""
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.setStyleSheet(
+            """
+            QListWidget::item:selected {
+                background: palette(base);
+            }
+            """
+        )
+
+    def mousePressEvent(self, event):
+        super().mousePressEvent(event)
+        item = self.itemAt(event.pos())
+        if item:
+            if item.checkState() == Qt.CheckState.Checked:
+                item.setCheckState(Qt.CheckState.Unchecked)
+            else:
+                item.setCheckState(Qt.CheckState.Checked)
+
+    def mouseReleaseEvent(self, event):
+        item = self.itemAt(event.pos())
+        if item and item.flags() & Qt.ItemFlag.ItemIsUserCheckable:
+            return
+        super().mouseReleaseEvent(event)
 
 
 def choose_list(
