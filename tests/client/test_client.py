@@ -97,13 +97,21 @@ def client_with_server_setup(vcr: VCR, request, marks):
 
 
 def print_docker_logs():
-    result = subprocess.run(
-        ["sudo", "docker-compose", "-f", COMPOSE_FILE.absolute(), "logs", "django"],
-        text=True,
-        stdout=subprocess.PIPE,
-        stderr=subprocess.PIPE,
-    )
-    print(f"Docker Logs:\n{result.stdout}")
+    for container in ["django", "postgres"]:
+        result = subprocess.run(
+            [
+                "sudo",
+                "docker-compose",
+                "-f",
+                COMPOSE_FILE.absolute(),
+                "logs",
+                container,
+            ],
+            text=True,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
+        )
+        print(f"{container.capitalize()} Docker Logs:\n{result.stdout}")
 
 
 @pytest.fixture(scope="session", autouse=True)
@@ -117,22 +125,12 @@ def docker_setup_teardown():
             COMPOSE_FILE.absolute(),
             "up",
             "-d",
+            "--no-recreate",
         ]
     )
 
     wait_for_postgres()
     yield
-
-    # Stop Docker container
-    subprocess.run(
-        [
-            "sudo",
-            "docker-compose",
-            "-f",
-            COMPOSE_FILE.absolute(),
-            "down",
-        ]
-    )
 
 
 def wait_for_postgres():
