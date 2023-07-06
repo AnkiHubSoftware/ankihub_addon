@@ -85,6 +85,10 @@ jobs:
                 django bash release.sh && \
                 django python manage.py print_settings
           docker-compose up -d
+          until $(curl --output /dev/null --silent --head --fail http://localhost:8000); do
+              printf '.'
+              sleep 5
+          done
 
       - name: Run pytest with coverage
         run: |
