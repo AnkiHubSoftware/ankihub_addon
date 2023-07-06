@@ -41,6 +41,7 @@ jobs:
         with:
           version: "5.15.2"
           setup-python: "false"
+        continue-on-error: true
 
       - name: Install deps
         run: |
