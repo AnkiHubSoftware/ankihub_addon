@@ -81,6 +81,8 @@ def client_with_server_setup(vcr: VCR, request, marks):
     cassette_path = VCR_CASSETTES_PATH / cassette_name
     playback_mode = vcr_enabled(vcr) and cassette_path.exists()
 
+    wait_for_postgres()
+
     if not playback_mode:
         run_command_in_django_container("python manage.py runscript create_test_users")
         run_command_in_django_container(
@@ -112,25 +114,6 @@ def print_docker_logs():
             stderr=subprocess.PIPE,
         )
         print(f"{container.capitalize()} Docker Logs:\n{result.stdout}")
-
-
-@pytest.fixture(scope="session", autouse=True)
-def docker_setup_teardown():
-    # Start Docker container
-    subprocess.run(
-        [
-            "sudo",
-            "docker-compose",
-            "-f",
-            COMPOSE_FILE.absolute(),
-            "up",
-            "-d",
-            "--no-recreate",
-        ]
-    )
-
-    wait_for_postgres()
-    yield
 
 
 def wait_for_postgres():
