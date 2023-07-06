@@ -519,6 +519,47 @@ class _AnkiHubDB:
             )
         return result
 
+    def media_names_exist_for_ankihub_deck(
+        self, ah_did: uuid.UUID, media_names: Set[str]
+    ) -> Dict[str, bool]:
+        """Returns a dictionary where each key is a media name and the corresponding value is a boolean
+        indicating whether the media file is referenced on any note in the given deck. This function is
+        defined in addition to media_names_for_ankihub_deck to provide a more efficient way to check
+        if some media files exist in the deck."""
+
+        # We use a different implementation for when there are more than 30 media names to check,
+        # because the first method is fast up to a certain number of media names, but then becomes
+        # very slow.
+        if len(media_names) <= 30:
+            result = self._media_names_exist_for_ankihub_deck(ah_did, media_names)
+        else:
+            media_names_for_deck = self.media_names_for_ankihub_deck(ah_did, {})
+            result = {name: name in media_names_for_deck for name in media_names}
+
+        return result
+
+    def _media_names_exist_for_ankihub_deck(
+        self, ah_did: uuid.UUID, media_names: Set[str]
+    ) -> Dict[str, bool]:
+        result = {}
+        for media_name in media_names:
+            result[media_name] = bool(
+                self.scalar(
+                    f"""
+                    SELECT EXISTS(
+                        SELECT 1 FROM notes
+                        WHERE ankihub_deck_id = '{ah_did}'
+                        AND (
+                            fields LIKE '%src="{media_name}"%' OR
+                            fields LIKE '%src=''{media_name}''%' OR
+                            fields LIKE '%[sound:{media_name}]%'
+                        )
+                    )
+                    """
+                )
+            )
+        return result
+
     def _media_names_on_notes_of_note_type(
         self, mid: NotetypeId, disabled_field_names: List[str]
     ) -> Set[str]:
