@@ -91,24 +91,6 @@ def client_with_server_setup(vcr: VCR, request, marks):
     yield client
 
 
-def print_docker_logs():
-    for container in ["django", "postgres"]:
-        result = subprocess.run(
-            [
-                "sudo",
-                "docker-compose",
-                "-f",
-                COMPOSE_FILE.absolute(),
-                "logs",
-                container,
-            ],
-            text=True,
-            stdout=subprocess.PIPE,
-            stderr=subprocess.PIPE,
-        )
-        print(f"{container.capitalize()} Docker Logs:\n{result.stdout}")
-
-
 def run_command_in_django_container(command):
     result = subprocess.run(
         [
