@@ -529,7 +529,7 @@ class _AnkiHubDB:
         defined in addition to media_names_for_ankihub_deck to provide a more efficient way to check
         if some media files exist in the deck."""
 
-        # We use a different implementation for when there are more than 30 media names to check,
+        # This uses a different implementation when there are more than 30 media names to check
         # because the first method is fast up to a certain number of media names, but then becomes
         # very slow.
         if len(media_names) <= 30:
