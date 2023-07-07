@@ -8,6 +8,7 @@ from typing import Callable, Generator, List
 from unittest.mock import Mock
 
 import pytest
+from anki.decks import DeckId
 from anki.models import NotetypeDict
 from anki.notes import Note, NoteId
 from aqt import utils
@@ -52,7 +53,7 @@ from ankihub.note_conversion import (
 from ankihub.settings import ANKIWEB_ID
 from ankihub.subdecks import SUBDECK_TAG, add_subdeck_tags_to_notes
 from ankihub.threading_utils import rate_limited
-from ankihub.utils import lowest_level_common_ancestor_deck_name
+from ankihub.utils import lowest_level_common_ancestor_deck_name, mids_of_notes
 
 
 @pytest.fixture
@@ -195,6 +196,27 @@ def test_updated_tags():
             protected_tags=[],
         )
     ) == set([optional_tag])
+
+
+def test_mids_of_notes(anki_session: AnkiSession):
+    with anki_session.profile_loaded():
+        mw = anki_session.mw
+
+        # Create a basic note
+        basic = mw.col.models.by_name("Basic")
+        note_basic = mw.col.new_note(basic)
+        mw.col.add_note(note_basic, deck_id=DeckId(1))
+
+        # Create a cloze note
+        cloze = mw.col.models.by_name("Cloze")
+        note_cloze = mw.col.new_note(cloze)
+        mw.col.add_note(note_cloze, deck_id=DeckId(1))
+
+        # Assert that getting the note type ids of the two notes works
+        assert mids_of_notes([note_basic.id, note_cloze.id]) == {
+            note_basic.mid,
+            note_cloze.mid,
+        }
 
 
 class TestGetFieldsProtectedByTags:

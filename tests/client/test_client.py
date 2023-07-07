@@ -81,16 +81,44 @@ def client_with_server_setup(vcr: VCR, request, marks):
     playback_mode = vcr_enabled(vcr) and cassette_path.exists()
 
     if not playback_mode:
-        run_command_in_django_container("python manage.py runscript create_test_users")
         run_command_in_django_container(
+            "python manage.py flush --no-input && "
+            "python manage.py runscript create_test_users && "
             "python manage.py runscript create_fixture_data"
         )
 
     client = AnkiHubClient(api_url=LOCAL_API_URL, local_media_dir_path=TEST_MEDIA_PATH)
     yield client
 
-    if not playback_mode:
-        run_command_in_django_container("python manage.py flush --no-input")
+
+def run_command_in_django_container(command):
+    result = subprocess.run(
+        [
+            "sudo",
+            "docker-compose",
+            "-f",
+            COMPOSE_FILE.absolute(),
+            "run",
+            "--rm",
+            "django",
+            "bash",
+            "-c",
+            command,
+        ],
+        text=True,
+        stdout=subprocess.PIPE,
+        stderr=subprocess.PIPE,
+    )
+
+    if result.returncode != 0:
+        print(f"Command '{command}' failed with error code {result.returncode}")
+        print(f"Stdout: {result.stdout}")
+        print(f"Stderr: {result.stderr}")
+    else:
+        print(f"Command '{command}' executed successfully.")
+        print(f"Stdout: {result.stdout}")
+
+    return result
 
 
 @pytest.fixture
@@ -109,23 +137,6 @@ def vcr_enabled(vcr: VCR):
         vcr.record_mode == "new_episodes"
         and vcr.before_record_response
         and vcr.before_record_response() is None
-    )
-
-
-def run_command_in_django_container(command):
-    subprocess.run(
-        [
-            "sudo",
-            "docker-compose",
-            "-f",
-            COMPOSE_FILE.absolute(),
-            "run",
-            "--rm",
-            "django",
-            "bash",
-            "-c",
-            command,
-        ]
     )
 
 

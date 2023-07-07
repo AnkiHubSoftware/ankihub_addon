@@ -7,7 +7,7 @@ import uuid
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
 from time import sleep
-from typing import Any, Callable, Dict, List, Optional, Protocol, Tuple
+from typing import Any, Callable, Dict, List, Optional, Protocol, Set, Tuple
 from unittest.mock import MagicMock, Mock, patch
 from zipfile import ZipFile
 
@@ -22,6 +22,8 @@ from aqt import AnkiQt, dialogs, gui_hooks
 from aqt.addcards import AddCards
 from aqt.addons import InstallOk
 from aqt.browser import Browser
+from aqt.browser.sidebar.item import SidebarItem
+from aqt.browser.sidebar.tree import SidebarTreeView
 from aqt.importing import AnkiPackageImporter
 from aqt.qt import Qt
 from pytest import MonkeyPatch, fixture
@@ -78,6 +80,7 @@ from ankihub.gui.browser import (
     NewNoteSearchNode,
     SuggestionTypeSearchNode,
     UpdatedInTheLastXDaysSearchNode,
+    _on_protect_fields_action,
     _on_reset_optional_tags_action,
     custom_columns,
 )
@@ -98,6 +101,7 @@ from ankihub.note_conversion import (
     ADDON_INTERNAL_TAGS,
     ANKI_INTERNAL_TAGS,
     TAG_FOR_OPTIONAL_TAGS,
+    TAG_FOR_PROTECTING_ALL_FIELDS,
     TAG_FOR_PROTECTING_FIELDS,
 )
 from ankihub.note_deletion import TAG_FOR_DELETED_NOTES
@@ -204,7 +208,7 @@ class ImportAHNote(Protocol):
 
 
 @fixture
-def import_ah_note(next_deterministic_id: Callable[[], uuid.UUID]) -> ImportAHNote:
+def import_ah_note(next_deterministic_uuid: Callable[[], uuid.UUID]) -> ImportAHNote:
     """Import a note into the Anki and AnkiHub databases and return the note info.
     The note type of the note is created in the Anki database if it does not exist yet.
     The default value for the note type is an AnkiHub version of the Basic note type.
@@ -220,14 +224,14 @@ def import_ah_note(next_deterministic_id: Callable[[], uuid.UUID]) -> ImportAHNo
     having to worry about creating note types, decks and the import process.
     """
     # All notes created by this fixture will be created in the same deck.
-    ah_did = next_deterministic_id()
+    ah_did = next_deterministic_uuid()
     deck_name = "test"
 
     def _import_ah_note(
         note_data: Optional[NoteInfo] = None,
         ah_nid: Optional[uuid.UUID] = None,
         mid: Optional[NotetypeId] = None,
-    ):
+    ) -> NoteInfo:
         if mid is None:
             ah_basic_note_type = create_or_get_ah_version_of_note_type(
                 aqt.mw, aqt.mw.col.models.by_name("Basic")
@@ -2163,11 +2167,6 @@ class TestBrowserTreeView:
         qtbot: QtBot,
         install_sample_ah_deck: InstallSampleAHDeck,
     ):
-        from aqt import dialogs
-        from aqt.browser import Browser
-        from aqt.browser.sidebar.item import SidebarItem
-        from aqt.browser.sidebar.tree import SidebarTreeView
-
         config.public_config["sync_on_startup"] = False
         entry_point.run()
 
@@ -2307,6 +2306,49 @@ def test_browser_custom_columns(
             "No",
             "No",
         ]
+
+
+@pytest.mark.qt_no_exception_capture
+@pytest.mark.parametrize(
+    "field_names_to_protect, expected_tag",
+    [
+        ({"Front"}, f"{TAG_FOR_PROTECTING_FIELDS}::Front"),
+        ({"Front", "Back"}, f"{TAG_FOR_PROTECTING_ALL_FIELDS}"),
+    ],
+)
+def test_protect_fields_action(
+    anki_session_with_addon_data: AnkiSession,
+    install_sample_ah_deck: InstallSampleAHDeck,
+    monkeypatch: MonkeyPatch,
+    qtbot: QtBot,
+    field_names_to_protect: Set[str],
+    expected_tag: str,
+):
+    with anki_session_with_addon_data.profile_loaded():
+        mw = anki_session_with_addon_data.mw
+
+        install_sample_ah_deck()
+
+        # Open the browser
+        browser: Browser = dialogs.open("Browser", mw)
+
+        # Patch gui function choose_subset to return the fields to protect
+        monkeypatch.setattr(
+            "ankihub.gui.browser.choose_subset",
+            lambda *args, **kwargs: field_names_to_protect,
+        )
+
+        # Call the action for a note
+        nids = mw.col.find_notes("Front:*")
+        nid = nids[0]
+        _on_protect_fields_action(browser, [nid])
+
+        # Assert that the note has the expected tag
+        def assert_note_has_expected_tag():
+            note = mw.col.get_note(nid)
+            assert expected_tag in note.tags
+
+        qtbot.wait_until(assert_note_has_expected_tag)
 
 
 class TestSubscribedDecksDialog:
@@ -3195,73 +3237,82 @@ def test_download_media_on_sync(
         download_media_mock.assert_called_once_with(["image.png"], ah_did)
 
 
+@fixture
+def mock_client_media_upload(
+    monkeypatch: MonkeyPatch,
+    requests_mock: Mocker,
+):
+    fake_presigned_url = AnkiHubClient().s3_bucket_url + "/fake_key"
+    s3_upload_request_mock = requests_mock.post(
+        fake_presigned_url, json={"success": True}, status_code=204
+    )
+
+    monkeypatch.setattr(
+        AnkiHubClient,
+        "is_media_upload_finished",
+        lambda *args, **kwargs: True,
+    )
+
+    monkeypatch.setattr(
+        AnkiHubClient,
+        "media_upload_finished",
+        lambda *args, **kwargs: False,
+    )
+
+    monkeypatch.setattr(
+        AnkiHubClient,
+        "_get_presigned_url_for_multiple_uploads",
+        lambda *args, **kwargs: {
+            "url": fake_presigned_url,
+            "fields": {
+                "key": "deck_images/test/${filename}",
+            },
+        },
+    )
+
+    # Mock os.remove so the zip is not deleted
+    os_remove_mock = MagicMock()
+    monkeypatch.setattr(os, "remove", os_remove_mock)
+
+    monkeypatch.setattr(
+        "anki.media.MediaManager.dir", lambda *args, **kwargs: TEST_DATA_PATH
+    )
+
+    yield s3_upload_request_mock
+
+
 class TestSuggestionsWithMedia:
     def test_suggest_note_update_with_media(
         self,
         anki_session_with_addon_data: AnkiSession,
-        requests_mock: Mocker,
+        mock_client_media_upload: Tuple[AnkiQt, Mock],
+        import_ah_note: ImportAHNote,
         monkeypatch: MonkeyPatch,
-        install_sample_ah_deck: Callable[[], Tuple[uuid.UUID, int]],
+        requests_mock: Mocker,
         qtbot: QtBot,
     ):
-        anki_session = anki_session_with_addon_data
-        with anki_session.profile_loaded():
-            mw = anki_session.mw
-            monkeypatch.setattr(
-                mw.col.media, "dir", lambda *args, **kwargs: TEST_DATA_PATH
+        s3_upload_request_mock = mock_client_media_upload
+
+        with anki_session_with_addon_data.profile_loaded():
+            mw = anki_session_with_addon_data.mw
+
+            note_data = import_ah_note()
+            ah_nid = ankihub_db.ankihub_nid_for_anki_nid(NoteId(note_data.anki_nid))
+            note = mw.col.get_note(NoteId(note_data.anki_nid))
+
+            suggestion_request_mock = requests_mock.post(
+                f"{config.api_url}/notes/{ah_nid}/suggestion/", status_code=201
             )
-
-            install_sample_ah_deck()
-
-            fake_presigned_url = AnkiHubClient().s3_bucket_url + "/fake_key"
-            s3_upload_request_mock = requests_mock.post(
-                fake_presigned_url, json={"success": True}, status_code=204
-            )
-
-            monkeypatch.setattr(
-                AnkiHubClient,
-                "is_media_upload_finished",
-                lambda *args, **kwargs: True,
-            )
-
-            monkeypatch.setattr(
-                AnkiHubClient,
-                "media_upload_finished",
-                lambda *args, **kwargs: None,
-            )
-
-            monkeypatch.setattr(
-                AnkiHubClient,
-                "_get_presigned_url_for_multiple_uploads",
-                lambda *args, **kwargs: {
-                    "url": fake_presigned_url,
-                    "fields": {
-                        "key": "deck_images/test/${filename}",
-                    },
-                },
-            )
-
-            # Mock os.remove so the zip is not deleted
-            os_remove_mock = MagicMock()
-            monkeypatch.setattr(os, "remove", os_remove_mock)
 
             with tempfile.NamedTemporaryFile(dir=TEST_DATA_PATH, suffix=".png") as f:
                 # add file to media folder
                 file_name_in_col = mw.col.media.add_file(f.name)
                 file_path_in_col = Path(mw.col.media.dir()) / file_name_in_col
 
-                nids = mw.col.find_notes("")
-                note = mw.col.get_note(nids[0])
-
                 # add file reference to a note
                 file_name_in_col = Path(file_path_in_col.name).name
                 note["Front"] = f'<img src="{file_name_in_col}">'
                 note.flush()
-
-                ah_nid = ankihub_db.ankihub_nid_for_anki_nid(note.id)
-                suggestion_request_mock = requests_mock.post(
-                    f"{config.api_url}/notes/{ah_nid}/suggestion/", status_code=201
-                )
 
                 # create a suggestion for the note
                 suggest_note_update(
@@ -3271,12 +3322,12 @@ class TestSuggestionsWithMedia:
                 )
 
                 # Wait for the background thread that uploads the media to finish.
-                qtbot.wait(200)
+                def assert_s3_upload():
+                    assert s3_upload_request_mock.called_once
 
-                assert len(suggestion_request_mock.request_history) == 1  # type: ignore
+                qtbot.wait_until(assert_s3_upload)
 
-                # assert that the media file was uploaded
-                assert len(s3_upload_request_mock.request_history) == 1  # type: ignore
+                assert suggestion_request_mock.called_once  # type: ignore
 
                 self._assert_media_names_as_expected(
                     note=note,
@@ -3288,56 +3339,16 @@ class TestSuggestionsWithMedia:
     def test_suggest_new_note_with_media(
         self,
         anki_session_with_addon_data: AnkiSession,
+        mock_client_media_upload: Tuple[AnkiQt, Mock],
+        ankihub_basic_note_type: NotetypeDict,
         requests_mock: Mocker,
         monkeypatch: MonkeyPatch,
-        install_sample_ah_deck: InstallSampleAHDeck,
         qtbot: QtBot,
     ):
-        anki_session = anki_session_with_addon_data
-        with anki_session.profile_loaded():
-            mw = anki_session.mw
-            monkeypatch.setattr(
-                mw.col.media, "dir", lambda *args, **kwargs: TEST_DATA_PATH
-            )
+        s3_upload_request_mock = mock_client_media_upload
 
-            _, ah_did = install_sample_ah_deck()
-
-            fake_presigned_url = f"{AnkiHubClient().s3_bucket_url}/fake_key"
-            s3_upload_request_mock = requests_mock.post(
-                fake_presigned_url, json={"success": True}, status_code=204
-            )
-
-            monkeypatch.setattr(
-                AnkiHubClient,
-                "is_media_upload_finished",
-                lambda *args, **kwargs: True,
-            )
-
-            monkeypatch.setattr(
-                AnkiHubClient,
-                "media_upload_finished",
-                lambda *args, **kwargs: None,
-            )
-
-            monkeypatch.setattr(
-                AnkiHubClient,
-                "_get_presigned_url_for_multiple_uploads",
-                lambda *args, **kwargs: {
-                    "url": fake_presigned_url,
-                    "fields": {
-                        "key": "deck_images/test/${filename}",
-                    },
-                },
-            )
-
-            suggestion_request_mock = requests_mock.post(
-                f"{config.api_url}/decks/{ah_did}/note-suggestion/",
-                status_code=201,
-            )
-
-            # Mock os.remove so the zip is not deleted
-            os_remove_mock = MagicMock()
-            monkeypatch.setattr(os, "remove", os_remove_mock)
+        with anki_session_with_addon_data.profile_loaded():
+            mw = anki_session_with_addon_data.mw
 
             with tempfile.NamedTemporaryFile(dir=TEST_DATA_PATH, suffix=".png") as f:
                 # add file to media folder
@@ -3346,11 +3357,15 @@ class TestSuggestionsWithMedia:
 
                 # add file reference to a note
                 file_name_in_col = Path(file_path_in_col.name).name
-                note = mw.col.new_note(
-                    mw.col.models.by_name("Basic (Testdeck / user1)")
-                )
+                note = mw.col.new_note(ankihub_basic_note_type)
                 note["Front"] = f'<img src="{file_name_in_col}">'
                 mw.col.add_note(note, DeckId(1))
+
+                ah_did = ankihub_db.ankihub_did_for_anki_nid(note.id)
+                suggestion_request_mock = requests_mock.post(
+                    f"{config.api_url}/decks/{ah_did}/note-suggestion/",
+                    status_code=201,
+                )
 
                 suggest_new_note(
                     note=note,
@@ -3359,7 +3374,12 @@ class TestSuggestionsWithMedia:
                 )
 
                 # Wait for the background thread that uploads the media to finish.
-                qtbot.wait(200)
+                def assert_s3_upload():
+                    assert s3_upload_request_mock.called_once
+
+                qtbot.wait_until(assert_s3_upload)
+
+                assert suggestion_request_mock.called_once  # type: ignore
 
                 self._assert_media_names_as_expected(
                     note=note,
@@ -3367,6 +3387,52 @@ class TestSuggestionsWithMedia:
                     suggestion_request_mock=suggestion_request_mock,  # type: ignore
                     monkeypatch=monkeypatch,
                 )
+
+    def test_should_ignore_media_file_names_not_present_in_local_collection(
+        self,
+        anki_session_with_addon_data: AnkiSession,
+        mock_client_media_upload: Tuple[AnkiQt, Mock],
+        import_ah_note: ImportAHNote,
+        requests_mock: Mocker,
+        qtbot: QtBot,
+    ):
+        s3_upload_request_mock = mock_client_media_upload
+
+        with anki_session_with_addon_data.profile_loaded():
+            mw = anki_session_with_addon_data.mw
+
+            note_data = import_ah_note()
+            note = mw.col.get_note(NoteId(note_data.anki_nid))
+
+            # add reference to a media file that does not exist locally to the note
+            note_content = '<img src="this_file_is_not_in_the_local_collection.png">'
+            note["Front"] = note_content
+            note.flush()
+
+            # create a suggestion for the note
+            ah_nid = ankihub_db.ankihub_nid_for_anki_nid(note.id)
+            suggestion_request_mock = requests_mock.post(
+                f"{config.api_url}/notes/{ah_nid}/suggestion/", status_code=201
+            )
+
+            suggest_note_update(
+                note=note,
+                change_type=SuggestionType.NEW_CONTENT,
+                comment="test",
+            )
+
+            qtbot.wait(300)
+
+            # assert that the suggestion is made
+            assert suggestion_request_mock.called_once  # type: ignore
+
+            # assert that the media file was NOT uploaded
+            assert len(s3_upload_request_mock.request_history) == 0  # type: ignore
+
+            note.load()
+
+            # Assert note content is unchanged
+            assert note_content == note["Front"]
 
     def _assert_media_names_as_expected(
         self,
@@ -3405,80 +3471,6 @@ class TestSuggestionsWithMedia:
         os.remove(path_to_created_zip_file)
         os.remove(TEST_DATA_PATH / "d41d8cd98f00b204e9800998ecf8427e.png")
         assert path_to_created_zip_file.is_file() is False
-
-    def test_should_ignore_media_file_names_not_present_in_local_collection(
-        self,
-        anki_session_with_addon_data: AnkiSession,
-        requests_mock: Mocker,
-        monkeypatch: MonkeyPatch,
-        install_sample_ah_deck: Callable[[], Tuple[uuid.UUID, int]],
-    ):
-        anki_session = anki_session_with_addon_data
-        with anki_session.profile_loaded():
-            mw = anki_session.mw
-
-            install_sample_ah_deck()
-
-            fake_presigned_url = "https://fake_presigned_url.com"
-            s3_upload_request_mock = requests_mock.post(
-                fake_presigned_url, json={"success": True}, status_code=204
-            )
-
-            monkeypatch.setattr(
-                AnkiHubClient,
-                "is_media_upload_finished",
-                lambda *args, **kwargs: True,
-            )
-
-            monkeypatch.setattr(
-                AnkiHubClient,
-                "media_upload_finished",
-                lambda *args, **kwargs: None,
-            )
-
-            monkeypatch.setattr(
-                AnkiHubClient,
-                "_get_presigned_url_for_multiple_uploads",
-                lambda *args, **kwargs: {
-                    "url": fake_presigned_url,
-                    "fields": {
-                        "key": "deck_images/test/${filename}",
-                    },
-                },
-            )
-
-            # grab a note from the deck
-            nids = mw.col.find_notes("")
-            note = mw.col.get_note(nids[0])
-
-            # add reference to a media file that does not exist locally to the note
-            note_content = '<img src="this_file_is_not_in_the_local_collection.png">'
-            note["Front"] = note_content
-            note.flush()
-
-            ah_nid = ankihub_db.ankihub_nid_for_anki_nid(note.id)
-
-            # create a suggestion for the note
-            suggestion_request_mock = requests_mock.post(
-                f"{config.api_url}/notes/{ah_nid}/suggestion/", status_code=201
-            )
-
-            suggest_note_update(
-                note=note,
-                change_type=SuggestionType.NEW_CONTENT,
-                comment="test",
-            )
-
-            # assert that the suggestion is made
-            assert len(suggestion_request_mock.request_history) == 1  # type: ignore
-
-            # assert that the media file was NOT uploaded
-            assert len(s3_upload_request_mock.request_history) == 0  # type: ignore
-
-            note.load()
-
-            # Assert note content is unchanged
-            assert note_content == note["Front"]
 
 
 class TestAddonUpdate:
