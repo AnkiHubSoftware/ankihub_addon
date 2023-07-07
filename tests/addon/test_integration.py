@@ -3404,7 +3404,7 @@ class TestSuggestionsWithMedia:
             # Import a note with a media reference
             existing_media_name = "foo.mp3"
             import_ah_note(
-                note_data=NoteInfoFactory(
+                note_data=NoteInfoFactory.create(
                     fields=[
                         Field(name="Front", value="front", order=0),
                         Field(
@@ -3448,7 +3448,7 @@ class TestSuggestionsWithMedia:
                 assert suggestion_request_mock.called_once  # type: ignore
 
                 # Assert that the media file was NOT uploaded
-                assert len(s3_upload_request_mock.request_history) == 0
+                assert len(s3_upload_request_mock.request_history) == 0  # type: ignore
 
     def test_should_ignore_media_file_names_not_present_in_local_collection(
         self,
