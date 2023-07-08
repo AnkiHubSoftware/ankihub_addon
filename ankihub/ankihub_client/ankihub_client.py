@@ -410,8 +410,6 @@ class AnkiHubClient:
         ah_did: uuid.UUID,
         s3_presigned_info: dict,
     ) -> None:
-        # TODO: Error logging/handling
-
         # Zip the media files found locally
         zip_filepath = Path(
             self.local_media_dir_path / f"{ah_did}_{chunk_number}_deck_assets_part.zip"
