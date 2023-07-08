@@ -409,7 +409,7 @@ class AnkiHubClient:
         chunk_number: int,
         ah_did: uuid.UUID,
         s3_presigned_info: dict,
-    ):
+    ) -> None:
         # TODO: Error logging/handling
 
         # Zip the media files found locally
