@@ -425,6 +425,7 @@ class AnkiHubClient:
         self._upload_file_to_s3_with_reusable_presigned_url(
             s3_presigned_info=s3_presigned_info, filepath=zip_filepath
         )
+        LOGGER.info(f"Successfully uploaded [{zip_filepath.name}]")
 
         # Remove the zip file from the local machine after the upload
         LOGGER.info(f"Removing file [{zip_filepath.name}] from local files")
@@ -434,8 +435,6 @@ class AnkiHubClient:
             LOGGER.warning(
                 f"Could not remove file [{zip_filepath.name}] from local files."
             )
-
-        LOGGER.info(f"Successfully uploaded [{zip_filepath.name}]")
 
     def _upload_file_to_s3_with_reusable_presigned_url(
         self, s3_presigned_info: dict, filepath: Path
