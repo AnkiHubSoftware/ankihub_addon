@@ -1,7 +1,7 @@
 import uuid
 from concurrent.futures import Future
 from pathlib import Path
-from typing import Callable, Dict, Iterable, List, Optional
+from typing import Callable, Dict, Iterable, List, Optional, Set
 
 import aqt
 from aqt.qt import QAction
@@ -55,7 +55,7 @@ class _AnkiHubMediaSync:
         self._amount_uploads_in_progress += 1
         self.refresh_sync_status_text()
 
-        media_paths = list(self._media_paths_for_media_names(media_names))
+        media_paths = self._media_paths_for_media_names(media_names)
         aqt.mw.taskman.run_in_background(
             lambda: AddonAnkiHubClient().upload_media(media_paths, ankihub_did),
             on_done=lambda future: self._on_upload_finished(
@@ -68,9 +68,7 @@ class _AnkiHubMediaSync:
         # GUI operations must be performed on the main thread.
         aqt.mw.taskman.run_on_main(self._refresh_media_download_status_inner)
 
-    def _media_paths_for_media_names(
-        self, media_names: Iterable[str]
-    ) -> Iterable[Path]:
+    def _media_paths_for_media_names(self, media_names: Iterable[str]) -> Set[Path]:
         media_dir_path = Path(aqt.mw.col.media.dir())
         return {media_dir_path / media_name for media_name in media_names}
 
