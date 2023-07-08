@@ -22,6 +22,7 @@ from typing import (
     List,
     Optional,
     Sequence,
+    Set,
     TypedDict,
     Union,
     cast,
@@ -353,7 +354,7 @@ class AnkiHubClient:
 
         return result
 
-    def upload_media(self, media_paths: List[Path], ah_did: uuid.UUID) -> None:
+    def upload_media(self, media_paths: Set[Path], ah_did: uuid.UUID) -> None:
         # Create chunks of media paths to zip and upload each chunk individually.
         # Each chunk is divided based on the size of all media files in that chunk to
         # create chunks of similar size.
@@ -408,9 +409,7 @@ class AnkiHubClient:
         chunk_number: int,
         ah_did: uuid.UUID,
         s3_presigned_info: dict,
-    ):
-        # TODO: Error logging/handling
-
+    ) -> None:
         # Zip the media files found locally
         zip_filepath = Path(
             self.local_media_dir_path / f"{ah_did}_{chunk_number}_deck_assets_part.zip"
@@ -426,12 +425,16 @@ class AnkiHubClient:
         self._upload_file_to_s3_with_reusable_presigned_url(
             s3_presigned_info=s3_presigned_info, filepath=zip_filepath
         )
+        LOGGER.info(f"Successfully uploaded [{zip_filepath.name}]")
 
         # Remove the zip file from the local machine after the upload
         LOGGER.info(f"Removing file [{zip_filepath.name}] from local files")
-        os.remove(zip_filepath)
-
-        LOGGER.info(f"Successfully uploaded [{zip_filepath.name}]")
+        try:
+            os.remove(zip_filepath)
+        except FileNotFoundError:
+            LOGGER.warning(
+                f"Could not remove file [{zip_filepath.name}] from local files."
+            )
 
     def _upload_file_to_s3_with_reusable_presigned_url(
         self, s3_presigned_info: dict, filepath: Path

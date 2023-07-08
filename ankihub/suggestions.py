@@ -358,7 +358,7 @@ def _rename_and_upload_media_for_suggestions(
     media_name_map = client.generate_media_files_with_hashed_names(added_media_paths)
 
     media_sync.start_media_upload(
-        media_names=media_name_map.values(), ankihub_did=ankihub_did
+        media_names=set(media_name_map.values()), ankihub_did=ankihub_did
     )
 
     if media_name_map:
