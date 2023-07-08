@@ -22,6 +22,7 @@ from typing import (
     List,
     Optional,
     Sequence,
+    Set,
     TypedDict,
     Union,
     cast,
@@ -353,7 +354,7 @@ class AnkiHubClient:
 
         return result
 
-    def upload_media(self, media_paths: List[Path], ah_did: uuid.UUID) -> None:
+    def upload_media(self, media_paths: Set[Path], ah_did: uuid.UUID) -> None:
         # Create chunks of media paths to zip and upload each chunk individually.
         # Each chunk is divided based on the size of all media files in that chunk to
         # create chunks of similar size.
