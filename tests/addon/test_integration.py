@@ -3254,8 +3254,7 @@ def mock_client_media_upload(
     )
 
     monkeypatch.setattr(
-        AnkiHubClient,
-        "media_upload_finished",
+        "ankihub.ankihub_client.AnkiHubClient.media_upload_finished",
         lambda *args, **kwargs: False,
     )
 

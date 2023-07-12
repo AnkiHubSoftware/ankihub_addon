@@ -1102,10 +1102,10 @@ class TestUploadMediaForSuggestion:
         media_name_map = client.generate_media_files_with_hashed_names(
             original_media_paths
         )
-        new_media_paths = [
+        new_media_paths = {
             TEST_MEDIA_PATH / media_name_map[original_media_path.name]
             for original_media_path in original_media_paths
-        ]
+        }
 
         client.upload_media(new_media_paths, ah_did=next_deterministic_uuid())
 
@@ -1285,7 +1285,7 @@ class TestUploadMediaForDeck:
         self, client: AnkiHubClient, notes_data: List[NoteInfo], ah_did: uuid.UUID
     ):
         media_names = get_media_names_from_notes_data(notes_data)
-        media_paths = [TEST_MEDIA_PATH / media_name for media_name in media_names]
+        media_paths = {TEST_MEDIA_PATH / media_name for media_name in media_names}
         client.upload_media(media_paths, ah_did)
 
 
