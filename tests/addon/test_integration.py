@@ -3280,6 +3280,7 @@ def mock_client_media_upload(
     yield s3_upload_request_mock
 
 
+@pytest.mark.qt_no_exception_capture
 class TestSuggestionsWithMedia:
     def test_suggest_note_update_with_media(
         self,
