@@ -533,14 +533,14 @@ class _AnkiHubDB:
         # because the first method is fast up to a certain number of media names, but then becomes
         # very slow.
         if len(media_names) <= 30:
-            result = self._media_names_exist_for_ankihub_deck(ah_did, media_names)
+            result = self._media_names_exist_for_ankihub_deck_inner(ah_did, media_names)
         else:
             media_names_for_deck = self.media_names_for_ankihub_deck(ah_did, {})
             result = {name: name in media_names_for_deck for name in media_names}
 
         return result
 
-    def _media_names_exist_for_ankihub_deck(
+    def _media_names_exist_for_ankihub_deck_inner(
         self, ah_did: uuid.UUID, media_names: Set[str]
     ) -> Dict[str, bool]:
         result = {}
