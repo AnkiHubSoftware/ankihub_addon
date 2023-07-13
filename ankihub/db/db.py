@@ -18,6 +18,7 @@ from typing import Any, Dict, Iterable, List, Optional, Sequence, Set, Tuple
 
 import aqt
 from anki.models import NotetypeId
+from anki.decks import DeckId
 from anki.notes import NoteId
 from anki.utils import ids2str, join_fields, split_fields
 
@@ -140,6 +141,7 @@ class _AnkiHubDB:
                     );
                     """
                 )
+                # TODO: Create decks table
                 conn.execute(
                     "CREATE INDEX ankihub_deck_id_idx ON notes (ankihub_deck_id);"
                 )
@@ -182,6 +184,7 @@ class _AnkiHubDB:
                     note_data.anki_nid,
                     str(note_data.ankihub_note_uuid),
                 )
+                # TODO: Add a condition to only add skipped_notes if deck is existent
                 if conflicting_ah_nid:
                     skipped_notes.append(note_data)
                     continue
@@ -460,6 +463,22 @@ class _AnkiHubDB:
             anki_note_type_id,
         )
         return result
+
+    def is_did_existent_on_decks(self, did: DeckId) -> bool:
+        result = self.scalar(
+            """
+            SELECT EXISTS(SELECT 1 FROM notes WHERE anki_note_type_id = ?)
+            """,
+            did,
+        )
+        return result
+    
+    def delete_deck_by_did(self, did: DeckId) -> None:
+        # TODO: also delete all notes with related ankihub_id
+        pass
+    
+    def ankihub_did_for_did(self, did: DeckId) -> uuid.UUID:
+        pass
 
     def note_types_for_ankihub_deck(self, ankihub_did: uuid.UUID) -> List[NotetypeId]:
         result = self.list(
