@@ -15,7 +15,7 @@ import aqt
 import sentry_sdk
 from anki.errors import BackendIOError, DBError, SyncError
 from anki.utils import checksum, is_win
-from aqt.utils import askUser, showInfo, tooltip
+from aqt.utils import askUser, showInfo
 from requests import exceptions
 from sentry_sdk import capture_exception, push_scope
 from sentry_sdk.integrations.argv import ArgvIntegration
@@ -157,10 +157,29 @@ def _try_handle_exception(
         if isinstance(
             exc_value.original_exception, (exceptions.ConnectionError, ConnectionError)
         ):
-            tooltip(
-                "Could not connect to AnkiHub (no internet or the site is down for maintenance)",
-                parent=aqt.mw,
-            )
+            if "[Errno -3] Temporary failure in name resolution" in str(
+                exc_value.args[0].reason
+            ):
+                show_error_dialog(
+                    """Server undergoing maintenance. Unable to connect.\n
+                    Please try again later.\n
+                    For any urgent concerns or further assistance, please contact our support team at our
+                    <a href='https://community.ankihub.net'>AnkiHub Community forum</a>""",
+                    title="AnkiHub Connection Error",
+                )
+            elif "[Errno -2] Name or service not known" in str(
+                exc_value.args[0].reason
+            ):
+                show_error_dialog(
+                    "Error: No Internet Connection\nPlease check your internet connection and try again.",
+                    title="AnkiHub Connection Error",
+                )
+            else:
+                show_error_dialog(
+                    "Could not connect to AnkiHub (no internet or the site is down for maintenance)",
+                    title="AnkiHub Connection Error",
+                )
+
             return True
 
     if _is_memory_full_error(exc_value):
