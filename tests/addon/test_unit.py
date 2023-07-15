@@ -482,16 +482,16 @@ class TestAnkiHubDBAnkiHubNidsToAnkiIds:
             notes_data=[note],
         )
 
-        not_exiisting_ah_nid = next_deterministic_uuid()
+        not_existing_ah_nid = next_deterministic_uuid()
 
         # Retrieve a dict of anki_nid -> ankihub_note_uuid for two anki_nids.
         ah_nids_for_anki_nids = ankihub_db.ankihub_nids_to_anki_nids(
-            ankihub_nids=[existing_ah_nid, not_exiisting_ah_nid]
+            ankihub_nids=[existing_ah_nid, not_existing_ah_nid]
         )
 
         assert ah_nids_for_anki_nids == {
             existing_ah_nid: anki_nid,
-            not_exiisting_ah_nid: None,
+            not_existing_ah_nid: None,
         }
 
 
