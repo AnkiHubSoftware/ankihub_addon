@@ -252,6 +252,15 @@ def _on_bulk_notes_suggest_action(browser: Browser, nids: Sequence[NoteId]) -> N
         )
         return
 
+    if len(filtered_notes) != len(notes):
+        showInfo(
+            f"{len(notes) - len(filtered_notes)} of the {len(notes)} selected notes don't have an AnkiHub note type "
+            "and will be ignored.<br><br>"
+            "You can use <b>AnkiHub -> With AnkiHub ID</b> (for suggesting changes to notes) "
+            "or <b>AnkiHub -> ID Pending</b> (for suggesting new notes) in the left sidebar to find notes to suggest.",
+            parent=browser,
+        )
+
     ah_dids = ankihub_db.ankihub_dids_for_anki_nids(
         [note.id for note in filtered_notes]
     )
