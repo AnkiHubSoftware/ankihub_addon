@@ -245,8 +245,9 @@ def _on_bulk_notes_suggest_action(browser: Browser, nids: Sequence[NoteId]) -> N
 
     if not filtered_notes:
         showInfo(
-            "The selected notes contain no AnkiHub notes.<br><br>"
-            "You can use the <b>AnkiHub -> With AnkiHub ID</b> item in the left sidebar to find AnkiHub notes.",
+            "The selected notes need to have an AnkiHub note type.<br><br>"
+            "You can use <b>AnkiHub -> With AnkiHub ID</b> (for suggesting changes to notes) "
+            "or <b>AnkiHub -> ID Pending</b> (for suggesting new notes) in the left sidebar to find notes to suggest.",
             parent=browser,
         )
         return
