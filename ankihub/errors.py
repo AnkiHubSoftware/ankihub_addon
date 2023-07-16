@@ -3,8 +3,10 @@ import dataclasses
 import os
 import re
 import sys
+import tempfile
 import time
 import traceback
+import zipfile
 from concurrent.futures import Future
 from pathlib import Path
 from sqlite3 import OperationalError
@@ -27,10 +29,20 @@ from sentry_sdk.integrations.threading import ThreadingIntegration
 from . import LOGGER
 from .addon_ankihub_client import AddonAnkiHubClient as AnkiHubClient
 from .ankihub_client import AnkiHubHTTPError, AnkiHubRequestException
-from .db import is_ankihub_db_attached_to_anki_db
+from .db import (
+    detach_ankihub_db_from_anki_db_connection,
+    is_ankihub_db_attached_to_anki_db,
+)
 from .gui.error_dialog import ErrorDialog
 from .gui.utils import check_and_prompt_for_updates_on_main_window, show_error_dialog
-from .settings import ADDON_VERSION, ANKI_VERSION, ANKIWEB_ID, config, log_file_path
+from .settings import (
+    ADDON_VERSION,
+    ANKI_VERSION,
+    ANKIWEB_ID,
+    config,
+    log_file_path,
+    user_files_path,
+)
 from .sync import NotLoggedInError
 
 SENTRY_ENV = "anki_desktop"
@@ -71,28 +83,79 @@ def report_exception_and_upload_logs(
     return sentry_id
 
 
-def upload_logs_in_background(
-    on_done: Optional[Callable[[Future], None]] = None, hide_username=False
-) -> str:
+def upload_logs_in_background() -> str:
     """Upload the logs to S3 in the background.
     Returns the S3 key of the uploaded logs."""
 
     LOGGER.info("Uploading logs...")
 
-    # many users use their email address as their username and may not want to share it on a forum
-    user_name = config.user() if not hide_username else checksum(config.user())[:5]
+    user_name = config.user()
     key = f"ankihub_addon_logs_{user_name}_{int(time.time())}.log"
 
-    if on_done is not None:
-        aqt.mw.taskman.run_in_background(
-            task=lambda: _upload_logs(key), on_done=on_done
-        )
-    else:
-        aqt.mw.taskman.run_in_background(
-            task=lambda: _upload_logs(key), on_done=_on_upload_logs_done
-        )
+    aqt.mw.taskman.run_in_background(
+        task=lambda: _upload_logs(key), on_done=_on_upload_logs_done
+    )
 
     return key
+
+
+def upload_data_dir_and_logs_in_background(
+    on_done: Callable[[Future], None] = None
+) -> str:
+    """Upload the data dir and logs to S3 in the background.
+    Returns the S3 key of the uploaded file."""
+
+    LOGGER.info("Uploading data dir and logs...")
+
+    # many users use their email address as their username and may not want to share it on a forum
+    user_name_hash = checksum(config.user())[:5]
+    key = f"ankihub_addon_debug_info_{user_name_hash}_{int(time.time())}.zip"
+
+    aqt.mw.taskman.run_in_background(
+        task=lambda: _upload_data_dir_and_logs(key), on_done=on_done
+    )
+
+    return key
+
+
+def _upload_data_dir_and_logs(key: str) -> str:
+
+    # detach the ankihub database from the anki database connection to prevent file permission errors
+    detach_ankihub_db_from_anki_db_connection()
+
+    # zip the user files and the log file
+    with tempfile.NamedTemporaryFile() as temp_file:
+        _zip_data_dir_and_logs(Path(temp_file.name))
+
+        try:
+            client = AnkiHubClient()
+            client.upload_logs(
+                file=Path(temp_file.name),
+                key=key,
+            )
+            LOGGER.info("Data dir and logs uploaded.")
+            return key
+        except AnkiHubHTTPError as e:
+            LOGGER.info("Data dir and logs uploaded")
+            raise e
+
+
+def _zip_data_dir_and_logs(destination_zip: Path) -> None:
+    """Zip the user files directory and the log file to the given destination."""
+    source_dir = user_files_path()
+    with zipfile.ZipFile(destination_zip, "w") as zipf:
+        for file in source_dir.rglob("*"):
+            # previously logs were stored in the user files directory and we don't want to
+            # include old log files in the zip
+            if file.name.endswith(".log") or ".log." in file.name:
+                continue
+            zipf.write(file, arcname=file.relative_to(source_dir))
+
+        log_file = log_file_path()
+        if log_file.exists():
+            zipf.write(log_file, arcname=log_file.name)
+        else:
+            LOGGER.info("No logs to upload.")
 
 
 def _setup_excepthook():

@@ -31,7 +31,7 @@ from ..ankihub_client import AnkiHubHTTPError
 from ..ankihub_client.models import UserDeckRelation
 from ..db import ankihub_db
 from ..deck_creation import create_ankihub_deck
-from ..errors import upload_logs_in_background
+from ..errors import upload_data_dir_and_logs_in_background
 from ..media_import.ui import open_import_dialog
 from ..media_sync import media_sync
 from ..settings import ADDON_VERSION, config, url_view_deck
@@ -374,7 +374,7 @@ def _upload_logs_action():
         LogUploadResultDialog(log_file_name=log_file_name).exec()
 
     aqt.mw.progress.start(label="Uploading logs...", parent=aqt.mw, immediate=True)
-    upload_logs_in_background(on_done=on_done, hide_username=True)
+    upload_data_dir_and_logs_in_background(on_done=on_done)
 
 
 def _ankihub_login_setup(parent):
