@@ -146,7 +146,7 @@ def _general_setup():
 
     setup_auto_sync()
     LOGGER.info("Called setup_ankihub_sync_on_ankiweb_sync.")
-    
+
     setup_hooks()
     LOGGER.info("Setup hooks for Anki default features")
 

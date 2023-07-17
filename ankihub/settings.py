@@ -236,6 +236,13 @@ class _Config:
         installed decks."""
         return list(self._private_config.decks.keys())
 
+    def get_deck_uuid_by_did(self, did: DeckId) -> Optional[uuid.UUID]:
+        decks = self._private_config.decks
+        return next(
+            (key for key in decks.keys() if decks[key].anki_id == did),
+            None,
+        )
+
     def deck_config(self, ankihub_did: uuid.UUID) -> Optional[DeckConfig]:
         return self._private_config.decks.get(ankihub_did)
 
