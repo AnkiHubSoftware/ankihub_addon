@@ -83,18 +83,26 @@ def report_exception_and_upload_logs(
     return sentry_id
 
 
-def upload_logs_in_background() -> str:
+def upload_logs_in_background(
+    on_done: Optional[Callable[[Future], None]] = None, hide_username=False
+) -> str:
     """Upload the logs to S3 in the background.
     Returns the S3 key of the uploaded logs."""
 
     LOGGER.info("Uploading logs...")
 
-    user_name = config.user()
+    # many users use their email address as their username and may not want to share it on a forum
+    user_name = config.user() if not hide_username else checksum(config.user())[:5]
     key = f"ankihub_addon_logs_{user_name}_{int(time.time())}.log"
 
-    aqt.mw.taskman.run_in_background(
-        task=lambda: _upload_logs(key), on_done=_on_upload_logs_done
-    )
+    if on_done is not None:
+        aqt.mw.taskman.run_in_background(
+            task=lambda: _upload_logs(key), on_done=on_done
+        )
+    else:
+        aqt.mw.taskman.run_in_background(
+            task=lambda: _upload_logs(key), on_done=_on_upload_logs_done
+        )
 
     return key
 
