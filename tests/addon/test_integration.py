@@ -2,6 +2,7 @@ import copy
 import importlib
 import os
 import re
+import shutil
 import tempfile
 import uuid
 from datetime import datetime, timedelta, timezone
@@ -39,7 +40,7 @@ from .conftest import TEST_PROFILE_ID
 # has to be set before importing ankihub
 os.environ["SKIP_INIT"] = "1"
 
-from ankihub import entry_point, media_sync
+from ankihub import entry_point, media_sync, settings
 from ankihub.addon_ankihub_client import AddonAnkiHubClient as AnkiHubClient
 from ankihub.addons import (
     _change_file_permissions_of_addon_files,
@@ -73,6 +74,7 @@ from ankihub.debug import (
     _setup_logging_for_sync_collection_and_media,
 )
 from ankihub.deck_creation import create_ankihub_deck, modify_note_type
+from ankihub.errors import upload_data_dir_and_logs_in_background
 from ankihub.exporting import to_note_data
 from ankihub.gui import operations, utils
 from ankihub.gui.browser import (
@@ -3637,3 +3639,45 @@ def test_handle_notes_deleted_from_webapp(
 
         # Assert that the note has a ankihub deleted tag if it was deleted from the webapp
         assert (TAG_FOR_DELETED_NOTES in note.tags) == was_deleted_from_webapp
+
+
+def test_upload_data_dir_and_logs(
+    anki_session_with_addon_data: AnkiSession,
+    monkeypatch: MonkeyPatch,
+    qtbot: QtBot,
+):
+    with anki_session_with_addon_data.profile_loaded():
+        file_copy_path = TEST_DATA_PATH / "ankihub_debug_info_copy.zip"
+        key: Optional[str] = None
+
+        def upload_logs_mock(*args, **kwargs):
+            shutil.copy(kwargs["file"], file_copy_path)
+
+            nonlocal key
+            key = kwargs["key"]
+
+        # Mock the client.upload_logs method
+        monkeypatch.setattr(
+            "ankihub.errors.AnkiHubClient.upload_logs",
+            upload_logs_mock,
+        )
+
+        # Start the upload in the background and wait until it is finished.
+        upload_data_dir_and_logs_in_background()
+
+        def upload_finished():
+            return key is not None
+
+        qtbot.wait_until(upload_finished)
+
+    try:
+        # Check the contents of the zip file
+        with ZipFile(file_copy_path, "r") as zip_file:
+            assert "ankihub.log" in zip_file.namelist()
+            assert f"{settings.profile_files_path().name}/" in zip_file.namelist()
+
+        # Check the key
+        assert key.startswith("ankihub_addon_debug_info_")
+        assert key.endswith(".zip")
+    finally:
+        file_copy_path.unlink(missing_ok=True)
