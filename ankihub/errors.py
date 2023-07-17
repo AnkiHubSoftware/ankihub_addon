@@ -132,26 +132,30 @@ def _upload_data_dir_and_logs(key: str) -> str:
     detach_ankihub_db_from_anki_db_connection()
 
     # zip the user files and the log file
-    with tempfile.NamedTemporaryFile() as temp_file:
-        _zip_data_dir_and_logs(Path(temp_file.name))
+    file_path = _zip_data_dir_and_logs()
 
-        try:
-            client = AnkiHubClient()
-            client.upload_logs(
-                file=Path(temp_file.name),
-                key=key,
-            )
-            LOGGER.info("Data dir and logs uploaded.")
-            return key
-        except AnkiHubHTTPError as e:
-            LOGGER.info("Data dir and logs uploaded")
-            raise e
+    # upload the zip file
+    try:
+        client = AnkiHubClient()
+        client.upload_logs(
+            file=file_path,
+            key=key,
+        )
+        LOGGER.info("Data dir and logs uploaded.")
+        return key
+    except AnkiHubHTTPError as e:
+        LOGGER.info("Data dir and logs uploaded")
+        raise e
+    finally:
+        os.unlink(file_path)
 
 
-def _zip_data_dir_and_logs(destination_zip: Path) -> None:
-    """Zip the user files directory and the log file to the given destination."""
-    source_dir = user_files_path()
-    with zipfile.ZipFile(destination_zip, "w") as zipf:
+def _zip_data_dir_and_logs() -> Path:
+    """Zip the user files directory and the log file and return the path of the zip file."""
+    temp_file = tempfile.NamedTemporaryFile(delete=False)
+    temp_file.close()
+    with zipfile.ZipFile(temp_file.name, "w") as zipf:
+        source_dir = user_files_path()
         for file in source_dir.rglob("*"):
             # previously logs were stored in the user files directory and we don't want to
             # include old log files in the zip
@@ -164,6 +168,8 @@ def _zip_data_dir_and_logs(destination_zip: Path) -> None:
             zipf.write(log_file, arcname=log_file.name)
         else:
             LOGGER.info("No logs to upload.")
+
+    return Path(temp_file.name)
 
 
 def _setup_excepthook():
