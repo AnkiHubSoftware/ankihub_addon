@@ -143,9 +143,6 @@ def _upload_data_dir_and_logs(key: str) -> str:
         )
         LOGGER.info("Data dir and logs uploaded.")
         return key
-    except AnkiHubHTTPError as e:
-        LOGGER.info("Data dir and logs uploaded")
-        raise e
     finally:
         os.unlink(file_path)
 
