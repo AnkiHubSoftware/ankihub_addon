@@ -157,16 +157,15 @@ def _try_handle_exception(
         if isinstance(
             exc_value.original_exception, (exceptions.ConnectionError, ConnectionError)
         ):
-            if "[Errno -3] Temporary failure in name resolution" in str(
-                exc_value.args[0].reason
+            if "[Errno -2] Name or service not known" in str(
+                exc_value.original_exception
             ):
                 show_error_dialog(
-                    "Server undergoing maintenance. Unable to connect.\n\
-                    Please try again later.",
+                    "Server undergoing maintenance. Unable to connect.\nPlease try again later.",
                     title="AnkiHub Connection Error",
                 )
-            elif "[Errno -2] Name or service not known" in str(
-                exc_value.args[0].reason
+            elif "[Errno -3] Temporary failure in name resolution" in str(
+                exc_value.original_exception
             ):
                 show_error_dialog(
                     "Error: No Internet Connection\nPlease check your internet connection and try again.",
@@ -177,7 +176,6 @@ def _try_handle_exception(
                     "Could not connect to AnkiHub (no internet or the site is down for maintenance)",
                     title="AnkiHub Connection Error",
                 )
-
             return True
 
     if _is_memory_full_error(exc_value):
