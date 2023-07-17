@@ -161,10 +161,8 @@ def _try_handle_exception(
                 exc_value.args[0].reason
             ):
                 show_error_dialog(
-                    """Server undergoing maintenance. Unable to connect.\n
-                    Please try again later.\n
-                    For any urgent concerns or further assistance, please contact our support team at our
-                    <a href='https://community.ankihub.net'>AnkiHub Community forum</a>""",
+                    "Server undergoing maintenance. Unable to connect.\n\
+                    Please try again later.",
                     title="AnkiHub Connection Error",
                 )
             elif "[Errno -2] Name or service not known" in str(
