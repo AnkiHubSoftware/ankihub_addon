@@ -39,11 +39,14 @@ def logging_hook(response: Response, *args, **kwargs):
         + (f"\ndata={pformat(body_dict)}" if body_dict else "")
     )
     LOGGER.info(f"response: {response}")
-    try:
-        LOGGER.debug(f"response content: {pformat(response.json())}")
-    except JSONDecodeError:
-        # We don't want to log the content of the response if it's not JSON
-        pass
+    if response.status_code < 400:
+        try:
+            LOGGER.debug(f"response content: {pformat(response.json())}")
+        except JSONDecodeError:
+            # We don't want to log the content of the response if it's not JSON
+            pass
+    else:
+        LOGGER.error(f"response content: {response.text}")
 
     return response
 
