@@ -28,6 +28,25 @@ def show_error_dialog(message: str, *args, **kwargs):
     aqt.mw.taskman.run_on_main(lambda: showWarning(message, *args, **kwargs))  # type: ignore
 
 
+def show_tooltip(message: str, parent=aqt.mw) -> None:
+    """Safer version of aqt.utils.tooltip that...
+    - runs the tooltip function on the main thread
+    - doesn't cause an error if the parent widget is deleted and instead shows
+    the tooltip on the active or main window.
+    """
+    aqt.mw.taskman.run_on_main(lambda: _show_tooltip(message, parent))
+
+
+def _show_tooltip(message: str, parent) -> None:
+    try:
+        tooltip(message, parent=parent)
+    except RuntimeError as e:
+        if "wrapped C/C++ object of type" in str(e) and "has been deleted" in str(e):
+            tooltip(message)
+        else:
+            raise e
+
+
 def choose_subset(
     prompt: str,
     choices: List[str],
@@ -229,22 +248,6 @@ def ask_user(
         return False
     else:
         return None
-
-
-def show_tooltip(
-    msg: str,
-    period: int = 3000,
-    parent: Optional[QWidget] = None,
-):
-    """Safer version of tooltip that doesn't cause an error if the parent widget is deleted and
-    instead shows the tooltip on the active or main window."""
-    try:
-        tooltip(msg, period, parent)
-    except RuntimeError as e:
-        if "wrapped C/C++ object of type" in str(e) and "has been deleted" in str(e):
-            tooltip(msg, period)
-        else:
-            raise e
 
 
 def set_tooltip_icon(btn: QPushButton) -> None:
