@@ -3300,10 +3300,6 @@ class TestSuggestionsWithMedia:
             ah_nid = ankihub_db.ankihub_nid_for_anki_nid(NoteId(note_data.anki_nid))
             note = mw.col.get_note(NoteId(note_data.anki_nid))
 
-            suggestion_request_mock = requests_mock.post(
-                f"{config.api_url}/notes/{ah_nid}/suggestion/", status_code=201
-            )
-
             with tempfile.NamedTemporaryFile(dir=TEST_DATA_PATH, suffix=".png") as f:
                 # add file to media folder
                 file_name_in_col = mw.col.media.add_file(f.name)
@@ -3313,6 +3309,10 @@ class TestSuggestionsWithMedia:
                 file_name_in_col = Path(file_path_in_col.name).name
                 note["Front"] = f'<img src="{file_name_in_col}">'
                 note.flush()
+
+                suggestion_request_mock = requests_mock.post(
+                    f"{config.api_url}/notes/{ah_nid}/suggestion/", status_code=201
+                )
 
                 # create a suggestion for the note
                 suggest_note_update(
@@ -3387,6 +3387,68 @@ class TestSuggestionsWithMedia:
                     suggestion_request_mock=suggestion_request_mock,  # type: ignore
                     monkeypatch=monkeypatch,
                 )
+
+    def test_should_ignore_media_file_names_which_already_exist_in_deck(
+        self,
+        anki_session_with_addon_data: AnkiSession,
+        mock_client_media_upload: Tuple[AnkiQt, Mock],
+        import_ah_note: ImportAHNote,
+        requests_mock: Mocker,
+        qtbot: QtBot,
+    ):
+        s3_upload_request_mock = mock_client_media_upload
+
+        with anki_session_with_addon_data.profile_loaded():
+            mw = anki_session_with_addon_data.mw
+
+            # Import a note with a media reference
+            existing_media_name = "foo.mp3"
+            import_ah_note(
+                note_data=NoteInfoFactory.create(
+                    fields=[
+                        Field(name="Front", value="front", order=0),
+                        Field(
+                            name="Back", value=f"[sound:{existing_media_name}]", order=1
+                        ),
+                    ]
+                )
+            )
+
+            note_data = import_ah_note()
+            ah_nid = ankihub_db.ankihub_nid_for_anki_nid(NoteId(note_data.anki_nid))
+            note = mw.col.get_note(NoteId(note_data.anki_nid))
+
+            suggestion_request_mock = requests_mock.post(
+                f"{config.api_url}/notes/{ah_nid}/suggestion/", status_code=201
+            )
+
+            with tempfile.NamedTemporaryFile(dir=TEST_DATA_PATH, suffix=".png") as f:
+                # add file to media folder
+                file_name_in_col = mw.col.media.add_file(f.name)
+                file_path_in_col = Path(mw.col.media.dir()) / file_name_in_col
+
+                # add file reference to a note
+                file_name_in_col = Path(file_path_in_col.name).name
+                note["Front"] = f"[sound:{existing_media_name}]"
+                note.flush()
+
+                suggestion_request_mock = requests_mock.post(
+                    f"{config.api_url}/notes/{ah_nid}/suggestion/", status_code=201
+                )
+
+                # create a suggestion for the note
+                suggest_note_update(
+                    note=note,
+                    change_type=SuggestionType.NEW_CONTENT,
+                    comment="test",
+                )
+
+                qtbot.wait(300)
+
+                assert suggestion_request_mock.called_once  # type: ignore
+
+                # Assert that the media file was NOT uploaded
+                assert len(s3_upload_request_mock.request_history) == 0  # type: ignore
 
     def test_should_ignore_media_file_names_not_present_in_local_collection(
         self,
