@@ -36,12 +36,14 @@ def show_tooltip(message: str, parent=aqt.mw, *args, **kwargs) -> None:
 
     Note: all parameters accepted by aqt.utils.tooltip can also be passed in the function call
     """
-    aqt.mw.taskman.run_on_main(lambda: _show_tooltip(message, parent, *args, **kwargs))
+    aqt.mw.taskman.run_on_main(
+        lambda: _show_tooltip(message, *args, parent=parent, **kwargs)
+    )
 
 
-def _show_tooltip(message: str, parent, *args, **kwargs) -> None:
+def _show_tooltip(message: str, *args, **kwargs) -> None:
     try:
-        tooltip(message, parent=parent, *args, **kwargs)
+        tooltip(message, *args, **kwargs)
     except RuntimeError as e:
         if "wrapped C/C++ object of type" in str(e) and "has been deleted" in str(e):
             tooltip(message)
