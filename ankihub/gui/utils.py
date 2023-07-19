@@ -28,18 +28,20 @@ def show_error_dialog(message: str, *args, **kwargs) -> None:
     aqt.mw.taskman.run_on_main(lambda: showWarning(message, *args, **kwargs))  # type: ignore
 
 
-def show_tooltip(message: str, parent=aqt.mw) -> None:
+def show_tooltip(message: str, parent=aqt.mw, *args, **kwargs) -> None:
     """Safer version of aqt.utils.tooltip that...
     - runs the tooltip function on the main thread
     - doesn't cause an error if the parent widget is deleted and instead shows
     the tooltip on the active or main window.
+
+    Note: all parameters accepted by aqt.utils.tooltip can also be passed in the function call
     """
-    aqt.mw.taskman.run_on_main(lambda: _show_tooltip(message, parent))
+    aqt.mw.taskman.run_on_main(lambda: _show_tooltip(message, parent, *args, **kwargs))
 
 
-def _show_tooltip(message: str, parent) -> None:
+def _show_tooltip(message: str, parent, *args, **kwargs) -> None:
     try:
-        tooltip(message, parent=parent)
+        tooltip(message, parent=parent, *args, **kwargs)
     except RuntimeError as e:
         if "wrapped C/C++ object of type" in str(e) and "has been deleted" in str(e):
             tooltip(message)

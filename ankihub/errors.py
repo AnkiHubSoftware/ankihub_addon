@@ -29,7 +29,11 @@ from .addon_ankihub_client import AddonAnkiHubClient as AnkiHubClient
 from .ankihub_client import AnkiHubHTTPError, AnkiHubRequestException
 from .db import is_ankihub_db_attached_to_anki_db
 from .gui.error_dialog import ErrorDialog
-from .gui.utils import check_and_prompt_for_updates_on_main_window, show_error_dialog
+from .gui.utils import (
+    check_and_prompt_for_updates_on_main_window,
+    show_error_dialog,
+    show_tooltip,
+)
 from .settings import ADDON_VERSION, ANKI_VERSION, ANKIWEB_ID, config, log_file_path
 from .sync import NotLoggedInError
 
@@ -160,21 +164,25 @@ def _try_handle_exception(
             if "[Errno -2] Name or service not known" in str(
                 exc_value.original_exception
             ):
-                show_error_dialog(
-                    "Server undergoing maintenance. Unable to connect.\nPlease try again later.",
-                    title="AnkiHub Connection Error",
+                show_tooltip(
+                    "🚧 AnkiHub is undergoing routine maintenance. "
+                    "Please visit ankihub.net/status and check your email for details.",
+                    parent=aqt.mw,
+                    period=10000,
                 )
             elif "[Errno -3] Temporary failure in name resolution" in str(
                 exc_value.original_exception
             ):
-                show_error_dialog(
-                    "Error: No Internet Connection\nPlease check your internet connection and try again.",
-                    title="AnkiHub Connection Error",
+                show_tooltip(
+                    "🔌 No Internet Connection detected. Please check your internet connection and try again.",
+                    parent=aqt.mw,
+                    period=10000,
                 )
             else:
-                show_error_dialog(
-                    "Could not connect to AnkiHub (no internet or the site is down for maintenance)",
-                    title="AnkiHub Connection Error",
+                show_tooltip(
+                    "📶 Could not connect to AnkiHub (no internet or the site is down for maintenance)",
+                    parent=aqt.mw,
+                    period=10000,
                 )
             return True
 
