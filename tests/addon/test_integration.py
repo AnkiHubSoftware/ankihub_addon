@@ -2,6 +2,7 @@ import copy
 import importlib
 import os
 import re
+import shutil
 import tempfile
 import uuid
 from datetime import datetime, timedelta, timezone
@@ -39,7 +40,7 @@ from .conftest import TEST_PROFILE_ID
 # has to be set before importing ankihub
 os.environ["SKIP_INIT"] = "1"
 
-from ankihub import entry_point, media_sync
+from ankihub import entry_point, media_sync, settings
 from ankihub.addon_ankihub_client import AddonAnkiHubClient as AnkiHubClient
 from ankihub.addons import (
     _change_file_permissions_of_addon_files,
@@ -73,6 +74,7 @@ from ankihub.debug import (
     _setup_logging_for_sync_collection_and_media,
 )
 from ankihub.deck_creation import create_ankihub_deck, modify_note_type
+from ankihub.errors import upload_data_dir_and_logs_in_background
 from ankihub.exporting import to_note_data
 from ankihub.gui import operations, utils
 from ankihub.gui.browser import (
@@ -3300,10 +3302,6 @@ class TestSuggestionsWithMedia:
             ah_nid = ankihub_db.ankihub_nid_for_anki_nid(NoteId(note_data.anki_nid))
             note = mw.col.get_note(NoteId(note_data.anki_nid))
 
-            suggestion_request_mock = requests_mock.post(
-                f"{config.api_url}/notes/{ah_nid}/suggestion/", status_code=201
-            )
-
             with tempfile.NamedTemporaryFile(dir=TEST_DATA_PATH, suffix=".png") as f:
                 # add file to media folder
                 file_name_in_col = mw.col.media.add_file(f.name)
@@ -3313,6 +3311,10 @@ class TestSuggestionsWithMedia:
                 file_name_in_col = Path(file_path_in_col.name).name
                 note["Front"] = f'<img src="{file_name_in_col}">'
                 note.flush()
+
+                suggestion_request_mock = requests_mock.post(
+                    f"{config.api_url}/notes/{ah_nid}/suggestion/", status_code=201
+                )
 
                 # create a suggestion for the note
                 suggest_note_update(
@@ -3387,6 +3389,68 @@ class TestSuggestionsWithMedia:
                     suggestion_request_mock=suggestion_request_mock,  # type: ignore
                     monkeypatch=monkeypatch,
                 )
+
+    def test_should_ignore_media_file_names_which_already_exist_in_deck(
+        self,
+        anki_session_with_addon_data: AnkiSession,
+        mock_client_media_upload: Tuple[AnkiQt, Mock],
+        import_ah_note: ImportAHNote,
+        requests_mock: Mocker,
+        qtbot: QtBot,
+    ):
+        s3_upload_request_mock = mock_client_media_upload
+
+        with anki_session_with_addon_data.profile_loaded():
+            mw = anki_session_with_addon_data.mw
+
+            # Import a note with a media reference
+            existing_media_name = "foo.mp3"
+            import_ah_note(
+                note_data=NoteInfoFactory.create(
+                    fields=[
+                        Field(name="Front", value="front", order=0),
+                        Field(
+                            name="Back", value=f"[sound:{existing_media_name}]", order=1
+                        ),
+                    ]
+                )
+            )
+
+            note_data = import_ah_note()
+            ah_nid = ankihub_db.ankihub_nid_for_anki_nid(NoteId(note_data.anki_nid))
+            note = mw.col.get_note(NoteId(note_data.anki_nid))
+
+            suggestion_request_mock = requests_mock.post(
+                f"{config.api_url}/notes/{ah_nid}/suggestion/", status_code=201
+            )
+
+            with tempfile.NamedTemporaryFile(dir=TEST_DATA_PATH, suffix=".png") as f:
+                # add file to media folder
+                file_name_in_col = mw.col.media.add_file(f.name)
+                file_path_in_col = Path(mw.col.media.dir()) / file_name_in_col
+
+                # add file reference to a note
+                file_name_in_col = Path(file_path_in_col.name).name
+                note["Front"] = f"[sound:{existing_media_name}]"
+                note.flush()
+
+                suggestion_request_mock = requests_mock.post(
+                    f"{config.api_url}/notes/{ah_nid}/suggestion/", status_code=201
+                )
+
+                # create a suggestion for the note
+                suggest_note_update(
+                    note=note,
+                    change_type=SuggestionType.NEW_CONTENT,
+                    comment="test",
+                )
+
+                qtbot.wait(300)
+
+                assert suggestion_request_mock.called_once  # type: ignore
+
+                # Assert that the media file was NOT uploaded
+                assert len(s3_upload_request_mock.request_history) == 0  # type: ignore
 
     def test_should_ignore_media_file_names_not_present_in_local_collection(
         self,
@@ -3637,3 +3701,45 @@ def test_handle_notes_deleted_from_webapp(
 
         # Assert that the note has a ankihub deleted tag if it was deleted from the webapp
         assert (TAG_FOR_DELETED_NOTES in note.tags) == was_deleted_from_webapp
+
+
+def test_upload_data_dir_and_logs(
+    anki_session_with_addon_data: AnkiSession,
+    monkeypatch: MonkeyPatch,
+    qtbot: QtBot,
+):
+    with anki_session_with_addon_data.profile_loaded():
+        file_copy_path = TEST_DATA_PATH / "ankihub_debug_info_copy.zip"
+        key: Optional[str] = None
+
+        def upload_logs_mock(*args, **kwargs):
+            shutil.copy(kwargs["file"], file_copy_path)
+
+            nonlocal key
+            key = kwargs["key"]
+
+        # Mock the client.upload_logs method
+        monkeypatch.setattr(
+            "ankihub.errors.AnkiHubClient.upload_logs",
+            upload_logs_mock,
+        )
+
+        # Start the upload in the background and wait until it is finished.
+        upload_data_dir_and_logs_in_background()
+
+        def upload_finished():
+            return key is not None
+
+        qtbot.wait_until(upload_finished)
+
+    try:
+        # Check the contents of the zip file
+        with ZipFile(file_copy_path, "r") as zip_file:
+            assert "ankihub.log" in zip_file.namelist()
+            assert f"{settings.profile_files_path().name}/" in zip_file.namelist()
+
+        # Check the key
+        assert key.startswith("ankihub_addon_debug_info_")
+        assert key.endswith(".zip")
+    finally:
+        file_copy_path.unlink(missing_ok=True)
