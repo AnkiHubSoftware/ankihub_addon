@@ -154,7 +154,7 @@ class AnkiHubClient:
         self.token = token
         self.get_token = get_token
         self.response_hooks = response_hooks
-        self.should_cancel_futures = False
+        self.should_stop_background_threads = False
 
     def _send_request(
         self,
@@ -417,7 +417,7 @@ class AnkiHubClient:
             for future in as_completed(futures):
                 future.result()
 
-                if self.should_cancel_futures:
+                if self.should_stop_background_threads:
                     for future in futures:
                         future.cancel()
                     return
@@ -498,7 +498,7 @@ class AnkiHubClient:
                 )
 
             for future in as_completed(futures):
-                if self.should_cancel_futures:
+                if self.should_stop_background_threads:
                     for future in futures:
                         future.cancel()
                     return
@@ -523,8 +523,9 @@ class AnkiHubClient:
                 f"Unable to download media file [{media_remote_path}]. Response status code: {response.status_code}"
             )
 
-    def cleanup(self) -> None:
-        self.should_cancel_futures = True
+    def stop_background_threads(self) -> None:
+        """Can be called to stop all background threads started by this client."""
+        self.should_stop_background_threads = True
 
     def get_deck_subscriptions(self) -> List[Deck]:
         response = self._send_request("GET", API.ANKIHUB, "/decks/subscriptions/")

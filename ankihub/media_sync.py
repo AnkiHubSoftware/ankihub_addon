@@ -65,8 +65,8 @@ class _AnkiHubMediaSync:
         )
 
     def cleanup(self):
-        """Stop all media sync operations. This should be called when Anki is closed."""
-        self._client.cleanup()
+        """Stop all media sync operations."""
+        self._client.stop_background_threads()
 
     def refresh_sync_status_text(self):
         """Refresh the status text on the status action."""
