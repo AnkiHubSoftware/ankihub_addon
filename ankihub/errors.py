@@ -3,8 +3,10 @@ import dataclasses
 import os
 import re
 import sys
+import tempfile
 import time
 import traceback
+import zipfile
 from concurrent.futures import Future
 from pathlib import Path
 from sqlite3 import OperationalError
@@ -27,14 +29,24 @@ from sentry_sdk.integrations.threading import ThreadingIntegration
 from . import LOGGER
 from .addon_ankihub_client import AddonAnkiHubClient as AnkiHubClient
 from .ankihub_client import AnkiHubHTTPError, AnkiHubRequestException
-from .db import is_ankihub_db_attached_to_anki_db
+from .db import (
+    detach_ankihub_db_from_anki_db_connection,
+    is_ankihub_db_attached_to_anki_db,
+)
 from .gui.error_dialog import ErrorDialog
 from .gui.utils import (
     check_and_prompt_for_updates_on_main_window,
     show_error_dialog,
     show_tooltip,
 )
-from .settings import ADDON_VERSION, ANKI_VERSION, ANKIWEB_ID, config, log_file_path
+from .settings import (
+    ADDON_VERSION,
+    ANKI_VERSION,
+    ANKIWEB_ID,
+    config,
+    log_file_path,
+    user_files_path,
+)
 from .sync import NotLoggedInError
 
 SENTRY_ENV = "anki_desktop"
@@ -97,6 +109,68 @@ def upload_logs_in_background(
         )
 
     return key
+
+
+def upload_data_dir_and_logs_in_background(
+    on_done: Callable[[Future], None] = None
+) -> str:
+    """Upload the data dir and logs to S3 in the background.
+    Returns the S3 key of the uploaded file."""
+
+    LOGGER.info("Uploading data dir and logs...")
+
+    # many users use their email address as their username and may not want to share it on a forum
+    user_name_hash = checksum(config.user())[:5]
+    key = f"ankihub_addon_debug_info_{user_name_hash}_{int(time.time())}.zip"
+
+    aqt.mw.taskman.run_in_background(
+        task=lambda: _upload_data_dir_and_logs(key), on_done=on_done
+    )
+
+    return key
+
+
+def _upload_data_dir_and_logs(key: str) -> str:
+
+    # detach the ankihub database from the anki database connection to prevent file permission errors
+    detach_ankihub_db_from_anki_db_connection()
+
+    # zip the user files and the log file
+    file_path = _zip_data_dir_and_logs()
+
+    # upload the zip file
+    try:
+        client = AnkiHubClient()
+        client.upload_logs(
+            file=file_path,
+            key=key,
+        )
+        LOGGER.info("Data dir and logs uploaded.")
+        return key
+    finally:
+        os.unlink(file_path)
+
+
+def _zip_data_dir_and_logs() -> Path:
+    """Zip the user files directory and the log file and return the path of the zip file."""
+    temp_file = tempfile.NamedTemporaryFile(delete=False)
+    temp_file.close()
+    with zipfile.ZipFile(temp_file.name, "w") as zipf:
+        source_dir = user_files_path()
+        for file in source_dir.rglob("*"):
+            # previously logs were stored in the user files directory and we don't want to
+            # include old log files in the zip
+            if file.name.endswith(".log") or ".log." in file.name:
+                continue
+            zipf.write(file, arcname=file.relative_to(source_dir))
+
+        log_file = log_file_path()
+        if log_file.exists():
+            zipf.write(log_file, arcname=log_file.name)
+        else:
+            LOGGER.info("No logs to upload.")
+
+    return Path(temp_file.name)
 
 
 def _setup_excepthook():

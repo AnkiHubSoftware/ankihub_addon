@@ -334,15 +334,25 @@ def _rename_and_upload_media_for_suggestions(
     suggestion_media_names: Set[str] = get_media_names_from_suggestions(suggestions)
 
     # Filter out unchanged media file names so we don't hash and upload media files that aren't part of the suggestion
-    added_media_names = suggestion_media_names.difference(original_media_names)
+    media_names_added_to_note = suggestion_media_names.difference(original_media_names)
 
-    if not added_media_names:
+    # Filter out media file names that already exist for the deck
+    media_names_added_to_ah_deck = {
+        name
+        for name, exists in ankihub_db.media_names_exist_for_ankihub_deck(
+            ah_did=ankihub_did, media_names=media_names_added_to_note
+        ).items()
+        if not exists
+    }
+
+    if not media_names_added_to_ah_deck:
         # No media files added, nothing to do here. Return
         # the original suggestions object
         return suggestions
 
+    media_dir = Path(aqt.mw.col.media.dir())
     added_media_paths = [
-        Path(aqt.mw.col.media.dir()) / media_name for media_name in added_media_names
+        (media_dir / media_name) for media_name in media_names_added_to_ah_deck
     ]
 
     media_name_map = client.generate_media_files_with_hashed_names(added_media_paths)

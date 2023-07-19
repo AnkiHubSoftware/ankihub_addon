@@ -31,7 +31,7 @@ from ..ankihub_client import AnkiHubHTTPError
 from ..ankihub_client.models import UserDeckRelation
 from ..db import ankihub_db
 from ..deck_creation import create_ankihub_deck
-from ..errors import upload_logs_in_background
+from ..errors import upload_data_dir_and_logs_in_background, upload_logs_in_background
 from ..media_import.ui import open_import_dialog
 from ..media_sync import media_sync
 from ..settings import ADDON_VERSION, config, url_view_deck
@@ -362,19 +362,33 @@ class LogUploadResultDialog(QDialog):
         self.layout_.addWidget(self.button)
 
 
-def _upload_logs_action():
+def _upload_logs_action() -> None:
     if not ask_user(
         "Do you want to upload the add-on's logs to AnkiHub to go along a bug report?"
     ):
         return
 
-    def on_done(future: Future):
-        aqt.mw.progress.finish()
-        log_file_name = future.result()
-        LogUploadResultDialog(log_file_name=log_file_name).exec()
-
     aqt.mw.progress.start(label="Uploading logs...", parent=aqt.mw, immediate=True)
-    upload_logs_in_background(on_done=on_done, hide_username=True)
+    upload_logs_in_background(on_done=_on_logs_uploaded, hide_username=True)
+
+
+def _upload_logs_and_data_action() -> None:
+    if not ask_user(
+        "Do you want to upload the add-on's logs and data to AnkiHub to go along a bug report?<br><br>"
+        "This can take a while."
+    ):
+        return
+
+    aqt.mw.progress.start(
+        label="Uploading logs and data...", parent=aqt.mw, immediate=True
+    )
+    upload_data_dir_and_logs_in_background(on_done=_on_logs_uploaded)
+
+
+def _on_logs_uploaded(future: Future):
+    aqt.mw.progress.finish()
+    log_file_name = future.result()
+    LogUploadResultDialog(log_file_name=log_file_name).exec()
 
 
 def _ankihub_login_setup(parent):
@@ -536,6 +550,10 @@ def _ankihub_help_setup(parent):
     q_upload_logs_action = QAction("Upload logs", help_menu)
     qconnect(q_upload_logs_action.triggered, _upload_logs_action)
     help_menu.addAction(q_upload_logs_action)
+
+    q_upload_logs_and_data_action = QAction("Upload logs and data", help_menu)
+    qconnect(q_upload_logs_and_data_action.triggered, _upload_logs_and_data_action)
+    help_menu.addAction(q_upload_logs_and_data_action)
 
     q_downgrade_from_beta_version_action = QAction(
         "Downgrade from add-on beta version", help_menu
