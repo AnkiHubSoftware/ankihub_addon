@@ -46,7 +46,7 @@ def logging_hook(response: Response, *args, **kwargs):
             # We don't want to log the content of the response if it's not JSON
             pass
     else:
-        LOGGER.info(f"response content: {response.text}")
+        LOGGER.debug(f"response content: {response.text}")
 
     return response
 
