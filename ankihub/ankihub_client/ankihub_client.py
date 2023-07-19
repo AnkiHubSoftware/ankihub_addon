@@ -137,16 +137,24 @@ class AnkiHubClient:
         self,
         response_hooks=None,
         token: Optional[str] = None,
+        get_token: Callable[[], str] = lambda: None,
         api_url: str = DEFAULT_API_URL,
         s3_bucket_url: str = DEFAULT_S3_BUCKET_URL,
         local_media_dir_path: Optional[Path] = None,
     ):
-        # If local_media_dir_path is None, then calling some methods related to media will fail.
+        """Create a new AnkiHubClient.
+        The token can be set with the token parameter or with the get_token parameter.
+        The get_token parameter is a function that returns the token. It has priority over the token parameter.
+        If both are set, the token parameter is ignored.
+        If local_media_dir_path is None, then calling some methods related to media will fail.
+        """
         self.api_url = api_url
         self.s3_bucket_url = s3_bucket_url
         self.local_media_dir_path = local_media_dir_path
         self.token = token
+        self.get_token = get_token
         self.response_hooks = response_hooks
+        self.should_stop_background_threads = False
 
     def _send_request(
         self,
@@ -176,8 +184,14 @@ class AnkiHubClient:
         if api == API.ANKIHUB:
             headers["Content-Type"] = "application/json"
             headers["Accept"] = f"application/json; version={API_VERSION}"
-            if self.token:
-                headers["Authorization"] = f"Token {self.token}"
+
+            # The value returned by self.get_token has priority over self.token
+            token = self.token
+            if self.get_token():
+                token = self.get_token()
+
+            if token:
+                headers["Authorization"] = f"Token {token}"
 
         request = Request(
             method=method,
@@ -387,8 +401,8 @@ class AnkiHubClient:
         )
 
         # Use ThreadPoolExecutor to zip & upload media files
-        futures = []
         with ThreadPoolExecutor() as executor:
+            futures: List[Future] = []
             for chunk_number, chunk in enumerate(media_path_chunks):
                 futures.append(
                     executor.submit(
@@ -402,6 +416,11 @@ class AnkiHubClient:
 
             for future in as_completed(futures):
                 future.result()
+
+                if self.should_stop_background_threads:
+                    for future in futures:
+                        future.cancel()
+                    return
 
     def _zip_and_upload_media_chunk(
         self,
@@ -461,8 +480,8 @@ class AnkiHubClient:
 
     def download_media(self, media_names: List[str], deck_id: uuid.UUID) -> None:
         deck_media_remote_dir = f"/deck_assets/{deck_id}/"
-        futures = []
         with ThreadPoolExecutor() as executor:
+            futures: List[Future] = []
             for media_name in media_names:
                 media_path = self.local_media_dir_path / media_name
                 media_remote_path = deck_media_remote_dir + urllib.parse.quote_plus(
@@ -479,7 +498,13 @@ class AnkiHubClient:
                 )
 
             for future in as_completed(futures):
+                if self.should_stop_background_threads:
+                    for future in futures:
+                        future.cancel()
+                    return
+
                 future.result()
+
             LOGGER.info("Downloaded media from AnkiHub.")
 
     def _download_media(self, media_file_path: Path, media_remote_path: str):
@@ -497,6 +522,10 @@ class AnkiHubClient:
             LOGGER.info(
                 f"Unable to download media file [{media_remote_path}]. Response status code: {response.status_code}"
             )
+
+    def stop_background_threads(self) -> None:
+        """Can be called to stop all background threads started by this client."""
+        self.should_stop_background_threads = True
 
     def get_deck_subscriptions(self) -> List[Deck]:
         response = self._send_request("GET", API.ANKIHUB, "/decks/subscriptions/")

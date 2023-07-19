@@ -4,7 +4,7 @@ from pprint import pformat
 
 import aqt
 from anki.errors import CardTypeError
-from aqt.gui_hooks import profile_did_open
+from aqt.gui_hooks import profile_did_open, profile_will_close
 
 from . import LOGGER, taskman
 from .addons import setup_addons
@@ -14,6 +14,7 @@ from .debug import setup as setup_debug
 from .errors import setup_error_handler
 from .gui import browser, editor, progress, reviewer
 from .gui.menu import menu_state, refresh_ankihub_menu, setup_ankihub_menu
+from .media_sync import media_sync
 from .note_deletion import handle_notes_deleted_from_webapp
 from .settings import (
     ANKI_VERSION,
@@ -42,6 +43,7 @@ def run():
     LOGGER.info(f"S3 bucket url: {config.s3_bucket_url}")
 
     profile_did_open.append(_on_profile_did_open)
+    profile_will_close.append(_on_profile_will_close)
 
 
 def _on_profile_did_open():
@@ -54,6 +56,10 @@ def _on_profile_did_open():
     if not ATTEMPTED_GENERAL_SETUP:
         ATTEMPTED_GENERAL_SETUP = True
         _general_setup()
+
+
+def _on_profile_will_close():
+    media_sync.cleanup()
 
 
 def _profile_setup() -> bool:
