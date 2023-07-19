@@ -1,5 +1,6 @@
 import uuid
 from concurrent.futures import Future
+from functools import cached_property
 from pathlib import Path
 from typing import Callable, Dict, Iterable, List, Optional, Set
 
@@ -57,16 +58,25 @@ class _AnkiHubMediaSync:
 
         media_paths = self._media_paths_for_media_names(media_names)
         aqt.mw.taskman.run_in_background(
-            lambda: AddonAnkiHubClient().upload_media(media_paths, ankihub_did),
+            lambda: self._client.upload_media(media_paths, ankihub_did),
             on_done=lambda future: self._on_upload_finished(
                 future, ankihub_deck_id=ankihub_did, on_success=on_success
             ),
         )
 
+    def cleanup(self):
+        """Stop all media sync operations. This should be called when Anki is closed."""
+        self._client.cleanup()
+
     def refresh_sync_status_text(self):
         """Refresh the status text on the status action."""
         # GUI operations must be performed on the main thread.
         aqt.mw.taskman.run_on_main(self._refresh_media_download_status_inner)
+
+    @cached_property
+    def _client(self) -> AddonAnkiHubClient:
+        # The client can't be initialized in __init__ because the add-on config is not set up yet at that point.
+        return AddonAnkiHubClient()
 
     def _media_paths_for_media_names(self, media_names: Iterable[str]) -> Set[Path]:
         media_dir_path = Path(aqt.mw.col.media.dir())
@@ -85,13 +95,12 @@ class _AnkiHubMediaSync:
 
         if on_success is not None:
             on_success()
-        AddonAnkiHubClient().media_upload_finished(ankihub_deck_id)
+        self._client.media_upload_finished(ankihub_deck_id)
 
     def _download_missing_media(self):
-        client = AddonAnkiHubClient()
         for ah_did in ankihub_db.ankihub_deck_ids():
             try:
-                if not client.is_media_upload_finished(ah_did):
+                if not self._client.is_media_upload_finished(ah_did):
                     continue
             except AnkiHubHTTPError as e:
                 if e.response.status_code in (403, 404):
@@ -101,13 +110,13 @@ class _AnkiHubMediaSync:
                     continue
                 else:
                     raise e
-            media_disabled_fields = client.get_media_disabled_fields(ah_did)
+            media_disabled_fields = self._client.get_media_disabled_fields(ah_did)
             missing_media_names = self._missing_media_for_ah_deck(
                 ah_did, media_disabled_fields
             )
             if not missing_media_names:
                 continue
-            client.download_media(missing_media_names, ah_did)
+            self._client.download_media(missing_media_names, ah_did)
 
     def _missing_media_for_ah_deck(
         self, ah_did: uuid.UUID, media_disabled_fields: Dict[int, List[str]]
