@@ -233,22 +233,37 @@ def _on_protect_fields_action(browser: Browser, nids: Sequence[NoteId]) -> None:
 
 
 def _on_bulk_notes_suggest_action(browser: Browser, nids: Sequence[NoteId]) -> None:
-    notes = [aqt.mw.col.get_note(nid) for nid in nids]
+    if len(nids) > 500:
+        msg = "Please select at most 500 notes at a time for bulk suggestions.<br>"
+        showInfo(msg, parent=browser)
+        return
 
-    mids = set(note.mid for note in notes)
-    if not all(ankihub_db.is_ankihub_note_type(mid) for mid in mids):
+    notes = [aqt.mw.col.get_note(nid) for nid in nids]
+    filtered_notes = [
+        note for note in notes if ankihub_db.is_ankihub_note_type(note.mid)
+    ]
+
+    if not filtered_notes:
         showInfo(
-            "Some of the notes you selected are not of a note type that is known by AnkiHub.",
+            "The selected notes need to have an AnkiHub note type.<br><br>"
+            "You can use <b>AnkiHub -> With AnkiHub ID</b> (for suggesting changes to notes) "
+            "or <b>AnkiHub -> ID Pending</b> (for suggesting new notes) in the left sidebar to find notes to suggest.",
             parent=browser,
         )
         return
 
-    if len(notes) > 500:
-        msg = "Please select less than 500 notes at a time for bulk suggestions.<br>"
-        showInfo(msg, parent=browser)
-        return
+    if len(filtered_notes) != len(notes):
+        showInfo(
+            f"{len(notes) - len(filtered_notes)} of the {len(notes)} selected notes don't have an AnkiHub note type "
+            "and will be ignored.<br><br>"
+            "You can use <b>AnkiHub -> With AnkiHub ID</b> (for suggesting changes to notes) "
+            "or <b>AnkiHub -> ID Pending</b> (for suggesting new notes) in the left sidebar to find notes to suggest.",
+            parent=browser,
+        )
 
-    ah_dids = set(ankihub_db.ankihub_did_for_note_type(mid) for mid in mids)
+    ah_dids = ankihub_db.ankihub_dids_for_anki_nids(
+        [note.id for note in filtered_notes]
+    )
     if len(ah_dids) > 1:
         msg = (
             "You can only create suggestions for notes from one AnkiHub deck at a time.<br>"
@@ -257,7 +272,7 @@ def _on_bulk_notes_suggest_action(browser: Browser, nids: Sequence[NoteId]) -> N
         showInfo(msg, parent=browser)
         return
 
-    open_suggestion_dialog_for_bulk_suggestion(notes=notes, parent=browser)
+    open_suggestion_dialog_for_bulk_suggestion(notes=filtered_notes, parent=browser)
 
 
 def _on_reset_local_changes_action(browser: Browser, nids: Sequence[NoteId]) -> None:
