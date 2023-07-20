@@ -241,19 +241,19 @@ def _try_handle_exception(
                 show_tooltip(
                     "🚧 AnkiHub is undergoing routine maintenance. "
                     "Please visit ankihub.net/status and check your email for details.",
-                    period=10000,
+                    period=5000,
                 )
             elif "[Errno -3] Temporary failure in name resolution" in str(
                 exc_value.original_exception
             ):
                 show_tooltip(
                     "🔌 No Internet Connection detected. Please check your internet connection and try again.",
-                    period=10000,
+                    period=5000,
                 )
             else:
                 show_tooltip(
                     "📶 Could not connect to AnkiHub (no internet or the site is down for maintenance)",
-                    period=10000,
+                    period=5000,
                 )
             return True
 
