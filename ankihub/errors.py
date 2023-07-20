@@ -17,7 +17,7 @@ import aqt
 import sentry_sdk
 from anki.errors import BackendIOError, DBError, SyncError
 from anki.utils import checksum, is_win
-from aqt.utils import askUser, showInfo, tooltip
+from aqt.utils import askUser, showInfo
 from requests import exceptions
 from sentry_sdk import capture_exception, push_scope
 from sentry_sdk.integrations.argv import ArgvIntegration
@@ -34,7 +34,11 @@ from .db import (
     is_ankihub_db_attached_to_anki_db,
 )
 from .gui.error_dialog import ErrorDialog
-from .gui.utils import check_and_prompt_for_updates_on_main_window, show_error_dialog
+from .gui.utils import (
+    check_and_prompt_for_updates_on_main_window,
+    show_error_dialog,
+    show_tooltip,
+)
 from .settings import (
     ADDON_VERSION,
     ANKI_VERSION,
@@ -231,10 +235,26 @@ def _try_handle_exception(
         if isinstance(
             exc_value.original_exception, (exceptions.ConnectionError, ConnectionError)
         ):
-            tooltip(
-                "Could not connect to AnkiHub (no internet or the site is down for maintenance)",
-                parent=aqt.mw,
-            )
+            if "[Errno -2] Name or service not known" in str(
+                exc_value.original_exception
+            ):
+                show_tooltip(
+                    "🚧 AnkiHub is undergoing routine maintenance. "
+                    "Please visit ankihub.net/status and check your email for details.",
+                    period=5000,
+                )
+            elif "[Errno -3] Temporary failure in name resolution" in str(
+                exc_value.original_exception
+            ):
+                show_tooltip(
+                    "🔌 No Internet Connection detected. Please check your internet connection and try again.",
+                    period=5000,
+                )
+            else:
+                show_tooltip(
+                    "📶 Could not connect to AnkiHub (no internet or the site is down for maintenance)",
+                    period=5000,
+                )
             return True
 
     if _is_memory_full_error(exc_value):
