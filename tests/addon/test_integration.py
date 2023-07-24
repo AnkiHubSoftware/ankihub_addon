@@ -847,6 +847,7 @@ def test_suggest_note_update(
             note=note,
             change_type=SuggestionType.NEW_CONTENT,
             comment="test",
+            media_upload_cb=Mock(),
         )
 
         # Check that the correct suggestion was created
@@ -891,6 +892,7 @@ def test_suggest_new_note(
             note=note,
             ankihub_did=ah_did,
             comment="test",
+            media_upload_cb=Mock(),
         )
 
         # ... assert that add-on internal and optional tags were filtered out
@@ -914,6 +916,7 @@ def test_suggest_new_note(
                 note=note,
                 ankihub_did=ah_did,
                 comment="test",
+                media_upload_cb=Mock(),
             )
         except AnkiHubHTTPError as e:
             exc = e
@@ -966,6 +969,7 @@ def test_suggest_notes_in_bulk(
                 auto_accept=False,
                 change_type=SuggestionType.NEW_CONTENT,
                 comment="test",
+                media_upload_cb=Mock(),
             )
 
         assert bulk_suggestions_method_mock.call_count == 1
@@ -3322,6 +3326,7 @@ class TestSuggestionsWithMedia:
                     note=note,
                     change_type=SuggestionType.NEW_CONTENT,
                     comment="test",
+                    media_upload_cb=media_sync.media_sync.start_media_upload,
                 )
 
                 # Wait for the background thread that uploads the media to finish.
@@ -3374,6 +3379,7 @@ class TestSuggestionsWithMedia:
                     note=note,
                     ankihub_did=ah_did,
                     comment="test",
+                    media_upload_cb=media_sync.media_sync.start_media_upload,
                 )
 
                 # Wait for the background thread that uploads the media to finish.
@@ -3444,6 +3450,7 @@ class TestSuggestionsWithMedia:
                     note=note,
                     change_type=SuggestionType.NEW_CONTENT,
                     comment="test",
+                    media_upload_cb=media_sync.media_sync.start_media_upload,
                 )
 
                 qtbot.wait(300)
@@ -3484,6 +3491,7 @@ class TestSuggestionsWithMedia:
                 note=note,
                 change_type=SuggestionType.NEW_CONTENT,
                 comment="test",
+                media_upload_cb=media_sync.media_sync.start_media_upload,
             )
 
             qtbot.wait(300)
