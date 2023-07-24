@@ -13,17 +13,17 @@ from anki.errors import NotFoundError
 from anki.models import NotetypeDict, NotetypeId
 from anki.notes import Note, NoteId
 
-from . import LOGGER, settings
-from .addon_ankihub_client import AddonAnkiHubClient as AnkiHubClient
-from .ankihub_client import Field, NoteInfo
-from .db import ankihub_db
+from .. import LOGGER, settings
+from ..addon_ankihub_client import AddonAnkiHubClient as AnkiHubClient
+from ..ankihub_client import Field, NoteInfo
+from ..db import ankihub_db
+from ..settings import config
 from .note_conversion import (
     TAG_FOR_PROTECTING_ALL_FIELDS,
     get_fields_protected_by_tags,
     is_internal_tag,
     is_optional_tag,
 )
-from .settings import config
 from .subdecks import build_subdecks_and_move_cards_to_them
 from .utils import (
     create_deck_with_id,

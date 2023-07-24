@@ -34,15 +34,15 @@ from ..ankihub_client import (
     get_media_names_from_note_info,
 )
 from ..db import ankihub_db
-from ..exporting import to_note_data
-from ..settings import ANKING_DECK_ID, RATIONALE_FOR_CHANGE_MAX_LENGTH
-from ..suggestions import (
+from ..main.exporting import to_note_data
+from ..main.suggestions import (
     ANKIHUB_NO_CHANGE_ERROR,
     BulkNoteSuggestionsResult,
     suggest_new_note,
     suggest_note_update,
     suggest_notes_in_bulk,
 )
+from ..settings import ANKING_DECK_ID, RATIONALE_FOR_CHANGE_MAX_LENGTH
 from .utils import show_error_dialog, show_tooltip
 
 

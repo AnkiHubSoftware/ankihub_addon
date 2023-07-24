@@ -30,13 +30,13 @@ from ..addon_ankihub_client import AddonAnkiHubClient as AnkiHubClient
 from ..ankihub_client import AnkiHubHTTPError
 from ..ankihub_client.models import UserDeckRelation
 from ..db import ankihub_db
-from ..deck_creation import create_ankihub_deck
-from ..errors import upload_data_dir_and_logs_in_background, upload_logs_in_background
+from ..main.deck_creation import create_ankihub_deck
+from ..main.subdecks import SUBDECK_TAG
 from ..media_import.ui import open_import_dialog
-from ..media_sync import media_sync
 from ..settings import ADDON_VERSION, config, url_view_deck
-from ..subdecks import SUBDECK_TAG
 from .decks_dialog import SubscribedDecksDialog
+from .errors import upload_data_dir_and_logs_in_background, upload_logs_in_background
+from .media_sync import media_sync
 from .operations.ankihub_sync import sync_with_ankihub
 from .utils import (
     ask_user,

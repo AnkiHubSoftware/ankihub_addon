@@ -13,9 +13,9 @@ from anki.decks import DeckId
 from anki.errors import NotFoundError
 from anki.notes import NoteId
 
-from . import LOGGER
-from .db import ankihub_db
-from .settings import config
+from .. import LOGGER
+from ..db import ankihub_db
+from ..settings import config
 from .utils import nids_in_deck_but_not_in_subdeck
 
 # root tag for tags that indicate which subdeck a note belongs to

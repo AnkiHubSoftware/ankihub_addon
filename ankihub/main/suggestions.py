@@ -11,8 +11,8 @@ from typing import Any, Dict, List, Optional, Sequence, Set, Tuple, cast
 import aqt
 from anki.notes import Note, NoteId
 
-from .addon_ankihub_client import AddonAnkiHubClient as AnkiHubClient
-from .ankihub_client import (
+from ..addon_ankihub_client import AddonAnkiHubClient as AnkiHubClient
+from ..ankihub_client import (
     ChangeNoteSuggestion,
     Field,
     NewNoteSuggestion,
@@ -22,9 +22,9 @@ from .ankihub_client import (
     get_media_names_from_notes_data,
     get_media_names_from_suggestions,
 )
-from .db import ankihub_db
+from ..db import ankihub_db
+from ..gui.media_sync import media_sync
 from .exporting import to_note_data
-from .media_sync import media_sync
 from .media_utils import find_and_replace_text_in_fields_on_all_notes
 
 # string that is contained in the errors returned from the AnkiHub API when

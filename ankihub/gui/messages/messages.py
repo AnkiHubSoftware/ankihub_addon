@@ -4,7 +4,7 @@ from typing import List
 from jinja2 import Environment, FileSystemLoader, select_autoescape
 
 from ...ankihub_client import Deck
-from ...importing import AnkiHubImportResult
+from ...main.importing import AnkiHubImportResult
 
 templates = (pathlib.Path(__file__).parent / "templates").absolute()
 env = Environment(loader=FileSystemLoader(templates), autoescape=select_autoescape())

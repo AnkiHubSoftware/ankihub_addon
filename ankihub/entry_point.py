@@ -6,16 +6,17 @@ import aqt
 from anki.errors import CardTypeError
 from aqt.gui_hooks import profile_did_open, profile_will_close
 
-from . import LOGGER, taskman
-from .addons import setup_addons
-from .auto_sync import setup_auto_sync
+from . import LOGGER
 from .db import ankihub_db
 from .debug import setup as setup_debug
-from .errors import setup_error_handler
-from .gui import browser, editor, progress, reviewer
+from .gui import browser, editor, progress, reviewer, taskman
+from .gui.addons import setup_addons
+from .gui.auto_sync import setup_auto_sync
+from .gui.errors import setup_error_handler
+from .gui.media_sync import media_sync
 from .gui.menu import menu_state, refresh_ankihub_menu, setup_ankihub_menu
-from .media_sync import media_sync
-from .note_deletion import handle_notes_deleted_from_webapp
+from .main.note_deletion import handle_notes_deleted_from_webapp
+from .main.utils import modify_note_type_templates
 from .settings import (
     ANKI_VERSION,
     ankihub_db_path,
@@ -23,7 +24,6 @@ from .settings import (
     setup_logger,
     setup_profile_data_folder,
 )
-from .utils import modify_note_type_templates
 
 # The general setup should be only once, because it sets up menu items, hooks, etc.
 # We don't want to set them up multiple times when the profile is opened multiple times,

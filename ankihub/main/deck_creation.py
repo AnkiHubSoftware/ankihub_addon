@@ -10,13 +10,13 @@ from anki.decks import DeckId
 from anki.models import NotetypeId
 from anki.notes import NoteId
 
-from . import LOGGER
-from .addon_ankihub_client import AddonAnkiHubClient as AnkiHubClient
-from .ankihub_client import NoteInfo, get_media_names_from_notes_data
-from .db import ankihub_db
+from .. import LOGGER
+from ..addon_ankihub_client import AddonAnkiHubClient as AnkiHubClient
+from ..ankihub_client import NoteInfo, get_media_names_from_notes_data
+from ..db import ankihub_db
+from ..gui.media_sync import media_sync
+from ..settings import ANKIHUB_NOTE_TYPE_FIELD_NAME, config
 from .exporting import to_note_data
-from .media_sync import media_sync
-from .settings import ANKIHUB_NOTE_TYPE_FIELD_NAME, config
 from .subdecks import add_subdeck_tags_to_notes
 from .utils import (
     change_note_type_of_note,

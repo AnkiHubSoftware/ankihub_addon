@@ -4,9 +4,9 @@ import aqt
 from anki.notes import NoteId
 from anki.utils import ids2str
 
-from .addon_ankihub_client import AddonAnkiHubClient as AnkiHubClient
-from .ankihub_client import OptionalTagSuggestion, TagGroupValidationResponse
-from .db import ankihub_db
+from ..addon_ankihub_client import AddonAnkiHubClient as AnkiHubClient
+from ..ankihub_client import OptionalTagSuggestion, TagGroupValidationResponse
+from ..db import ankihub_db
 from .note_conversion import TAG_FOR_OPTIONAL_TAGS, is_optional_tag, is_tag_for_group
 
 

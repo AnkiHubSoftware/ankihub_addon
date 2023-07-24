@@ -39,19 +39,19 @@ from ...db import (
     attached_ankihub_db,
     detach_ankihub_db_from_anki_db_connection,
 )
-from ...importing import get_fields_protected_by_tags
-from ...note_conversion import (
+from ...main.importing import get_fields_protected_by_tags
+from ...main.note_conversion import (
     TAG_FOR_PROTECTING_ALL_FIELDS,
     TAG_FOR_PROTECTING_FIELDS,
     is_tag_for_group,
 )
-from ...reset_local_changes import reset_local_changes_to_notes
+from ...main.reset_local_changes import reset_local_changes_to_notes
+from ...main.subdecks import SUBDECK_TAG, build_subdecks_and_move_cards_to_them
+from ...main.utils import mids_of_notes
 from ...settings import ANKIHUB_NOTE_TYPE_FIELD_NAME, DeckExtensionConfig, config
-from ...subdecks import SUBDECK_TAG, build_subdecks_and_move_cards_to_them
-from ...sync import NotLoggedInError, ah_sync
-from ...utils import mids_of_notes
 from ..optional_tag_suggestion_dialog import OptionalTagsSuggestionDialog
 from ..suggestion_dialog import open_suggestion_dialog_for_bulk_suggestion
+from ..sync import NotLoggedInError, ah_sync
 from ..utils import ask_user, choose_ankihub_deck, choose_list, choose_subset
 from .custom_columns import (
     AnkiHubIdColumn,

@@ -16,7 +16,7 @@ from requests_mock import Mocker
 os.environ["SKIP_INIT"] = "1"
 
 from ankihub.ankihub_client.ankihub_client import DEFAULT_API_URL
-from ankihub.utils import modify_note_type
+from ankihub.main.utils import modify_note_type
 
 
 @fixture
