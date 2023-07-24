@@ -1,6 +1,5 @@
 """AnkiHub menu on Anki's main window."""
 import re
-import uuid
 from concurrent.futures import Future
 from dataclasses import dataclass
 from datetime import datetime, timezone
@@ -27,10 +26,10 @@ from aqt.utils import openLink, showInfo, tooltip
 
 from .. import LOGGER
 from ..addon_ankihub_client import AddonAnkiHubClient as AnkiHubClient
-from ..ankihub_client import AnkiHubHTTPError
+from ..ankihub_client import AnkiHubHTTPError, get_media_names_from_notes_data
 from ..ankihub_client.models import UserDeckRelation
 from ..db import ankihub_db
-from ..main.deck_creation import create_ankihub_deck
+from ..main.deck_creation import DeckCreationResult, create_ankihub_deck
 from ..main.subdecks import SUBDECK_TAG
 from ..media_import.ui import open_import_dialog
 from ..settings import ADDON_VERSION, config, url_view_deck
@@ -286,17 +285,29 @@ def _create_collaborative_deck_action() -> None:
         "when installing the deck. "
     )
 
-    def on_success(ankihub_did: uuid.UUID) -> None:
+    def on_success(deck_creation_result: DeckCreationResult) -> None:
+
+        # Upload all existing local media for this deck
+        # (media files that are referenced on Deck's notes)
+        if should_upload_media:
+            media_names = get_media_names_from_notes_data(
+                deck_creation_result.notes_data
+            )
+            media_sync.start_media_upload(media_names, deck_creation_result.ankihub_did)
+
+        # Add the deck to the list of decks the user owns
         anki_did = aqt.mw.col.decks.id_for_name(deck_name)
         creation_time = datetime.now(tz=timezone.utc)
         config.add_deck(
             deck_name,
-            ankihub_did,
+            deck_creation_result.ankihub_did,
             anki_did,
             user_relation=UserDeckRelation.OWNER,
             latest_udpate=creation_time,
         )
-        deck_url = f"{url_view_deck()}{ankihub_did}"
+
+        # Show a message to the user with a link to the deck on AnkiHub
+        deck_url = f"{url_view_deck()}{deck_creation_result.ankihub_did}"
         showInfo(
             "🎉 Deck upload successful!<br><br>"
             "Link to the deck on AnkiHub:<br>"
@@ -313,7 +324,6 @@ def _create_collaborative_deck_action() -> None:
             deck_name,
             private=private,
             add_subdeck_tags=add_subdeck_tags,
-            should_upload_media=should_upload_media,
         ),
         success=on_success,
     ).failure(on_failure)

@@ -3,6 +3,7 @@ import re
 import typing
 import uuid
 from copy import deepcopy
+from dataclasses import dataclass
 from typing import Dict, List
 
 import aqt
@@ -12,9 +13,8 @@ from anki.notes import NoteId
 
 from .. import LOGGER
 from ..addon_ankihub_client import AddonAnkiHubClient as AnkiHubClient
-from ..ankihub_client import NoteInfo, get_media_names_from_notes_data
+from ..ankihub_client.models import NoteInfo
 from ..db import ankihub_db
-from ..gui.media_sync import media_sync
 from ..settings import ANKIHUB_NOTE_TYPE_FIELD_NAME, config
 from .exporting import to_note_data
 from .subdecks import add_subdeck_tags_to_notes
@@ -26,12 +26,17 @@ from .utils import (
 )
 
 
+@dataclass
+class DeckCreationResult:
+    ankihub_did: uuid.UUID
+    notes_data: List[NoteInfo]
+
+
 def create_ankihub_deck(
     deck_name: str,
     private: bool,
     add_subdeck_tags: bool = False,
-    should_upload_media: bool = False,
-) -> uuid.UUID:
+) -> DeckCreationResult:
     LOGGER.info("Creating collaborative deck")
 
     create_backup()
@@ -58,11 +63,11 @@ def create_ankihub_deck(
         deck_id,
         notes_data=notes_data,
         private=private,
-        should_upload_media=should_upload_media,
     )
     ankihub_db.upsert_notes_data(ankihub_did=ankihub_did, notes_data=notes_data)
     ankihub_db.transfer_mod_values_from_anki_db(notes_data=notes_data)
-    return ankihub_did
+
+    return DeckCreationResult(ankihub_did=ankihub_did, notes_data=notes_data)
 
 
 def _create_note_types_for_deck(deck_id: DeckId) -> Dict[NotetypeId, NotetypeId]:
@@ -116,7 +121,6 @@ def _upload_deck(
     did: DeckId,
     notes_data: List[NoteInfo],
     private: bool,
-    should_upload_media: bool = False,
 ) -> uuid.UUID:
     """Upload the deck to AnkiHub."""
 
@@ -134,11 +138,5 @@ def _upload_deck(
         anki_deck_id=did,
         private=private,
     )
-
-    # Upload all existing local media for this deck
-    # (media files that are referenced on Deck's notes)
-    if should_upload_media:
-        media_names = get_media_names_from_notes_data(notes_data)
-        media_sync.start_media_upload(media_names, ankihub_did)
 
     return ankihub_did
