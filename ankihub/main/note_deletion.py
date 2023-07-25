@@ -7,15 +7,15 @@ from typing import List
 import aqt
 from anki.utils import ids2str
 
-from . import LOGGER
-from .db import ankihub_db
-from .settings import ANKIHUB_NOTE_TYPE_FIELD_NAME
+from .. import LOGGER
+from ..db import ankihub_db
+from ..settings import ANKIHUB_NOTE_TYPE_FIELD_NAME
 
 # tag for notes which were deleted from the webapp
 TAG_FOR_DELETED_NOTES = "AnkiHub_Deleted"
 
 DELETED_NOTES_FILE = (
-    Path(__file__).parent / "resources/deleted_notes_from_anking_deck.json"
+    Path(__file__).parent.parent / "resources/deleted_notes_from_anking_deck.json"
 )
 
 

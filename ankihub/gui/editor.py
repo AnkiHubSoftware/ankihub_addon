@@ -13,7 +13,6 @@ from aqt.utils import openLink, showInfo, tooltip
 from .. import LOGGER, settings
 from ..ankihub_client import AnkiHubHTTPError
 from ..db import ankihub_db
-from ..errors import report_exception_and_upload_logs
 from ..settings import (
     ANKI_MINOR,
     ICONS_PATH,
@@ -22,6 +21,7 @@ from ..settings import (
     url_view_note,
     url_view_note_history,
 )
+from .errors import report_exception_and_upload_logs
 from .suggestion_dialog import open_suggestion_dialog_for_note
 from .utils import show_error_dialog
 

@@ -3,7 +3,7 @@ from typing import Callable
 
 import aqt
 
-from ...sync import ah_sync, show_tooltip_about_last_sync_results
+from ..sync import ah_sync, show_tooltip_about_last_sync_results
 from .db_check import maybe_check_databases
 from .new_deck_subscriptions import check_and_install_new_deck_subscriptions
 from .utils import future_with_exception, future_with_result

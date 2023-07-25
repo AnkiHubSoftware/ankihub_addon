@@ -7,10 +7,10 @@ from typing import Callable, Dict, Iterable, List, Optional, Set
 import aqt
 from aqt.qt import QAction
 
-from . import LOGGER
-from .addon_ankihub_client import AddonAnkiHubClient
-from .ankihub_client import AnkiHubHTTPError
-from .db import ankihub_db
+from .. import LOGGER
+from ..addon_ankihub_client import AddonAnkiHubClient
+from ..ankihub_client import AnkiHubHTTPError
+from ..db import ankihub_db
 
 
 class _AnkiHubMediaSync:

@@ -6,8 +6,8 @@ from typing import List, Optional
 
 from anki.notes import Note
 
-from .ankihub_client import Field, NoteInfo
-from .db import ankihub_db
+from ..ankihub_client import Field, NoteInfo
+from ..db import ankihub_db
 from .note_conversion import (
     get_fields_protected_by_tags,
     is_internal_tag,

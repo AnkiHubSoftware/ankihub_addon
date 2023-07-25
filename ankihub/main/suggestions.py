@@ -6,13 +6,13 @@ import copy
 import uuid
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Any, Dict, List, Optional, Sequence, Set, Tuple, cast
+from typing import Any, Dict, List, Optional, Protocol, Sequence, Set, Tuple, cast
 
 import aqt
 from anki.notes import Note, NoteId
 
-from .addon_ankihub_client import AddonAnkiHubClient as AnkiHubClient
-from .ankihub_client import (
+from ..addon_ankihub_client import AddonAnkiHubClient as AnkiHubClient
+from ..ankihub_client import (
     ChangeNoteSuggestion,
     Field,
     NewNoteSuggestion,
@@ -22,9 +22,8 @@ from .ankihub_client import (
     get_media_names_from_notes_data,
     get_media_names_from_suggestions,
 )
-from .db import ankihub_db
+from ..db import ankihub_db
 from .exporting import to_note_data
-from .media_sync import media_sync
 from .media_utils import find_and_replace_text_in_fields_on_all_notes
 
 # string that is contained in the errors returned from the AnkiHub API when
@@ -34,8 +33,17 @@ ANKIHUB_NO_CHANGE_ERROR = (
 )
 
 
+class MediaUploadCallback(Protocol):
+    def __call__(self, media_names: Set[str], ankihub_did: uuid.UUID) -> None:
+        ...
+
+
 def suggest_note_update(
-    note: Note, change_type: SuggestionType, comment: str, auto_accept: bool = False
+    note: Note,
+    change_type: SuggestionType,
+    comment: str,
+    media_upload_cb: MediaUploadCallback,
+    auto_accept: bool = False,
 ) -> bool:
     """Sends a ChangeNoteSuggestion to AnkiHub if the passed note has changes.
     Returns True if the suggestion was created, False if the note has no changes
@@ -52,7 +60,7 @@ def suggest_note_update(
     suggestion = cast(
         ChangeNoteSuggestion,
         _rename_and_upload_media_for_suggestion(
-            suggestion=suggestion, ankihub_did=ah_did
+            suggestion=suggestion, ankihub_did=ah_did, media_upload_cb=media_upload_cb
         ),
     )
 
@@ -66,7 +74,11 @@ def suggest_note_update(
 
 
 def suggest_new_note(
-    note: Note, comment: str, ankihub_did: uuid.UUID, auto_accept: bool = False
+    note: Note,
+    comment: str,
+    ankihub_did: uuid.UUID,
+    media_upload_cb: MediaUploadCallback,
+    auto_accept: bool = False,
 ) -> None:
     """Sends a NewNoteSuggestion to AnkiHub.
     Also renames media in the Anki collection and the media folder and uploads them to AnkiHub.
@@ -77,7 +89,9 @@ def suggest_new_note(
     suggestion = cast(
         NewNoteSuggestion,
         _rename_and_upload_media_for_suggestion(
-            suggestion=suggestion, ankihub_did=ankihub_did
+            suggestion=suggestion,
+            ankihub_did=ankihub_did,
+            media_upload_cb=media_upload_cb,
         ),
     )
 
@@ -97,6 +111,7 @@ def suggest_notes_in_bulk(
     auto_accept: bool,
     change_type: SuggestionType,
     comment: str,
+    media_upload_cb: MediaUploadCallback,
 ) -> BulkNoteSuggestionsResult:
     """
     Sends a NewNoteSuggestion or a ChangeNoteSuggestion to AnkiHub for each note in the list.
@@ -133,6 +148,7 @@ def suggest_notes_in_bulk(
         _rename_and_upload_media_for_suggestions(
             suggestions=new_note_suggestions,
             ankihub_did=ankihub_did,
+            media_upload_cb=media_upload_cb,
         ),
     )
     change_note_suggestions = cast(
@@ -140,6 +156,7 @@ def suggest_notes_in_bulk(
         _rename_and_upload_media_for_suggestions(
             suggestions=change_note_suggestions,
             ankihub_did=ankihub_did,
+            media_upload_cb=media_upload_cb,
         ),
     )
 
@@ -308,15 +325,20 @@ def _fields_that_changed(
 
 
 def _rename_and_upload_media_for_suggestion(
-    suggestion: NoteSuggestion, ankihub_did: uuid.UUID
+    suggestion: NoteSuggestion,
+    ankihub_did: uuid.UUID,
+    media_upload_cb: MediaUploadCallback,
 ) -> NoteSuggestion:
-    suggestion = _rename_and_upload_media_for_suggestions([suggestion], ankihub_did)[0]
+    suggestion = _rename_and_upload_media_for_suggestions(
+        [suggestion], ankihub_did, media_upload_cb=media_upload_cb
+    )[0]
     return suggestion
 
 
 def _rename_and_upload_media_for_suggestions(
     suggestions: Sequence[NoteSuggestion],
     ankihub_did: uuid.UUID,
+    media_upload_cb: MediaUploadCallback,
 ) -> Sequence[NoteSuggestion]:
     """Renames media files referenced on the suggestions in the Anki collection and the media folder and
     uploads them to AnkiHub in another thread.
@@ -357,9 +379,7 @@ def _rename_and_upload_media_for_suggestions(
 
     media_name_map = client.generate_media_files_with_hashed_names(added_media_paths)
 
-    media_sync.start_media_upload(
-        media_names=set(media_name_map.values()), ankihub_did=ankihub_did
-    )
+    media_upload_cb(media_names=set(media_name_map.values()), ankihub_did=ankihub_did)
 
     if media_name_map:
         suggestions = copy.deepcopy(suggestions)

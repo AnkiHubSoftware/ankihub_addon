@@ -3,7 +3,7 @@ import time
 from functools import wraps
 from typing import Callable, Optional
 
-from . import LOGGER
+from .. import LOGGER
 
 
 def rate_limited(seconds: float, on_done_arg_name: Optional[str] = None) -> Callable:

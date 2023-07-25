@@ -7,15 +7,15 @@ import aqt
 from anki.errors import NotFoundError
 from aqt.utils import showInfo, tooltip
 
-from . import LOGGER
-from .addon_ankihub_client import AddonAnkiHubClient as AnkiHubClient
-from .ankihub_client import AnkiHubHTTPError, DeckExtension
-from .db import ankihub_db
-from .gui.utils import show_error_dialog
-from .importing import AnkiHubImporter, AnkiHubImportResult
+from .. import LOGGER
+from ..addon_ankihub_client import AddonAnkiHubClient as AnkiHubClient
+from ..ankihub_client import AnkiHubHTTPError, DeckExtension
+from ..db import ankihub_db
+from ..main.importing import AnkiHubImporter, AnkiHubImportResult
+from ..main.utils import create_backup
+from ..settings import config
 from .media_sync import media_sync
-from .settings import config
-from .utils import create_backup
+from .utils import show_error_dialog
 
 
 class NotLoggedInError(Exception):

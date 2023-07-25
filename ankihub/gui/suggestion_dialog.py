@@ -34,15 +34,16 @@ from ..ankihub_client import (
     get_media_names_from_note_info,
 )
 from ..db import ankihub_db
-from ..exporting import to_note_data
-from ..settings import ANKING_DECK_ID, RATIONALE_FOR_CHANGE_MAX_LENGTH
-from ..suggestions import (
+from ..main.exporting import to_note_data
+from ..main.suggestions import (
     ANKIHUB_NO_CHANGE_ERROR,
     BulkNoteSuggestionsResult,
     suggest_new_note,
     suggest_note_update,
     suggest_notes_in_bulk,
 )
+from ..settings import ANKING_DECK_ID, RATIONALE_FOR_CHANGE_MAX_LENGTH
+from .media_sync import media_sync
 from .utils import show_error_dialog, show_tooltip
 
 
@@ -94,6 +95,7 @@ def open_suggestion_dialog_for_note(note: Note, parent: QWidget) -> None:
             note=note,
             change_type=suggestion_meta.change_type,
             comment=_comment_with_source(suggestion_meta),
+            media_upload_cb=media_sync.start_media_upload,
             auto_accept=suggestion_meta.auto_accept,
         ):
             show_tooltip("Submitted suggestion to AnkiHub.", parent=parent)
@@ -104,6 +106,7 @@ def open_suggestion_dialog_for_note(note: Note, parent: QWidget) -> None:
             note=note,
             ankihub_did=ah_did,
             comment=suggestion_meta.comment,
+            media_upload_cb=media_sync.start_media_upload,
             auto_accept=suggestion_meta.auto_accept,
         )
         show_tooltip("Submitted suggestion to AnkiHub.", parent=parent)
@@ -143,6 +146,7 @@ def open_suggestion_dialog_for_bulk_suggestion(
             auto_accept=suggestion_meta.auto_accept,
             change_type=suggestion_meta.change_type,
             comment=_comment_with_source(suggestion_meta),
+            media_upload_cb=media_sync.start_media_upload,
         ),
         on_done=lambda future: _on_suggest_notes_in_bulk_done(future, parent),
         parent=parent,

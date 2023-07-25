@@ -6,9 +6,9 @@ from typing import Sequence
 
 from anki.notes import NoteId
 
-from .db import ankihub_db
+from ..db import ankihub_db
+from ..settings import config
 from .importing import AnkiHubImporter
-from .settings import config
 
 
 def reset_local_changes_to_notes(

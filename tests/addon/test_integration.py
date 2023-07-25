@@ -40,12 +40,8 @@ from .conftest import TEST_PROFILE_ID
 # has to be set before importing ankihub
 os.environ["SKIP_INIT"] = "1"
 
-from ankihub import entry_point, media_sync, settings
+from ankihub import entry_point, settings
 from ankihub.addon_ankihub_client import AddonAnkiHubClient as AnkiHubClient
-from ankihub.addons import (
-    _change_file_permissions_of_addon_files,
-    _maybe_change_file_permissions_of_addon_files,
-)
 from ankihub.ankihub_client import (
     AnkiHubHTTPError,
     ChangeNoteSuggestion,
@@ -65,7 +61,6 @@ from ankihub.ankihub_client.ankihub_client import (
     DeckExtensionUpdateChunk,
     _transform_notes_data,
 )
-from ankihub.auto_sync import _setup_ankihub_sync_on_ankiweb_sync
 from ankihub.common_utils import local_media_names_from_html
 from ankihub.db import ankihub_db, attached_ankihub_db
 from ankihub.debug import (
@@ -73,10 +68,12 @@ from ankihub.debug import (
     _setup_logging_for_db_begin,
     _setup_logging_for_sync_collection_and_media,
 )
-from ankihub.deck_creation import create_ankihub_deck, modify_note_type
-from ankihub.errors import upload_data_dir_and_logs_in_background
-from ankihub.exporting import to_note_data
-from ankihub.gui import operations, utils
+from ankihub.gui import media_sync, operations, utils
+from ankihub.gui.addons import (
+    _change_file_permissions_of_addon_files,
+    _maybe_change_file_permissions_of_addon_files,
+)
+from ankihub.gui.auto_sync import _setup_ankihub_sync_on_ankiweb_sync
 from ankihub.gui.browser import (
     ModifiedAfterSyncSearchNode,
     NewNoteSearchNode,
@@ -89,25 +86,45 @@ from ankihub.gui.browser import (
 from ankihub.gui.browser.custom_search_nodes import UpdatedSinceLastReviewSearchNode
 from ankihub.gui.decks_dialog import SubscribedDecksDialog, download_and_install_decks
 from ankihub.gui.editor import _on_suggestion_button_press, _refresh_buttons
+from ankihub.gui.errors import upload_data_dir_and_logs_in_background
 from ankihub.gui.operations.new_deck_subscriptions import (
     check_and_install_new_deck_subscriptions,
 )
 from ankihub.gui.operations.utils import future_with_result
 from ankihub.gui.optional_tag_suggestion_dialog import OptionalTagsSuggestionDialog
-from ankihub.importing import (
+from ankihub.gui.sync import _AnkiHubSync, ah_sync
+from ankihub.main.deck_creation import create_ankihub_deck, modify_note_type
+from ankihub.main.exporting import to_note_data
+from ankihub.main.importing import (
     AnkiHubImporter,
     _adjust_note_types,
     reset_note_types_of_notes,
 )
-from ankihub.note_conversion import (
+from ankihub.main.note_conversion import (
     ADDON_INTERNAL_TAGS,
     ANKI_INTERNAL_TAGS,
     TAG_FOR_OPTIONAL_TAGS,
     TAG_FOR_PROTECTING_ALL_FIELDS,
     TAG_FOR_PROTECTING_FIELDS,
 )
-from ankihub.note_deletion import TAG_FOR_DELETED_NOTES
-from ankihub.reset_local_changes import reset_local_changes_to_notes
+from ankihub.main.note_deletion import TAG_FOR_DELETED_NOTES
+from ankihub.main.reset_local_changes import reset_local_changes_to_notes
+from ankihub.main.subdecks import (
+    SUBDECK_TAG,
+    build_subdecks_and_move_cards_to_them,
+    flatten_deck,
+)
+from ankihub.main.suggestions import (
+    suggest_new_note,
+    suggest_note_update,
+    suggest_notes_in_bulk,
+)
+from ankihub.main.utils import (
+    ANKIHUB_TEMPLATE_SNIPPET_RE,
+    all_dids,
+    get_note_types_in_deck,
+    note_type_contains_field,
+)
 from ankihub.settings import (
     ANKIHUB_NOTE_TYPE_FIELD_NAME,
     AnkiHubCommands,
@@ -115,23 +132,6 @@ from ankihub.settings import (
     DeckExtensionConfig,
     config,
     profile_files_path,
-)
-from ankihub.subdecks import (
-    SUBDECK_TAG,
-    build_subdecks_and_move_cards_to_them,
-    flatten_deck,
-)
-from ankihub.suggestions import (
-    suggest_new_note,
-    suggest_note_update,
-    suggest_notes_in_bulk,
-)
-from ankihub.sync import _AnkiHubSync, ah_sync
-from ankihub.utils import (
-    ANKIHUB_TEMPLATE_SNIPPET_RE,
-    all_dids,
-    get_note_types_in_deck,
-    note_type_contains_field,
 )
 
 SAMPLE_MODEL_ID = NotetypeId(1656968697414)
@@ -367,7 +367,7 @@ def test_editor(
 
         note_1_ah_nid = next_deterministic_uuid()
 
-        monkeypatch.setattr("ankihub.exporting.uuid.uuid4", lambda: note_1_ah_nid)
+        monkeypatch.setattr("ankihub.main.exporting.uuid.uuid4", lambda: note_1_ah_nid)
 
         requests_mock.post(
             f"{config.api_url}/notes/{note_1_ah_nid}/suggestion/",
@@ -847,6 +847,7 @@ def test_suggest_note_update(
             note=note,
             change_type=SuggestionType.NEW_CONTENT,
             comment="test",
+            media_upload_cb=Mock(),
         )
 
         # Check that the correct suggestion was created
@@ -891,6 +892,7 @@ def test_suggest_new_note(
             note=note,
             ankihub_did=ah_did,
             comment="test",
+            media_upload_cb=Mock(),
         )
 
         # ... assert that add-on internal and optional tags were filtered out
@@ -914,6 +916,7 @@ def test_suggest_new_note(
                 note=note,
                 ankihub_did=ah_did,
                 comment="test",
+                media_upload_cb=Mock(),
             )
         except AnkiHubHTTPError as e:
             exc = e
@@ -966,6 +969,7 @@ def test_suggest_notes_in_bulk(
                 auto_accept=False,
                 change_type=SuggestionType.NEW_CONTENT,
                 comment="test",
+                media_upload_cb=Mock(),
             )
 
         assert bulk_suggestions_method_mock.call_count == 1
@@ -2672,7 +2676,7 @@ def test_reset_local_changes_to_notes(
             )
 
         monkeypatch.setattr(
-            "ankihub.importing.AnkiHubImporter.import_ankihub_deck",
+            "ankihub.main.importing.AnkiHubImporter.import_ankihub_deck",
             mock_import_ankihub_deck,
         )
         # reset local changes
@@ -2704,7 +2708,8 @@ def test_migrate_profile_data_from_old_location(
 
     # mock the ah_sync object so that the add-on doesn't try to sync with AnkiHub
     monkeypatch.setattr(
-        "ankihub.sync.ah_sync.sync_all_decks_and_media", lambda *args, **kwargs: None
+        "ankihub.gui.sync.ah_sync.sync_all_decks_and_media",
+        lambda *args, **kwargs: None,
     )
 
     # run the entrypoint and load the profile to trigger the migration
@@ -3321,6 +3326,7 @@ class TestSuggestionsWithMedia:
                     note=note,
                     change_type=SuggestionType.NEW_CONTENT,
                     comment="test",
+                    media_upload_cb=media_sync.media_sync.start_media_upload,
                 )
 
                 # Wait for the background thread that uploads the media to finish.
@@ -3373,6 +3379,7 @@ class TestSuggestionsWithMedia:
                     note=note,
                     ankihub_did=ah_did,
                     comment="test",
+                    media_upload_cb=media_sync.media_sync.start_media_upload,
                 )
 
                 # Wait for the background thread that uploads the media to finish.
@@ -3443,6 +3450,7 @@ class TestSuggestionsWithMedia:
                     note=note,
                     change_type=SuggestionType.NEW_CONTENT,
                     comment="test",
+                    media_upload_cb=media_sync.media_sync.start_media_upload,
                 )
 
                 qtbot.wait(300)
@@ -3483,6 +3491,7 @@ class TestSuggestionsWithMedia:
                 note=note,
                 change_type=SuggestionType.NEW_CONTENT,
                 comment="test",
+                media_upload_cb=media_sync.media_sync.start_media_upload,
             )
 
             qtbot.wait(300)
@@ -3561,7 +3570,7 @@ class TestAddonUpdate:
             _maybe_change_file_permissions_of_addon_files
         )
         monkeypatch.setattr(
-            "ankihub.addons._maybe_change_file_permissions_of_addon_files",
+            "ankihub.gui.addons._maybe_change_file_permissions_of_addon_files",
             maybe_change_file_permissions_of_addon_files_mock,
         )
 
@@ -3720,7 +3729,7 @@ def test_upload_data_dir_and_logs(
 
         # Mock the client.upload_logs method
         monkeypatch.setattr(
-            "ankihub.errors.AnkiHubClient.upload_logs",
+            "ankihub.gui.errors.AnkiHubClient.upload_logs",
             upload_logs_mock,
         )
 

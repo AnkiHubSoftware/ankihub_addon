@@ -5,7 +5,7 @@ from typing import List
 
 from anki.notes import Note
 
-from . import settings
+from .. import settings
 from .note_deletion import TAG_FOR_DELETED_NOTES
 
 TAG_FOR_PROTECTING_FIELDS = "AnkiHub_Protect"
