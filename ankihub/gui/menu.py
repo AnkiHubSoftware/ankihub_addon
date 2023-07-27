@@ -33,6 +33,7 @@ from ..main.deck_creation import DeckCreationResult, create_ankihub_deck
 from ..main.subdecks import SUBDECK_TAG
 from ..media_import.ui import open_import_dialog
 from ..settings import ADDON_VERSION, config, url_view_deck
+from .config_dialog import config_dialog_manager
 from .decks_dialog import SubscribedDecksDialog
 from .errors import upload_data_dir_and_logs_in_background, upload_logs_in_background
 from .media_sync import media_sync
@@ -77,6 +78,7 @@ def refresh_ankihub_menu() -> None:
     else:
         _ankihub_login_setup(parent=menu_state.ankihub_menu)
 
+    _config_setup(parent=menu_state.ankihub_menu)
     _ankihub_help_setup(parent=menu_state.ankihub_menu)
 
 
@@ -331,7 +333,7 @@ def _create_collaborative_deck_action() -> None:
     op.with_progress(label="Creating collaborative deck").run_in_background()
 
 
-def _create_collaborative_deck_setup(parent):
+def _create_collaborative_deck_setup(parent: QMenu):
     q_action = QAction("🛠️ Create Collaborative Deck", parent=parent)
     qconnect(q_action.triggered, _create_collaborative_deck_action)
     parent.addAction(q_action)
@@ -401,25 +403,25 @@ def _on_logs_uploaded(future: Future):
     LogUploadResultDialog(log_file_name=log_file_name).exec()
 
 
-def _ankihub_login_setup(parent):
+def _ankihub_login_setup(parent: QMenu):
     sign_in_button = QAction("🔑 Sign into AnkiHub", aqt.mw)
     qconnect(sign_in_button.triggered, AnkiHubLogin.display_login)
     parent.addAction(sign_in_button)
 
 
-def _subscribed_decks_setup(parent):
+def _subscribed_decks_setup(parent: QMenu):
     q_action = QAction("📚 Subscribed Decks", aqt.mw)
     qconnect(q_action.triggered, SubscribedDecksDialog.display_subscribe_window)
     parent.addAction(q_action)
 
 
-def _import_media_setup(parent):
+def _import_media_setup(parent: QMenu):
     q_action = QAction("🖼️ Import media", aqt.mw)
     qconnect(q_action.triggered, open_import_dialog)
     parent.addAction(q_action)
 
 
-def _sync_with_ankihub_setup(parent):
+def _sync_with_ankihub_setup(parent: QMenu):
     """Set up the menu item for uploading suggestions in bulk."""
     q_action = QAction("🔃️ Sync with AnkiHub", aqt.mw)
 
@@ -435,7 +437,7 @@ def _sync_with_ankihub_setup(parent):
     parent.addAction(q_action)
 
 
-def _upload_deck_media_setup(parent):
+def _upload_deck_media_setup(parent: QMenu):
     """Set up the menu item for manually triggering the upload
     of all the media files for a given deck (logged user MUST be the
     deck owner)"""
@@ -539,7 +541,13 @@ def _upload_deck_media_action() -> None:
     )
 
 
-def _ankihub_help_setup(parent):
+def _config_setup(parent: QMenu) -> None:
+    config_action = QAction("⚙️ Config", parent)
+    qconnect(config_action.triggered, config_dialog_manager.open_config)
+    parent.addAction(config_action)
+
+
+def _ankihub_help_setup(parent: QMenu):
     """Set up the sub menu for help related items."""
     help_menu = QMenu("🆘 Help", parent)
 
@@ -599,7 +607,7 @@ def _trigger_install_release_version():
     check_and_prompt_for_updates_on_main_window()
 
 
-def _ankihub_logout_setup(parent):
+def _ankihub_logout_setup(parent: QMenu):
     q_action = QAction("🔑 Sign out", aqt.mw)
     qconnect(q_action.triggered, _sign_out_action)
     parent.addAction(q_action)
