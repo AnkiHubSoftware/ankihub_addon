@@ -8,19 +8,11 @@ during normal execution.
 (We access mw using aqt.mw across the codebase to prevent this problem.)"""
 from typing import cast
 
-import aqt
-
-from .. import LOGGER
-
 _config_dialog_manager = None
 
 
 def setup_config_dialog_manager():
     from .ankiaddonconfig import ConfigManager
-
-    if not aqt.mw:
-        LOGGER.warning("aqt.mw not set up yet, skipping setup_config_dialog_manager")
-        return
 
     global _config_dialog_manager
     _config_dialog_manager = ConfigManager()

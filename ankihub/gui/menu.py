@@ -543,12 +543,7 @@ def _upload_deck_media_action() -> None:
 
 def _config_setup(parent: QMenu) -> None:
     config_action = QAction("⚙️ Config", parent)
-    if not (config_dialog_manager := get_config_dialog_manager()):
-        LOGGER.warning(
-            "Failed to get config dialog manager, not adding config action to menu."
-        )
-        return
-    qconnect(config_action.triggered, config_dialog_manager.open_config)
+    qconnect(config_action.triggered, get_config_dialog_manager().open_config)
     parent.addAction(config_action)
 
 

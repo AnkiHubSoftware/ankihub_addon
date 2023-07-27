@@ -26,7 +26,7 @@ from aqt.browser import Browser
 from aqt.browser.sidebar.item import SidebarItem
 from aqt.browser.sidebar.tree import SidebarTreeView
 from aqt.importing import AnkiPackageImporter
-from aqt.qt import Qt
+from aqt.qt import QAction, Qt
 from pytest import MonkeyPatch, fixture
 from pytest_anki import AnkiSession
 from pytestqt.qtbot import QtBot  # type: ignore
@@ -84,9 +84,14 @@ from ankihub.gui.browser import (
     custom_columns,
 )
 from ankihub.gui.browser.custom_search_nodes import UpdatedSinceLastReviewSearchNode
+from ankihub.gui.config_dialog import (
+    get_config_dialog_manager,
+    setup_config_dialog_manager,
+)
 from ankihub.gui.decks_dialog import SubscribedDecksDialog, download_and_install_decks
 from ankihub.gui.editor import _on_suggestion_button_press, _refresh_buttons
 from ankihub.gui.errors import upload_data_dir_and_logs_in_background
+from ankihub.gui.menu import menu_state
 from ankihub.gui.operations.new_deck_subscriptions import (
     check_and_install_new_deck_subscriptions,
 )
@@ -3752,3 +3757,38 @@ def test_upload_data_dir_and_logs(
         assert key.endswith(".zip")
     finally:
         file_copy_path.unlink(missing_ok=True)
+
+
+class TestConfigDialog:
+    def test_ankihub_menu_item_exists(self, anki_session_with_addon_data: AnkiSession):
+
+        entry_point.run()
+        with anki_session_with_addon_data.profile_loaded():
+            # Assert that the Config menu item exists
+            config_action = next(
+                child
+                for child in menu_state.ankihub_menu.children()
+                if isinstance(child, QAction) and child.text() == "⚙️ Config"
+            )
+            assert config_action is not None
+
+    def test_open_config_dialog(
+        self, anki_session_with_addon_data: AnkiSession, qtbot: QtBot
+    ):
+
+        with anki_session_with_addon_data.profile_loaded():
+            setup_config_dialog_manager()
+
+            from ankihub.gui.ankiaddonconfig import ConfigManager, ConfigWindow
+
+            # Open the config dialog (similar code to the one here):
+            # https://github.com/ankipalace/ankihub_addon/blob/1c45c6e7f2075e3338b21bcf99430f9822ccc7cf/manager.py#L118
+            config_dialog_manager: ConfigManager = get_config_dialog_manager()
+            config_window = ConfigWindow(config_dialog_manager)
+            for fn in config_dialog_manager.window_open_hook:
+                fn(config_window)
+            config_window.on_open()
+            config_window.show()
+
+            # Check that opening the dialog does not throw an exception
+            qtbot.wait(500)
