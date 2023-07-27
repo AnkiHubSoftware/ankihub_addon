@@ -33,7 +33,7 @@ from ..main.deck_creation import DeckCreationResult, create_ankihub_deck
 from ..main.subdecks import SUBDECK_TAG
 from ..media_import.ui import open_import_dialog
 from ..settings import ADDON_VERSION, config, url_view_deck
-from .config_dialog import config_dialog_manager
+from .config_dialog import get_config_dialog_manager
 from .decks_dialog import SubscribedDecksDialog
 from .errors import upload_data_dir_and_logs_in_background, upload_logs_in_background
 from .media_sync import media_sync
@@ -543,6 +543,11 @@ def _upload_deck_media_action() -> None:
 
 def _config_setup(parent: QMenu) -> None:
     config_action = QAction("⚙️ Config", parent)
+    if not (config_dialog_manager := get_config_dialog_manager()):
+        LOGGER.warning(
+            "Failed to get config dialog manager, not adding config action to menu."
+        )
+        return
     qconnect(config_action.triggered, config_dialog_manager.open_config)
     parent.addAction(config_action)
 
