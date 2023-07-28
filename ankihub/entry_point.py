@@ -12,6 +12,7 @@ from .debug import setup as setup_debug
 from .gui import browser, editor, progress, reviewer, taskman
 from .gui.addons import setup_addons
 from .gui.auto_sync import setup_auto_sync
+from .gui.config_dialog import setup_config_dialog_manager
 from .gui.errors import setup_error_handler
 from .gui.media_sync import media_sync
 from .gui.menu import menu_state, refresh_ankihub_menu, setup_ankihub_menu
@@ -114,6 +115,9 @@ def _general_setup():
 
     setup_addons()
     LOGGER.info("Set up addons.")
+
+    setup_config_dialog_manager()
+    LOGGER.info("Set up config.")
 
     setup_ankihub_menu()
     LOGGER.info("Set up AnkiHub menu.")

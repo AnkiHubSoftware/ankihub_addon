@@ -4,3 +4,6 @@
 [submodule "media_export"]
 	path = media_export
 	url = https://github.com/RisingOrange/anki-media-exporter.git
+[submodule "ankihub/gui/ankiaddonconfig"]
+	path = ankihub/gui/ankiaddonconfig
+	url = https://github.com/RisingOrange/ankiaddonconfig.git
