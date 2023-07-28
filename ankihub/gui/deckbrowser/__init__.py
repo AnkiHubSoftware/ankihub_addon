@@ -24,9 +24,9 @@ def _deck_delete_hook():
             client = AddonAnkiHubClient()
             unsubscribe_from_deck(client, deck_ankihub_id, config)
 
-    aqt.mw.deckBrowser._delete = wrap(
+    aqt.mw.deckBrowser._delete = wrap(  # type: ignore
         old=aqt.mw.deckBrowser._delete, new=_delete_override
-    )  # type: ignore
+    )
 
 
 def setup_deck_browser_hooks():
