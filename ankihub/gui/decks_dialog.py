@@ -150,17 +150,10 @@ class SubscribedDecksDialog(QDialog):
 
         for item in items:
             ankihub_did: UUID = item.data(Qt.ItemDataRole.UserRole)
-            self.client.unsubscribe_from_deck(ankihub_did)
-            config.remove_deck(ankihub_did)
-            self._clear_deck_changes(ankihub_did)
+            unsubscribe_from_deck(self.client, ankihub_did, config)
 
         tooltip("Unsubscribed from AnkiHub Deck.", parent=aqt.mw)
         self._refresh_decks_list()
-
-    def _clear_deck_changes(self, ankihub_did: UUID) -> None:
-        mids = ankihub_db.note_types_for_ankihub_deck(ankihub_did)
-        undo_note_type_modfications(mids)
-        ankihub_db.remove_deck(ankihub_did)
 
     def _on_open_web(self) -> None:
         items = self.decks_list.selectedItems()
