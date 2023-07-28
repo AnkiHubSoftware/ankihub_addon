@@ -25,10 +25,9 @@ from aqt.studydeck import StudyDeck
 from aqt.utils import openLink, showInfo, showText, tooltip
 
 from ..addon_ankihub_client import AddonAnkiHubClient as AnkiHubClient
-from ..db import ankihub_db
 from ..main.subdecks import SUBDECK_TAG
-from ..main.utils import undo_note_type_modfications
 from ..settings import config, url_deck_base, url_decks, url_help
+from ..use_cases import unsubscribe_from_deck
 from .operations.deck_installation import download_and_install_decks
 from .operations.subdecks import confirm_and_toggle_subdecks
 from .utils import ask_user, set_tooltip_icon

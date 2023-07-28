@@ -1,5 +1,5 @@
-from ankihub.utils import undo_note_type_modfications
 from .db import ankihub_db
+from .main.utils import undo_note_type_modfications
 
 
 def unsubscribe_from_deck(client, deck_ankihub_id, config):
