@@ -32,7 +32,6 @@ from pytest_anki import AnkiSession
 from pytestqt.qtbot import QtBot  # type: ignore
 from requests_mock import Mocker
 
-<<<<<<< HEAD
 from ankihub.gui.browser.browser import (
     ModifiedAfterSyncSearchNode,
     NewNoteSearchNode,
@@ -42,10 +41,6 @@ from ankihub.gui.browser.browser import (
     _on_reset_optional_tags_action,
 )
 
-=======
-from ankihub import hooks
-
->>>>>>> 0bafb1b (Add tests)
 
 from ..factories import DeckFactory, NoteInfoFactory
 from ..fixtures import MockFunctionProtocol, create_or_get_ah_version_of_note_type
@@ -3840,9 +3835,14 @@ def test_delete_ankihub_private_config_on_deckBrowser__delete_option(
         assert deck_uuid
 
         # Will control the conditional responsible to delete or not the ankihub deck private config
-        mock_function(hooks, "ask_user", return_value=True)
+        mock_function(deckbrowser, "ask_user", return_value=True)
 
-        mw.deckBrowser._delete(anki_deck_id)
+        with patch.object(
+            AnkiHubClient, "unsubscribe_from_deck"
+        ) as unsubscribe_from_deck_mock:
+            mw.deckBrowser._delete(anki_deck_id)
+            unsubscribe_from_deck_mock.assert_called_once()
+
         qtbot.wait(500)
 
         deck_uuid = config.get_deck_uuid_by_did(anki_deck_id)
@@ -3886,7 +3886,7 @@ def test_not_delete_ankihub_private_config_on_deckBrowser__delete_option(
         assert deck_uuid
 
         # Will control the conditional responsible to delete or not the ankihub deck private config
-        mock_function(hooks, "ask_user", return_value=False)
+        mock_function(deckbrowser, "ask_user", return_value=False)
 
         mw.deckBrowser._delete(anki_deck_id)
         qtbot.wait(500)
