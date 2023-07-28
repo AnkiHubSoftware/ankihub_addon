@@ -147,8 +147,8 @@ def _general_setup():
     setup_auto_sync()
     LOGGER.info("Called setup_ankihub_sync_on_ankiweb_sync.")
 
-    setup_hooks()
-    LOGGER.info("Setup hooks for Anki default features")
+    setup_deck_browser_hooks()
+    LOGGER.info("Setup hooks for Anki deck browser features")
 
 
 def _log_enabled_addons():
