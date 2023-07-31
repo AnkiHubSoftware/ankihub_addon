@@ -123,6 +123,7 @@ class _AnkiHubSync:
                 ankihub_did=ankihub_did,
                 notes_data=notes_data,
                 deck_name=deck_config.name,
+                is_first_import_of_deck=False,
                 local_did=deck_config.anki_id,
                 protected_fields=chunk.protected_fields,
                 protected_tags=chunk.protected_tags,
