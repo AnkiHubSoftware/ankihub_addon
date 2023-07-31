@@ -41,7 +41,6 @@ from ankihub.gui.browser.browser import (
     _on_reset_optional_tags_action,
 )
 
-
 from ..factories import DeckFactory, NoteInfoFactory
 from ..fixtures import MockFunctionProtocol, create_or_get_ah_version_of_note_type
 from .conftest import TEST_PROFILE_ID
@@ -78,7 +77,7 @@ from ankihub.debug import (
     _setup_logging_for_db_begin,
     _setup_logging_for_sync_collection_and_media,
 )
-from ankihub.gui import media_sync, operations, utils
+from ankihub.gui import deckbrowser, media_sync, operations, utils
 from ankihub.gui.addons import (
     _change_file_permissions_of_addon_files,
     _maybe_change_file_permissions_of_addon_files,

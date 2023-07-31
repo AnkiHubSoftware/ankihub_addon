@@ -13,6 +13,7 @@ from .gui import browser, editor, progress, reviewer, taskman
 from .gui.addons import setup_addons
 from .gui.auto_sync import setup_auto_sync
 from .gui.config_dialog import setup_config_dialog_manager
+from .gui.deckbrowser import setup_deck_browser_hooks
 from .gui.errors import setup_error_handler
 from .gui.media_sync import media_sync
 from .gui.menu import menu_state, refresh_ankihub_menu, setup_ankihub_menu
