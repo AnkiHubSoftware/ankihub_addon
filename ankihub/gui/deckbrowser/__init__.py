@@ -17,7 +17,10 @@ def _deck_delete_hook():
         if ask_user(
             text="You deleted an Anki deck that was linked to an AnkiHub deck.<br>"
             "Would you like to unsubscribe from this AnkiHub deck as well?<br>"
-            f"Name of the AnkiHub deck: <b>{deck_name}</b>",
+            f"Name of the AnkiHub deck: <b>{deck_name}</b><br><br>"
+            "If you have any questions about this, see "
+            "<a href='https://community.ankihub.net/t/how-are-anki-decks-related-to-ankihub-decks/4811/1'>"
+            "this forum topic</a> for details.",
             title="Unsubscribe from AnkiHub deck?",
             parent=aqt.mw,
         ):
