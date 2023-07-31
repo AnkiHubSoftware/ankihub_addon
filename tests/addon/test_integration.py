@@ -32,6 +32,15 @@ from pytest_anki import AnkiSession
 from pytestqt.qtbot import QtBot  # type: ignore
 from requests_mock import Mocker
 
+from ankihub.gui.browser.browser import (
+    ModifiedAfterSyncSearchNode,
+    NewNoteSearchNode,
+    SuggestionTypeSearchNode,
+    UpdatedInTheLastXDaysSearchNode,
+    _on_protect_fields_action,
+    _on_reset_optional_tags_action,
+)
+
 from ..factories import DeckFactory, NoteInfoFactory
 from ..fixtures import MockFunctionProtocol, create_or_get_ah_version_of_note_type
 from .conftest import TEST_PROFILE_ID
@@ -74,15 +83,7 @@ from ankihub.gui.addons import (
     _maybe_change_file_permissions_of_addon_files,
 )
 from ankihub.gui.auto_sync import _setup_ankihub_sync_on_ankiweb_sync
-from ankihub.gui.browser import (
-    ModifiedAfterSyncSearchNode,
-    NewNoteSearchNode,
-    SuggestionTypeSearchNode,
-    UpdatedInTheLastXDaysSearchNode,
-    _on_protect_fields_action,
-    _on_reset_optional_tags_action,
-    custom_columns,
-)
+from ankihub.gui.browser import custom_columns
 from ankihub.gui.browser.custom_search_nodes import UpdatedSinceLastReviewSearchNode
 from ankihub.gui.config_dialog import (
     get_config_dialog_manager,
@@ -2361,7 +2362,7 @@ def test_protect_fields_action(
 
         # Patch gui function choose_subset to return the fields to protect
         monkeypatch.setattr(
-            "ankihub.gui.browser.choose_subset",
+            "ankihub.gui.browser.browser.choose_subset",
             lambda *args, **kwargs: field_names_to_protect,
         )
 
@@ -3162,11 +3163,11 @@ def test_reset_optional_tags_action(
         # mock the choose_list function to always return the first item
         choose_list_mock = Mock()
         choose_list_mock.return_value = 0
-        monkeypatch.setattr("ankihub.gui.browser.choose_list", choose_list_mock)
+        monkeypatch.setattr("ankihub.gui.browser.browser.choose_list", choose_list_mock)
 
         # mock the ask_user function to always confirm the reset
         monkeypatch.setattr(
-            "ankihub.gui.browser.ask_user", lambda *args, **kwargs: True
+            "ankihub.gui.browser.browser.ask_user", lambda *args, **kwargs: True
         )
 
         # mock the is_logged_in function to always return True
