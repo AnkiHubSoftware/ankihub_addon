@@ -653,8 +653,8 @@ class AnkiHubClient:
             )
 
             # decompress and transform notes data
-            notes_data_base64 = data["notes"]
-            notes_data_gzipped = base64.b85decode(notes_data_base64)
+            notes_data_base85 = data["notes"]
+            notes_data_gzipped = base64.b85decode(notes_data_base85)
             notes_data = json.loads(self._gzip_decompress_string(notes_data_gzipped))
             data["notes"] = _transform_notes_data(notes_data)
 
