@@ -123,6 +123,7 @@ def create_note_type_with_id(note_type: NotetypeDict, mid: NotetypeId) -> None:
     aqt.mw.col.db.execute(f"UPDATE templates SET ntid={mid} WHERE ntid={changes.id};")
     aqt.mw.col.db.execute(f"UPDATE fields SET ntid={mid} WHERE ntid={changes.id};")
     aqt.mw.col.models._clear_cache()  # TODO check if this is necessary
+    aqt.mw.col.db.commit()
 
     LOGGER.info(f"Created note type: {mid}")
     LOGGER.info(f"Note type:\n {pformat(note_type)}")
