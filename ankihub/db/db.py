@@ -140,7 +140,6 @@ class _AnkiHubDB:
                     );
                     """
                 )
-                # TODO: Create decks table
                 conn.execute(
                     "CREATE INDEX ankihub_deck_id_idx ON notes (ankihub_deck_id);"
                 )
@@ -183,7 +182,6 @@ class _AnkiHubDB:
                     note_data.anki_nid,
                     str(note_data.ankihub_note_uuid),
                 )
-                # TODO: Add a condition to only add skipped_notes if deck is existent
                 if conflicting_ah_nid:
                     skipped_notes.append(note_data)
                     continue
