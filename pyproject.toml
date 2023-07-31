@@ -9,15 +9,12 @@ extend-exclude = '''
 '''
 
 [tool.mypy]
-files=[
-  'ankihub',
-  'tests/addon',
-  'tests/client'
-]
+files = ['ankihub', 'tests/addon', 'tests/client']
 
 exclude = [
   'ankihub/media_import',
   'ankihub/media_export',
+  'ankihub/gui/ankiaddonconfig',
   'ankihub/lib/certifi',
   'ankihub/lib/sentry_sd',
   'ankihub/lib/urllib',
@@ -36,10 +33,9 @@ module = 'mashumaro.*'
 ignore_errors = true
 
 [[tool.mypy.overrides]]
-module = [
-  'sentry_sdk.*',
-  'certifi.*',
-  'urllib3.*',
-  'tenacity.*',
-]
+module = ['sentry_sdk.*', 'certifi.*', 'urllib3.*', 'tenacity.*']
 follow_imports = 'skip'
+
+[[tool.mypy.overrides]]
+module = 'ankihub.gui.ankiaddonconfig.*'
+ignore_errors = true

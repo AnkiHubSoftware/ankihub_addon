@@ -6,9 +6,9 @@ from typing import Sequence
 
 from anki.notes import NoteId
 
-from .db import ankihub_db
+from ..db import ankihub_db
+from ..settings import config
 from .importing import AnkiHubImporter
-from .settings import config
 
 
 def reset_local_changes_to_notes(
@@ -29,6 +29,7 @@ def reset_local_changes_to_notes(
         notes_data=[],
         deck_name=deck_config.name,
         local_did=deck_config.anki_id,
+        is_first_import_of_deck=False,
     )
 
     notes_data = [
@@ -41,6 +42,7 @@ def reset_local_changes_to_notes(
         ankihub_did=ankihub_deck_uuid,
         notes_data=notes_data,
         deck_name=deck_config.name,
+        is_first_import_of_deck=False,
         local_did=deck_config.anki_id,
         # we don't move existing notes between decks here, users might not want that
         subdecks_for_new_notes_only=deck_config.subdecks_enabled,

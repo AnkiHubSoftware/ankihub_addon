@@ -1,6 +1,5 @@
 """AnkiHub menu on Anki's main window."""
 import re
-import uuid
 from concurrent.futures import Future
 from dataclasses import dataclass
 from datetime import datetime, timezone
@@ -27,16 +26,17 @@ from aqt.utils import openLink, showInfo, tooltip
 
 from .. import LOGGER
 from ..addon_ankihub_client import AddonAnkiHubClient as AnkiHubClient
-from ..ankihub_client import AnkiHubHTTPError
+from ..ankihub_client import AnkiHubHTTPError, get_media_names_from_notes_data
 from ..ankihub_client.models import UserDeckRelation
 from ..db import ankihub_db
-from ..deck_creation import create_ankihub_deck
-from ..errors import upload_data_dir_and_logs_in_background, upload_logs_in_background
+from ..main.deck_creation import DeckCreationResult, create_ankihub_deck
+from ..main.subdecks import SUBDECK_TAG
 from ..media_import.ui import open_import_dialog
-from ..media_sync import media_sync
 from ..settings import ADDON_VERSION, config, url_view_deck
-from ..subdecks import SUBDECK_TAG
+from .config_dialog import get_config_dialog_manager
 from .decks_dialog import SubscribedDecksDialog
+from .errors import upload_data_dir_and_logs_in_background, upload_logs_in_background
+from .media_sync import media_sync
 from .operations.ankihub_sync import sync_with_ankihub
 from .utils import (
     ask_user,
@@ -78,6 +78,7 @@ def refresh_ankihub_menu() -> None:
     else:
         _ankihub_login_setup(parent=menu_state.ankihub_menu)
 
+    _config_setup(parent=menu_state.ankihub_menu)
     _ankihub_help_setup(parent=menu_state.ankihub_menu)
 
 
@@ -286,17 +287,29 @@ def _create_collaborative_deck_action() -> None:
         "when installing the deck. "
     )
 
-    def on_success(ankihub_did: uuid.UUID) -> None:
+    def on_success(deck_creation_result: DeckCreationResult) -> None:
+
+        # Upload all existing local media for this deck
+        # (media files that are referenced on Deck's notes)
+        if should_upload_media:
+            media_names = get_media_names_from_notes_data(
+                deck_creation_result.notes_data
+            )
+            media_sync.start_media_upload(media_names, deck_creation_result.ankihub_did)
+
+        # Add the deck to the list of decks the user owns
         anki_did = aqt.mw.col.decks.id_for_name(deck_name)
         creation_time = datetime.now(tz=timezone.utc)
         config.add_deck(
             deck_name,
-            ankihub_did,
+            deck_creation_result.ankihub_did,
             anki_did,
             user_relation=UserDeckRelation.OWNER,
             latest_udpate=creation_time,
         )
-        deck_url = f"{url_view_deck()}{ankihub_did}"
+
+        # Show a message to the user with a link to the deck on AnkiHub
+        deck_url = f"{url_view_deck()}{deck_creation_result.ankihub_did}"
         showInfo(
             "🎉 Deck upload successful!<br><br>"
             "Link to the deck on AnkiHub:<br>"
@@ -313,7 +326,6 @@ def _create_collaborative_deck_action() -> None:
             deck_name,
             private=private,
             add_subdeck_tags=add_subdeck_tags,
-            should_upload_media=should_upload_media,
         ),
         success=on_success,
     ).failure(on_failure)
@@ -321,7 +333,7 @@ def _create_collaborative_deck_action() -> None:
     op.with_progress(label="Creating collaborative deck").run_in_background()
 
 
-def _create_collaborative_deck_setup(parent):
+def _create_collaborative_deck_setup(parent: QMenu):
     q_action = QAction("🛠️ Create Collaborative Deck", parent=parent)
     qconnect(q_action.triggered, _create_collaborative_deck_action)
     parent.addAction(q_action)
@@ -391,25 +403,25 @@ def _on_logs_uploaded(future: Future):
     LogUploadResultDialog(log_file_name=log_file_name).exec()
 
 
-def _ankihub_login_setup(parent):
+def _ankihub_login_setup(parent: QMenu):
     sign_in_button = QAction("🔑 Sign into AnkiHub", aqt.mw)
     qconnect(sign_in_button.triggered, AnkiHubLogin.display_login)
     parent.addAction(sign_in_button)
 
 
-def _subscribed_decks_setup(parent):
+def _subscribed_decks_setup(parent: QMenu):
     q_action = QAction("📚 Subscribed Decks", aqt.mw)
     qconnect(q_action.triggered, SubscribedDecksDialog.display_subscribe_window)
     parent.addAction(q_action)
 
 
-def _import_media_setup(parent):
+def _import_media_setup(parent: QMenu):
     q_action = QAction("🖼️ Import media", aqt.mw)
     qconnect(q_action.triggered, open_import_dialog)
     parent.addAction(q_action)
 
 
-def _sync_with_ankihub_setup(parent):
+def _sync_with_ankihub_setup(parent: QMenu):
     """Set up the menu item for uploading suggestions in bulk."""
     q_action = QAction("🔃️ Sync with AnkiHub", aqt.mw)
 
@@ -425,7 +437,7 @@ def _sync_with_ankihub_setup(parent):
     parent.addAction(q_action)
 
 
-def _upload_deck_media_setup(parent):
+def _upload_deck_media_setup(parent: QMenu):
     """Set up the menu item for manually triggering the upload
     of all the media files for a given deck (logged user MUST be the
     deck owner)"""
@@ -529,7 +541,13 @@ def _upload_deck_media_action() -> None:
     )
 
 
-def _ankihub_help_setup(parent):
+def _config_setup(parent: QMenu) -> None:
+    config_action = QAction("⚙️ Config", parent)
+    qconnect(config_action.triggered, get_config_dialog_manager().open_config)
+    parent.addAction(config_action)
+
+
+def _ankihub_help_setup(parent: QMenu):
     """Set up the sub menu for help related items."""
     help_menu = QMenu("🆘 Help", parent)
 
@@ -589,7 +607,7 @@ def _trigger_install_release_version():
     check_and_prompt_for_updates_on_main_window()
 
 
-def _ankihub_logout_setup(parent):
+def _ankihub_logout_setup(parent: QMenu):
     q_action = QAction("🔑 Sign out", aqt.mw)
     qconnect(q_action.triggered, _sign_out_action)
     parent.addAction(q_action)

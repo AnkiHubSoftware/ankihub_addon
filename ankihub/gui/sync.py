@@ -7,15 +7,15 @@ import aqt
 from anki.errors import NotFoundError
 from aqt.utils import showInfo, tooltip
 
-from . import LOGGER
-from .addon_ankihub_client import AddonAnkiHubClient as AnkiHubClient
-from .ankihub_client import AnkiHubHTTPError, DeckExtension
-from .db import ankihub_db
-from .gui.utils import show_error_dialog
-from .importing import AnkiHubImporter, AnkiHubImportResult
+from .. import LOGGER
+from ..addon_ankihub_client import AddonAnkiHubClient as AnkiHubClient
+from ..ankihub_client import AnkiHubHTTPError, DeckExtension
+from ..db import ankihub_db
+from ..main.importing import AnkiHubImporter, AnkiHubImportResult
+from ..main.utils import create_backup
+from ..settings import config
 from .media_sync import media_sync
-from .settings import config
-from .utils import create_backup
+from .utils import show_error_dialog
 
 
 class NotLoggedInError(Exception):
@@ -123,6 +123,7 @@ class _AnkiHubSync:
                 ankihub_did=ankihub_did,
                 notes_data=notes_data,
                 deck_name=deck_config.name,
+                is_first_import_of_deck=False,
                 local_did=deck_config.anki_id,
                 protected_fields=chunk.protected_fields,
                 protected_tags=chunk.protected_tags,

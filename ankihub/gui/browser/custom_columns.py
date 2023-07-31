@@ -10,7 +10,7 @@ from anki.utils import ids2str
 from aqt.browser import Browser, CellRow, Column, ItemId
 
 from ...db import ankihub_db
-from ...utils import note_types_with_ankihub_id_field
+from ...main.utils import note_types_with_ankihub_id_field
 
 
 class CustomColumn:

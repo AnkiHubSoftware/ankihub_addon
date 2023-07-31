@@ -4,7 +4,7 @@ from threading import current_thread, main_thread
 from anki.hooks import wrap
 from aqt.taskman import TaskManager
 
-from . import LOGGER
+from .. import LOGGER
 
 
 def setup():

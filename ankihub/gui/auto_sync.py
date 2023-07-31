@@ -8,10 +8,10 @@ from typing import Callable
 from anki.hooks import wrap
 from aqt import AnkiQt
 
-from . import LOGGER
-from .gui.operations.ankihub_sync import sync_with_ankihub
-from .gui.operations.utils import future_with_exception, future_with_result
-from .settings import ANKI_MINOR, config
+from .. import LOGGER
+from ..settings import ANKI_MINOR, config
+from .operations.ankihub_sync import sync_with_ankihub
+from .operations.utils import future_with_exception, future_with_result
 from .threading_utils import rate_limited
 
 

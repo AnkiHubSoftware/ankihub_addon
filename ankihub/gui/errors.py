@@ -26,20 +26,14 @@ from sentry_sdk.integrations.logging import LoggingIntegration
 from sentry_sdk.integrations.stdlib import StdlibIntegration
 from sentry_sdk.integrations.threading import ThreadingIntegration
 
-from . import LOGGER
-from .addon_ankihub_client import AddonAnkiHubClient as AnkiHubClient
-from .ankihub_client import AnkiHubHTTPError, AnkiHubRequestException
-from .db import (
+from .. import LOGGER
+from ..addon_ankihub_client import AddonAnkiHubClient as AnkiHubClient
+from ..ankihub_client import AnkiHubHTTPError, AnkiHubRequestException
+from ..db import (
     detach_ankihub_db_from_anki_db_connection,
     is_ankihub_db_attached_to_anki_db,
 )
-from .gui.error_dialog import ErrorDialog
-from .gui.utils import (
-    check_and_prompt_for_updates_on_main_window,
-    show_error_dialog,
-    show_tooltip,
-)
-from .settings import (
+from ..settings import (
     ADDON_VERSION,
     ANKI_VERSION,
     ANKIWEB_ID,
@@ -47,7 +41,13 @@ from .settings import (
     log_file_path,
     user_files_path,
 )
+from .error_dialog import ErrorDialog
 from .sync import NotLoggedInError
+from .utils import (
+    check_and_prompt_for_updates_on_main_window,
+    show_error_dialog,
+    show_tooltip,
+)
 
 SENTRY_ENV = "anki_desktop"
 os.environ["SENTRY_ENVIRONMENT"] = SENTRY_ENV
@@ -266,7 +266,7 @@ def _try_handle_exception(
         return True
 
     if isinstance(exc_value, NotLoggedInError):
-        from .gui.menu import AnkiHubLogin
+        from .menu import AnkiHubLogin
 
         AnkiHubLogin.display_login()
         LOGGER.info("NotLoggedInError was handled.")
@@ -300,7 +300,7 @@ def _maybe_handle_ankihub_http_error(error: AnkiHubHTTPError) -> bool:
     response = error.response
     if response.status_code == 401:
         config.save_token("")
-        from .gui.menu import AnkiHubLogin
+        from .menu import AnkiHubLogin
 
         AnkiHubLogin.display_login()
         return True

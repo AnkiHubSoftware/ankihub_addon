@@ -17,24 +17,23 @@ from pytest import MonkeyPatch, fixture
 from pytest_anki import AnkiSession
 from pytestqt.qtbot import QtBot  # type: ignore
 
+from ankihub.gui import errors  # type: ignore
+
 from ..factories import NoteInfoFactory
 
 # workaround for vscode test discovery not using pytest.ini which sets this env var
 # has to be set before importing ankihub
 os.environ["SKIP_INIT"] = "1"
 
-from ankihub import errors, suggestions
 from ankihub.ankihub_client import AnkiHubHTTPError, Field, SuggestionType
 from ankihub.db.db import MEDIA_DISABLED_FIELD_BYPASS_TAG, _AnkiHubDB
-from ankihub.deck_creation import _note_type_name_without_ankihub_modifications
-from ankihub.errors import (
+from ankihub.gui.error_dialog import ErrorDialog
+from ankihub.gui.errors import (
     OUTDATED_CLIENT_ERROR_REASON,
     _contains_path_to_this_addon,
     _normalize_url,
     _try_handle_exception,
 )
-from ankihub.exporting import _prepared_field_html
-from ankihub.gui.error_dialog import ErrorDialog
 from ankihub.gui.menu import AnkiHubLogin
 from ankihub.gui.suggestion_dialog import (
     SourceType,
@@ -42,18 +41,21 @@ from ankihub.gui.suggestion_dialog import (
     SuggestionMetadata,
     SuggestionSource,
 )
-from ankihub.importing import _updated_tags
-from ankihub.note_conversion import (
+from ankihub.gui.threading_utils import rate_limited
+from ankihub.main import suggestions
+from ankihub.main.deck_creation import _note_type_name_without_ankihub_modifications
+from ankihub.main.exporting import _prepared_field_html
+from ankihub.main.importing import _updated_tags
+from ankihub.main.note_conversion import (
     ADDON_INTERNAL_TAGS,
     TAG_FOR_OPTIONAL_TAGS,
     TAG_FOR_PROTECTING_ALL_FIELDS,
     TAG_FOR_PROTECTING_FIELDS,
     _get_fields_protected_by_tags,
 )
+from ankihub.main.subdecks import SUBDECK_TAG, add_subdeck_tags_to_notes
+from ankihub.main.utils import lowest_level_common_ancestor_deck_name, mids_of_notes
 from ankihub.settings import ANKIWEB_ID
-from ankihub.subdecks import SUBDECK_TAG, add_subdeck_tags_to_notes
-from ankihub.threading_utils import rate_limited
-from ankihub.utils import lowest_level_common_ancestor_deck_name, mids_of_notes
 
 
 @pytest.fixture

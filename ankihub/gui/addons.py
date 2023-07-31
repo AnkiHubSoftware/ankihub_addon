@@ -10,8 +10,8 @@ from anki.hooks import wrap
 from aqt import addons
 from aqt.addons import AddonManager, DownloaderInstaller
 
-from . import LOGGER
-from .db import detach_ankihub_db_from_anki_db_connection
+from .. import LOGGER
+from ..db import detach_ankihub_db_from_anki_db_connection
 
 
 def setup_addons():

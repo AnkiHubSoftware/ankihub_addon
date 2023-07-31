@@ -1,4 +1,4 @@
-exclude: "lib|media_import"
+exclude: "lib|media_import|ankiaddonconfig"
 repos:
     - repo: https://github.com/pre-commit/pre-commit-hooks
       rev: v4.1.0

@@ -14,12 +14,12 @@ from ... import LOGGER
 from ...addon_ankihub_client import AddonAnkiHubClient as AnkiHubClient
 from ...ankihub_client import NoteInfo
 from ...ankihub_client.models import UserDeckRelation
-from ...importing import AnkiHubImporter, AnkiHubImportResult
-from ...media_sync import media_sync
+from ...main.importing import AnkiHubImporter, AnkiHubImportResult
+from ...main.subdecks import deck_contains_subdeck_tags
+from ...main.utils import create_backup
 from ...settings import config
-from ...subdecks import deck_contains_subdeck_tags
-from ...utils import create_backup
 from ..exceptions import DeckDownloadAndInstallError
+from ..media_sync import media_sync
 from ..messages import messages
 from ..utils import ask_user
 from .subdecks import confirm_and_toggle_subdecks
@@ -155,6 +155,7 @@ def _install_deck(
         ankihub_did=ankihub_did,
         notes_data=notes_data,
         deck_name=deck_name,
+        is_first_import_of_deck=True,
     )
 
     config.add_deck(

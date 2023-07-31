@@ -11,8 +11,8 @@ from anki.models import ChangeNotetypeRequest, NoteType, NotetypeDict, NotetypeI
 from anki.notes import Note, NoteId
 from anki.utils import checksum, ids2str
 
-from . import LOGGER, settings
-from .settings import (
+from .. import LOGGER, settings
+from ..settings import (
     ANKI_MINOR,
     ANKIHUB_NOTE_TYPE_FIELD_NAME,
     ANKIHUB_NOTE_TYPE_MODIFICATION_STRING,
