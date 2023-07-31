@@ -141,6 +141,10 @@ class AnkiHubImporter:
 
         _adjust_note_types(remote_note_types)
 
+        if self._first_import_of_deck:
+            # Clean up any left over data for this deck in the ankihub database from previous deck imports.
+            ankihub_db.remove_deck(ankihub_did)
+
         dids = self._import_notes(
             ankihub_did=ankihub_did,
             notes_data=notes_data,
