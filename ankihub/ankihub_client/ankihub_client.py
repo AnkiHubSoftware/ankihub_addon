@@ -120,6 +120,7 @@ class AnkiHubRequestException(Exception):
 
     def __init__(self, original_exception):
         self.original_exception = original_exception
+        self.__cause__ = original_exception
 
     def __str__(self):
         return f"AnkiHub request exception: {self.original_exception}"
