@@ -191,6 +191,7 @@ def import_sample_ankihub_deck(
         ankihub_did=ankihub_did,
         notes_data=ankihub_sample_deck_notes_data(),
         deck_name="Testdeck",
+        is_first_import_of_deck=True,
         protected_fields={},
         protected_tags=[],
         remote_note_types={},
@@ -266,7 +267,10 @@ def import_ah_note(next_deterministic_uuid: Callable[[], uuid.UUID]) -> ImportAH
         )
 
         AnkiHubImporter()._import_ankihub_deck_inner(
-            ankihub_did=ah_did, notes_data=[note_data], deck_name=deck_name
+            ankihub_did=ah_did,
+            notes_data=[note_data],
+            deck_name=deck_name,
+            is_first_import_of_deck=True,
         )
         return note_data
 
@@ -1102,6 +1106,7 @@ class TestAnkiHubImporter:
                 ankihub_did=ankihub_deck_uuid,
                 notes_data=ankihub_sample_deck_notes_data(),
                 deck_name="test",
+                is_first_import_of_deck=True,
                 remote_note_types={},
                 protected_fields={},
                 protected_tags=[],
@@ -1144,6 +1149,7 @@ class TestAnkiHubImporter:
                 ankihub_did=ankihub_deck_uuid,
                 notes_data=ankihub_sample_deck_notes_data(),
                 deck_name="test",
+                is_first_import_of_deck=True,
                 remote_note_types={},
                 protected_fields={},
                 protected_tags=[],
@@ -1190,6 +1196,7 @@ class TestAnkiHubImporter:
                 ankihub_did=ankihub_deck_uuid,
                 notes_data=ankihub_sample_deck_notes_data(),
                 deck_name="test",
+                is_first_import_of_deck=False,
                 remote_note_types={},
                 protected_fields={},
                 protected_tags=[],
@@ -1244,6 +1251,7 @@ class TestAnkiHubImporter:
                 ankihub_did=ankihub_deck_uuid,
                 notes_data=ankihub_sample_deck_notes_data(),
                 deck_name="test",
+                is_first_import_of_deck=True,
                 remote_note_types={},
                 protected_fields={},
                 protected_tags=[],
@@ -1280,6 +1288,7 @@ class TestAnkiHubImporter:
                 ankihub_did=ankihub_deck_uuid,
                 notes_data=ankihub_sample_deck_notes_data(),
                 deck_name="test",
+                is_first_import_of_deck=False,
                 remote_note_types={},
                 protected_fields={},
                 protected_tags=[],
@@ -1327,6 +1336,7 @@ class TestAnkiHubImporter:
                 ankihub_did=ankihub_deck_uuid,
                 notes_data=ankihub_sample_deck_notes_data(),
                 deck_name="test",
+                is_first_import_of_deck=False,
                 remote_note_types={},
                 protected_fields={},
                 protected_tags=[],
@@ -1373,6 +1383,7 @@ class TestAnkiHubImporter:
                 ankihub_did=ah_did,
                 notes_data=notes_data,
                 deck_name="test",
+                is_first_import_of_deck=False,
                 remote_note_types={},
                 protected_fields={},
                 protected_tags=[],
@@ -1529,6 +1540,7 @@ class TestAnkiHubImporter:
                 ankihub_did=ah_did,
                 notes_data=[note_data],
                 deck_name="test",
+                is_first_import_of_deck=False,
                 protected_fields={note_type_id: [protected_field_name]},
                 protected_tags=["protected_tag"],
                 remote_note_types={},
@@ -1571,6 +1583,7 @@ class TestAnkiHubImporter:
                 ankihub_did=ah_did_1,
                 notes_data=[note_info_1],
                 deck_name="test",
+                is_first_import_of_deck=True,
             )
             assert import_result.created_nids == [anki_nid]
             assert import_result.updated_nids == []
@@ -1591,6 +1604,7 @@ class TestAnkiHubImporter:
                 ankihub_did=ah_did_2,
                 notes_data=[note_info_2],
                 deck_name="test",
+                is_first_import_of_deck=True,
             )
             assert import_result.created_nids == []
             assert import_result.updated_nids == []
@@ -2045,6 +2059,7 @@ class TestCustomSearchNodes:
                 protected_fields={},
                 protected_tags=[],
                 deck_name="Test-Deck",
+                is_first_import_of_deck=True,
             )
 
             all_nids = mw.col.find_notes("")
@@ -2083,6 +2098,7 @@ class TestCustomSearchNodes:
                 protected_fields={},
                 protected_tags=[],
                 deck_name="Test-Deck",
+                is_first_import_of_deck=True,
             )
 
             all_nids = mw.col.find_notes("")

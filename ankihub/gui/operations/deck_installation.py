@@ -155,6 +155,7 @@ def _install_deck(
         ankihub_did=ankihub_did,
         notes_data=notes_data,
         deck_name=deck_name,
+        is_first_import_of_deck=True,
     )
 
     config.add_deck(

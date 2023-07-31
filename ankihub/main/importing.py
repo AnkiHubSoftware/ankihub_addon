@@ -61,6 +61,7 @@ class AnkiHubImporter:
         ankihub_did: uuid.UUID,
         notes_data: List[NoteInfo],
         deck_name: str,  # name that will be used for a deck if a new one gets created
+        is_first_import_of_deck: bool,
         local_did: Optional[  # did that new notes should be put into if importing not for the first time
             DeckId
         ] = None,
@@ -76,7 +77,6 @@ class AnkiHubImporter:
         """
         Used for importing an AnkiHub deck for the first time or when updating it.
 
-        When no local_did is provided this function assumes that the deck gets installed for the first time.
         Returns id of the deck future cards should be imported into - the local_did - if the import was sucessful,
         else it returns None.
         subdeck indicates whether cards should be moved into subdecks based on subdeck tags
@@ -102,10 +102,11 @@ class AnkiHubImporter:
             ankihub_did=ankihub_did,
             notes_data=notes_data,
             deck_name=deck_name,
+            is_first_import_of_deck=is_first_import_of_deck,
+            local_did=local_did,
             remote_note_types=remote_note_types,
             protected_fields=protected_fields,
             protected_tags=protected_tags,
-            local_did=local_did,
             subdecks=subdecks,
             subdecks_for_new_notes_only=subdecks_for_new_notes_only,
         )
@@ -115,10 +116,11 @@ class AnkiHubImporter:
         ankihub_did: uuid.UUID,
         notes_data: List[NoteInfo],
         deck_name: str,  # name that will be used for a deck if a new one gets created
+        is_first_import_of_deck: bool,
+        local_did: DeckId = None,  # did that new notes should be put into
         remote_note_types: Dict[NotetypeId, NotetypeDict] = {},
         protected_fields: Dict[int, List[str]] = {},
         protected_tags: List[str] = [],
-        local_did: DeckId = None,  # did that new notes should be put into if importing not for the first time
         subdecks: bool = False,
         subdecks_for_new_notes_only: bool = False,
     ) -> AnkiHubImportResult:
@@ -134,14 +136,14 @@ class AnkiHubImporter:
         self._updated_nids = []
         self._skipped_nids = []
 
-        self._first_import_of_deck = local_did is None
+        self._is_first_import_of_deck = is_first_import_of_deck
         self._protected_fields = protected_fields
         self._protected_tags = protected_tags
         self._local_did = _adjust_deck(deck_name, local_did)
 
         _adjust_note_types(remote_note_types)
 
-        if self._first_import_of_deck:
+        if self._is_first_import_of_deck:
             # Clean up any left over data for this deck in the ankihub database from previous deck imports.
             ankihub_db.remove_deck(ankihub_did)
 
@@ -150,7 +152,7 @@ class AnkiHubImporter:
             notes_data=notes_data,
         )
 
-        if self._first_import_of_deck:
+        if self._is_first_import_of_deck:
             self._local_did = self._cleanup_first_time_deck_import(
                 dids, self._local_did
             )
@@ -171,7 +173,7 @@ class AnkiHubImporter:
             created_nids=self._created_nids,
             updated_nids=self._updated_nids,
             skipped_nids=self._skipped_nids,
-            first_import_of_deck=self._first_import_of_deck,
+            first_import_of_deck=self._is_first_import_of_deck,
         )
         return result
 
