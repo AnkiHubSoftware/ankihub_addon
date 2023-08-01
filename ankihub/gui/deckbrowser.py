@@ -2,9 +2,9 @@ import aqt
 from anki.decks import DeckId
 from anki.hooks import wrap
 
-from ...gui.utils import ask_user
-from ...main.deck_unsubscribtion import unsubscribe_from_deck
-from ...settings import config
+from ..main.deck_unsubscribtion import unsubscribe_from_deck
+from ..settings import config
+from .utils import ask_user
 
 
 def _deck_delete_hook():
