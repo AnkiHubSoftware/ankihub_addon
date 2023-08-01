@@ -3226,11 +3226,16 @@ def test_download_media_on_sync(
         # Mock the token to simulate that the user is logged in.
         monkeypatch.setattr(config, "token", lambda: "test token")
 
-        # Mock the client to simulate that there are no deck updates and extensions.
+        # Mock the client
+        # ... get_deck_subscriptions has to return the deck that was installed or the sync will uninstall it.
         monkeypatch.setattr(
             AnkiHubClient,
             "get_deck_subscriptions",
-            lambda *args, **kwargs: [],
+            lambda *args, **kwargs: [
+                DeckFactory.create(
+                    ankihub_deck_uuid=ah_did,
+                )
+            ],
         )
         monkeypatch.setattr(
             AnkiHubClient,
