@@ -87,6 +87,9 @@ def _profile_setup() -> bool:
 def _after_profile_setup():
     _log_enabled_addons()
 
+    # This deletes broken notetypes with no fields or templates created by a previous version of the add-on.
+    delete_broken_notetypes()
+
     # This adjusts note type templates of note types used by AnkiHub notes when the profile is opened.
     # If this wouldn't be called here the templates would only be adjusted when syncing with AnkiHub.
     # We want the modifications to be present even if the user doesn't sync with AnkiHub, so we call
@@ -172,3 +175,9 @@ def _adjust_ankihub_note_type_templates():
         modify_note_type_templates(mids_filtered)
     except CardTypeError:  # noqa: E722
         LOGGER.exception("Failed to adjust AnkiHub note type templates.")
+
+def delete_broken_notetypes() -> None:
+    aqt.mw.col.db.execute("DELETE FROM notetypes as nt WHERE\
+ NOT EXISTS(SELECT 1 FROM templates where ntid = nt.id) OR\
+ NOT EXISTS(SELECT 1 FROM fields where ntid = nt.id)")
+    aqt.mw.col.db.commit()
