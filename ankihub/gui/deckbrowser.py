@@ -2,7 +2,7 @@ import aqt
 from anki.decks import DeckId
 from anki.hooks import wrap
 
-from ..main.deck_unsubscribtion import unsubscribe_from_deck
+from ..main.deck_unsubscribtion import unsubscribe_from_deck_and_uninstall
 from ..settings import config
 from .utils import ask_user
 
@@ -23,7 +23,7 @@ def _deck_delete_hook():
             title="Unsubscribe from AnkiHub deck?",
             parent=aqt.mw,
         ):
-            unsubscribe_from_deck(deck_ankihub_id)
+            unsubscribe_from_deck_and_uninstall(deck_ankihub_id)
 
     aqt.mw.deckBrowser._delete = wrap(  # type: ignore
         old=aqt.mw.deckBrowser._delete, new=_delete_override

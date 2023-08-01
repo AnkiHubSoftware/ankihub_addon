@@ -11,6 +11,7 @@ from .. import LOGGER
 from ..addon_ankihub_client import AddonAnkiHubClient as AnkiHubClient
 from ..ankihub_client import AnkiHubHTTPError, DeckExtension
 from ..db import ankihub_db
+from ..main.deck_unsubscribtion import uninstall_deck
 from ..main.importing import AnkiHubImporter, AnkiHubImportResult
 from ..main.utils import create_backup
 from ..settings import config
@@ -66,7 +67,7 @@ class _AnkiHubSync:
             deck.ankihub_deck_uuid for deck in client.get_deck_subscriptions()
         ]
         installed_ah_dids = config.deck_ids()
-        to_sync_ah_dids = list(set(subscribed_ah_dids).intersection(installed_ah_dids))
+        to_sync_ah_dids = set(subscribed_ah_dids).intersection(installed_ah_dids)
 
         for ah_did in to_sync_ah_dids:
             try:
@@ -78,6 +79,10 @@ class _AnkiHubSync:
                     return
                 else:
                     raise e
+
+        to_uninstall = set(installed_ah_dids).difference(subscribed_ah_dids)
+        for ah_did in to_uninstall:
+            uninstall_deck(ah_did)
 
     def _sync_deck(self, ankihub_did: uuid.UUID) -> bool:
         """Syncs a single deck with AnkiHub.
