@@ -25,9 +25,9 @@ from aqt.studydeck import StudyDeck
 from aqt.utils import openLink, showInfo, showText, tooltip
 
 from ..addon_ankihub_client import AddonAnkiHubClient as AnkiHubClient
+from ..main.deck_unsubscribtion import unsubscribe_from_deck
 from ..main.subdecks import SUBDECK_TAG
 from ..settings import config, url_deck_base, url_decks, url_help
-from ..use_cases import unsubscribe_from_deck
 from .operations.deck_installation import download_and_install_decks
 from .operations.subdecks import confirm_and_toggle_subdecks
 from .utils import ask_user, set_tooltip_icon
@@ -149,7 +149,7 @@ class SubscribedDecksDialog(QDialog):
 
         for item in items:
             ankihub_did: UUID = item.data(Qt.ItemDataRole.UserRole)
-            unsubscribe_from_deck(self.client, ankihub_did, config)
+            unsubscribe_from_deck(ankihub_did)
 
         tooltip("Unsubscribed from AnkiHub Deck.", parent=aqt.mw)
         self._refresh_decks_list()
