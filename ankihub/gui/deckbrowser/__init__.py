@@ -30,5 +30,5 @@ def _deck_delete_hook():
     )
 
 
-def setup_deck_browser_hooks():
+def setup():
     _deck_delete_hook()

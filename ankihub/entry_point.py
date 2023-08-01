@@ -9,11 +9,10 @@ from aqt.gui_hooks import profile_did_open, profile_will_close
 from . import LOGGER
 from .db import ankihub_db
 from .debug import setup as setup_debug
-from .gui import browser, editor, progress, reviewer, taskman
+from .gui import browser, deckbrowser, editor, progress, reviewer, taskman
 from .gui.addons import setup_addons
 from .gui.auto_sync import setup_auto_sync
 from .gui.config_dialog import setup_config_dialog_manager
-from .gui.deckbrowser import setup_deck_browser_hooks
 from .gui.errors import setup_error_handler
 from .gui.media_sync import media_sync
 from .gui.menu import menu_state, refresh_ankihub_menu, setup_ankihub_menu
@@ -138,6 +137,9 @@ def _general_setup():
     taskman.setup()
     LOGGER.info("Set up task manager.")
 
+    deckbrowser.setup()
+    LOGGER.info("Setup deck browser")
+
     _trigger_addon_update_check()
     LOGGER.info("Triggered add-on update check.")
 
@@ -147,9 +149,6 @@ def _general_setup():
 
     setup_auto_sync()
     LOGGER.info("Called setup_ankihub_sync_on_ankiweb_sync.")
-
-    setup_deck_browser_hooks()
-    LOGGER.info("Setup hooks for Anki deck browser features")
 
 
 def _log_enabled_addons():
