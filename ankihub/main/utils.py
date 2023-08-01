@@ -29,6 +29,7 @@ def create_deck_with_id(deck_name: str, deck_id: DeckId) -> None:
     ).id
     aqt.mw.col.db.execute(f"UPDATE decks SET id={deck_id} WHERE id={source_did};")
     aqt.mw.col.db.execute(f"UPDATE cards SET did={deck_id} WHERE did={source_did};")
+    aqt.mw.col.db.commit()
 
     LOGGER.info(f"Created deck {deck_name=} {deck_id=}")
 
@@ -88,6 +89,7 @@ def create_note_with_id(note: Note, anki_id: NoteId, anki_did: DeckId) -> Note:
     # Swap out the note id that Anki assigns to the new note with our own id.
     aqt.mw.col.db.execute(f"UPDATE notes SET id={anki_id} WHERE id={note.id};")
     aqt.mw.col.db.execute(f"UPDATE cards SET nid={anki_id} WHERE nid={note.id};")
+    aqt.mw.col.db.commit()
 
     note.id = anki_id
     return note

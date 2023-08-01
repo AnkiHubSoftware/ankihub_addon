@@ -135,7 +135,7 @@ def _set_deck_while_respecting_odid(nid: NoteId, did: DeckId) -> None:
             aqt.mw.col.db.execute(
                 "UPDATE cards SET odid=?, usn=-1 WHERE id=?", did, cid
             )
-
+    aqt.mw.col.db.commit()
 
 def _subdeck_tag_to_deck_name(anki_root_deck_name: str, tag: str) -> Optional[str]:
     """The tag should be of the form "AnkiHub_Subdeck::ankihub_deck_name[::subdeck_name]*"

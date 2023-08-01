@@ -42,6 +42,7 @@ def attach_ankihub_db_to_anki_db_connection() -> None:
             f"ATTACH DATABASE ? AS {ankihub_db.database_name}",
             str(ankihub_db.database_path),
         )
+        aqt.mw.col.db.commit()
         LOGGER.info("Attached AnkiHub DB to Anki DB connection")
 
 
@@ -61,6 +62,7 @@ def detach_ankihub_db_from_anki_db_connection() -> None:
 
         try:
             aqt.mw.col.db.execute(f"DETACH DATABASE {ankihub_db.database_name}")
+            aqt.mw.col.db.commit()
             LOGGER.info("Detached AnkiHub DB from Anki DB connection")
         except Exception:
             LOGGER.info("Failed to detach AnkiHub database.")
@@ -268,6 +270,7 @@ class _AnkiHubDB:
                 mod,
                 nid,
             )
+        aqt.mw.col.db.commit()
 
     def ankihub_nid_exists(self, ankihub_nid: uuid.UUID) -> bool:
         # It's possible that an AnkiHub nid does not exists after calling insert_or_update_notes_data
