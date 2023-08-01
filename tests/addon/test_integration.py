@@ -32,6 +32,7 @@ from pytest_anki import AnkiSession
 from pytestqt.qtbot import QtBot  # type: ignore
 from requests_mock import Mocker
 
+from ankihub.gui import deckbrowser
 from ankihub.gui.browser.browser import (
     ModifiedAfterSyncSearchNode,
     NewNoteSearchNode,
@@ -3809,3 +3810,86 @@ class TestConfigDialog:
 
             # Check that opening the dialog does not throw an exception
             qtbot.wait(500)
+
+
+def test_delete_ankihub_private_config_on_deckBrowser__delete_option(
+    anki_session_with_addon_data: AnkiSession,
+    install_sample_ah_deck: InstallSampleAHDeck,
+    qtbot: QtBot,
+    mock_function: MockFunctionProtocol,
+):
+    from aqt import mw
+
+    entry_point.run()
+
+    anki_session = anki_session_with_addon_data
+    with anki_session.profile_loaded():
+        anki_deck_id, ah_did = install_sample_ah_deck()
+
+        mids = ankihub_db.note_types_for_ankihub_deck(ah_did)
+        deck_uuid = config.get_deck_uuid_by_did(anki_deck_id)
+
+        assert len(mids) == 2
+        assert mw.col.decks.count() == 2
+        assert deck_uuid
+
+        # Will control the conditional responsible to delete or not the ankihub deck private config
+        mock_function(deckbrowser, "ask_user", return_value=True)
+
+        with patch.object(
+            AnkiHubClient, "unsubscribe_from_deck"
+        ) as unsubscribe_from_deck_mock:
+            mw.deckBrowser._delete(anki_deck_id)
+            unsubscribe_from_deck_mock.assert_called_once()
+
+        qtbot.wait(500)
+
+        deck_uuid = config.get_deck_uuid_by_did(anki_deck_id)
+
+        assert mw.col.decks.count() == 1
+        assert deck_uuid is None
+        assert all(not note_type_contains_field(mw.col.models.get(mid)) for mid in mids)
+        assert all(
+            not re.search(
+                ANKIHUB_TEMPLATE_SNIPPET_RE, mw.col.models.get(mid)["tmpls"][0]["afmt"]
+            )
+            for mid in mids
+        )
+
+        # check if the deck was removed from the db
+        mids = ankihub_db.note_types_for_ankihub_deck(ah_did)
+        assert len(mids) == 0
+
+        nids = ankihub_db.anki_nids_for_ankihub_deck(ah_did)
+        assert len(nids) == 0
+
+
+def test_not_delete_ankihub_private_config_on_deckBrowser__delete_option(
+    anki_session_with_addon_data: AnkiSession,
+    install_sample_ah_deck: InstallSampleAHDeck,
+    qtbot: QtBot,
+    mock_function: MockFunctionProtocol,
+):
+    from aqt import mw
+
+    entry_point.run()
+
+    anki_session = anki_session_with_addon_data
+    with anki_session.profile_loaded():
+        anki_deck_id, _ = install_sample_ah_deck()
+
+        deck_uuid = config.get_deck_uuid_by_did(anki_deck_id)
+
+        assert mw.col.decks.count() == 2
+        assert deck_uuid
+
+        # Will control the conditional responsible to delete or not the ankihub deck private config
+        mock_function(deckbrowser, "ask_user", return_value=False)
+
+        mw.deckBrowser._delete(anki_deck_id)
+        qtbot.wait(500)
+
+        deck_uuid = config.get_deck_uuid_by_did(anki_deck_id)
+
+        assert mw.col.decks.count() == 1
+        assert deck_uuid
