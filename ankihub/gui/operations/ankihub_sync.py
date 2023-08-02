@@ -41,7 +41,7 @@ def sync_with_ankihub(on_done: Callable[[Future], None]) -> None:
         client = AnkiHubClient()
         subscribed_decks = client.get_deck_subscriptions()
 
-        uninstall_decks_the_user_is_not_longer_subscribed_to(
+        _uninstall_decks_the_user_is_not_longer_subscribed_to(
             subscribed_decks=subscribed_decks
         )
         check_and_install_new_deck_subscriptions(
@@ -51,7 +51,7 @@ def sync_with_ankihub(on_done: Callable[[Future], None]) -> None:
         on_done(future_with_exception(e))
 
 
-def uninstall_decks_the_user_is_not_longer_subscribed_to(
+def _uninstall_decks_the_user_is_not_longer_subscribed_to(
     subscribed_decks: List[Deck],
 ) -> None:
     installed_ah_dids = config.deck_ids()
