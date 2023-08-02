@@ -2917,6 +2917,7 @@ class TestAutoSync:
         self,
         anki_session_with_addon_data: AnkiSession,
         monkeypatch: MonkeyPatch,
+        mock_client_methods_called_during_sync: None,
         qtbot: QtBot,
     ):
         with anki_session_with_addon_data.profile_loaded():
@@ -2973,6 +2974,7 @@ class TestAutoSync:
         self,
         anki_session_with_addon_data: AnkiSession,
         monkeypatch: MonkeyPatch,
+        mock_client_methods_called_during_sync: None,
         qtbot: QtBot,
     ):
         with anki_session_with_addon_data.profile_loaded():
