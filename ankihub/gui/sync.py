@@ -58,6 +58,8 @@ class _AnkiHubSync:
         return self._import_results
 
     def _sync_all_decks(self) -> None:
+        """Syncs updates for all subscribed and installed decks.
+        Uninstalls decks that are no longer subscribed to."""
         LOGGER.info("Syncing decks...")
 
         create_backup()
@@ -67,8 +69,8 @@ class _AnkiHubSync:
             deck.ankihub_deck_uuid for deck in client.get_deck_subscriptions()
         ]
         installed_ah_dids = config.deck_ids()
-        to_sync_ah_dids = set(subscribed_ah_dids).intersection(installed_ah_dids)
 
+        to_sync_ah_dids = set(subscribed_ah_dids).intersection(installed_ah_dids)
         for ah_did in to_sync_ah_dids:
             try:
                 should_continue = self._sync_deck(ah_did)
