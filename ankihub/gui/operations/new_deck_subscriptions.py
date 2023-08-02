@@ -2,7 +2,6 @@
 from concurrent.futures import Future
 from typing import Callable, List
 
-from ...addon_ankihub_client import AddonAnkiHubClient as AnkiHubClient
 from ...ankihub_client import Deck
 from ...settings import config
 from ..messages import messages
@@ -11,11 +10,13 @@ from .deck_installation import download_and_install_decks
 from .utils import future_with_exception, future_with_result
 
 
-def check_and_install_new_deck_subscriptions(on_done: Callable[[Future], None]) -> None:
+def check_and_install_new_deck_subscriptions(
+    subscribed_decks: List[Deck], on_done: Callable[[Future], None]
+) -> None:
     """Check if there are any new deck subscriptions and install them if the user agrees."""
     try:
         # Check if there are any new subscriptions
-        decks = _not_installed_ah_decks()
+        decks = _not_installed_ah_decks(subscribed_decks)
         if not decks:
             on_done(future_with_result(None))
             return
@@ -38,15 +39,11 @@ def check_and_install_new_deck_subscriptions(on_done: Callable[[Future], None]) 
         on_done(future_with_exception(e))
 
 
-def _not_installed_ah_decks() -> List[Deck]:
-    client = AnkiHubClient()
-    remote_decks = client.get_deck_subscriptions()
-    remote_deck_ids = [deck.ankihub_deck_uuid for deck in remote_decks]
-
+def _not_installed_ah_decks(subscribed_decks: List[Deck]) -> List[Deck]:
     local_deck_ids = config.deck_ids()
-
-    not_installed_dids = set(remote_deck_ids) - set(local_deck_ids)
     result = [
-        deck for deck in remote_decks if deck.ankihub_deck_uuid in not_installed_dids
+        deck
+        for deck in subscribed_decks
+        if deck.ankihub_deck_uuid not in local_deck_ids
     ]
     return result

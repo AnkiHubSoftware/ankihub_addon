@@ -5,6 +5,7 @@ import re
 import shutil
 import tempfile
 import uuid
+from concurrent.futures import Future
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
 from time import sleep
@@ -94,6 +95,7 @@ from ankihub.gui.decks_dialog import SubscribedDecksDialog, download_and_install
 from ankihub.gui.editor import _on_suggestion_button_press, _refresh_buttons
 from ankihub.gui.errors import upload_data_dir_and_logs_in_background
 from ankihub.gui.menu import menu_state
+from ankihub.gui.operations import ankihub_sync
 from ankihub.gui.operations.new_deck_subscriptions import (
     check_and_install_new_deck_subscriptions,
 )
@@ -371,6 +373,32 @@ def mock_client_methods_called_during_sync(monkeypatch: MonkeyPatch) -> None:
     )
 
 
+class SyncWithAnkiHub(Protocol):
+    def __call__(self) -> None:
+        ...
+
+
+@pytest.fixture
+def sync_with_ankihub(qtbot: QtBot) -> SyncWithAnkiHub:
+    """Sync with AnkiHub and wait until the sync is done."""
+
+    def _sync_with_ankihub() -> None:
+        done = False
+
+        def on_done(future: Future) -> None:
+            nonlocal done
+            done = True
+
+        ankihub_sync.sync_with_ankihub(on_done=on_done)
+
+        def is_done() -> bool:
+            return done
+
+        qtbot.wait_until(is_done)
+
+    return _sync_with_ankihub
+
+
 def test_entry_point(anki_session_with_addon_data: AnkiSession, qtbot: QtBot):
     entry_point.run()
     with anki_session_with_addon_data.profile_loaded():
@@ -644,12 +672,6 @@ class TestCheckAndInstallNewDeckSubscriptions:
         anki_session = anki_session_with_addon_data
         with anki_session.profile_loaded():
 
-            # Mock get_deck_subscriptions function to return a deck
-            deck = DeckFactory.create()
-            get_decks_with_user_relation_mock = mock_function(
-                AnkiHubClient, "get_deck_subscriptions", return_value=[deck]
-            )
-
             # Mock ask_user function to return True
             ask_user_mock = mock_function(
                 operations.new_deck_subscriptions, "ask_user", return_value=True
@@ -664,9 +686,12 @@ class TestCheckAndInstallNewDeckSubscriptions:
                 ),
             )
 
-            # Call the function
+            # Call the function with a deck
             on_done_mock = Mock()
-            check_and_install_new_deck_subscriptions(on_done_mock)
+            deck = DeckFactory.create()
+            check_and_install_new_deck_subscriptions(
+                subscribed_decks=[deck], on_done=on_done_mock
+            )
 
             qtbot.wait(500)
 
@@ -675,9 +700,7 @@ class TestCheckAndInstallNewDeckSubscriptions:
             assert on_done_mock.call_args[0][0].result() is None
 
             # Assert that the mocked functions were called
-            assert get_decks_with_user_relation_mock.call_count == 1
             assert ask_user_mock.call_count == 1
-
             assert download_and_install_decks_mock.call_count == 1
             assert download_and_install_decks_mock.call_args[0][0] == [
                 deck.ankihub_deck_uuid
@@ -692,20 +715,17 @@ class TestCheckAndInstallNewDeckSubscriptions:
         anki_session = anki_session_with_addon_data
         with anki_session.profile_loaded():
 
-            # Mock get_deck_subscriptions function to return a deck
-            deck = DeckFactory.create()
-            get_decks_with_user_relation_mock = mock_function(
-                AnkiHubClient, "get_deck_subscriptions", return_value=[deck]
-            )
-
             # Mock ask_user function to return False
             ask_user_mock = mock_function(
                 operations.new_deck_subscriptions, "ask_user", return_value=False
             )
 
-            # Call the function
+            # Call the function with a deck
             on_done_mock = Mock()
-            check_and_install_new_deck_subscriptions(on_done_mock)
+            deck = DeckFactory.create()
+            check_and_install_new_deck_subscriptions(
+                subscribed_decks=[deck], on_done=on_done_mock
+            )
 
             qtbot.wait(500)
 
@@ -713,38 +733,28 @@ class TestCheckAndInstallNewDeckSubscriptions:
             assert on_done_mock.call_count == 1
             assert on_done_mock.call_args[0][0].result() is None
 
-            # Assert that the mocked functions were called
-            assert get_decks_with_user_relation_mock.call_count == 1
+            # Assert that the mocked function were called
             assert ask_user_mock.call_count == 1
 
     def test_no_new_subscriptions(
         self,
         anki_session_with_addon_data: AnkiSession,
         qtbot: QtBot,
-        mock_function: MockFunctionProtocol,
     ):
         anki_session = anki_session_with_addon_data
         with anki_session.profile_loaded():
 
-            # Mock get_deck_subscriptions function to return an empty list
-            get_decks_with_user_relation_mock = mock_function(
-                AnkiHubClient,
-                "get_deck_subscriptions",
-                return_value=[],
-            )
-
-            # Call the function
+            # Call the function with an empty list
             on_done_mock = Mock()
-            check_and_install_new_deck_subscriptions(on_done_mock)
+            check_and_install_new_deck_subscriptions(
+                subscribed_decks=[], on_done=on_done_mock
+            )
 
             qtbot.wait(500)
 
             # Assert that the on_done callback was called with a future with a result of None
             assert on_done_mock.call_count == 1
             assert on_done_mock.call_args[0][0].result() is None
-
-            # Assert that the mocked functions were called
-            assert get_decks_with_user_relation_mock.call_count == 1
 
     def test_install_operation_raises_exception(
         self,
@@ -754,12 +764,6 @@ class TestCheckAndInstallNewDeckSubscriptions:
     ):
         anki_session = anki_session_with_addon_data
         with anki_session.profile_loaded():
-
-            # Mock get_deck_subscriptions function to return a deck
-            deck = DeckFactory.create()
-            get_decks_with_user_relation_mock = mock_function(
-                AnkiHubClient, "get_deck_subscriptions", return_value=[deck]
-            )
 
             # Mock ask_user function to return True
             ask_user_mock = mock_function(
@@ -776,9 +780,12 @@ class TestCheckAndInstallNewDeckSubscriptions:
                 side_effect=raise_exception,
             )
 
-            # Call the function
+            # Call the function with a deck
             on_done_mock = Mock()
-            check_and_install_new_deck_subscriptions(on_done_mock)
+            deck = DeckFactory.create()
+            check_and_install_new_deck_subscriptions(
+                subscribed_decks=[deck], on_done=on_done_mock
+            )
 
             qtbot.wait(500)
 
@@ -787,7 +794,6 @@ class TestCheckAndInstallNewDeckSubscriptions:
             assert on_done_mock.call_args[0][0].exception() is not None
 
             # Assert that the mocked functions were called
-            assert get_decks_with_user_relation_mock.call_count == 1
             assert ask_user_mock.call_count == 1
             assert download_and_install_decks_mock.call_count == 1
 
@@ -2848,11 +2854,12 @@ def test_profile_swap(
     "subscribed_to_deck",
     [True, False],
 )
-def test_uninstall_deck_on_sync_if_user_is_not_subscribed(
+def test_sync_uninstalls_unsubscribed_decks(
     anki_session_with_addon_data: AnkiSession,
     install_sample_ah_deck: InstallSampleAHDeck,
     monkeypatch: MonkeyPatch,
     mock_client_methods_called_during_sync: None,
+    sync_with_ankihub: SyncWithAnkiHub,
     subscribed_to_deck: bool,
 ):
 
@@ -2875,7 +2882,7 @@ def test_uninstall_deck_on_sync_if_user_is_not_subscribed(
         config.save_token("test_token")
 
         # Sync
-        ah_sync.sync_all_decks_and_media(start_media_sync=False)
+        sync_with_ankihub()
 
         # Assert that the deck was uninstalled if the user is not subscribed to it,
         # else assert that it was not uninstalled
@@ -2903,6 +2910,7 @@ class TestAutoSync:
         self,
         anki_session_with_addon_data: AnkiSession,
         monkeypatch: MonkeyPatch,
+        mock_client_methods_called_during_sync: None,
         qtbot: QtBot,
     ):
         with anki_session_with_addon_data.profile_loaded():
@@ -2959,6 +2967,7 @@ class TestAutoSync:
         self,
         anki_session_with_addon_data: AnkiSession,
         monkeypatch: MonkeyPatch,
+        mock_client_methods_called_during_sync: None,
         qtbot: QtBot,
     ):
         with anki_session_with_addon_data.profile_loaded():
