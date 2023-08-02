@@ -7,12 +7,18 @@ from ..settings import config
 from .utils import ask_user
 
 
-def _deck_delete_hook():
-    def _delete_override(did: DeckId) -> None:
+def setup() -> None:
+    _setup_deck_delete_hook()
+
+
+def _setup_deck_delete_hook() -> None:
+    """Ask the user if they want to unsubscribe from the AnkiHub deck when they delete the associated Anki deck."""
+
+    def _after_anki_deck_deleted(did: DeckId) -> None:
         deck_ankihub_id = config.get_deck_uuid_by_did(did)
-        deck_name = config.deck_config(deck_ankihub_id).name
         if not deck_ankihub_id:
             return
+        deck_name = config.deck_config(deck_ankihub_id).name
         if ask_user(
             text="You've deleted the Anki deck linked to the<br>"
             f"<b>{deck_name}</b> AnkiHub deck.<br><br>"
@@ -26,9 +32,6 @@ def _deck_delete_hook():
             unsubscribe_from_deck_and_uninstall(deck_ankihub_id)
 
     aqt.mw.deckBrowser._delete = wrap(  # type: ignore
-        old=aqt.mw.deckBrowser._delete, new=_delete_override
+        old=aqt.mw.deckBrowser._delete,
+        new=_after_anki_deck_deleted,
     )
-
-
-def setup():
-    _deck_delete_hook()
