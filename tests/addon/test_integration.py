@@ -344,6 +344,33 @@ def ankihub_sample_deck_notes_data() -> List[NoteInfo]:
     return result
 
 
+@pytest.fixture
+def mock_client_methods_called_during_sync(monkeypatch: MonkeyPatch) -> None:
+    monkeypatch.setattr(
+        AnkiHubClient, "get_deck_subscriptions", lambda *args, **kwargs: []
+    )
+    monkeypatch.setattr(
+        AnkiHubClient,
+        "get_deck_extensions_by_deck_id",
+        lambda *args, **kwargs: [],
+    )
+    monkeypatch.setattr(
+        AnkiHubClient,
+        "is_media_upload_finished",
+        lambda *args, **kwargs: True,
+    )
+    monkeypatch.setattr(
+        AnkiHubClient,
+        "get_deck_updates",
+        lambda *args, **kwargs: [],
+    )
+    monkeypatch.setattr(
+        AnkiHubClient,
+        "get_media_disabled_fields",
+        lambda *args, **kwargs: {},
+    )
+
+
 def test_entry_point(anki_session_with_addon_data: AnkiSession, qtbot: QtBot):
     entry_point.run()
     with anki_session_with_addon_data.profile_loaded():
@@ -2817,6 +2844,60 @@ def test_profile_swap(
     assert general_setup_mock.call_count == 1
 
 
+@pytest.mark.parametrize(
+    "subscribed_to_deck",
+    [True, False],
+)
+def test_uninstall_deck_on_sync_if_user_is_not_subscribed(
+    anki_session_with_addon_data: AnkiSession,
+    install_sample_ah_deck: InstallSampleAHDeck,
+    monkeypatch: MonkeyPatch,
+    mock_client_methods_called_during_sync: None,
+    subscribed_to_deck: bool,
+):
+
+    with anki_session_with_addon_data.profile_loaded():
+        mw = anki_session_with_addon_data.mw
+
+        # Install a deck
+        anki_did, ah_did = install_sample_ah_deck()
+
+        # Mock client.get_deck_subscriptions to return the deck if subscribed_to_deck is True else return an empty list
+        monkeypatch.setattr(
+            AnkiHubClient,
+            "get_deck_subscriptions",
+            lambda *args, **kwargs: [DeckFactory.create(ankihub_deck_uuid=ah_did)]
+            if subscribed_to_deck
+            else [],
+        )
+
+        # Set a fake token so that the sync is not skipped
+        config.save_token("test_token")
+
+        # Sync
+        ah_sync.sync_all_decks_and_media(start_media_sync=False)
+
+        # Assert that the deck was uninstalled if the user is not subscribed to it,
+        # else assert that it was not uninstalled
+        assert config.deck_ids() == ([ah_did] if subscribed_to_deck else [])
+        assert ankihub_db.ankihub_deck_ids() == ([ah_did] if subscribed_to_deck else [])
+
+        mids = [
+            mw.col.get_note(nid).mid for nid in mw.col.find_notes(f"did:{anki_did}")
+        ]
+        is_ankihub_note_type = [
+            note_type_contains_field(
+                mw.col.models.get(mid), ANKIHUB_NOTE_TYPE_FIELD_NAME
+            )
+            for mid in mids
+        ]
+        assert (
+            all(is_ankihub_note_type)
+            if subscribed_to_deck
+            else not any(is_ankihub_note_type)
+        )
+
+
 class TestAutoSync:
     def test_with_on_ankiweb_sync_config_option(
         self,
@@ -3210,6 +3291,7 @@ def test_download_media_on_sync(
     anki_session_with_addon_data: AnkiSession,
     install_sample_ah_deck: InstallSampleAHDeck,
     monkeypatch: MonkeyPatch,
+    mock_client_methods_called_during_sync: None,
     qtbot: QtBot,
 ):
     with anki_session_with_addon_data.profile_loaded():
@@ -3226,31 +3308,15 @@ def test_download_media_on_sync(
         # Mock the token to simulate that the user is logged in.
         monkeypatch.setattr(config, "token", lambda: "test token")
 
-        # Mock the client to simulate that there are no deck updates and extensions.
+        # Mock get_deck_subscriptions has to return the deck that was installed or the sync will uninstall it.
         monkeypatch.setattr(
             AnkiHubClient,
             "get_deck_subscriptions",
-            lambda *args, **kwargs: [],
-        )
-        monkeypatch.setattr(
-            AnkiHubClient,
-            "get_deck_updates",
-            lambda *args, **kwargs: [],
-        )
-        monkeypatch.setattr(
-            AnkiHubClient,
-            "get_deck_extensions_by_deck_id",
-            lambda *args, **kwargs: [],
-        )
-        monkeypatch.setattr(
-            AnkiHubClient,
-            "is_media_upload_finished",
-            lambda *args, **kwargs: True,
-        )
-        monkeypatch.setattr(
-            AnkiHubClient,
-            "get_media_disabled_fields",
-            lambda *args, **kwargs: {},
+            lambda *args, **kwargs: [
+                DeckFactory.create(
+                    ankihub_deck_uuid=ah_did,
+                )
+            ],
         )
 
         # Mock the client method for downloading media.
