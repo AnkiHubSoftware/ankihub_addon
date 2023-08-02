@@ -1,9 +1,10 @@
 from concurrent.futures import Future
-from typing import Callable
+from typing import Callable, List
 
 import aqt
 
 from ...addon_ankihub_client import AddonAnkiHubClient as AnkiHubClient
+from ...ankihub_client import Deck
 from ...main.deck_unsubscribtion import uninstall_deck
 from ...settings import config
 from ..sync import ah_sync, show_tooltip_about_last_sync_results
@@ -37,18 +38,24 @@ def sync_with_ankihub(on_done: Callable[[Future], None]) -> None:
         on_done(future_with_result(None))
 
     try:
-        uninstall_decks_the_user_is_not_longer_subscribed_to()
-        check_and_install_new_deck_subscriptions(on_done=on_new_deck_subscriptions_done)
+        client = AnkiHubClient()
+        subscribed_decks = client.get_deck_subscriptions()
+
+        uninstall_decks_the_user_is_not_longer_subscribed_to(
+            subscribed_decks=subscribed_decks
+        )
+        check_and_install_new_deck_subscriptions(
+            subscribed_decks=subscribed_decks, on_done=on_new_deck_subscriptions_done
+        )
     except Exception as e:
         on_done(future_with_exception(e))
 
 
-def uninstall_decks_the_user_is_not_longer_subscribed_to():
-    client = AnkiHubClient()
-    subscribed_ah_dids = [
-        deck.ankihub_deck_uuid for deck in client.get_deck_subscriptions()
-    ]
+def uninstall_decks_the_user_is_not_longer_subscribed_to(
+    subscribed_decks: List[Deck],
+) -> None:
     installed_ah_dids = config.deck_ids()
+    subscribed_ah_dids = [deck.ankihub_deck_uuid for deck in subscribed_decks]
     to_uninstall = set(installed_ah_dids).difference(subscribed_ah_dids)
     for ah_did in to_uninstall:
         uninstall_deck(ah_did)

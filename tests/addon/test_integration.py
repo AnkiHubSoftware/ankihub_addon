@@ -662,12 +662,6 @@ class TestCheckAndInstallNewDeckSubscriptions:
         anki_session = anki_session_with_addon_data
         with anki_session.profile_loaded():
 
-            # Mock get_deck_subscriptions function to return a deck
-            deck = DeckFactory.create()
-            get_decks_with_user_relation_mock = mock_function(
-                AnkiHubClient, "get_deck_subscriptions", return_value=[deck]
-            )
-
             # Mock ask_user function to return True
             ask_user_mock = mock_function(
                 operations.new_deck_subscriptions, "ask_user", return_value=True
@@ -682,9 +676,12 @@ class TestCheckAndInstallNewDeckSubscriptions:
                 ),
             )
 
-            # Call the function
+            # Call the function with a deck
             on_done_mock = Mock()
-            check_and_install_new_deck_subscriptions(on_done_mock)
+            deck = DeckFactory.create()
+            check_and_install_new_deck_subscriptions(
+                subscribed_decks=[deck], on_done=on_done_mock
+            )
 
             qtbot.wait(500)
 
@@ -693,9 +690,7 @@ class TestCheckAndInstallNewDeckSubscriptions:
             assert on_done_mock.call_args[0][0].result() is None
 
             # Assert that the mocked functions were called
-            assert get_decks_with_user_relation_mock.call_count == 1
             assert ask_user_mock.call_count == 1
-
             assert download_and_install_decks_mock.call_count == 1
             assert download_and_install_decks_mock.call_args[0][0] == [
                 deck.ankihub_deck_uuid
@@ -710,20 +705,17 @@ class TestCheckAndInstallNewDeckSubscriptions:
         anki_session = anki_session_with_addon_data
         with anki_session.profile_loaded():
 
-            # Mock get_deck_subscriptions function to return a deck
-            deck = DeckFactory.create()
-            get_decks_with_user_relation_mock = mock_function(
-                AnkiHubClient, "get_deck_subscriptions", return_value=[deck]
-            )
-
             # Mock ask_user function to return False
             ask_user_mock = mock_function(
                 operations.new_deck_subscriptions, "ask_user", return_value=False
             )
 
-            # Call the function
+            # Call the function with a deck
             on_done_mock = Mock()
-            check_and_install_new_deck_subscriptions(on_done_mock)
+            deck = DeckFactory.create()
+            check_and_install_new_deck_subscriptions(
+                subscribed_decks=[deck], on_done=on_done_mock
+            )
 
             qtbot.wait(500)
 
@@ -731,38 +723,28 @@ class TestCheckAndInstallNewDeckSubscriptions:
             assert on_done_mock.call_count == 1
             assert on_done_mock.call_args[0][0].result() is None
 
-            # Assert that the mocked functions were called
-            assert get_decks_with_user_relation_mock.call_count == 1
+            # Assert that the mocked function were called
             assert ask_user_mock.call_count == 1
 
     def test_no_new_subscriptions(
         self,
         anki_session_with_addon_data: AnkiSession,
         qtbot: QtBot,
-        mock_function: MockFunctionProtocol,
     ):
         anki_session = anki_session_with_addon_data
         with anki_session.profile_loaded():
 
-            # Mock get_deck_subscriptions function to return an empty list
-            get_decks_with_user_relation_mock = mock_function(
-                AnkiHubClient,
-                "get_deck_subscriptions",
-                return_value=[],
-            )
-
-            # Call the function
+            # Call the function with an empty list
             on_done_mock = Mock()
-            check_and_install_new_deck_subscriptions(on_done_mock)
+            check_and_install_new_deck_subscriptions(
+                subscribed_decks=[], on_done=on_done_mock
+            )
 
             qtbot.wait(500)
 
             # Assert that the on_done callback was called with a future with a result of None
             assert on_done_mock.call_count == 1
             assert on_done_mock.call_args[0][0].result() is None
-
-            # Assert that the mocked functions were called
-            assert get_decks_with_user_relation_mock.call_count == 1
 
     def test_install_operation_raises_exception(
         self,
@@ -772,12 +754,6 @@ class TestCheckAndInstallNewDeckSubscriptions:
     ):
         anki_session = anki_session_with_addon_data
         with anki_session.profile_loaded():
-
-            # Mock get_deck_subscriptions function to return a deck
-            deck = DeckFactory.create()
-            get_decks_with_user_relation_mock = mock_function(
-                AnkiHubClient, "get_deck_subscriptions", return_value=[deck]
-            )
 
             # Mock ask_user function to return True
             ask_user_mock = mock_function(
@@ -794,9 +770,12 @@ class TestCheckAndInstallNewDeckSubscriptions:
                 side_effect=raise_exception,
             )
 
-            # Call the function
+            # Call the function with a deck
             on_done_mock = Mock()
-            check_and_install_new_deck_subscriptions(on_done_mock)
+            deck = DeckFactory.create()
+            check_and_install_new_deck_subscriptions(
+                subscribed_decks=[deck], on_done=on_done_mock
+            )
 
             qtbot.wait(500)
 
@@ -805,7 +784,6 @@ class TestCheckAndInstallNewDeckSubscriptions:
             assert on_done_mock.call_args[0][0].exception() is not None
 
             # Assert that the mocked functions were called
-            assert get_decks_with_user_relation_mock.call_count == 1
             assert ask_user_mock.call_count == 1
             assert download_and_install_decks_mock.call_count == 1
 
