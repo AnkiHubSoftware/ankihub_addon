@@ -10,17 +10,17 @@ from .utils import ask_user
 def _deck_delete_hook():
     def _delete_override(did: DeckId) -> None:
         deck_ankihub_id = config.get_deck_uuid_by_did(did)
-        deck_name = aqt.mw.col.decks.name(did)
+        deck_name = config.deck_config(deck_ankihub_id).name
         if not deck_ankihub_id:
             return
         if ask_user(
-            text="You deleted an Anki deck that was linked to an AnkiHub deck.<br>"
-            "Would you like to unsubscribe from this AnkiHub deck as well?<br>"
-            f"Name of the AnkiHub deck: <b>{deck_name}</b><br><br>"
-            "If you have any questions about this, see "
+            text="You've deleted the Anki deck linked to the<br>"
+            f"<b>{deck_name}</b> AnkiHub deck.<br><br>"
+            "Do you also want to unsubscribe from this AnkiHub deck to avoid receiving future updates?<br><br>"
+            "For more info, check out "
             "<a href='https://community.ankihub.net/t/how-are-anki-decks-related-to-ankihub-decks/4811/1'>"
-            "this forum topic</a> for details.",
-            title="Unsubscribe from AnkiHub deck?",
+            "this topic on our forum</a>.",
+            title="Unsubscribe from AnkiHub Deck?",
             parent=aqt.mw,
         ):
             unsubscribe_from_deck_and_uninstall(deck_ankihub_id)

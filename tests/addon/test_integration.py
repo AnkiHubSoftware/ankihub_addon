@@ -3830,7 +3830,6 @@ def test_delete_ankihub_private_config_on_deckBrowser__delete_option(
     anki_session = anki_session_with_addon_data
     with anki_session.profile_loaded():
         anki_deck_id, ah_did = install_sample_ah_deck()
-        config.setup_private_config()
 
         mids = ankihub_db.note_types_for_ankihub_deck(ah_did)
         deck_uuid = config.get_deck_uuid_by_did(anki_deck_id)
@@ -3862,7 +3861,7 @@ def test_delete_ankihub_private_config_on_deckBrowser__delete_option(
             for mid in mids
         )
 
-        # # check if the deck was removed from the db
+        # check if the deck was removed from the db
         mids = ankihub_db.note_types_for_ankihub_deck(ah_did)
         assert len(mids) == 0
 
@@ -3882,8 +3881,7 @@ def test_not_delete_ankihub_private_config_on_deckBrowser__delete_option(
 
     anki_session = anki_session_with_addon_data
     with anki_session.profile_loaded():
-        anki_deck_id, ah_did = install_sample_ah_deck()
-        config.setup_private_config()
+        anki_deck_id, _ = install_sample_ah_deck()
 
         deck_uuid = config.get_deck_uuid_by_did(anki_deck_id)
 
