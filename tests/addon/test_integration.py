@@ -373,6 +373,22 @@ def mock_client_methods_called_during_sync(monkeypatch: MonkeyPatch) -> None:
     )
 
 
+def sync_with_ankihub(qtbot: QtBot) -> None:
+    """Sync with AnkiHub and wait until the sync is done."""
+    done = False
+
+    def on_done(future: Future) -> None:
+        nonlocal done
+        done = True
+
+    ankihub_sync.sync_with_ankihub(on_done=on_done)
+
+    def is_done() -> bool:
+        return done
+
+    qtbot.wait_until(is_done)
+
+
 def test_entry_point(anki_session_with_addon_data: AnkiSession, qtbot: QtBot):
     entry_point.run()
     with anki_session_with_addon_data.profile_loaded():
@@ -2850,7 +2866,7 @@ def test_profile_swap(
     "subscribed_to_deck",
     [True, False],
 )
-def test_uninstall_deck_on_sync_if_user_is_not_subscribed(
+def test_sync_uninstalls_unsubscribed_decks(
     anki_session_with_addon_data: AnkiSession,
     install_sample_ah_deck: InstallSampleAHDeck,
     monkeypatch: MonkeyPatch,
@@ -2878,18 +2894,7 @@ def test_uninstall_deck_on_sync_if_user_is_not_subscribed(
         config.save_token("test_token")
 
         # Sync
-        done = False
-
-        def on_done(future: Future):
-            nonlocal done
-            done = True
-
-        ankihub_sync.sync_with_ankihub(on_done=on_done)
-
-        def is_done():
-            return done
-
-        qtbot.wait_until(is_done)
+        sync_with_ankihub(qtbot)
 
         # Assert that the deck was uninstalled if the user is not subscribed to it,
         # else assert that it was not uninstalled
