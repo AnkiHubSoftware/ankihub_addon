@@ -5,6 +5,7 @@ import re
 import shutil
 import tempfile
 import uuid
+from concurrent.futures import Future
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
 from time import sleep
@@ -94,6 +95,7 @@ from ankihub.gui.decks_dialog import SubscribedDecksDialog, download_and_install
 from ankihub.gui.editor import _on_suggestion_button_press, _refresh_buttons
 from ankihub.gui.errors import upload_data_dir_and_logs_in_background
 from ankihub.gui.menu import menu_state
+from ankihub.gui.operations import ankihub_sync
 from ankihub.gui.operations.new_deck_subscriptions import (
     check_and_install_new_deck_subscriptions,
 )
@@ -2853,6 +2855,7 @@ def test_uninstall_deck_on_sync_if_user_is_not_subscribed(
     install_sample_ah_deck: InstallSampleAHDeck,
     monkeypatch: MonkeyPatch,
     mock_client_methods_called_during_sync: None,
+    qtbot: QtBot,
     subscribed_to_deck: bool,
 ):
 
@@ -2875,7 +2878,18 @@ def test_uninstall_deck_on_sync_if_user_is_not_subscribed(
         config.save_token("test_token")
 
         # Sync
-        ah_sync.sync_all_decks_and_media(start_media_sync=False)
+        done = False
+
+        def on_done(future: Future):
+            nonlocal done
+            done = True
+
+        ankihub_sync.sync_with_ankihub(on_done=on_done)
+
+        def is_done():
+            return done
+
+        qtbot.wait_until(is_done)
 
         # Assert that the deck was uninstalled if the user is not subscribed to it,
         # else assert that it was not uninstalled
