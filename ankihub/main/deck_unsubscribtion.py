@@ -11,6 +11,7 @@ def unsubscribe_from_deck_and_uninstall(deck_ankihub_id: uuid.UUID) -> None:
     client = AddonAnkiHubClient()
     client.unsubscribe_from_deck(deck_ankihub_id)
     uninstall_deck(deck_ankihub_id)
+    LOGGER.info(f"Unsubscribed from deck {deck_ankihub_id}")
 
 
 def uninstall_deck(deck_ankihub_id: uuid.UUID) -> None:
