@@ -2875,7 +2875,7 @@ def test_uninstall_deck_on_sync_if_user_is_not_subscribed(
         config.save_token("test_token")
 
         # Sync
-        ah_sync.sync_all_decks_and_media()
+        ah_sync.sync_all_decks_and_media(start_media_sync=False)
 
         # Assert that the deck was uninstalled if the user is not subscribed to it,
         # else assert that it was not uninstalled
