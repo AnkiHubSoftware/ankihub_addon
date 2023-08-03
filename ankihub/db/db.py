@@ -1,8 +1,8 @@
 """Code for managing the AnkiHub database. The AnkiHub database stores the state of AnkiHub decks
 as they are on AnkiHub, unlike the Anki database which can contain local changes to the deck.
-It should be updated when downloading updates from AnkiHub (this is done by the AnkiHubImporter).
-The purpose is for the add-on to have knowledge of the state of the decks on AnkiHub without having to
-request this data from AnkiHub every time we need it. This e.g.g enables the add-on to partially work offline and
+The AnkiHub database is updated when downloading updates from AnkiHub (this is done by the AnkiHubImporter).
+The purpose of the database is for the add-on to have knowledge of the state of the decks on AnkiHub without having to
+request this data from AnkiHub every time it is needed. This e.g. enables the add-on to partially work offline and
 to only send the necessary data to AnkiHub when syncing.
 
 Some differences between data stored in the AnkiHub database and the Anki database:
