@@ -388,6 +388,7 @@ def sync_with_ankihub(qtbot: QtBot) -> SyncWithAnkiHub:
         def on_done(future: Future) -> None:
             nonlocal done
             done = True
+            future.result()  # raises exception if there is one
 
         ankihub_sync.sync_with_ankihub(on_done=on_done)
 
