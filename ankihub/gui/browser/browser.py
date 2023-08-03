@@ -49,9 +49,9 @@ from ...main.reset_local_changes import reset_local_changes_to_notes
 from ...main.subdecks import SUBDECK_TAG, build_subdecks_and_move_cards_to_them
 from ...main.utils import mids_of_notes
 from ...settings import ANKIHUB_NOTE_TYPE_FIELD_NAME, DeckExtensionConfig, config
+from ..deck_updater import NotLoggedInError, ah_deck_updater
 from ..optional_tag_suggestion_dialog import OptionalTagsSuggestionDialog
 from ..suggestion_dialog import open_suggestion_dialog_for_bulk_suggestion
-from ..sync import NotLoggedInError, ah_sync
 from ..utils import ask_user, choose_ankihub_deck, choose_list, choose_subset
 from .custom_columns import (
     AnkiHubIdColumn,
@@ -515,9 +515,9 @@ def _reset_optional_tag_group(extension_id: int) -> None:
     # reset the latest extension update to sync all content for the deck extension on the next sync
     config.save_latest_extension_update(extension_id=extension_id, latest_update=None)
 
-    # sync with ankihub to re-download the deck extension
-    # TODO only sync the deck extension or the related deck instead of all decks
-    ah_sync.sync_all_decks_and_media(start_media_sync=False)
+    ah_deck_updater.update_decks_and_media(
+        ah_dids=[extension_config.ankihub_deck_uuid], start_media_sync=False
+    )
 
 
 def _remove_optional_tags_of_extension(extension_config: DeckExtensionConfig) -> None:
