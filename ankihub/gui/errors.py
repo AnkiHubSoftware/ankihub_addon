@@ -152,10 +152,11 @@ def _upload_data_dir_and_logs(key: str) -> str:
 
 
 def _zip_data_dir_and_logs() -> Path:
-    """Zip the user files directory and the log file and return the path of the zip file."""
+    """Zip the user files directory, the anki collection and the log file and return the path of the zip file."""
     temp_file = tempfile.NamedTemporaryFile(delete=False)
     temp_file.close()
     with zipfile.ZipFile(temp_file.name, "w") as zipf:
+        # Add the user files directory to the zip.
         source_dir = user_files_path()
         for file in source_dir.rglob("*"):
             # previously logs were stored in the user files directory and we don't want to
@@ -164,6 +165,13 @@ def _zip_data_dir_and_logs() -> Path:
                 continue
             zipf.write(file, arcname=file.relative_to(source_dir))
 
+        # Add the Anki collection to the zip.
+        try:
+            zipf.write(Path(aqt.mw.col.path), arcname="collection.anki2")
+        except Exception as e:
+            LOGGER.warning("Could not add Anki collection to zip.", exc_info=e)
+
+        # Add the log file to the zip.
         log_file = log_file_path()
         if log_file.exists():
             zipf.write(log_file, arcname=log_file.name)
