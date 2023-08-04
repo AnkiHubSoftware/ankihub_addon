@@ -1,4 +1,4 @@
-"""Modifies to Anki's reviewer UI (aqt.reviewer)."""
+"""Modifies Anki's reviewer UI (aqt.reviewer)."""
 from textwrap import dedent
 from typing import Any, Tuple
 
