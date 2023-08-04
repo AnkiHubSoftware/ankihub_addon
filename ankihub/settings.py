@@ -79,7 +79,9 @@ class DeckConfig(DataClassJSONMixin):
 
 @dataclass
 class DeckExtensionConfig(DataClassJSONMixin):
-    ah_did: uuid.UUID
+    ah_did: uuid.UUID = dataclasses.field(
+        metadata=field_options(alias="ankihub_deck_uuid")
+    )
     owner_id: int
     name: str
     tag_group_name: str
