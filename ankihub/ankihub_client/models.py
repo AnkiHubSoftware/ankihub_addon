@@ -52,9 +52,7 @@ class Field(DataClassJSONMixinWithConfig):
 
 @dataclass
 class NoteInfo(DataClassJSONMixinWithConfig):
-    ankihub_note_uuid: uuid.UUID = dataclasses.field(
-        metadata=field_options(alias="note_id")
-    )
+    ah_nid: uuid.UUID = dataclasses.field(metadata=field_options(alias="note_id"))
     anki_nid: int = dataclasses.field(metadata=field_options(alias="anki_id"))
     mid: int = dataclasses.field(metadata=field_options(alias="note_type_id"))
     fields: List[Field]
@@ -71,7 +69,7 @@ class NoteInfo(DataClassJSONMixinWithConfig):
 
 @dataclass
 class NoteInfoForUpload(DataClassJSONMixinWithConfig):
-    ankihub_note_uuid_str: str = dataclasses.field(metadata=field_options(alias="id"))
+    ah_nid_str: str = dataclasses.field(metadata=field_options(alias="id"))
     anki_nid: int = dataclasses.field(metadata=field_options(alias="anki_id"))
     mid: int = dataclasses.field(metadata=field_options(alias="note_type_id"))
     fields: List[Field]
@@ -81,7 +79,7 @@ class NoteInfoForUpload(DataClassJSONMixinWithConfig):
 
 def note_info_for_upload(note_info: NoteInfo) -> NoteInfoForUpload:
     return NoteInfoForUpload(
-        ankihub_note_uuid_str=str(note_info.ankihub_note_uuid),
+        ah_nid_str=str(note_info.ah_nid),
         anki_nid=note_info.anki_nid,
         mid=note_info.mid,
         fields=note_info.fields,
@@ -99,7 +97,7 @@ class UserDeckRelation(Enum):
 
 @dataclass
 class Deck(DataClassJSONMixinWithConfig):
-    ankihub_deck_uuid: uuid.UUID = dataclasses.field(metadata=field_options(alias="id"))
+    ah_did: uuid.UUID = dataclasses.field(metadata=field_options(alias="id"))
     anki_did: int = dataclasses.field(metadata=field_options(alias="anki_id"))
     name: str
     csv_last_upload: datetime = dataclasses.field(
@@ -154,7 +152,7 @@ class DeckUpdateChunk(DataClassJSONMixinWithConfig):
 
 @dataclass
 class NoteSuggestion(DataClassJSONMixinWithConfig, ABC):
-    ankihub_note_uuid: uuid.UUID = dataclasses.field(
+    ah_nid: uuid.UUID = dataclasses.field(
         metadata=field_options(
             alias="ankihub_id",
             serialize=str,
@@ -188,7 +186,7 @@ class ChangeNoteSuggestion(NoteSuggestion):
 
 @dataclass
 class NewNoteSuggestion(NoteSuggestion):
-    ankihub_deck_uuid: uuid.UUID = dataclasses.field(
+    ah_did: uuid.UUID = dataclasses.field(
         metadata=field_options(
             alias="deck_id",
             serialize=str,
@@ -220,7 +218,7 @@ class TagGroupValidationResponse(DataClassJSONMixinWithConfig):
 class OptionalTagSuggestion(DataClassJSONMixinWithConfig):
     tag_group_name: str
     deck_extension_id: int
-    ankihub_note_uuid: uuid.UUID = dataclasses.field(
+    ah_nid: uuid.UUID = dataclasses.field(
         metadata=field_options(
             alias="related_note",
             serialize=str,
@@ -232,9 +230,7 @@ class OptionalTagSuggestion(DataClassJSONMixinWithConfig):
 @dataclass
 class DeckExtension(DataClassJSONMixinWithConfig):
     id: int
-    ankihub_deck_uuid: uuid.UUID = dataclasses.field(
-        metadata=field_options(alias="deck")
-    )
+    ah_did: uuid.UUID = dataclasses.field(metadata=field_options(alias="deck"))
     owner_id: int = dataclasses.field(metadata=field_options(alias="owner"))
     name: str
     tag_group_name: str

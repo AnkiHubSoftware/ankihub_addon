@@ -33,7 +33,7 @@ def check_and_install_new_deck_subscriptions(
             return
 
         # Download the new decks
-        ah_dids = [deck.ankihub_deck_uuid for deck in decks]
+        ah_dids = [deck.ah_did for deck in decks]
         download_and_install_decks(ah_dids, on_done=on_done)
     except Exception as e:
         on_done(future_with_exception(e))
@@ -41,9 +41,5 @@ def check_and_install_new_deck_subscriptions(
 
 def _not_installed_ah_decks(subscribed_decks: List[Deck]) -> List[Deck]:
     local_deck_ids = config.deck_ids()
-    result = [
-        deck
-        for deck in subscribed_decks
-        if deck.ankihub_deck_uuid not in local_deck_ids
-    ]
+    result = [deck for deck in subscribed_decks if deck.ah_did not in local_deck_ids]
     return result

@@ -22,15 +22,15 @@ def to_note_data(note: Note, set_new_id: bool = False) -> NoteInfo:
     """
 
     if set_new_id:
-        ankihub_note_uuid = uuid.uuid4()
+        ah_nid = uuid.uuid4()
     else:
-        ankihub_note_uuid = ankihub_db.ankihub_nid_for_anki_nid(note.id)
+        ah_nid = ankihub_db.ankihub_nid_for_anki_nid(note.id)
 
     tags = _prepare_tags(note)
     fields = _prepare_fields(note)
 
     return NoteInfo(
-        ankihub_note_uuid=ankihub_note_uuid,
+        ah_nid=ah_nid,
         anki_nid=note.id,
         mid=note.mid,
         fields=fields,

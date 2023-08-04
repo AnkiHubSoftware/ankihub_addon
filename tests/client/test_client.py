@@ -167,7 +167,7 @@ def new_note_suggestion(
 ):
     ah_nid = next_deterministic_uuid()
     return NewNoteSuggestion(
-        ankihub_note_uuid=ah_nid,
+        ah_nid=ah_nid,
         anki_nid=1,
         fields=[
             Field(name="Front", value="front1", order=0),
@@ -176,7 +176,7 @@ def new_note_suggestion(
         tags=["tag1", "tag2"],
         guid="asdf",
         comment="comment1",
-        ankihub_deck_uuid=ah_nid,
+        ah_did=ah_nid,
         note_type_name="Cloze",
         anki_note_type_id=1,
     )
@@ -187,7 +187,7 @@ def new_note_suggestion_note_info(
     next_deterministic_uuid: Callable[[], uuid.UUID],
 ):
     return NoteInfo(
-        ankihub_note_uuid=next_deterministic_uuid(),
+        ah_nid=next_deterministic_uuid(),
         anki_nid=1,
         fields=[
             Field(name="Front", value="front1", order=0),
@@ -205,7 +205,7 @@ def change_note_suggestion(
     next_deterministic_uuid: Callable[[], uuid.UUID],
 ):
     return ChangeNoteSuggestion(
-        ankihub_note_uuid=next_deterministic_uuid(),
+        ah_nid=next_deterministic_uuid(),
         anki_nid=1,
         fields=[
             Field(name="Front", value="front2", order=0),
@@ -279,7 +279,7 @@ def test_download_deck(
             f"{client.s3_bucket_url}{get_presigned_url_suffix.return_value}",
             content=DECK_CSV.read_bytes(),
         )
-        notes_data = client.download_deck(ankihub_deck_uuid=ID_OF_DECK_OF_USER_TEST1)
+        notes_data = client.download_deck(ah_did=ID_OF_DECK_OF_USER_TEST1)
     assert len(notes_data) == 1
     assert notes_data[0].tags == ["asdf"]
 
@@ -308,7 +308,7 @@ def test_download_compressed_deck(
             f"{client.s3_bucket_url}{get_presigned_url_suffix.return_value}",
             content=DECK_CSV_GZ.read_bytes(),
         )
-        notes_data = client.download_deck(ankihub_deck_uuid=ID_OF_DECK_OF_USER_TEST1)
+        notes_data = client.download_deck(ah_did=ID_OF_DECK_OF_USER_TEST1)
     assert len(notes_data) == 1
     assert notes_data[0].tags == ["asdf"]
 
@@ -339,7 +339,7 @@ def test_download_deck_with_progress(
             headers={"content-length": "1000000"},
         )
         notes_data = client.download_deck(
-            ankihub_deck_uuid=ID_OF_DECK_OF_USER_TEST1,
+            ah_did=ID_OF_DECK_OF_USER_TEST1,
             download_progress_cb=_download_progress_cb,
         )
     assert len(notes_data) == 1
@@ -355,16 +355,14 @@ def create_note_on_ankihub_and_assert(
     assert isinstance(new_note_suggestion, NewNoteSuggestion)
 
     # create an auto-accepted new note suggestion
-    new_note_suggestion.ankihub_deck_uuid = uuid_of_deck
+    new_note_suggestion.ah_did = uuid_of_deck
     errors_by_nid = client.create_suggestions_in_bulk(
         new_note_suggestions=[new_note_suggestion], auto_accept=True
     )
     assert errors_by_nid == {}
 
     # assert that note was created
-    note = client.get_note_by_id(
-        ankihub_note_uuid=new_note_suggestion.ankihub_note_uuid
-    )
+    note = client.get_note_by_id(ah_nid=new_note_suggestion.ah_nid)
     assert note.fields == new_note_suggestion.fields
     assert set(note.tags) == set(new_note_suggestion.tags)
 
@@ -431,7 +429,7 @@ class TestCreateSuggestion:
 
         # create a change note suggestion without all fields (for the same note)
         cns: ChangeNoteSuggestion = change_note_suggestion
-        cns.ankihub_note_uuid = new_note_suggestion.ankihub_note_uuid
+        cns.ah_nid = new_note_suggestion.ah_nid
         cns.fields = [
             Field(name="Front", value="front2", order=0),
         ]
@@ -452,7 +450,7 @@ class TestCreateSuggestionsInBulk:
     ):
         client = authorized_client_for_user_test1
 
-        new_note_suggestion.ankihub_deck_uuid = ID_OF_DECK_OF_USER_TEST1
+        new_note_suggestion.ah_did = ID_OF_DECK_OF_USER_TEST1
         errors_by_nid = client.create_suggestions_in_bulk(
             new_note_suggestions=[new_note_suggestion],
             auto_accept=False,
@@ -469,10 +467,10 @@ class TestCreateSuggestionsInBulk:
         client = authorized_client_for_user_test1
 
         # create two new note suggestions at once
-        new_note_suggestion.ankihub_deck_uuid = ID_OF_DECK_OF_USER_TEST1
+        new_note_suggestion.ah_did = ID_OF_DECK_OF_USER_TEST1
 
         new_note_suggestion_2 = deepcopy(new_note_suggestion)
-        new_note_suggestion_2.ankihub_note_uuid = next_deterministic_uuid()
+        new_note_suggestion_2.ah_nid = next_deterministic_uuid()
         new_note_suggestion_2.anki_nid = 2
 
         errors_by_nid = client.create_suggestions_in_bulk(
@@ -490,13 +488,13 @@ class TestCreateSuggestionsInBulk:
         client = authorized_client_for_user_test1
 
         # create a new note suggestion
-        new_note_suggestion.ankihub_deck_uuid = ID_OF_DECK_OF_USER_TEST1
+        new_note_suggestion.ah_did = ID_OF_DECK_OF_USER_TEST1
         errors_by_nid = client.create_suggestions_in_bulk(
             new_note_suggestions=[new_note_suggestion], auto_accept=False
         )
         assert errors_by_nid == {}
 
-        # try creating a new note suggestion with the same ankihub_note_uuid as the first one
+        # try creating a new note suggestion with the same ah_nid as the first one
         new_note_suggestion_2 = deepcopy(new_note_suggestion)
         new_note_suggestion_2.anki_nid = 2
         errors_by_nid = client.create_suggestions_in_bulk(
@@ -527,7 +525,7 @@ class TestCreateSuggestionsInBulk:
     ):
         client = authorized_client_for_user_test1
 
-        new_note_suggestion.ankihub_deck_uuid = ID_OF_DECK_OF_USER_TEST1
+        new_note_suggestion.ah_did = ID_OF_DECK_OF_USER_TEST1
         create_note_on_ankihub_and_assert(
             authorized_client_for_user_test1,
             new_note_suggestion,
@@ -535,7 +533,7 @@ class TestCreateSuggestionsInBulk:
         )
 
         # create a change note suggestion
-        change_note_suggestion.ankihub_note_uuid = new_note_suggestion.ankihub_note_uuid
+        change_note_suggestion.ah_nid = new_note_suggestion.ah_nid
         errors_by_nid = client.create_suggestions_in_bulk(
             change_note_suggestions=[change_note_suggestion], auto_accept=False
         )
@@ -557,13 +555,11 @@ class TestCreateSuggestionsInBulk:
         )
 
         # create an auto-accepted change note suggestion and assert that note was changed
-        change_note_suggestion.ankihub_note_uuid = new_note_suggestion.ankihub_note_uuid
+        change_note_suggestion.ah_nid = new_note_suggestion.ah_nid
         errors_by_nid = client.create_suggestions_in_bulk(
             change_note_suggestions=[change_note_suggestion], auto_accept=True
         )
-        note = client.get_note_by_id(
-            ankihub_note_uuid=new_note_suggestion.ankihub_note_uuid
-        )
+        note = client.get_note_by_id(ah_nid=new_note_suggestion.ah_nid)
         assert errors_by_nid == {}
         assert note.fields == change_note_suggestion.fields
         assert set(note.tags) == set(change_note_suggestion.added_tags) | set(
@@ -616,7 +612,7 @@ class TestDeckSubscriptions:
         decks = client.get_deck_subscriptions()
         assert len(decks) == 1
         deck: Deck = decks[0]
-        assert deck.ankihub_deck_uuid == ID_OF_DECK_OF_USER_TEST1
+        assert deck.ah_did == ID_OF_DECK_OF_USER_TEST1
 
     @pytest.mark.vcr()
     def test_subscribe_with_unauthorized_client(
@@ -644,7 +640,7 @@ class TestDeckSubscriptions:
         decks = client.get_deck_subscriptions()
         assert len(decks) == 1
         deck: Deck = decks[0]
-        assert deck.ankihub_deck_uuid == ID_OF_DECK_OF_USER_TEST1
+        assert deck.ah_did == ID_OF_DECK_OF_USER_TEST1
 
         client.unsubscribe_from_deck(ID_OF_DECK_OF_USER_TEST1)
         assert client.get_deck_subscriptions() == []
@@ -682,21 +678,21 @@ class TestDecksWithUserRelation:
         decks = client.get_decks_with_user_relation()
         assert len(decks) == 1
         deck: Deck = decks[0]
-        assert deck.ankihub_deck_uuid == ID_OF_DECK_OF_USER_TEST1
+        assert deck.ah_did == ID_OF_DECK_OF_USER_TEST1
         assert deck.user_relation == UserDeckRelation.OWNER
 
         client.subscribe_to_deck(ID_OF_DECK_OF_USER_TEST2)
 
         decks = client.get_decks_with_user_relation()
         assert len(decks) == 2
-        assert set(deck.ankihub_deck_uuid for deck in decks) == set(
+        assert set(deck.ah_did for deck in decks) == set(
             [
                 ID_OF_DECK_OF_USER_TEST1,
                 ID_OF_DECK_OF_USER_TEST2,
             ]
         )
         deck_of_user_test2 = next(
-            deck for deck in decks if deck.ankihub_deck_uuid == ID_OF_DECK_OF_USER_TEST2
+            deck for deck in decks if deck.ah_did == ID_OF_DECK_OF_USER_TEST2
         )
         assert deck_of_user_test2.user_relation == UserDeckRelation.SUBSCRIBER
 
@@ -732,18 +728,16 @@ class TestGetDeckUpdates:
         since_time = datetime.now(timezone.utc)
 
         # create a new note
-        new_note_suggestion.ankihub_deck_uuid = ID_OF_DECK_OF_USER_TEST1
+        new_note_suggestion.ah_did = ID_OF_DECK_OF_USER_TEST1
         client.create_new_note_suggestion(new_note_suggestion, auto_accept=True)
 
         # get deck updates since the time of the new note creation
         chunks = list(
-            client.get_deck_updates(
-                ankihub_deck_uuid=ID_OF_DECK_OF_USER_TEST1, since=since_time
-            )
+            client.get_deck_updates(ah_did=ID_OF_DECK_OF_USER_TEST1, since=since_time)
         )
 
         note_info: NoteInfo = new_note_suggestion_note_info
-        note_info.ankihub_note_uuid = new_note_suggestion.ankihub_note_uuid
+        note_info.ah_nid = new_note_suggestion.ah_nid
         note_info.anki_nid = new_note_suggestion.anki_nid
         note_info.guid = new_note_suggestion.guid
 
@@ -767,7 +761,7 @@ def test_get_deck_extensions_by_deck_id(
         DeckExtension(
             id=999,
             owner_id=1,
-            ankihub_deck_uuid=DECK_WITH_EXTENSION_UUID,
+            ah_did=DECK_WITH_EXTENSION_UUID,
             name="test100",
             tag_group_name="test100",
             description="",
@@ -908,7 +902,7 @@ def test_prevalidate_tag_groups(authorized_client_for_user_test2: AnkiHubClient)
     client = authorized_client_for_user_test2
 
     tag_group_validation_responses = client.prevalidate_tag_groups(
-        ankihub_deck_uuid=DECK_WITH_EXTENSION_UUID,
+        ah_did=DECK_WITH_EXTENSION_UUID,
         tag_group_names=["test100", "invalid"],
     )
     assert tag_group_validation_responses == [
@@ -936,7 +930,7 @@ def test_suggest_optional_tags(authorized_client_for_user_test2: AnkiHubClient):
     client.suggest_optional_tags(
         suggestions=[
             OptionalTagSuggestion(
-                ankihub_note_uuid=uuid.UUID("8645c6d6-4f3d-417e-8295-8f5009042b6e"),
+                ah_nid=uuid.UUID("8645c6d6-4f3d-417e-8295-8f5009042b6e"),
                 tag_group_name="test100",
                 deck_extension_id=999,
                 tags=[
@@ -960,7 +954,7 @@ def test_suggest_auto_accepted_optional_tags(
         auto_accept=True,
         suggestions=[
             OptionalTagSuggestion(
-                ankihub_note_uuid=uuid.UUID("8645c6d6-4f3d-417e-8295-8f5009042b6e"),
+                ah_nid=uuid.UUID("8645c6d6-4f3d-417e-8295-8f5009042b6e"),
                 tag_group_name="test100",
                 deck_extension_id=DECK_EXTENSION_ID,
                 tags=[
@@ -1081,7 +1075,7 @@ class TestUploadMediaForSuggestion:
 
         if isinstance(suggestion, ChangeNoteSuggestion):
             suggestion_request_mock = requests_mock.post(
-                f"{DEFAULT_API_URL}/notes/{suggestion.ankihub_note_uuid}/suggestion/",
+                f"{DEFAULT_API_URL}/notes/{suggestion.ah_nid}/suggestion/",
                 status_code=201,
             )
 
@@ -1089,7 +1083,7 @@ class TestUploadMediaForSuggestion:
         else:
             assert isinstance(suggestion, NewNoteSuggestion)
             suggestion_request_mock = requests_mock.post(
-                f"{DEFAULT_API_URL}/decks/{suggestion.ankihub_deck_uuid}/note-suggestion/",
+                f"{DEFAULT_API_URL}/decks/{suggestion.ah_did}/note-suggestion/",
                 status_code=201,
             )
             client.create_new_note_suggestion(new_note_suggestion=suggestion)

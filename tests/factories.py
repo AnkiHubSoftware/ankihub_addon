@@ -28,7 +28,7 @@ class NoteInfoFactory(BaseFactory[NoteInfo]):
     class Meta:
         model = NoteInfo
 
-    ankihub_note_uuid = factory.LazyFunction(uuid.uuid4)
+    ah_nid = factory.LazyFunction(uuid.uuid4)
     anki_nid = 1
     mid = 1
     fields: List[Field] = factory.LazyAttribute(  # type: ignore
@@ -45,7 +45,7 @@ class DeckFactory(BaseFactory[Deck]):
     class Meta:
         model = Deck
 
-    ankihub_deck_uuid = uuid.uuid4()
+    ah_did = uuid.uuid4()
     name = "Test Deck"
     anki_did = 1
     csv_last_upload = datetime.datetime.now(tz=timezone.utc)

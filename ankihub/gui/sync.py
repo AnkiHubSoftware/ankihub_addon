@@ -63,9 +63,7 @@ class _AnkiHubSync:
         create_backup()
 
         client = AnkiHubClient()
-        subscribed_ah_dids = [
-            deck.ankihub_deck_uuid for deck in client.get_deck_subscriptions()
-        ]
+        subscribed_ah_dids = [deck.ah_did for deck in client.get_deck_subscriptions()]
         installed_ah_dids = config.deck_ids()
         to_sync_ah_dids = set(installed_ah_dids).intersection(subscribed_ah_dids)
         for ah_did in to_sync_ah_dids:

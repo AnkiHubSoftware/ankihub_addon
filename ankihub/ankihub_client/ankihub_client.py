@@ -562,10 +562,10 @@ class AnkiHubClient:
 
     def download_deck(
         self,
-        ankihub_deck_uuid: uuid.UUID,
+        ah_did: uuid.UUID,
         download_progress_cb: Optional[Callable[[int], None]] = None,
     ) -> List[NoteInfo]:
-        deck_info = self.get_deck_by_id(ankihub_deck_uuid)
+        deck_info = self.get_deck_by_id(ah_did)
 
         s3_url_suffix = self._get_presigned_url_suffix(
             key=deck_info.csv_notes_filename, action="download"
@@ -620,7 +620,7 @@ class AnkiHubClient:
 
     def get_deck_updates(
         self,
-        ankihub_deck_uuid: uuid.UUID,
+        ah_did: uuid.UUID,
         since: datetime,
         download_progress_cb: Optional[Callable[[int], None]] = None,
     ) -> Iterator[DeckUpdateChunk]:
@@ -634,7 +634,7 @@ class AnkiHubClient:
             "since": since.strftime(ANKIHUB_DATETIME_FORMAT_STR) if since else None,
             "size": DECK_UPDATE_PAGE_SIZE,
         }
-        url_suffix = f"/decks/{ankihub_deck_uuid}/updates"
+        url_suffix = f"/decks/{ah_did}/updates"
         i = 0
         notes_count = 0
         while url_suffix is not None:
@@ -667,11 +667,11 @@ class AnkiHubClient:
             if download_progress_cb:
                 download_progress_cb(notes_count)
 
-    def get_deck_by_id(self, ankihub_deck_uuid: uuid.UUID) -> Deck:
+    def get_deck_by_id(self, ah_did: uuid.UUID) -> Deck:
         response = self._send_request(
             "GET",
             API.ANKIHUB,
-            f"/decks/{ankihub_deck_uuid}/",
+            f"/decks/{ah_did}/",
         )
         if response.status_code != 200:
             raise AnkiHubHTTPError(response)
@@ -680,11 +680,11 @@ class AnkiHubClient:
         result = Deck.from_dict(data)
         return result
 
-    def get_note_by_id(self, ankihub_note_uuid: uuid.UUID) -> NoteInfo:
+    def get_note_by_id(self, ah_nid: uuid.UUID) -> NoteInfo:
         response = self._send_request(
             "GET",
             API.ANKIHUB,
-            f"/notes/{ankihub_note_uuid}",
+            f"/notes/{ah_nid}",
         )
         if response.status_code != 200:
             raise AnkiHubHTTPError(response)
@@ -701,7 +701,7 @@ class AnkiHubClient:
         response = self._send_request(
             "POST",
             API.ANKIHUB,
-            f"/notes/{change_note_suggestion.ankihub_note_uuid}/suggestion/",
+            f"/notes/{change_note_suggestion.ah_nid}/suggestion/",
             json={**change_note_suggestion.to_dict(), "auto_accept": auto_accept},
         )
         if response.status_code != 201:
@@ -715,7 +715,7 @@ class AnkiHubClient:
         response = self._send_request(
             "POST",
             API.ANKIHUB,
-            f"/decks/{new_note_suggestion.ankihub_deck_uuid}/note-suggestion/",
+            f"/decks/{new_note_suggestion.ah_did}/note-suggestion/",
             json={**new_note_suggestion.to_dict(), "auto_accept": auto_accept},
         )
         if response.status_code != 201:
@@ -823,13 +823,11 @@ class AnkiHubClient:
         result = _to_anki_note_type(data)
         return result
 
-    def get_protected_fields(
-        self, ankihub_deck_uuid: uuid.UUID
-    ) -> Dict[int, List[str]]:
+    def get_protected_fields(self, ah_did: uuid.UUID) -> Dict[int, List[str]]:
         response = self._send_request(
             "GET",
             API.ANKIHUB,
-            f"/decks/{ankihub_deck_uuid}/protected-fields/",
+            f"/decks/{ah_did}/protected-fields/",
         )
         if response.status_code == 404:
             return {}
@@ -843,11 +841,11 @@ class AnkiHubClient:
         }
         return result
 
-    def get_protected_tags(self, ankihub_deck_uuid: uuid.UUID) -> List[str]:
+    def get_protected_tags(self, ah_did: uuid.UUID) -> List[str]:
         response = self._send_request(
             "GET",
             API.ANKIHUB,
-            f"/decks/{ankihub_deck_uuid}/protected-tags/",
+            f"/decks/{ah_did}/protected-tags/",
         )
         if response.status_code == 404:
             return []
@@ -858,13 +856,11 @@ class AnkiHubClient:
         result = [x for x in result if x.strip()]
         return result
 
-    def get_media_disabled_fields(
-        self, ankihub_deck_uuid: uuid.UUID
-    ) -> Dict[int, List[str]]:
+    def get_media_disabled_fields(self, ah_did: uuid.UUID) -> Dict[int, List[str]]:
         response = self._send_request(
             "GET",
             API.ANKIHUB,
-            f"/decks/{ankihub_deck_uuid}/media-disabled-fields/",
+            f"/decks/{ah_did}/media-disabled-fields/",
         )
         if response.status_code == 404:
             return {}
@@ -933,7 +929,7 @@ class AnkiHubClient:
                 download_progress_cb(customizations_count)
 
     def prevalidate_tag_groups(
-        self, ankihub_deck_uuid: uuid.UUID, tag_group_names: List[str]
+        self, ah_did: uuid.UUID, tag_group_names: List[str]
     ) -> List[TagGroupValidationResponse]:
         suggestions = [
             {"tag_group_name": tag_group_name} for tag_group_name in tag_group_names
@@ -942,7 +938,7 @@ class AnkiHubClient:
             "POST",
             API.ANKIHUB,
             "/deck_extensions/suggestions/prevalidate",
-            json={"deck_id": str(ankihub_deck_uuid), "suggestions": suggestions},
+            json={"deck_id": str(ah_did), "suggestions": suggestions},
         )
         if response.status_code != 200:
             raise AnkiHubHTTPError(response)
@@ -1017,15 +1013,15 @@ class AnkiHubClient:
         data = response.json()
         return data
 
-    def is_media_upload_finished(self, ankihub_deck_uuid: uuid.UUID) -> bool:
-        deck_info = self.get_deck_by_id(ankihub_deck_uuid)
+    def is_media_upload_finished(self, ah_did: uuid.UUID) -> bool:
+        deck_info = self.get_deck_by_id(ah_did)
         return deck_info.media_upload_finished
 
-    def media_upload_finished(self, ankihub_deck_uuid: uuid.UUID) -> None:
+    def media_upload_finished(self, ah_did: uuid.UUID) -> None:
         response = self._send_request(
             "PATCH",
             API.ANKIHUB,
-            f"/decks/{ankihub_deck_uuid}/media-upload-finished",
+            f"/decks/{ah_did}/media-upload-finished",
         )
         if response.status_code != 204:
             raise AnkiHubHTTPError(response)
