@@ -93,7 +93,7 @@ from ankihub.gui.config_dialog import (
 )
 from ankihub.gui.decks_dialog import SubscribedDecksDialog, download_and_install_decks
 from ankihub.gui.editor import _on_suggestion_button_press, _refresh_buttons
-from ankihub.gui.errors import upload_data_dir_and_logs_in_background
+from ankihub.gui.errors import upload_logs_and_data_in_background
 from ankihub.gui.menu import menu_state
 from ankihub.gui.operations import ankihub_sync
 from ankihub.gui.operations.new_deck_subscriptions import (
@@ -3810,7 +3810,7 @@ def test_handle_notes_deleted_from_webapp(
         assert (TAG_FOR_DELETED_NOTES in note.tags) == was_deleted_from_webapp
 
 
-def test_upload_data_dir_and_logs(
+def test_upload_logs_and_data(
     anki_session_with_addon_data: AnkiSession,
     monkeypatch: MonkeyPatch,
     qtbot: QtBot,
@@ -3832,7 +3832,7 @@ def test_upload_data_dir_and_logs(
         )
 
         # Start the upload in the background and wait until it is finished.
-        upload_data_dir_and_logs_in_background()
+        upload_logs_and_data_in_background()
 
         def upload_finished():
             return key is not None
@@ -3844,6 +3844,7 @@ def test_upload_data_dir_and_logs(
         with ZipFile(file_copy_path, "r") as zip_file:
             assert "ankihub.log" in zip_file.namelist()
             assert f"{settings.profile_files_path().name}/" in zip_file.namelist()
+            assert "collection.anki2" in zip_file.namelist()
 
         # Check the key
         assert key.startswith("ankihub_addon_debug_info_")
