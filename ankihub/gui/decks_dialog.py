@@ -103,7 +103,7 @@ class SubscribedDecksDialog(QDialog):
                 item = QListWidgetItem(f"{name} (Maintained by you)")
             else:
                 item = QListWidgetItem(name)
-            item.setData(Qt.ItemDataRole.UserRole, deck.ankihub_deck_uuid)
+            item.setData(Qt.ItemDataRole.UserRole, deck.ah_did)
             self.decks_list.addItem(item)
 
     def _refresh_anki(self) -> None:

@@ -258,7 +258,7 @@ class AnkiHubImporter:
         anki_did: Optional[DeckId] = None,
     ) -> Note:
         LOGGER.debug(
-            f"Trying to update or create note: {note_data.anki_nid=}, {note_data.ankihub_note_uuid=}"
+            f"Trying to update or create note: {note_data.anki_nid=}, {note_data.ah_nid=}"
         )
 
         try:
@@ -381,7 +381,7 @@ class AnkiHubImporter:
         changed_guid = self._prepare_guid(note, note_data.guid)
 
         changed_ankihub_id_field = self._prepare_ankihub_id_field(
-            note, ankihub_nid=str(note_data.ankihub_note_uuid)
+            note, ankihub_nid=str(note_data.ah_nid)
         )
         changed_fields = self._prepare_fields(
             note, fields=note_data.fields, protected_fields=protected_fields

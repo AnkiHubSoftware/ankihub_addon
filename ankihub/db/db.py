@@ -180,7 +180,7 @@ class _AnkiHubDB:
                     AND ankihub_note_id != ?
                     """,
                     note_data.anki_nid,
-                    str(note_data.ankihub_note_uuid),
+                    str(note_data.ah_nid),
                 )
                 if conflicting_ah_nid:
                     skipped_notes.append(note_data)
@@ -208,7 +208,7 @@ class _AnkiHubDB:
                         last_update_type
                     ) VALUES (?, ?, ?, ?, ?, ?, ?, ?)
                     """,
-                    str(note_data.ankihub_note_uuid),
+                    str(note_data.ah_nid),
                     str(ankihub_did),
                     note_data.anki_nid,
                     note_data.mid,
@@ -223,13 +223,13 @@ class _AnkiHubDB:
 
         return (tuple(upserted_notes), tuple(skipped_notes))
 
-    def remove_notes(self, ankihub_note_uuids: Sequence[uuid.UUID]) -> None:
+    def remove_notes(self, ah_nids: Sequence[uuid.UUID]) -> None:
         """Removes notes from the AnkiHub DB"""
         with self.connection() as conn:
             conn.execute(
                 f"""
                 DELETE FROM notes WHERE ankihub_note_id IN
-                {uuids2str(ankihub_note_uuids)}
+                {uuids2str(ah_nids)}
                 """,
             )
 
@@ -249,7 +249,7 @@ class _AnkiHubDB:
                 conn.execute(
                     "UPDATE notes SET mod = ? WHERE ankihub_note_id = ?",
                     mod,
-                    str(note_data.ankihub_note_uuid),
+                    str(note_data.ah_nid),
                 )
 
     def reset_mod_values_in_anki_db(self, anki_nids: List[NoteId]) -> None:
@@ -305,7 +305,7 @@ class _AnkiHubDB:
             field["name"] for field in aqt.mw.col.models.get(NotetypeId(mid))["flds"]
         ]
         return NoteInfo(
-            ankihub_note_uuid=uuid.UUID(ah_nid),
+            ah_nid=uuid.UUID(ah_nid),
             anki_nid=anki_nid,
             mid=mid,
             tags=aqt.mw.col.tags.split(tags),
