@@ -80,7 +80,7 @@ class DeckConfig(DataClassJSONMixin):
 @dataclass
 class DeckExtensionConfig(DataClassJSONMixin):
     ah_did: uuid.UUID = dataclasses.field(
-        metadata=field_options(alias="ankihub_deck_uuid")
+        metadata=field_options(alias="ankihub_deck_uuid")  # for backwards compatibility
     )
     owner_id: int
     name: str
