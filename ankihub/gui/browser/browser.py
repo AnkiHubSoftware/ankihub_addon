@@ -301,7 +301,7 @@ def _on_reset_local_changes_action(browser: Browser, nids: Sequence[NoteId]) -> 
         tooltip("Reset local changes for selected notes.", parent=browser)
 
     aqt.mw.taskman.with_progress(
-        task=lambda: reset_local_changes_to_notes(nids, ankihub_deck_uuid=ankihub_did),
+        task=lambda: reset_local_changes_to_notes(nids, ah_did=ankihub_did),
         on_done=on_done,
         label="Resetting local changes...",
         parent=browser,
@@ -394,7 +394,7 @@ def _on_reset_deck_action(browser: Browser):
         tooltip(f"Reset local changes to deck <b>{deck_config.name}</b>")
 
     aqt.mw.taskman.with_progress(
-        lambda: reset_local_changes_to_notes(nids, ankihub_deck_uuid=ah_did),
+        lambda: reset_local_changes_to_notes(nids, ah_did=ah_did),
         on_done=on_done,
         label="Resetting local changes...",
         parent=browser,
@@ -467,7 +467,7 @@ def _on_reset_optional_tags_action(browser: Browser):
 
     extension_configs = [config.deck_extension_config(eid) for eid in extension_ids]
     tag_group_names = [c.tag_group_name for c in extension_configs]
-    deck_configs = [config.deck_config(c.ankihub_deck_uuid) for c in extension_configs]
+    deck_configs = [config.deck_config(c.ah_did) for c in extension_configs]
     tag_group_names_with_deck = [
         f"{extension_name} ({deck_config.name})"
         for extension_name, deck_config in zip(tag_group_names, deck_configs)
@@ -516,7 +516,7 @@ def _reset_optional_tag_group(extension_id: int) -> None:
     config.save_latest_extension_update(extension_id=extension_id, latest_update=None)
 
     ah_deck_updater.update_decks_and_media(
-        ah_dids=[extension_config.ankihub_deck_uuid], start_media_sync=False
+        ah_dids=[extension_config.ah_did], start_media_sync=False
     )
 
 
@@ -528,7 +528,7 @@ def _remove_optional_tags_of_extension(extension_config: DeckExtensionConfig) ->
         for tag in aqt.mw.col.tags.all()
         if is_tag_for_group(tag, extension_config.tag_group_name)
     ]
-    nids = ankihub_db.anki_nids_for_ankihub_deck(extension_config.ankihub_deck_uuid)
+    nids = ankihub_db.anki_nids_for_ankihub_deck(extension_config.ah_did)
     aqt.mw.col.tags.bulk_remove(note_ids=nids, tags=" ".join(tags_for_tag_group))
     LOGGER.info(f"Removed optional tags for {extension_config.tag_group_name}")
 

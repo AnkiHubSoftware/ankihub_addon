@@ -79,7 +79,9 @@ class DeckConfig(DataClassJSONMixin):
 
 @dataclass
 class DeckExtensionConfig(DataClassJSONMixin):
-    ankihub_deck_uuid: uuid.UUID
+    ah_did: uuid.UUID = dataclasses.field(
+        metadata=field_options(alias="ankihub_deck_uuid")  # for backwards compatibility
+    )
     owner_id: int
     name: str
     tag_group_name: str
@@ -270,7 +272,7 @@ class _Config:
         )
 
         self._private_config.deck_extensions[extension.id] = DeckExtensionConfig(
-            ankihub_deck_uuid=extension.ankihub_deck_uuid,
+            ah_did=extension.ah_did,
             name=extension.name,
             owner_id=extension.owner_id,
             tag_group_name=extension.tag_group_name,

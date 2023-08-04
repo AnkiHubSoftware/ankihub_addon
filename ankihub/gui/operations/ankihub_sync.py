@@ -23,7 +23,7 @@ def sync_with_ankihub(on_done: Callable[[Future], None]) -> None:
             return
 
         installed_ah_dids = config.deck_ids()
-        subscribed_ah_dids = [deck.ankihub_deck_uuid for deck in subscribed_decks]
+        subscribed_ah_dids = [deck.ah_did for deck in subscribed_decks]
         to_sync_ah_dids = set(installed_ah_dids).intersection(set(subscribed_ah_dids))
 
         aqt.mw.taskman.with_progress(
@@ -59,7 +59,7 @@ def _uninstall_decks_the_user_is_not_longer_subscribed_to(
     subscribed_decks: List[Deck],
 ) -> None:
     installed_ah_dids = config.deck_ids()
-    subscribed_ah_dids = [deck.ankihub_deck_uuid for deck in subscribed_decks]
+    subscribed_ah_dids = [deck.ah_did for deck in subscribed_decks]
     to_uninstall = set(installed_ah_dids).difference(subscribed_ah_dids)
     for ah_did in to_uninstall:
         uninstall_deck(ah_did)

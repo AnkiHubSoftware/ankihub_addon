@@ -256,7 +256,7 @@ def import_ah_note(next_deterministic_uuid: Callable[[], uuid.UUID]) -> ImportAH
         note_data.mid = mid
 
         if ah_nid:
-            note_data.ankihub_note_uuid = ah_nid
+            note_data.ah_nid = ah_nid
 
         # Check if note data is compatible with the note type.
         # For each field in note_data, check if there is a field in the note type with the same name.
@@ -549,7 +549,7 @@ def test_create_collaborative_deck_and_upload(
         # check that the client method was called with the correct data
         expected_note_types_data = [mw.col.models.get(note.mid)]
         expected_note_data = NoteInfo(
-            ankihub_note_uuid=ah_nid,
+            ah_nid=ah_nid,
             anki_nid=note.id,
             fields=[
                 Field(name="Front", value="front", order=0),
@@ -605,9 +605,7 @@ class TestDownloadAndInstallDecks:
 
             # Download and install the deck
             on_success_mock = Mock()
-            download_and_install_decks(
-                [deck.ankihub_deck_uuid], on_done=on_success_mock
-            )
+            download_and_install_decks([deck.ah_did], on_done=on_success_mock)
             qtbot.wait(500)
 
             # Assert that the deck was installed
@@ -616,11 +614,11 @@ class TestDownloadAndInstallDecks:
             assert mw.col.get_note(NoteId(notes_data[0].anki_nid)) is not None
 
             # ... in the AnkiHub database
-            ankihub_db.ankihub_deck_ids() == [deck.ankihub_deck_uuid]
+            ankihub_db.ankihub_deck_ids() == [deck.ah_did]
             assert ankihub_db.note_data(NoteId(notes_data[0].anki_nid)) == notes_data[0]
 
             # ... in the config
-            assert config.deck_ids() == [deck.ankihub_deck_uuid]
+            assert config.deck_ids() == [deck.ah_did]
 
             # Assert that the on_success callback was called
             on_success_mock.assert_called_once()
@@ -703,9 +701,7 @@ class TestCheckAndInstallNewDeckSubscriptions:
             # Assert that the mocked functions were called
             assert ask_user_mock.call_count == 1
             assert download_and_install_decks_mock.call_count == 1
-            assert download_and_install_decks_mock.call_args[0][0] == [
-                deck.ankihub_deck_uuid
-            ]
+            assert download_and_install_decks_mock.call_args[0][0] == [deck.ah_did]
 
     def test_user_declines(
         self,
@@ -806,10 +802,10 @@ def test_get_deck_by_id(
     client.local_media_dir_path = Path("/tmp/ankihub_media")
 
     # test get deck by id
-    ankihub_deck_uuid = next_deterministic_uuid()
+    ah_did = next_deterministic_uuid()
     date_time = datetime.now(tz=timezone.utc)
     expected_data = {
-        "id": str(ankihub_deck_uuid),
+        "id": str(ah_did),
         "name": "test",
         "anki_id": 1,
         "csv_last_upload": date_time.strftime(ANKIHUB_DATETIME_FORMAT_STR),
@@ -818,12 +814,10 @@ def test_get_deck_by_id(
         "user_relation": "subscriber",
     }
 
-    requests_mock.get(
-        f"{config.api_url}/decks/{ankihub_deck_uuid}/", json=expected_data
-    )
-    deck_info = client.get_deck_by_id(ankihub_deck_uuid=ankihub_deck_uuid)  # type: ignore
+    requests_mock.get(f"{config.api_url}/decks/{ah_did}/", json=expected_data)
+    deck_info = client.get_deck_by_id(ah_did=ah_did)  # type: ignore
     assert deck_info == Deck(
-        ankihub_deck_uuid=ankihub_deck_uuid,
+        ah_did=ah_did,
         anki_did=1,
         name="test",
         csv_last_upload=date_time,
@@ -833,10 +827,10 @@ def test_get_deck_by_id(
     )
 
     # test get deck by id unauthenticated
-    requests_mock.get(f"{config.api_url}/decks/{ankihub_deck_uuid}/", status_code=403)
+    requests_mock.get(f"{config.api_url}/decks/{ah_did}/", status_code=403)
 
     try:
-        client.get_deck_by_id(ankihub_deck_uuid=ankihub_deck_uuid)  # type: ignore
+        client.get_deck_by_id(ah_did=ah_did)  # type: ignore
     except AnkiHubHTTPError as e:
         exc = e
     assert exc is not None and exc.response.status_code == 403
@@ -899,7 +893,7 @@ def test_suggest_note_update(
         create_change_note_suggestion_mock.assert_called_once_with(
             change_note_suggestion=ChangeNoteSuggestion(
                 anki_nid=note.id,
-                ankihub_note_uuid=ankihub_db.ankihub_nid_for_anki_nid(note.id),
+                ah_nid=ankihub_db.ankihub_nid_for_anki_nid(note.id),
                 change_type=SuggestionType.NEW_CONTENT,
                 fields=[Field(name="Front", value="updated", order=0)],
                 added_tags=["added"],
@@ -1021,7 +1015,7 @@ def test_suggest_notes_in_bulk(
         assert bulk_suggestions_method_mock.call_args.kwargs == {
             "change_note_suggestions": [
                 ChangeNoteSuggestion(
-                    ankihub_note_uuid=uuid.UUID("67f182c2-7306-47f8-aed6-d7edb42cd7de"),
+                    ah_nid=uuid.UUID("67f182c2-7306-47f8-aed6-d7edb42cd7de"),
                     anki_nid=CHANGED_NOTE_ID,
                     fields=[
                         Field(
@@ -1038,7 +1032,7 @@ def test_suggest_notes_in_bulk(
             ],
             "new_note_suggestions": [
                 NewNoteSuggestion(
-                    ankihub_note_uuid=new_note_ah_id,
+                    ah_nid=new_note_ah_id,
                     anki_nid=new_note.id,
                     fields=[
                         Field(name="Front", order=0, value=""),
@@ -1047,7 +1041,7 @@ def test_suggest_notes_in_bulk(
                     tags=[],
                     guid=new_note.guid,
                     comment="test",
-                    ankihub_deck_uuid=ah_did,
+                    ah_did=ah_did,
                     note_type_name="Basic (Testdeck / user1)",
                     anki_note_type_id=1657023668893,
                 ),
@@ -1135,11 +1129,11 @@ class TestAnkiHubImporter:
             importer.run()
             mw.col.decks.remove([mw.col.decks.id_for_name("Testdeck")])
 
-            ankihub_deck_uuid = next_deterministic_uuid()
+            ah_did = next_deterministic_uuid()
             dids_before_import = all_dids()
             ankihub_importer = AnkiHubImporter()
             import_result = ankihub_importer._import_ankihub_deck_inner(
-                ankihub_did=ankihub_deck_uuid,
+                ankihub_did=ah_did,
                 notes_data=ankihub_sample_deck_notes_data(),
                 deck_name="test",
                 is_first_import_of_deck=True,
@@ -1158,9 +1152,7 @@ class TestAnkiHubImporter:
             assert len(import_result.created_nids) == 3
             assert len(import_result.updated_nids) == 0
 
-            assert_that_only_ankihub_sample_deck_info_in_database(
-                ankihub_deck_uuid=ankihub_deck_uuid
-            )
+            assert_that_only_ankihub_sample_deck_info_in_database(ah_did=ah_did)
 
     def test_import_existing_deck_1(
         self,
@@ -1178,11 +1170,11 @@ class TestAnkiHubImporter:
             importer.run()
             existing_did = mw.col.decks.id_for_name("Testdeck")
 
-            ankihub_deck_uuid = next_deterministic_uuid()
+            ah_did = next_deterministic_uuid()
             dids_before_import = all_dids()
             ankihub_importer = AnkiHubImporter()
             import_result = ankihub_importer._import_ankihub_deck_inner(
-                ankihub_did=ankihub_deck_uuid,
+                ankihub_did=ah_did,
                 notes_data=ankihub_sample_deck_notes_data(),
                 deck_name="test",
                 is_first_import_of_deck=True,
@@ -1200,9 +1192,7 @@ class TestAnkiHubImporter:
             assert len(import_result.created_nids) == 0
             assert len(import_result.updated_nids) == 0
 
-            assert_that_only_ankihub_sample_deck_info_in_database(
-                ankihub_deck_uuid=ankihub_deck_uuid
-            )
+            assert_that_only_ankihub_sample_deck_info_in_database(ah_did=ah_did)
 
     def test_import_existing_deck_2(
         self,
@@ -1225,11 +1215,11 @@ class TestAnkiHubImporter:
             assert len(cids) == 3
             mw.col.set_deck([cids[0]], other_deck_id)
 
-            ankihub_deck_uuid = next_deterministic_uuid()
+            ah_did = next_deterministic_uuid()
             dids_before_import = all_dids()
             ankihub_importer = AnkiHubImporter()
             import_result = ankihub_importer._import_ankihub_deck_inner(
-                ankihub_did=ankihub_deck_uuid,
+                ankihub_did=ah_did,
                 notes_data=ankihub_sample_deck_notes_data(),
                 deck_name="test",
                 is_first_import_of_deck=False,
@@ -1248,9 +1238,7 @@ class TestAnkiHubImporter:
             assert len(import_result.created_nids) == 0
             assert len(import_result.updated_nids) == 0
 
-            assert_that_only_ankihub_sample_deck_info_in_database(
-                ankihub_deck_uuid=ankihub_deck_uuid
-            )
+            assert_that_only_ankihub_sample_deck_info_in_database(ah_did=ah_did)
 
     def test_import_existing_deck_3(
         self,
@@ -1280,11 +1268,11 @@ class TestAnkiHubImporter:
             # delete one note
             mw.col.remove_notes([NoteId(1608240029527)])
 
-            ankihub_deck_uuid = next_deterministic_uuid()
+            ah_did = next_deterministic_uuid()
             dids_before_import = all_dids()
             ankihub_importer = AnkiHubImporter()
             import_result = ankihub_importer._import_ankihub_deck_inner(
-                ankihub_did=ankihub_deck_uuid,
+                ankihub_did=ah_did,
                 notes_data=ankihub_sample_deck_notes_data(),
                 deck_name="test",
                 is_first_import_of_deck=True,
@@ -1301,9 +1289,7 @@ class TestAnkiHubImporter:
             assert len(import_result.created_nids) == 1
             assert len(import_result.updated_nids) == 2
 
-            assert_that_only_ankihub_sample_deck_info_in_database(
-                ankihub_deck_uuid=ankihub_deck_uuid
-            )
+            assert_that_only_ankihub_sample_deck_info_in_database(ah_did=ah_did)
 
     def test_update_deck(
         self,
@@ -1317,11 +1303,11 @@ class TestAnkiHubImporter:
             anki_did, _ = install_sample_ah_deck()
             first_local_did = anki_did
 
-            ankihub_deck_uuid = next_deterministic_uuid()
+            ah_did = next_deterministic_uuid()
             dids_before_import = all_dids()
             ankihub_importer = AnkiHubImporter()
             import_result = ankihub_importer._import_ankihub_deck_inner(
-                ankihub_did=ankihub_deck_uuid,
+                ankihub_did=ah_did,
                 notes_data=ankihub_sample_deck_notes_data(),
                 deck_name="test",
                 is_first_import_of_deck=False,
@@ -1340,9 +1326,7 @@ class TestAnkiHubImporter:
             assert len(import_result.created_nids) == 0
             assert len(import_result.updated_nids) == 0
 
-            assert_that_only_ankihub_sample_deck_info_in_database(
-                ankihub_deck_uuid=ankihub_deck_uuid
-            )
+            assert_that_only_ankihub_sample_deck_info_in_database(ah_did=ah_did)
 
     def test_update_deck_when_it_was_deleted(
         self,
@@ -1365,11 +1349,11 @@ class TestAnkiHubImporter:
             mw.col.set_deck(cids, other_deck)
             mw.col.decks.remove([first_local_did])
 
-            ankihub_deck_uuid = next_deterministic_uuid()
+            ah_did = next_deterministic_uuid()
             dids_before_import = all_dids()
             ankihub_importer = AnkiHubImporter()
             import_result = ankihub_importer._import_ankihub_deck_inner(
-                ankihub_did=ankihub_deck_uuid,
+                ankihub_did=ah_did,
                 notes_data=ankihub_sample_deck_notes_data(),
                 deck_name="test",
                 is_first_import_of_deck=False,
@@ -1390,9 +1374,7 @@ class TestAnkiHubImporter:
             assert len(import_result.created_nids) == 0
             assert len(import_result.updated_nids) == 0
 
-            assert_that_only_ankihub_sample_deck_info_in_database(
-                ankihub_deck_uuid=ankihub_deck_uuid
-            )
+            assert_that_only_ankihub_sample_deck_info_in_database(ah_did=ah_did)
 
     def test_update_deck_with_subdecks(
         self,
@@ -1438,9 +1420,7 @@ class TestAnkiHubImporter:
             assert len(import_result.created_nids) == 0
             assert len(import_result.updated_nids) == 1
 
-            assert_that_only_ankihub_sample_deck_info_in_database(
-                ankihub_deck_uuid=ah_did
-            )
+            assert_that_only_ankihub_sample_deck_info_in_database(ah_did=ah_did)
 
             # check that cards of the note were moved to the subdeck
             assert note.cards()
@@ -1481,7 +1461,7 @@ class TestAnkiHubImporter:
                 # update the note using the AnkiHub importer
                 note_data = NoteInfo(
                     anki_nid=note.id,
-                    ankihub_note_uuid=ah_nid,
+                    ah_nid=ah_nid,
                     fields=[
                         Field(name="Text", value="{{c1::foo}} {{c2::bar}}", order=0)
                     ],
@@ -1660,9 +1640,9 @@ class TestAnkiHubImporter:
             assert to_note_data(mw.col.get_note(anki_nid)) == note_info_1
 
 
-def assert_that_only_ankihub_sample_deck_info_in_database(ankihub_deck_uuid: uuid.UUID):
-    assert ankihub_db.ankihub_deck_ids() == [ankihub_deck_uuid]
-    assert len(ankihub_db.anki_nids_for_ankihub_deck(ankihub_deck_uuid)) == 3
+def assert_that_only_ankihub_sample_deck_info_in_database(ah_did: uuid.UUID):
+    assert ankihub_db.ankihub_deck_ids() == [ah_did]
+    assert len(ankihub_db.anki_nids_for_ankihub_deck(ah_did)) == 3
 
 
 def create_copy_of_note_type(mw: AnkiQt, note_type: NotetypeDict) -> NotetypeDict:
@@ -1938,7 +1918,7 @@ def prepare_note(
         guid = note.guid
 
     note_data = NoteInfo(
-        ankihub_note_uuid=ankihub_nid,
+        ah_nid=ankihub_nid,
         anki_nid=note.id,
         fields=fields,
         tags=tags,
@@ -2365,7 +2345,7 @@ def test_browser_custom_columns(
         custom_column_cells = current_row.cells[4:]
         custom_column_cells_texts = [cell.text for cell in custom_column_cells]
         assert custom_column_cells_texts == [
-            str(notes_data[0].ankihub_note_uuid),
+            str(notes_data[0].ah_nid),
             "No",
             "No",
         ]
@@ -2461,9 +2441,7 @@ class TestSubscribedDecksDialog:
             monkeypatch.setattr(
                 AnkiHubClient,
                 "get_deck_subscriptions",
-                lambda *args: [
-                    DeckFactory.create(ankihub_deck_uuid=ah_did, anki_did=anki_did)
-                ],
+                lambda *args: [DeckFactory.create(ah_did=ah_did, anki_did=anki_did)],
             )
 
             # Refresh the dialog
@@ -2738,7 +2716,7 @@ def test_reset_local_changes_to_notes(
         )
         # reset local changes
         nids = ankihub_db.anki_nids_for_ankihub_deck(ah_did)
-        reset_local_changes_to_notes(nids=nids, ankihub_deck_uuid=ah_did)
+        reset_local_changes_to_notes(nids=nids, ah_did=ah_did)
 
         # assert that basic_note_1 was changed back is still in the deck it was moved to
         # (resetting local changes to notes should not move existing notes between decks as the
@@ -2874,7 +2852,7 @@ def test_sync_uninstalls_unsubscribed_decks(
         monkeypatch.setattr(
             AnkiHubClient,
             "get_deck_subscriptions",
-            lambda *args, **kwargs: [DeckFactory.create(ankihub_deck_uuid=ah_did)]
+            lambda *args, **kwargs: [DeckFactory.create(ah_did=ah_did)]
             if subscribed_to_deck
             else [],
         )
@@ -3054,11 +3032,11 @@ def test_sync_with_optional_content(
         with anki_session.deck_installed(SAMPLE_DECK_APKG) as _:
             mw = anki_session.mw
 
-            ankihub_deck_uuid = next_deterministic_uuid()
+            ah_did = next_deterministic_uuid()
             deck_extension_id = 31
 
             notes_data = ankihub_sample_deck_notes_data()
-            ankihub_db.upsert_notes_data(ankihub_deck_uuid, notes_data)
+            ankihub_db.upsert_notes_data(ah_did, notes_data)
             note_data = notes_data[0]
             note = mw.col.get_note(NoteId(note_data.anki_nid))
 
@@ -3072,7 +3050,7 @@ def test_sync_with_optional_content(
                         DeckExtension(
                             id=deck_extension_id,
                             owner_id=1,
-                            ankihub_deck_uuid=ankihub_deck_uuid,
+                            ah_did=ah_did,
                             name="test99",
                             tag_group_name="test99",
                             description="",
@@ -3085,7 +3063,7 @@ def test_sync_with_optional_content(
                         DeckExtensionUpdateChunk(
                             note_customizations=[
                                 NoteCustomization(
-                                    ankihub_nid=note_data.ankihub_note_uuid,
+                                    ankihub_nid=note_data.ah_nid,
                                     tags=[
                                         "AnkiHub_Optional::test99::test1",
                                         "AnkiHub_Optional::test99::test2",
@@ -3097,7 +3075,7 @@ def test_sync_with_optional_content(
                     ],
                 )
                 deck_updater = _AnkiHubDeckUpdater()
-                deck_updater._update_deck_extensions(ankihub_deck_uuid)
+                deck_updater._update_deck_extensions(ah_did)
 
             updated_note = mw.col.get_note(note.id)
 
@@ -3114,7 +3092,7 @@ def test_sync_with_optional_content(
             assert config.deck_extension_config(
                 extension_id=deck_extension_id
             ) == DeckExtensionConfig(
-                ankihub_deck_uuid=ankihub_deck_uuid,
+                ah_did=ah_did,
                 owner_id=1,
                 name="test99",
                 tag_group_name="test99",
@@ -3206,7 +3184,7 @@ def test_optional_tag_suggestion_dialog(
                 OptionalTagSuggestion(
                     tag_group_name="VALID",
                     deck_extension_id=1,
-                    ankihub_note_uuid=uuid.UUID("e2857855-b414-4a2a-a0bf-2a0eac273f21"),
+                    ah_nid=uuid.UUID("e2857855-b414-4a2a-a0bf-2a0eac273f21"),
                     tags=["AnkiHub_Optional::VALID::tag1"],
                 )
             ],
@@ -3233,7 +3211,7 @@ def test_reset_optional_tags_action(
         config.create_or_update_deck_extension_config(
             DeckExtension(
                 id=1,
-                ankihub_deck_uuid=ah_did,
+                ah_did=ah_did,
                 owner_id=1,
                 name="test99",
                 tag_group_name="test99",
@@ -3326,7 +3304,7 @@ def test_media_update_on_deck_update(
             "get_deck_subscriptions",
             lambda *args, **kwargs: [
                 DeckFactory.create(
-                    ankihub_deck_uuid=ah_did,
+                    ah_did=ah_did,
                 )
             ],
         )

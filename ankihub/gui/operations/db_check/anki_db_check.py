@@ -111,7 +111,7 @@ def _decks_with_missing_ankihub_nids():
 def _reset_decks(ah_dids: List[uuid.UUID]):
     for ah_did in ah_dids:
         nids = ankihub_db.anki_nids_for_ankihub_deck(ah_did)
-        reset_local_changes_to_notes(nids, ankihub_deck_uuid=ah_did)
+        reset_local_changes_to_notes(nids, ah_did=ah_did)
 
 
 def _check_ankihub_update_tags() -> None:
