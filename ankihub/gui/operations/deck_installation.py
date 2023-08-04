@@ -119,7 +119,7 @@ def _download_and_install_decks_inner(
 def _download_and_install_single_deck(ankihub_did: uuid.UUID) -> AnkiHubImportResult:
     deck = AnkiHubClient().get_deck_by_id(ankihub_did)
     notes_data: List[NoteInfo] = AnkiHubClient().download_deck(
-        deck.ankihub_deck_uuid, download_progress_cb=_download_progress_cb
+        deck.ah_did, download_progress_cb=_download_progress_cb
     )
 
     aqt.mw.taskman.run_on_main(
@@ -128,7 +128,7 @@ def _download_and_install_single_deck(ankihub_did: uuid.UUID) -> AnkiHubImportRe
     result = _install_deck(
         notes_data=notes_data,
         deck_name=deck.name,
-        ankihub_did=deck.ankihub_deck_uuid,
+        ankihub_did=deck.ah_did,
         user_relation=deck.user_relation,
         latest_update=deck.csv_last_upload,
     )

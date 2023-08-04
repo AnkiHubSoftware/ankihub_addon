@@ -13,11 +13,11 @@ from .importing import AnkiHubImporter
 
 def reset_local_changes_to_notes(
     nids: Sequence[NoteId],
-    ankihub_deck_uuid: uuid.UUID,
+    ah_did: uuid.UUID,
 ) -> None:
     # all notes have to be from the ankihub deck with the given uuid
 
-    deck_config = config.deck_config(ankihub_deck_uuid)
+    deck_config = config.deck_config(ah_did)
 
     importer = AnkiHubImporter()
 
@@ -25,7 +25,7 @@ def reset_local_changes_to_notes(
     # this is needed so that notes_data can be retrieved from the database if the fields
     # of the note type have changed
     importer.import_ankihub_deck(
-        ankihub_did=ankihub_deck_uuid,
+        ankihub_did=ah_did,
         notes_data=[],
         deck_name=deck_config.name,
         local_did=deck_config.anki_id,
@@ -39,7 +39,7 @@ def reset_local_changes_to_notes(
     ]
 
     importer.import_ankihub_deck(
-        ankihub_did=ankihub_deck_uuid,
+        ankihub_did=ah_did,
         notes_data=notes_data,
         deck_name=deck_config.name,
         is_first_import_of_deck=False,
