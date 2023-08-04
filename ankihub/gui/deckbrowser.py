@@ -1,3 +1,4 @@
+"""Modifies the Anki deck browser (aqt.deckbrowser)."""
 import aqt
 from anki.decks import DeckId
 from anki.hooks import wrap
