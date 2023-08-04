@@ -99,7 +99,7 @@ class UserDeckRelation(Enum):
 
 @dataclass
 class Deck(DataClassJSONMixinWithConfig):
-    ankihub_deck_uuid: uuid.UUID = dataclasses.field(metadata=field_options(alias="id"))
+    ah_did: uuid.UUID = dataclasses.field(metadata=field_options(alias="id"))
     anki_did: int = dataclasses.field(metadata=field_options(alias="anki_id"))
     name: str
     csv_last_upload: datetime = dataclasses.field(
@@ -188,7 +188,7 @@ class ChangeNoteSuggestion(NoteSuggestion):
 
 @dataclass
 class NewNoteSuggestion(NoteSuggestion):
-    ankihub_deck_uuid: uuid.UUID = dataclasses.field(
+    ah_did: uuid.UUID = dataclasses.field(
         metadata=field_options(
             alias="deck_id",
             serialize=str,
@@ -232,9 +232,7 @@ class OptionalTagSuggestion(DataClassJSONMixinWithConfig):
 @dataclass
 class DeckExtension(DataClassJSONMixinWithConfig):
     id: int
-    ankihub_deck_uuid: uuid.UUID = dataclasses.field(
-        metadata=field_options(alias="deck")
-    )
+    ah_did: uuid.UUID = dataclasses.field(metadata=field_options(alias="deck"))
     owner_id: int = dataclasses.field(metadata=field_options(alias="owner"))
     name: str
     tag_group_name: str

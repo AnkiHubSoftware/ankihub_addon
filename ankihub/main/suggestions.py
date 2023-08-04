@@ -246,7 +246,7 @@ def _suggestions_for_notes(
     new_note_suggestions = [
         _new_note_suggestion(
             note=note,
-            ankihub_deck_uuid=ankihub_did,
+            ah_did=ankihub_did,
             comment=comment,
         )
         for note in notes_that_dont_exist_on_remote
@@ -256,12 +256,12 @@ def _suggestions_for_notes(
 
 
 def _new_note_suggestion(
-    note: Note, ankihub_deck_uuid: uuid.UUID, comment: str
+    note: Note, ah_did: uuid.UUID, comment: str
 ) -> NewNoteSuggestion:
     note_data = to_note_data(note, set_new_id=True)
 
     return NewNoteSuggestion(
-        ankihub_deck_uuid=ankihub_deck_uuid,
+        ah_did=ah_did,
         ankihub_note_uuid=note_data.ankihub_note_uuid,
         anki_nid=note.id,
         fields=note_data.fields,

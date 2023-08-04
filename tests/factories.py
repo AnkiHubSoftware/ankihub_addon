@@ -45,7 +45,7 @@ class DeckFactory(BaseFactory[Deck]):
     class Meta:
         model = Deck
 
-    ankihub_deck_uuid = uuid.uuid4()
+    ah_did = uuid.uuid4()
     name = "Test Deck"
     anki_did = 1
     csv_last_upload = datetime.datetime.now(tz=timezone.utc)

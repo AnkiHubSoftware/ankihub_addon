@@ -38,7 +38,7 @@ class OptionalTagsSuggestionHelper:
     def prevalidate(self) -> List[TagGroupValidationResponse]:
         client = AnkiHubClient()
         result: List[TagGroupValidationResponse] = client.prevalidate_tag_groups(
-            ankihub_deck_uuid=self._ankihub_did,
+            ah_did=self._ankihub_did,
             tag_group_names=self._tag_groups,
         )
 
