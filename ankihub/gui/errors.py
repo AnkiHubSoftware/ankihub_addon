@@ -111,9 +111,7 @@ def upload_logs_in_background(
     return key
 
 
-def upload_data_dir_and_logs_in_background(
-    on_done: Callable[[Future], None] = None
-) -> str:
+def upload_logs_and_data_in_background(on_done: Callable[[Future], None] = None) -> str:
     """Upload the data dir and logs to S3 in the background.
     Returns the S3 key of the uploaded file."""
 
@@ -124,19 +122,19 @@ def upload_data_dir_and_logs_in_background(
     key = f"ankihub_addon_debug_info_{user_name_hash}_{int(time.time())}.zip"
 
     aqt.mw.taskman.run_in_background(
-        task=lambda: _upload_data_dir_and_logs(key), on_done=on_done
+        task=lambda: _upload_logs_and_data_in_background(key), on_done=on_done
     )
 
     return key
 
 
-def _upload_data_dir_and_logs(key: str) -> str:
+def _upload_logs_and_data_in_background(key: str) -> str:
 
     # detach the ankihub database from the anki database connection to prevent file permission errors
     detach_ankihub_db_from_anki_db_connection()
 
     # zip the user files and the log file
-    file_path = _zip_data_and_logs()
+    file_path = _zip_logs_and_data()
 
     # upload the zip file
     try:
@@ -151,11 +149,18 @@ def _upload_data_dir_and_logs(key: str) -> str:
         os.unlink(file_path)
 
 
-def _zip_data_and_logs() -> Path:
-    """Zip the user files directory, the anki collection and the log file and return the path of the zip file."""
+def _zip_logs_and_data() -> Path:
+    """Zip the log file, the user files directory and the anki collection and return the path of the zip file."""
     temp_file = tempfile.NamedTemporaryFile(delete=False)
     temp_file.close()
     with zipfile.ZipFile(temp_file.name, "w") as zipf:
+        # Add the log file to the zip.
+        log_file = log_file_path()
+        if log_file.exists():
+            zipf.write(log_file, arcname=log_file.name)
+        else:
+            LOGGER.info("No logs to upload.")
+
         # Add the user files directory to the zip.
         source_dir = user_files_path()
         for file in source_dir.rglob("*"):
@@ -170,13 +175,6 @@ def _zip_data_and_logs() -> Path:
             zipf.write(Path(aqt.mw.col.path), arcname="collection.anki2")
         except Exception as e:
             LOGGER.warning("Could not add Anki collection to zip.", exc_info=e)
-
-        # Add the log file to the zip.
-        log_file = log_file_path()
-        if log_file.exists():
-            zipf.write(log_file, arcname=log_file.name)
-        else:
-            LOGGER.info("No logs to upload.")
 
     return Path(temp_file.name)
 
