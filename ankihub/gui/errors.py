@@ -136,7 +136,7 @@ def _upload_data_dir_and_logs(key: str) -> str:
     detach_ankihub_db_from_anki_db_connection()
 
     # zip the user files and the log file
-    file_path = _zip_data_dir_and_logs()
+    file_path = _zip_data_and_logs()
 
     # upload the zip file
     try:
@@ -151,7 +151,7 @@ def _upload_data_dir_and_logs(key: str) -> str:
         os.unlink(file_path)
 
 
-def _zip_data_dir_and_logs() -> Path:
+def _zip_data_and_logs() -> Path:
     """Zip the user files directory, the anki collection and the log file and return the path of the zip file."""
     temp_file = tempfile.NamedTemporaryFile(delete=False)
     temp_file.close()
