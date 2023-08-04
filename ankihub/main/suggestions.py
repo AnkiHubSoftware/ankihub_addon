@@ -262,7 +262,7 @@ def _new_note_suggestion(
 
     return NewNoteSuggestion(
         ah_did=ah_did,
-        ankihub_note_uuid=note_data.ankihub_note_uuid,
+        ah_nid=note_data.ah_nid,
         anki_nid=note.id,
         fields=note_data.fields,
         tags=note_data.tags,
@@ -278,7 +278,7 @@ def _change_note_suggestion(
 ) -> Optional[ChangeNoteSuggestion]:
     note_from_anki_db = to_note_data(note)
     assert isinstance(note_from_anki_db, NoteInfo)
-    assert note_from_anki_db.ankihub_note_uuid is not None
+    assert note_from_anki_db.ah_nid is not None
     assert note_from_anki_db.tags is not None
 
     note_from_ah_db = ankihub_db.note_data(note.id)
@@ -295,7 +295,7 @@ def _change_note_suggestion(
         return None
 
     return ChangeNoteSuggestion(
-        ankihub_note_uuid=note_from_anki_db.ankihub_note_uuid,
+        ah_nid=note_from_anki_db.ah_nid,
         anki_nid=note.id,
         fields=fields_that_changed,
         added_tags=added_tags,

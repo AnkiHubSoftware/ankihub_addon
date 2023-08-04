@@ -670,11 +670,11 @@ class AnkiHubClient:
         result = Deck.from_dict(data)
         return result
 
-    def get_note_by_id(self, ankihub_note_uuid: uuid.UUID) -> NoteInfo:
+    def get_note_by_id(self, ah_nid: uuid.UUID) -> NoteInfo:
         response = self._send_request(
             "GET",
             API.ANKIHUB,
-            f"/notes/{ankihub_note_uuid}",
+            f"/notes/{ah_nid}",
         )
         if response.status_code != 200:
             raise AnkiHubHTTPError(response)
@@ -691,7 +691,7 @@ class AnkiHubClient:
         response = self._send_request(
             "POST",
             API.ANKIHUB,
-            f"/notes/{change_note_suggestion.ankihub_note_uuid}/suggestion/",
+            f"/notes/{change_note_suggestion.ah_nid}/suggestion/",
             json={**change_note_suggestion.to_dict(), "auto_accept": auto_accept},
         )
         if response.status_code != 201:

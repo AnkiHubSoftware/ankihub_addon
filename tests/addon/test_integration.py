@@ -256,7 +256,7 @@ def import_ah_note(next_deterministic_uuid: Callable[[], uuid.UUID]) -> ImportAH
         note_data.mid = mid
 
         if ah_nid:
-            note_data.ankihub_note_uuid = ah_nid
+            note_data.ah_nid = ah_nid
 
         # Check if note data is compatible with the note type.
         # For each field in note_data, check if there is a field in the note type with the same name.
@@ -548,7 +548,7 @@ def test_create_collaborative_deck_and_upload(
         # check that the client method was called with the correct data
         expected_note_types_data = [mw.col.models.get(note.mid)]
         expected_note_data = NoteInfo(
-            ankihub_note_uuid=ah_nid,
+            ah_nid=ah_nid,
             anki_nid=note.id,
             fields=[
                 Field(name="Front", value="front", order=0),
@@ -892,7 +892,7 @@ def test_suggest_note_update(
         create_change_note_suggestion_mock.assert_called_once_with(
             change_note_suggestion=ChangeNoteSuggestion(
                 anki_nid=note.id,
-                ankihub_note_uuid=ankihub_db.ankihub_nid_for_anki_nid(note.id),
+                ah_nid=ankihub_db.ankihub_nid_for_anki_nid(note.id),
                 change_type=SuggestionType.NEW_CONTENT,
                 fields=[Field(name="Front", value="updated", order=0)],
                 added_tags=["added"],
@@ -1014,7 +1014,7 @@ def test_suggest_notes_in_bulk(
         assert bulk_suggestions_method_mock.call_args.kwargs == {
             "change_note_suggestions": [
                 ChangeNoteSuggestion(
-                    ankihub_note_uuid=uuid.UUID("67f182c2-7306-47f8-aed6-d7edb42cd7de"),
+                    ah_nid=uuid.UUID("67f182c2-7306-47f8-aed6-d7edb42cd7de"),
                     anki_nid=CHANGED_NOTE_ID,
                     fields=[
                         Field(
@@ -1031,7 +1031,7 @@ def test_suggest_notes_in_bulk(
             ],
             "new_note_suggestions": [
                 NewNoteSuggestion(
-                    ankihub_note_uuid=new_note_ah_id,
+                    ah_nid=new_note_ah_id,
                     anki_nid=new_note.id,
                     fields=[
                         Field(name="Front", order=0, value=""),
@@ -1460,7 +1460,7 @@ class TestAnkiHubImporter:
                 # update the note using the AnkiHub importer
                 note_data = NoteInfo(
                     anki_nid=note.id,
-                    ankihub_note_uuid=ah_nid,
+                    ah_nid=ah_nid,
                     fields=[
                         Field(name="Text", value="{{c1::foo}} {{c2::bar}}", order=0)
                     ],
@@ -1917,7 +1917,7 @@ def prepare_note(
         guid = note.guid
 
     note_data = NoteInfo(
-        ankihub_note_uuid=ankihub_nid,
+        ah_nid=ankihub_nid,
         anki_nid=note.id,
         fields=fields,
         tags=tags,
@@ -2344,7 +2344,7 @@ def test_browser_custom_columns(
         custom_column_cells = current_row.cells[4:]
         custom_column_cells_texts = [cell.text for cell in custom_column_cells]
         assert custom_column_cells_texts == [
-            str(notes_data[0].ankihub_note_uuid),
+            str(notes_data[0].ah_nid),
             "No",
             "No",
         ]
@@ -3060,7 +3060,7 @@ def test_sync_with_optional_content(
                         DeckExtensionUpdateChunk(
                             note_customizations=[
                                 NoteCustomization(
-                                    ankihub_nid=note_data.ankihub_note_uuid,
+                                    ankihub_nid=note_data.ah_nid,
                                     tags=[
                                         "AnkiHub_Optional::test99::test1",
                                         "AnkiHub_Optional::test99::test2",
@@ -3181,7 +3181,7 @@ def test_optional_tag_suggestion_dialog(
                 OptionalTagSuggestion(
                     tag_group_name="VALID",
                     deck_extension_id=1,
-                    ankihub_note_uuid=uuid.UUID("e2857855-b414-4a2a-a0bf-2a0eac273f21"),
+                    ah_nid=uuid.UUID("e2857855-b414-4a2a-a0bf-2a0eac273f21"),
                     tags=["AnkiHub_Optional::VALID::tag1"],
                 )
             ],

@@ -167,7 +167,7 @@ def new_note_suggestion(
 ):
     ah_nid = next_deterministic_uuid()
     return NewNoteSuggestion(
-        ankihub_note_uuid=ah_nid,
+        ah_nid=ah_nid,
         anki_nid=1,
         fields=[
             Field(name="Front", value="front1", order=0),
@@ -187,7 +187,7 @@ def new_note_suggestion_note_info(
     next_deterministic_uuid: Callable[[], uuid.UUID],
 ):
     return NoteInfo(
-        ankihub_note_uuid=next_deterministic_uuid(),
+        ah_nid=next_deterministic_uuid(),
         anki_nid=1,
         fields=[
             Field(name="Front", value="front1", order=0),
@@ -205,7 +205,7 @@ def change_note_suggestion(
     next_deterministic_uuid: Callable[[], uuid.UUID],
 ):
     return ChangeNoteSuggestion(
-        ankihub_note_uuid=next_deterministic_uuid(),
+        ah_nid=next_deterministic_uuid(),
         anki_nid=1,
         fields=[
             Field(name="Front", value="front2", order=0),
@@ -362,9 +362,7 @@ def create_note_on_ankihub_and_assert(
     assert errors_by_nid == {}
 
     # assert that note was created
-    note = client.get_note_by_id(
-        ankihub_note_uuid=new_note_suggestion.ankihub_note_uuid
-    )
+    note = client.get_note_by_id(ah_nid=new_note_suggestion.ah_nid)
     assert note.fields == new_note_suggestion.fields
     assert set(note.tags) == set(new_note_suggestion.tags)
 
@@ -431,7 +429,7 @@ class TestCreateSuggestion:
 
         # create a change note suggestion without all fields (for the same note)
         cns: ChangeNoteSuggestion = change_note_suggestion
-        cns.ankihub_note_uuid = new_note_suggestion.ankihub_note_uuid
+        cns.ah_nid = new_note_suggestion.ah_nid
         cns.fields = [
             Field(name="Front", value="front2", order=0),
         ]
@@ -472,7 +470,7 @@ class TestCreateSuggestionsInBulk:
         new_note_suggestion.ah_did = ID_OF_DECK_OF_USER_TEST1
 
         new_note_suggestion_2 = deepcopy(new_note_suggestion)
-        new_note_suggestion_2.ankihub_note_uuid = next_deterministic_uuid()
+        new_note_suggestion_2.ah_nid = next_deterministic_uuid()
         new_note_suggestion_2.anki_nid = 2
 
         errors_by_nid = client.create_suggestions_in_bulk(
@@ -496,7 +494,7 @@ class TestCreateSuggestionsInBulk:
         )
         assert errors_by_nid == {}
 
-        # try creating a new note suggestion with the same ankihub_note_uuid as the first one
+        # try creating a new note suggestion with the same ah_nid as the first one
         new_note_suggestion_2 = deepcopy(new_note_suggestion)
         new_note_suggestion_2.anki_nid = 2
         errors_by_nid = client.create_suggestions_in_bulk(
@@ -535,7 +533,7 @@ class TestCreateSuggestionsInBulk:
         )
 
         # create a change note suggestion
-        change_note_suggestion.ankihub_note_uuid = new_note_suggestion.ankihub_note_uuid
+        change_note_suggestion.ah_nid = new_note_suggestion.ah_nid
         errors_by_nid = client.create_suggestions_in_bulk(
             change_note_suggestions=[change_note_suggestion], auto_accept=False
         )
@@ -557,13 +555,11 @@ class TestCreateSuggestionsInBulk:
         )
 
         # create an auto-accepted change note suggestion and assert that note was changed
-        change_note_suggestion.ankihub_note_uuid = new_note_suggestion.ankihub_note_uuid
+        change_note_suggestion.ah_nid = new_note_suggestion.ah_nid
         errors_by_nid = client.create_suggestions_in_bulk(
             change_note_suggestions=[change_note_suggestion], auto_accept=True
         )
-        note = client.get_note_by_id(
-            ankihub_note_uuid=new_note_suggestion.ankihub_note_uuid
-        )
+        note = client.get_note_by_id(ah_nid=new_note_suggestion.ah_nid)
         assert errors_by_nid == {}
         assert note.fields == change_note_suggestion.fields
         assert set(note.tags) == set(change_note_suggestion.added_tags) | set(
@@ -741,7 +737,7 @@ class TestGetDeckUpdates:
         )
 
         note_info: NoteInfo = new_note_suggestion_note_info
-        note_info.ankihub_note_uuid = new_note_suggestion.ankihub_note_uuid
+        note_info.ah_nid = new_note_suggestion.ah_nid
         note_info.anki_nid = new_note_suggestion.anki_nid
         note_info.guid = new_note_suggestion.guid
 
@@ -934,7 +930,7 @@ def test_suggest_optional_tags(authorized_client_for_user_test2: AnkiHubClient):
     client.suggest_optional_tags(
         suggestions=[
             OptionalTagSuggestion(
-                ankihub_note_uuid=uuid.UUID("8645c6d6-4f3d-417e-8295-8f5009042b6e"),
+                ah_nid=uuid.UUID("8645c6d6-4f3d-417e-8295-8f5009042b6e"),
                 tag_group_name="test100",
                 deck_extension_id=999,
                 tags=[
@@ -958,7 +954,7 @@ def test_suggest_auto_accepted_optional_tags(
         auto_accept=True,
         suggestions=[
             OptionalTagSuggestion(
-                ankihub_note_uuid=uuid.UUID("8645c6d6-4f3d-417e-8295-8f5009042b6e"),
+                ah_nid=uuid.UUID("8645c6d6-4f3d-417e-8295-8f5009042b6e"),
                 tag_group_name="test100",
                 deck_extension_id=DECK_EXTENSION_ID,
                 tags=[
@@ -1079,7 +1075,7 @@ class TestUploadMediaForSuggestion:
 
         if isinstance(suggestion, ChangeNoteSuggestion):
             suggestion_request_mock = requests_mock.post(
-                f"{DEFAULT_API_URL}/notes/{suggestion.ankihub_note_uuid}/suggestion/",
+                f"{DEFAULT_API_URL}/notes/{suggestion.ah_nid}/suggestion/",
                 status_code=201,
             )
 
