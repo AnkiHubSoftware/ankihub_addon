@@ -111,7 +111,7 @@ def _set_ankihub_id_fields_based_on_notes_data(notes_data: List[NoteInfo]) -> No
     LOGGER.info("Assigning AnkiHub IDs to notes.")
     for note_data in notes_data:
         note = aqt.mw.col.get_note(id=NoteId(note_data.anki_nid))
-        note[ANKIHUB_NOTE_TYPE_FIELD_NAME] = str(note_data.ankihub_note_uuid)
+        note[ANKIHUB_NOTE_TYPE_FIELD_NAME] = str(note_data.ah_nid)
         updated_notes.append(note)
     aqt.mw.col.update_notes(updated_notes)
     LOGGER.info(f"Updated notes: {', '.join(map(str, [n.id for n in updated_notes]))}")

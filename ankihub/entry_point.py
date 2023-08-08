@@ -9,7 +9,7 @@ from aqt.gui_hooks import profile_did_open, profile_will_close
 from . import LOGGER
 from .db import ankihub_db
 from .debug import setup as setup_debug
-from .gui import browser, editor, progress, reviewer, taskman
+from .gui import browser, deckbrowser, editor, progress, reviewer, taskman
 from .gui.addons import setup_addons
 from .gui.auto_sync import setup_auto_sync
 from .gui.config_dialog import setup_config_dialog_manager
@@ -136,6 +136,9 @@ def _general_setup():
 
     taskman.setup()
     LOGGER.info("Set up task manager.")
+
+    deckbrowser.setup()
+    LOGGER.info("Setup deck browser")
 
     _trigger_addon_update_check()
     LOGGER.info("Triggered add-on update check.")
