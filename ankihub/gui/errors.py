@@ -217,10 +217,11 @@ def _setup_excepthook():
 
 def _maybe_report_exception_and_show_feedback_dialog(exception: BaseException) -> None:
     sentry_event_id: Optional[str] = None
-    if _error_reporting_enabled():
+    mentioned_in_tb = _this_addon_mentioned_in_tb(exception.__traceback__)
+    if _error_reporting_enabled() and mentioned_in_tb:
         sentry_event_id = report_exception_and_upload_logs(exception=exception)
 
-    if _this_addon_mentioned_in_tb(exception.__traceback__):
+    if mentioned_in_tb:
         ErrorDialog(exception, sentry_event_id=sentry_event_id).exec()
 
 
