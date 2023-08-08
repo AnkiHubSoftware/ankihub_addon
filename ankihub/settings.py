@@ -79,7 +79,9 @@ class DeckConfig(DataClassJSONMixin):
 
 @dataclass
 class DeckExtensionConfig(DataClassJSONMixin):
-    ankihub_deck_uuid: uuid.UUID
+    ah_did: uuid.UUID = dataclasses.field(
+        metadata=field_options(alias="ankihub_deck_uuid")  # for backwards compatibility
+    )
     owner_id: int
     name: str
     tag_group_name: str
@@ -236,6 +238,13 @@ class _Config:
         installed decks."""
         return list(self._private_config.decks.keys())
 
+    def get_deck_uuid_by_did(self, did: DeckId) -> Optional[uuid.UUID]:
+        decks = self._private_config.decks
+        return next(
+            (key for key in decks.keys() if decks[key].anki_id == did),
+            None,
+        )
+
     def deck_config(self, ankihub_did: uuid.UUID) -> Optional[DeckConfig]:
         return self._private_config.decks.get(ankihub_did)
 
@@ -263,7 +272,7 @@ class _Config:
         )
 
         self._private_config.deck_extensions[extension.id] = DeckExtensionConfig(
-            ankihub_deck_uuid=extension.ankihub_deck_uuid,
+            ah_did=extension.ah_did,
             name=extension.name,
             owner_id=extension.owner_id,
             tag_group_name=extension.tag_group_name,

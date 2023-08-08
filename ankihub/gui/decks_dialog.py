@@ -25,9 +25,8 @@ from aqt.studydeck import StudyDeck
 from aqt.utils import openLink, showInfo, showText, tooltip
 
 from ..addon_ankihub_client import AddonAnkiHubClient as AnkiHubClient
-from ..db import ankihub_db
+from ..main.deck_unsubscribtion import unsubscribe_from_deck_and_uninstall
 from ..main.subdecks import SUBDECK_TAG
-from ..main.utils import undo_note_type_modfications
 from ..settings import config, url_deck_base, url_decks, url_help
 from .operations.deck_installation import download_and_install_decks
 from .operations.subdecks import confirm_and_toggle_subdecks
@@ -104,7 +103,7 @@ class SubscribedDecksDialog(QDialog):
                 item = QListWidgetItem(f"{name} (Maintained by you)")
             else:
                 item = QListWidgetItem(name)
-            item.setData(Qt.ItemDataRole.UserRole, deck.ankihub_deck_uuid)
+            item.setData(Qt.ItemDataRole.UserRole, deck.ah_did)
             self.decks_list.addItem(item)
 
     def _refresh_anki(self) -> None:
@@ -150,17 +149,10 @@ class SubscribedDecksDialog(QDialog):
 
         for item in items:
             ankihub_did: UUID = item.data(Qt.ItemDataRole.UserRole)
-            self.client.unsubscribe_from_deck(ankihub_did)
-            config.remove_deck(ankihub_did)
-            self._clear_deck_changes(ankihub_did)
+            unsubscribe_from_deck_and_uninstall(ankihub_did)
 
         tooltip("Unsubscribed from AnkiHub Deck.", parent=aqt.mw)
         self._refresh_decks_list()
-
-    def _clear_deck_changes(self, ankihub_did: UUID) -> None:
-        mids = ankihub_db.note_types_for_ankihub_deck(ankihub_did)
-        undo_note_type_modfications(mids)
-        ankihub_db.remove_deck(ankihub_did)
 
     def _on_open_web(self) -> None:
         items = self.decks_list.selectedItems()
