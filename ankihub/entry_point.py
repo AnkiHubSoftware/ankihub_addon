@@ -176,8 +176,11 @@ def _adjust_ankihub_note_type_templates():
     except CardTypeError:  # noqa: E722
         LOGGER.exception("Failed to adjust AnkiHub note type templates.")
 
+
 def delete_broken_notetypes() -> None:
-    aqt.mw.col.db.execute("DELETE FROM notetypes as nt WHERE\
+    aqt.mw.col.db.execute(
+        "DELETE FROM notetypes as nt WHERE\
  NOT EXISTS(SELECT 1 FROM templates where ntid = nt.id) OR\
- NOT EXISTS(SELECT 1 FROM fields where ntid = nt.id)")
+ NOT EXISTS(SELECT 1 FROM fields where ntid = nt.id)"
+    )
     aqt.mw.col.db.commit()
