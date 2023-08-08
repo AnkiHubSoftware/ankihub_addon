@@ -9,4 +9,5 @@ class DeckDownloadAndInstallError(Exception):
             f"Error while downloading and installing deck {ankihub_did}: {original_exception}"
         )
         self.original_exception = original_exception
+        self.__cause__ = original_exception
         self.ankihub_did = ankihub_did
