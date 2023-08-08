@@ -42,7 +42,6 @@ def attach_ankihub_db_to_anki_db_connection() -> None:
             f"ATTACH DATABASE ? AS {ankihub_db.database_name}",
             str(ankihub_db.database_path),
         )
-        aqt.mw.col.db.commit()
         LOGGER.info("Attached AnkiHub DB to Anki DB connection")
 
 
@@ -62,7 +61,6 @@ def detach_ankihub_db_from_anki_db_connection() -> None:
 
         try:
             aqt.mw.col.db.execute(f"DETACH DATABASE {ankihub_db.database_name}")
-            aqt.mw.col.db.commit()
             LOGGER.info("Detached AnkiHub DB from Anki DB connection")
         except Exception:
             LOGGER.info("Failed to detach AnkiHub database.")
