@@ -202,6 +202,7 @@ class AnkiHubImporter:
             dids_for_note = set(c.did for c in note.cards())
             dids = dids | dids_for_note
 
+        aqt.mw.col.db.commit()
         ankihub_db.transfer_mod_values_from_anki_db(notes_data=upserted_notes)
 
         LOGGER.info(
