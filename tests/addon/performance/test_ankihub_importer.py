@@ -82,10 +82,11 @@ def test_anking_deck_first_time_import(
         profiler.disable()
 
         elapsed_time = time.time() - start_time
-        assert elapsed_time < 1
 
         # Save the profiling results
         write_profiling_stats(profiler)
+
+        assert elapsed_time < 1
 
 
 def notes_data_from_csv_gz(csv_path: Path) -> list[NoteInfo]:
