@@ -4,7 +4,7 @@ git+https://github.com/ankipalace/pytest-anki.git
 black==22.6.0
 flake8==5.0.4
 mypy==0.971
-coverage==7.2.7
+coverage==4.5.4
 pytest-cov==4.1.0
 pre-commit==2.20.0
 requests-mock==1.9.3
