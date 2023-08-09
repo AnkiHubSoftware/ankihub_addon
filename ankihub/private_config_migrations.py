@@ -3,7 +3,7 @@ from typing import Dict
 from . import LOGGER
 
 
-def migrate_private_config(private_config_dict: Dict):
+def migrate_private_config(private_config_dict: Dict) -> None:
     """Migrate the private config of the add-on to the new format.
     This function should be updated when the private config of the add-on is changed and
     old config options need to be migrated to the new format.
