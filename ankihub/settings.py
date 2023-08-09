@@ -149,7 +149,6 @@ class _Config:
         self._private_config_path = private_config_path()
         if not self._private_config_path.exists():
             self._private_config = PrivateConfig()
-            self._update_private_config()
         else:
             try:
                 self._private_config = self._load_private_config()
