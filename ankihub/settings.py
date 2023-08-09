@@ -37,6 +37,7 @@ from .ankihub_client import (
     DeckExtension,
 )
 from .ankihub_client.models import UserDeckRelation
+from .private_config_migrations import migrate_private_config
 from .public_config_migrations import migrate_public_config
 
 ADDON_PATH = Path(__file__).parent.absolute()
@@ -79,9 +80,7 @@ class DeckConfig(DataClassJSONMixin):
 
 @dataclass
 class DeckExtensionConfig(DataClassJSONMixin):
-    ah_did: uuid.UUID = dataclasses.field(
-        metadata=field_options(alias="ankihub_deck_uuid")  # for backwards compatibility
-    )
+    ah_did: uuid.UUID
     owner_id: int
     name: str
     tag_group_name: str
@@ -150,18 +149,24 @@ class _Config:
         self._private_config_path = private_config_path()
         if not self._private_config_path.exists():
             self._private_config = PrivateConfig()
-            self._update_private_config()
         else:
             try:
                 self._private_config = self._load_private_config()
             except JSONDecodeError:
                 # TODO Instead of overwriting, query AnkiHub for config values.
                 self._private_config = PrivateConfig()
+
+        self._update_private_config()
         self._log_private_config()
 
     def _load_private_config(self) -> PrivateConfig:
         with open(self._private_config_path) as f:
             private_config_dict = json.load(f)
+
+        try:
+            migrate_private_config(private_config_dict)
+        except Exception:
+            LOGGER.warning("Failed to migrate private config")
 
         result = PrivateConfig.from_dict(private_config_dict)
         return result
