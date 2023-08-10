@@ -36,13 +36,6 @@ class _AnkiHubDeckUpdater:
         Returns the results of the imports of the updates."""
         LOGGER.info(f"Updating decks and media for {ah_dids=} {start_media_sync=}...")
 
-        if len(set(ah_dids).intersection(set(config.deck_ids()))) != len(ah_dids):
-            raise ValueError(
-                f"Some of the specified decks are not in the configuration.\n"
-                f"\t{ah_dids=}"
-                f"\t{config.deck_ids()=}"
-            )
-
         self._import_results = None
 
         if not config.is_logged_in():
