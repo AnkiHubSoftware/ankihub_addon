@@ -104,6 +104,17 @@ This requires ankihub runnig locally on localhost:8000. **The test setup clears 
 pytest tests/client --disable-vcr
 ```
 
+#### Running performance tests
+##### All addon tests including performance tests
+```
+pytest tests/addon --performance
+```
+
+##### Only performance tests
+```
+pytest tests/addon -k performance
+```
+
 #### Type checking
 ```
 mypy
