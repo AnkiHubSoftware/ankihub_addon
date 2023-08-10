@@ -17,7 +17,9 @@ def sync_with_ankihub(on_done: Callable[[Future], None]) -> None:
     """Uninstall decks the user is not subscribed to anymore, check for (and maybe install) new deck subscriptions,
     then download updates to decks."""
 
-    def on_new_deck_subscriptions_done(future: Future) -> None:
+    def on_new_deck_subscriptions_done(
+        future: Future, subscribed_decks: List[Deck]
+    ) -> None:
         if future.exception():
             on_done(future_with_exception(future.exception()))
             return
@@ -49,7 +51,10 @@ def sync_with_ankihub(on_done: Callable[[Future], None]) -> None:
             subscribed_decks=subscribed_decks
         )
         check_and_install_new_deck_subscriptions(
-            subscribed_decks=subscribed_decks, on_done=on_new_deck_subscriptions_done
+            subscribed_decks=subscribed_decks,
+            on_done=lambda future: on_new_deck_subscriptions_done(
+                future=future, subscribed_decks=subscribed_decks
+            ),
         )
     except Exception as e:
         on_done(future_with_exception(e))
