@@ -41,8 +41,8 @@ from ..settings import (
     log_file_path,
     user_files_path,
 )
+from .deck_updater import NotLoggedInError
 from .error_dialog import ErrorDialog
-from .sync import NotLoggedInError
 from .utils import (
     check_and_prompt_for_updates_on_main_window,
     show_error_dialog,

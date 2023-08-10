@@ -91,6 +91,7 @@ from ankihub.gui.config_dialog import (
     get_config_dialog_manager,
     setup_config_dialog_manager,
 )
+from ankihub.gui.deck_updater import _AnkiHubDeckUpdater, ah_deck_updater
 from ankihub.gui.decks_dialog import SubscribedDecksDialog, download_and_install_decks
 from ankihub.gui.editor import _on_suggestion_button_press, _refresh_buttons
 from ankihub.gui.errors import upload_data_dir_and_logs_in_background
@@ -101,7 +102,6 @@ from ankihub.gui.operations.new_deck_subscriptions import (
 )
 from ankihub.gui.operations.utils import future_with_result
 from ankihub.gui.optional_tag_suggestion_dialog import OptionalTagsSuggestionDialog
-from ankihub.gui.sync import _AnkiHubSync, ah_sync
 from ankihub.main.deck_creation import create_ankihub_deck, modify_note_type
 from ankihub.main.exporting import to_note_data
 from ankihub.main.importing import (
@@ -388,6 +388,7 @@ def sync_with_ankihub(qtbot: QtBot) -> SyncWithAnkiHub:
         def on_done(future: Future) -> None:
             nonlocal done
             done = True
+            future.result()  # raises exception if there is one
 
         ankihub_sync.sync_with_ankihub(on_done=on_done)
 
@@ -2740,9 +2741,9 @@ def test_migrate_profile_data_from_old_location(
 ):
     anki_session = anki_session_with_addon_before_profile_support
 
-    # mock the ah_sync object so that the add-on doesn't try to sync with AnkiHub
+    # mock update_decks_and_media so that the add-on doesn't try to download updates from AnkiHub
     monkeypatch.setattr(
-        "ankihub.gui.sync.ah_sync.sync_all_decks_and_media",
+        "ankihub.gui.deck_updater.ah_deck_updater.update_decks_and_media",
         lambda *args, **kwargs: None,
     )
 
@@ -2908,7 +2909,7 @@ class TestAutoSync:
             qtbot.wait(500)
 
             # Assert that both syncs were called.
-            assert self.ankihub_sync_mock.call_count == 1
+            assert self.udpate_decks_and_media_mock.call_count == 1
             assert self.ankiweb_sync_mock.call_count == 1
 
             assert self.check_and_install_new_deck_subscriptions_mock.call_count == 1
@@ -2936,7 +2937,7 @@ class TestAutoSync:
             qtbot.wait(500)
 
             # Assert that only the AnkiWeb sync was called.
-            assert self.ankihub_sync_mock.call_count == 0
+            assert self.udpate_decks_and_media_mock.call_count == 0
             assert self.ankiweb_sync_mock.call_count == 1
 
             assert self.check_and_install_new_deck_subscriptions_mock.call_count == 0
@@ -2965,7 +2966,7 @@ class TestAutoSync:
             qtbot.wait(500)
 
             # Assert that both syncs were called.
-            assert self.ankihub_sync_mock.call_count == 1
+            assert self.udpate_decks_and_media_mock.call_count == 1
             assert self.ankiweb_sync_mock.call_count == 1
 
             # Assert that the new deck subscriptions operation was called.
@@ -2976,7 +2977,7 @@ class TestAutoSync:
             qtbot.wait(500)
 
             # Assert that only the AnkiWeb sync was called the second time.
-            assert self.ankihub_sync_mock.call_count == 1
+            assert self.udpate_decks_and_media_mock.call_count == 1
             assert self.ankiweb_sync_mock.call_count == 2
 
             assert self.check_and_install_new_deck_subscriptions_mock.call_count == 1
@@ -2987,9 +2988,11 @@ class TestAutoSync:
             config, "token", MagicMock(return_value=lambda: "test_token")
         )
 
-        # Mock the AnkiHub sync so it does nothing.
-        self.ankihub_sync_mock = Mock()
-        monkeypatch.setattr(ah_sync, "sync_all_decks_and_media", self.ankihub_sync_mock)
+        # Mock update_decks_and_media so it does nothing.
+        self.udpate_decks_and_media_mock = Mock()
+        monkeypatch.setattr(
+            ah_deck_updater, "update_decks_and_media", self.udpate_decks_and_media_mock
+        )
 
         # Mock the AnkiWeb sync so it does nothing.
         self.ankiweb_sync_mock = Mock()
@@ -3071,8 +3074,8 @@ def test_sync_with_optional_content(
                         ),
                     ],
                 )
-                sync = _AnkiHubSync()
-                sync._sync_deck_extensions(ah_did)
+                deck_updater = _AnkiHubDeckUpdater()
+                deck_updater._update_deck_extensions(ah_did)
 
             updated_note = mw.col.get_note(note.id)
 
@@ -3244,10 +3247,10 @@ def test_reset_optional_tags_action(
         is_logged_in_mock.return_value = True
         monkeypatch.setattr(config, "is_logged_in", is_logged_in_mock)
 
-        # mock method of ah_sync
-        sync_all_decks_and_media_mock = Mock()
+        # mock method of ah_deck_updater
+        update_decks_and_media_mock = Mock()
         monkeypatch.setattr(
-            ah_sync, "sync_all_decks_and_media", sync_all_decks_and_media_mock
+            ah_deck_updater, "update_decks_and_media", update_decks_and_media_mock
         )
 
         # run the reset action
@@ -3266,7 +3269,7 @@ def test_reset_optional_tags_action(
         assert note.tags == []
 
         assert is_logged_in_mock.call_count == 1
-        assert sync_all_decks_and_media_mock.call_count == 1
+        assert update_decks_and_media_mock.call_count == 1
 
         # the other note should not be affected, because it is in a different deck
         assert mw.col.get_note(other_note.id).tags == [
@@ -3274,7 +3277,7 @@ def test_reset_optional_tags_action(
         ]
 
 
-def test_download_media_on_sync(
+def test_media_update_on_deck_update(
     anki_session_with_addon_data: AnkiSession,
     install_sample_ah_deck: InstallSampleAHDeck,
     monkeypatch: MonkeyPatch,
@@ -3310,8 +3313,8 @@ def test_download_media_on_sync(
         download_media_mock = Mock()
         monkeypatch.setattr(AnkiHubClient, "download_media", download_media_mock)
 
-        # Run the sync.
-        ah_sync.sync_all_decks_and_media()
+        # Update the deck.
+        ah_deck_updater.update_decks_and_media(ah_dids=[ah_did])
 
         # Let the background thread (which downloads missing media) finish.
         qtbot.wait(200)

@@ -1,7 +1,7 @@
 """Downloads updates to decks from AnkiHub and imports them."""
 import uuid
 from datetime import datetime
-from typing import List, Optional
+from typing import Collection, List, Optional
 
 import aqt
 from anki.errors import NotFoundError
@@ -22,18 +22,19 @@ class NotLoggedInError(Exception):
     pass
 
 
-class _AnkiHubSync:
+class _AnkiHubDeckUpdater:
     def __init__(self):
         self._importer = AnkiHubImporter()
         self._import_results: Optional[List[AnkiHubImportResult]] = None
 
-    def sync_all_decks_and_media(
-        self, start_media_sync: bool = True
+    def update_decks_and_media(
+        self, ah_dids: Collection[uuid.UUID], start_media_sync: bool = True
     ) -> List[AnkiHubImportResult]:
-        """Syncs all decks with AnkiHub and starts the media download.
+        """Fetch and apply deck updates from AnkiHub for the given decks and start the media download.
+        Also updates deck extensions.
         Should be called from a background thread with a progress dialog to avoid blocking the UI.
-        Returns the results of the sync."""
-        LOGGER.info("Syncing all decks and media...")
+        Returns the results of the imports of the updates."""
+        LOGGER.info(f"Updating decks and media for {ah_dids=} {start_media_sync=}...")
 
         self._import_results = None
 
@@ -41,34 +42,30 @@ class _AnkiHubSync:
             raise NotLoggedInError()
 
         self._import_results = []
-        self._sync_all_decks()
+        self._update_decks(ah_dids)
 
         # The media sync should be started after the deck updates are imported,
         # because the import can add new media references to notes.
         if start_media_sync:
             media_sync.start_media_download()
 
-        LOGGER.info("Sync finished.")
+        LOGGER.info("Finished updating decks")
         return self._import_results
 
-    def last_sync_results(self) -> Optional[List[AnkiHubImportResult]]:
-        """Returns the results of the last sync. Returns None if no sync has been performed yet or
-        if the last sync failed."""
+    def last_deck_updates_results(self) -> Optional[List[AnkiHubImportResult]]:
+        """Returns the results of the last deck updates. Returns None if no update has been performed yet or
+        if the last update process failed."""
         return self._import_results
 
-    def _sync_all_decks(self) -> None:
-        """Syncs updates for all subscribed and installed decks."""
-        LOGGER.info("Syncing decks...")
+    def _update_decks(self, ah_dids: Collection[uuid.UUID]) -> None:
+        """Fetches and applies updates for the given decks and their extensions."""
+        LOGGER.info(f"Updating decks for {ah_dids=}...")
 
         create_backup()
 
-        client = AnkiHubClient()
-        subscribed_ah_dids = [deck.ah_did for deck in client.get_deck_subscriptions()]
-        installed_ah_dids = config.deck_ids()
-        to_sync_ah_dids = set(installed_ah_dids).intersection(subscribed_ah_dids)
-        for ah_did in to_sync_ah_dids:
+        for ah_did in ah_dids:
             try:
-                should_continue = self._sync_deck(ah_did)
+                should_continue = self._update_single_deck(ah_did)
                 if not should_continue:
                     return
             except AnkiHubHTTPError as e:
@@ -77,19 +74,19 @@ class _AnkiHubSync:
                 else:
                     raise e
 
-    def _sync_deck(self, ankihub_did: uuid.UUID) -> bool:
-        """Syncs a single deck with AnkiHub.
-        Returns True if the sync was successful, False if the user cancelled it."""
+    def _update_single_deck(self, ankihub_did: uuid.UUID) -> bool:
+        """Fetches and applies updates for a single deck. Also updates the deck extensions of the deck.
+        Returns True if the update was successful, False if the user cancelled it."""
         result = self._download_updates_for_deck(ankihub_did)
         if not result:
             return False
 
-        result = self._sync_deck_extensions(ankihub_did)
+        result = self._update_deck_extensions(ankihub_did)
         return result
 
     def _download_updates_for_deck(self, ankihub_did) -> bool:
         """Downloads note updates from AnkiHub and imports them into Anki.
-        Returns True if the sync was successful, False if the user cancelled it."""
+        Returns True if the action was successful, False if the user cancelled it."""
 
         client = AnkiHubClient()
         notes_data = []
@@ -103,7 +100,7 @@ class _AnkiHubSync:
             ),
         ):
             if aqt.mw.progress.want_cancel():
-                LOGGER.info("User cancelled sync.")
+                LOGGER.info("User cancelled deck update.")
                 return False
 
             if not chunk.notes:
@@ -131,14 +128,14 @@ class _AnkiHubSync:
 
             config.save_latest_deck_update(ankihub_did, latest_update)
         else:
-            LOGGER.info(f"No new updates to sync for {ankihub_did=}")
+            LOGGER.info(f"No new updates for {ankihub_did=}")
         return True
 
-    def _sync_deck_extensions(self, ankihub_did: uuid.UUID) -> bool:
-        # returns True if the sync was successful, False if the user cancelled it
+    def _update_deck_extensions(self, ankihub_did: uuid.UUID) -> bool:
+        # returns True if the update was successful, False if the user cancelled it
         client = AnkiHubClient()
         if not (deck_extensions := client.get_deck_extensions_by_deck_id(ankihub_did)):
-            LOGGER.info(f"No extensions to sync for {ankihub_did=}")
+            LOGGER.info(f"No extensions to update for {ankihub_did=}")
             return True
 
         for deck_extension in deck_extensions:
@@ -148,7 +145,7 @@ class _AnkiHubSync:
         return True
 
     def _download_updates_for_extension(self, deck_extension: DeckExtension) -> bool:
-        # returns True if the sync was successful, False if the user cancelled it
+        # returns True if the update was successful, False if the user cancelled it
         config.create_or_update_deck_extension_config(deck_extension)
         deck_extension_config = config.deck_extension_config(deck_extension.id)
         latest_update: Optional[datetime] = None
@@ -165,7 +162,7 @@ class _AnkiHubSync:
                 continue
 
             if aqt.mw.progress.want_cancel():
-                LOGGER.debug("User cancelled sync.")
+                LOGGER.debug("User cancelled extension update.")
                 return False
 
             for customization in chunk.note_customizations:
@@ -210,7 +207,7 @@ class _AnkiHubSync:
             if error_message:
                 show_error_dialog(
                     error_message,
-                    title="Error syncing Deck :(",
+                    title="Error while downloading updates for deck :(",
                 )
                 return True
             else:
@@ -219,20 +216,22 @@ class _AnkiHubSync:
             aqt.mw.taskman.run_on_main(
                 lambda: showInfo(  # type: ignore
                     f"The deck <b>{deck_config.name}</b> does not exist on the AnkiHub website. "
-                    f"Remove it from the subscribed decks to be able to sync.<br><br>"
+                    f"Remove it from the subscribed decks to be able to get other deck updates.<br><br>"
                     f"deck id: <i>{ankihub_did}</i>",
                 )
             )
-            LOGGER.info("Unable to sync because the deck doesn't exist on AnkiHub.")
+            LOGGER.info(
+                "Unable to get deck updates because the deck doesn't exist on AnkiHub."
+            )
             return True
         return False
 
 
-ah_sync = _AnkiHubSync()
+ah_deck_updater = _AnkiHubDeckUpdater()
 
 
-def show_tooltip_about_last_sync_results() -> None:
-    sync_results = ah_sync.last_sync_results()
+def show_tooltip_about_last_deck_updates_results() -> None:
+    sync_results = ah_deck_updater.last_deck_updates_results()
     if sync_results is None:
         return
 
@@ -244,7 +243,7 @@ def show_tooltip_about_last_sync_results() -> None:
         tooltip("AnkiHub: No new updates")
     else:
         tooltip(
-            f"AnkiHub: Synced {total} note{'' if total == 1 else 's'}.",
+            f"AnkiHub: Updated {total} note{'' if total == 1 else 's'}.",
             parent=aqt.mw,
         )
 
