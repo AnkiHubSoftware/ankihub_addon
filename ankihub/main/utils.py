@@ -89,7 +89,6 @@ def create_note_with_id(note: Note, anki_id: NoteId, anki_did: DeckId) -> Note:
     # Swap out the note id that Anki assigns to the new note with our own id.
     aqt.mw.col.db.execute(f"UPDATE notes SET id={anki_id} WHERE id={note.id};")
     aqt.mw.col.db.execute(f"UPDATE cards SET nid={anki_id} WHERE nid={note.id};")
-    aqt.mw.col.db.commit()
 
     note.id = anki_id
     return note
