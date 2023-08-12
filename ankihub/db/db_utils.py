@@ -10,6 +10,10 @@ class DBConnection:
     def __init__(self, conn: sqlite3.Connection):
         self._conn = conn
         self._is_used_as_context_manager = False
+        with self._conn:
+            journal_mode = self._conn.execute("pragma journal_mode=wal").fetchone()[0]
+            if journal_mode != "wal":
+                LOGGER.warning("Failed to set journal_mode=wal")
 
     def execute(
         self,
