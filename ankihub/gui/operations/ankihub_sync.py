@@ -7,7 +7,7 @@ from ...addon_ankihub_client import AddonAnkiHubClient as AnkiHubClient
 from ...ankihub_client import Deck
 from ...main.deck_unsubscribtion import uninstall_deck
 from ...settings import config
-from ..sync import ah_sync, show_tooltip_about_last_sync_results
+from ..deck_updater import ah_deck_updater, show_tooltip_about_last_deck_updates_results
 from .db_check import maybe_check_databases
 from .new_deck_subscriptions import check_and_install_new_deck_subscriptions
 from .utils import future_with_exception, future_with_result
@@ -17,13 +17,19 @@ def sync_with_ankihub(on_done: Callable[[Future], None]) -> None:
     """Uninstall decks the user is not subscribed to anymore, check for (and maybe install) new deck subscriptions,
     then download updates to decks."""
 
-    def on_new_deck_subscriptions_done(future: Future) -> None:
+    def on_new_deck_subscriptions_done(
+        future: Future, subscribed_decks: List[Deck]
+    ) -> None:
         if future.exception():
             on_done(future_with_exception(future.exception()))
             return
 
+        installed_ah_dids = config.deck_ids()
+        subscribed_ah_dids = [deck.ah_did for deck in subscribed_decks]
+        to_sync_ah_dids = set(installed_ah_dids).intersection(set(subscribed_ah_dids))
+
         aqt.mw.taskman.with_progress(
-            task=ah_sync.sync_all_decks_and_media,
+            task=lambda: ah_deck_updater.update_decks_and_media(to_sync_ah_dids),
             immediate=True,
             on_done=on_sync_done,
         )
@@ -33,7 +39,7 @@ def sync_with_ankihub(on_done: Callable[[Future], None]) -> None:
             on_done(future_with_exception(future.exception()))
             return
 
-        show_tooltip_about_last_sync_results()
+        show_tooltip_about_last_deck_updates_results()
         maybe_check_databases()
         on_done(future_with_result(None))
 
@@ -45,7 +51,10 @@ def sync_with_ankihub(on_done: Callable[[Future], None]) -> None:
             subscribed_decks=subscribed_decks
         )
         check_and_install_new_deck_subscriptions(
-            subscribed_decks=subscribed_decks, on_done=on_new_deck_subscriptions_done
+            subscribed_decks=subscribed_decks,
+            on_done=lambda future: on_new_deck_subscriptions_done(
+                future=future, subscribed_decks=subscribed_decks
+            ),
         )
     except Exception as e:
         on_done(future_with_exception(e))
