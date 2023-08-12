@@ -234,9 +234,7 @@ def _try_handle_exception(
         f"From _try_handle_exception:\n{''.join(traceback.format_exception(exc_type, value=exc_value, tb=tb))}"
     )
 
-    if isinstance(exc_value, DeckDownloadAndInstallError) or isinstance(
-        exc_value, AnkiHubRequestException
-    ):
+    if isinstance(exc_value, (DeckDownloadAndInstallError, AnkiHubRequestException)):
         exc_value = exc_value.original_exception
 
     if isinstance(exc_value, AnkiHubHTTPError):
