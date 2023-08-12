@@ -33,6 +33,7 @@ from ..db import (
     detach_ankihub_db_from_anki_db_connection,
     is_ankihub_db_attached_to_anki_db,
 )
+from ..gui.exceptions import DeckDownloadAndInstallError
 from ..settings import (
     ADDON_VERSION,
     ANKI_VERSION,
@@ -232,6 +233,11 @@ def _try_handle_exception(
     LOGGER.info(
         f"From _try_handle_exception:\n{''.join(traceback.format_exception(exc_type, value=exc_value, tb=tb))}"
     )
+
+    if isinstance(exc_value, DeckDownloadAndInstallError) or isinstance(
+        exc_value, AnkiHubRequestException
+    ):
+        exc_value = exc_value.original_exception
 
     if isinstance(exc_value, AnkiHubHTTPError):
         if _maybe_handle_ankihub_http_error(exc_value):
