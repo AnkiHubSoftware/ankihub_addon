@@ -115,6 +115,9 @@ class _AnkiHubDB:
 
     def setup_and_migrate(self, db_path: Path) -> None:
         self.database_path = db_path
+        journal_mode = self.scalar("pragma journal_mode=wal")
+        if journal_mode != "wal":
+            LOGGER.warning("Failed to set journal_mode=wal")
 
         notes_table_exists = self.scalar(
             """
