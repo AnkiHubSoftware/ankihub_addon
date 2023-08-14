@@ -513,12 +513,18 @@ class AnkiHubClient:
         # Log and skip this iteration if the response is not 200 OK
         if response.ok:
             # If we get a valid response, open the file and write the content
-            with open(media_file_path, "wb") as handle:
+            with open(media_file_path, "wb") as file:
                 for block in response.iter_content(1024):
                     if not block:
                         break
 
-                    handle.write(block)
+                    file.write(block)
+
+                    if self.should_stop_background_threads:
+                        # Remove incomplete file if the download was interrupted
+                        file.close()
+                        media_file_path.unlink()
+                        return
         else:
             LOGGER.info(
                 f"Unable to download media file [{media_remote_path}]. Response status code: {response.status_code}"
