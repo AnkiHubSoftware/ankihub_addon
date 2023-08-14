@@ -46,6 +46,7 @@ from .models import (
     Deck,
     DeckExtension,
     DeckExtensionUpdateChunk,
+    DeckMediaUpdateChunk,
     DeckUpdateChunk,
     NewNoteSuggestion,
     NoteInfo,
@@ -69,6 +70,7 @@ API_VERSION = 12.0
 
 DECK_UPDATE_PAGE_SIZE = 2000  # seems to work well in terms of speed
 DECK_EXTENSION_UPDATE_PAGE_SIZE = 2000
+DECK_MEDIA_UPDATE_PAGE_SIZE = 2000
 
 CSV_DELIMITER = ";"
 
@@ -637,14 +639,14 @@ class AnkiHubClient:
             "size": DECK_UPDATE_PAGE_SIZE,
         }
         url_suffix = f"/decks/{ah_did}/updates"
-        i = 0
         notes_count = 0
+        first_request = True
         while url_suffix is not None:
             response = self._send_request(
                 "GET",
                 API.ANKIHUB,
                 url_suffix,
-                params=params if i == 0 else None,
+                params=params if first_request else None,
             )
             if response.status_code != 200:
                 raise AnkiHubHTTPError(response)
@@ -658,11 +660,47 @@ class AnkiHubClient:
             note_updates = DeckUpdateChunk.from_dict(data)
             yield note_updates
 
-            i += 1
             notes_count += len(note_updates.notes)
 
             if download_progress_cb:
                 download_progress_cb(notes_count)
+
+            first_request = False
+
+    def get_deck_media_updates(
+        self,
+        ah_did: uuid.UUID,
+        since: datetime,
+    ) -> Iterator[DeckMediaUpdateChunk]:
+        class Params(TypedDict, total=False):
+            since: str
+            size: int
+
+        params: Params = {
+            "since": since.strftime(ANKIHUB_DATETIME_FORMAT_STR) if since else None,
+            "size": DECK_MEDIA_UPDATE_PAGE_SIZE,
+        }
+        url_suffix = f"/decks/{ah_did}/media/list/"
+        first_request = True
+        while url_suffix is not None:
+            response = self._send_request(
+                "GET",
+                API.ANKIHUB,
+                url_suffix,
+                params=params if first_request else None,
+            )
+            if response.status_code != 200:
+                raise AnkiHubHTTPError(response)
+
+            data = response.json()
+            url_suffix = (
+                data["next"].split("/api", maxsplit=1)[1] if data["next"] else None
+            )
+
+            media_updates = DeckMediaUpdateChunk.from_dict(data)
+            yield media_updates
+
+            first_request = False
 
     def get_deck_by_id(self, ah_did: uuid.UUID) -> Deck:
         response = self._send_request(
