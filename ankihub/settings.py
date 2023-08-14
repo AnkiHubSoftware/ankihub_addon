@@ -338,11 +338,16 @@ def _set_anki_profile_id(profile_id: str) -> None:
     aqt.mw.pm.save()
 
 
+def addon_dir_path() -> Path:
+    addon_dir_name = aqt.mw.addonManager.addonFromModule(__name__)
+    result = Path(aqt.mw.addonManager.addonsFolder(addon_dir_name))
+    return result
+
+
 def user_files_path() -> Path:
     # The contents of the user_files folder are retained during updates.
     # See https://addon-docs.ankiweb.net/addon-config.html#user-files
-    addon_dir_name = aqt.mw.addonManager.addonFromModule(__name__)
-    result = Path(aqt.mw.addonManager.addonsFolder(addon_dir_name)) / "user_files"
+    result = addon_dir_path() / "user_files"
     return result
 
 
