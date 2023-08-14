@@ -156,7 +156,7 @@ class DeckMedia(DataClassJSONMixinWithConfig):
     file_content_hash: str
     referenced_on_accepted_note: bool
     exists_on_s3: bool
-    enabled: bool
+    download_enabled: bool
 
 
 @dataclass
