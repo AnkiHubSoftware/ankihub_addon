@@ -771,6 +771,9 @@ class TestGetDeckMediaUpdates:
             DeckMedia(
                 name=f"example_{i}.png",
                 file_content_hash=f"{i}0000000000000000000000000000000",
+                referenced_on_accepted_note=False,
+                exists_on_s3=False,
+                enabled=True,
             )
             for i in reversed(range(3))
         ]
@@ -796,6 +799,9 @@ class TestGetDeckMediaUpdates:
             DeckMedia(
                 name=f"example_{i}.png",
                 file_content_hash=f"{i}0000000000000000000000000000000",
+                referenced_on_accepted_note=False,
+                exists_on_s3=False,
+                enabled=True,
             )
             for i in reversed(range(1, 3))
         ]
@@ -826,6 +832,9 @@ class TestGetDeckMediaUpdates:
             DeckMedia(
                 name=f"example_{i}.png",
                 file_content_hash=f"{i}0000000000000000000000000000000",
+                referenced_on_accepted_note=False,
+                exists_on_s3=False,
+                enabled=True,
             )
             for i in reversed(range(3))
         ]
