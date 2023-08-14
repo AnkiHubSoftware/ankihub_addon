@@ -561,7 +561,8 @@ def _ankihub_help_setup(parent: QMenu):
 
     q_get_help_action = QAction("Get Help", help_menu)
     qconnect(
-        q_get_help_action.triggered, lambda: openLink("https://www.ankihub.net/support")
+        q_get_help_action.triggered,
+        lambda: openLink("https://community.ankihub.net/c/support"),
     )
     help_menu.addAction(q_get_help_action)
 
