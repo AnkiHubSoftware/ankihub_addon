@@ -31,6 +31,10 @@ from ankihub.ankihub_client import (
     ChangeNoteSuggestion,
     Deck,
     DeckExtension,
+    DeckExtensionUpdateChunk,
+    DeckMedia,
+    DeckMediaUpdateChunk,
+    DeckUpdateChunk,
     Field,
     NewNoteSuggestion,
     NoteCustomization,
@@ -42,10 +46,6 @@ from ankihub.ankihub_client import (
     UserDeckRelation,
     get_media_names_from_notes_data,
     get_media_names_from_suggestion,
-)
-from ankihub.ankihub_client.ankihub_client import (
-    DeckExtensionUpdateChunk,
-    DeckUpdateChunk,
 )
 from ankihub.gui.operations.deck_installation import _download_progress_cb
 
@@ -69,6 +69,10 @@ LOCAL_API_URL = "http://localhost:8000/api"
 
 ID_OF_DECK_OF_USER_TEST1 = uuid.UUID("dda0d3ad-89cd-45fb-8ddc-fabad93c2d7b")
 ID_OF_DECK_OF_USER_TEST2 = uuid.UUID("5528aef7-f7ac-406b-9b35-4eaf00de4b20")
+
+DATETIME_OF_ADDING_FIRST_DECK_MEDIA = datetime(
+    year=2023, month=1, day=2, tzinfo=timezone.utc
+)
 
 
 @pytest.fixture
@@ -713,8 +717,7 @@ class TestGetDeckUpdates:
         update_chunks: List[DeckUpdateChunk] = list(
             client.get_deck_updates(ID_OF_DECK_OF_USER_TEST2, since=None)
         )
-        assert len(update_chunks) == 2
-        assert all(len(chunk.notes) == page_size for chunk in update_chunks)
+        assert len(update_chunks) == 3
 
     @pytest.mark.skipifvcr()
     def test_get_deck_updates_since(
@@ -748,6 +751,84 @@ class TestGetDeckUpdates:
             protected_fields={},
             protected_tags=[],
         )
+
+
+class TestGetDeckMediaUpdates:
+    @pytest.mark.vcr()
+    def test_get_all_media(
+        self,
+        authorized_client_for_user_test1: AnkiHubClient,
+    ):
+        client = authorized_client_for_user_test1
+        update_chunks: List[DeckMediaUpdateChunk] = list(
+            client.get_deck_media_updates(ID_OF_DECK_OF_USER_TEST1, since=None)
+        )
+
+        assert len(update_chunks) == 1
+        assert len(update_chunks[0].media) == 3
+        deck_media_objects = update_chunks[0].media
+        assert deck_media_objects == [
+            DeckMedia(
+                name=f"example_{i}.png",
+                file_content_hash=f"{i}0000000000000000000000000000000",
+            )
+            for i in reversed(range(3))
+        ]
+
+    @pytest.mark.vcr()
+    def test_get_media_since(
+        self,
+        authorized_client_for_user_test1: AnkiHubClient,
+    ):
+        client = authorized_client_for_user_test1
+        update_chunks: List[DeckMediaUpdateChunk] = list(
+            client.get_deck_media_updates(
+                ID_OF_DECK_OF_USER_TEST1,
+                # by using this since value only DeckMedia added after the first DeckMedia will be returned
+                since=DATETIME_OF_ADDING_FIRST_DECK_MEDIA,
+            )
+        )
+
+        assert len(update_chunks) == 1
+        assert len(update_chunks[0].media) == 2
+        deck_media_objects = update_chunks[0].media
+        assert deck_media_objects == [
+            DeckMedia(
+                name=f"example_{i}.png",
+                file_content_hash=f"{i}0000000000000000000000000000000",
+            )
+            for i in reversed(range(1, 3))
+        ]
+
+    @pytest.mark.vcr()
+    def test_pagination(
+        self,
+        authorized_client_for_user_test1: AnkiHubClient,
+        monkeypatch: MonkeyPatch,
+    ):
+        client = authorized_client_for_user_test1
+
+        # Set page size to 1 so that we can test pagination
+        page_size = 1
+        monkeypatch.setattr(
+            "ankihub.ankihub_client.ankihub_client.DECK_MEDIA_UPDATE_PAGE_SIZE",
+            page_size,
+        )
+
+        update_chunks = list(
+            client.get_deck_media_updates(ID_OF_DECK_OF_USER_TEST1, since=None)
+        )
+
+        assert len(update_chunks) == 3
+
+        deck_media_objects = [media for chunk in update_chunks for media in chunk.media]
+        assert deck_media_objects == [
+            DeckMedia(
+                name=f"example_{i}.png",
+                file_content_hash=f"{i}0000000000000000000000000000000",
+            )
+            for i in reversed(range(3))
+        ]
 
 
 @pytest.mark.vcr()
