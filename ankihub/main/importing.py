@@ -175,6 +175,8 @@ class AnkiHubImporter:
             skipped_nids=self._skipped_nids,
             first_import_of_deck=self._is_first_import_of_deck,
         )
+        aqt.mw.col.save()
+
         return result
 
     def _import_notes(
