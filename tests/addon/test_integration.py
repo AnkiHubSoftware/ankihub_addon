@@ -1118,10 +1118,9 @@ class TestAnkiHubImporter:
         anki_session_with_addon_data: AnkiSession,
         next_deterministic_uuid: Callable[[], uuid.UUID],
     ):
-        from aqt import mw
-
         anki_session = anki_session_with_addon_data
         with anki_session.profile_loaded():
+            mw = anki_session.mw
 
             # import the apkg to get the note types, then delete the deck
             file = str(ANKIHUB_SAMPLE_DECK_APKG.absolute())
@@ -1159,10 +1158,9 @@ class TestAnkiHubImporter:
         anki_session_with_addon_data: AnkiSession,
         next_deterministic_uuid: Callable[[], uuid.UUID],
     ):
-        from aqt import mw
-
         anki_session = anki_session_with_addon_data
         with anki_session.profile_loaded():
+            mw = anki_session.mw
 
             # import the apkg
             file = str(ANKIHUB_SAMPLE_DECK_APKG.absolute())
@@ -1199,10 +1197,9 @@ class TestAnkiHubImporter:
         anki_session_with_addon_data: AnkiSession,
         next_deterministic_uuid: Callable[[], uuid.UUID],
     ):
-        from aqt import mw
-
         anki_session = anki_session_with_addon_data
         with anki_session.profile_loaded():
+            mw = anki_session.mw
 
             # import the apkg
             file = str(ANKIHUB_SAMPLE_DECK_APKG.absolute())
@@ -1245,10 +1242,9 @@ class TestAnkiHubImporter:
         anki_session_with_addon_data: AnkiSession,
         next_deterministic_uuid: Callable[[], uuid.UUID],
     ):
-        from aqt import mw
-
         anki_session = anki_session_with_addon_data
         with anki_session.profile_loaded():
+            mw = anki_session.mw
 
             # import the apkg
             file = str(ANKIHUB_SAMPLE_DECK_APKG.absolute())
@@ -1334,10 +1330,9 @@ class TestAnkiHubImporter:
         install_sample_ah_deck: InstallSampleAHDeck,
         next_deterministic_uuid: Callable[[], uuid.UUID],
     ):
-        from aqt import mw
-
         anki_session = anki_session_with_addon_data
         with anki_session.profile_loaded():
+            mw = anki_session.mw
 
             anki_did, _ = install_sample_ah_deck()
             first_local_did = anki_did
@@ -1381,10 +1376,9 @@ class TestAnkiHubImporter:
         anki_session_with_addon_data: AnkiSession,
         install_sample_ah_deck: InstallSampleAHDeck,
     ):
-        from aqt import mw
-
         anki_session = anki_session_with_addon_data
         with anki_session.profile_loaded():
+            mw = anki_session.mw
 
             anki_did, ah_did = install_sample_ah_deck()
 
@@ -1659,10 +1653,10 @@ def test_unsubscribe_from_deck(
     monkeypatch: MonkeyPatch,
     requests_mock: Mocker,
 ):
-    from aqt import mw
-
     anki_session = anki_session_with_addon_data
     with anki_session.profile_loaded():
+        mw = anki_session.mw
+
         anki_deck_id, ah_did = install_sample_ah_deck()
 
         mids = ankihub_db.note_types_for_ankihub_deck(ah_did)
@@ -2264,11 +2258,6 @@ class TestBrowserTreeView:
         qtbot: QtBot,
         install_sample_ah_deck: InstallSampleAHDeck,
     ):
-        from aqt import dialogs
-        from aqt.browser import Browser
-        from aqt.browser.sidebar.item import SidebarItem
-        from aqt.browser.sidebar.tree import SidebarTreeView
-
         config.public_config["sync_on_startup"] = False
         entry_point.run()
 
@@ -2314,8 +2303,6 @@ def test_browser_custom_columns(
     qtbot: QtBot,
     install_sample_ah_deck: InstallSampleAHDeck,
 ):
-    from aqt import dialogs
-
     config.public_config["sync_on_startup"] = False
     entry_point.run()
 
@@ -3199,8 +3186,6 @@ def test_reset_optional_tags_action(
     monkeypatch: MonkeyPatch,
     install_sample_ah_deck: InstallSampleAHDeck,
 ):
-    from aqt import dialogs
-
     entry_point.run()
 
     with anki_session_with_addon_data.profile_loaded():
@@ -3875,12 +3860,12 @@ def test_delete_ankihub_private_config_on_deckBrowser__delete_option(
     qtbot: QtBot,
     mock_function: MockFunctionProtocol,
 ):
-    from aqt import mw
-
     entry_point.run()
 
     anki_session = anki_session_with_addon_data
     with anki_session.profile_loaded():
+        mw = anki_session.mw
+
         anki_deck_id, ah_did = install_sample_ah_deck()
 
         mids = ankihub_db.note_types_for_ankihub_deck(ah_did)
@@ -3927,12 +3912,12 @@ def test_not_delete_ankihub_private_config_on_deckBrowser__delete_option(
     qtbot: QtBot,
     mock_function: MockFunctionProtocol,
 ):
-    from aqt import mw
-
     entry_point.run()
 
     anki_session = anki_session_with_addon_data
     with anki_session.profile_loaded():
+        mw = anki_session.mw
+
         anki_deck_id, _ = install_sample_ah_deck()
 
         deck_uuid = config.get_deck_uuid_by_did(anki_deck_id)
