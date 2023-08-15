@@ -1,5 +1,6 @@
 """Import NoteInfo objects into Anki and the AnkiHub database,
 create/update decks and note types in the Anki collection if necessary"""
+import textwrap
 import uuid
 from dataclasses import dataclass
 from pprint import pformat
@@ -78,12 +79,16 @@ class AnkiHubImporter:
         subdeck indicates whether cards should be moved into subdecks based on subdeck tags
         subdecks_for_new_notes_only indicates whether only new notes should be moved into subdecks
         """
-        LOGGER.info(f"Importing ankihub deck {deck_name=} {anki_did=}")
-        LOGGER.info(f"Notes: {pformat(truncated_list(notes, 2))}")
-        LOGGER.info(f"Protected fields: {pformat(protected_fields)}")
-        LOGGER.info(f"Protected tags: {pformat(protected_tags)}")
         LOGGER.info(
-            f"Subdecks: {subdecks}, Subdecks for new notes only: {subdecks_for_new_notes_only}"
+            textwrap.dedent(
+                f"""
+                Importing ankihub deck {deck_name=} {is_first_import_of_deck=} {ankihub_did=} {anki_did=}
+                \tNotes: {pformat(truncated_list(notes, 2))}
+                \tProtected fields: {pformat(protected_fields)}
+                \tProtected tags: {pformat(protected_tags)}
+                \tSubdecks: {subdecks}, Subdecks for new notes only: {subdecks_for_new_notes_only}
+                """
+            ).strip("\n")
         )
 
         # Instance attributes are reset here so that the results returned are only for the current deck.
