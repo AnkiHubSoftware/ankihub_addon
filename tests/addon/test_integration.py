@@ -3080,11 +3080,6 @@ class TestAutoSync:
         )
 
 
-class PickableMock(Mock):
-    def __reduce__(self):
-        return (Mock, ())
-
-
 def test_sync_with_optional_content(
     anki_session_with_addon_data: AnkiSession,
     monkeypatch: MonkeyPatch,
