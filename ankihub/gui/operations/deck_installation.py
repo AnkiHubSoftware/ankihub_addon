@@ -151,11 +151,16 @@ def _install_deck(
     create_backup()
 
     importer = AnkiHubImporter()
+    client = AnkiHubClient()
+    protected_fields = client.get_protected_fields(ah_did=ankihub_did)
+    protected_tags = client.get_protected_tags(ah_did=ankihub_did)
     import_result = importer.import_ankihub_deck(
         ankihub_did=ankihub_did,
         notes_data=notes_data,
         deck_name=deck_name,
         is_first_import_of_deck=True,
+        protected_fields=protected_fields,
+        protected_tags=protected_tags,
     )
 
     config.add_deck(

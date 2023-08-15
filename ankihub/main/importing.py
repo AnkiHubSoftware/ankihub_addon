@@ -60,17 +60,13 @@ class AnkiHubImporter:
         self,
         ankihub_did: uuid.UUID,
         notes_data: List[NoteInfo],
+        protected_fields: Dict[int, List[str]],
+        protected_tags: List[str],
         deck_name: str,  # name that will be used for a deck if a new one gets created
         is_first_import_of_deck: bool,
         local_did: Optional[  # did that new notes should be put into if importing not for the first time
             DeckId
         ] = None,
-        protected_fields: Optional[
-            Dict[int, List[str]]
-        ] = None,  # will be fetched from api if not provided
-        protected_tags: Optional[
-            List[str]
-        ] = None,  # will be fetched from api if not provided
         subdecks: bool = False,
         subdecks_for_new_notes_only: bool = False,
     ) -> AnkiHubImportResult:
@@ -91,12 +87,6 @@ class AnkiHubImporter:
             remote_note_types = _fetch_remote_note_types(mids)
         else:
             remote_note_types = _fetch_remote_note_types_based_on_notes_data(notes_data)
-
-        if protected_fields is None:
-            protected_fields = AnkiHubClient().get_protected_fields(ankihub_did)
-
-        if protected_tags is None:
-            protected_tags = AnkiHubClient().get_protected_tags(ankihub_did)
 
         return self._import_ankihub_deck_inner(
             ankihub_did=ankihub_did,
