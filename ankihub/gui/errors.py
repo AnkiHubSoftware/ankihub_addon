@@ -10,6 +10,7 @@ import zipfile
 from concurrent.futures import Future
 from pathlib import Path
 from sqlite3 import OperationalError
+from textwrap import dedent
 from types import TracebackType
 from typing import Any, Callable, Dict, Optional, Type
 
@@ -38,6 +39,7 @@ from ..settings import (
     ADDON_VERSION,
     ANKI_VERSION,
     ANKIWEB_ID,
+    addon_dir_path,
     config,
     log_file_path,
     user_files_path,
@@ -233,6 +235,20 @@ def _try_handle_exception(
     LOGGER.info(
         f"From _try_handle_exception:\n{''.join(traceback.format_exception(exc_type, value=exc_value, tb=tb))}"
     )
+
+    if not addon_dir_path().exists():
+        show_error_dialog(
+            dedent(
+                """
+                The AnkiHub add-on directory cannot be found.<br>
+                If you've uninstalled the add-on, please restart Anki.<br>
+                If you're facing issues, please reinstall the add-on.
+                """
+            ).strip("\n"),
+            title="AnkiHub",
+        )
+        LOGGER.info("Showing add-on directory not found warning.")
+        return True
 
     if isinstance(exc_value, (DeckDownloadAndInstallError, AnkiHubRequestException)):
         exc_value = exc_value.original_exception
