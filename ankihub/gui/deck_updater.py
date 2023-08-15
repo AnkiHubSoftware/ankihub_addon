@@ -12,6 +12,7 @@ from ..addon_ankihub_client import AddonAnkiHubClient as AnkiHubClient
 from ..ankihub_client import AnkiHubHTTPError, DeckExtension
 from ..db import ankihub_db
 from ..main.importing import AnkiHubImporter, AnkiHubImportResult
+from ..main.note_types import get_note_types_for_deck
 from ..main.utils import create_backup
 from ..settings import config
 from .media_sync import media_sync
@@ -114,9 +115,11 @@ class _AnkiHubDeckUpdater:
             )
 
         if notes_data:
+            note_types = get_note_types_for_deck(ankihub_did)
             import_result = self._importer.import_ankihub_deck(
                 ankihub_did=ankihub_did,
                 notes_data=notes_data,
+                remote_note_types=note_types,
                 deck_name=deck_config.name,
                 is_first_import_of_deck=False,
                 local_did=deck_config.anki_id,

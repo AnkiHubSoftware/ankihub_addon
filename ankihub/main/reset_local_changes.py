@@ -8,6 +8,7 @@ from anki.notes import NoteId
 
 from ..addon_ankihub_client import AddonAnkiHubClient as AnkiHubClient
 from ..db import ankihub_db
+from ..main.note_types import get_note_types_for_deck
 from ..settings import config
 from .importing import AnkiHubImporter
 
@@ -28,9 +29,11 @@ def reset_local_changes_to_notes(
     client = AnkiHubClient()
     protected_fields = client.get_protected_fields(ah_did=ah_did)
     protected_tags = client.get_protected_tags(ah_did=ah_did)
+    note_types = get_note_types_for_deck(ankihub_did=ah_did)
     importer.import_ankihub_deck(
         ankihub_did=ah_did,
         notes_data=[],
+        remote_note_types=note_types,
         deck_name=deck_config.name,
         local_did=deck_config.anki_id,
         is_first_import_of_deck=False,
@@ -47,6 +50,7 @@ def reset_local_changes_to_notes(
     importer.import_ankihub_deck(
         ankihub_did=ah_did,
         notes_data=notes_data,
+        remote_note_types=note_types,
         deck_name=deck_config.name,
         is_first_import_of_deck=False,
         local_did=deck_config.anki_id,

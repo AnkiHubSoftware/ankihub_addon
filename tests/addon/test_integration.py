@@ -350,20 +350,18 @@ def ankihub_sample_deck_notes_data() -> List[NoteInfo]:
 @fixture
 def mock_ankihub_sync_dependencies(
     mock_client_methods_called_during_ankihub_sync: None,
-    mock_fetch_remote_note_types: None,
+    mock_ankihub_db_note_types_for_ankihub_deck: None,
 ) -> None:
     # Set a fake token so that the deck update is not aborted
     config.save_token("test_token")
 
 
 @fixture
-def mock_fetch_remote_note_types(monkeypatch: MonkeyPatch) -> None:
+def mock_ankihub_db_note_types_for_ankihub_deck(monkeypatch: MonkeyPatch) -> None:
+    # This prevents the add-on from fetching the note types from the server
     monkeypatch.setattr(
-        "ankihub.main.importing._fetch_remote_note_types",
-        lambda *args, **kwargs: {},
-    )
-    monkeypatch.setattr(
-        "ankihub.main.importing._fetch_remote_note_types_based_on_notes_data",
+        ankihub_db,
+        "note_types_for_ankihub_deck",
         lambda *args, **kwargs: {},
     )
 
@@ -666,7 +664,6 @@ class TestDownloadAndInstallDecks:
             monkeypatch.setattr(object, func_name, mocks[func_name])
 
         # Mock client functions
-        add_mock(AnkiHubClient, "get_note_type", note_type)
         add_mock(AnkiHubClient, "get_deck_by_id", deck)
         add_mock(AnkiHubClient, "download_deck", notes_data)
         add_mock(AnkiHubClient, "get_protected_fields", {})
@@ -2685,8 +2682,8 @@ def test_flatten_deck(
 
 def test_reset_local_changes_to_notes(
     anki_session_with_addon_data: AnkiSession,
-    monkeypatch: MonkeyPatch,
     install_sample_ah_deck: InstallSampleAHDeck,
+    monkeypatch: MonkeyPatch,
 ):
     with anki_session_with_addon_data.profile_loaded():
         mw = anki_session_with_addon_data.mw
@@ -2705,24 +2702,22 @@ def test_reset_local_changes_to_notes(
         # delete a note
         mw.col.remove_notes([basic_note_2.id])
 
-        # Mock the import function (that is called by reset_local_changes_to_notes)
-        # so that it doesn't try to fetch data from AnkiHub
-        # and just use empty remote note types and protected fields and tags.
-        # This works because the note types are not deleted in the test and protected
-        # fields and tags are also not used in the test.
-        def mock_import_ankihub_deck(self: AnkiHubImporter, *args, **kwargs):
-            self._import_ankihub_deck_inner(
-                *args,
-                **kwargs,
-                remote_note_types=dict(),  # type: ignore
-                protected_fields=dict(),  # type: ignore
-                protected_tags=list(),  # type: ignore
-            )
-
+        # mock the client functions that are called to get the data needed for resetting local changes
         monkeypatch.setattr(
-            "ankihub.main.importing.AnkiHubImporter.import_ankihub_deck",
-            mock_import_ankihub_deck,
+            "ankihub.main.reset_local_changes.AnkiHubClient.get_protected_fields",
+            lambda *args, **kwargs: {},
         )
+        monkeypatch.setattr(
+            "ankihub.main.reset_local_changes.AnkiHubClient.get_protected_tags",
+            lambda *args, **kwargs: [],
+        )
+        # mock the db function that is called to get the note types of the deck so that the code
+        # doesn't try to get the note types from the server
+        monkeypatch.setattr(
+            "ankihub.main.reset_local_changes.ankihub_db.note_types_for_ankihub_deck",
+            lambda *args, **kwargs: {},
+        )
+
         # reset local changes
         nids = ankihub_db.anki_nids_for_ankihub_deck(ah_did)
         reset_local_changes_to_notes(nids=nids, ah_did=ah_did)

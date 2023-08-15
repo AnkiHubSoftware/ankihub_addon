@@ -14,7 +14,6 @@ from anki.models import NotetypeDict, NotetypeId
 from anki.notes import Note, NoteId
 
 from .. import LOGGER, settings
-from ..addon_ankihub_client import AddonAnkiHubClient as AnkiHubClient
 from ..ankihub_client import Field, NoteInfo
 from ..db import ankihub_db
 from ..settings import config
@@ -60,6 +59,7 @@ class AnkiHubImporter:
         self,
         ankihub_did: uuid.UUID,
         notes_data: List[NoteInfo],
+        remote_note_types: Dict[NotetypeId, NotetypeDict],
         protected_fields: Dict[int, List[str]],
         protected_tags: List[str],
         deck_name: str,  # name that will be used for a deck if a new one gets created
@@ -78,15 +78,6 @@ class AnkiHubImporter:
         subdeck indicates whether cards should be moved into subdecks based on subdeck tags
         subdecks_for_new_notes_only indicates whether only new notes should be moved into subdecks
         """
-
-        LOGGER.info(f"Importing ankihub deck {deck_name=} {local_did=}")
-
-        # this is not ideal, it would be probably better to fetch all note types associated with the deck each time
-        if not notes_data:
-            mids = ankihub_db.note_types_for_ankihub_deck(ankihub_did)
-            remote_note_types = _fetch_remote_note_types(mids)
-        else:
-            remote_note_types = _fetch_remote_note_types_based_on_notes_data(notes_data)
 
         return self._import_ankihub_deck_inner(
             ankihub_did=ankihub_did,
@@ -114,6 +105,7 @@ class AnkiHubImporter:
         subdecks: bool = False,
         subdecks_for_new_notes_only: bool = False,
     ) -> AnkiHubImportResult:
+        LOGGER.info(f"Importing ankihub deck {deck_name=} {local_did=}")
         LOGGER.info(f"Notes data: {pformat(truncated_list(notes_data, 2))}")
         LOGGER.info(f"Protected fields: {pformat(protected_fields)}")
         LOGGER.info(f"Protected tags: {pformat(protected_tags)}")
@@ -502,22 +494,6 @@ def _updated_tags(
     optional = [tag for tag in cur_tags if is_optional_tag(tag)]
 
     result = list(set(protected) | set(internal) | set(optional) | set(incoming_tags))
-    return result
-
-
-def _fetch_remote_note_types_based_on_notes_data(
-    notes_data: List[NoteInfo],
-) -> Dict[NotetypeId, NotetypeDict]:
-    remote_mids = set(NotetypeId(note_data.mid) for note_data in notes_data)
-    result = _fetch_remote_note_types(remote_mids)
-    return result
-
-
-def _fetch_remote_note_types(
-    mids: Iterable[NotetypeId],
-) -> Dict[NotetypeId, NotetypeDict]:
-    client = AnkiHubClient()
-    result = {mid: client.get_note_type(mid) for mid in mids}
     return result
 
 
