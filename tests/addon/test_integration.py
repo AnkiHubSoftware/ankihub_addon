@@ -347,6 +347,27 @@ def ankihub_sample_deck_notes_data() -> List[NoteInfo]:
     return result
 
 
+@fixture
+def mock_ankihub_sync_dependencies(
+    mock_client_methods_called_during_ankihub_sync: None,
+    mock_fetch_remote_note_types: None,
+) -> None:
+    # Set a fake token so that the deck update is not aborted
+    config.save_token("test_token")
+
+
+@fixture
+def mock_fetch_remote_note_types(monkeypatch: MonkeyPatch) -> None:
+    monkeypatch.setattr(
+        "ankihub.main.importing._fetch_remote_note_types",
+        lambda *args, **kwargs: {},
+    )
+    monkeypatch.setattr(
+        "ankihub.main.importing._fetch_remote_note_types_based_on_notes_data",
+        lambda *args, **kwargs: {},
+    )
+
+
 @pytest.fixture
 def mock_client_methods_called_during_ankihub_sync(monkeypatch: MonkeyPatch) -> None:
     monkeypatch.setattr(
@@ -2817,27 +2838,6 @@ def test_profile_swap(
     assert general_setup_mock.call_count == 1
 
 
-@fixture
-def mock_fetch_remote_note_types(monkeypatch: MonkeyPatch) -> None:
-    monkeypatch.setattr(
-        "ankihub.main.importing._fetch_remote_note_types",
-        lambda *args, **kwargs: {},
-    )
-    monkeypatch.setattr(
-        "ankihub.main.importing._fetch_remote_note_types_based_on_notes_data",
-        lambda *args, **kwargs: {},
-    )
-
-
-@fixture
-def mock_ankihub_sync_dependencies(
-    mock_client_methods_called_during_ankihub_sync: None,
-    mock_fetch_remote_note_types: None,
-) -> None:
-    # Set a fake token so that the deck update is not aborted
-    config.save_token("test_token")
-
-
 class TestDeckUpdater:
     def test_update_note(
         self,
@@ -2891,6 +2891,78 @@ class TestDeckUpdater:
 
             # Assert that the last update time was updated in the config
             assert config.deck_config(ah_did).latest_update == latest_update
+
+    def test_update_optional_tags(
+        self,
+        anki_session_with_addon_data: AnkiSession,
+        install_sample_ah_deck: InstallSampleAHDeck,
+        mock_ankihub_sync_dependencies: None,
+        monkeypatch: MonkeyPatch,
+    ):
+        with anki_session_with_addon_data.profile_loaded():
+            mw = anki_session_with_addon_data.mw
+
+            # Install a deck to be updated
+            _, ah_did = install_sample_ah_deck()
+            note_data = ankihub_sample_deck_notes_data()[0]
+
+            # Mock client to return a deck extension update
+            deck_extension_id = 1
+            deck_extension_name = "fake_deck_extension_name"
+            latest_update = datetime.now()
+            optional_tags = [
+                f"AnkiHub_Optional::{deck_extension_name}::test1",
+                f"AnkiHub_Optional::{deck_extension_name}::test2",
+            ]
+            monkeypatch.setattr(
+                "ankihub.gui.deck_updater.AnkiHubClient.get_deck_extensions_by_deck_id",
+                lambda *args, **kwargs: [
+                    DeckExtension(
+                        id=deck_extension_id,
+                        owner_id=1,
+                        ah_did=ah_did,
+                        name=deck_extension_name,
+                        tag_group_name=deck_extension_name,
+                        description="",
+                    )
+                ],
+            )
+            monkeypatch.setattr(
+                "ankihub.gui.deck_updater.AnkiHubClient.get_deck_extension_updates",
+                lambda *args, **kwargs: [
+                    DeckExtensionUpdateChunk(
+                        note_customizations=[
+                            NoteCustomization(
+                                ankihub_nid=note_data.ah_nid, tags=optional_tags
+                            ),
+                        ],
+                        latest_update=latest_update,
+                    ),
+                ],
+            )
+
+            # Update the deck
+            deck_updater = _AnkiHubDeckUpdater()
+            deck_updater.update_decks_and_media(
+                ah_dids=[ah_did], start_media_sync=False
+            )
+
+            # Assert that the optional tags were added to the note in Anki
+            updated_note = mw.col.get_note(NoteId(note_data.anki_nid))
+            expected_tags = ["my::tag2", "my::tag3", "my::tag", *optional_tags]
+            assert set(updated_note.tags) == set(expected_tags)
+
+            # Assert that the deck extension info was saved in the config
+            assert config.deck_extension_config(
+                extension_id=deck_extension_id
+            ) == DeckExtensionConfig(
+                ah_did=ah_did,
+                owner_id=1,
+                name=deck_extension_name,
+                tag_group_name=deck_extension_name,
+                description="",
+                latest_update=latest_update,
+            )
 
 
 @pytest.mark.parametrize(
@@ -3078,86 +3150,6 @@ class TestAutoSync:
         self.check_and_install_new_deck_subscriptions_mock.side_effect = (
             lambda *args, **kwargs: kwargs["on_done"](future_with_result(None))
         )
-
-
-def test_sync_with_optional_content(
-    anki_session_with_addon_data: AnkiSession,
-    monkeypatch: MonkeyPatch,
-    next_deterministic_uuid: Callable[[], uuid.UUID],
-):
-    anki_session = anki_session_with_addon_data
-
-    with anki_session.profile_loaded():
-        with anki_session.deck_installed(SAMPLE_DECK_APKG) as _:
-            mw = anki_session.mw
-
-            ah_did = next_deterministic_uuid()
-            deck_extension_id = 31
-
-            notes_data = ankihub_sample_deck_notes_data()
-            ankihub_db.upsert_notes_data(ah_did, notes_data)
-            note_data = notes_data[0]
-            note = mw.col.get_note(NoteId(note_data.anki_nid))
-
-            assert set(note.tags) == set(["my::tag2", "my::tag"])
-
-            latest_update = datetime.now()
-            with monkeypatch.context() as m:
-                m.setattr(
-                    "ankihub.ankihub_client.AnkiHubClient.get_deck_extensions_by_deck_id",
-                    lambda *args, **kwargs: [
-                        DeckExtension(
-                            id=deck_extension_id,
-                            owner_id=1,
-                            ah_did=ah_did,
-                            name="test99",
-                            tag_group_name="test99",
-                            description="",
-                        )
-                    ],
-                )
-                m.setattr(
-                    "ankihub.ankihub_client.AnkiHubClient.get_deck_extension_updates",
-                    lambda *args, **kwargs: [
-                        DeckExtensionUpdateChunk(
-                            note_customizations=[
-                                NoteCustomization(
-                                    ankihub_nid=note_data.ah_nid,
-                                    tags=[
-                                        "AnkiHub_Optional::test99::test1",
-                                        "AnkiHub_Optional::test99::test2",
-                                    ],
-                                ),
-                            ],
-                            latest_update=latest_update,
-                        ),
-                    ],
-                )
-                deck_updater = _AnkiHubDeckUpdater()
-                deck_updater._update_deck_extensions(ah_did)
-
-            updated_note = mw.col.get_note(note.id)
-
-            expected_tags = [
-                "my::tag2",
-                "my::tag",
-                "AnkiHub_Optional::test99::test2",
-                "AnkiHub_Optional::test99::test1",
-            ]
-
-            assert set(updated_note.tags) == set(expected_tags)
-
-            # assert that the deck extension info was saved in the config
-            assert config.deck_extension_config(
-                extension_id=deck_extension_id
-            ) == DeckExtensionConfig(
-                ah_did=ah_did,
-                owner_id=1,
-                name="test99",
-                tag_group_name="test99",
-                description="",
-                latest_update=latest_update,
-            )
 
 
 def test_optional_tag_suggestion_dialog(
