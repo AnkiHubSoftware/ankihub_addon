@@ -186,4 +186,4 @@ def _delete_broken_note_types() -> None:
  NOT EXISTS(SELECT 1 FROM templates where ntid = nt.id) OR\
  NOT EXISTS(SELECT 1 FROM fields where ntid = nt.id)"
     )
-    aqt.mw.col.db.commit()
+    aqt.mw.col.save()
