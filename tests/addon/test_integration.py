@@ -348,7 +348,7 @@ def ankihub_sample_deck_notes_data() -> List[NoteInfo]:
 
 
 @pytest.fixture
-def mock_client_methods_called_during_sync(monkeypatch: MonkeyPatch) -> None:
+def mock_client_methods_called_during_ankihub_sync(monkeypatch: MonkeyPatch) -> None:
     monkeypatch.setattr(
         AnkiHubClient, "get_deck_subscriptions", lambda *args, **kwargs: []
     )
@@ -2818,7 +2818,7 @@ def test_profile_swap(
 
 
 @fixture
-def mock_fetch_remote_note_types(monkeypatch: MonkeyPatch):
+def mock_fetch_remote_note_types(monkeypatch: MonkeyPatch) -> None:
     monkeypatch.setattr(
         "ankihub.main.importing._fetch_remote_note_types",
         lambda *args, **kwargs: {},
@@ -2829,21 +2829,26 @@ def mock_fetch_remote_note_types(monkeypatch: MonkeyPatch):
     )
 
 
+@fixture
+def mock_ankihub_sync_dependencies(
+    mock_client_methods_called_during_ankihub_sync: None,
+    mock_fetch_remote_note_types: None,
+) -> None:
+    # Set a fake token so that the deck update is not aborted
+    config.save_token("test_token")
+
+
 class TestDeckUpdater:
     def test_update_note(
         self,
         anki_session_with_addon_data: AnkiSession,
         install_sample_ah_deck: InstallSampleAHDeck,
-        mock_client_methods_called_during_sync: None,
-        mock_fetch_remote_note_types: None,
+        mock_ankihub_sync_dependencies: None,
         monkeypatch: MonkeyPatch,
     ):
         with anki_session_with_addon_data.profile_loaded():
             # Install a deck to be updated
             _, ah_did = install_sample_ah_deck()
-
-            # Set a fake token so that the deck update is not aborted
-            config.save_token("test_token")
 
             # Mock client.get_deck_updates to return a note update
             note_info = ankihub_sample_deck_notes_data()[0]
@@ -2896,7 +2901,7 @@ def test_sync_uninstalls_unsubscribed_decks(
     anki_session_with_addon_data: AnkiSession,
     install_sample_ah_deck: InstallSampleAHDeck,
     monkeypatch: MonkeyPatch,
-    mock_client_methods_called_during_sync: None,
+    mock_client_methods_called_during_ankihub_sync: None,
     sync_with_ankihub: SyncWithAnkiHub,
     subscribed_to_deck: bool,
 ):
@@ -2948,7 +2953,7 @@ class TestAutoSync:
         self,
         anki_session_with_addon_data: AnkiSession,
         monkeypatch: MonkeyPatch,
-        mock_client_methods_called_during_sync: None,
+        mock_client_methods_called_during_ankihub_sync: None,
         qtbot: QtBot,
     ):
         with anki_session_with_addon_data.profile_loaded():
@@ -3005,7 +3010,7 @@ class TestAutoSync:
         self,
         anki_session_with_addon_data: AnkiSession,
         monkeypatch: MonkeyPatch,
-        mock_client_methods_called_during_sync: None,
+        mock_client_methods_called_during_ankihub_sync: None,
         qtbot: QtBot,
     ):
         with anki_session_with_addon_data.profile_loaded():
@@ -3338,7 +3343,7 @@ def test_media_update_on_deck_update(
     anki_session_with_addon_data: AnkiSession,
     install_sample_ah_deck: InstallSampleAHDeck,
     monkeypatch: MonkeyPatch,
-    mock_client_methods_called_during_sync: None,
+    mock_client_methods_called_during_ankihub_sync: None,
     qtbot: QtBot,
 ):
     with anki_session_with_addon_data.profile_loaded():
