@@ -151,6 +151,17 @@ class DeckUpdateChunk(DataClassJSONMixinWithConfig):
 
 
 @dataclass
+class DeckMedia(DataClassJSONMixinWithConfig):
+    name: str
+    file_content_hash: str
+
+
+@dataclass
+class DeckMediaUpdateChunk(DataClassJSONMixinWithConfig):
+    media: List[DeckMedia]
+
+
+@dataclass
 class NoteSuggestion(DataClassJSONMixinWithConfig, ABC):
     ah_nid: uuid.UUID = dataclasses.field(
         metadata=field_options(

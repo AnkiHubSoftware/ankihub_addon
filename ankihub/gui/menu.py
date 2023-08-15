@@ -35,7 +35,7 @@ from ..media_import.ui import open_import_dialog
 from ..settings import ADDON_VERSION, config, url_view_deck
 from .config_dialog import get_config_dialog_manager
 from .decks_dialog import SubscribedDecksDialog
-from .errors import upload_data_dir_and_logs_in_background, upload_logs_in_background
+from .errors import upload_logs_and_data_in_background, upload_logs_in_background
 from .media_sync import media_sync
 from .operations.ankihub_sync import sync_with_ankihub
 from .utils import (
@@ -394,7 +394,7 @@ def _upload_logs_and_data_action() -> None:
     aqt.mw.progress.start(
         label="Uploading logs and data...", parent=aqt.mw, immediate=True
     )
-    upload_data_dir_and_logs_in_background(on_done=_on_logs_uploaded)
+    upload_logs_and_data_in_background(on_done=_on_logs_uploaded)
 
 
 def _on_logs_uploaded(future: Future):
@@ -561,7 +561,8 @@ def _ankihub_help_setup(parent: QMenu):
 
     q_get_help_action = QAction("Get Help", help_menu)
     qconnect(
-        q_get_help_action.triggered, lambda: openLink("https://www.ankihub.net/support")
+        q_get_help_action.triggered,
+        lambda: openLink("https://community.ankihub.net/c/support"),
     )
     help_menu.addAction(q_get_help_action)
 

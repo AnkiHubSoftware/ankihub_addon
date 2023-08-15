@@ -29,6 +29,7 @@ def create_deck_with_id(deck_name: str, deck_id: DeckId) -> None:
     ).id
     aqt.mw.col.db.execute(f"UPDATE decks SET id={deck_id} WHERE id={source_did};")
     aqt.mw.col.db.execute(f"UPDATE cards SET did={deck_id} WHERE did={source_did};")
+    aqt.mw.col.save()
 
     LOGGER.info(f"Created deck {deck_name=} {deck_id=}")
 
@@ -123,6 +124,7 @@ def create_note_type_with_id(note_type: NotetypeDict, mid: NotetypeId) -> None:
     aqt.mw.col.db.execute(f"UPDATE templates SET ntid={mid} WHERE ntid={changes.id};")
     aqt.mw.col.db.execute(f"UPDATE fields SET ntid={mid} WHERE ntid={changes.id};")
     aqt.mw.col.models._clear_cache()  # TODO check if this is necessary
+    aqt.mw.col.save()
 
     LOGGER.info(f"Created note type: {mid}")
     LOGGER.info(f"Note type:\n {pformat(note_type)}")

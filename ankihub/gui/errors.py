@@ -10,6 +10,7 @@ import zipfile
 from concurrent.futures import Future
 from pathlib import Path
 from sqlite3 import OperationalError
+from textwrap import dedent
 from types import TracebackType
 from typing import Any, Callable, Dict, Optional, Type
 
@@ -33,16 +34,18 @@ from ..db import (
     detach_ankihub_db_from_anki_db_connection,
     is_ankihub_db_attached_to_anki_db,
 )
+from ..gui.exceptions import DeckDownloadAndInstallError
 from ..settings import (
     ADDON_VERSION,
     ANKI_VERSION,
     ANKIWEB_ID,
+    addon_dir_path,
     config,
     log_file_path,
     user_files_path,
 )
+from .deck_updater import NotLoggedInError
 from .error_dialog import ErrorDialog
-from .sync import NotLoggedInError
 from .utils import (
     check_and_prompt_for_updates_on_main_window,
     show_error_dialog,
@@ -111,9 +114,7 @@ def upload_logs_in_background(
     return key
 
 
-def upload_data_dir_and_logs_in_background(
-    on_done: Callable[[Future], None] = None
-) -> str:
+def upload_logs_and_data_in_background(on_done: Callable[[Future], None] = None) -> str:
     """Upload the data dir and logs to S3 in the background.
     Returns the S3 key of the uploaded file."""
 
@@ -124,19 +125,19 @@ def upload_data_dir_and_logs_in_background(
     key = f"ankihub_addon_debug_info_{user_name_hash}_{int(time.time())}.zip"
 
     aqt.mw.taskman.run_in_background(
-        task=lambda: _upload_data_dir_and_logs(key), on_done=on_done
+        task=lambda: _upload_logs_and_data_in_background(key), on_done=on_done
     )
 
     return key
 
 
-def _upload_data_dir_and_logs(key: str) -> str:
+def _upload_logs_and_data_in_background(key: str) -> str:
 
     # detach the ankihub database from the anki database connection to prevent file permission errors
     detach_ankihub_db_from_anki_db_connection()
 
     # zip the user files and the log file
-    file_path = _zip_data_dir_and_logs()
+    file_path = _zip_logs_and_data()
 
     # upload the zip file
     try:
@@ -151,11 +152,19 @@ def _upload_data_dir_and_logs(key: str) -> str:
         os.unlink(file_path)
 
 
-def _zip_data_dir_and_logs() -> Path:
-    """Zip the user files directory and the log file and return the path of the zip file."""
+def _zip_logs_and_data() -> Path:
+    """Zip the log file, the user files directory and the anki collection and return the path of the zip file."""
     temp_file = tempfile.NamedTemporaryFile(delete=False)
     temp_file.close()
     with zipfile.ZipFile(temp_file.name, "w") as zipf:
+        # Add the log file to the zip.
+        log_file = log_file_path()
+        if log_file.exists():
+            zipf.write(log_file, arcname=log_file.name)
+        else:
+            LOGGER.info("No logs to upload.")
+
+        # Add the user files directory to the zip.
         source_dir = user_files_path()
         for file in source_dir.rglob("*"):
             # previously logs were stored in the user files directory and we don't want to
@@ -164,11 +173,11 @@ def _zip_data_dir_and_logs() -> Path:
                 continue
             zipf.write(file, arcname=file.relative_to(source_dir))
 
-        log_file = log_file_path()
-        if log_file.exists():
-            zipf.write(log_file, arcname=log_file.name)
-        else:
-            LOGGER.info("No logs to upload.")
+        # Add the Anki collection to the zip.
+        try:
+            zipf.write(Path(aqt.mw.col.path), arcname="collection.anki2")
+        except Exception as e:
+            LOGGER.warning("Could not add Anki collection to zip.", exc_info=e)
 
     return Path(temp_file.name)
 
@@ -226,6 +235,23 @@ def _try_handle_exception(
     LOGGER.info(
         f"From _try_handle_exception:\n{''.join(traceback.format_exception(exc_type, value=exc_value, tb=tb))}"
     )
+
+    if not addon_dir_path().exists():
+        show_error_dialog(
+            dedent(
+                """
+                The AnkiHub add-on directory cannot be found.<br>
+                If you've uninstalled the add-on, please restart Anki.<br>
+                If you're facing issues, please reinstall the add-on.
+                """
+            ).strip("\n"),
+            title="AnkiHub",
+        )
+        LOGGER.info("Showing add-on directory not found warning.")
+        return True
+
+    if isinstance(exc_value, (DeckDownloadAndInstallError, AnkiHubRequestException)):
+        exc_value = exc_value.original_exception
 
     if isinstance(exc_value, AnkiHubHTTPError):
         if _maybe_handle_ankihub_http_error(exc_value):

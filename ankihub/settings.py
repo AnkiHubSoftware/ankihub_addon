@@ -37,6 +37,7 @@ from .ankihub_client import (
     DeckExtension,
 )
 from .ankihub_client.models import UserDeckRelation
+from .private_config_migrations import migrate_private_config
 from .public_config_migrations import migrate_public_config
 
 ADDON_PATH = Path(__file__).parent.absolute()
@@ -79,9 +80,7 @@ class DeckConfig(DataClassJSONMixin):
 
 @dataclass
 class DeckExtensionConfig(DataClassJSONMixin):
-    ah_did: uuid.UUID = dataclasses.field(
-        metadata=field_options(alias="ankihub_deck_uuid")  # for backwards compatibility
-    )
+    ah_did: uuid.UUID
     owner_id: int
     name: str
     tag_group_name: str
@@ -150,18 +149,24 @@ class _Config:
         self._private_config_path = private_config_path()
         if not self._private_config_path.exists():
             self._private_config = PrivateConfig()
-            self._update_private_config()
         else:
             try:
                 self._private_config = self._load_private_config()
             except JSONDecodeError:
                 # TODO Instead of overwriting, query AnkiHub for config values.
                 self._private_config = PrivateConfig()
+
+        self._update_private_config()
         self._log_private_config()
 
     def _load_private_config(self) -> PrivateConfig:
         with open(self._private_config_path) as f:
             private_config_dict = json.load(f)
+
+        try:
+            migrate_private_config(private_config_dict)
+        except Exception:
+            LOGGER.warning("Failed to migrate private config")
 
         result = PrivateConfig.from_dict(private_config_dict)
         return result
@@ -333,11 +338,16 @@ def _set_anki_profile_id(profile_id: str) -> None:
     aqt.mw.pm.save()
 
 
+def addon_dir_path() -> Path:
+    addon_dir_name = aqt.mw.addonManager.addonFromModule(__name__)
+    result = Path(aqt.mw.addonManager.addonsFolder(addon_dir_name))
+    return result
+
+
 def user_files_path() -> Path:
     # The contents of the user_files folder are retained during updates.
     # See https://addon-docs.ankiweb.net/addon-config.html#user-files
-    addon_dir_name = aqt.mw.addonManager.addonFromModule(__name__)
-    result = Path(aqt.mw.addonManager.addonsFolder(addon_dir_name)) / "user_files"
+    result = addon_dir_path() / "user_files"
     return result
 
 

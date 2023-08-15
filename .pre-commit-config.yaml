@@ -23,10 +23,9 @@ repos:
           - id: flake8
 
     - repo: https://github.com/hadialqattan/pycln
-      rev: v1.2.5
+      rev: v2.2.1
       hooks:
           - id: pycln
-            additional_dependencies: ["click==8.0.4"]
 
     - repo: local
       hooks:

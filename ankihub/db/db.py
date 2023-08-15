@@ -115,6 +115,9 @@ class _AnkiHubDB:
 
     def setup_and_migrate(self, db_path: Path) -> None:
         self.database_path = db_path
+        journal_mode = self.scalar("pragma journal_mode=wal")
+        if journal_mode != "wal":
+            LOGGER.warning("Failed to set journal_mode=wal")
 
         notes_table_exists = self.scalar(
             """
@@ -268,6 +271,7 @@ class _AnkiHubDB:
                 mod,
                 nid,
             )
+        aqt.mw.col.save()
 
     def ankihub_nid_exists(self, ankihub_nid: uuid.UUID) -> bool:
         # It's possible that an AnkiHub nid does not exists after calling insert_or_update_notes_data

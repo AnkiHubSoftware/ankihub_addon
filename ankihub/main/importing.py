@@ -175,6 +175,8 @@ class AnkiHubImporter:
             skipped_nids=self._skipped_nids,
             first_import_of_deck=self._is_first_import_of_deck,
         )
+        aqt.mw.col.save()
+
         return result
 
     def _import_notes(
@@ -202,6 +204,7 @@ class AnkiHubImporter:
             dids_for_note = set(c.did for c in note.cards())
             dids = dids | dids_for_note
 
+        aqt.mw.col.save()
         ankihub_db.transfer_mod_values_from_anki_db(notes_data=upserted_notes)
 
         LOGGER.info(
