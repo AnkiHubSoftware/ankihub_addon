@@ -72,39 +72,9 @@ class AnkiHubImporter:
     ) -> AnkiHubImportResult:
         """
         Used for importing an AnkiHub deck for the first time or when updating it.
-
-        Returns id of the deck future cards should be imported into - the local_did - if the import was sucessful,
-        else it returns None.
         subdeck indicates whether cards should be moved into subdecks based on subdeck tags
         subdecks_for_new_notes_only indicates whether only new notes should be moved into subdecks
         """
-
-        return self._import_ankihub_deck_inner(
-            ankihub_did=ankihub_did,
-            notes_data=notes_data,
-            deck_name=deck_name,
-            is_first_import_of_deck=is_first_import_of_deck,
-            local_did=local_did,
-            remote_note_types=remote_note_types,
-            protected_fields=protected_fields,
-            protected_tags=protected_tags,
-            subdecks=subdecks,
-            subdecks_for_new_notes_only=subdecks_for_new_notes_only,
-        )
-
-    def _import_ankihub_deck_inner(
-        self,
-        ankihub_did: uuid.UUID,
-        notes_data: List[NoteInfo],
-        deck_name: str,  # name that will be used for a deck if a new one gets created
-        is_first_import_of_deck: bool,
-        local_did: DeckId = None,  # did that new notes should be put into
-        remote_note_types: Dict[NotetypeId, NotetypeDict] = {},
-        protected_fields: Dict[int, List[str]] = {},
-        protected_tags: List[str] = [],
-        subdecks: bool = False,
-        subdecks_for_new_notes_only: bool = False,
-    ) -> AnkiHubImportResult:
         LOGGER.info(f"Importing ankihub deck {deck_name=} {local_did=}")
         LOGGER.info(f"Notes data: {pformat(truncated_list(notes_data, 2))}")
         LOGGER.info(f"Protected fields: {pformat(protected_fields)}")

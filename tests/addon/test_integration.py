@@ -192,7 +192,7 @@ def import_sample_ankihub_deck(
     # import the deck from the notes data
     dids_before_import = all_dids()
     importer = AnkiHubImporter()
-    local_did = importer._import_ankihub_deck_inner(
+    local_did = importer.import_ankihub_deck(
         ankihub_did=ankihub_did,
         notes_data=ankihub_sample_deck_notes_data(),
         deck_name="Testdeck",
@@ -271,9 +271,12 @@ def import_ah_note(next_deterministic_uuid: Callable[[], uuid.UUID]) -> ImportAH
             f"\tNote data: {note_data.fields}, note type: {field_names_of_note_type}"
         )
 
-        AnkiHubImporter()._import_ankihub_deck_inner(
+        AnkiHubImporter().import_ankihub_deck(
             ankihub_did=ah_did,
             notes_data=[note_data],
+            remote_note_types={},
+            protected_fields={},
+            protected_tags=[],
             deck_name=deck_name,
             is_first_import_of_deck=True,
         )
@@ -1150,7 +1153,7 @@ class TestAnkiHubImporter:
             ah_did = next_deterministic_uuid()
             dids_before_import = all_dids()
             ankihub_importer = AnkiHubImporter()
-            import_result = ankihub_importer._import_ankihub_deck_inner(
+            import_result = ankihub_importer.import_ankihub_deck(
                 ankihub_did=ah_did,
                 notes_data=ankihub_sample_deck_notes_data(),
                 deck_name="test",
@@ -1190,7 +1193,7 @@ class TestAnkiHubImporter:
             ah_did = next_deterministic_uuid()
             dids_before_import = all_dids()
             ankihub_importer = AnkiHubImporter()
-            import_result = ankihub_importer._import_ankihub_deck_inner(
+            import_result = ankihub_importer.import_ankihub_deck(
                 ankihub_did=ah_did,
                 notes_data=ankihub_sample_deck_notes_data(),
                 deck_name="test",
@@ -1234,7 +1237,7 @@ class TestAnkiHubImporter:
             ah_did = next_deterministic_uuid()
             dids_before_import = all_dids()
             ankihub_importer = AnkiHubImporter()
-            import_result = ankihub_importer._import_ankihub_deck_inner(
+            import_result = ankihub_importer.import_ankihub_deck(
                 ankihub_did=ah_did,
                 notes_data=ankihub_sample_deck_notes_data(),
                 deck_name="test",
@@ -1286,7 +1289,7 @@ class TestAnkiHubImporter:
             ah_did = next_deterministic_uuid()
             dids_before_import = all_dids()
             ankihub_importer = AnkiHubImporter()
-            import_result = ankihub_importer._import_ankihub_deck_inner(
+            import_result = ankihub_importer.import_ankihub_deck(
                 ankihub_did=ah_did,
                 notes_data=ankihub_sample_deck_notes_data(),
                 deck_name="test",
@@ -1321,7 +1324,7 @@ class TestAnkiHubImporter:
             ah_did = next_deterministic_uuid()
             dids_before_import = all_dids()
             ankihub_importer = AnkiHubImporter()
-            import_result = ankihub_importer._import_ankihub_deck_inner(
+            import_result = ankihub_importer.import_ankihub_deck(
                 ankihub_did=ah_did,
                 notes_data=ankihub_sample_deck_notes_data(),
                 deck_name="test",
@@ -1366,7 +1369,7 @@ class TestAnkiHubImporter:
             ah_did = next_deterministic_uuid()
             dids_before_import = all_dids()
             ankihub_importer = AnkiHubImporter()
-            import_result = ankihub_importer._import_ankihub_deck_inner(
+            import_result = ankihub_importer.import_ankihub_deck(
                 ankihub_did=ah_did,
                 notes_data=ankihub_sample_deck_notes_data(),
                 deck_name="test",
@@ -1410,7 +1413,7 @@ class TestAnkiHubImporter:
             # import the deck again, now with the changed note data
             dids_before_import = all_dids()
             ankihub_importer = AnkiHubImporter()
-            import_result = ankihub_importer._import_ankihub_deck_inner(
+            import_result = ankihub_importer.import_ankihub_deck(
                 ankihub_did=ah_did,
                 notes_data=notes_data,
                 deck_name="test",
@@ -1565,7 +1568,7 @@ class TestAnkiHubImporter:
             note.flush()
 
             importer = AnkiHubImporter()
-            importer._import_ankihub_deck_inner(
+            importer.import_ankihub_deck(
                 ankihub_did=ah_did,
                 notes_data=[note_data],
                 deck_name="test",
@@ -1608,9 +1611,12 @@ class TestAnkiHubImporter:
                 mid=mid_1,
             )
             importer = AnkiHubImporter()
-            import_result = importer._import_ankihub_deck_inner(
+            import_result = importer.import_ankihub_deck(
                 ankihub_did=ah_did_1,
                 notes_data=[note_info_1],
+                remote_note_types={},
+                protected_fields={},
+                protected_tags=[],
                 deck_name="test",
                 is_first_import_of_deck=True,
             )
@@ -1629,9 +1635,12 @@ class TestAnkiHubImporter:
                 mid=mid_2,
             )
             importer = AnkiHubImporter()
-            import_result = importer._import_ankihub_deck_inner(
+            import_result = importer.import_ankihub_deck(
                 ankihub_did=ah_did_2,
                 notes_data=[note_info_2],
+                remote_note_types={},
+                protected_fields={},
+                protected_tags=[],
                 deck_name="test",
                 is_first_import_of_deck=True,
             )
@@ -2081,7 +2090,7 @@ class TestCustomSearchNodes:
             ankihub_models = {
                 m["id"]: m for m in mw.col.models.all() if "/" in m["name"]
             }
-            AnkiHubImporter()._import_ankihub_deck_inner(
+            AnkiHubImporter().import_ankihub_deck(
                 ankihub_did=next_deterministic_uuid(),
                 notes_data=notes_data,
                 remote_note_types=ankihub_models,
@@ -2120,7 +2129,7 @@ class TestCustomSearchNodes:
             ankihub_models = {
                 m["id"]: m for m in mw.col.models.all() if "/" in m["name"]
             }
-            AnkiHubImporter()._import_ankihub_deck_inner(
+            AnkiHubImporter().import_ankihub_deck(
                 ankihub_did=next_deterministic_uuid(),
                 notes_data=notes_data,
                 remote_note_types=ankihub_models,
