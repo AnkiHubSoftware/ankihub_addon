@@ -57,6 +57,7 @@ from ankihub.ankihub_client import (
     AnkiHubHTTPError,
     ChangeNoteSuggestion,
     Deck,
+    DeckUpdateChunk,
     Field,
     NewNoteSuggestion,
     NoteCustomization,
@@ -2814,6 +2815,77 @@ def test_profile_swap(
 
     # assert that the general_setup function was only called once
     assert general_setup_mock.call_count == 1
+
+
+@fixture
+def mock_fetch_remote_note_types(monkeypatch: MonkeyPatch):
+    monkeypatch.setattr(
+        "ankihub.main.importing._fetch_remote_note_types",
+        lambda *args, **kwargs: {},
+    )
+    monkeypatch.setattr(
+        "ankihub.main.importing._fetch_remote_note_types_based_on_notes_data",
+        lambda *args, **kwargs: {},
+    )
+
+
+class TestDeckUpdater:
+    def test_update_note(
+        self,
+        anki_session_with_addon_data: AnkiSession,
+        install_sample_ah_deck: InstallSampleAHDeck,
+        mock_client_methods_called_during_sync: None,
+        mock_fetch_remote_note_types: None,
+        monkeypatch: MonkeyPatch,
+    ):
+        with anki_session_with_addon_data.profile_loaded():
+            # Install a deck to be updated
+            _, ah_did = install_sample_ah_deck()
+
+            # Set a fake token so that the deck update is not aborted
+            config.save_token("test_token")
+
+            # Mock client.get_deck_updates to return a note update
+            note_info = ankihub_sample_deck_notes_data()[0]
+            note_info.fields[0].value = "changed"
+
+            latest_update = datetime.now()
+            monkeypatch.setattr(
+                "ankihub.gui.deck_updater.AnkiHubClient.get_deck_updates",
+                lambda *args, **kwargs: [
+                    DeckUpdateChunk(
+                        latest_update=latest_update,
+                        protected_fields={},
+                        protected_tags=[],
+                        notes=[note_info],
+                    )
+                ],
+            )
+
+            # Use the deck updater to update the deck
+            ah_deck_updater.update_decks_and_media(
+                ah_dids=[ah_did], start_media_sync=False
+            )
+
+            # Assert last_update_results are accurate
+            deck_updates_results = ah_deck_updater.last_deck_updates_results()
+            assert len(deck_updates_results) == 1
+            deck_update_result = deck_updates_results[0]
+            assert deck_update_result.ankihub_did == ah_did
+            assert deck_update_result.updated_nids == [note_info.anki_nid]
+            assert deck_update_result.created_nids == []
+            assert deck_update_result.skipped_nids == []
+
+            # Assert that the note was updated in Anki
+            note = aqt.mw.col.get_note(NoteId(note_info.anki_nid))
+            assert note["Front"] == "changed"
+
+            # Assert that the note was updated in the add-on database
+            note_info = ankihub_db.note_data(note.id)
+            assert note_info.fields[0].value == "changed"
+
+            # Assert that the last update time was updated in the config
+            assert config.deck_config(ah_did).latest_update == latest_update
 
 
 @pytest.mark.parametrize(
