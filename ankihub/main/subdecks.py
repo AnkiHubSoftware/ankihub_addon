@@ -62,6 +62,7 @@ def build_subdecks_and_move_cards_to_them(
     for nid, dest_deck_name in nid_to_dest_deck_name.items():
         dest_did = aqt.mw.col.decks.id_for_name(dest_deck_name)
         _set_deck_while_respecting_odid(nid=nid, did=dest_did)
+    aqt.mw.col.save()
 
     # remove empty subdecks
     for name_and_did in aqt.mw.col.decks.children(root_deck_id):
@@ -175,6 +176,7 @@ def flatten_deck(ankihub_did: uuid.UUID) -> None:
     nids = aqt.mw.col.find_notes(f'"deck:{root_deck_name}::*"')
     for nid in nids:
         _set_deck_while_respecting_odid(nid, root_deck_id)
+    aqt.mw.col.save()
 
     # remove subdecks
     for name_and_did in aqt.mw.col.decks.children(root_deck_id):
