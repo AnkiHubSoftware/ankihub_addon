@@ -158,8 +158,8 @@ def _install_deck(
     note_types = get_note_types_for_deck(ankihub_did=ankihub_did)
     import_result = importer.import_ankihub_deck(
         ankihub_did=ankihub_did,
-        notes_data=notes_data,
-        remote_note_types=note_types,
+        notes=notes_data,
+        note_types=note_types,
         deck_name=deck_name,
         is_first_import_of_deck=True,
         protected_fields=protected_fields,

@@ -58,13 +58,13 @@ class AnkiHubImporter:
     def import_ankihub_deck(
         self,
         ankihub_did: uuid.UUID,
-        notes_data: List[NoteInfo],
-        remote_note_types: Dict[NotetypeId, NotetypeDict],
+        notes: List[NoteInfo],
+        note_types: Dict[NotetypeId, NotetypeDict],
         protected_fields: Dict[int, List[str]],
         protected_tags: List[str],
         deck_name: str,  # name that will be used for a deck if a new one gets created
         is_first_import_of_deck: bool,
-        local_did: Optional[  # did that new notes should be put into if importing not for the first time
+        anki_did: Optional[  # did that new notes should be put into if importing not for the first time
             DeckId
         ] = None,
         subdecks: bool = False,
@@ -72,11 +72,14 @@ class AnkiHubImporter:
     ) -> AnkiHubImportResult:
         """
         Used for importing an AnkiHub deck for the first time or when updating it.
+        note_types are used to create or update note types in the Anki collection if necessary. Note types
+        won't be updated to exactly match the provided note types, but they will be updated to e.g. have the same
+        fields and field order as the provided note types.
         subdeck indicates whether cards should be moved into subdecks based on subdeck tags
         subdecks_for_new_notes_only indicates whether only new notes should be moved into subdecks
         """
-        LOGGER.info(f"Importing ankihub deck {deck_name=} {local_did=}")
-        LOGGER.info(f"Notes data: {pformat(truncated_list(notes_data, 2))}")
+        LOGGER.info(f"Importing ankihub deck {deck_name=} {anki_did=}")
+        LOGGER.info(f"Notes: {pformat(truncated_list(notes, 2))}")
         LOGGER.info(f"Protected fields: {pformat(protected_fields)}")
         LOGGER.info(f"Protected tags: {pformat(protected_tags)}")
         LOGGER.info(
@@ -91,9 +94,9 @@ class AnkiHubImporter:
         self._is_first_import_of_deck = is_first_import_of_deck
         self._protected_fields = protected_fields
         self._protected_tags = protected_tags
-        self._local_did = _adjust_deck(deck_name, local_did)
+        self._local_did = _adjust_deck(deck_name, anki_did)
 
-        _adjust_note_types(remote_note_types)
+        _adjust_note_types(note_types)
 
         if self._is_first_import_of_deck:
             # Clean up any left over data for this deck in the ankihub database from previous deck imports.
@@ -101,7 +104,7 @@ class AnkiHubImporter:
 
         dids = self._import_notes(
             ankihub_did=ankihub_did,
-            notes_data=notes_data,
+            notes_data=notes,
         )
 
         if self._is_first_import_of_deck:

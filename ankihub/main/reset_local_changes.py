@@ -32,10 +32,10 @@ def reset_local_changes_to_notes(
     note_types = get_note_types_for_deck(ankihub_did=ah_did)
     importer.import_ankihub_deck(
         ankihub_did=ah_did,
-        notes_data=[],
-        remote_note_types=note_types,
+        notes=[],
+        note_types=note_types,
         deck_name=deck_config.name,
-        local_did=deck_config.anki_id,
+        anki_did=deck_config.anki_id,
         is_first_import_of_deck=False,
         protected_fields=protected_fields,
         protected_tags=protected_tags,
@@ -49,11 +49,11 @@ def reset_local_changes_to_notes(
 
     importer.import_ankihub_deck(
         ankihub_did=ah_did,
-        notes_data=notes_data,
-        remote_note_types=note_types,
+        notes=notes_data,
+        note_types=note_types,
         deck_name=deck_config.name,
         is_first_import_of_deck=False,
-        local_did=deck_config.anki_id,
+        anki_did=deck_config.anki_id,
         protected_fields=protected_fields,
         protected_tags=protected_tags,
         # we don't move existing notes between decks here, users might not want that
