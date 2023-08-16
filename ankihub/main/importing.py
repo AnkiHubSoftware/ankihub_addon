@@ -112,12 +112,9 @@ class AnkiHubImporter:
             # Clean up any left over data for this deck in the ankihub database from previous deck imports.
             ankihub_db.remove_deck(ankihub_did)
 
-        self._import_note_types(ankihub_did=ankihub_did, note_types=note_types)
+        self._import_note_types(note_types=note_types)
 
-        dids = self._import_notes(
-            ankihub_did=ankihub_did,
-            notes_data=notes,
-        )
+        dids = self._import_notes(notes_data=notes)
 
         if self._is_first_import_of_deck:
             self._local_did = self._cleanup_first_time_deck_import(
@@ -131,7 +128,7 @@ class AnkiHubImporter:
                 anki_nids = list(self._created_nids + self._updated_nids)
 
             build_subdecks_and_move_cards_to_them(
-                ankihub_did=ankihub_did, nids=anki_nids
+                ankihub_did=self._ankihub_did, nids=anki_nids
             )
 
         result = AnkiHubImportResult(
@@ -146,29 +143,23 @@ class AnkiHubImporter:
 
         return result
 
-    def _import_note_types(
-        self, ankihub_did: uuid.UUID, note_types: Dict[NotetypeId, NotetypeDict]
-    ) -> None:
-        self._import_note_types_into_ankihub_db(
-            ankihub_did=ankihub_did, note_types=note_types
-        )
+    def _import_note_types(self, note_types: Dict[NotetypeId, NotetypeDict]) -> None:
+        self._import_note_types_into_ankihub_db(note_types=note_types)
         _adjust_note_types_in_anki_db(note_types)
 
     def _import_note_types_into_ankihub_db(
-        self, ankihub_did: uuid.UUID, note_types: Dict[NotetypeId, NotetypeDict]
+        self, note_types: Dict[NotetypeId, NotetypeDict]
     ) -> None:
         for note_type in note_types.values():
-            ankihub_db.upsert_note_type(ankihub_did=ankihub_did, note_type=note_type)
+            ankihub_db.upsert_note_type(
+                ankihub_did=self._ankihub_did, note_type=note_type
+            )
 
-    def _import_notes(
-        self,
-        ankihub_did: uuid.UUID,
-        notes_data: List[NoteInfo],
-    ) -> Set[DeckId]:
+    def _import_notes(self, notes_data: List[NoteInfo]) -> Set[DeckId]:
         # returns set of ids of decks notes were imported into
 
         upserted_notes, skipped_notes = ankihub_db.upsert_notes_data(
-            ankihub_did=ankihub_did, notes_data=notes_data
+            ankihub_did=self._ankihub_did, notes_data=notes_data
         )
         self._skipped_nids = [NoteId(note_data.anki_nid) for note_data in skipped_notes]
 
