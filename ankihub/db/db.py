@@ -115,47 +115,48 @@ class _AnkiHubDB:
 
     def setup_and_migrate(self, db_path: Path) -> None:
         self.database_path = db_path
+
         journal_mode = self.scalar("pragma journal_mode=wal")
         if journal_mode != "wal":
             LOGGER.warning("Failed to set journal_mode=wal")
 
-        notes_table_exists = self.scalar(
-            """
-            SELECT name FROM sqlite_master WHERE type='table' AND name='notes';
-            """
-        )
+        self._setup_notes_table()
 
-        if not notes_table_exists:
-            LOGGER.info("Creating AnkiHub DB")
-            with self.connection() as conn:
-                conn.execute(
-                    """
-                    CREATE TABLE notes (
-                        ankihub_note_id STRING PRIMARY KEY,
-                        ankihub_deck_id STRING,
-                        anki_note_id INTEGER UNIQUE,
-                        anki_note_type_id INTEGER,
-                        mod INTEGER,
-                        guid TEXT,
-                        fields TEXT,
-                        tags TEXT,
-                        last_update_type TEXT
-                    );
-                    """
-                )
-                conn.execute(
-                    "CREATE INDEX ankihub_deck_id_idx ON notes (ankihub_deck_id);"
-                )
-                conn.execute("CREATE INDEX anki_note_id_idx ON notes (anki_note_id);")
-                conn.execute(
-                    "CREATE INDEX anki_note_type_id ON notes (anki_note_type_id);"
-                )
-                conn.execute("PRAGMA user_version = 6")
-            LOGGER.info("Created AnkiHub DB")
-        else:
-            from .db_migrations import migrate_ankihub_db
+        from .db_migrations import migrate_ankihub_db
 
-            migrate_ankihub_db()
+        migrate_ankihub_db()
+
+    def _setup_notes_table(self) -> None:
+        """Creates the notes table if it does not exist."""
+        with self.connection() as conn:
+            notes_table_exists = self.scalar(
+                """
+                SELECT name FROM sqlite_master WHERE type='table' AND name='notes';
+                """
+            )
+            if notes_table_exists:
+                return
+
+            conn.execute(
+                """
+                CREATE TABLE notes (
+                    ankihub_note_id STRING PRIMARY KEY,
+                    ankihub_deck_id STRING,
+                    anki_note_id INTEGER UNIQUE,
+                    anki_note_type_id INTEGER,
+                    mod INTEGER,
+                    guid TEXT,
+                    fields TEXT,
+                    tags TEXT,
+                    last_update_type TEXT
+                );
+                """
+            )
+            conn.execute("CREATE INDEX ankihub_deck_id_idx ON notes (ankihub_deck_id);")
+            conn.execute("CREATE INDEX anki_note_id_idx ON notes (anki_note_id);")
+            conn.execute("CREATE INDEX anki_note_type_id ON notes (anki_note_type_id);")
+            conn.execute("PRAGMA user_version = 6")
+            LOGGER.info("Created notes table")
 
     def schema_version(self) -> int:
         result = self.scalar("PRAGMA user_version;")
