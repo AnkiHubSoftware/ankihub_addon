@@ -1,5 +1,6 @@
 import copy
 import importlib
+import json
 import os
 import re
 import shutil
@@ -149,6 +150,9 @@ TEST_DATA_PATH = Path(__file__).parent.parent / "test_data"
 SAMPLE_DECK_APKG = TEST_DATA_PATH / "small.apkg"
 ANKIHUB_SAMPLE_DECK_APKG = TEST_DATA_PATH / "small_ankihub.apkg"
 SAMPLE_NOTES_DATA = eval((TEST_DATA_PATH / "small_ankihub.txt").read_text())
+SAMPLE_NOTE_TYPES: Dict[NotetypeId, NotetypeDict] = json.loads(
+    (TEST_DATA_PATH / "small_ankihub_note_types.json").read_text()
+)
 
 # the package name in the manifest is "ankihub"
 # the package name is used during the add-on installation process
@@ -187,8 +191,6 @@ def install_sample_ah_deck(
 def import_sample_ankihub_deck(
     mw: aqt.AnkiQt, ankihub_did: uuid.UUID, assert_created_deck=True
 ) -> DeckId:
-    import_note_types_for_sample_deck(mw)
-
     # import the deck from the notes data
     dids_before_import = all_dids()
     importer = AnkiHubImporter()
@@ -199,7 +201,7 @@ def import_sample_ankihub_deck(
         is_first_import_of_deck=True,
         protected_fields={},
         protected_tags=[],
-        note_types={},
+        note_types=SAMPLE_NOTE_TYPES,
     ).anki_did
     new_dids = all_dids() - dids_before_import
 
@@ -2973,6 +2975,7 @@ class TestDeckUpdater:
     "subscribed_to_deck",
     [True, False],
 )
+@pytest.mark.qt_no_exception_capture
 def test_sync_uninstalls_unsubscribed_decks(
     anki_session_with_addon_data: AnkiSession,
     install_sample_ah_deck: InstallSampleAHDeck,
