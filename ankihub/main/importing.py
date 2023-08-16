@@ -1,5 +1,5 @@
-"""Import NoteInfo objects into Anki and the AnkiHub database,
-create/update decks and note types in the Anki collection if necessary"""
+"""Import NoteInfo objects and note types into Anki and the AnkiHub database,
+create/update decks in the Anki collection if necessary"""
 import textwrap
 import uuid
 from dataclasses import dataclass
@@ -56,6 +56,12 @@ class AnkiHubImporter:
         self._updated_nids: List[NoteId] = []
         self._skipped_nids: List[NoteId] = []
 
+        self._ankihub_did: Optional[uuid.UUID] = None
+        self._is_first_import_of_deck: Optional[bool] = None
+        self._protected_fields: Optional[Dict[int, List[str]]] = None
+        self._protected_tags: Optional[List[str]] = None
+        self._local_did: Optional[DeckId] = None
+
     def import_ankihub_deck(
         self,
         ankihub_did: uuid.UUID,
@@ -72,10 +78,10 @@ class AnkiHubImporter:
         subdecks_for_new_notes_only: bool = False,
     ) -> AnkiHubImportResult:
         """
-        Used for importing an AnkiHub deck for the first time or when updating it.
-        note_types are used to create or update note types in the Anki collection if necessary. Note types
-        won't be updated to exactly match the provided note types, but they will be updated to e.g. have the same
-        fields and field order as the provided note types.
+        Used for importing an AnkiHub deck for the first time or for updating it.
+        note_types are added to the AnkiHub db and used to create or update note types in the Anki collection if
+        necessary. Note types won't be updated to exactly match the provided note types,
+        but they will be updated to e.g. have the same fields and field order as the provided note types.
         subdeck indicates whether cards should be moved into subdecks based on subdeck tags
         subdecks_for_new_notes_only indicates whether only new notes should be moved into subdecks
         """
@@ -96,16 +102,17 @@ class AnkiHubImporter:
         self._updated_nids = []
         self._skipped_nids = []
 
+        self._ankihub_did = ankihub_did
         self._is_first_import_of_deck = is_first_import_of_deck
         self._protected_fields = protected_fields
         self._protected_tags = protected_tags
         self._local_did = _adjust_deck(deck_name, anki_did)
 
-        _adjust_note_types(note_types)
-
         if self._is_first_import_of_deck:
             # Clean up any left over data for this deck in the ankihub database from previous deck imports.
             ankihub_db.remove_deck(ankihub_did)
+
+        self._import_note_types(ankihub_did=ankihub_did, note_types=note_types)
 
         dids = self._import_notes(
             ankihub_did=ankihub_did,
@@ -138,6 +145,20 @@ class AnkiHubImporter:
         aqt.mw.col.save()
 
         return result
+
+    def _import_note_types(
+        self, ankihub_did: uuid.UUID, note_types: Dict[NotetypeId, NotetypeDict]
+    ) -> None:
+        self._import_note_types_into_ankihub_db(
+            ankihub_did=ankihub_did, note_types=note_types
+        )
+        _adjust_note_types_in_anki_db(note_types)
+
+    def _import_note_types_into_ankihub_db(
+        self, ankihub_did: uuid.UUID, note_types: Dict[NotetypeId, NotetypeDict]
+    ) -> None:
+        for note_type in note_types.values():
+            ankihub_db.upsert_note_type(ankihub_did=ankihub_did, note_type=note_type)
 
     def _import_notes(
         self,
@@ -475,7 +496,9 @@ def _updated_tags(
     return result
 
 
-def _adjust_note_types(remote_note_types: Dict[NotetypeId, NotetypeDict]) -> None:
+def _adjust_note_types_in_anki_db(
+    remote_note_types: Dict[NotetypeId, NotetypeDict]
+) -> None:
     # can be called when installing a deck for the first time and when synchronizing with AnkiHub
 
     LOGGER.info("Beginning adjusting note types...")

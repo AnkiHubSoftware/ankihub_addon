@@ -10,6 +10,7 @@ Some differences between data stored in the AnkiHub database and the Anki databa
     while the AnkiHub database stores ankihub_client.NoteInfo objects.
 - decks, notes and note types can be missing from the Anki database or be modified.
 """
+import json
 import sqlite3
 import uuid
 from contextlib import contextmanager
@@ -17,7 +18,7 @@ from pathlib import Path
 from typing import Any, Dict, Iterable, List, Optional, Sequence, Set, Tuple
 
 import aqt
-from anki.models import NotetypeId
+from anki.models import NotetypeDict, NotetypeId
 from anki.notes import NoteId
 from anki.utils import ids2str, join_fields, split_fields
 
@@ -161,10 +162,7 @@ class _AnkiHubDB:
                     anki_note_type_id INTEGER PRIMARY KEY,
                     ankihub_deck_id STRING,
                     name TEXT,
-                    type INTEGER,
-                    fields TEXT,
-                    css TEXT,
-                    templates TEXT
+                    note_type_dict_json TEXT
                 );
                 """
             )
@@ -638,6 +636,41 @@ class _AnkiHubDB:
 
                 result.update(local_media_names_from_html(field_text))
 
+        return result
+
+    # note types
+    def upsert_note_type(self, ankihub_did: uuid.UUID, note_type: NotetypeDict) -> None:
+        self.execute(
+            """
+            INSERT OR REPLACE INTO notetypes (
+                anki_note_type_id,
+                ankihub_deck_id,
+                note_type_dict_json
+            ) VALUES (?, ?, ?)
+            """,
+            note_type["id"],
+            str(ankihub_did),
+            json.dumps(note_type),
+        )
+
+    def note_type_dict(
+        self, ankihub_did: uuid.UUID, note_type_id: NotetypeId
+    ) -> NotetypeDict:
+        row = self.first(
+            """
+            SELECT note_type_dict_json
+            FROM notetypes
+            WHERE anki_note_type_id = ?
+            AND ankihub_deck_id = ?
+            """,
+            note_type_id,
+            str(ankihub_did),
+        )
+        if row is None:
+            return None
+
+        note_type_dict_json = row[0]
+        result = NotetypeDict(json.loads(note_type_dict_json))
         return result
 
 
