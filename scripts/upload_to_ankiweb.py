@@ -9,7 +9,7 @@ from selenium.webdriver.common.by import By
 from webbot import Browser
 from webdriver_manager.chrome import ChromeDriverManager
 
-webdriver_path = Path(ChromeDriverManager().install())
+webdriver_path = Path(ChromeDriverManager(driver_version="94.0.4606.41").install())
 
 
 def upload(
