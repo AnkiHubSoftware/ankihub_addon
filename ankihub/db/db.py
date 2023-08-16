@@ -120,23 +120,18 @@ class _AnkiHubDB:
         if journal_mode != "wal":
             LOGGER.warning("Failed to set journal_mode=wal")
 
-        self._setup_notes_table()
+        if self.schema_version() == 0:
+            self._setup_notes_table()
+            self._setup_note_types_table()
+            self.execute("PRAGMA user_version = 8")
+        else:
+            from .db_migrations import migrate_ankihub_db
 
-        from .db_migrations import migrate_ankihub_db
-
-        migrate_ankihub_db()
+            migrate_ankihub_db()
 
     def _setup_notes_table(self) -> None:
-        """Creates the notes table if it does not exist."""
+        """Create the notes table."""
         with self.connection() as conn:
-            notes_table_exists = self.scalar(
-                """
-                SELECT name FROM sqlite_master WHERE type='table' AND name='notes';
-                """
-            )
-            if notes_table_exists:
-                return
-
             conn.execute(
                 """
                 CREATE TABLE notes (
@@ -155,8 +150,28 @@ class _AnkiHubDB:
             conn.execute("CREATE INDEX ankihub_deck_id_idx ON notes (ankihub_deck_id);")
             conn.execute("CREATE INDEX anki_note_id_idx ON notes (anki_note_id);")
             conn.execute("CREATE INDEX anki_note_type_id ON notes (anki_note_type_id);")
-            conn.execute("PRAGMA user_version = 6")
             LOGGER.info("Created notes table")
+
+    def _setup_note_types_table(self) -> None:
+        """Create the note types table."""
+        with self.connection() as conn:
+            conn.execute(
+                """
+                CREATE TABLE notetypes (
+                    anki_note_type_id INTEGER PRIMARY KEY,
+                    ankihub_deck_id STRING,
+                    name TEXT,
+                    type INTEGER,
+                    fields TEXT,
+                    css TEXT,
+                    templates TEXT
+                );
+                """
+            )
+            conn.execute(
+                "CREATE INDEX notetypes_ankihub_deck_id_idx ON notetypes (ankihub_deck_id);"
+            )
+            LOGGER.info("Created note types table")
 
     def schema_version(self) -> int:
         result = self.scalar("PRAGMA user_version;")
