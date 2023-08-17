@@ -452,12 +452,20 @@ class _AnkiHubDB:
         return result
 
     def remove_deck(self, ankihub_did: uuid.UUID):
-        self.execute(
-            """
-            DELETE FROM notes WHERE ankihub_deck_id = ?
-            """,
-            str(ankihub_did),
-        )
+        """Removes all data for the given deck from the AnkiHub DB"""
+        with self.connection() as conn:
+            conn.execute(
+                """
+                DELETE FROM notes WHERE ankihub_deck_id = ?
+                """,
+                str(ankihub_did),
+            )
+            conn.execute(
+                """
+                DELETE FROM notetypes WHERE ankihub_deck_id = ?
+                """,
+                str(ankihub_did),
+            )
 
     def ankihub_deck_ids(self) -> List[uuid.UUID]:
         result = [
