@@ -358,21 +358,6 @@ class _AnkiHubDB:
         ]
         return result
 
-    def ankihub_did_for_note_type(
-        self, anki_note_type_id: NotetypeId
-    ) -> Optional[uuid.UUID]:
-        did_str = self.scalar(
-            """
-            SELECT ankihub_deck_id FROM notes WHERE anki_note_type_id = ?
-            """,
-            anki_note_type_id,
-        )
-        if did_str is None:
-            return None
-
-        result = uuid.UUID(did_str)
-        return result
-
     def ankihub_did_for_anki_nid(self, anki_nid: NoteId) -> Optional[uuid.UUID]:
         did_str = self.scalar(
             f"""
@@ -464,28 +449,6 @@ class _AnkiHubDB:
             return None
 
         result = NoteId(note_id_str)
-        return result
-
-    def ankihub_note_type_ids(self) -> List[NotetypeId]:
-        result = self.list("SELECT DISTINCT anki_note_type_id FROM notes")
-        return result
-
-    def is_ankihub_note_type(self, anki_note_type_id: NotetypeId) -> bool:
-        result = self.scalar(
-            """
-            SELECT EXISTS(SELECT 1 FROM notes WHERE anki_note_type_id = ?)
-            """,
-            anki_note_type_id,
-        )
-        return result
-
-    def note_types_for_ankihub_deck(self, ankihub_did: uuid.UUID) -> List[NotetypeId]:
-        result = self.list(
-            """
-            SELECT DISTINCT anki_note_type_id FROM notes WHERE ankihub_deck_id = ?
-            """,
-            str(ankihub_did),
-        )
         return result
 
     def remove_deck(self, ankihub_did: uuid.UUID):
@@ -671,6 +634,43 @@ class _AnkiHubDB:
 
         note_type_dict_json = row[0]
         result = NotetypeDict(json.loads(note_type_dict_json))
+        return result
+
+    def ankihub_note_type_ids(self) -> List[NotetypeId]:
+        result = self.list("SELECT anki_note_type_id FROM notetypes")
+        return result
+
+    def is_ankihub_note_type(self, anki_note_type_id: NotetypeId) -> bool:
+        result = self.scalar(
+            """
+            SELECT EXISTS(SELECT 1 FROM notetypes WHERE anki_note_type_id = ?)
+            """,
+            anki_note_type_id,
+        )
+        return result
+
+    def note_types_for_ankihub_deck(self, ankihub_did: uuid.UUID) -> List[NotetypeId]:
+        result = self.list(
+            """
+            SELECT anki_note_type_id FROM notetypes WHERE ankihub_deck_id = ?
+            """,
+            str(ankihub_did),
+        )
+        return result
+
+    def ankihub_did_for_note_type(
+        self, anki_note_type_id: NotetypeId
+    ) -> Optional[uuid.UUID]:
+        did_str = self.scalar(
+            """
+            SELECT ankihub_deck_id FROM notetypes WHERE anki_note_type_id = ?
+            """,
+            anki_note_type_id,
+        )
+        if did_str is None:
+            return None
+
+        result = uuid.UUID(did_str)
         return result
 
 
