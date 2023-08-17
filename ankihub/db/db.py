@@ -26,6 +26,7 @@ from .. import LOGGER
 from ..ankihub_client import Field, NoteInfo, suggestion_type_from_str
 from ..common_utils import local_media_names_from_html
 from .db_utils import DBConnection
+from .exceptions import IntegrityError
 
 # This tag can be added to a note to cause media files to be synced even if the
 # media file is in an media disabled field.
@@ -186,9 +187,21 @@ class _AnkiHubDB:
         If a note with the same Anki nid already exists in the AnkiHub DB then the note will not be inserted
         Returns a tuple of (NoteInfo objects that were inserted / updated, NoteInfo objects that were skipped)
         """
+
+        # Check if all note types used by notes exist in the AnkiHub DB before inserting
+        mids_of_notes = set([note_data.mid for note_data in notes_data])
+        mids_in_db = set(self.note_types_for_ankihub_deck(ankihub_did))
+        missing_mids = [mid for mid in mids_of_notes if mid not in mids_in_db]
+        if missing_mids:
+            raise IntegrityError(
+                "Can't insert notes data because the following note types are "
+                f"missing from the AnkiHub DB: {missing_mids}"
+            )
+
         upserted_notes: List[NoteInfo] = []
         skipped_notes: List[NoteInfo] = []
         with self.connection() as conn:
+
             for note_data in notes_data:
                 conflicting_ah_nid = conn.first(
                     """
