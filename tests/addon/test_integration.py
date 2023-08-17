@@ -353,18 +353,19 @@ def ankihub_sample_deck_notes_data() -> List[NoteInfo]:
 @fixture
 def mock_ankihub_sync_dependencies(
     mock_client_methods_called_during_ankihub_sync: None,
-    mock_ankihub_db_note_types_for_ankihub_deck: None,
+    mock_fetch_note_types_to_return_empty_dict: None,
 ) -> None:
     # Set a fake token so that the deck update is not aborted
     config.save_token("test_token")
 
 
 @fixture
-def mock_ankihub_db_note_types_for_ankihub_deck(monkeypatch: MonkeyPatch) -> None:
+def mock_fetch_note_types_to_return_empty_dict(
+    monkeypatch: MonkeyPatch,
+) -> None:
     # This prevents the add-on from fetching the note types from the server
     monkeypatch.setattr(
-        ankihub_db,
-        "note_types_for_ankihub_deck",
+        "ankihub.main.note_types._fetch_note_types",
         lambda *args, **kwargs: {},
     )
 
@@ -669,6 +670,7 @@ class TestDownloadAndInstallDecks:
         # Mock client functions
         add_mock(AnkiHubClient, "get_deck_by_id", deck)
         add_mock(AnkiHubClient, "download_deck", notes_data)
+        add_mock(AnkiHubClient, "get_note_type", note_type)
         add_mock(AnkiHubClient, "get_protected_fields", {})
         add_mock(AnkiHubClient, "get_protected_tags", [])
 
