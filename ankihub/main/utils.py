@@ -1,3 +1,4 @@
+import copy
 import re
 import time
 from pprint import pformat
@@ -115,8 +116,9 @@ def nids_in_deck_but_not_in_subdeck(deck_name: str) -> Sequence[NoteId]:
 
 # note types
 def create_note_type_with_id(note_type: NotetypeDict, mid: NotetypeId) -> None:
-    note_type["id"] = 0
-    changes = aqt.mw.col.models.add_dict(note_type)
+    note_type_copy = copy.deepcopy(note_type)
+    note_type_copy["id"] = 0
+    changes = aqt.mw.col.models.add_dict(note_type_copy)
 
     # Swap out the note type id that Anki assigns to the new note type with our own id.
     # TODO check if seperate statements are necessary
@@ -127,7 +129,7 @@ def create_note_type_with_id(note_type: NotetypeDict, mid: NotetypeId) -> None:
     aqt.mw.col.save()
 
     LOGGER.info(f"Created note type: {mid}")
-    LOGGER.info(f"Note type:\n {pformat(note_type)}")
+    LOGGER.info(f"Note type:\n {pformat(note_type_copy)}")
 
 
 def note_type_contains_field(
