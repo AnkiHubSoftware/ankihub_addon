@@ -57,6 +57,7 @@ from ankihub.ankihub_client import (
     AnkiHubHTTPError,
     ChangeNoteSuggestion,
     Deck,
+    DeckUpdateChunk,
     Field,
     NewNoteSuggestion,
     NoteCustomization,
@@ -346,8 +347,29 @@ def ankihub_sample_deck_notes_data() -> List[NoteInfo]:
     return result
 
 
+@fixture
+def mock_ankihub_sync_dependencies(
+    mock_client_methods_called_during_ankihub_sync: None,
+    mock_fetch_remote_note_types: None,
+) -> None:
+    # Set a fake token so that the deck update is not aborted
+    config.save_token("test_token")
+
+
+@fixture
+def mock_fetch_remote_note_types(monkeypatch: MonkeyPatch) -> None:
+    monkeypatch.setattr(
+        "ankihub.main.importing._fetch_remote_note_types",
+        lambda *args, **kwargs: {},
+    )
+    monkeypatch.setattr(
+        "ankihub.main.importing._fetch_remote_note_types_based_on_notes_data",
+        lambda *args, **kwargs: {},
+    )
+
+
 @pytest.fixture
-def mock_client_methods_called_during_sync(monkeypatch: MonkeyPatch) -> None:
+def mock_client_methods_called_during_ankihub_sync(monkeypatch: MonkeyPatch) -> None:
     monkeypatch.setattr(
         AnkiHubClient, "get_deck_subscriptions", lambda *args, **kwargs: []
     )
@@ -1118,10 +1140,9 @@ class TestAnkiHubImporter:
         anki_session_with_addon_data: AnkiSession,
         next_deterministic_uuid: Callable[[], uuid.UUID],
     ):
-        from aqt import mw
-
         anki_session = anki_session_with_addon_data
         with anki_session.profile_loaded():
+            mw = anki_session.mw
 
             # import the apkg to get the note types, then delete the deck
             file = str(ANKIHUB_SAMPLE_DECK_APKG.absolute())
@@ -1159,10 +1180,9 @@ class TestAnkiHubImporter:
         anki_session_with_addon_data: AnkiSession,
         next_deterministic_uuid: Callable[[], uuid.UUID],
     ):
-        from aqt import mw
-
         anki_session = anki_session_with_addon_data
         with anki_session.profile_loaded():
+            mw = anki_session.mw
 
             # import the apkg
             file = str(ANKIHUB_SAMPLE_DECK_APKG.absolute())
@@ -1199,10 +1219,9 @@ class TestAnkiHubImporter:
         anki_session_with_addon_data: AnkiSession,
         next_deterministic_uuid: Callable[[], uuid.UUID],
     ):
-        from aqt import mw
-
         anki_session = anki_session_with_addon_data
         with anki_session.profile_loaded():
+            mw = anki_session.mw
 
             # import the apkg
             file = str(ANKIHUB_SAMPLE_DECK_APKG.absolute())
@@ -1245,10 +1264,9 @@ class TestAnkiHubImporter:
         anki_session_with_addon_data: AnkiSession,
         next_deterministic_uuid: Callable[[], uuid.UUID],
     ):
-        from aqt import mw
-
         anki_session = anki_session_with_addon_data
         with anki_session.profile_loaded():
+            mw = anki_session.mw
 
             # import the apkg
             file = str(ANKIHUB_SAMPLE_DECK_APKG.absolute())
@@ -1334,10 +1352,9 @@ class TestAnkiHubImporter:
         install_sample_ah_deck: InstallSampleAHDeck,
         next_deterministic_uuid: Callable[[], uuid.UUID],
     ):
-        from aqt import mw
-
         anki_session = anki_session_with_addon_data
         with anki_session.profile_loaded():
+            mw = anki_session.mw
 
             anki_did, _ = install_sample_ah_deck()
             first_local_did = anki_did
@@ -1381,10 +1398,9 @@ class TestAnkiHubImporter:
         anki_session_with_addon_data: AnkiSession,
         install_sample_ah_deck: InstallSampleAHDeck,
     ):
-        from aqt import mw
-
         anki_session = anki_session_with_addon_data
         with anki_session.profile_loaded():
+            mw = anki_session.mw
 
             anki_did, ah_did = install_sample_ah_deck()
 
@@ -1659,10 +1675,10 @@ def test_unsubscribe_from_deck(
     monkeypatch: MonkeyPatch,
     requests_mock: Mocker,
 ):
-    from aqt import mw
-
     anki_session = anki_session_with_addon_data
     with anki_session.profile_loaded():
+        mw = anki_session.mw
+
         anki_deck_id, ah_did = install_sample_ah_deck()
 
         mids = ankihub_db.note_types_for_ankihub_deck(ah_did)
@@ -2264,11 +2280,6 @@ class TestBrowserTreeView:
         qtbot: QtBot,
         install_sample_ah_deck: InstallSampleAHDeck,
     ):
-        from aqt import dialogs
-        from aqt.browser import Browser
-        from aqt.browser.sidebar.item import SidebarItem
-        from aqt.browser.sidebar.tree import SidebarTreeView
-
         config.public_config["sync_on_startup"] = False
         entry_point.run()
 
@@ -2314,8 +2325,6 @@ def test_browser_custom_columns(
     qtbot: QtBot,
     install_sample_ah_deck: InstallSampleAHDeck,
 ):
-    from aqt import dialogs
-
     config.public_config["sync_on_startup"] = False
     entry_point.run()
 
@@ -2829,6 +2838,133 @@ def test_profile_swap(
     assert general_setup_mock.call_count == 1
 
 
+class TestDeckUpdater:
+    def test_update_note(
+        self,
+        anki_session_with_addon_data: AnkiSession,
+        install_sample_ah_deck: InstallSampleAHDeck,
+        mock_ankihub_sync_dependencies: None,
+        monkeypatch: MonkeyPatch,
+    ):
+        with anki_session_with_addon_data.profile_loaded():
+            # Install a deck to be updated
+            _, ah_did = install_sample_ah_deck()
+
+            # Mock client.get_deck_updates to return a note update
+            note_info = ankihub_sample_deck_notes_data()[0]
+            note_info.fields[0].value = "changed"
+
+            latest_update = datetime.now()
+            monkeypatch.setattr(
+                "ankihub.gui.deck_updater.AnkiHubClient.get_deck_updates",
+                lambda *args, **kwargs: [
+                    DeckUpdateChunk(
+                        latest_update=latest_update,
+                        protected_fields={},
+                        protected_tags=[],
+                        notes=[note_info],
+                    )
+                ],
+            )
+
+            # Use the deck updater to update the deck
+            ah_deck_updater.update_decks_and_media(
+                ah_dids=[ah_did], start_media_sync=False
+            )
+
+            # Assert last_update_results are accurate
+            deck_updates_results = ah_deck_updater.last_deck_updates_results()
+            assert len(deck_updates_results) == 1
+            deck_update_result = deck_updates_results[0]
+            assert deck_update_result.ankihub_did == ah_did
+            assert deck_update_result.updated_nids == [note_info.anki_nid]
+            assert deck_update_result.created_nids == []
+            assert deck_update_result.skipped_nids == []
+
+            # Assert that the note was updated in Anki
+            note = aqt.mw.col.get_note(NoteId(note_info.anki_nid))
+            assert note["Front"] == "changed"
+
+            # Assert that the note was updated in the add-on database
+            note_info = ankihub_db.note_data(note.id)
+            assert note_info.fields[0].value == "changed"
+
+            # Assert that the last update time was updated in the config
+            assert config.deck_config(ah_did).latest_update == latest_update
+
+    def test_update_optional_tags(
+        self,
+        anki_session_with_addon_data: AnkiSession,
+        install_sample_ah_deck: InstallSampleAHDeck,
+        mock_ankihub_sync_dependencies: None,
+        monkeypatch: MonkeyPatch,
+    ):
+        with anki_session_with_addon_data.profile_loaded():
+            mw = anki_session_with_addon_data.mw
+
+            # Install a deck to be updated
+            _, ah_did = install_sample_ah_deck()
+            note_data = ankihub_sample_deck_notes_data()[0]
+
+            # Mock client to return a deck extension update
+            deck_extension_id = 1
+            deck_extension_name = "fake_deck_extension_name"
+            latest_update = datetime.now()
+            optional_tags = [
+                f"AnkiHub_Optional::{deck_extension_name}::test1",
+                f"AnkiHub_Optional::{deck_extension_name}::test2",
+            ]
+            monkeypatch.setattr(
+                "ankihub.gui.deck_updater.AnkiHubClient.get_deck_extensions_by_deck_id",
+                lambda *args, **kwargs: [
+                    DeckExtension(
+                        id=deck_extension_id,
+                        owner_id=1,
+                        ah_did=ah_did,
+                        name=deck_extension_name,
+                        tag_group_name=deck_extension_name,
+                        description="",
+                    )
+                ],
+            )
+            monkeypatch.setattr(
+                "ankihub.gui.deck_updater.AnkiHubClient.get_deck_extension_updates",
+                lambda *args, **kwargs: [
+                    DeckExtensionUpdateChunk(
+                        note_customizations=[
+                            NoteCustomization(
+                                ankihub_nid=note_data.ah_nid, tags=optional_tags
+                            ),
+                        ],
+                        latest_update=latest_update,
+                    ),
+                ],
+            )
+
+            # Update the deck
+            deck_updater = _AnkiHubDeckUpdater()
+            deck_updater.update_decks_and_media(
+                ah_dids=[ah_did], start_media_sync=False
+            )
+
+            # Assert that the optional tags were added to the note in Anki
+            updated_note = mw.col.get_note(NoteId(note_data.anki_nid))
+            expected_tags = ["my::tag2", "my::tag3", "my::tag", *optional_tags]
+            assert set(updated_note.tags) == set(expected_tags)
+
+            # Assert that the deck extension info was saved in the config
+            assert config.deck_extension_config(
+                extension_id=deck_extension_id
+            ) == DeckExtensionConfig(
+                ah_did=ah_did,
+                owner_id=1,
+                name=deck_extension_name,
+                tag_group_name=deck_extension_name,
+                description="",
+                latest_update=latest_update,
+            )
+
+
 @pytest.mark.parametrize(
     "subscribed_to_deck",
     [True, False],
@@ -2837,7 +2973,7 @@ def test_sync_uninstalls_unsubscribed_decks(
     anki_session_with_addon_data: AnkiSession,
     install_sample_ah_deck: InstallSampleAHDeck,
     monkeypatch: MonkeyPatch,
-    mock_client_methods_called_during_sync: None,
+    mock_client_methods_called_during_ankihub_sync: None,
     sync_with_ankihub: SyncWithAnkiHub,
     subscribed_to_deck: bool,
 ):
@@ -2889,7 +3025,7 @@ class TestAutoSync:
         self,
         anki_session_with_addon_data: AnkiSession,
         monkeypatch: MonkeyPatch,
-        mock_client_methods_called_during_sync: None,
+        mock_client_methods_called_during_ankihub_sync: None,
         qtbot: QtBot,
     ):
         with anki_session_with_addon_data.profile_loaded():
@@ -2946,7 +3082,7 @@ class TestAutoSync:
         self,
         anki_session_with_addon_data: AnkiSession,
         monkeypatch: MonkeyPatch,
-        mock_client_methods_called_during_sync: None,
+        mock_client_methods_called_during_ankihub_sync: None,
         qtbot: QtBot,
     ):
         with anki_session_with_addon_data.profile_loaded():
@@ -3014,91 +3150,6 @@ class TestAutoSync:
         self.check_and_install_new_deck_subscriptions_mock.side_effect = (
             lambda *args, **kwargs: kwargs["on_done"](future_with_result(None))
         )
-
-
-class PickableMock(Mock):
-    def __reduce__(self):
-        return (Mock, ())
-
-
-def test_sync_with_optional_content(
-    anki_session_with_addon_data: AnkiSession,
-    monkeypatch: MonkeyPatch,
-    next_deterministic_uuid: Callable[[], uuid.UUID],
-):
-    anki_session = anki_session_with_addon_data
-
-    with anki_session.profile_loaded():
-        with anki_session.deck_installed(SAMPLE_DECK_APKG) as _:
-            mw = anki_session.mw
-
-            ah_did = next_deterministic_uuid()
-            deck_extension_id = 31
-
-            notes_data = ankihub_sample_deck_notes_data()
-            ankihub_db.upsert_notes_data(ah_did, notes_data)
-            note_data = notes_data[0]
-            note = mw.col.get_note(NoteId(note_data.anki_nid))
-
-            assert set(note.tags) == set(["my::tag2", "my::tag"])
-
-            latest_update = datetime.now()
-            with monkeypatch.context() as m:
-                m.setattr(
-                    "ankihub.ankihub_client.AnkiHubClient.get_deck_extensions_by_deck_id",
-                    lambda *args, **kwargs: [
-                        DeckExtension(
-                            id=deck_extension_id,
-                            owner_id=1,
-                            ah_did=ah_did,
-                            name="test99",
-                            tag_group_name="test99",
-                            description="",
-                        )
-                    ],
-                )
-                m.setattr(
-                    "ankihub.ankihub_client.AnkiHubClient.get_deck_extension_updates",
-                    lambda *args, **kwargs: [
-                        DeckExtensionUpdateChunk(
-                            note_customizations=[
-                                NoteCustomization(
-                                    ankihub_nid=note_data.ah_nid,
-                                    tags=[
-                                        "AnkiHub_Optional::test99::test1",
-                                        "AnkiHub_Optional::test99::test2",
-                                    ],
-                                ),
-                            ],
-                            latest_update=latest_update,
-                        ),
-                    ],
-                )
-                deck_updater = _AnkiHubDeckUpdater()
-                deck_updater._update_deck_extensions(ah_did)
-
-            updated_note = mw.col.get_note(note.id)
-
-            expected_tags = [
-                "my::tag2",
-                "my::tag",
-                "AnkiHub_Optional::test99::test2",
-                "AnkiHub_Optional::test99::test1",
-            ]
-
-            assert set(updated_note.tags) == set(expected_tags)
-
-            # assert that the deck extension info was saved in the config
-            assert config.deck_extension_config(
-                extension_id=deck_extension_id
-            ) == DeckExtensionConfig(
-                ah_did=ah_did,
-                owner_id=1,
-                name="test99",
-                tag_group_name="test99",
-                description="",
-                latest_update=latest_update,
-            )
 
 
 def test_optional_tag_suggestion_dialog(
@@ -3199,8 +3250,6 @@ def test_reset_optional_tags_action(
     monkeypatch: MonkeyPatch,
     install_sample_ah_deck: InstallSampleAHDeck,
 ):
-    from aqt import dialogs
-
     entry_point.run()
 
     with anki_session_with_addon_data.profile_loaded():
@@ -3281,7 +3330,7 @@ def test_media_update_on_deck_update(
     anki_session_with_addon_data: AnkiSession,
     install_sample_ah_deck: InstallSampleAHDeck,
     monkeypatch: MonkeyPatch,
-    mock_client_methods_called_during_sync: None,
+    mock_client_methods_called_during_ankihub_sync: None,
     qtbot: QtBot,
 ):
     with anki_session_with_addon_data.profile_loaded():
@@ -3875,12 +3924,12 @@ def test_delete_ankihub_private_config_on_deckBrowser__delete_option(
     qtbot: QtBot,
     mock_function: MockFunctionProtocol,
 ):
-    from aqt import mw
-
     entry_point.run()
 
     anki_session = anki_session_with_addon_data
     with anki_session.profile_loaded():
+        mw = anki_session.mw
+
         anki_deck_id, ah_did = install_sample_ah_deck()
 
         mids = ankihub_db.note_types_for_ankihub_deck(ah_did)
@@ -3927,12 +3976,12 @@ def test_not_delete_ankihub_private_config_on_deckBrowser__delete_option(
     qtbot: QtBot,
     mock_function: MockFunctionProtocol,
 ):
-    from aqt import mw
-
     entry_point.run()
 
     anki_session = anki_session_with_addon_data
     with anki_session.profile_loaded():
+        mw = anki_session.mw
+
         anki_deck_id, _ = install_sample_ah_deck()
 
         deck_uuid = config.get_deck_uuid_by_did(anki_deck_id)

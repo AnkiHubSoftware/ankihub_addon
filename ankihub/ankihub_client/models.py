@@ -154,6 +154,9 @@ class DeckUpdateChunk(DataClassJSONMixinWithConfig):
 class DeckMedia(DataClassJSONMixinWithConfig):
     name: str
     file_content_hash: str
+    referenced_on_accepted_note: bool
+    exists_on_s3: bool
+    download_enabled: bool
 
 
 @dataclass
