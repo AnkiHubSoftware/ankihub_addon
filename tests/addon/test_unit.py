@@ -439,17 +439,23 @@ class TestAnkiHubDBAnkiNidsToAnkiHubNids:
     def test_anki_nids_to_ankihub_nids(
         self,
         ankihub_db: _AnkiHubDB,
+        ankihub_basic_note_type: NotetypeDict,
         next_deterministic_uuid: Callable[[], uuid.UUID],
     ):
+        ah_did = next_deterministic_uuid()
         existing_anki_nid = 1
         non_existing_anki_nid = 2
 
+        # Add a note to the DB.
+        ankihub_db.upsert_note_type(
+            ankihub_did=ah_did,
+            note_type=ankihub_basic_note_type,
+        )
         note = NoteInfoFactory.create(
             anki_nid=existing_anki_nid,
+            mid=ankihub_basic_note_type["id"],
         )
 
-        # Add a note to the DB.
-        ah_did = next_deterministic_uuid()
         ankihub_db.upsert_notes_data(
             ankihub_did=ah_did,
             notes_data=[note],
@@ -470,17 +476,25 @@ class TestAnkiHubDBAnkiHubNidsToAnkiIds:
     def test_ankihub_nids_to_anki_ids(
         self,
         ankihub_db: _AnkiHubDB,
+        ankihub_basic_note_type: NotetypeDict,
         next_deterministic_uuid: Callable[[], uuid.UUID],
     ):
+        ah_did = next_deterministic_uuid()
         anki_nid = 1
+
+        ankihub_db.upsert_note_type(
+            ankihub_did=ah_did,
+            note_type=ankihub_basic_note_type,
+        )
 
         existing_ah_nid = next_deterministic_uuid()
         note = NoteInfoFactory.create(
             anki_nid=anki_nid,
             ah_nid=existing_ah_nid,
+            mid=ankihub_basic_note_type["id"],
         )
         ankihub_db.upsert_notes_data(
-            ankihub_did=next_deterministic_uuid(),
+            ankihub_did=ah_did,
             notes_data=[note],
         )
 
@@ -502,13 +516,19 @@ class TestAnkiHubDBRemoveNotes:
         self,
         ankihub_db: _AnkiHubDB,
         next_deterministic_uuid: Callable[[], uuid.UUID],
+        ankihub_basic_note_type: NotetypeDict,
     ):
+        ah_did = next_deterministic_uuid()
+        ankihub_db.upsert_note_type(
+            ankihub_did=ah_did,
+            note_type=ankihub_basic_note_type,
+        )
+
         ah_nid = next_deterministic_uuid()
         note = NoteInfoFactory.create(
             ah_nid=ah_nid,
+            mid=ankihub_basic_note_type["id"],
         )
-
-        ah_did = next_deterministic_uuid()
         ankihub_db.upsert_notes_data(
             ankihub_did=ah_did,
             notes_data=[note],
@@ -544,6 +564,9 @@ class TestAnkiHubDBMediaNamesForAnkiHubDeck:
             ],
         )
         self.ah_did = next_deterministic_uuid()
+        ankihub_db.upsert_note_type(
+            ankihub_did=self.ah_did, note_type=ankihub_basic_note_type
+        )
         ankihub_db.upsert_notes_data(self.ah_did, [note_info])
 
     def test_basic(

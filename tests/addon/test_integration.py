@@ -175,8 +175,7 @@ def install_sample_ah_deck(
         # Can only be used in an anki_session_with_addon.profile_loaded() context
 
         ah_did = next_deterministic_uuid()
-        mw = anki_session_with_addon_data.mw
-        anki_did = import_sample_ankihub_deck(mw, ankihub_did=ah_did)
+        anki_did = import_sample_ankihub_deck(ankihub_did=ah_did)
         config.add_deck(
             name="Testdeck",
             ankihub_did=ah_did,
@@ -189,7 +188,7 @@ def install_sample_ah_deck(
 
 
 def import_sample_ankihub_deck(
-    mw: aqt.AnkiQt, ankihub_did: uuid.UUID, assert_created_deck=True
+    ankihub_did: uuid.UUID, assert_created_deck=True
 ) -> DeckId:
     # import the deck from the notes data
     dids_before_import = all_dids()
@@ -276,7 +275,7 @@ def import_ah_note(next_deterministic_uuid: Callable[[], uuid.UUID]) -> ImportAH
         AnkiHubImporter().import_ankihub_deck(
             ankihub_did=ah_did,
             notes=[note_data],
-            note_types={},
+            note_types={note_type["id"]: note_type},
             protected_fields={},
             protected_tags=[],
             deck_name=deck_name,
@@ -397,6 +396,37 @@ def mock_client_methods_called_during_ankihub_sync(monkeypatch: MonkeyPatch) -> 
         "get_media_disabled_fields",
         lambda *args, **kwargs: {},
     )
+
+
+class MockClientGetNoteType(Protocol):
+    def __call__(self, note_types: List[NotetypeDict]) -> None:
+        ...
+
+
+@fixture
+def mock_client_get_note_type(monkeypatch: MonkeyPatch) -> MockClientGetNoteType:
+    """Mock the get_note_type method of the AnkiHubClient to return the matching note type
+    based on the id of the note type."""
+
+    def _mock_client_note_types(note_types: List[NotetypeDict]) -> None:
+        def note_type_by_id(self, note_type_id: int) -> NotetypeDict:
+            result = next(
+                (
+                    note_type
+                    for note_type in note_types
+                    if note_type["id"] == note_type_id
+                ),
+                None,
+            )
+            assert result is not None
+            return result
+
+        monkeypatch.setattr(
+            "ankihub.main.reset_local_changes.AnkiHubClient.get_note_type",
+            note_type_by_id,
+        )
+
+    return _mock_client_note_types
 
 
 class SyncWithAnkiHub(Protocol):
@@ -632,7 +662,7 @@ class TestDownloadAndInstallDecks:
             # Download and install the deck
             on_success_mock = Mock()
             download_and_install_decks([deck.ah_did], on_done=on_success_mock)
-            qtbot.wait(500)
+            qtbot.wait_until(lambda: on_success_mock.call_count == 1)
 
             # Assert that the deck was installed
             # ... in the Anki database
@@ -1162,7 +1192,7 @@ class TestAnkiHubImporter:
                 notes=ankihub_sample_deck_notes_data(),
                 deck_name="test",
                 is_first_import_of_deck=True,
-                note_types={},
+                note_types=SAMPLE_NOTE_TYPES,
                 protected_fields={},
                 protected_tags=[],
             )
@@ -1202,7 +1232,7 @@ class TestAnkiHubImporter:
                 notes=ankihub_sample_deck_notes_data(),
                 deck_name="test",
                 is_first_import_of_deck=True,
-                note_types={},
+                note_types=SAMPLE_NOTE_TYPES,
                 protected_fields={},
                 protected_tags=[],
             )
@@ -1246,7 +1276,7 @@ class TestAnkiHubImporter:
                 notes=ankihub_sample_deck_notes_data(),
                 deck_name="test",
                 is_first_import_of_deck=False,
-                note_types={},
+                note_types=SAMPLE_NOTE_TYPES,
                 protected_fields={},
                 protected_tags=[],
             )
@@ -1298,7 +1328,7 @@ class TestAnkiHubImporter:
                 notes=ankihub_sample_deck_notes_data(),
                 deck_name="test",
                 is_first_import_of_deck=True,
-                note_types={},
+                note_types=SAMPLE_NOTE_TYPES,
                 protected_fields={},
                 protected_tags=[],
             )
@@ -1331,9 +1361,9 @@ class TestAnkiHubImporter:
             import_result = ankihub_importer.import_ankihub_deck(
                 ankihub_did=ah_did,
                 notes=ankihub_sample_deck_notes_data(),
+                note_types=SAMPLE_NOTE_TYPES,
                 deck_name="test",
                 is_first_import_of_deck=False,
-                note_types={},
                 protected_fields={},
                 protected_tags=[],
                 anki_did=first_local_did,
@@ -1376,9 +1406,9 @@ class TestAnkiHubImporter:
             import_result = ankihub_importer.import_ankihub_deck(
                 ankihub_did=ah_did,
                 notes=ankihub_sample_deck_notes_data(),
+                note_types=SAMPLE_NOTE_TYPES,
                 deck_name="test",
                 is_first_import_of_deck=False,
-                note_types={},
                 protected_fields={},
                 protected_tags=[],
                 anki_did=first_local_did,
@@ -1422,7 +1452,7 @@ class TestAnkiHubImporter:
                 notes=notes_data,
                 deck_name="test",
                 is_first_import_of_deck=False,
-                note_types={},
+                note_types=SAMPLE_NOTE_TYPES,
                 protected_fields={},
                 protected_tags=[],
                 anki_did=anki_did,
@@ -1486,12 +1516,12 @@ class TestAnkiHubImporter:
                         Field(name="Text", value="{{c1::foo}} {{c2::bar}}", order=0)
                     ],
                     tags=[],
-                    mid=note.note_type()["id"],
+                    mid=ankihub_cloze["id"],
                     last_update_type=None,
                     guid=note.guid,
                 )
 
-                # note has to be active in the database or the importer won't update it
+                ankihub_db.upsert_note_type(ankihub_did=ah_did, note_type=ankihub_cloze)
                 ankihub_db.upsert_notes_data(ankihub_did=ah_did, notes_data=[note_data])
 
                 importer = AnkiHubImporter()
@@ -1579,7 +1609,7 @@ class TestAnkiHubImporter:
                 is_first_import_of_deck=False,
                 protected_fields={note_type_id: [protected_field_name]},
                 protected_tags=["protected_tag"],
-                note_types={},
+                note_types=SAMPLE_NOTE_TYPES,
             )
 
             # assert that the fields are saved correctly in the Anki DB (protected)
@@ -1605,7 +1635,9 @@ class TestAnkiHubImporter:
             anki_nid = NoteId(1)
 
             mid_1 = ankihub_basic_note_type["id"]
-            mid_2 = create_copy_of_note_type(mw, ankihub_basic_note_type)["id"]
+
+            note_type_2 = create_copy_of_note_type(mw, ankihub_basic_note_type)
+            mid_2 = note_type_2["id"]
 
             # import the first note
             ah_did_1 = next_deterministic_uuid()
@@ -1618,7 +1650,7 @@ class TestAnkiHubImporter:
             import_result = importer.import_ankihub_deck(
                 ankihub_did=ah_did_1,
                 notes=[note_info_1],
-                note_types={},
+                note_types={mid_1: ankihub_basic_note_type},
                 protected_fields={},
                 protected_tags=[],
                 deck_name="test",
@@ -1642,7 +1674,7 @@ class TestAnkiHubImporter:
             import_result = importer.import_ankihub_deck(
                 ankihub_did=ah_did_2,
                 notes=[note_info_2],
-                note_types={},
+                note_types={mid_2: note_type_2},
                 protected_fields={},
                 protected_tags=[],
                 deck_name="test",
@@ -1674,8 +1706,10 @@ def assert_that_only_ankihub_sample_deck_info_in_database(ah_did: uuid.UUID):
 def create_copy_of_note_type(mw: AnkiQt, note_type: NotetypeDict) -> NotetypeDict:
     new_model = copy.deepcopy(note_type)
     new_model["id"] = 0
-    mw.col.models.add_dict(new_model)
-    return new_model
+    changes = mw.col.models.add_dict(new_model)
+    mid = NotetypeId(changes.id)
+    result = mw.col.models.get(mid)
+    return result
 
 
 def test_unsubscribe_from_deck(
@@ -2696,6 +2730,7 @@ def test_flatten_deck(
 def test_reset_local_changes_to_notes(
     anki_session_with_addon_data: AnkiSession,
     install_sample_ah_deck: InstallSampleAHDeck,
+    mock_client_get_note_type: MockClientGetNoteType,
     monkeypatch: MonkeyPatch,
 ):
     with anki_session_with_addon_data.profile_loaded():
@@ -2724,12 +2759,7 @@ def test_reset_local_changes_to_notes(
             "ankihub.main.reset_local_changes.AnkiHubClient.get_protected_tags",
             lambda *args, **kwargs: [],
         )
-        # mock the db function that is called to get the note types of the deck so that the code
-        # doesn't try to get the note types from the server
-        monkeypatch.setattr(
-            "ankihub.main.reset_local_changes.ankihub_db.note_types_for_ankihub_deck",
-            lambda *args, **kwargs: {},
-        )
+        mock_client_get_note_type([note_type for note_type in mw.col.models.all()])
 
         # reset local changes
         nids = ankihub_db.anki_nids_for_ankihub_deck(ah_did)
