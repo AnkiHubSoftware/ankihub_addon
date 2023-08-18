@@ -115,27 +115,33 @@ def _on_browser_will_show_context_menu(browser: Browser, context_menu: QMenu) ->
 
     menu.addSeparator()
 
-    menu.addAction(
+    bulk_suggest_notes_action = menu.addAction(
         "AnkiHub: Bulk suggest notes",
         lambda: _on_bulk_notes_suggest_action(browser, nids=selected_nids),
     )
+    if not selected_nids:
+        bulk_suggest_notes_action.setDisabled(True)
 
     protect_fields_action = menu.addAction(
         "AnkiHub: Protect fields",
         lambda: _on_protect_fields_action(browser, nids=selected_nids),
     )
-    if len(selected_nids) < 1:
+    if not selected_nids:
         protect_fields_action.setDisabled(True)
 
-    menu.addAction(
+    reset_local_changes_action = menu.addAction(
         "AnkiHub: Reset local changes",
         lambda: _on_reset_local_changes_action(browser, nids=selected_nids),
     )
+    if not selected_nids:
+        reset_local_changes_action.setDisabled(True)
 
-    menu.addAction(
+    suggest_optional_tags_action = menu.addAction(
         "AnkiHub: Suggest Optional Tags",
         lambda: _on_suggest_optional_tags_action(browser),
     )
+    if not selected_nids:
+        suggest_optional_tags_action.setDisabled(True)
 
     copy_ankihub_id_action = menu.addAction(
         "AnkiHub: Copy AnkiHub ID to clipboard",
