@@ -34,7 +34,8 @@ from ..db import (
     detach_ankihub_db_from_anki_db_connection,
     is_ankihub_db_attached_to_anki_db,
 )
-from ..gui.exceptions import DeckDownloadAndInstallError
+from ..main.exceptions import NotetypeFieldsMismatchError
+from ..main.reset_local_changes import reset_local_change_to_note_type
 from ..settings import (
     ADDON_VERSION,
     ANKI_VERSION,
@@ -46,7 +47,9 @@ from ..settings import (
 )
 from .deck_updater import NotLoggedInError
 from .error_dialog import ErrorDialog
+from .exceptions import DeckDownloadAndInstallError
 from .utils import (
+    ask_user,
     check_and_prompt_for_updates_on_main_window,
     show_error_dialog,
     show_tooltip,
@@ -316,7 +319,25 @@ def _try_handle_exception(
         exc_value, OSError
     ) and "Could not find a suitable TLS CA certificate bundle" in str(exc_value):
         showInfo("Please restart Anki.", title="AnkiHub")
-        LOGGER.warning("TLS CA certificate bundle error was handled", exc_value)
+        LOGGER.warning("TLS CA certificate bundle error was handled: %s", exc_value)
+        return True
+
+    if isinstance(exc_value, NotetypeFieldsMismatchError):
+        if ask_user(
+            dedent(
+                f"""
+                The fields of the note type <b>{exc_value.note_type_name}</b> in Anki are not
+                the same as on AnkiHub.<br><br>
+                Changing note type fields is not supported yet by the AnkiHub add-on.<br><br>
+                Do you want to update the note type in Anki to match the note type on AnkiHub?<br><br>
+                You won't be able to create suggestions for this note type until you do this.
+                """
+            ).strip(),
+            title="AnkiHub",
+        ):
+            reset_local_change_to_note_type(mid=exc_value.note_type_id)
+
+        LOGGER.warning("NotetypeFieldsMismatchError was handled: %s", exc_value)
         return True
 
     return False

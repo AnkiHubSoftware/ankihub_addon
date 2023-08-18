@@ -4,8 +4,10 @@
 import uuid
 from typing import Sequence
 
+from anki.models import NotetypeId
 from anki.notes import NoteId
 
+from .. import LOGGER
 from ..addon_ankihub_client import AddonAnkiHubClient as AnkiHubClient
 from ..db import ankihub_db
 from ..settings import config
@@ -50,3 +52,25 @@ def reset_local_changes_to_notes(
 
     # this way the notes won't be marked as "changed after sync" anymore
     ankihub_db.reset_mod_values_in_anki_db(list(nids))
+
+    LOGGER.info(f"Local changes to notes {nids} have been reset.")
+
+
+def reset_local_change_to_note_type(
+    mid: NotetypeId,
+) -> None:
+    """Resets the local changes to the note type with the given id to the state it has in the AnkiHub database."""
+    ah_did = ankihub_db.ankihub_did_for_note_type(mid)
+    deck_config = config.deck_config(ah_did)
+    importer = AnkiHubImporter()
+    importer.import_ankihub_deck(
+        ankihub_did=ah_did,
+        notes=[],
+        note_types={mid: ankihub_db.note_type_dict(note_type_id=mid)},
+        protected_fields={},
+        protected_tags=[],
+        deck_name=deck_config.name,
+        is_first_import_of_deck=False,
+    )
+
+    LOGGER.info(f"Local changes to note type {mid} have been reset.")
