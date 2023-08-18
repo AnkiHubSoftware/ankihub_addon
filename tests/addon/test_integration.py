@@ -3559,8 +3559,8 @@ class TestSuggestionsWithMedia:
     def test_suggest_new_note_with_media(
         self,
         anki_session_with_addon_data: AnkiSession,
+        install_sample_ah_deck: InstallSampleAHDeck,
         mock_client_media_upload: Tuple[AnkiQt, Mock],
-        ankihub_basic_note_type: NotetypeDict,
         requests_mock: Mocker,
         monkeypatch: MonkeyPatch,
         qtbot: QtBot,
@@ -3571,22 +3571,25 @@ class TestSuggestionsWithMedia:
             mw = anki_session_with_addon_data.mw
 
             with tempfile.NamedTemporaryFile(dir=TEST_DATA_PATH, suffix=".png") as f:
-                # add file to media folder
-                file_name_in_col = mw.col.media.add_file(f.name)
-                file_path_in_col = Path(mw.col.media.dir()) / file_name_in_col
+                install_sample_ah_deck()
 
-                # add file reference to a note
-                file_name_in_col = Path(file_path_in_col.name).name
-                note = mw.col.new_note(ankihub_basic_note_type)
+                # Add file to media folder
+                file_name_in_col = mw.col.media.add_file(f.name)
+
+                # Create a new note and add a reference to the media file
+                basic_note_type = mw.col.models.get(SAMPLE_AH_DECK_BASIC_NOTE_TYPE_ID)
+                note = mw.col.new_note(basic_note_type)
                 note["Front"] = f'<img src="{file_name_in_col}">'
                 mw.col.add_note(note, DeckId(1))
 
+                # Mock the suggestion endpoint
                 ah_did = ankihub_db.ankihub_did_for_anki_nid(note.id)
                 suggestion_request_mock = requests_mock.post(
                     f"{config.api_url}/decks/{ah_did}/note-suggestion/",
                     status_code=201,
                 )
 
+                # Create a suggestion for the note
                 suggest_new_note(
                     note=note,
                     ankihub_did=ah_did,
@@ -3602,6 +3605,7 @@ class TestSuggestionsWithMedia:
 
                 assert suggestion_request_mock.called_once  # type: ignore
 
+                # Assert that the media file was uploaded
                 self._assert_media_names_as_expected(
                     note=note,
                     upload_request_mock=s3_upload_request_mock,  # type: ignore
