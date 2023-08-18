@@ -1,3 +1,4 @@
+import base64
 import csv
 import gzip
 import hashlib
@@ -66,7 +67,7 @@ STAGING_APP_URL = "https://staging.ankihub.net"
 STAGING_API_URL = f"{STAGING_APP_URL}/api"
 STAGING_S3_BUCKET_URL = "https://ankihub-staging.s3.amazonaws.com"
 
-API_VERSION = 12.0
+API_VERSION = 13.0
 
 DECK_UPDATE_PAGE_SIZE = 2000  # seems to work well in terms of speed
 DECK_EXTENSION_UPDATE_PAGE_SIZE = 2000
@@ -318,6 +319,10 @@ class AnkiHubClient:
                 encoding="utf-8",
             )
         )
+        return result
+
+    def _gzip_decompress_string(self, string: bytes) -> str:
+        result = gzip.decompress(string).decode("utf-8")
         return result
 
     def _upload_to_s3(
@@ -656,7 +661,12 @@ class AnkiHubClient:
                 data["next"].split("/api", maxsplit=1)[1] if data["next"] else None
             )
 
-            data["notes"] = _transform_notes_data(data["notes"])
+            # decompress and transform notes data
+            notes_data_base85 = data["notes"]
+            notes_data_gzipped = base64.b85decode(notes_data_base85)
+            notes_data = json.loads(self._gzip_decompress_string(notes_data_gzipped))
+            data["notes"] = _transform_notes_data(notes_data)
+
             note_updates = DeckUpdateChunk.from_dict(data)
             yield note_updates
 
