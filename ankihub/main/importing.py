@@ -1,5 +1,5 @@
 """Import NoteInfo objects and note types into Anki and the AnkiHub database,
-create/update decks in the Anki collection if necessary"""
+create/update decks and note types in the Anki collection if necessary"""
 import textwrap
 import uuid
 from dataclasses import dataclass
