@@ -105,6 +105,7 @@ from ankihub.gui.operations.new_deck_subscriptions import (
 from ankihub.gui.operations.utils import future_with_result
 from ankihub.gui.optional_tag_suggestion_dialog import OptionalTagsSuggestionDialog
 from ankihub.main.deck_creation import create_ankihub_deck, modify_note_type
+from ankihub.main.exceptions import NotetypeFieldsMismatchError
 from ankihub.main.exporting import to_note_data
 from ankihub.main.importing import (
     AnkiHubImporter,
@@ -153,6 +154,8 @@ SAMPLE_NOTES_DATA = eval((TEST_DATA_PATH / "small_ankihub.txt").read_text())
 SAMPLE_NOTE_TYPES: Dict[NotetypeId, NotetypeDict] = json.loads(
     (TEST_DATA_PATH / "small_ankihub_note_types.json").read_text()
 )
+SMALL_ANKIHUB_DECK_BASIC_NOTE_1_ID = NoteId(1608240057545)
+SAMPLE_AH_DECK_BASIC_NOTE_TYPE_ID = NotetypeId(1657023668893)
 
 # the package name in the manifest is "ankihub"
 # the package name is used during the add-on installation process
@@ -958,6 +961,48 @@ def test_suggest_note_update(
             ),
             auto_accept=False,
         )
+
+
+def test_suggest_note_update_with_changed_note_type_fields(
+    anki_session_with_addon_data: AnkiSession,
+    install_sample_ah_deck: InstallSampleAHDeck,
+):
+    with anki_session_with_addon_data.profile_loaded():
+        mw = anki_session_with_addon_data.mw
+
+        install_sample_ah_deck()
+
+        # Get a note from the deck
+        note = mw.col.get_note(NoteId(SMALL_ANKIHUB_DECK_BASIC_NOTE_1_ID))
+
+        # Change the fields of the note type of the note
+        note_type = note.note_type()
+        mw.col.models.add_field(note_type, mw.col.models.new_field("New Field"))
+        mw.col.models.update_dict(note_type)
+
+        # Try to suggest the note update, this should fail because the note type fields have changed
+        with pytest.raises(NotetypeFieldsMismatchError) as exc_info:
+            suggest_note_update(
+                note=note,
+                change_type=SuggestionType.NEW_CONTENT,
+                comment="test",
+                media_upload_cb=Mock(),
+            )
+
+        exception: NotetypeFieldsMismatchError = exc_info.value
+        assert exception.note_type_id == note_type["id"]
+        assert exception.note_type_name == note_type["name"]
+        assert exception.ankihub_field_names == [
+            "Front",
+            "Back",
+            ANKIHUB_NOTE_TYPE_FIELD_NAME,
+        ]
+        assert exception.anki_field_names == [
+            "Front",
+            "Back",
+            ANKIHUB_NOTE_TYPE_FIELD_NAME,
+            "New Field",
+        ]
 
 
 def test_suggest_new_note(
