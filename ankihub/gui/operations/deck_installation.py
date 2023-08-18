@@ -15,6 +15,7 @@ from ...addon_ankihub_client import AddonAnkiHubClient as AnkiHubClient
 from ...ankihub_client import NoteInfo
 from ...ankihub_client.models import UserDeckRelation
 from ...main.importing import AnkiHubImporter, AnkiHubImportResult
+from ...main.note_types import fetch_note_types_based_on_notes
 from ...main.subdecks import deck_contains_subdeck_tags
 from ...main.utils import create_backup
 from ...settings import config
@@ -151,11 +152,18 @@ def _install_deck(
     create_backup()
 
     importer = AnkiHubImporter()
+    client = AnkiHubClient()
+    protected_fields = client.get_protected_fields(ah_did=ankihub_did)
+    protected_tags = client.get_protected_tags(ah_did=ankihub_did)
+    note_types = fetch_note_types_based_on_notes(notes_data=notes_data)
     import_result = importer.import_ankihub_deck(
         ankihub_did=ankihub_did,
-        notes_data=notes_data,
+        notes=notes_data,
+        note_types=note_types,
         deck_name=deck_name,
         is_first_import_of_deck=True,
+        protected_fields=protected_fields,
+        protected_tags=protected_tags,
     )
 
     config.add_deck(

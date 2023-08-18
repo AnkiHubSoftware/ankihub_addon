@@ -192,14 +192,14 @@ def import_sample_ankihub_deck(
     # import the deck from the notes data
     dids_before_import = all_dids()
     importer = AnkiHubImporter()
-    local_did = importer._import_ankihub_deck_inner(
+    local_did = importer.import_ankihub_deck(
         ankihub_did=ankihub_did,
-        notes_data=ankihub_sample_deck_notes_data(),
+        notes=ankihub_sample_deck_notes_data(),
         deck_name="Testdeck",
         is_first_import_of_deck=True,
         protected_fields={},
         protected_tags=[],
-        remote_note_types={},
+        note_types={},
     ).anki_did
     new_dids = all_dids() - dids_before_import
 
@@ -271,9 +271,12 @@ def import_ah_note(next_deterministic_uuid: Callable[[], uuid.UUID]) -> ImportAH
             f"\tNote data: {note_data.fields}, note type: {field_names_of_note_type}"
         )
 
-        AnkiHubImporter()._import_ankihub_deck_inner(
+        AnkiHubImporter().import_ankihub_deck(
             ankihub_did=ah_did,
-            notes_data=[note_data],
+            notes=[note_data],
+            note_types={},
+            protected_fields={},
+            protected_tags=[],
             deck_name=deck_name,
             is_first_import_of_deck=True,
         )
@@ -350,20 +353,19 @@ def ankihub_sample_deck_notes_data() -> List[NoteInfo]:
 @fixture
 def mock_ankihub_sync_dependencies(
     mock_client_methods_called_during_ankihub_sync: None,
-    mock_fetch_remote_note_types: None,
+    mock_fetch_note_types_to_return_empty_dict: None,
 ) -> None:
     # Set a fake token so that the deck update is not aborted
     config.save_token("test_token")
 
 
 @fixture
-def mock_fetch_remote_note_types(monkeypatch: MonkeyPatch) -> None:
+def mock_fetch_note_types_to_return_empty_dict(
+    monkeypatch: MonkeyPatch,
+) -> None:
+    # This prevents the add-on from fetching the note types from the server
     monkeypatch.setattr(
-        "ankihub.main.importing._fetch_remote_note_types",
-        lambda *args, **kwargs: {},
-    )
-    monkeypatch.setattr(
-        "ankihub.main.importing._fetch_remote_note_types_based_on_notes_data",
+        "ankihub.main.note_types._fetch_note_types",
         lambda *args, **kwargs: {},
     )
 
@@ -666,9 +668,9 @@ class TestDownloadAndInstallDecks:
             monkeypatch.setattr(object, func_name, mocks[func_name])
 
         # Mock client functions
-        add_mock(AnkiHubClient, "get_note_type", note_type)
         add_mock(AnkiHubClient, "get_deck_by_id", deck)
         add_mock(AnkiHubClient, "download_deck", notes_data)
+        add_mock(AnkiHubClient, "get_note_type", note_type)
         add_mock(AnkiHubClient, "get_protected_fields", {})
         add_mock(AnkiHubClient, "get_protected_tags", [])
 
@@ -1153,12 +1155,12 @@ class TestAnkiHubImporter:
             ah_did = next_deterministic_uuid()
             dids_before_import = all_dids()
             ankihub_importer = AnkiHubImporter()
-            import_result = ankihub_importer._import_ankihub_deck_inner(
+            import_result = ankihub_importer.import_ankihub_deck(
                 ankihub_did=ah_did,
-                notes_data=ankihub_sample_deck_notes_data(),
+                notes=ankihub_sample_deck_notes_data(),
                 deck_name="test",
                 is_first_import_of_deck=True,
-                remote_note_types={},
+                note_types={},
                 protected_fields={},
                 protected_tags=[],
             )
@@ -1193,12 +1195,12 @@ class TestAnkiHubImporter:
             ah_did = next_deterministic_uuid()
             dids_before_import = all_dids()
             ankihub_importer = AnkiHubImporter()
-            import_result = ankihub_importer._import_ankihub_deck_inner(
+            import_result = ankihub_importer.import_ankihub_deck(
                 ankihub_did=ah_did,
-                notes_data=ankihub_sample_deck_notes_data(),
+                notes=ankihub_sample_deck_notes_data(),
                 deck_name="test",
                 is_first_import_of_deck=True,
-                remote_note_types={},
+                note_types={},
                 protected_fields={},
                 protected_tags=[],
             )
@@ -1237,12 +1239,12 @@ class TestAnkiHubImporter:
             ah_did = next_deterministic_uuid()
             dids_before_import = all_dids()
             ankihub_importer = AnkiHubImporter()
-            import_result = ankihub_importer._import_ankihub_deck_inner(
+            import_result = ankihub_importer.import_ankihub_deck(
                 ankihub_did=ah_did,
-                notes_data=ankihub_sample_deck_notes_data(),
+                notes=ankihub_sample_deck_notes_data(),
                 deck_name="test",
                 is_first_import_of_deck=False,
-                remote_note_types={},
+                note_types={},
                 protected_fields={},
                 protected_tags=[],
             )
@@ -1289,12 +1291,12 @@ class TestAnkiHubImporter:
             ah_did = next_deterministic_uuid()
             dids_before_import = all_dids()
             ankihub_importer = AnkiHubImporter()
-            import_result = ankihub_importer._import_ankihub_deck_inner(
+            import_result = ankihub_importer.import_ankihub_deck(
                 ankihub_did=ah_did,
-                notes_data=ankihub_sample_deck_notes_data(),
+                notes=ankihub_sample_deck_notes_data(),
                 deck_name="test",
                 is_first_import_of_deck=True,
-                remote_note_types={},
+                note_types={},
                 protected_fields={},
                 protected_tags=[],
             )
@@ -1324,15 +1326,15 @@ class TestAnkiHubImporter:
             ah_did = next_deterministic_uuid()
             dids_before_import = all_dids()
             ankihub_importer = AnkiHubImporter()
-            import_result = ankihub_importer._import_ankihub_deck_inner(
+            import_result = ankihub_importer.import_ankihub_deck(
                 ankihub_did=ah_did,
-                notes_data=ankihub_sample_deck_notes_data(),
+                notes=ankihub_sample_deck_notes_data(),
                 deck_name="test",
                 is_first_import_of_deck=False,
-                remote_note_types={},
+                note_types={},
                 protected_fields={},
                 protected_tags=[],
-                local_did=first_local_did,
+                anki_did=first_local_did,
             )
             second_anki_did = import_result.anki_did
             new_dids = all_dids() - dids_before_import
@@ -1369,15 +1371,15 @@ class TestAnkiHubImporter:
             ah_did = next_deterministic_uuid()
             dids_before_import = all_dids()
             ankihub_importer = AnkiHubImporter()
-            import_result = ankihub_importer._import_ankihub_deck_inner(
+            import_result = ankihub_importer.import_ankihub_deck(
                 ankihub_did=ah_did,
-                notes_data=ankihub_sample_deck_notes_data(),
+                notes=ankihub_sample_deck_notes_data(),
                 deck_name="test",
                 is_first_import_of_deck=False,
-                remote_note_types={},
+                note_types={},
                 protected_fields={},
                 protected_tags=[],
-                local_did=first_local_did,
+                anki_did=first_local_did,
             )
             second_anki_did = import_result.anki_did
             new_dids = all_dids() - dids_before_import
@@ -1413,15 +1415,15 @@ class TestAnkiHubImporter:
             # import the deck again, now with the changed note data
             dids_before_import = all_dids()
             ankihub_importer = AnkiHubImporter()
-            import_result = ankihub_importer._import_ankihub_deck_inner(
+            import_result = ankihub_importer.import_ankihub_deck(
                 ankihub_did=ah_did,
-                notes_data=notes_data,
+                notes=notes_data,
                 deck_name="test",
                 is_first_import_of_deck=False,
-                remote_note_types={},
+                note_types={},
                 protected_fields={},
                 protected_tags=[],
-                local_did=anki_did,
+                anki_did=anki_did,
                 subdecks=True,
             )
             second_anki_did = import_result.anki_did
@@ -1568,14 +1570,14 @@ class TestAnkiHubImporter:
             note.flush()
 
             importer = AnkiHubImporter()
-            importer._import_ankihub_deck_inner(
+            importer.import_ankihub_deck(
                 ankihub_did=ah_did,
-                notes_data=[note_data],
+                notes=[note_data],
                 deck_name="test",
                 is_first_import_of_deck=False,
                 protected_fields={note_type_id: [protected_field_name]},
                 protected_tags=["protected_tag"],
-                remote_note_types={},
+                note_types={},
             )
 
             # assert that the fields are saved correctly in the Anki DB (protected)
@@ -1611,9 +1613,12 @@ class TestAnkiHubImporter:
                 mid=mid_1,
             )
             importer = AnkiHubImporter()
-            import_result = importer._import_ankihub_deck_inner(
+            import_result = importer.import_ankihub_deck(
                 ankihub_did=ah_did_1,
-                notes_data=[note_info_1],
+                notes=[note_info_1],
+                note_types={},
+                protected_fields={},
+                protected_tags=[],
                 deck_name="test",
                 is_first_import_of_deck=True,
             )
@@ -1632,9 +1637,12 @@ class TestAnkiHubImporter:
                 mid=mid_2,
             )
             importer = AnkiHubImporter()
-            import_result = importer._import_ankihub_deck_inner(
+            import_result = importer.import_ankihub_deck(
                 ankihub_did=ah_did_2,
-                notes_data=[note_info_2],
+                notes=[note_info_2],
+                note_types={},
+                protected_fields={},
+                protected_tags=[],
                 deck_name="test",
                 is_first_import_of_deck=True,
             )
@@ -2084,10 +2092,10 @@ class TestCustomSearchNodes:
             ankihub_models = {
                 m["id"]: m for m in mw.col.models.all() if "/" in m["name"]
             }
-            AnkiHubImporter()._import_ankihub_deck_inner(
+            AnkiHubImporter().import_ankihub_deck(
                 ankihub_did=next_deterministic_uuid(),
-                notes_data=notes_data,
-                remote_note_types=ankihub_models,
+                notes=notes_data,
+                note_types=ankihub_models,
                 protected_fields={},
                 protected_tags=[],
                 deck_name="Test-Deck",
@@ -2123,10 +2131,10 @@ class TestCustomSearchNodes:
             ankihub_models = {
                 m["id"]: m for m in mw.col.models.all() if "/" in m["name"]
             }
-            AnkiHubImporter()._import_ankihub_deck_inner(
+            AnkiHubImporter().import_ankihub_deck(
                 ankihub_did=next_deterministic_uuid(),
-                notes_data=notes_data,
-                remote_note_types=ankihub_models,
+                notes=notes_data,
+                note_types=ankihub_models,
                 protected_fields={},
                 protected_tags=[],
                 deck_name="Test-Deck",
@@ -2685,8 +2693,8 @@ def test_flatten_deck(
 
 def test_reset_local_changes_to_notes(
     anki_session_with_addon_data: AnkiSession,
-    monkeypatch: MonkeyPatch,
     install_sample_ah_deck: InstallSampleAHDeck,
+    monkeypatch: MonkeyPatch,
 ):
     with anki_session_with_addon_data.profile_loaded():
         mw = anki_session_with_addon_data.mw
@@ -2705,24 +2713,22 @@ def test_reset_local_changes_to_notes(
         # delete a note
         mw.col.remove_notes([basic_note_2.id])
 
-        # Mock the import function (that is called by reset_local_changes_to_notes)
-        # so that it doesn't try to fetch data from AnkiHub
-        # and just use empty remote note types and protected fields and tags.
-        # This works because the note types are not deleted in the test and protected
-        # fields and tags are also not used in the test.
-        def mock_import_ankihub_deck(self: AnkiHubImporter, *args, **kwargs):
-            self._import_ankihub_deck_inner(
-                *args,
-                **kwargs,
-                remote_note_types=dict(),  # type: ignore
-                protected_fields=dict(),  # type: ignore
-                protected_tags=list(),  # type: ignore
-            )
-
+        # mock the client functions that are called to get the data needed for resetting local changes
         monkeypatch.setattr(
-            "ankihub.main.importing.AnkiHubImporter.import_ankihub_deck",
-            mock_import_ankihub_deck,
+            "ankihub.main.reset_local_changes.AnkiHubClient.get_protected_fields",
+            lambda *args, **kwargs: {},
         )
+        monkeypatch.setattr(
+            "ankihub.main.reset_local_changes.AnkiHubClient.get_protected_tags",
+            lambda *args, **kwargs: [],
+        )
+        # mock the db function that is called to get the note types of the deck so that the code
+        # doesn't try to get the note types from the server
+        monkeypatch.setattr(
+            "ankihub.main.reset_local_changes.ankihub_db.note_types_for_ankihub_deck",
+            lambda *args, **kwargs: {},
+        )
+
         # reset local changes
         nids = ankihub_db.anki_nids_for_ankihub_deck(ah_did)
         reset_local_changes_to_notes(nids=nids, ah_did=ah_did)

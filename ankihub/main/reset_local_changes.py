@@ -6,7 +6,9 @@ from typing import Sequence
 
 from anki.notes import NoteId
 
+from ..addon_ankihub_client import AddonAnkiHubClient as AnkiHubClient
 from ..db import ankihub_db
+from ..main.note_types import fetch_note_types_based_on_notes_in_db
 from ..settings import config
 from .importing import AnkiHubImporter
 
@@ -21,15 +23,23 @@ def reset_local_changes_to_notes(
 
     importer = AnkiHubImporter()
 
-    # import deck with empty notes_data to reset changes to note types and deck
-    # this is needed so that notes_data can be retrieved from the database if the fields
+    # Import deck with empty notes_data to reset changes to note types and deck.
+    # This is needed so that notes_data can be retrieved from the database if the fields
     # of the note type have changed
+    # TODO This won't be needed when note types will be stored in the AnkiHub database.
+    client = AnkiHubClient()
+    protected_fields = client.get_protected_fields(ah_did=ah_did)
+    protected_tags = client.get_protected_tags(ah_did=ah_did)
+    note_types = fetch_note_types_based_on_notes_in_db(ankihub_did=ah_did)
     importer.import_ankihub_deck(
         ankihub_did=ah_did,
-        notes_data=[],
+        notes=[],
+        note_types=note_types,
         deck_name=deck_config.name,
-        local_did=deck_config.anki_id,
+        anki_did=deck_config.anki_id,
         is_first_import_of_deck=False,
+        protected_fields=protected_fields,
+        protected_tags=protected_tags,
     )
 
     notes_data = [
@@ -40,10 +50,13 @@ def reset_local_changes_to_notes(
 
     importer.import_ankihub_deck(
         ankihub_did=ah_did,
-        notes_data=notes_data,
+        notes=notes_data,
+        note_types=note_types,
         deck_name=deck_config.name,
         is_first_import_of_deck=False,
-        local_did=deck_config.anki_id,
+        anki_did=deck_config.anki_id,
+        protected_fields=protected_fields,
+        protected_tags=protected_tags,
         # we don't move existing notes between decks here, users might not want that
         subdecks_for_new_notes_only=deck_config.subdecks_enabled,
     )

@@ -69,12 +69,12 @@ def test_anking_deck_first_time_import(
 
         start_time = time.time()
 
-        importer._import_ankihub_deck_inner(
+        importer.import_ankihub_deck(
             ankihub_did=next_deterministic_uuid(),
-            notes_data=notes_data,
+            notes=notes_data,
             deck_name="test",
             is_first_import_of_deck=True,
-            remote_note_types=note_types,
+            note_types=note_types,
             protected_fields={},
             protected_tags=[],
         )

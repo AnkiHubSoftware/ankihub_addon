@@ -1,5 +1,6 @@
 """Import NoteInfo objects into Anki and the AnkiHub database,
 create/update decks and note types in the Anki collection if necessary"""
+import textwrap
 import uuid
 from dataclasses import dataclass
 from pprint import pformat
@@ -14,7 +15,6 @@ from anki.models import NotetypeDict, NotetypeId
 from anki.notes import Note, NoteId
 
 from .. import LOGGER, settings
-from ..addon_ankihub_client import AddonAnkiHubClient as AnkiHubClient
 from ..ankihub_client import Field, NoteInfo
 from ..db import ankihub_db
 from ..settings import config
@@ -59,76 +59,36 @@ class AnkiHubImporter:
     def import_ankihub_deck(
         self,
         ankihub_did: uuid.UUID,
-        notes_data: List[NoteInfo],
+        notes: List[NoteInfo],
+        note_types: Dict[NotetypeId, NotetypeDict],
+        protected_fields: Dict[int, List[str]],
+        protected_tags: List[str],
         deck_name: str,  # name that will be used for a deck if a new one gets created
         is_first_import_of_deck: bool,
-        local_did: Optional[  # did that new notes should be put into if importing not for the first time
+        anki_did: Optional[  # did that new notes should be put into if importing not for the first time
             DeckId
         ] = None,
-        protected_fields: Optional[
-            Dict[int, List[str]]
-        ] = None,  # will be fetched from api if not provided
-        protected_tags: Optional[
-            List[str]
-        ] = None,  # will be fetched from api if not provided
         subdecks: bool = False,
         subdecks_for_new_notes_only: bool = False,
     ) -> AnkiHubImportResult:
         """
         Used for importing an AnkiHub deck for the first time or when updating it.
-
-        Returns id of the deck future cards should be imported into - the local_did - if the import was sucessful,
-        else it returns None.
+        note_types are used to create or update note types in the Anki collection if necessary. Note types
+        won't be updated to exactly match the provided note types, but they will be updated to e.g. have the same
+        fields and field order as the provided note types.
         subdeck indicates whether cards should be moved into subdecks based on subdeck tags
         subdecks_for_new_notes_only indicates whether only new notes should be moved into subdecks
         """
-
-        LOGGER.info(f"Importing ankihub deck {deck_name=} {local_did=}")
-
-        # this is not ideal, it would be probably better to fetch all note types associated with the deck each time
-        if not notes_data:
-            mids = ankihub_db.note_types_for_ankihub_deck(ankihub_did)
-            remote_note_types = _fetch_remote_note_types(mids)
-        else:
-            remote_note_types = _fetch_remote_note_types_based_on_notes_data(notes_data)
-
-        if protected_fields is None:
-            protected_fields = AnkiHubClient().get_protected_fields(ankihub_did)
-
-        if protected_tags is None:
-            protected_tags = AnkiHubClient().get_protected_tags(ankihub_did)
-
-        return self._import_ankihub_deck_inner(
-            ankihub_did=ankihub_did,
-            notes_data=notes_data,
-            deck_name=deck_name,
-            is_first_import_of_deck=is_first_import_of_deck,
-            local_did=local_did,
-            remote_note_types=remote_note_types,
-            protected_fields=protected_fields,
-            protected_tags=protected_tags,
-            subdecks=subdecks,
-            subdecks_for_new_notes_only=subdecks_for_new_notes_only,
-        )
-
-    def _import_ankihub_deck_inner(
-        self,
-        ankihub_did: uuid.UUID,
-        notes_data: List[NoteInfo],
-        deck_name: str,  # name that will be used for a deck if a new one gets created
-        is_first_import_of_deck: bool,
-        local_did: DeckId = None,  # did that new notes should be put into
-        remote_note_types: Dict[NotetypeId, NotetypeDict] = {},
-        protected_fields: Dict[int, List[str]] = {},
-        protected_tags: List[str] = [],
-        subdecks: bool = False,
-        subdecks_for_new_notes_only: bool = False,
-    ) -> AnkiHubImportResult:
-        LOGGER.info(f"Notes data: {pformat(truncated_list(notes_data, 2))}")
-        LOGGER.info(f"Protected fields: {pformat(protected_fields)}")
-        LOGGER.info(f"Protected tags: {pformat(protected_tags)}")
         LOGGER.info(
-            f"Subdecks: {subdecks}, Subdecks for new notes only: {subdecks_for_new_notes_only}"
+            textwrap.dedent(
+                f"""
+                Importing ankihub deck {deck_name=} {is_first_import_of_deck=} {ankihub_did=} {anki_did=}
+                \tNotes: {pformat(truncated_list(notes, 2))}
+                \tProtected fields: {pformat(protected_fields)}
+                \tProtected tags: {pformat(protected_tags)}
+                \tSubdecks: {subdecks}, Subdecks for new notes only: {subdecks_for_new_notes_only}
+                """
+            ).strip("\n")
         )
 
         # Instance attributes are reset here so that the results returned are only for the current deck.
@@ -139,9 +99,9 @@ class AnkiHubImporter:
         self._is_first_import_of_deck = is_first_import_of_deck
         self._protected_fields = protected_fields
         self._protected_tags = protected_tags
-        self._local_did = _adjust_deck(deck_name, local_did)
+        self._local_did = _adjust_deck(deck_name, anki_did)
 
-        _adjust_note_types(remote_note_types)
+        _adjust_note_types(note_types)
 
         if self._is_first_import_of_deck:
             # Clean up any left over data for this deck in the ankihub database from previous deck imports.
@@ -149,7 +109,7 @@ class AnkiHubImporter:
 
         dids = self._import_notes(
             ankihub_did=ankihub_did,
-            notes_data=notes_data,
+            notes_data=notes,
         )
 
         if self._is_first_import_of_deck:
@@ -512,22 +472,6 @@ def _updated_tags(
     optional = [tag for tag in cur_tags if is_optional_tag(tag)]
 
     result = list(set(protected) | set(internal) | set(optional) | set(incoming_tags))
-    return result
-
-
-def _fetch_remote_note_types_based_on_notes_data(
-    notes_data: List[NoteInfo],
-) -> Dict[NotetypeId, NotetypeDict]:
-    remote_mids = set(NotetypeId(note_data.mid) for note_data in notes_data)
-    result = _fetch_remote_note_types(remote_mids)
-    return result
-
-
-def _fetch_remote_note_types(
-    mids: Iterable[NotetypeId],
-) -> Dict[NotetypeId, NotetypeDict]:
-    client = AnkiHubClient()
-    result = {mid: client.get_note_type(mid) for mid in mids}
     return result
 
 
