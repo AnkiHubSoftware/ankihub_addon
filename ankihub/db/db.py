@@ -318,7 +318,6 @@ class _AnkiHubDB:
             f"""
             SELECT
                 ankihub_note_id,
-                ankihub_deck_id,
                 anki_note_id,
                 anki_note_type_id,
                 tags,
@@ -332,10 +331,8 @@ class _AnkiHubDB:
         if result is None:
             return None
 
-        ah_nid, ah_did, anki_nid, mid, tags, flds, guid, last_update_type = result
-        field_names = self._note_type_field_names(
-            ankihub_did=ah_did, anki_note_type_id=mid
-        )
+        ah_nid, anki_nid, mid, tags, flds, guid, last_update_type = result
+        field_names = self.note_type_field_names(anki_note_type_id=mid)
         return NoteInfo(
             ah_nid=uuid.UUID(ah_nid),
             anki_nid=anki_nid,
@@ -572,9 +569,7 @@ class _AnkiHubDB:
         if aqt.mw.col is None or aqt.mw.col.models.get(NotetypeId(mid)) is None:
             return set()
 
-        field_names_for_mid = self._note_type_field_names(
-            ankihub_did=self.ankihub_did_for_note_type(mid), anki_note_type_id=mid
-        )
+        field_names_for_mid = self.note_type_field_names(anki_note_type_id=mid)
         disabled_field_ords = [
             field_names_for_mid.index(name)
             for name in disabled_field_names
@@ -640,18 +635,14 @@ class _AnkiHubDB:
             json.dumps(note_type),
         )
 
-    def note_type_dict(
-        self, ankihub_did: uuid.UUID, note_type_id: NotetypeId
-    ) -> NotetypeDict:
+    def note_type_dict(self, note_type_id: NotetypeId) -> NotetypeDict:
         row = self.first(
             """
             SELECT note_type_dict_json
             FROM notetypes
             WHERE anki_note_type_id = ?
-            AND ankihub_deck_id = ?
             """,
             note_type_id,
-            str(ankihub_did),
         )
         if row is None:
             return None
@@ -697,15 +688,11 @@ class _AnkiHubDB:
         result = uuid.UUID(did_str)
         return result
 
-    def _note_type_field_names(
-        self, ankihub_did: uuid.UUID, anki_note_type_id: NotetypeId
-    ) -> List[str]:
+    def note_type_field_names(self, anki_note_type_id: NotetypeId) -> List[str]:
         """Returns the names of the fields of the note type."""
         result = [
             field["name"]
-            for field in self.note_type_dict(
-                ankihub_did=ankihub_did, note_type_id=anki_note_type_id
-            )["flds"]
+            for field in self.note_type_dict(note_type_id=anki_note_type_id)["flds"]
         ]
         return result
 

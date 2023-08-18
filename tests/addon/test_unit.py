@@ -574,9 +574,7 @@ class TestAnkiHubDBRemoveDeck:
         assert ankihub_db.anki_nids_for_ankihub_deck(ankihub_did=ah_did) == []
         assert ankihub_db.note_types_for_ankihub_deck(ankihub_did=ah_did) == []
         assert (
-            ankihub_db.note_type_dict(
-                ankihub_did=ah_did, note_type_id=ankihub_basic_note_type["id"]
-            )
+            ankihub_db.note_type_dict(note_type_id=ankihub_basic_note_type["id"])
             is None
         )
         assert (

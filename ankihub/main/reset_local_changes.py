@@ -30,7 +30,7 @@ def reset_local_changes_to_notes(
         if (note_data := ankihub_db.note_data(nid)) is not None
     ]
     note_types = {
-        mid: ankihub_db.note_type_dict(ankihub_did=ah_did, note_type_id=mid)
+        mid: ankihub_db.note_type_dict(note_type_id=mid)
         for mid in ankihub_db.note_types_for_ankihub_deck(ah_did)
     }
 

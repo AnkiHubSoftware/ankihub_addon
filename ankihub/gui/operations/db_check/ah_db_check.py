@@ -28,9 +28,7 @@ def _fetch_missing_note_types() -> None:
             str(ah_did),
         )
         mids_of_missing_note_types = [
-            mid
-            for mid in mids
-            if not ankihub_db.note_type_dict(ankihub_did=ah_did, note_type_id=mid)
+            mid for mid in mids if not ankihub_db.note_type_dict(note_type_id=mid)
         ]
         if not mids_of_missing_note_types:
             continue
