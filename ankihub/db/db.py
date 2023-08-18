@@ -186,6 +186,7 @@ class _AnkiHubDB:
         """Upsert notes data to the AnkiHub DB.
         If a note with the same Anki nid already exists in the AnkiHub DB then the note will not be inserted
         Returns a tuple of (NoteInfo objects that were inserted / updated, NoteInfo objects that were skipped)
+        An IntegrityError will be raised if a note type used by a note does not exist in the AnkiHub DB.
         """
 
         # Check if all note types used by notes exist in the AnkiHub DB before inserting
