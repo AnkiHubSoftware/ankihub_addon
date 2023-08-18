@@ -8,7 +8,7 @@ import zipfile
 from copy import deepcopy
 from datetime import datetime, timezone
 from pathlib import Path
-from typing import Callable, List
+from typing import Callable, List, cast
 from unittest.mock import MagicMock, Mock
 
 import pytest
@@ -68,6 +68,8 @@ LOCAL_API_URL = "http://localhost:8000/api"
 
 
 ID_OF_DECK_OF_USER_TEST1 = uuid.UUID("dda0d3ad-89cd-45fb-8ddc-fabad93c2d7b")
+ANKI_ID_OF_NOTE_TYPE_OF_USER_TEST1 = 1
+
 ID_OF_DECK_OF_USER_TEST2 = uuid.UUID("5528aef7-f7ac-406b-9b35-4eaf00de4b20")
 
 DATETIME_OF_ADDING_FIRST_DECK_MEDIA = datetime(
@@ -1386,3 +1388,23 @@ class TestOwnedDeckIds:
     ):
         client = authorized_client_for_user_test2
         assert [ID_OF_DECK_OF_USER_TEST2] == client.owned_deck_ids()
+
+
+@pytest.mark.vcr()
+class TestGetNoteType:
+    def test_get_note_type(self, authorized_client_for_user_test1: AnkiHubClient):
+        client = authorized_client_for_user_test1
+        note_type = client.get_note_type(
+            anki_note_type_id=ANKI_ID_OF_NOTE_TYPE_OF_USER_TEST1
+        )
+        assert note_type["id"] == ANKI_ID_OF_NOTE_TYPE_OF_USER_TEST1
+        assert note_type["name"] == "Cloze"
+
+    def test_get_not_existing_note_type(
+        self, authorized_client_for_user_test1: AnkiHubClient
+    ):
+        client = authorized_client_for_user_test1
+        with pytest.raises(AnkiHubHTTPError) as excinfo:
+            client.get_note_type(anki_note_type_id=-1)
+
+        assert cast(AnkiHubHTTPError, excinfo.value).response.status_code == 404

@@ -10,6 +10,7 @@ Some differences between data stored in the AnkiHub database and the Anki databa
     while the AnkiHub database stores ankihub_client.NoteInfo objects.
 - decks, notes and note types can be missing from the Anki database or be modified.
 """
+import json
 import sqlite3
 import uuid
 from contextlib import contextmanager
@@ -17,7 +18,7 @@ from pathlib import Path
 from typing import Any, Dict, Iterable, List, Optional, Sequence, Set, Tuple
 
 import aqt
-from anki.models import NotetypeId
+from anki.models import NotetypeDict, NotetypeId
 from anki.notes import NoteId
 from anki.utils import ids2str, join_fields, split_fields
 
@@ -25,6 +26,7 @@ from .. import LOGGER
 from ..ankihub_client import Field, NoteInfo, suggestion_type_from_str
 from ..common_utils import local_media_names_from_html
 from .db_utils import DBConnection
+from .exceptions import IntegrityError
 
 # This tag can be added to a note to cause media files to be synced even if the
 # media file is in an media disabled field.
@@ -115,47 +117,60 @@ class _AnkiHubDB:
 
     def setup_and_migrate(self, db_path: Path) -> None:
         self.database_path = db_path
+
         journal_mode = self.scalar("pragma journal_mode=wal")
         if journal_mode != "wal":
             LOGGER.warning("Failed to set journal_mode=wal")
 
-        notes_table_exists = self.scalar(
-            """
-            SELECT name FROM sqlite_master WHERE type='table' AND name='notes';
-            """
-        )
-
-        if not notes_table_exists:
-            LOGGER.info("Creating AnkiHub DB")
-            with self.connection() as conn:
-                conn.execute(
-                    """
-                    CREATE TABLE notes (
-                        ankihub_note_id STRING PRIMARY KEY,
-                        ankihub_deck_id STRING,
-                        anki_note_id INTEGER UNIQUE,
-                        anki_note_type_id INTEGER,
-                        mod INTEGER,
-                        guid TEXT,
-                        fields TEXT,
-                        tags TEXT,
-                        last_update_type TEXT
-                    );
-                    """
-                )
-                conn.execute(
-                    "CREATE INDEX ankihub_deck_id_idx ON notes (ankihub_deck_id);"
-                )
-                conn.execute("CREATE INDEX anki_note_id_idx ON notes (anki_note_id);")
-                conn.execute(
-                    "CREATE INDEX anki_note_type_id ON notes (anki_note_type_id);"
-                )
-                conn.execute("PRAGMA user_version = 6")
-            LOGGER.info("Created AnkiHub DB")
+        if self.schema_version() == 0:
+            self._setup_notes_table()
+            self._setup_note_types_table()
+            self.execute("PRAGMA user_version = 8")
         else:
             from .db_migrations import migrate_ankihub_db
 
             migrate_ankihub_db()
+
+    def _setup_notes_table(self) -> None:
+        """Create the notes table."""
+        with self.connection() as conn:
+            conn.execute(
+                """
+                CREATE TABLE notes (
+                    ankihub_note_id STRING PRIMARY KEY,
+                    ankihub_deck_id STRING,
+                    anki_note_id INTEGER UNIQUE,
+                    anki_note_type_id INTEGER,
+                    mod INTEGER,
+                    guid TEXT,
+                    fields TEXT,
+                    tags TEXT,
+                    last_update_type TEXT
+                );
+                """
+            )
+            conn.execute("CREATE INDEX ankihub_deck_id_idx ON notes (ankihub_deck_id);")
+            conn.execute("CREATE INDEX anki_note_id_idx ON notes (anki_note_id);")
+            conn.execute("CREATE INDEX anki_note_type_id ON notes (anki_note_type_id);")
+            LOGGER.info("Created notes table")
+
+    def _setup_note_types_table(self) -> None:
+        """Create the note types table."""
+        with self.connection() as conn:
+            conn.execute(
+                """
+                CREATE TABLE notetypes (
+                    anki_note_type_id INTEGER PRIMARY KEY,
+                    ankihub_deck_id STRING NOT NULL,
+                    name TEXT NOT NULL,
+                    note_type_dict_json TEXT NOT NULL
+                );
+                """
+            )
+            conn.execute(
+                "CREATE INDEX notetypes_ankihub_deck_id_idx ON notetypes (ankihub_deck_id);"
+            )
+            LOGGER.info("Created note types table")
 
     def schema_version(self) -> int:
         result = self.scalar("PRAGMA user_version;")
@@ -171,10 +186,23 @@ class _AnkiHubDB:
         """Upsert notes data to the AnkiHub DB.
         If a note with the same Anki nid already exists in the AnkiHub DB then the note will not be inserted
         Returns a tuple of (NoteInfo objects that were inserted / updated, NoteInfo objects that were skipped)
+        An IntegrityError will be raised if a note type used by a note does not exist in the AnkiHub DB.
         """
+
+        # Check if all note types used by notes exist in the AnkiHub DB before inserting
+        mids_of_notes = set([note_data.mid for note_data in notes_data])
+        mids_in_db = set(self.note_types_for_ankihub_deck(ankihub_did))
+        missing_mids = [mid for mid in mids_of_notes if mid not in mids_in_db]
+        if missing_mids:
+            raise IntegrityError(
+                "Can't insert notes data because the following note types are "
+                f"missing from the AnkiHub DB: {missing_mids}"
+            )
+
         upserted_notes: List[NoteInfo] = []
         skipped_notes: List[NoteInfo] = []
         with self.connection() as conn:
+
             for note_data in notes_data:
                 conflicting_ah_nid = conn.first(
                     """
@@ -344,21 +372,6 @@ class _AnkiHubDB:
         ]
         return result
 
-    def ankihub_did_for_note_type(
-        self, anki_note_type_id: NotetypeId
-    ) -> Optional[uuid.UUID]:
-        did_str = self.scalar(
-            """
-            SELECT ankihub_deck_id FROM notes WHERE anki_note_type_id = ?
-            """,
-            anki_note_type_id,
-        )
-        if did_str is None:
-            return None
-
-        result = uuid.UUID(did_str)
-        return result
-
     def ankihub_did_for_anki_nid(self, anki_nid: NoteId) -> Optional[uuid.UUID]:
         did_str = self.scalar(
             f"""
@@ -452,35 +465,21 @@ class _AnkiHubDB:
         result = NoteId(note_id_str)
         return result
 
-    def ankihub_note_type_ids(self) -> List[NotetypeId]:
-        result = self.list("SELECT DISTINCT anki_note_type_id FROM notes")
-        return result
-
-    def is_ankihub_note_type(self, anki_note_type_id: NotetypeId) -> bool:
-        result = self.scalar(
-            """
-            SELECT EXISTS(SELECT 1 FROM notes WHERE anki_note_type_id = ?)
-            """,
-            anki_note_type_id,
-        )
-        return result
-
-    def note_types_for_ankihub_deck(self, ankihub_did: uuid.UUID) -> List[NotetypeId]:
-        result = self.list(
-            """
-            SELECT DISTINCT anki_note_type_id FROM notes WHERE ankihub_deck_id = ?
-            """,
-            str(ankihub_did),
-        )
-        return result
-
     def remove_deck(self, ankihub_did: uuid.UUID):
-        self.execute(
-            """
-            DELETE FROM notes WHERE ankihub_deck_id = ?
-            """,
-            str(ankihub_did),
-        )
+        """Removes all data for the given deck from the AnkiHub DB"""
+        with self.connection() as conn:
+            conn.execute(
+                """
+                DELETE FROM notes WHERE ankihub_deck_id = ?
+                """,
+                str(ankihub_did),
+            )
+            conn.execute(
+                """
+                DELETE FROM notetypes WHERE ankihub_deck_id = ?
+                """,
+                str(ankihub_did),
+            )
 
     def ankihub_deck_ids(self) -> List[uuid.UUID]:
         result = [
@@ -622,6 +621,80 @@ class _AnkiHubDB:
 
                 result.update(local_media_names_from_html(field_text))
 
+        return result
+
+    # note types
+    def upsert_note_type(self, ankihub_did: uuid.UUID, note_type: NotetypeDict) -> None:
+        self.execute(
+            """
+            INSERT OR REPLACE INTO notetypes (
+                anki_note_type_id,
+                ankihub_deck_id,
+                name,
+                note_type_dict_json
+            ) VALUES (?, ?, ?, ?)
+            """,
+            note_type["id"],
+            str(ankihub_did),
+            note_type["name"],
+            json.dumps(note_type),
+        )
+
+    def note_type_dict(
+        self, ankihub_did: uuid.UUID, note_type_id: NotetypeId
+    ) -> NotetypeDict:
+        row = self.first(
+            """
+            SELECT note_type_dict_json
+            FROM notetypes
+            WHERE anki_note_type_id = ?
+            AND ankihub_deck_id = ?
+            """,
+            note_type_id,
+            str(ankihub_did),
+        )
+        if row is None:
+            return None
+
+        note_type_dict_json = row[0]
+        result = NotetypeDict(json.loads(note_type_dict_json))
+        return result
+
+    def ankihub_note_type_ids(self) -> List[NotetypeId]:
+        result = self.list("SELECT anki_note_type_id FROM notetypes")
+        return result
+
+    def is_ankihub_note_type(self, anki_note_type_id: NotetypeId) -> bool:
+        result = self.scalar(
+            """
+            SELECT EXISTS(SELECT 1 FROM notetypes WHERE anki_note_type_id = ?)
+            """,
+            anki_note_type_id,
+        )
+        return result
+
+    def note_types_for_ankihub_deck(self, ankihub_did: uuid.UUID) -> List[NotetypeId]:
+        result = self.list(
+            """
+            SELECT anki_note_type_id FROM notetypes WHERE ankihub_deck_id = ?
+            """,
+            str(ankihub_did),
+        )
+        return result
+
+    def ankihub_did_for_note_type(
+        self, anki_note_type_id: NotetypeId
+    ) -> Optional[uuid.UUID]:
+        did_str = self.scalar(
+            """
+            SELECT ankihub_deck_id FROM notetypes WHERE anki_note_type_id = ?
+            """,
+            anki_note_type_id,
+        )
+        if did_str is None:
+            return None
+
+        result = uuid.UUID(did_str)
         return result
 
 

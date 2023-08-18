@@ -46,8 +46,8 @@ def create_ankihub_deck(
     deck_id = aqt.mw.col.decks.id(deck_name)
     note_ids = list(map(NoteId, aqt.mw.col.find_notes(f'deck:"{deck_name}"')))
 
-    note_type_mapping = _create_note_types_for_deck(deck_id)
-    _change_note_types_of_notes(note_ids, note_type_mapping)
+    old_to_new_mid_dict = _create_note_types_for_deck(deck_id)
+    _change_note_types_of_notes(note_ids, old_to_new_mid_dict)
 
     if add_subdeck_tags:
         add_subdeck_tags_to_notes(anki_deck_name=deck_name, ankihub_deck_name=deck_name)
@@ -64,6 +64,13 @@ def create_ankihub_deck(
         notes_data=notes_data,
         private=private,
     )
+
+    # Add note types to AnkiHub DB
+    for new_mid in old_to_new_mid_dict.values():
+        note_type = aqt.mw.col.models.get(new_mid)
+        ankihub_db.upsert_note_type(ankihub_did=ankihub_did, note_type=note_type)
+
+    # Add notes to AnkiHub DB
     ankihub_db.upsert_notes_data(ankihub_did=ankihub_did, notes_data=notes_data)
     ankihub_db.transfer_mod_values_from_anki_db(notes_data=notes_data)
 
@@ -71,6 +78,7 @@ def create_ankihub_deck(
 
 
 def _create_note_types_for_deck(deck_id: DeckId) -> Dict[NotetypeId, NotetypeId]:
+    """Create note types for the deck and return a mapping from old note type IDs to new note type IDs."""
     result: Dict[NotetypeId, NotetypeId] = {}
     model_ids = get_note_types_in_deck(deck_id)
     for mid in model_ids:

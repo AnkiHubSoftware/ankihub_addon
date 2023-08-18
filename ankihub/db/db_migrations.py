@@ -9,7 +9,7 @@ def migrate_ankihub_db():
 
     LOGGER.info(f"AnkiHub DB schema version: {ankihub_db.schema_version()}")
 
-    if ankihub_db.schema_version() == 0:
+    if ankihub_db.schema_version() < 1:
         with ankihub_db.connection() as conn:
             conn.execute(
                 """
@@ -21,7 +21,7 @@ def migrate_ankihub_db():
             f"AnkiHub DB migrated to schema version {ankihub_db.schema_version()}"
         )
 
-    if ankihub_db.schema_version() <= 1:
+    if ankihub_db.schema_version() < 2:
         with ankihub_db.connection() as conn:
             conn.execute("CREATE INDEX ankihub_deck_id_idx ON notes (ankihub_deck_id)")
             conn.execute("CREATE INDEX anki_note_id_idx ON notes (anki_note_id)")
@@ -30,7 +30,7 @@ def migrate_ankihub_db():
             f"AnkiHub DB migrated to schema version {ankihub_db.schema_version()}"
         )
 
-    if ankihub_db.schema_version() <= 2:
+    if ankihub_db.schema_version() < 3:
         with ankihub_db.connection() as conn:
             conn.execute("ALTER TABLE notes ADD COLUMN guid TEXT")
             conn.execute("ALTER TABLE notes ADD COLUMN fields TEXT")
@@ -40,7 +40,7 @@ def migrate_ankihub_db():
             f"AnkiHub DB migrated to schema version {ankihub_db.schema_version()}"
         )
 
-    if ankihub_db.schema_version() <= 3:
+    if ankihub_db.schema_version() < 4:
         with ankihub_db.connection() as conn:
             conn.execute("ALTER TABLE notes ADD COLUMN last_update_type TEXT")
             conn.execute("PRAGMA user_version = 4;")
@@ -48,7 +48,7 @@ def migrate_ankihub_db():
             f"AnkiHub DB migrated to schema version {ankihub_db.schema_version()}"
         )
 
-    if ankihub_db.schema_version() <= 4:
+    if ankihub_db.schema_version() < 5:
         with ankihub_db.connection() as conn:
             conn.execute("CREATE INDEX anki_note_type_id ON notes (anki_note_type_id)")
             conn.execute("PRAGMA user_version = 5;")
@@ -56,7 +56,7 @@ def migrate_ankihub_db():
             f"AnkiHub DB migrated to schema version {ankihub_db.schema_version()}"
         )
 
-    if ankihub_db.schema_version() <= 5:
+    if ankihub_db.schema_version() < 6:
 
         with ankihub_db.connection() as conn:
             # find conflicting notes - notes that have the same anki_note_id
@@ -97,11 +97,19 @@ def migrate_ankihub_db():
             f"AnkiHub DB migrated to schema version {ankihub_db.schema_version()}"
         )
 
-    if ankihub_db.schema_version() <= 6:
+    if ankihub_db.schema_version() < 7:
         with ankihub_db.connection() as conn:
             # Remove newlines from tags
             conn.execute("UPDATE notes SET tags = REPLACE(tags, '\n', '')")
             conn.execute("PRAGMA user_version = 7;")
+
+        LOGGER.info(
+            f"AnkiHub DB migrated to schema version {ankihub_db.schema_version()}"
+        )
+
+    if ankihub_db.schema_version() < 8:
+        ankihub_db._setup_note_types_table()
+        ankihub_db.execute("PRAGMA user_version = 8;")
 
         LOGGER.info(
             f"AnkiHub DB migrated to schema version {ankihub_db.schema_version()}"

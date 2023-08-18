@@ -1107,7 +1107,7 @@ def _transform_notes_data(notes_data: List[Dict]) -> List[Dict]:
 
 def _to_anki_note_type(note_type_data: Dict) -> Dict[str, Any]:
     """Turn JSON response from AnkiHubClient.get_note_type into NotetypeDict."""
-    del note_type_data["anki_id"]
+    note_type_data["id"] = note_type_data.pop("anki_id")
     note_type_data["tmpls"] = note_type_data.pop("templates")
     note_type_data["flds"] = note_type_data.pop("fields")
     return note_type_data
