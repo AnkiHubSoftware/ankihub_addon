@@ -161,9 +161,9 @@ class _AnkiHubDB:
                 """
                 CREATE TABLE notetypes (
                     anki_note_type_id INTEGER PRIMARY KEY,
-                    ankihub_deck_id STRING,
-                    name TEXT,
-                    note_type_dict_json TEXT
+                    ankihub_deck_id STRING NOT NULL,
+                    name TEXT NOT NULL,
+                    note_type_dict_json TEXT NOT NULL
                 );
                 """
             )
