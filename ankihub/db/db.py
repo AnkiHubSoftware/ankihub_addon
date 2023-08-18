@@ -629,11 +629,13 @@ class _AnkiHubDB:
             INSERT OR REPLACE INTO notetypes (
                 anki_note_type_id,
                 ankihub_deck_id,
+                name,
                 note_type_dict_json
-            ) VALUES (?, ?, ?)
+            ) VALUES (?, ?, ?, ?)
             """,
             note_type["id"],
             str(ankihub_did),
+            note_type["name"],
             json.dumps(note_type),
         )
 
