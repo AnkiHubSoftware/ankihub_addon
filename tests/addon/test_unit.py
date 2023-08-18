@@ -27,6 +27,7 @@ os.environ["SKIP_INIT"] = "1"
 
 from ankihub.ankihub_client import AnkiHubHTTPError, Field, SuggestionType
 from ankihub.db.db import MEDIA_DISABLED_FIELD_BYPASS_TAG, _AnkiHubDB
+from ankihub.db.exceptions import IntegrityError
 from ankihub.gui.error_dialog import ErrorDialog
 from ankihub.gui.errors import (
     OUTDATED_CLIENT_ERROR_REASON,
@@ -541,6 +542,70 @@ class TestAnkiHubDBRemoveNotes:
         )
 
         assert ankihub_db.anki_nids_for_ankihub_deck(ankihub_did=ah_did) == []
+
+
+class TestAnkiHubDBRemoveDeck:
+    def test_removes_notes_and_note_types(
+        self,
+        ankihub_db: _AnkiHubDB,
+        next_deterministic_uuid: Callable[[], uuid.UUID],
+        ankihub_basic_note_type: NotetypeDict,
+    ):
+        ah_did = next_deterministic_uuid()
+        ankihub_db.upsert_note_type(
+            ankihub_did=ah_did,
+            note_type=ankihub_basic_note_type,
+        )
+
+        ah_nid = next_deterministic_uuid()
+        note = NoteInfoFactory.create(
+            ah_nid=ah_nid,
+            mid=ankihub_basic_note_type["id"],
+        )
+        ankihub_db.upsert_notes_data(
+            ankihub_did=ah_did,
+            notes_data=[note],
+        )
+
+        assert ankihub_db.anki_nids_for_ankihub_deck(ah_did) == [note.anki_nid]
+
+        ankihub_db.remove_deck(ankihub_did=ah_did)
+
+        assert ankihub_db.anki_nids_for_ankihub_deck(ankihub_did=ah_did) == []
+        assert ankihub_db.note_types_for_ankihub_deck(ankihub_did=ah_did) == []
+        assert (
+            ankihub_db.note_type_dict(
+                ankihub_did=ah_did, note_type_id=ankihub_basic_note_type["id"]
+            )
+            is None
+        )
+        assert (
+            ankihub_db.ankihub_did_for_note_type(
+                anki_note_type_id=ankihub_basic_note_type["id"]
+            )
+            is None
+        )
+
+
+class TestAnkiHubDBIntegrityError:
+    def test_upserting_notes_without_note_type_raises_integrity_error(
+        self,
+        ankihub_db: _AnkiHubDB,
+        next_deterministic_uuid: Callable[[], uuid.UUID],
+        ankihub_basic_note_type: NotetypeDict,
+    ):
+        ah_did = next_deterministic_uuid()
+        ah_nid = next_deterministic_uuid()
+        note = NoteInfoFactory.create(
+            ah_nid=ah_nid,
+            mid=ankihub_basic_note_type["id"],
+        )
+
+        with pytest.raises(IntegrityError):
+            ankihub_db.upsert_notes_data(
+                ankihub_did=ah_did,
+                notes_data=[note],
+            )
 
 
 class TestAnkiHubDBMediaNamesForAnkiHubDeck:
