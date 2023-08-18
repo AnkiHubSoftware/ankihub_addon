@@ -54,7 +54,9 @@ def create_ankihub_deck(
 
     nids = aqt.mw.col.find_notes(f'deck:"{deck_name}"')
     notes_data = [
-        to_note_data(aqt.mw.col.get_note(nid), set_new_id=True) for nid in nids
+        # check_field_names=False because the note type is not yet in the AnkiHub DB
+        to_note_data(aqt.mw.col.get_note(nid), set_new_id=True, check_field_names=False)
+        for nid in nids
     ]
 
     _set_ankihub_id_fields_based_on_notes_data(notes_data)

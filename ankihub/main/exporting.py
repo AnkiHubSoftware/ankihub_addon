@@ -8,6 +8,7 @@ from anki.notes import Note
 
 from ..ankihub_client import Field, NoteInfo
 from ..db import ankihub_db
+from .exceptions import NotetypeFieldsMismatchError
 from .note_conversion import (
     get_fields_protected_by_tags,
     is_internal_tag,
@@ -15,11 +16,18 @@ from .note_conversion import (
 )
 
 
-def to_note_data(note: Note, set_new_id: bool = False) -> NoteInfo:
+def to_note_data(
+    note: Note, set_new_id: bool = False, check_field_names: bool = True
+) -> NoteInfo:
     """Convert an Anki note to a NoteInfo object.
     Tags and fields are altered (internal and optional tags are removed, ankihub id field is removed, etc.).
     Protected fields are removed.
+    If check_field_names is True, an error is raised if the fields of the note type in Anki
+    are not the same as on AnkiHub.
     """
+
+    if check_field_names:
+        _check_field_names_match(note)
 
     if set_new_id:
         ah_nid = uuid.uuid4()
@@ -37,6 +45,19 @@ def to_note_data(note: Note, set_new_id: bool = False) -> NoteInfo:
         tags=tags,
         guid=note.guid,
     )
+
+
+def _check_field_names_match(note: Note) -> None:
+    """Raises an error if the fields of the note type in Anki are not the same as in the AnkiHub database."""
+    anki_field_names = [field["name"] for field in note.note_type()["flds"]]
+    ah_field_names = ankihub_db.note_type_field_names(anki_note_type_id=note.mid)
+    if anki_field_names != ah_field_names:
+        raise NotetypeFieldsMismatchError(
+            note_type_name=note.note_type()["name"],
+            note_type_id=note.mid,
+            ankihub_field_names=ah_field_names,
+            anki_field_names=anki_field_names,
+        )
 
 
 def _prepare_fields(note: Note) -> List[Field]:
