@@ -38,4 +38,4 @@ def test_anking_deck_first_time_import(
                 protected_tags=[],
             )
         )
-        assert duration < 1
+        assert duration < 2

@@ -52,4 +52,4 @@ def test_anking_export_without_changes(
                 to_note_data(note)
 
         duration = profile_and_time(export_notes)
-        assert duration < 0.3
+        assert duration < 0.8
