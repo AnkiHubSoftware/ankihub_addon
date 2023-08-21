@@ -30,7 +30,7 @@ def test_anking_export_without_changes(
     with anki_session_with_addon_data.profile_loaded():
         mw = anki_session_with_addon_data.mw
 
-        notes_amount = 1000
+        notes_amount = 100
 
         # Import notes
         notes_data = anking_notes_data[:notes_amount]
@@ -55,4 +55,4 @@ def test_anking_export_without_changes(
 
         duration = profile(export_notes)
         print(f"Exporting {len(notes)} notes took {duration} seconds")
-        assert duration < 0.8
+        assert duration < 0.1

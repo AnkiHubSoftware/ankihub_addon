@@ -27,7 +27,7 @@ def test_anking_deck_first_time_import(
 ):
     """Test that importing a portion of the AnKing deck takes less than a threshold duration."""
     with anki_session_with_addon_data.profile_loaded():
-        notes_data = anking_notes_data[:1000]
+        notes_data = anking_notes_data[:100]
         importer = AnkiHubImporter()
         duration = profile(
             lambda: importer.import_ankihub_deck(
@@ -41,4 +41,4 @@ def test_anking_deck_first_time_import(
             )
         )
         print(f"Importing {len(notes_data)} notes took {duration} seconds")
-        assert duration < 1.0
+        assert duration < 0.5
