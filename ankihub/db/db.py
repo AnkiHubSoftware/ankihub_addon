@@ -124,8 +124,8 @@ class _AnkiHubDB:
 
         if self.schema_version() == 0:
             self._setup_notes_table()
-            self._setup_note_types_table()
             self._setup_deck_media_table()
+            self._setup_note_types_table()
             self.execute("PRAGMA user_version = 9")
         else:
             from .db_migrations import migrate_ankihub_db
@@ -154,6 +154,25 @@ class _AnkiHubDB:
             conn.execute("CREATE INDEX anki_note_id_idx ON notes (anki_note_id);")
             conn.execute("CREATE INDEX anki_note_type_id ON notes (anki_note_type_id);")
             LOGGER.info("Created notes table")
+
+    def _setup_deck_media_table(self) -> None:
+        """Create the deck_media table."""
+        with self.connection() as conn:
+            conn.execute(
+                """
+                CREATE TABLE deck_media (
+                    name TEXT NOT NULL,
+                    ankihub_deck_id TEXT NOT NULL,
+                    file_content_hash TEXT NOT NULL,
+                    modified TIMESTAMP NOT NULL,
+                    referenced_on_accepted_note BOOLEAN NOT NULL,
+                    exists_on_s3 BOOLEAN NOT NULL,
+                    download_enabled BOOLEAN NOT NULL,
+                    PRIMARY KEY (name, ankihub_deck_id)
+                );
+                """
+            )
+            LOGGER.info("Created deck_media table")
 
     def _setup_note_types_table(self) -> None:
         """Create the note types table."""
@@ -623,25 +642,6 @@ class _AnkiHubDB:
                 result.update(local_media_names_from_html(field_text))
 
         return result
-
-    def _setup_deck_media_table(self) -> None:
-        """Create the deck_media table."""
-        with self.connection() as conn:
-            conn.execute(
-                """
-                CREATE TABLE deck_media (
-                    name TEXT NOT NULL,
-                    ankihub_deck_id TEXT NOT NULL,
-                    file_content_hash TEXT NOT NULL,
-                    modified TIMESTAMP NOT NULL,
-                    referenced_on_accepted_note BOOLEAN NOT NULL,
-                    exists_on_s3 BOOLEAN NOT NULL,
-                    download_enabled BOOLEAN NOT NULL,
-                    PRIMARY_KEY (name, ankihub_deck_id)
-                );
-                """
-            )
-            LOGGER.info("Created deck_media table")
 
     # note types
     def upsert_note_type(self, ankihub_did: uuid.UUID, note_type: NotetypeDict) -> None:
