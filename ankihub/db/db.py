@@ -622,6 +622,25 @@ class _AnkiHubDB:
                 result.update(local_media_names_from_html(field_text))
 
         return result
+    
+    def _setup_deck_media_table(self) -> None:
+        """Create the deck_media table."""
+        with self.connection() as conn:
+            conn.execute(
+                """
+                CREATE TABLE deck_media (
+                    name TEXT,
+                    ankihub_deck_id STRING,
+                    file_content_hash TEXT,
+                    modified TIMESTAMP,
+                    referenced_on_accepted_note BOOLEAN,
+                    exists_on_s3 BOOLEAN,
+                    download_enabled BOOLEAN
+                );
+                """             
+            )
+            conn.execute("CREATE INDEX ankihub_deck_id_idx ON deck_media (ankihub_deck_id);")
+            LOGGER.info("Created deck_media table")
 
     # note types
     def upsert_note_type(self, ankihub_did: uuid.UUID, note_type: NotetypeDict) -> None:
