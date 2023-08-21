@@ -73,6 +73,13 @@ class DeckConfig(DataClassJSONMixin):
         ),
         default=None,
     )
+    latest_media_update: Optional[datetime] = dataclasses.field(
+        metadata=field_options(
+            serialize=_serialize_datetime,
+            deserialize=_deserialize_datetime,
+        ),
+        default=None,
+    )
     subdecks_enabled: bool = (
         False  # whether deck is organized into subdecks by the add-on
     )
@@ -191,6 +198,12 @@ class _Config:
         self, ankihub_did: uuid.UUID, latest_update: Optional[datetime]
     ):
         self.deck_config(ankihub_did).latest_update = latest_update
+        self._update_private_config()
+
+    def save_latest_deck_media_update(
+        self, ankihub_did: uuid.UUID, latest_update: Optional[datetime]
+    ):
+        self.deck_config(ankihub_did).latest_media_update = latest_update
         self._update_private_config()
 
     def set_subdecks(self, ankihub_did: uuid.UUID, subdecks: bool):
