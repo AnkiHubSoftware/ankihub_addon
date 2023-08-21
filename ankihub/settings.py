@@ -201,9 +201,9 @@ class _Config:
         self._update_private_config()
 
     def save_latest_deck_media_update(
-        self, ankihub_did: uuid.UUID, latest_update: Optional[datetime]
+        self, ankihub_did: uuid.UUID, latest_media_update: Optional[datetime]
     ):
-        self.deck_config(ankihub_did).latest_media_update = latest_update
+        self.deck_config(ankihub_did).latest_media_update = latest_media_update
         self._update_private_config()
 
     def set_subdecks(self, ankihub_did: uuid.UUID, subdecks: bool):
