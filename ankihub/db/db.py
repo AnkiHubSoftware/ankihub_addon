@@ -26,6 +26,7 @@ from .. import LOGGER
 from ..ankihub_client import Field, NoteInfo, suggestion_type_from_str
 from ..ankihub_client.models import DeckMedia
 from ..common_utils import local_media_names_from_html
+from ..feature_flags import feature_flags
 from .db_utils import DBConnection
 from .exceptions import IntegrityError
 
@@ -564,33 +565,62 @@ class _AnkiHubDB:
         param media_disabled_fields: a dict mapping note type ids to a list of field names
             that should be ignored when looking for media files.
         """
-        result = set()
-        # We get the media names for each note type separately, because
-        # the disabled fields are note type specific.
-        # Note: One note type is always only used in one deck.
-        for mid in self.note_types_for_ankihub_deck(ah_did):
-            disabled_field_names = media_disabled_fields.get(int(mid), [])
-            result.update(
-                self._media_names_on_notes_of_note_type(mid, disabled_field_names)
+        if feature_flags.use_deck_media:
+            result = set(
+                self.list(
+                    """
+                    SELECT name FROM deck_media
+                    WHERE ankihub_deck_id = ?
+                    """,
+                    str(ah_did),
+                )
             )
-        return result
+            return result
+        else:
+            result = set()
+            # We get the media names for each note type separately, because
+            # the disabled fields are note type specific.
+            # Note: One note type is always only used in one deck.
+            for mid in self.note_types_for_ankihub_deck(ah_did):
+                disabled_field_names = media_disabled_fields.get(int(mid), [])
+                result.update(
+                    self._media_names_on_notes_of_note_type(mid, disabled_field_names)
+                )
+            return result
 
     def media_names_exist_for_ankihub_deck(
         self, ah_did: uuid.UUID, media_names: Set[str]
     ) -> Dict[str, bool]:
         """Returns a dictionary where each key is a media name and the corresponding value is a boolean
         indicating whether the media file is referenced on any note in the given deck. This function is
-        defined in addition to media_names_for_ankihub_deck to provide a more efficient way to check
+        ned in addition to media_names_for_ankihub_deck to provide a more efficient way to check
         if some media files exist in the deck."""
+        if feature_flags.use_deck_media:
+            placeholders = ",".join(["?" for _ in media_names])
+            sql = f"""
+                SELECT name FROM deck_media
+                WHERE ankihub_deck_id = ?
+                AND name IN ({placeholders})
+            """
 
-        # This uses a different implementation when there are more than 30 media names to check
-        # because the first method is fast up to a certain number of media names, but then becomes
-        # very slow.
-        if len(media_names) <= 30:
-            result = self._media_names_exist_for_ankihub_deck_inner(ah_did, media_names)
+            names_in_db = self.list(
+                sql,
+                str(ah_did),
+                *media_names,
+            )
+            result = {name: name in names_in_db for name in media_names}
+            return result
         else:
-            media_names_for_deck = self.media_names_for_ankihub_deck(ah_did, {})
-            result = {name: name in media_names_for_deck for name in media_names}
+            # This uses a different implementation when there are more than 30 media names to check
+            # because the first method is fast up to a certain number of media names, but then becomes
+            # very slow.
+            if len(media_names) <= 30:
+                result = self._media_names_exist_for_ankihub_deck_inner(
+                    ah_did, media_names
+                )
+            else:
+                media_names_for_deck = self.media_names_for_ankihub_deck(ah_did, {})
+                result = {name: name in media_names_for_deck for name in media_names}
 
         return result
 
