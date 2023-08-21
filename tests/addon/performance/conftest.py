@@ -94,7 +94,7 @@ def profile(write_profiling_stats: WriteProfilingStats) -> Profile:
 
         # Get the function with the highest cumulative time which is the total time spent in the function
         stats = pstats.Stats(profiler).strip_dirs()
-        highest_cum_time_func = max(stats.stats.items(), key=lambda x: x[1][3])
+        highest_cum_time_func = max(stats.stats.items(), key=lambda x: x[1][3])  # type: ignore
         total_cum_time = highest_cum_time_func[1][3]
 
         return total_cum_time
