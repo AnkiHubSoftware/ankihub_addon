@@ -565,23 +565,32 @@ def _ensure_local_and_remote_fields_are_same(
 def _adjust_field_ords(
     cur_model_flds: List[Dict], new_model_flds: List[Dict]
 ) -> List[Dict]:
-    # This makes sure that when fields get added or are moved field contents end up
-    # in the field with the same name as before.
-    # This is relevant because people can protect fields.
-    # Note that the result will have exactly the same set of field names as the new_model,
-    # just the ords will be adjusted.
-    for fld in new_model_flds:
+    """This makes sure that when fields get added or are moved field contents end up
+    in the field with the same name as before.
+    Note that the result will have exactly the same field names in the same order as the new_model,
+    just the ords of the fields will be adjusted.
+    """
+    # By setting the ord value of a field to x we cause Anki to move the contents of current field x
+    # to this field.
+    for new_field in new_model_flds:
         if (
             cur_ord := next(
-                (_fld["ord"] for _fld in cur_model_flds if _fld["name"] == fld["name"]),
+                (
+                    old_field["ord"]
+                    for old_field in cur_model_flds
+                    if old_field["name"].lower() == new_field["name"].lower()
+                ),
                 None,
             )
         ) is not None:
-            fld["ord"] = cur_ord
+            # If a field with the same name exists in the current model, use its ord.
+            new_field["ord"] = cur_ord
         else:
-            # it's okay to assign this to multiple fields because the
-            # backend assigns new ords equal to the fields index
-            fld["ord"] = len(new_model_flds) - 1
+            # If a field with the same name doesn't exist in the current model, we don't wan't Anki to
+            # move the contents of any current field to this field, so we set the ord to a value that
+            # is larger than the number of fields in the current model. This way the contents of this
+            # field will be empty.
+            new_field["ord"] = len(cur_model_flds) + 1
     return new_model_flds
 
 
