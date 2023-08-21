@@ -7,7 +7,7 @@ from pytest_anki import AnkiSession
 
 from ankihub.ankihub_client import NoteInfo
 
-from .conftest import ProfileAndTime
+from .conftest import Profile
 
 # workaround for vscode test discovery not using pytest.ini which sets this env var
 # has to be set before importing ankihub
@@ -22,7 +22,7 @@ def test_anking_export_without_changes(
     next_deterministic_uuid: Callable[[], uuid.UUID],
     anking_notes_data: List[NoteInfo],
     anking_note_types: Dict[NotetypeId, NotetypeDict],
-    profile_and_time: ProfileAndTime,
+    profile: Profile,
 ):
     """Test that exporting a portion of the AnKing deck takes less than a threshold duration."""
     with anki_session_with_addon_data.profile_loaded():
@@ -51,5 +51,5 @@ def test_anking_export_without_changes(
             for note in notes:
                 to_note_data(note)
 
-        duration = profile_and_time(export_notes)
+        duration = profile(export_notes)
         assert duration < 0.8

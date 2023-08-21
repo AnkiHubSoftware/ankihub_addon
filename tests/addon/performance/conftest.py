@@ -2,7 +2,7 @@ import cProfile
 import csv
 import gzip
 import json
-import time
+import pstats
 from pathlib import Path
 from typing import Any, Callable, Dict, List, Protocol
 
@@ -73,13 +73,13 @@ def current_test_name(request) -> str:
     return request.node.name
 
 
-class ProfileAndTime(Protocol):
+class Profile(Protocol):
     def __call__(self, func: Callable[[], Any]) -> float:
         ...
 
 
 @pytest.fixture
-def profile_and_time(write_profiling_stats: WriteProfilingStats) -> ProfileAndTime:
+def profile(write_profiling_stats: WriteProfilingStats) -> Profile:
     """Profile the given function and write the profiling stats to a file in the profiling stats directory.
     The file is named after the current test name.
     Return the elapsed time in seconds."""
@@ -87,11 +87,16 @@ def profile_and_time(write_profiling_stats: WriteProfilingStats) -> ProfileAndTi
     def _profile(func: Callable[[], Any]) -> float:
         profiler = cProfile.Profile()
         profiler.enable()
-        start_time = time.time()
         func()
         profiler.disable()
-        result = time.time() - start_time
+
         write_profiling_stats(profiler)
-        return result
+
+        # Get the function with the highest cumulative time which is the total time spent in the function
+        stats = pstats.Stats(profiler).strip_dirs()
+        highest_cum_time_func = max(stats.stats.items(), key=lambda x: x[1][3])
+        total_cum_time = highest_cum_time_func[1][3]
+
+        return total_cum_time
 
     return _profile
