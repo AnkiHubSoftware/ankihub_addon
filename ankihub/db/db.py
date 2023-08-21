@@ -125,6 +125,7 @@ class _AnkiHubDB:
         if self.schema_version() == 0:
             self._setup_notes_table()
             self._setup_note_types_table()
+            self._setup_deck_media_table()
             self.execute("PRAGMA user_version = 9")
         else:
             from .db_migrations import migrate_ankihub_db
