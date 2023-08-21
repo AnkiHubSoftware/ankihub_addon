@@ -69,6 +69,7 @@ def _profile_setup() -> bool:
     Returns whether the profile setup was successful.
     """
     setup_feature_flags()
+    LOGGER.info("Set up feature flags.")
 
     if not setup_profile_data_folder():
         return False
