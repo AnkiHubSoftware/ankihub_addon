@@ -25,11 +25,8 @@ def test_anking_deck_first_time_import(
 ):
     """Test that importing a portion of the AnKing deck takes less than a threshold duration."""
     with anki_session_with_addon_data.profile_loaded():
-
-        # Use the first 100 notes for profiling
-        notes_data = anking_notes_data[:100]
+        notes_data = anking_notes_data[:1000]
         importer = AnkiHubImporter()
-
         duration = profile_and_time(
             lambda: importer.import_ankihub_deck(
                 ankihub_did=next_deterministic_uuid(),
@@ -41,4 +38,4 @@ def test_anking_deck_first_time_import(
                 protected_tags=[],
             )
         )
-        assert duration < 0.5
+        assert duration < 1
