@@ -622,7 +622,7 @@ class _AnkiHubDB:
                 result.update(local_media_names_from_html(field_text))
 
         return result
-    
+
     def _setup_deck_media_table(self) -> None:
         """Create the deck_media table."""
         with self.connection() as conn:
@@ -638,7 +638,7 @@ class _AnkiHubDB:
                     download_enabled BOOLEAN NOT NULL,
                     PRIMARY_KEY (name, ankihub_deck_id)
                 );
-                """             
+                """
             )
             LOGGER.info("Created deck_media table")
 
