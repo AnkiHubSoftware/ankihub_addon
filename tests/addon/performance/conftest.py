@@ -82,7 +82,7 @@ class Profile(Protocol):
 def profile(write_profiling_stats: WriteProfilingStats) -> Profile:
     """Profile the given function and write the profiling stats to a file in the profiling stats directory.
     The file is named after the current test name.
-    Return the elapsed time in seconds."""
+    Return the cumulative time in seconds."""
 
     def _profile(func: Callable[[], Any]) -> float:
         profiler = cProfile.Profile()
