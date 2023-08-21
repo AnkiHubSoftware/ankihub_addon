@@ -40,4 +40,5 @@ def test_anking_deck_first_time_import(
                 protected_tags=[],
             )
         )
+        print(f"Importing {len(notes_data)} notes took {duration} seconds")
         assert duration < 1.0
