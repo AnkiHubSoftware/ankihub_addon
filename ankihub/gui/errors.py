@@ -35,7 +35,7 @@ from ..db import (
     is_ankihub_db_attached_to_anki_db,
 )
 from ..main.exceptions import NotetypeFieldsMismatchError
-from ..main.reset_local_changes import reset_local_change_to_note_type
+from ..main.reset_local_changes import reset_local_changes_to_note_type
 from ..settings import (
     ADDON_VERSION,
     ANKI_VERSION,
@@ -335,7 +335,7 @@ def _try_handle_exception(
             ).strip(),
             title="AnkiHub",
         ):
-            reset_local_change_to_note_type(mid=exc_value.note_type_id)
+            reset_local_changes_to_note_type(mid=exc_value.note_type_id)
 
         LOGGER.warning("NotetypeFieldsMismatchError was handled: %s", exc_value)
         return True

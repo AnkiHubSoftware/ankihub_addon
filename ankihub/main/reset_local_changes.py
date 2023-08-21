@@ -56,10 +56,13 @@ def reset_local_changes_to_notes(
     LOGGER.info(f"Local changes to notes {nids} have been reset.")
 
 
-def reset_local_change_to_note_type(
+def reset_local_changes_to_note_type(
     mid: NotetypeId,
 ) -> None:
     """Resets the local changes to the note type with the given id to the state it has in the AnkiHub database."""
+
+    # TODO This doesn't reset template changes yet.
+
     ah_did = ankihub_db.ankihub_did_for_note_type(mid)
     deck_config = config.deck_config(ah_did)
     importer = AnkiHubImporter()
