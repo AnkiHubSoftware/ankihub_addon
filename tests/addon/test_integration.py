@@ -34,6 +34,7 @@ from pytest_anki import AnkiSession
 from pytestqt.qtbot import QtBot  # type: ignore
 from requests_mock import Mocker
 
+from ankihub.ankihub_client.models import DeckMediaUpdateChunk
 from ankihub.gui import deckbrowser
 from ankihub.gui.browser.browser import (
     ModifiedAfterSyncSearchNode,
@@ -44,8 +45,12 @@ from ankihub.gui.browser.browser import (
     _on_reset_optional_tags_action,
 )
 
-from ..factories import DeckFactory, NoteInfoFactory
-from ..fixtures import MockFunctionProtocol, create_or_get_ah_version_of_note_type
+from ..factories import DeckFactory, DeckMediaFactory, NoteInfoFactory
+from ..fixtures import (
+    MockFunctionProtocol,
+    SetFeatureFlagState,
+    create_or_get_ah_version_of_note_type,
+)
 from .conftest import TEST_PROFILE_ID
 
 # workaround for vscode test discovery not using pytest.ini which sets this env var
@@ -519,7 +524,7 @@ def test_editor(
 
         # this should not trigger a suggestion because the note has not been changed
         _on_suggestion_button_press(editor)
-        assert suggestion_endpoint_mock.call_count == 0
+        assert suggestion_endpoint_mock.call_count == 0  # type: ignore
 
         # change the front of the note
         note["Front"] = "new front"
@@ -529,7 +534,7 @@ def test_editor(
         _on_suggestion_button_press(editor)
 
         # mocked requests: f"{config.api_url_base}/notes/{notes_2_ah_nid}/suggestion/"
-        assert suggestion_endpoint_mock.call_count == 1
+        assert suggestion_endpoint_mock.call_count == 1  # type: ignore
 
 
 def test_get_note_types_in_deck(anki_session_with_addon_data: AnkiSession):
@@ -3000,6 +3005,58 @@ class TestDeckUpdater:
                 tag_group_name=deck_extension_name,
                 description="",
                 latest_update=latest_update,
+            )
+
+    def test_update_deck_media(
+        self,
+        anki_session_with_addon_data: AnkiSession,
+        install_sample_ah_deck: InstallSampleAHDeck,
+        mock_ankihub_sync_dependencies: None,
+        monkeypatch: MonkeyPatch,
+        set_feature_flag_state: SetFeatureFlagState,
+    ):
+        # Enable the use_deck_media feature flag
+        set_feature_flag_state("use_deck_media", True)
+
+        with anki_session_with_addon_data.profile_loaded():
+
+            # Install a deck to be updated
+            _, ah_did = install_sample_ah_deck()
+
+            # Mock client to return a deck media update
+            latest_media_update = datetime.now()
+
+            deck_media = DeckMediaFactory.create(
+                name="test.png",
+                modified=latest_media_update,
+            )
+            monkeypatch.setattr(
+                "ankihub.gui.deck_updater.AnkiHubClient.get_deck_media_updates",
+                lambda *args, **kwargs: [
+                    DeckMediaUpdateChunk(
+                        media=[deck_media],
+                    )
+                ],
+            )
+
+            # Update the deck
+            deck_updater = _AnkiHubDeckUpdater()
+            deck_updater.update_decks_and_media(
+                ah_dids=[ah_did], start_media_sync=False
+            )
+
+            # Assert that the deck media was added to the database
+            assert ankihub_db.media_names_for_ankihub_deck(
+                ah_did, media_disabled_fields={}
+            ) == {deck_media.name}
+            assert ankihub_db.media_names_exist_for_ankihub_deck(
+                ah_did=ah_did, media_names={deck_media.name}
+            ) == {deck_media.name: True}
+
+            # Assert that the latest media update time was updated in the config
+            assert (
+                config.deck_config(ankihub_did=ah_did).latest_media_update
+                == latest_media_update
             )
 
 

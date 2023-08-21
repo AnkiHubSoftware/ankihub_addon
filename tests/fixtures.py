@@ -10,14 +10,13 @@ from anki.models import NotetypeDict
 from aqt.main import AnkiQt
 from pytest import MonkeyPatch, fixture
 from pytest_anki import AnkiSession
-from requests_mock import Mocker
 
 # workaround for vscode test discovery not using pytest.ini which sets this env var
 # has to be set before importing ankihub
 os.environ["SKIP_INIT"] = "1"
 
-from ankihub.ankihub_client.ankihub_client import DEFAULT_API_URL
-from ankihub.feature_flags import _FeatureFlags
+from ankihub.ankihub_client.ankihub_client import AnkiHubClient
+from ankihub.feature_flags import _FeatureFlags, setup_feature_flags
 from ankihub.main.utils import modify_note_type
 
 
@@ -76,14 +75,34 @@ def create_or_get_ah_version_of_note_type(
     return mw.col.models.by_name(note_type["name"])
 
 
+class SetFeatureFlagState(Protocol):
+    def __call__(self, feature_flag_name: str, is_active: bool = True) -> None:
+        ...
+
+
 @fixture
-def set_feature_flag_state(requests_mock: Mocker):
-    def set_feature_flag_state_inner(feature_flag_name, is_active=True):
-        requests_mock.get(
-            f"{DEFAULT_API_URL}/feature-flags",
-            status_code=200,
-            json={"flags": {feature_flag_name: {"is_active": is_active}}},
+def set_feature_flag_state(monkeypatch: MonkeyPatch) -> SetFeatureFlagState:
+    """Patches the AnkiHubClient.is_feature_flag_enabled method to return the desired value for
+    the provided feature flag and reloads feature flags."""
+
+    def set_feature_flag_state_inner(feature_flag_name, is_active=True) -> None:
+
+        # Patch the AnkiHubClient.is_feature_flag_enabled method to return the desired value
+        # for the provided feature flag.
+        old_is_feature_flag_enabled = AnkiHubClient.is_feature_flag_enabled
+
+        def new_is_feature_flag_enabled(self, flag_name: str) -> bool:
+            if flag_name == feature_flag_name:
+                return is_active
+            return old_is_feature_flag_enabled(self, flag_name)
+
+        monkeypatch.setattr(
+            "ankihub.ankihub_client.ankihub_client.AnkiHubClient.is_feature_flag_enabled",
+            new_is_feature_flag_enabled,
         )
+
+        # this is needed so that the feature flags are reloaded for the feature_flags singleton
+        setup_feature_flags()
 
     return set_feature_flag_state_inner
 
