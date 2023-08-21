@@ -24,6 +24,7 @@ from anki.utils import ids2str, join_fields, split_fields
 
 from .. import LOGGER
 from ..ankihub_client import Field, NoteInfo, suggestion_type_from_str
+from ..ankihub_client.models import DeckMedia
 from ..common_utils import local_media_names_from_html
 from .db_utils import DBConnection
 from .exceptions import IntegrityError
@@ -525,6 +526,36 @@ class _AnkiHubDB:
         )
         result = [uuid.UUID(did) for did in did_strs]
         return result
+
+    # Media related functions
+    def upsert_deck_media_infos(
+        self,
+        ankihub_did: uuid.UUID,
+        media_list: List[DeckMedia],
+    ) -> None:
+        """Upsert deck media to the AnkiHub DB."""
+        with self.connection() as conn:
+            for media_file in media_list:
+                conn.execute(
+                    """
+                    INSERT OR REPLACE INTO deck_media (
+                        name,
+                        ankihub_deck_id,
+                        file_content_hash,
+                        modified,
+                        referenced_on_accepted_note,
+                        exists_on_s3,
+                        download_enabled
+                    ) VALUES (?, ?, ?, ?, ?, ?, ?)
+                    """,
+                    media_file.name,
+                    str(ankihub_did),
+                    media_file.file_content_hash,
+                    media_file.modified,
+                    media_file.referenced_on_accepted_note,
+                    media_file.exists_on_s3,
+                    media_file.download_enabled,
+                )
 
     def media_names_for_ankihub_deck(
         self, ah_did: uuid.UUID, media_disabled_fields: Dict[int, List[str]]
