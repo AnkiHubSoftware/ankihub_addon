@@ -2,8 +2,9 @@ import cProfile
 import csv
 import gzip
 import json
+import time
 from pathlib import Path
-from typing import Dict, List, Protocol
+from typing import Any, Callable, Dict, List, Protocol
 
 import pytest
 from anki.models import NotetypeDict, NotetypeId
@@ -50,11 +51,6 @@ def note_types_from_json(json_path: Path) -> dict[NotetypeId, NotetypeDict]:
     return result
 
 
-@pytest.fixture
-def current_test_name(request) -> str:
-    return request.node.name
-
-
 class WriteProfilingStats(Protocol):
     def __call__(self, profiler: cProfile.Profile) -> None:
         ...
@@ -70,3 +66,32 @@ def write_profiling_stats(current_test_name) -> WriteProfilingStats:
         profiler.dump_stats(stats_path)
 
     return _write_profiling_stats
+
+
+@pytest.fixture
+def current_test_name(request) -> str:
+    return request.node.name
+
+
+class ProfileAndTime(Protocol):
+    def __call__(self, func: Callable[[], Any]) -> float:
+        ...
+
+
+@pytest.fixture
+def profile_and_time(write_profiling_stats: WriteProfilingStats) -> ProfileAndTime:
+    """Profile the given function and write the profiling stats to a file in the profiling stats directory.
+    The file is named after the current test name.
+    Return the elapsed time in seconds."""
+
+    def _profile(func: Callable[[], Any]) -> float:
+        profiler = cProfile.Profile()
+        profiler.enable()
+        start_time = time.time()
+        func()
+        profiler.disable()
+        result = time.time() - start_time
+        write_profiling_stats(profiler)
+        return result
+
+    return _profile
