@@ -1,6 +1,7 @@
 import copy
 import os
 import uuid
+from dataclasses import fields
 from typing import Any, Callable, Optional, Protocol
 from unittest.mock import Mock
 
@@ -16,6 +17,7 @@ from requests_mock import Mocker
 os.environ["SKIP_INIT"] = "1"
 
 from ankihub.ankihub_client.ankihub_client import DEFAULT_API_URL
+from ankihub.feature_flags import _FeatureFlags
 from ankihub.main.utils import modify_note_type
 
 
@@ -118,3 +120,9 @@ def mock_function(
         return mock
 
     return _mock_function
+
+
+@pytest.fixture
+def mock_all_feature_flags_to_default_values(set_feature_flag_state):
+    for field in fields(_FeatureFlags):
+        set_feature_flag_state(field.name, field.default)
