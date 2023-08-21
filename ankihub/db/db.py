@@ -125,7 +125,7 @@ class _AnkiHubDB:
         if self.schema_version() == 0:
             self._setup_notes_table()
             self._setup_note_types_table()
-            self.execute("PRAGMA user_version = 8")
+            self.execute("PRAGMA user_version = 9")
         else:
             from .db_migrations import migrate_ankihub_db
 
@@ -629,17 +629,17 @@ class _AnkiHubDB:
             conn.execute(
                 """
                 CREATE TABLE deck_media (
-                    name TEXT,
-                    ankihub_deck_id STRING,
-                    file_content_hash TEXT,
-                    modified TIMESTAMP,
-                    referenced_on_accepted_note BOOLEAN,
-                    exists_on_s3 BOOLEAN,
-                    download_enabled BOOLEAN
+                    name TEXT NOT NULL,
+                    ankihub_deck_id TEXT NOT NULL,
+                    file_content_hash TEXT NOT NULL,
+                    modified TIMESTAMP NOT NULL,
+                    referenced_on_accepted_note BOOLEAN NOT NULL,
+                    exists_on_s3 BOOLEAN NOT NULL,
+                    download_enabled BOOLEAN NOT NULL,
+                    PRIMARY_KEY (name, ankihub_deck_id)
                 );
                 """             
             )
-            conn.execute("CREATE INDEX ankihub_deck_id_idx ON deck_media (ankihub_deck_id);")
             LOGGER.info("Created deck_media table")
 
     # note types
