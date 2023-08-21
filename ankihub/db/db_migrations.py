@@ -114,3 +114,11 @@ def migrate_ankihub_db():
         LOGGER.info(
             f"AnkiHub DB migrated to schema version {ankihub_db.schema_version()}"
         )
+
+    if ankihub_db.schema_version() < 9:
+        ankihub_db._setup_deck_media_table()
+        ankihub_db.execute("PRAGMA user_version = 9;")
+
+        LOGGER.info(
+            f"AnkiHub DB migrated to schema version {ankihub_db.schema_version()}"
+        )
