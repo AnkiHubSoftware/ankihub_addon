@@ -2,6 +2,7 @@ import os
 import uuid
 from typing import Callable, Dict, List
 
+import pytest
 from anki.models import NotetypeDict, NotetypeId
 from pytest_anki import AnkiSession
 
@@ -16,6 +17,7 @@ os.environ["SKIP_INIT"] = "1"
 from ankihub.main.importing import AnkiHubImporter
 
 
+@pytest.mark.performance
 def test_anking_deck_first_time_import(
     anki_session_with_addon_data: AnkiSession,
     next_deterministic_uuid: Callable[[], uuid.UUID],

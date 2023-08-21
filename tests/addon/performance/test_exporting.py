@@ -2,6 +2,7 @@ import os
 import uuid
 from typing import Callable, Dict, List
 
+import pytest
 from anki.models import NotetypeDict, NotetypeId
 from pytest_anki import AnkiSession
 
@@ -17,6 +18,7 @@ from ankihub.main.exporting import to_note_data
 from ankihub.main.importing import AnkiHubImporter
 
 
+@pytest.mark.performance
 def test_anking_export_without_changes(
     anki_session_with_addon_data: AnkiSession,
     next_deterministic_uuid: Callable[[], uuid.UUID],
