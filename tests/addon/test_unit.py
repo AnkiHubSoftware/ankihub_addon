@@ -17,9 +17,10 @@ from pytest import MonkeyPatch, fixture
 from pytest_anki import AnkiSession
 from pytestqt.qtbot import QtBot  # type: ignore
 
-from ankihub.gui import errors  # type: ignore
+from ankihub.gui import errors
 
-from ..factories import NoteInfoFactory
+from ..factories import DeckMediaFactory, NoteInfoFactory
+from ..fixtures import SetFeatureFlagState  # type: ignore
 
 # workaround for vscode test discovery not using pytest.ini which sets this env var
 # has to be set before importing ankihub
@@ -694,6 +695,60 @@ class TestAnkiHubDBMediaNamesForAnkiHubDeck:
                     self.ah_did, media_disabled_fields={}
                 )
                 == set()
+            )
+
+
+@pytest.mark.parametrize(
+    "referenced_on_accepted_note,exists_on_s3,download_enabled",
+    [
+        (True, True, True),
+        (True, True, False),
+        (True, False, True),
+        (True, False, False),
+        (False, True, True),
+        (False, True, False),
+        (False, False, True),
+        (False, False, False),
+    ],
+)
+class TestAnkiHubDBDownloadableMediaNamesForAnkiHubDeck:
+    def test_basic(
+        self,
+        anki_session_with_addon_data: AnkiSession,
+        set_feature_flag_state: SetFeatureFlagState,
+        next_deterministic_uuid: Callable[[], uuid.UUID],
+        ankihub_db: _AnkiHubDB,
+        referenced_on_accepted_note: bool,
+        exists_on_s3: bool,
+        download_enabled: bool,
+    ):
+
+        with anki_session_with_addon_data.profile_loaded():
+            set_feature_flag_state("use_deck_media", True)
+
+            ah_did = next_deterministic_uuid()
+            ankihub_db.upsert_deck_media_infos(
+                ankihub_did=ah_did,
+                media_list=[
+                    DeckMediaFactory.create(
+                        name="test1.jpg",
+                        referenced_on_accepted_note=referenced_on_accepted_note,
+                        exists_on_s3=exists_on_s3,
+                        download_enabled=download_enabled,
+                    )
+                ],
+            )
+
+            expected_result = (
+                {"test1.jpg"}
+                if referenced_on_accepted_note and exists_on_s3 and download_enabled
+                else set()
+            )
+            assert (
+                ankihub_db.downloadable_media_names_for_ankihub_deck(
+                    ah_did=ah_did, media_disabled_fields={}
+                )
+                == expected_result
             )
 
 
