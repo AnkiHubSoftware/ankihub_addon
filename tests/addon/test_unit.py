@@ -3,6 +3,7 @@ import os
 import tempfile
 import time
 import uuid
+from dataclasses import fields
 from pathlib import Path
 from typing import Callable, Generator, List
 from unittest.mock import Mock
@@ -29,6 +30,7 @@ os.environ["SKIP_INIT"] = "1"
 from ankihub.ankihub_client import AnkiHubHTTPError, Field, SuggestionType
 from ankihub.db.db import MEDIA_DISABLED_FIELD_BYPASS_TAG, _AnkiHubDB
 from ankihub.db.exceptions import IntegrityError
+from ankihub.feature_flags import _FeatureFlags, feature_flags
 from ankihub.gui.error_dialog import ErrorDialog
 from ankihub.gui.errors import (
     OUTDATED_CLIENT_ERROR_REASON,
@@ -903,3 +905,23 @@ def test_error_dialog(qtbot: QtBot, monkeypatch: MonkeyPatch):
 
     # Check that clicking the No button does not throw an exception.
     dialog.button_box.button(QDialogButtonBox.StandardButton.No).click()
+
+
+class TestFeatureFlags:
+    def test_with_default_values(
+        self,
+        mock_all_feature_flags_to_default_values: None,
+    ):
+        for field in fields(_FeatureFlags):
+            assert getattr(feature_flags, field.name) == field.default
+
+    def test_with_set_values(
+        self,
+        set_feature_flag_state: SetFeatureFlagState,
+    ):
+        for field in fields(_FeatureFlags):
+            set_feature_flag_state(field.name, False)
+            assert not getattr(feature_flags, field.name)
+
+            set_feature_flag_state(field.name, True)
+            assert getattr(feature_flags, field.name)

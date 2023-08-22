@@ -16,17 +16,24 @@ feature_flags = _FeatureFlags()
 
 def setup_feature_flags() -> None:
     """Fetch feature flags from the server. If the server is not reachable, use the default values."""
-    for field in fields(_FeatureFlags):
-        _init_feature_flag(field.name, field.default)  # type: ignore
-    LOGGER.info(f"Feature flags: {feature_flags}")
-
-
-def _init_feature_flag(name: str, default: bool) -> None:
     try:
-        value = AnkiHubClient().is_feature_flag_enabled(name)
-        setattr(feature_flags, name, value)
+        feature_flags_dict = AnkiHubClient().get_feature_flags()
     except AnkiHubRequestException as e:
-        setattr(feature_flags, name, default)
         LOGGER.warning(
-            f"Failed to fetch {name} feature flag: {e}, using default value: {default}"
+            f"Failed to fetch feature flags from the server: {e}, using default values."
         )
+        feature_flags_dict = {}
+
+    # Set the feature flags to the values fetched from the server or to the default values
+    for field in fields(_FeatureFlags):
+        try:
+            value = feature_flags_dict[field.name]
+        except KeyError:
+            setattr(feature_flags, field.name, field.default)
+            LOGGER.warning(
+                f"No feature flag named {field.name} found, using default value: {field.default}."
+            )
+        else:
+            setattr(feature_flags, field.name, value)
+
+    LOGGER.info(f"Feature flags: {feature_flags}")

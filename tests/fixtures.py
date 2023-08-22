@@ -1,8 +1,7 @@
 import copy
 import os
 import uuid
-from dataclasses import fields
-from typing import Any, Callable, Optional, Protocol
+from typing import Any, Callable, Dict, Optional, Protocol
 from unittest.mock import Mock
 
 import pytest
@@ -16,7 +15,7 @@ from pytest_anki import AnkiSession
 os.environ["SKIP_INIT"] = "1"
 
 from ankihub.ankihub_client.ankihub_client import AnkiHubClient
-from ankihub.feature_flags import _FeatureFlags, setup_feature_flags
+from ankihub.feature_flags import setup_feature_flags
 from ankihub.main.utils import modify_note_type
 
 
@@ -80,31 +79,39 @@ class SetFeatureFlagState(Protocol):
         ...
 
 
-@fixture
+@pytest.fixture
 def set_feature_flag_state(monkeypatch: MonkeyPatch) -> SetFeatureFlagState:
-    """Patches the AnkiHubClient.is_feature_flag_enabled method to return the desired value for
+    """Patches the AnkiHubClient.get_feature_flags method to return the desired value for
     the provided feature flag and reloads feature flags."""
 
     def set_feature_flag_state_inner(feature_flag_name, is_active=True) -> None:
+        old_get_feature_flags = AnkiHubClient.get_feature_flags
 
-        # Patch the AnkiHubClient.is_feature_flag_enabled method to return the desired value
-        # for the provided feature flag.
-        old_is_feature_flag_enabled = AnkiHubClient.is_feature_flag_enabled
-
-        def new_is_feature_flag_enabled(self, flag_name: str) -> bool:
-            if flag_name == feature_flag_name:
-                return is_active
-            return old_is_feature_flag_enabled(self, flag_name)
+        def new_get_feature_flags(*args, **kwargs) -> Dict[str, bool]:
+            old_get_feature_flags_result = old_get_feature_flags(*args, **kwargs)
+            old_get_feature_flags_result[feature_flag_name] = is_active
+            return old_get_feature_flags_result
 
         monkeypatch.setattr(
-            "ankihub.ankihub_client.ankihub_client.AnkiHubClient.is_feature_flag_enabled",
-            new_is_feature_flag_enabled,
+            "ankihub.ankihub_client.ankihub_client.AnkiHubClient.get_feature_flags",
+            new_get_feature_flags,
         )
 
         # this is needed so that the feature flags are reloaded for the feature_flags singleton
         setup_feature_flags()
 
     return set_feature_flag_state_inner
+
+
+@pytest.fixture
+def mock_all_feature_flags_to_default_values(monkeypatch: MonkeyPatch) -> None:
+    monkeypatch.setattr(
+        AnkiHubClient,
+        "get_feature_flags",
+        lambda *args, **kwargs: {},
+    )
+    # this is needed so that the feature flags are reloaded for the feature_flags singleton
+    setup_feature_flags()
 
 
 class MockFunction(Protocol):
@@ -139,9 +146,3 @@ def mock_function(
         return mock
 
     return _mock_function
-
-
-@pytest.fixture
-def mock_all_feature_flags_to_default_values(set_feature_flag_state):
-    for field in fields(_FeatureFlags):
-        set_feature_flag_state(field.name, field.default)
