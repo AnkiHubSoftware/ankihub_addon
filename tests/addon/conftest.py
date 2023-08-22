@@ -11,6 +11,7 @@ from requests_mock import Mocker
 
 from ..fixtures import (  # noqa F401
     ankihub_basic_note_type,
+    mock_all_feature_flags_to_default_values,
     mock_function,
     next_deterministic_id,
     next_deterministic_uuid,
@@ -49,7 +50,10 @@ def pytest_runtest_setup(item: pytest.Item) -> None:
 # to prevent hidden real requests
 @pytest.fixture(scope="function", autouse=True)
 def anki_session_with_addon_data(
-    anki_session: AnkiSession, requests_mock: Mocker, monkeypatch: MonkeyPatch
+    anki_session: AnkiSession,
+    requests_mock: Mocker,
+    monkeypatch: MonkeyPatch,
+    mock_all_feature_flags_to_default_values,  # noqa F811
 ) -> Generator[AnkiSession, None, None]:
     """Sets up a temporary anki_base folder with the ankihub add-ons data (config, contents of profile_data_folder)
     in it's add-on folder. This is a replacement for running the whole initialization process of the add-on
