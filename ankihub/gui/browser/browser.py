@@ -140,7 +140,7 @@ def _on_browser_will_show_context_menu(browser: Browser, context_menu: QMenu) ->
         if not selected_nids or not at_least_one_note_has_ah_note_type:
             action.setDisabled(True)
 
-    # Set copy ankihub id to clipboard action
+    # Set up copy ankihub id to clipboard action
     copy_ankihub_id_action = context_menu.addAction(
         "AnkiHub: Copy AnkiHub ID to clipboard",
         lambda: aqt.mw.app.clipboard().setText(str(ah_nid)),
