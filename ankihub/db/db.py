@@ -165,7 +165,7 @@ class _AnkiHubDB:
                 CREATE TABLE deck_media (
                     name TEXT NOT NULL,
                     ankihub_deck_id TEXT NOT NULL,
-                    file_content_hash TEXT NOT NULL,
+                    file_content_hash TEXT,
                     modified TIMESTAMP NOT NULL,
                     referenced_on_accepted_note BOOLEAN NOT NULL,
                     exists_on_s3 BOOLEAN NOT NULL,
@@ -173,6 +173,9 @@ class _AnkiHubDB:
                     PRIMARY KEY (name, ankihub_deck_id)
                 );
                 """
+            )
+            conn.execute(
+                "CREATE INDEX deck_media_deck_hash ON deck_media (ankihub_deck_id, file_content_hash);"
             )
             LOGGER.info("Created deck_media table")
 
