@@ -558,50 +558,66 @@ class _AnkiHubDB:
                     media_file.download_enabled,
                 )
 
-    def media_names_for_ankihub_deck(
+    def downloadable_media_names_for_ankihub_deck(
         self, ah_did: uuid.UUID, media_disabled_fields: Dict[int, List[str]]
     ) -> Set[str]:
-        """Returns the names of all media files used in the notes of the given deck.
+        """Returns the names of all media files which can be downloaded for the given deck.
         param media_disabled_fields: a dict mapping note type ids to a list of field names
             that should be ignored when looking for media files.
         """
         if feature_flags.use_deck_media:
+            # media_disabled_fields is not used here because the deck_media table already
+            # contains the information if a media file is download_enabled or not.
             result = set(
                 self.list(
                     """
                     SELECT name FROM deck_media
                     WHERE ankihub_deck_id = ?
+                    AND referenced_on_accepted_note = 1
+                    AND exists_on_s3 = 1
+                    AND download_enabled = 1
                     """,
                     str(ah_did),
                 )
             )
             return result
         else:
-            result = set()
-            # We get the media names for each note type separately, because
-            # the disabled fields are note type specific.
-            # Note: One note type is always only used in one deck.
-            for mid in self.note_types_for_ankihub_deck(ah_did):
-                disabled_field_names = media_disabled_fields.get(int(mid), [])
-                result.update(
-                    self._media_names_on_notes_of_note_type(mid, disabled_field_names)
-                )
+            result = self.media_names_for_ankihub_deck(ah_did, media_disabled_fields)
             return result
+
+    def media_names_for_ankihub_deck(
+        self, ah_did: uuid.UUID, media_disabled_fields: Dict[int, List[str]]
+    ) -> Set[str]:
+        """Returns the names of all media files which are referenced on notes in the given deck.
+        param media_disabled_fields: a dict mapping note type ids to a list of field names
+            that should be ignored when looking for media files.
+        """
+        # We get the media names for each note type separately, because
+        # the disabled fields are note type specific.
+        # Note: One note type is always only used in one deck.
+        result = set()
+        for mid in self.note_types_for_ankihub_deck(ah_did):
+            disabled_field_names = media_disabled_fields.get(int(mid), [])
+            result.update(
+                self._media_names_on_notes_of_note_type(mid, disabled_field_names)
+            )
+        return result
 
     def media_names_exist_for_ankihub_deck(
         self, ah_did: uuid.UUID, media_names: Set[str]
     ) -> Dict[str, bool]:
         """Returns a dictionary where each key is a media name and the corresponding value is a boolean
-        indicating whether the media file is referenced on any note in the given deck. This function is
-        ned in addition to media_names_for_ankihub_deck to provide a more efficient way to check
-        if some media files exist in the deck."""
+        indicating whether the media file is referenced on a note in the given deck.
+        The media file doesn't have to exist on S3, it just has to referenced on a note in the deck.
+        """
         if feature_flags.use_deck_media:
             placeholders = ",".join(["?" for _ in media_names])
             sql = f"""
                 SELECT name FROM deck_media
                 WHERE ankihub_deck_id = ?
                 AND name IN ({placeholders})
-            """
+                AND referenced_on_accepted_note = 1
+                """
 
             names_in_db = self.list(
                 sql,
