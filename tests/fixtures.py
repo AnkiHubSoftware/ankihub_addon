@@ -107,7 +107,7 @@ def set_feature_flag_state(monkeypatch: MonkeyPatch) -> SetFeatureFlagState:
     return set_feature_flag_state_inner
 
 
-class MockFunctionProtocol(Protocol):
+class MockFunction(Protocol):
     def __call__(
         self,
         target_object: Any,
@@ -121,7 +121,7 @@ class MockFunctionProtocol(Protocol):
 @pytest.fixture
 def mock_function(
     monkeypatch: MonkeyPatch,
-) -> MockFunctionProtocol:
+) -> MockFunction:
     def _mock_function(
         target_object: Any,
         target_function_name: str,
