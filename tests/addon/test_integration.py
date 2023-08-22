@@ -3773,6 +3773,73 @@ class TestSuggestionsWithMedia:
             note.load()
             assert note["Front"] == note_content
 
+    def test_with_matching_file_existing_for_deck(
+        self,
+        anki_session_with_addon_data: AnkiSession,
+        mock_client_media_upload: Mocker,
+        import_ah_note: ImportAHNote,
+        next_deterministic_uuid: Callable[[], uuid.UUID],
+        create_change_suggestion: CreateChangeSuggestion,
+    ):
+        with anki_session_with_addon_data.profile_loaded():
+            mw = anki_session_with_addon_data.mw
+
+            media_dir = Path(mw.col.media.dir())
+            ah_did = next_deterministic_uuid()
+
+            # Two media files with the contents, one will be in the collection and the other in the database.
+            media_file_in_db = "testfile_1.jpeg"
+            media_file_in_collection = "testfile_1_copy.jpeg"
+            media_file_in_db_path = TEST_DATA_PATH / "media" / media_file_in_db
+            media_file_hash = mdb5_file_hash(media_file_in_db_path)
+
+            # Add a deck media entry to the database
+            ankihub_db.upsert_deck_media_infos(
+                ankihub_did=ah_did,
+                media_list=[
+                    DeckMediaFactory.create(
+                        name=media_file_in_db,
+                        file_content_hash=media_file_hash,
+                    )
+                ],
+            )
+
+            # Add the media file copy to the collection
+            shutil.copy(
+                media_file_in_db_path,
+                media_dir / media_file_in_collection,
+            )
+
+            # Create a suggestion for a note that references the media file in the collection
+            note_data = import_ah_note(ah_did=ah_did)
+            note = mw.col.get_note(NoteId(note_data.anki_nid))
+            note_content = f'<img src="{media_file_in_collection}">'
+            note["Front"] = note_content
+            note.flush()
+
+            create_change_suggestion_mock = create_change_suggestion(
+                note=note, wait_for_media_upload=False
+            )
+
+            # Assert that the suggestion was created.
+            assert create_change_suggestion_mock.called_once  # type: ignore
+
+            # Assert the file was not uploaded to S3.
+            assert mock_client_media_upload.call_count == 0
+
+            # Assert that the media reference was replaced with a reference to the existing
+            # media file in the database with the same hash on the note and in the suggestion.
+            self._assert_media_names_on_note_and_suggestion_as_expected(
+                note=note,
+                suggestion_request_mock=create_change_suggestion_mock,
+                expected_media_name=media_file_in_db,
+            )
+
+            # Assert both media files exist in the collection.
+            # The first one already existed and the second was created by copying the first one.
+            assert (media_dir / media_file_in_collection).is_file()
+            assert (media_dir / media_file_in_db).is_file()
+
     def _assert_media_names_on_note_and_suggestion_as_expected(
         self,
         note: Note,
