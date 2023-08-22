@@ -1420,3 +1420,12 @@ class TestGetNoteType:
             client.get_note_type(anki_note_type_id=-1)
 
         assert cast(AnkiHubHTTPError, excinfo.value).response.status_code == 404
+
+
+@pytest.mark.vcr()
+class TestGetFeatureFlags:
+    def test_get_feature_flags(self, authorized_client_for_user_test1: AnkiHubClient):
+        client = authorized_client_for_user_test1
+        client.get_feature_flags()
+        # This test just makes sure that the method does not throw an exception
+        # Feature flags can change so we don't want to assert anything
