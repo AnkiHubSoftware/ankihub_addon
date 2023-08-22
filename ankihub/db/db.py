@@ -723,6 +723,45 @@ class _AnkiHubDB:
 
         return result
 
+    def media_names_with_matching_hashes(
+        self, ah_did: uuid.UUID, media_to_hash: Dict[str, Optional[str]]
+    ) -> Dict[str, str]:
+        """Returns a dictionary where each key is a media name and the corresponding value is the
+        name of a media file in the given deck with the same hash.
+        Media without a matching hash are not included in the result.
+
+        Note: Media files with a hash of None are ignored as they can't be matched.
+        """
+
+        # Remove media files with None as hash because they can't be matched
+        media_to_hash = {
+            media_name: media_hash
+            for media_name, media_hash in media_to_hash.items()
+            if media_hash is not None
+        }
+
+        # Return early if no valid hashes remain
+        if not media_to_hash:
+            return {}
+
+        placeholders = ",".join(["?" for _ in media_to_hash])
+        hash_to_media = self.dict(
+            f"""
+            SELECT file_content_hash, name FROM deck_media
+            WHERE ankihub_deck_id = ?
+            AND file_content_hash IN ({placeholders})
+            """,
+            str(ah_did),
+            *media_to_hash.values(),
+        )
+
+        result = {
+            media_name: matching_media
+            for media_name, media_hash in media_to_hash.items()
+            if (matching_media := hash_to_media.get(media_hash)) is not None
+        }
+        return result
+
     # note types
     def upsert_note_type(self, ankihub_did: uuid.UUID, note_type: NotetypeDict) -> None:
         self.execute(

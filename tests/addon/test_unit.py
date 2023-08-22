@@ -754,6 +754,107 @@ class TestAnkiHubDBDownloadableMediaNamesForAnkiHubDeck:
             )
 
 
+class TestAnkiHubDBMediaNamesWithMatchingHashes:
+    def test_get_matching_media(
+        self, ankihub_db: _AnkiHubDB, next_deterministic_uuid: Callable[[], uuid.UUID]
+    ):
+        ah_did = next_deterministic_uuid()
+        ankihub_db.upsert_deck_media_infos(
+            ankihub_did=ah_did,
+            media_list=[
+                DeckMediaFactory.create(name="test1.jpg", file_content_hash="hash1"),
+            ],
+        )
+
+        assert ankihub_db.media_names_with_matching_hashes(
+            ah_did=ah_did, media_to_hash={"test1_copy.jpg": "hash1"}
+        ) == {"test1_copy.jpg": "test1.jpg"}
+
+    def test_get_matching_media_with_multiple_entries(
+        self, ankihub_db: _AnkiHubDB, next_deterministic_uuid: Callable[[], uuid.UUID]
+    ):
+        ah_did = next_deterministic_uuid()
+        ankihub_db.upsert_deck_media_infos(
+            ankihub_did=ah_did,
+            media_list=[
+                DeckMediaFactory.create(name="test1.jpg", file_content_hash="hash1"),
+                DeckMediaFactory.create(name="test2.jpg", file_content_hash="hash2"),
+            ],
+        )
+
+        assert ankihub_db.media_names_with_matching_hashes(
+            ah_did=ah_did,
+            media_to_hash={
+                "test1_copy.jpg": "hash1",
+                "test2_copy.jpg": "hash2",
+            },
+        ) == {
+            "test1_copy.jpg": "test1.jpg",
+            "test2_copy.jpg": "test2.jpg",
+        }
+
+    def test_get_matching_media_with_mixed_entries(
+        self, ankihub_db: _AnkiHubDB, next_deterministic_uuid: Callable[[], uuid.UUID]
+    ):
+        ah_did = next_deterministic_uuid()
+        ankihub_db.upsert_deck_media_infos(
+            ankihub_did=ah_did,
+            media_list=[
+                DeckMediaFactory.create(name="test1.jpg", file_content_hash="hash1"),
+                DeckMediaFactory.create(name="test2.jpg", file_content_hash=None),
+                DeckMediaFactory.create(name="test3.jpg", file_content_hash="hash3"),
+            ],
+        )
+
+        assert ankihub_db.media_names_with_matching_hashes(
+            ah_did=ah_did,
+            media_to_hash={
+                "test1_copy.jpg": "hash1",
+                "test2_copy.jpg": "hash2",
+                "test3_copy.jpg": "hash3",
+            },
+        ) == {
+            "test1_copy.jpg": "test1.jpg",
+            "test3_copy.jpg": "test3.jpg",
+        }
+
+    def test_with_none_in_media_to_hash(
+        self, ankihub_db: _AnkiHubDB, next_deterministic_uuid: Callable[[], uuid.UUID]
+    ):
+        ah_did = next_deterministic_uuid()
+        ankihub_db.upsert_deck_media_infos(
+            ankihub_did=ah_did,
+            media_list=[
+                DeckMediaFactory.create(name="test1.jpg", file_content_hash="hash1"),
+            ],
+        )
+
+        assert (
+            ankihub_db.media_names_with_matching_hashes(
+                ah_did=ah_did, media_to_hash={"test1_copy.jpg": None}
+            )
+            == {}
+        )
+
+    def test_with_none_in_db(
+        self, ankihub_db: _AnkiHubDB, next_deterministic_uuid: Callable[[], uuid.UUID]
+    ):
+        ah_did = next_deterministic_uuid()
+        ankihub_db.upsert_deck_media_infos(
+            ankihub_did=ah_did,
+            media_list=[
+                DeckMediaFactory.create(name="test1.jpg", file_content_hash=None),
+            ],
+        )
+
+        assert (
+            ankihub_db.media_names_with_matching_hashes(
+                ah_did=ah_did, media_to_hash={"test1_copy.jpg": "hash1"}
+            )
+            == {}
+        )
+
+
 class TestErrorHandling:
     def test_contains_path_to_this_addon(self):
         # Assert that the function returns True when the input string contains the
