@@ -1051,7 +1051,8 @@ class AnkiHubClient:
 
         data = response.json()
         result = {
-            flag_name: flag_data["is_active"] for flag_name, flag_data in data["flags"].items()
+            flag_name: flag_data["is_active"]
+            for flag_name, flag_data in data["flags"].items()
         }
         return result
 
