@@ -16,7 +16,7 @@ from aqt import utils
 from aqt.qt import QDialogButtonBox
 from pytest import MonkeyPatch, fixture
 from pytest_anki import AnkiSession
-from pytestqt.qtbot import QtBot
+from pytestqt.qtbot import QtBot  # type: ignore
 
 from ankihub.gui import errors
 from tests.fixtures import SetFeatureFlagState  # type: ignore
