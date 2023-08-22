@@ -1,0 +1,141 @@
+interactions:
+- request:
+    body: '{"username": "test1", "password": "asdf"}'
+    headers:
+      Accept:
+      - application/json; version=13.0
+      Content-Length:
+      - '41'
+      Content-Type:
+      - application/json
+    method: POST
+    uri: http://localhost:8000/api/login/
+  response:
+    body:
+      string: '{"expiry":"2023-09-19T12:38:38.101909Z","token":"b6207437fd4f975304058ff0f60a134ec12536b9ce75f1f6c21a60f33ce8c843"}'
+    headers:
+      Allow:
+      - POST, OPTIONS
+      Content-Language:
+      - en
+      Content-Length:
+      - '115'
+      Content-Type:
+      - application/json
+      Cross-Origin-Opener-Policy:
+      - same-origin
+      Date:
+      - Tue, 22 Aug 2023 12:38:38 GMT
+      Referrer-Policy:
+      - same-origin
+      Server:
+      - WSGIServer/0.2 CPython/3.8.16
+      Server-Timing:
+      - TimerPanel_utime;dur=469.45999999999975;desc="User CPU time", TimerPanel_stime;dur=72.78299999999993;desc="System
+        CPU time", TimerPanel_total;dur=542.2429999999997;desc="Total CPU time", TimerPanel_total_time;dur=261.17944717407227;desc="Elapsed
+        time", SQLPanel_sql_time;dur=6.162881851196289;desc="SQL 16 queries", CachePanel_total_time;dur=0;desc="Cache
+        0 Calls"
+      Set-Cookie:
+      - csrftoken=6AVbvMLpAtjxHq4piKlwkvO0oXB13KQz; expires=Tue, 20 Aug 2024 12:38:38
+        GMT; HttpOnly; Max-Age=31449600; Path=/; SameSite=Lax
+      - sessionid=nmkypsgjcq1f00vrsf4w5v45xhj3yk6u; expires=Tue, 29 Aug 2023 12:38:38
+        GMT; HttpOnly; Max-Age=604800; Path=/; SameSite=Lax
+      Vary:
+      - Accept, Cookie, Accept-Language, Origin
+      X-Content-Type-Options:
+      - nosniff
+      X-Frame-Options:
+      - DENY
+      djdt-store-id:
+      - 6daf697c03c145c88af3721997bf3c49
+    status:
+      code: 200
+      message: OK
+- request:
+    body: null
+    headers:
+      Accept:
+      - application/json; version=13.0
+      Authorization:
+      - Token b6207437fd4f975304058ff0f60a134ec12536b9ce75f1f6c21a60f33ce8c843
+      Content-Type:
+      - application/json
+    method: GET
+    uri: http://localhost:8000/api/feature-flags
+  response:
+    body:
+      string: ''
+    headers:
+      Content-Language:
+      - en
+      Content-Length:
+      - '0'
+      Content-Type:
+      - text/html; charset=utf-8
+      Cross-Origin-Opener-Policy:
+      - same-origin
+      Date:
+      - Tue, 22 Aug 2023 12:38:38 GMT
+      Location:
+      - /api/feature-flags/
+      Referrer-Policy:
+      - same-origin
+      Server:
+      - WSGIServer/0.2 CPython/3.8.16
+      Vary:
+      - Accept-Language, Origin
+      X-Content-Type-Options:
+      - nosniff
+    status:
+      code: 301
+      message: Moved Permanently
+- request:
+    body: null
+    headers:
+      Accept:
+      - application/json; version=13.0
+      Authorization:
+      - Token b6207437fd4f975304058ff0f60a134ec12536b9ce75f1f6c21a60f33ce8c843
+    method: GET
+    uri: http://localhost:8000/api/feature-flags/
+  response:
+    body:
+      string: '{"flags":{},"switches":{},"samples":{}}'
+    headers:
+      Allow:
+      - GET, HEAD, OPTIONS
+      Cache-Control:
+      - max-age=0, no-cache, no-store, must-revalidate, private
+      Content-Language:
+      - en
+      Content-Length:
+      - '39'
+      Content-Type:
+      - application/json
+      Cross-Origin-Opener-Policy:
+      - same-origin
+      Date:
+      - Tue, 22 Aug 2023 12:38:38 GMT
+      Expires:
+      - Tue, 22 Aug 2023 12:38:38 GMT
+      Referrer-Policy:
+      - same-origin
+      Server:
+      - WSGIServer/0.2 CPython/3.8.16
+      Server-Timing:
+      - TimerPanel_utime;dur=71.85300000000083;desc="User CPU time", TimerPanel_stime;dur=4.315000000000069;desc="System
+        CPU time", TimerPanel_total;dur=76.1680000000009;desc="Total CPU time", TimerPanel_total_time;dur=73.79841804504395;desc="Elapsed
+        time", SQLPanel_sql_time;dur=1.3201236724853516;desc="SQL 3 queries", CachePanel_total_time;dur=0.05507469177246094;desc="Cache
+        3 Calls"
+      Vary:
+      - Accept, Accept-Language, Cookie, Origin
+      X-Content-Type-Options:
+      - nosniff
+      X-Frame-Options:
+      - DENY
+      djdt-store-id:
+      - be0f41a7a61b41aa82b014dc239ba35f
+    status:
+      code: 200
+      message: OK
+version: 1

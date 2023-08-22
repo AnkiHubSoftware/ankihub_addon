@@ -1,3 +1,4 @@
+import dataclasses
 import gzip
 import json
 import os
@@ -756,6 +757,36 @@ class TestGetDeckUpdates:
 
 
 class TestGetDeckMediaUpdates:
+    def setup_method(self):
+        # Mimics the state of the deck media on the server.
+        # The deck media is ordered by the time of creation with the most recent one being the first.
+        self.deck_media_on_server = [
+            DeckMedia(
+                name=f"example_{i}.png",
+                file_content_hash=f"{i}0000000000000000000000000000000",
+                modified=datetime.now(tz=timezone.utc),  # will be ignored
+                referenced_on_accepted_note=False,
+                exists_on_s3=False,
+                download_enabled=True,
+            )
+            for i in reversed(range(3))
+        ]
+
+    def _assert_media_as_expected(
+        self, actual: List[DeckMedia], expected: List[DeckMedia]
+    ):
+        # Convert DeckMedia objects to dicts
+        actual_dicts = [dataclasses.asdict(media) for media in actual]
+        expected_dicts = [dataclasses.asdict(media) for media in expected]
+
+        # Remove the 'modified' field from all dictionaries
+        for a in actual_dicts:
+            a.pop("modified", None)
+        for e in expected_dicts:
+            e.pop("modified", None)
+
+        assert actual_dicts == expected_dicts
+
     @pytest.mark.vcr()
     def test_get_all_media(
         self,
@@ -769,16 +800,9 @@ class TestGetDeckMediaUpdates:
         assert len(update_chunks) == 1
         assert len(update_chunks[0].media) == 3
         deck_media_objects = update_chunks[0].media
-        assert deck_media_objects == [
-            DeckMedia(
-                name=f"example_{i}.png",
-                file_content_hash=f"{i}0000000000000000000000000000000",
-                referenced_on_accepted_note=False,
-                exists_on_s3=False,
-                download_enabled=True,
-            )
-            for i in reversed(range(3))
-        ]
+        self._assert_media_as_expected(
+            actual=deck_media_objects, expected=self.deck_media_on_server
+        )
 
     @pytest.mark.vcr()
     def test_get_media_since(
@@ -797,16 +821,11 @@ class TestGetDeckMediaUpdates:
         assert len(update_chunks) == 1
         assert len(update_chunks[0].media) == 2
         deck_media_objects = update_chunks[0].media
-        assert deck_media_objects == [
-            DeckMedia(
-                name=f"example_{i}.png",
-                file_content_hash=f"{i}0000000000000000000000000000000",
-                referenced_on_accepted_note=False,
-                exists_on_s3=False,
-                download_enabled=True,
-            )
-            for i in reversed(range(1, 3))
-        ]
+        self._assert_media_as_expected(
+            # the oldest DeckMedia is not returned
+            actual=deck_media_objects,
+            expected=self.deck_media_on_server[:-1],
+        )
 
     @pytest.mark.vcr()
     def test_pagination(
@@ -830,16 +849,9 @@ class TestGetDeckMediaUpdates:
         assert len(update_chunks) == 3
 
         deck_media_objects = [media for chunk in update_chunks for media in chunk.media]
-        assert deck_media_objects == [
-            DeckMedia(
-                name=f"example_{i}.png",
-                file_content_hash=f"{i}0000000000000000000000000000000",
-                referenced_on_accepted_note=False,
-                exists_on_s3=False,
-                download_enabled=True,
-            )
-            for i in reversed(range(3))
-        ]
+        self._assert_media_as_expected(
+            actual=deck_media_objects, expected=self.deck_media_on_server
+        )
 
 
 @pytest.mark.vcr()
@@ -1408,3 +1420,12 @@ class TestGetNoteType:
             client.get_note_type(anki_note_type_id=-1)
 
         assert cast(AnkiHubHTTPError, excinfo.value).response.status_code == 404
+
+
+@pytest.mark.vcr()
+class TestGetFeatureFlags:
+    def test_get_feature_flags(self, authorized_client_for_user_test1: AnkiHubClient):
+        client = authorized_client_for_user_test1
+        client.get_feature_flags()
+        # This test just makes sure that the method does not throw an exception
+        # Feature flags can change so we don't want to assert anything
