@@ -1039,14 +1039,8 @@ class AnkiHubClient:
         message = data["message"]
         LOGGER.debug(f"suggest_optional_tags response message: {message}")
 
-    def is_feature_flag_enabled(self, flag_name: str) -> bool:
-        return (
-            self._get_feature_flags_status()["flags"]
-            .get(flag_name, {})
-            .get("is_active", False)
-        )
-
-    def _get_feature_flags_status(self):
+    def get_feature_flags(self) -> Dict[str, bool]:
+        """Returns a dict of feature flags to their status (enabled or disabled)."""
         response = self._send_request(
             "GET",
             API.ANKIHUB,
@@ -1056,7 +1050,10 @@ class AnkiHubClient:
             raise AnkiHubHTTPError(response)
 
         data = response.json()
-        return data
+        result = {
+            flag_name: flag_data["is_active"] for flag_name, flag_data in data["flags"]
+        }
+        return result
 
     def is_media_upload_finished(self, ah_did: uuid.UUID) -> bool:
         deck_info = self.get_deck_by_id(ah_did)

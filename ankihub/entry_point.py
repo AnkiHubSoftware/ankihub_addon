@@ -9,6 +9,7 @@ from aqt.gui_hooks import profile_did_open, profile_will_close
 from . import LOGGER
 from .db import ankihub_db
 from .debug import setup as setup_debug
+from .feature_flags import setup_feature_flags
 from .gui import browser, deckbrowser, editor, progress, reviewer, taskman
 from .gui.addons import setup_addons
 from .gui.auto_sync import setup_auto_sync
@@ -67,6 +68,8 @@ def _profile_setup() -> bool:
     """Set up profile data folder, config, and AnkiHub DB for the current profile.
     Returns whether the profile setup was successful.
     """
+    setup_feature_flags()
+
     if not setup_profile_data_folder():
         return False
     LOGGER.info(f"Set up profile data folder for the current profile: {aqt.mw.pm.name}")

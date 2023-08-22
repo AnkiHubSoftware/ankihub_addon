@@ -508,7 +508,7 @@ def test_editor(
 
         note_2_ah_nid = ankihub_db.ankihub_nid_for_anki_nid(note.id)
 
-        requests_mock.post(
+        suggestion_endpoint_mock = requests_mock.post(
             f"{config.api_url}/notes/{note_2_ah_nid}/suggestion/",
             status_code=201,
             json={},
@@ -519,7 +519,7 @@ def test_editor(
 
         # this should not trigger a suggestion because the note has not been changed
         _on_suggestion_button_press(editor)
-        assert requests_mock.call_count == 0
+        assert suggestion_endpoint_mock.call_count == 0  # type: ignore
 
         # change the front of the note
         note["Front"] = "new front"
@@ -529,7 +529,7 @@ def test_editor(
         _on_suggestion_button_press(editor)
 
         # mocked requests: f"{config.api_url_base}/notes/{notes_2_ah_nid}/suggestion/"
-        assert requests_mock.call_count == 1
+        assert suggestion_endpoint_mock.call_count == 1  # type: ignore
 
 
 def test_get_note_types_in_deck(anki_session_with_addon_data: AnkiSession):
