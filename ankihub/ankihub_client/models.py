@@ -154,6 +154,11 @@ class DeckUpdateChunk(DataClassJSONMixinWithConfig):
 class DeckMedia(DataClassJSONMixinWithConfig):
     name: str
     file_content_hash: str
+    modified: datetime = dataclasses.field(
+        metadata=field_options(
+            deserialize=lambda x: datetime.strptime(x, ANKIHUB_DATETIME_FORMAT_STR)
+        ),
+    )
     referenced_on_accepted_note: bool
     exists_on_s3: bool
     download_enabled: bool
