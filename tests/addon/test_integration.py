@@ -3780,7 +3780,10 @@ class TestSuggestionsWithMedia:
         import_ah_note: ImportAHNote,
         next_deterministic_uuid: Callable[[], uuid.UUID],
         create_change_suggestion: CreateChangeSuggestion,
+        set_feature_flag_state: SetFeatureFlagState,
     ):
+        set_feature_flag_state("use_deck_media", True)
+
         with anki_session_with_addon_data.profile_loaded():
             mw = anki_session_with_addon_data.mw
 

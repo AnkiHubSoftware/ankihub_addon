@@ -24,6 +24,7 @@ from ..ankihub_client import (
     get_media_names_from_suggestions,
 )
 from ..db import ankihub_db
+from ..feature_flags import feature_flags
 from .exporting import to_note_data
 from .media_utils import find_and_replace_text_in_fields_on_all_notes
 from .utils import mdb5_file_hash
@@ -377,12 +378,13 @@ def _rename_and_upload_media_for_suggestions(
         if not exists
     }
 
-    media_names_added_to_ah_deck = _handle_media_with_matching_hashes(
-        ah_did=ankihub_did,
-        suggestions=suggestions,
-        media_names=media_names_added_to_ah_deck,
-    )
-
+    if feature_flags.use_deck_media:
+        media_names_added_to_ah_deck = _handle_media_with_matching_hashes(
+            ah_did=ankihub_did,
+            suggestions=suggestions,
+            media_names=media_names_added_to_ah_deck,
+        )
+    #
     if not media_names_added_to_ah_deck:
         # No media files added, nothing to do here. Return
         # the original suggestions object
