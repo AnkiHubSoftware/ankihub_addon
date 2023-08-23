@@ -1,6 +1,8 @@
 import copy
+import hashlib
 import re
 import time
+from pathlib import Path
 from pprint import pformat
 from textwrap import dedent
 from typing import Any, Dict, Iterable, List, Optional, Sequence, Set, Tuple
@@ -446,3 +448,11 @@ def _create_backup_anki_50() -> bool:
 def truncated_list(values: List[Any], limit: int) -> List[Any]:
     assert limit > 0
     return values[:limit] + ["..."] if len(values) > limit else values
+
+
+def mdb5_file_hash(media_path: Path) -> str:
+    """Return the md5 hash of the file content of the given media file."""
+    with media_path.open("rb") as media_file:
+        file_content_hash = hashlib.md5(media_file.read())
+    result = file_content_hash.hexdigest()
+    return result

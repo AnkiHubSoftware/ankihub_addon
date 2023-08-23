@@ -10,7 +10,18 @@ from concurrent.futures import Future
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
 from time import sleep
-from typing import Any, Callable, Dict, List, Optional, Protocol, Set, Tuple
+from typing import (
+    Any,
+    Callable,
+    Dict,
+    Iterator,
+    List,
+    Optional,
+    Protocol,
+    Set,
+    Tuple,
+    Union,
+)
 from unittest.mock import MagicMock, Mock, patch
 from zipfile import ZipFile
 
@@ -139,6 +150,7 @@ from ankihub.main.utils import (
     ANKIHUB_TEMPLATE_SNIPPET_RE,
     all_dids,
     get_note_types_in_deck,
+    mdb5_file_hash,
     note_type_contains_field,
 )
 from ankihub.settings import (
@@ -222,6 +234,7 @@ class ImportAHNote(Protocol):
         note_data: Optional[NoteInfo] = None,
         ah_nid: Optional[uuid.UUID] = None,
         mid: Optional[NotetypeId] = None,
+        ah_did: uuid.UUID = None,
     ) -> NoteInfo:
         ...
 
@@ -243,13 +256,14 @@ def import_ah_note(next_deterministic_uuid: Callable[[], uuid.UUID]) -> ImportAH
     having to worry about creating note types, decks and the import process.
     """
     # All notes created by this fixture will be created in the same deck.
-    ah_did = next_deterministic_uuid()
+    default_ah_did = next_deterministic_uuid()
     deck_name = "test"
 
     def _import_ah_note(
         note_data: Optional[NoteInfo] = None,
         ah_nid: Optional[uuid.UUID] = None,
         mid: Optional[NotetypeId] = None,
+        ah_did: uuid.UUID = default_ah_did,
     ) -> NoteInfo:
         if mid is None:
             ah_basic_note_type = create_or_get_ah_version_of_note_type(
@@ -459,6 +473,88 @@ def sync_with_ankihub(qtbot: QtBot) -> SyncWithAnkiHub:
         qtbot.wait_until(is_done)
 
     return _sync_with_ankihub
+
+
+class CreateChangeSuggestion(Protocol):
+    def __call__(self, note: Note, wait_for_media_upload: bool) -> Mock:
+        ...
+
+
+@pytest.fixture
+def create_change_suggestion(
+    qtbot: QtBot, mock_function: MockFunction, mock_client_media_upload: Mocker
+):
+    """Create a change suggestion for a note and wait for the background thread that uploads media to finish.
+    Returns the mock for the create_change_note_suggestion method. It can be used to get information
+    about the suggestion that was passed to the client."""
+
+    create_change_suggestion_mock = mock_function(
+        AnkiHubClient,
+        "create_change_note_suggestion",
+    )
+
+    def create_change_suggestion_inner(note: Note, wait_for_media_upload: bool):
+
+        suggest_note_update(
+            note=note,
+            change_type=SuggestionType.NEW_CONTENT,
+            comment="test",
+            media_upload_cb=media_sync.media_sync.start_media_upload,
+        )
+
+        if wait_for_media_upload:
+            # Wait for the background thread that uploads the media to finish.
+            def assert_s3_upload():
+                assert mock_client_media_upload.called_once
+
+            qtbot.wait_until(assert_s3_upload)
+
+        return create_change_suggestion_mock
+
+    return create_change_suggestion_inner
+
+
+class CreateNewNoteSuggestion(Protocol):
+    def __call__(
+        self, note: Note, ah_did: uuid.UUID, wait_for_media_upload: bool
+    ) -> Mock:
+        ...
+
+
+@pytest.fixture
+def create_new_note_suggestion(
+    qtbot: QtBot, mock_function: MockFunction, mock_client_media_upload: Mocker
+):
+    """Create a new note suggestion for a note and wait for the background thread that uploads media to finish.
+    Returns the mock for the create_new_note_suggestion_mock method. It can be used to get information
+    about the suggestion that was passed to the client."""
+
+    create_new_note_suggestion_mock = mock_function(
+        AnkiHubClient,
+        "create_new_note_suggestion",
+    )
+
+    def create_new_note_suggestion_inner(
+        note: Note, ah_did: uuid.UUID, wait_for_media_upload: bool
+    ):
+
+        suggest_new_note(
+            note=note,
+            comment="test",
+            ankihub_did=ah_did,
+            media_upload_cb=media_sync.media_sync.start_media_upload,
+        )
+
+        if wait_for_media_upload:
+            # Wait for the background thread that uploads the media to finish.
+            def assert_s3_upload():
+                assert mock_client_media_upload.called_once
+
+            qtbot.wait_until(assert_s3_upload)
+
+        return create_new_note_suggestion_mock
+
+    return create_new_note_suggestion_inner
 
 
 def test_entry_point(anki_session_with_addon_data: AnkiSession, qtbot: QtBot):
@@ -3481,7 +3577,7 @@ def test_media_update_on_deck_update(
 def mock_client_media_upload(
     monkeypatch: MonkeyPatch,
     requests_mock: Mocker,
-):
+) -> Iterator[Mocker]:
     fake_presigned_url = AnkiHubClient().s3_bucket_url + "/fake_key"
     s3_upload_request_mock = requests_mock.post(
         fake_presigned_url, json={"success": True}, status_code=204
@@ -3513,11 +3609,17 @@ def mock_client_media_upload(
     os_remove_mock = MagicMock()
     monkeypatch.setattr(os, "remove", os_remove_mock)
 
-    monkeypatch.setattr(
-        "anki.media.MediaManager.dir", lambda *args, **kwargs: TEST_DATA_PATH
-    )
+    # Create a temporary media folder and copy the test media files to it.
+    # Patch the media folder path to point to the temporary folder.
+    with tempfile.TemporaryDirectory() as tmp_dir:
+        for file in (TEST_DATA_PATH / "media").glob("*"):
+            shutil.copy(file, Path(tmp_dir) / file.name)
 
-    yield s3_upload_request_mock
+        monkeypatch.setattr(
+            "anki.media.MediaManager.dir", lambda *args, **kwargs: tmp_dir
+        )
+
+        yield s3_upload_request_mock  # type: ignore
 
 
 @pytest.mark.qt_no_exception_capture
@@ -3525,121 +3627,86 @@ class TestSuggestionsWithMedia:
     def test_suggest_note_update_with_media(
         self,
         anki_session_with_addon_data: AnkiSession,
-        mock_client_media_upload: Tuple[AnkiQt, Mock],
+        mock_client_media_upload: Mocker,
         import_ah_note: ImportAHNote,
-        monkeypatch: MonkeyPatch,
-        requests_mock: Mocker,
-        qtbot: QtBot,
+        create_change_suggestion: CreateChangeSuggestion,
     ):
-        s3_upload_request_mock = mock_client_media_upload
-
         with anki_session_with_addon_data.profile_loaded():
             mw = anki_session_with_addon_data.mw
 
             note_data = import_ah_note()
-            ah_nid = ankihub_db.ankihub_nid_for_anki_nid(NoteId(note_data.anki_nid))
             note = mw.col.get_note(NoteId(note_data.anki_nid))
 
-            with tempfile.NamedTemporaryFile(dir=TEST_DATA_PATH, suffix=".png") as f:
-                # add file to media folder
-                file_name_in_col = mw.col.media.add_file(f.name)
-                file_path_in_col = Path(mw.col.media.dir()) / file_name_in_col
+            # Add media reference to a note
+            media_file_name = "testfile_1.jpeg"
+            note["Front"] = f'<img src="{media_file_name}">'
+            note.flush()
 
-                # add file reference to a note
-                file_name_in_col = Path(file_path_in_col.name).name
-                note["Front"] = f'<img src="{file_name_in_col}">'
-                note.flush()
+            # Create a suggestion for the note
+            create_change_suggestion_mock = create_change_suggestion(
+                note, wait_for_media_upload=True
+            )
 
-                suggestion_request_mock = requests_mock.post(
-                    f"{config.api_url}/notes/{ah_nid}/suggestion/", status_code=201
-                )
+            # Assert that the suggestion was created with the correct media file name
+            expected_file_name = self._hashed_file_name(media_file_name)
+            self._assert_media_names_on_note_and_suggestion_as_expected(
+                note=note,
+                suggestion_request_mock=create_change_suggestion_mock,
+                expected_media_name=expected_file_name,
+            )
+            self._assert_media_name_in_zip_as_expected(
+                upload_request_mock=mock_client_media_upload,  # type: ignore
+                expected_media_name=expected_file_name,
+            )
 
-                # create a suggestion for the note
-                suggest_note_update(
-                    note=note,
-                    change_type=SuggestionType.NEW_CONTENT,
-                    comment="test",
-                    media_upload_cb=media_sync.media_sync.start_media_upload,
-                )
-
-                # Wait for the background thread that uploads the media to finish.
-                def assert_s3_upload():
-                    assert s3_upload_request_mock.called_once
-
-                qtbot.wait_until(assert_s3_upload)
-
-                assert suggestion_request_mock.called_once  # type: ignore
-
-                self._assert_media_names_as_expected(
-                    note=note,
-                    upload_request_mock=s3_upload_request_mock,  # type: ignore
-                    suggestion_request_mock=suggestion_request_mock,  # type: ignore
-                    monkeypatch=monkeypatch,
-                )
+    def _hashed_file_name(self, file_name: str) -> str:
+        """Return the file name the media file should have when renamed using its hash."""
+        media_dir = Path(aqt.mw.col.media.dir())
+        media_file_path = media_dir / file_name
+        result = mdb5_file_hash(media_file_path) + media_file_path.suffix
+        return result
 
     def test_suggest_new_note_with_media(
         self,
         anki_session_with_addon_data: AnkiSession,
-        mock_client_media_upload: Tuple[AnkiQt, Mock],
+        mock_client_media_upload: Mocker,
         ankihub_basic_note_type: NotetypeDict,
-        requests_mock: Mocker,
-        monkeypatch: MonkeyPatch,
-        qtbot: QtBot,
+        create_new_note_suggestion: CreateNewNoteSuggestion,
     ):
-        s3_upload_request_mock = mock_client_media_upload
-
         with anki_session_with_addon_data.profile_loaded():
             mw = anki_session_with_addon_data.mw
 
-            with tempfile.NamedTemporaryFile(dir=TEST_DATA_PATH, suffix=".png") as f:
-                # add file to media folder
-                file_name_in_col = mw.col.media.add_file(f.name)
-                file_path_in_col = Path(mw.col.media.dir()) / file_name_in_col
+            # Add media reference to a note
+            media_file_name = "testfile_1.jpeg"
+            note = mw.col.new_note(ankihub_basic_note_type)
+            note["Front"] = f'<img src="{media_file_name}">'
+            mw.col.add_note(note, DeckId(1))
 
-                # add file reference to a note
-                file_name_in_col = Path(file_path_in_col.name).name
-                note = mw.col.new_note(ankihub_basic_note_type)
-                note["Front"] = f'<img src="{file_name_in_col}">'
-                mw.col.add_note(note, DeckId(1))
+            # Create a suggestion for the note
+            ah_did = ankihub_db.ankihub_did_for_anki_nid(note.id)
+            create_new_note_suggestion_mock = create_new_note_suggestion(
+                note=note, ah_did=ah_did, wait_for_media_upload=True
+            )
 
-                ah_did = ankihub_db.ankihub_did_for_anki_nid(note.id)
-                suggestion_request_mock = requests_mock.post(
-                    f"{config.api_url}/decks/{ah_did}/note-suggestion/",
-                    status_code=201,
-                )
+            # Assert that the suggestion was created with the correct media file name
+            expected_file_name = self._hashed_file_name(media_file_name)
+            self._assert_media_names_on_note_and_suggestion_as_expected(
+                note=note,
+                suggestion_request_mock=create_new_note_suggestion_mock,
+                expected_media_name=expected_file_name,
+            )
+            self._assert_media_name_in_zip_as_expected(
+                upload_request_mock=mock_client_media_upload,  # type: ignore
+                expected_media_name=expected_file_name,
+            )
 
-                suggest_new_note(
-                    note=note,
-                    ankihub_did=ah_did,
-                    comment="test",
-                    media_upload_cb=media_sync.media_sync.start_media_upload,
-                )
-
-                # Wait for the background thread that uploads the media to finish.
-                def assert_s3_upload():
-                    assert s3_upload_request_mock.called_once
-
-                qtbot.wait_until(assert_s3_upload)
-
-                assert suggestion_request_mock.called_once  # type: ignore
-
-                self._assert_media_names_as_expected(
-                    note=note,
-                    upload_request_mock=s3_upload_request_mock,  # type: ignore
-                    suggestion_request_mock=suggestion_request_mock,  # type: ignore
-                    monkeypatch=monkeypatch,
-                )
-
-    def test_should_ignore_media_file_names_which_already_exist_in_deck(
+    def test_do_not_upload_files_which_already_exist_in_deck(
         self,
         anki_session_with_addon_data: AnkiSession,
-        mock_client_media_upload: Tuple[AnkiQt, Mock],
+        mock_client_media_upload: Mocker,
         import_ah_note: ImportAHNote,
-        requests_mock: Mocker,
-        qtbot: QtBot,
+        create_change_suggestion: CreateChangeSuggestion,
     ):
-        s3_upload_request_mock = mock_client_media_upload
-
         with anki_session_with_addon_data.profile_loaded():
             mw = anki_session_with_addon_data.mw
 
@@ -3656,127 +3723,99 @@ class TestSuggestionsWithMedia:
                 )
             )
 
+            # Create a note with a reference to the same media file
             note_data = import_ah_note()
-            ah_nid = ankihub_db.ankihub_nid_for_anki_nid(NoteId(note_data.anki_nid))
             note = mw.col.get_note(NoteId(note_data.anki_nid))
+            note["Front"] = f"[sound:{existing_media_name}]"
+            note.flush()
 
-            suggestion_request_mock = requests_mock.post(
-                f"{config.api_url}/notes/{ah_nid}/suggestion/", status_code=201
+            # Create a suggestion for the note
+            create_change_suggestion_mock = create_change_suggestion(
+                note=note, wait_for_media_upload=False
             )
 
-            with tempfile.NamedTemporaryFile(dir=TEST_DATA_PATH, suffix=".png") as f:
-                # add file to media folder
-                file_name_in_col = mw.col.media.add_file(f.name)
-                file_path_in_col = Path(mw.col.media.dir()) / file_name_in_col
+            # Assert that the suggestion was created
+            assert create_change_suggestion_mock.called_once
 
-                # add file reference to a note
-                file_name_in_col = Path(file_path_in_col.name).name
-                note["Front"] = f"[sound:{existing_media_name}]"
-                note.flush()
+            # Assert the file was not uploaded to S3
+            assert mock_client_media_upload.call_count == 0
 
-                suggestion_request_mock = requests_mock.post(
-                    f"{config.api_url}/notes/{ah_nid}/suggestion/", status_code=201
-                )
-
-                # create a suggestion for the note
-                suggest_note_update(
-                    note=note,
-                    change_type=SuggestionType.NEW_CONTENT,
-                    comment="test",
-                    media_upload_cb=media_sync.media_sync.start_media_upload,
-                )
-
-                qtbot.wait(300)
-
-                assert suggestion_request_mock.called_once  # type: ignore
-
-                # Assert that the media file was NOT uploaded
-                assert len(s3_upload_request_mock.request_history) == 0  # type: ignore
-
-    def test_should_ignore_media_file_names_not_present_in_local_collection(
+    def test_with_file_not_existing_in_collection(
         self,
         anki_session_with_addon_data: AnkiSession,
-        mock_client_media_upload: Tuple[AnkiQt, Mock],
+        mock_client_media_upload: Mocker,
         import_ah_note: ImportAHNote,
-        requests_mock: Mocker,
-        qtbot: QtBot,
+        create_change_suggestion: CreateChangeSuggestion,
     ):
-        s3_upload_request_mock = mock_client_media_upload
-
         with anki_session_with_addon_data.profile_loaded():
             mw = anki_session_with_addon_data.mw
 
             note_data = import_ah_note()
             note = mw.col.get_note(NoteId(note_data.anki_nid))
 
-            # add reference to a media file that does not exist locally to the note
+            # Add reference to a media file that does not exist locally to the note
             note_content = '<img src="this_file_is_not_in_the_local_collection.png">'
             note["Front"] = note_content
             note.flush()
 
-            # create a suggestion for the note
-            ah_nid = ankihub_db.ankihub_nid_for_anki_nid(note.id)
-            suggestion_request_mock = requests_mock.post(
-                f"{config.api_url}/notes/{ah_nid}/suggestion/", status_code=201
+            # Create a suggestion for the note
+            create_change_suggestion_mock = create_change_suggestion(
+                note=note, wait_for_media_upload=False
             )
 
-            suggest_note_update(
-                note=note,
-                change_type=SuggestionType.NEW_CONTENT,
-                comment="test",
-                media_upload_cb=media_sync.media_sync.start_media_upload,
-            )
+            # Assert that the suggestion was created
+            assert create_change_suggestion_mock.called_once
 
-            qtbot.wait(300)
-
-            # assert that the suggestion is made
-            assert suggestion_request_mock.called_once  # type: ignore
-
-            # assert that the media file was NOT uploaded
-            assert len(s3_upload_request_mock.request_history) == 0  # type: ignore
-
-            note.load()
+            # Assert the file was not uploaded to S3
+            assert mock_client_media_upload.call_count == 0
 
             # Assert note content is unchanged
-            assert note_content == note["Front"]
+            note.load()
+            assert note["Front"] == note_content
 
-    def _assert_media_names_as_expected(
+    def _assert_media_names_on_note_and_suggestion_as_expected(
         self,
         note: Note,
-        upload_request_mock: Mocker,
-        suggestion_request_mock: Mocker,
-        monkeypatch,
+        suggestion_request_mock: Mock,
+        expected_media_name: str,
     ):
-        # Assert that the media names in the suggestion, the note and the uploaded file are as expected.
+        # Assert that the media name in the note is as expected.
         note.load()
         media_name_in_note = list(local_media_names_from_html(note["Front"]))[0]
+        assert media_name_in_note == expected_media_name
+
+        # Assert that the media name in the suggestion is as expected.
+        suggestion: Union[ChangeNoteSuggestion, NewNoteSuggestion] = None
+        if "change_note_suggestion" in suggestion_request_mock.call_args.kwargs:
+            suggestion = suggestion_request_mock.call_args.kwargs[
+                "change_note_suggestion"
+            ]
+        else:
+            suggestion = suggestion_request_mock.call_args.kwargs["new_note_suggestion"]
+
+        first_field_value = suggestion.fields[0].value
+        media_name_in_suggestion = list(local_media_names_from_html(first_field_value))[
+            0
+        ]
+        assert media_name_in_suggestion == expected_media_name
+
+    def _assert_media_name_in_zip_as_expected(
+        self,
+        upload_request_mock: Mocker,
+        expected_media_name: str,
+    ) -> None:
+        # Get the name of the uploaded media file.
         zipfile_name = re.findall(
             r'filename="(.*?)"', str(upload_request_mock.last_request.body)
         )[0]
 
-        path_to_created_zip_file: Path = TEST_DATA_PATH / zipfile_name
+        media_dir = Path(aqt.mw.col.media.dir())
+        path_to_created_zip_file: Path = media_dir / zipfile_name
         with ZipFile(path_to_created_zip_file, "r") as zfile:
             namelist = zfile.namelist()
             name_of_uploaded_media = namelist[0]
 
-        suggestion_dict = suggestion_request_mock.last_request.json()  # type: ignore
-        first_field_value = suggestion_dict["fields"][0]["value"]
-        media_name_in_suggestion = list(local_media_names_from_html(first_field_value))[
-            0
-        ]
-
-        # The expected_img_name will be the same on each test run because the file is empty and thus
-        # the hash will be the same each time.
-        expected_media_name = "d41d8cd98f00b204e9800998ecf8427e.png"
-        assert media_name_in_suggestion == expected_media_name
-        assert media_name_in_note == expected_media_name
         assert name_of_uploaded_media == expected_media_name
-
-        # Remove the zipped file and the media file at the end of the test
-        monkeypatch.undo()
-        os.remove(path_to_created_zip_file)
-        os.remove(TEST_DATA_PATH / "d41d8cd98f00b204e9800998ecf8427e.png")
-        assert path_to_created_zip_file.is_file() is False
 
 
 class TestAddonUpdate:

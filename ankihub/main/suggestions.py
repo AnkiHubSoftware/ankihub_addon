@@ -96,7 +96,9 @@ def suggest_new_note(
     )
 
     client = AnkiHubClient()
-    client.create_new_note_suggestion(suggestion, auto_accept=auto_accept)
+    client.create_new_note_suggestion(
+        new_note_suggestion=suggestion, auto_accept=auto_accept
+    )
 
 
 @dataclass
