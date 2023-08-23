@@ -34,6 +34,7 @@ from pytest_anki import AnkiSession
 from pytestqt.qtbot import QtBot  # type: ignore
 from requests_mock import Mocker
 
+from ankihub.ankihub_client.models import DeckMediaUpdateChunk
 from ankihub.gui import deckbrowser
 from ankihub.gui.browser.browser import (
     ModifiedAfterSyncSearchNode,
@@ -44,8 +45,12 @@ from ankihub.gui.browser.browser import (
     _on_reset_optional_tags_action,
 )
 
-from ..factories import DeckFactory, NoteInfoFactory
-from ..fixtures import MockFunctionProtocol, create_or_get_ah_version_of_note_type
+from ..factories import DeckFactory, DeckMediaFactory, NoteInfoFactory
+from ..fixtures import (
+    MockFunction,
+    SetFeatureFlagState,
+    create_or_get_ah_version_of_note_type,
+)
 from .conftest import TEST_PROFILE_ID
 
 # workaround for vscode test discovery not using pytest.ini which sets this env var
@@ -722,7 +727,7 @@ class TestCheckAndInstallNewDeckSubscriptions:
         self,
         anki_session_with_addon_data: AnkiSession,
         qtbot: QtBot,
-        mock_function: MockFunctionProtocol,
+        mock_function: MockFunction,
     ):
         anki_session = anki_session_with_addon_data
         with anki_session.profile_loaded():
@@ -763,7 +768,7 @@ class TestCheckAndInstallNewDeckSubscriptions:
         self,
         anki_session_with_addon_data: AnkiSession,
         qtbot: QtBot,
-        mock_function: MockFunctionProtocol,
+        mock_function: MockFunction,
     ):
         anki_session = anki_session_with_addon_data
         with anki_session.profile_loaded():
@@ -813,7 +818,7 @@ class TestCheckAndInstallNewDeckSubscriptions:
         self,
         anki_session_with_addon_data: AnkiSession,
         qtbot: QtBot,
-        mock_function: MockFunctionProtocol,
+        mock_function: MockFunction,
     ):
         anki_session = anki_session_with_addon_data
         with anki_session.profile_loaded():
@@ -3002,6 +3007,67 @@ class TestDeckUpdater:
                 latest_update=latest_update,
             )
 
+    def test_update_deck_media(
+        self,
+        anki_session_with_addon_data: AnkiSession,
+        install_sample_ah_deck: InstallSampleAHDeck,
+        mock_ankihub_sync_dependencies: None,
+        set_feature_flag_state: SetFeatureFlagState,
+        mock_function: MockFunction,
+    ):
+        # Enable the use_deck_media feature flag
+        set_feature_flag_state("use_deck_media", True)
+
+        with anki_session_with_addon_data.profile_loaded():
+
+            # Install a deck to be updated
+            _, ah_did = install_sample_ah_deck()
+
+            # Mock client to return a deck media update
+            latest_media_update = datetime.now()
+            deck_media = DeckMediaFactory.create(
+                name="test.png",
+                modified=latest_media_update,
+                referenced_on_accepted_note=True,
+                exists_on_s3=True,
+                download_enabled=True,
+            )
+            get_deck_media_updates_mock = mock_function(
+                AnkiHubClient,
+                "get_deck_media_updates",
+                return_value=[
+                    DeckMediaUpdateChunk(
+                        media=[deck_media],
+                    )
+                ],
+            )
+
+            # Update the deck
+            deck_updater = _AnkiHubDeckUpdater()
+            deck_updater.update_decks_and_media(
+                ah_dids=[ah_did], start_media_sync=False
+            )
+
+            # Assert the client method was called with the correct arguments
+            get_deck_media_updates_mock.assert_called_once_with(
+                ah_did,
+                since=None,
+            )
+
+            # Assert that the deck media was added to the database
+            assert ankihub_db.downloadable_media_names_for_ankihub_deck(
+                ah_did, media_disabled_fields={}
+            ) == {deck_media.name}
+            assert ankihub_db.media_names_exist_for_ankihub_deck(
+                ah_did=ah_did, media_names={deck_media.name}
+            ) == {deck_media.name: True}
+
+            # Assert that the latest media update time was updated in the config
+            assert (
+                config.deck_config(ankihub_did=ah_did).latest_media_update
+                == latest_media_update
+            )
+
 
 @pytest.mark.parametrize(
     "subscribed_to_deck",
@@ -3961,7 +4027,7 @@ def test_delete_ankihub_private_config_on_deckBrowser__delete_option(
     anki_session_with_addon_data: AnkiSession,
     install_sample_ah_deck: InstallSampleAHDeck,
     qtbot: QtBot,
-    mock_function: MockFunctionProtocol,
+    mock_function: MockFunction,
 ):
     entry_point.run()
 
@@ -4013,7 +4079,7 @@ def test_not_delete_ankihub_private_config_on_deckBrowser__delete_option(
     anki_session_with_addon_data: AnkiSession,
     install_sample_ah_deck: InstallSampleAHDeck,
     qtbot: QtBot,
-    mock_function: MockFunctionProtocol,
+    mock_function: MockFunction,
 ):
     entry_point.run()
 

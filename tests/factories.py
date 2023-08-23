@@ -11,7 +11,7 @@ import factory
 os.environ["SKIP_INIT"] = "1"
 
 from ankihub.ankihub_client import Deck, Field, NoteInfo
-from ankihub.ankihub_client.models import UserDeckRelation
+from ankihub.ankihub_client.models import DeckMedia, UserDeckRelation
 
 T = TypeVar("T")
 
@@ -52,3 +52,17 @@ class DeckFactory(BaseFactory[Deck]):
     csv_notes_filename = "test.csv"
     media_upload_finished = False
     user_relation = UserDeckRelation.SUBSCRIBER
+
+
+class DeckMediaFactory(BaseFactory[DeckMedia]):
+    class Meta:
+        model = DeckMedia
+
+    name: str = factory.LazyFunction(lambda: uuid.uuid4().hex)  # type: ignore
+    file_content_hash: str = "test hash"
+    modified: datetime.datetime = factory.LazyFunction(  # type: ignore
+        lambda: datetime.datetime.now(tz=timezone.utc)
+    )
+    referenced_on_accepted_note: bool = False
+    exists_on_s3: bool = False
+    download_enabled: bool = True

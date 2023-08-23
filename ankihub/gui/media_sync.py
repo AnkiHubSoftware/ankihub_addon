@@ -121,7 +121,7 @@ class _AnkiHubMediaSync:
     def _missing_media_for_ah_deck(
         self, ah_did: uuid.UUID, media_disabled_fields: Dict[int, List[str]]
     ) -> List[str]:
-        media_names = ankihub_db.media_names_for_ankihub_deck(
+        media_names = ankihub_db.downloadable_media_names_for_ankihub_deck(
             ah_did, media_disabled_fields=media_disabled_fields
         )
         media_dir_path = Path(aqt.mw.col.media.dir())
