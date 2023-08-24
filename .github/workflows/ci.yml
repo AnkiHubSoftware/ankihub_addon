@@ -1,7 +1,6 @@
 name: tests
 env:
   COMPOSE_DOCKER_CLI_BUILD: 1
-  COMPOSE_FILE: ${{ github.workspace }}/ankihub_web/local.yml
 
 on:
   push:
@@ -76,27 +75,22 @@ jobs:
       - name: Set up AnkiHub env
         run: |
           mv ${{ github.workspace }}/ankihub_web/.env.dev ${{ github.workspace }}/ankihub_web/.env
-          echo DEPLOYMENT_ENVIRONMENT=local >> ${{ github.workspace }}/ankihub_web/.env
 
-      - run: docker-compose pull
-      - run: echo "WEEK=$(date +%U)" >> $GITHUB_ENV
-      - uses: satackey/action-docker-layer-caching@v0.0.11
-        continue-on-error: true
-        with:
-          key: ${{ github.workflow }}-${{ env.WEEK }}-{hash}
-          restore-keys: |
-            ${{ github.workflow }}-${{ env.WEEK }}-
-      - run: |
-          docker-compose build
-          docker-compose run --rm django \
-                python manage.py makemigrations && \
-                django bash release.sh && \
-                django python manage.py print_settings
-          docker-compose up -d
+
+      - uses: taiki-e/install-action@just
+
+      - name: Setup AnkiHub
+        working-directory: ${{ github.workspace }}/ankihub_web
+        run: |
+          just pull-all-images
+          docker compose run --rm django bash release.sh
+          just up
           until $(curl --output /dev/null --silent --head --fail http://localhost:8000); do
-              printf '.'
-              sleep 5
+            printf '.'
+            sleep 1
           done
+
+      - run: echo "WEEK=$(date +%U)" >> $GITHUB_ENV
 
       - name: Run pytest with coverage
         run: |
