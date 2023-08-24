@@ -82,10 +82,6 @@ jobs:
           just pull-all-images
           docker compose run --rm django bash release.sh
           just up
-          until $(curl --output /dev/null --silent --head --fail http://localhost:8000); do
-              printf '.'
-              sleep 1
-          done
 
       - run: echo "WEEK=$(date +%U)" >> $GITHUB_ENV
 
