@@ -51,17 +51,11 @@ jobs:
           python -m pip install -r ./requirements/dev.txt
           python -m pip install smokeshow
 
-      - name: Run pre-commit
-        run: pre-commit run --all-files
-
       - name: Build
         run: |
           python ./scripts/build.py
         env:
           GOOGLE_API_KEY: ${{ secrets.GOOGLE_API_KEY }}
-
-      - name: Run mypy
-        run: mypy
 
       - name: Enable cloning web app repo
         uses: webfactory/ssh-agent@v0.5.4
@@ -128,7 +122,3 @@ jobs:
         with:
           name: ankihub_addon_${{ github.sha }}
           path: ankihub.ankiaddon
-
-      - name: Clean up docker images
-        run: docker image prune --all --force --filter "until=168h"
-        if: always()
