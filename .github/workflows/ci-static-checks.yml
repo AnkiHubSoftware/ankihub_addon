@@ -34,13 +34,11 @@ jobs:
             ${{ runner.os }}-pip-
 
       - name: Install deps
-        if: ${{ steps.filter.outputs.py == 'true' }}
         run: |
           python -m pip install --upgrade pip
           python -m pip install pre-commit mypy flake8
 
       - name: Run pre-commit
-        if: ${{ steps.filter.outputs.py == 'true' }}
         run: pre-commit run --all
 
       - name: Run mypy
