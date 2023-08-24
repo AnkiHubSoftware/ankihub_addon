@@ -112,7 +112,7 @@ pytest tests/addon --performance
 
 ##### Only performance tests
 ```
-pytest tests/addon -k performance
+pytest tests/addon --peformance -k performance
 ```
 
 #### Type checking
