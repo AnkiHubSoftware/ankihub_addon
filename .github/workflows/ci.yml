@@ -84,6 +84,12 @@ jobs:
           docker compose run --rm django bash release.sh
           docker compose up -d
 
+      - name: Wait a bit for AnkiHub to start
+        run: sleep 10
+
+      - name: Print Django Logs
+        run: docker compose logs django
+
       - name: Wait for AnkiHub to start
         run: |
           until $(curl --output /dev/null --silent --head --fail http://localhost:8000); do
