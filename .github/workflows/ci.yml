@@ -84,7 +84,6 @@ jobs:
           docker compose run --rm django bash release.sh
           just up
 
-      - run: echo "WEEK=$(date +%U)" >> $GITHUB_ENV
 
       - name: Run pytest with coverage
         run: |
