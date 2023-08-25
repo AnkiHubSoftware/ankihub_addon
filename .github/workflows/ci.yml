@@ -116,3 +116,9 @@ jobs:
         with:
           name: ankihub_addon_${{ github.sha }}
           path: ankihub.ankiaddon
+
+      - name: Run pre-commit
+        run: pre-commit run --all
+
+      - name: Run mypy
+        run: mypy
