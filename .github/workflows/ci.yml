@@ -74,7 +74,6 @@ jobs:
         run: |
           mv ${{ github.workspace }}/ankihub_web/.env.dev ${{ github.workspace }}/ankihub_web/.env
 
-
       - uses: taiki-e/install-action@just
 
       - name: Setup AnkiHub
