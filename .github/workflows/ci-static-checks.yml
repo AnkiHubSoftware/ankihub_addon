@@ -38,6 +38,12 @@ jobs:
           python -m pip install --upgrade pip
           python -m pip install pre-commit mypy flake8
 
+      - name: Build
+        run: |
+          python ./scripts/build.py
+        env:
+          GOOGLE_API_KEY: ${{ secrets.GOOGLE_API_KEY }}
+
       - name: Run pre-commit
         run: pre-commit run --all
 
