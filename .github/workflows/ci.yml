@@ -84,6 +84,13 @@ jobs:
           docker compose run --rm django bash release.sh
           just up
 
+      - name: Wait for AnkiHub to start
+        run: |
+          until $(curl --output /dev/null --silent --head --fail http://localhost:8000); do
+              printf '.'
+              sleep 5
+          done
+
       - run: echo "WEEK=$(date +%U)" >> $GITHUB_ENV
 
       - name: Run pytest with coverage
