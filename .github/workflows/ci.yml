@@ -82,7 +82,7 @@ jobs:
         run: |
           just pull-all-images
           docker compose run --rm django bash release.sh
-          just up
+          docker compose up -d
 
       - name: Wait for AnkiHub to start
         run: |
