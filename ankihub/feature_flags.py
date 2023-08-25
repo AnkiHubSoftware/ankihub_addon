@@ -2,7 +2,7 @@
 from dataclasses import dataclass, fields
 
 from . import LOGGER
-from .addon_ankihub_client import AnkiHubClient
+from .addon_ankihub_client import AddonAnkiHubClient as AnkiHubClient
 from .ankihub_client import AnkiHubRequestException
 
 
