@@ -154,7 +154,9 @@ class _AnkiHubMediaSync:
             ankihub_db.upsert_deck_media_infos(
                 ankihub_did=ankihub_did, media_list=media_list
             )
-            config.save_latest_deck_media_update(ankihub_did, latest_update)
+            config.save_latest_deck_media_update(
+                ankihub_did, latest_media_update=latest_update
+            )
         else:
             LOGGER.info(f"No new media updates for {ankihub_did=}")
 
