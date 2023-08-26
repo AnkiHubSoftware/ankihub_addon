@@ -10,9 +10,7 @@ from aqt.utils import showInfo, tooltip
 from .. import LOGGER
 from ..addon_ankihub_client import AddonAnkiHubClient as AnkiHubClient
 from ..ankihub_client import AnkiHubHTTPError, DeckExtension
-from ..ankihub_client.models import DeckMedia
 from ..db import ankihub_db
-from ..feature_flags import feature_flags
 from ..main.importing import AnkiHubImporter, AnkiHubImportResult
 from ..main.note_types import fetch_note_types_based_on_notes
 from ..main.utils import create_backup
@@ -84,11 +82,6 @@ class _AnkiHubDeckUpdater:
         if not result:
             return False
 
-        if feature_flags.use_deck_media:
-            result = self._update_deck_media(ankihub_did)
-            if not result:
-                return False
-
         result = self._update_deck_extensions(ankihub_did)
         return result
 
@@ -139,39 +132,6 @@ class _AnkiHubDeckUpdater:
             config.save_latest_deck_update(ankihub_did, latest_update)
         else:
             LOGGER.info(f"No new updates for {ankihub_did=}")
-        return True
-
-    def _update_deck_media(self, ankihub_did: uuid.UUID) -> bool:
-        """Fetch deck media updates from AnkiHub and update the database.
-        Returns True if the action was successful, False if the user cancelled it."""
-
-        client = AnkiHubClient()
-        media_list: List[DeckMedia] = []
-        deck_config = config.deck_config(ankihub_did)
-        for chunk in client.get_deck_media_updates(
-            ankihub_did,
-            since=deck_config.latest_media_update,
-        ):
-            if aqt.mw.progress.want_cancel():
-                LOGGER.info("User cancelled media update.")
-                return False
-
-            if not chunk.media:
-                continue
-
-            media_list += chunk.media
-
-        if media_list:
-            ankihub_db.upsert_deck_media_infos(
-                ankihub_did=ankihub_did, media_list=media_list
-            )
-
-            # the deck media objects are sorted by their modified date in descending order,
-            # so we can take the timestamp of the first one
-            latest_media_update = media_list[0].modified
-            config.save_latest_deck_media_update(ankihub_did, latest_media_update)
-        else:
-            LOGGER.info(f"No new media updates for {ankihub_did=}")
         return True
 
     def _update_deck_extensions(self, ankihub_did: uuid.UUID) -> bool:
