@@ -167,6 +167,11 @@ class DeckMedia(DataClassJSONMixinWithConfig):
 @dataclass
 class DeckMediaUpdateChunk(DataClassJSONMixinWithConfig):
     media: List[DeckMedia]
+    latest_update: Optional[datetime] = dataclasses.field(
+        metadata=field_options(
+            deserialize=lambda x: datetime.strptime(x, ANKIHUB_DATETIME_FORMAT_STR)
+        )
+    )
 
 
 @dataclass

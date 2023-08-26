@@ -1,5 +1,6 @@
 import uuid
 from concurrent.futures import Future
+from datetime import datetime
 from functools import cached_property
 from pathlib import Path
 from typing import Callable, Dict, Iterable, List, Optional, Set
@@ -134,6 +135,7 @@ class _AnkiHubMediaSync:
         """Fetch deck media updates from AnkiHub and update the database and the config."""
         media_list: List[DeckMedia] = []
         deck_config = config.deck_config(ankihub_did)
+        latest_update: Optional[datetime] = None
         for chunk in self._client.get_deck_media_updates(
             ankihub_did,
             since=deck_config.latest_media_update,
@@ -142,16 +144,17 @@ class _AnkiHubMediaSync:
                 continue
 
             media_list += chunk.media
+            latest_update = (
+                max(chunk.latest_update, latest_update)
+                if latest_update
+                else chunk.latest_update
+            )
 
         if media_list:
             ankihub_db.upsert_deck_media_infos(
                 ankihub_did=ankihub_did, media_list=media_list
             )
-
-            # The DeckMedia objects are sorted by their modified date in descending order,
-            # so we can take the timestamp of the first one
-            latest_media_update = media_list[0].modified
-            config.save_latest_deck_media_update(ankihub_did, latest_media_update)
+            config.save_latest_deck_media_update(ankihub_did, latest_update)
         else:
             LOGGER.info(f"No new media updates for {ankihub_did=}")
 
