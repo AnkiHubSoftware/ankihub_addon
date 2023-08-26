@@ -3558,6 +3558,41 @@ class TestMediaSyncMediaDownload:
                 == latest_media_update
             )
 
+    def test_download_media_with_deck_media_workflow_with_no_updates(
+        self,
+        anki_session_with_addon_data: AnkiSession,
+        install_sample_ah_deck: InstallSampleAHDeck,
+        set_feature_flag_state: SetFeatureFlagState,
+        mock_function: MockFunction,
+        qtbot: QtBot,
+    ):
+        # Enable the use_deck_media feature flag
+        set_feature_flag_state("use_deck_media", True)
+
+        with anki_session_with_addon_data.profile_loaded():
+            _, ah_did = install_sample_ah_deck()
+
+            # Mock client to return an empty deck media update
+            get_deck_media_updates_mock = mock_function(
+                AnkiHubClient,
+                "get_deck_media_updates",
+                return_value=[DeckMediaUpdateChunk(media=[])],
+            )
+
+            # Mock the client method for downloading media
+            download_media_mock = mock_function(AnkiHubClient, "download_media")
+
+            # Start the media sync and wait for it to finish
+            media_sync.start_media_download()
+            qtbot.wait_until(lambda: media_sync._download_in_progress is False)
+
+            # Assert the client methods were called with the correct arguments
+            get_deck_media_updates_mock.assert_called_once_with(
+                ah_did,
+                since=None,
+            )
+            download_media_mock.assert_not_called()
+
 
 @fixture
 def mock_client_media_upload(
