@@ -68,9 +68,6 @@ def _profile_setup() -> bool:
     """Set up profile data folder, config, and AnkiHub DB for the current profile.
     Returns whether the profile setup was successful.
     """
-    setup_feature_flags()
-    LOGGER.info("Set up feature flags.")
-
     if not setup_profile_data_folder():
         return False
     LOGGER.info(f"Set up profile data folder for the current profile: {aqt.mw.pm.name}")
@@ -110,10 +107,13 @@ def _general_setup():
     """Set up things that don't depend on the profile and should only be run once, even if the
     profile changes."""
 
+    LOGGER.info(f"{ANKI_VERSION=}")
+
     setup_error_handler()
     LOGGER.info("Set up error handler.")
 
-    LOGGER.info(f"{ANKI_VERSION=}")
+    setup_feature_flags()
+    LOGGER.info("Set up feature flags.")
 
     aqt.mw.addonManager.setWebExports(__name__, r"gui/web/.*")
 
