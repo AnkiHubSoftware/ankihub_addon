@@ -2,8 +2,8 @@
 from dataclasses import dataclass, fields
 
 from . import LOGGER
-from .addon_ankihub_client import AnkiHubClient
-from .ankihub_client import AnkiHubRequestException
+from .addon_ankihub_client import AddonAnkiHubClient as AnkiHubClient
+from .ankihub_client import AnkiHubHTTPError, AnkiHubRequestException
 
 
 @dataclass
@@ -18,7 +18,7 @@ def setup_feature_flags() -> None:
     """Fetch feature flags from the server. If the server is not reachable, use the default values."""
     try:
         feature_flags_dict = AnkiHubClient().get_feature_flags()
-    except AnkiHubRequestException as e:
+    except (AnkiHubRequestException, AnkiHubHTTPError) as e:
         LOGGER.warning(
             f"Failed to fetch feature flags from the server: {e}, using default values."
         )
