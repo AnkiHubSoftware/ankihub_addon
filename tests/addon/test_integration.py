@@ -3790,6 +3790,8 @@ class TestSuggestionsWithMedia:
             media_dir = Path(mw.col.media.dir())
             ah_did = next_deterministic_uuid()
 
+            note_data = import_ah_note(ah_did=ah_did)
+
             # Two media files with the contents, one will be in the collection and the other in the database.
             media_file_in_db = "testfile_1.jpeg"
             media_file_in_collection = "testfile_1_copy.jpeg"
@@ -3814,7 +3816,6 @@ class TestSuggestionsWithMedia:
             )
 
             # Create a suggestion for a note that references the media file in the collection
-            note_data = import_ah_note(ah_did=ah_did)
             note = mw.col.get_note(NoteId(note_data.anki_nid))
             note_content = f'<img src="{media_file_in_collection}">'
             note["Front"] = note_content
