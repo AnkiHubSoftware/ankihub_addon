@@ -3525,8 +3525,8 @@ class TestMediaSyncMediaDownload:
                 "get_deck_media_updates",
                 return_value=[
                     DeckMediaUpdateChunk(
-                        media=[deck_media],
-                    )
+                        media=[deck_media], latest_update=latest_media_update
+                    ),
                 ],
             )
 
@@ -3576,7 +3576,9 @@ class TestMediaSyncMediaDownload:
             get_deck_media_updates_mock = mock_function(
                 AnkiHubClient,
                 "get_deck_media_updates",
-                return_value=[DeckMediaUpdateChunk(media=[])],
+                return_value=[
+                    DeckMediaUpdateChunk(media=[], latest_update=datetime.now())
+                ],
             )
 
             # Mock the client method for downloading media
