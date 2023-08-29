@@ -505,6 +505,12 @@ class _AnkiHubDB:
                 """,
                 str(ankihub_did),
             )
+            conn.execute(
+                """
+                DELETE FROM deck_media WHERE ankihub_deck_id = ?
+                """,
+                str(ankihub_did),
+            )
 
     def ankihub_deck_ids(self) -> List[uuid.UUID]:
         result = [
