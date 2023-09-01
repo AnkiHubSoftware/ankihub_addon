@@ -50,7 +50,9 @@ from ankihub.ankihub_client import (
 )
 from ankihub.gui.operations.deck_installation import _download_progress_cb
 
-COMPOSE_FILE = Path(os.getenv("COMPOSE_FILE")) if os.getenv("COMPOSE_FILE") else None
+WEBAPP_COMPOSE_FILE = (
+    Path(os.getenv("WEBAPP_COMPOSE_FILE")) if os.getenv("WEBAPP_COMPOSE_FILE") else None
+)
 
 TEST_DATA_PATH = Path(__file__).parent.parent / "test_data"
 DECK_CSV = TEST_DATA_PATH / "deck_with_one_basic_note.csv"
@@ -104,7 +106,7 @@ def run_command_in_django_container(command):
             "sudo",
             "docker-compose",
             "-f",
-            COMPOSE_FILE.absolute(),
+            WEBAPP_COMPOSE_FILE.absolute(),
             "run",
             "--rm",
             "django",
