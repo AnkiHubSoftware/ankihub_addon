@@ -337,7 +337,8 @@ def _maybe_handle_ankihub_http_error(error: AnkiHubHTTPError) -> bool:
     ):
         if ask_user(
             "The AnkiHub add-on needs to be updated to continue working.<br>"
-            "Do you want to open the add-on update dialog now?"
+            "Do you want to open the add-on update dialog now?",
+            parent=aqt.mw,
         ):
             check_and_prompt_for_updates_on_main_window()
         return True
