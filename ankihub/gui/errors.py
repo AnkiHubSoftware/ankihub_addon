@@ -425,6 +425,7 @@ def _report_exception(
     with push_scope() as scope:
         scope.level = "error"
         scope.user = {"id": config.user()}
+        scope.set_tag("os", sys.platform)
         scope.set_context("add-on config", dataclasses.asdict(config._private_config))
         scope.set_context("addon version", {"version": ADDON_VERSION})
         scope.set_context("anki version", {"version": ANKI_VERSION})
