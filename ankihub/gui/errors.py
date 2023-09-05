@@ -412,7 +412,19 @@ def _initialize_sentry():
         ],
         # This disable the AtexitIntegration because it causes a RuntimeError when Anki is closed.
         shutdown_timeout=0,
+        before_send=_before_send,
     )
+
+
+def _before_send(
+    event: Dict[str, Any], hint: Dict[str, Any]
+) -> Optional[Dict[str, Any]]:
+    """Filter out events created by the LoggingIntegration that are not related to this add-on."""
+    if "log_record" in hint:
+        logger_name = hint["log_record"].name
+        if logger_name != LOGGER.name:
+            return None
+    return event
 
 
 def _report_exception(
