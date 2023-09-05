@@ -16,7 +16,7 @@ from .ankihub_client.ankihub_client import API
 from .settings import config
 
 
-def logging_hook(response: Response, *args, **kwargs):
+def logging_hook(response: Response, *args, **kwargs) -> Response:
     endpoint = response.request.url
     method = response.request.method
     body = response.request.body
