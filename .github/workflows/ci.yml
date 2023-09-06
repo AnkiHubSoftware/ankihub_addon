@@ -85,10 +85,8 @@ jobs:
 
       - name: Run pytest with coverage
         run: |
-          pytest ./tests/addon --cov --cov-report=xml
-          pytest ./tests/client --disable-vcr --cov --cov-report=xml --cov-append
+          pytest ./tests/client -vv --show-capture=all --disable-vcr -k TestGetDeckMediaUpdates -rP
           coverage html
-          pytest ./tests/addon --performance -k performance -n1
 
       - name: Upload coverage report with smokeshow
         run: smokeshow upload coverage_html_report

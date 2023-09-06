@@ -831,6 +831,7 @@ class TestGetDeckMediaUpdates:
             expected=self.deck_media_on_server[:-1],
         )
 
+    @pytest.mark.timeout(30)
     @pytest.mark.vcr()
     def test_pagination(
         self,
@@ -846,9 +847,11 @@ class TestGetDeckMediaUpdates:
             page_size,
         )
 
+        print("Getting media updates")
         update_chunks = list(
             client.get_deck_media_updates(ID_OF_DECK_OF_USER_TEST1, since=None)
         )
+        print("Got media updates")
 
         assert len(update_chunks) == 3
 

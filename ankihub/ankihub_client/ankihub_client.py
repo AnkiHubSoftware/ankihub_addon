@@ -693,21 +693,25 @@ class AnkiHubClient:
         url_suffix = f"/decks/{ah_did}/media/list/"
         first_request = True
         while url_suffix is not None:
+            print(f"Requesting {url_suffix=}")
             response = self._send_request(
                 "GET",
                 API.ANKIHUB,
                 url_suffix,
                 params=params if first_request else None,
             )
+            print(f"Got {response.status_code=}")
             if response.status_code != 200:
                 raise AnkiHubHTTPError(response)
 
             data = response.json()
+            print(f"Got {data=}")
             url_suffix = (
                 data["next"].split("/api", maxsplit=1)[1] if data["next"] else None
             )
 
             media_updates = DeckMediaUpdateChunk.from_dict(data)
+            print(f"Yielding {media_updates=}\n")
             yield media_updates
 
             first_request = False
