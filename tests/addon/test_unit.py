@@ -1059,6 +1059,7 @@ class TestFeatureFlags:
 
     def test_with_set_values(
         self,
+        mock_all_feature_flags_to_default_values: None,
         set_feature_flag_state: SetFeatureFlagState,
     ):
         for field in fields(_FeatureFlags):
