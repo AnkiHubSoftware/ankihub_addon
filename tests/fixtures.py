@@ -88,10 +88,8 @@ def set_feature_flag_state(monkeypatch: MonkeyPatch) -> SetFeatureFlagState:
         old_get_feature_flags = AnkiHubClient.get_feature_flags
 
         def new_get_feature_flags(*args, **kwargs) -> Dict[str, bool]:
-            print("new_get_feature_flags")
             old_get_feature_flags_result = old_get_feature_flags(*args, **kwargs)
             old_get_feature_flags_result[feature_flag_name] = is_active
-            print(f"{old_get_feature_flags_result=}")
             return old_get_feature_flags_result
 
         monkeypatch.setattr(

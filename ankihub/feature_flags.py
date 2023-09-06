@@ -16,7 +16,6 @@ feature_flags = _FeatureFlags()
 
 def setup_feature_flags() -> None:
     """Fetch feature flags from the server. If the server is not reachable, use the default values."""
-    print("setup_feature_flags")
     try:
         feature_flags_dict = AnkiHubClient().get_feature_flags()
     except (AnkiHubRequestException, AnkiHubHTTPError) as e:
