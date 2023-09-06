@@ -1057,11 +1057,14 @@ class TestFeatureFlags:
         for field in fields(_FeatureFlags):
             assert getattr(feature_flags, field.name) == field.default
 
+    @pytest.mark.timeout(4)
     def test_with_set_values(
         self,
+        mock_all_feature_flags_to_default_values: None,
         set_feature_flag_state: SetFeatureFlagState,
     ):
         for field in fields(_FeatureFlags):
+            print(f"{field.name}")
             set_feature_flag_state(field.name, False)
             assert not getattr(feature_flags, field.name)
 
