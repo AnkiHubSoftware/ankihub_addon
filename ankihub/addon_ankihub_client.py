@@ -16,7 +16,7 @@ from .ankihub_client.ankihub_client import API
 from .settings import config
 
 
-def logging_hook(response: Response, *args, **kwargs):
+def logging_hook(response: Response, *args, **kwargs) -> Response:
     endpoint = response.request.url
     method = response.request.method
     body = response.request.body
@@ -46,7 +46,7 @@ def logging_hook(response: Response, *args, **kwargs):
             # We don't want to log the content of the response if it's not JSON
             pass
     else:
-        LOGGER.debug(f"response content: {response.text}")
+        LOGGER.info(f"response content: {response.text}")
 
     return response
 
