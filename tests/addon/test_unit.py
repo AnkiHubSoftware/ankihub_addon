@@ -972,17 +972,17 @@ class TestErrorHandling:
         self,
         monkeypatch: MonkeyPatch,
     ) -> Generator[Mock, None, None]:
-        # Simply monkeypatching askUser to return False doesn't work because the errors module
+        # Simply monkeypatching ask_user to return False doesn't work because the errors module
         # already imported the original askUser function when this fixture is called.
         # So we need to reload the errors module after monkeypatching askUser.
         try:
             with monkeypatch.context() as m:
-                askUser_mock = Mock(return_value=False)
-                m.setattr(utils, "askUser", askUser_mock)
+                ask_user_mock = Mock(return_value=False)
+                m.setattr("ankihub.gui.utils.ask_user", ask_user_mock)
                 # Reload the errors module so that the monkeypatched askUser function is used.
                 importlib.reload(errors)
 
-                yield askUser_mock
+                yield ask_user_mock
         finally:
             #  Reload the errors module again so that the original askUser function is used for other tests.
             importlib.reload(errors)
@@ -1056,3 +1056,17 @@ class TestFeatureFlags:
     ):
         for field in fields(_FeatureFlags):
             assert getattr(feature_flags, field.name) == field.default
+
+    @pytest.mark.timeout(4)
+    def test_with_set_values(
+        self,
+        mock_all_feature_flags_to_default_values: None,
+        set_feature_flag_state: SetFeatureFlagState,
+    ):
+        for field in fields(_FeatureFlags):
+            print(f"{field.name}")
+            set_feature_flag_state(field.name, False)
+            assert not getattr(feature_flags, field.name)
+
+            set_feature_flag_state(field.name, True)
+            assert getattr(feature_flags, field.name)
