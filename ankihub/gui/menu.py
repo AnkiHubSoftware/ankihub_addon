@@ -241,6 +241,7 @@ def _create_collaborative_deck_action() -> None:
             for d in aqt.mw.col.decks.all_names_and_ids(include_filtered=False)
             if "::" not in d.name and d.id != 1
         ],
+        parent=aqt.mw,
     )
     deck_name = deck_chooser.name
     if not deck_name:
