@@ -230,6 +230,7 @@ def _create_collaborative_deck_action() -> None:
     if not confirm:
         return
 
+    LOGGER.info("Asking user to choose a deck to upload...")
     deck_chooser = StudyDeck(
         aqt.mw,
         title="AnkiHub",
@@ -243,6 +244,8 @@ def _create_collaborative_deck_action() -> None:
         ],
         parent=aqt.mw,
     )
+    LOGGER.info(f"Closed deck chooser dialog: {deck_chooser}")
+    LOGGER.info(f"Chosen deck name: {deck_chooser.name}")
     deck_name = deck_chooser.name
     if not deck_name:
         return
