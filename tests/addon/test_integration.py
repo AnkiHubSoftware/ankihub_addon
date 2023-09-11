@@ -71,6 +71,7 @@ os.environ["SKIP_INIT"] = "1"
 from ankihub import entry_point, settings
 from ankihub.addon_ankihub_client import AddonAnkiHubClient as AnkiHubClient
 from ankihub.ankihub_client import (
+    API_VERSION,
     AnkiHubHTTPError,
     ChangeNoteSuggestion,
     Deck,
@@ -3159,6 +3160,19 @@ def test_sync_uninstalls_unsubscribed_decks(
             if subscribed_to_deck
             else not any(is_ankihub_note_type)
         )
+
+
+def test_sync_updates_api_version_on_last_sync(
+    anki_session_with_addon_data: AnkiSession,
+    sync_with_ankihub: SyncWithAnkiHub,
+    mock_ankihub_sync_dependencies: None,
+):
+    assert config._private_config.api_version_on_last_sync is None  # sanity check
+
+    with anki_session_with_addon_data.profile_loaded():
+        sync_with_ankihub()
+
+    assert config._private_config.api_version_on_last_sync == API_VERSION
 
 
 class TestAutoSync:
