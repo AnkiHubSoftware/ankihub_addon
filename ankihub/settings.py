@@ -117,6 +117,8 @@ class PrivateConfig(DataClassJSONMixin):
         default_factory=dict
     )
     ui: UIConfig = dataclasses.field(default_factory=UIConfig)
+    # used to determine which migrations to apply
+    api_version_on_last_sync: Optional[float] = None
 
 
 class _Config:
@@ -310,6 +312,10 @@ class _Config:
 
     def is_logged_in(self) -> bool:
         return bool(self.token())
+
+    def set_api_version_on_last_sync(self, api_version: float) -> None:
+        self._private_config.api_version_on_last_sync = api_version
+        self._update_private_config()
 
 
 config = _Config()
