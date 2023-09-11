@@ -4,11 +4,39 @@ from . import LOGGER
 
 
 def migrate_private_config(private_config_dict: Dict) -> None:
-    """Migrate the private config of the add-on to the new format.
-    This function should be updated when the private config of the add-on is changed and
-    old config options need to be migrated to the new format.
     """
+    Migrate the private config.
 
+    - This function handles changes to the private config format. Update it
+      whenever the format of the private config changes.
+    - It handles some invalid states. For instance, if an API previously
+      skipped certain entries, this function can reset the last update
+      timestamps to ensure that all entries are fetched again.
+
+    Note: The migrations that use api_version_on_last_sync rely on the fact
+    that the client must be restarted to utilize a new API version. Since
+    migrations are executed on client start, this ensures that necessary
+    migrations are always applied before the client interacts with an updated
+    API.
+    """
+    maybe_rename_ankihub_deck_uuid_to_ah_did(private_config_dict)
+    maybe_reset_media_update_timestamps(private_config_dict)
+
+
+def maybe_reset_media_update_timestamps(private_config_dict: Dict) -> None:
+    # This is needed because the api view which returns media updates previously skipped
+    # some entries and resetting the timestamps will ensure that all media updates are
+    # fetched again.
+    # The endpoint was fixed in API version 15.0.
+    if _is_api_version_on_last_sync_below_threshold(private_config_dict, 15.0):
+        LOGGER.info(
+            "Resetting media update timestamps because api version is below 15.0."
+        )
+        for deck in private_config_dict.get("decks", {}).values():
+            deck["latest_media_update"] = None
+
+
+def maybe_rename_ankihub_deck_uuid_to_ah_did(private_config_dict: Dict) -> None:
     # Rename the "ankihub_deck_uuid" key to "ah_did" in the deck extensions config.
     old_field_name = "ankihub_deck_uuid"
     new_field_name = "ah_did"
@@ -19,3 +47,14 @@ def migrate_private_config(private_config_dict: Dict) -> None:
             LOGGER.info(
                 f"Renamed {old_field_name} to {new_field_name} in deck extension config."
             )
+
+
+def _is_api_version_on_last_sync_below_threshold(
+    private_config_dict: Dict, version_threshold: float
+) -> bool:
+    """Check if the stored API version is below the given threshold."""
+    api_version = private_config_dict.get("api_version_on_last_sync")
+    if api_version is None:
+        return True
+
+    return api_version < version_threshold
