@@ -112,6 +112,7 @@ class BulkNoteSuggestionsResult:
 
 
 def suggest_notes_in_bulk(
+    ankihub_did: uuid.UUID,
     notes: List[Note],
     auto_accept: bool,
     change_type: SuggestionType,
@@ -120,28 +121,12 @@ def suggest_notes_in_bulk(
 ) -> BulkNoteSuggestionsResult:
     """
     Sends a NewNoteSuggestion or a ChangeNoteSuggestion to AnkiHub for each note in the list.
-    All notes have to be from one AnkiHub deck. If a note does not belong to any
-    AnkiHub deck, it will be ignored.
     Note: Notes that don't have any changes when compared to the local
     AnkiHub database will not be sent. This does not necessarily mean
     that the note has no changes when compared to the remote AnkiHub
     database. To create suggestions for notes that differ from the
     remote database but not from the local database, users have to
     sync first (so that the local database is up to date)."""
-
-    change_note_ah_dids = set(
-        ankihub_db.ankihub_dids_for_anki_nids([note.id for note in notes])
-    )
-    new_note_ah_dids = set(
-        ankihub_db.ankihub_did_for_note_type(note.mid) for note in notes
-    )
-
-    ankihub_dids = list(change_note_ah_dids | new_note_ah_dids)
-    ankihub_dids = [did for did in ankihub_dids if did is not None]
-
-    assert len(ankihub_dids) == 1, "All notes must belong to the same AnkiHub deck"
-    ankihub_did = ankihub_dids[0]
-
     (
         new_note_suggestions,
         change_note_suggestions,

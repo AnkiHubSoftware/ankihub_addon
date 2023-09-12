@@ -1,9 +1,10 @@
 """Dialog for creating a suggestion for a note or a bulk suggestion for multiple notes."""
+import uuid
 from concurrent.futures import Future
 from dataclasses import dataclass
 from enum import Enum
 from pprint import pformat
-from typing import Collection, Optional
+from typing import Collection, Dict, Optional, Set, Tuple
 
 import aqt
 from anki.notes import Note, NoteId
@@ -42,9 +43,10 @@ from ..main.suggestions import (
     suggest_note_update,
     suggest_notes_in_bulk,
 )
+from ..main.utils import get_anki_nid_to_mid_dict
 from ..settings import ANKING_DECK_ID, RATIONALE_FOR_CHANGE_MAX_LENGTH
 from .media_sync import media_sync
-from .utils import show_error_dialog, show_tooltip
+from .utils import choose_ankihub_deck, show_error_dialog, show_tooltip
 
 
 class SourceType(Enum):
@@ -113,23 +115,23 @@ def open_suggestion_dialog_for_note(note: Note, parent: QWidget) -> None:
 
 
 def open_suggestion_dialog_for_bulk_suggestion(
-    nids: Collection[NoteId], parent: QWidget
+    anki_nids: Collection[NoteId], parent: QWidget
 ) -> None:
     """Opens a dialog for creating a bulk suggestion for the given notes.
-    The notes have to be present in the Anki collection before calling this function.
-    May change the notes contents (e.g. by renaming media files) and therefore the
-    notes might need to be reloaded after this function is called."""
+    The notes have to be present in the Anki collection before calling this
+    function and they need to have an AnkiHub note type.
+    This function may change the notes contents (e.g. by renaming media files)
+    and therefore the notes might need to be reloaded after this function is
+    called."""
 
-    notes = [aqt.mw.col.get_note(nid) for nid in nids]
-    mids = set(note.mid for note in notes)
-    assert (
-        ankihub_db.is_ankihub_note_type(mid) for mid in mids
-    ), "Some of the note types of the notes are not associated with an AnkiHub deck."
+    ah_did, anki_nids = _determine_ah_did_and_anki_nids(
+        anki_nids=anki_nids, parent=parent
+    )
+    if ah_did is None:
+        LOGGER.info("User cancelled bulk suggestion from deck selection dialog.")
+        return
 
-    ah_dids = set(ankihub_db.ankihub_did_for_note_type(mid) for mid in mids)
-    assert len(ah_dids) == 1, "All notes have to be from the same AnkiHub deck."
-
-    ah_did = ah_dids.pop()
+    notes = [aqt.mw.col.get_note(nid) for nid in anki_nids]
 
     suggestion_meta = SuggestionDialog(
         is_new_note_suggestion=False,
@@ -139,11 +141,13 @@ def open_suggestion_dialog_for_bulk_suggestion(
         added_new_media=any(_added_new_media(note) for note in notes),
     ).run()
     if not suggestion_meta:
+        LOGGER.info("User cancelled bulk suggestion from suggestion dialog.")
         return
 
     aqt.mw.taskman.with_progress(
         task=lambda: suggest_notes_in_bulk(
-            notes,
+            ankihub_did=ah_did,
+            notes=notes,
             auto_accept=suggestion_meta.auto_accept,
             change_type=suggestion_meta.change_type,
             comment=_comment_with_source(suggestion_meta),
@@ -152,6 +156,72 @@ def open_suggestion_dialog_for_bulk_suggestion(
         on_done=lambda future: _on_suggest_notes_in_bulk_done(future, parent),
         parent=parent,
     )
+
+
+def _determine_ah_did_and_anki_nids(
+    anki_nids: Collection[NoteId], parent: QWidget
+) -> Tuple[uuid.UUID, Set[NoteId]]:
+    """Return the AnkiHub deck id and the list of anki note ids for the bulk suggestion.
+    If the choice of deck is ambiguous, the user is asked to choose a deck.
+    Note ids which can't belong to the chosen deck are not included in the list of note ids."""
+    anki_nid_to_possible_ah_dids = _get_anki_nid_to_possible_ah_dids_dict(anki_nids)
+    dids_that_all_notes_could_belong_to = set.intersection(
+        *anki_nid_to_possible_ah_dids.values()
+    )
+    if len(dids_that_all_notes_could_belong_to) == 1:
+        ah_did = dids_that_all_notes_could_belong_to.pop()
+        filtered_anki_nids = set(anki_nids)
+    else:
+        ah_dids = list(set.union(*anki_nid_to_possible_ah_dids.values()))
+        ah_did = choose_ankihub_deck(
+            prompt="Choose a deck to submit the suggestions to.",
+            ah_dids=ah_dids,
+            parent=parent,
+        )
+
+        if not ah_did:
+            LOGGER.info("User cancelled bulk suggestion.")
+            return None, set()
+
+        filtered_anki_nids = set(
+            nid
+            for nid, possible_dids in anki_nid_to_possible_ah_dids.items()
+            if ah_did in possible_dids
+        )
+
+    return ah_did, filtered_anki_nids
+
+
+def _get_anki_nid_to_possible_ah_dids_dict(
+    anki_nids: Collection[NoteId],
+) -> Dict[NoteId, Set[uuid.UUID]]:
+    """Returns a dictionary that maps anki note ids to the set of deck ids that the note could
+    belong to. Whether a note could belong to a deck is determined in this manner:
+    - If the note is on AnkiHub already, the deck id can be looked up in database by the note id.
+    - Otherwise the note type is used to determine the possible deck ids.
+    """
+    # Get definite deck ids for existing AnkiHub notes
+    anki_nid_to_ah_did = ankihub_db.anki_nid_to_ah_did_dict(anki_nids)
+
+    # Get possible deck ids for notes that are not on AnkiHub yet by looking at the note type
+    nids_without_ah_note = [
+        nid for nid in anki_nids if nid not in anki_nid_to_ah_did.keys()
+    ]
+    anki_nid_to_mid = get_anki_nid_to_mid_dict(nids_without_ah_note)
+    mid_to_ah_dids = {
+        mid: ankihub_db.ankihub_dids_for_note_type(mid)
+        for mid in set(anki_nid_to_mid.values())
+    }
+    anki_nid_to_possible_ah_dids = {
+        nid: mid_to_ah_dids[mid] for nid, mid in anki_nid_to_mid.items()
+    }
+
+    # Merge definite and possible deck ids
+    result = {
+        **{nid: {did} for nid, did in anki_nid_to_ah_did.items()},
+        **anki_nid_to_possible_ah_dids,
+    }
+    return result
 
 
 def _added_new_media(note: Note) -> bool:

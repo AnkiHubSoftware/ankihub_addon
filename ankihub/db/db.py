@@ -421,6 +421,20 @@ class _AnkiHubDB:
         result = [uuid.UUID(did) for did in did_strs]
         return result
 
+    def anki_nid_to_ah_did_dict(
+        self, anki_nids: Iterable[NoteId]
+    ) -> Dict[NoteId, Optional[uuid.UUID]]:
+        """Returns a dict mapping anki nids to the ankihub did of the deck the note is in.
+        Not found nids are omitted from the dict."""
+        result = self.dict(
+            f"""
+            SELECT anki_note_id, ankihub_deck_id FROM notes
+            WHERE anki_note_id IN {ids2str(anki_nids)}
+            """
+        )
+        result = {NoteId(k): uuid.UUID(v) for k, v in result.items()}
+        return result
+
     def are_ankihub_notes(self, anki_nids: List[NoteId]) -> bool:
         notes_count = self.scalar(
             f"""
@@ -606,7 +620,11 @@ class _AnkiHubDB:
         for mid in self.note_types_for_ankihub_deck(ah_did):
             disabled_field_names = media_disabled_fields.get(int(mid), [])
             result.update(
-                self._media_names_on_notes_of_note_type(mid, disabled_field_names)
+                self._media_names_on_notes_of_note_type(
+                    ah_did=ah_did,
+                    mid=mid,
+                    disabled_field_names=disabled_field_names,
+                )
             )
         return result
 
@@ -670,14 +688,14 @@ class _AnkiHubDB:
         return result
 
     def _media_names_on_notes_of_note_type(
-        self, mid: NotetypeId, disabled_field_names: List[str]
+        self, ah_did: uuid.UUID, mid: NotetypeId, disabled_field_names: List[str]
     ) -> Set[str]:
         """Returns the names of all media files used in the notes of the given note type."""
         if aqt.mw.col is None or aqt.mw.col.models.get(NotetypeId(mid)) is None:
             return set()
 
         field_names_for_mid = self._note_type_field_names(
-            ankihub_did=self.ankihub_did_for_note_type(mid), anki_note_type_id=mid
+            ankihub_did=ah_did, anki_note_type_id=mid
         )
         disabled_field_ords = [
             field_names_for_mid.index(name)
@@ -825,19 +843,20 @@ class _AnkiHubDB:
         )
         return result
 
-    def ankihub_did_for_note_type(
+    def ankihub_dids_for_note_type(
         self, anki_note_type_id: NotetypeId
-    ) -> Optional[uuid.UUID]:
-        did_str = self.scalar(
+    ) -> Optional[Set[uuid.UUID]]:
+        """Returns the AnkiHub deck ids that use the given note type."""
+        did_strings = self.list(
             """
             SELECT ankihub_deck_id FROM notetypes WHERE anki_note_type_id = ?
             """,
             anki_note_type_id,
         )
-        if did_str is None:
+        if not did_strings:
             return None
 
-        result = uuid.UUID(did_str)
+        result = set(uuid.UUID(did_str) for did_str in did_strings)
         return result
 
     def _note_type_field_names(

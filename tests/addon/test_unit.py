@@ -626,7 +626,7 @@ class TestAnkiHubDBRemoveDeck:
             is None
         )
         assert (
-            ankihub_db.ankihub_did_for_note_type(
+            ankihub_db.ankihub_dids_for_note_type(
                 anki_note_type_id=ankihub_basic_note_type["id"]
             )
             is None
