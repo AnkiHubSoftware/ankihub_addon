@@ -80,7 +80,7 @@ def open_suggestion_dialog_for_note(note: Note, parent: QWidget) -> None:
     ), f"Note type {note.mid} is not associated with an AnkiHub deck."
 
     ah_nid = ankihub_db.ankihub_nid_for_anki_nid(note.id)
-    ah_did = ankihub_db.ankihub_did_for_note_type(note.mid)
+    ah_did = ankihub_db.ankihub_did_for_anki_nid(note.id)
 
     suggestion_meta = SuggestionDialog(
         is_new_note_suggestion=ah_nid is None,
