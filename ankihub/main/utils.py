@@ -5,7 +5,7 @@ import time
 from pathlib import Path
 from pprint import pformat
 from textwrap import dedent
-from typing import Any, Dict, Iterable, List, Optional, Sequence, Set, Tuple
+from typing import Any, Collection, Dict, Iterable, List, Optional, Sequence, Set, Tuple
 
 import aqt
 from anki.decks import DeckId
@@ -15,6 +15,7 @@ from anki.notes import Note, NoteId
 from anki.utils import checksum, ids2str
 
 from .. import LOGGER, settings
+from ..db import ankihub_db
 from ..settings import (
     ANKI_MINOR,
     ANKIHUB_NOTE_TYPE_FIELD_NAME,
@@ -204,6 +205,28 @@ def mids_of_notes(nids: Sequence[NoteId]) -> Set[NotetypeId]:
             f"SELECT DISTINCT mid FROM notes WHERE id in {ids2str(nids)}"
         )
     )
+
+
+def retain_nids_with_ah_note_type(nids: Sequence[NoteId]) -> Sequence[NoteId]:
+    """Return nids that have an AnkiHub note type. Other nids are not included in the result."""
+    nids_to_mids = get_anki_nid_to_mid_dict(nids)
+    mid_to_is_ankihub_note_type = {
+        mid: ankihub_db.is_ankihub_note_type(mid) for mid in set(nids_to_mids.values())
+    }
+    result = [
+        nid for nid, mid in nids_to_mids.items() if mid_to_is_ankihub_note_type[mid]
+    ]
+    return result
+
+
+def get_anki_nid_to_mid_dict(nids: Collection[NoteId]) -> Dict[NoteId, NotetypeId]:
+    result = {
+        id_: mid
+        for id_, mid in aqt.mw.col.db.execute(
+            f"select id, mid from notes where id in {ids2str(nids)}"
+        )
+    }
+    return result
 
 
 # ... note type modifications
