@@ -165,13 +165,6 @@ def mock_function(
     return _mock_function
 
 
-class NewNoteWithNoteType(Protocol):
-    def __call__(
-        self, note_type: NotetypeDict, anki_did: Optional[DeckId] = None
-    ) -> Note:
-        ...
-
-
 class ImportAHNote(Protocol):
     def __call__(
         self,
@@ -249,6 +242,15 @@ def import_ah_note(next_deterministic_uuid: Callable[[], uuid.UUID]) -> ImportAH
     return _import_ah_note
 
 
+class ImportAHNoteType(Protocol):
+    def __call__(
+        self,
+        note_type: Optional[NotetypeDict] = None,
+        ah_did: Optional[uuid.UUID] = None,
+    ) -> NotetypeDict:
+        ...
+
+
 @pytest.fixture
 def import_ah_note_type(
     next_deterministic_uuid: Callable[[], uuid.UUID], ankihub_basic_note_type
@@ -281,6 +283,13 @@ def import_ah_note_type(
     return import_ah_note_type_inner
 
 
+class NewNoteWithNoteType(Protocol):
+    def __call__(
+        self, note_type: NotetypeDict, anki_did: Optional[DeckId] = None
+    ) -> Note:
+        ...
+
+
 @pytest.fixture
 def new_note_with_note_type() -> NewNoteWithNoteType:
     """Creates a new note with the given note type and adds it to the given deck."""
@@ -297,12 +306,3 @@ def new_note_with_note_type() -> NewNoteWithNoteType:
         return note
 
     return new_note_with_note_type_inner
-
-
-class ImportAHNoteType(Protocol):
-    def __call__(
-        self,
-        note_type: Optional[NotetypeDict] = None,
-        ah_did: Optional[uuid.UUID] = None,
-    ) -> NotetypeDict:
-        ...
