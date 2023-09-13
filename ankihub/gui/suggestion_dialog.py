@@ -3,10 +3,10 @@ from concurrent.futures import Future
 from dataclasses import dataclass
 from enum import Enum
 from pprint import pformat
-from typing import List, Optional
+from typing import Collection, Optional
 
 import aqt
-from anki.notes import Note
+from anki.notes import Note, NoteId
 from aqt.qt import (
     QCheckBox,
     QComboBox,
@@ -113,13 +113,14 @@ def open_suggestion_dialog_for_note(note: Note, parent: QWidget) -> None:
 
 
 def open_suggestion_dialog_for_bulk_suggestion(
-    notes: List[Note], parent: QWidget
+    nids: Collection[NoteId], parent: QWidget
 ) -> None:
     """Opens a dialog for creating a bulk suggestion for the given notes.
     The notes have to be present in the Anki collection before calling this function.
     May change the notes contents (e.g. by renaming media files) and therefore the
     notes might need to be reloaded after this function is called."""
 
+    notes = [aqt.mw.col.get_note(nid) for nid in nids]
     mids = set(note.mid for note in notes)
     assert (
         ankihub_db.is_ankihub_note_type(mid) for mid in mids

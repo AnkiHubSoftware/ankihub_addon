@@ -12,8 +12,11 @@ from requests_mock import Mocker
 from ..fixtures import (  # noqa F401
     MockAllFeatureFlagsToDefaultValues,
     ankihub_basic_note_type,
+    import_ah_note,
+    import_ah_note_type,
     mock_all_feature_flags_to_default_values,
     mock_function,
+    new_note_with_note_type,
     next_deterministic_id,
     next_deterministic_uuid,
     set_feature_flag_state,
