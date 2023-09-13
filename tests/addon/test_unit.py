@@ -50,6 +50,7 @@ from ankihub.gui.suggestion_dialog import (
     SuggestionDialog,
     SuggestionMetadata,
     SuggestionSource,
+    _get_anki_nid_to_possible_ah_dids_dict,
 )
 from ankihub.gui.threading_utils import rate_limited
 from ankihub.main import suggestions
@@ -447,6 +448,79 @@ class TestSuggestionDialog:
             change_type=suggestion_type if change_type_needed else None,
             source=expected_source,
         )
+
+
+class TestSuggestionDialogGetAnkiNidToPossibleAHDidsDict:
+    def test_with_existing_note_belonging_to_single_deck(
+        self,
+        anki_session_with_addon_data: AnkiSession,
+        import_ah_note: ImportAHNote,
+        next_deterministic_uuid: Callable[[], uuid.UUID],
+    ):
+        with anki_session_with_addon_data.profile_loaded():
+            ah_did = next_deterministic_uuid()
+            note_info = import_ah_note(ah_did=ah_did)
+            nids = [NoteId(note_info.anki_nid)]
+            assert _get_anki_nid_to_possible_ah_dids_dict(nids) == {
+                note_info.anki_nid: {ah_did}
+            }
+
+    def test_with_new_note_belonging_to_single_deck(
+        self,
+        anki_session_with_addon_data: AnkiSession,
+        import_ah_note_type: ImportAHNoteType,
+        new_note_with_note_type: NewNoteWithNoteType,
+        next_deterministic_uuid: Callable[[], uuid.UUID],
+    ):
+        with anki_session_with_addon_data.profile_loaded():
+            ah_did = next_deterministic_uuid()
+            note_type = import_ah_note_type(ah_did=ah_did)
+            note = new_note_with_note_type(note_type=note_type)
+            nids = [note.id]
+            assert _get_anki_nid_to_possible_ah_dids_dict(nids) == {note.id: {ah_did}}
+
+    def test_with_new_note_with_two_possible_decks(
+        self,
+        anki_session_with_addon_data: AnkiSession,
+        import_ah_note_type: ImportAHNoteType,
+        new_note_with_note_type: NewNoteWithNoteType,
+        next_deterministic_uuid: Callable[[], uuid.UUID],
+    ):
+        with anki_session_with_addon_data.profile_loaded():
+            ah_did_1 = next_deterministic_uuid()
+            note_type = import_ah_note_type(ah_did=ah_did_1)
+
+            ah_did_2 = next_deterministic_uuid()
+            import_ah_note_type(note_type=note_type, ah_did=ah_did_2)
+
+            # The note type of the new note is used in two decks, so the note could be suggested for either of them.
+            note = new_note_with_note_type(note_type=note_type)
+            nids = [note.id]
+            assert _get_anki_nid_to_possible_ah_dids_dict(nids) == {
+                note.id: {ah_did_1, ah_did_2}
+            }
+
+    def test_with_existing_note_with_note_type_used_in_two_decks(
+        self,
+        anki_session_with_addon_data: AnkiSession,
+        import_ah_note: ImportAHNote,
+        import_ah_note_type: ImportAHNoteType,
+        next_deterministic_uuid: Callable[[], uuid.UUID],
+    ):
+        with anki_session_with_addon_data.profile_loaded():
+            ah_did_1 = next_deterministic_uuid()
+            note_type = import_ah_note_type(ah_did=ah_did_1)
+            note_info = import_ah_note(ah_did=ah_did_1, mid=note_type["id"])
+
+            ah_did_2 = next_deterministic_uuid()
+            import_ah_note_type(note_type=note_type, ah_did=ah_did_2)
+
+            # The note type of the new note is used in two decks, but the note exists in one of them,
+            # so the note belongs to that deck.
+            nids = [NoteId(note_info.anki_nid)]
+            assert _get_anki_nid_to_possible_ah_dids_dict(nids) == {
+                note_info.anki_nid: {ah_did_1}
+            }
 
 
 class TestAnkiHubDBAnkiNidsToAnkiHubNids:
