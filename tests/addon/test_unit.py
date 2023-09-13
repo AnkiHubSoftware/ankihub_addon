@@ -8,6 +8,7 @@ from pathlib import Path
 from typing import Callable, Generator, List
 from unittest.mock import Mock
 
+import aqt
 import pytest
 from anki.decks import DeckId
 from anki.models import NotetypeDict
@@ -21,7 +22,12 @@ from pytestqt.qtbot import QtBot  # type: ignore
 from ankihub.gui import errors
 
 from ..factories import DeckMediaFactory, NoteInfoFactory
-from ..fixtures import SetFeatureFlagState  # type: ignore
+from ..fixtures import (  # type: ignore
+    ImportAHNoteType,
+    NewNoteWithNoteType,
+    SetFeatureFlagState,
+)
+from .test_integration import ImportAHNote
 
 # workaround for vscode test discovery not using pytest.ini which sets this env var
 # has to be set before importing ankihub
@@ -58,7 +64,11 @@ from ankihub.main.note_conversion import (
     _get_fields_protected_by_tags,
 )
 from ankihub.main.subdecks import SUBDECK_TAG, add_subdeck_tags_to_notes
-from ankihub.main.utils import lowest_level_common_ancestor_deck_name, mids_of_notes
+from ankihub.main.utils import (
+    lowest_level_common_ancestor_deck_name,
+    mids_of_notes,
+    retain_nids_with_ah_note_type,
+)
 from ankihub.settings import ANKIWEB_ID
 
 
@@ -1067,3 +1077,58 @@ class TestFeatureFlags:
 
             set_feature_flag_state(field.name, True)
             assert getattr(feature_flags, field.name)
+
+
+class TestRetainNidsWithAHNoteType:
+    def test_retain_one_ah_note(
+        self,
+        anki_session_with_addon_data: AnkiSession,
+        import_ah_note: ImportAHNote,
+    ):
+        with anki_session_with_addon_data.profile_loaded():
+            note_info = import_ah_note()
+            nids = [NoteId(note_info.anki_nid)]
+            assert retain_nids_with_ah_note_type(nids) == nids
+
+    def test_retain_one_new_note_with_ah_note_type(
+        self,
+        anki_session_with_addon_data: AnkiSession,
+        import_ah_note_type: ImportAHNoteType,
+        new_note_with_note_type: NewNoteWithNoteType,
+    ):
+        with anki_session_with_addon_data.profile_loaded():
+            note_type = import_ah_note_type()
+            note = new_note_with_note_type(note_type)
+            nids = [note.id]
+            assert retain_nids_with_ah_note_type(nids) == nids
+
+    def test_filters_out_note_with_non_ah_note_type(
+        self,
+        anki_session_with_addon_data: AnkiSession,
+        new_note_with_note_type: NewNoteWithNoteType,
+    ):
+        with anki_session_with_addon_data.profile_loaded():
+            note = new_note_with_note_type(aqt.mw.col.models.by_name("Basic"))
+            nids = [note.id]
+            assert len(retain_nids_with_ah_note_type(nids)) == 0
+
+    def test_combined(
+        self,
+        anki_session_with_addon_data: AnkiSession,
+        import_ah_note: ImportAHNote,
+        import_ah_note_type: ImportAHNoteType,
+        new_note_with_note_type: NewNoteWithNoteType,
+    ):
+        with anki_session_with_addon_data.profile_loaded():
+            note_info = import_ah_note()
+            nid_1 = NoteId(note_info.anki_nid)
+
+            note_type = import_ah_note_type()
+            note = new_note_with_note_type(note_type)
+            nid_2 = note.id
+
+            note = new_note_with_note_type(aqt.mw.col.models.by_name("Basic"))
+            nid_3 = note.id
+
+            nids = [nid_1, nid_2, nid_3]
+            assert retain_nids_with_ah_note_type(nids) == [nid_1, nid_2]
