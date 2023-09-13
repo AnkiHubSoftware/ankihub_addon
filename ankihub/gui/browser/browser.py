@@ -264,7 +264,7 @@ def _on_bulk_notes_suggest_action(browser: Browser, nids: Sequence[NoteId]) -> N
             parent=browser,
         )
 
-    ah_dids = ankihub_db.ankihub_dids_for_anki_nids([note.id for note in filtered_nids])
+    ah_dids = ankihub_db.ankihub_dids_for_anki_nids(filtered_nids)
     if len(ah_dids) > 1:
         msg = (
             "You can only create suggestions for notes from one AnkiHub deck at a time.<br>"
