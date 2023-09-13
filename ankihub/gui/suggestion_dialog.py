@@ -82,7 +82,7 @@ def open_suggestion_dialog_for_note(note: Note, parent: QWidget) -> None:
     ), f"Note type {note.mid} is not associated with an AnkiHub deck."
 
     ah_nid = ankihub_db.ankihub_nid_for_anki_nid(note.id)
-    ah_did = ankihub_db.ankihub_did_for_anki_nid(note.id)
+    ah_did, _ = _determine_ah_did_and_anki_nids_for_suggestion([note.id], parent)
 
     suggestion_meta = SuggestionDialog(
         is_new_note_suggestion=ah_nid is None,
@@ -124,7 +124,7 @@ def open_suggestion_dialog_for_bulk_suggestion(
     and therefore the notes might need to be reloaded after this function is
     called."""
 
-    ah_did, anki_nids = _determine_ah_did_and_anki_nids(
+    ah_did, anki_nids = _determine_ah_did_and_anki_nids_for_suggestion(
         anki_nids=anki_nids, parent=parent
     )
     if ah_did is None:
@@ -158,10 +158,10 @@ def open_suggestion_dialog_for_bulk_suggestion(
     )
 
 
-def _determine_ah_did_and_anki_nids(
+def _determine_ah_did_and_anki_nids_for_suggestion(
     anki_nids: Collection[NoteId], parent: QWidget
 ) -> Tuple[uuid.UUID, Set[NoteId]]:
-    """Return the AnkiHub deck id and the list of anki note ids for the bulk suggestion.
+    """Return the AnkiHub deck id and the list of anki note ids for the suggestion.
     If the choice of deck is ambiguous, the user is asked to choose a deck.
     Note ids which can't belong to the chosen deck are not included in the list of note ids."""
     anki_nid_to_possible_ah_dids = _get_anki_nid_to_possible_ah_dids_dict(anki_nids)
