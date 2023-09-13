@@ -128,7 +128,7 @@ def open_suggestion_dialog_for_bulk_suggestion(
         anki_nids=anki_nids, parent=parent
     )
     if ah_did is None:
-        LOGGER.info("User cancelled bulk suggestion from deck selection dialog.")
+        LOGGER.info("Bulk suggestion cancelled.")
         return
 
     notes = [aqt.mw.col.get_note(nid) for nid in anki_nids]
