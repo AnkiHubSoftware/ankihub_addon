@@ -4,7 +4,7 @@ from concurrent.futures import Future
 from dataclasses import dataclass
 from enum import Enum
 from pprint import pformat
-from typing import Collection, Dict, Optional, Set
+from typing import Collection, Optional
 
 import aqt
 from anki.notes import Note, NoteId
@@ -39,11 +39,11 @@ from ..main.exporting import to_note_data
 from ..main.suggestions import (
     ANKIHUB_NO_CHANGE_ERROR,
     BulkNoteSuggestionsResult,
+    get_anki_nid_to_possible_ah_dids_dict,
     suggest_new_note,
     suggest_note_update,
     suggest_notes_in_bulk,
 )
-from ..main.utils import get_anki_nid_to_mid_dict
 from ..settings import ANKING_DECK_ID, RATIONALE_FOR_CHANGE_MAX_LENGTH
 from .media_sync import media_sync
 from .utils import choose_ankihub_deck, show_error_dialog, show_tooltip
@@ -166,7 +166,7 @@ def _determine_ah_did_for_nids_to_be_suggested(
     of viable decks.
     Returns None if the user cancelled the deck selection dialog or if there is
     no deck that all notes could belong to."""
-    anki_nid_to_possible_ah_dids = _get_anki_nid_to_possible_ah_dids_dict(anki_nids)
+    anki_nid_to_possible_ah_dids = get_anki_nid_to_possible_ah_dids_dict(anki_nids)
     dids_that_all_notes_could_belong_to = set.intersection(
         *anki_nid_to_possible_ah_dids.values()
     )
@@ -189,38 +189,6 @@ def _determine_ah_did_for_nids_to_be_suggested(
             return None
 
     return ah_did
-
-
-def _get_anki_nid_to_possible_ah_dids_dict(
-    anki_nids: Collection[NoteId],
-) -> Dict[NoteId, Set[uuid.UUID]]:
-    """Returns a dictionary that maps anki note ids to the set of deck ids that the note could
-    belong to. Whether a note could belong to a deck is determined in this manner:
-    - If the note is on AnkiHub already, the deck id can be looked up in database by the note id.
-    - Otherwise the note type is used to determine the possible deck ids.
-    """
-    # Get definite deck ids for existing AnkiHub notes
-    anki_nid_to_ah_did = ankihub_db.anki_nid_to_ah_did_dict(anki_nids)
-
-    # Get possible deck ids for notes that are not on AnkiHub yet by looking at the note type
-    nids_without_ah_note = [
-        nid for nid in anki_nids if nid not in anki_nid_to_ah_did.keys()
-    ]
-    anki_nid_to_mid = get_anki_nid_to_mid_dict(nids_without_ah_note)
-    mid_to_ah_dids = {
-        mid: ankihub_db.ankihub_dids_for_note_type(mid)
-        for mid in set(anki_nid_to_mid.values())
-    }
-    anki_nid_to_possible_ah_dids = {
-        nid: mid_to_ah_dids[mid] for nid, mid in anki_nid_to_mid.items()
-    }
-
-    # Merge definite and possible deck ids
-    result = {
-        **{nid: {did} for nid, did in anki_nid_to_ah_did.items()},
-        **anki_nid_to_possible_ah_dids,
-    }
-    return result
 
 
 def _added_new_media(note: Note) -> bool:
