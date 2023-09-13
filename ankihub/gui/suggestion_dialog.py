@@ -180,7 +180,11 @@ def _determine_ah_did_for_nids_to_be_suggested(
         ah_did = dids_that_all_notes_could_belong_to.pop()
     else:
         ah_did = choose_ankihub_deck(
-            prompt="Choose a deck to submit the suggestions to.",
+            prompt=(
+                f"Choose a deck to submit the suggestion{'s' if len(anki_nids) > 1 else ''} to.<br><br>"
+                "<i>This dialog is shown because a note type of a <br>"
+                "new note is used by multiple AnkiHub decks.</i>"
+            ),
             ah_dids=list(dids_that_all_notes_could_belong_to),
             parent=parent,
         )
