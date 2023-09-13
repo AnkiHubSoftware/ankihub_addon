@@ -4,7 +4,7 @@ from concurrent.futures import Future
 from dataclasses import dataclass
 from enum import Enum
 from pprint import pformat
-from typing import Collection, Dict, Optional, Set, Tuple
+from typing import Collection, Dict, Optional, Set
 
 import aqt
 from anki.notes import Note, NoteId
@@ -26,7 +26,7 @@ from aqt.qt import (
     pyqtSignal,
     qconnect,
 )
-from aqt.utils import showText
+from aqt.utils import show_info, showText
 
 from .. import LOGGER
 from ..ankihub_client import (
@@ -82,7 +82,7 @@ def open_suggestion_dialog_for_note(note: Note, parent: QWidget) -> None:
     ), f"Note type {note.mid} is not associated with an AnkiHub deck."
 
     ah_nid = ankihub_db.ankihub_nid_for_anki_nid(note.id)
-    ah_did, _ = _determine_ah_did_and_anki_nids_for_suggestion([note.id], parent)
+    ah_did = _determine_ah_did_for_nids_to_be_suggested([note.id], parent)
 
     suggestion_meta = SuggestionDialog(
         is_new_note_suggestion=ah_nid is None,
@@ -124,7 +124,7 @@ def open_suggestion_dialog_for_bulk_suggestion(
     and therefore the notes might need to be reloaded after this function is
     called."""
 
-    ah_did, anki_nids = _determine_ah_did_and_anki_nids_for_suggestion(
+    ah_did = _determine_ah_did_for_nids_to_be_suggested(
         anki_nids=anki_nids, parent=parent
     )
     if ah_did is None:
@@ -158,38 +158,37 @@ def open_suggestion_dialog_for_bulk_suggestion(
     )
 
 
-def _determine_ah_did_and_anki_nids_for_suggestion(
+def _determine_ah_did_for_nids_to_be_suggested(
     anki_nids: Collection[NoteId], parent: QWidget
-) -> Tuple[uuid.UUID, Set[NoteId]]:
-    """Return the AnkiHub deck id and the list of anki note ids for the suggestion.
-    If the choice of deck is ambiguous, the user is asked to choose a deck.
-    Note ids which can't belong to the chosen deck are not included in the list of note ids."""
+) -> Optional[uuid.UUID]:
+    """Return an AnkiHub deck id that the notes will be suggested to. If the
+    choice of deck is ambiguous, the user is asked to choose a deck from a list
+    of viable decks.
+    Returns None if the user cancelled the deck selection dialog or if there is
+    no deck that all notes could belong to."""
     anki_nid_to_possible_ah_dids = _get_anki_nid_to_possible_ah_dids_dict(anki_nids)
     dids_that_all_notes_could_belong_to = set.intersection(
         *anki_nid_to_possible_ah_dids.values()
     )
-    if len(dids_that_all_notes_could_belong_to) == 1:
+    if len(dids_that_all_notes_could_belong_to) == 0:
+        LOGGER.info(
+            "User tried to submit suggestions for notes that could not belong to a single AnkiHub deck."
+        )
+        show_info("Please choose notes for one AnkiHub deck only.", parent=parent)
+        return None
+    elif len(dids_that_all_notes_could_belong_to) == 1:
         ah_did = dids_that_all_notes_could_belong_to.pop()
-        filtered_anki_nids = set(anki_nids)
     else:
-        ah_dids = list(set.union(*anki_nid_to_possible_ah_dids.values()))
         ah_did = choose_ankihub_deck(
             prompt="Choose a deck to submit the suggestions to.",
-            ah_dids=ah_dids,
+            ah_dids=list(dids_that_all_notes_could_belong_to),
             parent=parent,
         )
-
         if not ah_did:
             LOGGER.info("User cancelled bulk suggestion.")
-            return None, set()
+            return None
 
-        filtered_anki_nids = set(
-            nid
-            for nid, possible_dids in anki_nid_to_possible_ah_dids.items()
-            if ah_did in possible_dids
-        )
-
-    return ah_did, filtered_anki_nids
+    return ah_did
 
 
 def _get_anki_nid_to_possible_ah_dids_dict(
