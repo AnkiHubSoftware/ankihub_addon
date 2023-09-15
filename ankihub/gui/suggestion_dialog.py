@@ -183,11 +183,7 @@ def _determine_ah_did_for_nids_to_be_suggested(
         ah_did = dids_that_all_notes_could_belong_to.pop()
     else:
         ah_did = choose_ankihub_deck(
-            prompt=(
-                "Which AnkiHub deck would you like to submit your suggestion(s) to?<br><br>"
-                "<i>A note type is used in multiple decks so AnkiHub can't determine<br>"
-                "the deck automatically.</i>"
-            ),
+            prompt="Which AnkiHub deck would you like to submit your suggestion(s) to?",
             ah_dids=list(dids_that_all_notes_could_belong_to),
             parent=parent,
         )
