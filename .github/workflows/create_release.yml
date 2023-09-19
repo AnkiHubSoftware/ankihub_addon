@@ -13,6 +13,8 @@ jobs:
         run: |
           gh auth login --with-token <<< "${{ secrets.GH_BOT_ACCESS_TOKEN }}"
 
+          # Using a limit of 100 here because the default value is lower and this makes it less likely
+          # that the latest run on main is not included in the list.
           conclusion=$(gh run list \
               --workflow=ci.yml \
               --limit=100 \
