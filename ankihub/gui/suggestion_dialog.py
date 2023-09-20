@@ -232,12 +232,8 @@ def _on_suggest_notes_in_bulk_done(future: Future, parent: QWidget) -> None:
                     parent=parent,
                     title="Error submitting bulk suggestion :(",
                 )
-            else:
-                raise e
-        else:
-            raise e
-
-        return
+                return
+        raise e
 
     LOGGER.info("Created note suggestions in bulk.")
     LOGGER.info(f"errors_by_nid:\n{pformat(suggestions_result.errors_by_nid)}")
