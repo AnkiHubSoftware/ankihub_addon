@@ -83,7 +83,7 @@ def open_suggestion_dialog_for_note(note: Note, parent: QWidget) -> None:
 
     ah_did = _determine_ah_did_for_nids_to_be_suggested([note.id], parent)
     if not ah_did:
-        LOGGER.info("Suggestion cancelled.")
+        LOGGER.info(f"Suggestion cancelled. {note.id=}")
         return
 
     ah_nid = ankihub_db.ankihub_nid_for_anki_nid(note.id)
