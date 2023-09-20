@@ -6,7 +6,7 @@ import uuid
 from dataclasses import fields
 from pathlib import Path
 from textwrap import dedent
-from typing import Callable, Generator, List, Protocol
+from typing import Callable, Generator, List, Protocol, Tuple
 from unittest.mock import Mock
 
 import aqt
@@ -58,6 +58,7 @@ from ankihub.gui.suggestion_dialog import (
     _on_suggest_notes_in_bulk_done,
     get_anki_nid_to_possible_ah_dids_dict,
     open_suggestion_dialog_for_bulk_suggestion,
+    open_suggestion_dialog_for_note,
 )
 from ankihub.gui.threading_utils import rate_limited
 from ankihub.main import suggestions
@@ -528,6 +529,145 @@ class TestSuggestionDialogGetAnkiNidToPossibleAHDidsDict:
             assert get_anki_nid_to_possible_ah_dids_dict(nids) == {
                 note_info.anki_nid: {ah_did_1}
             }
+
+
+class MockDependenciesForSuggestionDialog(Protocol):
+    def __call__(self, user_cancels: bool) -> Tuple[Mock, Mock]:
+        ...
+
+
+@pytest.fixture
+def mock_dependiencies_for_suggestion_dialog(
+    monkeypatch: MonkeyPatch,
+    mock_function: MockFunction,
+) -> MockDependenciesForSuggestionDialog:
+    """Mocks the dependencies for open_suggestion_dialog_for_note.
+    Returns a tuple of mocks that replace suggest_note_update and suggest_new_note
+    If user_cancels is True, SuggestionDialog.run behaves as if the user cancelled the dialog."""
+
+    def mock_dependencies_for_suggestion_dialog_inner(
+        user_cancels: bool,
+    ) -> Tuple[Mock, Mock]:
+        monkeypatch.setattr(
+            "ankihub.gui.suggestion_dialog.SuggestionDialog.run",
+            Mock(return_value=None)
+            if user_cancels
+            else Mock(
+                return_value=SuggestionMetadata(
+                    comment="test",
+                )
+            ),
+        )
+
+        suggest_note_update_mock = mock_function(
+            suggestion_dialog,
+            "suggest_note_update",
+        )
+        suggest_new_note_mock = mock_function(
+            suggestion_dialog,
+            "suggest_new_note",
+        )
+
+        return suggest_note_update_mock, suggest_new_note_mock
+
+    return mock_dependencies_for_suggestion_dialog_inner
+
+
+class TestOpenSuggestionDialogForSingleSuggestion:
+    @pytest.mark.parametrize(
+        "user_cancels, suggest_note_update_succeeds",
+        [
+            (True, True),
+            (True, False),
+            (False, True),
+            (False, False),
+        ],
+    )
+    def test_with_existing_note_belonging_to_single_deck(
+        self,
+        anki_session_with_addon_data: AnkiSession,
+        import_ah_note: ImportAHNote,
+        next_deterministic_uuid: Callable[[], uuid.UUID],
+        mock_dependiencies_for_suggestion_dialog: MockDependenciesForSuggestionDialog,
+        user_cancels: bool,
+        suggest_note_update_succeeds: bool,
+    ):
+        with anki_session_with_addon_data.profile_loaded():
+            ah_did = next_deterministic_uuid()
+            note_info = import_ah_note(ah_did=ah_did)
+            note = aqt.mw.col.get_note(NoteId(note_info.anki_nid))
+
+            (
+                suggest_note_update_mock,
+                suggest_new_note_mock,
+            ) = mock_dependiencies_for_suggestion_dialog(user_cancels=user_cancels)
+
+            suggest_note_update_mock.return_value = suggest_note_update_succeeds
+
+            open_suggestion_dialog_for_note(note=note, parent=aqt.mw)
+
+            if user_cancels:
+                suggest_note_update_mock.assert_not_called()
+                suggest_new_note_mock.assert_not_called()
+            else:
+                _, kwargs = suggest_note_update_mock.call_args
+                assert kwargs.get("note") == note
+
+                suggest_new_note_mock.assert_not_called()
+
+    @pytest.mark.parametrize(
+        "user_cancels",
+        [
+            True,
+            False,
+        ],
+    )
+    def test_with_new_note_which_could_belong_to_two_decks(
+        self,
+        anki_session_with_addon_data: AnkiSession,
+        import_ah_note_type: ImportAHNoteType,
+        new_note_with_note_type: NewNoteWithNoteType,
+        next_deterministic_uuid: Callable[[], uuid.UUID],
+        mock_dependiencies_for_suggestion_dialog: MockDependenciesForSuggestionDialog,
+        mock_function: MockFunction,
+        user_cancels: bool,
+    ):
+        with anki_session_with_addon_data.profile_loaded():
+            ah_did_1 = next_deterministic_uuid()
+            note_type = import_ah_note_type(ah_did=ah_did_1)
+
+            # Add the note type to a second deck
+            ah_did_2 = next_deterministic_uuid()
+            import_ah_note_type(ah_did=ah_did_2, note_type=note_type)
+
+            note = new_note_with_note_type(note_type=note_type)
+
+            (
+                suggest_note_update_mock,
+                suggest_new_note_mock,
+            ) = mock_dependiencies_for_suggestion_dialog(user_cancels=False)
+
+            choose_ankihub_deck_mock = mock_function(
+                suggestion_dialog,
+                "choose_ankihub_deck",
+                return_value=None if user_cancels else ah_did_1,
+            )
+
+            open_suggestion_dialog_for_note(note=note, parent=aqt.mw)
+
+            if user_cancels:
+                suggest_note_update_mock.assert_not_called()
+                suggest_new_note_mock.assert_not_called()
+            else:
+                # There are two options for the deck, so the user has to choose one.
+                _, kwargs = choose_ankihub_deck_mock.call_args
+                assert kwargs.get("ah_dids") == [ah_did_1, ah_did_2]
+
+                # The note should be suggested for the chosen deck.
+                _, kwargs = suggest_new_note_mock.call_args
+                assert kwargs.get("note") == note
+
+                suggest_note_update_mock.assert_not_called()
 
 
 class MockDependenciesForBulkSuggestionDialog(Protocol):
