@@ -612,10 +612,12 @@ class _AnkiHubDB:
             AND referenced_on_accepted_note = 1
             """
 
-        names_in_db = self.list(
-            sql,
-            str(ah_did),
-            *media_names,
+        names_in_db = set(
+            self.list(
+                sql,
+                str(ah_did),
+                *media_names,
+            )
         )
         result = {name: name in names_in_db for name in media_names}
         return result
