@@ -117,7 +117,7 @@ def suggest_new_note(
 
 @dataclass
 class BulkNoteSuggestionsResult:
-    errors_by_nid: Dict[NoteId, Dict[str, List[str]]]  # dict of errors by anki_nid
+    errors_by_nid: Dict[NoteId, List[str]]
     new_note_suggestions_count: int
     change_note_suggestions_count: int
 
