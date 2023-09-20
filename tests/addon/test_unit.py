@@ -788,12 +788,12 @@ class TestOpenSuggestionDialogForBulkSuggestion:
     ):
         with anki_session_with_addon_data.profile_loaded():
             ah_did_1 = next_deterministic_uuid()
-            note_type_1 = import_ah_note_type(ah_did=ah_did_1)
-            note_1 = new_note_with_note_type(note_type=note_type_1)
+            note_type = import_ah_note_type(ah_did=ah_did_1)
+            note_1 = new_note_with_note_type(note_type=note_type)
 
             ah_did_2 = next_deterministic_uuid()
-            note_type_2 = import_ah_note_type(ah_did=ah_did_2)
-            note_2 = new_note_with_note_type(note_type=note_type_2)
+            import_ah_note_type(ah_did=ah_did_2, note_type=note_type)
+            note_2 = new_note_with_note_type(note_type=note_type)
 
             nids = [note_1.id, note_2.id]
 
