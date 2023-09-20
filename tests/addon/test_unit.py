@@ -5,7 +5,7 @@ import time
 import uuid
 from dataclasses import fields
 from pathlib import Path
-from typing import Callable, Generator, List
+from typing import Callable, Generator, List, Protocol
 from unittest.mock import Mock
 
 import aqt
@@ -24,6 +24,7 @@ from ankihub.gui import errors
 from ..factories import DeckMediaFactory, NoteInfoFactory
 from ..fixtures import (  # type: ignore
     ImportAHNoteType,
+    MockFunction,
     NewNoteWithNoteType,
     SetFeatureFlagState,
 )
@@ -37,6 +38,7 @@ from ankihub.ankihub_client import AnkiHubHTTPError, Field, SuggestionType
 from ankihub.db.db import MEDIA_DISABLED_FIELD_BYPASS_TAG, _AnkiHubDB
 from ankihub.db.exceptions import IntegrityError
 from ankihub.feature_flags import _FeatureFlags, feature_flags
+from ankihub.gui import suggestion_dialog
 from ankihub.gui.error_dialog import ErrorDialog
 from ankihub.gui.errors import (
     OUTDATED_CLIENT_ERROR_REASON,
@@ -51,6 +53,7 @@ from ankihub.gui.suggestion_dialog import (
     SuggestionMetadata,
     SuggestionSource,
     get_anki_nid_to_possible_ah_dids_dict,
+    open_suggestion_dialog_for_bulk_suggestion,
 )
 from ankihub.gui.threading_utils import rate_limited
 from ankihub.main import suggestions
@@ -521,6 +524,156 @@ class TestSuggestionDialogGetAnkiNidToPossibleAHDidsDict:
             assert get_anki_nid_to_possible_ah_dids_dict(nids) == {
                 note_info.anki_nid: {ah_did_1}
             }
+
+
+class MockDependenciesForBulkSuggestionDialog(Protocol):
+    def __call__(self, user_cancels: bool) -> Mock:
+        ...
+
+
+@pytest.fixture
+def mock_dependencies_for_bulk_suggestion_dialog(
+    monkeypatch: MonkeyPatch,
+) -> MockDependenciesForBulkSuggestionDialog:
+    """Mocks the dependencies for open_suggestion_dialog_for_bulk_suggestion.
+    Returns a Mock that replaces suggest_notes_in_bulk.
+    If user_cancels is True, SuggestionDialog.run behaves as if the user cancelled the dialog."""
+
+    def mock_dependencies_for_suggestion_dialog_inner(user_cancels: bool) -> Mock:
+        monkeypatch.setattr(
+            "ankihub.gui.suggestion_dialog.SuggestionDialog.run",
+            Mock(return_value=None)
+            if user_cancels
+            else Mock(
+                return_value=SuggestionMetadata(
+                    comment="test",
+                )
+            ),
+        )
+
+        suggest_notes_in_bulk_mock = Mock()
+        monkeypatch.setattr(
+            "ankihub.gui.suggestion_dialog.suggest_notes_in_bulk",
+            suggest_notes_in_bulk_mock,
+        )
+
+        monkeypatch.setattr(
+            "ankihub.gui.suggestion_dialog._on_suggest_notes_in_bulk_done", Mock()
+        )
+        return suggest_notes_in_bulk_mock
+
+    return mock_dependencies_for_suggestion_dialog_inner
+
+
+class TestOpenSuggestionDialogForBulkSuggestion:
+    @pytest.mark.parametrize(
+        "user_cancels",
+        [
+            True,
+            False,
+        ],
+    )
+    def test_with_existing_note_belonging_to_single_deck(
+        self,
+        anki_session_with_addon_data: AnkiSession,
+        import_ah_note: ImportAHNote,
+        next_deterministic_uuid: Callable[[], uuid.UUID],
+        qtbot: QtBot,
+        mock_dependencies_for_bulk_suggestion_dialog: MockDependenciesForBulkSuggestionDialog,
+        user_cancels: bool,
+    ):
+        with anki_session_with_addon_data.profile_loaded():
+            ah_did = next_deterministic_uuid()
+            note_info = import_ah_note(ah_did=ah_did)
+            nids = [NoteId(note_info.anki_nid)]
+
+            suggest_notes_in_bulk_mock = mock_dependencies_for_bulk_suggestion_dialog(
+                user_cancels=user_cancels
+            )
+
+            open_suggestion_dialog_for_bulk_suggestion(anki_nids=nids, parent=aqt.mw)
+
+            if user_cancels:
+                qtbot.wait(500)
+                suggest_notes_in_bulk_mock.assert_not_called()
+            else:
+                qtbot.wait_until(lambda: suggest_notes_in_bulk_mock.called)
+                _, kwargs = suggest_notes_in_bulk_mock.call_args
+                assert kwargs.get("ankihub_did") == ah_did
+                assert {note.id for note in kwargs.get("notes")} == set(nids)
+
+    def test_with_two_new_notes_without_decks_in_common(
+        self,
+        anki_session_with_addon_data: AnkiSession,
+        import_ah_note_type: ImportAHNoteType,
+        new_note_with_note_type: NewNoteWithNoteType,
+        next_deterministic_uuid: Callable[[], uuid.UUID],
+        mock_dependencies_for_bulk_suggestion_dialog: MockDependenciesForBulkSuggestionDialog,
+        qtbot: QtBot,
+    ):
+        with anki_session_with_addon_data.profile_loaded():
+            ah_did_1 = next_deterministic_uuid()
+            note_type_1 = import_ah_note_type(ah_did=ah_did_1)
+            note_1 = new_note_with_note_type(note_type=note_type_1)
+
+            ah_did_2 = next_deterministic_uuid()
+            note_type_2 = import_ah_note_type(ah_did=ah_did_2, force_new=True)
+            note_2 = new_note_with_note_type(note_type=note_type_2)
+
+            nids = [note_1.id, note_2.id]
+
+            suggest_notes_in_bulk_mock = mock_dependencies_for_bulk_suggestion_dialog(
+                user_cancels=False
+            )
+
+            open_suggestion_dialog_for_bulk_suggestion(anki_nids=nids, parent=aqt.mw)
+            qtbot.wait(500)
+
+            # The note suggestions can't be for the same deck, so the suggestion dialog should not be shown.
+            suggest_notes_in_bulk_mock.assert_not_called()
+
+    def test_with_two_new_notes_with_decks_in_common(
+        self,
+        anki_session_with_addon_data: AnkiSession,
+        import_ah_note_type: ImportAHNoteType,
+        new_note_with_note_type: NewNoteWithNoteType,
+        next_deterministic_uuid: Callable[[], uuid.UUID],
+        mock_dependencies_for_bulk_suggestion_dialog: MockDependenciesForBulkSuggestionDialog,
+        mock_function: MockFunction,
+        qtbot: QtBot,
+    ):
+        with anki_session_with_addon_data.profile_loaded():
+            ah_did_1 = next_deterministic_uuid()
+            note_type_1 = import_ah_note_type(ah_did=ah_did_1)
+            note_1 = new_note_with_note_type(note_type=note_type_1)
+
+            ah_did_2 = next_deterministic_uuid()
+            note_type_2 = import_ah_note_type(ah_did=ah_did_2)
+            note_2 = new_note_with_note_type(note_type=note_type_2)
+
+            nids = [note_1.id, note_2.id]
+
+            choose_ankihub_deck_mock = mock_function(
+                suggestion_dialog,
+                "choose_ankihub_deck",
+                return_value=ah_did_1,
+            )
+            suggest_notes_in_bulk_mock = mock_dependencies_for_bulk_suggestion_dialog(
+                user_cancels=False
+            )
+
+            open_suggestion_dialog_for_bulk_suggestion(anki_nids=nids, parent=aqt.mw)
+            qtbot.wait_until(lambda: suggest_notes_in_bulk_mock.called)
+
+            # There are two options for the deck the note suggestions can be for, so the user should be asked
+            # to choose between them.
+            _, kwargs = choose_ankihub_deck_mock.call_args
+            assert kwargs.get("ah_dids") == [ah_did_1, ah_did_2]
+
+            # After the user has chosen the deck, the suggestion dialog should be shown for the chosen deck.
+            _, kwargs = suggest_notes_in_bulk_mock.call_args
+            assert kwargs.get("ankihub_did") == ah_did_1
+            assert {note.id for note in kwargs.get("notes")} == set(nids)
 
 
 class TestAnkiHubDBAnkiNidsToAnkiHubNids:
