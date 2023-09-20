@@ -5,6 +5,7 @@ import time
 import uuid
 from dataclasses import fields
 from pathlib import Path
+from textwrap import dedent
 from typing import Callable, Generator, List, Protocol
 from unittest.mock import Mock
 
@@ -18,8 +19,10 @@ from aqt.qt import QDialogButtonBox
 from pytest import MonkeyPatch, fixture
 from pytest_anki import AnkiSession
 from pytestqt.qtbot import QtBot  # type: ignore
+from requests import Response  # type: ignore
 
 from ankihub.gui import errors
+from ankihub.gui.operations.utils import future_with_exception, future_with_result
 
 from ..factories import DeckMediaFactory, NoteInfoFactory
 from ..fixtures import (  # type: ignore
@@ -52,6 +55,7 @@ from ankihub.gui.suggestion_dialog import (
     SuggestionDialog,
     SuggestionMetadata,
     SuggestionSource,
+    _on_suggest_notes_in_bulk_done,
     get_anki_nid_to_possible_ah_dids_dict,
     open_suggestion_dialog_for_bulk_suggestion,
 )
@@ -674,6 +678,74 @@ class TestOpenSuggestionDialogForBulkSuggestion:
             _, kwargs = suggest_notes_in_bulk_mock.call_args
             assert kwargs.get("ankihub_did") == ah_did_1
             assert {note.id for note in kwargs.get("notes")} == set(nids)
+
+
+class TestOnSuggestNotesInBulkDone:
+    def test_correct_message_is_shown(
+        self,
+        mock_function: MockFunction,
+    ):
+        showText_mock = mock_function(
+            suggestion_dialog,
+            "showText",
+        )
+        nid_1 = NoteId(1)
+        nid_2 = NoteId(2)
+        _on_suggest_notes_in_bulk_done(
+            future=future_with_result(
+                suggestions.BulkNoteSuggestionsResult(
+                    errors_by_nid={
+                        nid_1: [suggestions.ANKIHUB_NO_CHANGE_ERROR],
+                        nid_2: ["some error"],
+                    },
+                    change_note_suggestions_count=10,
+                    new_note_suggestions_count=20,
+                )
+            ),
+            parent=aqt.mw,
+        )
+
+        _, kwargs = showText_mock.call_args
+        assert (
+            kwargs.get("txt")
+            == dedent(
+                """
+                Submitted 10 change note suggestion(s).
+                Submitted 20 new note suggestion(s).
+
+
+                Failed to submit suggestions for 2 note(s).
+                All notes with failed suggestions:
+                1, 2
+
+                Notes without changes (1):
+                1
+                """
+            ).strip()
+            + "\n"
+        )
+
+    def test_with_exception_in_future(self):
+        with pytest.raises(Exception):
+            _on_suggest_notes_in_bulk_done(
+                future=future_with_exception(Exception("test")),
+                parent=aqt.mw,
+            )
+
+    def test_with_http_403_exception_in_future(self, mock_function: MockFunction):
+        response = Response()
+        response.status_code = 403
+        response.json = lambda: {"detail": "test"}  # type: ignore
+        exception = AnkiHubHTTPError(response)
+
+        show_error_dialog_mock = mock_function(suggestion_dialog, "show_error_dialog")
+
+        _on_suggest_notes_in_bulk_done(
+            future=future_with_exception(exception),
+            parent=aqt.mw,
+        )
+        _, kwargs = show_error_dialog_mock.call_args
+        assert kwargs.get("message") == "test"
 
 
 class TestAnkiHubDBAnkiNidsToAnkiHubNids:

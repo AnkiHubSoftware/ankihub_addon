@@ -228,7 +228,7 @@ def _on_suggest_notes_in_bulk_done(future: Future, parent: QWidget) -> None:
             error_message = response_data.get("detail")
             if error_message:
                 show_error_dialog(
-                    error_message,
+                    message=error_message,
                     parent=parent,
                     title="Error submitting bulk suggestion :(",
                 )
@@ -261,7 +261,7 @@ def _on_suggest_notes_in_bulk_done(future: Future, parent: QWidget) -> None:
     )
 
     msg = msg_about_created_suggestions + msg_about_failed_suggestions
-    showText(msg, parent=parent)
+    showText(txt=msg, parent=parent)
 
 
 class SuggestionDialog(QDialog):
