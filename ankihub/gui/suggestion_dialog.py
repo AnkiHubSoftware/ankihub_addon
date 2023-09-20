@@ -188,7 +188,7 @@ def _determine_ah_did_for_nids_to_be_suggested(
             parent=parent,
         )
         if not ah_did:
-            LOGGER.info("User cancelled bulk suggestion.")
+            LOGGER.info("User cancelled suggestion.")
             return None
 
     return ah_did
