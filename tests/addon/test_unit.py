@@ -34,7 +34,7 @@ from .test_integration import ImportAHNote
 os.environ["SKIP_INIT"] = "1"
 
 from ankihub.ankihub_client import AnkiHubHTTPError, Field, SuggestionType
-from ankihub.db.db import MEDIA_DISABLED_FIELD_BYPASS_TAG, _AnkiHubDB
+from ankihub.db.db import _AnkiHubDB
 from ankihub.db.exceptions import IntegrityError
 from ankihub.feature_flags import _FeatureFlags, feature_flags
 from ankihub.gui.error_dialog import ErrorDialog
@@ -557,22 +557,13 @@ class TestAnkiHubDBRemoveNotes:
         assert ankihub_db.anki_nids_for_ankihub_deck(ankihub_did=ah_did) == []
 
 
-@pytest.mark.parametrize(
-    "use_deck_media",
-    [True, False],
-)
 class TestAnkiHubDBRemoveDeck:
     def test_removes_notes_and_note_types_and_deck_media(
         self,
         ankihub_db: _AnkiHubDB,
         next_deterministic_uuid: Callable[[], uuid.UUID],
         ankihub_basic_note_type: NotetypeDict,
-        set_feature_flag_state: SetFeatureFlagState,
-        use_deck_media: bool,
     ):
-        if use_deck_media:
-            set_feature_flag_state("use_deck_media", True)
-
         # Add data to the DB.
         ah_did = next_deterministic_uuid()
         ankihub_db.upsert_note_type(
@@ -594,24 +585,14 @@ class TestAnkiHubDBRemoveDeck:
         assert ankihub_db.anki_nids_for_ankihub_deck(ah_did) == [note.anki_nid]
         assert len(ankihub_db.note_types_for_ankihub_deck(ah_did))
 
-        if use_deck_media:
-            deck_media = DeckMediaFactory.create(
-                referenced_on_accepted_note=True,
-                exists_on_s3=True,
-                download_enabled=True,
-            )
-            ankihub_db.upsert_deck_media_infos(
-                ankihub_did=ah_did, media_list=[deck_media]
-            )
-            # sanity check
-            assert (
-                len(
-                    ankihub_db.downloadable_media_names_for_ankihub_deck(
-                        ah_did, media_disabled_fields={}
-                    )
-                )
-                == 1
-            )
+        deck_media = DeckMediaFactory.create(
+            referenced_on_accepted_note=True,
+            exists_on_s3=True,
+            download_enabled=True,
+        )
+        ankihub_db.upsert_deck_media_infos(ankihub_did=ah_did, media_list=[deck_media])
+        # sanity check
+        assert len(ankihub_db.downloadable_media_names_for_ankihub_deck(ah_did)) == 1
 
         # Remove the deck
         ankihub_db.remove_deck(ankihub_did=ah_did)
@@ -632,13 +613,7 @@ class TestAnkiHubDBRemoveDeck:
             is None
         )
 
-        if use_deck_media:
-            assert (
-                ankihub_db.downloadable_media_names_for_ankihub_deck(
-                    ah_did, media_disabled_fields={}
-                )
-                == set()
-            )
+        assert ankihub_db.downloadable_media_names_for_ankihub_deck(ah_did) == set()
 
 
 class TestAnkiHubDBIntegrityError:
@@ -696,59 +671,11 @@ class TestAnkiHubDBMediaNamesForAnkiHubDeck:
         with anki_session.profile_loaded():
             # Assert that the media name is returned for the field that is not disabled
             # and the media name is not returned for the field that is disabled.
-            assert ankihub_db.media_names_for_ankihub_deck(
-                self.ah_did, media_disabled_fields={}
-            ) == {
+            assert ankihub_db.media_names_for_ankihub_deck(self.ah_did) == {
                 "test1.jpg",
                 "test2.jpg",
                 "test3.mp3",
             }
-
-    def test_with_media_disabled_field(
-        self,
-        anki_session: AnkiSession,
-        ankihub_db: _AnkiHubDB,
-    ):
-        with anki_session.profile_loaded():
-            # Assert that the media name is returned for the field that is not disabled
-            # and the media name is not returned for the field that is disabled.
-            assert ankihub_db.media_names_for_ankihub_deck(
-                self.ah_did, media_disabled_fields={self.mid: ["Front"]}
-            ) == {"test2.jpg", "test3.mp3"}
-
-    def test_bypass_using_media_disabled_bypass_tag(
-        self,
-        anki_session: AnkiSession,
-        ankihub_db: _AnkiHubDB,
-    ):
-        with anki_session.profile_loaded():
-            # Set bypass tag
-            bypass_tag = f"{MEDIA_DISABLED_FIELD_BYPASS_TAG}::Front"
-            sql = f"UPDATE notes SET tags = '{bypass_tag}' WHERE ankihub_deck_id = '{str(self.ah_did)}';"
-            ankihub_db.execute(sql=sql)
-
-            assert ankihub_db.media_names_for_ankihub_deck(
-                self.ah_did, media_disabled_fields={self.mid: ["Front", "Back"]}
-            ) == {"test1.jpg"}
-
-    def test_with_notetype_missing_from_anki_db(
-        self,
-        anki_session: AnkiSession,
-        ankihub_db: _AnkiHubDB,
-    ):
-        with anki_session.profile_loaded():
-            mw = anki_session.mw
-            mw.col.models.remove(self.mid)
-
-            # Without the notetype in the Anki DB, the AnkiHub DB currently doesn't know the
-            # names of the fields, so it just returns an empty set.
-            # Assert that no error is raised and an empty set is returned.
-            assert (
-                ankihub_db.media_names_for_ankihub_deck(
-                    self.ah_did, media_disabled_fields={}
-                )
-                == set()
-            )
 
 
 @pytest.mark.parametrize(
@@ -768,7 +695,6 @@ class TestAnkiHubDBDownloadableMediaNamesForAnkiHubDeck:
     def test_basic(
         self,
         anki_session_with_addon_data: AnkiSession,
-        set_feature_flag_state: SetFeatureFlagState,
         next_deterministic_uuid: Callable[[], uuid.UUID],
         ankihub_db: _AnkiHubDB,
         referenced_on_accepted_note: bool,
@@ -777,8 +703,6 @@ class TestAnkiHubDBDownloadableMediaNamesForAnkiHubDeck:
     ):
 
         with anki_session_with_addon_data.profile_loaded():
-            set_feature_flag_state("use_deck_media", True)
-
             ah_did = next_deterministic_uuid()
             ankihub_db.upsert_deck_media_infos(
                 ankihub_did=ah_did,
@@ -798,9 +722,7 @@ class TestAnkiHubDBDownloadableMediaNamesForAnkiHubDeck:
                 else set()
             )
             assert (
-                ankihub_db.downloadable_media_names_for_ankihub_deck(
-                    ah_did=ah_did, media_disabled_fields={}
-                )
+                ankihub_db.downloadable_media_names_for_ankihub_deck(ah_did=ah_did)
                 == expected_result
             )
 
