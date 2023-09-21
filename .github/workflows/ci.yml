@@ -91,6 +91,7 @@ jobs:
           pytest ./tests/addon --performance -k performance -n1
 
       - name: Upload coverage report with smokeshow
+        if: always()
         run: smokeshow upload coverage_html_report
         env:
           SMOKESHOW_GITHUB_STATUS_DESCRIPTION: Add-on Test Coverage {coverage-percentage}
@@ -99,6 +100,7 @@ jobs:
           SMOKESHOW_GITHUB_PR_HEAD_SHA: ${{ github.event.pull_request.head.sha }}
 
       - name: Upload coverage to Codecov
+        if: always()
         env:
           CODECOV_TOKEN: "${{ secrets.CODECOV_TOKEN }}"
         uses: codecov/codecov-action@v1
