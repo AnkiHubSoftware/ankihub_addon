@@ -1,16 +1,34 @@
 FROM mcr.microsoft.com/devcontainers/python:3.11
 
 RUN apt-get update && export DEBIAN_FRONTEND=noninteractive \
-    && apt-get -y install --no-install-recommends xfce4 xfce4-goodies tigervnc-common tigervnc-standalone-server \
-    dbus-x11 xfonts-base xfonts-100dpi xfonts-75dpi \
-    python3 python3-pip libnss3 libasound2 zstd libqt5x11extras5 xvfb ffmpeg mplayer lame espeak-ng \
-    fonts-arphic-ukai fonts-arphic-uming fonts-ipafont-mincho fonts-ipafont-gothic fonts-unfonts-core
+    && apt-get -y install --no-install-recommends 
+    dbus-x11 \
+    espeak-ng \
+    ffmpeg \
+    fonts-arphic-ukai \
+    fonts-arphic-uming \
+    fonts-ipafont-gothic \
+    fonts-ipafont-mincho \ 
+    fonts-unfonts-core \
+    ibnss3 \
+    lame \
+    libasound2 \
+    libqt5x11extras5 \
+    mplayer \
+    python3-pyqt5 \
+    tigervnc-common \
+    tigervnc-standalone-server \
+    xfce4 \
+    xfce4-goodies \
+    xfonts-100dpi \
+    xfonts-75dpi \
+    xfonts-base \
+    xvfb \
+    zstd
 
 RUN git clone https://github.com/novnc/noVNC.git /opt/novnc
 RUN git clone https://github.com/novnc/websockify /opt/novnc/utils/websockify
 
-RUN pip3 install numpy
-# install packaged pip modules
 COPY ./requirements /requirements
 RUN python -m pip install --upgrade pip && \
     python -m pip install -r /requirements/dev.txt
