@@ -202,9 +202,7 @@ def get_anki_nid_to_possible_ah_dids_dict(
     anki_nid_to_ah_did = ankihub_db.anki_nid_to_ah_did_dict(anki_nids)
 
     # Get possible deck ids for notes that are not on AnkiHub yet by looking at the note type
-    nids_without_ah_note = [
-        nid for nid in anki_nids if nid not in anki_nid_to_ah_did.keys()
-    ]
+    nids_without_ah_note = set(anki_nids) - anki_nid_to_ah_did.keys()
     anki_nid_to_mid = get_anki_nid_to_mid_dict(nids_without_ah_note)
     mid_to_ah_dids = {
         mid: ankihub_db.ankihub_dids_for_note_type(mid)
