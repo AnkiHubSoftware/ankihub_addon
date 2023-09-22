@@ -1,15 +1,10 @@
-# See here for image contents: https://github.com/microsoft/vscode-dev-containers/tree/v0.222.0/containers/python-3/.devcontainer/base.Dockerfile
+FROM mcr.microsoft.com/devcontainers/python:3.11
 
-# python 3.9 image
-FROM mcr.microsoft.com/vscode/devcontainers/base:ubuntu-21.04
-
-# [Optional] Uncomment this section to install additional OS packages.
 RUN apt-get update && export DEBIAN_FRONTEND=noninteractive \
     && apt-get -y install --no-install-recommends xfce4 xfce4-goodies tigervnc-common tigervnc-standalone-server \
     dbus-x11 xfonts-base xfonts-100dpi xfonts-75dpi \
     python3 python3-pip libnss3 libasound2 zstd libqt5x11extras5 xvfb ffmpeg mplayer lame espeak-ng \
-    fonts-arphic-ukai fonts-arphic-uming fonts-ipafont-mincho fonts-ipafont-gothic fonts-unfonts-core \
-    nodejs npm
+    fonts-arphic-ukai fonts-arphic-uming fonts-ipafont-mincho fonts-ipafont-gothic fonts-unfonts-core
 
 RUN git clone https://github.com/novnc/noVNC.git /opt/novnc
 RUN git clone https://github.com/novnc/websockify /opt/novnc/utils/websockify
