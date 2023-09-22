@@ -1,16 +1,15 @@
 FROM mcr.microsoft.com/devcontainers/python:3.11
 
 RUN apt-get update && export DEBIAN_FRONTEND=noninteractive \
-    && apt-get -y install --no-install-recommends 
+    && apt-get -y install --no-install-recommends \
     dbus-x11 \
     espeak-ng \
     ffmpeg \
     fonts-arphic-ukai \
     fonts-arphic-uming \
     fonts-ipafont-gothic \
-    fonts-ipafont-mincho \ 
+    fonts-ipafont-mincho \
     fonts-unfonts-core \
-    ibnss3 \
     lame \
     libasound2 \
     libqt5x11extras5 \
