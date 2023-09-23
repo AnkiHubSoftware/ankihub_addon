@@ -2,35 +2,44 @@ FROM mcr.microsoft.com/devcontainers/python:3.11
 
 RUN apt-get update && export DEBIAN_FRONTEND=noninteractive \
     && apt-get -y install --no-install-recommends \
-    dbus-x11 \
-    espeak-ng \
-    ffmpeg \
-    fonts-arphic-ukai \
-    fonts-arphic-uming \
-    fonts-ipafont-gothic \
-    fonts-ipafont-mincho \
-    fonts-unfonts-core \
-    lame \
-    libasound2 \
-    libqt5x11extras5 \
-    mplayer \
-    python3-pyqt5 \
-    tigervnc-common \
-    tigervnc-standalone-server \
-    xfce4 \
-    xfce4-goodies \
-    xfonts-100dpi \
-    xfonts-75dpi \
-    xfonts-base \
-    xvfb \
-    zstd
+    findutils \
+    g++ \
+    gcc \
+    git \
+    grep \
+    libdbus-1-3 \
+    libegl1 \
+    libfontconfig1 \
+    libgl1 \
+    libgstreamer-gl1.0-0 \
+    libgstreamer-plugins-base1.0 \
+    libgstreamer1.0-0 \
+    libnss3 \
+    libpulse-mainloop-glib0 \
+    libpulse-mainloop-glib0 \
+    libssl-dev \
+    libxcomposite1 \
+    libxcursor1 \
+    libxi6 \
+    libxkbcommon-x11-0 \
+    libxkbcommon0 \
+    libxkbfile1	\
+    libxrandr2 \
+    libxrender1 \
+    libxtst6 \
+    make \
+    pkg-config \
+    portaudio19-dev \
+    rsync \
+    zstd \
+    python3-pyqt5
+
 
 RUN git clone https://github.com/novnc/noVNC.git /opt/novnc
 RUN git clone https://github.com/novnc/websockify /opt/novnc/utils/websockify
 
 COPY ./requirements /requirements
-RUN python -m pip install --upgrade pip && \
-    python -m pip install -r /requirements/dev.txt
+RUN pip3 --disable-pip-version-check --no-cache-dir install -r /requirements/dev.txt && rm -rf /tmp/pip-tmp
 
 # install anki versions
 ARG ANKI_DIR=/opt/anki
