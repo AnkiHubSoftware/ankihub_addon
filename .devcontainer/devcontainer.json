@@ -34,9 +34,6 @@
 
 	"forwardPorts": [6080],
 
-	// Comment out to connect as root instead. More info: https://aka.ms/vscode-remote/containers/non-root.
-	"remoteUser": "vscode",
-	// some environment variables
 	"remoteEnv": {
 		"SENTRY_ENV": "development",
 		"HYPER_TTS_DEBUG_LOGGING": "enable",

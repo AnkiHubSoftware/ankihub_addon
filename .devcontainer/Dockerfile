@@ -32,15 +32,17 @@ RUN apt-get update && export DEBIAN_FRONTEND=noninteractive \
     portaudio19-dev \
     rsync \
     zstd \
+    qtbase5-dev \
     python3-pyqt5 \
     python3-pyqt5.qtwebengine
-
 
 RUN git clone https://github.com/novnc/noVNC.git /opt/novnc
 RUN git clone https://github.com/novnc/websockify /opt/novnc/utils/websockify
 
 COPY ./requirements /requirements
-RUN pip3 --disable-pip-version-check --no-cache-dir install -r /requirements/dev.txt && rm -rf /tmp/pip-tmp
+RUN pip3 install --upgrade pip && \
+    pip3 --no-cache-dir install -r /requirements/dev.txt && \
+    rm -rf /tmp/pip-tmp
 
 # install anki versions
 ARG ANKI_DIR=/opt/anki
