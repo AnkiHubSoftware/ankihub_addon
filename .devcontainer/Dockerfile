@@ -32,7 +32,8 @@ RUN apt-get update && export DEBIAN_FRONTEND=noninteractive \
     portaudio19-dev \
     rsync \
     zstd \
-    python3-pyqt5
+    python3-pyqt5 \
+    python3-pyqt5.qtwebengine
 
 
 RUN git clone https://github.com/novnc/noVNC.git /opt/novnc
