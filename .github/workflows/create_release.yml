@@ -13,13 +13,12 @@ jobs:
         run: |
           gh auth login --with-token <<< "${{ secrets.GH_BOT_ACCESS_TOKEN }}"
 
-          # Using a limit of 100 here because the default value is lower and this makes it less likely
-          # that the latest run on main is not included in the list.
           conclusion=$(gh run list \
-              --workflow=ci.yml \
-              --limit=100 \
-              --json headBranch,conclusion \
-              --jq "[.[] | select(.headBranch == \"main\").conclusion][0]")
+            --workflow=ci.yml \
+            -b main \
+            -e push \
+            --json conclusion \
+            --jq ".[0].conclusion"
 
           if [[ -z "$conclusion" ]]; then
             echo "Could not determine the status of the most recent test run on the main branch. Aborting..."
