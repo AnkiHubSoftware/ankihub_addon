@@ -17,6 +17,7 @@ jobs:
             --workflow=ci.yml \
             -b main \
             -e push \
+            --limit 1 \
             --json conclusion \
             --jq ".[0].conclusion"
 
