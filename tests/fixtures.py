@@ -247,26 +247,37 @@ class ImportAHNoteType(Protocol):
         self,
         note_type: Optional[NotetypeDict] = None,
         ah_did: Optional[uuid.UUID] = None,
+        force_new: bool = False,
     ) -> NotetypeDict:
         ...
 
 
 @pytest.fixture
 def import_ah_note_type(
-    next_deterministic_uuid: Callable[[], uuid.UUID], ankihub_basic_note_type
-):
+    next_deterministic_uuid: Callable[[], uuid.UUID],
+    ankihub_basic_note_type: NotetypeDict,
+) -> ImportAHNoteType:
     """Imports a note type into the AnkiHub DB and Anki. Returns the note type.
-    You can optionally pass in a note type and/or an AnkiHub deck ID."""
+    You can optionally pass in a note type and/or an AnkiHub deck ID.
+    If force_new is True, a new unique id will be generated for the note type.
+    Otherwise, subsequent calls to this function that use the same note type won't create a new note type."""
     default_ah_did = next_deterministic_uuid()
     default_note_type = ankihub_basic_note_type
 
     def import_ah_note_type_inner(
-        note_type: Optional[NotetypeDict] = None, ah_did: Optional[uuid.UUID] = None
+        note_type: Optional[NotetypeDict] = None,
+        ah_did: Optional[uuid.UUID] = None,
+        force_new: bool = False,
     ) -> NotetypeDict:
         if note_type is None:
             note_type = default_note_type
         if ah_did is None:
             ah_did = default_ah_did
+
+        if force_new:
+            # Generate a new unique id for the note type
+            new_mid = max(model["id"] for model in aqt.mw.col.models.all()) + 1
+            note_type["id"] = new_mid
 
         importer = AnkiHubImporter()
         importer.import_ankihub_deck(
