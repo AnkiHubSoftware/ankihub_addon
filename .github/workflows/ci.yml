@@ -89,6 +89,7 @@ jobs:
           pytest ./tests/client --disable-vcr --cov --cov-report=xml --cov-append
           coverage html
           pytest ./tests/addon --performance -k performance -n1
+          coverage report --fail-under=76
 
       - name: Upload coverage report with smokeshow
         run: smokeshow upload coverage_html_report
