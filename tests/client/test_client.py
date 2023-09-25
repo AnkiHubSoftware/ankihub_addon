@@ -113,39 +113,23 @@ def client_with_server_setup(vcr: VCR, request, marks):
                 stdout=subprocess.PIPE,
                 stderr=subprocess.PIPE,
             )
-            if result.returncode != 0:
-                print(f"Command restore failed with error code {result.returncode}")
-                print(f"Stdout: {result.stdout}")
-                print(f"Stderr: {result.stderr}")
-            else:
-                print("Command restore executed successfully.")
-                print(f"Stdout: {result.stdout}")
+            print_command_result_info(command_name="pg_restore", result=result)
 
     client = AnkiHubClient(api_url=LOCAL_API_URL, local_media_dir_path=TEST_MEDIA_PATH)
     yield client
 
 
 @pytest.fixture(scope="session", autouse=True)
-def docker_setup_teardown():
-    # Start Docker container
-    subprocess.run(
-        [
-            "sudo",
-            "docker-compose",
-            "-f",
-            WEBAPP_COMPOSE_FILE.absolute(),
-            "up",
-            "-d",
-        ]
-    )
+def initial_server_setup():
 
+    # Prepare the DB state
     run_command_in_django_container(
         "python manage.py flush --no-input && "
         "python manage.py runscript create_test_users && "
         "python manage.py runscript create_fixture_data"
     )
 
-    # Dump the database to a file
+    # Dump the DB to a file to be able to restore it before each test
     result = subprocess.run(
         [
             "sudo",
@@ -163,26 +147,7 @@ def docker_setup_teardown():
         stdout=open(DUMP_FILE_NAME, "w"),
         stderr=subprocess.PIPE,
     )
-    if result.returncode != 0:
-        print(f"Command dump failed with error code {result.returncode}")
-        print(f"Stdout: {result.stdout}")
-        print(f"Stderr: {result.stderr}")
-    else:
-        print("Command dump executed successfully.")
-        print(f"Stdout: {result.stdout}")
-
-    yield
-
-    # Stop Docker container
-    subprocess.run(
-        [
-            "sudo",
-            "docker-compose",
-            "-f",
-            WEBAPP_COMPOSE_FILE.absolute(),
-            "down",
-        ]
-    )
+    print_command_result_info(command_name="pg_dump", result=result)
 
 
 def run_command_in_django_container(command):
@@ -203,16 +168,21 @@ def run_command_in_django_container(command):
         stdout=subprocess.PIPE,
         stderr=subprocess.PIPE,
     )
+    print_command_result_info(command_name=command, result=result)
 
+    return result
+
+
+def print_command_result_info(
+    command_name: str, result: subprocess.CompletedProcess
+) -> None:
     if result.returncode != 0:
-        print(f"Command '{command}' failed with error code {result.returncode}")
+        print(f"Command {command_name} failed with error code {result.returncode}")
         print(f"Stdout: {result.stdout}")
         print(f"Stderr: {result.stderr}")
     else:
-        print(f"Command '{command}' executed successfully.")
+        print(f"Command {command_name} executed successfully.")
         print(f"Stdout: {result.stdout}")
-
-    return result
 
 
 @pytest.fixture
