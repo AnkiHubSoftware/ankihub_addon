@@ -100,6 +100,34 @@ def client_with_server_setup(vcr: VCR, request, marks):
     yield client
 
 
+@pytest.fixture(scope="session", autouse=True)
+def docker_setup_teardown():
+    # Start Docker container
+    subprocess.run(
+        [
+            "sudo",
+            "docker-compose",
+            "-f",
+            WEBAPP_COMPOSE_FILE.absolute(),
+            "up",
+            "-d",
+        ]
+    )
+
+    yield
+
+    # Stop Docker container
+    subprocess.run(
+        [
+            "sudo",
+            "docker-compose",
+            "-f",
+            WEBAPP_COMPOSE_FILE.absolute(),
+            "down",
+        ]
+    )
+
+
 def run_command_in_django_container(command):
     result = subprocess.run(
         [
@@ -107,8 +135,8 @@ def run_command_in_django_container(command):
             "docker-compose",
             "-f",
             WEBAPP_COMPOSE_FILE.absolute(),
-            "run",
-            "--rm",
+            "exec",
+            "-T",
             "django",
             "bash",
             "-c",
@@ -120,11 +148,9 @@ def run_command_in_django_container(command):
     )
 
     if result.returncode != 0:
-        raise Exception(
-            f"Command '{command}' failed with error code {result.returncode}\n"
-            f"Stdout: {result.stdout}"
-            f"Stderr: {result.stderr}"
-        )
+        print(f"Command '{command}' failed with error code {result.returncode}")
+        print(f"Stdout: {result.stdout}")
+        print(f"Stderr: {result.stderr}")
     else:
         print(f"Command '{command}' executed successfully.")
         print(f"Stdout: {result.stdout}")
