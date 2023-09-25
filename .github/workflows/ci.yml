@@ -28,6 +28,7 @@ jobs:
         uses: ./.github/actions/setup-addon
         with:
           google_api_key: ${{ secrets.GOOGLE_API_KEY }}
+          install_qt: true
 
       - name: Run pytest with coverage
         run: |
@@ -59,6 +60,7 @@ jobs:
         uses: ./.github/actions/setup-addon
         with:
           google_api_key: ${{ secrets.GOOGLE_API_KEY }}
+          install_qt: false
 
       - name: Enable cloning web app repo
         uses: webfactory/ssh-agent@v0.5.4
@@ -87,7 +89,7 @@ jobs:
 
       - name: Run pytest with coverage
         run: |
-          pytest ./tests/client --disable-vcr --cov --cov-report=xml --cov-append \
+          pytest ./tests/client --disable-vcr --cov --cov-report=xml \
             --splits 3 --group ${{ matrix.group }} --durations-path=tests/.test_durations
 
       - name: Upload coverage
@@ -111,6 +113,7 @@ jobs:
         uses: ./.github/actions/setup-addon
         with:
           google_api_key: ${{ secrets.GOOGLE_API_KEY }}
+          install_qt: false
 
       - name: Download all artifacts
         uses: actions/download-artifact@v2

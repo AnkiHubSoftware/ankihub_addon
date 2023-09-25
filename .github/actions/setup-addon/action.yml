@@ -2,6 +2,8 @@ name: Setup addon
 inputs:
   google_api_key:
     required: true
+  install-qt:
+    required: true
 runs:
   using: "composite"
   steps:
@@ -23,6 +25,7 @@ runs:
           ${{ runner.os }}-pip-
 
     - name: Install Qt
+      if: ${{ inputs.install-qt == 'true' }}
       uses: jurplel/install-qt-action@v3
       with:
         version: "5.15.2"
