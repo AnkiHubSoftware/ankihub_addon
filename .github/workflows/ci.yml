@@ -29,6 +29,8 @@ jobs:
 
       - name: Setup addon
         uses: ./.github/actions/setup-addon
+        with:
+          google_api_key: ${{ secrets.GOOGLE_API_KEY }}
 
       - name: Enable cloning web app repo
         uses: webfactory/ssh-agent@v0.5.4
@@ -87,6 +89,8 @@ jobs:
 
       - name: Setup addon
         uses: ./.github/actions/setup-addon
+        with:
+          google_api_key: ${{ secrets.GOOGLE_API_KEY }}
 
       - name: Download all artifacts
         uses: actions/download-artifact@v2
