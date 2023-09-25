@@ -13,7 +13,35 @@ on:
   pull_request:
 
 jobs:
-  test:
+  test-addon:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/setup-python@v4
+        with:
+          python-version: "3.9"
+
+      - name: Checkout ankihub_addon
+        uses: actions/checkout@v3
+
+      - name: Setup addon
+        uses: ./.github/actions/setup-addon
+        with:
+          google_api_key: ${{ secrets.GOOGLE_API_KEY }}
+
+      - name: Run pytest with coverage
+        run: |
+          pytest ./tests/addon --cov --cov-report=xml
+          pytest ./tests/addon --performance -k performance -n1 --cov-report=xml --cov-append
+
+      - name: Upload coverage
+        uses: actions/upload-artifact@v2
+        with:
+          name: coverage_addon
+          path: .coverage
+
+
+  test-client:
     runs-on: ubuntu-latest
     strategy:
       matrix:
@@ -59,27 +87,18 @@ jobs:
 
       - name: Run pytest with coverage
         run: |
-          pytest ./tests/addon --cov --cov-report=xml \
-            --splits 3 --group ${{ matrix.group }} --durations-path=tests/.test_durations
-
           pytest ./tests/client --disable-vcr --cov --cov-report=xml --cov-append \
             --splits 3 --group ${{ matrix.group }} --durations-path=tests/.test_durations
-
-          # Don't fail tests if no tests were collected due to splitting. This is only needed
-          # because we have only a couple of tests in the performance group.
-          pytest ./tests/addon --performance -k performance -n1 --cov-report=xml --cov-append \
-            --splits 3 --group ${{ matrix.group }} --durations-path=tests/.test_durations || \
-          (ret=$?; if [ $ret -ne 5 ]; then exit $ret; fi)
 
       - name: Upload coverage
         uses: actions/upload-artifact@v2
         with:
-          name: coverage${{ matrix.group }}
+          name: coverage_client_${{ matrix.group }}
           path: .coverage
 
 
   coverage:
-    needs: test
+    needs: ["test-addon", "test-client"]
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v2
