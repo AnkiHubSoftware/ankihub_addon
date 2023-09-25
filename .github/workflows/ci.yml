@@ -100,6 +100,10 @@ jobs:
           coverage combine coverage*/.coverage*
           coverage html
 
+      - name: Install smokeshow
+        run: |
+          python -m pip install smokeshow
+
       - uses: codecov/codecov-action@v1
 
       - name: Upload coverage report with smokeshow
