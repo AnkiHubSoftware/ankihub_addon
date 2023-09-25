@@ -77,7 +77,7 @@ DATETIME_OF_ADDING_FIRST_DECK_MEDIA = datetime(
 
 DB_NAME = "anki_collab"
 DB_USERNAME = "FhzobpJaNmgBBkNhKNioNKULSqOqRjaO"
-DUMP_FILE_NAME = f"tests/client/{DB_NAME}.dump"
+DB_DUMP_FILE_NAME = f"tests/client/{DB_NAME}.dump"
 
 
 @pytest.fixture
@@ -91,7 +91,7 @@ def client_with_server_setup(vcr: VCR, request, marks):
 
     if not playback_mode:
         # Restore DB from dump
-        with open(DUMP_FILE_NAME, "r") as file:
+        with open(DB_DUMP_FILE_NAME, "r") as file:
             result = subprocess.run(
                 [
                     "sudo",
@@ -140,7 +140,7 @@ def initial_server_setup():
             "--table=user*",
             "--schema=public",
         ],
-        stdout=open(DUMP_FILE_NAME, "w"),
+        stdout=open(DB_DUMP_FILE_NAME, "w"),
         stderr=subprocess.PIPE,
     )
     print_command_result_info(command_name="pg_dump", result=result)
