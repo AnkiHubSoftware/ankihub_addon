@@ -79,7 +79,7 @@ DATETIME_OF_ADDING_FIRST_DECK_MEDIA = datetime(
     year=2023, month=1, day=2, tzinfo=timezone.utc
 )
 
-DB_NAME = "anki_collab"
+DB_NAME = "ankihub"
 DB_USERNAME = "user"
 DB_DUMP_FILE_NAME = f"{DB_NAME}.dump"
 
