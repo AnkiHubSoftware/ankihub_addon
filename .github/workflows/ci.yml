@@ -85,4 +85,4 @@ jobs:
 
       - name: Run pytest with coverage
         run: |
-          pytest ./tests/client --disable-vcr -k with_email
+          pytest ./tests/client --disable-vcr
