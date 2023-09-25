@@ -85,4 +85,4 @@ jobs:
 
       - name: Run pytest with coverage
         run: |
-          pytest ./tests/client --disable-vcr
+          pytest ./tests/client --disable-vcr --show-capture=stdout -rP
