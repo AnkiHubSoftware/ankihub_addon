@@ -79,6 +79,10 @@ DATETIME_OF_ADDING_FIRST_DECK_MEDIA = datetime(
     year=2023, month=1, day=2, tzinfo=timezone.utc
 )
 
+DB_NAME = "anki_collab"
+DB_USERNAME = "FhzobpJaNmgBBkNhKNioNKULSqOqRjaO"
+DUMP_FILE_NAME = f"{DB_NAME}.dump"
+
 
 @pytest.fixture
 def client_with_server_setup(vcr: VCR, request, marks):
@@ -90,11 +94,32 @@ def client_with_server_setup(vcr: VCR, request, marks):
     playback_mode = vcr_enabled(vcr) and cassette_path.exists()
 
     if not playback_mode:
-        run_command_in_django_container(
-            "python manage.py flush --no-input && "
-            "python manage.py runscript create_test_users && "
-            "python manage.py runscript create_fixture_data"
-        )
+        # Restore DB from dump
+        with open(DUMP_FILE_NAME, "r") as file:
+            result = subprocess.run(
+                [
+                    "sudo",
+                    "docker",
+                    "exec",
+                    "-i",
+                    "postgres",
+                    "pg_restore",
+                    f"--dbname={DB_NAME}",
+                    f"--username={DB_USERNAME}",
+                    "--format=custom",
+                    "--clean",
+                ],
+                stdin=file,
+                stdout=subprocess.PIPE,
+                stderr=subprocess.PIPE,
+            )
+            if result.returncode != 0:
+                print(f"Command restore failed with error code {result.returncode}")
+                print(f"Stdout: {result.stdout}")
+                print(f"Stderr: {result.stderr}")
+            else:
+                print("Command restore executed successfully.")
+                print(f"Stdout: {result.stdout}")
 
     client = AnkiHubClient(api_url=LOCAL_API_URL, local_media_dir_path=TEST_MEDIA_PATH)
     yield client
@@ -113,6 +138,38 @@ def docker_setup_teardown():
             "-d",
         ]
     )
+
+    run_command_in_django_container(
+        "python manage.py flush --no-input && "
+        "python manage.py runscript create_test_users && "
+        "python manage.py runscript create_fixture_data"
+    )
+
+    # Dump the database to a file
+    result = subprocess.run(
+        [
+            "sudo",
+            "docker",
+            "exec",
+            "postgres",
+            "pg_dump",
+            f"--dbname={DB_NAME}",
+            f"--username={DB_USERNAME}",
+            "--format=custom",
+            "--table=deck*",
+            "--table=user*",
+            "--schema=public",
+        ],
+        stdout=open(DUMP_FILE_NAME, "w"),
+        stderr=subprocess.PIPE,
+    )
+    if result.returncode != 0:
+        print(f"Command dump failed with error code {result.returncode}")
+        print(f"Stdout: {result.stdout}")
+        print(f"Stderr: {result.stderr}")
+    else:
+        print("Command dump executed successfully.")
+        print(f"Stdout: {result.stdout}")
 
     yield
 
