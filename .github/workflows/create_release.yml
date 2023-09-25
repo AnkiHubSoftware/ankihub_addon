@@ -19,7 +19,7 @@ jobs:
             -e push \
             --limit 1 \
             --json conclusion \
-            --jq ".[0].conclusion"
+            --jq ".[0].conclusion")
 
           if [[ -z "$conclusion" ]]; then
             echo "Could not determine the status of the most recent test run on the main branch. Aborting..."
