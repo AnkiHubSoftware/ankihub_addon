@@ -99,7 +99,7 @@ jobs:
           path: .coverage
 
 
-  coverage:
+  coverage-and-static-checks:
     needs: ["test-addon", "test-client"]
     runs-on: ubuntu-latest
     steps:
