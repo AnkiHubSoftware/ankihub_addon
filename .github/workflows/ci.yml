@@ -27,39 +27,8 @@ jobs:
       - name: Checkout ankihub_addon
         uses: actions/checkout@v3
 
-      - name: Get pip cache dir
-        id: pip-cache
-        run: |
-          python -m pip install --upgrade pip
-          echo "::set-output name=dir::$(pip cache dir)"
-
-      - name: pip cache
-        uses: actions/cache@v3
-        with:
-          path: |
-            ${{ steps.pip-cache.outputs.dir }}
-            ~/.cache/pre-commit
-          key: ${{ runner.os }}-pip-${{ hashFiles('**/dev.txt', '**/base.txt', '.pre-commit-config.yaml') }}
-          restore-keys: |
-            ${{ runner.os }}-pip-
-
-      - name: Install Qt
-        uses: jurplel/install-qt-action@v3
-        with:
-          version: "5.15.2"
-          setup-python: "false"
-        continue-on-error: true
-
-      - name: Install deps
-        run: |
-          python -m pip install -r ./requirements/dev.txt
-          python -m pip install smokeshow
-
-      - name: Build
-        run: |
-          python ./scripts/build.py
-        env:
-          GOOGLE_API_KEY: ${{ secrets.GOOGLE_API_KEY }}
+      - name: Setup addon
+        uses: ./.github/actions/setup-addon
 
       - name: Enable cloning web app repo
         uses: webfactory/ssh-agent@v0.5.4
@@ -116,39 +85,8 @@ jobs:
         with:
           python-version: "3.9"
 
-      - name: Get pip cache dir
-        id: pip-cache
-        run: |
-          python -m pip install --upgrade pip
-          echo "::set-output name=dir::$(pip cache dir)"
-
-      - name: pip cache
-        uses: actions/cache@v3
-        with:
-          path: |
-            ${{ steps.pip-cache.outputs.dir }}
-            ~/.cache/pre-commit
-          key: ${{ runner.os }}-pip-${{ hashFiles('**/dev.txt', '**/base.txt', '.pre-commit-config.yaml') }}
-          restore-keys: |
-            ${{ runner.os }}-pip-
-
-      - name: Install Qt
-        uses: jurplel/install-qt-action@v3
-        with:
-          version: "5.15.2"
-          setup-python: "false"
-        continue-on-error: true
-
-      - name: Install deps
-        run: |
-          python -m pip install -r ./requirements/dev.txt
-          python -m pip install smokeshow
-
-      - name: Build
-        run: |
-          python ./scripts/build.py
-        env:
-          GOOGLE_API_KEY: ${{ secrets.GOOGLE_API_KEY }}
+      - name: Setup addon
+        uses: ./.github/actions/setup-addon
 
       - name: Download all artifacts
         uses: actions/download-artifact@v2

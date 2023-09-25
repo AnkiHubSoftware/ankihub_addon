@@ -1,0 +1,40 @@
+- name: Setup addon
+  runs:
+    using: "composite"
+    steps:
+      - name: Get pip cache dir
+        id: pip-cache
+        run: |
+          python -m pip install --upgrade pip
+          echo "::set-output name=dir::$(pip cache dir)"
+        shell: bash
+
+      - name: pip cache
+        uses: actions/cache@v3
+        with:
+          path: |
+            ${{ steps.pip-cache.outputs.dir }}
+            ~/.cache/pre-commit
+          key: ${{ runner.os }}-pip-${{ hashFiles('**/dev.txt', '**/base.txt', '.pre-commit-config.yaml') }}
+          restore-keys: |
+            ${{ runner.os }}-pip-
+
+      - name: Install Qt
+        uses: jurplel/install-qt-action@v3
+        with:
+          version: "5.15.2"
+          setup-python: "false"
+        continue-on-error: true
+
+      - name: Install deps
+        run: |
+          python -m pip install -r ./requirements/dev.txt
+          python -m pip install smokeshow
+        shell: bash
+
+      - name: Build
+        run: |
+          python ./scripts/build.py
+        shell: bash
+        env:
+          GOOGLE_API_KEY: ${{ secrets.GOOGLE_API_KEY }}
