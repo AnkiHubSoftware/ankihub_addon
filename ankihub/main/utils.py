@@ -207,7 +207,7 @@ def mids_of_notes(nids: Sequence[NoteId]) -> Set[NotetypeId]:
     )
 
 
-def retain_nids_with_ah_note_type(nids: Sequence[NoteId]) -> Sequence[NoteId]:
+def retain_nids_with_ah_note_type(nids: Collection[NoteId]) -> Collection[NoteId]:
     """Return nids that have an AnkiHub note type. Other nids are not included in the result."""
     nids_to_mids = get_anki_nid_to_mid_dict(nids)
     mid_to_is_ankihub_note_type = {

@@ -122,7 +122,7 @@ class _AnkiHubDB:
             self._setup_notes_table()
             self._setup_deck_media_table()
             self._setup_note_types_table()
-            self.execute("PRAGMA user_version = 9")
+            self.execute("PRAGMA user_version = 10")
         else:
             from .db_migrations import migrate_ankihub_db
 
@@ -179,15 +179,13 @@ class _AnkiHubDB:
             conn.execute(
                 """
                 CREATE TABLE notetypes (
-                    anki_note_type_id INTEGER PRIMARY KEY,
+                    anki_note_type_id INTEGER NOT NULL,
                     ankihub_deck_id STRING NOT NULL,
                     name TEXT NOT NULL,
-                    note_type_dict_json TEXT NOT NULL
+                    note_type_dict_json TEXT NOT NULL,
+                    PRIMARY KEY (anki_note_type_id, ankihub_deck_id)
                 );
                 """
-            )
-            conn.execute(
-                "CREATE INDEX notetypes_ankihub_deck_id_idx ON notetypes (ankihub_deck_id);"
             )
             LOGGER.info("Created note types table")
 
@@ -415,6 +413,20 @@ class _AnkiHubDB:
             """
         )
         result = [uuid.UUID(did) for did in did_strs]
+        return result
+
+    def anki_nid_to_ah_did_dict(
+        self, anki_nids: Iterable[NoteId]
+    ) -> Dict[NoteId, Optional[uuid.UUID]]:
+        """Returns a dict mapping anki nids to the ankihub did of the deck the note is in.
+        Not found nids are omitted from the dict."""
+        result = self.dict(
+            f"""
+            SELECT anki_note_id, ankihub_deck_id FROM notes
+            WHERE anki_note_id IN {ids2str(anki_nids)}
+            """
+        )
+        result = {NoteId(k): uuid.UUID(v) for k, v in result.items()}
         return result
 
     def are_ankihub_notes(self, anki_nids: List[NoteId]) -> bool:
@@ -720,19 +732,20 @@ class _AnkiHubDB:
         )
         return result
 
-    def ankihub_did_for_note_type(
+    def ankihub_dids_for_note_type(
         self, anki_note_type_id: NotetypeId
-    ) -> Optional[uuid.UUID]:
-        did_str = self.scalar(
+    ) -> Optional[Set[uuid.UUID]]:
+        """Returns the AnkiHub deck ids that use the given note type."""
+        did_strings = self.list(
             """
             SELECT ankihub_deck_id FROM notetypes WHERE anki_note_type_id = ?
             """,
             anki_note_type_id,
         )
-        if did_str is None:
+        if not did_strings:
             return None
 
-        result = uuid.UUID(did_str)
+        result = set(uuid.UUID(did_str) for did_str in did_strings)
         return result
 
     def _note_type_field_names(
