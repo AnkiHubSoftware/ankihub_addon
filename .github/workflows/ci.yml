@@ -65,7 +65,8 @@ jobs:
           pytest ./tests/client --disable-vcr --cov --cov-report=xml --cov-append \
             --splits 3 --group ${{ matrix.group }} --durations-path=tests/.test_durations
 
-          # Don't fail tests if no tests were collected due to splitting
+          # Don't fail tests if no tests were collected due to splitting. This is only needed
+          # because we have only a couple of tests in the performance group.
           pytest ./tests/addon --performance -k performance -n1 --cov-report=xml --cov-append \
             --splits 3 --group ${{ matrix.group }} --durations-path=tests/.test_durations || \
           (ret=$?; if [ $ret -ne 5 ]; then exit $ret; fi)
