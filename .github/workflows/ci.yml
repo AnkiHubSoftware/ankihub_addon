@@ -88,9 +88,9 @@ jobs:
 
       - name: Run pytest with coverage
         run: |
-          pytest ./tests/addon --cov --cov-report=xml --splits 3 --group ${{ matrix.group }}
-          pytest ./tests/client --disable-vcr --cov --cov-report=xml --cov-append --splits 3 --group ${{ matrix.group }}
-          pytest ./tests/addon --performance -k performance -n1 --cov-report=xml --cov-append --splits 3 --group ${{ matrix.group }}
+          pytest ./tests/addon --cov --cov-report=xml --splits 3 --group ${{ matrix.group }} --durations-path=tests/.test_durations
+          pytest ./tests/client --disable-vcr --cov --cov-report=xml --cov-append --splits 3 --group ${{ matrix.group }} --durations-path=tests/.test_durations
+          pytest ./tests/addon --performance -k performance -n1 --cov-report=xml --cov-append --splits 3 --group ${{ matrix.group }} --durations-path=tests/.test_durations
 
       - name: Upload coverage
         uses: actions/upload-artifact@v2
