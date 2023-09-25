@@ -81,7 +81,7 @@ DATETIME_OF_ADDING_FIRST_DECK_MEDIA = datetime(
 
 DB_NAME = "anki_collab"
 DB_USERNAME = "FhzobpJaNmgBBkNhKNioNKULSqOqRjaO"
-DUMP_FILE_NAME = f"{DB_NAME}.dump"
+DUMP_FILE_NAME = f"tests/client/{DB_NAME}.dump"
 
 
 @pytest.fixture
