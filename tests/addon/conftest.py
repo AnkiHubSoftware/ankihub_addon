@@ -10,9 +10,13 @@ from pytest_anki import AnkiSession
 from requests_mock import Mocker
 
 from ..fixtures import (  # noqa F401
+    MockAllFeatureFlagsToDefaultValues,
     ankihub_basic_note_type,
+    import_ah_note,
+    import_ah_note_type,
     mock_all_feature_flags_to_default_values,
     mock_function,
+    new_note_with_note_type,
     next_deterministic_id,
     next_deterministic_uuid,
     set_feature_flag_state,
@@ -53,7 +57,7 @@ def anki_session_with_addon_data(
     anki_session: AnkiSession,
     requests_mock: Mocker,
     monkeypatch: MonkeyPatch,
-    mock_all_feature_flags_to_default_values,  # noqa F811
+    mock_all_feature_flags_to_default_values: MockAllFeatureFlagsToDefaultValues,  # noqa F811
 ) -> Generator[AnkiSession, None, None]:
     """Sets up a temporary anki_base folder with the ankihub add-ons data (config, contents of profile_data_folder)
     in it's add-on folder. This is a replacement for running the whole initialization process of the add-on
@@ -73,6 +77,7 @@ def anki_session_with_addon_data(
 
     config.setup_public_config_and_urls()
     setup_logger()
+    mock_all_feature_flags_to_default_values()
 
     with monkeypatch.context() as m:
         # monkeypatch the uuid4 function to always return the same value so

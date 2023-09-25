@@ -18,7 +18,7 @@ import aqt
 import sentry_sdk
 from anki.errors import BackendIOError, DBError, SyncError
 from anki.utils import checksum, is_win
-from aqt.utils import askUser, showInfo
+from aqt.utils import showInfo
 from requests import exceptions
 from sentry_sdk import capture_exception, push_scope
 from sentry_sdk.integrations.argv import ArgvIntegration
@@ -47,6 +47,7 @@ from ..settings import (
 from .deck_updater import NotLoggedInError
 from .error_dialog import ErrorDialog
 from .utils import (
+    ask_user,
     check_and_prompt_for_updates_on_main_window,
     show_error_dialog,
     show_tooltip,
@@ -334,9 +335,10 @@ def _maybe_handle_ankihub_http_error(error: AnkiHubHTTPError) -> bool:
     elif (
         response.status_code == 406 and response.reason == OUTDATED_CLIENT_ERROR_REASON
     ):
-        if askUser(
+        if ask_user(
             "The AnkiHub add-on needs to be updated to continue working.<br>"
-            "Do you want to open the add-on update dialog now?"
+            "Do you want to open the add-on update dialog now?",
+            parent=aqt.mw,
         ):
             check_and_prompt_for_updates_on_main_window()
         return True
@@ -412,7 +414,19 @@ def _initialize_sentry():
         ],
         # This disable the AtexitIntegration because it causes a RuntimeError when Anki is closed.
         shutdown_timeout=0,
+        before_send=_before_send,
     )
+
+
+def _before_send(
+    event: Dict[str, Any], hint: Dict[str, Any]
+) -> Optional[Dict[str, Any]]:
+    """Filter out events created by the LoggingIntegration that are not related to this add-on."""
+    if "log_record" in hint:
+        logger_name = hint["log_record"].name
+        if logger_name != LOGGER.name:
+            return None
+    return event
 
 
 def _report_exception(
@@ -425,6 +439,7 @@ def _report_exception(
     with push_scope() as scope:
         scope.level = "error"
         scope.user = {"id": config.user()}
+        scope.set_tag("os", sys.platform)
         scope.set_context("add-on config", dataclasses.asdict(config._private_config))
         scope.set_context("addon version", {"version": ADDON_VERSION})
         scope.set_context("anki version", {"version": ANKI_VERSION})

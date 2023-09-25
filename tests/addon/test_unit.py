@@ -5,9 +5,11 @@ import time
 import uuid
 from dataclasses import fields
 from pathlib import Path
-from typing import Callable, Generator, List
+from textwrap import dedent
+from typing import Callable, Generator, List, Protocol, Tuple
 from unittest.mock import Mock
 
+import aqt
 import pytest
 from anki.decks import DeckId
 from anki.models import NotetypeDict
@@ -17,11 +19,19 @@ from aqt.qt import QDialogButtonBox
 from pytest import MonkeyPatch, fixture
 from pytest_anki import AnkiSession
 from pytestqt.qtbot import QtBot  # type: ignore
+from requests import Response  # type: ignore
 
 from ankihub.gui import errors
+from ankihub.gui.operations.utils import future_with_exception, future_with_result
 
 from ..factories import DeckMediaFactory, NoteInfoFactory
-from ..fixtures import SetFeatureFlagState  # type: ignore
+from ..fixtures import (  # type: ignore
+    ImportAHNoteType,
+    MockFunction,
+    NewNoteWithNoteType,
+    SetFeatureFlagState,
+)
+from .test_integration import ImportAHNote
 
 # workaround for vscode test discovery not using pytest.ini which sets this env var
 # has to be set before importing ankihub
@@ -31,6 +41,7 @@ from ankihub.ankihub_client import AnkiHubHTTPError, Field, SuggestionType
 from ankihub.db.db import MEDIA_DISABLED_FIELD_BYPASS_TAG, _AnkiHubDB
 from ankihub.db.exceptions import IntegrityError
 from ankihub.feature_flags import _FeatureFlags, feature_flags
+from ankihub.gui import suggestion_dialog
 from ankihub.gui.error_dialog import ErrorDialog
 from ankihub.gui.errors import (
     OUTDATED_CLIENT_ERROR_REASON,
@@ -44,6 +55,10 @@ from ankihub.gui.suggestion_dialog import (
     SuggestionDialog,
     SuggestionMetadata,
     SuggestionSource,
+    _on_suggest_notes_in_bulk_done,
+    get_anki_nid_to_possible_ah_dids_dict,
+    open_suggestion_dialog_for_bulk_suggestion,
+    open_suggestion_dialog_for_note,
 )
 from ankihub.gui.threading_utils import rate_limited
 from ankihub.main import suggestions
@@ -58,7 +73,11 @@ from ankihub.main.note_conversion import (
     _get_fields_protected_by_tags,
 )
 from ankihub.main.subdecks import SUBDECK_TAG, add_subdeck_tags_to_notes
-from ankihub.main.utils import lowest_level_common_ancestor_deck_name, mids_of_notes
+from ankihub.main.utils import (
+    lowest_level_common_ancestor_deck_name,
+    mids_of_notes,
+    retain_nids_with_ah_note_type,
+)
 from ankihub.settings import ANKIWEB_ID
 
 
@@ -439,6 +458,436 @@ class TestSuggestionDialog:
         )
 
 
+class TestSuggestionDialogGetAnkiNidToPossibleAHDidsDict:
+    def test_with_existing_note_belonging_to_single_deck(
+        self,
+        anki_session_with_addon_data: AnkiSession,
+        import_ah_note: ImportAHNote,
+        next_deterministic_uuid: Callable[[], uuid.UUID],
+    ):
+        with anki_session_with_addon_data.profile_loaded():
+            ah_did = next_deterministic_uuid()
+            note_info = import_ah_note(ah_did=ah_did)
+            nids = [NoteId(note_info.anki_nid)]
+            assert get_anki_nid_to_possible_ah_dids_dict(nids) == {
+                note_info.anki_nid: {ah_did}
+            }
+
+    def test_with_new_note_belonging_to_single_deck(
+        self,
+        anki_session_with_addon_data: AnkiSession,
+        import_ah_note_type: ImportAHNoteType,
+        new_note_with_note_type: NewNoteWithNoteType,
+        next_deterministic_uuid: Callable[[], uuid.UUID],
+    ):
+        with anki_session_with_addon_data.profile_loaded():
+            ah_did = next_deterministic_uuid()
+            note_type = import_ah_note_type(ah_did=ah_did)
+            note = new_note_with_note_type(note_type=note_type)
+            nids = [note.id]
+            assert get_anki_nid_to_possible_ah_dids_dict(nids) == {note.id: {ah_did}}
+
+    def test_with_new_note_with_two_possible_decks(
+        self,
+        anki_session_with_addon_data: AnkiSession,
+        import_ah_note_type: ImportAHNoteType,
+        new_note_with_note_type: NewNoteWithNoteType,
+        next_deterministic_uuid: Callable[[], uuid.UUID],
+    ):
+        with anki_session_with_addon_data.profile_loaded():
+            ah_did_1 = next_deterministic_uuid()
+            note_type = import_ah_note_type(ah_did=ah_did_1)
+
+            ah_did_2 = next_deterministic_uuid()
+            import_ah_note_type(note_type=note_type, ah_did=ah_did_2)
+
+            # The note type of the new note is used in two decks, so the note could be suggested for either of them.
+            note = new_note_with_note_type(note_type=note_type)
+            nids = [note.id]
+            assert get_anki_nid_to_possible_ah_dids_dict(nids) == {
+                note.id: {ah_did_1, ah_did_2}
+            }
+
+    def test_with_existing_note_with_note_type_used_in_two_decks(
+        self,
+        anki_session_with_addon_data: AnkiSession,
+        import_ah_note: ImportAHNote,
+        import_ah_note_type: ImportAHNoteType,
+        next_deterministic_uuid: Callable[[], uuid.UUID],
+    ):
+        with anki_session_with_addon_data.profile_loaded():
+            ah_did_1 = next_deterministic_uuid()
+            note_type = import_ah_note_type(ah_did=ah_did_1)
+            note_info = import_ah_note(ah_did=ah_did_1, mid=note_type["id"])
+
+            ah_did_2 = next_deterministic_uuid()
+            import_ah_note_type(note_type=note_type, ah_did=ah_did_2)
+
+            # The note type of the new note is used in two decks, but the note exists in one of them,
+            # so the note belongs to that deck.
+            nids = [NoteId(note_info.anki_nid)]
+            assert get_anki_nid_to_possible_ah_dids_dict(nids) == {
+                note_info.anki_nid: {ah_did_1}
+            }
+
+
+class MockDependenciesForSuggestionDialog(Protocol):
+    def __call__(self, user_cancels: bool) -> Tuple[Mock, Mock]:
+        ...
+
+
+@pytest.fixture
+def mock_dependiencies_for_suggestion_dialog(
+    monkeypatch: MonkeyPatch,
+    mock_function: MockFunction,
+) -> MockDependenciesForSuggestionDialog:
+    """Mocks the dependencies for open_suggestion_dialog_for_note.
+    Returns a tuple of mocks that replace suggest_note_update and suggest_new_note
+    If user_cancels is True, SuggestionDialog.run behaves as if the user cancelled the dialog."""
+
+    def mock_dependencies_for_suggestion_dialog_inner(
+        user_cancels: bool,
+    ) -> Tuple[Mock, Mock]:
+        monkeypatch.setattr(
+            "ankihub.gui.suggestion_dialog.SuggestionDialog.run",
+            Mock(return_value=None)
+            if user_cancels
+            else Mock(
+                return_value=SuggestionMetadata(
+                    comment="test",
+                )
+            ),
+        )
+
+        suggest_note_update_mock = mock_function(
+            suggestion_dialog,
+            "suggest_note_update",
+        )
+        suggest_new_note_mock = mock_function(
+            suggestion_dialog,
+            "suggest_new_note",
+        )
+
+        return suggest_note_update_mock, suggest_new_note_mock
+
+    return mock_dependencies_for_suggestion_dialog_inner
+
+
+class TestOpenSuggestionDialogForSingleSuggestion:
+    @pytest.mark.parametrize(
+        "user_cancels, suggest_note_update_succeeds",
+        [
+            (True, True),
+            (True, False),
+            (False, True),
+            (False, False),
+        ],
+    )
+    def test_with_existing_note_belonging_to_single_deck(
+        self,
+        anki_session_with_addon_data: AnkiSession,
+        import_ah_note: ImportAHNote,
+        next_deterministic_uuid: Callable[[], uuid.UUID],
+        mock_dependiencies_for_suggestion_dialog: MockDependenciesForSuggestionDialog,
+        user_cancels: bool,
+        suggest_note_update_succeeds: bool,
+    ):
+        with anki_session_with_addon_data.profile_loaded():
+            ah_did = next_deterministic_uuid()
+            note_info = import_ah_note(ah_did=ah_did)
+            note = aqt.mw.col.get_note(NoteId(note_info.anki_nid))
+
+            (
+                suggest_note_update_mock,
+                suggest_new_note_mock,
+            ) = mock_dependiencies_for_suggestion_dialog(user_cancels=user_cancels)
+
+            suggest_note_update_mock.return_value = suggest_note_update_succeeds
+
+            open_suggestion_dialog_for_note(note=note, parent=aqt.mw)
+
+            if user_cancels:
+                suggest_note_update_mock.assert_not_called()
+                suggest_new_note_mock.assert_not_called()
+            else:
+                _, kwargs = suggest_note_update_mock.call_args
+                assert kwargs.get("note") == note
+
+                suggest_new_note_mock.assert_not_called()
+
+    @pytest.mark.parametrize(
+        "user_cancels",
+        [
+            True,
+            False,
+        ],
+    )
+    def test_with_new_note_which_could_belong_to_two_decks(
+        self,
+        anki_session_with_addon_data: AnkiSession,
+        import_ah_note_type: ImportAHNoteType,
+        new_note_with_note_type: NewNoteWithNoteType,
+        next_deterministic_uuid: Callable[[], uuid.UUID],
+        mock_dependiencies_for_suggestion_dialog: MockDependenciesForSuggestionDialog,
+        mock_function: MockFunction,
+        user_cancels: bool,
+    ):
+        with anki_session_with_addon_data.profile_loaded():
+            ah_did_1 = next_deterministic_uuid()
+            note_type = import_ah_note_type(ah_did=ah_did_1)
+
+            # Add the note type to a second deck
+            ah_did_2 = next_deterministic_uuid()
+            import_ah_note_type(ah_did=ah_did_2, note_type=note_type)
+
+            note = new_note_with_note_type(note_type=note_type)
+
+            (
+                suggest_note_update_mock,
+                suggest_new_note_mock,
+            ) = mock_dependiencies_for_suggestion_dialog(user_cancels=False)
+
+            choose_ankihub_deck_mock = mock_function(
+                suggestion_dialog,
+                "choose_ankihub_deck",
+                return_value=None if user_cancels else ah_did_1,
+            )
+
+            open_suggestion_dialog_for_note(note=note, parent=aqt.mw)
+
+            if user_cancels:
+                suggest_note_update_mock.assert_not_called()
+                suggest_new_note_mock.assert_not_called()
+            else:
+                # There are two options for the deck, so the user has to choose one.
+                _, kwargs = choose_ankihub_deck_mock.call_args
+                assert kwargs.get("ah_dids") == [ah_did_1, ah_did_2]
+
+                # The note should be suggested for the chosen deck.
+                _, kwargs = suggest_new_note_mock.call_args
+                assert kwargs.get("note") == note
+
+                suggest_note_update_mock.assert_not_called()
+
+
+class MockDependenciesForBulkSuggestionDialog(Protocol):
+    def __call__(self, user_cancels: bool) -> Mock:
+        ...
+
+
+@pytest.fixture
+def mock_dependencies_for_bulk_suggestion_dialog(
+    monkeypatch: MonkeyPatch,
+) -> MockDependenciesForBulkSuggestionDialog:
+    """Mocks the dependencies for open_suggestion_dialog_for_bulk_suggestion.
+    Returns a Mock that replaces suggest_notes_in_bulk.
+    If user_cancels is True, SuggestionDialog.run behaves as if the user cancelled the dialog."""
+
+    def mock_dependencies_for_suggestion_dialog_inner(user_cancels: bool) -> Mock:
+        monkeypatch.setattr(
+            "ankihub.gui.suggestion_dialog.SuggestionDialog.run",
+            Mock(return_value=None)
+            if user_cancels
+            else Mock(
+                return_value=SuggestionMetadata(
+                    comment="test",
+                )
+            ),
+        )
+
+        suggest_notes_in_bulk_mock = Mock()
+        monkeypatch.setattr(
+            "ankihub.gui.suggestion_dialog.suggest_notes_in_bulk",
+            suggest_notes_in_bulk_mock,
+        )
+
+        monkeypatch.setattr(
+            "ankihub.gui.suggestion_dialog._on_suggest_notes_in_bulk_done", Mock()
+        )
+        return suggest_notes_in_bulk_mock
+
+    return mock_dependencies_for_suggestion_dialog_inner
+
+
+class TestOpenSuggestionDialogForBulkSuggestion:
+    @pytest.mark.parametrize(
+        "user_cancels",
+        [
+            True,
+            False,
+        ],
+    )
+    def test_with_existing_note_belonging_to_single_deck(
+        self,
+        anki_session_with_addon_data: AnkiSession,
+        import_ah_note: ImportAHNote,
+        next_deterministic_uuid: Callable[[], uuid.UUID],
+        qtbot: QtBot,
+        mock_dependencies_for_bulk_suggestion_dialog: MockDependenciesForBulkSuggestionDialog,
+        user_cancels: bool,
+    ):
+        with anki_session_with_addon_data.profile_loaded():
+            ah_did = next_deterministic_uuid()
+            note_info = import_ah_note(ah_did=ah_did)
+            nids = [NoteId(note_info.anki_nid)]
+
+            suggest_notes_in_bulk_mock = mock_dependencies_for_bulk_suggestion_dialog(
+                user_cancels=user_cancels
+            )
+
+            open_suggestion_dialog_for_bulk_suggestion(anki_nids=nids, parent=aqt.mw)
+
+            if user_cancels:
+                qtbot.wait(500)
+                suggest_notes_in_bulk_mock.assert_not_called()
+            else:
+                qtbot.wait_until(lambda: suggest_notes_in_bulk_mock.called)
+                _, kwargs = suggest_notes_in_bulk_mock.call_args
+                assert kwargs.get("ankihub_did") == ah_did
+                assert {note.id for note in kwargs.get("notes")} == set(nids)
+
+    def test_with_two_new_notes_without_decks_in_common(
+        self,
+        anki_session_with_addon_data: AnkiSession,
+        import_ah_note_type: ImportAHNoteType,
+        new_note_with_note_type: NewNoteWithNoteType,
+        next_deterministic_uuid: Callable[[], uuid.UUID],
+        mock_dependencies_for_bulk_suggestion_dialog: MockDependenciesForBulkSuggestionDialog,
+        qtbot: QtBot,
+    ):
+        with anki_session_with_addon_data.profile_loaded():
+            ah_did_1 = next_deterministic_uuid()
+            note_type_1 = import_ah_note_type(ah_did=ah_did_1)
+            note_1 = new_note_with_note_type(note_type=note_type_1)
+
+            ah_did_2 = next_deterministic_uuid()
+            note_type_2 = import_ah_note_type(ah_did=ah_did_2, force_new=True)
+            note_2 = new_note_with_note_type(note_type=note_type_2)
+
+            nids = [note_1.id, note_2.id]
+
+            suggest_notes_in_bulk_mock = mock_dependencies_for_bulk_suggestion_dialog(
+                user_cancels=False
+            )
+
+            open_suggestion_dialog_for_bulk_suggestion(anki_nids=nids, parent=aqt.mw)
+            qtbot.wait(500)
+
+            # The note suggestions can't be for the same deck, so the suggestion dialog should not be shown.
+            suggest_notes_in_bulk_mock.assert_not_called()
+
+    def test_with_two_new_notes_with_decks_in_common(
+        self,
+        anki_session_with_addon_data: AnkiSession,
+        import_ah_note_type: ImportAHNoteType,
+        new_note_with_note_type: NewNoteWithNoteType,
+        next_deterministic_uuid: Callable[[], uuid.UUID],
+        mock_dependencies_for_bulk_suggestion_dialog: MockDependenciesForBulkSuggestionDialog,
+        mock_function: MockFunction,
+        qtbot: QtBot,
+    ):
+        with anki_session_with_addon_data.profile_loaded():
+            ah_did_1 = next_deterministic_uuid()
+            note_type = import_ah_note_type(ah_did=ah_did_1)
+            note_1 = new_note_with_note_type(note_type=note_type)
+
+            ah_did_2 = next_deterministic_uuid()
+            import_ah_note_type(ah_did=ah_did_2, note_type=note_type)
+            note_2 = new_note_with_note_type(note_type=note_type)
+
+            nids = [note_1.id, note_2.id]
+
+            choose_ankihub_deck_mock = mock_function(
+                suggestion_dialog,
+                "choose_ankihub_deck",
+                return_value=ah_did_1,
+            )
+            suggest_notes_in_bulk_mock = mock_dependencies_for_bulk_suggestion_dialog(
+                user_cancels=False
+            )
+
+            open_suggestion_dialog_for_bulk_suggestion(anki_nids=nids, parent=aqt.mw)
+            qtbot.wait_until(lambda: suggest_notes_in_bulk_mock.called)
+
+            # There are two options for the deck the note suggestions can be for, so the user should be asked
+            # to choose between them.
+            _, kwargs = choose_ankihub_deck_mock.call_args
+            assert kwargs.get("ah_dids") == [ah_did_1, ah_did_2]
+
+            # After the user has chosen the deck, the suggestion dialog should be shown for the chosen deck.
+            _, kwargs = suggest_notes_in_bulk_mock.call_args
+            assert kwargs.get("ankihub_did") == ah_did_1
+            assert {note.id for note in kwargs.get("notes")} == set(nids)
+
+
+class TestOnSuggestNotesInBulkDone:
+    def test_correct_message_is_shown(
+        self,
+        mock_function: MockFunction,
+    ):
+        showText_mock = mock_function(
+            suggestion_dialog,
+            "showText",
+        )
+        nid_1 = NoteId(1)
+        nid_2 = NoteId(2)
+        _on_suggest_notes_in_bulk_done(
+            future=future_with_result(
+                suggestions.BulkNoteSuggestionsResult(
+                    errors_by_nid={
+                        nid_1: [suggestions.ANKIHUB_NO_CHANGE_ERROR],
+                        nid_2: ["some error"],
+                    },
+                    change_note_suggestions_count=10,
+                    new_note_suggestions_count=20,
+                )
+            ),
+            parent=aqt.mw,
+        )
+
+        _, kwargs = showText_mock.call_args
+        assert (
+            kwargs.get("txt")
+            == dedent(
+                """
+                Submitted 10 change note suggestion(s).
+                Submitted 20 new note suggestion(s).
+
+
+                Failed to submit suggestions for 2 note(s).
+                All notes with failed suggestions:
+                1, 2
+
+                Notes without changes (1):
+                1
+                """
+            ).strip()
+            + "\n"
+        )
+
+    def test_with_exception_in_future(self):
+        with pytest.raises(Exception):
+            _on_suggest_notes_in_bulk_done(
+                future=future_with_exception(Exception("test")),
+                parent=aqt.mw,
+            )
+
+    def test_with_http_403_exception_in_future(self, mock_function: MockFunction):
+        response = Response()
+        response.status_code = 403
+        response.json = lambda: {"detail": "test"}  # type: ignore
+        exception = AnkiHubHTTPError(response)
+
+        show_error_dialog_mock = mock_function(suggestion_dialog, "show_error_dialog")
+
+        _on_suggest_notes_in_bulk_done(
+            future=future_with_exception(exception),
+            parent=aqt.mw,
+        )
+        _, kwargs = show_error_dialog_mock.call_args
+        assert kwargs.get("message") == "test"
+
+
 class TestAnkiHubDBAnkiNidsToAnkiHubNids:
     def test_anki_nids_to_ankihub_nids(
         self,
@@ -547,13 +996,23 @@ class TestAnkiHubDBRemoveNotes:
         assert ankihub_db.anki_nids_for_ankihub_deck(ankihub_did=ah_did) == []
 
 
+@pytest.mark.parametrize(
+    "use_deck_media",
+    [True, False],
+)
 class TestAnkiHubDBRemoveDeck:
-    def test_removes_notes_and_note_types(
+    def test_removes_notes_and_note_types_and_deck_media(
         self,
         ankihub_db: _AnkiHubDB,
         next_deterministic_uuid: Callable[[], uuid.UUID],
         ankihub_basic_note_type: NotetypeDict,
+        set_feature_flag_state: SetFeatureFlagState,
+        use_deck_media: bool,
     ):
+        if use_deck_media:
+            set_feature_flag_state("use_deck_media", True)
+
+        # Add data to the DB.
         ah_did = next_deterministic_uuid()
         ankihub_db.upsert_note_type(
             ankihub_did=ah_did,
@@ -570,10 +1029,33 @@ class TestAnkiHubDBRemoveDeck:
             notes_data=[note],
         )
 
+        # sanity check
         assert ankihub_db.anki_nids_for_ankihub_deck(ah_did) == [note.anki_nid]
+        assert len(ankihub_db.note_types_for_ankihub_deck(ah_did))
 
+        if use_deck_media:
+            deck_media = DeckMediaFactory.create(
+                referenced_on_accepted_note=True,
+                exists_on_s3=True,
+                download_enabled=True,
+            )
+            ankihub_db.upsert_deck_media_infos(
+                ankihub_did=ah_did, media_list=[deck_media]
+            )
+            # sanity check
+            assert (
+                len(
+                    ankihub_db.downloadable_media_names_for_ankihub_deck(
+                        ah_did, media_disabled_fields={}
+                    )
+                )
+                == 1
+            )
+
+        # Remove the deck
         ankihub_db.remove_deck(ankihub_did=ah_did)
 
+        # Assert that everything is removed
         assert ankihub_db.anki_nids_for_ankihub_deck(ankihub_did=ah_did) == []
         assert ankihub_db.note_types_for_ankihub_deck(ankihub_did=ah_did) == []
         assert (
@@ -583,11 +1065,19 @@ class TestAnkiHubDBRemoveDeck:
             is None
         )
         assert (
-            ankihub_db.ankihub_did_for_note_type(
+            ankihub_db.ankihub_dids_for_note_type(
                 anki_note_type_id=ankihub_basic_note_type["id"]
             )
             is None
         )
+
+        if use_deck_media:
+            assert (
+                ankihub_db.downloadable_media_names_for_ankihub_deck(
+                    ah_did, media_disabled_fields={}
+                )
+                == set()
+            )
 
 
 class TestAnkiHubDBIntegrityError:
@@ -931,17 +1421,17 @@ class TestErrorHandling:
         self,
         monkeypatch: MonkeyPatch,
     ) -> Generator[Mock, None, None]:
-        # Simply monkeypatching askUser to return False doesn't work because the errors module
+        # Simply monkeypatching ask_user to return False doesn't work because the errors module
         # already imported the original askUser function when this fixture is called.
         # So we need to reload the errors module after monkeypatching askUser.
         try:
             with monkeypatch.context() as m:
-                askUser_mock = Mock(return_value=False)
-                m.setattr(utils, "askUser", askUser_mock)
+                ask_user_mock = Mock(return_value=False)
+                m.setattr("ankihub.gui.utils.ask_user", ask_user_mock)
                 # Reload the errors module so that the monkeypatched askUser function is used.
                 importlib.reload(errors)
 
-                yield askUser_mock
+                yield ask_user_mock
         finally:
             #  Reload the errors module again so that the original askUser function is used for other tests.
             importlib.reload(errors)
@@ -1026,3 +1516,58 @@ class TestFeatureFlags:
 
             set_feature_flag_state(field.name, True)
             assert getattr(feature_flags, field.name)
+
+
+class TestRetainNidsWithAHNoteType:
+    def test_retain_one_ah_note(
+        self,
+        anki_session_with_addon_data: AnkiSession,
+        import_ah_note: ImportAHNote,
+    ):
+        with anki_session_with_addon_data.profile_loaded():
+            note_info = import_ah_note()
+            nids = [NoteId(note_info.anki_nid)]
+            assert retain_nids_with_ah_note_type(nids) == nids
+
+    def test_retain_one_new_note_with_ah_note_type(
+        self,
+        anki_session_with_addon_data: AnkiSession,
+        import_ah_note_type: ImportAHNoteType,
+        new_note_with_note_type: NewNoteWithNoteType,
+    ):
+        with anki_session_with_addon_data.profile_loaded():
+            note_type = import_ah_note_type()
+            note = new_note_with_note_type(note_type)
+            nids = [note.id]
+            assert retain_nids_with_ah_note_type(nids) == nids
+
+    def test_filters_out_note_with_non_ah_note_type(
+        self,
+        anki_session_with_addon_data: AnkiSession,
+        new_note_with_note_type: NewNoteWithNoteType,
+    ):
+        with anki_session_with_addon_data.profile_loaded():
+            note = new_note_with_note_type(aqt.mw.col.models.by_name("Basic"))
+            nids = [note.id]
+            assert len(retain_nids_with_ah_note_type(nids)) == 0
+
+    def test_combined(
+        self,
+        anki_session_with_addon_data: AnkiSession,
+        import_ah_note: ImportAHNote,
+        import_ah_note_type: ImportAHNoteType,
+        new_note_with_note_type: NewNoteWithNoteType,
+    ):
+        with anki_session_with_addon_data.profile_loaded():
+            note_info = import_ah_note()
+            nid_1 = NoteId(note_info.anki_nid)
+
+            note_type = import_ah_note_type()
+            note = new_note_with_note_type(note_type)
+            nid_2 = note.id
+
+            note = new_note_with_note_type(aqt.mw.col.models.by_name("Basic"))
+            nid_3 = note.id
+
+            nids = [nid_1, nid_2, nid_3]
+            assert retain_nids_with_ah_note_type(nids) == [nid_1, nid_2]

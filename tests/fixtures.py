@@ -4,18 +4,25 @@ import uuid
 from typing import Any, Callable, Dict, Optional, Protocol
 from unittest.mock import Mock
 
+import aqt
 import pytest
-from anki.models import NotetypeDict
+from anki.decks import DeckId
+from anki.models import NotetypeDict, NotetypeId
+from anki.notes import Note
 from aqt.main import AnkiQt
 from pytest import MonkeyPatch, fixture
 from pytest_anki import AnkiSession
+
+from .factories import NoteInfoFactory
 
 # workaround for vscode test discovery not using pytest.ini which sets this env var
 # has to be set before importing ankihub
 os.environ["SKIP_INIT"] = "1"
 
+from ankihub.ankihub_client import NoteInfo
 from ankihub.ankihub_client.ankihub_client import AnkiHubClient
 from ankihub.feature_flags import setup_feature_flags
+from ankihub.main.importing import AnkiHubImporter
 from ankihub.main.utils import modify_note_type
 
 
@@ -103,15 +110,25 @@ def set_feature_flag_state(monkeypatch: MonkeyPatch) -> SetFeatureFlagState:
     return set_feature_flag_state_inner
 
 
+class MockAllFeatureFlagsToDefaultValues(Protocol):
+    def __call__(self) -> None:
+        ...
+
+
 @pytest.fixture
-def mock_all_feature_flags_to_default_values(monkeypatch: MonkeyPatch) -> None:
-    monkeypatch.setattr(
-        AnkiHubClient,
-        "get_feature_flags",
-        lambda *args, **kwargs: {},
-    )
-    # this is needed so that the feature flags are reloaded for the feature_flags singleton
-    setup_feature_flags()
+def mock_all_feature_flags_to_default_values(
+    monkeypatch: MonkeyPatch,
+) -> MockAllFeatureFlagsToDefaultValues:
+    def mock_all_feature_flags_to_default_values_inner() -> None:
+        monkeypatch.setattr(
+            AnkiHubClient,
+            "get_feature_flags",
+            lambda *args, **kwargs: {},
+        )
+        # this is needed so that the feature flags are reloaded for the feature_flags singleton
+        setup_feature_flags()
+
+    return mock_all_feature_flags_to_default_values_inner
 
 
 class MockFunction(Protocol):
@@ -146,3 +163,157 @@ def mock_function(
         return mock
 
     return _mock_function
+
+
+class ImportAHNote(Protocol):
+    def __call__(
+        self,
+        note_data: Optional[NoteInfo] = None,
+        ah_nid: Optional[uuid.UUID] = None,
+        mid: Optional[NotetypeId] = None,
+        ah_did: uuid.UUID = None,
+    ) -> NoteInfo:
+        ...
+
+
+@fixture
+def import_ah_note(next_deterministic_uuid: Callable[[], uuid.UUID]) -> ImportAHNote:
+    """Import a note into the Anki and AnkiHub databases and return the note info.
+    The note type of the note is created in the Anki database if it does not exist yet.
+    The default value for the note type is an AnkiHub version of the Basic note type.
+    Can only be used in an anki_session_with_addon.profile_loaded() context.
+
+    Parameters:
+    Can be passed to override the default values of the note. When certain
+    parameters are overwritten, the note type can become incompatible with the
+    note, in this case an exception is raised.
+
+    Purpose:
+    Easily create notes in the Anki and AnkiHub databases without
+    having to worry about creating note types, decks and the import process.
+    """
+    # All notes created by this fixture will be created in the same deck.
+    default_ah_did = next_deterministic_uuid()
+    deck_name = "test"
+
+    def _import_ah_note(
+        note_data: Optional[NoteInfo] = None,
+        ah_nid: Optional[uuid.UUID] = None,
+        mid: Optional[NotetypeId] = None,
+        ah_did: uuid.UUID = default_ah_did,
+    ) -> NoteInfo:
+        if mid is None:
+            ah_basic_note_type = create_or_get_ah_version_of_note_type(
+                aqt.mw, aqt.mw.col.models.by_name("Basic")
+            )
+            mid = ah_basic_note_type["id"]
+
+        if note_data is None:
+            note_data = NoteInfoFactory.create()
+
+        note_data.mid = mid
+
+        if ah_nid:
+            note_data.ah_nid = ah_nid
+
+        # Check if note data is compatible with the note type.
+        # For each field in note_data, check if there is a field in the note type with the same name.
+        note_type = aqt.mw.col.models.get(mid)
+        field_names_of_note_type = set(field["name"] for field in note_type["flds"])
+        fields_are_compatible = all(
+            field.name in field_names_of_note_type for field in note_data.fields
+        )
+        assert fields_are_compatible, (
+            f"Note data is not compatible with the note type.\n"
+            f"\tNote data: {note_data.fields}, note type: {field_names_of_note_type}"
+        )
+
+        AnkiHubImporter().import_ankihub_deck(
+            ankihub_did=ah_did,
+            notes=[note_data],
+            note_types={note_type["id"]: note_type},
+            protected_fields={},
+            protected_tags=[],
+            deck_name=deck_name,
+            is_first_import_of_deck=True,
+        )
+        return note_data
+
+    return _import_ah_note
+
+
+class ImportAHNoteType(Protocol):
+    def __call__(
+        self,
+        note_type: Optional[NotetypeDict] = None,
+        ah_did: Optional[uuid.UUID] = None,
+        force_new: bool = False,
+    ) -> NotetypeDict:
+        ...
+
+
+@pytest.fixture
+def import_ah_note_type(
+    next_deterministic_uuid: Callable[[], uuid.UUID],
+    ankihub_basic_note_type: NotetypeDict,
+) -> ImportAHNoteType:
+    """Imports a note type into the AnkiHub DB and Anki. Returns the note type.
+    You can optionally pass in a note type and/or an AnkiHub deck ID.
+    If force_new is True, a new unique id will be generated for the note type.
+    Otherwise, subsequent calls to this function that use the same note type won't create a new note type."""
+    default_ah_did = next_deterministic_uuid()
+    default_note_type = ankihub_basic_note_type
+
+    def import_ah_note_type_inner(
+        note_type: Optional[NotetypeDict] = None,
+        ah_did: Optional[uuid.UUID] = None,
+        force_new: bool = False,
+    ) -> NotetypeDict:
+        if note_type is None:
+            note_type = default_note_type
+        if ah_did is None:
+            ah_did = default_ah_did
+
+        if force_new:
+            # Generate a new unique id for the note type
+            new_mid = max(model["id"] for model in aqt.mw.col.models.all()) + 1
+            note_type["id"] = new_mid
+
+        importer = AnkiHubImporter()
+        importer.import_ankihub_deck(
+            deck_name="test",
+            ankihub_did=ah_did,
+            note_types={note_type["id"]: note_type},
+            notes=[],
+            protected_fields={},
+            protected_tags=[],
+            is_first_import_of_deck=False,
+        )
+        return note_type
+
+    return import_ah_note_type_inner
+
+
+class NewNoteWithNoteType(Protocol):
+    def __call__(
+        self, note_type: NotetypeDict, anki_did: Optional[DeckId] = None
+    ) -> Note:
+        ...
+
+
+@pytest.fixture
+def new_note_with_note_type() -> NewNoteWithNoteType:
+    """Creates a new note with the given note type and adds it to the given deck."""
+    default_did = DeckId(1)
+
+    def new_note_with_note_type_inner(
+        note_type: NotetypeDict, anki_did: Optional[DeckId] = None
+    ) -> Note:
+        if anki_did is None:
+            anki_did = default_did
+
+        note = aqt.mw.col.new_note(note_type)
+        aqt.mw.col.add_note(note, DeckId(anki_did))
+        return note
+
+    return new_note_with_note_type_inner

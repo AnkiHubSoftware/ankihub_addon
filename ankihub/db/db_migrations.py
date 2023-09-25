@@ -122,3 +122,23 @@ def migrate_ankihub_db():
         LOGGER.info(
             f"AnkiHub DB migrated to schema version {ankihub_db.schema_version()}"
         )
+
+    if ankihub_db.schema_version() < 10:
+        # Migrate note_types to new table which has a different primary key
+        # To do that in sqlite, we need to create a new table, copy the data over and then delete the old table
+        ankihub_db.execute("ALTER TABLE notetypes RENAME TO temp_notetypes;")
+        ankihub_db._setup_note_types_table()
+        ankihub_db.execute(
+            """
+            INSERT INTO notetypes (anki_note_type_id, ankihub_deck_id, name, note_type_dict_json)
+            SELECT anki_note_type_id, ankihub_deck_id, name, note_type_dict_json
+            FROM temp_notetypes;
+            """
+        )
+        ankihub_db.execute("DROP TABLE temp_notetypes;")
+
+        ankihub_db.execute("PRAGMA user_version = 10;")
+
+        LOGGER.info(
+            f"AnkiHub DB migrated to schema version {ankihub_db.schema_version()}"
+        )

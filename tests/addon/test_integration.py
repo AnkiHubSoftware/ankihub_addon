@@ -58,6 +58,7 @@ from ankihub.gui.browser.browser import (
 
 from ..factories import DeckFactory, DeckMediaFactory, NoteInfoFactory
 from ..fixtures import (
+    ImportAHNote,
     MockFunction,
     SetFeatureFlagState,
     create_or_get_ah_version_of_note_type,
@@ -71,6 +72,7 @@ os.environ["SKIP_INIT"] = "1"
 from ankihub import entry_point, settings
 from ankihub.addon_ankihub_client import AddonAnkiHubClient as AnkiHubClient
 from ankihub.ankihub_client import (
+    API_VERSION,
     AnkiHubHTTPError,
     ChangeNoteSuggestion,
     Deck,
@@ -97,7 +99,7 @@ from ankihub.debug import (
     _setup_logging_for_db_begin,
     _setup_logging_for_sync_collection_and_media,
 )
-from ankihub.gui import media_sync, operations, utils
+from ankihub.gui import operations, utils
 from ankihub.gui.addons import (
     _change_file_permissions_of_addon_files,
     _maybe_change_file_permissions_of_addon_files,
@@ -113,6 +115,7 @@ from ankihub.gui.deck_updater import _AnkiHubDeckUpdater, ah_deck_updater
 from ankihub.gui.decks_dialog import SubscribedDecksDialog, download_and_install_decks
 from ankihub.gui.editor import _on_suggestion_button_press, _refresh_buttons
 from ankihub.gui.errors import upload_logs_and_data_in_background
+from ankihub.gui.media_sync import _AnkiHubMediaSync, media_sync
 from ankihub.gui.menu import menu_state
 from ankihub.gui.operations import ankihub_sync
 from ankihub.gui.operations.new_deck_subscriptions import (
@@ -226,83 +229,6 @@ def import_sample_ankihub_deck(
         assert local_did == list(new_dids)[0]
 
     return local_did
-
-
-class ImportAHNote(Protocol):
-    def __call__(
-        self,
-        note_data: Optional[NoteInfo] = None,
-        ah_nid: Optional[uuid.UUID] = None,
-        mid: Optional[NotetypeId] = None,
-        ah_did: uuid.UUID = None,
-    ) -> NoteInfo:
-        ...
-
-
-@fixture
-def import_ah_note(next_deterministic_uuid: Callable[[], uuid.UUID]) -> ImportAHNote:
-    """Import a note into the Anki and AnkiHub databases and return the note info.
-    The note type of the note is created in the Anki database if it does not exist yet.
-    The default value for the note type is an AnkiHub version of the Basic note type.
-    Can only be used in an anki_session_with_addon.profile_loaded() context.
-
-    Parameters:
-    Can be passed to override the default values of the note. When certain
-    parameters are overwritten, the note type can become incompatible with the
-    note, in this case an exception is raised.
-
-    Purpose:
-    Easily create notes in the Anki and AnkiHub databases without
-    having to worry about creating note types, decks and the import process.
-    """
-    # All notes created by this fixture will be created in the same deck.
-    default_ah_did = next_deterministic_uuid()
-    deck_name = "test"
-
-    def _import_ah_note(
-        note_data: Optional[NoteInfo] = None,
-        ah_nid: Optional[uuid.UUID] = None,
-        mid: Optional[NotetypeId] = None,
-        ah_did: uuid.UUID = default_ah_did,
-    ) -> NoteInfo:
-        if mid is None:
-            ah_basic_note_type = create_or_get_ah_version_of_note_type(
-                aqt.mw, aqt.mw.col.models.by_name("Basic")
-            )
-            mid = ah_basic_note_type["id"]
-
-        if note_data is None:
-            note_data = NoteInfoFactory.create()
-
-        note_data.mid = mid
-
-        if ah_nid:
-            note_data.ah_nid = ah_nid
-
-        # Check if note data is compatible with the note type.
-        # For each field in note_data, check if there is a field in the note type with the same name.
-        note_type = aqt.mw.col.models.get(mid)
-        field_names_of_note_type = set(field["name"] for field in note_type["flds"])
-        fields_are_compatible = all(
-            field.name in field_names_of_note_type for field in note_data.fields
-        )
-        assert fields_are_compatible, (
-            f"Note data is not compatible with the note type.\n"
-            f"\tNote data: {note_data.fields}, note type: {field_names_of_note_type}"
-        )
-
-        AnkiHubImporter().import_ankihub_deck(
-            ankihub_did=ah_did,
-            notes=[note_data],
-            note_types={note_type["id"]: note_type},
-            protected_fields={},
-            protected_tags=[],
-            deck_name=deck_name,
-            is_first_import_of_deck=True,
-        )
-        return note_data
-
-    return _import_ah_note
 
 
 class CreateAnkiAHNote(Protocol):
@@ -499,7 +425,7 @@ def create_change_suggestion(
             note=note,
             change_type=SuggestionType.NEW_CONTENT,
             comment="test",
-            media_upload_cb=media_sync.media_sync.start_media_upload,
+            media_upload_cb=media_sync.start_media_upload,
         )
 
         if wait_for_media_upload:
@@ -542,7 +468,7 @@ def create_new_note_suggestion(
             note=note,
             comment="test",
             ankihub_did=ah_did,
-            media_upload_cb=media_sync.media_sync.start_media_upload,
+            media_upload_cb=media_sync.start_media_upload,
         )
 
         if wait_for_media_upload:
@@ -813,7 +739,7 @@ class TestDownloadAndInstallDecks:
         add_mock(operations.deck_installation, "show_empty_cards")
 
         # Mock media sync
-        add_mock(media_sync._AnkiHubMediaSync, "start_media_download")
+        add_mock(_AnkiHubMediaSync, "start_media_download")
 
         return mocks
 
@@ -1161,6 +1087,7 @@ def test_suggest_notes_in_bulk(
         with monkeypatch.context() as m:
             m.setattr("uuid.uuid4", lambda: new_note_ah_id)
             suggest_notes_in_bulk(
+                ankihub_did=ah_did,
                 notes=notes,
                 auto_accept=False,
                 change_type=SuggestionType.NEW_CONTENT,
@@ -3103,67 +3030,6 @@ class TestDeckUpdater:
                 latest_update=latest_update,
             )
 
-    def test_update_deck_media(
-        self,
-        anki_session_with_addon_data: AnkiSession,
-        install_sample_ah_deck: InstallSampleAHDeck,
-        mock_ankihub_sync_dependencies: None,
-        set_feature_flag_state: SetFeatureFlagState,
-        mock_function: MockFunction,
-    ):
-        # Enable the use_deck_media feature flag
-        set_feature_flag_state("use_deck_media", True)
-
-        with anki_session_with_addon_data.profile_loaded():
-
-            # Install a deck to be updated
-            _, ah_did = install_sample_ah_deck()
-
-            # Mock client to return a deck media update
-            latest_media_update = datetime.now()
-            deck_media = DeckMediaFactory.create(
-                name="test.png",
-                modified=latest_media_update,
-                referenced_on_accepted_note=True,
-                exists_on_s3=True,
-                download_enabled=True,
-            )
-            get_deck_media_updates_mock = mock_function(
-                AnkiHubClient,
-                "get_deck_media_updates",
-                return_value=[
-                    DeckMediaUpdateChunk(
-                        media=[deck_media],
-                    )
-                ],
-            )
-
-            # Update the deck
-            deck_updater = _AnkiHubDeckUpdater()
-            deck_updater.update_decks_and_media(
-                ah_dids=[ah_did], start_media_sync=False
-            )
-
-            # Assert the client method was called with the correct arguments
-            get_deck_media_updates_mock.assert_called_once_with(
-                ah_did,
-                since=None,
-            )
-
-            # Assert that the deck media was added to the database
-            assert ankihub_db.downloadable_media_names_for_ankihub_deck(
-                ah_did, media_disabled_fields={}
-            ) == {deck_media.name}
-            assert ankihub_db.media_names_exist_for_ankihub_deck(
-                ah_did=ah_did, media_names={deck_media.name}
-            ) == {deck_media.name: True}
-
-            # Assert that the latest media update time was updated in the config
-            assert (
-                config.deck_config(ankihub_did=ah_did).latest_media_update
-                == latest_media_update
-            )
-
 
 @pytest.mark.parametrize(
     "subscribed_to_deck",
@@ -3219,6 +3085,19 @@ def test_sync_uninstalls_unsubscribed_decks(
             if subscribed_to_deck
             else not any(is_ankihub_note_type)
         )
+
+
+def test_sync_updates_api_version_on_last_sync(
+    anki_session_with_addon_data: AnkiSession,
+    sync_with_ankihub: SyncWithAnkiHub,
+    mock_ankihub_sync_dependencies: None,
+):
+    assert config._private_config.api_version_on_last_sync is None  # sanity check
+
+    with anki_session_with_addon_data.profile_loaded():
+        sync_with_ankihub()
+
+    assert config._private_config.api_version_on_last_sync == API_VERSION
 
 
 class TestAutoSync:
@@ -3527,50 +3406,133 @@ def test_reset_optional_tags_action(
         ]
 
 
-def test_media_update_on_deck_update(
-    anki_session_with_addon_data: AnkiSession,
-    install_sample_ah_deck: InstallSampleAHDeck,
-    monkeypatch: MonkeyPatch,
-    mock_client_methods_called_during_ankihub_sync: None,
-    qtbot: QtBot,
-):
-    with anki_session_with_addon_data.profile_loaded():
-        mw = anki_session_with_addon_data.mw
+class TestMediaSyncMediaDownload:
+    def test_download_media_without_deck_media_workflow(
+        self,
+        anki_session_with_addon_data: AnkiSession,
+        next_deterministic_uuid,
+        import_ah_note: ImportAHNote,
+        monkeypatch: MonkeyPatch,
+        mock_ankihub_sync_dependencies: None,
+        qtbot: QtBot,
+    ):
+        with anki_session_with_addon_data.profile_loaded():
+            # Add a reference to a media file to a note
+            note = NoteInfoFactory.create()
+            note.fields[0].value = "Some text. <img src='image.png'>"
 
-        _, ah_did = install_sample_ah_deck()
+            ah_did = next_deterministic_uuid()
+            import_ah_note(note, ah_did=ah_did)
 
-        # Add a reference to a local media file to a note.
-        nids = mw.col.find_notes("")
-        notes = [ankihub_db.note_data(nid) for nid in nids]
-        notes[0].fields[0].value = "Some text. <img src='image.png'>"
-        ankihub_db.upsert_notes_data(ah_did, notes)
+            # Mock the client method for downloading media
+            download_media_mock = Mock()
+            monkeypatch.setattr(AnkiHubClient, "download_media", download_media_mock)
 
-        # Mock the token to simulate that the user is logged in.
-        monkeypatch.setattr(config, "token", lambda: "test token")
+            # Start the media sync and wait for it to finish
+            media_sync.start_media_download()
+            qtbot.wait_until(lambda: media_sync._download_in_progress is False)
 
-        # Mock get_deck_subscriptions has to return the deck that was installed or the sync will uninstall it.
-        monkeypatch.setattr(
-            AnkiHubClient,
-            "get_deck_subscriptions",
-            lambda *args, **kwargs: [
-                DeckFactory.create(
-                    ah_did=ah_did,
-                )
-            ],
-        )
+            # Assert that the client method for downloading media was called with the correct arguments
+            # to download the media file
+            download_media_mock.assert_called_once_with(["image.png"], ah_did)
 
-        # Mock the client method for downloading media.
-        download_media_mock = Mock()
-        monkeypatch.setattr(AnkiHubClient, "download_media", download_media_mock)
+    def test_download_media_with_deck_media_workflow(
+        self,
+        anki_session_with_addon_data: AnkiSession,
+        install_sample_ah_deck: InstallSampleAHDeck,
+        set_feature_flag_state: SetFeatureFlagState,
+        mock_function: MockFunction,
+        qtbot: QtBot,
+    ):
+        # Enable the use_deck_media feature flag
+        set_feature_flag_state("use_deck_media", True)
 
-        # Update the deck.
-        ah_deck_updater.update_decks_and_media(ah_dids=[ah_did])
+        with anki_session_with_addon_data.profile_loaded():
+            _, ah_did = install_sample_ah_deck()
 
-        # Let the background thread (which downloads missing media) finish.
-        qtbot.wait(200)
+            # Mock client to return a deck media update
+            latest_media_update = datetime.now()
+            deck_media = DeckMediaFactory.create(
+                name="image.png",
+                modified=latest_media_update,
+                referenced_on_accepted_note=True,
+                exists_on_s3=True,
+                download_enabled=True,
+            )
+            get_deck_media_updates_mock = mock_function(
+                AnkiHubClient,
+                "get_deck_media_updates",
+                return_value=[
+                    DeckMediaUpdateChunk(
+                        media=[deck_media], latest_update=latest_media_update
+                    ),
+                ],
+            )
 
-        # Assert that the client method for downloading media was called with the correct arguments.
-        download_media_mock.assert_called_once_with(["image.png"], ah_did)
+            # Mock the client method for downloading media
+            download_media_mock = mock_function(AnkiHubClient, "download_media")
+
+            # Start the media sync and wait for it to finish
+            media_sync.start_media_download()
+            qtbot.wait_until(lambda: media_sync._download_in_progress is False)
+
+            # Assert the client methods were called with the correct arguments
+            get_deck_media_updates_mock.assert_called_once_with(
+                ah_did,
+                since=None,
+            )
+            download_media_mock.assert_called_once_with(["image.png"], ah_did)
+
+            # Assert that the deck media was added to the database
+            assert ankihub_db.downloadable_media_names_for_ankihub_deck(
+                ah_did, media_disabled_fields={}
+            ) == {deck_media.name}
+            assert ankihub_db.media_names_exist_for_ankihub_deck(
+                ah_did=ah_did, media_names={deck_media.name}
+            ) == {deck_media.name: True}
+
+            # Assert that the latest media update time was updated in the config
+            assert (
+                config.deck_config(ankihub_did=ah_did).latest_media_update
+                == latest_media_update
+            )
+
+    def test_download_media_with_deck_media_workflow_with_no_updates(
+        self,
+        anki_session_with_addon_data: AnkiSession,
+        install_sample_ah_deck: InstallSampleAHDeck,
+        set_feature_flag_state: SetFeatureFlagState,
+        mock_function: MockFunction,
+        qtbot: QtBot,
+    ):
+        # Enable the use_deck_media feature flag
+        set_feature_flag_state("use_deck_media", True)
+
+        with anki_session_with_addon_data.profile_loaded():
+            _, ah_did = install_sample_ah_deck()
+
+            # Mock client to return an empty deck media update
+            get_deck_media_updates_mock = mock_function(
+                AnkiHubClient,
+                "get_deck_media_updates",
+                return_value=[
+                    DeckMediaUpdateChunk(media=[], latest_update=datetime.now())
+                ],
+            )
+
+            # Mock the client method for downloading media
+            download_media_mock = mock_function(AnkiHubClient, "download_media")
+
+            # Start the media sync and wait for it to finish
+            media_sync.start_media_download()
+            qtbot.wait_until(lambda: media_sync._download_in_progress is False)
+
+            # Assert the client methods were called with the correct arguments
+            get_deck_media_updates_mock.assert_called_once_with(
+                ah_did,
+                since=None,
+            )
+            download_media_mock.assert_not_called()
 
 
 @fixture
@@ -3790,6 +3752,8 @@ class TestSuggestionsWithMedia:
             media_dir = Path(mw.col.media.dir())
             ah_did = next_deterministic_uuid()
 
+            note_data = import_ah_note(ah_did=ah_did)
+
             # Two media files with the contents, one will be in the collection and the other in the database.
             media_file_in_db = "testfile_1.jpeg"
             media_file_in_collection = "testfile_1_copy.jpeg"
@@ -3814,7 +3778,6 @@ class TestSuggestionsWithMedia:
             )
 
             # Create a suggestion for a note that references the media file in the collection
-            note_data = import_ah_note(ah_did=ah_did)
             note = mw.col.get_note(NoteId(note_data.anki_nid))
             note_content = f'<img src="{media_file_in_collection}">'
             note["Front"] = note_content

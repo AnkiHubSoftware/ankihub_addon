@@ -1,5 +1,6 @@
 import uuid
 from concurrent.futures import Future
+from datetime import datetime
 from functools import cached_property
 from pathlib import Path
 from typing import Callable, Dict, Iterable, List, Optional, Set
@@ -9,8 +10,10 @@ from aqt.qt import QAction
 
 from .. import LOGGER
 from ..addon_ankihub_client import AddonAnkiHubClient
-from ..ankihub_client import AnkiHubHTTPError
+from ..ankihub_client.models import DeckMedia
 from ..db import ankihub_db
+from ..feature_flags import feature_flags
+from ..settings import config
 
 
 class _AnkiHubMediaSync:
@@ -43,7 +46,8 @@ class _AnkiHubMediaSync:
         self.refresh_sync_status_text()
 
         aqt.mw.taskman.run_in_background(
-            self._download_missing_media, on_done=self._on_download_finished
+            self._update_deck_media_and_download_missing_media,
+            on_done=self._on_download_finished,
         )
 
     def start_media_upload(
@@ -97,26 +101,64 @@ class _AnkiHubMediaSync:
             on_success()
         self._client.media_upload_finished(ankihub_deck_id)
 
-    def _download_missing_media(self):
+    def _update_deck_media_and_download_missing_media(self) -> None:
         for ah_did in ankihub_db.ankihub_deck_ids():
-            try:
+            if feature_flags.use_deck_media:
+                self._update_deck_media(ankihub_did=ah_did)
+                # Fetching media disabled fields here is not necessary with the deck_media workflow.
+                # The DeckMedia objects have the download_enabled field which serves the same purpose.
+                media_disabled_fields = {}
+            else:
+                # is_media_upload_finished is only used for the old workflow which doesn't use deck media objects.
+                # Its purpose is to prevent the add-on from downloading media from decks that have media references,
+                # but no media on s3. (For example if the deck was created before the media feature was added.)
+                # With the new workflow, we have the exists_on_s3 field on the deck media objects that is used for this
+                # purpose.
                 if not self._client.is_media_upload_finished(ah_did):
-                    continue
-            except AnkiHubHTTPError as e:
-                if e.response.status_code in (403, 404):
-                    LOGGER.warning(
-                        f"Could not check if media upload is finished for AnkiHub deck {ah_did}."
+                    LOGGER.info(
+                        f"Media upload for {ah_did=} not finished, skipping media download..."
                     )
                     continue
-                else:
-                    raise e
-            media_disabled_fields = self._client.get_media_disabled_fields(ah_did)
+                media_disabled_fields = self._client.get_media_disabled_fields(ah_did)
+
             missing_media_names = self._missing_media_for_ah_deck(
                 ah_did, media_disabled_fields
             )
             if not missing_media_names:
+                LOGGER.info(f"No missing media for {ah_did=}")
                 continue
+
+            LOGGER.info(f"Downloading {len(missing_media_names)} media for {ah_did=}")
             self._client.download_media(missing_media_names, ah_did)
+
+    def _update_deck_media(self, ankihub_did: uuid.UUID) -> None:
+        """Fetch deck media updates from AnkiHub and update the database and the config."""
+        media_list: List[DeckMedia] = []
+        deck_config = config.deck_config(ankihub_did)
+        latest_update: Optional[datetime] = None
+        for chunk in self._client.get_deck_media_updates(
+            ankihub_did,
+            since=deck_config.latest_media_update,
+        ):
+            if not chunk.media:
+                continue
+
+            media_list += chunk.media
+            latest_update = (
+                max(chunk.latest_update, latest_update)
+                if latest_update
+                else chunk.latest_update
+            )
+
+        if media_list:
+            ankihub_db.upsert_deck_media_infos(
+                ankihub_did=ankihub_did, media_list=media_list
+            )
+            config.save_latest_deck_media_update(
+                ankihub_did, latest_media_update=latest_update
+            )
+        else:
+            LOGGER.info(f"No new media updates for {ankihub_did=}")
 
     def _missing_media_for_ah_deck(
         self, ah_did: uuid.UUID, media_disabled_fields: Dict[int, List[str]]
