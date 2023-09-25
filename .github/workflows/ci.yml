@@ -93,6 +93,7 @@ jobs:
 
       - name: Upload coverage report with smokeshow
         run: smokeshow upload coverage_html_report
+        if: always()
         env:
           SMOKESHOW_GITHUB_STATUS_DESCRIPTION: Add-on Test Coverage {coverage-percentage}
           SMOKESHOW_GITHUB_COVERAGE_THRESHOLD: 66
@@ -100,6 +101,7 @@ jobs:
           SMOKESHOW_GITHUB_PR_HEAD_SHA: ${{ github.event.pull_request.head.sha }}
 
       - name: Upload coverage to Codecov
+        if: always()
         env:
           CODECOV_TOKEN: "${{ secrets.CODECOV_TOKEN }}"
         uses: codecov/codecov-action@v1
