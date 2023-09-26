@@ -142,6 +142,8 @@ def initial_server_setup():
             "--format=custom",
             "--table=deck*",
             "--table=user*",
+            "--table=membership*",
+            "--table=auth*",
             "--schema=public",
         ],
         stdout=open(DB_DUMP_FILE_NAME, "w"),
