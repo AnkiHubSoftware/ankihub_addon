@@ -101,7 +101,7 @@ class _AnkiHubMediaSync:
         self._client.media_upload_finished(ankihub_deck_id)
 
     def _update_deck_media_and_download_missing_media(self) -> None:
-        for ah_did in ankihub_db.ankihub_deck_ids():
+        for ah_did in config.deck_ids():
             self._update_deck_media(ankihub_did=ah_did)
             missing_media_names = self._missing_media_for_ah_deck(ah_did)
             if not missing_media_names:
