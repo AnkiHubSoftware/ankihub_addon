@@ -91,6 +91,11 @@ NO_SUCH_FILE_OR_DIRECTORY_MESSAGE = "No such file or directory"
 
 @pytest.fixture
 def client_with_server_setup(vcr: VCR, marks: List[str], request: FixtureRequest):
+    """Resets the server database to an initial state before each test.
+    If VCR is used (playback mode), this step is skipped.
+    Returns a client that is logged in.
+    """
+
     if "skipifvcr" in marks and vcr_enabled(vcr):
         pytest.skip("Skipping test because test has skipifvcr mark and VCR is enabled")
 
