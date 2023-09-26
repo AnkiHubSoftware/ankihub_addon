@@ -3,32 +3,30 @@ image:
 
 tasks:
   - name: Set up AnkiHub
-    env:
-      COMPOSE_FILE: "local.yml"
     init: |
       git clone https://github.com/ankipalace/ankihub /workspace/ankihub
       cd /workspace/ankihub
       cp .env.dev .env
-      docker-compose build
-      docker-compose run --rm django bash -c ". release.sh"
+      just pull-all-images
+      docker compose run --rm django bash -c ". release.sh"
     command: |
-      docker-compose up -d
+      just up
       gp ports await 8000
-      docker-compose run --rm django bash
+      docker compose run --rm django bash
 
   - name: Set up Anki
     env:
       ANKIHUB_APP_URL: "http://localhost:8000"
       ANKIDEV: 1
       DEVELOPMENT: True
-      ANKI_BASE_ROOT: "/tmp"
+      TEMPORARY_ANKI_BASE: "=/tmp/Anki2"
 
     init: |
       pyenv local 3.9.13
       python3 scripts/build.py
       python3 scripts/create_tmp_anki_data_dir.py
     command: |
-      anki -p dev -b $ANKI_BASE_ROOT/Anki2
+      anki -p dev -b $TEMPORARY_ANKI_BASE
 
 github:
   prebuilds:
