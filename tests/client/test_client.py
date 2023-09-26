@@ -86,17 +86,17 @@ DB_USERNAME = "user"
 DB_DUMP_FILE_NAME = f"{DB_NAME}.dump"
 DB_CONTAINER_NAME = "postgres"
 
+NO_SUCH_FILE_OR_DIRECTORY_MESSAGE = "No such file or directory"
+
 
 @pytest.fixture
-def client_with_server_setup(vcr: VCR, request, marks):
+def client_with_server_setup(vcr: VCR, marks: List[str], request: FixtureRequest):
     if "skipifvcr" in marks and vcr_enabled(vcr):
         pytest.skip("Skipping test because test has skipifvcr mark and VCR is enabled")
 
-    cassette_name = ".".join(request.node.nodeid.split("::")[1:]) + ".yaml"
-    cassette_path = VCR_CASSETTES_PATH / cassette_name
-    playback_mode = vcr_enabled(vcr) and cassette_path.exists()
+    if not is_playback_mode(vcr, request):
+        create_db_dump_if_not_exists()
 
-    if not playback_mode:
         # Restore DB from dump
         result = subprocess.run(
             [
@@ -117,15 +117,54 @@ def client_with_server_setup(vcr: VCR, request, marks):
             stderr=subprocess.PIPE,
         )
         report_command_result(
-            command_name="pg_restore", result=result, raise_on_error=False
+            # We don't want to raise an error here because pg_restore might return some warnings which
+            # can be ignored.
+            command_name="pg_restore",
+            result=result,
+            raise_on_error=False,
         )
 
     client = AnkiHubClient(api_url=LOCAL_API_URL, local_media_dir_path=TEST_MEDIA_PATH)
     yield client
 
 
-@pytest.fixture(scope="session", autouse=True)
-def initial_server_setup():
+def is_playback_mode(vcr: VCR, request: FixtureRequest) -> bool:
+    """Playback mode is when the test is run using the recorded HTTP responses (VCR)."""
+    cassette_name = ".".join(request.node.nodeid.split("::")[1:]) + ".yaml"
+    cassette_path = VCR_CASSETTES_PATH / cassette_name
+    result = vcr_enabled(vcr) and cassette_path.exists()
+    return result
+
+
+def create_db_dump_if_not_exists() -> None:
+    """Create a DB dump with the initial state of the DB if it doesn't exist yet.
+    The DB is restored to this state before each test."""
+
+    # Check if DB dump exists
+    result = subprocess.run(
+        [
+            "sudo",
+            "docker",
+            "exec",
+            "-i",
+            DB_CONTAINER_NAME,
+            "ls",
+            DB_DUMP_FILE_NAME,
+        ],
+        stdout=subprocess.PIPE,
+        stderr=subprocess.PIPE,
+        text=True,
+    )
+    report_command_result(command_name="ls", result=result, raise_on_error=False)
+
+    if result.stdout.strip() == DB_DUMP_FILE_NAME:
+        # DB dump exists, no need to create it
+        return
+    elif NO_SUCH_FILE_OR_DIRECTORY_MESSAGE in result.stderr:
+        # DB dump doesn't exist, create it
+        pass
+    else:
+        assert False, f"Command ls failed with error code {result.returncode}"
 
     # Prepare the DB state
     result = subprocess.run(
@@ -138,16 +177,14 @@ def initial_server_setup():
             "-c",
             (
                 "python manage.py flush --no-input && "
-                "python manage.py runscript create_test_users && "
                 "python manage.py runscript create_fixture_data"
             ),
         ],
         stdout=subprocess.PIPE,
         stderr=subprocess.PIPE,
+        text=True,
     )
-    report_command_result(
-        command_name="initial_server_setup", result=result, raise_on_error=True
-    )
+    report_command_result(command_name="db setup", result=result, raise_on_error=True)
 
     # Dump the DB to a file to be able to restore it before each test
     result = subprocess.run(
@@ -168,6 +205,32 @@ def initial_server_setup():
         stderr=subprocess.PIPE,
     )
     report_command_result(command_name="pg_dump", result=result, raise_on_error=True)
+
+
+@pytest.fixture(scope="session", autouse=True)
+def remove_db_dump():
+    """Remove the db dump on the start of the session so that it is re-created for each session."""
+    result = subprocess.run(
+        [
+            "sudo",
+            "docker",
+            "exec",
+            DB_CONTAINER_NAME,
+            "rm",
+            DB_DUMP_FILE_NAME,
+        ],
+        stdout=subprocess.PIPE,
+        stderr=subprocess.PIPE,
+        text=True,
+    )
+    report_command_result(command_name="rm", result=result, raise_on_error=False)
+    if result.returncode == 0 or NO_SUCH_FILE_OR_DIRECTORY_MESSAGE in result.stderr:
+        # Nothing to do
+        pass
+    else:
+        assert False, f"Command rm failed with error code {result.returncode}"
+
+    yield
 
 
 def report_command_result(
