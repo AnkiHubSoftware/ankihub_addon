@@ -79,6 +79,8 @@ DATETIME_OF_ADDING_FIRST_DECK_MEDIA = datetime(
     year=2023, month=1, day=2, tzinfo=timezone.utc
 )
 
+DJANGO_CONTAINER_NAME = "django"
+
 DB_NAME = "ankihub"
 DB_USERNAME = "user"
 DB_DUMP_FILE_NAME = f"{DB_NAME}.dump"
@@ -131,7 +133,7 @@ def initial_server_setup():
             "sudo",
             "docker",
             "exec",
-            "django",
+            DJANGO_CONTAINER_NAME,
             "bash",
             "-c",
             (
