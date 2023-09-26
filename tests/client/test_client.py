@@ -9,7 +9,7 @@ import zipfile
 from copy import deepcopy
 from datetime import datetime, timezone
 from pathlib import Path
-from typing import Callable, List, cast
+from typing import Callable, Generator, List, cast
 from unittest.mock import MagicMock, Mock
 
 import pytest
@@ -120,6 +120,7 @@ def client_with_server_setup(vcr: VCR, marks: List[str], request: FixtureRequest
             ],
             stdout=subprocess.PIPE,
             stderr=subprocess.PIPE,
+            text=True,
         )
         report_command_result(
             # We don't want to raise an error here because pg_restore might return some warnings which
@@ -209,12 +210,13 @@ def create_db_dump_if_not_exists() -> None:
         ],
         stdout=subprocess.PIPE,
         stderr=subprocess.PIPE,
+        text=True,
     )
     report_command_result(command_name="pg_dump", result=result, raise_on_error=True)
 
 
 @pytest.fixture(scope="session", autouse=True)
-def remove_db_dump():
+def remove_db_dump() -> Generator:
     """Remove the db dump on the start of the session so that it is re-created for each session."""
     result = subprocess.run(
         [
