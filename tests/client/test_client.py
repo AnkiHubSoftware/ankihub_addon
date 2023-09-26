@@ -177,6 +177,7 @@ def create_db_dump_if_not_exists() -> None:
             "-c",
             (
                 "python manage.py flush --no-input && "
+                "python manage.py migrate && "
                 "python manage.py runscript create_fixture_data"
             ),
         ],
