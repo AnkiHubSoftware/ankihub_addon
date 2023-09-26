@@ -84,7 +84,6 @@ from ankihub.ankihub_client import (
 from ankihub.ankihub_client.ankihub_client import (
     ANKIHUB_DATETIME_FORMAT_STR,
     DEFAULT_API_URL,
-    IMAGE_FILE_EXTENSIONS,
     DeckExtensionUpdateChunk,
     _transform_notes_data,
 )
@@ -3579,8 +3578,11 @@ class TestSuggestionsWithMedia:
         """Return the file name the media file should have when the image was uploaded to S3."""
         media_dir = Path(aqt.mw.col.media.dir())
         media_file_path = media_dir / file_name
-        is_image = media_file_path.suffix in IMAGE_FILE_EXTENSIONS
-        suffix = ".webp" if is_image else media_file_path.suffix
+        suffix = (
+            ".webp"
+            if AnkiHubClient()._media_file_should_be_converted_to_webp(media_file_path)
+            else media_file_path.suffix
+        )
         result = mdb5_file_hash(media_file_path) + suffix
         return result
 

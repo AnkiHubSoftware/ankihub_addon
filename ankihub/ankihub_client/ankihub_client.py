@@ -374,7 +374,9 @@ class AnkiHubClient:
                 file_content_hash.hexdigest() + for_old_media_path.suffix
             )
 
-            if new_media_path.suffix in IMAGE_FILE_EXTENSIONS:
+            if self._media_file_should_be_converted_to_webp(for_old_media_path):
+                # The lambda will convert images to the webp format if they are uploaded with a .webp extension and
+                # are not already webp images.
                 new_media_path = new_media_path.with_suffix(".webp")
 
             # If the file with the hashed name does not exist already, we
@@ -389,6 +391,14 @@ class AnkiHubClient:
 
             result[for_old_media_path.name] = new_media_path.name
 
+        return result
+
+    def _media_file_should_be_converted_to_webp(self, media_path: Path) -> bool:
+        """Whether the media file should be converted to webp once its uploaded to s3."""
+        result = (
+            media_path.suffix in IMAGE_FILE_EXTENSIONS
+            and media_path.suffix not in [".svg", ".webp"]
+        )
         return result
 
     def upload_media(self, media_paths: Set[Path], ah_did: uuid.UUID) -> None:
