@@ -227,6 +227,9 @@ def remove_db_dump():
     if result.returncode == 0 or NO_SUCH_FILE_OR_DIRECTORY_MESSAGE in result.stderr:
         # Nothing to do
         pass
+    elif "Container" in result.stderr and "is not running" in result.stderr:
+        # Container is not running, nothing to do
+        pass
     else:
         assert False, f"Command rm failed with error code {result.returncode}"
 
