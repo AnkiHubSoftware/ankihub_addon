@@ -395,6 +395,7 @@ class AnkiHubClient:
 
     def _media_file_should_be_converted_to_webp(self, media_path: Path) -> bool:
         """Whether the media file should be converted to webp once its uploaded to s3."""
+        # We don't want to convert svgs, because they don't benefit from the conversion in most cases.
         result = (
             media_path.suffix in IMAGE_FILE_EXTENSIONS
             and media_path.suffix not in [".svg", ".webp"]
