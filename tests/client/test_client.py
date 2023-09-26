@@ -82,6 +82,7 @@ DATETIME_OF_ADDING_FIRST_DECK_MEDIA = datetime(
 DB_NAME = "ankihub"
 DB_USERNAME = "user"
 DB_DUMP_FILE_NAME = f"{DB_NAME}.dump"
+DB_CONTAINER_NAME = "postgres"
 
 
 @pytest.fixture
@@ -95,25 +96,26 @@ def client_with_server_setup(vcr: VCR, request, marks):
 
     if not playback_mode:
         # Restore DB from dump
-        with open(DB_DUMP_FILE_NAME, "r") as file:
-            result = subprocess.run(
-                [
-                    "sudo",
-                    "docker",
-                    "exec",
-                    "-i",
-                    "postgres",
-                    "pg_restore",
-                    f"--dbname={DB_NAME}",
-                    f"--username={DB_USERNAME}",
-                    "--format=custom",
-                    "--clean",
-                ],
-                stdin=file,
-                stdout=subprocess.PIPE,
-                stderr=subprocess.PIPE,
-            )
-            print_command_result_info(command_name="pg_restore", result=result)
+        result = subprocess.run(
+            [
+                "sudo",
+                "docker",
+                "exec",
+                "-i",
+                DB_CONTAINER_NAME,
+                "pg_restore",
+                f"--dbname={DB_NAME}",
+                f"--username={DB_USERNAME}",
+                "--format=custom",
+                "--clean",
+                DB_DUMP_FILE_NAME,
+            ],
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
+        )
+        report_command_result(
+            command_name="pg_restore", result=result, raise_on_error=False
+        )
 
     client = AnkiHubClient(api_url=LOCAL_API_URL, local_media_dir_path=TEST_MEDIA_PATH)
     yield client
@@ -123,10 +125,25 @@ def client_with_server_setup(vcr: VCR, request, marks):
 def initial_server_setup():
 
     # Prepare the DB state
-    run_command_in_django_container(
-        "python manage.py flush --no-input && "
-        "python manage.py runscript create_test_users && "
-        "python manage.py runscript create_fixture_data"
+    result = subprocess.run(
+        [
+            "sudo",
+            "docker",
+            "exec",
+            "django",
+            "bash",
+            "-c",
+            (
+                "python manage.py flush --no-input && "
+                "python manage.py runscript create_test_users && "
+                "python manage.py runscript create_fixture_data"
+            ),
+        ],
+        stdout=subprocess.PIPE,
+        stderr=subprocess.PIPE,
+    )
+    report_command_result(
+        command_name="initial_server_setup", result=result, raise_on_error=True
     )
 
     # Dump the DB to a file to be able to restore it before each test
@@ -135,49 +152,32 @@ def initial_server_setup():
             "sudo",
             "docker",
             "exec",
-            "postgres",
-            "pg_dump",
-            f"--dbname={DB_NAME}",
-            f"--username={DB_USERNAME}",
-            "--format=custom",
-            "--schema=public",
-        ],
-        stdout=open(DB_DUMP_FILE_NAME, "w"),
-        stderr=subprocess.PIPE,
-    )
-    print_command_result_info(command_name="pg_dump", result=result)
-
-
-def run_command_in_django_container(command):
-    result = subprocess.run(
-        [
-            "sudo",
-            "docker-compose",
-            "-f",
-            WEBAPP_COMPOSE_FILE.absolute(),
-            "exec",
-            "-T",
-            "django",
+            DB_CONTAINER_NAME,
             "bash",
             "-c",
-            command,
+            (
+                f"pg_dump --dbname={DB_NAME} --username={DB_USERNAME} "
+                "--format=custom --schema=public "
+                f"> {DB_DUMP_FILE_NAME}"
+            ),
         ],
-        text=True,
         stdout=subprocess.PIPE,
         stderr=subprocess.PIPE,
     )
-    print_command_result_info(command_name=command, result=result)
-
-    return result
+    report_command_result(command_name="pg_dump", result=result, raise_on_error=True)
 
 
-def print_command_result_info(
-    command_name: str, result: subprocess.CompletedProcess
+def report_command_result(
+    command_name: str, result: subprocess.CompletedProcess, raise_on_error: bool
 ) -> None:
     if result.returncode != 0:
         print(f"Command {command_name} failed with error code {result.returncode}")
         print(f"Stdout: {result.stdout}")
         print(f"Stderr: {result.stderr}")
+        if raise_on_error:
+            assert (
+                False
+            ), f"Command {command_name} failed with error code {result.returncode}"
     else:
         print(f"Command {command_name} executed successfully.")
         print(f"Stdout: {result.stdout}")
