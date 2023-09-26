@@ -1159,8 +1159,8 @@ class TestUploadMediaForSuggestion:
         )
 
         expected_media_name_map = {
-            "testfile_mario.png": "156ca948cd1356b1a2c1c790f0855ad9.png",
-            "testfile_test.jpeg": "a61eab59692d17a2adf4d1c5e9049ee4.jpeg",
+            "testfile_mario.png": "156ca948cd1356b1a2c1c790f0855ad9.webp",
+            "testfile_test.jpeg": "a61eab59692d17a2adf4d1c5e9049ee4.webp",
         }
 
         suggestion_request_mock = None
@@ -1231,9 +1231,9 @@ class TestUploadMediaForSuggestion:
         ]
 
         expected_result = {
-            "testfile_mario.png": "156ca948cd1356b1a2c1c790f0855ad9.png",
-            "testfile_anki.gif": "87617b1d58967eb86b9e0e5dc92d91ee.gif",
-            "testfile_test.jpeg": "a61eab59692d17a2adf4d1c5e9049ee4.jpeg",
+            "testfile_mario.png": "156ca948cd1356b1a2c1c790f0855ad9.webp",
+            "testfile_anki.gif": "87617b1d58967eb86b9e0e5dc92d91ee.webp",
+            "testfile_test.jpeg": "a61eab59692d17a2adf4d1c5e9049ee4.webp",
             "testfile_sound.mp3": "ae9120835f658f1ae57e5754811a9475.mp3",
         }
 

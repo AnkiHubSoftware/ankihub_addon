@@ -84,6 +84,7 @@ from ankihub.ankihub_client import (
 from ankihub.ankihub_client.ankihub_client import (
     ANKIHUB_DATETIME_FORMAT_STR,
     DEFAULT_API_URL,
+    IMAGE_FILE_EXTENSIONS,
     DeckExtensionUpdateChunk,
     _transform_notes_data,
 )
@@ -3563,7 +3564,7 @@ class TestSuggestionsWithMedia:
             )
 
             # Assert that the suggestion was created with the correct media file name
-            expected_file_name = self._hashed_file_name(media_file_name)
+            expected_file_name = self._new_media_file_name(media_file_name)
             self._assert_media_names_on_note_and_suggestion_as_expected(
                 note=note,
                 suggestion_request_mock=create_change_suggestion_mock,
@@ -3574,11 +3575,13 @@ class TestSuggestionsWithMedia:
                 expected_media_name=expected_file_name,
             )
 
-    def _hashed_file_name(self, file_name: str) -> str:
-        """Return the file name the media file should have when renamed using its hash."""
+    def _new_media_file_name(self, file_name: str) -> str:
+        """Return the file name the media file should have when the image was uploaded to S3."""
         media_dir = Path(aqt.mw.col.media.dir())
         media_file_path = media_dir / file_name
-        result = mdb5_file_hash(media_file_path) + media_file_path.suffix
+        is_image = media_file_path.suffix in IMAGE_FILE_EXTENSIONS
+        suffix = ".webp" if is_image else media_file_path.suffix
+        result = mdb5_file_hash(media_file_path) + suffix
         return result
 
     def test_suggest_new_note_with_media(
@@ -3604,7 +3607,7 @@ class TestSuggestionsWithMedia:
             )
 
             # Assert that the suggestion was created with the correct media file name
-            expected_file_name = self._hashed_file_name(media_file_name)
+            expected_file_name = self._new_media_file_name(media_file_name)
             self._assert_media_names_on_note_and_suggestion_as_expected(
                 note=note,
                 suggestion_request_mock=create_new_note_suggestion_mock,
