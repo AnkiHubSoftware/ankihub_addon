@@ -8,7 +8,7 @@ from .ankihub_client import AnkiHubHTTPError, AnkiHubRequestException
 
 @dataclass
 class _FeatureFlags:
-    use_deck_media: bool = False
+    ...
 
 
 feature_flags = _FeatureFlags()

@@ -497,10 +497,7 @@ def _upload_deck_media_action() -> None:
         showInfo("You can't upload media for an empty deck.")
         return
 
-    media_disabled_fields = client.get_media_disabled_fields(ah_did)
-    media_names = ankihub_db.media_names_for_ankihub_deck(
-        ah_did=ah_did, media_disabled_fields=media_disabled_fields
-    )
+    media_names = ankihub_db.media_names_for_ankihub_deck(ah_did=ah_did)
 
     # Check if the deck references any media files, if it does
     # not, no point on trying to upload it
