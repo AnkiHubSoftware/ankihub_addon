@@ -108,6 +108,7 @@ def client_with_server_setup(vcr: VCR, request, marks):
                 f"--username={DB_USERNAME}",
                 "--format=custom",
                 "--clean",
+                "--jobs=4",
                 DB_DUMP_FILE_NAME,
             ],
             stdout=subprocess.PIPE,
