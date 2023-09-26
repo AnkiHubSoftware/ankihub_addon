@@ -13,7 +13,7 @@ on:
   pull_request:
 
 jobs:
-  test:
+  test-addon:
     runs-on: ubuntu-latest
     timeout-minutes: 30
     steps:
@@ -24,39 +24,43 @@ jobs:
       - name: Checkout ankihub_addon
         uses: actions/checkout@v3
 
-      - name: Get pip cache dir
-        id: pip-cache
-        run: |
-          python -m pip install --upgrade pip
-          echo "::set-output name=dir::$(pip cache dir)"
-
-      - name: pip cache
-        uses: actions/cache@v3
+      - name: Setup addon
+        uses: ./.github/actions/setup-addon
         with:
-          path: |
-            ${{ steps.pip-cache.outputs.dir }}
-            ~/.cache/pre-commit
-          key: ${{ runner.os }}-pip-${{ hashFiles('**/dev.txt', '**/base.txt', '.pre-commit-config.yaml') }}
-          restore-keys: |
-            ${{ runner.os }}-pip-
+          google_api_key: ${{ secrets.GOOGLE_API_KEY }}
+          install_qt: true
 
-      - name: Install Qt
-        uses: jurplel/install-qt-action@v3
+      - name: Run pytest with coverage
+        run: |
+          pytest ./tests/addon --cov --cov-report=xml
+          pytest ./tests/addon --performance -k performance -n1 --cov-report=xml --cov-append
+
+      - name: Upload coverage
+        uses: actions/upload-artifact@v2
         with:
-          version: "5.15.2"
-          setup-python: "false"
-        continue-on-error: true
+          name: coverage_addon
+          path: .coverage
 
-      - name: Install deps
-        run: |
-          python -m pip install -r ./requirements/dev.txt
-          python -m pip install smokeshow
 
-      - name: Build
-        run: |
-          python ./scripts/build.py
-        env:
-          GOOGLE_API_KEY: ${{ secrets.GOOGLE_API_KEY }}
+  test-client:
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        group: [1, 2, 3]
+    timeout-minutes: 30
+    steps:
+      - uses: actions/setup-python@v4
+        with:
+          python-version: "3.9"
+
+      - name: Checkout ankihub_addon
+        uses: actions/checkout@v3
+
+      - name: Setup addon
+        uses: ./.github/actions/setup-addon
+        with:
+          google_api_key: ${{ secrets.GOOGLE_API_KEY }}
+          install_qt: false
 
       - name: Enable cloning web app repo
         uses: webfactory/ssh-agent@v0.5.4
@@ -85,10 +89,45 @@ jobs:
 
       - name: Run pytest with coverage
         run: |
-          pytest ./tests/addon --cov --cov-report=xml
-          pytest ./tests/client --disable-vcr --cov --cov-report=xml --cov-append
+          pytest ./tests/client --disable-vcr --cov --cov-report=xml \
+            --splits 3 --group ${{ matrix.group }} --durations-path=tests/.test_durations
+
+      - name: Upload coverage
+        uses: actions/upload-artifact@v2
+        with:
+          name: coverage_client_${{ matrix.group }}
+          path: .coverage
+
+
+  coverage-and-static-checks:
+    needs: ["test-addon", "test-client"]
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v2
+      - name: Set up Python 3.9
+        uses: actions/setup-python@v2
+        with:
+          python-version: "3.9"
+
+      - name: Setup addon
+        uses: ./.github/actions/setup-addon
+        with:
+          google_api_key: ${{ secrets.GOOGLE_API_KEY }}
+          install_qt: false
+
+      - name: Download all artifacts
+        uses: actions/download-artifact@v2
+
+      - name: Run coverage
+        run: |
+          coverage combine coverage*/.coverage*
           coverage html
-          pytest ./tests/addon --performance -k performance -n1
+
+      - name: Install smokeshow
+        run: |
+          python -m pip install smokeshow
+
+      - uses: codecov/codecov-action@v1
 
       - name: Upload coverage report with smokeshow
         run: smokeshow upload coverage_html_report
