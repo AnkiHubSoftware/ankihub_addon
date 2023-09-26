@@ -92,6 +92,18 @@ REQUEST_RETRY_EXCEPTION_TYPES = (
 # Status codes for which we should retry the request.
 RETRY_STATUS_CODES = {429}
 
+IMAGE_FILE_EXTENSIONS = [
+    ".png",
+    ".jpeg",
+    ".jpg",
+    ".gif",
+    ".bmp",
+    ".tif",
+    ".tiff",
+    ".svg",
+    ".webp",
+]
+
 
 def _should_retry_for_response(response: Response) -> bool:
     """Return True if the request should be retried for the given Response, False otherwise."""
@@ -361,6 +373,9 @@ class AnkiHubClient:
             new_media_path = for_old_media_path.parent / (
                 file_content_hash.hexdigest() + for_old_media_path.suffix
             )
+
+            if new_media_path.suffix in IMAGE_FILE_EXTENSIONS:
+                new_media_path = new_media_path.with_suffix(".webp")
 
             # If the file with the hashed name does not exist already, we
             # try to create it.
