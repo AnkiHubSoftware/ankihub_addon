@@ -57,12 +57,7 @@ from ankihub.gui.browser.browser import (
 )
 
 from ..factories import DeckFactory, DeckMediaFactory, NoteInfoFactory
-from ..fixtures import (
-    ImportAHNote,
-    MockFunction,
-    SetFeatureFlagState,
-    create_or_get_ah_version_of_note_type,
-)
+from ..fixtures import ImportAHNote, MockFunction, create_or_get_ah_version_of_note_type
 from .conftest import TEST_PROFILE_ID
 
 # workaround for vscode test discovery not using pytest.ini which sets this env var
@@ -335,11 +330,6 @@ def mock_client_methods_called_during_ankihub_sync(monkeypatch: MonkeyPatch) -> 
         AnkiHubClient,
         "get_deck_updates",
         lambda *args, **kwargs: [],
-    )
-    monkeypatch.setattr(
-        AnkiHubClient,
-        "get_media_disabled_fields",
-        lambda *args, **kwargs: {},
     )
 
 
@@ -3407,46 +3397,13 @@ def test_reset_optional_tags_action(
 
 
 class TestMediaSyncMediaDownload:
-    def test_download_media_without_deck_media_workflow(
-        self,
-        anki_session_with_addon_data: AnkiSession,
-        next_deterministic_uuid,
-        import_ah_note: ImportAHNote,
-        monkeypatch: MonkeyPatch,
-        mock_ankihub_sync_dependencies: None,
-        qtbot: QtBot,
-    ):
-        with anki_session_with_addon_data.profile_loaded():
-            # Add a reference to a media file to a note
-            note = NoteInfoFactory.create()
-            note.fields[0].value = "Some text. <img src='image.png'>"
-
-            ah_did = next_deterministic_uuid()
-            import_ah_note(note, ah_did=ah_did)
-
-            # Mock the client method for downloading media
-            download_media_mock = Mock()
-            monkeypatch.setattr(AnkiHubClient, "download_media", download_media_mock)
-
-            # Start the media sync and wait for it to finish
-            media_sync.start_media_download()
-            qtbot.wait_until(lambda: media_sync._download_in_progress is False)
-
-            # Assert that the client method for downloading media was called with the correct arguments
-            # to download the media file
-            download_media_mock.assert_called_once_with(["image.png"], ah_did)
-
-    def test_download_media_with_deck_media_workflow(
+    def test_download_media(
         self,
         anki_session_with_addon_data: AnkiSession,
         install_sample_ah_deck: InstallSampleAHDeck,
-        set_feature_flag_state: SetFeatureFlagState,
         mock_function: MockFunction,
         qtbot: QtBot,
     ):
-        # Enable the use_deck_media feature flag
-        set_feature_flag_state("use_deck_media", True)
-
         with anki_session_with_addon_data.profile_loaded():
             _, ah_did = install_sample_ah_deck()
 
@@ -3484,9 +3441,9 @@ class TestMediaSyncMediaDownload:
             download_media_mock.assert_called_once_with(["image.png"], ah_did)
 
             # Assert that the deck media was added to the database
-            assert ankihub_db.downloadable_media_names_for_ankihub_deck(
-                ah_did, media_disabled_fields={}
-            ) == {deck_media.name}
+            assert ankihub_db.downloadable_media_names_for_ankihub_deck(ah_did) == {
+                deck_media.name
+            }
             assert ankihub_db.media_names_exist_for_ankihub_deck(
                 ah_did=ah_did, media_names={deck_media.name}
             ) == {deck_media.name: True}
@@ -3497,17 +3454,13 @@ class TestMediaSyncMediaDownload:
                 == latest_media_update
             )
 
-    def test_download_media_with_deck_media_workflow_with_no_updates(
+    def test_download_media_with_no_updates(
         self,
         anki_session_with_addon_data: AnkiSession,
         install_sample_ah_deck: InstallSampleAHDeck,
-        set_feature_flag_state: SetFeatureFlagState,
         mock_function: MockFunction,
         qtbot: QtBot,
     ):
-        # Enable the use_deck_media feature flag
-        set_feature_flag_state("use_deck_media", True)
-
         with anki_session_with_addon_data.profile_loaded():
             _, ah_did = install_sample_ah_deck()
 
@@ -3742,10 +3695,7 @@ class TestSuggestionsWithMedia:
         import_ah_note: ImportAHNote,
         next_deterministic_uuid: Callable[[], uuid.UUID],
         create_change_suggestion: CreateChangeSuggestion,
-        set_feature_flag_state: SetFeatureFlagState,
     ):
-        set_feature_flag_state("use_deck_media", True)
-
         with anki_session_with_addon_data.profile_loaded():
             mw = anki_session_with_addon_data.mw
 
