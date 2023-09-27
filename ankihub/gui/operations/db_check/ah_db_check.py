@@ -1,18 +1,22 @@
 import uuid
+from concurrent.futures import Future
 from typing import Callable, List, Optional
 
 from .... import LOGGER
 from ....addon_ankihub_client import AddonAnkiHubClient as AnkiHubClient
+from ....ankihub_client import AnkiHubHTTPError
 from ....db import ankihub_db
+from ....main.deck_unsubscribtion import uninstall_deck
 from ....settings import config
 from ...decks_dialog import download_and_install_decks
+from ...exceptions import DeckDownloadAndInstallError
 from ...utils import ask_user
 
 
 def check_ankihub_db(on_success: Optional[Callable[[], None]] = None) -> None:
     _fetch_missing_note_types()
 
-    if not _fetch_missing_notes(on_success=on_success):
+    if not _try_reinstall_decks_with_something_missing(on_success=on_success):
         on_success()
 
 
@@ -48,9 +52,12 @@ def _fetch_missing_note_types() -> None:
         )
 
 
-def _fetch_missing_notes(on_success: Optional[Callable[[], None]] = None) -> bool:
-    """Fetches notes data which is missing from the database from AnkiHub.
-    Returns True if the user has chosen to fix the missing notes and on_success will be called, False otherwise."""
+def _try_reinstall_decks_with_something_missing(
+    on_success: Optional[Callable[[], None]] = None
+) -> bool:
+    """Checks which decks have missing values in the AnkiHubDB or are missing from the config and asks the user
+    if they want to fix the missing values by reinstalling the decks.
+    Returns True if the user has chosen to run the fix, False otherwise."""
     ah_dids_with_missing_values = ankihub_db.ankihub_dids_of_decks_with_missing_values()
     ah_dids_missing_from_config = _decks_missing_from_config()
     ah_dids_with_something_missing = list(
@@ -89,8 +96,26 @@ def _fetch_missing_notes(on_success: Optional[Callable[[], None]] = None) -> boo
         ),
         title="AnkiHub Database Check",
     ):
+
+        def on_download_and_install_done(future: Future) -> None:
+            try:
+                future.result()
+            except DeckDownloadAndInstallError as e:
+                if (
+                    isinstance(e.original_exception, AnkiHubHTTPError)
+                    and e.original_exception.response.status_code == 404
+                ):
+                    LOGGER.info(
+                        f"Deck {e.ankihub_did} not found on AnkiHub anymore. Uninstalling it."
+                    )
+                    uninstall_deck(e.ankihub_did)
+                else:
+                    raise e
+
+            on_success()
+
         download_and_install_decks(
-            ah_dids_with_something_missing, on_done=lambda _: on_success()
+            ah_dids_with_something_missing, on_done=on_download_and_install_done
         )
         return True
 
