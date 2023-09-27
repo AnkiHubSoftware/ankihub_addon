@@ -57,6 +57,7 @@ def _try_reinstall_decks_with_something_missing(
 ) -> bool:
     """Checks which decks have missing values in the AnkiHubDB or are missing from the config and asks the user
     if they want to fix the missing values by reinstalling the decks.
+    If the decks are not found on AnkiHub anymore, they are uninstalled instead.
     Returns True if the user has chosen to run the fix, False otherwise."""
     ah_dids_with_missing_values = ankihub_db.ankihub_dids_of_decks_with_missing_values()
     ah_dids_missing_from_config = _decks_missing_from_config()
