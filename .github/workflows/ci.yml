@@ -32,7 +32,7 @@ jobs:
 
       - name: Run pytest with coverage
         run: |
-          pytest ./tests/addon --cov --cov-report=xml
+          pytest ./tests/addon --cov --cov-report=xml -n 4
           pytest ./tests/addon --performance -k performance -n1 --cov-report=xml --cov-append
 
       - name: Upload coverage
@@ -46,7 +46,7 @@ jobs:
     runs-on: ubuntu-latest
     strategy:
       matrix:
-        group: [1, 2, 3]
+        group: [1, 2]
     timeout-minutes: 30
     steps:
       - uses: actions/setup-python@v4
@@ -90,7 +90,7 @@ jobs:
       - name: Run pytest with coverage
         run: |
           pytest ./tests/client --disable-vcr --cov --cov-report=xml \
-            --splits 3 --group ${{ matrix.group }} --durations-path=tests/.test_durations
+            --splits 2 --group ${{ matrix.group }} --durations-path=tests/.test_durations
 
       - name: Upload coverage
         uses: actions/upload-artifact@v2
@@ -121,7 +121,7 @@ jobs:
       - name: Run coverage
         run: |
           coverage combine coverage*/.coverage*
-          coverage html
+          coverage html --fail-under=76
 
       - name: Install smokeshow
         run: |
@@ -131,6 +131,7 @@ jobs:
 
       - name: Upload coverage report with smokeshow
         run: smokeshow upload coverage_html_report
+        if: always()
         env:
           SMOKESHOW_GITHUB_STATUS_DESCRIPTION: Add-on Test Coverage {coverage-percentage}
           SMOKESHOW_GITHUB_COVERAGE_THRESHOLD: 66
@@ -138,6 +139,7 @@ jobs:
           SMOKESHOW_GITHUB_PR_HEAD_SHA: ${{ github.event.pull_request.head.sha }}
 
       - name: Upload coverage to Codecov
+        if: always()
         env:
           CODECOV_TOKEN: "${{ secrets.CODECOV_TOKEN }}"
         uses: codecov/codecov-action@v1
