@@ -32,7 +32,7 @@ jobs:
 
       - name: Run pytest with coverage
         run: |
-          pytest ./tests/addon --cov --cov-report=xml
+          pytest ./tests/addon --cov --cov-report=xml -n 4
           pytest ./tests/addon --performance -k performance -n1 --cov-report=xml --cov-append
 
       - name: Upload coverage
