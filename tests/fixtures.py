@@ -1,7 +1,7 @@
 import copy
 import os
 import uuid
-from typing import Any, Callable, Dict, Optional, Protocol
+from typing import Any, Callable, Dict, List, Optional, Protocol
 from unittest.mock import Mock
 
 import aqt
@@ -12,6 +12,10 @@ from anki.notes import Note
 from aqt.main import AnkiQt
 from pytest import MonkeyPatch, fixture
 from pytest_anki import AnkiSession
+
+from ankihub.ankihub_client.models import Deck
+from ankihub.gui import operations
+from ankihub.gui.media_sync import _AnkiHubMediaSync
 
 from .factories import NoteInfoFactory
 
@@ -317,3 +321,57 @@ def new_note_with_note_type() -> NewNoteWithNoteType:
         return note
 
     return new_note_with_note_type_inner
+
+
+class MockDownloadAndInstallDeckDependencies(Protocol):
+    def __call__(
+        self,
+        deck: Deck,
+        notes_data: List[NoteInfo],
+        note_type: NotetypeDict,
+    ) -> Dict[str, Mock]:
+        ...
+
+
+@pytest.fixture
+def mock_download_and_install_deck_dependencies(
+    monkeypatch: MonkeyPatch,
+) -> MockDownloadAndInstallDeckDependencies:
+    """Mocks the dependencies of the download_and_install_deck function.
+    deck: The deck that is downloaded and installed.
+    notes_data: The notes of the deck.
+    note_type: The note type of the notes of the deck.
+
+    Returns a dictionary of mocked functions.
+    """
+
+    def mock_install_deck_dependencies(
+        deck: Deck,
+        notes_data: List[NoteInfo],
+        note_type: NotetypeDict,
+    ) -> Dict[str, Mock]:
+        mocks: Dict[str, Mock] = dict()
+
+        def add_mock(object, func_name: str, return_value: Any = None):
+            mocks[func_name] = Mock()
+            mocks[func_name].return_value = return_value
+            monkeypatch.setattr(object, func_name, mocks[func_name])
+
+        # Mock client functions
+        add_mock(AnkiHubClient, "get_deck_by_id", deck)
+        add_mock(AnkiHubClient, "download_deck", notes_data)
+        add_mock(AnkiHubClient, "get_note_type", note_type)
+        add_mock(AnkiHubClient, "get_protected_fields", {})
+        add_mock(AnkiHubClient, "get_protected_tags", [])
+
+        # Patch away gui functions which would otherwise block the test
+        add_mock(operations.deck_installation, "showInfo")
+        add_mock(operations.deck_installation, "ask_user", return_value=True)
+        add_mock(operations.deck_installation, "show_empty_cards")
+
+        # Mock media sync
+        add_mock(_AnkiHubMediaSync, "start_media_download")
+
+        return mocks
+
+    return mock_install_deck_dependencies

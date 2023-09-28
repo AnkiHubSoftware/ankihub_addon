@@ -57,7 +57,12 @@ from ankihub.gui.browser.browser import (
 )
 
 from ..factories import DeckFactory, DeckMediaFactory, NoteInfoFactory
-from ..fixtures import ImportAHNote, MockFunction, create_or_get_ah_version_of_note_type
+from ..fixtures import (
+    ImportAHNote,
+    MockDownloadAndInstallDeckDependencies,
+    MockFunction,
+    create_or_get_ah_version_of_note_type,
+)
 from .conftest import TEST_PROFILE_ID
 
 # workaround for vscode test discovery not using pytest.ini which sets this env var
@@ -110,7 +115,7 @@ from ankihub.gui.deck_updater import _AnkiHubDeckUpdater, ah_deck_updater
 from ankihub.gui.decks_dialog import SubscribedDecksDialog, download_and_install_decks
 from ankihub.gui.editor import _on_suggestion_button_press, _refresh_buttons
 from ankihub.gui.errors import upload_logs_and_data_in_background
-from ankihub.gui.media_sync import _AnkiHubMediaSync, media_sync
+from ankihub.gui.media_sync import media_sync
 from ankihub.gui.menu import menu_state
 from ankihub.gui.operations import ankihub_sync
 from ankihub.gui.operations.new_deck_subscriptions import (
@@ -664,21 +669,19 @@ class TestDownloadAndInstallDecks:
     def test_download_and_install_deck(
         self,
         anki_session_with_addon_data: AnkiSession,
-        monkeypatch: MonkeyPatch,
         qtbot: QtBot,
+        mock_download_and_install_deck_dependencies: MockDownloadAndInstallDeckDependencies,
     ):
         anki_session = anki_session_with_addon_data
         with anki_session.profile_loaded():
-            mw = anki_session.mw
-
             note_type = create_or_get_ah_version_of_note_type(
-                mw, aqt.mw.col.models.by_name("Basic")
+                aqt.mw, aqt.mw.col.models.by_name("Basic")
             )
             notes_data = [NoteInfoFactory.create(mid=note_type["id"])]
             deck = DeckFactory.create()
 
-            mocks = self._mock_client_and_gui_and_media_sync(
-                monkeypatch, deck, notes_data, note_type
+            mocks = mock_download_and_install_deck_dependencies(
+                deck, notes_data, note_type
             )
 
             # Download and install the deck
@@ -688,8 +691,8 @@ class TestDownloadAndInstallDecks:
 
             # Assert that the deck was installed
             # ... in the Anki database
-            assert deck.anki_did in [x.id for x in mw.col.decks.all_names_and_ids()]
-            assert mw.col.get_note(NoteId(notes_data[0].anki_nid)) is not None
+            assert deck.anki_did in [x.id for x in aqt.mw.col.decks.all_names_and_ids()]
+            assert aqt.mw.col.get_note(NoteId(notes_data[0].anki_nid)) is not None
 
             # ... in the AnkiHub database
             ankihub_db.ankihub_deck_ids() == [deck.ah_did]
@@ -706,37 +709,6 @@ class TestDownloadAndInstallDecks:
                 assert (
                     mock.call_count == 1
                 ), f"Mock {name} was not called once, but {mock.call_count} times"
-
-    def _mock_client_and_gui_and_media_sync(
-        self,
-        monkeypatch: MonkeyPatch,
-        deck: Deck,
-        notes_data: List[NoteInfo],
-        note_type: NotetypeDict,
-    ) -> Dict[str, Mock]:
-        mocks: Dict[str, Mock] = dict()
-
-        def add_mock(object, func_name: str, return_value: Any = None):
-            mocks[func_name] = Mock()
-            mocks[func_name].return_value = return_value
-            monkeypatch.setattr(object, func_name, mocks[func_name])
-
-        # Mock client functions
-        add_mock(AnkiHubClient, "get_deck_by_id", deck)
-        add_mock(AnkiHubClient, "download_deck", notes_data)
-        add_mock(AnkiHubClient, "get_note_type", note_type)
-        add_mock(AnkiHubClient, "get_protected_fields", {})
-        add_mock(AnkiHubClient, "get_protected_tags", [])
-
-        # Patch away gui functions which would otherwise block the test
-        add_mock(operations.deck_installation, "showInfo")
-        add_mock(operations.deck_installation, "ask_user", return_value=True)
-        add_mock(operations.deck_installation, "show_empty_cards")
-
-        # Mock media sync
-        add_mock(_AnkiHubMediaSync, "start_media_download")
-
-        return mocks
 
 
 class TestCheckAndInstallNewDeckSubscriptions:
