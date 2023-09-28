@@ -13,10 +13,6 @@ from aqt.main import AnkiQt
 from pytest import MonkeyPatch, fixture
 from pytest_anki import AnkiSession
 
-from ankihub.ankihub_client.models import Deck
-from ankihub.gui import operations
-from ankihub.gui.media_sync import _AnkiHubMediaSync
-
 from .factories import NoteInfoFactory
 
 # workaround for vscode test discovery not using pytest.ini which sets this env var
@@ -25,7 +21,10 @@ os.environ["SKIP_INIT"] = "1"
 
 from ankihub.ankihub_client import NoteInfo
 from ankihub.ankihub_client.ankihub_client import AnkiHubClient
+from ankihub.ankihub_client.models import Deck
 from ankihub.feature_flags import setup_feature_flags
+from ankihub.gui import operations
+from ankihub.gui.media_sync import _AnkiHubMediaSync
 from ankihub.main.importing import AnkiHubImporter
 from ankihub.main.utils import modify_note_type
 
