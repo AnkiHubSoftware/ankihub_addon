@@ -42,7 +42,7 @@ from aqt.importing import AnkiPackageImporter
 from aqt.qt import QAction, Qt
 from pytest import MonkeyPatch, fixture
 from pytest_anki import AnkiSession
-from pytestqt.qtbot import QtBot
+from pytestqt.qtbot import QtBot  # type: ignore
 from requests import Response  # type: ignore
 from requests_mock import Mocker
 
@@ -4124,7 +4124,7 @@ class TestAHDBCheck:
     def test_with_deck_missing_from_config(
         self,
         anki_session_with_addon_data: AnkiSession,
-        next_deterministic_uuid: uuid.UUID,
+        next_deterministic_uuid: Callable[[], uuid.UUID],
         import_ah_note: ImportAHNote,
         mock_download_and_install_deck_dependencies: MockDownloadAndInstallDeckDependencies,
         ankihub_basic_note_type: NotetypeDict,
@@ -4150,12 +4150,16 @@ class TestAHDBCheck:
 
             # Mock get_deck_by_id to return 404 if deck_exists_on_ankihub==False
             if not deck_exists_on_ankihub:
-                response_404 = Response()
-                response_404.status_code = 404
+
+                def raise_404(*args, **kwargs) -> None:
+                    response_404 = Response()
+                    response_404.status_code = 404
+                    raise AnkiHubHTTPError(response=response_404)
+
                 mock_function(
                     AnkiHubClient,
                     "get_deck_by_id",
-                    side_effect=AnkiHubHTTPError(response=response_404),
+                    side_effect=raise_404,
                 )
 
             # Mock ask_user function
