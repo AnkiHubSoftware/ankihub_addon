@@ -173,21 +173,23 @@ class _AnkiHubDB:
             )
             LOGGER.info("Created deck_media table")
 
-    def _setup_note_types_table(self) -> None:
+    def _setup_note_types_table(self, conn: Optional[DBConnection] = None) -> None:
         """Create the note types table."""
-        with self.connection() as conn:
-            conn.execute(
-                """
-                CREATE TABLE notetypes (
-                    anki_note_type_id INTEGER NOT NULL,
-                    ankihub_deck_id STRING NOT NULL,
-                    name TEXT NOT NULL,
-                    note_type_dict_json TEXT NOT NULL,
-                    PRIMARY KEY (anki_note_type_id, ankihub_deck_id)
-                );
-                """
-            )
-            LOGGER.info("Created note types table")
+        sql = """
+            CREATE TABLE notetypes (
+                anki_note_type_id INTEGER NOT NULL,
+                ankihub_deck_id STRING NOT NULL,
+                name TEXT NOT NULL,
+                note_type_dict_json TEXT NOT NULL,
+                PRIMARY KEY (anki_note_type_id, ankihub_deck_id)
+            );
+        """
+        if conn:
+            conn.execute(sql)
+        else:
+            self.execute(sql)
+
+        LOGGER.info("Created note types table")
 
     def schema_version(self) -> int:
         result = self.scalar("PRAGMA user_version;")
