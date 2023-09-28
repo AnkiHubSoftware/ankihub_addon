@@ -37,7 +37,7 @@ from ..ankihub_client import (
 from ..db import ankihub_db
 from .exporting import to_note_data
 from .media_utils import find_and_replace_text_in_fields_on_all_notes
-from .utils import get_anki_nid_to_mid_dict, mdb5_file_hash
+from .utils import get_anki_nid_to_mid_dict, md5_file_hash
 
 # string that is contained in the errors returned from the AnkiHub API when
 # there are no changes to the note for a change note suggestion
@@ -444,7 +444,7 @@ def _handle_media_with_matching_hashes(
     we create it by copying the referenced media file to prevent broken media references."""
     media_dir = Path(aqt.mw.col.media.dir())
     media_to_hash_dict = {
-        media_name: mdb5_file_hash(media_dir / media_name) for media_name in media_names
+        media_name: md5_file_hash(media_dir / media_name) for media_name in media_names
     }
 
     media_with_same_hash_dict = ankihub_db.media_names_with_matching_hashes(

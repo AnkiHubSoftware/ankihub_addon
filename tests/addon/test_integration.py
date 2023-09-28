@@ -148,7 +148,7 @@ from ankihub.main.utils import (
     ANKIHUB_TEMPLATE_SNIPPET_RE,
     all_dids,
     get_note_types_in_deck,
-    mdb5_file_hash,
+    md5_file_hash,
     note_type_contains_field,
 )
 from ankihub.settings import (
@@ -3583,7 +3583,7 @@ class TestSuggestionsWithMedia:
             if AnkiHubClient()._media_file_should_be_converted_to_webp(media_file_path)
             else media_file_path.suffix
         )
-        result = mdb5_file_hash(media_file_path) + suffix
+        result = md5_file_hash(media_file_path) + suffix
         return result
 
     def test_suggest_new_note_with_media(
@@ -3713,7 +3713,7 @@ class TestSuggestionsWithMedia:
             media_file_in_db = "testfile_1.jpeg"
             media_file_in_collection = "testfile_1_copy.jpeg"
             media_file_in_db_path = TEST_DATA_PATH / "media" / media_file_in_db
-            media_file_hash = mdb5_file_hash(media_file_in_db_path)
+            media_file_hash = md5_file_hash(media_file_in_db_path)
 
             # Add a deck media entry to the database
             ankihub_db.upsert_deck_media_infos(
