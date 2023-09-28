@@ -127,6 +127,9 @@ def migrate_ankihub_db():
         # Migrate note_types to new table which has a different primary key
         # To do that in sqlite, we need to create a new table, copy the data over and then delete the old table
         with ankihub_db.connection() as conn:
+            # Previously the migration was not wrapped in a transaction and the temp_note_types table was not dropped,
+            # so we need to drop it here if it exists
+            conn.execute("DROP TABLE IF EXISTS temp_notetypes;")
             conn.execute("ALTER TABLE notetypes RENAME TO temp_notetypes;")
             ankihub_db._setup_note_types_table(conn)
             conn.execute(
