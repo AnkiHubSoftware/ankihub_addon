@@ -13,13 +13,14 @@ from aqt.utils import showInfo
 from ... import LOGGER
 from ...addon_ankihub_client import AddonAnkiHubClient as AnkiHubClient
 from ...ankihub_client import NoteInfo
+from ...ankihub_client.ankihub_client import AnkiHubHTTPError
 from ...ankihub_client.models import UserDeckRelation
 from ...main.importing import AnkiHubImporter, AnkiHubImportResult
 from ...main.note_types import fetch_note_types_based_on_notes
 from ...main.subdecks import deck_contains_subdeck_tags
 from ...main.utils import create_backup
 from ...settings import config
-from ..exceptions import DeckDownloadAndInstallError
+from ..exceptions import DeckDownloadAndInstallError, RemoteDeckNotFoundError
 from ..media_sync import media_sync
 from ..messages import messages
 from ..utils import ask_user
@@ -118,7 +119,12 @@ def _download_and_install_decks_inner(
 
 
 def _download_and_install_single_deck(ankihub_did: uuid.UUID) -> AnkiHubImportResult:
-    deck = AnkiHubClient().get_deck_by_id(ankihub_did)
+    try:
+        deck = AnkiHubClient().get_deck_by_id(ankihub_did)
+    except AnkiHubHTTPError as e:
+        if e.response.status_code == 404:
+            raise RemoteDeckNotFoundError(ankihub_did=ankihub_did) from e
+
     notes_data: List[NoteInfo] = AnkiHubClient().download_deck(
         deck.ah_did, download_progress_cb=_download_progress_cb
     )

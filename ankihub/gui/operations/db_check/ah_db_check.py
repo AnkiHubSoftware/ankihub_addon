@@ -4,12 +4,11 @@ from typing import Callable, List, Optional
 
 from .... import LOGGER
 from ....addon_ankihub_client import AddonAnkiHubClient as AnkiHubClient
-from ....ankihub_client import AnkiHubHTTPError
 from ....db import ankihub_db
 from ....main.deck_unsubscribtion import uninstall_deck
 from ....settings import config
 from ...decks_dialog import download_and_install_decks
-from ...exceptions import DeckDownloadAndInstallError
+from ...exceptions import DeckDownloadAndInstallError, RemoteDeckNotFoundError
 from ...utils import ask_user
 
 
@@ -102,10 +101,7 @@ def _try_reinstall_decks_with_something_missing(
             try:
                 future.result()
             except DeckDownloadAndInstallError as e:
-                if (
-                    isinstance(e.original_exception, AnkiHubHTTPError)
-                    and e.original_exception.response.status_code == 404
-                ):
+                if isinstance(e.original_exception, RemoteDeckNotFoundError):
                     LOGGER.info(
                         f"Deck {e.ankihub_did} not found on AnkiHub anymore. Uninstalling it."
                     )
