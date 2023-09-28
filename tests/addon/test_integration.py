@@ -671,17 +671,14 @@ class TestDownloadAndInstallDecks:
         anki_session_with_addon_data: AnkiSession,
         qtbot: QtBot,
         mock_download_and_install_deck_dependencies: MockDownloadAndInstallDeckDependencies,
+        ankihub_basic_note_type: NotetypeDict,
     ):
         anki_session = anki_session_with_addon_data
         with anki_session.profile_loaded():
-            note_type = create_or_get_ah_version_of_note_type(
-                aqt.mw, aqt.mw.col.models.by_name("Basic")
-            )
-            notes_data = [NoteInfoFactory.create(mid=note_type["id"])]
             deck = DeckFactory.create()
-
+            notes_data = [NoteInfoFactory.create(mid=ankihub_basic_note_type["id"])]
             mocks = mock_download_and_install_deck_dependencies(
-                deck, notes_data, note_type
+                deck, notes_data, ankihub_basic_note_type
             )
 
             # Download and install the deck
