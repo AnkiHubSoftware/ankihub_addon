@@ -59,9 +59,11 @@ def _on_profile_did_open():
         ATTEMPTED_GENERAL_SETUP = True
         _general_setup()
 
+    media_sync.allow_background_threads()
+
 
 def _on_profile_will_close():
-    media_sync.cleanup()
+    media_sync.stop_background_threads()
 
 
 def _profile_setup() -> bool:
