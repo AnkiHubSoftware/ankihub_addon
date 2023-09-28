@@ -473,7 +473,7 @@ def truncated_list(values: List[Any], limit: int) -> List[Any]:
     return values[:limit] + ["..."] if len(values) > limit else values
 
 
-def md5_file_hash(media_path: Path) -> str:
+def mdb5_file_hash(media_path: Path) -> str:
     """Return the md5 hash of the file content of the given media file."""
     with media_path.open("rb") as media_file:
         file_content_hash = hashlib.md5(media_file.read())
