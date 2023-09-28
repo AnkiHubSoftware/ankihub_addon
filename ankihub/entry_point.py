@@ -20,6 +20,7 @@ from .gui.menu import menu_state, refresh_ankihub_menu, setup_ankihub_menu
 from .main.note_deletion import handle_notes_deleted_from_webapp
 from .main.utils import modify_note_type_templates
 from .settings import (
+    ADDON_VERSION,
     ANKI_VERSION,
     ankihub_db_path,
     config,
@@ -41,6 +42,8 @@ def run():
     setup_logger()
     LOGGER.info("Set up logger.")
 
+    LOGGER.info(f"{ADDON_VERSION=}")
+    LOGGER.info(f"{ANKI_VERSION=}")
     LOGGER.info(f"AnkiHub app url: {config.app_url}")
     LOGGER.info(f"S3 bucket url: {config.s3_bucket_url}")
 
@@ -106,8 +109,6 @@ def _after_profile_setup():
 def _general_setup():
     """Set up things that don't depend on the profile and should only be run once, even if the
     profile changes."""
-
-    LOGGER.info(f"{ANKI_VERSION=}")
 
     setup_error_handler()
     LOGGER.info("Set up error handler.")

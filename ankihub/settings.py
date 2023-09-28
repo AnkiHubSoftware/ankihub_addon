@@ -507,8 +507,6 @@ def setup_file_handler() -> None:
 version_file = Path(__file__).parent / "VERSION"
 with version_file.open() as f:
     ADDON_VERSION: str = f.read().strip()
-LOGGER.info(f"version: {ADDON_VERSION}")
-LOGGER.info(f"VERSION file: {version_file}")
 
 try:
     manifest = json.loads((Path(__file__).parent / "manifest.json").read_text())
