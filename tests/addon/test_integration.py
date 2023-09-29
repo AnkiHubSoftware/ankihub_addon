@@ -148,7 +148,7 @@ from ankihub.main.utils import (
     ANKIHUB_TEMPLATE_SNIPPET_RE,
     all_dids,
     get_note_types_in_deck,
-    mdb5_file_hash,
+    md5_file_hash,
     note_type_contains_field,
 )
 from ankihub.settings import (
@@ -3563,7 +3563,7 @@ class TestSuggestionsWithMedia:
             )
 
             # Assert that the suggestion was created with the correct media file name
-            expected_file_name = self._hashed_file_name(media_file_name)
+            expected_file_name = self._new_media_file_name(media_file_name)
             self._assert_media_names_on_note_and_suggestion_as_expected(
                 note=note,
                 suggestion_request_mock=create_change_suggestion_mock,
@@ -3574,11 +3574,16 @@ class TestSuggestionsWithMedia:
                 expected_media_name=expected_file_name,
             )
 
-    def _hashed_file_name(self, file_name: str) -> str:
-        """Return the file name the media file should have when renamed using its hash."""
+    def _new_media_file_name(self, file_name: str) -> str:
+        """Return the file name the media file should have when the image was uploaded to S3."""
         media_dir = Path(aqt.mw.col.media.dir())
         media_file_path = media_dir / file_name
-        result = mdb5_file_hash(media_file_path) + media_file_path.suffix
+        suffix = (
+            ".webp"
+            if AnkiHubClient()._media_file_should_be_converted_to_webp(media_file_path)
+            else media_file_path.suffix
+        )
+        result = md5_file_hash(media_file_path) + suffix
         return result
 
     def test_suggest_new_note_with_media(
@@ -3604,7 +3609,7 @@ class TestSuggestionsWithMedia:
             )
 
             # Assert that the suggestion was created with the correct media file name
-            expected_file_name = self._hashed_file_name(media_file_name)
+            expected_file_name = self._new_media_file_name(media_file_name)
             self._assert_media_names_on_note_and_suggestion_as_expected(
                 note=note,
                 suggestion_request_mock=create_new_note_suggestion_mock,
@@ -3708,7 +3713,7 @@ class TestSuggestionsWithMedia:
             media_file_in_db = "testfile_1.jpeg"
             media_file_in_collection = "testfile_1_copy.jpeg"
             media_file_in_db_path = TEST_DATA_PATH / "media" / media_file_in_db
-            media_file_hash = mdb5_file_hash(media_file_in_db_path)
+            media_file_hash = md5_file_hash(media_file_in_db_path)
 
             # Add a deck media entry to the database
             ankihub_db.upsert_deck_media_infos(
