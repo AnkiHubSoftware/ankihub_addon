@@ -67,9 +67,13 @@ class _AnkiHubMediaSync:
             ),
         )
 
-    def cleanup(self):
+    def stop_background_threads(self):
         """Stop all media sync operations."""
         self._client.stop_background_threads()
+
+    def allow_background_threads(self):
+        """Allow background media sync operations to be started after they have been stopped."""
+        self._client.allow_background_threads()
 
     def refresh_sync_status_text(self):
         """Refresh the status text on the status action."""
