@@ -92,18 +92,6 @@ REQUEST_RETRY_EXCEPTION_TYPES = (
 # Status codes for which we should retry the request.
 RETRY_STATUS_CODES = {429}
 
-IMAGE_FILE_EXTENSIONS = [
-    ".png",
-    ".jpeg",
-    ".jpg",
-    ".gif",
-    ".bmp",
-    ".tif",
-    ".tiff",
-    ".svg",
-    ".webp",
-]
-
 
 def _should_retry_for_response(response: Response) -> bool:
     """Return True if the request should be retried for the given Response, False otherwise."""
@@ -374,11 +362,6 @@ class AnkiHubClient:
                 file_content_hash.hexdigest() + for_old_media_path.suffix
             )
 
-            if self._media_file_should_be_converted_to_webp(for_old_media_path):
-                # The lambda will convert images to the webp format if they are uploaded with a .webp extension and
-                # are not already webp images.
-                new_media_path = new_media_path.with_suffix(".webp")
-
             # If the file with the hashed name does not exist already, we
             # try to create it.
             if not new_media_path.is_file():
@@ -391,15 +374,6 @@ class AnkiHubClient:
 
             result[for_old_media_path.name] = new_media_path.name
 
-        return result
-
-    def _media_file_should_be_converted_to_webp(self, media_path: Path) -> bool:
-        """Whether the media file should be converted to webp once its uploaded to s3."""
-        # We don't want to convert svgs, because they don't benefit from the conversion in most cases.
-        result = (
-            media_path.suffix in IMAGE_FILE_EXTENSIONS
-            and media_path.suffix not in [".svg", ".webp"]
-        )
         return result
 
     def upload_media(self, media_paths: Set[Path], ah_did: uuid.UUID) -> None:
