@@ -567,6 +567,10 @@ class AnkiHubClient:
         """Can be called to stop all background threads started by this client."""
         self.should_stop_background_threads = True
 
+    def allow_background_threads(self) -> None:
+        """Can be called to allow background threads to run after they were stopped previously."""
+        self.should_stop_background_threads = False
+
     def get_deck_subscriptions(self) -> List[Deck]:
         response = self._send_request("GET", API.ANKIHUB, "/decks/subscriptions/")
         if response.status_code != 200:
