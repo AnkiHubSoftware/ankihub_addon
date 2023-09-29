@@ -9,6 +9,13 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
+      - name: Checkout
+        uses: actions/checkout@v3
+        with:
+          submodules: recursive
+          fetch-depth: 0
+          token: ${{ secrets.GH_BOT_ACCESS_TOKEN }}
+
       - name: Check status of the last run of the test workflow
         run: |
           gh auth login --with-token <<< "${{ secrets.GH_BOT_ACCESS_TOKEN }}"
@@ -28,13 +35,6 @@ jobs:
             echo "The last run of the test workflow on the main branch was not successful. Aborting..."
             exit 1
           fi
-
-      - name: Checkout
-        uses: actions/checkout@v3
-        with:
-          submodules: recursive
-          fetch-depth: 0
-          token: ${{ secrets.GH_BOT_ACCESS_TOKEN }}
 
       - name: Setup git config
         run: |
