@@ -4,6 +4,7 @@
     "sync_hotkey": "Ctrl+Shift+h",
     "auto_sync": "on_ankiweb_sync",
     "suspend_new_cards_of_existing_notes": "if_siblings_are_suspended",
+    "suspend_new_cards_of_new_notes": "never",
     "debug_level_logs": false,
     "use_staging": false
 }
