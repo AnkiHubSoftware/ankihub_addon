@@ -276,7 +276,8 @@ class AnkiHubImporter:
 
         if cards_before_changes:
             # If there were cards before the changes, the note already existed in Anki.
-            config_value = config.public_config["suspend_new_cards_of_existing_notes"]
+            config_key = "suspend_new_cards_of_existing_notes"
+            config_value = config.public_config[config_key]
             if config_value == "never":
                 return
             elif config_value == "always":
@@ -287,14 +288,21 @@ class AnkiHubImporter:
                 ):
                     suspend_new_cards()
             else:
-                raise ValueError("Invalid suspend_new_cards config value")
+                raise ValueError(
+                    f"Invalid value for {config_key}: {config_value}"
+                )  # pragma: no cover
         else:
             # If there were no cards before the changes, the note didn't exist in Anki before.
-            config_value = config.public_config["suspend_new_cards_of_new_notes"]
+            config_key = "suspend_new_cards_of_new_notes"
+            config_value = config.public_config[config_key]
             if config_value == "never":
                 return
             elif config_value == "always":
                 suspend_new_cards()
+            else:
+                raise ValueError(
+                    f"Invalid value for {config_key}: {config_value}"
+                )  # pragma: no cover
 
     def _update_or_create_note_inner(
         self,
