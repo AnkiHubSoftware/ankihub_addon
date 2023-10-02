@@ -260,17 +260,12 @@ class AnkiHubImporter:
     def _maybe_suspend_new_cards(
         self, note: Note, cards_before_changes: List[Card]
     ) -> None:
-        if not cards_before_changes:
-            return
+        def new_cards() -> Set[Card]:
+            cids_before_changes = {c.id for c in cards_before_changes}
+            result = {c for c in note.cards() if c.id not in cids_before_changes}
+            return result
 
-        def new_cards():
-            return [
-                c
-                for c in note.cards()
-                if c.id not in [c.id for c in cards_before_changes]
-            ]
-
-        def suspend_new_cards():
+        def suspend_new_cards() -> None:
             if not (new_cards_ := new_cards()):
                 return
 
@@ -279,16 +274,27 @@ class AnkiHubImporter:
                 card.queue = QUEUE_TYPE_SUSPENDED
                 card.flush()
 
-        config_value = config.public_config["suspend_new_cards_of_existing_notes"]
-        if config_value == "never":
-            return
-        elif config_value == "always":
-            suspend_new_cards()
-        elif config_value == "if_siblings_are_suspended":
-            if all(card.queue == QUEUE_TYPE_SUSPENDED for card in cards_before_changes):
+        if cards_before_changes:
+            # If there were cards before the changes, the note already existed in Anki.
+            config_value = config.public_config["suspend_new_cards_of_existing_notes"]
+            if config_value == "never":
+                return
+            elif config_value == "always":
                 suspend_new_cards()
+            elif config_value == "if_siblings_are_suspended":
+                if all(
+                    card.queue == QUEUE_TYPE_SUSPENDED for card in cards_before_changes
+                ):
+                    suspend_new_cards()
+            else:
+                raise ValueError("Invalid suspend_new_cards config value")
         else:
-            raise ValueError("Invalid suspend_new_cards config value")
+            # If there were no cards before the changes, the note didn't exist in Anki before.
+            config_value = config.public_config["suspend_new_cards_of_new_notes"]
+            if config_value == "never":
+                return
+            elif config_value == "always":
+                suspend_new_cards()
 
     def _update_or_create_note_inner(
         self,

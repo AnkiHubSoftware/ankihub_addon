@@ -1636,7 +1636,7 @@ def create_copy_of_note_type(mw: AnkiQt, note_type: NotetypeDict) -> NotetypeDic
     return result
 
 
-class TestAnkiHubImporterSuspendNewCardsOfExistingNotesCardOption:
+class TestAnkiHubImporterSuspendNewCardsOfExistingNotesOption:
     @pytest.mark.parametrize(
         "option_value, existing_card_suspended, expected_new_card_suspended",
         [
@@ -1669,10 +1669,12 @@ class TestAnkiHubImporterSuspendNewCardsOfExistingNotesCardOption:
                 existing_card_suspended=existing_card_suspended,
                 ah_nid=ah_nid,
             )
+
             # Assert the old card has the same suspension state as before
             assert old_card.queue == (
                 QUEUE_TYPE_SUSPENDED if existing_card_suspended else QUEUE_TYPE_NEW
             )
+
             # Assert the new card is suspended or not suspended depending on the option value
             assert new_card.queue == (
                 QUEUE_TYPE_SUSPENDED if expected_new_card_suspended else QUEUE_TYPE_NEW
@@ -1724,6 +1726,38 @@ class TestAnkiHubImporterSuspendNewCardsOfExistingNotesCardOption:
         new_card = max(updated_note.cards(), key=lambda c: c.id)
 
         return old_card, new_card
+
+
+class TestAnkiHubImporterSuspendNewCardsOfNewNotesOption:
+    @pytest.mark.parametrize(
+        "option_value, expected_new_card_suspended",
+        [
+            ("always", True),
+            ("never", False),
+        ],
+    )
+    def test_suspend_new_cards_of_new_notes_option(
+        self,
+        anki_session_with_addon_data: AnkiSession,
+        import_ah_note: ImportAHNote,
+        option_value: str,
+        expected_new_card_suspended: bool,
+    ):
+        anki_session = anki_session_with_addon_data
+        with anki_session.profile_loaded():
+
+            config.public_config["suspend_new_cards_of_new_notes"] = option_value
+
+            note_info = import_ah_note()
+            note = aqt.mw.col.get_note(NoteId(note_info.anki_nid))
+            assert len(note.cards()) == 1
+
+            new_card = note.cards()[0]
+
+            # Assert the new card is suspended or not suspended depending on the option value
+            assert new_card.queue == (
+                QUEUE_TYPE_SUSPENDED if expected_new_card_suspended else QUEUE_TYPE_NEW
+            )
 
 
 def test_unsubscribe_from_deck(
