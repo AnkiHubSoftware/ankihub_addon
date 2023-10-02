@@ -8,6 +8,8 @@ during normal execution.
 (We access mw using aqt.mw across the codebase to prevent this problem.)"""
 from typing import cast
 
+from ..settings import config
+
 _config_dialog_manager = None
 
 
@@ -28,6 +30,9 @@ def _general_tab(conf_window) -> None:
     from .ankiaddonconfig import ConfigWindow
 
     conf_window = cast(ConfigWindow, conf_window)
+
+    # Refresh config when window is closed
+    conf_window.execute_on_close(lambda: config.load_public_config())
 
     tab = conf_window.add_tab("General")
 

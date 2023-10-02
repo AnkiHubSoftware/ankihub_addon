@@ -186,6 +186,10 @@ class _Config:
             f.write(json.dumps(json.loads(config_json), indent=4, sort_keys=True))
         self._log_private_config()
 
+    def load_public_config(self) -> None:
+        """For loading the public config from its file after it has been changed."""
+        self.public_config = aqt.mw.addonManager.getConfig(ADDON_PATH.name)
+
     def save_token(self, token: str):
         self._private_config.token = token
         self._update_private_config()
