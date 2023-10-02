@@ -134,7 +134,7 @@ class _Config:
 
     def setup_public_config_and_urls(self):
         migrate_public_config()
-        self.public_config = aqt.mw.addonManager.getConfig(ADDON_PATH.name)
+        self.load_public_config()
 
         if self.public_config.get("use_staging"):
             self.app_url = STAGING_APP_URL
@@ -187,7 +187,7 @@ class _Config:
         self._log_private_config()
 
     def load_public_config(self) -> None:
-        """For loading the public config from its file after it has been changed."""
+        """For loading the public config from its file (after it has been changed)."""
         self.public_config = aqt.mw.addonManager.getConfig(ADDON_PATH.name)
 
     def save_token(self, token: str):
