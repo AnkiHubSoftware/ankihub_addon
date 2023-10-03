@@ -11,3 +11,11 @@ class DeckDownloadAndInstallError(Exception):
         self.original_exception = original_exception
         self.__cause__ = original_exception
         self.ankihub_did = ankihub_did
+
+
+class RemoteDeckNotFoundError(Exception):
+    """Raised when a deck doesn't exist on AnkiHub (anymore)."""
+
+    def __init__(self, ankihub_did: UUID):
+        super().__init__(f"Deck {ankihub_did} not found on AnkiHub.")
+        self.ankihub_did = ankihub_did
