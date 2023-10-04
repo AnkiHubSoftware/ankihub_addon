@@ -48,7 +48,23 @@ RUN apt-get update && export DEBIAN_FRONTEND=noninteractive \
 RUN git clone https://github.com/novnc/noVNC.git /opt/novnc
 RUN git clone https://github.com/novnc/websockify /opt/novnc/utils/websockify
 
-# install anki versions
+# Setup virtual environment
+ENV VIRTUAL_ENV="/home/vscode/venv"
+RUN python -m venv $VIRTUAL_ENV
+ENV PATH="${VIRTUAL_ENV}/bin:${PATH}"
+
+# Update shell initialization files for runtime sessions
+RUN echo 'export PATH="'${VIRTUAL_ENV}'/bin:$PATH"' >> /home/vscode/.bashrc
+RUN echo 'export PATH="'${VIRTUAL_ENV}'/bin:$PATH"' >> /home/vscode/.zshrc
+
+# Install requirements
+COPY ./requirements /requirements
+RUN pip3 install --upgrade pip && \
+    pip3 --no-cache-dir install -r /requirements/dev.txt && \
+    rm -rf /tmp/pip-tmp
+
+
+# Install Anki
 ARG ANKI_DIR=/opt/anki
 RUN mkdir ${ANKI_DIR}
 ARG ANKI_2156_FILE=anki-2.1.56-linux-qt5.tar.zst
