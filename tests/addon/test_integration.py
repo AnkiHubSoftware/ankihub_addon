@@ -43,6 +43,7 @@ from aqt.qt import QAction, Qt
 from pytest import MonkeyPatch, fixture
 from pytest_anki import AnkiSession
 from pytestqt.qtbot import QtBot  # type: ignore
+from requests import Response  # type: ignore
 from requests_mock import Mocker
 
 from ankihub.ankihub_client.models import DeckMediaUpdateChunk
@@ -55,12 +56,14 @@ from ankihub.gui.browser.browser import (
     _on_protect_fields_action,
     _on_reset_optional_tags_action,
 )
+from ankihub.gui.operations.db_check import ah_db_check
+from ankihub.gui.operations.db_check.ah_db_check import check_ankihub_db
 
 from ..factories import DeckFactory, DeckMediaFactory, NoteInfoFactory
 from ..fixtures import (
     ImportAHNote,
+    MockDownloadAndInstallDeckDependencies,
     MockFunction,
-    SetFeatureFlagState,
     create_or_get_ah_version_of_note_type,
 )
 from .conftest import TEST_PROFILE_ID
@@ -115,7 +118,7 @@ from ankihub.gui.deck_updater import _AnkiHubDeckUpdater, ah_deck_updater
 from ankihub.gui.decks_dialog import SubscribedDecksDialog, download_and_install_decks
 from ankihub.gui.editor import _on_suggestion_button_press, _refresh_buttons
 from ankihub.gui.errors import upload_logs_and_data_in_background
-from ankihub.gui.media_sync import _AnkiHubMediaSync, media_sync
+from ankihub.gui.media_sync import media_sync
 from ankihub.gui.menu import menu_state
 from ankihub.gui.operations import ankihub_sync
 from ankihub.gui.operations.new_deck_subscriptions import (
@@ -338,8 +341,8 @@ def mock_client_methods_called_during_ankihub_sync(monkeypatch: MonkeyPatch) -> 
     )
     monkeypatch.setattr(
         AnkiHubClient,
-        "get_media_disabled_fields",
-        lambda *args, **kwargs: {},
+        "get_deck_media_updates",
+        lambda *args, **kwargs: [],
     )
 
 
@@ -669,21 +672,16 @@ class TestDownloadAndInstallDecks:
     def test_download_and_install_deck(
         self,
         anki_session_with_addon_data: AnkiSession,
-        monkeypatch: MonkeyPatch,
         qtbot: QtBot,
+        mock_download_and_install_deck_dependencies: MockDownloadAndInstallDeckDependencies,
+        ankihub_basic_note_type: NotetypeDict,
     ):
         anki_session = anki_session_with_addon_data
         with anki_session.profile_loaded():
-            mw = anki_session.mw
-
-            note_type = create_or_get_ah_version_of_note_type(
-                mw, aqt.mw.col.models.by_name("Basic")
-            )
-            notes_data = [NoteInfoFactory.create(mid=note_type["id"])]
             deck = DeckFactory.create()
-
-            mocks = self._mock_client_and_gui_and_media_sync(
-                monkeypatch, deck, notes_data, note_type
+            notes_data = [NoteInfoFactory.create(mid=ankihub_basic_note_type["id"])]
+            mocks = mock_download_and_install_deck_dependencies(
+                deck, notes_data, ankihub_basic_note_type
             )
 
             # Download and install the deck
@@ -693,8 +691,8 @@ class TestDownloadAndInstallDecks:
 
             # Assert that the deck was installed
             # ... in the Anki database
-            assert deck.anki_did in [x.id for x in mw.col.decks.all_names_and_ids()]
-            assert mw.col.get_note(NoteId(notes_data[0].anki_nid)) is not None
+            assert deck.anki_did in [x.id for x in aqt.mw.col.decks.all_names_and_ids()]
+            assert aqt.mw.col.get_note(NoteId(notes_data[0].anki_nid)) is not None
 
             # ... in the AnkiHub database
             ankihub_db.ankihub_deck_ids() == [deck.ah_did]
@@ -711,37 +709,6 @@ class TestDownloadAndInstallDecks:
                 assert (
                     mock.call_count == 1
                 ), f"Mock {name} was not called once, but {mock.call_count} times"
-
-    def _mock_client_and_gui_and_media_sync(
-        self,
-        monkeypatch: MonkeyPatch,
-        deck: Deck,
-        notes_data: List[NoteInfo],
-        note_type: NotetypeDict,
-    ) -> Dict[str, Mock]:
-        mocks: Dict[str, Mock] = dict()
-
-        def add_mock(object, func_name: str, return_value: Any = None):
-            mocks[func_name] = Mock()
-            mocks[func_name].return_value = return_value
-            monkeypatch.setattr(object, func_name, mocks[func_name])
-
-        # Mock client functions
-        add_mock(AnkiHubClient, "get_deck_by_id", deck)
-        add_mock(AnkiHubClient, "download_deck", notes_data)
-        add_mock(AnkiHubClient, "get_note_type", note_type)
-        add_mock(AnkiHubClient, "get_protected_fields", {})
-        add_mock(AnkiHubClient, "get_protected_tags", [])
-
-        # Patch away gui functions which would otherwise block the test
-        add_mock(operations.deck_installation, "showInfo")
-        add_mock(operations.deck_installation, "ask_user", return_value=True)
-        add_mock(operations.deck_installation, "show_empty_cards")
-
-        # Mock media sync
-        add_mock(_AnkiHubMediaSync, "start_media_download")
-
-        return mocks
 
 
 class TestCheckAndInstallNewDeckSubscriptions:
@@ -1087,6 +1054,7 @@ def test_suggest_notes_in_bulk(
         with monkeypatch.context() as m:
             m.setattr("uuid.uuid4", lambda: new_note_ah_id)
             suggest_notes_in_bulk(
+                ankihub_did=ah_did,
                 notes=notes,
                 auto_accept=False,
                 change_type=SuggestionType.NEW_CONTENT,
@@ -3406,46 +3374,13 @@ def test_reset_optional_tags_action(
 
 
 class TestMediaSyncMediaDownload:
-    def test_download_media_without_deck_media_workflow(
-        self,
-        anki_session_with_addon_data: AnkiSession,
-        next_deterministic_uuid,
-        import_ah_note: ImportAHNote,
-        monkeypatch: MonkeyPatch,
-        mock_ankihub_sync_dependencies: None,
-        qtbot: QtBot,
-    ):
-        with anki_session_with_addon_data.profile_loaded():
-            # Add a reference to a media file to a note
-            note = NoteInfoFactory.create()
-            note.fields[0].value = "Some text. <img src='image.png'>"
-
-            ah_did = next_deterministic_uuid()
-            import_ah_note(note, ah_did=ah_did)
-
-            # Mock the client method for downloading media
-            download_media_mock = Mock()
-            monkeypatch.setattr(AnkiHubClient, "download_media", download_media_mock)
-
-            # Start the media sync and wait for it to finish
-            media_sync.start_media_download()
-            qtbot.wait_until(lambda: media_sync._download_in_progress is False)
-
-            # Assert that the client method for downloading media was called with the correct arguments
-            # to download the media file
-            download_media_mock.assert_called_once_with(["image.png"], ah_did)
-
-    def test_download_media_with_deck_media_workflow(
+    def test_download_media(
         self,
         anki_session_with_addon_data: AnkiSession,
         install_sample_ah_deck: InstallSampleAHDeck,
-        set_feature_flag_state: SetFeatureFlagState,
         mock_function: MockFunction,
         qtbot: QtBot,
     ):
-        # Enable the use_deck_media feature flag
-        set_feature_flag_state("use_deck_media", True)
-
         with anki_session_with_addon_data.profile_loaded():
             _, ah_did = install_sample_ah_deck()
 
@@ -3483,9 +3418,9 @@ class TestMediaSyncMediaDownload:
             download_media_mock.assert_called_once_with(["image.png"], ah_did)
 
             # Assert that the deck media was added to the database
-            assert ankihub_db.downloadable_media_names_for_ankihub_deck(
-                ah_did, media_disabled_fields={}
-            ) == {deck_media.name}
+            assert ankihub_db.downloadable_media_names_for_ankihub_deck(ah_did) == {
+                deck_media.name
+            }
             assert ankihub_db.media_names_exist_for_ankihub_deck(
                 ah_did=ah_did, media_names={deck_media.name}
             ) == {deck_media.name: True}
@@ -3496,17 +3431,13 @@ class TestMediaSyncMediaDownload:
                 == latest_media_update
             )
 
-    def test_download_media_with_deck_media_workflow_with_no_updates(
+    def test_download_media_with_no_updates(
         self,
         anki_session_with_addon_data: AnkiSession,
         install_sample_ah_deck: InstallSampleAHDeck,
-        set_feature_flag_state: SetFeatureFlagState,
         mock_function: MockFunction,
         qtbot: QtBot,
     ):
-        # Enable the use_deck_media feature flag
-        set_feature_flag_state("use_deck_media", True)
-
         with anki_session_with_addon_data.profile_loaded():
             _, ah_did = install_sample_ah_deck()
 
@@ -3741,10 +3672,7 @@ class TestSuggestionsWithMedia:
         import_ah_note: ImportAHNote,
         next_deterministic_uuid: Callable[[], uuid.UUID],
         create_change_suggestion: CreateChangeSuggestion,
-        set_feature_flag_state: SetFeatureFlagState,
     ):
-        set_feature_flag_state("use_deck_media", True)
-
         with anki_session_with_addon_data.profile_loaded():
             mw = anki_session_with_addon_data.mw
 
@@ -4175,3 +4103,82 @@ def test_not_delete_ankihub_private_config_on_deckBrowser__delete_option(
 
         assert mw.col.decks.count() == 1
         assert deck_uuid
+
+
+@pytest.mark.qt_no_exception_capture
+class TestAHDBCheck:
+    def test_with_nothing_missing(self, qtbot: QtBot):
+        on_done_mock = Mock()
+        check_ankihub_db(on_done_mock)
+        qtbot.wait_until(lambda: on_done_mock.call_count == 1)
+
+    @pytest.mark.parametrize(
+        "user_confirms, deck_exists_on_ankihub",
+        [
+            (True, True),
+            (True, False),
+            (False, True),
+            (False, False),
+        ],
+    )
+    def test_with_deck_missing_from_config(
+        self,
+        anki_session_with_addon_data: AnkiSession,
+        next_deterministic_uuid: Callable[[], uuid.UUID],
+        import_ah_note: ImportAHNote,
+        mock_download_and_install_deck_dependencies: MockDownloadAndInstallDeckDependencies,
+        ankihub_basic_note_type: NotetypeDict,
+        mock_function: MockFunction,
+        qtbot: QtBot,
+        user_confirms: bool,
+        deck_exists_on_ankihub: bool,
+    ):
+        with anki_session_with_addon_data.profile_loaded():
+            # Install a deck (side effect of importing note)
+            ah_did = next_deterministic_uuid()
+            import_ah_note(ah_did=ah_did)
+
+            # Remove deck from config
+            config.remove_deck(ah_did)
+
+            # Mock dependencies for downloading and installing deck
+            deck = DeckFactory.create(ah_did=ah_did)
+            notes_data = [NoteInfoFactory.create(mid=ankihub_basic_note_type["id"])]
+            mocks = mock_download_and_install_deck_dependencies(
+                deck, notes_data, ankihub_basic_note_type
+            )
+
+            # Mock get_deck_by_id to return 404 if deck_exists_on_ankihub==False
+            if not deck_exists_on_ankihub:
+
+                def raise_404(*args, **kwargs) -> None:
+                    response_404 = Response()
+                    response_404.status_code = 404
+                    raise AnkiHubHTTPError(response=response_404)
+
+                mock_function(
+                    AnkiHubClient,
+                    "get_deck_by_id",
+                    side_effect=raise_404,
+                )
+
+            # Mock ask_user function
+            mock_function(ah_db_check, "ask_user", return_value=user_confirms)
+
+            # Run the db check
+            on_done_mock = Mock()
+            check_ankihub_db(on_done_mock)
+            qtbot.wait_until(lambda: on_done_mock.call_count == 1)
+
+            if user_confirms and deck_exists_on_ankihub:
+                # The deck was downloaded and installed, is now also in config
+                assert mocks["get_deck_by_id"].call_count == 1
+                assert config.deck_ids() == [ah_did]
+            elif user_confirms and not deck_exists_on_ankihub:
+                # The deck could't be installed because it doesn't exist, was uninstalled completely
+                assert ankihub_db.ankihub_deck_ids() == (
+                    [ah_did] if deck_exists_on_ankihub else []
+                )
+            else:
+                # User didn't confirm, nothing to do
+                assert mocks["get_deck_by_id"].call_count == 0

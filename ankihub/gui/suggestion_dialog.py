@@ -1,4 +1,5 @@
 """Dialog for creating a suggestion for a note or a bulk suggestion for multiple notes."""
+import uuid
 from concurrent.futures import Future
 from dataclasses import dataclass
 from enum import Enum
@@ -25,7 +26,7 @@ from aqt.qt import (
     pyqtSignal,
     qconnect,
 )
-from aqt.utils import showText
+from aqt.utils import show_info, showText
 
 from .. import LOGGER
 from ..ankihub_client import (
@@ -38,13 +39,14 @@ from ..main.exporting import to_note_data
 from ..main.suggestions import (
     ANKIHUB_NO_CHANGE_ERROR,
     BulkNoteSuggestionsResult,
+    get_anki_nid_to_possible_ah_dids_dict,
     suggest_new_note,
     suggest_note_update,
     suggest_notes_in_bulk,
 )
 from ..settings import ANKING_DECK_ID, RATIONALE_FOR_CHANGE_MAX_LENGTH
 from .media_sync import media_sync
-from .utils import show_error_dialog, show_tooltip
+from .utils import choose_ankihub_deck, show_error_dialog, show_tooltip
 
 
 class SourceType(Enum):
@@ -79,9 +81,12 @@ def open_suggestion_dialog_for_note(note: Note, parent: QWidget) -> None:
         note.mid
     ), f"Note type {note.mid} is not associated with an AnkiHub deck."
 
-    ah_nid = ankihub_db.ankihub_nid_for_anki_nid(note.id)
-    ah_did = ankihub_db.ankihub_did_for_note_type(note.mid)
+    ah_did = _determine_ah_did_for_nids_to_be_suggested([note.id], parent)
+    if not ah_did:
+        LOGGER.info(f"Suggestion cancelled. {note.id=}")
+        return
 
+    ah_nid = ankihub_db.ankihub_nid_for_anki_nid(note.id)
     suggestion_meta = SuggestionDialog(
         is_new_note_suggestion=ah_nid is None,
         is_for_anking_deck=ah_did == ANKING_DECK_ID,
@@ -113,23 +118,23 @@ def open_suggestion_dialog_for_note(note: Note, parent: QWidget) -> None:
 
 
 def open_suggestion_dialog_for_bulk_suggestion(
-    nids: Collection[NoteId], parent: QWidget
+    anki_nids: Collection[NoteId], parent: QWidget
 ) -> None:
     """Opens a dialog for creating a bulk suggestion for the given notes.
-    The notes have to be present in the Anki collection before calling this function.
-    May change the notes contents (e.g. by renaming media files) and therefore the
-    notes might need to be reloaded after this function is called."""
+    The notes have to be present in the Anki collection before calling this
+    function and they need to have an AnkiHub note type.
+    This function may change the notes contents (e.g. by renaming media files)
+    and therefore the notes might need to be reloaded after this function is
+    called."""
 
-    notes = [aqt.mw.col.get_note(nid) for nid in nids]
-    mids = set(note.mid for note in notes)
-    assert (
-        ankihub_db.is_ankihub_note_type(mid) for mid in mids
-    ), "Some of the note types of the notes are not associated with an AnkiHub deck."
+    ah_did = _determine_ah_did_for_nids_to_be_suggested(
+        anki_nids=anki_nids, parent=parent
+    )
+    if ah_did is None:
+        LOGGER.info("Bulk suggestion cancelled.")
+        return
 
-    ah_dids = set(ankihub_db.ankihub_did_for_note_type(mid) for mid in mids)
-    assert len(ah_dids) == 1, "All notes have to be from the same AnkiHub deck."
-
-    ah_did = ah_dids.pop()
+    notes = [aqt.mw.col.get_note(nid) for nid in anki_nids]
 
     suggestion_meta = SuggestionDialog(
         is_new_note_suggestion=False,
@@ -139,11 +144,13 @@ def open_suggestion_dialog_for_bulk_suggestion(
         added_new_media=any(_added_new_media(note) for note in notes),
     ).run()
     if not suggestion_meta:
+        LOGGER.info("User cancelled bulk suggestion from suggestion dialog.")
         return
 
     aqt.mw.taskman.with_progress(
         task=lambda: suggest_notes_in_bulk(
-            notes,
+            ankihub_did=ah_did,
+            notes=notes,
             auto_accept=suggestion_meta.auto_accept,
             change_type=suggestion_meta.change_type,
             comment=_comment_with_source(suggestion_meta),
@@ -152,6 +159,39 @@ def open_suggestion_dialog_for_bulk_suggestion(
         on_done=lambda future: _on_suggest_notes_in_bulk_done(future, parent),
         parent=parent,
     )
+
+
+def _determine_ah_did_for_nids_to_be_suggested(
+    anki_nids: Collection[NoteId], parent: QWidget
+) -> Optional[uuid.UUID]:
+    """Return an AnkiHub deck id that the notes will be suggested to. If the
+    choice of deck is ambiguous, the user is asked to choose a deck from a list
+    of viable decks.
+    Returns None if the user cancelled the deck selection dialog or if there is
+    no deck that all notes could belong to."""
+    anki_nid_to_possible_ah_dids = get_anki_nid_to_possible_ah_dids_dict(anki_nids)
+    dids_that_all_notes_could_belong_to = set.intersection(
+        *anki_nid_to_possible_ah_dids.values()
+    )
+    if len(dids_that_all_notes_could_belong_to) == 0:
+        LOGGER.info(
+            "User tried to submit suggestions for notes that could not belong to a single AnkiHub deck."
+        )
+        show_info("Please choose notes for one AnkiHub deck only.", parent=parent)
+        return None
+    elif len(dids_that_all_notes_could_belong_to) == 1:
+        ah_did = dids_that_all_notes_could_belong_to.pop()
+    else:
+        ah_did = choose_ankihub_deck(
+            prompt="Which AnkiHub deck would you like to submit your suggestion(s) to?",
+            ah_dids=list(dids_that_all_notes_could_belong_to),
+            parent=parent,
+        )
+        if not ah_did:
+            LOGGER.info("User cancelled suggestion.")
+            return None
+
+    return ah_did
 
 
 def _added_new_media(note: Note) -> bool:
@@ -188,23 +228,19 @@ def _on_suggest_notes_in_bulk_done(future: Future, parent: QWidget) -> None:
             error_message = response_data.get("detail")
             if error_message:
                 show_error_dialog(
-                    error_message,
+                    message=error_message,
                     parent=parent,
                     title="Error submitting bulk suggestion :(",
                 )
-            else:
-                raise e
-        else:
-            raise e
-
-        return
+                return
+        raise e
 
     LOGGER.info("Created note suggestions in bulk.")
     LOGGER.info(f"errors_by_nid:\n{pformat(suggestions_result.errors_by_nid)}")
 
     msg_about_created_suggestions = (
         f"Submitted {suggestions_result.change_note_suggestions_count} change note suggestion(s).\n"
-        f"Submitted {suggestions_result.new_note_suggestions_count} new note suggestion(s) to.\n\n\n"
+        f"Submitted {suggestions_result.new_note_suggestions_count} new note suggestion(s).\n\n\n"
     )
 
     notes_without_changes = [
@@ -225,7 +261,7 @@ def _on_suggest_notes_in_bulk_done(future: Future, parent: QWidget) -> None:
     )
 
     msg = msg_about_created_suggestions + msg_about_failed_suggestions
-    showText(msg, parent=parent)
+    showText(txt=msg, parent=parent)
 
 
 class SuggestionDialog(QDialog):

@@ -68,6 +68,9 @@ from .custom_search_nodes import (
     UpdatedSinceLastReviewSearchNode,
 )
 
+# Maximum number of notes that can be selected for bulk suggestions.
+BULK_SUGGESTION_LIMIT = 2000
+
 browser: Optional[Browser] = None
 ankihub_tree_item: Optional[SidebarItem] = None
 
@@ -240,8 +243,8 @@ def _on_protect_fields_action(browser: Browser, nids: Sequence[NoteId]) -> None:
 
 
 def _on_bulk_notes_suggest_action(browser: Browser, nids: Sequence[NoteId]) -> None:
-    if len(nids) > 500:
-        msg = "Please select at most 500 notes at a time for bulk suggestions.<br>"
+    if len(nids) > BULK_SUGGESTION_LIMIT:
+        msg = f"Please select at most {BULK_SUGGESTION_LIMIT} notes at a time for bulk suggestions.<br>"
         showInfo(msg, parent=browser)
         return
 
@@ -273,7 +276,7 @@ def _on_bulk_notes_suggest_action(browser: Browser, nids: Sequence[NoteId]) -> N
         showInfo(msg, parent=browser)
         return
 
-    open_suggestion_dialog_for_bulk_suggestion(nids=filtered_nids, parent=browser)
+    open_suggestion_dialog_for_bulk_suggestion(anki_nids=filtered_nids, parent=browser)
 
 
 def _on_reset_local_changes_action(browser: Browser, nids: Sequence[NoteId]) -> None:

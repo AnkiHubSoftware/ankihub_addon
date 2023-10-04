@@ -7,6 +7,7 @@ jobs:
   create-release:
     name: Create Release
     runs-on: ubuntu-latest
+
     steps:
       - name: Checkout
         uses: actions/checkout@v3
@@ -14,6 +15,26 @@ jobs:
           submodules: recursive
           fetch-depth: 0
           token: ${{ secrets.GH_BOT_ACCESS_TOKEN }}
+
+      - name: Check status of the last run of the test workflow
+        run: |
+          gh auth login --with-token <<< "${{ secrets.GH_BOT_ACCESS_TOKEN }}"
+
+          conclusion=$(gh run list \
+            --workflow=ci.yml \
+            -b main \
+            -e push \
+            --limit 1 \
+            --json conclusion \
+            --jq ".[0].conclusion")
+
+          if [[ -z "$conclusion" ]]; then
+            echo "Could not determine the status of the most recent test run on the main branch. Aborting..."
+            exit 1
+          elif [[ "$conclusion" != "success" ]]; then
+            echo "The last run of the test workflow on the main branch was not successful. Aborting..."
+            exit 1
+          fi
 
       - name: Setup git config
         run: |

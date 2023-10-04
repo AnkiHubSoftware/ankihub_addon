@@ -7,7 +7,18 @@ import shutil
 import uuid
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Any, Dict, List, Optional, Protocol, Sequence, Set, Tuple, cast
+from typing import (
+    Any,
+    Collection,
+    Dict,
+    List,
+    Optional,
+    Protocol,
+    Sequence,
+    Set,
+    Tuple,
+    cast,
+)
 
 import aqt
 from anki.notes import Note, NoteId
@@ -24,10 +35,9 @@ from ..ankihub_client import (
     get_media_names_from_suggestions,
 )
 from ..db import ankihub_db
-from ..feature_flags import feature_flags
 from .exporting import to_note_data
 from .media_utils import find_and_replace_text_in_fields_on_all_notes
-from .utils import mdb5_file_hash
+from .utils import get_anki_nid_to_mid_dict, mdb5_file_hash
 
 # string that is contained in the errors returned from the AnkiHub API when
 # there are no changes to the note for a change note suggestion
@@ -106,12 +116,13 @@ def suggest_new_note(
 
 @dataclass
 class BulkNoteSuggestionsResult:
-    errors_by_nid: Dict[NoteId, Dict[str, List[str]]]  # dict of errors by anki_nid
+    errors_by_nid: Dict[NoteId, List[str]]
     new_note_suggestions_count: int
     change_note_suggestions_count: int
 
 
 def suggest_notes_in_bulk(
+    ankihub_did: uuid.UUID,
     notes: List[Note],
     auto_accept: bool,
     change_type: SuggestionType,
@@ -120,28 +131,12 @@ def suggest_notes_in_bulk(
 ) -> BulkNoteSuggestionsResult:
     """
     Sends a NewNoteSuggestion or a ChangeNoteSuggestion to AnkiHub for each note in the list.
-    All notes have to be from one AnkiHub deck. If a note does not belong to any
-    AnkiHub deck, it will be ignored.
     Note: Notes that don't have any changes when compared to the local
     AnkiHub database will not be sent. This does not necessarily mean
     that the note has no changes when compared to the remote AnkiHub
     database. To create suggestions for notes that differ from the
     remote database but not from the local database, users have to
     sync first (so that the local database is up to date)."""
-
-    change_note_ah_dids = set(
-        ankihub_db.ankihub_dids_for_anki_nids([note.id for note in notes])
-    )
-    new_note_ah_dids = set(
-        ankihub_db.ankihub_did_for_note_type(note.mid) for note in notes
-    )
-
-    ankihub_dids = list(change_note_ah_dids | new_note_ah_dids)
-    ankihub_dids = [did for did in ankihub_dids if did is not None]
-
-    assert len(ankihub_dids) == 1, "All notes must belong to the same AnkiHub deck"
-    ankihub_did = ankihub_dids[0]
-
     (
         new_note_suggestions,
         change_note_suggestions,
@@ -191,6 +186,36 @@ def suggest_notes_in_bulk(
             [x for x in new_note_suggestions if x.anki_nid not in errors_by_nid]
         ),
     )
+    return result
+
+
+def get_anki_nid_to_possible_ah_dids_dict(
+    anki_nids: Collection[NoteId],
+) -> Dict[NoteId, Set[uuid.UUID]]:
+    """Returns a dictionary that maps anki note ids to the set of deck ids that the note could
+    be suggested to. Whether a note could be suggested to a deck is determined in this manner:
+    - If the note is on AnkiHub already, the deck id can be looked up in database by the note id.
+    - Otherwise the note type is used to determine the possible deck ids.
+    """
+    # Get definite deck ids for existing AnkiHub notes
+    anki_nid_to_ah_did = ankihub_db.anki_nid_to_ah_did_dict(anki_nids)
+
+    # Get possible deck ids for notes that are not on AnkiHub yet by looking at the note type
+    nids_without_ah_note = set(anki_nids) - anki_nid_to_ah_did.keys()
+    anki_nid_to_mid = get_anki_nid_to_mid_dict(nids_without_ah_note)
+    mid_to_ah_dids = {
+        mid: ankihub_db.ankihub_dids_for_note_type(mid)
+        for mid in set(anki_nid_to_mid.values())
+    }
+    anki_nid_to_possible_ah_dids = {
+        nid: mid_to_ah_dids[mid] for nid, mid in anki_nid_to_mid.items()
+    }
+
+    # Merge definite and possible deck ids
+    result = {
+        **{nid: {did} for nid, did in anki_nid_to_ah_did.items()},
+        **anki_nid_to_possible_ah_dids,
+    }
     return result
 
 
@@ -378,13 +403,12 @@ def _rename_and_upload_media_for_suggestions(
         if not exists
     }
 
-    if feature_flags.use_deck_media:
-        media_names_added_to_ah_deck = _handle_media_with_matching_hashes(
-            ah_did=ankihub_did,
-            suggestions=suggestions,
-            media_names=media_names_added_to_ah_deck,
-        )
-    #
+    media_names_added_to_ah_deck = _handle_media_with_matching_hashes(
+        ah_did=ankihub_did,
+        suggestions=suggestions,
+        media_names=media_names_added_to_ah_deck,
+    )
+
     if not media_names_added_to_ah_deck:
         # No media files added, nothing to do here. Return
         # the original suggestions object

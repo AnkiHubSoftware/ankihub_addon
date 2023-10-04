@@ -1,7 +1,7 @@
 import copy
 import os
 import uuid
-from typing import Any, Callable, Dict, Optional, Protocol
+from typing import Any, Callable, Dict, List, Optional, Protocol
 from unittest.mock import Mock
 
 import aqt
@@ -21,7 +21,10 @@ os.environ["SKIP_INIT"] = "1"
 
 from ankihub.ankihub_client import NoteInfo
 from ankihub.ankihub_client.ankihub_client import AnkiHubClient
+from ankihub.ankihub_client.models import Deck
 from ankihub.feature_flags import setup_feature_flags
+from ankihub.gui import operations
+from ankihub.gui.media_sync import _AnkiHubMediaSync
 from ankihub.main.importing import AnkiHubImporter
 from ankihub.main.utils import modify_note_type
 
@@ -247,26 +250,37 @@ class ImportAHNoteType(Protocol):
         self,
         note_type: Optional[NotetypeDict] = None,
         ah_did: Optional[uuid.UUID] = None,
+        force_new: bool = False,
     ) -> NotetypeDict:
         ...
 
 
 @pytest.fixture
 def import_ah_note_type(
-    next_deterministic_uuid: Callable[[], uuid.UUID], ankihub_basic_note_type
-):
+    next_deterministic_uuid: Callable[[], uuid.UUID],
+    ankihub_basic_note_type: NotetypeDict,
+) -> ImportAHNoteType:
     """Imports a note type into the AnkiHub DB and Anki. Returns the note type.
-    You can optionally pass in a note type and/or an AnkiHub deck ID."""
+    You can optionally pass in a note type and/or an AnkiHub deck ID.
+    If force_new is True, a new unique id will be generated for the note type.
+    Otherwise, subsequent calls to this function that use the same note type won't create a new note type."""
     default_ah_did = next_deterministic_uuid()
     default_note_type = ankihub_basic_note_type
 
     def import_ah_note_type_inner(
-        note_type: Optional[NotetypeDict] = None, ah_did: Optional[uuid.UUID] = None
+        note_type: Optional[NotetypeDict] = None,
+        ah_did: Optional[uuid.UUID] = None,
+        force_new: bool = False,
     ) -> NotetypeDict:
         if note_type is None:
             note_type = default_note_type
         if ah_did is None:
             ah_did = default_ah_did
+
+        if force_new:
+            # Generate a new unique id for the note type
+            new_mid = max(model["id"] for model in aqt.mw.col.models.all()) + 1
+            note_type["id"] = new_mid
 
         importer = AnkiHubImporter()
         importer.import_ankihub_deck(
@@ -306,3 +320,57 @@ def new_note_with_note_type() -> NewNoteWithNoteType:
         return note
 
     return new_note_with_note_type_inner
+
+
+class MockDownloadAndInstallDeckDependencies(Protocol):
+    def __call__(
+        self,
+        deck: Deck,
+        notes_data: List[NoteInfo],
+        note_type: NotetypeDict,
+    ) -> Dict[str, Mock]:
+        ...
+
+
+@pytest.fixture
+def mock_download_and_install_deck_dependencies(
+    monkeypatch: MonkeyPatch,
+) -> MockDownloadAndInstallDeckDependencies:
+    """Mocks the dependencies of the download_and_install_deck function.
+    deck: The deck that is downloaded and installed.
+    notes_data: The notes of the deck.
+    note_type: The note type of the notes of the deck.
+
+    Returns a dictionary of mocked functions.
+    """
+
+    def mock_install_deck_dependencies(
+        deck: Deck,
+        notes_data: List[NoteInfo],
+        note_type: NotetypeDict,
+    ) -> Dict[str, Mock]:
+        mocks: Dict[str, Mock] = dict()
+
+        def add_mock(object, func_name: str, return_value: Any = None):
+            mocks[func_name] = Mock()
+            mocks[func_name].return_value = return_value
+            monkeypatch.setattr(object, func_name, mocks[func_name])
+
+        # Mock client functions
+        add_mock(AnkiHubClient, "get_deck_by_id", deck)
+        add_mock(AnkiHubClient, "download_deck", notes_data)
+        add_mock(AnkiHubClient, "get_note_type", note_type)
+        add_mock(AnkiHubClient, "get_protected_fields", {})
+        add_mock(AnkiHubClient, "get_protected_tags", [])
+
+        # Patch away gui functions which would otherwise block the test
+        add_mock(operations.deck_installation, "showInfo")
+        add_mock(operations.deck_installation, "ask_user", return_value=True)
+        add_mock(operations.deck_installation, "show_empty_cards")
+
+        # Mock media sync
+        add_mock(_AnkiHubMediaSync, "start_media_download")
+
+        return mocks
+
+    return mock_install_deck_dependencies

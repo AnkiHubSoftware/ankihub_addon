@@ -3,7 +3,7 @@ from concurrent.futures import Future
 from datetime import datetime
 from functools import cached_property
 from pathlib import Path
-from typing import Callable, Dict, Iterable, List, Optional, Set
+from typing import Callable, Iterable, List, Optional, Set
 
 import aqt
 from aqt.qt import QAction
@@ -12,7 +12,6 @@ from .. import LOGGER
 from ..addon_ankihub_client import AddonAnkiHubClient
 from ..ankihub_client.models import DeckMedia
 from ..db import ankihub_db
-from ..feature_flags import feature_flags
 from ..settings import config
 
 
@@ -68,9 +67,13 @@ class _AnkiHubMediaSync:
             ),
         )
 
-    def cleanup(self):
+    def stop_background_threads(self):
         """Stop all media sync operations."""
         self._client.stop_background_threads()
+
+    def allow_background_threads(self):
+        """Allow background media sync operations to be started after they have been stopped."""
+        self._client.allow_background_threads()
 
     def refresh_sync_status_text(self):
         """Refresh the status text on the status action."""
@@ -102,28 +105,9 @@ class _AnkiHubMediaSync:
         self._client.media_upload_finished(ankihub_deck_id)
 
     def _update_deck_media_and_download_missing_media(self) -> None:
-        for ah_did in ankihub_db.ankihub_deck_ids():
-            if feature_flags.use_deck_media:
-                self._update_deck_media(ankihub_did=ah_did)
-                # Fetching media disabled fields here is not necessary with the deck_media workflow.
-                # The DeckMedia objects have the download_enabled field which serves the same purpose.
-                media_disabled_fields = {}
-            else:
-                # is_media_upload_finished is only used for the old workflow which doesn't use deck media objects.
-                # Its purpose is to prevent the add-on from downloading media from decks that have media references,
-                # but no media on s3. (For example if the deck was created before the media feature was added.)
-                # With the new workflow, we have the exists_on_s3 field on the deck media objects that is used for this
-                # purpose.
-                if not self._client.is_media_upload_finished(ah_did):
-                    LOGGER.info(
-                        f"Media upload for {ah_did=} not finished, skipping media download..."
-                    )
-                    continue
-                media_disabled_fields = self._client.get_media_disabled_fields(ah_did)
-
-            missing_media_names = self._missing_media_for_ah_deck(
-                ah_did, media_disabled_fields
-            )
+        for ah_did in config.deck_ids():
+            self._update_deck_media(ankihub_did=ah_did)
+            missing_media_names = self._missing_media_for_ah_deck(ah_did)
             if not missing_media_names:
                 LOGGER.info(f"No missing media for {ah_did=}")
                 continue
@@ -160,12 +144,8 @@ class _AnkiHubMediaSync:
         else:
             LOGGER.info(f"No new media updates for {ankihub_did=}")
 
-    def _missing_media_for_ah_deck(
-        self, ah_did: uuid.UUID, media_disabled_fields: Dict[int, List[str]]
-    ) -> List[str]:
-        media_names = ankihub_db.downloadable_media_names_for_ankihub_deck(
-            ah_did, media_disabled_fields=media_disabled_fields
-        )
+    def _missing_media_for_ah_deck(self, ah_did: uuid.UUID) -> List[str]:
+        media_names = ankihub_db.downloadable_media_names_for_ankihub_deck(ah_did)
         media_dir_path = Path(aqt.mw.col.media.dir())
 
         result = [

@@ -15,6 +15,7 @@ from ..fixtures import (  # noqa F401
     import_ah_note,
     import_ah_note_type,
     mock_all_feature_flags_to_default_values,
+    mock_download_and_install_deck_dependencies,
     mock_function,
     new_note_with_note_type,
     next_deterministic_id,
