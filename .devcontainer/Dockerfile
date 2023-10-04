@@ -34,7 +34,10 @@ RUN apt-get update && export DEBIAN_FRONTEND=noninteractive \
     zstd \
     qtbase5-dev \
     python3-pyqt5 \
-    python3-pyqt5.qtwebengine
+    python3-pyqt5.qtwebengine \
+    xvfb \
+    tigervnc-common \
+    tigervnc-standalone-server
 
 RUN git clone https://github.com/novnc/noVNC.git /opt/novnc
 RUN git clone https://github.com/novnc/websockify /opt/novnc/utils/websockify
