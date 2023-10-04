@@ -9,6 +9,10 @@
 			"VARIANT": "3.11",
 		}
 	},
+	"runArgs": [
+		"--env-file",
+		".devcontainer/devcontainer.env"
+	],
 	// Set *default* container specific settings.json values on container create.
 	"settings": {
 		"python.defaultInterpreterPath": "/usr/bin/python3",
