@@ -45,5 +45,5 @@ RUN git clone https://github.com/novnc/websockify /opt/novnc/utils/websockify
 # install anki versions
 ARG ANKI_DIR=/opt/anki
 RUN mkdir ${ANKI_DIR}
-ARG ANKI_2156_FILE=anki-2.1.56-linux-qt6.tar.zst
+ARG ANKI_2156_FILE=anki-2.1.56-linux-qt5.tar.zst
 RUN cd ${ANKI_DIR} && wget -q https://github.com/ankitects/anki/releases/download/2.1.56/${ANKI_2156_FILE} && tar xvaf ${ANKI_2156_FILE} && rm ${ANKI_2156_FILE}
