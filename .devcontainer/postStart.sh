@@ -27,3 +27,6 @@ DAEMON=/usr/bin/vncserver
 DAEMON_OPTS="-fg -SecurityTypes None -geometry 1920x1080 :1"
 rm $PIDFILE
 start-stop-daemon --start --quiet --background --pidfile $PIDFILE --exec $DAEMON -- $DAEMON_OPTS
+
+# TODO: Set api key properly
+sudo GOOGLE_API_KEY="fake_google_api_key" $HOME/venv/bin/python scripts/build.py
