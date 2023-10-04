@@ -32,12 +32,18 @@ RUN apt-get update && export DEBIAN_FRONTEND=noninteractive \
     portaudio19-dev \
     rsync \
     zstd \
-    qtbase5-dev \
-    python3-pyqt5 \
-    python3-pyqt5.qtwebengine \
     xvfb \
     tigervnc-common \
-    tigervnc-standalone-server
+    tigervnc-standalone-server \
+    xfce4 \
+    xfce4-goodies \
+    dbus-x11 \
+    xfonts-base \
+    xfonts-100dpi \
+    xfonts-75dpi \
+    qtbase5-dev \
+    python3-pyqt5 \
+    python3-pyqt5.qtwebengine
 
 RUN git clone https://github.com/novnc/noVNC.git /opt/novnc
 RUN git clone https://github.com/novnc/websockify /opt/novnc/utils/websockify
