@@ -39,3 +39,7 @@ follow_imports = 'skip'
 [[tool.mypy.overrides]]
 module = 'ankihub.gui.ankiaddonconfig.*'
 ignore_errors = true
+
+[[tool.mypy.overrides]]
+module = 'anki._vendor.*'
+ignore_missing_imports = true
