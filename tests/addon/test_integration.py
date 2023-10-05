@@ -2625,6 +2625,10 @@ class TestBuildSubdecksAndMoveCardsToThem:
         with anki_session_with_addon_data.profile_loaded():
             mw = anki_session_with_addon_data.mw
 
+            # Set the config to not suspend new cards of new notes.
+            # This is needed because the filtered deck will be empty otherwise.
+            config.public_config["suspend_new_cards_of_new_notes"] = "never"
+
             _, ah_did = install_sample_ah_deck()
 
             nids = mw.col.find_notes("deck:Testdeck")
