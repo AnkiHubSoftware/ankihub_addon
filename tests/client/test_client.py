@@ -238,8 +238,13 @@ def remove_db_dump() -> Generator:
     elif "Container" in result.stderr and "is not running" in result.stderr:
         # Container is not running, nothing to do
         pass
+    elif "docker: command not found" in result.stderr:
+        pass
+        # docker is not installed, nothing to do
     else:
-        assert False, f"Command rm failed with error code {result.returncode}"
+        assert (
+            False
+        ), f"Command rm failed with error code {result.returncode} {result.stderr}"
 
     yield
 
