@@ -27,8 +27,8 @@ from zipfile import ZipFile
 
 import aqt
 import pytest
-from anki.cards import CardId
-from anki.consts import QUEUE_TYPE_SUSPENDED
+from anki.cards import Card, CardId
+from anki.consts import QUEUE_TYPE_NEW, QUEUE_TYPE_SUSPENDED
 from anki.decks import DeckId, FilteredDeckConfig
 from anki.models import NotetypeDict, NotetypeId
 from anki.notes import Note, NoteId
@@ -1472,100 +1472,6 @@ class TestAnkiHubImporter:
             for card in note.cards():
                 assert card.did == mw.col.decks.id_for_name("Testdeck::A::B")
 
-    def test_suspend_new_cards_of_existing_notes(
-        self,
-        anki_session_with_addon_data: AnkiSession,
-        next_deterministic_uuid: Callable[[], uuid.UUID],
-    ):
-        anki_session = anki_session_with_addon_data
-        with anki_session.profile_loaded():
-            mw = anki_session.mw
-
-            ankihub_cloze = create_or_get_ah_version_of_note_type(
-                mw, mw.col.models.by_name("Cloze")
-            )
-
-            ah_nid = next_deterministic_uuid()
-            ah_did = next_deterministic_uuid()
-
-            def test_case(suspend_existing_card_before_update: bool):
-                # create a cloze note with one card, optionally suspend the existing card,
-                # then update the note using AnkiHubImporter adding a new cloze
-                # which results in a new card getting created for the added cloze
-
-                note = mw.col.new_note(ankihub_cloze)
-                note["Text"] = "{{c1::foo}}"
-                mw.col.add_note(note, DeckId(0))
-
-                if suspend_existing_card_before_update:
-                    # suspend the only card of the note
-                    card = note.cards()[0]
-                    card.queue = QUEUE_TYPE_SUSPENDED
-                    card.flush()
-
-                # update the note using the AnkiHub importer
-                note_data = NoteInfo(
-                    anki_nid=note.id,
-                    ah_nid=ah_nid,
-                    fields=[
-                        Field(name="Text", value="{{c1::foo}} {{c2::bar}}", order=0)
-                    ],
-                    tags=[],
-                    mid=ankihub_cloze["id"],
-                    last_update_type=None,
-                    guid=note.guid,
-                )
-
-                ankihub_db.upsert_note_type(ankihub_did=ah_did, note_type=ankihub_cloze)
-                ankihub_db.upsert_notes_data(ankihub_did=ah_did, notes_data=[note_data])
-
-                importer = AnkiHubImporter()
-                updated_note = importer._update_or_create_note(
-                    note_data=note_data,
-                    anki_did=DeckId(0),
-                    protected_fields={},
-                    protected_tags=[],
-                )
-                assert len(updated_note.cards()) == 2
-                return updated_note
-
-            def get_new_card(note: Note):
-                # the card with the higher id was created later
-                return max(note.cards(), key=lambda c: c.id)
-
-            # test "always" option
-            config.public_config["suspend_new_cards_of_existing_notes"] = "always"
-
-            updated_note = test_case(suspend_existing_card_before_update=False)
-            assert get_new_card(updated_note).queue == QUEUE_TYPE_SUSPENDED
-
-            updated_note = test_case(suspend_existing_card_before_update=True)
-            assert get_new_card(updated_note).queue == QUEUE_TYPE_SUSPENDED
-
-            # test "never" option
-            config.public_config["suspend_new_cards_of_existing_notes"] = "never"
-
-            updated_note = test_case(suspend_existing_card_before_update=False)
-            assert get_new_card(updated_note).queue != QUEUE_TYPE_SUSPENDED
-
-            updated_note = test_case(suspend_existing_card_before_update=True)
-            assert get_new_card(updated_note).queue != QUEUE_TYPE_SUSPENDED
-
-            # test "if_siblings_are_suspended" option
-            config.public_config[
-                "suspend_new_cards_of_existing_notes"
-            ] = "if_siblings_are_suspended"
-
-            updated_note = test_case(suspend_existing_card_before_update=False)
-            assert all(
-                card.queue != QUEUE_TYPE_SUSPENDED for card in updated_note.cards()
-            )
-
-            updated_note = test_case(suspend_existing_card_before_update=True)
-            assert all(
-                card.queue == QUEUE_TYPE_SUSPENDED for card in updated_note.cards()
-            )
-
     def test_import_deck_and_check_that_values_are_saved_to_databases(
         self,
         anki_session_with_addon_data: AnkiSession,
@@ -1705,6 +1611,130 @@ def create_copy_of_note_type(mw: AnkiQt, note_type: NotetypeDict) -> NotetypeDic
     mid = NotetypeId(changes.id)
     result = mw.col.models.get(mid)
     return result
+
+
+class TestAnkiHubImporterSuspendNewCardsOfExistingNotesOption:
+    @pytest.mark.parametrize(
+        "option_value, existing_card_suspended, expected_new_card_suspended",
+        [
+            # Always suspend new cards
+            ("always", False, True),
+            ("always", True, True),
+            # Never suspend new cards
+            ("never", True, False),
+            ("never", False, False),
+            # Suspend new cards if existing sibling cards are suspended
+            ("if_siblings_are_suspended", True, True),
+            ("if_siblings_are_suspended", False, False),
+        ],
+    )
+    def test_suspend_new_cards_of_existing_notes_option(
+        self,
+        anki_session_with_addon_data: AnkiSession,
+        next_deterministic_uuid: Callable[[], uuid.UUID],
+        option_value: str,
+        existing_card_suspended: bool,
+        expected_new_card_suspended: bool,
+    ):
+        anki_session = anki_session_with_addon_data
+        with anki_session.profile_loaded():
+
+            config.public_config["suspend_new_cards_of_existing_notes"] = option_value
+
+            ah_nid = next_deterministic_uuid()
+            old_card, new_card = self._create_and_update_note_with_new_card(
+                existing_card_suspended=existing_card_suspended,
+                ah_nid=ah_nid,
+            )
+
+            # Assert the old card has the same suspension state as before
+            assert old_card.queue == (
+                QUEUE_TYPE_SUSPENDED if existing_card_suspended else QUEUE_TYPE_NEW
+            )
+
+            # Assert the new card is suspended or not suspended depending on the option value
+            assert new_card.queue == (
+                QUEUE_TYPE_SUSPENDED if expected_new_card_suspended else QUEUE_TYPE_NEW
+            )
+
+    def _create_and_update_note_with_new_card(
+        self,
+        existing_card_suspended: bool,
+        ah_nid: uuid.UUID,
+    ) -> Tuple[Card, Card]:
+        # Create a cloze note with one card, optionally suspend the existing card,
+        # then update the note using AnkiHubImporter adding a new cloze
+        # which results in a new card getting created for the added cloze.
+        # Return the old and new card.
+
+        ankihub_cloze = create_or_get_ah_version_of_note_type(
+            aqt.mw, aqt.mw.col.models.by_name("Cloze")
+        )
+
+        note = aqt.mw.col.new_note(ankihub_cloze)
+        note["Text"] = "{{c1::foo}}"
+        aqt.mw.col.add_note(note, DeckId(0))
+
+        if existing_card_suspended:
+            # Suspend the only card of the note
+            card = note.cards()[0]
+            card.queue = QUEUE_TYPE_SUSPENDED
+            card.flush()
+
+        # Update the note using the AnkiHub importer
+        note_data = NoteInfoFactory.create(
+            anki_nid=note.id,
+            ah_nid=ah_nid,
+            fields=[Field(name="Text", value="{{c1::foo}} {{c2::bar}}", order=0)],
+            mid=ankihub_cloze["id"],
+        )
+
+        importer = AnkiHubImporter()
+        updated_note = importer._update_or_create_note(
+            note_data=note_data,
+            anki_did=DeckId(0),
+            protected_fields={},
+            protected_tags=[],
+        )
+        assert len(updated_note.cards()) == 2  # one existing and one new card
+
+        # The id is a timestamp, so the old card has a lower id than the new card
+        old_card = min(updated_note.cards(), key=lambda c: c.id)
+        new_card = max(updated_note.cards(), key=lambda c: c.id)
+
+        return old_card, new_card
+
+
+class TestAnkiHubImporterSuspendNewCardsOfNewNotesOption:
+    @pytest.mark.parametrize(
+        "option_value, expected_new_card_suspended",
+        [
+            ("always", True),
+            ("never", False),
+        ],
+    )
+    def test_suspend_new_cards_of_new_notes_option(
+        self,
+        anki_session_with_addon_data: AnkiSession,
+        import_ah_note: ImportAHNote,
+        option_value: str,
+        expected_new_card_suspended: bool,
+    ):
+        anki_session = anki_session_with_addon_data
+        with anki_session.profile_loaded():
+
+            config.public_config["suspend_new_cards_of_new_notes"] = option_value
+
+            note_info = import_ah_note()
+            note = aqt.mw.col.get_note(NoteId(note_info.anki_nid))
+            assert len(note.cards()) == 1
+
+            new_card = note.cards()[0]
+
+            # Assert the new card is suspended or not suspended depending on the option value
+            assert new_card.queue == (
+                QUEUE_TYPE_SUSPENDED if expected_new_card_suspended else QUEUE_TYPE_NEW
+            )
 
 
 def test_unsubscribe_from_deck(
