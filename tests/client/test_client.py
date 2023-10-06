@@ -1566,3 +1566,12 @@ class TestGetFeatureFlags:
         client.get_feature_flags()
         # This test just makes sure that the method does not throw an exception
         # Feature flags can change so we don't want to assert anything
+
+
+class TestSendReviewTimes:
+    def test_basic(self, authorized_client_for_user_test1: AnkiHubClient):
+        client = authorized_client_for_user_test1
+        client.send_review_times(
+            first_review_time=datetime.now(timezone.utc),
+            last_review_time=datetime.now(timezone.utc),
+        )

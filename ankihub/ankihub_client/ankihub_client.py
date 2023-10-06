@@ -1108,6 +1108,26 @@ class AnkiHubClient:
         result = [uuid.UUID(deck["id"]) for deck in data["created_decks"]]
         return result
 
+    def send_review_times(
+        self, first_review_time: datetime, last_review_time: datetime
+    ) -> None:
+        """Sends the first and last review time of an AnkiHub note to AnkiHub."""
+        response = self._send_request(
+            "PATCH",
+            API.ANKIHUB,
+            "/users/review-times",
+            json={
+                "first_card_review_at": first_review_time.strftime(
+                    ANKIHUB_DATETIME_FORMAT_STR
+                ),
+                "last_card_review_at": last_review_time.strftime(
+                    ANKIHUB_DATETIME_FORMAT_STR
+                ),
+            },
+        )
+        if response.status_code != 200:
+            raise AnkiHubHTTPError(response)
+
 
 def _transform_notes_data(notes_data: List[Dict]) -> List[Dict]:
     # TODO Fix differences between csv (used when installing for the first time) vs.
