@@ -6,7 +6,7 @@
             "type": "python",
             "request": "launch",
             "stopOnEntry": false,
-            "program": "scripts/runanki.py",
+            "program": "${command:python.interpreterPath}/../anki",
             "cwd": "${workspaceRoot}",
             "preLaunchTask": "Setup add-on symlink",
             "args": [
