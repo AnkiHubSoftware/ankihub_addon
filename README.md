@@ -7,6 +7,8 @@ This repo has a devcontainer which can be used:
 - locally in VSCode (Run `Dev Containers: Open folder in Container...`, choose the repo folder)
 - remotely in GitHub CodeSpaces
 
+After opening the devcontainer you can open `localhost:6080` in a browser to see the desktop environment of the container.
+
 ### Requirements for creating a development environment (without the devcontainer).
 #### Set up a virtual environment and VSCode
 
