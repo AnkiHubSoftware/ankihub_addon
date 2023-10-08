@@ -174,7 +174,8 @@ class ImportAHNote(Protocol):
         note_data: Optional[NoteInfo] = None,
         ah_nid: Optional[uuid.UUID] = None,
         mid: Optional[NotetypeId] = None,
-        ah_did: uuid.UUID = None,
+        ah_did: Optional[uuid.UUID] = None,
+        anki_did: Optional[DeckId] = None,
     ) -> NoteInfo:
         ...
 
@@ -204,6 +205,7 @@ def import_ah_note(next_deterministic_uuid: Callable[[], uuid.UUID]) -> ImportAH
         ah_nid: Optional[uuid.UUID] = None,
         mid: Optional[NotetypeId] = None,
         ah_did: uuid.UUID = default_ah_did,
+        anki_did: Optional[DeckId] = None,
     ) -> NoteInfo:
         if mid is None:
             ah_basic_note_type = create_or_get_ah_version_of_note_type(
@@ -238,7 +240,8 @@ def import_ah_note(next_deterministic_uuid: Callable[[], uuid.UUID]) -> ImportAH
             protected_fields={},
             protected_tags=[],
             deck_name=deck_name,
-            is_first_import_of_deck=True,
+            is_first_import_of_deck=anki_did is None,
+            anki_did=anki_did,
         )
         return note_data
 

@@ -43,7 +43,7 @@ from ankihub.ankihub_client import AnkiHubHTTPError, Field, SuggestionType
 from ankihub.db.db import _AnkiHubDB
 from ankihub.db.exceptions import IntegrityError
 from ankihub.feature_flags import _FeatureFlags, feature_flags
-from ankihub.gui import suggestion_dialog
+from ankihub.gui import deck_options_dialog, suggestion_dialog
 from ankihub.gui.error_dialog import ErrorDialog
 from ankihub.gui.errors import (
     OUTDATED_CLIENT_ERROR_REASON,
@@ -891,16 +891,25 @@ class TestOnSuggestNotesInBulkDone:
 
 
 class TestDeckOptionsDialog:
-    def test_basic(
+    @pytest.mark.parametrize(
+        "anki_deck_exists",
+        [
+            True,
+            False,
+        ],
+    )
+    def test_on_toggle_subdecks(
         self,
         anki_session_with_addon_data: AnkiSession,
         import_ah_note: ImportAHNote,
         next_deterministic_uuid: Callable[[], uuid.UUID],
-        next_deterministic_id: Callable[[], int],
+        mock_function: MockFunction,
+        anki_deck_exists: bool,
     ):
         with anki_session_with_addon_data.profile_loaded():
             ah_did = next_deterministic_uuid()
-            anki_did = next_deterministic_id()
+            # 1 is the default deck, we don't want to use that here
+            anki_did = DeckId(2)
 
             # Add a deck to the config
             config.add_deck(
@@ -910,11 +919,26 @@ class TestDeckOptionsDialog:
                 user_relation=UserDeckRelation.SUBSCRIBER,
             )
 
-            # Create the deck by importing a note for it
-            import_ah_note(ah_did=ah_did)
+            if anki_deck_exists:
+                # Create the deck by importing a note for it
+                import_ah_note(ah_did=ah_did, anki_did=anki_did)
+
+            showInfo_mock = mock_function(deck_options_dialog, "showInfo")
+            confirm_and_toggle_subdecks_mock = mock_function(
+                deck_options_dialog, "confirm_and_toggle_subdecks"
+            )
 
             # Open the deck options dialog
-            DeckOptionsDialog(ah_did=ah_did).exec()
+            dialog = DeckOptionsDialog(ah_did=ah_did)
+            dialog._on_toggle_subdecks()
+
+            # Assert that the correct methods were called
+            if anki_deck_exists:
+                confirm_and_toggle_subdecks_mock.assert_called_with(ah_did)
+                showInfo_mock.assert_not_called()
+            else:
+                confirm_and_toggle_subdecks_mock.assert_not_called()
+                showInfo_mock.assert_called_once()
 
 
 class TestAnkiHubDBAnkiNidsToAnkiHubNids:
