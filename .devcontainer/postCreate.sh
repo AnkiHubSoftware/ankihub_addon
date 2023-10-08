@@ -7,3 +7,6 @@ ln -s /workspaces/ankihub_addon/ankihub $HOME/.local/share/Anki2/addons21/ankihu
 # VNC setup
 sudo ln -s $PWD/.devcontainer/config/novnc/index.html /opt/novnc/index.html
 cp -rv $PWD/.devcontainer/config/.vnc $HOME/
+
+# Pre-commit setup
+pre-commit install
