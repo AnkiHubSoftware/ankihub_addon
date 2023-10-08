@@ -2,17 +2,21 @@ from uuid import UUID
 
 import aqt
 from aqt.qt import (
+    QBoxLayout,
     QDialog,
     QDialogButtonBox,
     QHBoxLayout,
     QLabel,
     QPushButton,
     QSizePolicy,
+    Qt,
+    QTabWidget,
     QVBoxLayout,
+    QWidget,
     qconnect,
 )
 from aqt.studydeck import StudyDeck
-from aqt.utils import showInfo, tooltip
+from aqt.utils import showInfo
 
 from ..main.subdecks import SUBDECK_TAG
 from ..settings import config
@@ -31,9 +35,26 @@ class DeckOptionsDialog(QDialog):
         self._setup_ui()
 
     def _setup_ui(self) -> None:
-        self.box = QVBoxLayout()
+        self._outer_layout = QVBoxLayout()
+        self._main_layout = QVBoxLayout()
+        self._btn_layout = QHBoxLayout()
+        self._outer_layout.addLayout(self._main_layout)
+        self._outer_layout.addLayout(self._btn_layout)
+        self.setLayout(self._outer_layout)
 
-        self.setMinimumWidth(300)
+        self._tab_widget = QTabWidget()
+        self._tab_widget.setFocusPolicy(Qt.FocusPolicy.StrongFocus)
+        self._main_layout.addWidget(self._tab_widget)
+
+        self._tab = QWidget(self)
+        self._tab_layout = QVBoxLayout()
+        self._tab.setLayout(self._tab_layout)
+        self._tab_widget.addTab(self._tab, "General")
+
+        self._setup_buttons(self._btn_layout)
+
+        self.setMinimumWidth(350)
+        self.setMinimumHeight(400)
         self.setSizePolicy(QSizePolicy.Policy.Minimum, QSizePolicy.Policy.Minimum)
 
         self._home_deck_row = QHBoxLayout()
@@ -48,14 +69,14 @@ class DeckOptionsDialog(QDialog):
 
         self._home_deck_row.addStretch()
 
-        self.box.addLayout(self._home_deck_row)
+        self._tab_layout.addLayout(self._home_deck_row)
 
         self.set_home_deck_btn = QPushButton("Change Home deck")
         qconnect(self.set_home_deck_btn.clicked, self._on_set_home_deck)
         self._refresh_home_deck_display()
-        self.box.addWidget(self.set_home_deck_btn)
+        self._tab_layout.addWidget(self.set_home_deck_btn)
 
-        self.box.addSpacing(10)
+        self._tab_layout.addSpacing(15)
 
         self.toggle_subdecks_btn = QPushButton("Enable Subdecks")
         self.toggle_subdecks_btn.setToolTip(
@@ -64,11 +85,22 @@ class DeckOptionsDialog(QDialog):
         )
         set_tooltip_icon(self.toggle_subdecks_btn)
         qconnect(self.toggle_subdecks_btn.clicked, self._on_toggle_subdecks)
-        self.box.addWidget(self.toggle_subdecks_btn)
+        self._tab_layout.addWidget(self.toggle_subdecks_btn)
 
-        self.box.addStretch()
+        self._tab_layout.addStretch()
 
-        self.setLayout(self.box)
+    def _setup_buttons(self, btn_box: QBoxLayout) -> None:
+        btn_box.addStretch(1)
+
+        self.cancel_btn = QPushButton("Cancel")
+        # self.cancel_btn.clicked.connect(self.on_cancel)  # type: ignore
+        btn_box.addWidget(self.cancel_btn)
+
+        self.save_btn = QPushButton("Save")
+        self.save_btn.setDefault(True)
+        self.save_btn.setShortcut("Ctrl+Return")
+        # self.save_btn.clicked.connect(self.on_save)  # type: ignore
+        btn_box.addWidget(self.save_btn)
 
     def _refresh_home_deck_display(self) -> None:
         home_deck_name = aqt.mw.col.decks.name_if_exists(self._deck_config.anki_id)
