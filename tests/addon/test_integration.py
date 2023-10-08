@@ -2473,7 +2473,7 @@ def test_protect_fields_action(
 
 
 class TestSubscribedDecksDialog:
-    def test_toggle_subdecks(
+    def test_deck_is_displayed(
         self,
         anki_session_with_addon_data: AnkiSession,
         qtbot: QtBot,
@@ -2482,8 +2482,6 @@ class TestSubscribedDecksDialog:
     ):
         anki_session = anki_session_with_addon_data
         with anki_session.profile_loaded():
-            mw = anki_session.mw
-
             # Mock the config to return that the user is logged in
             monkeypatch.setattr(config, "is_logged_in", lambda: True)
 
@@ -2502,18 +2500,14 @@ class TestSubscribedDecksDialog:
             # Open the dialog
             dialog = SubscribedDecksDialog()
             qtbot.add_widget(dialog)
-            dialog.display_subscribe_window()
+            dialog.display_subscribed_decks_dialog()
             qtbot.wait(200)
 
-            # The toggle subdecks button should be disabled because there are no decks
-            assert dialog.toggle_subdecks_btn.isEnabled() is False
+            # Assert that no decks are displayed
+            assert dialog.decks_list.count() == 0
 
-            # Install a deck with subdeck tags
-            subdeck_name, anki_did, ah_did = self._install_deck_with_subdeck_tag(
-                install_sample_ah_deck
-            )
-            # ... The subdeck should not exist yet
-            assert aqt.mw.col.decks.by_name(subdeck_name) is None
+            # Install a deck
+            anki_did, ah_did = install_sample_ah_deck()
 
             # Mock get_deck_subscriptions to return the deck
             monkeypatch.setattr(
@@ -2525,40 +2519,11 @@ class TestSubscribedDecksDialog:
             # Refresh the dialog
             dialog = SubscribedDecksDialog()
             qtbot.add_widget(dialog)
-            dialog.display_subscribe_window()
+            dialog.display_subscribed_decks_dialog()
             qtbot.wait(200)
 
-            # Select the deck and click the toggle subdeck button
+            # Assert that the deck is displayed
             assert dialog.decks_list.count() == 1
-            dialog.decks_list.setCurrentRow(0)
-            qtbot.wait(200)
-
-            assert dialog.toggle_subdecks_btn.isEnabled() is True
-            dialog.toggle_subdecks_btn.click()
-            qtbot.wait(200)
-
-            # The subdeck should now exist
-            assert mw.col.decks.by_name(subdeck_name) is not None
-
-            # Click the toggle subdeck button again
-            dialog.toggle_subdecks_btn.click()
-            qtbot.wait(200)
-
-            # The subdeck should not exist anymore
-            assert mw.col.decks.by_name(subdeck_name) is None
-
-    def _install_deck_with_subdeck_tag(
-        self,
-        install_sample_ah_deck: InstallSampleAHDeck,
-    ) -> Tuple[str, int, uuid.UUID]:
-        anki_did, ah_did = install_sample_ah_deck()
-        deck_name = aqt.mw.col.decks.get(anki_did)["name"]
-        subdeck_name = f"{deck_name}::Subdeck-1"
-        notes = aqt.mw.col.find_notes(f"did:{anki_did}")
-        note = aqt.mw.col.get_note(notes[0])
-        note.tags = [f"{SUBDECK_TAG}::{subdeck_name}"]
-        note.flush()
-        return subdeck_name, anki_did, ah_did
 
 
 class TestBuildSubdecksAndMoveCardsToThem:
