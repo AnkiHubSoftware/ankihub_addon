@@ -3,6 +3,7 @@ from uuid import UUID
 import aqt
 from aqt.qt import (
     QBoxLayout,
+    QCheckBox,
     QDialog,
     QDialogButtonBox,
     QHBoxLayout,
@@ -21,7 +22,7 @@ from aqt.utils import showInfo
 from ..main.subdecks import SUBDECK_TAG
 from ..settings import config
 from .operations.subdecks import confirm_and_toggle_subdecks
-from .utils import info_icon_label, set_tooltip_icon
+from .utils import info_icon_label
 
 
 class DeckOptionsDialog(QDialog):
@@ -78,14 +79,12 @@ class DeckOptionsDialog(QDialog):
 
         self._tab_layout.addSpacing(15)
 
-        self.toggle_subdecks_btn = QPushButton("Enable Subdecks")
-        self.toggle_subdecks_btn.setToolTip(
-            "Toggle between the deck being organized into subdecks or not.<br>"
+        self.subdecks_cb = QCheckBox("Subdecks")
+        self.subdecks_cb.setToolTip(
+            "Whether the deck should be organized into subdecks or not.<br>"
             f"This will only have an effect if notes in the deck have <b>{SUBDECK_TAG}</b> tags."
         )
-        set_tooltip_icon(self.toggle_subdecks_btn)
-        qconnect(self.toggle_subdecks_btn.clicked, self._on_toggle_subdecks)
-        self._tab_layout.addWidget(self.toggle_subdecks_btn)
+        self._tab_layout.addWidget(self.subdecks_cb)
 
         self._tab_layout.addStretch()
 
@@ -143,15 +142,6 @@ class DeckOptionsDialog(QDialog):
             return
 
         confirm_and_toggle_subdecks(self._ah_did)
-
-        self._refresh_subdecks_button()
-
-    def _refresh_subdecks_button(self) -> None:
-        self.toggle_subdecks_btn.setText(
-            "Disable Subdecks"
-            if self._deck_config.subdecks_enabled
-            else "Enable Subdecks"
-        )
 
 
 class StudyDeckWithoutHelpButton(StudyDeck):
