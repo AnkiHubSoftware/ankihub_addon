@@ -888,6 +888,10 @@ class TestOnSuggestNotesInBulkDone:
         assert kwargs.get("message") == "test"
 
 
+class TestDeckOptionsDialog:
+    pass
+
+
 class TestAnkiHubDBAnkiNidsToAnkiHubNids:
     def test_anki_nids_to_ankihub_nids(
         self,
