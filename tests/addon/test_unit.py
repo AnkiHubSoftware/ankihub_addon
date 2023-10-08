@@ -19,9 +19,11 @@ from aqt.qt import QDialogButtonBox
 from pytest import MonkeyPatch, fixture
 from pytest_anki import AnkiSession
 from pytestqt.qtbot import QtBot  # type: ignore
-from requests import Response  # type: ignore
+from requests import Response
 
+from ankihub.ankihub_client.models import UserDeckRelation  # type: ignore
 from ankihub.gui import errors
+from ankihub.gui.deck_options_dialog import DeckOptionsDialog
 from ankihub.gui.operations.utils import future_with_exception, future_with_result
 
 from ..factories import DeckMediaFactory, NoteInfoFactory
@@ -78,7 +80,7 @@ from ankihub.main.utils import (
     mids_of_notes,
     retain_nids_with_ah_note_type,
 )
-from ankihub.settings import ANKIWEB_ID
+from ankihub.settings import ANKIWEB_ID, config
 
 
 @pytest.fixture
@@ -889,7 +891,30 @@ class TestOnSuggestNotesInBulkDone:
 
 
 class TestDeckOptionsDialog:
-    pass
+    def test_basic(
+        self,
+        anki_session_with_addon_data: AnkiSession,
+        import_ah_note: ImportAHNote,
+        next_deterministic_uuid: Callable[[], uuid.UUID],
+        next_deterministic_id: Callable[[], int],
+    ):
+        with anki_session_with_addon_data.profile_loaded():
+            ah_did = next_deterministic_uuid()
+            anki_did = next_deterministic_id()
+
+            # Add a deck to the config
+            config.add_deck(
+                name="Test",
+                ankihub_did=ah_did,
+                anki_did=anki_did,
+                user_relation=UserDeckRelation.SUBSCRIBER,
+            )
+
+            # Create the deck by importing a note for it
+            import_ah_note(ah_did=ah_did)
+
+            # Open the deck options dialog
+            DeckOptionsDialog(ah_did=ah_did).exec()
 
 
 class TestAnkiHubDBAnkiNidsToAnkiHubNids:
