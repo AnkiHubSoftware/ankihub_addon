@@ -1,3 +1,4 @@
+from copy import deepcopy
 from uuid import UUID
 
 import aqt
@@ -22,7 +23,6 @@ from aqt.utils import showInfo
 from ..main.subdecks import SUBDECK_TAG
 from ..settings import config
 from .operations.subdecks import confirm_and_toggle_subdecks
-from .utils import info_icon_label
 
 
 class DeckOptionsDialog(QDialog):
@@ -30,7 +30,7 @@ class DeckOptionsDialog(QDialog):
         super(DeckOptionsDialog, self).__init__()
 
         self._ah_did = ah_did
-        self._deck_config = config.deck_config(ah_did)
+        self._deck_config = deepcopy(config.deck_config(ah_did))
 
         self.setWindowTitle(f"Deck options for {self._deck_config.name}")
         self._setup_ui()
@@ -58,33 +58,32 @@ class DeckOptionsDialog(QDialog):
         self.setMinimumHeight(400)
         self.setSizePolicy(QSizePolicy.Policy.Minimum, QSizePolicy.Policy.Minimum)
 
-        self._home_deck_row = QHBoxLayout()
+        self._current_home_deck_label = QLabel("")
+        self._current_home_deck_label.setToolTip(
+            "New cards will be added to this deck."
+        )
+        self._tab_layout.addWidget(self._current_home_deck_label)
 
-        home_deck_tooltip_text = "New cards will be added to this deck."
-        self._home_deck_info_icon_label = info_icon_label(home_deck_tooltip_text)
-        self._home_deck_row.addWidget(self._home_deck_info_icon_label)
-
-        self.current_home_deck_label = QLabel("")
-        self.current_home_deck_label.setToolTip(home_deck_tooltip_text)
-        self._home_deck_row.addWidget(self.current_home_deck_label)
-
-        self._home_deck_row.addStretch()
-
-        self._tab_layout.addLayout(self._home_deck_row)
-
-        self.set_home_deck_btn = QPushButton("Change Home deck")
+        self.set_home_deck_btn = QPushButton("Set Home deck")
         qconnect(self.set_home_deck_btn.clicked, self._on_set_home_deck)
         self._refresh_home_deck_display()
         self._tab_layout.addWidget(self.set_home_deck_btn)
 
         self._tab_layout.addSpacing(15)
 
-        self.subdecks_cb = QCheckBox("Subdecks")
-        self.subdecks_cb.setToolTip(
+        self._subdecks_cb = QCheckBox("Subdecks")
+        self._subdecks_cb.setToolTip(
             "Whether the deck should be organized into subdecks or not.<br>"
             f"This will only have an effect if notes in the deck have <b>{SUBDECK_TAG}</b> tags."
         )
-        self._tab_layout.addWidget(self.subdecks_cb)
+        self._subdecks_cb.setChecked(self._deck_config.subdecks_enabled)
+
+        def update_subdecks_enabled():
+            self._deck_config.subdecks_enabled = self._subdecks_cb.isChecked()
+
+        qconnect(self._subdecks_cb.stateChanged, update_subdecks_enabled)
+
+        self._tab_layout.addWidget(self._subdecks_cb)
 
         self._tab_layout.addStretch()
 
@@ -92,45 +91,17 @@ class DeckOptionsDialog(QDialog):
         btn_box.addStretch(1)
 
         self.cancel_btn = QPushButton("Cancel")
-        # self.cancel_btn.clicked.connect(self.on_cancel)  # type: ignore
+        qconnect(self.cancel_btn.clicked, self._on_cancel)
         btn_box.addWidget(self.cancel_btn)
 
         self.save_btn = QPushButton("Save")
         self.save_btn.setDefault(True)
         self.save_btn.setShortcut("Ctrl+Return")
-        # self.save_btn.clicked.connect(self.on_save)  # type: ignore
+        qconnect(self.save_btn.clicked, self._on_save)
         btn_box.addWidget(self.save_btn)
 
-    def _refresh_home_deck_display(self) -> None:
-        home_deck_name = aqt.mw.col.decks.name_if_exists(self._deck_config.anki_id)
-        self.current_home_deck_label.setText(
-            f"Home deck: {home_deck_name if home_deck_name else 'None'}"
-        )
-
-    def _on_set_home_deck(self) -> None:
-        def update_deck_config(ret: StudyDeck):
-            if not ret.name:
-                return
-
-            anki_did = aqt.mw.col.decks.id(ret.name)
-            config.set_home_deck(ankihub_did=self._ah_did, anki_did=anki_did)
-            self._refresh_home_deck_display()
-
-        if current_home_deck := aqt.mw.col.decks.get(self._deck_config.anki_id):
-            current_home_deck_name = current_home_deck["name"]
-        else:
-            current_home_deck_name = None
-
-        StudyDeckWithoutHelpButton(
-            aqt.mw,
-            current=current_home_deck_name,
-            accept="Set Home Deck",
-            title="Change Home Deck",
-            parent=self,
-            callback=update_deck_config,
-        )
-
-    def _on_toggle_subdecks(self) -> None:
+    def _on_save(self) -> None:
+        # Update subdecks enabled - or cancel save if user cancels toggling subdecks
         if aqt.mw.col.decks.name_if_exists(self._deck_config.anki_id) is None:
             showInfo(
                 (
@@ -139,9 +110,53 @@ class DeckOptionsDialog(QDialog):
                     "(You can do that from the AnkiHub menu in the Anki browser.)"
                 ),
             )
-            return
+        else:
+            if (
+                self._deck_config.subdecks_enabled
+                != config.deck_config(self._ah_did).subdecks_enabled
+            ):
+                if not confirm_and_toggle_subdecks(self._ah_did):
+                    # User cancelled
+                    return
 
-        confirm_and_toggle_subdecks(self._ah_did)
+        # Update home deck
+        config.set_home_deck(
+            ankihub_did=self._ah_did, anki_did=self._deck_config.anki_id
+        )
+
+        self.close()
+
+    def _on_cancel(self) -> None:
+        self.close()
+
+    def _refresh_home_deck_display(self) -> None:
+        home_deck_name = aqt.mw.col.decks.name_if_exists(self._deck_config.anki_id)
+        self._current_home_deck_label.setText(
+            f"Home deck: {home_deck_name if home_deck_name else 'None'}"
+        )
+
+    def _on_set_home_deck(self) -> None:
+        if current_home_deck := aqt.mw.col.decks.get(self._deck_config.anki_id):
+            current_home_deck_name = current_home_deck["name"]
+        else:
+            current_home_deck_name = None
+
+        def update_home_deck(study_deck: StudyDeck) -> None:
+            if not study_deck.name:
+                return
+
+            anki_did = aqt.mw.col.decks.id(study_deck.name)
+            self._deck_config.anki_id = anki_did
+            self._refresh_home_deck_display()
+
+        StudyDeckWithoutHelpButton(
+            aqt.mw,
+            current=current_home_deck_name,
+            accept="Set Home Deck",
+            title="Choose Home Deck",
+            parent=self,
+            callback=update_home_deck,
+        )
 
 
 class StudyDeckWithoutHelpButton(StudyDeck):

@@ -11,8 +11,9 @@ from ...settings import config
 from ..utils import ask_user, tooltip
 
 
-def confirm_and_toggle_subdecks(ankihub_id: uuid.UUID) -> None:
-    """Ask the user if they want to toggle subdecks for the given deck and do so if they confirm."""
+def confirm_and_toggle_subdecks(ankihub_id: uuid.UUID) -> bool:
+    """Ask the user if they want to toggle subdecks for the given deck and do so if they confirm.
+    Returns whether the user confirmed."""
     deck_config = config.deck_config(ankihub_id)
     using_subdecks = deck_config.subdecks_enabled
 
@@ -28,7 +29,7 @@ def confirm_and_toggle_subdecks(ankihub_id: uuid.UUID) -> None:
             "for details.",
             default_no=True,
         ):
-            return
+            return False
 
         aqt.mw.taskman.with_progress(
             label="Removing subdecks and moving cards...",
@@ -44,7 +45,7 @@ def confirm_and_toggle_subdecks(ankihub_id: uuid.UUID) -> None:
             "the AnkiHub docs</a> "
             "for details."
         ):
-            return
+            return False
 
         aqt.mw.taskman.with_progress(
             label="Building subdecks and moving cards...",
@@ -52,7 +53,8 @@ def confirm_and_toggle_subdecks(ankihub_id: uuid.UUID) -> None:
             on_done=_on_subdecks_updated,
         )
 
-    config.set_subdecks(ankihub_id, not using_subdecks)
+    config.set_subdecks_enabled(ankihub_id, not using_subdecks)
+    return True
 
 
 def _on_subdecks_updated(future: Future):

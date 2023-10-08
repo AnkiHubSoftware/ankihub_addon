@@ -4,17 +4,13 @@ from typing import Any, List, Optional
 import aqt
 from aqt.addons import check_and_prompt_for_updates
 from aqt.qt import (
-    QApplication,
-    QCheckBox,
     QDialog,
     QDialogButtonBox,
-    QIcon,
     QLabel,
     QListWidget,
     QListWidgetItem,
     QMessageBox,
     QPushButton,
-    QStyle,
     Qt,
     QVBoxLayout,
     QWidget,
@@ -253,31 +249,6 @@ def ask_user(
         return False
     else:
         return None
-
-
-def set_tooltip_icon(btn: QPushButton) -> None:
-    btn.setIcon(
-        QIcon(
-            QApplication.style().standardIcon(
-                QStyle.StandardPixmap.SP_MessageBoxInformation
-            )
-        )
-    )
-
-
-def info_icon() -> QIcon:
-    dummy = QCheckBox()
-    return dummy.style().standardIcon(QStyle.StandardPixmap.SP_MessageBoxInformation)
-
-
-def info_icon_label(text: str) -> QLabel:
-    result = QLabel("")
-    pixmap = info_icon().pixmap(
-        QCheckBox().iconSize()
-    )  # use same icon size as for checkbox
-    result.setPixmap(pixmap)
-    result.setToolTip(text)
-    return result
 
 
 def check_and_prompt_for_updates_on_main_window():

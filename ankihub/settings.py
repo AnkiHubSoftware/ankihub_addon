@@ -212,8 +212,8 @@ class _Config:
         self.deck_config(ankihub_did).latest_media_update = latest_media_update
         self._update_private_config()
 
-    def set_subdecks(self, ankihub_did: uuid.UUID, subdecks: bool):
-        self.deck_config(ankihub_did).subdecks_enabled = subdecks
+    def set_subdecks_enabled(self, ankihub_did: uuid.UUID, enabled: bool):
+        self.deck_config(ankihub_did).subdecks_enabled = enabled
         self._update_private_config()
 
     def add_deck(
