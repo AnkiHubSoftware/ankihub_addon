@@ -2,7 +2,7 @@
     "version": "0.2.0",
     "configurations": [
         {
-            "name": "Run Anki with ANKI_BASE.",
+            "name": "Run Anki with AnkiHub add-on",
             "type": "python",
             "request": "launch",
             "stopOnEntry": false,
