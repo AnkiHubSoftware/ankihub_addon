@@ -4,6 +4,8 @@ import aqt
 from aqt.qt import (
     QDialog,
     QDialogButtonBox,
+    QHBoxLayout,
+    QLabel,
     QPushButton,
     QSizePolicy,
     QVBoxLayout,
@@ -15,7 +17,7 @@ from aqt.utils import showInfo, tooltip
 from ..main.subdecks import SUBDECK_TAG
 from ..settings import config
 from .operations.subdecks import confirm_and_toggle_subdecks
-from .utils import set_tooltip_icon
+from .utils import info_icon_label, set_tooltip_icon
 
 
 class DeckOptionsDialog(QDialog):
@@ -28,17 +30,32 @@ class DeckOptionsDialog(QDialog):
         self.setWindowTitle(f"Deck options for {self._deck_config.name}")
         self._setup_ui()
 
-    def _setup_ui(self):
+    def _setup_ui(self) -> None:
         self.box = QVBoxLayout()
 
         self.setMinimumWidth(300)
         self.setSizePolicy(QSizePolicy.Policy.Minimum, QSizePolicy.Policy.Minimum)
 
-        self.set_home_deck_btn = QPushButton("Set Home deck")
-        self.set_home_deck_btn.setToolTip("New cards will be added to this deck.")
-        set_tooltip_icon(self.set_home_deck_btn)
+        self._home_deck_row = QHBoxLayout()
+
+        home_deck_tooltip_text = "New cards will be added to this deck."
+        self._home_deck_info_icon_label = info_icon_label(home_deck_tooltip_text)
+        self._home_deck_row.addWidget(self._home_deck_info_icon_label)
+
+        self.current_home_deck_label = QLabel("")
+        self.current_home_deck_label.setToolTip(home_deck_tooltip_text)
+        self._home_deck_row.addWidget(self.current_home_deck_label)
+
+        self._home_deck_row.addStretch()
+
+        self.box.addLayout(self._home_deck_row)
+
+        self.set_home_deck_btn = QPushButton("Change Home deck")
         qconnect(self.set_home_deck_btn.clicked, self._on_set_home_deck)
+        self._refresh_home_deck_display()
         self.box.addWidget(self.set_home_deck_btn)
+
+        self.box.addSpacing(10)
 
         self.toggle_subdecks_btn = QPushButton("Enable Subdecks")
         self.toggle_subdecks_btn.setToolTip(
@@ -49,16 +66,24 @@ class DeckOptionsDialog(QDialog):
         qconnect(self.toggle_subdecks_btn.clicked, self._on_toggle_subdecks)
         self.box.addWidget(self.toggle_subdecks_btn)
 
+        self.box.addStretch()
+
         self.setLayout(self.box)
 
-    def _on_set_home_deck(self):
+    def _refresh_home_deck_display(self) -> None:
+        home_deck_name = aqt.mw.col.decks.name_if_exists(self._deck_config.anki_id)
+        self.current_home_deck_label.setText(
+            f"Home deck: {home_deck_name if home_deck_name else 'None'}"
+        )
+
+    def _on_set_home_deck(self) -> None:
         def update_deck_config(ret: StudyDeck):
             if not ret.name:
                 return
 
             anki_did = aqt.mw.col.decks.id(ret.name)
             config.set_home_deck(ankihub_did=self._ah_did, anki_did=anki_did)
-            tooltip("Home deck updated.", parent=self)
+            self._refresh_home_deck_display()
 
         if current_home_deck := aqt.mw.col.decks.get(self._deck_config.anki_id):
             current_home_deck_name = current_home_deck["name"]
@@ -74,7 +99,7 @@ class DeckOptionsDialog(QDialog):
             callback=update_deck_config,
         )
 
-    def _on_toggle_subdecks(self):
+    def _on_toggle_subdecks(self) -> None:
         if aqt.mw.col.decks.name_if_exists(self._deck_config.anki_id) is None:
             showInfo(
                 (
@@ -89,7 +114,7 @@ class DeckOptionsDialog(QDialog):
 
         self._refresh_subdecks_button()
 
-    def _refresh_subdecks_button(self):
+    def _refresh_subdecks_button(self) -> None:
         self.toggle_subdecks_btn.setText(
             "Disable Subdecks"
             if self._deck_config.subdecks_enabled
