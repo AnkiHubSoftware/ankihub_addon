@@ -4,14 +4,9 @@
     "version": "2.0.0",
     "tasks": [
         {
-            "label": "Ensure Anki Base",
+            "label": "Setup add-on symlink",
             "type": "shell",
-            "command": "python scripts/ensure_data_dir.py",
-            "options": {
-                "env": {
-                    "ANKI_BASE": "${env:ANKI_BASE}"
-                }
-            }
+            "command": "python scripts/setup_addon_symlink.py ${workspaceRoot}/anki_base",
         }
     ]
 }

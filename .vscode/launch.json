@@ -6,12 +6,12 @@
             "type": "python",
             "request": "launch",
             "stopOnEntry": false,
-            "program": "${env:ANKI_EXEC}",
+            "program": "scripts/runanki.py",
             "cwd": "${workspaceRoot}",
-            "preLaunchTask": "Ensure Anki Base",
+            "preLaunchTask": "Setup add-on symlink",
             "args": [
                 "-b",
-                "${env:ANKI_BASE}"
+                "${workspaceRoot}/anki_base"
             ],
             "purpose": [
                 "debug-in-terminal",
@@ -27,23 +27,6 @@
             "cwd": "${workspaceRoot}",
             "purpose": [
                 "debug-test"
-            ],
-            "justMyCode": false,
-        },
-        {
-            "name": "Run Anki with ANKI_BASE (devcontainer).",
-            "type": "python",
-            "request": "launch",
-            "stopOnEntry": false,
-            "program": "/home/vscode/venv/bin/anki",
-            "cwd": "${workspaceRoot}",
-            "preLaunchTask": "Ensure Anki Base",
-            "args": [
-                "-b",
-                "${workspaceRoot}/anki_base"
-            ],
-            "purpose": [
-                "debug-in-terminal",
             ],
             "justMyCode": false,
         },

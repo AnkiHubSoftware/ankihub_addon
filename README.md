@@ -16,8 +16,6 @@
 
 - Copy `.envrc.dev` to `.envrc`:  `cp .envrc.dev .envrc`
 - Modify the newly created `.envrc`:
-  - Set `ANKI_EXEC` to the path of your `anki` executable.
-    You can find this by activating your virtual environment and typing `which anki`.
 - Set `GOOGLE_API_KEY`
   - Get this value from the `.envrc` in BitWarden (ask if you don't have permission)
 - Change `ANKIHUB_APP_URL` from http://localhost:8000 to https://staging.ankihub.net/, for example, to point the add-on at a different AnkiHub instance.
