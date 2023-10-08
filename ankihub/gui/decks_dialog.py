@@ -146,7 +146,7 @@ class SubscribedDecksDialog(QDialog):
 
     def _on_open_deck_options(self) -> None:
         ah_did = self._selected_decks_ah_dids()[0]
-        DeckOptionsDialog(ah_did).run()
+        DeckOptionsDialog(ah_did).exec()
 
     def _selected_decks_ah_dids(self) -> List[UUID]:
         selection = self.decks_list.selectedItems()

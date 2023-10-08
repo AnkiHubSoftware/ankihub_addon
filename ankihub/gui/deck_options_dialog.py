@@ -1,7 +1,14 @@
 from uuid import UUID
 
 import aqt
-from aqt.qt import QDialog, QDialogButtonBox, QPushButton, Qt, QVBoxLayout, qconnect
+from aqt.qt import (
+    QDialog,
+    QDialogButtonBox,
+    QPushButton,
+    QSizePolicy,
+    QVBoxLayout,
+    qconnect,
+)
 from aqt.studydeck import StudyDeck
 from aqt.utils import showInfo, tooltip
 
@@ -16,15 +23,16 @@ class DeckOptionsDialog(QDialog):
         super(DeckOptionsDialog, self).__init__()
 
         self._ah_did = ah_did
+        self._deck_config = config.deck_config(ah_did)
 
-        self.setWindowTitle("Subscribed AnkiHub Decks")
+        self.setWindowTitle(f"Deck options for {self._deck_config.name}")
         self._setup_ui()
-
-    def run(self) -> None:
-        self.exec()
 
     def _setup_ui(self):
         self.box = QVBoxLayout()
+
+        self.setMinimumWidth(300)
+        self.setSizePolicy(QSizePolicy.Policy.Minimum, QSizePolicy.Policy.Minimum)
 
         self.set_home_deck_btn = QPushButton("Set Home deck")
         self.set_home_deck_btn.setToolTip("New cards will be added to this deck.")
@@ -44,30 +52,22 @@ class DeckOptionsDialog(QDialog):
         self.setLayout(self.box)
 
     def _on_set_home_deck(self):
-        deck_names = self.decks_list.selectedItems()
-        if len(deck_names) == 0:
-            return
-
-        deck_name = deck_names[0]
-        ankihub_id: UUID = deck_name.data(Qt.ItemDataRole.UserRole)
-        current_home_deck = aqt.mw.col.decks.get(config.deck_config(ankihub_id).anki_id)
-        if current_home_deck is None:
-            current = None
-        else:
-            current = current_home_deck["name"]
-
         def update_deck_config(ret: StudyDeck):
             if not ret.name:
                 return
 
             anki_did = aqt.mw.col.decks.id(ret.name)
-            config.set_home_deck(ankihub_did=ankihub_id, anki_did=anki_did)
+            config.set_home_deck(ankihub_did=self._ah_did, anki_did=anki_did)
             tooltip("Home deck updated.", parent=self)
 
-        # this lets the user pick a deck
+        if current_home_deck := aqt.mw.col.decks.get(self._deck_config.anki_id):
+            current_home_deck_name = current_home_deck["name"]
+        else:
+            current_home_deck_name = None
+
         StudyDeckWithoutHelpButton(
             aqt.mw,
-            current=current,
+            current=current_home_deck_name,
             accept="Set Home Deck",
             title="Change Home Deck",
             parent=self,
@@ -75,45 +75,25 @@ class DeckOptionsDialog(QDialog):
         )
 
     def _on_toggle_subdecks(self):
-        deck_items = self.decks_list.selectedItems()
-        if len(deck_items) == 0:
-            return
-
-        deck_item = deck_items[0]
-        ankihub_id: UUID = deck_item.data(Qt.ItemDataRole.UserRole)
-
-        deck_config = config.deck_config(ankihub_id)
-        if aqt.mw.col.decks.name_if_exists(deck_config.anki_id) is None:
+        if aqt.mw.col.decks.name_if_exists(self._deck_config.anki_id) is None:
             showInfo(
                 (
-                    f"Anki deck <b>{deck_config.name}</b> doesn't exist in your Anki collection.<br>"
+                    f"Anki deck <b>{self._deck_config.name}</b> doesn't exist in your Anki collection.<br>"
                     "It might help to reset local changes to the deck first.<br>"
                     "(You can do that from the AnkiHub menu in the Anki browser.)"
                 ),
             )
             return
 
-        confirm_and_toggle_subdecks(ankihub_id)
+        confirm_and_toggle_subdecks(self._ah_did)
 
         self._refresh_subdecks_button()
 
     def _refresh_subdecks_button(self):
-        selection = self.decks_list.selectedItems()
-        one_selected: bool = len(selection) == 1
-
-        if not one_selected:
-            self.toggle_subdecks_btn.setEnabled(False)
-            return
-
-        ankihub_did: UUID = selection[0].data(Qt.ItemDataRole.UserRole)
-        using_subdecks = False
-        if deck_from_config := config.deck_config(ankihub_did):
-            using_subdecks = deck_from_config.subdecks_enabled
-            self.toggle_subdecks_btn.setEnabled(True)
-        else:
-            self.toggle_subdecks_btn.setEnabled(False)
         self.toggle_subdecks_btn.setText(
-            "Disable Subdecks" if using_subdecks else "Enable Subdecks"
+            "Disable Subdecks"
+            if self._deck_config.subdecks_enabled
+            else "Enable Subdecks"
         )
 
 
