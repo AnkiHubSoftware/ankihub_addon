@@ -43,10 +43,6 @@ They both set up Anki's base directory on a path you can configure using an envi
 They also create a symlink from the add-on directory to the add-on source - this way you can make changes to the
 add-on code, restart the debug session and Anki will use the updated add-on code.
 
-- Run Anki with TEMPORARY_ANKI_BASE.
-
-  This launch configuration sets up a clean Anki base directory in `TEMPORARY_ANKI_BASE` every time it starts.
-
 - Run Anki with ANKI_BASE.
 
   This launch configuration sets up an Anki base directory in `ANKI_BASE` if it doesn't exist yet and re-uses it otherwise.

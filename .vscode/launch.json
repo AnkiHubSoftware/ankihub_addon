@@ -2,26 +2,6 @@
     "version": "0.2.0",
     "configurations": [
         {
-            "name": "Run Anki with TEMPORARY_ANKI_BASE.",
-            "type": "python",
-            "request": "launch",
-            "stopOnEntry": false,
-            "program": "${env:ANKI_EXEC}",
-            "cwd": "${workspaceRoot}",
-            "preLaunchTask": "Generate Temporary Anki Base",
-            "args": [
-                "-b",
-                "${env:TEMPORARY_ANKI_BASE}",
-                "-p",
-                "${env:ANKI_PROFILE}",
-            ],
-            "purpose": [
-                // with this setting tests will use justMyCode=false in debug mode
-                "debug-in-terminal",
-            ],
-            "justMyCode": false,
-        },
-        {
             "name": "Run Anki with ANKI_BASE.",
             "type": "python",
             "request": "launch",

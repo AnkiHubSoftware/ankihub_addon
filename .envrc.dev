@@ -2,8 +2,6 @@
 export ANKI_EXEC=<CHANGE ME>
 export GOOGLE_API_KEY=<CHANGE ME>
 export ANKI_BASE=/tmp/Anki2
-export TEMPORARY_ANKI_BASE=/tmp/Anki2_temp
-export ANKI_PROFILE=dev
 export REPORT_ERRORS=0
 export ANKIHUB_APP_URL=http://localhost:8000
 export S3_BUCKET_URL=https://ankihubbucket.s3.us-east-2.amazonaws.com
