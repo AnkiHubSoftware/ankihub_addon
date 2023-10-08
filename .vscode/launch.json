@@ -18,17 +18,5 @@
             ],
             "justMyCode": false,
         },
-        {
-            "name": "Tests",
-            "type": "python",
-            "request": "launch",
-            "stopOnEntry": false,
-            "program": "${env:ANKI_EXEC}",
-            "cwd": "${workspaceRoot}",
-            "purpose": [
-                "debug-test"
-            ],
-            "justMyCode": false,
-        },
     ]
 }
