@@ -69,7 +69,7 @@ class SubscribedDecksDialog(QDialog):
         self.box_right.addWidget(self.open_web_btn)
         qconnect(self.open_web_btn.clicked, self._on_open_web)
 
-        self.open_deck_options_btn = QPushButton("Open Deck Options")
+        self.open_deck_options_btn = QPushButton("Deck Options")
         self.box_right.addWidget(self.open_deck_options_btn)
         qconnect(self.open_deck_options_btn.clicked, self._on_open_deck_options)
 
