@@ -50,5 +50,22 @@
             ],
             "justMyCode": false,
         },
+        {
+            "name": "Run Anki with ANKI_BASE (devcontainer).",
+            "type": "python",
+            "request": "launch",
+            "stopOnEntry": false,
+            "program": "/home/vscode/venv/bin/anki",
+            "cwd": "${workspaceRoot}",
+            "preLaunchTask": "Ensure Anki Base",
+            "args": [
+                "-b",
+                "${workspaceRoot}/anki_base"
+            ],
+            "purpose": [
+                "debug-in-terminal",
+            ],
+            "justMyCode": false,
+        },
     ]
 }

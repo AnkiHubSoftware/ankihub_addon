@@ -38,7 +38,7 @@
 		"SENTRY_ENV": "development",
 		"HYPER_TTS_DEBUG_LOGGING": "enable",
 		"LANG": "en_US.UTF-8",
-		"DISPLAY": ":2"
+		"DISPLAY": ":1.0"
 	},
 	"portsAttributes": {
 		"6080": {
