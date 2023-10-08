@@ -16,12 +16,12 @@ from anki.models import NotetypeDict
 from anki.notes import Note, NoteId
 from aqt import utils
 from aqt.qt import QDialogButtonBox
+from aqt.studydeck import StudyDeck
 from pytest import MonkeyPatch, fixture
 from pytest_anki import AnkiSession
 from pytestqt.qtbot import QtBot  # type: ignore
 from requests import Response
 
-from ankihub.ankihub_client.models import UserDeckRelation  # type: ignore
 from ankihub.gui import errors
 from ankihub.gui.deck_options_dialog import DeckOptionsDialog
 from ankihub.gui.operations.utils import future_with_exception, future_with_result
@@ -29,6 +29,7 @@ from ankihub.gui.operations.utils import future_with_exception, future_with_resu
 from ..factories import DeckMediaFactory, NoteInfoFactory
 from ..fixtures import (  # type: ignore
     ImportAHNoteType,
+    InstallAHDeck,
     MockFunction,
     NewNoteWithNoteType,
     SetFeatureFlagState,
@@ -892,53 +893,105 @@ class TestOnSuggestNotesInBulkDone:
 
 class TestDeckOptionsDialog:
     @pytest.mark.parametrize(
+        "anki_deck_name, subdecks_enabled",
+        [
+            ("Deck 1", True),
+            ("Deck 2", False),
+        ],
+    )
+    def test_shows_correct_option_states(
+        self,
+        anki_session_with_addon_data: AnkiSession,
+        install_ah_deck,
+        anki_deck_name: str,
+        subdecks_enabled: bool,
+    ):
+        with anki_session_with_addon_data.profile_loaded():
+            # Setup the deck with the given option values
+            ah_did = install_ah_deck(anki_deck_name=anki_deck_name)
+            config.set_subdecks_enabled(ah_did, enabled=subdecks_enabled)
+
+            # Open the deck options dialog
+            dialog = DeckOptionsDialog(ah_did=ah_did)
+
+            # Assert it displays correct option values
+            assert anki_deck_name in dialog._current_home_deck_label.text()
+            assert dialog._subdecks_cb.isChecked() == subdecks_enabled
+
+    @pytest.mark.parametrize(
         "anki_deck_exists",
         [
             True,
             False,
         ],
     )
-    def test_on_toggle_subdecks(
+    def test_on_save(
         self,
         anki_session_with_addon_data: AnkiSession,
-        import_ah_note: ImportAHNote,
-        next_deterministic_uuid: Callable[[], uuid.UUID],
+        install_ah_deck: InstallAHDeck,
         mock_function: MockFunction,
+        monkeypatch: MonkeyPatch,
         anki_deck_exists: bool,
     ):
         with anki_session_with_addon_data.profile_loaded():
-            ah_did = next_deterministic_uuid()
-            # 1 is the default deck, we don't want to use that here
-            anki_did = DeckId(2)
-
-            # Add a deck to the config
-            config.add_deck(
-                name="Test",
-                ankihub_did=ah_did,
-                anki_did=anki_did,
-                user_relation=UserDeckRelation.SUBSCRIBER,
-            )
-
-            if anki_deck_exists:
-                # Create the deck by importing a note for it
-                import_ah_note(ah_did=ah_did, anki_did=anki_did)
-
-            showInfo_mock = mock_function(deck_options_dialog, "showInfo")
-            confirm_and_toggle_subdecks_mock = mock_function(
-                deck_options_dialog, "confirm_and_toggle_subdecks"
-            )
+            ah_did = install_ah_deck()
 
             # Open the deck options dialog
             dialog = DeckOptionsDialog(ah_did=ah_did)
-            dialog._on_toggle_subdecks()
 
-            # Assert that the correct methods were called
+            # Change the home deck
+            new_home_deck_name = "New Deck"
+            install_ah_deck(anki_deck_name=new_home_deck_name)
+            new_home_deck_anki_id = aqt.mw.col.decks.id_for_name(new_home_deck_name)
+
+            self._set_home_deck_in_dialog(dialog, new_home_deck_name, monkeypatch)
+
+            if not anki_deck_exists:
+                aqt.mw.col.decks.remove([new_home_deck_anki_id])
+
+            # Change the subdeck option
+            dialog._subdecks_cb.setChecked(True)
+
+            confirm_and_toggle_subdecks_mock = mock_function(
+                deck_options_dialog, "confirm_and_toggle_subdecks"
+            )
+            showInfo_mock = mock_function(deck_options_dialog, "showInfo")
+
+            # Save
+            dialog._on_save()
+
+            # Assert the home deck was changed
+            assert config.deck_config(ah_did).anki_id == new_home_deck_anki_id
+
+            # Assert that the correct functions were called for the subdeck option
             if anki_deck_exists:
-                confirm_and_toggle_subdecks_mock.assert_called_with(ah_did)
+                confirm_and_toggle_subdecks_mock.assert_called_once_with(ah_did)
                 showInfo_mock.assert_not_called()
             else:
                 confirm_and_toggle_subdecks_mock.assert_not_called()
                 showInfo_mock.assert_called_once()
+
+    def _set_home_deck_in_dialog(
+        self,
+        dialog: DeckOptionsDialog,
+        new_home_deck_name: str,
+        monkeypatch: MonkeyPatch,
+    ):
+        """Sets the home deck in the DeckOptionsDialog to the given deck name."""
+        study_deck_mock = Mock()
+
+        def study_deck_mock_side_effect(*args, **kwargs):
+            callback = kwargs["callback"]
+            cb_study_deck_mock = Mock()
+            cb_study_deck_mock.name = new_home_deck_name
+            callback(cb_study_deck_mock)
+
+        study_deck_mock.side_effect = study_deck_mock_side_effect
+        monkeypatch.setattr(
+            deck_options_dialog, "StudyDeckWithoutHelpButton", study_deck_mock
+        )
+
+        dialog._on_set_home_deck()
 
 
 class TestAnkiHubDBAnkiNidsToAnkiHubNids:
