@@ -18,7 +18,6 @@
 		"python.defaultInterpreterPath": "/home/vscode/venv/bin/python3",
 		"editor.minimap.enabled": false,
 		"python.linting.enabled": true,
-		"python.linting.pylintEnabled": true,
 	},
 	// Add the IDs of extensions you want installed when the container is created.
 	"extensions": [
