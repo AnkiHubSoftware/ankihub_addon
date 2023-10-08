@@ -16,7 +16,6 @@ from anki.models import NotetypeDict
 from anki.notes import Note, NoteId
 from aqt import utils
 from aqt.qt import QDialogButtonBox
-from aqt.studydeck import StudyDeck
 from pytest import MonkeyPatch, fixture
 from pytest_anki import AnkiSession
 from pytestqt.qtbot import QtBot  # type: ignore
