@@ -902,7 +902,7 @@ class TestDeckOptionsDialog:
     def test_shows_correct_option_states(
         self,
         anki_session_with_addon_data: AnkiSession,
-        install_ah_deck,
+        install_ah_deck: InstallAHDeck,
         anki_deck_name: str,
         subdecks_enabled: bool,
     ):

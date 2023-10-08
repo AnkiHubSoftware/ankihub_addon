@@ -329,10 +329,10 @@ def new_note_with_note_type() -> NewNoteWithNoteType:
 class InstallAHDeck(Protocol):
     def __call__(
         self,
-        ah_did: uuid.UUID,
-        ah_deck_name: str,
-        anki_did: DeckId,
-        anki_deck_name: str,
+        ah_did: Optional[uuid.UUID] = None,
+        ah_deck_name: Optional[str] = None,
+        anki_did: Optional[DeckId] = None,
+        anki_deck_name: Optional[str] = None,
     ) -> uuid.UUID:
         ...
 
@@ -353,10 +353,10 @@ def install_ah_deck(
     default_anki_deck_name = "Test Deck"
 
     def install_ah_deck_inner(
-        ah_did: uuid.UUID = default_ah_did,
-        ah_deck_name: str = default_ah_deck_name,
-        anki_did: DeckId = default_anki_did,
-        anki_deck_name: str = default_anki_deck_name,
+        ah_did: Optional[uuid.UUID] = default_ah_did,
+        ah_deck_name: Optional[str] = default_ah_deck_name,
+        anki_did: Optional[DeckId] = default_anki_did,
+        anki_deck_name: Optional[str] = default_anki_deck_name,
     ) -> uuid.UUID:
         # Add deck to the config
         config.add_deck(
