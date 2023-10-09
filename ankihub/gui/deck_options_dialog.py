@@ -32,10 +32,14 @@ class DeckOptionsDialog(QDialog):
         self._ah_did = ah_did
         self._deck_config = deepcopy(config.deck_config(ah_did))
 
-        self.setWindowTitle(f"Deck options for {self._deck_config.name}")
         self._setup_ui()
 
     def _setup_ui(self) -> None:
+        self.setWindowTitle(f"Deck options for {self._deck_config.name}")
+        self.setMinimumWidth(350)
+        self.setMinimumHeight(400)
+        self.setSizePolicy(QSizePolicy.Policy.Minimum, QSizePolicy.Policy.Minimum)
+
         self._outer_layout = QVBoxLayout()
         self._main_layout = QVBoxLayout()
         self._btn_layout = QHBoxLayout()
@@ -53,10 +57,6 @@ class DeckOptionsDialog(QDialog):
         self._tab_widget.addTab(self._tab, "General")
 
         self._setup_buttons(self._btn_layout)
-
-        self.setMinimumWidth(350)
-        self.setMinimumHeight(400)
-        self.setSizePolicy(QSizePolicy.Policy.Minimum, QSizePolicy.Policy.Minimum)
 
         self._current_home_deck_label = QLabel("")
         self._current_home_deck_label.setToolTip(
