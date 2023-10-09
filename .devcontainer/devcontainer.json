@@ -18,12 +18,12 @@
 		"python.defaultInterpreterPath": "/home/vscode/venv/bin/python3",
 		"editor.minimap.enabled": false,
 		"python.linting.enabled": true,
-		"python.linting.pylintEnabled": true,
 	},
 	// Add the IDs of extensions you want installed when the container is created.
 	"extensions": [
 		"ms-python.python",
-		"ms-python.vscode-pylance"
+		"ms-python.vscode-pylance",
+		"eamodio.gitlens"
 	],
 	// Use 'forwardPorts' to make a list of ports inside the container available locally.
 	// "forwardPorts": [],
@@ -38,7 +38,7 @@
 		"SENTRY_ENV": "development",
 		"HYPER_TTS_DEBUG_LOGGING": "enable",
 		"LANG": "en_US.UTF-8",
-		"DISPLAY": ":2"
+		"DISPLAY": ":1.0"
 	},
 	"portsAttributes": {
 		"6080": {

@@ -2,7 +2,17 @@
 
 ## Development
 
-### Requirements for creating a development environment.
+### Devcontainer
+This repo has a devcontainer which can be used:
+- locally in VSCode (Run `Dev Containers: Open folder in Container...`, choose the repo folder)
+- remotely in GitHub CodeSpaces
+
+After opening the devcontainer you can open `localhost:6080` in a browser to see the desktop environment of the container.
+
+The devcontainer doesn't include the AnkiHub web app yet, so you have to use it with the web app on staging
+(or production).
+
+### Requirements for creating a development environment (without the devcontainer).
 #### Set up a virtual environment and VSCode
 
 - Create a python virtual environment in your preferred manner.
@@ -16,15 +26,12 @@
 
 - Copy `.envrc.dev` to `.envrc`:  `cp .envrc.dev .envrc`
 - Modify the newly created `.envrc`:
-  - Set `ANKI_EXEC` to the path of your `anki` executable.
-    You can find this by activating your virtual environment and typing `which anki`.
 - Set `GOOGLE_API_KEY`
   - Get this value from the `.envrc` in BitWarden (ask if you don't have permission)
-- Change `ANKIHUB_APP_URL` from http://localhost:8000 to https://staging.ankihub.net/, for example, to point the add-on at a different AnkiHub instance.
+- Set `ANKIHUB_APP_URL`
   - This environment variable overrides `ankihub_url` in the add-on config.
-- You can change `REPORT_ERRORS` from 0 to 1 if you want to capture Sentry errors.
-- `SKIP_INIT=1` (you don't need to add or change this)
-  - See `./ankihub_addon/ankihub/__init__.py` for what this does.  You need to set this when running tests.
+- Set `S3_BUCKET_URL`
+- Set `REPORT_ERRORS` from 0 to 1 if you want to capture Sentry errors
 
 #### Run the build script
 `python scripts/build.py`
@@ -42,10 +49,6 @@ There are two VSCode debug launch configurations (defined in `launch.json`).
 They both set up Anki's base directory on a path you can configure using an environment variable.
 They also create a symlink from the add-on directory to the add-on source - this way you can make changes to the
 add-on code, restart the debug session and Anki will use the updated add-on code.
-
-- Run Anki with TEMPORARY_ANKI_BASE.
-
-  This launch configuration sets up a clean Anki base directory in `TEMPORARY_ANKI_BASE` every time it starts.
 
 - Run Anki with ANKI_BASE.
 
