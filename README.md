@@ -9,6 +9,9 @@ This repo has a devcontainer which can be used:
 
 After opening the devcontainer you can open `localhost:6080` in a browser to see the desktop environment of the container.
 
+The devcontainer doesn't include the AnkiHub web app yet, so you have to use it with the web app on staging
+(or production).
+
 ### Requirements for creating a development environment (without the devcontainer).
 #### Set up a virtual environment and VSCode
 
