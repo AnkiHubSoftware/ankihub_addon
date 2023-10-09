@@ -132,7 +132,7 @@ class DeckOptionsDialog(QDialog):
     def _refresh_home_deck_display(self) -> None:
         home_deck_name = aqt.mw.col.decks.name_if_exists(self._deck_config.anki_id)
         self._current_home_deck_label.setText(
-            f"Home deck: {home_deck_name if home_deck_name else 'None'}"
+            f"Home deck: <b>{home_deck_name if home_deck_name else 'None'}</b>"
         )
 
     def _on_set_home_deck(self) -> None:
