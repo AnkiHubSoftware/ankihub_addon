@@ -6,6 +6,7 @@ import aqt
 from ...addon_ankihub_client import AddonAnkiHubClient as AnkiHubClient
 from ...ankihub_client import API_VERSION, Deck
 from ...main.deck_unsubscribtion import uninstall_deck
+from ...main.review_counts import send_review_counts
 from ...settings import config
 from ..deck_updater import ah_deck_updater, show_tooltip_about_last_deck_updates_results
 from .db_check import maybe_check_databases
@@ -42,6 +43,7 @@ def sync_with_ankihub(on_done: Callable[[Future], None]) -> None:
         config.set_api_version_on_last_sync(API_VERSION)
         show_tooltip_about_last_deck_updates_results()
         maybe_check_databases()
+        send_review_counts()
         on_done(future_with_result(None))
 
     try:
