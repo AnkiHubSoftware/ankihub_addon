@@ -36,6 +36,6 @@ def _get_review_count_for_ah_deck_since(ah_did: uuid.UUID, since: datetime) -> i
             WHERE r.id > ? AND ah_n.ankihub_deck_id = ?
             """,
             timestamp_ms,
-            ah_did,
+            str(ah_did),
         )
     return result
