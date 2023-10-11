@@ -233,6 +233,7 @@ class _Config:
             anki_id=DeckId(anki_did),
             user_relation=user_relation,
             subdecks_enabled=subdecks_enabled,
+            suspend_new_cards_of_new_notes=ankihub_did == ANKING_DECK_ID,
         )
         # remove duplicates
         self.save_latest_deck_update(ankihub_did, latest_udpate)
