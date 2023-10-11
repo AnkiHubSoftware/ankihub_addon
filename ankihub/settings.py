@@ -83,6 +83,8 @@ class DeckConfig(DataClassJSONMixin):
     subdecks_enabled: bool = (
         False  # whether deck is organized into subdecks by the add-on
     )
+    suspend_new_cards_of_new_notes: bool = False
+    suspend_new_cards_of_existing_notes: bool = True
 
 
 @dataclass
