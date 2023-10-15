@@ -91,19 +91,36 @@ class SubscribedDecksDialog(QDialog):
 
     def _setup_box_bottom_right(self) -> QVBoxLayout:
         box = QVBoxLayout()
-        self.unsubscribe_btn = QPushButton("Unsubscribe")
-        box.addWidget(self.unsubscribe_btn)
-        qconnect(self.unsubscribe_btn.clicked, self._on_unsubscribe)
+
+        # Deck Actions
+        self.box_deck_actions = QVBoxLayout()
+        box.addLayout(self.box_deck_actions)
+
+        self.deck_actions_label = QLabel("<b>Deck Actions</b>")
+        self.box_deck_actions.addWidget(self.deck_actions_label)
+
+        self.box_deck_action_buttons = QHBoxLayout()
+        self.box_deck_actions.addLayout(self.box_deck_action_buttons)
 
         self.open_web_btn = QPushButton("Open on AnkiHub")
-        box.addWidget(self.open_web_btn)
+        self.box_deck_action_buttons.addWidget(self.open_web_btn)
         qconnect(self.open_web_btn.clicked, self._on_open_web)
 
-        self.set_home_deck_btn = QPushButton("Set Home deck")
-        self.set_home_deck_btn.setToolTip("New cards will be added to this deck.")
-        set_tooltip_icon(self.set_home_deck_btn)
-        qconnect(self.set_home_deck_btn.clicked, self._on_set_home_deck)
-        box.addWidget(self.set_home_deck_btn)
+        self.unsubscribe_btn = QPushButton("Unsubscribe")
+        self.box_deck_action_buttons.addWidget(self.unsubscribe_btn)
+        qconnect(self.unsubscribe_btn.clicked, self._on_unsubscribe)
+
+        box.addSpacing(10)
+
+        # Deck Settings
+        self.box_deck_settings = QVBoxLayout()
+        box.addLayout(self.box_deck_settings)
+
+        self.deck_settings_label = QLabel("<b>Deck Settings</b>")
+        self.box_deck_settings.addWidget(self.deck_settings_label)
+
+        self.box_deck_settings_elements = QVBoxLayout()
+        self.box_deck_settings.addLayout(self.box_deck_settings_elements)
 
         self.toggle_subdecks_btn = QPushButton("Enable Subdecks")
         self.toggle_subdecks_btn.setToolTip(
@@ -112,7 +129,14 @@ class SubscribedDecksDialog(QDialog):
         )
         set_tooltip_icon(self.toggle_subdecks_btn)
         qconnect(self.toggle_subdecks_btn.clicked, self._on_toggle_subdecks)
-        box.addWidget(self.toggle_subdecks_btn)
+        self.box_deck_settings_elements.addWidget(self.toggle_subdecks_btn)
+
+        self.set_home_deck_btn = QPushButton("Set Home deck")
+        self.set_home_deck_btn.setToolTip("New cards will be added to this deck.")
+        set_tooltip_icon(self.set_home_deck_btn)
+        qconnect(self.set_home_deck_btn.clicked, self._on_set_home_deck)
+        self.box_deck_settings_elements.addWidget(self.set_home_deck_btn)
+
         box.addStretch(1)
 
         return box
