@@ -88,6 +88,9 @@ class SubscribedDecksDialog(QDialog):
     def _setup_box_bottom_left(self) -> QVBoxLayout:
         box = QVBoxLayout()
         self.decks_list_label = QLabel("<b>Subscribed AnkiHub Decks</b>")
+        self.decks_list_label.setSizePolicy(
+            QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Preferred
+        )
         box.addWidget(self.decks_list_label)
 
         self.decks_list = QListWidget()
@@ -104,6 +107,9 @@ class SubscribedDecksDialog(QDialog):
             box.addSpacing(30)
 
             self.no_deck_selected_label = QLabel("Choose deck to adjust settings.")
+            self.no_deck_selected_label.setSizePolicy(
+                QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Preferred
+            )
             box.addWidget(self.no_deck_selected_label)
 
             box.addStretch(1)
@@ -114,6 +120,9 @@ class SubscribedDecksDialog(QDialog):
         box.addLayout(self.box_deck_actions)
 
         self.deck_actions_label = QLabel("<b>Deck Actions</b>")
+        self.deck_actions_label.setSizePolicy(
+            QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Preferred
+        )
         self.box_deck_actions.addWidget(self.deck_actions_label)
 
         self.box_deck_action_buttons = QHBoxLayout()
