@@ -26,7 +26,7 @@ from ..main.deck_unsubscribtion import unsubscribe_from_deck_and_uninstall
 from ..main.subdecks import SUBDECK_TAG
 from ..settings import config, url_deck_base, url_decks
 from .operations.subdecks import confirm_and_toggle_subdecks
-from .utils import ask_user, set_tooltip_icon
+from .utils import ask_user, clear_layout, set_tooltip_icon
 
 
 class SubscribedDecksDialog(QDialog):
@@ -37,7 +37,6 @@ class SubscribedDecksDialog(QDialog):
         super(SubscribedDecksDialog, self).__init__()
         self.client = AnkiHubClient()
         self._setup_ui()
-        self._on_item_selection_changed()
         self._refresh_decks_list()
 
         if not config.is_logged_in():
@@ -61,7 +60,8 @@ class SubscribedDecksDialog(QDialog):
         self.box_bottom_left = self._setup_box_bottom_left()
         self.box_bottom.addLayout(self.box_bottom_left)
 
-        self.box_bottom_right = self._setup_box_bottom_right()
+        self.box_bottom_right = QVBoxLayout()
+        self._refresh_box_bottom_right(self.box_bottom_right, None)
         self.box_bottom.addLayout(self.box_bottom_right)
 
     def _setup_box_top(self) -> QVBoxLayout:
@@ -91,11 +91,22 @@ class SubscribedDecksDialog(QDialog):
 
         self.decks_list = QListWidget()
         box.addWidget(self.decks_list)
-        qconnect(self.decks_list.itemSelectionChanged, self._on_item_selection_changed)
+        qconnect(self.decks_list.itemSelectionChanged, self._on_deck_selection_changed)
         return box
 
-    def _setup_box_bottom_right(self) -> QVBoxLayout:
-        box = QVBoxLayout()
+    def _refresh_box_bottom_right(
+        self, box: QVBoxLayout, selected_ah_did: Optional[uuid.UUID]
+    ) -> None:
+        clear_layout(box)
+
+        if selected_ah_did is None:
+            box.addSpacing(30)
+
+            self.no_deck_selected_label = QLabel("Choose deck to adjust settings.")
+            box.addWidget(self.no_deck_selected_label)
+
+            box.addStretch(1)
+            return
 
         # Deck Actions
         self.box_deck_actions = QVBoxLayout()
@@ -143,8 +154,6 @@ class SubscribedDecksDialog(QDialog):
         self.box_deck_settings_elements.addWidget(self.set_home_deck_btn)
 
         box.addStretch(1)
-
-        return box
 
     def _refresh_decks_list(self) -> None:
         self.decks_list.clear()
@@ -283,7 +292,7 @@ class SubscribedDecksDialog(QDialog):
             "Disable Subdecks" if using_subdecks else "Enable Subdecks"
         )
 
-    def _on_item_selection_changed(self) -> None:
+    def _on_deck_selection_changed(self) -> None:
         selection = self.decks_list.selectedItems()
         one_selected: bool = len(selection) == 1
         is_deck_installed = False
@@ -291,6 +300,11 @@ class SubscribedDecksDialog(QDialog):
             selected = selection[0]
             ankihub_did: UUID = selected.data(Qt.ItemDataRole.UserRole)
             is_deck_installed = bool(config.deck_config(ankihub_did))
+
+        if one_selected:
+            self._refresh_box_bottom_right(self.box_bottom_right, ankihub_did)
+        else:
+            self._refresh_box_bottom_right(self.box_bottom_right, None)
 
         self.unsubscribe_btn.setEnabled(one_selected)
         self.open_web_btn.setEnabled(one_selected)
