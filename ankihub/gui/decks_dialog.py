@@ -21,6 +21,7 @@ from aqt.studydeck import StudyDeck
 from aqt.utils import openLink, showInfo, showText, tooltip
 
 from ..addon_ankihub_client import AddonAnkiHubClient as AnkiHubClient
+from ..gui.operations.deck_creation import create_collaborative_deck
 from ..main.deck_unsubscribtion import unsubscribe_from_deck_and_uninstall
 from ..main.subdecks import SUBDECK_TAG
 from ..settings import config, url_deck_base, url_decks
@@ -74,6 +75,10 @@ class SubscribedDecksDialog(QDialog):
         self.browse_btn = QPushButton("Browse Decks")
         self.box_top_buttons.addWidget(self.browse_btn)
         qconnect(self.browse_btn.clicked, lambda: openLink(url_decks()))
+
+        self.create_btn = QPushButton("Create Collaborative Deck")
+        self.box_top_buttons.addWidget(self.create_btn)
+        qconnect(self.create_btn.clicked, create_collaborative_deck)
 
         box.addSpacing(10)
 
