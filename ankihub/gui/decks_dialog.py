@@ -48,6 +48,7 @@ class SubscribedDecksDialog(QDialog):
     def _setup_ui(self):
         self.setWindowTitle("AnkiHub | Decks Managment")
         self.setMinimumWidth(640)
+        self.setMinimumHeight(450)
 
         self.box_main = QVBoxLayout()
         self.setLayout(self.box_main)
