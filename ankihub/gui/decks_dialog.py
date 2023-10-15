@@ -40,7 +40,6 @@ class SubscribedDecksDialog(QDialog):
     def __init__(self):
         super(SubscribedDecksDialog, self).__init__()
         self.client = AnkiHubClient()
-        self.setWindowTitle("Subscribed AnkiHub Decks")
         self._setup_ui()
         self._on_item_selection_changed()
         self._refresh_decks_list()
@@ -52,30 +51,64 @@ class SubscribedDecksDialog(QDialog):
             self.show()
 
     def _setup_ui(self):
-        self.box_top = QVBoxLayout()
-        self.box_above = QHBoxLayout()
-        self.box_right = QVBoxLayout()
+        self.setWindowTitle("AnkiHub | Decks Managment")
 
-        self.decks_list = QListWidget()
-        qconnect(self.decks_list.itemSelectionChanged, self._on_item_selection_changed)
+        self.box_main = QVBoxLayout()
+        self.setLayout(self.box_main)
+
+        self.box_top = self._setup_box_top()
+        self.box_main.addLayout(self.box_top)
+
+        self.box_bottom = QHBoxLayout()
+        self.box_main.addLayout(self.box_bottom)
+
+        self.box_bottom_left = self._setup_box_bottom_left()
+        self.box_bottom.addLayout(self.box_bottom_left)
+
+        self.box_bottom_right = self._setup_box_bottom_right()
+        self.box_bottom.addLayout(self.box_bottom_right)
+
+    def _setup_box_top(self) -> QVBoxLayout:
+        box = QVBoxLayout()
+        self.deck_operations_label = QLabel("<b>Deck Operations</b>")
+        box.addWidget(self.deck_operations_label)
+
+        self.box_top_buttons = QHBoxLayout()
+        box.addLayout(self.box_top_buttons)
 
         self.browse_btn = QPushButton("Browse Decks")
-        self.box_right.addWidget(self.browse_btn)
+        self.box_top_buttons.addWidget(self.browse_btn)
         qconnect(self.browse_btn.clicked, lambda: openLink(url_decks()))
 
+        box.addSpacing(10)
+
+        return box
+
+    def _setup_box_bottom_left(self) -> QVBoxLayout:
+        box = QVBoxLayout()
+        self.decks_list_label = QLabel("<b>Subscribed AnkiHub Decks</b>")
+        box.addWidget(self.decks_list_label)
+
+        self.decks_list = QListWidget()
+        box.addWidget(self.decks_list)
+        qconnect(self.decks_list.itemSelectionChanged, self._on_item_selection_changed)
+        return box
+
+    def _setup_box_bottom_right(self) -> QVBoxLayout:
+        box = QVBoxLayout()
         self.unsubscribe_btn = QPushButton("Unsubscribe")
-        self.box_right.addWidget(self.unsubscribe_btn)
+        box.addWidget(self.unsubscribe_btn)
         qconnect(self.unsubscribe_btn.clicked, self._on_unsubscribe)
 
         self.open_web_btn = QPushButton("Open on AnkiHub")
-        self.box_right.addWidget(self.open_web_btn)
+        box.addWidget(self.open_web_btn)
         qconnect(self.open_web_btn.clicked, self._on_open_web)
 
         self.set_home_deck_btn = QPushButton("Set Home deck")
         self.set_home_deck_btn.setToolTip("New cards will be added to this deck.")
         set_tooltip_icon(self.set_home_deck_btn)
         qconnect(self.set_home_deck_btn.clicked, self._on_set_home_deck)
-        self.box_right.addWidget(self.set_home_deck_btn)
+        box.addWidget(self.set_home_deck_btn)
 
         self.toggle_subdecks_btn = QPushButton("Enable Subdecks")
         self.toggle_subdecks_btn.setToolTip(
@@ -84,14 +117,10 @@ class SubscribedDecksDialog(QDialog):
         )
         set_tooltip_icon(self.toggle_subdecks_btn)
         qconnect(self.toggle_subdecks_btn.clicked, self._on_toggle_subdecks)
-        self.box_right.addWidget(self.toggle_subdecks_btn)
+        box.addWidget(self.toggle_subdecks_btn)
+        box.addStretch(1)
 
-        self.box_right.addStretch(1)
-
-        self.setLayout(self.box_top)
-        self.box_top.addLayout(self.box_above)
-        self.box_above.addWidget(self.decks_list)
-        self.box_above.addLayout(self.box_right)
+        return box
 
     def _refresh_decks_list(self) -> None:
         self.decks_list.clear()
