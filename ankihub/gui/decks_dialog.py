@@ -107,11 +107,16 @@ class SubscribedDecksDialog(QDialog):
         if selected_ah_did is None:
             box.addSpacing(30)
 
+            self.box_no_deck_selected = QHBoxLayout()
+            box.addLayout(self.box_no_deck_selected)
+
+            self.box_no_deck_selected.addSpacing(5)
+
             self.no_deck_selected_label = QLabel("Choose deck to adjust settings.")
             self.no_deck_selected_label.setSizePolicy(
                 QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Preferred
             )
-            box.addWidget(self.no_deck_selected_label)
+            self.box_no_deck_selected.addWidget(self.no_deck_selected_label)
 
             box.addStretch(1)
             return
