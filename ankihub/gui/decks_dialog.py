@@ -169,13 +169,41 @@ class SubscribedDecksDialog(QDialog):
         qconnect(self.toggle_subdecks_cb.clicked, self._on_toggle_subdecks)
         self.box_deck_settings_elements.addWidget(self.toggle_subdecks_cb)
 
-        self.set_home_deck_btn = QPushButton("Set Home deck")
-        self.set_home_deck_btn.setToolTip("New cards will be added to this deck.")
-        set_tooltip_icon(self.set_home_deck_btn)
-        qconnect(self.set_home_deck_btn.clicked, self._on_set_home_deck)
-        self.box_deck_settings_elements.addWidget(self.set_home_deck_btn)
+        box.addSpacing(10)
+
+        # Updates Destination
+        self.box_updates_destination = QVBoxLayout()
+        box.addLayout(self.box_updates_destination)
+
+        self.updates_destination_label = QLabel("<b>Updates Destination</b>")
+        self.box_updates_destination.addWidget(self.updates_destination_label)
+
+        self.updates_destination_details_label = QLabel()
+        self.updates_destination_details_label.setWordWrap(True)
+        self._refresh_updates_destination_details_label(selected_ah_did)
+        self.box_updates_destination.addWidget(self.updates_destination_details_label)
+
+        self.set_updates_destination_btn = QPushButton("Change updates destination")
+        qconnect(
+            self.set_updates_destination_btn.clicked,
+            self._on_change_updates_destination,
+        )
+        self.box_updates_destination.addWidget(self.set_updates_destination_btn)
 
         box.addStretch(1)
+
+    def _refresh_updates_destination_details_label(self, ah_did: uuid.UUID) -> None:
+        deck_config = config.deck_config(ah_did)
+        destination_anki_did = deck_config.anki_id
+        if name := aqt.mw.col.decks.name_if_exists(destination_anki_did):
+            self.updates_destination_details_label.setText(
+                f"New cards will be added to: {name}."
+            )
+        else:
+            # If the deck doesn't exitst, it will be re-created on next sync with the name from the config.
+            self.updates_destination_details_label.setText(
+                f"New cards will be added to <b>{deck_config.name}</b>."
+            )
 
     def _refresh_decks_list(self) -> None:
         self.decks_list.clear()
@@ -247,18 +275,20 @@ class SubscribedDecksDialog(QDialog):
             ankihub_id: UUID = item.data(Qt.ItemDataRole.UserRole)
             openLink(f"{url_deck_base()}/{ankihub_id}")
 
-    def _on_set_home_deck(self):
+    def _on_change_updates_destination(self):
         deck_names = self.decks_list.selectedItems()
         if len(deck_names) == 0:
             return
 
         deck_name = deck_names[0]
         ankihub_id: UUID = deck_name.data(Qt.ItemDataRole.UserRole)
-        current_home_deck = aqt.mw.col.decks.get(config.deck_config(ankihub_id).anki_id)
-        if current_home_deck is None:
+        current_destination_deck = aqt.mw.col.decks.get(
+            config.deck_config(ankihub_id).anki_id
+        )
+        if current_destination_deck is None:
             current = None
         else:
-            current = current_home_deck["name"]
+            current = current_destination_deck["name"]
 
         def update_deck_config(ret: StudyDeck):
             if not ret.name:
@@ -266,14 +296,14 @@ class SubscribedDecksDialog(QDialog):
 
             anki_did = aqt.mw.col.decks.id(ret.name)
             config.set_home_deck(ankihub_did=ankihub_id, anki_did=anki_did)
-            tooltip("Home deck updated.", parent=self)
+            self._refresh_updates_destination_details_label(ankihub_id)
 
         # this lets the user pick a deck
         StudyDeckWithoutHelpButton(
             aqt.mw,
             current=current,
-            accept="Set Home Deck",
-            title="Change Home Deck",
+            accept="Accept",
+            title="Choose Updates Destination",
             parent=self,
             callback=update_deck_config,
         )
@@ -336,7 +366,7 @@ class SubscribedDecksDialog(QDialog):
 
         self.unsubscribe_btn.setEnabled(one_selected)
         self.open_web_btn.setEnabled(one_selected)
-        self.set_home_deck_btn.setEnabled(one_selected and is_deck_installed)
+        self.set_updates_destination_btn.setEnabled(one_selected and is_deck_installed)
 
         self._refresh_subdecks_checkbox()
 
