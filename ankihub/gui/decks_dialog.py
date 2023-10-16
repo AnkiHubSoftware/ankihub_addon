@@ -107,8 +107,9 @@ class SubscribedDecksDialog(QDialog):
     ) -> None:
         clear_layout(box)
 
+        box.addSpacing(25)
+
         if selected_ah_did is None:
-            box.addSpacing(30)
 
             self.box_no_deck_selected = QHBoxLayout()
             box.addLayout(self.box_no_deck_selected)
