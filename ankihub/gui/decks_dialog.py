@@ -367,15 +367,11 @@ class SubscribedDecksDialog(QDialog):
             return
 
         ankihub_did: UUID = selection[0].data(Qt.ItemDataRole.UserRole)
-        if deck_config := config.deck_config(ankihub_did):
-            using_subdecks = deck_config.subdecks_enabled
-            has_subdeck_tags = deck_contains_subdeck_tags(ankihub_did)
-            self.toggle_subdecks_cb.setEnabled(has_subdeck_tags)
-        else:
-            using_subdecks = False
-            self.toggle_subdecks_cb.setEnabled(False)
+        deck_config = config.deck_config(ankihub_did)
 
-        self.toggle_subdecks_cb.setChecked(using_subdecks)
+        has_subdeck_tags = deck_contains_subdeck_tags(ankihub_did)
+        self.toggle_subdecks_cb.setEnabled(has_subdeck_tags)
+        self.toggle_subdecks_cb.setChecked(deck_config.subdecks_enabled)
 
     def _on_deck_selection_changed(self) -> None:
         selection = self.decks_list.selectedItems()
