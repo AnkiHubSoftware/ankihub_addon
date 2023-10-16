@@ -172,6 +172,7 @@ class SubscribedDecksDialog(QDialog):
             f"This option is only available if notes in the deck have <b>{SUBDECK_TAG}</b> tags."
         )
         set_tooltip_icon(self.toggle_subdecks_cb)
+        self._refresh_subdecks_checkbox()
         qconnect(self.toggle_subdecks_cb.clicked, self._on_toggle_subdecks)
         self.box_deck_settings_elements.addWidget(self.toggle_subdecks_cb)
 
@@ -390,8 +391,6 @@ class SubscribedDecksDialog(QDialog):
         self.unsubscribe_btn.setEnabled(one_selected)
         self.open_web_btn.setEnabled(one_selected)
         self.set_updates_destination_btn.setEnabled(one_selected and is_deck_installed)
-
-        self._refresh_subdecks_checkbox()
 
     @classmethod
     def display_subscribe_window(cls):
