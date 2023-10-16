@@ -228,7 +228,7 @@ class SubscribedDecksDialog(QDialog):
                 f"New cards will be added to: {name}."
             )
         else:
-            # If the deck doesn't exitst, it will be re-created on next sync with the name from the config.
+            # If the deck doesn't exist, it will be re-created on next sync with the name from the config.
             self.updates_destination_details_label.setText(
                 f"New cards will be added to <b>{deck_config.name}</b>."
             )
