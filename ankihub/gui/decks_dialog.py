@@ -7,6 +7,7 @@ import aqt
 from anki.collection import OpChanges
 from aqt import gui_hooks
 from aqt.qt import (
+    QCheckBox,
     QDialog,
     QDialogButtonBox,
     QHBoxLayout,
@@ -154,14 +155,14 @@ class SubscribedDecksDialog(QDialog):
         self.box_deck_settings_elements = QVBoxLayout()
         self.box_deck_settings.addLayout(self.box_deck_settings_elements)
 
-        self.toggle_subdecks_btn = QPushButton("Enable Subdecks")
-        self.toggle_subdecks_btn.setToolTip(
+        self.toggle_subdecks_cb = QCheckBox("Enable Subdecks")
+        self.toggle_subdecks_cb.setToolTip(
             "Toggle between the deck being organized into subdecks or not.<br>"
             f"This will only have an effect if notes in the deck have <b>{SUBDECK_TAG}</b> tags."
         )
-        set_tooltip_icon(self.toggle_subdecks_btn)
-        qconnect(self.toggle_subdecks_btn.clicked, self._on_toggle_subdecks)
-        self.box_deck_settings_elements.addWidget(self.toggle_subdecks_btn)
+        set_tooltip_icon(self.toggle_subdecks_cb)
+        qconnect(self.toggle_subdecks_cb.clicked, self._on_toggle_subdecks)
+        self.box_deck_settings_elements.addWidget(self.toggle_subdecks_cb)
 
         self.set_home_deck_btn = QPushButton("Set Home deck")
         self.set_home_deck_btn.setToolTip("New cards will be added to this deck.")
@@ -287,26 +288,25 @@ class SubscribedDecksDialog(QDialog):
 
         confirm_and_toggle_subdecks(ankihub_id)
 
-        self._refresh_subdecks_button()
+        self._refresh_subdecks_checkbox()
 
-    def _refresh_subdecks_button(self):
+    def _refresh_subdecks_checkbox(self):
         selection = self.decks_list.selectedItems()
         one_selected: bool = len(selection) == 1
 
         if not one_selected:
-            self.toggle_subdecks_btn.setEnabled(False)
+            self.toggle_subdecks_cb.setEnabled(False)
             return
 
         ankihub_did: UUID = selection[0].data(Qt.ItemDataRole.UserRole)
-        using_subdecks = False
         if deck_from_config := config.deck_config(ankihub_did):
             using_subdecks = deck_from_config.subdecks_enabled
-            self.toggle_subdecks_btn.setEnabled(True)
+            self.toggle_subdecks_cb.setEnabled(True)
         else:
-            self.toggle_subdecks_btn.setEnabled(False)
-        self.toggle_subdecks_btn.setText(
-            "Disable Subdecks" if using_subdecks else "Enable Subdecks"
-        )
+            using_subdecks = False
+            self.toggle_subdecks_cb.setEnabled(False)
+
+        self.toggle_subdecks_cb.setChecked(using_subdecks)
 
     def _on_deck_selection_changed(self) -> None:
         selection = self.decks_list.selectedItems()
@@ -326,7 +326,7 @@ class SubscribedDecksDialog(QDialog):
         self.open_web_btn.setEnabled(one_selected)
         self.set_home_deck_btn.setEnabled(one_selected and is_deck_installed)
 
-        self._refresh_subdecks_button()
+        self._refresh_subdecks_checkbox()
 
     @classmethod
     def display_subscribe_window(cls):
