@@ -23,6 +23,7 @@ from aqt.qt import (
     qconnect,
 )
 from aqt.studydeck import StudyDeck
+from aqt.theme import theme_manager
 from aqt.utils import openLink, showInfo, showText, tooltip
 
 from ..addon_ankihub_client import AddonAnkiHubClient as AnkiHubClient
@@ -80,11 +81,13 @@ class SubscribedDecksDialog(QDialog):
         self.box_top_buttons = QHBoxLayout()
         box.addLayout(self.box_top_buttons)
 
-        self.browse_btn = QPushButton("Browse Decks")
+        self.browse_btn = QPushButton("🔗 Browse Decks")
+        self.browse_btn.setStyleSheet("color: white; background-color: #306bec")
+
         self.box_top_buttons.addWidget(self.browse_btn)
         qconnect(self.browse_btn.clicked, lambda: openLink(url_decks()))
 
-        self.create_btn = QPushButton("Create Collaborative Deck")
+        self.create_btn = QPushButton("➕ Create Collaborative Deck")
         self.box_top_buttons.addWidget(self.create_btn)
         qconnect(self.create_btn.clicked, create_collaborative_deck)
 
@@ -146,6 +149,11 @@ class SubscribedDecksDialog(QDialog):
         qconnect(self.open_web_btn.clicked, self._on_open_web)
 
         self.unsubscribe_btn = QPushButton("Unsubscribe")
+        if theme_manager.night_mode:
+            self.unsubscribe_btn.setStyleSheet("color: #e29792")
+        else:
+            self.unsubscribe_btn.setStyleSheet("color: #e2857f")
+
         self.box_deck_action_buttons.addWidget(self.unsubscribe_btn)
         qconnect(self.unsubscribe_btn.clicked, self._on_unsubscribe)
 
