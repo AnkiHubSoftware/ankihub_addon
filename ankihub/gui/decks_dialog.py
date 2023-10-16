@@ -178,6 +178,16 @@ class SubscribedDecksDialog(QDialog):
         qconnect(self.toggle_subdecks_cb.clicked, self._on_toggle_subdecks)
         self.box_deck_settings_elements.addWidget(self.toggle_subdecks_cb)
 
+        self.subdecks_docs_link_label = QLabel(
+            """
+            <a href="https://docs.ankihub.net/user_docs/advanced.html#subdecks-and-subdeck-tags">
+                More about Subdecks
+            </a>
+            """
+        )
+        self.subdecks_docs_link_label.setOpenExternalLinks(True)
+        self.box_deck_settings_elements.addWidget(self.subdecks_docs_link_label)
+
         box.addSpacing(10)
 
         # Updates Destination
@@ -198,6 +208,17 @@ class SubscribedDecksDialog(QDialog):
             self._on_change_updates_destination,
         )
         self.box_updates_destination.addWidget(self.set_updates_destination_btn)
+        self.box_updates_destination.addSpacing(7)
+
+        self.destination_updates_docs_link_label = QLabel(
+            """
+            <a href="https://community.ankihub.net/t/how-are-anki-decks-related-to-ankihub-decks/4811">
+                More about Updates Destinations
+            </a>
+            """
+        )
+        self.destination_updates_docs_link_label.setOpenExternalLinks(True)
+        self.box_updates_destination.addWidget(self.destination_updates_docs_link_label)
 
         box.addStretch(1)
 
