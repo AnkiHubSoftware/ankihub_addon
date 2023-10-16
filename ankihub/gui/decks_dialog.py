@@ -1,6 +1,5 @@
 """Dialog for managing subscriptions to AnkiHub decks and deck-specific settings."""
 import uuid
-from concurrent.futures import Future
 from typing import Optional
 from uuid import UUID
 
@@ -13,7 +12,6 @@ from aqt.qt import (
     QDialogButtonBox,
     QHBoxLayout,
     QLabel,
-    QLineEdit,
     QListWidget,
     QListWidgetItem,
     QPushButton,
@@ -30,8 +28,7 @@ from ..addon_ankihub_client import AddonAnkiHubClient as AnkiHubClient
 from ..gui.operations.deck_creation import create_collaborative_deck
 from ..main.deck_unsubscribtion import unsubscribe_from_deck_and_uninstall
 from ..main.subdecks import SUBDECK_TAG, deck_contains_subdeck_tags
-from ..settings import config, url_deck_base, url_decks, url_help
-from .operations.deck_installation import download_and_install_decks
+from ..settings import config, url_deck_base, url_decks
 from .operations.subdecks import confirm_and_toggle_subdecks
 from .utils import ask_user, clear_layout, set_tooltip_icon
 
@@ -256,12 +253,6 @@ class SubscribedDecksDialog(QDialog):
         op.study_queues = True
         gui_hooks.operation_did_execute(op, handler=None)
 
-    def _on_add(self) -> None:
-        SubscribeDialog().exec()
-
-        self._refresh_decks_list()
-        self._refresh_anki()
-
     def _select_deck(self, ah_did: uuid.UUID):
         deck_item = next(
             (
@@ -419,101 +410,3 @@ class StudyDeckWithoutHelpButton(StudyDeck):
         self.form.buttonBox.removeButton(
             self.form.buttonBox.button(QDialogButtonBox.StandardButton.Help)
         )
-
-
-class SubscribeDialog(QDialog):
-    silentlyClose = True
-
-    def __init__(self):
-        super(SubscribeDialog, self).__init__()
-
-        self.thread = None  # type: ignore
-        self.box_top = QVBoxLayout()
-        self.box_mid = QHBoxLayout()
-        self.box_left = QVBoxLayout()
-        self.box_right = QVBoxLayout()
-
-        self.deck_id_box = QHBoxLayout()
-        self.deck_id_box_label = QLabel("Deck ID:")
-        self.deck_id_box_text = QLineEdit("", self)
-        self.deck_id_box_text.setMinimumWidth(300)
-        self.deck_id_box.addWidget(self.deck_id_box_label)
-        self.deck_id_box.addWidget(self.deck_id_box_text)
-        self.box_left.addLayout(self.deck_id_box)
-
-        self.box_mid.addLayout(self.box_left)
-        self.box_mid.addSpacing(20)
-        self.box_mid.addLayout(self.box_right)
-
-        self.buttonbox = QDialogButtonBox(
-            QDialogButtonBox.StandardButton.Ok | QDialogButtonBox.StandardButton.Cancel  # type: ignore
-        )
-        self.buttonbox.button(QDialogButtonBox.StandardButton.Ok).setText("Subscribe")
-        self.browse_btn = self.buttonbox.addButton(
-            "Browse Decks", QDialogButtonBox.ButtonRole.ActionRole
-        )
-        qconnect(self.browse_btn.clicked, self._on_browse_deck)
-        qconnect(self.buttonbox.accepted, self._subscribe)
-        self.buttonbox.rejected.connect(self.close)
-
-        self.instructions_label = QLabel(
-            "<center>Copy/Paste a Deck ID from AnkiHub.net/decks to subscribe.</center>"
-        )
-        # Add all widgets to top layout.
-        self.box_top.addWidget(self.instructions_label)
-        self.box_top.addSpacing(10)
-        self.box_top.addLayout(self.box_mid)
-        self.box_top.addStretch(1)
-        self.box_top.addWidget(self.buttonbox)
-        self.setLayout(self.box_top)
-
-        self.setMinimumWidth(500)
-        self.setSizePolicy(QSizePolicy.Policy.Minimum, QSizePolicy.Policy.Minimum)
-        self.setWindowTitle("Subscribe to AnkiHub Deck")
-
-        self.client = AnkiHubClient()
-        if not config.is_logged_in():
-            showText("Oops! Please make sure you are logged into AnkiHub!")
-            self.close()
-        else:
-            self.show()
-
-    def _subscribe(self) -> None:
-        ah_did_str = self.deck_id_box_text.text().strip()
-
-        try:
-            ah_did = uuid.UUID(ah_did_str)
-        except ValueError:
-            showInfo(
-                "The format of the Deck ID is invalid. Please make sure you copied the Deck ID correctly."
-            )
-            return
-
-        if ah_did in config.deck_ids():
-            showText(
-                f"You've already subscribed to deck {ah_did}. "
-                "Syncing with AnkiHub will happen automatically everytime you "
-                "restart Anki. You can manually sync with AnkiHub from the AnkiHub "
-                f"menu. See {url_help()} for more details."
-            )
-            self.close()
-            return
-
-        confirmed = ask_user(
-            f"Would you like to proceed with downloading and installing the deck? "
-            f"Your personal collection will be modified.<br><br>"
-            f"See <a href='{url_help()}'>{url_help()}</a> for details.",
-            title="Please confirm to proceed.",
-        )
-        if not confirmed:
-            return
-
-        def on_done(future: Future) -> None:
-            future.result()
-
-            self.accept()
-
-        download_and_install_decks([ah_did], on_done=on_done)
-
-    def _on_browse_deck(self) -> None:
-        openLink(url_decks())
