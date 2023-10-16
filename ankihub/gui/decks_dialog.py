@@ -157,7 +157,7 @@ class SubscribedDecksDialog(QDialog):
         self.box_deck_action_buttons.addWidget(self.unsubscribe_btn)
         qconnect(self.unsubscribe_btn.clicked, self._on_unsubscribe)
 
-        box.addSpacing(10)
+        box.addSpacing(20)
 
         # Deck Settings
         self.box_deck_settings = QVBoxLayout()
@@ -188,7 +188,7 @@ class SubscribedDecksDialog(QDialog):
         self.subdecks_docs_link_label.setOpenExternalLinks(True)
         self.box_deck_settings_elements.addWidget(self.subdecks_docs_link_label)
 
-        box.addSpacing(10)
+        box.addSpacing(20)
 
         # Updates Destination
         self.box_updates_destination = QVBoxLayout()
@@ -220,7 +220,7 @@ class SubscribedDecksDialog(QDialog):
         self.destination_updates_docs_link_label.setOpenExternalLinks(True)
         self.box_updates_destination.addWidget(self.destination_updates_docs_link_label)
 
-        box.addStretch(1)
+        box.addStretch()
 
     def _refresh_updates_destination_details_label(self, ah_did: uuid.UUID) -> None:
         deck_config = config.deck_config(ah_did)
