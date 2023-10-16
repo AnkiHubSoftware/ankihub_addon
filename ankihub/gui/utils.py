@@ -1,10 +1,11 @@
 import uuid
-from typing import Any, List, Optional
+from typing import Any, List, Optional, Union
 
 import aqt
 from aqt.addons import check_and_prompt_for_updates
 from aqt.qt import (
     QApplication,
+    QCheckBox,
     QDialog,
     QDialogButtonBox,
     QIcon,
@@ -255,8 +256,8 @@ def ask_user(
         return None
 
 
-def set_tooltip_icon(btn: QPushButton) -> None:
-    btn.setIcon(
+def set_tooltip_icon(widget: Union[QPushButton, QCheckBox]) -> None:
+    widget.setIcon(
         QIcon(
             QApplication.style().standardIcon(
                 QStyle.StandardPixmap.SP_MessageBoxInformation
