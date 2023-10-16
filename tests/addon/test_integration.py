@@ -63,6 +63,7 @@ from ankihub.gui.operations.db_check.ah_db_check import check_ankihub_db
 from ..factories import DeckFactory, DeckMediaFactory, NoteInfoFactory
 from ..fixtures import (
     ImportAHNote,
+    InstallAHDeck,
     MockDownloadAndInstallDeckDependencies,
     MockFunction,
     create_or_get_ah_version_of_note_type,
@@ -2571,6 +2572,74 @@ class TestSubscribedDecksDialog:
         note.tags = [f"{SUBDECK_TAG}::{subdeck_name}"]
         note.flush()
         return subdeck_name, anki_did, ah_did
+
+    def test_change_updates_destination(
+        self,
+        anki_session_with_addon_data: AnkiSession,
+        qtbot: QtBot,
+        install_ah_deck: InstallAHDeck,
+        monkeypatch: MonkeyPatch,
+    ):
+        with anki_session_with_addon_data.profile_loaded():
+            ah_did = install_ah_deck()
+
+            self._mock_dependencies(monkeypatch)
+
+            # Mock get_deck_subscriptions to return the deck
+            monkeypatch.setattr(
+                AnkiHubClient,
+                "get_deck_subscriptions",
+                lambda *args: [
+                    DeckFactory.create(
+                        ah_did=ah_did, anki_did=config.deck_config(ah_did).anki_id
+                    )
+                ],
+            )
+
+            # Mock the dialog that asks the user for the destination deck
+            new_destination_deck_name = "New Deck"
+            install_ah_deck(anki_deck_name=new_destination_deck_name)
+            new_home_deck_anki_id = aqt.mw.col.decks.id_for_name(
+                new_destination_deck_name
+            )
+            self._mock_new_cards_destination_dialog(
+                new_destination_deck_name, monkeypatch
+            )
+
+            # Open the dialog
+            dialog = SubscribedDecksDialog()
+            dialog.display_subscribe_window()
+            qtbot.wait(200)
+
+            # Select the deck and click the Set Updates Destination button
+            dialog.decks_list.setCurrentRow(0)
+            qtbot.wait(200)
+
+            dialog.set_updates_destination_btn.click()
+            qtbot.wait(200)
+
+            # Assert that the destination deck was updated
+            assert config.deck_config(ah_did).anki_id == new_home_deck_anki_id
+
+    def _mock_new_cards_destination_dialog(
+        self,
+        destination_deck_name: str,
+        monkeypatch: MonkeyPatch,
+    ) -> None:
+        """Sets the destination deck for new cards to the deck with the given name."""
+        study_deck_mock = Mock()
+
+        def study_deck_mock_side_effect(*args, **kwargs):
+            callback = kwargs["callback"]
+            cb_study_deck_mock = Mock()
+            cb_study_deck_mock.name = destination_deck_name
+            callback(cb_study_deck_mock)
+
+        study_deck_mock.side_effect = study_deck_mock_side_effect
+        monkeypatch.setattr(
+            "ankihub.gui.decks_dialog.StudyDeckWithoutHelpButton",
+            study_deck_mock,
+        )
 
     def _mock_dependencies(self, monkeypatch: MonkeyPatch) -> None:
         # Mock the config to return that the user is logged in

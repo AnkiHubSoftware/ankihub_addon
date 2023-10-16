@@ -21,12 +21,13 @@ os.environ["SKIP_INIT"] = "1"
 
 from ankihub.ankihub_client import NoteInfo
 from ankihub.ankihub_client.ankihub_client import AnkiHubClient
-from ankihub.ankihub_client.models import Deck
+from ankihub.ankihub_client.models import Deck, UserDeckRelation
 from ankihub.feature_flags import setup_feature_flags
 from ankihub.gui import operations
 from ankihub.gui.media_sync import _AnkiHubMediaSync
 from ankihub.main.importing import AnkiHubImporter
 from ankihub.main.utils import modify_note_type
+from ankihub.settings import config
 
 
 @fixture
@@ -174,7 +175,8 @@ class ImportAHNote(Protocol):
         note_data: Optional[NoteInfo] = None,
         ah_nid: Optional[uuid.UUID] = None,
         mid: Optional[NotetypeId] = None,
-        ah_did: uuid.UUID = None,
+        ah_did: Optional[uuid.UUID] = None,
+        anki_did: Optional[DeckId] = None,
     ) -> NoteInfo:
         ...
 
@@ -203,7 +205,8 @@ def import_ah_note(next_deterministic_uuid: Callable[[], uuid.UUID]) -> ImportAH
         note_data: Optional[NoteInfo] = None,
         ah_nid: Optional[uuid.UUID] = None,
         mid: Optional[NotetypeId] = None,
-        ah_did: uuid.UUID = default_ah_did,
+        ah_did: Optional[uuid.UUID] = default_ah_did,
+        anki_did: Optional[DeckId] = None,
     ) -> NoteInfo:
         if mid is None:
             ah_basic_note_type = create_or_get_ah_version_of_note_type(
@@ -238,7 +241,8 @@ def import_ah_note(next_deterministic_uuid: Callable[[], uuid.UUID]) -> ImportAH
             protected_fields={},
             protected_tags=[],
             deck_name=deck_name,
-            is_first_import_of_deck=True,
+            is_first_import_of_deck=anki_did is None,
+            anki_did=anki_did,
         )
         return note_data
 
@@ -320,6 +324,53 @@ def new_note_with_note_type() -> NewNoteWithNoteType:
         return note
 
     return new_note_with_note_type_inner
+
+
+class InstallAHDeck(Protocol):
+    def __call__(
+        self,
+        ah_did: Optional[uuid.UUID] = None,
+        ah_deck_name: Optional[str] = None,
+        anki_did: Optional[DeckId] = None,
+        anki_deck_name: Optional[str] = None,
+    ) -> uuid.UUID:
+        ...
+
+
+@pytest.fixture
+def install_ah_deck(
+    next_deterministic_uuid: Callable[[], uuid.UUID],
+    import_ah_note: ImportAHNote,
+) -> InstallAHDeck:
+    """Installs a deck with the given AnkiHub and Anki names and ids.
+    The deck is imported and added to the private config.
+    Returns the AnkiHub deck id."""
+    default_ah_did = next_deterministic_uuid()
+    default_ah_deck_name = "Test Deck"
+    # 1 is the id of the default deck, we don't want to use that here
+    default_anki_did = DeckId(2)
+    default_anki_deck_name = "Test Deck"
+
+    def install_ah_deck_inner(
+        ah_did: Optional[uuid.UUID] = default_ah_did,
+        ah_deck_name: Optional[str] = default_ah_deck_name,
+        anki_did: Optional[DeckId] = default_anki_did,
+        anki_deck_name: Optional[str] = default_anki_deck_name,
+    ) -> uuid.UUID:
+        # Add deck to the config
+        config.add_deck(
+            name=ah_deck_name,
+            ankihub_did=ah_did,
+            anki_did=anki_did,
+            user_relation=UserDeckRelation.SUBSCRIBER,
+        )
+
+        # Create deck by importing a note for it
+        import_ah_note(ah_did=ah_did, anki_did=anki_did)
+        aqt.mw.col.decks.rename(aqt.mw.col.decks.get(anki_did), anki_deck_name)
+        return ah_did
+
+    return install_ah_deck_inner
 
 
 class MockDownloadAndInstallDeckDependencies(Protocol):
