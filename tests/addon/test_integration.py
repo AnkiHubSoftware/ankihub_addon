@@ -40,6 +40,7 @@ from aqt.browser.sidebar.item import SidebarItem
 from aqt.browser.sidebar.tree import SidebarTreeView
 from aqt.importing import AnkiPackageImporter
 from aqt.qt import QAction, Qt
+from aqt.theme import theme_manager
 from pytest import MonkeyPatch, fixture
 from pytest_anki import AnkiSession
 from pytestqt.qtbot import QtBot  # type: ignore
@@ -2474,6 +2475,43 @@ def test_protect_fields_action(
 
 
 class TestSubscribedDecksDialog:
+    @pytest.mark.parametrize(
+        "nightmode",
+        [True, False],
+    )
+    def test_basic(
+        self,
+        anki_session_with_addon_data: AnkiSession,
+        install_sample_ah_deck: InstallSampleAHDeck,
+        qtbot: QtBot,
+        monkeypatch: MonkeyPatch,
+        nightmode: bool,
+    ):
+        with anki_session_with_addon_data.profile_loaded():
+
+            # Mock the config to return that the user is logged in
+            monkeypatch.setattr(config, "is_logged_in", lambda: True)
+
+            # Mock the ask_user function to always return True
+            monkeypatch.setattr(
+                operations.subdecks, "ask_user", lambda *args, **kwargs: True
+            )
+
+            ah_did, anki_did = install_sample_ah_deck()
+
+            # Mock get_deck_subscriptions to return the deck
+            monkeypatch.setattr(
+                AnkiHubClient,
+                "get_deck_subscriptions",
+                lambda *args: [DeckFactory.create(ah_did=ah_did, anki_did=anki_did)],
+            )
+
+            theme_manager.night_mode = nightmode
+
+            dialog = SubscribedDecksDialog()
+            qtbot.add_widget(dialog)
+            dialog.display_subscribe_window()
+
     def test_toggle_subdecks(
         self,
         anki_session_with_addon_data: AnkiSession,
