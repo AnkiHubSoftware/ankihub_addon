@@ -234,7 +234,13 @@ class SubscribedDecksDialog(QDialog):
 
     def _refresh_decks_list(self) -> None:
         self.decks_list.clear()
-        for deck in self.client.get_deck_subscriptions():
+
+        subscribed_decks = self.client.get_deck_subscriptions()
+        installed_ah_dids = config.deck_ids()
+        subscribed_and_installed_decks = [
+            deck for deck in subscribed_decks if deck.ah_did in installed_ah_dids
+        ]
+        for deck in subscribed_and_installed_decks:
             name = deck.name
             if deck.is_user_relation_owner:
                 item = QListWidgetItem(f"{name} (Created by you)")
