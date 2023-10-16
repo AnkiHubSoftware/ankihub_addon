@@ -11,9 +11,11 @@ from aqt.qt import (
     QDialog,
     QDialogButtonBox,
     QHBoxLayout,
+    QLabel,
     QListWidget,
     QListWidgetItem,
     QPushButton,
+    QSizePolicy,
     Qt,
     QVBoxLayout,
     qconnect,
@@ -24,7 +26,7 @@ from aqt.utils import openLink, showInfo, showText, tooltip
 from ..addon_ankihub_client import AddonAnkiHubClient as AnkiHubClient
 from ..gui.operations.deck_creation import create_collaborative_deck
 from ..main.deck_unsubscribtion import unsubscribe_from_deck_and_uninstall
-from ..main.subdecks import SUBDECK_TAG
+from ..main.subdecks import SUBDECK_TAG, deck_contains_subdeck_tags
 from ..settings import config, url_deck_base, url_decks
 from .operations.subdecks import confirm_and_toggle_subdecks
 from .utils import ask_user, clear_layout, set_tooltip_icon
@@ -158,7 +160,7 @@ class SubscribedDecksDialog(QDialog):
         self.toggle_subdecks_cb = QCheckBox("Enable Subdecks")
         self.toggle_subdecks_cb.setToolTip(
             "Toggle between the deck being organized into subdecks or not.<br>"
-            f"This will only have an effect if notes in the deck have <b>{SUBDECK_TAG}</b> tags."
+            f"This option is only available if notes in the deck have <b>{SUBDECK_TAG}</b> tags."
         )
         set_tooltip_icon(self.toggle_subdecks_cb)
         qconnect(self.toggle_subdecks_cb.clicked, self._on_toggle_subdecks)
@@ -299,9 +301,10 @@ class SubscribedDecksDialog(QDialog):
             return
 
         ankihub_did: UUID = selection[0].data(Qt.ItemDataRole.UserRole)
-        if deck_from_config := config.deck_config(ankihub_did):
-            using_subdecks = deck_from_config.subdecks_enabled
-            self.toggle_subdecks_cb.setEnabled(True)
+        if deck_config := config.deck_config(ankihub_did):
+            using_subdecks = deck_config.subdecks_enabled
+            has_subdeck_tags = deck_contains_subdeck_tags(ankihub_did)
+            self.toggle_subdecks_cb.setEnabled(has_subdeck_tags)
         else:
             using_subdecks = False
             self.toggle_subdecks_cb.setEnabled(False)
