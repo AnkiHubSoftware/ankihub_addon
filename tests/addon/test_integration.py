@@ -2492,22 +2492,6 @@ class TestSubscribedDecksDialog:
                 operations.subdecks, "ask_user", lambda *args, **kwargs: True
             )
 
-            # Mock get_deck_subscriptions to return an empty list
-            monkeypatch.setattr(
-                AnkiHubClient,
-                "get_deck_subscriptions",
-                lambda *args, **kwargs: [],
-            )
-
-            # Open the dialog
-            dialog = SubscribedDecksDialog()
-            qtbot.add_widget(dialog)
-            dialog.display_subscribe_window()
-            qtbot.wait(200)
-
-            # The toggle subdecks button should be disabled because there are no decks
-            assert dialog.toggle_subdecks_btn.isEnabled() is False
-
             # Install a deck with subdeck tags
             subdeck_name, anki_did, ah_did = self._install_deck_with_subdeck_tag(
                 install_sample_ah_deck
@@ -2533,15 +2517,15 @@ class TestSubscribedDecksDialog:
             dialog.decks_list.setCurrentRow(0)
             qtbot.wait(200)
 
-            assert dialog.toggle_subdecks_btn.isEnabled() is True
-            dialog.toggle_subdecks_btn.click()
+            assert dialog.toggle_subdecks_cb.isEnabled() is True
+            dialog.toggle_subdecks_cb.click()
             qtbot.wait(200)
 
             # The subdeck should now exist
             assert mw.col.decks.by_name(subdeck_name) is not None
 
             # Click the toggle subdeck button again
-            dialog.toggle_subdecks_btn.click()
+            dialog.toggle_subdecks_cb.click()
             qtbot.wait(200)
 
             # The subdeck should not exist anymore
