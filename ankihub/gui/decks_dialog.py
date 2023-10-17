@@ -154,11 +154,11 @@ class SubscribedDecksDialog(QDialog):
 
         box.addSpacing(20)
 
-        # Deck Settings
+        # Deck Options
         self.box_deck_settings = QVBoxLayout()
         box.addLayout(self.box_deck_settings)
 
-        self.deck_settings_label = QLabel("<b>Deck Settings</b>")
+        self.deck_settings_label = QLabel("<b>Deck Options</b>")
         self.box_deck_settings.addWidget(self.deck_settings_label)
 
         self.box_deck_settings_elements = QVBoxLayout()
