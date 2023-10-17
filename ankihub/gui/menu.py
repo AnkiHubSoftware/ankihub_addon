@@ -262,7 +262,7 @@ def _ankihub_login_setup(parent: QMenu):
 
 
 def _subscribed_decks_setup(parent: QMenu):
-    q_action = QAction("📚 Subscribed Decks", aqt.mw)
+    q_action = QAction("📚 Deck Management", aqt.mw)
     qconnect(q_action.triggered, DeckManagementDialog.display_subscribe_window)
     parent.addAction(q_action)
 
