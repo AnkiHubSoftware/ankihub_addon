@@ -72,8 +72,6 @@ class SubscribedDecksDialog(QDialog):
 
     def _setup_box_top(self) -> QVBoxLayout:
         box = QVBoxLayout()
-        self.deck_operations_label = QLabel("<b>Deck Operations</b>")
-        box.addWidget(self.deck_operations_label)
 
         self.box_top_buttons = QHBoxLayout()
         box.addLayout(self.box_top_buttons)
