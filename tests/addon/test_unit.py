@@ -21,15 +21,14 @@ from pytest_anki import AnkiSession
 from pytestqt.qtbot import QtBot  # type: ignore
 from requests import Response  # type: ignore
 
-from ankihub.gui import errors
-from ankihub.gui.operations.utils import future_with_exception, future_with_result
-
 from ..factories import DeckMediaFactory, NoteInfoFactory
 from ..fixtures import (  # type: ignore
     ImportAHNoteType,
     MockFunction,
     NewNoteWithNoteType,
     SetFeatureFlagState,
+    add_basic_anki_note_to_deck,
+    create_anki_deck,
 )
 from .test_integration import ImportAHNote
 
@@ -41,7 +40,7 @@ from ankihub.ankihub_client import AnkiHubHTTPError, Field, SuggestionType
 from ankihub.db.db import _AnkiHubDB
 from ankihub.db.exceptions import IntegrityError
 from ankihub.feature_flags import _FeatureFlags, feature_flags
-from ankihub.gui import suggestion_dialog
+from ankihub.gui import errors, suggestion_dialog
 from ankihub.gui.error_dialog import ErrorDialog
 from ankihub.gui.errors import (
     OUTDATED_CLIENT_ERROR_REASON,
@@ -50,6 +49,12 @@ from ankihub.gui.errors import (
     _try_handle_exception,
 )
 from ankihub.gui.menu import AnkiHubLogin
+from ankihub.gui.operations import deck_creation
+from ankihub.gui.operations.deck_creation import (
+    DeckCreationConfirmationDialog,
+    create_collaborative_deck,
+)
+from ankihub.gui.operations.utils import future_with_exception, future_with_result
 from ankihub.gui.suggestion_dialog import (
     SourceType,
     SuggestionDialog,
@@ -62,7 +67,10 @@ from ankihub.gui.suggestion_dialog import (
 )
 from ankihub.gui.threading_utils import rate_limited
 from ankihub.main import suggestions
-from ankihub.main.deck_creation import _note_type_name_without_ankihub_modifications
+from ankihub.main.deck_creation import (
+    DeckCreationResult,
+    _note_type_name_without_ankihub_modifications,
+)
 from ankihub.main.exporting import _prepared_field_html
 from ankihub.main.importing import _updated_tags
 from ankihub.main.note_conversion import (
@@ -1493,3 +1501,61 @@ class TestRetainNidsWithAHNoteType:
 
             nids = [nid_1, nid_2, nid_3]
             assert retain_nids_with_ah_note_type(nids) == [nid_1, nid_2]
+
+
+class TestCreateCollaborativeDeck:
+    def test_basic(
+        self,
+        anki_session_with_addon_data: AnkiSession,
+        mock_function: MockFunction,
+        next_deterministic_uuid: Callable[[], uuid.UUID],
+        qtbot: QtBot,
+    ) -> None:
+        with anki_session_with_addon_data.profile_loaded():
+            # Setup Anki deck with a note.
+            deck_name = "test"
+            anki_did = create_anki_deck(deck_name=deck_name)
+            add_basic_anki_note_to_deck(anki_did)
+
+            # Mock all the UI interactions.
+            mock_function(DeckCreationConfirmationDialog, "run", return_value=True)
+
+            study_deck_mock = Mock
+            study_deck_mock.name = deck_name
+            mock_function(deck_creation, "StudyDeck", return_value=study_deck_mock)
+
+            mock_function(deck_creation, "ask_user", return_value=True)
+
+            ah_did = next_deterministic_uuid()
+            notes_data = [NoteInfoFactory.create()]
+            create_ankihub_deck_mock = mock_function(
+                deck_creation,
+                "create_ankihub_deck",
+                return_value=DeckCreationResult(
+                    ankihub_did=ah_did,
+                    notes_data=notes_data,
+                ),
+            )
+
+            get_media_names_from_notes_data_mock = mock_function(
+                deck_creation,
+                "get_media_names_from_notes_data",
+                return_value=[],
+            )
+            start_media_upload_mock = mock_function(
+                deck_creation.media_sync, "start_media_upload"
+            )
+            showInfo_mock = mock_function(deck_creation, "showInfo")
+
+            # Create the collaborative deck.
+            create_collaborative_deck()
+
+            qtbot.wait_until(lambda: showInfo_mock.called)
+
+            # Assert that the correct functions were called.
+            create_ankihub_deck_mock.assert_called_once_with(
+                deck_name, private=False, add_subdeck_tags=False
+            )
+
+            get_media_names_from_notes_data_mock.assert_called_once_with(notes_data)
+            start_media_upload_mock.assert_called_once()
