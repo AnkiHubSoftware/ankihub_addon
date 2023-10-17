@@ -2511,6 +2511,9 @@ class TestSubscribedDecksDialog:
             dialog.decks_list.setCurrentRow(0)
             qtbot.wait(200)
 
+            deck_name = config.deck_config(ah_did).name
+            assert deck_name in dialog.deck_name_label.text()
+
     def test_toggle_subdecks(
         self,
         anki_session_with_addon_data: AnkiSession,

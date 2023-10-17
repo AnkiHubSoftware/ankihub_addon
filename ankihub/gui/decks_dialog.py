@@ -130,11 +130,12 @@ class SubscribedDecksDialog(QDialog):
         self.box_deck_actions = QVBoxLayout()
         box.addLayout(self.box_deck_actions)
 
-        self.deck_actions_label = QLabel("<b>Deck Actions</b>")
-        self.deck_actions_label.setSizePolicy(
+        deck_name = config.deck_config(selected_ah_did).name
+        self.deck_name_label = QLabel(f"<h3>{deck_name}</h3>")
+        self.deck_name_label.setSizePolicy(
             QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Preferred
         )
-        self.box_deck_actions.addWidget(self.deck_actions_label)
+        self.box_deck_actions.addWidget(self.deck_name_label)
 
         self.box_deck_action_buttons = QHBoxLayout()
         self.box_deck_actions.addLayout(self.box_deck_action_buttons)
