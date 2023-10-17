@@ -187,34 +187,40 @@ class SubscribedDecksDialog(QDialog):
         box.addSpacing(20)
 
         # Updates Destination
-        self.box_updates_destination = QVBoxLayout()
-        box.addLayout(self.box_updates_destination)
+        self.box_new_cards_destination = QVBoxLayout()
+        box.addLayout(self.box_new_cards_destination)
 
-        self.updates_destination_label = QLabel("<b>Updates Destination</b>")
-        self.box_updates_destination.addWidget(self.updates_destination_label)
+        self.new_cards_destination = QLabel("<b>Destination for New Cards</b>")
+        self.box_new_cards_destination.addWidget(self.new_cards_destination)
 
-        self.updates_destination_details_label = QLabel()
-        self.updates_destination_details_label.setWordWrap(True)
+        self.new_cards_destination_details_label = QLabel()
+        self.new_cards_destination_details_label.setWordWrap(True)
         self._refresh_updates_destination_details_label(selected_ah_did)
-        self.box_updates_destination.addWidget(self.updates_destination_details_label)
-
-        self.set_updates_destination_btn = QPushButton("Change updates destination")
-        qconnect(
-            self.set_updates_destination_btn.clicked,
-            self._on_change_updates_destination,
+        self.box_new_cards_destination.addWidget(
+            self.new_cards_destination_details_label
         )
-        self.box_updates_destination.addWidget(self.set_updates_destination_btn)
-        self.box_updates_destination.addSpacing(7)
 
-        self.destination_updates_docs_link_label = QLabel(
+        self.set_new_cards_destination_btn = QPushButton(
+            "Change Destination for New Cards"
+        )
+        qconnect(
+            self.set_new_cards_destination_btn.clicked,
+            self._on_new_cards_destination_btn_clicked,
+        )
+        self.box_new_cards_destination.addWidget(self.set_new_cards_destination_btn)
+        self.box_new_cards_destination.addSpacing(7)
+
+        self.new_cards_destination_docs_link_label = QLabel(
             """
             <a href="https://community.ankihub.net/t/how-are-anki-decks-related-to-ankihub-decks/4811">
-                More about Updates Destinations
+                More about destinations for new cards
             </a>
             """
         )
-        self.destination_updates_docs_link_label.setOpenExternalLinks(True)
-        self.box_updates_destination.addWidget(self.destination_updates_docs_link_label)
+        self.new_cards_destination_docs_link_label.setOpenExternalLinks(True)
+        self.box_new_cards_destination.addWidget(
+            self.new_cards_destination_docs_link_label
+        )
 
         box.addStretch()
 
@@ -222,13 +228,13 @@ class SubscribedDecksDialog(QDialog):
         deck_config = config.deck_config(ah_did)
         destination_anki_did = deck_config.anki_id
         if name := aqt.mw.col.decks.name_if_exists(destination_anki_did):
-            self.updates_destination_details_label.setText(
-                f"New cards will be added to: {name}."
+            self.new_cards_destination_details_label.setText(
+                f"New cards are saved to: {name}."
             )
         else:
             # If the deck doesn't exist, it will be re-created on next sync with the name from the config.
-            self.updates_destination_details_label.setText(
-                f"New cards will be added to <b>{deck_config.name}</b>."
+            self.new_cards_destination_details_label.setText(
+                f"New cards are saved to: {deck_config.name}."
             )
 
     def _refresh_decks_list(self) -> None:
@@ -301,7 +307,7 @@ class SubscribedDecksDialog(QDialog):
             ankihub_id: UUID = item.data(Qt.ItemDataRole.UserRole)
             openLink(f"{url_deck_base()}/{ankihub_id}")
 
-    def _on_change_updates_destination(self):
+    def _on_new_cards_destination_btn_clicked(self):
         deck_names = self.decks_list.selectedItems()
         if len(deck_names) == 0:
             return
@@ -329,7 +335,7 @@ class SubscribedDecksDialog(QDialog):
             aqt.mw,
             current=current,
             accept="Accept",
-            title="Choose Updates Destination",
+            title="Select Destination for New Cards",
             parent=self,
             callback=update_deck_config,
         )
@@ -388,7 +394,9 @@ class SubscribedDecksDialog(QDialog):
 
         self.unsubscribe_btn.setEnabled(one_selected)
         self.open_web_btn.setEnabled(one_selected)
-        self.set_updates_destination_btn.setEnabled(one_selected and is_deck_installed)
+        self.set_new_cards_destination_btn.setEnabled(
+            one_selected and is_deck_installed
+        )
 
     @classmethod
     def display_subscribe_window(cls):

@@ -2573,7 +2573,7 @@ class TestSubscribedDecksDialog:
         note.flush()
         return subdeck_name, anki_did, ah_did
 
-    def test_change_updates_destination(
+    def test_change_destination_for_new_cards(
         self,
         anki_session_with_addon_data: AnkiSession,
         qtbot: QtBot,
@@ -2618,7 +2618,7 @@ class TestSubscribedDecksDialog:
             dialog.decks_list.setCurrentRow(0)
             qtbot.wait(200)
 
-            dialog.set_updates_destination_btn.click()
+            dialog.set_new_cards_destination_btn.click()
             qtbot.wait(200)
 
             # Assert that the destination deck was updated
