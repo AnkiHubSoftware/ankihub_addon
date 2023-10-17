@@ -66,6 +66,8 @@ class SubscribedDecksDialog(QDialog):
         self.box_bottom_left = self._setup_box_bottom_left()
         self.box_bottom.addLayout(self.box_bottom_left)
 
+        self.box_bottom.addSpacing(10)
+
         self.box_bottom_right = QVBoxLayout()
         self._refresh_box_bottom_right(self.box_bottom_right, None)
         self.box_bottom.addLayout(self.box_bottom_right)
@@ -97,6 +99,8 @@ class SubscribedDecksDialog(QDialog):
             QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Preferred
         )
         box.addWidget(self.decks_list_label)
+
+        box.addSpacing(5)
 
         self.decks_list = QListWidget()
         box.addWidget(self.decks_list)
