@@ -199,7 +199,7 @@ class DeckManagementDialog(QDialog):
 
         box.addSpacing(20)
 
-        # Updates Destination
+        # Destination for new cards
         self.box_new_cards_destination = QVBoxLayout()
         box.addLayout(self.box_new_cards_destination)
 
