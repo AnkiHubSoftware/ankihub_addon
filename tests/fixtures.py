@@ -445,3 +445,31 @@ def add_basic_anki_note_to_deck(anki_did: DeckId) -> None:
     note = aqt.mw.col.new_note(aqt.mw.col.models.by_name("Basic"))
     note["Front"] = "some text"
     aqt.mw.col.add_note(note, anki_did)
+
+
+@fixture
+def mock_study_deck_dialog_with_cb(
+    monkeypatch: MonkeyPatch,
+):
+    """Mocks the aqt.studydeck.StudyDeck dialog to call the callback with the provided deck name
+    instead of showing the dialog."""
+
+    def mock_study_deck_dialog_inner(
+        target_object: Any,
+        deck_name: str,
+    ) -> None:
+        dialog_mock = Mock()
+
+        def study_deck_mock_side_effect(*args, **kwargs) -> None:
+            callback = kwargs["callback"]
+            cb_study_deck_mock = Mock()
+            cb_study_deck_mock.name = deck_name
+            callback(cb_study_deck_mock)
+
+        dialog_mock.side_effect = study_deck_mock_side_effect
+        monkeypatch.setattr(
+            target_object,
+            dialog_mock,
+        )
+
+    return mock_study_deck_dialog_inner

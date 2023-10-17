@@ -2579,6 +2579,7 @@ class TestSubscribedDecksDialog:
         qtbot: QtBot,
         install_ah_deck: InstallAHDeck,
         monkeypatch: MonkeyPatch,
+        mock_study_deck_dialog_with_cb,
     ):
         with anki_session_with_addon_data.profile_loaded():
             ah_did = install_ah_deck()
@@ -2596,14 +2597,16 @@ class TestSubscribedDecksDialog:
                 ],
             )
 
-            # Mock the dialog that asks the user for the destination deck
+            # Mock the dialog that asks the user for the destination deck to choose
+            # a new deck.
             new_destination_deck_name = "New Deck"
             install_ah_deck(anki_deck_name=new_destination_deck_name)
             new_home_deck_anki_id = aqt.mw.col.decks.id_for_name(
                 new_destination_deck_name
             )
-            self._mock_new_cards_destination_dialog(
-                new_destination_deck_name, monkeypatch
+            mock_study_deck_dialog_with_cb(
+                "ankihub.gui.decks_dialog.StudyDeckWithoutHelpButton",
+                deck_name=new_destination_deck_name,
             )
 
             # Open the dialog
@@ -2620,26 +2623,6 @@ class TestSubscribedDecksDialog:
 
             # Assert that the destination deck was updated
             assert config.deck_config(ah_did).anki_id == new_home_deck_anki_id
-
-    def _mock_new_cards_destination_dialog(
-        self,
-        destination_deck_name: str,
-        monkeypatch: MonkeyPatch,
-    ) -> None:
-        """Sets the destination deck for new cards to the deck with the given name."""
-        study_deck_mock = Mock()
-
-        def study_deck_mock_side_effect(*args, **kwargs):
-            callback = kwargs["callback"]
-            cb_study_deck_mock = Mock()
-            cb_study_deck_mock.name = destination_deck_name
-            callback(cb_study_deck_mock)
-
-        study_deck_mock.side_effect = study_deck_mock_side_effect
-        monkeypatch.setattr(
-            "ankihub.gui.decks_dialog.StudyDeckWithoutHelpButton",
-            study_deck_mock,
-        )
 
     def _mock_dependencies(self, monkeypatch: MonkeyPatch) -> None:
         # Mock the config to return that the user is logged in
