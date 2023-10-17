@@ -1503,13 +1503,19 @@ class TestRetainNidsWithAHNoteType:
             assert retain_nids_with_ah_note_type(nids) == [nid_1, nid_2]
 
 
+@pytest.mark.parametrize(
+    "creating_deck_fails",
+    [True, False],
+)
 class TestCreateCollaborativeDeck:
+    @pytest.mark.qt_no_exception_capture
     def test_basic(
         self,
         anki_session_with_addon_data: AnkiSession,
         mock_function: MockFunction,
         next_deterministic_uuid: Callable[[], uuid.UUID],
         qtbot: QtBot,
+        creating_deck_fails: bool,
     ) -> None:
         with anki_session_with_addon_data.profile_loaded():
             # Setup Anki deck with a note.
@@ -1526,6 +1532,9 @@ class TestCreateCollaborativeDeck:
 
             mock_function(deck_creation, "ask_user", return_value=True)
 
+            def raise_exception(*args, **kwargs) -> None:
+                raise Exception("test")
+
             ah_did = next_deterministic_uuid()
             notes_data = [NoteInfoFactory.create()]
             create_ankihub_deck_mock = mock_function(
@@ -1535,6 +1544,7 @@ class TestCreateCollaborativeDeck:
                     ankihub_did=ah_did,
                     notes_data=notes_data,
                 ),
+                side_effect=raise_exception if creating_deck_fails else None,
             )
 
             get_media_names_from_notes_data_mock = mock_function(
@@ -1548,14 +1558,19 @@ class TestCreateCollaborativeDeck:
             showInfo_mock = mock_function(deck_creation, "showInfo")
 
             # Create the collaborative deck.
-            create_collaborative_deck()
+            if creating_deck_fails:
+                create_collaborative_deck()
+                qtbot.wait(500)
+                showInfo_mock.assert_not_called()
+            else:
+                create_collaborative_deck()
 
-            qtbot.wait_until(lambda: showInfo_mock.called)
+                qtbot.wait_until(lambda: showInfo_mock.called)
 
-            # Assert that the correct functions were called.
-            create_ankihub_deck_mock.assert_called_once_with(
-                deck_name, private=False, add_subdeck_tags=False
-            )
+                # Assert that the correct functions were called.
+                create_ankihub_deck_mock.assert_called_once_with(
+                    deck_name, private=False, add_subdeck_tags=False
+                )
 
-            get_media_names_from_notes_data_mock.assert_called_once_with(notes_data)
-            start_media_upload_mock.assert_called_once()
+                get_media_names_from_notes_data_mock.assert_called_once_with(notes_data)
+                start_media_upload_mock.assert_called_once()
