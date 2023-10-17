@@ -2549,7 +2549,7 @@ class TestDeckManagementDialog:
             dialog.decks_list.setCurrentRow(0)
             qtbot.wait(200)
 
-            assert dialog.toggle_subdecks_cb.isEnabled() is True
+            assert dialog.toggle_subdecks_cb.isEnabled()
             dialog.toggle_subdecks_cb.click()
             qtbot.wait(200)
 
@@ -2585,9 +2585,9 @@ class TestDeckManagementDialog:
         mock_study_deck_dialog_with_cb,
     ):
         with anki_session_with_addon_data.profile_loaded():
-            ah_did = install_ah_deck()
-
             self._mock_dependencies(monkeypatch)
+
+            ah_did = install_ah_deck()
 
             # Mock get_deck_subscriptions to return the deck
             monkeypatch.setattr(
