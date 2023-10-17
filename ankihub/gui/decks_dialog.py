@@ -339,6 +339,7 @@ class SubscribedDecksDialog(QDialog):
             title="Select Destination for New Cards",
             parent=self,
             callback=update_deck_config,
+            buttons=[],  # This removes the "Add" button
         )
 
     def _on_toggle_subdecks(self):
