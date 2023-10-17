@@ -340,23 +340,28 @@ class InstallAHDeck(Protocol):
 @pytest.fixture
 def install_ah_deck(
     next_deterministic_uuid: Callable[[], uuid.UUID],
+    next_deterministic_id: Callable[[], int],
     import_ah_note: ImportAHNote,
 ) -> InstallAHDeck:
     """Installs a deck with the given AnkiHub and Anki names and ids.
     The deck is imported and added to the private config.
     Returns the AnkiHub deck id."""
-    default_ah_did = next_deterministic_uuid()
-    default_ah_deck_name = "Test Deck"
-    # 1 is the id of the default deck, we don't want to use that here
-    default_anki_did = DeckId(2)
-    default_anki_deck_name = "Test Deck"
 
     def install_ah_deck_inner(
-        ah_did: Optional[uuid.UUID] = default_ah_did,
-        ah_deck_name: Optional[str] = default_ah_deck_name,
-        anki_did: Optional[DeckId] = default_anki_did,
-        anki_deck_name: Optional[str] = default_anki_deck_name,
+        ah_did: Optional[uuid.UUID] = None,
+        ah_deck_name: Optional[str] = None,
+        anki_did: Optional[DeckId] = None,
+        anki_deck_name: Optional[str] = None,
     ) -> uuid.UUID:
+        if not ah_did:
+            ah_did = next_deterministic_uuid()
+        if not anki_did:
+            anki_did = DeckId(next_deterministic_id() + 1)  # 1 is the default deck
+        if not anki_deck_name:
+            anki_deck_name = f"Deck {anki_did}"
+        if not ah_deck_name:
+            ah_deck_name = f"Deck {ah_did}"
+
         # Add deck to the config
         config.add_deck(
             name=ah_deck_name,
