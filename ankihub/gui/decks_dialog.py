@@ -177,7 +177,7 @@ class SubscribedDecksDialog(QDialog):
         self.subdecks_docs_link_label = QLabel(
             """
             <a href="https://docs.ankihub.net/user_docs/advanced.html#subdecks-and-subdeck-tags">
-                More about Subdecks
+                More about subdecks
             </a>
             """
         )
