@@ -30,7 +30,7 @@ from ..main.deck_unsubscribtion import unsubscribe_from_deck_and_uninstall
 from ..main.subdecks import SUBDECK_TAG, deck_contains_subdeck_tags
 from ..settings import config, url_deck_base, url_decks
 from .operations.subdecks import confirm_and_toggle_subdecks
-from .utils import ask_user, clear_layout, set_tooltip_icon
+from .utils import ask_user, clear_layout, tooltip_icon
 
 
 class DeckManagementDialog(QDialog):
@@ -169,15 +169,23 @@ class DeckManagementDialog(QDialog):
         self.box_deck_settings_elements = QVBoxLayout()
         self.box_deck_settings.addLayout(self.box_deck_settings_elements)
 
-        self.toggle_subdecks_cb = QCheckBox("Enable Subdecks")
-        self.toggle_subdecks_cb.setToolTip(
+        self.subdecks_cb_row = QHBoxLayout()
+        self.box_deck_settings_elements.addLayout(self.subdecks_cb_row)
+
+        subdecks_tooltip_message = (
             "Toggle between the deck being organized into subdecks or not.<br>"
             f"This option is only available if notes in the deck have <b>{SUBDECK_TAG}</b> tags."
         )
-        set_tooltip_icon(self.toggle_subdecks_cb)
+        self.subdecks_cb = QCheckBox("Enable Subdecks")
+        self.subdecks_cb.setToolTip(subdecks_tooltip_message)
         self._refresh_subdecks_checkbox()
-        qconnect(self.toggle_subdecks_cb.clicked, self._on_toggle_subdecks)
-        self.box_deck_settings_elements.addWidget(self.toggle_subdecks_cb)
+        qconnect(self.subdecks_cb.clicked, self._on_toggle_subdecks)
+        self.subdecks_cb_row.addWidget(self.subdecks_cb)
+
+        self.subdeck_cb_icon_label = QLabel()
+        self.subdeck_cb_icon_label.setPixmap(tooltip_icon().pixmap(16, 16))
+        self.subdeck_cb_icon_label.setToolTip(subdecks_tooltip_message)
+        self.subdecks_cb_row.addWidget(self.subdeck_cb_icon_label)
 
         self.subdecks_docs_link_label = QLabel(
             """
@@ -374,15 +382,15 @@ class DeckManagementDialog(QDialog):
         one_selected: bool = len(selection) == 1
 
         if not one_selected:
-            self.toggle_subdecks_cb.setEnabled(False)
+            self.subdecks_cb.setEnabled(False)
             return
 
         ankihub_did: UUID = selection[0].data(Qt.ItemDataRole.UserRole)
         deck_config = config.deck_config(ankihub_did)
 
         has_subdeck_tags = deck_contains_subdeck_tags(ankihub_did)
-        self.toggle_subdecks_cb.setEnabled(has_subdeck_tags)
-        self.toggle_subdecks_cb.setChecked(deck_config.subdecks_enabled)
+        self.subdecks_cb.setEnabled(has_subdeck_tags)
+        self.subdecks_cb.setChecked(deck_config.subdecks_enabled)
 
     def _on_deck_selection_changed(self) -> None:
         selection = self.decks_list.selectedItems()

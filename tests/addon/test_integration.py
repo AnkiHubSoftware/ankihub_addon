@@ -2549,15 +2549,15 @@ class TestDeckManagementDialog:
             dialog.decks_list.setCurrentRow(0)
             qtbot.wait(200)
 
-            assert dialog.toggle_subdecks_cb.isEnabled()
-            dialog.toggle_subdecks_cb.click()
+            assert dialog.subdecks_cb.isEnabled()
+            dialog.subdecks_cb.click()
             qtbot.wait(200)
 
             # The subdeck should now exist
             assert aqt.mw.col.decks.by_name(subdeck_name) is not None
 
             # Click the toggle subdeck button again
-            dialog.toggle_subdecks_cb.click()
+            dialog.subdecks_cb.click()
             qtbot.wait(200)
 
             # The subdeck should not exist anymore
