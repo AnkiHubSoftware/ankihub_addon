@@ -117,7 +117,7 @@ from ankihub.gui.config_dialog import (
     setup_config_dialog_manager,
 )
 from ankihub.gui.deck_updater import _AnkiHubDeckUpdater, ah_deck_updater
-from ankihub.gui.decks_dialog import SubscribedDecksDialog
+from ankihub.gui.decks_dialog import DeckManagementDialog
 from ankihub.gui.editor import _on_suggestion_button_press, _refresh_buttons
 from ankihub.gui.errors import upload_logs_and_data_in_background
 from ankihub.gui.media_sync import media_sync
@@ -1779,7 +1779,7 @@ def test_unsubscribe_from_deck(
                 }
             ],
         )
-        dialog = SubscribedDecksDialog()
+        dialog = DeckManagementDialog()
         qtbot.wait(500)
 
         decks_list = dialog.decks_list
@@ -2475,7 +2475,7 @@ def test_protect_fields_action(
         qtbot.wait_until(assert_note_has_expected_tag)
 
 
-class TestSubscribedDecksDialog:
+class TestDeckManagementDialog:
     @pytest.mark.parametrize(
         "nightmode",
         [True, False],
@@ -2502,7 +2502,7 @@ class TestSubscribedDecksDialog:
 
             theme_manager.night_mode = nightmode
 
-            dialog = SubscribedDecksDialog()
+            dialog = DeckManagementDialog()
             dialog.display_subscribe_window()
 
             assert dialog.decks_list.count() == 1
@@ -2540,7 +2540,7 @@ class TestSubscribedDecksDialog:
             )
 
             # Open the dialog
-            dialog = SubscribedDecksDialog()
+            dialog = DeckManagementDialog()
             dialog.display_subscribe_window()
             qtbot.wait(200)
 
@@ -2613,7 +2613,7 @@ class TestSubscribedDecksDialog:
             )
 
             # Open the dialog
-            dialog = SubscribedDecksDialog()
+            dialog = DeckManagementDialog()
             dialog.display_subscribe_window()
             qtbot.wait(200)
 

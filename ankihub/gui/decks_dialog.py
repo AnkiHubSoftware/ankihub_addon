@@ -33,12 +33,12 @@ from .operations.subdecks import confirm_and_toggle_subdecks
 from .utils import ask_user, clear_layout, set_tooltip_icon
 
 
-class SubscribedDecksDialog(QDialog):
-    _window: Optional["SubscribedDecksDialog"] = None
+class DeckManagementDialog(QDialog):
+    _window: Optional["DeckManagementDialog"] = None
     silentlyClose = True
 
     def __init__(self):
-        super(SubscribedDecksDialog, self).__init__()
+        super(DeckManagementDialog, self).__init__()
         self.client = AnkiHubClient()
         self._setup_ui()
         self._refresh_decks_list()
@@ -50,7 +50,7 @@ class SubscribedDecksDialog(QDialog):
             self.show()
 
     def _setup_ui(self):
-        self.setWindowTitle("AnkiHub | Decks Managment")
+        self.setWindowTitle("AnkiHub | Deck Management")
         self.setMinimumWidth(640)
         self.setMinimumHeight(450)
 

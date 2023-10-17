@@ -26,7 +26,7 @@ from ..db import ankihub_db
 from ..media_import.ui import open_import_dialog
 from ..settings import ADDON_VERSION, config
 from .config_dialog import get_config_dialog_manager
-from .decks_dialog import SubscribedDecksDialog
+from .decks_dialog import DeckManagementDialog
 from .errors import upload_logs_and_data_in_background, upload_logs_in_background
 from .media_sync import media_sync
 from .operations.ankihub_sync import sync_with_ankihub
@@ -263,7 +263,7 @@ def _ankihub_login_setup(parent: QMenu):
 
 def _subscribed_decks_setup(parent: QMenu):
     q_action = QAction("📚 Subscribed Decks", aqt.mw)
-    qconnect(q_action.triggered, SubscribedDecksDialog.display_subscribe_window)
+    qconnect(q_action.triggered, DeckManagementDialog.display_subscribe_window)
     parent.addAction(q_action)
 
 
