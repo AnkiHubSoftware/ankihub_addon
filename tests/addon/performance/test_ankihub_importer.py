@@ -7,6 +7,7 @@ from anki.models import NotetypeDict, NotetypeId
 from pytest_anki import AnkiSession
 
 from ankihub.ankihub_client import NoteInfo
+from ankihub.settings import DeckConfig
 
 from .conftest import Profile
 
@@ -38,6 +39,8 @@ def test_anking_deck_first_time_import(
                 note_types=anking_note_types,
                 protected_fields={},
                 protected_tags=[],
+                suspend_new_cards_of_new_notes=False,
+                suspend_new_cards_of_existing_notes=DeckConfig.suspend_new_cards_of_existing_notes_default(),
             )
         )
         print(f"Importing {len(notes_data)} notes took {duration} seconds")
