@@ -126,6 +126,8 @@ class _AnkiHubDeckUpdater:
                 protected_fields=chunk.protected_fields,
                 protected_tags=chunk.protected_tags,
                 subdecks=deck_config.subdecks_enabled,
+                suspend_new_cards_of_new_notes=deck_config.suspend_new_cards_of_new_notes,
+                suspend_new_cards_of_existing_notes=deck_config.suspend_new_cards_of_existing_notes,
             )
             self._import_results.append(import_result)
 

@@ -90,9 +90,18 @@ class DeckConfig(DataClassJSONMixin):
         False  # whether deck is organized into subdecks by the add-on
     )
     suspend_new_cards_of_new_notes: bool = False
-    suspend_new_cards_of_existing_notes: SuspendNewCardsOfExistingNotes = (
+    suspend_new_cards_of_existing_notes = (
         SuspendNewCardsOfExistingNotes.IF_SIBLINGS_SUSPENDED
     )
+
+    @staticmethod
+    def suspend_new_cards_of_new_notes_default(ah_did: uuid.UUID) -> bool:
+        result = ah_did == ANKING_DECK_ID
+        return result
+
+    @staticmethod
+    def suspend_new_cards_of_existing_notes_default() -> SuspendNewCardsOfExistingNotes:
+        return SuspendNewCardsOfExistingNotes.IF_SIBLINGS_SUSPENDED
 
 
 @dataclass
@@ -251,7 +260,9 @@ class _Config:
             anki_id=DeckId(anki_did),
             user_relation=user_relation,
             subdecks_enabled=subdecks_enabled,
-            suspend_new_cards_of_new_notes=ankihub_did == ANKING_DECK_ID,
+            suspend_new_cards_of_new_notes=DeckConfig.suspend_new_cards_of_new_notes_default(
+                ankihub_did
+            ),
         )
         # remove duplicates
         self.save_latest_deck_update(ankihub_did, latest_udpate)
