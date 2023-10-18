@@ -212,8 +212,25 @@ class DeckManagementDialog(QDialog):
         self.box_deck_settings_elements.addSpacing(10)
 
         # ... Suspend new cards of new notes
+        self.suspend_new_cards_of_new_notes_row = QHBoxLayout()
+        self.box_deck_settings_elements.addLayout(
+            self.suspend_new_cards_of_new_notes_row
+        )
+
         self.suspend_new_cards_of_new_notes_cb = QCheckBox(
             "Suspend new cards of new notes"
+        )
+        self.suspend_new_cards_of_new_notes_row.addWidget(
+            self.suspend_new_cards_of_new_notes_cb
+        )
+
+        suspend_new_cards_of_new_notes_tooltip_message = (
+            "Will automatically suspend all <br>"
+            "the cards of new notes added to <br>"
+            "the deck in future updates."
+        )
+        self.suspend_new_cards_of_new_notes_cb.setToolTip(
+            suspend_new_cards_of_new_notes_tooltip_message
         )
         self.suspend_new_cards_of_new_notes_cb.setChecked(
             deck_config.suspend_new_cards_of_new_notes
@@ -224,8 +241,16 @@ class DeckManagementDialog(QDialog):
                 selected_ah_did, self.suspend_new_cards_of_new_notes_cb.isChecked()
             ),
         )
-        self.box_deck_settings_elements.addWidget(
-            self.suspend_new_cards_of_new_notes_cb
+
+        self.suspend_new_cards_of_new_notes_cb_icon_label = QLabel()
+        self.suspend_new_cards_of_new_notes_cb_icon_label.setPixmap(
+            tooltip_icon().pixmap(16, 16)
+        )
+        self.suspend_new_cards_of_new_notes_cb_icon_label.setToolTip(
+            suspend_new_cards_of_new_notes_tooltip_message
+        )
+        self.suspend_new_cards_of_new_notes_row.addWidget(
+            self.suspend_new_cards_of_new_notes_cb_icon_label
         )
 
         self.box_deck_settings_elements.addSpacing(10)
