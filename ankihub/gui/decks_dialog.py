@@ -135,6 +135,7 @@ class DeckManagementDialog(QDialog):
 
         deck_name = config.deck_config(selected_ah_did).name
         self.deck_name_label = QLabel(f"<h3>{deck_name}</h3>")
+        self.deck_name_label.setWordWrap(True)
         self.deck_name_label.setSizePolicy(
             QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Preferred
         )
