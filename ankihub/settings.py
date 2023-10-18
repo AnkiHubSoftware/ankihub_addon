@@ -226,6 +226,16 @@ class _Config:
         self.deck_config(ankihub_did).subdecks_enabled = subdecks
         self._update_private_config()
 
+    def set_suspend_new_cards_of_new_notes(self, ankihub_did: uuid.UUID, suspend: bool):
+        self.deck_config(ankihub_did).suspend_new_cards_of_new_notes = suspend
+        self._update_private_config()
+
+    def set_suspend_new_cards_of_existing_notes(
+        self, ankihub_did: uuid.UUID, suspend: SuspendNewCardsOfExistingNotes
+    ):
+        self.deck_config(ankihub_did).suspend_new_cards_of_existing_notes = suspend
+        self._update_private_config()
+
     def add_deck(
         self,
         name: str,

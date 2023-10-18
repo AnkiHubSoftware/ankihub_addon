@@ -8,6 +8,7 @@ from anki.collection import OpChanges
 from aqt import gui_hooks
 from aqt.qt import (
     QCheckBox,
+    QComboBox,
     QDialog,
     QDialogButtonBox,
     QHBoxLayout,
@@ -28,7 +29,7 @@ from ..addon_ankihub_client import AddonAnkiHubClient as AnkiHubClient
 from ..gui.operations.deck_creation import create_collaborative_deck
 from ..main.deck_unsubscribtion import unsubscribe_from_deck_and_uninstall
 from ..main.subdecks import SUBDECK_TAG, deck_contains_subdeck_tags
-from ..settings import config, url_deck_base, url_decks
+from ..settings import SuspendNewCardsOfExistingNotes, config, url_deck_base, url_decks
 from .operations.subdecks import confirm_and_toggle_subdecks
 from .utils import ask_user, clear_layout, tooltip_icon
 
@@ -52,7 +53,7 @@ class DeckManagementDialog(QDialog):
     def _setup_ui(self):
         self.setWindowTitle("AnkiHub | Deck Management")
         self.setMinimumWidth(640)
-        self.setMinimumHeight(450)
+        self.setMinimumHeight(500)
 
         self.box_main = QVBoxLayout()
         self.setLayout(self.box_main)
@@ -169,6 +170,64 @@ class DeckManagementDialog(QDialog):
         self.box_deck_settings_elements = QVBoxLayout()
         self.box_deck_settings.addLayout(self.box_deck_settings_elements)
 
+        # ... Suspend new cards of existing notes
+        deck_config = config.deck_config(selected_ah_did)
+
+        self.box_suspend_new_cards_of_existing_notes = QVBoxLayout()
+        self.box_deck_settings_elements.addLayout(
+            self.box_suspend_new_cards_of_existing_notes
+        )
+
+        self.suspend_new_cards_of_existing_notes_label = QLabel(
+            "Suspend new cards of existing notes"
+        )
+        self.box_suspend_new_cards_of_existing_notes.addWidget(
+            self.suspend_new_cards_of_existing_notes_label
+        )
+
+        self.suspend_new_cards_of_existing_notes = QComboBox()
+        self.box_suspend_new_cards_of_existing_notes.addWidget(
+            self.suspend_new_cards_of_existing_notes
+        )
+
+        self.suspend_new_cards_of_existing_notes.insertItems(
+            0, [option.value for option in SuspendNewCardsOfExistingNotes]
+        )
+        self.suspend_new_cards_of_existing_notes.setCurrentText(
+            deck_config.suspend_new_cards_of_existing_notes.name
+        )
+        qconnect(
+            self.suspend_new_cards_of_existing_notes.currentTextChanged,
+            lambda: config.set_suspend_new_cards_of_existing_notes(
+                selected_ah_did,
+                SuspendNewCardsOfExistingNotes(
+                    self.suspend_new_cards_of_existing_notes.currentText()
+                ),
+            ),
+        )
+
+        self.box_deck_settings_elements.addSpacing(10)
+
+        # ... Suspend new cards of new notes
+        self.suspend_new_cards_of_new_notes_cb = QCheckBox(
+            "Suspend new cards of new notes"
+        )
+        self.suspend_new_cards_of_new_notes_cb.setChecked(
+            deck_config.suspend_new_cards_of_new_notes
+        )
+        qconnect(
+            self.suspend_new_cards_of_new_notes_cb.toggled,
+            lambda: config.set_suspend_new_cards_of_new_notes(
+                selected_ah_did, self.suspend_new_cards_of_new_notes_cb.isChecked()
+            ),
+        )
+        self.box_deck_settings_elements.addWidget(
+            self.suspend_new_cards_of_new_notes_cb
+        )
+
+        self.box_deck_settings_elements.addSpacing(10)
+
+        # ... Subdecks
         self.subdecks_cb_row = QHBoxLayout()
         self.box_deck_settings_elements.addLayout(self.subdecks_cb_row)
 
