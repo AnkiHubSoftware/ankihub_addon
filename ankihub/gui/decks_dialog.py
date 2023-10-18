@@ -371,6 +371,7 @@ class DeckManagementDialog(QDialog):
 
         has_subdeck_tags = deck_contains_subdeck_tags(ah_did)
         self.subdecks_cb.setEnabled(has_subdeck_tags)
+        self.subdecks_cb.setStyleSheet("color: grey" if not has_subdeck_tags else "")
 
         deck_config = config.deck_config(ah_did)
         self.subdecks_cb.setChecked(deck_config.subdecks_enabled)
