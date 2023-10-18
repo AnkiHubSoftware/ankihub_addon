@@ -69,7 +69,7 @@ class DeckManagementDialog(QDialog):
         self.box_bottom.addSpacing(10)
 
         self.box_bottom_right = QVBoxLayout()
-        self._refresh_box_bottom_right(self.box_bottom_right, None)
+        self._refresh_box_bottom_right()
         self.box_bottom.addLayout(self.box_bottom_right)
 
     def _setup_box_top(self) -> QVBoxLayout:
@@ -104,20 +104,19 @@ class DeckManagementDialog(QDialog):
 
         self.decks_list = QListWidget()
         box.addWidget(self.decks_list)
-        qconnect(self.decks_list.itemSelectionChanged, self._on_deck_selection_changed)
+        qconnect(self.decks_list.itemSelectionChanged, self._refresh_box_bottom_right)
         return box
 
-    def _refresh_box_bottom_right(
-        self, box: QVBoxLayout, selected_ah_did: Optional[uuid.UUID]
-    ) -> None:
-        clear_layout(box)
+    def _refresh_box_bottom_right(self) -> None:
+        clear_layout(self.box_bottom_right)
 
-        box.addSpacing(25)
+        self.box_bottom_right.addSpacing(25)
 
+        selected_ah_did = self._selected_ah_did()
         if selected_ah_did is None:
 
             self.box_no_deck_selected = QHBoxLayout()
-            box.addLayout(self.box_no_deck_selected)
+            self.box_bottom_right.addLayout(self.box_no_deck_selected)
 
             self.box_no_deck_selected.addSpacing(5)
 
@@ -127,12 +126,12 @@ class DeckManagementDialog(QDialog):
             )
             self.box_no_deck_selected.addWidget(self.no_deck_selected_label)
 
-            box.addStretch(1)
+            self.box_bottom_right.addStretch(1)
             return
 
         # Deck Actions
         self.box_deck_actions = QVBoxLayout()
-        box.addLayout(self.box_deck_actions)
+        self.box_bottom_right.addLayout(self.box_deck_actions)
 
         deck_name = config.deck_config(selected_ah_did).name
         self.deck_name_label = QLabel(f"<h3>{deck_name}</h3>")
@@ -157,11 +156,11 @@ class DeckManagementDialog(QDialog):
         self.box_deck_action_buttons.addWidget(self.unsubscribe_btn)
         qconnect(self.unsubscribe_btn.clicked, self._on_unsubscribe)
 
-        box.addSpacing(20)
+        self.box_bottom_right.addSpacing(20)
 
         # Deck Options
         self.box_deck_settings = QVBoxLayout()
-        box.addLayout(self.box_deck_settings)
+        self.box_bottom_right.addLayout(self.box_deck_settings)
 
         self.deck_settings_label = QLabel("<b>Deck Options</b>")
         self.box_deck_settings.addWidget(self.deck_settings_label)
@@ -197,11 +196,11 @@ class DeckManagementDialog(QDialog):
         self.subdecks_docs_link_label.setOpenExternalLinks(True)
         self.box_deck_settings_elements.addWidget(self.subdecks_docs_link_label)
 
-        box.addSpacing(20)
+        self.box_bottom_right.addSpacing(20)
 
         # Destination for new cards
         self.box_new_cards_destination = QVBoxLayout()
-        box.addLayout(self.box_new_cards_destination)
+        self.box_bottom_right.addLayout(self.box_new_cards_destination)
 
         self.new_cards_destination = QLabel("<b>Destination for New Cards</b>")
         self.box_new_cards_destination.addWidget(self.new_cards_destination)
@@ -235,7 +234,7 @@ class DeckManagementDialog(QDialog):
             self.new_cards_destination_docs_link_label
         )
 
-        box.addStretch()
+        self.box_bottom_right.addStretch()
 
     def _refresh_new_cards_destination_details_label(self, ah_did: uuid.UUID) -> None:
         deck_config = config.deck_config(ah_did)
@@ -269,6 +268,14 @@ class DeckManagementDialog(QDialog):
             item.setData(Qt.ItemDataRole.UserRole, deck.ah_did)
             self.decks_list.addItem(item)
 
+    def _selected_ah_did(self) -> Optional[UUID]:
+        selection = self.decks_list.selectedItems()
+        if len(selection) != 1:
+            return None
+
+        result = selection[0].data(Qt.ItemDataRole.UserRole)
+        return result
+
     def _refresh_anki(self) -> None:
         op = OpChanges()
         op.deck = True
@@ -291,44 +298,32 @@ class DeckManagementDialog(QDialog):
             self.decks_list.setCurrentItem(deck_item)
 
     def _on_unsubscribe(self) -> None:
-        items = self.decks_list.selectedItems()
-        if len(items) == 0:
-            return
-        deck_names = [item.text() for item in items]
-        deck_names_text = ", ".join(deck_names)
+        ah_did = self._selected_ah_did()
+        deck_name = config.deck_config(ah_did).name
         confirm = ask_user(
-            f"Unsubscribe from deck {deck_names_text}?\n\n"
+            f"Unsubscribe from deck {deck_name}?\n\n"
             "The deck will remain in your collection, but it will no longer sync with AnkiHub.",
             title="Unsubscribe AnkiHub Deck",
         )
         if not confirm:
             return
 
-        for item in items:
-            ankihub_did: UUID = item.data(Qt.ItemDataRole.UserRole)
-            unsubscribe_from_deck_and_uninstall(ankihub_did)
+        unsubscribe_from_deck_and_uninstall(ah_did)
 
         tooltip("Unsubscribed from AnkiHub Deck.", parent=aqt.mw)
         self._refresh_decks_list()
 
     def _on_open_web(self) -> None:
-        items = self.decks_list.selectedItems()
-        if len(items) == 0:
+        ah_did = self._selected_ah_did()
+        if ah_did is None:
             return
 
-        for item in items:
-            ankihub_id: UUID = item.data(Qt.ItemDataRole.UserRole)
-            openLink(f"{url_deck_base()}/{ankihub_id}")
+        openLink(f"{url_deck_base()}/{ah_did}")
 
     def _on_new_cards_destination_btn_clicked(self):
-        deck_names = self.decks_list.selectedItems()
-        if len(deck_names) == 0:
-            return
-
-        deck_name = deck_names[0]
-        ankihub_id: UUID = deck_name.data(Qt.ItemDataRole.UserRole)
+        ah_did = self._selected_ah_did()
         current_destination_deck = aqt.mw.col.decks.get(
-            config.deck_config(ankihub_id).anki_id
+            config.deck_config(ah_did).anki_id
         )
         if current_destination_deck is None:
             current = None
@@ -340,8 +335,8 @@ class DeckManagementDialog(QDialog):
                 return
 
             anki_did = aqt.mw.col.decks.id(ret.name)
-            config.set_home_deck(ankihub_did=ankihub_id, anki_did=anki_did)
-            self._refresh_new_cards_destination_details_label(ankihub_id)
+            config.set_home_deck(ankihub_did=ah_did, anki_did=anki_did)
+            self._refresh_new_cards_destination_details_label(ah_did)
 
         # this lets the user pick a deck
         StudyDeckWithoutHelpButton(
@@ -355,14 +350,8 @@ class DeckManagementDialog(QDialog):
         )
 
     def _on_toggle_subdecks(self):
-        deck_items = self.decks_list.selectedItems()
-        if len(deck_items) == 0:
-            return
-
-        deck_item = deck_items[0]
-        ankihub_id: UUID = deck_item.data(Qt.ItemDataRole.UserRole)
-
-        deck_config = config.deck_config(ankihub_id)
+        ah_did = self._selected_ah_did()
+        deck_config = config.deck_config(ah_did)
         if aqt.mw.col.decks.name_if_exists(deck_config.anki_id) is None:
             showInfo(
                 (
@@ -373,38 +362,18 @@ class DeckManagementDialog(QDialog):
             )
             return
 
-        confirm_and_toggle_subdecks(ankihub_id)
+        confirm_and_toggle_subdecks(ah_did)
 
         self._refresh_subdecks_checkbox()
 
     def _refresh_subdecks_checkbox(self):
-        selection = self.decks_list.selectedItems()
-        ankihub_did: UUID = selection[0].data(Qt.ItemDataRole.UserRole)
-        deck_config = config.deck_config(ankihub_did)
+        ah_did = self._selected_ah_did()
 
-        has_subdeck_tags = deck_contains_subdeck_tags(ankihub_did)
+        has_subdeck_tags = deck_contains_subdeck_tags(ah_did)
         self.subdecks_cb.setEnabled(has_subdeck_tags)
+
+        deck_config = config.deck_config(ah_did)
         self.subdecks_cb.setChecked(deck_config.subdecks_enabled)
-
-    def _on_deck_selection_changed(self) -> None:
-        selection = self.decks_list.selectedItems()
-        one_selected: bool = len(selection) == 1
-        is_deck_installed = False
-        if one_selected:
-            selected = selection[0]
-            ankihub_did: UUID = selected.data(Qt.ItemDataRole.UserRole)
-            is_deck_installed = bool(config.deck_config(ankihub_did))
-
-        if one_selected:
-            self._refresh_box_bottom_right(self.box_bottom_right, ankihub_did)
-        else:
-            self._refresh_box_bottom_right(self.box_bottom_right, None)
-
-        self.unsubscribe_btn.setEnabled(one_selected)
-        self.open_web_btn.setEnabled(one_selected)
-        self.set_new_cards_destination_btn.setEnabled(
-            one_selected and is_deck_installed
-        )
 
     @classmethod
     def display_subscribe_window(cls):
