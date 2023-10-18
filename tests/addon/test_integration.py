@@ -66,6 +66,7 @@ from ..fixtures import (
     InstallAHDeck,
     MockDownloadAndInstallDeckDependencies,
     MockFunction,
+    MockStudyDeckDialogWithCB,
     create_or_get_ah_version_of_note_type,
 )
 from .conftest import TEST_PROFILE_ID
@@ -2582,7 +2583,7 @@ class TestDeckManagementDialog:
         qtbot: QtBot,
         install_ah_deck: InstallAHDeck,
         monkeypatch: MonkeyPatch,
-        mock_study_deck_dialog_with_cb,
+        mock_study_deck_dialog_with_cb: MockStudyDeckDialogWithCB,
     ):
         with anki_session_with_addon_data.profile_loaded():
             self._mock_dependencies(monkeypatch)

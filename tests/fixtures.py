@@ -447,10 +447,19 @@ def add_basic_anki_note_to_deck(anki_did: DeckId) -> None:
     aqt.mw.col.add_note(note, anki_did)
 
 
+class MockStudyDeckDialogWithCB(Protocol):
+    def __call__(
+        self,
+        target_object: Any,
+        deck_name: str,
+    ) -> None:
+        ...
+
+
 @fixture
 def mock_study_deck_dialog_with_cb(
     monkeypatch: MonkeyPatch,
-):
+) -> MockStudyDeckDialogWithCB:
     """Mocks the aqt.studydeck.StudyDeck dialog to call the callback with the provided deck name
     instead of showing the dialog."""
 
@@ -460,13 +469,13 @@ def mock_study_deck_dialog_with_cb(
     ) -> None:
         dialog_mock = Mock()
 
-        def study_deck_mock_side_effect(*args, **kwargs) -> None:
+        def dialog_mock_side_effect(*args, **kwargs) -> None:
             callback = kwargs["callback"]
             cb_study_deck_mock = Mock()
             cb_study_deck_mock.name = deck_name
             callback(cb_study_deck_mock)
 
-        dialog_mock.side_effect = study_deck_mock_side_effect
+        dialog_mock.side_effect = dialog_mock_side_effect
         monkeypatch.setattr(
             target_object,
             dialog_mock,
