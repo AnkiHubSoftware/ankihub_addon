@@ -176,8 +176,8 @@ class DeckManagementDialog(QDialog):
         self.box_deck_settings_elements.addLayout(self.subdecks_cb_row)
 
         subdecks_tooltip_message = (
-            "Toggle between the deck being organized into subdecks or not.<br>"
-            f"This option is only available if notes in the deck have <b>{SUBDECK_TAG}</b> tags."
+            "Activates organizing the deck into subdecks. "
+            f"Applies only to decks with <b>{SUBDECK_TAG}</b> tags."
         )
         self.subdecks_cb = QCheckBox("Enable Subdecks")
         self.subdecks_cb.setToolTip(subdecks_tooltip_message)
