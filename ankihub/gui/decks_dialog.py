@@ -29,6 +29,7 @@ from ..addon_ankihub_client import AddonAnkiHubClient as AnkiHubClient
 from ..gui.operations.deck_creation import create_collaborative_deck
 from ..main.deck_unsubscribtion import unsubscribe_from_deck_and_uninstall
 from ..main.subdecks import SUBDECK_TAG, deck_contains_subdeck_tags
+from ..main.utils import truncate_string
 from ..settings import SuspendNewCardsOfExistingNotes, config, url_deck_base, url_decks
 from .operations.subdecks import confirm_and_toggle_subdecks
 from .utils import ask_user, clear_layout, tooltip_icon
@@ -135,7 +136,9 @@ class DeckManagementDialog(QDialog):
         self.box_bottom_right.addLayout(self.box_deck_actions)
 
         deck_name = config.deck_config(selected_ah_did).name
-        self.deck_name_label = QLabel(f"<h3>{deck_name}</h3>")
+        self.deck_name_label = QLabel(
+            f"<h3>{truncate_string(deck_name, limit=70)}</h3>"
+        )
         self.deck_name_label.setWordWrap(True)
         self.deck_name_label.setSizePolicy(
             QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Preferred
@@ -232,8 +235,8 @@ class DeckManagementDialog(QDialog):
         self.box_deck_settings_elements.addLayout(self.subdecks_cb_row)
 
         subdecks_tooltip_message = (
-            "Toggle between the deck being organized into subdecks or not.<br>"
-            f"This option is only available if notes in the deck have <b>{SUBDECK_TAG}</b> tags."
+            "Activates organizing the deck into subdecks. "
+            f"Applies only to decks with <b>{SUBDECK_TAG}</b> tags."
         )
         self.subdecks_cb = QCheckBox("Enable Subdecks")
         self.subdecks_cb.setToolTip(subdecks_tooltip_message)
@@ -299,14 +302,14 @@ class DeckManagementDialog(QDialog):
     def _refresh_new_cards_destination_details_label(self, ah_did: uuid.UUID) -> None:
         deck_config = config.deck_config(ah_did)
         destination_anki_did = deck_config.anki_id
-        if name := aqt.mw.col.decks.name_if_exists(destination_anki_did):
+        if deck_name := aqt.mw.col.decks.name_if_exists(destination_anki_did):
             self.new_cards_destination_details_label.setText(
-                f"New cards are saved to: {name}."
+                f"New cards are saved to: {truncate_string(deck_name, limit=90)}."
             )
         else:
             # If the deck doesn't exist, it will be re-created on next sync with the name from the config.
             self.new_cards_destination_details_label.setText(
-                f"New cards are saved to: {deck_config.name}."
+                f"New cards are saved to: {truncate_string(deck_config.name, limit=90)}."
             )
 
     def _refresh_decks_list(self) -> None:
