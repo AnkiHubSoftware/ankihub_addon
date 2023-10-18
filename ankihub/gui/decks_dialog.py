@@ -110,7 +110,7 @@ class DeckManagementDialog(QDialog):
     def _refresh_box_bottom_right(self) -> None:
         clear_layout(self.box_bottom_right)
 
-        self.box_bottom_right.addSpacing(25)
+        self.box_bottom_right.addSpacing(30)
 
         selected_ah_did = self._selected_ah_did()
         if selected_ah_did is None:
