@@ -379,12 +379,6 @@ class DeckManagementDialog(QDialog):
 
     def _refresh_subdecks_checkbox(self):
         selection = self.decks_list.selectedItems()
-        one_selected: bool = len(selection) == 1
-
-        if not one_selected:
-            self.subdecks_cb.setEnabled(False)
-            return
-
         ankihub_did: UUID = selection[0].data(Qt.ItemDataRole.UserRole)
         deck_config = config.deck_config(ankihub_did)
 
