@@ -208,7 +208,7 @@ class DeckManagementDialog(QDialog):
 
         self.new_cards_destination_details_label = QLabel()
         self.new_cards_destination_details_label.setWordWrap(True)
-        self._refresh_updates_destination_details_label(selected_ah_did)
+        self._refresh_new_cards_destination_details_label(selected_ah_did)
         self.box_new_cards_destination.addWidget(
             self.new_cards_destination_details_label
         )
@@ -237,7 +237,7 @@ class DeckManagementDialog(QDialog):
 
         box.addStretch()
 
-    def _refresh_updates_destination_details_label(self, ah_did: uuid.UUID) -> None:
+    def _refresh_new_cards_destination_details_label(self, ah_did: uuid.UUID) -> None:
         deck_config = config.deck_config(ah_did)
         destination_anki_did = deck_config.anki_id
         if name := aqt.mw.col.decks.name_if_exists(destination_anki_did):
@@ -341,7 +341,7 @@ class DeckManagementDialog(QDialog):
 
             anki_did = aqt.mw.col.decks.id(ret.name)
             config.set_home_deck(ankihub_did=ankihub_id, anki_did=anki_did)
-            self._refresh_updates_destination_details_label(ankihub_id)
+            self._refresh_new_cards_destination_details_label(ankihub_id)
 
         # this lets the user pick a deck
         StudyDeckWithoutHelpButton(
