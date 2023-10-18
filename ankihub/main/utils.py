@@ -479,3 +479,8 @@ def md5_file_hash(media_path: Path) -> str:
         file_content_hash = hashlib.md5(media_file.read())
     result = file_content_hash.hexdigest()
     return result
+
+
+def truncate_string(string: str, limit: int) -> str:
+    assert limit > 0
+    return string[:limit] + "..." if len(string) > limit else string
