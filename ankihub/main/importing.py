@@ -17,7 +17,7 @@ from anki.notes import Note, NoteId
 from .. import LOGGER, settings
 from ..ankihub_client import Field, NoteInfo
 from ..db import ankihub_db
-from ..settings import config
+from ..settings import SuspendNewCardsOfExistingNotes, config
 from .note_conversion import (
     TAG_FOR_PROTECTING_ALL_FIELDS,
     get_fields_protected_by_tags,
@@ -274,35 +274,29 @@ class AnkiHubImporter:
                 card.queue = QUEUE_TYPE_SUSPENDED
                 card.flush()
 
+        deck_config = config.deck_config(self._ankihub_did)
         if cards_before_changes:
             # If there were cards before the changes, the note already existed in Anki.
-            config_key = "suspend_new_cards_of_existing_notes"
-            config_value = config.public_config[config_key]
-            if config_value == "never":
+            option = deck_config.suspend_new_cards_of_existing_notes
+            if option == SuspendNewCardsOfExistingNotes.NEVER:
                 return
-            elif config_value == "always":
+            elif option == SuspendNewCardsOfExistingNotes.ALWAYS:
                 suspend_new_cards()
-            elif config_value == "if_siblings_are_suspended":
+            elif option == SuspendNewCardsOfExistingNotes.IF_SIBLINGS_SUSPENDED:
                 if all(
                     card.queue == QUEUE_TYPE_SUSPENDED for card in cards_before_changes
                 ):
                     suspend_new_cards()
             else:
                 raise ValueError(
-                    f"Invalid value for {config_key}: {config_value}"
+                    f"Unknown value for {str(SuspendNewCardsOfExistingNotes)}"
                 )  # pragma: no cover
         else:
             # If there were no cards before the changes, the note didn't exist in Anki before.
-            config_key = "suspend_new_cards_of_new_notes"
-            config_value = config.public_config[config_key]
-            if config_value == "never":
-                return
-            elif config_value == "always":
+            if deck_config.suspend_new_cards_of_new_notes:
                 suspend_new_cards()
             else:
-                raise ValueError(
-                    f"Invalid value for {config_key}: {config_value}"
-                )  # pragma: no cover
+                return
 
     def _update_or_create_note_inner(
         self,
