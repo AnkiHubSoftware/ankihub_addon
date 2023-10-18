@@ -7,6 +7,7 @@ import aqt
 from anki.collection import OpChanges
 from aqt import gui_hooks
 from aqt.qt import (
+    QBoxLayout,
     QCheckBox,
     QComboBox,
     QDialog,
@@ -174,108 +175,21 @@ class DeckManagementDialog(QDialog):
         self.box_deck_settings.addLayout(self.box_deck_settings_elements)
 
         # ... Suspend new cards of existing notes
-        deck_config = config.deck_config(selected_ah_did)
-
-        self.box_suspend_new_cards_of_existing_notes = QVBoxLayout()
+        self.box_suspend_new_cards_of_existing_notes = (
+            self._setup_suspend_new_cards_of_existing_notes(selected_ah_did)
+        )
         self.box_deck_settings_elements.addLayout(
             self.box_suspend_new_cards_of_existing_notes
-        )
-
-        self.suspend_new_cards_of_existing_notes_row = QHBoxLayout()
-        self.box_suspend_new_cards_of_existing_notes.addLayout(
-            self.suspend_new_cards_of_existing_notes_row
-        )
-
-        suspend_cards_of_existing_notes_tooltip_message = (
-            "Will automatically suspend <br>"
-            "the cards of existing notes in <br>"
-            "the deck in future updates <br>"
-            "according to the chosen option."
-        )
-        self.suspend_new_cards_of_existing_notes_label = QLabel(
-            "Suspend new cards of existing notes"
-        )
-        self.suspend_new_cards_of_existing_notes_row.addWidget(
-            self.suspend_new_cards_of_existing_notes_label
-        )
-        self.suspend_new_cards_of_existing_notes_label.setToolTip(
-            suspend_cards_of_existing_notes_tooltip_message
-        )
-
-        self.suspend_new_cards_of_existing_notes_cb_icon_label = QLabel()
-        self.suspend_new_cards_of_existing_notes_row.addWidget(
-            self.suspend_new_cards_of_existing_notes_cb_icon_label
-        )
-        self.suspend_new_cards_of_existing_notes_cb_icon_label.setPixmap(
-            tooltip_icon().pixmap(16, 16)
-        )
-        self.suspend_new_cards_of_existing_notes_cb_icon_label.setToolTip(
-            suspend_cards_of_existing_notes_tooltip_message
-        )
-
-        self.suspend_new_cards_of_existing_notes = QComboBox()
-        self.box_suspend_new_cards_of_existing_notes.addWidget(
-            self.suspend_new_cards_of_existing_notes
-        )
-
-        self.suspend_new_cards_of_existing_notes.insertItems(
-            0, [option.value for option in SuspendNewCardsOfExistingNotes]
-        )
-        self.suspend_new_cards_of_existing_notes.setCurrentText(
-            deck_config.suspend_new_cards_of_existing_notes.name
-        )
-        qconnect(
-            self.suspend_new_cards_of_existing_notes.currentTextChanged,
-            lambda: config.set_suspend_new_cards_of_existing_notes(
-                selected_ah_did,
-                SuspendNewCardsOfExistingNotes(
-                    self.suspend_new_cards_of_existing_notes.currentText()
-                ),
-            ),
         )
 
         self.box_deck_settings_elements.addSpacing(10)
 
         # ... Suspend new cards of new notes
-        self.suspend_new_cards_of_new_notes_row = QHBoxLayout()
+        self.box_suspend_new_cards_of_new_notes = (
+            self._setup_suspend_new_cards_of_new_notes(selected_ah_did)
+        )
         self.box_deck_settings_elements.addLayout(
-            self.suspend_new_cards_of_new_notes_row
-        )
-
-        self.suspend_new_cards_of_new_notes_cb = QCheckBox(
-            "Suspend new cards of new notes"
-        )
-        self.suspend_new_cards_of_new_notes_row.addWidget(
-            self.suspend_new_cards_of_new_notes_cb
-        )
-
-        suspend_new_cards_of_new_notes_tooltip_message = (
-            "Will automatically suspend all <br>"
-            "the cards of new notes added to <br>"
-            "the deck in future updates."
-        )
-        self.suspend_new_cards_of_new_notes_cb.setToolTip(
-            suspend_new_cards_of_new_notes_tooltip_message
-        )
-        self.suspend_new_cards_of_new_notes_cb.setChecked(
-            deck_config.suspend_new_cards_of_new_notes
-        )
-        qconnect(
-            self.suspend_new_cards_of_new_notes_cb.toggled,
-            lambda: config.set_suspend_new_cards_of_new_notes(
-                selected_ah_did, self.suspend_new_cards_of_new_notes_cb.isChecked()
-            ),
-        )
-
-        self.suspend_new_cards_of_new_notes_cb_icon_label = QLabel()
-        self.suspend_new_cards_of_new_notes_cb_icon_label.setPixmap(
-            tooltip_icon().pixmap(16, 16)
-        )
-        self.suspend_new_cards_of_new_notes_cb_icon_label.setToolTip(
-            suspend_new_cards_of_new_notes_tooltip_message
-        )
-        self.suspend_new_cards_of_new_notes_row.addWidget(
-            self.suspend_new_cards_of_new_notes_cb_icon_label
+            self.box_suspend_new_cards_of_new_notes
         )
 
         self.box_deck_settings_elements.addSpacing(10)
@@ -348,6 +262,104 @@ class DeckManagementDialog(QDialog):
         )
 
         self.box_bottom_right.addStretch()
+
+    def _setup_suspend_new_cards_of_existing_notes(
+        self, selected_ah_did: uuid.UUID
+    ) -> QBoxLayout:
+        deck_config = config.deck_config(selected_ah_did)
+
+        box = QVBoxLayout()
+
+        self.suspend_new_cards_of_existing_notes_row = QHBoxLayout()
+        box.addLayout(self.suspend_new_cards_of_existing_notes_row)
+
+        suspend_cards_of_existing_notes_tooltip_message = (
+            "Will automatically suspend <br>"
+            "the cards of existing notes in <br>"
+            "the deck in future updates <br>"
+            "according to the chosen option."
+        )
+        self.suspend_new_cards_of_existing_notes_label = QLabel(
+            "Suspend new cards of existing notes"
+        )
+        self.suspend_new_cards_of_existing_notes_row.addWidget(
+            self.suspend_new_cards_of_existing_notes_label
+        )
+        self.suspend_new_cards_of_existing_notes_label.setToolTip(
+            suspend_cards_of_existing_notes_tooltip_message
+        )
+
+        self.suspend_new_cards_of_existing_notes_cb_icon_label = QLabel()
+        self.suspend_new_cards_of_existing_notes_row.addWidget(
+            self.suspend_new_cards_of_existing_notes_cb_icon_label
+        )
+        self.suspend_new_cards_of_existing_notes_cb_icon_label.setPixmap(
+            tooltip_icon().pixmap(16, 16)
+        )
+        self.suspend_new_cards_of_existing_notes_cb_icon_label.setToolTip(
+            suspend_cards_of_existing_notes_tooltip_message
+        )
+
+        self.suspend_new_cards_of_existing_notes = QComboBox()
+        box.addWidget(self.suspend_new_cards_of_existing_notes)
+
+        self.suspend_new_cards_of_existing_notes.insertItems(
+            0, [option.value for option in SuspendNewCardsOfExistingNotes]
+        )
+        self.suspend_new_cards_of_existing_notes.setCurrentText(
+            deck_config.suspend_new_cards_of_existing_notes.name
+        )
+        qconnect(
+            self.suspend_new_cards_of_existing_notes.currentTextChanged,
+            lambda: config.set_suspend_new_cards_of_existing_notes(
+                selected_ah_did,
+                SuspendNewCardsOfExistingNotes(
+                    self.suspend_new_cards_of_existing_notes.currentText()
+                ),
+            ),
+        )
+        return box
+
+    def _setup_suspend_new_cards_of_new_notes(
+        self,
+        selected_ah_did: uuid.UUID,
+    ) -> QBoxLayout:
+        deck_config = config.deck_config(selected_ah_did)
+
+        box = QHBoxLayout()
+
+        self.suspend_new_cards_of_new_notes_cb = QCheckBox(
+            "Suspend new cards of new notes"
+        )
+        box.addWidget(self.suspend_new_cards_of_new_notes_cb)
+
+        suspend_new_cards_of_new_notes_tooltip_message = (
+            "Will automatically suspend all <br>"
+            "the cards of new notes added to <br>"
+            "the deck in future updates."
+        )
+        self.suspend_new_cards_of_new_notes_cb.setToolTip(
+            suspend_new_cards_of_new_notes_tooltip_message
+        )
+        self.suspend_new_cards_of_new_notes_cb.setChecked(
+            deck_config.suspend_new_cards_of_new_notes
+        )
+        qconnect(
+            self.suspend_new_cards_of_new_notes_cb.toggled,
+            lambda: config.set_suspend_new_cards_of_new_notes(
+                selected_ah_did, self.suspend_new_cards_of_new_notes_cb.isChecked()
+            ),
+        )
+
+        self.suspend_new_cards_of_new_notes_cb_icon_label = QLabel()
+        self.suspend_new_cards_of_new_notes_cb_icon_label.setPixmap(
+            tooltip_icon().pixmap(16, 16)
+        )
+        self.suspend_new_cards_of_new_notes_cb_icon_label.setToolTip(
+            suspend_new_cards_of_new_notes_tooltip_message
+        )
+        box.addWidget(self.suspend_new_cards_of_new_notes_cb_icon_label)
+        return box
 
     def _refresh_new_cards_destination_details_label(self, ah_did: uuid.UUID) -> None:
         deck_config = config.deck_config(ah_did)
