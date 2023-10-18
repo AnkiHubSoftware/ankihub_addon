@@ -40,6 +40,7 @@ from aqt.browser.sidebar.item import SidebarItem
 from aqt.browser.sidebar.tree import SidebarTreeView
 from aqt.importing import AnkiPackageImporter
 from aqt.qt import QAction, Qt
+from aqt.theme import theme_manager
 from pytest import MonkeyPatch, fixture
 from pytest_anki import AnkiSession
 from pytestqt.qtbot import QtBot  # type: ignore
@@ -62,8 +63,10 @@ from ankihub.gui.operations.db_check.ah_db_check import check_ankihub_db
 from ..factories import DeckFactory, DeckMediaFactory, NoteInfoFactory
 from ..fixtures import (
     ImportAHNote,
+    InstallAHDeck,
     MockDownloadAndInstallDeckDependencies,
     MockFunction,
+    MockStudyDeckDialogWithCB,
     create_or_get_ah_version_of_note_type,
 )
 from .conftest import TEST_PROFILE_ID
@@ -115,12 +118,13 @@ from ankihub.gui.config_dialog import (
     setup_config_dialog_manager,
 )
 from ankihub.gui.deck_updater import _AnkiHubDeckUpdater, ah_deck_updater
-from ankihub.gui.decks_dialog import SubscribedDecksDialog, download_and_install_decks
+from ankihub.gui.decks_dialog import DeckManagementDialog
 from ankihub.gui.editor import _on_suggestion_button_press, _refresh_buttons
 from ankihub.gui.errors import upload_logs_and_data_in_background
 from ankihub.gui.media_sync import media_sync
 from ankihub.gui.menu import menu_state
 from ankihub.gui.operations import ankihub_sync
+from ankihub.gui.operations.deck_installation import download_and_install_decks
 from ankihub.gui.operations.new_deck_subscriptions import (
     check_and_install_new_deck_subscriptions,
 )
@@ -1776,7 +1780,7 @@ def test_unsubscribe_from_deck(
                 }
             ],
         )
-        dialog = SubscribedDecksDialog()
+        dialog = DeckManagementDialog()
         qtbot.wait(500)
 
         decks_list = dialog.decks_list
@@ -2472,7 +2476,45 @@ def test_protect_fields_action(
         qtbot.wait_until(assert_note_has_expected_tag)
 
 
-class TestSubscribedDecksDialog:
+class TestDeckManagementDialog:
+    @pytest.mark.parametrize(
+        "nightmode",
+        [True, False],
+    )
+    def test_basic(
+        self,
+        anki_session_with_addon_data: AnkiSession,
+        install_sample_ah_deck: InstallSampleAHDeck,
+        qtbot: QtBot,
+        monkeypatch: MonkeyPatch,
+        nightmode: bool,
+    ):
+        with anki_session_with_addon_data.profile_loaded():
+
+            self._mock_dependencies(monkeypatch)
+
+            anki_did, ah_did = install_sample_ah_deck()
+
+            monkeypatch.setattr(
+                AnkiHubClient,
+                "get_deck_subscriptions",
+                lambda *args: [DeckFactory.create(ah_did=ah_did, anki_did=anki_did)],
+            )
+
+            theme_manager.night_mode = nightmode
+
+            dialog = DeckManagementDialog()
+            dialog.display_subscribe_window()
+
+            assert dialog.decks_list.count() == 1
+
+            # Select a deck from the list
+            dialog.decks_list.setCurrentRow(0)
+            qtbot.wait(200)
+
+            deck_name = config.deck_config(ah_did).name
+            assert deck_name in dialog.deck_name_label.text()
+
     def test_toggle_subdecks(
         self,
         anki_session_with_addon_data: AnkiSession,
@@ -2480,33 +2522,9 @@ class TestSubscribedDecksDialog:
         install_sample_ah_deck: InstallSampleAHDeck,
         monkeypatch: MonkeyPatch,
     ):
-        anki_session = anki_session_with_addon_data
-        with anki_session.profile_loaded():
-            mw = anki_session.mw
+        with anki_session_with_addon_data.profile_loaded():
 
-            # Mock the config to return that the user is logged in
-            monkeypatch.setattr(config, "is_logged_in", lambda: True)
-
-            # Mock the ask_user function to always return True
-            monkeypatch.setattr(
-                operations.subdecks, "ask_user", lambda *args, **kwargs: True
-            )
-
-            # Mock get_deck_subscriptions to return an empty list
-            monkeypatch.setattr(
-                AnkiHubClient,
-                "get_deck_subscriptions",
-                lambda *args, **kwargs: [],
-            )
-
-            # Open the dialog
-            dialog = SubscribedDecksDialog()
-            qtbot.add_widget(dialog)
-            dialog.display_subscribe_window()
-            qtbot.wait(200)
-
-            # The toggle subdecks button should be disabled because there are no decks
-            assert dialog.toggle_subdecks_btn.isEnabled() is False
+            self._mock_dependencies(monkeypatch)
 
             # Install a deck with subdeck tags
             subdeck_name, anki_did, ah_did = self._install_deck_with_subdeck_tag(
@@ -2522,9 +2540,8 @@ class TestSubscribedDecksDialog:
                 lambda *args: [DeckFactory.create(ah_did=ah_did, anki_did=anki_did)],
             )
 
-            # Refresh the dialog
-            dialog = SubscribedDecksDialog()
-            qtbot.add_widget(dialog)
+            # Open the dialog
+            dialog = DeckManagementDialog()
             dialog.display_subscribe_window()
             qtbot.wait(200)
 
@@ -2533,19 +2550,19 @@ class TestSubscribedDecksDialog:
             dialog.decks_list.setCurrentRow(0)
             qtbot.wait(200)
 
-            assert dialog.toggle_subdecks_btn.isEnabled() is True
-            dialog.toggle_subdecks_btn.click()
+            assert dialog.subdecks_cb.isEnabled()
+            dialog.subdecks_cb.click()
             qtbot.wait(200)
 
             # The subdeck should now exist
-            assert mw.col.decks.by_name(subdeck_name) is not None
+            assert aqt.mw.col.decks.by_name(subdeck_name) is not None
 
             # Click the toggle subdeck button again
-            dialog.toggle_subdecks_btn.click()
+            dialog.subdecks_cb.click()
             qtbot.wait(200)
 
             # The subdeck should not exist anymore
-            assert mw.col.decks.by_name(subdeck_name) is None
+            assert aqt.mw.col.decks.by_name(subdeck_name) is None
 
     def _install_deck_with_subdeck_tag(
         self,
@@ -2559,6 +2576,66 @@ class TestSubscribedDecksDialog:
         note.tags = [f"{SUBDECK_TAG}::{subdeck_name}"]
         note.flush()
         return subdeck_name, anki_did, ah_did
+
+    def test_change_destination_for_new_cards(
+        self,
+        anki_session_with_addon_data: AnkiSession,
+        qtbot: QtBot,
+        install_ah_deck: InstallAHDeck,
+        monkeypatch: MonkeyPatch,
+        mock_study_deck_dialog_with_cb: MockStudyDeckDialogWithCB,
+    ):
+        with anki_session_with_addon_data.profile_loaded():
+            self._mock_dependencies(monkeypatch)
+
+            ah_did = install_ah_deck()
+
+            # Mock get_deck_subscriptions to return the deck
+            monkeypatch.setattr(
+                AnkiHubClient,
+                "get_deck_subscriptions",
+                lambda *args: [
+                    DeckFactory.create(
+                        ah_did=ah_did, anki_did=config.deck_config(ah_did).anki_id
+                    )
+                ],
+            )
+
+            # Mock the dialog that asks the user for the destination deck to choose
+            # a new deck.
+            new_destination_deck_name = "New Deck"
+            install_ah_deck(anki_deck_name=new_destination_deck_name)
+            new_home_deck_anki_id = aqt.mw.col.decks.id_for_name(
+                new_destination_deck_name
+            )
+            mock_study_deck_dialog_with_cb(
+                "ankihub.gui.decks_dialog.StudyDeckWithoutHelpButton",
+                deck_name=new_destination_deck_name,
+            )
+
+            # Open the dialog
+            dialog = DeckManagementDialog()
+            dialog.display_subscribe_window()
+            qtbot.wait(200)
+
+            # Select the deck and click the Set Updates Destination button
+            dialog.decks_list.setCurrentRow(0)
+            qtbot.wait(200)
+
+            dialog.set_new_cards_destination_btn.click()
+            qtbot.wait(200)
+
+            # Assert that the destination deck was updated
+            assert config.deck_config(ah_did).anki_id == new_home_deck_anki_id
+
+    def _mock_dependencies(self, monkeypatch: MonkeyPatch) -> None:
+        # Mock the config to return that the user is logged in
+        monkeypatch.setattr(config, "is_logged_in", lambda: True)
+
+        # Mock the ask_user function to always return True
+        monkeypatch.setattr(
+            operations.subdecks, "ask_user", lambda *args, **kwargs: True
+        )
 
 
 class TestBuildSubdecksAndMoveCardsToThem:
