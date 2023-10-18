@@ -24,12 +24,22 @@ class BaseFactory(factory.Factory, Generic[T]):
         return super().create(**kwargs)
 
 
+def _next_anki_nid() -> int:
+    # Returns a new nid for each call.
+    # The purpose of this is to make sure that the nids used by the NoteInfoFactory are unique.
+    _next_anki_nid.nid += 1  # type: ignore
+    return _next_anki_nid.nid  # type: ignore
+
+
+_next_anki_nid.nid = 0  # type: ignore
+
+
 class NoteInfoFactory(BaseFactory[NoteInfo]):
     class Meta:
         model = NoteInfo
 
-    ah_nid = factory.LazyFunction(uuid.uuid4)
-    anki_nid = 1
+    ah_nid: uuid.UUID = factory.LazyFunction(uuid.uuid4)  # type: ignore
+    anki_nid: int = factory.LazyFunction(_next_anki_nid)  # type: ignore
     mid = 1
     fields: List[Field] = factory.LazyAttribute(  # type: ignore
         lambda _: [
