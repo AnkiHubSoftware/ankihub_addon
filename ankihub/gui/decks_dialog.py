@@ -97,6 +97,8 @@ class DeckManagementDialog(QDialog):
         self.box_top_buttons.addWidget(self.browse_btn)
         qconnect(self.browse_btn.clicked, lambda: openLink(url_decks()))
 
+        self.box_top_buttons.addSpacing(10)
+
         self.create_btn = QPushButton("➕ Create Collaborative Deck")
         self.box_top_buttons.addWidget(self.create_btn)
         qconnect(self.create_btn.clicked, create_collaborative_deck)
