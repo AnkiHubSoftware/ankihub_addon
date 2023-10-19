@@ -181,47 +181,12 @@ class DeckManagementDialog(QDialog):
         self.box_bottom_right.addSpacing(20)
 
         # Deck Options
-        self.box_deck_options = QVBoxLayout()
+        self.box_deck_options = self._setup_deck_options()
         self.box_bottom_right.addLayout(self.box_deck_options)
-
-        self.deck_settings_label = QLabel("<b>Deck Options</b>")
-        self.box_deck_options.addWidget(self.deck_settings_label)
-
-        self.box_deck_settings_elements = QVBoxLayout()
-        self.box_deck_options.addLayout(self.box_deck_settings_elements)
-
-        self.subdecks_cb_row = QHBoxLayout()
-        self.box_deck_settings_elements.addLayout(self.subdecks_cb_row)
-
-        subdecks_tooltip_message = (
-            "Activates organizing the deck into subdecks. "
-            f"Applies only to decks with <b>{SUBDECK_TAG}</b> tags."
-        )
-        self.subdecks_cb = QCheckBox("Enable Subdecks")
-        self.subdecks_cb.setToolTip(subdecks_tooltip_message)
-        self._refresh_subdecks_checkbox()
-        qconnect(self.subdecks_cb.clicked, self._on_toggle_subdecks)
-        self.subdecks_cb_row.addWidget(self.subdecks_cb)
-
-        self.subdeck_cb_icon_label = QLabel()
-        self.subdeck_cb_icon_label.setPixmap(tooltip_icon().pixmap(16, 16))
-        self.subdeck_cb_icon_label.setToolTip(subdecks_tooltip_message)
-        self.subdecks_cb_row.addWidget(self.subdeck_cb_icon_label)
-
-        self.subdecks_docs_link_label = QLabel(
-            """
-            <a href="https://docs.ankihub.net/user_docs/advanced.html#subdecks-and-subdeck-tags">
-                More about subdecks
-            </a>
-            """
-        )
-        self.subdecks_docs_link_label.setOpenExternalLinks(True)
-        self.box_deck_settings_elements.addWidget(self.subdecks_docs_link_label)
-
-        self.box_bottom_right.addSpacing(20)
 
         # Destination for new cards
         self.box_new_cards_destination = QVBoxLayout()
+        self.box_bottom_right.addSpacing(20)
         self.box_bottom_right.addLayout(self.box_new_cards_destination)
 
         self.new_cards_destination = QLabel("<b>Destination for New Cards</b>")
@@ -257,6 +222,51 @@ class DeckManagementDialog(QDialog):
         )
 
         self.box_bottom_right.addStretch()
+
+    def _setup_deck_options(self) -> QVBoxLayout:
+        self.deck_options_label = QLabel("<b>Deck Options</b>")
+
+        # Initialize and set up the subdecks checkbox
+        subdecks_tooltip_message = (
+            "Activates organizing the deck into subdecks. "
+            f"Applies only to decks with <b>{SUBDECK_TAG}</b> tags."
+        )
+        self.subdecks_cb = QCheckBox("Enable Subdecks")
+        self.subdecks_cb.setToolTip(subdecks_tooltip_message)
+        self._refresh_subdecks_checkbox()
+        qconnect(self.subdecks_cb.clicked, self._on_toggle_subdecks)
+
+        # Initialize and set up the subdeck icon label
+        self.subdeck_cb_icon_label = QLabel()
+        self.subdeck_cb_icon_label.setPixmap(tooltip_icon().pixmap(16, 16))
+        self.subdeck_cb_icon_label.setToolTip(subdecks_tooltip_message)
+
+        # Add widgets to the subdecks checkbox row layout
+        self.subdecks_cb_row = QHBoxLayout()
+        self.subdecks_cb_row.addWidget(self.subdecks_cb)
+        self.subdecks_cb_row.addWidget(self.subdeck_cb_icon_label)
+
+        # Initialize and set up the subdecks documentation link label
+        self.subdecks_docs_link_label = QLabel(
+            """
+            <a href="https://docs.ankihub.net/user_docs/advanced.html#subdecks-and-subdeck-tags">
+                More about subdecks
+            </a>
+            """
+        )
+        self.subdecks_docs_link_label.setOpenExternalLinks(True)
+
+        # Add everything to the deck settings elements layout
+        self.box_deck_options_elements = QVBoxLayout()
+        self.box_deck_options_elements.addLayout(self.subdecks_cb_row)
+        self.box_deck_options_elements.addWidget(self.subdecks_docs_link_label)
+
+        # Add everything to the main deck options layout
+        box = QVBoxLayout()
+        box.addWidget(self.deck_options_label)
+        box.addLayout(self.box_deck_options_elements)
+
+        return box
 
     def _refresh_new_cards_destination_details_label(self, ah_did: uuid.UUID) -> None:
         deck_config = config.deck_config(ah_did)
