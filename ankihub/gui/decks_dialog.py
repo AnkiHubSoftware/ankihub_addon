@@ -125,18 +125,16 @@ class DeckManagementDialog(QDialog):
 
         selected_ah_did = self._selected_ah_did()
         if selected_ah_did is None:
-
-            self.box_no_deck_selected = QHBoxLayout()
-            self.box_bottom_right.addLayout(self.box_no_deck_selected)
-
-            self.box_no_deck_selected.addSpacing(5)
-
             self.no_deck_selected_label = QLabel("Choose deck to adjust settings.")
             self.no_deck_selected_label.setSizePolicy(
                 QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Preferred
             )
+
+            self.box_no_deck_selected = QHBoxLayout()
+            self.box_no_deck_selected.addSpacing(5)
             self.box_no_deck_selected.addWidget(self.no_deck_selected_label)
 
+            self.box_bottom_right.addLayout(self.box_no_deck_selected)
             self.box_bottom_right.addStretch(1)
             return
 
