@@ -118,6 +118,41 @@ class DeckManagementDialog(QDialog):
         box.addWidget(self.decks_list)
         return box
 
+    def _setup_box_deck_actions(self, selected_ah_did: uuid.UUID) -> QVBoxLayout:
+        # Initialize and setup the deck name label
+        deck_name = config.deck_config(selected_ah_did).name
+        self.deck_name_label = QLabel(
+            f"<h3>{truncate_string(deck_name, limit=70)}</h3>"
+        )
+        self.deck_name_label.setWordWrap(True)
+        self.deck_name_label.setSizePolicy(
+            QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Preferred
+        )
+
+        # Initialize and setup the open web button
+        self.open_web_btn = QPushButton("Open on AnkiHub")
+        qconnect(self.open_web_btn.clicked, self._on_open_web)
+
+        # Initialize and setup the unsubscribe button
+        self.unsubscribe_btn = QPushButton("Unsubscribe")
+        if theme_manager.night_mode:
+            self.unsubscribe_btn.setStyleSheet("color: #e29792")
+        else:
+            self.unsubscribe_btn.setStyleSheet("color: #e2857f")
+        qconnect(self.unsubscribe_btn.clicked, self._on_unsubscribe)
+
+        # Add widgets to the action buttons layout
+        self.box_deck_action_buttons = QHBoxLayout()
+        self.box_deck_action_buttons.addWidget(self.open_web_btn)
+        self.box_deck_action_buttons.addWidget(self.unsubscribe_btn)
+
+        # Add everything to the main deck actions layout
+        box = QVBoxLayout()
+        box.addWidget(self.deck_name_label)
+        box.addLayout(self.box_deck_action_buttons)
+
+        return box
+
     def _refresh_box_bottom_right(self) -> None:
         clear_layout(self.box_bottom_right)
 
@@ -141,35 +176,8 @@ class DeckManagementDialog(QDialog):
             return
 
         # Deck Actions
-        self.box_deck_actions = QVBoxLayout()
+        self.box_deck_actions = self._setup_box_deck_actions(selected_ah_did)
         self.box_bottom_right.addLayout(self.box_deck_actions)
-
-        deck_name = config.deck_config(selected_ah_did).name
-        self.deck_name_label = QLabel(
-            f"<h3>{truncate_string(deck_name, limit=70)}</h3>"
-        )
-        self.deck_name_label.setWordWrap(True)
-        self.deck_name_label.setSizePolicy(
-            QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Preferred
-        )
-        self.box_deck_actions.addWidget(self.deck_name_label)
-
-        self.box_deck_action_buttons = QHBoxLayout()
-        self.box_deck_actions.addLayout(self.box_deck_action_buttons)
-
-        self.open_web_btn = QPushButton("Open on AnkiHub")
-        self.box_deck_action_buttons.addWidget(self.open_web_btn)
-        qconnect(self.open_web_btn.clicked, self._on_open_web)
-
-        self.unsubscribe_btn = QPushButton("Unsubscribe")
-        if theme_manager.night_mode:
-            self.unsubscribe_btn.setStyleSheet("color: #e29792")
-        else:
-            self.unsubscribe_btn.setStyleSheet("color: #e2857f")
-
-        self.box_deck_action_buttons.addWidget(self.unsubscribe_btn)
-        qconnect(self.unsubscribe_btn.clicked, self._on_unsubscribe)
-
         self.box_bottom_right.addSpacing(20)
 
         # Deck Options
