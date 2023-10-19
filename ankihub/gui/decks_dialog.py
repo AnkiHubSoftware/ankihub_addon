@@ -203,7 +203,7 @@ class DeckManagementDialog(QDialog):
 
         # Setup "Suspend new cards of new notes"
         self.box_suspend_new_cards_of_new_notes = (
-            self._setup_suspend_new_cards_of_new_notes(selected_ah_did)
+            self._setup_box_suspend_new_cards_of_new_notes(selected_ah_did)
         )
 
         # Setup "Subdecks enabled"
@@ -289,23 +289,20 @@ class DeckManagementDialog(QDialog):
 
         return box
 
-    def _setup_suspend_new_cards_of_new_notes(
+    def _setup_box_suspend_new_cards_of_new_notes(
         self,
         selected_ah_did: uuid.UUID,
     ) -> QBoxLayout:
         deck_config = config.deck_config(selected_ah_did)
 
-        box = QHBoxLayout()
-
-        self.suspend_new_cards_of_new_notes_cb = QCheckBox(
-            "Suspend new cards of new notes"
-        )
-        box.addWidget(self.suspend_new_cards_of_new_notes_cb)
-
+        # Setup checkbox
         suspend_new_cards_of_new_notes_tooltip_message = (
             "Will automatically suspend all <br>"
             "the cards of new notes added to <br>"
             "the deck in future updates."
+        )
+        self.suspend_new_cards_of_new_notes_cb = QCheckBox(
+            "Suspend new cards of new notes"
         )
         self.suspend_new_cards_of_new_notes_cb.setToolTip(
             suspend_new_cards_of_new_notes_tooltip_message
@@ -320,6 +317,7 @@ class DeckManagementDialog(QDialog):
             ),
         )
 
+        # Setup tooltip icon
         self.suspend_new_cards_of_new_notes_cb_icon_label = QLabel()
         self.suspend_new_cards_of_new_notes_cb_icon_label.setPixmap(
             tooltip_icon().pixmap(16, 16)
@@ -327,7 +325,12 @@ class DeckManagementDialog(QDialog):
         self.suspend_new_cards_of_new_notes_cb_icon_label.setToolTip(
             suspend_new_cards_of_new_notes_tooltip_message
         )
+
+        # Add the checkbox and tooltip icon to the result layout
+        box = QHBoxLayout()
+        box.addWidget(self.suspend_new_cards_of_new_notes_cb)
         box.addWidget(self.suspend_new_cards_of_new_notes_cb_icon_label)
+
         return box
 
     def _setup_box_subdecks_enabled(self) -> QVBoxLayout:
