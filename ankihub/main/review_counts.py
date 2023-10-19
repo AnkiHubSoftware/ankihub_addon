@@ -4,6 +4,8 @@ from datetime import datetime, timedelta
 import aqt
 
 from .. import LOGGER
+from ..addon_ankihub_client import AddonAnkiHubClient as AnkiHubClient
+from ..ankihub_client import CardReviewData
 from ..db import attached_ankihub_db
 from ..settings import config
 
@@ -11,16 +13,23 @@ from ..settings import config
 REVIEW_PERIOD_DAYS = timedelta(days=30)
 
 
-def send_review_counts() -> None:
+def send_review_data() -> None:
     since = datetime.now() - REVIEW_PERIOD_DAYS
-    review_count_per_deck = {}
-    for ah_did in config.deck_ids():
-        review_count_per_deck[ah_did] = _get_review_count_for_ah_deck_since(
-            ah_did, since
+    card_review_data = [
+        CardReviewData(
+            ah_did=ah_did,
+            total_card_reviews_last_30_days=_get_review_count_for_ah_deck_since(
+                ah_did, since
+            ),
+            last_card_review_at=_get_last_review_datetime_for_ah_deck(ah_did),
         )
+        for ah_did in config.deck_ids()
+    ]
 
-    # TODO Send review counts to AnkiHub
-    LOGGER.info(f"Review counts: {review_count_per_deck}")
+    LOGGER.info(f"Review counts: {card_review_data}")
+
+    client = AnkiHubClient()
+    client.send_card_review_data(card_review_data)
 
 
 def _get_review_count_for_ah_deck_since(ah_did: uuid.UUID, since: datetime) -> int:
@@ -36,6 +45,22 @@ def _get_review_count_for_ah_deck_since(ah_did: uuid.UUID, since: datetime) -> i
             WHERE r.id > ? AND ah_n.ankihub_deck_id = ?
             """,
             timestamp_ms,
+            str(ah_did),
+        )
+    return result
+
+
+def _get_last_review_datetime_for_ah_deck(ah_did: uuid.UUID) -> datetime:
+    """Get the timestamp of the last review (recorded in Anki's review log table) for an ankihub deck."""
+    with attached_ankihub_db():
+        result = aqt.mw.col.db.scalar(
+            """
+            SELECT MAX(r.id)
+            FROM revlog as r
+            JOIN cards as c ON r.cid = c.id
+            JOIN ankihub_db.notes as ah_n ON c.nid = ah_n.anki_note_id
+            WHERE ah_n.ankihub_deck_id = ?
+            """,
             str(ah_did),
         )
     return result
