@@ -4,8 +4,6 @@ from typing import Optional
 from uuid import UUID
 
 import aqt
-from anki.collection import OpChanges
-from aqt import gui_hooks
 from aqt.qt import (
     QBoxLayout,
     QCheckBox,
@@ -412,14 +410,6 @@ class DeckManagementDialog(QDialog):
 
         result = selection[0].data(Qt.ItemDataRole.UserRole)
         return result
-
-    def _refresh_anki(self) -> None:
-        op = OpChanges()
-        op.deck = True
-        op.browser_table = True
-        op.browser_sidebar = True
-        op.study_queues = True
-        gui_hooks.operation_did_execute(op, handler=None)
 
     def _select_deck(self, ah_did: uuid.UUID):
         deck_item = next(
