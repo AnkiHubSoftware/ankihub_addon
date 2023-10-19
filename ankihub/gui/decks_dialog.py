@@ -317,7 +317,7 @@ class DeckManagementDialog(QDialog):
             0, [option.value for option in SuspendNewCardsOfExistingNotes]
         )
         self.suspend_new_cards_of_existing_notes.setCurrentText(
-            deck_config.suspend_new_cards_of_existing_notes.name
+            deck_config.suspend_new_cards_of_existing_notes.value
         )
         qconnect(
             self.suspend_new_cards_of_existing_notes.currentTextChanged,
