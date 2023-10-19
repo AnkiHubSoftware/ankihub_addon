@@ -146,7 +146,7 @@ class DeckManagementDialog(QDialog):
         self.box_deck_action_buttons.addWidget(self.open_web_btn)
         self.box_deck_action_buttons.addWidget(self.unsubscribe_btn)
 
-        # Add everything to the main deck actions layout
+        # Add everything to the result layout
         box = QVBoxLayout()
         box.addWidget(self.deck_name_label)
         box.addLayout(self.box_deck_action_buttons)
@@ -270,7 +270,7 @@ class DeckManagementDialog(QDialog):
         self.box_deck_options_elements.addLayout(self.subdecks_cb_row)
         self.box_deck_options_elements.addWidget(self.subdecks_docs_link_label)
 
-        # Add everything to the main deck options layout
+        # Add everything to the result layout
         box = QVBoxLayout()
         box.addWidget(self.deck_options_label)
         box.addLayout(self.box_deck_options_elements)
