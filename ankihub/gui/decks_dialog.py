@@ -181,14 +181,14 @@ class DeckManagementDialog(QDialog):
         self.box_bottom_right.addSpacing(20)
 
         # Deck Options
-        self.box_deck_settings = QVBoxLayout()
-        self.box_bottom_right.addLayout(self.box_deck_settings)
+        self.box_deck_options = QVBoxLayout()
+        self.box_bottom_right.addLayout(self.box_deck_options)
 
         self.deck_settings_label = QLabel("<b>Deck Options</b>")
-        self.box_deck_settings.addWidget(self.deck_settings_label)
+        self.box_deck_options.addWidget(self.deck_settings_label)
 
         self.box_deck_settings_elements = QVBoxLayout()
-        self.box_deck_settings.addLayout(self.box_deck_settings_elements)
+        self.box_deck_options.addLayout(self.box_deck_settings_elements)
 
         self.subdecks_cb_row = QHBoxLayout()
         self.box_deck_settings_elements.addLayout(self.subdecks_cb_row)
