@@ -183,22 +183,27 @@ class DeckManagementDialog(QDialog):
         # Deck Options
         self.box_deck_options = self._setup_deck_options()
         self.box_bottom_right.addLayout(self.box_deck_options)
+        self.box_bottom_right.addSpacing(20)
 
         # Destination for new cards
-        self.box_new_cards_destination = QVBoxLayout()
-        self.box_bottom_right.addSpacing(20)
+        self.box_new_cards_destination = self._setup_destination_for_new_cards(
+            selected_ah_did
+        )
         self.box_bottom_right.addLayout(self.box_new_cards_destination)
 
-        self.new_cards_destination = QLabel("<b>Destination for New Cards</b>")
-        self.box_new_cards_destination.addWidget(self.new_cards_destination)
+        self.box_bottom_right.addStretch()
 
+    def _setup_destination_for_new_cards(
+        self, selected_ah_did: uuid.UUID
+    ) -> QVBoxLayout:
+        self.new_cards_destination = QLabel("<b>Destination for New Cards</b>")
+
+        # Initialize and set up the destination details label
         self.new_cards_destination_details_label = QLabel()
         self.new_cards_destination_details_label.setWordWrap(True)
         self._refresh_new_cards_destination_details_label(selected_ah_did)
-        self.box_new_cards_destination.addWidget(
-            self.new_cards_destination_details_label
-        )
 
+        # Initialize and set up the change destination button
         self.set_new_cards_destination_btn = QPushButton(
             "Change Destination for New Cards"
         )
@@ -206,9 +211,8 @@ class DeckManagementDialog(QDialog):
             self.set_new_cards_destination_btn.clicked,
             self._on_new_cards_destination_btn_clicked,
         )
-        self.box_new_cards_destination.addWidget(self.set_new_cards_destination_btn)
-        self.box_new_cards_destination.addSpacing(7)
 
+        # Initialize and set up the documentation link label
         self.new_cards_destination_docs_link_label = QLabel(
             """
             <a href="https://community.ankihub.net/t/how-are-anki-decks-related-to-ankihub-decks/4811">
@@ -217,11 +221,16 @@ class DeckManagementDialog(QDialog):
             """
         )
         self.new_cards_destination_docs_link_label.setOpenExternalLinks(True)
-        self.box_new_cards_destination.addWidget(
-            self.new_cards_destination_docs_link_label
-        )
 
-        self.box_bottom_right.addStretch()
+        # Add everything to the result layout
+        box = QVBoxLayout()
+        box.addWidget(self.new_cards_destination)
+        box.addWidget(self.new_cards_destination_details_label)
+        box.addWidget(self.set_new_cards_destination_btn)
+        box.addSpacing(5)
+        box.addWidget(self.new_cards_destination_docs_link_label)
+
+        return box
 
     def _setup_deck_options(self) -> QVBoxLayout:
         self.deck_options_label = QLabel("<b>Deck Options</b>")
