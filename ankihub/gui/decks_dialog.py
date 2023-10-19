@@ -198,7 +198,7 @@ class DeckManagementDialog(QDialog):
 
         # Setup "Suspend new cards of existing notes"
         self.box_suspend_new_cards_of_existing_notes = (
-            self._setup_suspend_new_cards_of_existing_notes(selected_ah_did)
+            self._setup_box_suspend_new_cards_of_existing_notes(selected_ah_did)
         )
 
         # Setup "Suspend new cards of new notes"
@@ -227,16 +227,12 @@ class DeckManagementDialog(QDialog):
 
         return box
 
-    def _setup_suspend_new_cards_of_existing_notes(
+    def _setup_box_suspend_new_cards_of_existing_notes(
         self, selected_ah_did: uuid.UUID
     ) -> QBoxLayout:
         deck_config = config.deck_config(selected_ah_did)
 
-        box = QVBoxLayout()
-
-        self.suspend_new_cards_of_existing_notes_row = QHBoxLayout()
-        box.addLayout(self.suspend_new_cards_of_existing_notes_row)
-
+        # Setup label
         suspend_cards_of_existing_notes_tooltip_message = (
             "Will automatically suspend <br>"
             "the cards of existing notes in <br>"
@@ -246,17 +242,12 @@ class DeckManagementDialog(QDialog):
         self.suspend_new_cards_of_existing_notes_label = QLabel(
             "Suspend new cards of existing notes"
         )
-        self.suspend_new_cards_of_existing_notes_row.addWidget(
-            self.suspend_new_cards_of_existing_notes_label
-        )
         self.suspend_new_cards_of_existing_notes_label.setToolTip(
             suspend_cards_of_existing_notes_tooltip_message
         )
 
+        # Setup tooltip icon
         self.suspend_new_cards_of_existing_notes_cb_icon_label = QLabel()
-        self.suspend_new_cards_of_existing_notes_row.addWidget(
-            self.suspend_new_cards_of_existing_notes_cb_icon_label
-        )
         self.suspend_new_cards_of_existing_notes_cb_icon_label.setPixmap(
             tooltip_icon().pixmap(16, 16)
         )
@@ -264,9 +255,17 @@ class DeckManagementDialog(QDialog):
             suspend_cards_of_existing_notes_tooltip_message
         )
 
-        self.suspend_new_cards_of_existing_notes = QComboBox()
-        box.addWidget(self.suspend_new_cards_of_existing_notes)
+        # Add the label and tooltip icon to the row layout
+        self.suspend_new_cards_of_existing_notes_row = QHBoxLayout()
+        self.suspend_new_cards_of_existing_notes_row.addWidget(
+            self.suspend_new_cards_of_existing_notes_label
+        )
+        self.suspend_new_cards_of_existing_notes_row.addWidget(
+            self.suspend_new_cards_of_existing_notes_cb_icon_label
+        )
 
+        # Setup and configure the combo box for "Suspend new cards of existing notes"
+        self.suspend_new_cards_of_existing_notes = QComboBox()
         self.suspend_new_cards_of_existing_notes.insertItems(
             0, [option.value for option in SuspendNewCardsOfExistingNotes]
         )
@@ -282,6 +281,12 @@ class DeckManagementDialog(QDialog):
                 ),
             ),
         )
+
+        # Add the row and combo box to the result layout
+        box = QVBoxLayout()
+        box.addLayout(self.suspend_new_cards_of_existing_notes_row)
+        box.addWidget(self.suspend_new_cards_of_existing_notes)
+
         return box
 
     def _setup_suspend_new_cards_of_new_notes(
