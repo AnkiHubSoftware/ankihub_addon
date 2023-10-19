@@ -115,12 +115,13 @@ from ankihub.gui.config_dialog import (
     setup_config_dialog_manager,
 )
 from ankihub.gui.deck_updater import _AnkiHubDeckUpdater, ah_deck_updater
-from ankihub.gui.decks_dialog import SubscribedDecksDialog, download_and_install_decks
+from ankihub.gui.decks_dialog import SubscribedDecksDialog
 from ankihub.gui.editor import _on_suggestion_button_press, _refresh_buttons
 from ankihub.gui.errors import upload_logs_and_data_in_background
 from ankihub.gui.media_sync import media_sync
 from ankihub.gui.menu import menu_state
 from ankihub.gui.operations import ankihub_sync
+from ankihub.gui.operations.deck_installation import download_and_install_decks
 from ankihub.gui.operations.new_deck_subscriptions import (
     check_and_install_new_deck_subscriptions,
 )

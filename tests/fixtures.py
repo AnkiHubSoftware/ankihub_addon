@@ -374,3 +374,18 @@ def mock_download_and_install_deck_dependencies(
         return mocks
 
     return mock_install_deck_dependencies
+
+
+def create_anki_deck(deck_name: str) -> DeckId:
+    """Creates an Anki deck with the given name and returns the id."""
+    deck = aqt.mw.col.decks.new_deck()
+    deck.name = deck_name
+    changes = aqt.mw.col.decks.add_deck(deck)
+    return DeckId(changes.id)
+
+
+def add_basic_anki_note_to_deck(anki_did: DeckId) -> None:
+    """Adds a basic Anki note to the given deck."""
+    note = aqt.mw.col.new_note(aqt.mw.col.models.by_name("Basic"))
+    note["Front"] = "some text"
+    aqt.mw.col.add_note(note, anki_did)

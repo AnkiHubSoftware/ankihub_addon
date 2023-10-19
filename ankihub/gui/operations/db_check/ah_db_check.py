@@ -7,8 +7,8 @@ from ....addon_ankihub_client import AddonAnkiHubClient as AnkiHubClient
 from ....db import ankihub_db
 from ....main.deck_unsubscribtion import uninstall_deck
 from ....settings import config
-from ...decks_dialog import download_and_install_decks
 from ...exceptions import DeckDownloadAndInstallError, RemoteDeckNotFoundError
+from ...operations.deck_installation import download_and_install_decks
 from ...utils import ask_user
 
 
