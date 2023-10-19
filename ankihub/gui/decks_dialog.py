@@ -58,26 +58,38 @@ class DeckManagementDialog(QDialog):
         self.box_main = QVBoxLayout()
         self.setLayout(self.box_main)
 
+        self.box_main.addSpacing(10)
+
         self.box_top = self._setup_box_top()
         self.box_main.addLayout(self.box_top)
+
+        self.box_main.addSpacing(20)
 
         self.box_bottom = QHBoxLayout()
         self.box_main.addLayout(self.box_bottom)
 
+        self.box_bottom.addSpacing(10)
+
         self.box_bottom_left = self._setup_box_bottom_left()
+        self.box_bottom_left.addSpacing(10)
         self.box_bottom.addLayout(self.box_bottom_left)
 
         self.box_bottom.addSpacing(10)
 
         self.box_bottom_right = QVBoxLayout()
         self._refresh_box_bottom_right()
+        self.box_bottom_right.addSpacing(10)
         self.box_bottom.addLayout(self.box_bottom_right)
+
+        self.box_bottom.addSpacing(10)
 
     def _setup_box_top(self) -> QVBoxLayout:
         box = QVBoxLayout()
 
         self.box_top_buttons = QHBoxLayout()
         box.addLayout(self.box_top_buttons)
+
+        self.box_top_buttons.addSpacing(10)
 
         self.browse_btn = QPushButton("🔗 Browse Decks")
         self.browse_btn.setStyleSheet("color: white; background-color: #306bec")
@@ -89,7 +101,7 @@ class DeckManagementDialog(QDialog):
         self.box_top_buttons.addWidget(self.create_btn)
         qconnect(self.create_btn.clicked, create_collaborative_deck)
 
-        box.addSpacing(10)
+        self.box_top_buttons.addSpacing(10)
 
         return box
 
