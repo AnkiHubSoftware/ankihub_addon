@@ -118,6 +118,46 @@ class DeckManagementDialog(QDialog):
         box.addWidget(self.decks_list)
         return box
 
+    def _refresh_box_bottom_right(self) -> None:
+        clear_layout(self.box_bottom_right)
+
+        self.box_bottom_right.addSpacing(30)
+
+        selected_ah_did = self._selected_ah_did()
+        if selected_ah_did is None:
+
+            self.box_no_deck_selected = QHBoxLayout()
+            self.box_bottom_right.addLayout(self.box_no_deck_selected)
+
+            self.box_no_deck_selected.addSpacing(5)
+
+            self.no_deck_selected_label = QLabel("Choose deck to adjust settings.")
+            self.no_deck_selected_label.setSizePolicy(
+                QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Preferred
+            )
+            self.box_no_deck_selected.addWidget(self.no_deck_selected_label)
+
+            self.box_bottom_right.addStretch(1)
+            return
+
+        # Deck Actions
+        self.box_deck_actions = self._setup_box_deck_actions(selected_ah_did)
+        self.box_bottom_right.addLayout(self.box_deck_actions)
+        self.box_bottom_right.addSpacing(20)
+
+        # Deck Options
+        self.box_deck_options = self._setup_box_deck_options()
+        self.box_bottom_right.addLayout(self.box_deck_options)
+        self.box_bottom_right.addSpacing(20)
+
+        # Destination for new cards
+        self.box_new_cards_destination = self._setup_box_new_cards_destination(
+            selected_ah_did
+        )
+        self.box_bottom_right.addLayout(self.box_new_cards_destination)
+
+        self.box_bottom_right.addStretch()
+
     def _setup_box_deck_actions(self, selected_ah_did: uuid.UUID) -> QVBoxLayout:
         # Initialize and setup the deck name label
         deck_name = config.deck_config(selected_ah_did).name
@@ -153,86 +193,7 @@ class DeckManagementDialog(QDialog):
 
         return box
 
-    def _refresh_box_bottom_right(self) -> None:
-        clear_layout(self.box_bottom_right)
-
-        self.box_bottom_right.addSpacing(30)
-
-        selected_ah_did = self._selected_ah_did()
-        if selected_ah_did is None:
-
-            self.box_no_deck_selected = QHBoxLayout()
-            self.box_bottom_right.addLayout(self.box_no_deck_selected)
-
-            self.box_no_deck_selected.addSpacing(5)
-
-            self.no_deck_selected_label = QLabel("Choose deck to adjust settings.")
-            self.no_deck_selected_label.setSizePolicy(
-                QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Preferred
-            )
-            self.box_no_deck_selected.addWidget(self.no_deck_selected_label)
-
-            self.box_bottom_right.addStretch(1)
-            return
-
-        # Deck Actions
-        self.box_deck_actions = self._setup_box_deck_actions(selected_ah_did)
-        self.box_bottom_right.addLayout(self.box_deck_actions)
-        self.box_bottom_right.addSpacing(20)
-
-        # Deck Options
-        self.box_deck_options = self._setup_deck_options()
-        self.box_bottom_right.addLayout(self.box_deck_options)
-        self.box_bottom_right.addSpacing(20)
-
-        # Destination for new cards
-        self.box_new_cards_destination = self._setup_destination_for_new_cards(
-            selected_ah_did
-        )
-        self.box_bottom_right.addLayout(self.box_new_cards_destination)
-
-        self.box_bottom_right.addStretch()
-
-    def _setup_destination_for_new_cards(
-        self, selected_ah_did: uuid.UUID
-    ) -> QVBoxLayout:
-        self.new_cards_destination = QLabel("<b>Destination for New Cards</b>")
-
-        # Initialize and set up the destination details label
-        self.new_cards_destination_details_label = QLabel()
-        self.new_cards_destination_details_label.setWordWrap(True)
-        self._refresh_new_cards_destination_details_label(selected_ah_did)
-
-        # Initialize and set up the change destination button
-        self.set_new_cards_destination_btn = QPushButton(
-            "Change Destination for New Cards"
-        )
-        qconnect(
-            self.set_new_cards_destination_btn.clicked,
-            self._on_new_cards_destination_btn_clicked,
-        )
-
-        # Initialize and set up the documentation link label
-        self.new_cards_destination_docs_link_label = QLabel(
-            """
-            <a href="https://community.ankihub.net/t/how-are-anki-decks-related-to-ankihub-decks/4811">
-                More about destinations for new cards
-            </a>
-            """
-        )
-        self.new_cards_destination_docs_link_label.setOpenExternalLinks(True)
-
-        # Add everything to the result layout
-        box = QVBoxLayout()
-        box.addWidget(self.new_cards_destination)
-        box.addWidget(self.new_cards_destination_details_label)
-        box.addWidget(self.set_new_cards_destination_btn)
-        box.addSpacing(5)
-        box.addWidget(self.new_cards_destination_docs_link_label)
-
-        return box
-
-    def _setup_deck_options(self) -> QVBoxLayout:
+    def _setup_box_deck_options(self) -> QVBoxLayout:
         self.deck_options_label = QLabel("<b>Deck Options</b>")
 
         # Initialize and set up the subdecks checkbox
@@ -274,6 +235,45 @@ class DeckManagementDialog(QDialog):
         box = QVBoxLayout()
         box.addWidget(self.deck_options_label)
         box.addLayout(self.box_deck_options_elements)
+
+        return box
+
+    def _setup_box_new_cards_destination(
+        self, selected_ah_did: uuid.UUID
+    ) -> QVBoxLayout:
+        self.new_cards_destination = QLabel("<b>Destination for New Cards</b>")
+
+        # Initialize and set up the destination details label
+        self.new_cards_destination_details_label = QLabel()
+        self.new_cards_destination_details_label.setWordWrap(True)
+        self._refresh_new_cards_destination_details_label(selected_ah_did)
+
+        # Initialize and set up the change destination button
+        self.set_new_cards_destination_btn = QPushButton(
+            "Change Destination for New Cards"
+        )
+        qconnect(
+            self.set_new_cards_destination_btn.clicked,
+            self._on_new_cards_destination_btn_clicked,
+        )
+
+        # Initialize and set up the documentation link label
+        self.new_cards_destination_docs_link_label = QLabel(
+            """
+            <a href="https://community.ankihub.net/t/how-are-anki-decks-related-to-ankihub-decks/4811">
+                More about destinations for new cards
+            </a>
+            """
+        )
+        self.new_cards_destination_docs_link_label.setOpenExternalLinks(True)
+
+        # Add everything to the result layout
+        box = QVBoxLayout()
+        box.addWidget(self.new_cards_destination)
+        box.addWidget(self.new_cards_destination_details_label)
+        box.addWidget(self.set_new_cards_destination_btn)
+        box.addSpacing(5)
+        box.addWidget(self.new_cards_destination_docs_link_label)
 
         return box
 
