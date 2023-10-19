@@ -99,7 +99,7 @@ class DeckManagementDialog(QDialog):
 
         self.box_top_buttons.addSpacing(10)
 
-        self.create_btn = QPushButton("➕ Create Collaborative Deck")
+        self.create_btn = QPushButton("➕ Create AnkiHub Deck")
         self.box_top_buttons.addWidget(self.create_btn)
         qconnect(self.create_btn.clicked, create_collaborative_deck)
 

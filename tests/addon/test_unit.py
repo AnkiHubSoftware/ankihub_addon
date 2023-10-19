@@ -1557,7 +1557,7 @@ class TestCreateCollaborativeDeck:
             )
             showInfo_mock = mock_function(deck_creation, "showInfo")
 
-            # Create the collaborative deck.
+            # Create the AnkiHub deck.
             if creating_deck_fails:
                 create_collaborative_deck()
                 qtbot.wait(500)

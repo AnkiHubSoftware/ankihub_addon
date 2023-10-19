@@ -186,7 +186,7 @@ class AnkiHubLogin(QWidget):
 
 
 def _create_collaborative_deck_setup(parent: QMenu):
-    q_action = QAction("🛠️ Create Collaborative Deck", parent=parent)
+    q_action = QAction("🛠️ Create AnkiHub Deck", parent=parent)
     qconnect(q_action.triggered, create_collaborative_deck)
     parent.addAction(q_action)
 
