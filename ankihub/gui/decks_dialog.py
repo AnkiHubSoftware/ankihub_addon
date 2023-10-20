@@ -206,11 +206,15 @@ class DeckManagementDialog(QDialog):
 
             def on_done(future: Future):
                 future.result()
+                self._refresh_box_bottom_right()
+
+            def install_deck_and_refresh_dialog() -> None:
+                sync_with_ankihub(on_done=on_done)
 
             self.sync_to_install_btn = QPushButton("🔃️ Sync to install")
             qconnect(
                 self.sync_to_install_btn.clicked,
-                lambda: sync_with_ankihub(on_done=on_done),
+                install_deck_and_refresh_dialog,
             )
 
             self.sync_to_install_btn_row = QHBoxLayout()
