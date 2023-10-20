@@ -263,6 +263,12 @@ def tooltip_icon() -> QIcon:
     )
 
 
+def warning_icon() -> QIcon:
+    return QIcon(
+        QApplication.style().standardIcon(QStyle.StandardPixmap.SP_MessageBoxWarning)
+    )
+
+
 def check_and_prompt_for_updates_on_main_window():
     check_and_prompt_for_updates(
         parent=aqt.mw,

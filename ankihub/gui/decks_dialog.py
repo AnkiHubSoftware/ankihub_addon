@@ -1,5 +1,6 @@
 """Dialog for managing subscriptions to AnkiHub decks and deck-specific settings."""
 import uuid
+from concurrent.futures import Future
 from typing import Optional
 from uuid import UUID
 
@@ -30,6 +31,7 @@ from ..main.deck_unsubscribtion import unsubscribe_from_deck_and_uninstall
 from ..main.subdecks import SUBDECK_TAG, deck_contains_subdeck_tags
 from ..main.utils import truncate_string
 from ..settings import SuspendNewCardsOfExistingNotes, config, url_deck_base, url_decks
+from .operations.ankihub_sync import sync_with_ankihub
 from .operations.subdecks import confirm_and_toggle_subdecks
 from .utils import ask_user, clear_layout, tooltip_icon
 
@@ -141,41 +143,27 @@ class DeckManagementDialog(QDialog):
             return
 
         # Deck Actions
-        self.box_deck_actions = self._setup_box_deck_actions(selected_ah_did)
+        self.box_deck_actions = self._setup_box_deck_actions()
         self.box_bottom_right.addLayout(self.box_deck_actions)
         self.box_bottom_right.addSpacing(20)
-
-        if selected_ah_did not in config.deck_ids():
-            self.deck_not_installed_label = QLabel(
-                "Deck is not installed.<br>Sync with AnkiHub to Install."
-            )
-            self.deck_not_installed_label.setWordWrap(True)
-            self.deck_not_installed_label.setSizePolicy(
-                QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Preferred
-            )
-
-            self.box_deck_not_installed = QHBoxLayout()
-            self.box_deck_not_installed.addSpacing(5)
-            self.box_deck_not_installed.addWidget(self.deck_not_installed_label)
-
-            self.box_bottom_right.addLayout(self.box_deck_not_installed)
-            self.box_bottom_right.addStretch()
-            return
 
         # Deck Options
         self.box_deck_options = self._setup_box_deck_options(selected_ah_did)
         self.box_bottom_right.addLayout(self.box_deck_options)
         self.box_bottom_right.addSpacing(20)
 
+        if selected_ah_did not in config.deck_ids():
+            self.box_bottom_right.addStretch()
+            return
+
         # Destination for new cards
         self.box_new_cards_destination = self._setup_box_new_cards_destination(
             selected_ah_did
         )
         self.box_bottom_right.addLayout(self.box_new_cards_destination)
-
         self.box_bottom_right.addStretch()
 
-    def _setup_box_deck_actions(self, selected_ah_did: uuid.UUID) -> QVBoxLayout:
+    def _setup_box_deck_actions(self) -> QVBoxLayout:
         # Initialize and setup the deck name label
         deck_name = self._selected_ah_deck_name()
         self.deck_name_label = QLabel(
@@ -212,6 +200,32 @@ class DeckManagementDialog(QDialog):
 
     def _setup_box_deck_options(self, selected_ah_did: uuid.UUID) -> QVBoxLayout:
         self.deck_options_label = QLabel("<b>Deck Options</b>")
+
+        if selected_ah_did not in config.deck_ids():
+            self.deck_not_installed_label = QLabel("⚠️ This deck is not installed yet!")
+
+            def on_done(future: Future):
+                future.result()
+
+            self.sync_to_install_btn = QPushButton("🔃️ Sync to install")
+            qconnect(
+                self.sync_to_install_btn.clicked,
+                lambda: sync_with_ankihub(on_done=on_done),
+            )
+
+            self.sync_to_install_btn_row = QHBoxLayout()
+            self.sync_to_install_btn_row.addWidget(self.sync_to_install_btn)
+            self.sync_to_install_btn_row.addStretch()
+
+            self.box_deck_not_installed = QVBoxLayout()
+            self.box_deck_not_installed.addWidget(self.deck_not_installed_label)
+            self.box_deck_not_installed.addLayout(self.sync_to_install_btn_row)
+
+            box = QVBoxLayout()
+            box.addWidget(self.deck_options_label)
+            box.addLayout(self.box_deck_not_installed)
+
+            return box
 
         # Setup "Suspend new cards of existing notes"
         self.box_suspend_new_cards_of_existing_notes = (
