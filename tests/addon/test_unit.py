@@ -326,7 +326,7 @@ class TestDeckContainsSubdeckTags:
     ) -> None:
         with anki_session_with_addon_data.profile_loaded():
             ah_did = next_deterministic_uuid()
-            note_info = NoteInfoFactory(tags=[f"{SUBDECK_TAG}::A::B"])
+            note_info = NoteInfoFactory.create(tags=[f"{SUBDECK_TAG}::A::B"])
             import_ah_note(ah_did=ah_did, note_data=note_info)
 
             assert deck_contains_subdeck_tags(ah_did)
@@ -354,7 +354,9 @@ class TestDeckContainsSubdeckTags:
 
             import_ah_note(ah_did=ah_did)
 
-            note_info = NoteInfoFactory(tags=["some_other_tag", f"{SUBDECK_TAG}::A::B"])
+            note_info = NoteInfoFactory.create(
+                tags=["some_other_tag", f"{SUBDECK_TAG}::A::B"]
+            )
             import_ah_note(ah_did=ah_did, note_data=note_info)
 
             assert deck_contains_subdeck_tags(ah_did)
