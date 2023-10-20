@@ -464,14 +464,13 @@ class DeckManagementDialog(QDialog):
 
         subscribed_decks = self.client.get_deck_subscriptions()
         for deck in subscribed_decks:
-            name = deck.name
             if deck.is_user_relation_owner:
-                item = QListWidgetItem(f"{name} (Created by you)")
+                item = QListWidgetItem(f"{deck.name} (Created by you)")
             elif deck.is_user_relation_maintainer:
-                item = QListWidgetItem(f"{name} (Maintained by you)")
+                item = QListWidgetItem(f"{deck.name} (Maintained by you)")
             else:
-                item = QListWidgetItem(name)
-            item.setData(Qt.ItemDataRole.UserRole, deck.ah_did)
+                item = QListWidgetItem(deck.name)
+            item.setData(Qt.ItemDataRole.UserRole, deck)
             self.decks_list.addItem(item)
 
     def _selected_ah_did(self) -> Optional[UUID]:
@@ -479,7 +478,7 @@ class DeckManagementDialog(QDialog):
         if len(selection) != 1:
             return None
 
-        result = selection[0].data(Qt.ItemDataRole.UserRole)
+        result = selection[0].data(Qt.ItemDataRole.UserRole).ah_did
         return result
 
     def _selected_ah_deck_name(self) -> Optional[str]:
@@ -487,7 +486,7 @@ class DeckManagementDialog(QDialog):
         if len(selection) != 1:
             return None
 
-        result = selection[0].text()
+        result = selection[0].data(Qt.ItemDataRole.UserRole).name
         return result
 
     def _on_unsubscribe(self) -> None:
