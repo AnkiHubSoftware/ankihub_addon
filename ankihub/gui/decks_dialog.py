@@ -505,7 +505,7 @@ class DeckManagementDialog(QDialog):
 
     def _on_unsubscribe(self) -> None:
         ah_did = self._selected_ah_did()
-        deck_name = config.deck_config(ah_did).name
+        deck_name = self._selected_ah_deck_name()
         confirm = ask_user(
             f"Unsubscribe from deck {deck_name}?\n\n"
             "The deck will remain in your collection, but it will no longer sync with AnkiHub.",
