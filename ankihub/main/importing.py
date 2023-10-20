@@ -291,7 +291,7 @@ class AnkiHubImporter:
             if not (new_cards_ := new_cards()):
                 return
 
-            LOGGER.info(f"Suspending new cards of note {note.id}")
+            LOGGER.debug(f"Suspending new cards of note {note.id}")
             for card in new_cards_:
                 card.queue = QUEUE_TYPE_SUSPENDED
                 card.flush()
