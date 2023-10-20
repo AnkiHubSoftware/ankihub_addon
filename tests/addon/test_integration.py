@@ -2548,7 +2548,7 @@ class TestDeckManagementDialog:
     def test_basic(
         self,
         anki_session_with_addon_data: AnkiSession,
-        install_sample_ah_deck: InstallSampleAHDeck,
+        install_ah_deck: InstallAHDeck,
         qtbot: QtBot,
         monkeypatch: MonkeyPatch,
         nightmode: bool,
@@ -2557,12 +2557,16 @@ class TestDeckManagementDialog:
 
             self._mock_dependencies(monkeypatch)
 
-            anki_did, ah_did = install_sample_ah_deck()
+            deck_name = "Test Deck"
+            ah_did = install_ah_deck(ah_deck_name=deck_name)
+            anki_did = config.deck_config(ah_did).anki_id
 
             monkeypatch.setattr(
                 AnkiHubClient,
                 "get_deck_subscriptions",
-                lambda *args: [DeckFactory.create(ah_did=ah_did, anki_did=anki_did)],
+                lambda *args: [
+                    DeckFactory.create(ah_did=ah_did, anki_did=anki_did, name=deck_name)
+                ],
             )
 
             theme_manager.night_mode = nightmode
