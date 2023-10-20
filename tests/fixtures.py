@@ -27,7 +27,7 @@ from ankihub.gui import operations
 from ankihub.gui.media_sync import _AnkiHubMediaSync
 from ankihub.main.importing import AnkiHubImporter
 from ankihub.main.utils import modify_note_type
-from ankihub.settings import config
+from ankihub.settings import DeckConfig, config
 
 
 @fixture
@@ -234,6 +234,19 @@ def import_ah_note(next_deterministic_uuid: Callable[[], uuid.UUID]) -> ImportAH
             f"\tNote data: {note_data.fields}, note type: {field_names_of_note_type}"
         )
 
+        if deck_config := config.deck_config(ah_did):
+            suspend_new_cards_of_new_notes = deck_config.suspend_new_cards_of_new_notes
+            suspend_new_cards_of_existing_notes = (
+                deck_config.suspend_new_cards_of_existing_notes
+            )
+        else:
+            suspend_new_cards_of_new_notes = (
+                DeckConfig.suspend_new_cards_of_new_notes_default(ah_did)
+            )
+            suspend_new_cards_of_existing_notes = (
+                DeckConfig.suspend_new_cards_of_existing_notes_default()
+            )
+
         AnkiHubImporter().import_ankihub_deck(
             ankihub_did=ah_did,
             notes=[note_data],
@@ -243,6 +256,8 @@ def import_ah_note(next_deterministic_uuid: Callable[[], uuid.UUID]) -> ImportAH
             deck_name=deck_name,
             is_first_import_of_deck=anki_did is None,
             anki_did=anki_did,
+            suspend_new_cards_of_new_notes=suspend_new_cards_of_new_notes,
+            suspend_new_cards_of_existing_notes=suspend_new_cards_of_existing_notes,
         )
         return note_data
 
@@ -295,6 +310,10 @@ def import_ah_note_type(
             protected_fields={},
             protected_tags=[],
             is_first_import_of_deck=False,
+            suspend_new_cards_of_new_notes=DeckConfig.suspend_new_cards_of_new_notes_default(
+                ah_did
+            ),
+            suspend_new_cards_of_existing_notes=DeckConfig.suspend_new_cards_of_existing_notes_default(),
         )
         return note_type
 

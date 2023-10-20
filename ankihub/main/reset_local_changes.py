@@ -46,6 +46,8 @@ def reset_local_changes_to_notes(
         protected_tags=protected_tags,
         # we don't move existing notes between decks here, users might not want that
         subdecks_for_new_notes_only=deck_config.subdecks_enabled,
+        suspend_new_cards_of_new_notes=deck_config.suspend_new_cards_of_new_notes,
+        suspend_new_cards_of_existing_notes=deck_config.suspend_new_cards_of_existing_notes,
     )
 
     # this way the notes won't be marked as "changed after sync" anymore
