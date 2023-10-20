@@ -137,7 +137,20 @@ class DeckManagementDialog(QDialog):
             self.box_no_deck_selected.addWidget(self.no_deck_selected_label)
 
             self.box_bottom_right.addLayout(self.box_no_deck_selected)
-            self.box_bottom_right.addStretch(1)
+            self.box_bottom_right.addStretch()
+            return
+        elif selected_ah_did not in config.deck_ids():
+            self.deck_not_installed_label = QLabel("Sync with AnkiHub to install.")
+            self.deck_not_installed_label.setSizePolicy(
+                QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Preferred
+            )
+
+            self.box_deck_not_installed = QHBoxLayout()
+            self.box_deck_not_installed.addSpacing(5)
+            self.box_deck_not_installed.addWidget(self.deck_not_installed_label)
+
+            self.box_bottom_right.addLayout(self.box_deck_not_installed)
+            self.box_bottom_right.addStretch()
             return
 
         # Deck Actions
@@ -428,11 +441,7 @@ class DeckManagementDialog(QDialog):
         self.decks_list.clear()
 
         subscribed_decks = self.client.get_deck_subscriptions()
-        installed_ah_dids = config.deck_ids()
-        subscribed_and_installed_decks = [
-            deck for deck in subscribed_decks if deck.ah_did in installed_ah_dids
-        ]
-        for deck in subscribed_and_installed_decks:
+        for deck in subscribed_decks:
             name = deck.name
             if deck.is_user_relation_owner:
                 item = QListWidgetItem(f"{name} (Created by you)")
