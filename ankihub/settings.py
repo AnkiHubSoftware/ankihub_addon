@@ -94,6 +94,15 @@ class DeckConfig(DataClassJSONMixin):
         SuspendNewCardsOfExistingNotes.IF_SIBLINGS_SUSPENDED
     )
 
+    @staticmethod
+    def suspend_new_cards_of_new_notes_default(ah_did: uuid.UUID) -> bool:
+        result = ah_did == ANKING_DECK_ID
+        return result
+
+    @staticmethod
+    def suspend_new_cards_of_existing_notes_default() -> SuspendNewCardsOfExistingNotes:
+        return SuspendNewCardsOfExistingNotes.IF_SIBLINGS_SUSPENDED
+
 
 @dataclass
 class DeckExtensionConfig(DataClassJSONMixin):
@@ -226,6 +235,16 @@ class _Config:
         self.deck_config(ankihub_did).subdecks_enabled = subdecks
         self._update_private_config()
 
+    def set_suspend_new_cards_of_new_notes(self, ankihub_did: uuid.UUID, suspend: bool):
+        self.deck_config(ankihub_did).suspend_new_cards_of_new_notes = suspend
+        self._update_private_config()
+
+    def set_suspend_new_cards_of_existing_notes(
+        self, ankihub_did: uuid.UUID, suspend: SuspendNewCardsOfExistingNotes
+    ):
+        self.deck_config(ankihub_did).suspend_new_cards_of_existing_notes = suspend
+        self._update_private_config()
+
     def add_deck(
         self,
         name: str,
@@ -241,7 +260,9 @@ class _Config:
             anki_id=DeckId(anki_did),
             user_relation=user_relation,
             subdecks_enabled=subdecks_enabled,
-            suspend_new_cards_of_new_notes=ankihub_did == ANKING_DECK_ID,
+            suspend_new_cards_of_new_notes=DeckConfig.suspend_new_cards_of_new_notes_default(
+                ankihub_did
+            ),
         )
         # remove duplicates
         self.save_latest_deck_update(ankihub_did, latest_udpate)

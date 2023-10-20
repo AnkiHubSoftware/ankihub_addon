@@ -17,7 +17,7 @@ from anki.notes import Note, NoteId
 from .. import LOGGER, settings
 from ..ankihub_client import Field, NoteInfo
 from ..db import ankihub_db
-from ..settings import config
+from ..settings import SuspendNewCardsOfExistingNotes
 from .note_conversion import (
     TAG_FOR_PROTECTING_ALL_FIELDS,
     get_fields_protected_by_tags,
@@ -71,6 +71,8 @@ class AnkiHubImporter:
         protected_tags: List[str],
         deck_name: str,  # name that will be used for a deck if a new one gets created
         is_first_import_of_deck: bool,
+        suspend_new_cards_of_new_notes: bool,
+        suspend_new_cards_of_existing_notes: SuspendNewCardsOfExistingNotes,
         anki_did: Optional[  # did that new notes should be put into if importing not for the first time
             DeckId
         ] = None,
@@ -114,7 +116,9 @@ class AnkiHubImporter:
 
         self._import_note_types(note_types=note_types)
 
-        dids = self._import_notes(notes_data=notes)
+        dids = self._import_notes(
+            notes, suspend_new_cards_of_new_notes, suspend_new_cards_of_existing_notes
+        )
 
         if self._is_first_import_of_deck:
             self._local_did = self._cleanup_first_time_deck_import(
@@ -155,7 +159,12 @@ class AnkiHubImporter:
                 ankihub_did=self._ankihub_did, note_type=note_type
             )
 
-    def _import_notes(self, notes_data: List[NoteInfo]) -> Set[DeckId]:
+    def _import_notes(
+        self,
+        notes_data: List[NoteInfo],
+        suspend_new_cards_of_new_notes: bool,
+        suspend_new_cards_of_existing_notes: SuspendNewCardsOfExistingNotes,
+    ) -> Set[DeckId]:
         # returns set of ids of decks notes were imported into
 
         upserted_notes, skipped_notes = ankihub_db.upsert_notes_data(
@@ -172,6 +181,8 @@ class AnkiHubImporter:
                 anki_did=self._local_did,
                 protected_fields=self._protected_fields,
                 protected_tags=self._protected_tags,
+                suspend_new_cards_of_new_notes=suspend_new_cards_of_new_notes,
+                suspend_new_cards_of_existing_notes=suspend_new_cards_of_existing_notes,
             )
             dids_for_note = set(c.did for c in note.cards())
             dids = dids | dids_for_note
@@ -230,6 +241,8 @@ class AnkiHubImporter:
         note_data: NoteInfo,
         protected_fields: Dict[int, List[str]],
         protected_tags: List[str],
+        suspend_new_cards_of_new_notes: bool,
+        suspend_new_cards_of_existing_notes: SuspendNewCardsOfExistingNotes,
         anki_did: Optional[DeckId] = None,
     ) -> Note:
         LOGGER.debug(
@@ -253,12 +266,21 @@ class AnkiHubImporter:
             anki_did=anki_did,
         )
 
-        self._maybe_suspend_new_cards(note, cards_before_changes)
+        self._maybe_suspend_new_cards(
+            note=note,
+            cards_before_changes=cards_before_changes,
+            suspend_new_cards_of_new_notes=suspend_new_cards_of_new_notes,
+            suspend_new_cards_of_existing_notes=suspend_new_cards_of_existing_notes,
+        )
 
         return note
 
     def _maybe_suspend_new_cards(
-        self, note: Note, cards_before_changes: List[Card]
+        self,
+        note: Note,
+        cards_before_changes: List[Card],
+        suspend_new_cards_of_new_notes: bool,
+        suspend_new_cards_of_existing_notes: SuspendNewCardsOfExistingNotes,
     ) -> None:
         def new_cards() -> Set[Card]:
             cids_before_changes = {c.id for c in cards_before_changes}
@@ -276,33 +298,34 @@ class AnkiHubImporter:
 
         if cards_before_changes:
             # If there were cards before the changes, the note already existed in Anki.
-            config_key = "suspend_new_cards_of_existing_notes"
-            config_value = config.public_config[config_key]
-            if config_value == "never":
+            if (
+                suspend_new_cards_of_existing_notes
+                == SuspendNewCardsOfExistingNotes.NEVER
+            ):
                 return
-            elif config_value == "always":
+            elif (
+                suspend_new_cards_of_existing_notes
+                == SuspendNewCardsOfExistingNotes.ALWAYS
+            ):
                 suspend_new_cards()
-            elif config_value == "if_siblings_are_suspended":
+            elif (
+                suspend_new_cards_of_existing_notes
+                == SuspendNewCardsOfExistingNotes.IF_SIBLINGS_SUSPENDED
+            ):
                 if all(
                     card.queue == QUEUE_TYPE_SUSPENDED for card in cards_before_changes
                 ):
                     suspend_new_cards()
             else:
                 raise ValueError(
-                    f"Invalid value for {config_key}: {config_value}"
+                    f"Unknown value for {str(SuspendNewCardsOfExistingNotes)}"
                 )  # pragma: no cover
         else:
             # If there were no cards before the changes, the note didn't exist in Anki before.
-            config_key = "suspend_new_cards_of_new_notes"
-            config_value = config.public_config[config_key]
-            if config_value == "never":
-                return
-            elif config_value == "always":
+            if suspend_new_cards_of_new_notes:
                 suspend_new_cards()
             else:
-                raise ValueError(
-                    f"Invalid value for {config_key}: {config_value}"
-                )  # pragma: no cover
+                return
 
     def _update_or_create_note_inner(
         self,

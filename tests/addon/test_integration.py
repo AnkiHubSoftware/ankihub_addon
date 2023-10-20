@@ -166,8 +166,10 @@ from ankihub.main.utils import (
 from ankihub.settings import (
     ANKIHUB_NOTE_TYPE_FIELD_NAME,
     AnkiHubCommands,
+    DeckConfig,
     DeckExtension,
     DeckExtensionConfig,
+    SuspendNewCardsOfExistingNotes,
     config,
     profile_files_path,
 )
@@ -228,6 +230,10 @@ def import_sample_ankihub_deck(
         protected_fields={},
         protected_tags=[],
         note_types=SAMPLE_NOTE_TYPES,
+        suspend_new_cards_of_new_notes=DeckConfig.suspend_new_cards_of_new_notes_default(
+            ankihub_did
+        ),
+        suspend_new_cards_of_existing_notes=DeckConfig.suspend_new_cards_of_existing_notes_default(),
     ).anki_did
     new_dids = all_dids() - dids_before_import
 
@@ -1194,6 +1200,10 @@ class TestAnkiHubImporter:
                 note_types=SAMPLE_NOTE_TYPES,
                 protected_fields={},
                 protected_tags=[],
+                suspend_new_cards_of_new_notes=DeckConfig.suspend_new_cards_of_new_notes_default(
+                    ah_did
+                ),
+                suspend_new_cards_of_existing_notes=DeckConfig.suspend_new_cards_of_existing_notes_default(),
             )
             anki_did = import_result.anki_did
             new_dids = all_dids() - dids_before_import
@@ -1234,6 +1244,10 @@ class TestAnkiHubImporter:
                 note_types=SAMPLE_NOTE_TYPES,
                 protected_fields={},
                 protected_tags=[],
+                suspend_new_cards_of_new_notes=DeckConfig.suspend_new_cards_of_new_notes_default(
+                    ah_did
+                ),
+                suspend_new_cards_of_existing_notes=DeckConfig.suspend_new_cards_of_existing_notes_default(),
             )
             anki_did = import_result.anki_did
             new_dids = all_dids() - dids_before_import
@@ -1278,6 +1292,10 @@ class TestAnkiHubImporter:
                 note_types=SAMPLE_NOTE_TYPES,
                 protected_fields={},
                 protected_tags=[],
+                suspend_new_cards_of_new_notes=DeckConfig.suspend_new_cards_of_new_notes_default(
+                    ah_did
+                ),
+                suspend_new_cards_of_existing_notes=DeckConfig.suspend_new_cards_of_existing_notes_default(),
             )
             anki_did = import_result.anki_did
             new_dids = all_dids() - dids_before_import
@@ -1330,6 +1348,10 @@ class TestAnkiHubImporter:
                 note_types=SAMPLE_NOTE_TYPES,
                 protected_fields={},
                 protected_tags=[],
+                suspend_new_cards_of_new_notes=DeckConfig.suspend_new_cards_of_new_notes_default(
+                    ah_did
+                ),
+                suspend_new_cards_of_existing_notes=DeckConfig.suspend_new_cards_of_existing_notes_default(),
             )
             anki_did = import_result.anki_did
             new_dids = all_dids() - dids_before_import
@@ -1366,6 +1388,10 @@ class TestAnkiHubImporter:
                 protected_fields={},
                 protected_tags=[],
                 anki_did=first_local_did,
+                suspend_new_cards_of_new_notes=DeckConfig.suspend_new_cards_of_new_notes_default(
+                    ah_did
+                ),
+                suspend_new_cards_of_existing_notes=DeckConfig.suspend_new_cards_of_existing_notes_default(),
             )
             second_anki_did = import_result.anki_did
             new_dids = all_dids() - dids_before_import
@@ -1411,6 +1437,10 @@ class TestAnkiHubImporter:
                 protected_fields={},
                 protected_tags=[],
                 anki_did=first_local_did,
+                suspend_new_cards_of_new_notes=DeckConfig.suspend_new_cards_of_new_notes_default(
+                    ah_did
+                ),
+                suspend_new_cards_of_existing_notes=DeckConfig.suspend_new_cards_of_existing_notes_default(),
             )
             second_anki_did = import_result.anki_did
             new_dids = all_dids() - dids_before_import
@@ -1456,6 +1486,10 @@ class TestAnkiHubImporter:
                 protected_tags=[],
                 anki_did=anki_did,
                 subdecks=True,
+                suspend_new_cards_of_new_notes=DeckConfig.suspend_new_cards_of_new_notes_default(
+                    ah_did
+                ),
+                suspend_new_cards_of_existing_notes=DeckConfig.suspend_new_cards_of_existing_notes_default(),
             )
             second_anki_did = import_result.anki_did
             new_dids = all_dids() - dids_before_import
@@ -1515,6 +1549,10 @@ class TestAnkiHubImporter:
                 protected_fields={note_type_id: [protected_field_name]},
                 protected_tags=["protected_tag"],
                 note_types=SAMPLE_NOTE_TYPES,
+                suspend_new_cards_of_new_notes=DeckConfig.suspend_new_cards_of_new_notes_default(
+                    ah_did
+                ),
+                suspend_new_cards_of_existing_notes=DeckConfig.suspend_new_cards_of_existing_notes_default(),
             )
 
             # assert that the fields are saved correctly in the Anki DB (protected)
@@ -1560,6 +1598,10 @@ class TestAnkiHubImporter:
                 protected_tags=[],
                 deck_name="test",
                 is_first_import_of_deck=True,
+                suspend_new_cards_of_new_notes=DeckConfig.suspend_new_cards_of_new_notes_default(
+                    ah_did_1
+                ),
+                suspend_new_cards_of_existing_notes=DeckConfig.suspend_new_cards_of_existing_notes_default(),
             )
             assert import_result.created_nids == [anki_nid]
             assert import_result.updated_nids == []
@@ -1584,6 +1626,10 @@ class TestAnkiHubImporter:
                 protected_tags=[],
                 deck_name="test",
                 is_first_import_of_deck=True,
+                suspend_new_cards_of_new_notes=DeckConfig.suspend_new_cards_of_new_notes_default(
+                    ah_did_2
+                ),
+                suspend_new_cards_of_existing_notes=DeckConfig.suspend_new_cards_of_existing_notes_default(),
             )
             assert import_result.created_nids == []
             assert import_result.updated_nids == []
@@ -1622,33 +1668,36 @@ class TestAnkiHubImporterSuspendNewCardsOfExistingNotesOption:
         "option_value, existing_card_suspended, expected_new_card_suspended",
         [
             # Always suspend new cards
-            ("always", False, True),
-            ("always", True, True),
+            (SuspendNewCardsOfExistingNotes.ALWAYS, False, True),
+            (SuspendNewCardsOfExistingNotes.ALWAYS, True, True),
             # Never suspend new cards
-            ("never", True, False),
-            ("never", False, False),
+            (SuspendNewCardsOfExistingNotes.NEVER, True, False),
+            (SuspendNewCardsOfExistingNotes.NEVER, False, False),
             # Suspend new cards if existing sibling cards are suspended
-            ("if_siblings_are_suspended", True, True),
-            ("if_siblings_are_suspended", False, False),
+            (SuspendNewCardsOfExistingNotes.IF_SIBLINGS_SUSPENDED, True, True),
+            (SuspendNewCardsOfExistingNotes.IF_SIBLINGS_SUSPENDED, False, False),
         ],
     )
     def test_suspend_new_cards_of_existing_notes_option(
         self,
         anki_session_with_addon_data: AnkiSession,
         next_deterministic_uuid: Callable[[], uuid.UUID],
-        option_value: str,
+        install_ah_deck: InstallAHDeck,
+        option_value: SuspendNewCardsOfExistingNotes,
         existing_card_suspended: bool,
         expected_new_card_suspended: bool,
     ):
         anki_session = anki_session_with_addon_data
         with anki_session.profile_loaded():
 
-            config.public_config["suspend_new_cards_of_existing_notes"] = option_value
+            ah_did = install_ah_deck()
+            config.set_suspend_new_cards_of_existing_notes(ah_did, option_value)
 
             ah_nid = next_deterministic_uuid()
             old_card, new_card = self._create_and_update_note_with_new_card(
                 existing_card_suspended=existing_card_suspended,
                 ah_nid=ah_nid,
+                suspend_new_cards_of_existing_notes=option_value,
             )
 
             # Assert the old card has the same suspension state as before
@@ -1665,6 +1714,7 @@ class TestAnkiHubImporterSuspendNewCardsOfExistingNotesOption:
         self,
         existing_card_suspended: bool,
         ah_nid: uuid.UUID,
+        suspend_new_cards_of_existing_notes: SuspendNewCardsOfExistingNotes,
     ) -> Tuple[Card, Card]:
         # Create a cloze note with one card, optionally suspend the existing card,
         # then update the note using AnkiHubImporter adding a new cloze
@@ -1699,6 +1749,8 @@ class TestAnkiHubImporterSuspendNewCardsOfExistingNotesOption:
             anki_did=DeckId(0),
             protected_fields={},
             protected_tags=[],
+            suspend_new_cards_of_new_notes=False,
+            suspend_new_cards_of_existing_notes=suspend_new_cards_of_existing_notes,
         )
         assert len(updated_note.cards()) == 2  # one existing and one new card
 
@@ -1713,23 +1765,25 @@ class TestAnkiHubImporterSuspendNewCardsOfNewNotesOption:
     @pytest.mark.parametrize(
         "option_value, expected_new_card_suspended",
         [
-            ("always", True),
-            ("never", False),
+            (True, True),
+            (False, False),
         ],
     )
     def test_suspend_new_cards_of_new_notes_option(
         self,
         anki_session_with_addon_data: AnkiSession,
+        install_ah_deck: InstallAHDeck,
         import_ah_note: ImportAHNote,
-        option_value: str,
+        option_value: bool,
         expected_new_card_suspended: bool,
     ):
         anki_session = anki_session_with_addon_data
         with anki_session.profile_loaded():
 
-            config.public_config["suspend_new_cards_of_new_notes"] = option_value
+            ah_did = install_ah_deck()
+            config.set_suspend_new_cards_of_new_notes(ah_did, option_value)
 
-            note_info = import_ah_note()
+            note_info = import_ah_note(ah_did=ah_did)
             note = aqt.mw.col.get_note(NoteId(note_info.anki_nid))
             assert len(note.cards()) == 1
 
@@ -2157,14 +2211,19 @@ class TestCustomSearchNodes:
             ankihub_models = {
                 m["id"]: m for m in mw.col.models.all() if "/" in m["name"]
             }
+            ah_did = next_deterministic_uuid()
             AnkiHubImporter().import_ankihub_deck(
-                ankihub_did=next_deterministic_uuid(),
+                ankihub_did=ah_did,
                 notes=notes_data,
                 note_types=ankihub_models,
                 protected_fields={},
                 protected_tags=[],
                 deck_name="Test-Deck",
                 is_first_import_of_deck=True,
+                suspend_new_cards_of_new_notes=DeckConfig.suspend_new_cards_of_new_notes_default(
+                    ah_did
+                ),
+                suspend_new_cards_of_existing_notes=DeckConfig.suspend_new_cards_of_existing_notes_default(),
             )
 
             all_nids = mw.col.find_notes("")
@@ -2196,13 +2255,18 @@ class TestCustomSearchNodes:
             ankihub_models = {
                 m["id"]: m for m in mw.col.models.all() if "/" in m["name"]
             }
+            ah_did = next_deterministic_uuid()
             AnkiHubImporter().import_ankihub_deck(
-                ankihub_did=next_deterministic_uuid(),
+                ankihub_did=ah_did,
                 notes=notes_data,
                 note_types=ankihub_models,
                 protected_fields={},
                 protected_tags=[],
                 deck_name="Test-Deck",
+                suspend_new_cards_of_new_notes=DeckConfig.suspend_new_cards_of_new_notes_default(
+                    ah_did
+                ),
+                suspend_new_cards_of_existing_notes=DeckConfig.suspend_new_cards_of_existing_notes_default(),
                 is_first_import_of_deck=True,
             )
 

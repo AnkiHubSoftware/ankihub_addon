@@ -5,7 +5,9 @@ from uuid import UUID
 
 import aqt
 from aqt.qt import (
+    QBoxLayout,
     QCheckBox,
+    QComboBox,
     QDialog,
     QDialogButtonBox,
     QHBoxLayout,
@@ -27,7 +29,7 @@ from ..gui.operations.deck_creation import create_collaborative_deck
 from ..main.deck_unsubscribtion import unsubscribe_from_deck_and_uninstall
 from ..main.subdecks import SUBDECK_TAG, deck_contains_subdeck_tags
 from ..main.utils import truncate_string
-from ..settings import config, url_deck_base, url_decks
+from ..settings import SuspendNewCardsOfExistingNotes, config, url_deck_base, url_decks
 from .operations.subdecks import confirm_and_toggle_subdecks
 from .utils import ask_user, clear_layout, tooltip_icon
 
@@ -51,7 +53,7 @@ class DeckManagementDialog(QDialog):
     def _setup_ui(self):
         self.setWindowTitle("AnkiHub | Deck Management")
         self.setMinimumWidth(640)
-        self.setMinimumHeight(450)
+        self.setMinimumHeight(500)
 
         self.box_main = QVBoxLayout()
 
@@ -144,7 +146,7 @@ class DeckManagementDialog(QDialog):
         self.box_bottom_right.addSpacing(20)
 
         # Deck Options
-        self.box_deck_options = self._setup_box_deck_options()
+        self.box_deck_options = self._setup_box_deck_options(selected_ah_did)
         self.box_bottom_right.addLayout(self.box_deck_options)
         self.box_bottom_right.addSpacing(20)
 
@@ -191,14 +193,153 @@ class DeckManagementDialog(QDialog):
 
         return box
 
-    def _setup_box_deck_options(self) -> QVBoxLayout:
+    def _setup_box_deck_options(self, selected_ah_did: uuid.UUID) -> QVBoxLayout:
         self.deck_options_label = QLabel("<b>Deck Options</b>")
 
-        # Initialize and set up the subdecks checkbox
+        # Setup "Suspend new cards of existing notes"
+        self.box_suspend_new_cards_of_existing_notes = (
+            self._setup_box_suspend_new_cards_of_existing_notes(selected_ah_did)
+        )
+
+        # Setup "Suspend new cards of new notes"
+        self.box_suspend_new_cards_of_new_notes = (
+            self._setup_box_suspend_new_cards_of_new_notes(selected_ah_did)
+        )
+
+        # Setup "Subdecks enabled"
+        self.box_subdecks_enabled = self._setup_box_subdecks_enabled()
+
+        # Add individual elements to the deck options elements box
+        self.box_deck_options_elements = QVBoxLayout()
+        self.box_deck_options_elements.addLayout(
+            self.box_suspend_new_cards_of_existing_notes
+        )
+        self.box_deck_options_elements.addSpacing(10)
+        self.box_deck_options_elements.addLayout(
+            self.box_suspend_new_cards_of_new_notes
+        )
+        self.box_deck_options_elements.addLayout(self.box_subdecks_enabled)
+
+        # Add everything to the result layout
+        box = QVBoxLayout()
+        box.addWidget(self.deck_options_label)
+        box.addLayout(self.box_deck_options_elements)
+
+        return box
+
+    def _setup_box_suspend_new_cards_of_existing_notes(
+        self, selected_ah_did: uuid.UUID
+    ) -> QBoxLayout:
+        deck_config = config.deck_config(selected_ah_did)
+
+        # Setup label
+        suspend_cards_of_existing_notes_tooltip_message = (
+            "Will automatically suspend <br>"
+            "the cards of existing notes in <br>"
+            "the deck in future updates <br>"
+            "according to the chosen option."
+        )
+        self.suspend_new_cards_of_existing_notes_label = QLabel(
+            "Suspend new cards of existing notes"
+        )
+        self.suspend_new_cards_of_existing_notes_label.setToolTip(
+            suspend_cards_of_existing_notes_tooltip_message
+        )
+
+        # Setup tooltip icon
+        self.suspend_new_cards_of_existing_notes_cb_icon_label = QLabel()
+        self.suspend_new_cards_of_existing_notes_cb_icon_label.setPixmap(
+            tooltip_icon().pixmap(16, 16)
+        )
+        self.suspend_new_cards_of_existing_notes_cb_icon_label.setToolTip(
+            suspend_cards_of_existing_notes_tooltip_message
+        )
+
+        # Add the label and tooltip icon to the row layout
+        self.suspend_new_cards_of_existing_notes_row = QHBoxLayout()
+        self.suspend_new_cards_of_existing_notes_row.addWidget(
+            self.suspend_new_cards_of_existing_notes_label
+        )
+        self.suspend_new_cards_of_existing_notes_row.addWidget(
+            self.suspend_new_cards_of_existing_notes_cb_icon_label
+        )
+
+        # Setup and configure the combo box for "Suspend new cards of existing notes"
+        self.suspend_new_cards_of_existing_notes = QComboBox()
+        self.suspend_new_cards_of_existing_notes.insertItems(
+            0, [option.value for option in SuspendNewCardsOfExistingNotes]
+        )
+        self.suspend_new_cards_of_existing_notes.setCurrentText(
+            deck_config.suspend_new_cards_of_existing_notes.value
+        )
+        qconnect(
+            self.suspend_new_cards_of_existing_notes.currentTextChanged,
+            lambda: config.set_suspend_new_cards_of_existing_notes(
+                selected_ah_did,
+                SuspendNewCardsOfExistingNotes(
+                    self.suspend_new_cards_of_existing_notes.currentText()
+                ),
+            ),
+        )
+
+        # Add the row and combo box to the result layout
+        box = QVBoxLayout()
+        box.addLayout(self.suspend_new_cards_of_existing_notes_row)
+        box.addWidget(self.suspend_new_cards_of_existing_notes)
+
+        return box
+
+    def _setup_box_suspend_new_cards_of_new_notes(
+        self,
+        selected_ah_did: uuid.UUID,
+    ) -> QBoxLayout:
+        deck_config = config.deck_config(selected_ah_did)
+
+        # Setup checkbox
+        suspend_new_cards_of_new_notes_tooltip_message = (
+            "Will automatically suspend all <br>"
+            "the cards of new notes added to <br>"
+            "the deck in future updates."
+        )
+        self.suspend_new_cards_of_new_notes_cb = QCheckBox(
+            "Suspend new cards of new notes"
+        )
+        self.suspend_new_cards_of_new_notes_cb.setToolTip(
+            suspend_new_cards_of_new_notes_tooltip_message
+        )
+        self.suspend_new_cards_of_new_notes_cb.setChecked(
+            deck_config.suspend_new_cards_of_new_notes
+        )
+        qconnect(
+            self.suspend_new_cards_of_new_notes_cb.toggled,
+            lambda: config.set_suspend_new_cards_of_new_notes(
+                selected_ah_did, self.suspend_new_cards_of_new_notes_cb.isChecked()
+            ),
+        )
+
+        # Setup tooltip icon
+        self.suspend_new_cards_of_new_notes_cb_icon_label = QLabel()
+        self.suspend_new_cards_of_new_notes_cb_icon_label.setPixmap(
+            tooltip_icon().pixmap(16, 16)
+        )
+        self.suspend_new_cards_of_new_notes_cb_icon_label.setToolTip(
+            suspend_new_cards_of_new_notes_tooltip_message
+        )
+
+        # Add the checkbox and tooltip icon to the result layout
+        box = QHBoxLayout()
+        box.addWidget(self.suspend_new_cards_of_new_notes_cb)
+        box.addWidget(self.suspend_new_cards_of_new_notes_cb_icon_label)
+
+        return box
+
+    def _setup_box_subdecks_enabled(self) -> QVBoxLayout:
         subdecks_tooltip_message = (
             "Activates organizing the deck into subdecks. "
             f"Applies only to decks with <b>{SUBDECK_TAG}</b> tags."
         )
+
+        # Set up the subdecks checkbox
         self.subdecks_cb = QCheckBox("Enable Subdecks")
         self.subdecks_cb.setToolTip(subdecks_tooltip_message)
         self._refresh_subdecks_checkbox()
@@ -210,9 +351,9 @@ class DeckManagementDialog(QDialog):
         self.subdeck_cb_icon_label.setToolTip(subdecks_tooltip_message)
 
         # Add widgets to the subdecks checkbox row layout
-        self.subdecks_cb_row = QHBoxLayout()
-        self.subdecks_cb_row.addWidget(self.subdecks_cb)
-        self.subdecks_cb_row.addWidget(self.subdeck_cb_icon_label)
+        self.subdecks_enabled_row = QHBoxLayout()
+        self.subdecks_enabled_row.addWidget(self.subdecks_cb)
+        self.subdecks_enabled_row.addWidget(self.subdeck_cb_icon_label)
 
         # Initialize and set up the subdecks documentation link label
         self.subdecks_docs_link_label = QLabel(
@@ -224,15 +365,10 @@ class DeckManagementDialog(QDialog):
         )
         self.subdecks_docs_link_label.setOpenExternalLinks(True)
 
-        # Add everything to the deck settings elements layout
-        self.box_deck_options_elements = QVBoxLayout()
-        self.box_deck_options_elements.addLayout(self.subdecks_cb_row)
-        self.box_deck_options_elements.addWidget(self.subdecks_docs_link_label)
-
         # Add everything to the result layout
         box = QVBoxLayout()
-        box.addWidget(self.deck_options_label)
-        box.addLayout(self.box_deck_options_elements)
+        box.addLayout(self.subdecks_enabled_row)
+        box.addWidget(self.subdecks_docs_link_label)
 
         return box
 

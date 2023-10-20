@@ -49,18 +49,6 @@ def _general_tab(conf_window) -> None:
         values=["on_ankiweb_sync", "on_startup", "never"],
         description="Auto Sync with AnkiHub",
     )
-    tab.dropdown(
-        "suspend_new_cards_of_existing_notes",
-        labels=["If sibling cards are suspended", "Always", "Never"],
-        values=["if_siblings_are_suspended", "always", "never"],
-        description="Suspend new cards of existing notes",
-    )
-    tab.dropdown(
-        "suspend_new_cards_of_new_notes",
-        labels=["Always", "Never"],
-        values=["always", "never"],
-        description="Suspend new cards of new notes",
-    )
     tab.hseparator()
     tab.space(8)
 
