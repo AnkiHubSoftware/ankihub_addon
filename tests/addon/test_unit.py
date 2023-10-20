@@ -80,7 +80,11 @@ from ankihub.main.note_conversion import (
     TAG_FOR_PROTECTING_FIELDS,
     _get_fields_protected_by_tags,
 )
-from ankihub.main.subdecks import SUBDECK_TAG, add_subdeck_tags_to_notes
+from ankihub.main.subdecks import (
+    SUBDECK_TAG,
+    add_subdeck_tags_to_notes,
+    deck_contains_subdeck_tags,
+)
 from ankihub.main.utils import (
     lowest_level_common_ancestor_deck_name,
     mids_of_notes,
@@ -311,6 +315,49 @@ def test_remove_note_type_name_modifications():
 
     name = "Basic (deck_name/user_name)"
     assert _note_type_name_without_ankihub_modifications(name) == name
+
+
+class TestDeckContainsSubdeckTags:
+    def test_with_subdeck_tags(
+        self,
+        anki_session_with_addon_data: AnkiSession,
+        import_ah_note: ImportAHNote,
+        next_deterministic_uuid: Callable[[], uuid.UUID],
+    ) -> None:
+        with anki_session_with_addon_data.profile_loaded():
+            ah_did = next_deterministic_uuid()
+            note_info = NoteInfoFactory(tags=[f"{SUBDECK_TAG}::A::B"])
+            import_ah_note(ah_did=ah_did, note_data=note_info)
+
+            assert deck_contains_subdeck_tags(ah_did)
+
+    def test_without_subdeck_tags(
+        self,
+        anki_session_with_addon_data: AnkiSession,
+        import_ah_note: ImportAHNote,
+        next_deterministic_uuid: Callable[[], uuid.UUID],
+    ) -> None:
+        with anki_session_with_addon_data.profile_loaded():
+            ah_did = next_deterministic_uuid()
+            import_ah_note(ah_did=ah_did)
+
+            assert not deck_contains_subdeck_tags(ah_did)
+
+    def test_with_multiple_notes_and_tags(
+        self,
+        anki_session_with_addon_data: AnkiSession,
+        import_ah_note: ImportAHNote,
+        next_deterministic_uuid: Callable[[], uuid.UUID],
+    ) -> None:
+        with anki_session_with_addon_data.profile_loaded():
+            ah_did = next_deterministic_uuid()
+
+            import_ah_note(ah_did=ah_did)
+
+            note_info = NoteInfoFactory(tags=["some_other_tag", f"{SUBDECK_TAG}::A::B"])
+            import_ah_note(ah_did=ah_did, note_data=note_info)
+
+            assert deck_contains_subdeck_tags(ah_did)
 
 
 def test_add_subdeck_tags_to_notes(anki_session_with_addon_data: AnkiSession):
