@@ -182,10 +182,6 @@ class DeckManagementDialog(QDialog):
             f"<h3>{truncate_string(deck_name, limit=70)}</h3>"
         )
         self.deck_name_label.setWordWrap(True)
-        if selected_ah_did not in config.deck_ids():
-            self.deck_name_label.setStyleSheet("color: grey")
-        else:
-            self.deck_name_label.setStyleSheet("")
         self.deck_name_label.setSizePolicy(
             QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Preferred
         )
