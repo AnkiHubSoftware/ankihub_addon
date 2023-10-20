@@ -127,7 +127,7 @@ class DeckManagementDialog(QDialog):
 
         selected_ah_did = self._selected_ah_did()
         if selected_ah_did is None:
-            self.no_deck_selected_label = QLabel("Choose deck to adjust settings.")
+            self.no_deck_selected_label = QLabel("Choose deck to adjust options.")
             self.no_deck_selected_label.setSizePolicy(
                 QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Preferred
             )
