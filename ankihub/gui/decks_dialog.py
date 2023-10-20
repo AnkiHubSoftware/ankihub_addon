@@ -415,6 +415,9 @@ class DeckManagementDialog(QDialog):
         # Initialize and set up the destination details label
         self.new_cards_destination_details_label = QLabel()
         self.new_cards_destination_details_label.setWordWrap(True)
+        self.new_cards_destination_details_label.setSizePolicy(
+            QSizePolicy.Policy.Ignored, QSizePolicy.Policy.Preferred
+        )
         self._refresh_new_cards_destination_details_label(selected_ah_did)
 
         # Initialize and set up the change destination button
