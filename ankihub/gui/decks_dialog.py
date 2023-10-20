@@ -139,8 +139,17 @@ class DeckManagementDialog(QDialog):
             self.box_bottom_right.addLayout(self.box_no_deck_selected)
             self.box_bottom_right.addStretch()
             return
-        elif selected_ah_did not in config.deck_ids():
-            self.deck_not_installed_label = QLabel("Sync with AnkiHub to Install.")
+
+        # Deck Actions
+        self.box_deck_actions = self._setup_box_deck_actions(selected_ah_did)
+        self.box_bottom_right.addLayout(self.box_deck_actions)
+        self.box_bottom_right.addSpacing(20)
+
+        if selected_ah_did not in config.deck_ids():
+            self.deck_not_installed_label = QLabel(
+                "Deck is not installed.<br>Sync with AnkiHub to Install."
+            )
+            self.deck_not_installed_label.setWordWrap(True)
             self.deck_not_installed_label.setSizePolicy(
                 QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Preferred
             )
@@ -152,11 +161,6 @@ class DeckManagementDialog(QDialog):
             self.box_bottom_right.addLayout(self.box_deck_not_installed)
             self.box_bottom_right.addStretch()
             return
-
-        # Deck Actions
-        self.box_deck_actions = self._setup_box_deck_actions(selected_ah_did)
-        self.box_bottom_right.addLayout(self.box_deck_actions)
-        self.box_bottom_right.addSpacing(20)
 
         # Deck Options
         self.box_deck_options = self._setup_box_deck_options(selected_ah_did)
@@ -173,11 +177,15 @@ class DeckManagementDialog(QDialog):
 
     def _setup_box_deck_actions(self, selected_ah_did: uuid.UUID) -> QVBoxLayout:
         # Initialize and setup the deck name label
-        deck_name = config.deck_config(selected_ah_did).name
+        deck_name = self._selected_ah_deck_name()
         self.deck_name_label = QLabel(
             f"<h3>{truncate_string(deck_name, limit=70)}</h3>"
         )
         self.deck_name_label.setWordWrap(True)
+        if selected_ah_did not in config.deck_ids():
+            self.deck_name_label.setStyleSheet("color: grey")
+        else:
+            self.deck_name_label.setStyleSheet("")
         self.deck_name_label.setSizePolicy(
             QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Preferred
         )
@@ -458,6 +466,14 @@ class DeckManagementDialog(QDialog):
             return None
 
         result = selection[0].data(Qt.ItemDataRole.UserRole)
+        return result
+
+    def _selected_ah_deck_name(self) -> Optional[str]:
+        selection = self.decks_list.selectedItems()
+        if len(selection) != 1:
+            return None
+
+        result = selection[0].text()
         return result
 
     def _select_deck(self, ah_did: uuid.UUID):
