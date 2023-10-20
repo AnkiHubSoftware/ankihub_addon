@@ -204,7 +204,7 @@ class DeckManagementDialog(QDialog):
         if selected_ah_did not in config.deck_ids():
             self.deck_not_installed_label = QLabel("⚠️ This deck is not installed yet!")
 
-            def on_done(future: Future):
+            def on_done(future: Future) -> None:
                 future.result()
                 self._refresh_box_bottom_right()
 
