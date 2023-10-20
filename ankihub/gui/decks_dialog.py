@@ -490,19 +490,6 @@ class DeckManagementDialog(QDialog):
         result = selection[0].text()
         return result
 
-    def _select_deck(self, ah_did: uuid.UUID):
-        deck_item = next(
-            (
-                item
-                for i in range(self.decks_list.count())
-                if (item := self.decks_list.item(i)).data(Qt.ItemDataRole.UserRole)
-                == ah_did
-            ),
-            None,
-        )
-        if deck_item is not None:
-            self.decks_list.setCurrentItem(deck_item)
-
     def _on_unsubscribe(self) -> None:
         ah_did = self._selected_ah_did()
         deck_name = self._selected_ah_deck_name()
