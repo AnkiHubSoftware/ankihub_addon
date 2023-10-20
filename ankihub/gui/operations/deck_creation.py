@@ -17,7 +17,7 @@ from ..utils import ask_user
 
 
 def create_collaborative_deck() -> None:
-    """Creates a new collaborative deck and uploads it to AnkiHub.
+    """Creates a new AnkiHub deck and uploads it to AnkiHub.
 
     Asks the user to confirm, choose a deck to upload and for some additional options,
     and then uploads the deck to AnkiHub.
@@ -131,8 +131,8 @@ def create_collaborative_deck() -> None:
         ),
         success=on_success,
     ).failure(on_failure)
-    LOGGER.info("Instantiated QueryOp for creating collaborative deck")
-    op.with_progress(label="Creating collaborative deck").run_in_background()
+    LOGGER.info("Instantiated QueryOp for creating an AnkiHub deck")
+    op.with_progress(label="Creating AnkiHub deck").run_in_background()
 
 
 class DeckCreationConfirmationDialog(QMessageBox):
@@ -142,7 +142,7 @@ class DeckCreationConfirmationDialog(QMessageBox):
         self.setWindowTitle("Confirm AnkiHub Deck Creation")
         self.setIcon(QMessageBox.Icon.Question)
         self.setText(
-            "Are you sure you want to create a new collaborative deck?<br><br><br>"
+            "Are you sure you want to create a new AnkiHub deck?<br><br><br>"
             'Terms of use: <a href="https://www.ankihub.net/terms">https://www.ankihub.net/terms</a><br>'
             'Privacy Policy: <a href="https://www.ankihub.net/privacy">https://www.ankihub.net/privacy</a><br>',
         )

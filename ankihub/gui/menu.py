@@ -26,7 +26,7 @@ from ..db import ankihub_db
 from ..media_import.ui import open_import_dialog
 from ..settings import ADDON_VERSION, config
 from .config_dialog import get_config_dialog_manager
-from .decks_dialog import SubscribedDecksDialog
+from .decks_dialog import DeckManagementDialog
 from .errors import upload_logs_and_data_in_background, upload_logs_in_background
 from .media_sync import media_sync
 from .operations.ankihub_sync import sync_with_ankihub
@@ -186,7 +186,7 @@ class AnkiHubLogin(QWidget):
 
 
 def _create_collaborative_deck_setup(parent: QMenu):
-    q_action = QAction("🛠️ Create Collaborative Deck", parent=parent)
+    q_action = QAction("🛠️ Create AnkiHub Deck", parent=parent)
     qconnect(q_action.triggered, create_collaborative_deck)
     parent.addAction(q_action)
 
@@ -262,8 +262,8 @@ def _ankihub_login_setup(parent: QMenu):
 
 
 def _subscribed_decks_setup(parent: QMenu):
-    q_action = QAction("📚 Subscribed Decks", aqt.mw)
-    qconnect(q_action.triggered, SubscribedDecksDialog.display_subscribe_window)
+    q_action = QAction("📚 Deck Management", aqt.mw)
+    qconnect(q_action.triggered, DeckManagementDialog.display_subscribe_window)
     parent.addAction(q_action)
 
 

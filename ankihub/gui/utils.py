@@ -9,6 +9,7 @@ from aqt.qt import (
     QDialogButtonBox,
     QIcon,
     QLabel,
+    QLayout,
     QListWidget,
     QListWidgetItem,
     QMessageBox,
@@ -254,12 +255,10 @@ def ask_user(
         return None
 
 
-def set_tooltip_icon(btn: QPushButton) -> None:
-    btn.setIcon(
-        QIcon(
-            QApplication.style().standardIcon(
-                QStyle.StandardPixmap.SP_MessageBoxInformation
-            )
+def tooltip_icon() -> QIcon:
+    return QIcon(
+        QApplication.style().standardIcon(
+            QStyle.StandardPixmap.SP_MessageBoxInformation
         )
     )
 
@@ -271,3 +270,15 @@ def check_and_prompt_for_updates_on_main_window():
         on_done=aqt.mw.on_updates_installed,
         requested_by_user=True,
     )
+
+
+def clear_layout(layout: QLayout) -> None:
+    """Remove all widgets from a layout and delete them."""
+    while layout.count():
+        child = layout.takeAt(0)
+        if child.widget():
+            widget = child.widget()
+            widget.setParent(None)
+            widget.deleteLater()
+        elif child.layout():
+            clear_layout(child.layout())

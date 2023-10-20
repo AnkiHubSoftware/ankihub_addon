@@ -21,6 +21,9 @@ def migrate_private_config(private_config_dict: Dict) -> None:
     """
     maybe_rename_ankihub_deck_uuid_to_ah_did(private_config_dict)
     maybe_reset_media_update_timestamps(private_config_dict)
+    maybe_set_suspend_new_cards_of_new_notes_to_true_for_anking_deck(
+        private_config_dict
+    )
 
 
 def maybe_reset_media_update_timestamps(private_config_dict: Dict) -> None:
@@ -46,6 +49,23 @@ def maybe_rename_ankihub_deck_uuid_to_ah_did(private_config_dict: Dict) -> None:
             deck_extension[new_field_name] = deck_extension.pop(old_field_name)
             LOGGER.info(
                 f"Renamed {old_field_name} to {new_field_name} in deck extension config."
+            )
+
+
+def maybe_set_suspend_new_cards_of_new_notes_to_true_for_anking_deck(
+    private_config_dict: Dict,
+) -> None:
+    """Set suspend_new_cards_of_new_notes to True in the DeckConfig of the AnKing deck if the field
+    doesn't exist yet."""
+    from .settings import ANKING_DECK_ID
+
+    field_name = "suspend_new_cards_of_new_notes"
+    decks = private_config_dict["decks"]
+    for ah_did, deck in decks.items():
+        if ah_did == ANKING_DECK_ID and deck.get(field_name) is None:
+            deck[field_name] = True
+            LOGGER.info(
+                f"Set {field_name} to True for the previously installed AnKing deck."
             )
 
 

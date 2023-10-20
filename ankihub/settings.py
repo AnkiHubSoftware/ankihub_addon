@@ -61,6 +61,12 @@ def _deserialize_datetime(x: str) -> Optional[datetime]:
     return datetime.strptime(x, ANKIHUB_DATETIME_FORMAT_STR) if x else None
 
 
+class SuspendNewCardsOfExistingNotes(Enum):
+    ALWAYS = "Always"
+    NEVER = "Never"
+    IF_SIBLINGS_SUSPENDED = "If siblings are suspended"
+
+
 @dataclass
 class DeckConfig(DataClassJSONMixin):
     anki_id: DeckId
@@ -82,6 +88,10 @@ class DeckConfig(DataClassJSONMixin):
     )
     subdecks_enabled: bool = (
         False  # whether deck is organized into subdecks by the add-on
+    )
+    suspend_new_cards_of_new_notes: bool = False
+    suspend_new_cards_of_existing_notes: SuspendNewCardsOfExistingNotes = (
+        SuspendNewCardsOfExistingNotes.IF_SIBLINGS_SUSPENDED
     )
 
 
@@ -231,6 +241,7 @@ class _Config:
             anki_id=DeckId(anki_did),
             user_relation=user_relation,
             subdecks_enabled=subdecks_enabled,
+            suspend_new_cards_of_new_notes=ankihub_did == ANKING_DECK_ID,
         )
         # remove duplicates
         self.save_latest_deck_update(ankihub_did, latest_udpate)
