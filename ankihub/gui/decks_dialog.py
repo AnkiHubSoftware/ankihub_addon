@@ -140,7 +140,7 @@ class DeckManagementDialog(QDialog):
             self.box_bottom_right.addStretch()
             return
         elif selected_ah_did not in config.deck_ids():
-            self.deck_not_installed_label = QLabel("Sync with AnkiHub to install.")
+            self.deck_not_installed_label = QLabel("Sync with AnkiHub to Install.")
             self.deck_not_installed_label.setSizePolicy(
                 QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Preferred
             )
