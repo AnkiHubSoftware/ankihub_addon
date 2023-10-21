@@ -14,6 +14,7 @@ REVIEW_PERIOD_DAYS = timedelta(days=30)
 
 
 def send_review_data() -> None:
+    """Send data about card reviews for each installed AnkiHub deck to the server."""
     since = datetime.now() - REVIEW_PERIOD_DAYS
     card_review_data = [
         CardReviewData(
