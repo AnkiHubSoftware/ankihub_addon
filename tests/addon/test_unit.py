@@ -1595,7 +1595,7 @@ class TestGetReviewCountForAHDeckSince:
             ([timedelta(seconds=-1), timedelta(seconds=1)], timedelta(seconds=0), 1),
         ],
     )
-    def test_basic(
+    def test_review_times_relative_to_since_time(
         self,
         anki_session_with_addon_data: AnkiSession,
         install_ah_deck: InstallAHDeck,
