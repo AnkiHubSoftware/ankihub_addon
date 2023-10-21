@@ -255,7 +255,7 @@ def import_ah_note(next_deterministic_uuid: Callable[[], uuid.UUID]) -> ImportAH
             protected_fields={},
             protected_tags=[],
             deck_name=deck_name,
-            is_first_import_of_deck=anki_did is None,
+            is_first_import_of_deck=False,
             anki_did=anki_did,
             suspend_new_cards_of_new_notes=suspend_new_cards_of_new_notes,
             suspend_new_cards_of_existing_notes=suspend_new_cards_of_existing_notes,
