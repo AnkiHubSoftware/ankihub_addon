@@ -354,6 +354,11 @@ def mock_client_methods_called_during_ankihub_sync(monkeypatch: MonkeyPatch) -> 
         "get_deck_media_updates",
         lambda *args, **kwargs: [],
     )
+    monkeypatch.setattr(
+        AnkiHubClient,
+        "send_card_review_data",
+        lambda *args, **kwargs: [],
+    )
 
 
 class MockClientGetNoteType(Protocol):
