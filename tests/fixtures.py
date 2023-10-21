@@ -525,3 +525,10 @@ def record_review(cid: CardId, review_time_ms: int) -> None:
         1,
         0,
     )
+
+
+def assert_datetime_equal_ignore_milliseconds(dt1: datetime, dt2: datetime) -> None:
+    """Asserts that the two datetimes are equal, ignoring the milliseconds."""
+    dt1 = dt1.replace(microsecond=dt1.microsecond // 1000 * 1000)
+    dt2 = dt2.replace(microsecond=dt2.microsecond // 1000 * 1000)
+    assert dt1 == dt2

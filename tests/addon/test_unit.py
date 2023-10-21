@@ -7,7 +7,7 @@ from dataclasses import fields
 from datetime import datetime, timedelta
 from pathlib import Path
 from textwrap import dedent
-from typing import Callable, Generator, List, Protocol, Tuple
+from typing import Callable, Generator, List, Optional, Protocol, Tuple
 from unittest.mock import Mock
 
 import aqt
@@ -30,6 +30,7 @@ from ..fixtures import (  # type: ignore
     NewNoteWithNoteType,
     SetFeatureFlagState,
     add_basic_anki_note_to_deck,
+    assert_datetime_equal_ignore_milliseconds,
     create_anki_deck,
     record_review_for_anki_nid,
 )
@@ -83,7 +84,10 @@ from ankihub.main.note_conversion import (
     TAG_FOR_PROTECTING_FIELDS,
     _get_fields_protected_by_tags,
 )
-from ankihub.main.review_data import _get_review_count_for_ah_deck_since
+from ankihub.main.review_data import (
+    _get_last_review_datetime_for_ah_deck,
+    _get_review_count_for_ah_deck_since,
+)
 from ankihub.main.subdecks import SUBDECK_TAG, add_subdeck_tags_to_notes
 from ankihub.main.utils import (
     lowest_level_common_ancestor_deck_name,
@@ -1642,4 +1646,66 @@ class TestGetReviewCountForAHDeckSince:
             assert (
                 _get_review_count_for_ah_deck_since(ah_did=ah_did, since=since_time)
                 == 2
+            )
+
+
+class TestGetLastReviewTimeForAHDeck:
+    @pytest.mark.parametrize(
+        "review_deltas, expected_last_review_delta",
+        [
+            # Reviews in the past, the latest review is returned
+            ([timedelta(days=-3), timedelta(days=-2)], timedelta(days=-2)),
+            ([timedelta(days=-3), timedelta(days=0)], timedelta(days=0)),
+            # No reviews, None is returned
+            ([], None),
+        ],
+    )
+    def test_review_times_relative_to_since_time(
+        self,
+        anki_session_with_addon_data: AnkiSession,
+        install_ah_deck: InstallAHDeck,
+        import_ah_note: ImportAHNote,
+        review_deltas: List[timedelta],
+        expected_last_review_delta: Optional[timedelta],
+    ) -> None:
+        with anki_session_with_addon_data.profile_loaded():
+            ah_did = install_ah_deck()
+            note_info = import_ah_note(ah_did=ah_did)
+
+            now = datetime.now()
+            for review_delta in review_deltas:
+                record_review_for_anki_nid(
+                    NoteId(note_info.anki_nid), now + review_delta
+                )
+
+            if expected_last_review_delta is not None:
+                expected_last_review_time = now + expected_last_review_delta
+
+                assert_datetime_equal_ignore_milliseconds(
+                    _get_last_review_datetime_for_ah_deck(ah_did=ah_did),
+                    expected_last_review_time,
+                )
+            else:
+                assert _get_last_review_datetime_for_ah_deck(ah_did=ah_did) is None
+
+    def test_with_multiple_notes(
+        self,
+        anki_session_with_addon_data: AnkiSession,
+        install_ah_deck: InstallAHDeck,
+        import_ah_note: ImportAHNote,
+    ) -> None:
+        with anki_session_with_addon_data.profile_loaded():
+            ah_did = install_ah_deck()
+            note_info_1 = import_ah_note(ah_did=ah_did)
+            note_info_2 = import_ah_note(ah_did=ah_did)
+
+            first_review_time = datetime.now()
+            record_review_for_anki_nid(NoteId(note_info_1.anki_nid), first_review_time)
+
+            second_review_time = first_review_time + timedelta(days=1)
+            record_review_for_anki_nid(NoteId(note_info_2.anki_nid), second_review_time)
+
+            assert_datetime_equal_ignore_milliseconds(
+                _get_last_review_datetime_for_ah_deck(ah_did=ah_did),
+                second_review_time,
             )
