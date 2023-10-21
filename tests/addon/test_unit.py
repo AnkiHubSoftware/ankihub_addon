@@ -31,7 +31,7 @@ from ..fixtures import (  # type: ignore
     SetFeatureFlagState,
     add_basic_anki_note_to_deck,
     create_anki_deck,
-    record_review,
+    record_review_for_anki_nid,
 )
 from .test_integration import ImportAHNote
 
@@ -1610,7 +1610,7 @@ class TestGetReviewCountForAHDeckSince:
 
             now = datetime.now()
             for review_delta in review_deltas:
-                self._add_review_for_note(
+                record_review_for_anki_nid(
                     NoteId(note_info.anki_nid), now + review_delta
                 )
 
@@ -1633,8 +1633,8 @@ class TestGetReviewCountForAHDeckSince:
             note_info_2 = import_ah_note(ah_did=ah_did)
 
             now = datetime.now()
-            self._add_review_for_note(NoteId(note_info_1.anki_nid), now)
-            self._add_review_for_note(
+            record_review_for_anki_nid(NoteId(note_info_1.anki_nid), now)
+            record_review_for_anki_nid(
                 NoteId(note_info_2.anki_nid), now + timedelta(seconds=1)
             )
 
@@ -1643,7 +1643,3 @@ class TestGetReviewCountForAHDeckSince:
                 _get_review_count_for_ah_deck_since(ah_did=ah_did, since=since_time)
                 == 2
             )
-
-    def _add_review_for_note(self, anki_nid: NoteId, date_time: datetime) -> None:
-        cid = aqt.mw.col.get_note(anki_nid).card_ids()[0]
-        record_review(cid, date_time.timestamp())

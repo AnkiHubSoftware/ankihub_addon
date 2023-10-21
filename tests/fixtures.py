@@ -1,6 +1,7 @@
 import copy
 import os
 import uuid
+from datetime import datetime
 from typing import Any, Callable, Dict, List, Optional, Protocol
 from unittest.mock import Mock
 
@@ -9,7 +10,7 @@ import pytest
 from anki.cards import CardId
 from anki.decks import DeckId
 from anki.models import NotetypeDict, NotetypeId
-from anki.notes import Note
+from anki.notes import Note, NoteId
 from aqt.main import AnkiQt
 from pytest import MonkeyPatch, fixture
 from pytest_anki import AnkiSession
@@ -502,6 +503,12 @@ def mock_study_deck_dialog_with_cb(
         )
 
     return mock_study_deck_dialog_inner
+
+
+def record_review_for_anki_nid(anki_nid: NoteId, date_time: datetime) -> None:
+    """Adds a review for the note with the given anki_nid at the given date_time."""
+    cid = aqt.mw.col.get_note(anki_nid).card_ids()[0]
+    record_review(cid, date_time.timestamp())
 
 
 def record_review(cid: CardId, mod_seconds: float) -> None:
