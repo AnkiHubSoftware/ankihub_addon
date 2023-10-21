@@ -35,7 +35,7 @@ def send_review_data() -> None:
 
 def _get_review_count_for_ah_deck_since(ah_did: uuid.UUID, since: datetime) -> int:
     """Get the number of reviews (recorded in Anki's review log table) for an ankihub deck since a given time."""
-    timestamp_ms = datetime.timestamp(since) * 1000
+    timestamp_ms = int(datetime.timestamp(since) * 1000)
     with attached_ankihub_db():
         result = aqt.mw.col.db.scalar(
             """
