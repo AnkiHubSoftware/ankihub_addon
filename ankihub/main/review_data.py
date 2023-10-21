@@ -54,7 +54,7 @@ def _get_review_count_for_ah_deck_since(ah_did: uuid.UUID, since: datetime) -> i
 def _get_last_review_datetime_for_ah_deck(ah_did: uuid.UUID) -> datetime:
     """Get the timestamp of the last review (recorded in Anki's review log table) for an ankihub deck."""
     with attached_ankihub_db():
-        result = aqt.mw.col.db.scalar(
+        timestamp_str = aqt.mw.col.db.scalar(
             """
             SELECT MAX(r.id)
             FROM revlog as r
@@ -64,4 +64,6 @@ def _get_last_review_datetime_for_ah_deck(ah_did: uuid.UUID) -> datetime:
             """,
             str(ah_did),
         )
+    timestamp_ms = int(timestamp_str)
+    result = datetime.fromtimestamp(timestamp_ms / 1000)
     return result
