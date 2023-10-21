@@ -4,6 +4,7 @@ import tempfile
 import time
 import uuid
 from dataclasses import fields
+from datetime import datetime, timedelta
 from pathlib import Path
 from textwrap import dedent
 from typing import Callable, Generator, List, Protocol, Tuple
@@ -24,11 +25,13 @@ from requests import Response  # type: ignore
 from ..factories import DeckMediaFactory, NoteInfoFactory
 from ..fixtures import (  # type: ignore
     ImportAHNoteType,
+    InstallAHDeck,
     MockFunction,
     NewNoteWithNoteType,
     SetFeatureFlagState,
     add_basic_anki_note_to_deck,
     create_anki_deck,
+    record_review,
 )
 from .test_integration import ImportAHNote
 
@@ -80,6 +83,7 @@ from ankihub.main.note_conversion import (
     TAG_FOR_PROTECTING_FIELDS,
     _get_fields_protected_by_tags,
 )
+from ankihub.main.review_data import _get_review_count_for_ah_deck_since
 from ankihub.main.subdecks import SUBDECK_TAG, add_subdeck_tags_to_notes
 from ankihub.main.utils import (
     lowest_level_common_ancestor_deck_name,
@@ -1574,3 +1578,72 @@ class TestCreateCollaborativeDeck:
 
                 get_media_names_from_notes_data_mock.assert_called_once_with(notes_data)
                 start_media_upload_mock.assert_called_once()
+
+
+class TestGetReviewCountForAHDeckSince:
+    @pytest.mark.parametrize(
+        "review_deltas, since_time, expected_count",
+        [
+            # No reviews since the specified date
+            ([timedelta(days=-2), timedelta(days=-3)], timedelta(days=-1), 0),
+            # Only reviews after the `since` date
+            ([timedelta(seconds=1), timedelta(seconds=2)], timedelta(seconds=0), 2),
+            # Boundary test with `since` date
+            ([timedelta(seconds=0)], timedelta(seconds=0), 0),
+            ([timedelta(seconds=0)], timedelta(seconds=-1), 1),
+            # Reviews before and after the `since` date
+            ([timedelta(seconds=-1), timedelta(seconds=1)], timedelta(seconds=0), 1),
+        ],
+    )
+    def test_basic(
+        self,
+        anki_session_with_addon_data: AnkiSession,
+        install_ah_deck: InstallAHDeck,
+        import_ah_note: ImportAHNote,
+        review_deltas: List[timedelta],
+        since_time: timedelta,
+        expected_count: int,
+    ) -> None:
+        with anki_session_with_addon_data.profile_loaded():
+            ah_did = install_ah_deck()
+            note_info = import_ah_note(ah_did=ah_did)
+
+            now = datetime.now()
+            for review_delta in review_deltas:
+                self._add_review_for_note(
+                    NoteId(note_info.anki_nid), now + review_delta
+                )
+
+            assert (
+                _get_review_count_for_ah_deck_since(
+                    ah_did=ah_did, since=now + since_time
+                )
+                == expected_count
+            )
+
+    def test_with_multiple_notes(
+        self,
+        anki_session_with_addon_data: AnkiSession,
+        install_ah_deck: InstallAHDeck,
+        import_ah_note: ImportAHNote,
+    ) -> None:
+        with anki_session_with_addon_data.profile_loaded():
+            ah_did = install_ah_deck()
+            note_info_1 = import_ah_note(ah_did=ah_did)
+            note_info_2 = import_ah_note(ah_did=ah_did)
+
+            now = datetime.now()
+            self._add_review_for_note(NoteId(note_info_1.anki_nid), now)
+            self._add_review_for_note(
+                NoteId(note_info_2.anki_nid), now + timedelta(seconds=1)
+            )
+
+            since_time = now - timedelta(days=1)
+            assert (
+                _get_review_count_for_ah_deck_since(ah_did=ah_did, since=since_time)
+                == 2
+            )
+
+    def _add_review_for_note(self, anki_nid: NoteId, date_time: datetime) -> None:
+        cid = aqt.mw.col.get_note(anki_nid).card_ids()[0]
+        record_review(cid, date_time.timestamp())
