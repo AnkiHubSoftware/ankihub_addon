@@ -1,5 +1,6 @@
 import uuid
 from datetime import datetime, timedelta
+from typing import Optional
 
 import aqt
 
@@ -51,7 +52,7 @@ def _get_review_count_for_ah_deck_since(ah_did: uuid.UUID, since: datetime) -> i
     return result
 
 
-def _get_last_review_datetime_for_ah_deck(ah_did: uuid.UUID) -> datetime:
+def _get_last_review_datetime_for_ah_deck(ah_did: uuid.UUID) -> Optional[datetime]:
     """Get the timestamp of the last review (recorded in Anki's review log table) for an ankihub deck."""
     with attached_ankihub_db():
         timestamp_str = aqt.mw.col.db.scalar(
@@ -64,6 +65,9 @@ def _get_last_review_datetime_for_ah_deck(ah_did: uuid.UUID) -> datetime:
             """,
             str(ah_did),
         )
+    if timestamp_str is None:
+        return None
+
     timestamp_ms = int(timestamp_str)
     result = datetime.fromtimestamp(timestamp_ms / 1000)
     return result
