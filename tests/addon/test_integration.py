@@ -27,7 +27,7 @@ from zipfile import ZipFile
 
 import aqt
 import pytest
-from anki.cards import Card, CardId
+from anki.cards import Card
 from anki.consts import QUEUE_TYPE_NEW, QUEUE_TYPE_SUSPENDED
 from anki.decks import DeckId, FilteredDeckConfig
 from anki.models import NotetypeDict, NotetypeId
@@ -68,6 +68,7 @@ from ..fixtures import (
     MockFunction,
     MockStudyDeckDialogWithCB,
     create_or_get_ah_version_of_note_type,
+    record_review,
 )
 from .conftest import TEST_PROFILE_ID
 
@@ -2317,7 +2318,7 @@ class TestCustomSearchNodes:
             note = mw.col.get_note(nid)
             cid = note.card_ids()[0]
 
-            record_review(mw, cid, mod_seconds=1)
+            record_review(cid, mod_seconds=1)
 
             # Update the mod time in the ankihub database to simulate a note update.
             ankihub_db.execute(
@@ -2333,7 +2334,7 @@ class TestCustomSearchNodes:
                 ) == [nid]
 
             # Add another review entry for the card to the database.
-            record_review(mw, cid, mod_seconds=3)
+            record_review(cid, mod_seconds=3)
 
             # Check that the note of the card is not included in the search results anymore.
             with attached_ankihub_db():
@@ -2341,22 +2342,6 @@ class TestCustomSearchNodes:
                     UpdatedSinceLastReviewSearchNode(browser, "").filter_ids(all_nids)
                     == []
                 )
-
-
-def record_review(mw: AnkiQt, cid: CardId, mod_seconds: int):
-    mw.col.db.execute(
-        "INSERT INTO revlog VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)",
-        # the revlog table stores the timestamp in milliseconds
-        mod_seconds * 1000,
-        cid,
-        1,
-        1,
-        1,
-        1,
-        1,
-        1,
-        0,
-    )
 
 
 class TestBrowserTreeView:

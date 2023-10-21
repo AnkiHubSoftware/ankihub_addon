@@ -6,6 +6,7 @@ from unittest.mock import Mock
 
 import aqt
 import pytest
+from anki.cards import CardId
 from anki.decks import DeckId
 from anki.models import NotetypeDict, NotetypeId
 from anki.notes import Note
@@ -501,3 +502,19 @@ def mock_study_deck_dialog_with_cb(
         )
 
     return mock_study_deck_dialog_inner
+
+
+def record_review(cid: CardId, mod_seconds: float) -> None:
+    aqt.mw.col.db.execute(
+        "INSERT INTO revlog VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)",
+        # the revlog table stores the timestamp in milliseconds
+        int(mod_seconds * 1000),
+        cid,
+        1,
+        1,
+        1,
+        1,
+        1,
+        1,
+        0,
+    )
