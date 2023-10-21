@@ -53,7 +53,7 @@ def _get_review_count_for_ah_deck_since(ah_did: uuid.UUID, since: datetime) -> i
 
 
 def _get_last_review_datetime_for_ah_deck(ah_did: uuid.UUID) -> Optional[datetime]:
-    """Get the timestamp of the last review (recorded in Anki's review log table) for an ankihub deck."""
+    """Get the date time of the last review (recorded in Anki's review log table) for an ankihub deck."""
     with attached_ankihub_db():
         timestamp_str = aqt.mw.col.db.scalar(
             """
