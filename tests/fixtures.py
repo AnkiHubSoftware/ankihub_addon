@@ -508,14 +508,14 @@ def mock_study_deck_dialog_with_cb(
 def record_review_for_anki_nid(anki_nid: NoteId, date_time: datetime) -> None:
     """Adds a review for the note with the given anki_nid at the given date_time."""
     cid = aqt.mw.col.get_note(anki_nid).card_ids()[0]
-    record_review(cid, date_time.timestamp())
+    record_review(cid, int(date_time.timestamp() * 1000))
 
 
-def record_review(cid: CardId, mod_seconds: float) -> None:
+def record_review(cid: CardId, review_time_ms: int) -> None:
     aqt.mw.col.db.execute(
         "INSERT INTO revlog VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)",
         # the revlog table stores the timestamp in milliseconds
-        int(mod_seconds * 1000),
+        review_time_ms,
         cid,
         1,
         1,
