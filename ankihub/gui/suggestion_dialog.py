@@ -175,7 +175,7 @@ def _determine_ah_did_for_nids_to_be_suggested(
             *anki_nid_to_possible_ah_dids.values()
         )
     except Exception as e:
-        _debug_issue_with_determining_ah_did_for_nids(e, anki_nids)
+        _debug_issue_with_determining_ah_did_for_nids(e, anki_nids)  # pragma: no cover
 
     if len(dids_that_all_notes_could_belong_to) == 0:
         LOGGER.info(
