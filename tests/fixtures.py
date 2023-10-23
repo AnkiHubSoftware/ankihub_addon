@@ -376,10 +376,10 @@ def install_ah_deck(
             ah_did = next_deterministic_uuid()
         if not anki_did:
             anki_did = DeckId(next_deterministic_id() + 1)  # 1 is the default deck
-        if not anki_deck_name:
-            anki_deck_name = f"Deck {anki_did}"
         if not ah_deck_name:
             ah_deck_name = f"Deck {ah_did}"
+        if not anki_deck_name:
+            anki_deck_name = ah_deck_name
 
         # Add deck to the config
         config.add_deck(
