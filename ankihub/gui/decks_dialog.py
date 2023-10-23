@@ -33,7 +33,13 @@ from ..main.utils import truncate_string
 from ..settings import SuspendNewCardsOfExistingNotes, config, url_deck_base, url_decks
 from .operations.ankihub_sync import sync_with_ankihub
 from .operations.subdecks import confirm_and_toggle_subdecks
-from .utils import ask_user, clear_layout, tooltip_icon
+from .utils import (
+    ask_user,
+    clear_layout,
+    set_styled_tooltip,
+    tooltip_icon,
+    tooltip_stylesheet,
+)
 
 
 class DeckManagementDialog(QDialog):
@@ -277,8 +283,12 @@ class DeckManagementDialog(QDialog):
         self.suspend_new_cards_of_existing_notes_label = QLabel(
             "Suspend new cards of existing notes"
         )
-        self.suspend_new_cards_of_existing_notes_label.setToolTip(
-            suspend_cards_of_existing_notes_tooltip_message
+        set_styled_tooltip(
+            self.suspend_new_cards_of_existing_notes_label,
+            suspend_cards_of_existing_notes_tooltip_message,
+        )
+        self.suspend_new_cards_of_existing_notes_label.setStyleSheet(
+            tooltip_stylesheet()
         )
 
         # Setup tooltip icon
@@ -286,8 +296,9 @@ class DeckManagementDialog(QDialog):
         self.suspend_new_cards_of_existing_notes_cb_icon_label.setPixmap(
             tooltip_icon().pixmap(16, 16)
         )
-        self.suspend_new_cards_of_existing_notes_cb_icon_label.setToolTip(
-            suspend_cards_of_existing_notes_tooltip_message
+        set_styled_tooltip(
+            self.suspend_new_cards_of_existing_notes_cb_icon_label,
+            suspend_cards_of_existing_notes_tooltip_message,
         )
 
         # Add the label and tooltip icon to the row layout
@@ -339,8 +350,9 @@ class DeckManagementDialog(QDialog):
         self.suspend_new_cards_of_new_notes_cb = QCheckBox(
             "Suspend new cards of new notes"
         )
-        self.suspend_new_cards_of_new_notes_cb.setToolTip(
-            suspend_new_cards_of_new_notes_tooltip_message
+        set_styled_tooltip(
+            self.suspend_new_cards_of_new_notes_cb,
+            suspend_new_cards_of_new_notes_tooltip_message,
         )
         self.suspend_new_cards_of_new_notes_cb.setChecked(
             deck_config.suspend_new_cards_of_new_notes
@@ -357,8 +369,9 @@ class DeckManagementDialog(QDialog):
         self.suspend_new_cards_of_new_notes_cb_icon_label.setPixmap(
             tooltip_icon().pixmap(16, 16)
         )
-        self.suspend_new_cards_of_new_notes_cb_icon_label.setToolTip(
-            suspend_new_cards_of_new_notes_tooltip_message
+        set_styled_tooltip(
+            self.suspend_new_cards_of_existing_notes_cb_icon_label,
+            suspend_new_cards_of_new_notes_tooltip_message,
         )
 
         # Add the checkbox and tooltip icon to the result layout
@@ -376,14 +389,14 @@ class DeckManagementDialog(QDialog):
 
         # Set up the subdecks checkbox
         self.subdecks_cb = QCheckBox("Enable Subdecks")
-        self.subdecks_cb.setToolTip(subdecks_tooltip_message)
+        set_styled_tooltip(self.subdecks_cb, subdecks_tooltip_message)
         self._refresh_subdecks_checkbox()
         qconnect(self.subdecks_cb.clicked, self._on_toggle_subdecks)
 
         # Initialize and set up the subdeck icon label
         self.subdeck_cb_icon_label = QLabel()
         self.subdeck_cb_icon_label.setPixmap(tooltip_icon().pixmap(16, 16))
-        self.subdeck_cb_icon_label.setToolTip(subdecks_tooltip_message)
+        set_styled_tooltip(self.subdeck_cb_icon_label, subdecks_tooltip_message)
 
         # Add widgets to the subdecks checkbox row layout
         self.subdecks_enabled_row = QHBoxLayout()

@@ -269,6 +269,19 @@ def warning_icon() -> QIcon:
     )
 
 
+def tooltip_stylesheet() -> str:
+    return "QToolTip { color: #000000; }"
+
+
+def set_styled_tooltip(widget: QWidget, tooltip: str) -> None:
+    widget.setToolTip(tooltip)
+
+    # Add the tooltip style to the widget's stylesheet
+    current_style_sheet = widget.styleSheet()
+    new_style_sheet = f"{current_style_sheet} {tooltip_stylesheet()}"
+    widget.setStyleSheet(new_style_sheet)
+
+
 def check_and_prompt_for_updates_on_main_window():
     check_and_prompt_for_updates(
         parent=aqt.mw,
