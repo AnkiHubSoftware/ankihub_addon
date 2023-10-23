@@ -385,21 +385,20 @@ class DeckManagementDialog(QDialog):
         return box
 
     def _setup_box_subdecks_enabled(self) -> QVBoxLayout:
-        subdecks_tooltip_message = (
+        self.subdecks_tooltip_message = (
             "Activates organizing the deck into subdecks. "
             f"Applies only to decks with <b>{SUBDECK_TAG}</b> tags."
         )
 
         # Set up the subdecks checkbox
         self.subdecks_cb = QCheckBox("Enable Subdecks")
-        set_styled_tooltip(self.subdecks_cb, subdecks_tooltip_message)
         self._refresh_subdecks_checkbox()
         qconnect(self.subdecks_cb.clicked, self._on_toggle_subdecks)
 
         # Initialize and set up the subdeck icon label
         self.subdeck_cb_icon_label = QLabel()
         self.subdeck_cb_icon_label.setPixmap(tooltip_icon().pixmap(16, 16))
-        set_styled_tooltip(self.subdeck_cb_icon_label, subdecks_tooltip_message)
+        set_styled_tooltip(self.subdeck_cb_icon_label, self.subdecks_tooltip_message)
 
         # Add widgets to the subdecks checkbox row layout
         self.subdecks_enabled_row = QHBoxLayout()
@@ -582,7 +581,10 @@ class DeckManagementDialog(QDialog):
 
         has_subdeck_tags = deck_contains_subdeck_tags(ah_did)
         self.subdecks_cb.setEnabled(has_subdeck_tags)
-        self.subdecks_cb.setStyleSheet("color: grey" if not has_subdeck_tags else "")
+        self.subdecks_cb.setStyleSheet(
+            "QCheckBox { color: grey }" if not has_subdeck_tags else ""
+        )
+        set_styled_tooltip(self.subdecks_cb, self.subdecks_tooltip_message)
 
         deck_config = config.deck_config(ah_did)
         self.subdecks_cb.setChecked(deck_config.subdecks_enabled)

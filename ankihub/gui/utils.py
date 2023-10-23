@@ -20,6 +20,7 @@ from aqt.qt import (
     QWidget,
     qconnect,
 )
+from aqt.theme import theme_manager
 from aqt.utils import disable_help_button, showWarning, tooltip
 
 from ..settings import config
@@ -270,7 +271,14 @@ def warning_icon() -> QIcon:
 
 
 def tooltip_stylesheet() -> str:
-    return "QToolTip { color: #000000; }"
+    if theme_manager.night_mode:
+        return """
+            QToolTip { color: white; background-color: #252525; }
+            """
+    else:
+        return """
+            QToolTip { color: black; background-color: white; }
+            """
 
 
 def set_styled_tooltip(widget: QWidget, tooltip: str) -> None:
