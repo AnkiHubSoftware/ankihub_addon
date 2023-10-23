@@ -170,9 +170,13 @@ def _determine_ah_did_for_nids_to_be_suggested(
     Returns None if the user cancelled the deck selection dialog or if there is
     no deck that all notes could belong to."""
     anki_nid_to_possible_ah_dids = get_anki_nid_to_possible_ah_dids_dict(anki_nids)
-    dids_that_all_notes_could_belong_to = set.intersection(
-        *anki_nid_to_possible_ah_dids.values()
-    )
+    try:
+        dids_that_all_notes_could_belong_to = set.intersection(
+            *anki_nid_to_possible_ah_dids.values()
+        )
+    except Exception as e:
+        _debug_issue_with_determining_ah_did_for_nids(e, anki_nids)
+
     if len(dids_that_all_notes_could_belong_to) == 0:
         LOGGER.info(
             "User tried to submit suggestions for notes that could not belong to a single AnkiHub deck."
@@ -192,6 +196,26 @@ def _determine_ah_did_for_nids_to_be_suggested(
             return None
 
     return ah_did
+
+
+def _debug_issue_with_determining_ah_did_for_nids(
+    e: Exception, anki_nids: Collection[NoteId]
+) -> None:  # pragma: no cover
+    """Log information about the error that occurred when determining the AnkiHub
+    deck for the given notes and raises the given exception again.
+
+    https://ankihub.sentry.io/issues/4505671584/events/2f1d264aaba34c628a2562f9e2f35fe6/?project=6546414
+    """
+    if len(anki_nids) != 1 or anki_nids == [0]:
+        raise e
+
+    note = aqt.mw.col.get_note(list(anki_nids)[0])
+    LOGGER.info(
+        "Error while determining AnkiHub deck for note suggestion.\n"
+        f"\t{ankihub_db.is_ankihub_note_type(note.mid)=}\n"
+        f"\t{ankihub_db.ankihub_dids_for_note_type(note.mid)=}\n"
+    )
+    raise e
 
 
 def _added_new_media(note: Note) -> bool:
