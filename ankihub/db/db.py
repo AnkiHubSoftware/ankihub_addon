@@ -419,7 +419,7 @@ class _AnkiHubDB:
 
     def anki_nid_to_ah_did_dict(
         self, anki_nids: Iterable[NoteId]
-    ) -> Dict[NoteId, Optional[uuid.UUID]]:
+    ) -> Dict[NoteId, uuid.UUID]:
         """Returns a dict mapping anki nids to the ankihub did of the deck the note is in.
         Not found nids are omitted from the dict."""
         result = self.dict(
