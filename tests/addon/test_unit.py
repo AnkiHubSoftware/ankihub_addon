@@ -1648,6 +1648,32 @@ class TestGetReviewCountForAHDeckSince:
                 == 2
             )
 
+    def test_with_review_for_other_deck(
+        self,
+        anki_session_with_addon_data: AnkiSession,
+        install_ah_deck: InstallAHDeck,
+        import_ah_note: ImportAHNote,
+    ) -> None:
+        with anki_session_with_addon_data.profile_loaded():
+            ah_did_1 = install_ah_deck()
+            note_info_1 = import_ah_note(ah_did=ah_did_1)
+
+            ah_did_2 = install_ah_deck()
+            note_info_2 = import_ah_note(ah_did=ah_did_2)
+
+            now = datetime.now()
+            record_review_for_anki_nid(NoteId(note_info_1.anki_nid), now)
+            record_review_for_anki_nid(
+                NoteId(note_info_2.anki_nid), now + timedelta(seconds=1)
+            )
+
+            # Only the review for the first deck should be counted.
+            since_time = now - timedelta(days=1)
+            assert (
+                _get_review_count_for_ah_deck_since(ah_did=ah_did_1, since=since_time)
+                == 1
+            )
+
 
 class TestGetLastReviewTimeForAHDeck:
     @pytest.mark.parametrize(
@@ -1708,4 +1734,28 @@ class TestGetLastReviewTimeForAHDeck:
             assert_datetime_equal_ignore_milliseconds(
                 _get_last_review_datetime_for_ah_deck(ah_did=ah_did),
                 second_review_time,
+            )
+
+    def test_with_review_for_other_deck(
+        self,
+        anki_session_with_addon_data: AnkiSession,
+        install_ah_deck: InstallAHDeck,
+        import_ah_note: ImportAHNote,
+    ) -> None:
+        with anki_session_with_addon_data.profile_loaded():
+            ah_did_1 = install_ah_deck()
+            note_info_1 = import_ah_note(ah_did=ah_did_1)
+
+            ah_did_2 = install_ah_deck()
+            note_info_2 = import_ah_note(ah_did=ah_did_2)
+
+            now = datetime.now()
+            record_review_for_anki_nid(NoteId(note_info_1.anki_nid), now)
+            record_review_for_anki_nid(
+                NoteId(note_info_2.anki_nid), now + timedelta(seconds=1)
+            )
+
+            # Only the review for the first deck should be considered.
+            assert_datetime_equal_ignore_milliseconds(
+                _get_last_review_datetime_for_ah_deck(ah_did=ah_did_1), now
             )
