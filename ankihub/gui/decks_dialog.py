@@ -208,34 +208,7 @@ class DeckManagementDialog(QDialog):
         self.deck_options_label = QLabel("<b>Deck Options</b>")
 
         if selected_ah_did not in config.deck_ids():
-            self.deck_not_installed_label = QLabel("⚠️ This deck is not installed yet!")
-
-            def on_done(future: Future) -> None:
-                future.result()
-                self._refresh_box_bottom_right()
-
-            def install_deck_and_refresh_dialog() -> None:
-                sync_with_ankihub(on_done=on_done)
-
-            self.sync_to_install_btn = QPushButton("🔃️ Sync to install")
-            qconnect(
-                self.sync_to_install_btn.clicked,
-                install_deck_and_refresh_dialog,
-            )
-
-            self.sync_to_install_btn_row = QHBoxLayout()
-            self.sync_to_install_btn_row.addWidget(self.sync_to_install_btn)
-            self.sync_to_install_btn_row.addStretch()
-
-            self.box_deck_not_installed = QVBoxLayout()
-            self.box_deck_not_installed.addWidget(self.deck_not_installed_label)
-            self.box_deck_not_installed.addLayout(self.sync_to_install_btn_row)
-
-            box = QVBoxLayout()
-            box.addWidget(self.deck_options_label)
-            box.addLayout(self.box_deck_not_installed)
-
-            return box
+            return self._setup_box_deck_not_installed()
 
         # Setup "Suspend new cards of existing notes"
         self.box_suspend_new_cards_of_existing_notes = (
@@ -265,6 +238,36 @@ class DeckManagementDialog(QDialog):
         box = QVBoxLayout()
         box.addWidget(self.deck_options_label)
         box.addLayout(self.box_deck_options_elements)
+
+        return box
+
+    def _setup_box_deck_not_installed(self) -> QVBoxLayout:
+        self.deck_not_installed_label = QLabel("⚠️ This deck is not installed yet!")
+
+        def on_done(future: Future) -> None:
+            future.result()
+            self._refresh_box_bottom_right()
+
+        def install_deck_and_refresh_dialog() -> None:
+            sync_with_ankihub(on_done=on_done)
+
+        self.sync_to_install_btn = QPushButton("🔃️ Sync to install")
+        qconnect(
+            self.sync_to_install_btn.clicked,
+            install_deck_and_refresh_dialog,
+        )
+
+        self.sync_to_install_btn_row = QHBoxLayout()
+        self.sync_to_install_btn_row.addWidget(self.sync_to_install_btn)
+        self.sync_to_install_btn_row.addStretch()
+
+        self.box_deck_not_installed = QVBoxLayout()
+        self.box_deck_not_installed.addWidget(self.deck_not_installed_label)
+        self.box_deck_not_installed.addLayout(self.sync_to_install_btn_row)
+
+        box = QVBoxLayout()
+        box.addWidget(self.deck_options_label)
+        box.addLayout(self.box_deck_not_installed)
 
         return box
 
