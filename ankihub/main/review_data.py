@@ -15,7 +15,8 @@ REVIEW_PERIOD_DAYS = timedelta(days=30)
 
 
 def send_review_data() -> None:
-    """Send data about card reviews for each installed AnkiHub deck to the server."""
+    """Send data about card reviews for each installed AnkiHub deck to the server.
+    Data about decks that have not been reviewed yet will not be included."""
     since = datetime.now() - REVIEW_PERIOD_DAYS
     card_review_data = [
         CardReviewData(
@@ -23,9 +24,10 @@ def send_review_data() -> None:
             total_card_reviews_last_30_days=_get_review_count_for_ah_deck_since(
                 ah_did, since
             ),
-            last_card_review_at=_get_last_review_datetime_for_ah_deck(ah_did),
+            last_card_review_at=last_review_time,
         )
         for ah_did in config.deck_ids()
+        if (last_review_time := _get_last_review_datetime_for_ah_deck(ah_did))
     ]
 
     LOGGER.info(f"Review counts: {card_review_data}")
