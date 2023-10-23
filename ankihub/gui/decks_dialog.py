@@ -281,7 +281,7 @@ class DeckManagementDialog(QDialog):
             "Will automatically suspend <br>"
             "the cards of existing notes in <br>"
             "the deck in future updates <br>"
-            "according to the chosen option."
+            "based on your preference."
         )
         self.suspend_new_cards_of_existing_notes_label = QLabel(
             "Suspend new cards of existing notes"
