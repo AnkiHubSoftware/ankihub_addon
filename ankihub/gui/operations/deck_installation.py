@@ -101,7 +101,7 @@ def _show_deck_import_summary_dialog(
         textFormat=Qt.TextFormat.RichText,
         callback=on_button_clicked,
         icon=QMessageBox.Icon.Information,
-        buttons=["Go to Deck Options", QMessageBox.StandardButton.Ok],
+        buttons=["Go to Deck Management", QMessageBox.StandardButton.Ok],
     )
 
 
