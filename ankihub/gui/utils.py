@@ -1,5 +1,5 @@
 import uuid
-from typing import Any, List, Optional
+from typing import Any, Callable, List, Optional, Sequence
 
 import aqt
 from aqt.addons import check_and_prompt_for_updates
@@ -21,7 +21,7 @@ from aqt.qt import (
     qconnect,
 )
 from aqt.theme import theme_manager
-from aqt.utils import disable_help_button, showWarning, tooltip
+from aqt.utils import MessageBox, disable_help_button, showWarning, tooltip
 
 from ..settings import config
 
@@ -309,3 +309,26 @@ def clear_layout(layout: QLayout) -> None:
             widget.deleteLater()
         elif child.layout():
             clear_layout(child.layout())
+
+
+def ask_user_dialog(
+    text: str,
+    callback: Callable[[int], None],
+    buttons: Sequence[str | QMessageBox.StandardButton] | None = None,
+    default_button: int = 1,
+    icon: QMessageBox.Icon = QMessageBox.Icon.Question,
+    **kwargs: Any,
+) -> MessageBox:
+    """Shows a question to the user, passes the index of the button clicked to the callback.
+    Adapted from aqt.utils.ask_user_dialog."""
+    if buttons is None:
+        buttons = [QMessageBox.StandardButton.Yes, QMessageBox.StandardButton.No]
+
+    return MessageBox(
+        text,
+        callback=callback,
+        icon=icon,
+        buttons=buttons,
+        default_button=default_button,
+        **kwargs,
+    )
