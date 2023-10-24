@@ -373,7 +373,7 @@ class DeckManagementDialog(QDialog):
             tooltip_icon().pixmap(16, 16)
         )
         set_styled_tooltip(
-            self.suspend_new_cards_of_existing_notes_cb_icon_label,
+            self.suspend_new_cards_of_new_notes_cb_icon_label,
             suspend_new_cards_of_new_notes_tooltip_message,
         )
 
