@@ -273,7 +273,7 @@ def warning_icon() -> QIcon:
 def tooltip_stylesheet() -> str:
     if theme_manager.night_mode:
         return """
-            QToolTip { color: white; background-color: #252525; }
+            QToolTip { color: white; background-color: #2c2c2c; }
             """
     else:
         return """
