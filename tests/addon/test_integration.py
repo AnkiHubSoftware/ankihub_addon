@@ -2573,7 +2573,8 @@ class TestDeckManagementDialog:
         self,
         anki_session_with_addon_data: AnkiSession,
         qtbot: QtBot,
-        install_sample_ah_deck: InstallSampleAHDeck,
+        install_ah_deck: InstallAHDeck,
+        import_ah_note: ImportAHNote,
         monkeypatch: MonkeyPatch,
     ):
         with anki_session_with_addon_data.profile_loaded():
@@ -2582,7 +2583,7 @@ class TestDeckManagementDialog:
 
             # Install a deck with subdeck tags
             subdeck_name, anki_did, ah_did = self._install_deck_with_subdeck_tag(
-                install_sample_ah_deck
+                install_ah_deck, import_ah_note
             )
             # ... The subdeck should not exist yet
             assert aqt.mw.col.decks.by_name(subdeck_name) is None
@@ -2619,17 +2620,20 @@ class TestDeckManagementDialog:
             assert aqt.mw.col.decks.by_name(subdeck_name) is None
 
     def _install_deck_with_subdeck_tag(
-        self,
-        install_sample_ah_deck: InstallSampleAHDeck,
+        self, install_ah_deck: InstallAHDeck, import_ah_note: ImportAHNote
     ) -> Tuple[str, int, uuid.UUID]:
-        anki_did, ah_did = install_sample_ah_deck()
-        deck_name = aqt.mw.col.decks.get(anki_did)["name"]
-        subdeck_name = f"{deck_name}::Subdeck-1"
-        notes = aqt.mw.col.find_notes(f"did:{anki_did}")
-        note = aqt.mw.col.get_note(notes[0])
-        note.tags = [f"{SUBDECK_TAG}::{subdeck_name}"]
-        note.flush()
-        return subdeck_name, anki_did, ah_did
+        """Install a deck with a subdeck tag and return the full subdeck name."""
+        ah_did = install_ah_deck()
+        subdeck_name = "Subdeck"
+        deck_name = config.deck_config(ah_did).name
+        deck_name_as_tag = deck_name.replace(" ", "_")
+        note_info = NoteInfoFactory.create(
+            tags=[f"{SUBDECK_TAG}::{deck_name_as_tag}::{subdeck_name}"]
+        )
+        import_ah_note(ah_did=ah_did, note_data=note_info)
+        anki_did = config.deck_config(ah_did).anki_id
+        subdeck_full_name = f"{deck_name}::{subdeck_name}"
+        return subdeck_full_name, anki_did, ah_did
 
     def test_change_destination_for_new_cards(
         self,
