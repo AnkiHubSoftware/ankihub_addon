@@ -1,14 +1,16 @@
 import copy
 import os
 import uuid
+from datetime import datetime
 from typing import Any, Callable, Dict, List, Optional, Protocol
 from unittest.mock import Mock
 
 import aqt
 import pytest
+from anki.cards import CardId
 from anki.decks import DeckId
 from anki.models import NotetypeDict, NotetypeId
-from anki.notes import Note
+from anki.notes import Note, NoteId
 from aqt.main import AnkiQt
 from pytest import MonkeyPatch, fixture
 from pytest_anki import AnkiSession
@@ -254,7 +256,7 @@ def import_ah_note(next_deterministic_uuid: Callable[[], uuid.UUID]) -> ImportAH
             protected_fields={},
             protected_tags=[],
             deck_name=deck_name,
-            is_first_import_of_deck=anki_did is None,
+            is_first_import_of_deck=False,
             anki_did=anki_did,
             suspend_new_cards_of_new_notes=suspend_new_cards_of_new_notes,
             suspend_new_cards_of_existing_notes=suspend_new_cards_of_existing_notes,
@@ -501,3 +503,32 @@ def mock_study_deck_dialog_with_cb(
         )
 
     return mock_study_deck_dialog_inner
+
+
+def record_review_for_anki_nid(anki_nid: NoteId, date_time: datetime) -> None:
+    """Adds a review for the note with the given anki_nid at the given date_time."""
+    cid = aqt.mw.col.get_note(anki_nid).card_ids()[0]
+    record_review(cid, int(date_time.timestamp() * 1000))
+
+
+def record_review(cid: CardId, review_time_ms: int) -> None:
+    aqt.mw.col.db.execute(
+        "INSERT INTO revlog VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)",
+        # the revlog table stores the timestamp in milliseconds
+        review_time_ms,
+        cid,
+        1,
+        1,
+        1,
+        1,
+        1,
+        1,
+        0,
+    )
+
+
+def assert_datetime_equal_ignore_milliseconds(dt1: datetime, dt2: datetime) -> None:
+    """Asserts that the two datetimes are equal, ignoring the milliseconds."""
+    dt1 = dt1.replace(microsecond=dt1.microsecond // 1000 * 1000)
+    dt2 = dt2.replace(microsecond=dt2.microsecond // 1000 * 1000)
+    assert dt1 == dt2
