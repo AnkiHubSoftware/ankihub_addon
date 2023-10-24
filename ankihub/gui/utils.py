@@ -1,5 +1,5 @@
 import uuid
-from typing import Any, Callable, List, Optional, Sequence
+from typing import Any, Callable, List, Optional, Sequence, Union
 
 import aqt
 from aqt.addons import check_and_prompt_for_updates
@@ -314,7 +314,7 @@ def clear_layout(layout: QLayout) -> None:
 def ask_user_dialog(
     text: str,
     callback: Callable[[int], None],
-    buttons: Sequence[str | QMessageBox.StandardButton] | None = None,
+    buttons: Union[Sequence[Union[str, QMessageBox.StandardButton]], None] = None,
     default_button: int = 1,
     icon: QMessageBox.Icon = QMessageBox.Icon.Question,
     **kwargs: Any,
