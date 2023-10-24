@@ -552,7 +552,7 @@ class DeckManagementDialog(QDialog):
         StudyDeckWithoutHelpButton(
             aqt.mw,
             current=current,
-            accept="Accept",
+            accept="Confirm Destination for New Cards",
             title="Select Destination for New Cards",
             parent=self,
             callback=update_deck_config,
