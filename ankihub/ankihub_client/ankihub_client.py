@@ -43,6 +43,7 @@ from tenacity import (
 
 from .models import (
     ANKIHUB_DATETIME_FORMAT_STR,
+    CardReviewData,
     ChangeNoteSuggestion,
     Deck,
     DeckExtension,
@@ -1107,6 +1108,16 @@ class AnkiHubClient:
         data = response.json()
         result = [uuid.UUID(deck["id"]) for deck in data["created_decks"]]
         return result
+
+    def send_card_review_data(self, card_review_data: List[CardReviewData]) -> None:
+        response = self._send_request(
+            "POST",
+            API.ANKIHUB,
+            "/users/card-review-data/",
+            json=[review.to_dict() for review in card_review_data],
+        )
+        if response.status_code != 200:
+            raise AnkiHubHTTPError(response)
 
 
 def _transform_notes_data(notes_data: List[Dict]) -> List[Dict]:
