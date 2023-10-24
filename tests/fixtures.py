@@ -439,7 +439,6 @@ def mock_download_and_install_deck_dependencies(
         add_mock(AnkiHubClient, "get_protected_tags", [])
 
         # Patch away gui functions which would otherwise block the test
-        add_mock(operations.deck_installation, "showInfo")
         add_mock(operations.deck_installation, "ask_user", return_value=True)
         add_mock(operations.deck_installation, "show_empty_cards")
 
