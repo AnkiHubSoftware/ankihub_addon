@@ -48,13 +48,15 @@ def sync_with_ankihub(on_done: Callable[[Future], None]) -> None:
 
         try:
             send_review_data()
-        except DBError:
+        except DBError:  # pragma: no cover
             # TODO Attaching the ankihub db to the main db sometimes fails with a DBError
             # for some users. See:
             # https://ankihub.sentry.io/issues/4574509733/?project=6546414
             # This prevents the error from being shown to the user, until we find a fix.
             # The exception is sent to Sentry because of the LoggingIntegration.
-            LOGGER.exception("Could not send review data to AnkiHub")
+            LOGGER.exception(
+                "Could not send review data to AnkiHub"
+            )  # pragma: no cover
 
         on_done(future_with_result(None))
 
