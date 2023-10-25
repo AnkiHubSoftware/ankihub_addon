@@ -386,7 +386,7 @@ class DeckManagementDialog(QDialog):
 
     def _setup_box_subdecks_enabled(self) -> QVBoxLayout:
         self.subdecks_tooltip_message = (
-            "Activates organizing the deck into subdecks. "
+            "Use subdecks to organize this deck.<br>"
             f"Applies only to decks with <b>{SUBDECK_TAG}</b> tags."
         )
 
