@@ -2538,7 +2538,7 @@ class TestDeckManagementDialog:
     def test_basic(
         self,
         anki_session_with_addon_data: AnkiSession,
-        install_sample_ah_deck: InstallSampleAHDeck,
+        install_ah_deck: InstallAHDeck,
         qtbot: QtBot,
         monkeypatch: MonkeyPatch,
         nightmode: bool,
@@ -2547,12 +2547,16 @@ class TestDeckManagementDialog:
 
             self._mock_dependencies(monkeypatch)
 
-            anki_did, ah_did = install_sample_ah_deck()
+            deck_name = "Test Deck"
+            ah_did = install_ah_deck(ah_deck_name=deck_name)
+            anki_did = config.deck_config(ah_did).anki_id
 
             monkeypatch.setattr(
                 AnkiHubClient,
                 "get_deck_subscriptions",
-                lambda *args: [DeckFactory.create(ah_did=ah_did, anki_did=anki_did)],
+                lambda *args: [
+                    DeckFactory.create(ah_did=ah_did, anki_did=anki_did, name=deck_name)
+                ],
             )
 
             theme_manager.night_mode = nightmode
@@ -2685,6 +2689,37 @@ class TestDeckManagementDialog:
 
             # Assert that the destination deck was updated
             assert config.deck_config(ah_did).anki_id == new_home_deck_anki_id
+
+    def test_with_deck_not_installed(
+        self,
+        anki_session_with_addon_data: AnkiSession,
+        qtbot: QtBot,
+        monkeypatch: MonkeyPatch,
+        next_deterministic_uuid: Callable[[], uuid.UUID],
+        next_deterministic_id: Callable[[], int],
+    ):
+        with anki_session_with_addon_data.profile_loaded():
+
+            self._mock_dependencies(monkeypatch)
+
+            ah_did = next_deterministic_uuid()
+            anki_did = next_deterministic_id()
+            monkeypatch.setattr(
+                AnkiHubClient,
+                "get_deck_subscriptions",
+                lambda *args: [DeckFactory.create(ah_did=ah_did, anki_did=anki_did)],
+            )
+
+            dialog = DeckManagementDialog()
+            dialog.display_subscribe_window()
+
+            assert dialog.decks_list.count() == 1
+
+            # Select the deck from the list
+            dialog.decks_list.setCurrentRow(0)
+            qtbot.wait(200)
+
+            assert hasattr(dialog, "deck_not_installed_label")
 
     def _mock_dependencies(self, monkeypatch: MonkeyPatch) -> None:
         # Mock the config to return that the user is logged in

@@ -1,5 +1,5 @@
 import uuid
-from typing import Any, List, Optional
+from typing import Any, Callable, List, Optional, Sequence, Union
 
 import aqt
 from aqt.addons import check_and_prompt_for_updates
@@ -20,7 +20,8 @@ from aqt.qt import (
     QWidget,
     qconnect,
 )
-from aqt.utils import disable_help_button, showWarning, tooltip
+from aqt.theme import theme_manager
+from aqt.utils import MessageBox, disable_help_button, showWarning, tooltip
 
 from ..settings import config
 
@@ -263,6 +264,32 @@ def tooltip_icon() -> QIcon:
     )
 
 
+def warning_icon() -> QIcon:
+    return QIcon(
+        QApplication.style().standardIcon(QStyle.StandardPixmap.SP_MessageBoxWarning)
+    )
+
+
+def tooltip_stylesheet() -> str:
+    if theme_manager.night_mode:
+        return """
+            QToolTip { color: white; background-color: #2c2c2c; }
+            """
+    else:
+        return """
+            QToolTip { color: black; background-color: white; }
+            """
+
+
+def set_styled_tooltip(widget: QWidget, tooltip: str) -> None:
+    widget.setToolTip(tooltip)
+
+    # Add the tooltip style to the widget's stylesheet
+    current_style_sheet = widget.styleSheet()
+    new_style_sheet = f"{current_style_sheet} {tooltip_stylesheet()}"
+    widget.setStyleSheet(new_style_sheet)
+
+
 def check_and_prompt_for_updates_on_main_window():
     check_and_prompt_for_updates(
         parent=aqt.mw,
@@ -282,3 +309,26 @@ def clear_layout(layout: QLayout) -> None:
             widget.deleteLater()
         elif child.layout():
             clear_layout(child.layout())
+
+
+def ask_user_dialog(
+    text: str,
+    callback: Callable[[int], None],
+    buttons: Union[Sequence[Union[str, QMessageBox.StandardButton]], None] = None,
+    default_button: int = 1,
+    icon: QMessageBox.Icon = QMessageBox.Icon.Question,
+    **kwargs: Any,
+) -> MessageBox:
+    """Shows a question to the user, passes the index of the button clicked to the callback.
+    Adapted from aqt.utils.ask_user_dialog."""
+    if buttons is None:
+        buttons = [QMessageBox.StandardButton.Yes, QMessageBox.StandardButton.No]
+
+    return MessageBox(
+        text,
+        callback=callback,
+        icon=icon,
+        buttons=buttons,
+        default_button=default_button,
+        **kwargs,
+    )
