@@ -425,9 +425,32 @@ class DeckManagementDialog(QDialog):
     def _setup_box_new_cards_destination(
         self, selected_ah_did: uuid.UUID
     ) -> QVBoxLayout:
-        self.new_cards_destination = QLabel("<b>Destination for New Cards</b>")
 
-        # Initialize and set up the destination details label
+        # Set up the destination tooltip message
+        new_cards_destination_tooltip_message = (
+            "Select the deck you want new cards to be saved to."
+        )
+        self.new_cards_destination_label = QLabel("<b>Destination for New Cards</b>")
+        set_styled_tooltip(
+            self.new_cards_destination_label, new_cards_destination_tooltip_message
+        )
+
+        # Set up the destination icon label
+        self.new_cards_destination_icon_label = QLabel()
+        self.new_cards_destination_icon_label.setPixmap(tooltip_icon().pixmap(16, 16))
+        set_styled_tooltip(
+            self.new_cards_destination_icon_label,
+            new_cards_destination_tooltip_message,
+        )
+
+        # Add the destination label and icon to the destination label row layout
+        self.new_cards_destination_label_row = QHBoxLayout()
+        self.new_cards_destination_label_row.addWidget(self.new_cards_destination_label)
+        self.new_cards_destination_label_row.addWidget(
+            self.new_cards_destination_icon_label
+        )
+
+        # Set up the destination details label
         self.new_cards_destination_details_label = QLabel()
         self.new_cards_destination_details_label.setWordWrap(True)
         self.new_cards_destination_details_label.setSizePolicy(
@@ -435,7 +458,7 @@ class DeckManagementDialog(QDialog):
         )
         self._refresh_new_cards_destination_details_label(selected_ah_did)
 
-        # Initialize and set up the change destination button
+        # Set up the change destination button
         self.set_new_cards_destination_btn = QPushButton(
             "Change Destination for New Cards"
         )
@@ -456,7 +479,7 @@ class DeckManagementDialog(QDialog):
 
         # Add everything to the result layout
         box = QVBoxLayout()
-        box.addWidget(self.new_cards_destination)
+        box.addLayout(self.new_cards_destination_label_row)
         box.addWidget(self.new_cards_destination_details_label)
         box.addWidget(self.set_new_cards_destination_btn)
         box.addSpacing(5)
