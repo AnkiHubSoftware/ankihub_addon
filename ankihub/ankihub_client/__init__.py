@@ -17,6 +17,7 @@ from .ankihub_client import (  # noqa: F401
 )
 from .models import (  # noqa: F401
     ANKIHUB_DATETIME_FORMAT_STR,
+    CardReviewData,
     ChangeNoteSuggestion,
     Deck,
     DeckExtension,

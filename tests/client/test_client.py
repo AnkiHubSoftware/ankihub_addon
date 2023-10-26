@@ -48,6 +48,7 @@ from ankihub.ankihub_client import (
     get_media_names_from_notes_data,
     get_media_names_from_suggestion,
 )
+from ankihub.ankihub_client.models import CardReviewData
 from ankihub.gui.operations.deck_installation import _download_progress_cb
 
 WEBAPP_COMPOSE_FILE = (
@@ -1566,3 +1567,18 @@ class TestGetFeatureFlags:
         client.get_feature_flags()
         # This test just makes sure that the method does not throw an exception
         # Feature flags can change so we don't want to assert anything
+
+
+@pytest.mark.vcr()
+class TestSendCardReviewData:
+    def test_basic(
+        self,
+        authorized_client_for_user_test1: AnkiHubClient,
+    ) -> None:
+        card_review_data = CardReviewData(
+            ah_did=ID_OF_DECK_OF_USER_TEST1,
+            total_card_reviews_last_30_days=1,
+            last_card_review_at=datetime.now(tz=timezone.utc),
+        )
+
+        authorized_client_for_user_test1.send_card_review_data([card_review_data])

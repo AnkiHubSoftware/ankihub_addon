@@ -27,7 +27,7 @@ from zipfile import ZipFile
 
 import aqt
 import pytest
-from anki.cards import Card, CardId
+from anki.cards import Card
 from anki.consts import QUEUE_TYPE_NEW, QUEUE_TYPE_SUSPENDED
 from anki.decks import DeckId, FilteredDeckConfig
 from anki.models import NotetypeDict, NotetypeId
@@ -68,6 +68,7 @@ from ..fixtures import (
     MockFunction,
     MockStudyDeckDialogWithCB,
     create_or_get_ah_version_of_note_type,
+    record_review,
 )
 from .conftest import TEST_PROFILE_ID
 
@@ -352,6 +353,11 @@ def mock_client_methods_called_during_ankihub_sync(monkeypatch: MonkeyPatch) -> 
     monkeypatch.setattr(
         AnkiHubClient,
         "get_deck_media_updates",
+        lambda *args, **kwargs: [],
+    )
+    monkeypatch.setattr(
+        AnkiHubClient,
+        "send_card_review_data",
         lambda *args, **kwargs: [],
     )
 
@@ -2313,7 +2319,7 @@ class TestCustomSearchNodes:
             note = mw.col.get_note(nid)
             cid = note.card_ids()[0]
 
-            record_review(mw, cid, mod_seconds=1)
+            record_review(cid, review_time_ms=1 * 1000)
 
             # Update the mod time in the ankihub database to simulate a note update.
             ankihub_db.execute(
@@ -2329,7 +2335,7 @@ class TestCustomSearchNodes:
                 ) == [nid]
 
             # Add another review entry for the card to the database.
-            record_review(mw, cid, mod_seconds=3)
+            record_review(cid, review_time_ms=3 * 1000)
 
             # Check that the note of the card is not included in the search results anymore.
             with attached_ankihub_db():
@@ -2337,22 +2343,6 @@ class TestCustomSearchNodes:
                     UpdatedSinceLastReviewSearchNode(browser, "").filter_ids(all_nids)
                     == []
                 )
-
-
-def record_review(mw: AnkiQt, cid: CardId, mod_seconds: int):
-    mw.col.db.execute(
-        "INSERT INTO revlog VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)",
-        # the revlog table stores the timestamp in milliseconds
-        mod_seconds * 1000,
-        cid,
-        1,
-        1,
-        1,
-        1,
-        1,
-        1,
-        0,
-    )
 
 
 class TestBrowserTreeView:
@@ -2549,7 +2539,7 @@ class TestDeckManagementDialog:
     def test_basic(
         self,
         anki_session_with_addon_data: AnkiSession,
-        install_sample_ah_deck: InstallSampleAHDeck,
+        install_ah_deck: InstallAHDeck,
         qtbot: QtBot,
         monkeypatch: MonkeyPatch,
         nightmode: bool,
@@ -2558,12 +2548,16 @@ class TestDeckManagementDialog:
 
             self._mock_dependencies(monkeypatch)
 
-            anki_did, ah_did = install_sample_ah_deck()
+            deck_name = "Test Deck"
+            ah_did = install_ah_deck(ah_deck_name=deck_name)
+            anki_did = config.deck_config(ah_did).anki_id
 
             monkeypatch.setattr(
                 AnkiHubClient,
                 "get_deck_subscriptions",
-                lambda *args: [DeckFactory.create(ah_did=ah_did, anki_did=anki_did)],
+                lambda *args: [
+                    DeckFactory.create(ah_did=ah_did, anki_did=anki_did, name=deck_name)
+                ],
             )
 
             theme_manager.night_mode = nightmode
@@ -2584,7 +2578,8 @@ class TestDeckManagementDialog:
         self,
         anki_session_with_addon_data: AnkiSession,
         qtbot: QtBot,
-        install_sample_ah_deck: InstallSampleAHDeck,
+        install_ah_deck: InstallAHDeck,
+        import_ah_note: ImportAHNote,
         monkeypatch: MonkeyPatch,
     ):
         with anki_session_with_addon_data.profile_loaded():
@@ -2593,7 +2588,7 @@ class TestDeckManagementDialog:
 
             # Install a deck with subdeck tags
             subdeck_name, anki_did, ah_did = self._install_deck_with_subdeck_tag(
-                install_sample_ah_deck
+                install_ah_deck, import_ah_note
             )
             # ... The subdeck should not exist yet
             assert aqt.mw.col.decks.by_name(subdeck_name) is None
@@ -2630,17 +2625,20 @@ class TestDeckManagementDialog:
             assert aqt.mw.col.decks.by_name(subdeck_name) is None
 
     def _install_deck_with_subdeck_tag(
-        self,
-        install_sample_ah_deck: InstallSampleAHDeck,
+        self, install_ah_deck: InstallAHDeck, import_ah_note: ImportAHNote
     ) -> Tuple[str, int, uuid.UUID]:
-        anki_did, ah_did = install_sample_ah_deck()
-        deck_name = aqt.mw.col.decks.get(anki_did)["name"]
-        subdeck_name = f"{deck_name}::Subdeck-1"
-        notes = aqt.mw.col.find_notes(f"did:{anki_did}")
-        note = aqt.mw.col.get_note(notes[0])
-        note.tags = [f"{SUBDECK_TAG}::{subdeck_name}"]
-        note.flush()
-        return subdeck_name, anki_did, ah_did
+        """Install a deck with a subdeck tag and return the full subdeck name."""
+        ah_did = install_ah_deck()
+        subdeck_name = "Subdeck"
+        deck_name = config.deck_config(ah_did).name
+        deck_name_as_tag = deck_name.replace(" ", "_")
+        note_info = NoteInfoFactory.create(
+            tags=[f"{SUBDECK_TAG}::{deck_name_as_tag}::{subdeck_name}"]
+        )
+        import_ah_note(ah_did=ah_did, note_data=note_info)
+        anki_did = config.deck_config(ah_did).anki_id
+        subdeck_full_name = f"{deck_name}::{subdeck_name}"
+        return subdeck_full_name, anki_did, ah_did
 
     def test_change_destination_for_new_cards(
         self,
@@ -2692,6 +2690,37 @@ class TestDeckManagementDialog:
 
             # Assert that the destination deck was updated
             assert config.deck_config(ah_did).anki_id == new_home_deck_anki_id
+
+    def test_with_deck_not_installed(
+        self,
+        anki_session_with_addon_data: AnkiSession,
+        qtbot: QtBot,
+        monkeypatch: MonkeyPatch,
+        next_deterministic_uuid: Callable[[], uuid.UUID],
+        next_deterministic_id: Callable[[], int],
+    ):
+        with anki_session_with_addon_data.profile_loaded():
+
+            self._mock_dependencies(monkeypatch)
+
+            ah_did = next_deterministic_uuid()
+            anki_did = next_deterministic_id()
+            monkeypatch.setattr(
+                AnkiHubClient,
+                "get_deck_subscriptions",
+                lambda *args: [DeckFactory.create(ah_did=ah_did, anki_did=anki_did)],
+            )
+
+            dialog = DeckManagementDialog()
+            dialog.display_subscribe_window()
+
+            assert dialog.decks_list.count() == 1
+
+            # Select the deck from the list
+            dialog.decks_list.setCurrentRow(0)
+            qtbot.wait(200)
+
+            assert hasattr(dialog, "deck_not_installed_label")
 
     def _mock_dependencies(self, monkeypatch: MonkeyPatch) -> None:
         # Mock the config to return that the user is logged in

@@ -2,10 +2,13 @@ from concurrent.futures import Future
 from typing import Callable, List
 
 import aqt
+from anki.errors import DBError
 
+from ... import LOGGER
 from ...addon_ankihub_client import AddonAnkiHubClient as AnkiHubClient
 from ...ankihub_client import API_VERSION, Deck
 from ...main.deck_unsubscribtion import uninstall_deck
+from ...main.review_data import send_review_data
 from ...settings import config
 from ..deck_updater import ah_deck_updater, show_tooltip_about_last_deck_updates_results
 from .db_check import maybe_check_databases
@@ -42,6 +45,19 @@ def sync_with_ankihub(on_done: Callable[[Future], None]) -> None:
         config.set_api_version_on_last_sync(API_VERSION)
         show_tooltip_about_last_deck_updates_results()
         maybe_check_databases()
+
+        try:
+            send_review_data()
+        except DBError:  # pragma: no cover
+            # TODO Attaching the ankihub db to the main db sometimes fails with a DBError
+            # for some users. See:
+            # https://ankihub.sentry.io/issues/4574509733/?project=6546414
+            # This prevents the error from being shown to the user, until we find a fix.
+            # The exception is sent to Sentry because of the LoggingIntegration.
+            LOGGER.exception(
+                "Could not send review data to AnkiHub"
+            )  # pragma: no cover
+
         on_done(future_with_result(None))
 
     try:

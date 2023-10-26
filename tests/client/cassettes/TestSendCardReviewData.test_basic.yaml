@@ -1,0 +1,102 @@
+interactions:
+- request:
+    body: '{"username": "test1", "password": "asdf"}'
+    headers:
+      Accept:
+      - application/json; version=15.0
+      Content-Length:
+      - '41'
+      Content-Type:
+      - application/json
+    method: POST
+    uri: http://localhost:8000/api/login/
+  response:
+    body:
+      string: '{"expiry":"2023-11-18T09:19:59.539890Z","token":"c5a30e7fb91ba22029e35f446a2b8248572c95096deb64bf43cfa446b860564e"}'
+    headers:
+      Allow:
+      - POST, OPTIONS
+      Content-Language:
+      - en
+      Content-Length:
+      - '115'
+      Content-Type:
+      - application/json
+      Cross-Origin-Opener-Policy:
+      - same-origin
+      Date:
+      - Sat, 21 Oct 2023 09:19:59 GMT
+      Referrer-Policy:
+      - same-origin
+      Server:
+      - WSGIServer/0.2 CPython/3.8.17
+      Server-Timing:
+      - TimerPanel_utime;dur=243.29699999999832;desc="User CPU time", TimerPanel_stime;dur=24.96699999999974;desc="System
+        CPU time", TimerPanel_total;dur=268.2639999999981;desc="Total CPU time", TimerPanel_total_time;dur=221.01353300013216;desc="Elapsed
+        time", SQLPanel_sql_time;dur=5.932250000114436;desc="SQL 16 queries", CachePanel_total_time;dur=0;desc="Cache
+        0 Calls"
+      Set-Cookie:
+      - csrftoken=t11gwpGTVCixbtQC3kjbunNqx7phnWof; expires=Sat, 19 Oct 2024 09:19:59
+        GMT; HttpOnly; Max-Age=31449600; Path=/; SameSite=Lax
+      - sessionid=s0d6cz3ch59wxcqllh0kqm10bf3zo22v; expires=Sat, 28 Oct 2023 09:19:59
+        GMT; HttpOnly; Max-Age=604800; Path=/; SameSite=Lax
+      Vary:
+      - Accept, Cookie, Accept-Language, origin
+      X-Content-Type-Options:
+      - nosniff
+      X-Frame-Options:
+      - DENY
+      djdt-store-id:
+      - 4b964a38b262499c975c8a7ab5878130
+    status:
+      code: 200
+      message: OK
+- request:
+    body: '[{"deck_id": "dda0d3ad-89cd-45fb-8ddc-fabad93c2d7b", "total_card_reviews_last_30_days":
+      1, "last_card_review_at": "2023-10-21T09:19:59.691741+00:00"}]'
+    headers:
+      Accept:
+      - application/json; version=15.0
+      Authorization:
+      - Token c5a30e7fb91ba22029e35f446a2b8248572c95096deb64bf43cfa446b860564e
+      Content-Length:
+      - '150'
+      Content-Type:
+      - application/json
+    method: POST
+    uri: http://localhost:8000/api/users/card-review-data/
+  response:
+    body:
+      string: ''
+    headers:
+      Allow:
+      - POST, OPTIONS
+      Content-Language:
+      - en
+      Content-Length:
+      - '0'
+      Cross-Origin-Opener-Policy:
+      - same-origin
+      Date:
+      - Sat, 21 Oct 2023 09:19:59 GMT
+      Referrer-Policy:
+      - same-origin
+      Server:
+      - WSGIServer/0.2 CPython/3.8.17
+      Server-Timing:
+      - TimerPanel_utime;dur=206.23000000000147;desc="User CPU time", TimerPanel_stime;dur=4.7640000000002125;desc="System
+        CPU time", TimerPanel_total;dur=210.99400000000168;desc="Total CPU time",
+        TimerPanel_total_time;dur=216.40408500002195;desc="Elapsed time", SQLPanel_sql_time;dur=2.919528999427712;desc="SQL
+        8 queries", CachePanel_total_time;dur=0;desc="Cache 0 Calls"
+      Vary:
+      - Accept, Accept-Language, Cookie, origin
+      X-Content-Type-Options:
+      - nosniff
+      X-Frame-Options:
+      - DENY
+      djdt-store-id:
+      - 6410c742a6094888b4ec3e650d0d4caa
+    status:
+      code: 200
+      message: OK
+version: 1

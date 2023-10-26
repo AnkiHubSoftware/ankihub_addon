@@ -8,7 +8,7 @@ from typing import Callable, List
 import aqt
 from aqt.emptycards import show_empty_cards
 from aqt.operations.tag import clear_unused_tags
-from aqt.utils import showInfo
+from aqt.qt import QMessageBox, Qt
 
 from ... import LOGGER
 from ...addon_ankihub_client import AddonAnkiHubClient as AnkiHubClient
@@ -23,7 +23,7 @@ from ...settings import DeckConfig, config
 from ..exceptions import DeckDownloadAndInstallError, RemoteDeckNotFoundError
 from ..media_sync import media_sync
 from ..messages import messages
-from ..utils import ask_user
+from ..utils import ask_user, ask_user_dialog
 from .subdecks import confirm_and_toggle_subdecks
 from .utils import future_with_exception, future_with_result
 
@@ -61,25 +61,7 @@ def download_and_install_decks(
             if deck_contains_subdeck_tags(ah_did):
                 confirm_and_toggle_subdecks(ah_did)
 
-        # Show import result message
-        # ... Anki deck names can be different from AnkiHub deck names, so we need to look them up.
-        ankihub_deck_names = [
-            config.deck_config(ah_did).name for ah_did in ankihub_dids
-        ]
-        anki_deck_names = [
-            aqt.mw.col.decks.name(config.deck_config(ah_did).anki_id)
-            for ah_did in ankihub_dids
-        ]
-        message = messages.deck_import_summary(
-            ankihub_deck_names=ankihub_deck_names,
-            anki_deck_names=anki_deck_names,
-            import_results=import_results,
-        )
-        showInfo(
-            title="AnkiHub Deck Import Summary",
-            text=message,
-            textFormat="rich",
-        )
+        _show_deck_import_summary_dialog(import_results)
 
     try:
         # Install decks in background
@@ -90,6 +72,37 @@ def download_and_install_decks(
         )
     except Exception as e:
         on_done(future_with_exception(e))
+
+
+def _show_deck_import_summary_dialog(
+    import_results: List[AnkiHubImportResult],
+) -> None:
+    ankihub_dids = [import_result.ankihub_did for import_result in import_results]
+    ankihub_deck_names = [config.deck_config(ah_did).name for ah_did in ankihub_dids]
+    anki_deck_names = [
+        aqt.mw.col.decks.name(config.deck_config(ah_did).anki_id)
+        for ah_did in ankihub_dids
+    ]
+    message = messages.deck_import_summary(
+        ankihub_deck_names=ankihub_deck_names,
+        anki_deck_names=anki_deck_names,
+        import_results=import_results,
+    )
+
+    def on_button_clicked(button_index: int) -> None:
+        from ..decks_dialog import DeckManagementDialog
+
+        if button_index == 0:
+            DeckManagementDialog.display_subscribe_window()
+
+    ask_user_dialog(
+        title="AnkiHub Deck Import Summary",
+        text=message,
+        textFormat=Qt.TextFormat.RichText,
+        callback=on_button_clicked,
+        icon=QMessageBox.Icon.Information,
+        buttons=["Go to Deck Management", QMessageBox.StandardButton.Ok],
+    )
 
 
 def _download_and_install_decks_inner(
