@@ -41,6 +41,7 @@ from .test_integration import ImportAHNote
 os.environ["SKIP_INIT"] = "1"
 
 from ankihub.ankihub_client import AnkiHubHTTPError, Field, SuggestionType
+from ankihub.db import attached_ankihub_db
 from ankihub.db.db import _AnkiHubDB
 from ankihub.db.exceptions import IntegrityError
 from ankihub.feature_flags import _FeatureFlags, feature_flags
@@ -1666,13 +1667,13 @@ class TestGetReviewCountForAHDeckSince:
                 record_review_for_anki_nid(
                     NoteId(note_info.anki_nid), now + review_delta
                 )
-
-            assert (
-                _get_review_count_for_ah_deck_since(
-                    ah_did=ah_did, since=now + since_time
+            with attached_ankihub_db():
+                assert (
+                    _get_review_count_for_ah_deck_since(
+                        ah_did=ah_did, since=now + since_time
+                    )
+                    == expected_count
                 )
-                == expected_count
-            )
 
     def test_with_multiple_notes(
         self,
@@ -1692,10 +1693,11 @@ class TestGetReviewCountForAHDeckSince:
             )
 
             since_time = now - timedelta(days=1)
-            assert (
-                _get_review_count_for_ah_deck_since(ah_did=ah_did, since=since_time)
-                == 2
-            )
+            with attached_ankihub_db():
+                assert (
+                    _get_review_count_for_ah_deck_since(ah_did=ah_did, since=since_time)
+                    == 2
+                )
 
     def test_with_review_for_other_deck(
         self,
@@ -1718,10 +1720,13 @@ class TestGetReviewCountForAHDeckSince:
 
             # Only the review for the first deck should be counted.
             since_time = now - timedelta(days=1)
-            assert (
-                _get_review_count_for_ah_deck_since(ah_did=ah_did_1, since=since_time)
-                == 1
-            )
+            with attached_ankihub_db():
+                assert (
+                    _get_review_count_for_ah_deck_since(
+                        ah_did=ah_did_1, since=since_time
+                    )
+                    == 1
+                )
 
 
 class TestGetLastReviewTimeForAHDeck:
@@ -1753,15 +1758,16 @@ class TestGetLastReviewTimeForAHDeck:
                     NoteId(note_info.anki_nid), now + review_delta
                 )
 
-            if expected_last_review_delta is not None:
-                expected_last_review_time = now + expected_last_review_delta
+            with attached_ankihub_db():
+                if expected_last_review_delta is not None:
+                    expected_last_review_time = now + expected_last_review_delta
 
-                assert_datetime_equal_ignore_milliseconds(
-                    _get_last_review_datetime_for_ah_deck(ah_did=ah_did),
-                    expected_last_review_time,
-                )
-            else:
-                assert _get_last_review_datetime_for_ah_deck(ah_did=ah_did) is None
+                    assert_datetime_equal_ignore_milliseconds(
+                        _get_last_review_datetime_for_ah_deck(ah_did=ah_did),
+                        expected_last_review_time,
+                    )
+                else:
+                    assert _get_last_review_datetime_for_ah_deck(ah_did=ah_did) is None
 
     def test_with_multiple_notes(
         self,
@@ -1780,10 +1786,11 @@ class TestGetLastReviewTimeForAHDeck:
             second_review_time = first_review_time + timedelta(days=1)
             record_review_for_anki_nid(NoteId(note_info_2.anki_nid), second_review_time)
 
-            assert_datetime_equal_ignore_milliseconds(
-                _get_last_review_datetime_for_ah_deck(ah_did=ah_did),
-                second_review_time,
-            )
+            with attached_ankihub_db():
+                assert_datetime_equal_ignore_milliseconds(
+                    _get_last_review_datetime_for_ah_deck(ah_did=ah_did),
+                    second_review_time,
+                )
 
     def test_with_review_for_other_deck(
         self,
@@ -1805,6 +1812,7 @@ class TestGetLastReviewTimeForAHDeck:
             )
 
             # Only the review for the first deck should be considered.
-            assert_datetime_equal_ignore_milliseconds(
-                _get_last_review_datetime_for_ah_deck(ah_did=ah_did_1), now
-            )
+            with attached_ankihub_db():
+                assert_datetime_equal_ignore_milliseconds(
+                    _get_last_review_datetime_for_ah_deck(ah_did=ah_did_1), now
+                )
