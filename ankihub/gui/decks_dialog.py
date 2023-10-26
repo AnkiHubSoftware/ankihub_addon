@@ -60,6 +60,7 @@ class DeckManagementDialog(QDialog):
 
     def _setup_ui(self):
         self.setWindowModality(Qt.WindowModality.WindowModal)
+        self.setWindowFlags(self.windowFlags() | Qt.WindowType.WindowCloseButtonHint)
         self.setWindowTitle("AnkiHub | Deck Management")
         self.setMinimumWidth(640)
         self.setMinimumHeight(550)
