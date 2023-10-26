@@ -212,6 +212,8 @@ def _debug_issue_with_determining_ah_did_for_nids(
     note = aqt.mw.col.get_note(list(anki_nids)[0])
     LOGGER.info(
         "Error while determining AnkiHub deck for note suggestion.\n"
+        f"\t{note.id}\n"
+        f"\t{note.mid}\n"
         f"\t{ankihub_db.is_ankihub_note_type(note.mid)=}\n"
         f"\t{ankihub_db.ankihub_dids_for_note_type(note.mid)=}\n"
     )
