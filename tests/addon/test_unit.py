@@ -40,6 +40,7 @@ from .test_integration import ImportAHNote
 # has to be set before importing ankihub
 os.environ["SKIP_INIT"] = "1"
 
+from ankihub.addon_ankihub_client import AnkiHubClient
 from ankihub.ankihub_client import AnkiHubHTTPError, Field, SuggestionType
 from ankihub.db.db import _AnkiHubDB
 from ankihub.db.exceptions import IntegrityError
@@ -1588,6 +1589,8 @@ class TestCreateCollaborativeDeck:
             mock_function(deck_creation, "StudyDeck", return_value=study_deck_mock)
 
             mock_function(deck_creation, "ask_user", return_value=True)
+
+            mock_function(AnkiHubClient, "get_owned_decks", return_value=[])
 
             def raise_exception(*args, **kwargs) -> None:
                 raise Exception("test")
