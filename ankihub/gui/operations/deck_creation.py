@@ -7,6 +7,7 @@ from aqt.studydeck import StudyDeck
 from aqt.utils import showInfo, tooltip
 
 from ... import LOGGER
+from ...addon_ankihub_client import AddonAnkiHubClient as AnkiHubClient
 from ...ankihub_client import get_media_names_from_notes_data
 from ...ankihub_client.models import UserDeckRelation
 from ...main.deck_creation import DeckCreationResult, create_ankihub_deck
@@ -46,6 +47,29 @@ def create_collaborative_deck() -> None:
     LOGGER.info(f"Chosen deck name: {deck_chooser.name}")
     deck_name = deck_chooser.name
     if not deck_name:
+        return
+
+    client = AnkiHubClient()
+    owned_decks = client.get_owned_decks()
+    owned_deck_names = {deck.name for deck in owned_decks}
+    if deck_name in owned_deck_names:
+        showInfo(
+            "You already have a deck with this name on AnkiHub.<br><br>"
+            "Here's what you can do:<br>"
+            "<ul>"
+            "<li style='margin-bottom: 10px'>"
+            "If you selected the wrong deck, please choose a different deck from your Anki collection."
+            "</li>"
+            "<li style='margin-bottom: 10px'>"
+            "If you want to keep your existing deck on AnkiHub and upload this as a new deck, "
+            "please rename either the deck on AnkiHub or the deck you're trying to upload."
+            "</li>"
+            "<li style='margin-bottom: 10px'>"
+            "If you want to replace your existing deck on AnkiHub with this deck, "
+            "please remove the existing deck on AnkiHub before proceeding."
+            "</li>"
+            "</ul>"
+        )
         return
 
     if len(aqt.mw.col.find_cards(f'deck:"{deck_name}"')) == 0:
