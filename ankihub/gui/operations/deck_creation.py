@@ -54,7 +54,7 @@ def create_collaborative_deck() -> None:
     owned_deck_names = {deck.name for deck in owned_decks}
     if deck_name in owned_deck_names:
         showInfo(
-            "Selected another deck or rename it. You already have a deck with this name on AnkiHub."
+            "Select another deck or rename it. You already have a deck with this name on AnkiHub."
         )
         return
 
