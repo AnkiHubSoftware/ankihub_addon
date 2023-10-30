@@ -20,17 +20,22 @@ def send_review_data() -> None:
     since = datetime.now() - REVIEW_PERIOD_DAYS
 
     with attached_ankihub_db():
-        card_review_data = [
-            CardReviewData(
-                ah_did=ah_did,
-                total_card_reviews_last_30_days=_get_review_count_for_ah_deck_since(
-                    ah_did, since
-                ),
-                last_card_review_at=last_review_time,
+        card_review_data = []
+        for ah_did in config.deck_ids():
+            last_card_review_at = _get_last_review_datetime_for_ah_deck(ah_did)
+            if last_card_review_at is None:
+                continue
+
+            total_card_reviews_last_30_days = _get_review_count_for_ah_deck_since(
+                ah_did, since
             )
-            for ah_did in config.deck_ids()
-            if (last_review_time := _get_last_review_datetime_for_ah_deck(ah_did))
-        ]
+            card_review_data.append(
+                CardReviewData(
+                    ah_did=ah_did,
+                    total_card_reviews_last_30_days=total_card_reviews_last_30_days,
+                    last_card_review_at=last_card_review_at,
+                )
+            )
 
     LOGGER.info(f"Review counts: {card_review_data}")
 
