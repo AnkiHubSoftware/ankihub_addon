@@ -54,21 +54,7 @@ def create_collaborative_deck() -> None:
     owned_deck_names = {deck.name for deck in owned_decks}
     if deck_name in owned_deck_names:
         showInfo(
-            "You already have a deck with this name on AnkiHub.<br><br>"
-            "Here's what you can do:<br>"
-            "<ul>"
-            "<li style='margin-bottom: 10px'>"
-            "If you selected the wrong deck, please choose a different deck from your Anki collection."
-            "</li>"
-            "<li style='margin-bottom: 10px'>"
-            "If you want to keep your existing deck on AnkiHub and upload this as a new deck, "
-            "please rename either the deck on AnkiHub or the deck you're trying to upload."
-            "</li>"
-            "<li style='margin-bottom: 10px'>"
-            "If you want to replace your existing deck on AnkiHub with this deck, "
-            "please remove the existing deck on AnkiHub before proceeding."
-            "</li>"
-            "</ul>"
+            "Selected another deck or rename it. You already have a deck with this name on AnkiHub."
         )
         return
 
