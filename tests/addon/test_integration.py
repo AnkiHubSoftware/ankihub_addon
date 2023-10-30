@@ -551,7 +551,6 @@ def test_editor(
         # test a change note suggestion
         note = mw.col.get_note(mw.col.find_notes("")[0])
         editor.note = note
-        editor.addMode = False
 
         note_2_ah_nid = ankihub_db.ankihub_nid_for_anki_nid(note.id)
 
