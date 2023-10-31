@@ -49,24 +49,11 @@ def detach_ankihub_db_from_anki_db_connection() -> None:
         return
 
     if is_ankihub_db_attached_to_anki_db():
-        # Liberal use of try/except to ensure we always try to detach and begin a new
-        # transaction.
-        try:
-            # close the current transaction to avoid a "database is locked" error
-            aqt.mw.col.save(trx=False)
-        except Exception:
-            LOGGER.info("Failed to close transaction.")
-
         try:
             aqt.mw.col.db.execute(f"DETACH DATABASE {ankihub_db.database_name}")
             LOGGER.info("Detached AnkiHub DB from Anki DB connection")
         except Exception:
             LOGGER.info("Failed to detach AnkiHub database.")
-
-        # begin a new transaction because Anki expects one to be open
-        aqt.mw.col.db.begin()
-
-        LOGGER.info("Began new transaction.")
 
 
 def is_ankihub_db_attached_to_anki_db() -> bool:
@@ -318,7 +305,6 @@ class _AnkiHubDB:
                 mod,
                 nid,
             )
-        aqt.mw.col.save()
 
     def ankihub_nid_exists(self, ankihub_nid: uuid.UUID) -> bool:
         # It's possible that an AnkiHub nid does not exists after calling insert_or_update_notes_data

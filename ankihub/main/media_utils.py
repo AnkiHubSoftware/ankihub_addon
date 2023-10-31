@@ -10,4 +10,3 @@ def find_and_replace_text_in_fields_on_all_notes(old: str, new: str) -> None:
         old,
         new,
     )
-    aqt.mw.col.save()
