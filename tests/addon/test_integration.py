@@ -100,13 +100,10 @@ from ankihub.ankihub_client.ankihub_client import (
     DeckExtensionUpdateChunk,
     _transform_notes_data,
 )
+from ankihub.debug import _setup_logging_for_db_begin
 from ankihub.common_utils import local_media_names_from_html
 from ankihub.db import ankihub_db, attached_ankihub_db
-from ankihub.debug import (
-    _log_stack,
-    _setup_logging_for_db_begin,
-    _setup_logging_for_sync_collection_and_media,
-)
+from ankihub.debug import _log_stack, _setup_logging_for_sync_collection_and_media
 from ankihub.gui import operations, utils
 from ankihub.gui.addons import (
     _change_file_permissions_of_addon_files,

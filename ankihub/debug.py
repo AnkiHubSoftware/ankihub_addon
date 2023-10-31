@@ -1,7 +1,6 @@
 """Log or report extra information to sentry in certain situations to help debug issues."""
 import traceback
 
-from anki.dbproxy import DBProxy
 from anki.hooks import wrap
 from aqt.main import AnkiQt
 
@@ -11,7 +10,6 @@ from .settings import ANKI_MINOR
 
 def setup():
     _setup_logging_for_sync_collection_and_media()
-    _setup_logging_for_db_begin()
 
 
 def _log_stack(title: str):
