@@ -101,11 +101,7 @@ from ankihub.ankihub_client.ankihub_client import (
 )
 from ankihub.common_utils import local_media_names_from_html
 from ankihub.db import ankihub_db, attached_ankihub_db
-from ankihub.debug import (
-    _log_stack,
-    _setup_logging_for_db_begin,
-    _setup_logging_for_sync_collection_and_media,
-)
+from ankihub.debug import _log_stack, _setup_logging_for_sync_collection_and_media
 from ankihub.gui import operations, utils
 from ankihub.gui.addons import (
     _change_file_permissions_of_addon_files,
@@ -4087,21 +4083,6 @@ class TestDebugModule:
             mw._sync_collection_and_media(after_sync=lambda: None)
 
             sync_will_start_mock.assert_called_once()
-
-    def test_setup_logging_for_db_begin(
-        self, anki_session: AnkiSession, monkeypatch: MonkeyPatch
-    ):
-        with anki_session.profile_loaded():
-            mw = anki_session.mw
-
-            db_begin_mock = Mock()
-            monkeypatch.setattr(mw.col._backend, "db_begin", db_begin_mock)
-
-            _setup_logging_for_db_begin()
-
-            mw.col.db.begin()
-
-            db_begin_mock.assert_called_once()
 
     def test_log_stack(self):
         # Test that the _log_stack function does not throw an exception when called.
