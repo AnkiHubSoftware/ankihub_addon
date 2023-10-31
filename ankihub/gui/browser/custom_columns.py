@@ -59,7 +59,6 @@ class AnkiHubIdColumn(CustomColumn):
         key="ankihub_id",
         cards_mode_label="AnkiHub ID",
         notes_mode_label="AnkiHub ID",
-        sorting=BrowserColumns.SORTING_NONE,
         uses_cell_font=False,
         alignment=BrowserColumns.ALIGNMENT_CENTER,
     )
@@ -82,7 +81,8 @@ class EditedAfterSyncColumn(CustomColumn):
         key="edited_after_sync",
         cards_mode_label="AnkiHub: Modified After Sync",
         notes_mode_label="AnkiHub: Modified After Sync",
-        sorting=BrowserColumns.SORTING_DESCENDING,
+        sorting_notes=BrowserColumns.SORTING_DESCENDING,
+        sorting_cards=BrowserColumns.SORTING_DESCENDING,
         uses_cell_font=False,
         alignment=BrowserColumns.ALIGNMENT_CENTER,
     )
@@ -120,7 +120,6 @@ class UpdatedSinceLastReviewColumn(CustomColumn):
         key="updated_since_last_review",
         cards_mode_label="AnkiHub: Updated Since Last Review",
         notes_mode_label="AnkiHub: Updated Since Last Review",
-        sorting=BrowserColumns.SORTING_NONE,
         uses_cell_font=False,
         alignment=BrowserColumns.ALIGNMENT_CENTER,
     )
