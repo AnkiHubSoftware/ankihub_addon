@@ -20,7 +20,9 @@ from aqt.qt import QDialogButtonBox
 from pytest import MonkeyPatch, fixture
 from pytest_anki import AnkiSession
 from pytestqt.qtbot import QtBot  # type: ignore
-from requests import Response  # type: ignore
+from requests import Response
+
+from ankihub.ankihub_client.models import CardReviewData  # type: ignore
 
 from ..factories import DeckMediaFactory, NoteInfoFactory
 from ..fixtures import (  # type: ignore
@@ -40,7 +42,12 @@ from .test_integration import ImportAHNote
 # has to be set before importing ankihub
 os.environ["SKIP_INIT"] = "1"
 
-from ankihub.ankihub_client import AnkiHubHTTPError, Field, SuggestionType
+from ankihub.ankihub_client import (
+    AnkiHubClient,
+    AnkiHubHTTPError,
+    Field,
+    SuggestionType,
+)
 from ankihub.db import attached_ankihub_db
 from ankihub.db.db import _AnkiHubDB
 from ankihub.db.exceptions import IntegrityError
@@ -88,6 +95,7 @@ from ankihub.main.note_conversion import (
 from ankihub.main.review_data import (
     _get_last_review_datetime_for_ah_deck,
     _get_review_count_for_ah_deck_since,
+    send_review_data,
 )
 from ankihub.main.subdecks import (
     SUBDECK_TAG,
@@ -1816,3 +1824,44 @@ class TestGetLastReviewTimeForAHDeck:
                 assert_datetime_equal_ignore_milliseconds(
                     _get_last_review_datetime_for_ah_deck(ah_did=ah_did_1), now
                 )
+            assert_datetime_equal_ignore_milliseconds(
+                _get_last_review_datetime_for_ah_deck(ah_did=ah_did_1), now
+            )
+
+
+class TestSendReviewData:
+    def test_with_two_reviews_for_one_deck(
+        self,
+        anki_session_with_addon_data: AnkiSession,
+        install_ah_deck: InstallAHDeck,
+        import_ah_note: ImportAHNote,
+        mock_function: MockFunction,
+    ) -> None:
+        with anki_session_with_addon_data.profile_loaded():
+            ah_did = install_ah_deck()
+            note_info_1 = import_ah_note(ah_did=ah_did)
+            note_info_2 = import_ah_note(ah_did=ah_did)
+
+            first_review_time = datetime.now()
+            record_review_for_anki_nid(NoteId(note_info_1.anki_nid), first_review_time)
+
+            second_review_time = first_review_time + timedelta(days=1)
+            record_review_for_anki_nid(NoteId(note_info_2.anki_nid), second_review_time)
+
+            send_card_review_data_mock = mock_function(
+                AnkiHubClient, "send_card_review_data"
+            )
+
+            send_review_data()
+
+            # Assert that the correct data was passed to the client method.
+            send_card_review_data_mock.assert_called_once()
+
+            card_review_data: CardReviewData = send_card_review_data_mock.call_args[0][
+                0
+            ][0]
+            assert card_review_data.ah_did == ah_did
+            assert card_review_data.total_card_reviews_last_30_days == 2
+            assert_datetime_equal_ignore_milliseconds(
+                card_review_data.last_card_review_at, second_review_time
+            )
