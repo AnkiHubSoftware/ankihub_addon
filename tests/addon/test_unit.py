@@ -24,7 +24,7 @@ from requests import Response
 
 from ankihub.ankihub_client.models import CardReviewData  # type: ignore
 
-from ..factories import DeckMediaFactory, NoteInfoFactory
+from ..factories import DeckFactory, DeckMediaFactory, NoteInfoFactory
 from ..fixtures import (  # type: ignore
     ImportAHNoteType,
     InstallAHDeck,
@@ -1569,18 +1569,42 @@ class TestRetainNidsWithAHNoteType:
             assert retain_nids_with_ah_note_type(nids) == [nid_1, nid_2]
 
 
-@pytest.mark.parametrize(
-    "creating_deck_fails",
-    [True, False],
-)
+class MockUIForCreateCollaborativeDeck(Protocol):
+    def __call__(self, deck_name: str) -> None:
+        ...
+
+
+@pytest.fixture
+def mock_ui_for_create_collaborative_deck(
+    mock_function: MockFunction,
+) -> MockUIForCreateCollaborativeDeck:
+    """Mock the UI interaction for creating a collaborative deck.
+    The deck_name determines which deck will be chosen for the upload."""
+
+    def mock_ui_interaction_inner(deck_name) -> None:
+        study_deck_mock = Mock
+        study_deck_mock.name = deck_name
+        mock_function(deck_creation, "StudyDeck", return_value=study_deck_mock)
+        mock_function(deck_creation, "ask_user", return_value=True)
+        mock_function(deck_creation, "showInfo")
+        mock_function(DeckCreationConfirmationDialog, "run", return_value=True)
+
+    return mock_ui_interaction_inner
+
+
 class TestCreateCollaborativeDeck:
     @pytest.mark.qt_no_exception_capture
+    @pytest.mark.parametrize(
+        "creating_deck_fails",
+        [True, False],
+    )
     def test_basic(
         self,
         anki_session_with_addon_data: AnkiSession,
         mock_function: MockFunction,
         next_deterministic_uuid: Callable[[], uuid.UUID],
         qtbot: QtBot,
+        mock_ui_for_create_collaborative_deck: MockUIForCreateCollaborativeDeck,
         creating_deck_fails: bool,
     ) -> None:
         with anki_session_with_addon_data.profile_loaded():
@@ -1589,14 +1613,9 @@ class TestCreateCollaborativeDeck:
             anki_did = create_anki_deck(deck_name=deck_name)
             add_basic_anki_note_to_deck(anki_did)
 
-            # Mock all the UI interactions.
-            mock_function(DeckCreationConfirmationDialog, "run", return_value=True)
+            mock_ui_for_create_collaborative_deck(deck_name)
 
-            study_deck_mock = Mock
-            study_deck_mock.name = deck_name
-            mock_function(deck_creation, "StudyDeck", return_value=study_deck_mock)
-
-            mock_function(deck_creation, "ask_user", return_value=True)
+            mock_function(AnkiHubClient, "get_owned_decks", [])
 
             def raise_exception(*args, **kwargs) -> None:
                 raise Exception("test")
@@ -1640,6 +1659,43 @@ class TestCreateCollaborativeDeck:
 
                 get_media_names_from_notes_data_mock.assert_called_once_with(notes_data)
                 start_media_upload_mock.assert_called_once()
+
+    def test_with_deck_name_existing(
+        self,
+        anki_session_with_addon_data: AnkiSession,
+        mock_function: MockFunction,
+        mock_ui_for_create_collaborative_deck: MockUIForCreateCollaborativeDeck,
+    ):
+        """When the user already has a deck with the same name, the deck creation is cancelled and
+        a message is shown to the user."""
+        with anki_session_with_addon_data.profile_loaded():
+            # Setup Anki deck with a note.
+            deck_name = "test"
+            anki_did = create_anki_deck(deck_name=deck_name)
+            add_basic_anki_note_to_deck(anki_did)
+
+            mock_ui_for_create_collaborative_deck(deck_name)
+
+            mock_function(
+                AnkiHubClient,
+                "get_owned_decks",
+                return_value=[
+                    DeckFactory(
+                        name=deck_name,
+                    )
+                ],
+            )
+
+            showInfo_mock = mock_function(deck_creation, "showInfo")
+            create_ankihub_deck_mock = mock_function(
+                deck_creation,
+                "create_ankihub_deck",
+            )
+
+            create_collaborative_deck()
+
+            showInfo_mock.assert_called_once()
+            create_ankihub_deck_mock.assert_not_called()
 
 
 class TestGetReviewCountForAHDeckSince:
@@ -1824,9 +1880,6 @@ class TestGetLastReviewTimeForAHDeck:
                 assert_datetime_equal_ignore_milliseconds(
                     _get_last_review_datetime_for_ah_deck(ah_did=ah_did_1), now
                 )
-            assert_datetime_equal_ignore_milliseconds(
-                _get_last_review_datetime_for_ah_deck(ah_did=ah_did_1), now
-            )
 
 
 class TestSendReviewData:

@@ -55,6 +55,7 @@ from .models import (
     NoteSuggestion,
     OptionalTagSuggestion,
     TagGroupValidationResponse,
+    UserDeckRelation,
     note_info_for_upload,
 )
 
@@ -585,6 +586,13 @@ class AnkiHubClient:
             raise AnkiHubHTTPError(response)
 
         return [Deck.from_dict(deck) for deck in response.json()]
+
+    def get_owned_decks(self) -> List[Deck]:
+        decks = self.get_decks_with_user_relation()
+        result = [
+            deck for deck in decks if deck.user_relation == UserDeckRelation.OWNER
+        ]
+        return result
 
     def subscribe_to_deck(self, deck_id: uuid.UUID) -> None:
         response = self._send_request(
