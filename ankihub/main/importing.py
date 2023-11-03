@@ -339,24 +339,6 @@ class AnkiHubImporter:
 
         return created_did
 
-    def _update_or_create_note(
-        self,
-        note_data: NoteInfo,
-        protected_fields: Dict[int, List[str]],
-        protected_tags: List[str],
-        anki_did: Optional[DeckId] = None,
-    ) -> Note:
-        LOGGER.debug(
-            f"Trying to update or create note: {note_data.anki_nid=}, {note_data.ah_nid=}"
-        )
-        note = self._update_or_create_note_inner(
-            note_data,
-            protected_fields=protected_fields,
-            protected_tags=protected_tags,
-            anki_did=anki_did,
-        )
-        return note
-
     def _cards_to_suspend_for_note(
         self,
         note: Note,
@@ -402,7 +384,7 @@ class AnkiHubImporter:
             else:
                 return []
 
-    def _update_or_create_note_inner(
+    def _update_or_create_note(
         self,
         note_data: NoteInfo,
         protected_fields: Dict[int, List[str]],
