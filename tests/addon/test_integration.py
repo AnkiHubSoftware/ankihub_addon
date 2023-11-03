@@ -2078,7 +2078,7 @@ def prepare_note(
     )
 
     ankihub_importer = AnkiHubImporter()
-    result = ankihub_importer.prepare_note(
+    result = ankihub_importer._prepare_note_inner(
         note,
         note_data=note_data,
         protected_fields=protected_fields,

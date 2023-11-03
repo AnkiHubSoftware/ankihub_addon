@@ -4,6 +4,7 @@ create/update decks and note types in the Anki collection if necessary"""
 import textwrap
 import uuid
 from dataclasses import dataclass
+from enum import Enum
 from pprint import pformat
 from typing import Collection, Dict, Iterable, List, Optional, Sequence, Set, Tuple
 
@@ -38,6 +39,12 @@ from .utils import (
 )
 
 
+class NoteOperation(Enum):
+    CREATE = "create"
+    UPDATE = "update"
+    NO_CHANGES = "no changes"
+
+
 @dataclass(frozen=True)
 class AnkiHubImportResult:
     ankihub_did: uuid.UUID
@@ -56,9 +63,6 @@ class AnkiHubImporter:
         self._created_nids: List[NoteId] = []
         self._updated_nids: List[NoteId] = []
         self._skipped_nids: List[NoteId] = []
-
-        self._notes_to_create_by_ah_nid: Dict[uuid.UUID, Note] = {}
-        self._notes_to_update: List[Note] = []
 
         self._ankihub_did: Optional[uuid.UUID] = None
         self._is_first_import_of_deck: Optional[bool] = None
@@ -107,9 +111,6 @@ class AnkiHubImporter:
         self._created_nids = []
         self._updated_nids = []
         self._skipped_nids = []
-
-        self._notes_to_create_by_ah_nid = {}
-        self._notes_to_update = []
 
         self._ankihub_did = ankihub_did
         self._is_first_import_of_deck = is_first_import_of_deck
@@ -173,42 +174,55 @@ class AnkiHubImporter:
     ) -> Set[DeckId]:
         # Returns set of ids of decks notes were imported into
 
-        upserted_notes, skipped_notes = ankihub_db.upsert_notes_data(
+        upserted_notes_data, skipped_notes_data = ankihub_db.upsert_notes_data(
             ankihub_did=self._ankihub_did, notes_data=notes_data
         )
-        self._skipped_nids = [NoteId(note_data.anki_nid) for note_data in skipped_notes]
+        self._skipped_nids = [
+            NoteId(note_data.anki_nid) for note_data in skipped_notes_data
+        ]
 
-        _reset_note_types_of_notes_based_on_notes_data(upserted_notes)
+        _reset_note_types_of_notes_based_on_notes_data(upserted_notes_data)
 
         notes: List[Note] = []
-        for note_data in upserted_notes:
-            note = self._update_or_create_note(
+        notes_to_create_by_ah_nid: Dict[uuid.UUID, Note] = {}
+        notes_to_update: List[Note] = []
+        for note_data in upserted_notes_data:
+            note, operation = self._prepare_note(
                 note_data=note_data,
-                anki_did=self._local_did,
                 protected_fields=self._protected_fields,
                 protected_tags=self._protected_tags,
             )
             notes.append(note)
 
-        cards_by_anki_nid_before: Dict[NoteId, List[Card]] = {}
-        for note in self._notes_to_update:
-            cards_by_anki_nid_before[NoteId(note.id)] = note.cards()
+            if operation == NoteOperation.CREATE:
+                notes_to_create_by_ah_nid[note_data.ah_nid] = note
+            elif operation == NoteOperation.UPDATE:
+                notes_to_update.append(note)
 
-        if self._notes_to_update:
-            aqt.mw.col.update_notes(self._notes_to_update)
-            self._updated_nids = [note.id for note in self._notes_to_update]
+        cards_by_anki_nid_before_import: Dict[NoteId, List[Card]] = {}
+        for note in notes_to_update:
+            cards_by_anki_nid_before_import[NoteId(note.id)] = note.cards()
 
-        if self._notes_to_create_by_ah_nid:
+        if notes_to_update:
+            aqt.mw.col.update_notes(notes_to_update)
+            self._updated_nids = [note.id for note in notes_to_update]
+
+        if notes_to_create_by_ah_nid:
             self._create_notes(
-                notes_to_create_by_ah_nid=self._notes_to_create_by_ah_nid,
-                notes_data=upserted_notes,
+                notes_to_create_by_ah_nid=notes_to_create_by_ah_nid,
+                notes_data=upserted_notes_data,
             )
+            self._created_nids = [
+                note.id for note in notes_to_create_by_ah_nid.values()
+            ]
 
-        ankihub_db.transfer_mod_values_from_anki_db(notes_data=upserted_notes)
+        ankihub_db.transfer_mod_values_from_anki_db(notes_data=upserted_notes_data)
+
+        upserted_notes = list(notes_to_create_by_ah_nid.values()) + notes_to_update
 
         self._suspend_cards(
-            notes=notes,
-            cards_by_anki_nid_before=cards_by_anki_nid_before,
+            notes=upserted_notes,
+            cards_by_anki_nid_before=cards_by_anki_nid_before_import,
             suspend_new_cards_of_new_notes=suspend_new_cards_of_new_notes,
             suspend_new_cards_of_existing_notes=suspend_new_cards_of_existing_notes,
         )
@@ -302,10 +316,6 @@ class AnkiHubImporter:
         for ah_nid, note in notes_to_create_by_ah_nid.items():
             note.id = NoteId(notes_data_by_ah_nid[ah_nid].anki_nid)
 
-        self._created_nids = [
-            NoteId(note_info.anki_nid) for note_info in notes_data_filtered
-        ]
-
     def _cleanup_first_time_deck_import(
         self, dids_cards_were_imported_to: Iterable[DeckId], created_did: DeckId
     ) -> DeckId:
@@ -384,43 +394,39 @@ class AnkiHubImporter:
             else:
                 return []
 
-    def _update_or_create_note(
+    def _prepare_note(
         self,
         note_data: NoteInfo,
         protected_fields: Dict[int, List[str]],
         protected_tags: List[str],
-        anki_did: Optional[DeckId],  # only relevant for newly created notes
-    ) -> Note:
+    ) -> Tuple[Note, NoteOperation]:
         try:
             note = aqt.mw.col.get_note(id=NoteId(note_data.anki_nid))
-            changed = self.prepare_note(
+            changed = self._prepare_note_inner(
                 note,
                 note_data,
                 protected_fields,
                 protected_tags,
             )
             if changed:
-                self._notes_to_update.append(note)
                 LOGGER.debug(f"Updated note: {note_data.anki_nid=}")
+                return note, NoteOperation.UPDATE
             else:
                 LOGGER.debug(f"No changes, skipping {note_data.anki_nid=}")
+                return note, NoteOperation.NO_CHANGES
         except NotFoundError:
-            if anki_did is None:
-                raise ValueError("anki_did must be set for new notes")
-
             note_type = aqt.mw.col.models.get(NotetypeId(note_data.mid))
             note = aqt.mw.col.new_note(note_type)
-            self.prepare_note(
+            self._prepare_note_inner(
                 note,
                 note_data,
                 protected_fields,
                 protected_tags,
             )
             LOGGER.debug(f"Created note: {note_data.anki_nid=}")
-            self._notes_to_create_by_ah_nid[note_data.ah_nid] = note
-        return note
+            return note, NoteOperation.CREATE
 
-    def prepare_note(
+    def _prepare_note_inner(
         self,
         note: Note,
         note_data: NoteInfo,
