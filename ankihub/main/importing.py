@@ -31,6 +31,7 @@ from .subdecks import build_subdecks_and_move_cards_to_them
 from .utils import (
     create_deck_with_id,
     create_note_type_with_id,
+    dids_of_notes,
     get_unique_deck_name,
     lowest_level_common_ancestor_did,
     modify_note_type_templates,
@@ -173,8 +174,11 @@ class AnkiHubImporter:
         suspend_new_cards_of_new_notes: bool,
         suspend_new_cards_of_existing_notes: SuspendNewCardsOfExistingNotes,
     ) -> Set[DeckId]:
-        # Returns set of ids of decks notes were imported into
+        """Import notes into Anki and AnkiHub DB. Suspend cards in Anki DB if needed.
 
+        Returns the Anki deck ids the (cards of the) notes belong to."""
+
+        # Upsert notes into AnkiHub DB.
         upserted_notes_data, skipped_notes_data = ankihub_db.upsert_notes_data(
             ankihub_did=self._ankihub_did, notes_data=notes_data
         )
@@ -182,15 +186,14 @@ class AnkiHubImporter:
             NoteId(note_data.anki_nid) for note_data in skipped_notes_data
         ]
 
+        # Upsert notes into Anki DB and suspend cards if needed.
         _reset_note_types_of_notes_based_on_notes_data(upserted_notes_data)
 
         notes, notes_to_create_by_ah_nid, notes_to_update = self._prepare_notes(
             notes_data=upserted_notes_data
         )
 
-        cards_by_anki_nid_before_import: Dict[NoteId, List[Card]] = {}
-        for note in notes_to_update:
-            cards_by_anki_nid_before_import[NoteId(note.id)] = note.cards()
+        cards_by_anki_nid_before_import = cards_by_anki_nid_dict(notes_to_update)
 
         self._update_notes(notes_to_update)
         self._create_notes(notes_to_create_by_ah_nid, notes_data=upserted_notes_data)
@@ -198,7 +201,6 @@ class AnkiHubImporter:
         ankihub_db.transfer_mod_values_from_anki_db(notes_data=upserted_notes_data)
 
         upserted_notes = list(notes_to_create_by_ah_nid.values()) + notes_to_update
-
         self._suspend_cards(
             notes=upserted_notes,
             cards_by_anki_nid_before=cards_by_anki_nid_before_import,
@@ -206,11 +208,12 @@ class AnkiHubImporter:
             suspend_new_cards_of_existing_notes=suspend_new_cards_of_existing_notes,
         )
 
-        dids: Set[DeckId] = set()  # set of ids of decks notes were imported into
-        for note in notes:
-            dids_for_note = set(c.did for c in note.cards())
-            dids = dids | dids_for_note
+        self._log_note_import_summary()
 
+        dids = dids_of_notes(notes)
+        return dids
+
+    def _log_note_import_summary(self) -> None:
         LOGGER.info(
             f"Created {len(self._created_nids)} notes: {truncated_list(self._created_nids, limit=50)}"
         )
@@ -221,8 +224,6 @@ class AnkiHubImporter:
             f"Skippped {len(self._skipped_nids)} notes: "
             f"{truncated_list(self._skipped_nids, limit=50)}"
         )
-
-        return dids
 
     def _prepare_notes(
         self, notes_data
@@ -720,3 +721,10 @@ def _reset_note_types_of_notes_based_on_notes_data(
         for note_data in notes_data
     ]
     reset_note_types_of_notes(nid_mid_pairs)
+
+
+def cards_by_anki_nid_dict(notes: List[Note]) -> Dict[NoteId, List[Card]]:
+    result = {}
+    for note in notes:
+        result[NoteId(note.id)] = note.cards()
+    return result

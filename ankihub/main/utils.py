@@ -11,7 +11,7 @@ import aqt
 from anki.decks import DeckId
 from anki.errors import NotFoundError
 from anki.models import ChangeNotetypeRequest, NoteType, NotetypeDict, NotetypeId
-from anki.notes import NoteId
+from anki.notes import Note, NoteId
 from anki.utils import checksum, ids2str
 
 from .. import LOGGER, settings
@@ -64,6 +64,14 @@ def lowest_level_common_ancestor_deck_name(deck_names: Iterable[str]) -> Optiona
         return None
     else:
         return result
+
+
+def dids_of_notes(notes: List[Note]) -> Set[DeckId]:
+    result: Set[DeckId] = set()
+    for note in notes:
+        dids_for_note = set(c.did for c in note.cards())
+        result |= dids_for_note
+    return result
 
 
 def get_unique_deck_name(deck_name: str) -> str:
