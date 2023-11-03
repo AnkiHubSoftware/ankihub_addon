@@ -297,10 +297,10 @@ class AnkiHubImporter:
         notes_to_create_by_ah_nid: Dict[uuid.UUID, Note],
         notes_data: Collection[NoteInfo],
     ) -> None:
-        notes_data_filtered = [
+        note_data_to_create = [
             note_data
             for note_data in notes_data
-            if note_data.ah_nid in notes_to_create_by_ah_nid.keys()
+            if note_data.ah_nid in notes_to_create_by_ah_nid
         ]
 
         # Add the notes to the Anki database.
@@ -312,25 +312,20 @@ class AnkiHubImporter:
 
         # Set the nids in the Anki database to the nids of the notes in the AnkiHub database.
         notes_data_by_ah_nid = {
-            note_data.ah_nid: note_data for note_data in notes_data_filtered
+            note_data.ah_nid: note_data for note_data in note_data_to_create
         }
-        notes_updates = " ".join(
-            f"WHEN {note.id} THEN {notes_data_by_ah_nid[ah_nid].anki_nid}"
-            for ah_nid, note in notes_to_create_by_ah_nid.items()
-        )
-        cards_updates = " ".join(
+        case_conditions = " ".join(
             f"WHEN {note.id} THEN {notes_data_by_ah_nid[ah_nid].anki_nid}"
             for ah_nid, note in notes_to_create_by_ah_nid.items()
         )
         anki_nids = ", ".join(
             str(note.id) for note in notes_to_create_by_ah_nid.values()
         )
-
         aqt.mw.col.db.execute(
-            f"UPDATE notes SET id = CASE id {notes_updates} END WHERE id IN ({anki_nids});"
+            f"UPDATE notes SET id = CASE id {case_conditions} END WHERE id IN ({anki_nids});"
         )
         aqt.mw.col.db.execute(
-            f"UPDATE cards SET nid = CASE nid {cards_updates} END WHERE nid IN ({anki_nids});"
+            f"UPDATE cards SET nid = CASE nid {case_conditions} END WHERE nid IN ({anki_nids});"
         )
 
         # Update the note ids of the Note objects.
