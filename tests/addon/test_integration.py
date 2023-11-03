@@ -1690,6 +1690,7 @@ class TestAnkiHubImporterSuspendNewCardsOfExistingNotesOption:
         anki_session_with_addon_data: AnkiSession,
         next_deterministic_uuid: Callable[[], uuid.UUID],
         install_ah_deck: InstallAHDeck,
+        import_ah_note: ImportAHNote,
         option_value: SuspendNewCardsOfExistingNotes,
         existing_card_suspended: bool,
         expected_new_card_suspended: bool,
@@ -1702,9 +1703,11 @@ class TestAnkiHubImporterSuspendNewCardsOfExistingNotesOption:
 
             ah_nid = next_deterministic_uuid()
             old_card, new_card = self._create_and_update_note_with_new_card(
-                existing_card_suspended=existing_card_suspended,
+                ah_did=ah_did,
                 ah_nid=ah_nid,
+                existing_card_suspended=existing_card_suspended,
                 suspend_new_cards_of_existing_notes=option_value,
+                import_ah_note=import_ah_note,
             )
 
             # Assert the old card has the same suspension state as before
@@ -1719,13 +1722,15 @@ class TestAnkiHubImporterSuspendNewCardsOfExistingNotesOption:
 
     def _create_and_update_note_with_new_card(
         self,
-        existing_card_suspended: bool,
+        ah_did: uuid.UUID,
         ah_nid: uuid.UUID,
+        existing_card_suspended: bool,
         suspend_new_cards_of_existing_notes: SuspendNewCardsOfExistingNotes,
+        import_ah_note: ImportAHNote,
     ) -> Tuple[Card, Card]:
         # Create a cloze note with one card, optionally suspend the existing card,
-        # then update the note using AnkiHubImporter adding a new cloze
-        # which results in a new card getting created for the added cloze.
+        # then update the note, adding a new cloze, which results in a new card
+        # getting created for the added cloze.
         # Return the old and new card.
 
         ankihub_cloze = create_or_get_ah_version_of_note_type(
@@ -1750,15 +1755,13 @@ class TestAnkiHubImporterSuspendNewCardsOfExistingNotesOption:
             mid=ankihub_cloze["id"],
         )
 
-        importer = AnkiHubImporter()
-        updated_note = importer._update_or_create_note(
-            note_data=note_data,
-            anki_did=DeckId(0),
-            protected_fields={},
-            protected_tags=[],
-            suspend_new_cards_of_new_notes=False,
-            suspend_new_cards_of_existing_notes=suspend_new_cards_of_existing_notes,
+        config.set_suspend_new_cards_of_existing_notes(
+            ah_did, suspend_new_cards_of_existing_notes
         )
+        import_ah_note(note_data=note_data, mid=ankihub_cloze["id"], ah_did=ah_did)
+
+        updated_note = aqt.mw.col.get_note(note.id)
+
         assert len(updated_note.cards()) == 2  # one existing and one new card
 
         # The id is a timestamp, so the old card has a lower id than the new card
