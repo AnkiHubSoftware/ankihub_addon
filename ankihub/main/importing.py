@@ -183,38 +183,16 @@ class AnkiHubImporter:
 
         _reset_note_types_of_notes_based_on_notes_data(upserted_notes_data)
 
-        notes: List[Note] = []
-        notes_to_create_by_ah_nid: Dict[uuid.UUID, Note] = {}
-        notes_to_update: List[Note] = []
-        for note_data in upserted_notes_data:
-            note, operation = self._prepare_note(
-                note_data=note_data,
-                protected_fields=self._protected_fields,
-                protected_tags=self._protected_tags,
-            )
-            notes.append(note)
-
-            if operation == NoteOperation.CREATE:
-                notes_to_create_by_ah_nid[note_data.ah_nid] = note
-            elif operation == NoteOperation.UPDATE:
-                notes_to_update.append(note)
+        notes, notes_to_create_by_ah_nid, notes_to_update = self._prepare_notes(
+            notes_data=upserted_notes_data
+        )
 
         cards_by_anki_nid_before_import: Dict[NoteId, List[Card]] = {}
         for note in notes_to_update:
             cards_by_anki_nid_before_import[NoteId(note.id)] = note.cards()
 
-        if notes_to_update:
-            aqt.mw.col.update_notes(notes_to_update)
-            self._updated_nids = [note.id for note in notes_to_update]
-
-        if notes_to_create_by_ah_nid:
-            self._create_notes(
-                notes_to_create_by_ah_nid=notes_to_create_by_ah_nid,
-                notes_data=upserted_notes_data,
-            )
-            self._created_nids = [
-                note.id for note in notes_to_create_by_ah_nid.values()
-            ]
+        self._update_notes(notes_to_update)
+        self._create_notes(notes_to_create_by_ah_nid, notes_data=upserted_notes_data)
 
         ankihub_db.transfer_mod_values_from_anki_db(notes_data=upserted_notes_data)
 
@@ -245,6 +223,48 @@ class AnkiHubImporter:
 
         return dids
 
+    def _prepare_notes(
+        self, notes_data
+    ) -> Tuple[List[Note], Dict[uuid.UUID, Note], List[Note]]:
+        notes: List[Note] = []
+        notes_to_create_by_ah_nid: Dict[uuid.UUID, Note] = {}
+        notes_to_update: List[Note] = []
+        for note_data in notes_data:
+            note, operation = self._prepare_note(
+                note_data=note_data,
+                protected_fields=self._protected_fields,
+                protected_tags=self._protected_tags,
+            )
+            notes.append(note)
+
+            if operation == NoteOperation.CREATE:
+                notes_to_create_by_ah_nid[note_data.ah_nid] = note
+            elif operation == NoteOperation.UPDATE:
+                notes_to_update.append(note)
+
+        return notes, notes_to_create_by_ah_nid, notes_to_update
+
+    def _update_notes(self, notes_to_update: List[Note]) -> None:
+        if not notes_to_update:
+            return
+
+        aqt.mw.col.update_notes(notes_to_update)
+        self._updated_nids = [note.id for note in notes_to_update]
+
+    def _create_notes(
+        self,
+        notes_to_create_by_ah_nid: Dict[uuid.UUID, Note],
+        notes_data: Collection[NoteInfo],
+    ) -> None:
+        if not notes_to_create_by_ah_nid:
+            return
+
+        self._create_notes_inner(
+            notes_to_create_by_ah_nid=notes_to_create_by_ah_nid,
+            notes_data=notes_data,
+        )
+        self._created_nids = [note.id for note in notes_to_create_by_ah_nid.values()]
+
     def _suspend_cards(
         self,
         notes: Collection[Note],
@@ -271,7 +291,7 @@ class AnkiHubImporter:
             f"Suspended {len(cards_to_suspend)} cards: {truncated_list(cards_to_suspend, limit=50)}"
         )
 
-    def _create_notes(
+    def _create_notes_inner(
         self,
         notes_to_create_by_ah_nid: Dict[uuid.UUID, Note],
         notes_data: Collection[NoteInfo],
