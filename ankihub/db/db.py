@@ -422,7 +422,7 @@ class _AnkiHubDB:
 
     def anki_nid_to_ah_did_dict(
         self, anki_nids: Iterable[NoteId]
-    ) -> Dict[NoteId, Optional[uuid.UUID]]:
+    ) -> Dict[NoteId, uuid.UUID]:
         """Returns a dict mapping anki nids to the ankihub did of the deck the note is in.
         Not found nids are omitted from the dict."""
         result = self.dict(
@@ -720,12 +720,13 @@ class _AnkiHubDB:
         return result
 
     def is_ankihub_note_type(self, anki_note_type_id: NotetypeId) -> bool:
-        result = self.scalar(
+        result_str = self.scalar(
             """
             SELECT EXISTS(SELECT 1 FROM notetypes WHERE anki_note_type_id = ?)
             """,
             anki_note_type_id,
         )
+        result = bool(result_str)
         return result
 
     def note_types_for_ankihub_deck(self, ankihub_did: uuid.UUID) -> List[NotetypeId]:
