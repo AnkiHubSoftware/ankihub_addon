@@ -38,7 +38,7 @@ jobs:
 
       - name: Replace Anki version
         if: ${{ matrix.replace_anki_version }}
-        run: pip install aqt==${{ matrix.anki_version }}
+        run: pip install "aqt==${{ matrix.anki_version }}"
 
       - name: Run pytest with coverage
         run: |
