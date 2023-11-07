@@ -1,6 +1,7 @@
 """Log or report extra information to sentry in certain situations to help debug issues."""
 import traceback
 
+from anki.dbproxy import DBProxy
 from anki.hooks import wrap
 from aqt.main import AnkiQt
 
