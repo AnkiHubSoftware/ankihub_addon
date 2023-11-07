@@ -1,2 +1,6 @@
-anki==2.1.56
-aqt[qt5]==2.1.56
+anki==23.10
+aqt==23.10
+
+PyQt5==5.15.5
+PyQtWebEngine==5.15.6
+PyQtWebEngine-Qt5==5.15.2

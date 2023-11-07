@@ -11,6 +11,7 @@ from aqt.browser import Browser, CellRow, Column, ItemId
 
 from ...db import ankihub_db
 from ...main.utils import note_types_with_ankihub_id_field
+from ...settings import ANKI_MINOR
 
 
 class CustomColumn:
@@ -59,7 +60,6 @@ class AnkiHubIdColumn(CustomColumn):
         key="ankihub_id",
         cards_mode_label="AnkiHub ID",
         notes_mode_label="AnkiHub ID",
-        sorting=BrowserColumns.SORTING_NONE,
         uses_cell_font=False,
         alignment=BrowserColumns.ALIGNMENT_CENTER,
     )
@@ -78,14 +78,25 @@ class AnkiHubIdColumn(CustomColumn):
 
 
 class EditedAfterSyncColumn(CustomColumn):
-    builtin_column = Column(
-        key="edited_after_sync",
-        cards_mode_label="AnkiHub: Modified After Sync",
-        notes_mode_label="AnkiHub: Modified After Sync",
-        sorting=BrowserColumns.SORTING_DESCENDING,
-        uses_cell_font=False,
-        alignment=BrowserColumns.ALIGNMENT_CENTER,
-    )
+    def __init__(self) -> None:
+        if ANKI_MINOR >= 231000:
+            sorting_args = {
+                "sorting_cards": BrowserColumns.SORTING_DESCENDING,
+                "sorting_notes": BrowserColumns.SORTING_DESCENDING,
+            }
+        else:
+            sorting_args = {
+                "sorting": BrowserColumns.SORTING_DESCENDING,
+            }
+
+        self.builtin_column = Column(
+            key="edited_after_sync",
+            cards_mode_label="AnkiHub: Modified After Sync",
+            notes_mode_label="AnkiHub: Modified After Sync",
+            **sorting_args,  # type: ignore
+            uses_cell_font=False,
+            alignment=BrowserColumns.ALIGNMENT_CENTER,
+        )
 
     def _display_value(
         self,
@@ -120,7 +131,6 @@ class UpdatedSinceLastReviewColumn(CustomColumn):
         key="updated_since_last_review",
         cards_mode_label="AnkiHub: Updated Since Last Review",
         notes_mode_label="AnkiHub: Updated Since Last Review",
-        sorting=BrowserColumns.SORTING_NONE,
         uses_cell_font=False,
         alignment=BrowserColumns.ALIGNMENT_CENTER,
     )

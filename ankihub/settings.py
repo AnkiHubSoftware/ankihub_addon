@@ -19,8 +19,9 @@ from shutil import copyfile, rmtree
 from typing import Any, Callable, Dict, List, Optional
 
 import aqt
-from anki.buildinfo import version as ANKI_VERSION
+from anki import buildinfo
 from anki.decks import DeckId
+from anki.utils import point_version
 from aqt.utils import askUser, showInfo
 from mashumaro import field_options
 from mashumaro.mixins.json import DataClassJSONMixin
@@ -578,7 +579,9 @@ USER_EMAIL_SLUG = "user_email"
 
 USER_SUPPORT_EMAIL_SLUG = "support@ankihub.net"
 
-ANKI_MINOR = int(ANKI_VERSION.split(".")[2])
+
+ANKI_VERSION = buildinfo.version
+ANKI_MINOR = point_version()
 
 USER_FILES_PATH = Path(__file__).parent / "user_files"
 

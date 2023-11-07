@@ -32,6 +32,7 @@ from anki.consts import QUEUE_TYPE_NEW, QUEUE_TYPE_SUSPENDED
 from anki.decks import DeckId, FilteredDeckConfig
 from anki.models import NotetypeDict, NotetypeId
 from anki.notes import Note, NoteId
+from anki.utils import point_version
 from aqt import AnkiQt, dialogs, gui_hooks
 from aqt.addcards import AddCards
 from aqt.addons import InstallOk
@@ -4099,9 +4100,11 @@ class TestDebugModule:
 
             _setup_logging_for_db_begin()
 
-            mw.col.db.begin()
+            if point_version() <= 66:
+                # `db.begin` was removed in newer Anki versions
+                mw.col.db.begin()  # type: ignore
 
-            db_begin_mock.assert_called_once()
+                db_begin_mock.assert_called_once()
 
     def test_log_stack(self):
         # Test that the _log_stack function does not throw an exception when called.
