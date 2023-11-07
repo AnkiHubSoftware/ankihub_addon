@@ -6,6 +6,7 @@ from anki.hooks import wrap
 from aqt.main import AnkiQt
 
 from . import LOGGER
+from .settings import ANKI_MINOR
 
 
 def setup():
@@ -31,8 +32,10 @@ def _setup_logging_for_sync_collection_and_media():
 def _setup_logging_for_db_begin():
     # Log stack trace when db.begin is called to debug the
     # "Cannot start transaction within transaction" error.
-    DBProxy.begin = wrap(  # type: ignore
-        DBProxy.begin,
-        lambda *args, **kwargs: _log_stack("db.begin"),
-        "before",
-    )
+    if ANKI_MINOR <= 66:
+        # db.begin was removed in Ani 23.10
+        DBProxy.begin = wrap(  # type: ignore
+            DBProxy.begin,
+            lambda *args, **kwargs: _log_stack("db.begin"),
+            "before",
+        )
