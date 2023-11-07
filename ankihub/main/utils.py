@@ -11,7 +11,7 @@ import aqt
 from anki.decks import DeckId
 from anki.errors import NotFoundError
 from anki.models import ChangeNotetypeRequest, NoteType, NotetypeDict, NotetypeId
-from anki.notes import Note, NoteId
+from anki.notes import NoteId
 from anki.utils import checksum, ids2str
 
 from .. import LOGGER, settings
@@ -80,22 +80,6 @@ def get_unique_deck_name(deck_name: str) -> str:
 
 def highest_level_did(dids: Iterable[DeckId]) -> DeckId:
     return min(dids, key=lambda did: aqt.mw.col.decks.name(did).count("::"))
-
-
-# notes
-def create_note_with_id(note: Note, anki_id: NoteId, anki_did: DeckId) -> Note:
-    """Create a new note, add it to the appropriate deck and override the note id with
-    the note id of the original note creator."""
-    LOGGER.debug(f"Trying to create note: {anki_id=}")
-
-    aqt.mw.col.add_note(note, DeckId(anki_did))
-
-    # Swap out the note id that Anki assigns to the new note with our own id.
-    aqt.mw.col.db.execute(f"UPDATE notes SET id={anki_id} WHERE id={note.id};")
-    aqt.mw.col.db.execute(f"UPDATE cards SET nid={anki_id} WHERE nid={note.id};")
-
-    note.id = anki_id
-    return note
 
 
 def note_types_with_ankihub_id_field() -> List[NotetypeId]:
