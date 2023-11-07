@@ -35,7 +35,7 @@ def _setup_logging_for_db_begin():
     if ANKI_MINOR <= 66:
         # db.begin was removed in Ani 23.10
         DBProxy.begin = wrap(  # type: ignore
-            DBProxy.begin,
+            DBProxy.begin,  # type: ignore
             lambda *args, **kwargs: _log_stack("db.begin"),
             "before",
         )

@@ -93,7 +93,7 @@ class EditedAfterSyncColumn(CustomColumn):
             key="edited_after_sync",
             cards_mode_label="AnkiHub: Modified After Sync",
             notes_mode_label="AnkiHub: Modified After Sync",
-            **sorting_args,
+            **sorting_args,  # type: ignore
             uses_cell_font=False,
             alignment=BrowserColumns.ALIGNMENT_CENTER,
         )

@@ -66,7 +66,7 @@ def detach_ankihub_db_from_anki_db_connection() -> None:
 
         if ANKI_MINOR <= 66:
             # begin a new transaction because Anki expects one to be open
-            aqt.mw.col.db.begin()
+            aqt.mw.col.db.begin()  # type: ignore
 
         LOGGER.info("Began new transaction.")
 
