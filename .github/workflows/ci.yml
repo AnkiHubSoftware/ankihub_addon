@@ -46,6 +46,7 @@ jobs:
           pytest ./tests/addon --performance -k performance -n1 --cov-report=xml --cov-append
 
       - name: Upload coverage
+        if: ${{ !matrix.replace_anki_version }}
         uses: actions/upload-artifact@v2
         with:
           name: coverage_addon
