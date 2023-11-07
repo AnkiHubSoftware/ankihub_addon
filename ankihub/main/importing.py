@@ -208,6 +208,8 @@ class AnkiHubImporter:
             suspend_new_cards_of_existing_notes=suspend_new_cards_of_existing_notes,
         )
 
+        aqt.mw.col.save()
+
         self._log_note_import_summary()
 
         dids = dids_of_notes(notes)
