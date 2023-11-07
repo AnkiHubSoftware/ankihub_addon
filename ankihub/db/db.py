@@ -26,6 +26,7 @@ from .. import LOGGER
 from ..ankihub_client import Field, NoteInfo, suggestion_type_from_str
 from ..ankihub_client.models import DeckMedia
 from ..common_utils import local_media_names_from_html
+from ..settings import ANKI_MINOR
 from .db_utils import DBConnection
 from .exceptions import IntegrityError
 
@@ -63,8 +64,9 @@ def detach_ankihub_db_from_anki_db_connection() -> None:
         except Exception:
             LOGGER.info("Failed to detach AnkiHub database.")
 
-        # begin a new transaction because Anki expects one to be open
-        aqt.mw.col.db.begin()
+        if ANKI_MINOR <= 66:
+            # begin a new transaction because Anki expects one to be open
+            aqt.mw.col.db.begin()
 
         LOGGER.info("Began new transaction.")
 
