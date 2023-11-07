@@ -64,7 +64,8 @@ def detach_ankihub_db_from_anki_db_connection() -> None:
         except Exception:
             LOGGER.info("Failed to detach AnkiHub database.")
 
-        if ANKI_MINOR <= 66:
+        if ANKI_MINOR < 231000:
+            # db.begin was removed in Ani 23.10
             # begin a new transaction because Anki expects one to be open
             aqt.mw.col.db.begin()  # type: ignore
 

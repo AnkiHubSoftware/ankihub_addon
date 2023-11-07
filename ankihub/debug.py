@@ -32,7 +32,7 @@ def _setup_logging_for_sync_collection_and_media():
 def _setup_logging_for_db_begin():
     # Log stack trace when db.begin is called to debug the
     # "Cannot start transaction within transaction" error.
-    if ANKI_MINOR <= 66:
+    if ANKI_MINOR < 231000:
         # db.begin was removed in Ani 23.10
         DBProxy.begin = wrap(  # type: ignore
             DBProxy.begin,  # type: ignore
