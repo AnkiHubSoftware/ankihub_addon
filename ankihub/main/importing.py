@@ -228,8 +228,13 @@ class AnkiHubImporter:
         )
 
     def _prepare_notes(
-        self, notes_data
+        self, notes_data: Collection[NoteInfo]
     ) -> Tuple[List[Note], Dict[uuid.UUID, Note], List[Note]]:
+        """Prepare Anki notes for import into Anki DB. Fields and tags are updated according to the
+        notes_data. The changes are not committed to the Anki DB yet.
+        Returns a tuple of (notes, notes_to_create_by_ah_nid, notes_to_update).
+        `notes` contains all notes, ones that should be created, ones that should be updated and
+        notes without changes."""
         notes: List[Note] = []
         notes_to_create_by_ah_nid: Dict[uuid.UUID, Note] = {}
         notes_to_update: List[Note] = []
