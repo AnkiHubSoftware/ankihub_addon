@@ -96,16 +96,14 @@ def _on_suggestion_button_press(editor: Editor) -> None:
 def _on_suggestion_button_press_inner(editor: Editor) -> None:
     # The command is expected to have been set at this point already, either by
     # fetching the default or by selecting a command from the dropdown menu.
-    command = editor.ankihub_command  # type: ignore
-
     def on_did_add_note(note: anki.notes.Note) -> None:
         open_suggestion_dialog_for_note(note, parent=editor.widget)
         gui_hooks.add_cards_did_add_note.remove(on_did_add_note)
 
-    # If the user is adding a new note, it is not yet in the Anki database.
-    # Therefore, we call add_current_note() to add the note to the database,
+    # If the note is not yet in the database, we need to add it first.
+    # We call add_current_note() to add the note to the database,
     # and then open the suggestion dialog.
-    if command == AnkiHubCommands.NEW.value and editor.addMode:
+    if editor.note.id == 0:
         gui_hooks.add_cards_did_add_note.append(on_did_add_note)
         add_note_window: AddCards = editor.parentWindow  # type: ignore
         add_note_window.add_current_note()
