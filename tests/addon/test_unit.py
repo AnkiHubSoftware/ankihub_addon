@@ -20,9 +20,11 @@ from aqt.qt import QDialogButtonBox
 from pytest import MonkeyPatch, fixture
 from pytest_anki import AnkiSession
 from pytestqt.qtbot import QtBot  # type: ignore
-from requests import Response  # type: ignore
+from requests import Response
 
-from ..factories import DeckMediaFactory, NoteInfoFactory
+from ankihub.ankihub_client.models import CardReviewData  # type: ignore
+
+from ..factories import DeckFactory, DeckMediaFactory, NoteInfoFactory
 from ..fixtures import (  # type: ignore
     ImportAHNoteType,
     InstallAHDeck,
@@ -40,7 +42,13 @@ from .test_integration import ImportAHNote
 # has to be set before importing ankihub
 os.environ["SKIP_INIT"] = "1"
 
-from ankihub.ankihub_client import AnkiHubHTTPError, Field, SuggestionType
+from ankihub.ankihub_client import (
+    AnkiHubClient,
+    AnkiHubHTTPError,
+    Field,
+    SuggestionType,
+)
+from ankihub.db import attached_ankihub_db
 from ankihub.db.db import _AnkiHubDB
 from ankihub.db.exceptions import IntegrityError
 from ankihub.feature_flags import _FeatureFlags, feature_flags
@@ -87,6 +95,7 @@ from ankihub.main.note_conversion import (
 from ankihub.main.review_data import (
     _get_last_review_datetime_for_ah_deck,
     _get_review_count_for_ah_deck_since,
+    send_review_data,
 )
 from ankihub.main.subdecks import (
     SUBDECK_TAG,
@@ -1560,18 +1569,42 @@ class TestRetainNidsWithAHNoteType:
             assert retain_nids_with_ah_note_type(nids) == [nid_1, nid_2]
 
 
-@pytest.mark.parametrize(
-    "creating_deck_fails",
-    [True, False],
-)
+class MockUIForCreateCollaborativeDeck(Protocol):
+    def __call__(self, deck_name: str) -> None:
+        ...
+
+
+@pytest.fixture
+def mock_ui_for_create_collaborative_deck(
+    mock_function: MockFunction,
+) -> MockUIForCreateCollaborativeDeck:
+    """Mock the UI interaction for creating a collaborative deck.
+    The deck_name determines which deck will be chosen for the upload."""
+
+    def mock_ui_interaction_inner(deck_name) -> None:
+        study_deck_mock = Mock
+        study_deck_mock.name = deck_name
+        mock_function(deck_creation, "StudyDeck", return_value=study_deck_mock)
+        mock_function(deck_creation, "ask_user", return_value=True)
+        mock_function(deck_creation, "showInfo")
+        mock_function(DeckCreationConfirmationDialog, "run", return_value=True)
+
+    return mock_ui_interaction_inner
+
+
 class TestCreateCollaborativeDeck:
     @pytest.mark.qt_no_exception_capture
+    @pytest.mark.parametrize(
+        "creating_deck_fails",
+        [True, False],
+    )
     def test_basic(
         self,
         anki_session_with_addon_data: AnkiSession,
         mock_function: MockFunction,
         next_deterministic_uuid: Callable[[], uuid.UUID],
         qtbot: QtBot,
+        mock_ui_for_create_collaborative_deck: MockUIForCreateCollaborativeDeck,
         creating_deck_fails: bool,
     ) -> None:
         with anki_session_with_addon_data.profile_loaded():
@@ -1580,14 +1613,9 @@ class TestCreateCollaborativeDeck:
             anki_did = create_anki_deck(deck_name=deck_name)
             add_basic_anki_note_to_deck(anki_did)
 
-            # Mock all the UI interactions.
-            mock_function(DeckCreationConfirmationDialog, "run", return_value=True)
+            mock_ui_for_create_collaborative_deck(deck_name)
 
-            study_deck_mock = Mock
-            study_deck_mock.name = deck_name
-            mock_function(deck_creation, "StudyDeck", return_value=study_deck_mock)
-
-            mock_function(deck_creation, "ask_user", return_value=True)
+            mock_function(AnkiHubClient, "get_owned_decks", [])
 
             def raise_exception(*args, **kwargs) -> None:
                 raise Exception("test")
@@ -1632,6 +1660,43 @@ class TestCreateCollaborativeDeck:
                 get_media_names_from_notes_data_mock.assert_called_once_with(notes_data)
                 start_media_upload_mock.assert_called_once()
 
+    def test_with_deck_name_existing(
+        self,
+        anki_session_with_addon_data: AnkiSession,
+        mock_function: MockFunction,
+        mock_ui_for_create_collaborative_deck: MockUIForCreateCollaborativeDeck,
+    ):
+        """When the user already has a deck with the same name, the deck creation is cancelled and
+        a message is shown to the user."""
+        with anki_session_with_addon_data.profile_loaded():
+            # Setup Anki deck with a note.
+            deck_name = "test"
+            anki_did = create_anki_deck(deck_name=deck_name)
+            add_basic_anki_note_to_deck(anki_did)
+
+            mock_ui_for_create_collaborative_deck(deck_name)
+
+            mock_function(
+                AnkiHubClient,
+                "get_owned_decks",
+                return_value=[
+                    DeckFactory(
+                        name=deck_name,
+                    )
+                ],
+            )
+
+            showInfo_mock = mock_function(deck_creation, "showInfo")
+            create_ankihub_deck_mock = mock_function(
+                deck_creation,
+                "create_ankihub_deck",
+            )
+
+            create_collaborative_deck()
+
+            showInfo_mock.assert_called_once()
+            create_ankihub_deck_mock.assert_not_called()
+
 
 class TestGetReviewCountForAHDeckSince:
     @pytest.mark.parametrize(
@@ -1666,13 +1731,13 @@ class TestGetReviewCountForAHDeckSince:
                 record_review_for_anki_nid(
                     NoteId(note_info.anki_nid), now + review_delta
                 )
-
-            assert (
-                _get_review_count_for_ah_deck_since(
-                    ah_did=ah_did, since=now + since_time
+            with attached_ankihub_db():
+                assert (
+                    _get_review_count_for_ah_deck_since(
+                        ah_did=ah_did, since=now + since_time
+                    )
+                    == expected_count
                 )
-                == expected_count
-            )
 
     def test_with_multiple_notes(
         self,
@@ -1692,10 +1757,11 @@ class TestGetReviewCountForAHDeckSince:
             )
 
             since_time = now - timedelta(days=1)
-            assert (
-                _get_review_count_for_ah_deck_since(ah_did=ah_did, since=since_time)
-                == 2
-            )
+            with attached_ankihub_db():
+                assert (
+                    _get_review_count_for_ah_deck_since(ah_did=ah_did, since=since_time)
+                    == 2
+                )
 
     def test_with_review_for_other_deck(
         self,
@@ -1718,10 +1784,13 @@ class TestGetReviewCountForAHDeckSince:
 
             # Only the review for the first deck should be counted.
             since_time = now - timedelta(days=1)
-            assert (
-                _get_review_count_for_ah_deck_since(ah_did=ah_did_1, since=since_time)
-                == 1
-            )
+            with attached_ankihub_db():
+                assert (
+                    _get_review_count_for_ah_deck_since(
+                        ah_did=ah_did_1, since=since_time
+                    )
+                    == 1
+                )
 
 
 class TestGetLastReviewTimeForAHDeck:
@@ -1753,15 +1822,16 @@ class TestGetLastReviewTimeForAHDeck:
                     NoteId(note_info.anki_nid), now + review_delta
                 )
 
-            if expected_last_review_delta is not None:
-                expected_last_review_time = now + expected_last_review_delta
+            with attached_ankihub_db():
+                if expected_last_review_delta is not None:
+                    expected_last_review_time = now + expected_last_review_delta
 
-                assert_datetime_equal_ignore_milliseconds(
-                    _get_last_review_datetime_for_ah_deck(ah_did=ah_did),
-                    expected_last_review_time,
-                )
-            else:
-                assert _get_last_review_datetime_for_ah_deck(ah_did=ah_did) is None
+                    assert_datetime_equal_ignore_milliseconds(
+                        _get_last_review_datetime_for_ah_deck(ah_did=ah_did),
+                        expected_last_review_time,
+                    )
+                else:
+                    assert _get_last_review_datetime_for_ah_deck(ah_did=ah_did) is None
 
     def test_with_multiple_notes(
         self,
@@ -1780,10 +1850,11 @@ class TestGetLastReviewTimeForAHDeck:
             second_review_time = first_review_time + timedelta(days=1)
             record_review_for_anki_nid(NoteId(note_info_2.anki_nid), second_review_time)
 
-            assert_datetime_equal_ignore_milliseconds(
-                _get_last_review_datetime_for_ah_deck(ah_did=ah_did),
-                second_review_time,
-            )
+            with attached_ankihub_db():
+                assert_datetime_equal_ignore_milliseconds(
+                    _get_last_review_datetime_for_ah_deck(ah_did=ah_did),
+                    second_review_time,
+                )
 
     def test_with_review_for_other_deck(
         self,
@@ -1805,6 +1876,45 @@ class TestGetLastReviewTimeForAHDeck:
             )
 
             # Only the review for the first deck should be considered.
+            with attached_ankihub_db():
+                assert_datetime_equal_ignore_milliseconds(
+                    _get_last_review_datetime_for_ah_deck(ah_did=ah_did_1), now
+                )
+
+
+class TestSendReviewData:
+    def test_with_two_reviews_for_one_deck(
+        self,
+        anki_session_with_addon_data: AnkiSession,
+        install_ah_deck: InstallAHDeck,
+        import_ah_note: ImportAHNote,
+        mock_function: MockFunction,
+    ) -> None:
+        with anki_session_with_addon_data.profile_loaded():
+            ah_did = install_ah_deck()
+            note_info_1 = import_ah_note(ah_did=ah_did)
+            note_info_2 = import_ah_note(ah_did=ah_did)
+
+            first_review_time = datetime.now()
+            record_review_for_anki_nid(NoteId(note_info_1.anki_nid), first_review_time)
+
+            second_review_time = first_review_time + timedelta(days=1)
+            record_review_for_anki_nid(NoteId(note_info_2.anki_nid), second_review_time)
+
+            send_card_review_data_mock = mock_function(
+                AnkiHubClient, "send_card_review_data"
+            )
+
+            send_review_data()
+
+            # Assert that the correct data was passed to the client method.
+            send_card_review_data_mock.assert_called_once()
+
+            card_review_data: CardReviewData = send_card_review_data_mock.call_args[0][
+                0
+            ][0]
+            assert card_review_data.ah_did == ah_did
+            assert card_review_data.total_card_reviews_last_30_days == 2
             assert_datetime_equal_ignore_milliseconds(
-                _get_last_review_datetime_for_ah_deck(ah_did=ah_did_1), now
+                card_review_data.last_card_review_at, second_review_time
             )

@@ -842,6 +842,19 @@ class TestDecksWithUserRelation:
         assert deck_of_user_test2.user_relation == UserDeckRelation.SUBSCRIBER
 
 
+class TestGetOwnedDecks:
+    @pytest.mark.vcr()
+    def test_basic(
+        self,
+        authorized_client_for_user_test1: AnkiHubClient,
+    ):
+        client = authorized_client_for_user_test1
+
+        decks = client.get_owned_decks()
+        assert len(decks) == 1
+        assert decks[0].ah_did == ID_OF_DECK_OF_USER_TEST1
+
+
 class TestGetDeckUpdates:
     @pytest.mark.vcr()
     def test_get_deck_updates(
