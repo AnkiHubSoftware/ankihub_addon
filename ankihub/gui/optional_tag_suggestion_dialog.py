@@ -1,9 +1,10 @@
 """Dialog for suggesting optional tags for notes."""
 from concurrent.futures import Future
-from typing import Sequence
+from typing import List, Sequence
 
 import aqt
 from anki.notes import NoteId
+from aqt.operations import QueryOp
 from aqt.qt import (
     QAbstractItemView,
     QCheckBox,
@@ -20,6 +21,7 @@ from aqt.utils import showInfo, tooltip
 
 from .. import LOGGER
 from ..ankihub_client import AnkiHubHTTPError
+from ..ankihub_client.models import TagGroupValidationResponse
 from ..main.optional_tag_suggestions import OptionalTagsSuggestionHelper
 from .utils import show_error_dialog
 
@@ -144,19 +146,23 @@ class OptionalTagsSuggestionDialog(QDialog):
             )
             item.setToolTip("Validating...")
 
-    def _validate_tag_groups_and_update_ui(self):
-        aqt.mw.taskman.run_in_background(
-            task=self._validate_tag_groups_in_background,
-            on_done=self._on_validate_tag_groups_finished,
-        )
+    def _validate_tag_groups_and_update_ui(self) -> None:
+        def on_failure(exception: Exception) -> None:
+            raise exception
 
-    def _validate_tag_groups_in_background(self):
+        QueryOp(
+            parent=self,
+            op=lambda _: self._validate_tag_groups(),
+            success=self._on_validate_tag_groups_finished,
+        ).failure(on_failure).without_collection().run_in_background()
+
+    def _validate_tag_groups(self) -> List[TagGroupValidationResponse]:
         result = self._optional_tags_helper.prevalidate()
         return result
 
-    def _on_validate_tag_groups_finished(self, future: Future):
-        tag_group_validation_responses = future.result()
-
+    def _on_validate_tag_groups_finished(
+        self, tag_group_validation_responses: List[TagGroupValidationResponse]
+    ) -> None:
         self._valid_tag_groups = [
             response.tag_group_name
             for response in tag_group_validation_responses
