@@ -20,7 +20,7 @@ jobs:
         include:
           - replace_anki_version: false
           - replace_anki_version: true
-            anki_package_version: '"aqt[qt5]==2.1.56"'
+            anki_package_version: 'aqt[qt5]==2.1.56'
     timeout-minutes: 30
     steps:
       - uses: actions/setup-python@v4
@@ -38,7 +38,7 @@ jobs:
 
       - name: Replace Anki version
         if: ${{ matrix.replace_anki_version }}
-        run: pip install ${{ matrix.anki_package_version }}
+        run: pip install "${{ matrix.anki_package_version }}"
 
       - name: Run pytest with coverage
         run: |
