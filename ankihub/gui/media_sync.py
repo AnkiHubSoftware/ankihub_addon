@@ -6,6 +6,7 @@ from pathlib import Path
 from typing import Callable, Iterable, List, Optional, Set
 
 import aqt
+from aqt.operations import QueryOp
 from aqt.qt import QAction
 
 from .. import LOGGER
@@ -44,10 +45,15 @@ class _AnkiHubMediaSync:
         self._download_in_progress = True
         self.refresh_sync_status_text()
 
-        aqt.mw.taskman.run_in_background(
-            self._update_deck_media_and_download_missing_media,
-            on_done=self._on_download_finished,
-        )
+        def on_failure(exception: Exception) -> None:
+            self._download_in_progress = False
+            raise exception
+
+        QueryOp(
+            parent=aqt.mw,
+            op=lambda _: self._update_deck_media_and_download_missing_media(),
+            success=self._on_download_finished,
+        ).failure(on_failure).without_collection().run_in_background()
 
     def start_media_upload(
         self,
@@ -155,9 +161,8 @@ class _AnkiHubMediaSync:
         ]
         return result
 
-    def _on_download_finished(self, future: Future) -> None:
+    def _on_download_finished(self, _: None) -> None:
         self._download_in_progress = False
-        future.result()
         self.refresh_sync_status_text()
 
     def _refresh_media_download_status_inner(self):
