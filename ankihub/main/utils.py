@@ -122,8 +122,8 @@ def add_notes(notes: Collection[Note], deck_id: DeckId) -> None:
         add_note_requests = [AddNoteRequest(note, deck_id=deck_id) for note in notes]
         aqt.mw.col.add_notes(add_note_requests)
     else:
-        # Anki versions before 23.10 don't have col.add_notes. On the other hand adding notes
-        # one by one is faster on older Anki versions, so it's ok to do it this way.
+        # Anki versions before 23.10 don't have col.add_notes, so we have to add them one by one.
+        # It's ok to this because adding them one by one is fast on Anki versions before 23.10.
         for note in notes:
             aqt.mw.col.add_note(note, deck_id=deck_id)
         aqt.mw.col.save()
