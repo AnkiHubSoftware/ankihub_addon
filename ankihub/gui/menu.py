@@ -249,13 +249,12 @@ def _upload_logs_and_data_action() -> None:
     upload_logs_and_data_in_background(on_done=_on_logs_uploaded)
 
 
-def _on_logs_uploaded(future: Future):
+def _on_logs_uploaded(log_file_name: str) -> None:
     aqt.mw.progress.finish()
-    log_file_name = future.result()
     LogUploadResultDialog(log_file_name=log_file_name).exec()
 
 
-def _ankihub_login_setup(parent: QMenu):
+def _ankihub_login_setup(parent: QMenu) -> None:
     sign_in_button = QAction("🔑 Sign into AnkiHub", aqt.mw)
     qconnect(sign_in_button.triggered, AnkiHubLogin.display_login)
     parent.addAction(sign_in_button)

@@ -7,7 +7,6 @@ import tempfile
 import time
 import traceback
 import zipfile
-from concurrent.futures import Future
 from pathlib import Path
 from sqlite3 import OperationalError
 from textwrap import dedent
@@ -46,6 +45,7 @@ from ..settings import (
 )
 from .deck_updater import NotLoggedInError
 from .error_dialog import ErrorDialog
+from .operations import AddonQueryOp
 from .utils import (
     ask_user,
     check_and_prompt_for_updates_on_main_window,
@@ -92,7 +92,7 @@ def report_exception_and_upload_logs(
 
 
 def upload_logs_in_background(
-    on_done: Optional[Callable[[Future], None]] = None, hide_username=False
+    on_done: Optional[Callable[[str], None]] = None, hide_username=False
 ) -> str:
     """Upload the logs to S3 in the background.
     Returns the S3 key of the uploaded logs."""
@@ -103,19 +103,18 @@ def upload_logs_in_background(
     user_name = config.user() if not hide_username else checksum(config.user())[:5]
     key = f"ankihub_addon_logs_{user_name}_{int(time.time())}.log"
 
-    if on_done is not None:
-        aqt.mw.taskman.run_in_background(
-            task=lambda: _upload_logs(key), on_done=on_done
-        )
-    else:
-        aqt.mw.taskman.run_in_background(
-            task=lambda: _upload_logs(key), on_done=_on_upload_logs_done
-        )
+    AddonQueryOp(
+        parent=aqt.mw,
+        op=lambda _: _upload_logs(key),
+        success=on_done if on_done is not None else lambda _: None,
+    ).failure(_on_upload_logs_failure).without_collection().run_in_background()
 
     return key
 
 
-def upload_logs_and_data_in_background(on_done: Callable[[Future], None] = None) -> str:
+def upload_logs_and_data_in_background(
+    on_done: Optional[Callable[[str], None]] = None
+) -> str:
     """Upload the data dir and logs to S3 in the background.
     Returns the S3 key of the uploaded file."""
 
@@ -125,9 +124,11 @@ def upload_logs_and_data_in_background(on_done: Callable[[Future], None] = None)
     user_name_hash = checksum(config.user())[:5]
     key = f"ankihub_addon_debug_info_{user_name_hash}_{int(time.time())}.zip"
 
-    aqt.mw.taskman.run_in_background(
-        task=lambda: _upload_logs_and_data_in_background(key), on_done=on_done
-    )
+    AddonQueryOp(
+        parent=aqt.mw,
+        op=lambda _: _upload_logs_and_data_in_background(key),
+        success=on_done if on_done is not None else lambda _: None,
+    ).failure(_on_upload_logs_failure).without_collection().run_in_background()
 
     return key
 
@@ -577,20 +578,18 @@ def _upload_logs(key: str) -> str:
         raise e
 
 
-def _on_upload_logs_done(future: Future) -> None:
-    try:
-        future.result()
-    except AnkiHubHTTPError as e:
+def _on_upload_logs_failure(exc: Exception) -> None:
+    if isinstance(exc, AnkiHubHTTPError):
         from .errors import OUTDATED_CLIENT_ERROR_REASON
 
         # Don't report outdated client errors that happen when uploading logs,
         # because they are handled by the add-on when they happen in other places
         # and we don't want to see them in Sentry.
-        if e.response.status_code == 401 or (
-            e.response.status_code == 406
-            and e.response.reason == OUTDATED_CLIENT_ERROR_REASON
+        if exc.response.status_code == 401 or (
+            exc.response.status_code == 406
+            and exc.response.reason == OUTDATED_CLIENT_ERROR_REASON
         ):
             return
-        _report_exception(e)
-    except Exception as e:
-        _report_exception(e)
+        _report_exception(exc)
+    else:
+        _report_exception(exc)
