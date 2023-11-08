@@ -1,5 +1,4 @@
 import uuid
-from concurrent.futures import Future
 from datetime import datetime
 from functools import cached_property
 from pathlib import Path
@@ -66,12 +65,18 @@ class _AnkiHubMediaSync:
         self.refresh_sync_status_text()
 
         media_paths = self._media_paths_for_media_names(media_names)
-        aqt.mw.taskman.run_in_background(
-            lambda: self._client.upload_media(media_paths, ankihub_did),
-            on_done=lambda future: self._on_upload_finished(
-                future, ankihub_deck_id=ankihub_did, on_success=on_success
+
+        def on_failure(exception: Exception) -> None:
+            self._amount_uploads_in_progress -= 1
+            raise exception
+
+        QueryOp(
+            parent=aqt.mw,
+            op=lambda _: self._client.upload_media(media_paths, ankihub_did),
+            success=lambda _: self._on_upload_finished(
+                ankihub_deck_id=ankihub_did, on_success=on_success
             ),
-        )
+        ).failure(on_failure).without_collection().run_in_background()
 
     def stop_background_threads(self):
         """Stop all media sync operations."""
@@ -97,12 +102,10 @@ class _AnkiHubMediaSync:
 
     def _on_upload_finished(
         self,
-        future: Future,
         ankihub_deck_id: uuid.UUID,
         on_success: Optional[Callable[[], None]] = None,
     ):
         self._amount_uploads_in_progress -= 1
-        future.result()
         LOGGER.info("Uploaded media to AnkiHub.")
         self.refresh_sync_status_text()
 
