@@ -2,7 +2,6 @@ from datetime import datetime, timezone
 
 import aqt
 from aqt import QCheckBox, QMessageBox
-from aqt.operations import QueryOp
 from aqt.studydeck import StudyDeck
 from aqt.utils import showInfo, tooltip
 
@@ -14,6 +13,7 @@ from ...main.deck_creation import DeckCreationResult, create_ankihub_deck
 from ...main.subdecks import SUBDECK_TAG
 from ...settings import config, url_view_deck
 from ..media_sync import media_sync
+from ..operations import AddonQueryOp
 from ..utils import ask_user
 
 
@@ -128,13 +128,13 @@ def create_collaborative_deck() -> None:
             f"<a href={deck_url}>{deck_url}</a>"
         )
 
-    def on_failure(exc: Exception):
+    def on_failure(exc: Exception) -> None:
         aqt.mw.progress.finish()
         raise exc
 
-    op = QueryOp(
+    op = AddonQueryOp(
         parent=aqt.mw,
-        op=lambda col: create_ankihub_deck(
+        op=lambda _: create_ankihub_deck(
             deck_name,
             private=private,
             add_subdeck_tags=add_subdeck_tags,
