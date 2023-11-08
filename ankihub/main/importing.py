@@ -10,7 +10,6 @@ from typing import Collection, Dict, Iterable, List, Optional, Sequence, Set, Tu
 
 import aqt
 from anki.cards import Card
-from anki.collection import AddNoteRequest
 from anki.consts import QUEUE_TYPE_SUSPENDED
 from anki.decks import DeckId
 from anki.errors import NotFoundError
@@ -29,6 +28,7 @@ from .note_conversion import (
 )
 from .subdecks import build_subdecks_and_move_cards_to_them
 from .utils import (
+    add_notes,
     create_deck_with_id,
     create_note_type_with_id,
     dids_of_notes,
@@ -305,22 +305,18 @@ class AnkiHubImporter:
         notes_to_create_by_ah_nid: Dict[uuid.UUID, Note],
         notes_data: Collection[NoteInfo],
     ) -> None:
-        note_data_to_create = [
+        """Add notes to the Anki database and sets their ids to the ones from the AnkiHub database."""
+        notes_data_to_create = [
             note_data
             for note_data in notes_data
             if note_data.ah_nid in notes_to_create_by_ah_nid
         ]
 
-        # Add the notes to the Anki database.
-        add_note_requests = [
-            AddNoteRequest(note, deck_id=self._local_did)
-            for note in notes_to_create_by_ah_nid.values()
-        ]
-        aqt.mw.col.add_notes(add_note_requests)
+        add_notes(notes=notes_to_create_by_ah_nid.values(), deck_id=self._local_did)
 
         # Set the nids in the Anki database to the nids of the notes in the AnkiHub database.
         notes_data_by_ah_nid = {
-            note_data.ah_nid: note_data for note_data in note_data_to_create
+            note_data.ah_nid: note_data for note_data in notes_data_to_create
         }
         case_conditions = " ".join(
             f"WHEN {note.id} THEN {notes_data_by_ah_nid[ah_nid].anki_nid}"

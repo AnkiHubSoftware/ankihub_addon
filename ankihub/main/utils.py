@@ -24,8 +24,12 @@ from ..settings import (
     url_view_note,
 )
 
+if ANKI_MINOR >= 231000:
+    from anki.collection import AddNoteRequest
 
 # decks
+
+
 def create_deck_with_id(deck_name: str, deck_id: DeckId) -> None:
 
     source_did = aqt.mw.col.decks.add_normal_deck_with_name(
@@ -107,6 +111,22 @@ def nids_in_deck_but_not_in_subdeck(deck_name: str) -> Sequence[NoteId]:
     For example if a notes is in the deck "A" but not in "A::B" or "A::C" then it is returned.
     """
     return aqt.mw.col.find_notes(f'deck:"{deck_name}" -deck:"{deck_name}::*"')
+
+
+# notes
+
+
+def add_notes(notes: Collection[Note], deck_id: DeckId) -> None:
+    """Add notes to the Anki database in an efficient way."""
+    if ANKI_MINOR >= 231000:
+        add_note_requests = [AddNoteRequest(note, deck_id=deck_id) for note in notes]
+        aqt.mw.col.add_notes(add_note_requests)
+    else:
+        # Anki versions before 23.10 don't have col.add_notes. On the other hand adding notes
+        # one by one is faster on older Anki versions, so it's ok to do it this way.
+        for note in notes:
+            aqt.mw.col.add_note(note, deck_id=deck_id)
+        aqt.mw.col.save()
 
 
 # note types
