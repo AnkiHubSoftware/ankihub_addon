@@ -5,7 +5,6 @@ from pathlib import Path
 from typing import Callable, Iterable, List, Optional, Set
 
 import aqt
-from aqt.operations import QueryOp
 from aqt.qt import QAction
 
 from .. import LOGGER
@@ -13,6 +12,7 @@ from ..addon_ankihub_client import AddonAnkiHubClient
 from ..ankihub_client.models import DeckMedia
 from ..db import ankihub_db
 from ..settings import config
+from .operations import AddonQueryOp
 
 
 class _AnkiHubMediaSync:
@@ -48,7 +48,7 @@ class _AnkiHubMediaSync:
             self._download_in_progress = False
             raise exception
 
-        QueryOp(
+        AddonQueryOp(
             parent=aqt.mw,
             op=lambda _: self._update_deck_media_and_download_missing_media(),
             success=self._on_download_finished,
@@ -70,7 +70,7 @@ class _AnkiHubMediaSync:
             self._amount_uploads_in_progress -= 1
             raise exception
 
-        QueryOp(
+        AddonQueryOp(
             parent=aqt.mw,
             op=lambda _: self._client.upload_media(media_paths, ankihub_did),
             success=lambda _: self._on_upload_finished(

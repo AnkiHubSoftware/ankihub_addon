@@ -4,7 +4,6 @@ from typing import List, Sequence
 
 import aqt
 from anki.notes import NoteId
-from aqt.operations import QueryOp
 from aqt.qt import (
     QAbstractItemView,
     QCheckBox,
@@ -23,6 +22,7 @@ from .. import LOGGER
 from ..ankihub_client import AnkiHubHTTPError
 from ..ankihub_client.models import TagGroupValidationResponse
 from ..main.optional_tag_suggestions import OptionalTagsSuggestionHelper
+from .operations import AddonQueryOp
 from .utils import show_error_dialog
 
 
@@ -147,14 +147,11 @@ class OptionalTagsSuggestionDialog(QDialog):
             item.setToolTip("Validating...")
 
     def _validate_tag_groups_and_update_ui(self) -> None:
-        def on_failure(exception: Exception) -> None:
-            raise exception
-
-        QueryOp(
+        AddonQueryOp(
             parent=self,
             op=lambda _: self._validate_tag_groups(),
             success=self._on_validate_tag_groups_finished,
-        ).failure(on_failure).without_collection().run_in_background()
+        ).without_collection().run_in_background()
 
     def _validate_tag_groups(self) -> List[TagGroupValidationResponse]:
         result = self._optional_tags_helper.prevalidate()
