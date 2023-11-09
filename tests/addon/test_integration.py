@@ -1706,7 +1706,6 @@ class TestAnkiHubImporterSuspendNewCardsOfExistingNotesOption:
                 ah_did=ah_did,
                 ah_nid=ah_nid,
                 existing_card_suspended=existing_card_suspended,
-                suspend_new_cards_of_existing_notes=option_value,
                 import_ah_note=import_ah_note,
             )
 
@@ -1725,7 +1724,6 @@ class TestAnkiHubImporterSuspendNewCardsOfExistingNotesOption:
         ah_did: uuid.UUID,
         ah_nid: uuid.UUID,
         existing_card_suspended: bool,
-        suspend_new_cards_of_existing_notes: SuspendNewCardsOfExistingNotes,
         import_ah_note: ImportAHNote,
     ) -> Tuple[Card, Card]:
         # Create a cloze note with one card, optionally suspend the existing card,
@@ -1753,9 +1751,6 @@ class TestAnkiHubImporterSuspendNewCardsOfExistingNotesOption:
             ah_nid=ah_nid,
             fields=[Field(name="Text", value="{{c1::foo}} {{c2::bar}}", order=0)],
             mid=ankihub_cloze["id"],
-        )
-        config.set_suspend_new_cards_of_existing_notes(
-            ah_did, suspend_new_cards_of_existing_notes
         )
         import_ah_note(note_data=note_data, mid=ankihub_cloze["id"], ah_did=ah_did)
 
