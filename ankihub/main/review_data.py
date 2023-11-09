@@ -43,7 +43,7 @@ def send_review_data() -> None:
                 )
             )
 
-    LOGGER.info(f"Review counts: {card_review_data}")
+    LOGGER.info(f"Review data: {card_review_data}")
 
     client = AnkiHubClient()
     client.send_card_review_data(card_review_data)
