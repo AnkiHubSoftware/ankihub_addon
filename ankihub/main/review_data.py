@@ -1,6 +1,6 @@
 import uuid
 from datetime import datetime, timedelta
-from typing import Optional
+from typing import Optional, Tuple
 
 import aqt
 
@@ -10,30 +10,36 @@ from ..ankihub_client import CardReviewData
 from ..db import attached_ankihub_db
 from ..settings import config
 
-# The server needs the review counts for the last 30 days
-REVIEW_PERIOD_DAYS = timedelta(days=30)
-
 
 def send_review_data() -> None:
     """Send data about card reviews for each installed AnkiHub deck to the server.
     Data about decks that have not been reviewed yet will not be included."""
-    since = datetime.now() - REVIEW_PERIOD_DAYS
+    now = datetime.now()
 
     with attached_ankihub_db():
         card_review_data = []
         for ah_did in config.deck_ids():
-            last_card_review_at = _get_last_review_datetime_for_ah_deck(ah_did)
-            if last_card_review_at is None:
+            first_and_last_review_times = (
+                _get_first_and_last_review_datetime_for_ah_deck(ah_did)
+            )
+            if first_and_last_review_times is None:
                 continue
 
+            first_review_at, last_review_at = first_and_last_review_times
+
+            total_card_reviews_last_7_days = _get_review_count_for_ah_deck_since(
+                ah_did, now - timedelta(days=7)
+            )
             total_card_reviews_last_30_days = _get_review_count_for_ah_deck_since(
-                ah_did, since
+                ah_did, now - timedelta(days=30)
             )
             card_review_data.append(
                 CardReviewData(
                     ah_did=ah_did,
+                    total_card_reviews_last_7_days=total_card_reviews_last_7_days,
                     total_card_reviews_last_30_days=total_card_reviews_last_30_days,
-                    last_card_review_at=last_card_review_at,
+                    first_card_review_at=first_review_at,
+                    last_card_review_at=last_review_at,
                 )
             )
 
@@ -61,12 +67,14 @@ def _get_review_count_for_ah_deck_since(ah_did: uuid.UUID, since: datetime) -> i
     return result
 
 
-def _get_last_review_datetime_for_ah_deck(ah_did: uuid.UUID) -> Optional[datetime]:
+def _get_first_and_last_review_datetime_for_ah_deck(
+    ah_did: uuid.UUID,
+) -> Optional[Tuple[datetime, datetime]]:
     """Get the date time of the last review (recorded in Anki's review log table) for an ankihub deck.
     Requires the ankihub db to be attached to the Anki db."""
-    timestamp_str = aqt.mw.col.db.scalar(
+    row = aqt.mw.col.db.first(
         """
-        SELECT MAX(r.id)
+        SELECT MIN(r.id), MAX(r.id)
         FROM revlog as r
         JOIN cards as c ON r.cid = c.id
         JOIN ankihub_db.notes as ah_n ON c.nid = ah_n.anki_note_id
@@ -74,9 +82,14 @@ def _get_last_review_datetime_for_ah_deck(ah_did: uuid.UUID) -> Optional[datetim
         """,
         str(ah_did),
     )
-    if timestamp_str is None:
+    if row is None:
         return None
 
-    timestamp_ms = int(timestamp_str)
-    result = datetime.fromtimestamp(timestamp_ms / 1000)
-    return result
+    first_timestamp_str, last_timestamp_str = row
+    first_review_datetime = _ms_timestamp_to_datetime(int(first_timestamp_str))
+    last_review_datetime = _ms_timestamp_to_datetime(int(last_timestamp_str))
+    return first_review_datetime, last_review_datetime
+
+
+def _ms_timestamp_to_datetime(timestamp: int) -> datetime:
+    return datetime.fromtimestamp(timestamp / 1000)
