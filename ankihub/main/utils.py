@@ -24,8 +24,12 @@ from ..settings import (
     url_view_note,
 )
 
+if ANKI_MINOR >= 231000:
+    from anki.collection import AddNoteRequest
 
 # decks
+
+
 def create_deck_with_id(deck_name: str, deck_id: DeckId) -> None:
 
     source_did = aqt.mw.col.decks.add_normal_deck_with_name(
@@ -66,6 +70,14 @@ def lowest_level_common_ancestor_deck_name(deck_names: Iterable[str]) -> Optiona
         return result
 
 
+def dids_of_notes(notes: List[Note]) -> Set[DeckId]:
+    result: Set[DeckId] = set()
+    for note in notes:
+        dids_for_note = set(c.did for c in note.cards())
+        result |= dids_for_note
+    return result
+
+
 def get_unique_deck_name(deck_name: str) -> str:
     if not aqt.mw.col.decks.by_name(deck_name):
         return deck_name
@@ -80,22 +92,6 @@ def get_unique_deck_name(deck_name: str) -> str:
 
 def highest_level_did(dids: Iterable[DeckId]) -> DeckId:
     return min(dids, key=lambda did: aqt.mw.col.decks.name(did).count("::"))
-
-
-# notes
-def create_note_with_id(note: Note, anki_id: NoteId, anki_did: DeckId) -> Note:
-    """Create a new note, add it to the appropriate deck and override the note id with
-    the note id of the original note creator."""
-    LOGGER.debug(f"Trying to create note: {anki_id=}")
-
-    aqt.mw.col.add_note(note, DeckId(anki_did))
-
-    # Swap out the note id that Anki assigns to the new note with our own id.
-    aqt.mw.col.db.execute(f"UPDATE notes SET id={anki_id} WHERE id={note.id};")
-    aqt.mw.col.db.execute(f"UPDATE cards SET nid={anki_id} WHERE nid={note.id};")
-
-    note.id = anki_id
-    return note
 
 
 def note_types_with_ankihub_id_field() -> List[NotetypeId]:
@@ -115,6 +111,22 @@ def nids_in_deck_but_not_in_subdeck(deck_name: str) -> Sequence[NoteId]:
     For example if a notes is in the deck "A" but not in "A::B" or "A::C" then it is returned.
     """
     return aqt.mw.col.find_notes(f'deck:"{deck_name}" -deck:"{deck_name}::*"')
+
+
+# notes
+
+
+def add_notes(notes: Collection[Note], deck_id: DeckId) -> None:
+    """Add notes to the Anki database in an efficient way."""
+    if ANKI_MINOR >= 231000:
+        add_note_requests = [AddNoteRequest(note, deck_id=deck_id) for note in notes]
+        aqt.mw.col.add_notes(add_note_requests)
+    else:
+        # Anki versions before 23.10 don't have col.add_notes, so we have to add them one by one.
+        # It's ok to this because adding them one by one is fast on Anki versions before 23.10.
+        for note in notes:
+            aqt.mw.col.add_note(note, deck_id=deck_id)
+        aqt.mw.col.save()
 
 
 # note types
