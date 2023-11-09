@@ -70,7 +70,7 @@ def _get_review_count_for_ah_deck_since(ah_did: uuid.UUID, since: datetime) -> i
 def _get_first_and_last_review_datetime_for_ah_deck(
     ah_did: uuid.UUID,
 ) -> Optional[Tuple[datetime, datetime]]:
-    """Get the date time of the last review (recorded in Anki's review log table) for an ankihub deck.
+    """Get the date time of the first and last review (recorded in Anki's review log table) for an ankihub deck.
     Requires the ankihub db to be attached to the Anki db."""
     row = aqt.mw.col.db.first(
         """
@@ -82,7 +82,7 @@ def _get_first_and_last_review_datetime_for_ah_deck(
         """,
         str(ah_did),
     )
-    if row is None:
+    if row[0] is None:
         return None
 
     first_timestamp_str, last_timestamp_str = row
