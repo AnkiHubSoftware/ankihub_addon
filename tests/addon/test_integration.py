@@ -1754,7 +1754,6 @@ class TestAnkiHubImporterSuspendNewCardsOfExistingNotesOption:
             fields=[Field(name="Text", value="{{c1::foo}} {{c2::bar}}", order=0)],
             mid=ankihub_cloze["id"],
         )
-
         config.set_suspend_new_cards_of_existing_notes(
             ah_did, suspend_new_cards_of_existing_notes
         )
