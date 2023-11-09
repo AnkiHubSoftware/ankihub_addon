@@ -29,6 +29,7 @@ from ..fixtures import (  # type: ignore
     ImportAHNoteType,
     InstallAHDeck,
     MockFunction,
+    MockStudyDeckDialogWithCB,
     NewNoteWithNoteType,
     SetFeatureFlagState,
     add_basic_anki_note_to_deck,
@@ -1686,14 +1687,15 @@ class MockUIForCreateCollaborativeDeck(Protocol):
 @pytest.fixture
 def mock_ui_for_create_collaborative_deck(
     mock_function: MockFunction,
+    mock_study_deck_dialog_with_cb: MockStudyDeckDialogWithCB,
 ) -> MockUIForCreateCollaborativeDeck:
     """Mock the UI interaction for creating a collaborative deck.
     The deck_name determines which deck will be chosen for the upload."""
 
     def mock_ui_interaction_inner(deck_name) -> None:
-        study_deck_mock = Mock
-        study_deck_mock.name = deck_name
-        mock_function(deck_creation, "StudyDeck", return_value=study_deck_mock)
+        mock_study_deck_dialog_with_cb(
+            "ankihub.gui.operations.deck_creation.StudyDeck", deck_name
+        )
         mock_function(deck_creation, "ask_user", return_value=True)
         mock_function(deck_creation, "showInfo")
         mock_function(DeckCreationConfirmationDialog, "run", return_value=True)
