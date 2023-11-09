@@ -94,7 +94,7 @@ from ankihub.main.note_conversion import (
     _get_fields_protected_by_tags,
 )
 from ankihub.main.review_data import (
-    _get_last_review_datetime_for_ah_deck,
+    _get_first_and_last_review_datetime_for_ah_deck,
     _get_review_count_for_ah_deck_since,
     send_review_data,
 )
@@ -1797,13 +1797,16 @@ class TestGetReviewCountForAHDeckSince:
 
 class TestGetLastReviewTimeForAHDeck:
     @pytest.mark.parametrize(
-        "review_deltas, expected_last_review_delta",
+        "review_deltas, expected_first_review_delta, expected_last_review_delta",
         [
-            # Reviews in the past, the latest review is returned
-            ([timedelta(days=-3), timedelta(days=-2)], timedelta(days=-2)),
-            ([timedelta(days=-3), timedelta(days=0)], timedelta(days=0)),
+            # Reviews in the past, the first and last review times are returned
+            (
+                [timedelta(days=-3), timedelta(days=-2), timedelta(days=-1)],
+                timedelta(days=-3),
+                timedelta(days=-1),
+            ),
             # No reviews, None is returned
-            ([], None),
+            ([], None, None),
         ],
     )
     def test_review_times_relative_to_since_time(
@@ -1812,6 +1815,7 @@ class TestGetLastReviewTimeForAHDeck:
         install_ah_deck: InstallAHDeck,
         import_ah_note: ImportAHNote,
         review_deltas: List[timedelta],
+        expected_first_review_delta: Optional[timedelta],
         expected_last_review_delta: Optional[timedelta],
     ) -> None:
         with anki_session_with_addon_data.profile_loaded():
@@ -1825,15 +1829,25 @@ class TestGetLastReviewTimeForAHDeck:
                 )
 
             with attached_ankihub_db():
-                if expected_last_review_delta is not None:
-                    expected_last_review_time = now + expected_last_review_delta
+                first_and_last_time = _get_first_and_last_review_datetime_for_ah_deck(
+                    ah_did=ah_did
+                )
 
+                if expected_last_review_delta is not None:
+                    first_review_time, last_review_time = first_and_last_time
+
+                    expected_first_review_time = now + expected_first_review_delta
                     assert_datetime_equal_ignore_milliseconds(
-                        _get_last_review_datetime_for_ah_deck(ah_did=ah_did),
-                        expected_last_review_time,
+                        first_review_time,
+                        expected_first_review_time,
+                    )
+
+                    expected_last_review_time = now + expected_last_review_delta
+                    assert_datetime_equal_ignore_milliseconds(
+                        last_review_time, expected_last_review_time
                     )
                 else:
-                    assert _get_last_review_datetime_for_ah_deck(ah_did=ah_did) is None
+                    assert first_and_last_time is None
 
     def test_with_multiple_notes(
         self,
@@ -1846,17 +1860,29 @@ class TestGetLastReviewTimeForAHDeck:
             note_info_1 = import_ah_note(ah_did=ah_did)
             note_info_2 = import_ah_note(ah_did=ah_did)
 
-            first_review_time = datetime.now()
-            record_review_for_anki_nid(NoteId(note_info_1.anki_nid), first_review_time)
+            expected_first_review_time = datetime.now()
+            record_review_for_anki_nid(
+                NoteId(note_info_1.anki_nid), expected_first_review_time
+            )
 
-            second_review_time = first_review_time + timedelta(days=1)
-            record_review_for_anki_nid(NoteId(note_info_2.anki_nid), second_review_time)
+            expected_last_review_time = expected_first_review_time + timedelta(days=1)
+            record_review_for_anki_nid(
+                NoteId(note_info_2.anki_nid), expected_last_review_time
+            )
 
             with attached_ankihub_db():
-                assert_datetime_equal_ignore_milliseconds(
-                    _get_last_review_datetime_for_ah_deck(ah_did=ah_did),
-                    second_review_time,
-                )
+                (
+                    first_review_time,
+                    last_review_time,
+                ) = _get_first_and_last_review_datetime_for_ah_deck(ah_did=ah_did)
+
+            assert_datetime_equal_ignore_milliseconds(
+                first_review_time,
+                expected_first_review_time,
+            )
+            assert_datetime_equal_ignore_milliseconds(
+                last_review_time, expected_last_review_time
+            )
 
     def test_with_review_for_other_deck(
         self,
@@ -1871,16 +1897,26 @@ class TestGetLastReviewTimeForAHDeck:
             ah_did_2 = install_ah_deck()
             note_info_2 = import_ah_note(ah_did=ah_did_2)
 
-            now = datetime.now()
-            record_review_for_anki_nid(NoteId(note_info_1.anki_nid), now)
+            expected_review_time = datetime.now()
             record_review_for_anki_nid(
-                NoteId(note_info_2.anki_nid), now + timedelta(seconds=1)
+                NoteId(note_info_1.anki_nid), expected_review_time
+            )
+            record_review_for_anki_nid(
+                NoteId(note_info_2.anki_nid),
+                expected_review_time + timedelta(seconds=1),
             )
 
             # Only the review for the first deck should be considered.
             with attached_ankihub_db():
+                (
+                    first_review_time,
+                    last_review_time,
+                ) = _get_first_and_last_review_datetime_for_ah_deck(ah_did=ah_did_1)
+
+                assert first_review_time == last_review_time
                 assert_datetime_equal_ignore_milliseconds(
-                    _get_last_review_datetime_for_ah_deck(ah_did=ah_did_1), now
+                    first_review_time,
+                    expected_review_time,
                 )
 
 
@@ -1916,7 +1952,11 @@ class TestSendReviewData:
                 0
             ][0]
             assert card_review_data.ah_did == ah_did
+            assert card_review_data.total_card_reviews_last_7_days == 2
             assert card_review_data.total_card_reviews_last_30_days == 2
+            assert_datetime_equal_ignore_milliseconds(
+                card_review_data.first_card_review_at, first_review_time
+            )
             assert_datetime_equal_ignore_milliseconds(
                 card_review_data.last_card_review_at, second_review_time
             )
