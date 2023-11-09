@@ -30,7 +30,7 @@ def create_collaborative_deck() -> None:
         return
 
     LOGGER.info("Asking user to choose a deck to upload...")
-    deck_chooser = StudyDeck(
+    StudyDeck(
         aqt.mw,
         title="AnkiHub",
         accept="Upload",
@@ -42,10 +42,14 @@ def create_collaborative_deck() -> None:
             if "::" not in d.name and d.id != 1
         ],
         parent=aqt.mw,
+        callback=_on_deck_selected,
     )
-    LOGGER.info(f"Closed deck chooser dialog: {deck_chooser}")
-    LOGGER.info(f"Chosen deck name: {deck_chooser.name}")
-    deck_name = deck_chooser.name
+
+
+def _on_deck_selected(study_deck: StudyDeck) -> None:
+    deck_name = study_deck.name
+    LOGGER.info(f"Chosen deck name: {study_deck.name}")
+
     if not deck_name:
         return
 
