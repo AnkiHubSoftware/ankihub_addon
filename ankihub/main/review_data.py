@@ -23,6 +23,7 @@ def send_review_data() -> None:
                 _get_first_and_last_review_datetime_for_ah_deck(ah_did)
             )
             if first_and_last_review_times is None:
+                # This deck has no reviews yet
                 continue
 
             first_review_at, last_review_at = first_and_last_review_times
