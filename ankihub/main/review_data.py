@@ -27,7 +27,6 @@ def send_review_data() -> None:
                 continue
 
             first_review_at, last_review_at = first_and_last_review_times
-
             total_card_reviews_last_7_days = _get_review_count_for_ah_deck_since(
                 ah_did, now - timedelta(days=7)
             )
