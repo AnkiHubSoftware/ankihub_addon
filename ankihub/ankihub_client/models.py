@@ -283,7 +283,13 @@ class DeckExtensionUpdateChunk(DataClassJSONMixinWithConfig):
 @dataclass
 class CardReviewData(DataClassJSONMixinWithConfig):
     ah_did: uuid.UUID = dataclasses.field(metadata=field_options(alias="deck_id"))
+    total_card_reviews_last_7_days: int
     total_card_reviews_last_30_days: int
+    first_card_review_at: datetime = dataclasses.field(
+        metadata=field_options(
+            deserialize=lambda x: datetime.strptime(x, ANKIHUB_DATETIME_FORMAT_STR)
+        ),
+    )
     last_card_review_at: datetime = dataclasses.field(
         metadata=field_options(
             deserialize=lambda x: datetime.strptime(x, ANKIHUB_DATETIME_FORMAT_STR)
