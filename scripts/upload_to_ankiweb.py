@@ -84,7 +84,10 @@ def upload(
         xpath = '//div[@class="form-inline"]//input[2]'
         web.type("", xpath=xpath)
         time.sleep(0.3)
-        web.type(to_version_str(max_point_version), xpath=xpath)
+        # Preserve sign when converting to version string.
+        # A negative version prevents the add-on from being downloaded on any newer versions.
+        version_str = f"{'-' if max_point_version < 0 else ''}{to_version_str(abs(max_point_version))}"
+        web.type(version_str, xpath=xpath)
 
     web.click("Save")
 
