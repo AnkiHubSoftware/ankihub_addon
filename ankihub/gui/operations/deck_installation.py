@@ -137,6 +137,8 @@ def _download_and_install_single_deck(ankihub_did: uuid.UUID) -> AnkiHubImportRe
     except AnkiHubHTTPError as e:
         if e.response.status_code == 404:
             raise RemoteDeckNotFoundError(ankihub_did=ankihub_did) from e
+        else:
+            raise e
 
     notes_data: List[NoteInfo] = AnkiHubClient().download_deck(
         deck.ah_did, download_progress_cb=_download_progress_cb
