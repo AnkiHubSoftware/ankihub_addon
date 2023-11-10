@@ -40,13 +40,13 @@ def generate_manifest():
 def _max_point_version(
     max_anki_version: str = None, tested_anki_version: str = None
 ) -> int:
-    assert max_anki_version or tested_anki_version
-
     if max_anki_version is not None:
         # A negative max_point_version prevents the add-on from being downloaded on any newer versions.
         return -1 * to_point_version(max_anki_version)
     elif tested_anki_version is not None:
         return to_point_version(tested_anki_version)
+
+    assert False, "Either max_anki_version or tested_anki_version must be specified"
 
 
 if __name__ == "__main__":
