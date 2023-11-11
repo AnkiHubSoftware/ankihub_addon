@@ -6,6 +6,7 @@ from pathlib import Path
 from zipfile import ZipFile
 
 from selenium.webdriver.common.by import By
+from utils import to_version_str
 from webbot import Browser
 from webdriver_manager.chrome import ChromeDriverManager
 
@@ -77,13 +78,13 @@ def upload(
         xpath = '//div[@class="form-inline"]//input[1]'
         web.type("", xpath=xpath)
         time.sleep(0.3)
-        web.type(f"2.1.{min_point_version}", xpath=xpath)
+        web.type(to_version_str(min_point_version), xpath=xpath)
 
     if max_point_version := manifest_dict["max_point_version"]:
         xpath = '//div[@class="form-inline"]//input[2]'
         web.type("", xpath=xpath)
         time.sleep(0.3)
-        web.type(f"2.1.{max_point_version}", xpath=xpath)
+        web.type(to_version_str(max_point_version), xpath=xpath)
 
     web.click("Save")
 
