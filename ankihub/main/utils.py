@@ -18,13 +18,14 @@ from .. import LOGGER, settings
 from ..db import ankihub_db
 from ..settings import (
     ANKI_INT_VERSION,
+    ANKI_VERSION_23_10_00,
     ANKIHUB_NOTE_TYPE_FIELD_NAME,
     ANKIHUB_NOTE_TYPE_MODIFICATION_STRING,
     ANKIHUB_TEMPLATE_END_COMMENT,
     url_view_note,
 )
 
-if ANKI_INT_VERSION >= 231000:
+if ANKI_INT_VERSION >= ANKI_VERSION_23_10_00:
     from anki.collection import AddNoteRequest
 
 # decks
@@ -118,7 +119,7 @@ def nids_in_deck_but_not_in_subdeck(deck_name: str) -> Sequence[NoteId]:
 
 def add_notes(notes: Collection[Note], deck_id: DeckId) -> None:
     """Add notes to the Anki database in an efficient way."""
-    if ANKI_INT_VERSION >= 231000:
+    if ANKI_INT_VERSION >= ANKI_VERSION_23_10_00:
         add_note_requests = [AddNoteRequest(note, deck_id=deck_id) for note in notes]
         aqt.mw.col.add_notes(add_note_requests)
     else:
