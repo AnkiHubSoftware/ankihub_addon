@@ -440,7 +440,6 @@ def create_change_suggestion(
     )
 
     def create_change_suggestion_inner(note: Note, wait_for_media_upload: bool):
-
         suggest_note_update(
             note=note,
             change_type=SuggestionType.NEW_CONTENT,
@@ -483,7 +482,6 @@ def create_new_note_suggestion(
     def create_new_note_suggestion_inner(
         note: Note, ah_did: uuid.UUID, wait_for_media_upload: bool
     ):
-
         suggest_new_note(
             note=note,
             comment="test",
@@ -737,7 +735,6 @@ class TestCheckAndInstallNewDeckSubscriptions:
     ):
         anki_session = anki_session_with_addon_data
         with anki_session.profile_loaded():
-
             # Mock ask_user function to return True
             ask_user_mock = mock_function(
                 operations.new_deck_subscriptions, "ask_user", return_value=True
@@ -778,7 +775,6 @@ class TestCheckAndInstallNewDeckSubscriptions:
     ):
         anki_session = anki_session_with_addon_data
         with anki_session.profile_loaded():
-
             # Mock ask_user function to return False
             ask_user_mock = mock_function(
                 operations.new_deck_subscriptions, "ask_user", return_value=False
@@ -807,7 +803,6 @@ class TestCheckAndInstallNewDeckSubscriptions:
     ):
         anki_session = anki_session_with_addon_data
         with anki_session.profile_loaded():
-
             # Call the function with an empty list
             on_done_mock = Mock()
             check_and_install_new_deck_subscriptions(
@@ -828,7 +823,6 @@ class TestCheckAndInstallNewDeckSubscriptions:
     ):
         anki_session = anki_session_with_addon_data
         with anki_session.profile_loaded():
-
             # Mock ask_user function to return True
             ask_user_mock = mock_function(
                 operations.new_deck_subscriptions, "ask_user", return_value=True
@@ -1379,7 +1373,6 @@ class TestAnkiHubImporter:
     ):
         anki_session = anki_session_with_addon_data
         with anki_session.profile_loaded():
-
             anki_did, _ = install_sample_ah_deck()
             first_local_did = anki_did
 
@@ -1697,7 +1690,6 @@ class TestAnkiHubImporterSuspendNewCardsOfExistingNotesOption:
     ):
         anki_session = anki_session_with_addon_data
         with anki_session.profile_loaded():
-
             ah_did = install_ah_deck()
             config.set_suspend_new_cards_of_existing_notes(ah_did, option_value)
 
@@ -1783,7 +1775,6 @@ class TestAnkiHubImporterSuspendNewCardsOfNewNotesOption:
     ):
         anki_session = anki_session_with_addon_data
         with anki_session.profile_loaded():
-
             ah_did = install_ah_deck()
             config.set_suspend_new_cards_of_new_notes(ah_did, option_value)
 
@@ -1879,7 +1870,6 @@ def test_unsubscribe_from_deck(
 
 
 def import_note_types_for_sample_deck(mw: AnkiQt):
-
     # import the apkg to get the note types, then delete created decks
     dids_before_import = all_dids()
 
@@ -2542,7 +2532,6 @@ class TestDeckManagementDialog:
         nightmode: bool,
     ):
         with anki_session_with_addon_data.profile_loaded():
-
             self._mock_dependencies(monkeypatch)
 
             deck_name = "Test Deck"
@@ -2580,7 +2569,6 @@ class TestDeckManagementDialog:
         monkeypatch: MonkeyPatch,
     ):
         with anki_session_with_addon_data.profile_loaded():
-
             self._mock_dependencies(monkeypatch)
 
             # Install a deck with subdeck tags
@@ -2697,7 +2685,6 @@ class TestDeckManagementDialog:
         next_deterministic_id: Callable[[], int],
     ):
         with anki_session_with_addon_data.profile_loaded():
-
             self._mock_dependencies(monkeypatch)
 
             ah_did = next_deterministic_uuid()
@@ -3213,7 +3200,6 @@ def test_sync_uninstalls_unsubscribed_decks(
     sync_with_ankihub: SyncWithAnkiHub,
     subscribed_to_deck: bool,
 ):
-
     with anki_session_with_addon_data.profile_loaded():
         mw = anki_session_with_addon_data.mw
 
@@ -3405,30 +3391,39 @@ def test_optional_tag_suggestion_dialog(
     anki_session_with_addon_data: AnkiSession,
     qtbot: QtBot,
     monkeypatch: MonkeyPatch,
-    install_sample_ah_deck: InstallSampleAHDeck,
+    import_ah_note: ImportAHNote,
+    next_deterministic_uuid,
 ):
     anki_session = anki_session_with_addon_data
 
     with anki_session.profile_loaded():
-        mw = anki_session.mw
+        # Create 3 notes
+        ah_did = next_deterministic_uuid()
+        notes: List[Note] = []
+        note_infos: List[NoteInfo] = []
+        for _ in range(3):
+            note_info = import_ah_note(ah_did=ah_did)
+            note = aqt.mw.col.get_note(NoteId(note_info.anki_nid))
+            note_infos.append(note_info)
+            notes.append(note)
 
-        # import a sample deck and give notes optional tags
-        install_sample_ah_deck()
-
-        nids = mw.col.find_notes("")
-        notes = [mw.col.get_note(nid) for nid in nids]
-
+        # The first note has an optional tag associated with a valid tag group
         notes[0].tags = [
             f"{TAG_FOR_OPTIONAL_TAGS}::VALID::tag1",
         ]
         notes[0].flush()
 
+        # The second note has an optional tag associated with an invalid tag group
         notes[1].tags = [
             f"{TAG_FOR_OPTIONAL_TAGS}::INVALID::tag1",
         ]
         notes[1].flush()
 
-        # open the dialog
+        # The third note has no optional tags
+        notes[2].tags = []
+        notes[2].flush()
+
+        # Patch the client's prevaliate_tag_groups function to return validation results
         monkeypatch.setattr(
             "ankihub.ankihub_client.AnkiHubClient.prevalidate_tag_groups",
             lambda *args, **kwargs: [
@@ -3446,23 +3441,22 @@ def test_optional_tag_suggestion_dialog(
                 ),
             ],
         )
-        dialog = OptionalTagsSuggestionDialog(parent=mw, nids=nids)
+
+        # Open the dialog
+        dialog = OptionalTagsSuggestionDialog(
+            parent=aqt.mw, nids=[note.id for note in notes]
+        )
         dialog.show()
 
         qtbot.wait(500)
 
-        # assert that the dialog is in the correct state
+        # Assert that the dialog is in the correct state
+        # Items are sorted alphabetically and tooltips contain error messages if the tag group is invalid.
         assert dialog.tag_group_list.count() == 2
-
-        # items are sorted alphabetically
         assert dialog.tag_group_list.item(0).text() == "INVALID"
         assert "error message" in dialog.tag_group_list.item(0).toolTip()
-
         assert dialog.tag_group_list.item(1).text() == "VALID"
-        # empty tooltip means that the tag group is valid because invalid tag groups
-        # have a tooltip with the error message
         assert dialog.tag_group_list.item(1).toolTip() == ""
-
         assert dialog.submit_btn.isEnabled()
 
         suggest_optional_tags_mock = Mock()
@@ -3471,22 +3465,36 @@ def test_optional_tag_suggestion_dialog(
             suggest_optional_tags_mock,
         )
 
-        # select the "VALID" tag group and click the submit button
+        # Select the "VALID" tag group and click the submit button
         dialog.tag_group_list.item(1).setSelected(True)
         qtbot.mouseClick(dialog.submit_btn, Qt.MouseButton.LeftButton)
         qtbot.wait(500)
 
         assert suggest_optional_tags_mock.call_count == 1
 
-        # assert that the suggest_optional_tags function was called with the correct arguments
+        # Assert that the suggest_optional_tags function was called with the correct arguments.
+        # Suggestions should be created for all notes, even if they don't have optional tags.
+        # (To make it possible to remove all optional tags from notes.)
         assert suggest_optional_tags_mock.call_args.kwargs == {
             "suggestions": [
                 OptionalTagSuggestion(
                     tag_group_name="VALID",
                     deck_extension_id=1,
-                    ah_nid=uuid.UUID("e2857855-b414-4a2a-a0bf-2a0eac273f21"),
+                    ah_nid=note_infos[0].ah_nid,
                     tags=["AnkiHub_Optional::VALID::tag1"],
-                )
+                ),
+                OptionalTagSuggestion(
+                    tag_group_name="VALID",
+                    deck_extension_id=1,
+                    ah_nid=note_infos[1].ah_nid,
+                    tags=[],
+                ),
+                OptionalTagSuggestion(
+                    tag_group_name="VALID",
+                    deck_extension_id=1,
+                    ah_nid=note_infos[2].ah_nid,
+                    tags=[],
+                ),
             ],
             "auto_accept": False,
         }
@@ -4141,7 +4149,6 @@ def test_handle_notes_deleted_from_webapp(
     # Run the entry point and load the profile to trigger the handling of the deleted notes.
     entry_point.run()
     with anki_session_with_addon_data.profile_loaded():
-
         # Assert that the note has been deleted from the ankihub db if it was deleted from the webapp
         assert not ankihub_db.ankihub_nid_exists(ah_nid) == was_deleted_from_webapp
 
@@ -4198,7 +4205,6 @@ def test_upload_logs_and_data(
 
 class TestConfigDialog:
     def test_ankihub_menu_item_exists(self, anki_session_with_addon_data: AnkiSession):
-
         entry_point.run()
         with anki_session_with_addon_data.profile_loaded():
             # Assert that the Config menu item exists
@@ -4212,7 +4218,6 @@ class TestConfigDialog:
     def test_open_config_dialog(
         self, anki_session_with_addon_data: AnkiSession, qtbot: QtBot
     ):
-
         with anki_session_with_addon_data.profile_loaded():
             setup_config_dialog_manager()
 
