@@ -14,7 +14,7 @@ from .. import LOGGER, settings
 from ..ankihub_client import AnkiHubHTTPError
 from ..db import ankihub_db
 from ..settings import (
-    ANKI_MINOR,
+    ANKI_INT_VERSION,
     ICONS_PATH,
     AnkiHubCommands,
     config,
@@ -150,7 +150,7 @@ def _setup_editor_buttons(buttons: List[str], editor: Editor) -> None:
     buttons.append(view_history_on_ankihub_button)
 
     # fix style of buttons
-    if ANKI_MINOR >= 55:
+    if ANKI_INT_VERSION >= 55:
         buttons.append(
             "<style> "
             f"  [id^='{ANKIHUB_BTN_ID_PREFIX}'] img {{"
@@ -206,7 +206,7 @@ def _hide_ankihub_field_in_editor(
 ) -> str:
     """Add JS to the JS code of the editor to hide the ankihub_id field if it is present."""
     hide_last_field = settings.ANKIHUB_NOTE_TYPE_FIELD_NAME in note
-    if ANKI_MINOR >= 50:
+    if ANKI_INT_VERSION >= 50:
         refresh_fields_js = _refresh_editor_fields_for_anki_v50_and_up_js(
             hide_last_field
         )
@@ -220,7 +220,7 @@ def _hide_ankihub_field_in_editor(
 
 
 def _refresh_editor_fields_for_anki_v50_and_up_js(hide_last_field: bool) -> str:
-    if ANKI_MINOR >= 55:
+    if ANKI_INT_VERSION >= 55:
         change_visiblility_js = """
             function changeVisibilityOfField(field_idx, visible) {
                 require('anki/NoteEditor').instances[0].fields[field_idx].element.then(
@@ -228,7 +228,7 @@ def _refresh_editor_fields_for_anki_v50_and_up_js(hide_last_field: bool) -> str:
                 );
             }
         """
-    elif ANKI_MINOR >= 50:
+    elif ANKI_INT_VERSION >= 50:
         change_visiblility_js = """
             function changeVisibilityOfField(field_idx, visible) {
                 require('anki/NoteEditor').instances[0].fields[field_idx].element.then(

@@ -43,6 +43,7 @@ from .test_integration import ImportAHNote
 # has to be set before importing ankihub
 os.environ["SKIP_INIT"] = "1"
 
+from ankihub.addon_ankihub_client import AddonAnkiHubClient
 from ankihub.ankihub_client import (
     AnkiHubClient,
     AnkiHubHTTPError,
@@ -60,7 +61,9 @@ from ankihub.gui.errors import (
     _contains_path_to_this_addon,
     _normalize_url,
     _try_handle_exception,
+    upload_logs_in_background,
 )
+from ankihub.gui.media_sync import media_sync
 from ankihub.gui.menu import AnkiHubLogin
 from ankihub.gui.operations import deck_creation
 from ankihub.gui.operations.deck_creation import (
@@ -108,7 +111,7 @@ from ankihub.main.utils import (
     mids_of_notes,
     retain_nids_with_ah_note_type,
 )
-from ankihub.settings import ANKIWEB_ID
+from ankihub.settings import ANKIWEB_ID, log_file_path
 
 
 @pytest.fixture
@@ -160,6 +163,56 @@ class TestUploadMediaForSuggestion:
                 in " ".join(notes[1].fields)
             )
             assert '<img src="will_not_replace.jpeg">' in " ".join(notes[2].fields)
+
+
+class TestMediaSyncMediaDownload:
+    def test_with_exception(self, mock_function: MockFunction, qtbot: QtBot):
+        def raise_exception() -> None:
+            raise Exception("test")
+
+        update_and_download_mock = mock_function(
+            media_sync,
+            "_update_deck_media_and_download_missing_media",
+            side_effect=raise_exception,
+        )
+
+        with qtbot.captureExceptions() as exceptions:
+            media_sync.start_media_download()
+            qtbot.wait(500)
+
+        # Assert that _download_in_progress was set to False and the exception was raised
+        assert not media_sync._download_in_progress
+        assert len(exceptions) == 1
+        update_and_download_mock.assert_called_once()  # sanity check
+
+
+class TestMediaSyncMediaUpload:
+    def test_with_exception(
+        self,
+        anki_session_with_addon_data: AnkiSession,
+        mock_function: MockFunction,
+        qtbot: QtBot,
+        next_deterministic_uuid,
+    ):
+        with anki_session_with_addon_data.profile_loaded():
+
+            def raise_exception() -> None:
+                raise Exception("test")
+
+            upload_media_mock = mock_function(
+                media_sync._client,
+                "upload_media",
+                side_effect=raise_exception,
+            )
+
+            with qtbot.captureExceptions() as exceptions:
+                media_sync.start_media_upload([], next_deterministic_uuid())
+                qtbot.wait(500)
+
+            # Assert that _amount_uploads_in_progress was was reset to 0 and the exception was raised
+            assert media_sync._amount_uploads_in_progress == 0
+            assert len(exceptions) == 1
+            upload_media_mock.assert_called_once()  # sanity check
 
 
 def test_lowest_level_common_ancestor_deck_name():
@@ -1432,6 +1485,62 @@ class TestErrorHandling:
         finally:
             #  Reload the errors module again so that the original askUser function is used for other tests.
             importlib.reload(errors)
+
+
+class TestUploadLogs:
+    def test_basic(
+        self,
+        qtbot: QtBot,
+        mock_function: MockFunction,
+    ):
+        on_done_mock = Mock()
+        upload_logs_mock = mock_function(AddonAnkiHubClient, "upload_logs")
+        upload_logs_in_background(on_done=on_done_mock)
+
+        qtbot.wait_until(lambda: on_done_mock.called)
+
+        upload_logs_mock.assert_called_once()
+        assert upload_logs_mock.call_args[1]["file"] == log_file_path()
+
+    @pytest.mark.parametrize(
+        "exception, expected_report_exception_called",
+        [
+            # The exception should not be reported for these two specific cases
+            (AnkiHubHTTPError(response=Mock(status_code=401)), False),
+            (
+                AnkiHubHTTPError(
+                    response=Mock(status_code=406, reason=OUTDATED_CLIENT_ERROR_REASON)
+                ),
+                False,
+            ),
+            # The exception should be reported in all other cases
+            (AnkiHubHTTPError(response=Mock(status_code=500)), True),
+            (Exception("test"), True),
+        ],
+    )
+    def test_with_exception(
+        self,
+        qtbot: QtBot,
+        mock_function: MockFunction,
+        exception: Exception,
+        expected_report_exception_called: bool,
+    ):
+        def raise_exception(*args, **kwargs) -> None:
+            raise exception
+
+        on_done_mock = Mock()
+        upload_logs_mock = mock_function(
+            AddonAnkiHubClient, "upload_logs", side_effect=raise_exception
+        )
+        report_exception_mock = mock_function(errors, "_report_exception")
+        upload_logs_in_background(on_done=on_done_mock)
+
+        qtbot.wait(500)
+
+        upload_logs_mock.assert_called_once()
+        on_done_mock.assert_not_called()
+
+        assert report_exception_mock.called == expected_report_exception_called
 
 
 class TestRateLimitedDecorator:

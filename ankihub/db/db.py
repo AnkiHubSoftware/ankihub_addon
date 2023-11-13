@@ -26,7 +26,7 @@ from .. import LOGGER
 from ..ankihub_client import Field, NoteInfo, suggestion_type_from_str
 from ..ankihub_client.models import DeckMedia
 from ..common_utils import local_media_names_from_html
-from ..settings import ANKI_MINOR
+from ..settings import ANKI_INT_VERSION, ANKI_VERSION_23_10_00
 from .db_utils import DBConnection
 from .exceptions import IntegrityError
 
@@ -64,7 +64,7 @@ def detach_ankihub_db_from_anki_db_connection() -> None:
         except Exception:
             LOGGER.info("Failed to detach AnkiHub database.")
 
-        if ANKI_MINOR < 231000:
+        if ANKI_INT_VERSION < ANKI_VERSION_23_10_00:
             # db.begin was removed in Ani 23.10
             # begin a new transaction because Anki expects one to be open
             aqt.mw.col.db.begin()  # type: ignore
