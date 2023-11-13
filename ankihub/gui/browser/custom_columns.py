@@ -11,7 +11,7 @@ from aqt.browser import Browser, CellRow, Column, ItemId
 
 from ...db import ankihub_db
 from ...main.utils import note_types_with_ankihub_id_field
-from ...settings import ANKI_MINOR
+from ...settings import ANKI_INT_VERSION
 
 
 class CustomColumn:
@@ -79,7 +79,7 @@ class AnkiHubIdColumn(CustomColumn):
 
 class EditedAfterSyncColumn(CustomColumn):
     def __init__(self) -> None:
-        if ANKI_MINOR >= 231000:
+        if ANKI_INT_VERSION >= 231000:
             sorting_args = {
                 "sorting_cards": BrowserColumns.SORTING_DESCENDING,
                 "sorting_notes": BrowserColumns.SORTING_DESCENDING,

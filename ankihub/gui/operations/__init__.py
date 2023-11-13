@@ -1,6 +1,6 @@
 from aqt.operations import QueryOp
 
-from ...settings import ANKI_MINOR
+from ...settings import ANKI_INT_VERSION
 
 
 class AddonQueryOp(QueryOp):
@@ -21,7 +21,7 @@ class AddonQueryOp(QueryOp):
         already running in parallel, so there is no need to do anything.
         This way we can use the same code for all Anki versions.
         """
-        if ANKI_MINOR < 231000:
+        if ANKI_INT_VERSION < 231000:
             return self
 
         return super().without_collection()

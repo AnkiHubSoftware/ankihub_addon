@@ -581,7 +581,7 @@ USER_SUPPORT_EMAIL_SLUG = "support@ankihub.net"
 
 
 ANKI_VERSION = buildinfo.version
-ANKI_MINOR = point_version()
+ANKI_INT_VERSION = point_version()
 
 USER_FILES_PATH = Path(__file__).parent / "user_files"
 
