@@ -37,6 +37,13 @@ class OptionalTagsSuggestionHelper:
             config.deck_extension_config(deck_extension_id).tag_group_name
             for deck_extension_id in deck_extensions_ids_for_deck
         }
+        # self._all_tag_group_names contains both:
+        # - the tag group names of all deck extensions that are associated with the AnkiHub deck (data from config)
+        # - tag group names which just appear in the optional tags of the notes
+        # We need all tag groups from the config to be able to suggest the removal of all optional tags
+        # from a note.
+        # We need all tag group names from notes to be able to show a warning if a user tries to create
+        # optional tags for a tag group which has some problem (e.g. user is not subscribed to it or mistyped the name).
         self._all_tag_group_names = list(
             set(self._tag_group_names_from_config)
             | set(self._tag_group_names_from_tags)
