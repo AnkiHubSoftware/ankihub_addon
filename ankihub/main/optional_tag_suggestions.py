@@ -7,6 +7,7 @@ from anki.utils import ids2str
 from ..addon_ankihub_client import AddonAnkiHubClient as AnkiHubClient
 from ..ankihub_client import OptionalTagSuggestion, TagGroupValidationResponse
 from ..db import ankihub_db
+from ..settings import config
 from .note_conversion import TAG_FOR_OPTIONAL_TAGS, is_optional_tag, is_tag_for_group
 
 
@@ -25,44 +26,59 @@ class OptionalTagsSuggestionHelper:
         self._ankihub_did = ankihub_dids[0]
 
         self._optional_tags_by_nid = self._optional_tags_by_nid_dict()
-        self._nids_by_tag_group = self._nids_by_tag_group_dict(
+
+        self._tag_group_names_from_tags = self._extract_optional_tag_group_names(
             self._optional_tags_by_nid
         )
-        self._tag_groups = self._extract_optional_tag_groups(self._optional_tags_by_nid)
-        self._valid_tag_groups: Optional[List[str]] = None
-        self._extension_id_by_tag_group: Optional[Dict[str, int]] = None
+        deck_extensions_ids_for_deck = config.deck_extensions_ids_for_ah_did(
+            self._ankihub_did
+        )
+        self._tag_group_names_from_config = {
+            config.deck_extension_config(deck_extension_id).tag_group_name
+            for deck_extension_id in deck_extensions_ids_for_deck
+        }
+        self._all_tag_group_names = list(
+            set(self._tag_group_names_from_config)
+            | set(self._tag_group_names_from_tags)
+        )
+
+        self._extension_id_by_tag_group_name: Optional[Dict[str, int]] = None
+        self._valid_tag_group_names: Optional[List[str]] = None
 
     def tag_group_names(self) -> List[str]:
-        return self._tag_groups
+        return self._all_tag_group_names
 
-    def prevalidate(self) -> List[TagGroupValidationResponse]:
+    def prevalidate_tag_groups(self) -> List[TagGroupValidationResponse]:
+        """Prevalidate the tag groups and return a list of validation responses.
+        Has to be called before self.suggest_tags_for_groups().
+        Updates self._valid_tag_group_names and self._extension_id_by_tag_group_name."""
         client = AnkiHubClient()
         result: List[TagGroupValidationResponse] = client.prevalidate_tag_groups(
             ah_did=self._ankihub_did,
-            tag_group_names=self._tag_groups,
+            tag_group_names=self._all_tag_group_names,
         )
-
-        self._valid_tag_groups = [
+        self._valid_tag_group_names = [
             response.tag_group_name for response in result if response.success
         ]
-        self._extension_id_by_tag_group = {
+        self._extension_id_by_tag_group_name = {
             response.tag_group_name: response.deck_extension_id
             for response in result
             if response.success
         }
-
         return result
 
     def suggest_tags_for_groups(self, tag_groups: List[str], auto_accept: bool) -> None:
-        # has to be called after self.prevalidate
-        assert self._valid_tag_groups is not None
-        assert set(tag_groups).issubset(set(self._valid_tag_groups))
+        """Suggest optional tags for the given tag groups.
+        self.prevalidate_tag_groups() needs to be called before this method to validate the tag groups.
+        """
+        assert self._valid_tag_group_names is not None
+        assert set(tag_groups).issubset(set(self._valid_tag_group_names))
 
         suggestions: List[OptionalTagSuggestion] = []
 
         for tag_group in tag_groups:
-            for nid in self._nids_by_tag_group[tag_group]:
-                optional_tags_for_nid = self._optional_tags_by_nid[nid]
+            for nid in self._nids:
+                optional_tags_for_nid = self._optional_tags_by_nid.get(nid, [])
                 tags_for_group = [
                     tag
                     for tag in optional_tags_for_nid
@@ -72,7 +88,9 @@ class OptionalTagsSuggestionHelper:
                 suggestions.append(
                     OptionalTagSuggestion(
                         tag_group_name=tag_group,
-                        deck_extension_id=self._extension_id_by_tag_group[tag_group],
+                        deck_extension_id=self._extension_id_by_tag_group_name[
+                            tag_group
+                        ],
                         ah_nid=ankihub_db.ankihub_nid_for_anki_nid(nid),
                         tags=tags_for_group,
                     ),
@@ -85,6 +103,7 @@ class OptionalTagsSuggestionHelper:
         )
 
     def _optional_tags_by_nid_dict(self) -> Dict[NoteId, List[str]]:
+        """Returns a dict mapping note ids to a list of optional tags for that note."""
         nid_tags_string_tuples = aqt.mw.col.db.all(
             f"SELECT DISTINCT id, tags FROM NOTES WHERE id IN {ids2str(self._nids)} "
             f"AND tags LIKE '%{TAG_FOR_OPTIONAL_TAGS}%'"
@@ -104,22 +123,10 @@ class OptionalTagsSuggestionHelper:
 
         return result
 
-    def _nids_by_tag_group_dict(
-        self, optional_tags_by_nid: Dict[NoteId, List[str]]
-    ) -> Dict[str, List[NoteId]]:
-        result: Dict[str, List[NoteId]] = {}
-        for nid, tags in optional_tags_by_nid.items():
-            tag_groups = set(self._optional_tag_to_tag_group(tag) for tag in tags)
-            for tag_group in tag_groups:
-                if tag_group not in result:
-                    result[tag_group] = []
-                result[tag_group].append(nid)
-
-        return result
-
-    def _extract_optional_tag_groups(
+    def _extract_optional_tag_group_names(
         self, optional_tags_by_nid: Dict[NoteId, List[str]]
     ) -> List[str]:
+        """Extracts the tag group names from the optional tags of the given notes."""
         result = set()
         for _, optional_tags in optional_tags_by_nid.items():
             optional_tag_groups = [
@@ -130,4 +137,5 @@ class OptionalTagsSuggestionHelper:
         return list(result)
 
     def _optional_tag_to_tag_group(self, optional_tag: str) -> str:
+        """Extracts the tag group name from the given optional tag."""
         return optional_tag.split("::", maxsplit=2)[1]

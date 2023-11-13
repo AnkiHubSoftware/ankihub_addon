@@ -147,7 +147,7 @@ class OptionalTagsSuggestionDialog(QDialog):
         ).without_collection().run_in_background()
 
     def _validate_tag_groups(self) -> List[TagGroupValidationResponse]:
-        result = self._optional_tags_helper.prevalidate()
+        result = self._optional_tags_helper.prevalidate_tag_groups()
         return result
 
     def _on_validate_tag_groups_finished(

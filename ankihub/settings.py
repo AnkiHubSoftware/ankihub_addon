@@ -347,6 +347,14 @@ class _Config:
     def deck_extension_config(self, extension_id: int) -> Optional[DeckExtensionConfig]:
         return self._private_config.deck_extensions.get(extension_id)
 
+    def deck_extensions_ids_for_ah_did(self, ah_did: uuid.UUID) -> List[int]:
+        result = [
+            extension_id
+            for extension_id in self.deck_extension_ids()
+            if self.deck_extension_config(extension_id).ah_did == ah_did
+        ]
+        return result
+
     def is_logged_in(self) -> bool:
         return bool(self.token())
 
@@ -433,7 +441,8 @@ def _profile_data_exists_at_old_location() -> bool:
 def _migrate_profile_data_from_old_location() -> bool:
     """Migration of add-on files from before the add-on added support for multiple Anki profiles was added
     into a profile-specific folder.
-    Returns True if the data was migrated and False if it remains at the old location."""
+    Returns True if the data was migrated and False if it remains at the old location.
+    """
     if not _profile_data_exists_at_old_location():
         LOGGER.info("No data to migrate.")
         return True
@@ -489,7 +498,8 @@ def _file_should_be_migrated(file_path: Path) -> bool:
 
 def log_file_path() -> Path:
     """Path to the add-on log file.
-    The log file is outside of the user files folder because it caused problems when updating the add-on."""
+    The log file is outside of the user files folder because it caused problems when updating the add-on.
+    """
     # _defaultBase is the Anki data folder, we create a sibling folder to it, where we store the log file.
     anki_base = Path(aqt.mw.pm._default_base())
     ankihub_base = anki_base.parent / "AnkiHub"
