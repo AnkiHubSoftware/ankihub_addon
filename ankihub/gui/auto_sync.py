@@ -9,7 +9,7 @@ from anki.hooks import wrap
 from aqt import AnkiQt
 
 from .. import LOGGER
-from ..settings import ANKI_MINOR, config
+from ..settings import ANKI_INT_VERSION, config
 from .operations.ankihub_sync import sync_with_ankihub
 from .operations.utils import future_with_exception, future_with_result
 from .threading_utils import rate_limited
@@ -112,9 +112,9 @@ def _workaround_for_addon_compatibility_on_startup_sync() -> None:
     # Another way to deal with that is to tell users to set the auto_sync option to "never" and
     # to sync manually.
     LOGGER.info("Running _workaround_for_addon_compatibility_on_startup_sync")
-    if ANKI_MINOR < 50:
+    if ANKI_INT_VERSION < 50:
         sleep(3)
 
     LOGGER.info(
-        f"Finished _workaround_for_addon_compatibility_on_startup_sync {ANKI_MINOR=}"
+        f"Finished _workaround_for_addon_compatibility_on_startup_sync {ANKI_INT_VERSION=}"
     )
