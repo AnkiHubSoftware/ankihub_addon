@@ -516,7 +516,7 @@ def _file_should_be_migrated(file_path: Path) -> bool:
 
 
 def ankihub_base_path() -> Path:
-    # _default_base is the Anki data folder, we create a sibling folder to it, where we store the log file.
+    """Path to the folder where the add-on stores its data."""
     anki_base = Path(aqt.mw.pm._default_base())
     result = anki_base.parent / "AnkiHub"
     return result
