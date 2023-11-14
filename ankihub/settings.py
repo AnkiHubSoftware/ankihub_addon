@@ -376,8 +376,8 @@ def setup_profile_data_folder() -> bool:
 
 
 def _addon_data_exists_at_old_location() -> bool:
-    old_profile_path = user_files_path() / _get_anki_profile_id()
-    result = old_profile_path.exists()
+    old_profile_files_path = user_files_path() / _get_anki_profile_id()
+    result = old_profile_files_path.exists()
     return result
 
 

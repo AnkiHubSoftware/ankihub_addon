@@ -3060,6 +3060,29 @@ def test_profile_swap(
     assert general_setup_mock.call_count == 1
 
 
+def test_migrate_addon_data_from_old_location(
+    anki_session_with_addon_data: AnkiSession,
+):
+    # Move the profile data to the old location and add a file to the folder
+    old_profile_files_path = (
+        settings.user_files_path() / settings._get_anki_profile_id()
+    )
+    shutil.move(settings.profile_files_path(), old_profile_files_path)
+    (old_profile_files_path / "test").touch()
+
+    assert not settings.profile_files_path().exists()  # sanity check
+
+    # Start the add-on and load the profile to trigger the migration
+    entry_point.run()
+    with anki_session_with_addon_data.profile_loaded():
+        pass
+
+    # Assert that the profile data was migrated to the new location and the file was also moved
+    assert not old_profile_files_path.exists()
+    assert settings.profile_files_path().exists()
+    assert (settings.profile_files_path() / "test").exists()
+
+
 class TestDeckUpdater:
     def test_update_note(
         self,
