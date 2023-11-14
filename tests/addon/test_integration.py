@@ -108,10 +108,6 @@ from ankihub.debug import (
     _setup_logging_for_sync_collection_and_media,
 )
 from ankihub.gui import operations, utils
-from ankihub.gui.addons import (
-    _change_file_permissions_of_addon_files,
-    _maybe_change_file_permissions_of_addon_files,
-)
 from ankihub.gui.auto_sync import _setup_ankihub_sync_on_ankiweb_sync
 from ankihub.gui.browser import custom_columns
 from ankihub.gui.browser.custom_search_nodes import UpdatedSinceLastReviewSearchNode
@@ -3994,69 +3990,34 @@ class TestSuggestionsWithMedia:
         assert name_of_uploaded_media == expected_media_name
 
 
-class TestAddonUpdate:
-    def test_addon_update(
+class TestAddonInstallAndUpdate:
+    def test_install_and_update_addon(
         self,
         anki_session_with_addon_data: AnkiSession,
-        monkeypatch: MonkeyPatch,
         qtbot: QtBot,
     ):
-        # Install the add-on so that all files are in the add-on folder.
-        # The anki_session fixture does not setup the add-ons code in the add-ons folder.
-        with anki_session_with_addon_data.profile_loaded():
-            mw = anki_session_with_addon_data.mw
+        """This test does not install the latest version of the add-on. It just tests
+        that we are not breaking the add-on update process somehow."""
 
-            result = mw.addonManager.install(file=str(ANKIHUB_ANKIADDON_FILE))
+        assert aqt.mw.addonManager.allAddons() == []
+
+        # Install the add-on
+        with anki_session_with_addon_data.profile_loaded():
+            result = aqt.mw.addonManager.install(file=str(ANKIHUB_ANKIADDON_FILE))
             assert isinstance(result, InstallOk)
+            assert aqt.mw.addonManager.allAddons() == ["ankihub"]
 
-        # The purpose of this mocks is to test whether our modifications to the add-on update process
-        # (defined in ankihub.addons) are used.
-        # The original functions will still be called because this sets the side effect to be the original functions,
-        # but this way we can check if they were called.
-        maybe_change_file_permissions_of_addon_files_mock = Mock()
-        maybe_change_file_permissions_of_addon_files_mock.side_effect = (
-            _maybe_change_file_permissions_of_addon_files
-        )
-        monkeypatch.setattr(
-            "ankihub.gui.addons._maybe_change_file_permissions_of_addon_files",
-            maybe_change_file_permissions_of_addon_files_mock,
-        )
-
-        # Udpate the AnkiHub add-on entry point has to be run so that the add-on is loaded and
-        # the patches to the update process are applied
+        # Udpate the add-on
         entry_point.run()
         with anki_session_with_addon_data.profile_loaded():
-            mw = anki_session_with_addon_data.mw
-
-            result = mw.addonManager.install(file=str(ANKIHUB_ANKIADDON_FILE))
+            result = aqt.mw.addonManager.install(file=str(ANKIHUB_ANKIADDON_FILE))
             assert isinstance(result, InstallOk)
+            assert aqt.mw.addonManager.allAddons() == ["ankihub"]
 
-            assert mw.addonManager.allAddons() == ["ankihub"]
-
-        # This is called twice: for backupUserFiles and for deleteAddon.
-        assert maybe_change_file_permissions_of_addon_files_mock.call_count == 2
-
-        # start Anki
+        # Start Anki
         entry_point.run()
         with anki_session_with_addon_data.profile_loaded():
-            mw = anki_session_with_addon_data.mw
-
-            assert mw.addonManager.allAddons() == ["ankihub"]
-            qtbot.wait(1000)
-
-    def test_that_changing_file_permissions_of_addons_folder_does_not_break_addon_load(
-        self, anki_session_with_addon_data: AnkiSession, qtbot: QtBot
-    ):
-        with anki_session_with_addon_data.profile_loaded():
-            mw = anki_session_with_addon_data.mw
-
-            addon_dir = Path(mw.addonManager.addonsFolder("ankihub"))
-            _change_file_permissions_of_addon_files(addon_dir=addon_dir)
-
-        entry_point.run()
-        with anki_session_with_addon_data.profile_loaded():
-            mw = anki_session_with_addon_data.mw
-
+            assert aqt.mw.addonManager.allAddons() == ["ankihub"]
             qtbot.wait(1000)
 
 
