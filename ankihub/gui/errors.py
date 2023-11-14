@@ -136,7 +136,6 @@ def _upload_logs_and_data_in_background(key: str) -> str:
     # detach the ankihub database from the anki database connection to prevent file permission errors
     detach_ankihub_db_from_anki_db_connection()
 
-    # zip the user files and the log file
     file_path = _zip_logs_and_data()
 
     # upload the zip file
@@ -434,9 +433,9 @@ def _report_exception(
         scope.set_context("anki version", {"version": ANKI_VERSION})
 
         try:
-            scope.set_context("user files", _ankihub_base_path_context_dict())
+            scope.set_context("ankihub base files", _ankihub_base_path_context_dict())
         except Exception as e:
-            LOGGER.warning(f"Could not get user files context: {e}")
+            LOGGER.warning(f"Could not get ankihub base files context: {e}")
 
         for key, value in context.items():
             scope.set_context(key, value)
