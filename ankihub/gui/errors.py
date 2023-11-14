@@ -39,9 +39,9 @@ from ..settings import (
     ANKI_VERSION,
     ANKIWEB_ID,
     addon_dir_path,
+    ankihub_base_path,
     config,
     log_file_path,
-    user_files_path,
 )
 from .deck_updater import NotLoggedInError
 from .error_dialog import ErrorDialog
@@ -134,7 +134,6 @@ def upload_logs_and_data_in_background(
 
 
 def _upload_logs_and_data_in_background(key: str) -> str:
-
     # detach the ankihub database from the anki database connection to prevent file permission errors
     detach_ankihub_db_from_anki_db_connection()
 
@@ -155,24 +154,14 @@ def _upload_logs_and_data_in_background(key: str) -> str:
 
 
 def _zip_logs_and_data() -> Path:
-    """Zip the log file, the user files directory and the anki collection and return the path of the zip file."""
+    """Zip the ankihub base directory (which contains logs) and the anki collection.
+    Return the path of the zip file."""
     temp_file = tempfile.NamedTemporaryFile(delete=False)
     temp_file.close()
     with zipfile.ZipFile(temp_file.name, "w") as zipf:
-        # Add the log file to the zip.
-        log_file = log_file_path()
-        if log_file.exists():
-            zipf.write(log_file, arcname=log_file.name)
-        else:
-            LOGGER.info("No logs to upload.")
-
-        # Add the user files directory to the zip.
-        source_dir = user_files_path()
+        # Add the ankihub base directory to the zip. It also contains the logs.
+        source_dir = ankihub_base_path()
         for file in source_dir.rglob("*"):
-            # previously logs were stored in the user files directory and we don't want to
-            # include old log files in the zip
-            if file.name.endswith(".log") or ".log." in file.name:
-                continue
             zipf.write(file, arcname=file.relative_to(source_dir))
 
         # Add the Anki collection to the zip.
@@ -446,7 +435,7 @@ def _report_exception(
         scope.set_context("anki version", {"version": ANKI_VERSION})
 
         try:
-            scope.set_context("user files", _user_files_context_dict())
+            scope.set_context("user files", _ankihub_base_path_context_dict())
         except Exception as e:
             LOGGER.warning(f"Could not get user files context: {e}")
 
@@ -491,12 +480,10 @@ def _report_exception(
     return sentry_id
 
 
-def _user_files_context_dict() -> Dict[str, Any]:
-    """Return a dict with information about the user files of the AnkiHub add-on to be sent as
+def _ankihub_base_path_context_dict() -> Dict[str, Any]:
+    """Return a dict with information about the files of the AnkiHub add-on to be sent as
     context to Sentry."""
-    ankihub_module = aqt.mw.addonManager.addonFromModule(__name__)
-    user_files_path = Path(aqt.mw.addonManager._userFilesPath(ankihub_module))
-    all_file_paths = [user_files_path, *list(user_files_path.rglob("*"))]
+    all_file_paths = [ankihub_base_path(), *list(ankihub_base_path().rglob("*"))]
     problematic_file_paths = []
     if is_win:
         problematic_file_paths = [
@@ -525,7 +512,6 @@ def _file_is_accessible(f: Path) -> bool:
 
 
 def _normalize_url(url: str):
-
     # remove parameters
     result = re.sub(r"\?.+$", "", url)
 
@@ -536,7 +522,6 @@ def _normalize_url(url: str):
 
 
 def _error_reporting_enabled() -> bool:
-
     # Not sure if this is really necessary, but HyperTTS does it:
     # https://github.com/Language-Tools/anki-hyper-tts/blob/a73785eb43068db08f073809c74c4dd1f236a557/__init__.py#L34-L37
     # Some other add-ons package an obsolete version of sentry-sdk, which causes problems(?) when

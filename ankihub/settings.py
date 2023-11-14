@@ -15,7 +15,7 @@ from json import JSONDecodeError
 from logging.handlers import RotatingFileHandler
 from pathlib import Path
 from pprint import pformat
-from shutil import copyfile, rmtree
+from shutil import copyfile, copytree, rmtree
 from typing import Any, Callable, Dict, List, Optional
 
 import aqt
@@ -363,13 +363,40 @@ def setup_profile_data_folder() -> bool:
     _assign_id_to_profile_if_not_exists()
     LOGGER.info(f"Anki profile id: {_get_anki_profile_id()}")
 
-    if not (path := profile_files_path()).exists():
-        path.mkdir(parents=True)
-
     if _profile_data_exists_at_old_location():
         return _migrate_profile_data_from_old_location()
 
+    if _addon_data_exists_at_old_location():
+        _migrate_addon_data_from_old_location()
+
+    if not (path := profile_files_path()).exists():
+        path.mkdir(parents=True)
+
     return True
+
+
+def _addon_data_exists_at_old_location() -> bool:
+    old_profile_path = user_files_path() / _get_anki_profile_id()
+    result = old_profile_path.exists()
+    return result
+
+
+def _migrate_addon_data_from_old_location() -> None:
+    """Migrate the add-ons data from user_files to the ankihub_base_folder."""
+    LOGGER.info("Migrating add-on data from user_files to ankihub base folder...")
+
+    # Copy the files to the destination.
+    ankihub_base_path().mkdir(parents=True, exist_ok=True)
+    for file in user_files_path().glob("*"):
+        if file.is_dir():
+            copytree(file, ankihub_base_path() / file.name)
+        else:
+            copyfile(file, ankihub_base_path() / file.name)
+
+    # Remove the source files.
+    rmtree(user_files_path())
+
+    LOGGER.info("Migrated add-on data from user_files to ankihub base folder.")
 
 
 def _assign_id_to_profile_if_not_exists() -> None:
@@ -411,7 +438,7 @@ def profile_files_path() -> Path:
     """Path to the add-on data for this Anki profile."""
     # we need an id instead of using the profile name because profiles can be renamed
     cur_profile_id = _get_anki_profile_id()
-    result = user_files_path() / cur_profile_id
+    result = ankihub_base_path() / cur_profile_id
     return result
 
 
@@ -433,7 +460,8 @@ def _profile_data_exists_at_old_location() -> bool:
 def _migrate_profile_data_from_old_location() -> bool:
     """Migration of add-on files from before the add-on added support for multiple Anki profiles was added
     into a profile-specific folder.
-    Returns True if the data was migrated and False if it remains at the old location."""
+    Returns True if the data was migrated and False if it remains at the old location.
+    """
     if not _profile_data_exists_at_old_location():
         LOGGER.info("No data to migrate.")
         return True
@@ -487,13 +515,16 @@ def _file_should_be_migrated(file_path: Path) -> bool:
     return result
 
 
-def log_file_path() -> Path:
-    """Path to the add-on log file.
-    The log file is outside of the user files folder because it caused problems when updating the add-on."""
-    # _defaultBase is the Anki data folder, we create a sibling folder to it, where we store the log file.
+def ankihub_base_path() -> Path:
+    # _default_base is the Anki data folder, we create a sibling folder to it, where we store the log file.
     anki_base = Path(aqt.mw.pm._default_base())
-    ankihub_base = anki_base.parent / "AnkiHub"
-    result = ankihub_base / "ankihub.log"
+    result = anki_base.parent / "AnkiHub"
+    return result
+
+
+def log_file_path() -> Path:
+    """Path to the add-on log file."""
+    result = ankihub_base_path() / "ankihub.log"
     result.parent.mkdir(parents=True, exist_ok=True)
     return result
 
