@@ -26,7 +26,7 @@ from sentry_sdk.integrations.logging import LoggingIntegration
 from sentry_sdk.integrations.stdlib import StdlibIntegration
 from sentry_sdk.integrations.threading import ThreadingIntegration
 
-from .. import LOGGER
+from .. import LOGGER, settings
 from ..addon_ankihub_client import AddonAnkiHubClient as AnkiHubClient
 from ..ankihub_client import AnkiHubHTTPError, AnkiHubRequestException
 from ..db import (
@@ -39,7 +39,6 @@ from ..settings import (
     ANKI_VERSION,
     ANKIWEB_ID,
     addon_dir_path,
-    ankihub_base_path,
     config,
     log_file_path,
 )
@@ -160,7 +159,7 @@ def _zip_logs_and_data() -> Path:
     temp_file.close()
     with zipfile.ZipFile(temp_file.name, "w") as zipf:
         # Add the ankihub base directory to the zip. It also contains the logs.
-        source_dir = ankihub_base_path()
+        source_dir = settings.ankihub_base_path()
         for file in source_dir.rglob("*"):
             zipf.write(file, arcname=file.relative_to(source_dir))
 
@@ -483,7 +482,10 @@ def _report_exception(
 def _ankihub_base_path_context_dict() -> Dict[str, Any]:
     """Return a dict with information about the files of the AnkiHub add-on to be sent as
     context to Sentry."""
-    all_file_paths = [ankihub_base_path(), *list(ankihub_base_path().rglob("*"))]
+    all_file_paths = [
+        settings.ankihub_base_path(),
+        *list(settings.ankihub_base_path().rglob("*")),
+    ]
     problematic_file_paths = []
     if is_win:
         problematic_file_paths = [
