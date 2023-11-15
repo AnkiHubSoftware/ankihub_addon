@@ -359,12 +359,14 @@ config = _Config()
 
 
 def setup_profile_data_folder() -> bool:
-    """Returns False if the migration from the old location needs yet to be done."""
+    """Sets up the profile data folder for the currently open Anki profile.
+    Returns False if the migration from the add-on version with no support for multiple Anki profiles
+    needs yet to be done."""
     _assign_id_to_profile_if_not_exists()
     LOGGER.info(f"Anki profile id: {_get_anki_profile_id()}")
 
-    if _profile_data_exists_at_old_location():
-        return _migrate_profile_data_from_old_location()
+    if not _maybe_migrate_profile_data_from_old_location():
+        return False
 
     _maybe_migrate_addon_data_from_old_location()
 
@@ -450,7 +452,7 @@ def _profile_data_exists_at_old_location() -> bool:
     return result
 
 
-def _migrate_profile_data_from_old_location() -> bool:
+def _maybe_migrate_profile_data_from_old_location() -> bool:
     """Migration of add-on files from before the add-on added support for multiple Anki profiles was added
     into a profile-specific folder.
     Returns True if the data was migrated and False if it remains at the old location.
