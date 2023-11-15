@@ -517,6 +517,9 @@ def _file_should_be_migrated(file_path: Path) -> bool:
 
 def ankihub_base_path() -> Path:
     """Path to the folder where the add-on stores its data."""
+    if path_from_env_var := os.getenv("ANKIHUB_BASE_PATH"):
+        return Path(path_from_env_var)
+
     anki_base = Path(aqt.mw.pm._default_base())
     result = anki_base.parent / "AnkiHub"
     return result
