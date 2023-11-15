@@ -1,4 +1,5 @@
 import json
+import os
 import shutil
 import tempfile
 import uuid
@@ -82,7 +83,7 @@ def anki_session_with_addon_data(
 
     with tempfile.TemporaryDirectory() as tmpdir:
         # Change the ankihub base path to a temporary folder to isolate the tests
-        monkeypatch.setattr("ankihub.settings.ankihub_base_path", lambda: Path(tmpdir))
+        os.environ["ANKIHUB_BASE_PATH"] = tmpdir
 
         config.setup_public_config_and_urls()
         setup_logger()

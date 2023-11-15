@@ -168,6 +168,7 @@ from ankihub.settings import (
     DeckExtension,
     DeckExtensionConfig,
     SuspendNewCardsOfExistingNotes,
+    ankihub_base_path,
     config,
     profile_files_path,
 )
@@ -2988,7 +2989,7 @@ def test_migrate_profile_data_from_old_location(
     assert len(config.deck_ids()) == 1
 
     # Assert the expected contents of the ankihub base folder
-    assert set([x.name for x in settings.ankihub_base_path().glob("*")]) == {
+    assert set([x.name for x in ankihub_base_path().glob("*")]) == {
         str(TEST_PROFILE_ID),
         "ankihub.log",
     }
@@ -3017,7 +3018,7 @@ def test_profile_swap(
     with anki_session.profile_loaded():
         mw = anki_session.mw
 
-        assert profile_files_path() == settings.ankihub_base_path() / str(PROFILE_1_ID)
+        assert profile_files_path() == ankihub_base_path() / str(PROFILE_1_ID)
 
         install_sample_ah_deck()
 
@@ -3035,9 +3036,7 @@ def test_profile_swap(
     with monkeypatch.context() as m:
         m.setattr("uuid.uuid4", lambda: PROFILE_2_ID)
         with anki_session.profile_loaded():
-            assert profile_files_path() == settings.ankihub_base_path() / str(
-                PROFILE_2_ID
-            )
+            assert profile_files_path() == ankihub_base_path() / str(PROFILE_2_ID)
             # the database should be empty
             assert len(ankihub_db.ankihub_deck_ids()) == 0
             # the config should not conatin any deck subscriptions
@@ -3046,7 +3045,7 @@ def test_profile_swap(
     # load the first profile again
     mw.pm.load(PROFILE_1_NAME)
     with anki_session.profile_loaded():
-        assert profile_files_path() == settings.ankihub_base_path() / str(PROFILE_1_ID)
+        assert profile_files_path() == ankihub_base_path() / str(PROFILE_1_ID)
         # the database should contain the imported deck
         assert len(ankihub_db.ankihub_deck_ids()) == 1
         # the config should contain the deck subscription
