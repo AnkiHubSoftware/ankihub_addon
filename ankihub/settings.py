@@ -370,28 +370,9 @@ def setup_profile_data_folder() -> bool:
 
     _maybe_migrate_addon_data_from_old_location()
 
-    if not (path := profile_files_path()).exists():
-        path.mkdir(parents=True)
+    profile_files_path().mkdir(parents=True, exist_ok=True)
 
     return True
-
-
-def _maybe_migrate_addon_data_from_old_location() -> None:
-    """Migrate profile data folders from user_fiels to ankihub_base_path() if they exist in user_files."""
-    ankihub_base_path().mkdir(parents=True, exist_ok=True)
-
-    for file in user_files_path().glob("*"):
-        if not file.is_dir():
-            continue
-
-        try:
-            uuid.UUID(file.name)
-        except ValueError:
-            continue
-        else:
-            # Only move the folder if it's name is a uuid, otherwise it's not an add-on data folder
-            move(file, ankihub_base_path() / file.name)
-            LOGGER.info(f"Migrated add-on data for profile {file.name}")
 
 
 def _assign_id_to_profile_if_not_exists() -> None:
@@ -508,6 +489,24 @@ def _file_should_be_migrated(file_path: Path) -> bool:
         and not re.match(r".+\.log(\.\d+)?$", file_path.name)
     )
     return result
+
+
+def _maybe_migrate_addon_data_from_old_location() -> None:
+    """Migrate profile data folders from user_files to ankihub_base_path() if they exist in user_files."""
+    ankihub_base_path().mkdir(parents=True, exist_ok=True)
+
+    for file in user_files_path().glob("*"):
+        if not file.is_dir():
+            continue
+
+        try:
+            uuid.UUID(file.name)
+        except ValueError:
+            continue
+        else:
+            # Only move the folder if it's name is a uuid, otherwise it's not an add-on data folder
+            move(file, ankihub_base_path() / file.name)
+            LOGGER.info(f"Migrated add-on data for profile {file.name}")
 
 
 def ankihub_base_path() -> Path:
