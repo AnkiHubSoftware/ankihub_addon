@@ -109,7 +109,7 @@ def anki_session_with_addon_before_profile_support(anki_session_with_addon_data)
     with anki_session.profile_loaded():
         mw = anki_session.mw
 
-        # Setup up the user_files folder with test data
+        # Set up the user_files folder with test data
         user_files_path = Path(mw.addonManager.addonsFolder("ankihub")) / "user_files"
 
         if user_files_path.exists():
