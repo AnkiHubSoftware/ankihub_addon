@@ -15,7 +15,7 @@ from json import JSONDecodeError
 from logging.handlers import RotatingFileHandler
 from pathlib import Path
 from pprint import pformat
-from shutil import copyfile, copytree, rmtree
+from shutil import copyfile, move, rmtree
 from typing import Any, Callable, Dict, List, Optional
 
 import aqt
@@ -366,8 +366,7 @@ def setup_profile_data_folder() -> bool:
     if _profile_data_exists_at_old_location():
         return _migrate_profile_data_from_old_location()
 
-    if _addon_data_exists_at_old_location():
-        _migrate_addon_data_from_old_location()
+    _maybe_migrate_addon_data_from_old_location()
 
     if not (path := profile_files_path()).exists():
         path.mkdir(parents=True)
@@ -375,28 +374,22 @@ def setup_profile_data_folder() -> bool:
     return True
 
 
-def _addon_data_exists_at_old_location() -> bool:
-    old_profile_files_path = user_files_path() / _get_anki_profile_id()
-    result = old_profile_files_path.exists()
-    return result
-
-
-def _migrate_addon_data_from_old_location() -> None:
-    """Migrate the add-ons data from user_files to the ankihub_base_folder."""
-    LOGGER.info("Migrating add-on data from user_files to ankihub base folder...")
-
-    # Copy the files to the destination.
+def _maybe_migrate_addon_data_from_old_location() -> None:
+    """Migrate profile data folders from user_fiels to ankihub_base_path() if they exist in user_files."""
     ankihub_base_path().mkdir(parents=True, exist_ok=True)
+
     for file in user_files_path().glob("*"):
-        if file.is_dir():
-            copytree(file, ankihub_base_path() / file.name)
+        if not file.is_dir():
+            continue
+
+        try:
+            uuid.UUID(file.name)
+        except ValueError:
+            continue
         else:
-            copyfile(file, ankihub_base_path() / file.name)
-
-    # Remove the source files.
-    rmtree(user_files_path())
-
-    LOGGER.info("Migrated add-on data from user_files to ankihub base folder.")
+            # Only move the folder if it's name is a uuid, otherwise it's not an add-on data folder
+            move(file, ankihub_base_path() / file.name)
+            LOGGER.info(f"Migrated add-on data for profile {file.name}")
 
 
 def _assign_id_to_profile_if_not_exists() -> None:
