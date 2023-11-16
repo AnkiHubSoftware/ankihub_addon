@@ -6,7 +6,8 @@ from datetime import datetime
 from typing import Callable, List
 
 import aqt
-from aqt.emptycards import show_empty_cards
+from anki.collection import EmptyCardsReport
+from aqt.emptycards import EmptyCardsDialog
 from aqt.operations.tag import clear_unused_tags
 from aqt.qt import QMessageBox, Qt
 
@@ -23,7 +24,7 @@ from ...settings import DeckConfig, config
 from ..exceptions import DeckDownloadAndInstallError, RemoteDeckNotFoundError
 from ..media_sync import media_sync
 from ..messages import messages
-from ..utils import ask_user, ask_user_dialog
+from ..utils import ask_user_dialog
 from .subdecks import confirm_and_toggle_subdecks
 from .utils import future_with_exception, future_with_result
 
@@ -50,9 +51,8 @@ def download_and_install_decks(
             on_done(future_with_exception(e))
 
     def on_install_done_inner(import_results: List[AnkiHubImportResult]):
-
-        # Clean up after deck installations
-        _cleanup_after_deck_install(multiple_decks=len(import_results) > 1)
+        if cleanup:
+            _cleanup_after_deck_install()
 
         # Reset the main window
         aqt.mw.reset()
@@ -219,15 +219,20 @@ def _download_progress_cb(percent: int):
     )
 
 
-def _cleanup_after_deck_install(multiple_decks: bool) -> None:
-    message = (
-        (
-            "The deck has been successfully installed!<br><br>"
-            if not multiple_decks
-            else "The decks have been successfully installed!<br><br>"
-        )
-        + "Do you want to clear unused tags and empty cards from your collection? (recommended)"
-    )
-    if ask_user(message, title="AnkiHub", show_cancel_button=False):
-        clear_unused_tags(parent=aqt.mw).run_in_background()
-        show_empty_cards(aqt.mw)
+def _cleanup_after_deck_install() -> None:
+    clear_unused_tags(parent=aqt.mw).run_in_background()
+    _clear_empty_cards()
+
+
+def _clear_empty_cards() -> None:
+    def on_done(future: Future) -> None:
+        # This uses the EmptyCardsDialog to delete empty cards without showing the dialog.
+        report: EmptyCardsReport = future.result()
+        if not report.notes:
+            LOGGER.info("No empty cards found.")
+            return
+        dialog = EmptyCardsDialog(aqt.mw, report)
+        deleted_amount = dialog._delete_cards(keep_notes=True)
+        LOGGER.info(f"Deleted {deleted_amount} empty cards.")
+
+    aqt.mw.taskman.run_in_background(aqt.mw.col.get_empty_cards, on_done=on_done)
