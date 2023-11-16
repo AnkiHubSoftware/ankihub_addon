@@ -107,6 +107,7 @@ from ankihub.main.subdecks import (
     deck_contains_subdeck_tags,
 )
 from ankihub.main.utils import (
+    clear_empty_cards,
     lowest_level_common_ancestor_deck_name,
     mids_of_notes,
     retain_nids_with_ah_note_type,
@@ -216,7 +217,6 @@ class TestMediaSyncMediaUpload:
 
 
 def test_lowest_level_common_ancestor_deck_name():
-
     deck_names = [
         "A",
         "A::B",
@@ -671,7 +671,8 @@ def mock_dependiencies_for_suggestion_dialog(
 ) -> MockDependenciesForSuggestionDialog:
     """Mocks the dependencies for open_suggestion_dialog_for_note.
     Returns a tuple of mocks that replace suggest_note_update and suggest_new_note
-    If user_cancels is True, SuggestionDialog.run behaves as if the user cancelled the dialog."""
+    If user_cancels is True, SuggestionDialog.run behaves as if the user cancelled the dialog.
+    """
 
     def mock_dependencies_for_suggestion_dialog_inner(
         user_cancels: bool,
@@ -809,7 +810,8 @@ def mock_dependencies_for_bulk_suggestion_dialog(
 ) -> MockDependenciesForBulkSuggestionDialog:
     """Mocks the dependencies for open_suggestion_dialog_for_bulk_suggestion.
     Returns a Mock that replaces suggest_notes_in_bulk.
-    If user_cancels is True, SuggestionDialog.run behaves as if the user cancelled the dialog."""
+    If user_cancels is True, SuggestionDialog.run behaves as if the user cancelled the dialog.
+    """
 
     def mock_dependencies_for_suggestion_dialog_inner(user_cancels: bool) -> Mock:
         monkeypatch.setattr(
@@ -1268,7 +1270,6 @@ class TestAnkiHubDBDownloadableMediaNamesForAnkiHubDeck:
         exists_on_s3: bool,
         download_enabled: bool,
     ):
-
         with anki_session_with_addon_data.profile_loaded():
             ah_did = next_deterministic_uuid()
             ankihub_db.upsert_deck_media_infos(
@@ -2069,3 +2070,26 @@ class TestSendReviewData:
             assert_datetime_equal_ignore_milliseconds(
                 card_review_data.last_card_review_at, second_review_time
             )
+
+
+def test_clear_empty_cards(anki_session_with_addon_data: AnkiSession, qtbot: QtBot):
+    with anki_session_with_addon_data.profile_loaded():
+        # Create a note with two cards.
+        note = aqt.mw.col.new_note(
+            aqt.mw.col.models.by_name("Cloze"),
+        )
+        note["Text"] = "{{c1::first}} {{c2::second}}"
+        aqt.mw.col.add_note(note, DeckId(1))
+        assert len(note.cards()) == 2  # sanity check
+
+        # Cause the second card to be empty.
+        note["Text"] = "{{c1::first}}"
+        aqt.mw.col.update_note(note)
+        assert len(note.cards()) == 2  # sanity check
+
+        # Clear the empty card.
+        clear_empty_cards()
+        qtbot.wait_until(lambda: len(note.cards()) == 1)
+
+        # Assert that the empty card was cleared.
+        assert len(note.cards()) == 1
