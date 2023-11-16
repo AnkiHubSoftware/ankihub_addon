@@ -220,6 +220,8 @@ def _download_progress_cb(percent: int):
 
 
 def _cleanup_after_deck_install() -> None:
+    """Clears unused tags and empty cards. We do this because importing a deck which the user
+    already has in their collection can result in many unused tags and empty cards."""
     clear_unused_tags(parent=aqt.mw).run_in_background()
     _clear_empty_cards()
 
