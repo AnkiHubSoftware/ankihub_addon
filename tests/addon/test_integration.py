@@ -124,7 +124,7 @@ from ankihub.gui.editor import _on_suggestion_button_press, _refresh_buttons
 from ankihub.gui.errors import upload_logs_and_data_in_background
 from ankihub.gui.media_sync import media_sync
 from ankihub.gui.menu import menu_state
-from ankihub.gui.operations import ankihub_sync
+from ankihub.gui.operations import ankihub_sync, new_deck_subscriptions
 from ankihub.gui.operations.db_check import ah_db_check
 from ankihub.gui.operations.db_check.ah_db_check import check_ankihub_db
 from ankihub.gui.operations.deck_installation import download_and_install_decks
@@ -814,6 +814,41 @@ class TestCheckAndInstallNewDeckSubscriptions:
             # Assert that the on_done callback was called with a future with a result of None
             assert on_done_mock.call_count == 1
             assert on_done_mock.call_args[0][0].result() is None
+
+    def test_confirmation_dialog_raises_exception(
+        self,
+        anki_session_with_addon_data: AnkiSession,
+        qtbot: QtBot,
+        mock_function: MockFunction,
+    ):
+        anki_session = anki_session_with_addon_data
+        with anki_session.profile_loaded():
+            # Mock confirmation dialog to raise an exception
+
+            def raise_exception(*args, **kwargs):
+                raise Exception("Something went wrong")
+
+            message_box_mock = mock_function(
+                new_deck_subscriptions,
+                "MessageBox",
+                side_effect=raise_exception,
+            )
+
+            # Call the function with a deck
+            on_done_mock = Mock()
+            deck = DeckFactory.create()
+            check_and_install_new_deck_subscriptions(
+                subscribed_decks=[deck], on_done=on_done_mock
+            )
+
+            qtbot.wait(500)
+
+            # Assert that the on_done callback was called with a future with an exception
+            assert on_done_mock.call_count == 1
+            assert on_done_mock.call_args[0][0].exception() is not None
+
+            # Assert that the mocked functions were called
+            assert message_box_mock.call_count == 1
 
     def test_install_operation_raises_exception(
         self,
