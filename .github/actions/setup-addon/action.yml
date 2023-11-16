@@ -29,7 +29,8 @@ runs:
       uses: jurplel/install-qt-action@v3
       with:
         version: "5.15.2"
-        setup-python: "false"
+        setup-python: false
+        cache: true
       continue-on-error: true
 
     - name: Install deps
