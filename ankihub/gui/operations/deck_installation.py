@@ -6,8 +6,6 @@ from datetime import datetime
 from typing import Callable, List
 
 import aqt
-from anki.collection import EmptyCardsReport
-from aqt.emptycards import EmptyCardsDialog
 from aqt.operations.tag import clear_unused_tags
 from aqt.qt import QMessageBox, Qt
 
@@ -19,7 +17,7 @@ from ...ankihub_client.models import UserDeckRelation
 from ...main.importing import AnkiHubImporter, AnkiHubImportResult
 from ...main.note_types import fetch_note_types_based_on_notes
 from ...main.subdecks import deck_contains_subdeck_tags
-from ...main.utils import create_backup
+from ...main.utils import clear_empty_cards, create_backup
 from ...settings import DeckConfig, config
 from ..exceptions import DeckDownloadAndInstallError, RemoteDeckNotFoundError
 from ..media_sync import media_sync
@@ -225,18 +223,4 @@ def _cleanup_after_deck_install() -> None:
     """Clears unused tags and empty cards. We do this because importing a deck which the user
     already has in their collection can result in many unused tags and empty cards."""
     clear_unused_tags(parent=aqt.mw).run_in_background()
-    _clear_empty_cards()
-
-
-def _clear_empty_cards() -> None:
-    def on_done(future: Future) -> None:
-        # This uses the EmptyCardsDialog to delete empty cards without showing the dialog.
-        report: EmptyCardsReport = future.result()
-        if not report.notes:
-            LOGGER.info("No empty cards found.")
-            return
-        dialog = EmptyCardsDialog(aqt.mw, report)
-        deleted_amount = dialog._delete_cards(keep_notes=True)
-        LOGGER.info(f"Deleted {deleted_amount} empty cards.")
-
-    aqt.mw.taskman.run_in_background(aqt.mw.col.get_empty_cards, on_done=on_done)
+    clear_empty_cards()

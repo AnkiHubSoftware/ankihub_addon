@@ -2,17 +2,20 @@ import copy
 import hashlib
 import re
 import time
+from concurrent.futures import Future
 from pathlib import Path
 from pprint import pformat
 from textwrap import dedent
 from typing import Any, Collection, Dict, Iterable, List, Optional, Sequence, Set, Tuple
 
 import aqt
+from anki.collection import EmptyCardsReport
 from anki.decks import DeckId
 from anki.errors import NotFoundError
 from anki.models import ChangeNotetypeRequest, NoteType, NotetypeDict, NotetypeId
 from anki.notes import Note, NoteId
 from anki.utils import checksum, ids2str
+from aqt.emptycards import EmptyCardsDialog
 
 from .. import LOGGER, settings
 from ..db import ankihub_db
@@ -32,7 +35,6 @@ if ANKI_INT_VERSION >= ANKI_VERSION_23_10_00:
 
 
 def create_deck_with_id(deck_name: str, deck_id: DeckId) -> None:
-
     source_did = aqt.mw.col.decks.add_normal_deck_with_name(
         get_unique_deck_name(deck_name)
     ).id
@@ -130,6 +132,26 @@ def add_notes(notes: Collection[Note], deck_id: DeckId) -> None:
         aqt.mw.col.save()
 
 
+# cards
+
+
+def clear_empty_cards() -> None:
+    """Delete empty cards from the database.
+    Uses the EmptyCardsDialog to delete empty cards without showing the dialog."""
+
+    def on_done(future: Future) -> None:
+        # This uses the EmptyCardsDialog to delete empty cards without showing the dialog.
+        report: EmptyCardsReport = future.result()
+        if not report.notes:
+            LOGGER.info("No empty cards found.")
+            return
+        dialog = EmptyCardsDialog(aqt.mw, report)
+        deleted_amount = dialog._delete_cards(keep_notes=True)
+        LOGGER.info(f"Deleted {deleted_amount} empty cards.")
+
+    aqt.mw.taskman.run_in_background(aqt.mw.col.get_empty_cards, on_done=on_done)
+
+
 # note types
 def create_note_type_with_id(note_type: NotetypeDict, mid: NotetypeId) -> None:
     note_type_copy = copy.deepcopy(note_type)
@@ -172,7 +194,6 @@ def get_note_types_in_deck(did: DeckId) -> List[NotetypeId]:
 
 
 def reset_note_types_of_notes(nid_mid_pairs: List[Tuple[NoteId, NotetypeId]]) -> None:
-
     note_type_conflicts: Set[Tuple[NoteId, NotetypeId, NotetypeId]] = set()
     for nid, mid in nid_mid_pairs:
         try:
@@ -197,7 +218,6 @@ def reset_note_types_of_notes(nid_mid_pairs: List[Tuple[NoteId, NotetypeId]]) ->
 
 
 def change_note_type_of_note(nid: int, mid: int) -> None:
-
     current_schema: int = aqt.mw.col.db.scalar("select scm from col")
     note = aqt.mw.col.get_note(NoteId(nid))
     target_note_type = aqt.mw.col.models.get(NotetypeId(mid))
