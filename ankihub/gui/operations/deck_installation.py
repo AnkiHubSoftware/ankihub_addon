@@ -31,7 +31,7 @@ from .utils import future_with_exception, future_with_result
 
 def download_and_install_decks(
     ankihub_dids: List[uuid.UUID],
-    on_done: Callable[[Future], None],
+    on_done: Callable[[Future[List[AnkiHubImportResult]]], None],
     cleanup: bool = True,
 ) -> None:
     """Downloads and installs the given decks in the background.
@@ -48,7 +48,6 @@ def download_and_install_decks(
 
         try:
             on_install_done_inner(import_results)
-            on_done(future_with_result(None))
         except Exception as e:
             on_done(future_with_exception(e))
 
@@ -65,7 +64,7 @@ def download_and_install_decks(
             if deck_contains_subdeck_tags(ah_did):
                 confirm_and_toggle_subdecks(ah_did)
 
-        _show_deck_import_summary_dialog(import_results)
+        on_done(future_with_result(import_results))
 
     try:
         # Install decks in background
@@ -78,7 +77,7 @@ def download_and_install_decks(
         on_done(future_with_exception(e))
 
 
-def _show_deck_import_summary_dialog(
+def show_deck_import_summary_dialog(
     import_results: List[AnkiHubImportResult],
 ) -> None:
     ankihub_dids = [import_result.ankihub_did for import_result in import_results]
