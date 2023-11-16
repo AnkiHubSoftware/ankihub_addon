@@ -29,7 +29,9 @@ from .utils import future_with_exception, future_with_result
 
 
 def download_and_install_decks(
-    ankihub_dids: List[uuid.UUID], on_done: Callable[[Future], None]
+    ankihub_dids: List[uuid.UUID],
+    on_done: Callable[[Future], None],
+    cleanup: bool = True,
 ) -> None:
     """Downloads and installs the given decks in the background.
     Shows an import summary once the decks are installed."""

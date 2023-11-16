@@ -3,7 +3,7 @@ from concurrent.futures import Future
 from typing import Callable, List
 
 import aqt
-from aqt.qt import Qt
+from aqt.qt import QCheckBox, Qt
 from aqt.utils import MessageBox
 
 from ...ankihub_client import Deck
@@ -24,7 +24,10 @@ def check_and_install_new_deck_subscriptions(
             on_done(future_with_result(None))
             return
 
-        MessageBox(
+        cleanup_cb = QCheckBox("Remove unused tags and empty cards")
+        cleanup_cb.setChecked(True)
+
+        confirmation_dialog = MessageBox(
             title="AnkiHub | Sync",
             text=messages.deck_install_confirmation(decks),
             textFormat=Qt.TextFormat.RichText,
@@ -32,15 +35,26 @@ def check_and_install_new_deck_subscriptions(
             buttons=["Skip", "Install"],
             default_button=1,
             callback=lambda button_index: _on_button_clicked(
-                button_index=button_index, decks=decks, on_done=on_done
+                button_index=button_index,
+                cleanup_cb=cleanup_cb,
+                decks=decks,
+                on_done=on_done,
             ),
         )
+
+        confirmation_dialog.setCheckBox(cleanup_cb)
+
+        # This prevents the checkbox from being garbage collected too early
+        confirmation_dialog.cleanup_cb = cleanup_cb  # type: ignore
     except Exception as e:
         on_done(future_with_exception(e))
 
 
 def _on_button_clicked(
-    button_index: int, decks: List[Deck], on_done: Callable[[Future], None]
+    button_index: int,
+    cleanup_cb: QCheckBox,
+    decks: List[Deck],
+    on_done: Callable[[Future], None],
 ) -> None:
     if button_index == 0:
         # Skip
@@ -50,7 +64,9 @@ def _on_button_clicked(
     # Download the new decks
     try:
         ah_dids = [deck.ah_did for deck in decks]
-        download_and_install_decks(ah_dids, on_done=on_done)
+        download_and_install_decks(
+            ah_dids, on_done=on_done, cleanup=cleanup_cb.isChecked()
+        )
     except Exception as e:
         on_done(future_with_exception(e))
 
