@@ -58,8 +58,6 @@ from ankihub.gui.browser.browser import (
     _on_protect_fields_action,
     _on_reset_optional_tags_action,
 )
-from ankihub.gui.operations.db_check import ah_db_check
-from ankihub.gui.operations.db_check.ah_db_check import check_ankihub_db
 
 from ..factories import DeckFactory, DeckMediaFactory, NoteInfoFactory
 from ..fixtures import (
@@ -67,6 +65,7 @@ from ..fixtures import (
     InstallAHDeck,
     MockDownloadAndInstallDeckDependencies,
     MockFunction,
+    MockMessageBoxWithCB,
     MockStudyDeckDialogWithCB,
     create_or_get_ah_version_of_note_type,
     record_review,
@@ -126,6 +125,8 @@ from ankihub.gui.errors import upload_logs_and_data_in_background
 from ankihub.gui.media_sync import media_sync
 from ankihub.gui.menu import menu_state
 from ankihub.gui.operations import ankihub_sync
+from ankihub.gui.operations.db_check import ah_db_check
+from ankihub.gui.operations.db_check.ah_db_check import check_ankihub_db
 from ankihub.gui.operations.deck_installation import download_and_install_decks
 from ankihub.gui.operations.new_deck_subscriptions import (
     check_and_install_new_deck_subscriptions,
@@ -440,7 +441,6 @@ def create_change_suggestion(
     )
 
     def create_change_suggestion_inner(note: Note, wait_for_media_upload: bool):
-
         suggest_note_update(
             note=note,
             change_type=SuggestionType.NEW_CONTENT,
@@ -483,7 +483,6 @@ def create_new_note_suggestion(
     def create_new_note_suggestion_inner(
         note: Note, ah_did: uuid.UUID, wait_for_media_upload: bool
     ):
-
         suggest_new_note(
             note=note,
             comment="test",
@@ -734,13 +733,14 @@ class TestCheckAndInstallNewDeckSubscriptions:
         anki_session_with_addon_data: AnkiSession,
         qtbot: QtBot,
         mock_function: MockFunction,
+        mock_message_box_with_cb: MockMessageBoxWithCB,
     ):
         anki_session = anki_session_with_addon_data
         with anki_session.profile_loaded():
-
-            # Mock ask_user function to return True
-            ask_user_mock = mock_function(
-                operations.new_deck_subscriptions, "ask_user", return_value=True
+            # Mock confirmation dialog
+            mock_message_box_with_cb(
+                "ankihub.gui.operations.new_deck_subscriptions.MessageBox",
+                button_index=1,
             )
 
             # Mock download and install operation to only call the on_done callback
@@ -766,7 +766,6 @@ class TestCheckAndInstallNewDeckSubscriptions:
             assert on_done_mock.call_args[0][0].result() is None
 
             # Assert that the mocked functions were called
-            assert ask_user_mock.call_count == 1
             assert download_and_install_decks_mock.call_count == 1
             assert download_and_install_decks_mock.call_args[0][0] == [deck.ah_did]
 
@@ -774,14 +773,14 @@ class TestCheckAndInstallNewDeckSubscriptions:
         self,
         anki_session_with_addon_data: AnkiSession,
         qtbot: QtBot,
-        mock_function: MockFunction,
+        mock_message_box_with_cb: MockMessageBoxWithCB,
     ):
         anki_session = anki_session_with_addon_data
         with anki_session.profile_loaded():
-
-            # Mock ask_user function to return False
-            ask_user_mock = mock_function(
-                operations.new_deck_subscriptions, "ask_user", return_value=False
+            # Mock confirmation dialog
+            mock_message_box_with_cb(
+                "ankihub.gui.operations.new_deck_subscriptions.MessageBox",
+                button_index=0,
             )
 
             # Call the function with a deck
@@ -797,9 +796,6 @@ class TestCheckAndInstallNewDeckSubscriptions:
             assert on_done_mock.call_count == 1
             assert on_done_mock.call_args[0][0].result() is None
 
-            # Assert that the mocked function were called
-            assert ask_user_mock.call_count == 1
-
     def test_no_new_subscriptions(
         self,
         anki_session_with_addon_data: AnkiSession,
@@ -807,7 +803,6 @@ class TestCheckAndInstallNewDeckSubscriptions:
     ):
         anki_session = anki_session_with_addon_data
         with anki_session.profile_loaded():
-
             # Call the function with an empty list
             on_done_mock = Mock()
             check_and_install_new_deck_subscriptions(
@@ -825,13 +820,14 @@ class TestCheckAndInstallNewDeckSubscriptions:
         anki_session_with_addon_data: AnkiSession,
         qtbot: QtBot,
         mock_function: MockFunction,
+        mock_message_box_with_cb: MockMessageBoxWithCB,
     ):
         anki_session = anki_session_with_addon_data
         with anki_session.profile_loaded():
-
-            # Mock ask_user function to return True
-            ask_user_mock = mock_function(
-                operations.new_deck_subscriptions, "ask_user", return_value=True
+            # Mock confirmation dialog
+            mock_message_box_with_cb(
+                "ankihub.gui.operations.new_deck_subscriptions.MessageBox",
+                button_index=1,
             )
 
             # Mock download and install operation to raise an exception
@@ -858,7 +854,6 @@ class TestCheckAndInstallNewDeckSubscriptions:
             assert on_done_mock.call_args[0][0].exception() is not None
 
             # Assert that the mocked functions were called
-            assert ask_user_mock.call_count == 1
             assert download_and_install_decks_mock.call_count == 1
 
 
@@ -1379,7 +1374,6 @@ class TestAnkiHubImporter:
     ):
         anki_session = anki_session_with_addon_data
         with anki_session.profile_loaded():
-
             anki_did, _ = install_sample_ah_deck()
             first_local_did = anki_did
 
@@ -1697,7 +1691,6 @@ class TestAnkiHubImporterSuspendNewCardsOfExistingNotesOption:
     ):
         anki_session = anki_session_with_addon_data
         with anki_session.profile_loaded():
-
             ah_did = install_ah_deck()
             config.set_suspend_new_cards_of_existing_notes(ah_did, option_value)
 
@@ -1783,7 +1776,6 @@ class TestAnkiHubImporterSuspendNewCardsOfNewNotesOption:
     ):
         anki_session = anki_session_with_addon_data
         with anki_session.profile_loaded():
-
             ah_did = install_ah_deck()
             config.set_suspend_new_cards_of_new_notes(ah_did, option_value)
 
@@ -1879,7 +1871,6 @@ def test_unsubscribe_from_deck(
 
 
 def import_note_types_for_sample_deck(mw: AnkiQt):
-
     # import the apkg to get the note types, then delete created decks
     dids_before_import = all_dids()
 
@@ -2542,7 +2533,6 @@ class TestDeckManagementDialog:
         nightmode: bool,
     ):
         with anki_session_with_addon_data.profile_loaded():
-
             self._mock_dependencies(monkeypatch)
 
             deck_name = "Test Deck"
@@ -2580,7 +2570,6 @@ class TestDeckManagementDialog:
         monkeypatch: MonkeyPatch,
     ):
         with anki_session_with_addon_data.profile_loaded():
-
             self._mock_dependencies(monkeypatch)
 
             # Install a deck with subdeck tags
@@ -2697,7 +2686,6 @@ class TestDeckManagementDialog:
         next_deterministic_id: Callable[[], int],
     ):
         with anki_session_with_addon_data.profile_loaded():
-
             self._mock_dependencies(monkeypatch)
 
             ah_did = next_deterministic_uuid()
@@ -3213,7 +3201,6 @@ def test_sync_uninstalls_unsubscribed_decks(
     sync_with_ankihub: SyncWithAnkiHub,
     subscribed_to_deck: bool,
 ):
-
     with anki_session_with_addon_data.profile_loaded():
         mw = anki_session_with_addon_data.mw
 
@@ -4141,7 +4128,6 @@ def test_handle_notes_deleted_from_webapp(
     # Run the entry point and load the profile to trigger the handling of the deleted notes.
     entry_point.run()
     with anki_session_with_addon_data.profile_loaded():
-
         # Assert that the note has been deleted from the ankihub db if it was deleted from the webapp
         assert not ankihub_db.ankihub_nid_exists(ah_nid) == was_deleted_from_webapp
 
@@ -4198,7 +4184,6 @@ def test_upload_logs_and_data(
 
 class TestConfigDialog:
     def test_ankihub_menu_item_exists(self, anki_session_with_addon_data: AnkiSession):
-
         entry_point.run()
         with anki_session_with_addon_data.profile_loaded():
             # Assert that the Config menu item exists
@@ -4212,7 +4197,6 @@ class TestConfigDialog:
     def test_open_config_dialog(
         self, anki_session_with_addon_data: AnkiSession, qtbot: QtBot
     ):
-
         with anki_session_with_addon_data.profile_loaded():
             setup_config_dialog_manager()
 
