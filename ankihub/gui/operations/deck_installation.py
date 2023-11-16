@@ -35,7 +35,9 @@ def download_and_install_decks(
     cleanup: bool = True,
 ) -> None:
     """Downloads and installs the given decks in the background.
-    Shows an import summary once the decks are installed."""
+    Shows an import summary once the decks are installed.
+    If cleanup is True, unused tags and empty cards are cleared after the decks are installed.
+    """
 
     def on_install_done(future: Future):
         try:
