@@ -32,7 +32,6 @@ if ANKI_INT_VERSION >= ANKI_VERSION_23_10_00:
 
 
 def create_deck_with_id(deck_name: str, deck_id: DeckId) -> None:
-
     source_did = aqt.mw.col.decks.add_normal_deck_with_name(
         get_unique_deck_name(deck_name)
     ).id
@@ -130,6 +129,25 @@ def add_notes(notes: Collection[Note], deck_id: DeckId) -> None:
         aqt.mw.col.save()
 
 
+# cards
+
+
+def move_notes_to_decks_while_respecting_odid(nid_to_did: Dict[NoteId, DeckId]) -> None:
+    """Moves the cards of notes to the decks specified in nid_to_did.
+    If a card is in a filtered deck it is not moved and only its original deck id value gets changed.
+    """
+    cards = []
+    for nid, did in nid_to_did.items():
+        note = aqt.mw.col.get_note(nid)
+        for card in note.cards():
+            if card.odid == 0:
+                card.did = did
+            else:
+                card.odid = did
+            cards.append(card)
+    aqt.mw.col.update_cards(cards)
+
+
 # note types
 def create_note_type_with_id(note_type: NotetypeDict, mid: NotetypeId) -> None:
     note_type_copy = copy.deepcopy(note_type)
@@ -172,7 +190,6 @@ def get_note_types_in_deck(did: DeckId) -> List[NotetypeId]:
 
 
 def reset_note_types_of_notes(nid_mid_pairs: List[Tuple[NoteId, NotetypeId]]) -> None:
-
     note_type_conflicts: Set[Tuple[NoteId, NotetypeId, NotetypeId]] = set()
     for nid, mid in nid_mid_pairs:
         try:
@@ -197,7 +214,6 @@ def reset_note_types_of_notes(nid_mid_pairs: List[Tuple[NoteId, NotetypeId]]) ->
 
 
 def change_note_type_of_note(nid: int, mid: int) -> None:
-
     current_schema: int = aqt.mw.col.db.scalar("select scm from col")
     note = aqt.mw.col.get_note(NoteId(nid))
     target_note_type = aqt.mw.col.models.get(NotetypeId(mid))
