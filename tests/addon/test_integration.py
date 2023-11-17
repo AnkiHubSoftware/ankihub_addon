@@ -3132,28 +3132,60 @@ class TestDeckUpdater:
             # Assert that the last update time was updated in the config
             assert config.deck_config(ah_did).latest_update == latest_update
 
+    @pytest.mark.parametrize(
+        "initial_tags, incoming_optional_tags, expected_tags",
+        [
+            # An optional tag gets added
+            (
+                ["foo::bar"],
+                ["AnkiHub_Optional::tag_group::test1"],
+                ["foo::bar", "AnkiHub_Optional::tag_group::test1"],
+            ),
+            # Optional tag of current deck gets removed
+            (
+                ["AnkiHub_Optional::tag_group::test1"],
+                [],
+                [],
+            ),
+            # Optional tag of other deck extension is not removed
+            (
+                ["AnkiHub_Optional::other_tag_group::test1"],
+                [],
+                ["AnkiHub_Optional::other_tag_group::test1"],
+            ),
+            # Optional tag gets replaced
+            (
+                ["foo::bar", "AnkiHub_Optional::tag_group::test1"],
+                ["AnkiHub_Optional::tag_group::test2"],
+                ["foo::bar", "AnkiHub_Optional::tag_group::test2"],
+            ),
+        ],
+    )
     def test_update_optional_tags(
         self,
         anki_session_with_addon_data: AnkiSession,
-        install_sample_ah_deck: InstallSampleAHDeck,
-        mock_ankihub_sync_dependencies: None,
+        install_ah_deck: InstallAHDeck,
+        import_ah_note: ImportAHNote,
         monkeypatch: MonkeyPatch,
+        initial_tags: List[str],
+        incoming_optional_tags: List[str],
+        expected_tags: List[str],
+        mock_ankihub_sync_dependencies: None,
     ):
         with anki_session_with_addon_data.profile_loaded():
-            mw = anki_session_with_addon_data.mw
 
-            # Install a deck to be updated
-            _, ah_did = install_sample_ah_deck()
-            note_data = ankihub_sample_deck_notes_data()[0]
+            ah_did = install_ah_deck()
 
-            # Mock client to return a deck extension update
+            # Create note with initial tags
+            note_info = import_ah_note(ah_did=ah_did)
+            note = aqt.mw.col.get_note(NoteId(note_info.anki_nid))
+            note.tags = initial_tags
+            aqt.mw.col.update_note(note)
+
+            # Mock client to return a deck extension update with incoming_optional_tags
             deck_extension_id = 1
-            deck_extension_name = "fake_deck_extension_name"
+            tag_group_name = "tag_group"
             latest_update = datetime.now()
-            optional_tags = [
-                f"AnkiHub_Optional::{deck_extension_name}::test1",
-                f"AnkiHub_Optional::{deck_extension_name}::test2",
-            ]
             monkeypatch.setattr(
                 "ankihub.gui.deck_updater.AnkiHubClient.get_deck_extensions_by_deck_id",
                 lambda *args, **kwargs: [
@@ -3161,8 +3193,8 @@ class TestDeckUpdater:
                         id=deck_extension_id,
                         owner_id=1,
                         ah_did=ah_did,
-                        name=deck_extension_name,
-                        tag_group_name=deck_extension_name,
+                        name=tag_group_name,
+                        tag_group_name=tag_group_name,
                         description="",
                     )
                 ],
@@ -3173,7 +3205,8 @@ class TestDeckUpdater:
                     DeckExtensionUpdateChunk(
                         note_customizations=[
                             NoteCustomization(
-                                ankihub_nid=note_data.ah_nid, tags=optional_tags
+                                ankihub_nid=note_info.ah_nid,
+                                tags=incoming_optional_tags,
                             ),
                         ],
                         latest_update=latest_update,
@@ -3187,10 +3220,9 @@ class TestDeckUpdater:
                 ah_dids=[ah_did], start_media_sync=False
             )
 
-            # Assert that the optional tags were added to the note in Anki
-            updated_note = mw.col.get_note(NoteId(note_data.anki_nid))
-            expected_tags = ["my::tag2", "my::tag3", "my::tag", *optional_tags]
-            assert set(updated_note.tags) == set(expected_tags)
+            # Assert that the note now has the expected tags
+            note.load()
+            assert set(note.tags) == set(expected_tags)
 
             # Assert that the deck extension info was saved in the config
             assert config.deck_extension_config(
@@ -3198,8 +3230,8 @@ class TestDeckUpdater:
             ) == DeckExtensionConfig(
                 ah_did=ah_did,
                 owner_id=1,
-                name=deck_extension_name,
-                tag_group_name=deck_extension_name,
+                name=tag_group_name,
+                tag_group_name=tag_group_name,
                 description="",
                 latest_update=latest_update,
             )
