@@ -108,10 +108,6 @@ from ankihub.debug import (
     _setup_logging_for_sync_collection_and_media,
 )
 from ankihub.gui import operations, utils
-from ankihub.gui.addons import (
-    _change_file_permissions_of_addon_files,
-    _maybe_change_file_permissions_of_addon_files,
-)
 from ankihub.gui.auto_sync import _setup_ankihub_sync_on_ankiweb_sync
 from ankihub.gui.browser import custom_columns
 from ankihub.gui.browser.custom_search_nodes import UpdatedSinceLastReviewSearchNode
@@ -172,6 +168,7 @@ from ankihub.settings import (
     DeckExtension,
     DeckExtensionConfig,
     SuspendNewCardsOfExistingNotes,
+    ankihub_base_path,
     config,
     profile_files_path,
 )
@@ -2983,19 +2980,18 @@ def test_migrate_profile_data_from_old_location(
     with anki_session.profile_loaded():
         pass
 
-    user_files_path = Path(anki_session.base) / "addons21" / "ankihub" / "user_files"
-    profile_files_path = user_files_path / str(TEST_PROFILE_ID)
-
-    assert set([x.name for x in profile_files_path.glob("*")]) == {
+    # Assert that the profile data was migrated
+    assert set([x.name for x in profile_files_path().glob("*")]) == {
         "ankihub.db",
         ".private_config.json",
     }
+    assert config.user() == "user1"
+    assert len(config.deck_ids()) == 1
 
-    assert set([x.name for x in user_files_path.glob("*")]) == {
+    # Assert the expected contents of the ankihub base folder
+    assert set([x.name for x in ankihub_base_path().glob("*")]) == {
         str(TEST_PROFILE_ID),
-        "README.md",
         "ankihub.log",
-        "ankihub.log.1",
     }
 
 
@@ -3006,7 +3002,6 @@ def test_profile_swap(
 ):
     anki_session = anki_session_with_addon_data
 
-    USER_FILES_PATH = Path(anki_session.base) / "addons21/ankihub/user_files"
     # already exists
     PROFILE_1_NAME = "User 1"
     PROFILE_1_ID = TEST_PROFILE_ID
@@ -3023,7 +3018,7 @@ def test_profile_swap(
     with anki_session.profile_loaded():
         mw = anki_session.mw
 
-        assert profile_files_path() == USER_FILES_PATH / str(PROFILE_1_ID)
+        assert profile_files_path() == ankihub_base_path() / str(PROFILE_1_ID)
 
         install_sample_ah_deck()
 
@@ -3041,7 +3036,7 @@ def test_profile_swap(
     with monkeypatch.context() as m:
         m.setattr("uuid.uuid4", lambda: PROFILE_2_ID)
         with anki_session.profile_loaded():
-            assert profile_files_path() == USER_FILES_PATH / str(PROFILE_2_ID)
+            assert profile_files_path() == ankihub_base_path() / str(PROFILE_2_ID)
             # the database should be empty
             assert len(ankihub_db.ankihub_deck_ids()) == 0
             # the config should not conatin any deck subscriptions
@@ -3050,7 +3045,7 @@ def test_profile_swap(
     # load the first profile again
     mw.pm.load(PROFILE_1_NAME)
     with anki_session.profile_loaded():
-        assert profile_files_path() == USER_FILES_PATH / str(PROFILE_1_ID)
+        assert profile_files_path() == ankihub_base_path() / str(PROFILE_1_ID)
         # the database should contain the imported deck
         assert len(ankihub_db.ankihub_deck_ids()) == 1
         # the config should contain the deck subscription
@@ -3058,6 +3053,29 @@ def test_profile_swap(
 
     # assert that the general_setup function was only called once
     assert general_setup_mock.call_count == 1
+
+
+def test_migrate_addon_data_from_old_location(
+    anki_session_with_addon_data: AnkiSession,
+):
+    # Move the profile data to the old location and add a file to the folder
+    old_profile_files_path = (
+        settings.user_files_path() / settings._get_anki_profile_id()
+    )
+    shutil.move(settings.profile_files_path(), old_profile_files_path)
+    (old_profile_files_path / "test").touch()
+
+    assert not settings.profile_files_path().exists()  # sanity check
+
+    # Start the add-on and load the profile to trigger the migration
+    entry_point.run()
+    with anki_session_with_addon_data.profile_loaded():
+        pass
+
+    # Assert that the profile data was migrated to the new location and the file was also moved
+    assert not old_profile_files_path.exists()
+    assert settings.profile_files_path().exists()
+    assert (settings.profile_files_path() / "test").exists()
 
 
 class TestDeckUpdater:
@@ -3114,28 +3132,60 @@ class TestDeckUpdater:
             # Assert that the last update time was updated in the config
             assert config.deck_config(ah_did).latest_update == latest_update
 
+    @pytest.mark.parametrize(
+        "initial_tags, incoming_optional_tags, expected_tags",
+        [
+            # An optional tag gets added
+            (
+                ["foo::bar"],
+                ["AnkiHub_Optional::tag_group::test1"],
+                ["foo::bar", "AnkiHub_Optional::tag_group::test1"],
+            ),
+            # Optional tag of current deck gets removed
+            (
+                ["AnkiHub_Optional::tag_group::test1"],
+                [],
+                [],
+            ),
+            # Optional tag of other deck extension is not removed
+            (
+                ["AnkiHub_Optional::other_tag_group::test1"],
+                [],
+                ["AnkiHub_Optional::other_tag_group::test1"],
+            ),
+            # Optional tag gets replaced
+            (
+                ["foo::bar", "AnkiHub_Optional::tag_group::test1"],
+                ["AnkiHub_Optional::tag_group::test2"],
+                ["foo::bar", "AnkiHub_Optional::tag_group::test2"],
+            ),
+        ],
+    )
     def test_update_optional_tags(
         self,
         anki_session_with_addon_data: AnkiSession,
-        install_sample_ah_deck: InstallSampleAHDeck,
-        mock_ankihub_sync_dependencies: None,
+        install_ah_deck: InstallAHDeck,
+        import_ah_note: ImportAHNote,
         monkeypatch: MonkeyPatch,
+        initial_tags: List[str],
+        incoming_optional_tags: List[str],
+        expected_tags: List[str],
+        mock_ankihub_sync_dependencies: None,
     ):
         with anki_session_with_addon_data.profile_loaded():
-            mw = anki_session_with_addon_data.mw
 
-            # Install a deck to be updated
-            _, ah_did = install_sample_ah_deck()
-            note_data = ankihub_sample_deck_notes_data()[0]
+            ah_did = install_ah_deck()
 
-            # Mock client to return a deck extension update
+            # Create note with initial tags
+            note_info = import_ah_note(ah_did=ah_did)
+            note = aqt.mw.col.get_note(NoteId(note_info.anki_nid))
+            note.tags = initial_tags
+            aqt.mw.col.update_note(note)
+
+            # Mock client to return a deck extension update with incoming_optional_tags
             deck_extension_id = 1
-            deck_extension_name = "fake_deck_extension_name"
+            tag_group_name = "tag_group"
             latest_update = datetime.now()
-            optional_tags = [
-                f"AnkiHub_Optional::{deck_extension_name}::test1",
-                f"AnkiHub_Optional::{deck_extension_name}::test2",
-            ]
             monkeypatch.setattr(
                 "ankihub.gui.deck_updater.AnkiHubClient.get_deck_extensions_by_deck_id",
                 lambda *args, **kwargs: [
@@ -3143,8 +3193,8 @@ class TestDeckUpdater:
                         id=deck_extension_id,
                         owner_id=1,
                         ah_did=ah_did,
-                        name=deck_extension_name,
-                        tag_group_name=deck_extension_name,
+                        name=tag_group_name,
+                        tag_group_name=tag_group_name,
                         description="",
                     )
                 ],
@@ -3155,7 +3205,8 @@ class TestDeckUpdater:
                     DeckExtensionUpdateChunk(
                         note_customizations=[
                             NoteCustomization(
-                                ankihub_nid=note_data.ah_nid, tags=optional_tags
+                                ankihub_nid=note_info.ah_nid,
+                                tags=incoming_optional_tags,
                             ),
                         ],
                         latest_update=latest_update,
@@ -3169,10 +3220,9 @@ class TestDeckUpdater:
                 ah_dids=[ah_did], start_media_sync=False
             )
 
-            # Assert that the optional tags were added to the note in Anki
-            updated_note = mw.col.get_note(NoteId(note_data.anki_nid))
-            expected_tags = ["my::tag2", "my::tag3", "my::tag", *optional_tags]
-            assert set(updated_note.tags) == set(expected_tags)
+            # Assert that the note now has the expected tags
+            note.load()
+            assert set(note.tags) == set(expected_tags)
 
             # Assert that the deck extension info was saved in the config
             assert config.deck_extension_config(
@@ -3180,8 +3230,8 @@ class TestDeckUpdater:
             ) == DeckExtensionConfig(
                 ah_did=ah_did,
                 owner_id=1,
-                name=deck_extension_name,
-                tag_group_name=deck_extension_name,
+                name=tag_group_name,
+                tag_group_name=tag_group_name,
                 description="",
                 latest_update=latest_update,
             )
@@ -3993,69 +4043,34 @@ class TestSuggestionsWithMedia:
         assert name_of_uploaded_media == expected_media_name
 
 
-class TestAddonUpdate:
-    def test_addon_update(
+class TestAddonInstallAndUpdate:
+    def test_install_and_update_addon(
         self,
         anki_session_with_addon_data: AnkiSession,
-        monkeypatch: MonkeyPatch,
         qtbot: QtBot,
     ):
-        # Install the add-on so that all files are in the add-on folder.
-        # The anki_session fixture does not setup the add-ons code in the add-ons folder.
-        with anki_session_with_addon_data.profile_loaded():
-            mw = anki_session_with_addon_data.mw
+        """This test does not install the latest version of the add-on. It just tests
+        that we are not breaking the add-on update process somehow."""
 
-            result = mw.addonManager.install(file=str(ANKIHUB_ANKIADDON_FILE))
+        assert aqt.mw.addonManager.allAddons() == []
+
+        # Install the add-on
+        with anki_session_with_addon_data.profile_loaded():
+            result = aqt.mw.addonManager.install(file=str(ANKIHUB_ANKIADDON_FILE))
             assert isinstance(result, InstallOk)
+            assert aqt.mw.addonManager.allAddons() == ["ankihub"]
 
-        # The purpose of this mocks is to test whether our modifications to the add-on update process
-        # (defined in ankihub.addons) are used.
-        # The original functions will still be called because this sets the side effect to be the original functions,
-        # but this way we can check if they were called.
-        maybe_change_file_permissions_of_addon_files_mock = Mock()
-        maybe_change_file_permissions_of_addon_files_mock.side_effect = (
-            _maybe_change_file_permissions_of_addon_files
-        )
-        monkeypatch.setattr(
-            "ankihub.gui.addons._maybe_change_file_permissions_of_addon_files",
-            maybe_change_file_permissions_of_addon_files_mock,
-        )
-
-        # Udpate the AnkiHub add-on entry point has to be run so that the add-on is loaded and
-        # the patches to the update process are applied
+        # Udpate the add-on
         entry_point.run()
         with anki_session_with_addon_data.profile_loaded():
-            mw = anki_session_with_addon_data.mw
-
-            result = mw.addonManager.install(file=str(ANKIHUB_ANKIADDON_FILE))
+            result = aqt.mw.addonManager.install(file=str(ANKIHUB_ANKIADDON_FILE))
             assert isinstance(result, InstallOk)
+            assert aqt.mw.addonManager.allAddons() == ["ankihub"]
 
-            assert mw.addonManager.allAddons() == ["ankihub"]
-
-        # This is called twice: for backupUserFiles and for deleteAddon.
-        assert maybe_change_file_permissions_of_addon_files_mock.call_count == 2
-
-        # start Anki
+        # Start Anki
         entry_point.run()
         with anki_session_with_addon_data.profile_loaded():
-            mw = anki_session_with_addon_data.mw
-
-            assert mw.addonManager.allAddons() == ["ankihub"]
-            qtbot.wait(1000)
-
-    def test_that_changing_file_permissions_of_addons_folder_does_not_break_addon_load(
-        self, anki_session_with_addon_data: AnkiSession, qtbot: QtBot
-    ):
-        with anki_session_with_addon_data.profile_loaded():
-            mw = anki_session_with_addon_data.mw
-
-            addon_dir = Path(mw.addonManager.addonsFolder("ankihub"))
-            _change_file_permissions_of_addon_files(addon_dir=addon_dir)
-
-        entry_point.run()
-        with anki_session_with_addon_data.profile_loaded():
-            mw = anki_session_with_addon_data.mw
-
+            assert aqt.mw.addonManager.allAddons() == ["ankihub"]
             qtbot.wait(1000)
 
 

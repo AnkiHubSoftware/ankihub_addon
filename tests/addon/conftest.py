@@ -1,5 +1,7 @@
 import json
+import os
 import shutil
+import tempfile
 import uuid
 from pathlib import Path
 from typing import Generator
@@ -62,34 +64,40 @@ def anki_session_with_addon_data(
     monkeypatch: MonkeyPatch,
     mock_all_feature_flags_to_default_values: MockAllFeatureFlagsToDefaultValues,  # noqa F811
 ) -> Generator[AnkiSession, None, None]:
-    """Sets up a temporary anki_base folder with the ankihub add-ons data (config, contents of profile_data_folder)
-    in it's add-on folder. This is a replacement for running the whole initialization process of the add-on
+    """Sets up a temporary anki base folder and a temporary ankihub base folder.
+    This is a replacement for running the whole initialization process of the add-on
     which is not needed for most tests (test can call entrypoint.run manually if they need to).
-    It also makes it so that the profile_data_folder always has the same name (TEST_PROFILE_ID) to make this
-    aspect of the tests deterministic.
+    By setting up the temporary folders for each test the user's Anki/AnkiHub data is not modified
+    and the tests can be run in parallel.
     The add-ons code is not copied into the add-on's folder in the temporary anki_base folder.
     Instead the tests run the code in the ankihub folder of the repo.
     """
     from ankihub.entry_point import _profile_setup
     from ankihub.settings import config, setup_logger
 
+    # Add the add-ons public config to Anki
     config_path = REPO_ROOT_PATH / "ankihub" / "config.json"
     with open(config_path) as f:
         config_dict = json.load(f)
     anki_session.create_addon_config(package_name="ankihub", default_config=config_dict)
 
-    config.setup_public_config_and_urls()
-    setup_logger()
-    mock_all_feature_flags_to_default_values()
+    with tempfile.TemporaryDirectory() as tmpdir:
+        # Change the ankihub base path to a temporary folder to isolate the tests
+        os.environ["ANKIHUB_BASE_PATH"] = tmpdir
 
-    with monkeypatch.context() as m:
-        # monkeypatch the uuid4 function to always return the same value so
-        # the profile data folder is always the same
-        m.setattr("uuid.uuid4", lambda: TEST_PROFILE_ID)
-        with anki_session.profile_loaded():
-            _profile_setup()
+        config.setup_public_config_and_urls()
+        setup_logger()
 
-    yield anki_session
+        mock_all_feature_flags_to_default_values()
+
+        with monkeypatch.context() as m:
+            # monkeypatch the uuid4 function to always return the same value so
+            # the profile data folder is always the same
+            m.setattr("uuid.uuid4", lambda: TEST_PROFILE_ID)
+            with anki_session.profile_loaded():
+                _profile_setup()
+
+        yield anki_session
 
 
 @pytest.fixture
@@ -100,9 +108,13 @@ def anki_session_with_addon_before_profile_support(anki_session_with_addon_data)
     anki_session: AnkiSession = anki_session_with_addon_data
     with anki_session.profile_loaded():
         mw = anki_session.mw
+
+        # Set up the user_files folder with test data
         user_files_path = Path(mw.addonManager.addonsFolder("ankihub")) / "user_files"
 
-        shutil.rmtree(user_files_path)
+        if user_files_path.exists():
+            shutil.rmtree(user_files_path)
+
         shutil.copytree(
             REPO_ROOT_PATH / "tests" / "addon" / "profile_migration_test_data",
             user_files_path,
