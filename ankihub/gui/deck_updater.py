@@ -12,6 +12,7 @@ from ..addon_ankihub_client import AddonAnkiHubClient as AnkiHubClient
 from ..ankihub_client import AnkiHubHTTPError, DeckExtension
 from ..db import ankihub_db
 from ..main.importing import AnkiHubImporter, AnkiHubImportResult
+from ..main.note_conversion import is_tag_for_group
 from ..main.note_types import fetch_note_types_based_on_notes
 from ..main.utils import create_backup
 from ..settings import config
@@ -182,7 +183,13 @@ class _AnkiHubDeckUpdater:
                     )
                     continue
                 else:
-                    note.tags = list(set(note.tags) | set(customization.tags or []))
+                    # Only tags from this tag group should be modified.
+                    tags_not_from_this_tag_group = [
+                        tag
+                        for tag in note.tags
+                        if not is_tag_for_group(tag, deck_extension.tag_group_name)
+                    ]
+                    note.tags = tags_not_from_this_tag_group + customization.tags
                     updated_notes.append(note)
 
             # each chunk contains the latest update timestamp of the notes in it, we need the latest one
