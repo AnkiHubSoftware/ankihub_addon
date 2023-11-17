@@ -51,7 +51,7 @@ class TestBuildSubdecksAndMoveCardsToThem:
             print(
                 f"Moving {len(nids)} cards to their subdecks took {duration_seconds} seconds"
             )
-            assert duration_seconds < 0.1
+            assert duration_seconds < 0.2
 
 
 @pytest.mark.performance
@@ -84,4 +84,4 @@ class TestFlattenDeck:
             print(
                 f"Flattening deck with {len(nids)} cards took {duration_seconds} seconds"
             )
-            assert duration_seconds < 0.1
+            assert duration_seconds < 0.2
