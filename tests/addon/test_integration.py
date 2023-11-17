@@ -3441,30 +3441,39 @@ def test_optional_tag_suggestion_dialog(
     anki_session_with_addon_data: AnkiSession,
     qtbot: QtBot,
     monkeypatch: MonkeyPatch,
-    install_sample_ah_deck: InstallSampleAHDeck,
+    import_ah_note: ImportAHNote,
+    next_deterministic_uuid,
 ):
     anki_session = anki_session_with_addon_data
 
     with anki_session.profile_loaded():
-        mw = anki_session.mw
+        # Create 3 notes
+        ah_did = next_deterministic_uuid()
+        notes: List[Note] = []
+        note_infos: List[NoteInfo] = []
+        for _ in range(3):
+            note_info = import_ah_note(ah_did=ah_did)
+            note = aqt.mw.col.get_note(NoteId(note_info.anki_nid))
+            note_infos.append(note_info)
+            notes.append(note)
 
-        # import a sample deck and give notes optional tags
-        install_sample_ah_deck()
-
-        nids = mw.col.find_notes("")
-        notes = [mw.col.get_note(nid) for nid in nids]
-
+        # The first note has an optional tag associated with a valid tag group
         notes[0].tags = [
             f"{TAG_FOR_OPTIONAL_TAGS}::VALID::tag1",
         ]
         notes[0].flush()
 
+        # The second note has an optional tag associated with an invalid tag group
         notes[1].tags = [
             f"{TAG_FOR_OPTIONAL_TAGS}::INVALID::tag1",
         ]
         notes[1].flush()
 
-        # open the dialog
+        # The third note has no optional tags
+        notes[2].tags = []
+        notes[2].flush()
+
+        # Patch the client's prevaliate_tag_groups function to return validation results
         monkeypatch.setattr(
             "ankihub.ankihub_client.AnkiHubClient.prevalidate_tag_groups",
             lambda *args, **kwargs: [
@@ -3482,23 +3491,22 @@ def test_optional_tag_suggestion_dialog(
                 ),
             ],
         )
-        dialog = OptionalTagsSuggestionDialog(parent=mw, nids=nids)
+
+        # Open the dialog
+        dialog = OptionalTagsSuggestionDialog(
+            parent=aqt.mw, nids=[note.id for note in notes]
+        )
         dialog.show()
 
         qtbot.wait(500)
 
-        # assert that the dialog is in the correct state
+        # Assert that the dialog is in the correct state
+        # Items are sorted alphabetically and tooltips contain error messages if the tag group is invalid.
         assert dialog.tag_group_list.count() == 2
-
-        # items are sorted alphabetically
         assert dialog.tag_group_list.item(0).text() == "INVALID"
         assert "error message" in dialog.tag_group_list.item(0).toolTip()
-
         assert dialog.tag_group_list.item(1).text() == "VALID"
-        # empty tooltip means that the tag group is valid because invalid tag groups
-        # have a tooltip with the error message
         assert dialog.tag_group_list.item(1).toolTip() == ""
-
         assert dialog.submit_btn.isEnabled()
 
         suggest_optional_tags_mock = Mock()
@@ -3507,22 +3515,36 @@ def test_optional_tag_suggestion_dialog(
             suggest_optional_tags_mock,
         )
 
-        # select the "VALID" tag group and click the submit button
+        # Select the "VALID" tag group and click the submit button
         dialog.tag_group_list.item(1).setSelected(True)
         qtbot.mouseClick(dialog.submit_btn, Qt.MouseButton.LeftButton)
         qtbot.wait(500)
 
         assert suggest_optional_tags_mock.call_count == 1
 
-        # assert that the suggest_optional_tags function was called with the correct arguments
+        # Assert that the suggest_optional_tags function was called with the correct arguments.
+        # Suggestions should be created for all notes, even if they don't have optional tags.
+        # (To make it possible to remove all optional tags from notes.)
         assert suggest_optional_tags_mock.call_args.kwargs == {
             "suggestions": [
                 OptionalTagSuggestion(
                     tag_group_name="VALID",
                     deck_extension_id=1,
-                    ah_nid=uuid.UUID("e2857855-b414-4a2a-a0bf-2a0eac273f21"),
+                    ah_nid=note_infos[0].ah_nid,
                     tags=["AnkiHub_Optional::VALID::tag1"],
-                )
+                ),
+                OptionalTagSuggestion(
+                    tag_group_name="VALID",
+                    deck_extension_id=1,
+                    ah_nid=note_infos[1].ah_nid,
+                    tags=[],
+                ),
+                OptionalTagSuggestion(
+                    tag_group_name="VALID",
+                    deck_extension_id=1,
+                    ah_nid=note_infos[2].ah_nid,
+                    tags=[],
+                ),
             ],
             "auto_accept": False,
         }

@@ -347,6 +347,14 @@ class _Config:
     def deck_extension_config(self, extension_id: int) -> Optional[DeckExtensionConfig]:
         return self._private_config.deck_extensions.get(extension_id)
 
+    def deck_extensions_ids_for_ah_did(self, ah_did: uuid.UUID) -> List[int]:
+        result = [
+            extension_id
+            for extension_id in self.deck_extension_ids()
+            if self.deck_extension_config(extension_id).ah_did == ah_did
+        ]
+        return result
+
     def is_logged_in(self) -> bool:
         return bool(self.token())
 
