@@ -300,7 +300,7 @@ def show_dialog(
         icon_layout = QVBoxLayout()
 
         icon_label = QLabel()
-        icon_label.setPixmap(icon.pixmap(64, 64))
+        icon_label.setPixmap(icon.pixmap(48, 48))
         icon_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
         icon_layout.addWidget(icon_label)
 
