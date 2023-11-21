@@ -96,7 +96,7 @@ def _show_deck_import_summary_dialog(
 
     show_dialog(
         message,
-        title="Deck Import Summary",
+        title="AnkiHub | Deck Installation Summary",
         buttons=["Go to Deck Management", QDialogButtonBox.StandardButton.Ok],
         default_button_idx=1,
         scrollable=True,
