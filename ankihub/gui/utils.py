@@ -262,7 +262,7 @@ def ask_user(
 def show_dialog(
     text: str,
     title: str,
-    parent: QWidget | None = None,
+    parent: Optional[QWidget] = None,
     text_format: Qt.TextFormat = Qt.TextFormat.RichText,
     buttons: Union[Sequence[Union[str, QDialogButtonBox.StandardButton]], None] = [
         QDialogButtonBox.StandardButton.Ok
@@ -271,8 +271,8 @@ def show_dialog(
     scrollable: bool = False,
     min_width: Optional[int] = None,
     min_height: Optional[int] = None,
-    callback: Callable[[int], None] | None = None,
-    icon: QIcon | None = None,
+    callback: Optional[Callable[[int], None]] = None,
+    icon: Optional[QIcon] = None,
 ) -> None:
     """Show a dialog with the given text and buttons."""
     if not parent:
