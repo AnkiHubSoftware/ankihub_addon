@@ -279,14 +279,16 @@ def show_dialog(
         parent = aqt.mw.app.activeWindow() or aqt.mw
     dialog = QDialog(parent)
     dialog.setWindowTitle(title)
+    if min_width is not None:
+        dialog.setMinimumWidth(min_width)
+    if min_height is not None:
+        dialog.setMinimumHeight(min_height)
     disable_help_button(dialog)
 
+    main_layout = QVBoxLayout(dialog)
+    hlayout = QHBoxLayout()
+    main_layout.addLayout(hlayout)
     if scrollable:
-        main_layout = QVBoxLayout(dialog)
-
-        hlayout = QHBoxLayout()
-        main_layout.addLayout(hlayout)
-
         area = QScrollArea()
         area.setWidgetResizable(True)
         widget = QWidget()
@@ -294,14 +296,8 @@ def show_dialog(
         hlayout.addWidget(area)
         content_layout = QVBoxLayout(widget)
     else:
-        main_layout = QVBoxLayout(dialog)
-
-        hlayout = QHBoxLayout()
-
         content_layout = QVBoxLayout()
         hlayout.addLayout(content_layout)
-
-        main_layout.addLayout(hlayout)
 
     if icon is not None:
         icon_layout = QVBoxLayout()
@@ -324,6 +320,7 @@ def show_dialog(
 
     button_box = QDialogButtonBox()
     main_layout.addWidget(button_box)
+    main_layout.addStretch()
 
     def on_btn_clicked(button_index: int):
         dialog.reject()
@@ -346,13 +343,6 @@ def show_dialog(
         else:
             button.setDefault(False)
             button.setAutoDefault(False)
-
-    main_layout.addStretch()
-
-    if min_width is not None:
-        dialog.setMinimumWidth(min_width)
-    if min_height is not None:
-        dialog.setMinimumHeight(min_height)
 
     dialog.open()
 
