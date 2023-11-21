@@ -21,6 +21,7 @@ import aqt
 from anki.models import NotetypeDict, NotetypeId
 from anki.notes import NoteId
 from anki.utils import ids2str, join_fields, split_fields
+from readerwriterlock import rwlock
 
 from .. import LOGGER
 from ..ankihub_client import Field, NoteInfo, suggestion_type_from_str
@@ -30,6 +31,12 @@ from ..settings import ANKI_INT_VERSION, ANKI_VERSION_23_10_00
 from .db_utils import DBConnection
 from .exceptions import IntegrityError
 
+# Multiple threads can concurrently make read/write queries to the AnkiHub DB (read_lock), but they can't
+# do that while the AnkiHub DB is attached to the Anki DB connection (write_lock).
+rw_lock = rwlock.RWLockFair()
+write_lock = rw_lock.gen_wlock()
+read_lock = rw_lock.gen_rlock()
+
 
 def attach_ankihub_db_to_anki_db_connection() -> None:
     if aqt.mw.col is None:
@@ -37,14 +44,27 @@ def attach_ankihub_db_to_anki_db_connection() -> None:
         return
 
     if not is_ankihub_db_attached_to_anki_db():
-        aqt.mw.col.db.execute(
-            f"ATTACH DATABASE ? AS {ankihub_db.database_name}",
-            str(ankihub_db.database_path),
-        )
-        LOGGER.info("Attached AnkiHub DB to Anki DB connection")
+        if write_lock.acquire(blocking=True, timeout=5):
+            aqt.mw.col.db.execute(
+                f"ATTACH DATABASE ? AS {ankihub_db.database_name}",
+                str(ankihub_db.database_path),
+            )
+            LOGGER.info("Attached AnkiHub DB to Anki DB connection")
+        else:
+            raise RuntimeError("Failed to acquire write lock.")
 
 
 def detach_ankihub_db_from_anki_db_connection() -> None:
+    try:
+        write_lock.release()
+        LOGGER.info("Released write lock.")
+    except RuntimeError as e:
+        if "release unlocked lock" in str(e):
+            pass
+        else:
+            LOGGER.info("Failed to release write lock.")
+            raise e
+
     if aqt.mw.col is None:
         LOGGER.info("The collection is not open. Not detaching AnkiHub DB.")
         return
@@ -92,13 +112,18 @@ def attached_ankihub_db():
 
 
 class _AnkiHubDB:
-
     # name of the database when attached to the Anki DB connection
     database_name = "ankihub_db"
     database_path: Optional[Path] = None
 
     def execute(self, *args, **kwargs) -> List:
-        return self.connection().execute(*args, **kwargs)
+        if read_lock.acquire(blocking=True, timeout=5):
+            try:
+                return self.connection().execute(*args, **kwargs)
+            finally:
+                read_lock.release()
+        else:
+            raise RuntimeError("Failed to acquire read lock.")
 
     def list(self, *args, **kwargs) -> List:
         return self.connection().list(*args, **kwargs)
@@ -224,7 +249,6 @@ class _AnkiHubDB:
         upserted_notes: List[NoteInfo] = []
         skipped_notes: List[NoteInfo] = []
         with self.connection() as conn:
-
             for note_data in notes_data:
                 conflicting_ah_nid = conn.first(
                     """
