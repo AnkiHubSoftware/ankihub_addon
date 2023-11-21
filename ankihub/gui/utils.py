@@ -274,7 +274,10 @@ def show_dialog(
     callback: Optional[Callable[[int], None]] = None,
     icon: Optional[QIcon] = None,
 ) -> None:
-    """Show a dialog with the given text and buttons."""
+    """Show a dialog with the given text and buttons.
+    The callback is called with the index of the clicked button.
+    Adapted from aqt.utils.showText and aqt.utils.MessageBox. The main difference is that
+    this function allows to make the text scrollable."""
     if not parent:
         parent = aqt.mw.app.activeWindow() or aqt.mw
     dialog = QDialog(parent)
