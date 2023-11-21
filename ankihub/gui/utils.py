@@ -267,10 +267,8 @@ def show_dialog(
     buttons: Union[Sequence[Union[str, QDialogButtonBox.StandardButton]], None] = [
         QDialogButtonBox.StandardButton.Ok
     ],
-    default_button: int = 0,
+    default_button_idx: int = 0,
     scrollable: bool = False,
-    min_width: Optional[int] = None,
-    min_height: Optional[int] = None,
     callback: Optional[Callable[[int], None]] = None,
     icon: Optional[QIcon] = None,
 ) -> None:
@@ -282,10 +280,6 @@ def show_dialog(
         parent = aqt.mw.app.activeWindow() or aqt.mw
     dialog = QDialog(parent)
     dialog.setWindowTitle(title)
-    if min_width is not None:
-        dialog.setMinimumWidth(min_width)
-    if min_height is not None:
-        dialog.setMinimumHeight(min_height)
     disable_help_button(dialog)
 
     main_layout = QVBoxLayout(dialog)
@@ -340,7 +334,7 @@ def show_dialog(
 
         qconnect(button.clicked, partial(on_btn_clicked, button_index))
 
-        if button_index == default_button:
+        if button_index == default_button_idx:
             button.setDefault(True)
             button.setAutoDefault(True)
         else:
