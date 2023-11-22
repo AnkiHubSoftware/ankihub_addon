@@ -35,7 +35,6 @@ from .exceptions import IntegrityError
 # do that while the AnkiHub DB is attached to the Anki DB connection (write_lock).
 rw_lock = rwlock.RWLockFair()
 write_lock = rw_lock.gen_wlock()
-read_lock = rw_lock.gen_rlock()
 
 
 def attach_ankihub_db_to_anki_db_connection() -> None:
@@ -117,6 +116,7 @@ class _AnkiHubDB:
     database_path: Optional[Path] = None
 
     def execute(self, *args, **kwargs) -> List:
+        read_lock = rw_lock.gen_rlock()
         if read_lock.acquire(blocking=True, timeout=5):
             try:
                 return self.connection().execute(*args, **kwargs)
