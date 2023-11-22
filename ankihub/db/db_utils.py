@@ -7,7 +7,8 @@ from .. import LOGGER
 
 
 class DBConnection:
-    """A wrapper around a sqlite3.Connection that provides some convenience methods."""
+    """A wrapper around a sqlite3.Connection that provides some convenience methods.
+    The lock is used to wrap calls to self.execute()."""
 
     def __init__(self, conn: sqlite3.Connection, lock: Lockable):
         self._conn = conn
