@@ -22,6 +22,7 @@ from anki.models import NotetypeDict, NotetypeId
 from anki.notes import NoteId
 from anki.utils import ids2str, join_fields, split_fields
 from readerwriterlock import rwlock
+from readerwriterlock.rwlock import RELEASE_ERR_CLS, RELEASE_ERR_MSG
 
 from .. import LOGGER
 from ..ankihub_client import Field, NoteInfo, suggestion_type_from_str
@@ -57,11 +58,10 @@ def detach_ankihub_db_from_anki_db_connection() -> None:
     try:
         write_lock.release()
         LOGGER.info("Released write lock.")
-    except RuntimeError as e:
-        if "release unlocked lock" in str(e):
-            pass
+    except RELEASE_ERR_CLS as e:
+        if RELEASE_ERR_MSG in str(e):
+            LOGGER.info("Write lock was not acquired. Not releasing.")
         else:
-            LOGGER.info("Failed to release write lock.")
             raise e
 
     if aqt.mw.col is None:
