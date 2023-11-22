@@ -1,15 +1,18 @@
 import sqlite3
 from typing import Any, List, Optional, Tuple
 
+from readerwriterlock.rwlock import Lockable
+
 from .. import LOGGER
 
 
 class DBConnection:
     """A wrapper around a sqlite3.Connection that provides some convenience methods."""
 
-    def __init__(self, conn: sqlite3.Connection):
+    def __init__(self, conn: sqlite3.Connection, lock: Lockable):
         self._conn = conn
         self._is_used_as_context_manager = False
+        self._lock = lock
 
     def execute(
         self,
@@ -17,6 +20,15 @@ class DBConnection:
         *args,
         first_row_only=False,
     ) -> List:
+        if self._lock.acquire(blocking=True, timeout=5):
+            try:
+                return self._execute_inner(sql, *args, first_row_only=first_row_only)
+            finally:
+                self._lock.release()
+        else:
+            raise Exception("Could not acquire lock")
+
+    def _execute_inner(self, sql: str, *args, first_row_only=False) -> List:
         try:
             cur = self._conn.cursor()
             cur.execute(sql, args)

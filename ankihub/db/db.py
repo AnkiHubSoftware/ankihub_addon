@@ -116,14 +116,7 @@ class _AnkiHubDB:
     database_path: Optional[Path] = None
 
     def execute(self, *args, **kwargs) -> List:
-        read_lock = rw_lock.gen_rlock()
-        if read_lock.acquire(blocking=True, timeout=5):
-            try:
-                return self.connection().execute(*args, **kwargs)
-            finally:
-                read_lock.release()
-        else:
-            raise RuntimeError("Failed to acquire read lock.")
+        return self.connection().execute(*args, **kwargs)
 
     def list(self, *args, **kwargs) -> List:
         return self.connection().list(*args, **kwargs)
@@ -224,7 +217,10 @@ class _AnkiHubDB:
         return result
 
     def connection(self) -> DBConnection:
-        result = DBConnection(conn=sqlite3.connect(ankihub_db.database_path))
+        read_lock = rw_lock.gen_rlock()
+        result = DBConnection(
+            conn=sqlite3.connect(ankihub_db.database_path), lock=read_lock
+        )
         return result
 
     def upsert_notes_data(
