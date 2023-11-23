@@ -13,6 +13,9 @@
                 "-b",
                 "${workspaceRoot}/anki_base"
             ],
+            "env": {
+                "ANKIHUB_BASE_PATH": "${workspaceRoot}/ankihub_base",
+            },
             "purpose": [
                 "debug-in-terminal",
             ],
