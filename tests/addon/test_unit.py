@@ -2090,7 +2090,7 @@ class TestChooseAnkiHubDeck:
             ah_dids.append(install_ah_deck(ah_deck_name="Deck 1"))
             ah_dids.append(install_ah_deck(ah_deck_name="Deck 2"))
 
-            # Choose_ankihub_deck is blocking, so we setup a timer to press a key
+            # choose_ankihub_deck is blocking, so we setup a timer to press a key
             def on_timeout():
                 qtbot.keyClick(qwidget.children()[0], clicked_key)
 
