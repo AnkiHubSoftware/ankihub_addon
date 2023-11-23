@@ -32,7 +32,7 @@ from .utils import (
     create_deck_with_id,
     create_note_type_with_id,
     dids_of_notes,
-    get_unique_deck_name,
+    get_unique_ankihub_deck_name,
     lowest_level_common_ancestor_did,
     modify_note_type_templates,
     reset_note_types_of_notes,
@@ -363,8 +363,10 @@ class AnkiHubImporter:
                 f"Moved new cards to common ancestor deck {common_ancestor_did=}"
             )
 
-            aqt.mw.col.decks.remove([created_did])
-            LOGGER.info(f"Removed created deck {created_did=}")
+            if created_did != common_ancestor_did:
+                aqt.mw.col.decks.remove([created_did])
+                LOGGER.info(f"Removed created deck {created_did=}")
+
             return common_ancestor_did
 
         return created_did
@@ -513,7 +515,6 @@ class AnkiHubImporter:
         fields: List[Field],
         protected_fields: Dict[int, List[str]],
     ) -> bool:
-
         if TAG_FOR_PROTECTING_ALL_FIELDS in note.tags:
             LOGGER.debug(
                 "Skipping preparing fields because they are protected by a tag."
@@ -568,7 +569,7 @@ class AnkiHubImporter:
 
 
 def _adjust_deck(deck_name: str, local_did: Optional[DeckId] = None) -> DeckId:
-    unique_name = get_unique_deck_name(deck_name)
+    unique_name = get_unique_ankihub_deck_name(deck_name)
     if local_did is None:
         local_did = DeckId(aqt.mw.col.decks.add_normal_deck_with_name(unique_name).id)
         LOGGER.info(f"Created deck {local_did=}")
@@ -583,7 +584,6 @@ def _adjust_deck(deck_name: str, local_did: Optional[DeckId] = None) -> DeckId:
 def _updated_tags(
     cur_tags: List[str], incoming_tags: List[str], protected_tags: List[str]
 ) -> List[str]:
-
     # get subset of cur_tags that are protected
     # by being equal to a protected tag or by containing a protected tag
     # protected_tags can't contain "::" (this is enforced when the user chooses them in the webapp)
