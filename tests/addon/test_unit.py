@@ -2073,11 +2073,17 @@ class TestSendReviewData:
 
 
 class TestChooseAnkiHubDeck:
+    @pytest.mark.parametrize(
+        "clicked_key, expected_chosen_deck_index",
+        [(Qt.Key.Key_Enter, 0), (Qt.Key.Key_Escape, None)],
+    )
     def test_choose_deck(
         self,
         anki_session_with_addon_data: AnkiSession,
         install_ah_deck: InstallAHDeck,
         qtbot: QtBot,
+        clicked_key: Qt.Key,
+        expected_chosen_deck_index: Optional[int],
     ):
         with anki_session_with_addon_data.profile_loaded():
             ah_dids = []
@@ -2086,7 +2092,7 @@ class TestChooseAnkiHubDeck:
 
             # Choose_ankihub_deck is blocking, so we setup a timer to press a key
             def on_timeout():
-                qtbot.keyPress(qwidget.children()[0], Qt.Key_Enter)
+                qtbot.keyClick(qwidget.children()[0], clicked_key)
 
             QTimer.singleShot(0, on_timeout)
 
@@ -2096,29 +2102,7 @@ class TestChooseAnkiHubDeck:
                 ah_dids=list(ah_dids),
                 parent=qwidget,
             )
-            assert result == ah_dids[0]
-
-    def test_cancel(
-        self,
-        anki_session_with_addon_data: AnkiSession,
-        install_ah_deck: InstallAHDeck,
-        qtbot: QtBot,
-    ):
-        with anki_session_with_addon_data.profile_loaded():
-            ah_dids = []
-            ah_dids.append(install_ah_deck(ah_deck_name="Deck 1"))
-            ah_dids.append(install_ah_deck(ah_deck_name="Deck 2"))
-
-            # Choose_ankihub_deck is blocking, so we setup a timer to press a key
-            def on_timeout():
-                qtbot.keyPress(qwidget.children()[0], Qt.Key_Escape)
-
-            QTimer.singleShot(0, on_timeout)
-
-            qwidget = QWidget()
-            result = choose_ankihub_deck(
-                prompt="Choose a deck",
-                ah_dids=list(ah_dids),
-                parent=qwidget,
-            )
-            assert result is None
+            if expected_chosen_deck_index is None:
+                assert result is None
+            else:
+                assert ah_dids.index(result) == expected_chosen_deck_index
