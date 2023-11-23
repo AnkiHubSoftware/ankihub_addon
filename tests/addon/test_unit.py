@@ -16,7 +16,7 @@ from anki.decks import DeckId
 from anki.models import NotetypeDict
 from anki.notes import Note, NoteId
 from aqt import utils
-from aqt.qt import QDialogButtonBox
+from aqt.qt import QDialogButtonBox, Qt, QTimer, QWidget
 from pytest import MonkeyPatch, fixture
 from pytest_anki import AnkiSession
 from pytestqt.qtbot import QtBot  # type: ignore
@@ -82,6 +82,7 @@ from ankihub.gui.suggestion_dialog import (
     open_suggestion_dialog_for_note,
 )
 from ankihub.gui.threading_utils import rate_limited
+from ankihub.gui.utils import choose_ankihub_deck
 from ankihub.main import suggestions
 from ankihub.main.deck_creation import (
     DeckCreationResult,
@@ -216,7 +217,6 @@ class TestMediaSyncMediaUpload:
 
 
 def test_lowest_level_common_ancestor_deck_name():
-
     deck_names = [
         "A",
         "A::B",
@@ -671,7 +671,8 @@ def mock_dependiencies_for_suggestion_dialog(
 ) -> MockDependenciesForSuggestionDialog:
     """Mocks the dependencies for open_suggestion_dialog_for_note.
     Returns a tuple of mocks that replace suggest_note_update and suggest_new_note
-    If user_cancels is True, SuggestionDialog.run behaves as if the user cancelled the dialog."""
+    If user_cancels is True, SuggestionDialog.run behaves as if the user cancelled the dialog.
+    """
 
     def mock_dependencies_for_suggestion_dialog_inner(
         user_cancels: bool,
@@ -809,7 +810,8 @@ def mock_dependencies_for_bulk_suggestion_dialog(
 ) -> MockDependenciesForBulkSuggestionDialog:
     """Mocks the dependencies for open_suggestion_dialog_for_bulk_suggestion.
     Returns a Mock that replaces suggest_notes_in_bulk.
-    If user_cancels is True, SuggestionDialog.run behaves as if the user cancelled the dialog."""
+    If user_cancels is True, SuggestionDialog.run behaves as if the user cancelled the dialog.
+    """
 
     def mock_dependencies_for_suggestion_dialog_inner(user_cancels: bool) -> Mock:
         monkeypatch.setattr(
@@ -1268,7 +1270,6 @@ class TestAnkiHubDBDownloadableMediaNamesForAnkiHubDeck:
         exists_on_s3: bool,
         download_enabled: bool,
     ):
-
         with anki_session_with_addon_data.profile_loaded():
             ah_did = next_deterministic_uuid()
             ankihub_db.upsert_deck_media_infos(
@@ -2069,3 +2070,55 @@ class TestSendReviewData:
             assert_datetime_equal_ignore_milliseconds(
                 card_review_data.last_card_review_at, second_review_time
             )
+
+
+class TestChooseAnkiHubDeck:
+    def test_choose_deck(
+        self,
+        anki_session_with_addon_data: AnkiSession,
+        install_ah_deck: InstallAHDeck,
+        qtbot: QtBot,
+    ):
+        with anki_session_with_addon_data.profile_loaded():
+            ah_dids = []
+            ah_dids.append(install_ah_deck(ah_deck_name="Deck 1"))
+            ah_dids.append(install_ah_deck(ah_deck_name="Deck 2"))
+
+            # Choose_ankihub_deck is blocking, so we setup a timer to press a key
+            def on_timeout():
+                qtbot.keyPress(qwidget.children()[0], Qt.Key_Enter)
+
+            QTimer.singleShot(0, on_timeout)
+
+            qwidget = QWidget()
+            result = choose_ankihub_deck(
+                prompt="Choose a deck",
+                ah_dids=list(ah_dids),
+                parent=qwidget,
+            )
+            assert result == ah_dids[0]
+
+    def test_cancel(
+        self,
+        anki_session_with_addon_data: AnkiSession,
+        install_ah_deck: InstallAHDeck,
+        qtbot: QtBot,
+    ):
+        with anki_session_with_addon_data.profile_loaded():
+            ah_dids = []
+            ah_dids.append(install_ah_deck(ah_deck_name="Deck 1"))
+            ah_dids.append(install_ah_deck(ah_deck_name="Deck 2"))
+
+            # Choose_ankihub_deck is blocking, so we setup a timer to press a key
+            def on_timeout():
+                qtbot.keyPress(qwidget.children()[0], Qt.Key_Escape)
+
+            QTimer.singleShot(0, on_timeout)
+
+            qwidget = QWidget()
+            result = choose_ankihub_deck(
+                prompt="Choose a deck",
+                ah_dids=list(ah_dids),
+                parent=qwidget,
+            )
+            assert result is None
