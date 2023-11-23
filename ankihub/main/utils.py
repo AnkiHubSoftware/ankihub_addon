@@ -32,9 +32,8 @@ if ANKI_INT_VERSION >= ANKI_VERSION_23_10_00:
 
 
 def create_deck_with_id(deck_name: str, deck_id: DeckId) -> None:
-
     source_did = aqt.mw.col.decks.add_normal_deck_with_name(
-        get_unique_deck_name(deck_name)
+        get_unique_ankihub_deck_name(deck_name)
     ).id
     aqt.mw.col.db.execute(f"UPDATE decks SET id={deck_id} WHERE id={source_did};")
     aqt.mw.col.db.execute(f"UPDATE cards SET did={deck_id} WHERE did={source_did};")
@@ -79,16 +78,16 @@ def dids_of_notes(notes: List[Note]) -> Set[DeckId]:
     return result
 
 
-def get_unique_deck_name(deck_name: str) -> str:
+def get_unique_ankihub_deck_name(deck_name: str) -> str:
+    """Returns the passed deck_name if it is unique, otherwise returns a unique version of it
+    by adding a suffix."""
     if not aqt.mw.col.decks.by_name(deck_name):
         return deck_name
 
-    suffix = " (AnkiHub)"
-    if suffix not in deck_name:
-        deck_name += suffix
-    else:
-        deck_name += f" {checksum(str(time.time()))[:5]}"
-    return deck_name
+    result = f"{deck_name} (AnkiHub)"
+    if aqt.mw.col.decks.by_name(result) is not None:
+        result += f" {checksum(str(time.time()))[:5]}"
+    return result
 
 
 def highest_level_did(dids: Iterable[DeckId]) -> DeckId:
@@ -172,7 +171,6 @@ def get_note_types_in_deck(did: DeckId) -> List[NotetypeId]:
 
 
 def reset_note_types_of_notes(nid_mid_pairs: List[Tuple[NoteId, NotetypeId]]) -> None:
-
     note_type_conflicts: Set[Tuple[NoteId, NotetypeId, NotetypeId]] = set()
     for nid, mid in nid_mid_pairs:
         try:
@@ -197,7 +195,6 @@ def reset_note_types_of_notes(nid_mid_pairs: List[Tuple[NoteId, NotetypeId]]) ->
 
 
 def change_note_type_of_note(nid: int, mid: int) -> None:
-
     current_schema: int = aqt.mw.col.db.scalar("select scm from col")
     note = aqt.mw.col.get_note(NoteId(nid))
     target_note_type = aqt.mw.col.models.get(NotetypeId(mid))

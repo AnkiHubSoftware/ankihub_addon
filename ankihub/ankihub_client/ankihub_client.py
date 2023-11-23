@@ -153,22 +153,21 @@ class AnkiHubClient:
 
     def __init__(
         self,
+        local_media_dir_path_cb: Callable[[], Path],
         response_hooks=None,
         token: Optional[str] = None,
         get_token: Callable[[], str] = lambda: None,
         api_url: str = DEFAULT_API_URL,
         s3_bucket_url: str = DEFAULT_S3_BUCKET_URL,
-        local_media_dir_path: Optional[Path] = None,
     ):
         """Create a new AnkiHubClient.
         The token can be set with the token parameter or with the get_token parameter.
         The get_token parameter is a function that returns the token. It has priority over the token parameter.
         If both are set, the token parameter is ignored.
-        If local_media_dir_path is None, then calling some methods related to media will fail.
         """
         self.api_url = api_url
         self.s3_bucket_url = s3_bucket_url
-        self.local_media_dir_path = local_media_dir_path
+        self.local_media_dir_path_cb = local_media_dir_path_cb
         self.token = token
         self.get_token = get_token
         self.response_hooks = response_hooks
@@ -467,7 +466,8 @@ class AnkiHubClient:
     ) -> None:
         # Zip the media files found locally
         zip_filepath = Path(
-            self.local_media_dir_path / f"{ah_did}_{chunk_number}_deck_assets_part.zip"
+            self.local_media_dir_path_cb()
+            / f"{ah_did}_{chunk_number}_deck_assets_part.zip"
         )
         LOGGER.info(f"Creating zipped media file [{zip_filepath.name}]")
         with ZipFile(zip_filepath, "w") as media_zip:
@@ -517,9 +517,10 @@ class AnkiHubClient:
     def download_media(self, media_names: List[str], deck_id: uuid.UUID) -> None:
         deck_media_remote_dir = f"/deck_assets/{deck_id}/"
         with ThreadPoolExecutor() as executor:
+            media_dir_path = self.local_media_dir_path_cb()
             futures: List[Future] = []
             for media_name in media_names:
-                media_path = self.local_media_dir_path / media_name
+                media_path = media_dir_path / media_name
                 media_remote_path = deck_media_remote_dir + urllib.parse.quote_plus(
                     media_name
                 )
