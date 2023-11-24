@@ -1414,6 +1414,8 @@ class TestAnkiHubDBContextManagers:
     ):
         monkeypatch.setattr("ankihub.db.rw_lock.LOCK_TIMEOUT_SECONDS", 0.3)
 
+        task_2_finished = False
+
         def task_1():
             print("Starting task 1")
             with attached_ankihub_db():
@@ -1426,6 +1428,9 @@ class TestAnkiHubDBContextManagers:
             with detached_ankihub_db():
                 print("Task 2 acquired lock")
             print("Task 2 released lock")
+
+            nonlocal task_2_finished
+            task_2_finished = True
 
         with anki_session_with_addon_data.profile_loaded():
             aqt.mw.taskman.run_in_background(
@@ -1445,8 +1450,10 @@ class TestAnkiHubDBContextManagers:
             if raises_error:
                 assert len(exceptions) == 1
                 assert isinstance(exceptions[0][1], LockAcquisitionTimeoutError)
+                assert not task_2_finished
             else:
                 assert len(exceptions) == 0
+                assert task_2_finished
 
 
 class TestErrorHandling:
