@@ -30,7 +30,7 @@ from ..ankihub_client.models import DeckMedia
 from ..common_utils import local_media_names_from_html
 from ..settings import ANKI_INT_VERSION, ANKI_VERSION_23_10_00
 from .db_utils import DBConnection
-from .exceptions import IntegrityError
+from .exceptions import IntegrityError, LockAcquisitionTimeoutError
 
 # Multiple threads can concurrently make read/write queries to the AnkiHub DB (read_lock), but they can't
 # do that while the AnkiHub DB is attached to the Anki DB connection (write_lock).
@@ -51,7 +51,7 @@ def attach_ankihub_db_to_anki_db_connection() -> None:
             )
             LOGGER.info("Attached AnkiHub DB to Anki DB connection")
         else:
-            raise RuntimeError("Failed to acquire write lock.")
+            raise LockAcquisitionTimeoutError("Could not acquire lock to attach DB")
 
 
 def detach_ankihub_db_from_anki_db_connection() -> None:

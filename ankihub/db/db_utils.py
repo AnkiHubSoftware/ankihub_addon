@@ -4,6 +4,7 @@ from typing import Any, List, Optional, Tuple
 from readerwriterlock.rwlock import Lockable
 
 from .. import LOGGER
+from .exceptions import LockAcquisitionTimeoutError
 
 
 class DBConnection:
@@ -27,7 +28,8 @@ class DBConnection:
             finally:
                 self._lock.release()
         else:
-            raise Exception("Could not acquire lock")
+            LOGGER.info(f"Could not acquire lock to execute SQL: {sql}")
+            raise LockAcquisitionTimeoutError("Could not acquire lock to execute SQL.")
 
     def _execute_inner(self, sql: str, *args, first_row_only=False) -> List:
         try:
