@@ -43,7 +43,7 @@ def attached_ankihub_db():
         try:
             yield
         finally:
-            detach_ankihub_db_from_anki_db_connection()
+            _detach_ankihub_db_from_anki_db_connection()
 
 
 @contextmanager
@@ -68,7 +68,7 @@ def _attach_ankihub_db_to_anki_db_connection() -> None:
         LOGGER.info("Attached AnkiHub DB to Anki DB connection")
 
 
-def detach_ankihub_db_from_anki_db_connection() -> None:
+def _detach_ankihub_db_from_anki_db_connection() -> None:
     if aqt.mw.col is None:
         LOGGER.info("The collection is not open. Not detaching AnkiHub DB.")
         return

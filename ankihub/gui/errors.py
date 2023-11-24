@@ -29,10 +29,7 @@ from sentry_sdk.integrations.threading import ThreadingIntegration
 from .. import LOGGER
 from ..addon_ankihub_client import AddonAnkiHubClient as AnkiHubClient
 from ..ankihub_client import AnkiHubHTTPError, AnkiHubRequestException
-from ..db import (
-    detach_ankihub_db_from_anki_db_connection,
-    is_ankihub_db_attached_to_anki_db,
-)
+from ..db import detached_ankihub_db, is_ankihub_db_attached_to_anki_db
 from ..gui.exceptions import DeckDownloadAndInstallError
 from ..settings import (
     ADDON_VERSION,
@@ -134,9 +131,6 @@ def upload_logs_and_data_in_background(
 
 
 def _upload_logs_and_data_in_background(key: str) -> str:
-    # detach the ankihub database from the anki database connection to prevent file permission errors
-    detach_ankihub_db_from_anki_db_connection()
-
     file_path = _zip_logs_and_data()
 
     # upload the zip file
@@ -158,10 +152,11 @@ def _zip_logs_and_data() -> Path:
     temp_file = tempfile.NamedTemporaryFile(delete=False)
     temp_file.close()
     with zipfile.ZipFile(temp_file.name, "w") as zipf:
-        # Add the ankihub base directory to the zip. It also contains the logs.
-        source_dir = ankihub_base_path()
-        for file in source_dir.rglob("*"):
-            zipf.write(file, arcname=file.relative_to(source_dir))
+        with detached_ankihub_db():
+            # Add the ankihub base directory to the zip. It also contains the logs.
+            source_dir = ankihub_base_path()
+            for file in source_dir.rglob("*"):
+                zipf.write(file, arcname=file.relative_to(source_dir))
 
         # Add the Anki collection to the zip.
         try:
