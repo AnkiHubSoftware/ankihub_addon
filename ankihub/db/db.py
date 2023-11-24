@@ -21,8 +21,6 @@ import aqt
 from anki.models import NotetypeDict, NotetypeId
 from anki.notes import NoteId
 from anki.utils import ids2str, join_fields, split_fields
-from readerwriterlock import rwlock
-from readerwriterlock.rwlock import RELEASE_ERR_CLS, RELEASE_ERR_MSG
 
 from .. import LOGGER
 from ..ankihub_client import Field, NoteInfo, suggestion_type_from_str
@@ -30,28 +28,31 @@ from ..ankihub_client.models import DeckMedia
 from ..common_utils import local_media_names_from_html
 from ..settings import ANKI_INT_VERSION, ANKI_VERSION_23_10_00
 from .db_utils import DBConnection
-from .exceptions import IntegrityError, LockAcquisitionTimeoutError
-
-# Multiple threads can concurrently make read/write queries to the AnkiHub DB (read_lock), but they can't
-# do that while the AnkiHub DB is attached to the Anki DB connection (write_lock).
-rw_lock = rwlock.RWLockFair()
-write_lock = rw_lock.gen_wlock()
+from .exceptions import IntegrityError
+from .rw_lock import read_lock_context, write_lock_context
 
 
 @contextmanager
 def attached_ankihub_db():
     """Context manager that attaches the AnkiHub DB to the Anki DB connection and detaches it when the context exits.
-    A lock is used to ensure that other threads don't try to access the AnkiHub DB while it is attached to the Anki DB.
+    A lock is used to ensure that other threads don't try to access the AnkiHub DB through the _AnkiHubDB class
+    while it is attached to the Anki DB.
     """
-    _acquire_write_lock()
-    try:
+    with write_lock_context():
         _attach_ankihub_db_to_anki_db_connection()
-        yield
-    finally:
         try:
-            detach_ankihub_db_from_anki_db_connection()
+            yield
         finally:
-            _release_write_lock()
+            detach_ankihub_db_from_anki_db_connection()
+
+
+@contextmanager
+def detached_ankihub_db():
+    """Context manager that ensures the AnkiHub DB is detached from the Anki DB connection while the context is active.
+    The purpose of this is to be able to safely perform operations on the AnkiHub DB which require it to be detached,
+    for example coyping the AnkiHub DB file."""
+    with read_lock_context():
+        yield
 
 
 def _attach_ankihub_db_to_anki_db_connection() -> None:
@@ -93,25 +94,6 @@ def detach_ankihub_db_from_anki_db_connection() -> None:
             aqt.mw.col.db.begin()  # type: ignore
 
         LOGGER.info("Began new transaction.")
-
-
-def _acquire_write_lock() -> None:
-    if write_lock.acquire(blocking=True, timeout=5):
-        LOGGER.info("Acquired write lock.")
-        return
-    LOGGER.info("Could not acquire write lock.")
-    raise LockAcquisitionTimeoutError("Could not acquire lock to attach DB")
-
-
-def _release_write_lock() -> None:
-    try:
-        write_lock.release()
-        LOGGER.info("Released write lock.")
-    except RELEASE_ERR_CLS as e:
-        if RELEASE_ERR_MSG in str(e):
-            LOGGER.info("Write lock was not acquired. Not releasing.")
-        else:
-            raise e
 
 
 def is_ankihub_db_attached_to_anki_db() -> bool:
@@ -231,9 +213,9 @@ class _AnkiHubDB:
         return result
 
     def connection(self) -> DBConnection:
-        read_lock = rw_lock.gen_rlock()
         result = DBConnection(
-            conn=sqlite3.connect(ankihub_db.database_path), lock=read_lock
+            conn=sqlite3.connect(ankihub_db.database_path),
+            lock_context=read_lock_context,
         )
         return result
 

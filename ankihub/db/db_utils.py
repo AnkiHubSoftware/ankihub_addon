@@ -1,20 +1,19 @@
 import sqlite3
-from typing import Any, List, Optional, Tuple
-
-from readerwriterlock.rwlock import Lockable
+from typing import Any, Callable, ContextManager, List, Optional, Tuple
 
 from .. import LOGGER
-from .exceptions import LockAcquisitionTimeoutError
 
 
 class DBConnection:
     """A wrapper around a sqlite3.Connection that provides some convenience methods.
-    The lock is used to wrap calls to self.execute()."""
+    The lock_context is used to wrap calls to self.execute()."""
 
-    def __init__(self, conn: sqlite3.Connection, lock: Lockable):
+    def __init__(
+        self, conn: sqlite3.Connection, lock_context: Callable[[], ContextManager]
+    ):
         self._conn = conn
         self._is_used_as_context_manager = False
-        self._lock = lock
+        self._lock_context = lock_context
 
     def execute(
         self,
@@ -22,14 +21,8 @@ class DBConnection:
         *args,
         first_row_only=False,
     ) -> List:
-        if self._lock.acquire(blocking=True, timeout=5):
-            try:
-                return self._execute_inner(sql, *args, first_row_only=first_row_only)
-            finally:
-                self._lock.release()
-        else:
-            LOGGER.info(f"Could not acquire lock to execute SQL: {sql}")
-            raise LockAcquisitionTimeoutError("Could not acquire lock to execute SQL.")
+        with self._lock_context():
+            return self._execute_inner(sql, *args, first_row_only=first_row_only)
 
     def _execute_inner(self, sql: str, *args, first_row_only=False) -> List:
         try:

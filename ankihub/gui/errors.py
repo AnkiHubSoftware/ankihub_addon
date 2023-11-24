@@ -30,7 +30,7 @@ from .. import LOGGER
 from ..addon_ankihub_client import AddonAnkiHubClient as AnkiHubClient
 from ..ankihub_client import AnkiHubHTTPError, AnkiHubRequestException
 from ..db import (
-    _detach_ankihub_db_from_anki_db_connection,
+    detach_ankihub_db_from_anki_db_connection,
     is_ankihub_db_attached_to_anki_db,
 )
 from ..gui.exceptions import DeckDownloadAndInstallError
@@ -135,7 +135,7 @@ def upload_logs_and_data_in_background(
 
 def _upload_logs_and_data_in_background(key: str) -> str:
     # detach the ankihub database from the anki database connection to prevent file permission errors
-    _detach_ankihub_db_from_anki_db_connection()
+    detach_ankihub_db_from_anki_db_connection()
 
     file_path = _zip_logs_and_data()
 
