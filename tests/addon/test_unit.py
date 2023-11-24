@@ -66,7 +66,7 @@ from ankihub.gui.errors import (
 )
 from ankihub.gui.media_sync import media_sync
 from ankihub.gui.menu import AnkiHubLogin
-from ankihub.gui.operations import deck_creation
+from ankihub.gui.operations import AddonQueryOp, deck_creation
 from ankihub.gui.operations.deck_creation import (
     DeckCreationConfirmationDialog,
     create_collaborative_deck,
@@ -1433,16 +1433,12 @@ class TestAnkiHubDBContextManagers:
             task_2_finished = True
 
         with anki_session_with_addon_data.profile_loaded():
-            aqt.mw.taskman.run_in_background(
-                task=task_1,
-                on_done=lambda future: future.result(),
-                uses_collection=False,
-            )
-            aqt.mw.taskman.run_in_background(
-                task=task_2,
-                on_done=lambda future: future.result(),
-                uses_collection=False,
-            )
+            AddonQueryOp(
+                parent=qtbot, op=lambda _: task_1(), success=lambda _: None
+            ).without_collection().run_in_background()
+            AddonQueryOp(
+                parent=qtbot, op=lambda _: task_2(), success=lambda _: None
+            ).without_collection().run_in_background()
 
             with qtbot.captureExceptions() as exceptions:
                 qtbot.wait(500)
