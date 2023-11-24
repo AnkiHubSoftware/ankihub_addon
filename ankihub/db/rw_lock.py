@@ -1,3 +1,9 @@
+"""This module defines a readers-writer lock for the AnkiHub DB.
+Multiple threads can enter the non_exclusive_db_access_context() context, but when
+a thread enters the exclusive_db_access_context() context, no other thread can enter
+either context until the thread that entered the exclusive_db_access_context() context
+exits it.
+"""
 from contextlib import contextmanager
 
 from readerwriterlock import rwlock
@@ -7,34 +13,32 @@ from .exceptions import LockAcquisitionTimeoutError
 
 LOCK_TIMEOUT_SECONDS = 5
 
-# Multiple threads can concurrently make read/write queries to the AnkiHub DB (read_lock), but they can't
-# do that while the AnkiHub DB is attached to the Anki DB connection (write_lock).
 rw_lock = rwlock.RWLockFair()
 write_lock = rw_lock.gen_wlock()
 
 
 @contextmanager
-def write_lock_context():
+def exclusive_db_access_context():
     if write_lock.acquire(blocking=True, timeout=LOCK_TIMEOUT_SECONDS):
-        LOGGER.info("Acquired write lock.")
+        LOGGER.info("Acquired exclusive access.")
         try:
             yield
         finally:
             write_lock.release()
-            LOGGER.info("Released write lock.")
+            LOGGER.info("Released exclusive access.")
     else:
-        raise LockAcquisitionTimeoutError("Could not acquire write lock")
+        raise LockAcquisitionTimeoutError("Could not acquire exclusive access.")
 
 
 @contextmanager
-def read_lock_context():
+def non_exclusive_db_access_context():
     lock = rw_lock.gen_rlock()
     if lock.acquire(blocking=True, timeout=LOCK_TIMEOUT_SECONDS):
-        LOGGER.info("Acquired read lock.")
+        LOGGER.info("Acquired non-exclusive access.")
         try:
             yield
         finally:
             lock.release()
-            LOGGER.info("Released read lock.")
+            LOGGER.info("Released non-exclusive access.")
     else:
-        raise LockAcquisitionTimeoutError("Could not acquire read lock")
+        raise LockAcquisitionTimeoutError("Could not acquire non-exclusive access.")

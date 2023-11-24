@@ -29,7 +29,7 @@ from ..common_utils import local_media_names_from_html
 from ..settings import ANKI_INT_VERSION, ANKI_VERSION_23_10_00
 from .db_utils import DBConnection
 from .exceptions import IntegrityError
-from .rw_lock import read_lock_context, write_lock_context
+from .rw_lock import exclusive_db_access_context, non_exclusive_db_access_context
 
 
 @contextmanager
@@ -39,7 +39,7 @@ def attached_ankihub_db():
     A lock is used to ensure that other threads don't try to access the AnkiHub DB through the _AnkiHubDB class
     while it is attached to the Anki DB.
     """
-    with write_lock_context():
+    with exclusive_db_access_context():
         _attach_ankihub_db_to_anki_db_connection()
         try:
             yield
@@ -55,7 +55,7 @@ def detached_ankihub_db():
     It's used by the _AnkiHubDB class to ensure that the AnkiHub DB is detached from the Anki DB while
     queries are executed through the _AnkiHubDB class.
     """
-    with read_lock_context():
+    with non_exclusive_db_access_context():
         yield
 
 
