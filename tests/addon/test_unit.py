@@ -7,6 +7,7 @@ from dataclasses import fields
 from datetime import datetime, timedelta
 from pathlib import Path
 from textwrap import dedent
+from time import sleep
 from typing import Callable, Generator, List, Optional, Protocol, Tuple
 from unittest.mock import Mock
 
@@ -50,9 +51,9 @@ from ankihub.ankihub_client import (
     Field,
     SuggestionType,
 )
-from ankihub.db import attached_ankihub_db
+from ankihub.db import attached_ankihub_db, detached_ankihub_db
 from ankihub.db.db import _AnkiHubDB
-from ankihub.db.exceptions import IntegrityError
+from ankihub.db.exceptions import IntegrityError, LockAcquisitionTimeoutError
 from ankihub.feature_flags import _FeatureFlags, feature_flags
 from ankihub.gui import errors, suggestion_dialog
 from ankihub.gui.error_dialog import ErrorDialog
@@ -216,7 +217,6 @@ class TestMediaSyncMediaUpload:
 
 
 def test_lowest_level_common_ancestor_deck_name():
-
     deck_names = [
         "A",
         "A::B",
@@ -671,7 +671,8 @@ def mock_dependiencies_for_suggestion_dialog(
 ) -> MockDependenciesForSuggestionDialog:
     """Mocks the dependencies for open_suggestion_dialog_for_note.
     Returns a tuple of mocks that replace suggest_note_update and suggest_new_note
-    If user_cancels is True, SuggestionDialog.run behaves as if the user cancelled the dialog."""
+    If user_cancels is True, SuggestionDialog.run behaves as if the user cancelled the dialog.
+    """
 
     def mock_dependencies_for_suggestion_dialog_inner(
         user_cancels: bool,
@@ -809,7 +810,8 @@ def mock_dependencies_for_bulk_suggestion_dialog(
 ) -> MockDependenciesForBulkSuggestionDialog:
     """Mocks the dependencies for open_suggestion_dialog_for_bulk_suggestion.
     Returns a Mock that replaces suggest_notes_in_bulk.
-    If user_cancels is True, SuggestionDialog.run behaves as if the user cancelled the dialog."""
+    If user_cancels is True, SuggestionDialog.run behaves as if the user cancelled the dialog.
+    """
 
     def mock_dependencies_for_suggestion_dialog_inner(user_cancels: bool) -> Mock:
         monkeypatch.setattr(
@@ -1268,7 +1270,6 @@ class TestAnkiHubDBDownloadableMediaNamesForAnkiHubDeck:
         exists_on_s3: bool,
         download_enabled: bool,
     ):
-
         with anki_session_with_addon_data.profile_loaded():
             ah_did = next_deterministic_uuid()
             ankihub_db.upsert_deck_media_infos(
@@ -1393,6 +1394,59 @@ class TestAnkiHubDBMediaNamesWithMatchingHashes:
             )
             == {}
         )
+
+
+class TestAnkiHubDBContextManagers:
+    @pytest.mark.parametrize(
+        "blocking_task_duration, raises_error",
+        [
+            (0.1, False),
+            (1, True),
+        ],
+    )
+    def test_detached_ankihub_db_timeout_behavior(
+        self,
+        anki_session_with_addon_data: AnkiSession,
+        monkeypatch: MonkeyPatch,
+        qtbot: QtBot,
+        blocking_task_duration: float,
+        raises_error: bool,
+    ):
+        monkeypatch.setattr("ankihub.db.rw_lock.LOCK_TIMEOUT_SECONDS", 0.3)
+
+        def task_1():
+            print("Starting task 1")
+            with attached_ankihub_db():
+                print("Task 1 acquired lock")
+                sleep(blocking_task_duration)
+            print("Task 1 released lock")
+
+        def task_2():
+            print("Starting task 2")
+            with detached_ankihub_db():
+                print("Task 2 acquired lock")
+            print("Task 2 released lock")
+
+        with anki_session_with_addon_data.profile_loaded():
+            aqt.mw.taskman.run_in_background(
+                task=task_1,
+                on_done=lambda future: future.result(),
+                uses_collection=False,
+            )
+            aqt.mw.taskman.run_in_background(
+                task=task_2,
+                on_done=lambda future: future.result(),
+                uses_collection=False,
+            )
+
+            with qtbot.captureExceptions() as exceptions:
+                qtbot.wait(500)
+
+            if raises_error:
+                assert len(exceptions) == 1
+                assert isinstance(exceptions[0][1], LockAcquisitionTimeoutError)
+            else:
+                assert len(exceptions) == 0
 
 
 class TestErrorHandling:
