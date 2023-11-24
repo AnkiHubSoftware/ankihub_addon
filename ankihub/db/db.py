@@ -35,6 +35,7 @@ from .rw_lock import read_lock_context, write_lock_context
 @contextmanager
 def attached_ankihub_db():
     """Context manager that attaches the AnkiHub DB to the Anki DB connection and detaches it when the context exits.
+    The purpose is to e.g. do join queries between the Anki DB and the AnkiHub DB through aqt.mw.col.db.execute().
     A lock is used to ensure that other threads don't try to access the AnkiHub DB through the _AnkiHubDB class
     while it is attached to the Anki DB.
     """
@@ -50,7 +51,10 @@ def attached_ankihub_db():
 def detached_ankihub_db():
     """Context manager that ensures the AnkiHub DB is detached from the Anki DB connection while the context is active.
     The purpose of this is to be able to safely perform operations on the AnkiHub DB which require it to be detached,
-    for example coyping the AnkiHub DB file."""
+    for example coyping the AnkiHub DB file.
+    It's used by the _AnkiHubDB class to ensure that the AnkiHub DB is detached from the Anki DB while
+    queries are executed through the _AnkiHubDB class.
+    """
     with read_lock_context():
         yield
 
@@ -215,7 +219,7 @@ class _AnkiHubDB:
     def connection(self) -> DBConnection:
         result = DBConnection(
             conn=sqlite3.connect(ankihub_db.database_path),
-            lock_context=read_lock_context,
+            lock_context=detached_ankihub_db,
         )
         return result
 
