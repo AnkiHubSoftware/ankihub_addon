@@ -38,26 +38,38 @@ rw_lock = rwlock.RWLockFair()
 write_lock = rw_lock.gen_wlock()
 
 
-def attach_ankihub_db_to_anki_db_connection() -> None:
+@contextmanager
+def attached_ankihub_db():
+    """Context manager that attaches the AnkiHub DB to the Anki DB connection and detaches it when the context exits.
+    A lock is used to ensure that other threads don't try to access the AnkiHub DB while it is attached to the Anki DB.
+    """
+    _acquire_write_lock()
+    try:
+        _attach_ankihub_db_to_anki_db_connection()
+        yield
+    finally:
+        try:
+            detach_ankihub_db_from_anki_db_connection()
+        finally:
+            _release_write_lock()
+
+
+def _attach_ankihub_db_to_anki_db_connection() -> None:
     if aqt.mw.col is None:
         LOGGER.info("The collection is not open. Not attaching AnkiHub DB.")
         return
 
     if not is_ankihub_db_attached_to_anki_db():
-        if write_lock.acquire(blocking=True, timeout=5):
-            aqt.mw.col.db.execute(
-                f"ATTACH DATABASE ? AS {ankihub_db.database_name}",
-                str(ankihub_db.database_path),
-            )
-            LOGGER.info("Attached AnkiHub DB to Anki DB connection")
-        else:
-            raise LockAcquisitionTimeoutError("Could not acquire lock to attach DB")
+        aqt.mw.col.db.execute(
+            f"ATTACH DATABASE ? AS {ankihub_db.database_name}",
+            str(ankihub_db.database_path),
+        )
+        LOGGER.info("Attached AnkiHub DB to Anki DB connection")
 
 
 def detach_ankihub_db_from_anki_db_connection() -> None:
     if aqt.mw.col is None:
         LOGGER.info("The collection is not open. Not detaching AnkiHub DB.")
-        _release_write_lock()
         return
 
     if is_ankihub_db_attached_to_anki_db():
@@ -82,7 +94,13 @@ def detach_ankihub_db_from_anki_db_connection() -> None:
 
         LOGGER.info("Began new transaction.")
 
-    _release_write_lock()
+
+def _acquire_write_lock() -> None:
+    if write_lock.acquire(blocking=True, timeout=5):
+        LOGGER.info("Acquired write lock.")
+        return
+    LOGGER.info("Could not acquire write lock.")
+    raise LockAcquisitionTimeoutError("Could not acquire lock to attach DB")
 
 
 def _release_write_lock() -> None:
@@ -104,15 +122,6 @@ def is_ankihub_db_attached_to_anki_db() -> bool:
         name for _, name, _ in aqt.mw.col.db.all("PRAGMA database_list")
     ]
     return result
-
-
-@contextmanager
-def attached_ankihub_db():
-    attach_ankihub_db_to_anki_db_connection()
-    try:
-        yield
-    finally:
-        detach_ankihub_db_from_anki_db_connection()
 
 
 class _AnkiHubDB:
