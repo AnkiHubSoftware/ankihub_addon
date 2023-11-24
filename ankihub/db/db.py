@@ -55,17 +55,9 @@ def attach_ankihub_db_to_anki_db_connection() -> None:
 
 
 def detach_ankihub_db_from_anki_db_connection() -> None:
-    try:
-        write_lock.release()
-        LOGGER.info("Released write lock.")
-    except RELEASE_ERR_CLS as e:
-        if RELEASE_ERR_MSG in str(e):
-            LOGGER.info("Write lock was not acquired. Not releasing.")
-        else:
-            raise e
-
     if aqt.mw.col is None:
         LOGGER.info("The collection is not open. Not detaching AnkiHub DB.")
+        _release_write_lock()
         return
 
     if is_ankihub_db_attached_to_anki_db():
@@ -89,6 +81,19 @@ def detach_ankihub_db_from_anki_db_connection() -> None:
             aqt.mw.col.db.begin()  # type: ignore
 
         LOGGER.info("Began new transaction.")
+
+    _release_write_lock()
+
+
+def _release_write_lock() -> None:
+    try:
+        write_lock.release()
+        LOGGER.info("Released write lock.")
+    except RELEASE_ERR_CLS as e:
+        if RELEASE_ERR_MSG in str(e):
+            LOGGER.info("Write lock was not acquired. Not releasing.")
+        else:
+            raise e
 
 
 def is_ankihub_db_attached_to_anki_db() -> bool:
