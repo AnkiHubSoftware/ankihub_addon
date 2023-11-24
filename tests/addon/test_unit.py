@@ -8,7 +8,7 @@ from datetime import datetime, timedelta
 from pathlib import Path
 from textwrap import dedent
 from time import sleep
-from typing import Callable, Generator, List, Optional, Protocol, Tuple
+from typing import Callable, ContextManager, Generator, List, Optional, Protocol, Tuple
 from unittest.mock import Mock
 
 import aqt
@@ -1398,58 +1398,53 @@ class TestAnkiHubDBMediaNamesWithMatchingHashes:
 
 class TestAnkiHubDBContextManagers:
     @pytest.mark.parametrize(
-        "blocking_task_duration, raises_error",
+        "task_configs, task_times_out",
         [
-            (0.1, False),
-            (1, True),
+            # Format for a task_confg: (context_manager, duration)
+            # Detached, Detached - tasks don't block each other
+            ([(detached_ankihub_db, 0.1), (detached_ankihub_db, 0.1)], False),
+            ([(detached_ankihub_db, 0.5), (detached_ankihub_db, 0.1)], False),
+            # Attached, Attached - tasks block each other
+            ([(attached_ankihub_db, 0.1), (attached_ankihub_db, 0.1)], False),
+            ([(attached_ankihub_db, 0.5), (attached_ankihub_db, 0.1)], True),
+            # Attached, Detached - tasks block each other
+            ([(attached_ankihub_db, 0.1), (detached_ankihub_db, 0.1)], False),
+            ([(attached_ankihub_db, 0.5), (detached_ankihub_db, 0.1)], True),
+            # Detached, Attached - tasks block each other
+            ([(detached_ankihub_db, 0.1), (attached_ankihub_db, 0.1)], False),
+            ([(detached_ankihub_db, 0.5), (attached_ankihub_db, 0.1)], True),
         ],
     )
-    def test_detached_ankihub_db_timeout_behavior(
+    def test_blocking_and_timeout_behavior(
         self,
         anki_session_with_addon_data: AnkiSession,
         monkeypatch: MonkeyPatch,
         qtbot: QtBot,
-        blocking_task_duration: float,
-        raises_error: bool,
+        task_configs: List[Tuple[Callable[[], ContextManager], float]],
+        task_times_out: bool,
     ):
-        monkeypatch.setattr("ankihub.db.rw_lock.LOCK_TIMEOUT_SECONDS", 0.3)
+        monkeypatch.setattr("ankihub.db.rw_lock.LOCK_TIMEOUT_SECONDS", 0.2)
 
-        task_2_finished = False
-
-        def task_1():
-            print("Starting task 1")
-            with attached_ankihub_db():
-                print("Task 1 acquired lock")
-                sleep(blocking_task_duration)
-            print("Task 1 released lock")
-
-        def task_2():
-            print("Starting task 2")
-            with detached_ankihub_db():
-                print("Task 2 acquired lock")
-            print("Task 2 released lock")
-
-            nonlocal task_2_finished
-            task_2_finished = True
+        def task(context_manager: Callable[[], ContextManager], duration: float):
+            with context_manager():
+                sleep(duration)
 
         with anki_session_with_addon_data.profile_loaded():
-            AddonQueryOp(
-                parent=qtbot, op=lambda _: task_1(), success=lambda _: None
-            ).without_collection().run_in_background()
-            AddonQueryOp(
-                parent=qtbot, op=lambda _: task_2(), success=lambda _: None
-            ).without_collection().run_in_background()
+            for context_manager, duration in task_configs:
+                AddonQueryOp(
+                    parent=qtbot,
+                    op=lambda _: task(context_manager, duration),
+                    success=lambda _: None,
+                ).without_collection().run_in_background()
 
             with qtbot.captureExceptions() as exceptions:
                 qtbot.wait(500)
 
-            if raises_error:
+            if task_times_out:
                 assert len(exceptions) == 1
                 assert isinstance(exceptions[0][1], LockAcquisitionTimeoutError)
-                assert not task_2_finished
             else:
                 assert len(exceptions) == 0
-                assert task_2_finished
 
 
 class TestErrorHandling:
