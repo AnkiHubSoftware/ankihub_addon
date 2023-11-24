@@ -20,12 +20,12 @@ write_lock = rw_lock.gen_wlock()
 @contextmanager
 def exclusive_db_access_context():
     if write_lock.acquire(blocking=True, timeout=LOCK_TIMEOUT_SECONDS):
-        LOGGER.info("Acquired exclusive access.")
+        LOGGER.debug("Acquired exclusive access.")
         try:
             yield
         finally:
             write_lock.release()
-            LOGGER.info("Released exclusive access.")
+            LOGGER.debug("Released exclusive access.")
     else:
         raise LockAcquisitionTimeoutError("Could not acquire exclusive access.")
 
@@ -34,11 +34,11 @@ def exclusive_db_access_context():
 def non_exclusive_db_access_context():
     lock = rw_lock.gen_rlock()
     if lock.acquire(blocking=True, timeout=LOCK_TIMEOUT_SECONDS):
-        LOGGER.info("Acquired non-exclusive access.")
+        LOGGER.debug("Acquired non-exclusive access.")
         try:
             yield
         finally:
             lock.release()
-            LOGGER.info("Released non-exclusive access.")
+            LOGGER.debug("Released non-exclusive access.")
     else:
         raise LockAcquisitionTimeoutError("Could not acquire non-exclusive access.")
