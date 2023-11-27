@@ -188,6 +188,7 @@ def import_ah_note(next_deterministic_uuid: Callable[[], uuid.UUID]) -> ImportAH
     The note type of the note is created in the Anki database if it does not exist yet.
     The default value for the note type is an AnkiHub version of the Basic note type.
     Can only be used in an anki_session_with_addon.profile_loaded() context.
+    Use the import_ah_notes fixture if you want to import many notes at once.
 
     Parameters:
     Can be passed to override the default values of the note. When certain
@@ -263,6 +264,80 @@ def import_ah_note(next_deterministic_uuid: Callable[[], uuid.UUID]) -> ImportAH
         return note_data
 
     return _import_ah_note
+
+
+class ImportAHNotes(Protocol):
+    def __call__(
+        self,
+        note_infos: List[NoteInfo],
+        ah_did: Optional[uuid.UUID] = None,
+        anki_did: Optional[DeckId] = None,
+    ) -> None:
+        ...
+
+
+@fixture
+def import_ah_notes(next_deterministic_uuid: Callable[[], uuid.UUID]) -> ImportAHNotes:
+    """Alternative to import_ah_note that imports multiple notes at once.
+    Offers less flexibility than import_ah_note but is more efficient when importing multiple notes.
+    """
+    # All notes created by this fixture will be created in the same deck.
+    default_ah_did = next_deterministic_uuid()
+    deck_name = "test"
+
+    def _import_ah_notes(
+        note_infos: List[NoteInfo],
+        ah_did: Optional[uuid.UUID] = default_ah_did,
+        anki_did: Optional[DeckId] = None,
+    ) -> None:
+        assert len(note_infos) > 0, "note_infos must not be empty"
+        assert (
+            note_info.mid == note_infos[0].mid for note_info in note_infos
+        ), "All notes must have the same note type"
+
+        # Check if the note_infos are compatible with the note type.
+        # For each field in note_data, check if there is a field in the note type with the same name.
+        mid = note_infos[0].mid
+        note_type = aqt.mw.col.models.get(NotetypeId(mid))
+        assert note_type is not None, f"Note type with id {mid} does not exist."
+
+        field_names_of_note_type = set(field["name"] for field in note_type["flds"])
+        for note_info in note_infos:
+            fields_are_compatible = all(
+                field.name in field_names_of_note_type for field in note_info.fields
+            )
+            assert fields_are_compatible, (
+                f"Note data is not compatible with the note type.\n"
+                f"\tNote data: {note_info.fields}, note type: {field_names_of_note_type}"
+            )
+
+        if deck_config := config.deck_config(ah_did):
+            suspend_new_cards_of_new_notes = deck_config.suspend_new_cards_of_new_notes
+            suspend_new_cards_of_existing_notes = (
+                deck_config.suspend_new_cards_of_existing_notes
+            )
+        else:
+            suspend_new_cards_of_new_notes = (
+                DeckConfig.suspend_new_cards_of_new_notes_default(ah_did)
+            )
+            suspend_new_cards_of_existing_notes = (
+                DeckConfig.suspend_new_cards_of_existing_notes_default()
+            )
+
+        AnkiHubImporter().import_ankihub_deck(
+            ankihub_did=ah_did,
+            notes=note_infos,
+            note_types={note_type["id"]: note_type},
+            protected_fields={},
+            protected_tags=[],
+            deck_name=deck_name,
+            is_first_import_of_deck=False,
+            anki_did=anki_did,
+            suspend_new_cards_of_new_notes=suspend_new_cards_of_new_notes,
+            suspend_new_cards_of_existing_notes=suspend_new_cards_of_existing_notes,
+        )
+
+    return _import_ah_notes
 
 
 class ImportAHNoteType(Protocol):
