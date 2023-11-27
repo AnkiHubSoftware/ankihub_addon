@@ -9,14 +9,16 @@ import uuid
 from typing import Dict, Iterable, List, Optional
 
 import aqt
-from anki.decks import DeckId
 from anki.errors import NotFoundError
 from anki.notes import NoteId
 
 from .. import LOGGER
 from ..db import ankihub_db
 from ..settings import config
-from .utils import nids_in_deck_but_not_in_subdeck
+from .utils import (
+    move_notes_to_decks_while_respecting_odid,
+    nids_in_deck_but_not_in_subdeck,
+)
 
 # root tag for tags that indicate which subdeck a note belongs to
 SUBDECK_TAG = "AnkiHub_Subdeck"
@@ -68,10 +70,11 @@ def build_subdecks_and_move_cards_to_them(
     _create_decks(deck_names)
 
     # move cards to their destination decks
-    for nid, dest_deck_name in nid_to_dest_deck_name.items():
-        dest_did = aqt.mw.col.decks.id_for_name(dest_deck_name)
-        _set_deck_while_respecting_odid(nid=nid, did=dest_did)
-    aqt.mw.col.save()
+    nid_to_did = {
+        nid: aqt.mw.col.decks.id_for_name(deck_name)
+        for nid, deck_name in nid_to_dest_deck_name.items()
+    }
+    move_notes_to_decks_while_respecting_odid(nid_to_did=nid_to_did)
 
     # remove empty subdecks
     for name_and_did in aqt.mw.col.decks.children(root_deck_id):
@@ -128,25 +131,6 @@ def _nid_to_destination_deck_name(
     return result
 
 
-def _set_deck_while_respecting_odid(nid: NoteId, did: DeckId) -> None:
-    """Moves the cards of the note to the deck. If a card is in a filtered deck
-    it is not moved and only its original deck id value gets changed."""
-
-    # using database operations for performance reasons
-    cids = aqt.mw.col.db.list("SELECT id FROM cards WHERE nid = ?", nid)
-    for cid in cids:
-        odid = aqt.mw.col.db.scalar("SELECT odid FROM cards WHERE id=?", cid)
-        # if the card is in a filtered deck, we only change the original deck id
-        if odid == 0:
-            # setting usn to -1 so that this change is synced to AnkiWeb
-            # see https://github.com/ankidroid/Anki-Android/wiki/Database-Structure#cards
-            aqt.mw.col.db.execute("UPDATE cards SET did=?, usn=-1 WHERE id=?", did, cid)
-        else:
-            aqt.mw.col.db.execute(
-                "UPDATE cards SET odid=?, usn=-1 WHERE id=?", did, cid
-            )
-
-
 def _subdeck_tag_to_deck_name(anki_root_deck_name: str, tag: str) -> Optional[str]:
     """The tag should be of the form "AnkiHub_Subdeck::ankihub_deck_name[::subdeck_name]*"
     and this returns "anki_root_deck_name[::subdeck_name]*" in this case.
@@ -183,9 +167,8 @@ def flatten_deck(ankihub_did: uuid.UUID) -> None:
     root_deck_id = config.deck_config(ankihub_did).anki_id
     root_deck_name = aqt.mw.col.decks.name(root_deck_id)
     nids = aqt.mw.col.find_notes(f'"deck:{root_deck_name}::*"')
-    for nid in nids:
-        _set_deck_while_respecting_odid(nid, root_deck_id)
-    aqt.mw.col.save()
+    nid_to_did = {nid: root_deck_id for nid in nids}
+    move_notes_to_decks_while_respecting_odid(nid_to_did=nid_to_did)
 
     # remove subdecks
     for name_and_did in aqt.mw.col.decks.children(root_deck_id):
