@@ -128,6 +128,7 @@ def _setup_editor_buttons(buttons: List[str], editor: Editor) -> None:
         label=f'<span id="{SUGGESTION_BTN_ID}-label" style="vertical-align: top;"></span>',
         id=SUGGESTION_BTN_ID,
         keys=hotkey,
+        disables=False,
     )
     buttons.append(suggestion_button)
 
@@ -137,6 +138,7 @@ def _setup_editor_buttons(buttons: List[str], editor: Editor) -> None:
         func=_on_view_note_button_press,
         label="View on AnkiHub",
         id=VIEW_NOTE_BTN_ID,
+        disables=False,
     )
     buttons.append(view_on_ankihub_button)
 
@@ -146,6 +148,7 @@ def _setup_editor_buttons(buttons: List[str], editor: Editor) -> None:
         func=_on_view_note_history_button_press,
         label="View Note History",
         id=VIEW_NOTE_HISTORY_BTN_ID,
+        disables=False,
     )
     buttons.append(view_history_on_ankihub_button)
 
@@ -294,7 +297,8 @@ def _refresh_editor_fields_for_anki_below_v50_js(hide_last_field: bool) -> str:
 
 def _refresh_buttons(editor: Editor) -> None:
     """Enables/Disables buttons depending on the note type and if the note is synced with AnkiHub.
-    Also changes the label of the suggestion button based on whether the note is already on AnkiHub."""
+    Also changes the label of the suggestion button based on whether the note is already on AnkiHub.
+    """
     note = editor.note
 
     # Not sure why editor or editor.web can be None here, but it happens, there are reports on sentry
