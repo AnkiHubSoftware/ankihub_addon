@@ -15,7 +15,7 @@ from json import JSONDecodeError
 from logging.handlers import RotatingFileHandler
 from pathlib import Path
 from pprint import pformat
-from shutil import copyfile, rmtree
+from shutil import copyfile, move, rmtree
 from typing import Any, Callable, Dict, List, Optional
 
 import aqt
@@ -347,6 +347,14 @@ class _Config:
     def deck_extension_config(self, extension_id: int) -> Optional[DeckExtensionConfig]:
         return self._private_config.deck_extensions.get(extension_id)
 
+    def deck_extensions_ids_for_ah_did(self, ah_did: uuid.UUID) -> List[int]:
+        result = [
+            extension_id
+            for extension_id in self.deck_extension_ids()
+            if self.deck_extension_config(extension_id).ah_did == ah_did
+        ]
+        return result
+
     def is_logged_in(self) -> bool:
         return bool(self.token())
 
@@ -359,15 +367,18 @@ config = _Config()
 
 
 def setup_profile_data_folder() -> bool:
-    """Returns False if the migration from the old location needs yet to be done."""
+    """Sets up the profile data folder for the currently open Anki profile.
+    Returns False if the migration from the add-on version with no support for multiple Anki profiles
+    needs yet to be done."""
     _assign_id_to_profile_if_not_exists()
     LOGGER.info(f"Anki profile id: {_get_anki_profile_id()}")
 
-    if not (path := profile_files_path()).exists():
-        path.mkdir(parents=True)
+    if not _maybe_migrate_profile_data_from_old_location():
+        return False
 
-    if _profile_data_exists_at_old_location():
-        return _migrate_profile_data_from_old_location()
+    _maybe_migrate_addon_data_from_old_location()
+
+    profile_files_path().mkdir(parents=True, exist_ok=True)
 
     return True
 
@@ -411,7 +422,7 @@ def profile_files_path() -> Path:
     """Path to the add-on data for this Anki profile."""
     # we need an id instead of using the profile name because profiles can be renamed
     cur_profile_id = _get_anki_profile_id()
-    result = user_files_path() / cur_profile_id
+    result = ankihub_base_path() / cur_profile_id
     return result
 
 
@@ -430,10 +441,11 @@ def _profile_data_exists_at_old_location() -> bool:
     return result
 
 
-def _migrate_profile_data_from_old_location() -> bool:
+def _maybe_migrate_profile_data_from_old_location() -> bool:
     """Migration of add-on files from before the add-on added support for multiple Anki profiles was added
     into a profile-specific folder.
-    Returns True if the data was migrated and False if it remains at the old location."""
+    Returns True if the data was migrated and False if it remains at the old location.
+    """
     if not _profile_data_exists_at_old_location():
         LOGGER.info("No data to migrate.")
         return True
@@ -487,13 +499,37 @@ def _file_should_be_migrated(file_path: Path) -> bool:
     return result
 
 
-def log_file_path() -> Path:
-    """Path to the add-on log file.
-    The log file is outside of the user files folder because it caused problems when updating the add-on."""
-    # _defaultBase is the Anki data folder, we create a sibling folder to it, where we store the log file.
+def _maybe_migrate_addon_data_from_old_location() -> None:
+    """Migrate profile data folders from user_files to ankihub_base_path() if they exist in user_files."""
+    ankihub_base_path().mkdir(parents=True, exist_ok=True)
+
+    for file in user_files_path().glob("*"):
+        if not file.is_dir():
+            continue
+
+        try:
+            uuid.UUID(file.name)
+        except ValueError:
+            continue
+        else:
+            # Only move the folder if it's name is a uuid, otherwise it's not an add-on data folder
+            move(file, ankihub_base_path() / file.name)
+            LOGGER.info(f"Migrated add-on data for profile {file.name}")
+
+
+def ankihub_base_path() -> Path:
+    """Path to the folder where the add-on stores its data."""
+    if path_from_env_var := os.getenv("ANKIHUB_BASE_PATH"):
+        return Path(path_from_env_var)
+
     anki_base = Path(aqt.mw.pm._default_base())
-    ankihub_base = anki_base.parent / "AnkiHub"
-    result = ankihub_base / "ankihub.log"
+    result = anki_base.parent / "AnkiHub"
+    return result
+
+
+def log_file_path() -> Path:
+    """Path to the add-on log file."""
+    result = ankihub_base_path() / "ankihub.log"
     result.parent.mkdir(parents=True, exist_ok=True)
     return result
 

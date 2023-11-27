@@ -484,7 +484,7 @@ def mock_message_box_with_cb(monkeypatch: MonkeyPatch) -> MockMessageBoxWithCB:
         monkeypatch.setattr(
             target_object,
             lambda *args, **kwargs: MessageBoxMock(
-                button_index=button_index, *args, **kwargs
+                button_index=button_index, *args, **kwargs  # type: ignore
             ),
         )
 

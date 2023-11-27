@@ -38,13 +38,6 @@ class OptionalTagsSuggestionDialog(QDialog):
         self._setup_tag_group_list()
         self._validate_tag_groups_and_update_ui()
 
-    def exec(self):
-        if self._optional_tags_helper.tag_group_names() == []:
-            showInfo("No optional tags found for these notes.", parent=self._parent)
-            return
-
-        super().exec()
-
     def _setup_ui(self):
         self.setWindowTitle("Optional Tag Suggestions")
 
@@ -154,7 +147,7 @@ class OptionalTagsSuggestionDialog(QDialog):
         ).without_collection().run_in_background()
 
     def _validate_tag_groups(self) -> List[TagGroupValidationResponse]:
-        result = self._optional_tags_helper.prevalidate()
+        result = self._optional_tags_helper.prevalidate_tag_groups()
         return result
 
     def _on_validate_tag_groups_finished(
