@@ -7,7 +7,7 @@ from typing import Callable, List
 
 import aqt
 from aqt.operations.tag import clear_unused_tags
-from aqt.qt import QMessageBox, Qt
+from aqt.qt import QDialogButtonBox
 
 from ... import LOGGER
 from ...addon_ankihub_client import AddonAnkiHubClient as AnkiHubClient
@@ -22,7 +22,7 @@ from ...settings import DeckConfig, config
 from ..exceptions import DeckDownloadAndInstallError, RemoteDeckNotFoundError
 from ..media_sync import media_sync
 from ..messages import messages
-from ..utils import ask_user_dialog
+from ..utils import show_dialog, tooltip_icon
 from .subdecks import confirm_and_toggle_subdecks
 from .utils import future_with_exception, future_with_result
 
@@ -97,13 +97,14 @@ def _show_deck_import_summary_dialog(
         if button_index == 0:
             DeckManagementDialog.display_subscribe_window()
 
-    ask_user_dialog(
-        title="AnkiHub Deck Import Summary",
-        text=message,
-        textFormat=Qt.TextFormat.RichText,
+    show_dialog(
+        message,
+        title="AnkiHub | Deck Import Summary",
+        buttons=["Go to Deck Management", QDialogButtonBox.StandardButton.Ok],
+        default_button_idx=1,
+        scrollable=True,
+        icon=tooltip_icon(),
         callback=on_button_clicked,
-        icon=QMessageBox.Icon.Information,
-        buttons=["Go to Deck Management", QMessageBox.StandardButton.Ok],
     )
 
 

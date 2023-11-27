@@ -170,12 +170,9 @@ def _determine_ah_did_for_nids_to_be_suggested(
     Returns None if the user cancelled the deck selection dialog or if there is
     no deck that all notes could belong to."""
     anki_nid_to_possible_ah_dids = get_anki_nid_to_possible_ah_dids_dict(anki_nids)
-    try:
-        dids_that_all_notes_could_belong_to = set.intersection(
-            *anki_nid_to_possible_ah_dids.values()
-        )
-    except Exception as e:  # pragma: no cover
-        _debug_issue_with_determining_ah_did_for_nids(e, anki_nids)  # pragma: no cover
+    dids_that_all_notes_could_belong_to = set.intersection(
+        *anki_nid_to_possible_ah_dids.values()
+    )
 
     if len(dids_that_all_notes_could_belong_to) == 0:
         LOGGER.info(
@@ -196,28 +193,6 @@ def _determine_ah_did_for_nids_to_be_suggested(
             return None
 
     return ah_did
-
-
-def _debug_issue_with_determining_ah_did_for_nids(
-    e: Exception, anki_nids: Collection[NoteId]
-) -> None:  # pragma: no cover
-    """Log information about the error that occurred when determining the AnkiHub
-    deck for the given notes and raises the given exception again.
-
-    https://ankihub.sentry.io/issues/4505671584/events/2f1d264aaba34c628a2562f9e2f35fe6/?project=6546414
-    """
-    if len(anki_nids) != 1 or anki_nids == [0]:
-        raise e
-
-    note = aqt.mw.col.get_note(list(anki_nids)[0])
-    LOGGER.info(
-        "Error while determining AnkiHub deck for note suggestion.\n"
-        f"\t{note.id}\n"
-        f"\t{note.mid}\n"
-        f"\t{ankihub_db.is_ankihub_note_type(note.mid)=}\n"
-        f"\t{ankihub_db.ankihub_dids_for_note_type(note.mid)=}\n"
-    )
-    raise e
 
 
 def _added_new_media(note: Note) -> bool:
@@ -466,7 +441,6 @@ UWORLD_STEP_OPTIONS = [
 
 
 class SourceWidget(QWidget):
-
     # Emitted when the validation result was determined after self._validate was called.
     # The _validate method is called when the user changes the input in form elements that get validated.
     validation_signal = pyqtSignal(bool)

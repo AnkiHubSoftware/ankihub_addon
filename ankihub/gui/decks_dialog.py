@@ -312,6 +312,7 @@ class DeckManagementDialog(QDialog):
         self.suspend_new_cards_of_existing_notes_row.addWidget(
             self.suspend_new_cards_of_existing_notes_cb_icon_label
         )
+        self.suspend_new_cards_of_existing_notes_row.addStretch()
 
         # Setup and configure the combo box for "Suspend new cards of existing notes"
         self.suspend_new_cards_of_existing_notes = QComboBox()
@@ -381,6 +382,7 @@ class DeckManagementDialog(QDialog):
         box = QHBoxLayout()
         box.addWidget(self.suspend_new_cards_of_new_notes_cb)
         box.addWidget(self.suspend_new_cards_of_new_notes_cb_icon_label)
+        box.addStretch()
 
         return box
 
@@ -404,6 +406,7 @@ class DeckManagementDialog(QDialog):
         self.subdecks_enabled_row = QHBoxLayout()
         self.subdecks_enabled_row.addWidget(self.subdecks_cb)
         self.subdecks_enabled_row.addWidget(self.subdeck_cb_icon_label)
+        self.subdecks_enabled_row.addStretch()
 
         # Initialize and set up the subdecks documentation link label
         self.subdecks_docs_link_label = QLabel(
@@ -425,7 +428,6 @@ class DeckManagementDialog(QDialog):
     def _setup_box_new_cards_destination(
         self, selected_ah_did: uuid.UUID
     ) -> QVBoxLayout:
-
         # Set up the destination tooltip message
         new_cards_destination_tooltip_message = (
             "Select the deck you want new cards to be saved to."
@@ -449,6 +451,7 @@ class DeckManagementDialog(QDialog):
         self.new_cards_destination_label_row.addWidget(
             self.new_cards_destination_icon_label
         )
+        self.new_cards_destination_label_row.addStretch()
 
         # Set up the destination details label
         self.new_cards_destination_details_label = QLabel()
