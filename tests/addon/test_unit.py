@@ -16,7 +16,7 @@ from anki.decks import DeckId
 from anki.models import NotetypeDict
 from anki.notes import Note, NoteId
 from aqt import utils
-from aqt.qt import QDialog, QDialogButtonBox, Qt
+from aqt.qt import QDialog, QDialogButtonBox, Qt, QTimer, QWidget
 from pytest import MonkeyPatch, fixture
 from pytest_anki import AnkiSession
 from pytestqt.qtbot import QtBot  # type: ignore
@@ -82,7 +82,7 @@ from ankihub.gui.suggestion_dialog import (
     open_suggestion_dialog_for_note,
 )
 from ankihub.gui.threading_utils import rate_limited
-from ankihub.gui.utils import show_dialog
+from ankihub.gui.utils import choose_ankihub_deck, show_dialog
 from ankihub.main import suggestions
 from ankihub.main.deck_creation import (
     DeckCreationResult,
@@ -2070,6 +2070,42 @@ class TestSendReviewData:
             assert_datetime_equal_ignore_milliseconds(
                 card_review_data.last_card_review_at, second_review_time
             )
+
+
+class TestChooseAnkiHubDeck:
+    @pytest.mark.parametrize(
+        "clicked_key, expected_chosen_deck_index",
+        [(Qt.Key.Key_Enter, 0), (Qt.Key.Key_Escape, None)],
+    )
+    def test_choose_deck(
+        self,
+        anki_session_with_addon_data: AnkiSession,
+        install_ah_deck: InstallAHDeck,
+        qtbot: QtBot,
+        clicked_key: Qt.Key,
+        expected_chosen_deck_index: Optional[int],
+    ):
+        with anki_session_with_addon_data.profile_loaded():
+            ah_dids = []
+            ah_dids.append(install_ah_deck(ah_deck_name="Deck 1"))
+            ah_dids.append(install_ah_deck(ah_deck_name="Deck 2"))
+
+            # choose_ankihub_deck is blocking, so we setup a timer to press a key
+            def on_timeout():
+                qtbot.keyClick(qwidget.children()[0], clicked_key)
+
+            QTimer.singleShot(0, on_timeout)
+
+            qwidget = QWidget()
+            result = choose_ankihub_deck(
+                prompt="Choose a deck",
+                ah_dids=list(ah_dids),
+                parent=qwidget,
+            )
+            if expected_chosen_deck_index is None:
+                assert result is None
+            else:
+                assert ah_dids.index(result) == expected_chosen_deck_index
 
 
 class TestShowDialog:

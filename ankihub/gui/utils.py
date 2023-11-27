@@ -177,7 +177,10 @@ def choose_list(
     c.addItems(choices)
     c.setCurrentRow(startrow)
     layout.addWidget(c)
-    bb = QDialogButtonBox(QDialogButtonBox.StandardButton.Ok)
+    bb = QDialogButtonBox()
+    bb.addButton(QDialogButtonBox.StandardButton.Cancel)
+    bb.addButton(QDialogButtonBox.StandardButton.Ok)
+    qconnect(bb.rejected, d.reject)
     qconnect(bb.accepted, d.accept)
     layout.addWidget(bb)
     if d.exec() == QDialog.DialogCode.Accepted:
