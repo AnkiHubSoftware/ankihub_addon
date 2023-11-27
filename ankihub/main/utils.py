@@ -2,17 +2,20 @@ import copy
 import hashlib
 import re
 import time
+from concurrent.futures import Future
 from pathlib import Path
 from pprint import pformat
 from textwrap import dedent
 from typing import Any, Collection, Dict, Iterable, List, Optional, Sequence, Set, Tuple
 
 import aqt
+from anki.collection import EmptyCardsReport
 from anki.decks import DeckId
 from anki.errors import NotFoundError
 from anki.models import ChangeNotetypeRequest, NoteType, NotetypeDict, NotetypeId
 from anki.notes import Note, NoteId
 from anki.utils import checksum, ids2str
+from aqt.emptycards import EmptyCardsDialog
 
 from .. import LOGGER, settings
 from ..db import ankihub_db
@@ -127,6 +130,26 @@ def add_notes(notes: Collection[Note], deck_id: DeckId) -> None:
         for note in notes:
             aqt.mw.col.add_note(note, deck_id=deck_id)
         aqt.mw.col.save()
+
+
+# cards
+
+
+def clear_empty_cards() -> None:
+    """Delete empty cards from the database.
+    Uses the EmptyCardsDialog to delete empty cards without showing the dialog."""
+
+    def on_done(future: Future) -> None:
+        # This uses the EmptyCardsDialog to delete empty cards without showing the dialog.
+        report: EmptyCardsReport = future.result()
+        if not report.notes:
+            LOGGER.info("No empty cards found.")
+            return
+        dialog = EmptyCardsDialog(aqt.mw, report)
+        deleted_amount = dialog._delete_cards(keep_notes=True)
+        LOGGER.info(f"Deleted {deleted_amount} empty cards.")
+
+    aqt.mw.taskman.run_in_background(aqt.mw.col.get_empty_cards, on_done=on_done)
 
 
 # note types

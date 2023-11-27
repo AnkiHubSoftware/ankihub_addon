@@ -1,4 +1,5 @@
 import uuid
+from functools import partial
 from typing import Any, Callable, List, Optional, Sequence, Union
 
 import aqt
@@ -7,6 +8,7 @@ from aqt.qt import (
     QApplication,
     QDialog,
     QDialogButtonBox,
+    QHBoxLayout,
     QIcon,
     QLabel,
     QLayout,
@@ -14,6 +16,7 @@ from aqt.qt import (
     QListWidgetItem,
     QMessageBox,
     QPushButton,
+    QScrollArea,
     QStyle,
     Qt,
     QVBoxLayout,
@@ -21,7 +24,7 @@ from aqt.qt import (
     qconnect,
 )
 from aqt.theme import theme_manager
-from aqt.utils import MessageBox, disable_help_button, showWarning, tooltip
+from aqt.utils import disable_help_button, showWarning, tooltip
 
 from ..settings import config
 
@@ -174,7 +177,10 @@ def choose_list(
     c.addItems(choices)
     c.setCurrentRow(startrow)
     layout.addWidget(c)
-    bb = QDialogButtonBox(QDialogButtonBox.StandardButton.Ok)
+    bb = QDialogButtonBox()
+    bb.addButton(QDialogButtonBox.StandardButton.Cancel)
+    bb.addButton(QDialogButtonBox.StandardButton.Ok)
+    qconnect(bb.rejected, d.reject)
     qconnect(bb.accepted, d.accept)
     layout.addWidget(bb)
     if d.exec() == QDialog.DialogCode.Accepted:
@@ -256,6 +262,91 @@ def ask_user(
         return None
 
 
+def show_dialog(
+    text: str,
+    title: str,
+    parent: Optional[QWidget] = None,
+    text_format: Qt.TextFormat = Qt.TextFormat.RichText,
+    buttons: Union[Sequence[Union[str, QDialogButtonBox.StandardButton]], None] = [
+        QDialogButtonBox.StandardButton.Ok
+    ],
+    default_button_idx: int = 0,
+    scrollable: bool = False,
+    callback: Optional[Callable[[int], None]] = None,
+    icon: Optional[QIcon] = None,
+) -> None:
+    """Show a dialog with the given text and buttons.
+    The callback is called with the index of the clicked button.
+    Adapted from aqt.utils.showText and aqt.utils.MessageBox. The main difference is that
+    this function allows to make the text scrollable."""
+    if not parent:
+        parent = aqt.mw.app.activeWindow() or aqt.mw
+    dialog = QDialog(parent)
+    dialog.setWindowTitle(title)
+    disable_help_button(dialog)
+
+    main_layout = QVBoxLayout(dialog)
+    hlayout = QHBoxLayout()
+    main_layout.addLayout(hlayout)
+    if scrollable:
+        area = QScrollArea()
+        area.setWidgetResizable(True)
+        widget = QWidget()
+        area.setWidget(widget)
+        hlayout.addWidget(area)
+        content_layout = QVBoxLayout(widget)
+    else:
+        content_layout = QVBoxLayout()
+        hlayout.addLayout(content_layout)
+
+    if icon is not None:
+        icon_layout = QVBoxLayout()
+
+        icon_label = QLabel()
+        icon_label.setPixmap(icon.pixmap(48, 48))
+        icon_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        icon_layout.addWidget(icon_label)
+
+        icon_layout.addStretch()
+
+        hlayout.insertLayout(0, icon_layout)
+
+    label = QLabel(text)
+    label.setWordWrap(True)
+    label.setTextFormat(text_format)
+    content_layout.addWidget(label)
+
+    content_layout.addStretch()
+
+    button_box = QDialogButtonBox()
+    main_layout.addWidget(button_box)
+    main_layout.addStretch()
+
+    def on_btn_clicked(button_index: int):
+        dialog.reject()
+        if callback is not None:
+            callback(button_index)
+
+    for button_index, button in enumerate(buttons):
+        if isinstance(button, str):
+            button = button_box.addButton(
+                button, QDialogButtonBox.ButtonRole.ActionRole
+            )
+        elif isinstance(button, QDialogButtonBox.StandardButton):
+            button = button_box.addButton(button)
+
+        qconnect(button.clicked, partial(on_btn_clicked, button_index))
+
+        if button_index == default_button_idx:
+            button.setDefault(True)
+            button.setAutoDefault(True)
+        else:
+            button.setDefault(False)
+            button.setAutoDefault(False)
+
+    dialog.open()
+
+
 def tooltip_icon() -> QIcon:
     return QIcon(
         QApplication.style().standardIcon(
@@ -309,26 +400,3 @@ def clear_layout(layout: QLayout) -> None:
             widget.deleteLater()
         elif child.layout():
             clear_layout(child.layout())
-
-
-def ask_user_dialog(
-    text: str,
-    callback: Callable[[int], None],
-    buttons: Union[Sequence[Union[str, QMessageBox.StandardButton]], None] = None,
-    default_button: int = 1,
-    icon: QMessageBox.Icon = QMessageBox.Icon.Question,
-    **kwargs: Any,
-) -> MessageBox:
-    """Shows a question to the user, passes the index of the button clicked to the callback.
-    Adapted from aqt.utils.ask_user_dialog."""
-    if buttons is None:
-        buttons = [QMessageBox.StandardButton.Yes, QMessageBox.StandardButton.No]
-
-    return MessageBox(
-        text,
-        callback=callback,
-        icon=icon,
-        buttons=buttons,
-        default_button=default_button,
-        **kwargs,
-    )

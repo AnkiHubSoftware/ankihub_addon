@@ -16,7 +16,7 @@ from anki.decks import DeckId
 from anki.models import NotetypeDict
 from anki.notes import Note, NoteId
 from aqt import utils
-from aqt.qt import QDialogButtonBox
+from aqt.qt import QDialog, QDialogButtonBox, Qt, QTimer, QWidget
 from pytest import MonkeyPatch, fixture
 from pytest_anki import AnkiSession
 from pytestqt.qtbot import QtBot  # type: ignore
@@ -82,6 +82,7 @@ from ankihub.gui.suggestion_dialog import (
     open_suggestion_dialog_for_note,
 )
 from ankihub.gui.threading_utils import rate_limited
+from ankihub.gui.utils import choose_ankihub_deck, show_dialog
 from ankihub.main import suggestions
 from ankihub.main.deck_creation import (
     DeckCreationResult,
@@ -107,6 +108,7 @@ from ankihub.main.subdecks import (
     deck_contains_subdeck_tags,
 )
 from ankihub.main.utils import (
+    clear_empty_cards,
     lowest_level_common_ancestor_deck_name,
     mids_of_notes,
     retain_nids_with_ah_note_type,
@@ -216,7 +218,6 @@ class TestMediaSyncMediaUpload:
 
 
 def test_lowest_level_common_ancestor_deck_name():
-
     deck_names = [
         "A",
         "A::B",
@@ -671,7 +672,8 @@ def mock_dependiencies_for_suggestion_dialog(
 ) -> MockDependenciesForSuggestionDialog:
     """Mocks the dependencies for open_suggestion_dialog_for_note.
     Returns a tuple of mocks that replace suggest_note_update and suggest_new_note
-    If user_cancels is True, SuggestionDialog.run behaves as if the user cancelled the dialog."""
+    If user_cancels is True, SuggestionDialog.run behaves as if the user cancelled the dialog.
+    """
 
     def mock_dependencies_for_suggestion_dialog_inner(
         user_cancels: bool,
@@ -809,7 +811,8 @@ def mock_dependencies_for_bulk_suggestion_dialog(
 ) -> MockDependenciesForBulkSuggestionDialog:
     """Mocks the dependencies for open_suggestion_dialog_for_bulk_suggestion.
     Returns a Mock that replaces suggest_notes_in_bulk.
-    If user_cancels is True, SuggestionDialog.run behaves as if the user cancelled the dialog."""
+    If user_cancels is True, SuggestionDialog.run behaves as if the user cancelled the dialog.
+    """
 
     def mock_dependencies_for_suggestion_dialog_inner(user_cancels: bool) -> Mock:
         monkeypatch.setattr(
@@ -1268,7 +1271,6 @@ class TestAnkiHubDBDownloadableMediaNamesForAnkiHubDeck:
         exists_on_s3: bool,
         download_enabled: bool,
     ):
-
         with anki_session_with_addon_data.profile_loaded():
             ah_did = next_deterministic_uuid()
             ankihub_db.upsert_deck_media_infos(
@@ -2069,3 +2071,102 @@ class TestSendReviewData:
             assert_datetime_equal_ignore_milliseconds(
                 card_review_data.last_card_review_at, second_review_time
             )
+
+
+def test_clear_empty_cards(anki_session_with_addon_data: AnkiSession, qtbot: QtBot):
+    with anki_session_with_addon_data.profile_loaded():
+        # Create a note with two cards.
+        note = aqt.mw.col.new_note(
+            aqt.mw.col.models.by_name("Cloze"),
+        )
+        note["Text"] = "{{c1::first}} {{c2::second}}"
+        aqt.mw.col.add_note(note, DeckId(1))
+        assert len(note.cards()) == 2  # sanity check
+
+        # Cause the second card to be empty.
+        note["Text"] = "{{c1::first}}"
+        aqt.mw.col.update_note(note)
+        assert len(note.cards()) == 2  # sanity check
+
+        # Clear the empty card.
+        clear_empty_cards()
+        qtbot.wait_until(lambda: len(note.cards()) == 1)
+
+        # Assert that the empty card was cleared.
+        assert len(note.cards()) == 1
+
+
+class TestChooseAnkiHubDeck:
+    @pytest.mark.parametrize(
+        "clicked_key, expected_chosen_deck_index",
+        [(Qt.Key.Key_Enter, 0), (Qt.Key.Key_Escape, None)],
+    )
+    def test_choose_deck(
+        self,
+        anki_session_with_addon_data: AnkiSession,
+        install_ah_deck: InstallAHDeck,
+        qtbot: QtBot,
+        clicked_key: Qt.Key,
+        expected_chosen_deck_index: Optional[int],
+    ):
+        with anki_session_with_addon_data.profile_loaded():
+            ah_dids = []
+            ah_dids.append(install_ah_deck(ah_deck_name="Deck 1"))
+            ah_dids.append(install_ah_deck(ah_deck_name="Deck 2"))
+
+            # choose_ankihub_deck is blocking, so we setup a timer to press a key
+            def on_timeout():
+                qtbot.keyClick(qwidget.children()[0], clicked_key)
+
+            QTimer.singleShot(0, on_timeout)
+
+            qwidget = QWidget()
+            result = choose_ankihub_deck(
+                prompt="Choose a deck",
+                ah_dids=list(ah_dids),
+                parent=qwidget,
+            )
+            if expected_chosen_deck_index is None:
+                assert result is None
+            else:
+                assert ah_dids.index(result) == expected_chosen_deck_index
+
+
+class TestShowDialog:
+    @pytest.mark.parametrize(
+        "scrollable",
+        [True, False],
+    )
+    def test_scrollable_argument(self, qtbot: QtBot, scrollable: bool):
+        # This just tests that the function does not throw an exception for
+        # different values of the scrollable argument.
+        dialog = QDialog()
+        qtbot.addWidget(dialog)
+        show_dialog(
+            text="some text", title="some title", parent=dialog, scrollable=scrollable
+        )
+
+    @pytest.mark.parametrize(
+        "default_button_idx",
+        [0, 1],
+    )
+    def test_button_callback(self, qtbot: QtBot, default_button_idx: int):
+        button_index_from_cb: Optional[int] = None
+
+        def callback(button_index: int):
+            nonlocal button_index_from_cb
+            button_index_from_cb = button_index
+
+        dialog = QDialog()
+        qtbot.addWidget(dialog)
+        show_dialog(
+            text="some text",
+            title="some title",
+            parent=dialog,
+            callback=callback,
+            buttons=["Yes", "No"],
+            default_button_idx=default_button_idx,
+        )
+        qtbot.keyClick(dialog, Qt.Key.Key_Enter)
+
+        assert button_index_from_cb == default_button_idx
