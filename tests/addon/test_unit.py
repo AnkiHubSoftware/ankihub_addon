@@ -16,7 +16,7 @@ from anki.decks import DeckId
 from anki.models import NotetypeDict
 from anki.notes import Note, NoteId
 from aqt import utils
-from aqt.qt import QDialogButtonBox, Qt, QTimer, QWidget
+from aqt.qt import QDialog, QDialogButtonBox, Qt, QTimer, QWidget
 from pytest import MonkeyPatch, fixture
 from pytest_anki import AnkiSession
 from pytestqt.qtbot import QtBot  # type: ignore
@@ -82,7 +82,7 @@ from ankihub.gui.suggestion_dialog import (
     open_suggestion_dialog_for_note,
 )
 from ankihub.gui.threading_utils import rate_limited
-from ankihub.gui.utils import choose_ankihub_deck
+from ankihub.gui.utils import choose_ankihub_deck, show_dialog
 from ankihub.main import suggestions
 from ankihub.main.deck_creation import (
     DeckCreationResult,
@@ -2106,3 +2106,43 @@ class TestChooseAnkiHubDeck:
                 assert result is None
             else:
                 assert ah_dids.index(result) == expected_chosen_deck_index
+
+
+class TestShowDialog:
+    @pytest.mark.parametrize(
+        "scrollable",
+        [True, False],
+    )
+    def test_scrollable_argument(self, qtbot: QtBot, scrollable: bool):
+        # This just tests that the function does not throw an exception for
+        # different values of the scrollable argument.
+        dialog = QDialog()
+        qtbot.addWidget(dialog)
+        show_dialog(
+            text="some text", title="some title", parent=dialog, scrollable=scrollable
+        )
+
+    @pytest.mark.parametrize(
+        "default_button_idx",
+        [0, 1],
+    )
+    def test_button_callback(self, qtbot: QtBot, default_button_idx: int):
+        button_index_from_cb: Optional[int] = None
+
+        def callback(button_index: int):
+            nonlocal button_index_from_cb
+            button_index_from_cb = button_index
+
+        dialog = QDialog()
+        qtbot.addWidget(dialog)
+        show_dialog(
+            text="some text",
+            title="some title",
+            parent=dialog,
+            callback=callback,
+            buttons=["Yes", "No"],
+            default_button_idx=default_button_idx,
+        )
+        qtbot.keyClick(dialog, Qt.Key.Key_Enter)
+
+        assert button_index_from_cb == default_button_idx
