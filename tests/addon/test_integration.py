@@ -857,7 +857,7 @@ def test_get_deck_by_id(
     requests_mock: Mocker, next_deterministic_uuid: Callable[[], uuid.UUID]
 ):
     client = AnkiHubClient()
-    client.local_media_dir_path = Path("/tmp/ankihub_media")
+    client.local_media_dir_path_cb = lambda: Path("/tmp/ankihub_media")
 
     # test get deck by id
     ah_did = next_deterministic_uuid()
