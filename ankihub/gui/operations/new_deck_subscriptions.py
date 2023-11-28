@@ -82,11 +82,6 @@ def _on_decks_installed(
 ):
     try:
         import_results: List[AnkiHubImportResult] = future.result()
-    except Exception as e:
-        on_done(future_with_exception(e))
-        return
-
-    try:
         _show_deck_import_summary_dialog(
             import_results=import_results,
             on_done=lambda: on_done(future_with_result(None)),
