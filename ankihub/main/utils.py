@@ -132,6 +132,24 @@ def add_notes(notes: Collection[Note], deck_id: DeckId) -> None:
         aqt.mw.col.save()
 
 
+def move_notes_to_decks_while_respecting_odid(nid_to_did: Dict[NoteId, DeckId]) -> None:
+    """Moves the cards of notes to the decks specified in nid_to_did.
+    If a card is in a filtered deck it is not moved and only its original deck id value gets changed.
+    """
+    cards_to_update = []
+    for nid, did in nid_to_did.items():
+        # This is a bit faster than aqt.mw.col.get_note(nid).cards() to get the cards of a note.
+        cids = aqt.mw.col.db.list(f"SELECT id FROM cards WHERE nid={nid}")
+        cards = [aqt.mw.col.get_card(cid) for cid in cids]
+        for card in cards:
+            if card.odid == 0:
+                card.did = did
+            else:
+                card.odid = did
+            cards_to_update.append(card)
+    aqt.mw.col.update_cards(cards_to_update)
+
+
 # cards
 
 

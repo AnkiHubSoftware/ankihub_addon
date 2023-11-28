@@ -16,6 +16,7 @@ from ..fixtures import (  # noqa F401
     ankihub_basic_note_type,
     import_ah_note,
     import_ah_note_type,
+    import_ah_notes,
     install_ah_deck,
     mock_all_feature_flags_to_default_values,
     mock_download_and_install_deck_dependencies,
