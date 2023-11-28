@@ -66,6 +66,7 @@ from ..fixtures import (
     MockDownloadAndInstallDeckDependencies,
     MockFunction,
     MockMessageBoxWithCB,
+    MockShowDialogWithCB,
     MockStudyDeckDialogWithCB,
     create_or_get_ah_version_of_note_type,
     record_review,
@@ -731,6 +732,7 @@ class TestCheckAndInstallNewDeckSubscriptions:
         qtbot: QtBot,
         mock_function: MockFunction,
         mock_message_box_with_cb: MockMessageBoxWithCB,
+        mock_show_dialog_with_cb: MockShowDialogWithCB,
     ):
         anki_session = anki_session_with_addon_data
         with anki_session.profile_loaded():
@@ -745,8 +747,13 @@ class TestCheckAndInstallNewDeckSubscriptions:
                 operations.new_deck_subscriptions,
                 "download_and_install_decks",
                 side_effect=lambda *args, **kwargs: kwargs["on_done"](
-                    future_with_result(None)
+                    future_with_result([])
                 ),
+            )
+
+            # Mock the deck import summary dialog
+            mock_show_dialog_with_cb(
+                "ankihub.gui.operations.deck_installation.show_dialog", button_index=0
             )
 
             # Call the function with a deck

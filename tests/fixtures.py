@@ -491,6 +491,32 @@ def mock_message_box_with_cb(monkeypatch: MonkeyPatch) -> MockMessageBoxWithCB:
     return mock_message_box_with_cb_inner
 
 
+class MockShowDialogWithCB(Protocol):
+    def __call__(
+        self,
+        target_object: Any,
+        button_index: Optional[int],
+    ) -> None:
+        ...
+
+
+@pytest.fixture
+def mock_show_dialog_with_cb(monkeypatch: MonkeyPatch) -> MockShowDialogWithCB:
+    """Mocks ankihub.gui.utils.show_dialog to call the callback with the provided button index
+    instead of showing the dialog."""
+
+    def mock_show_dialog_with_cb_inner(
+        target_object: Any,
+        button_index: Optional[int],
+    ) -> None:
+        monkeypatch.setattr(
+            target_object,
+            lambda *args, **kwargs: kwargs["callback"](button_index),
+        )
+
+    return mock_show_dialog_with_cb_inner
+
+
 def create_anki_deck(deck_name: str) -> DeckId:
     """Creates an Anki deck with the given name and returns the id."""
     deck = aqt.mw.col.decks.new_deck()
