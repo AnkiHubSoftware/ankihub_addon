@@ -764,10 +764,9 @@ class TestCheckAndInstallNewDeckSubscriptions:
                 subscribed_decks=[deck], on_done=on_done_mock
             )
 
-            qtbot.wait(1000)
+            qtbot.wait_until(lambda: on_done_mock.call_count == 1)
 
             # Assert that the on_done callback was called with a future with a result of None
-            assert on_done_mock.call_count == 1
             assert on_done_mock.call_args[0][0].result() is None
 
             # Assert that the mocked functions were called
