@@ -8,7 +8,6 @@ from ... import LOGGER
 from ...addon_ankihub_client import AddonAnkiHubClient as AnkiHubClient
 from ...ankihub_client import API_VERSION, Deck
 from ...main.deck_unsubscribtion import uninstall_deck
-from ...main.importing import AnkiHubImportResult
 from ...main.review_data import send_review_data
 from ...settings import config
 from ..deck_updater import ah_deck_updater, show_tooltip_about_last_deck_updates_results
@@ -17,12 +16,12 @@ from .new_deck_subscriptions import check_and_install_new_deck_subscriptions
 from .utils import future_with_exception, future_with_result
 
 
-def sync_with_ankihub(on_done: Callable[[Future], None]) -> None:
+def sync_with_ankihub(on_done: Callable[[Future[None]], None]) -> None:
     """Uninstall decks the user is not subscribed to anymore, check for (and maybe install) new deck subscriptions,
     then download updates to decks."""
 
     def on_new_deck_subscriptions_done(
-        future: Future[List[AnkiHubImportResult]], subscribed_decks: List[Deck]
+        future: Future[None], subscribed_decks: List[Deck]
     ) -> None:
         if future.exception():
             on_done(future_with_exception(future.exception()))
@@ -38,7 +37,7 @@ def sync_with_ankihub(on_done: Callable[[Future], None]) -> None:
             on_done=lambda future: on_sync_done(future=future),
         )
 
-    def on_sync_done(future: Future) -> None:
+    def on_sync_done(future: Future[None]) -> None:
         if future.exception():
             on_done(future_with_exception(future.exception()))
             return

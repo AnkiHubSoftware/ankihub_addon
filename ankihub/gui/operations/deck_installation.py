@@ -34,7 +34,7 @@ def download_and_install_decks(
     If cleanup is True, unused tags and empty cards are cleared after the decks are installed.
     """
 
-    def on_install_done(future: Future):
+    def on_install_done(future: Future[List[AnkiHubImportResult]]):
         try:
             import_results: List[AnkiHubImportResult] = future.result()
         except Exception as e:

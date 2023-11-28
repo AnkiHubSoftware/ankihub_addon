@@ -17,7 +17,7 @@ from .utils import future_with_exception, future_with_result
 
 def check_and_install_new_deck_subscriptions(
     subscribed_decks: List[Deck],
-    on_done: Callable[[Future[List[AnkiHubImportResult]]], None],
+    on_done: Callable[[Future[None]], None],
 ) -> None:
     """Check if there are any new deck subscriptions and install them if the user confirms.
     Show a import summary dialog after the decks are installed."""
@@ -58,7 +58,7 @@ def _on_button_clicked(
     button_index: int,
     cleanup_cb: QCheckBox,
     decks: List[Deck],
-    on_done: Callable[[Future[List[AnkiHubImportResult]]], None],
+    on_done: Callable[[Future[None]], None],
 ) -> None:
     if button_index == 0:
         # Skip
@@ -77,7 +77,9 @@ def _on_button_clicked(
         on_done(future_with_exception(e))
 
 
-def _on_decks_installed(future: Future, on_done: Callable[[Future], None]):
+def _on_decks_installed(
+    future: Future[List[AnkiHubImportResult]], on_done: Callable[[Future[None]], None]
+):
     try:
         import_results: List[AnkiHubImportResult] = future.result()
     except Exception as e:
