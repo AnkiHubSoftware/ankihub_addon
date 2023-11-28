@@ -12,9 +12,7 @@ from ...main.importing import AnkiHubImportResult
 from ...main.review_data import send_review_data
 from ...settings import config
 from ..deck_updater import ah_deck_updater, show_tooltip_about_last_deck_updates_results
-from ..utils import let_qt_process_events
 from .db_check import maybe_check_databases
-from .deck_installation import show_deck_import_summary_dialog
 from .new_deck_subscriptions import check_and_install_new_deck_subscriptions
 from .utils import future_with_exception, future_with_result
 
@@ -26,10 +24,8 @@ def sync_with_ankihub(on_done: Callable[[Future], None]) -> None:
     def on_new_deck_subscriptions_done(
         future: Future[List[AnkiHubImportResult]], subscribed_decks: List[Deck]
     ) -> None:
-        try:
-            import_results_for_new_decks: List[AnkiHubImportResult] = future.result()
-        except Exception as e:
-            on_done(future_with_exception(e))
+        if future.exception():
+            on_done(future_with_exception(future.exception()))
             return
 
         installed_ah_dids = config.deck_ids()
@@ -39,20 +35,10 @@ def sync_with_ankihub(on_done: Callable[[Future], None]) -> None:
         aqt.mw.taskman.with_progress(
             task=lambda: ah_deck_updater.update_decks_and_media(to_sync_ah_dids),
             immediate=True,
-            on_done=lambda future: on_sync_done(
-                future=future, import_results_for_new_decks=import_results_for_new_decks
-            ),
+            on_done=lambda future: on_sync_done(future=future),
         )
 
-    def on_sync_done(
-        future: Future, import_results_for_new_decks: List[AnkiHubImportResult]
-    ) -> None:
-        if import_results_for_new_decks:
-            # Prevents the import summary dialog from being shown before the progress dialog is closed
-            let_qt_process_events(duration=0.5)
-
-            show_deck_import_summary_dialog(import_results_for_new_decks)
-
+    def on_sync_done(future: Future) -> None:
         if future.exception():
             on_done(future_with_exception(future.exception()))
             return

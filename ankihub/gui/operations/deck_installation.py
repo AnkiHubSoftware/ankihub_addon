@@ -76,7 +76,7 @@ def download_and_install_decks(
 
 
 def show_deck_import_summary_dialog(
-    import_results: List[AnkiHubImportResult],
+    import_results: List[AnkiHubImportResult], callback: Callable[[], None]
 ) -> None:
     ankihub_dids = [import_result.ankihub_did for import_result in import_results]
     ankihub_deck_names = [config.deck_config(ah_did).name for ah_did in ankihub_dids]

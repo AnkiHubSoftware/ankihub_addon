@@ -1,4 +1,3 @@
-import time
 import uuid
 from functools import partial
 from typing import Any, Callable, List, Optional, Sequence, Union
@@ -9,7 +8,6 @@ from aqt.qt import (
     QApplication,
     QDialog,
     QDialogButtonBox,
-    QEventLoop,
     QHBoxLayout,
     QIcon,
     QLabel,
@@ -274,11 +272,12 @@ def show_dialog(
     ],
     default_button_idx: int = 0,
     scrollable: bool = False,
-    callback: Optional[Callable[[int], None]] = None,
+    callback: Optional[Callable[[Optional[int]], None]] = None,
     icon: Optional[QIcon] = None,
 ) -> None:
     """Show a dialog with the given text and buttons.
-    The callback is called with the index of the clicked button.
+    The callback is called with the index of the clicked button or None if the dialog was closed
+    without clicking a button.
     Adapted from aqt.utils.showText and aqt.utils.MessageBox. The main difference is that
     this function allows to make the text scrollable."""
     if not parent:
@@ -324,8 +323,12 @@ def show_dialog(
     main_layout.addWidget(button_box)
     main_layout.addStretch()
 
-    def on_btn_clicked(button_index: int):
+    def on_btn_clicked_or_dialog_rejected(button_index: Optional[int]):
+        # Prevent the callback from being called twice
+        dialog.rejected.disconnect()
+
         dialog.reject()
+
         if callback is not None:
             callback(button_index)
 
@@ -337,7 +340,9 @@ def show_dialog(
         elif isinstance(button, QDialogButtonBox.StandardButton):
             button = button_box.addButton(button)
 
-        qconnect(button.clicked, partial(on_btn_clicked, button_index))
+        qconnect(
+            button.clicked, partial(on_btn_clicked_or_dialog_rejected, button_index)
+        )
 
         if button_index == default_button_idx:
             button.setDefault(True)
@@ -345,6 +350,8 @@ def show_dialog(
         else:
             button.setDefault(False)
             button.setAutoDefault(False)
+
+    qconnect(dialog.rejected, partial(on_btn_clicked_or_dialog_rejected, None))
 
     dialog.open()
 
@@ -402,9 +409,3 @@ def clear_layout(layout: QLayout) -> None:
             widget.deleteLater()
         elif child.layout():
             clear_layout(child.layout())
-
-
-def let_qt_process_events(duration: float) -> None:
-    start_time = time.time()
-    while time.time() - start_time < duration:
-        aqt.mw.app.processEvents(QEventLoop.ProcessEventsFlag.ExcludeUserInputEvents)  # type: ignore

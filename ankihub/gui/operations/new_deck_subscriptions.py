@@ -10,7 +10,10 @@ from ...ankihub_client import Deck
 from ...main.importing import AnkiHubImportResult
 from ...settings import config
 from ..messages import messages
-from .deck_installation import download_and_install_decks
+from .deck_installation import (
+    download_and_install_decks,
+    show_deck_import_summary_dialog,
+)
 from .utils import future_with_exception, future_with_result
 
 
@@ -67,10 +70,25 @@ def _on_button_clicked(
     try:
         ah_dids = [deck.ah_did for deck in decks]
         download_and_install_decks(
-            ah_dids, on_done=on_done, cleanup=cleanup_cb.isChecked()
+            ah_dids,
+            on_done=lambda future: _on_decks_installed(future=future, on_done=on_done),
+            cleanup=cleanup_cb.isChecked(),
         )
     except Exception as e:
         on_done(future_with_exception(e))
+
+
+def _on_decks_installed(future: Future, on_done: Callable[[Future], None]):
+    try:
+        import_results: List[AnkiHubImportResult] = future.result()
+    except Exception as e:
+        on_done(future_with_exception(e))
+        return
+
+    show_deck_import_summary_dialog(
+        import_results=import_results,
+        callback=lambda: on_done(future_with_result(None)),
+    )
 
 
 def _not_installed_ah_decks(subscribed_decks: List[Deck]) -> List[Deck]:
