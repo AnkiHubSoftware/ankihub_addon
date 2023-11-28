@@ -753,7 +753,8 @@ class TestCheckAndInstallNewDeckSubscriptions:
 
             # Mock the deck import summary dialog
             mock_show_dialog_with_cb(
-                "ankihub.gui.operations.deck_installation.show_dialog", button_index=0
+                "ankihub.gui.operations.new_deck_subscriptions.show_dialog",
+                button_index=0,
             )
 
             # Call the function with a deck
