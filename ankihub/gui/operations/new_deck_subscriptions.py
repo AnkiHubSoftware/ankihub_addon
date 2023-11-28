@@ -7,6 +7,7 @@ from aqt.qt import QCheckBox, Qt
 from aqt.utils import MessageBox
 
 from ...ankihub_client import Deck
+from ...main.importing import AnkiHubImportResult
 from ...settings import config
 from ..messages import messages
 from .deck_installation import download_and_install_decks
@@ -14,7 +15,8 @@ from .utils import future_with_exception, future_with_result
 
 
 def check_and_install_new_deck_subscriptions(
-    subscribed_decks: List[Deck], on_done: Callable[[Future], None]
+    subscribed_decks: List[Deck],
+    on_done: Callable[[Future[List[AnkiHubImportResult]]], None],
 ) -> None:
     """Check if there are any new deck subscriptions and install them if the user confirms."""
     try:
@@ -54,7 +56,7 @@ def _on_button_clicked(
     button_index: int,
     cleanup_cb: QCheckBox,
     decks: List[Deck],
-    on_done: Callable[[Future], None],
+    on_done: Callable[[Future[List[AnkiHubImportResult]]], None],
 ) -> None:
     if button_index == 0:
         # Skip
