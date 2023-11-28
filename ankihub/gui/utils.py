@@ -1,6 +1,6 @@
 import uuid
 from functools import partial
-from typing import Any, Callable, List, Optional, Sequence, Union
+from typing import Any, Callable, List, Optional, Sequence, Tuple, Union
 
 import aqt
 from aqt.addons import check_and_prompt_for_updates
@@ -267,14 +267,22 @@ def show_dialog(
     title: str,
     parent: Optional[QWidget] = None,
     text_format: Qt.TextFormat = Qt.TextFormat.RichText,
-    buttons: Union[Sequence[Union[str, QDialogButtonBox.StandardButton]], None] = [
-        QDialogButtonBox.StandardButton.Ok
-    ],
+    buttons: Union[
+        Sequence[
+            Union[
+                str,
+                QDialogButtonBox.StandardButton,
+                Tuple[str, QDialogButtonBox.ButtonRole],
+            ]
+        ],
+        None,
+    ] = [QDialogButtonBox.StandardButton.Ok],
     default_button_idx: int = 0,
     scrollable: bool = False,
     callback: Optional[Callable[[int], None]] = None,
     icon: Optional[QIcon] = None,
-) -> None:
+    open_dialog: bool = True,
+) -> Tuple[QDialog, QVBoxLayout]:
     """Show a dialog with the given text and buttons.
     The callback is called with the index of the clicked button.
     Adapted from aqt.utils.showText and aqt.utils.MessageBox. The main difference is that
@@ -322,8 +330,10 @@ def show_dialog(
     main_layout.addWidget(button_box)
     main_layout.addStretch()
 
-    def on_btn_clicked(button_index: int):
-        dialog.reject()
+    def on_btn_clicked_or_dialog_rejected(button_index: Optional[int]):
+        if button_index is not None:
+            dialog.reject()
+
         if callback is not None:
             callback(button_index)
 
@@ -334,8 +344,12 @@ def show_dialog(
             )
         elif isinstance(button, QDialogButtonBox.StandardButton):
             button = button_box.addButton(button)
+        elif isinstance(button, tuple):
+            button = button_box.addButton(*button)
 
-        qconnect(button.clicked, partial(on_btn_clicked, button_index))
+        qconnect(
+            button.clicked, partial(on_btn_clicked_or_dialog_rejected, button_index)
+        )
 
         if button_index == default_button_idx:
             button.setDefault(True)
@@ -344,7 +358,12 @@ def show_dialog(
             button.setDefault(False)
             button.setAutoDefault(False)
 
-    dialog.open()
+    qconnect(dialog.rejected, partial(on_btn_clicked_or_dialog_rejected, None))
+
+    if open_dialog:
+        dialog.open()
+
+    return dialog, main_layout
 
 
 def tooltip_icon() -> QIcon:

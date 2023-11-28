@@ -3,12 +3,12 @@ from concurrent.futures import Future
 from typing import Callable, List
 
 import aqt
-from aqt.qt import QCheckBox, Qt
-from aqt.utils import MessageBox
+from aqt.qt import QCheckBox, QDialogButtonBox
 
 from ...ankihub_client import Deck
 from ...settings import config
 from ..messages import messages
+from ..utils import show_dialog
 from .deck_installation import download_and_install_decks
 from .utils import future_with_exception, future_with_result
 
@@ -27,22 +27,28 @@ def check_and_install_new_deck_subscriptions(
         cleanup_cb = QCheckBox("Remove unused tags and empty cards")
         cleanup_cb.setChecked(True)
 
-        confirmation_dialog = MessageBox(
+        confirmation_dialog, confirmation_dialog_layout = show_dialog(
             title="AnkiHub | Sync",
             text=messages.deck_install_confirmation(decks),
-            textFormat=Qt.TextFormat.RichText,
             parent=aqt.mw,
-            buttons=["Skip", "Install"],
-            default_button=1,
+            buttons=[
+                ("Skip", QDialogButtonBox.ButtonRole.RejectRole),
+                ("Install", QDialogButtonBox.ButtonRole.AcceptRole),
+            ],
+            default_button_idx=1,
             callback=lambda button_index: _on_button_clicked(
                 button_index=button_index,
                 cleanup_cb=cleanup_cb,
                 decks=decks,
                 on_done=on_done,
             ),
+            open_dialog=False,
         )
-
-        confirmation_dialog.setCheckBox(cleanup_cb)
+        confirmation_dialog_layout.insertWidget(
+            confirmation_dialog_layout.count() - 2,
+            cleanup_cb,
+        )
+        confirmation_dialog.open()
 
         # This prevents the checkbox from being garbage collected too early
         confirmation_dialog.cleanup_cb = cleanup_cb  # type: ignore
