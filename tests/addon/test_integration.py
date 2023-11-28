@@ -58,6 +58,7 @@ from ankihub.gui.browser.browser import (
     _on_protect_fields_action,
     _on_reset_optional_tags_action,
 )
+from ankihub.gui.operations.utils import future_with_exception
 
 from ..factories import DeckFactory, DeckMediaFactory, NoteInfoFactory
 from ..fixtures import (
@@ -890,6 +891,45 @@ class TestCheckAndInstallNewDeckSubscriptions:
 
             # Assert that the on_done callback was called with a future with an exception
             assert on_done_mock.call_count == 1
+            assert on_done_mock.call_args[0][0].exception() is not None
+
+            # Assert that the mocked functions were called
+            assert download_and_install_decks_mock.call_count == 1
+
+    def test_install_operation_calls_callback_with_future_with_exception(
+        self,
+        anki_session_with_addon_data: AnkiSession,
+        qtbot: QtBot,
+        mock_function: MockFunction,
+        mock_message_box_with_cb: MockMessageBoxWithCB,
+    ):
+        anki_session = anki_session_with_addon_data
+        with anki_session.profile_loaded():
+            # Mock confirmation dialog
+            mock_message_box_with_cb(
+                "ankihub.gui.operations.new_deck_subscriptions.MessageBox",
+                button_index=1,
+            )
+
+            # Mock download and install operation to call callback with a future with an exception
+            download_and_install_decks_mock = mock_function(
+                operations.new_deck_subscriptions,
+                "download_and_install_decks",
+                side_effect=lambda *args, **kwargs: kwargs["on_done"](
+                    future_with_exception(Exception("Something went wrong"))
+                ),
+            )
+
+            # Call the function with a deck
+            on_done_mock = Mock()
+            deck = DeckFactory.create()
+            check_and_install_new_deck_subscriptions(
+                subscribed_decks=[deck], on_done=on_done_mock
+            )
+
+            qtbot.wait_until(lambda: on_done_mock.call_count == 1)
+
+            # Assert that the on_done callback was called with a future with an exception
             assert on_done_mock.call_args[0][0].exception() is not None
 
             # Assert that the mocked functions were called
