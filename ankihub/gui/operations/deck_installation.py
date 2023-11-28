@@ -90,20 +90,14 @@ def show_deck_import_summary_dialog(
         import_results=import_results,
     )
 
-    def on_button_clicked(button_index: int) -> None:
-        from ..decks_dialog import DeckManagementDialog
-
-        if button_index == 0:
-            DeckManagementDialog.display_subscribe_window()
-
     show_dialog(
         message,
         title="AnkiHub | Deck Import Summary",
-        buttons=["Go to Deck Management", QDialogButtonBox.StandardButton.Ok],
+        buttons=[QDialogButtonBox.StandardButton.Ok],
         default_button_idx=1,
         scrollable=True,
         icon=tooltip_icon(),
-        callback=on_button_clicked,
+        callback=lambda _: callback(),
     )
 
 
