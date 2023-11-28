@@ -84,10 +84,13 @@ def _on_decks_installed(future: Future, on_done: Callable[[Future], None]):
         on_done(future_with_exception(e))
         return
 
-    _show_deck_import_summary_dialog(
-        import_results=import_results,
-        on_done=lambda: on_done(future_with_result(None)),
-    )
+    try:
+        _show_deck_import_summary_dialog(
+            import_results=import_results,
+            on_done=lambda: on_done(future_with_result(None)),
+        )
+    except Exception as e:
+        on_done(future_with_exception(e))
 
 
 def _show_deck_import_summary_dialog(
