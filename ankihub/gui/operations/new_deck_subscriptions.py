@@ -108,7 +108,7 @@ def _show_deck_import_summary_dialog(
         message,
         title="AnkiHub | Deck Import Summary",
         buttons=[QDialogButtonBox.StandardButton.Ok],
-        default_button_idx=1,
+        default_button_idx=0,
         scrollable=True,
         icon=tooltip_icon(),
         callback=lambda _: callback(),
