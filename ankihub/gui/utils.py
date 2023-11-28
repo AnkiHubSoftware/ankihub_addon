@@ -325,7 +325,7 @@ def show_dialog(
 
     def on_btn_clicked_or_dialog_rejected(button_index: Optional[int]):
         # Prevent the callback from being called twice
-        dialog.rejected.disconnect()
+        dialog.rejected.disconnect()  # type: ignore
 
         dialog.reject()
 
