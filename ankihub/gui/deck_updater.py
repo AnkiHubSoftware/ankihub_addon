@@ -252,7 +252,7 @@ def show_tooltip_about_last_deck_updates_results() -> None:
     total = created_nids_amount + updated_nids_amount
 
     if total == 0:
-        tooltip("AnkiHub: No new updates")
+        tooltip("AnkiHub: No new updates", parent=aqt.mw)
     else:
         tooltip(
             f"AnkiHub: Updated {total} note{'' if total == 1 else 's'}.",
