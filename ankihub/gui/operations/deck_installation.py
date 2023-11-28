@@ -7,7 +7,6 @@ from typing import Callable, List
 
 import aqt
 from aqt.operations.tag import clear_unused_tags
-from aqt.qt import QDialogButtonBox
 
 from ... import LOGGER
 from ...addon_ankihub_client import AddonAnkiHubClient as AnkiHubClient
@@ -21,8 +20,6 @@ from ...main.utils import clear_empty_cards, create_backup
 from ...settings import DeckConfig, config
 from ..exceptions import DeckDownloadAndInstallError, RemoteDeckNotFoundError
 from ..media_sync import media_sync
-from ..messages import messages
-from ..utils import show_dialog, tooltip_icon
 from .subdecks import confirm_and_toggle_subdecks
 from .utils import future_with_exception, future_with_result
 
@@ -73,32 +70,6 @@ def download_and_install_decks(
         )
     except Exception as e:
         on_done(future_with_exception(e))
-
-
-def show_deck_import_summary_dialog(
-    import_results: List[AnkiHubImportResult], callback: Callable[[], None]
-) -> None:
-    ankihub_dids = [import_result.ankihub_did for import_result in import_results]
-    ankihub_deck_names = [config.deck_config(ah_did).name for ah_did in ankihub_dids]
-    anki_deck_names = [
-        aqt.mw.col.decks.name(config.deck_config(ah_did).anki_id)
-        for ah_did in ankihub_dids
-    ]
-    message = messages.deck_import_summary(
-        ankihub_deck_names=ankihub_deck_names,
-        anki_deck_names=anki_deck_names,
-        import_results=import_results,
-    )
-
-    show_dialog(
-        message,
-        title="AnkiHub | Deck Import Summary",
-        buttons=[QDialogButtonBox.StandardButton.Ok],
-        default_button_idx=1,
-        scrollable=True,
-        icon=tooltip_icon(),
-        callback=lambda _: callback(),
-    )
 
 
 def _download_and_install_decks_inner(

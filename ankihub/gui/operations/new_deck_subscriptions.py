@@ -3,17 +3,15 @@ from concurrent.futures import Future
 from typing import Callable, List
 
 import aqt
-from aqt.qt import QCheckBox, Qt
+from aqt.qt import QCheckBox, QDialogButtonBox, Qt
 from aqt.utils import MessageBox
 
 from ...ankihub_client import Deck
 from ...main.importing import AnkiHubImportResult
 from ...settings import config
 from ..messages import messages
-from .deck_installation import (
-    download_and_install_decks,
-    show_deck_import_summary_dialog,
-)
+from ..utils import show_dialog, tooltip_icon
+from .deck_installation import download_and_install_decks
 from .utils import future_with_exception, future_with_result
 
 
@@ -85,9 +83,35 @@ def _on_decks_installed(future: Future, on_done: Callable[[Future], None]):
         on_done(future_with_exception(e))
         return
 
-    show_deck_import_summary_dialog(
+    _show_deck_import_summary_dialog(
         import_results=import_results,
         callback=lambda: on_done(future_with_result(None)),
+    )
+
+
+def _show_deck_import_summary_dialog(
+    import_results: List[AnkiHubImportResult], callback: Callable[[], None]
+) -> None:
+    ankihub_dids = [import_result.ankihub_did for import_result in import_results]
+    ankihub_deck_names = [config.deck_config(ah_did).name for ah_did in ankihub_dids]
+    anki_deck_names = [
+        aqt.mw.col.decks.name(config.deck_config(ah_did).anki_id)
+        for ah_did in ankihub_dids
+    ]
+    message = messages.deck_import_summary(
+        ankihub_deck_names=ankihub_deck_names,
+        anki_deck_names=anki_deck_names,
+        import_results=import_results,
+    )
+
+    show_dialog(
+        message,
+        title="AnkiHub | Deck Import Summary",
+        buttons=[QDialogButtonBox.StandardButton.Ok],
+        default_button_idx=1,
+        scrollable=True,
+        icon=tooltip_icon(),
+        callback=lambda _: callback(),
     )
 
 
