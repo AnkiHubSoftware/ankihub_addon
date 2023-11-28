@@ -1,3 +1,4 @@
+import time
 import uuid
 from functools import partial
 from typing import Any, Callable, List, Optional, Sequence, Union
@@ -8,6 +9,7 @@ from aqt.qt import (
     QApplication,
     QDialog,
     QDialogButtonBox,
+    QEventLoop,
     QHBoxLayout,
     QIcon,
     QLabel,
@@ -400,3 +402,9 @@ def clear_layout(layout: QLayout) -> None:
             widget.deleteLater()
         elif child.layout():
             clear_layout(child.layout())
+
+
+def let_qt_process_events(duration: float) -> None:
+    start_time = time.time()
+    while time.time() - start_time < duration:
+        aqt.mw.app.processEvents(QEventLoop.ProcessEventsFlag.ExcludeUserInputEvents)  # type: ignore

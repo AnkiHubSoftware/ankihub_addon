@@ -12,6 +12,7 @@ from ...main.importing import AnkiHubImportResult
 from ...main.review_data import send_review_data
 from ...settings import config
 from ..deck_updater import ah_deck_updater, show_tooltip_about_last_deck_updates_results
+from ..utils import let_qt_process_events
 from .db_check import maybe_check_databases
 from .deck_installation import show_deck_import_summary_dialog
 from .new_deck_subscriptions import check_and_install_new_deck_subscriptions
@@ -47,6 +48,9 @@ def sync_with_ankihub(on_done: Callable[[Future], None]) -> None:
         future: Future, import_results_for_new_decks: List[AnkiHubImportResult]
     ) -> None:
         if import_results_for_new_decks:
+            # Prevents the import summary dialog from being shown before the progress dialog is closed
+            let_qt_process_events(duration=0.5)
+
             show_deck_import_summary_dialog(import_results_for_new_decks)
 
         if future.exception():
