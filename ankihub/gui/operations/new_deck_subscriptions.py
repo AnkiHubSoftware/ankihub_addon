@@ -19,7 +19,8 @@ def check_and_install_new_deck_subscriptions(
     subscribed_decks: List[Deck],
     on_done: Callable[[Future[List[AnkiHubImportResult]]], None],
 ) -> None:
-    """Check if there are any new deck subscriptions and install them if the user confirms."""
+    """Check if there are any new deck subscriptions and install them if the user confirms.
+    Show a import summary dialog after the decks are installed."""
     try:
         # Check if there are any new subscriptions
         decks = _not_installed_ah_decks(subscribed_decks)
