@@ -293,23 +293,18 @@ def show_dialog(
     dialog.setWindowTitle(title)
     disable_help_button(dialog)
 
-    main_layout = QVBoxLayout(dialog)
-    hlayout = QHBoxLayout()
-    main_layout.addLayout(hlayout)
-    if scrollable:
-        area = QScrollArea()
-        area.setWidgetResizable(True)
-        widget = QWidget()
-        area.setWidget(widget)
-        hlayout.addWidget(area)
-        content_layout = QVBoxLayout(widget)
-    else:
-        content_layout = QVBoxLayout()
-        hlayout.addLayout(content_layout)
+    outer_layout = QHBoxLayout(dialog)
+
+    icon_layout = QVBoxLayout()
+    outer_layout.addLayout(icon_layout)
+
+    outer_layout.addSpacing(20)
+
+    # Contains the text and the buttons
+    main_layout = QVBoxLayout()
+    outer_layout.addLayout(main_layout)
 
     if icon is not None:
-        icon_layout = QVBoxLayout()
-
         icon_label = QLabel()
         icon_label.setPixmap(icon.pixmap(48, 48))
         icon_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
@@ -317,14 +312,22 @@ def show_dialog(
 
         icon_layout.addStretch()
 
-        hlayout.insertLayout(0, icon_layout)
+    if scrollable:
+        area = QScrollArea()
+        area.setWidgetResizable(True)
+        widget = QWidget()
+        area.setWidget(widget)
+        main_layout.addWidget(area)
+        content_layout = QVBoxLayout(widget)
+    else:
+        content_layout = main_layout
 
     label = QLabel(text)
     label.setWordWrap(True)
     label.setTextFormat(text_format)
     content_layout.addWidget(label)
 
-    content_layout.addStretch()
+    content_layout.addSpacing(10)
 
     button_box = QDialogButtonBox()
     main_layout.addWidget(button_box)
@@ -365,7 +368,7 @@ def show_dialog(
     if open_dialog:
         dialog.open()
 
-    return dialog, main_layout
+    return dialog, content_layout
 
 
 def tooltip_icon() -> QIcon:
