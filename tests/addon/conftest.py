@@ -21,6 +21,7 @@ from ..fixtures import (  # noqa F401
     mock_all_feature_flags_to_default_values,
     mock_download_and_install_deck_dependencies,
     mock_function,
+    mock_message_box_with_cb,
     mock_study_deck_dialog_with_cb,
     new_note_with_note_type,
     next_deterministic_id,

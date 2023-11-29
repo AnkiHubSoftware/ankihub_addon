@@ -58,7 +58,7 @@ def confirm_and_toggle_subdecks(ankihub_id: uuid.UUID) -> None:
 def _on_subdecks_updated(future: Future):
     future.result()
 
-    tooltip("Subdecks updated.")
+    tooltip("Subdecks updated.", parent=aqt.mw)
     aqt.mw.deckBrowser.refresh()
     browser: Optional[Browser] = dialogs._dialogs["Browser"][1]
     if browser is not None:

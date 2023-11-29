@@ -108,6 +108,7 @@ from ankihub.main.subdecks import (
     deck_contains_subdeck_tags,
 )
 from ankihub.main.utils import (
+    clear_empty_cards,
     lowest_level_common_ancestor_deck_name,
     mids_of_notes,
     retain_nids_with_ah_note_type,
@@ -2070,6 +2071,29 @@ class TestSendReviewData:
             assert_datetime_equal_ignore_milliseconds(
                 card_review_data.last_card_review_at, second_review_time
             )
+
+
+def test_clear_empty_cards(anki_session_with_addon_data: AnkiSession, qtbot: QtBot):
+    with anki_session_with_addon_data.profile_loaded():
+        # Create a note with two cards.
+        note = aqt.mw.col.new_note(
+            aqt.mw.col.models.by_name("Cloze"),
+        )
+        note["Text"] = "{{c1::first}} {{c2::second}}"
+        aqt.mw.col.add_note(note, DeckId(1))
+        assert len(note.cards()) == 2  # sanity check
+
+        # Cause the second card to be empty.
+        note["Text"] = "{{c1::first}}"
+        aqt.mw.col.update_note(note)
+        assert len(note.cards()) == 2  # sanity check
+
+        # Clear the empty card.
+        clear_empty_cards()
+        qtbot.wait_until(lambda: len(note.cards()) == 1)
+
+        # Assert that the empty card was cleared.
+        assert len(note.cards()) == 1
 
 
 class TestChooseAnkiHubDeck:

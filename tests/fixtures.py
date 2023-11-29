@@ -25,7 +25,6 @@ from ankihub.ankihub_client import NoteInfo
 from ankihub.ankihub_client.ankihub_client import AnkiHubClient
 from ankihub.ankihub_client.models import Deck, UserDeckRelation
 from ankihub.feature_flags import setup_feature_flags
-from ankihub.gui import operations
 from ankihub.gui.media_sync import _AnkiHubMediaSync
 from ankihub.main.importing import AnkiHubImporter
 from ankihub.main.utils import modify_note_type
@@ -488,6 +487,7 @@ class MockDownloadAndInstallDeckDependencies(Protocol):
 @pytest.fixture
 def mock_download_and_install_deck_dependencies(
     monkeypatch: MonkeyPatch,
+    mock_message_box_with_cb,
 ) -> MockDownloadAndInstallDeckDependencies:
     """Mocks the dependencies of the download_and_install_deck function.
     deck: The deck that is downloaded and installed.
@@ -516,16 +516,54 @@ def mock_download_and_install_deck_dependencies(
         add_mock(AnkiHubClient, "get_protected_fields", {})
         add_mock(AnkiHubClient, "get_protected_tags", [])
 
-        # Patch away gui functions which would otherwise block the test
-        add_mock(operations.deck_installation, "ask_user", return_value=True)
-        add_mock(operations.deck_installation, "show_empty_cards")
-
         # Mock media sync
         add_mock(_AnkiHubMediaSync, "start_media_download")
+
+        # Mock UI interactions
+        mock_message_box_with_cb(
+            "ankihub.gui.operations.new_deck_subscriptions.MessageBox", 1
+        )
 
         return mocks
 
     return mock_install_deck_dependencies
+
+
+class MockMessageBoxWithCB(Protocol):
+    def __call__(
+        self,
+        target_object: Any,
+        button_index: int,
+    ) -> None:
+        ...
+
+
+class MessageBoxMock:
+    def __init__(self, button_index, *args, **kwargs):
+        callback = kwargs["callback"]
+        aqt.mw.taskman.run_in_background(task=lambda: callback(button_index))
+
+    def setCheckBox(self, *args, **kwargs):
+        pass
+
+
+@pytest.fixture
+def mock_message_box_with_cb(monkeypatch: MonkeyPatch) -> MockMessageBoxWithCB:
+    """Mocks the aqt.utils.MessageBox dialog to call the callback with the provided button index
+    instead of showing the dialog."""
+
+    def mock_message_box_with_cb_inner(
+        target_object: Any,
+        button_index: int,
+    ) -> None:
+        monkeypatch.setattr(
+            target_object,
+            lambda *args, **kwargs: MessageBoxMock(
+                button_index=button_index, *args, **kwargs  # type: ignore
+            ),
+        )
+
+    return mock_message_box_with_cb_inner
 
 
 def create_anki_deck(deck_name: str) -> DeckId:

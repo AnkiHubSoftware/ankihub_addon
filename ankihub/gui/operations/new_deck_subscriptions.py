@@ -2,10 +2,13 @@
 from concurrent.futures import Future
 from typing import Callable, List
 
+import aqt
+from aqt.qt import QCheckBox, Qt
+from aqt.utils import MessageBox
+
 from ...ankihub_client import Deck
 from ...settings import config
 from ..messages import messages
-from ..utils import ask_user
 from .deck_installation import download_and_install_decks
 from .utils import future_with_exception, future_with_result
 
@@ -13,7 +16,7 @@ from .utils import future_with_exception, future_with_result
 def check_and_install_new_deck_subscriptions(
     subscribed_decks: List[Deck], on_done: Callable[[Future], None]
 ) -> None:
-    """Check if there are any new deck subscriptions and install them if the user agrees."""
+    """Check if there are any new deck subscriptions and install them if the user confirms."""
     try:
         # Check if there are any new subscriptions
         decks = _not_installed_ah_decks(subscribed_decks)
@@ -21,20 +24,49 @@ def check_and_install_new_deck_subscriptions(
             on_done(future_with_result(None))
             return
 
-        # Ask user to confirm the installations.
-        if not ask_user(
-            title="AnkiHub Deck Installation",
-            text=messages.deck_install_confirmation(decks),
-            show_cancel_button=False,
-            yes_button_label="Install",
-            no_button_label="Skip",
-        ):
-            on_done(future_with_result(None))
-            return
+        cleanup_cb = QCheckBox("Remove unused tags and empty cards")
+        cleanup_cb.setChecked(True)
 
-        # Download the new decks
+        confirmation_dialog = MessageBox(
+            title="AnkiHub | Sync",
+            text=messages.deck_install_confirmation(decks),
+            textFormat=Qt.TextFormat.RichText,
+            parent=aqt.mw,
+            buttons=["Skip", "Install"],
+            default_button=1,
+            callback=lambda button_index: _on_button_clicked(
+                button_index=button_index,
+                cleanup_cb=cleanup_cb,
+                decks=decks,
+                on_done=on_done,
+            ),
+        )
+
+        confirmation_dialog.setCheckBox(cleanup_cb)
+
+        # This prevents the checkbox from being garbage collected too early
+        confirmation_dialog.cleanup_cb = cleanup_cb  # type: ignore
+    except Exception as e:
+        on_done(future_with_exception(e))
+
+
+def _on_button_clicked(
+    button_index: int,
+    cleanup_cb: QCheckBox,
+    decks: List[Deck],
+    on_done: Callable[[Future], None],
+) -> None:
+    if button_index == 0:
+        # Skip
+        on_done(future_with_result(None))
+        return
+
+    # Download the new decks
+    try:
         ah_dids = [deck.ah_did for deck in decks]
-        download_and_install_decks(ah_dids, on_done=on_done)
+        download_and_install_decks(
+            ah_dids, on_done=on_done, cleanup=cleanup_cb.isChecked()
+        )
     except Exception as e:
         on_done(future_with_exception(e))
 
