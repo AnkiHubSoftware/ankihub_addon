@@ -331,8 +331,10 @@ def show_dialog(
     main_layout.addStretch()
 
     def on_btn_clicked_or_dialog_rejected(button_index: Optional[int]):
-        if button_index is not None:
-            dialog.reject()
+        # Prevent the callback from being called twice
+        dialog.rejected.disconnect()  # type: ignore
+
+        dialog.reject()
 
         if callback is not None:
             callback(button_index)
