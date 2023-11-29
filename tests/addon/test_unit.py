@@ -2150,7 +2150,17 @@ class TestShowDialog:
         "default_button_idx",
         [0, 1],
     )
-    def test_button_callback(self, qtbot: QtBot, default_button_idx: int):
+    @pytest.mark.parametrize(
+        "buttons",
+        [
+            ["Yes", "No"],
+            [
+                ("Yes", QDialogButtonBox.ButtonRole.AcceptRole),
+                ("No", QDialogButtonBox.ButtonRole.RejectRole),
+            ],
+        ],
+    )
+    def test_button_callback(self, qtbot: QtBot, buttons, default_button_idx: int):
         button_index_from_cb: Optional[int] = None
 
         def callback(button_index: int):
@@ -2164,7 +2174,7 @@ class TestShowDialog:
             title="some title",
             parent=dialog,
             callback=callback,
-            buttons=["Yes", "No"],
+            buttons=buttons,
             default_button_idx=default_button_idx,
         )
         qtbot.keyClick(dialog, Qt.Key.Key_Enter)
