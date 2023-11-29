@@ -65,7 +65,7 @@ from ..fixtures import (
     InstallAHDeck,
     MockDownloadAndInstallDeckDependencies,
     MockFunction,
-    MockMessageBoxWithCB,
+    MockShowDialogWithCB,
     MockStudyDeckDialogWithCB,
     create_or_get_ah_version_of_note_type,
     record_review,
@@ -127,7 +127,7 @@ from ankihub.gui.operations.deck_installation import download_and_install_decks
 from ankihub.gui.operations.new_deck_subscriptions import (
     check_and_install_new_deck_subscriptions,
 )
-from ankihub.gui.operations.utils import future_with_result
+from ankihub.gui.operations.utils import future_with_exception, future_with_result
 from ankihub.gui.optional_tag_suggestion_dialog import OptionalTagsSuggestionDialog
 from ankihub.main.deck_creation import create_ankihub_deck, modify_note_type
 from ankihub.main.exporting import to_note_data
@@ -730,13 +730,13 @@ class TestCheckAndInstallNewDeckSubscriptions:
         anki_session_with_addon_data: AnkiSession,
         qtbot: QtBot,
         mock_function: MockFunction,
-        mock_message_box_with_cb: MockMessageBoxWithCB,
+        mock_show_dialog_with_cb: MockShowDialogWithCB,
     ):
         anki_session = anki_session_with_addon_data
         with anki_session.profile_loaded():
             # Mock confirmation dialog
-            mock_message_box_with_cb(
-                "ankihub.gui.operations.new_deck_subscriptions.MessageBox",
+            mock_show_dialog_with_cb(
+                "ankihub.gui.operations.new_deck_subscriptions.show_dialog",
                 button_index=1,
             )
 
@@ -770,13 +770,13 @@ class TestCheckAndInstallNewDeckSubscriptions:
         self,
         anki_session_with_addon_data: AnkiSession,
         qtbot: QtBot,
-        mock_message_box_with_cb: MockMessageBoxWithCB,
+        mock_show_dialog_with_cb: MockShowDialogWithCB,
     ):
         anki_session = anki_session_with_addon_data
         with anki_session.profile_loaded():
             # Mock confirmation dialog
-            mock_message_box_with_cb(
-                "ankihub.gui.operations.new_deck_subscriptions.MessageBox",
+            mock_show_dialog_with_cb(
+                "ankihub.gui.operations.new_deck_subscriptions.show_dialog",
                 button_index=0,
             )
 
@@ -827,7 +827,7 @@ class TestCheckAndInstallNewDeckSubscriptions:
 
             message_box_mock = mock_function(
                 new_deck_subscriptions,
-                "MessageBox",
+                "show_dialog",
                 side_effect=raise_exception,
             )
 
@@ -852,13 +852,13 @@ class TestCheckAndInstallNewDeckSubscriptions:
         anki_session_with_addon_data: AnkiSession,
         qtbot: QtBot,
         mock_function: MockFunction,
-        mock_message_box_with_cb: MockMessageBoxWithCB,
+        mock_show_dialog_with_cb: MockShowDialogWithCB,
     ):
         anki_session = anki_session_with_addon_data
         with anki_session.profile_loaded():
             # Mock confirmation dialog
-            mock_message_box_with_cb(
-                "ankihub.gui.operations.new_deck_subscriptions.MessageBox",
+            mock_show_dialog_with_cb(
+                "ankihub.gui.operations.new_deck_subscriptions.show_dialog",
                 button_index=1,
             )
 
@@ -883,6 +883,45 @@ class TestCheckAndInstallNewDeckSubscriptions:
 
             # Assert that the on_done callback was called with a future with an exception
             assert on_done_mock.call_count == 1
+            assert on_done_mock.call_args[0][0].exception() is not None
+
+            # Assert that the mocked functions were called
+            assert download_and_install_decks_mock.call_count == 1
+
+    def test_install_operation_calls_callback_with_future_with_exception(
+        self,
+        anki_session_with_addon_data: AnkiSession,
+        qtbot: QtBot,
+        mock_function: MockFunction,
+        mock_show_dialog_with_cb: MockShowDialogWithCB,
+    ):
+        anki_session = anki_session_with_addon_data
+        with anki_session.profile_loaded():
+            # Mock confirmation dialog
+            mock_show_dialog_with_cb(
+                "ankihub.gui.operations.new_deck_subscriptions.show_dialog",
+                button_index=1,
+            )
+
+            # Mock download and install operation to call callback with a future with an exception
+            download_and_install_decks_mock = mock_function(
+                operations.new_deck_subscriptions,
+                "download_and_install_decks",
+                side_effect=lambda *args, **kwargs: kwargs["on_done"](
+                    future_with_exception(Exception("Something went wrong"))
+                ),
+            )
+
+            # Call the function with a deck
+            on_done_mock = Mock()
+            deck = DeckFactory.create()
+            check_and_install_new_deck_subscriptions(
+                subscribed_decks=[deck], on_done=on_done_mock
+            )
+
+            qtbot.wait_until(lambda: on_done_mock.call_count == 1)
+
+            # Assert that the on_done callback was called with a future with an exception
             assert on_done_mock.call_args[0][0].exception() is not None
 
             # Assert that the mocked functions were called

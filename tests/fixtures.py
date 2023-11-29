@@ -2,8 +2,8 @@ import copy
 import os
 import uuid
 from datetime import datetime
-from typing import Any, Callable, Dict, List, Optional, Protocol
-from unittest.mock import Mock
+from typing import Any, Callable, Dict, List, Optional, Protocol, Tuple
+from unittest.mock import MagicMock, Mock
 
 import aqt
 import pytest
@@ -474,6 +474,33 @@ def install_ah_deck(
     return install_ah_deck_inner
 
 
+class MockShowDialogWithCB(Protocol):
+    def __call__(
+        self,
+        target_object: Any,
+        button_index: Optional[int],
+    ) -> Tuple[MagicMock, MagicMock]:
+        ...
+
+
+@pytest.fixture
+def mock_show_dialog_with_cb(monkeypatch: MonkeyPatch) -> MockShowDialogWithCB:
+    """Mocks ankihub.gui.utils.show_dialog to call the callback with the provided button index
+    instead of showing the dialog."""
+
+    def mock_show_dialog_with_cb_inner(
+        target_object: Any,
+        button_index: Optional[int],
+    ) -> None:
+        def show_dialog_mock(*args, **kwargs) -> Tuple[MagicMock, MagicMock]:
+            kwargs["callback"](button_index),
+            return MagicMock(), MagicMock()
+
+        monkeypatch.setattr(target_object, show_dialog_mock)
+
+    return mock_show_dialog_with_cb_inner
+
+
 class MockDownloadAndInstallDeckDependencies(Protocol):
     def __call__(
         self,
@@ -487,7 +514,7 @@ class MockDownloadAndInstallDeckDependencies(Protocol):
 @pytest.fixture
 def mock_download_and_install_deck_dependencies(
     monkeypatch: MonkeyPatch,
-    mock_message_box_with_cb,
+    mock_show_dialog_with_cb: MockShowDialogWithCB,
 ) -> MockDownloadAndInstallDeckDependencies:
     """Mocks the dependencies of the download_and_install_deck function.
     deck: The deck that is downloaded and installed.
@@ -520,8 +547,8 @@ def mock_download_and_install_deck_dependencies(
         add_mock(_AnkiHubMediaSync, "start_media_download")
 
         # Mock UI interactions
-        mock_message_box_with_cb(
-            "ankihub.gui.operations.new_deck_subscriptions.MessageBox", 1
+        mock_show_dialog_with_cb(
+            "ankihub.gui.operations.new_deck_subscriptions.show_dialog", button_index=1
         )
 
         return mocks
