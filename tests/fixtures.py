@@ -2,7 +2,7 @@ import copy
 import os
 import uuid
 from datetime import datetime
-from typing import Any, Callable, Dict, List, Optional, Protocol, Tuple
+from typing import Any, Callable, Dict, List, Optional, Protocol
 from unittest.mock import MagicMock, Mock
 
 import aqt
@@ -479,7 +479,7 @@ class MockShowDialogWithCB(Protocol):
         self,
         target_object: Any,
         button_index: Optional[int],
-    ) -> Tuple[MagicMock, MagicMock]:
+    ) -> MagicMock:
         ...
 
 
@@ -492,9 +492,9 @@ def mock_show_dialog_with_cb(monkeypatch: MonkeyPatch) -> MockShowDialogWithCB:
         target_object: Any,
         button_index: Optional[int],
     ) -> None:
-        def show_dialog_mock(*args, **kwargs) -> Tuple[MagicMock, MagicMock]:
+        def show_dialog_mock(*args, **kwargs) -> MagicMock:
             kwargs["callback"](button_index),
-            return MagicMock(), MagicMock()
+            return MagicMock()
 
         monkeypatch.setattr(target_object, show_dialog_mock)
 

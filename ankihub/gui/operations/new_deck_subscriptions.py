@@ -27,7 +27,7 @@ def check_and_install_new_deck_subscriptions(
         cleanup_cb = QCheckBox("Remove unused tags and empty cards")
         cleanup_cb.setChecked(True)
 
-        confirmation_dialog, confirmation_dialog_layout = show_dialog(
+        confirmation_dialog = show_dialog(
             title="AnkiHub | Sync",
             text=messages.deck_install_confirmation(decks),
             parent=aqt.mw,
@@ -44,6 +44,7 @@ def check_and_install_new_deck_subscriptions(
             ),
             open_dialog=False,
         )
+        confirmation_dialog_layout = confirmation_dialog.content_layout
         confirmation_dialog_layout.insertWidget(
             confirmation_dialog_layout.count() - 2,
             cleanup_cb,
