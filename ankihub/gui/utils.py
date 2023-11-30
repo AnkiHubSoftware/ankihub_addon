@@ -1,6 +1,6 @@
 import uuid
 from functools import partial
-from typing import Any, Callable, List, Optional, Sequence, Union
+from typing import Any, Callable, List, Optional, Sequence, Tuple, Union
 
 import aqt
 from aqt.addons import check_and_prompt_for_updates
@@ -262,89 +262,170 @@ def ask_user(
         return None
 
 
+ButtonParam = Union[
+    QDialogButtonBox.StandardButton,
+    str,
+    Tuple[str, QDialogButtonBox.ButtonRole],
+]
+
+
+class _Dialog(QDialog):
+    """A simple dialog with a text and buttons. The dialog closes when a button is clicked and
+    the callback is called with the index of the clicked button.
+    This class is intended to be used via with the show_dialog function.
+    """
+
+    def __init__(
+        self,
+        parent: QWidget,
+        text: str,
+        title: str,
+        text_format: Qt.TextFormat,
+        buttons: Optional[Sequence[ButtonParam]],
+        default_button_idx: int,
+        scrollable: bool,
+        callback: Optional[Callable[[int], None]],
+        icon: Optional[QIcon],
+    ) -> None:
+        super().__init__(parent)
+
+        self.text = text
+        self.title = title
+        self.text_format = text_format
+        self.buttons = buttons
+        self.default_button_idx = default_button_idx
+        self.scrollable = scrollable
+        self.callback = callback
+        self.icon = icon
+
+        self._setup_ui()
+
+    def _setup_ui(self) -> None:
+        self.setWindowTitle(self.title)
+        disable_help_button(self)
+
+        self.outer_layout = QHBoxLayout(self)
+
+        self.icon_layout = QVBoxLayout()
+        self.outer_layout.addLayout(self.icon_layout)
+
+        self.outer_layout.addSpacing(20)
+
+        # Contains the text and the buttons
+        self.main_layout = QVBoxLayout()
+        self.outer_layout.addLayout(self.main_layout)
+
+        if self.icon is not None:
+            icon_label = QLabel()
+            icon_label.setPixmap(self.icon.pixmap(48, 48))
+            icon_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
+            self.icon_layout.addWidget(icon_label)
+
+            self.icon_layout.addStretch()
+
+        if self.scrollable:
+            area = QScrollArea()
+            area.setWidgetResizable(True)
+            widget = QWidget()
+            area.setWidget(widget)
+            self.main_layout.addWidget(area)
+            self.content_layout = QVBoxLayout(widget)
+        else:
+            self.content_layout = self.main_layout
+
+        label = QLabel(self.text)
+        label.setWordWrap(True)
+        label.setTextFormat(self.text_format)
+        self.content_layout.addWidget(label)
+
+        self.content_layout.addSpacing(10)
+
+        self.button_box = self._setup_button_box()
+
+        self.main_layout.addWidget(self.button_box)
+        self.main_layout.addStretch()
+
+    def _setup_button_box(self) -> QDialogButtonBox:
+        button_box = QDialogButtonBox()
+
+        self.default_button = None
+        for button_index, button in enumerate(self.buttons):
+            if isinstance(button, str):
+                button = button_box.addButton(
+                    button, QDialogButtonBox.ButtonRole.ActionRole
+                )
+            elif isinstance(button, QDialogButtonBox.StandardButton):
+                button = button_box.addButton(button)
+            elif isinstance(button, tuple):
+                button = button_box.addButton(*button)
+
+            qconnect(
+                button.clicked,
+                partial(self._on_btn_clicked_or_dialog_rejected, button_index),
+            )
+
+            if button_index == self.default_button_idx:
+                self.default_button = button
+                button.setDefault(True)
+                button.setAutoDefault(True)
+            else:
+                button.setDefault(False)
+                button.setAutoDefault(False)
+
+        qconnect(self.rejected, partial(self._on_btn_clicked_or_dialog_rejected, None))
+
+        return button_box
+
+    def _on_btn_clicked_or_dialog_rejected(self, button_index: Optional[int]) -> None:
+        # Prevent the callback from being called twice
+        self.rejected.disconnect()  # type: ignore
+
+        self.reject()
+
+        if self.callback is not None:
+            self.callback(button_index)
+
+    def showEvent(self, event):
+        """Set focus to the default button when the dialog is shown."""
+        super().showEvent(event)
+
+        if self.default_button:
+            self.default_button.setFocus()
+
+
 def show_dialog(
     text: str,
     title: str,
     parent: Optional[QWidget] = None,
     text_format: Qt.TextFormat = Qt.TextFormat.RichText,
-    buttons: Union[Sequence[Union[str, QDialogButtonBox.StandardButton]], None] = [
-        QDialogButtonBox.StandardButton.Ok
-    ],
+    buttons: Optional[Sequence[ButtonParam]] = [QDialogButtonBox.StandardButton.Ok],
     default_button_idx: int = 0,
     scrollable: bool = False,
     callback: Optional[Callable[[int], None]] = None,
     icon: Optional[QIcon] = None,
-) -> None:
+    open_dialog: bool = True,
+) -> _Dialog:
     """Show a dialog with the given text and buttons.
-    The callback is called with the index of the clicked button.
-    Adapted from aqt.utils.showText and aqt.utils.MessageBox. The main difference is that
-    this function allows to make the text scrollable."""
+    The callback is called with the index of the clicked button."""
     if not parent:
         parent = aqt.mw.app.activeWindow() or aqt.mw
-    dialog = QDialog(parent)
-    dialog.setWindowTitle(title)
-    disable_help_button(dialog)
 
-    main_layout = QVBoxLayout(dialog)
-    hlayout = QHBoxLayout()
-    main_layout.addLayout(hlayout)
-    if scrollable:
-        area = QScrollArea()
-        area.setWidgetResizable(True)
-        widget = QWidget()
-        area.setWidget(widget)
-        hlayout.addWidget(area)
-        content_layout = QVBoxLayout(widget)
-    else:
-        content_layout = QVBoxLayout()
-        hlayout.addLayout(content_layout)
+    dialog = _Dialog(
+        parent=parent,
+        text=text,
+        title=title,
+        text_format=text_format,
+        buttons=buttons,
+        default_button_idx=default_button_idx,
+        scrollable=scrollable,
+        callback=callback,
+        icon=icon,
+    )
 
-    if icon is not None:
-        icon_layout = QVBoxLayout()
+    if open_dialog:
+        dialog.open()
 
-        icon_label = QLabel()
-        icon_label.setPixmap(icon.pixmap(48, 48))
-        icon_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
-        icon_layout.addWidget(icon_label)
-
-        icon_layout.addStretch()
-
-        hlayout.insertLayout(0, icon_layout)
-
-    label = QLabel(text)
-    label.setWordWrap(True)
-    label.setTextFormat(text_format)
-    content_layout.addWidget(label)
-
-    content_layout.addStretch()
-
-    button_box = QDialogButtonBox()
-    main_layout.addWidget(button_box)
-    main_layout.addStretch()
-
-    def on_btn_clicked(button_index: int):
-        dialog.reject()
-        if callback is not None:
-            callback(button_index)
-
-    for button_index, button in enumerate(buttons):
-        if isinstance(button, str):
-            button = button_box.addButton(
-                button, QDialogButtonBox.ButtonRole.ActionRole
-            )
-        elif isinstance(button, QDialogButtonBox.StandardButton):
-            button = button_box.addButton(button)
-
-        qconnect(button.clicked, partial(on_btn_clicked, button_index))
-
-        if button_index == default_button_idx:
-            button.setDefault(True)
-            button.setAutoDefault(True)
-        else:
-            button.setDefault(False)
-            button.setAutoDefault(False)
-
-    dialog.open()
+    return dialog
 
 
 def tooltip_icon() -> QIcon:

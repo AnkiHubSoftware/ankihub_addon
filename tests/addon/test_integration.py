@@ -65,7 +65,7 @@ from ..fixtures import (
     InstallAHDeck,
     MockDownloadAndInstallDeckDependencies,
     MockFunction,
-    MockMessageBoxWithCB,
+    MockShowDialogWithCB,
     MockStudyDeckDialogWithCB,
     create_or_get_ah_version_of_note_type,
     record_review,
@@ -730,13 +730,13 @@ class TestCheckAndInstallNewDeckSubscriptions:
         anki_session_with_addon_data: AnkiSession,
         qtbot: QtBot,
         mock_function: MockFunction,
-        mock_message_box_with_cb: MockMessageBoxWithCB,
+        mock_show_dialog_with_cb: MockShowDialogWithCB,
     ):
         anki_session = anki_session_with_addon_data
         with anki_session.profile_loaded():
             # Mock confirmation dialog
-            mock_message_box_with_cb(
-                "ankihub.gui.operations.new_deck_subscriptions.MessageBox",
+            mock_show_dialog_with_cb(
+                "ankihub.gui.operations.new_deck_subscriptions.show_dialog",
                 button_index=1,
             )
 
@@ -770,13 +770,13 @@ class TestCheckAndInstallNewDeckSubscriptions:
         self,
         anki_session_with_addon_data: AnkiSession,
         qtbot: QtBot,
-        mock_message_box_with_cb: MockMessageBoxWithCB,
+        mock_show_dialog_with_cb: MockShowDialogWithCB,
     ):
         anki_session = anki_session_with_addon_data
         with anki_session.profile_loaded():
             # Mock confirmation dialog
-            mock_message_box_with_cb(
-                "ankihub.gui.operations.new_deck_subscriptions.MessageBox",
+            mock_show_dialog_with_cb(
+                "ankihub.gui.operations.new_deck_subscriptions.show_dialog",
                 button_index=0,
             )
 
@@ -827,7 +827,7 @@ class TestCheckAndInstallNewDeckSubscriptions:
 
             message_box_mock = mock_function(
                 new_deck_subscriptions,
-                "MessageBox",
+                "show_dialog",
                 side_effect=raise_exception,
             )
 
@@ -852,13 +852,13 @@ class TestCheckAndInstallNewDeckSubscriptions:
         anki_session_with_addon_data: AnkiSession,
         qtbot: QtBot,
         mock_function: MockFunction,
-        mock_message_box_with_cb: MockMessageBoxWithCB,
+        mock_show_dialog_with_cb: MockShowDialogWithCB,
     ):
         anki_session = anki_session_with_addon_data
         with anki_session.profile_loaded():
             # Mock confirmation dialog
-            mock_message_box_with_cb(
-                "ankihub.gui.operations.new_deck_subscriptions.MessageBox",
+            mock_show_dialog_with_cb(
+                "ankihub.gui.operations.new_deck_subscriptions.show_dialog",
                 button_index=1,
             )
 
