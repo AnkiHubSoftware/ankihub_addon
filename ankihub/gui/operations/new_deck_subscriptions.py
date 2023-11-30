@@ -1,6 +1,6 @@
 """Check if the user is subscribed to any decks that are not installed and install them if the user agrees."""
 from concurrent.futures import Future
-from typing import Callable, List
+from typing import Callable, List, Optional
 
 import aqt
 from aqt.qt import QCheckBox, QDialogButtonBox
@@ -58,12 +58,12 @@ def check_and_install_new_deck_subscriptions(
 
 
 def _on_button_clicked(
-    button_index: int,
+    button_index: Optional[int],
     cleanup_cb: QCheckBox,
     decks: List[Deck],
     on_done: Callable[[Future], None],
 ) -> None:
-    if button_index == 0:
+    if button_index != 1:
         # Skip
         on_done(future_with_result(None))
         return
