@@ -262,6 +262,13 @@ def ask_user(
         return None
 
 
+ButtonParam = Union[
+    QDialogButtonBox.StandardButton,
+    str,
+    Tuple[str, QDialogButtonBox.ButtonRole],
+]
+
+
 class _Dialog(QDialog):
     """A simple dialog with a text and buttons. The dialog closes when a button is clicked and
     the callback is called with the index of the clicked button.
@@ -274,16 +281,7 @@ class _Dialog(QDialog):
         text: str,
         title: str,
         text_format: Qt.TextFormat,
-        buttons: Union[
-            Sequence[
-                Union[
-                    QDialogButtonBox.StandardButton,
-                    str,
-                    Tuple[str, QDialogButtonBox.ButtonRole],
-                ]
-            ],
-            None,
-        ],
+        buttons: Optional[Sequence[ButtonParam]],
         default_button_idx: int,
         scrollable: bool,
         callback: Optional[Callable[[int], None]],
@@ -400,16 +398,7 @@ def show_dialog(
     title: str,
     parent: Optional[QWidget] = None,
     text_format: Qt.TextFormat = Qt.TextFormat.RichText,
-    buttons: Union[
-        Sequence[
-            Union[
-                QDialogButtonBox.StandardButton,
-                str,
-                Tuple[str, QDialogButtonBox.ButtonRole],
-            ]
-        ],
-        None,
-    ] = [QDialogButtonBox.StandardButton.Ok],
+    buttons: Optional[Sequence[ButtonParam]] = [QDialogButtonBox.StandardButton.Ok],
     default_button_idx: int = 0,
     scrollable: bool = False,
     callback: Optional[Callable[[int], None]] = None,
