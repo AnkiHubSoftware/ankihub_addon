@@ -387,6 +387,13 @@ class _Dialog(QDialog):
         if self.callback is not None:
             self.callback(button_index)
 
+    def showEvent(self, event):
+        """Set focus to the default button when the dialog is shown."""
+        super().showEvent(event)
+
+        if self.default_button:
+            self.default_button.setFocus()
+
 
 def show_dialog(
     text: str,
