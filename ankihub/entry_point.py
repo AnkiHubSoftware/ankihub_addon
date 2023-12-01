@@ -158,7 +158,7 @@ def _general_setup():
     LOGGER.info("Loaded media_export.")
 
     setup_auto_sync()
-    LOGGER.info("Called setup_ankihub_sync_on_ankiweb_sync.")
+    LOGGER.info("Set up auto sync.")
 
 
 def _log_enabled_addons():
