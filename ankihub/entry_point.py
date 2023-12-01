@@ -148,7 +148,7 @@ def _general_setup():
     LOGGER.info("Set up task manager.")
 
     deckbrowser.setup()
-    LOGGER.info("Setup deck browser")
+    LOGGER.info("Set up deck browser")
 
     _trigger_addon_update_check()
     LOGGER.info("Triggered add-on update check.")
