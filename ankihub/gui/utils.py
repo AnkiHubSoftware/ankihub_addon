@@ -297,7 +297,7 @@ class _Dialog(QDialog):
         self.scrollable = scrollable
         self.callback = callback
         self.icon = icon
-        self._was_closed = False
+        self._is_closing = False
 
         self._setup_ui()
 
@@ -379,10 +379,10 @@ class _Dialog(QDialog):
 
     def _on_btn_clicked_or_dialog_rejected(self, button_index: Optional[int]) -> None:
         # Prevent the callback from getting called recursively when it calls self.reject()
-        if self._was_closed:
+        if self._is_closing:
             return
 
-        self._was_closed = True
+        self._is_closing = True
 
         self.reject()
 
