@@ -297,7 +297,7 @@ class _Dialog(QDialog):
         self.scrollable = scrollable
         self.callback = callback
         self.icon = icon
-        self._was_closed: bool = False
+        self._was_closed = False
 
         self._setup_ui()
 
