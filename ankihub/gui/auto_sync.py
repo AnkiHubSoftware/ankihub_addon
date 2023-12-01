@@ -24,8 +24,14 @@ auto_sync_state = _AutoSyncState()
 
 
 def setup_auto_sync() -> None:
-    _rate_limit_syncing()
+    """Setup AnkiHub sync on AnkiWeb sync"""
     _setup_ankihub_sync_on_ankiweb_sync()
+
+    # This has to be applied after _setup_ankihub_sync_on_ankiweb_sync because
+    # both functions wrap AnkiQt._sync_collection_and_media and we want to rate
+    # limit the outer function so that AnkiHub syncs can't be started in too
+    # short time intervals.
+    _rate_limit_syncing()
 
 
 def _setup_ankihub_sync_on_ankiweb_sync() -> None:
