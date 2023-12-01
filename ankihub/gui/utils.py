@@ -297,6 +297,7 @@ class _Dialog(QDialog):
         self.scrollable = scrollable
         self.callback = callback
         self.icon = icon
+        self._was_closed: bool = False
 
         self._setup_ui()
 
@@ -378,9 +379,11 @@ class _Dialog(QDialog):
 
     def _on_btn_clicked_or_dialog_rejected(self, button_index: Optional[int]) -> None:
         # Prevent the callback from being called twice
-        self.rejected.disconnect()  # type: ignore
+        if self._was_closed:
+            return
 
         self.reject()
+        self._was_closed = True
 
         if self.callback is not None:
             self.callback(button_index)
