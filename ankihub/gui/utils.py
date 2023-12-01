@@ -378,12 +378,13 @@ class _Dialog(QDialog):
         return button_box
 
     def _on_btn_clicked_or_dialog_rejected(self, button_index: Optional[int]) -> None:
-        # Prevent the callback from being called twice
+        # Prevent the callback from getting called recursively when it calls self.reject()
         if self._was_closed:
             return
 
-        self.reject()
         self._was_closed = True
+
+        self.reject()
 
         if self.callback is not None:
             self.callback(button_index)
