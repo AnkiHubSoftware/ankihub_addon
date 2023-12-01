@@ -43,8 +43,7 @@ def _setup_ankihub_sync_on_ankiweb_sync() -> None:
 
 
 def _rate_limit_syncing() -> None:
-    """Rate limit AnkiQt._sync_collection_and_media to avoid
-    "Cannot start transaction within a transaction" DBErrors.
+    """Rate limit AnkiQt._sync_collection_and_media to avoid syncs running in parallel and causing problems.
     Syncing is not thread safe and from Sentry reports you can see that the DBErrors are raised when
     the sync is called multiple times in a short time frame (< 0.2 seconds). Not sure why this happens.
     """
