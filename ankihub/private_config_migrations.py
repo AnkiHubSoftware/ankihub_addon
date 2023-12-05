@@ -87,8 +87,8 @@ def _remove_orphaned_deck_extensions(private_config_dict: Dict):
     deck_extensions = private_config_dict["deck_extensions"]
     for deck_extension_id, deck_extension in list(deck_extensions.items()):
         if deck_extension["ah_did"] not in decks:
+            del deck_extensions[deck_extension_id]
             LOGGER.info(
-                f"Removing deck extension config for deck {deck_extension['ah_did']} "
+                f"Removed deck extension config with {deck_extension_id=} for deck {deck_extension['ah_did']} "
                 "because the deck isn't in the config anymore."
             )
-            del deck_extensions[deck_extension_id]
