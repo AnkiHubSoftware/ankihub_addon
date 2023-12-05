@@ -355,6 +355,10 @@ class _Config:
         ]
         return result
 
+    def remove_deck_extension(self, extension_id: int) -> None:
+        self._private_config.deck_extensions.pop(extension_id)
+        self._update_private_config()
+
     def is_logged_in(self) -> bool:
         return bool(self.token())
 

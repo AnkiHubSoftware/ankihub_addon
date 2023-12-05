@@ -24,6 +24,7 @@ def migrate_private_config(private_config_dict: Dict) -> None:
     maybe_set_suspend_new_cards_of_new_notes_to_true_for_anking_deck(
         private_config_dict
     )
+    remove_orphaned_deck_extensions(private_config_dict)
 
 
 def maybe_reset_media_update_timestamps(private_config_dict: Dict) -> None:
@@ -78,3 +79,16 @@ def _is_api_version_on_last_sync_below_threshold(
         return True
 
     return api_version < version_threshold
+
+
+def remove_orphaned_deck_extensions(private_config_dict: Dict):
+    """Remove deck extension configs for which the corresponding deck isn't in the config anymore."""
+    decks = private_config_dict["decks"]
+    deck_extensions = private_config_dict["deck_extensions"]
+    for deck_extension_id, deck_extension in list(deck_extensions.items()):
+        if deck_extension["ah_did"] not in decks:
+            LOGGER.info(
+                f"Removing deck extension config for deck {deck_extension['ah_did']} "
+                "because the deck isn't in the config anymore."
+            )
+            del deck_extensions[deck_extension_id]
