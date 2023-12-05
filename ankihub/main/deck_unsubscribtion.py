@@ -7,16 +7,20 @@ from ..settings import config
 from .utils import undo_note_type_modfications
 
 
-def unsubscribe_from_deck_and_uninstall(deck_ankihub_id: uuid.UUID) -> None:
+def unsubscribe_from_deck_and_uninstall(ah_did: uuid.UUID) -> None:
     client = AddonAnkiHubClient()
-    client.unsubscribe_from_deck(deck_ankihub_id)
-    uninstall_deck(deck_ankihub_id)
-    LOGGER.info(f"Unsubscribed from deck {deck_ankihub_id}")
+    client.unsubscribe_from_deck(ah_did)
+    uninstall_deck(ah_did)
+    LOGGER.info(f"Unsubscribed from deck {ah_did}")
 
 
-def uninstall_deck(deck_ankihub_id: uuid.UUID) -> None:
-    config.remove_deck(deck_ankihub_id)
-    mids = ankihub_db.note_types_for_ankihub_deck(deck_ankihub_id)
+def uninstall_deck(ah_did: uuid.UUID) -> None:
+    for deck_extension_id in config.deck_extensions_ids_for_ah_did(ah_did):
+        config.remove_deck_extension(deck_extension_id)
+    LOGGER.info(f"Removed deck extensions for deck {ah_did}")
+
+    config.remove_deck(ah_did)
+    mids = ankihub_db.note_types_for_ankihub_deck(ah_did)
     undo_note_type_modfications(mids)
-    ankihub_db.remove_deck(deck_ankihub_id)
-    LOGGER.info(f"Uninstalled deck {deck_ankihub_id}")
+    ankihub_db.remove_deck(ah_did)
+    LOGGER.info(f"Uninstalled deck {ah_did}")
