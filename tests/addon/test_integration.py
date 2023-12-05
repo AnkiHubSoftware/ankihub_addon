@@ -4426,7 +4426,7 @@ class TestAHDBCheck:
             import_ah_note(ah_did=ah_did)
 
             # Remove deck from config
-            config.remove_deck(ah_did)
+            config.remove_deck_and_its_extensions(ah_did)
 
             # Mock dependencies for downloading and installing deck
             deck = DeckFactory.create(ah_did=ah_did)

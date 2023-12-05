@@ -272,8 +272,12 @@ class _Config:
         if self.subscriptions_change_hook:
             self.subscriptions_change_hook()
 
-    def remove_deck(self, ankihub_did: uuid.UUID) -> None:
-        """Remove deck from list of installed decks."""
+    def remove_deck_and_its_extensions(self, ankihub_did: uuid.UUID) -> None:
+        """Remove a deck. Also remove the deck extensions of the deck."""
+        for deck_extension_id in config.deck_extensions_ids_for_ah_did(ankihub_did):
+            config.remove_deck_extension(deck_extension_id)
+        LOGGER.info(f"Removed deck extensions for deck {ankihub_did}")
+
         if self._private_config.decks.get(ankihub_did):
             self._private_config.decks.pop(ankihub_did)
             self._update_private_config()
@@ -358,6 +362,7 @@ class _Config:
     def remove_deck_extension(self, extension_id: int) -> None:
         self._private_config.deck_extensions.pop(extension_id)
         self._update_private_config()
+        LOGGER.info(f"Removed deck extension {extension_id}")
 
     def is_logged_in(self) -> bool:
         return bool(self.token())
