@@ -81,7 +81,7 @@ def _is_api_version_on_last_sync_below_threshold(
     return api_version < version_threshold
 
 
-def _remove_orphaned_deck_extensions(private_config_dict: Dict):
+def _remove_orphaned_deck_extensions(private_config_dict: Dict) -> None:
     """Remove deck extension configs for which the corresponding deck isn't in the config anymore."""
     decks = private_config_dict["decks"]
     deck_extensions = private_config_dict["deck_extensions"]
