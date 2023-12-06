@@ -52,11 +52,12 @@ class OptionalTagsSuggestionDialog(QDialog):
         self.tag_group_list.setSelectionMode(
             QAbstractItemView.SelectionMode.ExtendedSelection
         )
+        qconnect(self.tag_group_list.itemSelectionChanged, self._on_selection_changed)
 
         self.submit_btn = QPushButton("Submit Suggestions")
         self.submit_btn.setDisabled(True)
-        self.btn_bar.addWidget(self.submit_btn)
         qconnect(self.submit_btn.clicked, self._on_submit)
+        self.btn_bar.addWidget(self.submit_btn)
 
         self.cancel_btn = QPushButton("Cancel")
         self.btn_bar.addWidget(self.cancel_btn)
@@ -75,6 +76,9 @@ class OptionalTagsSuggestionDialog(QDialog):
         self.hlayout.addWidget(self.tag_group_list)
         self.hlayout.addLayout(self.btn_bar)
         self.layout_.addWidget(self.auto_accept_cb)
+
+    def _on_selection_changed(self) -> None:
+        self.submit_btn.setDisabled(len(self.tag_group_list.selectedIndexes()) == 0)
 
     def _on_submit(self):
         selected_tag_groups = [
