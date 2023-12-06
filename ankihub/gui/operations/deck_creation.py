@@ -73,7 +73,7 @@ def _on_deck_selected(study_deck: StudyDeck) -> None:
         show_cancel_button=True,
     )
     if public is None:
-        return
+        return  # pragma: no cover
 
     private = public is False
 
@@ -88,7 +88,7 @@ def _on_deck_selected(study_deck: StudyDeck) -> None:
             show_cancel_button=True,
         )
         if add_subdeck_tags is None:
-            return
+            return  # pragma: no cover
 
     confirm = ask_user(
         "Uploading the deck to AnkiHub requires modifying notes and note types in "
@@ -97,7 +97,7 @@ def _on_deck_selected(study_deck: StudyDeck) -> None:
         show_cancel_button=True,
     )
     if not confirm:
-        return
+        return  # pragma: no cover
 
     should_upload_media = ask_user(
         "Do you want to upload media for this deck as well? "
@@ -107,7 +107,7 @@ def _on_deck_selected(study_deck: StudyDeck) -> None:
         show_cancel_button=True,
     )
     if should_upload_media is None:
-        return
+        return  # pragma: no cover
 
     def on_success(deck_creation_result: DeckCreationResult) -> None:
         # Upload all existing local media for this deck
