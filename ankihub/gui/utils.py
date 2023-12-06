@@ -221,7 +221,7 @@ def ask_user(
     parent: Optional[QWidget] = None,
     default_no: bool = False,
     title: str = "Anki",
-    show_cancel_button: bool = True,
+    show_cancel_button: bool = False,
     yes_button_label: str = "Yes",
     no_button_label: str = "No",
 ) -> Optional[bool]:
