@@ -255,7 +255,6 @@ class UserDeckExtensionRelation(Enum):
     SUBSCRIBER = "subscriber"
     OWNER = "owner"
     MAINTAINER = "maintainer"
-    NONE = None
 
 
 @dataclass
