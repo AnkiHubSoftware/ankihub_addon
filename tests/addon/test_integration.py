@@ -48,7 +48,10 @@ from pytestqt.qtbot import QtBot  # type: ignore
 from requests import Response  # type: ignore
 from requests_mock import Mocker
 
-from ankihub.ankihub_client.models import DeckMediaUpdateChunk
+from ankihub.ankihub_client.models import (
+    DeckMediaUpdateChunk,
+    UserDeckExtensionRelation,
+)
 from ankihub.gui import deckbrowser
 from ankihub.gui.browser.browser import (
     ModifiedAfterSyncSearchNode,
@@ -3231,6 +3234,7 @@ class TestDeckUpdater:
                         name=tag_group_name,
                         tag_group_name=tag_group_name,
                         description="",
+                        user_relation=UserDeckExtensionRelation.SUBSCRIBER,
                     )
                 ],
             )
@@ -3607,6 +3611,7 @@ def test_reset_optional_tags_action(
                 name="test99",
                 tag_group_name="test99",
                 description="",
+                user_relation=UserDeckExtensionRelation.SUBSCRIBER,
             )
         )
 
