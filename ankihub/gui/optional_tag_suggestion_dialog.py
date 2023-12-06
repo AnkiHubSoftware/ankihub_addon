@@ -53,7 +53,7 @@ class OptionalTagsSuggestionDialog(QDialog):
             QAbstractItemView.SelectionMode.ExtendedSelection
         )
 
-        self.submit_btn = QPushButton("Submit suggestions")
+        self.submit_btn = QPushButton("Submit Suggestions")
         self.submit_btn.setDisabled(True)
         self.btn_bar.addWidget(self.submit_btn)
         qconnect(self.submit_btn.clicked, self._on_submit)
