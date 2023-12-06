@@ -27,6 +27,7 @@ def confirm_and_toggle_subdecks(ankihub_id: uuid.UUID) -> None:
             "the AnkiHub docs</a> "
             "for details.",
             default_no=True,
+            show_cancel_button=True,
         ):
             return
 
@@ -42,7 +43,8 @@ def confirm_and_toggle_subdecks(ankihub_id: uuid.UUID) -> None:
             "<br><br>"
             "See <a href='https://docs.ankihub.net/user_docs/advanced.html#subdecks-and-subdeck-tags'>"
             "the AnkiHub docs</a> "
-            "for details."
+            "for details.",
+            show_cancel_button=True,
         ):
             return
 
