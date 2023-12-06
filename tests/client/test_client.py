@@ -48,7 +48,7 @@ from ankihub.ankihub_client import (
     get_media_names_from_notes_data,
     get_media_names_from_suggestion,
 )
-from ankihub.ankihub_client.models import CardReviewData
+from ankihub.ankihub_client.models import CardReviewData, UserDeckExtensionRelation
 from ankihub.gui.operations.deck_installation import _download_progress_cb
 
 WEBAPP_COMPOSE_FILE = (
@@ -1022,6 +1022,7 @@ def test_get_deck_extensions_by_deck_id(
             name="test100",
             tag_group_name="test100",
             description="",
+            user_relation=UserDeckExtensionRelation.OWNER,
         )
     ]
 
