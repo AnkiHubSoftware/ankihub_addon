@@ -106,8 +106,11 @@ from ankihub.debug import (
     _setup_logging_for_db_begin,
     _setup_logging_for_sync_collection_and_media,
 )
-from ankihub.gui import operations, utils
-from ankihub.gui.auto_sync import _setup_ankihub_sync_on_ankiweb_sync
+from ankihub.gui import auto_sync, operations, utils
+from ankihub.gui.auto_sync import (
+    SYNC_RATE_LIMIT_SECONDS,
+    _setup_ankihub_sync_on_ankiweb_sync,
+)
 from ankihub.gui.browser import custom_columns
 from ankihub.gui.browser.custom_search_nodes import UpdatedSinceLastReviewSearchNode
 from ankihub.gui.config_dialog import (
@@ -3470,6 +3473,41 @@ class TestAutoSync:
         self.check_and_install_new_deck_subscriptions_mock.side_effect = (
             lambda *args, **kwargs: kwargs["on_done"](future_with_result(None))
         )
+
+
+class TestAutoSyncRateLimit:
+    @pytest.mark.parametrize(
+        "delay_between_syncs_in_seconds, expected_call_count",
+        [
+            # When the delay is less than the rate limit, the sync should be called only once.
+            (0.0, 1),
+            # When the delay is higher than the rate limit, the sync should be called twice.
+            (SYNC_RATE_LIMIT_SECONDS + 0.1, 2),
+        ],
+    )
+    def test_rate_limit(
+        self,
+        anki_session_with_addon_data: AnkiSession,
+        mock_function: MockFunction,
+        qtbot: QtBot,
+        mock_ankihub_sync_dependencies,
+        delay_between_syncs_in_seconds: float,
+        expected_call_count: int,
+    ):
+        # Run the entry point so that the auto sync and rate limit is set up.
+        entry_point.run()
+        with anki_session_with_addon_data.profile_loaded():
+            sync_with_ankihub_mock = mock_function(auto_sync, "sync_with_ankihub")
+
+            # Trigger the sync two times, with a delay in between.
+            aqt.mw._sync_collection_and_media(lambda: None)
+            qtbot.wait(int(delay_between_syncs_in_seconds * 1000))
+            aqt.mw._sync_collection_and_media(lambda: None)
+
+            # Let the tasks run.
+            qtbot.wait(500)
+
+            assert sync_with_ankihub_mock.call_count == expected_call_count
 
 
 def test_optional_tag_suggestion_dialog(

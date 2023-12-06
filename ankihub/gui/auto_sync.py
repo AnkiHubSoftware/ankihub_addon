@@ -14,6 +14,9 @@ from .operations.ankihub_sync import sync_with_ankihub
 from .operations.utils import future_with_exception, future_with_result
 from .threading_utils import rate_limited
 
+# Rate limit to one sync every x seconds to prevent syncs running in parallel and causing problems.
+SYNC_RATE_LIMIT_SECONDS = 2
+
 
 @dataclass
 class _AutoSyncState:
@@ -54,7 +57,7 @@ def _rate_limit_syncing() -> None:
     )
 
 
-@rate_limited(2, "after_sync")
+@rate_limited(SYNC_RATE_LIMIT_SECONDS, "after_sync")
 def _rate_limited(*args, **kwargs) -> None:
     """Wrapper for AnkiQt._sync_collection_and_media that is rate limited to one call every x seconds.
     The `after_sync` callable passed to the _sync_collection_and_media function is called immediately
