@@ -19,6 +19,7 @@ from aqt.qt import (
 from aqt.utils import showInfo, tooltip
 
 from .. import LOGGER
+from ..addon_ankihub_client import AddonAnkiHubClient as AnkiHubClient
 from ..ankihub_client import AnkiHubHTTPError
 from ..ankihub_client.models import TagGroupValidationResponse
 from ..main.optional_tag_suggestions import OptionalTagsSuggestionHelper
@@ -32,6 +33,7 @@ class OptionalTagsSuggestionDialog(QDialog):
         self._parent = parent
         self.nids = nids
 
+        self._client = AnkiHubClient()
         self._optional_tags_helper = OptionalTagsSuggestionHelper(list(self.nids))
         self._valid_tag_groups: Sequence[str] = []
         self._setup_ui()
@@ -62,10 +64,10 @@ class OptionalTagsSuggestionDialog(QDialog):
 
         self.btn_bar.addStretch(1)
 
-        self.auto_accept_cb = QCheckBox("Submit without review (maintainers only)")
+        self.auto_accept_cb = QCheckBox("Submit without review")
         self.auto_accept_cb.setToolTip(
             "If checked, the suggestions will be automatically accepted. "
-            "This won't work if you are not a deck maintainer."
+            "This option is only available for maintainers of the deck."
         )
 
         self.setLayout(self.layout_)
