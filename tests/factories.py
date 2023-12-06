@@ -87,7 +87,7 @@ class DeckExtensionFactory(BaseFactory[DeckExtension]):
 
     id: int = factory.Sequence(lambda n: n)  # type: ignore
     ah_did: uuid.UUID
-    owner_id: int = fake.random_int()
-    name: str = fake.word()
-    tag_group_name: str = fake.word()
-    description: str = fake.sentence()
+    owner_id: int = factory.LazyAttribute(lambda _: fake.random_int())  # type: ignore
+    name: str = factory.LazyAttribute(lambda _: fake.word())  # type: ignore
+    tag_group_name: str = factory.LazyAttribute(lambda _: fake.word())  # type: ignore
+    description: str = factory.LazyAttribute(lambda _: fake.sentence())  # type: ignore
