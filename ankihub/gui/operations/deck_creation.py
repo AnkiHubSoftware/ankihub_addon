@@ -69,10 +69,11 @@ def _on_deck_selected(study_deck: StudyDeck) -> None:
     public = ask_user(
         "Would you like to make this deck public?<br><br>"
         'If you chose "No" it will be private and only people with a link '
-        "will be able to see it on the AnkiHub website."
+        "will be able to see it on the AnkiHub website.",
+        show_cancel_button=True,
     )
     if public is None:
-        return
+        return  # pragma: no cover
 
     private = public is False
 
@@ -83,28 +84,32 @@ def _on_deck_selected(study_deck: StudyDeck) -> None:
             "For example, if you have a deck named <b>My Deck</b> with a subdeck named <b>My Deck::Subdeck</b>, "
             "each note in <b>My Deck::Subdeck</b> will have a tag "
             f"<b>{SUBDECK_TAG}::Subdeck</b> added to it.<br><br>"
-            "This allows subscribers to have the same subdeck structure as you have."
+            "This allows subscribers to have the same subdeck structure as you have.",
+            show_cancel_button=True,
         )
         if add_subdeck_tags is None:
-            return
+            return  # pragma: no cover
 
     confirm = ask_user(
         "Uploading the deck to AnkiHub requires modifying notes and note types in "
         f"<b>{deck_name}</b> and will require a full sync afterwards. Would you like to "
         "continue?",
+        show_cancel_button=True,
     )
     if not confirm:
-        return
+        return  # pragma: no cover
 
     should_upload_media = ask_user(
         "Do you want to upload media for this deck as well? "
         "This will take some extra time but it is required to display images "
         "on AnkiHub and this way subscribers will be able to download media files "
-        "when installing the deck. "
+        "when installing the deck. ",
+        show_cancel_button=True,
     )
+    if should_upload_media is None:
+        return  # pragma: no cover
 
     def on_success(deck_creation_result: DeckCreationResult) -> None:
-
         # Upload all existing local media for this deck
         # (media files that are referenced on Deck's notes)
         if should_upload_media:
