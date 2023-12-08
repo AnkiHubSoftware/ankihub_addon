@@ -2194,7 +2194,7 @@ from ..factories import DeckExtensionFactory
 
 
 class TestOptionalTagSuggestionDialog:
-    def test_foo(
+    def test_submit_tags_for_validated_groups(
         self,
         anki_session_with_addon_data: AnkiSession,
         qtbot: QtBot,
@@ -2223,11 +2223,15 @@ class TestOptionalTagSuggestionDialog:
                     user_relation=UserDeckExtensionRelation.OWNER,
                 ),
             ]
+
+            # Add the deck extensions to the config
+            for deck_extension in deck_extensions:
+                config.create_or_update_deck_extension_config(deck_extension)
+
+            # Mock client methods
             index_of_invalid_tag_group = 0
             validation_responses = []
             for i, deck_extension in enumerate(deck_extensions):
-                config.create_or_update_deck_extension_config(deck_extension)
-
                 validation_reponse = TagGroupValidationResponse(
                     tag_group_name=deck_extension.tag_group_name,
                     success=i != index_of_invalid_tag_group,
@@ -2236,17 +2240,14 @@ class TestOptionalTagSuggestionDialog:
                 )
                 validation_responses.append(validation_reponse)
 
-            # Mock client methods
             get_deck_extensions_mock = mock_function(
-                AnkiHubClient,
-                "get_deck_extensions",
+                "ankihub.gui.optional_tag_suggestion_dialog.AnkiHubClient.get_deck_extensions",
                 return_value=deck_extensions,
             )
 
             prevalidate_tag_groups_mock = mock_function(
-                AnkiHubClient,
-                "prevalidate_tag_groups",
-                return_value=validation_responses,
+                "ankihub.main.optional_tag_suggestions.AnkiHubClient.prevalidate_tag_groups",
+                return_value=[validation_reponse],
             )
 
             widget = QWidget()
@@ -2275,3 +2276,59 @@ class TestOptionalTagSuggestionDialog:
                 [deck_extensions[1].tag_group_name, deck_extensions[2].tag_group_name]
             )
             assert not kwargs["auto_accept"]
+
+    @pytest.mark.parametrize(
+        "user_relation, expected_checkbox_is_visible",
+        [
+            (UserDeckExtensionRelation.OWNER, True),
+            (UserDeckExtensionRelation.MAINTAINER, True),
+            (UserDeckExtensionRelation.SUBSCRIBER, False),
+        ],
+    )
+    def test_submit_without_review_checkbox_hidden_when_user_cant_use_it(
+        self,
+        anki_session_with_addon_data: AnkiSession,
+        qtbot: QtBot,
+        install_ah_deck: InstallAHDeck,
+        import_ah_note: ImportAHNote,
+        mock_function: MockFunction,
+        user_relation: UserDeckExtensionRelation,
+        expected_checkbox_is_visible: bool,
+    ):
+        with anki_session_with_addon_data.profile_loaded():
+            ah_did = install_ah_deck()
+            note_info = import_ah_note(ah_did=ah_did)
+
+            deck_extension = DeckExtensionFactory.create(
+                ah_did=ah_did,
+                tag_group_name="tag_group_1",
+                user_relation=user_relation,
+            )
+            config.create_or_update_deck_extension_config(deck_extension)
+
+            validation_reponse = TagGroupValidationResponse(
+                tag_group_name=deck_extension.tag_group_name,
+                success=True,
+                errors=[],
+                deck_extension_id=deck_extension.id,
+            )
+
+            mock_function(
+                "ankihub.gui.optional_tag_suggestion_dialog.AnkiHubClient.get_deck_extensions",
+                return_value=[deck_extension],
+            )
+
+            mock_function(
+                "ankihub.main.optional_tag_suggestions.AnkiHubClient.prevalidate_tag_groups",
+                return_value=[validation_reponse],
+            )
+
+            widget = QWidget()
+            qtbot.addWidget(widget)
+            dialog = OptionalTagsSuggestionDialog(
+                parent=widget, nids=[NoteId(note_info.anki_nid)]
+            )
+
+            dialog.show()
+
+            assert dialog.auto_accept_cb.isVisible() == expected_checkbox_is_visible
