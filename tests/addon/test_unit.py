@@ -2237,7 +2237,7 @@ class TestOptionalTagSuggestionDialog:
                 validation_responses.append(validation_reponse)
 
             # Mock client methods
-            mock_function(
+            get_deck_extensions_mock = mock_function(
                 AnkiHubClient,
                 "get_deck_extensions",
                 return_value=deck_extensions,
@@ -2266,6 +2266,7 @@ class TestOptionalTagSuggestionDialog:
 
             qtbot.wait_until(lambda: suggest_tags_for_groups_mock.called)
 
+            get_deck_extensions_mock.assert_called_once()
             prevalidate_tag_groups_mock.assert_called_once()
 
             # Assert that suggest_tags_for_groups is called for the groups which were validated successfully
