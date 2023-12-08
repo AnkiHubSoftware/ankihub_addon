@@ -1738,7 +1738,7 @@ class TestCreateCollaborativeDeck:
 
             mock_ui_for_create_collaborative_deck(deck_name)
 
-            mock_function(AnkiHubClient, "get_owned_decks", [])
+            mock_function(AnkiHubClient, "get_owned_decks", return_value=[])
 
             def raise_exception(*args, **kwargs) -> None:
                 raise Exception("test")
@@ -2246,7 +2246,7 @@ class TestOptionalTagSuggestionDialog:
 
             prevalidate_tag_groups_mock = mock_function(
                 "ankihub.main.optional_tag_suggestions.AnkiHubClient.prevalidate_tag_groups",
-                return_value=[validation_reponse],
+                return_value=validation_responses,
             )
 
             widget = QWidget()
