@@ -2209,17 +2209,14 @@ class TestOptionalTagSuggestionDialog:
                 DeckExtensionFactory.create(
                     ah_did=ah_did,
                     tag_group_name="tag_group_1",
-                    user_relation=UserDeckExtensionRelation.SUBSCRIBER,
                 ),
                 DeckExtensionFactory.create(
                     ah_did=ah_did,
                     tag_group_name="tag_group_2",
-                    user_relation=UserDeckExtensionRelation.MAINTAINER,
                 ),
                 DeckExtensionFactory.create(
                     ah_did=ah_did,
                     tag_group_name="tag_group_3",
-                    user_relation=UserDeckExtensionRelation.OWNER,
                 ),
             ]
 
