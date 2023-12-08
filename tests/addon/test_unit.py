@@ -27,7 +27,12 @@ from ankihub.ankihub_client.models import (  # type: ignore
     UserDeckExtensionRelation,
 )
 
-from ..factories import DeckFactory, DeckMediaFactory, NoteInfoFactory
+from ..factories import (
+    DeckExtensionFactory,
+    DeckFactory,
+    DeckMediaFactory,
+    NoteInfoFactory,
+)
 from ..fixtures import (  # type: ignore
     ImportAHNoteType,
     InstallAHDeck,
@@ -52,6 +57,7 @@ from ankihub.ankihub_client import (
     AnkiHubHTTPError,
     Field,
     SuggestionType,
+    TagGroupValidationResponse,
 )
 from ankihub.db import attached_ankihub_db
 from ankihub.db.db import _AnkiHubDB
@@ -74,6 +80,7 @@ from ankihub.gui.operations.deck_creation import (
     create_collaborative_deck,
 )
 from ankihub.gui.operations.utils import future_with_exception, future_with_result
+from ankihub.gui.optional_tag_suggestion_dialog import OptionalTagsSuggestionDialog
 from ankihub.gui.suggestion_dialog import (
     SourceType,
     SuggestionDialog,
@@ -116,7 +123,7 @@ from ankihub.main.utils import (
     mids_of_notes,
     retain_nids_with_ah_note_type,
 )
-from ankihub.settings import ANKIWEB_ID, log_file_path
+from ankihub.settings import ANKIWEB_ID, config, log_file_path
 
 
 @pytest.fixture
@@ -2183,14 +2190,6 @@ class TestShowDialog:
         qtbot.keyClick(dialog, Qt.Key.Key_Enter)
 
         assert button_index_from_cb == default_button_idx
-
-
-# TODO Remove this or create a proper test
-from ankihub.ankihub_client import TagGroupValidationResponse
-from ankihub.gui.optional_tag_suggestion_dialog import OptionalTagsSuggestionDialog
-from ankihub.settings import config
-
-from ..factories import DeckExtensionFactory
 
 
 class TestOptionalTagSuggestionDialog:
