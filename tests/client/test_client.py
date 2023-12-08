@@ -1008,6 +1008,25 @@ class TestGetDeckMediaUpdates:
 
 
 @pytest.mark.vcr()
+def test_get_deck_extensions(
+    authorized_client_for_user_test1: AnkiHubClient,
+):
+    client = authorized_client_for_user_test1
+
+    response = client.get_deck_extensions()
+    assert response == [
+        DeckExtension(
+            id=999,
+            owner_id=1,
+            ah_did=DECK_WITH_EXTENSION_UUID,
+            name="test100",
+            tag_group_name="test100",
+            description="",
+        )
+    ]
+
+
+@pytest.mark.vcr()
 def test_get_deck_extensions_by_deck_id(
     authorized_client_for_user_test1: AnkiHubClient,
 ):

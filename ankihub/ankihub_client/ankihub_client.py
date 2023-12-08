@@ -959,6 +959,16 @@ class AnkiHubClient:
         }
         return result
 
+    def get_deck_extensions(self) -> List[DeckExtension]:
+        response = self._send_request("GET", API.ANKIHUB, "/users/deck_extensions")
+        if response.status_code != 200:
+            raise AnkiHubHTTPError(response)
+
+        data = response.json()
+        extension_dicts = data.get("deck_extensions", [])
+        result = [DeckExtension.from_dict(d) for d in extension_dicts]
+        return result
+
     def get_deck_extensions_by_deck_id(self, deck_id: uuid.UUID) -> List[DeckExtension]:
         response = self._send_request(
             "GET", API.ANKIHUB, "/users/deck_extensions", params={"deck_id": deck_id}
