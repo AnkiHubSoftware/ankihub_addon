@@ -2239,14 +2239,14 @@ class TestOptionalTagSuggestionDialog:
             # Mock client methods
             mock_function(
                 AnkiHubClient,
-                "prevalidate_tag_groups",
-                return_value=validation_responses,
-            )
-
-            mock_function(
-                AnkiHubClient,
                 "get_deck_extensions",
                 return_value=deck_extensions,
+            )
+
+            prevalidate_tag_groups_mock = mock_function(
+                AnkiHubClient,
+                "prevalidate_tag_groups",
+                return_value=validation_responses,
             )
 
             widget = QWidget()
@@ -2254,16 +2254,21 @@ class TestOptionalTagSuggestionDialog:
             dialog = OptionalTagsSuggestionDialog(
                 parent=widget, nids=[NoteId(note_info.anki_nid)]
             )
-            dialog.show()
 
+            # Mock the suggest_tags_for_groups method which is called when the submit button is clicked
             suggest_tags_for_groups_mock = mock_function(
                 dialog._optional_tags_helper, "suggest_tags_for_groups"
             )
+
+            dialog.show()
 
             qtbot.mouseClick(dialog.submit_btn, Qt.MouseButton.LeftButton)
 
             qtbot.wait_until(lambda: suggest_tags_for_groups_mock.called)
 
+            prevalidate_tag_groups_mock.assert_called_once()
+
+            # Assert that suggest_tags_for_groups is called for the groups which were validated successfully
             kwargs = suggest_tags_for_groups_mock.call_args.kwargs
             assert set(kwargs["tag_groups"]) == set(
                 [deck_extensions[1].tag_group_name, deck_extensions[2].tag_group_name]
