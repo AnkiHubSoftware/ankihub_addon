@@ -1022,6 +1022,7 @@ def test_get_deck_extensions(
             name="test100",
             tag_group_name="test100",
             description="",
+            user_relation=UserDeckExtensionRelation.OWNER,
         )
     ]
 
