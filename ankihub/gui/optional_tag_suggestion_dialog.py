@@ -103,7 +103,7 @@ class OptionalTagsSuggestionDialog(QDialog):
             if deck_extension.tag_group_name in selected_tag_groups
         ]
 
-        can_submit_without_review = all(
+        can_submit_without_review = selected_deck_extensions and all(
             deck_extension.user_relation
             in [UserDeckExtensionRelation.OWNER, UserDeckExtensionRelation.MAINTAINER]
             for deck_extension in selected_deck_extensions
