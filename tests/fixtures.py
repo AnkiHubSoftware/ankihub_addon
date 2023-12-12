@@ -139,8 +139,7 @@ def mock_all_feature_flags_to_default_values(
 class MockFunction(Protocol):
     def __call__(
         self,
-        target_object: Any,
-        target_function_name: str,
+        *args,
         return_value: Optional[Any] = None,
         side_effect: Optional[Callable] = None,
     ) -> Mock:
@@ -152,16 +151,16 @@ def mock_function(
     monkeypatch: MonkeyPatch,
 ) -> MockFunction:
     def _mock_function(
-        target_object: Any,
-        target_function_name: str,
+        *args,
         return_value: Optional[Any] = None,
         side_effect: Optional[Callable] = None,
     ) -> Mock:
+        # The args can be either an object and a function name or the full path to the function as a string.
+        assert len(args) in [1, 2]
         mock = Mock()
         mock.return_value = return_value
-        monkeypatch.setattr(
-            target_object,
-            target_function_name,
+        monkeypatch.setattr(  # type: ignore
+            *args,
             mock,
         )
         mock.side_effect = side_effect

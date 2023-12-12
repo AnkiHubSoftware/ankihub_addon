@@ -22,9 +22,17 @@ from pytest_anki import AnkiSession
 from pytestqt.qtbot import QtBot  # type: ignore
 from requests import Response
 
-from ankihub.ankihub_client.models import CardReviewData  # type: ignore
+from ankihub.ankihub_client.models import (  # type: ignore
+    CardReviewData,
+    UserDeckExtensionRelation,
+)
 
-from ..factories import DeckFactory, DeckMediaFactory, NoteInfoFactory
+from ..factories import (
+    DeckExtensionFactory,
+    DeckFactory,
+    DeckMediaFactory,
+    NoteInfoFactory,
+)
 from ..fixtures import (  # type: ignore
     ImportAHNoteType,
     InstallAHDeck,
@@ -49,6 +57,7 @@ from ankihub.ankihub_client import (
     AnkiHubHTTPError,
     Field,
     SuggestionType,
+    TagGroupValidationResponse,
 )
 from ankihub.db import attached_ankihub_db
 from ankihub.db.db import _AnkiHubDB
@@ -71,6 +80,7 @@ from ankihub.gui.operations.deck_creation import (
     create_collaborative_deck,
 )
 from ankihub.gui.operations.utils import future_with_exception, future_with_result
+from ankihub.gui.optional_tag_suggestion_dialog import OptionalTagsSuggestionDialog
 from ankihub.gui.suggestion_dialog import (
     SourceType,
     SuggestionDialog,
@@ -113,7 +123,7 @@ from ankihub.main.utils import (
     mids_of_notes,
     retain_nids_with_ah_note_type,
 )
-from ankihub.settings import ANKIWEB_ID, log_file_path
+from ankihub.settings import ANKIWEB_ID, config, log_file_path
 
 
 @pytest.fixture
@@ -1728,7 +1738,7 @@ class TestCreateCollaborativeDeck:
 
             mock_ui_for_create_collaborative_deck(deck_name)
 
-            mock_function(AnkiHubClient, "get_owned_decks", [])
+            mock_function(AnkiHubClient, "get_owned_decks", return_value=[])
 
             def raise_exception(*args, **kwargs) -> None:
                 raise Exception("test")
@@ -2180,3 +2190,141 @@ class TestShowDialog:
         qtbot.keyClick(dialog, Qt.Key.Key_Enter)
 
         assert button_index_from_cb == default_button_idx
+
+
+class TestOptionalTagSuggestionDialog:
+    def test_submit_tags_for_validated_groups(
+        self,
+        anki_session_with_addon_data: AnkiSession,
+        qtbot: QtBot,
+        install_ah_deck: InstallAHDeck,
+        import_ah_note: ImportAHNote,
+        mock_function: MockFunction,
+    ):
+        with anki_session_with_addon_data.profile_loaded():
+            ah_did = install_ah_deck()
+            note_info = import_ah_note(ah_did=ah_did)
+
+            deck_extensions = [
+                DeckExtensionFactory.create(
+                    ah_did=ah_did,
+                    tag_group_name="tag_group_1",
+                ),
+                DeckExtensionFactory.create(
+                    ah_did=ah_did,
+                    tag_group_name="tag_group_2",
+                ),
+                DeckExtensionFactory.create(
+                    ah_did=ah_did,
+                    tag_group_name="tag_group_3",
+                ),
+            ]
+
+            # Add the deck extensions to the config
+            for deck_extension in deck_extensions:
+                config.create_or_update_deck_extension_config(deck_extension)
+
+            # Mock client methods
+            index_of_invalid_tag_group = 0
+            validation_responses = []
+            for i, deck_extension in enumerate(deck_extensions):
+                validation_reponse = TagGroupValidationResponse(
+                    tag_group_name=deck_extension.tag_group_name,
+                    success=i != index_of_invalid_tag_group,
+                    errors=[],
+                    deck_extension_id=deck_extension.id,
+                )
+                validation_responses.append(validation_reponse)
+
+            get_deck_extensions_mock = mock_function(
+                "ankihub.gui.optional_tag_suggestion_dialog.AnkiHubClient.get_deck_extensions",
+                return_value=deck_extensions,
+            )
+
+            prevalidate_tag_groups_mock = mock_function(
+                "ankihub.main.optional_tag_suggestions.AnkiHubClient.prevalidate_tag_groups",
+                return_value=validation_responses,
+            )
+
+            widget = QWidget()
+            qtbot.addWidget(widget)
+            dialog = OptionalTagsSuggestionDialog(
+                parent=widget, nids=[NoteId(note_info.anki_nid)]
+            )
+
+            # Mock the suggest_tags_for_groups method which is called when the submit button is clicked
+            suggest_tags_for_groups_mock = mock_function(
+                dialog._optional_tags_helper, "suggest_tags_for_groups"
+            )
+
+            dialog.show()
+
+            qtbot.mouseClick(dialog.submit_btn, Qt.MouseButton.LeftButton)
+
+            qtbot.wait_until(lambda: suggest_tags_for_groups_mock.called)
+
+            get_deck_extensions_mock.assert_called_once()
+            prevalidate_tag_groups_mock.assert_called_once()
+
+            # Assert that suggest_tags_for_groups is called for the groups which were validated successfully
+            kwargs = suggest_tags_for_groups_mock.call_args.kwargs
+            assert set(kwargs["tag_groups"]) == set(
+                [deck_extensions[1].tag_group_name, deck_extensions[2].tag_group_name]
+            )
+            assert not kwargs["auto_accept"]
+
+    @pytest.mark.parametrize(
+        "user_relation, expected_checkbox_is_visible",
+        [
+            (UserDeckExtensionRelation.OWNER, True),
+            (UserDeckExtensionRelation.MAINTAINER, True),
+            (UserDeckExtensionRelation.SUBSCRIBER, False),
+        ],
+    )
+    def test_submit_without_review_checkbox_hidden_when_user_cant_use_it(
+        self,
+        anki_session_with_addon_data: AnkiSession,
+        qtbot: QtBot,
+        install_ah_deck: InstallAHDeck,
+        import_ah_note: ImportAHNote,
+        mock_function: MockFunction,
+        user_relation: UserDeckExtensionRelation,
+        expected_checkbox_is_visible: bool,
+    ):
+        with anki_session_with_addon_data.profile_loaded():
+            ah_did = install_ah_deck()
+            note_info = import_ah_note(ah_did=ah_did)
+
+            deck_extension = DeckExtensionFactory.create(
+                ah_did=ah_did,
+                tag_group_name="tag_group_1",
+                user_relation=user_relation,
+            )
+            config.create_or_update_deck_extension_config(deck_extension)
+
+            validation_reponse = TagGroupValidationResponse(
+                tag_group_name=deck_extension.tag_group_name,
+                success=True,
+                errors=[],
+                deck_extension_id=deck_extension.id,
+            )
+
+            mock_function(
+                "ankihub.gui.optional_tag_suggestion_dialog.AnkiHubClient.get_deck_extensions",
+                return_value=[deck_extension],
+            )
+
+            mock_function(
+                "ankihub.main.optional_tag_suggestions.AnkiHubClient.prevalidate_tag_groups",
+                return_value=[validation_reponse],
+            )
+
+            widget = QWidget()
+            qtbot.addWidget(widget)
+            dialog = OptionalTagsSuggestionDialog(
+                parent=widget, nids=[NoteId(note_info.anki_nid)]
+            )
+
+            dialog.show()
+
+            assert dialog.auto_accept_cb.isVisible() == expected_checkbox_is_visible
