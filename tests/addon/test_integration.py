@@ -3520,6 +3520,7 @@ def test_optional_tag_suggestion_dialog(
     monkeypatch: MonkeyPatch,
     import_ah_note: ImportAHNote,
     next_deterministic_uuid,
+    mock_function: MockFunction,
 ):
     anki_session = anki_session_with_addon_data
 
@@ -3550,7 +3551,12 @@ def test_optional_tag_suggestion_dialog(
         notes[2].tags = []
         notes[2].flush()
 
-        # Patch the client's prevaliate_tag_groups function to return validation results
+        # Mock client methods
+        mock_function(
+            "ankihub.gui.optional_tag_suggestion_dialog.AnkiHubClient.get_deck_extensions",
+            return_value=[],
+        )
+
         monkeypatch.setattr(
             "ankihub.ankihub_client.AnkiHubClient.prevalidate_tag_groups",
             lambda *args, **kwargs: [
