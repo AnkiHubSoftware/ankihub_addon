@@ -3313,6 +3313,7 @@ class TestDeckUpdater:
             config.update_deck(deck)
 
             # Mock client.get_deck_by_id to return the deck with the incoming relation
+            deck = copy.deepcopy(deck)
             deck.user_relation = incoming_relation
             mock_function(
                 "ankihub.gui.deck_updater.AnkiHubClient.get_deck_by_id",
