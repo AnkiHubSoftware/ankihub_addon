@@ -534,6 +534,7 @@ class TestSuggestionDialog:
             is_for_anking_deck=is_for_anking_deck,
             is_new_note_suggestion=is_new_note_suggestion,
             added_new_media=media_was_added,
+            can_submit_without_review=True,
         )
         dialog.show()
 
@@ -727,13 +728,13 @@ class TestOpenSuggestionDialogForSingleSuggestion:
         self,
         anki_session_with_addon_data: AnkiSession,
         import_ah_note: ImportAHNote,
-        next_deterministic_uuid: Callable[[], uuid.UUID],
         mock_dependiencies_for_suggestion_dialog: MockDependenciesForSuggestionDialog,
         user_cancels: bool,
         suggest_note_update_succeeds: bool,
+        install_ah_deck: InstallAHDeck,
     ):
         with anki_session_with_addon_data.profile_loaded():
-            ah_did = next_deterministic_uuid()
+            ah_did = install_ah_deck()
             note_info = import_ah_note(ah_did=ah_did)
             note = aqt.mw.col.get_note(NoteId(note_info.anki_nid))
 
@@ -765,19 +766,19 @@ class TestOpenSuggestionDialogForSingleSuggestion:
     def test_with_new_note_which_could_belong_to_two_decks(
         self,
         anki_session_with_addon_data: AnkiSession,
+        install_ah_deck: InstallAHDeck,
         import_ah_note_type: ImportAHNoteType,
         new_note_with_note_type: NewNoteWithNoteType,
-        next_deterministic_uuid: Callable[[], uuid.UUID],
         mock_dependiencies_for_suggestion_dialog: MockDependenciesForSuggestionDialog,
         mock_function: MockFunction,
         user_cancels: bool,
     ):
         with anki_session_with_addon_data.profile_loaded():
-            ah_did_1 = next_deterministic_uuid()
+            ah_did_1 = install_ah_deck()
             note_type = import_ah_note_type(ah_did=ah_did_1)
 
             # Add the note type to a second deck
-            ah_did_2 = next_deterministic_uuid()
+            ah_did_2 = install_ah_deck()
             import_ah_note_type(ah_did=ah_did_2, note_type=note_type)
 
             note = new_note_with_note_type(note_type=note_type)
@@ -861,14 +862,14 @@ class TestOpenSuggestionDialogForBulkSuggestion:
     def test_with_existing_note_belonging_to_single_deck(
         self,
         anki_session_with_addon_data: AnkiSession,
+        install_ah_deck: InstallAHDeck,
         import_ah_note: ImportAHNote,
-        next_deterministic_uuid: Callable[[], uuid.UUID],
         qtbot: QtBot,
         mock_dependencies_for_bulk_suggestion_dialog: MockDependenciesForBulkSuggestionDialog,
         user_cancels: bool,
     ):
         with anki_session_with_addon_data.profile_loaded():
-            ah_did = next_deterministic_uuid()
+            ah_did = install_ah_deck()
             note_info = import_ah_note(ah_did=ah_did)
             nids = [NoteId(note_info.anki_nid)]
 
@@ -890,18 +891,18 @@ class TestOpenSuggestionDialogForBulkSuggestion:
     def test_with_two_new_notes_without_decks_in_common(
         self,
         anki_session_with_addon_data: AnkiSession,
+        install_ah_deck: InstallAHDeck,
         import_ah_note_type: ImportAHNoteType,
         new_note_with_note_type: NewNoteWithNoteType,
-        next_deterministic_uuid: Callable[[], uuid.UUID],
         mock_dependencies_for_bulk_suggestion_dialog: MockDependenciesForBulkSuggestionDialog,
         qtbot: QtBot,
     ):
         with anki_session_with_addon_data.profile_loaded():
-            ah_did_1 = next_deterministic_uuid()
-            note_type_1 = import_ah_note_type(ah_did=ah_did_1)
+            ah_did_1 = install_ah_deck()
+            note_type_1 = import_ah_note_type(ah_did=ah_did_1, force_new=True)
             note_1 = new_note_with_note_type(note_type=note_type_1)
 
-            ah_did_2 = next_deterministic_uuid()
+            ah_did_2 = install_ah_deck()
             note_type_2 = import_ah_note_type(ah_did=ah_did_2, force_new=True)
             note_2 = new_note_with_note_type(note_type=note_type_2)
 
@@ -920,19 +921,19 @@ class TestOpenSuggestionDialogForBulkSuggestion:
     def test_with_two_new_notes_with_decks_in_common(
         self,
         anki_session_with_addon_data: AnkiSession,
+        install_ah_deck: InstallAHDeck,
         import_ah_note_type: ImportAHNoteType,
         new_note_with_note_type: NewNoteWithNoteType,
-        next_deterministic_uuid: Callable[[], uuid.UUID],
         mock_dependencies_for_bulk_suggestion_dialog: MockDependenciesForBulkSuggestionDialog,
         mock_function: MockFunction,
         qtbot: QtBot,
     ):
         with anki_session_with_addon_data.profile_loaded():
-            ah_did_1 = next_deterministic_uuid()
+            ah_did_1 = install_ah_deck()
             note_type = import_ah_note_type(ah_did=ah_did_1)
             note_1 = new_note_with_note_type(note_type=note_type)
 
-            ah_did_2 = next_deterministic_uuid()
+            ah_did_2 = install_ah_deck()
             import_ah_note_type(ah_did=ah_did_2, note_type=note_type)
             note_2 = new_note_with_note_type(note_type=note_type)
 

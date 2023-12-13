@@ -368,7 +368,7 @@ def import_ah_note_type(
         force_new: bool = False,
     ) -> NotetypeDict:
         if note_type is None:
-            note_type = default_note_type
+            note_type = copy.deepcopy(default_note_type)
         if ah_did is None:
             ah_did = default_ah_did
 
