@@ -37,7 +37,7 @@ from .ankihub_client import (
     STAGING_S3_BUCKET_URL,
     DeckExtension,
 )
-from .ankihub_client.models import UserDeckRelation
+from .ankihub_client.models import Deck, UserDeckRelation
 from .private_config_migrations import migrate_private_config
 from .public_config_migrations import migrate_public_config
 
@@ -271,6 +271,16 @@ class _Config:
 
         if self.subscriptions_change_hook:
             self.subscriptions_change_hook()
+
+    def update_deck(self, deck: Deck):
+        """Update the deck config with the values from the Deck object."""
+        deck_config = self.deck_config(deck.ah_did)
+
+        # Only these fields are needed for the deck config
+        deck_config.name = deck.name
+        deck_config.user_relation = deck.user_relation
+
+        self._update_private_config()
 
     def remove_deck(self, ankihub_did: uuid.UUID) -> None:
         """Remove deck from list of installed decks."""

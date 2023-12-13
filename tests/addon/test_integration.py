@@ -62,7 +62,12 @@ from ankihub.gui.browser.browser import (
     _on_reset_optional_tags_action,
 )
 
-from ..factories import DeckFactory, DeckMediaFactory, NoteInfoFactory
+from ..factories import (
+    DeckExtensionFactory,
+    DeckFactory,
+    DeckMediaFactory,
+    NoteInfoFactory,
+)
 from ..fixtures import (
     ImportAHNote,
     InstallAHDeck,
@@ -3125,8 +3130,8 @@ class TestDeckUpdater:
         self,
         anki_session_with_addon_data: AnkiSession,
         install_sample_ah_deck: InstallSampleAHDeck,
+        mock_function: MockFunction,
         mock_ankihub_sync_dependencies: None,
-        monkeypatch: MonkeyPatch,
     ):
         with anki_session_with_addon_data.profile_loaded():
             # Install a deck to be updated
@@ -3137,9 +3142,9 @@ class TestDeckUpdater:
             note_info.fields[0].value = "changed"
 
             latest_update = datetime.now()
-            monkeypatch.setattr(
+            mock_function(
                 "ankihub.gui.deck_updater.AnkiHubClient.get_deck_updates",
-                lambda *args, **kwargs: [
+                return_value=[
                     DeckUpdateChunk(
                         latest_update=latest_update,
                         protected_fields={},
@@ -3147,6 +3152,11 @@ class TestDeckUpdater:
                         notes=[note_info],
                     )
                 ],
+            )
+
+            mock_function(
+                "ankihub.gui.deck_updater.AnkiHubClient.get_deck_by_id",
+                return_value=DeckFactory.create(ah_did=ah_did),
             )
 
             # Use the deck updater to update the deck
@@ -3208,10 +3218,10 @@ class TestDeckUpdater:
         anki_session_with_addon_data: AnkiSession,
         install_ah_deck: InstallAHDeck,
         import_ah_note: ImportAHNote,
-        monkeypatch: MonkeyPatch,
         initial_tags: List[str],
         incoming_optional_tags: List[str],
         expected_tags: List[str],
+        mock_function: MockFunction,
         mock_ankihub_sync_dependencies: None,
     ):
         with anki_session_with_addon_data.profile_loaded():
@@ -3224,26 +3234,24 @@ class TestDeckUpdater:
             aqt.mw.col.update_note(note)
 
             # Mock client to return a deck extension update with incoming_optional_tags
-            deck_extension_id = 1
-            tag_group_name = "tag_group"
             latest_update = datetime.now()
-            monkeypatch.setattr(
-                "ankihub.gui.deck_updater.AnkiHubClient.get_deck_extensions_by_deck_id",
-                lambda *args, **kwargs: [
-                    DeckExtension(
-                        id=deck_extension_id,
-                        owner_id=1,
-                        ah_did=ah_did,
-                        name=tag_group_name,
-                        tag_group_name=tag_group_name,
-                        description="",
-                        user_relation=UserDeckExtensionRelation.SUBSCRIBER,
-                    )
-                ],
+
+            mock_function(
+                "ankihub.gui.deck_updater.AnkiHubClient.get_deck_by_id",
+                return_value=DeckFactory.create(ah_did=ah_did),
             )
-            monkeypatch.setattr(
+
+            deck_extension = DeckExtensionFactory.create(
+                ah_did=ah_did, tag_group_name="tag_group"
+            )
+            mock_function(
+                "ankihub.gui.deck_updater.AnkiHubClient.get_deck_extensions_by_deck_id",
+                return_value=[deck_extension],
+            )
+
+            mock_function(
                 "ankihub.gui.deck_updater.AnkiHubClient.get_deck_extension_updates",
-                lambda *args, **kwargs: [
+                return_value=[
                     DeckExtensionUpdateChunk(
                         note_customizations=[
                             NoteCustomization(
@@ -3268,15 +3276,57 @@ class TestDeckUpdater:
 
             # Assert that the deck extension info was saved in the config
             assert config.deck_extension_config(
-                extension_id=deck_extension_id
+                extension_id=deck_extension.id
             ) == DeckExtensionConfig(
                 ah_did=ah_did,
-                owner_id=1,
-                name=tag_group_name,
-                tag_group_name=tag_group_name,
-                description="",
+                owner_id=deck_extension.owner_id,
+                name=deck_extension.name,
+                tag_group_name=deck_extension.tag_group_name,
+                description=deck_extension.description,
                 latest_update=latest_update,
             )
+
+    @pytest.mark.parametrize(
+        "current_relation, incoming_relation",
+        [
+            (UserDeckRelation.SUBSCRIBER, UserDeckRelation.MAINTAINER),
+            (UserDeckRelation.MAINTAINER, UserDeckRelation.SUBSCRIBER),
+            (UserDeckRelation.SUBSCRIBER, UserDeckRelation.SUBSCRIBER),
+        ],
+    )
+    def test_user_relation_gets_updated_in_deck_config(
+        self,
+        anki_session_with_addon_data: AnkiSession,
+        install_ah_deck: InstallAHDeck,
+        mock_function: MockFunction,
+        current_relation: UserDeckRelation,
+        incoming_relation: UserDeckRelation,
+        mock_ankihub_sync_dependencies: None,
+    ):
+        with anki_session_with_addon_data.profile_loaded():
+            # Install deck and set the current relation in the config
+            ah_did = install_ah_deck()
+            deck = DeckFactory.create(
+                ah_did=ah_did,
+                user_relation=current_relation,
+            )
+            config.update_deck(deck)
+
+            # Mock client.get_deck_by_id to return the deck with the incoming relation
+            deck.user_relation = incoming_relation
+            mock_function(
+                "ankihub.gui.deck_updater.AnkiHubClient.get_deck_by_id",
+                return_value=deck,
+            )
+
+            # Update the deck
+            deck_updater = _AnkiHubDeckUpdater()
+            deck_updater.update_decks_and_media(
+                ah_dids=[ah_did], start_media_sync=False
+            )
+
+            # Assert that the deck config was updated with the incoming relation
+            assert config.deck_config(ah_did).user_relation == incoming_relation
 
 
 @pytest.mark.parametrize(
