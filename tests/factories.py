@@ -12,7 +12,12 @@ from faker import Faker
 os.environ["SKIP_INIT"] = "1"
 
 from ankihub.ankihub_client import Deck, Field, NoteInfo
-from ankihub.ankihub_client.models import DeckExtension, DeckMedia, UserDeckRelation
+from ankihub.ankihub_client.models import (
+    DeckExtension,
+    DeckMedia,
+    UserDeckExtensionRelation,
+    UserDeckRelation,
+)
 
 fake = Faker()
 
@@ -91,3 +96,4 @@ class DeckExtensionFactory(BaseFactory[DeckExtension]):
     name: str = factory.LazyAttribute(lambda _: fake.word())  # type: ignore
     tag_group_name: str = factory.LazyAttribute(lambda _: fake.word())  # type: ignore
     description: str = factory.LazyAttribute(lambda _: fake.sentence())  # type: ignore
+    user_relation: UserDeckExtensionRelation = UserDeckExtensionRelation.SUBSCRIBER

@@ -14,6 +14,9 @@ from .operations.ankihub_sync import sync_with_ankihub
 from .operations.utils import future_with_exception, future_with_result
 from .threading_utils import rate_limited
 
+# Rate limit to one sync every x seconds to prevent syncs running in parallel and causing problems.
+SYNC_RATE_LIMIT_SECONDS = 2
+
 
 @dataclass
 class _AutoSyncState:
@@ -24,8 +27,14 @@ auto_sync_state = _AutoSyncState()
 
 
 def setup_auto_sync() -> None:
-    _rate_limit_syncing()
+    """Setup AnkiHub sync on AnkiWeb sync"""
     _setup_ankihub_sync_on_ankiweb_sync()
+
+    # This has to be applied after _setup_ankihub_sync_on_ankiweb_sync because
+    # both functions wrap AnkiQt._sync_collection_and_media and we want to rate
+    # limit the outer function so that AnkiHub syncs can't be started in too
+    # short time intervals.
+    _rate_limit_syncing()
 
 
 def _setup_ankihub_sync_on_ankiweb_sync() -> None:
@@ -37,8 +46,7 @@ def _setup_ankihub_sync_on_ankiweb_sync() -> None:
 
 
 def _rate_limit_syncing() -> None:
-    """Rate limit AnkiQt._sync_collection_and_media to avoid
-    "Cannot start transaction within a transaction" DBErrors.
+    """Rate limit AnkiQt._sync_collection_and_media to avoid syncs running in parallel and causing problems.
     Syncing is not thread safe and from Sentry reports you can see that the DBErrors are raised when
     the sync is called multiple times in a short time frame (< 0.2 seconds). Not sure why this happens.
     """
@@ -49,7 +57,7 @@ def _rate_limit_syncing() -> None:
     )
 
 
-@rate_limited(2, "after_sync")
+@rate_limited(SYNC_RATE_LIMIT_SECONDS, "after_sync")
 def _rate_limited(*args, **kwargs) -> None:
     """Wrapper for AnkiQt._sync_collection_and_media that is rate limited to one call every x seconds.
     The `after_sync` callable passed to the _sync_collection_and_media function is called immediately

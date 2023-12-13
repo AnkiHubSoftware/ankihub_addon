@@ -201,7 +201,7 @@ def _install_deck(
         latest_udpate=latest_update,
     )
 
-    media_sync.start_media_download()
+    aqt.mw.taskman.run_on_main(media_sync.start_media_download)
 
     LOGGER.info("Importing deck was succesful.")
 

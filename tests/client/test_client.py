@@ -48,7 +48,7 @@ from ankihub.ankihub_client import (
     get_media_names_from_notes_data,
     get_media_names_from_suggestion,
 )
-from ankihub.ankihub_client.models import CardReviewData
+from ankihub.ankihub_client.models import CardReviewData, UserDeckExtensionRelation
 from ankihub.gui.operations.deck_installation import _download_progress_cb
 
 WEBAPP_COMPOSE_FILE = (
@@ -1008,6 +1008,26 @@ class TestGetDeckMediaUpdates:
 
 
 @pytest.mark.vcr()
+def test_get_deck_extensions(
+    authorized_client_for_user_test1: AnkiHubClient,
+):
+    client = authorized_client_for_user_test1
+
+    response = client.get_deck_extensions()
+    assert response == [
+        DeckExtension(
+            id=999,
+            owner_id=1,
+            ah_did=DECK_WITH_EXTENSION_UUID,
+            name="test100",
+            tag_group_name="test100",
+            description="",
+            user_relation=UserDeckExtensionRelation.OWNER,
+        )
+    ]
+
+
+@pytest.mark.vcr()
 def test_get_deck_extensions_by_deck_id(
     authorized_client_for_user_test1: AnkiHubClient,
 ):
@@ -1022,6 +1042,7 @@ def test_get_deck_extensions_by_deck_id(
             name="test100",
             tag_group_name="test100",
             description="",
+            user_relation=UserDeckExtensionRelation.OWNER,
         )
     ]
 
