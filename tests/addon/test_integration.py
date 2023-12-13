@@ -3129,16 +3129,17 @@ class TestDeckUpdater:
     def test_update_note(
         self,
         anki_session_with_addon_data: AnkiSession,
-        install_sample_ah_deck: InstallSampleAHDeck,
+        install_ah_deck: InstallAHDeck,
+        import_ah_note: ImportAHNote,
         mock_function: MockFunction,
         mock_ankihub_sync_dependencies: None,
     ):
         with anki_session_with_addon_data.profile_loaded():
             # Install a deck to be updated
-            _, ah_did = install_sample_ah_deck()
+            ah_did = install_ah_deck()
 
             # Mock client.get_deck_updates to return a note update
-            note_info = ankihub_sample_deck_notes_data()[0]
+            note_info = import_ah_note()
             note_info.fields[0].value = "changed"
 
             latest_update = datetime.now()
