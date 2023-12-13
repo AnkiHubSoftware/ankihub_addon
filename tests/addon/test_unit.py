@@ -597,6 +597,24 @@ class TestSuggestionDialog:
             source=expected_source,
         )
 
+    @pytest.mark.parametrize(
+        "can_submit_without_review",
+        [
+            True,
+            False,
+        ],
+    )
+    def test_submit_without_review_checkbox(self, can_submit_without_review: bool):
+        dialog = SuggestionDialog(
+            is_for_anking_deck=False,
+            is_new_note_suggestion=False,
+            added_new_media=False,
+            can_submit_without_review=can_submit_without_review,
+        )
+        dialog.show()
+
+        assert dialog.auto_accept_cb.isVisible() == can_submit_without_review
+
 
 class TestSuggestionDialogGetAnkiNidToPossibleAHDidsDict:
     def test_with_existing_note_belonging_to_single_deck(
