@@ -5,13 +5,21 @@ from datetime import timezone
 from typing import Generic, List, TypeVar
 
 import factory
+from faker import Faker
 
 # workaround for vscode test discovery not using pytest.ini which sets this env var
 # has to be set before importing ankihub
 os.environ["SKIP_INIT"] = "1"
 
 from ankihub.ankihub_client import Deck, Field, NoteInfo
-from ankihub.ankihub_client.models import DeckMedia, UserDeckRelation
+from ankihub.ankihub_client.models import (
+    DeckExtension,
+    DeckMedia,
+    UserDeckExtensionRelation,
+    UserDeckRelation,
+)
+
+fake = Faker()
 
 T = TypeVar("T")
 
@@ -76,3 +84,16 @@ class DeckMediaFactory(BaseFactory[DeckMedia]):
     referenced_on_accepted_note: bool = False
     exists_on_s3: bool = False
     download_enabled: bool = True
+
+
+class DeckExtensionFactory(BaseFactory[DeckExtension]):
+    class Meta:
+        model = DeckExtension
+
+    id: int = factory.Sequence(lambda n: n)  # type: ignore
+    ah_did: uuid.UUID
+    owner_id: int = factory.LazyAttribute(lambda _: fake.random_int())  # type: ignore
+    name: str = factory.LazyAttribute(lambda _: fake.word())  # type: ignore
+    tag_group_name: str = factory.LazyAttribute(lambda _: fake.word())  # type: ignore
+    description: str = factory.LazyAttribute(lambda _: fake.sentence())  # type: ignore
+    user_relation: UserDeckExtensionRelation = UserDeckExtensionRelation.SUBSCRIBER

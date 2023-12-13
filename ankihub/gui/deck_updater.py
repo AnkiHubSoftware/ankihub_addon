@@ -49,7 +49,7 @@ class _AnkiHubDeckUpdater:
         # The media sync should be started after the deck updates are imported,
         # because the import can add new media references to notes.
         if start_media_sync:
-            media_sync.start_media_download()
+            aqt.mw.taskman.run_on_main(media_sync.start_media_download)
 
         LOGGER.info("Finished updating decks")
         return self._import_results
