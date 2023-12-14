@@ -2192,6 +2192,24 @@ class TestShowDialog:
         assert button_index_from_cb == default_button_idx
 
 
+class TestPrivateConfigMigrations:
+    def test_oprphaned_deck_extensions_are_removed(
+        self, next_deterministic_uuid: Callable[[], uuid.UUID]
+    ):
+        # Add a deck extension without a corressponding deck to the private config.
+        ah_did = next_deterministic_uuid()
+        deck_extension = DeckExtensionFactory.create(ah_did=ah_did)
+        config.create_or_update_deck_extension_config(deck_extension)
+
+        # sanity check
+        assert config.deck_extensions_ids_for_ah_did(ah_did) == [deck_extension.id]
+
+        # Reload the private config to trigger the migration.
+        config.setup_private_config()
+
+        assert config.deck_extensions_ids_for_ah_did(ah_did) == []
+
+
 class TestOptionalTagSuggestionDialog:
     def test_submit_tags_for_validated_groups(
         self,
