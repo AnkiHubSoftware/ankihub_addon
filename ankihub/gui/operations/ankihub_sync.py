@@ -1,4 +1,5 @@
 from concurrent.futures import Future
+from functools import partial
 from typing import Callable, List
 
 import aqt
@@ -74,7 +75,9 @@ def sync_with_ankihub(on_done: Callable[[Future], None]) -> None:
             ),
         )
     except Exception as e:
-        on_done(future_with_exception(e))
+        # By using run_on_main the exception is not backpropagated to the caller and is instead
+        # only passed to the on_done callback.
+        aqt.mw.taskman.run_on_main(partial(on_done, future_with_exception(e)))
 
 
 def _uninstall_decks_the_user_is_not_longer_subscribed_to(

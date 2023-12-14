@@ -1,5 +1,6 @@
 """Check if the user is subscribed to any decks that are not installed and install them if the user agrees."""
 from concurrent.futures import Future
+from functools import partial
 from typing import Callable, List, Optional
 
 import aqt
@@ -54,7 +55,9 @@ def check_and_install_new_deck_subscriptions(
         # This prevents the checkbox from being garbage collected too early
         confirmation_dialog.cleanup_cb = cleanup_cb  # type: ignore
     except Exception as e:
-        on_done(future_with_exception(e))
+        # By using run_on_main the exception is not backpropagated to the caller and is instead
+        # only passed to the on_done callback.
+        aqt.mw.taskman.run_on_main(partial(on_done, future_with_exception(e)))
 
 
 def _on_button_clicked(
