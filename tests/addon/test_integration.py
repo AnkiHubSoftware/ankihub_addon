@@ -62,7 +62,12 @@ from ankihub.gui.browser.browser import (
     _on_reset_optional_tags_action,
 )
 
-from ..factories import DeckFactory, DeckMediaFactory, NoteInfoFactory
+from ..factories import (
+    DeckExtensionFactory,
+    DeckFactory,
+    DeckMediaFactory,
+    NoteInfoFactory,
+)
 from ..fixtures import (
     ImportAHNote,
     InstallAHDeck,
@@ -136,6 +141,7 @@ from ankihub.gui.operations.new_deck_subscriptions import (
 from ankihub.gui.operations.utils import future_with_result
 from ankihub.gui.optional_tag_suggestion_dialog import OptionalTagsSuggestionDialog
 from ankihub.main.deck_creation import create_ankihub_deck, modify_note_type
+from ankihub.main.deck_unsubscribtion import uninstall_deck
 from ankihub.main.exporting import to_note_data
 from ankihub.main.importing import (
     AnkiHubImporter,
@@ -3334,6 +3340,23 @@ def test_sync_uninstalls_unsubscribed_decks(
         )
 
 
+def test_uninstalling_deck_removes_related_deck_extension_from_config(
+    anki_session_with_addon_data: AnkiSession, install_ah_deck: InstallAHDeck
+):
+    with anki_session_with_addon_data.profile_loaded():
+        ah_did = install_ah_deck()
+        deck_extension = DeckExtensionFactory.create(
+            ah_did=ah_did,
+        )
+        config.create_or_update_deck_extension_config(deck_extension)
+
+        # sanity check
+        assert config.deck_extensions_ids_for_ah_did(ah_did) == [deck_extension.id]
+
+        uninstall_deck(ah_did)
+        assert config.deck_extensions_ids_for_ah_did(ah_did) == []
+
+
 def test_sync_updates_api_version_on_last_sync(
     anki_session_with_addon_data: AnkiSession,
     sync_with_ankihub: SyncWithAnkiHub,
@@ -4452,7 +4475,7 @@ class TestAHDBCheck:
             import_ah_note(ah_did=ah_did)
 
             # Remove deck from config
-            config.remove_deck(ah_did)
+            config.remove_deck_and_its_extensions(ah_did)
 
             # Mock dependencies for downloading and installing deck
             deck = DeckFactory.create(ah_did=ah_did)
