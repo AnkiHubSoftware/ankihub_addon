@@ -31,7 +31,7 @@ from ..settings import config
 
 def show_error_dialog(message: str, title: str, *args, **kwargs) -> None:
     aqt.mw.taskman.run_on_main(  # type: ignore
-        lambda: show_dialog(message, title=title, icon=warning_icon(), *args, **kwargs)
+        lambda: show_dialog(message, title=title, icon=warning_icon(), *args, **kwargs)  # type: ignore
     )
 
 
