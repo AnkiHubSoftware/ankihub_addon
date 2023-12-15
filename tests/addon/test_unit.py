@@ -1,4 +1,5 @@
 import importlib
+import json
 import os
 import tempfile
 import time
@@ -1459,6 +1460,34 @@ class TestErrorHandling:
         )
         assert handled
         display_login_mock.assert_called_once()
+
+    @pytest.mark.parametrize(
+        "response_content, expected_handled",
+        [
+            # The exception should only be handled for responses with json content that
+            # contains the "detail" key.
+            ("", False),
+            ("{}", False),
+            ('{"detail": "test"}', True),
+        ],
+    )
+    def test_handle_ankihub_403(
+        self, mock_function: MockFunction, response_content: str, expected_handled: bool
+    ):
+        show_error_dialog_mock = mock_function(errors, "show_error_dialog")
+
+        response_mock = Mock()
+        response_mock.status_code = 403
+        response_mock.text = response_content
+        response_mock.json = lambda: json.loads(response_content)  # type: ignore
+
+        handled = _try_handle_exception(
+            exc_type=AnkiHubHTTPError,
+            exc_value=AnkiHubHTTPError(response=response_mock),
+            tb=None,
+        )
+        assert handled == expected_handled
+        assert show_error_dialog_mock.called == expected_handled
 
     def test_handle_ankihub_406(
         self,
