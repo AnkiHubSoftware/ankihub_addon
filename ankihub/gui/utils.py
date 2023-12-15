@@ -24,13 +24,15 @@ from aqt.qt import (
     qconnect,
 )
 from aqt.theme import theme_manager
-from aqt.utils import disable_help_button, showWarning, tooltip
+from aqt.utils import disable_help_button, tooltip
 
 from ..settings import config
 
 
-def show_error_dialog(message: str, *args, **kwargs) -> None:
-    aqt.mw.taskman.run_on_main(lambda: showWarning(message, *args, **kwargs))  # type: ignore
+def show_error_dialog(message: str, title: str, *args, **kwargs) -> None:
+    aqt.mw.taskman.run_on_main(  # type: ignore
+        lambda: show_dialog(message, title=title, icon=warning_icon(), *args, **kwargs)
+    )
 
 
 def show_tooltip(message: str, parent=aqt.mw, *args, **kwargs) -> None:
