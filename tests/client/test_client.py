@@ -1394,15 +1394,16 @@ class TestUploadMediaForSuggestion:
 
         filenames = [
             TEST_MEDIA_PATH / "testfile_mario.png",
-            TEST_MEDIA_PATH / "testfile_anki.gif",
             TEST_MEDIA_PATH / "testfile_test.jpeg",
+            TEST_MEDIA_PATH / "testfile_anki.gif",
             TEST_MEDIA_PATH / "testfile_sound.mp3",
         ]
 
+        #
         expected_result = {
             "testfile_mario.png": "156ca948cd1356b1a2c1c790f0855ad9.webp",
-            "testfile_anki.gif": "87617b1d58967eb86b9e0e5dc92d91ee.webp",
             "testfile_test.jpeg": "a61eab59692d17a2adf4d1c5e9049ee4.webp",
+            "testfile_anki.gif": "87617b1d58967eb86b9e0e5dc92d91ee.gif",
             "testfile_sound.mp3": "ae9120835f658f1ae57e5754811a9475.mp3",
         }
 
