@@ -506,6 +506,34 @@ def test_add_subdeck_tags_to_notes_with_spaces_in_deck_name(
         assert note3.tags == [f"{SUBDECK_TAG}::AA::b_b::c_c"]
 
 
+class TestAnkiHubLoginDialog:
+    def test_login(self, qtbot: QtBot, mock_function: MockFunction):
+        username = "test_username"
+        password = "test_password"
+        token = "test_token"
+
+        login_mock = mock_function(
+            "ankihub.gui.menu.AnkiHubClient.login", return_value=token
+        )
+
+        AnkiHubLogin.display_login()
+
+        window: AnkiHubLogin = AnkiHubLogin._window
+
+        window.username_or_email_box_text.setText(username)
+        window.password_box_text.setText(password)
+        window.login_button.click()
+
+        qtbot.wait_until(lambda: not window.isVisible())
+
+        login_mock.assert_called_once_with(
+            credentials={"username": username, "password": password}
+        )
+
+        assert config.user() == username
+        assert config.token() == token
+
+
 class TestSuggestionDialog:
     @pytest.mark.parametrize(
         "is_new_note_suggestion,is_for_anking_deck,suggestion_type,source_type,media_was_added",
