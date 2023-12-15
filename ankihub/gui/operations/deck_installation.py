@@ -74,8 +74,8 @@ def download_and_install_decks(
             label="Downloading decks from AnkiHub",
         )
     except Exception as e:
-        # By using run_on_main the exception is not backpropagated to the caller and is instead
-        # only passed to the on_done callback.
+        # Using run_on_main prevents exceptions which occur in the callback to be backpropagated to the caller,
+        # which is what we want.
         aqt.mw.taskman.run_on_main(partial(on_done, future_with_exception(e)))
 
 
