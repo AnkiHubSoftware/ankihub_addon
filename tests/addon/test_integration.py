@@ -735,6 +735,34 @@ class TestDownloadAndInstallDecks:
                     mock.call_count == 1
                 ), f"Mock {name} was not called once, but {mock.call_count} times"
 
+    def test_exception_is_not_backpropagated_to_caller(
+        self, anki_session_with_addon_data: AnkiSession, mock_function: MockFunction
+    ):
+        with anki_session_with_addon_data.profile_loaded():
+            # Mock a function which is called in download_install_decks to raise an exception.
+            exception_mesaage = "test exception"
+
+            def raise_exception(*args, **kwargs) -> None:
+                raise Exception(exception_mesaage)
+
+            mock_function(
+                "ankihub.gui.operations.deck_installation.aqt.mw.taskman.with_progress",
+                side_effect=raise_exception,
+            )
+
+            # Set up the on_done callback
+            future: Optional[Future] = None
+
+            def on_done(future_: Future) -> None:
+                nonlocal future
+                future = future_
+
+            # Call download_and_install_decks. This shouldn't raise an exception.
+            download_and_install_decks(ankihub_dids=[], on_done=on_done)
+
+            # Assert that the future contains the exception and that it contains the expected message.
+            assert future.exception().args[0] == exception_mesaage
+
 
 class TestCheckAndInstallNewDeckSubscriptions:
     def test_one_new_subscription(
