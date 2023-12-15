@@ -3285,59 +3285,79 @@ class TestDeckUpdater:
             )
 
 
-@pytest.mark.parametrize(
-    "subscribed_to_deck",
-    [True, False],
-)
-@pytest.mark.qt_no_exception_capture
-def test_sync_uninstalls_unsubscribed_decks(
-    anki_session_with_addon_data: AnkiSession,
-    install_sample_ah_deck: InstallSampleAHDeck,
-    monkeypatch: MonkeyPatch,
-    mock_client_methods_called_during_ankihub_sync: None,
-    sync_with_ankihub: SyncWithAnkiHub,
-    subscribed_to_deck: bool,
-):
-    with anki_session_with_addon_data.profile_loaded():
-        mw = anki_session_with_addon_data.mw
+class TestSyncWithAnkiHub:
+    """Tests for the sync_with_ankihub operation."""
 
-        # Install a deck
-        anki_did, ah_did = install_sample_ah_deck()
+    @pytest.mark.parametrize(
+        "subscribed_to_deck",
+        [True, False],
+    )
+    @pytest.mark.qt_no_exception_capture
+    def test_sync_uninstalls_unsubscribed_decks(
+        self,
+        anki_session_with_addon_data: AnkiSession,
+        install_sample_ah_deck: InstallSampleAHDeck,
+        monkeypatch: MonkeyPatch,
+        mock_client_methods_called_during_ankihub_sync: None,
+        sync_with_ankihub: SyncWithAnkiHub,
+        subscribed_to_deck: bool,
+    ):
+        with anki_session_with_addon_data.profile_loaded():
+            mw = anki_session_with_addon_data.mw
 
-        # Mock client.get_deck_subscriptions to return the deck if subscribed_to_deck is True else return an empty list
-        monkeypatch.setattr(
-            AnkiHubClient,
-            "get_deck_subscriptions",
-            lambda *args, **kwargs: [DeckFactory.create(ah_did=ah_did)]
-            if subscribed_to_deck
-            else [],
-        )
+            # Install a deck
+            anki_did, ah_did = install_sample_ah_deck()
 
-        # Set a fake token so that the sync is not skipped
-        config.save_token("test_token")
-
-        # Sync
-        sync_with_ankihub()
-
-        # Assert that the deck was uninstalled if the user is not subscribed to it,
-        # else assert that it was not uninstalled
-        assert config.deck_ids() == ([ah_did] if subscribed_to_deck else [])
-        assert ankihub_db.ankihub_deck_ids() == ([ah_did] if subscribed_to_deck else [])
-
-        mids = [
-            mw.col.get_note(nid).mid for nid in mw.col.find_notes(f"did:{anki_did}")
-        ]
-        is_ankihub_note_type = [
-            note_type_contains_field(
-                mw.col.models.get(mid), ANKIHUB_NOTE_TYPE_FIELD_NAME
+            # Mock client.get_deck_subscriptions to return the deck if subscribed_to_deck is True and
+            # return an empty list otherwise
+            monkeypatch.setattr(
+                AnkiHubClient,
+                "get_deck_subscriptions",
+                lambda *args, **kwargs: [DeckFactory.create(ah_did=ah_did)]
+                if subscribed_to_deck
+                else [],
             )
-            for mid in mids
-        ]
-        assert (
-            all(is_ankihub_note_type)
-            if subscribed_to_deck
-            else not any(is_ankihub_note_type)
-        )
+
+            # Set a fake token so that the sync is not skipped
+            config.save_token("test_token")
+
+            # Sync
+            sync_with_ankihub()
+
+            # Assert that the deck was uninstalled if the user is not subscribed to it,
+            # else assert that it was not uninstalled
+            assert config.deck_ids() == ([ah_did] if subscribed_to_deck else [])
+            assert ankihub_db.ankihub_deck_ids() == (
+                [ah_did] if subscribed_to_deck else []
+            )
+
+            mids = [
+                mw.col.get_note(nid).mid for nid in mw.col.find_notes(f"did:{anki_did}")
+            ]
+            is_ankihub_note_type = [
+                note_type_contains_field(
+                    mw.col.models.get(mid), ANKIHUB_NOTE_TYPE_FIELD_NAME
+                )
+                for mid in mids
+            ]
+            assert (
+                all(is_ankihub_note_type)
+                if subscribed_to_deck
+                else not any(is_ankihub_note_type)
+            )
+
+    def test_sync_updates_api_version_on_last_sync(
+        self,
+        anki_session_with_addon_data: AnkiSession,
+        sync_with_ankihub: SyncWithAnkiHub,
+        mock_ankihub_sync_dependencies: None,
+    ):
+        assert config._private_config.api_version_on_last_sync is None  # sanity check
+
+        with anki_session_with_addon_data.profile_loaded():
+            sync_with_ankihub()
+
+        assert config._private_config.api_version_on_last_sync == API_VERSION
 
 
 def test_uninstalling_deck_removes_related_deck_extension_from_config(
@@ -3355,19 +3375,6 @@ def test_uninstalling_deck_removes_related_deck_extension_from_config(
 
         uninstall_deck(ah_did)
         assert config.deck_extensions_ids_for_ah_did(ah_did) == []
-
-
-def test_sync_updates_api_version_on_last_sync(
-    anki_session_with_addon_data: AnkiSession,
-    sync_with_ankihub: SyncWithAnkiHub,
-    mock_ankihub_sync_dependencies: None,
-):
-    assert config._private_config.api_version_on_last_sync is None  # sanity check
-
-    with anki_session_with_addon_data.profile_loaded():
-        sync_with_ankihub()
-
-    assert config._private_config.api_version_on_last_sync == API_VERSION
 
 
 class TestAutoSync:
