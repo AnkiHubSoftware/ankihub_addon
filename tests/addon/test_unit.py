@@ -92,7 +92,7 @@ from ankihub.gui.suggestion_dialog import (
     open_suggestion_dialog_for_note,
 )
 from ankihub.gui.threading_utils import rate_limited
-from ankihub.gui.utils import choose_ankihub_deck, show_dialog
+from ankihub.gui.utils import choose_ankihub_deck, show_dialog, show_error_dialog
 from ankihub.main import suggestions
 from ankihub.main.deck_creation import (
     DeckCreationResult,
@@ -1525,6 +1525,15 @@ class TestErrorHandling:
         finally:
             #  Reload the errors module again so that the original askUser function is used for other tests.
             importlib.reload(errors)
+
+
+def test_show_error_dialog(
+    anki_session_with_addon_data: AnkiSession, mock_function: MockFunction, qtbot: QtBot
+):
+    with anki_session_with_addon_data.profile_loaded():
+        show_dialog_mock = mock_function("ankihub.gui.utils.show_dialog")
+        show_error_dialog("some message", title="some title", parent=aqt.mw)
+        qtbot.wait_until(lambda: show_dialog_mock.called)
 
 
 class TestUploadLogs:
