@@ -335,12 +335,13 @@ def _maybe_handle_ankihub_http_error(error: AnkiHubHTTPError) -> bool:
     elif response.status_code == 403:
         try:
             response_data = response.json()
+        except JSONDecodeError:
+            return False
+        else:
             error_message = response_data.get("detail")
             if error_message:
                 show_error_dialog(error_message, title="Oh no!")
                 return True
-        except JSONDecodeError:
-            pass
 
     return False
 
