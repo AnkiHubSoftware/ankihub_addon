@@ -44,6 +44,7 @@ from aqt.qt import QAction, Qt
 from aqt.theme import theme_manager
 from pytest import MonkeyPatch, fixture
 from pytest_anki import AnkiSession
+from pytest_mock import MockerFixture
 from pytestqt.qtbot import QtBot  # type: ignore
 from requests import Response  # type: ignore
 from requests_mock import Mocker
@@ -333,45 +334,20 @@ def mock_ankihub_sync_dependencies(
 
 @fixture
 def mock_fetch_note_types_to_return_empty_dict(
-    monkeypatch: MonkeyPatch,
+    mocker: MockerFixture,
 ) -> None:
     # This prevents the add-on from fetching the note types from the server
-    monkeypatch.setattr(
-        "ankihub.main.note_types._fetch_note_types",
-        lambda *args, **kwargs: {},
-    )
+    mocker.patch("ankihub.main.note_types._fetch_note_types")
 
 
 @pytest.fixture
-def mock_client_methods_called_during_ankihub_sync(monkeypatch: MonkeyPatch) -> None:
-    monkeypatch.setattr(
-        AnkiHubClient, "get_deck_subscriptions", lambda *args, **kwargs: []
-    )
-    monkeypatch.setattr(
-        AnkiHubClient,
-        "get_deck_extensions_by_deck_id",
-        lambda *args, **kwargs: [],
-    )
-    monkeypatch.setattr(
-        AnkiHubClient,
-        "is_media_upload_finished",
-        lambda *args, **kwargs: True,
-    )
-    monkeypatch.setattr(
-        AnkiHubClient,
-        "get_deck_updates",
-        lambda *args, **kwargs: [],
-    )
-    monkeypatch.setattr(
-        AnkiHubClient,
-        "get_deck_media_updates",
-        lambda *args, **kwargs: [],
-    )
-    monkeypatch.setattr(
-        AnkiHubClient,
-        "send_card_review_data",
-        lambda *args, **kwargs: [],
-    )
+def mock_client_methods_called_during_ankihub_sync(mocker: MockerFixture) -> None:
+    mocker.patch.object(AnkiHubClient, "get_deck_subscriptions")
+    mocker.patch.object(AnkiHubClient, "get_deck_extensions_by_deck_id")
+    mocker.patch.object(AnkiHubClient, "is_media_upload_finished")
+    mocker.patch.object(AnkiHubClient, "get_deck_updates")
+    mocker.patch.object(AnkiHubClient, "get_deck_media_updates")
+    mocker.patch.object(AnkiHubClient, "send_card_review_data")
 
 
 class MockClientGetNoteType(Protocol):
@@ -524,7 +500,7 @@ def test_entry_point(anki_session_with_addon_data: AnkiSession, qtbot: QtBot):
 def test_editor(
     anki_session_with_addon_data: AnkiSession,
     requests_mock: Mocker,
-    monkeypatch: MonkeyPatch,
+    mocker: MockerFixture,
     next_deterministic_uuid: Callable[[], uuid.UUID],
     install_sample_ah_deck: InstallSampleAHDeck,
     mock_suggestion_dialog: MockSuggestionDialog,
@@ -544,7 +520,7 @@ def test_editor(
 
         note_1_ah_nid = next_deterministic_uuid()
 
-        monkeypatch.setattr("ankihub.main.exporting.uuid.uuid4", lambda: note_1_ah_nid)
+        mocker.patch("ankihub.main.exporting.uuid.uuid4", return_value=note_1_ah_nid)
 
         requests_mock.post(
             f"{config.api_url}/notes/{note_1_ah_nid}/suggestion/",
@@ -625,7 +601,7 @@ def test_modify_note_type(anki_session_with_addon_data: AnkiSession):
 
 def test_create_collaborative_deck_and_upload(
     anki_session_with_addon_data: AnkiSession,
-    monkeypatch: MonkeyPatch,
+    mocker: MockerFixture,
     next_deterministic_uuid: Callable[[], uuid.UUID],
 ):
     with anki_session_with_addon_data.profile_loaded():
@@ -643,15 +619,14 @@ def test_create_collaborative_deck_and_upload(
 
         # upload deck
         ah_did = next_deterministic_uuid()
-        upload_deck_mock = Mock()
-        upload_deck_mock.return_value = ah_did
         ah_nid = next_deterministic_uuid()
-        with monkeypatch.context() as m:
-            m.setattr(
-                "ankihub.ankihub_client.AnkiHubClient.upload_deck", upload_deck_mock
-            )
-            m.setattr("uuid.uuid4", lambda: ah_nid)
-            create_ankihub_deck(deck_name, private=False)
+        upload_deck_mock = mocker.patch.object(
+            AnkiHubClient,
+            "upload_deck",
+            return_value=ah_did,
+        )
+        mocker.patch("uuid.uuid4", return_value=ah_nid)
+        create_ankihub_deck(deck_name, private=False)
 
         # re-load note to get updated note.mid
         note.load()
@@ -972,7 +947,7 @@ def test_get_deck_by_id(
 def test_suggest_note_update(
     anki_session_with_addon_data: AnkiSession,
     install_sample_ah_deck: InstallSampleAHDeck,
-    monkeypatch: MonkeyPatch,
+    mocker: MockerFixture,
 ):
     anki_session = anki_session_with_addon_data
     with anki_session.profile_loaded():
@@ -1009,10 +984,9 @@ def test_suggest_note_update(
         note.tags.remove("removed")
 
         # Suggest the changes
-        create_change_note_suggestion_mock = MagicMock()
-        monkeypatch.setattr(
-            "ankihub.ankihub_client.AnkiHubClient.create_change_note_suggestion",
-            create_change_note_suggestion_mock,
+        create_change_note_suggestion_mock = mocker.patch.object(
+            AnkiHubClient,
+            "create_change_note_suggestion",
         )
 
         suggest_note_update(
@@ -1866,7 +1840,7 @@ def test_unsubscribe_from_deck(
     anki_session_with_addon_data: AnkiSession,
     install_sample_ah_deck: InstallSampleAHDeck,
     qtbot: QtBot,
-    monkeypatch: MonkeyPatch,
+    mocker: MockerFixture,
     requests_mock: Mocker,
 ):
     anki_session = anki_session_with_addon_data
@@ -1878,10 +1852,7 @@ def test_unsubscribe_from_deck(
         mids = ankihub_db.note_types_for_ankihub_deck(ah_did)
         assert len(mids) == 2
 
-        monkeypatch.setattr(
-            "ankihub.settings._Config.is_logged_in",
-            lambda *args, **kwargs: True,
-        )
+        mocker.patch.object(config, "is_logged_in", return_value=True)
         deck = mw.col.decks.get(anki_deck_id)
         requests_mock.get(
             f"{DEFAULT_API_URL}/decks/subscriptions/",
@@ -1908,19 +1879,17 @@ def test_unsubscribe_from_deck(
         deck_item_index = 0
         deck_item = decks_list.item(deck_item_index)
         deck_item.setSelected(True)
-        monkeypatch.setattr(
-            "ankihub.gui.decks_dialog.ask_user",
-            lambda *args, **kwargs: True,
-        )
+        mocker.patch("ankihub.gui.decks_dialog.ask_user", return_value=True)
 
         requests_mock.get(
             f"{DEFAULT_API_URL}/decks/subscriptions/", status_code=200, json=[]
         )
-        with patch.object(
-            AnkiHubClient, "unsubscribe_from_deck"
-        ) as unsubscribe_from_deck_mock:
-            qtbot.mouseClick(dialog.unsubscribe_btn, Qt.MouseButton.LeftButton)
-            unsubscribe_from_deck_mock.assert_called_once()
+        unsubscribe_from_deck_mock = mocker.patch.object(
+            AnkiHubClient,
+            "unsubscribe_from_deck",
+        )
+        qtbot.mouseClick(dialog.unsubscribe_btn, Qt.MouseButton.LeftButton)
+        unsubscribe_from_deck_mock.assert_called_once()
 
         assert dialog.decks_list.count() == 0
 
@@ -2558,7 +2527,7 @@ def test_browser_custom_columns(
 def test_protect_fields_action(
     anki_session_with_addon_data: AnkiSession,
     install_sample_ah_deck: InstallSampleAHDeck,
-    monkeypatch: MonkeyPatch,
+    mocker: MockerFixture,
     qtbot: QtBot,
     field_names_to_protect: Set[str],
     expected_tag: str,
@@ -2572,9 +2541,9 @@ def test_protect_fields_action(
         browser: Browser = dialogs.open("Browser", mw)
 
         # Patch gui function choose_subset to return the fields to protect
-        monkeypatch.setattr(
+        mocker.patch(
             "ankihub.gui.browser.browser.choose_subset",
-            lambda *args, **kwargs: field_names_to_protect,
+            return_value=field_names_to_protect,
         )
 
         # Call the action for a note
@@ -2987,7 +2956,7 @@ def test_reset_local_changes_to_notes(
     anki_session_with_addon_data: AnkiSession,
     install_sample_ah_deck: InstallSampleAHDeck,
     mock_client_get_note_type: MockClientGetNoteType,
-    monkeypatch: MonkeyPatch,
+    mocker: MockerFixture,
 ):
     with anki_session_with_addon_data.profile_loaded():
         mw = anki_session_with_addon_data.mw
@@ -3007,14 +2976,8 @@ def test_reset_local_changes_to_notes(
         mw.col.remove_notes([basic_note_2.id])
 
         # mock the client functions that are called to get the data needed for resetting local changes
-        monkeypatch.setattr(
-            "ankihub.main.reset_local_changes.AnkiHubClient.get_protected_fields",
-            lambda *args, **kwargs: {},
-        )
-        monkeypatch.setattr(
-            "ankihub.main.reset_local_changes.AnkiHubClient.get_protected_tags",
-            lambda *args, **kwargs: [],
-        )
+        mocker.patch.object(AnkiHubClient, "get_protected_fields")
+        mocker.patch.object(AnkiHubClient, "get_protected_tags")
         mock_client_get_note_type([note_type for note_type in mw.col.models.all()])
 
         # reset local changes
@@ -3072,7 +3035,7 @@ def test_migrate_profile_data_from_old_location(
 
 def test_profile_swap(
     anki_session_with_addon_data: AnkiSession,
-    monkeypatch: MonkeyPatch,
+    mocker: MockerFixture,
     install_sample_ah_deck: InstallSampleAHDeck,
 ):
     anki_session = anki_session_with_addon_data
@@ -3084,8 +3047,7 @@ def test_profile_swap(
     PROFILE_2_NAME = "User 2"
     PROFILE_2_ID = uuid.UUID("22222222-2222-2222-2222-222222222222")
 
-    general_setup_mock = Mock()
-    monkeypatch.setattr("ankihub.entry_point._general_setup", general_setup_mock)
+    general_setup_mock = mocker.patch("ankihub.entry_point._general_setup")
 
     entry_point.run()
 
@@ -3107,9 +3069,8 @@ def test_profile_swap(
 
     # load the second profile
     mw.pm.load(PROFILE_2_NAME)
-    # monkeypatch uuid4 so that the id of the second profile is known
-    with monkeypatch.context() as m:
-        m.setattr("uuid.uuid4", lambda: PROFILE_2_ID)
+    # monkey patch uuid4 so that the id of the second profile is known
+    with mocker.patch("uuid.uuid4", return_value=PROFILE_2_ID):
         with anki_session.profile_loaded():
             assert profile_files_path() == ankihub_base_path() / str(PROFILE_2_ID)
             # the database should be empty
