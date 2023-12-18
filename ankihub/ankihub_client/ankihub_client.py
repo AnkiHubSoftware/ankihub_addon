@@ -398,8 +398,8 @@ class AnkiHubClient:
         """Whether the media file should be converted to webp once its uploaded to s3."""
         # We don't want to convert svgs, because they don't benefit from the conversion in most cases.
         result = (
-            media_path.suffix in IMAGE_FILE_EXTENSIONS
-            and media_path.suffix not in [".svg", ".webp"]
+            media_path.suffix.lower() in IMAGE_FILE_EXTENSIONS
+            and media_path.suffix.lower() not in [".svg", ".webp"]
         )
         return result
 

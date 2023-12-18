@@ -1,4 +1,4 @@
-import importlib
+import json
 import os
 import tempfile
 import time
@@ -17,7 +17,7 @@ from anki.models import NotetypeDict
 from anki.notes import Note, NoteId
 from aqt import utils
 from aqt.qt import QDialog, QDialogButtonBox, Qt, QTimer, QWidget
-from pytest import MonkeyPatch, fixture
+from pytest import MonkeyPatch
 from pytest_anki import AnkiSession
 from pytestqt.qtbot import QtBot  # type: ignore
 from requests import Response
@@ -1488,16 +1488,9 @@ class TestErrorHandling:
             "\\addons21\\12345789\\src\\ankihub\\errors.py"
         )
 
-    def test_handle_ankihub_401(
-        self,
-        monkeypatch: MonkeyPatch,
-    ):
+    def test_handle_ankihub_401(self, mock_function: MockFunction):
         # Set up mock for AnkiHub login dialog.
-        display_login_mock = Mock()
-        monkeypatch.setattr(AnkiHubLogin, "display_login", display_login_mock)
-
-        # Mock _this_addon_is_involved to return True.
-        monkeypatch.setattr(errors, "_this_addon_mentioned_in_tb", lambda *args: True)
+        display_login_mock = mock_function(AnkiHubLogin, "display_login")
 
         handled = _try_handle_exception(
             exc_type=AnkiHubHTTPError,
@@ -1507,14 +1500,36 @@ class TestErrorHandling:
         assert handled
         display_login_mock.assert_called_once()
 
-    def test_handle_ankihub_406(
-        self,
-        monkeypatch: MonkeyPatch,
-        _mock_ask_user_to_return_false: Mock,
+    @pytest.mark.parametrize(
+        "response_content, expected_handled",
+        [
+            # The exception should only be handled for responses with json content that
+            # contains the "detail" key.
+            ("", False),
+            ("{}", False),
+            ('{"detail": "test"}', True),
+        ],
+    )
+    def test_handle_ankihub_403(
+        self, mock_function: MockFunction, response_content: str, expected_handled: bool
     ):
-        # Mock _this_addon_is_involved to return True.
-        monkeypatch.setattr(errors, "_this_addon_mentioned_in_tb", lambda *args: True)
+        show_error_dialog_mock = mock_function(errors, "show_error_dialog")
 
+        response_mock = Mock()
+        response_mock.status_code = 403
+        response_mock.text = response_content
+        response_mock.json = lambda: json.loads(response_content)  # type: ignore
+
+        handled = _try_handle_exception(
+            exc_type=AnkiHubHTTPError,
+            exc_value=AnkiHubHTTPError(response=response_mock),
+            tb=None,
+        )
+        assert handled == expected_handled
+        assert show_error_dialog_mock.called == expected_handled
+
+    def test_handle_ankihub_406(self, mock_function: MockFunction):
+        ask_user_mock = mock_function(errors, "ask_user", return_value=False)
         handled = _try_handle_exception(
             exc_type=AnkiHubHTTPError,
             exc_value=AnkiHubHTTPError(
@@ -1523,27 +1538,7 @@ class TestErrorHandling:
             tb=None,
         )
         assert handled
-        _mock_ask_user_to_return_false.assert_called_once()
-
-    @fixture
-    def _mock_ask_user_to_return_false(
-        self,
-        monkeypatch: MonkeyPatch,
-    ) -> Generator[Mock, None, None]:
-        # Simply monkeypatching ask_user to return False doesn't work because the errors module
-        # already imported the original askUser function when this fixture is called.
-        # So we need to reload the errors module after monkeypatching askUser.
-        try:
-            with monkeypatch.context() as m:
-                ask_user_mock = Mock(return_value=False)
-                m.setattr("ankihub.gui.utils.ask_user", ask_user_mock)
-                # Reload the errors module so that the monkeypatched askUser function is used.
-                importlib.reload(errors)
-
-                yield ask_user_mock
-        finally:
-            #  Reload the errors module again so that the original askUser function is used for other tests.
-            importlib.reload(errors)
+        ask_user_mock.assert_called_once()
 
 
 def test_show_error_dialog(
