@@ -34,6 +34,7 @@ from ..ankihub_client import (
     SuggestionType,
     get_media_names_from_note_info,
 )
+from ..ankihub_client.models import UserDeckRelation
 from ..db import ankihub_db
 from ..main.exporting import to_note_data
 from ..main.suggestions import (
@@ -44,7 +45,7 @@ from ..main.suggestions import (
     suggest_note_update,
     suggest_notes_in_bulk,
 )
-from ..settings import ANKING_DECK_ID, RATIONALE_FOR_CHANGE_MAX_LENGTH
+from ..settings import ANKING_DECK_ID, RATIONALE_FOR_CHANGE_MAX_LENGTH, config
 from .media_sync import media_sync
 from .utils import choose_ankihub_deck, show_error_dialog, show_tooltip
 
@@ -90,6 +91,7 @@ def open_suggestion_dialog_for_note(note: Note, parent: QWidget) -> None:
     suggestion_meta = SuggestionDialog(
         is_new_note_suggestion=ah_nid is None,
         is_for_anking_deck=ah_did == ANKING_DECK_ID,
+        can_submit_without_review=_can_submit_without_review(ah_did=ah_did),
         added_new_media=_added_new_media(note),
     ).run()
     if suggestion_meta is None:
@@ -139,6 +141,7 @@ def open_suggestion_dialog_for_bulk_suggestion(
     suggestion_meta = SuggestionDialog(
         is_new_note_suggestion=False,
         is_for_anking_deck=ah_did == ANKING_DECK_ID,
+        can_submit_without_review=_can_submit_without_review(ah_did=ah_did),
         # We currently have a limit of 500 notes per bulk suggestion, so we don't have to worry
         # about performance here.
         added_new_media=any(_added_new_media(note) for note in notes),
@@ -159,6 +162,14 @@ def open_suggestion_dialog_for_bulk_suggestion(
         on_done=lambda future: _on_suggest_notes_in_bulk_done(future, parent),
         parent=parent,
     )
+
+
+def _can_submit_without_review(ah_did: uuid.UUID) -> bool:
+    result = config.deck_config(ah_did).user_relation in [
+        UserDeckRelation.OWNER,
+        UserDeckRelation.MAINTAINER,
+    ]
+    return result
 
 
 def _determine_ah_did_for_nids_to_be_suggested(
@@ -276,11 +287,13 @@ class SuggestionDialog(QDialog):
         self,
         is_new_note_suggestion: bool,
         is_for_anking_deck: bool,
+        can_submit_without_review: bool,
         added_new_media: bool,
     ) -> None:
         super().__init__()
         self._is_new_note_suggestion = is_new_note_suggestion
         self._is_for_anking_deck = is_for_anking_deck
+        self._can_submit_without_review = can_submit_without_review
         self._added_new_media = added_new_media
 
         self._setup_ui()
@@ -347,7 +360,8 @@ class SuggestionDialog(QDialog):
             self.layout_.addSpacing(10)
 
         # Set up "auto-accept" checkbox
-        self.auto_accept_cb = QCheckBox("Submit without review (maintainers only).")
+        self.auto_accept_cb = QCheckBox("Submit without review.")
+        self.auto_accept_cb.setVisible(self._can_submit_without_review)
         self.layout_.addWidget(self.auto_accept_cb)
 
         # Set up button box
