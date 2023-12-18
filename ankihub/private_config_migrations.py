@@ -19,14 +19,15 @@ def migrate_private_config(private_config_dict: Dict) -> None:
     migrations are always applied before the client interacts with an updated
     API.
     """
-    maybe_rename_ankihub_deck_uuid_to_ah_did(private_config_dict)
-    maybe_reset_media_update_timestamps(private_config_dict)
-    maybe_set_suspend_new_cards_of_new_notes_to_true_for_anking_deck(
+    _maybe_rename_ankihub_deck_uuid_to_ah_did(private_config_dict)
+    _maybe_reset_media_update_timestamps(private_config_dict)
+    _maybe_set_suspend_new_cards_of_new_notes_to_true_for_anking_deck(
         private_config_dict
     )
+    _remove_orphaned_deck_extensions(private_config_dict)
 
 
-def maybe_reset_media_update_timestamps(private_config_dict: Dict) -> None:
+def _maybe_reset_media_update_timestamps(private_config_dict: Dict) -> None:
     # This is needed because the api view which returns media updates previously skipped
     # some entries and resetting the timestamps will ensure that all media updates are
     # fetched again.
@@ -39,7 +40,7 @@ def maybe_reset_media_update_timestamps(private_config_dict: Dict) -> None:
             deck["latest_media_update"] = None
 
 
-def maybe_rename_ankihub_deck_uuid_to_ah_did(private_config_dict: Dict) -> None:
+def _maybe_rename_ankihub_deck_uuid_to_ah_did(private_config_dict: Dict) -> None:
     # Rename the "ankihub_deck_uuid" key to "ah_did" in the deck extensions config.
     old_field_name = "ankihub_deck_uuid"
     new_field_name = "ah_did"
@@ -52,7 +53,7 @@ def maybe_rename_ankihub_deck_uuid_to_ah_did(private_config_dict: Dict) -> None:
             )
 
 
-def maybe_set_suspend_new_cards_of_new_notes_to_true_for_anking_deck(
+def _maybe_set_suspend_new_cards_of_new_notes_to_true_for_anking_deck(
     private_config_dict: Dict,
 ) -> None:
     """Set suspend_new_cards_of_new_notes to True in the DeckConfig of the AnKing deck if the field
@@ -78,3 +79,16 @@ def _is_api_version_on_last_sync_below_threshold(
         return True
 
     return api_version < version_threshold
+
+
+def _remove_orphaned_deck_extensions(private_config_dict: Dict) -> None:
+    """Remove deck extension configs for which the corresponding deck isn't in the config anymore."""
+    decks = private_config_dict["decks"]
+    deck_extensions = private_config_dict["deck_extensions"]
+    for deck_extension_id, deck_extension in list(deck_extensions.items()):
+        if deck_extension["ah_did"] not in decks:
+            del deck_extensions[deck_extension_id]
+            LOGGER.info(
+                f"Removed deck extension config with {deck_extension_id=} for deck {deck_extension['ah_did']} "
+                "because the deck isn't in the config anymore."
+            )

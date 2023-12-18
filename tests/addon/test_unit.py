@@ -92,7 +92,7 @@ from ankihub.gui.suggestion_dialog import (
     open_suggestion_dialog_for_note,
 )
 from ankihub.gui.threading_utils import rate_limited
-from ankihub.gui.utils import choose_ankihub_deck, show_dialog
+from ankihub.gui.utils import choose_ankihub_deck, show_dialog, show_error_dialog
 from ankihub.main import suggestions
 from ankihub.main.deck_creation import (
     DeckCreationResult,
@@ -504,6 +504,34 @@ def test_add_subdeck_tags_to_notes_with_spaces_in_deck_name(
 
         note3.load()
         assert note3.tags == [f"{SUBDECK_TAG}::AA::b_b::c_c"]
+
+
+class TestAnkiHubLoginDialog:
+    def test_login(self, qtbot: QtBot, mock_function: MockFunction):
+        username = "test_username"
+        password = "test_password"
+        token = "test_token"
+
+        login_mock = mock_function(
+            "ankihub.gui.menu.AnkiHubClient.login", return_value=token
+        )
+
+        AnkiHubLogin.display_login()
+
+        window: AnkiHubLogin = AnkiHubLogin._window
+
+        window.username_or_email_box_text.setText(username)
+        window.password_box_text.setText(password)
+        window.login_button.click()
+
+        qtbot.wait_until(lambda: not window.isVisible())
+
+        login_mock.assert_called_once_with(
+            credentials={"username": username, "password": password}
+        )
+
+        assert config.user() == username
+        assert config.token() == token
 
 
 class TestSuggestionDialog:
@@ -1499,6 +1527,15 @@ class TestErrorHandling:
             importlib.reload(errors)
 
 
+def test_show_error_dialog(
+    anki_session_with_addon_data: AnkiSession, mock_function: MockFunction, qtbot: QtBot
+):
+    with anki_session_with_addon_data.profile_loaded():
+        show_dialog_mock = mock_function("ankihub.gui.utils.show_dialog")
+        show_error_dialog("some message", title="some title", parent=aqt.mw)
+        qtbot.wait_until(lambda: show_dialog_mock.called)
+
+
 class TestUploadLogs:
     def test_basic(
         self,
@@ -2190,6 +2227,24 @@ class TestShowDialog:
         qtbot.keyClick(dialog, Qt.Key.Key_Enter)
 
         assert button_index_from_cb == default_button_idx
+
+
+class TestPrivateConfigMigrations:
+    def test_oprphaned_deck_extensions_are_removed(
+        self, next_deterministic_uuid: Callable[[], uuid.UUID]
+    ):
+        # Add a deck extension without a corressponding deck to the private config.
+        ah_did = next_deterministic_uuid()
+        deck_extension = DeckExtensionFactory.create(ah_did=ah_did)
+        config.create_or_update_deck_extension_config(deck_extension)
+
+        # sanity check
+        assert config.deck_extensions_ids_for_ah_did(ah_did) == [deck_extension.id]
+
+        # Reload the private config to trigger the migration.
+        config.setup_private_config()
+
+        assert config.deck_extensions_ids_for_ah_did(ah_did) == []
 
 
 class TestOptionalTagSuggestionDialog:
