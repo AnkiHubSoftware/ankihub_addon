@@ -77,6 +77,7 @@ class OptionalTagsSuggestionDialog(QDialog):
             "If checked, the suggestions will be automatically accepted. "
             "This option is only available for maintainers of the deck."
         )
+        self._refresh_auto_accept_check_box()
 
         self.setLayout(self.layout_)
         self.layout_.addLayout(self.hlayout)
