@@ -92,7 +92,7 @@ from ankihub.gui.suggestion_dialog import (
     open_suggestion_dialog_for_note,
 )
 from ankihub.gui.threading_utils import rate_limited
-from ankihub.gui.utils import choose_ankihub_deck, show_dialog
+from ankihub.gui.utils import choose_ankihub_deck, show_dialog, show_error_dialog
 from ankihub.main import suggestions
 from ankihub.main.deck_creation import (
     DeckCreationResult,
@@ -504,6 +504,34 @@ def test_add_subdeck_tags_to_notes_with_spaces_in_deck_name(
 
         note3.load()
         assert note3.tags == [f"{SUBDECK_TAG}::AA::b_b::c_c"]
+
+
+class TestAnkiHubLoginDialog:
+    def test_login(self, qtbot: QtBot, mock_function: MockFunction):
+        username = "test_username"
+        password = "test_password"
+        token = "test_token"
+
+        login_mock = mock_function(
+            "ankihub.gui.menu.AnkiHubClient.login", return_value=token
+        )
+
+        AnkiHubLogin.display_login()
+
+        window: AnkiHubLogin = AnkiHubLogin._window
+
+        window.username_or_email_box_text.setText(username)
+        window.password_box_text.setText(password)
+        window.login_button.click()
+
+        qtbot.wait_until(lambda: not window.isVisible())
+
+        login_mock.assert_called_once_with(
+            credentials={"username": username, "password": password}
+        )
+
+        assert config.user() == username
+        assert config.token() == token
 
 
 class TestSuggestionDialog:
@@ -1492,6 +1520,15 @@ class TestErrorHandling:
         )
         assert handled
         ask_user_mock.assert_called_once()
+
+
+def test_show_error_dialog(
+    anki_session_with_addon_data: AnkiSession, mock_function: MockFunction, qtbot: QtBot
+):
+    with anki_session_with_addon_data.profile_loaded():
+        show_dialog_mock = mock_function("ankihub.gui.utils.show_dialog")
+        show_error_dialog("some message", title="some title", parent=aqt.mw)
+        qtbot.wait_until(lambda: show_dialog_mock.called)
 
 
 class TestUploadLogs:
