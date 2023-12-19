@@ -100,13 +100,22 @@ class AnkiHubLogin(QWidget):
 
         # Password
         self.password_box = QHBoxLayout()
+
         self.password_box_label = QLabel("Password:")
+
         self.password_box_text = QLineEdit("", self)
         self.password_box_text.setEchoMode(QLineEdit.EchoMode.Password)
         self.password_box_text.setMinimumWidth(300)
         qconnect(self.password_box_text.returnPressed, self.login)
+
+        self.toggle_button = QPushButton("Show")
+        self.toggle_button.setCheckable(True)
+        self.toggle_button.setFixedHeight(30)
+        qconnect(self.toggle_button.toggled, self.refresh_password_visibility)
+
         self.password_box.addWidget(self.password_box_label)
         self.password_box.addWidget(self.password_box_text)
+        self.password_box.addWidget(self.toggle_button)
         self.box_left.addLayout(self.password_box)
 
         # Login
@@ -132,6 +141,14 @@ class AnkiHubLogin(QWidget):
         self.setWindowTitle("Login to AnkiHub.")
         self.setWindowFlags(self.windowFlags() | Qt.WindowType.WindowStaysOnTopHint)  # type: ignore
         self.show()
+
+    def refresh_password_visibility(self) -> None:
+        if self.toggle_button.isChecked():
+            self.password_box_text.setEchoMode(QLineEdit.EchoMode.Normal)
+            self.toggle_button.setText("Hide")
+        else:
+            self.password_box_text.setEchoMode(QLineEdit.EchoMode.Password)
+            self.toggle_button.setText("Show")
 
     def login(self):
         username_or_email = self.username_or_email_box_text.text()
