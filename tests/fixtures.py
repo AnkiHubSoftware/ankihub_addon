@@ -3,7 +3,7 @@ import os
 import uuid
 from datetime import datetime
 from typing import Any, Callable, Dict, List, Optional, Protocol
-from unittest.mock import Mock
+from unittest.mock import MagicMock, Mock
 
 import aqt
 import pytest
@@ -25,7 +25,6 @@ from ankihub.ankihub_client import NoteInfo
 from ankihub.ankihub_client.ankihub_client import AnkiHubClient
 from ankihub.ankihub_client.models import Deck, UserDeckRelation
 from ankihub.feature_flags import setup_feature_flags
-from ankihub.gui import operations
 from ankihub.gui.media_sync import _AnkiHubMediaSync
 from ankihub.main.importing import AnkiHubImporter
 from ankihub.main.utils import modify_note_type
@@ -140,8 +139,7 @@ def mock_all_feature_flags_to_default_values(
 class MockFunction(Protocol):
     def __call__(
         self,
-        target_object: Any,
-        target_function_name: str,
+        *args,
         return_value: Optional[Any] = None,
         side_effect: Optional[Callable] = None,
     ) -> Mock:
@@ -153,16 +151,16 @@ def mock_function(
     monkeypatch: MonkeyPatch,
 ) -> MockFunction:
     def _mock_function(
-        target_object: Any,
-        target_function_name: str,
+        *args,
         return_value: Optional[Any] = None,
         side_effect: Optional[Callable] = None,
     ) -> Mock:
+        # The args can be either an object and a function name or the full path to the function as a string.
+        assert len(args) in [1, 2]
         mock = Mock()
         mock.return_value = return_value
-        monkeypatch.setattr(
-            target_object,
-            target_function_name,
+        monkeypatch.setattr(  # type: ignore
+            *args,
             mock,
         )
         mock.side_effect = side_effect
@@ -189,6 +187,7 @@ def import_ah_note(next_deterministic_uuid: Callable[[], uuid.UUID]) -> ImportAH
     The note type of the note is created in the Anki database if it does not exist yet.
     The default value for the note type is an AnkiHub version of the Basic note type.
     Can only be used in an anki_session_with_addon.profile_loaded() context.
+    Use the import_ah_notes fixture if you want to import many notes at once.
 
     Parameters:
     Can be passed to override the default values of the note. When certain
@@ -266,6 +265,80 @@ def import_ah_note(next_deterministic_uuid: Callable[[], uuid.UUID]) -> ImportAH
     return _import_ah_note
 
 
+class ImportAHNotes(Protocol):
+    def __call__(
+        self,
+        note_infos: List[NoteInfo],
+        ah_did: Optional[uuid.UUID] = None,
+        anki_did: Optional[DeckId] = None,
+    ) -> None:
+        ...
+
+
+@fixture
+def import_ah_notes(next_deterministic_uuid: Callable[[], uuid.UUID]) -> ImportAHNotes:
+    """Alternative to import_ah_note that imports multiple notes at once.
+    Offers less flexibility than import_ah_note but is more efficient when importing multiple notes.
+    """
+    # All notes created by this fixture will be created in the same deck.
+    default_ah_did = next_deterministic_uuid()
+    deck_name = "test"
+
+    def _import_ah_notes(
+        note_infos: List[NoteInfo],
+        ah_did: Optional[uuid.UUID] = default_ah_did,
+        anki_did: Optional[DeckId] = None,
+    ) -> None:
+        assert len(note_infos) > 0, "note_infos must not be empty"
+        assert (
+            note_info.mid == note_infos[0].mid for note_info in note_infos
+        ), "All notes must have the same note type"
+
+        # Check if the note_infos are compatible with the note type.
+        # For each field in note_data, check if there is a field in the note type with the same name.
+        mid = note_infos[0].mid
+        note_type = aqt.mw.col.models.get(NotetypeId(mid))
+        assert note_type is not None, f"Note type with id {mid} does not exist."
+
+        field_names_of_note_type = set(field["name"] for field in note_type["flds"])
+        for note_info in note_infos:
+            fields_are_compatible = all(
+                field.name in field_names_of_note_type for field in note_info.fields
+            )
+            assert fields_are_compatible, (
+                f"Note data is not compatible with the note type.\n"
+                f"\tNote data: {note_info.fields}, note type: {field_names_of_note_type}"
+            )
+
+        if deck_config := config.deck_config(ah_did):
+            suspend_new_cards_of_new_notes = deck_config.suspend_new_cards_of_new_notes
+            suspend_new_cards_of_existing_notes = (
+                deck_config.suspend_new_cards_of_existing_notes
+            )
+        else:
+            suspend_new_cards_of_new_notes = (
+                DeckConfig.suspend_new_cards_of_new_notes_default(ah_did)
+            )
+            suspend_new_cards_of_existing_notes = (
+                DeckConfig.suspend_new_cards_of_existing_notes_default()
+            )
+
+        AnkiHubImporter().import_ankihub_deck(
+            ankihub_did=ah_did,
+            notes=note_infos,
+            note_types={note_type["id"]: note_type},
+            protected_fields={},
+            protected_tags=[],
+            deck_name=deck_name,
+            is_first_import_of_deck=False,
+            anki_did=anki_did,
+            suspend_new_cards_of_new_notes=suspend_new_cards_of_new_notes,
+            suspend_new_cards_of_existing_notes=suspend_new_cards_of_existing_notes,
+        )
+
+    return _import_ah_notes
+
+
 class ImportAHNoteType(Protocol):
     def __call__(
         self,
@@ -284,7 +357,8 @@ def import_ah_note_type(
     """Imports a note type into the AnkiHub DB and Anki. Returns the note type.
     You can optionally pass in a note type and/or an AnkiHub deck ID.
     If force_new is True, a new unique id will be generated for the note type.
-    Otherwise, subsequent calls to this function that use the same note type won't create a new note type."""
+    Otherwise, subsequent calls to this function that use the same note type won't create a new note type.
+    """
     default_ah_did = next_deterministic_uuid()
     default_note_type = ankihub_basic_note_type
 
@@ -294,7 +368,7 @@ def import_ah_note_type(
         force_new: bool = False,
     ) -> NotetypeDict:
         if note_type is None:
-            note_type = default_note_type
+            note_type = copy.deepcopy(default_note_type)
         if ah_did is None:
             ah_did = default_ah_did
 
@@ -399,6 +473,33 @@ def install_ah_deck(
     return install_ah_deck_inner
 
 
+class MockShowDialogWithCB(Protocol):
+    def __call__(
+        self,
+        target_object: Any,
+        button_index: Optional[int],
+    ) -> MagicMock:
+        ...
+
+
+@pytest.fixture
+def mock_show_dialog_with_cb(monkeypatch: MonkeyPatch) -> MockShowDialogWithCB:
+    """Mocks ankihub.gui.utils.show_dialog to call the callback with the provided button index
+    instead of showing the dialog."""
+
+    def mock_show_dialog_with_cb_inner(
+        target_object: Any,
+        button_index: Optional[int],
+    ) -> None:
+        def show_dialog_mock(*args, **kwargs) -> MagicMock:
+            kwargs["callback"](button_index),
+            return MagicMock()
+
+        monkeypatch.setattr(target_object, show_dialog_mock)
+
+    return mock_show_dialog_with_cb_inner
+
+
 class MockDownloadAndInstallDeckDependencies(Protocol):
     def __call__(
         self,
@@ -412,6 +513,7 @@ class MockDownloadAndInstallDeckDependencies(Protocol):
 @pytest.fixture
 def mock_download_and_install_deck_dependencies(
     monkeypatch: MonkeyPatch,
+    mock_show_dialog_with_cb: MockShowDialogWithCB,
 ) -> MockDownloadAndInstallDeckDependencies:
     """Mocks the dependencies of the download_and_install_deck function.
     deck: The deck that is downloaded and installed.
@@ -440,16 +542,54 @@ def mock_download_and_install_deck_dependencies(
         add_mock(AnkiHubClient, "get_protected_fields", {})
         add_mock(AnkiHubClient, "get_protected_tags", [])
 
-        # Patch away gui functions which would otherwise block the test
-        add_mock(operations.deck_installation, "ask_user", return_value=True)
-        add_mock(operations.deck_installation, "show_empty_cards")
-
         # Mock media sync
         add_mock(_AnkiHubMediaSync, "start_media_download")
+
+        # Mock UI interactions
+        mock_show_dialog_with_cb(
+            "ankihub.gui.operations.new_deck_subscriptions.show_dialog", button_index=1
+        )
 
         return mocks
 
     return mock_install_deck_dependencies
+
+
+class MockMessageBoxWithCB(Protocol):
+    def __call__(
+        self,
+        target_object: Any,
+        button_index: int,
+    ) -> None:
+        ...
+
+
+class MessageBoxMock:
+    def __init__(self, button_index, *args, **kwargs):
+        callback = kwargs["callback"]
+        aqt.mw.taskman.run_in_background(task=lambda: callback(button_index))
+
+    def setCheckBox(self, *args, **kwargs):
+        pass
+
+
+@pytest.fixture
+def mock_message_box_with_cb(monkeypatch: MonkeyPatch) -> MockMessageBoxWithCB:
+    """Mocks the aqt.utils.MessageBox dialog to call the callback with the provided button index
+    instead of showing the dialog."""
+
+    def mock_message_box_with_cb_inner(
+        target_object: Any,
+        button_index: int,
+    ) -> None:
+        monkeypatch.setattr(
+            target_object,
+            lambda *args, **kwargs: MessageBoxMock(
+                button_index=button_index, *args, **kwargs  # type: ignore
+            ),
+        )
+
+    return mock_message_box_with_cb_inner
 
 
 def create_anki_deck(deck_name: str) -> DeckId:

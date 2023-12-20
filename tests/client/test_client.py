@@ -48,7 +48,7 @@ from ankihub.ankihub_client import (
     get_media_names_from_notes_data,
     get_media_names_from_suggestion,
 )
-from ankihub.ankihub_client.models import CardReviewData
+from ankihub.ankihub_client.models import CardReviewData, UserDeckExtensionRelation
 from ankihub.gui.operations.deck_installation import _download_progress_cb
 
 WEBAPP_COMPOSE_FILE = (
@@ -131,7 +131,9 @@ def client_with_server_setup(vcr: VCR, marks: List[str], request: FixtureRequest
             raise_on_error=False,
         )
 
-    client = AnkiHubClient(api_url=LOCAL_API_URL, local_media_dir_path=TEST_MEDIA_PATH)
+    client = AnkiHubClient(
+        api_url=LOCAL_API_URL, local_media_dir_path_cb=lambda: TEST_MEDIA_PATH
+    )
     yield client
 
 
@@ -1006,6 +1008,26 @@ class TestGetDeckMediaUpdates:
 
 
 @pytest.mark.vcr()
+def test_get_deck_extensions(
+    authorized_client_for_user_test1: AnkiHubClient,
+):
+    client = authorized_client_for_user_test1
+
+    response = client.get_deck_extensions()
+    assert response == [
+        DeckExtension(
+            id=999,
+            owner_id=1,
+            ah_did=DECK_WITH_EXTENSION_UUID,
+            name="test100",
+            tag_group_name="test100",
+            description="",
+            user_relation=UserDeckExtensionRelation.OWNER,
+        )
+    ]
+
+
+@pytest.mark.vcr()
 def test_get_deck_extensions_by_deck_id(
     authorized_client_for_user_test1: AnkiHubClient,
 ):
@@ -1020,6 +1042,7 @@ def test_get_deck_extensions_by_deck_id(
             name="test100",
             tag_group_name="test100",
             description="",
+            user_relation=UserDeckExtensionRelation.OWNER,
         )
     ]
 
@@ -1265,8 +1288,7 @@ def test_download_media(
     next_deterministic_uuid: Callable[[], uuid.UUID],
 ):
     with tempfile.TemporaryDirectory() as temp_dir:
-
-        client = AnkiHubClient(local_media_dir_path=Path(temp_dir))
+        client = AnkiHubClient(local_media_dir_path_cb=lambda: Path(temp_dir))
 
         deck_id = next_deterministic_uuid()
         requests_mock.get(
@@ -1292,7 +1314,7 @@ class TestUploadMediaForSuggestion:
         remove_generated_media_files,
         request: FixtureRequest,
     ):
-        client = AnkiHubClient(local_media_dir_path=TEST_MEDIA_PATH)
+        client = AnkiHubClient(local_media_dir_path_cb=lambda: TEST_MEDIA_PATH)
 
         suggestion: NoteSuggestion = request.getfixturevalue(suggestion_type)
         suggestion.fields[0].value = (
@@ -1368,7 +1390,7 @@ class TestUploadMediaForSuggestion:
         assert media_name_map == expected_media_name_map
 
     def test_generate_media_files_with_hashed_names(self, remove_generated_media_files):
-        client = AnkiHubClient(local_media_dir_path=TEST_MEDIA_PATH)
+        client = AnkiHubClient(local_media_dir_path_cb=lambda: TEST_MEDIA_PATH)
 
         filenames = [
             TEST_MEDIA_PATH / "testfile_mario.png",
@@ -1430,7 +1452,7 @@ class TestUploadMediaForDeck:
     def test_zips_media_files_from_deck_notes(
         self, next_deterministic_uuid: Callable[[], uuid.UUID], monkeypatch: MonkeyPatch
     ):
-        client = AnkiHubClient(local_media_dir_path=TEST_MEDIA_PATH)
+        client = AnkiHubClient(local_media_dir_path_cb=lambda: TEST_MEDIA_PATH)
 
         notes_data = self.notes_data_with_many_media_files()
 
@@ -1468,7 +1490,7 @@ class TestUploadMediaForDeck:
     def test_uploads_generated_zipped_file(
         self, next_deterministic_uuid: Callable[[], uuid.UUID], monkeypatch: MonkeyPatch
     ):
-        client = AnkiHubClient(local_media_dir_path=TEST_MEDIA_PATH)
+        client = AnkiHubClient(local_media_dir_path_cb=lambda: TEST_MEDIA_PATH)
 
         notes_data = self.notes_data_with_many_media_files()
         deck_id = next_deterministic_uuid()
@@ -1511,7 +1533,7 @@ class TestUploadMediaForDeck:
     def test_removes_zipped_file_after_upload(
         self, next_deterministic_uuid: Callable[[], uuid.UUID], monkeypatch: MonkeyPatch
     ):
-        client = AnkiHubClient(local_media_dir_path=TEST_MEDIA_PATH)
+        client = AnkiHubClient(local_media_dir_path_cb=lambda: TEST_MEDIA_PATH)
 
         notes_data = self.notes_data_with_many_media_files()
 

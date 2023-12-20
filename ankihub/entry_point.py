@@ -10,7 +10,7 @@ from . import LOGGER
 from .db import ankihub_db
 from .debug import setup as setup_debug
 from .feature_flags import setup_feature_flags
-from .gui import browser, deckbrowser, editor, progress, reviewer, taskman
+from .gui import browser, deckbrowser, editor, progress, reviewer
 from .gui.addons import setup_addons
 from .gui.auto_sync import setup_auto_sync
 from .gui.config_dialog import setup_config_dialog_manager
@@ -144,11 +144,8 @@ def _general_setup():
     progress.setup()
     LOGGER.info("Set up progress manager.")
 
-    taskman.setup()
-    LOGGER.info("Set up task manager.")
-
     deckbrowser.setup()
-    LOGGER.info("Setup deck browser")
+    LOGGER.info("Set up deck browser")
 
     _trigger_addon_update_check()
     LOGGER.info("Triggered add-on update check.")
@@ -158,7 +155,7 @@ def _general_setup():
     LOGGER.info("Loaded media_export.")
 
     setup_auto_sync()
-    LOGGER.info("Called setup_ankihub_sync_on_ankiweb_sync.")
+    LOGGER.info("Set up auto sync.")
 
 
 def _log_enabled_addons():

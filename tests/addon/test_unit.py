@@ -1,4 +1,4 @@
-import importlib
+import json
 import os
 import tempfile
 import time
@@ -17,15 +17,23 @@ from anki.decks import DeckId
 from anki.models import NotetypeDict
 from anki.notes import Note, NoteId
 from aqt import utils
-from aqt.qt import QDialogButtonBox
-from pytest import MonkeyPatch, fixture
+from aqt.qt import QDialog, QDialogButtonBox, Qt, QTimer, QWidget
+from pytest import MonkeyPatch
 from pytest_anki import AnkiSession
 from pytestqt.qtbot import QtBot  # type: ignore
 from requests import Response
 
-from ankihub.ankihub_client.models import CardReviewData  # type: ignore
+from ankihub.ankihub_client.models import (  # type: ignore
+    CardReviewData,
+    UserDeckExtensionRelation,
+)
 
-from ..factories import DeckFactory, DeckMediaFactory, NoteInfoFactory
+from ..factories import (
+    DeckExtensionFactory,
+    DeckFactory,
+    DeckMediaFactory,
+    NoteInfoFactory,
+)
 from ..fixtures import (  # type: ignore
     ImportAHNoteType,
     InstallAHDeck,
@@ -50,6 +58,7 @@ from ankihub.ankihub_client import (
     AnkiHubHTTPError,
     Field,
     SuggestionType,
+    TagGroupValidationResponse,
 )
 from ankihub.db import attached_ankihub_db, detached_ankihub_db
 from ankihub.db.db import _AnkiHubDB
@@ -72,6 +81,7 @@ from ankihub.gui.operations.deck_creation import (
     create_collaborative_deck,
 )
 from ankihub.gui.operations.utils import future_with_exception, future_with_result
+from ankihub.gui.optional_tag_suggestion_dialog import OptionalTagsSuggestionDialog
 from ankihub.gui.suggestion_dialog import (
     SourceType,
     SuggestionDialog,
@@ -83,6 +93,7 @@ from ankihub.gui.suggestion_dialog import (
     open_suggestion_dialog_for_note,
 )
 from ankihub.gui.threading_utils import rate_limited
+from ankihub.gui.utils import choose_ankihub_deck, show_dialog, show_error_dialog
 from ankihub.main import suggestions
 from ankihub.main.deck_creation import (
     DeckCreationResult,
@@ -108,11 +119,12 @@ from ankihub.main.subdecks import (
     deck_contains_subdeck_tags,
 )
 from ankihub.main.utils import (
+    clear_empty_cards,
     lowest_level_common_ancestor_deck_name,
     mids_of_notes,
     retain_nids_with_ah_note_type,
 )
-from ankihub.settings import ANKIWEB_ID, log_file_path
+from ankihub.settings import ANKIWEB_ID, config, log_file_path
 
 
 @pytest.fixture
@@ -495,6 +507,34 @@ def test_add_subdeck_tags_to_notes_with_spaces_in_deck_name(
         assert note3.tags == [f"{SUBDECK_TAG}::AA::b_b::c_c"]
 
 
+class TestAnkiHubLoginDialog:
+    def test_login(self, qtbot: QtBot, mock_function: MockFunction):
+        username = "test_username"
+        password = "test_password"
+        token = "test_token"
+
+        login_mock = mock_function(
+            "ankihub.gui.menu.AnkiHubClient.login", return_value=token
+        )
+
+        AnkiHubLogin.display_login()
+
+        window: AnkiHubLogin = AnkiHubLogin._window
+
+        window.username_or_email_box_text.setText(username)
+        window.password_box_text.setText(password)
+        window.login_button.click()
+
+        qtbot.wait_until(lambda: not window.isVisible())
+
+        login_mock.assert_called_once_with(
+            credentials={"username": username, "password": password}
+        )
+
+        assert config.user() == username
+        assert config.token() == token
+
+
 class TestSuggestionDialog:
     @pytest.mark.parametrize(
         "is_new_note_suggestion,is_for_anking_deck,suggestion_type,source_type,media_was_added",
@@ -523,6 +563,7 @@ class TestSuggestionDialog:
             is_for_anking_deck=is_for_anking_deck,
             is_new_note_suggestion=is_new_note_suggestion,
             added_new_media=media_was_added,
+            can_submit_without_review=True,
         )
         dialog.show()
 
@@ -584,6 +625,24 @@ class TestSuggestionDialog:
             change_type=suggestion_type if change_type_needed else None,
             source=expected_source,
         )
+
+    @pytest.mark.parametrize(
+        "can_submit_without_review",
+        [
+            True,
+            False,
+        ],
+    )
+    def test_submit_without_review_checkbox(self, can_submit_without_review: bool):
+        dialog = SuggestionDialog(
+            is_for_anking_deck=False,
+            is_new_note_suggestion=False,
+            added_new_media=False,
+            can_submit_without_review=can_submit_without_review,
+        )
+        dialog.show()
+
+        assert dialog.auto_accept_cb.isVisible() == can_submit_without_review
 
 
 class TestSuggestionDialogGetAnkiNidToPossibleAHDidsDict:
@@ -716,13 +775,13 @@ class TestOpenSuggestionDialogForSingleSuggestion:
         self,
         anki_session_with_addon_data: AnkiSession,
         import_ah_note: ImportAHNote,
-        next_deterministic_uuid: Callable[[], uuid.UUID],
         mock_dependiencies_for_suggestion_dialog: MockDependenciesForSuggestionDialog,
         user_cancels: bool,
         suggest_note_update_succeeds: bool,
+        install_ah_deck: InstallAHDeck,
     ):
         with anki_session_with_addon_data.profile_loaded():
-            ah_did = next_deterministic_uuid()
+            ah_did = install_ah_deck()
             note_info = import_ah_note(ah_did=ah_did)
             note = aqt.mw.col.get_note(NoteId(note_info.anki_nid))
 
@@ -754,19 +813,19 @@ class TestOpenSuggestionDialogForSingleSuggestion:
     def test_with_new_note_which_could_belong_to_two_decks(
         self,
         anki_session_with_addon_data: AnkiSession,
+        install_ah_deck: InstallAHDeck,
         import_ah_note_type: ImportAHNoteType,
         new_note_with_note_type: NewNoteWithNoteType,
-        next_deterministic_uuid: Callable[[], uuid.UUID],
         mock_dependiencies_for_suggestion_dialog: MockDependenciesForSuggestionDialog,
         mock_function: MockFunction,
         user_cancels: bool,
     ):
         with anki_session_with_addon_data.profile_loaded():
-            ah_did_1 = next_deterministic_uuid()
+            ah_did_1 = install_ah_deck()
             note_type = import_ah_note_type(ah_did=ah_did_1)
 
             # Add the note type to a second deck
-            ah_did_2 = next_deterministic_uuid()
+            ah_did_2 = install_ah_deck()
             import_ah_note_type(ah_did=ah_did_2, note_type=note_type)
 
             note = new_note_with_note_type(note_type=note_type)
@@ -850,14 +909,14 @@ class TestOpenSuggestionDialogForBulkSuggestion:
     def test_with_existing_note_belonging_to_single_deck(
         self,
         anki_session_with_addon_data: AnkiSession,
+        install_ah_deck: InstallAHDeck,
         import_ah_note: ImportAHNote,
-        next_deterministic_uuid: Callable[[], uuid.UUID],
         qtbot: QtBot,
         mock_dependencies_for_bulk_suggestion_dialog: MockDependenciesForBulkSuggestionDialog,
         user_cancels: bool,
     ):
         with anki_session_with_addon_data.profile_loaded():
-            ah_did = next_deterministic_uuid()
+            ah_did = install_ah_deck()
             note_info = import_ah_note(ah_did=ah_did)
             nids = [NoteId(note_info.anki_nid)]
 
@@ -879,18 +938,18 @@ class TestOpenSuggestionDialogForBulkSuggestion:
     def test_with_two_new_notes_without_decks_in_common(
         self,
         anki_session_with_addon_data: AnkiSession,
+        install_ah_deck: InstallAHDeck,
         import_ah_note_type: ImportAHNoteType,
         new_note_with_note_type: NewNoteWithNoteType,
-        next_deterministic_uuid: Callable[[], uuid.UUID],
         mock_dependencies_for_bulk_suggestion_dialog: MockDependenciesForBulkSuggestionDialog,
         qtbot: QtBot,
     ):
         with anki_session_with_addon_data.profile_loaded():
-            ah_did_1 = next_deterministic_uuid()
-            note_type_1 = import_ah_note_type(ah_did=ah_did_1)
+            ah_did_1 = install_ah_deck()
+            note_type_1 = import_ah_note_type(ah_did=ah_did_1, force_new=True)
             note_1 = new_note_with_note_type(note_type=note_type_1)
 
-            ah_did_2 = next_deterministic_uuid()
+            ah_did_2 = install_ah_deck()
             note_type_2 = import_ah_note_type(ah_did=ah_did_2, force_new=True)
             note_2 = new_note_with_note_type(note_type=note_type_2)
 
@@ -909,19 +968,19 @@ class TestOpenSuggestionDialogForBulkSuggestion:
     def test_with_two_new_notes_with_decks_in_common(
         self,
         anki_session_with_addon_data: AnkiSession,
+        install_ah_deck: InstallAHDeck,
         import_ah_note_type: ImportAHNoteType,
         new_note_with_note_type: NewNoteWithNoteType,
-        next_deterministic_uuid: Callable[[], uuid.UUID],
         mock_dependencies_for_bulk_suggestion_dialog: MockDependenciesForBulkSuggestionDialog,
         mock_function: MockFunction,
         qtbot: QtBot,
     ):
         with anki_session_with_addon_data.profile_loaded():
-            ah_did_1 = next_deterministic_uuid()
+            ah_did_1 = install_ah_deck()
             note_type = import_ah_note_type(ah_did=ah_did_1)
             note_1 = new_note_with_note_type(note_type=note_type)
 
-            ah_did_2 = next_deterministic_uuid()
+            ah_did_2 = install_ah_deck()
             import_ah_note_type(ah_did=ah_did_2, note_type=note_type)
             note_2 = new_note_with_note_type(note_type=note_type)
 
@@ -1481,16 +1540,9 @@ class TestErrorHandling:
             "\\addons21\\12345789\\src\\ankihub\\errors.py"
         )
 
-    def test_handle_ankihub_401(
-        self,
-        monkeypatch: MonkeyPatch,
-    ):
+    def test_handle_ankihub_401(self, mock_function: MockFunction):
         # Set up mock for AnkiHub login dialog.
-        display_login_mock = Mock()
-        monkeypatch.setattr(AnkiHubLogin, "display_login", display_login_mock)
-
-        # Mock _this_addon_is_involved to return True.
-        monkeypatch.setattr(errors, "_this_addon_mentioned_in_tb", lambda *args: True)
+        display_login_mock = mock_function(AnkiHubLogin, "display_login")
 
         handled = _try_handle_exception(
             exc_type=AnkiHubHTTPError,
@@ -1500,14 +1552,36 @@ class TestErrorHandling:
         assert handled
         display_login_mock.assert_called_once()
 
-    def test_handle_ankihub_406(
-        self,
-        monkeypatch: MonkeyPatch,
-        _mock_ask_user_to_return_false: Mock,
+    @pytest.mark.parametrize(
+        "response_content, expected_handled",
+        [
+            # The exception should only be handled for responses with json content that
+            # contains the "detail" key.
+            ("", False),
+            ("{}", False),
+            ('{"detail": "test"}', True),
+        ],
+    )
+    def test_handle_ankihub_403(
+        self, mock_function: MockFunction, response_content: str, expected_handled: bool
     ):
-        # Mock _this_addon_is_involved to return True.
-        monkeypatch.setattr(errors, "_this_addon_mentioned_in_tb", lambda *args: True)
+        show_error_dialog_mock = mock_function(errors, "show_error_dialog")
 
+        response_mock = Mock()
+        response_mock.status_code = 403
+        response_mock.text = response_content
+        response_mock.json = lambda: json.loads(response_content)  # type: ignore
+
+        handled = _try_handle_exception(
+            exc_type=AnkiHubHTTPError,
+            exc_value=AnkiHubHTTPError(response=response_mock),
+            tb=None,
+        )
+        assert handled == expected_handled
+        assert show_error_dialog_mock.called == expected_handled
+
+    def test_handle_ankihub_406(self, mock_function: MockFunction):
+        ask_user_mock = mock_function(errors, "ask_user", return_value=False)
         handled = _try_handle_exception(
             exc_type=AnkiHubHTTPError,
             exc_value=AnkiHubHTTPError(
@@ -1516,27 +1590,16 @@ class TestErrorHandling:
             tb=None,
         )
         assert handled
-        _mock_ask_user_to_return_false.assert_called_once()
+        ask_user_mock.assert_called_once()
 
-    @fixture
-    def _mock_ask_user_to_return_false(
-        self,
-        monkeypatch: MonkeyPatch,
-    ) -> Generator[Mock, None, None]:
-        # Simply monkeypatching ask_user to return False doesn't work because the errors module
-        # already imported the original askUser function when this fixture is called.
-        # So we need to reload the errors module after monkeypatching askUser.
-        try:
-            with monkeypatch.context() as m:
-                ask_user_mock = Mock(return_value=False)
-                m.setattr("ankihub.gui.utils.ask_user", ask_user_mock)
-                # Reload the errors module so that the monkeypatched askUser function is used.
-                importlib.reload(errors)
 
-                yield ask_user_mock
-        finally:
-            #  Reload the errors module again so that the original askUser function is used for other tests.
-            importlib.reload(errors)
+def test_show_error_dialog(
+    anki_session_with_addon_data: AnkiSession, mock_function: MockFunction, qtbot: QtBot
+):
+    with anki_session_with_addon_data.profile_loaded():
+        show_dialog_mock = mock_function("ankihub.gui.utils.show_dialog")
+        show_error_dialog("some message", title="some title", parent=aqt.mw)
+        qtbot.wait_until(lambda: show_dialog_mock.called)
 
 
 class TestUploadLogs:
@@ -1778,7 +1841,7 @@ class TestCreateCollaborativeDeck:
 
             mock_ui_for_create_collaborative_deck(deck_name)
 
-            mock_function(AnkiHubClient, "get_owned_decks", [])
+            mock_function(AnkiHubClient, "get_owned_decks", return_value=[])
 
             def raise_exception(*args, **kwargs) -> None:
                 raise Exception("test")
@@ -2121,3 +2184,268 @@ class TestSendReviewData:
             assert_datetime_equal_ignore_milliseconds(
                 card_review_data.last_card_review_at, second_review_time
             )
+
+
+def test_clear_empty_cards(anki_session_with_addon_data: AnkiSession, qtbot: QtBot):
+    with anki_session_with_addon_data.profile_loaded():
+        # Create a note with two cards.
+        note = aqt.mw.col.new_note(
+            aqt.mw.col.models.by_name("Cloze"),
+        )
+        note["Text"] = "{{c1::first}} {{c2::second}}"
+        aqt.mw.col.add_note(note, DeckId(1))
+        assert len(note.cards()) == 2  # sanity check
+
+        # Cause the second card to be empty.
+        note["Text"] = "{{c1::first}}"
+        aqt.mw.col.update_note(note)
+        assert len(note.cards()) == 2  # sanity check
+
+        # Clear the empty card.
+        clear_empty_cards()
+        qtbot.wait_until(lambda: len(note.cards()) == 1)
+
+        # Assert that the empty card was cleared.
+        assert len(note.cards()) == 1
+
+
+class TestChooseAnkiHubDeck:
+    @pytest.mark.parametrize(
+        "clicked_key, expected_chosen_deck_index",
+        [(Qt.Key.Key_Enter, 0), (Qt.Key.Key_Escape, None)],
+    )
+    def test_choose_deck(
+        self,
+        anki_session_with_addon_data: AnkiSession,
+        install_ah_deck: InstallAHDeck,
+        qtbot: QtBot,
+        clicked_key: Qt.Key,
+        expected_chosen_deck_index: Optional[int],
+    ):
+        with anki_session_with_addon_data.profile_loaded():
+            ah_dids = []
+            ah_dids.append(install_ah_deck(ah_deck_name="Deck 1"))
+            ah_dids.append(install_ah_deck(ah_deck_name="Deck 2"))
+
+            # choose_ankihub_deck is blocking, so we setup a timer to press a key
+            def on_timeout():
+                qtbot.keyClick(qwidget.children()[0], clicked_key)
+
+            QTimer.singleShot(0, on_timeout)
+
+            qwidget = QWidget()
+            result = choose_ankihub_deck(
+                prompt="Choose a deck",
+                ah_dids=list(ah_dids),
+                parent=qwidget,
+            )
+            if expected_chosen_deck_index is None:
+                assert result is None
+            else:
+                assert ah_dids.index(result) == expected_chosen_deck_index
+
+
+class TestShowDialog:
+    @pytest.mark.parametrize(
+        "scrollable",
+        [True, False],
+    )
+    def test_scrollable_argument(self, qtbot: QtBot, scrollable: bool):
+        # This just tests that the function does not throw an exception for
+        # different values of the scrollable argument.
+        dialog = QDialog()
+        qtbot.addWidget(dialog)
+        show_dialog(
+            text="some text", title="some title", parent=dialog, scrollable=scrollable
+        )
+
+    @pytest.mark.parametrize(
+        "default_button_idx",
+        [0, 1],
+    )
+    @pytest.mark.parametrize(
+        "buttons",
+        [
+            ["Yes", "No"],
+            [
+                ("Yes", QDialogButtonBox.ButtonRole.AcceptRole),
+                ("No", QDialogButtonBox.ButtonRole.RejectRole),
+            ],
+        ],
+    )
+    def test_button_callback(self, qtbot: QtBot, buttons, default_button_idx: int):
+        button_index_from_cb: Optional[int] = None
+
+        def callback(button_index: int):
+            nonlocal button_index_from_cb
+            button_index_from_cb = button_index
+
+        dialog = QDialog()
+        qtbot.addWidget(dialog)
+        show_dialog(
+            text="some text",
+            title="some title",
+            parent=dialog,
+            callback=callback,
+            buttons=buttons,
+            default_button_idx=default_button_idx,
+        )
+        qtbot.keyClick(dialog, Qt.Key.Key_Enter)
+
+        assert button_index_from_cb == default_button_idx
+
+
+class TestPrivateConfigMigrations:
+    def test_oprphaned_deck_extensions_are_removed(
+        self, next_deterministic_uuid: Callable[[], uuid.UUID]
+    ):
+        # Add a deck extension without a corressponding deck to the private config.
+        ah_did = next_deterministic_uuid()
+        deck_extension = DeckExtensionFactory.create(ah_did=ah_did)
+        config.create_or_update_deck_extension_config(deck_extension)
+
+        # sanity check
+        assert config.deck_extensions_ids_for_ah_did(ah_did) == [deck_extension.id]
+
+        # Reload the private config to trigger the migration.
+        config.setup_private_config()
+
+        assert config.deck_extensions_ids_for_ah_did(ah_did) == []
+
+
+class TestOptionalTagSuggestionDialog:
+    def test_submit_tags_for_validated_groups(
+        self,
+        anki_session_with_addon_data: AnkiSession,
+        qtbot: QtBot,
+        install_ah_deck: InstallAHDeck,
+        import_ah_note: ImportAHNote,
+        mock_function: MockFunction,
+    ):
+        with anki_session_with_addon_data.profile_loaded():
+            ah_did = install_ah_deck()
+            note_info = import_ah_note(ah_did=ah_did)
+
+            deck_extensions = [
+                DeckExtensionFactory.create(
+                    ah_did=ah_did,
+                    tag_group_name="tag_group_1",
+                ),
+                DeckExtensionFactory.create(
+                    ah_did=ah_did,
+                    tag_group_name="tag_group_2",
+                ),
+                DeckExtensionFactory.create(
+                    ah_did=ah_did,
+                    tag_group_name="tag_group_3",
+                ),
+            ]
+
+            # Add the deck extensions to the config
+            for deck_extension in deck_extensions:
+                config.create_or_update_deck_extension_config(deck_extension)
+
+            # Mock client methods
+            index_of_invalid_tag_group = 0
+            validation_responses = []
+            for i, deck_extension in enumerate(deck_extensions):
+                validation_reponse = TagGroupValidationResponse(
+                    tag_group_name=deck_extension.tag_group_name,
+                    success=i != index_of_invalid_tag_group,
+                    errors=[],
+                    deck_extension_id=deck_extension.id,
+                )
+                validation_responses.append(validation_reponse)
+
+            get_deck_extensions_mock = mock_function(
+                "ankihub.gui.optional_tag_suggestion_dialog.AnkiHubClient.get_deck_extensions",
+                return_value=deck_extensions,
+            )
+
+            prevalidate_tag_groups_mock = mock_function(
+                "ankihub.main.optional_tag_suggestions.AnkiHubClient.prevalidate_tag_groups",
+                return_value=validation_responses,
+            )
+
+            widget = QWidget()
+            qtbot.addWidget(widget)
+            dialog = OptionalTagsSuggestionDialog(
+                parent=widget, nids=[NoteId(note_info.anki_nid)]
+            )
+
+            # Mock the suggest_tags_for_groups method which is called when the submit button is clicked
+            suggest_tags_for_groups_mock = mock_function(
+                dialog._optional_tags_helper, "suggest_tags_for_groups"
+            )
+
+            dialog.show()
+
+            qtbot.mouseClick(dialog.submit_btn, Qt.MouseButton.LeftButton)
+
+            qtbot.wait_until(lambda: suggest_tags_for_groups_mock.called)
+
+            get_deck_extensions_mock.assert_called_once()
+            prevalidate_tag_groups_mock.assert_called_once()
+
+            # Assert that suggest_tags_for_groups is called for the groups which were validated successfully
+            kwargs = suggest_tags_for_groups_mock.call_args.kwargs
+            assert set(kwargs["tag_groups"]) == set(
+                [deck_extensions[1].tag_group_name, deck_extensions[2].tag_group_name]
+            )
+            assert not kwargs["auto_accept"]
+
+    @pytest.mark.parametrize(
+        "user_relation, expected_checkbox_is_visible",
+        [
+            (UserDeckExtensionRelation.OWNER, True),
+            (UserDeckExtensionRelation.MAINTAINER, True),
+            (UserDeckExtensionRelation.SUBSCRIBER, False),
+        ],
+    )
+    def test_submit_without_review_checkbox_hidden_when_user_cant_use_it(
+        self,
+        anki_session_with_addon_data: AnkiSession,
+        qtbot: QtBot,
+        install_ah_deck: InstallAHDeck,
+        import_ah_note: ImportAHNote,
+        mock_function: MockFunction,
+        user_relation: UserDeckExtensionRelation,
+        expected_checkbox_is_visible: bool,
+    ):
+        with anki_session_with_addon_data.profile_loaded():
+            ah_did = install_ah_deck()
+            note_info = import_ah_note(ah_did=ah_did)
+
+            deck_extension = DeckExtensionFactory.create(
+                ah_did=ah_did,
+                tag_group_name="tag_group_1",
+                user_relation=user_relation,
+            )
+            config.create_or_update_deck_extension_config(deck_extension)
+
+            validation_reponse = TagGroupValidationResponse(
+                tag_group_name=deck_extension.tag_group_name,
+                success=True,
+                errors=[],
+                deck_extension_id=deck_extension.id,
+            )
+
+            mock_function(
+                "ankihub.gui.optional_tag_suggestion_dialog.AnkiHubClient.get_deck_extensions",
+                return_value=[deck_extension],
+            )
+
+            mock_function(
+                "ankihub.main.optional_tag_suggestions.AnkiHubClient.prevalidate_tag_groups",
+                return_value=[validation_reponse],
+            )
+
+            widget = QWidget()
+            qtbot.addWidget(widget)
+            dialog = OptionalTagsSuggestionDialog(
+                parent=widget, nids=[NoteId(note_info.anki_nid)]
+            )
+
+            dialog.show()
+
+            assert dialog.auto_accept_cb.isVisible() == expected_checkbox_is_visible

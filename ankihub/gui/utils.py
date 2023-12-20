@@ -1,5 +1,6 @@
 import uuid
-from typing import Any, Callable, List, Optional, Sequence, Union
+from functools import partial
+from typing import Any, Callable, List, Optional, Sequence, Tuple, Union
 
 import aqt
 from aqt.addons import check_and_prompt_for_updates
@@ -7,6 +8,7 @@ from aqt.qt import (
     QApplication,
     QDialog,
     QDialogButtonBox,
+    QHBoxLayout,
     QIcon,
     QLabel,
     QLayout,
@@ -14,6 +16,7 @@ from aqt.qt import (
     QListWidgetItem,
     QMessageBox,
     QPushButton,
+    QScrollArea,
     QStyle,
     Qt,
     QVBoxLayout,
@@ -21,13 +24,15 @@ from aqt.qt import (
     qconnect,
 )
 from aqt.theme import theme_manager
-from aqt.utils import MessageBox, disable_help_button, showWarning, tooltip
+from aqt.utils import disable_help_button, tooltip
 
 from ..settings import config
 
 
-def show_error_dialog(message: str, *args, **kwargs) -> None:
-    aqt.mw.taskman.run_on_main(lambda: showWarning(message, *args, **kwargs))  # type: ignore
+def show_error_dialog(message: str, title: str, *args, **kwargs) -> None:
+    aqt.mw.taskman.run_on_main(  # type: ignore
+        lambda: show_dialog(message, title=title, icon=warning_icon(), *args, **kwargs)  # type: ignore
+    )
 
 
 def show_tooltip(message: str, parent=aqt.mw, *args, **kwargs) -> None:
@@ -174,7 +179,10 @@ def choose_list(
     c.addItems(choices)
     c.setCurrentRow(startrow)
     layout.addWidget(c)
-    bb = QDialogButtonBox(QDialogButtonBox.StandardButton.Ok)
+    bb = QDialogButtonBox()
+    bb.addButton(QDialogButtonBox.StandardButton.Cancel)
+    bb.addButton(QDialogButtonBox.StandardButton.Ok)
+    qconnect(bb.rejected, d.reject)
     qconnect(bb.accepted, d.accept)
     layout.addWidget(bb)
     if d.exec() == QDialog.DialogCode.Accepted:
@@ -215,7 +223,7 @@ def ask_user(
     parent: Optional[QWidget] = None,
     default_no: bool = False,
     title: str = "Anki",
-    show_cancel_button: bool = True,
+    show_cancel_button: bool = False,
     yes_button_label: str = "Yes",
     no_button_label: str = "No",
 ) -> Optional[bool]:
@@ -254,6 +262,176 @@ def ask_user(
         return False
     else:
         return None
+
+
+ButtonParam = Union[
+    QDialogButtonBox.StandardButton,
+    str,
+    Tuple[str, QDialogButtonBox.ButtonRole],
+]
+
+
+class _Dialog(QDialog):
+    """A simple dialog with a text and buttons. The dialog closes when a button is clicked and
+    the callback is called with the index of the clicked button.
+    This class is intended to be used via with the show_dialog function.
+    """
+
+    def __init__(
+        self,
+        parent: QWidget,
+        text: str,
+        title: str,
+        text_format: Qt.TextFormat,
+        buttons: Optional[Sequence[ButtonParam]],
+        default_button_idx: int,
+        scrollable: bool,
+        callback: Optional[Callable[[int], None]],
+        icon: Optional[QIcon],
+    ) -> None:
+        super().__init__(parent)
+
+        self.text = text
+        self.title = title
+        self.text_format = text_format
+        self.buttons = buttons
+        self.default_button_idx = default_button_idx
+        self.scrollable = scrollable
+        self.callback = callback
+        self.icon = icon
+        self._is_closing = False
+
+        self._setup_ui()
+
+    def _setup_ui(self) -> None:
+        self.setWindowTitle(self.title)
+        disable_help_button(self)
+
+        self.outer_layout = QHBoxLayout(self)
+
+        self.icon_layout = QVBoxLayout()
+        self.outer_layout.addLayout(self.icon_layout)
+
+        self.outer_layout.addSpacing(20)
+
+        # Contains the text and the buttons
+        self.main_layout = QVBoxLayout()
+        self.outer_layout.addLayout(self.main_layout)
+
+        if self.icon is not None:
+            icon_label = QLabel()
+            icon_label.setPixmap(self.icon.pixmap(48, 48))
+            icon_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
+            self.icon_layout.addWidget(icon_label)
+
+            self.icon_layout.addStretch()
+
+        if self.scrollable:
+            area = QScrollArea()
+            area.setWidgetResizable(True)
+            widget = QWidget()
+            area.setWidget(widget)
+            self.main_layout.addWidget(area)
+            self.content_layout = QVBoxLayout(widget)
+        else:
+            self.content_layout = self.main_layout
+
+        label = QLabel(self.text)
+        label.setWordWrap(True)
+        label.setTextFormat(self.text_format)
+        self.content_layout.addWidget(label)
+
+        self.content_layout.addSpacing(10)
+
+        self.button_box = self._setup_button_box()
+
+        self.main_layout.addStretch()
+        self.main_layout.addWidget(self.button_box)
+
+    def _setup_button_box(self) -> QDialogButtonBox:
+        button_box = QDialogButtonBox()
+
+        self.default_button = None
+        for button_index, button in enumerate(self.buttons):
+            if isinstance(button, str):
+                button = button_box.addButton(
+                    button, QDialogButtonBox.ButtonRole.ActionRole
+                )
+            elif isinstance(button, QDialogButtonBox.StandardButton):
+                button = button_box.addButton(button)
+            elif isinstance(button, tuple):
+                button = button_box.addButton(*button)
+
+            qconnect(
+                button.clicked,
+                partial(self._on_btn_clicked_or_dialog_rejected, button_index),
+            )
+
+            if button_index == self.default_button_idx:
+                self.default_button = button
+                button.setDefault(True)
+                button.setAutoDefault(True)
+            else:
+                button.setDefault(False)
+                button.setAutoDefault(False)
+
+        qconnect(self.rejected, partial(self._on_btn_clicked_or_dialog_rejected, None))
+
+        return button_box
+
+    def _on_btn_clicked_or_dialog_rejected(self, button_index: Optional[int]) -> None:
+        # Prevent the callback from getting called recursively when it calls self.reject()
+        if self._is_closing:
+            return
+
+        self._is_closing = True
+
+        self.reject()
+
+        if self.callback is not None:
+            self.callback(button_index)
+
+    def showEvent(self, event):
+        """Set focus to the default button when the dialog is shown."""
+        super().showEvent(event)
+
+        if self.default_button:
+            self.default_button.setFocus()
+
+
+def show_dialog(
+    text: str,
+    title: str,
+    parent: Optional[QWidget] = None,
+    text_format: Qt.TextFormat = Qt.TextFormat.RichText,
+    buttons: Optional[Sequence[ButtonParam]] = [QDialogButtonBox.StandardButton.Ok],
+    default_button_idx: int = 0,
+    scrollable: bool = False,
+    callback: Optional[Callable[[int], None]] = None,
+    icon: Optional[QIcon] = None,
+    open_dialog: bool = True,
+) -> _Dialog:
+    """Show a dialog with the given text and buttons.
+    The callback is called with the index of the clicked button."""
+    if not parent:
+        parent = aqt.mw.app.activeWindow() or aqt.mw
+
+    dialog = _Dialog(
+        parent=parent,
+        text=text,
+        title=title,
+        text_format=text_format,
+        buttons=buttons,
+        default_button_idx=default_button_idx,
+        scrollable=scrollable,
+        callback=callback,
+        icon=icon,
+    )
+
+    if open_dialog:
+        dialog.open()
+
+    return dialog
 
 
 def tooltip_icon() -> QIcon:
@@ -309,26 +487,3 @@ def clear_layout(layout: QLayout) -> None:
             widget.deleteLater()
         elif child.layout():
             clear_layout(child.layout())
-
-
-def ask_user_dialog(
-    text: str,
-    callback: Callable[[int], None],
-    buttons: Union[Sequence[Union[str, QMessageBox.StandardButton]], None] = None,
-    default_button: int = 1,
-    icon: QMessageBox.Icon = QMessageBox.Icon.Question,
-    **kwargs: Any,
-) -> MessageBox:
-    """Shows a question to the user, passes the index of the button clicked to the callback.
-    Adapted from aqt.utils.ask_user_dialog."""
-    if buttons is None:
-        buttons = [QMessageBox.StandardButton.Yes, QMessageBox.StandardButton.No]
-
-    return MessageBox(
-        text,
-        callback=callback,
-        icon=icon,
-        buttons=buttons,
-        default_button=default_button,
-        **kwargs,
-    )

@@ -251,6 +251,12 @@ class OptionalTagSuggestion(DataClassJSONMixinWithConfig):
     tags: List[str]
 
 
+class UserDeckExtensionRelation(Enum):
+    SUBSCRIBER = "subscriber"
+    OWNER = "owner"
+    MAINTAINER = "maintainer"
+
+
 @dataclass
 class DeckExtension(DataClassJSONMixinWithConfig):
     id: int
@@ -259,6 +265,7 @@ class DeckExtension(DataClassJSONMixinWithConfig):
     name: str
     tag_group_name: str
     description: str
+    user_relation: UserDeckExtensionRelation
 
 
 @dataclass

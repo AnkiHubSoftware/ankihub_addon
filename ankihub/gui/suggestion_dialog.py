@@ -34,6 +34,7 @@ from ..ankihub_client import (
     SuggestionType,
     get_media_names_from_note_info,
 )
+from ..ankihub_client.models import UserDeckRelation
 from ..db import ankihub_db
 from ..main.exporting import to_note_data
 from ..main.suggestions import (
@@ -44,7 +45,7 @@ from ..main.suggestions import (
     suggest_note_update,
     suggest_notes_in_bulk,
 )
-from ..settings import ANKING_DECK_ID, RATIONALE_FOR_CHANGE_MAX_LENGTH
+from ..settings import ANKING_DECK_ID, RATIONALE_FOR_CHANGE_MAX_LENGTH, config
 from .media_sync import media_sync
 from .utils import choose_ankihub_deck, show_error_dialog, show_tooltip
 
@@ -90,6 +91,7 @@ def open_suggestion_dialog_for_note(note: Note, parent: QWidget) -> None:
     suggestion_meta = SuggestionDialog(
         is_new_note_suggestion=ah_nid is None,
         is_for_anking_deck=ah_did == ANKING_DECK_ID,
+        can_submit_without_review=_can_submit_without_review(ah_did=ah_did),
         added_new_media=_added_new_media(note),
     ).run()
     if suggestion_meta is None:
@@ -139,6 +141,7 @@ def open_suggestion_dialog_for_bulk_suggestion(
     suggestion_meta = SuggestionDialog(
         is_new_note_suggestion=False,
         is_for_anking_deck=ah_did == ANKING_DECK_ID,
+        can_submit_without_review=_can_submit_without_review(ah_did=ah_did),
         # We currently have a limit of 500 notes per bulk suggestion, so we don't have to worry
         # about performance here.
         added_new_media=any(_added_new_media(note) for note in notes),
@@ -161,6 +164,14 @@ def open_suggestion_dialog_for_bulk_suggestion(
     )
 
 
+def _can_submit_without_review(ah_did: uuid.UUID) -> bool:
+    result = config.deck_config(ah_did).user_relation in [
+        UserDeckRelation.OWNER,
+        UserDeckRelation.MAINTAINER,
+    ]
+    return result
+
+
 def _determine_ah_did_for_nids_to_be_suggested(
     anki_nids: Collection[NoteId], parent: QWidget
 ) -> Optional[uuid.UUID]:
@@ -170,12 +181,9 @@ def _determine_ah_did_for_nids_to_be_suggested(
     Returns None if the user cancelled the deck selection dialog or if there is
     no deck that all notes could belong to."""
     anki_nid_to_possible_ah_dids = get_anki_nid_to_possible_ah_dids_dict(anki_nids)
-    try:
-        dids_that_all_notes_could_belong_to = set.intersection(
-            *anki_nid_to_possible_ah_dids.values()
-        )
-    except Exception as e:  # pragma: no cover
-        _debug_issue_with_determining_ah_did_for_nids(e, anki_nids)  # pragma: no cover
+    dids_that_all_notes_could_belong_to = set.intersection(
+        *anki_nid_to_possible_ah_dids.values()
+    )
 
     if len(dids_that_all_notes_could_belong_to) == 0:
         LOGGER.info(
@@ -196,28 +204,6 @@ def _determine_ah_did_for_nids_to_be_suggested(
             return None
 
     return ah_did
-
-
-def _debug_issue_with_determining_ah_did_for_nids(
-    e: Exception, anki_nids: Collection[NoteId]
-) -> None:  # pragma: no cover
-    """Log information about the error that occurred when determining the AnkiHub
-    deck for the given notes and raises the given exception again.
-
-    https://ankihub.sentry.io/issues/4505671584/events/2f1d264aaba34c628a2562f9e2f35fe6/?project=6546414
-    """
-    if len(anki_nids) != 1 or anki_nids == [0]:
-        raise e
-
-    note = aqt.mw.col.get_note(list(anki_nids)[0])
-    LOGGER.info(
-        "Error while determining AnkiHub deck for note suggestion.\n"
-        f"\t{note.id}\n"
-        f"\t{note.mid}\n"
-        f"\t{ankihub_db.is_ankihub_note_type(note.mid)=}\n"
-        f"\t{ankihub_db.ankihub_dids_for_note_type(note.mid)=}\n"
-    )
-    raise e
 
 
 def _added_new_media(note: Note) -> bool:
@@ -301,11 +287,13 @@ class SuggestionDialog(QDialog):
         self,
         is_new_note_suggestion: bool,
         is_for_anking_deck: bool,
+        can_submit_without_review: bool,
         added_new_media: bool,
     ) -> None:
         super().__init__()
         self._is_new_note_suggestion = is_new_note_suggestion
         self._is_for_anking_deck = is_for_anking_deck
+        self._can_submit_without_review = can_submit_without_review
         self._added_new_media = added_new_media
 
         self._setup_ui()
@@ -372,7 +360,8 @@ class SuggestionDialog(QDialog):
             self.layout_.addSpacing(10)
 
         # Set up "auto-accept" checkbox
-        self.auto_accept_cb = QCheckBox("Submit without review (maintainers only).")
+        self.auto_accept_cb = QCheckBox("Submit without review.")
+        self.auto_accept_cb.setVisible(self._can_submit_without_review)
         self.layout_.addWidget(self.auto_accept_cb)
 
         # Set up button box
@@ -466,7 +455,6 @@ UWORLD_STEP_OPTIONS = [
 
 
 class SourceWidget(QWidget):
-
     # Emitted when the validation result was determined after self._validate was called.
     # The _validate method is called when the user changes the input in form elements that get validated.
     validation_signal = pyqtSignal(bool)

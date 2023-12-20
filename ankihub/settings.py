@@ -37,7 +37,7 @@ from .ankihub_client import (
     STAGING_S3_BUCKET_URL,
     DeckExtension,
 )
-from .ankihub_client.models import UserDeckRelation
+from .ankihub_client.models import Deck, UserDeckRelation
 from .private_config_migrations import migrate_private_config
 from .public_config_migrations import migrate_public_config
 
@@ -272,8 +272,22 @@ class _Config:
         if self.subscriptions_change_hook:
             self.subscriptions_change_hook()
 
-    def remove_deck(self, ankihub_did: uuid.UUID) -> None:
-        """Remove deck from list of installed decks."""
+    def update_deck(self, deck: Deck):
+        """Update the deck config with the values from the Deck object."""
+        deck_config = self.deck_config(deck.ah_did)
+
+        # Only these fields are needed for the deck config
+        deck_config.name = deck.name
+        deck_config.user_relation = deck.user_relation
+
+        self._update_private_config()
+
+    def remove_deck_and_its_extensions(self, ankihub_did: uuid.UUID) -> None:
+        """Remove a deck. Also remove the deck extensions of the deck."""
+        for deck_extension_id in config.deck_extensions_ids_for_ah_did(ankihub_did):
+            config.remove_deck_extension(deck_extension_id)
+        LOGGER.info(f"Removed deck extensions for deck {ankihub_did}")
+
         if self._private_config.decks.get(ankihub_did):
             self._private_config.decks.pop(ankihub_did)
             self._update_private_config()
@@ -354,6 +368,11 @@ class _Config:
             if self.deck_extension_config(extension_id).ah_did == ah_did
         ]
         return result
+
+    def remove_deck_extension(self, extension_id: int) -> None:
+        self._private_config.deck_extensions.pop(extension_id)
+        self._update_private_config()
+        LOGGER.info(f"Removed deck extension {extension_id}")
 
     def is_logged_in(self) -> bool:
         return bool(self.token())
