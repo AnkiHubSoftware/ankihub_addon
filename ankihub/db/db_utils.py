@@ -28,9 +28,11 @@ class DBConnection:
         except Exception as e:
             LOGGER.info(f"Error while executing SQL: {sql}")
             raise e
-        finally:
+        else:
             if not self._is_used_as_context_manager:
                 self._conn.commit()
+        finally:
+            if not self._is_used_as_context_manager:
                 self._conn.close()
 
         return result
