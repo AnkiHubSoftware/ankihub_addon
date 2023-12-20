@@ -333,7 +333,7 @@ class SuggestionDialog(QDialog):
         self._callback = callback
 
         self._setup_ui()
-        self.open()
+        self.show()
 
     def _setup_ui(self) -> None:
         self.setWindowTitle("Note Suggestion(s)")
