@@ -14,6 +14,7 @@ from .menu import AnkiHubLogin
 from .operations.ankihub_sync import sync_with_ankihub
 from .operations.utils import future_with_exception, future_with_result
 from .threading_utils import rate_limited
+from .utils import extract_argument
 
 # Rate limit to one sync every x seconds to prevent syncs running in parallel and causing problems.
 SYNC_RATE_LIMIT_SECONDS = 2
@@ -73,11 +74,9 @@ def _on_ankiweb_sync(*args, **kwargs) -> None:
     _old = kwargs["_old"]
     del kwargs["_old"]
 
-    if kwargs.get("after_sync"):
-        after_sync = kwargs["after_sync"]
-    else:
-        args = list(args)
-        after_sync = args.pop(1)
+    args, kwargs, after_sync = extract_argument(
+        _old, args=args, kwargs=kwargs, arg_name="after_sync"
+    )
 
     def new_after_sync() -> None:
         after_sync()
