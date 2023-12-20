@@ -132,8 +132,9 @@ class _AnkiHubMediaSync:
         """
         deck_config = config.deck_config(ankihub_did)
         if deck_config is None:
-            LOGGER.warning(f"No deck config for {ankihub_did=}")
-            return
+            # This only happens if the deck gets deleted during the media sync.
+            LOGGER.warning(f"No deck config for {ankihub_did=}")  # pragma: no cover
+            return  # pragma: no cover
 
         media_list: List[DeckMedia] = []
         latest_update: Optional[datetime] = None
