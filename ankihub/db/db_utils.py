@@ -6,14 +6,15 @@ from .. import LOGGER
 
 class DBConnection:
     """A wrapper around a sqlite3.Connection that provides some convenience methods.
-    The lock_context is used to wrap calls to self.execute()."""
+    The lock_context_func is used to wrap transactions."""
 
     def __init__(
-        self, conn: sqlite3.Connection, lock_context: Callable[[], ContextManager]
+        self, conn: sqlite3.Connection, lock_context_func: Callable[[], ContextManager]
     ):
         self._conn = conn
         self._is_used_as_context_manager = False
-        self._lock_context = lock_context
+        self._lock_context_func = lock_context_func
+        self._lock_context: Optional[ContextManager] = None
 
     def execute(
         self,
@@ -21,8 +22,11 @@ class DBConnection:
         *args,
         first_row_only=False,
     ) -> List:
-        with self._lock_context():
+        if self._is_used_as_context_manager:
             return self._execute_inner(sql, *args, first_row_only=first_row_only)
+        else:
+            with self._lock_context_func():
+                return self._execute_inner(sql, *args, first_row_only=first_row_only)
 
     def _execute_inner(self, sql: str, *args, first_row_only=False) -> List:
         try:
@@ -61,10 +65,13 @@ class DBConnection:
             return None
 
     def __enter__(self):
+        self._lock_context = self._lock_context_func()
+        self._lock_context.__enter__()
         self._is_used_as_context_manager = True
         return self
 
     def __exit__(self, exc_type, exc_val, exc_tb):
-        self._is_used_as_context_manager = False
         self._conn.commit()
         self._conn.close()
+        self._is_used_as_context_manager = False
+        self._lock_context.__exit__(exc_type, exc_val, exc_tb)
