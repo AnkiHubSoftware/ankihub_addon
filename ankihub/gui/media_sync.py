@@ -153,8 +153,6 @@ class _AnkiHubMediaSync:
             )
 
         if media_list:
-            # TODO This should be in a transaction to undo the changes if e.g. the deck gets deleted in the meantime.
-            # We can't use a transaction here right now because then we couldn't use the upsert_deck_media_infos method.
             ankihub_db.upsert_deck_media_infos(
                 ankihub_did=ankihub_did, media_list=media_list
             )
