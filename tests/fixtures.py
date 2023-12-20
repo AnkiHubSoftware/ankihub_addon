@@ -26,6 +26,7 @@ from ankihub.ankihub_client.ankihub_client import AnkiHubClient
 from ankihub.ankihub_client.models import Deck, UserDeckRelation
 from ankihub.feature_flags import setup_feature_flags
 from ankihub.gui.media_sync import _AnkiHubMediaSync
+from ankihub.gui.suggestion_dialog import SuggestionMetadata
 from ankihub.main.importing import AnkiHubImporter
 from ankihub.main.utils import modify_note_type
 from ankihub.settings import DeckConfig, config
@@ -642,6 +643,37 @@ def mock_study_deck_dialog_with_cb(
         )
 
     return mock_study_deck_dialog_inner
+
+
+class MockSuggestionDialog(Protocol):
+    def __call__(self, user_cancels: bool) -> None:
+        ...
+
+
+@pytest.fixture
+def mock_suggestion_dialog(monkeypatch: MonkeyPatch) -> MockSuggestionDialog:
+    """Mocks the SuggestionDialog class to call the callback with the correct suggestion metadata
+    when the class is instantiated."""
+
+    def mock_suggestion_dialog_inner(user_cancels: bool) -> None:
+        suggestion_dialog_mock = Mock()
+
+        def side_effect(*args, callback, **kwargs):
+            if user_cancels:
+                suggestion_metadata = None
+            else:
+                suggestion_metadata = SuggestionMetadata(
+                    comment="test",
+                )
+            aqt.mw.taskman.run_on_main(lambda: callback(suggestion_metadata))
+            return suggestion_dialog_mock
+
+        suggestion_dialog_mock.side_effect = side_effect
+        monkeypatch.setattr(
+            "ankihub.gui.suggestion_dialog.SuggestionDialog", suggestion_dialog_mock
+        )
+
+    return mock_suggestion_dialog_inner
 
 
 def record_review_for_anki_nid(anki_nid: NoteId, date_time: datetime) -> None:

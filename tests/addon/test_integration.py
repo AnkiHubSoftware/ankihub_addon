@@ -75,6 +75,7 @@ from ..fixtures import (
     MockFunction,
     MockShowDialogWithCB,
     MockStudyDeckDialogWithCB,
+    MockSuggestionDialog,
     create_or_get_ah_version_of_note_type,
     record_review,
 )
@@ -526,16 +527,14 @@ def test_editor(
     monkeypatch: MonkeyPatch,
     next_deterministic_uuid: Callable[[], uuid.UUID],
     install_sample_ah_deck: InstallSampleAHDeck,
+    mock_suggestion_dialog: MockSuggestionDialog,
 ):
     with anki_session_with_addon_data.profile_loaded():
         mw = anki_session_with_addon_data.mw
 
         install_sample_ah_deck()
 
-        # mock the dialog so it doesn't block the testq
-        monkeypatch.setattr(
-            "ankihub.gui.suggestion_dialog.SuggestionDialog.exec", Mock()
-        )
+        mock_suggestion_dialog(user_cancels=False)
 
         add_cards_dialog: AddCards = dialogs.open("AddCards", mw)
         editor = add_cards_dialog.editor
