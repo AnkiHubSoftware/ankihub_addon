@@ -79,7 +79,7 @@ def _try_reinstall_decks_with_something_missing(
             [
                 deck_config.name
                 for deck_id in ah_dids_with_missing_values
-                if (deck_config := config.deck_config(deck_id))
+                if (deck_config := config.deck_config(deck_id)) is not None
             ],
             key=str.lower,
         )
