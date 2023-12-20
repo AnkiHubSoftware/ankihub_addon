@@ -61,6 +61,8 @@ class DBConnection:
     def __exit__(self, exc_type, exc_val, exc_tb):
         if exc_type is None:
             self._conn.commit()
+        else:
+            self._conn.rollback()
 
         self._conn.close()
         self._is_used_as_context_manager = False
