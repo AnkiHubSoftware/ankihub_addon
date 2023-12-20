@@ -652,8 +652,12 @@ class MockSuggestionDialog(Protocol):
 
 @pytest.fixture
 def mock_suggestion_dialog(monkeypatch: MonkeyPatch) -> MockSuggestionDialog:
-    """Mocks the SuggestionDialog class to call the callback with the correct suggestion metadata
-    when the class is instantiated."""
+    """Mock the SuggestionDialog class to run the callback which is passed to its __init__ method
+    on the main thread when the __init__ method is called.
+
+    user_cancels: If True, the callback is called with None as the suggestion metadata.
+        If False, the callback is called with a SuggestionMetadata object as the suggestion metadata.
+    """
 
     def mock_suggestion_dialog_inner(user_cancels: bool) -> None:
         suggestion_dialog_mock = Mock()
