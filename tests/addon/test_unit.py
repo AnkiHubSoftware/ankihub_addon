@@ -1076,6 +1076,30 @@ class TestOnSuggestNotesInBulkDone:
         assert kwargs.get("message") == "test"
 
 
+class TestDBConnection:
+    @pytest.mark.parametrize(
+        "exception_is_raised",
+        [True, False],
+    )
+    def test_changes_are_rolled_back_on_exception_in_context_manager(
+        self, ankihub_db: _AnkiHubDB, exception_is_raised: bool
+    ):
+        try:
+            with ankihub_db.connection() as conn:
+                conn.execute("CREATE TABLE test (id TEXT PRIMARY KEY)")
+                conn.execute("INSERT INTO test VALUES (?)", 1)
+                if exception_is_raised:
+                    raise Exception("test")
+        except Exception:
+            pass
+
+        result_str = ankihub_db.scalar("SELECT * FROM test")
+        if exception_is_raised:
+            assert result_str is None
+        else:
+            assert result_str == "1"
+
+
 class TestAnkiHubDBAnkiNidsToAnkiHubNids:
     def test_anki_nids_to_ankihub_nids(
         self,
