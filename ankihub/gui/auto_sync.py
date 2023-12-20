@@ -10,6 +10,7 @@ from aqt import AnkiQt
 
 from .. import LOGGER
 from ..settings import ANKI_INT_VERSION, config
+from .menu import AnkiHubLogin
 from .operations.ankihub_sync import sync_with_ankihub
 from .operations.utils import future_with_exception, future_with_result
 from .threading_utils import rate_limited
@@ -72,12 +73,24 @@ def _on_ankiweb_sync(*args, **kwargs) -> None:
     _old = kwargs["_old"]
     del kwargs["_old"]
 
+    if kwargs.get("after_sync"):
+        after_sync = kwargs["after_sync"]
+    else:
+        args = list(args)
+        after_sync = args.pop(1)
+
+    def new_after_sync() -> None:
+        after_sync()
+
+        if _should_auto_sync_with_ankihub() and not config.is_logged_in():
+            AnkiHubLogin.display_login()
+
     # This function has to be called, because it could have a callback that Anki needs to run,
     # for example to close the Anki profile once the sync is done.
     def sync_with_ankiweb(future: Future) -> None:
         # The original function should be called even if the sync with AnkiHub fails, so we run it
         # this before future.result() (which can raise an exception)
-        _old(*args, **kwargs)
+        _old(*args, **kwargs, after_sync=new_after_sync)
 
         future.result()
 
@@ -99,16 +112,21 @@ def _maybe_sync_with_ankihub(on_done: Callable[[Future], None]) -> None:
         on_done(future_with_result(None))
         return
 
-    if (config.public_config["auto_sync"] == "on_ankiweb_sync") or (
-        config.public_config["auto_sync"] == "on_startup"
-        and not auto_sync_state.attempted_startup_sync
-    ):
+    if _should_auto_sync_with_ankihub():
         auto_sync_state.attempted_startup_sync = True
         LOGGER.info("Syncing with AnkiHub in _new_sync_collection")
         sync_with_ankihub(on_done=on_done)
     else:
         LOGGER.info("Not syncing with AnkiHub")
         on_done(future_with_result(None))
+
+
+def _should_auto_sync_with_ankihub() -> bool:
+    result = (config.public_config["auto_sync"] == "on_ankiweb_sync") or (
+        config.public_config["auto_sync"] == "on_startup"
+        and not auto_sync_state.attempted_startup_sync
+    )
+    return result
 
 
 def _workaround_for_addon_compatibility_on_startup_sync() -> None:
