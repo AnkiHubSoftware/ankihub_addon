@@ -125,9 +125,17 @@ class _AnkiHubMediaSync:
             self._client.download_media(missing_media_names, ah_did)
 
     def _update_deck_media(self, ankihub_did: uuid.UUID) -> None:
-        """Fetch deck media updates from AnkiHub and update the database and the config."""
-        media_list: List[DeckMedia] = []
+        """Fetch deck media updates from AnkiHub and update the database and the config.
+
+        If the deck configuration for the provided AnkiHub deck ID is not found (i.e., is None),
+        the function logs a warning and returns early without making any updates.
+        """
         deck_config = config.deck_config(ankihub_did)
+        if deck_config is None:
+            LOGGER.warning(f"No deck config for {ankihub_did=}")
+            return
+
+        media_list: List[DeckMedia] = []
         latest_update: Optional[datetime] = None
         for chunk in self._client.get_deck_media_updates(
             ankihub_did,
