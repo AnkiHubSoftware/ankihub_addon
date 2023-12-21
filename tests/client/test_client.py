@@ -1474,7 +1474,7 @@ class TestUploadMediaForDeck:
             assert set(zip_ref.namelist()) == set(all_media_names_in_notes)
 
         # Remove the zipped file at the end of the test
-        mocker.resetall()
+        mocker.stop(os.remove)
         os.remove(path_to_created_zip_file)
         assert path_to_created_zip_file.is_file() is False
 
