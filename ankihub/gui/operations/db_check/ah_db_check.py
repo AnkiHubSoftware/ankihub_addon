@@ -21,7 +21,8 @@ def check_ankihub_db(on_success: Optional[Callable[[], None]] = None) -> None:
 
 def _fetch_missing_note_types() -> None:
     """Fetches note types which are missing from the database from AnkiHub.
-    This is necessary because in a previous version of the add-on, note types were not saved in the database."""
+    This is necessary because in a previous version of the add-on, note types were not saved in the database.
+    """
     client = AnkiHubClient()
     for ah_did in ankihub_db.ankihub_deck_ids():
         mids = ankihub_db.list(
@@ -76,8 +77,9 @@ def _try_reinstall_decks_with_something_missing(
     else:
         deck_names = sorted(
             [
-                config.deck_config(deck_id).name
+                deck_config.name
                 for deck_id in ah_dids_with_missing_values
+                if (deck_config := config.deck_config(deck_id)) is not None
             ],
             key=str.lower,
         )

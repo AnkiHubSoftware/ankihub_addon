@@ -6,6 +6,7 @@ import uuid
 from dataclasses import fields
 from datetime import datetime, timedelta
 from pathlib import Path
+from sqlite3 import ProgrammingError
 from textwrap import dedent
 from time import sleep
 from typing import Callable, ContextManager, Generator, List, Optional, Protocol, Tuple
@@ -558,12 +559,15 @@ class TestSuggestionDialog:
         suggestion_type: SuggestionType,
         source_type: SourceType,
         media_was_added: bool,
+        qtbot: QtBot,
     ):
+        callback_mock = Mock()
         dialog = SuggestionDialog(
             is_for_anking_deck=is_for_anking_deck,
             is_new_note_suggestion=is_new_note_suggestion,
             added_new_media=media_was_added,
             can_submit_without_review=True,
+            callback=callback_mock,
         )
         dialog.show()
 
@@ -620,10 +624,16 @@ class TestSuggestionDialog:
             else None
         )
 
-        assert dialog.suggestion_meta() == SuggestionMetadata(
-            comment="test",
-            change_type=suggestion_type if change_type_needed else None,
-            source=expected_source,
+        dialog.accept()
+
+        qtbot.wait_until(lambda: callback_mock.called)
+
+        callback_mock.assert_called_once_with(
+            SuggestionMetadata(
+                comment="test",
+                change_type=suggestion_type if change_type_needed else None,
+                source=expected_source,
+            )
         )
 
     @pytest.mark.parametrize(
@@ -634,11 +644,13 @@ class TestSuggestionDialog:
         ],
     )
     def test_submit_without_review_checkbox(self, can_submit_without_review: bool):
+        callback_mock = Mock()
         dialog = SuggestionDialog(
             is_for_anking_deck=False,
             is_new_note_suggestion=False,
             added_new_media=False,
             can_submit_without_review=can_submit_without_review,
+            callback=callback_mock,
         )
         dialog.show()
 
@@ -725,8 +737,8 @@ class MockDependenciesForSuggestionDialog(Protocol):
 
 @pytest.fixture
 def mock_dependiencies_for_suggestion_dialog(
-    monkeypatch: MonkeyPatch,
     mock_function: MockFunction,
+    mock_suggestion_dialog,
 ) -> MockDependenciesForSuggestionDialog:
     """Mocks the dependencies for open_suggestion_dialog_for_note.
     Returns a tuple of mocks that replace suggest_note_update and suggest_new_note
@@ -736,16 +748,7 @@ def mock_dependiencies_for_suggestion_dialog(
     def mock_dependencies_for_suggestion_dialog_inner(
         user_cancels: bool,
     ) -> Tuple[Mock, Mock]:
-        monkeypatch.setattr(
-            "ankihub.gui.suggestion_dialog.SuggestionDialog.run",
-            Mock(return_value=None)
-            if user_cancels
-            else Mock(
-                return_value=SuggestionMetadata(
-                    comment="test",
-                )
-            ),
-        )
+        mock_suggestion_dialog(user_cancels=user_cancels)
 
         suggest_note_update_mock = mock_function(
             suggestion_dialog,
@@ -866,6 +869,7 @@ class MockDependenciesForBulkSuggestionDialog(Protocol):
 @pytest.fixture
 def mock_dependencies_for_bulk_suggestion_dialog(
     monkeypatch: MonkeyPatch,
+    mock_suggestion_dialog,
 ) -> MockDependenciesForBulkSuggestionDialog:
     """Mocks the dependencies for open_suggestion_dialog_for_bulk_suggestion.
     Returns a Mock that replaces suggest_notes_in_bulk.
@@ -873,16 +877,7 @@ def mock_dependencies_for_bulk_suggestion_dialog(
     """
 
     def mock_dependencies_for_suggestion_dialog_inner(user_cancels: bool) -> Mock:
-        monkeypatch.setattr(
-            "ankihub.gui.suggestion_dialog.SuggestionDialog.run",
-            Mock(return_value=None)
-            if user_cancels
-            else Mock(
-                return_value=SuggestionMetadata(
-                    comment="test",
-                )
-            ),
-        )
+        mock_suggestion_dialog(user_cancels=user_cancels)
 
         suggest_notes_in_bulk_mock = Mock()
         monkeypatch.setattr(
@@ -1075,6 +1070,72 @@ class TestOnSuggestNotesInBulkDone:
         )
         _, kwargs = show_error_dialog_mock.call_args
         assert kwargs.get("message") == "test"
+
+
+class TestDBConnection:
+    def test_execute(self, ankihub_db: _AnkiHubDB):
+        ankihub_db.connection().execute("CREATE TABLE test (id TEXT PRIMARY KEY)")
+        ankihub_db.connection().execute("INSERT INTO test VALUES (?)", 1)
+        result = ankihub_db.execute("SELECT * FROM test")
+        assert result == [("1",)]
+
+    def test_execute_first_row_only(self, ankihub_db: _AnkiHubDB):
+        ankihub_db.connection().execute("CREATE TABLE test (id TEXT PRIMARY KEY)")
+        ankihub_db.connection().execute("INSERT INTO test VALUES (?)", 1)
+        result = ankihub_db.execute("SELECT * FROM test", first_row_only=True)
+        assert result == ("1",)
+
+    def test_scalar(self, ankihub_db: _AnkiHubDB):
+        ankihub_db.connection().execute(
+            "CREATE TABLE test (id TEXT PRIMARY KEY, other_field TEXT)"
+        )
+        ankihub_db.connection().execute("INSERT INTO test VALUES (?, ?)", 1, "test")
+        result = ankihub_db.scalar("SELECT * FROM test")
+        assert result == "1"
+
+    def test_list(self, ankihub_db: _AnkiHubDB):
+        ankihub_db.connection().execute("CREATE TABLE test (id TEXT PRIMARY KEY)")
+        ankihub_db.connection().execute("INSERT INTO test VALUES (?)", 1)
+        ankihub_db.connection().execute("INSERT INTO test VALUES (?)", 2)
+        result = ankihub_db.list("SELECT * FROM test")
+        assert result == ["1", "2"]
+
+    def test_first(self, ankihub_db: _AnkiHubDB):
+        ankihub_db.connection().execute("CREATE TABLE test (id TEXT PRIMARY KEY)")
+        ankihub_db.connection().execute("INSERT INTO test VALUES (?)", 1)
+        result = ankihub_db.first("SELECT * FROM test")
+        assert result == ("1",)
+
+    def test_reusing_connection_not_as_context_manager_raises_exception(
+        self, ankihub_db: _AnkiHubDB
+    ):
+        conn = ankihub_db.connection()
+        with pytest.raises(ProgrammingError) as e:
+            conn.execute("CREATE TABLE test (id TEXT PRIMARY KEY)")
+            conn.execute("INSERT INTO test VALUES (?)", 1)
+        assert "Cannot operate on a closed database." in str(e.value)
+
+    @pytest.mark.parametrize(
+        "exception_is_raised",
+        [True, False],
+    )
+    def test_changes_are_rolled_back_on_exception_in_context_manager(
+        self, ankihub_db: _AnkiHubDB, exception_is_raised: bool
+    ):
+        try:
+            with ankihub_db.connection() as conn:
+                conn.execute("CREATE TABLE test (id TEXT PRIMARY KEY)")
+                conn.execute("INSERT INTO test VALUES (?)", 1)
+                if exception_is_raised:
+                    raise Exception("test")
+        except Exception:
+            pass
+
+        result_str = ankihub_db.scalar("SELECT * FROM test")
+        if exception_is_raised:
+            assert result_str is None
+        else:
+            assert result_str == "1"
 
 
 class TestAnkiHubDBAnkiNidsToAnkiHubNids:
