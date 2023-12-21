@@ -22,6 +22,7 @@ from typing import (
     Tuple,
     Union,
 )
+from unittest.mock import Mock
 from zipfile import ZipFile
 
 import aqt
@@ -404,7 +405,7 @@ def sync_with_ankihub(qtbot: QtBot) -> SyncWithAnkiHub:
 
 
 class CreateChangeSuggestion(Protocol):
-    def __call__(self, note: Note, wait_for_media_upload: bool) -> "unittest.mock.Mock":
+    def __call__(self, note: Note, wait_for_media_upload: bool) -> Mock:
         ...
 
 
@@ -444,7 +445,7 @@ def create_change_suggestion(
 class CreateNewNoteSuggestion(Protocol):
     def __call__(
         self, note: Note, ah_did: uuid.UUID, wait_for_media_upload: bool
-    ) -> "unittest.mock.Mock":
+    ) -> Mock:
         ...
 
 
@@ -4160,7 +4161,7 @@ class TestSuggestionsWithMedia:
     def _assert_media_names_on_note_and_suggestion_as_expected(
         self,
         note: Note,
-        suggestion_request_mock: "unittest.mock.Mock",
+        suggestion_request_mock: Mock,
         expected_media_name: str,
     ):
         # Assert that the media name in the note is as expected.
