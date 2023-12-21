@@ -149,7 +149,7 @@ class MockFunction(Protocol):
 
 @pytest.fixture
 def mock_function(
-    monkeypatch: MonkeyPatch,
+    mocker,
 ) -> MockFunction:
     def _mock_function(
         *args,
@@ -158,14 +158,9 @@ def mock_function(
     ) -> Mock:
         # The args can be either an object and a function name or the full path to the function as a string.
         assert len(args) in [1, 2]
-        mock = Mock()
-        mock.return_value = return_value
-        monkeypatch.setattr(  # type: ignore
-            *args,
-            mock,
+        return mocker.patch.object(
+            *args, return_value=return_value, side_effect=side_effect
         )
-        mock.side_effect = side_effect
-        return mock
 
     return _mock_function
 

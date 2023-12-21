@@ -706,18 +706,16 @@ class TestDownloadAndInstallDecks:
                 ), f"Mock {name} was not called once, but {mock.call_count} times"
 
     def test_exception_is_not_backpropagated_to_caller(
-        self, anki_session_with_addon_data: AnkiSession, mock_function: MockFunction
+        self, anki_session_with_addon_data: AnkiSession, mocker: MockerFixture
     ):
         with anki_session_with_addon_data.profile_loaded():
             # Mock a function which is called in download_install_decks to raise an exception.
             exception_mesaage = "test exception"
 
-            def raise_exception(*args, **kwargs) -> None:
-                raise Exception(exception_mesaage)
-
-            mock_function(
-                "ankihub.gui.operations.deck_installation.aqt.mw.taskman.with_progress",
-                side_effect=raise_exception,
+            mocker.patch.object(
+                aqt.mw.taskman,
+                "with_progress",
+                side_effect=Exception(exception_mesaage),
             )
 
             # Set up the on_done callback
@@ -3392,18 +3390,16 @@ class TestSyncWithAnkiHub:
         assert config._private_config.api_version_on_last_sync == API_VERSION
 
     def test_exception_is_not_backpropagated_to_caller(
-        self, anki_session_with_addon_data: AnkiSession, mock_function: MockFunction
+        self, anki_session_with_addon_data: AnkiSession, mocker: MockerFixture
     ):
         with anki_session_with_addon_data.profile_loaded():
             # Mock a client function which is called in sync_with_ankihub to raise an exception.
             exception_mesaage = "test exception"
 
-            def raise_exception(*args, **kwargs) -> None:
-                raise Exception(exception_mesaage)
-
-            mock_function(
-                "ankihub.gui.operations.ankihub_sync.AnkiHubClient.get_deck_subscriptions",
-                side_effect=raise_exception,
+            mocker.patch.object(
+                AnkiHubClient,
+                "get_deck_subscriptions",
+                side_effect=Exception(exception_mesaage),
             )
 
             # Set up the on_done callback
