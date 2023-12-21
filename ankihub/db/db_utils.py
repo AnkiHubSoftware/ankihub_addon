@@ -5,7 +5,16 @@ from .. import LOGGER
 
 
 class DBConnection:
-    """A wrapper around a sqlite3.Connection that provides some convenience methods."""
+    """A wrapper around a sqlite3.Connection that provides convenience methods for
+    executing queries and handling transactions.
+    This class can be used as a context manager, in which case all queries executed within
+    the context will be part of a single transaction. If an exception occurs within the context,
+    the transaction will be automatically rolled back.
+
+    Note: Once a query has been executed using an instance of this class,
+    the instance cannot be used to execute another query unless it is within a context manager.
+    Attempting to do so will raise an exception.
+    """
 
     def __init__(self, conn: sqlite3.Connection):
         self._conn = conn
@@ -38,6 +47,7 @@ class DBConnection:
         return result
 
     def scalar(self, sql: str, *args) -> Any:
+        """Returns the first column of the first row of the result set, or None if the result set is empty."""
         rows = self.execute(sql, *args, first_row_only=True)
         if rows:
             return rows[0]
@@ -45,9 +55,11 @@ class DBConnection:
             return None
 
     def list(self, sql: str, *args) -> List:
+        """Returns the first column of each row of the result set as a list."""
         return [x[0] for x in self.execute(sql, *args, first_row_only=False)]
 
     def first(self, sql: str, *args) -> Optional[Tuple]:
+        """Returns the first row of the result set, or None if the result set is empty."""
         rows = self.execute(sql, *args, first_row_only=True)
         if rows:
             return tuple(rows)
