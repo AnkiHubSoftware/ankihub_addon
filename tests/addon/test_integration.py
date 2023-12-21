@@ -53,7 +53,6 @@ from ankihub.ankihub_client.models import (
     DeckMediaUpdateChunk,
     UserDeckExtensionRelation,
 )
-from ankihub.gui import deckbrowser
 from ankihub.gui.browser.browser import (
     ModifiedAfterSyncSearchNode,
     NewNoteSearchNode,
@@ -115,7 +114,7 @@ from ankihub.debug import (
     _setup_logging_for_db_begin,
     _setup_logging_for_sync_collection_and_media,
 )
-from ankihub.gui import auto_sync, operations, utils
+from ankihub.gui import auto_sync, utils
 from ankihub.gui.auto_sync import (
     SYNC_RATE_LIMIT_SECONDS,
     _setup_ankihub_sync_on_ankiweb_sync,
@@ -132,7 +131,7 @@ from ankihub.gui.editor import _on_suggestion_button_press, _refresh_buttons
 from ankihub.gui.errors import upload_logs_and_data_in_background
 from ankihub.gui.media_sync import media_sync
 from ankihub.gui.menu import menu_state
-from ankihub.gui.operations import ankihub_sync, new_deck_subscriptions
+from ankihub.gui.operations import ankihub_sync
 from ankihub.gui.operations.db_check import ah_db_check
 from ankihub.gui.operations.db_check.ah_db_check import check_ankihub_db
 from ankihub.gui.operations.deck_installation import download_and_install_decks
@@ -750,9 +749,8 @@ class TestCheckAndInstallNewDeckSubscriptions:
             )
 
             # Mock download and install operation to only call the on_done callback
-            download_and_install_decks_mock = mocker.patch.object(
-                operations.new_deck_subscriptions,
-                "download_and_install_decks",
+            download_and_install_decks_mock = mocker.patch(
+                "ankihub.gui.operations.new_deck_subscriptions.download_and_install_decks",
                 side_effect=lambda *args, on_done, **kwargs: on_done(
                     future_with_result(None)
                 ),
@@ -833,9 +831,8 @@ class TestCheckAndInstallNewDeckSubscriptions:
         with anki_session.profile_loaded():
             # Mock confirmation dialog to raise an exception
 
-            message_box_mock = mocker.patch.object(
-                new_deck_subscriptions,
-                "show_dialog",
+            message_box_mock = mocker.patch(
+                "ankihub.gui.operations.new_deck_subscriptions.show_dialog",
                 side_effect=Exception("Something went wrong"),
             )
 
@@ -871,9 +868,8 @@ class TestCheckAndInstallNewDeckSubscriptions:
             )
 
             # Mock download and install operation to raise an exception
-            download_and_install_decks_mock = mocker.patch.object(
-                operations.new_deck_subscriptions,
-                "download_and_install_decks",
+            download_and_install_decks_mock = mocker.patch(
+                "ankihub.gui.operations.new_deck_subscriptions.download_and_install_decks",
                 side_effect=Exception("Something went wrong"),
             )
 
@@ -2747,7 +2743,7 @@ class TestDeckManagementDialog:
         mocker.patch.object(config, "is_logged_in", lambda: True)
 
         # Mock the ask_user function to always return True
-        mocker.patch.object(operations.subdecks, "ask_user", return_value=True)
+        mocker.patch("ankihub.gui.operations.subdecks.ask_user", return_value=True)
 
 
 class TestBuildSubdecksAndMoveCardsToThem:
@@ -3547,9 +3543,8 @@ class TestAutoSync:
         importlib.reload(aqt.main)
 
         # Mock the new deck subscriptions operation to just call its callback.
-        self.check_and_install_new_deck_subscriptions_mock = mocker.patch.object(
-            operations.ankihub_sync,
-            "check_and_install_new_deck_subscriptions",
+        self.check_and_install_new_deck_subscriptions_mock = mocker.patch(
+            "ankihub.gui.operations.ankihub_sync.check_and_install_new_deck_subscriptions"
         )
         self.check_and_install_new_deck_subscriptions_mock.side_effect = (
             lambda *args, **kwargs: kwargs["on_done"](future_with_result(None))
@@ -3578,7 +3573,9 @@ class TestAutoSyncRateLimit:
         # Run the entry point so that the auto sync and rate limit is set up.
         entry_point.run()
         with anki_session_with_addon_data.profile_loaded():
-            sync_with_ankihub_mock = mocker.patch.object(auto_sync, "sync_with_ankihub")
+            sync_with_ankihub_mock = mocker.patch(
+                "ankihub.gui.auto_sync.sync_with_ankihub"
+            )
 
             # Trigger the sync two times, with a delay in between.
             aqt.mw._sync_collection_and_media(lambda: None)
@@ -3921,7 +3918,7 @@ def mock_client_media_upload(
     )
 
     # Mock os.remove so the zip is not deleted
-    os_remove_mock = mocker.patch.object(os, "remove")
+    os_remove_mock = mocker.patch("os.remove")
 
     # Create a temporary media folder and copy the test media files to it.
     # Patch the media folder path to point to the temporary folder.
@@ -4428,7 +4425,7 @@ def test_delete_ankihub_private_config_on_deckBrowser__delete_option(
         assert deck_uuid
 
         # Will control the conditional responsible to delete or not the ankihub deck private config
-        mocker.patch.object(deckbrowser, "ask_user", return_value=True)
+        mocker.patch("ankihub.gui.deckbrowser.ask_user", return_value=True)
 
         unsubscribe_from_deck_mock = mocker.patch.object(
             AnkiHubClient, "unsubscribe_from_deck"
@@ -4478,7 +4475,7 @@ def test_not_delete_ankihub_private_config_on_deckBrowser__delete_option(
         assert deck_uuid
 
         # Will control the conditional responsible to delete or not the ankihub deck private config
-        mocker.patch.object(deckbrowser, "ask_user", return_value=False)
+        mocker.patch("ankihub.gui.deckbrowser.ask_user", return_value=False)
 
         mw.deckBrowser._delete(anki_deck_id)
         qtbot.wait(500)
