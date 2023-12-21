@@ -219,7 +219,7 @@ class _AnkiHubDB:
     def connection(self) -> DBConnection:
         result = DBConnection(
             conn=sqlite3.connect(ankihub_db.database_path),
-            lock_context_func=detached_ankihub_db,
+            thread_safety_context_func=detached_ankihub_db,
         )
         return result
 

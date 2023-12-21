@@ -11,7 +11,8 @@ class DBConnection:
     the context will be part of a single transaction. If an exception occurs within the context,
     the transaction will be automatically rolled back.
 
-    The lock_context_func is used to wrap transactions.
+    thread_safety_context_func: A function that returns a context manager. This is used to ensure that
+    threads only access the database when it is safe to do so.
 
     Note: Once a query has been executed using an instance of this class,
     the instance cannot be used to execute another query unless it is within a context manager.
@@ -19,12 +20,14 @@ class DBConnection:
     """
 
     def __init__(
-        self, conn: sqlite3.Connection, lock_context_func: Callable[[], ContextManager]
+        self,
+        conn: sqlite3.Connection,
+        thread_safety_context_func: Callable[[], ContextManager],
     ):
         self._conn = conn
         self._is_used_as_context_manager = False
-        self._lock_context_func = lock_context_func
-        self._lock_context: Optional[ContextManager] = None
+        self._thread_safety_context_func = thread_safety_context_func
+        self._thread_safety_context: Optional[ContextManager] = None
 
     def execute(
         self,
@@ -35,7 +38,7 @@ class DBConnection:
         if self._is_used_as_context_manager:
             return self._execute_inner(sql, *args, first_row_only=first_row_only)
         else:
-            with self._lock_context_func():
+            with self._thread_safety_context_func():
                 return self._execute_inner(sql, *args, first_row_only=first_row_only)
 
     def _execute_inner(self, sql: str, *args, first_row_only=False) -> List:
@@ -80,8 +83,8 @@ class DBConnection:
             return None
 
     def __enter__(self):
-        self._lock_context = self._lock_context_func()
-        self._lock_context.__enter__()
+        self._thread_safety_context = self._thread_safety_context_func()
+        self._thread_safety_context.__enter__()
         self._is_used_as_context_manager = True
         return self
 
@@ -93,4 +96,4 @@ class DBConnection:
 
         self._conn.close()
         self._is_used_as_context_manager = False
-        self._lock_context.__exit__(exc_type, exc_val, exc_tb)
+        self._thread_safety_context.__exit__(exc_type, exc_val, exc_tb)
