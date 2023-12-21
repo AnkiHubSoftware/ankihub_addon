@@ -15,10 +15,9 @@ import pytest
 from anki.decks import DeckId
 from anki.models import NotetypeDict
 from anki.notes import Note, NoteId
-from aqt import utils
 from aqt.qt import QDialog, QDialogButtonBox, Qt, QTimer, QWidget
-from pytest import MonkeyPatch
 from pytest_anki import AnkiSession
+from pytest_mock import MockerFixture
 from pytestqt.qtbot import QtBot  # type: ignore
 from requests import Response
 
@@ -866,8 +865,8 @@ class MockDependenciesForBulkSuggestionDialog(Protocol):
 
 @pytest.fixture
 def mock_dependencies_for_bulk_suggestion_dialog(
-    monkeypatch: MonkeyPatch,
     mock_suggestion_dialog,
+    mocker: MockerFixture,
 ) -> MockDependenciesForBulkSuggestionDialog:
     """Mocks the dependencies for open_suggestion_dialog_for_bulk_suggestion.
     Returns a Mock that replaces suggest_notes_in_bulk.
@@ -877,15 +876,11 @@ def mock_dependencies_for_bulk_suggestion_dialog(
     def mock_dependencies_for_suggestion_dialog_inner(user_cancels: bool) -> Mock:
         mock_suggestion_dialog(user_cancels=user_cancels)
 
-        suggest_notes_in_bulk_mock = Mock()
-        monkeypatch.setattr(
+        suggest_notes_in_bulk_mock = mocker.patch(
             "ankihub.gui.suggestion_dialog.suggest_notes_in_bulk",
-            suggest_notes_in_bulk_mock,
         )
 
-        monkeypatch.setattr(
-            "ankihub.gui.suggestion_dialog._on_suggest_notes_in_bulk_done", Mock()
-        )
+        mocker.patch("ankihub.gui.suggestion_dialog._on_suggest_notes_in_bulk_done")
         return suggest_notes_in_bulk_mock
 
     return mock_dependencies_for_suggestion_dialog_inner
@@ -1638,7 +1633,7 @@ class TestRateLimitedDecorator:
         assert execution_counter == 11
 
 
-def test_error_dialog(qtbot: QtBot, monkeypatch: MonkeyPatch):
+def test_error_dialog(qtbot: QtBot, mocker: MockerFixture):
     try:
         raise Exception("test")
     except Exception as e:
@@ -1652,8 +1647,7 @@ def test_error_dialog(qtbot: QtBot, monkeypatch: MonkeyPatch):
     dialog.debug_info_button.click()
 
     # Check that the Yes button opens a link (to the AnkiHub forum).
-    open_link_mock = Mock()
-    monkeypatch.setattr(utils, "openLink", open_link_mock)
+    open_link_mock = mocker.patch("aqt.utils.openLink")
     dialog.button_box.button(QDialogButtonBox.StandardButton.Yes).click()
     open_link_mock.assert_called_once()
 
