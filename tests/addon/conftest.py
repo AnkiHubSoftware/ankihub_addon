@@ -24,6 +24,7 @@ from ..fixtures import (  # noqa F401
     mock_message_box_with_cb,
     mock_show_dialog_with_cb,
     mock_study_deck_dialog_with_cb,
+    mock_suggestion_dialog,
     new_note_with_note_type,
     next_deterministic_id,
     next_deterministic_uuid,

@@ -558,12 +558,15 @@ class TestSuggestionDialog:
         suggestion_type: SuggestionType,
         source_type: SourceType,
         media_was_added: bool,
+        qtbot: QtBot,
     ):
+        callback_mock = Mock()
         dialog = SuggestionDialog(
             is_for_anking_deck=is_for_anking_deck,
             is_new_note_suggestion=is_new_note_suggestion,
             added_new_media=media_was_added,
             can_submit_without_review=True,
+            callback=callback_mock,
         )
         dialog.show()
 
@@ -620,10 +623,16 @@ class TestSuggestionDialog:
             else None
         )
 
-        assert dialog.suggestion_meta() == SuggestionMetadata(
-            comment="test",
-            change_type=suggestion_type if change_type_needed else None,
-            source=expected_source,
+        dialog.accept()
+
+        qtbot.wait_until(lambda: callback_mock.called)
+
+        callback_mock.assert_called_once_with(
+            SuggestionMetadata(
+                comment="test",
+                change_type=suggestion_type if change_type_needed else None,
+                source=expected_source,
+            )
         )
 
     @pytest.mark.parametrize(
@@ -634,11 +643,13 @@ class TestSuggestionDialog:
         ],
     )
     def test_submit_without_review_checkbox(self, can_submit_without_review: bool):
+        callback_mock = Mock()
         dialog = SuggestionDialog(
             is_for_anking_deck=False,
             is_new_note_suggestion=False,
             added_new_media=False,
             can_submit_without_review=can_submit_without_review,
+            callback=callback_mock,
         )
         dialog.show()
 
@@ -725,8 +736,8 @@ class MockDependenciesForSuggestionDialog(Protocol):
 
 @pytest.fixture
 def mock_dependiencies_for_suggestion_dialog(
-    monkeypatch: MonkeyPatch,
     mock_function: MockFunction,
+    mock_suggestion_dialog,
 ) -> MockDependenciesForSuggestionDialog:
     """Mocks the dependencies for open_suggestion_dialog_for_note.
     Returns a tuple of mocks that replace suggest_note_update and suggest_new_note
@@ -736,16 +747,7 @@ def mock_dependiencies_for_suggestion_dialog(
     def mock_dependencies_for_suggestion_dialog_inner(
         user_cancels: bool,
     ) -> Tuple[Mock, Mock]:
-        monkeypatch.setattr(
-            "ankihub.gui.suggestion_dialog.SuggestionDialog.run",
-            Mock(return_value=None)
-            if user_cancels
-            else Mock(
-                return_value=SuggestionMetadata(
-                    comment="test",
-                )
-            ),
-        )
+        mock_suggestion_dialog(user_cancels=user_cancels)
 
         suggest_note_update_mock = mock_function(
             suggestion_dialog,
@@ -866,6 +868,7 @@ class MockDependenciesForBulkSuggestionDialog(Protocol):
 @pytest.fixture
 def mock_dependencies_for_bulk_suggestion_dialog(
     monkeypatch: MonkeyPatch,
+    mock_suggestion_dialog,
 ) -> MockDependenciesForBulkSuggestionDialog:
     """Mocks the dependencies for open_suggestion_dialog_for_bulk_suggestion.
     Returns a Mock that replaces suggest_notes_in_bulk.
@@ -873,16 +876,7 @@ def mock_dependencies_for_bulk_suggestion_dialog(
     """
 
     def mock_dependencies_for_suggestion_dialog_inner(user_cancels: bool) -> Mock:
-        monkeypatch.setattr(
-            "ankihub.gui.suggestion_dialog.SuggestionDialog.run",
-            Mock(return_value=None)
-            if user_cancels
-            else Mock(
-                return_value=SuggestionMetadata(
-                    comment="test",
-                )
-            ),
-        )
+        mock_suggestion_dialog(user_cancels=user_cancels)
 
         suggest_notes_in_bulk_mock = Mock()
         monkeypatch.setattr(
