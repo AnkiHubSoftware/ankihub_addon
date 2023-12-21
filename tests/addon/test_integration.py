@@ -22,7 +22,6 @@ from typing import (
     Tuple,
     Union,
 )
-from unittest.mock import MagicMock, Mock, patch
 from zipfile import ZipFile
 
 import aqt
@@ -42,7 +41,7 @@ from aqt.browser.sidebar.tree import SidebarTreeView
 from aqt.importing import AnkiPackageImporter
 from aqt.qt import QAction, Qt
 from aqt.theme import theme_manager
-from pytest import MonkeyPatch, fixture
+from pytest import fixture
 from pytest_anki import AnkiSession
 from pytest_mock import MockerFixture
 from pytestqt.qtbot import QtBot  # type: ignore
@@ -73,7 +72,6 @@ from ..fixtures import (
     ImportAHNote,
     InstallAHDeck,
     MockDownloadAndInstallDeckDependencies,
-    MockFunction,
     MockShowDialogWithCB,
     MockStudyDeckDialogWithCB,
     MockSuggestionDialog,
@@ -356,7 +354,7 @@ class MockClientGetNoteType(Protocol):
 
 
 @fixture
-def mock_client_get_note_type(monkeypatch: MonkeyPatch) -> MockClientGetNoteType:
+def mock_client_get_note_type(mocker: MockerFixture) -> MockClientGetNoteType:
     """Mock the get_note_type method of the AnkiHubClient to return the matching note type
     based on the id of the note type."""
 
@@ -373,10 +371,7 @@ def mock_client_get_note_type(monkeypatch: MonkeyPatch) -> MockClientGetNoteType
             assert result is not None
             return result
 
-        monkeypatch.setattr(
-            "ankihub.main.reset_local_changes.AnkiHubClient.get_note_type",
-            note_type_by_id,
-        )
+        mocker.patch.object(AnkiHubClient, "get_note_type", side_effect=note_type_by_id)
 
     return _mock_client_note_types
 
@@ -409,19 +404,19 @@ def sync_with_ankihub(qtbot: QtBot) -> SyncWithAnkiHub:
 
 
 class CreateChangeSuggestion(Protocol):
-    def __call__(self, note: Note, wait_for_media_upload: bool) -> Mock:
+    def __call__(self, note: Note, wait_for_media_upload: bool) -> "unittest.mock.Mock":
         ...
 
 
 @pytest.fixture
 def create_change_suggestion(
-    qtbot: QtBot, mock_function: MockFunction, mock_client_media_upload: Mocker
+    qtbot: QtBot, mocker: MockerFixture, mock_client_media_upload: Mocker
 ):
     """Create a change suggestion for a note and wait for the background thread that uploads media to finish.
     Returns the mock for the create_change_note_suggestion method. It can be used to get information
     about the suggestion that was passed to the client."""
 
-    create_change_suggestion_mock = mock_function(
+    create_change_suggestion_mock = mocker.patch.object(
         AnkiHubClient,
         "create_change_note_suggestion",
     )
@@ -449,19 +444,19 @@ def create_change_suggestion(
 class CreateNewNoteSuggestion(Protocol):
     def __call__(
         self, note: Note, ah_did: uuid.UUID, wait_for_media_upload: bool
-    ) -> Mock:
+    ) -> "unittest.mock.Mock":
         ...
 
 
 @pytest.fixture
 def create_new_note_suggestion(
-    qtbot: QtBot, mock_function: MockFunction, mock_client_media_upload: Mocker
+    qtbot: QtBot, mocker: MockerFixture, mock_client_media_upload: Mocker
 ):
     """Create a new note suggestion for a note and wait for the background thread that uploads media to finish.
     Returns the mock for the create_new_note_suggestion_mock method. It can be used to get information
     about the suggestion that was passed to the client."""
 
-    create_new_note_suggestion_mock = mock_function(
+    create_new_note_suggestion_mock = mocker.patch.object(
         AnkiHubClient,
         "create_new_note_suggestion",
     )
@@ -672,6 +667,7 @@ class TestDownloadAndInstallDecks:
         self,
         anki_session_with_addon_data: AnkiSession,
         qtbot: QtBot,
+        mocker: MockerFixture,
         mock_download_and_install_deck_dependencies: MockDownloadAndInstallDeckDependencies,
         ankihub_basic_note_type: NotetypeDict,
     ):
@@ -684,7 +680,7 @@ class TestDownloadAndInstallDecks:
             )
 
             # Download and install the deck
-            on_success_mock = Mock()
+            on_success_mock = mocker.stub()
             download_and_install_decks([deck.ah_did], on_done=on_success_mock)
             qtbot.wait_until(lambda: on_success_mock.call_count == 1)
 
@@ -743,7 +739,7 @@ class TestCheckAndInstallNewDeckSubscriptions:
         self,
         anki_session_with_addon_data: AnkiSession,
         qtbot: QtBot,
-        mock_function: MockFunction,
+        mocker: MockerFixture,
         mock_show_dialog_with_cb: MockShowDialogWithCB,
     ):
         anki_session = anki_session_with_addon_data
@@ -755,16 +751,16 @@ class TestCheckAndInstallNewDeckSubscriptions:
             )
 
             # Mock download and install operation to only call the on_done callback
-            download_and_install_decks_mock = mock_function(
+            download_and_install_decks_mock = mocker.patch.object(
                 operations.new_deck_subscriptions,
                 "download_and_install_decks",
-                side_effect=lambda *args, **kwargs: kwargs["on_done"](
+                side_effect=lambda *args, on_done, **kwargs: on_done(
                     future_with_result(None)
                 ),
             )
 
             # Call the function with a deck
-            on_done_mock = Mock()
+            on_done_mock = mocker.stub()
             deck = DeckFactory.create()
             check_and_install_new_deck_subscriptions(
                 subscribed_decks=[deck], on_done=on_done_mock
@@ -784,6 +780,7 @@ class TestCheckAndInstallNewDeckSubscriptions:
         self,
         anki_session_with_addon_data: AnkiSession,
         qtbot: QtBot,
+        mocker: MockerFixture,
         mock_show_dialog_with_cb: MockShowDialogWithCB,
     ):
         anki_session = anki_session_with_addon_data
@@ -795,7 +792,7 @@ class TestCheckAndInstallNewDeckSubscriptions:
             )
 
             # Call the function with a deck
-            on_done_mock = Mock()
+            on_done_mock = mocker.stub()
             deck = DeckFactory.create()
             check_and_install_new_deck_subscriptions(
                 subscribed_decks=[deck], on_done=on_done_mock
@@ -810,12 +807,13 @@ class TestCheckAndInstallNewDeckSubscriptions:
     def test_no_new_subscriptions(
         self,
         anki_session_with_addon_data: AnkiSession,
+        mocker: MockerFixture,
         qtbot: QtBot,
     ):
         anki_session = anki_session_with_addon_data
         with anki_session.profile_loaded():
             # Call the function with an empty list
-            on_done_mock = Mock()
+            on_done_mock = mocker.stub()
             check_and_install_new_deck_subscriptions(
                 subscribed_decks=[], on_done=on_done_mock
             )
@@ -830,23 +828,20 @@ class TestCheckAndInstallNewDeckSubscriptions:
         self,
         anki_session_with_addon_data: AnkiSession,
         qtbot: QtBot,
-        mock_function: MockFunction,
+        mocker: MockerFixture,
     ):
         anki_session = anki_session_with_addon_data
         with anki_session.profile_loaded():
             # Mock confirmation dialog to raise an exception
 
-            def raise_exception(*args, **kwargs):
-                raise Exception("Something went wrong")
-
-            message_box_mock = mock_function(
+            message_box_mock = mocker.patch.object(
                 new_deck_subscriptions,
                 "show_dialog",
-                side_effect=raise_exception,
+                side_effect=Exception("Something went wrong"),
             )
 
             # Call the function with a deck
-            on_done_mock = Mock()
+            on_done_mock = mocker.stub()
             deck = DeckFactory.create()
             check_and_install_new_deck_subscriptions(
                 subscribed_decks=[deck], on_done=on_done_mock
@@ -865,7 +860,7 @@ class TestCheckAndInstallNewDeckSubscriptions:
         self,
         anki_session_with_addon_data: AnkiSession,
         qtbot: QtBot,
-        mock_function: MockFunction,
+        mocker: MockerFixture,
         mock_show_dialog_with_cb: MockShowDialogWithCB,
     ):
         anki_session = anki_session_with_addon_data
@@ -877,17 +872,14 @@ class TestCheckAndInstallNewDeckSubscriptions:
             )
 
             # Mock download and install operation to raise an exception
-            def raise_exception(*args, **kwargs):
-                raise Exception("Something went wrong")
-
-            download_and_install_decks_mock = mock_function(
+            download_and_install_decks_mock = mocker.patch.object(
                 operations.new_deck_subscriptions,
                 "download_and_install_decks",
-                side_effect=raise_exception,
+                side_effect=Exception("Something went wrong"),
             )
 
             # Call the function with a deck
-            on_done_mock = Mock()
+            on_done_mock = mocker.stub()
             deck = DeckFactory.create()
             check_and_install_new_deck_subscriptions(
                 subscribed_decks=[deck], on_done=on_done_mock
@@ -993,7 +985,7 @@ def test_suggest_note_update(
             note=note,
             change_type=SuggestionType.NEW_CONTENT,
             comment="test",
-            media_upload_cb=Mock(),
+            media_upload_cb=mocker.stub(),
         )
 
         # Check that the correct suggestion was created
@@ -1013,6 +1005,7 @@ def test_suggest_note_update(
 
 def test_suggest_new_note(
     anki_session_with_addon_data: AnkiSession,
+    mocker: MockerFixture,
     requests_mock: Mocker,
     install_sample_ah_deck: InstallSampleAHDeck,
 ):
@@ -1038,7 +1031,7 @@ def test_suggest_new_note(
             note=note,
             ankihub_did=ah_did,
             comment="test",
-            media_upload_cb=Mock(),
+            media_upload_cb=mocker.stub(),
         )
 
         # ... assert that add-on internal and optional tags were filtered out
@@ -1062,7 +1055,7 @@ def test_suggest_new_note(
                 note=note,
                 ankihub_did=ah_did,
                 comment="test",
-                media_upload_cb=Mock(),
+                media_upload_cb=mocker.stub(),
             )
         except AnkiHubHTTPError as e:
             exc = e
@@ -1071,15 +1064,13 @@ def test_suggest_new_note(
 
 def test_suggest_notes_in_bulk(
     anki_session_with_addon_data: AnkiSession,
-    monkeypatch: MonkeyPatch,
+    mocker: MockerFixture,
     install_sample_ah_deck: InstallSampleAHDeck,
     next_deterministic_uuid: Callable[[], uuid.UUID],
 ):
     anki_session = anki_session_with_addon_data
-    bulk_suggestions_method_mock = MagicMock()
-    monkeypatch.setattr(
-        "ankihub.ankihub_client.AnkiHubClient.create_suggestions_in_bulk",
-        bulk_suggestions_method_mock,
+    bulk_suggestions_method_mock = mocker.patch.object(
+        AnkiHubClient, "create_suggestions_in_bulk"
     )
     with anki_session.profile_loaded():
         mw = anki_session.mw
@@ -1108,16 +1099,15 @@ def test_suggest_notes_in_bulk(
         mw.col.update_notes(notes)
 
         new_note_ah_id = next_deterministic_uuid()
-        with monkeypatch.context() as m:
-            m.setattr("uuid.uuid4", lambda: new_note_ah_id)
-            suggest_notes_in_bulk(
-                ankihub_did=ah_did,
-                notes=notes,
-                auto_accept=False,
-                change_type=SuggestionType.NEW_CONTENT,
-                comment="test",
-                media_upload_cb=Mock(),
-            )
+        mocker.patch("uuid.uuid4", return_value=new_note_ah_id)
+        suggest_notes_in_bulk(
+            ankihub_did=ah_did,
+            notes=notes,
+            auto_accept=False,
+            change_type=SuggestionType.NEW_CONTENT,
+            comment="test",
+            media_upload_cb=mocker.stub(),
+        )
 
         assert bulk_suggestions_method_mock.call_count == 1
         assert bulk_suggestions_method_mock.call_args.kwargs == {
@@ -2120,6 +2110,7 @@ class TestCustomSearchNodes:
         self,
         anki_session_with_addon_data: AnkiSession,
         install_sample_ah_deck: InstallSampleAHDeck,
+        mocker: MockerFixture,
     ):
         with anki_session_with_addon_data.profile_loaded():
             mw = anki_session_with_addon_data.mw
@@ -2127,7 +2118,7 @@ class TestCustomSearchNodes:
             install_sample_ah_deck()
             all_nids = mw.col.find_notes("")
 
-            browser = Mock()
+            browser = mocker.Mock()
             browser.table.is_notes_mode.return_value = True
 
             with attached_ankihub_db():
@@ -2156,6 +2147,7 @@ class TestCustomSearchNodes:
         self,
         anki_session_with_addon_data: AnkiSession,
         install_sample_ah_deck: InstallSampleAHDeck,
+        mocker: MockerFixture,
     ):
         with anki_session_with_addon_data.profile_loaded():
             mw = anki_session_with_addon_data.mw
@@ -2163,7 +2155,7 @@ class TestCustomSearchNodes:
             install_sample_ah_deck()
             all_cids = mw.col.find_cards("")
 
-            browser = Mock()
+            browser = mocker.Mock()
             browser.table.is_notes_mode.return_value = False
 
             with attached_ankihub_db():
@@ -2192,6 +2184,7 @@ class TestCustomSearchNodes:
         self,
         anki_session_with_addon_data: AnkiSession,
         install_sample_ah_deck: InstallSampleAHDeck,
+        mocker: MockerFixture,
     ):
         with anki_session_with_addon_data.profile_loaded():
             mw = anki_session_with_addon_data.mw
@@ -2200,7 +2193,7 @@ class TestCustomSearchNodes:
 
             all_nids = mw.col.find_notes("")
 
-            browser = Mock()
+            browser = mocker.Mock()
             browser.table.is_notes_mode.return_value = True
 
             with attached_ankihub_db():
@@ -2233,6 +2226,7 @@ class TestCustomSearchNodes:
         self,
         anki_session_with_addon_data: AnkiSession,
         next_deterministic_uuid: Callable[[], uuid.UUID],
+        mocker: MockerFixture,
     ):
         with anki_session_with_addon_data.profile_loaded():
             mw = anki_session_with_addon_data.mw
@@ -2263,7 +2257,7 @@ class TestCustomSearchNodes:
 
             all_nids = mw.col.find_notes("")
 
-            browser = Mock()
+            browser = mocker.Mock()
             browser.table.is_notes_mode.return_value = True
 
             with attached_ankihub_db():
@@ -2277,6 +2271,7 @@ class TestCustomSearchNodes:
         self,
         anki_session_with_addon_data: AnkiSession,
         next_deterministic_uuid: Callable[[], uuid.UUID],
+        mocker: MockerFixture,
     ):
         with anki_session_with_addon_data.profile_loaded():
             mw = anki_session_with_addon_data.mw
@@ -2307,7 +2302,7 @@ class TestCustomSearchNodes:
 
             all_nids = mw.col.find_notes("")
 
-            browser = Mock()
+            browser = mocker.Mock()
             browser.table.is_notes_mode.return_value = True
 
             with attached_ankihub_db():
@@ -2325,6 +2320,7 @@ class TestCustomSearchNodes:
         self,
         anki_session_with_addon_data: AnkiSession,
         install_sample_ah_deck: InstallSampleAHDeck,
+        mocker: MockerFixture,
     ):
         with anki_session_with_addon_data.profile_loaded():
             mw = anki_session_with_addon_data.mw
@@ -2333,7 +2329,7 @@ class TestCustomSearchNodes:
 
             all_nids = mw.col.find_notes("")
 
-            browser = Mock()
+            browser = mocker.Mock()
             browser.table.is_notes_mode.return_value = True
 
             with attached_ankihub_db():
@@ -2569,20 +2565,20 @@ class TestDeckManagementDialog:
         anki_session_with_addon_data: AnkiSession,
         install_ah_deck: InstallAHDeck,
         qtbot: QtBot,
-        monkeypatch: MonkeyPatch,
+        mocker: MockerFixture,
         nightmode: bool,
     ):
         with anki_session_with_addon_data.profile_loaded():
-            self._mock_dependencies(monkeypatch)
+            self._mock_dependencies(mocker)
 
             deck_name = "Test Deck"
             ah_did = install_ah_deck(ah_deck_name=deck_name)
             anki_did = config.deck_config(ah_did).anki_id
 
-            monkeypatch.setattr(
+            mocker.patch.object(
                 AnkiHubClient,
                 "get_deck_subscriptions",
-                lambda *args: [
+                return_value=[
                     DeckFactory.create(ah_did=ah_did, anki_did=anki_did, name=deck_name)
                 ],
             )
@@ -2607,10 +2603,10 @@ class TestDeckManagementDialog:
         qtbot: QtBot,
         install_ah_deck: InstallAHDeck,
         import_ah_note: ImportAHNote,
-        monkeypatch: MonkeyPatch,
+        mocker: MockerFixture,
     ):
         with anki_session_with_addon_data.profile_loaded():
-            self._mock_dependencies(monkeypatch)
+            self._mock_dependencies(mocker)
 
             # Install a deck with subdeck tags
             subdeck_name, anki_did, ah_did = self._install_deck_with_subdeck_tag(
@@ -2620,10 +2616,10 @@ class TestDeckManagementDialog:
             assert aqt.mw.col.decks.by_name(subdeck_name) is None
 
             # Mock get_deck_subscriptions to return the deck
-            monkeypatch.setattr(
+            mocker.patch.object(
                 AnkiHubClient,
                 "get_deck_subscriptions",
-                lambda *args: [DeckFactory.create(ah_did=ah_did, anki_did=anki_did)],
+                return_value=[DeckFactory.create(ah_did=ah_did, anki_did=anki_did)],
             )
 
             # Open the dialog
@@ -2671,19 +2667,19 @@ class TestDeckManagementDialog:
         anki_session_with_addon_data: AnkiSession,
         qtbot: QtBot,
         install_ah_deck: InstallAHDeck,
-        monkeypatch: MonkeyPatch,
+        mocker: MockerFixture,
         mock_study_deck_dialog_with_cb: MockStudyDeckDialogWithCB,
     ):
         with anki_session_with_addon_data.profile_loaded():
-            self._mock_dependencies(monkeypatch)
+            self._mock_dependencies(mocker)
 
             ah_did = install_ah_deck()
 
             # Mock get_deck_subscriptions to return the deck
-            monkeypatch.setattr(
+            mocker.patch.object(
                 AnkiHubClient,
                 "get_deck_subscriptions",
-                lambda *args: [
+                return_value=[
                     DeckFactory.create(
                         ah_did=ah_did, anki_did=config.deck_config(ah_did).anki_id
                     )
@@ -2721,19 +2717,19 @@ class TestDeckManagementDialog:
         self,
         anki_session_with_addon_data: AnkiSession,
         qtbot: QtBot,
-        monkeypatch: MonkeyPatch,
+        mocker: MockerFixture,
         next_deterministic_uuid: Callable[[], uuid.UUID],
         next_deterministic_id: Callable[[], int],
     ):
         with anki_session_with_addon_data.profile_loaded():
-            self._mock_dependencies(monkeypatch)
+            self._mock_dependencies(mocker)
 
             ah_did = next_deterministic_uuid()
             anki_did = next_deterministic_id()
-            monkeypatch.setattr(
+            mocker.patch.object(
                 AnkiHubClient,
                 "get_deck_subscriptions",
-                lambda *args: [DeckFactory.create(ah_did=ah_did, anki_did=anki_did)],
+                return_value=[DeckFactory.create(ah_did=ah_did, anki_did=anki_did)],
             )
 
             dialog = DeckManagementDialog()
@@ -2747,14 +2743,12 @@ class TestDeckManagementDialog:
 
             assert hasattr(dialog, "deck_not_installed_label")
 
-    def _mock_dependencies(self, monkeypatch: MonkeyPatch) -> None:
+    def _mock_dependencies(self, mocker: MockerFixture) -> None:
         # Mock the config to return that the user is logged in
-        monkeypatch.setattr(config, "is_logged_in", lambda: True)
+        mocker.patch.object(config, "is_logged_in", lambda: True)
 
         # Mock the ask_user function to always return True
-        monkeypatch.setattr(
-            operations.subdecks, "ask_user", lambda *args, **kwargs: True
-        )
+        mocker.patch.object(operations.subdecks, "ask_user", return_value=True)
 
 
 class TestBuildSubdecksAndMoveCardsToThem:
@@ -3003,15 +2997,12 @@ def test_reset_local_changes_to_notes(
 
 def test_migrate_profile_data_from_old_location(
     anki_session_with_addon_before_profile_support: AnkiSession,
-    monkeypatch: MonkeyPatch,
+    mocker: MockerFixture,
 ):
     anki_session = anki_session_with_addon_before_profile_support
 
     # mock update_decks_and_media so that the add-on doesn't try to download updates from AnkiHub
-    monkeypatch.setattr(
-        "ankihub.gui.deck_updater.ah_deck_updater.update_decks_and_media",
-        lambda *args, **kwargs: None,
-    )
+    mocker.patch("ankihub.gui.deck_updater.ah_deck_updater.update_decks_and_media")
 
     # run the entrypoint and load the profile to trigger the migration
     entry_point.run()
@@ -3070,13 +3061,13 @@ def test_profile_swap(
     # load the second profile
     mw.pm.load(PROFILE_2_NAME)
     # monkey patch uuid4 so that the id of the second profile is known
-    with mocker.patch("uuid.uuid4", return_value=PROFILE_2_ID):
-        with anki_session.profile_loaded():
-            assert profile_files_path() == ankihub_base_path() / str(PROFILE_2_ID)
-            # the database should be empty
-            assert len(ankihub_db.ankihub_deck_ids()) == 0
-            # the config should not conatin any deck subscriptions
-            assert len(config.deck_ids()) == 0
+    mocker.patch("uuid.uuid4", return_value=PROFILE_2_ID)
+    with anki_session.profile_loaded():
+        assert profile_files_path() == ankihub_base_path() / str(PROFILE_2_ID)
+        # the database should be empty
+        assert len(ankihub_db.ankihub_deck_ids()) == 0
+        # the config should not conatin any deck subscriptions
+        assert len(config.deck_ids()) == 0
 
     # load the first profile again
     mw.pm.load(PROFILE_1_NAME)
@@ -3120,7 +3111,7 @@ class TestDeckUpdater:
         anki_session_with_addon_data: AnkiSession,
         install_ah_deck: InstallAHDeck,
         import_ah_note: ImportAHNote,
-        mock_function: MockFunction,
+        mocker: MockerFixture,
         mock_ankihub_sync_dependencies: None,
     ):
         with anki_session_with_addon_data.profile_loaded():
@@ -3132,8 +3123,9 @@ class TestDeckUpdater:
             note_info.fields[0].value = "changed"
 
             latest_update = datetime.now()
-            mock_function(
-                "ankihub.gui.deck_updater.AnkiHubClient.get_deck_updates",
+            mocker.patch.object(
+                AnkiHubClient,
+                "get_deck_updates",
                 return_value=[
                     DeckUpdateChunk(
                         latest_update=latest_update,
@@ -3144,8 +3136,9 @@ class TestDeckUpdater:
                 ],
             )
 
-            mock_function(
-                "ankihub.gui.deck_updater.AnkiHubClient.get_deck_by_id",
+            mocker.patch.object(
+                AnkiHubClient,
+                "get_deck_by_id",
                 return_value=DeckFactory.create(ah_did=ah_did),
             )
 
@@ -3211,7 +3204,7 @@ class TestDeckUpdater:
         initial_tags: List[str],
         incoming_optional_tags: List[str],
         expected_tags: List[str],
-        mock_function: MockFunction,
+        mocker: MockerFixture,
         mock_ankihub_sync_dependencies: None,
     ):
         with anki_session_with_addon_data.profile_loaded():
@@ -3226,21 +3219,24 @@ class TestDeckUpdater:
             # Mock client to return a deck extension update with incoming_optional_tags
             latest_update = datetime.now()
 
-            mock_function(
-                "ankihub.gui.deck_updater.AnkiHubClient.get_deck_by_id",
+            mocker.patch.object(
+                AnkiHubClient,
+                "get_deck_by_id",
                 return_value=DeckFactory.create(ah_did=ah_did),
             )
 
             deck_extension = DeckExtensionFactory.create(
                 ah_did=ah_did, tag_group_name="tag_group"
             )
-            mock_function(
-                "ankihub.gui.deck_updater.AnkiHubClient.get_deck_extensions_by_deck_id",
+            mocker.patch.object(
+                AnkiHubClient,
+                "get_deck_extensions_by_deck_id",
                 return_value=[deck_extension],
             )
 
-            mock_function(
-                "ankihub.gui.deck_updater.AnkiHubClient.get_deck_extension_updates",
+            mocker.patch.object(
+                AnkiHubClient,
+                "get_deck_extension_updates",
                 return_value=[
                     DeckExtensionUpdateChunk(
                         note_customizations=[
@@ -3288,7 +3284,7 @@ class TestDeckUpdater:
         self,
         anki_session_with_addon_data: AnkiSession,
         install_ah_deck: InstallAHDeck,
-        mock_function: MockFunction,
+        mocker: MockerFixture,
         current_relation: UserDeckRelation,
         incoming_relation: UserDeckRelation,
         mock_ankihub_sync_dependencies: None,
@@ -3305,8 +3301,9 @@ class TestDeckUpdater:
             # Mock client.get_deck_by_id to return the deck with the incoming relation
             deck = copy.deepcopy(deck)
             deck.user_relation = incoming_relation
-            mock_function(
-                "ankihub.gui.deck_updater.AnkiHubClient.get_deck_by_id",
+            mocker.patch.object(
+                AnkiHubClient,
+                "get_deck_by_id",
                 return_value=deck,
             )
 
@@ -3332,7 +3329,7 @@ class TestSyncWithAnkiHub:
         self,
         anki_session_with_addon_data: AnkiSession,
         install_sample_ah_deck: InstallSampleAHDeck,
-        monkeypatch: MonkeyPatch,
+        mocker: MockerFixture,
         mock_client_methods_called_during_ankihub_sync: None,
         sync_with_ankihub: SyncWithAnkiHub,
         subscribed_to_deck: bool,
@@ -3345,10 +3342,10 @@ class TestSyncWithAnkiHub:
 
             # Mock client.get_deck_subscriptions to return the deck if subscribed_to_deck is True and
             # return an empty list otherwise
-            monkeypatch.setattr(
+            mocker.patch.object(
                 AnkiHubClient,
                 "get_deck_subscriptions",
-                lambda *args, **kwargs: [DeckFactory.create(ah_did=ah_did)]
+                return_value=[DeckFactory.create(ah_did=ah_did)]
                 if subscribed_to_deck
                 else [],
             )
@@ -3444,7 +3441,7 @@ class TestAutoSync:
     def test_with_on_ankiweb_sync_config_option(
         self,
         anki_session_with_addon_data: AnkiSession,
-        monkeypatch: MonkeyPatch,
+        mocker: MockerFixture,
         mock_client_methods_called_during_ankihub_sync: None,
         qtbot: QtBot,
     ):
@@ -3452,7 +3449,7 @@ class TestAutoSync:
             mw = anki_session_with_addon_data.mw
 
             # Mock the syncs.
-            self._mock_syncs_and_check_new_subscriptions(monkeypatch)
+            self._mock_syncs_and_check_new_subscriptions(mocker)
 
             # Setup the auto sync.
             _setup_ankihub_sync_on_ankiweb_sync()
@@ -3461,7 +3458,7 @@ class TestAutoSync:
             config.public_config["auto_sync"] = "on_ankiweb_sync"
 
             # Trigger the AnkiWeb sync.
-            mw._sync_collection_and_media(after_sync=Mock())
+            mw._sync_collection_and_media(after_sync=mocker.stub())
             qtbot.wait(500)
 
             # Assert that both syncs were called.
@@ -3473,14 +3470,14 @@ class TestAutoSync:
     def test_with_never_option(
         self,
         anki_session_with_addon_data: AnkiSession,
-        monkeypatch: MonkeyPatch,
+        mocker: MockerFixture,
         qtbot: QtBot,
     ):
         with anki_session_with_addon_data.profile_loaded():
             mw = anki_session_with_addon_data.mw
 
             # Mock the syncs.
-            self._mock_syncs_and_check_new_subscriptions(monkeypatch)
+            self._mock_syncs_and_check_new_subscriptions(mocker)
 
             # Setup the auto sync.
             _setup_ankihub_sync_on_ankiweb_sync()
@@ -3489,7 +3486,7 @@ class TestAutoSync:
             config.public_config["auto_sync"] = "never"
 
             # Trigger the AnkiWeb sync.
-            mw._sync_collection_and_media(after_sync=Mock())
+            mw._sync_collection_and_media(after_sync=mocker.stub())
             qtbot.wait(500)
 
             # Assert that only the AnkiWeb sync was called.
@@ -3501,7 +3498,7 @@ class TestAutoSync:
     def test_with_on_startup_option(
         self,
         anki_session_with_addon_data: AnkiSession,
-        monkeypatch: MonkeyPatch,
+        mocker: MockerFixture,
         mock_client_methods_called_during_ankihub_sync: None,
         qtbot: QtBot,
     ):
@@ -3509,7 +3506,7 @@ class TestAutoSync:
             mw = anki_session_with_addon_data.mw
 
             # Mock the syncs.
-            self._mock_syncs_and_check_new_subscriptions(monkeypatch)
+            self._mock_syncs_and_check_new_subscriptions(mocker)
 
             # Setup the auto sync.
             _setup_ankihub_sync_on_ankiweb_sync()
@@ -3518,7 +3515,7 @@ class TestAutoSync:
             config.public_config["auto_sync"] = "on_startup"
 
             # Trigger the AnkiWeb sync.
-            mw._sync_collection_and_media(after_sync=Mock())
+            mw._sync_collection_and_media(after_sync=mocker.stub())
             qtbot.wait(500)
 
             # Assert that both syncs were called.
@@ -3529,7 +3526,7 @@ class TestAutoSync:
             self.check_and_install_new_deck_subscriptions_mock.call_count == 1
 
             # Trigger the AnkiWeb sync again.
-            mw._sync_collection_and_media(after_sync=Mock())
+            mw._sync_collection_and_media(after_sync=mocker.stub())
             qtbot.wait(500)
 
             # Assert that only the AnkiWeb sync was called the second time.
@@ -3538,34 +3535,24 @@ class TestAutoSync:
 
             assert self.check_and_install_new_deck_subscriptions_mock.call_count == 1
 
-    def _mock_syncs_and_check_new_subscriptions(self, monkeypatch: MonkeyPatch):
+    def _mock_syncs_and_check_new_subscriptions(self, mocker: MockerFixture):
         # Mock the token so that the AnkiHub sync is not skipped.
-        monkeypatch.setattr(
-            config, "token", MagicMock(return_value=lambda: "test_token")
-        )
+        mocker.patch.object(config, "token", return_value=lambda: "test_token")
 
         # Mock update_decks_and_media so it does nothing.
-        self.udpate_decks_and_media_mock = Mock()
-        monkeypatch.setattr(
-            ah_deck_updater, "update_decks_and_media", self.udpate_decks_and_media_mock
+        self.udpate_decks_and_media_mock = mocker.patch.object(
+            ah_deck_updater, "update_decks_and_media"
         )
 
         # Mock the AnkiWeb sync so it does nothing.
-        self.ankiweb_sync_mock = Mock()
-        monkeypatch.setattr(
-            aqt.sync,
-            "sync_collection",
-            self.ankiweb_sync_mock,
-        )
+        self.ankiweb_sync_mock = mocker.patch.object(aqt.sync, "sync_collection")
         # ... and reload aqt.main so the mock is used.
         importlib.reload(aqt.main)
 
         # Mock the new deck subscriptions operation to just call its callback.
-        self.check_and_install_new_deck_subscriptions_mock = Mock()
-        monkeypatch.setattr(
+        self.check_and_install_new_deck_subscriptions_mock = mocker.patch.object(
             operations.ankihub_sync,
             "check_and_install_new_deck_subscriptions",
-            self.check_and_install_new_deck_subscriptions_mock,
         )
         self.check_and_install_new_deck_subscriptions_mock.side_effect = (
             lambda *args, **kwargs: kwargs["on_done"](future_with_result(None))
@@ -3585,7 +3572,7 @@ class TestAutoSyncRateLimit:
     def test_rate_limit(
         self,
         anki_session_with_addon_data: AnkiSession,
-        mock_function: MockFunction,
+        mocker: MockerFixture,
         qtbot: QtBot,
         mock_ankihub_sync_dependencies,
         delay_between_syncs_in_seconds: float,
@@ -3594,7 +3581,7 @@ class TestAutoSyncRateLimit:
         # Run the entry point so that the auto sync and rate limit is set up.
         entry_point.run()
         with anki_session_with_addon_data.profile_loaded():
-            sync_with_ankihub_mock = mock_function(auto_sync, "sync_with_ankihub")
+            sync_with_ankihub_mock = mocker.patch.object(auto_sync, "sync_with_ankihub")
 
             # Trigger the sync two times, with a delay in between.
             aqt.mw._sync_collection_and_media(lambda: None)
@@ -3610,10 +3597,9 @@ class TestAutoSyncRateLimit:
 def test_optional_tag_suggestion_dialog(
     anki_session_with_addon_data: AnkiSession,
     qtbot: QtBot,
-    monkeypatch: MonkeyPatch,
+    mocker: MockerFixture,
     import_ah_note: ImportAHNote,
     next_deterministic_uuid,
-    mock_function: MockFunction,
 ):
     anki_session = anki_session_with_addon_data
 
@@ -3645,14 +3631,16 @@ def test_optional_tag_suggestion_dialog(
         notes[2].flush()
 
         # Mock client methods
-        mock_function(
-            "ankihub.gui.optional_tag_suggestion_dialog.AnkiHubClient.get_deck_extensions",
+        mocker.patch.object(
+            AnkiHubClient,
+            "get_deck_extensions",
             return_value=[],
         )
 
-        monkeypatch.setattr(
-            "ankihub.ankihub_client.AnkiHubClient.prevalidate_tag_groups",
-            lambda *args, **kwargs: [
+        mocker.patch.object(
+            AnkiHubClient,
+            "prevalidate_tag_groups",
+            return_value=[
                 TagGroupValidationResponse(
                     tag_group_name="VALID",
                     deck_extension_id=1,
@@ -3685,10 +3673,9 @@ def test_optional_tag_suggestion_dialog(
         assert dialog.tag_group_list.item(1).toolTip() == ""
         assert dialog.submit_btn.isEnabled()
 
-        suggest_optional_tags_mock = Mock()
-        monkeypatch.setattr(
-            "ankihub.ankihub_client.AnkiHubClient.suggest_optional_tags",
-            suggest_optional_tags_mock,
+        suggest_optional_tags_mock = mocker.patch.object(
+            AnkiHubClient,
+            "suggest_optional_tags",
         )
 
         # Select the "VALID" tag group and click the submit button
@@ -3730,7 +3717,7 @@ def test_optional_tag_suggestion_dialog(
 def test_reset_optional_tags_action(
     anki_session_with_addon_data: AnkiSession,
     qtbot: QtBot,
-    monkeypatch: MonkeyPatch,
+    mocker: MockerFixture,
     install_sample_ah_deck: InstallSampleAHDeck,
 ):
     entry_point.run()
@@ -3766,24 +3753,25 @@ def test_reset_optional_tags_action(
         mw.col.add_note(other_note, DeckId(1))
 
         # mock the choose_list function to always return the first item
-        choose_list_mock = Mock()
-        choose_list_mock.return_value = 0
-        monkeypatch.setattr("ankihub.gui.browser.browser.choose_list", choose_list_mock)
-
-        # mock the ask_user function to always confirm the reset
-        monkeypatch.setattr(
-            "ankihub.gui.browser.browser.ask_user", lambda *args, **kwargs: True
+        choose_list_mock = mocker.patch(
+            "ankihub.gui.browser.browser.choose_list",
+            return_value=0,
         )
 
+        # mock the ask_user function to always confirm the reset
+        mocker.patch("ankihub.gui.browser.browser.ask_user", return_value=True)
+
         # mock the is_logged_in function to always return True
-        is_logged_in_mock = Mock()
-        is_logged_in_mock.return_value = True
-        monkeypatch.setattr(config, "is_logged_in", is_logged_in_mock)
+        is_logged_in_mock = mocker.patch.object(
+            config,
+            "is_logged_in",
+            return_value=True,
+        )
 
         # mock method of ah_deck_updater
-        update_decks_and_media_mock = Mock()
-        monkeypatch.setattr(
-            ah_deck_updater, "update_decks_and_media", update_decks_and_media_mock
+        update_decks_and_media_mock = mocker.patch.object(
+            ah_deck_updater,
+            "update_decks_and_media",
         )
 
         # run the reset action
@@ -3815,7 +3803,7 @@ class TestMediaSyncMediaDownload:
         self,
         anki_session_with_addon_data: AnkiSession,
         install_sample_ah_deck: InstallSampleAHDeck,
-        mock_function: MockFunction,
+        mocker: MockerFixture,
         qtbot: QtBot,
     ):
         with anki_session_with_addon_data.profile_loaded():
@@ -3830,7 +3818,7 @@ class TestMediaSyncMediaDownload:
                 exists_on_s3=True,
                 download_enabled=True,
             )
-            get_deck_media_updates_mock = mock_function(
+            get_deck_media_updates_mock = mocker.patch.object(
                 AnkiHubClient,
                 "get_deck_media_updates",
                 return_value=[
@@ -3841,7 +3829,7 @@ class TestMediaSyncMediaDownload:
             )
 
             # Mock the client method for downloading media
-            download_media_mock = mock_function(AnkiHubClient, "download_media")
+            download_media_mock = mocker.patch.object(AnkiHubClient, "download_media")
 
             # Start the media sync and wait for it to finish
             media_sync.start_media_download()
@@ -3872,14 +3860,14 @@ class TestMediaSyncMediaDownload:
         self,
         anki_session_with_addon_data: AnkiSession,
         install_sample_ah_deck: InstallSampleAHDeck,
-        mock_function: MockFunction,
+        mocker: MockerFixture,
         qtbot: QtBot,
     ):
         with anki_session_with_addon_data.profile_loaded():
             _, ah_did = install_sample_ah_deck()
 
             # Mock client to return an empty deck media update
-            get_deck_media_updates_mock = mock_function(
+            get_deck_media_updates_mock = mocker.patch.object(
                 AnkiHubClient,
                 "get_deck_media_updates",
                 return_value=[
@@ -3888,7 +3876,7 @@ class TestMediaSyncMediaDownload:
             )
 
             # Mock the client method for downloading media
-            download_media_mock = mock_function(AnkiHubClient, "download_media")
+            download_media_mock = mocker.patch.object(AnkiHubClient, "download_media")
 
             # Start the media sync and wait for it to finish
             media_sync.start_media_download()
@@ -3904,7 +3892,7 @@ class TestMediaSyncMediaDownload:
 
 @fixture
 def mock_client_media_upload(
-    monkeypatch: MonkeyPatch,
+    mocker: MockerFixture,
     requests_mock: Mocker,
 ) -> Iterator[Mocker]:
     fake_presigned_url = AnkiHubClient().s3_bucket_url + "/fake_key"
@@ -3912,21 +3900,22 @@ def mock_client_media_upload(
         fake_presigned_url, json={"success": True}, status_code=204
     )
 
-    monkeypatch.setattr(
+    mocker.patch.object(
         AnkiHubClient,
         "is_media_upload_finished",
-        lambda *args, **kwargs: True,
+        return_value=True,
     )
 
-    monkeypatch.setattr(
-        "ankihub.ankihub_client.AnkiHubClient.media_upload_finished",
-        lambda *args, **kwargs: False,
+    mocker.patch.object(
+        AnkiHubClient,
+        "media_upload_finished",
+        return_value=False,
     )
 
-    monkeypatch.setattr(
+    mocker.patch.object(
         AnkiHubClient,
         "_get_presigned_url_for_multiple_uploads",
-        lambda *args, **kwargs: {
+        return_value={
             "url": fake_presigned_url,
             "fields": {
                 "key": "deck_images/test/${filename}",
@@ -3935,8 +3924,7 @@ def mock_client_media_upload(
     )
 
     # Mock os.remove so the zip is not deleted
-    os_remove_mock = MagicMock()
-    monkeypatch.setattr(os, "remove", os_remove_mock)
+    os_remove_mock = mocker.patch.object(os, "remove")
 
     # Create a temporary media folder and copy the test media files to it.
     # Patch the media folder path to point to the temporary folder.
@@ -3944,9 +3932,7 @@ def mock_client_media_upload(
         for file in (TEST_DATA_PATH / "media").glob("*"):
             shutil.copy(file, Path(tmp_dir) / file.name)
 
-        monkeypatch.setattr(
-            "anki.media.MediaManager.dir", lambda *args, **kwargs: tmp_dir
-        )
+        mocker.patch("anki.media.MediaManager.dir", return_value=tmp_dir)
 
         yield s3_upload_request_mock  # type: ignore
 
@@ -4178,7 +4164,7 @@ class TestSuggestionsWithMedia:
     def _assert_media_names_on_note_and_suggestion_as_expected(
         self,
         note: Note,
-        suggestion_request_mock: Mock,
+        suggestion_request_mock: "unittest.mock.Mock",
         expected_media_name: str,
     ):
         # Assert that the media name in the note is as expected.
@@ -4264,7 +4250,7 @@ def test_check_and_prompt_for_updates_on_main_window(
 @pytest.mark.qt_no_exception_capture
 class TestDebugModule:
     def test_setup_logging_for_sync_collection_and_media(
-        self, anki_session: AnkiSession, monkeypatch: MonkeyPatch
+        self, anki_session: AnkiSession, mocker: MockerFixture
     ):
         # Test that the original AnkiQt._sync_collection_and_media method gets called
         # despite the monkeypatching we do in debug.py.
@@ -4272,13 +4258,12 @@ class TestDebugModule:
             mw = anki_session.mw
 
             # Mock the AnkiWeb sync to do nothing
-            monkeypatch.setattr(aqt.sync, "sync_collection", Mock())
+            mocker.patch.object(aqt.sync, "sync_collection")
             # ... and reload the main module so that the mock is used.
             importlib.reload(aqt.main)
 
             # Mock the sync_will_start hook so that we can check if it was called when the sync starts.
-            sync_will_start_mock = Mock()
-            monkeypatch.setattr(gui_hooks, "sync_will_start", sync_will_start_mock)
+            sync_will_start_mock = mocker.patch.object(gui_hooks, "sync_will_start")
 
             _setup_logging_for_sync_collection_and_media()
 
@@ -4287,13 +4272,12 @@ class TestDebugModule:
             sync_will_start_mock.assert_called_once()
 
     def test_setup_logging_for_db_begin(
-        self, anki_session: AnkiSession, monkeypatch: MonkeyPatch
+        self, anki_session: AnkiSession, mocker: MockerFixture
     ):
         with anki_session.profile_loaded():
             mw = anki_session.mw
 
-            db_begin_mock = Mock()
-            monkeypatch.setattr(mw.col._backend, "db_begin", db_begin_mock)
+            db_begin_mock = mocker.patch.object(mw.col._backend, "db_begin")
 
             _setup_logging_for_db_begin()
 
@@ -4354,7 +4338,7 @@ def test_handle_notes_deleted_from_webapp(
 
 def test_upload_logs_and_data(
     anki_session_with_addon_data: AnkiSession,
-    monkeypatch: MonkeyPatch,
+    mocker: MockerFixture,
     qtbot: QtBot,
 ):
     with anki_session_with_addon_data.profile_loaded():
@@ -4368,10 +4352,7 @@ def test_upload_logs_and_data(
             key = kwargs["key"]
 
         # Mock the client.upload_logs method
-        monkeypatch.setattr(
-            "ankihub.gui.errors.AnkiHubClient.upload_logs",
-            upload_logs_mock,
-        )
+        mocker.patch.object(AnkiHubClient, "upload_logs", side_effect=upload_logs_mock)
 
         # Start the upload in the background and wait until it is finished.
         upload_logs_and_data_in_background()
@@ -4432,7 +4413,7 @@ def test_delete_ankihub_private_config_on_deckBrowser__delete_option(
     anki_session_with_addon_data: AnkiSession,
     install_sample_ah_deck: InstallSampleAHDeck,
     qtbot: QtBot,
-    mock_function: MockFunction,
+    mocker: MockerFixture,
 ):
     entry_point.run()
 
@@ -4450,13 +4431,13 @@ def test_delete_ankihub_private_config_on_deckBrowser__delete_option(
         assert deck_uuid
 
         # Will control the conditional responsible to delete or not the ankihub deck private config
-        mock_function(deckbrowser, "ask_user", return_value=True)
+        mocker.patch.object(deckbrowser, "ask_user", return_value=True)
 
-        with patch.object(
+        unsubscribe_from_deck_mock = mocker.patch.object(
             AnkiHubClient, "unsubscribe_from_deck"
-        ) as unsubscribe_from_deck_mock:
-            mw.deckBrowser._delete(anki_deck_id)
-            unsubscribe_from_deck_mock.assert_called_once()
+        )
+        mw.deckBrowser._delete(anki_deck_id)
+        unsubscribe_from_deck_mock.assert_called_once()
 
         qtbot.wait(500)
 
@@ -4484,7 +4465,7 @@ def test_not_delete_ankihub_private_config_on_deckBrowser__delete_option(
     anki_session_with_addon_data: AnkiSession,
     install_sample_ah_deck: InstallSampleAHDeck,
     qtbot: QtBot,
-    mock_function: MockFunction,
+    mocker: MockerFixture,
 ):
     entry_point.run()
 
@@ -4500,7 +4481,7 @@ def test_not_delete_ankihub_private_config_on_deckBrowser__delete_option(
         assert deck_uuid
 
         # Will control the conditional responsible to delete or not the ankihub deck private config
-        mock_function(deckbrowser, "ask_user", return_value=False)
+        mocker.patch.object(deckbrowser, "ask_user", return_value=False)
 
         mw.deckBrowser._delete(anki_deck_id)
         qtbot.wait(500)
@@ -4513,8 +4494,8 @@ def test_not_delete_ankihub_private_config_on_deckBrowser__delete_option(
 
 @pytest.mark.qt_no_exception_capture
 class TestAHDBCheck:
-    def test_with_nothing_missing(self, qtbot: QtBot):
-        on_done_mock = Mock()
+    def test_with_nothing_missing(self, qtbot: QtBot, mocker: MockerFixture):
+        on_done_mock = mocker.stub()
         check_ankihub_db(on_done_mock)
         qtbot.wait_until(lambda: on_done_mock.call_count == 1)
 
@@ -4534,7 +4515,7 @@ class TestAHDBCheck:
         import_ah_note: ImportAHNote,
         mock_download_and_install_deck_dependencies: MockDownloadAndInstallDeckDependencies,
         ankihub_basic_note_type: NotetypeDict,
-        mock_function: MockFunction,
+        mocker: MockerFixture,
         qtbot: QtBot,
         user_confirms: bool,
         deck_exists_on_ankihub: bool,
@@ -4562,17 +4543,17 @@ class TestAHDBCheck:
                     response_404.status_code = 404
                     raise AnkiHubHTTPError(response=response_404)
 
-                mock_function(
+                mocker.patch.object(
                     AnkiHubClient,
                     "get_deck_by_id",
                     side_effect=raise_404,
                 )
 
             # Mock ask_user function
-            mock_function(ah_db_check, "ask_user", return_value=user_confirms)
+            mocker.patch.object(ah_db_check, "ask_user", return_value=user_confirms)
 
             # Run the db check
-            on_done_mock = Mock()
+            on_done_mock = mocker.stub()
             check_ankihub_db(on_done_mock)
             qtbot.wait_until(lambda: on_done_mock.call_count == 1)
 
