@@ -61,7 +61,6 @@ from ankihub.db import attached_ankihub_db
 from ankihub.db.db import _AnkiHubDB
 from ankihub.db.exceptions import IntegrityError
 from ankihub.feature_flags import _FeatureFlags, feature_flags
-from ankihub.gui import errors, suggestion_dialog
 from ankihub.gui.error_dialog import ErrorDialog
 from ankihub.gui.errors import (
     OUTDATED_CLIENT_ERROR_REASON,
@@ -72,7 +71,6 @@ from ankihub.gui.errors import (
 )
 from ankihub.gui.media_sync import media_sync
 from ankihub.gui.menu import AnkiHubLogin
-from ankihub.gui.operations import deck_creation
 from ankihub.gui.operations.deck_creation import (
     DeckCreationConfirmationDialog,
     create_collaborative_deck,
@@ -743,13 +741,11 @@ def mock_dependiencies_for_suggestion_dialog(
     ) -> Tuple[Mock, Mock]:
         mock_suggestion_dialog(user_cancels=user_cancels)
 
-        suggest_note_update_mock = mocker.patch.object(
-            suggestion_dialog,
-            "suggest_note_update",
+        suggest_note_update_mock = mocker.patch(
+            "ankihub.gui.suggestion_dialog.suggest_note_update"
         )
-        suggest_new_note_mock = mocker.patch.object(
-            suggestion_dialog,
-            "suggest_new_note",
+        suggest_new_note_mock = mocker.patch(
+            "ankihub.gui.suggestion_dialog.suggest_new_note"
         )
 
         return suggest_note_update_mock, suggest_new_note_mock
@@ -831,9 +827,8 @@ class TestOpenSuggestionDialogForSingleSuggestion:
                 suggest_new_note_mock,
             ) = mock_dependiencies_for_suggestion_dialog(user_cancels=False)
 
-            choose_ankihub_deck_mock = mocker.patch.object(
-                suggestion_dialog,
-                "choose_ankihub_deck",
+            choose_ankihub_deck_mock = mocker.patch(
+                "ankihub.gui.suggestion_dialog.choose_ankihub_deck",
                 return_value=None if user_cancels else ah_did_1,
             )
 
@@ -970,9 +965,8 @@ class TestOpenSuggestionDialogForBulkSuggestion:
 
             nids = [note_1.id, note_2.id]
 
-            choose_ankihub_deck_mock = mocker.patch.object(
-                suggestion_dialog,
-                "choose_ankihub_deck",
+            choose_ankihub_deck_mock = mocker.patch(
+                "ankihub.gui.suggestion_dialog.choose_ankihub_deck",
                 return_value=ah_did_1,
             )
             suggest_notes_in_bulk_mock = mock_dependencies_for_bulk_suggestion_dialog(
@@ -998,7 +992,7 @@ class TestOnSuggestNotesInBulkDone:
         self,
         mocker: MockerFixture,
     ):
-        showText_mock = mocker.patch.object(suggestion_dialog, "showText")
+        showText_mock = mocker.patch("ankihub.gui.suggestion_dialog.showText")
         nid_1 = NoteId(1)
         nid_2 = NoteId(2)
         _on_suggest_notes_in_bulk_done(
@@ -1048,8 +1042,8 @@ class TestOnSuggestNotesInBulkDone:
         response.json = lambda: {"detail": "test"}  # type: ignore
         exception = AnkiHubHTTPError(response)
 
-        show_error_dialog_mock = mocker.patch.object(
-            suggestion_dialog, "show_error_dialog"
+        show_error_dialog_mock = mocker.patch(
+            "ankihub.gui.suggestion_dialog.show_error_dialog",
         )
 
         _on_suggest_notes_in_bulk_done(
@@ -1497,7 +1491,7 @@ class TestErrorHandling:
     def test_handle_ankihub_403(
         self, mocker: MockerFixture, response_content: str, expected_handled: bool
     ):
-        show_error_dialog_mock = mocker.patch.object(errors, "show_error_dialog")
+        show_error_dialog_mock = mocker.patch("ankihub.gui.errors.show_error_dialog")
 
         response_mock = Mock()
         response_mock.status_code = 403
@@ -1513,7 +1507,7 @@ class TestErrorHandling:
         assert show_error_dialog_mock.called == expected_handled
 
     def test_handle_ankihub_406(self, mocker: MockerFixture):
-        ask_user_mock = mocker.patch.object(errors, "ask_user", return_value=False)
+        ask_user_mock = mocker.patch("ankihub.gui.errors.ask_user", return_value=False)
         handled = _try_handle_exception(
             exc_type=AnkiHubHTTPError,
             exc_value=AnkiHubHTTPError(
@@ -1572,7 +1566,7 @@ class TestUploadLogs:
         upload_logs_mock = mocker.patch.object(
             AddonAnkiHubClient, "upload_logs", side_effect=exception
         )
-        report_exception_mock = mocker.patch.object(errors, "_report_exception")
+        report_exception_mock = mocker.patch("ankihub.gui.errors._report_exception")
         upload_logs_in_background(on_done=on_done_mock)
 
         qtbot.wait(500)
@@ -1735,8 +1729,8 @@ def mock_ui_for_create_collaborative_deck(
         mock_study_deck_dialog_with_cb(
             "ankihub.gui.operations.deck_creation.StudyDeck", deck_name
         )
-        mocker.patch.object(deck_creation, "ask_user", return_value=True)
-        mocker.patch.object(deck_creation, "showInfo")
+        mocker.patch("ankihub.gui.operations.deck_creation.ask_user", return_value=True)
+        mocker.patch("ankihub.gui.operations.deck_creation.showInfo")
         mocker.patch.object(DeckCreationConfirmationDialog, "run", return_value=True)
 
     return mock_ui_interaction_inner
@@ -1769,9 +1763,8 @@ class TestCreateCollaborativeDeck:
 
             ah_did = next_deterministic_uuid()
             notes_data = [NoteInfoFactory.create()]
-            create_ankihub_deck_mock = mocker.patch.object(
-                deck_creation,
-                "create_ankihub_deck",
+            create_ankihub_deck_mock = mocker.patch(
+                "ankihub.gui.operations.deck_creation.create_ankihub_deck",
                 return_value=DeckCreationResult(
                     ankihub_did=ah_did,
                     notes_data=notes_data,
@@ -1779,15 +1772,16 @@ class TestCreateCollaborativeDeck:
                 side_effect=Exception("test") if creating_deck_fails else None,
             )
 
-            get_media_names_from_notes_data_mock = mocker.patch.object(
-                deck_creation,
-                "get_media_names_from_notes_data",
+            get_media_names_from_notes_data_mock = mocker.patch(
+                "ankihub.gui.operations.deck_creation.get_media_names_from_notes_data",
                 return_value=[],
             )
             start_media_upload_mock = mocker.patch.object(
-                deck_creation.media_sync, "start_media_upload"
+                media_sync, "start_media_upload"
             )
-            showInfo_mock = mocker.patch.object(deck_creation, "showInfo")
+            showInfo_mock = mocker.patch(
+                "ankihub.gui.operations.deck_creation.showInfo"
+            )
 
             # Create the AnkiHub deck.
             if creating_deck_fails:
@@ -1833,10 +1827,11 @@ class TestCreateCollaborativeDeck:
                 ],
             )
 
-            showInfo_mock = mocker.patch.object(deck_creation, "showInfo")
-            create_ankihub_deck_mock = mocker.patch.object(
-                deck_creation,
-                "create_ankihub_deck",
+            showInfo_mock = mocker.patch(
+                "ankihub.gui.operations.deck_creation.showInfo"
+            )
+            create_ankihub_deck_mock = mocker.patch(
+                "ankihub.gui.operations.deck_creation.create_ankihub_deck"
             )
 
             create_collaborative_deck()
