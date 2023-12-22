@@ -551,8 +551,9 @@ class TestSuggestionDialog:
         source_type: SourceType,
         media_was_added: bool,
         qtbot: QtBot,
+        mocker: MockerFixture,
     ):
-        callback_mock = Mock()
+        callback_mock = mocker.stub()
         dialog = SuggestionDialog(
             is_for_anking_deck=is_for_anking_deck,
             is_new_note_suggestion=is_new_note_suggestion,
@@ -634,8 +635,10 @@ class TestSuggestionDialog:
             False,
         ],
     )
-    def test_submit_without_review_checkbox(self, can_submit_without_review: bool):
-        callback_mock = Mock()
+    def test_submit_without_review_checkbox(
+        self, can_submit_without_review: bool, mocker: MockerFixture
+    ):
+        callback_mock = mocker.stub()
         dialog = SuggestionDialog(
             is_for_anking_deck=False,
             is_new_note_suggestion=False,
@@ -1493,7 +1496,7 @@ class TestErrorHandling:
     ):
         show_error_dialog_mock = mocker.patch("ankihub.gui.errors.show_error_dialog")
 
-        response_mock = Mock()
+        response_mock = mocker.Mock()
         response_mock.status_code = 403
         response_mock.text = response_content
         response_mock.json = lambda: json.loads(response_content)  # type: ignore
@@ -1530,7 +1533,7 @@ def test_show_error_dialog(
 
 class TestUploadLogs:
     def test_basic(self, qtbot: QtBot, mocker: MockerFixture):
-        on_done_mock = Mock()
+        on_done_mock = mocker.stub()
         upload_logs_mock = mocker.patch.object(AddonAnkiHubClient, "upload_logs")
         upload_logs_in_background(on_done=on_done_mock)
 
@@ -1562,7 +1565,7 @@ class TestUploadLogs:
         expected_report_exception_called: bool,
         exception: Exception,
     ):
-        on_done_mock = Mock()
+        on_done_mock = mocker.stub()
         upload_logs_mock = mocker.patch.object(
             AddonAnkiHubClient, "upload_logs", side_effect=exception
         )
