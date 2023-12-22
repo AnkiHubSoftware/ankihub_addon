@@ -10,7 +10,6 @@ from copy import deepcopy
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
 from typing import Callable, Generator, List, cast
-from unittest.mock import Mock
 
 import pytest
 import requests_mock
@@ -1459,7 +1458,7 @@ class TestUploadMediaForDeck:
         mocker.patch.object(client, "_upload_file_to_s3_with_reusable_presigned_url")
 
         deck_id = next_deterministic_uuid()
-        mocked_remove = mocker.patch("os.remove")
+        remove_mock = mocker.patch("os.remove")
         self._upload_media_for_notes_data(client, notes_data, deck_id)
 
         # We will create and check for just one chunk in this test
@@ -1474,7 +1473,7 @@ class TestUploadMediaForDeck:
             assert set(zip_ref.namelist()) == set(all_media_names_in_notes)
 
         # Remove the zipped file at the end of the test
-        mocker.stop(os.remove)
+        mocker.stop(remove_mock)
         os.remove(path_to_created_zip_file)
         assert path_to_created_zip_file.is_file() is False
 
