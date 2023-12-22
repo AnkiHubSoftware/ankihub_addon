@@ -14,7 +14,7 @@ from unittest.mock import Mock
 
 import pytest
 import requests_mock
-from pytest import FixtureRequest, MonkeyPatch
+from pytest import FixtureRequest
 from pytest_mock import MockerFixture
 from requests_mock import Mocker
 from vcr import VCR  # type: ignore
@@ -1449,7 +1449,6 @@ class TestUploadMediaForDeck:
         self,
         next_deterministic_uuid: Callable[[], uuid.UUID],
         mocker: MockerFixture,
-        monkeypatch: MonkeyPatch,
     ):
         client = AnkiHubClient(local_media_dir_path_cb=lambda: TEST_MEDIA_PATH)
 
@@ -1460,9 +1459,8 @@ class TestUploadMediaForDeck:
         mocker.patch.object(client, "_upload_file_to_s3_with_reusable_presigned_url")
 
         deck_id = next_deterministic_uuid()
-        with monkeypatch.context() as m:
-            m.setattr("os.remove", Mock())
-            self._upload_media_for_notes_data(client, notes_data, deck_id)
+        mocked_remove = mocker.patch("os.remove")
+        self._upload_media_for_notes_data(client, notes_data, deck_id)
 
         # We will create and check for just one chunk in this test
         path_to_created_zip_file = Path(
@@ -1476,6 +1474,7 @@ class TestUploadMediaForDeck:
             assert set(zip_ref.namelist()) == set(all_media_names_in_notes)
 
         # Remove the zipped file at the end of the test
+        mocker.stop(os.remove)
         os.remove(path_to_created_zip_file)
         assert path_to_created_zip_file.is_file() is False
 
