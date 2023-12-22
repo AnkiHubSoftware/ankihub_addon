@@ -177,13 +177,10 @@ class TestUploadMediaForSuggestion:
 
 class TestMediaSyncMediaDownload:
     def test_with_exception(self, mocker: MockerFixture, qtbot: QtBot):
-        def raise_exception() -> None:
-            raise Exception("test")
-
         update_and_download_mock = mocker.patch.object(
             media_sync,
             "_update_deck_media_and_download_missing_media",
-            side_effect=raise_exception,
+            side_effect=Exception("test"),
         )
 
         with qtbot.captureExceptions() as exceptions:
@@ -205,14 +202,10 @@ class TestMediaSyncMediaUpload:
         next_deterministic_uuid,
     ):
         with anki_session_with_addon_data.profile_loaded():
-
-            def raise_exception() -> None:
-                raise Exception("test")
-
             upload_media_mock = mocker.patch.object(
                 media_sync._client,
                 "upload_media",
-                side_effect=raise_exception,
+                side_effect=Exception("test"),
             )
 
             with qtbot.captureExceptions() as exceptions:
@@ -1572,15 +1565,12 @@ class TestUploadLogs:
         self,
         qtbot: QtBot,
         mocker: MockerFixture,
-        exception: Exception,
         expected_report_exception_called: bool,
+        exception: Exception,
     ):
-        def raise_exception(*args, **kwargs) -> None:
-            raise exception
-
         on_done_mock = Mock()
         upload_logs_mock = mocker.patch.object(
-            AddonAnkiHubClient, "upload_logs", side_effect=raise_exception
+            AddonAnkiHubClient, "upload_logs", side_effect=exception
         )
         report_exception_mock = mocker.patch.object(errors, "_report_exception")
         upload_logs_in_background(on_done=on_done_mock)
@@ -1777,9 +1767,6 @@ class TestCreateCollaborativeDeck:
 
             mocker.patch.object(AnkiHubClient, "get_owned_decks", return_value=[])
 
-            def raise_exception(*args, **kwargs) -> None:
-                raise Exception("test")
-
             ah_did = next_deterministic_uuid()
             notes_data = [NoteInfoFactory.create()]
             create_ankihub_deck_mock = mocker.patch.object(
@@ -1789,7 +1776,7 @@ class TestCreateCollaborativeDeck:
                     ankihub_did=ah_did,
                     notes_data=notes_data,
                 ),
-                side_effect=raise_exception if creating_deck_fails else None,
+                side_effect=Exception("test") if creating_deck_fails else None,
             )
 
             get_media_names_from_notes_data_mock = mocker.patch.object(
