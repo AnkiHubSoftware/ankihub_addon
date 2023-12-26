@@ -2122,9 +2122,14 @@ class TestSendReviewData:
     def test_without_reviews(
         self,
         anki_session_with_addon_data: AnkiSession,
+        install_ah_deck: InstallAHDeck,
         mock_function: MockFunction,
     ) -> None:
         with anki_session_with_addon_data.profile_loaded():
+            # We install the deck so that we get coverage for the case where a deck
+            # has no reviews.
+            install_ah_deck()
+
             send_card_review_data_mock = mock_function(
                 AnkiHubClient, "send_card_review_data"
             )
