@@ -2119,6 +2119,24 @@ class TestSendReviewData:
                 card_review_data.last_card_review_at, second_review_time
             )
 
+    def test_without_reviews(
+        self,
+        anki_session_with_addon_data: AnkiSession,
+        mock_function: MockFunction,
+    ) -> None:
+        with anki_session_with_addon_data.profile_loaded():
+            send_card_review_data_mock = mock_function(
+                AnkiHubClient, "send_card_review_data"
+            )
+
+            send_review_data()
+
+            # Assert that the correct data was passed to the client method.
+            send_card_review_data_mock.assert_called_once()
+
+            review_data_list = send_card_review_data_mock.call_args[0][0]
+            assert review_data_list == []
+
 
 def test_clear_empty_cards(anki_session_with_addon_data: AnkiSession, qtbot: QtBot):
     with anki_session_with_addon_data.profile_loaded():
