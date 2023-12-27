@@ -6,6 +6,7 @@ import uuid
 from dataclasses import fields
 from datetime import datetime, timedelta
 from pathlib import Path
+from sqlite3 import ProgrammingError
 from textwrap import dedent
 from typing import Callable, Generator, List, Optional, Protocol, Tuple
 from unittest.mock import Mock
@@ -1067,6 +1068,72 @@ class TestOnSuggestNotesInBulkDone:
         )
         _, kwargs = show_error_dialog_mock.call_args
         assert kwargs.get("message") == "test"
+
+
+class TestDBConnection:
+    def test_execute(self, ankihub_db: _AnkiHubDB):
+        ankihub_db.connection().execute("CREATE TABLE test (id TEXT PRIMARY KEY)")
+        ankihub_db.connection().execute("INSERT INTO test VALUES (?)", 1)
+        result = ankihub_db.execute("SELECT * FROM test")
+        assert result == [("1",)]
+
+    def test_execute_first_row_only(self, ankihub_db: _AnkiHubDB):
+        ankihub_db.connection().execute("CREATE TABLE test (id TEXT PRIMARY KEY)")
+        ankihub_db.connection().execute("INSERT INTO test VALUES (?)", 1)
+        result = ankihub_db.execute("SELECT * FROM test", first_row_only=True)
+        assert result == ("1",)
+
+    def test_scalar(self, ankihub_db: _AnkiHubDB):
+        ankihub_db.connection().execute(
+            "CREATE TABLE test (id TEXT PRIMARY KEY, other_field TEXT)"
+        )
+        ankihub_db.connection().execute("INSERT INTO test VALUES (?, ?)", 1, "test")
+        result = ankihub_db.scalar("SELECT * FROM test")
+        assert result == "1"
+
+    def test_list(self, ankihub_db: _AnkiHubDB):
+        ankihub_db.connection().execute("CREATE TABLE test (id TEXT PRIMARY KEY)")
+        ankihub_db.connection().execute("INSERT INTO test VALUES (?)", 1)
+        ankihub_db.connection().execute("INSERT INTO test VALUES (?)", 2)
+        result = ankihub_db.list("SELECT * FROM test")
+        assert result == ["1", "2"]
+
+    def test_first(self, ankihub_db: _AnkiHubDB):
+        ankihub_db.connection().execute("CREATE TABLE test (id TEXT PRIMARY KEY)")
+        ankihub_db.connection().execute("INSERT INTO test VALUES (?)", 1)
+        result = ankihub_db.first("SELECT * FROM test")
+        assert result == ("1",)
+
+    def test_reusing_connection_not_as_context_manager_raises_exception(
+        self, ankihub_db: _AnkiHubDB
+    ):
+        conn = ankihub_db.connection()
+        with pytest.raises(ProgrammingError) as e:
+            conn.execute("CREATE TABLE test (id TEXT PRIMARY KEY)")
+            conn.execute("INSERT INTO test VALUES (?)", 1)
+        assert "Cannot operate on a closed database." in str(e.value)
+
+    @pytest.mark.parametrize(
+        "exception_is_raised",
+        [True, False],
+    )
+    def test_changes_are_rolled_back_on_exception_in_context_manager(
+        self, ankihub_db: _AnkiHubDB, exception_is_raised: bool
+    ):
+        try:
+            with ankihub_db.connection() as conn:
+                conn.execute("CREATE TABLE test (id TEXT PRIMARY KEY)")
+                conn.execute("INSERT INTO test VALUES (?)", 1)
+                if exception_is_raised:
+                    raise Exception("test")
+        except Exception:
+            pass
+
+        result_str = ankihub_db.scalar("SELECT * FROM test")
+        if exception_is_raised:
+            assert result_str is None
+        else:
+            assert result_str == "1"
 
 
 class TestAnkiHubDBAnkiNidsToAnkiHubNids:
