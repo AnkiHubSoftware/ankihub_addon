@@ -59,7 +59,6 @@ from ankihub.ankihub_client import (
     SuggestionType,
     TagGroupValidationResponse,
 )
-from ankihub.db import attached_ankihub_db
 from ankihub.db.db import _AnkiHubDB
 from ankihub.db.exceptions import IntegrityError
 from ankihub.feature_flags import _FeatureFlags, feature_flags
@@ -1899,13 +1898,13 @@ class TestGetReviewCountForAHDeckSince:
                 record_review_for_anki_nid(
                     NoteId(note_info.anki_nid), now + review_delta
                 )
-            with attached_ankihub_db():
-                assert (
-                    _get_review_count_for_ah_deck_since(
-                        ah_did=ah_did, since=now + since_time
-                    )
-                    == expected_count
+
+            assert (
+                _get_review_count_for_ah_deck_since(
+                    ah_did=ah_did, since=now + since_time
                 )
+                == expected_count
+            )
 
     def test_with_multiple_notes(
         self,
@@ -1925,11 +1924,10 @@ class TestGetReviewCountForAHDeckSince:
             )
 
             since_time = now - timedelta(days=1)
-            with attached_ankihub_db():
-                assert (
-                    _get_review_count_for_ah_deck_since(ah_did=ah_did, since=since_time)
-                    == 2
-                )
+            assert (
+                _get_review_count_for_ah_deck_since(ah_did=ah_did, since=since_time)
+                == 2
+            )
 
     def test_with_review_for_other_deck(
         self,
@@ -1952,13 +1950,10 @@ class TestGetReviewCountForAHDeckSince:
 
             # Only the review for the first deck should be counted.
             since_time = now - timedelta(days=1)
-            with attached_ankihub_db():
-                assert (
-                    _get_review_count_for_ah_deck_since(
-                        ah_did=ah_did_1, since=since_time
-                    )
-                    == 1
-                )
+            assert (
+                _get_review_count_for_ah_deck_since(ah_did=ah_did_1, since=since_time)
+                == 1
+            )
 
 
 class TestGetLastReviewTimeForAHDeck:
@@ -1994,26 +1989,25 @@ class TestGetLastReviewTimeForAHDeck:
                     NoteId(note_info.anki_nid), now + review_delta
                 )
 
-            with attached_ankihub_db():
-                first_and_last_time = _get_first_and_last_review_datetime_for_ah_deck(
-                    ah_did=ah_did
+            first_and_last_time = _get_first_and_last_review_datetime_for_ah_deck(
+                ah_did=ah_did
+            )
+
+            if expected_last_review_delta is not None:
+                first_review_time, last_review_time = first_and_last_time
+
+                expected_first_review_time = now + expected_first_review_delta
+                assert_datetime_equal_ignore_milliseconds(
+                    first_review_time,
+                    expected_first_review_time,
                 )
 
-                if expected_last_review_delta is not None:
-                    first_review_time, last_review_time = first_and_last_time
-
-                    expected_first_review_time = now + expected_first_review_delta
-                    assert_datetime_equal_ignore_milliseconds(
-                        first_review_time,
-                        expected_first_review_time,
-                    )
-
-                    expected_last_review_time = now + expected_last_review_delta
-                    assert_datetime_equal_ignore_milliseconds(
-                        last_review_time, expected_last_review_time
-                    )
-                else:
-                    assert first_and_last_time is None
+                expected_last_review_time = now + expected_last_review_delta
+                assert_datetime_equal_ignore_milliseconds(
+                    last_review_time, expected_last_review_time
+                )
+            else:
+                assert first_and_last_time is None
 
     def test_with_multiple_notes(
         self,
@@ -2036,11 +2030,10 @@ class TestGetLastReviewTimeForAHDeck:
                 NoteId(note_info_2.anki_nid), expected_last_review_time
             )
 
-            with attached_ankihub_db():
-                (
-                    first_review_time,
-                    last_review_time,
-                ) = _get_first_and_last_review_datetime_for_ah_deck(ah_did=ah_did)
+            (
+                first_review_time,
+                last_review_time,
+            ) = _get_first_and_last_review_datetime_for_ah_deck(ah_did=ah_did)
 
             assert_datetime_equal_ignore_milliseconds(
                 first_review_time,
@@ -2073,17 +2066,16 @@ class TestGetLastReviewTimeForAHDeck:
             )
 
             # Only the review for the first deck should be considered.
-            with attached_ankihub_db():
-                (
-                    first_review_time,
-                    last_review_time,
-                ) = _get_first_and_last_review_datetime_for_ah_deck(ah_did=ah_did_1)
+            (
+                first_review_time,
+                last_review_time,
+            ) = _get_first_and_last_review_datetime_for_ah_deck(ah_did=ah_did_1)
 
-                assert first_review_time == last_review_time
-                assert_datetime_equal_ignore_milliseconds(
-                    first_review_time,
-                    expected_review_time,
-                )
+            assert first_review_time == last_review_time
+            assert_datetime_equal_ignore_milliseconds(
+                first_review_time,
+                expected_review_time,
+            )
 
 
 class TestSendReviewData:
@@ -2126,6 +2118,29 @@ class TestSendReviewData:
             assert_datetime_equal_ignore_milliseconds(
                 card_review_data.last_card_review_at, second_review_time
             )
+
+    def test_without_reviews(
+        self,
+        anki_session_with_addon_data: AnkiSession,
+        install_ah_deck: InstallAHDeck,
+        mock_function: MockFunction,
+    ) -> None:
+        with anki_session_with_addon_data.profile_loaded():
+            # We install the deck so that we get coverage for the case where a deck
+            # has no reviews.
+            install_ah_deck()
+
+            send_card_review_data_mock = mock_function(
+                AnkiHubClient, "send_card_review_data"
+            )
+
+            send_review_data()
+
+            # Assert that the correct data was passed to the client method.
+            send_card_review_data_mock.assert_called_once()
+
+            review_data_list = send_card_review_data_mock.call_args[0][0]
+            assert review_data_list == []
 
 
 def test_clear_empty_cards(anki_session_with_addon_data: AnkiSession, qtbot: QtBot):
