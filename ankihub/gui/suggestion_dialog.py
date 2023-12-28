@@ -4,7 +4,7 @@ from concurrent.futures import Future
 from dataclasses import dataclass
 from enum import Enum
 from pprint import pformat
-from typing import Collection, Optional
+from typing import Callable, Collection, List, Optional
 
 import aqt
 from anki.notes import Note, NoteId
@@ -20,7 +20,6 @@ from aqt.qt import (
     QRegularExpression,
     QRegularExpressionValidator,
     QSpacerItem,
-    Qt,
     QVBoxLayout,
     QWidget,
     pyqtSignal,
@@ -88,15 +87,31 @@ def open_suggestion_dialog_for_note(note: Note, parent: QWidget) -> None:
         return
 
     ah_nid = ankihub_db.ankihub_nid_for_anki_nid(note.id)
-    suggestion_meta = SuggestionDialog(
+    SuggestionDialog(
         is_new_note_suggestion=ah_nid is None,
         is_for_anking_deck=ah_did == ANKING_DECK_ID,
         can_submit_without_review=_can_submit_without_review(ah_did=ah_did),
         added_new_media=_added_new_media(note),
-    ).run()
+        callback=lambda suggestion_meta: _on_suggestion_dialog_for_single_suggestion_closed(
+            suggestion_meta=suggestion_meta,
+            note=note,
+            ah_did=ah_did,
+            parent=parent,
+        ),
+        parent=parent,
+    )
+
+
+def _on_suggestion_dialog_for_single_suggestion_closed(
+    suggestion_meta: SuggestionMetadata,
+    note: Note,
+    ah_did: uuid.UUID,
+    parent: QWidget,
+) -> None:
     if suggestion_meta is None:
         return
 
+    ah_nid = ankihub_db.ankihub_nid_for_anki_nid(note.id)
     if ah_nid:
         if suggest_note_update(
             note=note,
@@ -138,15 +153,30 @@ def open_suggestion_dialog_for_bulk_suggestion(
 
     notes = [aqt.mw.col.get_note(nid) for nid in anki_nids]
 
-    suggestion_meta = SuggestionDialog(
+    SuggestionDialog(
         is_new_note_suggestion=False,
         is_for_anking_deck=ah_did == ANKING_DECK_ID,
         can_submit_without_review=_can_submit_without_review(ah_did=ah_did),
         # We currently have a limit of 500 notes per bulk suggestion, so we don't have to worry
         # about performance here.
         added_new_media=any(_added_new_media(note) for note in notes),
-    ).run()
-    if not suggestion_meta:
+        callback=lambda suggestion_meta: _on_suggestion_dialog_for_bulk_suggestion_closed(
+            suggestion_meta=suggestion_meta,
+            notes=notes,
+            ah_did=ah_did,
+            parent=parent,
+        ),
+        parent=parent,
+    )
+
+
+def _on_suggestion_dialog_for_bulk_suggestion_closed(
+    suggestion_meta: SuggestionMetadata,
+    notes: List[Note],
+    ah_did: uuid.UUID,
+    parent: QWidget,
+) -> None:
+    if suggestion_meta is None:
         LOGGER.info("User cancelled bulk suggestion from suggestion dialog.")
         return
 
@@ -289,17 +319,23 @@ class SuggestionDialog(QDialog):
         is_for_anking_deck: bool,
         can_submit_without_review: bool,
         added_new_media: bool,
+        callback: Callable[[Optional[SuggestionMetadata]], None],
+        parent: Optional[QWidget] = None,
     ) -> None:
-        super().__init__()
+        if parent is None:
+            parent = aqt.mw.app.activeWindow() or aqt.mw
+
+        super().__init__(parent)
         self._is_new_note_suggestion = is_new_note_suggestion
         self._is_for_anking_deck = is_for_anking_deck
         self._can_submit_without_review = can_submit_without_review
         self._added_new_media = added_new_media
+        self._callback = callback
 
         self._setup_ui()
+        self.show()
 
     def _setup_ui(self) -> None:
-        self.setWindowModality(Qt.WindowModality.WindowModal)
         self.setWindowTitle("Note Suggestion(s)")
 
         self.layout_ = QVBoxLayout()
@@ -372,11 +408,13 @@ class SuggestionDialog(QDialog):
         self._set_submit_button_enabled_state(False)
         qconnect(self.validation_signal, self._set_submit_button_enabled_state)
 
-    def run(self) -> Optional[SuggestionMetadata]:
-        if not self.exec():
-            return None
+    def accept(self) -> None:
+        self._callback(self.suggestion_meta())
+        super().accept()
 
-        return self.suggestion_meta()
+    def reject(self) -> None:
+        self._callback(None)
+        super().reject()
 
     def suggestion_meta(self) -> Optional[SuggestionMetadata]:
         return SuggestionMetadata(
