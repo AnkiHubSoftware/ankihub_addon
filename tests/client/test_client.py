@@ -238,6 +238,9 @@ def remove_db_dump() -> Generator:
     if result.returncode == 0 or NO_SUCH_FILE_OR_DIRECTORY_MESSAGE in result.stderr:
         # Nothing to do
         pass
+    elif result.returncode == 1 and "No such container" in result.stderr:
+        # Nothing to do
+        pass
     elif "Container" in result.stderr and "is not running" in result.stderr:
         # Container is not running, nothing to do
         pass
