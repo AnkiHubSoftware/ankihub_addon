@@ -114,7 +114,7 @@ from ankihub.debug import (
     _setup_logging_for_db_begin,
     _setup_logging_for_sync_collection_and_media,
 )
-from ankihub.gui import auto_sync, utils
+from ankihub.gui import utils
 from ankihub.gui.auto_sync import (
     SYNC_RATE_LIMIT_SECONDS,
     _setup_ankihub_sync_on_ankiweb_sync,
@@ -2740,7 +2740,7 @@ class TestDeckManagementDialog:
 
     def _mock_dependencies(self, mocker: MockerFixture) -> None:
         # Mock the config to return that the user is logged in
-        mocker.patch.object(config, "is_logged_in", lambda: True)
+        mocker.patch.object(config, "is_logged_in", return_value=True)
 
         # Mock the ask_user function to always return True
         mocker.patch("ankihub.gui.operations.subdecks.ask_user", return_value=True)
@@ -3530,7 +3530,7 @@ class TestAutoSync:
 
     def _mock_syncs_and_check_new_subscriptions(self, mocker: MockerFixture):
         # Mock the token so that the AnkiHub sync is not skipped.
-        mocker.patch.object(config, "token", return_value=lambda: "test_token")
+        mocker.patch.object(config, "token", return_value="test_token")
 
         # Mock update_decks_and_media so it does nothing.
         self.udpate_decks_and_media_mock = mocker.patch.object(
@@ -3900,11 +3900,7 @@ def mock_client_media_upload(
         return_value=True,
     )
 
-    mocker.patch.object(
-        AnkiHubClient,
-        "media_upload_finished",
-        return_value=False,
-    )
+    mocker.patch.object(AnkiHubClient, "media_upload_finished")
 
     mocker.patch.object(
         AnkiHubClient,
@@ -3918,7 +3914,7 @@ def mock_client_media_upload(
     )
 
     # Mock os.remove so the zip is not deleted
-    os_remove_mock = mocker.patch("os.remove")
+    mocker.patch("os.remove")
 
     # Create a temporary media folder and copy the test media files to it.
     # Patch the media folder path to point to the temporary folder.
