@@ -137,34 +137,6 @@ def mock_all_feature_flags_to_default_values(
     return mock_all_feature_flags_to_default_values_inner
 
 
-class MockFunction(Protocol):
-    def __call__(
-        self,
-        *args,
-        return_value: Optional[Any] = None,
-        side_effect: Optional[Callable] = None,
-    ) -> Mock:
-        ...
-
-
-@pytest.fixture
-def mock_function(
-    mocker,
-) -> MockFunction:
-    def _mock_function(
-        *args,
-        return_value: Optional[Any] = None,
-        side_effect: Optional[Callable] = None,
-    ) -> Mock:
-        # The args can be either an object and a function name or the full path to the function as a string.
-        assert len(args) in [1, 2]
-        return mocker.patch.object(
-            *args, return_value=return_value, side_effect=side_effect
-        )
-
-    return _mock_function
-
-
 class ImportAHNote(Protocol):
     def __call__(
         self,
