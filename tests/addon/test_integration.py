@@ -710,12 +710,12 @@ class TestDownloadAndInstallDecks:
     ):
         with anki_session_with_addon_data.profile_loaded():
             # Mock a function which is called in download_install_decks to raise an exception.
-            exception_mesaage = "test exception"
+            exception_message = "test exception"
 
             mocker.patch.object(
                 aqt.mw.taskman,
                 "with_progress",
-                side_effect=Exception(exception_mesaage),
+                side_effect=Exception(exception_message),
             )
 
             # Set up the on_done callback
@@ -729,7 +729,7 @@ class TestDownloadAndInstallDecks:
             download_and_install_decks(ankihub_dids=[], on_done=on_done)
 
             # Assert that the future contains the exception and that it contains the expected message.
-            assert future.exception().args[0] == exception_mesaage
+            assert future.exception().args[0] == exception_message
 
 
 class TestCheckAndInstallNewDeckSubscriptions:
@@ -3391,12 +3391,12 @@ class TestSyncWithAnkiHub:
     ):
         with anki_session_with_addon_data.profile_loaded():
             # Mock a client function which is called in sync_with_ankihub to raise an exception.
-            exception_mesaage = "test exception"
+            exception_message = "test exception"
 
             mocker.patch.object(
                 AnkiHubClient,
                 "get_deck_subscriptions",
-                side_effect=Exception(exception_mesaage),
+                side_effect=Exception(exception_message),
             )
 
             # Set up the on_done callback
@@ -3410,7 +3410,7 @@ class TestSyncWithAnkiHub:
             ankihub_sync.sync_with_ankihub(on_done=on_done)
 
             # Assert that the future contains the exception and that it contains the expected message.
-            assert future.exception().args[0] == exception_mesaage
+            assert future.exception().args[0] == exception_message
 
 
 def test_uninstalling_deck_removes_related_deck_extension_from_config(
