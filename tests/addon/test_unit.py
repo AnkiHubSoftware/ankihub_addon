@@ -512,7 +512,7 @@ def test_add_subdeck_tags_to_notes_with_spaces_in_deck_name(
 
 class TestAnkiHubSignOut:
     @pytest.mark.parametrize(
-        "confirmed_sign_out,expected_logged_in_state", [(True, False), (False, False)]
+        "confirmed_sign_out,expected_logged_in_state", [(True, False), (False, True)]
     )
     def test_sign_out(
         self,
@@ -522,10 +522,6 @@ class TestAnkiHubSignOut:
         confirmed_sign_out: bool,
         expected_logged_in_state: bool,
     ):
-        # 1. fill the token with a fake token
-        # 2. mock ask_user to return true
-        # 3. call
-
         anki_session = anki_session_with_addon_data
 
         with anki_session.profile_loaded():
@@ -561,11 +557,11 @@ class TestAnkiHubSignOut:
             )
 
             if expected_logged_in_state:
-                expected_token = ""
-            else:
                 expected_token = user_token
+            else:
+                expected_token = ""
 
-            assert config._private_config.token == expected_token
+            assert config.token() == expected_token
             assert config.is_logged_in() is expected_logged_in_state
 
 
