@@ -106,7 +106,6 @@ def client_with_server_setup(vcr: VCR, marks: List[str], request: FixtureRequest
         # Restore DB from dump
         result = subprocess.run(
             [
-                "sudo",
                 "docker",
                 "exec",
                 "-i",
@@ -152,7 +151,6 @@ def create_db_dump_if_not_exists() -> None:
     # Check if DB dump exists
     result = subprocess.run(
         [
-            "sudo",
             "docker",
             "exec",
             "-i",
@@ -178,7 +176,6 @@ def create_db_dump_if_not_exists() -> None:
     # Prepare the DB state
     result = subprocess.run(
         [
-            "sudo",
             "docker",
             "exec",
             DJANGO_CONTAINER_NAME,
@@ -199,7 +196,6 @@ def create_db_dump_if_not_exists() -> None:
     # Dump the DB to a file to be able to restore it before each test
     result = subprocess.run(
         [
-            "sudo",
             "docker",
             "exec",
             DB_CONTAINER_NAME,
@@ -223,7 +219,6 @@ def remove_db_dump() -> Generator:
     """Remove the db dump on the start of the session so that it is re-created for each session."""
     result = subprocess.run(
         [
-            "sudo",
             "docker",
             "exec",
             DB_CONTAINER_NAME,
@@ -236,6 +231,9 @@ def remove_db_dump() -> Generator:
     )
     report_command_result(command_name="rm", result=result, raise_on_error=False)
     if result.returncode == 0 or NO_SUCH_FILE_OR_DIRECTORY_MESSAGE in result.stderr:
+        # Nothing to do
+        pass
+    elif result.returncode == 1 and "No such container" in result.stderr:
         # Nothing to do
         pass
     elif "Container" in result.stderr and "is not running" in result.stderr:
