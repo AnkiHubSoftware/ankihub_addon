@@ -29,9 +29,37 @@ from ..common_utils import local_media_names_from_html
 from ..settings import ANKI_INT_VERSION, ANKI_VERSION_23_10_00
 from .db_utils import DBConnection
 from .exceptions import IntegrityError
+from .rw_lock import exclusive_db_access_context, non_exclusive_db_access_context
 
 
-def attach_ankihub_db_to_anki_db_connection() -> None:
+@contextmanager
+def attached_ankihub_db():
+    """Context manager that attaches the AnkiHub DB to the Anki DB connection and detaches it when the context exits.
+    The purpose is to e.g. do join queries between the Anki DB and the AnkiHub DB through aqt.mw.col.db.execute().
+    A lock is used to ensure that other threads don't try to access the AnkiHub DB through the _AnkiHubDB class
+    while it is attached to the Anki DB.
+    """
+    with exclusive_db_access_context():
+        _attach_ankihub_db_to_anki_db_connection()
+        try:
+            yield
+        finally:
+            _detach_ankihub_db_from_anki_db_connection()
+
+
+@contextmanager
+def detached_ankihub_db():
+    """Context manager that ensures the AnkiHub DB is detached from the Anki DB connection while the context is active.
+    The purpose of this is to be able to safely perform operations on the AnkiHub DB which require it to be detached,
+    for example coyping the AnkiHub DB file.
+    It's used by the _AnkiHubDB class to ensure that the AnkiHub DB is detached from the Anki DB while
+    queries are executed through the _AnkiHubDB class.
+    """
+    with non_exclusive_db_access_context():
+        yield
+
+
+def _attach_ankihub_db_to_anki_db_connection() -> None:
     if aqt.mw.col is None:
         LOGGER.info("The collection is not open. Not attaching AnkiHub DB.")
         return
@@ -44,7 +72,7 @@ def attach_ankihub_db_to_anki_db_connection() -> None:
         LOGGER.info("Attached AnkiHub DB to Anki DB connection")
 
 
-def detach_ankihub_db_from_anki_db_connection() -> None:
+def _detach_ankihub_db_from_anki_db_connection() -> None:
     if aqt.mw.col is None:
         LOGGER.info("The collection is not open. Not detaching AnkiHub DB.")
         return
@@ -82,17 +110,7 @@ def is_ankihub_db_attached_to_anki_db() -> bool:
     return result
 
 
-@contextmanager
-def attached_ankihub_db():
-    attach_ankihub_db_to_anki_db_connection()
-    try:
-        yield
-    finally:
-        detach_ankihub_db_from_anki_db_connection()
-
-
 class _AnkiHubDB:
-
     # name of the database when attached to the Anki DB connection
     database_name = "ankihub_db"
     database_path: Optional[Path] = None
@@ -199,7 +217,10 @@ class _AnkiHubDB:
         return result
 
     def connection(self) -> DBConnection:
-        result = DBConnection(conn=sqlite3.connect(ankihub_db.database_path))
+        result = DBConnection(
+            conn=sqlite3.connect(ankihub_db.database_path),
+            thread_safety_context_func=detached_ankihub_db,
+        )
         return result
 
     def upsert_notes_data(
@@ -224,7 +245,6 @@ class _AnkiHubDB:
         upserted_notes: List[NoteInfo] = []
         skipped_notes: List[NoteInfo] = []
         with self.connection() as conn:
-
             for note_data in notes_data:
                 conflicting_ah_nid = conn.first(
                     """

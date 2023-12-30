@@ -20,6 +20,7 @@ exclude = [
   'ankihub/lib/urllib',
   'ankihub/lib/other/typing_extension',
   'ankihub/lib/tenacity',
+  'ankihub/lib/readerwriterlock',
 ]
 
 no_strict_optional = true

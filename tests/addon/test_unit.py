@@ -6,8 +6,10 @@ import uuid
 from dataclasses import fields
 from datetime import datetime, timedelta
 from pathlib import Path
+from sqlite3 import ProgrammingError
 from textwrap import dedent
-from typing import Callable, Generator, List, Optional, Protocol, Tuple
+from time import sleep
+from typing import Callable, ContextManager, Generator, List, Optional, Protocol, Tuple
 from unittest.mock import Mock
 
 import aqt
@@ -57,9 +59,9 @@ from ankihub.ankihub_client import (
     SuggestionType,
     TagGroupValidationResponse,
 )
-from ankihub.db import attached_ankihub_db
+from ankihub.db import attached_ankihub_db, detached_ankihub_db
 from ankihub.db.db import _AnkiHubDB
-from ankihub.db.exceptions import IntegrityError
+from ankihub.db.exceptions import IntegrityError, LockAcquisitionTimeoutError
 from ankihub.feature_flags import _FeatureFlags, feature_flags
 from ankihub.gui.error_dialog import ErrorDialog
 from ankihub.gui.errors import (
@@ -71,6 +73,7 @@ from ankihub.gui.errors import (
 )
 from ankihub.gui.media_sync import media_sync
 from ankihub.gui.menu import AnkiHubLogin
+from ankihub.gui.operations import AddonQueryOp
 from ankihub.gui.operations.deck_creation import (
     DeckCreationConfirmationDialog,
     create_collaborative_deck,
@@ -1057,6 +1060,72 @@ class TestOnSuggestNotesInBulkDone:
         assert kwargs.get("message") == "test"
 
 
+class TestDBConnection:
+    def test_execute(self, ankihub_db: _AnkiHubDB):
+        ankihub_db.connection().execute("CREATE TABLE test (id TEXT PRIMARY KEY)")
+        ankihub_db.connection().execute("INSERT INTO test VALUES (?)", 1)
+        result = ankihub_db.execute("SELECT * FROM test")
+        assert result == [("1",)]
+
+    def test_execute_first_row_only(self, ankihub_db: _AnkiHubDB):
+        ankihub_db.connection().execute("CREATE TABLE test (id TEXT PRIMARY KEY)")
+        ankihub_db.connection().execute("INSERT INTO test VALUES (?)", 1)
+        result = ankihub_db.execute("SELECT * FROM test", first_row_only=True)
+        assert result == ("1",)
+
+    def test_scalar(self, ankihub_db: _AnkiHubDB):
+        ankihub_db.connection().execute(
+            "CREATE TABLE test (id TEXT PRIMARY KEY, other_field TEXT)"
+        )
+        ankihub_db.connection().execute("INSERT INTO test VALUES (?, ?)", 1, "test")
+        result = ankihub_db.scalar("SELECT * FROM test")
+        assert result == "1"
+
+    def test_list(self, ankihub_db: _AnkiHubDB):
+        ankihub_db.connection().execute("CREATE TABLE test (id TEXT PRIMARY KEY)")
+        ankihub_db.connection().execute("INSERT INTO test VALUES (?)", 1)
+        ankihub_db.connection().execute("INSERT INTO test VALUES (?)", 2)
+        result = ankihub_db.list("SELECT * FROM test")
+        assert result == ["1", "2"]
+
+    def test_first(self, ankihub_db: _AnkiHubDB):
+        ankihub_db.connection().execute("CREATE TABLE test (id TEXT PRIMARY KEY)")
+        ankihub_db.connection().execute("INSERT INTO test VALUES (?)", 1)
+        result = ankihub_db.first("SELECT * FROM test")
+        assert result == ("1",)
+
+    def test_reusing_connection_not_as_context_manager_raises_exception(
+        self, ankihub_db: _AnkiHubDB
+    ):
+        conn = ankihub_db.connection()
+        with pytest.raises(ProgrammingError) as e:
+            conn.execute("CREATE TABLE test (id TEXT PRIMARY KEY)")
+            conn.execute("INSERT INTO test VALUES (?)", 1)
+        assert "Cannot operate on a closed database." in str(e.value)
+
+    @pytest.mark.parametrize(
+        "exception_is_raised",
+        [True, False],
+    )
+    def test_changes_are_rolled_back_on_exception_in_context_manager(
+        self, ankihub_db: _AnkiHubDB, exception_is_raised: bool
+    ):
+        try:
+            with ankihub_db.connection() as conn:
+                conn.execute("CREATE TABLE test (id TEXT PRIMARY KEY)")
+                conn.execute("INSERT INTO test VALUES (?)", 1)
+                if exception_is_raised:
+                    raise Exception("test")
+        except Exception:
+            pass
+
+        result_str = ankihub_db.scalar("SELECT * FROM test")
+        if exception_is_raised:
+            assert result_str is None
+        else:
+            assert result_str == "1"
+
+
 class TestAnkiHubDBAnkiNidsToAnkiHubNids:
     def test_anki_nids_to_ankihub_nids(
         self,
@@ -1433,6 +1502,57 @@ class TestAnkiHubDBMediaNamesWithMatchingHashes:
             )
             == {}
         )
+
+
+class TestAnkiHubDBContextManagers:
+    @pytest.mark.parametrize(
+        "task_configs, task_times_out",
+        [
+            # Format for a task_confg: (context_manager, duration)
+            # Detached, Detached - tasks don't block each other
+            ([(detached_ankihub_db, 0.1), (detached_ankihub_db, 0.1)], False),
+            ([(detached_ankihub_db, 0.5), (detached_ankihub_db, 0.1)], False),
+            # Attached, Attached - tasks block each other
+            ([(attached_ankihub_db, 0.1), (attached_ankihub_db, 0.1)], False),
+            ([(attached_ankihub_db, 0.5), (attached_ankihub_db, 0.1)], True),
+            # Attached, Detached - tasks block each other
+            ([(attached_ankihub_db, 0.1), (detached_ankihub_db, 0.1)], False),
+            ([(attached_ankihub_db, 0.5), (detached_ankihub_db, 0.1)], True),
+            # Detached, Attached - tasks block each other
+            ([(detached_ankihub_db, 0.1), (attached_ankihub_db, 0.1)], False),
+            ([(detached_ankihub_db, 0.5), (attached_ankihub_db, 0.1)], True),
+        ],
+    )
+    def test_blocking_and_timeout_behavior(
+        self,
+        anki_session_with_addon_data: AnkiSession,
+        qtbot: QtBot,
+        mocker: MockerFixture,
+        task_configs: List[Tuple[Callable[[], ContextManager], float]],
+        task_times_out: bool,
+    ):
+        mocker.patch("ankihub.db.rw_lock.LOCK_TIMEOUT_SECONDS", 0.2)
+
+        def task(context_manager: Callable[[], ContextManager], duration: float):
+            with context_manager():
+                sleep(duration)
+
+        with anki_session_with_addon_data.profile_loaded():
+            for context_manager, duration in task_configs:
+                AddonQueryOp(
+                    parent=qtbot,
+                    op=lambda _: task(context_manager, duration),
+                    success=lambda _: None,
+                ).without_collection().run_in_background()
+
+            with qtbot.captureExceptions() as exceptions:
+                qtbot.wait(500)
+
+            if task_times_out:
+                assert len(exceptions) == 1
+                assert isinstance(exceptions[0][1], LockAcquisitionTimeoutError)
+            else:
+                assert len(exceptions) == 0
 
 
 class TestErrorHandling:
@@ -1876,13 +1996,13 @@ class TestGetReviewCountForAHDeckSince:
                 record_review_for_anki_nid(
                     NoteId(note_info.anki_nid), now + review_delta
                 )
-            with attached_ankihub_db():
-                assert (
-                    _get_review_count_for_ah_deck_since(
-                        ah_did=ah_did, since=now + since_time
-                    )
-                    == expected_count
+
+            assert (
+                _get_review_count_for_ah_deck_since(
+                    ah_did=ah_did, since=now + since_time
                 )
+                == expected_count
+            )
 
     def test_with_multiple_notes(
         self,
@@ -1902,11 +2022,10 @@ class TestGetReviewCountForAHDeckSince:
             )
 
             since_time = now - timedelta(days=1)
-            with attached_ankihub_db():
-                assert (
-                    _get_review_count_for_ah_deck_since(ah_did=ah_did, since=since_time)
-                    == 2
-                )
+            assert (
+                _get_review_count_for_ah_deck_since(ah_did=ah_did, since=since_time)
+                == 2
+            )
 
     def test_with_review_for_other_deck(
         self,
@@ -1929,13 +2048,10 @@ class TestGetReviewCountForAHDeckSince:
 
             # Only the review for the first deck should be counted.
             since_time = now - timedelta(days=1)
-            with attached_ankihub_db():
-                assert (
-                    _get_review_count_for_ah_deck_since(
-                        ah_did=ah_did_1, since=since_time
-                    )
-                    == 1
-                )
+            assert (
+                _get_review_count_for_ah_deck_since(ah_did=ah_did_1, since=since_time)
+                == 1
+            )
 
 
 class TestGetLastReviewTimeForAHDeck:
@@ -1971,26 +2087,25 @@ class TestGetLastReviewTimeForAHDeck:
                     NoteId(note_info.anki_nid), now + review_delta
                 )
 
-            with attached_ankihub_db():
-                first_and_last_time = _get_first_and_last_review_datetime_for_ah_deck(
-                    ah_did=ah_did
+            first_and_last_time = _get_first_and_last_review_datetime_for_ah_deck(
+                ah_did=ah_did
+            )
+
+            if expected_last_review_delta is not None:
+                first_review_time, last_review_time = first_and_last_time
+
+                expected_first_review_time = now + expected_first_review_delta
+                assert_datetime_equal_ignore_milliseconds(
+                    first_review_time,
+                    expected_first_review_time,
                 )
 
-                if expected_last_review_delta is not None:
-                    first_review_time, last_review_time = first_and_last_time
-
-                    expected_first_review_time = now + expected_first_review_delta
-                    assert_datetime_equal_ignore_milliseconds(
-                        first_review_time,
-                        expected_first_review_time,
-                    )
-
-                    expected_last_review_time = now + expected_last_review_delta
-                    assert_datetime_equal_ignore_milliseconds(
-                        last_review_time, expected_last_review_time
-                    )
-                else:
-                    assert first_and_last_time is None
+                expected_last_review_time = now + expected_last_review_delta
+                assert_datetime_equal_ignore_milliseconds(
+                    last_review_time, expected_last_review_time
+                )
+            else:
+                assert first_and_last_time is None
 
     def test_with_multiple_notes(
         self,
@@ -2013,11 +2128,10 @@ class TestGetLastReviewTimeForAHDeck:
                 NoteId(note_info_2.anki_nid), expected_last_review_time
             )
 
-            with attached_ankihub_db():
-                (
-                    first_review_time,
-                    last_review_time,
-                ) = _get_first_and_last_review_datetime_for_ah_deck(ah_did=ah_did)
+            (
+                first_review_time,
+                last_review_time,
+            ) = _get_first_and_last_review_datetime_for_ah_deck(ah_did=ah_did)
 
             assert_datetime_equal_ignore_milliseconds(
                 first_review_time,
@@ -2050,17 +2164,16 @@ class TestGetLastReviewTimeForAHDeck:
             )
 
             # Only the review for the first deck should be considered.
-            with attached_ankihub_db():
-                (
-                    first_review_time,
-                    last_review_time,
-                ) = _get_first_and_last_review_datetime_for_ah_deck(ah_did=ah_did_1)
+            (
+                first_review_time,
+                last_review_time,
+            ) = _get_first_and_last_review_datetime_for_ah_deck(ah_did=ah_did_1)
 
-                assert first_review_time == last_review_time
-                assert_datetime_equal_ignore_milliseconds(
-                    first_review_time,
-                    expected_review_time,
-                )
+            assert first_review_time == last_review_time
+            assert_datetime_equal_ignore_milliseconds(
+                first_review_time,
+                expected_review_time,
+            )
 
 
 class TestSendReviewData:
@@ -2103,6 +2216,29 @@ class TestSendReviewData:
             assert_datetime_equal_ignore_milliseconds(
                 card_review_data.last_card_review_at, second_review_time
             )
+
+    def test_without_reviews(
+        self,
+        anki_session_with_addon_data: AnkiSession,
+        install_ah_deck: InstallAHDeck,
+        mocker: MockerFixture,
+    ) -> None:
+        with anki_session_with_addon_data.profile_loaded():
+            # We install the deck so that we get coverage for the case where a deck
+            # has no reviews.
+            install_ah_deck()
+
+            send_card_review_data_mock = mocker.patch.object(
+                AnkiHubClient, "send_card_review_data"
+            )
+
+            send_review_data()
+
+            # Assert that the correct data was passed to the client method.
+            send_card_review_data_mock.assert_called_once()
+
+            review_data_list = send_card_review_data_mock.call_args[0][0]
+            assert review_data_list == []
 
 
 def test_clear_empty_cards(anki_session_with_addon_data: AnkiSession, qtbot: QtBot):

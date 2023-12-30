@@ -33,12 +33,7 @@ from aqt.utils import showInfo, showWarning, tooltip, tr
 
 from ... import LOGGER
 from ...ankihub_client import SuggestionType
-from ...db import (
-    ankihub_db,
-    attach_ankihub_db_to_anki_db_connection,
-    attached_ankihub_db,
-    detach_ankihub_db_from_anki_db_connection,
-)
+from ...db import ankihub_db, attached_ankihub_db
 from ...main.importing import get_fields_protected_by_tags
 from ...main.note_conversion import (
     TAG_FOR_PROTECTING_ALL_FIELDS,
@@ -55,7 +50,6 @@ from ..suggestion_dialog import open_suggestion_dialog_for_bulk_suggestion
 from ..utils import ask_user, choose_ankihub_deck, choose_list, choose_subset
 from .custom_columns import (
     AnkiHubIdColumn,
-    CustomColumn,
     EditedAfterSyncColumn,
     UpdatedSinceLastReviewColumn,
 )
@@ -512,7 +506,6 @@ def _on_reset_optional_tags_action(browser: Browser):
 
 
 def _reset_optional_tag_group(extension_id: int) -> None:
-
     extension_config = config.deck_extension_config(extension_id)
     _remove_optional_tags_of_extension(extension_config)
 
@@ -566,30 +559,10 @@ def _on_browser_did_fetch_row(
 # cutom search nodes
 def _setup_search():
     browser_will_search.append(_on_browser_will_search)
-    browser_did_search.append(_on_browser_did_search)
+    browser_did_search.append(_on_browser_did_search_handle_custom_search_parameters)
 
 
 def _on_browser_will_search(ctx: SearchContext):
-    _on_browser_will_search_handle_custom_column_ordering(ctx)
-    _on_browser_will_search_handle_custom_search_parameters(ctx)
-
-
-def _on_browser_will_search_handle_custom_column_ordering(ctx: SearchContext):
-    if not isinstance(ctx.order, Column):
-        return
-
-    custom_column: CustomColumn = next(
-        (c for c in custom_columns if c.builtin_column.key == ctx.order.key), None
-    )
-    if custom_column is None:
-        return
-
-    attach_ankihub_db_to_anki_db_connection()
-
-    ctx.order = custom_column.order_by_str()
-
-
-def _on_browser_will_search_handle_custom_search_parameters(ctx: SearchContext):
     if not ctx.search:
         return
 
@@ -613,15 +586,6 @@ def _on_browser_will_search_handle_custom_search_parameters(ctx: SearchContext):
 
         # remove the custom search parameter from the search string
         ctx.search = ctx.search.replace(m.group(0), "")
-
-
-def _on_browser_did_search(ctx: SearchContext):
-    # Detach the ankihub database in case it was attached in on_browser_will_search_handle_custom_column_ordering.
-    # The attached_ankihub_db context manager can't be used for this because the database query happens
-    # in the rust backend.
-    detach_ankihub_db_from_anki_db_connection()
-
-    _on_browser_did_search_handle_custom_search_parameters(ctx)
 
 
 def _on_browser_did_search_handle_custom_search_parameters(ctx: SearchContext):
@@ -735,7 +699,6 @@ def _sidebar_item_descendants(item: SidebarItem) -> List[SidebarItem]:
 
 
 def _add_ankihub_tree(tree: SidebarItem) -> SidebarItem:
-
     result = tree.add_simple(
         name="👑 AnkiHub",
         icon="",
