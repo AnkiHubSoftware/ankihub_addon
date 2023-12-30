@@ -43,7 +43,7 @@ jobs:
       - name: Run pytest with coverage
         run: |
           pytest ./tests/addon --cov --cov-report=xml -n 4 --reruns 5 --reruns-delay 1 \
-            --only-rerun "pytestqt.exceptions.TimeoutError: Signal match_found() not emitted after 5000 ms"
+            --only-rerun "Signal match_found\(\) not emitted after 5000 ms"
           pytest ./tests/addon --performance -k performance -n1 --cov-report=xml --cov-append
 
       - name: Upload coverage
