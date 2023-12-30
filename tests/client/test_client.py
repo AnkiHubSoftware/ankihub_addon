@@ -10,11 +10,11 @@ from copy import deepcopy
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
 from typing import Callable, Generator, List, cast
-from unittest.mock import MagicMock, Mock
 
 import pytest
 import requests_mock
-from pytest import FixtureRequest, MonkeyPatch
+from pytest import FixtureRequest
+from pytest_mock import MockerFixture
 from requests_mock import Mocker
 from vcr import VCR  # type: ignore
 
@@ -404,13 +404,13 @@ def test_client_login_and_signout_with_email(client_with_server_setup):
 
 @pytest.mark.vcr()
 def test_download_deck(
-    authorized_client_for_user_test1: AnkiHubClient, monkeypatch: MonkeyPatch
+    authorized_client_for_user_test1: AnkiHubClient, mocker: MockerFixture
 ):
     client = authorized_client_for_user_test1
-
-    get_presigned_url_suffix = MagicMock()
-    get_presigned_url_suffix.return_value = "/fake_key"
-    monkeypatch.setattr(client, "_get_presigned_url_suffix", get_presigned_url_suffix)
+    presigned_url_suffix = "/fake_key"
+    mocker.patch.object(
+        client, "_get_presigned_url_suffix", return_value=presigned_url_suffix
+    )
 
     original_get_deck_by_id = client.get_deck_by_id
 
@@ -419,11 +419,11 @@ def test_download_deck(
         result.csv_notes_filename = "notes.csv"
         return result
 
-    monkeypatch.setattr(client, "get_deck_by_id", get_deck_by_id)
+    mocker.patch.object(client, "get_deck_by_id", side_effect=get_deck_by_id)
 
     with requests_mock.Mocker(real_http=True) as m:
         m.get(
-            f"{client.s3_bucket_url}{get_presigned_url_suffix.return_value}",
+            f"{client.s3_bucket_url}{presigned_url_suffix}",
             content=DECK_CSV.read_bytes(),
         )
         notes_data = client.download_deck(ah_did=ID_OF_DECK_OF_USER_TEST1)
@@ -433,13 +433,15 @@ def test_download_deck(
 
 @pytest.mark.vcr()
 def test_download_compressed_deck(
-    authorized_client_for_user_test1: AnkiHubClient, monkeypatch: MonkeyPatch
+    authorized_client_for_user_test1: AnkiHubClient,
+    mocker: MockerFixture,
 ):
     client = authorized_client_for_user_test1
 
-    get_presigned_url_suffix = MagicMock()
-    get_presigned_url_suffix.return_value = "/fake_key"
-    monkeypatch.setattr(client, "_get_presigned_url_suffix", get_presigned_url_suffix)
+    presigned_url_suffix = "/fake_key"
+    mocker.patch.object(
+        client, "_get_presigned_url_suffix", return_value=presigned_url_suffix
+    )
 
     original_get_deck_by_id = client.get_deck_by_id
 
@@ -448,11 +450,11 @@ def test_download_compressed_deck(
         result.csv_notes_filename = "notes.csv.gz"
         return result
 
-    monkeypatch.setattr(client, "get_deck_by_id", get_deck_by_id)
+    mocker.patch.object(client, "get_deck_by_id", side_effect=get_deck_by_id)
 
     with requests_mock.Mocker(real_http=True) as m:
         m.get(
-            f"{client.s3_bucket_url}{get_presigned_url_suffix.return_value}",
+            f"{client.s3_bucket_url}{presigned_url_suffix}",
             content=DECK_CSV_GZ.read_bytes(),
         )
         notes_data = client.download_deck(ah_did=ID_OF_DECK_OF_USER_TEST1)
@@ -462,13 +464,14 @@ def test_download_compressed_deck(
 
 @pytest.mark.vcr()
 def test_download_deck_with_progress(
-    authorized_client_for_user_test1: AnkiHubClient, monkeypatch: MonkeyPatch
+    authorized_client_for_user_test1: AnkiHubClient, mocker: MockerFixture
 ):
     client = authorized_client_for_user_test1
 
-    get_presigned_url_suffix = MagicMock()
-    get_presigned_url_suffix.return_value = "/fake_key"
-    monkeypatch.setattr(client, "_get_presigned_url_suffix", get_presigned_url_suffix)
+    presigned_url_suffix = "/fake_key"
+    mocker.patch.object(
+        client, "_get_presigned_url_suffix", return_value=presigned_url_suffix
+    )
 
     original_get_deck_by_id = client.get_deck_by_id
 
@@ -477,11 +480,11 @@ def test_download_deck_with_progress(
         result.csv_notes_filename = "notes.csv"
         return result
 
-    monkeypatch.setattr(client, "get_deck_by_id", get_deck_by_id)
+    mocker.patch.object(client, "get_deck_by_id", side_effect=get_deck_by_id)
 
     with requests_mock.Mocker(real_http=True) as m:
         m.get(
-            f"{client.s3_bucket_url}{get_presigned_url_suffix.return_value}",
+            f"{client.s3_bucket_url}{presigned_url_suffix}",
             content=DECK_CSV.read_bytes(),
             headers={"content-length": "1000000"},
         )
@@ -518,7 +521,7 @@ def create_note_on_ankihub_and_assert(
 def test_upload_deck(
     authorized_client_for_user_test1: AnkiHubClient,
     next_deterministic_id: Callable[[], int],
-    monkeypatch: MonkeyPatch,
+    mocker: MockerFixture,
 ):
     client = authorized_client_for_user_test1
 
@@ -527,20 +530,16 @@ def test_upload_deck(
     # create the deck on AnkiHub
     # upload to s3 is mocked out, this will potentially cause errors on the locally running AnkiHub
     # because the deck will not be uploaded to s3, but we don't care about that here
-    upload_to_s3_mock = Mock()
-    with monkeypatch.context() as m:
-        m.setattr(client, "_upload_to_s3", upload_to_s3_mock)
-        m.setattr(
-            client, "_get_presigned_url_suffix", lambda *args, **kwargs: "fake_key"
-        )
+    upload_to_s3_mock = mocker.patch.object(client, "_upload_to_s3")
+    mocker.patch.object(client, "_get_presigned_url_suffix", return_value="fake_key")
 
-        client.upload_deck(
-            deck_name="test deck",
-            notes_data=[note_data],
-            note_types_data=[],
-            anki_deck_id=next_deterministic_id(),
-            private=False,
-        )
+    client.upload_deck(
+        deck_name="test deck",
+        notes_data=[note_data],
+        note_types_data=[],
+        anki_deck_id=next_deterministic_id(),
+        private=False,
+    )
 
     # check that the deck would be uploaded to s3
     assert upload_to_s3_mock.call_count == 1
@@ -860,14 +859,12 @@ class TestGetOwnedDecks:
 class TestGetDeckUpdates:
     @pytest.mark.vcr()
     def test_get_deck_updates(
-        self,
-        authorized_client_for_user_test2: AnkiHubClient,
-        monkeypatch: MonkeyPatch,
+        self, authorized_client_for_user_test2: AnkiHubClient, mocker: MockerFixture
     ):
         client = authorized_client_for_user_test2
 
         page_size = 5
-        monkeypatch.setattr(
+        mocker.patch(
             "ankihub.ankihub_client.ankihub_client.DECK_UPDATE_PAGE_SIZE", page_size
         )
         update_chunks: List[DeckUpdateChunk] = list(
@@ -982,15 +979,13 @@ class TestGetDeckMediaUpdates:
 
     @pytest.mark.vcr()
     def test_pagination(
-        self,
-        authorized_client_for_user_test1: AnkiHubClient,
-        monkeypatch: MonkeyPatch,
+        self, authorized_client_for_user_test1: AnkiHubClient, mocker: MockerFixture
     ):
         client = authorized_client_for_user_test1
 
         # Set page size to 1 so that we can test pagination
         page_size = 1
-        monkeypatch.setattr(
+        mocker.patch(
             "ankihub.ankihub_client.ankihub_client.DECK_MEDIA_UPDATE_PAGE_SIZE",
             page_size,
         )
@@ -1087,9 +1082,7 @@ def test_get_note_customizations_by_deck_extension_id(
 
 
 @pytest.mark.vcr()
-def test_get_media_disabled_fields(
-    authorized_client_for_user_test1: AnkiHubClient, monkeypatch: MonkeyPatch
-):
+def test_get_media_disabled_fields(authorized_client_for_user_test1: AnkiHubClient):
     client = authorized_client_for_user_test1
 
     deck_uuid = ID_OF_DECK_OF_USER_TEST1
@@ -1127,14 +1120,16 @@ def test_media_upload_finished(authorized_client_for_user_test1: AnkiHubClient):
 
 @pytest.mark.vcr()
 def test_get_note_customizations_by_deck_extension_id_in_multiple_chunks(
-    authorized_client_for_user_test1: AnkiHubClient, monkeypatch: MonkeyPatch
+    authorized_client_for_user_test1: AnkiHubClient, mocker: MockerFixture
 ):
     client = authorized_client_for_user_test1
 
     deck_extension_id = 999
 
-    monkeypatch.setattr(
-        "ankihub.ankihub_client.ankihub_client.DECK_EXTENSION_UPDATE_PAGE_SIZE", 1
+    page_size = 1
+    mocker.patch(
+        "ankihub.ankihub_client.ankihub_client.DECK_EXTENSION_UPDATE_PAGE_SIZE",
+        page_size,
     )
 
     expected_chunk_1 = DeckExtensionUpdateChunk(
@@ -1309,7 +1304,7 @@ class TestUploadMediaForSuggestion:
         self,
         suggestion_type: str,
         requests_mock: Mocker,
-        monkeypatch,
+        mocker: MockerFixture,
         next_deterministic_uuid: Callable[[], uuid.UUID],
         remove_generated_media_files,
         request: FixtureRequest,
@@ -1334,10 +1329,10 @@ class TestUploadMediaForSuggestion:
 
         suggestion_request_mock = None
 
-        monkeypatch.setattr(
+        mocker.patch.object(
             AnkiHubClient,
             "_get_presigned_url_for_multiple_uploads",
-            lambda *args, **kwargs: {
+            return_value={
                 "url": fake_presigned_url,
                 "fields": {
                     "key": "deck_images/test/${filename}",
@@ -1450,25 +1445,20 @@ class TestUploadMediaForDeck:
         return notes_data
 
     def test_zips_media_files_from_deck_notes(
-        self, next_deterministic_uuid: Callable[[], uuid.UUID], monkeypatch: MonkeyPatch
+        self,
+        next_deterministic_uuid: Callable[[], uuid.UUID],
+        mocker: MockerFixture,
     ):
         client = AnkiHubClient(local_media_dir_path_cb=lambda: TEST_MEDIA_PATH)
 
         notes_data = self.notes_data_with_many_media_files()
 
-        # Mock os.remove so the zip is not deleted
-        os_remove_mock = MagicMock()
-        monkeypatch.setattr(os, "remove", os_remove_mock)
-
         # Mock upload-related stuff
-        monkeypatch.setattr(
-            client, "_get_presigned_url_for_multiple_uploads", MagicMock()
-        )
-        monkeypatch.setattr(
-            client, "_upload_file_to_s3_with_reusable_presigned_url", MagicMock()
-        )
+        mocker.patch.object(client, "_get_presigned_url_for_multiple_uploads")
+        mocker.patch.object(client, "_upload_file_to_s3_with_reusable_presigned_url")
 
         deck_id = next_deterministic_uuid()
+        remove_mock = mocker.patch("os.remove")
         self._upload_media_for_notes_data(client, notes_data, deck_id)
 
         # We will create and check for just one chunk in this test
@@ -1483,12 +1473,12 @@ class TestUploadMediaForDeck:
             assert set(zip_ref.namelist()) == set(all_media_names_in_notes)
 
         # Remove the zipped file at the end of the test
-        monkeypatch.undo()
+        mocker.stop(remove_mock)
         os.remove(path_to_created_zip_file)
         assert path_to_created_zip_file.is_file() is False
 
     def test_uploads_generated_zipped_file(
-        self, next_deterministic_uuid: Callable[[], uuid.UUID], monkeypatch: MonkeyPatch
+        self, next_deterministic_uuid: Callable[[], uuid.UUID], mocker: MockerFixture
     ):
         client = AnkiHubClient(local_media_dir_path_cb=lambda: TEST_MEDIA_PATH)
 
@@ -1509,17 +1499,14 @@ class TestUploadMediaForDeck:
                 "x-amz-signature": "test_822ac386d1ece605db8cfca",
             },
         }
-        get_presigned_url_mock = MagicMock()
-        get_presigned_url_mock.return_value = s3_info_mocked_value
-        monkeypatch.setattr(
-            client, "_get_presigned_url_for_multiple_uploads", get_presigned_url_mock
+        get_presigned_url_mock = mocker.patch.object(
+            client,
+            "_get_presigned_url_for_multiple_uploads",
+            return_value=s3_info_mocked_value,
         )
-
-        mocked_upload_file_to_s3 = MagicMock()
-        monkeypatch.setattr(
+        mocked_upload_file_to_s3 = mocker.patch.object(
             client,
             "_upload_file_to_s3_with_reusable_presigned_url",
-            mocked_upload_file_to_s3,
         )
 
         self._upload_media_for_notes_data(client, notes_data, deck_id)
@@ -1531,19 +1518,15 @@ class TestUploadMediaForDeck:
         )
 
     def test_removes_zipped_file_after_upload(
-        self, next_deterministic_uuid: Callable[[], uuid.UUID], monkeypatch: MonkeyPatch
+        self, next_deterministic_uuid: Callable[[], uuid.UUID], mocker: MockerFixture
     ):
         client = AnkiHubClient(local_media_dir_path_cb=lambda: TEST_MEDIA_PATH)
 
         notes_data = self.notes_data_with_many_media_files()
 
         # Mock upload-related stuff
-        monkeypatch.setattr(
-            client, "_get_presigned_url_for_multiple_uploads", MagicMock()
-        )
-        monkeypatch.setattr(
-            client, "_upload_file_to_s3_with_reusable_presigned_url", MagicMock()
-        )
+        mocker.patch.object(client, "_get_presigned_url_for_multiple_uploads")
+        mocker.patch.object(client, "_upload_file_to_s3_with_reusable_presigned_url")
 
         deck_id = next_deterministic_uuid()
         self._upload_media_for_notes_data(client, notes_data, deck_id)
