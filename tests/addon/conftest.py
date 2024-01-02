@@ -20,7 +20,6 @@ from ..fixtures import (  # noqa F401
     install_ah_deck,
     mock_all_feature_flags_to_default_values,
     mock_download_and_install_deck_dependencies,
-    mock_function,
     mock_message_box_with_cb,
     mock_show_dialog_with_cb,
     mock_study_deck_dialog_with_cb,

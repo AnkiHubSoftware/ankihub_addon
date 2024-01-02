@@ -18,6 +18,7 @@ pytest-vcr==1.0.2
 pytest-qt==4.2.0
 pytest-split==0.8.1
 pytest-rerunfailures==13.0
+pytest-mock==3.12.0
 factory-boy==3.2.1
 types-factory-boy==0.3.1
 pytest-xvfb==2.0.0
