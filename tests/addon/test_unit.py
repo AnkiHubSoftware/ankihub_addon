@@ -8,7 +8,8 @@ from datetime import datetime, timedelta
 from pathlib import Path
 from sqlite3 import ProgrammingError
 from textwrap import dedent
-from typing import Callable, Generator, List, Optional, Protocol, Tuple
+from time import sleep
+from typing import Callable, ContextManager, Generator, List, Optional, Protocol, Tuple
 from unittest.mock import Mock
 
 import aqt
@@ -18,8 +19,8 @@ from anki.models import NotetypeDict
 from anki.notes import Note, NoteId
 from aqt import QMenu, utils
 from aqt.qt import QDialog, QDialogButtonBox, Qt, QTimer, QWidget
-from pytest import MonkeyPatch
 from pytest_anki import AnkiSession
+from pytest_mock import MockerFixture
 from pytestqt.qtbot import QtBot  # type: ignore
 from requests import Response
 from requests_mock import Mocker
@@ -41,7 +42,6 @@ from ..factories import (
 from ..fixtures import (  # type: ignore
     ImportAHNoteType,
     InstallAHDeck,
-    MockFunction,
     MockStudyDeckDialogWithCB,
     NewNoteWithNoteType,
     SetFeatureFlagState,
@@ -64,10 +64,10 @@ from ankihub.ankihub_client import (
     SuggestionType,
     TagGroupValidationResponse,
 )
+from ankihub.db import attached_ankihub_db, detached_ankihub_db
 from ankihub.db.db import _AnkiHubDB
-from ankihub.db.exceptions import IntegrityError
+from ankihub.db.exceptions import IntegrityError, LockAcquisitionTimeoutError
 from ankihub.feature_flags import _FeatureFlags, feature_flags
-from ankihub.gui import errors, suggestion_dialog
 from ankihub.gui.error_dialog import ErrorDialog
 from ankihub.gui.errors import (
     OUTDATED_CLIENT_ERROR_REASON,
@@ -78,7 +78,7 @@ from ankihub.gui.errors import (
 )
 from ankihub.gui.media_sync import media_sync
 from ankihub.gui.menu import AnkiHubLogin, menu_state, refresh_ankihub_menu
-from ankihub.gui.operations import deck_creation
+from ankihub.gui.operations import deck_creation, AddonQueryOp
 from ankihub.gui.operations.deck_creation import (
     DeckCreationConfirmationDialog,
     create_collaborative_deck,
@@ -182,14 +182,11 @@ class TestUploadMediaForSuggestion:
 
 
 class TestMediaSyncMediaDownload:
-    def test_with_exception(self, mock_function: MockFunction, qtbot: QtBot):
-        def raise_exception() -> None:
-            raise Exception("test")
-
-        update_and_download_mock = mock_function(
+    def test_with_exception(self, mocker: MockerFixture, qtbot: QtBot):
+        update_and_download_mock = mocker.patch.object(
             media_sync,
             "_update_deck_media_and_download_missing_media",
-            side_effect=raise_exception,
+            side_effect=Exception("test"),
         )
 
         with qtbot.captureExceptions() as exceptions:
@@ -206,19 +203,15 @@ class TestMediaSyncMediaUpload:
     def test_with_exception(
         self,
         anki_session_with_addon_data: AnkiSession,
-        mock_function: MockFunction,
+        mocker: MockerFixture,
         qtbot: QtBot,
         next_deterministic_uuid,
     ):
         with anki_session_with_addon_data.profile_loaded():
-
-            def raise_exception() -> None:
-                raise Exception("test")
-
-            upload_media_mock = mock_function(
+            upload_media_mock = mocker.patch.object(
                 media_sync._client,
                 "upload_media",
-                side_effect=raise_exception,
+                side_effect=Exception("test"),
             )
 
             with qtbot.captureExceptions() as exceptions:
@@ -566,12 +559,16 @@ class TestAnkiHubSignOut:
 
 
 class TestAnkiHubLoginDialog:
-    def test_login(self, qtbot: QtBot, mock_function: MockFunction):
+    def test_login(
+        self,
+        qtbot: QtBot,
+        mocker: MockerFixture,
+    ):
         username = "test_username"
         password = "test_password"
         token = "test_token"
 
-        login_mock = mock_function(
+        login_mock = mocker.patch(
             "ankihub.gui.menu.AnkiHubClient.login", return_value=token
         )
 
@@ -617,8 +614,9 @@ class TestSuggestionDialog:
         source_type: SourceType,
         media_was_added: bool,
         qtbot: QtBot,
+        mocker: MockerFixture,
     ):
-        callback_mock = Mock()
+        callback_mock = mocker.stub()
         dialog = SuggestionDialog(
             is_for_anking_deck=is_for_anking_deck,
             is_new_note_suggestion=is_new_note_suggestion,
@@ -700,8 +698,10 @@ class TestSuggestionDialog:
             False,
         ],
     )
-    def test_submit_without_review_checkbox(self, can_submit_without_review: bool):
-        callback_mock = Mock()
+    def test_submit_without_review_checkbox(
+        self, can_submit_without_review: bool, mocker: MockerFixture
+    ):
+        callback_mock = mocker.stub()
         dialog = SuggestionDialog(
             is_for_anking_deck=False,
             is_new_note_suggestion=False,
@@ -794,7 +794,7 @@ class MockDependenciesForSuggestionDialog(Protocol):
 
 @pytest.fixture
 def mock_dependiencies_for_suggestion_dialog(
-    mock_function: MockFunction,
+    mocker: MockerFixture,
     mock_suggestion_dialog,
 ) -> MockDependenciesForSuggestionDialog:
     """Mocks the dependencies for open_suggestion_dialog_for_note.
@@ -807,13 +807,11 @@ def mock_dependiencies_for_suggestion_dialog(
     ) -> Tuple[Mock, Mock]:
         mock_suggestion_dialog(user_cancels=user_cancels)
 
-        suggest_note_update_mock = mock_function(
-            suggestion_dialog,
-            "suggest_note_update",
+        suggest_note_update_mock = mocker.patch(
+            "ankihub.gui.suggestion_dialog.suggest_note_update"
         )
-        suggest_new_note_mock = mock_function(
-            suggestion_dialog,
-            "suggest_new_note",
+        suggest_new_note_mock = mocker.patch(
+            "ankihub.gui.suggestion_dialog.suggest_new_note"
         )
 
         return suggest_note_update_mock, suggest_new_note_mock
@@ -877,7 +875,7 @@ class TestOpenSuggestionDialogForSingleSuggestion:
         import_ah_note_type: ImportAHNoteType,
         new_note_with_note_type: NewNoteWithNoteType,
         mock_dependiencies_for_suggestion_dialog: MockDependenciesForSuggestionDialog,
-        mock_function: MockFunction,
+        mocker: MockerFixture,
         user_cancels: bool,
     ):
         with anki_session_with_addon_data.profile_loaded():
@@ -895,9 +893,8 @@ class TestOpenSuggestionDialogForSingleSuggestion:
                 suggest_new_note_mock,
             ) = mock_dependiencies_for_suggestion_dialog(user_cancels=False)
 
-            choose_ankihub_deck_mock = mock_function(
-                suggestion_dialog,
-                "choose_ankihub_deck",
+            choose_ankihub_deck_mock = mocker.patch(
+                "ankihub.gui.suggestion_dialog.choose_ankihub_deck",
                 return_value=None if user_cancels else ah_did_1,
             )
 
@@ -925,8 +922,8 @@ class MockDependenciesForBulkSuggestionDialog(Protocol):
 
 @pytest.fixture
 def mock_dependencies_for_bulk_suggestion_dialog(
-    monkeypatch: MonkeyPatch,
     mock_suggestion_dialog,
+    mocker: MockerFixture,
 ) -> MockDependenciesForBulkSuggestionDialog:
     """Mocks the dependencies for open_suggestion_dialog_for_bulk_suggestion.
     Returns a Mock that replaces suggest_notes_in_bulk.
@@ -936,15 +933,11 @@ def mock_dependencies_for_bulk_suggestion_dialog(
     def mock_dependencies_for_suggestion_dialog_inner(user_cancels: bool) -> Mock:
         mock_suggestion_dialog(user_cancels=user_cancels)
 
-        suggest_notes_in_bulk_mock = Mock()
-        monkeypatch.setattr(
+        suggest_notes_in_bulk_mock = mocker.patch(
             "ankihub.gui.suggestion_dialog.suggest_notes_in_bulk",
-            suggest_notes_in_bulk_mock,
         )
 
-        monkeypatch.setattr(
-            "ankihub.gui.suggestion_dialog._on_suggest_notes_in_bulk_done", Mock()
-        )
+        mocker.patch("ankihub.gui.suggestion_dialog._on_suggest_notes_in_bulk_done")
         return suggest_notes_in_bulk_mock
 
     return mock_dependencies_for_suggestion_dialog_inner
@@ -1024,7 +1017,7 @@ class TestOpenSuggestionDialogForBulkSuggestion:
         import_ah_note_type: ImportAHNoteType,
         new_note_with_note_type: NewNoteWithNoteType,
         mock_dependencies_for_bulk_suggestion_dialog: MockDependenciesForBulkSuggestionDialog,
-        mock_function: MockFunction,
+        mocker: MockerFixture,
         qtbot: QtBot,
     ):
         with anki_session_with_addon_data.profile_loaded():
@@ -1038,9 +1031,8 @@ class TestOpenSuggestionDialogForBulkSuggestion:
 
             nids = [note_1.id, note_2.id]
 
-            choose_ankihub_deck_mock = mock_function(
-                suggestion_dialog,
-                "choose_ankihub_deck",
+            choose_ankihub_deck_mock = mocker.patch(
+                "ankihub.gui.suggestion_dialog.choose_ankihub_deck",
                 return_value=ah_did_1,
             )
             suggest_notes_in_bulk_mock = mock_dependencies_for_bulk_suggestion_dialog(
@@ -1064,12 +1056,9 @@ class TestOpenSuggestionDialogForBulkSuggestion:
 class TestOnSuggestNotesInBulkDone:
     def test_correct_message_is_shown(
         self,
-        mock_function: MockFunction,
+        mocker: MockerFixture,
     ):
-        showText_mock = mock_function(
-            suggestion_dialog,
-            "showText",
-        )
+        showText_mock = mocker.patch("ankihub.gui.suggestion_dialog.showText")
         nid_1 = NoteId(1)
         nid_2 = NoteId(2)
         _on_suggest_notes_in_bulk_done(
@@ -1113,13 +1102,15 @@ class TestOnSuggestNotesInBulkDone:
                 parent=aqt.mw,
             )
 
-    def test_with_http_403_exception_in_future(self, mock_function: MockFunction):
+    def test_with_http_403_exception_in_future(self, mocker: MockerFixture):
         response = Response()
         response.status_code = 403
         response.json = lambda: {"detail": "test"}  # type: ignore
         exception = AnkiHubHTTPError(response)
 
-        show_error_dialog_mock = mock_function(suggestion_dialog, "show_error_dialog")
+        show_error_dialog_mock = mocker.patch(
+            "ankihub.gui.suggestion_dialog.show_error_dialog",
+        )
 
         _on_suggest_notes_in_bulk_done(
             future=future_with_exception(exception),
@@ -1573,6 +1564,57 @@ class TestAnkiHubDBMediaNamesWithMatchingHashes:
         )
 
 
+class TestAnkiHubDBContextManagers:
+    @pytest.mark.parametrize(
+        "task_configs, task_times_out",
+        [
+            # Format for a task_confg: (context_manager, duration)
+            # Detached, Detached - tasks don't block each other
+            ([(detached_ankihub_db, 0.1), (detached_ankihub_db, 0.1)], False),
+            ([(detached_ankihub_db, 0.5), (detached_ankihub_db, 0.1)], False),
+            # Attached, Attached - tasks block each other
+            ([(attached_ankihub_db, 0.1), (attached_ankihub_db, 0.1)], False),
+            ([(attached_ankihub_db, 0.5), (attached_ankihub_db, 0.1)], True),
+            # Attached, Detached - tasks block each other
+            ([(attached_ankihub_db, 0.1), (detached_ankihub_db, 0.1)], False),
+            ([(attached_ankihub_db, 0.5), (detached_ankihub_db, 0.1)], True),
+            # Detached, Attached - tasks block each other
+            ([(detached_ankihub_db, 0.1), (attached_ankihub_db, 0.1)], False),
+            ([(detached_ankihub_db, 0.5), (attached_ankihub_db, 0.1)], True),
+        ],
+    )
+    def test_blocking_and_timeout_behavior(
+        self,
+        anki_session_with_addon_data: AnkiSession,
+        qtbot: QtBot,
+        mocker: MockerFixture,
+        task_configs: List[Tuple[Callable[[], ContextManager], float]],
+        task_times_out: bool,
+    ):
+        mocker.patch("ankihub.db.rw_lock.LOCK_TIMEOUT_SECONDS", 0.2)
+
+        def task(context_manager: Callable[[], ContextManager], duration: float):
+            with context_manager():
+                sleep(duration)
+
+        with anki_session_with_addon_data.profile_loaded():
+            for context_manager, duration in task_configs:
+                AddonQueryOp(
+                    parent=qtbot,
+                    op=lambda _: task(context_manager, duration),
+                    success=lambda _: None,
+                ).without_collection().run_in_background()
+
+            with qtbot.captureExceptions() as exceptions:
+                qtbot.wait(500)
+
+            if task_times_out:
+                assert len(exceptions) == 1
+                assert isinstance(exceptions[0][1], LockAcquisitionTimeoutError)
+            else:
+                assert len(exceptions) == 0
+
+
 class TestErrorHandling:
     def test_contains_path_to_this_addon(self):
         # Assert that the function returns True when the input string contains the
@@ -1607,9 +1649,9 @@ class TestErrorHandling:
             "\\addons21\\12345789\\src\\ankihub\\errors.py"
         )
 
-    def test_handle_ankihub_401(self, mock_function: MockFunction):
+    def test_handle_ankihub_401(self, mocker: MockerFixture):
         # Set up mock for AnkiHub login dialog.
-        display_login_mock = mock_function(AnkiHubLogin, "display_login")
+        display_login_mock = mocker.patch.object(AnkiHubLogin, "display_login")
 
         handled = _try_handle_exception(
             exc_type=AnkiHubHTTPError,
@@ -1630,11 +1672,11 @@ class TestErrorHandling:
         ],
     )
     def test_handle_ankihub_403(
-        self, mock_function: MockFunction, response_content: str, expected_handled: bool
+        self, mocker: MockerFixture, response_content: str, expected_handled: bool
     ):
-        show_error_dialog_mock = mock_function(errors, "show_error_dialog")
+        show_error_dialog_mock = mocker.patch("ankihub.gui.errors.show_error_dialog")
 
-        response_mock = Mock()
+        response_mock = mocker.Mock()
         response_mock.status_code = 403
         response_mock.text = response_content
         response_mock.json = lambda: json.loads(response_content)  # type: ignore
@@ -1647,8 +1689,8 @@ class TestErrorHandling:
         assert handled == expected_handled
         assert show_error_dialog_mock.called == expected_handled
 
-    def test_handle_ankihub_406(self, mock_function: MockFunction):
-        ask_user_mock = mock_function(errors, "ask_user", return_value=False)
+    def test_handle_ankihub_406(self, mocker: MockerFixture):
+        ask_user_mock = mocker.patch("ankihub.gui.errors.ask_user", return_value=False)
         handled = _try_handle_exception(
             exc_type=AnkiHubHTTPError,
             exc_value=AnkiHubHTTPError(
@@ -1661,22 +1703,18 @@ class TestErrorHandling:
 
 
 def test_show_error_dialog(
-    anki_session_with_addon_data: AnkiSession, mock_function: MockFunction, qtbot: QtBot
+    anki_session_with_addon_data: AnkiSession, mocker: MockerFixture, qtbot: QtBot
 ):
     with anki_session_with_addon_data.profile_loaded():
-        show_dialog_mock = mock_function("ankihub.gui.utils.show_dialog")
+        show_dialog_mock = mocker.patch("ankihub.gui.utils.show_dialog")
         show_error_dialog("some message", title="some title", parent=aqt.mw)
         qtbot.wait_until(lambda: show_dialog_mock.called)
 
 
 class TestUploadLogs:
-    def test_basic(
-        self,
-        qtbot: QtBot,
-        mock_function: MockFunction,
-    ):
-        on_done_mock = Mock()
-        upload_logs_mock = mock_function(AddonAnkiHubClient, "upload_logs")
+    def test_basic(self, qtbot: QtBot, mocker: MockerFixture):
+        on_done_mock = mocker.stub()
+        upload_logs_mock = mocker.patch.object(AddonAnkiHubClient, "upload_logs")
         upload_logs_in_background(on_done=on_done_mock)
 
         qtbot.wait_until(lambda: on_done_mock.called)
@@ -1703,18 +1741,15 @@ class TestUploadLogs:
     def test_with_exception(
         self,
         qtbot: QtBot,
-        mock_function: MockFunction,
-        exception: Exception,
+        mocker: MockerFixture,
         expected_report_exception_called: bool,
+        exception: Exception,
     ):
-        def raise_exception(*args, **kwargs) -> None:
-            raise exception
-
-        on_done_mock = Mock()
-        upload_logs_mock = mock_function(
-            AddonAnkiHubClient, "upload_logs", side_effect=raise_exception
+        on_done_mock = mocker.stub()
+        upload_logs_mock = mocker.patch.object(
+            AddonAnkiHubClient, "upload_logs", side_effect=exception
         )
-        report_exception_mock = mock_function(errors, "_report_exception")
+        report_exception_mock = mocker.patch("ankihub.gui.errors._report_exception")
         upload_logs_in_background(on_done=on_done_mock)
 
         qtbot.wait(500)
@@ -1763,7 +1798,7 @@ class TestRateLimitedDecorator:
         assert execution_counter == 11
 
 
-def test_error_dialog(qtbot: QtBot, monkeypatch: MonkeyPatch):
+def test_error_dialog(qtbot: QtBot, mocker: MockerFixture):
     try:
         raise Exception("test")
     except Exception as e:
@@ -1777,8 +1812,7 @@ def test_error_dialog(qtbot: QtBot, monkeypatch: MonkeyPatch):
     dialog.debug_info_button.click()
 
     # Check that the Yes button opens a link (to the AnkiHub forum).
-    open_link_mock = Mock()
-    monkeypatch.setattr(utils, "openLink", open_link_mock)
+    open_link_mock = mocker.patch("aqt.utils.openLink")
     dialog.button_box.button(QDialogButtonBox.StandardButton.Yes).click()
     open_link_mock.assert_called_once()
 
@@ -1868,7 +1902,7 @@ class MockUIForCreateCollaborativeDeck(Protocol):
 
 @pytest.fixture
 def mock_ui_for_create_collaborative_deck(
-    mock_function: MockFunction,
+    mocker: MockerFixture,
     mock_study_deck_dialog_with_cb: MockStudyDeckDialogWithCB,
 ) -> MockUIForCreateCollaborativeDeck:
     """Mock the UI interaction for creating a collaborative deck.
@@ -1878,9 +1912,9 @@ def mock_ui_for_create_collaborative_deck(
         mock_study_deck_dialog_with_cb(
             "ankihub.gui.operations.deck_creation.StudyDeck", deck_name
         )
-        mock_function(deck_creation, "ask_user", return_value=True)
-        mock_function(deck_creation, "showInfo")
-        mock_function(DeckCreationConfirmationDialog, "run", return_value=True)
+        mocker.patch("ankihub.gui.operations.deck_creation.ask_user", return_value=True)
+        mocker.patch("ankihub.gui.operations.deck_creation.showInfo")
+        mocker.patch.object(DeckCreationConfirmationDialog, "run", return_value=True)
 
     return mock_ui_interaction_inner
 
@@ -1894,7 +1928,7 @@ class TestCreateCollaborativeDeck:
     def test_basic(
         self,
         anki_session_with_addon_data: AnkiSession,
-        mock_function: MockFunction,
+        mocker: MockerFixture,
         next_deterministic_uuid: Callable[[], uuid.UUID],
         qtbot: QtBot,
         mock_ui_for_create_collaborative_deck: MockUIForCreateCollaborativeDeck,
@@ -1908,32 +1942,29 @@ class TestCreateCollaborativeDeck:
 
             mock_ui_for_create_collaborative_deck(deck_name)
 
-            mock_function(AnkiHubClient, "get_owned_decks", return_value=[])
-
-            def raise_exception(*args, **kwargs) -> None:
-                raise Exception("test")
+            mocker.patch.object(AnkiHubClient, "get_owned_decks", return_value=[])
 
             ah_did = next_deterministic_uuid()
             notes_data = [NoteInfoFactory.create()]
-            create_ankihub_deck_mock = mock_function(
-                deck_creation,
-                "create_ankihub_deck",
+            create_ankihub_deck_mock = mocker.patch(
+                "ankihub.gui.operations.deck_creation.create_ankihub_deck",
                 return_value=DeckCreationResult(
                     ankihub_did=ah_did,
                     notes_data=notes_data,
                 ),
-                side_effect=raise_exception if creating_deck_fails else None,
+                side_effect=Exception("test") if creating_deck_fails else None,
             )
 
-            get_media_names_from_notes_data_mock = mock_function(
-                deck_creation,
-                "get_media_names_from_notes_data",
+            get_media_names_from_notes_data_mock = mocker.patch(
+                "ankihub.gui.operations.deck_creation.get_media_names_from_notes_data",
                 return_value=[],
             )
-            start_media_upload_mock = mock_function(
-                deck_creation.media_sync, "start_media_upload"
+            start_media_upload_mock = mocker.patch.object(
+                media_sync, "start_media_upload"
             )
-            showInfo_mock = mock_function(deck_creation, "showInfo")
+            showInfo_mock = mocker.patch(
+                "ankihub.gui.operations.deck_creation.showInfo"
+            )
 
             # Create the AnkiHub deck.
             if creating_deck_fails:
@@ -1956,7 +1987,7 @@ class TestCreateCollaborativeDeck:
     def test_with_deck_name_existing(
         self,
         anki_session_with_addon_data: AnkiSession,
-        mock_function: MockFunction,
+        mocker: MockerFixture,
         mock_ui_for_create_collaborative_deck: MockUIForCreateCollaborativeDeck,
     ):
         """When the user already has a deck with the same name, the deck creation is cancelled and
@@ -1969,7 +2000,7 @@ class TestCreateCollaborativeDeck:
 
             mock_ui_for_create_collaborative_deck(deck_name)
 
-            mock_function(
+            mocker.patch.object(
                 AnkiHubClient,
                 "get_owned_decks",
                 return_value=[
@@ -1979,10 +2010,11 @@ class TestCreateCollaborativeDeck:
                 ],
             )
 
-            showInfo_mock = mock_function(deck_creation, "showInfo")
-            create_ankihub_deck_mock = mock_function(
-                deck_creation,
-                "create_ankihub_deck",
+            showInfo_mock = mocker.patch(
+                "ankihub.gui.operations.deck_creation.showInfo"
+            )
+            create_ankihub_deck_mock = mocker.patch(
+                "ankihub.gui.operations.deck_creation.create_ankihub_deck"
             )
 
             create_collaborative_deck()
@@ -2210,7 +2242,7 @@ class TestSendReviewData:
         anki_session_with_addon_data: AnkiSession,
         install_ah_deck: InstallAHDeck,
         import_ah_note: ImportAHNote,
-        mock_function: MockFunction,
+        mocker: MockerFixture,
     ) -> None:
         with anki_session_with_addon_data.profile_loaded():
             ah_did = install_ah_deck()
@@ -2223,7 +2255,7 @@ class TestSendReviewData:
             second_review_time = first_review_time + timedelta(days=1)
             record_review_for_anki_nid(NoteId(note_info_2.anki_nid), second_review_time)
 
-            send_card_review_data_mock = mock_function(
+            send_card_review_data_mock = mocker.patch.object(
                 AnkiHubClient, "send_card_review_data"
             )
 
@@ -2249,14 +2281,14 @@ class TestSendReviewData:
         self,
         anki_session_with_addon_data: AnkiSession,
         install_ah_deck: InstallAHDeck,
-        mock_function: MockFunction,
+        mocker: MockerFixture,
     ) -> None:
         with anki_session_with_addon_data.profile_loaded():
             # We install the deck so that we get coverage for the case where a deck
             # has no reviews.
             install_ah_deck()
 
-            send_card_review_data_mock = mock_function(
+            send_card_review_data_mock = mocker.patch.object(
                 AnkiHubClient, "send_card_review_data"
             )
 
@@ -2403,7 +2435,7 @@ class TestOptionalTagSuggestionDialog:
         qtbot: QtBot,
         install_ah_deck: InstallAHDeck,
         import_ah_note: ImportAHNote,
-        mock_function: MockFunction,
+        mocker: MockerFixture,
     ):
         with anki_session_with_addon_data.profile_loaded():
             ah_did = install_ah_deck()
@@ -2440,12 +2472,12 @@ class TestOptionalTagSuggestionDialog:
                 )
                 validation_responses.append(validation_reponse)
 
-            get_deck_extensions_mock = mock_function(
+            get_deck_extensions_mock = mocker.patch(
                 "ankihub.gui.optional_tag_suggestion_dialog.AnkiHubClient.get_deck_extensions",
                 return_value=deck_extensions,
             )
 
-            prevalidate_tag_groups_mock = mock_function(
+            prevalidate_tag_groups_mock = mocker.patch(
                 "ankihub.main.optional_tag_suggestions.AnkiHubClient.prevalidate_tag_groups",
                 return_value=validation_responses,
             )
@@ -2457,7 +2489,7 @@ class TestOptionalTagSuggestionDialog:
             )
 
             # Mock the suggest_tags_for_groups method which is called when the submit button is clicked
-            suggest_tags_for_groups_mock = mock_function(
+            suggest_tags_for_groups_mock = mocker.patch.object(
                 dialog._optional_tags_helper, "suggest_tags_for_groups"
             )
 
@@ -2491,7 +2523,7 @@ class TestOptionalTagSuggestionDialog:
         qtbot: QtBot,
         install_ah_deck: InstallAHDeck,
         import_ah_note: ImportAHNote,
-        mock_function: MockFunction,
+        mocker: MockerFixture,
         user_relation: UserDeckExtensionRelation,
         expected_checkbox_is_visible: bool,
     ):
@@ -2513,12 +2545,12 @@ class TestOptionalTagSuggestionDialog:
                 deck_extension_id=deck_extension.id,
             )
 
-            mock_function(
+            mocker.patch(
                 "ankihub.gui.optional_tag_suggestion_dialog.AnkiHubClient.get_deck_extensions",
                 return_value=[deck_extension],
             )
 
-            mock_function(
+            mocker.patch(
                 "ankihub.main.optional_tag_suggestions.AnkiHubClient.prevalidate_tag_groups",
                 return_value=[validation_reponse],
             )
