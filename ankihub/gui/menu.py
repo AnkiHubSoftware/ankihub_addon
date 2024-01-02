@@ -192,6 +192,18 @@ def _create_collaborative_deck_setup(parent: QMenu):
     parent.addAction(q_action)
 
 
+def _confirm_sign_out():
+    confirm = ask_user(
+        "Are you sure you want to Sign out?",
+        yes_button_label="Sign Out",
+        no_button_label="Cancel",
+    )
+    if not confirm:
+        return
+
+    _sign_out_action()
+
+
 def _sign_out_action():
     try:
         AnkiHubClient().signout()
@@ -459,7 +471,7 @@ def _trigger_install_release_version():
 
 def _ankihub_logout_setup(parent: QMenu):
     q_action = QAction("🔑 Sign out", aqt.mw)
-    qconnect(q_action.triggered, _sign_out_action)
+    qconnect(q_action.triggered, _confirm_sign_out)
     parent.addAction(q_action)
 
 
