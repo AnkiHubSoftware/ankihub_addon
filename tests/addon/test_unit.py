@@ -17,16 +17,22 @@ import pytest
 from anki.decks import DeckId
 from anki.models import NotetypeDict
 from anki.notes import Note, NoteId
+from aqt import QMenu
 from aqt.qt import QDialog, QDialogButtonBox, Qt, QTimer, QWidget
+from pytest import MonkeyPatch
 from pytest_anki import AnkiSession
 from pytest_mock import MockerFixture
 from pytestqt.qtbot import QtBot  # type: ignore
 from requests import Response
+from requests_mock import Mocker
 
+from ankihub.ankihub_client.ankihub_client import DEFAULT_API_URL
 from ankihub.ankihub_client.models import (  # type: ignore
     CardReviewData,
     UserDeckExtensionRelation,
 )
+from ankihub.gui import menu
+from ankihub.gui.config_dialog import setup_config_dialog_manager
 
 from ..factories import (
     DeckExtensionFactory,
@@ -72,7 +78,7 @@ from ankihub.gui.errors import (
     upload_logs_in_background,
 )
 from ankihub.gui.media_sync import media_sync
-from ankihub.gui.menu import AnkiHubLogin
+from ankihub.gui.menu import AnkiHubLogin, menu_state, refresh_ankihub_menu
 from ankihub.gui.operations import AddonQueryOp
 from ankihub.gui.operations.deck_creation import (
     DeckCreationConfirmationDialog,
@@ -496,6 +502,61 @@ def test_add_subdeck_tags_to_notes_with_spaces_in_deck_name(
 
         note3.load()
         assert note3.tags == [f"{SUBDECK_TAG}::AA::b_b::c_c"]
+
+
+class TestAnkiHubSignOut:
+    @pytest.mark.parametrize(
+        "confirmed_sign_out,expected_logged_in_state", [(True, False), (False, True)]
+    )
+    def test_sign_out(
+        self,
+        monkeypatch: MonkeyPatch,
+        anki_session_with_addon_data: AnkiSession,
+        requests_mock: Mocker,
+        confirmed_sign_out: bool,
+        expected_logged_in_state: bool,
+    ):
+        anki_session = anki_session_with_addon_data
+
+        with anki_session.profile_loaded():
+            user_token = "random_token_382fasfkjep1flaksnioqwndjk&@*(%248)"
+            # This means user is logged in
+            config._private_config.token = user_token
+
+            mw = anki_session.mw
+            menu_state.ankihub_menu = QMenu("&AnkiHub", parent=aqt.mw)
+            mw.form.menubar.addMenu(menu_state.ankihub_menu)
+            setup_config_dialog_manager()
+            refresh_ankihub_menu()
+
+            sign_out_action = [
+                action
+                for action in menu_state.ankihub_menu.actions()
+                if action.text() == "🔑 Sign out"
+            ][0]
+
+            assert sign_out_action is not None
+
+            ask_user_mock = Mock(return_value=confirmed_sign_out)
+            monkeypatch.setattr(menu, "ask_user", ask_user_mock)
+
+            requests_mock.post(f"{DEFAULT_API_URL}/logout/", status_code=204, json=[])
+
+            sign_out_action.trigger()
+
+            ask_user_mock.assert_called_once_with(
+                "Are you sure you want to Sign out?",
+                yes_button_label="Sign Out",
+                no_button_label="Cancel",
+            )
+
+            if expected_logged_in_state:
+                expected_token = user_token
+            else:
+                expected_token = ""
+
+            assert config.token() == expected_token
+            assert config.is_logged_in() is expected_logged_in_state
 
 
 class TestAnkiHubLoginDialog:
