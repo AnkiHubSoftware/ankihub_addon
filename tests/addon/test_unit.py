@@ -17,8 +17,9 @@ import pytest
 from anki.decks import DeckId
 from anki.models import NotetypeDict
 from anki.notes import Note, NoteId
-from aqt import QMenu, utils
+from aqt import QMenu
 from aqt.qt import QDialog, QDialogButtonBox, Qt, QTimer, QWidget
+from pytest import MonkeyPatch
 from pytest_anki import AnkiSession
 from pytest_mock import MockerFixture
 from pytestqt.qtbot import QtBot  # type: ignore
@@ -78,7 +79,7 @@ from ankihub.gui.errors import (
 )
 from ankihub.gui.media_sync import media_sync
 from ankihub.gui.menu import AnkiHubLogin, menu_state, refresh_ankihub_menu
-from ankihub.gui.operations import deck_creation, AddonQueryOp
+from ankihub.gui.operations import AddonQueryOp
 from ankihub.gui.operations.deck_creation import (
     DeckCreationConfirmationDialog,
     create_collaborative_deck,
