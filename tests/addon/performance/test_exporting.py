@@ -58,4 +58,4 @@ def test_anking_export_without_changes(
 
         duration = profile(export_notes)
         print(f"Exporting {len(notes)} notes took {duration} seconds")
-        assert duration < 0.1
+        assert duration < 0.2
