@@ -3,6 +3,7 @@ from datetime import datetime, timedelta
 from typing import Optional, Tuple
 
 import aqt
+from anki import consts as anki_consts
 
 from .. import LOGGER
 from ..addon_ankihub_client import AddonAnkiHubClient as AnkiHubClient
@@ -56,7 +57,9 @@ def _get_review_count_for_ah_deck_since(ah_did: uuid.UUID, since: datetime) -> i
         SELECT COUNT(*)
         FROM revlog as r
         JOIN cards as c ON r.cid = c.id
-        WHERE r.id > ? AND c.nid IN ({','.join(map(str, anki_nids))})
+        WHERE r.id > ?
+            AND r.type != {anki_consts.REVLOG_RESCHED}
+            AND c.nid IN ({','.join(map(str, anki_nids))})
         """,
         timestamp_ms,
     )
@@ -73,7 +76,8 @@ def _get_first_and_last_review_datetime_for_ah_deck(
         SELECT MIN(r.id), MAX(r.id)
         FROM revlog as r
         JOIN cards as c ON r.cid = c.id
-        WHERE c.nid IN ({','.join(map(str, anki_nids))})
+        WHERE r.type != {anki_consts.REVLOG_RESCHED}
+            AND c.nid IN ({','.join(map(str, anki_nids))})
         """,
     )
     if row[0] is None:
