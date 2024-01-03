@@ -2563,5 +2563,6 @@ class TestOptionalTagSuggestionDialog:
             )
 
             dialog.show()
+            qtbot.wait(500)
 
             assert dialog.auto_accept_cb.isVisible() == expected_checkbox_is_visible
