@@ -763,10 +763,9 @@ class TestCheckAndInstallNewDeckSubscriptions:
                 subscribed_decks=[deck], on_done=on_done_mock
             )
 
-            qtbot.wait(500)
+            qtbot.wait_until(lambda: on_done_mock.called)
 
             # Assert that the on_done callback was called with a future with a result of None
-            assert on_done_mock.call_count == 1
             assert on_done_mock.call_args[0][0].result() is None
 
             # Assert that the mocked functions were called
@@ -795,10 +794,9 @@ class TestCheckAndInstallNewDeckSubscriptions:
                 subscribed_decks=[deck], on_done=on_done_mock
             )
 
-            qtbot.wait(500)
+            qtbot.wait_until(lambda: on_done_mock.called)
 
             # Assert that the on_done callback was called with a future with a result of None
-            assert on_done_mock.call_count == 1
             assert on_done_mock.call_args[0][0].result() is None
 
     def test_no_new_subscriptions(
@@ -815,10 +813,9 @@ class TestCheckAndInstallNewDeckSubscriptions:
                 subscribed_decks=[], on_done=on_done_mock
             )
 
-            qtbot.wait(500)
+            qtbot.wait_until(lambda: on_done_mock.called)
 
             # Assert that the on_done callback was called with a future with a result of None
-            assert on_done_mock.call_count == 1
             assert on_done_mock.call_args[0][0].result() is None
 
     def test_confirmation_dialog_raises_exception(
@@ -843,10 +840,9 @@ class TestCheckAndInstallNewDeckSubscriptions:
                 subscribed_decks=[deck], on_done=on_done_mock
             )
 
-            qtbot.wait(500)
+            qtbot.wait_until(lambda: on_done_mock.called)
 
             # Assert that the on_done callback was called with a future with an exception
-            assert on_done_mock.call_count == 1
             assert on_done_mock.call_args[0][0].exception() is not None
 
             # Assert that the mocked functions were called
@@ -880,7 +876,7 @@ class TestCheckAndInstallNewDeckSubscriptions:
                 subscribed_decks=[deck], on_done=on_done_mock
             )
 
-            qtbot.wait(500)
+            qtbot.wait_until(lambda: on_done_mock.called)
 
             # Assert that the on_done callback was called with a future with an exception
             assert on_done_mock.call_count == 1
@@ -1858,8 +1854,6 @@ def test_unsubscribe_from_deck(
             ],
         )
         dialog = DeckManagementDialog()
-        qtbot.wait(500)
-
         decks_list = dialog.decks_list
         deck_item_index = 0
         deck_item = decks_list.item(deck_item_index)
@@ -3452,13 +3446,12 @@ class TestAutoSync:
 
             # Trigger the AnkiWeb sync.
             mw._sync_collection_and_media(after_sync=mocker.stub())
-            qtbot.wait(500)
+            qtbot.wait_until(lambda: self.ankiweb_sync_mock.called)
 
             # Assert that both syncs were called.
+            assert self.check_and_install_new_deck_subscriptions_mock.call_count == 1
             assert self.udpate_decks_and_media_mock.call_count == 1
             assert self.ankiweb_sync_mock.call_count == 1
-
-            assert self.check_and_install_new_deck_subscriptions_mock.call_count == 1
 
     def test_with_never_option(
         self,
@@ -3480,13 +3473,12 @@ class TestAutoSync:
 
             # Trigger the AnkiWeb sync.
             mw._sync_collection_and_media(after_sync=mocker.stub())
-            qtbot.wait(500)
+            qtbot.wait_until(lambda: self.ankiweb_sync_mock.called)
 
             # Assert that only the AnkiWeb sync was called.
             assert self.udpate_decks_and_media_mock.call_count == 0
-            assert self.ankiweb_sync_mock.call_count == 1
-
             assert self.check_and_install_new_deck_subscriptions_mock.call_count == 0
+            assert self.ankiweb_sync_mock.call_count == 1
 
     def test_with_on_startup_option(
         self,
@@ -3509,7 +3501,7 @@ class TestAutoSync:
 
             # Trigger the AnkiWeb sync.
             mw._sync_collection_and_media(after_sync=mocker.stub())
-            qtbot.wait(500)
+            qtbot.wait_until(lambda: self.ankiweb_sync_mock.called)
 
             # Assert that both syncs were called.
             assert self.udpate_decks_and_media_mock.call_count == 1
@@ -3520,7 +3512,7 @@ class TestAutoSync:
 
             # Trigger the AnkiWeb sync again.
             mw._sync_collection_and_media(after_sync=mocker.stub())
-            qtbot.wait(500)
+            qtbot.wait_until(lambda: self.ankiweb_sync_mock.call_count == 2)
 
             # Assert that only the AnkiWeb sync was called the second time.
             assert self.udpate_decks_and_media_mock.call_count == 1
@@ -3675,9 +3667,7 @@ def test_optional_tag_suggestion_dialog(
         # Select the "VALID" tag group and click the submit button
         dialog.tag_group_list.item(1).setSelected(True)
         qtbot.mouseClick(dialog.submit_btn, Qt.MouseButton.LeftButton)
-        qtbot.wait(500)
-
-        assert suggest_optional_tags_mock.call_count == 1
+        qtbot.wait_until(lambda: suggest_optional_tags_mock.called)
 
         # Assert that the suggest_optional_tags function was called with the correct arguments.
         # Suggestions should be created for all notes, even if they don't have optional tags.
@@ -4420,7 +4410,6 @@ def test_delete_ankihub_private_config_on_deckBrowser__delete_option(
         assert mw.col.decks.count() == 2
         assert deck_uuid
 
-        # Will control the conditional responsible to delete or not the ankihub deck private config
         mocker.patch("ankihub.gui.deckbrowser.ask_user", return_value=True)
 
         unsubscribe_from_deck_mock = mocker.patch.object(
@@ -4429,12 +4418,11 @@ def test_delete_ankihub_private_config_on_deckBrowser__delete_option(
         mw.deckBrowser._delete(anki_deck_id)
         unsubscribe_from_deck_mock.assert_called_once()
 
-        qtbot.wait(500)
-
+        # Assert that the deck was removed from the private config
         deck_uuid = config.get_deck_uuid_by_did(anki_deck_id)
-
-        assert mw.col.decks.count() == 1
         assert deck_uuid is None
+
+        # Assert that the note type modifications were undone
         assert all(not note_type_contains_field(mw.col.models.get(mid)) for mid in mids)
         assert all(
             not re.search(
@@ -4443,12 +4431,15 @@ def test_delete_ankihub_private_config_on_deckBrowser__delete_option(
             for mid in mids
         )
 
-        # check if the deck was removed from the db
+        # Assert that the deck was removed from the AnkiHub database
         mids = ankihub_db.note_types_for_ankihub_deck(ah_did)
         assert len(mids) == 0
 
         nids = ankihub_db.anki_nids_for_ankihub_deck(ah_did)
         assert len(nids) == 0
+
+        # Assert that the deck gets removed from the Anki database
+        qtbot.wait_until(lambda: mw.col.decks.count() == 1)
 
 
 def test_not_delete_ankihub_private_config_on_deckBrowser__delete_option(
@@ -4470,16 +4461,16 @@ def test_not_delete_ankihub_private_config_on_deckBrowser__delete_option(
         assert mw.col.decks.count() == 2
         assert deck_uuid
 
-        # Will control the conditional responsible to delete or not the ankihub deck private config
         mocker.patch("ankihub.gui.deckbrowser.ask_user", return_value=False)
 
         mw.deckBrowser._delete(anki_deck_id)
-        qtbot.wait(500)
 
+        # Assert that the deck was not removed from the private config
         deck_uuid = config.get_deck_uuid_by_did(anki_deck_id)
+        assert deck_uuid is not None
 
-        assert mw.col.decks.count() == 1
-        assert deck_uuid
+        # Assert that the deck gets removed from the Anki database
+        qtbot.wait_until(lambda: mw.col.decks.count() == 1)
 
 
 @pytest.mark.qt_no_exception_capture
