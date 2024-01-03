@@ -118,8 +118,8 @@ class AnkiHubLogin(QWidget):
         self.password_box.addWidget(self.toggle_button)
         self.box_left.addLayout(self.password_box)
 
-        # Login
-        self.login_button = QPushButton("Login", self)
+        # Sign in button
+        self.login_button = QPushButton("Sign in", self)
         self.bottom_box_section.addWidget(self.login_button)
         qconnect(self.login_button.clicked, self.login)
         self.login_button.setDefault(True)
@@ -138,7 +138,7 @@ class AnkiHubLogin(QWidget):
 
         self.setMinimumWidth(500)
         self.setSizePolicy(QSizePolicy.Policy.Minimum, QSizePolicy.Policy.Minimum)
-        self.setWindowTitle("Login to AnkiHub.")
+        self.setWindowTitle("Sign in to AnkiHub.")
         self.setWindowFlags(self.windowFlags() | Qt.WindowType.WindowStaysOnTopHint)  # type: ignore
         self.show()
 
