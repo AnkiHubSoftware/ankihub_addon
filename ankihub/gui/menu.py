@@ -123,8 +123,25 @@ class AnkiHubLogin(QWidget):
         self.bottom_box_section.addWidget(self.login_button)
         qconnect(self.login_button.clicked, self.login)
         self.login_button.setDefault(True)
-
+        self.bottom_box_section.setContentsMargins(0, 12, 0, 12)
         self.box_left.addLayout(self.bottom_box_section)
+
+        # Sign up / forgot password text
+        self.sign_up_and_recover_password_container = QVBoxLayout()
+        self.sign_up_and_recover_password_container.setSpacing(8)
+        self.sign_up_and_recover_password_container.setContentsMargins(0, 0, 0, 5)
+        self.login_button.setDefault(True)
+        self.sign_up_help_text = QLabel(
+            'Don\'t have a AnkiHub account? <a href="https://app.ankihub.net/accounts/signup/">Register now</a>'
+        )
+        self.recover_password_help_text = QLabel(
+            '<a href="https://app.ankihub.net/accounts/password/reset/">Forgot password?</a>'
+        )
+        self.sign_up_and_recover_password_container.addWidget(self.sign_up_help_text)
+        self.sign_up_and_recover_password_container.addWidget(
+            self.recover_password_help_text
+        )
+        self.box_left.addLayout(self.sign_up_and_recover_password_container)
 
         # Add left and right layouts to upper
         self.box_upper.addLayout(self.box_left)
@@ -136,7 +153,7 @@ class AnkiHubLogin(QWidget):
         self.box_top.addStretch(1)
         self.setLayout(self.box_top)
 
-        self.setMinimumWidth(500)
+        self.setContentsMargins(20, 10, 0, 10)
         self.setSizePolicy(QSizePolicy.Policy.Minimum, QSizePolicy.Policy.Minimum)
         self.setWindowTitle("Sign in to AnkiHub.")
         self.setWindowFlags(self.windowFlags() | Qt.WindowType.WindowStaysOnTopHint)  # type: ignore
