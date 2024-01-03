@@ -38,6 +38,13 @@ The devcontainer doesn't include the AnkiHub web app yet, so you have to use it 
 
 You only have to do this once.
 
+#### Setup pre-commit hooks
+`pre-commit`
+
+This will ensure linters and code auto-formatters are run before each commit.
+
+You only have to do this once.
+
 #### Set up VSCode workspace with Anki source code (optional)
 During development of the add-on it is convenient to be able to navigate and search in Anki's source code in addition to the add-on source code.
 This can be achieved using VSCode workspaces (https://code.visualstudio.com/docs/editor/workspaces).
