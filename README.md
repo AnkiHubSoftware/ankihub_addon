@@ -45,6 +45,15 @@ This will ensure linters and code auto-formatters are run before each commit.
 
 You only have to do this once.
 
+#### Install Xvfb (optional)
+If running on Linux or another operating system using X11 for graphics, installing Xvfb (the X virtual frame buffer) will allow running tests in the background.
+
+For example, on Ubuntu Linux this command will install Xvfb:
+
+```
+sudo apt install xvfb
+```
+
 #### Set up VSCode workspace with Anki source code (optional)
 During development of the add-on it is convenient to be able to navigate and search in Anki's source code in addition to the add-on source code.
 This can be achieved using VSCode workspaces (https://code.visualstudio.com/docs/editor/workspaces).
