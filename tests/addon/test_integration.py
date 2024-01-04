@@ -411,7 +411,7 @@ class CreateChangeSuggestion(Protocol):
 
 @pytest.fixture
 def create_change_suggestion(
-    qtbot: QtBot, mocker: MockerFixture, mock_client_media_upload: Mocker
+    qtbot: QtBot, mocker: MockerFixture, mock_client_media_upload: Mock
 ):
     """Create a change suggestion for a note and wait for the background thread that uploads media to finish.
     Returns the mock for the create_change_note_suggestion method. It can be used to get information
@@ -423,19 +423,17 @@ def create_change_suggestion(
     )
 
     def create_change_suggestion_inner(note: Note, wait_for_media_upload: bool):
-        suggest_note_update(
-            note=note,
-            change_type=SuggestionType.NEW_CONTENT,
-            comment="test",
-            media_upload_cb=media_sync.start_media_upload,
-        )
-
-        if wait_for_media_upload:
-            # Wait for the background thread that uploads the media to finish.
-            def assert_s3_upload():
-                assert mock_client_media_upload.called_once
-
-            qtbot.wait_until(assert_s3_upload)
+        with qtbot.wait_callback() as callback:
+            mock_client_media_upload.side_effect = callback
+            suggest_note_update(
+                note=note,
+                change_type=SuggestionType.NEW_CONTENT,
+                comment="test",
+                media_upload_cb=media_sync.start_media_upload,
+            )
+            if not wait_for_media_upload:
+                # Call the callback immediately to not wait for it to be called by the client
+                callback()
 
         return create_change_suggestion_mock
 
@@ -451,7 +449,7 @@ class CreateNewNoteSuggestion(Protocol):
 
 @pytest.fixture
 def create_new_note_suggestion(
-    qtbot: QtBot, mocker: MockerFixture, mock_client_media_upload: Mocker
+    qtbot: QtBot, mocker: MockerFixture, mock_client_media_upload: Mock
 ):
     """Create a new note suggestion for a note and wait for the background thread that uploads media to finish.
     Returns the mock for the create_new_note_suggestion_mock method. It can be used to get information
@@ -465,19 +463,17 @@ def create_new_note_suggestion(
     def create_new_note_suggestion_inner(
         note: Note, ah_did: uuid.UUID, wait_for_media_upload: bool
     ):
-        suggest_new_note(
-            note=note,
-            comment="test",
-            ankihub_did=ah_did,
-            media_upload_cb=media_sync.start_media_upload,
-        )
-
-        if wait_for_media_upload:
-            # Wait for the background thread that uploads the media to finish.
-            def assert_s3_upload():
-                assert mock_client_media_upload.called_once
-
-            qtbot.wait_until(assert_s3_upload)
+        with qtbot.wait_callback() as callback:
+            mock_client_media_upload.side_effect = callback
+            suggest_new_note(
+                note=note,
+                comment="test",
+                ankihub_did=ah_did,
+                media_upload_cb=media_sync.start_media_upload,
+            )
+            if not wait_for_media_upload:
+                # Call the callback immediately to not wait for it to be called by the client
+                callback()
 
         return create_new_note_suggestion_mock
 
@@ -3870,33 +3866,18 @@ class TestMediaSyncMediaDownload:
 
 
 @fixture
-def mock_client_media_upload(
-    mocker: MockerFixture,
-    requests_mock: Mocker,
-) -> Iterator[Mocker]:
-    fake_presigned_url = AnkiHubClient().s3_bucket_url + "/fake_key"
-    s3_upload_request_mock = requests_mock.post(
-        fake_presigned_url, json={"success": True}, status_code=204
+def mock_client_media_upload(mocker: MockerFixture) -> Iterator[Mock]:
+    """Setup a temporary media folder and mock client methods used for uploading media.
+    Returns a mock for the _upload_file_to_s3_with_reusable_presigned_url method,
+    which takes a filepath argument for the file to upload.
+    This fixture also mocks the os.remove function so that the file to upload is not deleted
+    by the client.
+    """
+    upload_file_to_s3_with_reusable_presigned_url_mock = mocker.patch.object(
+        AnkiHubClient, "_upload_file_to_s3_with_reusable_presigned_url"
     )
-
-    mocker.patch.object(
-        AnkiHubClient,
-        "is_media_upload_finished",
-        return_value=True,
-    )
-
+    mocker.patch.object(AnkiHubClient, "_get_presigned_url_for_multiple_uploads")
     mocker.patch.object(AnkiHubClient, "media_upload_finished")
-
-    mocker.patch.object(
-        AnkiHubClient,
-        "_get_presigned_url_for_multiple_uploads",
-        return_value={
-            "url": fake_presigned_url,
-            "fields": {
-                "key": "deck_images/test/${filename}",
-            },
-        },
-    )
 
     # Mock os.remove so the zip is not deleted
     mocker.patch("os.remove")
@@ -3909,15 +3890,14 @@ def mock_client_media_upload(
 
         mocker.patch("anki.media.MediaManager.dir", return_value=tmp_dir)
 
-        yield s3_upload_request_mock  # type: ignore
+        yield upload_file_to_s3_with_reusable_presigned_url_mock
 
 
-@pytest.mark.qt_no_exception_capture
 class TestSuggestionsWithMedia:
     def test_suggest_note_update_with_media(
         self,
         anki_session_with_addon_data: AnkiSession,
-        mock_client_media_upload: Mocker,
+        mock_client_media_upload: Mock,
         import_ah_note: ImportAHNote,
         create_change_suggestion: CreateChangeSuggestion,
     ):
@@ -3964,7 +3944,7 @@ class TestSuggestionsWithMedia:
     def test_suggest_new_note_with_media(
         self,
         anki_session_with_addon_data: AnkiSession,
-        mock_client_media_upload: Mocker,
+        mock_client_media_upload: Mock,
         ankihub_basic_note_type: NotetypeDict,
         create_new_note_suggestion: CreateNewNoteSuggestion,
     ):
@@ -3998,7 +3978,7 @@ class TestSuggestionsWithMedia:
     def test_do_not_upload_files_which_already_exist_in_deck(
         self,
         anki_session_with_addon_data: AnkiSession,
-        mock_client_media_upload: Mocker,
+        mock_client_media_upload: Mock,
         import_ah_note: ImportAHNote,
         create_change_suggestion: CreateChangeSuggestion,
     ):
@@ -4038,7 +4018,7 @@ class TestSuggestionsWithMedia:
     def test_with_file_not_existing_in_collection(
         self,
         anki_session_with_addon_data: AnkiSession,
-        mock_client_media_upload: Mocker,
+        mock_client_media_upload: Mock,
         import_ah_note: ImportAHNote,
         create_change_suggestion: CreateChangeSuggestion,
     ):
@@ -4071,7 +4051,7 @@ class TestSuggestionsWithMedia:
     def test_with_matching_file_existing_for_deck(
         self,
         anki_session_with_addon_data: AnkiSession,
-        mock_client_media_upload: Mocker,
+        mock_client_media_upload: Mock,
         import_ah_note: ImportAHNote,
         next_deterministic_uuid: Callable[[], uuid.UUID],
         create_change_suggestion: CreateChangeSuggestion,
@@ -4164,14 +4144,10 @@ class TestSuggestionsWithMedia:
 
     def _assert_media_name_in_zip_as_expected(
         self,
-        upload_request_mock: Mocker,
+        upload_request_mock: Mock,
         expected_media_name: str,
     ) -> None:
-        # Get the name of the uploaded media file.
-        zipfile_name = re.findall(
-            r'filename="(.*?)"', str(upload_request_mock.last_request.body)
-        )[0]
-
+        zipfile_name = upload_request_mock.call_args.kwargs["filepath"]
         media_dir = Path(aqt.mw.col.media.dir())
         path_to_created_zip_file: Path = media_dir / zipfile_name
         with ZipFile(path_to_created_zip_file, "r") as zfile:
