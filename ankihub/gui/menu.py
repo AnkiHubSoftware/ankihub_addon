@@ -153,7 +153,7 @@ class AnkiHubLogin(QWidget):
         self.box_top.addStretch(1)
         self.setLayout(self.box_top)
 
-        self.setContentsMargins(20, 10, 0, 10)
+        self.setContentsMargins(20, 5, 0, 5)
         self.setSizePolicy(QSizePolicy.Policy.Minimum, QSizePolicy.Policy.Minimum)
         self.setWindowTitle("Sign in to AnkiHub.")
         self.setWindowFlags(self.windowFlags() | Qt.WindowType.WindowStaysOnTopHint)  # type: ignore
