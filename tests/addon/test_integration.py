@@ -387,19 +387,11 @@ def sync_with_ankihub(qtbot: QtBot) -> SyncWithAnkiHub:
     """Sync with AnkiHub and wait until the sync is done."""
 
     def _sync_with_ankihub() -> None:
-        done = False
+        with qtbot.wait_callback() as on_done:
+            ankihub_sync.sync_with_ankihub(on_done=on_done)
 
-        def on_done(future: Future) -> None:
-            nonlocal done
-            done = True
-            future.result()  # raises exception if there is one
-
-        ankihub_sync.sync_with_ankihub(on_done=on_done)
-
-        def is_done() -> bool:
-            return done
-
-        qtbot.wait_until(is_done)
+        future: Future = on_done.args[0]
+        future.result()  # raises exception if there is one
 
     return _sync_with_ankihub
 
@@ -3519,10 +3511,20 @@ class TestAutoSync:
             ah_deck_updater, "update_decks_and_media"
         )
 
-        # Mock the AnkiWeb sync so it does nothing.
-        self.ankiweb_sync_mock = mocker.patch.object(aqt.sync, "sync_collection")
+        # Mock the AnkiWeb sync to just call its callback.
+        def sync_collection_side_effect(*args, **kwargs) -> None:
+            on_done: Callable[[], None] = kwargs["on_done"]
+            on_done()
+
+        self.ankiweb_sync_mock = mocker.patch.object(
+            aqt.sync, "sync_collection", side_effect=sync_collection_side_effect
+        )
         # ... and reload aqt.main so the mock is used.
         importlib.reload(aqt.main)
+
+        # Mock the aqt.mw.reset method which is called after the AnkiWeb sync to refresh Anki's UI.
+        # Otherwise it causes exceptions in the qt event loop when it is called after Anki is closed.
+        mocker.patch.object(aqt.mw, "reset")
 
         # Mock the new deck subscriptions operation to just call its callback.
         self.check_and_install_new_deck_subscriptions_mock = mocker.patch(
