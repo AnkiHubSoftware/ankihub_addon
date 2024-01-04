@@ -387,10 +387,10 @@ def sync_with_ankihub(qtbot: QtBot) -> SyncWithAnkiHub:
     """Sync with AnkiHub and wait until the sync is done."""
 
     def _sync_with_ankihub() -> None:
-        with qtbot.wait_callback() as on_done:
-            ankihub_sync.sync_with_ankihub(on_done=on_done)
+        with qtbot.wait_callback() as callback:
+            ankihub_sync.sync_with_ankihub(on_done=callback)
 
-        future: Future = on_done.args[0]
+        future: Future = callback.args[0]
         future.result()  # raises exception if there is one
 
     return _sync_with_ankihub
@@ -669,8 +669,8 @@ class TestDownloadAndInstallDecks:
             )
 
             # Download and install the deck
-            with qtbot.wait_callback() as on_done_mock:
-                download_and_install_decks([deck.ah_did], on_done=on_done_mock)
+            with qtbot.wait_callback() as callback:
+                download_and_install_decks([deck.ah_did], on_done=callback)
 
             # Assert that the deck was installed
             # ... in the Anki database
@@ -683,9 +683,6 @@ class TestDownloadAndInstallDecks:
 
             # ... in the config
             assert config.deck_ids() == [deck.ah_did]
-
-            # Assert that the on_success callback was called
-            assert on_done_mock.called
 
             # Assert that the mocked functions were called
             for name, mock in mocks.items():
@@ -745,15 +742,15 @@ class TestCheckAndInstallNewDeckSubscriptions:
             )
 
             # Call the function with a deck
-            on_done_mock = mocker.stub()
+            callback = mocker.stub()
             deck = DeckFactory.create()
-            with qtbot.wait_callback() as on_done_mock:
+            with qtbot.wait_callback() as callback:
                 check_and_install_new_deck_subscriptions(
-                    subscribed_decks=[deck], on_done=on_done_mock
+                    subscribed_decks=[deck], on_done=callback
                 )
 
             # Assert that the on_done callback was called with a future with a result of None
-            assert on_done_mock.args[0].result() is None
+            assert callback.args[0].result() is None
 
             # Assert that the mocked functions were called
             assert download_and_install_decks_mock.call_count == 1
@@ -763,7 +760,6 @@ class TestCheckAndInstallNewDeckSubscriptions:
         self,
         anki_session_with_addon_data: AnkiSession,
         qtbot: QtBot,
-        mocker: MockerFixture,
         mock_show_dialog_with_cb: MockShowDialogWithCB,
     ):
         anki_session = anki_session_with_addon_data
@@ -775,32 +771,30 @@ class TestCheckAndInstallNewDeckSubscriptions:
             )
 
             # Call the function with a deck
-            on_done_mock = mocker.stub()
             deck = DeckFactory.create()
-            with qtbot.wait_callback() as on_done_mock:
+            with qtbot.wait_callback() as callback:
                 check_and_install_new_deck_subscriptions(
-                    subscribed_decks=[deck], on_done=on_done_mock
+                    subscribed_decks=[deck], on_done=callback
                 )
 
             # Assert that the on_done callback was called with a future with a result of None
-            assert on_done_mock.args[0].result() is None
+            assert callback.args[0].result() is None
 
     def test_no_new_subscriptions(
         self,
         anki_session_with_addon_data: AnkiSession,
-        mocker: MockerFixture,
         qtbot: QtBot,
     ):
         anki_session = anki_session_with_addon_data
         with anki_session.profile_loaded():
             # Call the function with an empty list
-            with qtbot.wait_callback() as on_done_mock:
+            with qtbot.wait_callback() as callback:
                 check_and_install_new_deck_subscriptions(
-                    subscribed_decks=[], on_done=on_done_mock
+                    subscribed_decks=[], on_done=callback
                 )
 
             # Assert that the on_done callback was called with a future with a result of None
-            assert on_done_mock.args[0].result() is None
+            assert callback.args[0].result() is None
 
     def test_confirmation_dialog_raises_exception(
         self,
@@ -818,16 +812,16 @@ class TestCheckAndInstallNewDeckSubscriptions:
             )
 
             # Call the function with a deck
-            on_done_mock = mocker.stub()
+            callback = mocker.stub()
             deck = DeckFactory.create()
 
-            with qtbot.wait_callback() as on_done_mock:
+            with qtbot.wait_callback() as callback:
                 check_and_install_new_deck_subscriptions(
-                    subscribed_decks=[deck], on_done=on_done_mock
+                    subscribed_decks=[deck], on_done=callback
                 )
 
             # Assert that the on_done callback was called with a future with an exception
-            assert on_done_mock.args[0].exception() is not None
+            assert callback.args[0].exception() is not None
 
             # Assert that the mocked functions were called
             assert message_box_mock.call_count == 1
@@ -854,15 +848,14 @@ class TestCheckAndInstallNewDeckSubscriptions:
             )
 
             # Call the function with a deck
-            on_done_mock = mocker.stub()
             deck = DeckFactory.create()
-            with qtbot.wait_callback() as on_done_mock:
+            with qtbot.wait_callback() as callback:
                 check_and_install_new_deck_subscriptions(
-                    subscribed_decks=[deck], on_done=on_done_mock
+                    subscribed_decks=[deck], on_done=callback
                 )
 
             # Assert that the on_done callback was called with a future with an exception
-            assert on_done_mock.args[0].exception() is not None
+            assert callback.args[0].exception() is not None
 
             # Assert that the mocked functions were called
             assert download_and_install_decks_mock.call_count == 1
@@ -3426,8 +3419,8 @@ class TestAutoSync:
             config.public_config["auto_sync"] = "on_ankiweb_sync"
 
             # Trigger the AnkiWeb sync.
-            with qtbot.wait_callback() as after_sync_mock:
-                mw._sync_collection_and_media(after_sync=after_sync_mock)
+            with qtbot.wait_callback() as callback:
+                mw._sync_collection_and_media(after_sync=callback)
 
             # Assert that both syncs were called.
             assert self.check_and_install_new_deck_subscriptions_mock.call_count == 1
@@ -3453,8 +3446,8 @@ class TestAutoSync:
             config.public_config["auto_sync"] = "never"
 
             # Trigger the AnkiWeb sync.
-            with qtbot.wait_callback() as after_sync_mock:
-                mw._sync_collection_and_media(after_sync=after_sync_mock)
+            with qtbot.wait_callback() as callback:
+                mw._sync_collection_and_media(after_sync=callback)
 
             # Assert that only the AnkiWeb sync was called.
             assert self.udpate_decks_and_media_mock.call_count == 0
@@ -3481,8 +3474,8 @@ class TestAutoSync:
             config.public_config["auto_sync"] = "on_startup"
 
             # Trigger the AnkiWeb sync.
-            with qtbot.wait_callback() as after_sync_mock:
-                mw._sync_collection_and_media(after_sync=after_sync_mock)
+            with qtbot.wait_callback() as callback:
+                mw._sync_collection_and_media(after_sync=callback)
 
             # Assert that both syncs were called.
             assert self.udpate_decks_and_media_mock.call_count == 1
@@ -3492,8 +3485,8 @@ class TestAutoSync:
             self.check_and_install_new_deck_subscriptions_mock.call_count == 1
 
             # Trigger the AnkiWeb sync again.
-            with qtbot.wait_callback() as after_sync_mock:
-                mw._sync_collection_and_media(after_sync=after_sync_mock)
+            with qtbot.wait_callback() as callback:
+                mw._sync_collection_and_media(after_sync=callback)
 
             # Assert that only the AnkiWeb sync was called the second time.
             assert self.udpate_decks_and_media_mock.call_count == 1
@@ -4451,8 +4444,8 @@ def test_not_delete_ankihub_private_config_on_deckBrowser__delete_option(
 @pytest.mark.qt_no_exception_capture
 class TestAHDBCheck:
     def test_with_nothing_missing(self, qtbot: QtBot, mocker: MockerFixture):
-        with qtbot.wait_callback() as on_done_mock:
-            check_ankihub_db(on_done_mock)
+        with qtbot.wait_callback() as callback:
+            check_ankihub_db(on_success=callback)
 
     @pytest.mark.parametrize(
         "user_confirms, deck_exists_on_ankihub",
@@ -4508,8 +4501,8 @@ class TestAHDBCheck:
             mocker.patch.object(ah_db_check, "ask_user", return_value=user_confirms)
 
             # Run the db check
-            with qtbot.wait_callback() as on_done_mock:
-                check_ankihub_db(on_done_mock)
+            with qtbot.wait_callback() as callback:
+                check_ankihub_db(on_success=callback)
 
             if user_confirms and deck_exists_on_ankihub:
                 # The deck was downloaded and installed, is now also in config
