@@ -753,7 +753,7 @@ class TestCheckAndInstallNewDeckSubscriptions:
                 )
 
             # Assert that the on_done callback was called with a future with a result of None
-            assert on_done_mock.call_args[0][0].result() is None
+            assert on_done_mock.args[0].result() is None
 
             # Assert that the mocked functions were called
             assert download_and_install_decks_mock.call_count == 1
@@ -783,7 +783,7 @@ class TestCheckAndInstallNewDeckSubscriptions:
                 )
 
             # Assert that the on_done callback was called with a future with a result of None
-            assert on_done_mock.call_args[0][0].result() is None
+            assert on_done_mock.args[0].result() is None
 
     def test_no_new_subscriptions(
         self,
@@ -800,7 +800,7 @@ class TestCheckAndInstallNewDeckSubscriptions:
                 )
 
             # Assert that the on_done callback was called with a future with a result of None
-            assert on_done_mock.call_args[0][0].result() is None
+            assert on_done_mock.args[0].result() is None
 
     def test_confirmation_dialog_raises_exception(
         self,
@@ -827,7 +827,7 @@ class TestCheckAndInstallNewDeckSubscriptions:
                 )
 
             # Assert that the on_done callback was called with a future with an exception
-            assert on_done_mock.call_args[0][0].exception() is not None
+            assert on_done_mock.args[0].exception() is not None
 
             # Assert that the mocked functions were called
             assert message_box_mock.call_count == 1
@@ -862,8 +862,7 @@ class TestCheckAndInstallNewDeckSubscriptions:
                 )
 
             # Assert that the on_done callback was called with a future with an exception
-            assert on_done_mock.call_count == 1
-            assert on_done_mock.call_args[0][0].exception() is not None
+            assert on_done_mock.args[0].exception() is not None
 
             # Assert that the mocked functions were called
             assert download_and_install_decks_mock.call_count == 1
@@ -3659,8 +3658,9 @@ def test_optional_tag_suggestion_dialog(
         # Select the "VALID" tag group and click the submit button
         dialog.tag_group_list.item(1).setSelected(True)
 
-        qtbot.mouseClick(dialog.submit_btn, Qt.MouseButton.LeftButton)
-        qtbot.wait_until(lambda: suggest_optional_tags_mock.called)
+        with qtbot.wait_callback() as callback:
+            suggest_optional_tags_mock.side_effect = callback
+            qtbot.mouseClick(dialog.submit_btn, Qt.MouseButton.LeftButton)
 
         # Assert that the suggest_optional_tags function was called with the correct arguments.
         # Suggestions should be created for all notes, even if they don't have optional tags.
@@ -4298,22 +4298,24 @@ def test_upload_logs_and_data(
         file_copy_path = TEST_DATA_PATH / "ankihub_debug_info_copy.zip"
         key: Optional[str] = None
 
-        def upload_logs_mock(*args, **kwargs):
-            shutil.copy(kwargs["file"], file_copy_path)
-
-            nonlocal key
-            key = kwargs["key"]
-
-        # Mock the client.upload_logs method
-        mocker.patch.object(AnkiHubClient, "upload_logs", side_effect=upload_logs_mock)
-
         # Start the upload in the background and wait until it is finished.
-        upload_logs_and_data_in_background()
+        with qtbot.wait_callback() as callback:
+            # Mock the client.upload_logs method
 
-        def upload_finished():
-            return key is not None
+            def upload_logs_mock(*args, **kwargs):
+                # Copy the file because the original file gets deleted after the upload.
+                shutil.copy(kwargs["file"], file_copy_path)
 
-        qtbot.wait_until(upload_finished)
+                nonlocal key
+                key = kwargs["key"]
+
+                callback()
+
+            mocker.patch.object(
+                AnkiHubClient, "upload_logs", side_effect=upload_logs_mock
+            )
+
+            upload_logs_and_data_in_background()
 
     try:
         # Check the contents of the zip file
