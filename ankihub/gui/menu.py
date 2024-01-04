@@ -134,9 +134,11 @@ class AnkiHubLogin(QWidget):
         self.sign_up_help_text = QLabel(
             'Don\'t have a AnkiHub account? <a href="https://app.ankihub.net/accounts/signup/">Register now</a>'
         )
+        self.sign_up_help_text.setOpenExternalLinks(True)
         self.recover_password_help_text = QLabel(
             '<a href="https://app.ankihub.net/accounts/password/reset/">Forgot password?</a>'
         )
+        self.recover_password_help_text.setOpenExternalLinks(True)
         self.sign_up_and_recover_password_container.addWidget(self.sign_up_help_text)
         self.sign_up_and_recover_password_container.addWidget(
             self.recover_password_help_text

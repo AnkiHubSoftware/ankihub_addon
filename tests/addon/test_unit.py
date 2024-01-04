@@ -619,6 +619,26 @@ class TestAnkiHubLoginDialog:
         assert window.password_box_text.echoMode() == QLineEdit.EchoMode.Password
         assert window.toggle_button.isChecked() is False
 
+    @patch("ankihub.gui.menu.AnkiHubClient.login")
+    def test_forgot_password_and_sign_up_links_are_present(
+        self, login_mock, qtbot: QtBot
+    ):
+        AnkiHubLogin.display_login()
+
+        window: AnkiHubLogin = AnkiHubLogin._window
+
+        assert window.sign_up_help_text.openExternalLinks() is True
+        assert (
+            window.sign_up_help_text.text()
+            == 'Don\'t have a AnkiHub account? <a href="https://app.ankihub.net/accounts/signup/">Register now</a>'
+        )
+
+        assert window.recover_password_help_text.openExternalLinks() is True
+        assert (
+            window.recover_password_help_text.text()
+            == '<a href="https://app.ankihub.net/accounts/password/reset/">Forgot password?</a>'
+        )
+
 
 class TestSuggestionDialog:
     @pytest.mark.parametrize(
