@@ -33,6 +33,7 @@ from ankihub.ankihub_client.models import (  # type: ignore
 )
 from ankihub.gui import menu
 from ankihub.gui.config_dialog import setup_config_dialog_manager
+from tests.addon.test_utils import wrap_func_with_run_on_main
 
 from ..factories import (
     DeckExtensionFactory,
@@ -2502,7 +2503,9 @@ class TestOptionalTagSuggestionDialog:
             dialog.show()
 
             with qtbot.wait_callback() as callback:
-                suggest_tags_for_groups_mock.side_effect = callback
+                suggest_tags_for_groups_mock.side_effect = wrap_func_with_run_on_main(
+                    callback
+                )
                 qtbot.mouseClick(dialog.submit_btn, Qt.MouseButton.LeftButton)
 
             get_deck_extensions_mock.assert_called_once()

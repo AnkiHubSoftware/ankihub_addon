@@ -79,6 +79,7 @@ from ..fixtures import (
     record_review,
 )
 from .conftest import TEST_PROFILE_ID
+from .test_utils import wrap_func_with_run_on_main
 
 # workaround for vscode test discovery not using pytest.ini which sets this env var
 # has to be set before importing ankihub
@@ -416,7 +417,11 @@ def create_change_suggestion(
 
     def create_change_suggestion_inner(note: Note, wait_for_media_upload: bool):
         with qtbot.wait_callback() as callback:
-            mock_client_media_upload.side_effect = callback
+            if wait_for_media_upload:
+                mock_client_media_upload.side_effect = wrap_func_with_run_on_main(
+                    callback
+                )
+
             suggest_note_update(
                 note=note,
                 change_type=SuggestionType.NEW_CONTENT,
@@ -424,7 +429,7 @@ def create_change_suggestion(
                 media_upload_cb=media_sync.start_media_upload,
             )
             if not wait_for_media_upload:
-                # Call the callback immediately to not wait for it to be called by the client
+                # Call the callback immediately to exit the wait_callback context manager
                 callback()
 
         return create_change_suggestion_mock
@@ -456,7 +461,10 @@ def create_new_note_suggestion(
         note: Note, ah_did: uuid.UUID, wait_for_media_upload: bool
     ):
         with qtbot.wait_callback() as callback:
-            mock_client_media_upload.side_effect = callback
+            if wait_for_media_upload:
+                mock_client_media_upload.side_effect = wrap_func_with_run_on_main(
+                    callback
+                )
             suggest_new_note(
                 note=note,
                 comment="test",
@@ -464,7 +472,7 @@ def create_new_note_suggestion(
                 media_upload_cb=media_sync.start_media_upload,
             )
             if not wait_for_media_upload:
-                # Call the callback immediately to not wait for it to be called by the client
+                # Call the callback immediately to exit the wait_callback context manager
                 callback()
 
         return create_new_note_suggestion_mock
@@ -3652,7 +3660,9 @@ def test_optional_tag_suggestion_dialog(
         dialog.tag_group_list.item(1).setSelected(True)
 
         with qtbot.wait_callback() as callback:
-            suggest_optional_tags_mock.side_effect = callback
+            suggest_optional_tags_mock.side_effect = wrap_func_with_run_on_main(
+                callback
+            )
             qtbot.mouseClick(dialog.submit_btn, Qt.MouseButton.LeftButton)
 
         # Assert that the suggest_optional_tags function was called with the correct arguments.
@@ -4302,7 +4312,7 @@ def test_upload_logs_and_data(
                 nonlocal key
                 key = kwargs["key"]
 
-                callback()
+                aqt.mw.taskman.run_on_main(callback)
 
             mocker.patch.object(
                 AnkiHubClient, "upload_logs", side_effect=upload_logs_mock
