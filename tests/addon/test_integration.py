@@ -346,6 +346,7 @@ def mock_client_methods_called_during_ankihub_sync(mocker: MockerFixture) -> Non
     mocker.patch.object(AnkiHubClient, "get_deck_updates")
     mocker.patch.object(AnkiHubClient, "get_deck_media_updates")
     mocker.patch.object(AnkiHubClient, "send_card_review_data")
+    mocker.patch.object(AnkiHubClient, "get_deck_by_id")
 
 
 class MockClientGetNoteType(Protocol):
@@ -3323,15 +3324,14 @@ class TestSyncWithAnkiHub:
             # Install a deck
             anki_did, ah_did = install_sample_ah_deck()
 
-            # Mock client.get_deck_subscriptions to return the deck if subscribed_to_deck is True and
-            # return an empty list otherwise
+            # Mock client methods
+            deck = DeckFactory.create(ah_did=ah_did)
             mocker.patch.object(
                 AnkiHubClient,
                 "get_deck_subscriptions",
-                return_value=[DeckFactory.create(ah_did=ah_did)]
-                if subscribed_to_deck
-                else [],
+                return_value=[deck] if subscribed_to_deck else [],
             )
+            mocker.patch.object(AnkiHubClient, "get_deck_by_id", return_value=deck)
 
             # Set a fake token so that the sync is not skipped
             config.save_token("test_token")
