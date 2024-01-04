@@ -10,14 +10,14 @@ from sqlite3 import ProgrammingError
 from textwrap import dedent
 from time import sleep
 from typing import Callable, ContextManager, Generator, List, Optional, Protocol, Tuple
-from unittest.mock import Mock
+from unittest.mock import Mock, patch
 
 import aqt
 import pytest
 from anki.decks import DeckId
 from anki.models import NotetypeDict
 from anki.notes import Note, NoteId
-from aqt import QMenu
+from aqt import QLineEdit, QMenu
 from aqt.qt import QDialog, QDialogButtonBox, Qt, QTimer, QWidget
 from pytest import MonkeyPatch
 from pytest_anki import AnkiSession
@@ -589,6 +589,35 @@ class TestAnkiHubLoginDialog:
 
         assert config.user() == username
         assert config.token() == token
+
+    @patch("ankihub.gui.menu.AnkiHubClient.login")
+    def test_password_visibility_toggle(self, qtbot: QtBot, login_mock):
+        password = "test_password"
+
+        AnkiHubLogin.display_login()
+
+        window: AnkiHubLogin = AnkiHubLogin._window
+        window.password_box_text.setText(password)
+
+        # assert password is not visible and toggle button is at the initial state
+        assert window.password_box_text.echoMode == QLineEdit.EchoMode.Password
+        assert window.toggle_button.isChecked() is True
+
+        window.toggle_button.click()
+        qtbot.wait_until(
+            lambda: window.password_box_text.echoMode == QLineEdit.EchoMode.Normal
+        )
+
+        assert window.password_box_text.echoMode == QLineEdit.EchoMode.Normal
+        assert window.toggle_button.isChecked() is False
+
+        window.toggle_button.click()
+        qtbot.wait_until(
+            lambda: window.password_box_text.echoMode == QLineEdit.EchoMode.Password
+        )
+
+        assert window.password_box_text.echoMode == QLineEdit.EchoMode.Password
+        assert window.toggle_button.isChecked() is True
 
 
 class TestSuggestionDialog:
