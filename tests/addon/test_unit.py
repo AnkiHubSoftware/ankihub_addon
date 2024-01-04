@@ -591,7 +591,7 @@ class TestAnkiHubLoginDialog:
         assert config.token() == token
 
     @patch("ankihub.gui.menu.AnkiHubClient.login")
-    def test_password_visibility_toggle(self, qtbot: QtBot, login_mock):
+    def test_password_visibility_toggle(self, login_mock, qtbot: QtBot):
         password = "test_password"
 
         AnkiHubLogin.display_login()
