@@ -600,23 +600,23 @@ class TestAnkiHubLoginDialog:
         window.password_box_text.setText(password)
 
         # assert password is not visible and toggle button is at the initial state
-        assert window.password_box_text.echoMode == QLineEdit.EchoMode.Password
+        assert window.password_box_text.echoMode() == QLineEdit.EchoMode.Password
         assert window.toggle_button.isChecked() is True
 
         window.toggle_button.click()
         qtbot.wait_until(
-            lambda: window.password_box_text.echoMode == QLineEdit.EchoMode.Normal
+            lambda: window.password_box_text.echoMode() == QLineEdit.EchoMode.Normal
         )
 
-        assert window.password_box_text.echoMode == QLineEdit.EchoMode.Normal
+        assert window.password_box_text.echoMode() == QLineEdit.EchoMode.Normal
         assert window.toggle_button.isChecked() is False
 
         window.toggle_button.click()
         qtbot.wait_until(
-            lambda: window.password_box_text.echoMode == QLineEdit.EchoMode.Password
+            lambda: window.password_box_text.echoMode() == QLineEdit.EchoMode.Password
         )
 
-        assert window.password_box_text.echoMode == QLineEdit.EchoMode.Password
+        assert window.password_box_text.echoMode() == QLineEdit.EchoMode.Password
         assert window.toggle_button.isChecked() is True
 
 
