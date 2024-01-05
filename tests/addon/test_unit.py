@@ -10,14 +10,14 @@ from sqlite3 import ProgrammingError
 from textwrap import dedent
 from time import sleep
 from typing import Callable, ContextManager, Generator, List, Optional, Protocol, Tuple
-from unittest.mock import Mock
+from unittest.mock import Mock, patch
 
 import aqt
 import pytest
 from anki.decks import DeckId
 from anki.models import NotetypeDict
 from anki.notes import Note, NoteId
-from aqt import QMenu
+from aqt import QLineEdit, QMenu
 from aqt.qt import QDialog, QDialogButtonBox, Qt, QTimer, QWidget
 from pytest import MonkeyPatch
 from pytest_anki import AnkiSession
@@ -589,6 +589,55 @@ class TestAnkiHubLoginDialog:
 
         assert config.user() == username
         assert config.token() == token
+
+    @patch("ankihub.gui.menu.AnkiHubClient.login")
+    def test_password_visibility_toggle(self, login_mock, qtbot: QtBot):
+        password = "test_password"
+
+        AnkiHubLogin.display_login()
+
+        window: AnkiHubLogin = AnkiHubLogin._window
+        window.password_box_text.setText(password)
+
+        # assert password is not visible and toggle button is at the initial state
+        assert window.password_box_text.echoMode() == QLineEdit.EchoMode.Password
+        assert window.toggle_button.isChecked() is False
+
+        window.toggle_button.click()
+        qtbot.wait_until(
+            lambda: window.password_box_text.echoMode() == QLineEdit.EchoMode.Normal
+        )
+
+        assert window.password_box_text.echoMode() == QLineEdit.EchoMode.Normal
+        assert window.toggle_button.isChecked() is True
+
+        window.toggle_button.click()
+        qtbot.wait_until(
+            lambda: window.password_box_text.echoMode() == QLineEdit.EchoMode.Password
+        )
+
+        assert window.password_box_text.echoMode() == QLineEdit.EchoMode.Password
+        assert window.toggle_button.isChecked() is False
+
+    @patch("ankihub.gui.menu.AnkiHubClient.login")
+    def test_forgot_password_and_sign_up_links_are_present(
+        self, login_mock, qtbot: QtBot
+    ):
+        AnkiHubLogin.display_login()
+
+        window: AnkiHubLogin = AnkiHubLogin._window
+
+        assert window.sign_up_help_text.openExternalLinks() is True
+        assert (
+            window.sign_up_help_text.text()
+            == 'Don\'t have a AnkiHub account? <a href="https://app.ankihub.net/accounts/signup/">Register now</a>'
+        )
+
+        assert window.recover_password_help_text.openExternalLinks() is True
+        assert (
+            window.recover_password_help_text.text()
+            == '<a href="https://app.ankihub.net/accounts/password/reset/">Forgot password?</a>'
+        )
 
 
 class TestSuggestionDialog:
