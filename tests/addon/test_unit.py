@@ -630,7 +630,7 @@ class TestAnkiHubLoginDialog:
         assert window.sign_up_help_text.openExternalLinks() is True
         assert (
             window.sign_up_help_text.text()
-            == 'Don\'t have a AnkiHub account? <a href="https://app.ankihub.net/accounts/signup/">Register now</a>'
+            == 'Don\'t have an AnkiHub account? <a href="https://app.ankihub.net/accounts/signup/">Register now</a>'
         )
 
         assert window.recover_password_help_text.openExternalLinks() is True
