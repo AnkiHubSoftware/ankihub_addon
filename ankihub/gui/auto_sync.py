@@ -84,7 +84,14 @@ def _on_ankiweb_sync(*args, **kwargs) -> None:
         arg_name="after_sync",
     )
 
-    def new_after_sync() -> None:
+    def new_after_sync() -> None:  # pragma: no cover
+        # TODO: This is not being tested because in addition to it being an internal function, it is not called
+        # directly within the upper level function. The upper level function instead defines another function,
+        # 'sync_with_ankiweb', which calls another function where 'new_after_sync' is sent as a callback argument.
+        # However, 'sync_with_ankiweb' itself will also be sent as a callback argument to '_maybe_sync_with_ankihub'
+        # (see below). This means that 'new_after_sync' is effectively the callback of a callback of a function
+        # that is being called here - making this a rather complex function to test.
+
         """The original after_sync callback function passed to AnkiQt._sync_collection_and_media is replaced by
         this function."""
         original_after_sync()
