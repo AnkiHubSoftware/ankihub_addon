@@ -89,6 +89,8 @@ def _on_ankiweb_sync(*args, **kwargs) -> None:
         this function."""
         original_after_sync()
 
+        # If we displayed the login dialog before the AnkiWeb sync, the user wouldn't be able to interact with it until
+        # the sync is finished. So we display it after the AnkiWeb sync.
         if _should_auto_sync_with_ankihub() and not config.is_logged_in():
             AnkiHubLogin.display_login()
 
