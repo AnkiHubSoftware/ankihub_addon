@@ -130,7 +130,7 @@ from ankihub.gui.decks_dialog import DeckManagementDialog
 from ankihub.gui.editor import _on_suggestion_button_press, _refresh_buttons
 from ankihub.gui.errors import upload_logs_and_data_in_background
 from ankihub.gui.media_sync import media_sync
-from ankihub.gui.menu import menu_state
+from ankihub.gui.menu import AnkiHubLogin, menu_state
 from ankihub.gui.operations import ankihub_sync
 from ankihub.gui.operations.db_check import ah_db_check
 from ankihub.gui.operations.db_check.ah_db_check import check_ankihub_db
@@ -559,6 +559,74 @@ def test_editor(
 
         # mocked requests: f"{config.api_url_base}/notes/{notes_2_ah_nid}/suggestion/"
         assert suggestion_endpoint_mock.call_count == 1  # type: ignore
+
+
+@patch("ankihub.settings.config.is_logged_in")
+def test_editor_should_display_login_window_if_user_attempts_to_submit_new_note_without_being_signed_in(
+    is_logged_in_mock,
+    qtbot: QtBot,
+    anki_session_with_addon_data: AnkiSession,
+    mocker: MockerFixture,
+    next_deterministic_uuid: Callable[[], uuid.UUID],
+    install_sample_ah_deck: InstallSampleAHDeck,
+):
+    is_logged_in_mock.return_value = False
+
+    with anki_session_with_addon_data.profile_loaded():
+        mw = anki_session_with_addon_data.mw
+
+        install_sample_ah_deck()
+
+        add_cards_dialog: AddCards = dialogs.open("AddCards", mw)
+        editor = add_cards_dialog.editor
+
+        # test a new note suggestion
+        editor.note = mw.col.new_note(mw.col.models.by_name("Basic (Testdeck / user1)"))
+
+        note_1_ah_nid = next_deterministic_uuid()
+
+        mocker.patch("ankihub.main.exporting.uuid.uuid4", return_value=note_1_ah_nid)
+
+        _refresh_buttons(editor)
+        assert editor.ankihub_command == AnkiHubCommands.NEW.value  # type: ignore
+        _on_suggestion_button_press(editor)
+        window: AnkiHubLogin = AnkiHubLogin._window
+        qtbot.waitUntil(lambda: window.isVisible())
+
+
+@patch("ankihub.settings.config.is_logged_in")
+def test_editor_should_display_login_window_if_user_attempts_to_submit_change_note_suggestion_without_being_signed_in(
+    is_logged_in_mock,
+    qtbot: QtBot,
+    anki_session_with_addon_data: AnkiSession,
+    install_sample_ah_deck: InstallSampleAHDeck,
+):
+    is_logged_in_mock.return_value = False
+
+    with anki_session_with_addon_data.profile_loaded():
+        mw = anki_session_with_addon_data.mw
+
+        install_sample_ah_deck()
+
+        add_cards_dialog: AddCards = dialogs.open("AddCards", mw)
+        editor = add_cards_dialog.editor
+
+        # test a change note suggestion
+        note = mw.col.get_note(mw.col.find_notes("")[0])
+        editor.note = note
+
+        _refresh_buttons(editor)
+
+        assert editor.ankihub_command == AnkiHubCommands.CHANGE.value  # type: ignore
+
+        # change the front of the note
+        note["Front"] = "new front"
+        note.flush()
+
+        # this should trigger a suggestion because the note has been changed
+        _on_suggestion_button_press(editor)
+        window: AnkiHubLogin = AnkiHubLogin._window
+        qtbot.waitUntil(lambda: window.isVisible())
 
 
 def test_get_note_types_in_deck(anki_session_with_addon_data: AnkiSession):
