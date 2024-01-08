@@ -132,7 +132,7 @@ class AnkiHubLogin(QWidget):
         self.sign_up_and_recover_password_container.setContentsMargins(0, 0, 0, 5)
         self.login_button.setDefault(True)
         self.sign_up_help_text = QLabel(
-            'Don\'t have a AnkiHub account? <a href="https://app.ankihub.net/accounts/signup/">Register now</a>'
+            'Don\'t have an AnkiHub account? <a href="https://app.ankihub.net/accounts/signup/">Register now</a>'
         )
         self.sign_up_help_text.setOpenExternalLinks(True)
         self.recover_password_help_text = QLabel(
