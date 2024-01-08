@@ -71,25 +71,31 @@ def _rate_limited(*args, **kwargs) -> None:
 
 
 def _on_ankiweb_sync(*args, **kwargs) -> None:
-    _old = kwargs["_old"]
+    """Wrapper for AnkiQt._sync_collection_and_media that syncs with with AnkiHub before syncing with AnkiWeb.
+    When the user is not logged into AnkiHub and the auto sync would be run otherwise, the AnkiHub login dialog
+    is displayed after the AnkiWeb sync."""
+    original_sync_collection_and_media = kwargs["_old"]
     del kwargs["_old"]
 
-    args, kwargs, after_sync = extract_argument(
-        _old, args=args, kwargs=kwargs, arg_name="after_sync"
+    args, kwargs, original_after_sync = extract_argument(
+        original_sync_collection_and_media,
+        args=args,
+        kwargs=kwargs,
+        arg_name="after_sync",
     )
 
     def new_after_sync() -> None:
-        after_sync()
+        """The original after_sync callback function passed to AnkiQt._sync_collection_and_media is replaced by
+        this function."""
+        original_after_sync()
 
         if _should_auto_sync_with_ankihub() and not config.is_logged_in():
             AnkiHubLogin.display_login()
 
-    # This function has to be called, because it could have a callback that Anki needs to run,
-    # for example to close the Anki profile once the sync is done.
     def sync_with_ankiweb(future: Future) -> None:
         # The original function should be called even if the sync with AnkiHub fails, so we run it
         # this before future.result() (which can raise an exception)
-        _old(*args, **kwargs, after_sync=new_after_sync)
+        original_sync_collection_and_media(*args, **kwargs, after_sync=new_after_sync)
 
         future.result()
 
