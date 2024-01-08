@@ -4,11 +4,13 @@ import shutil
 import tempfile
 import uuid
 from pathlib import Path
-from typing import Generator
+from typing import Any, Dict, Generator, Optional
 
 import pytest
-from pytest import MonkeyPatch
+from pytest import FixtureRequest, MonkeyPatch
 from pytest_anki import AnkiSession
+from pytest_anki.plugin import anki_running
+from pytestqt.qtbot import QtBot  # type: ignore
 from requests_mock import Mocker
 
 from ..fixtures import (  # noqa F401
@@ -51,6 +53,24 @@ def pytest_runtest_setup(item: pytest.Item) -> None:
     """Skips performance tests if --performance is not passed to pytest"""
     if "performance" in item.keywords and not item.config.getoption("--performance"):
         pytest.skip("Performance tests are not requested, skipping.")
+
+
+@pytest.fixture
+def anki_session(
+    request: FixtureRequest, qtbot: QtBot
+) -> Generator[AnkiSession, None, None]:
+    """Overwrites the anki_session fixture from pytest-anki to disable web debugging by default.
+    This is done because web debugging is not used in any tests and it sometimes leads to errors.
+    """
+    default_parameters = {"enable_web_debugging": False}
+    indirect_parameters: Optional[Dict[str, Any]] = getattr(request, "param", None)
+    merged_parameters: Optional[Dict[str, Any]] = {
+        **default_parameters,
+        **(indirect_parameters if indirect_parameters else {}),
+    }
+
+    with anki_running(qtbot=qtbot, **merged_parameters) as session:
+        yield session
 
 
 # autouse=True is set so that the tests don't fail because without it mw is None
@@ -104,7 +124,9 @@ def anki_session_with_addon_data(
 
 
 @pytest.fixture
-def anki_session_with_addon_before_profile_support(anki_session_with_addon_data):
+def anki_session_with_addon_before_profile_support(
+    anki_session_with_addon_data: AnkiSession,
+):
     # previous versions of the add-on didn't support multiple Anki profiles and
     # had one set of data for all profiles
     # this fixtures simulates the data structure of such an add-on version
