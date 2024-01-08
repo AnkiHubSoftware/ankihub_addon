@@ -61,6 +61,7 @@ def anki_session(
 ) -> Generator[AnkiSession, None, None]:
     """Overwrites the anki_session fixture from pytest-anki to disable web debugging by default.
     This is done because web debugging is not used in any tests and it sometimes leads to errors.
+    Otherwise the fixture is the same as the original.
     """
     default_parameters = {"enable_web_debugging": False}
     indirect_parameters: Optional[Dict[str, Any]] = getattr(request, "param", {})
