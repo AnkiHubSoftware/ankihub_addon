@@ -22,7 +22,7 @@ from typing import (
     Tuple,
     Union,
 )
-from unittest.mock import Mock
+from unittest.mock import Mock, patch
 from zipfile import ZipFile
 
 import aqt
@@ -492,7 +492,9 @@ def test_entry_point(anki_session_with_addon_data: AnkiSession, qtbot: QtBot):
     # and that the add-on doesn't crash on Anki startup
 
 
+@patch("ankihub.settings.config.is_logged_in")
 def test_editor(
+    is_logged_in_mock,
     anki_session_with_addon_data: AnkiSession,
     requests_mock: Mocker,
     mocker: MockerFixture,
@@ -500,6 +502,8 @@ def test_editor(
     install_sample_ah_deck: InstallSampleAHDeck,
     mock_suggestion_dialog: MockSuggestionDialog,
 ):
+    is_logged_in_mock.return_value = True
+
     with anki_session_with_addon_data.profile_loaded():
         mw = anki_session_with_addon_data.mw
 
