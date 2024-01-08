@@ -63,10 +63,10 @@ def anki_session(
     This is done because web debugging is not used in any tests and it sometimes leads to errors.
     """
     default_parameters = {"enable_web_debugging": False}
-    indirect_parameters: Optional[Dict[str, Any]] = getattr(request, "param", None)
+    indirect_parameters: Optional[Dict[str, Any]] = getattr(request, "param", {})
     merged_parameters: Optional[Dict[str, Any]] = {
         **default_parameters,
-        **(indirect_parameters if indirect_parameters else {}),
+        **indirect_parameters,
     }
 
     with anki_running(qtbot=qtbot, **merged_parameters) as session:
