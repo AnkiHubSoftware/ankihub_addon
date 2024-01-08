@@ -201,21 +201,22 @@ def choose_ankihub_deck(
     If 'ah_dids' param is provided, only the decks with those UUIDS will be listed.
     When left as None (default value), all subscribed decks will be displayed.
     """
-
     ah_dids = ah_dids or config.deck_ids()
-    deck_configs = [
-        (config.deck_config(did), did) for did in ah_dids if did in config.deck_ids()
+    ah_did_deck_config_tuples = [
+        (ah_did, deck_config)
+        for ah_did in ah_dids
+        if (deck_config := config.deck_config(ah_did)) is not None
     ]
     chosen_deck_idx = choose_list(
         prompt=prompt,
-        choices=[deck.name for deck, _ in deck_configs],
+        choices=[deck.name for _, deck in ah_did_deck_config_tuples],
         parent=parent,
     )
 
     if chosen_deck_idx is None:
         return None
 
-    chosen_deck_ah_did = deck_configs[chosen_deck_idx][1]
+    chosen_deck_ah_did = ah_did_deck_config_tuples[chosen_deck_idx][0]
     return chosen_deck_ah_did
 
 

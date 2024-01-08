@@ -3,6 +3,7 @@
 import uuid
 from concurrent.futures import Future
 from datetime import datetime
+from functools import partial
 from typing import Callable, List
 
 import aqt
@@ -73,7 +74,9 @@ def download_and_install_decks(
             label="Downloading decks from AnkiHub",
         )
     except Exception as e:
-        on_done(future_with_exception(e))
+        # Using run_on_main prevents exceptions which occur in the callback to be backpropagated to the caller,
+        # which is what we want.
+        aqt.mw.taskman.run_on_main(partial(on_done, future_with_exception(e)))
 
 
 def _show_deck_import_summary_dialog(

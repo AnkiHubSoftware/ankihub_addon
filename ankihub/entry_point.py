@@ -10,7 +10,7 @@ from . import LOGGER
 from .db import ankihub_db
 from .debug import setup as setup_debug
 from .feature_flags import setup_feature_flags
-from .gui import browser, deckbrowser, editor, progress, reviewer, taskman
+from .gui import browser, deckbrowser, editor, progress, reviewer
 from .gui.addons import setup_addons
 from .gui.auto_sync import setup_auto_sync
 from .gui.config_dialog import setup_config_dialog_manager
@@ -143,9 +143,6 @@ def _general_setup():
 
     progress.setup()
     LOGGER.info("Set up progress manager.")
-
-    taskman.setup()
-    LOGGER.info("Set up task manager.")
 
     deckbrowser.setup()
     LOGGER.info("Set up deck browser")

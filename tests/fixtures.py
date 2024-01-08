@@ -26,6 +26,7 @@ from ankihub.ankihub_client.ankihub_client import AnkiHubClient
 from ankihub.ankihub_client.models import Deck, UserDeckRelation
 from ankihub.feature_flags import setup_feature_flags
 from ankihub.gui.media_sync import _AnkiHubMediaSync
+from ankihub.gui.suggestion_dialog import SuggestionMetadata
 from ankihub.main.importing import AnkiHubImporter
 from ankihub.main.utils import modify_note_type
 from ankihub.settings import DeckConfig, config
@@ -134,39 +135,6 @@ def mock_all_feature_flags_to_default_values(
         setup_feature_flags()
 
     return mock_all_feature_flags_to_default_values_inner
-
-
-class MockFunction(Protocol):
-    def __call__(
-        self,
-        *args,
-        return_value: Optional[Any] = None,
-        side_effect: Optional[Callable] = None,
-    ) -> Mock:
-        ...
-
-
-@pytest.fixture
-def mock_function(
-    monkeypatch: MonkeyPatch,
-) -> MockFunction:
-    def _mock_function(
-        *args,
-        return_value: Optional[Any] = None,
-        side_effect: Optional[Callable] = None,
-    ) -> Mock:
-        # The args can be either an object and a function name or the full path to the function as a string.
-        assert len(args) in [1, 2]
-        mock = Mock()
-        mock.return_value = return_value
-        monkeypatch.setattr(  # type: ignore
-            *args,
-            mock,
-        )
-        mock.side_effect = side_effect
-        return mock
-
-    return _mock_function
 
 
 class ImportAHNote(Protocol):
@@ -642,6 +610,41 @@ def mock_study_deck_dialog_with_cb(
         )
 
     return mock_study_deck_dialog_inner
+
+
+class MockSuggestionDialog(Protocol):
+    def __call__(self, user_cancels: bool) -> None:
+        ...
+
+
+@pytest.fixture
+def mock_suggestion_dialog(monkeypatch: MonkeyPatch) -> MockSuggestionDialog:
+    """Mock the SuggestionDialog class to run the callback which is passed to its __init__ method
+    on the main thread when the __init__ method is called.
+
+    user_cancels: If True, the callback is called with None as the suggestion metadata.
+        If False, the callback is called with a SuggestionMetadata object as the suggestion metadata.
+    """
+
+    def mock_suggestion_dialog_inner(user_cancels: bool) -> None:
+        suggestion_dialog_mock = Mock()
+
+        def side_effect(*args, callback, **kwargs):
+            if user_cancels:
+                suggestion_metadata = None
+            else:
+                suggestion_metadata = SuggestionMetadata(
+                    comment="test",
+                )
+            aqt.mw.taskman.run_on_main(lambda: callback(suggestion_metadata))
+            return suggestion_dialog_mock
+
+        suggestion_dialog_mock.side_effect = side_effect
+        monkeypatch.setattr(
+            "ankihub.gui.suggestion_dialog.SuggestionDialog", suggestion_dialog_mock
+        )
+
+    return mock_suggestion_dialog_inner
 
 
 def record_review_for_anki_nid(anki_nid: NoteId, date_time: datetime) -> None:
