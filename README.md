@@ -39,7 +39,7 @@ The devcontainer doesn't include the AnkiHub web app yet, so you have to use it 
 You only have to do this once.
 
 #### Setup pre-commit hooks
-`pre-commit`
+`pre-commit install`
 
 This will ensure linters and code auto-formatters are run before each commit.
 
