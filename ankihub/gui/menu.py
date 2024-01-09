@@ -100,22 +100,50 @@ class AnkiHubLogin(QWidget):
 
         # Password
         self.password_box = QHBoxLayout()
+
         self.password_box_label = QLabel("Password:")
+
         self.password_box_text = QLineEdit("", self)
         self.password_box_text.setEchoMode(QLineEdit.EchoMode.Password)
         self.password_box_text.setMinimumWidth(300)
         qconnect(self.password_box_text.returnPressed, self.login)
+
+        self.toggle_button = QPushButton("Show")
+        self.toggle_button.setCheckable(True)
+        self.toggle_button.setFixedHeight(30)
+        qconnect(self.toggle_button.toggled, self.refresh_password_visibility)
+
         self.password_box.addWidget(self.password_box_label)
         self.password_box.addWidget(self.password_box_text)
+        self.password_box.addWidget(self.toggle_button)
         self.box_left.addLayout(self.password_box)
 
-        # Login
-        self.login_button = QPushButton("Login", self)
+        # Sign in button
+        self.login_button = QPushButton("Sign in", self)
         self.bottom_box_section.addWidget(self.login_button)
         qconnect(self.login_button.clicked, self.login)
         self.login_button.setDefault(True)
-
+        self.bottom_box_section.setContentsMargins(0, 12, 0, 12)
         self.box_left.addLayout(self.bottom_box_section)
+
+        # Sign up / forgot password text
+        self.sign_up_and_recover_password_container = QVBoxLayout()
+        self.sign_up_and_recover_password_container.setSpacing(8)
+        self.sign_up_and_recover_password_container.setContentsMargins(0, 0, 0, 5)
+        self.login_button.setDefault(True)
+        self.sign_up_help_text = QLabel(
+            'Don\'t have an AnkiHub account? <a href="https://app.ankihub.net/accounts/signup/">Register now</a>'
+        )
+        self.sign_up_help_text.setOpenExternalLinks(True)
+        self.recover_password_help_text = QLabel(
+            '<a href="https://app.ankihub.net/accounts/password/reset/">Forgot password?</a>'
+        )
+        self.recover_password_help_text.setOpenExternalLinks(True)
+        self.sign_up_and_recover_password_container.addWidget(self.sign_up_help_text)
+        self.sign_up_and_recover_password_container.addWidget(
+            self.recover_password_help_text
+        )
+        self.box_left.addLayout(self.sign_up_and_recover_password_container)
 
         # Add left and right layouts to upper
         self.box_upper.addLayout(self.box_left)
@@ -127,11 +155,19 @@ class AnkiHubLogin(QWidget):
         self.box_top.addStretch(1)
         self.setLayout(self.box_top)
 
-        self.setMinimumWidth(500)
+        self.setContentsMargins(20, 5, 0, 5)
         self.setSizePolicy(QSizePolicy.Policy.Minimum, QSizePolicy.Policy.Minimum)
-        self.setWindowTitle("Login to AnkiHub.")
+        self.setWindowTitle("Sign in to AnkiHub.")
         self.setWindowFlags(self.windowFlags() | Qt.WindowType.WindowStaysOnTopHint)  # type: ignore
         self.show()
+
+    def refresh_password_visibility(self) -> None:
+        if self.toggle_button.isChecked():
+            self.password_box_text.setEchoMode(QLineEdit.EchoMode.Normal)
+            self.toggle_button.setText("Hide")
+        else:
+            self.password_box_text.setEchoMode(QLineEdit.EchoMode.Password)
+            self.toggle_button.setText("Show")
 
     def login(self):
         username_or_email = self.username_or_email_box_text.text()
