@@ -424,10 +424,7 @@ def create_change_suggestion(
 
         if wait_for_media_upload:
             # Wait for the background thread that uploads the media to finish.
-            def assert_s3_upload():
-                assert mock_client_media_upload.called_once
-
-            qtbot.wait_until(assert_s3_upload)
+            qtbot.wait_until(lambda: mock_client_media_upload.call_count == 1)
 
         return create_change_suggestion_mock
 
@@ -466,10 +463,7 @@ def create_new_note_suggestion(
 
         if wait_for_media_upload:
             # Wait for the background thread that uploads the media to finish.
-            def assert_s3_upload():
-                assert mock_client_media_upload.called_once
-
-            qtbot.wait_until(assert_s3_upload)
+            qtbot.wait_until(lambda: mock_client_media_upload.call_count == 1)
 
         return create_new_note_suggestion_mock
 
