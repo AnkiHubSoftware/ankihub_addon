@@ -2,7 +2,6 @@
 Depends on the auto_sync setting in the public config."""
 from concurrent.futures import Future
 from dataclasses import dataclass
-from time import sleep
 from typing import Callable
 
 from anki.hooks import wrap
@@ -108,9 +107,6 @@ def _on_ankiweb_sync(*args, **kwargs) -> None:
 
         future.result()
 
-    if not auto_sync_state.attempted_startup_sync:
-        _workaround_for_addon_compatibility_on_startup_sync()
-
     try:
         _maybe_sync_with_ankihub(on_done=sync_with_ankiweb)
     except Exception as e:
@@ -135,14 +131,6 @@ def _maybe_sync_with_ankihub(on_done: Callable[[Future], None]) -> None:
         on_done(future_with_result(None))
 
 
-def _should_auto_sync_with_ankihub() -> bool:
-    result = (config.public_config["auto_sync"] == "on_ankiweb_sync") or (
-        config.public_config["auto_sync"] == "on_startup"
-        and not auto_sync_state.attempted_startup_sync
-    )
-    return result
-
-
 def _workaround_for_addon_compatibility_on_startup_sync() -> None:
     # AnkiHubSync creates a backup before syncing and creating a backup requires to close
     # the collection in Anki versions lower than 2.1.50.
@@ -158,3 +146,4 @@ def _workaround_for_addon_compatibility_on_startup_sync() -> None:
     LOGGER.info(
         f"Finished _workaround_for_addon_compatibility_on_startup_sync {ANKI_INT_VERSION=}"
     )
+
