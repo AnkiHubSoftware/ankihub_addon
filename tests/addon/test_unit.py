@@ -1020,8 +1020,8 @@ class TestOpenSuggestionDialogForBulkSuggestion:
             )
 
             with qtbot.wait_callback(raising=False, timeout=500) as callback:
-                suggest_notes_in_bulk_mock.side_effect = (
-                    lambda *args, **kwargs: aqt.mw.taskman.run_on_main(callback)
+                suggest_notes_in_bulk_mock.side_effect = wrap_func_with_run_on_main(
+                    callback
                 )
                 open_suggestion_dialog_for_bulk_suggestion(
                     anki_nids=nids, parent=aqt.mw
@@ -1093,8 +1093,8 @@ class TestOpenSuggestionDialogForBulkSuggestion:
             )
 
             with qtbot.wait_callback() as callback:
-                suggest_notes_in_bulk_mock.side_effect = (
-                    lambda *args, **kwargs: aqt.mw.taskman.run_on_main(callback)
+                suggest_notes_in_bulk_mock.side_effect = wrap_func_with_run_on_main(
+                    callback
                 )
                 open_suggestion_dialog_for_bulk_suggestion(
                     anki_nids=nids, parent=aqt.mw
