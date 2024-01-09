@@ -33,7 +33,6 @@ from ankihub.ankihub_client.models import (  # type: ignore
 )
 from ankihub.gui import menu
 from ankihub.gui.config_dialog import setup_config_dialog_manager
-from tests.addon.test_utils import wrap_func_with_run_on_main
 
 from ..factories import (
     DeckExtensionFactory,
@@ -666,14 +665,15 @@ class TestSuggestionDialog:
         source_type: SourceType,
         media_was_added: bool,
         qtbot: QtBot,
+        mocker: MockerFixture,
     ):
-        suggestion_dialog_callback_mock = qtbot.wait_callback()
+        callback_mock = mocker.stub()
         dialog = SuggestionDialog(
             is_for_anking_deck=is_for_anking_deck,
             is_new_note_suggestion=is_new_note_suggestion,
             added_new_media=media_was_added,
             can_submit_without_review=True,
-            callback=suggestion_dialog_callback_mock,
+            callback=callback_mock,
         )
         dialog.show()
 
@@ -732,8 +732,9 @@ class TestSuggestionDialog:
 
         dialog.accept()
 
-        suggestion_dialog_callback_mock.wait()
-        suggestion_dialog_callback_mock.assert_called_with(
+        qtbot.wait_until(lambda: callback_mock.called)
+
+        callback_mock.assert_called_once_with(
             SuggestionMetadata(
                 comment="test",
                 change_type=suggestion_type if change_type_needed else None,
@@ -1019,16 +1020,13 @@ class TestOpenSuggestionDialogForBulkSuggestion:
                 user_cancels=user_cancels
             )
 
-            with qtbot.wait_callback(raising=False, timeout=500) as callback:
-                suggest_notes_in_bulk_mock.side_effect = wrap_func_with_run_on_main(
-                    callback
-                )
-                open_suggestion_dialog_for_bulk_suggestion(
-                    anki_nids=nids, parent=aqt.mw
-                )
+            open_suggestion_dialog_for_bulk_suggestion(anki_nids=nids, parent=aqt.mw)
+
             if user_cancels:
+                qtbot.wait(500)
                 suggest_notes_in_bulk_mock.assert_not_called()
             else:
+                qtbot.wait_until(lambda: suggest_notes_in_bulk_mock.called)
                 _, kwargs = suggest_notes_in_bulk_mock.call_args
                 assert kwargs.get("ankihub_did") == ah_did
                 assert {note.id for note in kwargs.get("notes")} == set(nids)
@@ -1092,13 +1090,8 @@ class TestOpenSuggestionDialogForBulkSuggestion:
                 user_cancels=False
             )
 
-            with qtbot.wait_callback() as callback:
-                suggest_notes_in_bulk_mock.side_effect = wrap_func_with_run_on_main(
-                    callback
-                )
-                open_suggestion_dialog_for_bulk_suggestion(
-                    anki_nids=nids, parent=aqt.mw
-                )
+            open_suggestion_dialog_for_bulk_suggestion(anki_nids=nids, parent=aqt.mw)
+            qtbot.wait_until(lambda: suggest_notes_in_bulk_mock.called)
 
             # There are two options for the deck the note suggestions can be for, so the user should be asked
             # to choose between them.
@@ -1765,9 +1758,8 @@ def test_show_error_dialog(
 ):
     with anki_session_with_addon_data.profile_loaded():
         show_dialog_mock = mocker.patch("ankihub.gui.utils.show_dialog")
-        with qtbot.wait_callback() as callback:
-            show_dialog_mock.side_effect = callback
-            show_error_dialog("some message", title="some title", parent=aqt.mw)
+        show_error_dialog("some message", title="some title", parent=aqt.mw)
+        qtbot.wait_until(lambda: show_dialog_mock.called)
 
 
 class TestUploadLogs:
@@ -2024,14 +2016,15 @@ class TestCreateCollaborativeDeck:
             )
 
             # Create the AnkiHub deck.
-
-            with qtbot.wait_callback(raising=False, timeout=500) as callback:
-                showInfo_mock.side_effect = callback
-                create_collaborative_deck()
-
             if creating_deck_fails:
+                create_collaborative_deck()
+                qtbot.wait(500)
                 showInfo_mock.assert_not_called()
             else:
+                create_collaborative_deck()
+
+                qtbot.wait_until(lambda: showInfo_mock.called)
+
                 # Assert that the correct functions were called.
                 create_ankihub_deck_mock.assert_called_once_with(
                     deck_name, private=False, add_subdeck_tags=False
@@ -2551,11 +2544,9 @@ class TestOptionalTagSuggestionDialog:
 
             dialog.show()
 
-            with qtbot.wait_callback() as callback:
-                suggest_tags_for_groups_mock.side_effect = wrap_func_with_run_on_main(
-                    callback
-                )
-                qtbot.mouseClick(dialog.submit_btn, Qt.MouseButton.LeftButton)
+            qtbot.mouseClick(dialog.submit_btn, Qt.MouseButton.LeftButton)
+
+            qtbot.wait_until(lambda: suggest_tags_for_groups_mock.called)
 
             get_deck_extensions_mock.assert_called_once()
             prevalidate_tag_groups_mock.assert_called_once()

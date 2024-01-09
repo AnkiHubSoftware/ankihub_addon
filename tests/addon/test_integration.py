@@ -79,7 +79,6 @@ from ..fixtures import (
     record_review,
 )
 from .conftest import TEST_PROFILE_ID
-from .test_utils import wrap_func_with_run_on_main
 
 # workaround for vscode test discovery not using pytest.ini which sets this env var
 # has to be set before importing ankihub
@@ -416,21 +415,19 @@ def create_change_suggestion(
     )
 
     def create_change_suggestion_inner(note: Note, wait_for_media_upload: bool):
-        with qtbot.wait_callback() as callback:
-            if wait_for_media_upload:
-                mock_client_media_upload.side_effect = wrap_func_with_run_on_main(
-                    callback
-                )
+        suggest_note_update(
+            note=note,
+            change_type=SuggestionType.NEW_CONTENT,
+            comment="test",
+            media_upload_cb=media_sync.start_media_upload,
+        )
 
-            suggest_note_update(
-                note=note,
-                change_type=SuggestionType.NEW_CONTENT,
-                comment="test",
-                media_upload_cb=media_sync.start_media_upload,
-            )
-            if not wait_for_media_upload:
-                # Call the callback immediately to exit the wait_callback context manager
-                callback()
+        if wait_for_media_upload:
+            # Wait for the background thread that uploads the media to finish.
+            def assert_s3_upload():
+                assert mock_client_media_upload.called_once
+
+            qtbot.wait_until(assert_s3_upload)
 
         return create_change_suggestion_mock
 
@@ -460,20 +457,19 @@ def create_new_note_suggestion(
     def create_new_note_suggestion_inner(
         note: Note, ah_did: uuid.UUID, wait_for_media_upload: bool
     ):
-        with qtbot.wait_callback() as callback:
-            if wait_for_media_upload:
-                mock_client_media_upload.side_effect = wrap_func_with_run_on_main(
-                    callback
-                )
-            suggest_new_note(
-                note=note,
-                comment="test",
-                ankihub_did=ah_did,
-                media_upload_cb=media_sync.start_media_upload,
-            )
-            if not wait_for_media_upload:
-                # Call the callback immediately to exit the wait_callback context manager
-                callback()
+        suggest_new_note(
+            note=note,
+            comment="test",
+            ankihub_did=ah_did,
+            media_upload_cb=media_sync.start_media_upload,
+        )
+
+        if wait_for_media_upload:
+            # Wait for the background thread that uploads the media to finish.
+            def assert_s3_upload():
+                assert mock_client_media_upload.called_once
+
+            qtbot.wait_until(assert_s3_upload)
 
         return create_new_note_suggestion_mock
 
@@ -750,7 +746,6 @@ class TestCheckAndInstallNewDeckSubscriptions:
             )
 
             # Call the function with a deck
-            callback = mocker.stub()
             deck = DeckFactory.create()
             with qtbot.wait_callback() as callback:
                 check_and_install_new_deck_subscriptions(
@@ -820,7 +815,6 @@ class TestCheckAndInstallNewDeckSubscriptions:
             )
 
             # Call the function with a deck
-            callback = mocker.stub()
             deck = DeckFactory.create()
 
             with qtbot.wait_callback() as callback:
@@ -3659,11 +3653,8 @@ def test_optional_tag_suggestion_dialog(
         # Select the "VALID" tag group and click the submit button
         dialog.tag_group_list.item(1).setSelected(True)
 
-        with qtbot.wait_callback() as callback:
-            suggest_optional_tags_mock.side_effect = wrap_func_with_run_on_main(
-                callback
-            )
-            qtbot.mouseClick(dialog.submit_btn, Qt.MouseButton.LeftButton)
+        qtbot.mouseClick(dialog.submit_btn, Qt.MouseButton.LeftButton)
+        qtbot.wait_until(lambda: suggest_optional_tags_mock.call_count == 1)
 
         # Assert that the suggest_optional_tags function was called with the correct arguments.
         # Suggestions should be created for all notes, even if they don't have optional tags.
@@ -4301,24 +4292,22 @@ def test_upload_logs_and_data(
         file_copy_path = TEST_DATA_PATH / "ankihub_debug_info_copy.zip"
         key: Optional[str] = None
 
+        def upload_logs_mock(*args, **kwargs):
+            shutil.copy(kwargs["file"], file_copy_path)
+
+            nonlocal key
+            key = kwargs["key"]
+
+        # Mock the client.upload_logs method
+        mocker.patch.object(AnkiHubClient, "upload_logs", side_effect=upload_logs_mock)
+
         # Start the upload in the background and wait until it is finished.
-        with qtbot.wait_callback() as callback:
-            # Mock the client.upload_logs method
+        upload_logs_and_data_in_background()
 
-            def upload_logs_mock(*args, **kwargs):
-                # Copy the file because the original file gets deleted after the upload.
-                shutil.copy(kwargs["file"], file_copy_path)
+        def upload_finished():
+            return key is not None
 
-                nonlocal key
-                key = kwargs["key"]
-
-                aqt.mw.taskman.run_on_main(callback)
-
-            mocker.patch.object(
-                AnkiHubClient, "upload_logs", side_effect=upload_logs_mock
-            )
-
-            upload_logs_and_data_in_background()
+        qtbot.wait_until(upload_finished)
 
     try:
         # Check the contents of the zip file
