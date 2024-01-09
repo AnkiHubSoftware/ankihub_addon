@@ -3613,6 +3613,7 @@ class TestAutoSync:
             # Mock the syncs.
             self._mock_syncs_and_check_new_subscriptions(mocker)
 
+            # Set the token to None
             mocker.patch.object(config, "token", return_value=None)
 
             display_login_mock = mocker.patch.object(AnkiHubLogin, "display_login")
