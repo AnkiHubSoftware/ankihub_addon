@@ -3600,6 +3600,43 @@ class TestAutoSync:
 
             assert self.check_and_install_new_deck_subscriptions_mock.call_count == 1
 
+    def test_with_user_not_being_logged_in(
+        self,
+        anki_session_with_addon_data: AnkiSession,
+        mocker: MockerFixture,
+        mock_client_methods_called_during_ankihub_sync: None,
+        qtbot: QtBot,
+    ):
+        with anki_session_with_addon_data.profile_loaded():
+            mw = anki_session_with_addon_data.mw
+
+            # Mock the syncs.
+            self._mock_syncs_and_check_new_subscriptions(mocker)
+
+            mocker.patch.object(config, "token", return_value=None)
+
+            display_login_mock = mocker.patch.object(AnkiHubLogin, "display_login")
+
+            # Setup the auto sync.
+            _setup_ankihub_sync_on_ankiweb_sync()
+
+            # Set the auto sync config option.
+            config.public_config["auto_sync"] = "on_ankiweb_sync"
+
+            # Trigger the AnkiWeb sync.
+            mw._sync_collection_and_media(after_sync=mocker.stub())
+            qtbot.wait(500)
+
+            # Assert that the login dialog was displayed.
+            assert display_login_mock.call_count == 1
+
+            # Assert that the he AnkiWeb sync was run
+            assert self.ankiweb_sync_mock.call_count == 1
+
+            # Assert that the AnkiHub sync was not run.
+            assert self.check_and_install_new_deck_subscriptions_mock.call_count == 0
+            assert self.udpate_decks_and_media_mock.call_count == 0
+
     def _mock_syncs_and_check_new_subscriptions(self, mocker: MockerFixture):
         # Mock the token so that the AnkiHub sync is not skipped.
         mocker.patch.object(config, "token", return_value="test_token")
@@ -3609,8 +3646,14 @@ class TestAutoSync:
             ah_deck_updater, "update_decks_and_media"
         )
 
-        # Mock the AnkiWeb sync so it does nothing.
-        self.ankiweb_sync_mock = mocker.patch.object(aqt.sync, "sync_collection")
+        # Mock the AnkiWeb sync so it only calls its callback on the main thread.
+        def run_callback_on_main(*args, **kwargs) -> None:
+            on_done = kwargs["on_done"]
+            aqt.mw.taskman.run_on_main(on_done)
+
+        self.ankiweb_sync_mock = mocker.patch.object(
+            aqt.sync, "sync_collection", side_effect=run_callback_on_main
+        )
         # ... and reload aqt.main so the mock is used.
         importlib.reload(aqt.main)
 
