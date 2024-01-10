@@ -13,6 +13,7 @@ from aqt.utils import openLink, showInfo, tooltip
 from .. import LOGGER, settings
 from ..ankihub_client import AnkiHubHTTPError
 from ..db import ankihub_db
+from ..gui.menu import AnkiHubLogin
 from ..settings import (
     ANKI_INT_VERSION,
     ICONS_PATH,
@@ -56,6 +57,10 @@ def _on_suggestion_button_press(editor: Editor) -> None:
     Action to be performed when the AnkiHub icon button is clicked or when
     the hotkey is pressed.
     """
+
+    if not config.is_logged_in():
+        AnkiHubLogin.display_login()
+        return
 
     try:
         _on_suggestion_button_press_inner(editor)

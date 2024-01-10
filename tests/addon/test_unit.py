@@ -97,7 +97,12 @@ from ankihub.gui.suggestion_dialog import (
     open_suggestion_dialog_for_note,
 )
 from ankihub.gui.threading_utils import rate_limited
-from ankihub.gui.utils import choose_ankihub_deck, show_dialog, show_error_dialog
+from ankihub.gui.utils import (
+    choose_ankihub_deck,
+    extract_argument,
+    show_dialog,
+    show_error_dialog,
+)
 from ankihub.main import suggestions
 from ankihub.main.deck_creation import (
     DeckCreationResult,
@@ -2615,3 +2620,37 @@ class TestOptionalTagSuggestionDialog:
             qtbot.wait(500)
 
             assert dialog.auto_accept_cb.isVisible() == expected_checkbox_is_visible
+
+
+class TestUtils:
+    def test_extract_argument_when_argument_not_found(self):
+        def func(*args, **kwargs):
+            return
+
+        args = [1, 2, 3]
+        kwargs = {"a": True, "b": False}
+
+        with pytest.raises(ValueError):
+            args, kwargs, value = extract_argument(
+                func,
+                args=args,
+                kwargs=kwargs,
+                arg_name="after_sync",
+            )
+
+    def test_extract_argument_with_keyword_arguments(self):
+        def func(*, a, b):
+            return
+
+        kwargs = {"a": True, "b": "test"}
+
+        args, kwargs, value = extract_argument(
+            func,
+            args=tuple(),
+            kwargs=kwargs,
+            arg_name="b",
+        )
+
+        assert not args
+        assert kwargs == {"a": True}
+        assert value == "test"
