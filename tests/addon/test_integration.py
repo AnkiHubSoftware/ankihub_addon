@@ -22,7 +22,7 @@ from typing import (
     Tuple,
     Union,
 )
-from unittest.mock import Mock, patch
+from unittest.mock import Mock
 from zipfile import ZipFile
 
 import aqt
@@ -492,9 +492,7 @@ def test_entry_point(anki_session_with_addon_data: AnkiSession, qtbot: QtBot):
     # and that the add-on doesn't crash on Anki startup
 
 
-@patch("ankihub.settings.config.is_logged_in")
 def test_editor(
-    is_logged_in_mock,
     anki_session_with_addon_data: AnkiSession,
     requests_mock: Mocker,
     mocker: MockerFixture,
@@ -502,7 +500,7 @@ def test_editor(
     install_sample_ah_deck: InstallSampleAHDeck,
     mock_suggestion_dialog: MockSuggestionDialog,
 ):
-    is_logged_in_mock.return_value = True
+    mocker.patch.object(config, "is_logged_in", return_value=True)
 
     with anki_session_with_addon_data.profile_loaded():
         mw = anki_session_with_addon_data.mw
@@ -561,16 +559,13 @@ def test_editor(
         assert suggestion_endpoint_mock.call_count == 1  # type: ignore
 
 
-@patch("ankihub.settings.config.is_logged_in")
 def test_editor_should_display_login_window_if_user_attempts_to_submit_new_note_without_being_signed_in(
-    is_logged_in_mock,
     qtbot: QtBot,
     anki_session_with_addon_data: AnkiSession,
     mocker: MockerFixture,
-    next_deterministic_uuid: Callable[[], uuid.UUID],
     install_sample_ah_deck: InstallSampleAHDeck,
 ):
-    is_logged_in_mock.return_value = False
+    mocker.patch.object(config, "is_logged_in", return_value=True)
 
     with anki_session_with_addon_data.profile_loaded():
         mw = anki_session_with_addon_data.mw
@@ -583,7 +578,6 @@ def test_editor_should_display_login_window_if_user_attempts_to_submit_new_note_
         # test a new note suggestion
         editor.note = mw.col.new_note(mw.col.models.by_name("Basic (Testdeck / user1)"))
 
-
         _refresh_buttons(editor)
         assert editor.ankihub_command == AnkiHubCommands.NEW.value  # type: ignore
         _on_suggestion_button_press(editor)
@@ -591,14 +585,13 @@ def test_editor_should_display_login_window_if_user_attempts_to_submit_new_note_
         qtbot.waitUntil(lambda: window.isVisible())
 
 
-@patch("ankihub.settings.config.is_logged_in")
 def test_editor_should_display_login_window_if_user_attempts_to_submit_change_note_suggestion_without_being_signed_in(
-    is_logged_in_mock,
     qtbot: QtBot,
     anki_session_with_addon_data: AnkiSession,
+    mocker: MockerFixture,
     install_sample_ah_deck: InstallSampleAHDeck,
 ):
-    is_logged_in_mock.return_value = False
+    mocker.patch.object(config, "is_logged_in", return_value=True)
 
     with anki_session_with_addon_data.profile_loaded():
         mw = anki_session_with_addon_data.mw
