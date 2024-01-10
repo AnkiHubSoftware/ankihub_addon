@@ -39,6 +39,7 @@ from aqt.addons import InstallOk
 from aqt.browser import Browser
 from aqt.browser.sidebar.item import SidebarItem
 from aqt.browser.sidebar.tree import SidebarTreeView
+from aqt.editor import Editor
 from aqt.importing import AnkiPackageImporter
 from aqt.qt import QAction, Qt
 from aqt.theme import theme_manager
@@ -569,6 +570,15 @@ class TestEditor:
 
             create_new_note_suggestion_mock = mocker.patch.object(
                 AnkiHubClient, "create_new_note_suggestion"
+            )
+
+            # Mocking Editor.call_after_note_saved to just call the callback immediately.
+            # This is not needed locally, but it is needed on CI for some unknown reason.
+            call_after_note_saved_mock = mocker.patch.object(
+                Editor, "call_after_note_saved"
+            )
+            call_after_note_saved_mock.side_effect = (
+                lambda callback, *args, **kwargs: aqt.mw.taskman.run_on_main(callback)
             )
 
             ah_did = install_ah_deck()
