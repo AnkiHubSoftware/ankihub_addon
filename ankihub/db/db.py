@@ -406,37 +406,30 @@ class _AnkiHubDB:
         return [note.anki_note_id for note in query]
 
     def ankihub_dids(self) -> List[uuid.UUID]:
-        result = [
-            uuid.UUID(did)
-            for did in self.list("SELECT DISTINCT ankihub_deck_id FROM notes")
+        from .models import AnkiHubNotes
+
+        return [
+            uuid.UUID(note.ankihub_deck_id)
+            for note in AnkiHubNotes.select(AnkiHubNotes.ankihub_deck_id).distinct()
         ]
-        return result
 
     def ankihub_did_for_anki_nid(self, anki_nid: NoteId) -> Optional[uuid.UUID]:
-        did_str = self.scalar(
-            f"""
-            SELECT ankihub_deck_id FROM notes
-            WHERE anki_note_id = {anki_nid}
-            """
-        )
+        from .models import AnkiHubNotes
 
-        if not did_str:
-            return None
-
-        result = uuid.UUID(did_str)
-        return result
+        note = AnkiHubNotes.get_or_none(AnkiHubNotes.anki_note_id == anki_nid)
+        return uuid.UUID(note.ankihub_deck_id) if note else None
 
     def ankihub_dids_for_anki_nids(
         self, anki_nids: Iterable[NoteId]
     ) -> List[uuid.UUID]:
-        did_strs = self.list(
-            f"""
-            SELECT DISTINCT ankihub_deck_id FROM notes
-            WHERE anki_note_id IN {ids2str(anki_nids)}
-            """
+        from .models import AnkiHubNotes
+
+        query = (
+            AnkiHubNotes.select(AnkiHubNotes.ankihub_deck_id)
+            .where(AnkiHubNotes.anki_note_id.in_(anki_nids))
+            .distinct()
         )
-        result = [uuid.UUID(did) for did in did_strs]
-        return result
+        return [uuid.UUID(note.ankihub_deck_id) for note in query]
 
     def anki_nid_to_ah_did_dict(
         self, anki_nids: Iterable[NoteId]
@@ -453,10 +446,12 @@ class _AnkiHubDB:
         return result
 
     def are_ankihub_notes(self, anki_nids: List[NoteId]) -> bool:
-        notes_count = self.scalar(
-            f"""
-            SELECT COUNT(*) FROM notes WHERE anki_note_id IN {ids2str(anki_nids)}
-            """
+        from .models import AnkiHubNotes
+
+        notes_count = (
+            AnkiHubNotes.select()
+            .where(AnkiHubNotes.anki_note_id.in_(anki_nids))
+            .count()
         )
         return notes_count == len(set(anki_nids))
 
@@ -507,17 +502,15 @@ class _AnkiHubDB:
         return result
 
     def anki_nid_for_ankihub_nid(self, ankihub_id: uuid.UUID) -> Optional[NoteId]:
-        note_id_str = self.scalar(
-            """
-            SELECT anki_note_id FROM notes WHERE ankihub_note_id = ?
-            """,
-            str(ankihub_id),
-        )
-        if note_id_str is None:
-            return None
+        from .models import AnkiHubNotes
 
-        result = NoteId(note_id_str)
-        return result
+        note = (
+            AnkiHubNotes.select(AnkiHubNotes.anki_note_id)
+            .where(AnkiHubNotes.ankihub_note_id == ankihub_id)
+            .get_or_none()
+        )
+
+        return NoteId(note.anki_note_id) if note else None
 
     def remove_deck(self, ankihub_did: uuid.UUID):
         """Removes all data for the given deck from the AnkiHub DB"""
