@@ -398,14 +398,12 @@ class _AnkiHubDB:
         )
 
     def anki_nids_for_ankihub_deck(self, ankihub_did: uuid.UUID) -> List[NoteId]:
-        result = self.list(
-            """
-            SELECT anki_note_id FROM notes
-            WHERE ankihub_deck_id = ?
-            """,
-            str(ankihub_did),
+        from .models import AnkiHubNotes
+
+        query = AnkiHubNotes.select(AnkiHubNotes.anki_note_id).where(
+            AnkiHubNotes.ankihub_deck_id == str(ankihub_did)
         )
-        return result
+        return [note.anki_note_id for note in query]
 
     def ankihub_dids(self) -> List[uuid.UUID]:
         result = [
