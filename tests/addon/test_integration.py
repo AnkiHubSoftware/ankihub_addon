@@ -130,7 +130,7 @@ from ankihub.gui.decks_dialog import DeckManagementDialog
 from ankihub.gui.editor import _on_suggestion_button_press, _refresh_buttons
 from ankihub.gui.errors import upload_logs_and_data_in_background
 from ankihub.gui.media_sync import media_sync
-from ankihub.gui.menu import menu_state
+from ankihub.gui.menu import AnkiHubLogin, menu_state
 from ankihub.gui.operations import ankihub_sync
 from ankihub.gui.operations.db_check import ah_db_check
 from ankihub.gui.operations.db_check.ah_db_check import check_ankihub_db
@@ -487,6 +487,8 @@ def test_editor(
     install_sample_ah_deck: InstallSampleAHDeck,
     mock_suggestion_dialog: MockSuggestionDialog,
 ):
+    mocker.patch.object(config, "is_logged_in", return_value=True)
+
     with anki_session_with_addon_data.profile_loaded():
         mw = anki_session_with_addon_data.mw
 
@@ -542,6 +544,66 @@ def test_editor(
 
         # mocked requests: f"{config.api_url_base}/notes/{notes_2_ah_nid}/suggestion/"
         assert suggestion_endpoint_mock.call_count == 1  # type: ignore
+
+
+def test_editor_should_display_login_window_if_user_attempts_to_submit_new_note_without_being_signed_in(
+    qtbot: QtBot,
+    anki_session_with_addon_data: AnkiSession,
+    mocker: MockerFixture,
+    install_sample_ah_deck: InstallSampleAHDeck,
+):
+    mocker.patch.object(config, "is_logged_in", return_value=False)
+
+    with anki_session_with_addon_data.profile_loaded():
+        mw = anki_session_with_addon_data.mw
+
+        install_sample_ah_deck()
+
+        add_cards_dialog: AddCards = dialogs.open("AddCards", mw)
+        editor = add_cards_dialog.editor
+
+        # test a new note suggestion
+        editor.note = mw.col.new_note(mw.col.models.by_name("Basic (Testdeck / user1)"))
+
+        _refresh_buttons(editor)
+        assert editor.ankihub_command == AnkiHubCommands.NEW.value  # type: ignore
+        _on_suggestion_button_press(editor)
+        window: AnkiHubLogin = AnkiHubLogin._window
+        qtbot.waitUntil(lambda: window.isVisible())
+
+
+def test_editor_should_display_login_window_if_user_attempts_to_submit_change_note_suggestion_without_being_signed_in(
+    qtbot: QtBot,
+    anki_session_with_addon_data: AnkiSession,
+    mocker: MockerFixture,
+    install_sample_ah_deck: InstallSampleAHDeck,
+):
+    mocker.patch.object(config, "is_logged_in", return_value=False)
+
+    with anki_session_with_addon_data.profile_loaded():
+        mw = anki_session_with_addon_data.mw
+
+        install_sample_ah_deck()
+
+        add_cards_dialog: AddCards = dialogs.open("AddCards", mw)
+        editor = add_cards_dialog.editor
+
+        # test a change note suggestion
+        note = mw.col.get_note(mw.col.find_notes("")[0])
+        editor.note = note
+
+        _refresh_buttons(editor)
+
+        assert editor.ankihub_command == AnkiHubCommands.CHANGE.value  # type: ignore
+
+        # change the front of the note
+        note["Front"] = "new front"
+        note.flush()
+
+        # this should trigger a suggestion because the note has been changed
+        _on_suggestion_button_press(editor)
+        window: AnkiHubLogin = AnkiHubLogin._window
+        qtbot.waitUntil(lambda: window.isVisible())
 
 
 def test_get_note_types_in_deck(anki_session_with_addon_data: AnkiSession):
@@ -3490,6 +3552,44 @@ class TestAutoSync:
 
             assert self.check_and_install_new_deck_subscriptions_mock.call_count == 1
 
+    def test_with_user_not_being_logged_in(
+        self,
+        anki_session_with_addon_data: AnkiSession,
+        mocker: MockerFixture,
+        mock_client_methods_called_during_ankihub_sync: None,
+        qtbot: QtBot,
+    ):
+        with anki_session_with_addon_data.profile_loaded():
+            mw = anki_session_with_addon_data.mw
+
+            # Mock the syncs.
+            self._mock_syncs_and_check_new_subscriptions(mocker)
+
+            # Set the token to None
+            mocker.patch.object(config, "token", return_value=None)
+
+            display_login_mock = mocker.patch.object(AnkiHubLogin, "display_login")
+
+            # Setup the auto sync.
+            _setup_ankihub_sync_on_ankiweb_sync()
+
+            # Set the auto sync config option.
+            config.public_config["auto_sync"] = "on_ankiweb_sync"
+
+            # Trigger the AnkiWeb sync.
+            mw._sync_collection_and_media(after_sync=mocker.stub())
+            qtbot.wait(500)
+
+            # Assert that the login dialog was displayed.
+            assert display_login_mock.call_count == 1
+
+            # Assert that the he AnkiWeb sync was run
+            assert self.ankiweb_sync_mock.call_count == 1
+
+            # Assert that the AnkiHub sync was not run.
+            assert self.check_and_install_new_deck_subscriptions_mock.call_count == 0
+            assert self.udpate_decks_and_media_mock.call_count == 0
+
     def _mock_syncs_and_check_new_subscriptions(self, mocker: MockerFixture):
         # Mock the token so that the AnkiHub sync is not skipped.
         mocker.patch.object(config, "token", return_value="test_token")
@@ -3499,13 +3599,13 @@ class TestAutoSync:
             ah_deck_updater, "update_decks_and_media"
         )
 
-        # Mock the AnkiWeb sync to just call its callback.
-        def sync_collection_side_effect(*args, **kwargs) -> None:
-            on_done: Callable[[], None] = kwargs["on_done"]
-            on_done()
+        # Mock the AnkiWeb sync so it only calls its callback on the main thread.
+        def run_callback_on_main(*args, **kwargs) -> None:
+            on_done = kwargs["on_done"]
+            aqt.mw.taskman.run_on_main(on_done)
 
         self.ankiweb_sync_mock = mocker.patch.object(
-            aqt.sync, "sync_collection", side_effect=sync_collection_side_effect
+            aqt.sync, "sync_collection", side_effect=run_callback_on_main
         )
         # ... and reload aqt.main so the mock is used.
         importlib.reload(aqt.main)
