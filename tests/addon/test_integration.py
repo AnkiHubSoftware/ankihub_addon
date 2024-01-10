@@ -129,7 +129,7 @@ from ankihub.gui.config_dialog import (
 )
 from ankihub.gui.deck_updater import _AnkiHubDeckUpdater, ah_deck_updater
 from ankihub.gui.decks_dialog import DeckManagementDialog
-from ankihub.gui.editor import _on_suggestion_button_press, _refresh_buttons
+from ankihub.gui.editor import _on_suggestion_button_press
 from ankihub.gui.errors import upload_logs_and_data_in_background
 from ankihub.gui.media_sync import media_sync
 from ankihub.gui.menu import AnkiHubLogin, menu_state
@@ -532,7 +532,6 @@ class TestEditor:
                 new_field_value = "new field value"
                 anki_note["Front"] = new_field_value
 
-            _refresh_buttons(editor)
             _on_suggestion_button_press(editor)
 
             if not logged_in:
