@@ -583,9 +583,6 @@ def test_editor_should_display_login_window_if_user_attempts_to_submit_new_note_
         # test a new note suggestion
         editor.note = mw.col.new_note(mw.col.models.by_name("Basic (Testdeck / user1)"))
 
-        note_1_ah_nid = next_deterministic_uuid()
-
-        mocker.patch("ankihub.main.exporting.uuid.uuid4", return_value=note_1_ah_nid)
 
         _refresh_buttons(editor)
         assert editor.ankihub_command == AnkiHubCommands.NEW.value  # type: ignore
