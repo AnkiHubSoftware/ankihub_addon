@@ -591,7 +591,7 @@ def test_editor_should_display_login_window_if_user_attempts_to_submit_change_no
     mocker: MockerFixture,
     install_sample_ah_deck: InstallSampleAHDeck,
 ):
-    mocker.patch.object(config, "is_logged_in", return_value=True)
+    mocker.patch.object(config, "is_logged_in", return_value=False)
 
     with anki_session_with_addon_data.profile_loaded():
         mw = anki_session_with_addon_data.mw
