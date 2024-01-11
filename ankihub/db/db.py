@@ -326,13 +326,14 @@ class _AnkiHubDB:
                 )
 
     def reset_mod_values_in_anki_db(self, anki_nids: List[NoteId]) -> None:
+        from .models import AnkiHubNotes
+
         # resets the mod values of the notes in the Anki DB to the
         # mod values stored in the AnkiHub DB
-        nid_mod_tuples = self.execute(
-            f"""
-            SELECT anki_note_id, mod from notes
-            WHERE anki_note_id IN {ids2str(anki_nids)}
-            """
+        nid_mod_tuples = (
+            AnkiHubNotes.select(AnkiHubNotes.ankihub_note_id, AnkiHubNotes.mod)
+            .where(AnkiHubNotes.anki_note_id.in_(anki_nids))
+            .tuples()
         )
 
         for nid, mod in nid_mod_tuples:
