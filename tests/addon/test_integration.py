@@ -129,7 +129,11 @@ from ankihub.gui.config_dialog import (
 )
 from ankihub.gui.deck_updater import _AnkiHubDeckUpdater, ah_deck_updater
 from ankihub.gui.decks_dialog import DeckManagementDialog
-from ankihub.gui.editor import _on_suggestion_button_press
+from ankihub.gui.editor import (
+    AnkiHubCommands,
+    _on_suggestion_button_press,
+    _refresh_buttons,
+)
 from ankihub.gui.errors import upload_logs_and_data_in_background
 from ankihub.gui.media_sync import media_sync
 from ankihub.gui.menu import AnkiHubLogin, menu_state
@@ -519,6 +523,9 @@ class TestEditor:
                 new_field_value = "new field value"
                 anki_note["Front"] = new_field_value
 
+            _refresh_buttons(editor)
+            assert editor.ankihub_command == AnkiHubCommands.CHANGE.value  # type: ignore
+
             _on_suggestion_button_press(editor)
 
             if not logged_in:
@@ -562,9 +569,8 @@ class TestEditor:
             )
 
             # Mocking Editor.call_after_note_saved to just call the callback immediately.
-            # This is not needed locally, but it is needed on CI for some unknown reason,
-            # otherwise the callback, which calls the code that creates the suggestion,
-            # is not called.
+            # This is not needed locally, but it is needed on CI because webviews are not
+            # working correctly there.
             call_after_note_saved_mock = mocker.patch.object(
                 Editor, "call_after_note_saved"
             )
@@ -582,6 +588,9 @@ class TestEditor:
             add_cards_dialog: AddCards = dialogs.open("AddCards", aqt.mw)
             editor = add_cards_dialog.editor
             editor.note = anki_note
+
+            _refresh_buttons(editor)
+            assert editor.ankihub_command == AnkiHubCommands.NEW.value  # type: ignore
 
             _on_suggestion_button_press(editor)
 
