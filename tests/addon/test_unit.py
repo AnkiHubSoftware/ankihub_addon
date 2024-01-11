@@ -44,6 +44,7 @@ from ..fixtures import (  # type: ignore
     ImportAHNoteType,
     InstallAHDeck,
     MockStudyDeckDialogWithCB,
+    MockSuggestionDialog,
     NewNoteWithNoteType,
     SetFeatureFlagState,
     add_basic_anki_note_to_deck,
@@ -977,7 +978,7 @@ class MockDependenciesForBulkSuggestionDialog(Protocol):
 
 @pytest.fixture
 def mock_dependencies_for_bulk_suggestion_dialog(
-    mock_suggestion_dialog,
+    mock_suggestion_dialog: MockSuggestionDialog,
     mocker: MockerFixture,
 ) -> MockDependenciesForBulkSuggestionDialog:
     """Mocks the dependencies for open_suggestion_dialog_for_bulk_suggestion.
@@ -1768,11 +1769,9 @@ def test_show_error_dialog(
 
 class TestUploadLogs:
     def test_basic(self, qtbot: QtBot, mocker: MockerFixture):
-        on_done_mock = mocker.stub()
         upload_logs_mock = mocker.patch.object(AddonAnkiHubClient, "upload_logs")
-        upload_logs_in_background(on_done=on_done_mock)
-
-        qtbot.wait_until(lambda: on_done_mock.called)
+        with qtbot.wait_callback() as callback:
+            upload_logs_in_background(on_done=callback)
 
         upload_logs_mock.assert_called_once()
         assert upload_logs_mock.call_args[1]["file"] == log_file_path()
