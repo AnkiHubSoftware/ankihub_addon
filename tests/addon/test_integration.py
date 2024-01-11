@@ -552,6 +552,9 @@ class TestEditor:
                 qtbot.wait_until(lambda: show_tooltip_mock.called)
                 assert not create_change_note_suggestion_mock.called
 
+            # Clear editor to prevent dialog that asks for confirmation to discard changes when closing the editor
+            editor.cleanup()
+
     @pytest.mark.parametrize("logged_in", [True, False])
     def test_create_new_note_suggestion(
         self,
@@ -606,6 +609,9 @@ class TestEditor:
                     ]
                 )
                 assert new_note_suggestion.fields[0].value == field_value
+
+            # Clear editor to prevent dialog that asks for confirmation to discard changes when closing the editor
+            editor.cleanup()
 
 
 def test_get_note_types_in_deck(anki_session_with_addon_data: AnkiSession):
