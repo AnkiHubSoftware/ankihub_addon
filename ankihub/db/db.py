@@ -247,57 +247,62 @@ class _AnkiHubDB:
 
         upserted_notes: List[NoteInfo] = []
         skipped_notes: List[NoteInfo] = []
-        with self.connection() as conn:
-            for note_data in notes_data:
-                conflicting_ah_nid = conn.first(
-                    """
-                    SELECT ankihub_note_id FROM notes
-                    WHERE anki_note_id = ?
-                    AND ankihub_note_id != ?
-                    """,
-                    note_data.anki_nid,
-                    str(note_data.ah_nid),
+        for note_data in notes_data:
+            # Check for conflicting note
+            conflicting_ah_nid = (
+                AnkiHubNote.select(AnkiHubNote.ankihub_note_id)
+                .where(
+                    (AnkiHubNote.anki_note_id == note_data.anki_nid)
+                    & (AnkiHubNote.ankihub_note_id != str(note_data.ah_nid))
                 )
-                if conflicting_ah_nid:
-                    skipped_notes.append(note_data)
-                    continue
+                .first()
+            )
 
-                fields = join_fields(
-                    [
-                        field.value
-                        for field in sorted(
-                            note_data.fields, key=lambda field: field.order
-                        )
-                    ]
-                )
-                note_data.tags = [tag for tag in note_data.tags if tag is not None]
-                conn.execute(
-                    """
-                    INSERT OR REPLACE INTO notes (
-                        ankihub_note_id,
-                        ankihub_deck_id,
-                        anki_note_id,
-                        anki_note_type_id,
-                        fields,
-                        tags,
-                        guid,
-                        last_update_type
-                    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?)
-                    """,
-                    str(note_data.ah_nid),
-                    str(ankihub_did),
-                    note_data.anki_nid,
-                    note_data.mid,
-                    fields,
-                    " ".join(note_data.tags),
-                    note_data.guid,
-                    note_data.last_update_type.value[0]
+            if conflicting_ah_nid:
+                skipped_notes.append(note_data)
+                continue
+
+            # Prepare fields and tags for insertion
+            fields = join_fields(
+                [
+                    field.value
+                    for field in sorted(note_data.fields, key=lambda field: field.order)
+                ]
+            )
+            tags = " ".join([tag for tag in note_data.tags if tag is not None])
+
+            # Insert or update the note
+            (
+                AnkiHubNote.insert(
+                    ankihub_note_id=str(note_data.ah_nid),
+                    ankihub_deck_id=str(ankihub_did),
+                    anki_note_id=note_data.anki_nid,
+                    anki_note_type_id=note_data.mid,
+                    fields=fields,
+                    tags=tags,
+                    guid=note_data.guid,
+                    last_update_type=note_data.last_update_type.value[0]
                     if note_data.last_update_type is not None
                     else None,
                 )
-                upserted_notes.append(note_data)
+                .on_conflict(
+                    conflict_target=[AnkiHubNote.ankihub_note_id],
+                    preserve=[
+                        AnkiHubNote.ankihub_deck_id,
+                        AnkiHubNote.anki_note_id,
+                        AnkiHubNote.anki_note_type_id,
+                        AnkiHubNote.fields,
+                        AnkiHubNote.tags,
+                        AnkiHubNote.guid,
+                        AnkiHubNote.last_update_type,
+                    ],
+                )
+                .execute()
+            )
 
-        return (tuple(upserted_notes), tuple(skipped_notes))
+            upserted_notes.append(note_data)
+
+        return tuple(upserted_notes), tuple(skipped_notes)
 
     def remove_notes(self, ah_nids: Sequence[uuid.UUID]) -> None:
         """Removes notes from the AnkiHub DB"""
@@ -502,8 +507,6 @@ class _AnkiHubDB:
         return result
 
     def last_sync(self, ankihub_note_id: uuid.UUID) -> Optional[int]:
-        from .models import AnkiHubNote
-
         return (
             AnkiHubNote.select(AnkiHubNote.mod)
             .where(AnkiHubNote.ankihub_note_id == str(ankihub_note_id))
