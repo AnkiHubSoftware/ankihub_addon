@@ -30,7 +30,7 @@ from ..settings import ANKI_INT_VERSION, ANKI_VERSION_23_10_00
 from .db_utils import DBConnection
 from .exceptions import IntegrityError
 from .rw_lock import exclusive_db_access_context, non_exclusive_db_access_context
-from .models import AnkiHubNotes, set_peewee_database
+from .models import AnkiHubNote, set_peewee_database
 
 
 @contextmanager
@@ -332,8 +332,8 @@ class _AnkiHubDB:
         # resets the mod values of the notes in the Anki DB to the
         # mod values stored in the AnkiHub DB
         nid_mod_tuples = (
-            AnkiHubNotes.select(AnkiHubNotes.ankihub_note_id, AnkiHubNotes.mod)
-            .where(AnkiHubNotes.anki_note_id.in_(anki_nids))
+            AnkiHubNote.select(AnkiHubNote.ankihub_note_id, AnkiHubNote.mod)
+            .where(AnkiHubNote.anki_note_id.in_(anki_nids))
             .tuples()
         )
 
@@ -350,16 +350,14 @@ class _AnkiHubDB:
         # with a NoteInfo that has the AnkkiHub nid if a note with the same Anki nid already exists
         # in the AnkiHub DB but in different deck.
         return (
-            AnkiHubNotes.select()
-            .where(AnkiHubNotes.ankihub_note_id == str(ankihub_nid))
+            AnkiHubNote.select()
+            .where(AnkiHubNote.ankihub_note_id == str(ankihub_nid))
             .exists()
         )
 
     def note_data(self, anki_note_id: int) -> Optional[NoteInfo]:
         note = (
-            AnkiHubNotes.select()
-            .where(AnkiHubNotes.anki_note_id == anki_note_id)
-            .first()
+            AnkiHubNote.select().where(AnkiHubNote.anki_note_id == anki_note_id).first()
         )
 
         if not note:
@@ -389,27 +387,27 @@ class _AnkiHubDB:
         )
 
     def anki_nids_for_ankihub_deck(self, ankihub_did: uuid.UUID) -> List[NoteId]:
-        query = AnkiHubNotes.select(AnkiHubNotes.anki_note_id).where(
-            AnkiHubNotes.ankihub_deck_id == str(ankihub_did)
+        query = AnkiHubNote.select(AnkiHubNote.anki_note_id).where(
+            AnkiHubNote.ankihub_deck_id == str(ankihub_did)
         )
         return [note.anki_note_id for note in query]
 
     def ankihub_dids(self) -> List[uuid.UUID]:
         return [
             uuid.UUID(note.ankihub_deck_id)
-            for note in AnkiHubNotes.select(AnkiHubNotes.ankihub_deck_id).distinct()
+            for note in AnkiHubNote.select(AnkiHubNote.ankihub_deck_id).distinct()
         ]
 
     def ankihub_did_for_anki_nid(self, anki_nid: NoteId) -> Optional[uuid.UUID]:
-        note = AnkiHubNotes.get_or_none(AnkiHubNotes.anki_note_id == anki_nid)
+        note = AnkiHubNote.get_or_none(AnkiHubNote.anki_note_id == anki_nid)
         return uuid.UUID(note.ankihub_deck_id) if note else None
 
     def ankihub_dids_for_anki_nids(
         self, anki_nids: Iterable[NoteId]
     ) -> List[uuid.UUID]:
         query = (
-            AnkiHubNotes.select(AnkiHubNotes.ankihub_deck_id)
-            .where(AnkiHubNotes.anki_note_id.in_(anki_nids))
+            AnkiHubNote.select(AnkiHubNote.ankihub_deck_id)
+            .where(AnkiHubNote.anki_note_id.in_(anki_nids))
             .distinct()
         )
         return [uuid.UUID(note.ankihub_deck_id) for note in query]
@@ -419,23 +417,21 @@ class _AnkiHubDB:
     ) -> Dict[NoteId, uuid.UUID]:
         """Returns a dict mapping anki nids to the ankihub did of the deck the note is in.
         Not found nids are omitted from the dict."""
-        query = AnkiHubNotes.select().where(AnkiHubNotes.anki_note_id.in_(anki_nids))
+        query = AnkiHubNote.select().where(AnkiHubNote.anki_note_id.in_(anki_nids))
         return {
             NoteId(note.anki_note_id): uuid.UUID(note.ankihub_deck_id) for note in query
         }
 
     def are_ankihub_notes(self, anki_nids: List[NoteId]) -> bool:
         notes_count = (
-            AnkiHubNotes.select()
-            .where(AnkiHubNotes.anki_note_id.in_(anki_nids))
-            .count()
+            AnkiHubNote.select().where(AnkiHubNote.anki_note_id.in_(anki_nids)).count()
         )
         return notes_count == len(set(anki_nids))
 
     def ankihub_nid_for_anki_nid(self, anki_note_id: NoteId) -> Optional[uuid.UUID]:
         result = (
-            AnkiHubNotes.select(AnkiHubNotes.ankihub_note_id)
-            .where(AnkiHubNotes.anki_note_id == anki_note_id)
+            AnkiHubNote.select(AnkiHubNote.ankihub_note_id)
+            .where(AnkiHubNote.anki_note_id == anki_note_id)
             .scalar()
         )
         return uuid.UUID(result) if result else None
@@ -443,9 +439,9 @@ class _AnkiHubDB:
     def anki_nids_to_ankihub_nids(
         self, anki_nids: List[NoteId]
     ) -> Dict[NoteId, uuid.UUID]:
-        ah_nid_for_anki_nid = AnkiHubNotes.select(
-            AnkiHubNotes.anki_note_id, AnkiHubNotes.ankihub_note_id
-        ).where(AnkiHubNotes.anki_note_id.in_(anki_nids))
+        ah_nid_for_anki_nid = AnkiHubNote.select(
+            AnkiHubNote.anki_note_id, AnkiHubNote.ankihub_note_id
+        ).where(AnkiHubNote.anki_note_id.in_(anki_nids))
         result = {
             note.anki_note_id: uuid.UUID(note.ankihub_note_id)
             for note in ah_nid_for_anki_nid
@@ -457,9 +453,9 @@ class _AnkiHubDB:
     def ankihub_nids_to_anki_nids(
         self, ankihub_nids: List[uuid.UUID]
     ) -> Dict[uuid.UUID, NoteId]:
-        ah_nid_for_anki_nid = AnkiHubNotes.select(
-            AnkiHubNotes.ankihub_note_id, AnkiHubNotes.anki_note_id
-        ).where(AnkiHubNotes.ankihub_note_id.in_([str(id) for id in ankihub_nids]))
+        ah_nid_for_anki_nid = AnkiHubNote.select(
+            AnkiHubNote.ankihub_note_id, AnkiHubNote.anki_note_id
+        ).where(AnkiHubNote.ankihub_note_id.in_([str(id) for id in ankihub_nids]))
         result = {
             uuid.UUID(note.ankihub_note_id): NoteId(note.anki_note_id)
             for note in ah_nid_for_anki_nid
@@ -469,8 +465,8 @@ class _AnkiHubDB:
 
     def anki_nid_for_ankihub_nid(self, ankihub_id: uuid.UUID) -> Optional[NoteId]:
         note = (
-            AnkiHubNotes.select(AnkiHubNotes.anki_note_id)
-            .where(AnkiHubNotes.ankihub_note_id == ankihub_id)
+            AnkiHubNote.select(AnkiHubNote.anki_note_id)
+            .where(AnkiHubNote.ankihub_note_id == ankihub_id)
             .get_or_none()
         )
 
@@ -506,23 +502,23 @@ class _AnkiHubDB:
         return result
 
     def last_sync(self, ankihub_note_id: uuid.UUID) -> Optional[int]:
-        from .models import AnkiHubNotes
+        from .models import AnkiHubNote
 
         return (
-            AnkiHubNotes.select(AnkiHubNotes.mod)
-            .where(AnkiHubNotes.ankihub_note_id == str(ankihub_note_id))
+            AnkiHubNote.select(AnkiHubNote.mod)
+            .where(AnkiHubNote.ankihub_note_id == str(ankihub_note_id))
             .scalar()
         )
 
     def ankihub_dids_of_decks_with_missing_values(self) -> List[uuid.UUID]:
         # currently only checks the guid, fields and tags columns
         query = (
-            AnkiHubNotes.select(AnkiHubNotes.ankihub_deck_id)
+            AnkiHubNote.select(AnkiHubNote.ankihub_deck_id)
             .distinct()
             .where(
-                (AnkiHubNotes.guid.is_null(True))
-                | (AnkiHubNotes.fields.is_null(True))
-                | (AnkiHubNotes.tags.is_null(True))
+                (AnkiHubNote.guid.is_null(True))
+                | (AnkiHubNote.fields.is_null(True))
+                | (AnkiHubNote.tags.is_null(True))
             )
         )
         return [note.ankihub_deck_id for note in query]
@@ -575,11 +571,11 @@ class _AnkiHubDB:
 
     def media_names_for_ankihub_deck(self, ah_did: uuid.UUID) -> Set[str]:
         """Returns the names of all media files which are referenced on notes in the given deck."""
-        notes = AnkiHubNotes.select(AnkiHubNotes.fields).where(
-            (AnkiHubNotes.ankihub_deck_id == str(ah_did))
+        notes = AnkiHubNote.select(AnkiHubNote.fields).where(
+            (AnkiHubNote.ankihub_deck_id == str(ah_did))
             & (
-                (AnkiHubNotes.fields.contains("<img"))
-                | (AnkiHubNotes.fields.contains("[sound:"))
+                (AnkiHubNote.fields.contains("<img"))
+                | (AnkiHubNote.fields.contains("[sound:"))
             )
         )
         return {

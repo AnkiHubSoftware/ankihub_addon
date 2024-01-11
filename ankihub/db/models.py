@@ -14,7 +14,7 @@ from ..settings import ankihub_db_path
 ankihub_db_proxy = Proxy()
 
 
-class AnkiHubNotes(Model):
+class AnkiHubNote(Model):
     ankihub_note_id = CharField(primary_key=True)
     ankihub_deck_id = CharField()
     anki_note_id = IntegerField(unique=True)
