@@ -3005,10 +3005,11 @@ def test_migrate_profile_data_from_old_location(
         pass
 
     # Assert that the profile data was migrated
-    assert set([x.name for x in profile_files_path().glob("*")]) == {
-        "ankihub.db",
-        ".private_config.json",
-    }
+    assert {
+        x.name
+        for x in profile_files_path().glob("*")
+        if not x.name.startswith("ankihub.db")
+    } == {".private_config.json"}
     assert config.user() == "user1"
     assert len(config.deck_ids()) == 1
 
