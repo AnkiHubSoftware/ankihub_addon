@@ -349,53 +349,42 @@ class _AnkiHubDB:
         # It's possible that an AnkiHub nid does not exists after calling insert_or_update_notes_data
         # with a NoteInfo that has the AnkkiHub nid if a note with the same Anki nid already exists
         # in the AnkiHub DB but in different deck.
-        result = self.scalar(
-            """
-            SELECT 1 FROM notes WHERE ankihub_note_id = ? LIMIT 1
-            """,
-            str(ankihub_nid),
+        return (
+            AnkiHubNotes.select()
+            .where(AnkiHubNotes.ankihub_note_id == str(ankihub_nid))
+            .exists()
         )
-        return bool(result)
 
-    def note_data(self, anki_note_id: NoteId) -> Optional[NoteInfo]:
-        result = self.first(
-            f"""
-            SELECT
-                ankihub_note_id,
-                ankihub_deck_id,
-                anki_note_id,
-                anki_note_type_id,
-                tags,
-                fields,
-                guid,
-                last_update_type
-            FROM notes
-            WHERE anki_note_id = {anki_note_id}
-            """,
+    def note_data(self, anki_note_id: int) -> Optional[NoteInfo]:
+        note = (
+            AnkiHubNotes.select()
+            .where(AnkiHubNotes.anki_note_id == anki_note_id)
+            .first()
         )
-        if result is None:
+
+        if not note:
             return None
 
-        ah_nid, ah_did, anki_nid, mid, tags, flds, guid, last_update_type = result
         field_names = self._note_type_field_names(
-            ankihub_did=ah_did, anki_note_type_id=mid
+            ankihub_did=note.ankihub_deck_id, anki_note_type_id=note.anki_note_type_id
         )
+
         return NoteInfo(
-            ah_nid=uuid.UUID(ah_nid),
-            anki_nid=anki_nid,
-            mid=mid,
-            tags=aqt.mw.col.tags.split(tags),
+            ah_nid=uuid.UUID(note.ankihub_note_id),
+            anki_nid=note.anki_note_id,
+            mid=note.anki_note_type_id,
+            tags=aqt.mw.col.tags.split(note.tags),
             fields=[
                 Field(
                     name=field_names[i],
                     value=value,
                     order=i,
                 )
-                for i, value in enumerate(split_fields(flds))
+                for i, value in enumerate(split_fields(note.fields))
             ],
-            guid=guid,
-            last_update_type=suggestion_type_from_str(last_update_type)
-            if last_update_type
+            guid=note.guid,
+            last_update_type=suggestion_type_from_str(note.last_update_type)
+            if note.last_update_type
             else None,
         )
 
@@ -586,23 +575,18 @@ class _AnkiHubDB:
 
     def media_names_for_ankihub_deck(self, ah_did: uuid.UUID) -> Set[str]:
         """Returns the names of all media files which are referenced on notes in the given deck."""
-        fields_strings = self.list(
-            """
-            SELECT fields FROM notes
-            WHERE (
-                ankihub_deck_id = ? AND
-                fields LIKE '%<img%' OR fields LIKE '%[sound:%'
+        notes = AnkiHubNotes.select(AnkiHubNotes.fields).where(
+            (AnkiHubNotes.ankihub_deck_id == str(ah_did))
+            & (
+                (AnkiHubNotes.fields.contains("<img"))
+                | (AnkiHubNotes.fields.contains("[sound:"))
             )
-            """,
-            str(ah_did),
         )
-
-        result = {
+        return {
             media_name
-            for fields_string in fields_strings
-            for media_name in local_media_names_from_html(fields_string)
+            for note in notes
+            for media_name in local_media_names_from_html(note.fields)
         }
-        return result
 
     def media_names_exist_for_ankihub_deck(
         self, ah_did: uuid.UUID, media_names: Set[str]
