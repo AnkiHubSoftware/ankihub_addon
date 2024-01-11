@@ -436,14 +436,12 @@ class _AnkiHubDB:
     ) -> Dict[NoteId, uuid.UUID]:
         """Returns a dict mapping anki nids to the ankihub did of the deck the note is in.
         Not found nids are omitted from the dict."""
-        result = self.dict(
-            f"""
-            SELECT anki_note_id, ankihub_deck_id FROM notes
-            WHERE anki_note_id IN {ids2str(anki_nids)}
-            """
-        )
-        result = {NoteId(k): uuid.UUID(v) for k, v in result.items()}
-        return result
+        from .models import AnkiHubNotes
+
+        query = AnkiHubNotes.select().where(AnkiHubNotes.anki_note_id.in_(anki_nids))
+        return {
+            NoteId(note.anki_note_id): uuid.UUID(note.ankihub_deck_id) for note in query
+        }
 
     def are_ankihub_notes(self, anki_nids: List[NoteId]) -> bool:
         from .models import AnkiHubNotes
@@ -456,50 +454,45 @@ class _AnkiHubDB:
         return notes_count == len(set(anki_nids))
 
     def ankihub_nid_for_anki_nid(self, anki_note_id: NoteId) -> Optional[uuid.UUID]:
-        nid_str = self.scalar(
-            """
-            SELECT ankihub_note_id FROM notes
-            WHERE anki_note_id = ?
-            """,
-            anki_note_id,
-        )
-        if nid_str is None:
-            return None
+        from .models import AnkiHubNotes
 
-        result = uuid.UUID(nid_str)
-        return result
+        result = (
+            AnkiHubNotes.select(AnkiHubNotes.ankihub_note_id)
+            .where(AnkiHubNotes.anki_note_id == anki_note_id)
+            .scalar()
+        )
+        return uuid.UUID(result) if result else None
 
     def anki_nids_to_ankihub_nids(
         self, anki_nids: List[NoteId]
     ) -> Dict[NoteId, uuid.UUID]:
-        ah_nid_for_anki_nid = self.dict(
-            f"""
-            SELECT anki_note_id, ankihub_note_id FROM notes
-            WHERE anki_note_id IN {ids2str(anki_nids)}
-            """
-        )
-        result = {NoteId(k): uuid.UUID(v) for k, v in ah_nid_for_anki_nid.items()}
+        from .models import AnkiHubNotes
+
+        ah_nid_for_anki_nid = AnkiHubNotes.select(
+            AnkiHubNotes.anki_note_id, AnkiHubNotes.ankihub_note_id
+        ).where(AnkiHubNotes.anki_note_id.in_(anki_nids))
+        result = {
+            note.anki_note_id: uuid.UUID(note.ankihub_note_id)
+            for note in ah_nid_for_anki_nid
+        }
 
         not_existing = set(anki_nids) - set(result.keys())
-        result.update({nid: None for nid in not_existing})
-
-        return result
+        return result | dict.fromkeys(not_existing)
 
     def ankihub_nids_to_anki_nids(
         self, ankihub_nids: List[uuid.UUID]
     ) -> Dict[uuid.UUID, NoteId]:
-        anki_nid_for_ah_nid = self.dict(
-            f"""
-            SELECT ankihub_note_id, anki_note_id FROM notes
-            WHERE ankihub_note_id IN {uuids2str(ankihub_nids)}
-            """
-        )
-        result = {uuid.UUID(k): NoteId(v) for k, v in anki_nid_for_ah_nid.items()}
+        from .models import AnkiHubNotes
 
+        ah_nid_for_anki_nid = AnkiHubNotes.select(
+            AnkiHubNotes.ankihub_note_id, AnkiHubNotes.anki_note_id
+        ).where(AnkiHubNotes.ankihub_note_id.in_([str(id) for id in ankihub_nids]))
+        result = {
+            uuid.UUID(note.ankihub_note_id): NoteId(note.anki_note_id)
+            for note in ah_nid_for_anki_nid
+        }
         not_existing = set(ankihub_nids) - set(result.keys())
-        result.update({nid: None for nid in not_existing})
-
-        return result
+        return result | dict.fromkeys(not_existing)
 
     def anki_nid_for_ankihub_nid(self, ankihub_id: uuid.UUID) -> Optional[NoteId]:
         from .models import AnkiHubNotes
@@ -542,22 +535,28 @@ class _AnkiHubDB:
         return result
 
     def last_sync(self, ankihub_note_id: uuid.UUID) -> Optional[int]:
-        result = self.scalar(
-            "SELECT mod FROM notes WHERE ankihub_note_id = ?",
-            str(ankihub_note_id),
+        from .models import AnkiHubNotes
+
+        return (
+            AnkiHubNotes.select(AnkiHubNotes.mod)
+            .where(AnkiHubNotes.ankihub_note_id == str(ankihub_note_id))
+            .scalar()
         )
-        return result
 
     def ankihub_dids_of_decks_with_missing_values(self) -> List[uuid.UUID]:
         # currently only checks the guid, fields and tags columns
-        did_strs = self.list(
-            "SELECT DISTINCT ankihub_deck_id FROM notes WHERE "
-            "guid IS NULL OR "
-            "fields IS NULL OR "
-            "tags IS NULL"
+        from .models import AnkiHubNotes
+
+        query = (
+            AnkiHubNotes.select(AnkiHubNotes.ankihub_deck_id)
+            .distinct()
+            .where(
+                (AnkiHubNotes.guid.is_null(True))
+                | (AnkiHubNotes.fields.is_null(True))
+                | (AnkiHubNotes.tags.is_null(True))
+            )
         )
-        result = [uuid.UUID(did) for did in did_strs]
-        return result
+        return [note.ankihub_deck_id for note in query]
 
     # Media related functions
     def upsert_deck_media_infos(
