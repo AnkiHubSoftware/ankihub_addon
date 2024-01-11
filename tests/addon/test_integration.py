@@ -575,7 +575,9 @@ class TestEditor:
             )
 
             # Mocking Editor.call_after_note_saved to just call the callback immediately.
-            # This is not needed locally, but it is needed on CI for some unknown reason.
+            # This is not needed locally, but it is needed on CI for some unknown reason,
+            # otherwise the callback, which calls the code that creates the suggestion,
+            # is not called.
             call_after_note_saved_mock = mocker.patch.object(
                 Editor, "call_after_note_saved"
             )
