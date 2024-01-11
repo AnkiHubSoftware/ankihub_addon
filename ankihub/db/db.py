@@ -30,7 +30,7 @@ from ..settings import ANKI_INT_VERSION, ANKI_VERSION_23_10_00
 from .db_utils import DBConnection
 from .exceptions import IntegrityError
 from .rw_lock import exclusive_db_access_context, non_exclusive_db_access_context
-from .models import AnkiHubNote, set_peewee_database
+from .models import AnkiHubNote, AnkiHubNoteType, set_peewee_database
 
 
 @contextmanager
@@ -668,22 +668,20 @@ class _AnkiHubDB:
     def note_type_dict(
         self, ankihub_did: uuid.UUID, note_type_id: NotetypeId
     ) -> NotetypeDict:
-        row = self.first(
-            """
-            SELECT note_type_dict_json
-            FROM notetypes
-            WHERE anki_note_type_id = ?
-            AND ankihub_deck_id = ?
-            """,
-            note_type_id,
-            str(ankihub_did),
+        query = (
+            AnkiHubNoteType.select(AnkiHubNoteType.note_type_dict_json)
+            .where(
+                (AnkiHubNoteType.anki_note_type_id == note_type_id)
+                & (AnkiHubNoteType.ankihub_deck_id == str(ankihub_did))
+            )
+            .first()
         )
-        if row is None:
+
+        if query is None:
             return None
 
-        note_type_dict_json = row[0]
-        result = NotetypeDict(json.loads(note_type_dict_json))
-        return result
+        note_type_dict_json = query.note_type_dict_json
+        return NotetypeDict(json.loads(note_type_dict_json))
 
     def ankihub_note_type_ids(self) -> List[NotetypeId]:
         result = self.list("SELECT anki_note_type_id FROM notetypes")

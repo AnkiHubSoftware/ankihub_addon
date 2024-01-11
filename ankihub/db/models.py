@@ -30,6 +30,17 @@ class AnkiHubNote(Model):
         database = ankihub_db_proxy
 
 
+class AnkiHubNoteType(Model):
+    anki_note_type_id = IntegerField(primary_key=True)
+    ankihub_deck_id = CharField()
+    name = CharField()
+    note_type_dict_json = CharField()
+
+    class Meta:
+        table_name = "notetypes"
+        database = ankihub_db_proxy
+
+
 def set_peewee_database():
     ankihub_db = SqliteDatabase(ankihub_db_path())
     ankihub_db_proxy.initialize(ankihub_db)
