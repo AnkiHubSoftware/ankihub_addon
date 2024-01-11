@@ -30,6 +30,7 @@ from ..settings import ANKI_INT_VERSION, ANKI_VERSION_23_10_00
 from .db_utils import DBConnection
 from .exceptions import IntegrityError
 from .rw_lock import exclusive_db_access_context, non_exclusive_db_access_context
+from .models import AnkiHubNotes, set_peewee_database
 
 
 @contextmanager
@@ -148,6 +149,8 @@ class _AnkiHubDB:
             from .db_migrations import migrate_ankihub_db
 
             migrate_ankihub_db()
+
+        set_peewee_database()
 
     def _setup_notes_table(self) -> None:
         """Create the notes table."""
@@ -326,8 +329,6 @@ class _AnkiHubDB:
                 )
 
     def reset_mod_values_in_anki_db(self, anki_nids: List[NoteId]) -> None:
-        from .models import AnkiHubNotes
-
         # resets the mod values of the notes in the Anki DB to the
         # mod values stored in the AnkiHub DB
         nid_mod_tuples = (
@@ -399,32 +400,24 @@ class _AnkiHubDB:
         )
 
     def anki_nids_for_ankihub_deck(self, ankihub_did: uuid.UUID) -> List[NoteId]:
-        from .models import AnkiHubNotes
-
         query = AnkiHubNotes.select(AnkiHubNotes.anki_note_id).where(
             AnkiHubNotes.ankihub_deck_id == str(ankihub_did)
         )
         return [note.anki_note_id for note in query]
 
     def ankihub_dids(self) -> List[uuid.UUID]:
-        from .models import AnkiHubNotes
-
         return [
             uuid.UUID(note.ankihub_deck_id)
             for note in AnkiHubNotes.select(AnkiHubNotes.ankihub_deck_id).distinct()
         ]
 
     def ankihub_did_for_anki_nid(self, anki_nid: NoteId) -> Optional[uuid.UUID]:
-        from .models import AnkiHubNotes
-
         note = AnkiHubNotes.get_or_none(AnkiHubNotes.anki_note_id == anki_nid)
         return uuid.UUID(note.ankihub_deck_id) if note else None
 
     def ankihub_dids_for_anki_nids(
         self, anki_nids: Iterable[NoteId]
     ) -> List[uuid.UUID]:
-        from .models import AnkiHubNotes
-
         query = (
             AnkiHubNotes.select(AnkiHubNotes.ankihub_deck_id)
             .where(AnkiHubNotes.anki_note_id.in_(anki_nids))
@@ -437,16 +430,12 @@ class _AnkiHubDB:
     ) -> Dict[NoteId, uuid.UUID]:
         """Returns a dict mapping anki nids to the ankihub did of the deck the note is in.
         Not found nids are omitted from the dict."""
-        from .models import AnkiHubNotes
-
         query = AnkiHubNotes.select().where(AnkiHubNotes.anki_note_id.in_(anki_nids))
         return {
             NoteId(note.anki_note_id): uuid.UUID(note.ankihub_deck_id) for note in query
         }
 
     def are_ankihub_notes(self, anki_nids: List[NoteId]) -> bool:
-        from .models import AnkiHubNotes
-
         notes_count = (
             AnkiHubNotes.select()
             .where(AnkiHubNotes.anki_note_id.in_(anki_nids))
@@ -455,8 +444,6 @@ class _AnkiHubDB:
         return notes_count == len(set(anki_nids))
 
     def ankihub_nid_for_anki_nid(self, anki_note_id: NoteId) -> Optional[uuid.UUID]:
-        from .models import AnkiHubNotes
-
         result = (
             AnkiHubNotes.select(AnkiHubNotes.ankihub_note_id)
             .where(AnkiHubNotes.anki_note_id == anki_note_id)
@@ -467,8 +454,6 @@ class _AnkiHubDB:
     def anki_nids_to_ankihub_nids(
         self, anki_nids: List[NoteId]
     ) -> Dict[NoteId, uuid.UUID]:
-        from .models import AnkiHubNotes
-
         ah_nid_for_anki_nid = AnkiHubNotes.select(
             AnkiHubNotes.anki_note_id, AnkiHubNotes.ankihub_note_id
         ).where(AnkiHubNotes.anki_note_id.in_(anki_nids))
@@ -483,8 +468,6 @@ class _AnkiHubDB:
     def ankihub_nids_to_anki_nids(
         self, ankihub_nids: List[uuid.UUID]
     ) -> Dict[uuid.UUID, NoteId]:
-        from .models import AnkiHubNotes
-
         ah_nid_for_anki_nid = AnkiHubNotes.select(
             AnkiHubNotes.ankihub_note_id, AnkiHubNotes.anki_note_id
         ).where(AnkiHubNotes.ankihub_note_id.in_([str(id) for id in ankihub_nids]))
@@ -496,8 +479,6 @@ class _AnkiHubDB:
         return result | dict.fromkeys(not_existing)
 
     def anki_nid_for_ankihub_nid(self, ankihub_id: uuid.UUID) -> Optional[NoteId]:
-        from .models import AnkiHubNotes
-
         note = (
             AnkiHubNotes.select(AnkiHubNotes.anki_note_id)
             .where(AnkiHubNotes.ankihub_note_id == ankihub_id)
@@ -546,8 +527,6 @@ class _AnkiHubDB:
 
     def ankihub_dids_of_decks_with_missing_values(self) -> List[uuid.UUID]:
         # currently only checks the guid, fields and tags columns
-        from .models import AnkiHubNotes
-
         query = (
             AnkiHubNotes.select(AnkiHubNotes.ankihub_deck_id)
             .distinct()

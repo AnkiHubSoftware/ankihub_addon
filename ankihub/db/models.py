@@ -1,4 +1,3 @@
-import pathlib
 from typing import List
 import uuid
 
@@ -7,12 +6,12 @@ from peewee import (
     CharField,
     IntegerField,
     SqliteDatabase,
+    Proxy,
 )
-
 from ..settings import ankihub_db_path
 
 
-ankihub_db = SqliteDatabase(ankihub_db_path())
+ankihub_db_proxy = Proxy()
 
 
 class AnkiHubNotes(Model):
@@ -27,5 +26,10 @@ class AnkiHubNotes(Model):
     last_update_type = CharField()
 
     class Meta:
-        database = ankihub_db
         table_name = "notes"
+        database = ankihub_db_proxy
+
+
+def set_peewee_database():
+    ankihub_db = SqliteDatabase(ankihub_db_path())
+    ankihub_db_proxy.initialize(ankihub_db)
