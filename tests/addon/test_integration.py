@@ -178,6 +178,7 @@ from ankihub.main.utils import (
 )
 from ankihub.settings import (
     ANKIHUB_NOTE_TYPE_FIELD_NAME,
+    AnkiHubCommands,
     DeckConfig,
     DeckExtension,
     DeckExtensionConfig,
@@ -521,12 +522,15 @@ class TestEditor:
             add_cards_dialog: AddCards = dialogs.open("AddCards", aqt.mw)
             add_cards_dialog.editor.set_note(anki_note)
 
-            refresh_buttons_spy = mocker.spy(editor, "_refresh_buttons")
-            qtbot.wait_until(lambda: refresh_buttons_spy.called)
+            self.wait_suggestion_button_ready(qtbot=qtbot, mocker=mocker)
 
-            add_cards_dialog.editor.web.eval(
-                f"document.getElementById('{SUGGESTION_BTN_ID}').click()"
+            self.assert_suggestion_button_text(
+                qtbot=qtbot,
+                addcards=add_cards_dialog,
+                expected_text=AnkiHubCommands.CHANGE.value,
             )
+
+            self.click_suggestion_button(add_cards_dialog)
 
             if not logged_in:
                 # Assert that the login dialog was shown
@@ -579,12 +583,15 @@ class TestEditor:
             add_cards_dialog: AddCards = dialogs.open("AddCards", aqt.mw)
             add_cards_dialog.editor.set_note(anki_note)
 
-            refresh_buttons_spy = mocker.spy(editor, "_refresh_buttons")
-            qtbot.wait_until(lambda: refresh_buttons_spy.called)
+            self.wait_suggestion_button_ready(qtbot=qtbot, mocker=mocker)
 
-            add_cards_dialog.editor.web.eval(
-                f"document.getElementById('{SUGGESTION_BTN_ID}').click()"
+            self.assert_suggestion_button_text(
+                qtbot=qtbot,
+                addcards=add_cards_dialog,
+                expected_text=AnkiHubCommands.NEW.value,
             )
+
+            self.click_suggestion_button(add_cards_dialog)
 
             if not logged_in:
                 # Assert that the login dialog was shown
@@ -602,6 +609,25 @@ class TestEditor:
 
             # Clear editor to prevent dialog that asks for confirmation to discard changes when closing the editor
             add_cards_dialog.editor.cleanup()
+
+    def wait_suggestion_button_ready(self, qtbot: QtBot, mocker: MockerFixture) -> None:
+        refresh_buttons_spy = mocker.spy(editor, "_refresh_buttons")
+        qtbot.wait_until(lambda: refresh_buttons_spy.called)
+
+    def assert_suggestion_button_text(
+        self, qtbot: QtBot, addcards: AddCards, expected_text: str
+    ) -> None:
+        with qtbot.wait_callback() as callback:
+            addcards.editor.web.evalWithCallback(
+                f"document.getElementById('{SUGGESTION_BTN_ID}-label').textContent",
+                callback,
+            )
+        callback.assert_called_with(expected_text)
+
+    def click_suggestion_button(self, addcards: AddCards) -> None:
+        addcards.editor.web.eval(
+            f"document.getElementById('{SUGGESTION_BTN_ID}').click()"
+        )
 
 
 def test_get_note_types_in_deck(anki_session_with_addon_data: AnkiSession):
