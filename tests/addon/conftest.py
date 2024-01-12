@@ -37,22 +37,6 @@ REPO_ROOT_PATH = Path(__file__).absolute().parent.parent.parent
 TEST_PROFILE_ID = uuid.UUID("11111111-1111-1111-1111-111111111111")
 
 
-def pytest_addoption(parser: pytest.Parser) -> None:
-    """Adds the --performance option to pytest so that performance tests can be run with pytest --performance"""
-    parser.addoption(
-        "--performance",
-        action="store_true",
-        default=False,
-        help="Run performance tests",
-    )
-
-
-def pytest_runtest_setup(item: pytest.Item) -> None:
-    """Skips performance tests if --performance is not passed to pytest"""
-    if "performance" in item.keywords and not item.config.getoption("--performance"):
-        pytest.skip("Performance tests are not requested, skipping.")
-
-
 # autouse=True is set so that the tests don't fail because without it mw is None
 # when imported from aqt (from aqt import mw)
 # and some add-ons file use mw when you import them
