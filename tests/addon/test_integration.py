@@ -53,6 +53,7 @@ from ankihub.ankihub_client.models import (
     DeckMediaUpdateChunk,
     UserDeckExtensionRelation,
 )
+from ankihub.gui import editor
 from ankihub.gui.browser.browser import (
     ModifiedAfterSyncSearchNode,
     NewNoteSearchNode,
@@ -70,6 +71,7 @@ from ..factories import (
 )
 from ..fixtures import (
     ImportAHNote,
+    ImportAHNoteType,
     InstallAHDeck,
     MockDownloadAndInstallDeckDependencies,
     MockShowDialogWithCB,
@@ -127,7 +129,11 @@ from ankihub.gui.config_dialog import (
 )
 from ankihub.gui.deck_updater import _AnkiHubDeckUpdater, ah_deck_updater
 from ankihub.gui.decks_dialog import DeckManagementDialog
-from ankihub.gui.editor import _on_suggestion_button_press, _refresh_buttons
+from ankihub.gui.editor import (
+    SUGGESTION_BTN_ID,
+    _on_suggestion_button_press,
+    _refresh_buttons,
+)
 from ankihub.gui.errors import upload_logs_and_data_in_background
 from ankihub.gui.media_sync import media_sync
 from ankihub.gui.menu import AnkiHubLogin, menu_state
@@ -477,6 +483,45 @@ def test_entry_point(anki_session_with_addon_data: AnkiSession, qtbot: QtBot):
 
     # this test is just to make sure the entry point doesn't crash
     # and that the add-on doesn't crash on Anki startup
+
+
+def test_suggestion_button(
+    anki_session_with_addon_data: AnkiSession,
+    install_ah_deck: InstallAHDeck,
+    import_ah_note_type: ImportAHNoteType,
+    qtbot: QtBot,
+):
+    editor.setup()
+
+    with anki_session_with_addon_data.profile_loaded():
+        ah_did = install_ah_deck()
+        ah_note_type = import_ah_note_type(ah_did=ah_did)
+
+        anki_note = aqt.mw.col.new_note(ah_note_type)
+
+        add_cards_dialog: AddCards = dialogs.open("AddCards", aqt.mw)
+        add_cards_dialog.set_note(anki_note)
+
+        qtbot.wait(1000)
+
+        # Get the button text
+        button_text = None
+
+        def callback(value: str):
+            nonlocal button_text
+            button_text = value
+
+        js = f"document.getElementById('{SUGGESTION_BTN_ID}-label').textContent"
+
+        add_cards_dialog.editor.web.evalWithCallback(js, callback)
+
+        qtbot.wait_until(lambda: button_text is not None)
+
+        # Assert that the button text is correct
+        assert button_text == AnkiHubCommands.NEW.value
+
+        # # Clear editor to prevent dialog that asks for confirmation to discard changes when closing the editor
+        add_cards_dialog.editor.cleanup()
 
 
 def test_editor(

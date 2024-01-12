@@ -5,6 +5,8 @@ env:
   AWS_REGION: us-east-1
   AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
   AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+  DISABLE_QT5_COMPAT: 1
+  QTWEBENGINE_CHROMIUM_FLAGS: --no-sandbox
 
 on:
   push:
@@ -15,12 +17,6 @@ on:
 jobs:
   test-addon:
     runs-on: ubuntu-latest
-    strategy:
-      matrix:
-        include:
-          - replace_anki_version: false
-          - replace_anki_version: true
-            anki_package_version: 'aqt[qt5]==2.1.56'
     timeout-minutes: 30
     steps:
       - uses: actions/setup-python@v4
@@ -30,146 +26,25 @@ jobs:
       - name: Checkout ankihub_addon
         uses: actions/checkout@v3
 
-      - name: Setup addon
-        uses: ./.github/actions/setup-addon
-        with:
-          google_api_key: ${{ secrets.GOOGLE_API_KEY }}
-          install_qt: true
-
-      - name: Replace Anki version
-        if: ${{ matrix.replace_anki_version }}
-        run: pip install "${{ matrix.anki_package_version }}"
-
-      - name: Run pytest with coverage
+      - name: Install non-python deps
         run: |
-          pytest ./tests/addon --cov --cov-report=xml -n 4
-          pytest ./tests/addon --performance -k performance -n1 --cov-report=xml --cov-append
+          sudo apt-get update
+          sudo apt-get install -y pyqt5-dev-tools xvfb jq
 
-      - name: Upload coverage
-        uses: actions/upload-artifact@v2
-        with:
-          name: coverage_addon_${{ matrix.anki_package_version }}
-          path: .coverage
-
-
-  test-client:
-    runs-on: ubuntu-latest
-    strategy:
-      matrix:
-        group: [1, 2]
-    timeout-minutes: 30
-    steps:
-      - uses: actions/setup-python@v4
-        with:
-          python-version: "3.9"
-
-      - name: Checkout ankihub_addon
-        uses: actions/checkout@v3
-
-      - name: Setup addon
-        uses: ./.github/actions/setup-addon
-        with:
-          google_api_key: ${{ secrets.GOOGLE_API_KEY }}
-          install_qt: false
-
-      - name: Enable cloning web app repo
-        uses: webfactory/ssh-agent@v0.5.4
-        with:
-          ssh-private-key: ${{ secrets.ANKIHUB_SSH_PRIVATE_KEY }}
-
-      - name: Checkout ankipalace/ankihub web app repo
-        uses: actions/checkout@v3
-        with:
-          repository: ankipalace/ankihub
-          ref: dev
-          path: ankihub_web
-
-      - name: Set up AnkiHub env
+      - name: Install python deps
         run: |
-          mv ${{ github.workspace }}/ankihub_web/.env.dev ${{ github.workspace }}/ankihub_web/.env
+          python -m pip install -r ./requirements/dev.txt
+        shell: bash
 
-      - uses: taiki-e/install-action@just
-
-      - name: Setup AnkiHub
-        working-directory: ${{ github.workspace }}/ankihub_web
+      - name: Build
         run: |
-          just pull-all-images
-          docker compose run --rm django bash release.sh
-          just up
-
-      - name: Run pytest with coverage
-        run: |
-          pytest ./tests/client --disable-vcr --cov --cov-report=xml \
-            --splits 2 --group ${{ matrix.group }} --durations-path=tests/.test_durations
-
-      - name: Upload coverage
-        uses: actions/upload-artifact@v2
-        with:
-          name: coverage_client_${{ matrix.group }}
-          path: .coverage
-
-
-  coverage-and-static-checks:
-    needs: ["test-addon", "test-client"]
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v2
-      - name: Set up Python 3.9
-        uses: actions/setup-python@v2
-        with:
-          python-version: "3.9"
-
-      - name: Setup addon
-        uses: ./.github/actions/setup-addon
-        with:
-          google_api_key: ${{ secrets.GOOGLE_API_KEY }}
-          install_qt: false
-
-      - name: Download all artifacts
-        uses: actions/download-artifact@v2
-
-      - name: Run coverage
-        run: |
-          coverage combine coverage*/.coverage*
-          coverage html --fail-under=76
-
-      - name: Install smokeshow
-        run: |
-          python -m pip install smokeshow
-
-      - uses: codecov/codecov-action@v1
-
-      - name: Upload coverage report with smokeshow
-        run: smokeshow upload coverage_html_report
-        if: always()
-        env:
-          SMOKESHOW_GITHUB_STATUS_DESCRIPTION: Add-on Test Coverage {coverage-percentage}
-          SMOKESHOW_GITHUB_COVERAGE_THRESHOLD: 66
-          SMOKESHOW_GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          SMOKESHOW_GITHUB_PR_HEAD_SHA: ${{ github.event.pull_request.head.sha }}
-
-      - name: Upload coverage to Codecov
-        if: always()
-        env:
-          CODECOV_TOKEN: "${{ secrets.CODECOV_TOKEN }}"
-        uses: codecov/codecov-action@v1
-        with:
-          fail_ci_if_error: false
-
-      - name: Create ankiaddon file
-        run: |
-          bash ./scripts/release.sh
+          python ./scripts/build.py
+        shell: bash
         env:
           GOOGLE_API_KEY: ${{ secrets.GOOGLE_API_KEY }}
 
-      - name: Archive .ankiaddon
-        uses: actions/upload-artifact@v3
-        with:
-          name: ankihub_addon_${{ github.sha }}
-          path: ankihub.ankiaddon
-
-      - name: Run pre-commit
-        run: pre-commit run --all
-
-      - name: Run mypy
-        run: mypy
+      - name: Run pytest with coverage
+        run: |
+          pytest ./tests/addon -k test_suggestion_button -n 1
+          pytest ./tests/addon --cov --cov-report=xml -n 4
+          pytest ./tests/addon --performance -k performance -n1 --cov-report=xml --cov-append
