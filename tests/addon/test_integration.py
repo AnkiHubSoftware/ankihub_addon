@@ -523,6 +523,7 @@ def test_suggestion_button(
     import_ah_note_type: ImportAHNoteType,
     qtbot: QtBot,
     use_qtbot_wait_until: bool,
+    mocker: MockerFixture,
 ):
     editor.setup()
 
@@ -535,7 +536,7 @@ def test_suggestion_button(
         add_cards_dialog: AddCards = dialogs.open("AddCards", aqt.mw)
         add_cards_dialog.set_note(anki_note)
 
-        qtbot.wait(1000)
+        qtbot.wait(500)
 
         # Get the button text
         button_text = None
@@ -549,9 +550,9 @@ def test_suggestion_button(
         add_cards_dialog.editor.web.evalWithCallback(js, callback)
 
         if use_qtbot_wait_until:
-            qtbot.wait_until(lambda: button_text)
+            qtbot.wait_until(lambda: bool(button_text))
         else:
-            wait_until(lambda: button_text)
+            wait_until(lambda: bool(button_text))
 
         # Assert that the button text is correct
         assert button_text == AnkiHubCommands.NEW.value
@@ -579,9 +580,9 @@ def test_get_document_body(
         aqt.mw.web.evalWithCallback(js, callback)
 
         if use_qtbot_wait_until:
-            qtbot.wait_until(lambda: body_text)
+            qtbot.wait_until(lambda: bool(body_text))
         else:
-            wait_until(lambda: body_text)
+            wait_until(lambda: bool(body_text))
 
         # Assert that the button text is correct
         assert body_text.startswith("\n")
