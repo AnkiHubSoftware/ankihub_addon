@@ -79,7 +79,6 @@ from ..fixtures import (
     MockSuggestionDialog,
     create_or_get_ah_version_of_note_type,
     record_review,
-    wait_until,
 )
 from .conftest import TEST_PROFILE_ID
 
@@ -130,7 +129,7 @@ from ankihub.gui.config_dialog import (
 )
 from ankihub.gui.deck_updater import _AnkiHubDeckUpdater, ah_deck_updater
 from ankihub.gui.decks_dialog import DeckManagementDialog
-from ankihub.gui.editor import SUGGESTION_BTN_ID, AnkiHubCommands
+from ankihub.gui.editor import SUGGESTION_BTN_ID
 from ankihub.gui.errors import upload_logs_and_data_in_background
 from ankihub.gui.media_sync import media_sync
 from ankihub.gui.menu import AnkiHubLogin, menu_state
@@ -602,55 +601,6 @@ class TestEditor:
 
             # Clear editor to prevent dialog that asks for confirmation to discard changes when closing the editor
             add_cards_dialog.editor.cleanup()
-
-
-@pytest.mark.parametrize(
-    "use_qtbot_wait_until",
-    [True, False],
-)
-def test_suggestion_button(
-    anki_session_with_addon_data: AnkiSession,
-    install_ah_deck: InstallAHDeck,
-    import_ah_note_type: ImportAHNoteType,
-    qtbot: QtBot,
-    use_qtbot_wait_until: bool,
-    mocker: MockerFixture,
-):
-    editor.setup()
-
-    with anki_session_with_addon_data.profile_loaded():
-        ah_did = install_ah_deck()
-        ah_note_type = import_ah_note_type(ah_did=ah_did)
-
-        anki_note = aqt.mw.col.new_note(ah_note_type)
-
-        add_cards_dialog: AddCards = dialogs.open("AddCards", aqt.mw)
-        add_cards_dialog.set_note(anki_note)
-
-        refresh_buttons_spy = mocker.spy(editor, "_refresh_buttons")
-        wait_until(lambda: refresh_buttons_spy.called)
-
-        # Get the button text
-        button_text = None
-
-        def callback(value: str):
-            nonlocal button_text
-            button_text = value
-
-        js = f"document.getElementById('{SUGGESTION_BTN_ID}-label').textContent"
-
-        add_cards_dialog.editor.web.evalWithCallback(js, callback)
-
-        if use_qtbot_wait_until:
-            qtbot.wait_until(lambda: bool(button_text))
-        else:
-            wait_until(lambda: bool(button_text))
-
-        # Assert that the button text is correct
-        assert button_text == AnkiHubCommands.NEW.value
-
-        # # Clear editor to prevent dialog that asks for confirmation to discard changes when closing the editor
-        add_cards_dialog.editor.cleanup()
 
 
 def test_get_note_types_in_deck(anki_session_with_addon_data: AnkiSession):

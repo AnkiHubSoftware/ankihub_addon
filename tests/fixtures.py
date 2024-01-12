@@ -1,6 +1,5 @@
 import copy
 import os
-import time
 import uuid
 from datetime import datetime
 from typing import Any, Callable, Dict, List, Optional, Protocol
@@ -13,7 +12,6 @@ from anki.decks import DeckId
 from anki.models import NotetypeDict, NotetypeId
 from anki.notes import Note, NoteId
 from aqt.main import AnkiQt
-from PyQt5 import QtTest
 from pytest import MonkeyPatch, fixture
 from pytest_anki import AnkiSession
 
@@ -676,22 +674,3 @@ def assert_datetime_equal_ignore_milliseconds(dt1: datetime, dt2: datetime) -> N
     dt1 = dt1.replace(microsecond=dt1.microsecond // 1000 * 1000)
     dt2 = dt2.replace(microsecond=dt2.microsecond // 1000 * 1000)
     assert dt1 == dt2
-
-
-def wait(seconds: float) -> None:
-    milliseconds = int(seconds * 1000)
-    QtTest.QTest.qWait(milliseconds)  # type: ignore
-
-
-def wait_until(booleanish_function, at_most_seconds=5) -> None:
-    deadline = time.time() + at_most_seconds
-
-    while time.time() < deadline:
-        if booleanish_function():
-            return
-        wait(0.01)
-
-    raise Exception(
-        f"Function {booleanish_function} never once returned "
-        f"a positive value in {at_most_seconds} seconds"
-    )
