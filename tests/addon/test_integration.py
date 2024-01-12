@@ -552,9 +552,13 @@ def test_suggestion_button(
         add_cards_dialog.editor.cleanup()
 
 
-def test_get_document_body(anki_session_with_addon_data: AnkiSession, qtbot: QtBot):
-    editor.setup()
-
+@pytest.mark.parametrize(
+    "use_qtbot_wait_until",
+    [True, False],
+)
+def test_get_document_body(
+    anki_session_with_addon_data: AnkiSession, qtbot: QtBot, use_qtbot_wait_until: bool
+):
     with anki_session_with_addon_data.profile_loaded():
         body_text = None
 
@@ -566,7 +570,10 @@ def test_get_document_body(anki_session_with_addon_data: AnkiSession, qtbot: QtB
         js = "document.body.textContent"
         aqt.mw.web.evalWithCallback(js, callback)
 
-        wait_until(lambda: body_text is not None)
+        if use_qtbot_wait_until:
+            qtbot.wait_until(lambda: body_text is not None)
+        else:
+            wait_until(lambda: body_text is not None)
 
         # Assert that the button text is correct
         assert body_text.startswith("\n")
