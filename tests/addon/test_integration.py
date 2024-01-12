@@ -552,6 +552,26 @@ def test_suggestion_button(
         add_cards_dialog.editor.cleanup()
 
 
+def test_get_document_body(anki_session_with_addon_data: AnkiSession, qtbot: QtBot):
+    editor.setup()
+
+    with anki_session_with_addon_data.profile_loaded():
+        body_text = None
+
+        def callback(value: str):
+            nonlocal body_text
+            body_text = value
+
+        qtbot.wait(1000)
+        js = "document.body.textContent"
+        aqt.mw.web.evalWithCallback(js, callback)
+
+        wait_until(lambda: body_text is not None)
+
+        # Assert that the button text is correct
+        assert body_text.startswith("\n")
+
+
 def test_editor(
     anki_session_with_addon_data: AnkiSession,
     requests_mock: Mocker,

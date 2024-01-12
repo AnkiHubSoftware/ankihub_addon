@@ -44,6 +44,7 @@ jobs:
 
       - name: Run pytest with coverage
         run: |
+          pytest ./tests/addon -k get_document_body -n 1
           pytest ./tests/addon -k suggestion_button -n 1
           pytest ./tests/addon --cov --cov-report=xml -n 4
           pytest ./tests/addon --performance -k performance -n1 --cov-report=xml --cov-append
