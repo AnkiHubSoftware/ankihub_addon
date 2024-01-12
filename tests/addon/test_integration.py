@@ -535,7 +535,7 @@ def test_suggestion_button(
         add_cards_dialog: AddCards = dialogs.open("AddCards", aqt.mw)
         add_cards_dialog.set_note(anki_note)
 
-        qtbot.wait(1000)
+        qtbot.wait(2000)
 
         # Get the button text
         button_text = None
