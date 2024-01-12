@@ -531,7 +531,7 @@ class TestEditor:
             if not logged_in:
                 # Assert that the login dialog was shown
                 window: AnkiHubLogin = AnkiHubLogin._window
-                qtbot.waitUntil(lambda: window.isVisible())
+                qtbot.wait_until(lambda: window.isVisible())
             elif note_fields_changed:
                 # Assert that the suggestion was sent to the server with the correct data
                 qtbot.wait_until(lambda: create_change_note_suggestion_mock.called)
