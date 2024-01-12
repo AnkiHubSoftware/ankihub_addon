@@ -1,6 +1,5 @@
 -r base.txt
 
-git+https://github.com/ankipalace/pytest-anki.git
 black==22.6.0
 flake8==5.0.4
 mypy==0.971
