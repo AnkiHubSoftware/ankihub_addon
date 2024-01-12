@@ -45,5 +45,16 @@ jobs:
 
       - name: Run pytest with coverage
         run: |
+          # Create a temporary directory
+          TEMP_DIR=$(mktemp -d)
+
+          # Set the HOME environment variable to the temporary directory
+          export HOME=$TEMP_DIR/home
+
+          # Create the home directory
+          mkdir -p $HOME
+
+          xvfb-run python -m pytest ./tests/addon -k test_suggestion_button -n 1
+
           pytest ./tests/addon --cov --cov-report=xml -n 4
           pytest ./tests/addon --performance -k performance -n1 --cov-report=xml --cov-append
