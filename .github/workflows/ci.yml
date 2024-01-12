@@ -44,8 +44,9 @@ jobs:
 
       - name: Run pytest with coverage
         run: |
-          pytest ./tests/addon --cov --cov-report=xml -n 4
-          pytest ./tests/addon --performance -k performance -n1 --cov-report=xml --cov-append
+          pytest ./tests/addon -n 1 -k sequential --cov --cov-report=xml
+          pytest ./tests/addon -n 4 -k "not sequential" --cov --cov-report=xml
+          pytest ./tests/addon -n 1 --performance -k performance --cov-report=xml --cov-append
 
       - name: Upload coverage
         uses: actions/upload-artifact@v2

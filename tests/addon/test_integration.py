@@ -481,6 +481,7 @@ def test_entry_point(anki_session_with_addon_data: AnkiSession, qtbot: QtBot):
     # and that the add-on doesn't crash on Anki startup
 
 
+@pytest.mark.sequential
 class TestEditor:
     @pytest.mark.parametrize(
         "note_fields_changed, logged_in", [(True, True), (False, True), (True, False)]
@@ -521,7 +522,7 @@ class TestEditor:
             add_cards_dialog.editor.set_note(anki_note)
 
             refresh_buttons_spy = mocker.spy(editor, "_refresh_buttons")
-            wait_until(lambda: refresh_buttons_spy.called)
+            qtbot.wait_until(lambda: refresh_buttons_spy.called)
 
             add_cards_dialog.editor.web.eval(
                 f"document.getElementById('{SUGGESTION_BTN_ID}').click()"
@@ -579,7 +580,7 @@ class TestEditor:
             add_cards_dialog.editor.set_note(anki_note)
 
             refresh_buttons_spy = mocker.spy(editor, "_refresh_buttons")
-            wait_until(lambda: refresh_buttons_spy.called)
+            qtbot.wait_until(lambda: refresh_buttons_spy.called)
 
             add_cards_dialog.editor.web.eval(
                 f"document.getElementById('{SUGGESTION_BTN_ID}').click()"
