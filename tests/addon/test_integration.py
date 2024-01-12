@@ -523,6 +523,7 @@ def test_suggestion_button(
     import_ah_note_type: ImportAHNoteType,
     qtbot: QtBot,
     use_qtbot_wait_until: bool,
+    mocker: MockerFixture,
 ):
     editor.setup()
 
@@ -535,7 +536,8 @@ def test_suggestion_button(
         add_cards_dialog: AddCards = dialogs.open("AddCards", aqt.mw)
         add_cards_dialog.set_note(anki_note)
 
-        qtbot.wait(2000)
+        refresh_buttons_spy = mocker.spy(editor, "_refresh_buttons")
+        qtbot.wait_until(lambda: refresh_buttons_spy.called)
 
         # Get the button text
         button_text = None
