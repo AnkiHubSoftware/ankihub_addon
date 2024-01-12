@@ -480,6 +480,7 @@ def test_entry_point(anki_session_with_addon_data: AnkiSession, qtbot: QtBot):
     # and that the add-on doesn't crash on Anki startup
 
 
+# The JS in the webviews is flaky if not run in sequential mode
 @pytest.mark.sequential
 class TestEditor:
     @pytest.mark.parametrize(
