@@ -1,6 +1,7 @@
 """Downloads updates to decks from AnkiHub and imports them."""
 import uuid
 from datetime import datetime
+from functools import cached_property
 from typing import Collection, List, Optional
 
 import aqt
@@ -12,6 +13,7 @@ from ..addon_ankihub_client import AddonAnkiHubClient as AnkiHubClient
 from ..ankihub_client import AnkiHubHTTPError, DeckExtension
 from ..db import ankihub_db
 from ..main.importing import AnkiHubImporter, AnkiHubImportResult
+from ..main.note_conversion import is_tag_for_group
 from ..main.note_types import fetch_note_types_based_on_notes
 from ..main.utils import create_backup
 from ..settings import config
@@ -27,6 +29,11 @@ class _AnkiHubDeckUpdater:
     def __init__(self):
         self._importer = AnkiHubImporter()
         self._import_results: Optional[List[AnkiHubImportResult]] = None
+
+    @cached_property
+    def _client(self) -> AnkiHubClient:
+        # The client can't be initialized in __init__ because the add-on config is not set up yet at that point.
+        return AnkiHubClient()
 
     def update_decks_and_media(
         self, ah_dids: Collection[uuid.UUID], start_media_sync: bool = True
@@ -48,7 +55,7 @@ class _AnkiHubDeckUpdater:
         # The media sync should be started after the deck updates are imported,
         # because the import can add new media references to notes.
         if start_media_sync:
-            media_sync.start_media_download()
+            aqt.mw.taskman.run_on_main(media_sync.start_media_download)
 
         LOGGER.info("Finished updating decks")
         return self._import_results
@@ -78,6 +85,8 @@ class _AnkiHubDeckUpdater:
     def _update_single_deck(self, ankihub_did: uuid.UUID) -> bool:
         """Fetches and applies updates for a single deck. Also updates the deck extensions of the deck.
         Returns True if the update was successful, False if the user cancelled it."""
+        self._update_deck_config(ankihub_did)
+
         result = self._download_updates_for_deck(ankihub_did)
         if not result:
             return False
@@ -85,15 +94,18 @@ class _AnkiHubDeckUpdater:
         result = self._update_deck_extensions(ankihub_did)
         return result
 
+    def _update_deck_config(self, ankihub_did: uuid.UUID) -> None:
+        deck = self._client.get_deck_by_id(ankihub_did)
+        config.update_deck(deck=deck)
+
     def _download_updates_for_deck(self, ankihub_did) -> bool:
         """Downloads note updates from AnkiHub and imports them into Anki.
         Returns True if the action was successful, False if the user cancelled it."""
 
-        client = AnkiHubClient()
         notes_data = []
         latest_update: Optional[datetime] = None
         deck_config = config.deck_config(ankihub_did)
-        for chunk in client.get_deck_updates(
+        for chunk in self._client.get_deck_updates(
             ankihub_did,
             since=deck_config.latest_update,
             download_progress_cb=lambda notes_count: _update_deck_download_progress_cb(
@@ -126,6 +138,8 @@ class _AnkiHubDeckUpdater:
                 protected_fields=chunk.protected_fields,
                 protected_tags=chunk.protected_tags,
                 subdecks=deck_config.subdecks_enabled,
+                suspend_new_cards_of_new_notes=deck_config.suspend_new_cards_of_new_notes,
+                suspend_new_cards_of_existing_notes=deck_config.suspend_new_cards_of_existing_notes,
             )
             self._import_results.append(import_result)
 
@@ -136,8 +150,9 @@ class _AnkiHubDeckUpdater:
 
     def _update_deck_extensions(self, ankihub_did: uuid.UUID) -> bool:
         # returns True if the update was successful, False if the user cancelled it
-        client = AnkiHubClient()
-        if not (deck_extensions := client.get_deck_extensions_by_deck_id(ankihub_did)):
+        if not (
+            deck_extensions := self._client.get_deck_extensions_by_deck_id(ankihub_did)
+        ):
             LOGGER.info(f"No extensions to update for {ankihub_did=}")
             return True
 
@@ -153,8 +168,7 @@ class _AnkiHubDeckUpdater:
         deck_extension_config = config.deck_extension_config(deck_extension.id)
         latest_update: Optional[datetime] = None
         updated_notes = []
-        client = AnkiHubClient()
-        for chunk in client.get_deck_extension_updates(
+        for chunk in self._client.get_deck_extension_updates(
             deck_extension_id=deck_extension.id,
             since=deck_extension_config.latest_update,
             download_progress_cb=lambda note_customizations_count: _update_extension_download_progress_cb(
@@ -180,7 +194,13 @@ class _AnkiHubDeckUpdater:
                     )
                     continue
                 else:
-                    note.tags = list(set(note.tags) | set(customization.tags or []))
+                    # Only tags from this tag group should be modified.
+                    tags_not_from_this_tag_group = [
+                        tag
+                        for tag in note.tags
+                        if not is_tag_for_group(tag, deck_extension.tag_group_name)
+                    ]
+                    note.tags = tags_not_from_this_tag_group + customization.tags
                     updated_notes.append(note)
 
             # each chunk contains the latest update timestamp of the notes in it, we need the latest one

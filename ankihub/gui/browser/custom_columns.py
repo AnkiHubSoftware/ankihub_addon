@@ -1,16 +1,14 @@
 """Custom Anki browser columns."""
 import uuid
 from abc import abstractmethod
-from typing import Optional, Sequence
+from typing import Sequence
 
 import aqt
 from anki.collection import BrowserColumns
 from anki.notes import Note
-from anki.utils import ids2str
 from aqt.browser import Browser, CellRow, Column, ItemId
 
 from ...db import ankihub_db
-from ...main.utils import note_types_with_ankihub_id_field
 
 
 class CustomColumn:
@@ -48,18 +46,12 @@ class CustomColumn:
     ) -> str:
         raise NotImplementedError
 
-    def order_by_str(self) -> Optional[str]:
-        """Return the SQL string that will be appended after "ORDER BY" to the query that
-        fetches the search results when sorting by this column."""
-        return None
-
 
 class AnkiHubIdColumn(CustomColumn):
     builtin_column = Column(
         key="ankihub_id",
         cards_mode_label="AnkiHub ID",
         notes_mode_label="AnkiHub ID",
-        sorting=BrowserColumns.SORTING_NONE,
         uses_cell_font=False,
         alignment=BrowserColumns.ALIGNMENT_CENTER,
     )
@@ -78,14 +70,14 @@ class AnkiHubIdColumn(CustomColumn):
 
 
 class EditedAfterSyncColumn(CustomColumn):
-    builtin_column = Column(
-        key="edited_after_sync",
-        cards_mode_label="AnkiHub: Modified After Sync",
-        notes_mode_label="AnkiHub: Modified After Sync",
-        sorting=BrowserColumns.SORTING_DESCENDING,
-        uses_cell_font=False,
-        alignment=BrowserColumns.ALIGNMENT_CENTER,
-    )
+    def __init__(self) -> None:
+        self.builtin_column = Column(
+            key="edited_after_sync",
+            cards_mode_label="AnkiHub: Modified After Sync",
+            notes_mode_label="AnkiHub: Modified After Sync",
+            uses_cell_font=False,
+            alignment=BrowserColumns.ALIGNMENT_CENTER,
+        )
 
     def _display_value(
         self,
@@ -101,26 +93,12 @@ class EditedAfterSyncColumn(CustomColumn):
 
         return "Yes" if note.mod > last_sync else "No"
 
-    def order_by_str(self) -> str:
-        mids = note_types_with_ankihub_id_field()
-        if not mids:
-            return None
-
-        return f"""
-            (
-                SELECT n.mod > ah_n.mod from {ankihub_db.database_name}.notes AS ah_n
-                WHERE ah_n.anki_note_id = n.id LIMIT 1
-            ) DESC,
-            (n.mid IN {ids2str(mids)}) DESC
-            """
-
 
 class UpdatedSinceLastReviewColumn(CustomColumn):
     builtin_column = Column(
         key="updated_since_last_review",
         cards_mode_label="AnkiHub: Updated Since Last Review",
         notes_mode_label="AnkiHub: Updated Since Last Review",
-        sorting=BrowserColumns.SORTING_NONE,
         uses_cell_font=False,
         alignment=BrowserColumns.ALIGNMENT_CENTER,
     )

@@ -154,6 +154,11 @@ class DeckUpdateChunk(DataClassJSONMixinWithConfig):
 class DeckMedia(DataClassJSONMixinWithConfig):
     name: str
     file_content_hash: str
+    modified: datetime = dataclasses.field(
+        metadata=field_options(
+            deserialize=lambda x: datetime.strptime(x, ANKIHUB_DATETIME_FORMAT_STR)
+        ),
+    )
     referenced_on_accepted_note: bool
     exists_on_s3: bool
     download_enabled: bool
@@ -162,6 +167,11 @@ class DeckMedia(DataClassJSONMixinWithConfig):
 @dataclass
 class DeckMediaUpdateChunk(DataClassJSONMixinWithConfig):
     media: List[DeckMedia]
+    latest_update: Optional[datetime] = dataclasses.field(
+        metadata=field_options(
+            deserialize=lambda x: datetime.strptime(x, ANKIHUB_DATETIME_FORMAT_STR)
+        )
+    )
 
 
 @dataclass
@@ -241,6 +251,12 @@ class OptionalTagSuggestion(DataClassJSONMixinWithConfig):
     tags: List[str]
 
 
+class UserDeckExtensionRelation(Enum):
+    SUBSCRIBER = "subscriber"
+    OWNER = "owner"
+    MAINTAINER = "maintainer"
+
+
 @dataclass
 class DeckExtension(DataClassJSONMixinWithConfig):
     id: int
@@ -249,6 +265,7 @@ class DeckExtension(DataClassJSONMixinWithConfig):
     name: str
     tag_group_name: str
     description: str
+    user_relation: UserDeckExtensionRelation
 
 
 @dataclass
@@ -267,6 +284,23 @@ class DeckExtensionUpdateChunk(DataClassJSONMixinWithConfig):
             else None,
         ),
         default=None,
+    )
+
+
+@dataclass
+class CardReviewData(DataClassJSONMixinWithConfig):
+    ah_did: uuid.UUID = dataclasses.field(metadata=field_options(alias="deck_id"))
+    total_card_reviews_last_7_days: int
+    total_card_reviews_last_30_days: int
+    first_card_review_at: datetime = dataclasses.field(
+        metadata=field_options(
+            deserialize=lambda x: datetime.strptime(x, ANKIHUB_DATETIME_FORMAT_STR)
+        ),
+    )
+    last_card_review_at: datetime = dataclasses.field(
+        metadata=field_options(
+            deserialize=lambda x: datetime.strptime(x, ANKIHUB_DATETIME_FORMAT_STR)
+        ),
     )
 
 

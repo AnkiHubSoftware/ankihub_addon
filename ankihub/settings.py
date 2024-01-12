@@ -15,12 +15,13 @@ from json import JSONDecodeError
 from logging.handlers import RotatingFileHandler
 from pathlib import Path
 from pprint import pformat
-from shutil import copyfile, rmtree
+from shutil import copyfile, move, rmtree
 from typing import Any, Callable, Dict, List, Optional
 
 import aqt
-from anki.buildinfo import version as ANKI_VERSION
+from anki import buildinfo
 from anki.decks import DeckId
+from anki.utils import point_version
 from aqt.utils import askUser, showInfo
 from mashumaro import field_options
 from mashumaro.mixins.json import DataClassJSONMixin
@@ -36,7 +37,7 @@ from .ankihub_client import (
     STAGING_S3_BUCKET_URL,
     DeckExtension,
 )
-from .ankihub_client.models import UserDeckRelation
+from .ankihub_client.models import Deck, UserDeckRelation
 from .private_config_migrations import migrate_private_config
 from .public_config_migrations import migrate_public_config
 
@@ -61,6 +62,12 @@ def _deserialize_datetime(x: str) -> Optional[datetime]:
     return datetime.strptime(x, ANKIHUB_DATETIME_FORMAT_STR) if x else None
 
 
+class SuspendNewCardsOfExistingNotes(Enum):
+    ALWAYS = "Always"
+    NEVER = "Never"
+    IF_SIBLINGS_SUSPENDED = "If siblings are suspended"
+
+
 @dataclass
 class DeckConfig(DataClassJSONMixin):
     anki_id: DeckId
@@ -73,9 +80,29 @@ class DeckConfig(DataClassJSONMixin):
         ),
         default=None,
     )
+    latest_media_update: Optional[datetime] = dataclasses.field(
+        metadata=field_options(
+            serialize=_serialize_datetime,
+            deserialize=_deserialize_datetime,
+        ),
+        default=None,
+    )
     subdecks_enabled: bool = (
         False  # whether deck is organized into subdecks by the add-on
     )
+    suspend_new_cards_of_new_notes: bool = False
+    suspend_new_cards_of_existing_notes: SuspendNewCardsOfExistingNotes = (
+        SuspendNewCardsOfExistingNotes.IF_SIBLINGS_SUSPENDED
+    )
+
+    @staticmethod
+    def suspend_new_cards_of_new_notes_default(ah_did: uuid.UUID) -> bool:
+        result = ah_did == ANKING_DECK_ID
+        return result
+
+    @staticmethod
+    def suspend_new_cards_of_existing_notes_default() -> SuspendNewCardsOfExistingNotes:
+        return SuspendNewCardsOfExistingNotes.IF_SIBLINGS_SUSPENDED
 
 
 @dataclass
@@ -110,6 +137,8 @@ class PrivateConfig(DataClassJSONMixin):
         default_factory=dict
     )
     ui: UIConfig = dataclasses.field(default_factory=UIConfig)
+    # used to determine which migrations to apply
+    api_version_on_last_sync: Optional[float] = None
 
 
 class _Config:
@@ -125,7 +154,7 @@ class _Config:
 
     def setup_public_config_and_urls(self):
         migrate_public_config()
-        self.public_config = aqt.mw.addonManager.getConfig(ADDON_PATH.name)
+        self.load_public_config()
 
         if self.public_config.get("use_staging"):
             self.app_url = STAGING_APP_URL
@@ -177,6 +206,10 @@ class _Config:
             f.write(json.dumps(json.loads(config_json), indent=4, sort_keys=True))
         self._log_private_config()
 
+    def load_public_config(self) -> None:
+        """For loading the public config from its file (after it has been changed)."""
+        self.public_config = aqt.mw.addonManager.getConfig(ADDON_PATH.name)
+
     def save_token(self, token: str):
         self._private_config.token = token
         self._update_private_config()
@@ -193,8 +226,24 @@ class _Config:
         self.deck_config(ankihub_did).latest_update = latest_update
         self._update_private_config()
 
+    def save_latest_deck_media_update(
+        self, ankihub_did: uuid.UUID, latest_media_update: Optional[datetime]
+    ):
+        self.deck_config(ankihub_did).latest_media_update = latest_media_update
+        self._update_private_config()
+
     def set_subdecks(self, ankihub_did: uuid.UUID, subdecks: bool):
         self.deck_config(ankihub_did).subdecks_enabled = subdecks
+        self._update_private_config()
+
+    def set_suspend_new_cards_of_new_notes(self, ankihub_did: uuid.UUID, suspend: bool):
+        self.deck_config(ankihub_did).suspend_new_cards_of_new_notes = suspend
+        self._update_private_config()
+
+    def set_suspend_new_cards_of_existing_notes(
+        self, ankihub_did: uuid.UUID, suspend: SuspendNewCardsOfExistingNotes
+    ):
+        self.deck_config(ankihub_did).suspend_new_cards_of_existing_notes = suspend
         self._update_private_config()
 
     def add_deck(
@@ -212,6 +261,9 @@ class _Config:
             anki_id=DeckId(anki_did),
             user_relation=user_relation,
             subdecks_enabled=subdecks_enabled,
+            suspend_new_cards_of_new_notes=DeckConfig.suspend_new_cards_of_new_notes_default(
+                ankihub_did
+            ),
         )
         # remove duplicates
         self.save_latest_deck_update(ankihub_did, latest_udpate)
@@ -220,8 +272,22 @@ class _Config:
         if self.subscriptions_change_hook:
             self.subscriptions_change_hook()
 
-    def remove_deck(self, ankihub_did: uuid.UUID) -> None:
-        """Remove deck from list of installed decks."""
+    def update_deck(self, deck: Deck):
+        """Update the deck config with the values from the Deck object."""
+        deck_config = self.deck_config(deck.ah_did)
+
+        # Only these fields are needed for the deck config
+        deck_config.name = deck.name
+        deck_config.user_relation = deck.user_relation
+
+        self._update_private_config()
+
+    def remove_deck_and_its_extensions(self, ankihub_did: uuid.UUID) -> None:
+        """Remove a deck. Also remove the deck extensions of the deck."""
+        for deck_extension_id in config.deck_extensions_ids_for_ah_did(ankihub_did):
+            config.remove_deck_extension(deck_extension_id)
+        LOGGER.info(f"Removed deck extensions for deck {ankihub_did}")
+
         if self._private_config.decks.get(ankihub_did):
             self._private_config.decks.pop(ankihub_did)
             self._update_private_config()
@@ -295,23 +361,43 @@ class _Config:
     def deck_extension_config(self, extension_id: int) -> Optional[DeckExtensionConfig]:
         return self._private_config.deck_extensions.get(extension_id)
 
+    def deck_extensions_ids_for_ah_did(self, ah_did: uuid.UUID) -> List[int]:
+        result = [
+            extension_id
+            for extension_id in self.deck_extension_ids()
+            if self.deck_extension_config(extension_id).ah_did == ah_did
+        ]
+        return result
+
+    def remove_deck_extension(self, extension_id: int) -> None:
+        self._private_config.deck_extensions.pop(extension_id)
+        self._update_private_config()
+        LOGGER.info(f"Removed deck extension {extension_id}")
+
     def is_logged_in(self) -> bool:
         return bool(self.token())
+
+    def set_api_version_on_last_sync(self, api_version: float) -> None:
+        self._private_config.api_version_on_last_sync = api_version
+        self._update_private_config()
 
 
 config = _Config()
 
 
 def setup_profile_data_folder() -> bool:
-    """Returns False if the migration from the old location needs yet to be done."""
+    """Sets up the profile data folder for the currently open Anki profile.
+    Returns False if the migration from the add-on version with no support for multiple Anki profiles
+    needs yet to be done."""
     _assign_id_to_profile_if_not_exists()
     LOGGER.info(f"Anki profile id: {_get_anki_profile_id()}")
 
-    if not (path := profile_files_path()).exists():
-        path.mkdir(parents=True)
+    if not _maybe_migrate_profile_data_from_old_location():
+        return False
 
-    if _profile_data_exists_at_old_location():
-        return _migrate_profile_data_from_old_location()
+    _maybe_migrate_addon_data_from_old_location()
+
+    profile_files_path().mkdir(parents=True, exist_ok=True)
 
     return True
 
@@ -355,7 +441,7 @@ def profile_files_path() -> Path:
     """Path to the add-on data for this Anki profile."""
     # we need an id instead of using the profile name because profiles can be renamed
     cur_profile_id = _get_anki_profile_id()
-    result = user_files_path() / cur_profile_id
+    result = ankihub_base_path() / cur_profile_id
     return result
 
 
@@ -374,10 +460,11 @@ def _profile_data_exists_at_old_location() -> bool:
     return result
 
 
-def _migrate_profile_data_from_old_location() -> bool:
+def _maybe_migrate_profile_data_from_old_location() -> bool:
     """Migration of add-on files from before the add-on added support for multiple Anki profiles was added
     into a profile-specific folder.
-    Returns True if the data was migrated and False if it remains at the old location."""
+    Returns True if the data was migrated and False if it remains at the old location.
+    """
     if not _profile_data_exists_at_old_location():
         LOGGER.info("No data to migrate.")
         return True
@@ -431,13 +518,37 @@ def _file_should_be_migrated(file_path: Path) -> bool:
     return result
 
 
-def log_file_path() -> Path:
-    """Path to the add-on log file.
-    The log file is outside of the user files folder because it caused problems when updating the add-on."""
-    # _defaultBase is the Anki data folder, we create a sibling folder to it, where we store the log file.
+def _maybe_migrate_addon_data_from_old_location() -> None:
+    """Migrate profile data folders from user_files to ankihub_base_path() if they exist in user_files."""
+    ankihub_base_path().mkdir(parents=True, exist_ok=True)
+
+    for file in user_files_path().glob("*"):
+        if not file.is_dir():
+            continue
+
+        try:
+            uuid.UUID(file.name)
+        except ValueError:
+            continue
+        else:
+            # Only move the folder if it's name is a uuid, otherwise it's not an add-on data folder
+            move(file, ankihub_base_path() / file.name)
+            LOGGER.info(f"Migrated add-on data for profile {file.name}")
+
+
+def ankihub_base_path() -> Path:
+    """Path to the folder where the add-on stores its data."""
+    if path_from_env_var := os.getenv("ANKIHUB_BASE_PATH"):
+        return Path(path_from_env_var)
+
     anki_base = Path(aqt.mw.pm._default_base())
-    ankihub_base = anki_base.parent / "AnkiHub"
-    result = ankihub_base / "ankihub.log"
+    result = anki_base.parent / "AnkiHub"
+    return result
+
+
+def log_file_path() -> Path:
+    """Path to the add-on log file."""
+    result = ankihub_base_path() / "ankihub.log"
     result.parent.mkdir(parents=True, exist_ok=True)
     return result
 
@@ -488,8 +599,6 @@ def setup_file_handler() -> None:
 version_file = Path(__file__).parent / "VERSION"
 with version_file.open() as f:
     ADDON_VERSION: str = f.read().strip()
-LOGGER.info(f"version: {ADDON_VERSION}")
-LOGGER.info(f"VERSION file: {version_file}")
 
 try:
     manifest = json.loads((Path(__file__).parent / "manifest.json").read_text())
@@ -525,7 +634,9 @@ USER_EMAIL_SLUG = "user_email"
 
 USER_SUPPORT_EMAIL_SLUG = "support@ankihub.net"
 
-ANKI_MINOR = int(ANKI_VERSION.split(".")[2])
+
+ANKI_VERSION = buildinfo.version
+ANKI_INT_VERSION = point_version()
 
 USER_FILES_PATH = Path(__file__).parent / "user_files"
 
@@ -536,3 +647,5 @@ class AnkiHubCommands(Enum):
 
 
 RATIONALE_FOR_CHANGE_MAX_LENGTH = 1024
+
+ANKI_VERSION_23_10_00 = 231000

@@ -7,7 +7,7 @@ import tempfile
 import time
 import traceback
 import zipfile
-from concurrent.futures import Future
+from json import JSONDecodeError
 from pathlib import Path
 from sqlite3 import OperationalError
 from textwrap import dedent
@@ -18,7 +18,7 @@ import aqt
 import sentry_sdk
 from anki.errors import BackendIOError, DBError, SyncError
 from anki.utils import checksum, is_win
-from aqt.utils import askUser, showInfo
+from aqt.utils import showInfo
 from requests import exceptions
 from sentry_sdk import capture_exception, push_scope
 from sentry_sdk.integrations.argv import ArgvIntegration
@@ -30,10 +30,8 @@ from sentry_sdk.integrations.threading import ThreadingIntegration
 from .. import LOGGER
 from ..addon_ankihub_client import AddonAnkiHubClient as AnkiHubClient
 from ..ankihub_client import AnkiHubHTTPError, AnkiHubRequestException
-from ..db import (
-    detach_ankihub_db_from_anki_db_connection,
-    is_ankihub_db_attached_to_anki_db,
-)
+from ..db import detached_ankihub_db, is_ankihub_db_attached_to_anki_db
+from ..gui.exceptions import DeckDownloadAndInstallError
 from ..main.exceptions import NotetypeFieldsMismatchError
 from ..main.reset_local_changes import reset_local_changes_to_note_type
 from ..settings import (
@@ -41,13 +39,13 @@ from ..settings import (
     ANKI_VERSION,
     ANKIWEB_ID,
     addon_dir_path,
+    ankihub_base_path,
     config,
     log_file_path,
-    user_files_path,
 )
 from .deck_updater import NotLoggedInError
 from .error_dialog import ErrorDialog
-from .exceptions import DeckDownloadAndInstallError
+from .operations import AddonQueryOp
 from .utils import (
     ask_user,
     check_and_prompt_for_updates_on_main_window,
@@ -94,7 +92,7 @@ def report_exception_and_upload_logs(
 
 
 def upload_logs_in_background(
-    on_done: Optional[Callable[[Future], None]] = None, hide_username=False
+    on_done: Optional[Callable[[str], None]] = None, hide_username=False
 ) -> str:
     """Upload the logs to S3 in the background.
     Returns the S3 key of the uploaded logs."""
@@ -105,19 +103,18 @@ def upload_logs_in_background(
     user_name = config.user() if not hide_username else checksum(config.user())[:5]
     key = f"ankihub_addon_logs_{user_name}_{int(time.time())}.log"
 
-    if on_done is not None:
-        aqt.mw.taskman.run_in_background(
-            task=lambda: _upload_logs(key), on_done=on_done
-        )
-    else:
-        aqt.mw.taskman.run_in_background(
-            task=lambda: _upload_logs(key), on_done=_on_upload_logs_done
-        )
+    AddonQueryOp(
+        parent=aqt.mw,
+        op=lambda _: _upload_logs(key),
+        success=on_done if on_done is not None else lambda _: None,
+    ).failure(_on_upload_logs_failure).without_collection().run_in_background()
 
     return key
 
 
-def upload_logs_and_data_in_background(on_done: Callable[[Future], None] = None) -> str:
+def upload_logs_and_data_in_background(
+    on_done: Optional[Callable[[str], None]] = None
+) -> str:
     """Upload the data dir and logs to S3 in the background.
     Returns the S3 key of the uploaded file."""
 
@@ -127,19 +124,16 @@ def upload_logs_and_data_in_background(on_done: Callable[[Future], None] = None)
     user_name_hash = checksum(config.user())[:5]
     key = f"ankihub_addon_debug_info_{user_name_hash}_{int(time.time())}.zip"
 
-    aqt.mw.taskman.run_in_background(
-        task=lambda: _upload_logs_and_data_in_background(key), on_done=on_done
-    )
+    AddonQueryOp(
+        parent=aqt.mw,
+        op=lambda _: _upload_logs_and_data_in_background(key),
+        success=on_done if on_done is not None else lambda _: None,
+    ).failure(_on_upload_logs_failure).without_collection().run_in_background()
 
     return key
 
 
 def _upload_logs_and_data_in_background(key: str) -> str:
-
-    # detach the ankihub database from the anki database connection to prevent file permission errors
-    detach_ankihub_db_from_anki_db_connection()
-
-    # zip the user files and the log file
     file_path = _zip_logs_and_data()
 
     # upload the zip file
@@ -156,25 +150,16 @@ def _upload_logs_and_data_in_background(key: str) -> str:
 
 
 def _zip_logs_and_data() -> Path:
-    """Zip the log file, the user files directory and the anki collection and return the path of the zip file."""
+    """Zip the ankihub base directory (which contains logs) and the anki collection.
+    Return the path of the zip file."""
     temp_file = tempfile.NamedTemporaryFile(delete=False)
     temp_file.close()
     with zipfile.ZipFile(temp_file.name, "w") as zipf:
-        # Add the log file to the zip.
-        log_file = log_file_path()
-        if log_file.exists():
-            zipf.write(log_file, arcname=log_file.name)
-        else:
-            LOGGER.info("No logs to upload.")
-
-        # Add the user files directory to the zip.
-        source_dir = user_files_path()
-        for file in source_dir.rglob("*"):
-            # previously logs were stored in the user files directory and we don't want to
-            # include old log files in the zip
-            if file.name.endswith(".log") or ".log." in file.name:
-                continue
-            zipf.write(file, arcname=file.relative_to(source_dir))
+        with detached_ankihub_db():
+            # Add the ankihub base directory to the zip. It also contains the logs.
+            source_dir = ankihub_base_path()
+            for file in source_dir.rglob("*"):
+                zipf.write(file, arcname=file.relative_to(source_dir))
 
         # Add the Anki collection to the zip.
         try:
@@ -355,18 +340,23 @@ def _maybe_handle_ankihub_http_error(error: AnkiHubHTTPError) -> bool:
     elif (
         response.status_code == 406 and response.reason == OUTDATED_CLIENT_ERROR_REASON
     ):
-        if askUser(
+        if ask_user(
             "The AnkiHub add-on needs to be updated to continue working.<br>"
-            "Do you want to open the add-on update dialog now?"
+            "Do you want to open the add-on update dialog now?",
+            parent=aqt.mw,
         ):
             check_and_prompt_for_updates_on_main_window()
         return True
     elif response.status_code == 403:
-        response_data = response.json()
-        error_message = response_data.get("detail")
-        if error_message:
-            show_error_dialog(error_message, title="Oh no!")
-            return True
+        try:
+            response_data = response.json()
+        except JSONDecodeError:
+            return False
+        else:
+            error_message = response_data.get("detail")
+            if error_message:
+                show_error_dialog(error_message, title="Oh no!")
+                return True
 
     return False
 
@@ -433,7 +423,19 @@ def _initialize_sentry():
         ],
         # This disable the AtexitIntegration because it causes a RuntimeError when Anki is closed.
         shutdown_timeout=0,
+        before_send=_before_send,
     )
+
+
+def _before_send(
+    event: Dict[str, Any], hint: Dict[str, Any]
+) -> Optional[Dict[str, Any]]:
+    """Filter out events created by the LoggingIntegration that are not related to this add-on."""
+    if "log_record" in hint:
+        logger_name = hint["log_record"].name
+        if logger_name != LOGGER.name:
+            return None
+    return event
 
 
 def _report_exception(
@@ -446,14 +448,15 @@ def _report_exception(
     with push_scope() as scope:
         scope.level = "error"
         scope.user = {"id": config.user()}
+        scope.set_tag("os", sys.platform)
         scope.set_context("add-on config", dataclasses.asdict(config._private_config))
         scope.set_context("addon version", {"version": ADDON_VERSION})
         scope.set_context("anki version", {"version": ANKI_VERSION})
 
         try:
-            scope.set_context("user files", _user_files_context_dict())
+            scope.set_context("ankihub base files", _ankihub_base_path_context_dict())
         except Exception as e:
-            LOGGER.warning(f"Could not get user files context: {e}")
+            LOGGER.warning(f"Could not get ankihub base files context: {e}")
 
         for key, value in context.items():
             scope.set_context(key, value)
@@ -496,12 +499,13 @@ def _report_exception(
     return sentry_id
 
 
-def _user_files_context_dict() -> Dict[str, Any]:
-    """Return a dict with information about the user files of the AnkiHub add-on to be sent as
+def _ankihub_base_path_context_dict() -> Dict[str, Any]:
+    """Return a dict with information about the files of the AnkiHub add-on to be sent as
     context to Sentry."""
-    ankihub_module = aqt.mw.addonManager.addonFromModule(__name__)
-    user_files_path = Path(aqt.mw.addonManager._userFilesPath(ankihub_module))
-    all_file_paths = [user_files_path, *list(user_files_path.rglob("*"))]
+    all_file_paths = [
+        ankihub_base_path(),
+        *list(ankihub_base_path().rglob("*")),
+    ]
     problematic_file_paths = []
     if is_win:
         problematic_file_paths = [
@@ -530,7 +534,6 @@ def _file_is_accessible(f: Path) -> bool:
 
 
 def _normalize_url(url: str):
-
     # remove parameters
     result = re.sub(r"\?.+$", "", url)
 
@@ -541,7 +544,6 @@ def _normalize_url(url: str):
 
 
 def _error_reporting_enabled() -> bool:
-
     # Not sure if this is really necessary, but HyperTTS does it:
     # https://github.com/Language-Tools/anki-hyper-tts/blob/a73785eb43068db08f073809c74c4dd1f236a557/__init__.py#L34-L37
     # Some other add-ons package an obsolete version of sentry-sdk, which causes problems(?) when
@@ -583,20 +585,18 @@ def _upload_logs(key: str) -> str:
         raise e
 
 
-def _on_upload_logs_done(future: Future) -> None:
-    try:
-        future.result()
-    except AnkiHubHTTPError as e:
+def _on_upload_logs_failure(exc: Exception) -> None:
+    if isinstance(exc, AnkiHubHTTPError):
         from .errors import OUTDATED_CLIENT_ERROR_REASON
 
         # Don't report outdated client errors that happen when uploading logs,
         # because they are handled by the add-on when they happen in other places
         # and we don't want to see them in Sentry.
-        if e.response.status_code == 401 or (
-            e.response.status_code == 406
-            and e.response.reason == OUTDATED_CLIENT_ERROR_REASON
+        if exc.response.status_code == 401 or (
+            exc.response.status_code == 406
+            and exc.response.reason == OUTDATED_CLIENT_ERROR_REASON
         ):
             return
-        _report_exception(e)
-    except Exception as e:
-        _report_exception(e)
+        _report_exception(exc)
+    else:
+        _report_exception(exc)

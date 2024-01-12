@@ -24,17 +24,42 @@ from anki.utils import ids2str, join_fields, split_fields
 
 from .. import LOGGER
 from ..ankihub_client import Field, NoteInfo, suggestion_type_from_str
+from ..ankihub_client.models import DeckMedia
 from ..common_utils import local_media_names_from_html
+from ..settings import ANKI_INT_VERSION, ANKI_VERSION_23_10_00
 from .db_utils import DBConnection
 from .exceptions import IntegrityError
-
-# This tag can be added to a note to cause media files to be synced even if the
-# media file is in an media disabled field.
-# It does NOT only work for images, but the name is kept for backwards compatibility.
-MEDIA_DISABLED_FIELD_BYPASS_TAG = "AnkiHub_ImageReady"
+from .rw_lock import exclusive_db_access_context, non_exclusive_db_access_context
 
 
-def attach_ankihub_db_to_anki_db_connection() -> None:
+@contextmanager
+def attached_ankihub_db():
+    """Context manager that attaches the AnkiHub DB to the Anki DB connection and detaches it when the context exits.
+    The purpose is to e.g. do join queries between the Anki DB and the AnkiHub DB through aqt.mw.col.db.execute().
+    A lock is used to ensure that other threads don't try to access the AnkiHub DB through the _AnkiHubDB class
+    while it is attached to the Anki DB.
+    """
+    with exclusive_db_access_context():
+        _attach_ankihub_db_to_anki_db_connection()
+        try:
+            yield
+        finally:
+            _detach_ankihub_db_from_anki_db_connection()
+
+
+@contextmanager
+def detached_ankihub_db():
+    """Context manager that ensures the AnkiHub DB is detached from the Anki DB connection while the context is active.
+    The purpose of this is to be able to safely perform operations on the AnkiHub DB which require it to be detached,
+    for example coyping the AnkiHub DB file.
+    It's used by the _AnkiHubDB class to ensure that the AnkiHub DB is detached from the Anki DB while
+    queries are executed through the _AnkiHubDB class.
+    """
+    with non_exclusive_db_access_context():
+        yield
+
+
+def _attach_ankihub_db_to_anki_db_connection() -> None:
     if aqt.mw.col is None:
         LOGGER.info("The collection is not open. Not attaching AnkiHub DB.")
         return
@@ -47,7 +72,7 @@ def attach_ankihub_db_to_anki_db_connection() -> None:
         LOGGER.info("Attached AnkiHub DB to Anki DB connection")
 
 
-def detach_ankihub_db_from_anki_db_connection() -> None:
+def _detach_ankihub_db_from_anki_db_connection() -> None:
     if aqt.mw.col is None:
         LOGGER.info("The collection is not open. Not detaching AnkiHub DB.")
         return
@@ -67,8 +92,10 @@ def detach_ankihub_db_from_anki_db_connection() -> None:
         except Exception:
             LOGGER.info("Failed to detach AnkiHub database.")
 
-        # begin a new transaction because Anki expects one to be open
-        aqt.mw.col.db.begin()
+        if ANKI_INT_VERSION < ANKI_VERSION_23_10_00:
+            # db.begin was removed in Ani 23.10
+            # begin a new transaction because Anki expects one to be open
+            aqt.mw.col.db.begin()  # type: ignore
 
         LOGGER.info("Began new transaction.")
 
@@ -83,17 +110,7 @@ def is_ankihub_db_attached_to_anki_db() -> bool:
     return result
 
 
-@contextmanager
-def attached_ankihub_db():
-    attach_ankihub_db_to_anki_db_connection()
-    try:
-        yield
-    finally:
-        detach_ankihub_db_from_anki_db_connection()
-
-
 class _AnkiHubDB:
-
     # name of the database when attached to the Anki DB connection
     database_name = "ankihub_db"
     database_path: Optional[Path] = None
@@ -124,8 +141,9 @@ class _AnkiHubDB:
 
         if self.schema_version() == 0:
             self._setup_notes_table()
+            self._setup_deck_media_table()
             self._setup_note_types_table()
-            self.execute("PRAGMA user_version = 8")
+            self.execute("PRAGMA user_version = 10")
         else:
             from .db_migrations import migrate_ankihub_db
 
@@ -154,30 +172,55 @@ class _AnkiHubDB:
             conn.execute("CREATE INDEX anki_note_type_id ON notes (anki_note_type_id);")
             LOGGER.info("Created notes table")
 
-    def _setup_note_types_table(self) -> None:
-        """Create the note types table."""
+    def _setup_deck_media_table(self) -> None:
+        """Create the deck_media table."""
         with self.connection() as conn:
             conn.execute(
                 """
-                CREATE TABLE notetypes (
-                    anki_note_type_id INTEGER PRIMARY KEY,
-                    ankihub_deck_id STRING NOT NULL,
+                CREATE TABLE deck_media (
                     name TEXT NOT NULL,
-                    note_type_dict_json TEXT NOT NULL
+                    ankihub_deck_id TEXT NOT NULL,
+                    file_content_hash TEXT,
+                    modified TIMESTAMP NOT NULL,
+                    referenced_on_accepted_note BOOLEAN NOT NULL,
+                    exists_on_s3 BOOLEAN NOT NULL,
+                    download_enabled BOOLEAN NOT NULL,
+                    PRIMARY KEY (name, ankihub_deck_id)
                 );
                 """
             )
             conn.execute(
-                "CREATE INDEX notetypes_ankihub_deck_id_idx ON notetypes (ankihub_deck_id);"
+                "CREATE INDEX deck_media_deck_hash ON deck_media (ankihub_deck_id, file_content_hash);"
             )
-            LOGGER.info("Created note types table")
+            LOGGER.info("Created deck_media table")
+
+    def _setup_note_types_table(self, conn: Optional[DBConnection] = None) -> None:
+        """Create the note types table."""
+        sql = """
+            CREATE TABLE notetypes (
+                anki_note_type_id INTEGER NOT NULL,
+                ankihub_deck_id STRING NOT NULL,
+                name TEXT NOT NULL,
+                note_type_dict_json TEXT NOT NULL,
+                PRIMARY KEY (anki_note_type_id, ankihub_deck_id)
+            );
+        """
+        if conn:
+            conn.execute(sql)
+        else:
+            self.execute(sql)
+
+        LOGGER.info("Created note types table")
 
     def schema_version(self) -> int:
         result = self.scalar("PRAGMA user_version;")
         return result
 
     def connection(self) -> DBConnection:
-        result = DBConnection(conn=sqlite3.connect(ankihub_db.database_path))
+        result = DBConnection(
+            conn=sqlite3.connect(ankihub_db.database_path),
+            thread_safety_context_func=detached_ankihub_db,
+        )
         return result
 
     def upsert_notes_data(
@@ -202,7 +245,6 @@ class _AnkiHubDB:
         upserted_notes: List[NoteInfo] = []
         skipped_notes: List[NoteInfo] = []
         with self.connection() as conn:
-
             for note_data in notes_data:
                 conflicting_ah_nid = conn.first(
                     """
@@ -395,6 +437,20 @@ class _AnkiHubDB:
         result = [uuid.UUID(did) for did in did_strs]
         return result
 
+    def anki_nid_to_ah_did_dict(
+        self, anki_nids: Iterable[NoteId]
+    ) -> Dict[NoteId, uuid.UUID]:
+        """Returns a dict mapping anki nids to the ankihub did of the deck the note is in.
+        Not found nids are omitted from the dict."""
+        result = self.dict(
+            f"""
+            SELECT anki_note_id, ankihub_deck_id FROM notes
+            WHERE anki_note_id IN {ids2str(anki_nids)}
+            """
+        )
+        result = {NoteId(k): uuid.UUID(v) for k, v in result.items()}
+        return result
+
     def are_ankihub_notes(self, anki_nids: List[NoteId]) -> bool:
         notes_count = self.scalar(
             f"""
@@ -477,6 +533,12 @@ class _AnkiHubDB:
                 """,
                 str(ankihub_did),
             )
+            conn.execute(
+                """
+                DELETE FROM deck_media WHERE ankihub_deck_id = ?
+                """,
+                str(ankihub_did),
+            )
 
     def ankihub_deck_ids(self) -> List[uuid.UUID]:
         result = [
@@ -503,119 +565,134 @@ class _AnkiHubDB:
         result = [uuid.UUID(did) for did in did_strs]
         return result
 
-    def media_names_for_ankihub_deck(
-        self, ah_did: uuid.UUID, media_disabled_fields: Dict[int, List[str]]
-    ) -> Set[str]:
-        """Returns the names of all media files used in the notes of the given deck.
-        param media_disabled_fields: a dict mapping note type ids to a list of field names
-            that should be ignored when looking for media files.
-        """
-        result = set()
-        # We get the media names for each note type separately, because
-        # the disabled fields are note type specific.
-        # Note: One note type is always only used in one deck.
-        for mid in self.note_types_for_ankihub_deck(ah_did):
-            disabled_field_names = media_disabled_fields.get(int(mid), [])
-            result.update(
-                self._media_names_on_notes_of_note_type(mid, disabled_field_names)
+    # Media related functions
+    def upsert_deck_media_infos(
+        self,
+        ankihub_did: uuid.UUID,
+        media_list: List[DeckMedia],
+    ) -> None:
+        """Upsert deck media to the AnkiHub DB."""
+        with self.connection() as conn:
+            for media_file in media_list:
+                conn.execute(
+                    """
+                    INSERT OR REPLACE INTO deck_media (
+                        name,
+                        ankihub_deck_id,
+                        file_content_hash,
+                        modified,
+                        referenced_on_accepted_note,
+                        exists_on_s3,
+                        download_enabled
+                    ) VALUES (?, ?, ?, ?, ?, ?, ?)
+                    """,
+                    media_file.name,
+                    str(ankihub_did),
+                    media_file.file_content_hash,
+                    media_file.modified,
+                    media_file.referenced_on_accepted_note,
+                    media_file.exists_on_s3,
+                    media_file.download_enabled,
+                )
+
+    def downloadable_media_names_for_ankihub_deck(self, ah_did: uuid.UUID) -> Set[str]:
+        """Returns the names of all media files which can be downloaded for the given deck."""
+        result = set(
+            self.list(
+                """
+                SELECT name FROM deck_media
+                WHERE ankihub_deck_id = ?
+                AND referenced_on_accepted_note = 1
+                AND exists_on_s3 = 1
+                AND download_enabled = 1
+                """,
+                str(ah_did),
             )
+        )
+        return result
+
+    def media_names_for_ankihub_deck(self, ah_did: uuid.UUID) -> Set[str]:
+        """Returns the names of all media files which are referenced on notes in the given deck."""
+        fields_strings = self.list(
+            """
+            SELECT fields FROM notes
+            WHERE (
+                ankihub_deck_id = ? AND
+                fields LIKE '%<img%' OR fields LIKE '%[sound:%'
+            )
+            """,
+            str(ah_did),
+        )
+
+        result = {
+            media_name
+            for fields_string in fields_strings
+            for media_name in local_media_names_from_html(fields_string)
+        }
         return result
 
     def media_names_exist_for_ankihub_deck(
         self, ah_did: uuid.UUID, media_names: Set[str]
     ) -> Dict[str, bool]:
         """Returns a dictionary where each key is a media name and the corresponding value is a boolean
-        indicating whether the media file is referenced on any note in the given deck. This function is
-        defined in addition to media_names_for_ankihub_deck to provide a more efficient way to check
-        if some media files exist in the deck."""
-
-        # This uses a different implementation when there are more than 30 media names to check
-        # because the first method is fast up to a certain number of media names, but then becomes
-        # very slow.
-        if len(media_names) <= 30:
-            result = self._media_names_exist_for_ankihub_deck_inner(ah_did, media_names)
-        else:
-            media_names_for_deck = self.media_names_for_ankihub_deck(ah_did, {})
-            result = {name: name in media_names_for_deck for name in media_names}
-
-        return result
-
-    def _media_names_exist_for_ankihub_deck_inner(
-        self, ah_did: uuid.UUID, media_names: Set[str]
-    ) -> Dict[str, bool]:
-        result = {}
-        for media_name in media_names:
-            result[media_name] = bool(
-                self.scalar(
-                    f"""
-                    SELECT EXISTS(
-                        SELECT 1 FROM notes
-                        WHERE ankihub_deck_id = '{ah_did}'
-                        AND (
-                            fields LIKE '%src="{media_name}"%' OR
-                            fields LIKE '%src=''{media_name}''%' OR
-                            fields LIKE '%[sound:{media_name}]%'
-                        )
-                    )
-                    """
-                )
-            )
-        return result
-
-    def _media_names_on_notes_of_note_type(
-        self, mid: NotetypeId, disabled_field_names: List[str]
-    ) -> Set[str]:
-        """Returns the names of all media files used in the notes of the given note type."""
-        if aqt.mw.col is None or aqt.mw.col.models.get(NotetypeId(mid)) is None:
-            return set()
-
-        field_names_for_mid = self.note_type_field_names(anki_note_type_id=mid)
-        disabled_field_ords = [
-            field_names_for_mid.index(name)
-            for name in disabled_field_names
-            # We ignore fields that are not present in the note type.
-            # This can happen if the user has remove the fields from the note type.
-            if name in field_names_for_mid
-        ]
-        fields_tags_pairs = self.execute(
-            f"""
-            SELECT fields, tags FROM notes
-            WHERE (
-                anki_note_type_id = {mid} AND
-                (fields LIKE '%<img%' OR fields LIKE '%[sound:%')
-            )
+        indicating whether the media file is referenced on a note in the given deck.
+        The media file doesn't have to exist on S3, it just has to referenced on a note in the deck.
+        """
+        placeholders = ",".join(["?" for _ in media_names])
+        sql = f"""
+            SELECT name FROM deck_media
+            WHERE ankihub_deck_id = ?
+            AND name IN ({placeholders})
+            AND referenced_on_accepted_note = 1
             """
+
+        names_in_db = set(
+            self.list(
+                sql,
+                str(ah_did),
+                *media_names,
+            )
+        )
+        result = {name: name in names_in_db for name in media_names}
+        return result
+
+    def media_names_with_matching_hashes(
+        self, ah_did: uuid.UUID, media_to_hash: Dict[str, Optional[str]]
+    ) -> Dict[str, str]:
+        """Returns a dictionary where each key is a media name and the corresponding value is the
+        name of a media file in the given deck with the same hash.
+        Media without a matching hash are not included in the result.
+
+        Note: Media files with a hash of None are ignored as they can't be matched.
+        """
+
+        # Remove media files with None as hash because they can't be matched
+        media_to_hash = {
+            media_name: media_hash
+            for media_name, media_hash in media_to_hash.items()
+            if media_hash is not None
+        }
+
+        # Return early if no valid hashes remain
+        if not media_to_hash:
+            return {}
+
+        placeholders = ",".join(["?" for _ in media_to_hash])
+        hash_to_media = self.dict(
+            f"""
+            SELECT file_content_hash, name FROM deck_media
+            WHERE ankihub_deck_id = ?
+            AND file_content_hash IN ({placeholders})
+            """,
+            str(ah_did),
+            *media_to_hash.values(),
         )
 
-        result = set()
-        for fields_string, tags_string in fields_tags_pairs:
-            fields = split_fields(fields_string)
-            tags = set(tags_string.split(" "))
-            for field_idx, field_text in enumerate(fields):
-                # TODO: This ANKIHUB_MEDIA_ENABLED_TAG bypass is used to allow fields with
-                # this specific tag to have the media files downloaded, despite the field being
-                # marked as an media-disabled field. Decide whether to remove this.
-                field_name = field_names_for_mid[field_idx]
-                # Tags cant have spaces, so we replace spaces with underscores to make it possible to
-                # reference a field name with spaces using a tag.
-                bypass_media_disabled_tag = (
-                    f"{MEDIA_DISABLED_FIELD_BYPASS_TAG}::{field_name.replace(' ', '_')}"
-                )
-
-                bypass = bypass_media_disabled_tag in tags
-                if not bypass and field_idx in disabled_field_ords:
-                    LOGGER.debug(
-                        f"Blocking media download in [{field_name}] field without the tag [{bypass_media_disabled_tag}]"
-                    )
-                    continue
-
-                if bypass:
-                    LOGGER.debug(
-                        f"Allowing media download in [{field_name}] field - note has tag [{bypass_media_disabled_tag}]",
-                    )
-
-                result.update(local_media_names_from_html(field_text))
-
+        result = {
+            media_name: matching_media
+            for media_name, media_hash in media_to_hash.items()
+            if (matching_media := hash_to_media.get(media_hash)) is not None
+        }
         return result
 
     # note types
@@ -656,12 +733,13 @@ class _AnkiHubDB:
         return result
 
     def is_ankihub_note_type(self, anki_note_type_id: NotetypeId) -> bool:
-        result = self.scalar(
+        result_str = self.scalar(
             """
             SELECT EXISTS(SELECT 1 FROM notetypes WHERE anki_note_type_id = ?)
             """,
             anki_note_type_id,
         )
+        result = bool(result_str)
         return result
 
     def note_types_for_ankihub_deck(self, ankihub_did: uuid.UUID) -> List[NotetypeId]:
@@ -673,19 +751,20 @@ class _AnkiHubDB:
         )
         return result
 
-    def ankihub_did_for_note_type(
+    def ankihub_dids_for_note_type(
         self, anki_note_type_id: NotetypeId
-    ) -> Optional[uuid.UUID]:
-        did_str = self.scalar(
+    ) -> Optional[Set[uuid.UUID]]:
+        """Returns the AnkiHub deck ids that use the given note type."""
+        did_strings = self.list(
             """
             SELECT ankihub_deck_id FROM notetypes WHERE anki_note_type_id = ?
             """,
             anki_note_type_id,
         )
-        if did_str is None:
+        if not did_strings:
             return None
 
-        result = uuid.UUID(did_str)
+        result = set(uuid.UUID(did_str) for did_str in did_strings)
         return result
 
     def note_type_field_names(self, anki_note_type_id: NotetypeId) -> List[str]:

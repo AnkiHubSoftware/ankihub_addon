@@ -33,12 +33,7 @@ from aqt.utils import showInfo, showWarning, tooltip, tr
 
 from ... import LOGGER
 from ...ankihub_client import SuggestionType
-from ...db import (
-    ankihub_db,
-    attach_ankihub_db_to_anki_db_connection,
-    attached_ankihub_db,
-    detach_ankihub_db_from_anki_db_connection,
-)
+from ...db import ankihub_db, attached_ankihub_db
 from ...main.importing import get_fields_protected_by_tags
 from ...main.note_conversion import (
     TAG_FOR_PROTECTING_ALL_FIELDS,
@@ -47,7 +42,7 @@ from ...main.note_conversion import (
 )
 from ...main.reset_local_changes import reset_local_changes_to_notes
 from ...main.subdecks import SUBDECK_TAG, build_subdecks_and_move_cards_to_them
-from ...main.utils import mids_of_notes
+from ...main.utils import mids_of_notes, retain_nids_with_ah_note_type
 from ...settings import ANKIHUB_NOTE_TYPE_FIELD_NAME, DeckExtensionConfig, config
 from ..deck_updater import NotLoggedInError, ah_deck_updater
 from ..optional_tag_suggestion_dialog import OptionalTagsSuggestionDialog
@@ -55,7 +50,6 @@ from ..suggestion_dialog import open_suggestion_dialog_for_bulk_suggestion
 from ..utils import ask_user, choose_ankihub_deck, choose_list, choose_subset
 from .custom_columns import (
     AnkiHubIdColumn,
-    CustomColumn,
     EditedAfterSyncColumn,
     UpdatedSinceLastReviewColumn,
 )
@@ -67,6 +61,9 @@ from .custom_search_nodes import (
     UpdatedInTheLastXDaysSearchNode,
     UpdatedSinceLastReviewSearchNode,
 )
+
+# Maximum number of notes that can be selected for bulk suggestions.
+BULK_SUGGESTION_LIMIT = 2000
 
 browser: Optional[Browser] = None
 ankihub_tree_item: Optional[SidebarItem] = None
@@ -104,45 +101,52 @@ def _setup_context_menu():
 
 
 def _on_browser_will_show_context_menu(browser: Browser, context_menu: QMenu) -> None:
+    """Adds AnkiHub menu actions to the browser context menu."""
+
+    context_menu.addSeparator()
+
     selected_nids = browser.selected_notes()
-    selected_nid = None
-    ankihub_nid = None
-    if len(selected_nids) == 1:
-        selected_nid = selected_nids[0]
-        ankihub_nid = ankihub_db.ankihub_nid_for_anki_nid(selected_nid)
 
-    menu = context_menu
+    # Set up actions that are only available if at least one note is selected
+    # and at least one of the selected notes has an AnkiHub note type.
+    actions = [
+        (
+            "AnkiHub: Bulk suggest notes",
+            lambda: _on_bulk_notes_suggest_action(browser, nids=selected_nids),
+        ),
+        (
+            "AnkiHub: Protect fields",
+            lambda: _on_protect_fields_action(browser, nids=selected_nids),
+        ),
+        (
+            "AnkiHub: Reset local changes",
+            lambda: _on_reset_local_changes_action(browser, nids=selected_nids),
+        ),
+        (
+            "AnkiHub: Suggest Optional Tags",
+            lambda: _on_suggest_optional_tags_action(browser),
+        ),
+    ]
 
-    menu.addSeparator()
-
-    menu.addAction(
-        "AnkiHub: Bulk suggest notes",
-        lambda: _on_bulk_notes_suggest_action(browser, nids=selected_nids),
+    mids = mids_of_notes(selected_nids)
+    at_least_one_note_has_ah_note_type = any(
+        ankihub_db.is_ankihub_note_type(mid) for mid in mids
     )
+    for name, func in actions:
+        action = context_menu.addAction(name, func)
+        if not selected_nids or not at_least_one_note_has_ah_note_type:
+            action.setDisabled(True)
 
-    protect_fields_action = menu.addAction(
-        "AnkiHub: Protect fields",
-        lambda: _on_protect_fields_action(browser, nids=selected_nids),
-    )
-    if len(selected_nids) < 1:
-        protect_fields_action.setDisabled(True)
-
-    menu.addAction(
-        "AnkiHub: Reset local changes",
-        lambda: _on_reset_local_changes_action(browser, nids=selected_nids),
-    )
-
-    menu.addAction(
-        "AnkiHub: Suggest Optional Tags",
-        lambda: _on_suggest_optional_tags_action(browser),
-    )
-
-    copy_ankihub_id_action = menu.addAction(
+    # Set up copy ankihub id to clipboard action
+    copy_ankihub_id_action = context_menu.addAction(
         "AnkiHub: Copy AnkiHub ID to clipboard",
-        lambda: aqt.mw.app.clipboard().setText(str(ankihub_nid)),
+        lambda: aqt.mw.app.clipboard().setText(str(ah_nid)),
     )
-    if len(selected_nids) != 1 or not ankihub_nid:
-        copy_ankihub_id_action.setDisabled(True)
+    copy_ankihub_id_action.setDisabled(True)
+    if len(selected_nids) == 1 and (
+        ah_nid := ankihub_db.ankihub_nid_for_anki_nid(selected_nids[0])
+    ):
+        copy_ankihub_id_action.setDisabled(False)
 
 
 def _on_protect_fields_action(browser: Browser, nids: Sequence[NoteId]) -> None:
@@ -233,17 +237,13 @@ def _on_protect_fields_action(browser: Browser, nids: Sequence[NoteId]) -> None:
 
 
 def _on_bulk_notes_suggest_action(browser: Browser, nids: Sequence[NoteId]) -> None:
-    if len(nids) > 500:
-        msg = "Please select at most 500 notes at a time for bulk suggestions.<br>"
+    if len(nids) > BULK_SUGGESTION_LIMIT:
+        msg = f"Please select at most {BULK_SUGGESTION_LIMIT} notes at a time for bulk suggestions.<br>"
         showInfo(msg, parent=browser)
         return
 
-    notes = [aqt.mw.col.get_note(nid) for nid in nids]
-    filtered_notes = [
-        note for note in notes if ankihub_db.is_ankihub_note_type(note.mid)
-    ]
-
-    if not filtered_notes:
+    filtered_nids = retain_nids_with_ah_note_type(nids)
+    if not filtered_nids:
         showInfo(
             "The selected notes need to have an AnkiHub note type.<br><br>"
             "You can use <b>AnkiHub -> With AnkiHub ID</b> (for suggesting changes to notes) "
@@ -252,18 +252,16 @@ def _on_bulk_notes_suggest_action(browser: Browser, nids: Sequence[NoteId]) -> N
         )
         return
 
-    if len(filtered_notes) != len(notes):
+    if len(filtered_nids) != len(nids):
         showInfo(
-            f"{len(notes) - len(filtered_notes)} of the {len(notes)} selected notes don't have an AnkiHub note type "
+            f"{len(nids) - len(filtered_nids)} of the {len(nids)} selected notes don't have an AnkiHub note type "
             "and will be ignored.<br><br>"
             "You can use <b>AnkiHub -> With AnkiHub ID</b> (for suggesting changes to notes) "
             "or <b>AnkiHub -> ID Pending</b> (for suggesting new notes) in the left sidebar to find notes to suggest.",
             parent=browser,
         )
 
-    ah_dids = ankihub_db.ankihub_dids_for_anki_nids(
-        [note.id for note in filtered_notes]
-    )
+    ah_dids = ankihub_db.ankihub_dids_for_anki_nids(filtered_nids)
     if len(ah_dids) > 1:
         msg = (
             "You can only create suggestions for notes from one AnkiHub deck at a time.<br>"
@@ -272,7 +270,7 @@ def _on_bulk_notes_suggest_action(browser: Browser, nids: Sequence[NoteId]) -> N
         showInfo(msg, parent=browser)
         return
 
-    open_suggestion_dialog_for_bulk_suggestion(notes=filtered_notes, parent=browser)
+    open_suggestion_dialog_for_bulk_suggestion(anki_nids=filtered_nids, parent=browser)
 
 
 def _on_reset_local_changes_action(browser: Browser, nids: Sequence[NoteId]) -> None:
@@ -508,7 +506,6 @@ def _on_reset_optional_tags_action(browser: Browser):
 
 
 def _reset_optional_tag_group(extension_id: int) -> None:
-
     extension_config = config.deck_extension_config(extension_id)
     _remove_optional_tags_of_extension(extension_config)
 
@@ -562,30 +559,10 @@ def _on_browser_did_fetch_row(
 # cutom search nodes
 def _setup_search():
     browser_will_search.append(_on_browser_will_search)
-    browser_did_search.append(_on_browser_did_search)
+    browser_did_search.append(_on_browser_did_search_handle_custom_search_parameters)
 
 
 def _on_browser_will_search(ctx: SearchContext):
-    _on_browser_will_search_handle_custom_column_ordering(ctx)
-    _on_browser_will_search_handle_custom_search_parameters(ctx)
-
-
-def _on_browser_will_search_handle_custom_column_ordering(ctx: SearchContext):
-    if not isinstance(ctx.order, Column):
-        return
-
-    custom_column: CustomColumn = next(
-        (c for c in custom_columns if c.builtin_column.key == ctx.order.key), None
-    )
-    if custom_column is None:
-        return
-
-    attach_ankihub_db_to_anki_db_connection()
-
-    ctx.order = custom_column.order_by_str()
-
-
-def _on_browser_will_search_handle_custom_search_parameters(ctx: SearchContext):
     if not ctx.search:
         return
 
@@ -609,15 +586,6 @@ def _on_browser_will_search_handle_custom_search_parameters(ctx: SearchContext):
 
         # remove the custom search parameter from the search string
         ctx.search = ctx.search.replace(m.group(0), "")
-
-
-def _on_browser_did_search(ctx: SearchContext):
-    # Detach the ankihub database in case it was attached in on_browser_will_search_handle_custom_column_ordering.
-    # The attached_ankihub_db context manager can't be used for this because the database query happens
-    # in the rust backend.
-    detach_ankihub_db_from_anki_db_connection()
-
-    _on_browser_did_search_handle_custom_search_parameters(ctx)
 
 
 def _on_browser_did_search_handle_custom_search_parameters(ctx: SearchContext):
@@ -731,7 +699,6 @@ def _sidebar_item_descendants(item: SidebarItem) -> List[SidebarItem]:
 
 
 def _add_ankihub_tree(tree: SidebarItem) -> SidebarItem:
-
     result = tree.add_simple(
         name="👑 AnkiHub",
         icon="",

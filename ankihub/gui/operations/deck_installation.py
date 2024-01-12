@@ -3,35 +3,40 @@
 import uuid
 from concurrent.futures import Future
 from datetime import datetime
+from functools import partial
 from typing import Callable, List
 
 import aqt
-from aqt.emptycards import show_empty_cards
 from aqt.operations.tag import clear_unused_tags
-from aqt.utils import showInfo
+from aqt.qt import QDialogButtonBox
 
 from ... import LOGGER
 from ...addon_ankihub_client import AddonAnkiHubClient as AnkiHubClient
 from ...ankihub_client import NoteInfo
+from ...ankihub_client.ankihub_client import AnkiHubHTTPError
 from ...ankihub_client.models import UserDeckRelation
 from ...main.importing import AnkiHubImporter, AnkiHubImportResult
 from ...main.note_types import fetch_note_types_based_on_notes
 from ...main.subdecks import deck_contains_subdeck_tags
-from ...main.utils import create_backup
-from ...settings import config
-from ..exceptions import DeckDownloadAndInstallError
+from ...main.utils import clear_empty_cards, create_backup
+from ...settings import DeckConfig, config
+from ..exceptions import DeckDownloadAndInstallError, RemoteDeckNotFoundError
 from ..media_sync import media_sync
 from ..messages import messages
-from ..utils import ask_user
+from ..utils import show_dialog, tooltip_icon
 from .subdecks import confirm_and_toggle_subdecks
 from .utils import future_with_exception, future_with_result
 
 
 def download_and_install_decks(
-    ankihub_dids: List[uuid.UUID], on_done: Callable[[Future], None]
+    ankihub_dids: List[uuid.UUID],
+    on_done: Callable[[Future], None],
+    cleanup: bool = True,
 ) -> None:
     """Downloads and installs the given decks in the background.
-    Shows an import summary once the decks are installed."""
+    Shows an import summary once the decks are installed.
+    If cleanup is True, unused tags and empty cards are cleared after the decks are installed.
+    """
 
     def on_install_done(future: Future):
         try:
@@ -47,9 +52,8 @@ def download_and_install_decks(
             on_done(future_with_exception(e))
 
     def on_install_done_inner(import_results: List[AnkiHubImportResult]):
-
-        # Clean up after deck installations
-        _cleanup_after_deck_install(multiple_decks=len(import_results) > 1)
+        if cleanup:
+            _cleanup_after_deck_install()
 
         # Reset the main window
         aqt.mw.reset()
@@ -60,25 +64,7 @@ def download_and_install_decks(
             if deck_contains_subdeck_tags(ah_did):
                 confirm_and_toggle_subdecks(ah_did)
 
-        # Show import result message
-        # ... Anki deck names can be different from AnkiHub deck names, so we need to look them up.
-        ankihub_deck_names = [
-            config.deck_config(ah_did).name for ah_did in ankihub_dids
-        ]
-        anki_deck_names = [
-            aqt.mw.col.decks.name(config.deck_config(ah_did).anki_id)
-            for ah_did in ankihub_dids
-        ]
-        message = messages.deck_import_summary(
-            ankihub_deck_names=ankihub_deck_names,
-            anki_deck_names=anki_deck_names,
-            import_results=import_results,
-        )
-        showInfo(
-            title="AnkiHub Deck Import Summary",
-            text=message,
-            textFormat="rich",
-        )
+        _show_deck_import_summary_dialog(import_results)
 
     try:
         # Install decks in background
@@ -88,7 +74,41 @@ def download_and_install_decks(
             label="Downloading decks from AnkiHub",
         )
     except Exception as e:
-        on_done(future_with_exception(e))
+        # Using run_on_main prevents exceptions which occur in the callback to be backpropagated to the caller,
+        # which is what we want.
+        aqt.mw.taskman.run_on_main(partial(on_done, future_with_exception(e)))
+
+
+def _show_deck_import_summary_dialog(
+    import_results: List[AnkiHubImportResult],
+) -> None:
+    ankihub_dids = [import_result.ankihub_did for import_result in import_results]
+    ankihub_deck_names = [config.deck_config(ah_did).name for ah_did in ankihub_dids]
+    anki_deck_names = [
+        aqt.mw.col.decks.name(config.deck_config(ah_did).anki_id)
+        for ah_did in ankihub_dids
+    ]
+    message = messages.deck_import_summary(
+        ankihub_deck_names=ankihub_deck_names,
+        anki_deck_names=anki_deck_names,
+        import_results=import_results,
+    )
+
+    def on_button_clicked(button_index: int) -> None:
+        from ..decks_dialog import DeckManagementDialog
+
+        if button_index == 0:
+            DeckManagementDialog.display_subscribe_window()
+
+    show_dialog(
+        message,
+        title="AnkiHub | Deck Import Summary",
+        buttons=["Go to Deck Management", QDialogButtonBox.StandardButton.Ok],
+        default_button_idx=1,
+        scrollable=True,
+        icon=tooltip_icon(),
+        callback=on_button_clicked,
+    )
 
 
 def _download_and_install_decks_inner(
@@ -118,7 +138,13 @@ def _download_and_install_decks_inner(
 
 
 def _download_and_install_single_deck(ankihub_did: uuid.UUID) -> AnkiHubImportResult:
-    deck = AnkiHubClient().get_deck_by_id(ankihub_did)
+    try:
+        deck = AnkiHubClient().get_deck_by_id(ankihub_did)
+    except AnkiHubHTTPError as e:
+        if e.response.status_code == 404:
+            raise RemoteDeckNotFoundError(ankihub_did=ankihub_did) from e
+        raise e
+
     notes_data: List[NoteInfo] = AnkiHubClient().download_deck(
         deck.ah_did, download_progress_cb=_download_progress_cb
     )
@@ -164,6 +190,10 @@ def _install_deck(
         is_first_import_of_deck=True,
         protected_fields=protected_fields,
         protected_tags=protected_tags,
+        suspend_new_cards_of_existing_notes=DeckConfig.suspend_new_cards_of_existing_notes_default(),
+        suspend_new_cards_of_new_notes=DeckConfig.suspend_new_cards_of_new_notes_default(
+            ankihub_did
+        ),
     )
 
     config.add_deck(
@@ -174,7 +204,7 @@ def _install_deck(
         latest_udpate=latest_update,
     )
 
-    media_sync.start_media_download()
+    aqt.mw.taskman.run_on_main(media_sync.start_media_download)
 
     LOGGER.info("Importing deck was succesful.")
 
@@ -193,15 +223,8 @@ def _download_progress_cb(percent: int):
     )
 
 
-def _cleanup_after_deck_install(multiple_decks: bool) -> None:
-    message = (
-        (
-            "The deck has been successfully installed!<br><br>"
-            if not multiple_decks
-            else "The decks have been successfully installed!<br><br>"
-        )
-        + "Do you want to clear unused tags and empty cards from your collection? (recommended)"
-    )
-    if ask_user(message, title="AnkiHub", show_cancel_button=False):
-        clear_unused_tags(parent=aqt.mw).run_in_background()
-        show_empty_cards(aqt.mw)
+def _cleanup_after_deck_install() -> None:
+    """Clears unused tags and empty cards. We do this because importing a deck which the user
+    already has in their collection can result in many unused tags and empty cards."""
+    clear_unused_tags(parent=aqt.mw).run_in_background()
+    clear_empty_cards()

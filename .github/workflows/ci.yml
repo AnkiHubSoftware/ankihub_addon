@@ -1,7 +1,10 @@
 name: tests
 env:
   COMPOSE_DOCKER_CLI_BUILD: 1
-  COMPOSE_FILE: ${{ github.workspace }}/ankihub_web/local.yml
+  WEBAPP_COMPOSE_FILE: ${{ github.workspace }}/ankihub_web/compose.yml
+  AWS_REGION: us-east-1
+  AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
+  AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
 
 on:
   push:
@@ -10,8 +13,14 @@ on:
   pull_request:
 
 jobs:
-  test:
+  test-addon:
     runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        include:
+          - replace_anki_version: false
+          - replace_anki_version: true
+            anki_package_version: 'aqt[qt5]==2.1.56'
     timeout-minutes: 30
     steps:
       - uses: actions/setup-python@v4
@@ -21,45 +30,47 @@ jobs:
       - name: Checkout ankihub_addon
         uses: actions/checkout@v3
 
-      - name: Get pip cache dir
-        id: pip-cache
-        run: |
-          python -m pip install --upgrade pip
-          echo "::set-output name=dir::$(pip cache dir)"
-
-      - name: pip cache
-        uses: actions/cache@v3
+      - name: Setup addon
+        uses: ./.github/actions/setup-addon
         with:
-          path: |
-            ${{ steps.pip-cache.outputs.dir }}
-            ~/.cache/pre-commit
-          key: ${{ runner.os }}-pip-${{ hashFiles('**/dev.txt', '**/base.txt', '.pre-commit-config.yaml') }}
-          restore-keys: |
-            ${{ runner.os }}-pip-
+          google_api_key: ${{ secrets.GOOGLE_API_KEY }}
+          install_qt: true
 
-      - name: Install Qt
-        uses: jurplel/install-qt-action@v3
+      - name: Replace Anki version
+        if: ${{ matrix.replace_anki_version }}
+        run: pip install "${{ matrix.anki_package_version }}"
+
+      - name: Run pytest with coverage
+        run: |
+          pytest ./tests/addon --cov --cov-report=xml -n 4
+          pytest ./tests/addon --performance -k performance -n1 --cov-report=xml --cov-append
+
+      - name: Upload coverage
+        uses: actions/upload-artifact@v2
         with:
-          version: "5.15.2"
-          setup-python: "false"
-        continue-on-error: true
+          name: coverage_addon_${{ matrix.anki_package_version }}
+          path: .coverage
 
-      - name: Install deps
-        run: |
-          python -m pip install -r ./requirements/dev.txt
-          python -m pip install smokeshow
 
-      - name: Run pre-commit
-        run: pre-commit run --all-files
+  test-client:
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        group: [1, 2]
+    timeout-minutes: 30
+    steps:
+      - uses: actions/setup-python@v4
+        with:
+          python-version: "3.9"
 
-      - name: Build
-        run: |
-          python ./scripts/build.py
-        env:
-          GOOGLE_API_KEY: ${{ secrets.GOOGLE_API_KEY }}
+      - name: Checkout ankihub_addon
+        uses: actions/checkout@v3
 
-      - name: Run mypy
-        run: mypy
+      - name: Setup addon
+        uses: ./.github/actions/setup-addon
+        with:
+          google_api_key: ${{ secrets.GOOGLE_API_KEY }}
+          install_qt: false
 
       - name: Enable cloning web app repo
         uses: webfactory/ssh-agent@v0.5.4
@@ -76,37 +87,61 @@ jobs:
       - name: Set up AnkiHub env
         run: |
           mv ${{ github.workspace }}/ankihub_web/.env.dev ${{ github.workspace }}/ankihub_web/.env
-          echo DEPLOYMENT_ENVIRONMENT=local >> ${{ github.workspace }}/ankihub_web/.env
 
-      - run: docker-compose pull
-      - run: echo "WEEK=$(date +%U)" >> $GITHUB_ENV
-      - uses: satackey/action-docker-layer-caching@v0.0.11
-        continue-on-error: true
-        with:
-          key: ${{ github.workflow }}-${{ env.WEEK }}-{hash}
-          restore-keys: |
-            ${{ github.workflow }}-${{ env.WEEK }}-
-      - run: |
-          docker-compose build
-          docker-compose run --rm django \
-                python manage.py makemigrations && \
-                django bash release.sh && \
-                django python manage.py print_settings
-          docker-compose up -d
-          until $(curl --output /dev/null --silent --head --fail http://localhost:8000); do
-              printf '.'
-              sleep 5
-          done
+      - uses: taiki-e/install-action@just
+
+      - name: Setup AnkiHub
+        working-directory: ${{ github.workspace }}/ankihub_web
+        run: |
+          just pull-all-images
+          docker compose run --rm django bash release.sh
+          just up
 
       - name: Run pytest with coverage
         run: |
-          pytest ./tests/addon --cov --cov-report=xml
-          pytest ./tests/client --disable-vcr --cov --cov-report=xml --cov-append
-          coverage html
-          pytest ./tests/addon -k performance -n1
+          pytest ./tests/client --disable-vcr --cov --cov-report=xml \
+            --splits 2 --group ${{ matrix.group }} --durations-path=tests/.test_durations
+
+      - name: Upload coverage
+        uses: actions/upload-artifact@v2
+        with:
+          name: coverage_client_${{ matrix.group }}
+          path: .coverage
+
+
+  coverage-and-static-checks:
+    needs: ["test-addon", "test-client"]
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v2
+      - name: Set up Python 3.9
+        uses: actions/setup-python@v2
+        with:
+          python-version: "3.9"
+
+      - name: Setup addon
+        uses: ./.github/actions/setup-addon
+        with:
+          google_api_key: ${{ secrets.GOOGLE_API_KEY }}
+          install_qt: false
+
+      - name: Download all artifacts
+        uses: actions/download-artifact@v2
+
+      - name: Run coverage
+        run: |
+          coverage combine coverage*/.coverage*
+          coverage html --fail-under=76
+
+      - name: Install smokeshow
+        run: |
+          python -m pip install smokeshow
+
+      - uses: codecov/codecov-action@v1
 
       - name: Upload coverage report with smokeshow
         run: smokeshow upload coverage_html_report
+        if: always()
         env:
           SMOKESHOW_GITHUB_STATUS_DESCRIPTION: Add-on Test Coverage {coverage-percentage}
           SMOKESHOW_GITHUB_COVERAGE_THRESHOLD: 66
@@ -114,6 +149,7 @@ jobs:
           SMOKESHOW_GITHUB_PR_HEAD_SHA: ${{ github.event.pull_request.head.sha }}
 
       - name: Upload coverage to Codecov
+        if: always()
         env:
           CODECOV_TOKEN: "${{ secrets.CODECOV_TOKEN }}"
         uses: codecov/codecov-action@v1
@@ -132,6 +168,8 @@ jobs:
           name: ankihub_addon_${{ github.sha }}
           path: ankihub.ankiaddon
 
-      - name: Clean up docker images
-        run: docker image prune --all --force --filter "until=168h"
-        if: always()
+      - name: Run pre-commit
+        run: pre-commit run --all
+
+      - name: Run mypy
+        run: mypy

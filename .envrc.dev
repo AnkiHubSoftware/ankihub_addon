@@ -1,9 +1,5 @@
 # These are used by VSCode prior to starting Anki.
-export ANKI_EXEC=<CHANGE ME>
 export GOOGLE_API_KEY=<CHANGE ME>
-export ANKI_BASE=/tmp/Anki2
-export TEMPORARY_ANKI_BASE=/tmp/Anki2_temp
-export ANKI_PROFILE=dev
 export REPORT_ERRORS=0
 export ANKIHUB_APP_URL=http://localhost:8000
 export S3_BUCKET_URL=https://ankihubbucket.s3.us-east-2.amazonaws.com
@@ -12,3 +8,4 @@ export QTWEBENGINE_CHROMIUM_FLAGS="--no-sandbox"
 export QTWEBENGINE_REMOTE_DEBUGGING=8080
 export ANKIDEV=1
 export LOGTERM=1
+export WEBAPP_COMPOSE_FILE=<CHANGE ME>

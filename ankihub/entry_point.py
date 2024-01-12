@@ -9,7 +9,8 @@ from aqt.gui_hooks import profile_did_open, profile_will_close
 from . import LOGGER
 from .db import ankihub_db
 from .debug import setup as setup_debug
-from .gui import browser, deckbrowser, editor, progress, reviewer, taskman
+from .feature_flags import setup_feature_flags
+from .gui import browser, deckbrowser, editor, progress, reviewer
 from .gui.addons import setup_addons
 from .gui.auto_sync import setup_auto_sync
 from .gui.config_dialog import setup_config_dialog_manager
@@ -19,6 +20,7 @@ from .gui.menu import menu_state, refresh_ankihub_menu, setup_ankihub_menu
 from .main.note_deletion import handle_notes_deleted_from_webapp
 from .main.utils import modify_note_type_templates
 from .settings import (
+    ADDON_VERSION,
     ANKI_VERSION,
     ankihub_db_path,
     config,
@@ -40,6 +42,8 @@ def run():
     setup_logger()
     LOGGER.info("Set up logger.")
 
+    LOGGER.info(f"{ADDON_VERSION=}")
+    LOGGER.info(f"{ANKI_VERSION=}")
     LOGGER.info(f"AnkiHub app url: {config.app_url}")
     LOGGER.info(f"S3 bucket url: {config.s3_bucket_url}")
 
@@ -58,9 +62,11 @@ def _on_profile_did_open():
         ATTEMPTED_GENERAL_SETUP = True
         _general_setup()
 
+    media_sync.allow_background_threads()
+
 
 def _on_profile_will_close():
-    media_sync.cleanup()
+    media_sync.stop_background_threads()
 
 
 def _profile_setup() -> bool:
@@ -109,7 +115,8 @@ def _general_setup():
     setup_error_handler()
     LOGGER.info("Set up error handler.")
 
-    LOGGER.info(f"{ANKI_VERSION=}")
+    setup_feature_flags()
+    LOGGER.info("Set up feature flags.")
 
     aqt.mw.addonManager.setWebExports(__name__, r"gui/web/.*")
 
@@ -137,11 +144,8 @@ def _general_setup():
     progress.setup()
     LOGGER.info("Set up progress manager.")
 
-    taskman.setup()
-    LOGGER.info("Set up task manager.")
-
     deckbrowser.setup()
-    LOGGER.info("Setup deck browser")
+    LOGGER.info("Set up deck browser")
 
     _trigger_addon_update_check()
     LOGGER.info("Triggered add-on update check.")
@@ -151,7 +155,7 @@ def _general_setup():
     LOGGER.info("Loaded media_export.")
 
     setup_auto_sync()
-    LOGGER.info("Called setup_ankihub_sync_on_ankiweb_sync.")
+    LOGGER.info("Set up auto sync.")
 
 
 def _log_enabled_addons():

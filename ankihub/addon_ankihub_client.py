@@ -16,7 +16,7 @@ from .ankihub_client.ankihub_client import API
 from .settings import config
 
 
-def logging_hook(response: Response, *args, **kwargs):
+def logging_hook(response: Response, *args, **kwargs) -> Response:
     endpoint = response.request.url
     method = response.request.method
     body = response.request.body
@@ -46,7 +46,7 @@ def logging_hook(response: Response, *args, **kwargs):
             # We don't want to log the content of the response if it's not JSON
             pass
     else:
-        LOGGER.debug(f"response content: {response.text}")
+        LOGGER.info(f"response content: {response.text}")
 
     return response
 
@@ -63,11 +63,12 @@ class AddonAnkiHubClient(AnkiHubClient):
             s3_bucket_url=config.s3_bucket_url,
             response_hooks=hooks if hooks is not None else DEFAULT_RESPONSE_HOOKS,
             get_token=lambda: config.token(),
-            local_media_dir_path=Path(aqt.mw.col.media.dir()) if aqt.mw.col else None,
+            local_media_dir_path_cb=lambda: Path(aqt.mw.col.media.dir())
+            if aqt.mw.col
+            else None,
         )
 
     def upload_logs(self, file: Path, key: str) -> None:
-
         with open(file, "rb") as f:
             log_data = f.read()
 

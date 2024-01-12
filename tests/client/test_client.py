@@ -1,3 +1,4 @@
+import dataclasses
 import gzip
 import json
 import os
@@ -6,14 +7,14 @@ import tempfile
 import uuid
 import zipfile
 from copy import deepcopy
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 from pathlib import Path
-from typing import Callable, List, cast
-from unittest.mock import MagicMock, Mock
+from typing import Callable, Generator, List, cast
 
 import pytest
 import requests_mock
-from pytest import FixtureRequest, MonkeyPatch
+from pytest import FixtureRequest
+from pytest_mock import MockerFixture
 from requests_mock import Mocker
 from vcr import VCR  # type: ignore
 
@@ -47,9 +48,12 @@ from ankihub.ankihub_client import (
     get_media_names_from_notes_data,
     get_media_names_from_suggestion,
 )
+from ankihub.ankihub_client.models import CardReviewData, UserDeckExtensionRelation
 from ankihub.gui.operations.deck_installation import _download_progress_cb
 
-COMPOSE_FILE = Path(os.getenv("COMPOSE_FILE")) if os.getenv("COMPOSE_FILE") else None
+WEBAPP_COMPOSE_FILE = (
+    Path(os.getenv("WEBAPP_COMPOSE_FILE")) if os.getenv("WEBAPP_COMPOSE_FILE") else None
+)
 
 TEST_DATA_PATH = Path(__file__).parent.parent / "test_data"
 DECK_CSV = TEST_DATA_PATH / "deck_with_one_basic_note.csv"
@@ -76,55 +80,190 @@ DATETIME_OF_ADDING_FIRST_DECK_MEDIA = datetime(
     year=2023, month=1, day=2, tzinfo=timezone.utc
 )
 
+DJANGO_CONTAINER_NAME = "django"
+
+DB_NAME = "ankihub"
+DB_USERNAME = "user"
+DB_DUMP_FILE_NAME = f"{DB_NAME}.dump"
+DB_CONTAINER_NAME = "postgres"
+
+NO_SUCH_FILE_OR_DIRECTORY_MESSAGE = "No such file or directory"
+
 
 @pytest.fixture
-def client_with_server_setup(vcr: VCR, request, marks):
+def client_with_server_setup(vcr: VCR, marks: List[str], request: FixtureRequest):
+    """Resets the server database to an initial state before each test.
+    If VCR is used (playback mode), this step is skipped.
+    Yields a client that is logged in.
+    """
+
     if "skipifvcr" in marks and vcr_enabled(vcr):
         pytest.skip("Skipping test because test has skipifvcr mark and VCR is enabled")
 
-    cassette_name = ".".join(request.node.nodeid.split("::")[1:]) + ".yaml"
-    cassette_path = VCR_CASSETTES_PATH / cassette_name
-    playback_mode = vcr_enabled(vcr) and cassette_path.exists()
+    if not is_playback_mode(vcr, request):
+        create_db_dump_if_not_exists()
 
-    if not playback_mode:
-        run_command_in_django_container(
-            "python manage.py flush --no-input && "
-            "python manage.py runscript create_test_users && "
-            "python manage.py runscript create_fixture_data"
+        # Restore DB from dump
+        result = subprocess.run(
+            [
+                "docker",
+                "exec",
+                "-i",
+                DB_CONTAINER_NAME,
+                "pg_restore",
+                f"--dbname={DB_NAME}",
+                f"--username={DB_USERNAME}",
+                "--format=custom",
+                "--clean",
+                "--jobs=4",
+                DB_DUMP_FILE_NAME,
+            ],
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
+            text=True,
+        )
+        report_command_result(
+            # We don't want to raise an error here because pg_restore might return some warnings which
+            # can be ignored.
+            command_name="pg_restore",
+            result=result,
+            raise_on_error=False,
         )
 
-    client = AnkiHubClient(api_url=LOCAL_API_URL, local_media_dir_path=TEST_MEDIA_PATH)
+    client = AnkiHubClient(
+        api_url=LOCAL_API_URL, local_media_dir_path_cb=lambda: TEST_MEDIA_PATH
+    )
     yield client
 
 
-def run_command_in_django_container(command):
+def is_playback_mode(vcr: VCR, request: FixtureRequest) -> bool:
+    """Playback mode is when the test is run using the recorded HTTP responses (VCR)."""
+    cassette_name = ".".join(request.node.nodeid.split("::")[1:]) + ".yaml"
+    cassette_path = VCR_CASSETTES_PATH / cassette_name
+    result = vcr_enabled(vcr) and cassette_path.exists()
+    return result
+
+
+def create_db_dump_if_not_exists() -> None:
+    """Create a DB dump with the initial state of the DB if it doesn't exist yet.
+    The DB is restored to this state before each test."""
+
+    # Check if DB dump exists
     result = subprocess.run(
         [
-            "sudo",
-            "docker-compose",
-            "-f",
-            COMPOSE_FILE.absolute(),
-            "run",
-            "--rm",
-            "django",
-            "bash",
-            "-c",
-            command,
+            "docker",
+            "exec",
+            "-i",
+            DB_CONTAINER_NAME,
+            "ls",
+            DB_DUMP_FILE_NAME,
         ],
-        text=True,
         stdout=subprocess.PIPE,
         stderr=subprocess.PIPE,
+        text=True,
     )
+    report_command_result(command_name="ls", result=result, raise_on_error=False)
 
+    if result.stdout.strip() == DB_DUMP_FILE_NAME:
+        # DB dump exists, no need to create it
+        return
+    elif NO_SUCH_FILE_OR_DIRECTORY_MESSAGE in result.stderr:
+        # DB dump doesn't exist, create it
+        pass
+    else:
+        assert False, f"Command ls failed with error code {result.returncode}"
+
+    # Prepare the DB state
+    result = subprocess.run(
+        [
+            "docker",
+            "exec",
+            DJANGO_CONTAINER_NAME,
+            "bash",
+            "-c",
+            (
+                "python manage.py flush --no-input && "
+                "python manage.py migrate && "
+                "python manage.py runscript create_fixture_data"
+            ),
+        ],
+        stdout=subprocess.PIPE,
+        stderr=subprocess.PIPE,
+        text=True,
+    )
+    report_command_result(command_name="db setup", result=result, raise_on_error=True)
+
+    # Dump the DB to a file to be able to restore it before each test
+    result = subprocess.run(
+        [
+            "docker",
+            "exec",
+            DB_CONTAINER_NAME,
+            "bash",
+            "-c",
+            (
+                f"pg_dump --dbname={DB_NAME} --username={DB_USERNAME} "
+                "--format=custom --schema=public "
+                f"> {DB_DUMP_FILE_NAME}"
+            ),
+        ],
+        stdout=subprocess.PIPE,
+        stderr=subprocess.PIPE,
+        text=True,
+    )
+    report_command_result(command_name="pg_dump", result=result, raise_on_error=True)
+
+
+@pytest.fixture(scope="session", autouse=True)
+def remove_db_dump() -> Generator:
+    """Remove the db dump on the start of the session so that it is re-created for each session."""
+    result = subprocess.run(
+        [
+            "docker",
+            "exec",
+            DB_CONTAINER_NAME,
+            "rm",
+            DB_DUMP_FILE_NAME,
+        ],
+        stdout=subprocess.PIPE,
+        stderr=subprocess.PIPE,
+        text=True,
+    )
+    report_command_result(command_name="rm", result=result, raise_on_error=False)
+    if result.returncode == 0 or NO_SUCH_FILE_OR_DIRECTORY_MESSAGE in result.stderr:
+        # Nothing to do
+        pass
+    elif result.returncode == 1 and "No such container" in result.stderr:
+        # Nothing to do
+        pass
+    elif "Container" in result.stderr and "is not running" in result.stderr:
+        # Container is not running, nothing to do
+        pass
+    elif "docker: command not found" in result.stderr:
+        pass
+        # docker is not installed, nothing to do
+    else:
+        assert (
+            False
+        ), f"Command rm failed with error code {result.returncode} {result.stderr}"
+
+    yield
+
+
+def report_command_result(
+    command_name: str, result: subprocess.CompletedProcess, raise_on_error: bool
+) -> None:
     if result.returncode != 0:
-        print(f"Command '{command}' failed with error code {result.returncode}")
+        print(f"Command {command_name} failed with error code {result.returncode}")
         print(f"Stdout: {result.stdout}")
         print(f"Stderr: {result.stderr}")
+        if raise_on_error:
+            assert (
+                False
+            ), f"Command {command_name} failed with error code {result.returncode}"
     else:
-        print(f"Command '{command}' executed successfully.")
+        print(f"Command {command_name} executed successfully.")
         print(f"Stdout: {result.stdout}")
-
-    return result
 
 
 @pytest.fixture
@@ -263,13 +402,13 @@ def test_client_login_and_signout_with_email(client_with_server_setup):
 
 @pytest.mark.vcr()
 def test_download_deck(
-    authorized_client_for_user_test1: AnkiHubClient, monkeypatch: MonkeyPatch
+    authorized_client_for_user_test1: AnkiHubClient, mocker: MockerFixture
 ):
     client = authorized_client_for_user_test1
-
-    get_presigned_url_suffix = MagicMock()
-    get_presigned_url_suffix.return_value = "/fake_key"
-    monkeypatch.setattr(client, "_get_presigned_url_suffix", get_presigned_url_suffix)
+    presigned_url_suffix = "/fake_key"
+    mocker.patch.object(
+        client, "_get_presigned_url_suffix", return_value=presigned_url_suffix
+    )
 
     original_get_deck_by_id = client.get_deck_by_id
 
@@ -278,11 +417,11 @@ def test_download_deck(
         result.csv_notes_filename = "notes.csv"
         return result
 
-    monkeypatch.setattr(client, "get_deck_by_id", get_deck_by_id)
+    mocker.patch.object(client, "get_deck_by_id", side_effect=get_deck_by_id)
 
     with requests_mock.Mocker(real_http=True) as m:
         m.get(
-            f"{client.s3_bucket_url}{get_presigned_url_suffix.return_value}",
+            f"{client.s3_bucket_url}{presigned_url_suffix}",
             content=DECK_CSV.read_bytes(),
         )
         notes_data = client.download_deck(ah_did=ID_OF_DECK_OF_USER_TEST1)
@@ -292,13 +431,15 @@ def test_download_deck(
 
 @pytest.mark.vcr()
 def test_download_compressed_deck(
-    authorized_client_for_user_test1: AnkiHubClient, monkeypatch: MonkeyPatch
+    authorized_client_for_user_test1: AnkiHubClient,
+    mocker: MockerFixture,
 ):
     client = authorized_client_for_user_test1
 
-    get_presigned_url_suffix = MagicMock()
-    get_presigned_url_suffix.return_value = "/fake_key"
-    monkeypatch.setattr(client, "_get_presigned_url_suffix", get_presigned_url_suffix)
+    presigned_url_suffix = "/fake_key"
+    mocker.patch.object(
+        client, "_get_presigned_url_suffix", return_value=presigned_url_suffix
+    )
 
     original_get_deck_by_id = client.get_deck_by_id
 
@@ -307,11 +448,11 @@ def test_download_compressed_deck(
         result.csv_notes_filename = "notes.csv.gz"
         return result
 
-    monkeypatch.setattr(client, "get_deck_by_id", get_deck_by_id)
+    mocker.patch.object(client, "get_deck_by_id", side_effect=get_deck_by_id)
 
     with requests_mock.Mocker(real_http=True) as m:
         m.get(
-            f"{client.s3_bucket_url}{get_presigned_url_suffix.return_value}",
+            f"{client.s3_bucket_url}{presigned_url_suffix}",
             content=DECK_CSV_GZ.read_bytes(),
         )
         notes_data = client.download_deck(ah_did=ID_OF_DECK_OF_USER_TEST1)
@@ -321,13 +462,14 @@ def test_download_compressed_deck(
 
 @pytest.mark.vcr()
 def test_download_deck_with_progress(
-    authorized_client_for_user_test1: AnkiHubClient, monkeypatch: MonkeyPatch
+    authorized_client_for_user_test1: AnkiHubClient, mocker: MockerFixture
 ):
     client = authorized_client_for_user_test1
 
-    get_presigned_url_suffix = MagicMock()
-    get_presigned_url_suffix.return_value = "/fake_key"
-    monkeypatch.setattr(client, "_get_presigned_url_suffix", get_presigned_url_suffix)
+    presigned_url_suffix = "/fake_key"
+    mocker.patch.object(
+        client, "_get_presigned_url_suffix", return_value=presigned_url_suffix
+    )
 
     original_get_deck_by_id = client.get_deck_by_id
 
@@ -336,11 +478,11 @@ def test_download_deck_with_progress(
         result.csv_notes_filename = "notes.csv"
         return result
 
-    monkeypatch.setattr(client, "get_deck_by_id", get_deck_by_id)
+    mocker.patch.object(client, "get_deck_by_id", side_effect=get_deck_by_id)
 
     with requests_mock.Mocker(real_http=True) as m:
         m.get(
-            f"{client.s3_bucket_url}{get_presigned_url_suffix.return_value}",
+            f"{client.s3_bucket_url}{presigned_url_suffix}",
             content=DECK_CSV.read_bytes(),
             headers={"content-length": "1000000"},
         )
@@ -377,7 +519,7 @@ def create_note_on_ankihub_and_assert(
 def test_upload_deck(
     authorized_client_for_user_test1: AnkiHubClient,
     next_deterministic_id: Callable[[], int],
-    monkeypatch: MonkeyPatch,
+    mocker: MockerFixture,
 ):
     client = authorized_client_for_user_test1
 
@@ -386,20 +528,16 @@ def test_upload_deck(
     # create the deck on AnkiHub
     # upload to s3 is mocked out, this will potentially cause errors on the locally running AnkiHub
     # because the deck will not be uploaded to s3, but we don't care about that here
-    upload_to_s3_mock = Mock()
-    with monkeypatch.context() as m:
-        m.setattr(client, "_upload_to_s3", upload_to_s3_mock)
-        m.setattr(
-            client, "_get_presigned_url_suffix", lambda *args, **kwargs: "fake_key"
-        )
+    upload_to_s3_mock = mocker.patch.object(client, "_upload_to_s3")
+    mocker.patch.object(client, "_get_presigned_url_suffix", return_value="fake_key")
 
-        client.upload_deck(
-            deck_name="test deck",
-            notes_data=[note_data],
-            note_types_data=[],
-            anki_deck_id=next_deterministic_id(),
-            private=False,
-        )
+    client.upload_deck(
+        deck_name="test deck",
+        notes_data=[note_data],
+        note_types_data=[],
+        anki_deck_id=next_deterministic_id(),
+        private=False,
+    )
 
     # check that the deck would be uploaded to s3
     assert upload_to_s3_mock.call_count == 1
@@ -703,17 +841,28 @@ class TestDecksWithUserRelation:
         assert deck_of_user_test2.user_relation == UserDeckRelation.SUBSCRIBER
 
 
+class TestGetOwnedDecks:
+    @pytest.mark.vcr()
+    def test_basic(
+        self,
+        authorized_client_for_user_test1: AnkiHubClient,
+    ):
+        client = authorized_client_for_user_test1
+
+        decks = client.get_owned_decks()
+        assert len(decks) == 1
+        assert decks[0].ah_did == ID_OF_DECK_OF_USER_TEST1
+
+
 class TestGetDeckUpdates:
     @pytest.mark.vcr()
     def test_get_deck_updates(
-        self,
-        authorized_client_for_user_test2: AnkiHubClient,
-        monkeypatch: MonkeyPatch,
+        self, authorized_client_for_user_test2: AnkiHubClient, mocker: MockerFixture
     ):
         client = authorized_client_for_user_test2
 
         page_size = 5
-        monkeypatch.setattr(
+        mocker.patch(
             "ankihub.ankihub_client.ankihub_client.DECK_UPDATE_PAGE_SIZE", page_size
         )
         update_chunks: List[DeckUpdateChunk] = list(
@@ -756,6 +905,36 @@ class TestGetDeckUpdates:
 
 
 class TestGetDeckMediaUpdates:
+    def setup_method(self):
+        # Mimics the state of the deck media on the server.
+        # The deck media is ordered by the time of creation with the most recent one being the first.
+        self.deck_media_on_server = [
+            DeckMedia(
+                name=f"example_{i}.png",
+                file_content_hash=f"{i}0000000000000000000000000000000",
+                modified=datetime.now(tz=timezone.utc),  # will be ignored
+                referenced_on_accepted_note=False,
+                exists_on_s3=False,
+                download_enabled=True,
+            )
+            for i in reversed(range(3))
+        ]
+
+    def _assert_media_as_expected(
+        self, actual: List[DeckMedia], expected: List[DeckMedia]
+    ):
+        # Convert DeckMedia objects to dicts
+        actual_dicts = [dataclasses.asdict(media) for media in actual]
+        expected_dicts = [dataclasses.asdict(media) for media in expected]
+
+        # Remove the 'modified' field from all dictionaries
+        for a in actual_dicts:
+            a.pop("modified", None)
+        for e in expected_dicts:
+            e.pop("modified", None)
+
+        assert actual_dicts == expected_dicts
+
     @pytest.mark.vcr()
     def test_get_all_media(
         self,
@@ -769,16 +948,9 @@ class TestGetDeckMediaUpdates:
         assert len(update_chunks) == 1
         assert len(update_chunks[0].media) == 3
         deck_media_objects = update_chunks[0].media
-        assert deck_media_objects == [
-            DeckMedia(
-                name=f"example_{i}.png",
-                file_content_hash=f"{i}0000000000000000000000000000000",
-                referenced_on_accepted_note=False,
-                exists_on_s3=False,
-                download_enabled=True,
-            )
-            for i in reversed(range(3))
-        ]
+        self._assert_media_as_expected(
+            actual=deck_media_objects, expected=self.deck_media_on_server
+        )
 
     @pytest.mark.vcr()
     def test_get_media_since(
@@ -797,28 +969,21 @@ class TestGetDeckMediaUpdates:
         assert len(update_chunks) == 1
         assert len(update_chunks[0].media) == 2
         deck_media_objects = update_chunks[0].media
-        assert deck_media_objects == [
-            DeckMedia(
-                name=f"example_{i}.png",
-                file_content_hash=f"{i}0000000000000000000000000000000",
-                referenced_on_accepted_note=False,
-                exists_on_s3=False,
-                download_enabled=True,
-            )
-            for i in reversed(range(1, 3))
-        ]
+        self._assert_media_as_expected(
+            # the oldest DeckMedia is not returned
+            actual=deck_media_objects,
+            expected=self.deck_media_on_server[:-1],
+        )
 
     @pytest.mark.vcr()
     def test_pagination(
-        self,
-        authorized_client_for_user_test1: AnkiHubClient,
-        monkeypatch: MonkeyPatch,
+        self, authorized_client_for_user_test1: AnkiHubClient, mocker: MockerFixture
     ):
         client = authorized_client_for_user_test1
 
         # Set page size to 1 so that we can test pagination
         page_size = 1
-        monkeypatch.setattr(
+        mocker.patch(
             "ankihub.ankihub_client.ankihub_client.DECK_MEDIA_UPDATE_PAGE_SIZE",
             page_size,
         )
@@ -830,16 +995,29 @@ class TestGetDeckMediaUpdates:
         assert len(update_chunks) == 3
 
         deck_media_objects = [media for chunk in update_chunks for media in chunk.media]
-        assert deck_media_objects == [
-            DeckMedia(
-                name=f"example_{i}.png",
-                file_content_hash=f"{i}0000000000000000000000000000000",
-                referenced_on_accepted_note=False,
-                exists_on_s3=False,
-                download_enabled=True,
-            )
-            for i in reversed(range(3))
-        ]
+        self._assert_media_as_expected(
+            actual=deck_media_objects, expected=self.deck_media_on_server
+        )
+
+
+@pytest.mark.vcr()
+def test_get_deck_extensions(
+    authorized_client_for_user_test1: AnkiHubClient,
+):
+    client = authorized_client_for_user_test1
+
+    response = client.get_deck_extensions()
+    assert response == [
+        DeckExtension(
+            id=999,
+            owner_id=1,
+            ah_did=DECK_WITH_EXTENSION_UUID,
+            name="test100",
+            tag_group_name="test100",
+            description="",
+            user_relation=UserDeckExtensionRelation.OWNER,
+        )
+    ]
 
 
 @pytest.mark.vcr()
@@ -857,6 +1035,7 @@ def test_get_deck_extensions_by_deck_id(
             name="test100",
             tag_group_name="test100",
             description="",
+            user_relation=UserDeckExtensionRelation.OWNER,
         )
     ]
 
@@ -901,9 +1080,7 @@ def test_get_note_customizations_by_deck_extension_id(
 
 
 @pytest.mark.vcr()
-def test_get_media_disabled_fields(
-    authorized_client_for_user_test1: AnkiHubClient, monkeypatch: MonkeyPatch
-):
+def test_get_media_disabled_fields(authorized_client_for_user_test1: AnkiHubClient):
     client = authorized_client_for_user_test1
 
     deck_uuid = ID_OF_DECK_OF_USER_TEST1
@@ -941,14 +1118,16 @@ def test_media_upload_finished(authorized_client_for_user_test1: AnkiHubClient):
 
 @pytest.mark.vcr()
 def test_get_note_customizations_by_deck_extension_id_in_multiple_chunks(
-    authorized_client_for_user_test1: AnkiHubClient, monkeypatch: MonkeyPatch
+    authorized_client_for_user_test1: AnkiHubClient, mocker: MockerFixture
 ):
     client = authorized_client_for_user_test1
 
     deck_extension_id = 999
 
-    monkeypatch.setattr(
-        "ankihub.ankihub_client.ankihub_client.DECK_EXTENSION_UPDATE_PAGE_SIZE", 1
+    page_size = 1
+    mocker.patch(
+        "ankihub.ankihub_client.ankihub_client.DECK_EXTENSION_UPDATE_PAGE_SIZE",
+        page_size,
     )
 
     expected_chunk_1 = DeckExtensionUpdateChunk(
@@ -1102,8 +1281,7 @@ def test_download_media(
     next_deterministic_uuid: Callable[[], uuid.UUID],
 ):
     with tempfile.TemporaryDirectory() as temp_dir:
-
-        client = AnkiHubClient(local_media_dir_path=Path(temp_dir))
+        client = AnkiHubClient(local_media_dir_path_cb=lambda: Path(temp_dir))
 
         deck_id = next_deterministic_uuid()
         requests_mock.get(
@@ -1124,12 +1302,12 @@ class TestUploadMediaForSuggestion:
         self,
         suggestion_type: str,
         requests_mock: Mocker,
-        monkeypatch,
+        mocker: MockerFixture,
         next_deterministic_uuid: Callable[[], uuid.UUID],
         remove_generated_media_files,
         request: FixtureRequest,
     ):
-        client = AnkiHubClient(local_media_dir_path=TEST_MEDIA_PATH)
+        client = AnkiHubClient(local_media_dir_path_cb=lambda: TEST_MEDIA_PATH)
 
         suggestion: NoteSuggestion = request.getfixturevalue(suggestion_type)
         suggestion.fields[0].value = (
@@ -1143,16 +1321,16 @@ class TestUploadMediaForSuggestion:
         )
 
         expected_media_name_map = {
-            "testfile_mario.png": "156ca948cd1356b1a2c1c790f0855ad9.png",
-            "testfile_test.jpeg": "a61eab59692d17a2adf4d1c5e9049ee4.jpeg",
+            "testfile_mario.png": "156ca948cd1356b1a2c1c790f0855ad9.webp",
+            "testfile_test.jpeg": "a61eab59692d17a2adf4d1c5e9049ee4.webp",
         }
 
         suggestion_request_mock = None
 
-        monkeypatch.setattr(
+        mocker.patch.object(
             AnkiHubClient,
             "_get_presigned_url_for_multiple_uploads",
-            lambda *args, **kwargs: {
+            return_value={
                 "url": fake_presigned_url,
                 "fields": {
                     "key": "deck_images/test/${filename}",
@@ -1205,7 +1383,7 @@ class TestUploadMediaForSuggestion:
         assert media_name_map == expected_media_name_map
 
     def test_generate_media_files_with_hashed_names(self, remove_generated_media_files):
-        client = AnkiHubClient(local_media_dir_path=TEST_MEDIA_PATH)
+        client = AnkiHubClient(local_media_dir_path_cb=lambda: TEST_MEDIA_PATH)
 
         filenames = [
             TEST_MEDIA_PATH / "testfile_mario.png",
@@ -1215,9 +1393,9 @@ class TestUploadMediaForSuggestion:
         ]
 
         expected_result = {
-            "testfile_mario.png": "156ca948cd1356b1a2c1c790f0855ad9.png",
-            "testfile_anki.gif": "87617b1d58967eb86b9e0e5dc92d91ee.gif",
-            "testfile_test.jpeg": "a61eab59692d17a2adf4d1c5e9049ee4.jpeg",
+            "testfile_mario.png": "156ca948cd1356b1a2c1c790f0855ad9.webp",
+            "testfile_anki.gif": "87617b1d58967eb86b9e0e5dc92d91ee.webp",
+            "testfile_test.jpeg": "a61eab59692d17a2adf4d1c5e9049ee4.webp",
             "testfile_sound.mp3": "ae9120835f658f1ae57e5754811a9475.mp3",
         }
 
@@ -1265,25 +1443,20 @@ class TestUploadMediaForDeck:
         return notes_data
 
     def test_zips_media_files_from_deck_notes(
-        self, next_deterministic_uuid: Callable[[], uuid.UUID], monkeypatch: MonkeyPatch
+        self,
+        next_deterministic_uuid: Callable[[], uuid.UUID],
+        mocker: MockerFixture,
     ):
-        client = AnkiHubClient(local_media_dir_path=TEST_MEDIA_PATH)
+        client = AnkiHubClient(local_media_dir_path_cb=lambda: TEST_MEDIA_PATH)
 
         notes_data = self.notes_data_with_many_media_files()
 
-        # Mock os.remove so the zip is not deleted
-        os_remove_mock = MagicMock()
-        monkeypatch.setattr(os, "remove", os_remove_mock)
-
         # Mock upload-related stuff
-        monkeypatch.setattr(
-            client, "_get_presigned_url_for_multiple_uploads", MagicMock()
-        )
-        monkeypatch.setattr(
-            client, "_upload_file_to_s3_with_reusable_presigned_url", MagicMock()
-        )
+        mocker.patch.object(client, "_get_presigned_url_for_multiple_uploads")
+        mocker.patch.object(client, "_upload_file_to_s3_with_reusable_presigned_url")
 
         deck_id = next_deterministic_uuid()
+        remove_mock = mocker.patch("os.remove")
         self._upload_media_for_notes_data(client, notes_data, deck_id)
 
         # We will create and check for just one chunk in this test
@@ -1298,14 +1471,14 @@ class TestUploadMediaForDeck:
             assert set(zip_ref.namelist()) == set(all_media_names_in_notes)
 
         # Remove the zipped file at the end of the test
-        monkeypatch.undo()
+        mocker.stop(remove_mock)
         os.remove(path_to_created_zip_file)
         assert path_to_created_zip_file.is_file() is False
 
     def test_uploads_generated_zipped_file(
-        self, next_deterministic_uuid: Callable[[], uuid.UUID], monkeypatch: MonkeyPatch
+        self, next_deterministic_uuid: Callable[[], uuid.UUID], mocker: MockerFixture
     ):
-        client = AnkiHubClient(local_media_dir_path=TEST_MEDIA_PATH)
+        client = AnkiHubClient(local_media_dir_path_cb=lambda: TEST_MEDIA_PATH)
 
         notes_data = self.notes_data_with_many_media_files()
         deck_id = next_deterministic_uuid()
@@ -1324,17 +1497,14 @@ class TestUploadMediaForDeck:
                 "x-amz-signature": "test_822ac386d1ece605db8cfca",
             },
         }
-        get_presigned_url_mock = MagicMock()
-        get_presigned_url_mock.return_value = s3_info_mocked_value
-        monkeypatch.setattr(
-            client, "_get_presigned_url_for_multiple_uploads", get_presigned_url_mock
+        get_presigned_url_mock = mocker.patch.object(
+            client,
+            "_get_presigned_url_for_multiple_uploads",
+            return_value=s3_info_mocked_value,
         )
-
-        mocked_upload_file_to_s3 = MagicMock()
-        monkeypatch.setattr(
+        mocked_upload_file_to_s3 = mocker.patch.object(
             client,
             "_upload_file_to_s3_with_reusable_presigned_url",
-            mocked_upload_file_to_s3,
         )
 
         self._upload_media_for_notes_data(client, notes_data, deck_id)
@@ -1346,19 +1516,15 @@ class TestUploadMediaForDeck:
         )
 
     def test_removes_zipped_file_after_upload(
-        self, next_deterministic_uuid: Callable[[], uuid.UUID], monkeypatch: MonkeyPatch
+        self, next_deterministic_uuid: Callable[[], uuid.UUID], mocker: MockerFixture
     ):
-        client = AnkiHubClient(local_media_dir_path=TEST_MEDIA_PATH)
+        client = AnkiHubClient(local_media_dir_path_cb=lambda: TEST_MEDIA_PATH)
 
         notes_data = self.notes_data_with_many_media_files()
 
         # Mock upload-related stuff
-        monkeypatch.setattr(
-            client, "_get_presigned_url_for_multiple_uploads", MagicMock()
-        )
-        monkeypatch.setattr(
-            client, "_upload_file_to_s3_with_reusable_presigned_url", MagicMock()
-        )
+        mocker.patch.object(client, "_get_presigned_url_for_multiple_uploads")
+        mocker.patch.object(client, "_upload_file_to_s3_with_reusable_presigned_url")
 
         deck_id = next_deterministic_uuid()
         self._upload_media_for_notes_data(client, notes_data, deck_id)
@@ -1408,3 +1574,30 @@ class TestGetNoteType:
             client.get_note_type(anki_note_type_id=-1)
 
         assert cast(AnkiHubHTTPError, excinfo.value).response.status_code == 404
+
+
+@pytest.mark.vcr()
+class TestGetFeatureFlags:
+    def test_get_feature_flags(self, authorized_client_for_user_test1: AnkiHubClient):
+        client = authorized_client_for_user_test1
+        client.get_feature_flags()
+        # This test just makes sure that the method does not throw an exception
+        # Feature flags can change so we don't want to assert anything
+
+
+@pytest.mark.vcr()
+class TestSendCardReviewData:
+    def test_basic(
+        self,
+        authorized_client_for_user_test1: AnkiHubClient,
+    ) -> None:
+        now = datetime.now(tz=timezone.utc)
+        card_review_data = CardReviewData(
+            ah_did=ID_OF_DECK_OF_USER_TEST1,
+            total_card_reviews_last_7_days=10,
+            total_card_reviews_last_30_days=20,
+            first_card_review_at=now - timedelta(days=30),
+            last_card_review_at=now,
+        )
+
+        authorized_client_for_user_test1.send_card_review_data([card_review_data])

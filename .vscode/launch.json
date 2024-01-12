@@ -2,51 +2,22 @@
     "version": "0.2.0",
     "configurations": [
         {
-            "name": "Run Anki with TEMPORARY_ANKI_BASE.",
+            "name": "Run Anki with AnkiHub add-on",
             "type": "python",
             "request": "launch",
             "stopOnEntry": false,
-            "program": "${env:ANKI_EXEC}",
+            "program": "${command:python.interpreterPath}/../anki",
             "cwd": "${workspaceRoot}",
-            "preLaunchTask": "Generate Temporary Anki Base",
+            "preLaunchTask": "Setup add-on symlink",
             "args": [
                 "-b",
-                "${env:TEMPORARY_ANKI_BASE}",
-                "-p",
-                "${env:ANKI_PROFILE}",
+                "${workspaceRoot}/anki_base"
             ],
-            "purpose": [
-                // with this setting tests will use justMyCode=false in debug mode
-                "debug-in-terminal",
-            ],
-            "justMyCode": false,
-        },
-        {
-            "name": "Run Anki with ANKI_BASE.",
-            "type": "python",
-            "request": "launch",
-            "stopOnEntry": false,
-            "program": "${env:ANKI_EXEC}",
-            "cwd": "${workspaceRoot}",
-            "preLaunchTask": "Ensure Anki Base",
-            "args": [
-                "-b",
-                "${env:ANKI_BASE}"
-            ],
+            "env": {
+                "ANKIHUB_BASE_PATH": "${workspaceRoot}/ankihub_base",
+            },
             "purpose": [
                 "debug-in-terminal",
-            ],
-            "justMyCode": false,
-        },
-        {
-            "name": "Tests",
-            "type": "python",
-            "request": "launch",
-            "stopOnEntry": false,
-            "program": "${env:ANKI_EXEC}",
-            "cwd": "${workspaceRoot}",
-            "purpose": [
-                "debug-test"
             ],
             "justMyCode": false,
         },

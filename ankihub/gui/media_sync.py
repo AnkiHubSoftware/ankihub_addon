@@ -1,16 +1,18 @@
 import uuid
-from concurrent.futures import Future
+from datetime import datetime
 from functools import cached_property
 from pathlib import Path
-from typing import Callable, Dict, Iterable, List, Optional, Set
+from typing import Callable, Iterable, List, Optional, Set
 
 import aqt
 from aqt.qt import QAction
 
 from .. import LOGGER
 from ..addon_ankihub_client import AddonAnkiHubClient
-from ..ankihub_client import AnkiHubHTTPError
+from ..ankihub_client.models import DeckMedia
 from ..db import ankihub_db
+from ..settings import config
+from .operations import AddonQueryOp
 
 
 class _AnkiHubMediaSync:
@@ -42,9 +44,15 @@ class _AnkiHubMediaSync:
         self._download_in_progress = True
         self.refresh_sync_status_text()
 
-        aqt.mw.taskman.run_in_background(
-            self._download_missing_media, on_done=self._on_download_finished
-        )
+        def on_failure(exception: Exception) -> None:
+            self._download_in_progress = False
+            raise exception
+
+        AddonQueryOp(
+            parent=aqt.mw,
+            op=lambda _: self._update_deck_media_and_download_missing_media(),
+            success=self._on_download_finished,
+        ).failure(on_failure).without_collection().run_in_background()
 
     def start_media_upload(
         self,
@@ -57,16 +65,26 @@ class _AnkiHubMediaSync:
         self.refresh_sync_status_text()
 
         media_paths = self._media_paths_for_media_names(media_names)
-        aqt.mw.taskman.run_in_background(
-            lambda: self._client.upload_media(media_paths, ankihub_did),
-            on_done=lambda future: self._on_upload_finished(
-                future, ankihub_deck_id=ankihub_did, on_success=on_success
-            ),
-        )
 
-    def cleanup(self):
+        def on_failure(exception: Exception) -> None:
+            self._amount_uploads_in_progress -= 1
+            raise exception
+
+        AddonQueryOp(
+            parent=aqt.mw,
+            op=lambda _: self._client.upload_media(media_paths, ankihub_did),
+            success=lambda _: self._on_upload_finished(
+                ankihub_deck_id=ankihub_did, on_success=on_success
+            ),
+        ).failure(on_failure).without_collection().run_in_background()
+
+    def stop_background_threads(self):
         """Stop all media sync operations."""
         self._client.stop_background_threads()
+
+    def allow_background_threads(self):
+        """Allow background media sync operations to be started after they have been stopped."""
+        self._client.allow_background_threads()
 
     def refresh_sync_status_text(self):
         """Refresh the status text on the status action."""
@@ -84,12 +102,10 @@ class _AnkiHubMediaSync:
 
     def _on_upload_finished(
         self,
-        future: Future,
         ankihub_deck_id: uuid.UUID,
         on_success: Optional[Callable[[], None]] = None,
     ):
         self._amount_uploads_in_progress -= 1
-        future.result()
         LOGGER.info("Uploaded media to AnkiHub.")
         self.refresh_sync_status_text()
 
@@ -97,33 +113,57 @@ class _AnkiHubMediaSync:
             on_success()
         self._client.media_upload_finished(ankihub_deck_id)
 
-    def _download_missing_media(self):
-        for ah_did in ankihub_db.ankihub_deck_ids():
-            try:
-                if not self._client.is_media_upload_finished(ah_did):
-                    continue
-            except AnkiHubHTTPError as e:
-                if e.response.status_code in (403, 404):
-                    LOGGER.warning(
-                        f"Could not check if media upload is finished for AnkiHub deck {ah_did}."
-                    )
-                    continue
-                else:
-                    raise e
-            media_disabled_fields = self._client.get_media_disabled_fields(ah_did)
-            missing_media_names = self._missing_media_for_ah_deck(
-                ah_did, media_disabled_fields
-            )
+    def _update_deck_media_and_download_missing_media(self) -> None:
+        for ah_did in config.deck_ids():
+            self._update_deck_media(ankihub_did=ah_did)
+            missing_media_names = self._missing_media_for_ah_deck(ah_did)
             if not missing_media_names:
+                LOGGER.info(f"No missing media for {ah_did=}")
                 continue
+
+            LOGGER.info(f"Downloading {len(missing_media_names)} media for {ah_did=}")
             self._client.download_media(missing_media_names, ah_did)
 
-    def _missing_media_for_ah_deck(
-        self, ah_did: uuid.UUID, media_disabled_fields: Dict[int, List[str]]
-    ) -> List[str]:
-        media_names = ankihub_db.media_names_for_ankihub_deck(
-            ah_did, media_disabled_fields=media_disabled_fields
-        )
+    def _update_deck_media(self, ankihub_did: uuid.UUID) -> None:
+        """Fetch deck media updates from AnkiHub and update the database and the config.
+
+        If the deck configuration for the provided AnkiHub deck ID is not found (i.e., is None),
+        the function logs a warning and returns early without making any updates.
+        """
+        deck_config = config.deck_config(ankihub_did)
+        if deck_config is None:
+            # This only happens if the deck gets deleted during the media sync.
+            LOGGER.warning(f"No deck config for {ankihub_did=}")  # pragma: no cover
+            return  # pragma: no cover
+
+        media_list: List[DeckMedia] = []
+        latest_update: Optional[datetime] = None
+        for chunk in self._client.get_deck_media_updates(
+            ankihub_did,
+            since=deck_config.latest_media_update,
+        ):
+            if not chunk.media:
+                continue
+
+            media_list += chunk.media
+            latest_update = (
+                max(chunk.latest_update, latest_update)
+                if latest_update
+                else chunk.latest_update
+            )
+
+        if media_list:
+            ankihub_db.upsert_deck_media_infos(
+                ankihub_did=ankihub_did, media_list=media_list
+            )
+            config.save_latest_deck_media_update(
+                ankihub_did, latest_media_update=latest_update
+            )
+        else:
+            LOGGER.info(f"No new media updates for {ankihub_did=}")
+
+    def _missing_media_for_ah_deck(self, ah_did: uuid.UUID) -> List[str]:
+        media_names = ankihub_db.downloadable_media_names_for_ankihub_deck(ah_did)
         media_dir_path = Path(aqt.mw.col.media.dir())
 
         result = [
@@ -133,9 +173,8 @@ class _AnkiHubMediaSync:
         ]
         return result
 
-    def _on_download_finished(self, future: Future) -> None:
+    def _on_download_finished(self, _: None) -> None:
         self._download_in_progress = False
-        future.result()
         self.refresh_sync_status_text()
 
     def _refresh_media_download_status_inner(self):

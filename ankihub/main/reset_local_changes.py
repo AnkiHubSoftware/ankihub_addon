@@ -10,7 +10,7 @@ from anki.notes import NoteId
 from .. import LOGGER
 from ..addon_ankihub_client import AddonAnkiHubClient as AnkiHubClient
 from ..db import ankihub_db
-from ..settings import config
+from ..settings import SuspendNewCardsOfExistingNotes, config
 from .importing import AnkiHubImporter
 
 
@@ -48,6 +48,8 @@ def reset_local_changes_to_notes(
         protected_tags=protected_tags,
         # we don't move existing notes between decks here, users might not want that
         subdecks_for_new_notes_only=deck_config.subdecks_enabled,
+        suspend_new_cards_of_new_notes=deck_config.suspend_new_cards_of_new_notes,
+        suspend_new_cards_of_existing_notes=deck_config.suspend_new_cards_of_existing_notes,
     )
 
     # this way the notes won't be marked as "changed after sync" anymore
@@ -61,9 +63,12 @@ def reset_local_changes_to_note_type(
 ) -> None:
     """Resets the local changes to the note type with the given id to the state it has in the AnkiHub database."""
 
-    # TODO This doesn't reset template changes yet.
+    # TODO Not sure how to handle the note type being in multiple decks yet.
+    ah_dids = ankihub_db.ankihub_dids_for_note_type(mid)
 
-    ah_did = ankihub_db.ankihub_did_for_note_type(mid)
+    ah_did = list(ah_dids)[0]
+
+    # TODO This doesn't reset template changes yet.
     deck_config = config.deck_config(ah_did)
     importer = AnkiHubImporter()
     importer.import_ankihub_deck(
@@ -74,6 +79,8 @@ def reset_local_changes_to_note_type(
         protected_tags=[],
         deck_name=deck_config.name,
         is_first_import_of_deck=False,
+        suspend_new_cards_of_new_notes=False,
+        suspend_new_cards_of_existing_notes=SuspendNewCardsOfExistingNotes.NEVER,
     )
 
     LOGGER.info(f"Local changes to note type {mid} have been reset.")

@@ -4,6 +4,7 @@ The ankihub.common_utils module is an exception.
 """
 
 from .ankihub_client import (  # noqa: F401
+    API_VERSION,
     DEFAULT_API_URL,
     DEFAULT_APP_URL,
     DEFAULT_S3_BUCKET_URL,
@@ -16,6 +17,7 @@ from .ankihub_client import (  # noqa: F401
 )
 from .models import (  # noqa: F401
     ANKIHUB_DATETIME_FORMAT_STR,
+    CardReviewData,
     ChangeNoteSuggestion,
     Deck,
     DeckExtension,

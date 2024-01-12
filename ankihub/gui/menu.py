@@ -2,42 +2,35 @@
 import re
 from concurrent.futures import Future
 from dataclasses import dataclass
-from datetime import datetime, timezone
 from pathlib import Path
 from typing import Optional
 
 import aqt
 from aqt import (
     AnkiApp,
-    QCheckBox,
     QHBoxLayout,
     QLabel,
     QLineEdit,
-    QMessageBox,
     QPushButton,
     QSizePolicy,
     QVBoxLayout,
     QWidget,
 )
-from aqt.operations import QueryOp
 from aqt.qt import QAction, QDialog, QKeySequence, QMenu, Qt, qconnect
-from aqt.studydeck import StudyDeck
 from aqt.utils import openLink, showInfo, tooltip
 
 from .. import LOGGER
 from ..addon_ankihub_client import AddonAnkiHubClient as AnkiHubClient
-from ..ankihub_client import AnkiHubHTTPError, get_media_names_from_notes_data
-from ..ankihub_client.models import UserDeckRelation
+from ..ankihub_client import AnkiHubHTTPError
 from ..db import ankihub_db
-from ..main.deck_creation import DeckCreationResult, create_ankihub_deck
-from ..main.subdecks import SUBDECK_TAG
 from ..media_import.ui import open_import_dialog
-from ..settings import ADDON_VERSION, config, url_view_deck
+from ..settings import ADDON_VERSION, config
 from .config_dialog import get_config_dialog_manager
-from .decks_dialog import SubscribedDecksDialog
+from .decks_dialog import DeckManagementDialog
 from .errors import upload_logs_and_data_in_background, upload_logs_in_background
 from .media_sync import media_sync
 from .operations.ankihub_sync import sync_with_ankihub
+from .operations.deck_creation import create_collaborative_deck
 from .utils import (
     ask_user,
     check_and_prompt_for_updates_on_main_window,
@@ -107,22 +100,50 @@ class AnkiHubLogin(QWidget):
 
         # Password
         self.password_box = QHBoxLayout()
+
         self.password_box_label = QLabel("Password:")
+
         self.password_box_text = QLineEdit("", self)
         self.password_box_text.setEchoMode(QLineEdit.EchoMode.Password)
         self.password_box_text.setMinimumWidth(300)
         qconnect(self.password_box_text.returnPressed, self.login)
+
+        self.toggle_button = QPushButton("Show")
+        self.toggle_button.setCheckable(True)
+        self.toggle_button.setFixedHeight(30)
+        qconnect(self.toggle_button.toggled, self.refresh_password_visibility)
+
         self.password_box.addWidget(self.password_box_label)
         self.password_box.addWidget(self.password_box_text)
+        self.password_box.addWidget(self.toggle_button)
         self.box_left.addLayout(self.password_box)
 
-        # Login
-        self.login_button = QPushButton("Login", self)
+        # Sign in button
+        self.login_button = QPushButton("Sign in", self)
         self.bottom_box_section.addWidget(self.login_button)
         qconnect(self.login_button.clicked, self.login)
         self.login_button.setDefault(True)
-
+        self.bottom_box_section.setContentsMargins(0, 12, 0, 12)
         self.box_left.addLayout(self.bottom_box_section)
+
+        # Sign up / forgot password text
+        self.sign_up_and_recover_password_container = QVBoxLayout()
+        self.sign_up_and_recover_password_container.setSpacing(8)
+        self.sign_up_and_recover_password_container.setContentsMargins(0, 0, 0, 5)
+        self.login_button.setDefault(True)
+        self.sign_up_help_text = QLabel(
+            'Don\'t have an AnkiHub account? <a href="https://app.ankihub.net/accounts/signup/">Register now</a>'
+        )
+        self.sign_up_help_text.setOpenExternalLinks(True)
+        self.recover_password_help_text = QLabel(
+            '<a href="https://app.ankihub.net/accounts/password/reset/">Forgot password?</a>'
+        )
+        self.recover_password_help_text.setOpenExternalLinks(True)
+        self.sign_up_and_recover_password_container.addWidget(self.sign_up_help_text)
+        self.sign_up_and_recover_password_container.addWidget(
+            self.recover_password_help_text
+        )
+        self.box_left.addLayout(self.sign_up_and_recover_password_container)
 
         # Add left and right layouts to upper
         self.box_upper.addLayout(self.box_left)
@@ -134,10 +155,19 @@ class AnkiHubLogin(QWidget):
         self.box_top.addStretch(1)
         self.setLayout(self.box_top)
 
-        self.setMinimumWidth(500)
+        self.setContentsMargins(20, 5, 0, 5)
         self.setSizePolicy(QSizePolicy.Policy.Minimum, QSizePolicy.Policy.Minimum)
-        self.setWindowTitle("Login to AnkiHub.")
+        self.setWindowTitle("Sign in to AnkiHub.")
+        self.setWindowFlags(self.windowFlags() | Qt.WindowType.WindowStaysOnTopHint)  # type: ignore
         self.show()
+
+    def refresh_password_visibility(self) -> None:
+        if self.toggle_button.isChecked():
+            self.password_box_text.setEchoMode(QLineEdit.EchoMode.Normal)
+            self.toggle_button.setText("Hide")
+        else:
+            self.password_box_text.setEchoMode(QLineEdit.EchoMode.Password)
+            self.toggle_button.setText("Show")
 
     def login(self):
         username_or_email = self.username_or_email_box_text.text()
@@ -192,151 +222,22 @@ class AnkiHubLogin(QWidget):
         return cls._window
 
 
-class DeckCreationConfirmationDialog(QMessageBox):
-    def __init__(self):
-        super().__init__(parent=aqt.mw)
-
-        self.setWindowTitle("Confirm AnkiHub Deck Creation")
-        self.setIcon(QMessageBox.Icon.Question)
-        self.setText(
-            "Are you sure you want to create a new collaborative deck?<br><br><br>"
-            'Terms of use: <a href="https://www.ankihub.net/terms">https://www.ankihub.net/terms</a><br>'
-            'Privacy Policy: <a href="https://www.ankihub.net/privacy">https://www.ankihub.net/privacy</a><br>',
-        )
-        self.setStandardButtons(
-            QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.Cancel  # type: ignore
-        )
-        self.confirmation_cb = QCheckBox(
-            text=" by checking this checkbox you agree to the terms of use",
-            parent=self,
-        )
-        self.setCheckBox(self.confirmation_cb)
-
-    def run(self) -> bool:
-        clicked_ok = self.exec() == QMessageBox.StandardButton.Yes
-        if not clicked_ok:
-            return False
-
-        if not self.confirmation_cb.isChecked():
-            tooltip("You didn't agree to the terms of use.")
-            return False
-
-        return True
-
-
-def _create_collaborative_deck_action() -> None:
-
-    confirm = DeckCreationConfirmationDialog().run()
-    if not confirm:
-        return
-
-    deck_chooser = StudyDeck(
-        aqt.mw,
-        title="AnkiHub",
-        accept="Upload",
-        # Removes the "Add" button
-        buttons=[],
-        names=lambda: [
-            d.name
-            for d in aqt.mw.col.decks.all_names_and_ids(include_filtered=False)
-            if "::" not in d.name and d.id != 1
-        ],
-    )
-    deck_name = deck_chooser.name
-    if not deck_name:
-        return
-
-    if len(aqt.mw.col.find_cards(f'deck:"{deck_name}"')) == 0:
-        showInfo("You can't upload an empty deck.")
-        return
-
-    public = ask_user(
-        "Would you like to make this deck public?<br><br>"
-        'If you chose "No" it will be private and only people with a link '
-        "will be able to see it on the AnkiHub website."
-    )
-    if public is None:
-        return
-
-    private = public is False
-
-    add_subdeck_tags = False
-    if aqt.mw.col.decks.children(aqt.mw.col.decks.id_for_name(deck_name)):
-        add_subdeck_tags = ask_user(
-            "Would you like to add a tag to each note in the deck that indicates which subdeck it belongs to?<br><br>"
-            "For example, if you have a deck named <b>My Deck</b> with a subdeck named <b>My Deck::Subdeck</b>, "
-            "each note in <b>My Deck::Subdeck</b> will have a tag "
-            f"<b>{SUBDECK_TAG}::Subdeck</b> added to it.<br><br>"
-            "This allows subscribers to have the same subdeck structure as you have."
-        )
-        if add_subdeck_tags is None:
-            return
-
-    confirm = ask_user(
-        "Uploading the deck to AnkiHub requires modifying notes and note types in "
-        f"<b>{deck_name}</b> and will require a full sync afterwards. Would you like to "
-        "continue?",
-    )
-    if not confirm:
-        return
-
-    should_upload_media = ask_user(
-        "Do you want to upload media for this deck as well? "
-        "This will take some extra time but it is required to display images "
-        "on AnkiHub and this way subscribers will be able to download media files "
-        "when installing the deck. "
-    )
-
-    def on_success(deck_creation_result: DeckCreationResult) -> None:
-
-        # Upload all existing local media for this deck
-        # (media files that are referenced on Deck's notes)
-        if should_upload_media:
-            media_names = get_media_names_from_notes_data(
-                deck_creation_result.notes_data
-            )
-            media_sync.start_media_upload(media_names, deck_creation_result.ankihub_did)
-
-        # Add the deck to the list of decks the user owns
-        anki_did = aqt.mw.col.decks.id_for_name(deck_name)
-        creation_time = datetime.now(tz=timezone.utc)
-        config.add_deck(
-            deck_name,
-            deck_creation_result.ankihub_did,
-            anki_did,
-            user_relation=UserDeckRelation.OWNER,
-            latest_udpate=creation_time,
-        )
-
-        # Show a message to the user with a link to the deck on AnkiHub
-        deck_url = f"{url_view_deck()}{deck_creation_result.ankihub_did}"
-        showInfo(
-            "🎉 Deck upload successful!<br><br>"
-            "Link to the deck on AnkiHub:<br>"
-            f"<a href={deck_url}>{deck_url}</a>"
-        )
-
-    def on_failure(exc: Exception):
-        aqt.mw.progress.finish()
-        raise exc
-
-    op = QueryOp(
-        parent=aqt.mw,
-        op=lambda col: create_ankihub_deck(
-            deck_name,
-            private=private,
-            add_subdeck_tags=add_subdeck_tags,
-        ),
-        success=on_success,
-    ).failure(on_failure)
-    LOGGER.info("Instantiated QueryOp for creating collaborative deck")
-    op.with_progress(label="Creating collaborative deck").run_in_background()
-
-
 def _create_collaborative_deck_setup(parent: QMenu):
-    q_action = QAction("🛠️ Create Collaborative Deck", parent=parent)
-    qconnect(q_action.triggered, _create_collaborative_deck_action)
+    q_action = QAction("🛠️ Create AnkiHub Deck", parent=parent)
+    qconnect(q_action.triggered, create_collaborative_deck)
     parent.addAction(q_action)
+
+
+def _confirm_sign_out():
+    confirm = ask_user(
+        "Are you sure you want to Sign out?",
+        yes_button_label="Sign Out",
+        no_button_label="Cancel",
+    )
+    if not confirm:
+        return
+
+    _sign_out_action()
 
 
 def _sign_out_action():
@@ -397,21 +298,20 @@ def _upload_logs_and_data_action() -> None:
     upload_logs_and_data_in_background(on_done=_on_logs_uploaded)
 
 
-def _on_logs_uploaded(future: Future):
+def _on_logs_uploaded(log_file_name: str) -> None:
     aqt.mw.progress.finish()
-    log_file_name = future.result()
     LogUploadResultDialog(log_file_name=log_file_name).exec()
 
 
-def _ankihub_login_setup(parent: QMenu):
+def _ankihub_login_setup(parent: QMenu) -> None:
     sign_in_button = QAction("🔑 Sign into AnkiHub", aqt.mw)
     qconnect(sign_in_button.triggered, AnkiHubLogin.display_login)
     parent.addAction(sign_in_button)
 
 
 def _subscribed_decks_setup(parent: QMenu):
-    q_action = QAction("📚 Subscribed Decks", aqt.mw)
-    qconnect(q_action.triggered, SubscribedDecksDialog.display_subscribe_window)
+    q_action = QAction("📚 Deck Management", aqt.mw)
+    qconnect(q_action.triggered, DeckManagementDialog.display_subscribe_window)
     parent.addAction(q_action)
 
 
@@ -493,10 +393,7 @@ def _upload_deck_media_action() -> None:
         showInfo("You can't upload media for an empty deck.")
         return
 
-    media_disabled_fields = client.get_media_disabled_fields(ah_did)
-    media_names = ankihub_db.media_names_for_ankihub_deck(
-        ah_did=ah_did, media_disabled_fields=media_disabled_fields
-    )
+    media_names = ankihub_db.media_names_for_ankihub_deck(ah_did=ah_did)
 
     # Check if the deck references any media files, if it does
     # not, no point on trying to upload it
@@ -610,7 +507,7 @@ def _trigger_install_release_version():
 
 def _ankihub_logout_setup(parent: QMenu):
     q_action = QAction("🔑 Sign out", aqt.mw)
-    qconnect(q_action.triggered, _sign_out_action)
+    qconnect(q_action.triggered, _confirm_sign_out)
     parent.addAction(q_action)
 
 

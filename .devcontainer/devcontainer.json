@@ -1,0 +1,48 @@
+// For format details, see https://aka.ms/devcontainer.json. For config options, see the README at:
+// https://github.com/microsoft/vscode-dev-containers/tree/v0.222.0/containers/python-3
+{
+	"name": "Python 3",
+	"build": {
+		"dockerfile": "Dockerfile",
+		"context": "..",
+		"args": {
+			"VARIANT": "3.11",
+		}
+	},
+	"runArgs": [
+		"--env-file",
+		".devcontainer/devcontainer.env"
+	],
+	// Set *default* container specific settings.json values on container create.
+	"settings": {
+		"python.defaultInterpreterPath": "/home/vscode/venv/bin/python3",
+		"editor.minimap.enabled": false,
+		"python.linting.enabled": true,
+	},
+	// Add the IDs of extensions you want installed when the container is created.
+	"extensions": [
+		"ms-python.python",
+		"ms-python.vscode-pylance",
+		"eamodio.gitlens"
+	],
+	// Use 'forwardPorts' to make a list of ports inside the container available locally.
+	// "forwardPorts": [],
+	// Use 'postCreateCommand' to run commands after the container is created.
+	// "postCreateCommand": "pip3 install --user -r requirements/dev.txt",
+	"postCreateCommand": ".devcontainer/postCreate.sh",
+	"postStartCommand": ".devcontainer/postStart.sh",
+	"forwardPorts": [
+		6080
+	],
+	"remoteEnv": {
+		"SENTRY_ENV": "development",
+		"HYPER_TTS_DEBUG_LOGGING": "enable",
+		"LANG": "en_US.UTF-8",
+		"DISPLAY": ":1.0"
+	},
+	"portsAttributes": {
+		"6080": {
+			"label": "novnc"
+		}
+	}
+}

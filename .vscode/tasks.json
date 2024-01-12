@@ -4,24 +4,9 @@
     "version": "2.0.0",
     "tasks": [
         {
-            "label": "Generate Temporary Anki Base",
+            "label": "Setup add-on symlink",
             "type": "shell",
-            "command": "python scripts/create_tmp_anki_data_dir.py",
-            "options": {
-                "env": {
-                    "TEMPORARY_ANKI_BASE": "${env:TEMPORARY_ANKI_BASE}"
-                }
-            }
-        },
-        {
-            "label": "Ensure Anki Base",
-            "type": "shell",
-            "command": "python scripts/ensure_data_dir.py",
-            "options": {
-                "env": {
-                    "ANKI_BASE": "${env:ANKI_BASE}"
-                }
-            }
+            "command": "python scripts/setup_addon_symlink.py ${workspaceRoot}/anki_base",
         }
     ]
 }

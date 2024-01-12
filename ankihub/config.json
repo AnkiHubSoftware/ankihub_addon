@@ -3,7 +3,6 @@
     "report_errors": true,
     "sync_hotkey": "Ctrl+Shift+h",
     "auto_sync": "on_ankiweb_sync",
-    "suspend_new_cards_of_existing_notes": "if_siblings_are_suspended",
     "debug_level_logs": false,
     "use_staging": false
 }

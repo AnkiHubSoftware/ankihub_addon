@@ -1,6 +1,12 @@
 # Anki related
 ankihub/meta.json
 
+# Anki base directory
+anki_base
+
+# AnkiHub base directory
+ankihub_base
+
 # Ignore everything except the README.
 /ankihub/user_files/*
 !/ankihub/user_files/README.md
@@ -51,7 +57,7 @@ ankihub.ankiaddon
 pip-log.txt
 pip-delete-this-directory.txt
 
-# Unit test / coverage reports
+# Unit test / coverage reports / profiling data
 htmlcov/
 .tox/
 .nox/
@@ -65,6 +71,7 @@ coverage.xml
 .hypothesis/
 .pytest_cache/
 tests/test.db
+*.pstats
 
 # Translations
 *.mo

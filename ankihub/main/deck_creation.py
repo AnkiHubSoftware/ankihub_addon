@@ -37,7 +37,7 @@ def create_ankihub_deck(
     private: bool,
     add_subdeck_tags: bool = False,
 ) -> DeckCreationResult:
-    LOGGER.info("Creating collaborative deck")
+    LOGGER.info("Creating AnkiHub deck")
 
     create_backup()
 

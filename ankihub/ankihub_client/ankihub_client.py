@@ -43,6 +43,7 @@ from tenacity import (
 
 from .models import (
     ANKIHUB_DATETIME_FORMAT_STR,
+    CardReviewData,
     ChangeNoteSuggestion,
     Deck,
     DeckExtension,
@@ -54,6 +55,7 @@ from .models import (
     NoteSuggestion,
     OptionalTagSuggestion,
     TagGroupValidationResponse,
+    UserDeckRelation,
     note_info_for_upload,
 )
 
@@ -67,7 +69,7 @@ STAGING_APP_URL = "https://staging.ankihub.net"
 STAGING_API_URL = f"{STAGING_APP_URL}/api"
 STAGING_S3_BUCKET_URL = "https://ankihub-staging.s3.amazonaws.com"
 
-API_VERSION = 13.0
+API_VERSION = 16.0
 
 DECK_UPDATE_PAGE_SIZE = 2000  # seems to work well in terms of speed
 DECK_EXTENSION_UPDATE_PAGE_SIZE = 2000
@@ -91,6 +93,18 @@ REQUEST_RETRY_EXCEPTION_TYPES = (
 
 # Status codes for which we should retry the request.
 RETRY_STATUS_CODES = {429}
+
+IMAGE_FILE_EXTENSIONS = [
+    ".png",
+    ".jpeg",
+    ".jpg",
+    ".gif",
+    ".bmp",
+    ".tif",
+    ".tiff",
+    ".svg",
+    ".webp",
+]
 
 
 def _should_retry_for_response(response: Response) -> bool:
@@ -139,22 +153,21 @@ class AnkiHubClient:
 
     def __init__(
         self,
+        local_media_dir_path_cb: Callable[[], Path],
         response_hooks=None,
         token: Optional[str] = None,
         get_token: Callable[[], str] = lambda: None,
         api_url: str = DEFAULT_API_URL,
         s3_bucket_url: str = DEFAULT_S3_BUCKET_URL,
-        local_media_dir_path: Optional[Path] = None,
     ):
         """Create a new AnkiHubClient.
         The token can be set with the token parameter or with the get_token parameter.
         The get_token parameter is a function that returns the token. It has priority over the token parameter.
         If both are set, the token parameter is ignored.
-        If local_media_dir_path is None, then calling some methods related to media will fail.
         """
         self.api_url = api_url
         self.s3_bucket_url = s3_bucket_url
-        self.local_media_dir_path = local_media_dir_path
+        self.local_media_dir_path_cb = local_media_dir_path_cb
         self.token = token
         self.get_token = get_token
         self.response_hooks = response_hooks
@@ -362,6 +375,11 @@ class AnkiHubClient:
                 file_content_hash.hexdigest() + for_old_media_path.suffix
             )
 
+            if self._media_file_should_be_converted_to_webp(for_old_media_path):
+                # The lambda will convert images to the webp format if they are uploaded with a .webp extension and
+                # are not already webp images.
+                new_media_path = new_media_path.with_suffix(".webp")
+
             # If the file with the hashed name does not exist already, we
             # try to create it.
             if not new_media_path.is_file():
@@ -374,6 +392,15 @@ class AnkiHubClient:
 
             result[for_old_media_path.name] = new_media_path.name
 
+        return result
+
+    def _media_file_should_be_converted_to_webp(self, media_path: Path) -> bool:
+        """Whether the media file should be converted to webp once its uploaded to s3."""
+        # We don't want to convert svgs, because they don't benefit from the conversion in most cases.
+        result = (
+            media_path.suffix.lower() in IMAGE_FILE_EXTENSIONS
+            and media_path.suffix.lower() not in [".svg", ".webp"]
+        )
         return result
 
     def upload_media(self, media_paths: Set[Path], ah_did: uuid.UUID) -> None:
@@ -439,7 +466,8 @@ class AnkiHubClient:
     ) -> None:
         # Zip the media files found locally
         zip_filepath = Path(
-            self.local_media_dir_path / f"{ah_did}_{chunk_number}_deck_assets_part.zip"
+            self.local_media_dir_path_cb()
+            / f"{ah_did}_{chunk_number}_deck_assets_part.zip"
         )
         LOGGER.info(f"Creating zipped media file [{zip_filepath.name}]")
         with ZipFile(zip_filepath, "w") as media_zip:
@@ -489,9 +517,10 @@ class AnkiHubClient:
     def download_media(self, media_names: List[str], deck_id: uuid.UUID) -> None:
         deck_media_remote_dir = f"/deck_assets/{deck_id}/"
         with ThreadPoolExecutor() as executor:
+            media_dir_path = self.local_media_dir_path_cb()
             futures: List[Future] = []
             for media_name in media_names:
-                media_path = self.local_media_dir_path / media_name
+                media_path = media_dir_path / media_name
                 media_remote_path = deck_media_remote_dir + urllib.parse.quote_plus(
                     media_name
                 )
@@ -541,6 +570,10 @@ class AnkiHubClient:
         """Can be called to stop all background threads started by this client."""
         self.should_stop_background_threads = True
 
+    def allow_background_threads(self) -> None:
+        """Can be called to allow background threads to run after they were stopped previously."""
+        self.should_stop_background_threads = False
+
     def get_deck_subscriptions(self) -> List[Deck]:
         response = self._send_request("GET", API.ANKIHUB, "/decks/subscriptions/")
         if response.status_code != 200:
@@ -554,6 +587,13 @@ class AnkiHubClient:
             raise AnkiHubHTTPError(response)
 
         return [Deck.from_dict(deck) for deck in response.json()]
+
+    def get_owned_decks(self) -> List[Deck]:
+        decks = self.get_decks_with_user_relation()
+        result = [
+            deck for deck in decks if deck.user_relation == UserDeckRelation.OWNER
+        ]
+        return result
 
     def subscribe_to_deck(self, deck_id: uuid.UUID) -> None:
         response = self._send_request(
@@ -919,6 +959,16 @@ class AnkiHubClient:
         }
         return result
 
+    def get_deck_extensions(self) -> List[DeckExtension]:
+        response = self._send_request("GET", API.ANKIHUB, "/users/deck_extensions")
+        if response.status_code != 200:
+            raise AnkiHubHTTPError(response)
+
+        data = response.json()
+        extension_dicts = data.get("deck_extensions", [])
+        result = [DeckExtension.from_dict(d) for d in extension_dicts]
+        return result
+
     def get_deck_extensions_by_deck_id(self, deck_id: uuid.UUID) -> List[DeckExtension]:
         response = self._send_request(
             "GET", API.ANKIHUB, "/users/deck_extensions", params={"deck_id": deck_id}
@@ -1039,14 +1089,8 @@ class AnkiHubClient:
         message = data["message"]
         LOGGER.debug(f"suggest_optional_tags response message: {message}")
 
-    def is_feature_flag_enabled(self, flag_name: str) -> bool:
-        return (
-            self._get_feature_flags_status()["flags"]
-            .get(flag_name, {})
-            .get("is_active", False)
-        )
-
-    def _get_feature_flags_status(self):
+    def get_feature_flags(self) -> Dict[str, bool]:
+        """Returns a dict of feature flags to their status (enabled or disabled)."""
         response = self._send_request(
             "GET",
             API.ANKIHUB,
@@ -1056,7 +1100,11 @@ class AnkiHubClient:
             raise AnkiHubHTTPError(response)
 
         data = response.json()
-        return data
+        result = {
+            flag_name: flag_data["is_active"]
+            for flag_name, flag_data in data["flags"].items()
+        }
+        return result
 
     def is_media_upload_finished(self, ah_did: uuid.UUID) -> bool:
         deck_info = self.get_deck_by_id(ah_did)
@@ -1079,6 +1127,16 @@ class AnkiHubClient:
         data = response.json()
         result = [uuid.UUID(deck["id"]) for deck in data["created_decks"]]
         return result
+
+    def send_card_review_data(self, card_review_data: List[CardReviewData]) -> None:
+        response = self._send_request(
+            "POST",
+            API.ANKIHUB,
+            "/users/card-review-data/",
+            json=[review.to_dict() for review in card_review_data],
+        )
+        if response.status_code != 200:
+            raise AnkiHubHTTPError(response)
 
 
 def _transform_notes_data(notes_data: List[Dict]) -> List[Dict]:

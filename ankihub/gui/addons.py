@@ -1,23 +1,18 @@
 """Code that modifies Anki's add-ons module.
 Handles problems with add-on updates and deletions."""
-import os
 from concurrent.futures import Future
-from pathlib import Path
 from typing import Any, Callable
 
 import aqt
 from anki.hooks import wrap
 from aqt import addons
-from aqt.addons import AddonManager, DownloaderInstaller
+from aqt.addons import DownloaderInstaller
 
 from .. import LOGGER
-from ..db import detach_ankihub_db_from_anki_db_connection
 
 
 def setup_addons():
     _raise_exceptions_on_otherwise_silent_addon_update_failures()
-
-    _prevent_errors_during_addon_updates_and_deletions()
 
     _prevent_ui_deadlock_of_update_dialog_with_progress_dialog()
 
@@ -50,70 +45,6 @@ def _check_future_for_exceptions(*args: Any, **kwargs: Any) -> None:
 
     # throws exception if there was one in the future
     future.result()
-
-
-def _prevent_errors_during_addon_updates_and_deletions():
-    """Prevents errors during add-on updates and deletions on Windows.
-    Detaches the AnkiHub database from the Anki database connection and changes the file permissions
-    of the files in the user files directory.
-    """
-
-    # Add _detach_ankihub_db to backupUserFiles and deleteAddon.
-    # We don't need to add it to restoreUserFiles because backupUserFiles is always called before restoreUserFiles.
-    AddonManager.backupUserFiles = wrap(  # type: ignore
-        old=AddonManager.backupUserFiles,
-        new=_detach_ankihub_db,
-        pos="before",
-    )
-
-    AddonManager.deleteAddon = wrap(  # type: ignore
-        old=AddonManager.deleteAddon,
-        new=_detach_ankihub_db,
-        pos="before",
-    )
-
-    # Add _maybe_change_file_permissions_of_addon_files to backupUserFiles and deleteAddon.
-    # We don't need to add it to restoreUserFiles because backupUserFiles is always called before restoreUserFiles.
-    AddonManager.backupUserFiles = wrap(  # type: ignore
-        old=AddonManager.backupUserFiles,
-        new=lambda self, sid: _maybe_change_file_permissions_of_addon_files(sid),
-        pos="before",
-    )
-
-    AddonManager.deleteAddon = wrap(  # type: ignore
-        old=AddonManager.deleteAddon,
-        new=lambda self, module: _maybe_change_file_permissions_of_addon_files(module),
-        pos="before",
-    )
-
-
-def _detach_ankihub_db(*args: Any, **kwargs: Any) -> None:
-    detach_ankihub_db_from_anki_db_connection()
-
-
-def _maybe_change_file_permissions_of_addon_files(module: str) -> None:
-    ankihub_module = aqt.mw.addonManager.addonFromModule(__name__)
-    if module != ankihub_module:
-        LOGGER.info(
-            f"Did not change file permissions because {module} is not {ankihub_module}"
-        )
-        return
-
-    addon_dir = Path(aqt.mw.addonManager.addonsFolder(module))
-    _change_file_permissions_of_addon_files(addon_dir=addon_dir)
-
-
-def _change_file_permissions_of_addon_files(addon_dir: Path) -> None:
-    for file in addon_dir.rglob("*"):
-        try:
-            if file.is_dir():
-                os.chmod(file, 0o777)
-            else:
-                os.chmod(file, 0o666)
-        except FileNotFoundError:
-            # This can happen if the file was deleted in the meantime (e.g. __pychache__ files)
-            pass
-    LOGGER.info(f"On deleteAddon changed file permissions for all files in {addon_dir}")
 
 
 def _prevent_ui_deadlock_of_update_dialog_with_progress_dialog():

@@ -6,21 +6,21 @@ from pathlib import Path
 from zipfile import ZipFile
 
 from selenium.webdriver.common.by import By
+from utils import to_version_str
 from webbot import Browser
 from webdriver_manager.chrome import ChromeDriverManager
 
-webdriver_path = Path(ChromeDriverManager(driver_version="94.0.4606.41").install())
+webdriver_path = Path(ChromeDriverManager().install())
 
 
 def upload(
-    ankiweb_username,
-    ankiweb_password,
-    build_file_path,
-    description_file_path,
-    support_url,
-    show_window=False,
-):
-
+    ankiweb_username: str,
+    ankiweb_password: str,
+    build_file_path: str,
+    description_file_path: str,
+    support_url: str,
+    show_window: bool = False,
+) -> None:
     with ZipFile(build_file_path) as zipf:
         zipf.extract("manifest.json")
 
@@ -30,12 +30,15 @@ def upload(
 
     # use webbot to upload the add-on
     web = Browser(showWindow=show_window, driverPath=webdriver_path)
-    web.go_to("https://ankiweb.net/shared/upload")
+
+    web.go_to("https://ankiweb.net/account/login")
+    time.sleep(2)
+
     web.type(ankiweb_username, into="Email")
     web.type(ankiweb_password, into="Password")
     web.press(web.Key.ENTER)
-
     time.sleep(2)
+
     print("Url after login:", web.get_current_url())
 
     if manifest_dict["ankiweb_id"]:
@@ -45,11 +48,13 @@ def upload(
         # upload new addon
         web.go_to("https://ankiweb.net/shared/upload")
 
+    time.sleep(2)
+
     web.type(manifest_dict["name"], into="title")
-    web.type(support_url, into="support url")
+    web.type(support_url, into="Support Page")
     web.type(
         str(Path(build_file_path).absolute()),
-        id="v21file0",
+        xpath="//input[@type='file']",
     )
 
     with open(description_file_path) as f:
@@ -57,24 +62,34 @@ def upload(
 
     # web.type doesn't handle unicode characters correctly, so we use javascript
     driver = web.driver
-    description_field = driver.find_element(By.ID, "desc")
+    description_field = driver.find_element(By.TAG_NAME, "textarea")
     escaped_description = json.dumps(description)
     driver.execute_script(
-        "arguments[0].value = " + escaped_description, description_field
+        # the event is needed, otherwise the description change will be ignored
+        f"""
+        arguments[0].value = {escaped_description}
+        arguments[0].dispatchEvent(new Event('input'));
+        """,
+        description_field,
+        escaped_description,
     )
 
-    # optional values
-    def enter_optional_value(dict_, key, into="", id=""):
-        if dict_.get(key) is not None:
-            web.type(dict_[key], into=into, id=id)
+    if min_point_version := manifest_dict["min_point_version"]:
+        xpath = '//div[@class="form-inline"]//input[1]'
+        web.type("", xpath=xpath)
+        time.sleep(0.3)
+        web.type(to_version_str(min_point_version), xpath=xpath)
 
-    enter_optional_value(manifest_dict, "min_point_version", id="minVer0")
-    enter_optional_value(manifest_dict, "max_point_version", id="maxVer0")
+    if max_point_version := manifest_dict["max_point_version"]:
+        xpath = '//div[@class="form-inline"]//input[2]'
+        web.type("", xpath=xpath)
+        time.sleep(0.3)
+        # Preserve sign when converting to version string.
+        # A negative version prevents the add-on from being downloaded on any newer versions.
+        version_str = f"{'-' if max_point_version < 0 else ''}{to_version_str(abs(max_point_version))}"
+        web.type(version_str, xpath=xpath)
 
-    if manifest_dict["ankiweb_id"]:
-        web.click("Update")
-    else:
-        web.click("Upload")
+    web.click("Save")
 
     # check if upload was successful
     for _ in range(5):

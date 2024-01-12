@@ -1,32 +1,42 @@
 import copy
+import hashlib
 import re
 import time
+from concurrent.futures import Future
+from pathlib import Path
 from pprint import pformat
 from textwrap import dedent
-from typing import Any, Dict, Iterable, List, Optional, Sequence, Set, Tuple
+from typing import Any, Collection, Dict, Iterable, List, Optional, Sequence, Set, Tuple
 
 import aqt
+from anki.collection import EmptyCardsReport
 from anki.decks import DeckId
 from anki.errors import NotFoundError
 from anki.models import ChangeNotetypeRequest, NoteType, NotetypeDict, NotetypeId
 from anki.notes import Note, NoteId
 from anki.utils import checksum, ids2str
+from aqt.emptycards import EmptyCardsDialog
 
 from .. import LOGGER, settings
+from ..db import ankihub_db
 from ..settings import (
-    ANKI_MINOR,
+    ANKI_INT_VERSION,
+    ANKI_VERSION_23_10_00,
     ANKIHUB_NOTE_TYPE_FIELD_NAME,
     ANKIHUB_NOTE_TYPE_MODIFICATION_STRING,
     ANKIHUB_TEMPLATE_END_COMMENT,
     url_view_note,
 )
 
+if ANKI_INT_VERSION >= ANKI_VERSION_23_10_00:
+    from anki.collection import AddNoteRequest
 
 # decks
-def create_deck_with_id(deck_name: str, deck_id: DeckId) -> None:
 
+
+def create_deck_with_id(deck_name: str, deck_id: DeckId) -> None:
     source_did = aqt.mw.col.decks.add_normal_deck_with_name(
-        get_unique_deck_name(deck_name)
+        get_unique_ankihub_deck_name(deck_name)
     ).id
     aqt.mw.col.db.execute(f"UPDATE decks SET id={deck_id} WHERE id={source_did};")
     aqt.mw.col.db.execute(f"UPDATE cards SET did={deck_id} WHERE did={source_did};")
@@ -63,36 +73,28 @@ def lowest_level_common_ancestor_deck_name(deck_names: Iterable[str]) -> Optiona
         return result
 
 
-def get_unique_deck_name(deck_name: str) -> str:
+def dids_of_notes(notes: List[Note]) -> Set[DeckId]:
+    result: Set[DeckId] = set()
+    for note in notes:
+        dids_for_note = set(c.did for c in note.cards())
+        result |= dids_for_note
+    return result
+
+
+def get_unique_ankihub_deck_name(deck_name: str) -> str:
+    """Returns the passed deck_name if it is unique, otherwise returns a unique version of it
+    by adding a suffix."""
     if not aqt.mw.col.decks.by_name(deck_name):
         return deck_name
 
-    suffix = " (AnkiHub)"
-    if suffix not in deck_name:
-        deck_name += suffix
-    else:
-        deck_name += f" {checksum(str(time.time()))[:5]}"
-    return deck_name
+    result = f"{deck_name} (AnkiHub)"
+    if aqt.mw.col.decks.by_name(result) is not None:
+        result += f" {checksum(str(time.time()))[:5]}"
+    return result
 
 
 def highest_level_did(dids: Iterable[DeckId]) -> DeckId:
     return min(dids, key=lambda did: aqt.mw.col.decks.name(did).count("::"))
-
-
-# notes
-def create_note_with_id(note: Note, anki_id: NoteId, anki_did: DeckId) -> Note:
-    """Create a new note, add it to the appropriate deck and override the note id with
-    the note id of the original note creator."""
-    LOGGER.debug(f"Trying to create note: {anki_id=}")
-
-    aqt.mw.col.add_note(note, DeckId(anki_did))
-
-    # Swap out the note id that Anki assigns to the new note with our own id.
-    aqt.mw.col.db.execute(f"UPDATE notes SET id={anki_id} WHERE id={note.id};")
-    aqt.mw.col.db.execute(f"UPDATE cards SET nid={anki_id} WHERE nid={note.id};")
-
-    note.id = anki_id
-    return note
 
 
 def note_types_with_ankihub_id_field() -> List[NotetypeId]:
@@ -112,6 +114,60 @@ def nids_in_deck_but_not_in_subdeck(deck_name: str) -> Sequence[NoteId]:
     For example if a notes is in the deck "A" but not in "A::B" or "A::C" then it is returned.
     """
     return aqt.mw.col.find_notes(f'deck:"{deck_name}" -deck:"{deck_name}::*"')
+
+
+# notes
+
+
+def add_notes(notes: Collection[Note], deck_id: DeckId) -> None:
+    """Add notes to the Anki database in an efficient way."""
+    if ANKI_INT_VERSION >= ANKI_VERSION_23_10_00:
+        add_note_requests = [AddNoteRequest(note, deck_id=deck_id) for note in notes]
+        aqt.mw.col.add_notes(add_note_requests)
+    else:
+        # Anki versions before 23.10 don't have col.add_notes, so we have to add them one by one.
+        # It's ok to this because adding them one by one is fast on Anki versions before 23.10.
+        for note in notes:
+            aqt.mw.col.add_note(note, deck_id=deck_id)
+        aqt.mw.col.save()
+
+
+def move_notes_to_decks_while_respecting_odid(nid_to_did: Dict[NoteId, DeckId]) -> None:
+    """Moves the cards of notes to the decks specified in nid_to_did.
+    If a card is in a filtered deck it is not moved and only its original deck id value gets changed.
+    """
+    cards_to_update = []
+    for nid, did in nid_to_did.items():
+        # This is a bit faster than aqt.mw.col.get_note(nid).cards() to get the cards of a note.
+        cids = aqt.mw.col.db.list(f"SELECT id FROM cards WHERE nid={nid}")
+        cards = [aqt.mw.col.get_card(cid) for cid in cids]
+        for card in cards:
+            if card.odid == 0:
+                card.did = did
+            else:
+                card.odid = did
+            cards_to_update.append(card)
+    aqt.mw.col.update_cards(cards_to_update)
+
+
+# cards
+
+
+def clear_empty_cards() -> None:
+    """Delete empty cards from the database.
+    Uses the EmptyCardsDialog to delete empty cards without showing the dialog."""
+
+    def on_done(future: Future) -> None:
+        # This uses the EmptyCardsDialog to delete empty cards without showing the dialog.
+        report: EmptyCardsReport = future.result()
+        if not report.notes:
+            LOGGER.info("No empty cards found.")
+            return
+        dialog = EmptyCardsDialog(aqt.mw, report)
+        deleted_amount = dialog._delete_cards(keep_notes=True)
+        LOGGER.info(f"Deleted {deleted_amount} empty cards.")
+
+    aqt.mw.taskman.run_in_background(aqt.mw.col.get_empty_cards, on_done=on_done)
 
 
 # note types
@@ -156,7 +212,6 @@ def get_note_types_in_deck(did: DeckId) -> List[NotetypeId]:
 
 
 def reset_note_types_of_notes(nid_mid_pairs: List[Tuple[NoteId, NotetypeId]]) -> None:
-
     note_type_conflicts: Set[Tuple[NoteId, NotetypeId, NotetypeId]] = set()
     for nid, mid in nid_mid_pairs:
         try:
@@ -181,7 +236,6 @@ def reset_note_types_of_notes(nid_mid_pairs: List[Tuple[NoteId, NotetypeId]]) ->
 
 
 def change_note_type_of_note(nid: int, mid: int) -> None:
-
     current_schema: int = aqt.mw.col.db.scalar("select scm from col")
     note = aqt.mw.col.get_note(NoteId(nid))
     target_note_type = aqt.mw.col.models.get(NotetypeId(mid))
@@ -202,6 +256,28 @@ def mids_of_notes(nids: Sequence[NoteId]) -> Set[NotetypeId]:
             f"SELECT DISTINCT mid FROM notes WHERE id in {ids2str(nids)}"
         )
     )
+
+
+def retain_nids_with_ah_note_type(nids: Collection[NoteId]) -> Collection[NoteId]:
+    """Return nids that have an AnkiHub note type. Other nids are not included in the result."""
+    nids_to_mids = get_anki_nid_to_mid_dict(nids)
+    mid_to_is_ankihub_note_type = {
+        mid: ankihub_db.is_ankihub_note_type(mid) for mid in set(nids_to_mids.values())
+    }
+    result = [
+        nid for nid, mid in nids_to_mids.items() if mid_to_is_ankihub_note_type[mid]
+    ]
+    return result
+
+
+def get_anki_nid_to_mid_dict(nids: Collection[NoteId]) -> Dict[NoteId, NotetypeId]:
+    result = {
+        id_: mid
+        for id_, mid in aqt.mw.col.db.execute(
+            f"select id, mid from notes where id in {ids2str(nids)}"
+        )
+    }
+    return result
 
 
 # ... note type modifications
@@ -390,7 +466,7 @@ def create_backup() -> None:
     LOGGER.info("Starting backup...")
     try:
         created: Optional[bool] = None
-        if ANKI_MINOR >= 50:
+        if ANKI_INT_VERSION >= 50:
             # if there were no changes since the last backup, no backup is created
             created = _create_backup_with_retry_anki_50()
             LOGGER.info(f"Backup successful. {created=}")
@@ -446,3 +522,16 @@ def _create_backup_anki_50() -> bool:
 def truncated_list(values: List[Any], limit: int) -> List[Any]:
     assert limit > 0
     return values[:limit] + ["..."] if len(values) > limit else values
+
+
+def md5_file_hash(media_path: Path) -> str:
+    """Return the md5 hash of the file content of the given media file."""
+    with media_path.open("rb") as media_file:
+        file_content_hash = hashlib.md5(media_file.read())
+    result = file_content_hash.hexdigest()
+    return result
+
+
+def truncate_string(string: str, limit: int) -> str:
+    assert limit > 0
+    return string[:limit] + "..." if len(string) > limit else string

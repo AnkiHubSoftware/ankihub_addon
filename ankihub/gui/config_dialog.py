@@ -8,6 +8,8 @@ during normal execution.
 (We access mw using aqt.mw across the codebase to prevent this problem.)"""
 from typing import cast
 
+from ..settings import config
+
 _config_dialog_manager = None
 
 
@@ -29,6 +31,9 @@ def _general_tab(conf_window) -> None:
 
     conf_window = cast(ConfigWindow, conf_window)
 
+    # Refresh config when window is closed
+    conf_window.execute_on_close(lambda: config.load_public_config())
+
     tab = conf_window.add_tab("General")
 
     tab.text("Shortcuts", bold=True)
@@ -43,12 +48,6 @@ def _general_tab(conf_window) -> None:
         labels=["On AnkiWeb Sync", "On Anki start", "Never"],
         values=["on_ankiweb_sync", "on_startup", "never"],
         description="Auto Sync with AnkiHub",
-    )
-    tab.dropdown(
-        "suspend_new_cards_of_existing_notes",
-        labels=["If sibling cards are suspended", "Always", "Never"],
-        values=["if_siblings_are_suspended", "always", "never"],
-        description="Suspend new cards of existing notes",
     )
     tab.hseparator()
     tab.space(8)

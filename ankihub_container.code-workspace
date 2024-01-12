@@ -1,0 +1,20 @@
+{
+    "folders": [
+        {
+            "path": "/workspaces/ankihub_addon"
+        },
+        {
+            "path": "/home/vscode/venv/lib/python3.11/site-packages/anki"
+        },
+        {
+            "path": "/home/vscode/venv/lib/python3.11/site-packages/aqt"
+        }
+    ],
+    "settings": {
+        "search.exclude": {
+            "**/media_import": true,
+            "**/media_export": true,
+            "dist": true
+        }
+    }
+}

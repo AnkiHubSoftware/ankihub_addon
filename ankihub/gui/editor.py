@@ -13,8 +13,9 @@ from aqt.utils import openLink, showInfo, tooltip
 from .. import LOGGER, settings
 from ..ankihub_client import AnkiHubHTTPError
 from ..db import ankihub_db
+from ..gui.menu import AnkiHubLogin
 from ..settings import (
-    ANKI_MINOR,
+    ANKI_INT_VERSION,
     ICONS_PATH,
     AnkiHubCommands,
     config,
@@ -57,6 +58,10 @@ def _on_suggestion_button_press(editor: Editor) -> None:
     the hotkey is pressed.
     """
 
+    if not config.is_logged_in():
+        AnkiHubLogin.display_login()
+        return
+
     try:
         _on_suggestion_button_press_inner(editor)
     except AnkiHubHTTPError as e:
@@ -96,16 +101,14 @@ def _on_suggestion_button_press(editor: Editor) -> None:
 def _on_suggestion_button_press_inner(editor: Editor) -> None:
     # The command is expected to have been set at this point already, either by
     # fetching the default or by selecting a command from the dropdown menu.
-    command = editor.ankihub_command  # type: ignore
-
     def on_did_add_note(note: anki.notes.Note) -> None:
         open_suggestion_dialog_for_note(note, parent=editor.widget)
         gui_hooks.add_cards_did_add_note.remove(on_did_add_note)
 
-    # If the user is adding a new note, it is not yet in the Anki database.
-    # Therefore, we call add_current_note() to add the note to the database,
+    # If the note is not yet in the database, we need to add it first.
+    # We call add_current_note() to add the note to the database,
     # and then open the suggestion dialog.
-    if command == AnkiHubCommands.NEW.value and editor.addMode:
+    if editor.note.id == 0:
         gui_hooks.add_cards_did_add_note.append(on_did_add_note)
         add_note_window: AddCards = editor.parentWindow  # type: ignore
         add_note_window.add_current_note()
@@ -130,6 +133,7 @@ def _setup_editor_buttons(buttons: List[str], editor: Editor) -> None:
         label=f'<span id="{SUGGESTION_BTN_ID}-label" style="vertical-align: top;"></span>',
         id=SUGGESTION_BTN_ID,
         keys=hotkey,
+        disables=False,
     )
     buttons.append(suggestion_button)
 
@@ -139,6 +143,7 @@ def _setup_editor_buttons(buttons: List[str], editor: Editor) -> None:
         func=_on_view_note_button_press,
         label="View on AnkiHub",
         id=VIEW_NOTE_BTN_ID,
+        disables=False,
     )
     buttons.append(view_on_ankihub_button)
 
@@ -148,11 +153,12 @@ def _setup_editor_buttons(buttons: List[str], editor: Editor) -> None:
         func=_on_view_note_history_button_press,
         label="View Note History",
         id=VIEW_NOTE_HISTORY_BTN_ID,
+        disables=False,
     )
     buttons.append(view_history_on_ankihub_button)
 
     # fix style of buttons
-    if ANKI_MINOR >= 55:
+    if ANKI_INT_VERSION >= 55:
         buttons.append(
             "<style> "
             f"  [id^='{ANKIHUB_BTN_ID_PREFIX}'] img {{"
@@ -208,7 +214,7 @@ def _hide_ankihub_field_in_editor(
 ) -> str:
     """Add JS to the JS code of the editor to hide the ankihub_id field if it is present."""
     hide_last_field = settings.ANKIHUB_NOTE_TYPE_FIELD_NAME in note
-    if ANKI_MINOR >= 50:
+    if ANKI_INT_VERSION >= 50:
         refresh_fields_js = _refresh_editor_fields_for_anki_v50_and_up_js(
             hide_last_field
         )
@@ -222,7 +228,7 @@ def _hide_ankihub_field_in_editor(
 
 
 def _refresh_editor_fields_for_anki_v50_and_up_js(hide_last_field: bool) -> str:
-    if ANKI_MINOR >= 55:
+    if ANKI_INT_VERSION >= 55:
         change_visiblility_js = """
             function changeVisibilityOfField(field_idx, visible) {
                 require('anki/NoteEditor').instances[0].fields[field_idx].element.then(
@@ -230,7 +236,7 @@ def _refresh_editor_fields_for_anki_v50_and_up_js(hide_last_field: bool) -> str:
                 );
             }
         """
-    elif ANKI_MINOR >= 50:
+    elif ANKI_INT_VERSION >= 50:
         change_visiblility_js = """
             function changeVisibilityOfField(field_idx, visible) {
                 require('anki/NoteEditor').instances[0].fields[field_idx].element.then(
@@ -296,7 +302,8 @@ def _refresh_editor_fields_for_anki_below_v50_js(hide_last_field: bool) -> str:
 
 def _refresh_buttons(editor: Editor) -> None:
     """Enables/Disables buttons depending on the note type and if the note is synced with AnkiHub.
-    Also changes the label of the suggestion button based on whether the note is already on AnkiHub."""
+    Also changes the label of the suggestion button based on whether the note is already on AnkiHub.
+    """
     note = editor.note
 
     # Not sure why editor or editor.web can be None here, but it happens, there are reports on sentry
