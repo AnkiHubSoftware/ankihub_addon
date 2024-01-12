@@ -5,6 +5,7 @@ import os
 import re
 import shutil
 import tempfile
+import time
 import uuid
 from concurrent.futures import Future
 from datetime import datetime, timedelta, timezone
@@ -485,7 +486,33 @@ def test_entry_point(anki_session_with_addon_data: AnkiSession, qtbot: QtBot):
     # and that the add-on doesn't crash on Anki startup
 
 
-def test_suggestion_button(
+try:
+    from PyQt6 import QtTest
+except ImportError:
+    from PyQt5 import QtTest
+
+
+# wait for n seconds, while events are being processed
+def wait(seconds):
+    milliseconds = int(seconds * 1000)
+    QtTest.QTest.qWait(milliseconds)  # noqa
+
+
+def wait_until(booleanish_function, at_most_seconds=30):
+    deadline = time.time() + at_most_seconds
+
+    while time.time() < deadline:
+        if booleanish_function():
+            return
+        wait(0.01)
+
+    raise Exception(
+        f"Function {booleanish_function} never once returned "
+        f"a positive value in {at_most_seconds} seconds"
+    )
+
+
+def test_suggestion_button_1(
     anki_session_with_addon_data: AnkiSession,
     install_ah_deck: InstallAHDeck,
     import_ah_note_type: ImportAHNoteType,
@@ -516,6 +543,45 @@ def test_suggestion_button(
         add_cards_dialog.editor.web.evalWithCallback(js, callback)
 
         qtbot.wait_until(lambda: button_text is not None)
+
+        # Assert that the button text is correct
+        assert button_text == AnkiHubCommands.NEW.value
+
+        # # Clear editor to prevent dialog that asks for confirmation to discard changes when closing the editor
+        add_cards_dialog.editor.cleanup()
+
+
+def test_suggestion_button_2(
+    anki_session_with_addon_data: AnkiSession,
+    install_ah_deck: InstallAHDeck,
+    import_ah_note_type: ImportAHNoteType,
+    qtbot: QtBot,
+):
+    editor.setup()
+
+    with anki_session_with_addon_data.profile_loaded():
+        ah_did = install_ah_deck()
+        ah_note_type = import_ah_note_type(ah_did=ah_did)
+
+        anki_note = aqt.mw.col.new_note(ah_note_type)
+
+        add_cards_dialog: AddCards = dialogs.open("AddCards", aqt.mw)
+        add_cards_dialog.set_note(anki_note)
+
+        qtbot.wait(1000)
+
+        # Get the button text
+        button_text = None
+
+        def callback(value: str):
+            nonlocal button_text
+            button_text = value
+
+        js = f"document.getElementById('{SUGGESTION_BTN_ID}-label').textContent"
+
+        add_cards_dialog.editor.web.evalWithCallback(js, callback)
+
+        wait_until(lambda: button_text is not None)
 
         # Assert that the button text is correct
         assert button_text == AnkiHubCommands.NEW.value
