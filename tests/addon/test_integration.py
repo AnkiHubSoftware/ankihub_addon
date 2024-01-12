@@ -513,11 +513,16 @@ def wait_until(booleanish_function, at_most_seconds=5):
     )
 
 
+@pytest.mark.parametrize(
+    "use_qtbot_wait_until",
+    [True, False],
+)
 def test_suggestion_button(
     anki_session_with_addon_data: AnkiSession,
     install_ah_deck: InstallAHDeck,
     import_ah_note_type: ImportAHNoteType,
     qtbot: QtBot,
+    use_qtbot_wait_until: bool,
 ):
     editor.setup()
 
@@ -543,7 +548,10 @@ def test_suggestion_button(
 
         add_cards_dialog.editor.web.evalWithCallback(js, callback)
 
-        wait_until(lambda: button_text is not None)
+        if use_qtbot_wait_until:
+            qtbot.wait_until(lambda: button_text is not None)
+        else:
+            wait_until(lambda: button_text is not None)
 
         # Assert that the button text is correct
         assert button_text == AnkiHubCommands.NEW.value
