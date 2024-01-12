@@ -6,7 +6,7 @@ env:
   AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
   AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
   DISABLE_QT5_COMPAT: 1
-  # QTWEBENGINE_CHROMIUM_FLAGS: --no-sandbox
+  QTWEBENGINE_CHROMIUM_FLAGS: --no-sandbox
 
 on:
   push:
