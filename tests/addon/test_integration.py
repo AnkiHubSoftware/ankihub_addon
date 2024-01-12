@@ -498,7 +498,7 @@ def wait(seconds):
     QtTest.QTest.qWait(milliseconds)  # noqa
 
 
-def wait_until(booleanish_function, at_most_seconds=30):
+def wait_until(booleanish_function, at_most_seconds=5):
     deadline = time.time() + at_most_seconds
 
     while time.time() < deadline:
