@@ -1,6 +1,2 @@
 anki==23.10
-aqt==23.10
-
-PyQt5==5.15.5
-PyQtWebEngine==5.15.6
-PyQtWebEngine-Qt5==5.15.2
+aqt[qt5]==23.10
