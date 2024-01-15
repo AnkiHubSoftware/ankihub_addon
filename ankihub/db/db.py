@@ -20,7 +20,7 @@ from typing import Any, Dict, Iterable, List, Optional, Sequence, Set, Tuple
 import aqt
 from anki.models import NotetypeDict, NotetypeId
 from anki.notes import NoteId
-from anki.utils import ids2str, join_fields, split_fields
+from anki.utils import join_fields, split_fields
 
 from .. import LOGGER
 from ..ankihub_client import Field, NoteInfo, suggestion_type_from_str
@@ -29,8 +29,8 @@ from ..common_utils import local_media_names_from_html
 from ..settings import ANKI_INT_VERSION, ANKI_VERSION_23_10_00
 from .db_utils import DBConnection
 from .exceptions import IntegrityError
-from .rw_lock import exclusive_db_access_context, non_exclusive_db_access_context
 from .models import AnkiHubNote, AnkiHubNoteType, set_peewee_database
+from .rw_lock import exclusive_db_access_context, non_exclusive_db_access_context
 
 
 @contextmanager
@@ -90,6 +90,8 @@ def _detach_ankihub_db_from_anki_db_connection() -> None:
         try:
             aqt.mw.col.db.execute(f"DETACH DATABASE {ankihub_db.database_name}")
             LOGGER.info("Detached AnkiHub DB from Anki DB connection")
+
+            # set_peewee_database()
         except Exception:
             LOGGER.info("Failed to detach AnkiHub database.")
 

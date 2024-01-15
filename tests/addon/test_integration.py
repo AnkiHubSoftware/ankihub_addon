@@ -2361,6 +2361,42 @@ class TestCustomSearchNodes:
                 )
 
 
+def test_io_error(anki_session_with_addon_data: AnkiSession):
+    with anki_session_with_addon_data.profile_loaded():
+        AnkiHubNote.insert(anki_note_id=1, ankihub_note_id=1, mod=1).execute()
+
+        # Commenting this out makes the test pass
+        with attached_ankihub_db():
+            pass
+
+        # This fails with an I/O Error
+        ankihub_db.execute("SELECT * FROM notes")
+
+
+def test_changes_not_getting_applied(anki_session_with_addon_data: AnkiSession):
+    with anki_session_with_addon_data.profile_loaded():
+        nid = 1
+        AnkiHubNote.insert(anki_note_id=nid, mod=1).execute()
+
+        # Commenting this out makes the test pass
+        with attached_ankihub_db():
+            pass
+
+        new_mod_value = 7
+        AnkiHubNote.update(mod=new_mod_value).where(
+            AnkiHubNote.anki_note_id == nid
+        ).execute()
+
+        with attached_ankihub_db():
+            # This finds that the mod value was not changed
+            assert (
+                aqt.mw.col.db.scalar(
+                    "SELECT mod FROM ankihub_db.notes WHERE anki_note_id = ?", nid
+                )
+                == new_mod_value
+            )
+
+
 class TestBrowserTreeView:
     # without this mark the test sometime fails on clean-up
     @pytest.mark.qt_no_exception_capture

@@ -1,15 +1,6 @@
-from typing import List
-import uuid
+from peewee import CharField, IntegerField, Model, Proxy, SqliteDatabase
 
-from peewee import (
-    Model,
-    CharField,
-    IntegerField,
-    SqliteDatabase,
-    Proxy,
-)
 from ..settings import ankihub_db_path
-
 
 ankihub_db_proxy = Proxy()
 
