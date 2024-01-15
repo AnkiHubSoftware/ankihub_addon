@@ -66,7 +66,7 @@ class CustomSearchNode(ABC):
 class ModifiedAfterSyncSearchNode(CustomSearchNode):
     parameter_name = "ankihub_modified_after_sync"
 
-    def __init__(self, browser, value: str):
+    def __init__(self, browser: Browser, value: str):
         self.browser = browser
         self.value = value
 
@@ -111,7 +111,7 @@ class ModifiedAfterSyncSearchNode(CustomSearchNode):
 class UpdatedInTheLastXDaysSearchNode(CustomSearchNode):
     parameter_name = "ankihub_updated"
 
-    def __init__(self, browser, value: str):
+    def __init__(self, browser: Browser, value: str):
         self.browser = browser
         self.value = value
 
@@ -154,8 +154,8 @@ class NewNoteSearchNode(CustomSearchNode):
     parameter_name = "ankihub_new_note"
 
     def __init__(self, browser: Browser, value: str):
-        self.browser: Browser = browser
-        self.value: str = value
+        self.browser = browser
+        self.value = value
 
     def filter_ids(self, ids: Sequence[ItemId]) -> Sequence[ItemId]:
         if self.value.strip() != "":
@@ -180,7 +180,7 @@ class NewNoteSearchNode(CustomSearchNode):
 class SuggestionTypeSearchNode(CustomSearchNode):
     parameter_name = "ankihub_suggestion_type"
 
-    def __init__(self, browser, value: str):
+    def __init__(self, browser: Browser, value: str):
         self.browser = browser
         self.value = value
 
@@ -210,7 +210,7 @@ class SuggestionTypeSearchNode(CustomSearchNode):
 class UpdatedSinceLastReviewSearchNode(CustomSearchNode):
     parameter_name = "ankihub_updated_since_last_review"
 
-    def __init__(self, browser, value: str):
+    def __init__(self, browser: Browser, value: str):
         self.browser = browser
         self.value = value
 
