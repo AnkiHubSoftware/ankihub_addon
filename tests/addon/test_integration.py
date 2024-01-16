@@ -53,6 +53,7 @@ from ankihub.ankihub_client.models import (
     DeckMediaUpdateChunk,
     UserDeckExtensionRelation,
 )
+from ankihub.gui import editor
 from ankihub.gui.browser.browser import (
     ModifiedAfterSyncSearchNode,
     NewNoteSearchNode,
@@ -70,6 +71,7 @@ from ..factories import (
 )
 from ..fixtures import (
     ImportAHNote,
+    ImportAHNoteType,
     InstallAHDeck,
     MockDownloadAndInstallDeckDependencies,
     MockShowDialogWithCB,
@@ -127,7 +129,7 @@ from ankihub.gui.config_dialog import (
 )
 from ankihub.gui.deck_updater import _AnkiHubDeckUpdater, ah_deck_updater
 from ankihub.gui.decks_dialog import DeckManagementDialog
-from ankihub.gui.editor import _on_suggestion_button_press, _refresh_buttons
+from ankihub.gui.editor import SUGGESTION_BTN_ID
 from ankihub.gui.errors import upload_logs_and_data_in_background
 from ankihub.gui.media_sync import media_sync
 from ankihub.gui.menu import AnkiHubLogin, menu_state
@@ -479,131 +481,153 @@ def test_entry_point(anki_session_with_addon_data: AnkiSession, qtbot: QtBot):
     # and that the add-on doesn't crash on Anki startup
 
 
-def test_editor(
-    anki_session_with_addon_data: AnkiSession,
-    requests_mock: Mocker,
-    mocker: MockerFixture,
-    next_deterministic_uuid: Callable[[], uuid.UUID],
-    install_sample_ah_deck: InstallSampleAHDeck,
-    mock_suggestion_dialog: MockSuggestionDialog,
-):
-    mocker.patch.object(config, "is_logged_in", return_value=True)
+# The JS in the webviews is flaky if not run in sequential mode
+@pytest.mark.sequential
+class TestEditor:
+    @pytest.mark.parametrize(
+        "note_fields_changed, logged_in", [(True, True), (False, True), (True, False)]
+    )
+    def test_create_change_note_suggestion(
+        self,
+        anki_session_with_addon_data: AnkiSession,
+        mocker: MockerFixture,
+        install_ah_deck: InstallAHDeck,
+        import_ah_note: ImportAHNote,
+        mock_suggestion_dialog: MockSuggestionDialog,
+        qtbot: QtBot,
+        note_fields_changed: bool,
+        logged_in: bool,
+    ):
+        editor.setup()
+        with anki_session_with_addon_data.profile_loaded():
+            mocker.patch.object(config, "is_logged_in", return_value=logged_in)
+            mock_suggestion_dialog(user_cancels=False)
 
-    with anki_session_with_addon_data.profile_loaded():
-        mw = anki_session_with_addon_data.mw
+            create_change_note_suggestion_mock = mocker.patch.object(
+                AnkiHubClient, "create_change_note_suggestion"
+            )
 
-        install_sample_ah_deck()
+            show_tooltip_mock = mocker.patch(
+                "ankihub.gui.suggestion_dialog.show_tooltip"
+            )
 
-        mock_suggestion_dialog(user_cancels=False)
+            ah_did = install_ah_deck()
+            ah_note = import_ah_note(ah_did=ah_did)
+            anki_note = aqt.mw.col.get_note(NoteId(ah_note.anki_nid))
 
-        add_cards_dialog: AddCards = dialogs.open("AddCards", mw)
-        editor = add_cards_dialog.editor
+            if note_fields_changed:
+                new_field_value = "new field value"
+                anki_note["Front"] = new_field_value
 
-        # test a new note suggestion
-        editor.note = mw.col.new_note(mw.col.models.by_name("Basic (Testdeck / user1)"))
+            add_cards_dialog: AddCards = dialogs.open("AddCards", aqt.mw)
+            add_cards_dialog.editor.set_note(anki_note)
 
-        note_1_ah_nid = next_deterministic_uuid()
+            self.wait_suggestion_button_ready(qtbot=qtbot, mocker=mocker)
 
-        mocker.patch("ankihub.main.exporting.uuid.uuid4", return_value=note_1_ah_nid)
+            self.assert_suggestion_button_text(
+                qtbot=qtbot,
+                addcards=add_cards_dialog,
+                expected_text=AnkiHubCommands.CHANGE.value,
+            )
 
-        requests_mock.post(
-            f"{config.api_url}/notes/{note_1_ah_nid}/suggestion/",
-            status_code=201,
-            json={},
+            self.click_suggestion_button(add_cards_dialog)
+
+            if not logged_in:
+                # Assert that the login dialog was shown
+                window: AnkiHubLogin = AnkiHubLogin._window
+                qtbot.wait_until(lambda: window and window.isVisible())
+            elif note_fields_changed:
+                # Assert that the suggestion was sent to the server with the correct data
+                qtbot.wait_until(lambda: create_change_note_suggestion_mock.called)
+                change_note_suggestion: ChangeNoteSuggestion = (
+                    create_change_note_suggestion_mock.call_args.kwargs[
+                        "change_note_suggestion"
+                    ]
+                )
+                assert change_note_suggestion.fields[0].value == new_field_value
+            else:
+                # Assert that no suggestion was sent to the server and that a tooltip was shown
+                qtbot.wait_until(lambda: show_tooltip_mock.called)
+                assert not create_change_note_suggestion_mock.called
+
+            # Clear editor to prevent dialog that asks for confirmation to discard changes when closing the editor
+            add_cards_dialog.editor.cleanup()
+
+    @pytest.mark.parametrize("logged_in", [True, False])
+    def test_create_new_note_suggestion(
+        self,
+        anki_session_with_addon_data: AnkiSession,
+        mocker: MockerFixture,
+        mock_suggestion_dialog: MockSuggestionDialog,
+        install_ah_deck: InstallAHDeck,
+        import_ah_note_type: ImportAHNoteType,
+        qtbot: QtBot,
+        logged_in: bool,
+    ):
+        editor.setup()
+        with anki_session_with_addon_data.profile_loaded():
+            mocker.patch.object(config, "is_logged_in", return_value=logged_in)
+            mock_suggestion_dialog(user_cancels=False)
+
+            create_new_note_suggestion_mock = mocker.patch.object(
+                AnkiHubClient, "create_new_note_suggestion"
+            )
+
+            ah_did = install_ah_deck()
+            ah_note_type = import_ah_note_type(ah_did=ah_did)
+
+            anki_note = aqt.mw.col.new_note(ah_note_type)
+            field_value = "field value"
+            anki_note["Front"] = field_value
+
+            add_cards_dialog: AddCards = dialogs.open("AddCards", aqt.mw)
+            add_cards_dialog.editor.set_note(anki_note)
+
+            self.wait_suggestion_button_ready(qtbot=qtbot, mocker=mocker)
+
+            self.assert_suggestion_button_text(
+                qtbot=qtbot,
+                addcards=add_cards_dialog,
+                expected_text=AnkiHubCommands.NEW.value,
+            )
+
+            self.click_suggestion_button(add_cards_dialog)
+
+            if not logged_in:
+                # Assert that the login dialog was shown
+                window: AnkiHubLogin = AnkiHubLogin._window
+                qtbot.wait_until(lambda: window and window.isVisible())
+            else:
+                # Assert that the suggestion was created with the correct data
+                qtbot.wait_until(lambda: create_new_note_suggestion_mock.called)
+                new_note_suggestion: NewNoteSuggestion = (
+                    create_new_note_suggestion_mock.call_args.kwargs[
+                        "new_note_suggestion"
+                    ]
+                )
+                assert new_note_suggestion.fields[0].value == field_value
+
+            # Clear editor to prevent dialog that asks for confirmation to discard changes when closing the editor
+            add_cards_dialog.editor.cleanup()
+
+    def wait_suggestion_button_ready(self, qtbot: QtBot, mocker: MockerFixture) -> None:
+        refresh_buttons_spy = mocker.spy(editor, "_refresh_buttons")
+        qtbot.wait_until(lambda: refresh_buttons_spy.called)
+
+    def assert_suggestion_button_text(
+        self, qtbot: QtBot, addcards: AddCards, expected_text: str
+    ) -> None:
+        with qtbot.wait_callback() as callback:
+            addcards.editor.web.evalWithCallback(
+                f"document.getElementById('{SUGGESTION_BTN_ID}-label').textContent",
+                callback,
+            )
+        callback.assert_called_with(expected_text)
+
+    def click_suggestion_button(self, addcards: AddCards) -> None:
+        addcards.editor.web.eval(
+            f"document.getElementById('{SUGGESTION_BTN_ID}').click()"
         )
-
-        _refresh_buttons(editor)
-        assert editor.ankihub_command == AnkiHubCommands.NEW.value  # type: ignore
-        _on_suggestion_button_press(editor)
-
-        # test a change note suggestion
-        note = mw.col.get_note(mw.col.find_notes("")[0])
-        editor.note = note
-
-        note_2_ah_nid = ankihub_db.ankihub_nid_for_anki_nid(note.id)
-
-        suggestion_endpoint_mock = requests_mock.post(
-            f"{config.api_url}/notes/{note_2_ah_nid}/suggestion/",
-            status_code=201,
-            json={},
-        )
-
-        _refresh_buttons(editor)
-        assert editor.ankihub_command == AnkiHubCommands.CHANGE.value  # type: ignore
-
-        # this should not trigger a suggestion because the note has not been changed
-        _on_suggestion_button_press(editor)
-        assert suggestion_endpoint_mock.call_count == 0  # type: ignore
-
-        # change the front of the note
-        note["Front"] = "new front"
-        note.flush()
-
-        # this should trigger a suggestion because the note has been changed
-        _on_suggestion_button_press(editor)
-
-        # mocked requests: f"{config.api_url_base}/notes/{notes_2_ah_nid}/suggestion/"
-        assert suggestion_endpoint_mock.call_count == 1  # type: ignore
-
-
-def test_editor_should_display_login_window_if_user_attempts_to_submit_new_note_without_being_signed_in(
-    qtbot: QtBot,
-    anki_session_with_addon_data: AnkiSession,
-    mocker: MockerFixture,
-    install_sample_ah_deck: InstallSampleAHDeck,
-):
-    mocker.patch.object(config, "is_logged_in", return_value=False)
-
-    with anki_session_with_addon_data.profile_loaded():
-        mw = anki_session_with_addon_data.mw
-
-        install_sample_ah_deck()
-
-        add_cards_dialog: AddCards = dialogs.open("AddCards", mw)
-        editor = add_cards_dialog.editor
-
-        # test a new note suggestion
-        editor.note = mw.col.new_note(mw.col.models.by_name("Basic (Testdeck / user1)"))
-
-        _refresh_buttons(editor)
-        assert editor.ankihub_command == AnkiHubCommands.NEW.value  # type: ignore
-        _on_suggestion_button_press(editor)
-        window: AnkiHubLogin = AnkiHubLogin._window
-        qtbot.waitUntil(lambda: window.isVisible())
-
-
-def test_editor_should_display_login_window_if_user_attempts_to_submit_change_note_suggestion_without_being_signed_in(
-    qtbot: QtBot,
-    anki_session_with_addon_data: AnkiSession,
-    mocker: MockerFixture,
-    install_sample_ah_deck: InstallSampleAHDeck,
-):
-    mocker.patch.object(config, "is_logged_in", return_value=False)
-
-    with anki_session_with_addon_data.profile_loaded():
-        mw = anki_session_with_addon_data.mw
-
-        install_sample_ah_deck()
-
-        add_cards_dialog: AddCards = dialogs.open("AddCards", mw)
-        editor = add_cards_dialog.editor
-
-        # test a change note suggestion
-        note = mw.col.get_note(mw.col.find_notes("")[0])
-        editor.note = note
-
-        _refresh_buttons(editor)
-
-        assert editor.ankihub_command == AnkiHubCommands.CHANGE.value  # type: ignore
-
-        # change the front of the note
-        note["Front"] = "new front"
-        note.flush()
-
-        # this should trigger a suggestion because the note has been changed
-        _on_suggestion_button_press(editor)
-        window: AnkiHubLogin = AnkiHubLogin._window
-        qtbot.waitUntil(lambda: window.isVisible())
 
 
 def test_get_note_types_in_deck(anki_session_with_addon_data: AnkiSession):

@@ -106,8 +106,20 @@ of pytest's docs for details.
 Tests are seperated into add-on tests and client tests.
 
 #### Running add-on tests
+#### Run all tests except tests that need to be run sequentially and performance tests
 ```
 pytest tests/addon
+```
+
+#### Run sequential tests
+These are test that are flaky when run in parallel with other tests using `pytest-xdist`.
+```
+pytest tests/addon -m sequential -n 1
+```
+
+#### Run performance tests
+```
+pytest tests/addon -m performance -n 1
 ```
 
 #### Running client tests
@@ -121,17 +133,6 @@ See https://vcrpy.readthedocs.io/en/latest/.
 This requires ankihub runnig locally on localhost:8000. **The test setup clears the ankihub database.**
 ```
 pytest tests/client --disable-vcr
-```
-
-#### Running performance tests
-##### All addon tests including performance tests
-```
-pytest tests/addon --performance
-```
-
-##### Only performance tests
-```
-pytest tests/addon --peformance -k performance
 ```
 
 #### Type checking

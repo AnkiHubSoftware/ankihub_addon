@@ -5,6 +5,8 @@ env:
   AWS_REGION: us-east-1
   AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
   AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+  QTWEBENGINE_CHROMIUM_FLAGS: --no-sandbox
+  DISABLE_QT5_COMPAT: 1
 
 on:
   push:
@@ -42,8 +44,9 @@ jobs:
 
       - name: Run pytest with coverage
         run: |
-          pytest ./tests/addon --cov --cov-report=xml -n 4
-          pytest ./tests/addon --performance -k performance -n1 --cov-report=xml --cov-append
+          pytest ./tests/addon -n 1 -m sequential --cov --cov-report=xml
+          pytest ./tests/addon -n 4 -m "not sequential and not performance" --cov --cov-report=xml --cov-append
+          pytest ./tests/addon -n 1 -m performance --cov-report=xml --cov-append
 
       - name: Upload coverage
         uses: actions/upload-artifact@v2
