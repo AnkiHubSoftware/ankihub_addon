@@ -77,6 +77,7 @@ from ..fixtures import (
     MockShowDialogWithCB,
     MockStudyDeckDialogWithCB,
     MockSuggestionDialog,
+    add_basic_anki_note_to_deck,
     create_or_get_ah_version_of_note_type,
     record_review,
 )
@@ -110,7 +111,7 @@ from ankihub.ankihub_client.ankihub_client import (
     _transform_notes_data,
 )
 from ankihub.common_utils import local_media_names_from_html
-from ankihub.db import ankihub_db, attached_ankihub_db
+from ankihub.db import ankihub_db
 from ankihub.debug import (
     _log_stack,
     _setup_logging_for_db_begin,
@@ -122,6 +123,7 @@ from ankihub.gui.auto_sync import (
     _setup_ankihub_sync_on_ankiweb_sync,
 )
 from ankihub.gui.browser import custom_columns
+from ankihub.gui.browser import setup as setup_browser
 from ankihub.gui.browser.custom_search_nodes import UpdatedSinceLastReviewSearchNode
 from ankihub.gui.config_dialog import (
     get_config_dialog_manager,
@@ -2152,6 +2154,54 @@ def prepare_note(
 
 
 class TestCustomSearchNodes:
+    def test_use_custom_search_node_in_browser_search(
+        self,
+        anki_session_with_addon_data: AnkiSession,
+        import_ah_note: ImportAHNote,
+        qtbot: QtBot,
+    ):
+        setup_browser()
+        with anki_session_with_addon_data.profile_loaded():
+            # Add an AnkiHub note to the collection
+            note_info = NoteInfoFactory.create()
+            import_ah_note(note_info)
+
+            # Add a non-AnkiHub note to the collection
+            add_basic_anki_note_to_deck(DeckId(1))
+
+            # Search for new AnkiHub notes in the browser using our NewNoteSearchNode
+            browser: Browser = dialogs.open("Browser", aqt.mw)
+            search_string = f"{NewNoteSearchNode.parameter_name}:"
+            browser.search_for(search=search_string)
+
+            # Assert that only the AnkiHub note is in the search results
+            browser.table.select_all()
+            assert browser.table.get_selected_note_ids() == [note_info.anki_nid]
+
+            # Close the browser to prevent RuntimeErrors getting raised during teardown
+            with qtbot.wait_callback() as callback:
+                dialogs.closeAll(onsuccess=callback)
+
+    def test_use_custom_search_node_in_browser_search_with_invalid_parameter(
+        self,
+        anki_session_with_addon_data: AnkiSession,
+        mocker: MockerFixture,
+        qtbot: QtBot,
+    ):
+        setup_browser()
+        with anki_session_with_addon_data.profile_loaded():
+            showWarning_mock = mocker.patch("ankihub.gui.browser.browser.showWarning")
+
+            browser: Browser = dialogs.open("Browser", aqt.mw)
+            search_string = f"{NewNoteSearchNode.parameter_name}:invalid-parameter"
+            browser.search_for(search=search_string)
+
+            assert showWarning_mock.called
+
+            # Close the browser to prevent RuntimeErrors getting raised during teardown
+            with qtbot.wait_callback() as callback:
+                dialogs.closeAll(onsuccess=callback)
+
     def test_ModifiedAfterSyncSearchNode_with_notes(
         self,
         anki_session_with_addon_data: AnkiSession,
@@ -2167,27 +2217,24 @@ class TestCustomSearchNodes:
             browser = mocker.Mock()
             browser.table.is_notes_mode.return_value = True
 
-            with attached_ankihub_db():
-                assert (
-                    ModifiedAfterSyncSearchNode(browser, "yes").filter_ids(all_nids)
-                    == []
-                )
-                assert (
-                    ModifiedAfterSyncSearchNode(browser, "no").filter_ids(all_nids)
-                    == all_nids
-                )
+            assert (
+                ModifiedAfterSyncSearchNode(browser, "yes").filter_ids(all_nids) == []
+            )
+            assert set(
+                ModifiedAfterSyncSearchNode(browser, "no").filter_ids(all_nids)
+            ) == set(all_nids)
 
-                # we can't use freeze_time here because note.mod is set by the Rust backend
-                sleep(1.1)
+            # we can't use freeze_time here because note.mod is set by the Rust backend
+            sleep(1.1)
 
-                # modify a note - this changes its mod value in the Anki DB
-                nid = all_nids[0]
-                note = mw.col.get_note(nid)
-                note["Front"] = "new front"
-                note.flush()
+            # modify a note - this changes its mod value in the Anki DB
+            nid = all_nids[0]
+            note = mw.col.get_note(nid)
+            note["Front"] = "new front"
+            note.flush()
 
-                nids = ModifiedAfterSyncSearchNode(browser, "yes").filter_ids(all_nids)
-                assert nids == [nid]
+            nids = ModifiedAfterSyncSearchNode(browser, "yes").filter_ids(all_nids)
+            assert nids == [nid]
 
     def test_ModifiedAfterSyncSearchNode_with_cards(
         self,
@@ -2204,27 +2251,24 @@ class TestCustomSearchNodes:
             browser = mocker.Mock()
             browser.table.is_notes_mode.return_value = False
 
-            with attached_ankihub_db():
-                assert (
-                    ModifiedAfterSyncSearchNode(browser, "yes").filter_ids(all_cids)
-                    == []
-                )
-                assert (
-                    ModifiedAfterSyncSearchNode(browser, "no").filter_ids(all_cids)
-                    == all_cids
-                )
+            assert (
+                ModifiedAfterSyncSearchNode(browser, "yes").filter_ids(all_cids) == []
+            )
+            assert set(
+                ModifiedAfterSyncSearchNode(browser, "no").filter_ids(all_cids)
+            ) == set(all_cids)
 
-                # we can't use freeze_time here because note.mod is set by the Rust backend
-                sleep(1.1)
+            # we can't use freeze_time here because note.mod is set by the Rust backend
+            sleep(1.1)
 
-                # modify a note - this changes its mod value in the Anki DB
-                cid = all_cids[0]
-                note = mw.col.get_note(mw.col.get_card(cid).nid)
-                note["Front"] = "new front"
-                note.flush()
+            # modify a note - this changes its mod value in the Anki DB
+            cid = all_cids[0]
+            note = mw.col.get_note(mw.col.get_card(cid).nid)
+            note["Front"] = "new front"
+            note.flush()
 
-                cids = ModifiedAfterSyncSearchNode(browser, "yes").filter_ids(all_cids)
-                assert cids == [cid]
+            cids = ModifiedAfterSyncSearchNode(browser, "yes").filter_ids(all_cids)
+            assert cids == [cid]
 
     def test_UpdatedInTheLastXDaysSearchNode(
         self,
@@ -2242,31 +2286,25 @@ class TestCustomSearchNodes:
             browser = mocker.Mock()
             browser.table.is_notes_mode.return_value = True
 
-            with attached_ankihub_db():
-                assert (
-                    UpdatedInTheLastXDaysSearchNode(browser, "1").filter_ids(all_nids)
-                    == all_nids
-                )
-                assert (
-                    UpdatedInTheLastXDaysSearchNode(browser, "2").filter_ids(all_nids)
-                    == all_nids
-                )
+            assert (
+                UpdatedInTheLastXDaysSearchNode(browser, "1").filter_ids(all_nids)
+                == all_nids
+            )
+            assert (
+                UpdatedInTheLastXDaysSearchNode(browser, "2").filter_ids(all_nids)
+                == all_nids
+            )
 
-                yesterday_timestamp = int(
-                    (datetime.now() - timedelta(days=1)).timestamp()
-                )
-                mw.col.db.execute(
-                    f"UPDATE ankihub_db.notes SET mod = {yesterday_timestamp}"
-                )
+            yesterday_timestamp = int((datetime.now() - timedelta(days=1)).timestamp())
+            ankihub_db.execute(f"UPDATE notes SET mod = {yesterday_timestamp}")
 
-                assert (
-                    UpdatedInTheLastXDaysSearchNode(browser, "1").filter_ids(all_nids)
-                    == []
-                )
-                assert (
-                    UpdatedInTheLastXDaysSearchNode(browser, "2").filter_ids(all_nids)
-                    == all_nids
-                )
+            assert (
+                UpdatedInTheLastXDaysSearchNode(browser, "1").filter_ids(all_nids) == []
+            )
+            assert (
+                UpdatedInTheLastXDaysSearchNode(browser, "2").filter_ids(all_nids)
+                == all_nids
+            )
 
     def test_NewNoteSearchNode(
         self,
@@ -2306,12 +2344,11 @@ class TestCustomSearchNodes:
             browser = mocker.Mock()
             browser.table.is_notes_mode.return_value = True
 
-            with attached_ankihub_db():
-                # notes without a last_update_type are new
-                assert NewNoteSearchNode(browser, "").filter_ids(all_nids) == [
-                    notes_data[0].anki_nid,
-                    notes_data[1].anki_nid,
-                ]
+            # notes without a last_update_type are new
+            assert NewNoteSearchNode(browser, "").filter_ids(all_nids) == [
+                notes_data[0].anki_nid,
+                notes_data[1].anki_nid,
+            ]
 
     def test_SuggestionTypeSearchNode(
         self,
@@ -2351,16 +2388,15 @@ class TestCustomSearchNodes:
             browser = mocker.Mock()
             browser.table.is_notes_mode.return_value = True
 
-            with attached_ankihub_db():
-                assert SuggestionTypeSearchNode(
-                    browser, SuggestionType.NEW_CONTENT.value[0]
-                ).filter_ids(all_nids) == [
-                    notes_data[0].anki_nid,
-                    notes_data[1].anki_nid,
-                ]
-                assert SuggestionTypeSearchNode(
-                    browser, SuggestionType.SPELLING_GRAMMATICAL.value[0]
-                ).filter_ids(all_nids) == [notes_data[2].anki_nid]
+            assert SuggestionTypeSearchNode(
+                browser, SuggestionType.NEW_CONTENT.value[0]
+            ).filter_ids(all_nids) == [
+                notes_data[0].anki_nid,
+                notes_data[1].anki_nid,
+            ]
+            assert SuggestionTypeSearchNode(
+                browser, SuggestionType.SPELLING_GRAMMATICAL.value[0]
+            ).filter_ids(all_nids) == [notes_data[2].anki_nid]
 
     def test_UpdatedSinceLastReviewSearchNode(
         self,
@@ -2378,11 +2414,9 @@ class TestCustomSearchNodes:
             browser = mocker.Mock()
             browser.table.is_notes_mode.return_value = True
 
-            with attached_ankihub_db():
-                assert (
-                    UpdatedSinceLastReviewSearchNode(browser, "").filter_ids(all_nids)
-                    == []
-                )
+            assert (
+                UpdatedSinceLastReviewSearchNode(browser, "").filter_ids(all_nids) == []
+            )
 
             # Add a review entry for a card to the database.
             nid = all_nids[0]
@@ -2399,20 +2433,17 @@ class TestCustomSearchNodes:
             )
 
             # Check that the note of the card is now included in the search results.
-            with attached_ankihub_db():
-                assert UpdatedSinceLastReviewSearchNode(browser, "").filter_ids(
-                    all_nids
-                ) == [nid]
+            assert UpdatedSinceLastReviewSearchNode(browser, "").filter_ids(
+                all_nids
+            ) == [nid]
 
             # Add another review entry for the card to the database.
             record_review(cid, review_time_ms=3 * 1000)
 
             # Check that the note of the card is not included in the search results anymore.
-            with attached_ankihub_db():
-                assert (
-                    UpdatedSinceLastReviewSearchNode(browser, "").filter_ids(all_nids)
-                    == []
-                )
+            assert (
+                UpdatedSinceLastReviewSearchNode(browser, "").filter_ids(all_nids) == []
+            )
 
 
 class TestBrowserTreeView:
