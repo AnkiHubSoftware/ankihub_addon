@@ -101,7 +101,7 @@ class ModifiedAfterSyncSearchNode(CustomSearchNode):
         retained_nids = [
             nid
             for nid, anki_mod in nid_to_anki_mod.items()
-            if (ah_mod := nid_to_ah_mod.get(nid)) is not None and op(anki_mod, ah_mod)
+            if nid in nid_to_ah_mod and op(anki_mod, nid_to_ah_mod[nid])
         ]
 
         result = self._output_ids(retained_nids)
@@ -134,19 +134,15 @@ class UpdatedInTheLastXDaysSearchNode(CustomSearchNode):
 
         nids = self._note_ids(ids)
 
-        nid_ah_mod_tuples = ankihub_db.execute(
+        retained_nids = ankihub_db.list(
             f"""
-            SELECT anki_note_id, mod FROM notes
-            WHERE anki_note_id in {ids2str(nids)}
+            SELECT anki_note_id FROM notes
+            WHERE anki_note_id in {ids2str(nids)} AND
+            mod >= {threshold_timestamp}
             """
         )
 
-        retained_nids = [
-            nid for nid, ah_mod in nid_ah_mod_tuples if ah_mod >= threshold_timestamp
-        ]
-
         result = self._output_ids(retained_nids)
-
         return result
 
 
