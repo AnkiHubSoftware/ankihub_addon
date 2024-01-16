@@ -2155,7 +2155,10 @@ def prepare_note(
 
 class TestCustomSearchNodes:
     def test_use_custom_search_node_in_browser_search(
-        self, anki_session_with_addon_data: AnkiSession, import_ah_note: ImportAHNote
+        self,
+        anki_session_with_addon_data: AnkiSession,
+        import_ah_note: ImportAHNote,
+        qtbot: QtBot,
     ):
         setup_browser()
         with anki_session_with_addon_data.profile_loaded():
@@ -2176,12 +2179,14 @@ class TestCustomSearchNodes:
             assert browser.table.get_selected_note_ids() == [note_info.anki_nid]
 
             # Close the browser to prevent RuntimeErrors getting raised during teardown
-            browser.close()
+            with qtbot.wait_callback() as callback:
+                dialogs.closeAll(onsuccess=callback)
 
     def test_use_custom_search_node_in_browser_search_with_invalid_parameter(
         self,
         anki_session_with_addon_data: AnkiSession,
         mocker: MockerFixture,
+        qtbot: QtBot,
     ):
         setup_browser()
         with anki_session_with_addon_data.profile_loaded():
@@ -2194,7 +2199,8 @@ class TestCustomSearchNodes:
             assert showWarning_mock.called
 
             # Close the browser to prevent RuntimeErrors getting raised during teardown
-            browser.close()
+            with qtbot.wait_callback() as callback:
+                dialogs.closeAll(onsuccess=callback)
 
     def test_ModifiedAfterSyncSearchNode_with_notes(
         self,
