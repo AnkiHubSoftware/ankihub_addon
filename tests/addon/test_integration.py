@@ -77,6 +77,7 @@ from ..fixtures import (
     MockShowDialogWithCB,
     MockStudyDeckDialogWithCB,
     MockSuggestionDialog,
+    add_basic_anki_note_to_deck,
     create_or_get_ah_version_of_note_type,
     record_review,
 )
@@ -122,6 +123,7 @@ from ankihub.gui.auto_sync import (
     _setup_ankihub_sync_on_ankiweb_sync,
 )
 from ankihub.gui.browser import custom_columns
+from ankihub.gui.browser import setup as setup_browser
 from ankihub.gui.browser.custom_search_nodes import UpdatedSinceLastReviewSearchNode
 from ankihub.gui.config_dialog import (
     get_config_dialog_manager,
@@ -2152,6 +2154,27 @@ def prepare_note(
 
 
 class TestCustomSearchNodes:
+    def test_use_custom_search_node_in_browser_search(
+        self, anki_session_with_addon_data: AnkiSession, import_ah_note: ImportAHNote
+    ):
+        setup_browser()
+        with anki_session_with_addon_data.profile_loaded():
+            # Add an AnkiHub note to the collection
+            note_info = NoteInfoFactory.create()
+            import_ah_note(note_info)
+
+            # Add a non-AnkiHub note to the collection
+            add_basic_anki_note_to_deck(DeckId(1))
+
+            # Search for new AnkiHub notes in the browser using our NewNoteSearchNode
+            browser: Browser = dialogs.open("Browser", aqt.mw)
+            search_string = f"{NewNoteSearchNode.parameter_name}:"
+            browser.search_for(search=search_string)
+
+            # Assert that only the AnkiHub note is in the search results
+            browser.table.select_all()
+            assert browser.table.get_selected_note_ids() == [note_info.anki_nid]
+
     def test_ModifiedAfterSyncSearchNode_with_notes(
         self,
         anki_session_with_addon_data: AnkiSession,
