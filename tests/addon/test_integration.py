@@ -2175,6 +2175,21 @@ class TestCustomSearchNodes:
             browser.table.select_all()
             assert browser.table.get_selected_note_ids() == [note_info.anki_nid]
 
+    def test_use_custom_search_node_in_browser_search_with_invalid_parameter(
+        self,
+        anki_session_with_addon_data: AnkiSession,
+        mocker: MockerFixture,
+    ):
+        setup_browser()
+        with anki_session_with_addon_data.profile_loaded():
+            showWarning_mock = mocker.patch("ankihub.gui.browser.browser.showWarning")
+
+            browser: Browser = dialogs.open("Browser", aqt.mw)
+            search_string = f"{NewNoteSearchNode.parameter_name}:invalid-parameter"
+            browser.search_for(search=search_string)
+
+            assert showWarning_mock.called
+
     def test_ModifiedAfterSyncSearchNode_with_notes(
         self,
         anki_session_with_addon_data: AnkiSession,
