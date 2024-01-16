@@ -248,8 +248,8 @@ class UpdatedSinceLastReviewSearchNode(CustomSearchNode):
         retained_nids = [
             nid
             for nid, ah_mod in nid_to_ah_mod.items()
-            if (max_revlog_id := nid_to_last_review_timestamp_ms.get(nid)) is not None
-            and ah_mod >= max_revlog_id / 1000
+            if nid in nid_to_last_review_timestamp_ms
+            and ah_mod >= nid_to_last_review_timestamp_ms[nid] / 1000
         ]
 
         result = self._output_ids(retained_nids)
