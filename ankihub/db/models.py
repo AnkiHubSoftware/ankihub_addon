@@ -3,11 +3,13 @@ import uuid
 
 from peewee import (
     Model,
+    BooleanField,
     CharField,
     CompositeKey,
     IntegerField,
     SqliteDatabase,
-    Proxy,
+    TextField,
+    TimestampField,
 )
 from playhouse.shortcuts import ThreadSafeDatabaseMetadata
 from ..settings import ankihub_db_path
@@ -46,6 +48,20 @@ class AnkiHubNoteType(BaseModel):
     class Meta:
         table_name = "notetypes"
         primary_key = CompositeKey("anki_note_type_id", "ankihub_deck_id")
+
+
+class DeckMedia(BaseModel):
+    name = TextField()
+    ankihub_deck_id = TextField()
+    file_content_hash = TextField(null=True)
+    modified = TimestampField()
+    referenced_on_accepted_note = BooleanField()
+    exists_on_s3 = BooleanField()
+    download_enabled = BooleanField()
+
+    class Meta:
+        table_name = "deck_media"
+        primary_key = CompositeKey("name", "ankihub_deck_id")
 
 
 def set_peewee_database():

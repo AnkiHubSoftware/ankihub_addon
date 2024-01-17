@@ -24,13 +24,13 @@ from anki.utils import ids2str, join_fields, split_fields
 
 from .. import LOGGER
 from ..ankihub_client import Field, NoteInfo, suggestion_type_from_str
-from ..ankihub_client.models import DeckMedia
+from ..ankihub_client.models import DeckMedia as DeckMediaClientModel
 from ..common_utils import local_media_names_from_html
 from ..settings import ANKI_INT_VERSION, ANKI_VERSION_23_10_00
 from .db_utils import DBConnection
 from .exceptions import IntegrityError
 from .rw_lock import exclusive_db_access_context, non_exclusive_db_access_context
-from .models import AnkiHubNote, AnkiHubNoteType, set_peewee_database
+from .models import AnkiHubNote, AnkiHubNoteType, DeckMedia, set_peewee_database
 
 
 @contextmanager
@@ -317,17 +317,14 @@ class _AnkiHubDB:
         the mod values in the Anki DB have been updated.
         (The mod values are used to determine if a note has been modified in Anki since it was last imported/exported.)
         """
-        with self.connection() as conn:
-            for note_data in notes_data:
-                mod = aqt.mw.col.db.scalar(
-                    "SELECT mod FROM notes WHERE id = ?", note_data.anki_nid
-                )
+        for note_data in notes_data:
+            mod = aqt.mw.col.db.scalar(
+                "SELECT mod FROM notes WHERE id = ?", note_data.anki_nid
+            )
 
-                conn.execute(
-                    "UPDATE notes SET mod = ? WHERE ankihub_note_id = ?",
-                    mod,
-                    str(note_data.ah_nid),
-                )
+            AnkiHubNote.update(mod=mod).where(
+                AnkiHubNote.ankihub_note_id == str(note_data.ah_nid)
+            ).execute()
 
     def reset_mod_values_in_anki_db(self, anki_nids: List[NoteId]) -> None:
         # resets the mod values of the notes in the Anki DB to the
@@ -475,25 +472,10 @@ class _AnkiHubDB:
 
     def remove_deck(self, ankihub_did: uuid.UUID):
         """Removes all data for the given deck from the AnkiHub DB"""
-        with self.connection() as conn:
-            conn.execute(
-                """
-                DELETE FROM notes WHERE ankihub_deck_id = ?
-                """,
-                str(ankihub_did),
-            )
-            conn.execute(
-                """
-                DELETE FROM notetypes WHERE ankihub_deck_id = ?
-                """,
-                str(ankihub_did),
-            )
-            conn.execute(
-                """
-                DELETE FROM deck_media WHERE ankihub_deck_id = ?
-                """,
-                str(ankihub_did),
-            )
+        did = str(ankihub_did)
+        AnkiHubNote.delete().where(AnkiHubNote.ankihub_deck_id == did).execute()
+        AnkiHubNoteType.delete().where(AnkiHubNoteType.ankihub_deck_id == did).execute()
+        DeckMedia.delete().where(DeckMedia.ankihub_deck_id == did).execute()
 
     def ankihub_deck_ids(self) -> List[uuid.UUID]:
         return [
@@ -525,47 +507,43 @@ class _AnkiHubDB:
     def upsert_deck_media_infos(
         self,
         ankihub_did: uuid.UUID,
-        media_list: List[DeckMedia],
+        media_list: List[DeckMediaClientModel],
     ) -> None:
         """Upsert deck media to the AnkiHub DB."""
-        with self.connection() as conn:
-            for media_file in media_list:
-                conn.execute(
-                    """
-                    INSERT OR REPLACE INTO deck_media (
-                        name,
-                        ankihub_deck_id,
-                        file_content_hash,
-                        modified,
-                        referenced_on_accepted_note,
-                        exists_on_s3,
-                        download_enabled
-                    ) VALUES (?, ?, ?, ?, ?, ?, ?)
-                    """,
-                    media_file.name,
-                    str(ankihub_did),
-                    media_file.file_content_hash,
-                    media_file.modified,
-                    media_file.referenced_on_accepted_note,
-                    media_file.exists_on_s3,
-                    media_file.download_enabled,
+        for media_file in media_list:
+            (
+                DeckMedia.insert(
+                    name=media_file.name,
+                    ankihub_deck_id=str(ankihub_did),
+                    file_content_hash=media_file.file_content_hash,
+                    modified=media_file.modified,
+                    referenced_on_accepted_note=media_file.referenced_on_accepted_note,
+                    exists_on_s3=media_file.exists_on_s3,
+                    download_enabled=media_file.download_enabled,
                 )
+                .on_conflict(
+                    conflict_target=[DeckMedia.name, DeckMedia.ankihub_deck_id],
+                    preserve=[
+                        DeckMedia.file_content_hash,
+                        DeckMedia.modified,
+                        DeckMedia.referenced_on_accepted_note,
+                        DeckMedia.exists_on_s3,
+                        DeckMedia.download_enabled,
+                    ],
+                )
+                .execute()
+            )
 
     def downloadable_media_names_for_ankihub_deck(self, ah_did: uuid.UUID) -> Set[str]:
         """Returns the names of all media files which can be downloaded for the given deck."""
-        result = set(
-            self.list(
-                """
-                SELECT name FROM deck_media
-                WHERE ankihub_deck_id = ?
-                AND referenced_on_accepted_note = 1
-                AND exists_on_s3 = 1
-                AND download_enabled = 1
-                """,
-                str(ah_did),
-            )
+        query = DeckMedia.select(DeckMedia.name).where(
+            (DeckMedia.ankihub_deck_id == str(ah_did))
+            & (DeckMedia.referenced_on_accepted_note == True)
+            & (DeckMedia.exists_on_s3 == True)
+            & (DeckMedia.download_enabled == True)
         )
-        return result
+
+        return {media.name for media in query}
 
     def media_names_for_ankihub_deck(self, ah_did: uuid.UUID) -> Set[str]:
         """Returns the names of all media files which are referenced on notes in the given deck."""
@@ -589,23 +567,13 @@ class _AnkiHubDB:
         indicating whether the media file is referenced on a note in the given deck.
         The media file doesn't have to exist on S3, it just has to referenced on a note in the deck.
         """
-        placeholders = ",".join(["?" for _ in media_names])
-        sql = f"""
-            SELECT name FROM deck_media
-            WHERE ankihub_deck_id = ?
-            AND name IN ({placeholders})
-            AND referenced_on_accepted_note = 1
-            """
-
-        names_in_db = set(
-            self.list(
-                sql,
-                str(ah_did),
-                *media_names,
-            )
+        query = DeckMedia.select(DeckMedia.name).where(
+            (DeckMedia.ankihub_deck_id == str(ah_did))
+            & (DeckMedia.name.in_(media_names))
+            & (DeckMedia.referenced_on_accepted_note == True)
         )
-        result = {name: name in names_in_db for name in media_names}
-        return result
+        names_in_db = {media.name for media in query}
+        return {name: (name in names_in_db) for name in media_names}
 
     def media_names_with_matching_hashes(
         self, ah_did: uuid.UUID, media_to_hash: Dict[str, Optional[str]]
@@ -628,23 +596,18 @@ class _AnkiHubDB:
         if not media_to_hash:
             return {}
 
-        placeholders = ",".join(["?" for _ in media_to_hash])
-        hash_to_media = self.dict(
-            f"""
-            SELECT file_content_hash, name FROM deck_media
-            WHERE ankihub_deck_id = ?
-            AND file_content_hash IN ({placeholders})
-            """,
-            str(ah_did),
-            *media_to_hash.values(),
+        query = DeckMedia.select(DeckMedia.file_content_hash, DeckMedia.name).where(
+            (DeckMedia.ankihub_deck_id == str(ah_did))
+            & (DeckMedia.file_content_hash.in_(list(media_to_hash.values())))
         )
 
-        result = {
+        hash_to_media = {media.file_content_hash: media.name for media in query}
+
+        return {
             media_name: matching_media
             for media_name, media_hash in media_to_hash.items()
             if (matching_media := hash_to_media.get(media_hash)) is not None
         }
-        return result
 
     # note types
     def upsert_note_type(self, ankihub_did: uuid.UUID, note_type: NotetypeDict) -> None:
