@@ -306,13 +306,9 @@ class _AnkiHubDB:
 
     def remove_notes(self, ah_nids: Sequence[uuid.UUID]) -> None:
         """Removes notes from the AnkiHub DB"""
-        with self.connection() as conn:
-            conn.execute(
-                f"""
-                DELETE FROM notes WHERE ankihub_note_id IN
-                {uuids2str(ah_nids)}
-                """,
-            )
+        AnkiHubNote.delete().where(
+            AnkiHubNote.ankihub_note_id.in_([str(uuid) for uuid in ah_nids])
+        ).execute()
 
     def transfer_mod_values_from_anki_db(self, notes_data: Sequence[NoteInfo]):
         """Takes mod values for the notes from the Anki DB and saves them to the AnkiHub DB.
@@ -500,11 +496,10 @@ class _AnkiHubDB:
             )
 
     def ankihub_deck_ids(self) -> List[uuid.UUID]:
-        result = [
-            uuid.UUID(did)
-            for did in self.list("SELECT DISTINCT ankihub_deck_id FROM notes")
+        return [
+            uuid.UUID(note.ankihub_deck_id)
+            for note in AnkiHubNote.select(AnkiHubNote.ankihub_deck_id).distinct()
         ]
-        return result
 
     def last_sync(self, ankihub_note_id: uuid.UUID) -> Optional[int]:
         return (
@@ -653,19 +648,25 @@ class _AnkiHubDB:
 
     # note types
     def upsert_note_type(self, ankihub_did: uuid.UUID, note_type: NotetypeDict) -> None:
-        self.execute(
-            """
-            INSERT OR REPLACE INTO notetypes (
-                anki_note_type_id,
-                ankihub_deck_id,
-                name,
-                note_type_dict_json
-            ) VALUES (?, ?, ?, ?)
-            """,
-            note_type["id"],
-            str(ankihub_did),
-            note_type["name"],
-            json.dumps(note_type),
+        (
+            AnkiHubNoteType.insert(
+                anki_note_type_id=note_type["id"],
+                ankihub_deck_id=str(ankihub_did),
+                name=note_type["name"],
+                note_type_dict_json=json.dumps(note_type),
+            )
+            .on_conflict(
+                conflict_target=[
+                    AnkiHubNoteType.anki_note_type_id,
+                    AnkiHubNoteType.ankihub_deck_id,
+                ],
+                preserve=[
+                    AnkiHubNoteType.ankihub_deck_id,
+                    AnkiHubNoteType.name,
+                    AnkiHubNoteType.note_type_dict_json,
+                ],
+            )
+            .execute()
         )
 
     def note_type_dict(
@@ -687,43 +688,39 @@ class _AnkiHubDB:
         return NotetypeDict(json.loads(note_type_dict_json))
 
     def ankihub_note_type_ids(self) -> List[NotetypeId]:
-        result = self.list("SELECT anki_note_type_id FROM notetypes")
-        return result
+        return [
+            note_type.anki_note_type_id
+            for note_type in AnkiHubNoteType.select(AnkiHubNoteType.anki_note_type_id)
+        ]
 
     def is_ankihub_note_type(self, anki_note_type_id: NotetypeId) -> bool:
-        result_str = self.scalar(
-            """
-            SELECT EXISTS(SELECT 1 FROM notetypes WHERE anki_note_type_id = ?)
-            """,
-            anki_note_type_id,
+        return (
+            AnkiHubNoteType.select()
+            .where(AnkiHubNoteType.anki_note_type_id == anki_note_type_id)
+            .exists()
         )
-        result = bool(result_str)
-        return result
 
     def note_types_for_ankihub_deck(self, ankihub_did: uuid.UUID) -> List[NotetypeId]:
-        result = self.list(
-            """
-            SELECT anki_note_type_id FROM notetypes WHERE ankihub_deck_id = ?
-            """,
-            str(ankihub_did),
+        query = AnkiHubNoteType.select(AnkiHubNoteType.anki_note_type_id).where(
+            AnkiHubNoteType.ankihub_deck_id == str(ankihub_did)
         )
-        return result
+
+        return [note_type.anki_note_type_id for note_type in query]
 
     def ankihub_dids_for_note_type(
         self, anki_note_type_id: NotetypeId
     ) -> Optional[Set[uuid.UUID]]:
         """Returns the AnkiHub deck ids that use the given note type."""
-        did_strings = self.list(
-            """
-            SELECT ankihub_deck_id FROM notetypes WHERE anki_note_type_id = ?
-            """,
-            anki_note_type_id,
+        query = AnkiHubNoteType.select(AnkiHubNoteType.ankihub_deck_id).where(
+            AnkiHubNoteType.anki_note_type_id == anki_note_type_id
         )
+
+        did_strings = [str(note.ankihub_deck_id) for note in query]
+
         if not did_strings:
             return None
 
-        result = set(uuid.UUID(did_str) for did_str in did_strings)
-        return result
+        return {uuid.UUID(did_str) for did_str in did_strings}
 
     def _note_type_field_names(
         self, ankihub_did: uuid.UUID, anki_note_type_id: NotetypeId

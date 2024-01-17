@@ -4,6 +4,7 @@ import uuid
 from peewee import (
     Model,
     CharField,
+    CompositeKey,
     IntegerField,
     SqliteDatabase,
     Proxy,
@@ -37,13 +38,14 @@ class AnkiHubNote(BaseModel):
 
 
 class AnkiHubNoteType(BaseModel):
-    anki_note_type_id = IntegerField(primary_key=True)
+    anki_note_type_id = IntegerField()
     ankihub_deck_id = CharField()
     name = CharField()
     note_type_dict_json = CharField()
 
     class Meta:
         table_name = "notetypes"
+        primary_key = CompositeKey("anki_note_type_id", "ankihub_deck_id")
 
 
 def set_peewee_database():
