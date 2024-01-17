@@ -15,9 +15,9 @@ from aqt.qt import (
     QLayout,
     QListWidget,
     QListWidgetItem,
-    QMessageBox,
     QPushButton,
     QScrollArea,
+    QSize,
     QStyle,
     Qt,
     QVBoxLayout,
@@ -220,52 +220,6 @@ def choose_ankihub_deck(
     return chosen_deck_ah_did
 
 
-def ask_user(
-    text: str,
-    parent: Optional[QWidget] = None,
-    default_no: bool = False,
-    title: str = "Anki",
-    show_cancel_button: bool = False,
-    yes_button_label: str = "Yes",
-    no_button_label: str = "No",
-) -> Optional[bool]:
-    "Show a yes/no question. Return true if yes. Return false if no. Return None if cancelled."
-
-    if not parent:
-        parent = aqt.mw.app.activeWindow()
-
-    msg = QMessageBox(parent=parent)
-    msg.setWindowTitle(title)
-    msg.setTextFormat(Qt.TextFormat.RichText)
-    msg.setText(text)
-
-    yes_button = msg.addButton(
-        yes_button_label,
-        QMessageBox.ButtonRole.YesRole,
-    )
-    no_button = msg.addButton(
-        no_button_label,
-        QMessageBox.ButtonRole.NoRole,
-    )
-    if show_cancel_button:
-        msg.addButton(
-            "Cancel",
-            QMessageBox.ButtonRole.RejectRole,
-        )
-
-    msg.setDefaultButton(no_button if default_no else yes_button)
-    msg.setIcon(QMessageBox.Icon.Question)
-
-    msg.exec()
-
-    if msg.clickedButton() == yes_button:
-        return True
-    elif msg.clickedButton() == no_button:
-        return False
-    else:
-        return None
-
-
 ButtonParam = Union[
     QDialogButtonBox.StandardButton,
     str,
@@ -276,7 +230,7 @@ ButtonParam = Union[
 class _Dialog(QDialog):
     """A simple dialog with a text and buttons. The dialog closes when a button is clicked and
     the callback is called with the index of the clicked button.
-    This class is intended to be used via with the show_dialog function.
+    This class is intended to be used via with the show_dialog or ask_user functions.
     """
 
     def __init__(
@@ -302,8 +256,12 @@ class _Dialog(QDialog):
         self.callback = callback
         self.icon = icon
         self._is_closing = False
+        self._clicked_button_index: Optional[int] = None
 
         self._setup_ui()
+
+    def sizeHint(self) -> QSize:
+        return QSize(450, super().sizeHint().height())
 
     def _setup_ui(self) -> None:
         self.setWindowTitle(self.title)
@@ -341,6 +299,7 @@ class _Dialog(QDialog):
         label = QLabel(self.text)
         label.setWordWrap(True)
         label.setTextFormat(self.text_format)
+        label.setOpenExternalLinks(True)
         self.content_layout.addWidget(label)
 
         self.content_layout.addSpacing(10)
@@ -390,6 +349,8 @@ class _Dialog(QDialog):
 
         self.reject()
 
+        self._clicked_button_index = button_index
+
         if self.callback is not None:
             self.callback(button_index)
 
@@ -399,6 +360,9 @@ class _Dialog(QDialog):
 
         if self.default_button:
             self.default_button.setFocus()
+
+    def clicked_button_index(self) -> Optional[int]:
+        return self._clicked_button_index
 
 
 def show_dialog(
@@ -436,6 +400,50 @@ def show_dialog(
     return dialog
 
 
+def ask_user(
+    text: str,
+    parent: Optional[QWidget] = None,
+    default_no: bool = False,
+    title: str = "AnkiHub",
+    show_cancel_button: bool = False,
+    yes_button_label: str = "Yes",
+    no_button_label: str = "No",
+) -> Optional[bool]:
+    "Show a yes/no question. Return true if yes. Return false if no. Return None if cancelled."
+
+    yes_button = (yes_button_label, QDialogButtonBox.ButtonRole.YesRole)
+    no_button = (no_button_label, QDialogButtonBox.ButtonRole.NoRole)
+
+    if show_cancel_button:
+        cancel_button: ButtonParam = QDialogButtonBox.StandardButton.Cancel
+        buttons = [yes_button, no_button, cancel_button]
+    else:
+        buttons = [yes_button, no_button]
+
+    if not parent:
+        parent = aqt.mw.app.activeWindow()
+
+    dialog = _Dialog(
+        parent=parent,
+        text=text,
+        title=title,
+        text_format=Qt.TextFormat.RichText,
+        scrollable=False,
+        buttons=buttons,
+        default_button_idx=1 if default_no else 0,
+        callback=None,
+        icon=question_icon(),
+    )
+    dialog.exec()
+
+    if dialog.clicked_button_index() == 0:
+        return True
+    elif dialog.clicked_button_index() == 1:
+        return False
+    else:
+        return None
+
+
 def tooltip_icon() -> QIcon:
     return QIcon(
         QApplication.style().standardIcon(
@@ -447,6 +455,12 @@ def tooltip_icon() -> QIcon:
 def warning_icon() -> QIcon:
     return QIcon(
         QApplication.style().standardIcon(QStyle.StandardPixmap.SP_MessageBoxWarning)
+    )
+
+
+def question_icon() -> QIcon:
+    return QIcon(
+        QApplication.style().standardIcon(QStyle.StandardPixmap.SP_MessageBoxQuestion)
     )
 
 
