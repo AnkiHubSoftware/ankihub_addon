@@ -11,7 +11,7 @@ from peewee import (
 from ..settings import ankihub_db_path
 
 
-ankihub_db_proxy = Proxy()
+ankihub_db = SqliteDatabase(None)
 
 
 class AnkiHubNote(Model):
@@ -27,7 +27,7 @@ class AnkiHubNote(Model):
 
     class Meta:
         table_name = "notes"
-        database = ankihub_db_proxy
+        database = ankihub_db
 
 
 class AnkiHubNoteType(Model):
@@ -38,9 +38,8 @@ class AnkiHubNoteType(Model):
 
     class Meta:
         table_name = "notetypes"
-        database = ankihub_db_proxy
+        database = ankihub_db
 
 
 def set_peewee_database():
-    ankihub_db = SqliteDatabase(ankihub_db_path())
-    ankihub_db_proxy.initialize(ankihub_db)
+    ankihub_db.init(ankihub_db_path())
