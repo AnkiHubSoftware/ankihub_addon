@@ -1,6 +1,7 @@
+import inspect
 import uuid
 from functools import partial
-from typing import Any, Callable, List, Optional, Sequence, Tuple, Union
+from typing import Any, Callable, Dict, List, Optional, Sequence, Tuple, Union
 
 import aqt
 from aqt.addons import check_and_prompt_for_updates
@@ -488,3 +489,44 @@ def clear_layout(layout: QLayout) -> None:
             widget.deleteLater()
         elif child.layout():
             clear_layout(child.layout())
+
+
+def extract_argument(
+    func: Callable, args: Tuple, kwargs: Dict, arg_name: str
+) -> Tuple[Tuple, Dict, Any]:
+    """
+    Extract and remove an argument from args or kwargs based on the function signature.
+
+    Args:
+    - func (callable): The function whose signature to follow.
+    - args (tuple): The positional arguments.
+    - kwargs (dict): The keyword arguments.
+    - arg_name (str): The name of the argument to extract.
+
+    Returns:
+    - tuple: (new_args, new_kwargs, arg_value)
+    """
+
+    signature = inspect.signature(func)
+    bound_args = signature.bind(*args, **kwargs)
+    bound_args.apply_defaults()
+
+    if arg_name not in bound_args.arguments:
+        raise ValueError(f"Argument '{arg_name}' not found in the function signature.")
+
+    arg_value = bound_args.arguments.pop(arg_name)
+
+    # Reconstruct args and kwargs without the extracted argument
+    new_args = []
+    new_kwargs = {}
+    for param in signature.parameters.values():
+        if param.name in bound_args.arguments:
+            if param.kind in [
+                inspect.Parameter.POSITIONAL_ONLY,
+                inspect.Parameter.POSITIONAL_OR_KEYWORD,
+            ]:
+                new_args.append(bound_args.arguments[param.name])
+            elif param.kind == inspect.Parameter.KEYWORD_ONLY:
+                new_kwargs[param.name] = bound_args.arguments[param.name]
+
+    return tuple(new_args), new_kwargs, arg_value

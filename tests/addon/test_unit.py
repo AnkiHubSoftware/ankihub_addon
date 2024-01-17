@@ -44,6 +44,7 @@ from ..fixtures import (  # type: ignore
     ImportAHNoteType,
     InstallAHDeck,
     MockStudyDeckDialogWithCB,
+    MockSuggestionDialog,
     NewNoteWithNoteType,
     SetFeatureFlagState,
     add_basic_anki_note_to_deck,
@@ -97,7 +98,12 @@ from ankihub.gui.suggestion_dialog import (
     open_suggestion_dialog_for_note,
 )
 from ankihub.gui.threading_utils import rate_limited
-from ankihub.gui.utils import choose_ankihub_deck, show_dialog, show_error_dialog
+from ankihub.gui.utils import (
+    choose_ankihub_deck,
+    extract_argument,
+    show_dialog,
+    show_error_dialog,
+)
 from ankihub.main import suggestions
 from ankihub.main.deck_creation import (
     DeckCreationResult,
@@ -972,7 +978,7 @@ class MockDependenciesForBulkSuggestionDialog(Protocol):
 
 @pytest.fixture
 def mock_dependencies_for_bulk_suggestion_dialog(
-    mock_suggestion_dialog,
+    mock_suggestion_dialog: MockSuggestionDialog,
     mocker: MockerFixture,
 ) -> MockDependenciesForBulkSuggestionDialog:
     """Mocks the dependencies for open_suggestion_dialog_for_bulk_suggestion.
@@ -1763,11 +1769,9 @@ def test_show_error_dialog(
 
 class TestUploadLogs:
     def test_basic(self, qtbot: QtBot, mocker: MockerFixture):
-        on_done_mock = mocker.stub()
         upload_logs_mock = mocker.patch.object(AddonAnkiHubClient, "upload_logs")
-        upload_logs_in_background(on_done=on_done_mock)
-
-        qtbot.wait_until(lambda: on_done_mock.called)
+        with qtbot.wait_callback() as callback:
+            upload_logs_in_background(on_done=callback)
 
         upload_logs_mock.assert_called_once()
         assert upload_logs_mock.call_args[1]["file"] == log_file_path()
@@ -2615,3 +2619,37 @@ class TestOptionalTagSuggestionDialog:
             qtbot.wait(500)
 
             assert dialog.auto_accept_cb.isVisible() == expected_checkbox_is_visible
+
+
+class TestUtils:
+    def test_extract_argument_when_argument_not_found(self):
+        def func(*args, **kwargs):
+            return
+
+        args = [1, 2, 3]
+        kwargs = {"a": True, "b": False}
+
+        with pytest.raises(ValueError):
+            args, kwargs, value = extract_argument(
+                func,
+                args=args,
+                kwargs=kwargs,
+                arg_name="after_sync",
+            )
+
+    def test_extract_argument_with_keyword_arguments(self):
+        def func(*, a, b):
+            return
+
+        kwargs = {"a": True, "b": "test"}
+
+        args, kwargs, value = extract_argument(
+            func,
+            args=tuple(),
+            kwargs=kwargs,
+            arg_name="b",
+        )
+
+        assert not args
+        assert kwargs == {"a": True}
+        assert value == "test"

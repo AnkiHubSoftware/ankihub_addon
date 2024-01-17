@@ -1,20 +1,22 @@
 """Custom search nodes for the browser.
 Search nodes are used to define search parameters for the Anki browser search bar."""
+import operator
 from abc import ABC, abstractmethod
 from datetime import datetime, timedelta
-from typing import Optional, Sequence
+from typing import Dict, Sequence, cast
 
 import aqt
+from anki.notes import NoteId
 from anki.utils import ids2str
 from aqt.browser import Browser, ItemId
 
 from ...ankihub_client import suggestion_type_from_str
+from ...db import ankihub_db
 
 
 class CustomSearchNode(ABC):
-
-    parameter_name: Optional[str] = None
-    browser: Optional[Browser] = None
+    parameter_name: str = None
+    browser: Browser = None
 
     @classmethod
     def from_parameter_type_and_value(cls, browser, parameter_name, value):
@@ -38,64 +40,78 @@ class CustomSearchNode(ABC):
         # Ids can be either note ids or card ids.
         pass
 
-    def _retain_ids_where(self, ids: Sequence[ItemId], where: str) -> Sequence[ItemId]:
-        # Returns these ids that match the given where clause
-        # while joining notes with their corresponding information from the ankihub database.
-        # The provided ids can be either note ids or card ids.
-        # The anki notes table can be accessed with the table name "notes",
-        # cards can be accessed as "cards" and the ankihub notes
-        # table can be accessed as "ah_notes".
+    def _note_ids(self, ids: Sequence[ItemId]) -> Sequence[NoteId]:
+        """Converts the given card ids to note ids if the browser is in card mode.
+        Otherwise returns the given note ids."""
         if self.browser.table.is_notes_mode():
-            query = (
-                "SELECT id FROM notes, ankihub_db.notes as ah_notes "
-                "WHERE notes.id = ah_notes.anki_note_id AND "
-                f"notes.id IN {ids2str(ids)} AND " + where
-            )
-            nids = aqt.mw.col.db.list(query)
-            return nids
+            result = cast(Sequence[NoteId], ids)
         else:
-            # this approach is faster than joining notes with cards in the query,
-            # but maybe this wouldn't be the case if the query were written better
-            nids = aqt.mw.col.db.list(
-                "SELECT DISTINCT nid FROM cards WHERE id IN " + ids2str(ids)
+            result = aqt.mw.col.db.list(
+                f"SELECT DISTINCT nid FROM cards WHERE id IN {ids2str(ids)}"
             )
-            selected_note_ids = aqt.mw.col.db.list(
-                "SELECT id FROM notes, ankihub_db.notes as ah_notes "
-                "WHERE notes.id = ah_notes.anki_note_id AND "
-                f"notes.id IN {ids2str(nids)} AND " + where
-            )
-            cids = aqt.mw.col.db.list(
-                "SELECT id FROM cards WHERE nid IN " + ids2str(selected_note_ids)
-            )
-            return cids
+        return result
+
+    def _output_ids(self, note_ids: Sequence[NoteId]) -> Sequence[ItemId]:
+        """Converts the given note ids to card ids if the browser is in card mode.
+        Otherwise returns the given note ids."""
+        if self.browser.table.is_notes_mode():
+            return note_ids
+
+        result = aqt.mw.col.db.list(
+            f"SELECT id from cards WHERE nid in {ids2str(note_ids)}"
+        )
+        return result
 
 
 class ModifiedAfterSyncSearchNode(CustomSearchNode):
-
     parameter_name = "ankihub_modified_after_sync"
 
-    def __init__(self, browser, value: str):
+    def __init__(self, browser: Browser, value: str):
         self.browser = browser
         self.value = value
 
     def filter_ids(self, ids: Sequence[ItemId]) -> Sequence[ItemId]:
-        if self.value == "yes":
-            ids = self._retain_ids_where(ids, "notes.mod > ah_notes.mod")
-        elif self.value == "no":
-            ids = self._retain_ids_where(ids, "notes.mod <= ah_notes.mod")
-        else:
+        if self.value not in ("yes", "no"):
             raise ValueError(
                 f"Invalid value for {self.parameter_name}: {self.value}. Options are 'yes' and 'no'."
             )
 
-        return ids
+        nids = self._note_ids(ids)
+
+        nid_to_ah_mod: Dict[NoteId, int] = dict(
+            ankihub_db.execute(
+                f"""
+                SELECT anki_note_id, mod FROM notes
+                WHERE anki_note_id in {ids2str(nids)}
+                """
+            )
+        )
+
+        nid_to_anki_mod: Dict[NoteId, int] = dict(
+            aqt.mw.col.db.all(  # type: ignore
+                f"""
+                SELECT id, mod FROM notes
+                WHERE id in {ids2str(nid_to_ah_mod.keys())}
+                """
+            )
+        )
+
+        retain_notes_modified_after_sync = self.value == "yes"
+        op = operator.gt if retain_notes_modified_after_sync else operator.le
+        retained_nids = [
+            nid
+            for nid, anki_mod in nid_to_anki_mod.items()
+            if nid in nid_to_ah_mod and op(anki_mod, nid_to_ah_mod[nid])
+        ]
+
+        result = self._output_ids(retained_nids)
+        return result
 
 
 class UpdatedInTheLastXDaysSearchNode(CustomSearchNode):
-
     parameter_name = "ankihub_updated"
 
-    def __init__(self, browser, value: str):
+    def __init__(self, browser: Browser, value: str):
         self.browser = browser
         self.value = value
 
@@ -115,16 +131,25 @@ class UpdatedInTheLastXDaysSearchNode(CustomSearchNode):
                 - timedelta(days=days - 1)
             ).timestamp()
         )
-        ids = self._retain_ids_where(ids, f"ah_notes.mod >= {threshold_timestamp}")
 
-        return ids
+        nids = self._note_ids(ids)
+
+        retained_nids = ankihub_db.list(
+            f"""
+            SELECT anki_note_id FROM notes
+            WHERE anki_note_id in {ids2str(nids)} AND
+            mod >= {threshold_timestamp}
+            """
+        )
+
+        result = self._output_ids(retained_nids)
+        return result
 
 
 class NewNoteSearchNode(CustomSearchNode):
-
     parameter_name = "ankihub_new_note"
 
-    def __init__(self, browser, value: str):
+    def __init__(self, browser: Browser, value: str):
         self.browser = browser
         self.value = value
 
@@ -134,16 +159,24 @@ class NewNoteSearchNode(CustomSearchNode):
                 f"Invalid value for {self.parameter_name}: {self.value}. This search parameter takes no values."
             )
 
-        ids = self._retain_ids_where(ids, "ah_notes.last_update_type is NULL")
+        nids = self._note_ids(ids)
 
-        return ids
+        retained_nids = ankihub_db.list(
+            f"""
+            SELECT anki_note_id FROM notes
+            WHERE anki_note_id in {ids2str(nids)} AND
+            last_update_type IS NULL
+            """
+        )
+
+        result = self._output_ids(retained_nids)
+        return result
 
 
 class SuggestionTypeSearchNode(CustomSearchNode):
-
     parameter_name = "ankihub_suggestion_type"
 
-    def __init__(self, browser, value: str):
+    def __init__(self, browser: Browser, value: str):
         self.browser = browser
         self.value = value
 
@@ -156,16 +189,24 @@ class SuggestionTypeSearchNode(CustomSearchNode):
                 f"Invalid value for {self.parameter_name}: {value}. Must be a suggestion type."
             )
 
-        ids = self._retain_ids_where(ids, f"ah_notes.last_update_type = '{value}'")
+        nids = self._note_ids(ids)
 
-        return ids
+        retained_nids = ankihub_db.list(
+            f"""
+            SELECT anki_note_id FROM notes
+            WHERE anki_note_id in {ids2str(nids)} AND
+            last_update_type = '{value}'
+            """
+        )
+
+        result = self._output_ids(retained_nids)
+        return result
 
 
 class UpdatedSinceLastReviewSearchNode(CustomSearchNode):
-
     parameter_name = "ankihub_updated_since_last_review"
 
-    def __init__(self, browser, value: str):
+    def __init__(self, browser: Browser, value: str):
         self.browser = browser
         self.value = value
 
@@ -175,14 +216,37 @@ class UpdatedSinceLastReviewSearchNode(CustomSearchNode):
                 f"Invalid value for {self.parameter_name}: {self.value}. This search parameter takes no values."
             )
 
-        ids = self._retain_ids_where(
-            ids,
-            """
-            ah_notes.mod >= (
-                SELECT max(revlog.id) FROM revlog, cards
-                WHERE revlog.cid = cards.id AND cards.nid = notes.id
-            ) / 1000
-            """,
+        nids = self._note_ids(ids)
+
+        nid_to_ah_mod: Dict[NoteId, int] = dict(
+            ankihub_db.execute(
+                f"""
+                SELECT anki_note_id, mod FROM notes
+                WHERE anki_note_id in {ids2str(nids)}
+                """
+            )
         )
 
-        return ids
+        # The id column of the revlog table is an epoch timestamp in milliseconds of when the review was done.
+        nid_to_last_review_timestamp_ms: Dict[NoteId, int] = dict(
+            aqt.mw.col.db.all(  # type: ignore
+                f"""
+                SELECT notes.id, max(revlog.id)
+                FROM notes
+                JOIN cards ON cards.nid = notes.id
+                JOIN revlog ON revlog.cid = cards.id
+                WHERE notes.id IN {ids2str(nid_to_ah_mod.keys())}
+                GROUP BY notes.id
+                """
+            )
+        )
+
+        retained_nids = [
+            nid
+            for nid, ah_mod in nid_to_ah_mod.items()
+            if nid in nid_to_last_review_timestamp_ms
+            and ah_mod >= nid_to_last_review_timestamp_ms[nid] / 1000
+        ]
+
+        result = self._output_ids(retained_nids)
+        return result

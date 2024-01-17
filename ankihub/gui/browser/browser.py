@@ -33,7 +33,7 @@ from aqt.utils import showInfo, showWarning, tooltip, tr
 
 from ... import LOGGER
 from ...ankihub_client import SuggestionType
-from ...db import ankihub_db, attached_ankihub_db
+from ...db import ankihub_db
 from ...main.importing import get_fields_protected_by_tags
 from ...main.note_conversion import (
     TAG_FOR_PROTECTING_ALL_FIELDS,
@@ -594,15 +594,14 @@ def _on_browser_did_search_handle_custom_search_parameters(ctx: SearchContext):
     if not custom_search_nodes:
         return
 
-    with attached_ankihub_db():
-        try:
-            for node in custom_search_nodes:
-                ctx.ids = node.filter_ids(ctx.ids)
-        except ValueError as e:
-            showWarning(f"AnkiHub search error: {e}")
-            return
-        finally:
-            custom_search_nodes = []
+    try:
+        for node in custom_search_nodes:
+            ctx.ids = node.filter_ids(ctx.ids)
+    except ValueError as e:
+        showWarning(f"AnkiHub search error: {e}")
+        return
+    finally:
+        custom_search_nodes = []
 
 
 # sidebar

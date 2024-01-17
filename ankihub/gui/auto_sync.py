@@ -2,17 +2,18 @@
 Depends on the auto_sync setting in the public config."""
 from concurrent.futures import Future
 from dataclasses import dataclass
-from time import sleep
 from typing import Callable
 
 from anki.hooks import wrap
 from aqt import AnkiQt
 
 from .. import LOGGER
-from ..settings import ANKI_INT_VERSION, config
+from ..settings import config
+from .menu import AnkiHubLogin
 from .operations.ankihub_sync import sync_with_ankihub
 from .operations.utils import future_with_exception, future_with_result
 from .threading_utils import rate_limited
+from .utils import extract_argument
 
 # Rate limit to one sync every x seconds to prevent syncs running in parallel and causing problems.
 SYNC_RATE_LIMIT_SECONDS = 2
@@ -69,20 +70,35 @@ def _rate_limited(*args, **kwargs) -> None:
 
 
 def _on_ankiweb_sync(*args, **kwargs) -> None:
-    _old = kwargs["_old"]
+    """Wrapper for AnkiQt._sync_collection_and_media that syncs with with AnkiHub before syncing with AnkiWeb.
+    When the user is not logged into AnkiHub and the auto sync would be run otherwise, the AnkiHub login dialog
+    is displayed after the AnkiWeb sync."""
+    original_sync_collection_and_media = kwargs["_old"]
     del kwargs["_old"]
 
-    # This function has to be called, because it could have a callback that Anki needs to run,
-    # for example to close the Anki profile once the sync is done.
+    args, kwargs, original_after_sync = extract_argument(
+        original_sync_collection_and_media,
+        args=args,
+        kwargs=kwargs,
+        arg_name="after_sync",
+    )
+
+    def new_after_sync() -> None:  # pragma: no cover
+        """The original after_sync callback function passed to AnkiQt._sync_collection_and_media is replaced by
+        this function."""
+        original_after_sync()
+
+        # If we displayed the login dialog before the AnkiWeb sync, the user wouldn't be able to interact with it until
+        # the sync is finished. So we display it after the AnkiWeb sync.
+        if _should_auto_sync_with_ankihub() and not config.is_logged_in():
+            AnkiHubLogin.display_login()
+
     def sync_with_ankiweb(future: Future) -> None:
         # The original function should be called even if the sync with AnkiHub fails, so we run it
         # this before future.result() (which can raise an exception)
-        _old(*args, **kwargs)
+        original_sync_collection_and_media(*args, **kwargs, after_sync=new_after_sync)
 
         future.result()
-
-    if not auto_sync_state.attempted_startup_sync:
-        _workaround_for_addon_compatibility_on_startup_sync()
 
     try:
         _maybe_sync_with_ankihub(on_done=sync_with_ankiweb)
@@ -99,10 +115,7 @@ def _maybe_sync_with_ankihub(on_done: Callable[[Future], None]) -> None:
         on_done(future_with_result(None))
         return
 
-    if (config.public_config["auto_sync"] == "on_ankiweb_sync") or (
-        config.public_config["auto_sync"] == "on_startup"
-        and not auto_sync_state.attempted_startup_sync
-    ):
+    if _should_auto_sync_with_ankihub():
         auto_sync_state.attempted_startup_sync = True
         LOGGER.info("Syncing with AnkiHub in _new_sync_collection")
         sync_with_ankihub(on_done=on_done)
@@ -111,18 +124,9 @@ def _maybe_sync_with_ankihub(on_done: Callable[[Future], None]) -> None:
         on_done(future_with_result(None))
 
 
-def _workaround_for_addon_compatibility_on_startup_sync() -> None:
-    # AnkiHubSync creates a backup before syncing and creating a backup requires to close
-    # the collection in Anki versions lower than 2.1.50.
-    # When other add-ons try to access the collection while it is closed they will get an error.
-    # Many add-ons are added to the profile_did_open hook so we can wait until they are probably finished
-    # and sync then.
-    # Another way to deal with that is to tell users to set the auto_sync option to "never" and
-    # to sync manually.
-    LOGGER.info("Running _workaround_for_addon_compatibility_on_startup_sync")
-    if ANKI_INT_VERSION < 50:
-        sleep(3)
-
-    LOGGER.info(
-        f"Finished _workaround_for_addon_compatibility_on_startup_sync {ANKI_INT_VERSION=}"
+def _should_auto_sync_with_ankihub() -> bool:
+    result = (config.public_config["auto_sync"] == "on_ankiweb_sync") or (
+        config.public_config["auto_sync"] == "on_startup"
+        and not auto_sync_state.attempted_startup_sync
     )
+    return result
