@@ -8,13 +8,20 @@ from peewee import (
     SqliteDatabase,
     Proxy,
 )
+from playhouse.shortcuts import ThreadSafeDatabaseMetadata
 from ..settings import ankihub_db_path
 
 
 ankihub_db = SqliteDatabase(None)
 
 
-class AnkiHubNote(Model):
+class BaseModel(Model):
+    class Meta:
+        model_metadata_class = ThreadSafeDatabaseMetadata
+        database = ankihub_db
+
+
+class AnkiHubNote(BaseModel):
     ankihub_note_id = CharField(primary_key=True)
     ankihub_deck_id = CharField()
     anki_note_id = IntegerField(unique=True)
@@ -27,10 +34,9 @@ class AnkiHubNote(Model):
 
     class Meta:
         table_name = "notes"
-        database = ankihub_db
 
 
-class AnkiHubNoteType(Model):
+class AnkiHubNoteType(BaseModel):
     anki_note_type_id = IntegerField(primary_key=True)
     ankihub_deck_id = CharField()
     name = CharField()
@@ -38,7 +44,6 @@ class AnkiHubNoteType(Model):
 
     class Meta:
         table_name = "notetypes"
-        database = ankihub_db
 
 
 def set_peewee_database():
