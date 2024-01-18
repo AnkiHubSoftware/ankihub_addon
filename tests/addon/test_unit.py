@@ -99,6 +99,8 @@ from ankihub.gui.suggestion_dialog import (
 )
 from ankihub.gui.threading_utils import rate_limited
 from ankihub.gui.utils import (
+    _Dialog,
+    ask_user,
     choose_ankihub_deck,
     extract_argument,
     show_dialog,
@@ -2653,3 +2655,54 @@ class TestUtils:
         assert not args
         assert kwargs == {"a": True}
         assert value == "test"
+
+
+@pytest.mark.parametrize(
+    "show_cancel_button, text_of_button_to_click, expected_return_value",
+    [
+        # Without cancel button
+        (False, "Yes", True),
+        (False, "No", False),
+        # With cancel button
+        (True, "Yes", True),
+        (True, "No", False),
+        (True, "Cancel", None),
+    ],
+)
+def test_ask_user(
+    mocker: MockerFixture,
+    qtbot: QtBot,
+    show_cancel_button: bool,
+    text_of_button_to_click: str,
+    expected_return_value: bool,
+):
+    # Patch _Dialog.__init__ to store the _Dialog instance in the dialog variable when
+    # it is created.
+    dialog: _Dialog = None
+
+    def new_init(self, *args, **kwargs):
+        nonlocal dialog
+        dialog = self
+        original_init(self, *args, **kwargs)
+
+    original_init = _Dialog.__init__
+    mocker.patch.object(_Dialog, "__init__", new=new_init)
+
+    # Click a button on the dialog after it is shown
+    def click_button():
+        button = next(
+            button
+            for button in dialog.button_box.buttons()
+            if text_of_button_to_click in button.text()
+        )
+        qtbot.mouseClick(button, Qt.MouseButton.LeftButton)
+
+    QTimer.singleShot(0, click_button)
+
+    # Show the dialog (blocks until the button is clicked)
+    return_value = ask_user(
+        text="Do you want to continue?",
+        title="Continue?",
+        show_cancel_button=show_cancel_button,
+    )
+    assert return_value == expected_return_value
