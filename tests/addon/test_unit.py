@@ -8,8 +8,7 @@ from datetime import datetime, timedelta
 from pathlib import Path
 from sqlite3 import ProgrammingError
 from textwrap import dedent
-from time import sleep
-from typing import Callable, ContextManager, Generator, List, Optional, Protocol, Tuple
+from typing import Callable, Generator, List, Optional, Protocol, Tuple
 from unittest.mock import Mock, patch
 
 import aqt
@@ -66,9 +65,8 @@ from ankihub.ankihub_client import (
     SuggestionType,
     TagGroupValidationResponse,
 )
-from ankihub.db import attached_ankihub_db, detached_ankihub_db
 from ankihub.db.db import _AnkiHubDB
-from ankihub.db.exceptions import IntegrityError, LockAcquisitionTimeoutError
+from ankihub.db.exceptions import IntegrityError
 from ankihub.feature_flags import _FeatureFlags, feature_flags
 from ankihub.gui.error_dialog import ErrorDialog
 from ankihub.gui.errors import (
@@ -80,7 +78,6 @@ from ankihub.gui.errors import (
 )
 from ankihub.gui.media_sync import media_sync
 from ankihub.gui.menu import AnkiHubLogin, menu_state, refresh_ankihub_menu
-from ankihub.gui.operations import AddonQueryOp
 from ankihub.gui.operations.deck_creation import (
     DeckCreationConfirmationDialog,
     create_collaborative_deck,
@@ -1620,57 +1617,6 @@ class TestAnkiHubDBMediaNamesWithMatchingHashes:
             )
             == {}
         )
-
-
-class TestAnkiHubDBContextManagers:
-    @pytest.mark.parametrize(
-        "task_configs, task_times_out",
-        [
-            # Format for a task_confg: (context_manager, duration)
-            # Detached, Detached - tasks don't block each other
-            ([(detached_ankihub_db, 0.1), (detached_ankihub_db, 0.1)], False),
-            ([(detached_ankihub_db, 0.5), (detached_ankihub_db, 0.1)], False),
-            # Attached, Attached - tasks block each other
-            ([(attached_ankihub_db, 0.1), (attached_ankihub_db, 0.1)], False),
-            ([(attached_ankihub_db, 0.5), (attached_ankihub_db, 0.1)], True),
-            # Attached, Detached - tasks block each other
-            ([(attached_ankihub_db, 0.1), (detached_ankihub_db, 0.1)], False),
-            ([(attached_ankihub_db, 0.5), (detached_ankihub_db, 0.1)], True),
-            # Detached, Attached - tasks block each other
-            ([(detached_ankihub_db, 0.1), (attached_ankihub_db, 0.1)], False),
-            ([(detached_ankihub_db, 0.5), (attached_ankihub_db, 0.1)], True),
-        ],
-    )
-    def test_blocking_and_timeout_behavior(
-        self,
-        anki_session_with_addon_data: AnkiSession,
-        qtbot: QtBot,
-        mocker: MockerFixture,
-        task_configs: List[Tuple[Callable[[], ContextManager], float]],
-        task_times_out: bool,
-    ):
-        mocker.patch("ankihub.db.rw_lock.LOCK_TIMEOUT_SECONDS", 0.2)
-
-        def task(context_manager: Callable[[], ContextManager], duration: float):
-            with context_manager():
-                sleep(duration)
-
-        with anki_session_with_addon_data.profile_loaded():
-            for context_manager, duration in task_configs:
-                AddonQueryOp(
-                    parent=qtbot,
-                    op=lambda _: task(context_manager, duration),
-                    success=lambda _: None,
-                ).without_collection().run_in_background()
-
-            with qtbot.captureExceptions() as exceptions:
-                qtbot.wait(500)
-
-            if task_times_out:
-                assert len(exceptions) == 1
-                assert isinstance(exceptions[0][1], LockAcquisitionTimeoutError)
-            else:
-                assert len(exceptions) == 0
 
 
 class TestErrorHandling:

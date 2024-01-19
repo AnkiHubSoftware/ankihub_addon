@@ -13,7 +13,6 @@ Some differences between data stored in the AnkiHub database and the Anki databa
 import json
 import sqlite3
 import uuid
-from contextlib import contextmanager
 from pathlib import Path
 from typing import Any, Dict, Iterable, List, Optional, Sequence, Set, Tuple
 
@@ -26,93 +25,11 @@ from .. import LOGGER
 from ..ankihub_client import Field, NoteInfo, suggestion_type_from_str
 from ..ankihub_client.models import DeckMedia
 from ..common_utils import local_media_names_from_html
-from ..settings import ANKI_INT_VERSION, ANKI_VERSION_23_10_00
 from .db_utils import DBConnection
 from .exceptions import IntegrityError
-from .rw_lock import exclusive_db_access_context, non_exclusive_db_access_context
-
-
-@contextmanager
-def attached_ankihub_db():
-    """Context manager that attaches the AnkiHub DB to the Anki DB connection and detaches it when the context exits.
-    The purpose is to e.g. do join queries between the Anki DB and the AnkiHub DB through aqt.mw.col.db.execute().
-    A lock is used to ensure that other threads don't try to access the AnkiHub DB through the _AnkiHubDB class
-    while it is attached to the Anki DB.
-    """
-    with exclusive_db_access_context():
-        _attach_ankihub_db_to_anki_db_connection()
-        try:
-            yield
-        finally:
-            _detach_ankihub_db_from_anki_db_connection()
-
-
-@contextmanager
-def detached_ankihub_db():
-    """Context manager that ensures the AnkiHub DB is detached from the Anki DB connection while the context is active.
-    The purpose of this is to be able to safely perform operations on the AnkiHub DB which require it to be detached,
-    for example coyping the AnkiHub DB file.
-    It's used by the _AnkiHubDB class to ensure that the AnkiHub DB is detached from the Anki DB while
-    queries are executed through the _AnkiHubDB class.
-    """
-    with non_exclusive_db_access_context():
-        yield
-
-
-def _attach_ankihub_db_to_anki_db_connection() -> None:
-    if aqt.mw.col is None:
-        LOGGER.info("The collection is not open. Not attaching AnkiHub DB.")
-        return
-
-    if not is_ankihub_db_attached_to_anki_db():
-        aqt.mw.col.db.execute(
-            f"ATTACH DATABASE ? AS {ankihub_db.database_name}",
-            str(ankihub_db.database_path),
-        )
-        LOGGER.info("Attached AnkiHub DB to Anki DB connection")
-
-
-def _detach_ankihub_db_from_anki_db_connection() -> None:
-    if aqt.mw.col is None:
-        LOGGER.info("The collection is not open. Not detaching AnkiHub DB.")
-        return
-
-    if is_ankihub_db_attached_to_anki_db():
-        # Liberal use of try/except to ensure we always try to detach and begin a new
-        # transaction.
-        try:
-            # close the current transaction to avoid a "database is locked" error
-            aqt.mw.col.save(trx=False)
-        except Exception:
-            LOGGER.info("Failed to close transaction.")
-
-        try:
-            aqt.mw.col.db.execute(f"DETACH DATABASE {ankihub_db.database_name}")
-            LOGGER.info("Detached AnkiHub DB from Anki DB connection")
-        except Exception:
-            LOGGER.info("Failed to detach AnkiHub database.")
-
-        if ANKI_INT_VERSION < ANKI_VERSION_23_10_00:
-            # db.begin was removed in Ani 23.10
-            # begin a new transaction because Anki expects one to be open
-            aqt.mw.col.db.begin()  # type: ignore
-
-        LOGGER.info("Began new transaction.")
-
-
-def is_ankihub_db_attached_to_anki_db() -> bool:
-    if aqt.mw.col is None:
-        return False
-
-    result = ankihub_db.database_name in [
-        name for _, name, _ in aqt.mw.col.db.all("PRAGMA database_list")
-    ]
-    return result
 
 
 class _AnkiHubDB:
-    # name of the database when attached to the Anki DB connection
-    database_name = "ankihub_db"
     database_path: Optional[Path] = None
 
     def execute(self, *args, **kwargs) -> List:
@@ -219,7 +136,6 @@ class _AnkiHubDB:
     def connection(self) -> DBConnection:
         result = DBConnection(
             conn=sqlite3.connect(ankihub_db.database_path),
-            thread_safety_context_func=detached_ankihub_db,
         )
         return result
 
