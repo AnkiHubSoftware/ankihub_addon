@@ -1210,14 +1210,12 @@ class TestDBConnection:
         result = ankihub_db.first("SELECT * FROM test")
         assert result == ("1",)
 
-    def test_reusing_connection_not_as_context_manager_raises_exception(
+    def test_reusing_connection_not_as_context_manager_does_not_raise_exception(
         self, ankihub_db: _AnkiHubDB
     ):
         conn = ankihub_db.connection()
-        with pytest.raises(ProgrammingError) as e:
-            conn.execute("CREATE TABLE test (id TEXT PRIMARY KEY)")
-            conn.execute("INSERT INTO test VALUES (?)", 1)
-        assert "Cannot operate on a closed database." in str(e.value)
+        conn.execute("CREATE TABLE test (id TEXT PRIMARY KEY)")
+        conn.execute("INSERT INTO test VALUES (?)", 1)
 
     @pytest.mark.parametrize(
         "exception_is_raised",

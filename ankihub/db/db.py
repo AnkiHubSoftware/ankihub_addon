@@ -220,10 +220,7 @@ class _AnkiHubDB:
         return result
 
     def connection(self) -> DBConnection:
-        result = DBConnection(
-            conn=sqlite3.connect(ankihub_db.database_path),
-            thread_safety_context_func=detached_ankihub_db,
-        )
+        result = DBConnection(thread_safety_context_func=detached_ankihub_db)
         return result
 
     def upsert_notes_data(
@@ -343,9 +340,7 @@ class _AnkiHubDB:
         )
 
     def note_data(self, anki_note_id: int) -> Optional[NoteInfo]:
-        note = (
-            AnkiHubNote.get_or_none(AnkiHubNote.anki_note_id == anki_note_id)
-        )
+        note = AnkiHubNote.get_or_none(AnkiHubNote.anki_note_id == anki_note_id)
 
         if not note:
             return None

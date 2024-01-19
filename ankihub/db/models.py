@@ -15,13 +15,12 @@ from playhouse.shortcuts import ThreadSafeDatabaseMetadata
 from ..settings import ankihub_db_path
 
 
-ankihub_db = SqliteDatabase(None)
+_ankihub_db = None  # This will eventually be set to a peewee database object
 
 
 class BaseModel(Model):
     class Meta:
         model_metadata_class = ThreadSafeDatabaseMetadata
-        database = ankihub_db
 
 
 class AnkiHubNote(BaseModel):
@@ -65,4 +64,12 @@ class DeckMedia(BaseModel):
 
 
 def set_peewee_database():
-    ankihub_db.init(ankihub_db_path())
+    global _ankihub_db
+    _ankihub_db = SqliteDatabase(ankihub_db_path())
+    _ankihub_db.bind([AnkiHubNote, AnkiHubNoteType, DeckMedia])
+
+
+def get_peewee_database():
+    if not _ankihub_db:
+        set_peewee_database()
+    return _ankihub_db
