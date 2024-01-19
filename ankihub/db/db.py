@@ -255,7 +255,7 @@ class _AnkiHubDB:
                     AnkiHubNote.anki_note_id == note_data.anki_nid,
                     AnkiHubNote.ankihub_note_id != str(note_data.ah_nid),
                 )
-                .first()
+                .get_or_none()
             )
 
             if conflicting_ah_nid:
@@ -537,10 +537,10 @@ class _AnkiHubDB:
     def downloadable_media_names_for_ankihub_deck(self, ah_did: uuid.UUID) -> Set[str]:
         """Returns the names of all media files which can be downloaded for the given deck."""
         query = DeckMedia.select(DeckMedia.name).where(
-            (DeckMedia.ankihub_deck_id == str(ah_did))
-            & (DeckMedia.referenced_on_accepted_note == True)
-            & (DeckMedia.exists_on_s3 == True)
-            & (DeckMedia.download_enabled == True)
+            DeckMedia.ankihub_deck_id == str(ah_did),
+            DeckMedia.referenced_on_accepted_note,
+            DeckMedia.exists_on_s3,
+            DeckMedia.download_enabled,
         )
 
         return {media.name for media in query}
@@ -548,11 +548,11 @@ class _AnkiHubDB:
     def media_names_for_ankihub_deck(self, ah_did: uuid.UUID) -> Set[str]:
         """Returns the names of all media files which are referenced on notes in the given deck."""
         notes = AnkiHubNote.select(AnkiHubNote.fields).where(
-            (AnkiHubNote.ankihub_deck_id == str(ah_did))
-            & (
-                (AnkiHubNote.fields.contains("<img"))
-                | (AnkiHubNote.fields.contains("[sound:"))
-            )
+            AnkiHubNote.ankihub_deck_id == str(ah_did),
+            (
+                AnkiHubNote.fields.contains("<img")
+                | AnkiHubNote.fields.contains("[sound:")
+            ),
         )
         return {
             media_name
@@ -568,9 +568,9 @@ class _AnkiHubDB:
         The media file doesn't have to exist on S3, it just has to referenced on a note in the deck.
         """
         query = DeckMedia.select(DeckMedia.name).where(
-            (DeckMedia.ankihub_deck_id == str(ah_did))
-            & (DeckMedia.name.in_(media_names))
-            & (DeckMedia.referenced_on_accepted_note == True)
+            DeckMedia.ankihub_deck_id == str(ah_did),
+            DeckMedia.name.in_(media_names),
+            DeckMedia.referenced_on_accepted_note == True,
         )
         names_in_db = {media.name for media in query}
         return {name: (name in names_in_db) for name in media_names}
@@ -597,8 +597,8 @@ class _AnkiHubDB:
             return {}
 
         query = DeckMedia.select(DeckMedia.file_content_hash, DeckMedia.name).where(
-            (DeckMedia.ankihub_deck_id == str(ah_did))
-            & (DeckMedia.file_content_hash.in_(list(media_to_hash.values())))
+            DeckMedia.ankihub_deck_id == str(ah_did),
+            DeckMedia.file_content_hash.in_(list(media_to_hash.values())),
         )
 
         hash_to_media = {media.file_content_hash: media.name for media in query}
@@ -638,10 +638,10 @@ class _AnkiHubDB:
         query = (
             AnkiHubNoteType.select(AnkiHubNoteType.note_type_dict_json)
             .where(
-                (AnkiHubNoteType.anki_note_type_id == note_type_id)
-                & (AnkiHubNoteType.ankihub_deck_id == str(ankihub_did))
+                AnkiHubNoteType.anki_note_type_id == note_type_id,
+                AnkiHubNoteType.ankihub_deck_id == str(ankihub_did),
             )
-            .first()
+            .get_or_none()
         )
 
         if query is None:
@@ -678,7 +678,7 @@ class _AnkiHubDB:
             AnkiHubNoteType.anki_note_type_id == anki_note_type_id
         )
 
-        did_strings = [str(note.ankihub_deck_id) for note in query]
+        did_strings = [note_type.ankihub_deck_id for note_type in query]
 
         if not did_strings:
             return None
