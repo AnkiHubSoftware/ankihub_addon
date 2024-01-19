@@ -26,12 +26,6 @@ class DBConnection:
         *args,
         first_row_only=False,
     ) -> List:
-        if self._is_used_as_context_manager:
-            return self._execute_inner(sql, *args, first_row_only=first_row_only)
-        else:
-            return self._execute_inner(sql, *args, first_row_only=first_row_only)
-
-    def _execute_inner(self, sql: str, *args, first_row_only=False) -> List:
         try:
             cur = self._conn.cursor()
             cur.execute(sql, args)
