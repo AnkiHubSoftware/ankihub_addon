@@ -285,18 +285,7 @@ class _AnkiHubDB:
                     if note_data.last_update_type is not None
                     else None,
                 )
-                .on_conflict(
-                    conflict_target=[AnkiHubNote.ankihub_note_id],
-                    preserve=[
-                        AnkiHubNote.ankihub_deck_id,
-                        AnkiHubNote.anki_note_id,
-                        AnkiHubNote.anki_note_type_id,
-                        AnkiHubNote.fields,
-                        AnkiHubNote.tags,
-                        AnkiHubNote.guid,
-                        AnkiHubNote.last_update_type,
-                    ],
-                )
+                .on_conflict_replace()
                 .execute()
             )
 
@@ -521,16 +510,7 @@ class _AnkiHubDB:
                     exists_on_s3=media_file.exists_on_s3,
                     download_enabled=media_file.download_enabled,
                 )
-                .on_conflict(
-                    conflict_target=[DeckMedia.name, DeckMedia.ankihub_deck_id],
-                    preserve=[
-                        DeckMedia.file_content_hash,
-                        DeckMedia.modified,
-                        DeckMedia.referenced_on_accepted_note,
-                        DeckMedia.exists_on_s3,
-                        DeckMedia.download_enabled,
-                    ],
-                )
+                .on_conflict_replace()
                 .execute()
             )
 
@@ -618,17 +598,7 @@ class _AnkiHubDB:
                 name=note_type["name"],
                 note_type_dict_json=json.dumps(note_type),
             )
-            .on_conflict(
-                conflict_target=[
-                    AnkiHubNoteType.anki_note_type_id,
-                    AnkiHubNoteType.ankihub_deck_id,
-                ],
-                preserve=[
-                    AnkiHubNoteType.ankihub_deck_id,
-                    AnkiHubNoteType.name,
-                    AnkiHubNoteType.note_type_dict_json,
-                ],
-            )
+            .on_conflict_replace()
             .execute()
         )
 
