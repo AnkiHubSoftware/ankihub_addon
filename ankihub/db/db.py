@@ -355,7 +355,7 @@ class _AnkiHubDB:
 
     def note_data(self, anki_note_id: int) -> Optional[NoteInfo]:
         note = (
-            AnkiHubNote.select().where(AnkiHubNote.anki_note_id == anki_note_id).first()
+            AnkiHubNote.get_or_none(AnkiHubNote.anki_note_id == anki_note_id)
         )
 
         if not note:
