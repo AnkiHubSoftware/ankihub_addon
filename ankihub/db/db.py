@@ -252,8 +252,8 @@ class _AnkiHubDB:
             conflicting_ah_nid = (
                 AnkiHubNote.select(AnkiHubNote.ankihub_note_id)
                 .where(
-                    (AnkiHubNote.anki_note_id == note_data.anki_nid)
-                    & (AnkiHubNote.ankihub_note_id != str(note_data.ah_nid))
+                    AnkiHubNote.anki_note_id == note_data.anki_nid,
+                    AnkiHubNote.ankihub_note_id != str(note_data.ah_nid),
                 )
                 .first()
             )
