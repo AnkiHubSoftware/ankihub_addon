@@ -1,3 +1,4 @@
+from sqlite3 import Connection
 from typing import Any, List, Optional, Tuple
 
 from .. import LOGGER
@@ -17,7 +18,7 @@ class DBConnection:
     """
 
     def __init__(self):
-        self._conn = get_peewee_database().connection()
+        self._conn: Connection = get_peewee_database().connection()
         self._is_used_as_context_manager = False
 
     def execute(
