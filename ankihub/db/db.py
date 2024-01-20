@@ -592,9 +592,3 @@ class _AnkiHubDB:
 
 
 ankihub_db = _AnkiHubDB()
-
-
-def uuids2str(ankihub_nids: Sequence[uuid.UUID]) -> str:
-    result = ", ".join(f"'{nid}'" for nid in ankihub_nids)
-    result = f"({result})"
-    return result
