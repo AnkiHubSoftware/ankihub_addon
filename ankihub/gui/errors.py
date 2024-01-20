@@ -30,7 +30,6 @@ from sentry_sdk.integrations.threading import ThreadingIntegration
 from .. import LOGGER
 from ..addon_ankihub_client import AddonAnkiHubClient as AnkiHubClient
 from ..ankihub_client import AnkiHubHTTPError, AnkiHubRequestException
-from ..db import detached_ankihub_db, is_ankihub_db_attached_to_anki_db
 from ..gui.exceptions import DeckDownloadAndInstallError
 from ..settings import (
     ADDON_VERSION,
@@ -153,11 +152,10 @@ def _zip_logs_and_data() -> Path:
     temp_file = tempfile.NamedTemporaryFile(delete=False)
     temp_file.close()
     with zipfile.ZipFile(temp_file.name, "w") as zipf:
-        with detached_ankihub_db():
-            # Add the ankihub base directory to the zip. It also contains the logs.
-            source_dir = ankihub_base_path()
-            for file in source_dir.rglob("*"):
-                zipf.write(file, arcname=file.relative_to(source_dir))
+        # Add the ankihub base directory to the zip. It also contains the logs.
+        source_dir = ankihub_base_path()
+        for file in source_dir.rglob("*"):
+            zipf.write(file, arcname=file.relative_to(source_dir))
 
         # Add the Anki collection to the zip.
         try:
@@ -495,7 +493,6 @@ def _ankihub_base_path_context_dict() -> Dict[str, Any]:
     result = {
         "all files": [str(file) for file in all_file_paths],
         "inaccessible files (Windows)": [str(file) for file in problematic_file_paths],
-        "Is ankihub database attached to anki database?": is_ankihub_db_attached_to_anki_db(),
     }
     return result
 
