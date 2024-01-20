@@ -1,19 +1,16 @@
-from typing import List
-import uuid
-
 from peewee import (
-    Model,
     BooleanField,
     CharField,
     CompositeKey,
     IntegerField,
+    Model,
     SqliteDatabase,
     TextField,
     TimestampField,
 )
 from playhouse.shortcuts import ThreadSafeDatabaseMetadata
-from ..settings import ankihub_db_path
 
+from ..settings import ankihub_db_path
 
 _ankihub_db = None  # This will eventually be set to a peewee database object
 

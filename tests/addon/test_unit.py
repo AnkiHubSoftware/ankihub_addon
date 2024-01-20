@@ -6,10 +6,8 @@ import uuid
 from dataclasses import fields
 from datetime import datetime, timedelta
 from pathlib import Path
-from sqlite3 import ProgrammingError
 from textwrap import dedent
-from time import sleep
-from typing import Callable, ContextManager, Generator, List, Optional, Protocol, Tuple
+from typing import Callable, Generator, List, Optional, Protocol, Tuple
 from unittest.mock import Mock, patch
 
 import aqt
@@ -66,9 +64,8 @@ from ankihub.ankihub_client import (
     SuggestionType,
     TagGroupValidationResponse,
 )
-from ankihub.db import attached_ankihub_db, detached_ankihub_db
 from ankihub.db.db import _AnkiHubDB
-from ankihub.db.exceptions import IntegrityError, LockAcquisitionTimeoutError
+from ankihub.db.exceptions import IntegrityError
 from ankihub.feature_flags import _FeatureFlags, feature_flags
 from ankihub.gui.error_dialog import ErrorDialog
 from ankihub.gui.errors import (
@@ -80,7 +77,6 @@ from ankihub.gui.errors import (
 )
 from ankihub.gui.media_sync import media_sync
 from ankihub.gui.menu import AnkiHubLogin, menu_state, refresh_ankihub_menu
-from ankihub.gui.operations import AddonQueryOp
 from ankihub.gui.operations.deck_creation import (
     DeckCreationConfirmationDialog,
     create_collaborative_deck,
@@ -99,6 +95,8 @@ from ankihub.gui.suggestion_dialog import (
 )
 from ankihub.gui.threading_utils import rate_limited
 from ankihub.gui.utils import (
+    _Dialog,
+    ask_user,
     choose_ankihub_deck,
     extract_argument,
     show_dialog,
@@ -1618,57 +1616,6 @@ class TestAnkiHubDBMediaNamesWithMatchingHashes:
         )
 
 
-class TestAnkiHubDBContextManagers:
-    @pytest.mark.parametrize(
-        "task_configs, task_times_out",
-        [
-            # Format for a task_confg: (context_manager, duration)
-            # Detached, Detached - tasks don't block each other
-            ([(detached_ankihub_db, 0.1), (detached_ankihub_db, 0.1)], False),
-            ([(detached_ankihub_db, 0.5), (detached_ankihub_db, 0.1)], False),
-            # Attached, Attached - tasks block each other
-            ([(attached_ankihub_db, 0.1), (attached_ankihub_db, 0.1)], False),
-            ([(attached_ankihub_db, 0.5), (attached_ankihub_db, 0.1)], True),
-            # Attached, Detached - tasks block each other
-            ([(attached_ankihub_db, 0.1), (detached_ankihub_db, 0.1)], False),
-            ([(attached_ankihub_db, 0.5), (detached_ankihub_db, 0.1)], True),
-            # Detached, Attached - tasks block each other
-            ([(detached_ankihub_db, 0.1), (attached_ankihub_db, 0.1)], False),
-            ([(detached_ankihub_db, 0.5), (attached_ankihub_db, 0.1)], True),
-        ],
-    )
-    def test_blocking_and_timeout_behavior(
-        self,
-        anki_session_with_addon_data: AnkiSession,
-        qtbot: QtBot,
-        mocker: MockerFixture,
-        task_configs: List[Tuple[Callable[[], ContextManager], float]],
-        task_times_out: bool,
-    ):
-        mocker.patch("ankihub.db.rw_lock.LOCK_TIMEOUT_SECONDS", 0.2)
-
-        def task(context_manager: Callable[[], ContextManager], duration: float):
-            with context_manager():
-                sleep(duration)
-
-        with anki_session_with_addon_data.profile_loaded():
-            for context_manager, duration in task_configs:
-                AddonQueryOp(
-                    parent=qtbot,
-                    op=lambda _: task(context_manager, duration),
-                    success=lambda _: None,
-                ).without_collection().run_in_background()
-
-            with qtbot.captureExceptions() as exceptions:
-                qtbot.wait(500)
-
-            if task_times_out:
-                assert len(exceptions) == 1
-                assert isinstance(exceptions[0][1], LockAcquisitionTimeoutError)
-            else:
-                assert len(exceptions) == 0
-
-
 class TestErrorHandling:
     def test_contains_path_to_this_addon(self):
         # Assert that the function returns True when the input string contains the
@@ -2651,3 +2598,54 @@ class TestUtils:
         assert not args
         assert kwargs == {"a": True}
         assert value == "test"
+
+
+@pytest.mark.parametrize(
+    "show_cancel_button, text_of_button_to_click, expected_return_value",
+    [
+        # Without cancel button
+        (False, "Yes", True),
+        (False, "No", False),
+        # With cancel button
+        (True, "Yes", True),
+        (True, "No", False),
+        (True, "Cancel", None),
+    ],
+)
+def test_ask_user(
+    mocker: MockerFixture,
+    qtbot: QtBot,
+    show_cancel_button: bool,
+    text_of_button_to_click: str,
+    expected_return_value: bool,
+):
+    # Patch _Dialog.__init__ to store the _Dialog instance in the dialog variable when
+    # it is created.
+    dialog: _Dialog = None
+
+    def new_init(self, *args, **kwargs):
+        nonlocal dialog
+        dialog = self
+        original_init(self, *args, **kwargs)
+
+    original_init = _Dialog.__init__
+    mocker.patch.object(_Dialog, "__init__", new=new_init)
+
+    # Click a button on the dialog after it is shown
+    def click_button():
+        button = next(
+            button
+            for button in dialog.button_box.buttons()
+            if text_of_button_to_click in button.text()
+        )
+        qtbot.mouseClick(button, Qt.MouseButton.LeftButton)
+
+    QTimer.singleShot(0, click_button)
+
+    # Show the dialog (blocks until the button is clicked)
+    return_value = ask_user(
+        text="Do you want to continue?",
+        title="Continue?",
+        show_cancel_button=show_cancel_button,
+    )
+    assert return_value == expected_return_value
