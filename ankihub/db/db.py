@@ -150,12 +150,21 @@ class _AnkiHubDB:
     def upsert_notes_data(
         self, ankihub_did: uuid.UUID, notes_data: List[NoteInfo]
     ) -> Tuple[Tuple[NoteInfo, ...], Tuple[NoteInfo, ...]]:
-        """Upsert notes data to the AnkiHub DB.
-        If a note with the same Anki nid already exists in the AnkiHub DB then the note will not be inserted
-        Returns a tuple of (NoteInfo objects that were inserted / updated, NoteInfo objects that were skipped)
-        An IntegrityError will be raised if a note type used by a note does not exist in the AnkiHub DB.
         """
+        Upsert notes data into the AnkiHub DB.
 
+        If a note with the same Anki nid already exists in the AnkiHub DB, the note will be skipped.
+        An IntegrityError will be raised if a note type used by a note does not exist in the AnkiHub DB.
+
+        Returns:
+            A tuple of (NoteInfo objects that were upserted, NoteInfo objects that were skipped)
+
+        Post-conditions:
+            After calling this function, you should:
+            1. Upsert the notes which were upserted into the AnkiHub DB into the Anki DB.
+            2. Call transfer_mod_values_from_anki_db to transfer the mod values of the upserted notes from the Anki DB
+               to the AnkiHub DB.
+        """
         # Check if all note types used by notes exist in the AnkiHub DB before inserting
         mids_of_notes = set([note_data.mid for note_data in notes_data])
         mids_in_db = set(self.note_types_for_ankihub_deck(ankihub_did))
