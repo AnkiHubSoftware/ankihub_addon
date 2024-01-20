@@ -21,7 +21,7 @@ exclude = [
   'ankihub/lib/other/typing_extension',
   'ankihub/lib/tenacity',
   'ankihub/lib/peewee',
-  'ankihub/lib/shortcuts',
+  'ankihub/lib/playhouse',
 ]
 
 no_strict_optional = true
