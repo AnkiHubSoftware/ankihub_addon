@@ -63,7 +63,7 @@ class _AnkiHubDB:
 
         journal_mode = self.scalar("pragma journal_mode=wal")
         if journal_mode != "wal":
-            LOGGER.warning("Failed to set journal_mode=wal")
+            LOGGER.warning("Failed to set journal_mode=wal")  # pragma: no cover
 
         if self.schema_version() == 0:
             self._setup_notes_table()
