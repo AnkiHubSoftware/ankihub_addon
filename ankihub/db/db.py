@@ -51,11 +51,6 @@ class _AnkiHubDB:
     def first(self, *args, **kwargs) -> Optional[Tuple]:
         return self.connection().first(*args, **kwargs)
 
-    def dict(self, *args, **kwargs) -> Dict[Any, Any]:
-        rows = self.connection().execute(*args, **kwargs, first_row_only=False)
-        result = {row[0]: row[1] for row in rows}
-        return result
-
     def setup_and_migrate(self, db_path: Path) -> None:
         self.database_path = db_path
 
