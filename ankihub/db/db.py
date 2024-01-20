@@ -31,6 +31,7 @@ from .models import (
     AnkiHubNoteType,
     DeckMedia,
     bind_peewee_models,
+    get_peewee_database,
     set_peewee_database,
 )
 
@@ -167,49 +168,52 @@ class _AnkiHubDB:
 
         upserted_notes: List[NoteInfo] = []
         skipped_notes: List[NoteInfo] = []
-        for note_data in notes_data:
-            # Check for conflicting note
-            conflicting_ah_nid = (
-                AnkiHubNote.select(AnkiHubNote.ankihub_note_id)
-                .where(
-                    AnkiHubNote.anki_note_id == note_data.anki_nid,
-                    AnkiHubNote.ankihub_note_id != str(note_data.ah_nid),
+        with get_peewee_database().atomic():
+            for note_data in notes_data:
+                # Check for conflicting note
+                conflicting_ah_nid = (
+                    AnkiHubNote.select(AnkiHubNote.ankihub_note_id)
+                    .where(
+                        AnkiHubNote.anki_note_id == note_data.anki_nid,
+                        AnkiHubNote.ankihub_note_id != str(note_data.ah_nid),
+                    )
+                    .get_or_none()
                 )
-                .get_or_none()
-            )
 
-            if conflicting_ah_nid:
-                skipped_notes.append(note_data)
-                continue
+                if conflicting_ah_nid:
+                    skipped_notes.append(note_data)
+                    continue
 
-            # Prepare fields and tags for insertion
-            fields = join_fields(
-                [
-                    field.value
-                    for field in sorted(note_data.fields, key=lambda field: field.order)
-                ]
-            )
-            tags = " ".join([tag for tag in note_data.tags if tag is not None])
-
-            # Insert or update the note
-            (
-                AnkiHubNote.insert(
-                    ankihub_note_id=str(note_data.ah_nid),
-                    ankihub_deck_id=str(ankihub_did),
-                    anki_note_id=note_data.anki_nid,
-                    anki_note_type_id=note_data.mid,
-                    fields=fields,
-                    tags=tags,
-                    guid=note_data.guid,
-                    last_update_type=note_data.last_update_type.value[0]
-                    if note_data.last_update_type is not None
-                    else None,
+                # Prepare fields and tags for insertion
+                fields = join_fields(
+                    [
+                        field.value
+                        for field in sorted(
+                            note_data.fields, key=lambda field: field.order
+                        )
+                    ]
                 )
-                .on_conflict_replace()
-                .execute()
-            )
+                tags = " ".join([tag for tag in note_data.tags if tag is not None])
 
-            upserted_notes.append(note_data)
+                # Insert or update the note
+                (
+                    AnkiHubNote.insert(
+                        ankihub_note_id=str(note_data.ah_nid),
+                        ankihub_deck_id=str(ankihub_did),
+                        anki_note_id=note_data.anki_nid,
+                        anki_note_type_id=note_data.mid,
+                        fields=fields,
+                        tags=tags,
+                        guid=note_data.guid,
+                        last_update_type=note_data.last_update_type.value[0]
+                        if note_data.last_update_type is not None
+                        else None,
+                    )
+                    .on_conflict_replace()
+                    .execute()
+                )
+
+                upserted_notes.append(note_data)
 
         return tuple(upserted_notes), tuple(skipped_notes)
 
@@ -226,14 +230,15 @@ class _AnkiHubDB:
         the mod values in the Anki DB have been updated.
         (The mod values are used to determine if a note has been modified in Anki since it was last imported/exported.)
         """
-        for note_data in notes_data:
-            mod = aqt.mw.col.db.scalar(
-                "SELECT mod FROM notes WHERE id = ?", note_data.anki_nid
-            )
+        with get_peewee_database().atomic():
+            for note_data in notes_data:
+                mod = aqt.mw.col.db.scalar(
+                    "SELECT mod FROM notes WHERE id = ?", note_data.anki_nid
+                )
 
-            AnkiHubNote.update(mod=mod).where(
-                AnkiHubNote.ankihub_note_id == str(note_data.ah_nid)
-            ).execute()
+                AnkiHubNote.update(mod=mod).where(
+                    AnkiHubNote.ankihub_note_id == str(note_data.ah_nid)
+                ).execute()
 
     def reset_mod_values_in_anki_db(self, anki_nids: List[NoteId]) -> None:
         # resets the mod values of the notes in the Anki DB to the
