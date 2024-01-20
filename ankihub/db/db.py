@@ -26,7 +26,13 @@ from ..ankihub_client.models import DeckMedia as DeckMediaClientModel
 from ..common_utils import local_media_names_from_html
 from .db_utils import DBConnection
 from .exceptions import IntegrityError
-from .models import AnkiHubNote, AnkiHubNoteType, DeckMedia, set_peewee_database
+from .models import (
+    AnkiHubNote,
+    AnkiHubNoteType,
+    DeckMedia,
+    bind_peewee_models,
+    set_peewee_database,
+)
 
 
 class _AnkiHubDB:
@@ -52,6 +58,8 @@ class _AnkiHubDB:
     def setup_and_migrate(self, db_path: Path) -> None:
         self.database_path = db_path
 
+        set_peewee_database()
+
         journal_mode = self.scalar("pragma journal_mode=wal")
         if journal_mode != "wal":
             LOGGER.warning("Failed to set journal_mode=wal")
@@ -66,7 +74,7 @@ class _AnkiHubDB:
 
             migrate_ankihub_db()
 
-        set_peewee_database()
+        bind_peewee_models()
 
     def _setup_notes_table(self) -> None:
         """Create the notes table."""

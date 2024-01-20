@@ -60,13 +60,14 @@ class DeckMedia(BaseModel):
         primary_key = CompositeKey("name", "ankihub_deck_id")
 
 
-def set_peewee_database():
+def set_peewee_database() -> None:
     global _ankihub_db
     _ankihub_db = SqliteDatabase(ankihub_db_path())
+
+
+def bind_peewee_models() -> None:
     _ankihub_db.bind([AnkiHubNote, AnkiHubNoteType, DeckMedia])
 
 
-def get_peewee_database():
-    if not _ankihub_db:
-        set_peewee_database()
+def get_peewee_database() -> SqliteDatabase:
     return _ankihub_db
