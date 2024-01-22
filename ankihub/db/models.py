@@ -24,12 +24,12 @@ class AnkiHubNote(BaseModel):
     ankihub_note_id = CharField(primary_key=True)
     ankihub_deck_id = CharField()
     anki_note_id = IntegerField(unique=True)
-    anki_note_type_id = IntegerField()
-    mod = IntegerField()
+    anki_note_type_id = IntegerField(index=True)
+    mod = IntegerField(null=True)
     guid = CharField()
     fields = CharField()
     tags = CharField()
-    last_update_type = CharField()
+    last_update_type = CharField(null=True)
 
     class Meta:
         table_name = "notes"
@@ -58,6 +58,7 @@ class DeckMedia(BaseModel):
     class Meta:
         table_name = "deck_media"
         primary_key = CompositeKey("name", "ankihub_deck_id")
+        indexes = ((("ankihub_deck_id", "file_content_hash"), False),)
 
 
 def set_peewee_database(db_path: Path) -> None:
