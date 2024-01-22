@@ -9,6 +9,7 @@ from peewee import (
     SqliteDatabase,
     TextField,
     TimestampField,
+    UUIDField,
 )
 from playhouse.shortcuts import ThreadSafeDatabaseMetadata
 
@@ -21,8 +22,8 @@ class BaseModel(Model):
 
 
 class AnkiHubNote(BaseModel):
-    ankihub_note_id = CharField(primary_key=True)
-    ankihub_deck_id = CharField(null=True)
+    ankihub_note_id = UUIDField(primary_key=True)
+    ankihub_deck_id = UUIDField(null=True)
     anki_note_id = IntegerField(unique=True, null=True)
     anki_note_type_id = IntegerField(index=True, null=True)
     mod = IntegerField(null=True)
@@ -37,7 +38,7 @@ class AnkiHubNote(BaseModel):
 
 class AnkiHubNoteType(BaseModel):
     anki_note_type_id = IntegerField()
-    ankihub_deck_id = CharField()
+    ankihub_deck_id = UUIDField()
     name = CharField()
     note_type_dict_json = CharField()
 
@@ -48,7 +49,7 @@ class AnkiHubNoteType(BaseModel):
 
 class DeckMedia(BaseModel):
     name = TextField()
-    ankihub_deck_id = TextField()
+    ankihub_deck_id = UUIDField()
     file_content_hash = TextField(null=True)
     modified = TimestampField()
     referenced_on_accepted_note = BooleanField()
