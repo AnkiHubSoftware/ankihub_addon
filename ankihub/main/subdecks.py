@@ -35,7 +35,7 @@ def deck_contains_subdeck_tags(ah_did: uuid.UUID) -> bool:
             AND tags LIKE ?
         )
         """,
-        str(ah_did),
+        ah_did.hex,
         f"%{SUBDECK_TAG}%::%::%",
     )
     return bool(result)
