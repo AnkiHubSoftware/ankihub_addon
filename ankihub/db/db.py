@@ -249,11 +249,8 @@ class _AnkiHubDB:
         ]
 
     def ankihub_did_for_anki_nid(self, anki_nid: NoteId) -> Optional[uuid.UUID]:
-        return (
-            AnkiHubNote.select(AnkiHubNote.ankihub_deck_id)
-            .where(AnkiHubNote.anki_note_id == anki_nid)
-            .scalar()
-        )
+        note = AnkiHubNote.get_or_none(AnkiHubNote.anki_note_id == anki_nid)
+        return uuid.UUID(note.ankihub_deck_id) if note else None
 
     def ankihub_dids_for_anki_nids(
         self, anki_nids: Iterable[NoteId]
