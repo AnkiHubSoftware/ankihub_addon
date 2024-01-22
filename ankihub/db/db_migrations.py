@@ -1,7 +1,11 @@
 from typing import List
 
+from peewee import UUIDField
+from playhouse.migrate import SqliteMigrator, migrate
+
 from .. import LOGGER
 from .db import ankihub_db
+from .models import get_peewee_database
 
 
 def migrate_ankihub_db():
@@ -141,6 +145,49 @@ def migrate_ankihub_db():
             conn.execute("DROP TABLE temp_notetypes;")
 
             conn.execute("PRAGMA user_version = 10;")
+
+        LOGGER.info(
+            f"AnkiHub DB migrated to schema version {ankihub_db.schema_version()}"
+        )
+
+    if ankihub_db.schema_version() < 11:
+        migrator = SqliteMigrator(get_peewee_database())
+
+        # Change the data type of the uuid columns
+        with get_peewee_database().atomic():
+            migrate(
+                migrator.alter_column_type(
+                    "notes", "ankihub_note_id", UUIDField(primary_key=True)
+                ),
+                migrator.alter_column_type(
+                    "notes", "ankihub_deck_id", UUIDField(null=True)
+                ),
+                migrator.alter_column_type("notetypes", "ankihub_deck_id", UUIDField()),
+                migrator.alter_column_type(
+                    "deck_media", "ankihub_deck_id", UUIDField()
+                ),
+            )
+
+        # Remove hyphens from uuid columns because peewee's UUIDFields expect uuids to be stored without hyphens
+        with ankihub_db.connection() as conn:
+            remove_hyphens_sql = "UPDATE {table_name} SET {column_name} = REPLACE({column_name}, '-', '')"
+
+            # Remove hyphens from the ankihub_note_id column in the notes table
+            conn.execute(
+                remove_hyphens_sql.format(
+                    table_name="notes", column_name="ankihub_note_id"
+                )
+            )
+
+            # Remove hyphens from the ankihub_deck_id column in the notes, notetypes and deck_media tables
+            for table_name in ["notes", "notetypes", "deck_media"]:
+                conn.execute(
+                    remove_hyphens_sql.format(
+                        table_name=table_name, column_name="ankihub_deck_id"
+                    )
+                )
+
+            conn.execute("PRAGMA user_version = 11;")
 
         LOGGER.info(
             f"AnkiHub DB migrated to schema version {ankihub_db.schema_version()}"
