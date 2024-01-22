@@ -249,8 +249,11 @@ class _AnkiHubDB:
         ]
 
     def ankihub_did_for_anki_nid(self, anki_nid: NoteId) -> Optional[uuid.UUID]:
-        note = AnkiHubNote.get_or_none(AnkiHubNote.anki_note_id == anki_nid)
-        return uuid.UUID(note.ankihub_deck_id) if note else None
+        return (
+            AnkiHubNote.select(AnkiHubNote.anki_note_id)
+            .where(AnkiHubNote.anki_note_id == anki_nid)
+            .scalar()
+        )
 
     def ankihub_dids_for_anki_nids(
         self, anki_nids: Iterable[NoteId]
@@ -468,19 +471,18 @@ class _AnkiHubDB:
     def note_type_dict(
         self, ankihub_did: uuid.UUID, note_type_id: NotetypeId
     ) -> NotetypeDict:
-        query = (
+        note_type_dict_json = (
             AnkiHubNoteType.select(AnkiHubNoteType.note_type_dict_json)
             .where(
                 AnkiHubNoteType.anki_note_type_id == note_type_id,
                 AnkiHubNoteType.ankihub_deck_id == str(ankihub_did),
             )
-            .get_or_none()
+            .scalar()
         )
 
-        if query is None:
+        if note_type_dict_json is None:
             return None
 
-        note_type_dict_json = query.note_type_dict_json
         return NotetypeDict(json.loads(note_type_dict_json))
 
     def ankihub_note_type_ids(self) -> List[NotetypeId]:
