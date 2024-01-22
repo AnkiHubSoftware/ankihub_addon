@@ -2,7 +2,6 @@ from pathlib import Path
 
 from peewee import (
     BooleanField,
-    CharField,
     CompositeKey,
     IntegerField,
     Model,
@@ -21,15 +20,15 @@ class BaseModel(Model):
 
 
 class AnkiHubNote(BaseModel):
-    ankihub_note_id = CharField(primary_key=True)
-    ankihub_deck_id = CharField(null=True)
+    ankihub_note_id = TextField(primary_key=True)
+    ankihub_deck_id = TextField(null=True)
     anki_note_id = IntegerField(unique=True, null=True)
     anki_note_type_id = IntegerField(index=True, null=True)
     mod = IntegerField(null=True)
-    guid = CharField(null=True)
-    fields = CharField(null=True)
-    tags = CharField(null=True)
-    last_update_type = CharField(null=True)
+    guid = TextField(null=True)
+    fields = TextField(null=True)
+    tags = TextField(null=True)
+    last_update_type = TextField(null=True)
 
     class Meta:
         table_name = "notes"
@@ -37,9 +36,9 @@ class AnkiHubNote(BaseModel):
 
 class AnkiHubNoteType(BaseModel):
     anki_note_type_id = IntegerField()
-    ankihub_deck_id = CharField()
-    name = CharField()
-    note_type_dict_json = CharField()
+    ankihub_deck_id = TextField()
+    name = TextField()
+    note_type_dict_json = TextField()
 
     class Meta:
         table_name = "notetypes"
