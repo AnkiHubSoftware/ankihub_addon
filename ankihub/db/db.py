@@ -31,6 +31,7 @@ from .models import (
     AnkiHubNoteType,
     DeckMedia,
     bind_peewee_models,
+    create_tables,
     get_peewee_database,
     set_peewee_database,
 )
@@ -61,16 +62,14 @@ class _AnkiHubDB:
             LOGGER.warning("Failed to set journal_mode=wal")  # pragma: no cover
 
         if self.schema_version() == 0:
-            self._setup_notes_table()
-            self._setup_deck_media_table()
-            self._setup_note_types_table()
+            bind_peewee_models()
+            create_tables()
             self.execute("PRAGMA user_version = 10")
         else:
             from .db_migrations import migrate_ankihub_db
 
             migrate_ankihub_db()
-
-        bind_peewee_models()
+            bind_peewee_models()
 
     def _setup_notes_table(self) -> None:
         """Create the notes table."""
