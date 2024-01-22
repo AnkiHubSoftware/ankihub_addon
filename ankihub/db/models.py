@@ -22,13 +22,13 @@ class BaseModel(Model):
 
 class AnkiHubNote(BaseModel):
     ankihub_note_id = CharField(primary_key=True)
-    ankihub_deck_id = CharField()
-    anki_note_id = IntegerField(unique=True)
-    anki_note_type_id = IntegerField(index=True)
+    ankihub_deck_id = CharField(null=True)
+    anki_note_id = IntegerField(unique=True, null=True)
+    anki_note_type_id = IntegerField(index=True, null=True)
     mod = IntegerField(null=True)
-    guid = CharField()
-    fields = CharField()
-    tags = CharField()
+    guid = CharField(null=True)
+    fields = CharField(null=True)
+    tags = CharField(null=True)
     last_update_type = CharField(null=True)
 
     class Meta:
