@@ -54,7 +54,7 @@ class _AnkiHubDB:
     def setup_and_migrate(self, db_path: Path) -> None:
         self.database_path = db_path
 
-        set_peewee_database()
+        set_peewee_database(db_path)
 
         journal_mode = self.scalar("pragma journal_mode=wal")
         if journal_mode != "wal":

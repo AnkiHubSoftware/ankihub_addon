@@ -1,3 +1,5 @@
+from pathlib import Path
+
 from peewee import (
     BooleanField,
     CharField,
@@ -9,8 +11,6 @@ from peewee import (
     TimestampField,
 )
 from playhouse.shortcuts import ThreadSafeDatabaseMetadata
-
-from ..settings import ankihub_db_path
 
 _ankihub_db = None  # This will eventually be set to a peewee database object
 
@@ -60,9 +60,9 @@ class DeckMedia(BaseModel):
         primary_key = CompositeKey("name", "ankihub_deck_id")
 
 
-def set_peewee_database() -> None:
+def set_peewee_database(db_path: Path) -> None:
     global _ankihub_db
-    _ankihub_db = SqliteDatabase(ankihub_db_path())
+    _ankihub_db = SqliteDatabase(db_path)
 
 
 def bind_peewee_models() -> None:
