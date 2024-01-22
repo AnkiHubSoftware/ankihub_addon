@@ -250,7 +250,7 @@ class _AnkiHubDB:
 
     def ankihub_did_for_anki_nid(self, anki_nid: NoteId) -> Optional[uuid.UUID]:
         return (
-            AnkiHubNote.select(AnkiHubNote.anki_note_id)
+            AnkiHubNote.select(AnkiHubNote.ankihub_deck_id)
             .where(AnkiHubNote.anki_note_id == anki_nid)
             .scalar()
         )
