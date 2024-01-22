@@ -71,69 +71,6 @@ class _AnkiHubDB:
             migrate_ankihub_db()
             bind_peewee_models()
 
-    def _setup_notes_table(self) -> None:
-        """Create the notes table."""
-        with self.connection() as conn:
-            conn.execute(
-                """
-                CREATE TABLE notes (
-                    ankihub_note_id STRING PRIMARY KEY,
-                    ankihub_deck_id STRING,
-                    anki_note_id INTEGER UNIQUE,
-                    anki_note_type_id INTEGER,
-                    mod INTEGER,
-                    guid TEXT,
-                    fields TEXT,
-                    tags TEXT,
-                    last_update_type TEXT
-                );
-                """
-            )
-            conn.execute("CREATE INDEX ankihub_deck_id_idx ON notes (ankihub_deck_id);")
-            conn.execute("CREATE INDEX anki_note_id_idx ON notes (anki_note_id);")
-            conn.execute("CREATE INDEX anki_note_type_id ON notes (anki_note_type_id);")
-            LOGGER.info("Created notes table")
-
-    def _setup_deck_media_table(self) -> None:
-        """Create the deck_media table."""
-        with self.connection() as conn:
-            conn.execute(
-                """
-                CREATE TABLE deck_media (
-                    name TEXT NOT NULL,
-                    ankihub_deck_id TEXT NOT NULL,
-                    file_content_hash TEXT,
-                    modified TIMESTAMP NOT NULL,
-                    referenced_on_accepted_note BOOLEAN NOT NULL,
-                    exists_on_s3 BOOLEAN NOT NULL,
-                    download_enabled BOOLEAN NOT NULL,
-                    PRIMARY KEY (name, ankihub_deck_id)
-                );
-                """
-            )
-            conn.execute(
-                "CREATE INDEX deck_media_deck_hash ON deck_media (ankihub_deck_id, file_content_hash);"
-            )
-            LOGGER.info("Created deck_media table")
-
-    def _setup_note_types_table(self, conn: Optional[DBConnection] = None) -> None:
-        """Create the note types table."""
-        sql = """
-            CREATE TABLE notetypes (
-                anki_note_type_id INTEGER NOT NULL,
-                ankihub_deck_id STRING NOT NULL,
-                name TEXT NOT NULL,
-                note_type_dict_json TEXT NOT NULL,
-                PRIMARY KEY (anki_note_type_id, ankihub_deck_id)
-            );
-        """
-        if conn:
-            conn.execute(sql)
-        else:
-            self.execute(sql)
-
-        LOGGER.info("Created note types table")
-
     def schema_version(self) -> int:
         result = self.scalar("PRAGMA user_version;")
         return result
