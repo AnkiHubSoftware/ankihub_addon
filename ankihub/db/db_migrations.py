@@ -2,6 +2,7 @@ from typing import List
 
 from .. import LOGGER
 from .db import ankihub_db
+from .models import get_peewee_database, models
 
 
 def migrate_ankihub_db():
@@ -141,6 +142,37 @@ def migrate_ankihub_db():
             conn.execute("DROP TABLE temp_notetypes;")
 
             conn.execute("PRAGMA user_version = 10;")
+
+        LOGGER.info(
+            f"AnkiHub DB migrated to schema version {ankihub_db.schema_version()}"
+        )
+
+    if ankihub_db.schema_version() < 11:
+        # Migrate tables to ensure that all users have the same schemas which are created by peewee.
+        # This for example ensures that column types and index names are the same for all users.
+        with get_peewee_database().atomic():
+            for model in models:
+                table_name = model._meta.table_name
+                temp_table_name = f"temp_{table_name}"
+
+                # Rename old table
+                get_peewee_database().execute_sql(
+                    f"ALTER TABLE {table_name} RENAME TO {temp_table_name}"
+                )
+
+                # Create new table using peewee
+                model.bind(get_peewee_database())
+                model.create_table()
+
+                # Move the data from the old table to the new table
+                get_peewee_database().execute_sql(
+                    f"INSERT INTO {table_name} SELECT * FROM {temp_table_name}"
+                )
+
+                # Drop the old table
+                get_peewee_database().execute_sql(f"DROP TABLE {temp_table_name}")
+
+            get_peewee_database().execute_sql("PRAGMA user_version = 11;")
 
         LOGGER.info(
             f"AnkiHub DB migrated to schema version {ankihub_db.schema_version()}"
