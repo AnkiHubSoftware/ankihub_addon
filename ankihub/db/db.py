@@ -110,17 +110,16 @@ class _AnkiHubDB:
         skipped_notes: List[NoteInfo] = []
         with get_peewee_database().atomic():
             for note_data in notes_data:
-                # Check for conflicting note
-                conflicting_ah_nid = (
+                conflicting_note_exists = (
                     AnkiHubNote.select(AnkiHubNote.ankihub_note_id)
                     .where(
                         AnkiHubNote.anki_note_id == note_data.anki_nid,
                         AnkiHubNote.ankihub_note_id != str(note_data.ah_nid),
                     )
-                    .get_or_none()
+                    .exists()
                 )
 
-                if conflicting_ah_nid:
+                if conflicting_note_exists:
                     skipped_notes.append(note_data)
                     continue
 
