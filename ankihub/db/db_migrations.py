@@ -173,7 +173,7 @@ def migrate_ankihub_db():
                 model.bind(get_peewee_database())
                 model.create_table()
 
-                # Move the data to the new table
+                # Copy the data to the new table
                 get_peewee_database().execute_sql(
                     f"INSERT INTO {table_name} SELECT * FROM {temp_table_name}"
                 )
