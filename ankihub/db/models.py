@@ -21,7 +21,7 @@ class BaseModel(Model):
 
 class AnkiHubNote(BaseModel):
     ankihub_note_id = TextField(primary_key=True)
-    ankihub_deck_id = TextField(null=True)
+    ankihub_deck_id = TextField(index=True, null=True)
     anki_note_id = IntegerField(unique=True, null=True)
     anki_note_type_id = IntegerField(index=True, null=True)
     mod = IntegerField(null=True)
