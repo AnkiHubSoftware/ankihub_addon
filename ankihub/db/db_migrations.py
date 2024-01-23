@@ -2,7 +2,13 @@ from typing import List
 
 from .. import LOGGER
 from .db import ankihub_db
-from .models import get_peewee_database, models
+from .models import (
+    AnkiHubNote,
+    AnkiHubNoteType,
+    BaseModel,
+    DeckMedia,
+    get_peewee_database,
+)
 
 
 def migrate_ankihub_db():
@@ -151,7 +157,12 @@ def migrate_ankihub_db():
         # Migrate tables to ensure that all users have the same schemas which are created by peewee.
         # This for example ensures that column types and index names are the same for all users.
         with get_peewee_database().atomic():
-            for model in models:
+            models_to_migrate: List[BaseModel] = [
+                AnkiHubNote,  # type: ignore
+                AnkiHubNoteType,  # type: ignore
+                DeckMedia,  # type: ignore
+            ]
+            for model in models_to_migrate:
                 table_name = model._meta.table_name
                 temp_table_name = f"temp_{table_name}"
 

@@ -1,5 +1,4 @@
 from pathlib import Path
-from typing import List
 
 from peewee import (
     BooleanField,
@@ -61,16 +60,13 @@ class DeckMedia(BaseModel):
         indexes = ((("ankihub_deck_id", "file_content_hash"), False),)
 
 
-models: List[BaseModel] = [AnkiHubNote, AnkiHubNoteType, DeckMedia]  # type: ignore
-
-
 def set_peewee_database(db_path: Path) -> None:
     global _ankihub_db
     _ankihub_db = SqliteDatabase(db_path)
 
 
 def create_tables() -> None:
-    _ankihub_db.create_tables(models)
+    _ankihub_db.create_tables([AnkiHubNote, AnkiHubNoteType, DeckMedia])
 
 
 def bind_peewee_models() -> None:
