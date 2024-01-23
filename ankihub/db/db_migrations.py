@@ -155,16 +155,25 @@ def migrate_ankihub_db():
                 table_name = model._meta.table_name
                 temp_table_name = f"temp_{table_name}"
 
-                # Rename old table
-                get_peewee_database().execute_sql(
-                    f"ALTER TABLE {table_name} RENAME TO {temp_table_name}"
-                )
+                # Rename the current table if it exists
+                try:
+                    get_peewee_database().execute_sql(
+                        f"ALTER TABLE {table_name} RENAME TO {temp_table_name}"
+                    )
+                except Exception as e:
+                    # Renaming a table can't be rolled back in SQLite. If a previous run of this migration
+                    # was interrupted after renaming the table, the table will still be have the temp_ prefix.
+                    # All other changes in this migration will be rolled back in this case.
+                    # This means we can just ignore the error here and continue with the migration.
+                    LOGGER.warning(
+                        f"Failed to rename table {table_name} to {temp_table_name}: {e}"
+                    )
 
-                # Create new table using peewee
+                # Create the new table using peewee
                 model.bind(get_peewee_database())
                 model.create_table()
 
-                # Move the data from the old table to the new table
+                # Move the data to the new table
                 get_peewee_database().execute_sql(
                     f"INSERT INTO {table_name} SELECT * FROM {temp_table_name}"
                 )
