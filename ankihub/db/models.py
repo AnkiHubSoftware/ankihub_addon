@@ -61,7 +61,7 @@ class DeckMedia(BaseModel):
         indexes = ((("ankihub_deck_id", "file_content_hash"), False),)
 
 
-models: List[BaseModel] = [AnkiHubNote, AnkiHubNoteType, DeckMedia]
+models: List[BaseModel] = [AnkiHubNote, AnkiHubNoteType, DeckMedia]  # type: ignore
 
 
 def set_peewee_database(db_path: Path) -> None:
