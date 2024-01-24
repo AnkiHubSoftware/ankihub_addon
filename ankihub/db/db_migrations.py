@@ -220,6 +220,10 @@ def migrate_ankihub_db():
 
             get_peewee_database().execute_sql("PRAGMA user_version = 12;")
 
+        LOGGER.info(
+            f"AnkiHub DB migrated to schema version {ankihub_db.schema_version()}"
+        )
+
 
 def _setup_note_types_table() -> None:
     """Create the note types table as it was in schema version 8.""" ""
