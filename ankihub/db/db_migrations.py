@@ -218,7 +218,7 @@ def migrate_ankihub_db():
                     )
                 )
 
-            get_peewee_database().execute_sql("PRAGMA user_version = 11;")
+            get_peewee_database().execute_sql("PRAGMA user_version = 12;")
 
 
 def _setup_note_types_table() -> None:
