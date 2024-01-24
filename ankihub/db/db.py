@@ -64,7 +64,7 @@ class _AnkiHubDB:
         if self.schema_version() == 0:
             bind_peewee_models()
             create_tables()
-            self.execute("PRAGMA user_version = 12")
+            self.execute("PRAGMA user_version = 11")
         else:
             from .db_migrations import migrate_ankihub_db
 

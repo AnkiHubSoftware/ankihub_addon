@@ -29,7 +29,7 @@ def _fetch_missing_note_types() -> None:
             """
             SELECT DISTINCT anki_note_type_id FROM notes WHERE ankihub_deck_id = ?
             """,
-            ah_did.hex,
+            str(ah_did),
         )
         mids_of_missing_note_types = [
             mid

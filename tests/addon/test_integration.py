@@ -731,7 +731,7 @@ def test_create_collaborative_deck_and_upload(
         # check that note mod value is in database
         assert (
             ankihub_db.scalar(
-                "SELECT mod from notes WHERE ankihub_note_id = ?", ah_nid.hex
+                "SELECT mod from notes WHERE ankihub_note_id = ?", str(ah_nid)
             )
             == note.mod
         )
