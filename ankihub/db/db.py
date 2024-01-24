@@ -288,29 +288,28 @@ class _AnkiHubDB:
     def anki_nids_to_ankihub_nids(
         self, anki_nids: List[NoteId]
     ) -> Dict[NoteId, uuid.UUID]:
-        ah_nid_for_anki_nid = AnkiHubNote.select(
+        query = AnkiHubNote.select(
             AnkiHubNote.anki_note_id, AnkiHubNote.ankihub_note_id
         ).where(AnkiHubNote.anki_note_id.in_(anki_nids))
-        result = {
-            note.anki_note_id: uuid.UUID(note.ankihub_note_id)
-            for note in ah_nid_for_anki_nid
+        anki_nid_to_ah_nid = {
+            note.anki_note_id: uuid.UUID(note.ankihub_note_id) for note in query
         }
 
-        not_existing = set(anki_nids) - set(result.keys())
-        return result | dict.fromkeys(not_existing)
+        not_existing = set(anki_nids) - set(anki_nid_to_ah_nid.keys())
+        return anki_nid_to_ah_nid | dict.fromkeys(not_existing)
 
     def ankihub_nids_to_anki_nids(
         self, ankihub_nids: List[uuid.UUID]
     ) -> Dict[uuid.UUID, NoteId]:
-        ah_nid_for_anki_nid = AnkiHubNote.select(
+        query = AnkiHubNote.select(
             AnkiHubNote.ankihub_note_id, AnkiHubNote.anki_note_id
         ).where(AnkiHubNote.ankihub_note_id.in_([str(id) for id in ankihub_nids]))
-        result = {
-            uuid.UUID(note.ankihub_note_id): NoteId(note.anki_note_id)
-            for note in ah_nid_for_anki_nid
+        ah_nid_to_anki_nid = {
+            uuid.UUID(note.ankihub_note_id): NoteId(note.anki_note_id) for note in query
         }
-        not_existing = set(ankihub_nids) - set(result.keys())
-        return result | dict.fromkeys(not_existing)
+
+        not_existing = set(ankihub_nids) - set(ah_nid_to_anki_nid.keys())
+        return ah_nid_to_anki_nid | dict.fromkeys(not_existing)
 
     def anki_nid_for_ankihub_nid(self, ankihub_id: uuid.UUID) -> Optional[NoteId]:
         note = (
