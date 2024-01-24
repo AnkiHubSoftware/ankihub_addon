@@ -200,11 +200,11 @@ def migrate_ankihub_db():
 
     if ankihub_db.schema_version() < 12:
         # Remove hyphens from uuid columns because peewee's UUIDFields expect uuids to be stored without hyphens
-        with ankihub_db.connection() as conn:
+        with get_peewee_database().atomic():
             remove_hyphens_sql = "UPDATE {table_name} SET {column_name} = REPLACE({column_name}, '-', '')"
 
             # Remove hyphens from the ankihub_note_id column in the notes table
-            conn.execute(
+            get_peewee_database().execute_sql(
                 remove_hyphens_sql.format(
                     table_name="notes", column_name="ankihub_note_id"
                 )
@@ -212,13 +212,13 @@ def migrate_ankihub_db():
 
             # Remove hyphens from the ankihub_deck_id column in the notes, notetypes and deck_media tables
             for table_name in ["notes", "notetypes", "deck_media"]:
-                conn.execute(
+                get_peewee_database().execute_sql(
                     remove_hyphens_sql.format(
                         table_name=table_name, column_name="ankihub_deck_id"
                     )
                 )
 
-            conn.execute("PRAGMA user_version = 11;")
+            get_peewee_database().execute_sql("PRAGMA user_version = 11;")
 
 
 def _setup_note_types_table() -> None:
