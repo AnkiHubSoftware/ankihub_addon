@@ -64,7 +64,7 @@ class _AnkiHubDB:
         if self.schema_version() == 0:
             bind_peewee_models()
             create_tables()
-            self.execute("PRAGMA user_version = 11")
+            self.execute("PRAGMA user_version = 12")
         else:
             from .db_migrations import migrate_ankihub_db
 
@@ -110,17 +110,16 @@ class _AnkiHubDB:
         skipped_notes: List[NoteInfo] = []
         with get_peewee_database().atomic():
             for note_data in notes_data:
-                # Check for conflicting note
-                conflicting_ah_nid = (
+                conflicting_note_exists = (
                     AnkiHubNote.select(AnkiHubNote.ankihub_note_id)
                     .where(
                         AnkiHubNote.anki_note_id == note_data.anki_nid,
                         AnkiHubNote.ankihub_note_id != note_data.ah_nid,
                     )
-                    .get_or_none()
+                    .exists()
                 )
 
-                if conflicting_ah_nid:
+                if conflicting_note_exists:
                     skipped_notes.append(note_data)
                     continue
 
@@ -466,19 +465,18 @@ class _AnkiHubDB:
     def note_type_dict(
         self, ankihub_did: uuid.UUID, note_type_id: NotetypeId
     ) -> NotetypeDict:
-        query = (
+        note_type_dict_json = (
             AnkiHubNoteType.select(AnkiHubNoteType.note_type_dict_json)
             .where(
                 AnkiHubNoteType.anki_note_type_id == note_type_id,
                 AnkiHubNoteType.ankihub_deck_id == ankihub_did,
             )
-            .get_or_none()
+            .scalar()
         )
 
-        if query is None:
+        if note_type_dict_json is None:
             return None
 
-        note_type_dict_json = query.note_type_dict_json
         return NotetypeDict(json.loads(note_type_dict_json))
 
     def ankihub_note_type_ids(self) -> List[NotetypeId]:

@@ -1,4 +1,5 @@
 from pathlib import Path
+from typing import Optional
 
 from peewee import (
     BooleanField,
@@ -12,7 +13,8 @@ from peewee import (
 )
 from playhouse.shortcuts import ThreadSafeDatabaseMetadata
 
-_ankihub_db = None  # This will eventually be set to a peewee database object
+# This will eventually be set to a peewee database object
+_ankihub_db: Optional[SqliteDatabase] = None
 
 
 class BaseModel(Model):
@@ -22,7 +24,7 @@ class BaseModel(Model):
 
 class AnkiHubNote(BaseModel):
     ankihub_note_id = UUIDField(primary_key=True)
-    ankihub_deck_id = UUIDField(null=True)
+    ankihub_deck_id = UUIDField(index=True, null=True)
     anki_note_id = IntegerField(unique=True, null=True)
     anki_note_type_id = IntegerField(index=True, null=True)
     mod = IntegerField(null=True)
@@ -66,13 +68,13 @@ def set_peewee_database(db_path: Path) -> None:
     _ankihub_db = SqliteDatabase(db_path)
 
 
+def get_peewee_database() -> SqliteDatabase:
+    return _ankihub_db
+
+
 def create_tables() -> None:
     _ankihub_db.create_tables([AnkiHubNote, AnkiHubNoteType, DeckMedia])
 
 
 def bind_peewee_models() -> None:
     _ankihub_db.bind([AnkiHubNote, AnkiHubNoteType, DeckMedia])
-
-
-def get_peewee_database() -> SqliteDatabase:
-    return _ankihub_db
