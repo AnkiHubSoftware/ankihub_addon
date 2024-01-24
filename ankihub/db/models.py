@@ -18,11 +18,6 @@ from playhouse.shortcuts import ThreadSafeDatabaseMetadata
 _ankihub_db: Optional[SqliteDatabase] = None
 
 
-class BaseModel(Model):
-    class Meta:
-        model_metadata_class = ThreadSafeDatabaseMetadata
-
-
 class StrUUIDField(Field):
     """A UUID field that stores the UUID as a string in the database.
     It differs from peewee's built-in UUIDField in that the DB represantation
@@ -35,6 +30,11 @@ class StrUUIDField(Field):
 
     def python_value(self, value: str) -> uuid.UUID:
         return uuid.UUID(value)
+
+
+class BaseModel(Model):
+    class Meta:
+        model_metadata_class = ThreadSafeDatabaseMetadata
 
 
 class AnkiHubNote(BaseModel):
