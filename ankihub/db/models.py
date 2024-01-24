@@ -1,4 +1,5 @@
 import uuid
+from datetime import datetime
 from pathlib import Path
 from typing import Optional
 
@@ -10,7 +11,6 @@ from peewee import (
     Model,
     SqliteDatabase,
     TextField,
-    TimestampField,
 )
 from playhouse.shortcuts import ThreadSafeDatabaseMetadata
 
@@ -30,6 +30,16 @@ class StrUUIDField(Field):
 
     def python_value(self, value: str) -> uuid.UUID:
         return uuid.UUID(value)
+
+
+class DateTimeField(Field):
+    field_type = "TEXT"
+
+    def db_value(self, value: datetime) -> str:
+        return value.isoformat()
+
+    def python_value(self, value: str) -> datetime:
+        return datetime.fromisoformat(value)
 
 
 class BaseModel(Model):
@@ -67,7 +77,7 @@ class DeckMedia(BaseModel):
     name = TextField()
     ankihub_deck_id = StrUUIDField()
     file_content_hash = TextField(null=True)
-    modified = TimestampField()
+    modified = DateTimeField()
     referenced_on_accepted_note = BooleanField()
     exists_on_s3 = BooleanField()
     download_enabled = BooleanField()
