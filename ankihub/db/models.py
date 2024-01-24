@@ -65,13 +65,13 @@ def set_peewee_database(db_path: Path) -> None:
     _ankihub_db = SqliteDatabase(db_path)
 
 
+def get_peewee_database() -> SqliteDatabase:
+    return _ankihub_db
+
+
 def create_tables() -> None:
     _ankihub_db.create_tables([AnkiHubNote, AnkiHubNoteType, DeckMedia])
 
 
 def bind_peewee_models() -> None:
     _ankihub_db.bind([AnkiHubNote, AnkiHubNoteType, DeckMedia])
-
-
-def get_peewee_database() -> SqliteDatabase:
-    return _ankihub_db
