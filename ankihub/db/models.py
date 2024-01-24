@@ -1,4 +1,5 @@
 from pathlib import Path
+from typing import Optional
 
 from peewee import (
     BooleanField,
@@ -11,7 +12,8 @@ from peewee import (
 )
 from playhouse.shortcuts import ThreadSafeDatabaseMetadata
 
-_ankihub_db = None  # This will eventually be set to a peewee database object
+# This will eventually be set to a peewee database object
+_ankihub_db: Optional[SqliteDatabase] = None
 
 
 class BaseModel(Model):
