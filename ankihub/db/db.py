@@ -312,13 +312,11 @@ class _AnkiHubDB:
         return ah_nid_to_anki_nid | dict.fromkeys(not_existing)
 
     def anki_nid_for_ankihub_nid(self, ankihub_id: uuid.UUID) -> Optional[NoteId]:
-        note = (
+        return (
             AnkiHubNote.select(AnkiHubNote.anki_note_id)
             .where(AnkiHubNote.ankihub_note_id == ankihub_id)
-            .get_or_none()
+            .scalar()
         )
-
-        return NoteId(note.anki_note_id) if note else None
 
     def remove_deck(self, ankihub_did: uuid.UUID):
         """Removes all data for the given deck from the AnkiHub DB"""
