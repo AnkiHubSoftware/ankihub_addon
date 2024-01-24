@@ -111,7 +111,7 @@ class _AnkiHubDB:
         with get_peewee_database().atomic():
             for note_data in notes_data:
                 conflicting_note_exists = (
-                    AnkiHubNote.select(AnkiHubNote.ankihub_note_id)
+                    AnkiHubNote.select()
                     .where(
                         AnkiHubNote.anki_note_id == note_data.anki_nid,
                         AnkiHubNote.ankihub_note_id != str(note_data.ah_nid),
