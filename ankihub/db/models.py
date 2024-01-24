@@ -1,19 +1,30 @@
+from datetime import datetime
 from pathlib import Path
 from typing import Optional
 
 from peewee import (
     BooleanField,
     CompositeKey,
+    Field,
     IntegerField,
     Model,
     SqliteDatabase,
     TextField,
-    TimestampField,
 )
 from playhouse.shortcuts import ThreadSafeDatabaseMetadata
 
 # This will eventually be set to a peewee database object
 _ankihub_db: Optional[SqliteDatabase] = None
+
+
+class DateTimeField(Field):
+    field_type = "TEXT"
+
+    def db_value(self, value: datetime) -> str:
+        return value.isoformat()
+
+    def python_value(self, value: str) -> datetime:
+        return datetime.fromisoformat(value)
 
 
 class BaseModel(Model):
@@ -51,7 +62,7 @@ class DeckMedia(BaseModel):
     name = TextField()
     ankihub_deck_id = TextField()
     file_content_hash = TextField(null=True)
-    modified = TimestampField()
+    modified = DateTimeField()
     referenced_on_accepted_note = BooleanField()
     exists_on_s3 = BooleanField()
     download_enabled = BooleanField()
