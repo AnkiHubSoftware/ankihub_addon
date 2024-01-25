@@ -1339,7 +1339,7 @@ class TestAnkiHubDBAreAnkiHubNotes:
                 anki_nids=[NoteId(note_info_1.anki_nid), NoteId(note_info_2.anki_nid)]
             )
 
-    def test_with_non_ankihub_notes(
+    def test_with_one_non_ankihub_note(
         self,
         anki_session_with_addon_data: AnkiSession,
         ankihub_db: _AnkiHubDB,
