@@ -1,3 +1,4 @@
+import json
 from datetime import datetime
 from pathlib import Path
 from typing import Optional
@@ -27,6 +28,16 @@ class DateTimeField(Field):
         return datetime.fromisoformat(value)
 
 
+class JsonField(Field):
+    field_type = "TEXT"
+
+    def db_value(self, value: dict) -> str:
+        return json.dumps(value)
+
+    def python_value(self, value: str) -> dict:
+        return json.loads(value)
+
+
 class BaseModel(Model):
     class Meta:
         model_metadata_class = ThreadSafeDatabaseMetadata
@@ -51,7 +62,7 @@ class AnkiHubNoteType(BaseModel):
     anki_note_type_id = IntegerField()
     ankihub_deck_id = TextField()
     name = TextField()
-    note_type_dict_json = TextField()
+    note_type_dict = JsonField()
 
     class Meta:
         table_name = "notetypes"
