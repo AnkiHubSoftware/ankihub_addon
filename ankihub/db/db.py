@@ -370,7 +370,7 @@ class _AnkiHubDB:
 
     def downloadable_media_names_for_ankihub_deck(self, ah_did: uuid.UUID) -> Set[str]:
         """Returns the names of all media files which can be downloaded for the given deck."""
-        return (
+        return set(
             DeckMedia.select(DeckMedia.name)
             .where(
                 DeckMedia.ankihub_deck_id == ah_did,
