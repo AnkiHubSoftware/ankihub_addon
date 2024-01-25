@@ -6,7 +6,6 @@ import uuid
 from dataclasses import fields
 from datetime import datetime, timedelta
 from pathlib import Path
-from sqlite3 import ProgrammingError
 from textwrap import dedent
 from typing import Callable, Generator, List, Optional, Protocol, Tuple
 from unittest.mock import Mock, patch
@@ -30,6 +29,7 @@ from ankihub.ankihub_client.models import (  # type: ignore
     CardReviewData,
     UserDeckExtensionRelation,
 )
+from ankihub.db.models import DeckMedia, get_peewee_database
 from ankihub.gui import menu
 from ankihub.gui.config_dialog import setup_config_dialog_manager
 
@@ -1209,14 +1209,12 @@ class TestDBConnection:
         result = ankihub_db.first("SELECT * FROM test")
         assert result == ("1",)
 
-    def test_reusing_connection_not_as_context_manager_raises_exception(
+    def test_reusing_connection_not_as_context_manager_does_not_raise_exception(
         self, ankihub_db: _AnkiHubDB
     ):
         conn = ankihub_db.connection()
-        with pytest.raises(ProgrammingError) as e:
-            conn.execute("CREATE TABLE test (id TEXT PRIMARY KEY)")
-            conn.execute("INSERT INTO test VALUES (?)", 1)
-        assert "Cannot operate on a closed database." in str(e.value)
+        conn.execute("CREATE TABLE test (id TEXT PRIMARY KEY)")
+        conn.execute("INSERT INTO test VALUES (?)", 1)
 
     @pytest.mark.parametrize(
         "exception_is_raised",
@@ -1617,6 +1615,27 @@ class TestAnkiHubDBMediaNamesWithMatchingHashes:
             )
             == {}
         )
+
+
+class TestAnkiHubDBDeckMedia:
+    def test_modified_field_is_stored_in_correct_format_in_db(
+        self, ankihub_db: _AnkiHubDB, next_deterministic_uuid
+    ):
+        ah_did = next_deterministic_uuid()
+        deck_media_from_client = DeckMediaFactory.create()
+
+        ankihub_db.upsert_deck_media_infos(
+            ankihub_did=ah_did, media_list=[deck_media_from_client]
+        )
+
+        # Assert that the retrieved value is the same as the one that was stored.
+        deck_media_from_db = DeckMedia.get()
+        assert deck_media_from_db.modified == deck_media_from_client.modified
+
+        # Assert that the modified value is stored in the DB in the correct format.
+        cursor = get_peewee_database().execute_sql("SELECT modified from deck_media")
+        modified_in_db = cursor.fetchone()[0]
+        assert modified_in_db == deck_media_from_client.modified.isoformat()
 
 
 class TestErrorHandling:

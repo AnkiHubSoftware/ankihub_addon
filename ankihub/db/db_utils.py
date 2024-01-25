@@ -1,7 +1,8 @@
-import sqlite3
+from sqlite3 import Connection
 from typing import Any, List, Optional, Tuple
 
 from .. import LOGGER
+from .models import get_peewee_database
 
 
 class DBConnection:
@@ -16,8 +17,8 @@ class DBConnection:
     Attempting to do so will raise an exception.
     """
 
-    def __init__(self, conn: sqlite3.Connection):
-        self._conn = conn
+    def __init__(self):
+        self._conn: Connection = get_peewee_database().connection()
         self._is_used_as_context_manager = False
 
     def execute(
@@ -40,9 +41,6 @@ class DBConnection:
         else:
             if not self._is_used_as_context_manager:
                 self._conn.commit()
-        finally:
-            if not self._is_used_as_context_manager:
-                self._conn.close()
 
         return result
 
@@ -67,13 +65,23 @@ class DBConnection:
             return None
 
     def __enter__(self):
+        """
+        Temporarily changes connection isolation level from None to DEFERRED
+
+        A non-None isolation level will auto-open transactions before INSERT, UPDATE, DELETE, and REPLACE:
+        https://docs.python.org/3/library/sqlite3.html#sqlite3.Cursor.execute
+        """
+        self._conn.isolation_level = "DEFERRED"
         self._is_used_as_context_manager = True
         return self
 
     def __exit__(self, exc_type, exc_val, exc_tb):
+        """
+        Changes connection isolation level back to None (peewee expects this)
+        """
         if exc_type is None:
             self._conn.commit()
         else:
             self._conn.rollback()
 
-        self._conn.close()
+        self._conn.isolation_level = None

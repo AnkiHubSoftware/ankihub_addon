@@ -112,6 +112,7 @@ from ankihub.ankihub_client.ankihub_client import (
 )
 from ankihub.common_utils import local_media_names_from_html
 from ankihub.db import ankihub_db
+from ankihub.db.models import AnkiHubNote
 from ankihub.debug import (
     _log_stack,
     _setup_logging_for_db_begin,
@@ -2426,11 +2427,7 @@ class TestCustomSearchNodes:
             record_review(cid, review_time_ms=1 * 1000)
 
             # Update the mod time in the ankihub database to simulate a note update.
-            ankihub_db.execute(
-                "UPDATE notes SET mod = ? WHERE anki_note_id = ?",
-                2,
-                nid,
-            )
+            AnkiHubNote.update(mod=2).where(AnkiHubNote.anki_note_id == nid).execute()
 
             # Check that the note of the card is now included in the search results.
             assert UpdatedSinceLastReviewSearchNode(browser, "").filter_ids(
@@ -3087,10 +3084,11 @@ def test_migrate_profile_data_from_old_location(
         pass
 
     # Assert that the profile data was migrated
-    assert set([x.name for x in profile_files_path().glob("*")]) == {
-        "ankihub.db",
-        ".private_config.json",
-    }
+    assert {
+        x.name
+        for x in profile_files_path().glob("*")
+        if not x.name.startswith("ankihub.db")
+    } == {".private_config.json"}
     assert config.user() == "user1"
     assert len(config.deck_ids()) == 1
 
