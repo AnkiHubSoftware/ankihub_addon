@@ -29,6 +29,7 @@ from ankihub.ankihub_client.models import (  # type: ignore
     CardReviewData,
     UserDeckExtensionRelation,
 )
+from ankihub.db.models import DeckMedia, get_peewee_database
 from ankihub.gui import menu
 from ankihub.gui.config_dialog import setup_config_dialog_manager
 
@@ -1614,6 +1615,27 @@ class TestAnkiHubDBMediaNamesWithMatchingHashes:
             )
             == {}
         )
+
+
+class TestAnkiHubDBDeckMedia:
+    def test_modified_field_is_stored_in_correct_format_in_db(
+        self, ankihub_db: _AnkiHubDB, next_deterministic_uuid
+    ):
+        ah_did = next_deterministic_uuid()
+        deck_media_from_client = DeckMediaFactory.create()
+
+        ankihub_db.upsert_deck_media_infos(
+            ankihub_did=ah_did, media_list=[deck_media_from_client]
+        )
+
+        # Assert that the retrieved value is the same as the one that was stored.
+        deck_media_from_db = DeckMedia.get()
+        assert deck_media_from_db.modified == deck_media_from_client.modified
+
+        # Assert that the modified value is stored in the DB in the correct format.
+        cursor = get_peewee_database().execute_sql("SELECT modified from deck_media")
+        modified_in_db = cursor.fetchone()[0]
+        assert modified_in_db == deck_media_from_client.modified.isoformat()
 
 
 class TestErrorHandling:
