@@ -2749,7 +2749,7 @@ class TestAnkiHubDBMigrations:
             conn = sqlite3.Connection(migration_test_db_path)
 
             inital_table_definition = """
-                CREATE TABLE IF NOT EXISTS notes (
+                CREATE TABLE notes (
                     ankihub_note_id STRING PRIMARY KEY,
                     ankihub_deck_id STRING,
                     anki_note_id INTEGER,
