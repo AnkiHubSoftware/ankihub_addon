@@ -2725,12 +2725,28 @@ def test_ask_user(
 
 class TestAnkiHubDBMigrations:
     def test_migrate_from_schema_version_1(
-        self, next_deterministic_uuid, next_deterministic_id
+        self, next_deterministic_uuid, next_deterministic_id, ankihub_db: _AnkiHubDB
     ):
+        """Test the migration from schema version 1 to the newest schema.
+
+        This test creates a temporary database with an old schema (version 1),
+        adds a single row to the notes table (which was the only table at the time),
+        and then applies the migrations to upgrade the database to the newest schema.
+
+        After the migration, it checks that:
+        - The row in the notes table was migrated correctly.
+        - The table and index definitions in the migrated database are the same
+          as those in the original database.
+
+        Limitations:
+        - The test is not exhaustive as it only starts with one row in one table.
+        - It does not test the migration of data in other tables and fields that
+            were added in newer schema versions.
+        """
         with tempfile.TemporaryDirectory() as f:
             # Create a database with an old schema (version 1) in a temporary directory
-            db_path = Path(f) / "test.db"
-            conn = sqlite3.Connection(db_path)
+            migration_test_db_path = Path(f) / "test.db"
+            conn = sqlite3.Connection(migration_test_db_path)
 
             inital_table_definition = """
                 CREATE TABLE IF NOT EXISTS notes (
@@ -2763,8 +2779,8 @@ class TestAnkiHubDBMigrations:
             conn.close()
 
             # Apply the migrations
-            ankihub_db = _AnkiHubDB()
-            ankihub_db.setup_and_migrate(db_path=db_path)
+            migration_test_db = _AnkiHubDB()
+            migration_test_db.setup_and_migrate(db_path=migration_test_db_path)
 
             # Assert that the row was migrated correctly
             note = AnkiHubNote.get()
@@ -2773,3 +2789,23 @@ class TestAnkiHubDBMigrations:
             assert note.anki_note_id == anki_nid
             assert note.anki_note_type_id == anki_mid
             assert note.mod == mod
+
+            # Get the expected table and index definitions
+            table_definitions_sql = "SELECT sql FROM sqlite_master WHERE type='table'"
+            index_definitions_sql = "SELECT sql FROM sqlite_master WHERE type='index'"
+
+            conn = sqlite3.Connection(ankihub_db.database_path)
+            expected_table_definitions = conn.execute(table_definitions_sql).fetchall()
+            expected_index_definitions = conn.execute(index_definitions_sql).fetchall()
+            conn.close()
+
+            # Get the table and index definitions after the migration for the migration test db
+            conn = sqlite3.Connection(migration_test_db_path)
+            table_definitions = conn.execute(table_definitions_sql).fetchall()
+            index_definitions = conn.execute(index_definitions_sql).fetchall()
+            conn.close()
+
+            # Assert that the table and index definitions are the same for the two databases
+            assert table_definitions == expected_table_definitions
+            assert index_definitions == expected_index_definitions
+            assert ankihub_db.database_path != migration_test_db_path  # sanity check
