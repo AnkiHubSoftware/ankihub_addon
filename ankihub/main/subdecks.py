@@ -14,6 +14,7 @@ from anki.notes import NoteId
 
 from .. import LOGGER
 from ..db import ankihub_db
+from ..db.models import AnkiHubNote
 from ..settings import config
 from .utils import (
     move_notes_to_decks_while_respecting_odid,
@@ -26,19 +27,14 @@ SUBDECK_TAG = "AnkiHub_Subdeck"
 
 def deck_contains_subdeck_tags(ah_did: uuid.UUID) -> bool:
     """Return whether the given deck contains any notes which have subdeck tags in the AnkiHub database."""
-    result = ankihub_db.scalar(
-        """
-        SELECT EXISTS (
-            SELECT 1
-            FROM notes
-            WHERE ankihub_deck_id = ?
-            AND tags LIKE ?
+    return (
+        AnkiHubNote.select()
+        .where(
+            AnkiHubNote.ankihub_deck_id == ah_did,
+            AnkiHubNote.tags.ilike(f"%{SUBDECK_TAG}::%::%"),
         )
-        """,
-        str(ah_did),
-        f"%{SUBDECK_TAG}%::%::%",
+        .exists()
     )
-    return bool(result)
 
 
 def build_subdecks_and_move_cards_to_them(
