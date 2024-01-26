@@ -43,7 +43,7 @@ class DateTimeField(Field):
         return datetime.fromisoformat(value)
 
 
-class JsonField(Field):
+class JSONField(Field):
     field_type = "TEXT"
 
     def db_value(self, value: dict) -> str:
@@ -77,7 +77,7 @@ class AnkiHubNoteType(BaseModel):
     anki_note_type_id = IntegerField()
     ankihub_deck_id = UUIDField()
     name = TextField()
-    note_type_dict = JsonField()
+    note_type_dict = JSONField(column_name="note_type_dict_json")
 
     class Meta:
         table_name = "notetypes"
