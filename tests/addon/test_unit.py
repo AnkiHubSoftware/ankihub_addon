@@ -1,5 +1,6 @@
 import json
 import os
+import sqlite3
 import tempfile
 import time
 import uuid
@@ -29,7 +30,6 @@ from ankihub.ankihub_client.models import (  # type: ignore
     CardReviewData,
     UserDeckExtensionRelation,
 )
-from ankihub.db.models import DeckMedia, get_peewee_database
 from ankihub.gui import menu
 from ankihub.gui.config_dialog import setup_config_dialog_manager
 
@@ -67,6 +67,7 @@ from ankihub.ankihub_client import (
 )
 from ankihub.db.db import _AnkiHubDB
 from ankihub.db.exceptions import IntegrityError
+from ankihub.db.models import AnkiHubNote, DeckMedia, get_peewee_database
 from ankihub.feature_flags import _FeatureFlags, feature_flags
 from ankihub.gui.error_dialog import ErrorDialog
 from ankihub.gui.errors import (
@@ -2720,3 +2721,54 @@ def test_ask_user(
         show_cancel_button=show_cancel_button,
     )
     assert return_value == expected_return_value
+
+
+class TestAnkiHubDBMigrations:
+    def test_migrate_from_schema_version_1(
+        self, next_deterministic_uuid, next_deterministic_id
+    ):
+        with tempfile.TemporaryDirectory() as f:
+            # Create a database with an old schema (version 1) in a temporary directory
+            db_path = Path(f) / "test.db"
+            conn = sqlite3.Connection(db_path)
+
+            inital_table_definition = """
+                CREATE TABLE IF NOT EXISTS notes (
+                    ankihub_note_id STRING PRIMARY KEY,
+                    ankihub_deck_id STRING,
+                    anki_note_id INTEGER,
+                    anki_note_type_id INTEGER,
+                    mod INTEGER
+                )
+            """
+            conn.execute(inital_table_definition)
+            conn.commit()
+
+            # Add a row to the notes table
+            ah_nid = next_deterministic_uuid()
+            ah_did = next_deterministic_uuid()
+            anki_nid = next_deterministic_id()
+            anki_mid = next_deterministic_id()
+            mod = 7
+            conn.execute(
+                "INSERT INTO notes VALUES (?, ?, ?, ?, ?)",
+                (str(ah_nid), str(ah_did), anki_nid, anki_mid, mod),
+            )
+            conn.commit()
+
+            # Set the user version to 1
+            conn.execute("PRAGMA user_version = 1")
+            conn.commit()
+
+            conn.close()
+
+            # Apply the migrations
+            ankihub_db = _AnkiHubDB()
+            ankihub_db.setup_and_migrate(db_path=db_path)
+
+            # Assert that the row was migrated correctly
+            note = AnkiHubNote.get()
+            assert note.ankihub_note_id == ah_nid
+            assert note.ankihub_deck_id == ah_did
+            assert note.anki_note_id == anki_nid
+            assert note.anki_note_type_id == anki_mid
