@@ -1,4 +1,5 @@
 import json
+import uuid
 from datetime import datetime
 from pathlib import Path
 from typing import Optional
@@ -16,6 +17,20 @@ from playhouse.shortcuts import ThreadSafeDatabaseMetadata
 
 # This will eventually be set to a peewee database object
 _ankihub_db: Optional[SqliteDatabase] = None
+
+
+class UUIDField(Field):
+    """A UUID field that stores the UUID as a string in the database.
+    It differs from peewee's built-in UUIDField in that the DB represantation
+    of the UUID contains hypens, e.g. "123e4567-e89b-12d3-a456-426614174000"."""
+
+    field_type = "TEXT"
+
+    def db_value(self, value: uuid.UUID) -> str:
+        return str(value)
+
+    def python_value(self, value: str) -> uuid.UUID:
+        return uuid.UUID(value)
 
 
 class DateTimeField(Field):
@@ -44,8 +59,8 @@ class BaseModel(Model):
 
 
 class AnkiHubNote(BaseModel):
-    ankihub_note_id = TextField(primary_key=True)
-    ankihub_deck_id = TextField(index=True, null=True)
+    ankihub_note_id = UUIDField(primary_key=True)
+    ankihub_deck_id = UUIDField(index=True, null=True)
     anki_note_id = IntegerField(unique=True, null=True)
     anki_note_type_id = IntegerField(index=True, null=True)
     mod = IntegerField(null=True)
@@ -60,7 +75,7 @@ class AnkiHubNote(BaseModel):
 
 class AnkiHubNoteType(BaseModel):
     anki_note_type_id = IntegerField()
-    ankihub_deck_id = TextField()
+    ankihub_deck_id = UUIDField()
     name = TextField()
     note_type_dict = JsonField()
 
@@ -71,7 +86,7 @@ class AnkiHubNoteType(BaseModel):
 
 class DeckMedia(BaseModel):
     name = TextField()
-    ankihub_deck_id = TextField()
+    ankihub_deck_id = UUIDField()
     file_content_hash = TextField(null=True)
     modified = DateTimeField()
     referenced_on_accepted_note = BooleanField()
