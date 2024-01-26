@@ -4,7 +4,8 @@ from typing import Callable, List, Optional
 
 from .... import LOGGER
 from ....addon_ankihub_client import AddonAnkiHubClient as AnkiHubClient
-from ....db import ankihub_db
+from ....db import ankihub_db, flat
+from ....db.models import AnkiHubNote
 from ....main.deck_unsubscribtion import uninstall_deck
 from ....settings import config
 from ...exceptions import DeckDownloadAndInstallError, RemoteDeckNotFoundError
@@ -25,15 +26,15 @@ def _fetch_missing_note_types() -> None:
     """
     client = AnkiHubClient()
     for ah_did in ankihub_db.ankihub_deck_ids():
-        mids = ankihub_db.list(
-            """
-            SELECT DISTINCT anki_note_type_id FROM notes WHERE ankihub_deck_id = ?
-            """,
-            str(ah_did),
+        mids_of_notes_of_deck = (
+            AnkiHubNote.select(AnkiHubNote.anki_note_type_id)
+            .distinct()
+            .where(AnkiHubNote.ankihub_deck_id == ah_did)
+            .objects(flat)
         )
         mids_of_missing_note_types = [
             mid
-            for mid in mids
+            for mid in mids_of_notes_of_deck
             if not ankihub_db.note_type_dict(ankihub_did=ah_did, note_type_id=mid)
         ]
         if not mids_of_missing_note_types:
