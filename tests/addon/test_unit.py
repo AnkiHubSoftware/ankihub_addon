@@ -2772,3 +2772,4 @@ class TestAnkiHubDBMigrations:
             assert note.ankihub_deck_id == ah_did
             assert note.anki_note_id == anki_nid
             assert note.anki_note_type_id == anki_mid
+            assert note.mod == mod
