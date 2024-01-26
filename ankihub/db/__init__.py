@@ -1,1 +1,1 @@
-from .db import ankihub_db  # noqa: F401
+from .db import ankihub_db, flat  # noqa: F401
