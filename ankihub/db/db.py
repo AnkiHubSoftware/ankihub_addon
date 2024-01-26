@@ -517,3 +517,9 @@ class _AnkiHubDB:
 
 
 ankihub_db = _AnkiHubDB()
+
+
+def flat(**row_data: Dict[str, Any]) -> Any:
+    """Return the value from a single-item dictionary."""
+    [(_, field_value)] = row_data.items()
+    return field_value
