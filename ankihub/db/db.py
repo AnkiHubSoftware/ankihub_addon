@@ -24,7 +24,6 @@ from .. import LOGGER
 from ..ankihub_client import Field, NoteInfo, suggestion_type_from_str
 from ..ankihub_client.models import DeckMedia as DeckMediaClientModel
 from ..common_utils import local_media_names_from_html
-from .db_utils import DBConnection
 from .exceptions import IntegrityError
 from .models import (
     AnkiHubNote,
@@ -39,18 +38,6 @@ from .models import (
 
 class _AnkiHubDB:
     database_path: Optional[Path] = None
-
-    def execute(self, *args, **kwargs) -> List:
-        return self.connection().execute(*args, **kwargs)
-
-    def list(self, *args, **kwargs) -> List:
-        return self.connection().list(*args, **kwargs)
-
-    def scalar(self, *args, **kwargs) -> Any:
-        return self.connection().scalar(*args, **kwargs)
-
-    def first(self, *args, **kwargs) -> Optional[Tuple]:
-        return self.connection().first(*args, **kwargs)
 
     def setup_and_migrate(self, db_path: Path) -> None:
         self.database_path = db_path
@@ -75,9 +62,6 @@ class _AnkiHubDB:
 
     def schema_version(self) -> int:
         return get_peewee_database().execute_sql("PRAGMA user_version;").fetchone()[0]
-
-    def connection(self) -> DBConnection:
-        return DBConnection()
 
     def upsert_notes_data(
         self, ankihub_did: uuid.UUID, notes_data: List[NoteInfo]
