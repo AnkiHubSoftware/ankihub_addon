@@ -40,11 +40,11 @@ from ..factories import (
     NoteInfoFactory,
 )
 from ..fixtures import (  # type: ignore
+    AddAnkiNote,
     ImportAHNoteType,
     InstallAHDeck,
     MockStudyDeckDialogWithCB,
     MockSuggestionDialog,
-    NewNoteWithNoteType,
     SetFeatureFlagState,
     add_basic_anki_note_to_deck,
     assert_datetime_equal_ignore_milliseconds,
@@ -788,13 +788,13 @@ class TestSuggestionDialogGetAnkiNidToPossibleAHDidsDict:
         self,
         anki_session_with_addon_data: AnkiSession,
         import_ah_note_type: ImportAHNoteType,
-        new_note_with_note_type: NewNoteWithNoteType,
+        add_anki_note: AddAnkiNote,
         next_deterministic_uuid: Callable[[], uuid.UUID],
     ):
         with anki_session_with_addon_data.profile_loaded():
             ah_did = next_deterministic_uuid()
             note_type = import_ah_note_type(ah_did=ah_did)
-            note = new_note_with_note_type(note_type=note_type)
+            note = add_anki_note(note_type=note_type)
             nids = [note.id]
             assert get_anki_nid_to_possible_ah_dids_dict(nids) == {note.id: {ah_did}}
 
@@ -802,7 +802,7 @@ class TestSuggestionDialogGetAnkiNidToPossibleAHDidsDict:
         self,
         anki_session_with_addon_data: AnkiSession,
         import_ah_note_type: ImportAHNoteType,
-        new_note_with_note_type: NewNoteWithNoteType,
+        add_anki_note: AddAnkiNote,
         next_deterministic_uuid: Callable[[], uuid.UUID],
     ):
         with anki_session_with_addon_data.profile_loaded():
@@ -813,7 +813,7 @@ class TestSuggestionDialogGetAnkiNidToPossibleAHDidsDict:
             import_ah_note_type(note_type=note_type, ah_did=ah_did_2)
 
             # The note type of the new note is used in two decks, so the note could be suggested for either of them.
-            note = new_note_with_note_type(note_type=note_type)
+            note = add_anki_note(note_type=note_type)
             nids = [note.id]
             assert get_anki_nid_to_possible_ah_dids_dict(nids) == {
                 note.id: {ah_did_1, ah_did_2}
@@ -928,7 +928,7 @@ class TestOpenSuggestionDialogForSingleSuggestion:
         anki_session_with_addon_data: AnkiSession,
         install_ah_deck: InstallAHDeck,
         import_ah_note_type: ImportAHNoteType,
-        new_note_with_note_type: NewNoteWithNoteType,
+        add_anki_note: AddAnkiNote,
         mock_dependiencies_for_suggestion_dialog: MockDependenciesForSuggestionDialog,
         mocker: MockerFixture,
         user_cancels: bool,
@@ -941,7 +941,7 @@ class TestOpenSuggestionDialogForSingleSuggestion:
             ah_did_2 = install_ah_deck()
             import_ah_note_type(ah_did=ah_did_2, note_type=note_type)
 
-            note = new_note_with_note_type(note_type=note_type)
+            note = add_anki_note(note_type=note_type)
 
             (
                 suggest_note_update_mock,
@@ -1040,18 +1040,18 @@ class TestOpenSuggestionDialogForBulkSuggestion:
         anki_session_with_addon_data: AnkiSession,
         install_ah_deck: InstallAHDeck,
         import_ah_note_type: ImportAHNoteType,
-        new_note_with_note_type: NewNoteWithNoteType,
+        add_anki_note: AddAnkiNote,
         mock_dependencies_for_bulk_suggestion_dialog: MockDependenciesForBulkSuggestionDialog,
         qtbot: QtBot,
     ):
         with anki_session_with_addon_data.profile_loaded():
             ah_did_1 = install_ah_deck()
             note_type_1 = import_ah_note_type(ah_did=ah_did_1, force_new=True)
-            note_1 = new_note_with_note_type(note_type=note_type_1)
+            note_1 = add_anki_note(note_type=note_type_1)
 
             ah_did_2 = install_ah_deck()
             note_type_2 = import_ah_note_type(ah_did=ah_did_2, force_new=True)
-            note_2 = new_note_with_note_type(note_type=note_type_2)
+            note_2 = add_anki_note(note_type=note_type_2)
 
             nids = [note_1.id, note_2.id]
 
@@ -1070,7 +1070,7 @@ class TestOpenSuggestionDialogForBulkSuggestion:
         anki_session_with_addon_data: AnkiSession,
         install_ah_deck: InstallAHDeck,
         import_ah_note_type: ImportAHNoteType,
-        new_note_with_note_type: NewNoteWithNoteType,
+        add_anki_note: AddAnkiNote,
         mock_dependencies_for_bulk_suggestion_dialog: MockDependenciesForBulkSuggestionDialog,
         mocker: MockerFixture,
         qtbot: QtBot,
@@ -1078,11 +1078,11 @@ class TestOpenSuggestionDialogForBulkSuggestion:
         with anki_session_with_addon_data.profile_loaded():
             ah_did_1 = install_ah_deck()
             note_type = import_ah_note_type(ah_did=ah_did_1)
-            note_1 = new_note_with_note_type(note_type=note_type)
+            note_1 = add_anki_note(note_type=note_type)
 
             ah_did_2 = install_ah_deck()
             import_ah_note_type(ah_did=ah_did_2, note_type=note_type)
-            note_2 = new_note_with_note_type(note_type=note_type)
+            note_2 = add_anki_note(note_type=note_type)
 
             nids = [note_1.id, note_2.id]
 
@@ -1313,6 +1313,55 @@ class TestAnkiHubDBAnkiHubNidsToAnkiIds:
             existing_ah_nid: anki_nid,
             not_existing_ah_nid: None,
         }
+
+
+class TestAnkiHubDBAreAnkiHubNotes:
+    def test_with_one_ankihub_note(
+        self,
+        anki_session_with_addon_data: AnkiSession,
+        ankihub_db: _AnkiHubDB,
+        import_ah_note: ImportAHNote,
+    ):
+        with anki_session_with_addon_data.profile_loaded():
+            note_info = import_ah_note()
+            assert ankihub_db.are_ankihub_notes(anki_nids=[NoteId(note_info.anki_nid)])
+
+    def test_with_multiple_ankihub_notes(
+        self,
+        anki_session_with_addon_data: AnkiSession,
+        ankihub_db: _AnkiHubDB,
+        import_ah_note: ImportAHNote,
+    ):
+        with anki_session_with_addon_data.profile_loaded():
+            note_info_1 = import_ah_note()
+            note_info_2 = import_ah_note()
+            assert ankihub_db.are_ankihub_notes(
+                anki_nids=[NoteId(note_info_1.anki_nid), NoteId(note_info_2.anki_nid)]
+            )
+
+    def test_with_one_non_ankihub_note(
+        self,
+        anki_session_with_addon_data: AnkiSession,
+        ankihub_db: _AnkiHubDB,
+        add_anki_note: AddAnkiNote,
+    ):
+        with anki_session_with_addon_data.profile_loaded():
+            anki_note = add_anki_note()
+            assert not ankihub_db.are_ankihub_notes(anki_nids=[anki_note.id])
+
+    def test_with_mixed_notes(
+        self,
+        anki_session_with_addon_data: AnkiSession,
+        ankihub_db: _AnkiHubDB,
+        import_ah_note: ImportAHNote,
+        add_anki_note: AddAnkiNote,
+    ):
+        with anki_session_with_addon_data.profile_loaded():
+            anki_note = add_anki_note()
+            note_info = import_ah_note()
+            assert not ankihub_db.are_ankihub_notes(
+                anki_nids=[anki_note.id, NoteId(note_info.anki_nid)]
+            )
 
 
 class TestAnkiHubDBRemoveNotes:
@@ -1876,21 +1925,21 @@ class TestRetainNidsWithAHNoteType:
         self,
         anki_session_with_addon_data: AnkiSession,
         import_ah_note_type: ImportAHNoteType,
-        new_note_with_note_type: NewNoteWithNoteType,
+        add_anki_note: AddAnkiNote,
     ):
         with anki_session_with_addon_data.profile_loaded():
             note_type = import_ah_note_type()
-            note = new_note_with_note_type(note_type)
+            note = add_anki_note(note_type)
             nids = [note.id]
             assert retain_nids_with_ah_note_type(nids) == nids
 
     def test_filters_out_note_with_non_ah_note_type(
         self,
         anki_session_with_addon_data: AnkiSession,
-        new_note_with_note_type: NewNoteWithNoteType,
+        add_anki_note: AddAnkiNote,
     ):
         with anki_session_with_addon_data.profile_loaded():
-            note = new_note_with_note_type(aqt.mw.col.models.by_name("Basic"))
+            note = add_anki_note(aqt.mw.col.models.by_name("Basic"))
             nids = [note.id]
             assert len(retain_nids_with_ah_note_type(nids)) == 0
 
@@ -1899,17 +1948,17 @@ class TestRetainNidsWithAHNoteType:
         anki_session_with_addon_data: AnkiSession,
         import_ah_note: ImportAHNote,
         import_ah_note_type: ImportAHNoteType,
-        new_note_with_note_type: NewNoteWithNoteType,
+        add_anki_note: AddAnkiNote,
     ):
         with anki_session_with_addon_data.profile_loaded():
             note_info = import_ah_note()
             nid_1 = NoteId(note_info.anki_nid)
 
             note_type = import_ah_note_type()
-            note = new_note_with_note_type(note_type)
+            note = add_anki_note(note_type)
             nid_2 = note.id
 
-            note = new_note_with_note_type(aqt.mw.col.models.by_name("Basic"))
+            note = add_anki_note(aqt.mw.col.models.by_name("Basic"))
             nid_3 = note.id
 
             nids = [nid_1, nid_2, nid_3]

@@ -364,29 +364,36 @@ def import_ah_note_type(
     return import_ah_note_type_inner
 
 
-class NewNoteWithNoteType(Protocol):
+class AddAnkiNote(Protocol):
     def __call__(
-        self, note_type: NotetypeDict, anki_did: Optional[DeckId] = None
+        self,
+        note_type: Optional[NotetypeDict] = None,
+        anki_did: Optional[DeckId] = None,
     ) -> Note:
         ...
 
 
 @pytest.fixture
-def new_note_with_note_type() -> NewNoteWithNoteType:
-    """Creates a new note with the given note type and adds it to the given deck."""
-    default_did = DeckId(1)
+def add_anki_note() -> AddAnkiNote:
+    """Creates a new note with the given note type and adds it to the given deck.
+    If no note type is provided, the Basic note type is used.
+    If no deck is provided, the default deck is used."""
 
-    def new_note_with_note_type_inner(
-        note_type: NotetypeDict, anki_did: Optional[DeckId] = None
+    def add_note_inner(
+        note_type: Optional[NotetypeDict] = None,
+        anki_did: Optional[DeckId] = None,
     ) -> Note:
         if anki_did is None:
-            anki_did = default_did
+            anki_did = DeckId(1)
+
+        if note_type is None:
+            note_type = aqt.mw.col.models.by_name("Basic")
 
         note = aqt.mw.col.new_note(note_type)
         aqt.mw.col.add_note(note, DeckId(anki_did))
         return note
 
-    return new_note_with_note_type_inner
+    return add_note_inner
 
 
 class InstallAHDeck(Protocol):
