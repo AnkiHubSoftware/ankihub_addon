@@ -10,7 +10,6 @@ Some differences between data stored in the AnkiHub database and the Anki databa
     while the AnkiHub database stores ankihub_client.NoteInfo objects.
 - decks, notes and note types can be missing from the Anki database or be modified.
 """
-import json
 import uuid
 from pathlib import Path
 from typing import Any, Dict, Iterable, List, Optional, Sequence, Set, Tuple
@@ -141,7 +140,7 @@ class _AnkiHubDB:
 
         return tuple(upserted_notes), tuple(skipped_notes)
 
-    def remove_notes(self, ah_nids: Sequence[uuid.UUID]) -> None:
+    def remove_notes(self, ah_nids: List[uuid.UUID]) -> None:
         """Removes notes from the AnkiHub DB"""
         AnkiHubNote.delete().where(AnkiHubNote.ankihub_note_id.in_(ah_nids)).execute()
 
@@ -219,16 +218,14 @@ class _AnkiHubDB:
         )
 
     def anki_nids_for_ankihub_deck(self, ankihub_did: uuid.UUID) -> List[NoteId]:
-        query = AnkiHubNote.select(AnkiHubNote.anki_note_id).where(
-            AnkiHubNote.ankihub_deck_id == ankihub_did
+        return (
+            AnkiHubNote.select(AnkiHubNote.anki_note_id)
+            .where(AnkiHubNote.ankihub_deck_id == ankihub_did)
+            .objects(flat)
         )
-        return [note.anki_note_id for note in query]
 
     def ankihub_dids(self) -> List[uuid.UUID]:
-        return [
-            note.ankihub_deck_id
-            for note in AnkiHubNote.select(AnkiHubNote.ankihub_deck_id).distinct()
-        ]
+        return AnkiHubNote.select(AnkiHubNote.ankihub_deck_id).distinct().objects(flat)
 
     def ankihub_did_for_anki_nid(self, anki_nid: NoteId) -> Optional[uuid.UUID]:
         return (
@@ -240,20 +237,23 @@ class _AnkiHubDB:
     def ankihub_dids_for_anki_nids(
         self, anki_nids: Iterable[NoteId]
     ) -> List[uuid.UUID]:
-        query = (
+        return (
             AnkiHubNote.select(AnkiHubNote.ankihub_deck_id)
             .where(AnkiHubNote.anki_note_id.in_(anki_nids))
             .distinct()
+            .objects(flat)
         )
-        return [note.ankihub_deck_id for note in query]
 
     def anki_nid_to_ah_did_dict(
         self, anki_nids: Iterable[NoteId]
     ) -> Dict[NoteId, uuid.UUID]:
         """Returns a dict mapping anki nids to the ankihub did of the deck the note is in.
         Not found nids are omitted from the dict."""
-        query = AnkiHubNote.select().where(AnkiHubNote.anki_note_id.in_(anki_nids))
-        return {NoteId(note.anki_note_id): note.ankihub_deck_id for note in query}
+        return dict(
+            AnkiHubNote.select(AnkiHubNote.anki_note_id, AnkiHubNote.ankihub_deck_id)
+            .where(AnkiHubNote.anki_note_id.in_(anki_nids))
+            .tuples()
+        )
 
     def are_ankihub_notes(self, anki_nids: List[NoteId]) -> bool:
         notes_count = (
@@ -271,10 +271,11 @@ class _AnkiHubDB:
     def anki_nids_to_ankihub_nids(
         self, anki_nids: List[NoteId]
     ) -> Dict[NoteId, uuid.UUID]:
-        query = AnkiHubNote.select(
-            AnkiHubNote.anki_note_id, AnkiHubNote.ankihub_note_id
-        ).where(AnkiHubNote.anki_note_id.in_(anki_nids))
-        anki_nid_to_ah_nid = {note.anki_note_id: note.ankihub_note_id for note in query}
+        anki_nid_to_ah_nid = dict(
+            AnkiHubNote.select(AnkiHubNote.anki_note_id, AnkiHubNote.ankihub_note_id)
+            .where(AnkiHubNote.anki_note_id.in_(anki_nids))
+            .tuples()
+        )
 
         not_existing = set(anki_nids) - set(anki_nid_to_ah_nid.keys())
         return anki_nid_to_ah_nid | dict.fromkeys(not_existing)
@@ -282,10 +283,11 @@ class _AnkiHubDB:
     def ankihub_nids_to_anki_nids(
         self, ankihub_nids: List[uuid.UUID]
     ) -> Dict[uuid.UUID, NoteId]:
-        query = AnkiHubNote.select(
-            AnkiHubNote.ankihub_note_id, AnkiHubNote.anki_note_id
-        ).where(AnkiHubNote.ankihub_note_id.in_([str(id) for id in ankihub_nids]))
-        ah_nid_to_anki_nid = {note.ankihub_note_id: note.anki_note_id for note in query}
+        ah_nid_to_anki_nid = dict(
+            AnkiHubNote.select(AnkiHubNote.ankihub_note_id, AnkiHubNote.anki_note_id)
+            .where(AnkiHubNote.ankihub_note_id.in_([str(id) for id in ankihub_nids]))
+            .tuples()
+        )
 
         not_existing = set(ankihub_nids) - set(ah_nid_to_anki_nid.keys())
         return ah_nid_to_anki_nid | dict.fromkeys(not_existing)
@@ -306,10 +308,7 @@ class _AnkiHubDB:
         DeckMedia.delete().where(DeckMedia.ankihub_deck_id == ankihub_did).execute()
 
     def ankihub_deck_ids(self) -> List[uuid.UUID]:
-        return [
-            note.ankihub_deck_id
-            for note in AnkiHubNote.select(AnkiHubNote.ankihub_deck_id).distinct()
-        ]
+        return AnkiHubNote.select(AnkiHubNote.ankihub_deck_id).distinct().objects(flat)
 
     def last_sync(self, ankihub_note_id: uuid.UUID) -> Optional[int]:
         return (
@@ -320,7 +319,7 @@ class _AnkiHubDB:
 
     def ankihub_dids_of_decks_with_missing_values(self) -> List[uuid.UUID]:
         # currently only checks the guid, fields and tags columns
-        query = (
+        return (
             AnkiHubNote.select(AnkiHubNote.ankihub_deck_id)
             .distinct()
             .where(
@@ -328,8 +327,8 @@ class _AnkiHubDB:
                 | (AnkiHubNote.fields.is_null(True))
                 | (AnkiHubNote.tags.is_null(True))
             )
+            .objects(flat)
         )
-        return [note.ankihub_deck_id for note in query]
 
     # Media related functions
     def upsert_deck_media_infos(
@@ -355,14 +354,16 @@ class _AnkiHubDB:
 
     def downloadable_media_names_for_ankihub_deck(self, ah_did: uuid.UUID) -> Set[str]:
         """Returns the names of all media files which can be downloaded for the given deck."""
-        query = DeckMedia.select(DeckMedia.name).where(
-            DeckMedia.ankihub_deck_id == ah_did,
-            DeckMedia.referenced_on_accepted_note,
-            DeckMedia.exists_on_s3,
-            DeckMedia.download_enabled,
+        return set(
+            DeckMedia.select(DeckMedia.name)
+            .where(
+                DeckMedia.ankihub_deck_id == ah_did,
+                DeckMedia.referenced_on_accepted_note,
+                DeckMedia.exists_on_s3,
+                DeckMedia.download_enabled,
+            )
+            .objects(flat)
         )
-
-        return {media.name for media in query}
 
     def media_names_for_ankihub_deck(self, ah_did: uuid.UUID) -> Set[str]:
         """Returns the names of all media files which are referenced on notes in the given deck."""
@@ -386,12 +387,15 @@ class _AnkiHubDB:
         indicating whether the media file is referenced on a note in the given deck.
         The media file doesn't have to exist on S3, it just has to referenced on a note in the deck.
         """
-        query = DeckMedia.select(DeckMedia.name).where(
-            DeckMedia.ankihub_deck_id == ah_did,
-            DeckMedia.name.in_(media_names),
-            DeckMedia.referenced_on_accepted_note,
+        names_in_db = set(
+            DeckMedia.select(DeckMedia.name)
+            .where(
+                DeckMedia.ankihub_deck_id == ah_did,
+                DeckMedia.name.in_(media_names),
+                DeckMedia.referenced_on_accepted_note,
+            )
+            .objects(flat)
         )
-        names_in_db = {media.name for media in query}
         return {name: (name in names_in_db) for name in media_names}
 
     def media_names_with_matching_hashes(
@@ -415,12 +419,14 @@ class _AnkiHubDB:
         if not media_to_hash:
             return {}
 
-        query = DeckMedia.select(DeckMedia.file_content_hash, DeckMedia.name).where(
-            DeckMedia.ankihub_deck_id == ah_did,
-            DeckMedia.file_content_hash.in_(list(media_to_hash.values())),
+        hash_to_media = dict(
+            DeckMedia.select(DeckMedia.file_content_hash, DeckMedia.name)
+            .where(
+                DeckMedia.ankihub_deck_id == ah_did,
+                DeckMedia.file_content_hash.in_(list(media_to_hash.values())),
+            )
+            .tuples()
         )
-
-        hash_to_media = {media.file_content_hash: media.name for media in query}
 
         return {
             media_name: matching_media
@@ -435,7 +441,7 @@ class _AnkiHubDB:
                 anki_note_type_id=note_type["id"],
                 ankihub_deck_id=ankihub_did,
                 name=note_type["name"],
-                note_type_dict_json=json.dumps(note_type),
+                note_type_dict=note_type,
             )
             .on_conflict_replace()
             .execute()
@@ -444,8 +450,8 @@ class _AnkiHubDB:
     def note_type_dict(
         self, ankihub_did: uuid.UUID, note_type_id: NotetypeId
     ) -> NotetypeDict:
-        note_type_dict_json = (
-            AnkiHubNoteType.select(AnkiHubNoteType.note_type_dict_json)
+        return (
+            AnkiHubNoteType.select(AnkiHubNoteType.note_type_dict)
             .where(
                 AnkiHubNoteType.anki_note_type_id == note_type_id,
                 AnkiHubNoteType.ankihub_deck_id == ankihub_did,
@@ -453,16 +459,8 @@ class _AnkiHubDB:
             .scalar()
         )
 
-        if note_type_dict_json is None:
-            return None
-
-        return NotetypeDict(json.loads(note_type_dict_json))
-
     def ankihub_note_type_ids(self) -> List[NotetypeId]:
-        return [
-            note_type.anki_note_type_id
-            for note_type in AnkiHubNoteType.select(AnkiHubNoteType.anki_note_type_id)
-        ]
+        return AnkiHubNoteType.select(AnkiHubNoteType.anki_note_type_id).objects(flat)
 
     def is_ankihub_note_type(self, anki_note_type_id: NotetypeId) -> bool:
         return (
@@ -472,21 +470,22 @@ class _AnkiHubDB:
         )
 
     def note_types_for_ankihub_deck(self, ankihub_did: uuid.UUID) -> List[NotetypeId]:
-        query = AnkiHubNoteType.select(AnkiHubNoteType.anki_note_type_id).where(
-            AnkiHubNoteType.ankihub_deck_id == ankihub_did
+        return (
+            AnkiHubNoteType.select(AnkiHubNoteType.anki_note_type_id)
+            .where(AnkiHubNoteType.ankihub_deck_id == ankihub_did)
+            .objects(flat)
         )
-
-        return [note_type.anki_note_type_id for note_type in query]
 
     def ankihub_dids_for_note_type(
         self, anki_note_type_id: NotetypeId
     ) -> Optional[Set[uuid.UUID]]:
         """Returns the AnkiHub deck ids that use the given note type."""
-        query = AnkiHubNoteType.select(AnkiHubNoteType.ankihub_deck_id).where(
-            AnkiHubNoteType.anki_note_type_id == anki_note_type_id
+        result = set(
+            AnkiHubNoteType.select(AnkiHubNoteType.ankihub_deck_id)
+            .where(AnkiHubNoteType.anki_note_type_id == anki_note_type_id)
+            .objects(flat)
         )
-        result = {note_type.ankihub_deck_id for note_type in query}
-        return result or None
+        return result if result else None
 
     def _note_type_field_names(
         self, ankihub_did: uuid.UUID, anki_note_type_id: NotetypeId
