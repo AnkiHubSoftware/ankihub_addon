@@ -115,16 +115,18 @@ def migrate_ankihub_db():
         )
 
     if schema_version < 8:
-        _setup_note_types_table(peewee_db=peewee_db)
-        peewee_db.execute_sql("PRAGMA user_version = 8;")
+        with peewee_db.atomic():
+            _setup_note_types_table(peewee_db=peewee_db)
+            peewee_db.execute_sql("PRAGMA user_version = 8;")
 
         LOGGER.info(
             f"AnkiHub DB migrated to schema version {ankihub_db.schema_version()}"
         )
 
     if schema_version < 9:
-        _setup_deck_media_table(peewee_db=peewee_db)
-        peewee_db.execute_sql("PRAGMA user_version = 9;")
+        with peewee_db.atomic():
+            _setup_deck_media_table(peewee_db=peewee_db)
+            peewee_db.execute_sql("PRAGMA user_version = 9;")
 
         LOGGER.info(
             f"AnkiHub DB migrated to schema version {ankihub_db.schema_version()}"
