@@ -156,7 +156,7 @@ class _AnkiHubDB:
 
         return tuple(upserted_notes), tuple(skipped_notes)
 
-    def remove_notes(self, ah_nids: Sequence[uuid.UUID]) -> None:
+    def remove_notes(self, ah_nids: List[uuid.UUID]) -> None:
         """Removes notes from the AnkiHub DB"""
         AnkiHubNote.delete().where(AnkiHubNote.ankihub_note_id.in_(ah_nids)).execute()
 
