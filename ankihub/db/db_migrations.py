@@ -30,9 +30,6 @@ def migrate_ankihub_db():
                 "CREATE INDEX anki_note_id_idx ON notes (anki_note_id)"
             )
             peewee_db.execute_sql("PRAGMA user_version = 2;")
-        LOGGER.info(
-            f"AnkiHub DB migrated to schema version {ankihub_db.schema_version()}"
-        )
 
     if schema_version < 3:
         with peewee_db.atomic():
