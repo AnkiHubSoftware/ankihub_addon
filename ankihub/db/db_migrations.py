@@ -21,18 +21,6 @@ def migrate_ankihub_db():
     peewee_db = get_peewee_database()
     schema_version = ankihub_db.schema_version()
 
-    if schema_version < 1:
-        with peewee_db.atomic():
-            peewee_db.execute_sql(
-                """
-                ALTER TABLE notes ADD COLUMN mod INTEGER
-                """
-            )
-            peewee_db.execute_sql("PRAGMA user_version = 1;")
-        LOGGER.info(
-            f"AnkiHub DB migrated to schema version {ankihub_db.schema_version()}"
-        )
-
     if schema_version < 2:
         with peewee_db.atomic():
             peewee_db.execute_sql(
@@ -214,7 +202,7 @@ def migrate_ankihub_db():
 
 def _setup_note_types_table(peewee_db: Database) -> None:
     """Create the note types table as it was in schema version 8.""" ""
-    peewee_db.execute(
+    peewee_db.execute_sql(
         """
         CREATE TABLE notetypes (
             anki_note_type_id INTEGER NOT NULL,
