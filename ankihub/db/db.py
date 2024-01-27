@@ -10,7 +10,6 @@ Some differences between data stored in the AnkiHub database and the Anki databa
     while the AnkiHub database stores ankihub_client.NoteInfo objects.
 - decks, notes and note types can be missing from the Anki database or be modified.
 """
-import json
 import uuid
 from pathlib import Path
 from typing import Any, Dict, Iterable, List, Optional, Sequence, Set, Tuple
@@ -457,7 +456,7 @@ class _AnkiHubDB:
                 anki_note_type_id=note_type["id"],
                 ankihub_deck_id=ankihub_did,
                 name=note_type["name"],
-                note_type_dict_json=json.dumps(note_type),
+                note_type_dict=note_type,
             )
             .on_conflict_replace()
             .execute()
@@ -466,19 +465,14 @@ class _AnkiHubDB:
     def note_type_dict(
         self, ankihub_did: uuid.UUID, note_type_id: NotetypeId
     ) -> NotetypeDict:
-        note_type_dict_json = (
-            AnkiHubNoteType.select(AnkiHubNoteType.note_type_dict_json)
+        return (
+            AnkiHubNoteType.select(AnkiHubNoteType.note_type_dict)
             .where(
                 AnkiHubNoteType.anki_note_type_id == note_type_id,
                 AnkiHubNoteType.ankihub_deck_id == ankihub_did,
             )
             .scalar()
         )
-
-        if note_type_dict_json is None:
-            return None
-
-        return NotetypeDict(json.loads(note_type_dict_json))
 
     def ankihub_note_type_ids(self) -> List[NotetypeId]:
         return AnkiHubNoteType.select(AnkiHubNoteType.anki_note_type_id).objects(flat)
