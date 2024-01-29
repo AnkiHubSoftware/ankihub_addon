@@ -29,14 +29,14 @@ def migrate_ankihub_db():
             peewee_db.execute_sql(
                 "CREATE INDEX anki_note_id_idx ON notes (anki_note_id)"
             )
-            peewee_db.execute_sql("PRAGMA user_version = 2;")
+            peewee_db.pragma("user_version", 2)
 
     if schema_version < 3:
         with peewee_db.atomic():
             peewee_db.execute_sql("ALTER TABLE notes ADD COLUMN guid TEXT")
             peewee_db.execute_sql("ALTER TABLE notes ADD COLUMN fields TEXT")
             peewee_db.execute_sql("ALTER TABLE notes ADD COLUMN tags TEXT")
-            peewee_db.execute_sql("PRAGMA user_version = 3;")
+            peewee_db.pragma("user_version", 3)
         LOGGER.info(
             f"AnkiHub DB migrated to schema version {ankihub_db.schema_version()}"
         )
@@ -44,7 +44,7 @@ def migrate_ankihub_db():
     if schema_version < 4:
         with peewee_db.atomic():
             peewee_db.execute_sql("ALTER TABLE notes ADD COLUMN last_update_type TEXT")
-            peewee_db.execute_sql("PRAGMA user_version = 4;")
+            peewee_db.pragma("user_version", 4)
         LOGGER.info(
             f"AnkiHub DB migrated to schema version {ankihub_db.schema_version()}"
         )
@@ -54,7 +54,7 @@ def migrate_ankihub_db():
             peewee_db.execute_sql(
                 "CREATE INDEX anki_note_type_id ON notes (anki_note_type_id)"
             )
-            peewee_db.execute_sql("PRAGMA user_version = 5;")
+            peewee_db.pragma("user_version", 5)
         LOGGER.info(
             f"AnkiHub DB migrated to schema version {ankihub_db.schema_version()}"
         )
@@ -95,7 +95,7 @@ def migrate_ankihub_db():
                 "CREATE INDEX anki_note_type_id_idx ON notes (anki_note_type_id)"
             )
 
-            peewee_db.execute_sql("PRAGMA user_version = 6;")
+            peewee_db.pragma("user_version", 6)
 
         LOGGER.info(
             f"AnkiHub DB migrated to schema version {ankihub_db.schema_version()}"
@@ -105,7 +105,7 @@ def migrate_ankihub_db():
         with peewee_db.atomic():
             # Remove newlines from tags
             peewee_db.execute_sql("UPDATE notes SET tags = REPLACE(tags, '\n', '')")
-            peewee_db.execute_sql("PRAGMA user_version = 7;")
+            peewee_db.pragma("user_version", 7)
 
         LOGGER.info(
             f"AnkiHub DB migrated to schema version {ankihub_db.schema_version()}"
@@ -114,7 +114,7 @@ def migrate_ankihub_db():
     if schema_version < 8:
         with peewee_db.atomic():
             _setup_note_types_table(peewee_db=peewee_db)
-            peewee_db.execute_sql("PRAGMA user_version = 8;")
+            peewee_db.pragma("user_version", 8)
 
         LOGGER.info(
             f"AnkiHub DB migrated to schema version {ankihub_db.schema_version()}"
@@ -123,7 +123,7 @@ def migrate_ankihub_db():
     if schema_version < 9:
         with peewee_db.atomic():
             _setup_deck_media_table(peewee_db=peewee_db)
-            peewee_db.execute_sql("PRAGMA user_version = 9;")
+            peewee_db.pragma("user_version", 9)
 
         LOGGER.info(
             f"AnkiHub DB migrated to schema version {ankihub_db.schema_version()}"
@@ -147,7 +147,7 @@ def migrate_ankihub_db():
             )
             peewee_db.execute_sql("DROP TABLE temp_notetypes;")
 
-            peewee_db.execute_sql("PRAGMA user_version = 10;")
+            peewee_db.pragma("user_version", 10)
 
         LOGGER.info(
             f"AnkiHub DB migrated to schema version {ankihub_db.schema_version()}"
@@ -192,7 +192,7 @@ def migrate_ankihub_db():
                 # Drop the old table
                 get_peewee_database().execute_sql(f"DROP TABLE {temp_table_name}")
 
-            get_peewee_database().execute_sql("PRAGMA user_version = 11;")
+            peewee_db.pragma("user_version", 11)
 
         LOGGER.info(
             f"AnkiHub DB migrated to schema version {ankihub_db.schema_version()}"
