@@ -20,7 +20,9 @@ class CustomSearchNode(ABC):
     browser: Browser = None
 
     @classmethod
-    def from_parameter_type_and_value(cls, browser, parameter_name, value):
+    def from_parameter_type_and_value(
+        cls, browser: Browser, parameter_name: str, value: str
+    ) -> "CustomSearchNode":
         custom_search_node_types = (
             ModifiedAfterSyncSearchNode,
             UpdatedInTheLastXDaysSearchNode,
