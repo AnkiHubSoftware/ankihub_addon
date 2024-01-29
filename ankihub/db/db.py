@@ -56,14 +56,14 @@ class _AnkiHubDB:
 
         set_peewee_database(db_path)
 
-        journal_mode = self.scalar("pragma journal_mode=wal")
+        journal_mode = get_peewee_database().pragma("journal_mode", "wal")
         if journal_mode != "wal":
             LOGGER.warning("Failed to set journal_mode=wal")  # pragma: no cover
 
         if self.schema_version() == 0:
             bind_peewee_models()
             create_tables()
-            self.execute("PRAGMA user_version = 11")
+            get_peewee_database().pragma("user_version", 11)
         else:
             from .db_migrations import migrate_ankihub_db
 
@@ -71,8 +71,7 @@ class _AnkiHubDB:
             bind_peewee_models()
 
     def schema_version(self) -> int:
-        result = self.scalar("PRAGMA user_version;")
-        return result
+        return get_peewee_database().pragma("user_version")
 
     def connection(self) -> DBConnection:
         return DBConnection()
