@@ -729,12 +729,7 @@ def test_create_collaborative_deck_and_upload(
         assert ankihub_db.note_data(note.id) == expected_note_data
 
         # check that note mod value is in database
-        assert (
-            ankihub_db.scalar(
-                "SELECT mod from notes WHERE ankihub_note_id = ?", str(ah_nid)
-            )
-            == note.mod
-        )
+        assert AnkiHubNote.get(AnkiHubNote.anki_note_id == note.id).mod == note.mod
 
 
 class TestDownloadAndInstallDecks:
@@ -1694,7 +1689,7 @@ class TestAnkiHubImporter:
             assert import_result.updated_nids == []
             assert import_result.skipped_nids == []
 
-            mod_1 = ankihub_db.scalar("SELECT mod FROM notes WHERE anki_note_id = ?", 1)
+            mod_1 = AnkiHubNote.get(AnkiHubNote.anki_note_id == 1).mod
             sleep(0.1)  # sleep to test for mod value changes
 
             # import the second note with the same nid
@@ -1727,7 +1722,7 @@ class TestAnkiHubImporter:
             assert ankihub_db.ankihub_deck_ids() == [ah_did_1]
 
             # Check that the mod value of the first note was not changed.
-            mod_2 = ankihub_db.scalar("SELECT mod FROM notes WHERE anki_note_id = ?", 1)
+            mod_2 = AnkiHubNote.get(AnkiHubNote.anki_note_id == 1).mod
             assert mod_2 == mod_1
 
             # Check that the note in the Anki database wasn't changed by the second import.
@@ -2297,7 +2292,7 @@ class TestCustomSearchNodes:
             )
 
             yesterday_timestamp = int((datetime.now() - timedelta(days=1)).timestamp())
-            ankihub_db.execute(f"UPDATE notes SET mod = {yesterday_timestamp}")
+            AnkiHubNote.update(mod=yesterday_timestamp).execute()
 
             assert (
                 UpdatedInTheLastXDaysSearchNode(browser, "1").filter_ids(all_nids) == []
