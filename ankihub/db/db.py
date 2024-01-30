@@ -311,7 +311,7 @@ class _AnkiHubDB:
         return (
             AnkiHubNote.select(AnkiHubNote.ankihub_deck_id)
             .distinct()
-            .filter((DQ(guid__is=None) | DQ(fields__is=None) | DQ(tags__is=None)))
+            .filter(DQ(guid__is=None) | DQ(fields__is=None) | DQ(tags__is=None))
             .objects(flat)
         )
 
