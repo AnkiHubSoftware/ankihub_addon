@@ -83,7 +83,7 @@ class ModifiedAfterSyncSearchNode(CustomSearchNode):
 
         nid_to_ah_mod: Dict[NoteId, int] = dict(
             AnkiHubNote.select(AnkiHubNote.anki_note_id, AnkiHubNote.mod)
-            .where(AnkiHubNote.anki_note_id.in_(nids))
+            .filter(anki_note_id__in=nids)
             .tuples()
         )
 
@@ -136,9 +136,9 @@ class UpdatedInTheLastXDaysSearchNode(CustomSearchNode):
 
         retained_nids = (
             AnkiHubNote.select(AnkiHubNote.anki_note_id)
-            .where(
-                AnkiHubNote.anki_note_id.in_(nids),
-                AnkiHubNote.mod >= threshold_timestamp,
+            .filter(
+                anki_note_id__in=nids,
+                mod__gte=threshold_timestamp,
             )
             .objects(flat)
         )
@@ -164,9 +164,9 @@ class NewNoteSearchNode(CustomSearchNode):
 
         retained_nids = (
             AnkiHubNote.select(AnkiHubNote.anki_note_id)
-            .where(
-                AnkiHubNote.anki_note_id.in_(nids),
-                AnkiHubNote.last_update_type.is_null(),
+            .filter(
+                anki_note_id__in=nids,
+                last_update_type__is=None,
             )
             .objects(flat)
         )
@@ -195,9 +195,9 @@ class SuggestionTypeSearchNode(CustomSearchNode):
 
         retained_nids = (
             AnkiHubNote.select(AnkiHubNote.anki_note_id)
-            .where(
-                AnkiHubNote.anki_note_id.in_(nids),
-                AnkiHubNote.last_update_type == value,
+            .filter(
+                anki_note_id__in=nids,
+                last_update_type=value,
             )
             .objects(flat)
         )
@@ -223,7 +223,7 @@ class UpdatedSinceLastReviewSearchNode(CustomSearchNode):
 
         nid_to_ah_mod: Dict[NoteId, int] = dict(
             AnkiHubNote.select(AnkiHubNote.anki_note_id, AnkiHubNote.mod)
-            .where(AnkiHubNote.anki_note_id.in_(nids))
+            .filter(anki_note_id__in=nids)
             .tuples()
         )
 

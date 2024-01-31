@@ -27,14 +27,10 @@ SUBDECK_TAG = "AnkiHub_Subdeck"
 
 def deck_contains_subdeck_tags(ah_did: uuid.UUID) -> bool:
     """Return whether the given deck contains any notes which have subdeck tags in the AnkiHub database."""
-    return (
-        AnkiHubNote.select()
-        .where(
-            AnkiHubNote.ankihub_deck_id == ah_did,
-            AnkiHubNote.tags.ilike(f"%{SUBDECK_TAG}::%::%"),
-        )
-        .exists()
-    )
+    return AnkiHubNote.filter(
+        ankihub_deck_id=ah_did,
+        tags__ilike=f"%{SUBDECK_TAG}::%::%",
+    ).exists()
 
 
 def build_subdecks_and_move_cards_to_them(
