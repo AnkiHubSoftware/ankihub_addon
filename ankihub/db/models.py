@@ -101,7 +101,7 @@ class DeckMedia(BaseModel):
 
 def set_peewee_database(db_path: Path) -> None:
     global _ankihub_db
-    _ankihub_db = SqliteDatabase(db_path)
+    _ankihub_db = SqliteDatabase(db_path, pragmas={"journal_mode": "wal"})
 
 
 def get_peewee_database() -> SqliteDatabase:
