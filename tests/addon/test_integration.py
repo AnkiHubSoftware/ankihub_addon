@@ -2667,6 +2667,10 @@ class TestBrowserContextMenu:
             )
             clipboard_setText_mock.assert_called_once_with(expected_clipboard_text)
 
+            # Close the browser to prevent RuntimeErrors getting raised during teardown
+            with qtbot.wait_callback() as callback:
+                dialogs.closeAll(onsuccess=callback)
+
 
 @pytest.mark.qt_no_exception_capture
 @pytest.mark.parametrize(
