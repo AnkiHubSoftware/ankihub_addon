@@ -274,7 +274,7 @@ class _AnkiHubDB:
     ) -> Dict[uuid.UUID, NoteId]:
         ah_nid_to_anki_nid = dict(
             AnkiHubNote.select(AnkiHubNote.ankihub_note_id, AnkiHubNote.anki_note_id)
-            .filter(ankihub_note_id__in=[str(id) for id in ankihub_nids])
+            .filter(ankihub_note_id__in=ankihub_nids)
             .tuples()
         )
 
