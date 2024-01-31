@@ -2593,7 +2593,7 @@ class TestBrowserContextMenu:
             note_info = NoteInfoFactory.create()
             import_ah_note(note_info)
 
-            menu = self.setup_browser_context_menu_with_ankihub_actions()
+            menu = self.open_browser_context_menu_with_all_notes_selected()
 
             # Get the texts of the actions in the menu
             actions = [action for action in menu.actions() if not action.isSeparator()]
@@ -2614,11 +2614,13 @@ class TestBrowserContextMenu:
             with qtbot.wait_callback() as callback:
                 dialogs.closeAll(onsuccess=callback)
 
-    def setup_browser_context_menu_with_ankihub_actions(self) -> QMenu:
+    def open_browser_context_menu_with_all_notes_selected(self) -> QMenu:
+        """Returns a menu with just our context menu actions. The actions behave as if
+        all notes in the Anki collection were selected."""
         # Set up our browser modifications, open the browser and select all notes
         setup_browser()
         browser: Browser = dialogs.open("Browser", aqt.mw)
-        browser.search_for(search="")
+        browser.search_for(search="")  # The empty search matches all notes
         browser.table.select_all()
 
         # Call Anki's hoks for the context menu and let it add the actions to a menu
@@ -2647,7 +2649,7 @@ class TestBrowserContextMenu:
             note_info = NoteInfoFactory.create()
             import_ah_note(note_info)
 
-            menu = self.setup_browser_context_menu_with_ankihub_actions()
+            menu = self.open_browser_context_menu_with_all_notes_selected()
 
             # Trigger the action
             action: QAction = next(
