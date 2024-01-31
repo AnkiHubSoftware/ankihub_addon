@@ -33,12 +33,13 @@ from anki.decks import DeckId, FilteredDeckConfig
 from anki.models import NotetypeDict, NotetypeId
 from anki.notes import Note, NoteId
 from anki.utils import point_version
-from aqt import AnkiQt, dialogs, gui_hooks
+from aqt import AnkiQt, QMenu, dialogs, gui_hooks
 from aqt.addcards import AddCards
 from aqt.addons import InstallOk
 from aqt.browser import Browser
 from aqt.browser.sidebar.item import SidebarItem
 from aqt.browser.sidebar.tree import SidebarTreeView
+from aqt.gui_hooks import browser_will_show_context_menu
 from aqt.importing import AnkiPackageImporter
 from aqt.qt import QAction, Qt
 from aqt.theme import theme_manager
@@ -2579,6 +2580,90 @@ def test_browser_custom_columns(
             "No",
             "No",
         ]
+
+
+class TestBrowserContextMenu:
+    def test_ankihub_actions_are_added_to_the_browser_context_menu(
+        self,
+        anki_session_with_addon_data: AnkiSession,
+        import_ah_note: ImportAHNote,
+        qtbot: QtBot,
+    ):
+        with anki_session_with_addon_data.profile_loaded():
+            note_info = NoteInfoFactory.create()
+            import_ah_note(note_info)
+
+            menu = self.setup_browser_context_menu_with_ankihub_actions()
+
+            # Get the texts of the actions in the menu
+            actions = [action for action in menu.actions() if not action.isSeparator()]
+            texts = [action.text() for action in actions]
+
+            expected_texts = [
+                "AnkiHub: Bulk suggest notes",
+                "AnkiHub: Protect fields",
+                "AnkiHub: Reset local changes",
+                "AnkiHub: Suggest Optional Tags",
+                "AnkiHub: Copy Anki Note ID to clipboard",
+                "AnkiHub: Copy AnkiHub Note ID to clipboard",
+            ]
+
+            assert texts == expected_texts
+
+            # Close the browser to prevent RuntimeErrors getting raised during teardown
+            with qtbot.wait_callback() as callback:
+                dialogs.closeAll(onsuccess=callback)
+
+    def setup_browser_context_menu_with_ankihub_actions(self) -> QMenu:
+        # Set up our browser modifications, open the browser and select all notes
+        setup_browser()
+        browser: Browser = dialogs.open("Browser", aqt.mw)
+        browser.search_for(search="")
+        browser.table.select_all()
+
+        # Call Anki's hoks for the context menu and let it add the actions to a menu
+        menu = QMenu()
+        browser_will_show_context_menu(browser=browser, menu=menu)
+
+        return menu
+
+    @pytest.mark.parametrize(
+        "action_text, expected_note_attribute_in_clipboard",
+        [
+            ("AnkiHub: Copy Anki Note ID to clipboard", "anki_nid"),
+            ("AnkiHub: Copy AnkiHub Note ID to clipboard", "ah_nid"),
+        ],
+    )
+    def test_copy_nid_actions(
+        self,
+        anki_session_with_addon_data: AnkiSession,
+        import_ah_note: ImportAHNote,
+        mocker: MockerFixture,
+        qtbot: QtBot,
+        action_text: str,
+        expected_note_attribute_in_clipboard: str,
+    ):
+        with anki_session_with_addon_data.profile_loaded():
+            note_info = NoteInfoFactory.create()
+            import_ah_note(note_info)
+
+            menu = self.setup_browser_context_menu_with_ankihub_actions()
+
+            # Trigger the action
+            action: QAction = next(
+                action for action in menu.actions() if action.text() == action_text
+            )
+            clipboard = aqt.mw.app.clipboard()
+            clipboard_setText_mock = mocker.patch.object(clipboard, "setText")
+            action.trigger()
+
+            # Assert that the clipboard contains the expected nid
+            qtbot.wait_until(lambda: clipboard_setText_mock.called)
+
+            expected_clipboard_text = str(
+                getattr(note_info, expected_note_attribute_in_clipboard)
+            )
+            clipboard_setText_mock.assert_called_once_with(expected_clipboard_text)
 
 
 @pytest.mark.qt_no_exception_capture
