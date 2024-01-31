@@ -107,46 +107,53 @@ def _on_browser_will_show_context_menu(browser: Browser, context_menu: QMenu) ->
 
     selected_nids = browser.selected_notes()
 
-    # Set up actions that are only available if at least one note is selected
-    # and at least one of the selected notes has an AnkiHub note type.
-    actions = [
-        (
-            "AnkiHub: Bulk suggest notes",
-            lambda: _on_bulk_notes_suggest_action(browser, nids=selected_nids),
-        ),
-        (
-            "AnkiHub: Protect fields",
-            lambda: _on_protect_fields_action(browser, nids=selected_nids),
-        ),
-        (
-            "AnkiHub: Reset local changes",
-            lambda: _on_reset_local_changes_action(browser, nids=selected_nids),
-        ),
-        (
-            "AnkiHub: Suggest Optional Tags",
-            lambda: _on_suggest_optional_tags_action(browser),
-        ),
-    ]
-
     mids = mids_of_notes(selected_nids)
     at_least_one_note_has_ah_note_type = any(
         ankihub_db.is_ankihub_note_type(mid) for mid in mids
     )
-    for name, func in actions:
-        action = context_menu.addAction(name, func)
-        if not selected_nids or not at_least_one_note_has_ah_note_type:
-            action.setDisabled(True)
 
-    # Set up copy ankihub id to clipboard action
-    copy_ankihub_id_action = context_menu.addAction(
-        "AnkiHub: Copy AnkiHub ID to clipboard",
-        lambda: aqt.mw.app.clipboard().setText(str(ah_nid)),
+    exactly_one_ah_note_selected = len(selected_nids) == 1 and bool(
+        ankihub_db.ankihub_nid_for_anki_nid(selected_nids[0])
     )
-    copy_ankihub_id_action.setDisabled(True)
-    if len(selected_nids) == 1 and (
-        ah_nid := ankihub_db.ankihub_nid_for_anki_nid(selected_nids[0])
-    ):
-        copy_ankihub_id_action.setDisabled(False)
+
+    # List of (name, function, enabled) tuples for the actions to add to the context menu.
+    actions = [
+        (
+            "AnkiHub: Bulk suggest notes",
+            lambda: _on_bulk_notes_suggest_action(browser, nids=selected_nids),
+            at_least_one_note_has_ah_note_type,
+        ),
+        (
+            "AnkiHub: Protect fields",
+            lambda: _on_protect_fields_action(browser, nids=selected_nids),
+            at_least_one_note_has_ah_note_type,
+        ),
+        (
+            "AnkiHub: Reset local changes",
+            lambda: _on_reset_local_changes_action(browser, nids=selected_nids),
+            at_least_one_note_has_ah_note_type,
+        ),
+        (
+            "AnkiHub: Suggest Optional Tags",
+            lambda: _on_suggest_optional_tags_action(browser),
+            at_least_one_note_has_ah_note_type,
+        ),
+        (
+            "AnkiHub: Copy AnkiHub ID to clipboard",
+            lambda: _on_copy_ankihub_id_action(browser, selected_nids),
+            exactly_one_ah_note_selected,
+        ),
+    ]
+
+    for name, func, enabled in actions:
+        action = context_menu.addAction(name, func)
+        action.setEnabled(enabled)
+
+
+def _on_copy_ankihub_id_action(browser: Browser, nids: Sequence[NoteId]) -> None:
+    nid = nids[0]
+    ah_nid = ankihub_db.ankihub_nid_for_anki_nid(nid)
+    aqt.mw.app.clipboard().setText(str(ah_nid))
 
 
 def _on_protect_fields_action(browser: Browser, nids: Sequence[NoteId]) -> None:
