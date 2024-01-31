@@ -230,7 +230,7 @@ class _AnkiHubDB:
     ) -> List[uuid.UUID]:
         return (
             AnkiHubNote.select(AnkiHubNote.ankihub_deck_id)
-            .filter(AnkiHubNote.anki_note_id.in_(anki_nids))
+            .filter(anki_note_id__in=anki_nids)
             .distinct()
             .objects(flat)
         )
