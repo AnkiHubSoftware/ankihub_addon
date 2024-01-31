@@ -13,7 +13,6 @@ from peewee import (
     SqliteDatabase,
     TextField,
 )
-from playhouse.shortcuts import ThreadSafeDatabaseMetadata
 
 # This will eventually be set to a peewee database object
 _ankihub_db: Optional[SqliteDatabase] = None
@@ -53,12 +52,7 @@ class JSONField(Field):
         return json.loads(value)
 
 
-class BaseModel(Model):
-    class Meta:
-        model_metadata_class = ThreadSafeDatabaseMetadata
-
-
-class AnkiHubNote(BaseModel):
+class AnkiHubNote(Model):
     ankihub_note_id = UUIDField(primary_key=True)
     ankihub_deck_id = UUIDField(index=True, null=True)
     anki_note_id = IntegerField(unique=True, null=True)
@@ -73,7 +67,7 @@ class AnkiHubNote(BaseModel):
         table_name = "notes"
 
 
-class AnkiHubNoteType(BaseModel):
+class AnkiHubNoteType(Model):
     anki_note_type_id = IntegerField()
     ankihub_deck_id = UUIDField()
     name = TextField()
@@ -84,7 +78,7 @@ class AnkiHubNoteType(BaseModel):
         primary_key = CompositeKey("anki_note_type_id", "ankihub_deck_id")
 
 
-class DeckMedia(BaseModel):
+class DeckMedia(Model):
     name = TextField()
     ankihub_deck_id = UUIDField()
     file_content_hash = TextField(null=True)
@@ -101,7 +95,7 @@ class DeckMedia(BaseModel):
 
 def set_peewee_database(db_path: Path) -> None:
     global _ankihub_db
-    _ankihub_db = SqliteDatabase(db_path)
+    _ankihub_db = SqliteDatabase(db_path, pragmas={"journal_mode": "wal"})
 
 
 def get_peewee_database() -> SqliteDatabase:

@@ -21,7 +21,6 @@ exclude = [
   'ankihub/lib/other/typing_extension',
   'ankihub/lib/tenacity',
   'ankihub/lib/peewee',
-  'ankihub/lib/playhouse',
 ]
 
 no_strict_optional = true
@@ -35,7 +34,7 @@ module = 'mashumaro.*'
 ignore_errors = true
 
 [[tool.mypy.overrides]]
-module = ['sentry_sdk.*', 'certifi.*', 'urllib3.*', 'tenacity.*', 'peewee.*', 'playhouse.*']
+module = ['sentry_sdk.*', 'certifi.*', 'urllib3.*', 'tenacity.*', 'peewee.*']
 follow_imports = 'skip'
 
 [[tool.mypy.overrides]]

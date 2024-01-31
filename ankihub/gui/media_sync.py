@@ -11,7 +11,7 @@ from .. import LOGGER
 from ..addon_ankihub_client import AddonAnkiHubClient
 from ..ankihub_client.models import DeckMedia
 from ..db import ankihub_db
-from ..settings import config
+from ..settings import config, get_anki_profile_id
 from .operations import AddonQueryOp
 
 
@@ -26,6 +26,9 @@ class _AnkiHubMediaSync:
         self._download_in_progress = False
         self._amount_uploads_in_progress = 0
         self._status_action: Optional[QAction] = None
+        # Used to store the Anki profile ID when the media download is started.
+        # If the Anki profile changes during the media download, the download is aborted.
+        self._anki_profile_id_at_download_start: Optional[str] = None
 
     def set_status_action(self, status_action: QAction):
         """Set the QAction that should be used to show the status of the media sync."""
@@ -42,6 +45,7 @@ class _AnkiHubMediaSync:
         LOGGER.info("Starting media download...")
 
         self._download_in_progress = True
+        self._anki_profile_id_at_download_start = get_anki_profile_id()
         self.refresh_sync_status_text()
 
         def on_failure(exception: Exception) -> None:
@@ -132,7 +136,8 @@ class _AnkiHubMediaSync:
         """
         deck_config = config.deck_config(ankihub_did)
         if deck_config is None:
-            # This only happens if the deck gets deleted during the media sync.
+            # This can happen if the deck gets deleted or the user switches the Anki
+            # profile during the media sync.
             LOGGER.warning(f"No deck config for {ankihub_did=}")  # pragma: no cover
             return  # pragma: no cover
 
@@ -151,6 +156,12 @@ class _AnkiHubMediaSync:
                 if latest_update
                 else chunk.latest_update
             )
+
+            if self._anki_profile_id_at_download_start != get_anki_profile_id():
+                LOGGER.info(
+                    "Anki profile changed during media download, aborting download of deck media objects..."
+                )
+                return
 
         if media_list:
             ankihub_db.upsert_deck_media_infos(

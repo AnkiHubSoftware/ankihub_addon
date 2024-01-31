@@ -19,7 +19,6 @@ from anki.models import NotetypeDict, NotetypeId
 from anki.notes import NoteId
 from anki.utils import join_fields, split_fields
 
-from .. import LOGGER
 from ..ankihub_client import Field, NoteInfo, suggestion_type_from_str
 from ..ankihub_client.models import DeckMedia as DeckMediaClientModel
 from ..common_utils import local_media_names_from_html
@@ -42,10 +41,6 @@ class _AnkiHubDB:
         self.database_path = db_path
 
         set_peewee_database(db_path)
-
-        journal_mode = get_peewee_database().pragma("journal_mode", "wal")
-        if journal_mode != "wal":
-            LOGGER.warning("Failed to set journal_mode=wal")  # pragma: no cover
 
         if self.schema_version() == 0:
             bind_peewee_models()
