@@ -112,6 +112,8 @@ def _on_browser_will_show_context_menu(browser: Browser, context_menu: QMenu) ->
         ankihub_db.is_ankihub_note_type(mid) for mid in mids
     )
 
+    exactly_one_note_selected = len(selected_nids) == 1
+
     exactly_one_ah_note_selected = len(selected_nids) == 1 and bool(
         ankihub_db.ankihub_nid_for_anki_nid(selected_nids[0])
     )
@@ -139,8 +141,13 @@ def _on_browser_will_show_context_menu(browser: Browser, context_menu: QMenu) ->
             at_least_one_note_has_ah_note_type,
         ),
         (
-            "AnkiHub: Copy AnkiHub ID to clipboard",
-            lambda: _on_copy_ankihub_id_action(browser, selected_nids),
+            "AnkiHub: Copy Anki Note ID to clipboard",
+            lambda: _on_copy_anki_nid_action(browser, selected_nids),
+            exactly_one_note_selected,
+        ),
+        (
+            "AnkiHub: Copy AnkiHub Note ID to clipboard",
+            lambda: _on_copy_ankihub_nid_action(browser, selected_nids),
             exactly_one_ah_note_selected,
         ),
     ]
@@ -150,7 +157,12 @@ def _on_browser_will_show_context_menu(browser: Browser, context_menu: QMenu) ->
         action.setEnabled(enabled)
 
 
-def _on_copy_ankihub_id_action(browser: Browser, nids: Sequence[NoteId]) -> None:
+def _on_copy_anki_nid_action(browser: Browser, nids: Sequence[NoteId]) -> None:
+    anki_nid = nids[0]
+    aqt.mw.app.clipboard().setText(str(anki_nid))
+
+
+def _on_copy_ankihub_nid_action(browser: Browser, nids: Sequence[NoteId]) -> None:
     nid = nids[0]
     ah_nid = ankihub_db.ankihub_nid_for_anki_nid(nid)
     aqt.mw.app.clipboard().setText(str(ah_nid))
