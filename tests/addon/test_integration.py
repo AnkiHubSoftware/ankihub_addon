@@ -2601,6 +2601,7 @@ class TestBrowserContextMenu:
 
             expected_texts = [
                 "AnkiHub: Bulk suggest notes",
+                "AnkiHub: Suggest deletion",
                 "AnkiHub: Protect fields",
                 "AnkiHub: Reset local changes",
                 "AnkiHub: Suggest Optional Tags",

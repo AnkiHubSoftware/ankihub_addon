@@ -134,14 +134,18 @@ def _on_suggestion_dialog_for_single_suggestion_closed(
 
 
 def open_suggestion_dialog_for_bulk_suggestion(
-    anki_nids: Collection[NoteId], parent: QWidget
+    anki_nids: Collection[NoteId], parent: QWidget, suggest_deletion=False
 ) -> None:
     """Opens a dialog for creating a bulk suggestion for the given notes.
     The notes have to be present in the Anki collection before calling this
     function and they need to have an AnkiHub note type.
     This function may change the notes contents (e.g. by renaming media files)
     and therefore the notes might need to be reloaded after this function is
-    called."""
+    called.
+
+    If suggest_deletion is True, the Delete option will be preselected in the
+    change type dropdown.
+    """
 
     ah_did = _determine_ah_did_for_nids_to_be_suggested(
         anki_nids=anki_nids, parent=parent
@@ -165,6 +169,7 @@ def open_suggestion_dialog_for_bulk_suggestion(
             ah_did=ah_did,
             parent=parent,
         ),
+        preselected_change_type=SuggestionType.DELETE if suggest_deletion else None,
         parent=parent,
     )
 
@@ -319,6 +324,7 @@ class SuggestionDialog(QDialog):
         can_submit_without_review: bool,
         added_new_media: bool,
         callback: Callable[[Optional[SuggestionMetadata]], None],
+        preselected_change_type: Optional[SuggestionType] = None,
         parent: Optional[QWidget] = None,
     ) -> None:
         if parent is None:
@@ -330,8 +336,13 @@ class SuggestionDialog(QDialog):
         self._can_submit_without_review = can_submit_without_review
         self._added_new_media = added_new_media
         self._callback = callback
+        self._preselected_change_type = preselected_change_type
 
         self._setup_ui()
+
+        if preselected_change_type:
+            self.change_type_select.setCurrentText(preselected_change_type.value[1])
+
         self.show()
 
     def _setup_ui(self) -> None:
