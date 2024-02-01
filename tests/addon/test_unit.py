@@ -660,6 +660,8 @@ class TestSuggestionDialog:
             (False, False, SuggestionType.OTHER, SourceType.AMBOSS, False),
             (False, True, SuggestionType.NEW_CONTENT, SourceType.UWORLD, False),
             (False, True, SuggestionType.NEW_CONTENT, SourceType.UWORLD, True),
+            (False, True, SuggestionType.DELETE, SourceType.DUPLICATE_NOTE, False),
+            (False, False, SuggestionType.DELETE, SourceType.DUPLICATE_NOTE, False),
         ],
     )
     def test_visibility_of_form_elements_and_form_result(
@@ -685,9 +687,12 @@ class TestSuggestionDialog:
         # Fill in the form
         change_type_needed = not is_new_note_suggestion
         source_needed = not is_new_note_suggestion and (
-            suggestion_type
-            in [SuggestionType.UPDATED_CONTENT, SuggestionType.NEW_CONTENT]
-            and is_for_anking_deck
+            (
+                suggestion_type
+                in [SuggestionType.UPDATED_CONTENT, SuggestionType.NEW_CONTENT]
+                and is_for_anking_deck
+            )
+            or suggestion_type == SuggestionType.DELETE
         )
 
         if change_type_needed:
