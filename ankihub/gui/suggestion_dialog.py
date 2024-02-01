@@ -17,8 +17,6 @@ from aqt.qt import (
     QLabel,
     QLineEdit,
     QPlainTextEdit,
-    QRegularExpression,
-    QRegularExpressionValidator,
     QSpacerItem,
     QVBoxLayout,
     QWidget,
@@ -518,6 +516,10 @@ source_type_to_source_place_holder_text = {
     SourceType.DUPLICATE_NOTE: "[Include ID, if applicable]",
 }
 
+source_types_where_input_is_optional = [
+    SourceType.DUPLICATE_NOTE,
+]
+
 # Options for the UWorld step select dropdown.
 UWORLD_STEP_OPTIONS = [
     "Step 1",
@@ -563,9 +565,6 @@ class SourceWidget(QWidget):
         self.layout_.addWidget(self.source_input_label)
 
         self.source_edit = QLineEdit()
-        self.source_edit.setValidator(
-            QRegularExpressionValidator(QRegularExpression(r".+"))
-        )
         qconnect(self.source_edit.textChanged, self._validate)
         self.layout_.addWidget(self.source_edit)
 
@@ -600,7 +599,14 @@ class SourceWidget(QWidget):
         return SuggestionSource(source_type=source_type, source_text=source)
 
     def is_valid(self) -> bool:
-        return self.source_edit.hasAcceptableInput()
+        text = self.source_edit.text().strip()
+        if (
+            self._source_type() in source_types_where_input_is_optional
+            and len(text) == 0
+        ):
+            return True
+
+        return len(text) > 0
 
     def _validate(self) -> None:
         if not self.is_valid():
