@@ -622,13 +622,10 @@ class SourceWidget(QWidget):
         return SuggestionSource(source_type=source_type, source_text=source)
 
     def is_valid(self) -> bool:
-        text = self.source_edit.text().strip()
-        if (
-            self._source_type() in source_types_where_input_is_optional
-            and len(text) == 0
-        ):
+        if self._source_type() in source_types_where_input_is_optional:
             return True
 
+        text = self.source_edit.text().strip()
         return len(text) > 0
 
     def _validate(self) -> None:
