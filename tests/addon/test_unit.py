@@ -43,6 +43,7 @@ from ..fixtures import (  # type: ignore
     AddAnkiNote,
     ImportAHNoteType,
     InstallAHDeck,
+    LatestInstanceTracker,
     MockStudyDeckDialogWithCB,
     MockSuggestionDialog,
     SetFeatureFlagState,
@@ -2626,26 +2627,17 @@ class TestUtils:
     ],
 )
 def test_ask_user(
-    mocker: MockerFixture,
     qtbot: QtBot,
     show_cancel_button: bool,
     text_of_button_to_click: str,
     expected_return_value: bool,
+    latest_instance_tracker: LatestInstanceTracker,
 ):
-    # Patch _Dialog.__init__ to store the _Dialog instance in the dialog variable when
-    # it is created.
-    dialog: _Dialog = None
-
-    def new_init(self, *args, **kwargs):
-        nonlocal dialog
-        dialog = self
-        original_init(self, *args, **kwargs)
-
-    original_init = _Dialog.__init__
-    mocker.patch.object(_Dialog, "__init__", new=new_init)
+    latest_instance_tracker.track(_Dialog)
 
     # Click a button on the dialog after it is shown
     def click_button():
+        dialog = latest_instance_tracker.get_latest_instance(_Dialog)
         button = next(
             button
             for button in dialog.button_box.buttons()

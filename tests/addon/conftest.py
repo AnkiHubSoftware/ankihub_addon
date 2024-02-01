@@ -21,6 +21,7 @@ from ..fixtures import (  # noqa F401
     import_ah_note_type,
     import_ah_notes,
     install_ah_deck,
+    latest_instance_tracker,
     mock_all_feature_flags_to_default_values,
     mock_download_and_install_deck_dependencies,
     mock_message_box_with_cb,
