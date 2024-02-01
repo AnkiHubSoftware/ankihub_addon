@@ -254,7 +254,7 @@ def _added_new_media(note: Note) -> bool:
 
 def _comment_with_source(suggestion_meta: SuggestionMetadata) -> str:
     result = suggestion_meta.comment
-    if suggestion_meta.source:
+    if suggestion_meta.source and suggestion_meta.source.source_text.strip():
         result += f"\nSource: {suggestion_meta.source.source_type.value} - {suggestion_meta.source.source_text}"
 
     return result
