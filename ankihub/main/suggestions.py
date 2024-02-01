@@ -322,12 +322,9 @@ def _change_note_suggestion(
             prev_tags=note_from_ah_db.tags, cur_tags=note_from_anki_db.tags
         )
 
-        fields_that_changed = _fields_that_changed(
-            prev_fields=note_from_ah_db.fields, cur_fields=note_from_anki_db.fields
-        )
-
-        if not added_tags and not removed_tags and not fields_that_changed:
-            return None
+    no_changes = not added_tags and not removed_tags and not fields_that_changed
+    if no_changes and not change_type == SuggestionType.DELETE:
+        return None
 
     return ChangeNoteSuggestion(
         ah_nid=note_from_anki_db.ah_nid,
