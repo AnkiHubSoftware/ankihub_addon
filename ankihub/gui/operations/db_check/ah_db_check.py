@@ -29,7 +29,7 @@ def _fetch_missing_note_types() -> None:
         mids_of_notes_of_deck = (
             AnkiHubNote.select(AnkiHubNote.anki_note_type_id)
             .distinct()
-            .where(AnkiHubNote.ankihub_deck_id == ah_did)
+            .filter(ankihub_deck_id=ah_did)
             .objects(flat)
         )
         mids_of_missing_note_types = [

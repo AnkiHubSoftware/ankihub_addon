@@ -3247,9 +3247,7 @@ def test_migrate_addon_data_from_old_location(
     anki_session_with_addon_data: AnkiSession,
 ):
     # Move the profile data to the old location and add a file to the folder
-    old_profile_files_path = (
-        settings.user_files_path() / settings._get_anki_profile_id()
-    )
+    old_profile_files_path = settings.user_files_path() / settings.get_anki_profile_id()
     shutil.move(settings.profile_files_path(), old_profile_files_path)
     (old_profile_files_path / "test").touch()
 

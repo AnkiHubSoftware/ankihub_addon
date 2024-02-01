@@ -390,7 +390,7 @@ def setup_profile_data_folder() -> bool:
     Returns False if the migration from the add-on version with no support for multiple Anki profiles
     needs yet to be done."""
     _assign_id_to_profile_if_not_exists()
-    LOGGER.info(f"Anki profile id: {_get_anki_profile_id()}")
+    LOGGER.info(f"Anki profile id: {get_anki_profile_id()}")
 
     if not _maybe_migrate_profile_data_from_old_location():
         return False
@@ -410,10 +410,10 @@ def _assign_id_to_profile_if_not_exists() -> None:
     new_profile_id = uuid.uuid4()
     _set_anki_profile_id(str(new_profile_id))
 
-    LOGGER.info(f"Assigned new id to Anki profile: {_get_anki_profile_id()}")
+    LOGGER.info(f"Assigned new id to Anki profile: {get_anki_profile_id()}")
 
 
-def _get_anki_profile_id() -> str:
+def get_anki_profile_id() -> str:
     """Returns the id of the currently open Anki profile."""
     return aqt.mw.pm.profile[PROFILE_ID_FIELD_NAME]
 
@@ -440,7 +440,7 @@ def user_files_path() -> Path:
 def profile_files_path() -> Path:
     """Path to the add-on data for this Anki profile."""
     # we need an id instead of using the profile name because profiles can be renamed
-    cur_profile_id = _get_anki_profile_id()
+    cur_profile_id = get_anki_profile_id()
     result = ankihub_base_path() / cur_profile_id
     return result
 
