@@ -370,7 +370,7 @@ class SuggestionDialog(QDialog):
             self.layout_.addWidget(self.change_type_select)
             qconnect(
                 self.change_type_select.currentTextChanged,
-                self._on_change_type_changed,
+                self._refresh_source_widget,
             )
             self.layout_.addSpacing(10)
 
@@ -449,11 +449,7 @@ class SuggestionDialog(QDialog):
             ),
         )
 
-    def _on_change_type_changed(self) -> None:
-        self._refresh_source_widget()
-        self._validate()
-
-    def _refresh_source_widget(self):
+    def _refresh_source_widget(self) -> None:
         if self._source_needed():
             self.source_widget.setup_for_change_type(change_type=self._change_type())
             self.source_widget_group_box.show()
@@ -539,10 +535,6 @@ source_type_to_source_place_holder_text = {
     SourceType.DUPLICATE_NOTE: "[Include ID, if applicable]",
 }
 
-source_types_where_input_is_optional = [
-    SourceType.DUPLICATE_NOTE,
-]
-
 # Options for the UWorld step select dropdown.
 UWORLD_STEP_OPTIONS = [
     "Step 1",
@@ -605,7 +597,7 @@ class SourceWidget(QWidget):
             self.source_type_select.show()
             self.space_below_source_type_select.changeSize(0, 10)
         else:
-            # The source type select is not necessary if there is only one source type option.
+            # The source type selet is not necessary if there is only one source type option.
             self.source_type_select.hide()
             self.space_below_source_type_select.changeSize(0, 0)
 
@@ -658,6 +650,11 @@ class SourceWidget(QWidget):
             self._source_type(), ""
         )
         self.source_edit.setPlaceholderText(place_holder_text)
+
+        if not text:
+            self.source_input_label.hide()
+        else:
+            self.source_input_label.show()
 
     def _source_type(self) -> Optional[SourceType]:
         if self.source_type_select.currentText():
