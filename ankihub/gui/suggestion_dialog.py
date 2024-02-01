@@ -539,6 +539,10 @@ source_type_to_source_place_holder_text = {
     SourceType.DUPLICATE_NOTE: "[Include ID, if applicable]",
 }
 
+source_types_where_input_is_optional = [
+    SourceType.DUPLICATE_NOTE,
+]
+
 # Options for the UWorld step select dropdown.
 UWORLD_STEP_OPTIONS = [
     "Step 1",
@@ -618,10 +622,13 @@ class SourceWidget(QWidget):
         return SuggestionSource(source_type=source_type, source_text=source)
 
     def is_valid(self) -> bool:
-        if self._source_type() in source_types_where_input_is_optional:
+        text = self.source_edit.text().strip()
+        if (
+            self._source_type() in source_types_where_input_is_optional
+            and len(text) == 0
+        ):
             return True
 
-        text = self.source_edit.text().strip()
         return len(text) > 0
 
     def _validate(self) -> None:
