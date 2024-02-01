@@ -351,7 +351,7 @@ class SuggestionDialog(QDialog):
             self.layout_.addWidget(self.change_type_select)
             qconnect(
                 self.change_type_select.currentTextChanged,
-                self._refresh_source_widget,
+                self._on_change_type_changed,
             )
             self.layout_.addSpacing(10)
 
@@ -366,7 +366,7 @@ class SuggestionDialog(QDialog):
         qconnect(self.source_widget.validation_signal, self._validate)
         self.layout_.addSpacing(10)
 
-        self._refresh_source_widget()
+        self._refresh_soruce_widget()
 
         # Set up rationale field
         label = QLabel("Rationale for Change (Required)")
@@ -428,7 +428,11 @@ class SuggestionDialog(QDialog):
             else None,
         )
 
-    def _refresh_source_widget(self) -> None:
+    def _on_change_type_changed(self) -> None:
+        self._refresh_soruce_widget()
+        self._validate()
+
+    def _refresh_soruce_widget(self):
         if self._source_needed():
             self.source_widget.setup_for_change_type(change_type=self._change_type())
             self.source_widget_group_box.show()
