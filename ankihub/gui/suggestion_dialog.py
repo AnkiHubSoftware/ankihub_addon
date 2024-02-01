@@ -639,11 +639,6 @@ class SourceWidget(QWidget):
         )
         self.source_edit.setPlaceholderText(place_holder_text)
 
-        if not text:
-            self.source_input_label.hide()
-        else:
-            self.source_input_label.show()
-
     def _source_type(self) -> Optional[SourceType]:
         if self.source_type_select.currentText():
             return SourceType(self.source_type_select.currentText())
