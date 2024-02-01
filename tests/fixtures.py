@@ -24,7 +24,7 @@ os.environ["SKIP_INIT"] = "1"
 
 from ankihub.ankihub_client import NoteInfo
 from ankihub.ankihub_client.ankihub_client import AnkiHubClient
-from ankihub.ankihub_client.models import Deck, UserDeckRelation
+from ankihub.ankihub_client.models import Deck, SuggestionType, UserDeckRelation
 from ankihub.feature_flags import setup_feature_flags
 from ankihub.gui.media_sync import _AnkiHubMediaSync
 from ankihub.gui.suggestion_dialog import SuggestionMetadata
@@ -621,7 +621,11 @@ def mock_study_deck_dialog_with_cb(
 
 
 class MockSuggestionDialog(Protocol):
-    def __call__(self, user_cancels: bool) -> None:
+    def __call__(
+        self,
+        user_cancels: bool,
+        suggestion_type: SuggestionType = SuggestionType.UPDATED_CONTENT,
+    ) -> None:
         ...
 
 
@@ -634,7 +638,10 @@ def mock_suggestion_dialog(monkeypatch: MonkeyPatch) -> MockSuggestionDialog:
         If False, the callback is called with a SuggestionMetadata object as the suggestion metadata.
     """
 
-    def mock_suggestion_dialog_inner(user_cancels: bool) -> None:
+    def mock_suggestion_dialog_inner(
+        user_cancels: bool,
+        suggestion_type: SuggestionType = SuggestionType.UPDATED_CONTENT,
+    ) -> None:
         suggestion_dialog_mock = Mock()
 
         def side_effect(*args, callback, **kwargs):
@@ -643,6 +650,7 @@ def mock_suggestion_dialog(monkeypatch: MonkeyPatch) -> MockSuggestionDialog:
             else:
                 suggestion_metadata = SuggestionMetadata(
                     comment="test",
+                    change_type=suggestion_type,
                 )
             aqt.mw.taskman.run_on_main(lambda: callback(suggestion_metadata))
             return suggestion_dialog_mock

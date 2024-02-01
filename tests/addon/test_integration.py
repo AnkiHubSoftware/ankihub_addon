@@ -491,7 +491,13 @@ def test_entry_point(anki_session_with_addon_data: AnkiSession, qtbot: QtBot):
 @pytest.mark.sequential
 class TestEditor:
     @pytest.mark.parametrize(
-        "note_fields_changed, logged_in", [(True, True), (False, True), (True, False)]
+        "note_fields_changed, suggest_deletion, logged_in",
+        [
+            (True, False, True),
+            (False, False, True),
+            (False, True, True),
+            (True, False, False),
+        ],
     )
     def test_create_change_note_suggestion(
         self,
@@ -503,11 +509,18 @@ class TestEditor:
         qtbot: QtBot,
         note_fields_changed: bool,
         logged_in: bool,
+        suggest_deletion: bool,
     ):
         editor.setup()
         with anki_session_with_addon_data.profile_loaded():
             mocker.patch.object(config, "is_logged_in", return_value=logged_in)
-            mock_suggestion_dialog(user_cancels=False)
+
+            mock_suggestion_dialog(
+                user_cancels=False,
+                suggestion_type=SuggestionType.DELETE
+                if suggest_deletion
+                else SuggestionType.UPDATED_CONTENT,
+            )
 
             create_change_note_suggestion_mock = mocker.patch.object(
                 AnkiHubClient, "create_change_note_suggestion"
@@ -542,7 +555,7 @@ class TestEditor:
                 # Assert that the login dialog was shown
                 window: AnkiHubLogin = AnkiHubLogin._window
                 qtbot.wait_until(lambda: window and window.isVisible())
-            elif note_fields_changed:
+            elif note_fields_changed or suggest_deletion:
                 # Assert that the suggestion was sent to the server with the correct data
                 qtbot.wait_until(lambda: create_change_note_suggestion_mock.called)
                 change_note_suggestion: ChangeNoteSuggestion = (
@@ -550,7 +563,10 @@ class TestEditor:
                         "change_note_suggestion"
                     ]
                 )
-                assert change_note_suggestion.fields[0].value == new_field_value
+                if suggest_deletion:
+                    assert not change_note_suggestion.fields
+                else:
+                    assert change_note_suggestion.fields[0].value == new_field_value
             else:
                 # Assert that no suggestion was sent to the server and that a tooltip was shown
                 qtbot.wait_until(lambda: show_tooltip_mock.called)
