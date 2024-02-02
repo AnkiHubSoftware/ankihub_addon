@@ -174,10 +174,16 @@ class AnkiHubImporter:
         suspend_new_cards_of_new_notes: bool,
         suspend_new_cards_of_existing_notes: SuspendNewCardsOfExistingNotes,
     ) -> Set[DeckId]:
-        """Import notes into Anki and AnkiHub DB. Suspend cards in Anki DB if needed.
+        """
+        Handles the import of notes into the Anki and AnkiHub databases. This
+        includes creating and updating notes, and marking notes as deleted in
+        AnkiHub. Depending on the deck settings, notes can be deleted or marked
+        as deleted in the Anki database.
 
-        Returns the Anki deck ids the (cards of the) notes belong to."""
+        Cards in the Anki database may be suspended based on the provided parameters.
 
+        Returns a set of Anki deck IDs that the created or updated notes belong to.
+        """
         # Upsert notes into AnkiHub DB.
         upserted_notes_data, skipped_notes_data = ankihub_db.upsert_notes_data(
             ankihub_did=self._ankihub_did, notes_data=notes_data
