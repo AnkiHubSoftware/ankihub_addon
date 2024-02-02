@@ -693,8 +693,13 @@ def latest_instance_tracker(mocker: MockerFixture) -> LatestInstanceTracker:
     return LatestInstanceTracker(mocker)
 
 
-def record_review_for_anki_nid(anki_nid: NoteId, date_time: datetime) -> None:
+def record_review_for_anki_nid(
+    anki_nid: NoteId, date_time: Optional[datetime] = None
+) -> None:
     """Adds a review for the note with the given anki_nid at the given date_time."""
+    if date_time is None:
+        date_time = datetime.now()
+
     cid = aqt.mw.col.get_note(anki_nid).card_ids()[0]
     record_review(cid, int(date_time.timestamp() * 1000))
 
