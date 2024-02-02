@@ -1832,6 +1832,58 @@ class TestAnkiHubImporter:
                 assert len(import_result.marked_as_deleted_nids) == 0
                 assert len(import_result.deleted_nids) == 1
 
+    @pytest.mark.parametrize(
+        "delete_note_on_remote_delete",
+        [
+            (DeleteNoteOnRemoteDelete.NEVER),
+            (DeleteNoteOnRemoteDelete.IF_NOT_REVIEWED_YET),
+        ],
+    )
+    def test_import_note_update_and_deletion_for_same_note(
+        self,
+        anki_session_with_addon_data: AnkiSession,
+        import_ah_note: ImportAHNote,
+        next_deterministic_uuid: Callable[[], uuid.UUID],
+        next_deterministic_id: Callable[[], int],
+        delete_note_on_remote_delete: DeleteNoteOnRemoteDelete,
+    ):
+        with anki_session_with_addon_data.profile_loaded():
+            ah_did = next_deterministic_uuid()
+            anki_did = DeckId(next_deterministic_id())
+
+            ah_note = import_ah_note(ah_did=ah_did, anki_did=anki_did)
+
+            ah_note_for_update = copy.deepcopy(ah_note)
+            ah_note_for_update.tags = ["tag1"]
+
+            ah_note_for_deletion = copy.deepcopy(ah_note_for_update)
+            ah_note_for_deletion.last_update_type = SuggestionType.DELETE
+
+            import_result = self._import_notes(
+                [ah_note_for_update, ah_note_for_deletion],
+                delete_note_on_remote_delete=delete_note_on_remote_delete,
+                is_first_import_of_deck=False,
+                ah_did=ah_did,
+                anki_did=anki_did,
+            )
+
+            if delete_note_on_remote_delete == DeleteNoteOnRemoteDelete.NEVER:
+                anki_note = aqt.mw.col.get_note(NoteId(ah_note.anki_nid))
+                assert TAG_FOR_DELETED_NOTES in anki_note.tags
+
+                assert len(import_result.created_nids) == 0
+                assert len(import_result.updated_nids) == 1
+                assert len(import_result.marked_as_deleted_nids) == 1
+                assert len(import_result.deleted_nids) == 0
+            else:
+                with pytest.raises(NotFoundError):
+                    aqt.mw.col.get_note(NoteId(ah_note.anki_nid))
+
+                assert len(import_result.created_nids) == 0
+                assert len(import_result.updated_nids) == 1
+                assert len(import_result.marked_as_deleted_nids) == 0
+                assert len(import_result.deleted_nids) == 1
+
     def _import_notes(
         self,
         ah_notes: List[NoteInfo],
