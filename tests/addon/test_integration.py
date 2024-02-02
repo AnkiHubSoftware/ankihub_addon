@@ -188,6 +188,7 @@ from ankihub.settings import (
     DeckConfig,
     DeckExtension,
     DeckExtensionConfig,
+    DeleteNoteOnRemoteDelete,
     SuspendNewCardsOfExistingNotes,
     ankihub_base_path,
     config,
@@ -247,6 +248,7 @@ def import_sample_ankihub_deck(
         notes=ankihub_sample_deck_notes_data(),
         deck_name="Testdeck",
         is_first_import_of_deck=True,
+        delete_note_on_remote_delete=DeleteNoteOnRemoteDelete.NEVER,
         protected_fields={},
         protected_tags=[],
         note_types=SAMPLE_NOTE_TYPES,
@@ -517,9 +519,11 @@ class TestEditor:
 
             mock_suggestion_dialog(
                 user_cancels=False,
-                suggestion_type=SuggestionType.DELETE
-                if suggest_deletion
-                else SuggestionType.UPDATED_CONTENT,
+                suggestion_type=(
+                    SuggestionType.DELETE
+                    if suggest_deletion
+                    else SuggestionType.UPDATED_CONTENT
+                ),
             )
 
             create_change_note_suggestion_mock = mocker.patch.object(
@@ -1299,6 +1303,7 @@ class TestAnkiHubImporter:
                 notes=ankihub_sample_deck_notes_data(),
                 deck_name="test",
                 is_first_import_of_deck=True,
+                delete_note_on_remote_delete=DeleteNoteOnRemoteDelete.NEVER,
                 note_types=SAMPLE_NOTE_TYPES,
                 protected_fields={},
                 protected_tags=[],
@@ -1343,6 +1348,7 @@ class TestAnkiHubImporter:
                 notes=ankihub_sample_deck_notes_data(),
                 deck_name="test",
                 is_first_import_of_deck=True,
+                delete_note_on_remote_delete=DeleteNoteOnRemoteDelete.NEVER,
                 note_types=SAMPLE_NOTE_TYPES,
                 protected_fields={},
                 protected_tags=[],
@@ -1391,6 +1397,7 @@ class TestAnkiHubImporter:
                 notes=ankihub_sample_deck_notes_data(),
                 deck_name="test",
                 is_first_import_of_deck=False,
+                delete_note_on_remote_delete=DeleteNoteOnRemoteDelete.NEVER,
                 note_types=SAMPLE_NOTE_TYPES,
                 protected_fields={},
                 protected_tags=[],
@@ -1447,6 +1454,7 @@ class TestAnkiHubImporter:
                 notes=ankihub_sample_deck_notes_data(),
                 deck_name="test",
                 is_first_import_of_deck=True,
+                delete_note_on_remote_delete=DeleteNoteOnRemoteDelete.NEVER,
                 note_types=SAMPLE_NOTE_TYPES,
                 protected_fields={},
                 protected_tags=[],
@@ -1486,6 +1494,7 @@ class TestAnkiHubImporter:
                 note_types=SAMPLE_NOTE_TYPES,
                 deck_name="test",
                 is_first_import_of_deck=False,
+                delete_note_on_remote_delete=DeleteNoteOnRemoteDelete.NEVER,
                 protected_fields={},
                 protected_tags=[],
                 anki_did=first_local_did,
@@ -1535,6 +1544,7 @@ class TestAnkiHubImporter:
                 note_types=SAMPLE_NOTE_TYPES,
                 deck_name="test",
                 is_first_import_of_deck=False,
+                delete_note_on_remote_delete=DeleteNoteOnRemoteDelete.NEVER,
                 protected_fields={},
                 protected_tags=[],
                 anki_did=first_local_did,
@@ -1582,6 +1592,7 @@ class TestAnkiHubImporter:
                 notes=notes_data,
                 deck_name="test",
                 is_first_import_of_deck=False,
+                delete_note_on_remote_delete=DeleteNoteOnRemoteDelete.NEVER,
                 note_types=SAMPLE_NOTE_TYPES,
                 protected_fields={},
                 protected_tags=[],
@@ -1647,6 +1658,7 @@ class TestAnkiHubImporter:
                 notes=[note_data],
                 deck_name="test",
                 is_first_import_of_deck=False,
+                delete_note_on_remote_delete=DeleteNoteOnRemoteDelete.NEVER,
                 protected_fields={note_type_id: [protected_field_name]},
                 protected_tags=["protected_tag"],
                 note_types=SAMPLE_NOTE_TYPES,
@@ -1699,6 +1711,7 @@ class TestAnkiHubImporter:
                 protected_tags=[],
                 deck_name="test",
                 is_first_import_of_deck=True,
+                delete_note_on_remote_delete=DeleteNoteOnRemoteDelete.NEVER,
                 suspend_new_cards_of_new_notes=DeckConfig.suspend_new_cards_of_new_notes_default(
                     ah_did_1
                 ),
@@ -1727,6 +1740,7 @@ class TestAnkiHubImporter:
                 protected_tags=[],
                 deck_name="test",
                 is_first_import_of_deck=True,
+                delete_note_on_remote_delete=DeleteNoteOnRemoteDelete.NEVER,
                 suspend_new_cards_of_new_notes=DeckConfig.suspend_new_cards_of_new_notes_default(
                     ah_did_2
                 ),
@@ -2348,6 +2362,7 @@ class TestCustomSearchNodes:
                 protected_tags=[],
                 deck_name="Test-Deck",
                 is_first_import_of_deck=True,
+                delete_note_on_remote_delete=DeleteNoteOnRemoteDelete.NEVER,
                 suspend_new_cards_of_new_notes=DeckConfig.suspend_new_cards_of_new_notes_default(
                     ah_did
                 ),
@@ -2391,6 +2406,7 @@ class TestCustomSearchNodes:
                 protected_fields={},
                 protected_tags=[],
                 deck_name="Test-Deck",
+                delete_note_on_remote_delete=DeleteNoteOnRemoteDelete.NEVER,
                 suspend_new_cards_of_new_notes=DeckConfig.suspend_new_cards_of_new_notes_default(
                     ah_did
                 ),
