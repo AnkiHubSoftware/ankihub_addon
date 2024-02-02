@@ -134,6 +134,7 @@ class _AnkiHubDeckUpdater:
                 note_types=note_types,
                 deck_name=deck_config.name,
                 is_first_import_of_deck=False,
+                delete_note_on_remote_delete=deck_config.delete_note_on_remote_delete,
                 anki_did=deck_config.anki_id,
                 protected_fields=chunk.protected_fields,
                 protected_tags=chunk.protected_tags,

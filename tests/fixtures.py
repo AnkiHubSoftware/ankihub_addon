@@ -30,7 +30,7 @@ from ankihub.gui.media_sync import _AnkiHubMediaSync
 from ankihub.gui.suggestion_dialog import SuggestionMetadata
 from ankihub.main.importing import AnkiHubImporter
 from ankihub.main.utils import modify_note_type
-from ankihub.settings import DeckConfig, config
+from ankihub.settings import DeckConfig, DeleteNoteOnRemoteDelete, config
 
 
 @fixture
@@ -225,6 +225,7 @@ def import_ah_note(next_deterministic_uuid: Callable[[], uuid.UUID]) -> ImportAH
             protected_tags=[],
             deck_name=deck_name,
             is_first_import_of_deck=False,
+            delete_note_on_remote_delete=DeleteNoteOnRemoteDelete.NEVER,
             anki_did=anki_did,
             suspend_new_cards_of_new_notes=suspend_new_cards_of_new_notes,
             suspend_new_cards_of_existing_notes=suspend_new_cards_of_existing_notes,
@@ -300,6 +301,7 @@ def import_ah_notes(next_deterministic_uuid: Callable[[], uuid.UUID]) -> ImportA
             protected_tags=[],
             deck_name=deck_name,
             is_first_import_of_deck=False,
+            delete_note_on_remote_delete=DeleteNoteOnRemoteDelete.NEVER,
             anki_did=anki_did,
             suspend_new_cards_of_new_notes=suspend_new_cards_of_new_notes,
             suspend_new_cards_of_existing_notes=suspend_new_cards_of_existing_notes,
@@ -355,6 +357,7 @@ def import_ah_note_type(
             protected_fields={},
             protected_tags=[],
             is_first_import_of_deck=False,
+            delete_note_on_remote_delete=DeleteNoteOnRemoteDelete.NEVER,
             suspend_new_cards_of_new_notes=DeckConfig.suspend_new_cards_of_new_notes_default(
                 ah_did
             ),

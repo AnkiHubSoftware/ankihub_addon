@@ -19,7 +19,7 @@ from ...main.importing import AnkiHubImporter, AnkiHubImportResult
 from ...main.note_types import fetch_note_types_based_on_notes
 from ...main.subdecks import deck_contains_subdeck_tags
 from ...main.utils import clear_empty_cards, create_backup
-from ...settings import DeckConfig, config
+from ...settings import DeckConfig, DeleteNoteOnRemoteDelete, config
 from ..exceptions import DeckDownloadAndInstallError, RemoteDeckNotFoundError
 from ..media_sync import media_sync
 from ..messages import messages
@@ -188,6 +188,7 @@ def _install_deck(
         note_types=note_types,
         deck_name=deck_name,
         is_first_import_of_deck=True,
+        delete_note_on_remote_delete=DeleteNoteOnRemoteDelete.NEVER,
         protected_fields=protected_fields,
         protected_tags=protected_tags,
         suspend_new_cards_of_existing_notes=DeckConfig.suspend_new_cards_of_existing_notes_default(),
