@@ -56,6 +56,8 @@ class AnkiHubImportResult:
     anki_did: DeckId
     updated_nids: List[NoteId]
     created_nids: List[NoteId]
+    deleted_nids: List[NoteId]
+    marked_as_deleted_nids: List[NoteId]
     skipped_nids: List[NoteId]
     first_import_of_deck: bool
 
@@ -67,6 +69,8 @@ class AnkiHubImporter:
     def __init__(self):
         self._created_nids: List[NoteId] = []
         self._updated_nids: List[NoteId] = []
+        self._deleted_nids: List[NoteId] = []
+        self._marked_as_deleted_nids: List[NoteId] = []
         self._skipped_nids: List[NoteId] = []
 
         self._ankihub_did: Optional[uuid.UUID] = None
@@ -157,6 +161,8 @@ class AnkiHubImporter:
             anki_did=self._local_did,
             created_nids=self._created_nids,
             updated_nids=self._updated_nids,
+            deleted_nids=self._deleted_nids,
+            marked_as_deleted_nids=self._marked_as_deleted_nids,
             skipped_nids=self._skipped_nids,
             first_import_of_deck=self._is_first_import_of_deck,
         )
@@ -252,6 +258,17 @@ class AnkiHubImporter:
             f"Updated {len(self._updated_nids)} notes: {truncated_list(self._updated_nids, limit=50)}"
         )
         LOGGER.info(
+            f"Deleted {len(self._deleted_nids)} notes: {truncated_list(self._deleted_nids, limit=50)}"
+        )
+        LOGGER.info(
+            textwrap.dedent(
+                f"""
+                Marked {len(self._marked_as_deleted_nids)} notes as deleted:
+                {truncated_list(self._marked_as_deleted_nids, limit=50)}
+                """
+            ).strip()
+        )
+        LOGGER.info(
             f"Skippped {len(self._skipped_nids)} notes: "
             f"{truncated_list(self._skipped_nids, limit=50)}"
         )
@@ -341,17 +358,20 @@ class AnkiHubImporter:
 
             if notes_with_reviews:
                 self._tag_notes_as_deleted(notes_with_reviews)
+                self._marked_as_deleted_nids = list(nids_of_notes_with_reviews)
 
             if notes_without_reviews:
                 changes = aqt.mw.col.remove_notes(
                     [note.id for note in notes_without_reviews]
                 )
-                nids = [note.id for note in notes_without_reviews]
+                nids_to_delete = [note.id for note in notes_without_reviews]
                 LOGGER.info(
-                    f"Deleted {changes.count} notes: {truncated_list(nids, limit=50)}"
+                    f"Deleted {changes.count} notes: {truncated_list(nids_to_delete, limit=50)}"
                 )
+                self._deleted_nids = nids_to_delete
         elif delete_note_on_remote_delete == DeleteNoteOnRemoteDelete.NEVER:
             self._tag_notes_as_deleted(notes_to_delete)
+            self._marked_as_deleted_nids = [note.id for note in notes_to_delete]
         else:
             raise ValueError(  # pragma: no cover
                 f"Unknown value for {str(DeleteNoteOnRemoteDelete)}"
