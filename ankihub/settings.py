@@ -1,6 +1,7 @@
 """Code for the config of the add-on. This file also defines paths to files and directories used by the add-on
 as well as some constants and code for setting up the profile folder and logger.
 """
+
 import dataclasses
 import json
 import logging
@@ -68,10 +69,21 @@ class SuspendNewCardsOfExistingNotes(Enum):
     IF_SIBLINGS_SUSPENDED = "If siblings are suspended"
 
 
+class DeleteNoteOnRemoteDelete(Enum):
+    """Whether to delete the note on Anki when it's deleted on AnkiHub."""
+
+    IF_NOT_REVIEWED_YET = "If not reviewed yet"
+    NEVER = "Never"
+
+
 @dataclass
 class DeckConfig(DataClassJSONMixin):
     anki_id: DeckId
     name: str
+    # TODO The user should be prompted to choose this (for each deck)?
+    delete_note_on_remote_delete: DeleteNoteOnRemoteDelete = (
+        DeleteNoteOnRemoteDelete.NEVER
+    )
     user_relation: UserDeckRelation = UserDeckRelation.SUBSCRIBER
     latest_update: Optional[datetime] = dataclasses.field(
         metadata=field_options(
