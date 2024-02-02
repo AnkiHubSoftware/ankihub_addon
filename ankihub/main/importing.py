@@ -15,17 +15,20 @@ from anki.decks import DeckId
 from anki.errors import NotFoundError
 from anki.models import NotetypeDict, NotetypeId
 from anki.notes import Note, NoteId
+from anki.utils import ids2str
 
 from .. import LOGGER, settings
 from ..ankihub_client import Field, NoteInfo
+from ..ankihub_client.models import SuggestionType
 from ..db import ankihub_db
-from ..settings import SuspendNewCardsOfExistingNotes
+from ..settings import DeleteNoteOnRemoteDelete, SuspendNewCardsOfExistingNotes
 from .note_conversion import (
     TAG_FOR_PROTECTING_ALL_FIELDS,
     get_fields_protected_by_tags,
     is_internal_tag,
     is_optional_tag,
 )
+from .note_deletion import TAG_FOR_DELETED_NOTES
 from .subdecks import build_subdecks_and_move_cards_to_them
 from .utils import (
     add_notes,
@@ -43,6 +46,7 @@ from .utils import (
 class NoteOperation(Enum):
     CREATE = "create"
     UPDATE = "update"
+    DELETE = "delete"
     NO_CHANGES = "no changes"
 
 
@@ -80,6 +84,7 @@ class AnkiHubImporter:
         protected_tags: List[str],
         deck_name: str,  # name that will be used for a deck if a new one gets created
         is_first_import_of_deck: bool,
+        delete_note_on_remote_delete: DeleteNoteOnRemoteDelete,
         suspend_new_cards_of_new_notes: bool,
         suspend_new_cards_of_existing_notes: SuspendNewCardsOfExistingNotes,
         anki_did: Optional[  # did that new notes should be put into if importing not for the first time
@@ -126,7 +131,10 @@ class AnkiHubImporter:
         self._import_note_types(note_types=note_types)
 
         dids = self._import_notes(
-            notes, suspend_new_cards_of_new_notes, suspend_new_cards_of_existing_notes
+            notes_data=notes,
+            delete_note_on_remote_delete=delete_note_on_remote_delete,
+            suspend_new_cards_of_new_notes=suspend_new_cards_of_new_notes,
+            suspend_new_cards_of_existing_notes=suspend_new_cards_of_existing_notes,
         )
 
         if self._is_first_import_of_deck:
@@ -171,6 +179,7 @@ class AnkiHubImporter:
     def _import_notes(
         self,
         notes_data: List[NoteInfo],
+        delete_note_on_remote_delete: DeleteNoteOnRemoteDelete,
         suspend_new_cards_of_new_notes: bool,
         suspend_new_cards_of_existing_notes: SuspendNewCardsOfExistingNotes,
     ) -> Set[DeckId]:
@@ -182,7 +191,8 @@ class AnkiHubImporter:
 
         Cards in the Anki database may be suspended based on the provided parameters.
 
-        Returns a set of Anki deck IDs that the created or updated notes belong to.
+        Returns a set of Anki deck IDs that the created or updated or notes
+        without changes belong to.
         """
         # Upsert notes into AnkiHub DB.
         upserted_notes_data, skipped_notes_data = ankihub_db.upsert_notes_data(
@@ -192,23 +202,31 @@ class AnkiHubImporter:
             NoteId(note_data.anki_nid) for note_data in skipped_notes_data
         ]
 
-        # Upsert notes into Anki DB and suspend cards if needed.
+        # Upsert notes into Anki DB, delete them or mark them as deleted
         _reset_note_types_of_notes_based_on_notes_data(upserted_notes_data)
 
-        notes, notes_to_create_by_ah_nid, notes_to_update = self._prepare_notes(
-            notes_data=upserted_notes_data
-        )
+        (
+            notes_to_create_by_ah_nid,
+            notes_to_update,
+            notes_to_delete,
+            notes_without_changes,
+        ) = self._prepare_notes(notes_data=upserted_notes_data)
 
         cards_by_anki_nid_before_import = cards_by_anki_nid_dict(notes_to_update)
 
         self._update_notes(notes_to_update)
         self._create_notes(notes_to_create_by_ah_nid, notes_data=upserted_notes_data)
+        self._delete_notes_or_mark_as_deleted(
+            notes_to_delete, delete_note_on_remote_delete=delete_note_on_remote_delete
+        )
 
-        ankihub_db.transfer_mod_values_from_anki_db(notes_data=upserted_notes_data)
+        # Update the AnkiHubNote.mod values in the AnkiHub DB.
+        ankihub_db.update_mod_values_based_on_anki_db(notes_data=upserted_notes_data)
 
-        upserted_notes = list(notes_to_create_by_ah_nid.values()) + notes_to_update
+        # Suspend new cards in Anki DB if needed.
+        notes = list(notes_to_create_by_ah_nid.values()) + notes_to_update
         self._suspend_cards(
-            notes=upserted_notes,
+            notes=notes,
             cards_by_anki_nid_before=cards_by_anki_nid_before_import,
             suspend_new_cards_of_new_notes=suspend_new_cards_of_new_notes,
             suspend_new_cards_of_existing_notes=suspend_new_cards_of_existing_notes,
@@ -218,6 +236,11 @@ class AnkiHubImporter:
 
         self._log_note_import_summary()
 
+        notes = (
+            list(notes_to_create_by_ah_nid.values())
+            + notes_to_update
+            + notes_without_changes
+        )
         dids = dids_of_notes(notes)
         return dids
 
@@ -235,29 +258,41 @@ class AnkiHubImporter:
 
     def _prepare_notes(
         self, notes_data: Collection[NoteInfo]
-    ) -> Tuple[List[Note], Dict[uuid.UUID, Note], List[Note]]:
+    ) -> Tuple[Dict[uuid.UUID, Note], List[Note], List[Note], List[Note]]:
         """Prepare Anki notes for import into Anki DB. Fields and tags are updated according to the
         notes_data. The changes are not committed to the Anki DB yet.
-        Returns a tuple of (notes, notes_to_create_by_ah_nid, notes_to_update).
-        `notes` contains all notes, ones that should be created, ones that should be updated and
-        notes without changes."""
-        notes: List[Note] = []
+        Returns a tuple of (notes_to_create_by_ah_nid, notes_to_update, notes_to_delete, notes_without_changes).
+        """
         notes_to_create_by_ah_nid: Dict[uuid.UUID, Note] = {}
         notes_to_update: List[Note] = []
+        notes_to_delete: List[Note] = []
+        notes_without_changes: List[Note] = []
         for note_data in notes_data:
             note, operation = self._prepare_note(
                 note_data=note_data,
                 protected_fields=self._protected_fields,
                 protected_tags=self._protected_tags,
             )
-            notes.append(note)
 
             if operation == NoteOperation.CREATE:
                 notes_to_create_by_ah_nid[note_data.ah_nid] = note
             elif operation == NoteOperation.UPDATE:
                 notes_to_update.append(note)
+            elif operation == NoteOperation.DELETE:
+                notes_to_delete.append(note)
+            elif operation == NoteOperation.NO_CHANGES:
+                notes_without_changes.append(note)
+            else:
+                raise ValueError(
+                    f"Unknown value for {str(NoteOperation)}"
+                )  # pragma: no cover
 
-        return notes, notes_to_create_by_ah_nid, notes_to_update
+        return (
+            notes_to_create_by_ah_nid,
+            notes_to_update,
+            notes_to_delete,
+            notes_without_changes,
+        )
 
     def _update_notes(self, notes_to_update: List[Note]) -> None:
         if not notes_to_update:
@@ -279,6 +314,55 @@ class AnkiHubImporter:
             notes_data=notes_data,
         )
         self._created_nids = [note.id for note in notes_to_create_by_ah_nid.values()]
+
+    def _delete_notes_or_mark_as_deleted(
+        self,
+        notes_to_delete: Collection[Note],
+        delete_note_on_remote_delete: DeleteNoteOnRemoteDelete,
+    ) -> None:
+        if not notes_to_delete:
+            return
+
+        if delete_note_on_remote_delete == DeleteNoteOnRemoteDelete.IF_NOT_REVIEWED_YET:
+            nids = [note.id for note in notes_to_delete]
+            nids_of_notes_with_reviews: Set[NoteId] = set(
+                aqt.mw.col.db.list(
+                    "SELECT DISTINCT nid FROM cards "
+                    f"WHERE nid IN {ids2str(nids)} AND "
+                    "id IN (SELECT DISTINCT cid FROM revlog)"
+                )
+            )
+            notes_with_reviews = set(
+                note
+                for note in notes_to_delete
+                if note.id in nids_of_notes_with_reviews
+            )
+            notes_without_reviews = set(notes_to_delete) - notes_with_reviews
+
+            if notes_with_reviews:
+                self._tag_notes_as_deleted(notes_with_reviews)
+
+            if notes_without_reviews:
+                changes = aqt.mw.col.remove_notes(
+                    [note.id for note in notes_without_reviews]
+                )
+                nids = [note.id for note in notes_without_reviews]
+                LOGGER.info(
+                    f"Deleted {changes.count} notes: {truncated_list(nids, limit=50)}"
+                )
+        elif delete_note_on_remote_delete == DeleteNoteOnRemoteDelete.NEVER:
+            self._tag_notes_as_deleted(notes_to_delete)
+        else:
+            raise ValueError(  # pragma: no cover
+                f"Unknown value for {str(DeleteNoteOnRemoteDelete)}"
+            )
+
+    def _tag_notes_as_deleted(self, notes: Collection[Note]) -> None:
+        nids = [note.id for note in notes]
+        changes = aqt.mw.col.tags.bulk_add(note_ids=nids, tags=TAG_FOR_DELETED_NOTES)
+        LOGGER.info(
+            f"Tagged {changes.count} notes as deleted: {truncated_list(nids, limit=50)}"
+        )
 
     def _suspend_cards(
         self,
@@ -428,31 +512,36 @@ class AnkiHubImporter:
         protected_fields: Dict[int, List[str]],
         protected_tags: List[str],
     ) -> Tuple[Note, NoteOperation]:
+        """Gets or creates a note and prepares it for import into Anki DB. Returns the note and the operation that
+        should be performed on it."""
         try:
             note = aqt.mw.col.get_note(id=NoteId(note_data.anki_nid))
+            note_exists = True
+        except NotFoundError:
+            note_type = aqt.mw.col.models.get(NotetypeId(note_data.mid))
+            note = aqt.mw.col.new_note(note_type)
+            note_exists = False
+
+        if note_data.last_update_type == SuggestionType.DELETE:
+            operation = NoteOperation.DELETE
+        else:
             changed = self._prepare_note_inner(
                 note,
                 note_data,
                 protected_fields,
                 protected_tags,
             )
-            if changed:
-                LOGGER.debug(f"Updated note: {note_data.anki_nid=}")
-                return note, NoteOperation.UPDATE
+            if not note_exists:
+                operation = NoteOperation.CREATE
+            elif note_exists and changed:
+                operation = NoteOperation.UPDATE
+            elif note_exists and not changed:
+                operation = NoteOperation.NO_CHANGES
             else:
-                LOGGER.debug(f"No changes, skipping {note_data.anki_nid=}")
-                return note, NoteOperation.NO_CHANGES
-        except NotFoundError:
-            note_type = aqt.mw.col.models.get(NotetypeId(note_data.mid))
-            note = aqt.mw.col.new_note(note_type)
-            self._prepare_note_inner(
-                note,
-                note_data,
-                protected_fields,
-                protected_tags,
-            )
-            LOGGER.debug(f"Created note: {note_data.anki_nid=}")
-            return note, NoteOperation.CREATE
+                raise AssertionError("This should never happen.")  # pragma: no cover
+
+        LOGGER.debug(f"Prepared note: {note_data.anki_nid=} {operation=}")
+        return note, operation
 
     def _prepare_note_inner(
         self,
