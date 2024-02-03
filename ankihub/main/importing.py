@@ -334,14 +334,14 @@ class AnkiHubImporter:
 
     def _delete_notes_or_mark_as_deleted(
         self,
-        notes_to_delete: Collection[Note],
+        notes: Collection[Note],
         delete_note_on_remote_delete: DeleteNoteOnRemoteDelete,
     ) -> None:
-        if not notes_to_delete:
+        if not notes:
             return
 
         if delete_note_on_remote_delete == DeleteNoteOnRemoteDelete.IF_NOT_REVIEWED_YET:
-            nids = [note.id for note in notes_to_delete]
+            nids = [note.id for note in notes]
             nids_of_notes_with_reviews: Set[NoteId] = set(
                 aqt.mw.col.db.list(
                     "SELECT DISTINCT nid FROM cards "
@@ -350,17 +350,15 @@ class AnkiHubImporter:
                 )
             )
             notes_with_reviews = set(
-                note
-                for note in notes_to_delete
-                if note.id in nids_of_notes_with_reviews
+                note for note in notes if note.id in nids_of_notes_with_reviews
             )
-            notes_without_reviews = set(notes_to_delete) - notes_with_reviews
+            notes_without_reviews = set(notes) - notes_with_reviews
 
             self._mark_notes_as_deleted(notes_with_reviews)
             self._delete_notes(notes_without_reviews)
 
         elif delete_note_on_remote_delete == DeleteNoteOnRemoteDelete.NEVER:
-            self._mark_notes_as_deleted(notes_to_delete)
+            self._mark_notes_as_deleted(notes)
         else:
             raise ValueError(  # pragma: no cover
                 f"Unknown value for {str(DeleteNoteOnRemoteDelete)}"
