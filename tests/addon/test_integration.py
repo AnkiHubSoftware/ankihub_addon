@@ -1815,6 +1815,7 @@ class TestAnkiHubImporter:
             ):
                 anki_note = aqt.mw.col.get_note(NoteId(ah_note.anki_nid))
                 assert TAG_FOR_DELETED_NOTES in anki_note.tags
+                assert anki_note[ANKIHUB_NOTE_TYPE_FIELD_NAME] == ""
 
                 assert len(import_result.created_nids) == 0
                 assert len(import_result.updated_nids) == 0
@@ -1870,6 +1871,7 @@ class TestAnkiHubImporter:
             if delete_note_on_remote_delete == DeleteNoteOnRemoteDelete.NEVER:
                 anki_note = aqt.mw.col.get_note(NoteId(ah_note.anki_nid))
                 assert TAG_FOR_DELETED_NOTES in anki_note.tags
+                assert anki_note[ANKIHUB_NOTE_TYPE_FIELD_NAME] == ""
 
                 assert len(import_result.created_nids) == 0
                 assert len(import_result.updated_nids) == 1
