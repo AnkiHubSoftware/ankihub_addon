@@ -357,8 +357,7 @@ class AnkiHubImporter:
             notes_without_reviews = set(notes_to_delete) - notes_with_reviews
 
             if notes_with_reviews:
-                self._tag_notes_as_deleted(notes_with_reviews)
-                self._marked_as_deleted_nids = list(nids_of_notes_with_reviews)
+                self._mark_notes_as_deleted(notes_with_reviews)
 
             if notes_without_reviews:
                 changes = aqt.mw.col.remove_notes(
@@ -370,18 +369,26 @@ class AnkiHubImporter:
                 )
                 self._deleted_nids = nids_to_delete
         elif delete_note_on_remote_delete == DeleteNoteOnRemoteDelete.NEVER:
-            self._tag_notes_as_deleted(notes_to_delete)
-            self._marked_as_deleted_nids = [note.id for note in notes_to_delete]
+            self._mark_notes_as_deleted(notes_to_delete)
         else:
             raise ValueError(  # pragma: no cover
                 f"Unknown value for {str(DeleteNoteOnRemoteDelete)}"
             )
 
-    def _tag_notes_as_deleted(self, notes: Collection[Note]) -> None:
+    def _mark_notes_as_deleted(self, notes: Collection[Note]) -> None:
+        """Add a tag to the notes to mark them as deleted and clear their ankihub_id field.
+        By clearing their ankihub_id field the "View on AnkiHub" button won't be shown on mobile for these notes.
+        """
+        for note in notes:
+            note.tags = list(set(note.tags) | {TAG_FOR_DELETED_NOTES})
+            note[settings.ANKIHUB_NOTE_TYPE_FIELD_NAME] = ""
+        aqt.mw.col.update_notes(list(notes))
+
         nids = [note.id for note in notes]
-        changes = aqt.mw.col.tags.bulk_add(note_ids=nids, tags=TAG_FOR_DELETED_NOTES)
+        self._marked_as_deleted_nids = nids
+
         LOGGER.info(
-            f"Tagged {changes.count} notes as deleted: {truncated_list(nids, limit=50)}"
+            f"Marked {len(notes)} notes as deleted: {truncated_list(nids, limit=50)}"
         )
 
     def _suspend_cards(
