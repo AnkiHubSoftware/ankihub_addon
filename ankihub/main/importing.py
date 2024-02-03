@@ -360,14 +360,7 @@ class AnkiHubImporter:
                 self._mark_notes_as_deleted(notes_with_reviews)
 
             if notes_without_reviews:
-                changes = aqt.mw.col.remove_notes(
-                    [note.id for note in notes_without_reviews]
-                )
-                nids_to_delete = [note.id for note in notes_without_reviews]
-                LOGGER.info(
-                    f"Deleted {changes.count} notes: {truncated_list(nids_to_delete, limit=50)}"
-                )
-                self._deleted_nids = nids_to_delete
+                self._delete_notes(notes_without_reviews)
         elif delete_note_on_remote_delete == DeleteNoteOnRemoteDelete.NEVER:
             self._mark_notes_as_deleted(notes_to_delete)
         else:
@@ -375,8 +368,18 @@ class AnkiHubImporter:
                 f"Unknown value for {str(DeleteNoteOnRemoteDelete)}"
             )
 
+    def _delete_notes(self, notes: Collection[Note]) -> None:
+        """Delete notes from the Anki database. Updates the _deleted_nids attribute."""
+        changes = aqt.mw.col.remove_notes([note.id for note in notes])
+        nids_to_delete = [note.id for note in notes]
+        LOGGER.info(
+            f"Deleted {changes.count} notes: {truncated_list(nids_to_delete, limit=50)}"
+        )
+        self._deleted_nids = nids_to_delete
+
     def _mark_notes_as_deleted(self, notes: Collection[Note]) -> None:
         """Add a tag to the notes to mark them as deleted and clear their ankihub_id field.
+        Updates the _marked_as_deleted_nids attribute.
         By clearing their ankihub_id field the "View on AnkiHub" button won't be shown on mobile for these notes.
         """
         for note in notes:
