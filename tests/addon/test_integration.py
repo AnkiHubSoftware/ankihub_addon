@@ -152,7 +152,7 @@ from ankihub.main.exporting import to_note_data
 from ankihub.main.importing import (
     AnkiHubImporter,
     _adjust_note_types_in_anki_db,
-    reset_note_types_of_notes,
+    change_note_types_of_notes,
 )
 from ankihub.main.note_conversion import (
     ADDON_INTERNAL_TAGS,
@@ -1252,7 +1252,7 @@ def test_reset_note_types_of_notes(anki_session_with_addon_data: AnkiSession):
         nid_mid_pairs = [
             (NoteId(note.id), NotetypeId(cloze["id"])),
         ]
-        reset_note_types_of_notes(nid_mid_pairs)
+        change_note_types_of_notes(nid_mid_pairs)
 
         assert mw.col.get_note(note.id).mid == cloze["id"]
 

@@ -211,7 +211,7 @@ def get_note_types_in_deck(did: DeckId) -> List[NotetypeId]:
     return aqt.mw.col.db.list(query)
 
 
-def reset_note_types_of_notes(nid_mid_pairs: List[Tuple[NoteId, NotetypeId]]) -> None:
+def change_note_types_of_notes(nid_mid_pairs: List[Tuple[NoteId, NotetypeId]]) -> None:
     """Changes the note type of notes based on provided pairs of note id and target note type id."""
 
     # Group notes by source and target note type

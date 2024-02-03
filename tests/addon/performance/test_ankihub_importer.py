@@ -15,7 +15,7 @@ os.environ["SKIP_INIT"] = "1"
 
 from ankihub.ankihub_client import NoteInfo
 from ankihub.main.importing import AnkiHubImporter
-from ankihub.main.utils import reset_note_types_of_notes
+from ankihub.main.utils import change_note_types_of_notes
 from ankihub.settings import DeckConfig
 
 
@@ -88,7 +88,7 @@ def test_anking_deck_update(
         nid_mid_pairs = [
             (NoteId(note.anki_nid), new_note_type["id"]) for note in notes_data
         ]
-        reset_note_types_of_notes(nid_mid_pairs=nid_mid_pairs)
+        change_note_types_of_notes(nid_mid_pairs=nid_mid_pairs)
 
         # Change the fields and tags of notes so that the import has to update them.
         for note in notes_data:
