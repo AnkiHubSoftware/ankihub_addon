@@ -371,8 +371,8 @@ class AnkiHubImporter:
         if not notes:
             return
 
-        changes = aqt.mw.col.remove_notes([note.id for note in notes])
         nids_to_delete = [note.id for note in notes]
+        changes = aqt.mw.col.remove_notes(nids_to_delete)
         LOGGER.info(
             f"Deleted {changes.count} notes: {truncated_list(nids_to_delete, limit=50)}"
         )
