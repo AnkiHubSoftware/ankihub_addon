@@ -2,6 +2,7 @@ import copy
 import hashlib
 import re
 import time
+from collections import defaultdict
 from concurrent.futures import Future
 from pathlib import Path
 from pprint import pformat
@@ -11,7 +12,6 @@ from typing import Any, Collection, Dict, Iterable, List, Optional, Sequence, Se
 import aqt
 from anki.collection import EmptyCardsReport
 from anki.decks import DeckId
-from anki.errors import NotFoundError
 from anki.models import ChangeNotetypeRequest, NoteType, NotetypeDict, NotetypeId
 from anki.notes import Note, NoteId
 from anki.utils import checksum, ids2str
@@ -212,37 +212,46 @@ def get_note_types_in_deck(did: DeckId) -> List[NotetypeId]:
 
 
 def reset_note_types_of_notes(nid_mid_pairs: List[Tuple[NoteId, NotetypeId]]) -> None:
-    note_type_conflicts: Set[Tuple[NoteId, NotetypeId, NotetypeId]] = set()
+    """Changes the note type of notes based on provided pairs of note id and target note type id."""
+
+    # Group notes by source and target note type
+    notes_grouped_by_type_change: Dict[
+        Tuple[NotetypeId, NotetypeId], List[NoteId]
+    ] = defaultdict(list)
     for nid, mid in nid_mid_pairs:
-        try:
-            note = aqt.mw.col.get_note(nid)
-        except NotFoundError:
-            # we don't care about missing notes here
+        current_mid = aqt.mw.col.db.scalar(f"SELECT mid FROM notes WHERE id={nid}")
+        if current_mid is None:
             continue
 
-        if note.mid != mid:
-            note_type_conflicts.add((note.id, mid, note.mid))
+        if current_mid != mid:
+            notes_grouped_by_type_change[(current_mid, mid)].append(nid)
 
-    for anki_nid, target_note_type_id, _ in note_type_conflicts:
-        LOGGER.info(
-            f"Note types differ: anki_nid: {anki_nid} target_note_type_id {target_note_type_id}",
+    # Change note types of notes for each group
+    for (
+        source_note_type_id,
+        target_note_type_id,
+    ), note_ids in notes_grouped_by_type_change.items():
+        LOGGER.debug(
+            f"Note types differ: source_note_type_id: {source_note_type_id} target_note_type_id {target_note_type_id}",
         )
-        change_note_type_of_note(anki_nid, target_note_type_id)
-        LOGGER.info(
-            f"Changed note type: anki_nid {anki_nid} target_note_type_id {target_note_type_id}",
+        _change_note_type_of_notes_inner(
+            note_ids, source_note_type_id, target_note_type_id
         )
+        LOGGER.debug(
+            f"Changed note type: source_note_type_id {source_note_type_id} target_note_type_id {target_note_type_id}",
+        )
+    LOGGER.info("Changed note types of notes.")
 
-    LOGGER.info("Reset note types of notes.")
 
-
-def change_note_type_of_note(nid: int, mid: int) -> None:
+def _change_note_type_of_notes_inner(
+    nids: List[NoteId], old_mid: NotetypeId, new_mid: NotetypeId
+) -> None:
     current_schema: int = aqt.mw.col.db.scalar("select scm from col")
-    note = aqt.mw.col.get_note(NoteId(nid))
-    target_note_type = aqt.mw.col.models.get(NotetypeId(mid))
+    target_note_type = aqt.mw.col.models.get(NotetypeId(new_mid))
     request = ChangeNotetypeRequest(
-        note_ids=[note.id],
-        old_notetype_id=note.mid,
-        new_notetype_id=NotetypeId(mid),
+        note_ids=nids,
+        old_notetype_id=old_mid,
+        new_notetype_id=new_mid,
         current_schema=current_schema,
         new_fields=list(range(0, len(target_note_type["flds"]))),
     )

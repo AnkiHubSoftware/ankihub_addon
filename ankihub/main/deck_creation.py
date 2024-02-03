@@ -1,4 +1,5 @@
 """Code for creating an AnkiHub deck from an existing deck in Anki."""
+
 import re
 import typing
 import uuid
@@ -19,10 +20,10 @@ from ..settings import ANKIHUB_NOTE_TYPE_FIELD_NAME, config
 from .exporting import to_note_data
 from .subdecks import add_subdeck_tags_to_notes
 from .utils import (
-    change_note_type_of_note,
     create_backup,
     get_note_types_in_deck,
     modify_note_type,
+    reset_note_types_of_notes,
 )
 
 
@@ -106,10 +107,13 @@ def _change_note_types_of_notes(
     LOGGER.info(
         f"Changing note types of notes according to mapping: {note_type_mapping}"
     )
+    nid_mid_pairs = []
     for note_id in note_ids:
         note = aqt.mw.col.get_note(id=note_id)
         target_note_type_id = note_type_mapping[note.mid]
-        change_note_type_of_note(note_id, target_note_type_id)
+        nid_mid_pairs.append((note_id, target_note_type_id))
+
+    reset_note_types_of_notes(nid_mid_pairs=nid_mid_pairs)
     LOGGER.info("Changed note types of notes.")
 
 
