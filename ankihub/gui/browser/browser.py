@@ -806,7 +806,7 @@ def _add_ankihub_tree(tree: SidebarItem) -> SidebarItem:
             ),
         )
 
-    result.add_simple(
+    updated_since_last_review_item = result.add_simple(
         name="Updated Since Last Review",
         icon="",
         type=SidebarItemType.SAVED_SEARCH_ROOT,
@@ -814,6 +814,30 @@ def _add_ankihub_tree(tree: SidebarItem) -> SidebarItem:
             SearchNode(parsable_text="ankihub_id:_*"),
             SearchNode(
                 parsable_text=f"{UpdatedSinceLastReviewSearchNode.parameter_name}:"
+            ),
+        ),
+    )
+
+    updated_since_last_review_item.add_simple(
+        name="Deleted",
+        icon="",
+        type=SidebarItemType.SAVED_SEARCH,
+        search_node=aqt.mw.col.group_searches(
+            SearchNode(parsable_text="ankihub_id:_*"),
+            SearchNode(
+                parsable_text=f"{SuggestionTypeSearchNode.parameter_name}:{SuggestionType.DELETE.value[0]}"
+            ),
+        ),
+    )
+
+    result.add_simple(
+        name="Deleted Notes",
+        icon="",
+        type=SidebarItemType.SAVED_SEARCH_ROOT,
+        search_node=aqt.mw.col.group_searches(
+            SearchNode(parsable_text="ankihub_id:_*"),
+            SearchNode(
+                parsable_text=f"{SuggestionTypeSearchNode.parameter_name}:{SuggestionType.DELETE.value[0]}"
             ),
         ),
     )
