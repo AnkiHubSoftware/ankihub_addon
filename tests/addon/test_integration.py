@@ -2472,6 +2472,7 @@ class TestBrowserTreeView:
                 "Not Modified After Sync",
                 "Updated Today",
                 "Updated Since Last Review",
+                "Deleted Notes",
             ]
 
             updated_today_item = ankihub_item.children[4]
@@ -2534,6 +2535,7 @@ class TestBrowserTreeView:
                 "Not Modified After Sync",
                 "Updated Today",
                 "Updated Since Last Review",
+                "Deleted Notes",
                 TAG_FOR_OPTIONAL_TAGS,
                 TAG_FOR_PROTECTING_FIELDS,
                 SUBDECK_TAG,
