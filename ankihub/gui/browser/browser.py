@@ -48,7 +48,7 @@ from ..deck_updater import NotLoggedInError, ah_deck_updater
 from ..optional_tag_suggestion_dialog import OptionalTagsSuggestionDialog
 from ..suggestion_dialog import (
     open_suggestion_dialog_for_bulk_suggestion,
-    open_suggestion_dialog_for_note,
+    open_suggestion_dialog_for_single_suggestion,
 )
 from ..utils import ask_user, choose_ankihub_deck, choose_list, choose_subset
 from .custom_columns import (
@@ -307,7 +307,7 @@ def _on_bulk_notes_suggest_action(
 
     if len(filtered_nids) == 1:
         nid = list(filtered_nids)[0]
-        open_suggestion_dialog_for_note(
+        open_suggestion_dialog_for_single_suggestion(
             note=aqt.mw.col.get_note(nid),
             preselected_change_type=preselected_change_type,
             parent=browser,
