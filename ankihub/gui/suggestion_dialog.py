@@ -69,7 +69,7 @@ class SuggestionMetadata:
     source: Optional[SuggestionSource] = None
 
 
-def open_suggestion_dialog_for_single_suggestion(
+def open_suggestion_dialog_for_note(
     note: Note,
     parent: QWidget,
     preselected_change_type: Optional[SuggestionType] = None,
