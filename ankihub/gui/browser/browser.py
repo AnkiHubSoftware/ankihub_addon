@@ -791,19 +791,27 @@ def _add_ankihub_tree(tree: SidebarItem) -> SidebarItem:
         suggestion_value, suggestion_name = suggestion_type.value
         # anki doesn't allow slashes in search parameters
         suggestion_value_escaped = suggestion_value.replace("/", "_slash_")
-        updated_today_item.add_simple(
-            name=suggestion_name,
-            icon="",
-            type=SidebarItemType.SAVED_SEARCH,
-            search_node=aqt.mw.col.group_searches(
-                SearchNode(parsable_text="ankihub_id:_*"),
+        search_nodes = []
+
+        if suggestion_type != SuggestionType.DELETE:
+            search_nodes.append(SearchNode(parsable_text="ankihub_id:_*"))
+
+        search_nodes.extend(
+            [
                 SearchNode(
                     parsable_text=f"{UpdatedInTheLastXDaysSearchNode.parameter_name}:1"
                 ),
                 SearchNode(
                     parsable_text=f"{SuggestionTypeSearchNode.parameter_name}:{suggestion_value_escaped}"
                 ),
-            ),
+            ]
+        )
+
+        updated_today_item.add_simple(
+            name=suggestion_name,
+            icon="",
+            type=SidebarItemType.SAVED_SEARCH,
+            search_node=aqt.mw.col.group_searches(*search_nodes),
         )
 
     updated_since_last_review_item = result.add_simple(
@@ -823,7 +831,9 @@ def _add_ankihub_tree(tree: SidebarItem) -> SidebarItem:
         icon="",
         type=SidebarItemType.SAVED_SEARCH,
         search_node=aqt.mw.col.group_searches(
-            SearchNode(parsable_text="ankihub_id:_*"),
+            SearchNode(
+                parsable_text=f"{UpdatedSinceLastReviewSearchNode.parameter_name}:"
+            ),
             SearchNode(
                 parsable_text=f"{SuggestionTypeSearchNode.parameter_name}:{SuggestionType.DELETE.value[0]}"
             ),
@@ -835,7 +845,6 @@ def _add_ankihub_tree(tree: SidebarItem) -> SidebarItem:
         icon="",
         type=SidebarItemType.SAVED_SEARCH_ROOT,
         search_node=aqt.mw.col.group_searches(
-            SearchNode(parsable_text="ankihub_id:_*"),
             SearchNode(
                 parsable_text=f"{SuggestionTypeSearchNode.parameter_name}:{SuggestionType.DELETE.value[0]}"
             ),
