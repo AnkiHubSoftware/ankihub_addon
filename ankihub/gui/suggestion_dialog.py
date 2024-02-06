@@ -603,7 +603,7 @@ class SourceWidget(QWidget):
             self.source_type_select.show()
             self.space_below_source_type_select.changeSize(0, 10)
         else:
-            # The source type selet is not necessary if there is only one source type option.
+            # The source type select is not necessary if there is only one source type option.
             self.source_type_select.hide()
             self.space_below_source_type_select.changeSize(0, 0)
 
