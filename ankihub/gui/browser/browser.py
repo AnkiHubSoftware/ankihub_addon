@@ -131,7 +131,9 @@ def _on_browser_will_show_context_menu(browser: Browser, context_menu: QMenu) ->
         (
             "AnkiHub: Suggest deletion",
             lambda: _on_bulk_notes_suggest_action(
-                browser, nids=selected_nids, suggest_deletion=True
+                browser,
+                nids=selected_nids,
+                preselected_change_type=SuggestionType.DELETE,
             ),
             at_least_one_note_has_ah_note_type,
         ),
@@ -266,7 +268,9 @@ def _on_protect_fields_action(browser: Browser, nids: Sequence[NoteId]) -> None:
 
 
 def _on_bulk_notes_suggest_action(
-    browser: Browser, nids: Sequence[NoteId], suggest_deletion=False
+    browser: Browser,
+    nids: Sequence[NoteId],
+    preselected_change_type: Optional[SuggestionType] = None,
 ) -> None:
     if len(nids) > BULK_SUGGESTION_LIMIT:
         msg = f"Please select at most {BULK_SUGGESTION_LIMIT} notes at a time for bulk suggestions.<br>"
@@ -302,7 +306,9 @@ def _on_bulk_notes_suggest_action(
         return
 
     open_suggestion_dialog_for_bulk_suggestion(
-        anki_nids=filtered_nids, parent=browser, suggest_deletion=suggest_deletion
+        anki_nids=filtered_nids,
+        parent=browser,
+        preselected_change_type=preselected_change_type,
     )
 
 
