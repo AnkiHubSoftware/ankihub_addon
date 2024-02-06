@@ -69,11 +69,18 @@ class SuggestionMetadata:
     source: Optional[SuggestionSource] = None
 
 
-def open_suggestion_dialog_for_note(note: Note, parent: QWidget) -> None:
+def open_suggestion_dialog_for_single_suggestion(
+    note: Note,
+    parent: QWidget,
+    preselected_change_type: Optional[SuggestionType] = None,
+) -> None:
     """Opens a dialog for creating a note suggestion for the given note.
     The note has to be present in the Anki collection before calling this function.
     May change the notes contents (e.g. by renaming media files) and therefore the
     note might need to be reloaded after this function is called.
+
+    The preselected_change_type will be preselected in the
+    change type dropdown when the dialog is opened.
     """
 
     assert ankihub_db.is_ankihub_note_type(
@@ -97,6 +104,7 @@ def open_suggestion_dialog_for_note(note: Note, parent: QWidget) -> None:
             ah_did=ah_did,
             parent=parent,
         ),
+        preselected_change_type=preselected_change_type,
         parent=parent,
     )
 
@@ -134,7 +142,9 @@ def _on_suggestion_dialog_for_single_suggestion_closed(
 
 
 def open_suggestion_dialog_for_bulk_suggestion(
-    anki_nids: Collection[NoteId], parent: QWidget, suggest_deletion=False
+    anki_nids: Collection[NoteId],
+    parent: QWidget,
+    preselected_change_type: Optional[SuggestionType] = None,
 ) -> None:
     """Opens a dialog for creating a bulk suggestion for the given notes.
     The notes have to be present in the Anki collection before calling this
@@ -143,8 +153,8 @@ def open_suggestion_dialog_for_bulk_suggestion(
     and therefore the notes might need to be reloaded after this function is
     called.
 
-    If suggest_deletion is True, the Delete option will be preselected in the
-    change type dropdown.
+    The preselected_change_type will be preselected in the
+    change type dropdown when the dialog is opened.
     """
 
     ah_did = _determine_ah_did_for_nids_to_be_suggested(
@@ -169,7 +179,7 @@ def open_suggestion_dialog_for_bulk_suggestion(
             ah_did=ah_did,
             parent=parent,
         ),
-        preselected_change_type=SuggestionType.DELETE if suggest_deletion else None,
+        preselected_change_type=preselected_change_type,
         parent=parent,
     )
 
@@ -375,7 +385,7 @@ class SuggestionDialog(QDialog):
         qconnect(self.source_widget.validation_signal, self._validate)
         self.layout_.addSpacing(10)
 
-        self._refresh_soruce_widget()
+        self._refresh_source_widget()
 
         # Set up rationale field
         label = QLabel("Rationale for Change (Required)")
@@ -432,16 +442,18 @@ class SuggestionDialog(QDialog):
             change_type=self._change_type(),
             comment=self._comment(),
             auto_accept=self._auto_accept(),
-            source=self.source_widget.suggestion_source()
-            if self._source_needed()
-            else None,
+            source=(
+                self.source_widget.suggestion_source()
+                if self._source_needed()
+                else None
+            ),
         )
 
     def _on_change_type_changed(self) -> None:
-        self._refresh_soruce_widget()
+        self._refresh_source_widget()
         self._validate()
 
-    def _refresh_soruce_widget(self):
+    def _refresh_source_widget(self):
         if self._source_needed():
             self.source_widget.setup_for_change_type(change_type=self._change_type())
             self.source_widget_group_box.show()
@@ -593,7 +605,7 @@ class SourceWidget(QWidget):
             self.source_type_select.show()
             self.space_below_source_type_select.changeSize(0, 10)
         else:
-            # The source type selet is not necessary if there is only one source type option.
+            # The source type select is not necessary if there is only one source type option.
             self.source_type_select.hide()
             self.space_below_source_type_select.changeSize(0, 0)
 
