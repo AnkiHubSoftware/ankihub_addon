@@ -311,19 +311,23 @@ def _change_note_suggestion(
     assert note_from_anki_db.ah_nid is not None
     assert note_from_anki_db.tags is not None
 
-    note_from_ah_db = ankihub_db.note_data(note.id)
+    added_tags: List[str] = []
+    removed_tags: List[str] = []
+    fields_that_changed: List[Field] = []
 
-    added_tags, removed_tags = _added_and_removed_tags(
-        prev_tags=note_from_ah_db.tags, cur_tags=note_from_anki_db.tags
-    )
+    if change_type != SuggestionType.DELETE:
+        note_from_ah_db = ankihub_db.note_data(note.id)
 
-    fields_that_changed = _fields_that_changed(
-        prev_fields=note_from_ah_db.fields, cur_fields=note_from_anki_db.fields
-    )
+        added_tags, removed_tags = _added_and_removed_tags(
+            prev_tags=note_from_ah_db.tags, cur_tags=note_from_anki_db.tags
+        )
 
-    no_changes = not added_tags and not removed_tags and not fields_that_changed
-    if no_changes and not change_type == SuggestionType.DELETE:
-        return None
+        fields_that_changed = _fields_that_changed(
+            prev_fields=note_from_ah_db.fields, cur_fields=note_from_anki_db.fields
+        )
+
+        if not added_tags and not removed_tags and not fields_that_changed:
+            return None
 
     return ChangeNoteSuggestion(
         ah_nid=note_from_anki_db.ah_nid,
