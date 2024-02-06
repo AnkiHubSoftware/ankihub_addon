@@ -231,31 +231,20 @@ def change_note_types_of_notes(nid_mid_pairs: List[Tuple[NoteId, NotetypeId]]) -
         source_note_type_id,
         target_note_type_id,
     ), note_ids in notes_grouped_by_type_change.items():
+        current_schema: int = aqt.mw.col.db.scalar("select scm from col")
+        target_note_type = aqt.mw.col.models.get(NotetypeId(target_note_type_id))
+        request = ChangeNotetypeRequest(
+            note_ids=note_ids,
+            old_notetype_id=source_note_type_id,
+            new_notetype_id=target_note_type_id,
+            current_schema=current_schema,
+            new_fields=list(range(0, len(target_note_type["flds"]))),
+        )
+        aqt.mw.col.models.change_notetype_of_notes(request)
         LOGGER.debug(
-            f"Note types differ: source_note_type_id: {source_note_type_id} target_note_type_id {target_note_type_id}",
+            f"Changed note type of {len(note_ids)} notes {source_note_type_id=} {target_note_type_id=}",
         )
-        _change_note_type_of_notes_inner(
-            note_ids, source_note_type_id, target_note_type_id
-        )
-        LOGGER.debug(
-            f"Changed note type: source_note_type_id {source_note_type_id} target_note_type_id {target_note_type_id}",
-        )
-    LOGGER.info("Changed note types of notes.")
-
-
-def _change_note_type_of_notes_inner(
-    nids: List[NoteId], old_mid: NotetypeId, new_mid: NotetypeId
-) -> None:
-    current_schema: int = aqt.mw.col.db.scalar("select scm from col")
-    target_note_type = aqt.mw.col.models.get(NotetypeId(new_mid))
-    request = ChangeNotetypeRequest(
-        note_ids=nids,
-        old_notetype_id=old_mid,
-        new_notetype_id=new_mid,
-        current_schema=current_schema,
-        new_fields=list(range(0, len(target_note_type["flds"]))),
-    )
-    aqt.mw.col.models.change_notetype_of_notes(request)
+    LOGGER.info("Finished changing note types of notes.")
 
 
 def mids_of_notes(nids: Sequence[NoteId]) -> Set[NotetypeId]:
