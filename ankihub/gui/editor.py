@@ -23,7 +23,7 @@ from ..settings import (
     url_view_note_history,
 )
 from .errors import report_exception_and_upload_logs
-from .suggestion_dialog import open_suggestion_dialog_for_note
+from .suggestion_dialog import open_suggestion_dialog_for_single_suggestion
 from .utils import show_error_dialog
 
 ANKIHUB_BTN_ID_PREFIX = "ankihub-btn"
@@ -102,7 +102,7 @@ def _on_suggestion_button_press_inner(editor: Editor) -> None:
     # The command is expected to have been set at this point already, either by
     # fetching the default or by selecting a command from the dropdown menu.
     def on_did_add_note(note: anki.notes.Note) -> None:
-        open_suggestion_dialog_for_note(note, parent=editor.widget)
+        open_suggestion_dialog_for_single_suggestion(note, parent=editor.widget)
         gui_hooks.add_cards_did_add_note.remove(on_did_add_note)
 
     # If the note is not yet in the database, we need to add it first.
@@ -113,7 +113,7 @@ def _on_suggestion_button_press_inner(editor: Editor) -> None:
         add_note_window: AddCards = editor.parentWindow  # type: ignore
         add_note_window.add_current_note()
     else:
-        open_suggestion_dialog_for_note(editor.note, parent=editor.widget)
+        open_suggestion_dialog_for_single_suggestion(editor.note, parent=editor.widget)
 
         # Needed because the note might have been modified when the suggestion was created.
         editor.note.load()

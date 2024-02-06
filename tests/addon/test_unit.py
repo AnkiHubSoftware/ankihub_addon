@@ -94,7 +94,7 @@ from ankihub.gui.suggestion_dialog import (
     _on_suggest_notes_in_bulk_done,
     get_anki_nid_to_possible_ah_dids_dict,
     open_suggestion_dialog_for_bulk_suggestion,
-    open_suggestion_dialog_for_note,
+    open_suggestion_dialog_for_single_suggestion,
 )
 from ankihub.gui.threading_utils import rate_limited
 from ankihub.gui.utils import (
@@ -912,7 +912,7 @@ class TestOpenSuggestionDialogForSingleSuggestion:
 
             suggest_note_update_mock.return_value = suggest_note_update_succeeds
 
-            open_suggestion_dialog_for_note(note=note, parent=aqt.mw)
+            open_suggestion_dialog_for_single_suggestion(note=note, parent=aqt.mw)
 
             if user_cancels:
                 suggest_note_update_mock.assert_not_called()
@@ -960,7 +960,7 @@ class TestOpenSuggestionDialogForSingleSuggestion:
                 return_value=None if user_cancels else ah_did_1,
             )
 
-            open_suggestion_dialog_for_note(note=note, parent=aqt.mw)
+            open_suggestion_dialog_for_single_suggestion(note=note, parent=aqt.mw)
 
             if user_cancels:
                 suggest_note_update_mock.assert_not_called()
