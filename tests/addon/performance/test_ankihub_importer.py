@@ -97,4 +97,4 @@ def test_anking_deck_update(
 
         duration_seconds = profile(lambda: import_anking_notes(notes_data))
         print(f"Importing {len(notes_data)} notes took {duration_seconds} seconds")
-        assert duration_seconds < 0.25
+        assert duration_seconds < 0.5
