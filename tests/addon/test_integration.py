@@ -2653,7 +2653,7 @@ class TestBrowserContextMenu:
         [
             # The suggestion type which is selected by default is UPDATED_CONTENT
             ("AnkiHub: Bulk suggest notes", SuggestionType.UPDATED_CONTENT.value[1]),
-            # When the user uses the "Suggest deletion" action, the suggestion type is DELETED
+            # When the user uses the "Suggest deletion" action, the suggestion type is DELETE
             ("AnkiHub: Suggest deletion", SuggestionType.DELETE.value[1]),
         ],
     )
