@@ -69,11 +69,18 @@ class SuggestionMetadata:
     source: Optional[SuggestionSource] = None
 
 
-def open_suggestion_dialog_for_note(note: Note, parent: QWidget) -> None:
+def open_suggestion_dialog_for_note(
+    note: Note,
+    parent: QWidget,
+    preselected_change_type: Optional[SuggestionType] = None,
+) -> None:
     """Opens a dialog for creating a note suggestion for the given note.
     The note has to be present in the Anki collection before calling this function.
     May change the notes contents (e.g. by renaming media files) and therefore the
     note might need to be reloaded after this function is called.
+
+    The preselected_change_type will be preselected in the
+    change type dropdown when the dialog is opened.
     """
 
     assert ankihub_db.is_ankihub_note_type(
@@ -97,6 +104,7 @@ def open_suggestion_dialog_for_note(note: Note, parent: QWidget) -> None:
             ah_did=ah_did,
             parent=parent,
         ),
+        preselected_change_type=preselected_change_type,
         parent=parent,
     )
 
