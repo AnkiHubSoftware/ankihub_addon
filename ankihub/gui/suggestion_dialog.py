@@ -134,7 +134,9 @@ def _on_suggestion_dialog_for_single_suggestion_closed(
 
 
 def open_suggestion_dialog_for_bulk_suggestion(
-    anki_nids: Collection[NoteId], parent: QWidget, suggest_deletion=False
+    anki_nids: Collection[NoteId],
+    parent: QWidget,
+    preselected_change_type: Optional[SuggestionType] = None,
 ) -> None:
     """Opens a dialog for creating a bulk suggestion for the given notes.
     The notes have to be present in the Anki collection before calling this
@@ -143,8 +145,8 @@ def open_suggestion_dialog_for_bulk_suggestion(
     and therefore the notes might need to be reloaded after this function is
     called.
 
-    If suggest_deletion is True, the Delete option will be preselected in the
-    change type dropdown.
+    The preselected_change_type will be preselected in the
+    change type dropdown when the dialog is opened.
     """
 
     ah_did = _determine_ah_did_for_nids_to_be_suggested(
@@ -169,7 +171,7 @@ def open_suggestion_dialog_for_bulk_suggestion(
             ah_did=ah_did,
             parent=parent,
         ),
-        preselected_change_type=SuggestionType.DELETE if suggest_deletion else None,
+        preselected_change_type=preselected_change_type,
         parent=parent,
     )
 
@@ -432,9 +434,11 @@ class SuggestionDialog(QDialog):
             change_type=self._change_type(),
             comment=self._comment(),
             auto_accept=self._auto_accept(),
-            source=self.source_widget.suggestion_source()
-            if self._source_needed()
-            else None,
+            source=(
+                self.source_widget.suggestion_source()
+                if self._source_needed()
+                else None
+            ),
         )
 
     def _on_change_type_changed(self) -> None:
