@@ -26,6 +26,7 @@ class _AnkiHubMediaSync:
         self._download_in_progress = False
         self._amount_uploads_in_progress = 0
         self._status_action: Optional[QAction] = None
+        self._stop_background_threads = False
         # Used to store the Anki profile ID when the media download is started.
         # If the Anki profile changes during the media download, the download is aborted.
         self._anki_profile_id_at_download_start: Optional[str] = None
@@ -85,10 +86,12 @@ class _AnkiHubMediaSync:
     def stop_background_threads(self):
         """Stop all media sync operations."""
         self._client.stop_background_threads()
+        self._stop_background_threads = True
 
     def allow_background_threads(self):
         """Allow background media sync operations to be started after they have been stopped."""
         self._client.allow_background_threads()
+        self._stop_background_threads = False
 
     def refresh_sync_status_text(self):
         """Refresh the status text on the status action."""
@@ -156,6 +159,12 @@ class _AnkiHubMediaSync:
                 if latest_update
                 else chunk.latest_update
             )
+
+            if self._stop_background_threads:
+                LOGGER.info(
+                    "Background threads stopped, aborting download of deck media objects..."
+                )
+                return
 
             if self._anki_profile_id_at_download_start != get_anki_profile_id():
                 LOGGER.info(
