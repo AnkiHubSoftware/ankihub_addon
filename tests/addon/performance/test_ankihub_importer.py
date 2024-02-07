@@ -15,6 +15,7 @@ os.environ["SKIP_INIT"] = "1"
 
 from ankihub.ankihub_client import NoteInfo
 from ankihub.main.importing import AnkiHubImporter
+from ankihub.main.utils import change_note_types_of_notes
 from ankihub.settings import DeckConfig, DeleteNoteOnRemoteDelete
 
 
