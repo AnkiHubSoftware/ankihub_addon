@@ -1771,8 +1771,8 @@ class TestAnkiHubImporter:
         [
             (BehaviorOnRemoteNoteDeleted.NEVER_DELETE, False),
             (BehaviorOnRemoteNoteDeleted.NEVER_DELETE, True),
-            (BehaviorOnRemoteNoteDeleted.DELETE_IF_NOT_REVIEWED_YET, False),
-            (BehaviorOnRemoteNoteDeleted.DELETE_IF_NOT_REVIEWED_YET, True),
+            (BehaviorOnRemoteNoteDeleted.DELETE_IF_NO_REVIEWS, False),
+            (BehaviorOnRemoteNoteDeleted.DELETE_IF_NO_REVIEWS, True),
         ],
     )
     def test_import_note_deletion(
@@ -1813,7 +1813,7 @@ class TestAnkiHubImporter:
                 == BehaviorOnRemoteNoteDeleted.NEVER_DELETE
                 or (
                     behavior_on_remote_note_deleted
-                    == BehaviorOnRemoteNoteDeleted.DELETE_IF_NOT_REVIEWED_YET
+                    == BehaviorOnRemoteNoteDeleted.DELETE_IF_NO_REVIEWS
                     and note_has_review
                 )
             ):
@@ -1827,7 +1827,7 @@ class TestAnkiHubImporter:
                 assert len(import_result.deleted_nids) == 0
             elif (
                 behavior_on_remote_note_deleted
-                == BehaviorOnRemoteNoteDeleted.DELETE_IF_NOT_REVIEWED_YET
+                == BehaviorOnRemoteNoteDeleted.DELETE_IF_NO_REVIEWS
             ):
                 with pytest.raises(NotFoundError):
                     aqt.mw.col.get_note(NoteId(ah_note.anki_nid))
@@ -1857,7 +1857,7 @@ class TestAnkiHubImporter:
 
             import_result = self._import_notes(
                 [ah_note_1, ah_note_2],
-                behavior_on_remote_note_deleted=BehaviorOnRemoteNoteDeleted.DELETE_IF_NOT_REVIEWED_YET,
+                behavior_on_remote_note_deleted=BehaviorOnRemoteNoteDeleted.DELETE_IF_NO_REVIEWS,
                 is_first_import_of_deck=False,
                 ah_did=ah_did,
                 anki_did=anki_did,
