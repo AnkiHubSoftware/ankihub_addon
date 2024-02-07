@@ -343,7 +343,7 @@ class AnkiHubImporter:
 
         if (
             behavior_on_remote_note_deleted
-            == BehaviorOnRemoteNoteDeleted.DELETE_IF_NOT_REVIEWED_YET
+            == BehaviorOnRemoteNoteDeleted.DELETE_IF_NO_REVIEWS
         ):
             nids = [note.id for note in notes]
             nids_of_notes_with_reviews: Set[NoteId] = set(

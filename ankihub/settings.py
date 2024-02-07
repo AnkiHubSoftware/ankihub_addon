@@ -72,7 +72,7 @@ class SuspendNewCardsOfExistingNotes(Enum):
 class BehaviorOnRemoteNoteDeleted(Enum):
     """What to do with the local note in Anki when it's deleted on AnkiHub."""
 
-    DELETE_IF_NOT_REVIEWED_YET = "If not reviewed yet"
+    DELETE_IF_NO_REVIEWS = "Delete if no reviews"
     NEVER_DELETE = "Never"
 
 
