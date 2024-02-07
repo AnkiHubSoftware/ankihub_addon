@@ -188,10 +188,10 @@ from ankihub.main.utils import (
 from ankihub.settings import (
     ANKIHUB_NOTE_TYPE_FIELD_NAME,
     AnkiHubCommands,
+    BehaviorOnRemoteNoteDeleted,
     DeckConfig,
     DeckExtension,
     DeckExtensionConfig,
-    DeleteNoteOnRemoteDelete,
     SuspendNewCardsOfExistingNotes,
     ankihub_base_path,
     config,
@@ -251,7 +251,7 @@ def import_sample_ankihub_deck(
         notes=ankihub_sample_deck_notes_data(),
         deck_name="Testdeck",
         is_first_import_of_deck=True,
-        delete_note_on_remote_delete=DeleteNoteOnRemoteDelete.NEVER,
+        behavior_on_remote_note_deleted=BehaviorOnRemoteNoteDeleted.NEVER_DELETE,
         protected_fields={},
         protected_tags=[],
         note_types=SAMPLE_NOTE_TYPES,
@@ -1306,7 +1306,7 @@ class TestAnkiHubImporter:
                 notes=ankihub_sample_deck_notes_data(),
                 deck_name="test",
                 is_first_import_of_deck=True,
-                delete_note_on_remote_delete=DeleteNoteOnRemoteDelete.NEVER,
+                behavior_on_remote_note_deleted=BehaviorOnRemoteNoteDeleted.NEVER_DELETE,
                 note_types=SAMPLE_NOTE_TYPES,
                 protected_fields={},
                 protected_tags=[],
@@ -1351,7 +1351,7 @@ class TestAnkiHubImporter:
                 notes=ankihub_sample_deck_notes_data(),
                 deck_name="test",
                 is_first_import_of_deck=True,
-                delete_note_on_remote_delete=DeleteNoteOnRemoteDelete.NEVER,
+                behavior_on_remote_note_deleted=BehaviorOnRemoteNoteDeleted.NEVER_DELETE,
                 note_types=SAMPLE_NOTE_TYPES,
                 protected_fields={},
                 protected_tags=[],
@@ -1400,7 +1400,7 @@ class TestAnkiHubImporter:
                 notes=ankihub_sample_deck_notes_data(),
                 deck_name="test",
                 is_first_import_of_deck=False,
-                delete_note_on_remote_delete=DeleteNoteOnRemoteDelete.NEVER,
+                behavior_on_remote_note_deleted=BehaviorOnRemoteNoteDeleted.NEVER_DELETE,
                 note_types=SAMPLE_NOTE_TYPES,
                 protected_fields={},
                 protected_tags=[],
@@ -1457,7 +1457,7 @@ class TestAnkiHubImporter:
                 notes=ankihub_sample_deck_notes_data(),
                 deck_name="test",
                 is_first_import_of_deck=True,
-                delete_note_on_remote_delete=DeleteNoteOnRemoteDelete.NEVER,
+                behavior_on_remote_note_deleted=BehaviorOnRemoteNoteDeleted.NEVER_DELETE,
                 note_types=SAMPLE_NOTE_TYPES,
                 protected_fields={},
                 protected_tags=[],
@@ -1497,7 +1497,7 @@ class TestAnkiHubImporter:
                 note_types=SAMPLE_NOTE_TYPES,
                 deck_name="test",
                 is_first_import_of_deck=False,
-                delete_note_on_remote_delete=DeleteNoteOnRemoteDelete.NEVER,
+                behavior_on_remote_note_deleted=BehaviorOnRemoteNoteDeleted.NEVER_DELETE,
                 protected_fields={},
                 protected_tags=[],
                 anki_did=first_local_did,
@@ -1547,7 +1547,7 @@ class TestAnkiHubImporter:
                 note_types=SAMPLE_NOTE_TYPES,
                 deck_name="test",
                 is_first_import_of_deck=False,
-                delete_note_on_remote_delete=DeleteNoteOnRemoteDelete.NEVER,
+                behavior_on_remote_note_deleted=BehaviorOnRemoteNoteDeleted.NEVER_DELETE,
                 protected_fields={},
                 protected_tags=[],
                 anki_did=first_local_did,
@@ -1595,7 +1595,7 @@ class TestAnkiHubImporter:
                 notes=notes_data,
                 deck_name="test",
                 is_first_import_of_deck=False,
-                delete_note_on_remote_delete=DeleteNoteOnRemoteDelete.NEVER,
+                behavior_on_remote_note_deleted=BehaviorOnRemoteNoteDeleted.NEVER_DELETE,
                 note_types=SAMPLE_NOTE_TYPES,
                 protected_fields={},
                 protected_tags=[],
@@ -1661,7 +1661,7 @@ class TestAnkiHubImporter:
                 notes=[note_data],
                 deck_name="test",
                 is_first_import_of_deck=False,
-                delete_note_on_remote_delete=DeleteNoteOnRemoteDelete.NEVER,
+                behavior_on_remote_note_deleted=BehaviorOnRemoteNoteDeleted.NEVER_DELETE,
                 protected_fields={note_type_id: [protected_field_name]},
                 protected_tags=["protected_tag"],
                 note_types=SAMPLE_NOTE_TYPES,
@@ -1714,7 +1714,7 @@ class TestAnkiHubImporter:
                 protected_tags=[],
                 deck_name="test",
                 is_first_import_of_deck=True,
-                delete_note_on_remote_delete=DeleteNoteOnRemoteDelete.NEVER,
+                behavior_on_remote_note_deleted=BehaviorOnRemoteNoteDeleted.NEVER_DELETE,
                 suspend_new_cards_of_new_notes=DeckConfig.suspend_new_cards_of_new_notes_default(
                     ah_did_1
                 ),
@@ -1743,7 +1743,7 @@ class TestAnkiHubImporter:
                 protected_tags=[],
                 deck_name="test",
                 is_first_import_of_deck=True,
-                delete_note_on_remote_delete=DeleteNoteOnRemoteDelete.NEVER,
+                behavior_on_remote_note_deleted=BehaviorOnRemoteNoteDeleted.NEVER_DELETE,
                 suspend_new_cards_of_new_notes=DeckConfig.suspend_new_cards_of_new_notes_default(
                     ah_did_2
                 ),
@@ -1767,12 +1767,12 @@ class TestAnkiHubImporter:
             assert to_note_data(mw.col.get_note(anki_nid)) == note_info_1
 
     @pytest.mark.parametrize(
-        "delete_note_on_remote_delete, note_has_review",
+        "behavior_on_remote_note_deleted, note_has_review",
         [
-            (DeleteNoteOnRemoteDelete.NEVER, False),
-            (DeleteNoteOnRemoteDelete.NEVER, True),
-            (DeleteNoteOnRemoteDelete.IF_NOT_REVIEWED_YET, False),
-            (DeleteNoteOnRemoteDelete.IF_NOT_REVIEWED_YET, True),
+            (BehaviorOnRemoteNoteDeleted.NEVER_DELETE, False),
+            (BehaviorOnRemoteNoteDeleted.NEVER_DELETE, True),
+            (BehaviorOnRemoteNoteDeleted.DELETE_IF_NOT_REVIEWED_YET, False),
+            (BehaviorOnRemoteNoteDeleted.DELETE_IF_NOT_REVIEWED_YET, True),
         ],
     )
     def test_import_note_deletion(
@@ -1781,7 +1781,7 @@ class TestAnkiHubImporter:
         import_ah_note: ImportAHNote,
         next_deterministic_uuid: Callable[[], uuid.UUID],
         next_deterministic_id: Callable[[], int],
-        delete_note_on_remote_delete: DeleteNoteOnRemoteDelete,
+        behavior_on_remote_note_deleted: BehaviorOnRemoteNoteDeleted,
         note_has_review: bool,
     ):
         with anki_session_with_addon_data.profile_loaded():
@@ -1798,7 +1798,7 @@ class TestAnkiHubImporter:
 
             import_result = self._import_notes(
                 [ah_note],
-                delete_note_on_remote_delete=delete_note_on_remote_delete,
+                behavior_on_remote_note_deleted=behavior_on_remote_note_deleted,
                 is_first_import_of_deck=False,
                 ah_did=ah_did,
                 anki_did=anki_did,
@@ -1808,10 +1808,14 @@ class TestAnkiHubImporter:
 
             assert not new_dids
 
-            if delete_note_on_remote_delete == DeleteNoteOnRemoteDelete.NEVER or (
-                delete_note_on_remote_delete
-                == DeleteNoteOnRemoteDelete.IF_NOT_REVIEWED_YET
-                and note_has_review
+            if (
+                behavior_on_remote_note_deleted
+                == BehaviorOnRemoteNoteDeleted.NEVER_DELETE
+                or (
+                    behavior_on_remote_note_deleted
+                    == BehaviorOnRemoteNoteDeleted.DELETE_IF_NOT_REVIEWED_YET
+                    and note_has_review
+                )
             ):
                 anki_note = aqt.mw.col.get_note(NoteId(ah_note.anki_nid))
                 assert TAG_FOR_DELETED_NOTES in anki_note.tags
@@ -1822,8 +1826,8 @@ class TestAnkiHubImporter:
                 assert len(import_result.marked_as_deleted_nids) == 1
                 assert len(import_result.deleted_nids) == 0
             elif (
-                delete_note_on_remote_delete
-                == DeleteNoteOnRemoteDelete.IF_NOT_REVIEWED_YET
+                behavior_on_remote_note_deleted
+                == BehaviorOnRemoteNoteDeleted.DELETE_IF_NOT_REVIEWED_YET
             ):
                 with pytest.raises(NotFoundError):
                     aqt.mw.col.get_note(NoteId(ah_note.anki_nid))
@@ -1838,7 +1842,7 @@ class TestAnkiHubImporter:
         ah_notes: List[NoteInfo],
         ah_did: uuid.UUID,
         is_first_import_of_deck: bool,
-        delete_note_on_remote_delete: DeleteNoteOnRemoteDelete,
+        behavior_on_remote_note_deleted: BehaviorOnRemoteNoteDeleted,
         anki_did: Optional[DeckId] = None,
     ) -> AnkiHubImportResult:
         """Helper function to use the AnkiHubImporter to import notes with default arguments."""
@@ -1849,7 +1853,7 @@ class TestAnkiHubImporter:
             deck_name="test",
             anki_did=anki_did,
             is_first_import_of_deck=is_first_import_of_deck,
-            delete_note_on_remote_delete=delete_note_on_remote_delete,
+            behavior_on_remote_note_deleted=behavior_on_remote_note_deleted,
             note_types={},
             protected_fields={},
             protected_tags=[],
@@ -2459,7 +2463,7 @@ class TestCustomSearchNodes:
                 protected_tags=[],
                 deck_name="Test-Deck",
                 is_first_import_of_deck=True,
-                delete_note_on_remote_delete=DeleteNoteOnRemoteDelete.NEVER,
+                behavior_on_remote_note_deleted=BehaviorOnRemoteNoteDeleted.NEVER_DELETE,
                 suspend_new_cards_of_new_notes=DeckConfig.suspend_new_cards_of_new_notes_default(
                     ah_did
                 ),
@@ -2503,7 +2507,7 @@ class TestCustomSearchNodes:
                 protected_fields={},
                 protected_tags=[],
                 deck_name="Test-Deck",
-                delete_note_on_remote_delete=DeleteNoteOnRemoteDelete.NEVER,
+                behavior_on_remote_note_deleted=BehaviorOnRemoteNoteDeleted.NEVER_DELETE,
                 suspend_new_cards_of_new_notes=DeckConfig.suspend_new_cards_of_new_notes_default(
                     ah_did
                 ),

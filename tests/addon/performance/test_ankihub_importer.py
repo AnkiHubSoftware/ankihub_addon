@@ -13,7 +13,7 @@ os.environ["SKIP_INIT"] = "1"
 
 from ankihub.ankihub_client import NoteInfo
 from ankihub.main.importing import AnkiHubImporter
-from ankihub.settings import DeckConfig, DeleteNoteOnRemoteDelete
+from ankihub.settings import BehaviorOnRemoteNoteDeleted, DeckConfig
 
 
 class ImportAnkingNotes(Protocol):
@@ -40,7 +40,7 @@ def import_anking_notes(
             notes=anking_notes_data,
             deck_name="test",
             is_first_import_of_deck=True,
-            delete_note_on_remote_delete=DeleteNoteOnRemoteDelete.NEVER,
+            behavior_on_remote_note_deleted=BehaviorOnRemoteNoteDeleted.NEVER_DELETE,
             note_types=anking_note_types,
             protected_fields={},
             protected_tags=[],

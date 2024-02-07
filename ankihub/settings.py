@@ -69,11 +69,11 @@ class SuspendNewCardsOfExistingNotes(Enum):
     IF_SIBLINGS_SUSPENDED = "If siblings are suspended"
 
 
-class DeleteNoteOnRemoteDelete(Enum):
-    """Whether to delete the note on Anki when it's deleted on AnkiHub."""
+class BehaviorOnRemoteNoteDeleted(Enum):
+    """What to do with the local note in Anki when it's deleted on AnkiHub."""
 
-    IF_NOT_REVIEWED_YET = "If not reviewed yet"
-    NEVER = "Never"
+    DELETE_IF_NOT_REVIEWED_YET = "If not reviewed yet"
+    NEVER_DELETE = "Never"
 
 
 @dataclass
@@ -81,8 +81,8 @@ class DeckConfig(DataClassJSONMixin):
     anki_id: DeckId
     name: str
     # TODO The user should be prompted to choose this (for each deck)?
-    delete_note_on_remote_delete: DeleteNoteOnRemoteDelete = (
-        DeleteNoteOnRemoteDelete.NEVER
+    behavior_on_remote_note_deleted: BehaviorOnRemoteNoteDeleted = (
+        BehaviorOnRemoteNoteDeleted.NEVER_DELETE
     )
     user_relation: UserDeckRelation = UserDeckRelation.SUBSCRIBER
     latest_update: Optional[datetime] = dataclasses.field(
