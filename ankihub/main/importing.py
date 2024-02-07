@@ -21,7 +21,7 @@ from .. import LOGGER, settings
 from ..ankihub_client import Field, NoteInfo
 from ..ankihub_client.models import SuggestionType
 from ..db import ankihub_db
-from ..settings import DeleteNoteOnRemoteDelete, SuspendNewCardsOfExistingNotes
+from ..settings import BehaviorOnRemoteNoteDeleted, SuspendNewCardsOfExistingNotes
 from .note_conversion import (
     TAG_FOR_PROTECTING_ALL_FIELDS,
     get_fields_protected_by_tags,
@@ -88,7 +88,7 @@ class AnkiHubImporter:
         protected_tags: List[str],
         deck_name: str,  # name that will be used for a deck if a new one gets created
         is_first_import_of_deck: bool,
-        delete_note_on_remote_delete: DeleteNoteOnRemoteDelete,
+        behavior_on_remote_note_deleted: BehaviorOnRemoteNoteDeleted,
         suspend_new_cards_of_new_notes: bool,
         suspend_new_cards_of_existing_notes: SuspendNewCardsOfExistingNotes,
         anki_did: Optional[  # did that new notes should be put into if importing not for the first time
@@ -136,7 +136,7 @@ class AnkiHubImporter:
 
         dids = self._import_notes(
             notes_data=notes,
-            delete_note_on_remote_delete=delete_note_on_remote_delete,
+            behavior_on_remote_note_deleted=behavior_on_remote_note_deleted,
             suspend_new_cards_of_new_notes=suspend_new_cards_of_new_notes,
             suspend_new_cards_of_existing_notes=suspend_new_cards_of_existing_notes,
         )
@@ -185,7 +185,7 @@ class AnkiHubImporter:
     def _import_notes(
         self,
         notes_data: List[NoteInfo],
-        delete_note_on_remote_delete: DeleteNoteOnRemoteDelete,
+        behavior_on_remote_note_deleted: BehaviorOnRemoteNoteDeleted,
         suspend_new_cards_of_new_notes: bool,
         suspend_new_cards_of_existing_notes: SuspendNewCardsOfExistingNotes,
     ) -> Set[DeckId]:
@@ -223,7 +223,8 @@ class AnkiHubImporter:
         self._update_notes(notes_to_update)
         self._create_notes(notes_to_create_by_ah_nid, notes_data=upserted_notes_data)
         self._delete_notes_or_mark_as_deleted(
-            notes_to_delete, delete_note_on_remote_delete=delete_note_on_remote_delete
+            notes_to_delete,
+            behavior_on_remote_note_deleted=behavior_on_remote_note_deleted,
         )
 
         # Update the AnkiHubNote.mod values in the AnkiHub DB.
@@ -335,12 +336,15 @@ class AnkiHubImporter:
     def _delete_notes_or_mark_as_deleted(
         self,
         notes: Collection[Note],
-        delete_note_on_remote_delete: DeleteNoteOnRemoteDelete,
+        behavior_on_remote_note_deleted: BehaviorOnRemoteNoteDeleted,
     ) -> None:
         if not notes:
             return
 
-        if delete_note_on_remote_delete == DeleteNoteOnRemoteDelete.IF_NOT_REVIEWED_YET:
+        if (
+            behavior_on_remote_note_deleted
+            == BehaviorOnRemoteNoteDeleted.DELETE_IF_NOT_REVIEWED_YET
+        ):
             nids = [note.id for note in notes]
             nids_of_notes_with_reviews: Set[NoteId] = set(
                 aqt.mw.col.db.list(
@@ -357,11 +361,13 @@ class AnkiHubImporter:
             self._mark_notes_as_deleted(notes_with_reviews)
             self._delete_notes(notes_without_reviews)
 
-        elif delete_note_on_remote_delete == DeleteNoteOnRemoteDelete.NEVER:
+        elif (
+            behavior_on_remote_note_deleted == BehaviorOnRemoteNoteDeleted.NEVER_DELETE
+        ):
             self._mark_notes_as_deleted(notes)
         else:
             raise ValueError(  # pragma: no cover
-                f"Unknown value for {str(DeleteNoteOnRemoteDelete)}"
+                f"Unknown value for {str(BehaviorOnRemoteNoteDeleted)}"
             )
 
     def _delete_notes(self, notes: Collection[Note]) -> None:
