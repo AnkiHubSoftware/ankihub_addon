@@ -9,6 +9,7 @@ from pprint import pformat
 from typing import Collection, Dict, Iterable, List, Optional, Sequence, Set, Tuple
 
 import aqt
+from anki import consts as anki_consts
 from anki.cards import Card
 from anki.consts import QUEUE_TYPE_SUSPENDED
 from anki.decks import DeckId
@@ -350,7 +351,7 @@ class AnkiHubImporter:
                 aqt.mw.col.db.list(
                     "SELECT DISTINCT nid FROM cards "
                     f"WHERE nid IN {ids2str(nids)} AND "
-                    "id IN (SELECT DISTINCT cid FROM revlog)"
+                    f"id IN (SELECT DISTINCT cid FROM revlog WHERE type != {anki_consts.REVLOG_RESCHED})"
                 )
             )
             notes_with_reviews = set(
