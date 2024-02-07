@@ -222,7 +222,7 @@ class AnkiHubImporter:
 
         self._update_notes(notes_to_update)
         self._create_notes(notes_to_create_by_ah_nid, notes_data=upserted_notes_data)
-        self._handle_deleted_notes(
+        self._delete_notes_or_mark_as_deleted(
             notes_to_delete,
             behavior_on_remote_note_deleted=behavior_on_remote_note_deleted,
         )
@@ -333,7 +333,7 @@ class AnkiHubImporter:
         )
         self._created_nids = [note.id for note in notes_to_create_by_ah_nid.values()]
 
-    def _handle_deleted_notes(
+    def _delete_notes_or_mark_as_deleted(
         self,
         notes: Collection[Note],
         behavior_on_remote_note_deleted: BehaviorOnRemoteNoteDeleted,
