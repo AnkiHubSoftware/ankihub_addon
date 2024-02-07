@@ -1,15 +1,14 @@
 import json
 import os
+import sqlite3
 import tempfile
 import time
 import uuid
 from dataclasses import fields
 from datetime import datetime, timedelta
 from pathlib import Path
-from sqlite3 import ProgrammingError
 from textwrap import dedent
-from time import sleep
-from typing import Callable, ContextManager, Generator, List, Optional, Protocol, Tuple
+from typing import Callable, Generator, List, Optional, Protocol, Tuple
 from unittest.mock import Mock, patch
 
 import aqt
@@ -41,11 +40,11 @@ from ..factories import (
     NoteInfoFactory,
 )
 from ..fixtures import (  # type: ignore
+    AddAnkiNote,
     ImportAHNoteType,
     InstallAHDeck,
     MockStudyDeckDialogWithCB,
     MockSuggestionDialog,
-    NewNoteWithNoteType,
     SetFeatureFlagState,
     add_basic_anki_note_to_deck,
     assert_datetime_equal_ignore_milliseconds,
@@ -66,9 +65,9 @@ from ankihub.ankihub_client import (
     SuggestionType,
     TagGroupValidationResponse,
 )
-from ankihub.db import attached_ankihub_db, detached_ankihub_db
 from ankihub.db.db import _AnkiHubDB
-from ankihub.db.exceptions import IntegrityError, LockAcquisitionTimeoutError
+from ankihub.db.exceptions import IntegrityError
+from ankihub.db.models import AnkiHubNote, DeckMedia, get_peewee_database
 from ankihub.feature_flags import _FeatureFlags, feature_flags
 from ankihub.gui.error_dialog import ErrorDialog
 from ankihub.gui.errors import (
@@ -80,7 +79,6 @@ from ankihub.gui.errors import (
 )
 from ankihub.gui.media_sync import media_sync
 from ankihub.gui.menu import AnkiHubLogin, menu_state, refresh_ankihub_menu
-from ankihub.gui.operations import AddonQueryOp
 from ankihub.gui.operations.deck_creation import (
     DeckCreationConfirmationDialog,
     create_collaborative_deck,
@@ -99,6 +97,8 @@ from ankihub.gui.suggestion_dialog import (
 )
 from ankihub.gui.threading_utils import rate_limited
 from ankihub.gui.utils import (
+    _Dialog,
+    ask_user,
     choose_ankihub_deck,
     extract_argument,
     show_dialog,
@@ -789,13 +789,13 @@ class TestSuggestionDialogGetAnkiNidToPossibleAHDidsDict:
         self,
         anki_session_with_addon_data: AnkiSession,
         import_ah_note_type: ImportAHNoteType,
-        new_note_with_note_type: NewNoteWithNoteType,
+        add_anki_note: AddAnkiNote,
         next_deterministic_uuid: Callable[[], uuid.UUID],
     ):
         with anki_session_with_addon_data.profile_loaded():
             ah_did = next_deterministic_uuid()
             note_type = import_ah_note_type(ah_did=ah_did)
-            note = new_note_with_note_type(note_type=note_type)
+            note = add_anki_note(note_type=note_type)
             nids = [note.id]
             assert get_anki_nid_to_possible_ah_dids_dict(nids) == {note.id: {ah_did}}
 
@@ -803,7 +803,7 @@ class TestSuggestionDialogGetAnkiNidToPossibleAHDidsDict:
         self,
         anki_session_with_addon_data: AnkiSession,
         import_ah_note_type: ImportAHNoteType,
-        new_note_with_note_type: NewNoteWithNoteType,
+        add_anki_note: AddAnkiNote,
         next_deterministic_uuid: Callable[[], uuid.UUID],
     ):
         with anki_session_with_addon_data.profile_loaded():
@@ -814,7 +814,7 @@ class TestSuggestionDialogGetAnkiNidToPossibleAHDidsDict:
             import_ah_note_type(note_type=note_type, ah_did=ah_did_2)
 
             # The note type of the new note is used in two decks, so the note could be suggested for either of them.
-            note = new_note_with_note_type(note_type=note_type)
+            note = add_anki_note(note_type=note_type)
             nids = [note.id]
             assert get_anki_nid_to_possible_ah_dids_dict(nids) == {
                 note.id: {ah_did_1, ah_did_2}
@@ -929,7 +929,7 @@ class TestOpenSuggestionDialogForSingleSuggestion:
         anki_session_with_addon_data: AnkiSession,
         install_ah_deck: InstallAHDeck,
         import_ah_note_type: ImportAHNoteType,
-        new_note_with_note_type: NewNoteWithNoteType,
+        add_anki_note: AddAnkiNote,
         mock_dependiencies_for_suggestion_dialog: MockDependenciesForSuggestionDialog,
         mocker: MockerFixture,
         user_cancels: bool,
@@ -942,7 +942,7 @@ class TestOpenSuggestionDialogForSingleSuggestion:
             ah_did_2 = install_ah_deck()
             import_ah_note_type(ah_did=ah_did_2, note_type=note_type)
 
-            note = new_note_with_note_type(note_type=note_type)
+            note = add_anki_note(note_type=note_type)
 
             (
                 suggest_note_update_mock,
@@ -1041,18 +1041,18 @@ class TestOpenSuggestionDialogForBulkSuggestion:
         anki_session_with_addon_data: AnkiSession,
         install_ah_deck: InstallAHDeck,
         import_ah_note_type: ImportAHNoteType,
-        new_note_with_note_type: NewNoteWithNoteType,
+        add_anki_note: AddAnkiNote,
         mock_dependencies_for_bulk_suggestion_dialog: MockDependenciesForBulkSuggestionDialog,
         qtbot: QtBot,
     ):
         with anki_session_with_addon_data.profile_loaded():
             ah_did_1 = install_ah_deck()
             note_type_1 = import_ah_note_type(ah_did=ah_did_1, force_new=True)
-            note_1 = new_note_with_note_type(note_type=note_type_1)
+            note_1 = add_anki_note(note_type=note_type_1)
 
             ah_did_2 = install_ah_deck()
             note_type_2 = import_ah_note_type(ah_did=ah_did_2, force_new=True)
-            note_2 = new_note_with_note_type(note_type=note_type_2)
+            note_2 = add_anki_note(note_type=note_type_2)
 
             nids = [note_1.id, note_2.id]
 
@@ -1071,7 +1071,7 @@ class TestOpenSuggestionDialogForBulkSuggestion:
         anki_session_with_addon_data: AnkiSession,
         install_ah_deck: InstallAHDeck,
         import_ah_note_type: ImportAHNoteType,
-        new_note_with_note_type: NewNoteWithNoteType,
+        add_anki_note: AddAnkiNote,
         mock_dependencies_for_bulk_suggestion_dialog: MockDependenciesForBulkSuggestionDialog,
         mocker: MockerFixture,
         qtbot: QtBot,
@@ -1079,11 +1079,11 @@ class TestOpenSuggestionDialogForBulkSuggestion:
         with anki_session_with_addon_data.profile_loaded():
             ah_did_1 = install_ah_deck()
             note_type = import_ah_note_type(ah_did=ah_did_1)
-            note_1 = new_note_with_note_type(note_type=note_type)
+            note_1 = add_anki_note(note_type=note_type)
 
             ah_did_2 = install_ah_deck()
             import_ah_note_type(ah_did=ah_did_2, note_type=note_type)
-            note_2 = new_note_with_note_type(note_type=note_type)
+            note_2 = add_anki_note(note_type=note_type)
 
             nids = [note_1.id, note_2.id]
 
@@ -1176,72 +1176,6 @@ class TestOnSuggestNotesInBulkDone:
         assert kwargs.get("message") == "test"
 
 
-class TestDBConnection:
-    def test_execute(self, ankihub_db: _AnkiHubDB):
-        ankihub_db.connection().execute("CREATE TABLE test (id TEXT PRIMARY KEY)")
-        ankihub_db.connection().execute("INSERT INTO test VALUES (?)", 1)
-        result = ankihub_db.execute("SELECT * FROM test")
-        assert result == [("1",)]
-
-    def test_execute_first_row_only(self, ankihub_db: _AnkiHubDB):
-        ankihub_db.connection().execute("CREATE TABLE test (id TEXT PRIMARY KEY)")
-        ankihub_db.connection().execute("INSERT INTO test VALUES (?)", 1)
-        result = ankihub_db.execute("SELECT * FROM test", first_row_only=True)
-        assert result == ("1",)
-
-    def test_scalar(self, ankihub_db: _AnkiHubDB):
-        ankihub_db.connection().execute(
-            "CREATE TABLE test (id TEXT PRIMARY KEY, other_field TEXT)"
-        )
-        ankihub_db.connection().execute("INSERT INTO test VALUES (?, ?)", 1, "test")
-        result = ankihub_db.scalar("SELECT * FROM test")
-        assert result == "1"
-
-    def test_list(self, ankihub_db: _AnkiHubDB):
-        ankihub_db.connection().execute("CREATE TABLE test (id TEXT PRIMARY KEY)")
-        ankihub_db.connection().execute("INSERT INTO test VALUES (?)", 1)
-        ankihub_db.connection().execute("INSERT INTO test VALUES (?)", 2)
-        result = ankihub_db.list("SELECT * FROM test")
-        assert result == ["1", "2"]
-
-    def test_first(self, ankihub_db: _AnkiHubDB):
-        ankihub_db.connection().execute("CREATE TABLE test (id TEXT PRIMARY KEY)")
-        ankihub_db.connection().execute("INSERT INTO test VALUES (?)", 1)
-        result = ankihub_db.first("SELECT * FROM test")
-        assert result == ("1",)
-
-    def test_reusing_connection_not_as_context_manager_raises_exception(
-        self, ankihub_db: _AnkiHubDB
-    ):
-        conn = ankihub_db.connection()
-        with pytest.raises(ProgrammingError) as e:
-            conn.execute("CREATE TABLE test (id TEXT PRIMARY KEY)")
-            conn.execute("INSERT INTO test VALUES (?)", 1)
-        assert "Cannot operate on a closed database." in str(e.value)
-
-    @pytest.mark.parametrize(
-        "exception_is_raised",
-        [True, False],
-    )
-    def test_changes_are_rolled_back_on_exception_in_context_manager(
-        self, ankihub_db: _AnkiHubDB, exception_is_raised: bool
-    ):
-        try:
-            with ankihub_db.connection() as conn:
-                conn.execute("CREATE TABLE test (id TEXT PRIMARY KEY)")
-                conn.execute("INSERT INTO test VALUES (?)", 1)
-                if exception_is_raised:
-                    raise Exception("test")
-        except Exception:
-            pass
-
-        result_str = ankihub_db.scalar("SELECT * FROM test")
-        if exception_is_raised:
-            assert result_str is None
-        else:
-            assert result_str == "1"
-
-
 class TestAnkiHubDBAnkiNidsToAnkiHubNids:
     def test_anki_nids_to_ankihub_nids(
         self,
@@ -1316,6 +1250,55 @@ class TestAnkiHubDBAnkiHubNidsToAnkiIds:
             existing_ah_nid: anki_nid,
             not_existing_ah_nid: None,
         }
+
+
+class TestAnkiHubDBAreAnkiHubNotes:
+    def test_with_one_ankihub_note(
+        self,
+        anki_session_with_addon_data: AnkiSession,
+        ankihub_db: _AnkiHubDB,
+        import_ah_note: ImportAHNote,
+    ):
+        with anki_session_with_addon_data.profile_loaded():
+            note_info = import_ah_note()
+            assert ankihub_db.are_ankihub_notes(anki_nids=[NoteId(note_info.anki_nid)])
+
+    def test_with_multiple_ankihub_notes(
+        self,
+        anki_session_with_addon_data: AnkiSession,
+        ankihub_db: _AnkiHubDB,
+        import_ah_note: ImportAHNote,
+    ):
+        with anki_session_with_addon_data.profile_loaded():
+            note_info_1 = import_ah_note()
+            note_info_2 = import_ah_note()
+            assert ankihub_db.are_ankihub_notes(
+                anki_nids=[NoteId(note_info_1.anki_nid), NoteId(note_info_2.anki_nid)]
+            )
+
+    def test_with_one_non_ankihub_note(
+        self,
+        anki_session_with_addon_data: AnkiSession,
+        ankihub_db: _AnkiHubDB,
+        add_anki_note: AddAnkiNote,
+    ):
+        with anki_session_with_addon_data.profile_loaded():
+            anki_note = add_anki_note()
+            assert not ankihub_db.are_ankihub_notes(anki_nids=[anki_note.id])
+
+    def test_with_mixed_notes(
+        self,
+        anki_session_with_addon_data: AnkiSession,
+        ankihub_db: _AnkiHubDB,
+        import_ah_note: ImportAHNote,
+        add_anki_note: AddAnkiNote,
+    ):
+        with anki_session_with_addon_data.profile_loaded():
+            anki_note = add_anki_note()
+            note_info = import_ah_note()
+            assert not ankihub_db.are_ankihub_notes(
+                anki_nids=[anki_note.id, NoteId(note_info.anki_nid)]
+            )
 
 
 class TestAnkiHubDBRemoveNotes:
@@ -1620,55 +1603,25 @@ class TestAnkiHubDBMediaNamesWithMatchingHashes:
         )
 
 
-class TestAnkiHubDBContextManagers:
-    @pytest.mark.parametrize(
-        "task_configs, task_times_out",
-        [
-            # Format for a task_confg: (context_manager, duration)
-            # Detached, Detached - tasks don't block each other
-            ([(detached_ankihub_db, 0.1), (detached_ankihub_db, 0.1)], False),
-            ([(detached_ankihub_db, 0.5), (detached_ankihub_db, 0.1)], False),
-            # Attached, Attached - tasks block each other
-            ([(attached_ankihub_db, 0.1), (attached_ankihub_db, 0.1)], False),
-            ([(attached_ankihub_db, 0.5), (attached_ankihub_db, 0.1)], True),
-            # Attached, Detached - tasks block each other
-            ([(attached_ankihub_db, 0.1), (detached_ankihub_db, 0.1)], False),
-            ([(attached_ankihub_db, 0.5), (detached_ankihub_db, 0.1)], True),
-            # Detached, Attached - tasks block each other
-            ([(detached_ankihub_db, 0.1), (attached_ankihub_db, 0.1)], False),
-            ([(detached_ankihub_db, 0.5), (attached_ankihub_db, 0.1)], True),
-        ],
-    )
-    def test_blocking_and_timeout_behavior(
-        self,
-        anki_session_with_addon_data: AnkiSession,
-        qtbot: QtBot,
-        mocker: MockerFixture,
-        task_configs: List[Tuple[Callable[[], ContextManager], float]],
-        task_times_out: bool,
+class TestAnkiHubDBDeckMedia:
+    def test_modified_field_is_stored_in_correct_format_in_db(
+        self, ankihub_db: _AnkiHubDB, next_deterministic_uuid
     ):
-        mocker.patch("ankihub.db.rw_lock.LOCK_TIMEOUT_SECONDS", 0.2)
+        ah_did = next_deterministic_uuid()
+        deck_media_from_client = DeckMediaFactory.create()
 
-        def task(context_manager: Callable[[], ContextManager], duration: float):
-            with context_manager():
-                sleep(duration)
+        ankihub_db.upsert_deck_media_infos(
+            ankihub_did=ah_did, media_list=[deck_media_from_client]
+        )
 
-        with anki_session_with_addon_data.profile_loaded():
-            for context_manager, duration in task_configs:
-                AddonQueryOp(
-                    parent=qtbot,
-                    op=lambda _: task(context_manager, duration),
-                    success=lambda _: None,
-                ).without_collection().run_in_background()
+        # Assert that the retrieved value is the same as the one that was stored.
+        deck_media_from_db = DeckMedia.get()
+        assert deck_media_from_db.modified == deck_media_from_client.modified
 
-            with qtbot.captureExceptions() as exceptions:
-                qtbot.wait(500)
-
-            if task_times_out:
-                assert len(exceptions) == 1
-                assert isinstance(exceptions[0][1], LockAcquisitionTimeoutError)
-            else:
-                assert len(exceptions) == 0
+        # Assert that the modified value is stored in the DB in the correct format.
+        cursor = get_peewee_database().execute_sql("SELECT modified from deck_media")
+        modified_in_db = cursor.fetchone()[0]
+        assert modified_in_db == deck_media_from_client.modified.isoformat()
 
 
 class TestErrorHandling:
@@ -1909,21 +1862,21 @@ class TestRetainNidsWithAHNoteType:
         self,
         anki_session_with_addon_data: AnkiSession,
         import_ah_note_type: ImportAHNoteType,
-        new_note_with_note_type: NewNoteWithNoteType,
+        add_anki_note: AddAnkiNote,
     ):
         with anki_session_with_addon_data.profile_loaded():
             note_type = import_ah_note_type()
-            note = new_note_with_note_type(note_type)
+            note = add_anki_note(note_type)
             nids = [note.id]
             assert retain_nids_with_ah_note_type(nids) == nids
 
     def test_filters_out_note_with_non_ah_note_type(
         self,
         anki_session_with_addon_data: AnkiSession,
-        new_note_with_note_type: NewNoteWithNoteType,
+        add_anki_note: AddAnkiNote,
     ):
         with anki_session_with_addon_data.profile_loaded():
-            note = new_note_with_note_type(aqt.mw.col.models.by_name("Basic"))
+            note = add_anki_note(aqt.mw.col.models.by_name("Basic"))
             nids = [note.id]
             assert len(retain_nids_with_ah_note_type(nids)) == 0
 
@@ -1932,17 +1885,17 @@ class TestRetainNidsWithAHNoteType:
         anki_session_with_addon_data: AnkiSession,
         import_ah_note: ImportAHNote,
         import_ah_note_type: ImportAHNoteType,
-        new_note_with_note_type: NewNoteWithNoteType,
+        add_anki_note: AddAnkiNote,
     ):
         with anki_session_with_addon_data.profile_loaded():
             note_info = import_ah_note()
             nid_1 = NoteId(note_info.anki_nid)
 
             note_type = import_ah_note_type()
-            note = new_note_with_note_type(note_type)
+            note = add_anki_note(note_type)
             nid_2 = note.id
 
-            note = new_note_with_note_type(aqt.mw.col.models.by_name("Basic"))
+            note = add_anki_note(aqt.mw.col.models.by_name("Basic"))
             nid_3 = note.id
 
             nids = [nid_1, nid_2, nid_3]
@@ -2653,3 +2606,142 @@ class TestUtils:
         assert not args
         assert kwargs == {"a": True}
         assert value == "test"
+
+
+@pytest.mark.parametrize(
+    "show_cancel_button, text_of_button_to_click, expected_return_value",
+    [
+        # Without cancel button
+        (False, "Yes", True),
+        (False, "No", False),
+        # With cancel button
+        (True, "Yes", True),
+        (True, "No", False),
+        (True, "Cancel", None),
+    ],
+)
+def test_ask_user(
+    mocker: MockerFixture,
+    qtbot: QtBot,
+    show_cancel_button: bool,
+    text_of_button_to_click: str,
+    expected_return_value: bool,
+):
+    # Patch _Dialog.__init__ to store the _Dialog instance in the dialog variable when
+    # it is created.
+    dialog: _Dialog = None
+
+    def new_init(self, *args, **kwargs):
+        nonlocal dialog
+        dialog = self
+        original_init(self, *args, **kwargs)
+
+    original_init = _Dialog.__init__
+    mocker.patch.object(_Dialog, "__init__", new=new_init)
+
+    # Click a button on the dialog after it is shown
+    def click_button():
+        button = next(
+            button
+            for button in dialog.button_box.buttons()
+            if text_of_button_to_click in button.text()
+        )
+        qtbot.mouseClick(button, Qt.MouseButton.LeftButton)
+
+    QTimer.singleShot(0, click_button)
+
+    # Show the dialog (blocks until the button is clicked)
+    return_value = ask_user(
+        text="Do you want to continue?",
+        title="Continue?",
+        show_cancel_button=show_cancel_button,
+    )
+    assert return_value == expected_return_value
+
+
+class TestAnkiHubDBMigrations:
+    def test_migrate_from_schema_version_1(
+        self, next_deterministic_uuid, next_deterministic_id, ankihub_db: _AnkiHubDB
+    ):
+        """Test the migration from schema version 1 to the newest schema.
+
+        This test creates a temporary database with an old schema (version 1),
+        adds a single row to the notes table (which was the only table at the time),
+        and then applies the migrations to upgrade the database to the newest schema.
+
+        After the migration, it checks that:
+        - The row in the notes table was migrated correctly.
+        - The table and index definitions in the migrated database are the same
+          as those in the original database.
+
+        Limitations:
+        - The test is not exhaustive as it only starts with one row in one table.
+        - It does not test the migration of data in other tables and fields that
+            were added in newer schema versions.
+        """
+        with tempfile.TemporaryDirectory() as f:
+            # Create a database with an old schema (version 1) in a temporary directory
+            migration_test_db_path = Path(f) / "test.db"
+            conn = sqlite3.Connection(migration_test_db_path)
+
+            inital_table_definition = """
+                CREATE TABLE notes (
+                    ankihub_note_id STRING PRIMARY KEY,
+                    ankihub_deck_id STRING,
+                    anki_note_id INTEGER,
+                    anki_note_type_id INTEGER,
+                    mod INTEGER
+                )
+            """
+            conn.execute(inital_table_definition)
+            conn.commit()
+
+            # Add a row to the notes table
+            ah_nid = next_deterministic_uuid()
+            ah_did = next_deterministic_uuid()
+            anki_nid = next_deterministic_id()
+            anki_mid = next_deterministic_id()
+            mod = 7
+            conn.execute(
+                "INSERT INTO notes VALUES (?, ?, ?, ?, ?)",
+                (str(ah_nid), str(ah_did), anki_nid, anki_mid, mod),
+            )
+            conn.commit()
+
+            # Set the user version to 1
+            conn.execute("PRAGMA user_version = 1")
+            conn.commit()
+
+            conn.close()
+
+            # Apply the migrations
+            migration_test_db = _AnkiHubDB()
+            migration_test_db.setup_and_migrate(db_path=migration_test_db_path)
+
+            # Assert that the row was migrated correctly
+            note = AnkiHubNote.get()
+            assert note.ankihub_note_id == ah_nid
+            assert note.ankihub_deck_id == ah_did
+            assert note.anki_note_id == anki_nid
+            assert note.anki_note_type_id == anki_mid
+            assert note.mod == mod
+
+            # Get the expected table and index definitions
+            table_definitions_sql = "SELECT sql FROM sqlite_master WHERE type='table'"
+            index_definitions_sql = "SELECT sql FROM sqlite_master WHERE type='index'"
+
+            conn = sqlite3.Connection(ankihub_db.database_path)
+            expected_table_definitions = conn.execute(table_definitions_sql).fetchall()
+            expected_index_definitions = conn.execute(index_definitions_sql).fetchall()
+            conn.close()
+
+            # Get the table and index definitions after the migration for the migration test db
+            conn = sqlite3.Connection(migration_test_db_path)
+            table_definitions = conn.execute(table_definitions_sql).fetchall()
+            index_definitions = conn.execute(index_definitions_sql).fetchall()
+            conn.close()
+
+            # Assert that the table and index definitions are the same for the two databases
+            assert table_definitions == expected_table_definitions
+            assert index_definitions == expected_index_definitions
+            assert ankihub_db.database_path != migration_test_db_path  # sanity check

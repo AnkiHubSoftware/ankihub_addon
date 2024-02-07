@@ -33,12 +33,13 @@ from anki.decks import DeckId, FilteredDeckConfig
 from anki.models import NotetypeDict, NotetypeId
 from anki.notes import Note, NoteId
 from anki.utils import point_version
-from aqt import AnkiQt, dialogs, gui_hooks
+from aqt import AnkiQt, QMenu, dialogs, gui_hooks
 from aqt.addcards import AddCards
 from aqt.addons import InstallOk
 from aqt.browser import Browser
 from aqt.browser.sidebar.item import SidebarItem
 from aqt.browser.sidebar.tree import SidebarTreeView
+from aqt.gui_hooks import browser_will_show_context_menu
 from aqt.importing import AnkiPackageImporter
 from aqt.qt import QAction, Qt
 from aqt.theme import theme_manager
@@ -53,6 +54,7 @@ from ankihub.ankihub_client.models import (
     DeckMediaUpdateChunk,
     UserDeckExtensionRelation,
 )
+from ankihub.gui import editor
 from ankihub.gui.browser.browser import (
     ModifiedAfterSyncSearchNode,
     NewNoteSearchNode,
@@ -70,11 +72,13 @@ from ..factories import (
 )
 from ..fixtures import (
     ImportAHNote,
+    ImportAHNoteType,
     InstallAHDeck,
     MockDownloadAndInstallDeckDependencies,
     MockShowDialogWithCB,
     MockStudyDeckDialogWithCB,
     MockSuggestionDialog,
+    add_basic_anki_note_to_deck,
     create_or_get_ah_version_of_note_type,
     record_review,
 )
@@ -108,7 +112,8 @@ from ankihub.ankihub_client.ankihub_client import (
     _transform_notes_data,
 )
 from ankihub.common_utils import local_media_names_from_html
-from ankihub.db import ankihub_db, attached_ankihub_db
+from ankihub.db import ankihub_db
+from ankihub.db.models import AnkiHubNote
 from ankihub.debug import (
     _log_stack,
     _setup_logging_for_db_begin,
@@ -120,6 +125,7 @@ from ankihub.gui.auto_sync import (
     _setup_ankihub_sync_on_ankiweb_sync,
 )
 from ankihub.gui.browser import custom_columns
+from ankihub.gui.browser import setup as setup_browser
 from ankihub.gui.browser.custom_search_nodes import UpdatedSinceLastReviewSearchNode
 from ankihub.gui.config_dialog import (
     get_config_dialog_manager,
@@ -127,7 +133,7 @@ from ankihub.gui.config_dialog import (
 )
 from ankihub.gui.deck_updater import _AnkiHubDeckUpdater, ah_deck_updater
 from ankihub.gui.decks_dialog import DeckManagementDialog
-from ankihub.gui.editor import _on_suggestion_button_press, _refresh_buttons
+from ankihub.gui.editor import SUGGESTION_BTN_ID
 from ankihub.gui.errors import upload_logs_and_data_in_background
 from ankihub.gui.media_sync import media_sync
 from ankihub.gui.menu import AnkiHubLogin, menu_state
@@ -146,7 +152,7 @@ from ankihub.main.exporting import to_note_data
 from ankihub.main.importing import (
     AnkiHubImporter,
     _adjust_note_types_in_anki_db,
-    reset_note_types_of_notes,
+    change_note_types_of_notes,
 )
 from ankihub.main.note_conversion import (
     ADDON_INTERNAL_TAGS,
@@ -479,131 +485,153 @@ def test_entry_point(anki_session_with_addon_data: AnkiSession, qtbot: QtBot):
     # and that the add-on doesn't crash on Anki startup
 
 
-def test_editor(
-    anki_session_with_addon_data: AnkiSession,
-    requests_mock: Mocker,
-    mocker: MockerFixture,
-    next_deterministic_uuid: Callable[[], uuid.UUID],
-    install_sample_ah_deck: InstallSampleAHDeck,
-    mock_suggestion_dialog: MockSuggestionDialog,
-):
-    mocker.patch.object(config, "is_logged_in", return_value=True)
+# The JS in the webviews is flaky if not run in sequential mode
+@pytest.mark.sequential
+class TestEditor:
+    @pytest.mark.parametrize(
+        "note_fields_changed, logged_in", [(True, True), (False, True), (True, False)]
+    )
+    def test_create_change_note_suggestion(
+        self,
+        anki_session_with_addon_data: AnkiSession,
+        mocker: MockerFixture,
+        install_ah_deck: InstallAHDeck,
+        import_ah_note: ImportAHNote,
+        mock_suggestion_dialog: MockSuggestionDialog,
+        qtbot: QtBot,
+        note_fields_changed: bool,
+        logged_in: bool,
+    ):
+        editor.setup()
+        with anki_session_with_addon_data.profile_loaded():
+            mocker.patch.object(config, "is_logged_in", return_value=logged_in)
+            mock_suggestion_dialog(user_cancels=False)
 
-    with anki_session_with_addon_data.profile_loaded():
-        mw = anki_session_with_addon_data.mw
+            create_change_note_suggestion_mock = mocker.patch.object(
+                AnkiHubClient, "create_change_note_suggestion"
+            )
 
-        install_sample_ah_deck()
+            show_tooltip_mock = mocker.patch(
+                "ankihub.gui.suggestion_dialog.show_tooltip"
+            )
 
-        mock_suggestion_dialog(user_cancels=False)
+            ah_did = install_ah_deck()
+            ah_note = import_ah_note(ah_did=ah_did)
+            anki_note = aqt.mw.col.get_note(NoteId(ah_note.anki_nid))
 
-        add_cards_dialog: AddCards = dialogs.open("AddCards", mw)
-        editor = add_cards_dialog.editor
+            if note_fields_changed:
+                new_field_value = "new field value"
+                anki_note["Front"] = new_field_value
 
-        # test a new note suggestion
-        editor.note = mw.col.new_note(mw.col.models.by_name("Basic (Testdeck / user1)"))
+            add_cards_dialog: AddCards = dialogs.open("AddCards", aqt.mw)
+            add_cards_dialog.editor.set_note(anki_note)
 
-        note_1_ah_nid = next_deterministic_uuid()
+            self.wait_suggestion_button_ready(qtbot=qtbot, mocker=mocker)
 
-        mocker.patch("ankihub.main.exporting.uuid.uuid4", return_value=note_1_ah_nid)
+            self.assert_suggestion_button_text(
+                qtbot=qtbot,
+                addcards=add_cards_dialog,
+                expected_text=AnkiHubCommands.CHANGE.value,
+            )
 
-        requests_mock.post(
-            f"{config.api_url}/notes/{note_1_ah_nid}/suggestion/",
-            status_code=201,
-            json={},
+            self.click_suggestion_button(add_cards_dialog)
+
+            if not logged_in:
+                # Assert that the login dialog was shown
+                window: AnkiHubLogin = AnkiHubLogin._window
+                qtbot.wait_until(lambda: window and window.isVisible())
+            elif note_fields_changed:
+                # Assert that the suggestion was sent to the server with the correct data
+                qtbot.wait_until(lambda: create_change_note_suggestion_mock.called)
+                change_note_suggestion: ChangeNoteSuggestion = (
+                    create_change_note_suggestion_mock.call_args.kwargs[
+                        "change_note_suggestion"
+                    ]
+                )
+                assert change_note_suggestion.fields[0].value == new_field_value
+            else:
+                # Assert that no suggestion was sent to the server and that a tooltip was shown
+                qtbot.wait_until(lambda: show_tooltip_mock.called)
+                assert not create_change_note_suggestion_mock.called
+
+            # Clear editor to prevent dialog that asks for confirmation to discard changes when closing the editor
+            add_cards_dialog.editor.cleanup()
+
+    @pytest.mark.parametrize("logged_in", [True, False])
+    def test_create_new_note_suggestion(
+        self,
+        anki_session_with_addon_data: AnkiSession,
+        mocker: MockerFixture,
+        mock_suggestion_dialog: MockSuggestionDialog,
+        install_ah_deck: InstallAHDeck,
+        import_ah_note_type: ImportAHNoteType,
+        qtbot: QtBot,
+        logged_in: bool,
+    ):
+        editor.setup()
+        with anki_session_with_addon_data.profile_loaded():
+            mocker.patch.object(config, "is_logged_in", return_value=logged_in)
+            mock_suggestion_dialog(user_cancels=False)
+
+            create_new_note_suggestion_mock = mocker.patch.object(
+                AnkiHubClient, "create_new_note_suggestion"
+            )
+
+            ah_did = install_ah_deck()
+            ah_note_type = import_ah_note_type(ah_did=ah_did)
+
+            anki_note = aqt.mw.col.new_note(ah_note_type)
+            field_value = "field value"
+            anki_note["Front"] = field_value
+
+            add_cards_dialog: AddCards = dialogs.open("AddCards", aqt.mw)
+            add_cards_dialog.editor.set_note(anki_note)
+
+            self.wait_suggestion_button_ready(qtbot=qtbot, mocker=mocker)
+
+            self.assert_suggestion_button_text(
+                qtbot=qtbot,
+                addcards=add_cards_dialog,
+                expected_text=AnkiHubCommands.NEW.value,
+            )
+
+            self.click_suggestion_button(add_cards_dialog)
+
+            if not logged_in:
+                # Assert that the login dialog was shown
+                window: AnkiHubLogin = AnkiHubLogin._window
+                qtbot.wait_until(lambda: window and window.isVisible())
+            else:
+                # Assert that the suggestion was created with the correct data
+                qtbot.wait_until(lambda: create_new_note_suggestion_mock.called)
+                new_note_suggestion: NewNoteSuggestion = (
+                    create_new_note_suggestion_mock.call_args.kwargs[
+                        "new_note_suggestion"
+                    ]
+                )
+                assert new_note_suggestion.fields[0].value == field_value
+
+            # Clear editor to prevent dialog that asks for confirmation to discard changes when closing the editor
+            add_cards_dialog.editor.cleanup()
+
+    def wait_suggestion_button_ready(self, qtbot: QtBot, mocker: MockerFixture) -> None:
+        refresh_buttons_spy = mocker.spy(editor, "_refresh_buttons")
+        qtbot.wait_until(lambda: refresh_buttons_spy.called)
+
+    def assert_suggestion_button_text(
+        self, qtbot: QtBot, addcards: AddCards, expected_text: str
+    ) -> None:
+        with qtbot.wait_callback() as callback:
+            addcards.editor.web.evalWithCallback(
+                f"document.getElementById('{SUGGESTION_BTN_ID}-label').textContent",
+                callback,
+            )
+        callback.assert_called_with(expected_text)
+
+    def click_suggestion_button(self, addcards: AddCards) -> None:
+        addcards.editor.web.eval(
+            f"document.getElementById('{SUGGESTION_BTN_ID}').click()"
         )
-
-        _refresh_buttons(editor)
-        assert editor.ankihub_command == AnkiHubCommands.NEW.value  # type: ignore
-        _on_suggestion_button_press(editor)
-
-        # test a change note suggestion
-        note = mw.col.get_note(mw.col.find_notes("")[0])
-        editor.note = note
-
-        note_2_ah_nid = ankihub_db.ankihub_nid_for_anki_nid(note.id)
-
-        suggestion_endpoint_mock = requests_mock.post(
-            f"{config.api_url}/notes/{note_2_ah_nid}/suggestion/",
-            status_code=201,
-            json={},
-        )
-
-        _refresh_buttons(editor)
-        assert editor.ankihub_command == AnkiHubCommands.CHANGE.value  # type: ignore
-
-        # this should not trigger a suggestion because the note has not been changed
-        _on_suggestion_button_press(editor)
-        assert suggestion_endpoint_mock.call_count == 0  # type: ignore
-
-        # change the front of the note
-        note["Front"] = "new front"
-        note.flush()
-
-        # this should trigger a suggestion because the note has been changed
-        _on_suggestion_button_press(editor)
-
-        # mocked requests: f"{config.api_url_base}/notes/{notes_2_ah_nid}/suggestion/"
-        assert suggestion_endpoint_mock.call_count == 1  # type: ignore
-
-
-def test_editor_should_display_login_window_if_user_attempts_to_submit_new_note_without_being_signed_in(
-    qtbot: QtBot,
-    anki_session_with_addon_data: AnkiSession,
-    mocker: MockerFixture,
-    install_sample_ah_deck: InstallSampleAHDeck,
-):
-    mocker.patch.object(config, "is_logged_in", return_value=False)
-
-    with anki_session_with_addon_data.profile_loaded():
-        mw = anki_session_with_addon_data.mw
-
-        install_sample_ah_deck()
-
-        add_cards_dialog: AddCards = dialogs.open("AddCards", mw)
-        editor = add_cards_dialog.editor
-
-        # test a new note suggestion
-        editor.note = mw.col.new_note(mw.col.models.by_name("Basic (Testdeck / user1)"))
-
-        _refresh_buttons(editor)
-        assert editor.ankihub_command == AnkiHubCommands.NEW.value  # type: ignore
-        _on_suggestion_button_press(editor)
-        window: AnkiHubLogin = AnkiHubLogin._window
-        qtbot.waitUntil(lambda: window.isVisible())
-
-
-def test_editor_should_display_login_window_if_user_attempts_to_submit_change_note_suggestion_without_being_signed_in(
-    qtbot: QtBot,
-    anki_session_with_addon_data: AnkiSession,
-    mocker: MockerFixture,
-    install_sample_ah_deck: InstallSampleAHDeck,
-):
-    mocker.patch.object(config, "is_logged_in", return_value=False)
-
-    with anki_session_with_addon_data.profile_loaded():
-        mw = anki_session_with_addon_data.mw
-
-        install_sample_ah_deck()
-
-        add_cards_dialog: AddCards = dialogs.open("AddCards", mw)
-        editor = add_cards_dialog.editor
-
-        # test a change note suggestion
-        note = mw.col.get_note(mw.col.find_notes("")[0])
-        editor.note = note
-
-        _refresh_buttons(editor)
-
-        assert editor.ankihub_command == AnkiHubCommands.CHANGE.value  # type: ignore
-
-        # change the front of the note
-        note["Front"] = "new front"
-        note.flush()
-
-        # this should trigger a suggestion because the note has been changed
-        _on_suggestion_button_press(editor)
-        window: AnkiHubLogin = AnkiHubLogin._window
-        qtbot.waitUntil(lambda: window.isVisible())
 
 
 def test_get_note_types_in_deck(anki_session_with_addon_data: AnkiSession):
@@ -702,12 +730,7 @@ def test_create_collaborative_deck_and_upload(
         assert ankihub_db.note_data(note.id) == expected_note_data
 
         # check that note mod value is in database
-        assert (
-            ankihub_db.scalar(
-                "SELECT mod from notes WHERE ankihub_note_id = ?", str(ah_nid)
-            )
-            == note.mod
-        )
+        assert AnkiHubNote.get(AnkiHubNote.anki_note_id == note.id).mod == note.mod
 
 
 class TestDownloadAndInstallDecks:
@@ -1229,7 +1252,7 @@ def test_reset_note_types_of_notes(anki_session_with_addon_data: AnkiSession):
         nid_mid_pairs = [
             (NoteId(note.id), NotetypeId(cloze["id"])),
         ]
-        reset_note_types_of_notes(nid_mid_pairs)
+        change_note_types_of_notes(nid_mid_pairs)
 
         assert mw.col.get_note(note.id).mid == cloze["id"]
 
@@ -1667,7 +1690,7 @@ class TestAnkiHubImporter:
             assert import_result.updated_nids == []
             assert import_result.skipped_nids == []
 
-            mod_1 = ankihub_db.scalar("SELECT mod FROM notes WHERE anki_note_id = ?", 1)
+            mod_1 = AnkiHubNote.get(AnkiHubNote.anki_note_id == 1).mod
             sleep(0.1)  # sleep to test for mod value changes
 
             # import the second note with the same nid
@@ -1700,7 +1723,7 @@ class TestAnkiHubImporter:
             assert ankihub_db.ankihub_deck_ids() == [ah_did_1]
 
             # Check that the mod value of the first note was not changed.
-            mod_2 = ankihub_db.scalar("SELECT mod FROM notes WHERE anki_note_id = ?", 1)
+            mod_2 = AnkiHubNote.get(AnkiHubNote.anki_note_id == 1).mod
             assert mod_2 == mod_1
 
             # Check that the note in the Anki database wasn't changed by the second import.
@@ -2128,6 +2151,54 @@ def prepare_note(
 
 
 class TestCustomSearchNodes:
+    def test_use_custom_search_node_in_browser_search(
+        self,
+        anki_session_with_addon_data: AnkiSession,
+        import_ah_note: ImportAHNote,
+        qtbot: QtBot,
+    ):
+        setup_browser()
+        with anki_session_with_addon_data.profile_loaded():
+            # Add an AnkiHub note to the collection
+            note_info = NoteInfoFactory.create()
+            import_ah_note(note_info)
+
+            # Add a non-AnkiHub note to the collection
+            add_basic_anki_note_to_deck(DeckId(1))
+
+            # Search for new AnkiHub notes in the browser using our NewNoteSearchNode
+            browser: Browser = dialogs.open("Browser", aqt.mw)
+            search_string = f"{NewNoteSearchNode.parameter_name}:"
+            browser.search_for(search=search_string)
+
+            # Assert that only the AnkiHub note is in the search results
+            browser.table.select_all()
+            assert browser.table.get_selected_note_ids() == [note_info.anki_nid]
+
+            # Close the browser to prevent RuntimeErrors getting raised during teardown
+            with qtbot.wait_callback() as callback:
+                dialogs.closeAll(onsuccess=callback)
+
+    def test_use_custom_search_node_in_browser_search_with_invalid_parameter(
+        self,
+        anki_session_with_addon_data: AnkiSession,
+        mocker: MockerFixture,
+        qtbot: QtBot,
+    ):
+        setup_browser()
+        with anki_session_with_addon_data.profile_loaded():
+            showWarning_mock = mocker.patch("ankihub.gui.browser.browser.showWarning")
+
+            browser: Browser = dialogs.open("Browser", aqt.mw)
+            search_string = f"{NewNoteSearchNode.parameter_name}:invalid-parameter"
+            browser.search_for(search=search_string)
+
+            assert showWarning_mock.called
+
+            # Close the browser to prevent RuntimeErrors getting raised during teardown
+            with qtbot.wait_callback() as callback:
+                dialogs.closeAll(onsuccess=callback)
+
     def test_ModifiedAfterSyncSearchNode_with_notes(
         self,
         anki_session_with_addon_data: AnkiSession,
@@ -2143,27 +2214,24 @@ class TestCustomSearchNodes:
             browser = mocker.Mock()
             browser.table.is_notes_mode.return_value = True
 
-            with attached_ankihub_db():
-                assert (
-                    ModifiedAfterSyncSearchNode(browser, "yes").filter_ids(all_nids)
-                    == []
-                )
-                assert (
-                    ModifiedAfterSyncSearchNode(browser, "no").filter_ids(all_nids)
-                    == all_nids
-                )
+            assert (
+                ModifiedAfterSyncSearchNode(browser, "yes").filter_ids(all_nids) == []
+            )
+            assert set(
+                ModifiedAfterSyncSearchNode(browser, "no").filter_ids(all_nids)
+            ) == set(all_nids)
 
-                # we can't use freeze_time here because note.mod is set by the Rust backend
-                sleep(1.1)
+            # we can't use freeze_time here because note.mod is set by the Rust backend
+            sleep(1.1)
 
-                # modify a note - this changes its mod value in the Anki DB
-                nid = all_nids[0]
-                note = mw.col.get_note(nid)
-                note["Front"] = "new front"
-                note.flush()
+            # modify a note - this changes its mod value in the Anki DB
+            nid = all_nids[0]
+            note = mw.col.get_note(nid)
+            note["Front"] = "new front"
+            note.flush()
 
-                nids = ModifiedAfterSyncSearchNode(browser, "yes").filter_ids(all_nids)
-                assert nids == [nid]
+            nids = ModifiedAfterSyncSearchNode(browser, "yes").filter_ids(all_nids)
+            assert nids == [nid]
 
     def test_ModifiedAfterSyncSearchNode_with_cards(
         self,
@@ -2180,27 +2248,24 @@ class TestCustomSearchNodes:
             browser = mocker.Mock()
             browser.table.is_notes_mode.return_value = False
 
-            with attached_ankihub_db():
-                assert (
-                    ModifiedAfterSyncSearchNode(browser, "yes").filter_ids(all_cids)
-                    == []
-                )
-                assert (
-                    ModifiedAfterSyncSearchNode(browser, "no").filter_ids(all_cids)
-                    == all_cids
-                )
+            assert (
+                ModifiedAfterSyncSearchNode(browser, "yes").filter_ids(all_cids) == []
+            )
+            assert set(
+                ModifiedAfterSyncSearchNode(browser, "no").filter_ids(all_cids)
+            ) == set(all_cids)
 
-                # we can't use freeze_time here because note.mod is set by the Rust backend
-                sleep(1.1)
+            # we can't use freeze_time here because note.mod is set by the Rust backend
+            sleep(1.1)
 
-                # modify a note - this changes its mod value in the Anki DB
-                cid = all_cids[0]
-                note = mw.col.get_note(mw.col.get_card(cid).nid)
-                note["Front"] = "new front"
-                note.flush()
+            # modify a note - this changes its mod value in the Anki DB
+            cid = all_cids[0]
+            note = mw.col.get_note(mw.col.get_card(cid).nid)
+            note["Front"] = "new front"
+            note.flush()
 
-                cids = ModifiedAfterSyncSearchNode(browser, "yes").filter_ids(all_cids)
-                assert cids == [cid]
+            cids = ModifiedAfterSyncSearchNode(browser, "yes").filter_ids(all_cids)
+            assert cids == [cid]
 
     def test_UpdatedInTheLastXDaysSearchNode(
         self,
@@ -2218,31 +2283,25 @@ class TestCustomSearchNodes:
             browser = mocker.Mock()
             browser.table.is_notes_mode.return_value = True
 
-            with attached_ankihub_db():
-                assert (
-                    UpdatedInTheLastXDaysSearchNode(browser, "1").filter_ids(all_nids)
-                    == all_nids
-                )
-                assert (
-                    UpdatedInTheLastXDaysSearchNode(browser, "2").filter_ids(all_nids)
-                    == all_nids
-                )
+            assert (
+                UpdatedInTheLastXDaysSearchNode(browser, "1").filter_ids(all_nids)
+                == all_nids
+            )
+            assert (
+                UpdatedInTheLastXDaysSearchNode(browser, "2").filter_ids(all_nids)
+                == all_nids
+            )
 
-                yesterday_timestamp = int(
-                    (datetime.now() - timedelta(days=1)).timestamp()
-                )
-                mw.col.db.execute(
-                    f"UPDATE ankihub_db.notes SET mod = {yesterday_timestamp}"
-                )
+            yesterday_timestamp = int((datetime.now() - timedelta(days=1)).timestamp())
+            AnkiHubNote.update(mod=yesterday_timestamp).execute()
 
-                assert (
-                    UpdatedInTheLastXDaysSearchNode(browser, "1").filter_ids(all_nids)
-                    == []
-                )
-                assert (
-                    UpdatedInTheLastXDaysSearchNode(browser, "2").filter_ids(all_nids)
-                    == all_nids
-                )
+            assert (
+                UpdatedInTheLastXDaysSearchNode(browser, "1").filter_ids(all_nids) == []
+            )
+            assert (
+                UpdatedInTheLastXDaysSearchNode(browser, "2").filter_ids(all_nids)
+                == all_nids
+            )
 
     def test_NewNoteSearchNode(
         self,
@@ -2282,12 +2341,11 @@ class TestCustomSearchNodes:
             browser = mocker.Mock()
             browser.table.is_notes_mode.return_value = True
 
-            with attached_ankihub_db():
-                # notes without a last_update_type are new
-                assert NewNoteSearchNode(browser, "").filter_ids(all_nids) == [
-                    notes_data[0].anki_nid,
-                    notes_data[1].anki_nid,
-                ]
+            # notes without a last_update_type are new
+            assert NewNoteSearchNode(browser, "").filter_ids(all_nids) == [
+                notes_data[0].anki_nid,
+                notes_data[1].anki_nid,
+            ]
 
     def test_SuggestionTypeSearchNode(
         self,
@@ -2327,16 +2385,15 @@ class TestCustomSearchNodes:
             browser = mocker.Mock()
             browser.table.is_notes_mode.return_value = True
 
-            with attached_ankihub_db():
-                assert SuggestionTypeSearchNode(
-                    browser, SuggestionType.NEW_CONTENT.value[0]
-                ).filter_ids(all_nids) == [
-                    notes_data[0].anki_nid,
-                    notes_data[1].anki_nid,
-                ]
-                assert SuggestionTypeSearchNode(
-                    browser, SuggestionType.SPELLING_GRAMMATICAL.value[0]
-                ).filter_ids(all_nids) == [notes_data[2].anki_nid]
+            assert SuggestionTypeSearchNode(
+                browser, SuggestionType.NEW_CONTENT.value[0]
+            ).filter_ids(all_nids) == [
+                notes_data[0].anki_nid,
+                notes_data[1].anki_nid,
+            ]
+            assert SuggestionTypeSearchNode(
+                browser, SuggestionType.SPELLING_GRAMMATICAL.value[0]
+            ).filter_ids(all_nids) == [notes_data[2].anki_nid]
 
     def test_UpdatedSinceLastReviewSearchNode(
         self,
@@ -2354,11 +2411,9 @@ class TestCustomSearchNodes:
             browser = mocker.Mock()
             browser.table.is_notes_mode.return_value = True
 
-            with attached_ankihub_db():
-                assert (
-                    UpdatedSinceLastReviewSearchNode(browser, "").filter_ids(all_nids)
-                    == []
-                )
+            assert (
+                UpdatedSinceLastReviewSearchNode(browser, "").filter_ids(all_nids) == []
+            )
 
             # Add a review entry for a card to the database.
             nid = all_nids[0]
@@ -2368,27 +2423,20 @@ class TestCustomSearchNodes:
             record_review(cid, review_time_ms=1 * 1000)
 
             # Update the mod time in the ankihub database to simulate a note update.
-            ankihub_db.execute(
-                "UPDATE notes SET mod = ? WHERE anki_note_id = ?",
-                2,
-                nid,
-            )
+            AnkiHubNote.update(mod=2).where(AnkiHubNote.anki_note_id == nid).execute()
 
             # Check that the note of the card is now included in the search results.
-            with attached_ankihub_db():
-                assert UpdatedSinceLastReviewSearchNode(browser, "").filter_ids(
-                    all_nids
-                ) == [nid]
+            assert UpdatedSinceLastReviewSearchNode(browser, "").filter_ids(
+                all_nids
+            ) == [nid]
 
             # Add another review entry for the card to the database.
             record_review(cid, review_time_ms=3 * 1000)
 
             # Check that the note of the card is not included in the search results anymore.
-            with attached_ankihub_db():
-                assert (
-                    UpdatedSinceLastReviewSearchNode(browser, "").filter_ids(all_nids)
-                    == []
-                )
+            assert (
+                UpdatedSinceLastReviewSearchNode(browser, "").filter_ids(all_nids) == []
+            )
 
 
 class TestBrowserTreeView:
@@ -2532,6 +2580,96 @@ def test_browser_custom_columns(
             "No",
             "No",
         ]
+
+
+class TestBrowserContextMenu:
+    def test_ankihub_actions_are_added_to_the_browser_context_menu(
+        self,
+        anki_session_with_addon_data: AnkiSession,
+        import_ah_note: ImportAHNote,
+        qtbot: QtBot,
+    ):
+        with anki_session_with_addon_data.profile_loaded():
+            note_info = NoteInfoFactory.create()
+            import_ah_note(note_info)
+
+            menu = self.open_browser_context_menu_with_all_notes_selected()
+
+            # Get the texts of the actions in the menu
+            actions = [action for action in menu.actions() if not action.isSeparator()]
+            texts = [action.text() for action in actions]
+
+            expected_texts = [
+                "AnkiHub: Bulk suggest notes",
+                "AnkiHub: Protect fields",
+                "AnkiHub: Reset local changes",
+                "AnkiHub: Suggest Optional Tags",
+                "AnkiHub: Copy Anki Note ID to clipboard",
+                "AnkiHub: Copy AnkiHub Note ID to clipboard",
+            ]
+
+            assert texts == expected_texts
+
+            # Close the browser to prevent RuntimeErrors getting raised during teardown
+            with qtbot.wait_callback() as callback:
+                dialogs.closeAll(onsuccess=callback)
+
+    def open_browser_context_menu_with_all_notes_selected(self) -> QMenu:
+        """Returns a menu with just our context menu actions. The actions behave as if
+        all notes in the Anki collection were selected."""
+        # Set up our browser modifications, open the browser and select all notes
+        setup_browser()
+        browser: Browser = dialogs.open("Browser", aqt.mw)
+        browser.search_for(search="")  # The empty search matches all notes
+        browser.table.select_all()
+
+        # Call Anki's hoks for the context menu and let it add the actions to a menu
+        menu = QMenu()
+        browser_will_show_context_menu(browser=browser, menu=menu)
+
+        return menu
+
+    @pytest.mark.parametrize(
+        "action_text, expected_note_attribute_in_clipboard",
+        [
+            ("AnkiHub: Copy Anki Note ID to clipboard", "anki_nid"),
+            ("AnkiHub: Copy AnkiHub Note ID to clipboard", "ah_nid"),
+        ],
+    )
+    def test_copy_nid_actions(
+        self,
+        anki_session_with_addon_data: AnkiSession,
+        import_ah_note: ImportAHNote,
+        mocker: MockerFixture,
+        qtbot: QtBot,
+        action_text: str,
+        expected_note_attribute_in_clipboard: str,
+    ):
+        with anki_session_with_addon_data.profile_loaded():
+            note_info = NoteInfoFactory.create()
+            import_ah_note(note_info)
+
+            menu = self.open_browser_context_menu_with_all_notes_selected()
+
+            # Trigger the action
+            action: QAction = next(
+                action for action in menu.actions() if action.text() == action_text
+            )
+            clipboard = aqt.mw.app.clipboard()
+            clipboard_setText_mock = mocker.patch.object(clipboard, "setText")
+            action.trigger()
+
+            # Assert that the clipboard contains the expected nid
+            qtbot.wait_until(lambda: clipboard_setText_mock.called)
+
+            expected_clipboard_text = str(
+                getattr(note_info, expected_note_attribute_in_clipboard)
+            )
+            clipboard_setText_mock.assert_called_once_with(expected_clipboard_text)
+
+            # Close the browser to prevent RuntimeErrors getting raised during teardown
+            with qtbot.wait_callback() as callback:
+                dialogs.closeAll(onsuccess=callback)
 
 
 @pytest.mark.qt_no_exception_capture
@@ -3032,10 +3170,11 @@ def test_migrate_profile_data_from_old_location(
         pass
 
     # Assert that the profile data was migrated
-    assert set([x.name for x in profile_files_path().glob("*")]) == {
-        "ankihub.db",
-        ".private_config.json",
-    }
+    assert {
+        x.name
+        for x in profile_files_path().glob("*")
+        if not x.name.startswith("ankihub.db")
+    } == {".private_config.json"}
     assert config.user() == "user1"
     assert len(config.deck_ids()) == 1
 
@@ -3108,9 +3247,7 @@ def test_migrate_addon_data_from_old_location(
     anki_session_with_addon_data: AnkiSession,
 ):
     # Move the profile data to the old location and add a file to the folder
-    old_profile_files_path = (
-        settings.user_files_path() / settings._get_anki_profile_id()
-    )
+    old_profile_files_path = settings.user_files_path() / settings.get_anki_profile_id()
     shutil.move(settings.profile_files_path(), old_profile_files_path)
     (old_profile_files_path / "test").touch()
 

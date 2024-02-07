@@ -1,12 +1,11 @@
 import os
 from typing import Dict, List, Protocol
 
+import aqt
 import pytest
 from anki.models import NotetypeDict, NotetypeId
+from anki.notes import NoteId
 from pytest_anki import AnkiSession
-
-from ankihub.ankihub_client import NoteInfo
-from ankihub.settings import DeckConfig
 
 from .conftest import Profile
 
@@ -14,7 +13,10 @@ from .conftest import Profile
 # has to be set before importing ankihub
 os.environ["SKIP_INIT"] = "1"
 
+from ankihub.ankihub_client import NoteInfo
 from ankihub.main.importing import AnkiHubImporter
+from ankihub.main.utils import change_note_types_of_notes
+from ankihub.settings import DeckConfig
 
 
 class ImportAnkingNotes(Protocol):
@@ -78,6 +80,17 @@ def test_anking_deck_update(
         notes_data = anking_notes_data[:100]
         import_anking_notes(notes_data)
 
+        # Change the note type of notes so that the import has to change it back.
+        # This way we will also test the performance of changing note types.
+        current_note_type = aqt.mw.col.models.get(NotetypeId(notes_data[0].mid))
+        new_note_type = aqt.mw.col.models.copy(current_note_type)
+
+        nid_mid_pairs = [
+            (NoteId(note.anki_nid), new_note_type["id"]) for note in notes_data
+        ]
+        change_note_types_of_notes(nid_mid_pairs=nid_mid_pairs)
+
+        # Change the fields and tags of notes so that the import has to update them.
         for note in notes_data:
             note.fields[0].value = "updated"
             note.tags = ["updated"]
