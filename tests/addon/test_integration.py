@@ -1837,6 +1837,44 @@ class TestAnkiHubImporter:
                 assert len(import_result.marked_as_deleted_nids) == 0
                 assert len(import_result.deleted_nids) == 1
 
+    def test_import_note_deletion_with_one_note_deleted_and_one_marked_as_deleted(
+        self,
+        anki_session_with_addon_data: AnkiSession,
+        import_ah_note: ImportAHNote,
+        next_deterministic_uuid: Callable[[], uuid.UUID],
+        next_deterministic_id: Callable[[], int],
+    ):
+        with anki_session_with_addon_data.profile_loaded():
+            ah_did = next_deterministic_uuid()
+            anki_did = DeckId(next_deterministic_id())
+
+            ah_note_1 = import_ah_note(ah_did=ah_did, anki_did=anki_did)
+            ah_note_1.last_update_type = SuggestionType.DELETE
+            record_review_for_anki_nid(NoteId(ah_note_1.anki_nid))
+
+            ah_note_2 = import_ah_note(ah_did=ah_did, anki_did=anki_did)
+            ah_note_2.last_update_type = SuggestionType.DELETE
+
+            import_result = self._import_notes(
+                [ah_note_1, ah_note_2],
+                behavior_on_remote_note_deleted=BehaviorOnRemoteNoteDeleted.DELETE_IF_NOT_REVIEWED_YET,
+                is_first_import_of_deck=False,
+                ah_did=ah_did,
+                anki_did=anki_did,
+            )
+
+            anki_note_1 = aqt.mw.col.get_note(NoteId(ah_note_1.anki_nid))
+            assert TAG_FOR_DELETED_NOTES in anki_note_1.tags
+            assert anki_note_1[ANKIHUB_NOTE_TYPE_FIELD_NAME] == ""
+
+            with pytest.raises(NotFoundError):
+                aqt.mw.col.get_note(NoteId(ah_note_2.anki_nid))
+
+            assert len(import_result.created_nids) == 0
+            assert len(import_result.updated_nids) == 0
+            assert len(import_result.marked_as_deleted_nids) == 1
+            assert len(import_result.deleted_nids) == 1
+
     def _import_notes(
         self,
         ah_notes: List[NoteInfo],
