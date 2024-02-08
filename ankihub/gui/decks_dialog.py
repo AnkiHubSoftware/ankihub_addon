@@ -31,7 +31,7 @@ from ..main.deck_unsubscribtion import unsubscribe_from_deck_and_uninstall
 from ..main.subdecks import SUBDECK_TAG, deck_contains_subdeck_tags
 from ..main.utils import truncate_string
 from ..settings import (
-    DeleteNoteOnRemoteDelete,
+    BehaviorOnRemoteNoteDeleted,
     SuspendNewCardsOfExistingNotes,
     config,
     url_deck_base,
@@ -459,7 +459,7 @@ class DeckManagementDialog(QDialog):
         # Setup and configure the combo box for "Remove AnkiHub deleted notes from deck"
         self.ankihub_deleted_notes_behavior = QComboBox()
         self.ankihub_deleted_notes_behavior.insertItems(
-            0, [option.value for option in DeleteNoteOnRemoteDelete]
+            0, [option.value for option in BehaviorOnRemoteNoteDeleted]
         )
         self.ankihub_deleted_notes_behavior.setCurrentText(
             deck_config.delete_note_on_remote_delete.value
@@ -468,7 +468,7 @@ class DeckManagementDialog(QDialog):
             self.ankihub_deleted_notes_behavior.currentTextChanged,
             lambda: config.set_ankihub_deleted_notes_behavior(
                 selected_ah_did,
-                DeleteNoteOnRemoteDelete(
+                BehaviorOnRemoteNoteDeleted(
                     self.ankihub_deleted_notes_behavior.currentText()
                 ),
             ),
