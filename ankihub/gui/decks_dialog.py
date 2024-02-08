@@ -446,7 +446,7 @@ class DeckManagementDialog(QDialog):
 
         # Setup label
         self.ankihub_deleted_notes_behavior_label = QLabel(
-            "Suspend new cards of existing notes"
+            "Remove AnkiHub deleted notes from deck"
         )
 
         # Add the label to the row layout
@@ -456,7 +456,7 @@ class DeckManagementDialog(QDialog):
         )
         self.ankihub_deleted_notes_behavior_row.addStretch()
 
-        # Setup and configure the combo box for "Suspend new cards of existing notes"
+        # Setup and configure the combo box for "Remove AnkiHub deleted notes from deck"
         self.ankihub_deleted_notes_behavior = QComboBox()
         self.ankihub_deleted_notes_behavior.insertItems(
             0, [option.value for option in DeleteNoteOnRemoteDelete]
