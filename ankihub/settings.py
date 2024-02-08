@@ -81,9 +81,7 @@ class DeckConfig(DataClassJSONMixin):
     anki_id: DeckId
     name: str
     # TODO The user should be prompted to choose this (for each deck)?
-    behavior_on_remote_note_deleted: BehaviorOnRemoteNoteDeleted = (
-        BehaviorOnRemoteNoteDeleted.NEVER_DELETE
-    )
+    behavior_on_remote_note_deleted: BehaviorOnRemoteNoteDeleted = None
     user_relation: UserDeckRelation = UserDeckRelation.SUBSCRIBER
     latest_update: Optional[datetime] = dataclasses.field(
         metadata=field_options(
@@ -263,7 +261,7 @@ class _Config:
     ):
         self.deck_config(
             ankihub_did
-        ).delete_note_on_remote_delete = note_delete_behavior
+        ).behavior_on_remote_note_deleted = note_delete_behavior
         self._update_private_config()
 
     def add_deck(
