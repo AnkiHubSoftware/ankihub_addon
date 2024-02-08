@@ -40,6 +40,7 @@ from ..settings import (
 from .operations.ankihub_sync import sync_with_ankihub
 from .operations.subdecks import confirm_and_toggle_subdecks
 from .utils import (
+    PatchedQComboBox,
     ask_user,
     clear_layout,
     set_styled_tooltip,
@@ -457,7 +458,8 @@ class DeckManagementDialog(QDialog):
         self.ankihub_deleted_notes_behavior_row.addStretch()
 
         # Setup and configure the combo box for "Remove AnkiHub deleted notes from deck"
-        self.ankihub_deleted_notes_behavior = QComboBox()
+        self.ankihub_deleted_notes_behavior = PatchedQComboBox()
+        self.ankihub_deleted_notes_behavior.setPlaceholderText("Choose an option...")
         self.ankihub_deleted_notes_behavior.insertItems(
             0, [option.value for option in BehaviorOnRemoteNoteDeleted]
         )
