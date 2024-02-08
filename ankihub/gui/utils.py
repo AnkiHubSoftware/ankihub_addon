@@ -560,7 +560,7 @@ class PatchedQComboBox(QtWidgets.QComboBox):
         # draw the combobox frame, focusrect and selected etc.
         opt = QtWidgets.QStyleOptionComboBox()
         self.initStyleOption(opt)
-        painter.drawComplexControl(QtWidgets.QStyle.CC_ComboBox, opt)
+        painter.drawComplexControl(QtWidgets.QStyle.CC_ComboBox, opt)  # type: ignore
 
         if self.currentIndex() < 0:
             opt.palette.setBrush(
@@ -571,4 +571,4 @@ class PatchedQComboBox(QtWidgets.QComboBox):
                 opt.currentText = self.placeholderText()
 
         # draw the icon and text
-        painter.drawControl(QtWidgets.QStyle.CE_ComboBoxLabel, opt)
+        painter.drawControl(QtWidgets.QStyle.CE_ComboBoxLabel, opt)  # type: ignore
