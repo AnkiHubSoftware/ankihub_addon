@@ -30,7 +30,7 @@ from ankihub.gui.media_sync import _AnkiHubMediaSync
 from ankihub.gui.suggestion_dialog import SuggestionMetadata
 from ankihub.main.importing import AnkiHubImporter
 from ankihub.main.utils import modify_note_type
-from ankihub.settings import DeckConfig, config
+from ankihub.settings import BehaviorOnRemoteNoteDeleted, DeckConfig, config
 
 
 @fixture
@@ -225,6 +225,7 @@ def import_ah_note(next_deterministic_uuid: Callable[[], uuid.UUID]) -> ImportAH
             protected_tags=[],
             deck_name=deck_name,
             is_first_import_of_deck=False,
+            behavior_on_remote_note_deleted=BehaviorOnRemoteNoteDeleted.NEVER_DELETE,
             anki_did=anki_did,
             suspend_new_cards_of_new_notes=suspend_new_cards_of_new_notes,
             suspend_new_cards_of_existing_notes=suspend_new_cards_of_existing_notes,
@@ -300,6 +301,7 @@ def import_ah_notes(next_deterministic_uuid: Callable[[], uuid.UUID]) -> ImportA
             protected_tags=[],
             deck_name=deck_name,
             is_first_import_of_deck=False,
+            behavior_on_remote_note_deleted=BehaviorOnRemoteNoteDeleted.NEVER_DELETE,
             anki_did=anki_did,
             suspend_new_cards_of_new_notes=suspend_new_cards_of_new_notes,
             suspend_new_cards_of_existing_notes=suspend_new_cards_of_existing_notes,
@@ -355,6 +357,7 @@ def import_ah_note_type(
             protected_fields={},
             protected_tags=[],
             is_first_import_of_deck=False,
+            behavior_on_remote_note_deleted=BehaviorOnRemoteNoteDeleted.NEVER_DELETE,
             suspend_new_cards_of_new_notes=DeckConfig.suspend_new_cards_of_new_notes_default(
                 ah_did
             ),
@@ -690,8 +693,13 @@ def latest_instance_tracker(mocker: MockerFixture) -> LatestInstanceTracker:
     return LatestInstanceTracker(mocker)
 
 
-def record_review_for_anki_nid(anki_nid: NoteId, date_time: datetime) -> None:
+def record_review_for_anki_nid(
+    anki_nid: NoteId, date_time: Optional[datetime] = None
+) -> None:
     """Adds a review for the note with the given anki_nid at the given date_time."""
+    if date_time is None:
+        date_time = datetime.now()
+
     cid = aqt.mw.col.get_note(anki_nid).card_ids()[0]
     record_review(cid, int(date_time.timestamp() * 1000))
 
