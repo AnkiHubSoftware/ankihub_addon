@@ -258,6 +258,14 @@ class _Config:
         self.deck_config(ankihub_did).suspend_new_cards_of_existing_notes = suspend
         self._update_private_config()
 
+    def set_ankihub_deleted_notes_behavior(
+        self, ankihub_did: uuid.UUID, note_delete_behavior: BehaviorOnRemoteNoteDeleted
+    ):
+        self.deck_config(
+            ankihub_did
+        ).delete_note_on_remote_delete = note_delete_behavior
+        self._update_private_config()
+
     def add_deck(
         self,
         name: str,
