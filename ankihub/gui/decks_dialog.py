@@ -461,9 +461,12 @@ class DeckManagementDialog(QDialog):
         self.ankihub_deleted_notes_behavior.insertItems(
             0, [option.value for option in BehaviorOnRemoteNoteDeleted]
         )
-        self.ankihub_deleted_notes_behavior.setCurrentText(
-            deck_config.delete_note_on_remote_delete.value
-        )
+
+        if deck_config.behavior_on_remote_note_deleted:
+            self.ankihub_deleted_notes_behavior.setCurrentText(
+                deck_config.behavior_on_remote_note_deleted.value
+            )
+
         qconnect(
             self.ankihub_deleted_notes_behavior.currentTextChanged,
             lambda: config.set_ankihub_deleted_notes_behavior(
