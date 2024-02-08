@@ -26,6 +26,7 @@ class SuggestionType(Enum):
     NEW_TAGS = "new_tags", "New Tags"
     UPDATED_TAGS = "updated_tags", "Updated Tags"
     DELETE = "delete", "Delete"
+    OTHER = "other", "Other"
 
 
 def suggestion_type_from_str(s: str) -> Optional[SuggestionType]:
