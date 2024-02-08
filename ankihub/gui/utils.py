@@ -549,7 +549,7 @@ def extract_argument(
 
 class PatchedQComboBox(QtWidgets.QComboBox):
     # https://code.qt.io/cgit/qt/qtbase.git/tree/src/widgets/widgets/qcombobox.cpp?h=5.15.2#n3173
-    # This patched combobox class came from this SO answer: https://stackoverflow.com/a/65830989
+    # FIXME This patched combobox class came from this SO answer: https://stackoverflow.com/a/65830989
     # This class overrides the paintEvent from QComboBox to solve this bug: https://bugreports.qt.io/browse/QTBUG-90522
     # that prevents the placeholder text set by setPlaceHolderText() from rendering.
     def paintEvent(self, event):
