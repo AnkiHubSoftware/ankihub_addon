@@ -46,7 +46,10 @@ from ...main.utils import mids_of_notes, retain_nids_with_ah_note_type
 from ...settings import ANKIHUB_NOTE_TYPE_FIELD_NAME, DeckExtensionConfig, config
 from ..deck_updater import NotLoggedInError, ah_deck_updater
 from ..optional_tag_suggestion_dialog import OptionalTagsSuggestionDialog
-from ..suggestion_dialog import open_suggestion_dialog_for_bulk_suggestion
+from ..suggestion_dialog import (
+    open_suggestion_dialog_for_bulk_suggestion,
+    open_suggestion_dialog_for_single_suggestion,
+)
 from ..utils import ask_user, choose_ankihub_deck, choose_list, choose_subset
 from .custom_columns import (
     AnkiHubIdColumn,
@@ -123,6 +126,15 @@ def _on_browser_will_show_context_menu(browser: Browser, context_menu: QMenu) ->
         (
             "AnkiHub: Bulk suggest notes",
             lambda: _on_bulk_notes_suggest_action(browser, nids=selected_nids),
+            at_least_one_note_has_ah_note_type,
+        ),
+        (
+            "AnkiHub: Suggest deletion",
+            lambda: _on_bulk_notes_suggest_action(
+                browser,
+                nids=selected_nids,
+                preselected_change_type=SuggestionType.DELETE,
+            ),
             at_least_one_note_has_ah_note_type,
         ),
         (
@@ -255,7 +267,11 @@ def _on_protect_fields_action(browser: Browser, nids: Sequence[NoteId]) -> None:
     )
 
 
-def _on_bulk_notes_suggest_action(browser: Browser, nids: Sequence[NoteId]) -> None:
+def _on_bulk_notes_suggest_action(
+    browser: Browser,
+    nids: Sequence[NoteId],
+    preselected_change_type: Optional[SuggestionType] = None,
+) -> None:
     if len(nids) > BULK_SUGGESTION_LIMIT:
         msg = f"Please select at most {BULK_SUGGESTION_LIMIT} notes at a time for bulk suggestions.<br>"
         showInfo(msg, parent=browser)
@@ -289,7 +305,19 @@ def _on_bulk_notes_suggest_action(browser: Browser, nids: Sequence[NoteId]) -> N
         showInfo(msg, parent=browser)
         return
 
-    open_suggestion_dialog_for_bulk_suggestion(anki_nids=filtered_nids, parent=browser)
+    if len(filtered_nids) == 1:
+        nid = list(filtered_nids)[0]
+        open_suggestion_dialog_for_single_suggestion(
+            note=aqt.mw.col.get_note(nid),
+            preselected_change_type=preselected_change_type,
+            parent=browser,
+        )
+    else:
+        open_suggestion_dialog_for_bulk_suggestion(
+            anki_nids=filtered_nids,
+            preselected_change_type=preselected_change_type,
+            parent=browser,
+        )
 
 
 def _on_reset_local_changes_action(browser: Browser, nids: Sequence[NoteId]) -> None:

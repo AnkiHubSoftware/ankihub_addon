@@ -1,4 +1,6 @@
-"""Code for handling notes that were deleted on the webapp."""
+"""Code for handling notes that were deleted on the webapp.
+This is a temporary solution for selected notes from the AnKing deck."""
+
 import json
 import uuid
 from pathlib import Path

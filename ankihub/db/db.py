@@ -10,6 +10,8 @@ Some differences between data stored in the AnkiHub database and the Anki databa
     while the AnkiHub database stores ankihub_client.NoteInfo objects.
 - decks, notes and note types can be missing from the Anki database or be modified.
 """
+
+import time
 import uuid
 from pathlib import Path
 from typing import Any, Dict, Iterable, List, Optional, Sequence, Set, Tuple
@@ -71,8 +73,7 @@ class _AnkiHubDB:
         Post-conditions:
             After calling this function, you should:
             1. Upsert the notes which were upserted into the AnkiHub DB into the Anki DB.
-            2. Call transfer_mod_values_from_anki_db to transfer the mod values of the upserted notes from the Anki DB
-               to the AnkiHub DB.
+            2. Call update_mod_values_based_on_anki_db to update the mod values of the upserted notes.
         """
         # Check if all note types used by notes exist in the AnkiHub DB before inserting
         mids_of_notes = set([note_data.mid for note_data in notes_data])
@@ -118,9 +119,11 @@ class _AnkiHubDB:
                         fields=fields,
                         tags=tags,
                         guid=note_data.guid,
-                        last_update_type=note_data.last_update_type.value[0]
-                        if note_data.last_update_type is not None
-                        else None,
+                        last_update_type=(
+                            note_data.last_update_type.value[0]
+                            if note_data.last_update_type is not None
+                            else None
+                        ),
                     )
                     .on_conflict_replace()
                     .execute()
@@ -134,18 +137,26 @@ class _AnkiHubDB:
         """Removes notes from the AnkiHub DB"""
         AnkiHubNote.delete().where(AnkiHubNote.ankihub_note_id.in_(ah_nids)).execute()
 
-    def transfer_mod_values_from_anki_db(self, notes_data: Sequence[NoteInfo]):
-        """Takes mod values for the notes from the Anki DB and saves them to the AnkiHub DB.
+    def update_mod_values_based_on_anki_db(
+        self, notes_data: Sequence[NoteInfo]
+    ) -> None:
+        """Updates the 'mod' values of notes in the AnkiHub database based on
+        their corresponding values in the Anki database.
 
-        Should always be called after importing notes or exporting notes after
-        the mod values in the Anki DB have been updated.
-        (The mod values are used to determine if a note has been modified in Anki since it was last imported/exported.)
+        This function should be called after importing or exporting notes, once
+        the 'mod' values in the Anki database have been updated. The 'mod'
+        values are used to determine if a note has been modified in Anki since
+        it was last imported/exported. If a note does not exist in the Anki
+        database, its 'mod' value is set to the current time.
         """
         with get_peewee_database().atomic():
             for note_data in notes_data:
-                mod = aqt.mw.col.db.scalar(
+                mod: Optional[int] = aqt.mw.col.db.scalar(
                     "SELECT mod FROM notes WHERE id = ?", note_data.anki_nid
                 )
+                if not mod:
+                    # The format of mod is milliseconds since the epoch.
+                    mod = int(time.time() * 1000)
 
                 AnkiHubNote.update(mod=mod).where(
                     AnkiHubNote.ankihub_note_id == note_data.ah_nid
@@ -198,9 +209,11 @@ class _AnkiHubDB:
                 for i, value in enumerate(split_fields(note.fields))
             ],
             guid=note.guid,
-            last_update_type=suggestion_type_from_str(note.last_update_type)
-            if note.last_update_type
-            else None,
+            last_update_type=(
+                suggestion_type_from_str(note.last_update_type)
+                if note.last_update_type
+                else None
+            ),
         )
 
     def anki_nids_for_ankihub_deck(self, ankihub_did: uuid.UUID) -> List[NoteId]:

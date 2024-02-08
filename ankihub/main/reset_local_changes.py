@@ -41,6 +41,7 @@ def reset_local_changes_to_notes(
         note_types=note_types,
         deck_name=deck_config.name,
         is_first_import_of_deck=False,
+        behavior_on_remote_note_deleted=deck_config.behavior_on_remote_note_deleted,
         anki_did=deck_config.anki_id,
         protected_fields=protected_fields,
         protected_tags=protected_tags,
