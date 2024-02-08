@@ -33,13 +33,13 @@ from .note_deletion import TAG_FOR_DELETED_NOTES
 from .subdecks import build_subdecks_and_move_cards_to_them
 from .utils import (
     add_notes,
+    change_note_types_of_notes,
     create_deck_with_id,
     create_note_type_with_id,
     dids_of_notes,
     get_unique_ankihub_deck_name,
     lowest_level_common_ancestor_did,
     modify_note_type_templates,
-    reset_note_types_of_notes,
     truncated_list,
 )
 
@@ -852,7 +852,7 @@ def _reset_note_types_of_notes_based_on_notes_data(
         (NoteId(note_data.anki_nid), NotetypeId(note_data.mid))
         for note_data in notes_data
     ]
-    reset_note_types_of_notes(nid_mid_pairs)
+    change_note_types_of_notes(nid_mid_pairs)
 
 
 def cards_by_anki_nid_dict(notes: List[Note]) -> Dict[NoteId, List[Card]]:
