@@ -43,6 +43,7 @@ from ..fixtures import (  # type: ignore
     AddAnkiNote,
     ImportAHNoteType,
     InstallAHDeck,
+    LatestInstanceTracker,
     MockStudyDeckDialogWithCB,
     MockSuggestionDialog,
     SetFeatureFlagState,
@@ -93,7 +94,7 @@ from ankihub.gui.suggestion_dialog import (
     _on_suggest_notes_in_bulk_done,
     get_anki_nid_to_possible_ah_dids_dict,
     open_suggestion_dialog_for_bulk_suggestion,
-    open_suggestion_dialog_for_note,
+    open_suggestion_dialog_for_single_suggestion,
 )
 from ankihub.gui.threading_utils import rate_limited
 from ankihub.gui.utils import (
@@ -660,6 +661,8 @@ class TestSuggestionDialog:
             (False, False, SuggestionType.OTHER, SourceType.AMBOSS, False),
             (False, True, SuggestionType.NEW_CONTENT, SourceType.UWORLD, False),
             (False, True, SuggestionType.NEW_CONTENT, SourceType.UWORLD, True),
+            (False, True, SuggestionType.DELETE, SourceType.DUPLICATE_NOTE, False),
+            (False, False, SuggestionType.DELETE, SourceType.DUPLICATE_NOTE, False),
         ],
     )
     def test_visibility_of_form_elements_and_form_result(
@@ -685,9 +688,12 @@ class TestSuggestionDialog:
         # Fill in the form
         change_type_needed = not is_new_note_suggestion
         source_needed = not is_new_note_suggestion and (
-            suggestion_type
-            in [SuggestionType.UPDATED_CONTENT, SuggestionType.NEW_CONTENT]
-            and is_for_anking_deck
+            (
+                suggestion_type
+                in [SuggestionType.UPDATED_CONTENT, SuggestionType.NEW_CONTENT]
+                and is_for_anking_deck
+            )
+            or suggestion_type == SuggestionType.DELETE
         )
 
         if change_type_needed:
@@ -906,7 +912,7 @@ class TestOpenSuggestionDialogForSingleSuggestion:
 
             suggest_note_update_mock.return_value = suggest_note_update_succeeds
 
-            open_suggestion_dialog_for_note(note=note, parent=aqt.mw)
+            open_suggestion_dialog_for_single_suggestion(note=note, parent=aqt.mw)
 
             if user_cancels:
                 suggest_note_update_mock.assert_not_called()
@@ -954,7 +960,7 @@ class TestOpenSuggestionDialogForSingleSuggestion:
                 return_value=None if user_cancels else ah_did_1,
             )
 
-            open_suggestion_dialog_for_note(note=note, parent=aqt.mw)
+            open_suggestion_dialog_for_single_suggestion(note=note, parent=aqt.mw)
 
             if user_cancels:
                 suggest_note_update_mock.assert_not_called()
@@ -2621,26 +2627,17 @@ class TestUtils:
     ],
 )
 def test_ask_user(
-    mocker: MockerFixture,
     qtbot: QtBot,
     show_cancel_button: bool,
     text_of_button_to_click: str,
     expected_return_value: bool,
+    latest_instance_tracker: LatestInstanceTracker,
 ):
-    # Patch _Dialog.__init__ to store the _Dialog instance in the dialog variable when
-    # it is created.
-    dialog: _Dialog = None
-
-    def new_init(self, *args, **kwargs):
-        nonlocal dialog
-        dialog = self
-        original_init(self, *args, **kwargs)
-
-    original_init = _Dialog.__init__
-    mocker.patch.object(_Dialog, "__init__", new=new_init)
+    latest_instance_tracker.track(_Dialog)
 
     # Click a button on the dialog after it is shown
     def click_button():
+        dialog = latest_instance_tracker.get_latest_instance(_Dialog)
         button = next(
             button
             for button in dialog.button_box.buttons()

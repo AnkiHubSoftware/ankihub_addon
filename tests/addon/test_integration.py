@@ -74,6 +74,7 @@ from ..fixtures import (
     ImportAHNote,
     ImportAHNoteType,
     InstallAHDeck,
+    LatestInstanceTracker,
     MockDownloadAndInstallDeckDependencies,
     MockShowDialogWithCB,
     MockStudyDeckDialogWithCB,
@@ -146,6 +147,7 @@ from ankihub.gui.operations.new_deck_subscriptions import (
 )
 from ankihub.gui.operations.utils import future_with_result
 from ankihub.gui.optional_tag_suggestion_dialog import OptionalTagsSuggestionDialog
+from ankihub.gui.suggestion_dialog import SuggestionDialog
 from ankihub.main.deck_creation import create_ankihub_deck, modify_note_type
 from ankihub.main.deck_unsubscribtion import uninstall_deck
 from ankihub.main.exporting import to_note_data
@@ -489,7 +491,13 @@ def test_entry_point(anki_session_with_addon_data: AnkiSession, qtbot: QtBot):
 @pytest.mark.sequential
 class TestEditor:
     @pytest.mark.parametrize(
-        "note_fields_changed, logged_in", [(True, True), (False, True), (True, False)]
+        "note_fields_changed, suggest_deletion, logged_in",
+        [
+            (True, False, True),
+            (False, False, True),
+            (False, True, True),
+            (True, False, False),
+        ],
     )
     def test_create_change_note_suggestion(
         self,
@@ -501,11 +509,18 @@ class TestEditor:
         qtbot: QtBot,
         note_fields_changed: bool,
         logged_in: bool,
+        suggest_deletion: bool,
     ):
         editor.setup()
         with anki_session_with_addon_data.profile_loaded():
             mocker.patch.object(config, "is_logged_in", return_value=logged_in)
-            mock_suggestion_dialog(user_cancels=False)
+
+            mock_suggestion_dialog(
+                user_cancels=False,
+                suggestion_type=SuggestionType.DELETE
+                if suggest_deletion
+                else SuggestionType.UPDATED_CONTENT,
+            )
 
             create_change_note_suggestion_mock = mocker.patch.object(
                 AnkiHubClient, "create_change_note_suggestion"
@@ -540,7 +555,7 @@ class TestEditor:
                 # Assert that the login dialog was shown
                 window: AnkiHubLogin = AnkiHubLogin._window
                 qtbot.wait_until(lambda: window and window.isVisible())
-            elif note_fields_changed:
+            elif note_fields_changed or suggest_deletion:
                 # Assert that the suggestion was sent to the server with the correct data
                 qtbot.wait_until(lambda: create_change_note_suggestion_mock.called)
                 change_note_suggestion: ChangeNoteSuggestion = (
@@ -548,7 +563,10 @@ class TestEditor:
                         "change_note_suggestion"
                     ]
                 )
-                assert change_note_suggestion.fields[0].value == new_field_value
+                if suggest_deletion:
+                    assert not change_note_suggestion.fields
+                else:
+                    assert change_note_suggestion.fields[0].value == new_field_value
             else:
                 # Assert that no suggestion was sent to the server and that a tooltip was shown
                 qtbot.wait_until(lambda: show_tooltip_mock.called)
@@ -2601,6 +2619,7 @@ class TestBrowserContextMenu:
 
             expected_texts = [
                 "AnkiHub: Bulk suggest notes",
+                "AnkiHub: Suggest deletion",
                 "AnkiHub: Protect fields",
                 "AnkiHub: Reset local changes",
                 "AnkiHub: Suggest Optional Tags",
@@ -2628,6 +2647,51 @@ class TestBrowserContextMenu:
         browser_will_show_context_menu(browser=browser, menu=menu)
 
         return menu
+
+    @pytest.mark.parametrize(
+        "action_text, expected_change_type_text",
+        [
+            # The suggestion type which is selected by default is UPDATED_CONTENT
+            ("AnkiHub: Bulk suggest notes", SuggestionType.UPDATED_CONTENT.value[1]),
+            # When the user uses the "Suggest deletion" action, the suggestion type is DELETE
+            ("AnkiHub: Suggest deletion", SuggestionType.DELETE.value[1]),
+        ],
+    )
+    def test_note_suggestion_actions(
+        self,
+        anki_session_with_addon_data: AnkiSession,
+        install_ah_deck: InstallAHDeck,
+        import_ah_note: ImportAHNote,
+        latest_instance_tracker: LatestInstanceTracker,
+        qtbot: QtBot,
+        action_text: str,
+        expected_change_type_text: str,
+    ):
+        with anki_session_with_addon_data.profile_loaded():
+            ah_did = install_ah_deck()
+            note_info = NoteInfoFactory.create()
+            import_ah_note(note_info, ah_did=ah_did)
+
+            menu = self.open_browser_context_menu_with_all_notes_selected()
+
+            latest_instance_tracker.track(SuggestionDialog)
+
+            # Trigger the action
+            action: QAction = next(
+                action for action in menu.actions() if action.text() == action_text
+            )
+            action.trigger()
+
+            # Assert the suggestion dialog was opened with the right suggestion type
+            dialog: SuggestionDialog = latest_instance_tracker.get_latest_instance(
+                SuggestionDialog
+            )
+            assert dialog.isVisible()
+            assert dialog.change_type_select.currentText() == expected_change_type_text
+
+            # Close the browser to prevent RuntimeErrors getting raised during teardown
+            with qtbot.wait_callback() as callback:
+                dialogs.closeAll(onsuccess=callback)
 
     @pytest.mark.parametrize(
         "action_text, expected_note_attribute_in_clipboard",

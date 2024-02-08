@@ -311,18 +311,23 @@ def _change_note_suggestion(
     assert note_from_anki_db.ah_nid is not None
     assert note_from_anki_db.tags is not None
 
-    note_from_ah_db = ankihub_db.note_data(note.id)
+    added_tags: List[str] = []
+    removed_tags: List[str] = []
+    fields_that_changed: List[Field] = []
 
-    added_tags, removed_tags = _added_and_removed_tags(
-        prev_tags=note_from_ah_db.tags, cur_tags=note_from_anki_db.tags
-    )
+    if change_type != SuggestionType.DELETE:
+        note_from_ah_db = ankihub_db.note_data(note.id)
 
-    fields_that_changed = _fields_that_changed(
-        prev_fields=note_from_ah_db.fields, cur_fields=note_from_anki_db.fields
-    )
+        added_tags, removed_tags = _added_and_removed_tags(
+            prev_tags=note_from_ah_db.tags, cur_tags=note_from_anki_db.tags
+        )
 
-    if not added_tags and not removed_tags and not fields_that_changed:
-        return None
+        fields_that_changed = _fields_that_changed(
+            prev_fields=note_from_ah_db.fields, cur_fields=note_from_anki_db.fields
+        )
+
+        if not added_tags and not removed_tags and not fields_that_changed:
+            return None
 
     return ChangeNoteSuggestion(
         ah_nid=note_from_anki_db.ah_nid,
@@ -441,7 +446,8 @@ def _handle_media_with_matching_hashes(
     """If a media file with the same hash already exist for the deck, we shouldn't upload the media file,
     just change the media file name on the notes and suggestions to the name of the existing media file.
     If the file with the matching hash is not in the Anki collection,
-    we create it by copying the referenced media file to prevent broken media references."""
+    we create it by copying the referenced media file to prevent broken media references.
+    """
     media_dir = Path(aqt.mw.col.media.dir())
     media_to_hash_dict = {
         media_name: md5_file_hash(media_dir / media_name) for media_name in media_names
