@@ -26,7 +26,6 @@ from aqt.qt import (
 )
 from aqt.theme import theme_manager
 from aqt.utils import disable_help_button, tooltip
-from PyQt5 import QtGui, QtWidgets
 
 from ..settings import config
 
@@ -545,29 +544,3 @@ def extract_argument(
                 new_kwargs[param.name] = bound_args.arguments[param.name]
 
     return tuple(new_args), new_kwargs, arg_value
-
-
-class PatchedQComboBox(QtWidgets.QComboBox):
-    # This patched combobox class came from this SO answer: https://stackoverflow.com/a/65830989
-    # This class overrides the paintEvent from QComboBox to solve this bug: https://bugreports.qt.io/browse/QTBUG-90522
-    # that prevents the placeholder text set by setPlaceHolderText() from rendering.
-    def paintEvent(self, event):
-
-        painter = QtWidgets.QStylePainter(self)
-        painter.setPen(self.palette().color(QtGui.QPalette.Text))
-
-        # draw the combobox frame, focusrect and selected etc.
-        opt = QtWidgets.QStyleOptionComboBox()
-        self.initStyleOption(opt)
-        painter.drawComplexControl(QtWidgets.QStyle.ComplexControl.CC_ComboBox, opt)
-
-        if self.currentIndex() < 0:
-            opt.palette.setBrush(
-                QtGui.QPalette.ButtonText,
-                opt.palette.brush(QtGui.QPalette.ButtonText).color().lighter(),
-            )
-            if self.placeholderText():
-                opt.currentText = self.placeholderText()
-
-        # draw the icon and text
-        painter.drawControl(QtWidgets.QStyle.ControlElement.CE_ComboBoxLabel, opt)

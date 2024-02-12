@@ -40,7 +40,6 @@ from ..settings import (
 from .operations.ankihub_sync import sync_with_ankihub
 from .operations.subdecks import confirm_and_toggle_subdecks
 from .utils import (
-    PatchedQComboBox,
     ask_user,
     clear_layout,
     set_styled_tooltip,
@@ -452,25 +451,38 @@ class DeckManagementDialog(QDialog):
         )
 
         # Setup and configure the combo box for "Remove AnkiHub deleted notes from deck"
-        self.ankihub_deleted_notes_behavior = PatchedQComboBox()
-        self.ankihub_deleted_notes_behavior.setPlaceholderText("Choose an option...")
+        self.ankihub_deleted_notes_behavior = QComboBox()
         self.ankihub_deleted_notes_behavior.insertItems(
             0, [option.value for option in BehaviorOnRemoteNoteDeleted]
         )
 
+        placeholder_text = "Choose an option..."
         if deck_config.behavior_on_remote_note_deleted:
             self.ankihub_deleted_notes_behavior.setCurrentText(
                 deck_config.behavior_on_remote_note_deleted.value
             )
+        else:
+            # QComboBox.setPlaceholderText() is not available on all platforms and supported Anki versions,
+            # so we are using a workaround to add a placeholder item at the beginning of the list.
+            # It is removed when the user selects an option.
+            self.ankihub_deleted_notes_behavior.insertItem(0, placeholder_text)
+            self.ankihub_deleted_notes_behavior.setCurrentIndex(0)
+
+        def on_option_changed() -> None:
+            if self.ankihub_deleted_notes_behavior.currentText() != placeholder_text:
+                config.set_ankihub_deleted_notes_behavior(
+                    selected_ah_did,
+                    BehaviorOnRemoteNoteDeleted(
+                        self.ankihub_deleted_notes_behavior.currentText()
+                    ),
+                )
+
+            if self.ankihub_deleted_notes_behavior.itemText(0) == placeholder_text:
+                self.ankihub_deleted_notes_behavior.removeItem(0)
 
         qconnect(
             self.ankihub_deleted_notes_behavior.currentTextChanged,
-            lambda: config.set_ankihub_deleted_notes_behavior(
-                selected_ah_did,
-                BehaviorOnRemoteNoteDeleted(
-                    self.ankihub_deleted_notes_behavior.currentText()
-                ),
-            ),
+            on_option_changed,
         )
 
         # Add the label and combo box to the result layout
