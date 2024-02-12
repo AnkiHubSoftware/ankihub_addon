@@ -377,7 +377,7 @@ class AnkiHubImporter:
             self._mark_notes_as_deleted(notes)
         else:
             raise ValueError(  # pragma: no cover
-                f"Unknown value for {str(BehaviorOnRemoteNoteDeleted)}"
+                f"Unknown value for {behavior_on_remote_note_deleted=}"
             )
 
     def _delete_notes(self, notes: Collection[Note]) -> None:
