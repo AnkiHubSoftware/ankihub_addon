@@ -81,9 +81,7 @@ class DeckConfig(DataClassJSONMixin):
     anki_id: DeckId
     name: str
     # TODO The user should be prompted to choose this (for each deck)?
-    behavior_on_remote_note_deleted: BehaviorOnRemoteNoteDeleted = (
-        BehaviorOnRemoteNoteDeleted.NEVER_DELETE
-    )
+    behavior_on_remote_note_deleted: Optional[BehaviorOnRemoteNoteDeleted] = None
     user_relation: UserDeckRelation = UserDeckRelation.SUBSCRIBER
     latest_update: Optional[datetime] = dataclasses.field(
         metadata=field_options(
@@ -256,6 +254,14 @@ class _Config:
         self, ankihub_did: uuid.UUID, suspend: SuspendNewCardsOfExistingNotes
     ):
         self.deck_config(ankihub_did).suspend_new_cards_of_existing_notes = suspend
+        self._update_private_config()
+
+    def set_ankihub_deleted_notes_behavior(
+        self, ankihub_did: uuid.UUID, note_delete_behavior: BehaviorOnRemoteNoteDeleted
+    ):
+        self.deck_config(
+            ankihub_did
+        ).behavior_on_remote_note_deleted = note_delete_behavior
         self._update_private_config()
 
     def add_deck(
