@@ -548,8 +548,7 @@ def extract_argument(
 
 
 class PatchedQComboBox(QtWidgets.QComboBox):
-    # https://code.qt.io/cgit/qt/qtbase.git/tree/src/widgets/widgets/qcombobox.cpp?h=5.15.2#n3173
-    # FIXME This patched combobox class came from this SO answer: https://stackoverflow.com/a/65830989
+    # This patched combobox class came from this SO answer: https://stackoverflow.com/a/65830989
     # This class overrides the paintEvent from QComboBox to solve this bug: https://bugreports.qt.io/browse/QTBUG-90522
     # that prevents the placeholder text set by setPlaceHolderText() from rendering.
     def paintEvent(self, event):
@@ -560,7 +559,7 @@ class PatchedQComboBox(QtWidgets.QComboBox):
         # draw the combobox frame, focusrect and selected etc.
         opt = QtWidgets.QStyleOptionComboBox()
         self.initStyleOption(opt)
-        painter.drawComplexControl(QtWidgets.QStyle.CC_ComboBox, opt)  # type: ignore
+        painter.drawComplexControl(QtWidgets.QStyle.ComplexControl.CC_ComboBox, opt)
 
         if self.currentIndex() < 0:
             opt.palette.setBrush(
@@ -571,4 +570,4 @@ class PatchedQComboBox(QtWidgets.QComboBox):
                 opt.currentText = self.placeholderText()
 
         # draw the icon and text
-        painter.drawControl(QtWidgets.QStyle.CE_ComboBoxLabel, opt)  # type: ignore
+        painter.drawControl(QtWidgets.QStyle.ControlElement.CE_ComboBoxLabel, opt)
