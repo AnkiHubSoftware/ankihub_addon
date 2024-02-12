@@ -240,11 +240,12 @@ class DeckManagementDialog(QDialog):
         self.box_deck_options_elements.addLayout(
             self.box_suspend_new_cards_of_existing_notes
         )
-        self.box_deck_options_elements.addSpacing(10)
         self.box_deck_options_elements.addLayout(
             self.box_suspend_new_cards_of_new_notes
         )
+        self.box_deck_options_elements.addSpacing(10)
         self.box_deck_options_elements.addLayout(self.box_subdecks_enabled)
+        self.box_deck_options_elements.addSpacing(10)
         self.box_deck_options_elements.addLayout(
             self.box_ankihub_deleted_notes_behavior
         )
@@ -450,13 +451,6 @@ class DeckManagementDialog(QDialog):
             "Remove AnkiHub deleted notes from deck"
         )
 
-        # Add the label to the row layout
-        self.ankihub_deleted_notes_behavior_row = QHBoxLayout()
-        self.ankihub_deleted_notes_behavior_row.addWidget(
-            self.ankihub_deleted_notes_behavior_label
-        )
-        self.ankihub_deleted_notes_behavior_row.addStretch()
-
         # Setup and configure the combo box for "Remove AnkiHub deleted notes from deck"
         self.ankihub_deleted_notes_behavior = PatchedQComboBox()
         self.ankihub_deleted_notes_behavior.setPlaceholderText("Choose an option...")
@@ -479,9 +473,9 @@ class DeckManagementDialog(QDialog):
             ),
         )
 
-        # Add the row and combo box to the result layout
+        # Add the label and combo box to the result layout
         box = QVBoxLayout()
-        box.addLayout(self.ankihub_deleted_notes_behavior_row)
+        box.addWidget(self.ankihub_deleted_notes_behavior_label)
         box.addWidget(self.ankihub_deleted_notes_behavior)
 
         return box
