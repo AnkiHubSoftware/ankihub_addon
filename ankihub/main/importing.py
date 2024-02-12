@@ -339,6 +339,15 @@ class AnkiHubImporter:
         notes: Collection[Note],
         behavior_on_remote_note_deleted: BehaviorOnRemoteNoteDeleted,
     ) -> None:
+
+        # Exclude notes that don't exist in the Anki database.
+        note_ids = set(
+            aqt.mw.col.db.list(
+                f"SELECT id FROM notes WHERE id IN {ids2str(note.id for note in notes)}"
+            )
+        )
+        notes = [note for note in notes if note.id in note_ids]
+
         if not notes:
             return
 
