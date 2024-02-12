@@ -1894,7 +1894,7 @@ class TestAnkiHubImporter:
             ah_did = next_deterministic_uuid()
             anki_did = DeckId(next_deterministic_id())
 
-            ah_note = NoteInfoFactory(
+            ah_note = NoteInfoFactory.create(
                 last_update_type=SuggestionType.DELETE,
                 mid=ankihub_basic_note_type["id"],
             )
