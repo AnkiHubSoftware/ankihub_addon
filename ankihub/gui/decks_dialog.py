@@ -67,7 +67,7 @@ class DeckManagementDialog(QDialog):
     def _setup_ui(self):
         self.setWindowTitle("AnkiHub | Deck Management")
         self.setMinimumWidth(640)
-        self.setMinimumHeight(570)
+        self.setMinimumHeight(650)
 
         self.box_main = QVBoxLayout()
 
