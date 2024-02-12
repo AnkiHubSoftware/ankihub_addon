@@ -1,4 +1,5 @@
 """Dialog for managing subscriptions to AnkiHub decks and deck-specific settings."""
+
 import uuid
 from concurrent.futures import Future
 from typing import Optional
@@ -456,33 +457,19 @@ class DeckManagementDialog(QDialog):
             0, [option.value for option in BehaviorOnRemoteNoteDeleted]
         )
 
-        placeholder_text = "Choose an option..."
         if deck_config.behavior_on_remote_note_deleted:
             self.ankihub_deleted_notes_behavior.setCurrentText(
                 deck_config.behavior_on_remote_note_deleted.value
             )
-        else:
-            # QComboBox.setPlaceholderText() is not available on all platforms and supported Anki versions,
-            # so we are using a workaround to add a placeholder item at the beginning of the list.
-            # It is removed when the user selects an option.
-            self.ankihub_deleted_notes_behavior.insertItem(0, placeholder_text)
-            self.ankihub_deleted_notes_behavior.setCurrentIndex(0)
-
-        def on_option_changed() -> None:
-            if self.ankihub_deleted_notes_behavior.currentText() != placeholder_text:
-                config.set_ankihub_deleted_notes_behavior(
-                    selected_ah_did,
-                    BehaviorOnRemoteNoteDeleted(
-                        self.ankihub_deleted_notes_behavior.currentText()
-                    ),
-                )
-
-            if self.ankihub_deleted_notes_behavior.itemText(0) == placeholder_text:
-                self.ankihub_deleted_notes_behavior.removeItem(0)
 
         qconnect(
             self.ankihub_deleted_notes_behavior.currentTextChanged,
-            on_option_changed,
+            lambda: config.set_ankihub_deleted_notes_behavior(
+                selected_ah_did,
+                BehaviorOnRemoteNoteDeleted(
+                    self.ankihub_deleted_notes_behavior.currentText()
+                ),
+            ),
         )
 
         # Add the label and combo box to the result layout
