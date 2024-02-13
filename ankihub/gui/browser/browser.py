@@ -1,4 +1,5 @@
 """Modifies the Anki browser (aqt.browser) to add AnkiHub features."""
+
 import re
 from concurrent.futures import Future
 from typing import List, Optional, Sequence
@@ -67,6 +68,8 @@ from .custom_search_nodes import (
 
 # Maximum number of notes that can be selected for bulk suggestions.
 BULK_SUGGESTION_LIMIT = 2000
+
+ANKIHUB_TAGS_EXCLUDED_FROM_TAG_TREE = ["AnkiHub_Deleted"]
 
 browser: Optional[Browser] = None
 ankihub_tree_item: Optional[SidebarItem] = None
@@ -682,21 +685,22 @@ def _build_tag_tree_and_copy_ah_tag_items_to_ah_tree(
     root_tree_item: SidebarItem, ankihub_tree_item: SidebarItem, browser: Browser
 ) -> bool:
     """Build the tag tree and copy AnkiHub tag items to the AnkiHub tree so
-    that all AnkiHub related sidebar items are grouped together.
+    that AnkiHub related sidebar items are grouped together.
     The tag items should still be in the tag tree to avoid confusion and to
     allow users to use the context menu actions on them.
+    Items for tags in ANKIHUB_TAGS_EXCLUDED_FROM_TAG_TREE are not copied to the AnkiHub tree.
     Returns True if the tag tree was built successfully, False otherwise.
     Building the tag tree can fail if related Anki functions change in the future.
     """
 
-    # build the tag tree using the original function used by Anki
+    # Build the tag tree using the original function used by Anki
     try:
         browser.sidebar._tag_tree(root_tree_item)
     except (AttributeError, ValueError):
         LOGGER.warning("AnkiHub: Could not build tag tree")
         return False
 
-    # move the AnkiHub tag items to the AnkiHub tree
+    # Move the AnkiHub tag items to the AnkiHub tree
     tag_tree = next(
         (
             item
@@ -711,7 +715,10 @@ def _build_tag_tree_and_copy_ah_tag_items_to_ah_tree(
         return False
 
     ankihub_tag_tree_items = [
-        item for item in tag_tree.children if item.name.startswith("AnkiHub_")
+        item
+        for item in tag_tree.children
+        if item.name.startswith("AnkiHub_")
+        and item.name not in ANKIHUB_TAGS_EXCLUDED_FROM_TAG_TREE
     ]
 
     for ah_tag_tree_item in ankihub_tag_tree_items:
@@ -721,12 +728,12 @@ def _build_tag_tree_and_copy_ah_tag_items_to_ah_tree(
         ah_tag_tree_item._parent_item = ankihub_tree_item
         ah_tag_tree_item.item_type = SidebarItemType.CUSTOM
 
-        # remove tag icons because it looks better without them
+        # Remove tag icons because it looks better without them
         ah_tag_tree_item.icon = ""
         for descendant in _sidebar_item_descendants(ah_tag_tree_item):
             descendant.icon = ""
 
-    # remove and re-add the tag tree so that the AnkiHub tag items are under the AnkiHub tree
+    # Remove and re-add the tag tree so that the AnkiHub tag items are under the AnkiHub tree
     # and also under the tag tree
     root_tree_item.children.remove(tag_tree)
     browser.sidebar._tag_tree(root_tree_item)
