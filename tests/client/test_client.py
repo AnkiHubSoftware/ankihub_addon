@@ -605,7 +605,7 @@ class TestCreateSuggestion:
             ID_OF_DECK_OF_USER_TEST1,
         )
 
-        # Create an auto-accepted deletion suggestion
+        # Create a deletion suggestion
         change_note_suggestion = ChangeNoteSuggestion(
             ah_nid=new_note_suggestion.ah_nid,
             anki_nid=new_note_suggestion.anki_nid,
