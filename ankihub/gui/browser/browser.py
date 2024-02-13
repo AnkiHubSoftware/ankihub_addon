@@ -69,6 +69,11 @@ from .custom_search_nodes import (
 # Maximum number of notes that can be selected for bulk suggestions.
 BULK_SUGGESTION_LIMIT = 2000
 
+# Various special tags used by AnkiHub have this prefix. The sidebar items of tags with this prefix
+# are copied to the AnkiHub tree in the sidebar.
+ANKIHUB_TAGS_PREFIX = "AnkiHub_"
+
+# These tags are not copied to the AnkiHub tree in the sidebar.
 ANKIHUB_TAGS_EXCLUDED_FROM_TAG_TREE = ["AnkiHub_Deleted"]
 
 browser: Optional[Browser] = None
@@ -717,7 +722,7 @@ def _build_tag_tree_and_copy_ah_tag_items_to_ah_tree(
     ankihub_tag_tree_items = [
         item
         for item in tag_tree.children
-        if item.name.startswith("AnkiHub_")
+        if item.name.startswith(ANKIHUB_TAGS_PREFIX)
         and item.name not in ANKIHUB_TAGS_EXCLUDED_FROM_TAG_TREE
     ]
 
