@@ -71,10 +71,10 @@ BULK_SUGGESTION_LIMIT = 2000
 
 # Various special tags used by AnkiHub have this prefix. The sidebar items of tags with this prefix
 # are copied to the AnkiHub tree in the sidebar.
-ANKIHUB_TAGS_PREFIX = "AnkiHub_"
+ANKIHUB_TAGS_PREFIX = "ankihub_"
 
 # These tags are not copied to the AnkiHub tree in the sidebar.
-ANKIHUB_TAGS_EXCLUDED_FROM_TAG_TREE = ["AnkiHub_Deleted"]
+ANKIHUB_TAGS_EXCLUDED_FROM_TAG_TREE = ["ankihub_deleted"]
 
 browser: Optional[Browser] = None
 ankihub_tree_item: Optional[SidebarItem] = None
@@ -722,8 +722,8 @@ def _build_tag_tree_and_copy_ah_tag_items_to_ah_tree(
     ankihub_tag_tree_items = [
         item
         for item in tag_tree.children
-        if item.name.startswith(ANKIHUB_TAGS_PREFIX)
-        and item.name not in ANKIHUB_TAGS_EXCLUDED_FROM_TAG_TREE
+        if item.name.lower().startswith(ANKIHUB_TAGS_PREFIX)
+        and item.name.lower() not in ANKIHUB_TAGS_EXCLUDED_FROM_TAG_TREE
     ]
 
     for ah_tag_tree_item in ankihub_tag_tree_items:
