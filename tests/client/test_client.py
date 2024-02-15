@@ -584,6 +584,53 @@ class TestCreateSuggestion:
             auto_accept=True,
         )
 
+    @pytest.mark.vcr()
+    @pytest.mark.parametrize(
+        "auto_accept",
+        [True, False],
+    )
+    def test_create_deletion_suggestion(
+        self,
+        authorized_client_for_user_test1: AnkiHubClient,
+        new_note_suggestion: NewNoteSuggestion,
+        change_note_suggestion: ChangeNoteSuggestion,
+        auto_accept: bool,
+    ):
+        client = authorized_client_for_user_test1
+
+        # Setup a note on the server
+        create_note_on_ankihub_and_assert(
+            client,
+            new_note_suggestion,
+            ID_OF_DECK_OF_USER_TEST1,
+        )
+
+        # Create a deletion suggestion
+        change_note_suggestion = ChangeNoteSuggestion(
+            ah_nid=new_note_suggestion.ah_nid,
+            anki_nid=new_note_suggestion.anki_nid,
+            fields=[],
+            added_tags=[],
+            removed_tags=[],
+            comment="test",
+            change_type=SuggestionType.DELETE,
+        )
+
+        client.create_change_note_suggestion(
+            change_note_suggestion=change_note_suggestion,
+            auto_accept=auto_accept,
+        )
+
+        if auto_accept:
+            # Assert that the note was deleted
+            with pytest.raises(AnkiHubHTTPError):
+                client.get_note_by_id(ah_nid=new_note_suggestion.ah_nid)
+        else:
+            # Assert that the note is still there
+            note = client.get_note_by_id(ah_nid=new_note_suggestion.ah_nid)
+            assert note.fields == new_note_suggestion.fields
+            assert set(note.tags) == set(new_note_suggestion.tags)
+
 
 class TestCreateSuggestionsInBulk:
     @pytest.mark.vcr()

@@ -1875,6 +1875,46 @@ class TestAnkiHubImporter:
             assert len(import_result.marked_as_deleted_nids) == 1
             assert len(import_result.deleted_nids) == 1
 
+    @pytest.mark.parametrize(
+        "behavior_on_remote_note_deleted",
+        [
+            BehaviorOnRemoteNoteDeleted.NEVER_DELETE,
+            BehaviorOnRemoteNoteDeleted.DELETE_IF_NO_REVIEWS,
+        ],
+    )
+    def test_import_note_deletion_for_note_that_doesnt_exist_in_anki(
+        self,
+        anki_session_with_addon_data: AnkiSession,
+        ankihub_basic_note_type: NotetypeDict,
+        next_deterministic_uuid: Callable[[], uuid.UUID],
+        next_deterministic_id: Callable[[], int],
+        behavior_on_remote_note_deleted: BehaviorOnRemoteNoteDeleted,
+    ):
+        with anki_session_with_addon_data.profile_loaded():
+            ah_did = next_deterministic_uuid()
+            anki_did = DeckId(next_deterministic_id())
+
+            ah_note = NoteInfoFactory.create(
+                last_update_type=SuggestionType.DELETE,
+                mid=ankihub_basic_note_type["id"],
+            )
+            import_result = self._import_notes(
+                [ah_note],
+                note_types={ankihub_basic_note_type["id"]: ankihub_basic_note_type},
+                behavior_on_remote_note_deleted=behavior_on_remote_note_deleted,
+                is_first_import_of_deck=False,
+                ah_did=ah_did,
+                anki_did=anki_did,
+            )
+
+            with pytest.raises(NotFoundError):
+                aqt.mw.col.get_note(NoteId(ah_note.anki_nid))
+
+            assert len(import_result.created_nids) == 0
+            assert len(import_result.updated_nids) == 0
+            assert len(import_result.marked_as_deleted_nids) == 0
+            assert len(import_result.deleted_nids) == 0
+
     def _import_notes(
         self,
         ah_notes: List[NoteInfo],
@@ -1882,6 +1922,7 @@ class TestAnkiHubImporter:
         is_first_import_of_deck: bool,
         behavior_on_remote_note_deleted: BehaviorOnRemoteNoteDeleted,
         anki_did: Optional[DeckId] = None,
+        note_types: Dict[NotetypeId, NotetypeDict] = {},
     ) -> AnkiHubImportResult:
         """Helper function to use the AnkiHubImporter to import notes with default arguments."""
         ankihub_importer = AnkiHubImporter()
@@ -1892,7 +1933,7 @@ class TestAnkiHubImporter:
             anki_did=anki_did,
             is_first_import_of_deck=is_first_import_of_deck,
             behavior_on_remote_note_deleted=behavior_on_remote_note_deleted,
-            note_types={},
+            note_types=note_types,
             protected_fields={},
             protected_tags=[],
             suspend_new_cards_of_new_notes=DeckConfig.suspend_new_cards_of_new_notes_default(
