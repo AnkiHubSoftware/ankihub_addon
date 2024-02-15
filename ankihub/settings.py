@@ -80,7 +80,6 @@ class BehaviorOnRemoteNoteDeleted(Enum):
 class DeckConfig(DataClassJSONMixin):
     anki_id: DeckId
     name: str
-    # TODO The user should be prompted to choose this (for each deck)?
     behavior_on_remote_note_deleted: Optional[BehaviorOnRemoteNoteDeleted] = None
     user_relation: UserDeckRelation = UserDeckRelation.SUBSCRIBER
     latest_update: Optional[datetime] = dataclasses.field(
