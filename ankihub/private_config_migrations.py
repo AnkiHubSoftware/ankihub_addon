@@ -6,6 +6,7 @@ from aqt.qt import (
     QCheckBox,
     QDialog,
     QDialogButtonBox,
+    QEvent,
     QGridLayout,
     QHBoxLayout,
     QLabel,
@@ -143,6 +144,9 @@ def _maybe_prompt_user_for_behavior_on_remote_note_deleted(
 class ConfigureDeletedNotesDialog(QDialog):
     """Dialog to configure the behavior when a remote note is deleted for each deck.
     Shows a list of decks and a checkbox for each deck to configure the behavior.
+    The dialog can't be closed using the close button in the title bar. It can only be closed by
+    clicking the OK button. The reason for this is that we want to ensure that the user
+    configures the behavior for each deck before continuing.
     """
 
     def __init__(
@@ -228,3 +232,7 @@ class ConfigureDeletedNotesDialog(QDialog):
         self.grid_layout.setColumnStretch(0, 3)
         self.grid_layout.setColumnStretch(1, 1)
         return self.grid_layout
+
+    def closeEvent(self, event: QEvent) -> None:
+        # Thsi prevents the dialog from being closed using the close button in the title bar.
+        event.ignore()
