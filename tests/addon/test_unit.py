@@ -2471,7 +2471,7 @@ class TestPrivateConfigMigrations:
         config.add_deck(
             name=deck.name,
             ankihub_did=deck.ah_did,
-            anki_did=deck.anki_did,
+            anki_did=DeckId(deck.anki_did),
             user_relation=UserDeckRelation.OWNER,
         )
 
