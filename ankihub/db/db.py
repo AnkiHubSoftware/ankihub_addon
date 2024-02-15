@@ -155,8 +155,8 @@ class _AnkiHubDB:
                     "SELECT mod FROM notes WHERE id = ?", note_data.anki_nid
                 )
                 if not mod:
-                    # The format of mod is milliseconds since the epoch.
-                    mod = int(time.time() * 1000)
+                    # The format of mod is seconds since the epoch.
+                    mod = int(time.time())
 
                 AnkiHubNote.update(mod=mod).where(
                     AnkiHubNote.ankihub_note_id == note_data.ah_nid
