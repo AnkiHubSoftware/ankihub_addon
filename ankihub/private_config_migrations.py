@@ -16,7 +16,7 @@ from aqt.qt import (
 from . import LOGGER
 
 if TYPE_CHECKING:
-    from .settings import BehaviorOnRemoteNoteDeleted
+    from .settings import BehaviorOnRemoteNoteDeleted  # pragma: no cover
 
 
 def migrate_private_config(private_config_dict: Dict) -> None:
