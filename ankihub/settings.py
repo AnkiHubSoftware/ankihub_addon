@@ -193,6 +193,7 @@ class _Config:
                 self._private_config = self._load_private_config()
             except JSONDecodeError:
                 # TODO Instead of overwriting, query AnkiHub for config values.
+                LOGGER.exception("Failed to load private config. Overwriting it.")
                 self._private_config = PrivateConfig()
 
         self._update_private_config()
@@ -204,8 +205,8 @@ class _Config:
 
         try:
             migrate_private_config(private_config_dict)
-        except Exception:
-            LOGGER.warning("Failed to migrate private config")
+        except Exception as e:
+            LOGGER.exception(f"Failed to migrate private config: {e}")
 
         result = PrivateConfig.from_dict(private_config_dict)
         return result
