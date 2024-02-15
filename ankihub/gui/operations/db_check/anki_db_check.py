@@ -7,7 +7,9 @@ from anki.utils import ids2str
 from aqt.utils import showInfo
 
 from .... import LOGGER
-from ....db import ankihub_db
+from ....ankihub_client.models import SuggestionType
+from ....db import ankihub_db, flat
+from ....db.models import AnkiHubNote
 from ....main.reset_local_changes import reset_local_changes_to_notes
 from ....settings import ANKIHUB_NOTE_TYPE_FIELD_NAME, config
 from ...utils import ask_user
@@ -61,7 +63,7 @@ def _on_done(future: Future):
     showInfo("Missing values have been restored.")
 
 
-def _decks_with_missing_ankihub_nids():
+def _decks_with_missing_ankihub_nids() -> List[uuid.UUID]:
     result = []
     ah_dids = ankihub_db.ankihub_dids()
     for ah_did in ah_dids:
@@ -86,8 +88,15 @@ def _decks_with_missing_ankihub_nids():
                 result.append(ah_did)
                 break
         else:
-            # add ah_did to results if for any note of the deck the AnkiHub ID field is empty
-            nids = ankihub_db.anki_nids_for_ankihub_deck(ah_did)
+            # add ah_did to results if for any (not deleted) note of the deck the AnkiHub ID field is empty
+            nids = (
+                AnkiHubNote.select(AnkiHubNote.anki_note_id)
+                .filter(
+                    ankihub_deck_id=ah_did,
+                    last_update_type__ne=SuggestionType.DELETE.value[0],
+                )
+                .objects(flat)
+            )
             field_seperator = "\x1f"  # see anki.utils.split_fields
 
             # Check if any note has an empty AnkiHub ID field by checking if the last field is empty.
