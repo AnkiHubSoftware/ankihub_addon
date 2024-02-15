@@ -2796,11 +2796,11 @@ class TestAnkiHubDBMigrations:
             assert ankihub_db.database_path != migration_test_db_path  # sanity check
 
 
-@pytest.mark.parametrize(
-    "check_first_checkbox, check_second_checkbox",
-    [(True, False), (False, True), (True, True), (False, False)],
-)
 class TestConfigureDeletedNotesDialog:
+    @pytest.mark.parametrize(
+        "check_first_checkbox, check_second_checkbox",
+        [(True, False), (False, True), (True, True), (False, False)],
+    )
     def test_with_two_decks(
         self,
         next_deterministic_uuid,
@@ -2863,3 +2863,38 @@ class TestConfigureDeletedNotesDialog:
                 else BehaviorOnRemoteNoteDeleted.NEVER_DELETE
             ),
         }
+
+    def test_close_button_has_no_effect(self, next_deterministic_uuid):
+        parent = QDialog()
+
+        deck_1_id = next_deterministic_uuid()
+        deck_1_name = "Test Deck"
+        deck_id_name_tuples = [
+            (deck_1_id, deck_1_name),
+        ]
+
+        dialog = ConfigureDeletedNotesDialog(
+            deck_id_and_name_tuples=deck_id_name_tuples,
+            parent=parent,
+        )
+        dialog.show()
+        dialog.close()
+
+        assert dialog.isVisible()
+
+    def test_ok_button_closes_dialog(self, next_deterministic_uuid):
+        parent = QDialog()
+
+        deck_1_id = next_deterministic_uuid()
+        deck_1_name = "Test Deck"
+        deck_id_name_tuples = [
+            (deck_1_id, deck_1_name),
+        ]
+
+        dialog = ConfigureDeletedNotesDialog(
+            deck_id_and_name_tuples=deck_id_name_tuples,
+            parent=parent,
+        )
+        dialog.button_box.button(QDialogButtonBox.Ok).click()
+
+        assert not dialog.isVisible()
