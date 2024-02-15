@@ -37,6 +37,7 @@ from ankihub.ankihub_client.ankihub_client import DEFAULT_API_URL
 from ankihub.ankihub_client.models import (  # type: ignore
     CardReviewData,
     UserDeckExtensionRelation,
+    UserDeckRelation,
 )
 from ankihub.gui import menu
 from ankihub.gui.config_dialog import setup_config_dialog_manager
@@ -2453,6 +2454,43 @@ class TestPrivateConfigMigrations:
         config.setup_private_config()
 
         assert config.deck_extensions_ids_for_ah_did(ah_did) == []
+
+    @pytest.mark.parametrize(
+        "behavior_on_remote_note_deleted",
+        [
+            BehaviorOnRemoteNoteDeleted.DELETE_IF_NO_REVIEWS,
+            BehaviorOnRemoteNoteDeleted.NEVER_DELETE,
+        ],
+    )
+    def test_maybe_prompt_user_for_behavior_on_remote_note_deleted(
+        self,
+        mocker: MockerFixture,
+        behavior_on_remote_note_deleted: BehaviorOnRemoteNoteDeleted,
+    ):
+        deck = DeckFactory.create()
+        config.add_deck(
+            name=deck.name,
+            ankihub_did=deck.ah_did,
+            anki_did=deck.anki_did,
+            user_relation=UserDeckRelation.OWNER,
+        )
+
+        mocker.patch.object(ConfigureDeletedNotesDialog, "exec")
+        mocker.patch.object(
+            ConfigureDeletedNotesDialog,
+            "deck_id_to_behavior_on_remote_note_deleted_dict",
+            return_value={deck.ah_did: behavior_on_remote_note_deleted},
+        )
+
+        assert config.deck_config(deck.ah_did).behavior_on_remote_note_deleted is None
+
+        # Reload the private config to trigger the migration.
+        config.setup_private_config()
+
+        assert (
+            config.deck_config(deck.ah_did).behavior_on_remote_note_deleted
+            == behavior_on_remote_note_deleted
+        )
 
 
 class TestOptionalTagSuggestionDialog:
