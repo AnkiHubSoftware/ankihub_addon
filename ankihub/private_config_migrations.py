@@ -203,6 +203,10 @@ class ConfigureDeletedNotesDialog(QDialog):
 
         self.setLayout(self.main_layout)
 
+        # Fix the size of the dialog to prevent it from being resized.
+        self.adjustSize()
+        self.setFixedSize(self.size())
+
     def _setup_grid_layout(self) -> QGridLayout:
         self.grid_layout = QGridLayout()
 
