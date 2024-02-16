@@ -765,7 +765,6 @@ class TestDownloadAndInstallDecks:
         self,
         anki_session_with_addon_data: AnkiSession,
         qtbot: QtBot,
-        mocker: MockerFixture,
         mock_download_and_install_deck_dependencies: MockDownloadAndInstallDeckDependencies,
         ankihub_basic_note_type: NotetypeDict,
     ):
@@ -821,6 +820,37 @@ class TestDownloadAndInstallDecks:
 
             # Call download_and_install_decks. This shouldn't raise an exception.
             download_and_install_decks(ankihub_dids=[], on_done=on_done)
+
+            # Assert that the future contains the exception and that it contains the expected message.
+            assert future.exception().args[0] == exception_message
+
+    def test_fetching_deck_infos_raises_exception(
+        self,
+        anki_session_with_addon_data: AnkiSession,
+        mocker: MockerFixture,
+        qtbot: QtBot,
+        mock_download_and_install_deck_dependencies: MockDownloadAndInstallDeckDependencies,
+        ankihub_basic_note_type: NotetypeDict,
+    ):
+        with anki_session_with_addon_data.profile_loaded():
+
+            deck = DeckFactory.create()
+            notes_data = [NoteInfoFactory.create(mid=ankihub_basic_note_type["id"])]
+            mock_download_and_install_deck_dependencies(
+                deck, notes_data, ankihub_basic_note_type
+            )
+
+            exception_message = "test exception"
+            mocker.patch.object(
+                AnkiHubClient,
+                "get_deck_by_id",
+                side_effect=Exception(exception_message),
+            )
+
+            with qtbot.wait_callback() as callback:
+                download_and_install_decks(ankihub_dids=[deck.ah_did], on_done=callback)
+
+            future: Future = callback.args[0]
 
             # Assert that the future contains the exception and that it contains the expected message.
             assert future.exception().args[0] == exception_message
