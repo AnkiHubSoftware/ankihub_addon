@@ -27,90 +27,65 @@ from ..media_sync import media_sync
 from ..messages import messages
 from ..utils import show_dialog, tooltip_icon
 from .subdecks import confirm_and_toggle_subdecks
-from .utils import future_with_exception, future_with_result
+from .utils import future_with_result, pass_exceptions_to_on_done
 
 
+@pass_exceptions_to_on_done
 def download_and_install_decks(
     ankihub_dids: List[uuid.UUID],
     on_done: Callable[[Future], None],
     cleanup: bool = True,
 ) -> None:
-    """Downloads and installs the given decks in the background.
-    Asks the user to configure the behavior when a remote note is deleted for each deck before installing the decks.
-    Shows an import summary once the decks are installed.
-    If cleanup is True, unused tags and empty cards are cleared after the decks are installed.
-    """
+    """Downloads and installs the given decks in the background."""
+    aqt.mw.taskman.with_progress(
+        task=lambda: _fetch_deck_infos(ankihub_dids),
+        on_done=partial(_on_deck_infos_fetched, on_done=on_done, cleanup=cleanup),
+        label="Getting deck information from AnkiHub...",
+    )
 
-    def on_install_done(future: Future):
-        try:
-            import_results: List[AnkiHubImportResult] = future.result()
-        except Exception as e:
-            on_done(future_with_exception(e))
-            return
 
-        try:
-            on_install_done_inner(import_results)
-            on_done(future_with_result(None))
-        except Exception as e:
-            on_done(future_with_exception(e))
+@pass_exceptions_to_on_done
+def _on_deck_infos_fetched(
+    future: Future, on_done: Callable[[Future], None], cleanup: bool
+) -> None:
+    decks = future.result()
 
-    def on_install_done_inner(import_results: List[AnkiHubImportResult]):
-        if cleanup:
-            _cleanup_after_deck_install()
+    deck_id_name_tuples = [(deck.ah_did, deck.name) for deck in decks]
+    dialog = ConfigureDeletedNotesDialog(
+        parent=aqt.mw.app.activeWindow(),
+        deck_id_and_name_tuples=deck_id_name_tuples,
+    )
+    dialog.exec()
 
-        # Reset the main window
-        aqt.mw.reset()
+    # TODO
+    # deck_id_to_behavior_on_remote_note_deleted_dict = (
+    #     dialog.deck_id_to_behavior_on_remote_note_deleted_dict()
+    # )
 
-        # Ask user to enable subdecks if available for each deck that was installed.
-        for import_result in import_results:
-            ah_did = import_result.ankihub_did
-            if deck_contains_subdeck_tags(ah_did):
-                confirm_and_toggle_subdecks(ah_did)
+    aqt.mw.taskman.with_progress(
+        task=lambda: _download_and_install_decks_inner(decks),
+        on_done=partial(_on_install_done, on_done=on_done, cleanup=cleanup),
+        label="Downloading decks from AnkiHub...",
+    )
 
-        _show_deck_import_summary_dialog(import_results)
 
-    def _on_deck_infos_fetched(future: Future) -> None:
-        try:
-            decks = future.result()
-        except Exception as e:
-            on_done(future_with_exception(e))
-            return
+@pass_exceptions_to_on_done
+def _on_install_done(future: Future, on_done: Callable[[Future], None], cleanup: bool):
+    import_results: List[AnkiHubImportResult] = future.result()
 
-        # Show Configure deleted notes dialog
-        deck_id_name_tuples = [(deck.ah_did, deck.name) for deck in decks]
-        dialog = ConfigureDeletedNotesDialog(
-            parent=aqt.mw.app.activeWindow(),
-            deck_id_and_name_tuples=deck_id_name_tuples,
-        )
-        dialog.exec()
+    if cleanup:
+        _cleanup_after_deck_install()
 
-        # TODO
-        # deck_id_to_behavior_on_remote_note_deleted_dict = (
-        #     dialog.deck_id_to_behavior_on_remote_note_deleted_dict()
-        # )
+    aqt.mw.reset()
 
-        try:
-            # Install decks in background
-            aqt.mw.taskman.with_progress(
-                task=lambda: _download_and_install_decks_inner(decks),
-                on_done=on_install_done,
-                label="Downloading decks from AnkiHub...",
-            )
-        except Exception as e:
-            # Using run_on_main prevents exceptions which occur in the callback to be backpropagated to the caller,
-            # which is what we want.
-            aqt.mw.taskman.run_on_main(partial(on_done, future_with_exception(e)))
+    for import_result in import_results:
+        ah_did = import_result.ankihub_did
+        if deck_contains_subdeck_tags(ah_did):
+            confirm_and_toggle_subdecks(ah_did)
 
-    try:
-        aqt.mw.taskman.with_progress(
-            task=lambda: _fetch_deck_infos(ankihub_dids),
-            on_done=_on_deck_infos_fetched,
-            label="Getting deck information from AnkiHub...",
-        )
-    except Exception as e:
-        # Using run_on_main prevents exceptions which occur in the callback to be backpropagated to the caller,
-        # which is what we want.
-        aqt.mw.taskman.run_on_main(partial(on_done, future_with_exception(e)))
+    _show_deck_import_summary_dialog(import_results)
+
+    on_done(future_with_result(None))
 
 
 def _fetch_deck_infos(ankihub_dids: List[uuid.UUID]) -> List[Deck]:
@@ -120,7 +95,10 @@ def _fetch_deck_infos(ankihub_dids: List[uuid.UUID]) -> List[Deck]:
             deck = AnkiHubClient().get_deck_by_id(ankihub_did)
         except AnkiHubHTTPError as e:
             if e.response.status_code == 404:
-                raise RemoteDeckNotFoundError(ankihub_did=ankihub_did) from e
+                raise DeckDownloadAndInstallError(
+                    RemoteDeckNotFoundError(ankihub_did=ankihub_did),
+                    ankihub_did=ankihub_did,
+                ) from e
             raise e
         result.append(deck)
     return result
