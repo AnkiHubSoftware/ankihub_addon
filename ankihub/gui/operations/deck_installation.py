@@ -1,5 +1,6 @@
 """Code for downloading and installing decks in the background and showing the related dialogs
 (install confirmation dialog, import summary dialog, etc.)."""
+
 import uuid
 from concurrent.futures import Future
 from datetime import datetime
@@ -14,12 +15,13 @@ from ... import LOGGER
 from ...addon_ankihub_client import AddonAnkiHubClient as AnkiHubClient
 from ...ankihub_client import NoteInfo
 from ...ankihub_client.ankihub_client import AnkiHubHTTPError
-from ...ankihub_client.models import UserDeckRelation
+from ...ankihub_client.models import Deck, UserDeckRelation
 from ...main.importing import AnkiHubImporter, AnkiHubImportResult
 from ...main.note_types import fetch_note_types_based_on_notes
 from ...main.subdecks import deck_contains_subdeck_tags
 from ...main.utils import clear_empty_cards, create_backup
 from ...settings import BehaviorOnRemoteNoteDeleted, DeckConfig, config
+from ..configure_deleted_notes_dialog import ConfigureDeletedNotesDialog
 from ..exceptions import DeckDownloadAndInstallError, RemoteDeckNotFoundError
 from ..media_sync import media_sync
 from ..messages import messages
@@ -34,6 +36,7 @@ def download_and_install_decks(
     cleanup: bool = True,
 ) -> None:
     """Downloads and installs the given decks in the background.
+    Asks the user to configure the behavior when a remote note is deleted for each deck before installing the decks.
     Shows an import summary once the decks are installed.
     If cleanup is True, unused tags and empty cards are cleared after the decks are installed.
     """
@@ -66,17 +69,61 @@ def download_and_install_decks(
 
         _show_deck_import_summary_dialog(import_results)
 
+    def _on_deck_infos_fetched(future: Future) -> None:
+        try:
+            decks = future.result()
+        except Exception as e:
+            on_done(future_with_exception(e))
+            return
+
+        # Show Configure deleted notes dialog
+        deck_id_name_tuples = [(deck.ah_did, deck.name) for deck in decks]
+        dialog = ConfigureDeletedNotesDialog(
+            parent=aqt.mw.app.activeWindow(),
+            deck_id_and_name_tuples=deck_id_name_tuples,
+        )
+        dialog.exec()
+
+        # TODO
+        # deck_id_to_behavior_on_remote_note_deleted_dict = (
+        #     dialog.deck_id_to_behavior_on_remote_note_deleted_dict()
+        # )
+
+        try:
+            # Install decks in background
+            aqt.mw.taskman.with_progress(
+                task=lambda: _download_and_install_decks_inner(decks),
+                on_done=on_install_done,
+                label="Downloading decks from AnkiHub...",
+            )
+        except Exception as e:
+            # Using run_on_main prevents exceptions which occur in the callback to be backpropagated to the caller,
+            # which is what we want.
+            aqt.mw.taskman.run_on_main(partial(on_done, future_with_exception(e)))
+
     try:
-        # Install decks in background
         aqt.mw.taskman.with_progress(
-            task=lambda: _download_and_install_decks_inner(ankihub_dids),
-            on_done=on_install_done,
-            label="Downloading decks from AnkiHub",
+            task=lambda: _fetch_deck_infos(ankihub_dids),
+            on_done=_on_deck_infos_fetched,
+            label="Getting deck information from AnkiHub...",
         )
     except Exception as e:
         # Using run_on_main prevents exceptions which occur in the callback to be backpropagated to the caller,
         # which is what we want.
         aqt.mw.taskman.run_on_main(partial(on_done, future_with_exception(e)))
+
+
+def _fetch_deck_infos(ankihub_dids: List[uuid.UUID]) -> List[Deck]:
+    result: List[Deck] = []
+    for ankihub_did in ankihub_dids:
+        try:
+            deck = AnkiHubClient().get_deck_by_id(ankihub_did)
+        except AnkiHubHTTPError as e:
+            if e.response.status_code == 404:
+                raise RemoteDeckNotFoundError(ankihub_did=ankihub_did) from e
+            raise e
+        result.append(deck)
+    return result
 
 
 def _show_deck_import_summary_dialog(
@@ -111,24 +158,24 @@ def _show_deck_import_summary_dialog(
     )
 
 
-def _download_and_install_decks_inner(
-    ankihub_dids: List[uuid.UUID],
-) -> List[AnkiHubImportResult]:
+def _download_and_install_decks_inner(decks: List[Deck]) -> List[AnkiHubImportResult]:
     """Downloads and installs the given decks.
     Attempts to install all decks even if some fail."""
     result = []
     exceptions = []
-    for ah_did in ankihub_dids:
+    for deck in decks:
         try:
-            result.append(_download_and_install_single_deck(ah_did))
+            result.append(_download_and_install_single_deck(deck))
         except Exception as e:
             exceptions.append(
                 DeckDownloadAndInstallError(
                     original_exception=e,
-                    ankihub_did=ah_did,
+                    ankihub_did=deck.ah_did,
                 )
             )
-            LOGGER.warning(f"Failed to download and install deck {ah_did}.", exc_info=e)
+            LOGGER.warning(
+                f"Failed to download and install deck {deck.ah_did}.", exc_info=e
+            )
 
     if exceptions:
         # Raise the first exception that occurred
@@ -137,14 +184,7 @@ def _download_and_install_decks_inner(
     return result
 
 
-def _download_and_install_single_deck(ankihub_did: uuid.UUID) -> AnkiHubImportResult:
-    try:
-        deck = AnkiHubClient().get_deck_by_id(ankihub_did)
-    except AnkiHubHTTPError as e:
-        if e.response.status_code == 404:
-            raise RemoteDeckNotFoundError(ankihub_did=ankihub_did) from e
-        raise e
-
+def _download_and_install_single_deck(deck: Deck) -> AnkiHubImportResult:
     notes_data: List[NoteInfo] = AnkiHubClient().download_deck(
         deck.ah_did, download_progress_cb=_download_progress_cb
     )
