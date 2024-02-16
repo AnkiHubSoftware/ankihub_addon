@@ -38,7 +38,7 @@ from ...main.importing import get_fields_protected_by_tags
 from ...main.note_conversion import (
     TAG_FOR_PROTECTING_ALL_FIELDS,
     TAG_FOR_PROTECTING_FIELDS,
-    is_tag_for_group,
+    optional_tag_prefix_for_group,
 )
 from ...main.reset_local_changes import reset_local_changes_to_notes
 from ...main.subdecks import SUBDECK_TAG, build_subdecks_and_move_cards_to_them
@@ -537,15 +537,17 @@ def _reset_optional_tag_group(extension_id: int) -> None:
 
 
 def _remove_optional_tags_of_extension(extension_config: DeckExtensionConfig) -> None:
-    # only removes the tags for notes of the deck related to the deck extension,
-    # some people use the same tag group for multiple decks
-    tags_for_tag_group = [
-        tag
-        for tag in aqt.mw.col.tags.all()
-        if is_tag_for_group(tag, extension_config.tag_group_name)
-    ]
+    """Remove all optional tags of the given extension from all notes of the deck the extension is for."""
+    # Some people use the same tag group name for multiple decks, so we have to be careful to
+    # only remove tags from notes of the deck the deck extension is for.
     nids = ankihub_db.anki_nids_for_ankihub_deck(extension_config.ah_did)
-    aqt.mw.col.tags.bulk_remove(note_ids=nids, tags=" ".join(tags_for_tag_group))
+    aqt.mw.col.tags.find_and_replace(
+        note_ids=nids,
+        search=f"{optional_tag_prefix_for_group(extension_config.tag_group_name)}.+",
+        replacement="",
+        regex=True,
+        match_case=False,
+    )
     LOGGER.info(f"Removed optional tags for {extension_config.tag_group_name}")
 
 
