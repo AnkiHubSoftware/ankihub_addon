@@ -762,19 +762,34 @@ def test_create_collaborative_deck_and_upload(
 
 class TestDownloadAndInstallDecks:
     @pytest.mark.qt_no_exception_capture
+    @pytest.mark.parametrize(
+        "has_subdeck_tags",
+        [True, False],
+    )
     def test_download_and_install_deck(
         self,
         anki_session_with_addon_data: AnkiSession,
         qtbot: QtBot,
         mock_download_and_install_deck_dependencies: MockDownloadAndInstallDeckDependencies,
         ankihub_basic_note_type: NotetypeDict,
+        mocker: MockerFixture,
+        has_subdeck_tags: bool,
     ):
         anki_session = anki_session_with_addon_data
         with anki_session.profile_loaded():
             deck = DeckFactory.create()
-            notes_data = [NoteInfoFactory.create(mid=ankihub_basic_note_type["id"])]
+            notes_data = [
+                NoteInfoFactory.create(
+                    mid=ankihub_basic_note_type["id"],
+                    tags=[f"{SUBDECK_TAG}::Deck::Subdeck"] if has_subdeck_tags else [],
+                )
+            ]
             mocks = mock_download_and_install_deck_dependencies(
                 deck, notes_data, ankihub_basic_note_type
+            )
+
+            confirm_and_toggle_subdecks_mock = mocker.patch(
+                "ankihub.gui.operations.deck_installation.confirm_and_toggle_subdecks"
             )
 
             # Download and install the deck
@@ -798,6 +813,11 @@ class TestDownloadAndInstallDecks:
                 assert (
                     mock.call_count == 1
                 ), f"Mock {name} was not called once, but {mock.call_count} times"
+
+            if has_subdeck_tags:
+                confirm_and_toggle_subdecks_mock.assert_called_once_with(deck.ah_did)
+            else:
+                confirm_and_toggle_subdecks_mock.assert_not_called()
 
     def test_exception_is_not_backpropagated_to_caller(
         self, anki_session_with_addon_data: AnkiSession, mocker: MockerFixture
