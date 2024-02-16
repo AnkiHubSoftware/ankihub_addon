@@ -138,6 +138,7 @@ from ankihub.gui.deck_updater import _AnkiHubDeckUpdater, ah_deck_updater
 from ankihub.gui.decks_dialog import DeckManagementDialog
 from ankihub.gui.editor import SUGGESTION_BTN_ID
 from ankihub.gui.errors import upload_logs_and_data_in_background
+from ankihub.gui.exceptions import DeckDownloadAndInstallError, RemoteDeckNotFoundError
 from ankihub.gui.media_sync import media_sync
 from ankihub.gui.menu import AnkiHubLogin, menu_state
 from ankihub.gui.operations import ankihub_sync
@@ -824,13 +825,18 @@ class TestDownloadAndInstallDecks:
             # Assert that the future contains the exception and that it contains the expected message.
             assert future.exception().args[0] == exception_message
 
-    def test_fetching_deck_infos_raises_exception(
+    @pytest.mark.parametrize(
+        "response_status_code",
+        [404, 500],
+    )
+    def test_fetching_deck_infos_raises_ankihub_http_error(
         self,
         anki_session_with_addon_data: AnkiSession,
         mocker: MockerFixture,
         qtbot: QtBot,
         mock_download_and_install_deck_dependencies: MockDownloadAndInstallDeckDependencies,
         ankihub_basic_note_type: NotetypeDict,
+        response_status_code: int,
     ):
         with anki_session_with_addon_data.profile_loaded():
 
@@ -840,20 +846,25 @@ class TestDownloadAndInstallDecks:
                 deck, notes_data, ankihub_basic_note_type
             )
 
-            exception_message = "test exception"
+            response = Response()
+            response.status_code = response_status_code
             mocker.patch.object(
                 AnkiHubClient,
                 "get_deck_by_id",
-                side_effect=Exception(exception_message),
+                side_effect=AnkiHubHTTPError(response=response),
             )
 
             with qtbot.wait_callback() as callback:
                 download_and_install_decks(ankihub_dids=[deck.ah_did], on_done=callback)
 
             future: Future = callback.args[0]
+            exception = future.exception()
+            assert isinstance(exception, DeckDownloadAndInstallError)
 
-            # Assert that the future contains the exception and that it contains the expected message.
-            assert future.exception().args[0] == exception_message
+            if response_status_code == 404:
+                assert isinstance(exception.original_exception, RemoteDeckNotFoundError)
+            else:
+                assert isinstance(exception.original_exception, AnkiHubHTTPError)
 
 
 class TestCheckAndInstallNewDeckSubscriptions:

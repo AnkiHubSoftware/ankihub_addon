@@ -98,13 +98,13 @@ def _fetch_deck_infos(ankihub_dids: List[uuid.UUID]) -> List[Deck]:
     for ankihub_did in ankihub_dids:
         try:
             deck = AnkiHubClient().get_deck_by_id(ankihub_did)
-        except AnkiHubHTTPError as e:
-            if e.response.status_code == 404:
+        except Exception as e:
+            if isinstance(e, AnkiHubHTTPError) and e.response.status_code == 404:
                 raise DeckDownloadAndInstallError(
                     RemoteDeckNotFoundError(ankihub_did=ankihub_did),
                     ankihub_did=ankihub_did,
                 ) from e
-            raise e
+            raise DeckDownloadAndInstallError(e, ankihub_did=ankihub_did) from e
         result.append(deck)
     return result
 
