@@ -270,6 +270,7 @@ class _Config:
         ankihub_did: uuid.UUID,
         anki_did: DeckId,
         user_relation: UserDeckRelation,
+        behavior_on_remote_note_deleted: BehaviorOnRemoteNoteDeleted,
         latest_udpate: Optional[datetime] = None,
         subdecks_enabled: bool = False,
     ) -> None:
@@ -282,6 +283,7 @@ class _Config:
             suspend_new_cards_of_new_notes=DeckConfig.suspend_new_cards_of_new_notes_default(
                 ankihub_did
             ),
+            behavior_on_remote_note_deleted=behavior_on_remote_note_deleted,
         )
         # remove duplicates
         self.save_latest_deck_update(ankihub_did, latest_udpate)

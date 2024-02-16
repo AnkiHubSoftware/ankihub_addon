@@ -2473,7 +2473,13 @@ class TestPrivateConfigMigrations:
             ankihub_did=deck.ah_did,
             anki_did=DeckId(deck.anki_did),
             user_relation=UserDeckRelation.OWNER,
+            behavior_on_remote_note_deleted=BehaviorOnRemoteNoteDeleted.NEVER_DELETE,
         )
+
+        # Set the behavior_on_remote_note_deleted to None in the private config,
+        # to simulate the old state.
+        config.deck_config(deck.ah_did).behavior_on_remote_note_deleted = None
+        config._update_private_config()
 
         mocker.patch.object(ConfigureDeletedNotesDialog, "exec")
         mocker.patch.object(

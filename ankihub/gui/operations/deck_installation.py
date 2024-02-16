@@ -203,6 +203,7 @@ def _install_deck(
         anki_did=import_result.anki_did,
         user_relation=user_relation,
         latest_udpate=latest_update,
+        behavior_on_remote_note_deleted=BehaviorOnRemoteNoteDeleted.NEVER_DELETE,
     )
 
     aqt.mw.taskman.run_on_main(media_sync.start_media_download)

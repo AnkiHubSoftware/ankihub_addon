@@ -442,6 +442,7 @@ def install_ah_deck(
             ankihub_did=ah_did,
             anki_did=anki_did,
             user_relation=UserDeckRelation.SUBSCRIBER,
+            behavior_on_remote_note_deleted=BehaviorOnRemoteNoteDeleted.NEVER_DELETE,
         )
 
         # Create deck by importing a note for it

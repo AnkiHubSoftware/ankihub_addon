@@ -11,7 +11,7 @@ from ...ankihub_client import get_media_names_from_notes_data
 from ...ankihub_client.models import UserDeckRelation
 from ...main.deck_creation import DeckCreationResult, create_ankihub_deck
 from ...main.subdecks import SUBDECK_TAG
-from ...settings import config, url_view_deck
+from ...settings import BehaviorOnRemoteNoteDeleted, config, url_view_deck
 from ..media_sync import media_sync
 from ..operations import AddonQueryOp
 from ..utils import ask_user
@@ -127,6 +127,7 @@ def _on_deck_selected(study_deck: StudyDeck) -> None:
             anki_did,
             user_relation=UserDeckRelation.OWNER,
             latest_udpate=creation_time,
+            behavior_on_remote_note_deleted=BehaviorOnRemoteNoteDeleted.NEVER_DELETE,
         )
 
         # Show a message to the user with a link to the deck on AnkiHub
