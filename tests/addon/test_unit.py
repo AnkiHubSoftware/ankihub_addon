@@ -41,7 +41,7 @@ from ankihub.ankihub_client.models import (  # type: ignore
 )
 from ankihub.gui import menu
 from ankihub.gui.config_dialog import setup_config_dialog_manager
-from ankihub.private_config_migrations import ConfigureDeletedNotesDialog
+from ankihub.gui.configure_deleted_notes_dialog import ConfigureDeletedNotesDialog
 
 from ..factories import (
     DeckExtensionFactory,
