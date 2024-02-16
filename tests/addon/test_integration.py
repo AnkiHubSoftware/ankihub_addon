@@ -866,6 +866,36 @@ class TestDownloadAndInstallDecks:
             else:
                 assert isinstance(exception.original_exception, AnkiHubHTTPError)
 
+    def test_download_and_install_single_deck_raises_exception(
+        self,
+        anki_session_with_addon_data: AnkiSession,
+        mocker: MockerFixture,
+        qtbot: QtBot,
+        mock_download_and_install_deck_dependencies: MockDownloadAndInstallDeckDependencies,
+        ankihub_basic_note_type: NotetypeDict,
+    ):
+        with anki_session_with_addon_data.profile_loaded():
+
+            deck = DeckFactory.create()
+            notes_data = [NoteInfoFactory.create(mid=ankihub_basic_note_type["id"])]
+            mock_download_and_install_deck_dependencies(
+                deck, notes_data, ankihub_basic_note_type
+            )
+
+            exception_message = "test exception"
+            mocker.patch(
+                "ankihub.gui.operations.deck_installation._download_and_install_single_deck",
+                side_effect=Exception(exception_message),
+            )
+
+            with qtbot.wait_callback() as callback:
+                download_and_install_decks(ankihub_dids=[deck.ah_did], on_done=callback)
+
+            future: Future = callback.args[0]
+            exception = future.exception()
+            assert isinstance(exception, DeckDownloadAndInstallError)
+            assert exception.original_exception.args[0] == exception_message
+
 
 class TestCheckAndInstallNewDeckSubscriptions:
     def test_one_new_subscription(
