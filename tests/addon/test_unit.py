@@ -16,8 +16,16 @@ import pytest
 from anki.decks import DeckId
 from anki.models import NotetypeDict
 from anki.notes import Note, NoteId
-from aqt import QLineEdit, QMenu
-from aqt.qt import QDialog, QDialogButtonBox, Qt, QTimer, QWidget
+from aqt.qt import (
+    QCheckBox,
+    QDialog,
+    QDialogButtonBox,
+    QLineEdit,
+    QMenu,
+    Qt,
+    QTimer,
+    QWidget,
+)
 from pytest import MonkeyPatch
 from pytest_anki import AnkiSession
 from pytest_mock import MockerFixture
@@ -29,9 +37,11 @@ from ankihub.ankihub_client.ankihub_client import DEFAULT_API_URL
 from ankihub.ankihub_client.models import (  # type: ignore
     CardReviewData,
     UserDeckExtensionRelation,
+    UserDeckRelation,
 )
 from ankihub.gui import menu
 from ankihub.gui.config_dialog import setup_config_dialog_manager
+from ankihub.private_config_migrations import ConfigureDeletedNotesDialog
 
 from ..factories import (
     DeckExtensionFactory,
@@ -135,7 +145,12 @@ from ankihub.main.utils import (
     mids_of_notes,
     retain_nids_with_ah_note_type,
 )
-from ankihub.settings import ANKIWEB_ID, config, log_file_path
+from ankihub.settings import (
+    ANKIWEB_ID,
+    BehaviorOnRemoteNoteDeleted,
+    config,
+    log_file_path,
+)
 
 
 @pytest.fixture
@@ -2440,6 +2455,43 @@ class TestPrivateConfigMigrations:
 
         assert config.deck_extensions_ids_for_ah_did(ah_did) == []
 
+    @pytest.mark.parametrize(
+        "behavior_on_remote_note_deleted",
+        [
+            BehaviorOnRemoteNoteDeleted.DELETE_IF_NO_REVIEWS,
+            BehaviorOnRemoteNoteDeleted.NEVER_DELETE,
+        ],
+    )
+    def test_maybe_prompt_user_for_behavior_on_remote_note_deleted(
+        self,
+        mocker: MockerFixture,
+        behavior_on_remote_note_deleted: BehaviorOnRemoteNoteDeleted,
+    ):
+        deck = DeckFactory.create()
+        config.add_deck(
+            name=deck.name,
+            ankihub_did=deck.ah_did,
+            anki_did=DeckId(deck.anki_did),
+            user_relation=UserDeckRelation.OWNER,
+        )
+
+        mocker.patch.object(ConfigureDeletedNotesDialog, "exec")
+        mocker.patch.object(
+            ConfigureDeletedNotesDialog,
+            "deck_id_to_behavior_on_remote_note_deleted_dict",
+            return_value={deck.ah_did: behavior_on_remote_note_deleted},
+        )
+
+        assert config.deck_config(deck.ah_did).behavior_on_remote_note_deleted is None
+
+        # Reload the private config to trigger the migration.
+        config.setup_private_config()
+
+        assert (
+            config.deck_config(deck.ah_did).behavior_on_remote_note_deleted
+            == behavior_on_remote_note_deleted
+        )
+
 
 class TestOptionalTagSuggestionDialog:
     def test_submit_tags_for_validated_groups(
@@ -2742,3 +2794,107 @@ class TestAnkiHubDBMigrations:
             assert table_definitions == expected_table_definitions
             assert index_definitions == expected_index_definitions
             assert ankihub_db.database_path != migration_test_db_path  # sanity check
+
+
+class TestConfigureDeletedNotesDialog:
+    @pytest.mark.parametrize(
+        "check_first_checkbox, check_second_checkbox",
+        [(True, False), (False, True), (True, True), (False, False)],
+    )
+    def test_with_two_decks(
+        self,
+        next_deterministic_uuid,
+        check_first_checkbox: bool,
+        check_second_checkbox: bool,
+    ):
+        parent = QDialog()
+
+        deck_1_id = next_deterministic_uuid()
+        deck_1_name = "Deck 1"
+
+        deck_2_id = next_deterministic_uuid()
+        deck_2_name = "Deck 2"
+
+        deck_id_name_tuples = [
+            (deck_1_id, deck_1_name),
+            (deck_2_id, deck_2_name),
+        ]
+
+        dialog = ConfigureDeletedNotesDialog(
+            deck_id_and_name_tuples=deck_id_name_tuples,
+            parent=parent,
+        )
+        dialog.show()
+
+        # Check initial state
+        label_for_deck_1 = dialog.grid_layout.itemAtPosition(1, 0).widget()
+        assert label_for_deck_1.text() == deck_1_name
+
+        label_for_deck_2 = dialog.grid_layout.itemAtPosition(2, 0).widget()
+        assert label_for_deck_2.text() == deck_2_name
+
+        checkbox_for_deck_1: QCheckBox = (
+            dialog.grid_layout.itemAtPosition(1, 1).layout().itemAt(1).widget()
+        )
+        assert not checkbox_for_deck_1.isChecked()
+
+        checkbox_for_deck_2: QCheckBox = (
+            dialog.grid_layout.itemAtPosition(2, 1).layout().itemAt(1).widget()
+        )
+        assert not checkbox_for_deck_2.isChecked()
+
+        # Check a checkbox
+        if check_first_checkbox:
+            checkbox_for_deck_1.setChecked(True)
+
+        if check_second_checkbox:
+            checkbox_for_deck_2.setChecked(True)
+
+        # Check that the dialog returns the expected values
+        assert dialog.deck_id_to_behavior_on_remote_note_deleted_dict() == {
+            deck_1_id: (
+                BehaviorOnRemoteNoteDeleted.DELETE_IF_NO_REVIEWS
+                if check_first_checkbox
+                else BehaviorOnRemoteNoteDeleted.NEVER_DELETE
+            ),
+            deck_2_id: (
+                BehaviorOnRemoteNoteDeleted.DELETE_IF_NO_REVIEWS
+                if check_second_checkbox
+                else BehaviorOnRemoteNoteDeleted.NEVER_DELETE
+            ),
+        }
+
+    def test_close_button_has_no_effect(self, next_deterministic_uuid):
+        parent = QDialog()
+
+        deck_1_id = next_deterministic_uuid()
+        deck_1_name = "Test Deck"
+        deck_id_name_tuples = [
+            (deck_1_id, deck_1_name),
+        ]
+
+        dialog = ConfigureDeletedNotesDialog(
+            deck_id_and_name_tuples=deck_id_name_tuples,
+            parent=parent,
+        )
+        dialog.show()
+        dialog.close()
+
+        assert dialog.isVisible()
+
+    def test_ok_button_closes_dialog(self, next_deterministic_uuid):
+        parent = QDialog()
+
+        deck_1_id = next_deterministic_uuid()
+        deck_1_name = "Test Deck"
+        deck_id_name_tuples = [
+            (deck_1_id, deck_1_name),
+        ]
+
+        dialog = ConfigureDeletedNotesDialog(
+            deck_id_and_name_tuples=deck_id_name_tuples,
+            parent=parent,
+        )
+        dialog.button_box.button(QDialogButtonBox.Ok).click()
+
+        assert not dialog.isVisible()

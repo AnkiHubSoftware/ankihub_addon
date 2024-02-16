@@ -235,6 +235,11 @@ def install_sample_ah_deck(
             anki_did=anki_did,
             user_relation=UserDeckRelation.SUBSCRIBER,
         )
+        config.set_ankihub_deleted_notes_behavior(
+            ankihub_did=ah_did,
+            note_delete_behavior=BehaviorOnRemoteNoteDeleted.NEVER_DELETE,
+        )
+
         return anki_did, ah_did
 
     return _install_sample_ah_deck
