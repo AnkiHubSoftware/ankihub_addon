@@ -5003,9 +5003,7 @@ class TestAHDBCheck:
                 assert config.deck_ids() == [ah_did]
             elif user_confirms and not deck_exists_on_ankihub:
                 # The deck could't be installed because it doesn't exist, was uninstalled completely
-                assert ankihub_db.ankihub_deck_ids() == (
-                    [ah_did] if deck_exists_on_ankihub else []
-                )
+                assert ankihub_db.ankihub_deck_ids() == []
             else:
                 # User didn't confirm, nothing to do
                 assert mocks["get_deck_by_id"].call_count == 0
