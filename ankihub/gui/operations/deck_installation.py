@@ -5,7 +5,7 @@ import uuid
 from concurrent.futures import Future
 from datetime import datetime
 from functools import partial
-from typing import Callable, List
+from typing import Callable, Dict, List
 
 import aqt
 from aqt.operations.tag import clear_unused_tags
@@ -40,7 +40,7 @@ def download_and_install_decks(
     aqt.mw.taskman.with_progress(
         task=lambda: _fetch_deck_infos(ankihub_dids),
         on_done=partial(_on_deck_infos_fetched, on_done=on_done, cleanup=cleanup),
-        label="Getting deck information from AnkiHub...",
+        label="Getting deck information...",
     )
 
 
@@ -50,6 +50,7 @@ def _on_deck_infos_fetched(
 ) -> None:
     decks = future.result()
 
+    # Ask the user how to handle deleted notes
     deck_id_name_tuples = [(deck.ah_did, deck.name) for deck in decks]
     dialog = ConfigureDeletedNotesDialog(
         parent=aqt.mw.app.activeWindow(),
@@ -57,13 +58,15 @@ def _on_deck_infos_fetched(
     )
     dialog.exec()
 
-    # TODO
-    # deck_id_to_behavior_on_remote_note_deleted_dict = (
-    #     dialog.deck_id_to_behavior_on_remote_note_deleted_dict()
-    # )
+    ah_did_to_deletion_behavior = (
+        dialog.deck_id_to_behavior_on_remote_note_deleted_dict()
+    )
 
+    # Download and install the decks
     aqt.mw.taskman.with_progress(
-        task=lambda: _download_and_install_decks_inner(decks),
+        task=lambda: _download_and_install_decks_inner(
+            decks, ah_did_to_deletion_behavior=ah_did_to_deletion_behavior
+        ),
         on_done=partial(_on_install_done, on_done=on_done, cleanup=cleanup),
         label="Downloading decks from AnkiHub...",
     )
@@ -76,8 +79,10 @@ def _on_install_done(future: Future, on_done: Callable[[Future], None], cleanup:
     if cleanup:
         _cleanup_after_deck_install()
 
+    # Reset the main window so that the decks are displayed
     aqt.mw.reset()
 
+    # Ask user if they want to enable subdecks
     for import_result in import_results:
         ah_did = import_result.ankihub_did
         if deck_contains_subdeck_tags(ah_did):
@@ -136,14 +141,24 @@ def _show_deck_import_summary_dialog(
     )
 
 
-def _download_and_install_decks_inner(decks: List[Deck]) -> List[AnkiHubImportResult]:
+def _download_and_install_decks_inner(
+    decks: List[Deck],
+    ah_did_to_deletion_behavior: Dict[uuid.UUID, BehaviorOnRemoteNoteDeleted],
+) -> List[AnkiHubImportResult]:
     """Downloads and installs the given decks.
     Attempts to install all decks even if some fail."""
     result = []
     exceptions = []
     for deck in decks:
         try:
-            result.append(_download_and_install_single_deck(deck))
+            result.append(
+                _download_and_install_single_deck(
+                    deck,
+                    behavior_on_remote_note_deleted=ah_did_to_deletion_behavior[
+                        deck.ah_did
+                    ],
+                )
+            )
         except Exception as e:
             exceptions.append(
                 DeckDownloadAndInstallError(
@@ -162,7 +177,9 @@ def _download_and_install_decks_inner(decks: List[Deck]) -> List[AnkiHubImportRe
     return result
 
 
-def _download_and_install_single_deck(deck: Deck) -> AnkiHubImportResult:
+def _download_and_install_single_deck(
+    deck: Deck, behavior_on_remote_note_deleted: BehaviorOnRemoteNoteDeleted
+) -> AnkiHubImportResult:
     notes_data: List[NoteInfo] = AnkiHubClient().download_deck(
         deck.ah_did, download_progress_cb=_download_progress_cb
     )
@@ -175,6 +192,7 @@ def _download_and_install_single_deck(deck: Deck) -> AnkiHubImportResult:
         deck_name=deck.name,
         ankihub_did=deck.ah_did,
         user_relation=deck.user_relation,
+        behavior_on_remote_note_deleted=behavior_on_remote_note_deleted,
         latest_update=deck.csv_last_upload,
     )
 
@@ -186,6 +204,7 @@ def _install_deck(
     deck_name: str,
     ankihub_did: uuid.UUID,
     user_relation: UserDeckRelation,
+    behavior_on_remote_note_deleted: BehaviorOnRemoteNoteDeleted,
     latest_update: datetime,
 ) -> AnkiHubImportResult:
     """Imports the notes_data into the Anki collection.
@@ -206,7 +225,7 @@ def _install_deck(
         note_types=note_types,
         deck_name=deck_name,
         is_first_import_of_deck=True,
-        behavior_on_remote_note_deleted=BehaviorOnRemoteNoteDeleted.NEVER_DELETE,
+        behavior_on_remote_note_deleted=behavior_on_remote_note_deleted,
         protected_fields=protected_fields,
         protected_tags=protected_tags,
         suspend_new_cards_of_existing_notes=DeckConfig.suspend_new_cards_of_existing_notes_default(),
@@ -221,7 +240,7 @@ def _install_deck(
         anki_did=import_result.anki_did,
         user_relation=user_relation,
         latest_udpate=latest_update,
-        behavior_on_remote_note_deleted=BehaviorOnRemoteNoteDeleted.NEVER_DELETE,
+        behavior_on_remote_note_deleted=behavior_on_remote_note_deleted,
     )
 
     aqt.mw.taskman.run_on_main(media_sync.start_media_download)
