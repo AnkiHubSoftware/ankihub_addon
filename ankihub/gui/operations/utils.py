@@ -29,7 +29,7 @@ def pass_exceptions_to_on_done(func: Callable) -> Callable:
         "on_done" not in params
         or params["on_done"].default is not inspect.Parameter.empty
     ):
-        raise ValueError(
+        raise ValueError(  # pragma: no cover
             f"Function {func.__name__} must have a required 'on_done' parameter"
         )
 
