@@ -9,7 +9,9 @@ from aqt.qt import (
     QGridLayout,
     QHBoxLayout,
     QLabel,
+    QScrollArea,
     QVBoxLayout,
+    QWidget,
     qconnect,
 )
 
@@ -57,7 +59,7 @@ class ConfigureDeletedNotesDialog(QDialog):
             "should also be removed locally from these decks..."
         )
 
-        self.grid_layout = self._setup_grid_layout()
+        self.scroll_area = self._setup_scroll_area()
 
         self.bottom_label = QLabel(
             "You can adjust this setting later in the <b>Deck Management</b> menu."
@@ -71,7 +73,7 @@ class ConfigureDeletedNotesDialog(QDialog):
 
         self.main_layout.addWidget(self.top_label)
         self.main_layout.addSpacing(10)
-        self.main_layout.addLayout(self.grid_layout)
+        self.main_layout.addWidget(self.scroll_area)
         self.main_layout.addSpacing(10)
         self.main_layout.addWidget(self.bottom_label)
         self.main_layout.addSpacing(25)
@@ -82,6 +84,15 @@ class ConfigureDeletedNotesDialog(QDialog):
         # Fix the size of the dialog to prevent it from being resized.
         self.adjustSize()
         self.setFixedSize(self.size())
+
+    def _setup_scroll_area(self) -> QScrollArea:
+        scroll_area = QScrollArea()
+        scroll_area.setWidgetResizable(True)
+        scroll_widget = QWidget()
+        grid_layout = self._setup_grid_layout()
+        scroll_widget.setLayout(grid_layout)
+        scroll_area.setWidget(scroll_widget)
+        return scroll_area
 
     def _setup_grid_layout(self) -> QGridLayout:
         self.grid_layout = QGridLayout()
