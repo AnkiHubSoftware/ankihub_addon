@@ -115,7 +115,9 @@ def _maybe_prompt_user_for_behavior_on_remote_note_deleted(
         (uuid.UUID(ah_did_str), deck["name"]) for ah_did_str, deck in decks_dict.items()
     ]
     dialog = ConfigureDeletedNotesDialog(
-        parent=aqt.mw, deck_id_and_name_tuples=deck_id_and_name_tuples
+        parent=aqt.mw,
+        deck_id_and_name_tuples=deck_id_and_name_tuples,
+        show_new_feature_message=True,
     )
     dialog.exec()
 
