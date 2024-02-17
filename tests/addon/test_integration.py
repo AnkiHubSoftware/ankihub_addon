@@ -138,6 +138,7 @@ from ankihub.gui.deck_updater import _AnkiHubDeckUpdater, ah_deck_updater
 from ankihub.gui.decks_dialog import DeckManagementDialog
 from ankihub.gui.editor import SUGGESTION_BTN_ID
 from ankihub.gui.errors import upload_logs_and_data_in_background
+from ankihub.gui.exceptions import DeckDownloadAndInstallError, RemoteDeckNotFoundError
 from ankihub.gui.media_sync import media_sync
 from ankihub.gui.menu import AnkiHubLogin, menu_state
 from ankihub.gui.operations import ankihub_sync
@@ -234,12 +235,8 @@ def install_sample_ah_deck(
             ankihub_did=ah_did,
             anki_did=anki_did,
             user_relation=UserDeckRelation.SUBSCRIBER,
+            behavior_on_remote_note_deleted=BehaviorOnRemoteNoteDeleted.NEVER_DELETE,
         )
-        config.set_ankihub_deleted_notes_behavior(
-            ankihub_did=ah_did,
-            note_delete_behavior=BehaviorOnRemoteNoteDeleted.NEVER_DELETE,
-        )
-
         return anki_did, ah_did
 
     return _install_sample_ah_deck
@@ -765,20 +762,34 @@ def test_create_collaborative_deck_and_upload(
 
 class TestDownloadAndInstallDecks:
     @pytest.mark.qt_no_exception_capture
+    @pytest.mark.parametrize(
+        "has_subdeck_tags",
+        [True, False],
+    )
     def test_download_and_install_deck(
         self,
         anki_session_with_addon_data: AnkiSession,
         qtbot: QtBot,
-        mocker: MockerFixture,
         mock_download_and_install_deck_dependencies: MockDownloadAndInstallDeckDependencies,
         ankihub_basic_note_type: NotetypeDict,
+        mocker: MockerFixture,
+        has_subdeck_tags: bool,
     ):
         anki_session = anki_session_with_addon_data
         with anki_session.profile_loaded():
             deck = DeckFactory.create()
-            notes_data = [NoteInfoFactory.create(mid=ankihub_basic_note_type["id"])]
+            notes_data = [
+                NoteInfoFactory.create(
+                    mid=ankihub_basic_note_type["id"],
+                    tags=[f"{SUBDECK_TAG}::Deck::Subdeck"] if has_subdeck_tags else [],
+                )
+            ]
             mocks = mock_download_and_install_deck_dependencies(
                 deck, notes_data, ankihub_basic_note_type
+            )
+
+            confirm_and_toggle_subdecks_mock = mocker.patch(
+                "ankihub.gui.operations.deck_installation.confirm_and_toggle_subdecks"
             )
 
             # Download and install the deck
@@ -802,6 +813,11 @@ class TestDownloadAndInstallDecks:
                 assert (
                     mock.call_count == 1
                 ), f"Mock {name} was not called once, but {mock.call_count} times"
+
+            if has_subdeck_tags:
+                confirm_and_toggle_subdecks_mock.assert_called_once_with(deck.ah_did)
+            else:
+                confirm_and_toggle_subdecks_mock.assert_not_called()
 
     def test_exception_is_not_backpropagated_to_caller(
         self, anki_session_with_addon_data: AnkiSession, mocker: MockerFixture
@@ -828,6 +844,77 @@ class TestDownloadAndInstallDecks:
 
             # Assert that the future contains the exception and that it contains the expected message.
             assert future.exception().args[0] == exception_message
+
+    @pytest.mark.parametrize(
+        "response_status_code",
+        [404, 500],
+    )
+    def test_fetching_deck_infos_raises_ankihub_http_error(
+        self,
+        anki_session_with_addon_data: AnkiSession,
+        mocker: MockerFixture,
+        qtbot: QtBot,
+        mock_download_and_install_deck_dependencies: MockDownloadAndInstallDeckDependencies,
+        ankihub_basic_note_type: NotetypeDict,
+        response_status_code: int,
+    ):
+        with anki_session_with_addon_data.profile_loaded():
+
+            deck = DeckFactory.create()
+            notes_data = [NoteInfoFactory.create(mid=ankihub_basic_note_type["id"])]
+            mock_download_and_install_deck_dependencies(
+                deck, notes_data, ankihub_basic_note_type
+            )
+
+            response = Response()
+            response.status_code = response_status_code
+            mocker.patch.object(
+                AnkiHubClient,
+                "get_deck_by_id",
+                side_effect=AnkiHubHTTPError(response=response),
+            )
+
+            with qtbot.wait_callback() as callback:
+                download_and_install_decks(ankihub_dids=[deck.ah_did], on_done=callback)
+
+            future: Future = callback.args[0]
+            exception = future.exception()
+            assert isinstance(exception, DeckDownloadAndInstallError)
+
+            if response_status_code == 404:
+                assert isinstance(exception.original_exception, RemoteDeckNotFoundError)
+            else:
+                assert isinstance(exception.original_exception, AnkiHubHTTPError)
+
+    def test_download_and_install_single_deck_raises_exception(
+        self,
+        anki_session_with_addon_data: AnkiSession,
+        mocker: MockerFixture,
+        qtbot: QtBot,
+        mock_download_and_install_deck_dependencies: MockDownloadAndInstallDeckDependencies,
+        ankihub_basic_note_type: NotetypeDict,
+    ):
+        with anki_session_with_addon_data.profile_loaded():
+
+            deck = DeckFactory.create()
+            notes_data = [NoteInfoFactory.create(mid=ankihub_basic_note_type["id"])]
+            mock_download_and_install_deck_dependencies(
+                deck, notes_data, ankihub_basic_note_type
+            )
+
+            exception_message = "test exception"
+            mocker.patch(
+                "ankihub.gui.operations.deck_installation._download_and_install_single_deck",
+                side_effect=Exception(exception_message),
+            )
+
+            with qtbot.wait_callback() as callback:
+                download_and_install_decks(ankihub_dids=[deck.ah_did], on_done=callback)
+
+            future: Future = callback.args[0]
+            exception = future.exception()
+            assert isinstance(exception, DeckDownloadAndInstallError)
+            assert exception.original_exception.args[0] == exception_message
 
 
 class TestCheckAndInstallNewDeckSubscriptions:
@@ -5007,9 +5094,7 @@ class TestAHDBCheck:
                 assert config.deck_ids() == [ah_did]
             elif user_confirms and not deck_exists_on_ankihub:
                 # The deck could't be installed because it doesn't exist, was uninstalled completely
-                assert ankihub_db.ankihub_deck_ids() == (
-                    [ah_did] if deck_exists_on_ankihub else []
-                )
+                assert ankihub_db.ankihub_deck_ids() == []
             else:
                 # User didn't confirm, nothing to do
                 assert mocks["get_deck_by_id"].call_count == 0
