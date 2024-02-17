@@ -2901,6 +2901,31 @@ class TestConfigureDeletedNotesDialog:
             deck_id_and_name_tuples=deck_id_name_tuples,
             parent=parent,
         )
+        dialog.show()
         dialog.button_box.button(QDialogButtonBox.Ok).click()
 
         assert not dialog.isVisible()
+
+    @pytest.mark.parametrize(
+        "show_new_feature_message",
+        [True, False],
+    )
+    def test_show_new_feature_message(
+        self, next_deterministic_uuid, show_new_feature_message: bool
+    ):
+        parent = QDialog()
+
+        deck_1_id = next_deterministic_uuid()
+        deck_1_name = "Test Deck"
+        deck_id_name_tuples = [
+            (deck_1_id, deck_1_name),
+        ]
+
+        dialog = ConfigureDeletedNotesDialog(
+            deck_id_and_name_tuples=deck_id_name_tuples,
+            parent=parent,
+            show_new_feature_message=show_new_feature_message,
+        )
+        dialog.show()
+
+        assert dialog.new_feature_label.isVisible() == show_new_feature_message
