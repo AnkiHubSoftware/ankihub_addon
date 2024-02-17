@@ -1,6 +1,7 @@
 """Modifies the Anki editor (aqt.editor) to add AnkiHub buttons and functionality."""
+
 from pprint import pformat
-from typing import Any, List, Tuple
+from typing import Any, List, Tuple, cast
 
 import anki
 import aqt
@@ -13,6 +14,7 @@ from aqt.utils import openLink, showInfo, tooltip
 from .. import LOGGER, settings
 from ..ankihub_client import AnkiHubHTTPError
 from ..db import ankihub_db
+from ..db.models import AnkiHubNote
 from ..gui.menu import AnkiHubLogin
 from ..settings import (
     ANKI_INT_VERSION,
@@ -122,17 +124,15 @@ def _on_suggestion_button_press_inner(editor: Editor) -> None:
 
 def _setup_editor_buttons(buttons: List[str], editor: Editor) -> None:
     """Add buttons to Editor."""
-    public_config = config.public_config
-    hotkey = public_config["hotkey"]
     img = str(ICONS_PATH / "ankihub_button.png")
     suggestion_button = editor.addButton(
         icon=img,
         cmd=SUGGESTION_BTN_ID,
         func=_on_suggestion_button_press,
-        tip=f"Send your request to AnkiHub ({hotkey})",
+        tip=_default_suggestion_button_tooltip(),
         label=f'<span id="{SUGGESTION_BTN_ID}-label" style="vertical-align: top;"></span>',
         id=SUGGESTION_BTN_ID,
-        keys=hotkey,
+        keys=_suggestion_button_hotkey(),
         disables=False,
     )
     buttons.append(suggestion_button)
@@ -167,17 +167,25 @@ def _setup_editor_buttons(buttons: List[str], editor: Editor) -> None:
             "       bottom: 0!important; left: 0!important;"
             "       filter: invert(0)!important;"
             "   }\n"
-            f"  [id^='{ANKIHUB_BTN_ID_PREFIX}'][disabled] {{ opacity:.4; pointer-events: none; }}\n"
+            f"  [id^='{ANKIHUB_BTN_ID_PREFIX}'][disabled] {{ opacity:.4; }}\n"
             "</style>"
         )
     else:
         buttons.append(
             "<style> "
             f"  [id^='{ANKIHUB_BTN_ID_PREFIX}'] {{ width:auto; padding:1px; }}\n"
-            f"  [id^='{ANKIHUB_BTN_ID_PREFIX}'][disabled] {{ opacity:.4; pointer-events: none; }}\n"
+            f"  [id^='{ANKIHUB_BTN_ID_PREFIX}'][disabled] {{ opacity:.4; }}\n"
             f"  [id^='{ANKIHUB_BTN_ID_PREFIX}'] img  {{filter: invert(0)!important;}}"
             "</style>"
         )
+
+
+def _default_suggestion_button_tooltip() -> str:
+    return f"Send your request to AnkiHub ({_suggestion_button_hotkey()})"
+
+
+def _suggestion_button_hotkey():
+    return config.public_config["hotkey"]
 
 
 def _on_view_note_button_press(editor: Editor) -> None:
@@ -318,14 +326,34 @@ def _refresh_buttons(editor: Editor) -> None:
     if note is None or not ankihub_db.is_ankihub_note_type(note.mid):
         _disable_buttons(editor, all_button_ids)
         _set_suggestion_button_label(editor, "")
+        _set_suggestion_button_tooltip(editor, "")
         return
 
-    if ankihub_db.ankihub_nid_for_anki_nid(note.id):
+    if ah_note := AnkiHubNote.get_or_none(anki_note_id=note.id):
         command = AnkiHubCommands.CHANGE.value
-        _enable_buttons(editor, all_button_ids)
+
+        ah_note = cast(AnkiHubNote, ah_note)
+        if ah_note.was_deleted():
+            _disable_buttons(editor, all_button_ids)
+            _set_suggestion_button_tooltip(
+                editor,
+                "This note has been deleted from AnkiHub. No new suggestions can be made.",
+            )
+        else:
+            _enable_buttons(editor, all_button_ids)
+            _set_suggestion_button_tooltip(
+                editor,
+                _default_suggestion_button_tooltip(),
+            )
     else:
         command = AnkiHubCommands.NEW.value
+
         _enable_buttons(editor, [SUGGESTION_BTN_ID])
+        _set_suggestion_button_tooltip(
+            editor,
+            _default_suggestion_button_tooltip(),
+        )
+
         _disable_buttons(editor, [VIEW_NOTE_BTN_ID, VIEW_NOTE_HISTORY_BTN_ID])
 
     _set_suggestion_button_label(editor, command)
@@ -356,6 +384,11 @@ def _set_suggestion_button_label(editor: Editor, label: str) -> None:
         f"document.getElementById('{SUGGESTION_BTN_ID}-label').textContent='{{}}';"
     )
     editor.web.eval(set_label_script.format(label))
+
+
+def _set_suggestion_button_tooltip(editor: Editor, text: str) -> None:
+    set_tooltip_script = f"document.getElementById('{SUGGESTION_BTN_ID}').title='{{}}';"
+    editor.web.eval(set_tooltip_script.format(text))
 
 
 editor: Editor
