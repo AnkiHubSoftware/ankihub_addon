@@ -337,7 +337,7 @@ def _on_suggest_notes_in_bulk_done(future: Future, parent: QWidget) -> None:
     )
 
     msg = msg_about_created_suggestions + msg_about_failed_suggestions
-    showText(txt=msg, parent=parent)
+    showText(txt=msg, parent=parent, title="AnkiHub | Bulk Suggestion Summary")
 
 
 class SuggestionDialog(QDialog):
