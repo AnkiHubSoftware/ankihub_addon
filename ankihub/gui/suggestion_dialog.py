@@ -317,13 +317,20 @@ def _on_suggest_notes_in_bulk_done(future: Future, parent: QWidget) -> None:
         for note, errors in suggestions_result.errors_by_nid.items()
         if ANKIHUB_NO_CHANGE_ERROR in str(errors)
     ]
+    notes_that_dont_exist_on_ankihub = [
+        note
+        for note, errors in suggestions_result.errors_by_nid.items()
+        if "Note object does not exist" in str(errors)
+    ]
     msg_about_failed_suggestions = (
         (
             f"Failed to submit suggestions for {len(suggestions_result.errors_by_nid)} note(s).\n"
             "All notes with failed suggestions:\n"
             f'{", ".join(str(nid) for nid in suggestions_result.errors_by_nid.keys())}\n\n'
             f"Notes without changes ({len(notes_without_changes)}):\n"
-            f'{", ".join(str(nid) for nid in notes_without_changes)}\n'
+            f'{", ".join(str(nid) for nid in notes_without_changes)}\n\n'
+            f"Notes that don't exist on AnkiHub ({len(notes_that_dont_exist_on_ankihub)}):\n"
+            f'{", ".join(str(nid) for nid in notes_that_dont_exist_on_ankihub)}'
         )
         if suggestions_result.errors_by_nid
         else ""
