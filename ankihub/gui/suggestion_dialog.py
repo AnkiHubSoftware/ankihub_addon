@@ -1,4 +1,5 @@
 """Dialog for creating a suggestion for a note or a bulk suggestion for multiple notes."""
+
 import uuid
 from concurrent.futures import Future
 from dataclasses import dataclass
@@ -37,6 +38,7 @@ from ..main.exporting import to_note_data
 from ..main.suggestions import (
     ANKIHUB_NO_CHANGE_ERROR,
     BulkNoteSuggestionsResult,
+    ChangeSuggestionResult,
     get_anki_nid_to_possible_ah_dids_dict,
     suggest_new_note,
     suggest_note_update,
@@ -120,16 +122,27 @@ def _on_suggestion_dialog_for_single_suggestion_closed(
 
     ah_nid = ankihub_db.ankihub_nid_for_anki_nid(note.id)
     if ah_nid:
-        if suggest_note_update(
+        suggestion_result = suggest_note_update(
             note=note,
             change_type=suggestion_meta.change_type,
             comment=_comment_with_source(suggestion_meta),
             media_upload_cb=media_sync.start_media_upload,
             auto_accept=suggestion_meta.auto_accept,
-        ):
+        )
+        if suggestion_result == ChangeSuggestionResult.SUCCESS:
             show_tooltip("Submitted suggestion to AnkiHub.", parent=parent)
-        else:
+        elif suggestion_result == ChangeSuggestionResult.NO_CHANGES:
             show_tooltip("No changes. Try syncing with AnkiHub first.", parent=parent)
+        elif suggestion_result == ChangeSuggestionResult.ANKIHUB_NOT_FOUND:
+            show_error_dialog(
+                "This note has been deleted from AnkiHub. No new suggestions can be made.",
+                title="Note has been deleted from AnkiHub.",
+                parent=parent,
+            )
+        else:
+            raise ValueError(  # pragma: no cover
+                f"Unknown suggestion result: {suggestion_result}"
+            )
     else:
         suggest_new_note(
             note=note,

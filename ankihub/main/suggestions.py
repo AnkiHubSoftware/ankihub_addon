@@ -2,10 +2,12 @@
 to the version stored in the AnkiHub database. Suggestions are sent to AnkiHub.
 (The AnkiHub database is the source of truth for the notes in the AnkiHub deck and is updated
 when syncing with AnkiHub.)"""
+
 import copy
 import shutil
 import uuid
 from dataclasses import dataclass
+from enum import Enum
 from pathlib import Path
 from typing import (
     Any,
@@ -34,6 +36,7 @@ from ..ankihub_client import (
     get_media_names_from_notes_data,
     get_media_names_from_suggestions,
 )
+from ..ankihub_client.ankihub_client import AnkiHubHTTPError
 from ..db import ankihub_db
 from .exporting import to_note_data
 from .media_utils import find_and_replace_text_in_fields_on_all_notes
@@ -44,6 +47,12 @@ from .utils import get_anki_nid_to_mid_dict, md5_file_hash
 ANKIHUB_NO_CHANGE_ERROR = (
     "Suggestion fields and tags don't have any changes to the original note"
 )
+
+
+class ChangeSuggestionResult(Enum):
+    SUCCESS = "success"
+    NO_CHANGES = "no changes"
+    ANKIHUB_NOT_FOUND = "not found"
 
 
 class MediaUploadCallback(Protocol):
@@ -57,17 +66,16 @@ def suggest_note_update(
     comment: str,
     media_upload_cb: MediaUploadCallback,
     auto_accept: bool = False,
-) -> bool:
+) -> ChangeSuggestionResult:
     """Sends a ChangeNoteSuggestion to AnkiHub if the passed note has changes.
-    Returns True if the suggestion was created, False if the note has no changes
-    (and therefore no suggestion was created).
+    Returns a ChangeSuggestionResult enum value.
     Also renames media files in the Anki collection and the media folder and uploads them to AnkiHub.
     If calling this function from the editor, the note should be reloaded after this function is called,
     because the note's media files will possibly have been renamed.
     """
     suggestion = _change_note_suggestion(note, change_type, comment)
     if suggestion is None:
-        return False
+        return ChangeSuggestionResult.NO_CHANGES
 
     ah_did = ankihub_db.ankihub_did_for_anki_nid(NoteId(suggestion.anki_nid))
     suggestion = cast(
@@ -78,12 +86,17 @@ def suggest_note_update(
     )
 
     client = AnkiHubClient()
-    client.create_change_note_suggestion(
-        change_note_suggestion=suggestion,
-        auto_accept=auto_accept,
-    )
+    try:
+        client.create_change_note_suggestion(
+            change_note_suggestion=suggestion,
+            auto_accept=auto_accept,
+        )
+    except AnkiHubHTTPError as e:
+        if e.response.status_code == 404:
+            return ChangeSuggestionResult.ANKIHUB_NOT_FOUND
+        raise e
 
-    return True
+    return ChangeSuggestionResult.SUCCESS
 
 
 def suggest_new_note(
