@@ -50,7 +50,7 @@ class ConfigureDeletedNotesDialog(QDialog):
         return result
 
     def _setup_ui(self) -> None:
-        self.setWindowTitle("Configure deleted notes")
+        self.setWindowTitle("AnkiHub | Configure deleted notes")
 
         self.top_label = QLabel(
             "When AnkiHub deletes notes that I have no review history with, they<br>"
