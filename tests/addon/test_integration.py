@@ -641,6 +641,58 @@ class TestEditor:
             # Clear editor to prevent dialog that asks for confirmation to discard changes when closing the editor
             add_cards_dialog.editor.cleanup()
 
+    def test_with_note_deleted_on_ankihub(
+        self,
+        anki_session_with_addon_data: AnkiSession,
+        mocker: MockerFixture,
+        qtbot: QtBot,
+        install_ah_deck: InstallAHDeck,
+        import_ah_note: ImportAHNote,
+        mock_suggestion_dialog: MockSuggestionDialog,
+    ):
+        editor.setup()
+        with anki_session_with_addon_data.profile_loaded():
+            mocker.patch.object(config, "is_logged_in", return_value=True)
+
+            mock_suggestion_dialog(user_cancels=False)
+
+            # Mock the client method to raise an exception with a 404 response
+            response = Response()
+            response.status_code = 404
+            create_change_note_suggestion_mock = mocker.patch.object(
+                AnkiHubClient,
+                "create_change_note_suggestion",
+                side_effect=AnkiHubHTTPError(response=response),
+            )
+
+            # Setup a note with some changes to create a change suggestion
+            ah_did = install_ah_deck()
+            ah_note = import_ah_note(ah_did=ah_did)
+            anki_note = aqt.mw.col.get_note(NoteId(ah_note.anki_nid))
+
+            new_field_value = "new field value"
+            anki_note["Front"] = new_field_value
+
+            show_error_dialog_mock = mocker.patch(
+                "ankihub.gui.suggestion_dialog.show_error_dialog"
+            )
+
+            add_cards_dialog: AddCards = dialogs.open("AddCards", aqt.mw)
+            add_cards_dialog.editor.set_note(anki_note)
+            self.wait_suggestion_button_ready(qtbot=qtbot, mocker=mocker)
+            self.click_suggestion_button(add_cards_dialog)
+
+            # Assert that the error dialog was shown with the correct message
+            qtbot.wait_until(lambda: show_error_dialog_mock.called)
+            assert (
+                show_error_dialog_mock.call_args.args[0]
+                == "This note has been deleted from AnkiHub. No new suggestions can be made."
+            )
+            create_change_note_suggestion_mock.assert_called_once()  # sanity check
+
+            # Clear editor to prevent dialog that asks for confirmation to discard changes when closing the editor
+            add_cards_dialog.editor.cleanup()
+
     def wait_suggestion_button_ready(self, qtbot: QtBot, mocker: MockerFixture) -> None:
         refresh_buttons_spy = mocker.spy(editor, "_refresh_buttons")
         qtbot.wait_until(lambda: refresh_buttons_spy.called)
