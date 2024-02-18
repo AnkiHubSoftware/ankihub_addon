@@ -1167,6 +1167,9 @@ class TestOnSuggestNotesInBulkDone:
 
                 Notes without changes (1):
                 1
+
+                Notes that don't exist on AnkiHub (0):
+
                 """
             ).strip()
             + "\n"
