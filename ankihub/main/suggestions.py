@@ -179,15 +179,19 @@ def suggest_notes_in_bulk(
         ),
     )
 
-    client = AnkiHubClient()
-    errors_by_nid_int = client.create_suggestions_in_bulk(
-        new_note_suggestions=new_note_suggestions,
-        change_note_suggestions=change_note_suggestions,
-        auto_accept=auto_accept,
-    )
-    errors_by_nid_from_remote = {
-        NoteId(nid): errors for nid, errors in errors_by_nid_int.items()
-    }
+    if new_note_suggestions or change_note_suggestions:
+        client = AnkiHubClient()
+        errors_by_nid_int = client.create_suggestions_in_bulk(
+            new_note_suggestions=new_note_suggestions,
+            change_note_suggestions=change_note_suggestions,
+            auto_accept=auto_accept,
+        )
+        errors_by_nid_from_remote = {
+            NoteId(nid): errors for nid, errors in errors_by_nid_int.items()
+        }
+    else:
+        errors_by_nid_from_remote = {}
+
     errors_by_nid_from_local = {
         **{nid: ANKIHUB_NO_CHANGE_ERROR for nid in nids_without_changes},
         **{nid: ANKIHUB_NOTE_DOES_NOT_EXIST_ERROR for nid in nids_deleted_on_remote},
