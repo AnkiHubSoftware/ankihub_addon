@@ -72,6 +72,7 @@ from ..factories import (
     NoteInfoFactory,
 )
 from ..fixtures import (
+    AddAnkiNote,
     ImportAHNote,
     ImportAHNoteType,
     InstallAHDeck,
@@ -637,6 +638,33 @@ class TestEditor:
                     ]
                 )
                 assert new_note_suggestion.fields[0].value == field_value
+
+            # Clear editor to prevent dialog that asks for confirmation to discard changes when closing the editor
+            add_cards_dialog.editor.cleanup()
+
+    def test_suggestion_button_is_disabled_for_notes_without_ankihub_note_type(
+        self,
+        anki_session_with_addon_data: AnkiSession,
+        mocker: MockerFixture,
+        qtbot: QtBot,
+        add_anki_note: AddAnkiNote,
+    ):
+        editor.setup()
+        with anki_session_with_addon_data.profile_loaded():
+            anki_note = add_anki_note()
+            add_cards_dialog: AddCards = dialogs.open("AddCards", aqt.mw)
+            add_cards_dialog.editor.set_note(anki_note)
+
+            self.wait_suggestion_button_ready(qtbot=qtbot, mocker=mocker)
+
+            self.assert_suggestion_button_text(
+                qtbot=qtbot,
+                addcards=add_cards_dialog,
+                expected_text="",
+            )
+            self.assert_suggestion_button_enabled_status(
+                qtbot=qtbot, addcards=add_cards_dialog, expected_enabled=False
+            )
 
             # Clear editor to prevent dialog that asks for confirmation to discard changes when closing the editor
             add_cards_dialog.editor.cleanup()
