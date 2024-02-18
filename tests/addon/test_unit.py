@@ -1206,43 +1206,6 @@ class TestOnSuggestNotesInBulkDone:
         assert kwargs.get("message") == "test"
 
 
-class TestAnkiHubDBAnkiNidsToAnkiHubNids:
-    def test_anki_nids_to_ankihub_nids(
-        self,
-        ankihub_db: _AnkiHubDB,
-        ankihub_basic_note_type: NotetypeDict,
-        next_deterministic_uuid: Callable[[], uuid.UUID],
-    ):
-        ah_did = next_deterministic_uuid()
-        existing_anki_nid = 1
-        non_existing_anki_nid = 2
-
-        # Add a note to the DB.
-        ankihub_db.upsert_note_type(
-            ankihub_did=ah_did,
-            note_type=ankihub_basic_note_type,
-        )
-        note = NoteInfoFactory.create(
-            anki_nid=existing_anki_nid,
-            mid=ankihub_basic_note_type["id"],
-        )
-
-        ankihub_db.upsert_notes_data(
-            ankihub_did=ah_did,
-            notes_data=[note],
-        )
-
-        # Retrieve a dict of anki_nid -> ah_nid for two anki_nids.
-        ah_nids_for_anki_nids = ankihub_db.anki_nids_to_ankihub_nids(
-            anki_nids=[NoteId(existing_anki_nid), NoteId(non_existing_anki_nid)]
-        )
-
-        assert ah_nids_for_anki_nids == {
-            existing_anki_nid: note.ah_nid,
-            non_existing_anki_nid: None,
-        }
-
-
 class TestAnkiHubDBAnkiHubNidsToAnkiIds:
     def test_ankihub_nids_to_anki_ids(
         self,

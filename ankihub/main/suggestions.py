@@ -38,6 +38,7 @@ from ..ankihub_client import (
 )
 from ..ankihub_client.ankihub_client import AnkiHubHTTPError
 from ..db import ankihub_db
+from ..db.models import AnkiHubNote
 from .exporting import to_note_data
 from .media_utils import find_and_replace_text_in_fields_on_all_notes
 from .utils import get_anki_nid_to_mid_dict, md5_file_hash
@@ -47,6 +48,10 @@ from .utils import get_anki_nid_to_mid_dict, md5_file_hash
 ANKIHUB_NO_CHANGE_ERROR = (
     "Suggestion fields and tags don't have any changes to the original note"
 )
+
+# string that is contained in the errors returned from the AnkiHub API when
+# the note does not exist on AnkiHub
+ANKIHUB_NOTE_DOES_NOT_EXIST_ERROR = "Note object does not exist"
 
 
 class ChangeSuggestionResult(Enum):
@@ -154,6 +159,7 @@ def suggest_notes_in_bulk(
         new_note_suggestions,
         change_note_suggestions,
         nids_without_changes,
+        nids_deleted_on_remote,
     ) = _suggestions_for_notes(notes, ankihub_did, change_type, comment)
 
     new_note_suggestions = cast(
@@ -183,7 +189,8 @@ def suggest_notes_in_bulk(
         NoteId(nid): errors for nid, errors in errors_by_nid_int.items()
     }
     errors_by_nid_from_local = {
-        nid: ANKIHUB_NO_CHANGE_ERROR for nid in nids_without_changes
+        **{nid: ANKIHUB_NO_CHANGE_ERROR for nid in nids_without_changes},
+        **{nid: ANKIHUB_NOTE_DOES_NOT_EXIST_ERROR for nid in nids_deleted_on_remote},
     }
     errors_by_nid: Dict[NoteId, Any] = {
         **errors_by_nid_from_remote,
@@ -235,67 +242,74 @@ def get_anki_nid_to_possible_ah_dids_dict(
 def _suggestions_for_notes(
     notes: List[Note], ankihub_did: uuid.UUID, change_type: SuggestionType, comment: str
 ) -> Tuple[
-    Sequence[NewNoteSuggestion], Sequence[ChangeNoteSuggestion], Sequence[NoteId]
+    Sequence[NewNoteSuggestion],
+    Sequence[ChangeNoteSuggestion],
+    Sequence[NoteId],
+    Sequence[NoteId],
 ]:
     """
-    Splits the list of notes into three categories:
+    Splits the list of notes into four categories:
     - notes that should be sent as NewNoteSuggestions
     - notes that should be sent as ChangeNoteSuggestions
     - notes that should not be sent because they don't have any changes
-    Returns a tuple of three sequences:
+    - notes that should not be sent because they were deleted on AnkiHub
+
+    Returns a tuple of four sequences:
     - new_note_suggestions
     - change_note_suggestions
     - nids_without_changes
+    - nids_deleted_on_remote
     """
-    anki_nids_to_ankihub_nids = ankihub_db.anki_nids_to_ankihub_nids(
-        [note.id for note in notes]
-    )
-    note_by_anki_id = {note.id: note for note in notes}
+    anki_nids = [note.id for note in notes]
+    ah_db_note_by_anki_nid = {
+        note.anki_note_id: note
+        for note in AnkiHubNote.filter(anki_note_id__in=anki_nids)
+    }
 
-    notes_that_exist_on_remote = [
-        note_by_anki_id[anki_nid]
-        for anki_nid, ah_nid in anki_nids_to_ankihub_nids.items()
-        if ah_nid
-    ]
+    notes_for_new_note_suggestions = []
+    notes_for_change_note_suggestions = []
+    nids_deleted_on_remote = []
+    for note in notes:
+        if ah_db_note := ah_db_note_by_anki_nid.get(note.id):
+            ah_db_note = cast(AnkiHubNote, ah_db_note)
+            if ah_db_note.was_deleted():
+                nids_deleted_on_remote.append(note.id)
+            else:
+                notes_for_change_note_suggestions.append(note)
+        else:
+            notes_for_new_note_suggestions.append(note)
 
-    notes_that_dont_exist_on_remote = [
-        note_by_anki_id[anki_nid]
-        for anki_nid, ah_nid in anki_nids_to_ankihub_nids.items()
-        if ah_nid is None
-    ]
-
-    # Create change note suggestions for notes that exist on remote
-    change_note_suggestions_or_none_by_nid = {
+    change_note_suggestion_or_none_by_anki_nid = {
         note.id: _change_note_suggestion(
             note=note,
             change_type=change_type,
             comment=comment,
         )
-        for note in notes_that_exist_on_remote
+        for note in notes_for_change_note_suggestions
     }
-    change_note_suggestions = [
-        suggestion
-        for suggestion in change_note_suggestions_or_none_by_nid.values()
-        if suggestion
-    ]
-    # nids of notes that exist on remote but have no changes
-    nids_without_changes = [
-        nid
-        for nid, suggestion in change_note_suggestions_or_none_by_nid.items()
-        if not suggestion
-    ]
+    change_note_suggestions = []
+    nids_without_changes = []
+    for nid, suggestion in change_note_suggestion_or_none_by_anki_nid.items():
+        if suggestion:
+            change_note_suggestions.append(suggestion)
+        else:
+            nids_without_changes.append(nid)
 
-    # Create new note suggestions for notes that don't exist on remote
     new_note_suggestions = [
         _new_note_suggestion(
             note=note,
             ah_did=ankihub_did,
             comment=comment,
         )
-        for note in notes_that_dont_exist_on_remote
+        for note in notes_for_new_note_suggestions
     ]
 
-    return new_note_suggestions, change_note_suggestions, nids_without_changes
+    return (
+        new_note_suggestions,
+        change_note_suggestions,
+        nids_without_changes,
+        nids_deleted_on_remote,
+    )
 
 
 def _new_note_suggestion(
