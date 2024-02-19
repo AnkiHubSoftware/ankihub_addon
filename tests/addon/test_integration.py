@@ -2033,89 +2033,88 @@ class TestAnkiHubImporter:
             note_data_from_db = ankihub_db.note_data(nid)
             assert note_data_from_db == note_data
 
+    @pytest.mark.parametrize(
+        # Deleted notes are not considered as conflicting notes and can be overwritten.
+        "first_note_is_soft_deleted",
+        [True, False],
+    )
     def test_conflicting_notes_dont_get_imported(
         self,
         anki_session_with_addon_data: AnkiSession,
         ankihub_basic_note_type: NotetypeDict,
         next_deterministic_uuid: Callable[[], uuid.UUID],
+        first_note_is_soft_deleted: bool,
     ):
         with anki_session_with_addon_data.profile_loaded():
             mw = anki_session_with_addon_data.mw
 
             anki_nid = NoteId(1)
-
             mid_1 = ankihub_basic_note_type["id"]
-
             note_type_2 = create_copy_of_note_type(mw, ankihub_basic_note_type)
             mid_2 = note_type_2["id"]
 
-            # import the first note
+            # Import the first note
             ah_did_1 = next_deterministic_uuid()
             note_info_1 = NoteInfoFactory.create(
                 anki_nid=anki_nid,
                 tags=["tag1"],
                 mid=mid_1,
-            )
-            importer = AnkiHubImporter()
-            import_result = importer.import_ankihub_deck(
-                ankihub_did=ah_did_1,
-                notes=[note_info_1],
-                note_types={mid_1: ankihub_basic_note_type},
-                protected_fields={},
-                protected_tags=[],
-                deck_name="test",
-                is_first_import_of_deck=True,
-                behavior_on_remote_note_deleted=BehaviorOnRemoteNoteDeleted.NEVER_DELETE,
-                suspend_new_cards_of_new_notes=DeckConfig.suspend_new_cards_of_new_notes_default(
-                    ah_did_1
+                last_update_type=(
+                    SuggestionType.DELETE if first_note_is_soft_deleted else None
                 ),
-                suspend_new_cards_of_existing_notes=DeckConfig.suspend_new_cards_of_existing_notes_default(),
             )
-            assert import_result.created_nids == [anki_nid]
-            assert import_result.updated_nids == []
-            assert import_result.skipped_nids == []
+            import_result = self._import_notes(
+                [note_info_1],
+                is_first_import_of_deck=True,
+                ah_did=ah_did_1,
+                note_types={mid_1: ankihub_basic_note_type},
+            )
 
-            mod_1 = AnkiHubNote.get(AnkiHubNote.anki_note_id == 1).mod
-            sleep(0.1)  # sleep to test for mod value changes
+            mod_before = AnkiHubNote.get(AnkiHubNote.anki_note_id == anki_nid).mod
+            sleep(1)  # Sleep to test for mod value changes
 
-            # import the second note with the same nid
+            # Import a second note with the same anki_nid
             ah_did_2 = next_deterministic_uuid()
             note_info_2 = NoteInfoFactory.create(
                 anki_nid=anki_nid,
                 tags=["tag2"],
                 mid=mid_2,
             )
-            importer = AnkiHubImporter()
-            import_result = importer.import_ankihub_deck(
-                ankihub_did=ah_did_2,
-                notes=[note_info_2],
-                note_types={mid_2: note_type_2},
-                protected_fields={},
-                protected_tags=[],
-                deck_name="test",
+            import_result = self._import_notes(
+                [note_info_2],
                 is_first_import_of_deck=True,
-                behavior_on_remote_note_deleted=BehaviorOnRemoteNoteDeleted.NEVER_DELETE,
-                suspend_new_cards_of_new_notes=DeckConfig.suspend_new_cards_of_new_notes_default(
-                    ah_did_2
-                ),
-                suspend_new_cards_of_existing_notes=DeckConfig.suspend_new_cards_of_existing_notes_default(),
+                ah_did=ah_did_2,
+                note_types={mid_2: note_type_2},
             )
-            assert import_result.created_nids == []
-            assert import_result.updated_nids == []
-            assert import_result.skipped_nids == [anki_nid]
 
-            # Check that the first note wasn't changed by the second import.
-            assert ankihub_db.note_data(anki_nid) == note_info_1
-            assert ankihub_db.ankihub_deck_ids() == [ah_did_1]
+            if first_note_is_soft_deleted:
+                assert import_result.created_nids == [anki_nid]
+                assert import_result.updated_nids == []
+                assert import_result.skipped_nids == []
+                assert import_result.deleted_nids == []
+            else:
+                assert import_result.created_nids == []
+                assert import_result.updated_nids == []
+                assert import_result.skipped_nids == [anki_nid]
+                assert import_result.deleted_nids == []
 
-            # Check that the mod value of the first note was not changed.
-            mod_2 = AnkiHubNote.get(AnkiHubNote.anki_note_id == 1).mod
-            assert mod_2 == mod_1
+            if first_note_is_soft_deleted:
+                expected_ah_note = note_info_2
+            else:
+                expected_ah_note = note_info_1
 
-            # Check that the note in the Anki database wasn't changed by the second import.
-            assert mw.col.get_note(anki_nid).tags == ["tag1"]
-            assert mw.col.get_note(anki_nid).mid == mid_1
-            assert to_note_data(mw.col.get_note(anki_nid)) == note_info_1
+            # Check the note data in the AnkiHub DB
+            assert ankihub_db.note_data(anki_nid) == expected_ah_note
+
+            # Check the mod value in the AnkiHub DB
+            mod_after = AnkiHubNote.get(AnkiHubNote.anki_note_id == anki_nid).mod
+            if first_note_is_soft_deleted:
+                assert mod_after > mod_before
+            else:
+                assert mod_after == mod_before
+
+            # Check the note data in the Anki DB
+            assert to_note_data(mw.col.get_note(anki_nid)) == expected_ah_note
 
     @pytest.mark.parametrize(
         "behavior_on_remote_note_deleted, note_has_review",
@@ -2271,7 +2270,7 @@ class TestAnkiHubImporter:
         ah_notes: List[NoteInfo],
         ah_did: uuid.UUID,
         is_first_import_of_deck: bool,
-        behavior_on_remote_note_deleted: BehaviorOnRemoteNoteDeleted,
+        behavior_on_remote_note_deleted: BehaviorOnRemoteNoteDeleted = BehaviorOnRemoteNoteDeleted.NEVER_DELETE,
         anki_did: Optional[DeckId] = None,
         note_types: Dict[NotetypeId, NotetypeDict] = {},
     ) -> AnkiHubImportResult:
