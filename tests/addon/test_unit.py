@@ -139,6 +139,7 @@ from ankihub.main.subdecks import (
     add_subdeck_tags_to_notes,
     deck_contains_subdeck_tags,
 )
+from ankihub.main.suggestions import ChangeSuggestionResult
 from ankihub.main.utils import (
     clear_empty_cards,
     lowest_level_common_ancestor_deck_name,
@@ -911,9 +912,9 @@ class TestOpenSuggestionDialogForSingleSuggestion:
         anki_session_with_addon_data: AnkiSession,
         import_ah_note: ImportAHNote,
         mock_dependiencies_for_suggestion_dialog: MockDependenciesForSuggestionDialog,
+        install_ah_deck: InstallAHDeck,
         user_cancels: bool,
         suggest_note_update_succeeds: bool,
-        install_ah_deck: InstallAHDeck,
     ):
         with anki_session_with_addon_data.profile_loaded():
             ah_did = install_ah_deck()
@@ -925,7 +926,11 @@ class TestOpenSuggestionDialogForSingleSuggestion:
                 suggest_new_note_mock,
             ) = mock_dependiencies_for_suggestion_dialog(user_cancels=user_cancels)
 
-            suggest_note_update_mock.return_value = suggest_note_update_succeeds
+            suggest_note_update_mock.return_value = (
+                ChangeSuggestionResult.SUCCESS
+                if suggest_note_update_succeeds
+                else ChangeSuggestionResult.NO_CHANGES
+            )
 
             open_suggestion_dialog_for_single_suggestion(note=note, parent=aqt.mw)
 
@@ -1138,12 +1143,14 @@ class TestOnSuggestNotesInBulkDone:
         showText_mock = mocker.patch("ankihub.gui.suggestion_dialog.showText")
         nid_1 = NoteId(1)
         nid_2 = NoteId(2)
+        nid_3 = NoteId(3)
         _on_suggest_notes_in_bulk_done(
             future=future_with_result(
                 suggestions.BulkNoteSuggestionsResult(
                     errors_by_nid={
-                        nid_1: [suggestions.ANKIHUB_NO_CHANGE_ERROR],
-                        nid_2: ["some error"],
+                        nid_1: ["some error"],
+                        nid_2: [suggestions.ANKIHUB_NO_CHANGE_ERROR],
+                        nid_3: ["Note object does not exist"],
                     },
                     change_note_suggestions_count=10,
                     new_note_suggestions_count=20,
@@ -1161,15 +1168,17 @@ class TestOnSuggestNotesInBulkDone:
                 Submitted 20 new note suggestion(s).
 
 
-                Failed to submit suggestions for 2 note(s).
+                Failed to submit suggestions for 3 note(s).
                 All notes with failed suggestions:
-                1, 2
+                1, 2, 3
 
                 Notes without changes (1):
-                1
+                2
+
+                Notes that don't exist on AnkiHub (1):
+                3
                 """
             ).strip()
-            + "\n"
         )
 
     def test_with_exception_in_future(self):
