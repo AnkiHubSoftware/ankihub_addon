@@ -59,6 +59,9 @@ TEST_DATA_PATH = Path(__file__).parent.parent / "test_data"
 
 DECK_CSV = TEST_DATA_PATH / "deck_with_one_basic_note.csv"
 DECK_CSV_GZ = TEST_DATA_PATH / "deck_with_one_basic_note.csv.gz"
+DECK_CSV_WITH_ONE_DELETED_BASIC_NOTE = (
+    TEST_DATA_PATH / "deck_with_one_deleted_basic_note.csv"
+)
 
 DECK_CSV_WITHOUT_DELETED_COLUMN = (
     TEST_DATA_PATH / "deck_with_one_basic_note_without_deleted_column.csv"
@@ -419,6 +422,9 @@ class TestDownloadDeck:
             # Previously CSVs didn't have the deleted column and some CSV might still not have it
             DECK_CSV_WITHOUT_DELETED_COLUMN,
             DECK_CSV_GZ_WITHOUT_DELETED_COLUMN,
+            # This deck has one note that was deleted. In this case the last_update_type should be DELETE
+            # (we don't have an extra field on the NoteInfo to indicate that the note was deleted).
+            DECK_CSV_WITH_ONE_DELETED_BASIC_NOTE,
         ],
     )
     def test_download_deck(
@@ -450,6 +456,12 @@ class TestDownloadDeck:
             notes_data = client.download_deck(ah_did=ID_OF_DECK_OF_USER_TEST1)
         assert len(notes_data) == 1
         assert notes_data[0].tags == ["asdf"]
+
+        if deck_file.name == DECK_CSV_WITH_ONE_DELETED_BASIC_NOTE.name:
+            assert notes_data[0].last_update_type == SuggestionType.DELETE
+        else:
+            # Notes which are not deleted should have last_update_type set to None
+            assert notes_data[0].last_update_type is None
 
     @pytest.mark.vcr()
     def test_download_deck_with_progress(
