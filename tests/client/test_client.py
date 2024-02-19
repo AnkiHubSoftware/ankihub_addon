@@ -56,8 +56,16 @@ WEBAPP_COMPOSE_FILE = (
 )
 
 TEST_DATA_PATH = Path(__file__).parent.parent / "test_data"
+
 DECK_CSV = TEST_DATA_PATH / "deck_with_one_basic_note.csv"
 DECK_CSV_GZ = TEST_DATA_PATH / "deck_with_one_basic_note.csv.gz"
+
+DECK_CSV_WITHOUT_DELETED_COLUMN = (
+    TEST_DATA_PATH / "deck_with_one_basic_note_without_deleted_column.csv"
+)
+DECK_CSV_GZ_WITHOUT_DELETED_COLUMN = (
+    TEST_DATA_PATH / "deck_with_one_basic_note_without_deleted_column.csv.gz"
+)
 
 TEST_MEDIA_PATH = TEST_DATA_PATH / "media"
 
@@ -401,97 +409,80 @@ def test_client_login_and_signout_with_email(client_with_server_setup):
 
 
 @pytest.mark.vcr()
-def test_download_deck(
-    authorized_client_for_user_test1: AnkiHubClient, mocker: MockerFixture
-):
-    client = authorized_client_for_user_test1
-    presigned_url_suffix = "/fake_key"
-    mocker.patch.object(
-        client, "_get_presigned_url_suffix", return_value=presigned_url_suffix
+class TestDownloadDeck:
+    @pytest.mark.parametrize(
+        "deck_file",
+        [
+            # The deck file can be either a CSV or a GZipped CSV
+            DECK_CSV,
+            DECK_CSV_GZ,
+            # Previously CSVs didn't have the deleted column and some CSV might still not have it
+            DECK_CSV_WITHOUT_DELETED_COLUMN,
+            DECK_CSV_GZ_WITHOUT_DELETED_COLUMN,
+        ],
     )
-
-    original_get_deck_by_id = client.get_deck_by_id
-
-    def get_deck_by_id(*args, **kwargs) -> Deck:
-        result = original_get_deck_by_id(*args, **kwargs)
-        result.csv_notes_filename = "notes.csv"
-        return result
-
-    mocker.patch.object(client, "get_deck_by_id", side_effect=get_deck_by_id)
-
-    with requests_mock.Mocker(real_http=True) as m:
-        m.get(
-            f"{client.s3_bucket_url}{presigned_url_suffix}",
-            content=DECK_CSV.read_bytes(),
+    def test_download_deck(
+        self,
+        authorized_client_for_user_test1: AnkiHubClient,
+        mocker: MockerFixture,
+        deck_file: Path,
+    ):
+        client = authorized_client_for_user_test1
+        presigned_url_suffix = "/fake_key"
+        mocker.patch.object(
+            client, "_get_presigned_url_suffix", return_value=presigned_url_suffix
         )
-        notes_data = client.download_deck(ah_did=ID_OF_DECK_OF_USER_TEST1)
-    assert len(notes_data) == 1
-    assert notes_data[0].tags == ["asdf"]
 
+        original_get_deck_by_id = client.get_deck_by_id
 
-@pytest.mark.vcr()
-def test_download_compressed_deck(
-    authorized_client_for_user_test1: AnkiHubClient,
-    mocker: MockerFixture,
-):
-    client = authorized_client_for_user_test1
+        def get_deck_by_id(*args, **kwargs) -> Deck:
+            result = original_get_deck_by_id(*args, **kwargs)
+            result.csv_notes_filename = deck_file.name
+            return result
 
-    presigned_url_suffix = "/fake_key"
-    mocker.patch.object(
-        client, "_get_presigned_url_suffix", return_value=presigned_url_suffix
-    )
+        mocker.patch.object(client, "get_deck_by_id", side_effect=get_deck_by_id)
 
-    original_get_deck_by_id = client.get_deck_by_id
+        with requests_mock.Mocker(real_http=True) as m:
+            m.get(
+                f"{client.s3_bucket_url}{presigned_url_suffix}",
+                content=deck_file.read_bytes(),
+            )
+            notes_data = client.download_deck(ah_did=ID_OF_DECK_OF_USER_TEST1)
+        assert len(notes_data) == 1
+        assert notes_data[0].tags == ["asdf"]
 
-    def get_deck_by_id(*args, **kwargs) -> Deck:
-        result = original_get_deck_by_id(*args, **kwargs)
-        result.csv_notes_filename = "notes.csv.gz"
-        return result
+    @pytest.mark.vcr()
+    def test_download_deck_with_progress(
+        self, authorized_client_for_user_test1: AnkiHubClient, mocker: MockerFixture
+    ):
+        client = authorized_client_for_user_test1
 
-    mocker.patch.object(client, "get_deck_by_id", side_effect=get_deck_by_id)
-
-    with requests_mock.Mocker(real_http=True) as m:
-        m.get(
-            f"{client.s3_bucket_url}{presigned_url_suffix}",
-            content=DECK_CSV_GZ.read_bytes(),
+        presigned_url_suffix = "/fake_key"
+        mocker.patch.object(
+            client, "_get_presigned_url_suffix", return_value=presigned_url_suffix
         )
-        notes_data = client.download_deck(ah_did=ID_OF_DECK_OF_USER_TEST1)
-    assert len(notes_data) == 1
-    assert notes_data[0].tags == ["asdf"]
 
+        original_get_deck_by_id = client.get_deck_by_id
 
-@pytest.mark.vcr()
-def test_download_deck_with_progress(
-    authorized_client_for_user_test1: AnkiHubClient, mocker: MockerFixture
-):
-    client = authorized_client_for_user_test1
+        def get_deck_by_id(*args, **kwargs) -> Deck:
+            result = original_get_deck_by_id(*args, **kwargs)
+            result.csv_notes_filename = "notes.csv"
+            return result
 
-    presigned_url_suffix = "/fake_key"
-    mocker.patch.object(
-        client, "_get_presigned_url_suffix", return_value=presigned_url_suffix
-    )
+        mocker.patch.object(client, "get_deck_by_id", side_effect=get_deck_by_id)
 
-    original_get_deck_by_id = client.get_deck_by_id
-
-    def get_deck_by_id(*args, **kwargs) -> Deck:
-        result = original_get_deck_by_id(*args, **kwargs)
-        result.csv_notes_filename = "notes.csv"
-        return result
-
-    mocker.patch.object(client, "get_deck_by_id", side_effect=get_deck_by_id)
-
-    with requests_mock.Mocker(real_http=True) as m:
-        m.get(
-            f"{client.s3_bucket_url}{presigned_url_suffix}",
-            content=DECK_CSV.read_bytes(),
-            headers={"content-length": "1000000"},
-        )
-        notes_data = client.download_deck(
-            ah_did=ID_OF_DECK_OF_USER_TEST1,
-            download_progress_cb=_download_progress_cb,
-        )
-    assert len(notes_data) == 1
-    assert notes_data[0].tags == ["asdf"]
+        with requests_mock.Mocker(real_http=True) as m:
+            m.get(
+                f"{client.s3_bucket_url}{presigned_url_suffix}",
+                content=DECK_CSV.read_bytes(),
+                headers={"content-length": "1000000"},
+            )
+            notes_data = client.download_deck(
+                ah_did=ID_OF_DECK_OF_USER_TEST1,
+                download_progress_cb=_download_progress_cb,
+            )
+        assert len(notes_data) == 1
+        assert notes_data[0].tags == ["asdf"]
 
 
 def create_note_on_ankihub_and_assert(
