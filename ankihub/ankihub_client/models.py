@@ -25,7 +25,7 @@ class SuggestionType(Enum):
     NEW_CARD_TO_ADD = "new_card_to_add", "New card to add"
     NEW_TAGS = "new_tags", "New Tags"
     UPDATED_TAGS = "updated_tags", "Updated Tags"
-    DELETE = "delete", "Delete"
+    DELETE = "delete", "Delete Note"
     OTHER = "other", "Other"
 
 
