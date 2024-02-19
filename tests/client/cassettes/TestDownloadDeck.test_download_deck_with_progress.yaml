@@ -1,0 +1,102 @@
+interactions:
+- request:
+    body: '{"username": "test1", "password": "asdf"}'
+    headers:
+      Accept:
+      - application/json; version=16.0
+      Content-Length:
+      - '41'
+      Content-Type:
+      - application/json
+    method: POST
+    uri: http://localhost:8000/api/login/
+  response:
+    body:
+      string: '{"expiry":"2024-03-18T18:35:05.880069Z","token":"a654331d37fff0dfba7d32a073710bbb067ce785030b036a8f9e386524b7d162"}'
+    headers:
+      Allow:
+      - POST, OPTIONS
+      Content-Language:
+      - en
+      Content-Length:
+      - '115'
+      Content-Type:
+      - application/json
+      Cross-Origin-Opener-Policy:
+      - same-origin
+      Date:
+      - Mon, 19 Feb 2024 18:35:06 GMT
+      Referrer-Policy:
+      - same-origin
+      Server:
+      - WSGIServer/0.2 CPython/3.8.17
+      Server-Timing:
+      - TimerPanel_utime;dur=260.22599999998874;desc="User CPU time", TimerPanel_stime;dur=42.16699999999918;desc="System
+        CPU time", TimerPanel_total;dur=302.3929999999879;desc="Total CPU time", TimerPanel_total_time;dur=241.79482399995322;desc="Elapsed
+        time", SQLPanel_sql_time;dur=7.15561200013326;desc="SQL 16 queries", CachePanel_total_time;dur=0;desc="Cache
+        0 Calls"
+      Set-Cookie:
+      - csrftoken=yDMj6Ng9o0TgFufoyFidXaBGRwwsP3Jv; expires=Mon, 17 Feb 2025 18:35:06
+        GMT; HttpOnly; Max-Age=31449600; Path=/; SameSite=Lax
+      - sessionid=9avpcppnm5s5c3u8wul8ce2149xwok2w; expires=Mon, 26 Feb 2024 18:35:06
+        GMT; HttpOnly; Max-Age=604800; Path=/; SameSite=Lax
+      Vary:
+      - Accept, Cookie, Accept-Language, origin
+      X-Content-Type-Options:
+      - nosniff
+      X-Frame-Options:
+      - DENY
+      djdt-store-id:
+      - 8ac1198a832041039599d1d6926d0748
+    status:
+      code: 200
+      message: OK
+- request:
+    body: null
+    headers:
+      Accept:
+      - application/json; version=16.0
+      Authorization:
+      - Token a654331d37fff0dfba7d32a073710bbb067ce785030b036a8f9e386524b7d162
+      Content-Type:
+      - application/json
+    method: GET
+    uri: http://localhost:8000/api/decks/dda0d3ad-89cd-45fb-8ddc-fabad93c2d7b/
+  response:
+    body:
+      string: '{"id":"dda0d3ad-89cd-45fb-8ddc-fabad93c2d7b","owner":1,"anki_id":3285377039,"name":"Universal
+        systematic groupware #0","csv_last_upload":null,"csv_notes_filename":null,"media_upload_finished":false,"note_types":[],"is_private":false,"user_relation":"owner","subscribed_at":null}'
+    headers:
+      Allow:
+      - GET, HEAD, OPTIONS
+      Content-Language:
+      - en
+      Content-Length:
+      - '278'
+      Content-Type:
+      - application/json
+      Cross-Origin-Opener-Policy:
+      - same-origin
+      Date:
+      - Mon, 19 Feb 2024 18:35:06 GMT
+      Referrer-Policy:
+      - same-origin
+      Server:
+      - WSGIServer/0.2 CPython/3.8.17
+      Server-Timing:
+      - TimerPanel_utime;dur=97.29300000003605;desc="User CPU time", TimerPanel_stime;dur=3.657999999994388;desc="System
+        CPU time", TimerPanel_total;dur=100.95100000003043;desc="Total CPU time",
+        TimerPanel_total_time;dur=99.03261399995245;desc="Elapsed time", SQLPanel_sql_time;dur=3.702939000504557;desc="SQL
+        8 queries", CachePanel_total_time;dur=0;desc="Cache 0 Calls"
+      Vary:
+      - Accept, Accept-Language, Cookie, origin
+      X-Content-Type-Options:
+      - nosniff
+      X-Frame-Options:
+      - DENY
+      djdt-store-id:
+      - ca2cc0380e404b5a928bedd1bfc5a211
+    status:
+      code: 200
+      message: OK
+version: 1

@@ -54,6 +54,7 @@ from .models import (
     NoteInfo,
     NoteSuggestion,
     OptionalTagSuggestion,
+    SuggestionType,
     TagGroupValidationResponse,
     UserDeckRelation,
     note_info_for_upload,
@@ -1146,17 +1147,24 @@ def _transform_notes_data(notes_data: List[Dict]) -> List[Dict]:
     result = [
         {
             **note_data,
-            "fields": json.loads(note_data["fields"])
-            if isinstance(note_data["fields"], str)
-            else note_data["fields"],
+            "fields": (
+                json.loads(note_data["fields"])
+                if isinstance(note_data["fields"], str)
+                else note_data["fields"]
+            ),
             "anki_id": int((note_data["anki_id"])),
             "note_id": note_data.get(
                 "note_id", note_data.get("ankihub_id", note_data.get("id"))
             ),
             "note_type_id": int(note_data["note_type_id"]),
-            "tags": json.loads(note_data["tags"])
-            if isinstance(note_data["tags"], str)
-            else note_data["tags"],
+            "tags": (
+                json.loads(note_data["tags"])
+                if isinstance(note_data["tags"], str)
+                else note_data["tags"]
+            ),
+            "last_update_type": (
+                SuggestionType.DELETE.value[0] if note_data.get("deleted") else None
+            ),
         }
         for note_data in notes_data
     ]
