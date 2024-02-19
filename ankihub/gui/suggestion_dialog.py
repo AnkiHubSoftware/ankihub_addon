@@ -72,10 +72,7 @@ class SuggestionMetadata:
 
 def open_suggestion_dialog_for_note(note: Note, parent: QWidget) -> None:
     """Opens a dialog for creating a note suggestion for the given note.
-    The note has to be present in the Anki collection before calling this function.
-    May change the notes contents (e.g. by renaming media files) and therefore the
-    note might need to be reloaded after this function is called.
-    """
+    The note has to be present in the Anki collection before calling this function."""
 
     assert ankihub_db.is_ankihub_note_type(
         note.mid
@@ -139,10 +136,7 @@ def open_suggestion_dialog_for_bulk_suggestion(
 ) -> None:
     """Opens a dialog for creating a bulk suggestion for the given notes.
     The notes have to be present in the Anki collection before calling this
-    function and they need to have an AnkiHub note type.
-    This function may change the notes contents (e.g. by renaming media files)
-    and therefore the notes might need to be reloaded after this function is
-    called."""
+    function and they need to have an AnkiHub note type."""
 
     ah_did = _determine_ah_did_for_nids_to_be_suggested(
         anki_nids=anki_nids, parent=parent
