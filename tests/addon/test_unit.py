@@ -731,16 +731,11 @@ class TestSuggestionDialog:
 
         # Assert that correct form elements are shown
         assert dialog.isVisible()
-
-        if change_type_needed:
-            assert dialog.change_type_select.isVisible()
-        else:
-            assert not dialog.change_type_select.isVisible()
-
-        if source_needed:
-            assert dialog.source_widget_group_box.isVisible()
-        else:
-            assert not dialog.source_widget_group_box.isVisible()
+        assert dialog.change_type_select.isVisible() == change_type_needed
+        assert dialog.source_widget_group_box.isVisible() == source_needed
+        assert dialog.hint_for_note_deletions.isVisible() == (
+            suggestion_type == SuggestionType.DELETE
+        )
 
         # Assert that the form submit button is enabled (it is disabled if the form input is invalid)
         assert dialog.button_box.button(QDialogButtonBox.StandardButton.Ok).isEnabled()
