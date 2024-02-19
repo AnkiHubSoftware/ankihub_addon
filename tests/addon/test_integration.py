@@ -645,6 +645,71 @@ class TestEditor:
             # Clear editor to prevent dialog that asks for confirmation to discard changes when closing the editor
             add_cards_dialog.editor.cleanup()
 
+    def test_suggestion_button_is_disabled_for_notes_without_ankihub_note_type(
+        self,
+        anki_session_with_addon_data: AnkiSession,
+        mocker: MockerFixture,
+        qtbot: QtBot,
+        add_anki_note: AddAnkiNote,
+    ):
+        editor.setup()
+        with anki_session_with_addon_data.profile_loaded():
+            anki_note = add_anki_note()
+            add_cards_dialog: AddCards = dialogs.open("AddCards", aqt.mw)
+            add_cards_dialog.editor.set_note(anki_note)
+
+            self.wait_suggestion_button_ready(qtbot=qtbot, mocker=mocker)
+
+            self.assert_suggestion_button_text(
+                qtbot=qtbot,
+                addcards=add_cards_dialog,
+                expected_text="",
+            )
+            self.assert_suggestion_button_enabled_status(
+                qtbot=qtbot, addcards=add_cards_dialog, expected_enabled=False
+            )
+
+            # Clear editor to prevent dialog that asks for confirmation to discard changes when closing the editor
+            add_cards_dialog.editor.cleanup()
+
+    @pytest.mark.parametrize("is_deleted", [True, False])
+    def test_suggestion_button_is_disabled_for_notes_deleted_from_ankihub(
+        self,
+        anki_session_with_addon_data: AnkiSession,
+        mocker: MockerFixture,
+        install_ah_deck: InstallAHDeck,
+        import_ah_note: ImportAHNote,
+        qtbot: QtBot,
+        is_deleted: bool,
+    ):
+        editor.setup()
+        with anki_session_with_addon_data.profile_loaded():
+            ah_did = install_ah_deck()
+            ah_note = import_ah_note(ah_did=ah_did)
+            anki_note = aqt.mw.col.get_note(NoteId(ah_note.anki_nid))
+
+            if is_deleted:
+                AnkiHubNote.update(
+                    last_update_type=SuggestionType.DELETE.value[0]
+                ).where(AnkiHubNote.ankihub_note_id == ah_note.ah_nid).execute()
+
+            add_cards_dialog: AddCards = dialogs.open("AddCards", aqt.mw)
+            add_cards_dialog.editor.set_note(anki_note)
+
+            self.wait_suggestion_button_ready(qtbot=qtbot, mocker=mocker)
+
+            self.assert_suggestion_button_text(
+                qtbot=qtbot,
+                addcards=add_cards_dialog,
+                expected_text=AnkiHubCommands.CHANGE.value,
+            )
+            self.assert_suggestion_button_enabled_status(
+                qtbot=qtbot, addcards=add_cards_dialog, expected_enabled=not is_deleted
+            )
+
+            # Clear editor to prevent dialog that asks for confirmation to discard changes when closing the editor
+            add_cards_dialog.editor.cleanup()
+
     def test_with_note_deleted_on_ankihub(
         self,
         anki_session_with_addon_data: AnkiSession,
@@ -710,6 +775,16 @@ class TestEditor:
                 callback,
             )
         callback.assert_called_with(expected_text)
+
+    def assert_suggestion_button_enabled_status(
+        self, qtbot: QtBot, addcards: AddCards, expected_enabled: bool
+    ) -> None:
+        with qtbot.wait_callback() as callback:
+            addcards.editor.web.evalWithCallback(
+                f"document.getElementById('{SUGGESTION_BTN_ID}').disabled",
+                callback,
+            )
+        callback.assert_called_with(not expected_enabled)
 
     def click_suggestion_button(self, addcards: AddCards) -> None:
         addcards.editor.web.eval(
