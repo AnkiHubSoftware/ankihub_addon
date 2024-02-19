@@ -125,8 +125,8 @@ def _setup_editor_buttons(buttons: List[str], editor: Editor) -> None:
     suggestion_button = editor.addButton(
         icon=img,
         cmd=SUGGESTION_BTN_ID,
-        func=lambda e: e.call_after_note_saved(
-            functools.partial(_on_suggestion_button_press, e), keepFocus=True
+        func=lambda editor: editor.call_after_note_saved(
+            functools.partial(_on_suggestion_button_press, editor), keepFocus=True
         ),
         tip=f"Send your request to AnkiHub ({hotkey})",
         label=f'<span id="{SUGGESTION_BTN_ID}-label" style="vertical-align: top;"></span>',
