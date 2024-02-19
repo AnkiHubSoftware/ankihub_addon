@@ -446,36 +446,51 @@ class DeckManagementDialog(QDialog):
     ) -> QBoxLayout:
         deck_config = config.deck_config(selected_ah_did)
 
-        # Setup label
-        self.ankihub_deleted_notes_behavior_label = QLabel(
-            "Remove AnkiHub deleted notes from deck"
+        self.deleted_notes_behavior_tooltip_message = (
+            "Will automatically delete notes<br>"
+            "that you haven't reviewed when<br>"
+            "they are deleted from AnkiHub."
         )
 
-        # Setup and configure the combo box for "Remove AnkiHub deleted notes from deck"
-        self.ankihub_deleted_notes_behavior = QComboBox()
-        self.ankihub_deleted_notes_behavior.insertItems(
-            0, [option.value for option in BehaviorOnRemoteNoteDeleted]
+        # Setup and configure the check box
+        self.ankihub_deleted_notes_behavior_cb = QCheckBox(
+            "Remove notes without review history\nlocally when deleted on AnkiHub"
+        )
+        set_styled_tooltip(
+            self.ankihub_deleted_notes_behavior_cb,
+            self.deleted_notes_behavior_tooltip_message,
+        )
+        self.ankihub_deleted_notes_behavior_cb.setChecked(
+            deck_config.behavior_on_remote_note_deleted
+            == BehaviorOnRemoteNoteDeleted.DELETE_IF_NO_REVIEWS
         )
 
-        if deck_config.behavior_on_remote_note_deleted:
-            self.ankihub_deleted_notes_behavior.setCurrentText(
-                deck_config.behavior_on_remote_note_deleted.value
-            )
+        # Initialize and set up the icon label
+        self.ankihub_deleted_notes_behavior_icon_label = QLabel()
+        self.ankihub_deleted_notes_behavior_icon_label.setPixmap(
+            tooltip_icon().pixmap(16, 16)
+        )
+        set_styled_tooltip(
+            self.ankihub_deleted_notes_behavior_icon_label,
+            self.deleted_notes_behavior_tooltip_message,
+        )
 
         qconnect(
-            self.ankihub_deleted_notes_behavior.currentTextChanged,
+            self.ankihub_deleted_notes_behavior_cb.stateChanged,
             lambda: config.set_ankihub_deleted_notes_behavior(
                 selected_ah_did,
-                BehaviorOnRemoteNoteDeleted(
-                    self.ankihub_deleted_notes_behavior.currentText()
+                (
+                    BehaviorOnRemoteNoteDeleted.DELETE_IF_NO_REVIEWS
+                    if self.ankihub_deleted_notes_behavior_cb.isChecked()
+                    else BehaviorOnRemoteNoteDeleted.NEVER_DELETE
                 ),
             ),
         )
 
-        # Add the label and combo box to the result layout
-        box = QVBoxLayout()
-        box.addWidget(self.ankihub_deleted_notes_behavior_label)
-        box.addWidget(self.ankihub_deleted_notes_behavior)
+        # Add checkbox and icon label to the result layout
+        box = QHBoxLayout()
+        box.addWidget(self.ankihub_deleted_notes_behavior_cb)
+        box.addWidget(self.ankihub_deleted_notes_behavior_icon_label)
 
         return box
 

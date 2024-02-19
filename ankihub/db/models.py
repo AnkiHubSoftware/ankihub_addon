@@ -68,7 +68,7 @@ class AnkiHubNote(Model):
     class Meta:
         table_name = "notes"
 
-    def was_deleted(self):
+    def was_deleted(self) -> bool:
         return self.last_update_type == SuggestionType.DELETE.value[0]
 
 

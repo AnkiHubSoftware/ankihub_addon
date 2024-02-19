@@ -1,4 +1,5 @@
 """Dialog for creating a suggestion for a note or a bulk suggestion for multiple notes."""
+
 import uuid
 from concurrent.futures import Future
 from dataclasses import dataclass
@@ -37,6 +38,7 @@ from ..main.exporting import to_note_data
 from ..main.suggestions import (
     ANKIHUB_NO_CHANGE_ERROR,
     BulkNoteSuggestionsResult,
+    ChangeSuggestionResult,
     get_anki_nid_to_possible_ah_dids_dict,
     suggest_new_note,
     suggest_note_update,
@@ -120,16 +122,27 @@ def _on_suggestion_dialog_for_single_suggestion_closed(
 
     ah_nid = ankihub_db.ankihub_nid_for_anki_nid(note.id)
     if ah_nid:
-        if suggest_note_update(
+        suggestion_result = suggest_note_update(
             note=note,
             change_type=suggestion_meta.change_type,
             comment=_comment_with_source(suggestion_meta),
             media_upload_cb=media_sync.start_media_upload,
             auto_accept=suggestion_meta.auto_accept,
-        ):
+        )
+        if suggestion_result == ChangeSuggestionResult.SUCCESS:
             show_tooltip("Submitted suggestion to AnkiHub.", parent=parent)
-        else:
+        elif suggestion_result == ChangeSuggestionResult.NO_CHANGES:
             show_tooltip("No changes. Try syncing with AnkiHub first.", parent=parent)
+        elif suggestion_result == ChangeSuggestionResult.ANKIHUB_NOT_FOUND:
+            show_error_dialog(
+                "This note has been deleted from AnkiHub. No new suggestions can be made.",
+                title="Note has been deleted from AnkiHub.",
+                parent=parent,
+            )
+        else:
+            raise ValueError(  # pragma: no cover
+                f"Unknown suggestion result: {suggestion_result}"
+            )
     else:
         suggest_new_note(
             note=note,
@@ -304,20 +317,27 @@ def _on_suggest_notes_in_bulk_done(future: Future, parent: QWidget) -> None:
         for note, errors in suggestions_result.errors_by_nid.items()
         if ANKIHUB_NO_CHANGE_ERROR in str(errors)
     ]
+    notes_that_dont_exist_on_ankihub = [
+        note
+        for note, errors in suggestions_result.errors_by_nid.items()
+        if "Note object does not exist" in str(errors)
+    ]
     msg_about_failed_suggestions = (
         (
             f"Failed to submit suggestions for {len(suggestions_result.errors_by_nid)} note(s).\n"
             "All notes with failed suggestions:\n"
             f'{", ".join(str(nid) for nid in suggestions_result.errors_by_nid.keys())}\n\n'
             f"Notes without changes ({len(notes_without_changes)}):\n"
-            f'{", ".join(str(nid) for nid in notes_without_changes)}\n'
+            f'{", ".join(str(nid) for nid in notes_without_changes)}\n\n'
+            f"Notes that don't exist on AnkiHub ({len(notes_that_dont_exist_on_ankihub)}):\n"
+            f'{", ".join(str(nid) for nid in notes_that_dont_exist_on_ankihub)}'
         )
         if suggestions_result.errors_by_nid
         else ""
     )
 
     msg = msg_about_created_suggestions + msg_about_failed_suggestions
-    showText(txt=msg, parent=parent)
+    showText(txt=msg, parent=parent, title="AnkiHub | Bulk Suggestion Summary")
 
 
 class SuggestionDialog(QDialog):

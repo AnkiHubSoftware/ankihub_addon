@@ -9,7 +9,9 @@ from aqt.qt import (
     QGridLayout,
     QHBoxLayout,
     QLabel,
+    QScrollArea,
     QVBoxLayout,
+    QWidget,
     qconnect,
 )
 
@@ -19,18 +21,25 @@ if TYPE_CHECKING:
 
 class ConfigureDeletedNotesDialog(QDialog):
     """Dialog to configure the behavior when a remote note is deleted for each deck.
-    Shows a list of decks and a checkbox for each deck to configure the behavior.
+
+    This dialog shows a list of decks and a checkbox for each deck to configure the behavior.
     The dialog can't be closed using the close button in the title bar. It can only be closed by
-    clicking the OK button. The reason for this is that we want to ensure that the user
-    configures the behavior for each deck before continuing.
+    clicking the OK button. This ensures that the user configures the behavior for each deck before continuing.
+
+    If show_new_feature_message is True, a message will be shown at the top of the dialog
+    to inform the user about the note deletion feature.
     """
 
     def __init__(
-        self, parent, deck_id_and_name_tuples: List[Tuple[uuid.UUID, str]]
+        self,
+        parent,
+        deck_id_and_name_tuples: List[Tuple[uuid.UUID, str]],
+        show_new_feature_message: bool = False,
     ) -> None:
         super().__init__(parent)
 
         self._deck_id_and_name_tuples = deck_id_and_name_tuples
+        self._show_new_feature_message = show_new_feature_message
         self._setup_ui()
 
     def deck_id_to_behavior_on_remote_note_deleted_dict(
@@ -50,14 +59,20 @@ class ConfigureDeletedNotesDialog(QDialog):
         return result
 
     def _setup_ui(self) -> None:
-        self.setWindowTitle("Configure deleted notes")
+        self.setWindowTitle("AnkiHub | Configure deleted notes")
+
+        self.new_feature_label = QLabel(
+            "🌟 <b>New Feature!</b> Notes can now be deleted from AnkiHub.<br>"
+            'Deck maintainers may approve suggestions to "delete notes",<br>'
+            "providing learners with the most concise and high quality decks."
+        )
 
         self.top_label = QLabel(
             "When AnkiHub deletes notes that I have no review history with, they<br>"
             "should also be removed locally from these decks..."
         )
 
-        self.grid_layout = self._setup_grid_layout()
+        self.scroll_area = self._setup_scroll_area()
 
         self.bottom_label = QLabel(
             "You can adjust this setting later in the <b>Deck Management</b> menu."
@@ -69,9 +84,13 @@ class ConfigureDeletedNotesDialog(QDialog):
         self.main_layout = QVBoxLayout()
         self.main_layout.setContentsMargins(20, 20, 20, 20)
 
+        if self._show_new_feature_message:
+            self.main_layout.addWidget(self.new_feature_label)
+            self.main_layout.addSpacing(20)
+
         self.main_layout.addWidget(self.top_label)
         self.main_layout.addSpacing(10)
-        self.main_layout.addLayout(self.grid_layout)
+        self.main_layout.addWidget(self.scroll_area)
         self.main_layout.addSpacing(10)
         self.main_layout.addWidget(self.bottom_label)
         self.main_layout.addSpacing(25)
@@ -82,6 +101,15 @@ class ConfigureDeletedNotesDialog(QDialog):
         # Fix the size of the dialog to prevent it from being resized.
         self.adjustSize()
         self.setFixedSize(self.size())
+
+    def _setup_scroll_area(self) -> QScrollArea:
+        scroll_area = QScrollArea()
+        scroll_area.setWidgetResizable(True)
+        scroll_widget = QWidget()
+        grid_layout = self._setup_grid_layout()
+        scroll_widget.setLayout(grid_layout)
+        scroll_area.setWidget(scroll_widget)
+        return scroll_area
 
     def _setup_grid_layout(self) -> QGridLayout:
         self.grid_layout = QGridLayout()

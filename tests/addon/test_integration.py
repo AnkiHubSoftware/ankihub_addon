@@ -176,6 +176,9 @@ from ankihub.main.subdecks import (
     flatten_deck,
 )
 from ankihub.main.suggestions import (
+    ANKIHUB_NO_CHANGE_ERROR,
+    ANKIHUB_NOTE_DOES_NOT_EXIST_ERROR,
+    BulkNoteSuggestionsResult,
     suggest_new_note,
     suggest_note_update,
     suggest_notes_in_bulk,
@@ -703,6 +706,58 @@ class TestEditor:
             self.assert_suggestion_button_enabled_status(
                 qtbot=qtbot, addcards=add_cards_dialog, expected_enabled=not is_deleted
             )
+
+            # Clear editor to prevent dialog that asks for confirmation to discard changes when closing the editor
+            add_cards_dialog.editor.cleanup()
+
+    def test_with_note_deleted_on_ankihub(
+        self,
+        anki_session_with_addon_data: AnkiSession,
+        mocker: MockerFixture,
+        qtbot: QtBot,
+        install_ah_deck: InstallAHDeck,
+        import_ah_note: ImportAHNote,
+        mock_suggestion_dialog: MockSuggestionDialog,
+    ):
+        editor.setup()
+        with anki_session_with_addon_data.profile_loaded():
+            mocker.patch.object(config, "is_logged_in", return_value=True)
+
+            mock_suggestion_dialog(user_cancels=False)
+
+            # Mock the client method to raise an exception with a 404 response
+            response = Response()
+            response.status_code = 404
+            create_change_note_suggestion_mock = mocker.patch.object(
+                AnkiHubClient,
+                "create_change_note_suggestion",
+                side_effect=AnkiHubHTTPError(response=response),
+            )
+
+            # Setup a note with some changes to create a change suggestion
+            ah_did = install_ah_deck()
+            ah_note = import_ah_note(ah_did=ah_did)
+            anki_note = aqt.mw.col.get_note(NoteId(ah_note.anki_nid))
+
+            new_field_value = "new field value"
+            anki_note["Front"] = new_field_value
+
+            show_error_dialog_mock = mocker.patch(
+                "ankihub.gui.suggestion_dialog.show_error_dialog"
+            )
+
+            add_cards_dialog: AddCards = dialogs.open("AddCards", aqt.mw)
+            add_cards_dialog.editor.set_note(anki_note)
+            self.wait_suggestion_button_ready(qtbot=qtbot, mocker=mocker)
+            self.click_suggestion_button(add_cards_dialog)
+
+            # Assert that the error dialog was shown with the correct message
+            qtbot.wait_until(lambda: show_error_dialog_mock.called)
+            assert (
+                show_error_dialog_mock.call_args.args[0]
+                == "This note has been deleted from AnkiHub. No new suggestions can be made."
+            )
+            create_change_note_suggestion_mock.assert_called_once()  # sanity check
 
             # Clear editor to prevent dialog that asks for confirmation to discard changes when closing the editor
             add_cards_dialog.editor.cleanup()
@@ -1302,90 +1357,218 @@ def test_suggest_new_note(
         assert exc is not None and exc.response.status_code == 403
 
 
-def test_suggest_notes_in_bulk(
-    anki_session_with_addon_data: AnkiSession,
-    mocker: MockerFixture,
-    install_sample_ah_deck: InstallSampleAHDeck,
-    next_deterministic_uuid: Callable[[], uuid.UUID],
-):
-    anki_session = anki_session_with_addon_data
-    bulk_suggestions_method_mock = mocker.patch.object(
-        AnkiHubClient, "create_suggestions_in_bulk"
-    )
-    with anki_session.profile_loaded():
-        mw = anki_session.mw
-
-        anki_did, ah_did = install_sample_ah_deck()
-
-        # add a new note
-        new_note = mw.col.new_note(mw.col.models.by_name("Basic (Testdeck / user1)"))
-        mw.col.add_note(new_note, deck_id=anki_did)
-
-        CHANGED_NOTE_ID = NoteId(1608240057545)
-        changed_note = mw.col.get_note(CHANGED_NOTE_ID)
-        changed_note["Front"] = "changed front"
-        changed_note.tags += ["a"]
-        changed_note.flush()
-
-        # suggest two notes, one new and one updated, check if the client method was called with the correct arguments
-        nids = [changed_note.id, new_note.id]
-        notes = [mw.col.get_note(nid) for nid in nids]
-        # also add one optional tag to each one of them to verify that the optional tags are not sent
-        for note in notes:
-            note.tags = list(
-                set(note.tags)
-                | set([f"{TAG_FOR_OPTIONAL_TAGS}::TAG_GROUP::OptionalTag"])
-            )
-        mw.col.update_notes(notes)
-
-        new_note_ah_id = next_deterministic_uuid()
-        mocker.patch("uuid.uuid4", return_value=new_note_ah_id)
-        suggest_notes_in_bulk(
-            ankihub_did=ah_did,
-            notes=notes,
-            auto_accept=False,
-            change_type=SuggestionType.NEW_CONTENT,
-            comment="test",
-            media_upload_cb=mocker.stub(),
+class TestSuggestNotesInBulk:
+    def test_new_note_suggestion(
+        self,
+        anki_session_with_addon_data: AnkiSession,
+        mocker: MockerFixture,
+        install_ah_deck: InstallAHDeck,
+        next_deterministic_uuid: Callable[[], uuid.UUID],
+        import_ah_note_type: ImportAHNoteType,
+        add_anki_note: AddAnkiNote,
+    ):
+        bulk_suggestions_method_mock = mocker.patch.object(
+            AnkiHubClient, "create_suggestions_in_bulk"
         )
+        with anki_session_with_addon_data.profile_loaded():
+            ah_did = install_ah_deck()
 
-        assert bulk_suggestions_method_mock.call_count == 1
-        assert bulk_suggestions_method_mock.call_args.kwargs == {
-            "change_note_suggestions": [
-                ChangeNoteSuggestion(
-                    ah_nid=uuid.UUID("67f182c2-7306-47f8-aed6-d7edb42cd7de"),
-                    anki_nid=CHANGED_NOTE_ID,
-                    fields=[
-                        Field(
-                            name="Front",
-                            order=0,
-                            value="changed front",
+            # Add a new note
+            note_type = import_ah_note_type(ah_did=ah_did)
+            new_note = add_anki_note(note_type=note_type)
+
+            ah_nid = next_deterministic_uuid()
+            mocker.patch("uuid.uuid4", return_value=ah_nid)
+
+            result = suggest_notes_in_bulk(
+                ankihub_did=ah_did,
+                notes=[new_note],
+                auto_accept=False,
+                change_type=SuggestionType.NEW_CONTENT,
+                comment="test",
+                media_upload_cb=mocker.stub(),
+            )
+
+            assert bulk_suggestions_method_mock.call_count == 1
+            assert bulk_suggestions_method_mock.call_args.kwargs == {
+                "new_note_suggestions": [
+                    NewNoteSuggestion(
+                        ah_nid=ah_nid,
+                        anki_nid=new_note.id,
+                        fields=[
+                            Field(name="Front", order=0, value=""),
+                            Field(name="Back", order=1, value=""),
+                        ],
+                        tags=[],
+                        guid=new_note.guid,
+                        comment="test",
+                        ah_did=ah_did,
+                        note_type_name=note_type["name"],
+                        anki_note_type_id=note_type["id"],
+                    ),
+                ],
+                "change_note_suggestions": [],
+                "auto_accept": False,
+            }
+            assert result.new_note_suggestions_count == 1
+            assert result.change_note_suggestions_count == 0
+            assert len(result.errors_by_nid) == 0
+
+    @pytest.mark.parametrize(
+        "note_has_changes, note_is_marked_as_deleted",
+        [
+            (True, True),
+            (True, False),
+            (False, True),
+            (False, False),
+        ],
+    )
+    def test_change_note_suggestion(
+        self,
+        anki_session_with_addon_data: AnkiSession,
+        mocker: MockerFixture,
+        install_ah_deck: InstallAHDeck,
+        import_ah_note: ImportAHNote,
+        note_has_changes: bool,
+        note_is_marked_as_deleted: bool,
+    ):
+        bulk_suggestions_method_mock = mocker.patch.object(
+            AnkiHubClient, "create_suggestions_in_bulk"
+        )
+        with anki_session_with_addon_data.profile_loaded():
+            ah_did = install_ah_deck()
+
+            ah_note = import_ah_note(ah_did=ah_did)
+            changed_note = aqt.mw.col.get_note(NoteId(ah_note.anki_nid))
+
+            if note_has_changes:
+                changed_note["Front"] = "new front"
+                changed_note.tags += ["test"]
+                changed_note.flush()
+
+            if note_is_marked_as_deleted:
+                AnkiHubNote.update(
+                    last_update_type=SuggestionType.DELETE.value[0]
+                ).where(AnkiHubNote.anki_note_id == changed_note.id).execute()
+
+            result = suggest_notes_in_bulk(
+                ankihub_did=ah_did,
+                notes=[changed_note],
+                auto_accept=False,
+                change_type=SuggestionType.NEW_CONTENT,
+                comment="test",
+                media_upload_cb=mocker.stub(),
+            )
+
+            if note_has_changes and not note_is_marked_as_deleted:
+                assert bulk_suggestions_method_mock.call_count == 1
+                assert bulk_suggestions_method_mock.call_args.kwargs == {
+                    "change_note_suggestions": [
+                        ChangeNoteSuggestion(
+                            ah_nid=ah_note.ah_nid,
+                            anki_nid=changed_note.id,
+                            fields=[
+                                Field(
+                                    name="Front",
+                                    order=0,
+                                    value="new front",
+                                ),
+                            ],
+                            added_tags=["test"],
+                            removed_tags=[],
+                            comment="test",
+                            change_type=SuggestionType.NEW_CONTENT,
                         ),
                     ],
-                    added_tags=["a"],
-                    removed_tags=[],
-                    comment="test",
-                    change_type=SuggestionType.NEW_CONTENT,
-                ),
-            ],
-            "new_note_suggestions": [
-                NewNoteSuggestion(
-                    ah_nid=new_note_ah_id,
-                    anki_nid=new_note.id,
-                    fields=[
-                        Field(name="Front", order=0, value=""),
-                        Field(name="Back", order=1, value=""),
-                    ],
-                    tags=[],
-                    guid=new_note.guid,
-                    comment="test",
-                    ah_did=ah_did,
-                    note_type_name="Basic (Testdeck / user1)",
-                    anki_note_type_id=1657023668893,
-                ),
-            ],
-            "auto_accept": False,
-        }
+                    "new_note_suggestions": [],
+                    "auto_accept": False,
+                }
+                assert result == BulkNoteSuggestionsResult(
+                    new_note_suggestions_count=0,
+                    change_note_suggestions_count=1,
+                    errors_by_nid={},
+                )
+            else:
+                assert bulk_suggestions_method_mock.call_count == 0
+                assert result.change_note_suggestions_count == 0
+                assert result.new_note_suggestions_count == 0
+                assert len(result.errors_by_nid) == 1
+                if note_is_marked_as_deleted:
+                    assert ANKIHUB_NOTE_DOES_NOT_EXIST_ERROR in str(
+                        result.errors_by_nid[changed_note.id]
+                    )
+                else:
+                    assert ANKIHUB_NO_CHANGE_ERROR in str(
+                        result.errors_by_nid[changed_note.id]
+                    )
+
+    def test_suggestion_for_multiple_notes(
+        self,
+        anki_session_with_addon_data: AnkiSession,
+        mocker: MockerFixture,
+        install_ah_deck: InstallAHDeck,
+        next_deterministic_uuid: Callable[[], uuid.UUID],
+        import_ah_note_type: ImportAHNoteType,
+        add_anki_note: AddAnkiNote,
+        import_ah_note: ImportAHNote,
+    ):
+        anki_session = anki_session_with_addon_data
+        bulk_suggestions_method_mock = mocker.patch.object(
+            AnkiHubClient, "create_suggestions_in_bulk"
+        )
+        with anki_session.profile_loaded():
+            ah_did = install_ah_deck()
+
+            # Add multiple notes for new note suggestions
+            note_type = import_ah_note_type(ah_did=ah_did)
+            new_notes = [add_anki_note(note_type=note_type) for _ in range(3)]
+
+            ah_nids = [next_deterministic_uuid() for _ in range(3)]
+            mocker.patch("uuid.uuid4", side_effect=ah_nids)
+
+            # Add multiple notes for change note suggestions
+            ah_notes = [import_ah_note(ah_did=ah_did) for _ in range(3)]
+            changed_notes = [
+                aqt.mw.col.get_note(NoteId(ah_note.anki_nid)) for ah_note in ah_notes
+            ]
+            for note in changed_notes:
+                note["Front"] = "new front"
+                note.flush()
+
+            result = suggest_notes_in_bulk(
+                ankihub_did=ah_did,
+                notes=new_notes + changed_notes,
+                auto_accept=False,
+                change_type=SuggestionType.NEW_CONTENT,
+                comment="test",
+                media_upload_cb=mocker.stub(),
+            )
+
+            assert bulk_suggestions_method_mock.call_count == 1
+
+            def get_ah_nids_from_suggestions(
+                suggestions: List[Union[ChangeNoteSuggestion, NewNoteSuggestion]]
+            ) -> List[uuid.UUID]:
+                return [suggestion.ah_nid for suggestion in suggestions]
+
+            kwargs = bulk_suggestions_method_mock.call_args.kwargs
+
+            assert len(kwargs["new_note_suggestions"]) == 3
+            assert (
+                get_ah_nids_from_suggestions(kwargs["new_note_suggestions"]) == ah_nids
+            )
+
+            assert len(kwargs["change_note_suggestions"]) == 3
+            assert get_ah_nids_from_suggestions(kwargs["change_note_suggestions"]) == [
+                ah_note.ah_nid for ah_note in ah_notes
+            ]
+
+            assert not kwargs["auto_accept"]
+            assert result == BulkNoteSuggestionsResult(
+                new_note_suggestions_count=3,
+                change_note_suggestions_count=3,
+                errors_by_nid={},
+            )
 
 
 def test_adjust_note_types(anki_session_with_addon_data: AnkiSession):

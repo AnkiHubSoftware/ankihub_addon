@@ -139,6 +139,7 @@ from ankihub.main.subdecks import (
     add_subdeck_tags_to_notes,
     deck_contains_subdeck_tags,
 )
+from ankihub.main.suggestions import ChangeSuggestionResult
 from ankihub.main.utils import (
     clear_empty_cards,
     lowest_level_common_ancestor_deck_name,
@@ -911,9 +912,9 @@ class TestOpenSuggestionDialogForSingleSuggestion:
         anki_session_with_addon_data: AnkiSession,
         import_ah_note: ImportAHNote,
         mock_dependiencies_for_suggestion_dialog: MockDependenciesForSuggestionDialog,
+        install_ah_deck: InstallAHDeck,
         user_cancels: bool,
         suggest_note_update_succeeds: bool,
-        install_ah_deck: InstallAHDeck,
     ):
         with anki_session_with_addon_data.profile_loaded():
             ah_did = install_ah_deck()
@@ -925,7 +926,11 @@ class TestOpenSuggestionDialogForSingleSuggestion:
                 suggest_new_note_mock,
             ) = mock_dependiencies_for_suggestion_dialog(user_cancels=user_cancels)
 
-            suggest_note_update_mock.return_value = suggest_note_update_succeeds
+            suggest_note_update_mock.return_value = (
+                ChangeSuggestionResult.SUCCESS
+                if suggest_note_update_succeeds
+                else ChangeSuggestionResult.NO_CHANGES
+            )
 
             open_suggestion_dialog_for_single_suggestion(note=note, parent=aqt.mw)
 
@@ -1138,12 +1143,14 @@ class TestOnSuggestNotesInBulkDone:
         showText_mock = mocker.patch("ankihub.gui.suggestion_dialog.showText")
         nid_1 = NoteId(1)
         nid_2 = NoteId(2)
+        nid_3 = NoteId(3)
         _on_suggest_notes_in_bulk_done(
             future=future_with_result(
                 suggestions.BulkNoteSuggestionsResult(
                     errors_by_nid={
-                        nid_1: [suggestions.ANKIHUB_NO_CHANGE_ERROR],
-                        nid_2: ["some error"],
+                        nid_1: ["some error"],
+                        nid_2: [suggestions.ANKIHUB_NO_CHANGE_ERROR],
+                        nid_3: ["Note object does not exist"],
                     },
                     change_note_suggestions_count=10,
                     new_note_suggestions_count=20,
@@ -1161,15 +1168,17 @@ class TestOnSuggestNotesInBulkDone:
                 Submitted 20 new note suggestion(s).
 
 
-                Failed to submit suggestions for 2 note(s).
+                Failed to submit suggestions for 3 note(s).
                 All notes with failed suggestions:
-                1, 2
+                1, 2, 3
 
                 Notes without changes (1):
-                1
+                2
+
+                Notes that don't exist on AnkiHub (1):
+                3
                 """
             ).strip()
-            + "\n"
         )
 
     def test_with_exception_in_future(self):
@@ -1195,43 +1204,6 @@ class TestOnSuggestNotesInBulkDone:
         )
         _, kwargs = show_error_dialog_mock.call_args
         assert kwargs.get("message") == "test"
-
-
-class TestAnkiHubDBAnkiNidsToAnkiHubNids:
-    def test_anki_nids_to_ankihub_nids(
-        self,
-        ankihub_db: _AnkiHubDB,
-        ankihub_basic_note_type: NotetypeDict,
-        next_deterministic_uuid: Callable[[], uuid.UUID],
-    ):
-        ah_did = next_deterministic_uuid()
-        existing_anki_nid = 1
-        non_existing_anki_nid = 2
-
-        # Add a note to the DB.
-        ankihub_db.upsert_note_type(
-            ankihub_did=ah_did,
-            note_type=ankihub_basic_note_type,
-        )
-        note = NoteInfoFactory.create(
-            anki_nid=existing_anki_nid,
-            mid=ankihub_basic_note_type["id"],
-        )
-
-        ankihub_db.upsert_notes_data(
-            ankihub_did=ah_did,
-            notes_data=[note],
-        )
-
-        # Retrieve a dict of anki_nid -> ah_nid for two anki_nids.
-        ah_nids_for_anki_nids = ankihub_db.anki_nids_to_ankihub_nids(
-            anki_nids=[NoteId(existing_anki_nid), NoteId(non_existing_anki_nid)]
-        )
-
-        assert ah_nids_for_anki_nids == {
-            existing_anki_nid: note.ah_nid,
-            non_existing_anki_nid: None,
-        }
 
 
 class TestAnkiHubDBAnkiHubNidsToAnkiIds:
@@ -2901,6 +2873,31 @@ class TestConfigureDeletedNotesDialog:
             deck_id_and_name_tuples=deck_id_name_tuples,
             parent=parent,
         )
+        dialog.show()
         dialog.button_box.button(QDialogButtonBox.Ok).click()
 
         assert not dialog.isVisible()
+
+    @pytest.mark.parametrize(
+        "show_new_feature_message",
+        [True, False],
+    )
+    def test_show_new_feature_message(
+        self, next_deterministic_uuid, show_new_feature_message: bool
+    ):
+        parent = QDialog()
+
+        deck_1_id = next_deterministic_uuid()
+        deck_1_name = "Test Deck"
+        deck_id_name_tuples = [
+            (deck_1_id, deck_1_name),
+        ]
+
+        dialog = ConfigureDeletedNotesDialog(
+            deck_id_and_name_tuples=deck_id_name_tuples,
+            parent=parent,
+            show_new_feature_message=show_new_feature_message,
+        )
+        dialog.show()
+
+        assert dialog.new_feature_label.isVisible() == show_new_feature_message
