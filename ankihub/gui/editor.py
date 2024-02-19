@@ -116,6 +116,7 @@ def _on_suggestion_button_press_inner(editor: Editor) -> None:
     else:
         open_suggestion_dialog_for_note(editor.note, parent=editor.widget)
 
+
 def _setup_editor_buttons(buttons: List[str], editor: Editor) -> None:
     """Add buttons to Editor."""
     public_config = config.public_config
@@ -124,7 +125,9 @@ def _setup_editor_buttons(buttons: List[str], editor: Editor) -> None:
     suggestion_button = editor.addButton(
         icon=img,
         cmd=SUGGESTION_BTN_ID,
-        func=lambda e: e.call_after_note_saved(functools.partial(_on_suggestion_button_press, e), keepFocus=True),
+        func=lambda e: e.call_after_note_saved(
+            functools.partial(_on_suggestion_button_press, e), keepFocus=True
+        ),
         tip=f"Send your request to AnkiHub ({hotkey})",
         label=f'<span id="{SUGGESTION_BTN_ID}-label" style="vertical-align: top;"></span>',
         id=SUGGESTION_BTN_ID,
