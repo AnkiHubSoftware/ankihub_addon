@@ -265,18 +265,6 @@ class _AnkiHubDB:
             .scalar()
         )
 
-    def anki_nids_to_ankihub_nids(
-        self, anki_nids: List[NoteId]
-    ) -> Dict[NoteId, uuid.UUID]:
-        anki_nid_to_ah_nid = dict(
-            AnkiHubNote.select(AnkiHubNote.anki_note_id, AnkiHubNote.ankihub_note_id)
-            .filter(anki_note_id__in=anki_nids)
-            .tuples()
-        )
-
-        not_existing = set(anki_nids) - set(anki_nid_to_ah_nid.keys())
-        return anki_nid_to_ah_nid | dict.fromkeys(not_existing)
-
     def ankihub_nids_to_anki_nids(
         self, ankihub_nids: List[uuid.UUID]
     ) -> Dict[uuid.UUID, NoteId]:
