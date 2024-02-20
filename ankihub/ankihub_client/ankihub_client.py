@@ -70,7 +70,7 @@ STAGING_APP_URL = "https://staging.ankihub.net"
 STAGING_API_URL = f"{STAGING_APP_URL}/api"
 STAGING_S3_BUCKET_URL = "https://ankihub-staging.s3.amazonaws.com"
 
-API_VERSION = 16.0
+API_VERSION = 17.0
 
 DECK_UPDATE_PAGE_SIZE = 2000  # seems to work well in terms of speed
 DECK_EXTENSION_UPDATE_PAGE_SIZE = 2000
