@@ -173,32 +173,31 @@ class _Config:
         if s3_url_from_env_var := os.getenv("S3_BUCKET_URL"):
             self.s3_bucket_url = s3_url_from_env_var
 
-    def setup_private_config(self):
-        # requires the profile setup to be completed unlike self.setup_pbulic_config
+    def setup_private_config(self) -> None:
+        # Requires the profile setup to be completed unlike self.setup_public_config_and_urls
         self._private_config_path = private_config_path()
-        if not self._private_config_path.exists():
-            self._private_config = PrivateConfig()
-        else:
+
+        private_config_dict = None
+        if self._private_config_path.exists():
             try:
-                self._private_config = self._load_private_config()
+                private_config_dict = json.loads(self._private_config_path.read_text())
             except JSONDecodeError:
-                # TODO Instead of overwriting, query AnkiHub for config values.
-                self._private_config = PrivateConfig()
+                LOGGER.exception("Failed to load private config")
+
+            if private_config_dict:
+                try:
+                    migrate_private_config(private_config_dict)
+                except Exception as e:
+                    LOGGER.exception(f"Failed to migrate private config: {e}")
+                    private_config_dict = None
+
+        if private_config_dict:
+            self._private_config = PrivateConfig.from_dict(private_config_dict)
+        else:
+            self._private_config = PrivateConfig()
 
         self._update_private_config()
         self._log_private_config()
-
-    def _load_private_config(self) -> PrivateConfig:
-        with open(self._private_config_path) as f:
-            private_config_dict = json.load(f)
-
-        try:
-            migrate_private_config(private_config_dict)
-        except Exception:
-            LOGGER.warning("Failed to migrate private config")
-
-        result = PrivateConfig.from_dict(private_config_dict)
-        return result
 
     def _update_private_config(self):
         with open(self._private_config_path, "w") as f:
