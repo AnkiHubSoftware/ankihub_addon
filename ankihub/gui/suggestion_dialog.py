@@ -407,6 +407,13 @@ class SuggestionDialog(QDialog):
 
         self._refresh_source_widget()
 
+        self.hint_for_note_deletions = QLabel(
+            "💡 When deleting a note, any changes<br>to fields will not be applied."
+        )
+        self.hint_for_note_deletions.hide()
+        self.layout_.addWidget(self.hint_for_note_deletions)
+        self.layout_.addSpacing(10)
+
         # Set up rationale field
         label = QLabel("Rationale for Change (Required)")
         self.layout_.addWidget(label)
@@ -471,6 +478,7 @@ class SuggestionDialog(QDialog):
 
     def _on_change_type_changed(self) -> None:
         self._refresh_source_widget()
+        self._refresh_hint_for_note_deletions()
         self._validate()
 
     def _refresh_source_widget(self):
@@ -489,6 +497,11 @@ class SuggestionDialog(QDialog):
             ]
             and self._is_for_anking_deck
         ) or (self._change_type() == SuggestionType.DELETE)
+
+    def _refresh_hint_for_note_deletions(self) -> None:
+        self.hint_for_note_deletions.setVisible(
+            self._change_type() == SuggestionType.DELETE
+        )
 
     def _set_submit_button_enabled_state(self, enabled: bool) -> None:
         self.button_box.button(QDialogButtonBox.StandardButton.Ok).setEnabled(enabled)
