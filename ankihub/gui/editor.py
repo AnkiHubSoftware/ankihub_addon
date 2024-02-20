@@ -333,7 +333,8 @@ def _refresh_buttons(editor: Editor) -> None:
 
         ah_note = cast(AnkiHubNote, ah_note)
         if ah_note.was_deleted():
-            _disable_buttons(editor, all_button_ids)
+            _enable_buttons(editor, [VIEW_NOTE_HISTORY_BTN_ID])
+            _disable_buttons(editor, [SUGGESTION_BTN_ID, VIEW_NOTE_BTN_ID])
             _set_suggestion_button_tooltip(
                 editor,
                 "This note has been deleted from AnkiHub. No new suggestions can be made.",
@@ -348,12 +349,11 @@ def _refresh_buttons(editor: Editor) -> None:
         command = AnkiHubCommands.NEW.value
 
         _enable_buttons(editor, [SUGGESTION_BTN_ID])
+        _disable_buttons(editor, [VIEW_NOTE_BTN_ID, VIEW_NOTE_HISTORY_BTN_ID])
         _set_suggestion_button_tooltip(
             editor,
             _default_suggestion_button_tooltip(),
         )
-
-        _disable_buttons(editor, [VIEW_NOTE_BTN_ID, VIEW_NOTE_HISTORY_BTN_ID])
 
     _set_suggestion_button_label(editor, command)
     editor.ankihub_command = command  # type: ignore
