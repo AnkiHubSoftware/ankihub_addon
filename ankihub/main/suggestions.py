@@ -73,11 +73,10 @@ def suggest_note_update(
     auto_accept: bool = False,
 ) -> ChangeSuggestionResult:
     """Sends a ChangeNoteSuggestion to AnkiHub if the passed note has changes.
-    Returns a ChangeSuggestionResult enum value.
     Also renames media files in the Anki collection and the media folder and uploads them to AnkiHub.
-    If calling this function from the editor, the note should be reloaded after this function is called,
-    because the note's media files will possibly have been renamed.
+    Returns a ChangeSuggestionResult enum value.
     """
+
     suggestion = _change_note_suggestion(note, change_type, comment)
     if suggestion is None:
         return ChangeSuggestionResult.NO_CHANGES
@@ -112,9 +111,7 @@ def suggest_new_note(
     auto_accept: bool = False,
 ) -> None:
     """Sends a NewNoteSuggestion to AnkiHub.
-    Also renames media in the Anki collection and the media folder and uploads them to AnkiHub.
-    If calling this function from the editor, the note should be reloaded after this function is called,
-    because the note's media will possibly have been renamed."""
+    Also renames media in the Anki collection and the media folder and uploads them to AnkiHub."""
     suggestion = _new_note_suggestion(note, ankihub_did, comment)
 
     suggestion = cast(

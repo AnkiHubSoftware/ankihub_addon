@@ -1,5 +1,6 @@
 """Modifies the Anki editor (aqt.editor) to add AnkiHub buttons and functionality."""
 
+import functools
 from pprint import pformat
 from typing import Any, List, Tuple, cast
 
@@ -117,10 +118,6 @@ def _on_suggestion_button_press_inner(editor: Editor) -> None:
     else:
         open_suggestion_dialog_for_single_suggestion(editor.note, parent=editor.widget)
 
-        # Needed because the note might have been modified when the suggestion was created.
-        editor.note.load()
-        editor.loadNote()
-
 
 def _setup_editor_buttons(buttons: List[str], editor: Editor) -> None:
     """Add buttons to Editor."""
@@ -128,8 +125,10 @@ def _setup_editor_buttons(buttons: List[str], editor: Editor) -> None:
     suggestion_button = editor.addButton(
         icon=img,
         cmd=SUGGESTION_BTN_ID,
-        func=_on_suggestion_button_press,
-        tip=_default_suggestion_button_tooltip(),
+        func=lambda editor: editor.call_after_note_saved(
+            functools.partial(_on_suggestion_button_press, editor), keepFocus=True
+        ),
+        tip=f"Send your request to AnkiHub ({_suggestion_button_hotkey()})",
         label=f'<span id="{SUGGESTION_BTN_ID}-label" style="vertical-align: top;"></span>',
         id=SUGGESTION_BTN_ID,
         keys=_suggestion_button_hotkey(),
