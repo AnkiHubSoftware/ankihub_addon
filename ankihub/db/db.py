@@ -24,6 +24,7 @@ from peewee import DQ
 
 from ..ankihub_client import Field, NoteInfo, suggestion_type_from_str
 from ..ankihub_client.models import DeckMedia as DeckMediaClientModel
+from ..ankihub_client.models import SuggestionType
 from ..common_utils import local_media_names_from_html
 from .exceptions import IntegrityError
 from .models import (
@@ -89,12 +90,7 @@ class _AnkiHubDB:
         skipped_notes: List[NoteInfo] = []
         with get_peewee_database().atomic():
             for note_data in notes_data:
-                conflicting_note_exists = AnkiHubNote.filter(
-                    anki_note_id=note_data.anki_nid,
-                    ankihub_note_id__ne=note_data.ah_nid,
-                ).exists()
-
-                if conflicting_note_exists:
+                if self._conflicting_note_exists(note_data):
                     skipped_notes.append(note_data)
                     continue
 
@@ -132,6 +128,21 @@ class _AnkiHubDB:
                 upserted_notes.append(note_data)
 
         return tuple(upserted_notes), tuple(skipped_notes)
+
+    def _conflicting_note_exists(self, note_data: NoteInfo) -> bool:
+        """Returns True if a note with the same Anki nid, but different AnkiHub nid exists in the AnkiHub DB
+        and is not marked as deleted.
+        Deleted notes are not considered conflicting, this way their entries in the DB can be overwritten.
+        This prevents the situation where a deleted note is blocking the insertion of a new note with the same Anki nid
+        from another deck."""
+        return AnkiHubNote.filter(
+            (
+                DQ(last_update_type__is=None)
+                | DQ(last_update_type__ne=SuggestionType.DELETE.value[0])
+            ),
+            anki_note_id=note_data.anki_nid,
+            ankihub_note_id__ne=note_data.ah_nid,
+        ).exists()
 
     def remove_notes(self, ah_nids: List[uuid.UUID]) -> None:
         """Removes notes from the AnkiHub DB"""
