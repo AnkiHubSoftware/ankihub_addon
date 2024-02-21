@@ -14,6 +14,8 @@ from peewee import (
     TextField,
 )
 
+from ..ankihub_client.models import SuggestionType
+
 # This will eventually be set to a peewee database object
 _ankihub_db: Optional[SqliteDatabase] = None
 
@@ -65,6 +67,9 @@ class AnkiHubNote(Model):
 
     class Meta:
         table_name = "notes"
+
+    def was_deleted(self) -> bool:
+        return self.last_update_type == SuggestionType.DELETE.value[0]
 
 
 class AnkiHubNoteType(Model):

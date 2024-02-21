@@ -1,6 +1,10 @@
+import uuid
 from typing import Dict
 
+import aqt
+
 from . import LOGGER
+from .gui.configure_deleted_notes_dialog import ConfigureDeletedNotesDialog
 
 
 def migrate_private_config(private_config_dict: Dict) -> None:
@@ -25,6 +29,7 @@ def migrate_private_config(private_config_dict: Dict) -> None:
         private_config_dict
     )
     _remove_orphaned_deck_extensions(private_config_dict)
+    _maybe_prompt_user_for_behavior_on_remote_note_deleted(private_config_dict)
 
 
 def _maybe_reset_media_update_timestamps(private_config_dict: Dict) -> None:
@@ -92,3 +97,34 @@ def _remove_orphaned_deck_extensions(private_config_dict: Dict) -> None:
                 f"Removed deck extension config with {deck_extension_id=} for deck {deck_extension['ah_did']} "
                 "because the deck isn't in the config anymore."
             )
+
+
+def _maybe_prompt_user_for_behavior_on_remote_note_deleted(
+    private_config_dict: Dict,
+) -> None:
+    """Prompt the user to configure the behavior on remote note deleted for each deck if it's not set yet."""
+    field_name = "behavior_on_remote_note_deleted"
+
+    decks_dict = private_config_dict["decks"]
+    if all(deck.get(field_name) is not None for deck in decks_dict.values()):
+        return
+
+    LOGGER.info("Prompting user to configure behavior on remote note deleted.")
+
+    deck_id_and_name_tuples = [
+        (uuid.UUID(ah_did_str), deck["name"]) for ah_did_str, deck in decks_dict.items()
+    ]
+    dialog = ConfigureDeletedNotesDialog(
+        parent=aqt.mw,
+        deck_id_and_name_tuples=deck_id_and_name_tuples,
+        show_new_feature_message=True,
+    )
+    dialog.exec()
+
+    for (
+        deck_id,
+        behavior_on_remote_note_deleted,
+    ) in dialog.deck_id_to_behavior_on_remote_note_deleted_dict().items():
+        decks_dict[str(deck_id)][field_name] = behavior_on_remote_note_deleted.value
+
+    LOGGER.info("Configured behavior on remote note deleted.")

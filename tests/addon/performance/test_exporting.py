@@ -6,17 +6,16 @@ import pytest
 from anki.models import NotetypeDict, NotetypeId
 from pytest_anki import AnkiSession
 
-from ankihub.ankihub_client import NoteInfo
-from ankihub.settings import DeckConfig
-
 from .conftest import Profile
 
 # workaround for vscode test discovery not using pytest.ini which sets this env var
 # has to be set before importing ankihub
 os.environ["SKIP_INIT"] = "1"
 
+from ankihub.ankihub_client import NoteInfo
 from ankihub.main.exporting import to_note_data
 from ankihub.main.importing import AnkiHubImporter
+from ankihub.settings import BehaviorOnRemoteNoteDeleted, DeckConfig
 
 
 @pytest.mark.performance
@@ -41,6 +40,7 @@ def test_anking_export_without_changes(
             notes=notes_data,
             deck_name="test",
             is_first_import_of_deck=True,
+            behavior_on_remote_note_deleted=BehaviorOnRemoteNoteDeleted.NEVER_DELETE,
             note_types=anking_note_types,
             protected_fields={},
             protected_tags=[],

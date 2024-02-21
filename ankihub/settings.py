@@ -1,6 +1,7 @@
 """Code for the config of the add-on. This file also defines paths to files and directories used by the add-on
 as well as some constants and code for setting up the profile folder and logger.
 """
+
 import dataclasses
 import json
 import logging
@@ -68,10 +69,18 @@ class SuspendNewCardsOfExistingNotes(Enum):
     IF_SIBLINGS_SUSPENDED = "If siblings are suspended"
 
 
+class BehaviorOnRemoteNoteDeleted(Enum):
+    """What to do with the local note in Anki when it's deleted on AnkiHub."""
+
+    DELETE_IF_NO_REVIEWS = "Delete if no reviews"
+    NEVER_DELETE = "Never"
+
+
 @dataclass
 class DeckConfig(DataClassJSONMixin):
     anki_id: DeckId
     name: str
+    behavior_on_remote_note_deleted: Optional[BehaviorOnRemoteNoteDeleted] = None
     user_relation: UserDeckRelation = UserDeckRelation.SUBSCRIBER
     latest_update: Optional[datetime] = dataclasses.field(
         metadata=field_options(
@@ -183,6 +192,7 @@ class _Config:
                 self._private_config = self._load_private_config()
             except JSONDecodeError:
                 # TODO Instead of overwriting, query AnkiHub for config values.
+                LOGGER.exception("Failed to load private config. Overwriting it.")
                 self._private_config = PrivateConfig()
 
         self._update_private_config()
@@ -194,8 +204,8 @@ class _Config:
 
         try:
             migrate_private_config(private_config_dict)
-        except Exception:
-            LOGGER.warning("Failed to migrate private config")
+        except Exception as e:
+            LOGGER.exception(f"Failed to migrate private config: {e}")
 
         result = PrivateConfig.from_dict(private_config_dict)
         return result
@@ -246,12 +256,21 @@ class _Config:
         self.deck_config(ankihub_did).suspend_new_cards_of_existing_notes = suspend
         self._update_private_config()
 
+    def set_ankihub_deleted_notes_behavior(
+        self, ankihub_did: uuid.UUID, note_delete_behavior: BehaviorOnRemoteNoteDeleted
+    ):
+        self.deck_config(
+            ankihub_did
+        ).behavior_on_remote_note_deleted = note_delete_behavior
+        self._update_private_config()
+
     def add_deck(
         self,
         name: str,
         ankihub_did: uuid.UUID,
         anki_did: DeckId,
         user_relation: UserDeckRelation,
+        behavior_on_remote_note_deleted: BehaviorOnRemoteNoteDeleted,
         latest_udpate: Optional[datetime] = None,
         subdecks_enabled: bool = False,
     ) -> None:
@@ -264,6 +283,7 @@ class _Config:
             suspend_new_cards_of_new_notes=DeckConfig.suspend_new_cards_of_new_notes_default(
                 ankihub_did
             ),
+            behavior_on_remote_note_deleted=behavior_on_remote_note_deleted,
         )
         # remove duplicates
         self.save_latest_deck_update(ankihub_did, latest_udpate)

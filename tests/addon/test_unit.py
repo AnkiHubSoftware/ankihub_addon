@@ -16,8 +16,16 @@ import pytest
 from anki.decks import DeckId
 from anki.models import NotetypeDict
 from anki.notes import Note, NoteId
-from aqt import QLineEdit, QMenu
-from aqt.qt import QDialog, QDialogButtonBox, Qt, QTimer, QWidget
+from aqt.qt import (
+    QCheckBox,
+    QDialog,
+    QDialogButtonBox,
+    QLineEdit,
+    QMenu,
+    Qt,
+    QTimer,
+    QWidget,
+)
 from pytest import MonkeyPatch
 from pytest_anki import AnkiSession
 from pytest_mock import MockerFixture
@@ -29,9 +37,11 @@ from ankihub.ankihub_client.ankihub_client import DEFAULT_API_URL
 from ankihub.ankihub_client.models import (  # type: ignore
     CardReviewData,
     UserDeckExtensionRelation,
+    UserDeckRelation,
 )
 from ankihub.gui import menu
 from ankihub.gui.config_dialog import setup_config_dialog_manager
+from ankihub.gui.configure_deleted_notes_dialog import ConfigureDeletedNotesDialog
 
 from ..factories import (
     DeckExtensionFactory,
@@ -43,6 +53,7 @@ from ..fixtures import (  # type: ignore
     AddAnkiNote,
     ImportAHNoteType,
     InstallAHDeck,
+    LatestInstanceTracker,
     MockStudyDeckDialogWithCB,
     MockSuggestionDialog,
     SetFeatureFlagState,
@@ -93,7 +104,7 @@ from ankihub.gui.suggestion_dialog import (
     _on_suggest_notes_in_bulk_done,
     get_anki_nid_to_possible_ah_dids_dict,
     open_suggestion_dialog_for_bulk_suggestion,
-    open_suggestion_dialog_for_note,
+    open_suggestion_dialog_for_single_suggestion,
 )
 from ankihub.gui.threading_utils import rate_limited
 from ankihub.gui.utils import (
@@ -128,13 +139,19 @@ from ankihub.main.subdecks import (
     add_subdeck_tags_to_notes,
     deck_contains_subdeck_tags,
 )
+from ankihub.main.suggestions import ChangeSuggestionResult
 from ankihub.main.utils import (
     clear_empty_cards,
     lowest_level_common_ancestor_deck_name,
     mids_of_notes,
     retain_nids_with_ah_note_type,
 )
-from ankihub.settings import ANKIWEB_ID, config, log_file_path
+from ankihub.settings import (
+    ANKIWEB_ID,
+    BehaviorOnRemoteNoteDeleted,
+    config,
+    log_file_path,
+)
 
 
 @pytest.fixture
@@ -660,6 +677,8 @@ class TestSuggestionDialog:
             (False, False, SuggestionType.OTHER, SourceType.AMBOSS, False),
             (False, True, SuggestionType.NEW_CONTENT, SourceType.UWORLD, False),
             (False, True, SuggestionType.NEW_CONTENT, SourceType.UWORLD, True),
+            (False, True, SuggestionType.DELETE, SourceType.DUPLICATE_NOTE, False),
+            (False, False, SuggestionType.DELETE, SourceType.DUPLICATE_NOTE, False),
         ],
     )
     def test_visibility_of_form_elements_and_form_result(
@@ -685,9 +704,12 @@ class TestSuggestionDialog:
         # Fill in the form
         change_type_needed = not is_new_note_suggestion
         source_needed = not is_new_note_suggestion and (
-            suggestion_type
-            in [SuggestionType.UPDATED_CONTENT, SuggestionType.NEW_CONTENT]
-            and is_for_anking_deck
+            (
+                suggestion_type
+                in [SuggestionType.UPDATED_CONTENT, SuggestionType.NEW_CONTENT]
+                and is_for_anking_deck
+            )
+            or suggestion_type == SuggestionType.DELETE
         )
 
         if change_type_needed:
@@ -709,16 +731,11 @@ class TestSuggestionDialog:
 
         # Assert that correct form elements are shown
         assert dialog.isVisible()
-
-        if change_type_needed:
-            assert dialog.change_type_select.isVisible()
-        else:
-            assert not dialog.change_type_select.isVisible()
-
-        if source_needed:
-            assert dialog.source_widget_group_box.isVisible()
-        else:
-            assert not dialog.source_widget_group_box.isVisible()
+        assert dialog.change_type_select.isVisible() == change_type_needed
+        assert dialog.source_widget_group_box.isVisible() == source_needed
+        assert dialog.hint_for_note_deletions.isVisible() == (
+            suggestion_type == SuggestionType.DELETE
+        )
 
         # Assert that the form submit button is enabled (it is disabled if the form input is invalid)
         assert dialog.button_box.button(QDialogButtonBox.StandardButton.Ok).isEnabled()
@@ -890,9 +907,9 @@ class TestOpenSuggestionDialogForSingleSuggestion:
         anki_session_with_addon_data: AnkiSession,
         import_ah_note: ImportAHNote,
         mock_dependiencies_for_suggestion_dialog: MockDependenciesForSuggestionDialog,
+        install_ah_deck: InstallAHDeck,
         user_cancels: bool,
         suggest_note_update_succeeds: bool,
-        install_ah_deck: InstallAHDeck,
     ):
         with anki_session_with_addon_data.profile_loaded():
             ah_did = install_ah_deck()
@@ -904,9 +921,13 @@ class TestOpenSuggestionDialogForSingleSuggestion:
                 suggest_new_note_mock,
             ) = mock_dependiencies_for_suggestion_dialog(user_cancels=user_cancels)
 
-            suggest_note_update_mock.return_value = suggest_note_update_succeeds
+            suggest_note_update_mock.return_value = (
+                ChangeSuggestionResult.SUCCESS
+                if suggest_note_update_succeeds
+                else ChangeSuggestionResult.NO_CHANGES
+            )
 
-            open_suggestion_dialog_for_note(note=note, parent=aqt.mw)
+            open_suggestion_dialog_for_single_suggestion(note=note, parent=aqt.mw)
 
             if user_cancels:
                 suggest_note_update_mock.assert_not_called()
@@ -954,7 +975,7 @@ class TestOpenSuggestionDialogForSingleSuggestion:
                 return_value=None if user_cancels else ah_did_1,
             )
 
-            open_suggestion_dialog_for_note(note=note, parent=aqt.mw)
+            open_suggestion_dialog_for_single_suggestion(note=note, parent=aqt.mw)
 
             if user_cancels:
                 suggest_note_update_mock.assert_not_called()
@@ -1117,12 +1138,14 @@ class TestOnSuggestNotesInBulkDone:
         showText_mock = mocker.patch("ankihub.gui.suggestion_dialog.showText")
         nid_1 = NoteId(1)
         nid_2 = NoteId(2)
+        nid_3 = NoteId(3)
         _on_suggest_notes_in_bulk_done(
             future=future_with_result(
                 suggestions.BulkNoteSuggestionsResult(
                     errors_by_nid={
-                        nid_1: [suggestions.ANKIHUB_NO_CHANGE_ERROR],
-                        nid_2: ["some error"],
+                        nid_1: ["some error"],
+                        nid_2: [suggestions.ANKIHUB_NO_CHANGE_ERROR],
+                        nid_3: ["Note object does not exist"],
                     },
                     change_note_suggestions_count=10,
                     new_note_suggestions_count=20,
@@ -1140,15 +1163,17 @@ class TestOnSuggestNotesInBulkDone:
                 Submitted 20 new note suggestion(s).
 
 
-                Failed to submit suggestions for 2 note(s).
+                Failed to submit suggestions for 3 note(s).
                 All notes with failed suggestions:
-                1, 2
+                1, 2, 3
 
                 Notes without changes (1):
-                1
+                2
+
+                Notes that don't exist on AnkiHub (1):
+                3
                 """
             ).strip()
-            + "\n"
         )
 
     def test_with_exception_in_future(self):
@@ -1174,43 +1199,6 @@ class TestOnSuggestNotesInBulkDone:
         )
         _, kwargs = show_error_dialog_mock.call_args
         assert kwargs.get("message") == "test"
-
-
-class TestAnkiHubDBAnkiNidsToAnkiHubNids:
-    def test_anki_nids_to_ankihub_nids(
-        self,
-        ankihub_db: _AnkiHubDB,
-        ankihub_basic_note_type: NotetypeDict,
-        next_deterministic_uuid: Callable[[], uuid.UUID],
-    ):
-        ah_did = next_deterministic_uuid()
-        existing_anki_nid = 1
-        non_existing_anki_nid = 2
-
-        # Add a note to the DB.
-        ankihub_db.upsert_note_type(
-            ankihub_did=ah_did,
-            note_type=ankihub_basic_note_type,
-        )
-        note = NoteInfoFactory.create(
-            anki_nid=existing_anki_nid,
-            mid=ankihub_basic_note_type["id"],
-        )
-
-        ankihub_db.upsert_notes_data(
-            ankihub_did=ah_did,
-            notes_data=[note],
-        )
-
-        # Retrieve a dict of anki_nid -> ah_nid for two anki_nids.
-        ah_nids_for_anki_nids = ankihub_db.anki_nids_to_ankihub_nids(
-            anki_nids=[NoteId(existing_anki_nid), NoteId(non_existing_anki_nid)]
-        )
-
-        assert ah_nids_for_anki_nids == {
-            existing_anki_nid: note.ah_nid,
-            non_existing_anki_nid: None,
-        }
 
 
 class TestAnkiHubDBAnkiHubNidsToAnkiIds:
@@ -2434,6 +2422,49 @@ class TestPrivateConfigMigrations:
 
         assert config.deck_extensions_ids_for_ah_did(ah_did) == []
 
+    @pytest.mark.parametrize(
+        "behavior_on_remote_note_deleted",
+        [
+            BehaviorOnRemoteNoteDeleted.DELETE_IF_NO_REVIEWS,
+            BehaviorOnRemoteNoteDeleted.NEVER_DELETE,
+        ],
+    )
+    def test_maybe_prompt_user_for_behavior_on_remote_note_deleted(
+        self,
+        mocker: MockerFixture,
+        behavior_on_remote_note_deleted: BehaviorOnRemoteNoteDeleted,
+    ):
+        deck = DeckFactory.create()
+        config.add_deck(
+            name=deck.name,
+            ankihub_did=deck.ah_did,
+            anki_did=DeckId(deck.anki_did),
+            user_relation=UserDeckRelation.OWNER,
+            behavior_on_remote_note_deleted=BehaviorOnRemoteNoteDeleted.NEVER_DELETE,
+        )
+
+        # Set the behavior_on_remote_note_deleted to None in the private config,
+        # to simulate the old state.
+        config.deck_config(deck.ah_did).behavior_on_remote_note_deleted = None
+        config._update_private_config()
+
+        mocker.patch.object(ConfigureDeletedNotesDialog, "exec")
+        mocker.patch.object(
+            ConfigureDeletedNotesDialog,
+            "deck_id_to_behavior_on_remote_note_deleted_dict",
+            return_value={deck.ah_did: behavior_on_remote_note_deleted},
+        )
+
+        assert config.deck_config(deck.ah_did).behavior_on_remote_note_deleted is None
+
+        # Reload the private config to trigger the migration.
+        config.setup_private_config()
+
+        assert (
+            config.deck_config(deck.ah_did).behavior_on_remote_note_deleted
+            == behavior_on_remote_note_deleted
+        )
+
 
 class TestOptionalTagSuggestionDialog:
     def test_submit_tags_for_validated_groups(
@@ -2621,26 +2652,17 @@ class TestUtils:
     ],
 )
 def test_ask_user(
-    mocker: MockerFixture,
     qtbot: QtBot,
     show_cancel_button: bool,
     text_of_button_to_click: str,
     expected_return_value: bool,
+    latest_instance_tracker: LatestInstanceTracker,
 ):
-    # Patch _Dialog.__init__ to store the _Dialog instance in the dialog variable when
-    # it is created.
-    dialog: _Dialog = None
-
-    def new_init(self, *args, **kwargs):
-        nonlocal dialog
-        dialog = self
-        original_init(self, *args, **kwargs)
-
-    original_init = _Dialog.__init__
-    mocker.patch.object(_Dialog, "__init__", new=new_init)
+    latest_instance_tracker.track(_Dialog)
 
     # Click a button on the dialog after it is shown
     def click_button():
+        dialog = latest_instance_tracker.get_latest_instance(_Dialog)
         button = next(
             button
             for button in dialog.button_box.buttons()
@@ -2745,3 +2767,132 @@ class TestAnkiHubDBMigrations:
             assert table_definitions == expected_table_definitions
             assert index_definitions == expected_index_definitions
             assert ankihub_db.database_path != migration_test_db_path  # sanity check
+
+
+class TestConfigureDeletedNotesDialog:
+    @pytest.mark.parametrize(
+        "check_first_checkbox, check_second_checkbox",
+        [(True, False), (False, True), (True, True), (False, False)],
+    )
+    def test_with_two_decks(
+        self,
+        next_deterministic_uuid,
+        check_first_checkbox: bool,
+        check_second_checkbox: bool,
+    ):
+        parent = QDialog()
+
+        deck_1_id = next_deterministic_uuid()
+        deck_1_name = "Deck 1"
+
+        deck_2_id = next_deterministic_uuid()
+        deck_2_name = "Deck 2"
+
+        deck_id_name_tuples = [
+            (deck_1_id, deck_1_name),
+            (deck_2_id, deck_2_name),
+        ]
+
+        dialog = ConfigureDeletedNotesDialog(
+            deck_id_and_name_tuples=deck_id_name_tuples,
+            parent=parent,
+        )
+        dialog.show()
+
+        # Check initial state
+        label_for_deck_1 = dialog.grid_layout.itemAtPosition(1, 0).widget()
+        assert label_for_deck_1.text() == deck_1_name
+
+        label_for_deck_2 = dialog.grid_layout.itemAtPosition(2, 0).widget()
+        assert label_for_deck_2.text() == deck_2_name
+
+        checkbox_for_deck_1: QCheckBox = (
+            dialog.grid_layout.itemAtPosition(1, 1).layout().itemAt(1).widget()
+        )
+        assert not checkbox_for_deck_1.isChecked()
+
+        checkbox_for_deck_2: QCheckBox = (
+            dialog.grid_layout.itemAtPosition(2, 1).layout().itemAt(1).widget()
+        )
+        assert not checkbox_for_deck_2.isChecked()
+
+        # Check a checkbox
+        if check_first_checkbox:
+            checkbox_for_deck_1.setChecked(True)
+
+        if check_second_checkbox:
+            checkbox_for_deck_2.setChecked(True)
+
+        # Check that the dialog returns the expected values
+        assert dialog.deck_id_to_behavior_on_remote_note_deleted_dict() == {
+            deck_1_id: (
+                BehaviorOnRemoteNoteDeleted.DELETE_IF_NO_REVIEWS
+                if check_first_checkbox
+                else BehaviorOnRemoteNoteDeleted.NEVER_DELETE
+            ),
+            deck_2_id: (
+                BehaviorOnRemoteNoteDeleted.DELETE_IF_NO_REVIEWS
+                if check_second_checkbox
+                else BehaviorOnRemoteNoteDeleted.NEVER_DELETE
+            ),
+        }
+
+    def test_close_button_has_no_effect(self, next_deterministic_uuid):
+        parent = QDialog()
+
+        deck_1_id = next_deterministic_uuid()
+        deck_1_name = "Test Deck"
+        deck_id_name_tuples = [
+            (deck_1_id, deck_1_name),
+        ]
+
+        dialog = ConfigureDeletedNotesDialog(
+            deck_id_and_name_tuples=deck_id_name_tuples,
+            parent=parent,
+        )
+        dialog.show()
+        dialog.close()
+
+        assert dialog.isVisible()
+
+    def test_ok_button_closes_dialog(self, next_deterministic_uuid):
+        parent = QDialog()
+
+        deck_1_id = next_deterministic_uuid()
+        deck_1_name = "Test Deck"
+        deck_id_name_tuples = [
+            (deck_1_id, deck_1_name),
+        ]
+
+        dialog = ConfigureDeletedNotesDialog(
+            deck_id_and_name_tuples=deck_id_name_tuples,
+            parent=parent,
+        )
+        dialog.show()
+        dialog.button_box.button(QDialogButtonBox.Ok).click()
+
+        assert not dialog.isVisible()
+
+    @pytest.mark.parametrize(
+        "show_new_feature_message",
+        [True, False],
+    )
+    def test_show_new_feature_message(
+        self, next_deterministic_uuid, show_new_feature_message: bool
+    ):
+        parent = QDialog()
+
+        deck_1_id = next_deterministic_uuid()
+        deck_1_name = "Test Deck"
+        deck_id_name_tuples = [
+            (deck_1_id, deck_1_name),
+        ]
+
+        dialog = ConfigureDeletedNotesDialog(
+            deck_id_and_name_tuples=deck_id_name_tuples,
+            parent=parent,
+            show_new_feature_message=show_new_feature_message,
+        )
+        dialog.show()
+
+        assert dialog.new_feature_label.isVisible() == show_new_feature_message

@@ -73,7 +73,7 @@ def create_ankihub_deck(
 
     # Add notes to AnkiHub DB
     ankihub_db.upsert_notes_data(ankihub_did=ankihub_did, notes_data=notes_data)
-    ankihub_db.transfer_mod_values_from_anki_db(notes_data=notes_data)
+    ankihub_db.update_mod_values_based_on_anki_db(notes_data=notes_data)
 
     return DeckCreationResult(ankihub_did=ankihub_did, notes_data=notes_data)
 

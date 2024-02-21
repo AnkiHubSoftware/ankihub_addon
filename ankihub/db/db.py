@@ -10,6 +10,8 @@ Some differences between data stored in the AnkiHub database and the Anki databa
     while the AnkiHub database stores ankihub_client.NoteInfo objects.
 - decks, notes and note types can be missing from the Anki database or be modified.
 """
+
+import time
 import uuid
 from pathlib import Path
 from typing import Any, Dict, Iterable, List, Optional, Sequence, Set, Tuple
@@ -22,6 +24,7 @@ from peewee import DQ
 
 from ..ankihub_client import Field, NoteInfo, suggestion_type_from_str
 from ..ankihub_client.models import DeckMedia as DeckMediaClientModel
+from ..ankihub_client.models import SuggestionType
 from ..common_utils import local_media_names_from_html
 from .exceptions import IntegrityError
 from .models import (
@@ -71,8 +74,7 @@ class _AnkiHubDB:
         Post-conditions:
             After calling this function, you should:
             1. Upsert the notes which were upserted into the AnkiHub DB into the Anki DB.
-            2. Call transfer_mod_values_from_anki_db to transfer the mod values of the upserted notes from the Anki DB
-               to the AnkiHub DB.
+            2. Call update_mod_values_based_on_anki_db to update the mod values of the upserted notes.
         """
         # Check if all note types used by notes exist in the AnkiHub DB before inserting
         mids_of_notes = set([note_data.mid for note_data in notes_data])
@@ -88,12 +90,7 @@ class _AnkiHubDB:
         skipped_notes: List[NoteInfo] = []
         with get_peewee_database().atomic():
             for note_data in notes_data:
-                conflicting_note_exists = AnkiHubNote.filter(
-                    anki_note_id=note_data.anki_nid,
-                    ankihub_note_id__ne=note_data.ah_nid,
-                ).exists()
-
-                if conflicting_note_exists:
+                if self._conflicting_note_exists(note_data):
                     skipped_notes.append(note_data)
                     continue
 
@@ -118,9 +115,11 @@ class _AnkiHubDB:
                         fields=fields,
                         tags=tags,
                         guid=note_data.guid,
-                        last_update_type=note_data.last_update_type.value[0]
-                        if note_data.last_update_type is not None
-                        else None,
+                        last_update_type=(
+                            note_data.last_update_type.value[0]
+                            if note_data.last_update_type is not None
+                            else None
+                        ),
                     )
                     .on_conflict_replace()
                     .execute()
@@ -130,22 +129,45 @@ class _AnkiHubDB:
 
         return tuple(upserted_notes), tuple(skipped_notes)
 
+    def _conflicting_note_exists(self, note_data: NoteInfo) -> bool:
+        """Returns True if a note with the same Anki nid, but different AnkiHub nid exists in the AnkiHub DB
+        and is not marked as deleted.
+        Deleted notes are not considered conflicting, this way their entries in the DB can be overwritten.
+        This prevents the situation where a deleted note is blocking the insertion of a new note with the same Anki nid
+        from another deck."""
+        return AnkiHubNote.filter(
+            (
+                DQ(last_update_type__is=None)
+                | DQ(last_update_type__ne=SuggestionType.DELETE.value[0])
+            ),
+            anki_note_id=note_data.anki_nid,
+            ankihub_note_id__ne=note_data.ah_nid,
+        ).exists()
+
     def remove_notes(self, ah_nids: List[uuid.UUID]) -> None:
         """Removes notes from the AnkiHub DB"""
         AnkiHubNote.delete().where(AnkiHubNote.ankihub_note_id.in_(ah_nids)).execute()
 
-    def transfer_mod_values_from_anki_db(self, notes_data: Sequence[NoteInfo]):
-        """Takes mod values for the notes from the Anki DB and saves them to the AnkiHub DB.
+    def update_mod_values_based_on_anki_db(
+        self, notes_data: Sequence[NoteInfo]
+    ) -> None:
+        """Updates the 'mod' values of notes in the AnkiHub database based on
+        their corresponding values in the Anki database.
 
-        Should always be called after importing notes or exporting notes after
-        the mod values in the Anki DB have been updated.
-        (The mod values are used to determine if a note has been modified in Anki since it was last imported/exported.)
+        This function should be called after importing or exporting notes, once
+        the 'mod' values in the Anki database have been updated. The 'mod'
+        values are used to determine if a note has been modified in Anki since
+        it was last imported/exported. If a note does not exist in the Anki
+        database, its 'mod' value is set to the current time.
         """
         with get_peewee_database().atomic():
             for note_data in notes_data:
-                mod = aqt.mw.col.db.scalar(
+                mod: Optional[int] = aqt.mw.col.db.scalar(
                     "SELECT mod FROM notes WHERE id = ?", note_data.anki_nid
                 )
+                if not mod:
+                    # The format of mod is seconds since the epoch.
+                    mod = int(time.time())
 
                 AnkiHubNote.update(mod=mod).where(
                     AnkiHubNote.ankihub_note_id == note_data.ah_nid
@@ -198,9 +220,11 @@ class _AnkiHubDB:
                 for i, value in enumerate(split_fields(note.fields))
             ],
             guid=note.guid,
-            last_update_type=suggestion_type_from_str(note.last_update_type)
-            if note.last_update_type
-            else None,
+            last_update_type=(
+                suggestion_type_from_str(note.last_update_type)
+                if note.last_update_type
+                else None
+            ),
         )
 
     def anki_nids_for_ankihub_deck(self, ankihub_did: uuid.UUID) -> List[NoteId]:
@@ -251,18 +275,6 @@ class _AnkiHubDB:
             .filter(anki_note_id=anki_note_id)
             .scalar()
         )
-
-    def anki_nids_to_ankihub_nids(
-        self, anki_nids: List[NoteId]
-    ) -> Dict[NoteId, uuid.UUID]:
-        anki_nid_to_ah_nid = dict(
-            AnkiHubNote.select(AnkiHubNote.anki_note_id, AnkiHubNote.ankihub_note_id)
-            .filter(anki_note_id__in=anki_nids)
-            .tuples()
-        )
-
-        not_existing = set(anki_nids) - set(anki_nid_to_ah_nid.keys())
-        return anki_nid_to_ah_nid | dict.fromkeys(not_existing)
 
     def ankihub_nids_to_anki_nids(
         self, ankihub_nids: List[uuid.UUID]

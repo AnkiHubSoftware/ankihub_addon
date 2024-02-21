@@ -1,4 +1,5 @@
 """Dialog for creating a suggestion for a note or a bulk suggestion for multiple notes."""
+
 import uuid
 from concurrent.futures import Future
 from dataclasses import dataclass
@@ -17,8 +18,6 @@ from aqt.qt import (
     QLabel,
     QLineEdit,
     QPlainTextEdit,
-    QRegularExpression,
-    QRegularExpressionValidator,
     QSpacerItem,
     QVBoxLayout,
     QWidget,
@@ -39,6 +38,7 @@ from ..main.exporting import to_note_data
 from ..main.suggestions import (
     ANKIHUB_NO_CHANGE_ERROR,
     BulkNoteSuggestionsResult,
+    ChangeSuggestionResult,
     get_anki_nid_to_possible_ah_dids_dict,
     suggest_new_note,
     suggest_note_update,
@@ -53,6 +53,7 @@ class SourceType(Enum):
     AMBOSS = "AMBOSS"
     UWORLD = "UWorld"
     SOCIETY_GUIDELINES = "Society Guidelines"
+    DUPLICATE_NOTE = "Duplicate Note"
     OTHER = "Other"
 
 
@@ -70,9 +71,17 @@ class SuggestionMetadata:
     source: Optional[SuggestionSource] = None
 
 
-def open_suggestion_dialog_for_note(note: Note, parent: QWidget) -> None:
+def open_suggestion_dialog_for_single_suggestion(
+    note: Note,
+    parent: QWidget,
+    preselected_change_type: Optional[SuggestionType] = None,
+) -> None:
     """Opens a dialog for creating a note suggestion for the given note.
-    The note has to be present in the Anki collection before calling this function."""
+    The note has to be present in the Anki collection before calling this function.
+
+    The preselected_change_type will be preselected in the
+    change type dropdown when the dialog is opened.
+    """
 
     assert ankihub_db.is_ankihub_note_type(
         note.mid
@@ -95,6 +104,7 @@ def open_suggestion_dialog_for_note(note: Note, parent: QWidget) -> None:
             ah_did=ah_did,
             parent=parent,
         ),
+        preselected_change_type=preselected_change_type,
         parent=parent,
     )
 
@@ -110,16 +120,27 @@ def _on_suggestion_dialog_for_single_suggestion_closed(
 
     ah_nid = ankihub_db.ankihub_nid_for_anki_nid(note.id)
     if ah_nid:
-        if suggest_note_update(
+        suggestion_result = suggest_note_update(
             note=note,
             change_type=suggestion_meta.change_type,
             comment=_comment_with_source(suggestion_meta),
             media_upload_cb=media_sync.start_media_upload,
             auto_accept=suggestion_meta.auto_accept,
-        ):
+        )
+        if suggestion_result == ChangeSuggestionResult.SUCCESS:
             show_tooltip("Submitted suggestion to AnkiHub.", parent=parent)
-        else:
+        elif suggestion_result == ChangeSuggestionResult.NO_CHANGES:
             show_tooltip("No changes. Try syncing with AnkiHub first.", parent=parent)
+        elif suggestion_result == ChangeSuggestionResult.ANKIHUB_NOT_FOUND:
+            show_error_dialog(
+                "This note has been deleted from AnkiHub. No new suggestions can be made.",
+                title="Note has been deleted from AnkiHub.",
+                parent=parent,
+            )
+        else:
+            raise ValueError(  # pragma: no cover
+                f"Unknown suggestion result: {suggestion_result}"
+            )
     else:
         suggest_new_note(
             note=note,
@@ -132,11 +153,17 @@ def _on_suggestion_dialog_for_single_suggestion_closed(
 
 
 def open_suggestion_dialog_for_bulk_suggestion(
-    anki_nids: Collection[NoteId], parent: QWidget
+    anki_nids: Collection[NoteId],
+    parent: QWidget,
+    preselected_change_type: Optional[SuggestionType] = None,
 ) -> None:
     """Opens a dialog for creating a bulk suggestion for the given notes.
     The notes have to be present in the Anki collection before calling this
-    function and they need to have an AnkiHub note type."""
+    function and they need to have an AnkiHub note type.
+
+    The preselected_change_type will be preselected in the
+    change type dropdown when the dialog is opened.
+    """
 
     ah_did = _determine_ah_did_for_nids_to_be_suggested(
         anki_nids=anki_nids, parent=parent
@@ -160,6 +187,7 @@ def open_suggestion_dialog_for_bulk_suggestion(
             ah_did=ah_did,
             parent=parent,
         ),
+        preselected_change_type=preselected_change_type,
         parent=parent,
     )
 
@@ -249,7 +277,7 @@ def _added_new_media(note: Note) -> bool:
 
 def _comment_with_source(suggestion_meta: SuggestionMetadata) -> str:
     result = suggestion_meta.comment
-    if suggestion_meta.source:
+    if suggestion_meta.source and suggestion_meta.source.source_text.strip():
         result += f"\nSource: {suggestion_meta.source.source_type.value} - {suggestion_meta.source.source_text}"
 
     return result
@@ -284,20 +312,27 @@ def _on_suggest_notes_in_bulk_done(future: Future, parent: QWidget) -> None:
         for note, errors in suggestions_result.errors_by_nid.items()
         if ANKIHUB_NO_CHANGE_ERROR in str(errors)
     ]
+    notes_that_dont_exist_on_ankihub = [
+        note
+        for note, errors in suggestions_result.errors_by_nid.items()
+        if "Note object does not exist" in str(errors)
+    ]
     msg_about_failed_suggestions = (
         (
             f"Failed to submit suggestions for {len(suggestions_result.errors_by_nid)} note(s).\n"
             "All notes with failed suggestions:\n"
             f'{", ".join(str(nid) for nid in suggestions_result.errors_by_nid.keys())}\n\n'
             f"Notes without changes ({len(notes_without_changes)}):\n"
-            f'{", ".join(str(nid) for nid in notes_without_changes)}\n'
+            f'{", ".join(str(nid) for nid in notes_without_changes)}\n\n'
+            f"Notes that don't exist on AnkiHub ({len(notes_that_dont_exist_on_ankihub)}):\n"
+            f'{", ".join(str(nid) for nid in notes_that_dont_exist_on_ankihub)}'
         )
         if suggestions_result.errors_by_nid
         else ""
     )
 
     msg = msg_about_created_suggestions + msg_about_failed_suggestions
-    showText(txt=msg, parent=parent)
+    showText(txt=msg, parent=parent, title="AnkiHub | Bulk Suggestion Summary")
 
 
 class SuggestionDialog(QDialog):
@@ -314,6 +349,7 @@ class SuggestionDialog(QDialog):
         can_submit_without_review: bool,
         added_new_media: bool,
         callback: Callable[[Optional[SuggestionMetadata]], None],
+        preselected_change_type: Optional[SuggestionType] = None,
         parent: Optional[QWidget] = None,
     ) -> None:
         if parent is None:
@@ -325,8 +361,13 @@ class SuggestionDialog(QDialog):
         self._can_submit_without_review = can_submit_without_review
         self._added_new_media = added_new_media
         self._callback = callback
+        self._preselected_change_type = preselected_change_type
 
         self._setup_ui()
+
+        if preselected_change_type:
+            self.change_type_select.setCurrentText(preselected_change_type.value[1])
+
         self.show()
 
     def _setup_ui(self) -> None:
@@ -344,7 +385,7 @@ class SuggestionDialog(QDialog):
             self.layout_.addWidget(self.change_type_select)
             qconnect(
                 self.change_type_select.currentTextChanged,
-                self._set_source_widget_visibility,
+                self._on_change_type_changed,
             )
             self.layout_.addSpacing(10)
 
@@ -357,7 +398,15 @@ class SuggestionDialog(QDialog):
 
         self.source_widget_group_box_layout.addWidget(self.source_widget)
         qconnect(self.source_widget.validation_signal, self._validate)
-        self._set_source_widget_visibility()
+        self.layout_.addSpacing(10)
+
+        self._refresh_source_widget()
+
+        self.hint_for_note_deletions = QLabel(
+            "💡 When deleting a note, any changes<br>to fields will not be applied."
+        )
+        self.hint_for_note_deletions.hide()
+        self.layout_.addWidget(self.hint_for_note_deletions)
         self.layout_.addSpacing(10)
 
         # Set up rationale field
@@ -415,27 +464,39 @@ class SuggestionDialog(QDialog):
             change_type=self._change_type(),
             comment=self._comment(),
             auto_accept=self._auto_accept(),
-            source=self.source_widget.suggestion_source()
-            if self._source_needed()
-            else None,
+            source=(
+                self.source_widget.suggestion_source()
+                if self._source_needed()
+                else None
+            ),
         )
 
-    def _set_source_widget_visibility(self) -> None:
+    def _on_change_type_changed(self) -> None:
+        self._refresh_source_widget()
+        self._refresh_hint_for_note_deletions()
+        self._validate()
+
+    def _refresh_source_widget(self):
         if self._source_needed():
+            self.source_widget.setup_for_change_type(change_type=self._change_type())
             self.source_widget_group_box.show()
         else:
             self.source_widget_group_box.hide()
 
     def _source_needed(self) -> bool:
-        result = (
+        return (
             self._change_type()
             in [
                 SuggestionType.NEW_CONTENT,
                 SuggestionType.UPDATED_CONTENT,
             ]
             and self._is_for_anking_deck
+        ) or (self._change_type() == SuggestionType.DELETE)
+
+    def _refresh_hint_for_note_deletions(self) -> None:
+        self.hint_for_note_deletions.setVisible(
+            self._change_type() == SuggestionType.DELETE
         )
-        return result
 
     def _set_submit_button_enabled_state(self, enabled: bool) -> None:
         self.button_box.button(QDialogButtonBox.StandardButton.Ok).setEnabled(enabled)
@@ -472,13 +533,45 @@ class SuggestionDialog(QDialog):
         return self.auto_accept_cb.isChecked()
 
 
+# Maps change types to source types that are available for that change type.
+change_type_to_source_types = {
+    SuggestionType.NEW_CONTENT: [
+        SourceType.AMBOSS,
+        SourceType.UWORLD,
+        SourceType.SOCIETY_GUIDELINES,
+        SourceType.OTHER,
+    ],
+    SuggestionType.UPDATED_CONTENT: [
+        SourceType.AMBOSS,
+        SourceType.UWORLD,
+        SourceType.SOCIETY_GUIDELINES,
+        SourceType.OTHER,
+    ],
+    SuggestionType.DELETE: [
+        SourceType.DUPLICATE_NOTE,
+    ],
+}
+
+# Maps source types to the label that is shown next to the source input field.
 source_type_to_source_label = {
     SourceType.AMBOSS: "Link",
     SourceType.UWORLD: "UWorld Question ID",
     SourceType.SOCIETY_GUIDELINES: "Link",
+    SourceType.DUPLICATE_NOTE: "Anki note ID of duplicate note",
     SourceType.OTHER: "",
 }
 
+# Maps source types to the placeholder text that is shown in the source input field.
+# If a source type is not in this dict, no placeholder text is shown.
+source_type_to_source_place_holder_text = {
+    SourceType.DUPLICATE_NOTE: "[Include ID, if applicable]",
+}
+
+source_types_where_input_is_optional = [
+    SourceType.DUPLICATE_NOTE,
+]
+
+# Options for the UWorld step select dropdown.
 UWORLD_STEP_OPTIONS = [
     "Step 1",
     "Step 2",
@@ -501,12 +594,15 @@ class SourceWidget(QWidget):
 
         # Setup source type dropdown
         self.source_type_select = QComboBox()
-        self.source_type_select.addItems([x.value for x in SourceType])
         self.layout_.addWidget(self.source_type_select)
         qconnect(
             self.source_type_select.currentTextChanged, self._on_source_type_change
         )
-        self.layout_.addSpacing(10)
+
+        # Setup space below source type select.
+        # Its size will be changed depending on whether the source type select is visible or not.
+        self.space_below_source_type_select = QSpacerItem(0, 10)
+        self.layout_.addSpacerItem(self.space_below_source_type_select)
 
         # Setup UWorld step select
         self.uworld_step_select = QComboBox()
@@ -520,14 +616,28 @@ class SourceWidget(QWidget):
         self.layout_.addWidget(self.source_input_label)
 
         self.source_edit = QLineEdit()
-        self.source_edit.setValidator(
-            QRegularExpressionValidator(QRegularExpression(r".+"))
-        )
         qconnect(self.source_edit.textChanged, self._validate)
         self.layout_.addWidget(self.source_edit)
 
-        # Set initial state
-        self._on_source_type_change()
+    def setup_for_change_type(self, change_type: SuggestionType) -> None:
+        """Sets up the source widget for the given change type. This method should be called initially
+        after the source widget was created and whenever the change type changes."""
+        source_types = change_type_to_source_types[change_type]
+
+        self.source_type_select.clear()
+        self.source_type_select.addItems(
+            [source_type.value for source_type in source_types]
+        )
+
+        if len(source_types) > 1:
+            self.source_type_select.show()
+            self.space_below_source_type_select.changeSize(0, 10)
+        else:
+            # The source type select is not necessary if there is only one source type option.
+            self.source_type_select.hide()
+            self.space_below_source_type_select.changeSize(0, 0)
+
+        self._refresh_source_input_label()
 
     def suggestion_source(self) -> SuggestionSource:
         source_type = self._source_type()
@@ -540,7 +650,11 @@ class SourceWidget(QWidget):
         return SuggestionSource(source_type=source_type, source_text=source)
 
     def is_valid(self) -> bool:
-        return self.source_edit.hasAcceptableInput()
+        if self._source_type() in source_types_where_input_is_optional:
+            return True
+
+        text = self.source_edit.text().strip()
+        return len(text) > 0
 
     def _validate(self) -> None:
         if not self.is_valid():
@@ -549,9 +663,12 @@ class SourceWidget(QWidget):
             self.validation_signal.emit(True)
 
     def _on_source_type_change(self) -> None:
-        self._refresh_source_input_label()
+        source_type = self._source_type()
+        if source_type is None:
+            return
 
-        if self._source_type() == SourceType.UWORLD:
+        self._refresh_source_input_label()
+        if source_type == SourceType.UWORLD:
             self.uworld_step_select.show()
             self.space_after_uworld_step_select.changeSize(0, 10)
             self.layout_.invalidate()
@@ -561,15 +678,17 @@ class SourceWidget(QWidget):
             self.layout_.invalidate()
 
     def _refresh_source_input_label(self) -> None:
-        source_type = self._source_type()
-        text = source_type_to_source_label[source_type]
+        text = source_type_to_source_label[self._source_type()]
 
         self.source_input_label.setText(text)
 
-        if not text:
-            self.source_input_label.hide()
-        else:
-            self.source_input_label.show()
+        place_holder_text = source_type_to_source_place_holder_text.get(
+            self._source_type(), ""
+        )
+        self.source_edit.setPlaceholderText(place_holder_text)
 
-    def _source_type(self) -> SourceType:
-        return SourceType(self.source_type_select.currentText())
+    def _source_type(self) -> Optional[SourceType]:
+        if self.source_type_select.currentText():
+            return SourceType(self.source_type_select.currentText())
+        else:
+            return None

@@ -30,6 +30,7 @@ import pytest
 from anki.cards import Card
 from anki.consts import QUEUE_TYPE_NEW, QUEUE_TYPE_SUSPENDED
 from anki.decks import DeckId, FilteredDeckConfig
+from anki.errors import NotFoundError
 from anki.models import NotetypeDict, NotetypeId
 from anki.notes import Note, NoteId
 from anki.utils import point_version
@@ -71,9 +72,11 @@ from ..factories import (
     NoteInfoFactory,
 )
 from ..fixtures import (
+    AddAnkiNote,
     ImportAHNote,
     ImportAHNoteType,
     InstallAHDeck,
+    LatestInstanceTracker,
     MockDownloadAndInstallDeckDependencies,
     MockShowDialogWithCB,
     MockStudyDeckDialogWithCB,
@@ -81,6 +84,7 @@ from ..fixtures import (
     add_basic_anki_note_to_deck,
     create_or_get_ah_version_of_note_type,
     record_review,
+    record_review_for_anki_nid,
 )
 from .conftest import TEST_PROFILE_ID
 
@@ -135,6 +139,7 @@ from ankihub.gui.deck_updater import _AnkiHubDeckUpdater, ah_deck_updater
 from ankihub.gui.decks_dialog import DeckManagementDialog
 from ankihub.gui.editor import SUGGESTION_BTN_ID
 from ankihub.gui.errors import upload_logs_and_data_in_background
+from ankihub.gui.exceptions import DeckDownloadAndInstallError, RemoteDeckNotFoundError
 from ankihub.gui.media_sync import media_sync
 from ankihub.gui.menu import AnkiHubLogin, menu_state
 from ankihub.gui.operations import ankihub_sync
@@ -146,11 +151,13 @@ from ankihub.gui.operations.new_deck_subscriptions import (
 )
 from ankihub.gui.operations.utils import future_with_result
 from ankihub.gui.optional_tag_suggestion_dialog import OptionalTagsSuggestionDialog
+from ankihub.gui.suggestion_dialog import SuggestionDialog
 from ankihub.main.deck_creation import create_ankihub_deck, modify_note_type
 from ankihub.main.deck_unsubscribtion import uninstall_deck
 from ankihub.main.exporting import to_note_data
 from ankihub.main.importing import (
     AnkiHubImporter,
+    AnkiHubImportResult,
     _adjust_note_types_in_anki_db,
     change_note_types_of_notes,
 )
@@ -169,6 +176,9 @@ from ankihub.main.subdecks import (
     flatten_deck,
 )
 from ankihub.main.suggestions import (
+    ANKIHUB_NO_CHANGE_ERROR,
+    ANKIHUB_NOTE_DOES_NOT_EXIST_ERROR,
+    BulkNoteSuggestionsResult,
     suggest_new_note,
     suggest_note_update,
     suggest_notes_in_bulk,
@@ -183,6 +193,7 @@ from ankihub.main.utils import (
 from ankihub.settings import (
     ANKIHUB_NOTE_TYPE_FIELD_NAME,
     AnkiHubCommands,
+    BehaviorOnRemoteNoteDeleted,
     DeckConfig,
     DeckExtension,
     DeckExtensionConfig,
@@ -228,6 +239,7 @@ def install_sample_ah_deck(
             ankihub_did=ah_did,
             anki_did=anki_did,
             user_relation=UserDeckRelation.SUBSCRIBER,
+            behavior_on_remote_note_deleted=BehaviorOnRemoteNoteDeleted.NEVER_DELETE,
         )
         return anki_did, ah_did
 
@@ -245,6 +257,7 @@ def import_sample_ankihub_deck(
         notes=ankihub_sample_deck_notes_data(),
         deck_name="Testdeck",
         is_first_import_of_deck=True,
+        behavior_on_remote_note_deleted=BehaviorOnRemoteNoteDeleted.NEVER_DELETE,
         protected_fields={},
         protected_tags=[],
         note_types=SAMPLE_NOTE_TYPES,
@@ -489,7 +502,13 @@ def test_entry_point(anki_session_with_addon_data: AnkiSession, qtbot: QtBot):
 @pytest.mark.sequential
 class TestEditor:
     @pytest.mark.parametrize(
-        "note_fields_changed, logged_in", [(True, True), (False, True), (True, False)]
+        "note_fields_changed, suggest_deletion, logged_in",
+        [
+            (True, False, True),
+            (False, False, True),
+            (False, True, True),
+            (True, False, False),
+        ],
     )
     def test_create_change_note_suggestion(
         self,
@@ -501,11 +520,20 @@ class TestEditor:
         qtbot: QtBot,
         note_fields_changed: bool,
         logged_in: bool,
+        suggest_deletion: bool,
     ):
         editor.setup()
         with anki_session_with_addon_data.profile_loaded():
             mocker.patch.object(config, "is_logged_in", return_value=logged_in)
-            mock_suggestion_dialog(user_cancels=False)
+
+            mock_suggestion_dialog(
+                user_cancels=False,
+                suggestion_type=(
+                    SuggestionType.DELETE
+                    if suggest_deletion
+                    else SuggestionType.UPDATED_CONTENT
+                ),
+            )
 
             create_change_note_suggestion_mock = mocker.patch.object(
                 AnkiHubClient, "create_change_note_suggestion"
@@ -540,7 +568,7 @@ class TestEditor:
                 # Assert that the login dialog was shown
                 window: AnkiHubLogin = AnkiHubLogin._window
                 qtbot.wait_until(lambda: window and window.isVisible())
-            elif note_fields_changed:
+            elif note_fields_changed or suggest_deletion:
                 # Assert that the suggestion was sent to the server with the correct data
                 qtbot.wait_until(lambda: create_change_note_suggestion_mock.called)
                 change_note_suggestion: ChangeNoteSuggestion = (
@@ -548,7 +576,10 @@ class TestEditor:
                         "change_note_suggestion"
                     ]
                 )
-                assert change_note_suggestion.fields[0].value == new_field_value
+                if suggest_deletion:
+                    assert not change_note_suggestion.fields
+                else:
+                    assert change_note_suggestion.fields[0].value == new_field_value
             else:
                 # Assert that no suggestion was sent to the server and that a tooltip was shown
                 qtbot.wait_until(lambda: show_tooltip_mock.called)
@@ -614,6 +645,123 @@ class TestEditor:
             # Clear editor to prevent dialog that asks for confirmation to discard changes when closing the editor
             add_cards_dialog.editor.cleanup()
 
+    def test_suggestion_button_is_disabled_for_notes_without_ankihub_note_type(
+        self,
+        anki_session_with_addon_data: AnkiSession,
+        mocker: MockerFixture,
+        qtbot: QtBot,
+        add_anki_note: AddAnkiNote,
+    ):
+        editor.setup()
+        with anki_session_with_addon_data.profile_loaded():
+            anki_note = add_anki_note()
+            add_cards_dialog: AddCards = dialogs.open("AddCards", aqt.mw)
+            add_cards_dialog.editor.set_note(anki_note)
+
+            self.wait_suggestion_button_ready(qtbot=qtbot, mocker=mocker)
+
+            self.assert_suggestion_button_text(
+                qtbot=qtbot,
+                addcards=add_cards_dialog,
+                expected_text="",
+            )
+            self.assert_suggestion_button_enabled_status(
+                qtbot=qtbot, addcards=add_cards_dialog, expected_enabled=False
+            )
+
+            # Clear editor to prevent dialog that asks for confirmation to discard changes when closing the editor
+            add_cards_dialog.editor.cleanup()
+
+    @pytest.mark.parametrize("is_deleted", [True, False])
+    def test_suggestion_button_is_disabled_for_notes_deleted_from_ankihub(
+        self,
+        anki_session_with_addon_data: AnkiSession,
+        mocker: MockerFixture,
+        install_ah_deck: InstallAHDeck,
+        import_ah_note: ImportAHNote,
+        qtbot: QtBot,
+        is_deleted: bool,
+    ):
+        editor.setup()
+        with anki_session_with_addon_data.profile_loaded():
+            ah_did = install_ah_deck()
+            ah_note = import_ah_note(ah_did=ah_did)
+            anki_note = aqt.mw.col.get_note(NoteId(ah_note.anki_nid))
+
+            if is_deleted:
+                AnkiHubNote.update(
+                    last_update_type=SuggestionType.DELETE.value[0]
+                ).where(AnkiHubNote.ankihub_note_id == ah_note.ah_nid).execute()
+
+            add_cards_dialog: AddCards = dialogs.open("AddCards", aqt.mw)
+            add_cards_dialog.editor.set_note(anki_note)
+
+            self.wait_suggestion_button_ready(qtbot=qtbot, mocker=mocker)
+
+            self.assert_suggestion_button_text(
+                qtbot=qtbot,
+                addcards=add_cards_dialog,
+                expected_text=AnkiHubCommands.CHANGE.value,
+            )
+            self.assert_suggestion_button_enabled_status(
+                qtbot=qtbot, addcards=add_cards_dialog, expected_enabled=not is_deleted
+            )
+
+            # Clear editor to prevent dialog that asks for confirmation to discard changes when closing the editor
+            add_cards_dialog.editor.cleanup()
+
+    def test_with_note_deleted_on_ankihub(
+        self,
+        anki_session_with_addon_data: AnkiSession,
+        mocker: MockerFixture,
+        qtbot: QtBot,
+        install_ah_deck: InstallAHDeck,
+        import_ah_note: ImportAHNote,
+        mock_suggestion_dialog: MockSuggestionDialog,
+    ):
+        editor.setup()
+        with anki_session_with_addon_data.profile_loaded():
+            mocker.patch.object(config, "is_logged_in", return_value=True)
+
+            mock_suggestion_dialog(user_cancels=False)
+
+            # Mock the client method to raise an exception with a 404 response
+            response = Response()
+            response.status_code = 404
+            create_change_note_suggestion_mock = mocker.patch.object(
+                AnkiHubClient,
+                "create_change_note_suggestion",
+                side_effect=AnkiHubHTTPError(response=response),
+            )
+
+            # Setup a note with some changes to create a change suggestion
+            ah_did = install_ah_deck()
+            ah_note = import_ah_note(ah_did=ah_did)
+            anki_note = aqt.mw.col.get_note(NoteId(ah_note.anki_nid))
+
+            new_field_value = "new field value"
+            anki_note["Front"] = new_field_value
+
+            show_error_dialog_mock = mocker.patch(
+                "ankihub.gui.suggestion_dialog.show_error_dialog"
+            )
+
+            add_cards_dialog: AddCards = dialogs.open("AddCards", aqt.mw)
+            add_cards_dialog.editor.set_note(anki_note)
+            self.wait_suggestion_button_ready(qtbot=qtbot, mocker=mocker)
+            self.click_suggestion_button(add_cards_dialog)
+
+            # Assert that the error dialog was shown with the correct message
+            qtbot.wait_until(lambda: show_error_dialog_mock.called)
+            assert (
+                show_error_dialog_mock.call_args.args[0]
+                == "This note has been deleted from AnkiHub. No new suggestions can be made."
+            )
+            create_change_note_suggestion_mock.assert_called_once()  # sanity check
+
+            # Clear editor to prevent dialog that asks for confirmation to discard changes when closing the editor
+            add_cards_dialog.editor.cleanup()
+
     def wait_suggestion_button_ready(self, qtbot: QtBot, mocker: MockerFixture) -> None:
         refresh_buttons_spy = mocker.spy(editor, "_refresh_buttons")
         qtbot.wait_until(lambda: refresh_buttons_spy.called)
@@ -627,6 +775,16 @@ class TestEditor:
                 callback,
             )
         callback.assert_called_with(expected_text)
+
+    def assert_suggestion_button_enabled_status(
+        self, qtbot: QtBot, addcards: AddCards, expected_enabled: bool
+    ) -> None:
+        with qtbot.wait_callback() as callback:
+            addcards.editor.web.evalWithCallback(
+                f"document.getElementById('{SUGGESTION_BTN_ID}').disabled",
+                callback,
+            )
+        callback.assert_called_with(not expected_enabled)
 
     def click_suggestion_button(self, addcards: AddCards) -> None:
         addcards.editor.web.eval(
@@ -735,20 +893,34 @@ def test_create_collaborative_deck_and_upload(
 
 class TestDownloadAndInstallDecks:
     @pytest.mark.qt_no_exception_capture
+    @pytest.mark.parametrize(
+        "has_subdeck_tags",
+        [True, False],
+    )
     def test_download_and_install_deck(
         self,
         anki_session_with_addon_data: AnkiSession,
         qtbot: QtBot,
-        mocker: MockerFixture,
         mock_download_and_install_deck_dependencies: MockDownloadAndInstallDeckDependencies,
         ankihub_basic_note_type: NotetypeDict,
+        mocker: MockerFixture,
+        has_subdeck_tags: bool,
     ):
         anki_session = anki_session_with_addon_data
         with anki_session.profile_loaded():
             deck = DeckFactory.create()
-            notes_data = [NoteInfoFactory.create(mid=ankihub_basic_note_type["id"])]
+            notes_data = [
+                NoteInfoFactory.create(
+                    mid=ankihub_basic_note_type["id"],
+                    tags=[f"{SUBDECK_TAG}::Deck::Subdeck"] if has_subdeck_tags else [],
+                )
+            ]
             mocks = mock_download_and_install_deck_dependencies(
                 deck, notes_data, ankihub_basic_note_type
+            )
+
+            confirm_and_toggle_subdecks_mock = mocker.patch(
+                "ankihub.gui.operations.deck_installation.confirm_and_toggle_subdecks"
             )
 
             # Download and install the deck
@@ -772,6 +944,11 @@ class TestDownloadAndInstallDecks:
                 assert (
                     mock.call_count == 1
                 ), f"Mock {name} was not called once, but {mock.call_count} times"
+
+            if has_subdeck_tags:
+                confirm_and_toggle_subdecks_mock.assert_called_once_with(deck.ah_did)
+            else:
+                confirm_and_toggle_subdecks_mock.assert_not_called()
 
     def test_exception_is_not_backpropagated_to_caller(
         self, anki_session_with_addon_data: AnkiSession, mocker: MockerFixture
@@ -798,6 +975,77 @@ class TestDownloadAndInstallDecks:
 
             # Assert that the future contains the exception and that it contains the expected message.
             assert future.exception().args[0] == exception_message
+
+    @pytest.mark.parametrize(
+        "response_status_code",
+        [404, 500],
+    )
+    def test_fetching_deck_infos_raises_ankihub_http_error(
+        self,
+        anki_session_with_addon_data: AnkiSession,
+        mocker: MockerFixture,
+        qtbot: QtBot,
+        mock_download_and_install_deck_dependencies: MockDownloadAndInstallDeckDependencies,
+        ankihub_basic_note_type: NotetypeDict,
+        response_status_code: int,
+    ):
+        with anki_session_with_addon_data.profile_loaded():
+
+            deck = DeckFactory.create()
+            notes_data = [NoteInfoFactory.create(mid=ankihub_basic_note_type["id"])]
+            mock_download_and_install_deck_dependencies(
+                deck, notes_data, ankihub_basic_note_type
+            )
+
+            response = Response()
+            response.status_code = response_status_code
+            mocker.patch.object(
+                AnkiHubClient,
+                "get_deck_by_id",
+                side_effect=AnkiHubHTTPError(response=response),
+            )
+
+            with qtbot.wait_callback() as callback:
+                download_and_install_decks(ankihub_dids=[deck.ah_did], on_done=callback)
+
+            future: Future = callback.args[0]
+            exception = future.exception()
+            assert isinstance(exception, DeckDownloadAndInstallError)
+
+            if response_status_code == 404:
+                assert isinstance(exception.original_exception, RemoteDeckNotFoundError)
+            else:
+                assert isinstance(exception.original_exception, AnkiHubHTTPError)
+
+    def test_download_and_install_single_deck_raises_exception(
+        self,
+        anki_session_with_addon_data: AnkiSession,
+        mocker: MockerFixture,
+        qtbot: QtBot,
+        mock_download_and_install_deck_dependencies: MockDownloadAndInstallDeckDependencies,
+        ankihub_basic_note_type: NotetypeDict,
+    ):
+        with anki_session_with_addon_data.profile_loaded():
+
+            deck = DeckFactory.create()
+            notes_data = [NoteInfoFactory.create(mid=ankihub_basic_note_type["id"])]
+            mock_download_and_install_deck_dependencies(
+                deck, notes_data, ankihub_basic_note_type
+            )
+
+            exception_message = "test exception"
+            mocker.patch(
+                "ankihub.gui.operations.deck_installation._download_and_install_single_deck",
+                side_effect=Exception(exception_message),
+            )
+
+            with qtbot.wait_callback() as callback:
+                download_and_install_decks(ankihub_dids=[deck.ah_did], on_done=callback)
+
+            future: Future = callback.args[0]
+            exception = future.exception()
+            assert isinstance(exception, DeckDownloadAndInstallError)
+            assert exception.original_exception.args[0] == exception_message
 
 
 class TestCheckAndInstallNewDeckSubscriptions:
@@ -1109,90 +1357,218 @@ def test_suggest_new_note(
         assert exc is not None and exc.response.status_code == 403
 
 
-def test_suggest_notes_in_bulk(
-    anki_session_with_addon_data: AnkiSession,
-    mocker: MockerFixture,
-    install_sample_ah_deck: InstallSampleAHDeck,
-    next_deterministic_uuid: Callable[[], uuid.UUID],
-):
-    anki_session = anki_session_with_addon_data
-    bulk_suggestions_method_mock = mocker.patch.object(
-        AnkiHubClient, "create_suggestions_in_bulk"
-    )
-    with anki_session.profile_loaded():
-        mw = anki_session.mw
-
-        anki_did, ah_did = install_sample_ah_deck()
-
-        # add a new note
-        new_note = mw.col.new_note(mw.col.models.by_name("Basic (Testdeck / user1)"))
-        mw.col.add_note(new_note, deck_id=anki_did)
-
-        CHANGED_NOTE_ID = NoteId(1608240057545)
-        changed_note = mw.col.get_note(CHANGED_NOTE_ID)
-        changed_note["Front"] = "changed front"
-        changed_note.tags += ["a"]
-        changed_note.flush()
-
-        # suggest two notes, one new and one updated, check if the client method was called with the correct arguments
-        nids = [changed_note.id, new_note.id]
-        notes = [mw.col.get_note(nid) for nid in nids]
-        # also add one optional tag to each one of them to verify that the optional tags are not sent
-        for note in notes:
-            note.tags = list(
-                set(note.tags)
-                | set([f"{TAG_FOR_OPTIONAL_TAGS}::TAG_GROUP::OptionalTag"])
-            )
-        mw.col.update_notes(notes)
-
-        new_note_ah_id = next_deterministic_uuid()
-        mocker.patch("uuid.uuid4", return_value=new_note_ah_id)
-        suggest_notes_in_bulk(
-            ankihub_did=ah_did,
-            notes=notes,
-            auto_accept=False,
-            change_type=SuggestionType.NEW_CONTENT,
-            comment="test",
-            media_upload_cb=mocker.stub(),
+class TestSuggestNotesInBulk:
+    def test_new_note_suggestion(
+        self,
+        anki_session_with_addon_data: AnkiSession,
+        mocker: MockerFixture,
+        install_ah_deck: InstallAHDeck,
+        next_deterministic_uuid: Callable[[], uuid.UUID],
+        import_ah_note_type: ImportAHNoteType,
+        add_anki_note: AddAnkiNote,
+    ):
+        bulk_suggestions_method_mock = mocker.patch.object(
+            AnkiHubClient, "create_suggestions_in_bulk"
         )
+        with anki_session_with_addon_data.profile_loaded():
+            ah_did = install_ah_deck()
 
-        assert bulk_suggestions_method_mock.call_count == 1
-        assert bulk_suggestions_method_mock.call_args.kwargs == {
-            "change_note_suggestions": [
-                ChangeNoteSuggestion(
-                    ah_nid=uuid.UUID("67f182c2-7306-47f8-aed6-d7edb42cd7de"),
-                    anki_nid=CHANGED_NOTE_ID,
-                    fields=[
-                        Field(
-                            name="Front",
-                            order=0,
-                            value="changed front",
+            # Add a new note
+            note_type = import_ah_note_type(ah_did=ah_did)
+            new_note = add_anki_note(note_type=note_type)
+
+            ah_nid = next_deterministic_uuid()
+            mocker.patch("uuid.uuid4", return_value=ah_nid)
+
+            result = suggest_notes_in_bulk(
+                ankihub_did=ah_did,
+                notes=[new_note],
+                auto_accept=False,
+                change_type=SuggestionType.NEW_CONTENT,
+                comment="test",
+                media_upload_cb=mocker.stub(),
+            )
+
+            assert bulk_suggestions_method_mock.call_count == 1
+            assert bulk_suggestions_method_mock.call_args.kwargs == {
+                "new_note_suggestions": [
+                    NewNoteSuggestion(
+                        ah_nid=ah_nid,
+                        anki_nid=new_note.id,
+                        fields=[
+                            Field(name="Front", order=0, value=""),
+                            Field(name="Back", order=1, value=""),
+                        ],
+                        tags=[],
+                        guid=new_note.guid,
+                        comment="test",
+                        ah_did=ah_did,
+                        note_type_name=note_type["name"],
+                        anki_note_type_id=note_type["id"],
+                    ),
+                ],
+                "change_note_suggestions": [],
+                "auto_accept": False,
+            }
+            assert result.new_note_suggestions_count == 1
+            assert result.change_note_suggestions_count == 0
+            assert len(result.errors_by_nid) == 0
+
+    @pytest.mark.parametrize(
+        "note_has_changes, note_is_marked_as_deleted",
+        [
+            (True, True),
+            (True, False),
+            (False, True),
+            (False, False),
+        ],
+    )
+    def test_change_note_suggestion(
+        self,
+        anki_session_with_addon_data: AnkiSession,
+        mocker: MockerFixture,
+        install_ah_deck: InstallAHDeck,
+        import_ah_note: ImportAHNote,
+        note_has_changes: bool,
+        note_is_marked_as_deleted: bool,
+    ):
+        bulk_suggestions_method_mock = mocker.patch.object(
+            AnkiHubClient, "create_suggestions_in_bulk"
+        )
+        with anki_session_with_addon_data.profile_loaded():
+            ah_did = install_ah_deck()
+
+            ah_note = import_ah_note(ah_did=ah_did)
+            changed_note = aqt.mw.col.get_note(NoteId(ah_note.anki_nid))
+
+            if note_has_changes:
+                changed_note["Front"] = "new front"
+                changed_note.tags += ["test"]
+                changed_note.flush()
+
+            if note_is_marked_as_deleted:
+                AnkiHubNote.update(
+                    last_update_type=SuggestionType.DELETE.value[0]
+                ).where(AnkiHubNote.anki_note_id == changed_note.id).execute()
+
+            result = suggest_notes_in_bulk(
+                ankihub_did=ah_did,
+                notes=[changed_note],
+                auto_accept=False,
+                change_type=SuggestionType.NEW_CONTENT,
+                comment="test",
+                media_upload_cb=mocker.stub(),
+            )
+
+            if note_has_changes and not note_is_marked_as_deleted:
+                assert bulk_suggestions_method_mock.call_count == 1
+                assert bulk_suggestions_method_mock.call_args.kwargs == {
+                    "change_note_suggestions": [
+                        ChangeNoteSuggestion(
+                            ah_nid=ah_note.ah_nid,
+                            anki_nid=changed_note.id,
+                            fields=[
+                                Field(
+                                    name="Front",
+                                    order=0,
+                                    value="new front",
+                                ),
+                            ],
+                            added_tags=["test"],
+                            removed_tags=[],
+                            comment="test",
+                            change_type=SuggestionType.NEW_CONTENT,
                         ),
                     ],
-                    added_tags=["a"],
-                    removed_tags=[],
-                    comment="test",
-                    change_type=SuggestionType.NEW_CONTENT,
-                ),
-            ],
-            "new_note_suggestions": [
-                NewNoteSuggestion(
-                    ah_nid=new_note_ah_id,
-                    anki_nid=new_note.id,
-                    fields=[
-                        Field(name="Front", order=0, value=""),
-                        Field(name="Back", order=1, value=""),
-                    ],
-                    tags=[],
-                    guid=new_note.guid,
-                    comment="test",
-                    ah_did=ah_did,
-                    note_type_name="Basic (Testdeck / user1)",
-                    anki_note_type_id=1657023668893,
-                ),
-            ],
-            "auto_accept": False,
-        }
+                    "new_note_suggestions": [],
+                    "auto_accept": False,
+                }
+                assert result == BulkNoteSuggestionsResult(
+                    new_note_suggestions_count=0,
+                    change_note_suggestions_count=1,
+                    errors_by_nid={},
+                )
+            else:
+                assert bulk_suggestions_method_mock.call_count == 0
+                assert result.change_note_suggestions_count == 0
+                assert result.new_note_suggestions_count == 0
+                assert len(result.errors_by_nid) == 1
+                if note_is_marked_as_deleted:
+                    assert ANKIHUB_NOTE_DOES_NOT_EXIST_ERROR in str(
+                        result.errors_by_nid[changed_note.id]
+                    )
+                else:
+                    assert ANKIHUB_NO_CHANGE_ERROR in str(
+                        result.errors_by_nid[changed_note.id]
+                    )
+
+    def test_suggestion_for_multiple_notes(
+        self,
+        anki_session_with_addon_data: AnkiSession,
+        mocker: MockerFixture,
+        install_ah_deck: InstallAHDeck,
+        next_deterministic_uuid: Callable[[], uuid.UUID],
+        import_ah_note_type: ImportAHNoteType,
+        add_anki_note: AddAnkiNote,
+        import_ah_note: ImportAHNote,
+    ):
+        anki_session = anki_session_with_addon_data
+        bulk_suggestions_method_mock = mocker.patch.object(
+            AnkiHubClient, "create_suggestions_in_bulk"
+        )
+        with anki_session.profile_loaded():
+            ah_did = install_ah_deck()
+
+            # Add multiple notes for new note suggestions
+            note_type = import_ah_note_type(ah_did=ah_did)
+            new_notes = [add_anki_note(note_type=note_type) for _ in range(3)]
+
+            ah_nids = [next_deterministic_uuid() for _ in range(3)]
+            mocker.patch("uuid.uuid4", side_effect=ah_nids)
+
+            # Add multiple notes for change note suggestions
+            ah_notes = [import_ah_note(ah_did=ah_did) for _ in range(3)]
+            changed_notes = [
+                aqt.mw.col.get_note(NoteId(ah_note.anki_nid)) for ah_note in ah_notes
+            ]
+            for note in changed_notes:
+                note["Front"] = "new front"
+                note.flush()
+
+            result = suggest_notes_in_bulk(
+                ankihub_did=ah_did,
+                notes=new_notes + changed_notes,
+                auto_accept=False,
+                change_type=SuggestionType.NEW_CONTENT,
+                comment="test",
+                media_upload_cb=mocker.stub(),
+            )
+
+            assert bulk_suggestions_method_mock.call_count == 1
+
+            def get_ah_nids_from_suggestions(
+                suggestions: List[Union[ChangeNoteSuggestion, NewNoteSuggestion]]
+            ) -> List[uuid.UUID]:
+                return [suggestion.ah_nid for suggestion in suggestions]
+
+            kwargs = bulk_suggestions_method_mock.call_args.kwargs
+
+            assert len(kwargs["new_note_suggestions"]) == 3
+            assert (
+                get_ah_nids_from_suggestions(kwargs["new_note_suggestions"]) == ah_nids
+            )
+
+            assert len(kwargs["change_note_suggestions"]) == 3
+            assert get_ah_nids_from_suggestions(kwargs["change_note_suggestions"]) == [
+                ah_note.ah_nid for ah_note in ah_notes
+            ]
+
+            assert not kwargs["auto_accept"]
+            assert result == BulkNoteSuggestionsResult(
+                new_note_suggestions_count=3,
+                change_note_suggestions_count=3,
+                errors_by_nid={},
+            )
 
 
 def test_adjust_note_types(anki_session_with_addon_data: AnkiSession):
@@ -1281,6 +1657,7 @@ class TestAnkiHubImporter:
                 notes=ankihub_sample_deck_notes_data(),
                 deck_name="test",
                 is_first_import_of_deck=True,
+                behavior_on_remote_note_deleted=BehaviorOnRemoteNoteDeleted.NEVER_DELETE,
                 note_types=SAMPLE_NOTE_TYPES,
                 protected_fields={},
                 protected_tags=[],
@@ -1325,6 +1702,7 @@ class TestAnkiHubImporter:
                 notes=ankihub_sample_deck_notes_data(),
                 deck_name="test",
                 is_first_import_of_deck=True,
+                behavior_on_remote_note_deleted=BehaviorOnRemoteNoteDeleted.NEVER_DELETE,
                 note_types=SAMPLE_NOTE_TYPES,
                 protected_fields={},
                 protected_tags=[],
@@ -1373,6 +1751,7 @@ class TestAnkiHubImporter:
                 notes=ankihub_sample_deck_notes_data(),
                 deck_name="test",
                 is_first_import_of_deck=False,
+                behavior_on_remote_note_deleted=BehaviorOnRemoteNoteDeleted.NEVER_DELETE,
                 note_types=SAMPLE_NOTE_TYPES,
                 protected_fields={},
                 protected_tags=[],
@@ -1429,6 +1808,7 @@ class TestAnkiHubImporter:
                 notes=ankihub_sample_deck_notes_data(),
                 deck_name="test",
                 is_first_import_of_deck=True,
+                behavior_on_remote_note_deleted=BehaviorOnRemoteNoteDeleted.NEVER_DELETE,
                 note_types=SAMPLE_NOTE_TYPES,
                 protected_fields={},
                 protected_tags=[],
@@ -1468,6 +1848,7 @@ class TestAnkiHubImporter:
                 note_types=SAMPLE_NOTE_TYPES,
                 deck_name="test",
                 is_first_import_of_deck=False,
+                behavior_on_remote_note_deleted=BehaviorOnRemoteNoteDeleted.NEVER_DELETE,
                 protected_fields={},
                 protected_tags=[],
                 anki_did=first_local_did,
@@ -1517,6 +1898,7 @@ class TestAnkiHubImporter:
                 note_types=SAMPLE_NOTE_TYPES,
                 deck_name="test",
                 is_first_import_of_deck=False,
+                behavior_on_remote_note_deleted=BehaviorOnRemoteNoteDeleted.NEVER_DELETE,
                 protected_fields={},
                 protected_tags=[],
                 anki_did=first_local_did,
@@ -1564,6 +1946,7 @@ class TestAnkiHubImporter:
                 notes=notes_data,
                 deck_name="test",
                 is_first_import_of_deck=False,
+                behavior_on_remote_note_deleted=BehaviorOnRemoteNoteDeleted.NEVER_DELETE,
                 note_types=SAMPLE_NOTE_TYPES,
                 protected_fields={},
                 protected_tags=[],
@@ -1629,6 +2012,7 @@ class TestAnkiHubImporter:
                 notes=[note_data],
                 deck_name="test",
                 is_first_import_of_deck=False,
+                behavior_on_remote_note_deleted=BehaviorOnRemoteNoteDeleted.NEVER_DELETE,
                 protected_fields={note_type_id: [protected_field_name]},
                 protected_tags=["protected_tag"],
                 note_types=SAMPLE_NOTE_TYPES,
@@ -1649,87 +2033,265 @@ class TestAnkiHubImporter:
             note_data_from_db = ankihub_db.note_data(nid)
             assert note_data_from_db == note_data
 
+    @pytest.mark.parametrize(
+        # Deleted notes are not considered as conflicting notes and can be overwritten.
+        "first_note_is_soft_deleted",
+        [True, False],
+    )
     def test_conflicting_notes_dont_get_imported(
         self,
         anki_session_with_addon_data: AnkiSession,
         ankihub_basic_note_type: NotetypeDict,
         next_deterministic_uuid: Callable[[], uuid.UUID],
+        first_note_is_soft_deleted: bool,
     ):
         with anki_session_with_addon_data.profile_loaded():
             mw = anki_session_with_addon_data.mw
 
             anki_nid = NoteId(1)
-
             mid_1 = ankihub_basic_note_type["id"]
-
             note_type_2 = create_copy_of_note_type(mw, ankihub_basic_note_type)
             mid_2 = note_type_2["id"]
 
-            # import the first note
+            # Import the first note
             ah_did_1 = next_deterministic_uuid()
             note_info_1 = NoteInfoFactory.create(
                 anki_nid=anki_nid,
                 tags=["tag1"],
                 mid=mid_1,
-            )
-            importer = AnkiHubImporter()
-            import_result = importer.import_ankihub_deck(
-                ankihub_did=ah_did_1,
-                notes=[note_info_1],
-                note_types={mid_1: ankihub_basic_note_type},
-                protected_fields={},
-                protected_tags=[],
-                deck_name="test",
-                is_first_import_of_deck=True,
-                suspend_new_cards_of_new_notes=DeckConfig.suspend_new_cards_of_new_notes_default(
-                    ah_did_1
+                last_update_type=(
+                    SuggestionType.DELETE if first_note_is_soft_deleted else None
                 ),
-                suspend_new_cards_of_existing_notes=DeckConfig.suspend_new_cards_of_existing_notes_default(),
             )
-            assert import_result.created_nids == [anki_nid]
-            assert import_result.updated_nids == []
-            assert import_result.skipped_nids == []
+            import_result = self._import_notes(
+                [note_info_1],
+                is_first_import_of_deck=True,
+                ah_did=ah_did_1,
+                note_types={mid_1: ankihub_basic_note_type},
+            )
 
-            mod_1 = AnkiHubNote.get(AnkiHubNote.anki_note_id == 1).mod
-            sleep(0.1)  # sleep to test for mod value changes
+            mod_before = AnkiHubNote.get(AnkiHubNote.anki_note_id == anki_nid).mod
+            sleep(1)  # Sleep to test for mod value changes
 
-            # import the second note with the same nid
+            # Import a second note with the same anki_nid
             ah_did_2 = next_deterministic_uuid()
             note_info_2 = NoteInfoFactory.create(
                 anki_nid=anki_nid,
                 tags=["tag2"],
                 mid=mid_2,
             )
-            importer = AnkiHubImporter()
-            import_result = importer.import_ankihub_deck(
-                ankihub_did=ah_did_2,
-                notes=[note_info_2],
-                note_types={mid_2: note_type_2},
-                protected_fields={},
-                protected_tags=[],
-                deck_name="test",
+            import_result = self._import_notes(
+                [note_info_2],
                 is_first_import_of_deck=True,
-                suspend_new_cards_of_new_notes=DeckConfig.suspend_new_cards_of_new_notes_default(
-                    ah_did_2
-                ),
-                suspend_new_cards_of_existing_notes=DeckConfig.suspend_new_cards_of_existing_notes_default(),
+                ah_did=ah_did_2,
+                note_types={mid_2: note_type_2},
             )
-            assert import_result.created_nids == []
-            assert import_result.updated_nids == []
-            assert import_result.skipped_nids == [anki_nid]
 
-            # Check that the first note wasn't changed by the second import.
-            assert ankihub_db.note_data(anki_nid) == note_info_1
-            assert ankihub_db.ankihub_deck_ids() == [ah_did_1]
+            if first_note_is_soft_deleted:
+                assert import_result.created_nids == [anki_nid]
+                assert import_result.updated_nids == []
+                assert import_result.skipped_nids == []
+                assert import_result.deleted_nids == []
+            else:
+                assert import_result.created_nids == []
+                assert import_result.updated_nids == []
+                assert import_result.skipped_nids == [anki_nid]
+                assert import_result.deleted_nids == []
 
-            # Check that the mod value of the first note was not changed.
-            mod_2 = AnkiHubNote.get(AnkiHubNote.anki_note_id == 1).mod
-            assert mod_2 == mod_1
+            if first_note_is_soft_deleted:
+                expected_ah_note = note_info_2
+            else:
+                expected_ah_note = note_info_1
 
-            # Check that the note in the Anki database wasn't changed by the second import.
-            assert mw.col.get_note(anki_nid).tags == ["tag1"]
-            assert mw.col.get_note(anki_nid).mid == mid_1
-            assert to_note_data(mw.col.get_note(anki_nid)) == note_info_1
+            # Check the note data in the AnkiHub DB
+            assert ankihub_db.note_data(anki_nid) == expected_ah_note
+
+            # Check the mod value in the AnkiHub DB
+            mod_after = AnkiHubNote.get(AnkiHubNote.anki_note_id == anki_nid).mod
+            if first_note_is_soft_deleted:
+                assert mod_after > mod_before
+            else:
+                assert mod_after == mod_before
+
+            # Check the note data in the Anki DB
+            assert to_note_data(mw.col.get_note(anki_nid)) == expected_ah_note
+
+    @pytest.mark.parametrize(
+        "behavior_on_remote_note_deleted, note_has_review",
+        [
+            (BehaviorOnRemoteNoteDeleted.NEVER_DELETE, False),
+            (BehaviorOnRemoteNoteDeleted.NEVER_DELETE, True),
+            (BehaviorOnRemoteNoteDeleted.DELETE_IF_NO_REVIEWS, False),
+            (BehaviorOnRemoteNoteDeleted.DELETE_IF_NO_REVIEWS, True),
+        ],
+    )
+    def test_import_note_deletion(
+        self,
+        anki_session_with_addon_data: AnkiSession,
+        import_ah_note: ImportAHNote,
+        next_deterministic_uuid: Callable[[], uuid.UUID],
+        next_deterministic_id: Callable[[], int],
+        behavior_on_remote_note_deleted: BehaviorOnRemoteNoteDeleted,
+        note_has_review: bool,
+    ):
+        with anki_session_with_addon_data.profile_loaded():
+            ah_did = next_deterministic_uuid()
+            anki_did = DeckId(next_deterministic_id())
+            ah_note = import_ah_note(ah_did=ah_did, anki_did=anki_did)
+
+            if note_has_review:
+                record_review_for_anki_nid(NoteId(ah_note.anki_nid))
+
+            ah_note.last_update_type = SuggestionType.DELETE
+
+            dids_before_import = all_dids()
+
+            import_result = self._import_notes(
+                [ah_note],
+                behavior_on_remote_note_deleted=behavior_on_remote_note_deleted,
+                is_first_import_of_deck=False,
+                ah_did=ah_did,
+                anki_did=anki_did,
+            )
+
+            new_dids = all_dids() - dids_before_import
+
+            assert not new_dids
+
+            if (
+                behavior_on_remote_note_deleted
+                == BehaviorOnRemoteNoteDeleted.NEVER_DELETE
+                or (
+                    behavior_on_remote_note_deleted
+                    == BehaviorOnRemoteNoteDeleted.DELETE_IF_NO_REVIEWS
+                    and note_has_review
+                )
+            ):
+                anki_note = aqt.mw.col.get_note(NoteId(ah_note.anki_nid))
+                assert TAG_FOR_DELETED_NOTES in anki_note.tags
+                assert anki_note[ANKIHUB_NOTE_TYPE_FIELD_NAME] == ""
+
+                assert len(import_result.created_nids) == 0
+                assert len(import_result.updated_nids) == 0
+                assert len(import_result.marked_as_deleted_nids) == 1
+                assert len(import_result.deleted_nids) == 0
+            elif (
+                behavior_on_remote_note_deleted
+                == BehaviorOnRemoteNoteDeleted.DELETE_IF_NO_REVIEWS
+            ):
+                with pytest.raises(NotFoundError):
+                    aqt.mw.col.get_note(NoteId(ah_note.anki_nid))
+
+                assert len(import_result.created_nids) == 0
+                assert len(import_result.updated_nids) == 0
+                assert len(import_result.marked_as_deleted_nids) == 0
+                assert len(import_result.deleted_nids) == 1
+
+    def test_import_note_deletion_with_one_note_deleted_and_one_marked_as_deleted(
+        self,
+        anki_session_with_addon_data: AnkiSession,
+        import_ah_note: ImportAHNote,
+        next_deterministic_uuid: Callable[[], uuid.UUID],
+        next_deterministic_id: Callable[[], int],
+    ):
+        with anki_session_with_addon_data.profile_loaded():
+            ah_did = next_deterministic_uuid()
+            anki_did = DeckId(next_deterministic_id())
+
+            ah_note_1 = import_ah_note(ah_did=ah_did, anki_did=anki_did)
+            ah_note_1.last_update_type = SuggestionType.DELETE
+            record_review_for_anki_nid(NoteId(ah_note_1.anki_nid))
+
+            ah_note_2 = import_ah_note(ah_did=ah_did, anki_did=anki_did)
+            ah_note_2.last_update_type = SuggestionType.DELETE
+
+            import_result = self._import_notes(
+                [ah_note_1, ah_note_2],
+                behavior_on_remote_note_deleted=BehaviorOnRemoteNoteDeleted.DELETE_IF_NO_REVIEWS,
+                is_first_import_of_deck=False,
+                ah_did=ah_did,
+                anki_did=anki_did,
+            )
+
+            anki_note_1 = aqt.mw.col.get_note(NoteId(ah_note_1.anki_nid))
+            assert TAG_FOR_DELETED_NOTES in anki_note_1.tags
+            assert anki_note_1[ANKIHUB_NOTE_TYPE_FIELD_NAME] == ""
+
+            with pytest.raises(NotFoundError):
+                aqt.mw.col.get_note(NoteId(ah_note_2.anki_nid))
+
+            assert len(import_result.created_nids) == 0
+            assert len(import_result.updated_nids) == 0
+            assert len(import_result.marked_as_deleted_nids) == 1
+            assert len(import_result.deleted_nids) == 1
+
+    @pytest.mark.parametrize(
+        "behavior_on_remote_note_deleted",
+        [
+            BehaviorOnRemoteNoteDeleted.NEVER_DELETE,
+            BehaviorOnRemoteNoteDeleted.DELETE_IF_NO_REVIEWS,
+        ],
+    )
+    def test_import_note_deletion_for_note_that_doesnt_exist_in_anki(
+        self,
+        anki_session_with_addon_data: AnkiSession,
+        ankihub_basic_note_type: NotetypeDict,
+        next_deterministic_uuid: Callable[[], uuid.UUID],
+        next_deterministic_id: Callable[[], int],
+        behavior_on_remote_note_deleted: BehaviorOnRemoteNoteDeleted,
+    ):
+        with anki_session_with_addon_data.profile_loaded():
+            ah_did = next_deterministic_uuid()
+            anki_did = DeckId(next_deterministic_id())
+
+            ah_note = NoteInfoFactory.create(
+                last_update_type=SuggestionType.DELETE,
+                mid=ankihub_basic_note_type["id"],
+            )
+            import_result = self._import_notes(
+                [ah_note],
+                note_types={ankihub_basic_note_type["id"]: ankihub_basic_note_type},
+                behavior_on_remote_note_deleted=behavior_on_remote_note_deleted,
+                is_first_import_of_deck=False,
+                ah_did=ah_did,
+                anki_did=anki_did,
+            )
+
+            with pytest.raises(NotFoundError):
+                aqt.mw.col.get_note(NoteId(ah_note.anki_nid))
+
+            assert len(import_result.created_nids) == 0
+            assert len(import_result.updated_nids) == 0
+            assert len(import_result.marked_as_deleted_nids) == 0
+            assert len(import_result.deleted_nids) == 0
+
+    def _import_notes(
+        self,
+        ah_notes: List[NoteInfo],
+        ah_did: uuid.UUID,
+        is_first_import_of_deck: bool,
+        behavior_on_remote_note_deleted: BehaviorOnRemoteNoteDeleted = BehaviorOnRemoteNoteDeleted.NEVER_DELETE,
+        anki_did: Optional[DeckId] = None,
+        note_types: Dict[NotetypeId, NotetypeDict] = {},
+    ) -> AnkiHubImportResult:
+        """Helper function to use the AnkiHubImporter to import notes with default arguments."""
+        ankihub_importer = AnkiHubImporter()
+        import_result = ankihub_importer.import_ankihub_deck(
+            ankihub_did=ah_did,
+            notes=ah_notes,
+            deck_name="test",
+            anki_did=anki_did,
+            is_first_import_of_deck=is_first_import_of_deck,
+            behavior_on_remote_note_deleted=behavior_on_remote_note_deleted,
+            note_types=note_types,
+            protected_fields={},
+            protected_tags=[],
+            suspend_new_cards_of_new_notes=DeckConfig.suspend_new_cards_of_new_notes_default(
+                ah_did
+            ),
+            suspend_new_cards_of_existing_notes=DeckConfig.suspend_new_cards_of_existing_notes_default(),
+        )
+        return import_result
 
 
 def assert_that_only_ankihub_sample_deck_info_in_database(ah_did: uuid.UUID):
@@ -2330,6 +2892,7 @@ class TestCustomSearchNodes:
                 protected_tags=[],
                 deck_name="Test-Deck",
                 is_first_import_of_deck=True,
+                behavior_on_remote_note_deleted=BehaviorOnRemoteNoteDeleted.NEVER_DELETE,
                 suspend_new_cards_of_new_notes=DeckConfig.suspend_new_cards_of_new_notes_default(
                     ah_did
                 ),
@@ -2373,6 +2936,7 @@ class TestCustomSearchNodes:
                 protected_fields={},
                 protected_tags=[],
                 deck_name="Test-Deck",
+                behavior_on_remote_note_deleted=BehaviorOnRemoteNoteDeleted.NEVER_DELETE,
                 suspend_new_cards_of_new_notes=DeckConfig.suspend_new_cards_of_new_notes_default(
                     ah_did
                 ),
@@ -2472,6 +3036,7 @@ class TestBrowserTreeView:
                 "Not Modified After Sync",
                 "Updated Today",
                 "Updated Since Last Review",
+                "Deleted Notes",
             ]
 
             updated_today_item = ankihub_item.children[4]
@@ -2534,6 +3099,7 @@ class TestBrowserTreeView:
                 "Not Modified After Sync",
                 "Updated Today",
                 "Updated Since Last Review",
+                "Deleted Notes",
                 TAG_FOR_OPTIONAL_TAGS,
                 TAG_FOR_PROTECTING_FIELDS,
                 SUBDECK_TAG,
@@ -2601,6 +3167,7 @@ class TestBrowserContextMenu:
 
             expected_texts = [
                 "AnkiHub: Bulk suggest notes",
+                "AnkiHub: Suggest to delete note",
                 "AnkiHub: Protect fields",
                 "AnkiHub: Reset local changes",
                 "AnkiHub: Suggest Optional Tags",
@@ -2628,6 +3195,51 @@ class TestBrowserContextMenu:
         browser_will_show_context_menu(browser=browser, menu=menu)
 
         return menu
+
+    @pytest.mark.parametrize(
+        "action_text, expected_change_type_text",
+        [
+            # The suggestion type which is selected by default is UPDATED_CONTENT
+            ("AnkiHub: Bulk suggest notes", SuggestionType.UPDATED_CONTENT.value[1]),
+            # When the user uses the "Suggest to delete note" action, the suggestion type is DELETE
+            ("AnkiHub: Suggest to delete note", SuggestionType.DELETE.value[1]),
+        ],
+    )
+    def test_note_suggestion_actions(
+        self,
+        anki_session_with_addon_data: AnkiSession,
+        install_ah_deck: InstallAHDeck,
+        import_ah_note: ImportAHNote,
+        latest_instance_tracker: LatestInstanceTracker,
+        qtbot: QtBot,
+        action_text: str,
+        expected_change_type_text: str,
+    ):
+        with anki_session_with_addon_data.profile_loaded():
+            ah_did = install_ah_deck()
+            note_info = NoteInfoFactory.create()
+            import_ah_note(note_info, ah_did=ah_did)
+
+            menu = self.open_browser_context_menu_with_all_notes_selected()
+
+            latest_instance_tracker.track(SuggestionDialog)
+
+            # Trigger the action
+            action: QAction = next(
+                action for action in menu.actions() if action.text() == action_text
+            )
+            action.trigger()
+
+            # Assert the suggestion dialog was opened with the right suggestion type
+            dialog: SuggestionDialog = latest_instance_tracker.get_latest_instance(
+                SuggestionDialog
+            )
+            assert dialog.isVisible()
+            assert dialog.change_type_select.currentText() == expected_change_type_text
+
+            # Close the browser to prevent RuntimeErrors getting raised during teardown
+            with qtbot.wait_callback() as callback:
+                dialogs.closeAll(onsuccess=callback)
 
     @pytest.mark.parametrize(
         "action_text, expected_note_attribute_in_clipboard",
@@ -4740,9 +5352,7 @@ class TestAHDBCheck:
                 assert config.deck_ids() == [ah_did]
             elif user_confirms and not deck_exists_on_ankihub:
                 # The deck could't be installed because it doesn't exist, was uninstalled completely
-                assert ankihub_db.ankihub_deck_ids() == (
-                    [ah_did] if deck_exists_on_ankihub else []
-                )
+                assert ankihub_db.ankihub_deck_ids() == []
             else:
                 # User didn't confirm, nothing to do
                 assert mocks["get_deck_by_id"].call_count == 0

@@ -2,10 +2,12 @@
 to the version stored in the AnkiHub database. Suggestions are sent to AnkiHub.
 (The AnkiHub database is the source of truth for the notes in the AnkiHub deck and is updated
 when syncing with AnkiHub.)"""
+
 import copy
 import shutil
 import uuid
 from dataclasses import dataclass
+from enum import Enum
 from pathlib import Path
 from typing import (
     Any,
@@ -34,7 +36,9 @@ from ..ankihub_client import (
     get_media_names_from_notes_data,
     get_media_names_from_suggestions,
 )
+from ..ankihub_client.ankihub_client import AnkiHubHTTPError
 from ..db import ankihub_db
+from ..db.models import AnkiHubNote
 from .exporting import to_note_data
 from .media_utils import find_and_replace_text_in_fields_on_all_notes
 from .utils import get_anki_nid_to_mid_dict, md5_file_hash
@@ -44,6 +48,16 @@ from .utils import get_anki_nid_to_mid_dict, md5_file_hash
 ANKIHUB_NO_CHANGE_ERROR = (
     "Suggestion fields and tags don't have any changes to the original note"
 )
+
+# string that is contained in the errors returned from the AnkiHub API when
+# the note does not exist on AnkiHub
+ANKIHUB_NOTE_DOES_NOT_EXIST_ERROR = "Note object does not exist"
+
+
+class ChangeSuggestionResult(Enum):
+    SUCCESS = "success"
+    NO_CHANGES = "no changes"
+    ANKIHUB_NOT_FOUND = "not found"
 
 
 class MediaUploadCallback(Protocol):
@@ -57,14 +71,15 @@ def suggest_note_update(
     comment: str,
     media_upload_cb: MediaUploadCallback,
     auto_accept: bool = False,
-) -> bool:
+) -> ChangeSuggestionResult:
     """Sends a ChangeNoteSuggestion to AnkiHub if the passed note has changes.
-    Returns True if the suggestion was created, False if the note has no changes
-    (and therefore no suggestion was created).
-    Also renames media files in the Anki collection and the media folder and uploads them to AnkiHub."""
+    Also renames media files in the Anki collection and the media folder and uploads them to AnkiHub.
+    Returns a ChangeSuggestionResult enum value.
+    """
+
     suggestion = _change_note_suggestion(note, change_type, comment)
     if suggestion is None:
-        return False
+        return ChangeSuggestionResult.NO_CHANGES
 
     ah_did = ankihub_db.ankihub_did_for_anki_nid(NoteId(suggestion.anki_nid))
     suggestion = cast(
@@ -75,12 +90,17 @@ def suggest_note_update(
     )
 
     client = AnkiHubClient()
-    client.create_change_note_suggestion(
-        change_note_suggestion=suggestion,
-        auto_accept=auto_accept,
-    )
+    try:
+        client.create_change_note_suggestion(
+            change_note_suggestion=suggestion,
+            auto_accept=auto_accept,
+        )
+    except AnkiHubHTTPError as e:
+        if e.response.status_code == 404:
+            return ChangeSuggestionResult.ANKIHUB_NOT_FOUND
+        raise e
 
-    return True
+    return ChangeSuggestionResult.SUCCESS
 
 
 def suggest_new_note(
@@ -136,6 +156,7 @@ def suggest_notes_in_bulk(
         new_note_suggestions,
         change_note_suggestions,
         nids_without_changes,
+        nids_deleted_on_remote,
     ) = _suggestions_for_notes(notes, ankihub_did, change_type, comment)
 
     new_note_suggestions = cast(
@@ -155,17 +176,22 @@ def suggest_notes_in_bulk(
         ),
     )
 
-    client = AnkiHubClient()
-    errors_by_nid_int = client.create_suggestions_in_bulk(
-        new_note_suggestions=new_note_suggestions,
-        change_note_suggestions=change_note_suggestions,
-        auto_accept=auto_accept,
-    )
-    errors_by_nid_from_remote = {
-        NoteId(nid): errors for nid, errors in errors_by_nid_int.items()
-    }
+    if new_note_suggestions or change_note_suggestions:
+        client = AnkiHubClient()
+        errors_by_nid_int = client.create_suggestions_in_bulk(
+            new_note_suggestions=new_note_suggestions,
+            change_note_suggestions=change_note_suggestions,
+            auto_accept=auto_accept,
+        )
+        errors_by_nid_from_remote = {
+            NoteId(nid): errors for nid, errors in errors_by_nid_int.items()
+        }
+    else:
+        errors_by_nid_from_remote = {}
+
     errors_by_nid_from_local = {
-        nid: ANKIHUB_NO_CHANGE_ERROR for nid in nids_without_changes
+        **{nid: ANKIHUB_NO_CHANGE_ERROR for nid in nids_without_changes},
+        **{nid: ANKIHUB_NOTE_DOES_NOT_EXIST_ERROR for nid in nids_deleted_on_remote},
     }
     errors_by_nid: Dict[NoteId, Any] = {
         **errors_by_nid_from_remote,
@@ -217,67 +243,74 @@ def get_anki_nid_to_possible_ah_dids_dict(
 def _suggestions_for_notes(
     notes: List[Note], ankihub_did: uuid.UUID, change_type: SuggestionType, comment: str
 ) -> Tuple[
-    Sequence[NewNoteSuggestion], Sequence[ChangeNoteSuggestion], Sequence[NoteId]
+    Sequence[NewNoteSuggestion],
+    Sequence[ChangeNoteSuggestion],
+    Sequence[NoteId],
+    Sequence[NoteId],
 ]:
     """
-    Splits the list of notes into three categories:
+    Splits the list of notes into four categories:
     - notes that should be sent as NewNoteSuggestions
     - notes that should be sent as ChangeNoteSuggestions
     - notes that should not be sent because they don't have any changes
-    Returns a tuple of three sequences:
+    - notes that should not be sent because they were deleted on AnkiHub
+
+    Returns a tuple of four sequences:
     - new_note_suggestions
     - change_note_suggestions
     - nids_without_changes
+    - nids_deleted_on_remote
     """
-    anki_nids_to_ankihub_nids = ankihub_db.anki_nids_to_ankihub_nids(
-        [note.id for note in notes]
-    )
-    note_by_anki_id = {note.id: note for note in notes}
+    anki_nids = [note.id for note in notes]
+    ah_db_note_by_anki_nid = {
+        note.anki_note_id: note
+        for note in AnkiHubNote.filter(anki_note_id__in=anki_nids)
+    }
 
-    notes_that_exist_on_remote = [
-        note_by_anki_id[anki_nid]
-        for anki_nid, ah_nid in anki_nids_to_ankihub_nids.items()
-        if ah_nid
-    ]
+    notes_for_new_note_suggestions = []
+    notes_for_change_note_suggestions = []
+    nids_deleted_on_remote = []
+    for note in notes:
+        if ah_db_note := ah_db_note_by_anki_nid.get(note.id):
+            ah_db_note = cast(AnkiHubNote, ah_db_note)
+            if ah_db_note.was_deleted():
+                nids_deleted_on_remote.append(note.id)
+            else:
+                notes_for_change_note_suggestions.append(note)
+        else:
+            notes_for_new_note_suggestions.append(note)
 
-    notes_that_dont_exist_on_remote = [
-        note_by_anki_id[anki_nid]
-        for anki_nid, ah_nid in anki_nids_to_ankihub_nids.items()
-        if ah_nid is None
-    ]
-
-    # Create change note suggestions for notes that exist on remote
-    change_note_suggestions_or_none_by_nid = {
+    change_note_suggestion_or_none_by_anki_nid = {
         note.id: _change_note_suggestion(
             note=note,
             change_type=change_type,
             comment=comment,
         )
-        for note in notes_that_exist_on_remote
+        for note in notes_for_change_note_suggestions
     }
-    change_note_suggestions = [
-        suggestion
-        for suggestion in change_note_suggestions_or_none_by_nid.values()
-        if suggestion
-    ]
-    # nids of notes that exist on remote but have no changes
-    nids_without_changes = [
-        nid
-        for nid, suggestion in change_note_suggestions_or_none_by_nid.items()
-        if not suggestion
-    ]
+    change_note_suggestions = []
+    nids_without_changes = []
+    for nid, suggestion in change_note_suggestion_or_none_by_anki_nid.items():
+        if suggestion:
+            change_note_suggestions.append(suggestion)
+        else:
+            nids_without_changes.append(nid)
 
-    # Create new note suggestions for notes that don't exist on remote
     new_note_suggestions = [
         _new_note_suggestion(
             note=note,
             ah_did=ankihub_did,
             comment=comment,
         )
-        for note in notes_that_dont_exist_on_remote
+        for note in notes_for_new_note_suggestions
     ]
 
-    return new_note_suggestions, change_note_suggestions, nids_without_changes
+    return (
+        new_note_suggestions,
+        change_note_suggestions,
+        nids_without_changes,
+        nids_deleted_on_remote,
+    )
 
 
 def _new_note_suggestion(
@@ -306,18 +339,23 @@ def _change_note_suggestion(
     assert note_from_anki_db.ah_nid is not None
     assert note_from_anki_db.tags is not None
 
-    note_from_ah_db = ankihub_db.note_data(note.id)
+    added_tags: List[str] = []
+    removed_tags: List[str] = []
+    fields_that_changed: List[Field] = []
 
-    added_tags, removed_tags = _added_and_removed_tags(
-        prev_tags=note_from_ah_db.tags, cur_tags=note_from_anki_db.tags
-    )
+    if change_type != SuggestionType.DELETE:
+        note_from_ah_db = ankihub_db.note_data(note.id)
 
-    fields_that_changed = _fields_that_changed(
-        prev_fields=note_from_ah_db.fields, cur_fields=note_from_anki_db.fields
-    )
+        added_tags, removed_tags = _added_and_removed_tags(
+            prev_tags=note_from_ah_db.tags, cur_tags=note_from_anki_db.tags
+        )
 
-    if not added_tags and not removed_tags and not fields_that_changed:
-        return None
+        fields_that_changed = _fields_that_changed(
+            prev_fields=note_from_ah_db.fields, cur_fields=note_from_anki_db.fields
+        )
+
+        if not added_tags and not removed_tags and not fields_that_changed:
+            return None
 
     return ChangeNoteSuggestion(
         ah_nid=note_from_anki_db.ah_nid,
@@ -436,7 +474,8 @@ def _handle_media_with_matching_hashes(
     """If a media file with the same hash already exist for the deck, we shouldn't upload the media file,
     just change the media file name on the notes and suggestions to the name of the existing media file.
     If the file with the matching hash is not in the Anki collection,
-    we create it by copying the referenced media file to prevent broken media references."""
+    we create it by copying the referenced media file to prevent broken media references.
+    """
     media_dir = Path(aqt.mw.col.media.dir())
     media_to_hash_dict = {
         media_name: md5_file_hash(media_dir / media_name) for media_name in media_names

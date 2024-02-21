@@ -1,4 +1,5 @@
 """Modifies the Anki browser (aqt.browser) to add AnkiHub features."""
+
 import re
 from concurrent.futures import Future
 from typing import List, Optional, Sequence
@@ -46,7 +47,10 @@ from ...main.utils import mids_of_notes, retain_nids_with_ah_note_type
 from ...settings import ANKIHUB_NOTE_TYPE_FIELD_NAME, DeckExtensionConfig, config
 from ..deck_updater import NotLoggedInError, ah_deck_updater
 from ..optional_tag_suggestion_dialog import OptionalTagsSuggestionDialog
-from ..suggestion_dialog import open_suggestion_dialog_for_bulk_suggestion
+from ..suggestion_dialog import (
+    open_suggestion_dialog_for_bulk_suggestion,
+    open_suggestion_dialog_for_single_suggestion,
+)
 from ..utils import ask_user, choose_ankihub_deck, choose_list, choose_subset
 from .custom_columns import (
     AnkiHubIdColumn,
@@ -64,6 +68,13 @@ from .custom_search_nodes import (
 
 # Maximum number of notes that can be selected for bulk suggestions.
 BULK_SUGGESTION_LIMIT = 2000
+
+# Various special tags used by AnkiHub have this prefix. The sidebar items of tags with this prefix
+# are copied to the AnkiHub tree in the sidebar.
+ANKIHUB_TAGS_PREFIX = "ankihub_"
+
+# These tags are not copied to the AnkiHub tree in the sidebar.
+ANKIHUB_TAGS_EXCLUDED_FROM_TAG_TREE = ["ankihub_deleted"]
 
 browser: Optional[Browser] = None
 ankihub_tree_item: Optional[SidebarItem] = None
@@ -123,6 +134,15 @@ def _on_browser_will_show_context_menu(browser: Browser, context_menu: QMenu) ->
         (
             "AnkiHub: Bulk suggest notes",
             lambda: _on_bulk_notes_suggest_action(browser, nids=selected_nids),
+            at_least_one_note_has_ah_note_type,
+        ),
+        (
+            "AnkiHub: Suggest to delete note",
+            lambda: _on_bulk_notes_suggest_action(
+                browser,
+                nids=selected_nids,
+                preselected_change_type=SuggestionType.DELETE,
+            ),
             at_least_one_note_has_ah_note_type,
         ),
         (
@@ -255,7 +275,11 @@ def _on_protect_fields_action(browser: Browser, nids: Sequence[NoteId]) -> None:
     )
 
 
-def _on_bulk_notes_suggest_action(browser: Browser, nids: Sequence[NoteId]) -> None:
+def _on_bulk_notes_suggest_action(
+    browser: Browser,
+    nids: Sequence[NoteId],
+    preselected_change_type: Optional[SuggestionType] = None,
+) -> None:
     if len(nids) > BULK_SUGGESTION_LIMIT:
         msg = f"Please select at most {BULK_SUGGESTION_LIMIT} notes at a time for bulk suggestions.<br>"
         showInfo(msg, parent=browser)
@@ -289,7 +313,19 @@ def _on_bulk_notes_suggest_action(browser: Browser, nids: Sequence[NoteId]) -> N
         showInfo(msg, parent=browser)
         return
 
-    open_suggestion_dialog_for_bulk_suggestion(anki_nids=filtered_nids, parent=browser)
+    if len(filtered_nids) == 1:
+        nid = list(filtered_nids)[0]
+        open_suggestion_dialog_for_single_suggestion(
+            note=aqt.mw.col.get_note(nid),
+            preselected_change_type=preselected_change_type,
+            parent=browser,
+        )
+    else:
+        open_suggestion_dialog_for_bulk_suggestion(
+            anki_nids=filtered_nids,
+            preselected_change_type=preselected_change_type,
+            parent=browser,
+        )
 
 
 def _on_reset_local_changes_action(browser: Browser, nids: Sequence[NoteId]) -> None:
@@ -656,21 +692,22 @@ def _build_tag_tree_and_copy_ah_tag_items_to_ah_tree(
     root_tree_item: SidebarItem, ankihub_tree_item: SidebarItem, browser: Browser
 ) -> bool:
     """Build the tag tree and copy AnkiHub tag items to the AnkiHub tree so
-    that all AnkiHub related sidebar items are grouped together.
+    that AnkiHub related sidebar items are grouped together.
     The tag items should still be in the tag tree to avoid confusion and to
     allow users to use the context menu actions on them.
+    Items for tags in ANKIHUB_TAGS_EXCLUDED_FROM_TAG_TREE are not copied to the AnkiHub tree.
     Returns True if the tag tree was built successfully, False otherwise.
     Building the tag tree can fail if related Anki functions change in the future.
     """
 
-    # build the tag tree using the original function used by Anki
+    # Build the tag tree using the original function used by Anki
     try:
         browser.sidebar._tag_tree(root_tree_item)
     except (AttributeError, ValueError):
         LOGGER.warning("AnkiHub: Could not build tag tree")
         return False
 
-    # move the AnkiHub tag items to the AnkiHub tree
+    # Move the AnkiHub tag items to the AnkiHub tree
     tag_tree = next(
         (
             item
@@ -685,7 +722,10 @@ def _build_tag_tree_and_copy_ah_tag_items_to_ah_tree(
         return False
 
     ankihub_tag_tree_items = [
-        item for item in tag_tree.children if item.name.startswith("AnkiHub_")
+        item
+        for item in tag_tree.children
+        if item.name.lower().startswith(ANKIHUB_TAGS_PREFIX)
+        and item.name.lower() not in ANKIHUB_TAGS_EXCLUDED_FROM_TAG_TREE
     ]
 
     for ah_tag_tree_item in ankihub_tag_tree_items:
@@ -695,12 +735,12 @@ def _build_tag_tree_and_copy_ah_tag_items_to_ah_tree(
         ah_tag_tree_item._parent_item = ankihub_tree_item
         ah_tag_tree_item.item_type = SidebarItemType.CUSTOM
 
-        # remove tag icons because it looks better without them
+        # Remove tag icons because it looks better without them
         ah_tag_tree_item.icon = ""
         for descendant in _sidebar_item_descendants(ah_tag_tree_item):
             descendant.icon = ""
 
-    # remove and re-add the tag tree so that the AnkiHub tag items are under the AnkiHub tree
+    # Remove and re-add the tag tree so that the AnkiHub tag items are under the AnkiHub tree
     # and also under the tag tree
     root_tree_item.children.remove(tag_tree)
     browser.sidebar._tag_tree(root_tree_item)
@@ -793,22 +833,30 @@ def _add_ankihub_tree(tree: SidebarItem) -> SidebarItem:
         suggestion_value, suggestion_name = suggestion_type.value
         # anki doesn't allow slashes in search parameters
         suggestion_value_escaped = suggestion_value.replace("/", "_slash_")
-        updated_today_item.add_simple(
-            name=suggestion_name,
-            icon="",
-            type=SidebarItemType.SAVED_SEARCH,
-            search_node=aqt.mw.col.group_searches(
-                SearchNode(parsable_text="ankihub_id:_*"),
+        search_nodes = []
+
+        if suggestion_type != SuggestionType.DELETE:
+            search_nodes.append(SearchNode(parsable_text="ankihub_id:_*"))
+
+        search_nodes.extend(
+            [
                 SearchNode(
                     parsable_text=f"{UpdatedInTheLastXDaysSearchNode.parameter_name}:1"
                 ),
                 SearchNode(
                     parsable_text=f"{SuggestionTypeSearchNode.parameter_name}:{suggestion_value_escaped}"
                 ),
-            ),
+            ]
         )
 
-    result.add_simple(
+        updated_today_item.add_simple(
+            name=suggestion_name,
+            icon="",
+            type=SidebarItemType.SAVED_SEARCH,
+            search_node=aqt.mw.col.group_searches(*search_nodes),
+        )
+
+    updated_since_last_review_item = result.add_simple(
         name="Updated Since Last Review",
         icon="",
         type=SidebarItemType.SAVED_SEARCH_ROOT,
@@ -816,6 +864,31 @@ def _add_ankihub_tree(tree: SidebarItem) -> SidebarItem:
             SearchNode(parsable_text="ankihub_id:_*"),
             SearchNode(
                 parsable_text=f"{UpdatedSinceLastReviewSearchNode.parameter_name}:"
+            ),
+        ),
+    )
+
+    updated_since_last_review_item.add_simple(
+        name="Deleted",
+        icon="",
+        type=SidebarItemType.SAVED_SEARCH,
+        search_node=aqt.mw.col.group_searches(
+            SearchNode(
+                parsable_text=f"{UpdatedSinceLastReviewSearchNode.parameter_name}:"
+            ),
+            SearchNode(
+                parsable_text=f"{SuggestionTypeSearchNode.parameter_name}:{SuggestionType.DELETE.value[0]}"
+            ),
+        ),
+    )
+
+    result.add_simple(
+        name="Deleted Notes",
+        icon="",
+        type=SidebarItemType.SAVED_SEARCH_ROOT,
+        search_node=aqt.mw.col.group_searches(
+            SearchNode(
+                parsable_text=f"{SuggestionTypeSearchNode.parameter_name}:{SuggestionType.DELETE.value[0]}"
             ),
         ),
     )
