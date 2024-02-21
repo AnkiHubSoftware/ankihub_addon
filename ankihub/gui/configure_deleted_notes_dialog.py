@@ -63,7 +63,7 @@ class ConfigureDeletedNotesDialog(QDialog):
 
         self.new_feature_label = QLabel(
             "🌟 <b>New Feature!</b> Notes can now be deleted from AnkiHub.<br>"
-            'Deck maintainers may approve suggestions to "delete notes",<br>'
+            'Deck maintainers may approve suggestions to "delete notes,"<br>'
             "providing learners with the most concise and high quality decks."
         )
 
