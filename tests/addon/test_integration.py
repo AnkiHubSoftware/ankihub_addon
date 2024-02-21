@@ -3167,7 +3167,7 @@ class TestBrowserContextMenu:
 
             expected_texts = [
                 "AnkiHub: Bulk suggest notes",
-                "AnkiHub: Suggest deletion",
+                "AnkiHub: Suggest to delete note",
                 "AnkiHub: Protect fields",
                 "AnkiHub: Reset local changes",
                 "AnkiHub: Suggest Optional Tags",
@@ -3201,8 +3201,8 @@ class TestBrowserContextMenu:
         [
             # The suggestion type which is selected by default is UPDATED_CONTENT
             ("AnkiHub: Bulk suggest notes", SuggestionType.UPDATED_CONTENT.value[1]),
-            # When the user uses the "Suggest deletion" action, the suggestion type is DELETE
-            ("AnkiHub: Suggest deletion", SuggestionType.DELETE.value[1]),
+            # When the user uses the "Suggest to delete note" action, the suggestion type is DELETE
+            ("AnkiHub: Suggest to delete note", SuggestionType.DELETE.value[1]),
         ],
     )
     def test_note_suggestion_actions(
