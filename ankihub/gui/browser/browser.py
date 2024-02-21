@@ -137,7 +137,7 @@ def _on_browser_will_show_context_menu(browser: Browser, context_menu: QMenu) ->
             at_least_one_note_has_ah_note_type,
         ),
         (
-            "AnkiHub: Suggest deletion",
+            "AnkiHub: Suggest to delete note",
             lambda: _on_bulk_notes_suggest_action(
                 browser,
                 nids=selected_nids,
