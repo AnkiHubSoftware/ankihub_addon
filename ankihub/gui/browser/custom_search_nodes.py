@@ -46,6 +46,7 @@ class CustomSearchNode(ABC):
     def _note_ids(self, ids: Sequence[ItemId]) -> List[NoteId]:
         """Converts the given card ids to note ids if the browser is in card mode.
         Otherwise returns the given note ids."""
+        self.browser = cast(Browser, self.browser)
         if self.browser.table.is_notes_mode():
             result = cast(Sequence[NoteId], ids)
         else:
@@ -57,6 +58,7 @@ class CustomSearchNode(ABC):
     def _output_ids(self, note_ids: Sequence[NoteId]) -> Sequence[ItemId]:
         """Converts the given note ids to card ids if the browser is in card mode.
         Otherwise returns the given note ids."""
+        self.browser = cast(Browser, self.browser)
         if self.browser.table.is_notes_mode():
             return note_ids
 
