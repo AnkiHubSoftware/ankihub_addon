@@ -3050,6 +3050,22 @@ class TestCustomSearchNodes:
                 note.id
             ]
 
+    def test_AnkiHubNoteSearchNode_invalid_value(
+        self,
+        anki_session_with_addon_data: AnkiSession,
+        mocker: MockerFixture,
+    ):
+        with anki_session_with_addon_data.profile_loaded():
+            browser = mocker.Mock()
+            browser.table.is_notes_mode.return_value = True
+
+            all_nids = aqt.mw.col.find_notes("")
+            with pytest.raises(
+                ValueError,
+                match=rf"Invalid value for {AnkiHubNoteSearchNode.parameter_name}.+",
+            ):
+                AnkiHubNoteSearchNode(browser, "invalid").filter_ids(all_nids)
+
 
 class TestBrowserTreeView:
     # without this mark the test sometime fails on clean-up
