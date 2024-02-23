@@ -91,17 +91,19 @@ class ModifiedAfterSyncSearchNode(CustomSearchNode):
 
         nid_to_ah_mod: Dict[NoteId, int] = dict(
             execute_list_query_in_chunks(
-                AnkiHubNote.select(AnkiHubNote.anki_note_id, AnkiHubNote.mod)
-                .filter(
-                    (
-                        DQ(last_update_type__is=None)
-                        | DQ(last_update_type__ne=SuggestionType.DELETE.value[0])
-                    ),
-                    anki_note_id__in=nids,
-                )
-                .tuples()
+                lambda nids: (
+                    AnkiHubNote.select(AnkiHubNote.anki_note_id, AnkiHubNote.mod)
+                    .filter(
+                        (
+                            DQ(last_update_type__is=None)
+                            | DQ(last_update_type__ne=SuggestionType.DELETE.value[0])
+                        ),
+                        anki_note_id__in=nids,
+                    )
+                    .tuples()
+                ),
+                ids=nids,
             ),
-            ids=nids,
         )
 
         nid_to_anki_mod: Dict[NoteId, int] = dict(
