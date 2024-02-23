@@ -162,7 +162,14 @@ class _AnkiHubDB:
 
     def remove_notes(self, ah_nids: List[uuid.UUID]) -> None:
         """Removes notes from the AnkiHub DB"""
-        AnkiHubNote.delete().where(AnkiHubNote.ankihub_note_id.in_(ah_nids)).execute()
+        execute_modifying_query_in_chunks(
+            lambda ah_nids: (
+                AnkiHubNote.delete()
+                .where(AnkiHubNote.ankihub_note_id.in_(ah_nids))
+                .execute(),
+            ),
+            ids=ah_nids,
+        )
 
     def update_mod_values_based_on_anki_db(
         self, notes_data: Sequence[NoteInfo]
@@ -600,6 +607,16 @@ def execute_query_in_chunks(
         result_chunk = query_func(ids_chunk)
         result = accumulator(result, result_chunk)
     return result
+
+
+def execute_modifying_query_in_chunks(
+    modifying_query_func: Callable[[Sequence[Id]], Any],
+    ids: List[Id],
+    chunk_size: int = DEFAULT_CHUNK_SIZE,
+) -> None:
+    """Execute a modifying query function in chunks to avoid SQLite's "too many SQL variables" error."""
+    for ids_chunk in chunks(ids, chunk_size):
+        modifying_query_func(ids_chunk)
 
 
 def chunks(items: List, chunk_size: int) -> Generator[List, None, None]:
