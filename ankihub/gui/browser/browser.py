@@ -58,6 +58,7 @@ from .custom_columns import (
     UpdatedSinceLastReviewColumn,
 )
 from .custom_search_nodes import (
+    AnkiHubNoteSearchNode,
     CustomSearchNode,
     ModifiedAfterSyncSearchNode,
     NewNoteSearchNode,
@@ -781,7 +782,10 @@ def _add_ankihub_tree(tree: SidebarItem) -> SidebarItem:
         name="ID Pending",
         icon="",
         type=SidebarItemType.SAVED_SEARCH,
-        search_node=SearchNode(parsable_text="ankihub_id:"),
+        search_node=aqt.mw.col.group_searches(
+            SearchNode(parsable_text="ankihub_id:"),
+            SearchNode(parsable_text=f"{AnkiHubNoteSearchNode.parameter_name}:no"),
+        ),
     )
 
     result.add_simple(
