@@ -130,7 +130,10 @@ from ankihub.gui.auto_sync import (
 )
 from ankihub.gui.browser import custom_columns
 from ankihub.gui.browser import setup as setup_browser
-from ankihub.gui.browser.custom_search_nodes import UpdatedSinceLastReviewSearchNode
+from ankihub.gui.browser.custom_search_nodes import (
+    AnkiHubNoteSearchNode,
+    UpdatedSinceLastReviewSearchNode,
+)
 from ankihub.gui.config_dialog import (
     get_config_dialog_manager,
     setup_config_dialog_manager,
@@ -3001,6 +3004,51 @@ class TestCustomSearchNodes:
             assert (
                 UpdatedSinceLastReviewSearchNode(browser, "").filter_ids(all_nids) == []
             )
+
+    def test_AnkiHubNoteSearchNode_yes(
+        self,
+        anki_session_with_addon_data: AnkiSession,
+        import_ah_note: ImportAHNote,
+        add_anki_note: AddAnkiNote,
+        mocker: MockerFixture,
+    ):
+        with anki_session_with_addon_data.profile_loaded():
+            ah_note_1 = import_ah_note()
+            add_anki_note()
+
+            # Add a deleted note the ankihub database. It should be included in the search results.
+            ah_note_2 = import_ah_note()
+            AnkiHubNote.update(last_update_type=SuggestionType.DELETE.value[0]).where(
+                AnkiHubNote.ankihub_note_id == ah_note_2.ah_nid
+            ).execute()
+
+            browser = mocker.Mock()
+            browser.table.is_notes_mode.return_value = True
+
+            all_nids = aqt.mw.col.find_notes("")
+            assert AnkiHubNoteSearchNode(browser, "yes").filter_ids(all_nids) == [
+                ah_note_1.anki_nid,
+                ah_note_2.anki_nid,
+            ]
+
+    def test_AnkiHubNoteSearchNode_no(
+        self,
+        anki_session_with_addon_data: AnkiSession,
+        import_ah_note: ImportAHNote,
+        add_anki_note: AddAnkiNote,
+        mocker: MockerFixture,
+    ):
+        with anki_session_with_addon_data.profile_loaded():
+            import_ah_note()
+            note = add_anki_note()
+
+            browser = mocker.Mock()
+            browser.table.is_notes_mode.return_value = True
+
+            all_nids = aqt.mw.col.find_notes("")
+            assert AnkiHubNoteSearchNode(browser, "no").filter_ids(all_nids) == [
+                note.id
+            ]
 
 
 class TestBrowserTreeView:
