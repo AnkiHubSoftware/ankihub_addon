@@ -38,6 +38,7 @@ from ..ankihub_client import (
 )
 from ..ankihub_client.ankihub_client import AnkiHubHTTPError
 from ..db import ankihub_db
+from ..db.db import execute_list_query_in_chunks
 from ..db.models import AnkiHubNote
 from .exporting import to_note_data
 from .media_utils import find_and_replace_text_in_fields_on_all_notes
@@ -111,7 +112,8 @@ def suggest_new_note(
     auto_accept: bool = False,
 ) -> None:
     """Sends a NewNoteSuggestion to AnkiHub.
-    Also renames media in the Anki collection and the media folder and uploads them to AnkiHub."""
+    Also renames media in the Anki collection and the media folder and uploads them to AnkiHub.
+    """
     suggestion = _new_note_suggestion(note, ankihub_did, comment)
 
     suggestion = cast(
@@ -262,9 +264,13 @@ def _suggestions_for_notes(
     - nids_deleted_on_remote
     """
     anki_nids = [note.id for note in notes]
+
+    ah_db_notes = execute_list_query_in_chunks(
+        lambda anki_nids: AnkiHubNote.filter(anki_note_id__in=anki_nids),
+        ids=anki_nids,
+    )
     ah_db_note_by_anki_nid = {
-        note.anki_note_id: note
-        for note in AnkiHubNote.filter(anki_note_id__in=anki_nids)
+        NoteId(ah_db_note.anki_note_id): ah_db_note for ah_db_note in ah_db_notes
     }
 
     notes_for_new_note_suggestions = []
