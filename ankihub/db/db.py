@@ -610,7 +610,7 @@ def execute_query_in_chunks(
 
 
 def execute_modifying_query_in_chunks(
-    modifying_query_func: Callable[[Sequence[Id]], None],
+    modifying_query_func: Callable[[Sequence[Id]], Any],
     ids: List[Id],
     chunk_size: int = DEFAULT_CHUNK_SIZE,
 ) -> None:
