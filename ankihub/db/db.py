@@ -14,7 +14,19 @@ Some differences between data stored in the AnkiHub database and the Anki databa
 import time
 import uuid
 from pathlib import Path
-from typing import Any, Dict, Iterable, List, Optional, Sequence, Set, Tuple
+from typing import (
+    Any,
+    Callable,
+    Dict,
+    Generator,
+    Iterable,
+    List,
+    Optional,
+    Sequence,
+    Set,
+    Tuple,
+    TypeVar,
+)
 
 import aqt
 from anki.models import NotetypeDict, NotetypeId
@@ -36,6 +48,10 @@ from .models import (
     get_peewee_database,
     set_peewee_database,
 )
+
+# Chunk size for executing queries in chunks to avoid SQLite's "too many SQL variables" error.
+# The variable limit is 32_766, so the chunk size is set to 30_000 to be safe.
+DEFAULT_CHUNK_SIZE = 30_000
 
 
 class _AnkiHubDB:
@@ -146,7 +162,14 @@ class _AnkiHubDB:
 
     def remove_notes(self, ah_nids: List[uuid.UUID]) -> None:
         """Removes notes from the AnkiHub DB"""
-        AnkiHubNote.delete().where(AnkiHubNote.ankihub_note_id.in_(ah_nids)).execute()
+        execute_modifying_query_in_chunks(
+            lambda ah_nids: (
+                AnkiHubNote.delete()
+                .where(AnkiHubNote.ankihub_note_id.in_(ah_nids))
+                .execute(),
+            ),
+            ids=ah_nids,
+        )
 
     def update_mod_values_based_on_anki_db(
         self, notes_data: Sequence[NoteInfo]
@@ -176,10 +199,13 @@ class _AnkiHubDB:
     def reset_mod_values_in_anki_db(self, anki_nids: List[NoteId]) -> None:
         # resets the mod values of the notes in the Anki DB to the
         # mod values stored in the AnkiHub DB
-        nid_mod_tuples = (
-            AnkiHubNote.select(AnkiHubNote.ankihub_note_id, AnkiHubNote.mod)
-            .filter(anki_note_id__in=anki_nids)
-            .tuples()
+        nid_mod_tuples = execute_list_query_in_chunks(
+            lambda anki_nids: (
+                AnkiHubNote.select(AnkiHubNote.ankihub_note_id, AnkiHubNote.mod)
+                .filter(anki_note_id__in=anki_nids)
+                .tuples()
+            ),
+            ids=anki_nids,
         )
 
         for nid, mod in nid_mod_tuples:
@@ -247,11 +273,14 @@ class _AnkiHubDB:
     def ankihub_dids_for_anki_nids(
         self, anki_nids: Iterable[NoteId]
     ) -> List[uuid.UUID]:
-        return (
-            AnkiHubNote.select(AnkiHubNote.ankihub_deck_id)
-            .filter(anki_note_id__in=anki_nids)
-            .distinct()
-            .objects(flat)
+        return execute_list_query_in_chunks(
+            lambda anki_nids: (
+                AnkiHubNote.select(AnkiHubNote.ankihub_deck_id)
+                .filter(anki_note_id__in=anki_nids)
+                .distinct()
+                .objects(flat)
+            ),
+            ids=list(anki_nids),
         )
 
     def anki_nid_to_ah_did_dict(
@@ -260,13 +289,22 @@ class _AnkiHubDB:
         """Returns a dict mapping anki nids to the ankihub did of the deck the note is in.
         Not found nids are omitted from the dict."""
         return dict(
-            AnkiHubNote.select(AnkiHubNote.anki_note_id, AnkiHubNote.ankihub_deck_id)
-            .filter(anki_note_id__in=anki_nids)
-            .tuples()
+            execute_list_query_in_chunks(
+                lambda anki_nids: (
+                    AnkiHubNote.select(
+                        AnkiHubNote.anki_note_id, AnkiHubNote.ankihub_deck_id
+                    )
+                    .filter(anki_note_id__in=anki_nids)
+                    .tuples()
+                ),
+                ids=list(anki_nids),
+            )
         )
 
     def are_ankihub_notes(self, anki_nids: List[NoteId]) -> bool:
-        notes_count = AnkiHubNote.filter(anki_note_id__in=anki_nids).count()
+        notes_count = execute_count_query_in_chunks(
+            lambda nids: AnkiHubNote.filter(anki_note_id__in=nids).count(), anki_nids
+        )
         return notes_count == len(set(anki_nids))
 
     def ankihub_nid_for_anki_nid(self, anki_note_id: NoteId) -> Optional[uuid.UUID]:
@@ -280,9 +318,16 @@ class _AnkiHubDB:
         self, ankihub_nids: List[uuid.UUID]
     ) -> Dict[uuid.UUID, NoteId]:
         ah_nid_to_anki_nid = dict(
-            AnkiHubNote.select(AnkiHubNote.ankihub_note_id, AnkiHubNote.anki_note_id)
-            .filter(ankihub_note_id__in=ankihub_nids)
-            .tuples()
+            execute_list_query_in_chunks(
+                lambda ankihub_nids: (
+                    AnkiHubNote.select(
+                        AnkiHubNote.ankihub_note_id, AnkiHubNote.anki_note_id
+                    )
+                    .filter(ankihub_note_id__in=ankihub_nids)
+                    .tuples()
+                ),
+                ids=ankihub_nids,
+            )
         )
 
         not_existing = set(ankihub_nids) - set(ah_nid_to_anki_nid.keys())
@@ -377,13 +422,18 @@ class _AnkiHubDB:
         The media file doesn't have to exist on S3, it just has to referenced on a note in the deck.
         """
         names_in_db = set(
-            DeckMedia.select(DeckMedia.name)
-            .filter(
-                ankihub_deck_id=ah_did,
-                name__in=media_names,
-                referenced_on_accepted_note__is=True,
+            execute_list_query_in_chunks(
+                lambda media_names: (
+                    DeckMedia.select(DeckMedia.name)
+                    .filter(
+                        ankihub_deck_id=ah_did,
+                        name__in=media_names,
+                        referenced_on_accepted_note__is=True,
+                    )
+                    .objects(flat)
+                ),
+                ids=list(media_names),
             )
-            .objects(flat)
         )
         return {name: (name in names_in_db) for name in media_names}
 
@@ -409,12 +459,17 @@ class _AnkiHubDB:
             return {}
 
         hash_to_media = dict(
-            DeckMedia.select(DeckMedia.file_content_hash, DeckMedia.name)
-            .filter(
-                ankihub_deck_id=ah_did,
-                file_content_hash__in=list(media_to_hash.values()),
+            execute_list_query_in_chunks(
+                lambda media_hashes: (
+                    DeckMedia.select(DeckMedia.file_content_hash, DeckMedia.name)
+                    .filter(
+                        ankihub_deck_id=ah_did,
+                        file_content_hash__in=media_hashes,
+                    )
+                    .tuples()
+                ),
+                ids=list(media_to_hash.values()),
             )
-            .tuples()
         )
 
         return {
@@ -496,3 +551,75 @@ def flat(**row_data: Dict[str, Any]) -> Any:
     """Return the value from a single-item dictionary."""
     [(_, field_value)] = row_data.items()
     return field_value
+
+
+Id = TypeVar("Id")
+ResultEntry = TypeVar("ResultEntry")
+
+
+def execute_count_query_in_chunks(
+    query_func: Callable[[Sequence[Id]], int],
+    ids: List[Id],
+    chunk_size: int = DEFAULT_CHUNK_SIZE,
+) -> int:
+    """Execute a count query function in chunks to avoid SQLite's "too many SQL variables" error.
+    The query function should take a list of ids and return a count.
+    """
+    return execute_query_in_chunks(
+        query_func,
+        ids,
+        accumulator=lambda total, count: total + count,
+        initial=0,
+        chunk_size=chunk_size,
+    )
+
+
+def execute_list_query_in_chunks(
+    query_func: Callable[[Sequence[Id]], List[ResultEntry]],
+    ids: List[Id],
+    chunk_size: int = DEFAULT_CHUNK_SIZE,
+) -> List[ResultEntry]:
+    """Execute a list query function in chunks to avoid SQLite's "too many SQL variables" error.
+    The query function should take a list of ids and return a list of results.
+    """
+    return execute_query_in_chunks(
+        query_func,
+        ids,
+        accumulator=lambda total, chunk: total + list(chunk),
+        initial=[],
+        chunk_size=chunk_size,
+    )
+
+
+def execute_query_in_chunks(
+    query_func: Callable[[Sequence[Id]], ResultEntry],
+    ids: List[Id],
+    accumulator: Callable[[ResultEntry, ResultEntry], ResultEntry],
+    initial: ResultEntry,
+    chunk_size: int = DEFAULT_CHUNK_SIZE,
+) -> ResultEntry:
+    """Execute a query function in chunks to avoid SQLite's "too many SQL variables" error.
+    The query function should take a list of ids and return a result.
+    The accumulator function is used to accumulate the results.
+    """
+    result: ResultEntry = initial
+    for ids_chunk in chunks(ids, chunk_size):
+        result_chunk = query_func(ids_chunk)
+        result = accumulator(result, result_chunk)
+    return result
+
+
+def execute_modifying_query_in_chunks(
+    modifying_query_func: Callable[[Sequence[Id]], None],
+    ids: List[Id],
+    chunk_size: int = DEFAULT_CHUNK_SIZE,
+) -> None:
+    """Execute a modifying query function in chunks to avoid SQLite's "too many SQL variables" error."""
+    for ids_chunk in chunks(ids, chunk_size):
+        modifying_query_func(ids_chunk)
+
+
+def chunks(items: List, chunk_size: int) -> Generator[List, None, None]:
+    """Yield chunks of size 'chunk_size' from 'items' list."""
+    for i in range(0, len(items), chunk_size):
+        yield items[i : i + chunk_size]
