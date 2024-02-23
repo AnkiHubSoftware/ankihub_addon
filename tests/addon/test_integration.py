@@ -2832,6 +2832,28 @@ class TestCustomSearchNodes:
             cids = ModifiedAfterSyncSearchNode(browser, "yes").filter_ids(all_cids)
             assert cids == [cid]
 
+    def test_ModifiedAfterSyncSearchNode_excludes_deleted_notes(
+        self,
+        anki_session_with_addon_data: AnkiSession,
+        import_ah_note: ImportAHNote,
+        mocker: MockerFixture,
+    ):
+        with anki_session_with_addon_data.profile_loaded():
+            browser = mocker.Mock()
+            browser.table.is_notes_mode.return_value = True
+
+            import_ah_note()
+            AnkiHubNote.update(
+                last_update_type=SuggestionType.DELETE.value[0]
+            ).execute()
+
+            # The note is soft deleted, so it should not be included in the search results
+            all_nids = aqt.mw.col.find_notes("")
+            assert (
+                ModifiedAfterSyncSearchNode(browser, "yes").filter_ids(all_nids) == []
+            )
+            assert ModifiedAfterSyncSearchNode(browser, "no").filter_ids(all_nids) == []
+
     def test_UpdatedInTheLastXDaysSearchNode(
         self,
         anki_session_with_addon_data: AnkiSession,
@@ -3039,11 +3061,11 @@ class TestCustomSearchNodes:
         mocker: MockerFixture,
     ):
         with anki_session_with_addon_data.profile_loaded():
-            import_ah_note()
-            note = add_anki_note()
-
             browser = mocker.Mock()
             browser.table.is_notes_mode.return_value = True
+
+            import_ah_note()
+            note = add_anki_note()
 
             all_nids = aqt.mw.col.find_notes("")
             assert AnkiHubNoteSearchNode(browser, "no").filter_ids(all_nids) == [

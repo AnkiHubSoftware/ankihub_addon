@@ -10,8 +10,9 @@ import aqt
 from anki.notes import NoteId
 from anki.utils import ids2str
 from aqt.browser import Browser, ItemId
+from peewee import DQ
 
-from ...ankihub_client import suggestion_type_from_str
+from ...ankihub_client import SuggestionType, suggestion_type_from_str
 from ...db import execute_list_query_in_chunks, flat
 from ...db.models import AnkiHubNote
 
@@ -71,6 +72,9 @@ class CustomSearchNode(ABC):
 
 
 class ModifiedAfterSyncSearchNode(CustomSearchNode):
+    """Search node for filtering notes that have or haven't been modified after the last sync with AnkiHub.
+    Deleted notes are always excluded."""
+
     parameter_name = "ankihub_modified_after_sync"
 
     def __init__(self, browser: Browser, value: str):
@@ -86,14 +90,15 @@ class ModifiedAfterSyncSearchNode(CustomSearchNode):
         nids = self._note_ids(ids)
 
         nid_to_ah_mod: Dict[NoteId, int] = dict(
-            execute_list_query_in_chunks(
-                lambda nids: (
-                    AnkiHubNote.select(AnkiHubNote.anki_note_id, AnkiHubNote.mod)
-                    .filter(anki_note_id__in=nids)
-                    .tuples()
+            AnkiHubNote.select(AnkiHubNote.anki_note_id, AnkiHubNote.mod)
+            .filter(
+                (
+                    DQ(last_update_type__is=None)
+                    | DQ(last_update_type__ne=SuggestionType.DELETE.value[0])
                 ),
-                ids=nids,
+                anki_note_id__in=nids,
             )
+            .tuples()
         )
 
         nid_to_anki_mod: Dict[NoteId, int] = dict(
