@@ -1,5 +1,6 @@
 """Custom search nodes for the browser.
 Search nodes are used to define search parameters for the Anki browser search bar."""
+
 import operator
 from abc import ABC, abstractmethod
 from datetime import datetime, timedelta
@@ -11,7 +12,7 @@ from anki.utils import ids2str
 from aqt.browser import Browser, ItemId
 
 from ...ankihub_client import suggestion_type_from_str
-from ...db import flat
+from ...db import execute_list_query_in_chunks, flat
 from ...db.models import AnkiHubNote
 
 
@@ -46,6 +47,7 @@ class CustomSearchNode(ABC):
     def _note_ids(self, ids: Sequence[ItemId]) -> List[NoteId]:
         """Converts the given card ids to note ids if the browser is in card mode.
         Otherwise returns the given note ids."""
+        self.browser = cast(Browser, self.browser)
         if self.browser.table.is_notes_mode():
             result = cast(Sequence[NoteId], ids)
         else:
@@ -57,6 +59,7 @@ class CustomSearchNode(ABC):
     def _output_ids(self, note_ids: Sequence[NoteId]) -> Sequence[ItemId]:
         """Converts the given note ids to card ids if the browser is in card mode.
         Otherwise returns the given note ids."""
+        self.browser = cast(Browser, self.browser)
         if self.browser.table.is_notes_mode():
             return note_ids
 
@@ -82,9 +85,14 @@ class ModifiedAfterSyncSearchNode(CustomSearchNode):
         nids = self._note_ids(ids)
 
         nid_to_ah_mod: Dict[NoteId, int] = dict(
-            AnkiHubNote.select(AnkiHubNote.anki_note_id, AnkiHubNote.mod)
-            .filter(anki_note_id__in=nids)
-            .tuples()
+            execute_list_query_in_chunks(
+                lambda nids: (
+                    AnkiHubNote.select(AnkiHubNote.anki_note_id, AnkiHubNote.mod)
+                    .filter(anki_note_id__in=nids)
+                    .tuples()
+                ),
+                ids=nids,
+            )
         )
 
         nid_to_anki_mod: Dict[NoteId, int] = dict(
@@ -134,13 +142,16 @@ class UpdatedInTheLastXDaysSearchNode(CustomSearchNode):
 
         nids = self._note_ids(ids)
 
-        retained_nids = (
-            AnkiHubNote.select(AnkiHubNote.anki_note_id)
-            .filter(
-                anki_note_id__in=nids,
-                mod__gte=threshold_timestamp,
-            )
-            .objects(flat)
+        retained_nids = execute_list_query_in_chunks(
+            lambda nids: (
+                AnkiHubNote.select(AnkiHubNote.anki_note_id)
+                .filter(
+                    anki_note_id__in=nids,
+                    mod__gte=threshold_timestamp,
+                )
+                .objects(flat)
+            ),
+            ids=nids,
         )
 
         result = self._output_ids(retained_nids)
@@ -162,13 +173,16 @@ class NewNoteSearchNode(CustomSearchNode):
 
         nids = self._note_ids(ids)
 
-        retained_nids = (
-            AnkiHubNote.select(AnkiHubNote.anki_note_id)
-            .filter(
-                anki_note_id__in=nids,
-                last_update_type__is=None,
-            )
-            .objects(flat)
+        retained_nids = execute_list_query_in_chunks(
+            lambda nids: (
+                AnkiHubNote.select(AnkiHubNote.anki_note_id)
+                .filter(
+                    anki_note_id__in=nids,
+                    last_update_type__is=None,
+                )
+                .objects(flat)
+            ),
+            ids=nids,
         )
 
         result = self._output_ids(retained_nids)
@@ -193,13 +207,16 @@ class SuggestionTypeSearchNode(CustomSearchNode):
 
         nids = self._note_ids(ids)
 
-        retained_nids = (
-            AnkiHubNote.select(AnkiHubNote.anki_note_id)
-            .filter(
-                anki_note_id__in=nids,
-                last_update_type=value,
-            )
-            .objects(flat)
+        retained_nids = execute_list_query_in_chunks(
+            lambda nids: (
+                AnkiHubNote.select(AnkiHubNote.anki_note_id)
+                .filter(
+                    anki_note_id__in=nids,
+                    last_update_type=value,
+                )
+                .objects(flat)
+            ),
+            ids=nids,
         )
 
         result = self._output_ids(retained_nids)
@@ -222,9 +239,14 @@ class UpdatedSinceLastReviewSearchNode(CustomSearchNode):
         nids = self._note_ids(ids)
 
         nid_to_ah_mod: Dict[NoteId, int] = dict(
-            AnkiHubNote.select(AnkiHubNote.anki_note_id, AnkiHubNote.mod)
-            .filter(anki_note_id__in=nids)
-            .tuples()
+            execute_list_query_in_chunks(
+                lambda nids: (
+                    AnkiHubNote.select(AnkiHubNote.anki_note_id, AnkiHubNote.mod)
+                    .filter(anki_note_id__in=nids)
+                    .tuples()
+                ),
+                ids=nids,
+            )
         )
 
         # The id column of the revlog table is an epoch timestamp in milliseconds of when the review was done.
