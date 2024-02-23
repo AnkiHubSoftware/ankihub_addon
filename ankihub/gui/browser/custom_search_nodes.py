@@ -10,8 +10,9 @@ import aqt
 from anki.notes import NoteId
 from anki.utils import ids2str
 from aqt.browser import Browser, ItemId
+from peewee import DQ
 
-from ...ankihub_client import suggestion_type_from_str
+from ...ankihub_client import SuggestionType, suggestion_type_from_str
 from ...db import execute_list_query_in_chunks, flat
 from ...db.models import AnkiHubNote
 
@@ -30,6 +31,7 @@ class CustomSearchNode(ABC):
             SuggestionTypeSearchNode,
             NewNoteSearchNode,
             UpdatedSinceLastReviewSearchNode,
+            AnkiHubNoteSearchNode,
         )
         for custom_search_node_type in custom_search_node_types:
             if custom_search_node_type.parameter_name == parameter_name:
@@ -70,6 +72,9 @@ class CustomSearchNode(ABC):
 
 
 class ModifiedAfterSyncSearchNode(CustomSearchNode):
+    """Search node for filtering notes that have or haven't been modified after the last sync with AnkiHub.
+    Deleted notes are always excluded."""
+
     parameter_name = "ankihub_modified_after_sync"
 
     def __init__(self, browser: Browser, value: str):
@@ -88,11 +93,17 @@ class ModifiedAfterSyncSearchNode(CustomSearchNode):
             execute_list_query_in_chunks(
                 lambda nids: (
                     AnkiHubNote.select(AnkiHubNote.anki_note_id, AnkiHubNote.mod)
-                    .filter(anki_note_id__in=nids)
+                    .filter(
+                        (
+                            DQ(last_update_type__is=None)
+                            | DQ(last_update_type__ne=SuggestionType.DELETE.value[0])
+                        ),
+                        anki_note_id__in=nids,
+                    )
                     .tuples()
                 ),
                 ids=nids,
-            )
+            ),
         )
 
         nid_to_anki_mod: Dict[NoteId, int] = dict(
@@ -269,6 +280,41 @@ class UpdatedSinceLastReviewSearchNode(CustomSearchNode):
             if nid in nid_to_last_review_timestamp_ms
             and ah_mod >= nid_to_last_review_timestamp_ms[nid] / 1000
         ]
+
+        result = self._output_ids(retained_nids)
+        return result
+
+
+class AnkiHubNoteSearchNode(CustomSearchNode):
+    """Search parameter to filter notes based on whether they are in the AnkiHub database.
+    Deleted notes are considered to be in the AnkiHub database."""
+
+    parameter_name = "ankihub_note"
+
+    def __init__(self, browser: Browser, value: str):
+        self.browser = browser
+        self.value = value
+
+    def filter_ids(self, ids: Sequence[ItemId]) -> Sequence[ItemId]:
+        if self.value not in ("yes", "no"):
+            raise ValueError(
+                f"Invalid value for {self.parameter_name}: {self.value}. Options are 'yes' and 'no'."
+            )
+
+        nids = self._note_ids(ids)
+
+        nids_in_ah_db = execute_list_query_in_chunks(
+            lambda nids: (
+                AnkiHubNote.select(AnkiHubNote.anki_note_id)
+                .filter(anki_note_id__in=nids)
+                .objects(flat)
+            ),
+            ids=nids,
+        )
+        if self.value == "yes":
+            retained_nids = list(nids_in_ah_db)
+        else:
+            retained_nids = list(set(nids) - set(nids_in_ah_db))
 
         result = self._output_ids(retained_nids)
         return result
