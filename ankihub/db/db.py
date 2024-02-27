@@ -14,7 +14,6 @@ Some differences between data stored in the AnkiHub database and the Anki databa
 import time
 import uuid
 from pathlib import Path
-from threading import Lock
 from typing import (
     Any,
     Callable,
@@ -49,10 +48,14 @@ from .models import (
     get_peewee_database,
     set_peewee_database,
 )
+from .utils import TimedLock
 
 # Chunk size for executing queries in chunks to avoid SQLite's "too many SQL variables" error.
 # The variable limit is 32_766, so the chunk size is set to 30_000 to be safe.
 DEFAULT_CHUNK_SIZE = 30_000
+
+# Timeout duration for the write lock. We use a timeout to make sure that deadlocks don't occur.
+WRITE_LOCK_TIMEOUT_SECONDS = 10
 
 
 class _AnkiHubDB:
@@ -60,7 +63,7 @@ class _AnkiHubDB:
 
     # Lock for write operations to the AnkiHub DB. This is used to prevent concurrent write operations
     # which can lead to "OperationalError: database is locked" errors
-    write_lock = Lock()
+    write_lock = TimedLock(timeout_seconds=WRITE_LOCK_TIMEOUT_SECONDS)
 
     def setup_and_migrate(self, db_path: Path) -> None:
         self.database_path = db_path
