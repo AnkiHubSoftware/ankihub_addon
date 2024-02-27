@@ -1234,10 +1234,12 @@ def test_get_deck_by_id(
     assert exc is not None and exc.response.status_code == 403
 
 
+@pytest.mark.parametrize("change_tags_to_upper_case", [True, False])
 def test_suggest_note_update(
     anki_session_with_addon_data: AnkiSession,
     install_sample_ah_deck: InstallSampleAHDeck,
     mocker: MockerFixture,
+    change_tags_to_upper_case: bool,
 ):
     anki_session = anki_session_with_addon_data
     with anki_session.profile_loaded():
@@ -1273,6 +1275,10 @@ def test_suggest_note_update(
         note.tags.append("added")
         note.tags.remove("removed")
 
+        if change_tags_to_upper_case:
+            # Change the tags to upper case to see if the tag comparison is case-insensitive
+            note.tags = [tag.upper() for tag in note.tags]
+
         # Suggest the changes
         create_change_note_suggestion_mock = mocker.patch.object(
             AnkiHubClient,
@@ -1293,7 +1299,9 @@ def test_suggest_note_update(
                 ah_nid=ankihub_db.ankihub_nid_for_anki_nid(note.id),
                 change_type=SuggestionType.NEW_CONTENT,
                 fields=[Field(name="Front", value="updated", order=0)],
-                added_tags=["added"],
+                # Even though the tag comparison is case-insensitive (e.g. the "stays" -> "STAYS" change is not sent),
+                # the tags should be sent in the same case as they are in the note when a new tag is added.
+                added_tags=["added" if not change_tags_to_upper_case else "ADDED"],
                 removed_tags=["removed"],
                 comment="test",
             ),
