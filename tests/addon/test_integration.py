@@ -2438,6 +2438,23 @@ class TestAnkiHubImporterSuspendNewCardsOfNewNotesOption:
             )
 
 
+def test_keep_notes_with_instructions_tag_unsuspended(
+    anki_session_with_addon_data: AnkiSession,
+    install_ah_deck: InstallAHDeck,
+    import_ah_note: ImportAHNote,
+):
+    anki_session = anki_session_with_addon_data
+    with anki_session.profile_loaded():
+        ah_did = install_ah_deck()
+        config.set_suspend_new_cards_of_new_notes(ah_did, True)
+        note_info = NoteInfoFactory.create(tags=[settings.TAG_FOR_INSTRUCTION_NOTES])
+        import_ah_note(ah_did=ah_did, note_data=note_info)
+        note = aqt.mw.col.get_note(NoteId(note_info.anki_nid))
+        new_card = note.cards()[0]
+
+        assert new_card.queue == QUEUE_TYPE_NEW
+
+
 def test_unsubscribe_from_deck(
     anki_session_with_addon_data: AnkiSession,
     install_sample_ah_deck: InstallSampleAHDeck,
