@@ -53,6 +53,7 @@ PROFILE_ID_FIELD_NAME = "ankihub_id"
 
 # Id of the AnKing Overhaul deck
 ANKING_DECK_ID = uuid.UUID("e77aedfe-a636-40e2-8169-2fce2673187e")
+TAG_FOR_INSTRUCTION_NOTES = "AnkiHub_Instructions"
 
 
 def _serialize_datetime(x: datetime) -> str:

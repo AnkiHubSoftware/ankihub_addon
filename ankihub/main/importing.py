@@ -22,7 +22,11 @@ from .. import LOGGER, settings
 from ..ankihub_client import Field, NoteInfo
 from ..ankihub_client.models import SuggestionType
 from ..db import ankihub_db
-from ..settings import BehaviorOnRemoteNoteDeleted, SuspendNewCardsOfExistingNotes
+from ..settings import (
+    TAG_FOR_INSTRUCTION_NOTES,
+    BehaviorOnRemoteNoteDeleted,
+    SuspendNewCardsOfExistingNotes,
+)
 from .note_conversion import (
     TAG_FOR_PROTECTING_ALL_FIELDS,
     get_fields_protected_by_tags,
@@ -516,6 +520,9 @@ class AnkiHubImporter:
         suspend_new_cards_of_new_notes: bool,
         suspend_new_cards_of_existing_notes: SuspendNewCardsOfExistingNotes,
     ) -> Collection[Card]:
+        if aqt.mw.col.tags.in_list(TAG_FOR_INSTRUCTION_NOTES, note.tags):
+            return []
+
         def new_cards() -> List[Card]:
             cids_before_changes = {c.id for c in cards_before_changes}
             result = [c for c in note.cards() if c.id not in cids_before_changes]
