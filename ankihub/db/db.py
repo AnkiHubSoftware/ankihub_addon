@@ -57,6 +57,9 @@ DEFAULT_CHUNK_SIZE = 30_000
 
 class _AnkiHubDB:
     database_path: Optional[Path] = None
+
+    # Lock for write operations to the AnkiHub DB. This is used to prevent concurrent write operations
+    # which can lead to "OperationalError: database is locked" errors
     write_lock = Lock()
 
     def setup_and_migrate(self, db_path: Path) -> None:
