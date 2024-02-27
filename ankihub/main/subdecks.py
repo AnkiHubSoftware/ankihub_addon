@@ -145,7 +145,7 @@ def _create_decks(deck_names: Iterable[str]) -> None:
 
 def _subdeck_tag(tags: List[str]) -> Optional[str]:
     result = next(
-        (tag for tag in tags if tag.startswith(SUBDECK_TAG)),
+        (tag for tag in tags if tag.lower().startswith(SUBDECK_TAG.lower())),
         None,
     )
     return result

@@ -658,7 +658,7 @@ class AnkiHubImporter:
         fields: List[Field],
         protected_fields: Dict[int, List[str]],
     ) -> bool:
-        if TAG_FOR_PROTECTING_ALL_FIELDS in note.tags:
+        if aqt.mw.col.tags.in_list(TAG_FOR_PROTECTING_ALL_FIELDS, note.tags):
             LOGGER.debug(
                 "Skipping preparing fields because they are protected by a tag."
             )
@@ -733,7 +733,10 @@ def _updated_tags(
     protected = set(
         tag
         for tag in cur_tags
-        if any(protected_tag in tag.split("::") for protected_tag in protected_tags)
+        if any(
+            protected_tag.lower() in tag.lower().split("::")
+            for protected_tag in protected_tags
+        )
     )
 
     # keep addon internal tags

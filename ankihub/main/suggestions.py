@@ -377,8 +377,12 @@ def _change_note_suggestion(
 def _added_and_removed_tags(
     prev_tags: List[str], cur_tags: List[str]
 ) -> Tuple[List[str], List[str]]:
-    added_tags = [tag for tag in cur_tags if tag not in prev_tags]
-    removed_tags = [tag for tag in prev_tags if tag not in cur_tags]
+    added_tags = [
+        tag for tag in cur_tags if not aqt.mw.col.tags.in_list(tag, prev_tags)
+    ]
+    removed_tags = [
+        tag for tag in prev_tags if not aqt.mw.col.tags.in_list(tag, cur_tags)
+    ]
     return added_tags, removed_tags
 
 

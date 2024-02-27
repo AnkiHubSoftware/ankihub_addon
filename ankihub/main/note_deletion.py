@@ -52,7 +52,7 @@ def _mark_notes_in_anki_and_delete_from_db(ah_nids: List[uuid.UUID]) -> None:
         if ANKIHUB_NOTE_TYPE_FIELD_NAME in note:
             note[ANKIHUB_NOTE_TYPE_FIELD_NAME] = ""
 
-        if TAG_FOR_DELETED_NOTES not in note.tags:
+        if not aqt.mw.col.tags.in_list(TAG_FOR_DELETED_NOTES, note.tags):
             note.tags.append(TAG_FOR_DELETED_NOTES)
 
         notes.append(note)
