@@ -3635,10 +3635,16 @@ class TestDeckManagementDialog:
 
 
 class TestBuildSubdecksAndMoveCardsToThem:
+    @pytest.mark.parametrize(
+        # The tag comparison is case-insensitive
+        "use_lower_case_subdeck_tags",
+        [True, False],
+    )
     def test_basic(
         self,
         anki_session_with_addon_data: AnkiSession,
         install_sample_ah_deck: InstallSampleAHDeck,
+        use_lower_case_subdeck_tags: bool,
     ):
         with anki_session_with_addon_data.profile_loaded():
             mw = anki_session_with_addon_data.mw
@@ -3648,11 +3654,14 @@ class TestBuildSubdecksAndMoveCardsToThem:
             # add subdeck tags to notes
             nids = mw.col.find_notes("deck:Testdeck")
             note1 = mw.col.get_note(nids[0])
-            note1.tags = [f"{SUBDECK_TAG}::Testdeck"]
+            subdeck_tag_prefix = (
+                SUBDECK_TAG.lower() if use_lower_case_subdeck_tags else SUBDECK_TAG
+            )
+            note1.tags = [f"{subdeck_tag_prefix}::Testdeck"]
             note1.flush()
 
             note2 = mw.col.get_note(nids[1])
-            note2.tags = [f"{SUBDECK_TAG}::Testdeck::B::C"]
+            note2.tags = [f"{subdeck_tag_prefix}::Testdeck::B::C"]
             note2.flush()
 
             # call the function that moves all cards in the deck to their subdecks
