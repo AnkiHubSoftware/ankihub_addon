@@ -463,6 +463,13 @@ def _ankihub_help_setup(parent: QMenu):
     )
     help_menu.addAction(q_get_help_action)
 
+    q_changelog_action = QAction("Changelog", help_menu)
+    qconnect(
+        q_changelog_action.triggered,
+        lambda: openLink("https://community.ankihub.net/c/announcements/"),
+    )
+    help_menu.addAction(q_changelog_action)
+
     q_upload_logs_action = QAction("Upload logs", help_menu)
     qconnect(q_upload_logs_action.triggered, _upload_logs_action)
     help_menu.addAction(q_upload_logs_action)
