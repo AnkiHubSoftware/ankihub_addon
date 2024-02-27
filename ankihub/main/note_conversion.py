@@ -3,10 +3,10 @@ and from NoteInfo objects to Anki note objects (import)."""
 
 from typing import List
 
-import aqt
 from anki.notes import Note
 
 from .. import settings
+from ..main.utils import is_tag_in_list
 from .note_deletion import TAG_FOR_DELETED_NOTES
 
 TAG_FOR_PROTECTING_FIELDS = "AnkiHub_Protect"
@@ -51,7 +51,7 @@ def get_fields_protected_by_tags(note: Note) -> List[str]:
 
 
 def _get_fields_protected_by_tags(tags: List[str], field_names: List[str]) -> List[str]:
-    if aqt.mw.col.tags.in_list(TAG_FOR_PROTECTING_ALL_FIELDS, tags):
+    if is_tag_in_list(TAG_FOR_PROTECTING_ALL_FIELDS, tags):
         return [
             field_name
             for field_name in field_names
@@ -66,10 +66,10 @@ def _get_fields_protected_by_tags(tags: List[str], field_names: List[str]) -> Li
     # Both a field and the field with underscores replaced with spaces should be protected.
     # This makes it possible to protect fields with spaces in their name because tags cant contain spaces.
     standardized_field_names_from_tags = [
-        field.replace("_", " ") for field in field_names_from_tags
+        field.replace("_", " ").lower() for field in field_names_from_tags
     ]
     standardized_field_names_from_note = [
-        field.replace("_", " ") for field in field_names
+        field.replace("_", " ").lower() for field in field_names
     ]
 
     result = [

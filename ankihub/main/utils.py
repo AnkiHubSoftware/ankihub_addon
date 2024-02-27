@@ -533,3 +533,9 @@ def md5_file_hash(media_path: Path) -> str:
 def truncate_string(string: str, limit: int) -> str:
     assert limit > 0
     return string[:limit] + "..." if len(string) > limit else string
+
+
+def is_tag_in_list(tag: str, tags: List[str]) -> bool:
+    # Copied from aqt.mw.col.tags.in_list in order to be able to use it without instantiating anki.tags.TagManager
+    "True if TAG is in TAGS. Ignore case."
+    return tag.lower() in [tag.lower() for tag in tags]

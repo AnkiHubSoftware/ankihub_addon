@@ -190,6 +190,7 @@ from ankihub.main.utils import (
     ANKIHUB_TEMPLATE_SNIPPET_RE,
     all_dids,
     get_note_types_in_deck,
+    is_tag_in_list,
     md5_file_hash,
     note_type_contains_field,
 )
@@ -2171,7 +2172,7 @@ class TestAnkiHubImporter:
                 )
             ):
                 anki_note = aqt.mw.col.get_note(NoteId(ah_note.anki_nid))
-                assert aqt.mw.col.tags.in_list(TAG_FOR_DELETED_NOTES, anki_note.tags)
+                assert is_tag_in_list(TAG_FOR_DELETED_NOTES, anki_note.tags)
                 assert anki_note[ANKIHUB_NOTE_TYPE_FIELD_NAME] == ""
 
                 assert len(import_result.created_nids) == 0
@@ -2217,7 +2218,7 @@ class TestAnkiHubImporter:
             )
 
             anki_note_1 = aqt.mw.col.get_note(NoteId(ah_note_1.anki_nid))
-            assert aqt.mw.col.tags.in_list(TAG_FOR_DELETED_NOTES, anki_note_1.tags)
+            assert is_tag_in_list(TAG_FOR_DELETED_NOTES, anki_note_1.tags)
             assert anki_note_1[ANKIHUB_NOTE_TYPE_FIELD_NAME] == ""
 
             with pytest.raises(NotFoundError):
@@ -3425,7 +3426,7 @@ def test_protect_fields_action(
         # Assert that the note has the expected tag
         def assert_note_has_expected_tag():
             note = mw.col.get_note(nid)
-            assert aqt.mw.col.tags.in_list(expected_tag, note.tags)
+            assert is_tag_in_list(expected_tag, note.tags)
 
         qtbot.wait_until(assert_note_has_expected_tag)
 
@@ -5227,7 +5228,7 @@ def test_handle_notes_deleted_from_webapp(
 
         # Assert that the note has a ankihub deleted tag if it was deleted from the webapp
         assert (
-            aqt.mw.col.tags.in_list(TAG_FOR_DELETED_NOTES, note.tags)
+            is_tag_in_list(TAG_FOR_DELETED_NOTES, note.tags)
         ) == was_deleted_from_webapp
 
 

@@ -42,6 +42,7 @@ from .utils import (
     create_note_type_with_id,
     dids_of_notes,
     get_unique_ankihub_deck_name,
+    is_tag_in_list,
     lowest_level_common_ancestor_did,
     modify_note_type_templates,
     truncated_list,
@@ -520,7 +521,7 @@ class AnkiHubImporter:
         suspend_new_cards_of_new_notes: bool,
         suspend_new_cards_of_existing_notes: SuspendNewCardsOfExistingNotes,
     ) -> Collection[Card]:
-        if aqt.mw.col.tags.in_list(TAG_FOR_INSTRUCTION_NOTES, note.tags):
+        if is_tag_in_list(TAG_FOR_INSTRUCTION_NOTES, note.tags):
             return []
 
         def new_cards() -> List[Card]:
@@ -665,7 +666,7 @@ class AnkiHubImporter:
         fields: List[Field],
         protected_fields: Dict[int, List[str]],
     ) -> bool:
-        if aqt.mw.col.tags.in_list(TAG_FOR_PROTECTING_ALL_FIELDS, note.tags):
+        if is_tag_in_list(TAG_FOR_PROTECTING_ALL_FIELDS, note.tags):
             LOGGER.debug(
                 "Skipping preparing fields because they are protected by a tag."
             )
