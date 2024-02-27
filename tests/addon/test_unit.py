@@ -407,9 +407,20 @@ class TestGetFieldsProtectedByTags:
                 ["Text", "Missed Questions"],
                 ["Missed Questions"],
             ),
+            # Test the tag for protecting all fields
+            (
+                [TAG_FOR_PROTECTING_ALL_FIELDS],
+                ["Text", "Extra", "Missed Questions", "Lecture Notes"],
+                ["Text", "Extra", "Missed Questions", "Lecture Notes"],
+            ),
+            (
+                [TAG_FOR_PROTECTING_ALL_FIELDS.lower()],
+                ["Text", "Extra", "Missed Questions", "Lecture Notes"],
+                ["Text", "Extra", "Missed Questions", "Lecture Notes"],
+            ),
         ],
     )
-    def test_protecting_single_fields(
+    def test_protect_fields(
         self,
         tags: List[str],
         field_names: List[str],
@@ -422,7 +433,7 @@ class TestGetFieldsProtectedByTags:
             )
         ) == set(expected_protected_fields)
 
-    def test_trying_to_protect_not_existing_field(self):
+    def test_try_to_protect_not_existing_field(self):
         # When trying to protect a field that does not exist, it should be ignored.
         assert set(
             _get_fields_protected_by_tags(
@@ -433,14 +444,6 @@ class TestGetFieldsProtectedByTags:
                 field_names=["Text", "Extra", "Missed Questions", "Lecture Notes"],
             )
         ) == set(["Text"])
-
-    def test_protecting_all_fields(self):
-        assert set(
-            _get_fields_protected_by_tags(
-                tags=[TAG_FOR_PROTECTING_ALL_FIELDS],
-                field_names=["Text", "Extra", "Missed Questions", "Lecture Notes"],
-            )
-        ) == set(["Text", "Extra", "Missed Questions", "Lecture Notes"])
 
 
 def test_normalize_url():
