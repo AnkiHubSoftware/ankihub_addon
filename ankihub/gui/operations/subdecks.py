@@ -23,7 +23,7 @@ def confirm_and_toggle_subdecks(ankihub_id: uuid.UUID) -> None:
             "<b>Warning:</b> This will remove all subdecks of this deck and move "
             "all of its cards back to the main deck.</b>"
             "<br><br>"
-            "See <a href='https://docs.ankihub.net/user_docs/advanced.html#subdecks-and-subdeck-tags'>"
+            "See <a href='https://community.ankihub.net/t/creating-a-deck/103683#subdecks-and-subdeck-tags-2'>"
             "the AnkiHub docs</a> "
             "for details.",
             default_no=True,
@@ -41,7 +41,7 @@ def confirm_and_toggle_subdecks(ankihub_id: uuid.UUID) -> None:
             "Do you want to enable subdecks for<br>"
             f"<b>{config.deck_config(ankihub_id).name}</b>?"
             "<br><br>"
-            "See <a href='https://docs.ankihub.net/user_docs/advanced.html#subdecks-and-subdeck-tags'>"
+            "See <a href='https://community.ankihub.net/t/creating-a-deck/103683#subdecks-and-subdeck-tags-2'>"
             "the AnkiHub docs</a> "
             "for details.",
             show_cancel_button=True,
