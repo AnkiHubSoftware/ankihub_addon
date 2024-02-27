@@ -14,6 +14,7 @@ Some differences between data stored in the AnkiHub database and the Anki databa
 import time
 import uuid
 from pathlib import Path
+from threading import Lock
 from typing import (
     Any,
     Callable,
@@ -56,6 +57,7 @@ DEFAULT_CHUNK_SIZE = 30_000
 
 class _AnkiHubDB:
     database_path: Optional[Path] = None
+    write_lock = Lock()
 
     def setup_and_migrate(self, db_path: Path) -> None:
         self.database_path = db_path
@@ -104,7 +106,7 @@ class _AnkiHubDB:
 
         upserted_notes: List[NoteInfo] = []
         skipped_notes: List[NoteInfo] = []
-        with get_peewee_database().atomic():
+        with self.write_lock, get_peewee_database().atomic():
             for note_data in notes_data:
                 if self._conflicting_note_exists(note_data):
                     skipped_notes.append(note_data)
@@ -162,14 +164,15 @@ class _AnkiHubDB:
 
     def remove_notes(self, ah_nids: List[uuid.UUID]) -> None:
         """Removes notes from the AnkiHub DB"""
-        execute_modifying_query_in_chunks(
-            lambda ah_nids: (
-                AnkiHubNote.delete()
-                .where(AnkiHubNote.ankihub_note_id.in_(ah_nids))
-                .execute(),
-            ),
-            ids=ah_nids,
-        )
+        with self.write_lock, get_peewee_database().atomic():
+            execute_modifying_query_in_chunks(
+                lambda ah_nids: (
+                    AnkiHubNote.delete()
+                    .where(AnkiHubNote.ankihub_note_id.in_(ah_nids))
+                    .execute(),
+                ),
+                ids=ah_nids,
+            )
 
     def update_mod_values_based_on_anki_db(
         self, notes_data: Sequence[NoteInfo]
@@ -183,7 +186,7 @@ class _AnkiHubDB:
         it was last imported/exported. If a note does not exist in the Anki
         database, its 'mod' value is set to the current time.
         """
-        with get_peewee_database().atomic():
+        with self.write_lock, get_peewee_database().atomic():
             for note_data in notes_data:
                 mod: Optional[int] = aqt.mw.col.db.scalar(
                     "SELECT mod FROM notes WHERE id = ?", note_data.anki_nid
@@ -342,11 +345,14 @@ class _AnkiHubDB:
 
     def remove_deck(self, ankihub_did: uuid.UUID):
         """Removes all data for the given deck from the AnkiHub DB"""
-        AnkiHubNote.delete().where(AnkiHubNote.ankihub_deck_id == ankihub_did).execute()
-        AnkiHubNoteType.delete().where(
-            AnkiHubNoteType.ankihub_deck_id == ankihub_did
-        ).execute()
-        DeckMedia.delete().where(DeckMedia.ankihub_deck_id == ankihub_did).execute()
+        with self.write_lock, get_peewee_database().atomic():
+            AnkiHubNote.delete().where(
+                AnkiHubNote.ankihub_deck_id == ankihub_did
+            ).execute()
+            AnkiHubNoteType.delete().where(
+                AnkiHubNoteType.ankihub_deck_id == ankihub_did
+            ).execute()
+            DeckMedia.delete().where(DeckMedia.ankihub_deck_id == ankihub_did).execute()
 
     def ankihub_deck_ids(self) -> List[uuid.UUID]:
         return AnkiHubNote.select(AnkiHubNote.ankihub_deck_id).distinct().objects(flat)
@@ -374,20 +380,21 @@ class _AnkiHubDB:
         media_list: List[DeckMediaClientModel],
     ) -> None:
         """Upsert deck media to the AnkiHub DB."""
-        for media_file in media_list:
-            (
-                DeckMedia.insert(
-                    name=media_file.name,
-                    ankihub_deck_id=ankihub_did,
-                    file_content_hash=media_file.file_content_hash,
-                    modified=media_file.modified,
-                    referenced_on_accepted_note=media_file.referenced_on_accepted_note,
-                    exists_on_s3=media_file.exists_on_s3,
-                    download_enabled=media_file.download_enabled,
+        with self.write_lock, get_peewee_database().atomic():
+            for media_file in media_list:
+                (
+                    DeckMedia.insert(
+                        name=media_file.name,
+                        ankihub_deck_id=ankihub_did,
+                        file_content_hash=media_file.file_content_hash,
+                        modified=media_file.modified,
+                        referenced_on_accepted_note=media_file.referenced_on_accepted_note,
+                        exists_on_s3=media_file.exists_on_s3,
+                        download_enabled=media_file.download_enabled,
+                    )
+                    .on_conflict_replace()
+                    .execute()
                 )
-                .on_conflict_replace()
-                .execute()
-            )
 
     def downloadable_media_names_for_ankihub_deck(self, ah_did: uuid.UUID) -> Set[str]:
         """Returns the names of all media files which can be downloaded for the given deck."""
@@ -480,16 +487,17 @@ class _AnkiHubDB:
 
     # note types
     def upsert_note_type(self, ankihub_did: uuid.UUID, note_type: NotetypeDict) -> None:
-        (
-            AnkiHubNoteType.insert(
-                anki_note_type_id=note_type["id"],
-                ankihub_deck_id=ankihub_did,
-                name=note_type["name"],
-                note_type_dict=note_type,
+        with self.write_lock:
+            (
+                AnkiHubNoteType.insert(
+                    anki_note_type_id=note_type["id"],
+                    ankihub_deck_id=ankihub_did,
+                    name=note_type["name"],
+                    note_type_dict=note_type,
+                )
+                .on_conflict_replace()
+                .execute()
             )
-            .on_conflict_replace()
-            .execute()
-        )
 
     def note_type_dict(
         self, ankihub_did: uuid.UUID, note_type_id: NotetypeId
