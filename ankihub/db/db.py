@@ -149,13 +149,10 @@ class _AnkiHubDB:
                 )
                 upserted_notes.append(note_data)
 
-            execute_modifying_query_in_chunks(
-                lambda notes_dicts: AnkiHubNote.insert_many(notes_dicts)
-                .on_conflict_replace()
-                .execute(),
-                ids=notes_dicts,
-                chunk_size=int(DEFAULT_CHUNK_SIZE / 10),
-            )
+            # The chunk size is chosen as 1/10 of the default chunk size, because we need < 10 SQL variables
+            # for each deck media entry. The purpose is to avoid the "too many SQL variables" error.
+            for chunk in chunks(notes_dicts, int(DEFAULT_CHUNK_SIZE / 10)):
+                AnkiHubNote.insert_many(chunk).on_conflict_replace().execute()
 
         return tuple(upserted_notes), tuple(skipped_notes)
 
@@ -392,27 +389,24 @@ class _AnkiHubDB:
         media_list: List[DeckMediaClientModel],
     ) -> None:
         """Upsert deck media to the AnkiHub DB."""
-        data = [
+        deck_media_dicts = [
             {
-                "name": media_file.name,
+                "name": deck_media.name,
                 "ankihub_deck_id": ankihub_did,
-                "file_content_hash": media_file.file_content_hash,
-                "modified": media_file.modified,
-                "referenced_on_accepted_note": media_file.referenced_on_accepted_note,
-                "exists_on_s3": media_file.exists_on_s3,
-                "download_enabled": media_file.download_enabled,
+                "file_content_hash": deck_media.file_content_hash,
+                "modified": deck_media.modified,
+                "referenced_on_accepted_note": deck_media.referenced_on_accepted_note,
+                "exists_on_s3": deck_media.exists_on_s3,
+                "download_enabled": deck_media.download_enabled,
             }
-            for media_file in media_list
+            for deck_media in media_list
         ]
 
         with self.write_lock, get_peewee_database().atomic():
-            execute_modifying_query_in_chunks(
-                lambda data: (
-                    DeckMedia.insert_many(data).on_conflict_replace().execute(),
-                ),
-                ids=data,
-                chunk_size=int(DEFAULT_CHUNK_SIZE / 10),
-            )
+            # The chunk size is chosen as 1/10 of the default chunk size, because we need < 10 SQL variables
+            # for each deck media entry. The purpose is to avoid the "too many SQL variables" error.
+            for chunk in chunks(deck_media_dicts, int(DEFAULT_CHUNK_SIZE / 10)):
+                DeckMedia.insert_many(chunk).on_conflict_replace().execute()
 
     def downloadable_media_names_for_ankihub_deck(self, ah_did: uuid.UUID) -> Set[str]:
         """Returns the names of all media files which can be downloaded for the given deck."""
