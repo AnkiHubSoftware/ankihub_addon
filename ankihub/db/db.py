@@ -31,7 +31,7 @@ from typing import (
 import aqt
 from anki.models import NotetypeDict, NotetypeId
 from anki.notes import NoteId
-from anki.utils import join_fields, split_fields
+from anki.utils import ids2str, join_fields, split_fields
 from peewee import DQ
 
 from ..ankihub_client import Field, NoteInfo, suggestion_type_from_str
@@ -48,14 +48,22 @@ from .models import (
     get_peewee_database,
     set_peewee_database,
 )
+from .utils import TimedLock
 
 # Chunk size for executing queries in chunks to avoid SQLite's "too many SQL variables" error.
 # The variable limit is 32_766, so the chunk size is set to 30_000 to be safe.
 DEFAULT_CHUNK_SIZE = 30_000
 
+# Timeout duration for the write lock. We use a timeout to make sure that deadlocks don't occur.
+WRITE_LOCK_TIMEOUT_SECONDS = 10
+
 
 class _AnkiHubDB:
     database_path: Optional[Path] = None
+
+    # Lock for write operations to the AnkiHub DB. This is used to prevent concurrent write operations
+    # which can lead to "OperationalError: database is locked" errors
+    write_lock = TimedLock(timeout_seconds=WRITE_LOCK_TIMEOUT_SECONDS)
 
     def setup_and_migrate(self, db_path: Path) -> None:
         self.database_path = db_path
@@ -104,7 +112,9 @@ class _AnkiHubDB:
 
         upserted_notes: List[NoteInfo] = []
         skipped_notes: List[NoteInfo] = []
-        with get_peewee_database().atomic():
+
+        note_dicts = []
+        with self.write_lock, get_peewee_database().atomic():
             for note_data in notes_data:
                 if self._conflicting_note_exists(note_data):
                     skipped_notes.append(note_data)
@@ -121,27 +131,28 @@ class _AnkiHubDB:
                 )
                 tags = " ".join([tag for tag in note_data.tags if tag is not None])
 
-                # Insert or update the note
-                (
-                    AnkiHubNote.insert(
-                        ankihub_note_id=note_data.ah_nid,
-                        ankihub_deck_id=ankihub_did,
-                        anki_note_id=note_data.anki_nid,
-                        anki_note_type_id=note_data.mid,
-                        fields=fields,
-                        tags=tags,
-                        guid=note_data.guid,
-                        last_update_type=(
+                note_dicts.append(
+                    {
+                        "ankihub_note_id": note_data.ah_nid,
+                        "ankihub_deck_id": ankihub_did,
+                        "anki_note_id": note_data.anki_nid,
+                        "anki_note_type_id": note_data.mid,
+                        "fields": fields,
+                        "tags": tags,
+                        "guid": note_data.guid,
+                        "last_update_type": (
                             note_data.last_update_type.value[0]
                             if note_data.last_update_type is not None
                             else None
                         ),
-                    )
-                    .on_conflict_replace()
-                    .execute()
+                    }
                 )
-
                 upserted_notes.append(note_data)
+
+            # The chunk size is chosen as 1/10 of the default chunk size, because we need < 10 SQL variables
+            # for each deck media entry. The purpose is to avoid the "too many SQL variables" error.
+            for chunk in chunks(note_dicts, int(DEFAULT_CHUNK_SIZE / 10)):
+                AnkiHubNote.insert_many(chunk).on_conflict_replace().execute()
 
         return tuple(upserted_notes), tuple(skipped_notes)
 
@@ -162,14 +173,15 @@ class _AnkiHubDB:
 
     def remove_notes(self, ah_nids: List[uuid.UUID]) -> None:
         """Removes notes from the AnkiHub DB"""
-        execute_modifying_query_in_chunks(
-            lambda ah_nids: (
-                AnkiHubNote.delete()
-                .where(AnkiHubNote.ankihub_note_id.in_(ah_nids))
-                .execute(),
-            ),
-            ids=ah_nids,
-        )
+        with self.write_lock, get_peewee_database().atomic():
+            execute_modifying_query_in_chunks(
+                lambda ah_nids: (
+                    AnkiHubNote.delete()
+                    .where(AnkiHubNote.ankihub_note_id.in_(ah_nids))
+                    .execute(),
+                ),
+                ids=ah_nids,
+            )
 
     def update_mod_values_based_on_anki_db(
         self, notes_data: Sequence[NoteInfo]
@@ -183,18 +195,27 @@ class _AnkiHubDB:
         it was last imported/exported. If a note does not exist in the Anki
         database, its 'mod' value is set to the current time.
         """
-        with get_peewee_database().atomic():
-            for note_data in notes_data:
-                mod: Optional[int] = aqt.mw.col.db.scalar(
-                    "SELECT mod FROM notes WHERE id = ?", note_data.anki_nid
-                )
-                if not mod:
-                    # The format of mod is seconds since the epoch.
-                    mod = int(time.time())
+        anki_nids = [note_data.anki_nid for note_data in notes_data]
+        nid_mod_tuples = aqt.mw.col.db.all(
+            f"SELECT id, mod FROM notes WHERE id IN {ids2str(anki_nids)}"
+        )
+        nid_to_mod_dict = {nid: mod for nid, mod in nid_mod_tuples}
 
-                AnkiHubNote.update(mod=mod).where(
-                    AnkiHubNote.ankihub_note_id == note_data.ah_nid
-                ).execute()
+        notes = []
+        for note_data in notes_data:
+            mod = nid_to_mod_dict.get(note_data.anki_nid)
+            if not mod:
+                # The format of mod is seconds since the epoch.
+                mod = int(time.time())
+            note = AnkiHubNote(ankihub_note_id=note_data.ah_nid, mod=mod)
+            notes.append(note)
+
+        with self.write_lock, get_peewee_database().atomic():
+            # The chunk size is chosen as 1/10 of the default chunk size, because we need < 10 SQL variables
+            # for each entry. The purpose is to avoid the "too many SQL variables" error.
+            AnkiHubNote.bulk_update(
+                notes, fields=[AnkiHubNote.mod], batch_size=int(DEFAULT_CHUNK_SIZE / 10)
+            )
 
     def reset_mod_values_in_anki_db(self, anki_nids: List[NoteId]) -> None:
         # resets the mod values of the notes in the Anki DB to the
@@ -342,11 +363,14 @@ class _AnkiHubDB:
 
     def remove_deck(self, ankihub_did: uuid.UUID):
         """Removes all data for the given deck from the AnkiHub DB"""
-        AnkiHubNote.delete().where(AnkiHubNote.ankihub_deck_id == ankihub_did).execute()
-        AnkiHubNoteType.delete().where(
-            AnkiHubNoteType.ankihub_deck_id == ankihub_did
-        ).execute()
-        DeckMedia.delete().where(DeckMedia.ankihub_deck_id == ankihub_did).execute()
+        with self.write_lock, get_peewee_database().atomic():
+            AnkiHubNote.delete().where(
+                AnkiHubNote.ankihub_deck_id == ankihub_did
+            ).execute()
+            AnkiHubNoteType.delete().where(
+                AnkiHubNoteType.ankihub_deck_id == ankihub_did
+            ).execute()
+            DeckMedia.delete().where(DeckMedia.ankihub_deck_id == ankihub_did).execute()
 
     def ankihub_deck_ids(self) -> List[uuid.UUID]:
         return AnkiHubNote.select(AnkiHubNote.ankihub_deck_id).distinct().objects(flat)
@@ -374,20 +398,24 @@ class _AnkiHubDB:
         media_list: List[DeckMediaClientModel],
     ) -> None:
         """Upsert deck media to the AnkiHub DB."""
-        for media_file in media_list:
-            (
-                DeckMedia.insert(
-                    name=media_file.name,
-                    ankihub_deck_id=ankihub_did,
-                    file_content_hash=media_file.file_content_hash,
-                    modified=media_file.modified,
-                    referenced_on_accepted_note=media_file.referenced_on_accepted_note,
-                    exists_on_s3=media_file.exists_on_s3,
-                    download_enabled=media_file.download_enabled,
-                )
-                .on_conflict_replace()
-                .execute()
-            )
+        deck_media_dicts = [
+            {
+                "name": deck_media.name,
+                "ankihub_deck_id": ankihub_did,
+                "file_content_hash": deck_media.file_content_hash,
+                "modified": deck_media.modified,
+                "referenced_on_accepted_note": deck_media.referenced_on_accepted_note,
+                "exists_on_s3": deck_media.exists_on_s3,
+                "download_enabled": deck_media.download_enabled,
+            }
+            for deck_media in media_list
+        ]
+
+        with self.write_lock, get_peewee_database().atomic():
+            # The chunk size is chosen as 1/10 of the default chunk size, because we need < 10 SQL variables
+            # for each deck media entry. The purpose is to avoid the "too many SQL variables" error.
+            for chunk in chunks(deck_media_dicts, int(DEFAULT_CHUNK_SIZE / 10)):
+                DeckMedia.insert_many(chunk).on_conflict_replace().execute()
 
     def downloadable_media_names_for_ankihub_deck(self, ah_did: uuid.UUID) -> Set[str]:
         """Returns the names of all media files which can be downloaded for the given deck."""
@@ -480,16 +508,17 @@ class _AnkiHubDB:
 
     # note types
     def upsert_note_type(self, ankihub_did: uuid.UUID, note_type: NotetypeDict) -> None:
-        (
-            AnkiHubNoteType.insert(
-                anki_note_type_id=note_type["id"],
-                ankihub_deck_id=ankihub_did,
-                name=note_type["name"],
-                note_type_dict=note_type,
+        with self.write_lock:
+            (
+                AnkiHubNoteType.insert(
+                    anki_note_type_id=note_type["id"],
+                    ankihub_deck_id=ankihub_did,
+                    name=note_type["name"],
+                    note_type_dict=note_type,
+                )
+                .on_conflict_replace()
+                .execute()
             )
-            .on_conflict_replace()
-            .execute()
-        )
 
     def note_type_dict(
         self, ankihub_did: uuid.UUID, note_type_id: NotetypeId
