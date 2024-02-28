@@ -386,21 +386,27 @@ class _AnkiHubDB:
         media_list: List[DeckMediaClientModel],
     ) -> None:
         """Upsert deck media to the AnkiHub DB."""
+        data = [
+            {
+                "name": media_file.name,
+                "ankihub_deck_id": ankihub_did,
+                "file_content_hash": media_file.file_content_hash,
+                "modified": media_file.modified,
+                "referenced_on_accepted_note": media_file.referenced_on_accepted_note,
+                "exists_on_s3": media_file.exists_on_s3,
+                "download_enabled": media_file.download_enabled,
+            }
+            for media_file in media_list
+        ]
+
         with self.write_lock, get_peewee_database().atomic():
-            for media_file in media_list:
-                (
-                    DeckMedia.insert(
-                        name=media_file.name,
-                        ankihub_deck_id=ankihub_did,
-                        file_content_hash=media_file.file_content_hash,
-                        modified=media_file.modified,
-                        referenced_on_accepted_note=media_file.referenced_on_accepted_note,
-                        exists_on_s3=media_file.exists_on_s3,
-                        download_enabled=media_file.download_enabled,
-                    )
-                    .on_conflict_replace()
-                    .execute()
-                )
+            execute_modifying_query_in_chunks(
+                lambda data: (
+                    DeckMedia.insert_many(data).on_conflict_replace().execute(),
+                ),
+                ids=data,
+                chunk_size=int(DEFAULT_CHUNK_SIZE / 10),
+            )
 
     def downloadable_media_names_for_ankihub_deck(self, ah_did: uuid.UUID) -> Set[str]:
         """Returns the names of all media files which can be downloaded for the given deck."""
