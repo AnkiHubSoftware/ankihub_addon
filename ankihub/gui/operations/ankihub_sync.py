@@ -73,7 +73,9 @@ def sync_with_ankihub(on_done: Callable[[Future], None]) -> None:
 
 def _on_send_review_data_done(future: Future) -> None:
     if future.exception():
-        LOGGER.error(f"Failed to send review data: {future.exception()}")
+        LOGGER.error(  # pragma: no cover
+            f"Failed to send review data: {future.exception()}"
+        )
     else:
         LOGGER.info("Review data sent successfully")
 
