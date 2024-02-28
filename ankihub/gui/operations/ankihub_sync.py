@@ -3,7 +3,6 @@ from functools import partial
 from typing import Callable, List
 
 import aqt
-from anki.errors import DBError
 
 from ... import LOGGER
 from ...addon_ankihub_client import AddonAnkiHubClient as AnkiHubClient
@@ -47,17 +46,9 @@ def sync_with_ankihub(on_done: Callable[[Future], None]) -> None:
         show_tooltip_about_last_deck_updates_results()
         maybe_check_databases()
 
-        try:
-            send_review_data()
-        except DBError:  # pragma: no cover
-            # TODO Attaching the ankihub db to the main db sometimes fails with a DBError
-            # for some users. See:
-            # https://ankihub.sentry.io/issues/4574509733/?project=6546414
-            # This prevents the error from being shown to the user, until we find a fix.
-            # The exception is sent to Sentry because of the LoggingIntegration.
-            LOGGER.exception(
-                "Could not send review data to AnkiHub"
-            )  # pragma: no cover
+        aqt.mw.taskman.run_in_background(
+            send_review_data, on_done=_on_send_review_data_done
+        )
 
         on_done(future_with_result(None))
 
@@ -78,6 +69,15 @@ def sync_with_ankihub(on_done: Callable[[Future], None]) -> None:
         # Using run_on_main prevents exceptions which occur in the callback to be backpropagated to the caller,
         # which is what we want.
         aqt.mw.taskman.run_on_main(partial(on_done, future_with_exception(e)))
+
+
+def _on_send_review_data_done(future: Future) -> None:
+    if future.exception():
+        LOGGER.error(  # pragma: no cover
+            f"Failed to send review data: {future.exception()}"
+        )
+    else:
+        LOGGER.info("Review data sent successfully")
 
 
 def _uninstall_decks_the_user_is_not_longer_subscribed_to(
