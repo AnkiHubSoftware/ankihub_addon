@@ -112,6 +112,8 @@ class _AnkiHubDB:
 
         upserted_notes: List[NoteInfo] = []
         skipped_notes: List[NoteInfo] = []
+
+        notes_dicts = []
         with self.write_lock, get_peewee_database().atomic():
             for note_data in notes_data:
                 if self._conflicting_note_exists(note_data):
@@ -129,27 +131,31 @@ class _AnkiHubDB:
                 )
                 tags = " ".join([tag for tag in note_data.tags if tag is not None])
 
-                # Insert or update the note
-                (
-                    AnkiHubNote.insert(
-                        ankihub_note_id=note_data.ah_nid,
-                        ankihub_deck_id=ankihub_did,
-                        anki_note_id=note_data.anki_nid,
-                        anki_note_type_id=note_data.mid,
-                        fields=fields,
-                        tags=tags,
-                        guid=note_data.guid,
-                        last_update_type=(
+                notes_dicts.append(
+                    {
+                        "ankihub_note_id": note_data.ah_nid,
+                        "ankihub_deck_id": ankihub_did,
+                        "anki_note_id": note_data.anki_nid,
+                        "anki_note_type_id": note_data.mid,
+                        "fields": fields,
+                        "tags": tags,
+                        "guid": note_data.guid,
+                        "last_update_type": (
                             note_data.last_update_type.value[0]
                             if note_data.last_update_type is not None
                             else None
                         ),
-                    )
-                    .on_conflict_replace()
-                    .execute()
+                    }
                 )
-
                 upserted_notes.append(note_data)
+
+            execute_modifying_query_in_chunks(
+                lambda notes_dicts: AnkiHubNote.insert_many(notes_dicts)
+                .on_conflict_replace()
+                .execute(),
+                ids=notes_dicts,
+                chunk_size=int(DEFAULT_CHUNK_SIZE / 10),
+            )
 
         return tuple(upserted_notes), tuple(skipped_notes)
 
