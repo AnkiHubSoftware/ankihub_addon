@@ -31,7 +31,7 @@ from typing import (
 import aqt
 from anki.models import NotetypeDict, NotetypeId
 from anki.notes import NoteId
-from anki.utils import join_fields, split_fields
+from anki.utils import ids2str, join_fields, split_fields
 from peewee import DQ
 
 from ..ankihub_client import Field, NoteInfo, suggestion_type_from_str
@@ -195,18 +195,27 @@ class _AnkiHubDB:
         it was last imported/exported. If a note does not exist in the Anki
         database, its 'mod' value is set to the current time.
         """
-        with self.write_lock, get_peewee_database().atomic():
-            for note_data in notes_data:
-                mod: Optional[int] = aqt.mw.col.db.scalar(
-                    "SELECT mod FROM notes WHERE id = ?", note_data.anki_nid
-                )
-                if not mod:
-                    # The format of mod is seconds since the epoch.
-                    mod = int(time.time())
+        anki_nids = [note_data.anki_nid for note_data in notes_data]
+        nid_mod_tuples = aqt.mw.col.db.all(
+            f"SELECT id, mod FROM notes WHERE id IN {ids2str(anki_nids)}"
+        )
+        nid_to_mod_dict = {nid: mod for nid, mod in nid_mod_tuples}
 
-                AnkiHubNote.update(mod=mod).where(
-                    AnkiHubNote.ankihub_note_id == note_data.ah_nid
-                ).execute()
+        notes = []
+        for note_data in notes_data:
+            mod = nid_to_mod_dict.get(note_data.anki_nid)
+            if not mod:
+                # The format of mod is seconds since the epoch.
+                mod = int(time.time())
+            note = AnkiHubNote(ankihub_note_id=note_data.ah_nid, mod=mod)
+            notes.append(note)
+
+        with self.write_lock, get_peewee_database().atomic():
+            # The chunk size is chosen as 1/10 of the default chunk size, because we need < 10 SQL variables
+            # for each entry. The purpose is to avoid the "too many SQL variables" error.
+            AnkiHubNote.bulk_update(
+                notes, fields=[AnkiHubNote.mod], batch_size=int(DEFAULT_CHUNK_SIZE / 10)
+            )
 
     def reset_mod_values_in_anki_db(self, anki_nids: List[NoteId]) -> None:
         # resets the mod values of the notes in the Anki DB to the
