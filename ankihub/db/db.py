@@ -113,7 +113,7 @@ class _AnkiHubDB:
         upserted_notes: List[NoteInfo] = []
         skipped_notes: List[NoteInfo] = []
 
-        notes_dicts = []
+        note_dicts = []
         with self.write_lock, get_peewee_database().atomic():
             for note_data in notes_data:
                 if self._conflicting_note_exists(note_data):
@@ -131,7 +131,7 @@ class _AnkiHubDB:
                 )
                 tags = " ".join([tag for tag in note_data.tags if tag is not None])
 
-                notes_dicts.append(
+                note_dicts.append(
                     {
                         "ankihub_note_id": note_data.ah_nid,
                         "ankihub_deck_id": ankihub_did,
@@ -151,7 +151,7 @@ class _AnkiHubDB:
 
             # The chunk size is chosen as 1/10 of the default chunk size, because we need < 10 SQL variables
             # for each deck media entry. The purpose is to avoid the "too many SQL variables" error.
-            for chunk in chunks(notes_dicts, int(DEFAULT_CHUNK_SIZE / 10)):
+            for chunk in chunks(note_dicts, int(DEFAULT_CHUNK_SIZE / 10)):
                 AnkiHubNote.insert_many(chunk).on_conflict_replace().execute()
 
         return tuple(upserted_notes), tuple(skipped_notes)
