@@ -42,7 +42,7 @@ from ..db.db import execute_list_query_in_chunks
 from ..db.models import AnkiHubNote
 from .exporting import to_note_data
 from .media_utils import find_and_replace_text_in_fields_on_all_notes
-from .utils import get_anki_nid_to_mid_dict, md5_file_hash
+from .utils import get_anki_nid_to_mid_dict, is_tag_in_list, md5_file_hash
 
 # string that is contained in the errors returned from the AnkiHub API when
 # there are no changes to the note for a change note suggestion
@@ -377,8 +377,8 @@ def _change_note_suggestion(
 def _added_and_removed_tags(
     prev_tags: List[str], cur_tags: List[str]
 ) -> Tuple[List[str], List[str]]:
-    added_tags = [tag for tag in cur_tags if tag not in prev_tags]
-    removed_tags = [tag for tag in prev_tags if tag not in cur_tags]
+    added_tags = [tag for tag in cur_tags if not is_tag_in_list(tag, prev_tags)]
+    removed_tags = [tag for tag in prev_tags if not is_tag_in_list(tag, cur_tags)]
     return added_tags, removed_tags
 
 

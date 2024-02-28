@@ -11,6 +11,7 @@ from anki.utils import ids2str
 
 from .. import LOGGER
 from ..db import ankihub_db
+from ..main.utils import is_tag_in_list
 from ..settings import ANKIHUB_NOTE_TYPE_FIELD_NAME
 
 # tag for notes which were deleted from the webapp
@@ -52,7 +53,7 @@ def _mark_notes_in_anki_and_delete_from_db(ah_nids: List[uuid.UUID]) -> None:
         if ANKIHUB_NOTE_TYPE_FIELD_NAME in note:
             note[ANKIHUB_NOTE_TYPE_FIELD_NAME] = ""
 
-        if TAG_FOR_DELETED_NOTES not in note.tags:
+        if not is_tag_in_list(TAG_FOR_DELETED_NOTES, note.tags):
             note.tags.append(TAG_FOR_DELETED_NOTES)
 
         notes.append(note)

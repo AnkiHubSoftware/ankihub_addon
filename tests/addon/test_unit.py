@@ -284,6 +284,15 @@ def test_updated_tags():
         )
     ) == set(["A"])
 
+    # ... the comparison should be case insensitive
+    assert set(
+        _updated_tags(
+            cur_tags=["a", "B"],
+            incoming_tags=[],
+            protected_tags=["A"],
+        )
+    ) == set(["a"])
+
     # dont delete tags that contain protected tags
     assert set(
         _updated_tags(
@@ -308,6 +317,15 @@ def test_updated_tags():
             protected_tags=["C"],
         )
     ) == set(["A::B::C"])
+
+    # ... the comparison should be case insensitive
+    assert set(
+        _updated_tags(
+            cur_tags=["a::b::c"],
+            incoming_tags=[],
+            protected_tags=["C"],
+        )
+    ) == set(["a::b::c"])
 
     # keep add-on internal tags
     assert set(
@@ -360,18 +378,62 @@ def test_mids_of_notes(anki_session: AnkiSession):
 
 
 class TestGetFieldsProtectedByTags:
-    def test_protecting_single_fields(self):
+    @pytest.mark.parametrize(
+        "tags,field_names,expected_protected_fields",
+        [
+            ([], ["Text", "Extra"], []),
+            (
+                [f"{TAG_FOR_PROTECTING_FIELDS}::Text"],
+                ["Text", "Extra"],
+                ["Text"],
+            ),
+            (
+                [
+                    f"{TAG_FOR_PROTECTING_FIELDS}::Text",
+                    f"{TAG_FOR_PROTECTING_FIELDS}::Extra",
+                ],
+                ["Text", "Extra"],
+                ["Text", "Extra"],
+            ),
+            # For fields with spaces in their names a tag with spaces replaced by underscores will protect the field
+            (
+                [f"{TAG_FOR_PROTECTING_FIELDS}::Missed_Questions"],
+                ["Text", "Missed Questions"],
+                ["Missed Questions"],
+            ),
+            # The tag comparison is case insensitive
+            (
+                [f"{TAG_FOR_PROTECTING_FIELDS}::Missed_Questions".lower()],
+                ["Text", "Missed Questions"],
+                ["Missed Questions"],
+            ),
+            # Test the tag for protecting all fields
+            (
+                [TAG_FOR_PROTECTING_ALL_FIELDS],
+                ["Text", "Extra", "Missed Questions", "Lecture Notes"],
+                ["Text", "Extra", "Missed Questions", "Lecture Notes"],
+            ),
+            (
+                [TAG_FOR_PROTECTING_ALL_FIELDS.lower()],
+                ["Text", "Extra", "Missed Questions", "Lecture Notes"],
+                ["Text", "Extra", "Missed Questions", "Lecture Notes"],
+            ),
+        ],
+    )
+    def test_protect_fields(
+        self,
+        tags: List[str],
+        field_names: List[str],
+        expected_protected_fields: List[str],
+    ):
         assert set(
             _get_fields_protected_by_tags(
-                tags=[
-                    f"{TAG_FOR_PROTECTING_FIELDS}::Text",
-                    f"{TAG_FOR_PROTECTING_FIELDS}::Missed_Questions",
-                ],
-                field_names=["Text", "Extra", "Missed Questions", "Lecture Notes"],
+                tags=tags,
+                field_names=field_names,
             )
-        ) == set(["Text", "Missed Questions"])
+        ) == set(expected_protected_fields)
 
-    def test_trying_to_protect_not_existing_field(self):
+    def test_try_to_protect_not_existing_field(self):
         # When trying to protect a field that does not exist, it should be ignored.
         assert set(
             _get_fields_protected_by_tags(
@@ -382,14 +444,6 @@ class TestGetFieldsProtectedByTags:
                 field_names=["Text", "Extra", "Missed Questions", "Lecture Notes"],
             )
         ) == set(["Text"])
-
-    def test_protecting_all_fields(self):
-        assert set(
-            _get_fields_protected_by_tags(
-                tags=[TAG_FOR_PROTECTING_ALL_FIELDS],
-                field_names=["Text", "Extra", "Missed Questions", "Lecture Notes"],
-            )
-        ) == set(["Text", "Extra", "Missed Questions", "Lecture Notes"])
 
 
 def test_normalize_url():

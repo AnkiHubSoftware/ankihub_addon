@@ -168,7 +168,9 @@ def _check_ankihub_update_tags() -> None:
 
 def _remove_ankihub_update_tags():
     tags_to_remove = [
-        tag for tag in aqt.mw.col.tags.all() if tag.startswith("AnkiHub_Update::")
+        tag
+        for tag in aqt.mw.col.tags.all()
+        if tag.lower().startswith("ankihub_update::")
     ]
     tags_to_remove_str = " ".join(tags_to_remove)
     aqt.mw.col.tags.remove(tags_to_remove_str)

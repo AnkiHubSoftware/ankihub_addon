@@ -6,6 +6,7 @@ from typing import List
 from anki.notes import Note
 
 from .. import settings
+from ..main.utils import is_tag_in_list
 from .note_deletion import TAG_FOR_DELETED_NOTES
 
 TAG_FOR_PROTECTING_FIELDS = "AnkiHub_Protect"
@@ -25,18 +26,19 @@ ANKI_INTERNAL_TAGS = ["leech", "marked"]
 
 
 def is_internal_tag(tag: str) -> bool:
+    tag = tag.lower()
     return any(
-        tag == internal_tag or tag.startswith(f"{internal_tag}::")
+        tag == internal_tag.lower() or tag.startswith(f"{internal_tag.lower()}::")
         for internal_tag in [*ADDON_INTERNAL_TAGS]
-    ) or any(tag == internal_tag for internal_tag in ANKI_INTERNAL_TAGS)
+    ) or any(tag == internal_tag.lower() for internal_tag in ANKI_INTERNAL_TAGS)
 
 
 def is_optional_tag(tag: str) -> bool:
-    return tag.startswith(TAG_FOR_OPTIONAL_TAGS)
+    return tag.lower().startswith(TAG_FOR_OPTIONAL_TAGS.lower())
 
 
 def is_tag_for_group(tag: str, group_name: str) -> bool:
-    return tag.startswith(optional_tag_prefix_for_group(group_name))
+    return tag.lower().startswith(optional_tag_prefix_for_group(group_name).lower())
 
 
 def optional_tag_prefix_for_group(group_name: str) -> str:
@@ -49,26 +51,25 @@ def get_fields_protected_by_tags(note: Note) -> List[str]:
 
 
 def _get_fields_protected_by_tags(tags: List[str], field_names: List[str]) -> List[str]:
-    if TAG_FOR_PROTECTING_ALL_FIELDS in tags:
+    if is_tag_in_list(TAG_FOR_PROTECTING_ALL_FIELDS, tags):
         return [
             field_name
             for field_name in field_names
             if field_name != settings.ANKIHUB_NOTE_TYPE_FIELD_NAME
         ]
 
+    tag_prefix = f"{TAG_FOR_PROTECTING_FIELDS}::".lower()
     field_names_from_tags = [
-        tag[len(prefix) :]
-        for tag in tags
-        if tag.startswith((prefix := f"{TAG_FOR_PROTECTING_FIELDS}::"))
+        tag[len(tag_prefix) :] for tag in tags if tag.lower().startswith(tag_prefix)
     ]
 
     # Both a field and the field with underscores replaced with spaces should be protected.
     # This makes it possible to protect fields with spaces in their name because tags cant contain spaces.
     standardized_field_names_from_tags = [
-        field.replace("_", " ") for field in field_names_from_tags
+        field.replace("_", " ").lower() for field in field_names_from_tags
     ]
     standardized_field_names_from_note = [
-        field.replace("_", " ") for field in field_names
+        field.replace("_", " ").lower() for field in field_names
     ]
 
     result = [

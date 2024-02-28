@@ -241,7 +241,7 @@ def _on_protect_fields_action(browser: Browser, nids: Sequence[NoteId]) -> None:
             note.tags = [
                 tag
                 for tag in note.tags
-                if not tag.startswith(TAG_FOR_PROTECTING_FIELDS)
+                if not tag.lower().startswith(TAG_FOR_PROTECTING_FIELDS.lower())
             ]
 
             # add new tags for protecting fields
