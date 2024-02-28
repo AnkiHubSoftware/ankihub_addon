@@ -452,7 +452,7 @@ def _ankihub_help_setup(parent: QMenu):
     q_notion_action = QAction("Documentation", help_menu)
     qconnect(
         q_notion_action.triggered,
-        lambda: openLink("https://community.ankihub.net/c/docs"),
+        lambda: openLink("https://community.ankihub.net/docs"),
     )
     help_menu.addAction(q_notion_action)
 
