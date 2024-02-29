@@ -449,10 +449,10 @@ def _ankihub_help_setup(parent: QMenu):
     help_menu = QMenu("🆘 Help", parent)
 
     # && is an escaped & in qt
-    q_notion_action = QAction("Instructions && Changelog", help_menu)
+    q_notion_action = QAction("Documentation", help_menu)
     qconnect(
         q_notion_action.triggered,
-        lambda: openLink("http://docs.ankihub.net/"),
+        lambda: openLink("https://community.ankihub.net/docs"),
     )
     help_menu.addAction(q_notion_action)
 
@@ -462,6 +462,13 @@ def _ankihub_help_setup(parent: QMenu):
         lambda: openLink("https://community.ankihub.net/c/support"),
     )
     help_menu.addAction(q_get_help_action)
+
+    q_changelog_action = QAction("Changelog", help_menu)
+    qconnect(
+        q_changelog_action.triggered,
+        lambda: openLink("https://community.ankihub.net/c/announcements/"),
+    )
+    help_menu.addAction(q_changelog_action)
 
     q_upload_logs_action = QAction("Upload logs", help_menu)
     qconnect(q_upload_logs_action.triggered, _upload_logs_action)

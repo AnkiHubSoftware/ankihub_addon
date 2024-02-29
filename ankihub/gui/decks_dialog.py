@@ -427,7 +427,7 @@ class DeckManagementDialog(QDialog):
         # Initialize and set up the subdecks documentation link label
         self.subdecks_docs_link_label = QLabel(
             """
-            <a href="https://docs.ankihub.net/user_docs/advanced.html#subdecks-and-subdeck-tags">
+            <a href="https://community.ankihub.net/t/creating-a-deck/103683#subdecks-and-subdeck-tags-2">
                 More about subdecks
             </a>
             """
