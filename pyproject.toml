@@ -15,7 +15,6 @@ exclude = [
   'ankihub/media_import',
   'ankihub/media_export',
   'ankihub/gui/ankiaddonconfig',
-  'ankihub/lib/certifi',
   'ankihub/lib/sentry_sd',
   'ankihub/lib/urllib',
   'ankihub/lib/other/typing_extension',
@@ -34,7 +33,7 @@ module = 'mashumaro.*'
 ignore_errors = true
 
 [[tool.mypy.overrides]]
-module = ['sentry_sdk.*', 'certifi.*', 'urllib3.*', 'tenacity.*', 'peewee.*']
+module = ['sentry_sdk.*', 'urllib3.*', 'tenacity.*', 'peewee.*']
 follow_imports = 'skip'
 
 [[tool.mypy.overrides]]
