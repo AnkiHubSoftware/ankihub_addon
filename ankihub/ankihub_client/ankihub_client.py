@@ -224,12 +224,16 @@ class AnkiHubClient:
             hooks={"response": self.response_hooks} if self.response_hooks else None,
         )
         prepped = request.prepare()
-        response = self._send_request_with_retry(prepped, stream=stream)
+        response = self._send_request_with_retry(
+            prepped,
+            stream=stream,
+            timeout=TIMEOUT_SECONDS if api == API.ANKIHUB else None,
+        )
 
         return response
 
     def _send_request_with_retry(
-        self, request: PreparedRequest, stream=False
+        self, request: PreparedRequest, stream=False, timeout: Optional[int] = None
     ) -> Response:
         """
         This method is only used in the _send_request method.
@@ -238,7 +242,9 @@ class AnkiHubClient:
         If the last request failed because of an exception, that exception is raised.
         """
         try:
-            response = self._send_request_with_retry_inner(request, stream=stream)
+            response = self._send_request_with_retry_inner(
+                request, stream=stream, timeout=timeout
+            )
         except RetryError as e:
             # Catch RetryErrors to make the usage of tenacity transparent to the caller.
             last_attempt = cast(Future, e.last_attempt)
@@ -255,11 +261,11 @@ class AnkiHubClient:
         retry=RETRY_CONDITION,
     )
     def _send_request_with_retry_inner(
-        self, request: PreparedRequest, stream=False
+        self, request: PreparedRequest, stream=False, timeout: Optional[int] = None
     ) -> Response:
         session = Session()
         try:
-            response = session.send(request, stream=stream, timeout=TIMEOUT_SECONDS)
+            response = session.send(request, stream=stream, timeout=timeout)
         finally:
             session.close()
         return response
