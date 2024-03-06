@@ -107,6 +107,8 @@ IMAGE_FILE_EXTENSIONS = [
     ".webp",
 ]
 
+TIMEOUT_SECONDS = 20
+
 
 def _should_retry_for_response(response: Response) -> bool:
     """Return True if the request should be retried for the given Response, False otherwise."""
@@ -257,7 +259,7 @@ class AnkiHubClient:
     ) -> Response:
         session = Session()
         try:
-            response = session.send(request, stream=stream)
+            response = session.send(request, stream=stream, timeout=TIMEOUT_SECONDS)
         finally:
             session.close()
         return response
