@@ -9,7 +9,7 @@ from aqt.gui_hooks import profile_did_open, profile_will_close
 from . import LOGGER
 from .db import ankihub_db
 from .debug import setup as setup_debug
-from .feature_flags import setup_feature_flags
+from .feature_flags import setup_feature_flags_in_background
 from .gui import browser, deckbrowser, editor, progress, reviewer
 from .gui.addons import setup_addons
 from .gui.auto_sync import setup_auto_sync
@@ -114,9 +114,7 @@ def _general_setup():
 
     setup_error_handler()
     LOGGER.info("Set up error handler.")
-
-    setup_feature_flags()
-    LOGGER.info("Set up feature flags.")
+    setup_feature_flags_in_background()
 
     aqt.mw.addonManager.setWebExports(__name__, r"gui/web/.*")
 

@@ -1,9 +1,12 @@
 """Feature flags are used to enable/disable features on the client side. The flags are fetched from the server."""
 from dataclasses import dataclass, fields
 
+import aqt
+
 from . import LOGGER
 from .addon_ankihub_client import AddonAnkiHubClient as AnkiHubClient
 from .ankihub_client import AnkiHubHTTPError, AnkiHubRequestException
+from .gui.operations import AddonQueryOp
 
 
 @dataclass
@@ -37,3 +40,14 @@ def setup_feature_flags() -> None:
             setattr(feature_flags, field.name, value)
 
     LOGGER.info(f"Feature flags: {feature_flags}")
+
+
+def setup_feature_flags_in_background() -> None:
+    def on_done(_: None):
+        LOGGER.info("Set up feature flags.")
+
+    AddonQueryOp(
+        parent=aqt.mw,
+        op=lambda _: setup_feature_flags(),
+        success=on_done,
+    ).without_collection().run_in_background()
