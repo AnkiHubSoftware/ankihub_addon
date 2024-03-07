@@ -114,6 +114,7 @@ def _general_setup():
 
     setup_error_handler()
     LOGGER.info("Set up error handler.")
+
     setup_feature_flags_in_background()
 
     aqt.mw.addonManager.setWebExports(__name__, r"gui/web/.*")
