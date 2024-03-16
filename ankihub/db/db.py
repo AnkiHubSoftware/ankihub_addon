@@ -11,6 +11,7 @@ Some differences between data stored in the AnkiHub database and the Anki databa
 - decks, notes and note types can be missing from the Anki database or be modified.
 """
 
+import operator
 import time
 import uuid
 from pathlib import Path
@@ -32,7 +33,7 @@ import aqt
 from anki.models import NotetypeDict, NotetypeId
 from anki.notes import NoteId
 from anki.utils import ids2str, join_fields, split_fields
-from peewee import DQ
+from peewee import DQ, reduce
 
 from ..ankihub_client import Field, NoteInfo, suggestion_type_from_str
 from ..ankihub_client.models import DeckMedia as DeckMediaClientModel
@@ -110,66 +111,98 @@ class _AnkiHubDB:
                 f"missing from the AnkiHub DB: {missing_mids}"
             )
 
+        skipped_notes = self._determine_notes_to_skip(notes_data)
+        notes_data = [
+            note_data for note_data in notes_data if note_data not in skipped_notes
+        ]
+
         upserted_notes: List[NoteInfo] = []
-        skipped_notes: List[NoteInfo] = []
-
         note_dicts = []
+        for note_data in notes_data:
+
+            # Prepare fields and tags for insertion
+            fields = join_fields(
+                [
+                    field.value
+                    for field in sorted(note_data.fields, key=lambda field: field.order)
+                ]
+            )
+            tags = " ".join([tag for tag in note_data.tags if tag is not None])
+
+            note_dicts.append(
+                {
+                    "ankihub_note_id": note_data.ah_nid,
+                    "ankihub_deck_id": ankihub_did,
+                    "anki_note_id": note_data.anki_nid,
+                    "anki_note_type_id": note_data.mid,
+                    "fields": fields,
+                    "tags": tags,
+                    "guid": note_data.guid,
+                    "last_update_type": (
+                        note_data.last_update_type.value[0]
+                        if note_data.last_update_type is not None
+                        else None
+                    ),
+                }
+            )
+            upserted_notes.append(note_data)
+
+        # The chunk size is chosen as 1/10 of the default chunk size, because we need < 10 SQL variables
+        # for each deck media entry. The purpose is to avoid the "too many SQL variables" error.
         with self.write_lock, get_peewee_database().atomic():
-            for note_data in notes_data:
-                if self._conflicting_note_exists(note_data):
-                    skipped_notes.append(note_data)
-                    continue
-
-                # Prepare fields and tags for insertion
-                fields = join_fields(
-                    [
-                        field.value
-                        for field in sorted(
-                            note_data.fields, key=lambda field: field.order
-                        )
-                    ]
-                )
-                tags = " ".join([tag for tag in note_data.tags if tag is not None])
-
-                note_dicts.append(
-                    {
-                        "ankihub_note_id": note_data.ah_nid,
-                        "ankihub_deck_id": ankihub_did,
-                        "anki_note_id": note_data.anki_nid,
-                        "anki_note_type_id": note_data.mid,
-                        "fields": fields,
-                        "tags": tags,
-                        "guid": note_data.guid,
-                        "last_update_type": (
-                            note_data.last_update_type.value[0]
-                            if note_data.last_update_type is not None
-                            else None
-                        ),
-                    }
-                )
-                upserted_notes.append(note_data)
-
-            # The chunk size is chosen as 1/10 of the default chunk size, because we need < 10 SQL variables
-            # for each deck media entry. The purpose is to avoid the "too many SQL variables" error.
             for chunk in chunks(note_dicts, int(DEFAULT_CHUNK_SIZE / 10)):
                 AnkiHubNote.insert_many(chunk).on_conflict_replace().execute()
 
         return tuple(upserted_notes), tuple(skipped_notes)
 
-    def _conflicting_note_exists(self, note_data: NoteInfo) -> bool:
-        """Returns True if a note with the same Anki nid, but different AnkiHub nid exists in the AnkiHub DB
-        and is not marked as deleted.
-        Deleted notes are not considered conflicting, this way their entries in the DB can be overwritten.
-        This prevents the situation where a deleted note is blocking the insertion of a new note with the same Anki nid
-        from another deck."""
-        return AnkiHubNote.filter(
-            (
-                DQ(last_update_type__is=None)
-                | DQ(last_update_type__ne=SuggestionType.DELETE.value[0])
-            ),
-            anki_note_id=note_data.anki_nid,
-            ankihub_note_id__ne=note_data.ah_nid,
-        ).exists()
+    def _determine_notes_to_skip(self, notes_data: List[NoteInfo]) -> List[NoteInfo]:
+        """
+        Determines which notes data to skip.
+
+        This function checks for each note if a note with the same Anki nid,
+        but different AnkiHub nid exists in the AnkiHub DB and is not marked as
+        deleted. Notes that meet these conditions are considered conflicting
+        and are added to the list of notes to skip.
+
+        Deleted notes are not considered conflicting, this way their entries in
+        the DB can be overwritten. This prevents the situation where a deleted
+        note is blocking the insertion of a new note with the same Anki nid
+        from another deck.
+
+        Args:
+            notes_data (List[NoteInfo]): A list of NoteInfo objects representing the notes to check.
+
+        Returns:
+            List[NoteInfo]: A list of NoteInfo objects representing the notes to skip.
+        """
+        conflicting_anki_nids: Set[NoteId] = set()
+
+        # The chunk size is chosen as 1/2 of the default chunk size, because we need 2 SQL variables
+        # for each note. The purpose is to avoid the "too many SQL variables" error.
+        for notes_data_chunk in chunks(
+            notes_data, chunk_size=int(DEFAULT_CHUNK_SIZE / 2)
+        ):
+            conditions = [
+                (AnkiHubNote.anki_note_id == note_data.anki_nid)
+                & (AnkiHubNote.ankihub_note_id != note_data.ah_nid)
+                for note_data in notes_data_chunk
+            ]
+            aggregate_condition = reduce(operator.or_, conditions)
+            conflicting_anki_nids.update(
+                AnkiHubNote.select(AnkiHubNote.anki_note_id)
+                .filter(
+                    DQ(last_update_type__is=None)
+                    | DQ(last_update_type__ne=SuggestionType.DELETE.value[0]),
+                    aggregate_condition,
+                )
+                .objects(flat)
+            )
+
+        return [
+            note_data
+            for note_data in notes_data
+            if note_data.anki_nid in conflicting_anki_nids
+        ]
 
     def remove_notes(self, ah_nids: List[uuid.UUID]) -> None:
         """Removes notes from the AnkiHub DB"""
@@ -648,7 +681,10 @@ def execute_modifying_query_in_chunks(
         modifying_query_func(ids_chunk)
 
 
-def chunks(items: List, chunk_size: int) -> Generator[List, None, None]:
+T = TypeVar("T")
+
+
+def chunks(items: List[T], chunk_size: int) -> Generator[List[T], None, None]:
     """Yield chunks of size 'chunk_size' from 'items' list."""
     for i in range(0, len(items), chunk_size):
         yield items[i : i + chunk_size]
