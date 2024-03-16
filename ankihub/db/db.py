@@ -11,7 +11,6 @@ Some differences between data stored in the AnkiHub database and the Anki databa
 - decks, notes and note types can be missing from the Anki database or be modified.
 """
 
-import operator
 import time
 import uuid
 from pathlib import Path
@@ -33,7 +32,7 @@ import aqt
 from anki.models import NotetypeDict, NotetypeId
 from anki.notes import NoteId
 from anki.utils import ids2str, join_fields, split_fields
-from peewee import DQ, reduce
+from peewee import DQ
 
 from ..ankihub_client import Field, NoteInfo, suggestion_type_from_str
 from ..ankihub_client.models import DeckMedia as DeckMediaClientModel
@@ -111,7 +110,9 @@ class _AnkiHubDB:
                 f"missing from the AnkiHub DB: {missing_mids}"
             )
 
-        skipped_notes = self._determine_notes_to_skip(notes_data)
+        skipped_notes = self._determine_notes_to_skip(
+            notes_data, ankihub_did=ankihub_did
+        )
         notes_data = [
             note_data for note_data in notes_data if note_data not in skipped_notes
         ]
@@ -155,12 +156,14 @@ class _AnkiHubDB:
 
         return tuple(upserted_notes), tuple(skipped_notes)
 
-    def _determine_notes_to_skip(self, notes_data: List[NoteInfo]) -> List[NoteInfo]:
+    def _determine_notes_to_skip(
+        self, notes_data: List[NoteInfo], ankihub_did: uuid.UUID
+    ) -> List[NoteInfo]:
         """
-        Determines which notes data to skip.
+        Determines which notes data to skip when upserting notes data into the AnkiHub DB.
 
         This function checks for each note if a note with the same Anki nid,
-        but different AnkiHub nid exists in the AnkiHub DB and is not marked as
+        but different AnkiHub deck id exists in the AnkiHub DB and is not marked as
         deleted. Notes that meet these conditions are considered conflicting
         and are added to the list of notes to skip.
 
@@ -171,32 +174,23 @@ class _AnkiHubDB:
 
         Args:
             notes_data (List[NoteInfo]): A list of NoteInfo objects representing the notes to check.
+            ankihub_did (uuid.UUID): The AnkiHub deck id the notes are being inserted into.
 
         Returns:
             List[NoteInfo]: A list of NoteInfo objects representing the notes to skip.
         """
-        conflicting_anki_nids: Set[NoteId] = set()
 
-        # The chunk size is chosen as 1/2 of the default chunk size, because we need 2 SQL variables
-        # for each note. The purpose is to avoid the "too many SQL variables" error.
-        for notes_data_chunk in chunks(
-            notes_data, chunk_size=int(DEFAULT_CHUNK_SIZE / 2)
-        ):
-            conditions = [
-                (AnkiHubNote.anki_note_id == note_data.anki_nid)
-                & (AnkiHubNote.ankihub_note_id != note_data.ah_nid)
-                for note_data in notes_data_chunk
-            ]
-            aggregate_condition = reduce(operator.or_, conditions)
-            conflicting_anki_nids.update(
-                AnkiHubNote.select(AnkiHubNote.anki_note_id)
-                .filter(
-                    DQ(last_update_type__is=None)
-                    | DQ(last_update_type__ne=SuggestionType.DELETE.value[0]),
-                    aggregate_condition,
-                )
-                .objects(flat)
+        anki_note_ids = [note_data.anki_nid for note_data in notes_data]
+        conflicting_anki_nids = set(
+            AnkiHubNote.select(AnkiHubNote.anki_note_id)
+            .filter(
+                DQ(last_update_type__is=None)
+                | DQ(last_update_type__ne=SuggestionType.DELETE.value[0]),
+                anki_note_id__in=anki_note_ids,
+                ankihub_deck_id__ne=ankihub_did,
             )
+            .objects(flat)
+        )
 
         return [
             note_data
