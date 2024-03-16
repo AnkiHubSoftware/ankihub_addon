@@ -232,10 +232,11 @@ def install_sample_ah_deck(
     anki_session_with_addon_data: AnkiSession,
     next_deterministic_uuid: Callable[[], uuid.UUID],
 ) -> InstallSampleAHDeck:
+
+    ah_did = next_deterministic_uuid()
+
     def _install_sample_ah_deck():
         # Can only be used in an anki_session_with_addon.profile_loaded() context
-
-        ah_did = next_deterministic_uuid()
         anki_did = import_sample_ankihub_deck(ankihub_did=ah_did)
         config.add_deck(
             name="Testdeck",
@@ -1843,14 +1844,12 @@ class TestAnkiHubImporter:
         self,
         anki_session_with_addon_data: AnkiSession,
         install_sample_ah_deck: InstallSampleAHDeck,
-        next_deterministic_uuid: Callable[[], uuid.UUID],
     ):
         anki_session = anki_session_with_addon_data
         with anki_session.profile_loaded():
-            anki_did, _ = install_sample_ah_deck()
+            anki_did, ah_did = install_sample_ah_deck()
             first_local_did = anki_did
 
-            ah_did = next_deterministic_uuid()
             dids_before_import = all_dids()
             ankihub_importer = AnkiHubImporter()
             import_result = ankihub_importer.import_ankihub_deck(
@@ -1884,13 +1883,12 @@ class TestAnkiHubImporter:
         self,
         anki_session_with_addon_data: AnkiSession,
         install_sample_ah_deck: InstallSampleAHDeck,
-        next_deterministic_uuid: Callable[[], uuid.UUID],
     ):
         anki_session = anki_session_with_addon_data
         with anki_session.profile_loaded():
             mw = anki_session.mw
 
-            anki_did, _ = install_sample_ah_deck()
+            anki_did, ah_did = install_sample_ah_deck()
             first_local_did = anki_did
 
             # move cards to another deck and remove the original one
@@ -1900,7 +1898,6 @@ class TestAnkiHubImporter:
             mw.col.set_deck(cids, other_deck)
             mw.col.decks.remove([first_local_did])
 
-            ah_did = next_deterministic_uuid()
             dids_before_import = all_dids()
             ankihub_importer = AnkiHubImporter()
             import_result = ankihub_importer.import_ankihub_deck(
@@ -4010,7 +4007,7 @@ class TestDeckUpdater:
             ah_did = install_ah_deck()
 
             # Mock client.get_deck_updates to return a note update
-            note_info = import_ah_note()
+            note_info = import_ah_note(ah_did=ah_did)
             note_info.fields[0].value = "changed"
 
             latest_update = datetime.now()

@@ -7,6 +7,8 @@ from anki.models import NotetypeDict, NotetypeId
 from anki.notes import NoteId
 from pytest_anki import AnkiSession
 
+from ankihub.db.db import ankihub_db
+
 from .conftest import Profile
 
 # workaround for vscode test discovery not using pytest.ini which sets this env var
@@ -34,15 +36,18 @@ def import_anking_notes(
 ) -> ImportAnkingNotes:
     """Imports the given AnKing NoteInfos using the AnkHubImporter."""
 
+    ah_did = next_deterministic_uuid()
+
     def import_anking_notes_inner(
         anking_notes_data: List[NoteInfo],
     ) -> None:
+        first_import = ah_did not in ankihub_db.ankihub_deck_ids()
         importer = AnkiHubImporter()
         importer.import_ankihub_deck(
-            ankihub_did=next_deterministic_uuid(),
+            ankihub_did=ah_did,
             notes=anking_notes_data,
             deck_name="test",
-            is_first_import_of_deck=True,
+            is_first_import_of_deck=first_import,
             behavior_on_remote_note_deleted=BehaviorOnRemoteNoteDeleted.NEVER_DELETE,
             note_types=anking_note_types,
             protected_fields={},
