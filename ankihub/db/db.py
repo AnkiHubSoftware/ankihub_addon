@@ -180,16 +180,19 @@ class _AnkiHubDB:
             List[NoteInfo]: A list of NoteInfo objects representing the notes to skip.
         """
 
-        anki_note_ids = [note_data.anki_nid for note_data in notes_data]
+        anki_nids = [note_data.anki_nid for note_data in notes_data]
         conflicting_anki_nids = set(
-            AnkiHubNote.select(AnkiHubNote.anki_note_id)
-            .filter(
-                DQ(last_update_type__is=None)
-                | DQ(last_update_type__ne=SuggestionType.DELETE.value[0]),
-                anki_note_id__in=anki_note_ids,
-                ankihub_deck_id__ne=ankihub_did,
+            execute_list_query_in_chunks(
+                lambda anki_nids: AnkiHubNote.select(AnkiHubNote.anki_note_id)
+                .filter(
+                    DQ(last_update_type__is=None)
+                    | DQ(last_update_type__ne=SuggestionType.DELETE.value[0]),
+                    ankihub_deck_id__ne=ankihub_did,
+                    anki_note_id__in=anki_nids,
+                )
+                .objects(flat),
+                anki_nids,
             )
-            .objects(flat)
         )
 
         return [
