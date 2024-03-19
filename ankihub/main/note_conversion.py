@@ -1,6 +1,7 @@
 """Contains code that is used for converting Anki Note objects to NoteInfo objects (export)
 and from NoteInfo objects to Anki note objects (import)."""
 
+import re
 from typing import List
 
 from anki.notes import Note
@@ -24,17 +25,23 @@ ADDON_INTERNAL_TAGS = [
 # tags that are used internally by Anki and should not be deleted or appear in suggestions
 ANKI_INTERNAL_TAGS = ["leech", "marked"]
 
+INTERNAL_TAGS = ADDON_INTERNAL_TAGS + ANKI_INTERNAL_TAGS
+INTERNAL_TAGS = [tag.lower() for tag in INTERNAL_TAGS]
+INTERNAL_TAGS_REGEX = re.compile(
+    "|".join(f"^{tag}($|::)" for tag in INTERNAL_TAGS), flags=re.IGNORECASE
+)
+
+OPTIONAL_TAG_REGEX = re.compile(
+    f"^{TAG_FOR_OPTIONAL_TAGS.lower()}::", flags=re.IGNORECASE
+)
+
 
 def is_internal_tag(tag: str) -> bool:
-    tag = tag.lower()
-    return any(
-        tag == internal_tag.lower() or tag.startswith(f"{internal_tag.lower()}::")
-        for internal_tag in [*ADDON_INTERNAL_TAGS]
-    ) or any(tag == internal_tag.lower() for internal_tag in ANKI_INTERNAL_TAGS)
+    return bool(INTERNAL_TAGS_REGEX.match(tag))
 
 
 def is_optional_tag(tag: str) -> bool:
-    return tag.lower().startswith(TAG_FOR_OPTIONAL_TAGS.lower())
+    return bool(OPTIONAL_TAG_REGEX.match(tag))
 
 
 def is_tag_for_group(tag: str, group_name: str) -> bool:
