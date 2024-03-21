@@ -1,3 +1,4 @@
+import base64
 import dataclasses
 import gzip
 import json
@@ -10,6 +11,7 @@ from copy import deepcopy
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
 from typing import Callable, Generator, List, cast
+from unittest.mock import Mock
 
 import pytest
 import requests_mock
@@ -48,7 +50,11 @@ from ankihub.ankihub_client import (
     get_media_names_from_notes_data,
     get_media_names_from_suggestion,
 )
-from ankihub.ankihub_client.models import CardReviewData, UserDeckExtensionRelation
+from ankihub.ankihub_client.models import (
+    ANKIHUB_DATETIME_FORMAT_STR,
+    CardReviewData,
+    UserDeckExtensionRelation,
+)
 from ankihub.gui.utils import deck_download_progress_cb
 
 WEBAPP_COMPOSE_FILE = (
@@ -952,6 +958,68 @@ class TestGetDeckUpdates:
             protected_fields={},
             protected_tags=[],
         )
+
+    def test_get_deck_updates_with_external_notes_url(
+        self, authorized_client_for_user_test1: AnkiHubClient, mocker: MockerFixture
+    ):
+        # This test mocks the responses instead of relying on real responses from the server,
+        # because the setup required to get real responses with non-null external_notes_url is too costly or complex.
+        client = authorized_client_for_user_test1
+
+        # Mock responses from deck updates endpoint
+        # ... The first response contains the external_notes_url
+        first_response = Mock()
+        latest_udpate = datetime.now(timezone.utc)
+        latest_udpate_str = datetime.strftime(
+            latest_udpate, ANKIHUB_DATETIME_FORMAT_STR
+        )
+        first_response.json = lambda: {
+            "external_notes_url": "test_url",
+            "next": None,
+            "notes": None,
+            "latest_update": latest_udpate_str,
+            "protected_fields": {},
+            "protected_tags": [],
+        }
+        first_response.status_code = 200
+
+        # ... The second response is doesn't contain an external_notes_url and is empty
+        second_response = Mock()
+        notes = []
+        notes_encoded = gzip.compress(json.dumps(notes).encode("utf-8"))
+        notes_encoded = base64.b85encode(notes_encoded)
+        second_response.json = lambda: {
+            "external_notes_url": None,
+            "next": None,
+            "notes": notes_encoded,
+            "latest_update": None,
+            "protected_fields": {},
+            "protected_tags": [],
+        }
+        second_response.status_code = 200
+
+        mocker.patch(
+            "ankihub.ankihub_client.ankihub_client.AnkiHubClient._send_request",
+            side_effect=[first_response, second_response],
+        )
+
+        # Mock the download of the deck from the external_notes_url
+        note_info = NoteInfoFactory.create()
+        mocker.patch(
+            "ankihub.ankihub_client.ankihub_client.AnkiHubClient.download_deck",
+            return_value=[note_info],
+        )
+
+        update_chunks: List[DeckUpdateChunk] = list(
+            client.get_deck_updates(ID_OF_DECK_OF_USER_TEST1, since=None)
+        )
+        assert len(update_chunks) == 2
+
+        assert update_chunks[0].notes == [note_info]
+        assert update_chunks[0].latest_update == latest_udpate
+
+        assert update_chunks[1].notes == []
+        assert update_chunks[1].latest_update is None
 
 
 class TestGetDeckMediaUpdates:
