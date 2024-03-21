@@ -75,7 +75,7 @@ class _AnkiHubDB:
             create_tables()
             get_peewee_database().pragma("user_version", 11)
         else:
-            from .db_migrations import migrate_ankihub_db
+            from .db_migrations.db_migrations import migrate_ankihub_db
 
             migrate_ankihub_db()
             bind_peewee_models()

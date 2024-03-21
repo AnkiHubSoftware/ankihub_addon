@@ -2,9 +2,10 @@ from typing import List
 
 from peewee import Database, Model
 
-from .. import LOGGER
-from .db import ankihub_db
-from .models import AnkiHubNote, AnkiHubNoteType, DeckMedia, get_peewee_database
+from ... import LOGGER
+from ..db import ankihub_db
+from ..models import get_peewee_database
+from . import models_v11
 
 
 def migrate_ankihub_db():
@@ -152,9 +153,9 @@ def migrate_ankihub_db():
         # This for example ensures that column types and index names are the same for all users.
         with get_peewee_database().atomic():
             models_to_migrate: List[Model] = [
-                AnkiHubNote,  # type: ignore
-                AnkiHubNoteType,  # type: ignore
-                DeckMedia,  # type: ignore
+                models_v11.AnkiHubNote,  # type: ignore
+                models_v11.AnkiHubNoteType,  # type: ignore
+                models_v11.DeckMedia,  # type: ignore
             ]
             for model in models_to_migrate:
                 table_name = model._meta.table_name
