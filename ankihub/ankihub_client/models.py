@@ -1,5 +1,6 @@
 """Defines classes that represent data returned by the AnkiHub API or sent to it.
 Also defines some helper functions."""
+
 import dataclasses
 import uuid
 from abc import ABC
@@ -15,6 +16,9 @@ from mashumaro.mixins.json import DataClassJSONMixin
 from ..common_utils import local_media_names_from_html
 
 ANKIHUB_DATETIME_FORMAT_STR = "%Y-%m-%dT%H:%M:%S.%f%z"
+
+# This is the old format which was used in deck CSV files previously
+ANKIHUB_DATETIME_FORMAT_STR_OLD = "%Y-%m-%d %H:%M:%S.%f%z"
 
 
 class SuggestionType(Enum):
@@ -37,6 +41,15 @@ def suggestion_type_from_str(s: str) -> Optional[SuggestionType]:
     if result is None:
         raise ValueError("Invalid suggestion type string")
     return result
+
+
+def datetime_from_str(string: str) -> Optional[datetime]:
+    if string is None:
+        return None
+    try:
+        return datetime.strptime(string, ANKIHUB_DATETIME_FORMAT_STR)
+    except ValueError:
+        return datetime.strptime(string, ANKIHUB_DATETIME_FORMAT_STR_OLD)
 
 
 class DataClassJSONMixinWithConfig(DataClassJSONMixin):
@@ -64,6 +77,10 @@ class NoteInfo(DataClassJSONMixinWithConfig):
             serialize=lambda x: x.value[0] if x is not None else None,
             deserialize=suggestion_type_from_str,
         ),
+        default=None,
+    )
+    last_sync: Optional[datetime] = dataclasses.field(
+        metadata=field_options(deserialize=datetime_from_str),
         default=None,
     )
 
@@ -103,9 +120,9 @@ class Deck(DataClassJSONMixinWithConfig):
     name: str
     csv_last_upload: datetime = dataclasses.field(
         metadata=field_options(
-            deserialize=lambda x: datetime.strptime(x, ANKIHUB_DATETIME_FORMAT_STR)
-            if x
-            else None
+            deserialize=lambda x: (
+                datetime.strptime(x, ANKIHUB_DATETIME_FORMAT_STR) if x else None
+            )
         )
     )
     csv_notes_filename: str
@@ -141,9 +158,9 @@ class Deck(DataClassJSONMixinWithConfig):
 class DeckUpdateChunk(DataClassJSONMixinWithConfig):
     latest_update: Optional[datetime] = dataclasses.field(
         metadata=field_options(
-            deserialize=lambda x: datetime.strptime(x, ANKIHUB_DATETIME_FORMAT_STR)
-            if x
-            else None,
+            deserialize=lambda x: (
+                datetime.strptime(x, ANKIHUB_DATETIME_FORMAT_STR) if x else None
+            ),
         ),
     )
     protected_fields: Dict[int, List[str]]
@@ -280,9 +297,9 @@ class DeckExtensionUpdateChunk(DataClassJSONMixinWithConfig):
     note_customizations: List[NoteCustomization]
     latest_update: Optional[datetime] = dataclasses.field(
         metadata=field_options(
-            deserialize=lambda x: datetime.strptime(x, ANKIHUB_DATETIME_FORMAT_STR)
-            if x
-            else None,
+            deserialize=lambda x: (
+                datetime.strptime(x, ANKIHUB_DATETIME_FORMAT_STR) if x else None
+            ),
         ),
         default=None,
     )

@@ -37,11 +37,11 @@ class UUIDField(Field):
 class DateTimeField(Field):
     field_type = "TEXT"
 
-    def db_value(self, value: datetime) -> str:
-        return value.isoformat()
+    def db_value(self, value: Optional[datetime]) -> Optional[str]:
+        return value.isoformat() if value is not None else None
 
-    def python_value(self, value: str) -> datetime:
-        return datetime.fromisoformat(value)
+    def python_value(self, value: Optional[str]) -> Optional[datetime]:
+        return datetime.fromisoformat(value) if value is not None else None
 
 
 class JSONField(Field):
@@ -64,6 +64,7 @@ class AnkiHubNote(Model):
     fields = TextField(null=True)
     tags = TextField(null=True)
     last_update_type = TextField(null=True)
+    last_sync = DateTimeField(null=True)
 
     class Meta:
         table_name = "notes"

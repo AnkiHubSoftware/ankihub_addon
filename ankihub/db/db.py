@@ -73,7 +73,7 @@ class _AnkiHubDB:
         if self.schema_version() == 0:
             bind_peewee_models()
             create_tables()
-            get_peewee_database().pragma("user_version", 11)
+            get_peewee_database().pragma("user_version", 12)
         else:
             from .db_migrations.db_migrations import migrate_ankihub_db
 
@@ -144,6 +144,7 @@ class _AnkiHubDB:
                         if note_data.last_update_type is not None
                         else None
                     ),
+                    "last_sync": note_data.last_sync,
                 }
             )
             upserted_notes.append(note_data)
@@ -244,7 +245,9 @@ class _AnkiHubDB:
             # The chunk size is chosen as 1/10 of the default chunk size, because we need < 10 SQL variables
             # for each entry. The purpose is to avoid the "too many SQL variables" error.
             AnkiHubNote.bulk_update(
-                notes, fields=[AnkiHubNote.mod], batch_size=int(DEFAULT_CHUNK_SIZE / 10)
+                notes,
+                fields=[AnkiHubNote.mod],
+                batch_size=int(DEFAULT_CHUNK_SIZE / 10),
             )
 
     def reset_mod_values_in_anki_db(self, anki_nids: List[NoteId]) -> None:
@@ -302,6 +305,7 @@ class _AnkiHubDB:
                 if note.last_update_type
                 else None
             ),
+            last_sync=note.last_sync,
         )
 
     def anki_nids_for_ankihub_deck(self, ankihub_did: uuid.UUID) -> List[NoteId]:
