@@ -985,7 +985,7 @@ class TestGetDeckUpdates:
 
         # ... The second response is doesn't contain an external_notes_url and is empty
         second_response = Mock()
-        notes = []
+        notes: List[NoteInfo] = []
         notes_encoded = gzip.compress(json.dumps(notes).encode("utf-8"))
         notes_encoded = base64.b85encode(notes_encoded)
         second_response.json = lambda: {
