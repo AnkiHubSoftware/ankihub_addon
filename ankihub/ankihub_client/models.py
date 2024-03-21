@@ -43,7 +43,7 @@ def suggestion_type_from_str(s: str) -> Optional[SuggestionType]:
     return result
 
 
-def datetime_from_str(string: str) -> Optional[datetime]:
+def _datetime_from_str(string: str) -> Optional[datetime]:
     if string is None:
         return None
     try:
@@ -80,7 +80,7 @@ class NoteInfo(DataClassJSONMixinWithConfig):
         default=None,
     )
     last_sync: Optional[datetime] = dataclasses.field(
-        metadata=field_options(deserialize=datetime_from_str),
+        metadata=field_options(deserialize=_datetime_from_str),
         default=None,
     )
 
