@@ -710,6 +710,22 @@ class AnkiHubClient:
                 data["next"].split("/api", maxsplit=1)[1] if data["next"] else None
             )
 
+            if data["external_notes_url"]:
+                notes_data_deck = self.download_deck(ah_did, download_progress_cb)
+                chunk = DeckUpdateChunk.from_dict(data)
+                chunk.notes = notes_data_deck
+                yield chunk
+
+                # Get the rest of the updates, because the CSV is most likely not completely up to date
+                yield from self.get_deck_updates(
+                    ah_did=ah_did,
+                    since=chunk.latest_update,
+                    download_progress_cb=download_progress_cb,
+                )
+                return
+            elif not data["notes"]:
+                raise ValueError("No notes in the response")  # pragma: no cover
+
             # decompress and transform notes data
             notes_data_base85 = data["notes"]
             notes_data_gzipped = base64.b85decode(notes_data_base85)
