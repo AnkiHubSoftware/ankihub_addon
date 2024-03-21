@@ -3,7 +3,7 @@ interactions:
     body: '{"username": "test2", "password": "asdf"}'
     headers:
       Accept:
-      - application/json; version=13.0
+      - application/json; version=17.0
       Content-Length:
       - '41'
       Content-Type:
@@ -12,7 +12,7 @@ interactions:
     uri: http://localhost:8000/api/login/
   response:
     body:
-      string: '{"expiry":"2023-09-14T18:53:07.457090Z","token":"fdb8732fbe54f4a76e04a422a26a986aaeee8843641fd7eb85613e5da96c5654"}'
+      string: '{"expiry":"2024-04-18T18:19:00.551440Z","token":"84c28a73bc5fe46bbf2991d52ace7e889661d286e2f9f4a5ac9c91e5f102c176"}'
     headers:
       Allow:
       - POST, OPTIONS
@@ -25,29 +25,29 @@ interactions:
       Cross-Origin-Opener-Policy:
       - same-origin
       Date:
-      - Thu, 17 Aug 2023 18:53:07 GMT
+      - Thu, 21 Mar 2024 18:19:00 GMT
       Referrer-Policy:
       - same-origin
       Server:
-      - WSGIServer/0.2 CPython/3.8.16
+      - WSGIServer/0.2 CPython/3.8.17
       Server-Timing:
-      - TimerPanel_utime;dur=988.9610000000002;desc="User CPU time", TimerPanel_stime;dur=129.00099999999998;desc="System
-        CPU time", TimerPanel_total;dur=1117.9620000000002;desc="Total CPU time",
-        TimerPanel_total_time;dur=864.9270534515381;desc="Elapsed time", SQLPanel_sql_time;dur=5.539178848266602;desc="SQL
-        16 queries", CachePanel_total_time;dur=0;desc="Cache 0 Calls"
+      - TimerPanel_utime;dur=325.1010000000001;desc="User CPU time", TimerPanel_stime;dur=28.452000000000144;desc="System
+        CPU time", TimerPanel_total;dur=353.5530000000003;desc="Total CPU time", TimerPanel_total_time;dur=288.4251640007278;desc="Elapsed
+        time", SQLPanel_sql_time;dur=8.462707002763636;desc="SQL 16 queries", CachePanel_total_time;dur=0;desc="Cache
+        0 Calls"
       Set-Cookie:
-      - csrftoken=9AuCD3TzxguB9zjbqoxFgqIKWStc2XDD; expires=Thu, 15 Aug 2024 18:53:07
+      - csrftoken=4u5kF4EGkAFr9IfXCr5sZR60Ec0izVoy; expires=Thu, 20 Mar 2025 18:19:00
         GMT; HttpOnly; Max-Age=31449600; Path=/; SameSite=Lax
-      - sessionid=vrybegfrbzof2qibvszbpqtevqkczyip; expires=Thu, 24 Aug 2023 18:53:07
+      - sessionid=btcf4prkf73pgve1o5rbv0u5pcahy72z; expires=Thu, 28 Mar 2024 18:19:00
         GMT; HttpOnly; Max-Age=604800; Path=/; SameSite=Lax
       Vary:
-      - Accept, Cookie, Accept-Language, Origin
+      - Accept, Cookie, Accept-Language, origin
       X-Content-Type-Options:
       - nosniff
       X-Frame-Options:
       - DENY
       djdt-store-id:
-      - df494999c43043f5af9356ce0f8bad68
+      - cb68a8e149d84a378950314f4073958f
     status:
       code: 200
       message: OK
@@ -55,46 +55,46 @@ interactions:
     body: null
     headers:
       Accept:
-      - application/json; version=13.0
+      - application/json; version=17.0
       Authorization:
-      - Token fdb8732fbe54f4a76e04a422a26a986aaeee8843641fd7eb85613e5da96c5654
+      - Token 84c28a73bc5fe46bbf2991d52ace7e889661d286e2f9f4a5ac9c91e5f102c176
       Content-Type:
       - application/json
     method: GET
     uri: http://localhost:8000/api/decks/5528aef7-f7ac-406b-9b35-4eaf00de4b20/updates?size=5
   response:
     body:
-      string: '{"next":"http://localhost:8000/api/decks/5528aef7-f7ac-406b-9b35-4eaf00de4b20/updates?cursor=cD0yMDIzLTA4LTE3KzE4JTNBNTMlM0EwNS4wNTc3NDMlMkIwMCUzQTAw&size=5","notes":"ABzY8lWg8(0{`ulO^e$w5QhJXG4!?y^5{Ekdnoi&+C#gyC76*kPR%-Yh@Fx)<iA&Ta5pXNp=DunSP<ydXg-*EknWE;whwh#$9$O;%4m=UnBpeOBZY^vIadlSQe{|WFfhrrXU+@7Bw@vQB<X?YDWs~YiG7N=KjtlNXpFt1!!X`;yGXla;7NbSW`Dl?R`*$2m>rLyST1|qY#TbAve0xtDT~z5P<QR(w%)9>eiz=-Ve%+pv2EAy^3zTBSn0!I*x_ZV;<8kJTBYN9f9~khXM6Xh{%GFp$AAX=q1<mH4pa_5wv&IitJiglO&Pj&pmyq^?UKVefgp&n5}sAwOC~iH%vs>f@rceM5^D83WX|~>`#St#J!gYt8gM;LZZ-9E!33l;#(;urXHvX06O@Vq`HEFhR!myJ#Doi`$W$@9VAEipg^2{C1X!!pl`;93;eYKml+oyt4QX3EGYl|BqP4_AjKriu&TR0Ih*$&-PRStu3&tqQX^f*NW&yJhvyih;v(U3Jv#_&p`QMO*N|3D-LcT(N3bMC_=bCdSWa68iMa5j;$k6j3g$Ip7Ts35H;EdJAzCwNyvU1#sLISht(@QTodWIo=t5$PA(htb(l|f$p0zZR*>emPW00","protected_fields":{},"protected_tags":[],"latest_update":"2023-08-17T18:53:05.133740Z"}'
+      string: '{"next":"http://localhost:8000/api/decks/5528aef7-f7ac-406b-9b35-4eaf00de4b20/updates?size=5&cursor=MjAyNC0wMy0yMSAxODoxODo1Ny4wMDI0OTUrMDA6MDB8ZmVlNDc3OWItZDI3Ni00MWRiLWFlNjEtMWNkZDk5MzdlMmU2","notes":"ABzY86ngw+0{`ukZEM>w5XZlY@#`vB&r;Y1D-8B}+q+WCNjhbwwj5$-OBeFpCp&m;*_&<@mO;UwzfSkS-OqP(EFs-BbrZ^UK{?}+RYJ<Eq73No&gN1|W&oomQG+L<QjS>1B@qa*ssakfs&Wo#al|Pk?b|jRVuNiM^8MymCg^ZV_5}~)<lOH9?y{lE`Wv+S^W)cMDDnrz@#yJ#JwUf@@pLMD+yB5~F3|L8^`_}I#jx{l@i2STY_(0Bcjf7-c&PN@Fz(=SDf+lndAiNl&HmhC`t&i~Uw?n!byGkK!&vXP0Y<FH`|a%C@0v}MpsjtMMoe=Lsm~7Q1P;MRhn7^xfCytX0Rupsi_{uvLR8hSkR|6e42^$cJ!fOtG{R<{-0j@c10-gdWHv)!{~aXyuOV?swbtAaAs8dVfg(<4W<pWrbfl8Y_#%+<8c}H}Gu5R-`V$(T`wk17T#7Lts~4sNQ~?JN1keT|JU9Z>(mW<3sp3)6O8pg`N!0UPCqWm%7Qq)G79kg*7NHkm7GcZZR#OTlgcL@<QhzpebjYLEmRRXD5zJ`fq{_pQnlWi8Di<!Adj3VN;Zh0lO8wc?BcjmSIue*xM9`3T9Tg?ihhQz&$nes3{q`rZj9BC>2><{","external_notes_url":null,"protected_fields":{},"protected_tags":[],"latest_update":"2024-03-21T18:18:57.082041Z"}'
     headers:
       Allow:
       - GET, HEAD, OPTIONS
       Content-Language:
       - en
       Content-Length:
-      - '874'
+      - '943'
       Content-Type:
       - application/json
       Cross-Origin-Opener-Policy:
       - same-origin
       Date:
-      - Thu, 17 Aug 2023 18:53:08 GMT
+      - Thu, 21 Mar 2024 18:19:01 GMT
       Referrer-Policy:
       - same-origin
       Server:
-      - WSGIServer/0.2 CPython/3.8.16
+      - WSGIServer/0.2 CPython/3.8.17
       Server-Timing:
-      - TimerPanel_utime;dur=477.63199999999983;desc="User CPU time", TimerPanel_stime;dur=0.0;desc="System
-        CPU time", TimerPanel_total;dur=477.63199999999983;desc="Total CPU time",
-        TimerPanel_total_time;dur=484.76266860961914;desc="Elapsed time", SQLPanel_sql_time;dur=4.657268524169922;desc="SQL
-        11 queries", CachePanel_total_time;dur=0;desc="Cache 0 Calls"
+      - TimerPanel_utime;dur=461.0759999999985;desc="User CPU time", TimerPanel_stime;dur=4.1519999999999335;desc="System
+        CPU time", TimerPanel_total;dur=465.2279999999984;desc="Total CPU time", TimerPanel_total_time;dur=482.6728890002414;desc="Elapsed
+        time", SQLPanel_sql_time;dur=11.622153000644175;desc="SQL 15 queries", CachePanel_total_time;dur=0;desc="Cache
+        0 Calls"
       Vary:
-      - Accept, Accept-Language, Cookie, Origin
+      - Accept, Accept-Language, Cookie, origin
       X-Content-Type-Options:
       - nosniff
       X-Frame-Options:
       - DENY
       djdt-store-id:
-      - b209e53a867a488a803dd11403db8308
+      - 38b73de59ca54d5eb688598686450e65
     status:
       code: 200
       message: OK
@@ -102,46 +102,46 @@ interactions:
     body: null
     headers:
       Accept:
-      - application/json; version=13.0
+      - application/json; version=17.0
       Authorization:
-      - Token fdb8732fbe54f4a76e04a422a26a986aaeee8843641fd7eb85613e5da96c5654
+      - Token 84c28a73bc5fe46bbf2991d52ace7e889661d286e2f9f4a5ac9c91e5f102c176
       Content-Type:
       - application/json
     method: GET
-    uri: http://localhost:8000/api/decks/5528aef7-f7ac-406b-9b35-4eaf00de4b20/updates?cursor=cD0yMDIzLTA4LTE3KzE4JTNBNTMlM0EwNS4wNTc3NDMlMkIwMCUzQTAw&size=5
+    uri: http://localhost:8000/api/decks/5528aef7-f7ac-406b-9b35-4eaf00de4b20/updates?size=5&cursor=MjAyNC0wMy0yMSAxODoxODo1Ny4wMDI0OTUrMDA6MDB8ZmVlNDc3OWItZDI3Ni00MWRiLWFlNjEtMWNkZDk5MzdlMmU2
   response:
     body:
-      string: '{"next":"http://localhost:8000/api/decks/5528aef7-f7ac-406b-9b35-4eaf00de4b20/updates?cursor=cD0yMDIzLTA4LTE3KzE4JTNBNTMlM0EwNC45Njk3MzIlMkIwMCUzQTAw&size=5","notes":"ABzY8lx*H)0{`umORL*35QYDWF?4rT^ccOeEOb@cMSFLb5Ju7{HP^92?3CMv{P)UE-KLA|vj`Y;G^2B{=L7lWRAcwrY?@TBDhU>>mQL`es!kMNFXdX78dA0_TZ|023Cstj84za96G4!?E|%O-n}*_eIn^ERX!1VO+c@?5L!v_|Owm8EJzkpMo1rQXR;N=GtJQ$JeM{$a72Ez7Rf$>}o4$KrpP#CKkssg2172r}>&$Qcjw+gtRAX6+cU{`s<K<I6e{s)Wn@{%LaSCX07&pg#!jU%P&;9K056!meu-(MI8>yRLzU#|@OMoTi0KhOuHZzDxGncGmoU$`Y=ctMQwJez*aA@Lx)jtC-r4hID$R@Fwt&<Rokc&`@fJNv<m_^t{xJCGSJ<skMveeEBZ}kK6Eyz-H0CI{Mj}v60%Pcf75hYQQ3N)JghAgcDrHy_-z6m)yYduebVN8iZ5{?B(mIV=_L&v?4cMh3r=bbe|JRskK3@T-nI5MAtVjyt3xTRoaCq%FgGvHlA7T_cZ>4kbgz6qJ4*H&egc|rz(h=mO0$E+b+2woeW?hNw!H%Lq%I(Z2I00","protected_fields":{},"protected_tags":[],"latest_update":"2023-08-17T18:53:05.040810Z"}'
+      string: '{"next":"http://localhost:8000/api/decks/5528aef7-f7ac-406b-9b35-4eaf00de4b20/updates?size=5&cursor=MjAyNC0wMy0yMSAxODoxODo1Ni45MDM3MjQrMDA6MDB8Y2MzYzI0MTUtNWZhYi00OWQyLTk2M2YtNjFjZWVjZjVjNjZh","notes":"ABzY86?*(-0{`umO^=%}5QhH>;=Eq@`y;omRH^57Z>tEI@i>bXOcY4>Bg%iT0nw(n9CHXl;$=MZ0`q9h%c=C~t*M$&ZVG0Nvcg!WABr*{ye;8UDQ-PRL!$9OB-J%>wNON&kCX<KHK*lV(&C6yNjkP|4#WoAFy#A}Q<;2+li4$Vj8k%d2zbZ=n)Pqr9+$<}W+?LMi_;0%W;6J1-{SdPK-+&|F+ZT`(_?vlDE?V~{}>Pc(vw|!{^~m{a7ro0e95)jyu3Ru-<E#<NS{yd-@0xxX#Fr&$9?c4R^#V>uI~@cu1UVFpid*F`Q=le6BYvthDK@~QISO=9avJMlmwiL)?v-8=6_38&nG`L@LzOs<2f|?-Q2QCRC8Y^!B)XnAyy$*p;n<+VOC*R;mYmYy9??@O3N%W;!gc~>Rf_|)Dfy}O{58oSWPK$F>>lqc(i!i)U|Vr=i@%>*Hd>2Yig+?RLM*|@Z2256yeqeU`h(^;I^qN$(*y=&^z_(sS6p9nwmt^n0I*Nh}S>~rvOnSM-=k5sWYy0{<SN4r+zhc00CU);a1V-S$BaGr$r>10U|^NTKgNLzWoDpxPc<h2><{","external_notes_url":null,"protected_fields":{},"protected_tags":[],"latest_update":"2024-03-21T18:18:56.979262Z"}'
     headers:
       Allow:
       - GET, HEAD, OPTIONS
       Content-Language:
       - en
       Content-Length:
-      - '829'
+      - '903'
       Content-Type:
       - application/json
       Cross-Origin-Opener-Policy:
       - same-origin
       Date:
-      - Thu, 17 Aug 2023 18:53:08 GMT
+      - Thu, 21 Mar 2024 18:19:01 GMT
       Referrer-Policy:
       - same-origin
       Server:
-      - WSGIServer/0.2 CPython/3.8.16
+      - WSGIServer/0.2 CPython/3.8.17
       Server-Timing:
-      - TimerPanel_utime;dur=119.59000000000053;desc="User CPU time", TimerPanel_stime;dur=0.0;desc="System
-        CPU time", TimerPanel_total;dur=119.59000000000053;desc="Total CPU time",
-        TimerPanel_total_time;dur=124.79233741760254;desc="Elapsed time", SQLPanel_sql_time;dur=4.348516464233398;desc="SQL
-        11 queries", CachePanel_total_time;dur=0;desc="Cache 0 Calls"
+      - TimerPanel_utime;dur=228.74900000000054;desc="User CPU time", TimerPanel_stime;dur=8.312999999999793;desc="System
+        CPU time", TimerPanel_total;dur=237.06200000000032;desc="Total CPU time",
+        TimerPanel_total_time;dur=256.13290799992683;desc="Elapsed time", SQLPanel_sql_time;dur=9.076108002773253;desc="SQL
+        15 queries", CachePanel_total_time;dur=0;desc="Cache 0 Calls"
       Vary:
-      - Accept, Accept-Language, Cookie, Origin
+      - Accept, Accept-Language, Cookie, origin
       X-Content-Type-Options:
       - nosniff
       X-Frame-Options:
       - DENY
       djdt-store-id:
-      - c3e532ecdc7e4c18906b88d67e196078
+      - 139a422d979c463dacb815fcfce8b80f
     status:
       code: 200
       message: OK
@@ -149,46 +149,46 @@ interactions:
     body: null
     headers:
       Accept:
-      - application/json; version=13.0
+      - application/json; version=17.0
       Authorization:
-      - Token fdb8732fbe54f4a76e04a422a26a986aaeee8843641fd7eb85613e5da96c5654
+      - Token 84c28a73bc5fe46bbf2991d52ace7e889661d286e2f9f4a5ac9c91e5f102c176
       Content-Type:
       - application/json
     method: GET
-    uri: http://localhost:8000/api/decks/5528aef7-f7ac-406b-9b35-4eaf00de4b20/updates?cursor=cD0yMDIzLTA4LTE3KzE4JTNBNTMlM0EwNC45Njk3MzIlMkIwMCUzQTAw&size=5
+    uri: http://localhost:8000/api/decks/5528aef7-f7ac-406b-9b35-4eaf00de4b20/updates?size=5&cursor=MjAyNC0wMy0yMSAxODoxODo1Ni45MDM3MjQrMDA6MDB8Y2MzYzI0MTUtNWZhYi00OWQyLTk2M2YtNjFjZWVjZjVjNjZh
   response:
     body:
-      string: '{"next":null,"notes":"ABzY8lx*H)0{`ukPix#T5XHZWF!UA$N!H(`?V-?9X%B5~VKF0V?235p#rBqMm;LUQZQLY>9$I?Hp<wJEGxHwuJam64pnFJFip7p_#+kNSa(+XKh~Z%^7fJ~WSQ}a!2vjodsq>|x5}{@+qV$3lSyCr#<Cqoqm!g9M&e}UXPjjyyA`ZF0GJk{iv^Kw{k>m%+<r4UAH^SlA;`K^G+y6ikvBfF%-EDEbA&-{t&(i=;J^545FZ}@t&Ld>XpRC>Ic5_;P<>M!N_c?tquTHZ;3*%Isju9rTrtil^-w&xt9kf;Gy9vAH@Lit=Rs*SRj7Dn89E()?(opY&pb#TM>74U5|0UTx-@%x|v+C+5a%qBQS=kKLvc?(s24aJ91G$0PKyP3+up78yzwGWYWF>`RN-Oa{<KJZ*z$)Q1qXF_uYE%@w28tpwU&gYQ%Dm`|x#L0^!GwEZA-_(ChKxgagXd+UVz<YxdHW~X|KqH!5w>K?QeOIepM}p?*}J?PsFe*0nT~&VpZC}OPr+1@bX^4i00","protected_fields":{},"protected_tags":[],"latest_update":"2023-08-17T18:53:04.953284Z"}'
+      string: '{"next":null,"notes":"ABzY86?*(-0{`ujOKaRP6ovna@Hz^5%O2W71BI^B?!sX7xOPosd9Xd{q{IC8$~J1JyQXB3MZus?SN9xS_xRylnE2S$oiBEX>WcGH5^;kH5AJcR7E-d(K%;S^jl+T{iz~||7GN4eJP6B3u}T8Wut?%Dgj8rc2!2ZYhjS544~yAXIL%A*FnSnMfh2x1;kX@s>n4;QgU)A1ce}~-hX9uga$)!ZXnjF9#M|O>gMM3nI?bcG_N3RIUxpqKEG=kGOVaMsaeLhE7VkgD=ezG8`+hM9W}55c!J8TC`T4Nwhp}tBXhQ9VI73`NJ`Sm2Gq92{X-bE^WEu;p7&cNh*p!kI4iqdgza-i7&P<*Aqq@1VRGLk@j%<N?o$CTL1IxfOhzv4=%Ahlp8LDEx&h9#NDzz4*`XBmVhfW&mMdJl-I0!5(r`V<;VyzU{j8Mx#zwOYa6iTOv-+Jipy1qrz=-$I=?WoD^A+{f0@-Mt{_70?~xUg6^GR??Jk1MAcCRAzed?g&vf69J;+5ZGnpPAu~1poj","external_notes_url":null,"protected_fields":{},"protected_tags":[],"latest_update":"2024-03-21T18:18:56.882851Z"}'
     headers:
       Allow:
       - GET, HEAD, OPTIONS
       Content-Language:
       - en
       Content-Length:
-      - '634'
+      - '662'
       Content-Type:
       - application/json
       Cross-Origin-Opener-Policy:
       - same-origin
       Date:
-      - Thu, 17 Aug 2023 18:53:08 GMT
+      - Thu, 21 Mar 2024 18:19:01 GMT
       Referrer-Policy:
       - same-origin
       Server:
-      - WSGIServer/0.2 CPython/3.8.16
+      - WSGIServer/0.2 CPython/3.8.17
       Server-Timing:
-      - TimerPanel_utime;dur=118.05500000000002;desc="User CPU time", TimerPanel_stime;dur=2.7810000000000334;desc="System
-        CPU time", TimerPanel_total;dur=120.83600000000006;desc="Total CPU time",
-        TimerPanel_total_time;dur=127.1524429321289;desc="Elapsed time", SQLPanel_sql_time;dur=5.36036491394043;desc="SQL
-        11 queries", CachePanel_total_time;dur=0;desc="Cache 0 Calls"
+      - TimerPanel_utime;dur=259.52900000000056;desc="User CPU time", TimerPanel_stime;dur=9.261999999999881;desc="System
+        CPU time", TimerPanel_total;dur=268.79100000000045;desc="Total CPU time",
+        TimerPanel_total_time;dur=263.70251499974984;desc="Elapsed time", SQLPanel_sql_time;dur=7.241155000883737;desc="SQL
+        15 queries", CachePanel_total_time;dur=0;desc="Cache 0 Calls"
       Vary:
-      - Accept, Accept-Language, Cookie, Origin
+      - Accept, Accept-Language, Cookie, origin
       X-Content-Type-Options:
       - nosniff
       X-Frame-Options:
       - DENY
       djdt-store-id:
-      - b3b3c5b81e1c4338845dfd5ced679f2d
+      - 84aa21b845354b088ad615266ed3fefe
     status:
       code: 200
       message: OK
