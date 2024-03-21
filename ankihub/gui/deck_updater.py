@@ -273,7 +273,9 @@ def show_tooltip_about_last_deck_updates_results() -> None:
         )
 
 
-def _update_deck_updates_download_progress_cb(notes_count: int, ankihub_did: uuid.UUID):
+def _update_deck_updates_download_progress_cb(
+    notes_count: int, ankihub_did: uuid.UUID
+) -> None:
     aqt.mw.taskman.run_on_main(
         lambda: _update_deck_updates_download_progress_cb_inner(
             notes_count=notes_count, ankihub_did=ankihub_did
@@ -283,7 +285,7 @@ def _update_deck_updates_download_progress_cb(notes_count: int, ankihub_did: uui
 
 def _update_deck_updates_download_progress_cb_inner(
     notes_count: int, ankihub_did: uuid.UUID
-):
+) -> None:
     try:
         aqt.mw.progress.update(
             "Downloading updates\n"
