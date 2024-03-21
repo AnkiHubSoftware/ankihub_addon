@@ -680,9 +680,11 @@ class AnkiHubClient:
         self,
         ah_did: uuid.UUID,
         since: datetime,
-        download_progress_cb: Optional[Callable[[int], None]] = None,
+        updates_download_progress_cb: Optional[Callable[[int], None]] = None,
+        deck_download_progress_cb: Optional[Callable[[int], None]] = None,
     ) -> Iterator[DeckUpdateChunk]:
-        # download_progress_cb gets passed the number of notes downloaded until now
+        # updates_download_progress_cb gets passed the number of notes downloaded until now
+        # deck_download_progress_cb gets passed the percentage of the download progress
 
         class Params(TypedDict, total=False):
             since: str
@@ -711,7 +713,7 @@ class AnkiHubClient:
             )
 
             if data["external_notes_url"]:
-                notes_data_deck = self.download_deck(ah_did, download_progress_cb)
+                notes_data_deck = self.download_deck(ah_did, deck_download_progress_cb)
                 chunk = DeckUpdateChunk.from_dict(data)
                 chunk.notes = notes_data_deck
                 yield chunk
@@ -720,7 +722,8 @@ class AnkiHubClient:
                 yield from self.get_deck_updates(
                     ah_did=ah_did,
                     since=chunk.latest_update,
-                    download_progress_cb=download_progress_cb,
+                    updates_download_progress_cb=updates_download_progress_cb,
+                    deck_download_progress_cb=deck_download_progress_cb,
                 )
                 return
             elif not data["notes"]:
@@ -737,8 +740,8 @@ class AnkiHubClient:
 
             notes_count += len(note_updates.notes)
 
-            if download_progress_cb:
-                download_progress_cb(notes_count)
+            if updates_download_progress_cb:
+                updates_download_progress_cb(notes_count)
 
             first_request = False
 

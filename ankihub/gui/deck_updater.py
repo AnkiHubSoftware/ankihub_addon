@@ -18,7 +18,7 @@ from ..main.note_types import fetch_note_types_based_on_notes
 from ..main.utils import create_backup
 from ..settings import config
 from .media_sync import media_sync
-from .utils import show_error_dialog
+from .utils import deck_download_progress_cb, show_error_dialog
 
 
 class NotLoggedInError(Exception):
@@ -108,9 +108,10 @@ class _AnkiHubDeckUpdater:
         for chunk in self._client.get_deck_updates(
             ankihub_did,
             since=deck_config.latest_update,
-            download_progress_cb=lambda notes_count: _update_deck_download_progress_cb(
+            updates_download_progress_cb=lambda notes_count: _update_deck_updates_download_progress_cb(
                 notes_count, ankihub_did=ankihub_did
             ),
+            deck_download_progress_cb=deck_download_progress_cb,
         ):
             if aqt.mw.progress.want_cancel():
                 LOGGER.info("User cancelled deck update.")
@@ -272,15 +273,17 @@ def show_tooltip_about_last_deck_updates_results() -> None:
         )
 
 
-def _update_deck_download_progress_cb(notes_count: int, ankihub_did: uuid.UUID):
+def _update_deck_updates_download_progress_cb(notes_count: int, ankihub_did: uuid.UUID):
     aqt.mw.taskman.run_on_main(
-        lambda: _update_deck_download_progress_cb_inner(
+        lambda: _update_deck_updates_download_progress_cb_inner(
             notes_count=notes_count, ankihub_did=ankihub_did
         )
     )
 
 
-def _update_deck_download_progress_cb_inner(notes_count: int, ankihub_did: uuid.UUID):
+def _update_deck_updates_download_progress_cb_inner(
+    notes_count: int, ankihub_did: uuid.UUID
+):
     try:
         aqt.mw.progress.update(
             "Downloading updates\n"

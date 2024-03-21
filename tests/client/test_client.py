@@ -49,7 +49,7 @@ from ankihub.ankihub_client import (
     get_media_names_from_suggestion,
 )
 from ankihub.ankihub_client.models import CardReviewData, UserDeckExtensionRelation
-from ankihub.gui.operations.deck_installation import _download_progress_cb
+from ankihub.gui.utils import deck_download_progress_cb
 
 WEBAPP_COMPOSE_FILE = (
     Path(os.getenv("WEBAPP_COMPOSE_FILE")) if os.getenv("WEBAPP_COMPOSE_FILE") else None
@@ -491,7 +491,7 @@ class TestDownloadDeck:
             )
             notes_data = client.download_deck(
                 ah_did=ID_OF_DECK_OF_USER_TEST1,
-                download_progress_cb=_download_progress_cb,
+                download_progress_cb=deck_download_progress_cb,
             )
         assert len(notes_data) == 1
         assert notes_data[0].tags == ["asdf"]
