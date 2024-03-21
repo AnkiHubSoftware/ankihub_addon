@@ -726,7 +726,7 @@ class AnkiHubClient:
                     deck_download_progress_cb=deck_download_progress_cb,
                 )
                 return
-            elif not data["notes"]:
+            elif data["notes"] is None:
                 raise ValueError("No notes in the response")  # pragma: no cover
 
             # decompress and transform notes data
