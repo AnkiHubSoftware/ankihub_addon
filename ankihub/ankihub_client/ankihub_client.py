@@ -689,7 +689,22 @@ class AnkiHubClient:
         deck_download_progress_cb: Optional[Callable[[int], None]] = None,
         should_cancel: Optional[Callable[[], bool]] = None,
     ) -> Optional[DeckUpdates]:
+        """
+        Fetches updates for a specific deck from the AnkiHub server.
 
+        Args:
+            ah_did: The UUID of the deck to fetch updates for.
+            since: The time from which to fetch updates.
+            updates_download_progress_cb: An optional callback function to report the progress of the updates download.
+                The function should take one argument: the number of notes downloaded.
+            deck_download_progress_cb: An optional callback function to report the progress of the deck download.
+                The function should take one argument: the percentage of the deck download progress.
+            should_cancel: An optional callback function that should return True if the operation should be cancelled.
+
+        Returns:
+            A DeckUpdates object containing the fetched updates and the latest update timestamp,
+            or None if the operation was cancelled.
+        """
         notes_data_from_csv = []
         notes_data_from_json = []
         latest_update = None
