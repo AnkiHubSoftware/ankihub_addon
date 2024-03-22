@@ -1,3 +1,4 @@
+import base64
 import dataclasses
 import gzip
 import json
@@ -10,6 +11,7 @@ from copy import deepcopy
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
 from typing import Callable, Generator, List, cast
+from unittest.mock import Mock
 
 import pytest
 import requests_mock
@@ -35,7 +37,6 @@ from ankihub.ankihub_client import (
     DeckExtensionUpdateChunk,
     DeckMedia,
     DeckMediaUpdateChunk,
-    DeckUpdateChunk,
     Field,
     NewNoteSuggestion,
     NoteCustomization,
@@ -48,8 +49,13 @@ from ankihub.ankihub_client import (
     get_media_names_from_notes_data,
     get_media_names_from_suggestion,
 )
-from ankihub.ankihub_client.models import CardReviewData, UserDeckExtensionRelation
-from ankihub.gui.operations.deck_installation import _download_progress_cb
+from ankihub.ankihub_client.models import (
+    ANKIHUB_DATETIME_FORMAT_STR,
+    CardReviewData,
+    DeckUpdates,
+    UserDeckExtensionRelation,
+)
+from ankihub.gui.utils import deck_download_progress_cb
 
 WEBAPP_COMPOSE_FILE = (
     Path(os.getenv("WEBAPP_COMPOSE_FILE")) if os.getenv("WEBAPP_COMPOSE_FILE") else None
@@ -434,9 +440,9 @@ class TestDownloadDeck:
         deck_file: Path,
     ):
         client = authorized_client_for_user_test1
-        presigned_url_suffix = "/fake_key"
+        presigned_url_suffix = f"/{deck_file.name}"
         mocker.patch.object(
-            client, "_get_presigned_url_suffix", return_value=presigned_url_suffix
+            client, "_presigned_url_suffix_from_key", return_value=presigned_url_suffix
         )
 
         original_get_deck_by_id = client.get_deck_by_id
@@ -471,7 +477,7 @@ class TestDownloadDeck:
 
         presigned_url_suffix = "/fake_key"
         mocker.patch.object(
-            client, "_get_presigned_url_suffix", return_value=presigned_url_suffix
+            client, "_presigned_url_suffix_from_key", return_value=presigned_url_suffix
         )
 
         original_get_deck_by_id = client.get_deck_by_id
@@ -491,8 +497,28 @@ class TestDownloadDeck:
             )
             notes_data = client.download_deck(
                 ah_did=ID_OF_DECK_OF_USER_TEST1,
-                download_progress_cb=_download_progress_cb,
+                download_progress_cb=deck_download_progress_cb,
             )
+        assert len(notes_data) == 1
+        assert notes_data[0].tags == ["asdf"]
+
+    def test_download_deck_with_presigned_url_argument(
+        self,
+        authorized_client_for_user_test1: AnkiHubClient,
+    ):
+        client = authorized_client_for_user_test1
+        deck_file = DECK_CSV_GZ
+        deck_file_presigned_url = f"{DEFAULT_S3_BUCKET_URL}/{deck_file.name}?auth=123"
+        with requests_mock.Mocker(real_http=True) as m:
+            m.get(
+                deck_file_presigned_url,
+                content=deck_file.read_bytes(),
+            )
+            notes_data = client.download_deck(
+                ah_did=ID_OF_DECK_OF_USER_TEST1,
+                s3_presigned_url=deck_file_presigned_url,
+            )
+
         assert len(notes_data) == 1
         assert notes_data[0].tags == ["asdf"]
 
@@ -532,7 +558,9 @@ def test_upload_deck(
     # upload to s3 is mocked out, this will potentially cause errors on the locally running AnkiHub
     # because the deck will not be uploaded to s3, but we don't care about that here
     upload_to_s3_mock = mocker.patch.object(client, "_upload_to_s3")
-    mocker.patch.object(client, "_get_presigned_url_suffix", return_value="fake_key")
+    mocker.patch.object(
+        client, "_presigned_url_suffix_from_key", return_value="fake_key"
+    )
 
     client.upload_deck(
         deck_name="test deck",
@@ -906,19 +934,10 @@ class TestGetOwnedDecks:
 
 class TestGetDeckUpdates:
     @pytest.mark.vcr()
-    def test_get_deck_updates(
-        self, authorized_client_for_user_test2: AnkiHubClient, mocker: MockerFixture
-    ):
+    def test_get_deck_updates(self, authorized_client_for_user_test2: AnkiHubClient):
         client = authorized_client_for_user_test2
-
-        page_size = 5
-        mocker.patch(
-            "ankihub.ankihub_client.ankihub_client.DECK_UPDATE_PAGE_SIZE", page_size
-        )
-        update_chunks: List[DeckUpdateChunk] = list(
-            client.get_deck_updates(ID_OF_DECK_OF_USER_TEST2, since=None)
-        )
-        assert len(update_chunks) == 3
+        deck_updates = client.get_deck_updates(ID_OF_DECK_OF_USER_TEST2, since=None)
+        assert len(deck_updates.notes) == 13
 
     @pytest.mark.skipifvcr()
     def test_get_deck_updates_since(
@@ -936,8 +955,8 @@ class TestGetDeckUpdates:
         client.create_new_note_suggestion(new_note_suggestion, auto_accept=True)
 
         # get deck updates since the time of the new note creation
-        chunks = list(
-            client.get_deck_updates(ah_did=ID_OF_DECK_OF_USER_TEST1, since=since_time)
+        deck_updates = client.get_deck_updates(
+            ah_did=ID_OF_DECK_OF_USER_TEST1, since=since_time
         )
 
         note_info: NoteInfo = new_note_suggestion_note_info
@@ -945,13 +964,94 @@ class TestGetDeckUpdates:
         note_info.anki_nid = new_note_suggestion.anki_nid
         note_info.guid = new_note_suggestion.guid
 
-        assert len(chunks) == 1
-        assert chunks[0] == DeckUpdateChunk(
-            latest_update=chunks[0].latest_update,  # not the same as since_time_str
+        assert deck_updates == DeckUpdates(
+            latest_update=deck_updates.latest_update,
             notes=[note_info],
             protected_fields={},
             protected_tags=[],
         )
+
+    @pytest.mark.vcr()
+    def test_get_deck_updates_with_external_notes_url(
+        self, authorized_client_for_user_test1: AnkiHubClient, mocker: MockerFixture
+    ):
+        # This test mocks the responses instead of relying on real responses from the server,
+        # because the setup required to get real responses with non-null external_notes_url is too costly or complex.
+        client = authorized_client_for_user_test1
+
+        # Mock responses from deck updates endpoint
+        latest_update = datetime.now(timezone.utc)
+        note1_from_csv = NoteInfoFactory.create()
+        note1_from_json = NoteInfoFactory.create(ah_nid=note1_from_csv.ah_nid)
+        note2_from_csv = NoteInfoFactory.create()
+
+        response_with_csv_notes = self._deck_updates_response_mock_with_csv_notes(
+            notes=[note1_from_csv, note2_from_csv],
+            latest_update=latest_update,
+            mocker=mocker,
+        )
+
+        response_with_json_notes = self._deck_updates_response_mock_with_json_notes(
+            notes=[note1_from_json],
+            latest_update=latest_update,
+        )
+
+        mocker.patch(
+            "ankihub.ankihub_client.ankihub_client.AnkiHubClient._send_request",
+            side_effect=[response_with_csv_notes, response_with_json_notes],
+        )
+
+        # Assert that the deck updates are as expected.
+        # For note1, which is present in both the CSV and JSON responses, the note from the JSON should be used.
+        # (The note from the JSON can be more recent than the one from the CSV.)
+        deck_updates = client.get_deck_updates(ID_OF_DECK_OF_USER_TEST1, since=None)
+        assert deck_updates.notes == [note1_from_json, note2_from_csv]
+        assert deck_updates.latest_update == latest_update
+
+    def _deck_updates_response_mock_with_json_notes(
+        self, notes: List[NoteInfo], latest_update: datetime
+    ) -> Mock:
+        result = Mock()
+        note_dicts = [note.to_dict() for note in notes]
+        notes_encoded = gzip.compress(json.dumps(note_dicts).encode("utf-8"))
+        notes_encoded = base64.b85encode(notes_encoded)
+        latest_update_str = datetime.strftime(
+            latest_update, ANKIHUB_DATETIME_FORMAT_STR
+        )
+        result.json = lambda: {
+            "external_notes_url": None,
+            "next": None,
+            "notes": notes_encoded,
+            "latest_update": latest_update_str,
+            "protected_fields": {},
+            "protected_tags": [],
+        }
+        result.status_code = 200
+        return result
+
+    def _deck_updates_response_mock_with_csv_notes(
+        self, notes: List[NoteInfo], latest_update: datetime, mocker: MockerFixture
+    ) -> Mock:
+        result = Mock()
+        latest_update_str = datetime.strftime(
+            latest_update, ANKIHUB_DATETIME_FORMAT_STR
+        )
+        result.json = lambda: {
+            "external_notes_url": "test_url",
+            "next": None,
+            "notes": None,
+            "latest_update": latest_update_str,
+            "protected_fields": {},
+            "protected_tags": [],
+        }
+        result.status_code = 200
+
+        # Mock the download of the deck from the external_notes_url
+        mocker.patch(
+            "ankihub.ankihub_client.ankihub_client.AnkiHubClient.download_deck",
+            return_value=notes,
+        )
+        return result
 
 
 class TestGetDeckMediaUpdates:

@@ -72,7 +72,7 @@ class AddonAnkiHubClient(AnkiHubClient):
         with open(file, "rb") as f:
             log_data = f.read()
 
-        s3_url_suffix = self._get_presigned_url_suffix(key=key, action="upload")
+        s3_url_suffix = self._presigned_url_suffix_from_key(key=key, action="upload")
         s3_response = self._send_request("PUT", API.S3, s3_url_suffix, data=log_data)
         if s3_response.status_code != 200:
             raise AnkiHubHTTPError(s3_response)

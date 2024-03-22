@@ -18,7 +18,7 @@ from ..main.note_types import fetch_note_types_based_on_notes
 from ..main.utils import create_backup
 from ..settings import config
 from .media_sync import media_sync
-from .utils import show_error_dialog
+from .utils import deck_download_progress_cb, show_error_dialog
 
 
 class NotLoggedInError(Exception):
@@ -102,49 +102,39 @@ class _AnkiHubDeckUpdater:
         """Downloads note updates from AnkiHub and imports them into Anki.
         Returns True if the action was successful, False if the user cancelled it."""
 
-        notes_data = []
-        latest_update: Optional[datetime] = None
         deck_config = config.deck_config(ankihub_did)
-        for chunk in self._client.get_deck_updates(
+        deck_updates = self._client.get_deck_updates(
             ankihub_did,
             since=deck_config.latest_update,
-            download_progress_cb=lambda notes_count: _update_deck_download_progress_cb(
+            updates_download_progress_cb=lambda notes_count: _update_deck_updates_download_progress_cb(
                 notes_count, ankihub_did=ankihub_did
             ),
-        ):
-            if aqt.mw.progress.want_cancel():
-                LOGGER.info("User cancelled deck update.")
-                return False
+            deck_download_progress_cb=deck_download_progress_cb,
+            should_cancel=lambda: aqt.mw.progress.want_cancel(),
+        )
+        if deck_updates is None:
+            LOGGER.info("User cancelled deck update.")
+            return False
 
-            if not chunk.notes:
-                continue
-
-            notes_data += chunk.notes
-
-            # each chunk contains the latest update timestamp of the notes in it, we need the latest one
-            latest_update = max(
-                chunk.latest_update, latest_update or chunk.latest_update
-            )
-
-        if notes_data:
-            note_types = fetch_note_types_based_on_notes(notes_data=notes_data)
+        if deck_updates.notes:
+            note_types = fetch_note_types_based_on_notes(notes_data=deck_updates.notes)
             import_result = self._importer.import_ankihub_deck(
                 ankihub_did=ankihub_did,
-                notes=notes_data,
+                notes=deck_updates.notes,
                 note_types=note_types,
                 deck_name=deck_config.name,
                 is_first_import_of_deck=False,
                 behavior_on_remote_note_deleted=deck_config.behavior_on_remote_note_deleted,
                 anki_did=deck_config.anki_id,
-                protected_fields=chunk.protected_fields,
-                protected_tags=chunk.protected_tags,
+                protected_fields=deck_updates.protected_fields,
+                protected_tags=deck_updates.protected_tags,
                 subdecks=deck_config.subdecks_enabled,
                 suspend_new_cards_of_new_notes=deck_config.suspend_new_cards_of_new_notes,
                 suspend_new_cards_of_existing_notes=deck_config.suspend_new_cards_of_existing_notes,
             )
             self._import_results.append(import_result)
 
-            config.save_latest_deck_update(ankihub_did, latest_update)
+            config.save_latest_deck_update(ankihub_did, deck_updates.latest_update)
         else:
             LOGGER.info(f"No new updates for {ankihub_did=}")
         return True
@@ -272,15 +262,19 @@ def show_tooltip_about_last_deck_updates_results() -> None:
         )
 
 
-def _update_deck_download_progress_cb(notes_count: int, ankihub_did: uuid.UUID):
+def _update_deck_updates_download_progress_cb(
+    notes_count: int, ankihub_did: uuid.UUID
+) -> None:
     aqt.mw.taskman.run_on_main(
-        lambda: _update_deck_download_progress_cb_inner(
+        lambda: _update_deck_updates_download_progress_cb_inner(
             notes_count=notes_count, ankihub_did=ankihub_did
         )
     )
 
 
-def _update_deck_download_progress_cb_inner(notes_count: int, ankihub_did: uuid.UUID):
+def _update_deck_updates_download_progress_cb_inner(
+    notes_count: int, ankihub_did: uuid.UUID
+) -> None:
     try:
         aqt.mw.progress.update(
             "Downloading updates\n"

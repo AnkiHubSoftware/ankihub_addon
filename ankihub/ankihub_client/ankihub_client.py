@@ -49,7 +49,8 @@ from .models import (
     DeckExtension,
     DeckExtensionUpdateChunk,
     DeckMediaUpdateChunk,
-    DeckUpdateChunk,
+    DeckUpdates,
+    DeckUpdatesChunk,
     NewNoteSuggestion,
     NoteInfo,
     NoteSuggestion,
@@ -298,7 +299,7 @@ class AnkiHubClient:
         deck_name_normalized = re.sub('[\\\\/?<>:*|"^]', "_", deck_name)
         deck_file_name = f"{deck_name_normalized}-{uuid.uuid4()}.json.gz"
 
-        s3_url_suffix = self._get_presigned_url_suffix(
+        s3_url_suffix = self._presigned_url_suffix_from_key(
             key=deck_file_name, action="upload"
         )
 
@@ -622,12 +623,15 @@ class AnkiHubClient:
         self,
         ah_did: uuid.UUID,
         download_progress_cb: Optional[Callable[[int], None]] = None,
+        s3_presigned_url: Optional[str] = None,
     ) -> List[NoteInfo]:
-        deck_info = self.get_deck_by_id(ah_did)
-
-        s3_url_suffix = self._get_presigned_url_suffix(
-            key=deck_info.csv_notes_filename, action="download"
-        )
+        if not s3_presigned_url:
+            deck_info = self.get_deck_by_id(ah_did)
+            s3_url_suffix = self._presigned_url_suffix_from_key(
+                key=deck_info.csv_notes_filename, action="download"
+            )
+        else:
+            s3_url_suffix = self._presigned_url_suffix_from_url(s3_presigned_url)
 
         if download_progress_cb:
             s3_response_content = self._download_with_progress_cb(
@@ -639,7 +643,8 @@ class AnkiHubClient:
                 raise AnkiHubHTTPError(s3_response)
             s3_response_content = s3_response.content
 
-        if deck_info.csv_notes_filename.endswith(".gz"):
+        csv_filename = s3_url_suffix[1:].split("?", maxsplit=1)[0]
+        if csv_filename.endswith(".gz"):
             deck_csv_content = gzip.decompress(s3_response_content).decode("utf-8")
         else:
             deck_csv_content = s3_response_content.decode("utf-8")
@@ -680,9 +685,73 @@ class AnkiHubClient:
         self,
         ah_did: uuid.UUID,
         since: datetime,
-        download_progress_cb: Optional[Callable[[int], None]] = None,
-    ) -> Iterator[DeckUpdateChunk]:
-        # download_progress_cb gets passed the number of notes downloaded until now
+        updates_download_progress_cb: Optional[Callable[[int], None]] = None,
+        deck_download_progress_cb: Optional[Callable[[int], None]] = None,
+        should_cancel: Optional[Callable[[], bool]] = None,
+    ) -> Optional[DeckUpdates]:
+        """
+        Fetches updates for a specific deck from the AnkiHub server.
+
+        Args:
+            ah_did: The UUID of the deck to fetch updates for.
+            since: The time from which to fetch updates.
+            updates_download_progress_cb: An optional callback function to report the progress of the updates download.
+                The function should take one argument: the number of notes downloaded.
+            deck_download_progress_cb: An optional callback function to report the progress of the deck download.
+                The function should take one argument: the percentage of the deck download progress.
+            should_cancel: An optional callback function that should return True if the operation should be cancelled.
+
+        Returns:
+            A DeckUpdates object containing the fetched updates and the latest update timestamp,
+            or None if the operation was cancelled.
+        """
+        notes_data_from_csv = []
+        notes_data_from_json = []
+        latest_update = None
+        for chunk in self._get_deck_updates_inner(
+            ah_did,
+            since,
+            updates_download_progress_cb,
+            deck_download_progress_cb,
+        ):
+            if should_cancel and should_cancel():
+                return None
+
+            if chunk.from_csv:
+                # The CSV contains all notes, so we assign instead of extending
+                notes_data_from_csv = chunk.notes
+            else:
+                notes_data_from_json.extend(chunk.notes)
+
+            # Each chunk contains the latest update timestamp of the notes in it, we need the latest one
+            latest_update = max(
+                chunk.latest_update, latest_update or chunk.latest_update
+            )
+
+        # When a note is both in the CSV and JSON, the JSON version is the more recent one and
+        # the CSV version should be discarded.
+        ah_nids_from_json = {note.ah_nid for note in notes_data_from_json}
+        filtered_notes_data_from_csv = [
+            note for note in notes_data_from_csv if note.ah_nid not in ah_nids_from_json
+        ]
+        notes_data = notes_data_from_json + filtered_notes_data_from_csv
+
+        return DeckUpdates(
+            notes=notes_data,
+            latest_update=latest_update,
+            protected_fields=chunk.protected_fields,
+            protected_tags=chunk.protected_tags,
+        )
+
+    def _get_deck_updates_inner(
+        self,
+        ah_did: uuid.UUID,
+        since: datetime,
+        updates_download_progress_cb: Optional[Callable[[int], None]] = None,
+        deck_download_progress_cb: Optional[Callable[[int], None]] = None,
+    ) -> Iterator[DeckUpdatesChunk]:
+        # updates_download_progress_cb gets passed the number of notes downloaded until now
+        # deck_download_progress_cb gets passed the percentage of the download progress
 
         class Params(TypedDict, total=False):
             since: str
@@ -710,19 +779,40 @@ class AnkiHubClient:
                 data["next"].split("/api", maxsplit=1)[1] if data["next"] else None
             )
 
+            if data["external_notes_url"]:
+                notes_data_deck = self.download_deck(
+                    ah_did,
+                    deck_download_progress_cb,
+                    s3_presigned_url=data["external_notes_url"],
+                )
+                chunk = DeckUpdatesChunk.from_dict({**data, "from_csv": True})
+                chunk.notes = notes_data_deck
+                yield chunk
+
+                # Get the rest of the updates, because the CSV is most likely not completely up to date
+                yield from self._get_deck_updates_inner(
+                    ah_did=ah_did,
+                    since=chunk.latest_update,
+                    updates_download_progress_cb=updates_download_progress_cb,
+                    deck_download_progress_cb=deck_download_progress_cb,
+                )
+                return
+            elif data["notes"] is None:
+                raise ValueError("No notes in the response")  # pragma: no cover
+
             # decompress and transform notes data
             notes_data_base85 = data["notes"]
             notes_data_gzipped = base64.b85decode(notes_data_base85)
             notes_data = json.loads(self._gzip_decompress_string(notes_data_gzipped))
             data["notes"] = _transform_notes_data(notes_data)
 
-            note_updates = DeckUpdateChunk.from_dict(data)
+            note_updates = DeckUpdatesChunk.from_dict({**data, "from_csv": False})
             yield note_updates
 
             notes_count += len(note_updates.notes)
 
-            if download_progress_cb:
-                download_progress_cb(notes_count)
+            if updates_download_progress_cb:
+                updates_download_progress_cb(notes_count)
 
             first_request = False
 
@@ -866,7 +956,7 @@ class AnkiHubClient:
         }
         return errors_by_anki_nid
 
-    def _get_presigned_url_suffix(self, key: str, action: str) -> str:
+    def _presigned_url_suffix_from_key(self, key: str, action: str) -> str:
         """
         Get presigned URL suffix for S3 to upload a single file.
         The suffix is the part of the URL after the base url.
@@ -884,8 +974,10 @@ class AnkiHubClient:
             raise AnkiHubHTTPError(response)
 
         url = response.json()["pre_signed_url"]
-        result = url.split(self.s3_bucket_url)[1]
-        return result
+        return self._presigned_url_suffix_from_url(url)
+
+    def _presigned_url_suffix_from_url(self, url: str) -> str:
+        return url.split(self.s3_bucket_url)[1]
 
     def _get_presigned_url_for_multiple_uploads(self, prefix: str) -> dict:
         """

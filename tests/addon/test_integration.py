@@ -53,6 +53,7 @@ from requests_mock import Mocker
 
 from ankihub.ankihub_client.models import (
     DeckMediaUpdateChunk,
+    DeckUpdates,
     UserDeckExtensionRelation,
 )
 from ankihub.gui import editor
@@ -99,7 +100,6 @@ from ankihub.ankihub_client import (
     AnkiHubHTTPError,
     ChangeNoteSuggestion,
     Deck,
-    DeckUpdateChunk,
     Field,
     NewNoteSuggestion,
     NoteCustomization,
@@ -366,10 +366,15 @@ def mock_client_methods_called_during_ankihub_sync(mocker: MockerFixture) -> Non
     mocker.patch.object(AnkiHubClient, "get_deck_subscriptions")
     mocker.patch.object(AnkiHubClient, "get_deck_extensions_by_deck_id")
     mocker.patch.object(AnkiHubClient, "is_media_upload_finished")
-    mocker.patch.object(AnkiHubClient, "get_deck_updates")
     mocker.patch.object(AnkiHubClient, "get_deck_media_updates")
     mocker.patch.object(AnkiHubClient, "send_card_review_data")
     mocker.patch.object(AnkiHubClient, "get_deck_by_id")
+
+    deck_updates_mock = Mock()
+    deck_updates_mock.notes = []
+    mocker.patch.object(
+        AnkiHubClient, "get_deck_updates", return_value=deck_updates_mock
+    )
 
 
 class MockClientGetNoteType(Protocol):
@@ -4014,14 +4019,12 @@ class TestDeckUpdater:
             mocker.patch.object(
                 AnkiHubClient,
                 "get_deck_updates",
-                return_value=[
-                    DeckUpdateChunk(
-                        latest_update=latest_update,
-                        protected_fields={},
-                        protected_tags=[],
-                        notes=[note_info],
-                    )
-                ],
+                return_value=DeckUpdates(
+                    latest_update=latest_update,
+                    protected_fields={},
+                    protected_tags=[],
+                    notes=[note_info],
+                ),
             )
 
             mocker.patch.object(

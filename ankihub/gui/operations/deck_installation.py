@@ -25,7 +25,7 @@ from ..configure_deleted_notes_dialog import ConfigureDeletedNotesDialog
 from ..exceptions import DeckDownloadAndInstallError, RemoteDeckNotFoundError
 from ..media_sync import media_sync
 from ..messages import messages
-from ..utils import show_dialog, tooltip_icon
+from ..utils import deck_download_progress_cb, show_dialog, tooltip_icon
 from .subdecks import confirm_and_toggle_subdecks
 from .utils import future_with_result, pass_exceptions_to_on_done
 
@@ -181,7 +181,7 @@ def _download_and_install_single_deck(
     deck: Deck, behavior_on_remote_note_deleted: BehaviorOnRemoteNoteDeleted
 ) -> AnkiHubImportResult:
     notes_data: List[NoteInfo] = AnkiHubClient().download_deck(
-        deck.ah_did, download_progress_cb=_download_progress_cb
+        deck.ah_did, download_progress_cb=deck_download_progress_cb
     )
 
     aqt.mw.taskman.run_on_main(
@@ -248,18 +248,6 @@ def _install_deck(
     LOGGER.info("Importing deck was succesful.")
 
     return import_result
-
-
-def _download_progress_cb(percent: int):
-    # adding +1 to avoid progress increasing while at 0% progress
-    # (the aqt.mw.progress.update function does that)
-    aqt.mw.taskman.run_on_main(
-        lambda: aqt.mw.progress.update(
-            label="Downloading deck...",
-            value=percent + 1,
-            max=101,
-        )
-    )
 
 
 def _cleanup_after_deck_install() -> None:

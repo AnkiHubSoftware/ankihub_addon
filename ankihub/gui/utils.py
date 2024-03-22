@@ -544,3 +544,15 @@ def extract_argument(
                 new_kwargs[param.name] = bound_args.arguments[param.name]
 
     return tuple(new_args), new_kwargs, arg_value
+
+
+def deck_download_progress_cb(percent: int) -> None:
+    # adding +1 to avoid progress increasing while at 0% progress
+    # (the aqt.mw.progress.update function does that)
+    aqt.mw.taskman.run_on_main(
+        lambda: aqt.mw.progress.update(
+            label="Downloading deck...",
+            value=percent + 1,
+            max=101,
+        )
+    )
