@@ -502,6 +502,26 @@ class TestDownloadDeck:
         assert len(notes_data) == 1
         assert notes_data[0].tags == ["asdf"]
 
+    def test_download_deck_with_presigned_url_argument(
+        self,
+        authorized_client_for_user_test1: AnkiHubClient,
+    ):
+        client = authorized_client_for_user_test1
+        deck_file = DECK_CSV_GZ
+        deck_file_presigned_url = f"{DEFAULT_S3_BUCKET_URL}/{deck_file.name}?auth=123"
+        with requests_mock.Mocker(real_http=True) as m:
+            m.get(
+                deck_file_presigned_url,
+                content=deck_file.read_bytes(),
+            )
+            notes_data = client.download_deck(
+                ah_did=ID_OF_DECK_OF_USER_TEST1,
+                s3_presigned_url=deck_file_presigned_url,
+            )
+
+        assert len(notes_data) == 1
+        assert notes_data[0].tags == ["asdf"]
+
 
 def create_note_on_ankihub_and_assert(
     client, new_note_suggestion, uuid_of_deck: uuid.UUID
