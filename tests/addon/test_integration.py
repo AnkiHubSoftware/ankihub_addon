@@ -366,10 +366,15 @@ def mock_client_methods_called_during_ankihub_sync(mocker: MockerFixture) -> Non
     mocker.patch.object(AnkiHubClient, "get_deck_subscriptions")
     mocker.patch.object(AnkiHubClient, "get_deck_extensions_by_deck_id")
     mocker.patch.object(AnkiHubClient, "is_media_upload_finished")
-    mocker.patch.object(AnkiHubClient, "get_deck_updates")
     mocker.patch.object(AnkiHubClient, "get_deck_media_updates")
     mocker.patch.object(AnkiHubClient, "send_card_review_data")
     mocker.patch.object(AnkiHubClient, "get_deck_by_id")
+
+    deck_updates_mock = Mock()
+    deck_updates_mock.notes = []
+    mocker.patch.object(
+        AnkiHubClient, "get_deck_updates", return_value=deck_updates_mock
+    )
 
 
 class MockClientGetNoteType(Protocol):
