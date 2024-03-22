@@ -622,12 +622,15 @@ class AnkiHubClient:
         self,
         ah_did: uuid.UUID,
         download_progress_cb: Optional[Callable[[int], None]] = None,
+        s3_presigned_url: Optional[str] = None,
     ) -> List[NoteInfo]:
-        deck_info = self.get_deck_by_id(ah_did)
-
-        s3_url_suffix = self._get_presigned_url_suffix(
-            key=deck_info.csv_notes_filename, action="download"
-        )
+        if not s3_presigned_url:
+            deck_info = self.get_deck_by_id(ah_did)
+            s3_url_suffix = self._get_presigned_url_suffix(
+                key=deck_info.csv_notes_filename, action="download"
+            )
+        else:
+            s3_url_suffix = self._s3_presigned_url_suffix(s3_presigned_url)
 
         if download_progress_cb:
             s3_response_content = self._download_with_progress_cb(
@@ -639,7 +642,8 @@ class AnkiHubClient:
                 raise AnkiHubHTTPError(s3_response)
             s3_response_content = s3_response.content
 
-        if deck_info.csv_notes_filename.endswith(".gz"):
+        csv_filename = s3_url_suffix[1:].split("?", maxsplit=1)[0]
+        if csv_filename.endswith(".gz"):
             deck_csv_content = gzip.decompress(s3_response_content).decode("utf-8")
         else:
             deck_csv_content = s3_response_content.decode("utf-8")
@@ -713,7 +717,11 @@ class AnkiHubClient:
             )
 
             if data["external_notes_url"]:
-                notes_data_deck = self.download_deck(ah_did, deck_download_progress_cb)
+                notes_data_deck = self.download_deck(
+                    ah_did,
+                    deck_download_progress_cb,
+                    s3_presigned_url=data["external_notes_url"],
+                )
                 chunk = DeckUpdateChunk.from_dict(data)
                 chunk.notes = notes_data_deck
                 yield chunk
@@ -903,8 +911,10 @@ class AnkiHubClient:
             raise AnkiHubHTTPError(response)
 
         url = response.json()["pre_signed_url"]
-        result = url.split(self.s3_bucket_url)[1]
-        return result
+        return self._s3_presigned_url_suffix(url)
+
+    def _s3_presigned_url_suffix(self, url: str) -> str:
+        return url.split(self.s3_bucket_url)[1]
 
     def _get_presigned_url_for_multiple_uploads(self, prefix: str) -> dict:
         """
