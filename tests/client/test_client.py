@@ -442,7 +442,7 @@ class TestDownloadDeck:
         client = authorized_client_for_user_test1
         presigned_url_suffix = f"/{deck_file.name}"
         mocker.patch.object(
-            client, "_get_presigned_url_suffix", return_value=presigned_url_suffix
+            client, "_presigned_url_suffix_from_key", return_value=presigned_url_suffix
         )
 
         original_get_deck_by_id = client.get_deck_by_id
@@ -477,7 +477,7 @@ class TestDownloadDeck:
 
         presigned_url_suffix = "/fake_key"
         mocker.patch.object(
-            client, "_get_presigned_url_suffix", return_value=presigned_url_suffix
+            client, "_presigned_url_suffix_from_key", return_value=presigned_url_suffix
         )
 
         original_get_deck_by_id = client.get_deck_by_id
@@ -558,7 +558,9 @@ def test_upload_deck(
     # upload to s3 is mocked out, this will potentially cause errors on the locally running AnkiHub
     # because the deck will not be uploaded to s3, but we don't care about that here
     upload_to_s3_mock = mocker.patch.object(client, "_upload_to_s3")
-    mocker.patch.object(client, "_get_presigned_url_suffix", return_value="fake_key")
+    mocker.patch.object(
+        client, "_presigned_url_suffix_from_key", return_value="fake_key"
+    )
 
     client.upload_deck(
         deck_name="test deck",
