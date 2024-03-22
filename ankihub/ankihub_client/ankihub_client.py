@@ -299,7 +299,7 @@ class AnkiHubClient:
         deck_name_normalized = re.sub('[\\\\/?<>:*|"^]', "_", deck_name)
         deck_file_name = f"{deck_name_normalized}-{uuid.uuid4()}.json.gz"
 
-        s3_url_suffix = self._get_presigned_url_suffix(
+        s3_url_suffix = self._presigned_url_suffix_from_key(
             key=deck_file_name, action="upload"
         )
 
@@ -627,11 +627,11 @@ class AnkiHubClient:
     ) -> List[NoteInfo]:
         if not s3_presigned_url:
             deck_info = self.get_deck_by_id(ah_did)
-            s3_url_suffix = self._get_presigned_url_suffix(
+            s3_url_suffix = self._presigned_url_suffix_from_key(
                 key=deck_info.csv_notes_filename, action="download"
             )
         else:
-            s3_url_suffix = self._s3_presigned_url_suffix(s3_presigned_url)
+            s3_url_suffix = self._presigned_url_suffix_from_url(s3_presigned_url)
 
         if download_progress_cb:
             s3_response_content = self._download_with_progress_cb(
@@ -956,7 +956,7 @@ class AnkiHubClient:
         }
         return errors_by_anki_nid
 
-    def _get_presigned_url_suffix(self, key: str, action: str) -> str:
+    def _presigned_url_suffix_from_key(self, key: str, action: str) -> str:
         """
         Get presigned URL suffix for S3 to upload a single file.
         The suffix is the part of the URL after the base url.
@@ -974,9 +974,9 @@ class AnkiHubClient:
             raise AnkiHubHTTPError(response)
 
         url = response.json()["pre_signed_url"]
-        return self._s3_presigned_url_suffix(url)
+        return self._presigned_url_suffix_from_url(url)
 
-    def _s3_presigned_url_suffix(self, url: str) -> str:
+    def _presigned_url_suffix_from_url(self, url: str) -> str:
         return url.split(self.s3_bucket_url)[1]
 
     def _get_presigned_url_for_multiple_uploads(self, prefix: str) -> dict:
