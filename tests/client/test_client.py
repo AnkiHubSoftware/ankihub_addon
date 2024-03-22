@@ -980,7 +980,7 @@ class TestGetDeckUpdates:
         )
 
         # Assert that the deck updates are as expected.
-        # For note1, which is present in both the CSV and JSON responses, the JSON response should be used.
+        # For note1, which is present in both the CSV and JSON responses, the note from the JSON should be used.
         # (The note from the JSON can be more recent than the one from the CSV.)
         deck_updates = client.get_deck_updates(ID_OF_DECK_OF_USER_TEST1, since=None)
         assert deck_updates.notes == [note1_from_json, note2_from_csv]
