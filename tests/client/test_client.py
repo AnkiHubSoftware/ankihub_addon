@@ -958,52 +958,78 @@ class TestGetDeckUpdates:
         client = authorized_client_for_user_test1
 
         # Mock responses from deck updates endpoint
-        # ... The first response contains the external_notes_url
-        first_response = Mock()
-        latest_udpate = datetime.now(timezone.utc)
-        latest_udpate_str = datetime.strftime(
-            latest_udpate, ANKIHUB_DATETIME_FORMAT_STR
-        )
-        first_response.json = lambda: {
-            "external_notes_url": "test_url",
-            "next": None,
-            "notes": None,
-            "latest_update": latest_udpate_str,
-            "protected_fields": {},
-            "protected_tags": [],
-        }
-        first_response.status_code = 200
+        latest_update = datetime.now(timezone.utc)
+        note1_from_csv = NoteInfoFactory.create()
+        note1_from_json = NoteInfoFactory.create(ah_nid=note1_from_csv.ah_nid)
+        note2_from_csv = NoteInfoFactory.create()
 
-        # ... The second response is doesn't contain an external_notes_url and is empty
-        second_response = Mock()
-        notes: List[NoteInfo] = []
-        notes_encoded = gzip.compress(json.dumps(notes).encode("utf-8"))
-        notes_encoded = base64.b85encode(notes_encoded)
-        second_response.json = lambda: {
-            "external_notes_url": None,
-            "next": None,
-            "notes": notes_encoded,
-            "latest_update": None,
-            "protected_fields": {},
-            "protected_tags": [],
-        }
-        second_response.status_code = 200
+        response_with_csv_notes = self._deck_updates_response_mock_with_csv_notes(
+            notes=[note1_from_csv, note2_from_csv],
+            latest_update=latest_update,
+            mocker=mocker,
+        )
+
+        response_with_json_notes = self._deck_updates_response_mock_with_json_notes(
+            notes=[note1_from_json],
+            latest_update=latest_update,
+        )
 
         mocker.patch(
             "ankihub.ankihub_client.ankihub_client.AnkiHubClient._send_request",
-            side_effect=[first_response, second_response],
+            side_effect=[response_with_csv_notes, response_with_json_notes],
         )
+
+        # Assert that the deck updates are as expected.
+        # For note1, which is present in both the CSV and JSON responses, the JSON response should be used.
+        # (The note from the JSON can be more recent than the one from the CSV.)
+        deck_updates = client.get_deck_updates(ID_OF_DECK_OF_USER_TEST1, since=None)
+        assert deck_updates.notes == [note1_from_json, note2_from_csv]
+        assert deck_updates.latest_update == latest_update
+
+    def _deck_updates_response_mock_with_json_notes(
+        self, notes: List[NoteInfo], latest_update: datetime
+    ) -> Mock:
+        result = Mock()
+        note_dicts = [note.to_dict() for note in notes]
+        notes_encoded = gzip.compress(json.dumps(note_dicts).encode("utf-8"))
+        notes_encoded = base64.b85encode(notes_encoded)
+        latest_update_str = datetime.strftime(
+            latest_update, ANKIHUB_DATETIME_FORMAT_STR
+        )
+        result.json = lambda: {
+            "external_notes_url": None,
+            "next": None,
+            "notes": notes_encoded,
+            "latest_update": latest_update_str,
+            "protected_fields": {},
+            "protected_tags": [],
+        }
+        result.status_code = 200
+        return result
+
+    def _deck_updates_response_mock_with_csv_notes(
+        self, notes: List[NoteInfo], latest_update: datetime, mocker: MockerFixture
+    ) -> Mock:
+        result = Mock()
+        latest_update_str = datetime.strftime(
+            latest_update, ANKIHUB_DATETIME_FORMAT_STR
+        )
+        result.json = lambda: {
+            "external_notes_url": "test_url",
+            "next": None,
+            "notes": None,
+            "latest_update": latest_update_str,
+            "protected_fields": {},
+            "protected_tags": [],
+        }
+        result.status_code = 200
 
         # Mock the download of the deck from the external_notes_url
-        note_info = NoteInfoFactory.create()
         mocker.patch(
             "ankihub.ankihub_client.ankihub_client.AnkiHubClient.download_deck",
-            return_value=[note_info],
+            return_value=notes,
         )
-
-        deck_updates = client.get_deck_updates(ID_OF_DECK_OF_USER_TEST1, since=None)
-        assert deck_updates.notes == [note_info]
-        assert deck_updates.latest_update == latest_udpate
+        return result
 
 
 class TestGetDeckMediaUpdates:
