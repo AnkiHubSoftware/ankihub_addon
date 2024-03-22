@@ -49,7 +49,8 @@ from .models import (
     DeckExtension,
     DeckExtensionUpdateChunk,
     DeckMediaUpdateChunk,
-    DeckUpdateChunk,
+    DeckUpdates,
+    DeckUpdatesChunk,
     NewNoteSuggestion,
     NoteInfo,
     NoteSuggestion,
@@ -686,7 +687,57 @@ class AnkiHubClient:
         since: datetime,
         updates_download_progress_cb: Optional[Callable[[int], None]] = None,
         deck_download_progress_cb: Optional[Callable[[int], None]] = None,
-    ) -> Iterator[DeckUpdateChunk]:
+        should_cancel: Optional[Callable[[], bool]] = None,
+    ) -> Optional[DeckUpdates]:
+
+        notes_data_from_csv = []
+        notes_data_from_json = []
+        latest_update = None
+        for chunk in self._get_deck_updates_inner(
+            ah_did,
+            since,
+            updates_download_progress_cb,
+            deck_download_progress_cb,
+        ):
+            if should_cancel and should_cancel():
+                return None
+
+            if not chunk.notes:
+                continue
+
+            if chunk.from_csv:
+                # The CSV contains all notes, so we assign instead of extending
+                notes_data_from_csv = chunk.notes
+            else:
+                notes_data_from_json.extend(chunk.notes)
+
+            # Each chunk contains the latest update timestamp of the notes in it, we need the latest one
+            latest_update = max(
+                chunk.latest_update, latest_update or chunk.latest_update
+            )
+
+        # When a note is both in the CSV and JSON, the JSON version is the more recent one and
+        # the CSV version should be discarded.
+        ah_nids_from_json = {note.ah_nid for note in notes_data_from_json}
+        filtered_notes_data_from_csv = [
+            note for note in notes_data_from_csv if note.ah_nid not in ah_nids_from_json
+        ]
+        notes_data = notes_data_from_json + filtered_notes_data_from_csv
+
+        return DeckUpdates(
+            notes=notes_data,
+            latest_update=latest_update,
+            protected_fields=chunk.protected_fields,
+            protected_tags=chunk.protected_tags,
+        )
+
+    def _get_deck_updates_inner(
+        self,
+        ah_did: uuid.UUID,
+        since: datetime,
+        updates_download_progress_cb: Optional[Callable[[int], None]] = None,
+        deck_download_progress_cb: Optional[Callable[[int], None]] = None,
+    ) -> Iterator[DeckUpdatesChunk]:
         # updates_download_progress_cb gets passed the number of notes downloaded until now
         # deck_download_progress_cb gets passed the percentage of the download progress
 
@@ -722,12 +773,12 @@ class AnkiHubClient:
                     deck_download_progress_cb,
                     s3_presigned_url=data["external_notes_url"],
                 )
-                chunk = DeckUpdateChunk.from_dict(data)
+                chunk = DeckUpdatesChunk.from_dict({**data, "from_csv": True})
                 chunk.notes = notes_data_deck
                 yield chunk
 
                 # Get the rest of the updates, because the CSV is most likely not completely up to date
-                yield from self.get_deck_updates(
+                yield from self._get_deck_updates_inner(
                     ah_did=ah_did,
                     since=chunk.latest_update,
                     updates_download_progress_cb=updates_download_progress_cb,
@@ -743,7 +794,7 @@ class AnkiHubClient:
             notes_data = json.loads(self._gzip_decompress_string(notes_data_gzipped))
             data["notes"] = _transform_notes_data(notes_data)
 
-            note_updates = DeckUpdateChunk.from_dict(data)
+            note_updates = DeckUpdatesChunk.from_dict({**data, "from_csv": False})
             yield note_updates
 
             notes_count += len(note_updates.notes)

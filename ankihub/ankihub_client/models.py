@@ -138,7 +138,7 @@ class Deck(DataClassJSONMixinWithConfig):
 
 
 @dataclass
-class DeckUpdateChunk(DataClassJSONMixinWithConfig):
+class DeckUpdates(DataClassJSONMixinWithConfig):
     latest_update: Optional[datetime] = dataclasses.field(
         metadata=field_options(
             deserialize=lambda x: datetime.strptime(x, ANKIHUB_DATETIME_FORMAT_STR)
@@ -149,6 +149,11 @@ class DeckUpdateChunk(DataClassJSONMixinWithConfig):
     protected_fields: Dict[int, List[str]]
     protected_tags: List[str]
     notes: List[NoteInfo]
+
+
+@dataclass
+class DeckUpdatesChunk(DeckUpdates):
+    from_csv: bool
 
 
 @dataclass

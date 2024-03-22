@@ -53,6 +53,7 @@ from requests_mock import Mocker
 
 from ankihub.ankihub_client.models import (
     DeckMediaUpdateChunk,
+    DeckUpdates,
     UserDeckExtensionRelation,
 )
 from ankihub.gui import editor
@@ -99,7 +100,6 @@ from ankihub.ankihub_client import (
     AnkiHubHTTPError,
     ChangeNoteSuggestion,
     Deck,
-    DeckUpdateChunk,
     Field,
     NewNoteSuggestion,
     NoteCustomization,
@@ -4014,14 +4014,12 @@ class TestDeckUpdater:
             mocker.patch.object(
                 AnkiHubClient,
                 "get_deck_updates",
-                return_value=[
-                    DeckUpdateChunk(
-                        latest_update=latest_update,
-                        protected_fields={},
-                        protected_tags=[],
-                        notes=[note_info],
-                    )
-                ],
+                return_value=DeckUpdates(
+                    latest_update=latest_update,
+                    protected_fields={},
+                    protected_tags=[],
+                    notes=[note_info],
+                ),
             )
 
             mocker.patch.object(

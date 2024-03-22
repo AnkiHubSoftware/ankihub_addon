@@ -24,7 +24,7 @@ from .models import (  # noqa: F401
     DeckExtensionUpdateChunk,
     DeckMedia,
     DeckMediaUpdateChunk,
-    DeckUpdateChunk,
+    DeckUpdatesChunk,
     Field,
     NewNoteSuggestion,
     NoteCustomization,
