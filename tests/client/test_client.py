@@ -37,7 +37,6 @@ from ankihub.ankihub_client import (
     DeckExtensionUpdateChunk,
     DeckMedia,
     DeckMediaUpdateChunk,
-    DeckUpdateChunk,
     Field,
     NewNoteSuggestion,
     NoteCustomization,
@@ -53,6 +52,7 @@ from ankihub.ankihub_client import (
 from ankihub.ankihub_client.models import (
     ANKIHUB_DATETIME_FORMAT_STR,
     CardReviewData,
+    DeckUpdates,
     UserDeckExtensionRelation,
 )
 from ankihub.gui.utils import deck_download_progress_cb
@@ -440,7 +440,7 @@ class TestDownloadDeck:
         deck_file: Path,
     ):
         client = authorized_client_for_user_test1
-        presigned_url_suffix = "/fake_key"
+        presigned_url_suffix = f"/{deck_file.name}"
         mocker.patch.object(
             client, "_get_presigned_url_suffix", return_value=presigned_url_suffix
         )
@@ -912,19 +912,10 @@ class TestGetOwnedDecks:
 
 class TestGetDeckUpdates:
     @pytest.mark.vcr()
-    def test_get_deck_updates(
-        self, authorized_client_for_user_test2: AnkiHubClient, mocker: MockerFixture
-    ):
+    def test_get_deck_updates(self, authorized_client_for_user_test2: AnkiHubClient):
         client = authorized_client_for_user_test2
-
-        page_size = 5
-        mocker.patch(
-            "ankihub.ankihub_client.ankihub_client.DECK_UPDATE_PAGE_SIZE", page_size
-        )
-        update_chunks: List[DeckUpdateChunk] = list(
-            client.get_deck_updates(ID_OF_DECK_OF_USER_TEST2, since=None)
-        )
-        assert len(update_chunks) == 3
+        deck_updates = client.get_deck_updates(ID_OF_DECK_OF_USER_TEST2, since=None)
+        assert len(deck_updates.notes) == 13
 
     @pytest.mark.skipifvcr()
     def test_get_deck_updates_since(
@@ -942,8 +933,8 @@ class TestGetDeckUpdates:
         client.create_new_note_suggestion(new_note_suggestion, auto_accept=True)
 
         # get deck updates since the time of the new note creation
-        chunks = list(
-            client.get_deck_updates(ah_did=ID_OF_DECK_OF_USER_TEST1, since=since_time)
+        deck_updates = client.get_deck_updates(
+            ah_did=ID_OF_DECK_OF_USER_TEST1, since=since_time
         )
 
         note_info: NoteInfo = new_note_suggestion_note_info
@@ -951,14 +942,14 @@ class TestGetDeckUpdates:
         note_info.anki_nid = new_note_suggestion.anki_nid
         note_info.guid = new_note_suggestion.guid
 
-        assert len(chunks) == 1
-        assert chunks[0] == DeckUpdateChunk(
-            latest_update=chunks[0].latest_update,  # not the same as since_time_str
+        assert deck_updates == DeckUpdates(
+            latest_update=deck_updates.latest_update,
             notes=[note_info],
             protected_fields={},
             protected_tags=[],
         )
 
+    @pytest.mark.vcr()
     def test_get_deck_updates_with_external_notes_url(
         self, authorized_client_for_user_test1: AnkiHubClient, mocker: MockerFixture
     ):
@@ -1010,16 +1001,9 @@ class TestGetDeckUpdates:
             return_value=[note_info],
         )
 
-        update_chunks: List[DeckUpdateChunk] = list(
-            client.get_deck_updates(ID_OF_DECK_OF_USER_TEST1, since=None)
-        )
-        assert len(update_chunks) == 2
-
-        assert update_chunks[0].notes == [note_info]
-        assert update_chunks[0].latest_update == latest_udpate
-
-        assert update_chunks[1].notes == []
-        assert update_chunks[1].latest_update is None
+        deck_updates = client.get_deck_updates(ID_OF_DECK_OF_USER_TEST1, since=None)
+        assert deck_updates.notes == [note_info]
+        assert deck_updates.latest_update == latest_udpate
 
 
 class TestGetDeckMediaUpdates:
