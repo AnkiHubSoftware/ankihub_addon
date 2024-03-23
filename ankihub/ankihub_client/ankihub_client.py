@@ -717,6 +717,9 @@ class AnkiHubClient:
             if should_cancel and should_cancel():
                 return None
 
+            if not chunk.notes:
+                continue
+
             if chunk.from_csv:
                 # The CSV contains all notes, so we assign instead of extending
                 notes_data_from_csv = chunk.notes
