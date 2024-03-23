@@ -1,0 +1,54 @@
+interactions:
+- request:
+    body: '{"username": "test1", "password": "asdf"}'
+    headers:
+      Accept:
+      - application/json; version=18.0
+      Content-Length:
+      - '41'
+      Content-Type:
+      - application/json
+    method: POST
+    uri: http://localhost:8000/api/login/
+  response:
+    body:
+      string: '{"expiry":"2024-04-20T10:29:10.255854Z","token":"bcfe4df61731d03a865fad738c8ecf45cbbfe8706a9b1541baa501476439ec2b"}'
+    headers:
+      Allow:
+      - POST, OPTIONS
+      Content-Language:
+      - en
+      Content-Length:
+      - '115'
+      Content-Type:
+      - application/json
+      Cross-Origin-Opener-Policy:
+      - same-origin
+      Date:
+      - Sat, 23 Mar 2024 10:29:10 GMT
+      Referrer-Policy:
+      - same-origin
+      Server:
+      - WSGIServer/0.2 CPython/3.8.17
+      Server-Timing:
+      - TimerPanel_utime;dur=254.595000000009;desc="User CPU time", TimerPanel_stime;dur=63.58600000000081;desc="System
+        CPU time", TimerPanel_total;dur=318.1810000000098;desc="Total CPU time", TimerPanel_total_time;dur=255.47747599966897;desc="Elapsed
+        time", SQLPanel_sql_time;dur=15.29612700051075;desc="SQL 16 queries", CachePanel_total_time;dur=0;desc="Cache
+        0 Calls"
+      Set-Cookie:
+      - csrftoken=2H0GaWsUwJrdSKhKfyAcR4Ji1ZVbqv0b; expires=Sat, 22 Mar 2025 10:29:10
+        GMT; HttpOnly; Max-Age=31449600; Path=/; SameSite=Lax
+      - sessionid=41zsuth6f15mgzqc2upkl3cj0fe9cwls; expires=Sat, 30 Mar 2024 10:29:10
+        GMT; HttpOnly; Max-Age=604800; Path=/; SameSite=Lax
+      Vary:
+      - Accept, Cookie, Accept-Language, origin
+      X-Content-Type-Options:
+      - nosniff
+      X-Frame-Options:
+      - DENY
+      djdt-store-id:
+      - 5b6ae0e49e5c4e3f9b82999af12374e5
+    status:
+      code: 200
+      message: OK
+version: 1

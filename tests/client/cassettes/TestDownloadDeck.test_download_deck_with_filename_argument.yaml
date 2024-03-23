@@ -3,7 +3,7 @@ interactions:
     body: '{"username": "test1", "password": "asdf"}'
     headers:
       Accept:
-      - application/json; version=17.0
+      - application/json; version=18.0
       Content-Length:
       - '41'
       Content-Type:
@@ -12,7 +12,7 @@ interactions:
     uri: http://localhost:8000/api/login/
   response:
     body:
-      string: '{"expiry":"2024-04-19T16:04:50.973068Z","token":"5e1b4d58e478488ba4e2299cdcec1b9dd8fdbd66ae8e4931331643a7714a3f3f"}'
+      string: '{"expiry":"2024-04-20T10:23:28.030902Z","token":"9c2b0ae507984486d27efbc413cce983c564aa04f8b476035f1c9cb62c7f80f5"}'
     headers:
       Allow:
       - POST, OPTIONS
@@ -25,20 +25,20 @@ interactions:
       Cross-Origin-Opener-Policy:
       - same-origin
       Date:
-      - Fri, 22 Mar 2024 16:04:51 GMT
+      - Sat, 23 Mar 2024 10:23:28 GMT
       Referrer-Policy:
       - same-origin
       Server:
       - WSGIServer/0.2 CPython/3.8.17
       Server-Timing:
-      - TimerPanel_utime;dur=258.18499999999744;desc="User CPU time", TimerPanel_stime;dur=67.2309999999996;desc="System
-        CPU time", TimerPanel_total;dur=325.41599999999704;desc="Total CPU time",
-        TimerPanel_total_time;dur=227.40730599980452;desc="Elapsed time", SQLPanel_sql_time;dur=6.024389002050157;desc="SQL
-        16 queries", CachePanel_total_time;dur=0;desc="Cache 0 Calls"
+      - TimerPanel_utime;dur=726.1450000000025;desc="User CPU time", TimerPanel_stime;dur=103.36700000000043;desc="System
+        CPU time", TimerPanel_total;dur=829.5120000000029;desc="Total CPU time", TimerPanel_total_time;dur=753.0351560001236;desc="Elapsed
+        time", SQLPanel_sql_time;dur=6.186213000319185;desc="SQL 16 queries", CachePanel_total_time;dur=0;desc="Cache
+        0 Calls"
       Set-Cookie:
-      - csrftoken=WbsLF84WGnowizRjkua3nXLYQLTwPUGA; expires=Fri, 21 Mar 2025 16:04:51
+      - csrftoken=3OU26ivFEcHrC4EV0eJTqRDiCL9EBJjq; expires=Sat, 22 Mar 2025 10:23:28
         GMT; HttpOnly; Max-Age=31449600; Path=/; SameSite=Lax
-      - sessionid=zp3j98adlpg0ldp71rmkq3ko3m1vp5yx; expires=Fri, 29 Mar 2024 16:04:51
+      - sessionid=mq2h4cj4kkqegw0frg7uxhikavae3stz; expires=Sat, 30 Mar 2024 10:23:28
         GMT; HttpOnly; Max-Age=604800; Path=/; SameSite=Lax
       Vary:
       - Accept, Cookie, Accept-Language, origin
@@ -47,7 +47,7 @@ interactions:
       X-Frame-Options:
       - DENY
       djdt-store-id:
-      - 51595cf93f844a5484285c312286d5db
+      - 0d981ff7253c4dddbc27d23125b6f004
     status:
       code: 200
       message: OK

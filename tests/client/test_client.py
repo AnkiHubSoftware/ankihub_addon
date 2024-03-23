@@ -253,7 +253,7 @@ def remove_db_dump() -> Generator:
     elif result.returncode == 1 and "No such container" in result.stderr:
         # Nothing to do
         pass
-    elif "Container" in result.stderr and "is not running" in result.stderr:
+    elif "container" in result.stderr.lower() and "is not running" in result.stderr:
         # Container is not running, nothing to do
         pass
     elif "docker: command not found" in result.stderr:
@@ -474,8 +474,9 @@ class TestDownloadDeck:
         self, authorized_client_for_user_test1: AnkiHubClient, mocker: MockerFixture
     ):
         client = authorized_client_for_user_test1
+        deck_file = DECK_CSV
 
-        presigned_url_suffix = "/fake_key"
+        presigned_url_suffix = f"/{deck_file.name}"
         mocker.patch.object(
             client, "_presigned_url_suffix_from_key", return_value=presigned_url_suffix
         )
@@ -492,7 +493,7 @@ class TestDownloadDeck:
         with requests_mock.Mocker(real_http=True) as m:
             m.get(
                 f"{client.s3_bucket_url}{presigned_url_suffix}",
-                content=DECK_CSV.read_bytes(),
+                content=deck_file.read_bytes(),
                 headers={"content-length": "1000000"},
             )
             notes_data = client.download_deck(
@@ -502,21 +503,26 @@ class TestDownloadDeck:
         assert len(notes_data) == 1
         assert notes_data[0].tags == ["asdf"]
 
-    def test_download_deck_with_presigned_url_argument(
+    def test_download_deck_with_filename_argument(
         self,
         authorized_client_for_user_test1: AnkiHubClient,
+        mocker: MockerFixture,
     ):
         client = authorized_client_for_user_test1
-        deck_file = DECK_CSV_GZ
-        deck_file_presigned_url = f"{DEFAULT_S3_BUCKET_URL}/{deck_file.name}?auth=123"
+        deck_file = DECK_CSV
+
+        presigned_url_suffix = f"/{deck_file.name}"
+        mocker.patch.object(
+            client, "_presigned_url_suffix_from_key", return_value=presigned_url_suffix
+        )
         with requests_mock.Mocker(real_http=True) as m:
             m.get(
-                deck_file_presigned_url,
+                f"{client.s3_bucket_url}{presigned_url_suffix}",
                 content=deck_file.read_bytes(),
             )
             notes_data = client.download_deck(
                 ah_did=ID_OF_DECK_OF_USER_TEST1,
-                s3_presigned_url=deck_file_presigned_url,
+                filename=deck_file.name,
             )
 
         assert len(notes_data) == 1
@@ -972,11 +978,11 @@ class TestGetDeckUpdates:
         )
 
     @pytest.mark.vcr()
-    def test_get_deck_updates_with_external_notes_url(
+    def test_get_deck_updates_with_notes_csv_filename(
         self, authorized_client_for_user_test1: AnkiHubClient, mocker: MockerFixture
     ):
         # This test mocks the responses instead of relying on real responses from the server,
-        # because the setup required to get real responses with non-null external_notes_url is too costly or complex.
+        # because the setup required to get real responses with non-null notes_csv_filename is too costly or complex.
         client = authorized_client_for_user_test1
 
         # Mock responses from deck updates endpoint
@@ -1019,7 +1025,7 @@ class TestGetDeckUpdates:
             latest_update, ANKIHUB_DATETIME_FORMAT_STR
         )
         result.json = lambda: {
-            "external_notes_url": None,
+            "notes_csv_filename": None,
             "next": None,
             "notes": notes_encoded,
             "latest_update": latest_update_str,
@@ -1037,7 +1043,7 @@ class TestGetDeckUpdates:
             latest_update, ANKIHUB_DATETIME_FORMAT_STR
         )
         result.json = lambda: {
-            "external_notes_url": "test_url",
+            "notes_csv_filename": "test_url",
             "next": None,
             "notes": None,
             "latest_update": latest_update_str,
@@ -1046,7 +1052,7 @@ class TestGetDeckUpdates:
         }
         result.status_code = 200
 
-        # Mock the download of the deck from the external_notes_url
+        # Mock the download of the deck
         mocker.patch(
             "ankihub.ankihub_client.ankihub_client.AnkiHubClient.download_deck",
             return_value=notes,
