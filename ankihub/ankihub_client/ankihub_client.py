@@ -623,15 +623,15 @@ class AnkiHubClient:
         self,
         ah_did: uuid.UUID,
         download_progress_cb: Optional[Callable[[int], None]] = None,
-        s3_presigned_url: Optional[str] = None,
+        filename: Optional[str] = None,
     ) -> List[NoteInfo]:
-        if not s3_presigned_url:
+        if not filename:
             deck_info = self.get_deck_by_id(ah_did)
-            s3_url_suffix = self._presigned_url_suffix_from_key(
-                key=deck_info.csv_notes_filename, action="download"
-            )
-        else:
-            s3_url_suffix = self._presigned_url_suffix_from_url(s3_presigned_url)
+            filename = deck_info.csv_notes_filename
+
+        s3_url_suffix = self._presigned_url_suffix_from_key(
+            key=filename, action="download"
+        )
 
         if download_progress_cb:
             s3_response_content = self._download_with_progress_cb(
@@ -779,11 +779,11 @@ class AnkiHubClient:
                 data["next"].split("/api", maxsplit=1)[1] if data["next"] else None
             )
 
-            if data["external_notes_url"]:
+            if data["notes_csv_filename"]:
                 notes_data_deck = self.download_deck(
                     ah_did,
                     deck_download_progress_cb,
-                    s3_presigned_url=data["external_notes_url"],
+                    filename=data["notes_csv_filename"],
                 )
                 chunk = DeckUpdatesChunk.from_dict({**data, "from_csv": True})
                 chunk.notes = notes_data_deck
