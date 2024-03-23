@@ -10,7 +10,7 @@ import zipfile
 from copy import deepcopy
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
-from typing import Callable, Generator, List, cast
+from typing import Callable, Generator, List, Optional, cast
 from unittest.mock import Mock
 
 import pytest
@@ -1015,21 +1015,44 @@ class TestGetDeckUpdates:
         assert deck_updates.notes == [note1_from_json, note2_from_csv]
         assert deck_updates.latest_update == latest_update
 
+    @pytest.mark.vcr()
+    def test_get_empty_deck_updates(
+        self, authorized_client_for_user_test1: AnkiHubClient, mocker: MockerFixture
+    ):
+        client = authorized_client_for_user_test1
+
+        # Mock responses from deck updates endpoint
+        response = self._deck_updates_response_mock_with_json_notes(
+            notes=[],
+            latest_update=None,
+        )
+
+        mocker.patch(
+            "ankihub.ankihub_client.ankihub_client.AnkiHubClient._send_request",
+            side_effect=[response],
+        )
+
+        # Assert that the deck updates are as expected.
+        deck_updates = client.get_deck_updates(ID_OF_DECK_OF_USER_TEST1, since=None)
+        assert deck_updates.notes == []
+        assert deck_updates.latest_update is None
+
     def _deck_updates_response_mock_with_json_notes(
-        self, notes: List[NoteInfo], latest_update: datetime
+        self, notes: List[NoteInfo], latest_update: Optional[datetime]
     ) -> Mock:
         result = Mock()
         note_dicts = [note.to_dict() for note in notes]
         notes_encoded = gzip.compress(json.dumps(note_dicts).encode("utf-8"))
         notes_encoded = base64.b85encode(notes_encoded)
-        latest_update_str = datetime.strftime(
-            latest_update, ANKIHUB_DATETIME_FORMAT_STR
-        )
         result.json = lambda: {
             "notes_csv_filename": None,
             "next": None,
             "notes": notes_encoded,
-            "latest_update": latest_update_str,
+            "latest_update": datetime.strftime(
+                latest_update, ANKIHUB_DATETIME_FORMAT_STR
+            )
+            if latest_update
+            else None,
             "protected_fields": {},
             "protected_tags": [],
         }
@@ -1037,17 +1060,21 @@ class TestGetDeckUpdates:
         return result
 
     def _deck_updates_response_mock_with_csv_notes(
-        self, notes: List[NoteInfo], latest_update: datetime, mocker: MockerFixture
+        self,
+        notes: List[NoteInfo],
+        latest_update: Optional[datetime],
+        mocker: MockerFixture,
     ) -> Mock:
         result = Mock()
-        latest_update_str = datetime.strftime(
-            latest_update, ANKIHUB_DATETIME_FORMAT_STR
-        )
         result.json = lambda: {
             "notes_csv_filename": "test_url",
             "next": None,
             "notes": None,
-            "latest_update": latest_update_str,
+            "latest_update": datetime.strftime(
+                latest_update, ANKIHUB_DATETIME_FORMAT_STR
+            )
+            if latest_update
+            else None,
             "protected_fields": {},
             "protected_tags": [],
         }
