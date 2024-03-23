@@ -982,7 +982,8 @@ class TestGetDeckUpdates:
         self, authorized_client_for_user_test1: AnkiHubClient, mocker: MockerFixture
     ):
         # This test mocks the responses instead of relying on real responses from the server,
-        # because the setup required to get real responses with non-null notes_csv_filename is too costly or complex.
+        # because the setup required to get real responses a with non-null notes_csv_filename value
+        # is too costly or complex.
         client = authorized_client_for_user_test1
 
         # Mock responses from deck updates endpoint
