@@ -1029,7 +1029,7 @@ class TestGetDeckUpdates:
 
         mocker.patch(
             "ankihub.ankihub_client.ankihub_client.AnkiHubClient._send_request",
-            side_effect=[response],
+            return_value=response,
         )
 
         # Assert that the deck updates are as expected.
