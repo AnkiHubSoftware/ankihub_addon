@@ -253,7 +253,7 @@ def remove_db_dump() -> Generator:
     elif result.returncode == 1 and "No such container" in result.stderr:
         # Nothing to do
         pass
-    elif "Container" in result.stderr and "is not running" in result.stderr:
+    elif "container" in result.stderr.lower() and "is not running" in result.stderr:
         # Container is not running, nothing to do
         pass
     elif "docker: command not found" in result.stderr:
