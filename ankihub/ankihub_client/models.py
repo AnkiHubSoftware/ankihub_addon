@@ -1,5 +1,6 @@
 """Defines classes that represent data returned by the AnkiHub API or sent to it.
 Also defines some helper functions."""
+
 import dataclasses
 import uuid
 from abc import ABC
@@ -103,9 +104,9 @@ class Deck(DataClassJSONMixinWithConfig):
     name: str
     csv_last_upload: datetime = dataclasses.field(
         metadata=field_options(
-            deserialize=lambda x: datetime.strptime(x, ANKIHUB_DATETIME_FORMAT_STR)
-            if x
-            else None
+            deserialize=lambda x: (
+                datetime.strptime(x, ANKIHUB_DATETIME_FORMAT_STR) if x else None
+            )
         )
     )
     csv_notes_filename: str
@@ -141,9 +142,9 @@ class Deck(DataClassJSONMixinWithConfig):
 class DeckUpdates(DataClassJSONMixinWithConfig):
     latest_update: Optional[datetime] = dataclasses.field(
         metadata=field_options(
-            deserialize=lambda x: datetime.strptime(x, ANKIHUB_DATETIME_FORMAT_STR)
-            if x
-            else None,
+            deserialize=lambda x: (
+                datetime.strptime(x, ANKIHUB_DATETIME_FORMAT_STR) if x else None
+            ),
         ),
     )
     protected_fields: Dict[int, List[str]]
@@ -178,6 +179,16 @@ class DeckMediaUpdateChunk(DataClassJSONMixinWithConfig):
             deserialize=lambda x: datetime.strptime(x, ANKIHUB_DATETIME_FORMAT_STR)
         )
     )
+
+
+class NotesActionChoices(Enum):
+    UNSUSPEND = "unsuspend"
+
+
+@dataclass
+class NotesAction(DataClassJSONMixinWithConfig):
+    action: NotesActionChoices
+    note_ids: List[uuid.UUID]
 
 
 @dataclass
@@ -285,9 +296,9 @@ class DeckExtensionUpdateChunk(DataClassJSONMixinWithConfig):
     note_customizations: List[NoteCustomization]
     latest_update: Optional[datetime] = dataclasses.field(
         metadata=field_options(
-            deserialize=lambda x: datetime.strptime(x, ANKIHUB_DATETIME_FORMAT_STR)
-            if x
-            else None,
+            deserialize=lambda x: (
+                datetime.strptime(x, ANKIHUB_DATETIME_FORMAT_STR) if x else None
+            ),
         ),
         default=None,
     )
