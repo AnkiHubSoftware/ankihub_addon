@@ -1,4 +1,5 @@
 """Downloads updates to decks from AnkiHub and imports them."""
+
 import uuid
 from datetime import datetime
 from functools import cached_property
@@ -6,17 +7,22 @@ from typing import Collection, List, Optional
 
 import aqt
 from anki.errors import NotFoundError
+from anki.utils import ids2str
+from aqt.operations.scheduling import unsuspend_cards
 from aqt.utils import showInfo, tooltip
 
 from .. import LOGGER
 from ..addon_ankihub_client import AddonAnkiHubClient as AnkiHubClient
 from ..ankihub_client import AnkiHubHTTPError, DeckExtension
+from ..ankihub_client.models import NotesActionChoices, SuggestionType
 from ..db import ankihub_db
+from ..db.db import execute_list_query_in_chunks, flat
+from ..db.models import AnkiHubNote
 from ..main.importing import AnkiHubImporter, AnkiHubImportResult
 from ..main.note_conversion import is_tag_for_group
 from ..main.note_types import fetch_note_types_based_on_notes
 from ..main.utils import create_backup
-from ..settings import config
+from ..settings import ANKING_DECK_ID, config
 from .media_sync import media_sync
 from .utils import deck_download_progress_cb, show_error_dialog
 
@@ -87,18 +93,24 @@ class _AnkiHubDeckUpdater:
         Returns True if the update was successful, False if the user cancelled it."""
         self._update_deck_config(ankihub_did)
 
-        result = self._download_updates_for_deck(ankihub_did)
+        result = self._fetch_and_apply_deck_updates(ankihub_did)
         if not result:
             return False
 
-        result = self._update_deck_extensions(ankihub_did)
-        return result
+        result = self._fetch_and_apply_deck_extension_updates(ankihub_did)
+        if not result:
+            return False
+
+        if ankihub_did == ANKING_DECK_ID:
+            self._fetch_and_apply_pending_notes_actions(ankihub_did)
+
+        return True
 
     def _update_deck_config(self, ankihub_did: uuid.UUID) -> None:
         deck = self._client.get_deck_by_id(ankihub_did)
         config.update_deck(deck=deck)
 
-    def _download_updates_for_deck(self, ankihub_did) -> bool:
+    def _fetch_and_apply_deck_updates(self, ankihub_did) -> bool:
         """Downloads note updates from AnkiHub and imports them into Anki.
         Returns True if the action was successful, False if the user cancelled it."""
 
@@ -139,7 +151,48 @@ class _AnkiHubDeckUpdater:
             LOGGER.info(f"No new updates for {ankihub_did=}")
         return True
 
-    def _update_deck_extensions(self, ankihub_did: uuid.UUID) -> bool:
+    def _fetch_and_apply_pending_notes_actions(self, ankihub_did: uuid.UUID) -> None:
+        pending_notes_actions = self._client.get_pending_notes_actions_for_deck(
+            ankihub_did
+        )
+        if not pending_notes_actions:
+            LOGGER.info(f"No pending notes actions to apply for {ankihub_did=}")
+
+        for pending_note_action in pending_notes_actions:
+            if pending_note_action.action != NotesActionChoices.UNSUSPEND:
+                raise NotImplementedError(  # pragma: no cover
+                    f"Unsupported pending notes action: {pending_note_action.action}"
+                )
+            self._unsuspend_notes(ah_nids=pending_note_action.note_ids)
+
+    def _unsuspend_notes(self, ah_nids: List[uuid.UUID]) -> None:
+        anki_nids = execute_list_query_in_chunks(
+            lambda ah_nids: AnkiHubNote.select(AnkiHubNote.anki_note_id)
+            .filter(
+                ankihub_note_id__in=ah_nids,
+                last_update_type__ne=SuggestionType.DELETE,
+            )
+            .objects(flat),
+            ids=ah_nids,
+        )
+        anki_cids = aqt.mw.col.db.list(
+            f"SELECT id FROM cards WHERE nid IN {ids2str(anki_nids)}"
+        )
+
+        def on_success(_):
+            LOGGER.info(f"Unsuspended {len(anki_cids)} cards for note ids: {ah_nids}")
+
+        def on_failure(exception: Exception):
+            LOGGER.exception(f"Failed to unsuspend cards for {ah_nids}: {exception}")
+
+        aqt.mw.taskman.run_on_main(
+            lambda: unsuspend_cards(parent=aqt.mw, card_ids=anki_cids)
+            .success(on_success)
+            .failure(on_failure)
+            .run_in_background()
+        )
+
+    def _fetch_and_apply_deck_extension_updates(self, ankihub_did: uuid.UUID) -> bool:
         # returns True if the update was successful, False if the user cancelled it
         if not (
             deck_extensions := self._client.get_deck_extensions_by_deck_id(ankihub_did)
