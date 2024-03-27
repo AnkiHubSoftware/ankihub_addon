@@ -179,10 +179,10 @@ class _AnkiHubDeckUpdater:
             f"SELECT id FROM cards WHERE nid IN {ids2str(anki_nids)}"
         )
 
-        def on_success(_):
+        def on_success(_) -> None:
             LOGGER.info(f"Unsuspended {len(anki_cids)} cards for note ids: {ah_nids}")
 
-        def on_failure(exception: Exception):
+        def on_failure(exception: Exception) -> None:
             LOGGER.exception(f"Failed to unsuspend cards for {ah_nids}: {exception}")
 
         aqt.mw.taskman.run_on_main(
