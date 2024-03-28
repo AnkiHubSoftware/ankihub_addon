@@ -4332,7 +4332,8 @@ class TestSyncWithAnkiHub:
             # Sync
             sync_with_ankihub()
 
-            # Assert that the cards of the note get unsuspended if its the AnKing deck which was synced
+            # Assert that the cards of the note get unsuspended if its the AnKing deck which was synced.
+            # (We don't support notes actions for other decks yet.)
             def cards_of_note_are_unsuspended():
                 note = aqt.mw.col.get_note(NoteId(note_info.anki_nid))
                 cards = note.cards()
