@@ -54,6 +54,8 @@ from requests_mock import Mocker
 from ankihub.ankihub_client.models import (
     DeckMediaUpdateChunk,
     DeckUpdates,
+    NotesAction,
+    NotesActionChoices,
     UserDeckExtensionRelation,
 )
 from ankihub.gui import editor
@@ -195,6 +197,7 @@ from ankihub.main.utils import (
 )
 from ankihub.settings import (
     ANKIHUB_NOTE_TYPE_FIELD_NAME,
+    ANKING_DECK_ID,
     AnkiHubCommands,
     BehaviorOnRemoteNoteDeleted,
     DeckConfig,
@@ -4280,6 +4283,66 @@ class TestSyncWithAnkiHub:
             sync_with_ankihub()
 
         assert config._private_config.api_version_on_last_sync == API_VERSION
+
+    @pytest.mark.parametrize(
+        "is_for_anking_deck",
+        [True, False],
+    )
+    def test_sync_applies_pending_notes_actions(
+        self,
+        anki_session_with_addon_data: AnkiSession,
+        install_ah_deck: InstallAHDeck,
+        import_ah_note: ImportAHNote,
+        mocker: MockerFixture,
+        mock_ankihub_sync_dependencies: None,
+        sync_with_ankihub: SyncWithAnkiHub,
+        qtbot: QtBot,
+        is_for_anking_deck: bool,
+    ):
+        with anki_session_with_addon_data.profile_loaded():
+            # Setup deck with a note that has a suspended card
+            ah_did = install_ah_deck(
+                ah_did=ANKING_DECK_ID if is_for_anking_deck else None
+            )
+            note_info = import_ah_note(
+                ah_did=ah_did,
+            )
+            note = aqt.mw.col.get_note(NoteId(note_info.anki_nid))
+            card = note.cards()[0]
+            card.queue = QUEUE_TYPE_SUSPENDED
+            aqt.mw.col.update_card(card)
+
+            # Mock client methods
+            deck = DeckFactory.create(ah_did=ah_did)
+            mocker.patch.object(
+                AnkiHubClient, "get_deck_subscriptions", return_value=[deck]
+            )
+            mocker.patch.object(AnkiHubClient, "get_deck_by_id", return_value=deck)
+
+            # ... Mock get_pending_notes_actions_for_deck to return an unsuspend action for the note
+            notes_action = NotesAction(
+                action=NotesActionChoices.UNSUSPEND, note_ids=[note_info.ah_nid]
+            )
+            mocker.patch.object(
+                AnkiHubClient,
+                "get_pending_notes_actions_for_deck",
+                return_value=[notes_action],
+            )
+
+            # Sync
+            sync_with_ankihub()
+
+            # Assert that the cards of the note get unsuspended if its the AnKing deck which was synced
+            def cards_of_note_are_unsuspended():
+                note = aqt.mw.col.get_note(NoteId(note_info.anki_nid))
+                cards = note.cards()
+                return all(not card.queue == QUEUE_TYPE_SUSPENDED for card in cards)
+
+            if is_for_anking_deck:
+                qtbot.wait_until(cards_of_note_are_unsuspended)
+            else:
+                qtbot.wait(500)
+                assert not cards_of_note_are_unsuspended()
 
     def test_exception_is_not_backpropagated_to_caller(
         self, anki_session_with_addon_data: AnkiSession, mocker: MockerFixture
