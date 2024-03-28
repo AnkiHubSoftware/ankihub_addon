@@ -10,6 +10,7 @@ from anki.errors import NotFoundError
 from anki.utils import ids2str
 from aqt.operations.scheduling import unsuspend_cards
 from aqt.utils import showInfo, tooltip
+from peewee import DQ
 
 from .. import LOGGER
 from ..addon_ankihub_client import AddonAnkiHubClient as AnkiHubClient
@@ -157,6 +158,7 @@ class _AnkiHubDeckUpdater:
         )
         if not pending_notes_actions:
             LOGGER.info(f"No pending notes actions to apply for {ankihub_did=}")
+            return
 
         for pending_note_action in pending_notes_actions:
             if pending_note_action.action != NotesActionChoices.UNSUSPEND:
@@ -167,12 +169,15 @@ class _AnkiHubDeckUpdater:
 
     def _unsuspend_notes(self, ah_nids: List[uuid.UUID]) -> None:
         anki_nids = execute_list_query_in_chunks(
-            lambda ah_nids: AnkiHubNote.select(AnkiHubNote.anki_note_id)
-            .filter(
-                ankihub_note_id__in=ah_nids,
-                last_update_type__ne=SuggestionType.DELETE,
-            )
-            .objects(flat),
+            lambda ah_nids: (
+                AnkiHubNote.select(AnkiHubNote.anki_note_id)
+                .filter(
+                    DQ(last_update_type__ne=SuggestionType.DELETE.value[0])
+                    | DQ(last_update_type__is=None),
+                    ankihub_note_id__in=ah_nids,
+                )
+                .objects(flat)
+            ),
             ids=ah_nids,
         )
         anki_cids = aqt.mw.col.db.list(
@@ -183,7 +188,9 @@ class _AnkiHubDeckUpdater:
             LOGGER.info(f"Unsuspended {len(anki_cids)} cards for note ids: {ah_nids}")
 
         def on_failure(exception: Exception) -> None:
-            LOGGER.exception(f"Failed to unsuspend cards for {ah_nids}: {exception}")
+            LOGGER.exception(  # pragma: no cover
+                f"Failed to unsuspend cards for {ah_nids}: {exception}"
+            )
 
         aqt.mw.taskman.run_on_main(
             lambda: unsuspend_cards(parent=aqt.mw, card_ids=anki_cids)
