@@ -72,12 +72,20 @@ def sync_with_ankihub(on_done: Callable[[Future], None]) -> None:
 
 
 def _on_send_review_data_done(future: Future) -> None:
-    if future.exception():
-        LOGGER.error(  # pragma: no cover
-            f"Failed to send review data: {future.exception()}"
+    exception = future.exception()
+    if not exception:
+        LOGGER.info("Review data sent successfully")
+        return
+
+    # CollectionNotOpen is raised by Anki when trying to access the collection when it is closed.
+    # This happens e.g. when the sync is triggered by the user closing Anki. Then the task for sending review data
+    # starts and tries to access the collection, but it is already closed. We can ignore this error.
+    if "CollectionNotOpen" in str(exception):  # pragma: no cover
+        LOGGER.warning(  # pragma: no cover
+            f"Failed to send review data because the collection is closed: {exception}"
         )
     else:
-        LOGGER.info("Review data sent successfully")
+        LOGGER.error(f"Failed to send review data: {exception}")  # pragma: no cover
 
 
 def _uninstall_decks_the_user_is_not_longer_subscribed_to(
