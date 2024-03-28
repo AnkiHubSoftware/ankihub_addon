@@ -1790,6 +1790,7 @@ class TestGetPendingNotesActionsForDeck:
         authorized_client_for_user_test1: AnkiHubClient,
     ):
         client = authorized_client_for_user_test1
+        client.subscribe_to_deck(ID_OF_DECK_WITH_NOTES_ACTION)
         notes_actions = client.get_pending_notes_actions_for_deck(
             ID_OF_DECK_WITH_NOTES_ACTION
         )
@@ -1802,6 +1803,7 @@ class TestGetPendingNotesActionsForDeck:
         authorized_client_for_user_test1: AnkiHubClient,
     ):
         client = authorized_client_for_user_test1
+        client.subscribe_to_deck(ID_OF_DECK_WITH_NOTES_ACTION)
         notes_actions = client.get_pending_notes_actions_for_deck(
             ID_OF_DECK_WITH_NOTES_ACTION
         )
