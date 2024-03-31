@@ -27,6 +27,7 @@ from ..settings import (
     BehaviorOnRemoteNoteDeleted,
     SuspendNewCardsOfExistingNotes,
 )
+from .deck_options import set_ankihub_config_for_deck
 from .note_conversion import (
     TAG_FOR_PROTECTING_ALL_FIELDS,
     get_fields_protected_by_tags,
@@ -151,6 +152,7 @@ class AnkiHubImporter:
             self._local_did = self._cleanup_first_time_deck_import(
                 dids, self._local_did
             )
+            set_ankihub_config_for_deck(self._local_did)
 
         if subdecks or subdecks_for_new_notes_only:
             if subdecks_for_new_notes_only:
