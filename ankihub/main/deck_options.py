@@ -7,7 +7,7 @@ from anki.decks import DeckConfigDict, DeckId
 try:
     from anki import deck_config_pb2
 except ImportError:
-    from anki import deckconfig_pb2 as deck_config_pb2
+    from anki import deckconfig_pb2 as deck_config_pb2  # type: ignore
 
 ANKIHUB_PRESET_NAME = "AnkiHub"
 DECK_CONFIG: Dict[str, Any] = {
