@@ -4,15 +4,20 @@ import anki
 import aqt
 from anki.decks import DeckConfigDict, DeckId
 
+try:
+    from anki import deck_config_pb2
+except ImportError:
+    from anki import deckconfig_pb2 as deck_config_pb2
+
 ANKIHUB_PRESET_NAME = "AnkiHub"
 DECK_CONFIG: Dict[str, Any] = {
     "steps": [15, 1440],
     "new_order": anki.consts.NEW_CARDS_DUE,
-    "new_gather_priority": anki.deck_config_pb2.DeckConfig.Config.NewCardGatherPriority.NEW_CARD_GATHER_PRIORITY_LOWEST_POSITION,  # noqa: E501
-    "new_sort_order": anki.deck_config_pb2.DeckConfig.Config.NewCardSortOrder.NEW_CARD_SORT_ORDER_NO_SORT,
-    "new_mix": anki.deck_config_pb2.DeckConfig.Config.ReviewMix.REVIEW_MIX_AFTER_REVIEWS,
-    "interday_learning_mix": anki.deck_config_pb2.DeckConfig.Config.ReviewMix.REVIEW_MIX_BEFORE_REVIEWS,
-    "review_order": anki.deck_config_pb2.DeckConfig.Config.ReviewCardOrder.REVIEW_CARD_ORDER_DAY,
+    "new_gather_priority": deck_config_pb2.DeckConfig.Config.NewCardGatherPriority.NEW_CARD_GATHER_PRIORITY_LOWEST_POSITION,  # noqa: E501
+    "new_sort_order": deck_config_pb2.DeckConfig.Config.NewCardSortOrder.NEW_CARD_SORT_ORDER_NO_SORT,
+    "new_mix": deck_config_pb2.DeckConfig.Config.ReviewMix.REVIEW_MIX_AFTER_REVIEWS,
+    "interday_learning_mix": deck_config_pb2.DeckConfig.Config.ReviewMix.REVIEW_MIX_BEFORE_REVIEWS,
+    "review_order": deck_config_pb2.DeckConfig.Config.ReviewCardOrder.REVIEW_CARD_ORDER_DAY,
     "daily_limit": 9999,
     "bury": True,
     "new_intervals": [3, 4, 0],
