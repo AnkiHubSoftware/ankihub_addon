@@ -63,9 +63,12 @@ def deep_set(data: Dict, path: str, value: Any) -> None:
 
 def _create_deck_preset_if_not_exists() -> DeckConfigDict:
     conf = next(
-        conf
-        for conf in aqt.mw.col.decks.all_config()
-        if conf["name"] == ANKIHUB_PRESET_NAME
+        (
+            conf
+            for conf in aqt.mw.col.decks.all_config()
+            if conf["name"] == ANKIHUB_PRESET_NAME
+        ),
+        None,
     )
     if conf:
         aqt.mw.col.decks.restore_to_default(conf)
