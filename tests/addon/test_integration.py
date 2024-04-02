@@ -67,6 +67,7 @@ from ankihub.gui.browser.browser import (
     _on_protect_fields_action,
     _on_reset_optional_tags_action,
 )
+from ankihub.main.deck_options import ANKIHUB_PRESET_NAME
 
 from ..factories import (
     DeckExtensionFactory,
@@ -2280,6 +2281,45 @@ class TestAnkiHubImporter:
             assert len(import_result.updated_nids) == 0
             assert len(import_result.marked_as_deleted_nids) == 0
             assert len(import_result.deleted_nids) == 0
+
+    @pytest.mark.parametrize("use_ankihub_deckconfig", [True, False])
+    def test_import_new_deck_uses_ankihub_deck_config(
+        self,
+        anki_session_with_addon_data: AnkiSession,
+        next_deterministic_uuid: Callable[[], uuid.UUID],
+        use_ankihub_deckconfig: bool,
+    ):
+        anki_session = anki_session_with_addon_data
+        with anki_session.profile_loaded():
+            mw = anki_session.mw
+            file = str(ANKIHUB_SAMPLE_DECK_APKG.absolute())
+            importer = AnkiPackageImporter(mw.col, file)
+            importer.run()
+            mw.col.decks.remove([mw.col.decks.id_for_name("Testdeck")])
+
+            ah_did = next_deterministic_uuid()
+            ankihub_importer = AnkiHubImporter()
+            import_result = ankihub_importer.import_ankihub_deck(
+                ankihub_did=ah_did,
+                notes=ankihub_sample_deck_notes_data(),
+                deck_name="test",
+                is_first_import_of_deck=True,
+                behavior_on_remote_note_deleted=BehaviorOnRemoteNoteDeleted.NEVER_DELETE,
+                note_types=SAMPLE_NOTE_TYPES,
+                protected_fields={},
+                protected_tags=[],
+                suspend_new_cards_of_new_notes=DeckConfig.suspend_new_cards_of_new_notes_default(
+                    ah_did
+                ),
+                suspend_new_cards_of_existing_notes=DeckConfig.suspend_new_cards_of_existing_notes_default(),
+                default_settings=use_ankihub_deckconfig,
+            )
+            anki_did = import_result.anki_did
+            deck_config = mw.col.decks.config_dict_for_deck_id(anki_did)
+            if use_ankihub_deckconfig:
+                assert deck_config["name"] == ANKIHUB_PRESET_NAME
+            else:
+                assert deck_config["name"] != ANKIHUB_PRESET_NAME
 
     def _import_notes(
         self,
