@@ -1,0 +1,49 @@
+interactions:
+- request:
+    body: null
+    headers:
+      Accept:
+      - application/json; version=18.0
+      Content-Type:
+      - application/json
+    method: GET
+    uri: http://localhost:8000/api/decks/3d124f2e-a15c-4cf9-a470-b2ab8015debe/notes-actions/
+  response:
+    body:
+      string: '{"detail":"Authentication credentials were not provided."}'
+    headers:
+      Allow:
+      - GET, HEAD, OPTIONS
+      Content-Language:
+      - en
+      Content-Length:
+      - '58'
+      Content-Type:
+      - application/json
+      Cross-Origin-Opener-Policy:
+      - same-origin
+      Date:
+      - Thu, 28 Mar 2024 14:58:02 GMT
+      Referrer-Policy:
+      - same-origin
+      Server:
+      - WSGIServer/0.2 CPython/3.8.17
+      Server-Timing:
+      - TimerPanel_utime;dur=30.01199999999926;desc="User CPU time", TimerPanel_stime;dur=0.1870000000003813;desc="System
+        CPU time", TimerPanel_total;dur=30.198999999999643;desc="Total CPU time",
+        TimerPanel_total_time;dur=33.516741999847;desc="Elapsed time", SQLPanel_sql_time;dur=0;desc="SQL
+        0 queries", CachePanel_total_time;dur=0;desc="Cache 0 Calls"
+      Vary:
+      - Accept, Accept-Language, Cookie, origin
+      WWW-Authenticate:
+      - Token
+      X-Content-Type-Options:
+      - nosniff
+      X-Frame-Options:
+      - DENY
+      djdt-store-id:
+      - 21256d7b04c94ecdbf3691e8e72fa33e
+    status:
+      code: 401
+      message: Unauthorized
+version: 1

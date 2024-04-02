@@ -53,6 +53,7 @@ from ankihub.ankihub_client.models import (
     ANKIHUB_DATETIME_FORMAT_STR,
     CardReviewData,
     DeckUpdates,
+    NotesActionChoices,
     UserDeckExtensionRelation,
 )
 from ankihub.gui.utils import deck_download_progress_cb
@@ -96,6 +97,8 @@ ID_OF_DECK_OF_USER_TEST2 = uuid.UUID("5528aef7-f7ac-406b-9b35-4eaf00de4b20")
 DATETIME_OF_ADDING_FIRST_DECK_MEDIA = datetime(
     year=2023, month=1, day=2, tzinfo=timezone.utc
 )
+
+ID_OF_DECK_WITH_NOTES_ACTION = uuid.UUID("3d124f2e-a15c-4cf9-a470-b2ab8015debe")
 
 DJANGO_CONTAINER_NAME = "django"
 
@@ -1041,11 +1044,11 @@ class TestGetDeckUpdates:
             "external_notes_url": None,
             "next": None,
             "notes": notes_encoded,
-            "latest_update": datetime.strftime(
-                latest_update, ANKIHUB_DATETIME_FORMAT_STR
-            )
-            if latest_update
-            else None,
+            "latest_update": (
+                datetime.strftime(latest_update, ANKIHUB_DATETIME_FORMAT_STR)
+                if latest_update
+                else None
+            ),
             "protected_fields": {},
             "protected_tags": [],
         }
@@ -1063,11 +1066,11 @@ class TestGetDeckUpdates:
             "external_notes_url": "test_url",
             "next": None,
             "notes": None,
-            "latest_update": datetime.strftime(
-                latest_update, ANKIHUB_DATETIME_FORMAT_STR
-            )
-            if latest_update
-            else None,
+            "latest_update": (
+                datetime.strftime(latest_update, ANKIHUB_DATETIME_FORMAT_STR)
+                if latest_update
+                else None
+            ),
             "protected_fields": {},
             "protected_tags": [],
         }
@@ -1778,3 +1781,43 @@ class TestSendCardReviewData:
         )
 
         authorized_client_for_user_test1.send_card_review_data([card_review_data])
+
+
+@pytest.mark.vcr
+class TestGetPendingNotesActionsForDeck:
+    def test_get_one_note_action(
+        self,
+        authorized_client_for_user_test1: AnkiHubClient,
+    ):
+        client = authorized_client_for_user_test1
+        client.subscribe_to_deck(ID_OF_DECK_WITH_NOTES_ACTION)
+        notes_actions = client.get_pending_notes_actions_for_deck(
+            ID_OF_DECK_WITH_NOTES_ACTION
+        )
+        assert len(notes_actions) == 1
+        assert notes_actions[0].action == NotesActionChoices.UNSUSPEND
+        assert len(notes_actions[0].note_ids) == 1
+
+    def test_notes_action_is_only_returned_once(
+        self,
+        authorized_client_for_user_test1: AnkiHubClient,
+    ):
+        client = authorized_client_for_user_test1
+        client.subscribe_to_deck(ID_OF_DECK_WITH_NOTES_ACTION)
+        notes_actions = client.get_pending_notes_actions_for_deck(
+            ID_OF_DECK_WITH_NOTES_ACTION
+        )
+        assert len(notes_actions) == 1
+
+        notes_actions = client.get_pending_notes_actions_for_deck(
+            ID_OF_DECK_WITH_NOTES_ACTION
+        )
+        assert len(notes_actions) == 0
+
+    def test_when_not_authorized(
+        self,
+        unauthorized_client: AnkiHubClient,
+    ):
+        client = unauthorized_client
+        with pytest.raises(AnkiHubHTTPError):
+            client.get_pending_notes_actions_for_deck(ID_OF_DECK_WITH_NOTES_ACTION)

@@ -53,6 +53,7 @@ from .models import (
     DeckUpdatesChunk,
     NewNoteSuggestion,
     NoteInfo,
+    NotesAction,
     NoteSuggestion,
     OptionalTagSuggestion,
     SuggestionType,
@@ -853,6 +854,17 @@ class AnkiHubClient:
             yield media_updates
 
             first_request = False
+
+    def get_pending_notes_actions_for_deck(
+        self, ah_did: uuid.UUID
+    ) -> List[NotesAction]:
+        response = self._send_request(
+            "GET", API.ANKIHUB, f"/decks/{ah_did}/notes-actions/"
+        )
+        if response.status_code != 200:
+            raise AnkiHubHTTPError(response)
+
+        return [NotesAction.from_dict(action) for action in response.json()]
 
     def get_deck_by_id(self, ah_did: uuid.UUID) -> Deck:
         response = self._send_request(
