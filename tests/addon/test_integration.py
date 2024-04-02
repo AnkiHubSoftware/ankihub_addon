@@ -2282,12 +2282,12 @@ class TestAnkiHubImporter:
             assert len(import_result.marked_as_deleted_nids) == 0
             assert len(import_result.deleted_nids) == 0
 
-    @pytest.mark.parametrize("use_ankihub_deckconfig", [True, False])
+    @pytest.mark.parametrize("recommended_deck_settings", [True, False])
     def test_import_new_deck_uses_ankihub_deck_config(
         self,
         anki_session_with_addon_data: AnkiSession,
         next_deterministic_uuid: Callable[[], uuid.UUID],
-        use_ankihub_deckconfig: bool,
+        recommended_deck_settings: bool,
     ):
         anki_session = anki_session_with_addon_data
         with anki_session.profile_loaded():
@@ -2312,11 +2312,11 @@ class TestAnkiHubImporter:
                     ah_did
                 ),
                 suspend_new_cards_of_existing_notes=DeckConfig.suspend_new_cards_of_existing_notes_default(),
-                default_settings=use_ankihub_deckconfig,
+                recommended_deck_settings=recommended_deck_settings,
             )
             anki_did = import_result.anki_did
             deck_config = mw.col.decks.config_dict_for_deck_id(anki_did)
-            if use_ankihub_deckconfig:
+            if recommended_deck_settings:
                 assert deck_config["name"] == ANKIHUB_PRESET_NAME
             else:
                 assert deck_config["name"] != ANKIHUB_PRESET_NAME

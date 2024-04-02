@@ -35,7 +35,7 @@ def download_and_install_decks(
     ankihub_dids: List[uuid.UUID],
     on_done: Callable[[Future], None],
     cleanup: bool = True,
-    default_settings: bool = True,
+    recommended_deck_settings: bool = True,
 ) -> None:
     """Downloads and installs the given decks in the background."""
     aqt.mw.taskman.with_progress(
@@ -44,7 +44,7 @@ def download_and_install_decks(
             _on_deck_infos_fetched,
             on_done=on_done,
             cleanup=cleanup,
-            default_settings=default_settings,
+            recommended_deck_settings=recommended_deck_settings,
         ),
         label="Getting deck information...",
     )
@@ -55,7 +55,7 @@ def _on_deck_infos_fetched(
     future: Future,
     on_done: Callable[[Future], None],
     cleanup: bool,
-    default_settings: bool,
+    recommended_deck_settings: bool,
 ) -> None:
     decks = future.result()
 
@@ -76,7 +76,7 @@ def _on_deck_infos_fetched(
         task=lambda: _download_and_install_decks_inner(
             decks,
             ah_did_to_deletion_behavior=ah_did_to_deletion_behavior,
-            default_settings=default_settings,
+            recommended_deck_settings=recommended_deck_settings,
         ),
         on_done=partial(_on_install_done, on_done=on_done, cleanup=cleanup),
         label="Downloading decks from AnkiHub...",
@@ -155,7 +155,7 @@ def _show_deck_import_summary_dialog(
 def _download_and_install_decks_inner(
     decks: List[Deck],
     ah_did_to_deletion_behavior: Dict[uuid.UUID, BehaviorOnRemoteNoteDeleted],
-    default_settings: bool,
+    recommended_deck_settings: bool,
 ) -> List[AnkiHubImportResult]:
     """Downloads and installs the given decks.
     Attempts to install all decks even if some fail."""
@@ -169,7 +169,7 @@ def _download_and_install_decks_inner(
                     behavior_on_remote_note_deleted=ah_did_to_deletion_behavior[
                         deck.ah_did
                     ],
-                    default_settings=default_settings,
+                    recommended_deck_settings=recommended_deck_settings,
                 )
             )
         except Exception as e:
@@ -193,7 +193,7 @@ def _download_and_install_decks_inner(
 def _download_and_install_single_deck(
     deck: Deck,
     behavior_on_remote_note_deleted: BehaviorOnRemoteNoteDeleted,
-    default_settings: bool,
+    recommended_deck_settings: bool,
 ) -> AnkiHubImportResult:
     notes_data: List[NoteInfo] = AnkiHubClient().download_deck(
         deck.ah_did, download_progress_cb=deck_download_progress_cb
@@ -209,7 +209,7 @@ def _download_and_install_single_deck(
         user_relation=deck.user_relation,
         behavior_on_remote_note_deleted=behavior_on_remote_note_deleted,
         latest_update=deck.csv_last_upload,
-        default_settings=default_settings,
+        recommended_deck_settings=recommended_deck_settings,
     )
 
     return result
@@ -222,7 +222,7 @@ def _install_deck(
     user_relation: UserDeckRelation,
     behavior_on_remote_note_deleted: BehaviorOnRemoteNoteDeleted,
     latest_update: datetime,
-    default_settings: bool,
+    recommended_deck_settings: bool,
 ) -> AnkiHubImportResult:
     """Imports the notes_data into the Anki collection.
     Saves the deck subscription to the config file.
@@ -249,7 +249,7 @@ def _install_deck(
         suspend_new_cards_of_new_notes=DeckConfig.suspend_new_cards_of_new_notes_default(
             ankihub_did
         ),
-        default_settings=default_settings,
+        recommended_deck_settings=recommended_deck_settings,
     )
 
     config.add_deck(

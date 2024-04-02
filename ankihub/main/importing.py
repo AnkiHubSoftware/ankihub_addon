@@ -103,7 +103,7 @@ class AnkiHubImporter:
         ] = None,
         subdecks: bool = False,
         subdecks_for_new_notes_only: bool = False,
-        default_settings: bool = True,
+        recommended_deck_settings: bool = True,
     ) -> AnkiHubImportResult:
         """
         Used for importing an AnkiHub deck for the first time or for updating it.
@@ -153,7 +153,7 @@ class AnkiHubImporter:
             self._local_did = self._cleanup_first_time_deck_import(
                 dids, self._local_did
             )
-            if default_settings:
+            if recommended_deck_settings:
                 set_ankihub_config_for_deck(self._local_did)
 
         if subdecks or subdecks_for_new_notes_only:
