@@ -47,10 +47,12 @@ class ConfigureDeletedNotesDialog(QDialog):
         self._setup_ui()
 
     def accept(self) -> None:
+        deck_id_to_behavior = self.deck_id_to_behavior_on_remote_note_deleted_dict()
+
         super().accept()
 
         if self._callback:
-            self._callback(self.deck_id_to_behavior_on_remote_note_deleted_dict())
+            self._callback(deck_id_to_behavior)
 
     def deck_id_to_behavior_on_remote_note_deleted_dict(
         self,
