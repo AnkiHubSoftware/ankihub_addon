@@ -80,6 +80,7 @@ def _on_deck_infos_fetched(
         deck_id_and_name_tuples=deck_id_name_tuples,
         callback=_on_configure_deleted_notes_done,
     )
+    aqt.mw._ah_configure_deleted_notes_dialog = dialog
     dialog.open()
 
 
