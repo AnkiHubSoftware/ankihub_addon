@@ -76,7 +76,7 @@ def _on_deck_infos_fetched(
     # Ask the user how to handle deleted notes
     deck_id_name_tuples = [(deck.ah_did, deck.name) for deck in decks]
     dialog = ConfigureDeletedNotesDialog(
-        parent=aqt.mw.app.activeWindow(),
+        parent=aqt.mw,
         deck_id_and_name_tuples=deck_id_name_tuples,
         callback=_on_configure_deleted_notes_done,
     )
