@@ -455,6 +455,33 @@ def install_ah_deck(
     return install_ah_deck_inner
 
 
+class LatestInstanceTracker:
+    def __init__(self, mocker: MockerFixture):
+        self.latest_instances: Dict[Type, Any] = {}
+        self.mocker = mocker
+
+    def track(self, cls: Type) -> None:
+        original_init = cls.__init__
+        latest_instances_alias = self.latest_instances
+
+        def new_init(self, *args, **kwargs):
+            latest_instances_alias[cls] = self
+            original_init(self, *args, **kwargs)
+
+        self.mocker.patch.object(cls, "__init__", new=new_init)
+
+    def get_latest_instance(self, cls: Type) -> Any:
+        return self.latest_instances.get(cls)
+
+
+@pytest.fixture
+def latest_instance_tracker(mocker: MockerFixture) -> LatestInstanceTracker:
+    """Tracks the latest instances of classes that are passed to the track method.
+    This allows you to access the latest instance of a class that was created.
+    """
+    return LatestInstanceTracker(mocker)
+
+
 class MockShowDialogWithCB(Protocol):
     def __call__(
         self,
@@ -497,6 +524,7 @@ def mock_download_and_install_deck_dependencies(
     monkeypatch: MonkeyPatch,
     mock_show_dialog_with_cb: MockShowDialogWithCB,
     mocker: MockerFixture,
+    latest_instance_tracker: LatestInstanceTracker,
 ) -> MockDownloadAndInstallDeckDependencies:
     """Mocks the dependencies of the download_and_install_deck function.
     deck: The deck that is downloaded and installed.
@@ -533,12 +561,20 @@ def mock_download_and_install_deck_dependencies(
             "ankihub.gui.operations.new_deck_subscriptions.show_dialog", button_index=1
         )
 
-        mocker.patch.object(ConfigureDeletedNotesDialog, "exec")
         mocker.patch.object(
             ConfigureDeletedNotesDialog,
             "deck_id_to_behavior_on_remote_note_deleted_dict",
             return_value=defaultdict(lambda: BehaviorOnRemoteNoteDeleted.NEVER_DELETE),
         )
+
+        latest_instance_tracker.track(ConfigureDeletedNotesDialog)
+
+        def accept_dialog(_) -> None:
+            latest_instance_tracker.get_latest_instance(
+                ConfigureDeletedNotesDialog
+            ).accept()
+
+        mocker.patch.object(ConfigureDeletedNotesDialog, "open", accept_dialog)
 
         return mocks
 
@@ -675,33 +711,6 @@ def mock_suggestion_dialog(monkeypatch: MonkeyPatch) -> MockSuggestionDialog:
         )
 
     return mock_suggestion_dialog_inner
-
-
-class LatestInstanceTracker:
-    def __init__(self, mocker: MockerFixture):
-        self.latest_instances: Dict[Type, Any] = {}
-        self.mocker = mocker
-
-    def track(self, cls: Type) -> None:
-        original_init = cls.__init__
-        latest_instances_alias = self.latest_instances
-
-        def new_init(self, *args, **kwargs):
-            latest_instances_alias[cls] = self
-            original_init(self, *args, **kwargs)
-
-        self.mocker.patch.object(cls, "__init__", new=new_init)
-
-    def get_latest_instance(self, cls: Type) -> Any:
-        return self.latest_instances.get(cls)
-
-
-@pytest.fixture
-def latest_instance_tracker(mocker: MockerFixture) -> LatestInstanceTracker:
-    """Tracks the latest instances of classes that are passed to the track method.
-    This allows you to access the latest instance of a class that was created.
-    """
-    return LatestInstanceTracker(mocker)
 
 
 def record_review_for_anki_nid(
