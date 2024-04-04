@@ -80,22 +80,7 @@ def _on_deck_infos_fetched(
         deck_id_and_name_tuples=deck_id_name_tuples,
         callback=_on_configure_deleted_notes_done,
     )
-    dialog.exec()
-
-    ah_did_to_deletion_behavior = (
-        dialog.deck_id_to_behavior_on_remote_note_deleted_dict()
-    )
-
-    # Download and install the decks
-    aqt.mw.taskman.with_progress(
-        task=lambda: _download_and_install_decks_inner(
-            decks,
-            ah_did_to_deletion_behavior=ah_did_to_deletion_behavior,
-            recommended_deck_settings=recommended_deck_settings,
-        ),
-        on_done=partial(_on_install_done, on_done=on_done, cleanup=cleanup),
-        label="Downloading decks from AnkiHub...",
-    )
+    dialog.open()
 
 
 @pass_exceptions_to_on_done
