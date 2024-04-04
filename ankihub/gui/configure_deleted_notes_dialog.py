@@ -43,8 +43,8 @@ class ConfigureDeletedNotesDialog(QDialog):
 
         self._deck_id_and_name_tuples = deck_id_and_name_tuples
         self._show_new_feature_message = show_new_feature_message
-        self._setup_ui()
         self._callback = callback
+        self._setup_ui()
 
     def accept(self) -> None:
         super().accept()
@@ -113,13 +113,13 @@ class ConfigureDeletedNotesDialog(QDialog):
         self.setFixedSize(self.size())
 
     def _setup_scroll_area(self) -> QScrollArea:
-        scroll_area = QScrollArea()
-        scroll_area.setWidgetResizable(True)
-        scroll_widget = QWidget()
-        grid_layout = self._setup_grid_layout()
-        scroll_widget.setLayout(grid_layout)
-        scroll_area.setWidget(scroll_widget)
-        return scroll_area
+        self.scroll_area = QScrollArea()
+        self.scroll_area.setWidgetResizable(True)
+        self.scroll_widget = QWidget()
+        self.grid_layout = self._setup_grid_layout()
+        self.scroll_widget.setLayout(self.grid_layout)
+        self.scroll_area.setWidget(self.scroll_widget)
+        return self.scroll_area
 
     def _setup_grid_layout(self) -> QGridLayout:
         self.grid_layout = QGridLayout()
@@ -152,5 +152,5 @@ class ConfigureDeletedNotesDialog(QDialog):
         return self.grid_layout
 
     def closeEvent(self, event: QEvent) -> None:
-        # Thsi prevents the dialog from being closed using the close button in the title bar.
+        # This prevents the dialog from being closed using the close button in the title bar.
         event.ignore()
