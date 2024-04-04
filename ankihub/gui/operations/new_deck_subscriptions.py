@@ -28,6 +28,9 @@ def check_and_install_new_deck_subscriptions(
         cleanup_cb = QCheckBox("Remove unused tags and empty cards")
         cleanup_cb.setChecked(True)
 
+        recommended_deck_settings_cb = QCheckBox("Use recommended deck settings")
+        recommended_deck_settings_cb.setChecked(True)
+
         confirmation_dialog = show_dialog(
             title="AnkiHub | Sync",
             text=messages.deck_install_confirmation(decks),
@@ -40,6 +43,7 @@ def check_and_install_new_deck_subscriptions(
             callback=lambda button_index: _on_button_clicked(
                 button_index=button_index,
                 cleanup_cb=cleanup_cb,
+                recommended_deck_settings_cb=recommended_deck_settings_cb,
                 decks=decks,
                 on_done=on_done,
             ),
@@ -49,6 +53,10 @@ def check_and_install_new_deck_subscriptions(
         confirmation_dialog_layout.insertWidget(
             confirmation_dialog_layout.count() - 2,
             cleanup_cb,
+        )
+        confirmation_dialog_layout.insertWidget(
+            confirmation_dialog_layout.count() - 1,
+            recommended_deck_settings_cb,
         )
         confirmation_dialog.open()
 
@@ -63,6 +71,7 @@ def check_and_install_new_deck_subscriptions(
 def _on_button_clicked(
     button_index: Optional[int],
     cleanup_cb: QCheckBox,
+    recommended_deck_settings_cb: QCheckBox,
     decks: List[Deck],
     on_done: Callable[[Future], None],
 ) -> None:
@@ -75,7 +84,10 @@ def _on_button_clicked(
     try:
         ah_dids = [deck.ah_did for deck in decks]
         download_and_install_decks(
-            ah_dids, on_done=on_done, cleanup=cleanup_cb.isChecked()
+            ah_dids,
+            on_done=on_done,
+            cleanup=cleanup_cb.isChecked(),
+            recommended_deck_settings=recommended_deck_settings_cb.isChecked(),
         )
     except Exception as e:
         on_done(future_with_exception(e))
