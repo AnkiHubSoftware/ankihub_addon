@@ -1,5 +1,5 @@
 import uuid
-from typing import TYPE_CHECKING, Dict, List, Tuple
+from typing import TYPE_CHECKING, Callable, Dict, List, Optional, Tuple
 
 from aqt.qt import (
     QCheckBox,
@@ -35,12 +35,22 @@ class ConfigureDeletedNotesDialog(QDialog):
         parent,
         deck_id_and_name_tuples: List[Tuple[uuid.UUID, str]],
         show_new_feature_message: bool = False,
+        callback: Optional[
+            Callable[[Dict[uuid.UUID, "BehaviorOnRemoteNoteDeleted"]], None]
+        ] = None,
     ) -> None:
         super().__init__(parent)
 
         self._deck_id_and_name_tuples = deck_id_and_name_tuples
         self._show_new_feature_message = show_new_feature_message
         self._setup_ui()
+        self._callback = callback
+
+    def accept(self) -> None:
+        super().accept()
+
+        if self._callback:
+            self._callback(self.deck_id_to_behavior_on_remote_note_deleted_dict())
 
     def deck_id_to_behavior_on_remote_note_deleted_dict(
         self,
