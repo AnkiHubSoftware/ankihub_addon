@@ -34,7 +34,6 @@ from .utils import future_with_result, pass_exceptions_to_on_done
 def download_and_install_decks(
     ankihub_dids: List[uuid.UUID],
     on_done: Callable[[Future], None],
-    cleanup: bool = True,
     recommended_deck_settings: bool = True,
 ) -> None:
     """Downloads and installs the given decks in the background."""
@@ -43,7 +42,6 @@ def download_and_install_decks(
         on_done=partial(
             _on_deck_infos_fetched,
             on_done=on_done,
-            cleanup=cleanup,
             recommended_deck_settings=recommended_deck_settings,
         ),
         label="Getting deck information...",
@@ -54,7 +52,6 @@ def download_and_install_decks(
 def _on_deck_infos_fetched(
     future: Future,
     on_done: Callable[[Future], None],
-    cleanup: bool,
     recommended_deck_settings: bool,
 ) -> None:
     decks = future.result()
@@ -78,17 +75,16 @@ def _on_deck_infos_fetched(
             ah_did_to_deletion_behavior=ah_did_to_deletion_behavior,
             recommended_deck_settings=recommended_deck_settings,
         ),
-        on_done=partial(_on_install_done, on_done=on_done, cleanup=cleanup),
+        on_done=partial(_on_install_done, on_done=on_done),
         label="Downloading decks from AnkiHub...",
     )
 
 
 @pass_exceptions_to_on_done
-def _on_install_done(future: Future, on_done: Callable[[Future], None], cleanup: bool):
+def _on_install_done(future: Future, on_done: Callable[[Future], None]):
     import_results: List[AnkiHubImportResult] = future.result()
 
-    if cleanup:
-        _cleanup_after_deck_install()
+    _cleanup_after_deck_install()
 
     # Reset the main window so that the decks are displayed
     aqt.mw.reset()
