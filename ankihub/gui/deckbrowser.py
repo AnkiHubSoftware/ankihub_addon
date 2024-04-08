@@ -10,7 +10,7 @@ from aqt.gui_hooks import (
     deck_browser_will_render_content,
     webview_did_receive_js_message,
 )
-from aqt.qt import QUrl
+from aqt.qt import QDialog, QUrl, QVBoxLayout
 from aqt.webview import AnkiWebView
 
 from ..main.deck_unsubscribtion import unsubscribe_from_deck_and_uninstall
@@ -62,24 +62,40 @@ def _handle_flashcard_selector_button_click(
         return handled
 
 
+class FlashCardSelectorDialog(QDialog):
+    def __init__(self, parent: Any) -> None:
+        super().__init__(parent)
+        self._setup_ui()
+
+    def _setup_ui(
+        self,
+    ) -> None:
+        self.setMinimumHeight(400)
+        self.setMinimumWidth(600)
+        self.setContentsMargins(0, 0, 0, 0)
+
+        self.web = AnkiWebView(parent=self)
+        self.web.stdHtml(body="", default_css=False)
+
+        self.web.set_open_links_externally(False)
+        self.web.load_url(
+            QUrl(
+                "http://localhost:8000/ai/c63e7ce8-7039-4cdf-876f-4d5b8c24d39e/flashcard-selector/?foo=asdf"
+            )
+        )
+
+        js = "document.documentElement.style.backgroundColor = 'white';"
+        self.web.eval(js)
+
+        self.layout_ = QVBoxLayout()
+        self.layout_.addWidget(self.web)
+
+        self.setLayout(self.layout_)
+
+
 def _open_flashcard_selector() -> None:
-    webview = AnkiWebView()
-    webview.set_open_links_externally(False)
-    webview.load_url(QUrl("https://app.ankihub.net/explore/"))
-
-    # Open the webview window in the center of the main window
-    # ... Calculate the center point of the main window
-    main_window_geometry = aqt.mw.geometry()
-    center_x = main_window_geometry.x() + main_window_geometry.width() // 2
-    center_y = main_window_geometry.y() + main_window_geometry.height() // 2
-
-    # ... Adjust for the size of the webview window
-    webview_x = center_x - webview.width() // 2
-    webview_y = center_y - webview.height() // 2
-
-    # Set the position of the webview window
-    webview.move(webview_x, webview_y)
-    webview.show()
+    dialog = FlashCardSelectorDialog(aqt.mw)
+    dialog.show()
 
 
 def _setup_deck_delete_hook() -> None:
