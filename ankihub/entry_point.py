@@ -1,4 +1,5 @@
 """Code to be run on Anki start up."""
+
 import time
 from pprint import pformat
 
@@ -46,10 +47,6 @@ def run():
     LOGGER.info(f"{ANKI_VERSION=}")
     LOGGER.info(f"AnkiHub app url: {config.app_url}")
     LOGGER.info(f"S3 bucket url: {config.s3_bucket_url}")
-
-    # Has to be called before the deck browser is shown
-    deckbrowser.setup()
-    LOGGER.info("Set up deck browser")
 
     profile_did_open.append(_on_profile_did_open)
     profile_will_close.append(_on_profile_will_close)
@@ -146,6 +143,9 @@ def _general_setup():
 
     progress.setup()
     LOGGER.info("Set up progress manager.")
+
+    deckbrowser.setup()
+    LOGGER.info("Set up deck browser")
 
     _trigger_addon_update_check()
     LOGGER.info("Triggered add-on update check.")

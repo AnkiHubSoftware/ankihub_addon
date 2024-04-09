@@ -5,11 +5,8 @@ from typing import Any
 import aqt
 from anki.decks import DeckId
 from anki.hooks import wrap
-from aqt.deckbrowser import DeckBrowser, DeckBrowserContent
-from aqt.gui_hooks import (
-    deck_browser_will_render_content,
-    webview_did_receive_js_message,
-)
+from aqt.deckbrowser import DeckBrowser
+from aqt.gui_hooks import deck_browser_did_render, webview_did_receive_js_message
 from aqt.qt import QColor, QDialog, QUrl, QVBoxLayout
 from aqt.webview import AnkiWebView
 
@@ -26,26 +23,36 @@ def setup() -> None:
 
 
 def _setup_flashcard_selector_button() -> None:
-    deck_browser_will_render_content.append(_add_flashcard_selector_button)
+    """Add a button to the deck browser that opens the flashcard selector dialog."""
+    deck_browser_did_render.append(
+        lambda *args, **kwargs: _maybe_add_flashcard_selector_button()
+    )
+    # We need to call this here, because the deck browser is already rendered at this point
+    _maybe_add_flashcard_selector_button()
+
     webview_did_receive_js_message.append(_handle_flashcard_selector_button_click)
 
 
-def _add_flashcard_selector_button(
-    browser: DeckBrowser, content: DeckBrowserContent
-) -> None:
-    anking_anki_did = config.deck_config(ANKING_DECK_ID).anki_id
-    content.tree += f"""
-        <script>
-            var button = document.createElement("button");
-            button.innerHTML = "Add flashcards";
+def _maybe_add_flashcard_selector_button() -> None:
+    """Add the flashcard selector button to the Anking deck if it exists."""
+    if not (deck_config := config.deck_config(ANKING_DECK_ID)):
+        return
 
-            button.addEventListener("click", function() {{
-              pycmd("{FLASHCARD_SELCTOR_PYCMD}");
-            }});
+    deck_browser_web: AnkiWebView = aqt.mw.deckBrowser.web
+    deck_browser_web.eval(_js_add_flashcard_selector_button(deck_config.anki_id))
 
-            var deckElement = document.querySelector(".deck[id='{anking_anki_did}']");
-            deckElement.appendChild(button);
-        </script>
+
+def _js_add_flashcard_selector_button(anki_deck_id: DeckId) -> str:
+    return f"""
+        var button = document.createElement("button");
+        button.innerHTML = "Add flashcards";
+
+        button.addEventListener("click", function() {{
+          pycmd("{FLASHCARD_SELCTOR_PYCMD}");
+        }});
+
+        var deckElement = document.querySelector(".deck[id='{anki_deck_id}']");
+        deckElement.appendChild(button);
     """
 
 
@@ -76,8 +83,9 @@ class FlashCardSelectorDialog(QDialog):
 
         self.web = AnkiWebView(parent=self)
         self.web.set_open_links_externally(False)
-        self.web.load_url(QUrl(url_flashcard_selector(ANKING_DECK_ID)))
         self.web.page().setBackgroundColor(QColor("white"))
+        self.web.load_url(QUrl(url_flashcard_selector(ANKING_DECK_ID)))
+
         self.layout_ = QVBoxLayout()
         self.layout_.setContentsMargins(0, 0, 0, 0)
         self.layout_.addWidget(self.web)
