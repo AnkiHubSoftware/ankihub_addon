@@ -9,6 +9,7 @@ from aqt.gui_hooks import deck_browser_did_render, webview_did_receive_js_messag
 from aqt.qt import QColor, QDialog, QUrl, QVBoxLayout, qconnect
 from aqt.webview import AnkiWebView
 
+from .. import LOGGER
 from ..main.deck_unsubscribtion import unsubscribe_from_deck_and_uninstall
 from ..settings import ANKING_DECK_ID, config, url_flashcard_selector
 from .menu import AnkiHubLogin
@@ -16,6 +17,7 @@ from .utils import ask_user
 
 FLASHCARD_SELECTOR_OPEN_PYCMD = "ankihub_flashcard_selector_open"
 FLASHCARD_SELECTOR_AUTH_FAILED_PYCMD = "ankihub_flashcard_selector_auth_failed"
+FLASHCARD_SELECTOR_BUTTON_ID = "ankihub-flashcard-selector-button"
 
 
 def setup() -> None:
@@ -31,7 +33,7 @@ def _setup_flashcard_selector_button() -> None:
     # We need to call this here, because the deck browser is already rendered at this point
     _maybe_add_flashcard_selector_button()
 
-    webview_did_receive_js_message.append(_handle_flashcard_selector_button_click)
+    webview_did_receive_js_message.append(_handle_flashcard_selector_py_commands)
 
 
 def _maybe_add_flashcard_selector_button() -> None:
@@ -46,6 +48,7 @@ def _maybe_add_flashcard_selector_button() -> None:
 def _js_add_flashcard_selector_button(anki_deck_id: DeckId) -> str:
     return f"""
         var button = document.createElement("button");
+        button.id = "{FLASHCARD_SELECTOR_BUTTON_ID}";
         button.innerHTML = "Add flashcards";
 
         button.addEventListener("click", function() {{
@@ -86,6 +89,10 @@ class FlashCardSelectorDialog(QDialog):
         qconnect(self.web.loadFinished, self._on_web_load_finished)
 
     def _on_web_load_finished(self, ok: bool) -> None:
+        if not ok:
+            LOGGER.error("Failed to load flashcard selector page.")
+            return
+
         self.web.eval(
             f"""
             if (window.location.href.includes('login')) {{
@@ -108,11 +115,12 @@ class FlashCardSelectorDialog(QDialog):
         return cls.dialog
 
 
-def _handle_flashcard_selector_button_click(
+def _handle_flashcard_selector_py_commands(
     handled: tuple[bool, Any], message: str, context: Any
 ) -> tuple[bool, Any]:
     if message == FLASHCARD_SELECTOR_OPEN_PYCMD:
         FlashCardSelectorDialog.display(aqt.mw)
+        LOGGER.info("Opened flashcard selector dialog.")
         return (True, None)
     elif message == FLASHCARD_SELECTOR_AUTH_FAILED_PYCMD:
         # Close the dialog if the user is not authenticated and prompt them to log in,
@@ -122,6 +130,9 @@ def _handle_flashcard_selector_button_click(
 
         AnkiHubLogin.display_login()
 
+        LOGGER.info(
+            "Prompted user to log in to AnkiHub, after failed authentication in flashcard selector."
+        )
         return (True, None)
     else:
         return handled
