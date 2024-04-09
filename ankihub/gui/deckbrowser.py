@@ -92,8 +92,8 @@ class FlashCardSelectorDialog(QDialog):
 
     def _on_web_load_finished(self, ok: bool) -> None:
         if not ok:
-            LOGGER.error("Failed to load flashcard selector page.")
-            return
+            LOGGER.error("Failed to load flashcard selector page.")  # pragma: no cover
+            return  # pragma: no cover
 
         self.web.eval(
             f"""
