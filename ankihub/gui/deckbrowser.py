@@ -1,6 +1,6 @@
 """Modifies the Anki deck browser (aqt.deckbrowser)."""
 
-from typing import Any
+from typing import Any, Optional
 
 import aqt
 from anki.decks import DeckId
@@ -64,7 +64,7 @@ def _handle_flashcard_selector_button_click(
         return handled
 
     if message == FLASHCARD_SELCTOR_PYCMD:
-        _open_flashcard_selector()
+        FlashCardSelectorDialog.display(aqt.mw)
         # Return True to indicate that the message was handled
         return (True, None)
     else:
@@ -72,6 +72,8 @@ def _handle_flashcard_selector_button_click(
 
 
 class FlashCardSelectorDialog(QDialog):
+    _window: Optional["FlashCardSelectorDialog"] = None
+
     def __init__(self, parent: Any) -> None:
         super().__init__(parent)
         self._setup_ui()
@@ -79,13 +81,15 @@ class FlashCardSelectorDialog(QDialog):
     def _setup_ui(
         self,
     ) -> None:
+        self.setWindowTitle("AnkiHub | Flashcard Selector")
         self.setMinimumHeight(400)
         self.setMinimumWidth(600)
 
         self.web = AnkiWebView(parent=self)
         self.web.set_open_links_externally(False)
         self.web.page().setBackgroundColor(QColor("white"))
-        self.web.load_url(QUrl(url_flashcard_selector(ANKING_DECK_ID)))
+
+        self._load_flashcard_selector_page()
 
         self.layout_ = QVBoxLayout()
         self.layout_.setContentsMargins(0, 0, 0, 0)
@@ -93,10 +97,21 @@ class FlashCardSelectorDialog(QDialog):
 
         self.setLayout(self.layout_)
 
+    def _load_flashcard_selector_page(self) -> None:
+        self.web.load_url(QUrl(url_flashcard_selector(ANKING_DECK_ID)))
 
-def _open_flashcard_selector() -> None:
-    dialog = FlashCardSelectorDialog(aqt.mw)
-    dialog.show()
+    @classmethod
+    def display(cls, parent: Any) -> "FlashCardSelectorDialog":
+        if cls._window is None:
+            cls._window = cls(parent)
+
+        cls._window._load_flashcard_selector_page()
+
+        cls._window.activateWindow()
+        cls._window.raise_()
+        cls._window.show()
+
+        return cls._window
 
 
 def _setup_deck_delete_hook() -> None:
