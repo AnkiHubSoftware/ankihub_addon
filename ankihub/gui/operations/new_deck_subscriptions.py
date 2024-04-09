@@ -25,9 +25,6 @@ def check_and_install_new_deck_subscriptions(
             on_done(future_with_result(None))
             return
 
-        cleanup_cb = QCheckBox("Remove unused tags and empty cards")
-        cleanup_cb.setChecked(True)
-
         recommended_deck_settings_cb = QCheckBox("Use recommended deck settings")
         recommended_deck_settings_cb.setChecked(True)
 
@@ -42,7 +39,6 @@ def check_and_install_new_deck_subscriptions(
             default_button_idx=1,
             callback=lambda button_index: _on_button_clicked(
                 button_index=button_index,
-                cleanup_cb=cleanup_cb,
                 recommended_deck_settings_cb=recommended_deck_settings_cb,
                 decks=decks,
                 on_done=on_done,
@@ -52,16 +48,12 @@ def check_and_install_new_deck_subscriptions(
         confirmation_dialog_layout = confirmation_dialog.content_layout
         confirmation_dialog_layout.insertWidget(
             confirmation_dialog_layout.count() - 2,
-            cleanup_cb,
-        )
-        confirmation_dialog_layout.insertWidget(
-            confirmation_dialog_layout.count() - 1,
             recommended_deck_settings_cb,
         )
         confirmation_dialog.open()
 
         # This prevents the checkbox from being garbage collected too early
-        confirmation_dialog.cleanup_cb = cleanup_cb  # type: ignore
+        confirmation_dialog.recommended_deck_settings_cb = recommended_deck_settings_cb  # type: ignore
     except Exception as e:
         # Using run_on_main prevents exceptions which occur in the callback to be backpropagated to the caller,
         # which is what we want.
@@ -70,7 +62,6 @@ def check_and_install_new_deck_subscriptions(
 
 def _on_button_clicked(
     button_index: Optional[int],
-    cleanup_cb: QCheckBox,
     recommended_deck_settings_cb: QCheckBox,
     decks: List[Deck],
     on_done: Callable[[Future], None],
@@ -86,7 +77,6 @@ def _on_button_clicked(
         download_and_install_decks(
             ah_dids,
             on_done=on_done,
-            cleanup=cleanup_cb.isChecked(),
             recommended_deck_settings=recommended_deck_settings_cb.isChecked(),
         )
     except Exception as e:
