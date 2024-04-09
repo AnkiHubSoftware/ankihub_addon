@@ -47,16 +47,18 @@ def _maybe_add_flashcard_selector_button() -> None:
 
 def _js_add_flashcard_selector_button(anki_deck_id: DeckId) -> str:
     return f"""
-        var button = document.createElement("button");
-        button.id = "{FLASHCARD_SELECTOR_BUTTON_ID}";
-        button.innerHTML = "Add flashcards";
+        if(!document.getElementById("{FLASHCARD_SELECTOR_BUTTON_ID}")) {{
+            var button = document.createElement("button");
+            button.id = "{FLASHCARD_SELECTOR_BUTTON_ID}";
+            button.innerHTML = "Add flashcards";
 
-        button.addEventListener("click", function() {{
-          pycmd("{FLASHCARD_SELECTOR_OPEN_PYCMD}");
-        }});
+            button.addEventListener("click", function() {{
+              pycmd("{FLASHCARD_SELECTOR_OPEN_PYCMD}");
+            }});
 
-        var deckElement = document.querySelector(".deck[id='{anki_deck_id}']");
-        deckElement.appendChild(button);
+            var deckElement = document.querySelector(".deck[id='{anki_deck_id}']");
+            deckElement.appendChild(button);
+        }}
     """
 
 
