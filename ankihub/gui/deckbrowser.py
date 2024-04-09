@@ -10,7 +10,7 @@ from aqt.gui_hooks import (
     deck_browser_will_render_content,
     webview_did_receive_js_message,
 )
-from aqt.qt import QDialog, QUrl, QVBoxLayout
+from aqt.qt import QColor, QDialog, QUrl, QVBoxLayout
 from aqt.webview import AnkiWebView
 
 from ..main.deck_unsubscribtion import unsubscribe_from_deck_and_uninstall
@@ -72,22 +72,17 @@ class FlashCardSelectorDialog(QDialog):
     ) -> None:
         self.setMinimumHeight(400)
         self.setMinimumWidth(600)
-        self.setContentsMargins(0, 0, 0, 0)
 
         self.web = AnkiWebView(parent=self)
-        self.web.stdHtml(body="", default_css=False)
-
         self.web.set_open_links_externally(False)
         self.web.load_url(
             QUrl(
                 "http://localhost:8000/ai/c63e7ce8-7039-4cdf-876f-4d5b8c24d39e/flashcard-selector/?foo=asdf"
             )
         )
-
-        js = "document.documentElement.style.backgroundColor = 'white';"
-        self.web.eval(js)
-
+        self.web.page().setBackgroundColor(QColor("white"))
         self.layout_ = QVBoxLayout()
+        self.layout_.setContentsMargins(0, 0, 0, 0)
         self.layout_.addWidget(self.web)
 
         self.setLayout(self.layout_)
