@@ -105,8 +105,8 @@ class FlashCardSelectorDialog(QDialog):
     def display(cls, parent: Any) -> "FlashCardSelectorDialog":
         if cls.dialog is None:
             cls.dialog = cls(parent)
-
-        cls.dialog._load_flashcard_selector_page()
+        else:
+            cls.dialog._load_flashcard_selector_page()
 
         cls.dialog.activateWindow()
         cls.dialog.raise_()
