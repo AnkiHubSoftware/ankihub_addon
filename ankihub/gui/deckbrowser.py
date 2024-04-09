@@ -5,7 +5,6 @@ from typing import Any
 import aqt
 from anki.decks import DeckId
 from anki.hooks import wrap
-from aqt.deckbrowser import DeckBrowser
 from aqt.gui_hooks import deck_browser_did_render, webview_did_receive_js_message
 from aqt.qt import QColor, QDialog, QUrl, QVBoxLayout
 from aqt.webview import AnkiWebView
@@ -59,6 +58,8 @@ def _js_add_flashcard_selector_button(anki_deck_id: DeckId) -> str:
 def _handle_flashcard_selector_button_click(
     handled: tuple[bool, Any], message: str, context: Any
 ) -> tuple[bool, Any]:
+    from aqt.deckbrowser import DeckBrowser
+
     if not isinstance(context, DeckBrowser):
         return handled
 
