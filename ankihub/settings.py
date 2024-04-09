@@ -636,6 +636,9 @@ url_view_deck = lambda: f"{config.app_url}/decks/"  # noqa: E731
 url_help = lambda: f"{config.app_url}/help"  # noqa: E731
 url_decks = lambda: f"{config.app_url}/explore"  # noqa: E731
 url_deck_base = lambda: f"{config.app_url}/decks"  # noqa: E731
+url_flashcard_selector = (
+    lambda deck_id: f"{config.app_url}/ai/{deck_id}/flashcard-selector"
+)  # noqa: E731
 
 
 ANKIHUB_NOTE_TYPE_FIELD_NAME = "ankihub_id"

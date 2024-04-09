@@ -14,16 +14,15 @@ from aqt.qt import QColor, QDialog, QUrl, QVBoxLayout
 from aqt.webview import AnkiWebView
 
 from ..main.deck_unsubscribtion import unsubscribe_from_deck_and_uninstall
-from ..settings import config
+from ..settings import ANKING_DECK_ID, config, url_flashcard_selector
 from .utils import ask_user
 
 FLASHCARD_SELCTOR_PYCMD = "ankihub_flashcard_selector"
-FLASHCARD_SELECTOR_DECK_ID = 1708540327330
 
 
 def setup() -> None:
-    _setup_deck_delete_hook()
     _setup_flashcard_selector_button()
+    _setup_deck_delete_hook()
 
 
 def _setup_flashcard_selector_button() -> None:
@@ -34,8 +33,9 @@ def _setup_flashcard_selector_button() -> None:
 def _add_flashcard_selector_button(
     browser: DeckBrowser, content: DeckBrowserContent
 ) -> None:
+    anking_anki_did = config.deck_config(ANKING_DECK_ID).anki_id
     content.tree += f"""
-        <script type="text/javascript">
+        <script>
             var button = document.createElement("button");
             button.innerHTML = "Add flashcards";
 
@@ -43,7 +43,7 @@ def _add_flashcard_selector_button(
               pycmd("{FLASHCARD_SELCTOR_PYCMD}");
             }});
 
-            var deckElement = document.querySelector(".deck[id='{FLASHCARD_SELECTOR_DECK_ID}']");
+            var deckElement = document.querySelector(".deck[id='{anking_anki_did}']");
             deckElement.appendChild(button);
         </script>
     """
@@ -57,6 +57,7 @@ def _handle_flashcard_selector_button_click(
 
     if message == FLASHCARD_SELCTOR_PYCMD:
         _open_flashcard_selector()
+        # Return True to indicate that the message was handled
         return (True, None)
     else:
         return handled
@@ -75,11 +76,7 @@ class FlashCardSelectorDialog(QDialog):
 
         self.web = AnkiWebView(parent=self)
         self.web.set_open_links_externally(False)
-        self.web.load_url(
-            QUrl(
-                "http://localhost:8000/ai/c63e7ce8-7039-4cdf-876f-4d5b8c24d39e/flashcard-selector/?foo=asdf"
-            )
-        )
+        self.web.load_url(QUrl(url_flashcard_selector(ANKING_DECK_ID)))
         self.web.page().setBackgroundColor(QColor("white"))
         self.layout_ = QVBoxLayout()
         self.layout_.setContentsMargins(0, 0, 0, 0)
