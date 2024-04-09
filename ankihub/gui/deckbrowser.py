@@ -17,7 +17,7 @@ from ..main.deck_unsubscribtion import unsubscribe_from_deck_and_uninstall
 from ..settings import ANKING_DECK_ID, config, url_flashcard_selector
 from .utils import ask_user
 
-FLASHCARD_SELCTOR_PYCMD = "ankihub_flashcard_selector"
+FLASHCARD_SELCTOR_PYCMD = "ankihub_flashcard_selector_open"
 
 
 def setup() -> None:
