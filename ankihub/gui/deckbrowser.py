@@ -1,6 +1,6 @@
 """Modifies the Anki deck browser (aqt.deckbrowser)."""
 
-from typing import Any, Optional
+from typing import Any, Optional, cast
 
 import aqt
 from anki.decks import DeckId
@@ -23,7 +23,6 @@ from .menu import AnkiHubLogin
 from .utils import ask_user
 
 FLASHCARD_SELECTOR_OPEN_PYCMD = "ankihub_flashcard_selector_open"
-FLASHCARD_SELECTOR_AUTH_FAILED_PYCMD = "ankihub_flashcard_selector_auth_failed"
 FLASHCARD_SELECTOR_BUTTON_ID = "ankihub-flashcard-selector-button"
 
 
@@ -100,6 +99,7 @@ class FlashCardSelectorDialog(QDialog):
         token = config.token()
         if not token:
             _handle_flashcard_selector_auth_failed()
+            return
 
         self.web.load_url(QUrl(url_flashcard_selector(ANKING_DECK_ID)))
         qconnect(self.web.loadFinished, self._on_web_load_finished)
@@ -109,14 +109,15 @@ class FlashCardSelectorDialog(QDialog):
             LOGGER.error("Failed to load flashcard selector page.")  # pragma: no cover
             return  # pragma: no cover
 
-        # Notify message handler if the user is not authenticated
-        self.web.eval(
-            f"""
-            if (window.location.href.includes('login')) {{
-                pycmd('{FLASHCARD_SELECTOR_AUTH_FAILED_PYCMD}');
-            }}
-            """
+        # Handle authentication failure
+        def check_auth_failure_callback(value: str) -> None:
+            if value.strip().endswith("Invalid token"):
+                _handle_flashcard_selector_auth_failed()
+
+        self.web.evalWithCallback(
+            "document.body.innerHTML", check_auth_failure_callback
         )
+
         # Overwrite focus outline included by default by QtWebEngine
         css = """
             :focus {
@@ -163,12 +164,6 @@ def _handle_flashcard_selector_py_commands(
         FlashCardSelectorDialog.display(aqt.mw)
         LOGGER.info("Opened flashcard selector dialog.")
         return (True, None)
-    elif message == FLASHCARD_SELECTOR_AUTH_FAILED_PYCMD:
-        _handle_flashcard_selector_auth_failed()
-        LOGGER.info(
-            "Prompted user to log in to AnkiHub, after failed authentication in flashcard selector."
-        )
-        return (True, None)
     else:
         return handled
 
@@ -176,8 +171,9 @@ def _handle_flashcard_selector_py_commands(
 def _handle_flashcard_selector_auth_failed() -> None:
     # Close the flashcard selector dialog and prompt them to log in,
     # then they can open the dialog again
-    dialog: FlashCardSelectorDialog = FlashCardSelectorDialog.dialog
-    dialog.close()
+    if dialog := FlashCardSelectorDialog.dialog:
+        dialog = cast(FlashCardSelectorDialog, dialog)
+        dialog.close()
 
     AnkiHubLogin.display_login()
     LOGGER.info(

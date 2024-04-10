@@ -21,6 +21,7 @@ from typing import (
     Set,
     Tuple,
     Union,
+    cast,
 )
 from unittest.mock import Mock
 from zipfile import ZipFile
@@ -42,7 +43,7 @@ from aqt.browser.sidebar.item import SidebarItem
 from aqt.browser.sidebar.tree import SidebarTreeView
 from aqt.gui_hooks import browser_will_show_context_menu
 from aqt.importing import AnkiPackageImporter
-from aqt.qt import QAction, Qt, qconnect
+from aqt.qt import QAction, Qt, QUrl
 from aqt.theme import theme_manager
 from aqt.webview import AnkiWebView
 from pytest import fixture
@@ -143,7 +144,6 @@ from ankihub.gui.config_dialog import (
 )
 from ankihub.gui.deck_updater import _AnkiHubDeckUpdater, ah_deck_updater
 from ankihub.gui.deckbrowser import (
-    FLASHCARD_SELECTOR_AUTH_FAILED_PYCMD,
     FLASHCARD_SELECTOR_BUTTON_ID,
     FlashCardSelectorDialog,
 )
@@ -5451,18 +5451,24 @@ class TestFlashCardSelector:
         self,
         anki_session_with_addon_data: AnkiSession,
         qtbot: QtBot,
+        mocker: MockerFixture,
     ):
         entry_point.run()
         with anki_session_with_addon_data.profile_loaded():
-            dialog = FlashCardSelectorDialog.display(aqt.mw)
-            web: AnkiWebView = dialog.web
+            mocker.patch.object(config, "token")
 
-            qconnect(
-                web.loadFinished,
-                lambda *args, **kwargs: web.eval(
-                    f"pycmd('{FLASHCARD_SELECTOR_AUTH_FAILED_PYCMD}')"
-                ),
-            )
+            original_load_url = aqt.webview.AnkiWebView.load_url
+
+            def new_load_url(self, url: QUrl, *args, **kwargs):
+                self = cast(AnkiWebView, self)
+                if "flashcard-selector" in url.toString():
+                    return self.stdHtml(body="Invalid token")
+                else:
+                    return original_load_url(self, url, *args, **kwargs)
+
+            mocker.patch("aqt.webview.AnkiWebView.load_url", new=new_load_url)
+
+            dialog = FlashCardSelectorDialog.display(aqt.mw)
 
             def auth_failure_was_handled() -> bool:
                 return not dialog.isVisible() and AnkiHubLogin._window.isVisible()
