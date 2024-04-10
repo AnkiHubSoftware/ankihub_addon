@@ -5487,6 +5487,46 @@ class TestFlashCardSelector:
 
             qtbot.wait_until(flashcard_selector_opened)
 
+    def test_clicking_button_twice_shows_existing_dialog_again(
+        self,
+        anki_session_with_addon_data: AnkiSession,
+        install_ah_deck: InstallAHDeck,
+        qtbot: QtBot,
+    ):
+        entry_point.run()
+        with anki_session_with_addon_data.profile_loaded():
+            install_ah_deck(ah_did=ANKING_DECK_ID)
+
+            deckbrowser_web: AnkiWebView = aqt.mw.deckBrowser.web
+            aqt.mw.deckBrowser.refresh()
+
+            qtbot.wait(500)
+            deckbrowser_web.eval(
+                f"document.getElementById('{FLASHCARD_SELECTOR_BUTTON_ID}').click()",
+            )
+
+            def flashcard_selector_opened():
+                if FlashCardSelectorDialog.dialog is None:
+                    return False
+
+                dialog: FlashCardSelectorDialog = FlashCardSelectorDialog.dialog
+                return dialog.isVisible()
+
+            qtbot.wait_until(flashcard_selector_opened)
+
+            dialog = cast(FlashCardSelectorDialog, FlashCardSelectorDialog.dialog)
+            dialog.close()
+
+            qtbot.wait_until(lambda: not FlashCardSelectorDialog.dialog.isVisible())
+
+            deckbrowser_web.eval(
+                f"document.getElementById('{FLASHCARD_SELECTOR_BUTTON_ID}').click()",
+            )
+
+            qtbot.wait_until(flashcard_selector_opened)
+
+            assert FlashCardSelectorDialog.dialog == dialog
+
     def test_with_auth_failing(
         self,
         anki_session_with_addon_data: AnkiSession,

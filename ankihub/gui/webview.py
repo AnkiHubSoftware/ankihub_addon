@@ -60,12 +60,12 @@ class AnkiHubWebViewDialog(QDialog):
     @abstractmethod
     def _get_url(self) -> QUrl:
         """Return the URL to load in the web view."""
-        pass
+        ...
 
     @abstractmethod
     def _handle_auth_failure(self) -> None:
         """Handle an authentication failure, e.g. prompt the user to log in."""
-        pass
+        ...
 
     def _load_page(self) -> None:
         token = config.token()
