@@ -117,6 +117,22 @@ class FlashCardSelectorDialog(QDialog):
             }}
             """
         )
+        # Overwrite focus outline included by default by QtWebEngine
+        css = """
+            :focus {
+                outline: none !important;
+            }
+        """
+
+        css_code = """
+            var style = document.createElement('style');
+            style.type = 'text/css';
+            style.innerHTML = `{}`;
+            document.head.appendChild(style);
+        """.format(
+            css
+        )
+        self.web.eval(css_code)
 
     @classmethod
     def display(cls, parent: Any) -> "FlashCardSelectorDialog":
