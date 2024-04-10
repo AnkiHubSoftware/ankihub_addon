@@ -94,21 +94,19 @@ class AnkiHubWebViewDialog(QDialog):
         )
 
     def _adjust_web_styling(self) -> None:
-        # Remove focus outline that QtWebEngine uses by default
+        # Replace focus outline that QtWebEngine uses by default
         css = """
             :focus {
-                outline: none !important;
+                outline: 2px !important;
             }
         """
 
-        css_code = """
+        css_code = f"""
             var style = document.createElement('style');
             style.type = 'text/css';
-            style.innerHTML = `{}`;
+            style.innerHTML = `{css}`;
             document.head.appendChild(style);
-        """.format(
-            css
-        )
+        """
 
         self.web.eval(css_code)
 
