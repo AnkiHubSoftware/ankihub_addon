@@ -154,7 +154,9 @@ class AuthenticationRequestInterceptor(QWebEngineUrlRequestInterceptor):
         token = config.token()
         if not token:
             return
-        info.setHttpHeader(b"Authorization", b"Token " + token.encode())
+
+        if config.app_url in info.requestUrl().toString():
+            info.setHttpHeader(b"Authorization", b"Token " + token.encode())
 
 
 def _handle_flashcard_selector_py_commands(
