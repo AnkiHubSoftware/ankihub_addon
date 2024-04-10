@@ -1,19 +1,12 @@
 """Modifies the Anki deck browser (aqt.deckbrowser)."""
 
-from typing import Any, Optional, cast
+from typing import Any, cast
 
 import aqt
 from anki.decks import DeckId
 from anki.hooks import wrap
 from aqt.gui_hooks import deck_browser_did_render, webview_did_receive_js_message
-from aqt.qt import (
-    QColor,
-    QDialog,
-    QUrl,
-    QVBoxLayout,
-    QWebEngineUrlRequestInterceptor,
-    qconnect,
-)
+from aqt.qt import QUrl
 from aqt.webview import AnkiWebView
 
 from .. import LOGGER
@@ -21,6 +14,7 @@ from ..main.deck_unsubscribtion import unsubscribe_from_deck_and_uninstall
 from ..settings import ANKING_DECK_ID, config, url_flashcard_selector
 from .menu import AnkiHubLogin
 from .utils import ask_user
+from .webview import AnkiHubWebViewDialog
 
 FLASHCARD_SELECTOR_OPEN_PYCMD = "ankihub_flashcard_selector_open"
 FLASHCARD_SELECTOR_BUTTON_ID = "ankihub-flashcard-selector-button"
@@ -68,97 +62,6 @@ def _js_add_flashcard_selector_button(anki_deck_id: DeckId) -> str:
     """
 
 
-class FlashCardSelectorDialog(QDialog):
-    dialog: Optional["FlashCardSelectorDialog"] = None
-
-    def __init__(self, parent: Any) -> None:
-        super().__init__(parent)
-        self._setup_ui()
-
-    def _setup_ui(self) -> None:
-        self.setWindowTitle("AnkiHub | Flashcard Selector")
-        self.setMinimumHeight(400)
-        self.setMinimumWidth(600)
-
-        self.web = AnkiWebView(parent=self)
-        self.web.set_open_links_externally(False)
-        self.web.page().setBackgroundColor(QColor("white"))
-
-        self.interceptor = AuthenticationRequestInterceptor()
-        self.web.page().profile().setUrlRequestInterceptor(self.interceptor)
-
-        self._load_flashcard_selector_page()
-
-        self.layout_ = QVBoxLayout()
-        self.layout_.setContentsMargins(0, 0, 0, 0)
-        self.layout_.addWidget(self.web)
-
-        self.setLayout(self.layout_)
-
-    def _load_flashcard_selector_page(self) -> None:
-        token = config.token()
-        if not token:
-            _handle_flashcard_selector_auth_failed()
-            return
-
-        self.web.load_url(QUrl(url_flashcard_selector(ANKING_DECK_ID)))
-        qconnect(self.web.loadFinished, self._on_web_load_finished)
-
-    def _on_web_load_finished(self, ok: bool) -> None:
-        if not ok:
-            LOGGER.error("Failed to load flashcard selector page.")  # pragma: no cover
-            return  # pragma: no cover
-
-        # Handle authentication failure
-        def check_auth_failure_callback(value: str) -> None:
-            if value.strip().endswith("Invalid token"):
-                _handle_flashcard_selector_auth_failed()
-
-        self.web.evalWithCallback(
-            "document.body.innerHTML", check_auth_failure_callback
-        )
-
-        # Overwrite focus outline included by default by QtWebEngine
-        css = """
-            :focus {
-                outline: none !important;
-            }
-        """
-
-        css_code = """
-            var style = document.createElement('style');
-            style.type = 'text/css';
-            style.innerHTML = `{}`;
-            document.head.appendChild(style);
-        """.format(
-            css
-        )
-        self.web.eval(css_code)
-
-    @classmethod
-    def display(cls, parent: Any) -> "FlashCardSelectorDialog":
-        if cls.dialog is None:
-            cls.dialog = cls(parent)
-        else:
-            cls.dialog._load_flashcard_selector_page()
-
-        cls.dialog.activateWindow()
-        cls.dialog.raise_()
-        cls.dialog.show()
-
-        return cls.dialog
-
-
-class AuthenticationRequestInterceptor(QWebEngineUrlRequestInterceptor):
-    def interceptRequest(self, info) -> None:
-        token = config.token()
-        if not token:
-            return
-
-        if config.app_url in info.requestUrl().toString():
-            info.setHttpHeader(b"Authorization", b"Token " + token.encode())
-
-
 def _handle_flashcard_selector_py_commands(
     handled: tuple[bool, Any], message: str, context: Any
 ) -> tuple[bool, Any]:
@@ -170,17 +73,31 @@ def _handle_flashcard_selector_py_commands(
         return handled
 
 
-def _handle_flashcard_selector_auth_failed() -> None:
-    # Close the flashcard selector dialog and prompt them to log in,
-    # then they can open the dialog again
-    if dialog := FlashCardSelectorDialog.dialog:
-        dialog = cast(FlashCardSelectorDialog, dialog)
-        dialog.close()
+class FlashCardSelectorDialog(AnkiHubWebViewDialog):
+    def __init__(self, parent: Any) -> None:
+        super().__init__(parent)
 
-    AnkiHubLogin.display_login()
-    LOGGER.info(
-        "Prompted user to log in to AnkiHub, after failed authentication in flashcard selector."
-    )
+    def _setup_ui(self) -> None:
+        self.setWindowTitle("AnkiHub | Flashcard Selector")
+        self.setMinimumHeight(400)
+        self.setMinimumWidth(600)
+
+        super()._setup_ui()
+
+    def _get_url(self) -> QUrl:
+        return QUrl(url_flashcard_selector(ANKING_DECK_ID))
+
+    def _handle_auth_failure(self) -> None:
+        # Close the flashcard selector dialog and prompt them to log in,
+        # then they can open the dialog again
+        if self.dialog:
+            self.dialog = cast(FlashCardSelectorDialog, self.dialog)
+            self.dialog.close()
+
+        AnkiHubLogin.display_login()
+        LOGGER.info(
+            "Prompted user to log in to AnkiHub, after failed authentication in flashcard selector."
+        )
 
 
 def _setup_deck_delete_hook() -> None:
