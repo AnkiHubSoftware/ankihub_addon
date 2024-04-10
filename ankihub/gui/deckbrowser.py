@@ -6,7 +6,14 @@ import aqt
 from anki.decks import DeckId
 from anki.hooks import wrap
 from aqt.gui_hooks import deck_browser_did_render, webview_did_receive_js_message
-from aqt.qt import QColor, QDialog, QUrl, QVBoxLayout, qconnect
+from aqt.qt import (
+    QColor,
+    QDialog,
+    QUrl,
+    QVBoxLayout,
+    QWebEngineUrlRequestInterceptor,
+    qconnect,
+)
 from aqt.webview import AnkiWebView
 
 from .. import LOGGER
@@ -78,6 +85,9 @@ class FlashCardSelectorDialog(QDialog):
         self.web.set_open_links_externally(False)
         self.web.page().setBackgroundColor(QColor("white"))
 
+        self.interceptor = AuthenticationRequestInterceptor()
+        self.web._page.profile().setRequestInterceptor(self.interceptor)
+
         self._load_flashcard_selector_page()
 
         self.layout_ = QVBoxLayout()
@@ -87,6 +97,10 @@ class FlashCardSelectorDialog(QDialog):
         self.setLayout(self.layout_)
 
     def _load_flashcard_selector_page(self) -> None:
+        token = config.token()
+        if not token:
+            _handle_flashcard_selector_auth_failed()
+
         self.web.load_url(QUrl(url_flashcard_selector(ANKING_DECK_ID)))
         qconnect(self.web.loadFinished, self._on_web_load_finished)
 
@@ -95,6 +109,7 @@ class FlashCardSelectorDialog(QDialog):
             LOGGER.error("Failed to load flashcard selector page.")  # pragma: no cover
             return  # pragma: no cover
 
+        # Notify message handler if the user is not authenticated
         self.web.eval(
             f"""
             if (window.location.href.includes('login')) {{
@@ -117,6 +132,14 @@ class FlashCardSelectorDialog(QDialog):
         return cls.dialog
 
 
+class AuthenticationRequestInterceptor(QWebEngineUrlRequestInterceptor):
+    def interceptRequest(self, info) -> None:
+        token = config.token()
+        if not token:
+            return
+        info.setHttpHeader(b"Authorization", b"Token " + token.encode())
+
+
 def _handle_flashcard_selector_py_commands(
     handled: tuple[bool, Any], message: str, context: Any
 ) -> tuple[bool, Any]:
@@ -125,19 +148,25 @@ def _handle_flashcard_selector_py_commands(
         LOGGER.info("Opened flashcard selector dialog.")
         return (True, None)
     elif message == FLASHCARD_SELECTOR_AUTH_FAILED_PYCMD:
-        # Close the dialog if the user is not authenticated and prompt them to log in,
-        # then they can open the dialog again
-        dialog: FlashCardSelectorDialog = FlashCardSelectorDialog.dialog
-        dialog.close()
-
-        AnkiHubLogin.display_login()
-
+        _handle_flashcard_selector_auth_failed()
         LOGGER.info(
             "Prompted user to log in to AnkiHub, after failed authentication in flashcard selector."
         )
         return (True, None)
     else:
         return handled
+
+
+def _handle_flashcard_selector_auth_failed() -> None:
+    # Close the flashcard selector dialog and prompt them to log in,
+    # then they can open the dialog again
+    dialog: FlashCardSelectorDialog = FlashCardSelectorDialog.dialog
+    dialog.close()
+
+    AnkiHubLogin.display_login()
+    LOGGER.info(
+        "Prompted user to log in to AnkiHub, after failed authentication in flashcard selector."
+    )
 
 
 def _setup_deck_delete_hook() -> None:
