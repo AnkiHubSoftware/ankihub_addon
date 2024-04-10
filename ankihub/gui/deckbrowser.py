@@ -79,8 +79,8 @@ class FlashCardSelectorDialog(AnkiHubWebViewDialog):
 
     def _setup_ui(self) -> None:
         self.setWindowTitle("AnkiHub | Flashcard Selector")
-        self.setMinimumHeight(400)
-        self.setMinimumWidth(600)
+        self.setMinimumHeight(800)
+        self.setMinimumWidth(900)
 
         super()._setup_ui()
 
