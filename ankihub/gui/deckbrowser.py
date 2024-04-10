@@ -85,7 +85,7 @@ class FlashCardSelectorDialog(QDialog):
         self.web.page().setBackgroundColor(QColor("white"))
 
         self.interceptor = AuthenticationRequestInterceptor()
-        self.web._page.profile().setRequestInterceptor(self.interceptor)
+        self.web.page().profile().setUrlRequestInterceptor(self.interceptor)
 
         self._load_flashcard_selector_page()
 
