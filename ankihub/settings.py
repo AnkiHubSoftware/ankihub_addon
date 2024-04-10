@@ -636,7 +636,7 @@ url_view_deck = lambda: f"{config.app_url}/decks/"  # noqa: E731
 url_help = lambda: f"{config.app_url}/help"  # noqa: E731
 url_decks = lambda: f"{config.app_url}/explore"  # noqa: E731
 url_deck_base = lambda: f"{config.app_url}/decks"  # noqa: E731
-url_flashcard_selector = (
+url_flashcard_selector_embed = (
     lambda deck_id: f"{config.app_url}/ai/{deck_id}/flashcard-selector-embed"
 )  # noqa: E731
 

@@ -11,7 +11,7 @@ from aqt.webview import AnkiWebView
 
 from .. import LOGGER
 from ..main.deck_unsubscribtion import unsubscribe_from_deck_and_uninstall
-from ..settings import ANKING_DECK_ID, config, url_flashcard_selector
+from ..settings import ANKING_DECK_ID, config, url_flashcard_selector_embed
 from .menu import AnkiHubLogin
 from .utils import ask_user
 from .webview import AnkiHubWebViewDialog
@@ -85,7 +85,7 @@ class FlashCardSelectorDialog(AnkiHubWebViewDialog):
         super()._setup_ui()
 
     def _get_url(self) -> QUrl:
-        return QUrl(url_flashcard_selector(ANKING_DECK_ID))
+        return QUrl(url_flashcard_selector_embed(ANKING_DECK_ID))
 
     def _handle_auth_failure(self) -> None:
         # Close the flashcard selector dialog and prompt them to log in,
