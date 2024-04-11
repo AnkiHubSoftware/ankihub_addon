@@ -26,7 +26,7 @@ from ..exceptions import DeckDownloadAndInstallError, RemoteDeckNotFoundError
 from ..media_sync import media_sync
 from ..messages import messages
 from ..utils import deck_download_progress_cb, show_dialog, tooltip_icon
-from .subdecks import confirm_and_toggle_subdecks
+from .subdecks import build_subdecks_and_move_cards_to_them_in_background
 from .utils import future_with_result, pass_exceptions_to_on_done
 
 
@@ -93,7 +93,7 @@ def _on_install_done(future: Future, on_done: Callable[[Future], None]):
     for import_result in import_results:
         ah_did = import_result.ankihub_did
         if deck_contains_subdeck_tags(ah_did):
-            confirm_and_toggle_subdecks(ah_did)
+            build_subdecks_and_move_cards_to_them_in_background(ah_did)
 
     _show_deck_import_summary_dialog(import_results)
 
