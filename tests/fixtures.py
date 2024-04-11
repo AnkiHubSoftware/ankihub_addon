@@ -1,7 +1,6 @@
 import copy
 import os
 import uuid
-from collections import defaultdict
 from datetime import datetime
 from typing import Any, Callable, Dict, List, Optional, Protocol, Type
 from unittest.mock import MagicMock, Mock
@@ -27,7 +26,6 @@ from ankihub.ankihub_client import NoteInfo
 from ankihub.ankihub_client.ankihub_client import AnkiHubClient
 from ankihub.ankihub_client.models import Deck, SuggestionType, UserDeckRelation
 from ankihub.feature_flags import setup_feature_flags
-from ankihub.gui.configure_deleted_notes_dialog import ConfigureDeletedNotesDialog
 from ankihub.gui.media_sync import _AnkiHubMediaSync
 from ankihub.gui.suggestion_dialog import SuggestionMetadata
 from ankihub.main.importing import AnkiHubImporter
@@ -531,13 +529,6 @@ def mock_download_and_install_deck_dependencies(
         # Mock UI interactions
         mock_show_dialog_with_cb(
             "ankihub.gui.operations.new_deck_subscriptions.show_dialog", button_index=1
-        )
-
-        mocker.patch.object(ConfigureDeletedNotesDialog, "exec")
-        mocker.patch.object(
-            ConfigureDeletedNotesDialog,
-            "deck_id_to_behavior_on_remote_note_deleted_dict",
-            return_value=defaultdict(lambda: BehaviorOnRemoteNoteDeleted.NEVER_DELETE),
         )
 
         return mocks

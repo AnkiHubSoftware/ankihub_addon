@@ -5,7 +5,7 @@ import uuid
 from concurrent.futures import Future
 from datetime import datetime
 from functools import partial
-from typing import Callable, Dict, List
+from typing import Callable, List
 
 import aqt
 from aqt.operations.tag import clear_unused_tags
@@ -21,7 +21,6 @@ from ...main.note_types import fetch_note_types_based_on_notes
 from ...main.subdecks import deck_contains_subdeck_tags
 from ...main.utils import clear_empty_cards, create_backup
 from ...settings import BehaviorOnRemoteNoteDeleted, DeckConfig, config
-from ..configure_deleted_notes_dialog import ConfigureDeletedNotesDialog
 from ..exceptions import DeckDownloadAndInstallError, RemoteDeckNotFoundError
 from ..media_sync import media_sync
 from ..messages import messages
@@ -35,6 +34,7 @@ def download_and_install_decks(
     ankihub_dids: List[uuid.UUID],
     on_done: Callable[[Future], None],
     recommended_deck_settings: bool = True,
+    behavior_on_remote_note_deleted: BehaviorOnRemoteNoteDeleted = BehaviorOnRemoteNoteDeleted.DELETE_IF_NO_REVIEWS,
 ) -> None:
     """Downloads and installs the given decks in the background."""
     aqt.mw.taskman.with_progress(
@@ -43,6 +43,7 @@ def download_and_install_decks(
             _on_deck_infos_fetched,
             on_done=on_done,
             recommended_deck_settings=recommended_deck_settings,
+            behavior_on_remote_note_deleted=behavior_on_remote_note_deleted,
         ),
         label="Getting deck information...",
     )
@@ -53,26 +54,15 @@ def _on_deck_infos_fetched(
     future: Future,
     on_done: Callable[[Future], None],
     recommended_deck_settings: bool,
+    behavior_on_remote_note_deleted: BehaviorOnRemoteNoteDeleted,
 ) -> None:
     decks = future.result()
-
-    # Ask the user how to handle deleted notes
-    deck_id_name_tuples = [(deck.ah_did, deck.name) for deck in decks]
-    dialog = ConfigureDeletedNotesDialog(
-        parent=aqt.mw,
-        deck_id_and_name_tuples=deck_id_name_tuples,
-    )
-    dialog.exec()
-
-    ah_did_to_deletion_behavior = (
-        dialog.deck_id_to_behavior_on_remote_note_deleted_dict()
-    )
 
     # Download and install the decks
     aqt.mw.taskman.with_progress(
         task=lambda: _download_and_install_decks_inner(
             decks,
-            ah_did_to_deletion_behavior=ah_did_to_deletion_behavior,
+            behavior_on_remote_note_deleted=behavior_on_remote_note_deleted,
             recommended_deck_settings=recommended_deck_settings,
         ),
         on_done=partial(_on_install_done, on_done=on_done),
@@ -150,7 +140,7 @@ def _show_deck_import_summary_dialog(
 
 def _download_and_install_decks_inner(
     decks: List[Deck],
-    ah_did_to_deletion_behavior: Dict[uuid.UUID, BehaviorOnRemoteNoteDeleted],
+    behavior_on_remote_note_deleted: BehaviorOnRemoteNoteDeleted,
     recommended_deck_settings: bool,
 ) -> List[AnkiHubImportResult]:
     """Downloads and installs the given decks.
@@ -162,9 +152,7 @@ def _download_and_install_decks_inner(
             result.append(
                 _download_and_install_single_deck(
                     deck,
-                    behavior_on_remote_note_deleted=ah_did_to_deletion_behavior[
-                        deck.ah_did
-                    ],
+                    behavior_on_remote_note_deleted=behavior_on_remote_note_deleted,
                     recommended_deck_settings=recommended_deck_settings,
                 )
             )
