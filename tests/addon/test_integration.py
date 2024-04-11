@@ -87,6 +87,7 @@ from ..fixtures import (
     MockShowDialogWithCB,
     MockStudyDeckDialogWithCB,
     MockSuggestionDialog,
+    SetFeatureFlagState,
     add_basic_anki_note_to_deck,
     create_or_get_ah_version_of_note_type,
     record_review,
@@ -5431,10 +5432,11 @@ class TestConfigDialog:
 @pytest.mark.sequential
 class TestFlashCardSelector:
     @pytest.mark.parametrize(
-        "deck_id, expected_button_exists",
+        "deck_id, feature_flag_active, expected_button_exists",
         [
-            (ANKING_DECK_ID, True),
-            (uuid.uuid4(), False),
+            (ANKING_DECK_ID, True, True),
+            (ANKING_DECK_ID, False, False),
+            (uuid.uuid4(), True, False),
         ],
     )
     def test_flashcard_selector_button_exists_for_anking_deck(
@@ -5443,8 +5445,14 @@ class TestFlashCardSelector:
         install_ah_deck: InstallAHDeck,
         qtbot: QtBot,
         deck_id: uuid.UUID,
+        set_feature_flag_state: SetFeatureFlagState,
+        feature_flag_active: bool,
         expected_button_exists: bool,
     ):
+        set_feature_flag_state(
+            "show_flashcards_selector_button", is_active=feature_flag_active
+        )
+
         entry_point.run()
         with anki_session_with_addon_data.profile_loaded():
             install_ah_deck(ah_did=deck_id)
@@ -5465,7 +5473,10 @@ class TestFlashCardSelector:
         anki_session_with_addon_data: AnkiSession,
         install_ah_deck: InstallAHDeck,
         qtbot: QtBot,
+        set_feature_flag_state: SetFeatureFlagState,
     ):
+        set_feature_flag_state("show_flashcards_selector_button")
+
         entry_point.run()
         with anki_session_with_addon_data.profile_loaded():
             install_ah_deck(ah_did=ANKING_DECK_ID)
@@ -5492,7 +5503,10 @@ class TestFlashCardSelector:
         anki_session_with_addon_data: AnkiSession,
         install_ah_deck: InstallAHDeck,
         qtbot: QtBot,
+        set_feature_flag_state: SetFeatureFlagState,
     ):
+        set_feature_flag_state("show_flashcards_selector_button")
+
         entry_point.run()
         with anki_session_with_addon_data.profile_loaded():
             install_ah_deck(ah_did=ANKING_DECK_ID)
@@ -5532,7 +5546,10 @@ class TestFlashCardSelector:
         anki_session_with_addon_data: AnkiSession,
         qtbot: QtBot,
         mocker: MockerFixture,
+        set_feature_flag_state: SetFeatureFlagState,
     ):
+        set_feature_flag_state("show_flashcards_selector_button")
+
         entry_point.run()
         with anki_session_with_addon_data.profile_loaded():
             mocker.patch.object(config, "token")
