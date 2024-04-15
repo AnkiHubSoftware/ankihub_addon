@@ -27,11 +27,11 @@ class AnkiHubWebViewDialog(QDialog):
         self._setup_ui()
 
     @classmethod
-    def display(cls, parent: Any) -> "AnkiHubWebViewDialog":
+    def display(cls, parent: Any) -> "Optional[AnkiHubWebViewDialog]":
         """Display the dialog. If the dialog is already open, the existing dialog is activated and shown."""
         if not config.token():
             cls._handle_auth_failure()
-            return
+            return None
 
         if cls.dialog is None:
             cls.dialog = cls(parent)
@@ -70,7 +70,7 @@ class AnkiHubWebViewDialog(QDialog):
         """Handle an authentication failure, e.g. prompt the user to log in."""
         ...  # pragma: no cover
 
-    def _load_page(self) -> bool:
+    def _load_page(self) -> None:
         self.web.load_url(self._get_url())
         qconnect(self.web.loadFinished, self._on_web_load_finished)
 
