@@ -1,4 +1,5 @@
 """Code to be run on Anki start up."""
+
 import time
 from pprint import pformat
 
