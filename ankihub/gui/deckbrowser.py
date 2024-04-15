@@ -10,6 +10,7 @@ from aqt.qt import QUrl
 from aqt.webview import AnkiWebView
 
 from .. import LOGGER
+from ..feature_flags import add_feature_flags_update_callback, feature_flags
 from ..main.deck_unsubscribtion import unsubscribe_from_deck_and_uninstall
 from ..settings import ANKING_DECK_ID, config, url_flashcard_selector_embed
 from .menu import AnkiHubLogin
@@ -33,12 +34,22 @@ def _setup_flashcard_selector_button() -> None:
     # We need to call this here, because the deck browser is already rendered at this point
     _maybe_add_flashcard_selector_button()
 
+    # The button is only added when the feature flag is enabled. The feature flag is fetched in the background,
+    # so we might need to add the button when the feature flag is fetched.
+    add_feature_flags_update_callback(_maybe_add_flashcard_selector_button)
+
     webview_did_receive_js_message.append(_handle_flashcard_selector_py_commands)
 
 
 def _maybe_add_flashcard_selector_button() -> None:
     """Add the flashcard selector button to the Anking deck if it exists."""
     if not (deck_config := config.deck_config(ANKING_DECK_ID)):
+        return
+
+    if not feature_flags.show_flashcards_selector_button:
+        LOGGER.info(
+            "Feature flag to show flashcard selector button is disabled, not adding the button."
+        )
         return
 
     deck_browser_web: AnkiWebView = aqt.mw.deckBrowser.web

@@ -1,5 +1,7 @@
 """Feature flags are used to enable/disable features on the client side. The flags are fetched from the server."""
+
 from dataclasses import dataclass, fields
+from typing import Callable, List
 
 import aqt
 
@@ -11,13 +13,31 @@ from .gui.operations import AddonQueryOp
 
 @dataclass
 class _FeatureFlags:
-    ...
+    show_flashcards_selector_button: bool = False
 
 
 feature_flags = _FeatureFlags()
 
+# List of callbacks that are called when the feature flags are updated.
+# This can e.g. be used to update the UI once the feature flags are fetched.
+_feature_flags_update_callbacks: List[Callable[[], None]] = []
 
-def setup_feature_flags() -> None:
+
+def setup_feature_flags_in_background() -> None:
+    def on_done(_: None) -> None:
+        LOGGER.info("Set up feature flags.")
+
+        for callback in _feature_flags_update_callbacks:
+            callback()
+
+    AddonQueryOp(
+        parent=aqt.mw,
+        op=lambda _: _setup_feature_flags(),
+        success=on_done,
+    ).without_collection().run_in_background()
+
+
+def _setup_feature_flags() -> None:
     """Fetch feature flags from the server. If the server is not reachable, use the default values."""
 
     if not fields(_FeatureFlags):
@@ -45,12 +65,5 @@ def setup_feature_flags() -> None:
     LOGGER.info(f"Feature flags: {feature_flags}")
 
 
-def setup_feature_flags_in_background() -> None:
-    def on_done(_: None):
-        LOGGER.info("Set up feature flags.")
-
-    AddonQueryOp(
-        parent=aqt.mw,
-        op=lambda _: setup_feature_flags(),
-        success=on_done,
-    ).without_collection().run_in_background()
+def add_feature_flags_update_callback(callback: Callable[[], None]) -> None:
+    _feature_flags_update_callbacks.append(callback)

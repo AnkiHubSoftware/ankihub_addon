@@ -116,8 +116,6 @@ def _general_setup():
     setup_error_handler()
     LOGGER.info("Set up error handler.")
 
-    setup_feature_flags_in_background()
-
     aqt.mw.addonManager.setWebExports(__name__, r"gui/web/.*")
 
     setup_debug()
@@ -156,6 +154,15 @@ def _general_setup():
 
     setup_auto_sync()
     LOGGER.info("Set up auto sync.")
+
+    # Call setup_feature_flags_in_background last among the setup functions.
+    # This is because other setup functions can add callbacks which react to the feature flags getting fetched.
+    # If this function is called earlier, the feature flags might be fetched before the callbacks are added,
+    # which would cause the callbacks to not be called.
+    setup_feature_flags_in_background()
+    LOGGER.info(
+        "Set up feature flag fetching (flags will be fetched in the background)."
+    )
 
 
 def _log_enabled_addons():
