@@ -3,6 +3,7 @@ from functools import partial
 from typing import Callable, List
 
 import aqt
+from anki.collection import OpChangesWithCount
 
 from ... import LOGGER
 from ...addon_ankihub_client import AddonAnkiHubClient as AnkiHubClient
@@ -47,6 +48,10 @@ def sync_with_ankihub(on_done: Callable[[Future], None]) -> None:
         maybe_check_databases()
 
         aqt.mw.taskman.run_in_background(
+            aqt.mw.col.tags.clear_unused_tags, on_done=_on_clear_unused_tags_done
+        )
+
+        aqt.mw.taskman.run_in_background(
             send_review_data, on_done=_on_send_review_data_done
         )
 
@@ -69,6 +74,11 @@ def sync_with_ankihub(on_done: Callable[[Future], None]) -> None:
         # Using run_on_main prevents exceptions which occur in the callback to be backpropagated to the caller,
         # which is what we want.
         aqt.mw.taskman.run_on_main(partial(on_done, future_with_exception(e)))
+
+
+def _on_clear_unused_tags_done(future: Future) -> None:
+    changes: OpChangesWithCount = future.result()
+    LOGGER.info(f"Cleared {changes.count} unused tags.")
 
 
 def _on_send_review_data_done(future: Future) -> None:
