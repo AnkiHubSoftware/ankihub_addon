@@ -11,6 +11,7 @@ Some differences between data stored in the AnkiHub database and the Anki databa
 - decks, notes and note types can be missing from the Anki database or be modified.
 """
 
+import logging
 import time
 import uuid
 from pathlib import Path
@@ -49,6 +50,11 @@ from .models import (
     set_peewee_database,
 )
 from .utils import TimedLock
+
+# Change the log level of the peewee logger to not show debug messges which show the sql queries.
+# These messages are bad for performance when e.g. inserting a lot entries into the database.
+peewee_logger = logging.getLogger("peewee")
+peewee_logger.setLevel(logging.INFO)
 
 # Chunk size for executing queries in chunks to avoid SQLite's "too many SQL variables" error.
 # The variable limit is 32_766, so the chunk size is set to 30_000 to be safe.
