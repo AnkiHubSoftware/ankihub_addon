@@ -87,12 +87,13 @@ class FlashCardSelectorDialog(AnkiHubWebViewDialog):
     def _get_url(self) -> QUrl:
         return QUrl(url_flashcard_selector_embed(ANKING_DECK_ID))
 
-    def _handle_auth_failure(self) -> None:
+    @classmethod
+    def _handle_auth_failure(cls) -> None:
         # Close the flashcard selector dialog and prompt them to log in,
         # then they can open the dialog again
-        if self.dialog:
-            self.dialog = cast(FlashCardSelectorDialog, self.dialog)
-            self.dialog.close()
+        if cls.dialog:
+            cls.dialog = cast(FlashCardSelectorDialog, cls.dialog)
+            cls.dialog.close()
 
         AnkiHubLogin.display_login()
         LOGGER.info(

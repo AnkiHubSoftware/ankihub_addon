@@ -5465,9 +5465,12 @@ class TestFlashCardSelector:
         anki_session_with_addon_data: AnkiSession,
         install_ah_deck: InstallAHDeck,
         qtbot: QtBot,
+        mocker: MockerFixture,
     ):
         entry_point.run()
         with anki_session_with_addon_data.profile_loaded():
+            mocker.patch.object(config, "token")
+
             install_ah_deck(ah_did=ANKING_DECK_ID)
 
             deckbrowser_web: AnkiWebView = aqt.mw.deckBrowser.web
@@ -5492,9 +5495,12 @@ class TestFlashCardSelector:
         anki_session_with_addon_data: AnkiSession,
         install_ah_deck: InstallAHDeck,
         qtbot: QtBot,
+        mocker: MockerFixture,
     ):
         entry_point.run()
         with anki_session_with_addon_data.profile_loaded():
+            mocker.patch.object(config, "token")
+
             install_ah_deck(ah_did=ANKING_DECK_ID)
 
             deckbrowser_web: AnkiWebView = aqt.mw.deckBrowser.web
@@ -5526,6 +5532,20 @@ class TestFlashCardSelector:
             qtbot.wait_until(flashcard_selector_opened)
 
             assert FlashCardSelectorDialog.dialog == dialog
+
+    def test_with_no_auth_token(
+        self,
+        anki_session_with_addon_data: AnkiSession,
+        qtbot: QtBot,
+    ):
+        entry_point.run()
+        with anki_session_with_addon_data.profile_loaded():
+            dialog = FlashCardSelectorDialog.display(aqt.mw)
+
+            def auth_failure_was_handled() -> bool:
+                return not dialog and AnkiHubLogin._window.isVisible()
+
+            qtbot.wait_until(auth_failure_was_handled)
 
     def test_with_auth_failing(
         self,

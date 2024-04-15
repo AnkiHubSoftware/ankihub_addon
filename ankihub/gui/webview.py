@@ -29,12 +29,16 @@ class AnkiHubWebViewDialog(QDialog):
     @classmethod
     def display(cls, parent: Any) -> "AnkiHubWebViewDialog":
         """Display the dialog. If the dialog is already open, the existing dialog is activated and shown."""
+        if not config.token():
+            cls._handle_auth_failure()
+            return
+
         if cls.dialog is None:
             cls.dialog = cls(parent)
         else:
             cls.dialog = cast(AnkiHubWebViewDialog, cls.dialog)
-            cls.dialog._load_page()
 
+        cls.dialog._load_page()
         cls.dialog.activateWindow()
         cls.dialog.raise_()
         cls.dialog.show()
@@ -49,8 +53,6 @@ class AnkiHubWebViewDialog(QDialog):
         self.interceptor = AuthenticationRequestInterceptor()
         self.web.page().profile().setUrlRequestInterceptor(self.interceptor)
 
-        self._load_page()
-
         self.layout_ = QVBoxLayout()
         self.layout_.setContentsMargins(0, 0, 0, 0)
         self.layout_.addWidget(self.web)
@@ -62,17 +64,13 @@ class AnkiHubWebViewDialog(QDialog):
         """Return the URL to load in the web view."""
         ...  # pragma: no cover
 
+    @classmethod
     @abstractmethod
-    def _handle_auth_failure(self) -> None:
+    def _handle_auth_failure(cls) -> None:
         """Handle an authentication failure, e.g. prompt the user to log in."""
         ...  # pragma: no cover
 
-    def _load_page(self) -> None:
-        token = config.token()
-        if not token:
-            self._handle_auth_failure()
-            return
-
+    def _load_page(self) -> bool:
         self.web.load_url(self._get_url())
         qconnect(self.web.loadFinished, self._on_web_load_finished)
 
