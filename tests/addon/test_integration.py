@@ -21,6 +21,7 @@ from typing import (
     Set,
     Tuple,
     Union,
+    cast,
 )
 from unittest.mock import Mock
 from zipfile import ZipFile
@@ -42,8 +43,9 @@ from aqt.browser.sidebar.item import SidebarItem
 from aqt.browser.sidebar.tree import SidebarTreeView
 from aqt.gui_hooks import browser_will_show_context_menu
 from aqt.importing import AnkiPackageImporter
-from aqt.qt import QAction, Qt
+from aqt.qt import QAction, Qt, QUrl
 from aqt.theme import theme_manager
+from aqt.webview import AnkiWebView
 from pytest import fixture
 from pytest_anki import AnkiSession
 from pytest_mock import MockerFixture
@@ -85,6 +87,7 @@ from ..fixtures import (
     MockShowDialogWithCB,
     MockStudyDeckDialogWithCB,
     MockSuggestionDialog,
+    SetFeatureFlagState,
     add_basic_anki_note_to_deck,
     create_or_get_ah_version_of_note_type,
     record_review,
@@ -142,6 +145,10 @@ from ankihub.gui.config_dialog import (
     setup_config_dialog_manager,
 )
 from ankihub.gui.deck_updater import _AnkiHubDeckUpdater, ah_deck_updater
+from ankihub.gui.deckbrowser import (
+    FLASHCARD_SELECTOR_BUTTON_ID,
+    FlashCardSelectorDialog,
+)
 from ankihub.gui.decks_dialog import DeckManagementDialog
 from ankihub.gui.editor import SUGGESTION_BTN_ID
 from ankihub.gui.errors import upload_logs_and_data_in_background
@@ -5410,6 +5417,170 @@ class TestConfigDialog:
 
             # Check that opening the dialog does not throw an exception
             qtbot.wait(500)
+
+
+@pytest.mark.sequential
+class TestFlashCardSelector:
+    @pytest.mark.parametrize(
+        "deck_id, feature_flag_active, expected_button_exists",
+        [
+            (ANKING_DECK_ID, True, True),
+            (ANKING_DECK_ID, False, False),
+            (uuid.uuid4(), True, False),
+        ],
+    )
+    def test_flashcard_selector_button_exists_for_anking_deck(
+        self,
+        anki_session_with_addon_data: AnkiSession,
+        install_ah_deck: InstallAHDeck,
+        qtbot: QtBot,
+        deck_id: uuid.UUID,
+        set_feature_flag_state: SetFeatureFlagState,
+        feature_flag_active: bool,
+        expected_button_exists: bool,
+    ):
+        set_feature_flag_state(
+            "show_flashcards_selector_button", is_active=feature_flag_active
+        )
+
+        entry_point.run()
+        with anki_session_with_addon_data.profile_loaded():
+            install_ah_deck(ah_did=deck_id)
+
+            deckbrowser_web: AnkiWebView = aqt.mw.deckBrowser.web
+            aqt.mw.deckBrowser.refresh()
+
+            qtbot.wait(500)
+            with qtbot.wait_callback() as callback:
+                deckbrowser_web.evalWithCallback(
+                    f"document.getElementById('{FLASHCARD_SELECTOR_BUTTON_ID}') !== null",
+                    callback,
+                )
+            callback.assert_called_with(expected_button_exists)
+
+    def test_clicking_button_opens_flashcard_selector_dialog(
+        self,
+        anki_session_with_addon_data: AnkiSession,
+        install_ah_deck: InstallAHDeck,
+        qtbot: QtBot,
+        set_feature_flag_state: SetFeatureFlagState,
+        mocker: MockerFixture,
+    ):
+        set_feature_flag_state("show_flashcards_selector_button")
+
+        entry_point.run()
+        with anki_session_with_addon_data.profile_loaded():
+            mocker.patch.object(config, "token")
+
+            install_ah_deck(ah_did=ANKING_DECK_ID)
+
+            deckbrowser_web: AnkiWebView = aqt.mw.deckBrowser.web
+            aqt.mw.deckBrowser.refresh()
+
+            qtbot.wait(500)
+            deckbrowser_web.eval(
+                f"document.getElementById('{FLASHCARD_SELECTOR_BUTTON_ID}').click()",
+            )
+
+            def flashcard_selector_opened():
+                if FlashCardSelectorDialog.dialog is None:
+                    return False
+
+                dialog: FlashCardSelectorDialog = FlashCardSelectorDialog.dialog
+                return dialog.isVisible()
+
+            qtbot.wait_until(flashcard_selector_opened)
+
+    def test_clicking_button_twice_shows_existing_dialog_again(
+        self,
+        anki_session_with_addon_data: AnkiSession,
+        install_ah_deck: InstallAHDeck,
+        qtbot: QtBot,
+        set_feature_flag_state: SetFeatureFlagState,
+        mocker: MockerFixture,
+    ):
+        set_feature_flag_state("show_flashcards_selector_button")
+
+        entry_point.run()
+        with anki_session_with_addon_data.profile_loaded():
+            mocker.patch.object(config, "token")
+
+            install_ah_deck(ah_did=ANKING_DECK_ID)
+
+            deckbrowser_web: AnkiWebView = aqt.mw.deckBrowser.web
+            aqt.mw.deckBrowser.refresh()
+
+            qtbot.wait(500)
+            deckbrowser_web.eval(
+                f"document.getElementById('{FLASHCARD_SELECTOR_BUTTON_ID}').click()",
+            )
+
+            def flashcard_selector_opened():
+                if FlashCardSelectorDialog.dialog is None:
+                    return False
+
+                dialog: FlashCardSelectorDialog = FlashCardSelectorDialog.dialog
+                return dialog.isVisible()
+
+            qtbot.wait_until(flashcard_selector_opened)
+
+            dialog = cast(FlashCardSelectorDialog, FlashCardSelectorDialog.dialog)
+            dialog.close()
+
+            qtbot.wait_until(lambda: not FlashCardSelectorDialog.dialog.isVisible())
+
+            deckbrowser_web.eval(
+                f"document.getElementById('{FLASHCARD_SELECTOR_BUTTON_ID}').click()",
+            )
+
+            qtbot.wait_until(flashcard_selector_opened)
+
+            assert FlashCardSelectorDialog.dialog == dialog
+
+    def test_with_no_auth_token(
+        self,
+        anki_session_with_addon_data: AnkiSession,
+        qtbot: QtBot,
+    ):
+        entry_point.run()
+        with anki_session_with_addon_data.profile_loaded():
+            dialog = FlashCardSelectorDialog.display(aqt.mw)
+
+            def auth_failure_was_handled() -> bool:
+                return not dialog and AnkiHubLogin._window.isVisible()
+
+            qtbot.wait_until(auth_failure_was_handled)
+
+    def test_with_auth_failing(
+        self,
+        anki_session_with_addon_data: AnkiSession,
+        qtbot: QtBot,
+        mocker: MockerFixture,
+        set_feature_flag_state: SetFeatureFlagState,
+    ):
+        set_feature_flag_state("show_flashcards_selector_button")
+
+        entry_point.run()
+        with anki_session_with_addon_data.profile_loaded():
+            mocker.patch.object(config, "token")
+
+            original_load_url = aqt.webview.AnkiWebView.load_url
+
+            def new_load_url(self, url: QUrl, *args, **kwargs):
+                self = cast(AnkiWebView, self)
+                if "flashcard-selector" in url.toString():
+                    return self.stdHtml(body="Invalid token")
+                else:
+                    return original_load_url(self, url, *args, **kwargs)
+
+            mocker.patch("aqt.webview.AnkiWebView.load_url", new=new_load_url)
+
+            dialog = FlashCardSelectorDialog.display(aqt.mw)
+
+            def auth_failure_was_handled() -> bool:
+                return not dialog.isVisible() and AnkiHubLogin._window.isVisible()
+
+            qtbot.wait_until(auth_failure_was_handled)
 
 
 def test_delete_ankihub_private_config_on_deckBrowser__delete_option(
