@@ -65,7 +65,7 @@ def _js_add_flashcard_selector_button(anki_deck_id: DeckId) -> str:
         if(!document.getElementById("{FLASHCARD_SELECTOR_BUTTON_ID}")) {{
             var button = document.createElement("button");
             button.id = "{FLASHCARD_SELECTOR_BUTTON_ID}";
-            button.innerHTML = "Add flashcards";
+            button.innerHTML = "Select flashcards";
 
             button.addEventListener("click", function() {{
               pycmd("{FLASHCARD_SELECTOR_OPEN_PYCMD}");
