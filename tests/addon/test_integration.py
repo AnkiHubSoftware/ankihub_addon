@@ -5430,8 +5430,8 @@ class TestConfigDialog:
             qtbot.wait(500)
 
 
-@pytest.mark.sequential
 class TestFlashCardSelector:
+    @pytest.mark.sequential
     @pytest.mark.parametrize(
         "deck_id, feature_flag_active, expected_button_exists",
         [
@@ -5469,6 +5469,7 @@ class TestFlashCardSelector:
                 )
             callback.assert_called_with(expected_button_exists)
 
+    @pytest.mark.sequential
     def test_clicking_button_opens_flashcard_selector_dialog(
         self,
         anki_session_with_addon_data: AnkiSession,
@@ -5502,6 +5503,7 @@ class TestFlashCardSelector:
 
             qtbot.wait_until(flashcard_selector_opened)
 
+    @pytest.mark.sequential
     def test_clicking_button_twice_shows_existing_dialog_again(
         self,
         anki_session_with_addon_data: AnkiSession,
@@ -5553,7 +5555,6 @@ class TestFlashCardSelector:
         anki_session_with_addon_data: AnkiSession,
         qtbot: QtBot,
     ):
-        entry_point.run()
         with anki_session_with_addon_data.profile_loaded():
             dialog = FlashCardSelectorDialog.display(aqt.mw)
 
@@ -5562,6 +5563,7 @@ class TestFlashCardSelector:
 
             qtbot.wait_until(auth_failure_was_handled)
 
+    @pytest.mark.sequential
     def test_with_auth_failing(
         self,
         anki_session_with_addon_data: AnkiSession,
