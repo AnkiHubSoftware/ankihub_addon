@@ -945,7 +945,11 @@ class TestDownloadAndInstallDecks:
 
             # Download and install the deck
             with qtbot.wait_callback() as callback:
-                download_and_install_decks([deck.ah_did], on_done=callback)
+                download_and_install_decks(
+                    [deck.ah_did],
+                    on_done=callback,
+                    behavior_on_remote_note_deleted=BehaviorOnRemoteNoteDeleted.NEVER_DELETE,
+                )
 
             # Assert that the deck was installed
             # ... in the Anki database
@@ -1026,7 +1030,11 @@ class TestDownloadAndInstallDecks:
             )
 
             with qtbot.wait_callback() as callback:
-                download_and_install_decks(ankihub_dids=[deck.ah_did], on_done=callback)
+                download_and_install_decks(
+                    ankihub_dids=[deck.ah_did],
+                    on_done=callback,
+                    behavior_on_remote_note_deleted=BehaviorOnRemoteNoteDeleted.NEVER_DELETE,
+                )
 
             future: Future = callback.args[0]
             exception = future.exception()
@@ -1060,7 +1068,11 @@ class TestDownloadAndInstallDecks:
             )
 
             with qtbot.wait_callback() as callback:
-                download_and_install_decks(ankihub_dids=[deck.ah_did], on_done=callback)
+                download_and_install_decks(
+                    ankihub_dids=[deck.ah_did],
+                    on_done=callback,
+                    behavior_on_remote_note_deleted=BehaviorOnRemoteNoteDeleted.NEVER_DELETE,
+                )
 
             future: Future = callback.args[0]
             exception = future.exception()
