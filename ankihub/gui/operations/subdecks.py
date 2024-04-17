@@ -1,14 +1,28 @@
 import uuid
 from concurrent.futures import Future
-from typing import Optional
+from typing import List, Optional
 
 import aqt
+from anki.notes import NoteId
 from aqt import dialogs
 from aqt.browser import Browser
 
 from ...main.subdecks import build_subdecks_and_move_cards_to_them, flatten_deck
 from ...settings import config
 from ..utils import ask_user, tooltip
+
+
+def build_subdecks_and_move_cards_to_them_in_background(
+    ankihub_did: uuid.UUID, nids: Optional[List[NoteId]] = None
+) -> None:
+    aqt.mw.taskman.with_progress(
+        label="Building subdecks and moving cards...",
+        task=lambda: build_subdecks_and_move_cards_to_them(
+            ankihub_did=ankihub_did, nids=nids
+        ),
+        on_done=_on_subdecks_updated,
+    )
+    config.set_subdecks(ankihub_did, True)
 
 
 def confirm_and_toggle_subdecks(ankihub_id: uuid.UUID) -> None:
@@ -48,11 +62,7 @@ def confirm_and_toggle_subdecks(ankihub_id: uuid.UUID) -> None:
         ):
             return
 
-        aqt.mw.taskman.with_progress(
-            label="Building subdecks and moving cards...",
-            task=lambda: build_subdecks_and_move_cards_to_them(ankihub_id),
-            on_done=_on_subdecks_updated,
-        )
+        build_subdecks_and_move_cards_to_them_in_background(ankihub_id)
 
     config.set_subdecks(ankihub_id, not using_subdecks)
 

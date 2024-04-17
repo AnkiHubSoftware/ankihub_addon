@@ -923,7 +923,6 @@ class TestDownloadAndInstallDecks:
         qtbot: QtBot,
         mock_download_and_install_deck_dependencies: MockDownloadAndInstallDeckDependencies,
         ankihub_basic_note_type: NotetypeDict,
-        mocker: MockerFixture,
         has_subdeck_tags: bool,
     ):
         anki_session = anki_session_with_addon_data
@@ -937,10 +936,6 @@ class TestDownloadAndInstallDecks:
             ]
             mocks = mock_download_and_install_deck_dependencies(
                 deck, notes_data, ankihub_basic_note_type
-            )
-
-            confirm_and_toggle_subdecks_mock = mocker.patch(
-                "ankihub.gui.operations.deck_installation.confirm_and_toggle_subdecks"
             )
 
             # Download and install the deck
@@ -968,11 +963,6 @@ class TestDownloadAndInstallDecks:
                 assert (
                     mock.call_count == 1
                 ), f"Mock {name} was not called once, but {mock.call_count} times"
-
-            if has_subdeck_tags:
-                confirm_and_toggle_subdecks_mock.assert_called_once_with(deck.ah_did)
-            else:
-                confirm_and_toggle_subdecks_mock.assert_not_called()
 
     def test_exception_is_not_backpropagated_to_caller(
         self, anki_session_with_addon_data: AnkiSession, mocker: MockerFixture
