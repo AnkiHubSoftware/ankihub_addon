@@ -215,6 +215,7 @@ from ankihub.settings import (
     ankihub_base_path,
     config,
     profile_files_path,
+    url_flashcard_selector,
 )
 
 SAMPLE_MODEL_ID = NotetypeId(1656968697414)
@@ -5591,6 +5592,24 @@ class TestFlashCardSelector:
                 return not dialog.isVisible() and AnkiHubLogin._window.isVisible()
 
             qtbot.wait_until(auth_failure_was_handled)
+
+    def test_view_in_web_browser_button(
+        self,
+        anki_session_with_addon_data: AnkiSession,
+        mocker: MockerFixture,
+    ):
+        with anki_session_with_addon_data.profile_loaded():
+            mocker.patch.object(config, "token")
+
+            dialog = FlashCardSelectorDialog.display(aqt.mw)
+
+            openLink_mock = mocker.patch("ankihub.gui.webview.openLink")
+
+            dialog.view_in_web_browser_button.click()
+
+            openLink_mock.assert_called_once_with(
+                url_flashcard_selector(ANKING_DECK_ID)
+            )
 
 
 def test_delete_ankihub_private_config_on_deckBrowser__delete_option(
