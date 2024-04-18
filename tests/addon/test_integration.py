@@ -5599,6 +5599,7 @@ class TestFlashCardSelector:
         self,
         anki_session_with_addon_data: AnkiSession,
         mocker: MockerFixture,
+        qtbot: QtBot,
     ):
         with anki_session_with_addon_data.profile_loaded():
             mocker.patch.object(config, "token")
@@ -5612,6 +5613,7 @@ class TestFlashCardSelector:
             openLink_mock.assert_called_once_with(
                 url_flashcard_selector(ANKING_DECK_ID)
             )
+            assert not dialog.isVisible()
 
 
 def test_delete_ankihub_private_config_on_deckBrowser__delete_option(

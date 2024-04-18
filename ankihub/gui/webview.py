@@ -66,7 +66,7 @@ class AnkiHubWebViewDialog(QDialog):
         self.view_in_web_browser_button.setAutoDefault(False)
         qconnect(
             self.view_in_web_browser_button.clicked,
-            lambda: openLink(self._get_non_embed_url()),
+            self._on_view_in_web_browser_button_clicked,
         )
 
         self.close_button = QPushButton("Close")
@@ -157,6 +157,10 @@ class AnkiHubWebViewDialog(QDialog):
         """
 
         self.web.eval(css_code)
+
+    def _on_view_in_web_browser_button_clicked(self) -> None:
+        openLink(self._get_non_embed_url())
+        self.close()
 
 
 class AuthenticationRequestInterceptor(QWebEngineUrlRequestInterceptor):
