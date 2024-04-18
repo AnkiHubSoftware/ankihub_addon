@@ -5599,7 +5599,6 @@ class TestFlashCardSelector:
         self,
         anki_session_with_addon_data: AnkiSession,
         mocker: MockerFixture,
-        qtbot: QtBot,
     ):
         with anki_session_with_addon_data.profile_loaded():
             mocker.patch.object(config, "token")
