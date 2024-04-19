@@ -9,6 +9,7 @@ from aqt.qt import (
     QWebEngineUrlRequestInterceptor,
     qconnect,
 )
+from aqt.theme import theme_manager
 from aqt.webview import AnkiWebView
 
 from .. import LOGGER
@@ -71,6 +72,12 @@ class AnkiHubWebViewDialog(QDialog):
         ...  # pragma: no cover
 
     def _load_page(self) -> None:
+
+        if theme_manager.get_night_mode():
+            self.web.eval("localStorage.setItem('theme', 'dark')")
+        else:
+            self.web.eval("localStorage.removeItem('theme')")
+
         self.web.load_url(self._get_url())
         qconnect(self.web.loadFinished, self._on_web_load_finished)
 
