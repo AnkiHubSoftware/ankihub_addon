@@ -80,6 +80,21 @@ def _handle_flashcard_selector_py_commands(
         FlashCardSelectorDialog.display(aqt.mw)
         LOGGER.info("Opened flashcard selector dialog.")
         return (True, None)
+    elif message.startswith("ankihub_flashcard_selector_unsuspend"):
+        # TODO This is a first draft, maybe we don't want to sync here but just unsuspend the cards
+        note_ids = message.split(" ")[1:]
+        print("Note IDs to unsuspend:", note_ids)
+
+        from .operations.ankihub_sync import sync_with_ankihub
+
+        def on_done(future):
+            if future.exception():
+                LOGGER.error(f"Failed to unsuspend flashcards: {future.exception()}")
+            else:
+                LOGGER.info("Unsuspended flashcards.")
+
+        sync_with_ankihub(on_done=on_done)
+        return (True, None)
     else:
         return handled
 
@@ -109,6 +124,28 @@ class FlashCardSelectorDialog(AnkiHubWebViewDialog):
         AnkiHubLogin.display_login()
         LOGGER.info(
             "Prompted user to log in to AnkiHub, after failed authentication in flashcard selector."
+        )
+
+    def _on_successful_page_load(self) -> None:
+        # Setup event listener for unsuspend button to send pycmd to unsuspend flashcards
+        # TODO The select note ids are not accurate, we need to change the embed page server side to
+        # include all relevant note ids
+        self.web.eval(
+            """
+            // Periodically check if the unsuspend button exists on the page and
+            // add a click listener to send a pycmd to unsuspend the selected flashcards when clicked
+            var checkExist = setInterval(function() {
+                var unsuspendButton = document.getElementById("unsuspend-cards-button");
+                if (unsuspendButton && !unsuspendButton.listenerAdded) {
+                    unsuspendButton.addEventListener("click", function() {
+                        let selectedNoteIds = document.getElementById("selected-note-ids").value;
+                        pycmd("ankihub_flashcard_selector_unsuspend " + selectedNoteIds);
+                    });
+                    unsuspendButton.listenerAdded = true;
+                    clearInterval(checkExist);
+                }
+            }, 100);
+            """
         )
 
 
