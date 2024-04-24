@@ -1,14 +1,18 @@
 from abc import abstractmethod
 from typing import Any, Optional, cast
 
+from aqt.gui_hooks import theme_did_change
 from aqt.qt import (
     QColor,
     QDialog,
+    QHBoxLayout,
+    QPushButton,
     QUrl,
     QVBoxLayout,
     QWebEngineUrlRequestInterceptor,
     qconnect,
 )
+from aqt.utils import openLink
 from aqt.webview import AnkiWebView
 
 from .. import LOGGER
@@ -48,20 +52,66 @@ class AnkiHubWebViewDialog(QDialog):
     def _setup_ui(self) -> None:
         self.web = AnkiWebView(parent=self)
         self.web.set_open_links_externally(False)
-        self.web.page().setBackgroundColor(QColor("white"))
 
         self.interceptor = AuthenticationRequestInterceptor()
         self.web.page().profile().setUrlRequestInterceptor(self.interceptor)
+        self.web.page().setBackgroundColor(QColor("white"))
+
+        # Set the background color of the web view back to white when Anki's theme changes it to dark
+        theme_did_change.append(
+            lambda: self.web.page().setBackgroundColor(QColor("white"))
+        )
+
+        self.view_in_web_browser_button = QPushButton("View in web browser")
+        self.view_in_web_browser_button.setAutoDefault(False)
+        qconnect(
+            self.view_in_web_browser_button.clicked,
+            self._on_view_in_web_browser_button_clicked,
+        )
+
+        self.close_button = QPushButton("Close")
+        self.close_button.setAutoDefault(False)
+        qconnect(self.close_button.clicked, self.close)
+
+        self.button_layout = QHBoxLayout()
+        self.button_layout.setContentsMargins(10, 5, 10, 10)
+        self.button_layout.addSpacing(20)
+        self.button_layout.addWidget(self.view_in_web_browser_button)
+        self.button_layout.addStretch()
+        self.button_layout.addWidget(self.close_button)
+        self.button_layout.addSpacing(20)
 
         self.layout_ = QVBoxLayout()
         self.layout_.setContentsMargins(0, 0, 0, 0)
         self.layout_.addWidget(self.web)
+        self.layout_.addLayout(self.button_layout)
 
         self.setLayout(self.layout_)
 
+        # Set the background color of the dialog and buttons to fit the light theme of the web app.
+        # We will always show the light theme version of the embed, so the dialog needs to match.
+        self.setStyleSheet(
+            self.styleSheet()
+            + """
+            QDialog {
+                background-color: white;
+            }
+            QPushButton {
+                color: black;
+                background-color: #fcfcfc;
+                border-color: #ccc;
+            }
+            """
+        )
+
     @abstractmethod
-    def _get_url(self) -> QUrl:
+    def _get_embed_url(self) -> str:
         """Return the URL to load in the web view."""
+        ...  # pragma: no cover
+
+    @abstractmethod
+    def _get_non_embed_url(self) -> str:
+        """Return the URL to load in the default browser."""
         ...  # pragma: no cover
 
     @classmethod
@@ -71,7 +121,7 @@ class AnkiHubWebViewDialog(QDialog):
         ...  # pragma: no cover
 
     def _load_page(self) -> None:
-        self.web.load_url(self._get_url())
+        self.web.load_url(QUrl(self._get_embed_url()))
         qconnect(self.web.loadFinished, self._on_web_load_finished)
 
     def _on_web_load_finished(self, ok: bool) -> None:
@@ -107,6 +157,10 @@ class AnkiHubWebViewDialog(QDialog):
         """
 
         self.web.eval(css_code)
+
+    def _on_view_in_web_browser_button_clicked(self) -> None:
+        openLink(self._get_non_embed_url())
+        self.close()
 
 
 class AuthenticationRequestInterceptor(QWebEngineUrlRequestInterceptor):

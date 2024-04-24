@@ -215,6 +215,7 @@ from ankihub.settings import (
     ankihub_base_path,
     config,
     profile_files_path,
+    url_flashcard_selector,
 )
 
 SAMPLE_MODEL_ID = NotetypeId(1656968697414)
@@ -5431,8 +5432,8 @@ class TestConfigDialog:
             qtbot.wait(500)
 
 
-@pytest.mark.sequential
 class TestFlashCardSelector:
+    @pytest.mark.sequential
     @pytest.mark.parametrize(
         "deck_id, feature_flag_active, expected_button_exists",
         [
@@ -5470,6 +5471,7 @@ class TestFlashCardSelector:
                 )
             callback.assert_called_with(expected_button_exists)
 
+    @pytest.mark.sequential
     def test_clicking_button_opens_flashcard_selector_dialog(
         self,
         anki_session_with_addon_data: AnkiSession,
@@ -5503,6 +5505,7 @@ class TestFlashCardSelector:
 
             qtbot.wait_until(flashcard_selector_opened)
 
+    @pytest.mark.sequential
     def test_clicking_button_twice_shows_existing_dialog_again(
         self,
         anki_session_with_addon_data: AnkiSession,
@@ -5554,7 +5557,6 @@ class TestFlashCardSelector:
         anki_session_with_addon_data: AnkiSession,
         qtbot: QtBot,
     ):
-        entry_point.run()
         with anki_session_with_addon_data.profile_loaded():
             dialog = FlashCardSelectorDialog.display(aqt.mw)
 
@@ -5563,6 +5565,7 @@ class TestFlashCardSelector:
 
             qtbot.wait_until(auth_failure_was_handled)
 
+    @pytest.mark.sequential
     def test_with_auth_failing(
         self,
         anki_session_with_addon_data: AnkiSession,
@@ -5593,6 +5596,25 @@ class TestFlashCardSelector:
                 return not dialog.isVisible() and AnkiHubLogin._window.isVisible()
 
             qtbot.wait_until(auth_failure_was_handled)
+
+    def test_view_in_web_browser_button(
+        self,
+        anki_session_with_addon_data: AnkiSession,
+        mocker: MockerFixture,
+    ):
+        with anki_session_with_addon_data.profile_loaded():
+            mocker.patch.object(config, "token")
+
+            dialog = FlashCardSelectorDialog.display(aqt.mw)
+
+            openLink_mock = mocker.patch("ankihub.gui.webview.openLink")
+
+            dialog.view_in_web_browser_button.click()
+
+            openLink_mock.assert_called_once_with(
+                url_flashcard_selector(ANKING_DECK_ID)
+            )
+            assert not dialog.isVisible()
 
 
 def test_delete_ankihub_private_config_on_deckBrowser__delete_option(
