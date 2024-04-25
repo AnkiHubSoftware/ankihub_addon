@@ -17,6 +17,7 @@ from aqt.webview import AnkiWebView
 
 from .. import LOGGER
 from ..settings import config
+from .utils import using_qt5
 
 
 class AnkiHubWebViewDialog(QDialog):
@@ -179,6 +180,14 @@ class AnkiHubWebViewDialog(QDialog):
                 height: 2px;
             }
         """
+
+        if using_qt5():
+            css += """
+                /* Fix range input styling */
+                input[type="range"]::-webkit-slider-thumb {
+                    margin-top: -7px
+                }
+            """
 
         css_code = f"""
             var style = document.createElement('style');
