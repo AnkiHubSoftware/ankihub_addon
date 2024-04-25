@@ -561,7 +561,7 @@ def deck_download_progress_cb(percent: int) -> None:
 def using_qt5() -> bool:
     try:
         import PyQt5  # noqa F401
-    except ImportError:
-        return False
+    except ImportError:  # pragma: no cover
+        return False  # pragma: no cover
     else:
         return True
