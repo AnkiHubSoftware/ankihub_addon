@@ -142,10 +142,41 @@ class AnkiHubWebViewDialog(QDialog):
         )
 
     def _adjust_web_styling(self) -> None:
-        # Replace focus outline that QtWebEngine uses by default
         css = """
+            /* Replace focus outline that QtWebEngine uses by default */
             :focus {
                 outline: 2px !important;
+            }
+
+            /* Fix checkbox styling */
+            input[type="checkbox"]:checked::before {
+                background-color: initial;
+                transform: initial;
+                clip-path: initial;
+                content: "";
+                position: absolute;
+                left: 5px;
+                top: 1px;
+                width: 5px;
+                height: 10px;
+                border: solid white;
+                border-width: 0 2px 2px 0;
+                -webkit-transform: rotate(45deg);
+                -ms-transform: rotate(45deg);
+                transform: rotate(45deg);
+            }
+            input[type="checkbox"]:indeterminate::before {
+                background-color: initial;
+                transform: initial;
+                clip-path: initial;
+                content: "";
+                position: absolute;
+                top: 50%;
+                left: 50%;
+                transform: translate(-50%, -50%);
+                background-color: #fff;
+                width: 7px;
+                height: 2px;
             }
         """
 
