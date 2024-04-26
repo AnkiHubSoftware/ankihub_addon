@@ -1,11 +1,13 @@
 """Modifies the Anki deck browser (aqt.deckbrowser)."""
 
+from concurrent.futures import Future
 from typing import Any, cast
 
 import aqt
 from anki.decks import DeckId
 from anki.hooks import wrap
 from aqt.gui_hooks import deck_browser_did_render, webview_did_receive_js_message
+from aqt.utils import tooltip
 from aqt.webview import AnkiWebView
 
 from .. import LOGGER
@@ -17,12 +19,16 @@ from ..settings import (
     url_flashcard_selector,
     url_flashcard_selector_embed,
 )
+from .deck_updater import ah_deck_updater
 from .menu import AnkiHubLogin
 from .utils import ask_user
 from .webview import AnkiHubWebViewDialog
 
+FLASHCARD_SELECTOR_OPEN_BUTTON_ID = "ankihub-flashcard-selector-open-button"
 FLASHCARD_SELECTOR_OPEN_PYCMD = "ankihub_flashcard_selector_open"
-FLASHCARD_SELECTOR_BUTTON_ID = "ankihub-flashcard-selector-button"
+
+FLAHSCARD_SELCTOR_UNSUSPEND_FLASHCARDS_BUTTON_ID = "select-flashcards-button"
+FLASHCARD_SELECTOR_SYNC_NOTES_ACTIONS_PYCMD = "ankihub_sync_notes_actions"
 
 
 def setup() -> None:
@@ -62,9 +68,9 @@ def _maybe_add_flashcard_selector_button() -> None:
 
 def _js_add_flashcard_selector_button(anki_deck_id: DeckId) -> str:
     return f"""
-        if(!document.getElementById("{FLASHCARD_SELECTOR_BUTTON_ID}")) {{
+        if(!document.getElementById("{FLASHCARD_SELECTOR_OPEN_BUTTON_ID}")) {{
             var button = document.createElement("button");
-            button.id = "{FLASHCARD_SELECTOR_BUTTON_ID}";
+            button.id = "{FLASHCARD_SELECTOR_OPEN_BUTTON_ID}";
             button.innerHTML = "Select flashcards";
 
             button.addEventListener("click", function() {{
@@ -84,23 +90,26 @@ def _handle_flashcard_selector_py_commands(
         FlashCardSelectorDialog.display(aqt.mw)
         LOGGER.info("Opened flashcard selector dialog.")
         return (True, None)
-    elif message.startswith("ankihub_flashcard_selector_unsuspend"):
-        # TODO This is a first draft, maybe we don't want to sync here but just unsuspend the cards
-        note_ids = message.split(" ")[1:]
-        print("Note IDs to unsuspend:", note_ids)
-
-        from .operations.ankihub_sync import sync_with_ankihub
-
-        def on_done(future):
-            if future.exception():
-                LOGGER.error(f"Failed to unsuspend flashcards: {future.exception()}")
-            else:
-                LOGGER.info("Unsuspended flashcards.")
-
-        sync_with_ankihub(on_done=on_done)
+    elif message == FLASHCARD_SELECTOR_SYNC_NOTES_ACTIONS_PYCMD:
+        aqt.mw.taskman.run_in_background(
+            ah_deck_updater.fetch_and_apply_pending_notes_actions_for_anking_deck,
+            on_done=_on_fetch_and_apply_pending_notes_actions_done,
+        )
         return (True, None)
     else:
         return handled
+
+
+def _on_fetch_and_apply_pending_notes_actions_done(future: Future) -> None:
+    future.result()
+
+    LOGGER.info("Successfully fetched and applied pending notes actions.")
+    tooltip(
+        "Unsuspended flashcards.",
+        parent=(
+            FlashCardSelectorDialog.dialog if FlashCardSelectorDialog.dialog else aqt.mw
+        ),
+    )
 
 
 class FlashCardSelectorDialog(AnkiHubWebViewDialog):
@@ -134,24 +143,41 @@ class FlashCardSelectorDialog(AnkiHubWebViewDialog):
         )
 
     def _on_successful_page_load(self) -> None:
-        # Setup event listener for unsuspend button to send pycmd to unsuspend flashcards
-        # TODO The select note ids are not accurate, we need to change the embed page server side to
-        # include all relevant note ids
         self.web.eval(
-            """
-            // Periodically check if the unsuspend button exists on the page and
-            // add a click listener to send a pycmd to unsuspend the selected flashcards when clicked
-            var checkExist = setInterval(function() {
-                var unsuspendButton = document.getElementById("unsuspend-cards-button");
-                if (unsuspendButton && !unsuspendButton.listenerAdded) {
-                    unsuspendButton.addEventListener("click", function() {
-                        let selectedNoteIds = document.getElementById("selected-note-ids").value;
-                        pycmd("ankihub_flashcard_selector_unsuspend " + selectedNoteIds);
-                    });
-                    unsuspendButton.listenerAdded = true;
-                    clearInterval(checkExist);
-                }
-            }, 100);
+            f"""
+            // Apply modifications to the unsuspend button to notify python to sync notes actions after
+            // the notes action is created when the unsuspend button is clicked.
+            setInterval(function() {{
+                var unsuspendButton = document.getElementById("{FLAHSCARD_SELCTOR_UNSUSPEND_FLASHCARDS_BUTTON_ID}");
+                if (unsuspendButton && !unsuspendButton.appliedModifications) {{
+                    // Notify python to sync notes actions after the notes action is created for
+                    // the selected flashcards.
+                    unsuspendButton.setAttribute("x-on:htmx:after-request", "ankihubHandleUnsuspendNotesResponse")
+                    htmx.process(unsuspendButton);
+
+                    unsuspendButton.appliedModifications = true;
+                    console.log("Added htmx:after-request attribute to unsuspend button.");
+
+                    // Add a hidden input to the form to disable the success notification. We are using a different
+                    // notification with the flashcard selector dialog.
+                    var showNotificationInput = document.createElement("input");
+                    var unsuspendCardsData = document.getElementById("unsuspend-cards-data");
+                    unsuspendCardsData.appendChild(showNotificationInput);
+                    showNotificationInput.outerHTML = `
+                        <input type="hidden" name="show-success-notification" value="false">
+                    `
+                    console.log("Added hidden input to disable success notification.");
+                }}
+            }}, 100);
+
+            window.ankihubHandleUnsuspendNotesResponse = function(event) {{
+                if (event.detail.xhr.status === 201) {{
+                    console.log("Unsuspending notes...");
+                    pycmd("{FLASHCARD_SELECTOR_SYNC_NOTES_ACTIONS_PYCMD}");
+                }} else {{
+                    console.error("Request to creates notes action failed");
+                }}
+            }}
             """
         )
 

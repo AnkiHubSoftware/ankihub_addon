@@ -146,7 +146,7 @@ from ankihub.gui.config_dialog import (
 )
 from ankihub.gui.deck_updater import _AnkiHubDeckUpdater, ah_deck_updater
 from ankihub.gui.deckbrowser import (
-    FLASHCARD_SELECTOR_BUTTON_ID,
+    FLASHCARD_SELECTOR_OPEN_BUTTON_ID,
     FlashCardSelectorDialog,
 )
 from ankihub.gui.decks_dialog import DeckManagementDialog
@@ -5466,7 +5466,7 @@ class TestFlashCardSelector:
             qtbot.wait(500)
             with qtbot.wait_callback() as callback:
                 deckbrowser_web.evalWithCallback(
-                    f"document.getElementById('{FLASHCARD_SELECTOR_BUTTON_ID}') !== null",
+                    f"document.getElementById('{FLASHCARD_SELECTOR_OPEN_BUTTON_ID}') !== null",
                     callback,
                 )
             callback.assert_called_with(expected_button_exists)
@@ -5493,7 +5493,7 @@ class TestFlashCardSelector:
 
             qtbot.wait(500)
             deckbrowser_web.eval(
-                f"document.getElementById('{FLASHCARD_SELECTOR_BUTTON_ID}').click()",
+                f"document.getElementById('{FLASHCARD_SELECTOR_OPEN_BUTTON_ID}').click()",
             )
 
             def flashcard_selector_opened():
@@ -5527,7 +5527,7 @@ class TestFlashCardSelector:
 
             qtbot.wait(500)
             deckbrowser_web.eval(
-                f"document.getElementById('{FLASHCARD_SELECTOR_BUTTON_ID}').click()",
+                f"document.getElementById('{FLASHCARD_SELECTOR_OPEN_BUTTON_ID}').click()",
             )
 
             def flashcard_selector_opened():
@@ -5545,7 +5545,7 @@ class TestFlashCardSelector:
             qtbot.wait_until(lambda: not FlashCardSelectorDialog.dialog.isVisible())
 
             deckbrowser_web.eval(
-                f"document.getElementById('{FLASHCARD_SELECTOR_BUTTON_ID}').click()",
+                f"document.getElementById('{FLASHCARD_SELECTOR_OPEN_BUTTON_ID}').click()",
             )
 
             qtbot.wait_until(flashcard_selector_opened)
