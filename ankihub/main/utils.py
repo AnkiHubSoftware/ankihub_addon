@@ -517,7 +517,7 @@ def _create_backup_anki_50() -> bool:
     return created
 
 
-def truncated_list(values: List[Any], limit: int) -> List[Any]:
+def truncated_list(values: List[Any], limit: int = 10) -> List[Any]:
     assert limit > 0
     return values[:limit] + ["..."] if len(values) > limit else values
 
