@@ -6,13 +6,17 @@ import aqt
 from anki.decks import DeckId
 from anki.hooks import wrap
 from aqt.gui_hooks import deck_browser_did_render, webview_did_receive_js_message
-from aqt.qt import QUrl
 from aqt.webview import AnkiWebView
 
 from .. import LOGGER
 from ..feature_flags import add_feature_flags_update_callback, feature_flags
 from ..main.deck_unsubscribtion import unsubscribe_from_deck_and_uninstall
-from ..settings import ANKING_DECK_ID, config, url_flashcard_selector_embed
+from ..settings import (
+    ANKING_DECK_ID,
+    config,
+    url_flashcard_selector,
+    url_flashcard_selector_embed,
+)
 from .menu import AnkiHubLogin
 from .utils import ask_user
 from .webview import AnkiHubWebViewDialog
@@ -61,7 +65,7 @@ def _js_add_flashcard_selector_button(anki_deck_id: DeckId) -> str:
         if(!document.getElementById("{FLASHCARD_SELECTOR_BUTTON_ID}")) {{
             var button = document.createElement("button");
             button.id = "{FLASHCARD_SELECTOR_BUTTON_ID}";
-            button.innerHTML = "Add flashcards";
+            button.innerHTML = "Select flashcards";
 
             button.addEventListener("click", function() {{
               pycmd("{FLASHCARD_SELECTOR_OPEN_PYCMD}");
@@ -110,8 +114,11 @@ class FlashCardSelectorDialog(AnkiHubWebViewDialog):
 
         super()._setup_ui()
 
-    def _get_url(self) -> QUrl:
-        return QUrl(url_flashcard_selector_embed(ANKING_DECK_ID))
+    def _get_embed_url(self) -> str:
+        return url_flashcard_selector_embed(ANKING_DECK_ID)
+
+    def _get_non_embed_url(self) -> str:
+        return url_flashcard_selector(ANKING_DECK_ID)
 
     @classmethod
     def _handle_auth_failure(cls) -> None:
