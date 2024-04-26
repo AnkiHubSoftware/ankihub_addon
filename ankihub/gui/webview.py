@@ -121,7 +121,7 @@ class AnkiHubWebViewDialog(QDialog):
         ...  # pragma: no cover
 
     def _on_successful_page_load(self) -> None:
-        pass
+        ...  # pragma: no cover
 
     def _load_page(self) -> None:
         self.web.load_url(QUrl(self._get_embed_url()))
