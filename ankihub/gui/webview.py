@@ -121,6 +121,9 @@ class AnkiHubWebViewDialog(QDialog):
         """Handle an authentication failure, e.g. prompt the user to log in."""
         ...  # pragma: no cover
 
+    def _on_successful_page_load(self) -> None:
+        ...  # pragma: no cover
+
     def _load_page(self) -> None:
         self.web.load_url(QUrl(self._get_embed_url()))
         qconnect(self.web.loadFinished, self._on_web_load_finished)
@@ -132,6 +135,7 @@ class AnkiHubWebViewDialog(QDialog):
 
         self._handle_auth_failure_if_needed()
         self._adjust_web_styling()
+        self._on_successful_page_load()
 
     def _handle_auth_failure_if_needed(self) -> None:
         def check_auth_failure_callback(value: str) -> None:

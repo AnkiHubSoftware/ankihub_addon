@@ -22,7 +22,7 @@ from ..db.models import AnkiHubNote
 from ..main.importing import AnkiHubImporter, AnkiHubImportResult
 from ..main.note_conversion import is_tag_for_group
 from ..main.note_types import fetch_note_types_based_on_notes
-from ..main.utils import create_backup
+from ..main.utils import create_backup, truncated_list
 from ..settings import ANKING_DECK_ID, config
 from .media_sync import media_sync
 from .utils import deck_download_progress_cb, show_error_dialog
@@ -103,7 +103,7 @@ class _AnkiHubDeckUpdater:
             return False
 
         if ankihub_did == ANKING_DECK_ID:
-            self._fetch_and_apply_pending_notes_actions(ankihub_did)
+            self.fetch_and_apply_pending_notes_actions_for_deck(ankihub_did)
 
         return True
 
@@ -152,7 +152,9 @@ class _AnkiHubDeckUpdater:
             LOGGER.info(f"No new updates for {ankihub_did=}")
         return True
 
-    def _fetch_and_apply_pending_notes_actions(self, ankihub_did: uuid.UUID) -> None:
+    def fetch_and_apply_pending_notes_actions_for_deck(
+        self, ankihub_did: uuid.UUID
+    ) -> None:
         pending_notes_actions = self._client.get_pending_notes_actions_for_deck(
             ankihub_did
         )
@@ -185,11 +187,13 @@ class _AnkiHubDeckUpdater:
         )
 
         def on_success(_) -> None:
-            LOGGER.info(f"Unsuspended {len(anki_cids)} cards for note ids: {ah_nids}")
+            LOGGER.info(
+                f"Unsuspended {len(anki_cids)} cards for note ids: {truncated_list(ah_nids)}"
+            )
 
         def on_failure(exception: Exception) -> None:
             LOGGER.exception(  # pragma: no cover
-                f"Failed to unsuspend cards for {ah_nids}: {exception}"
+                f"Failed to unsuspend cards for {truncated_list(ah_nids)}: {exception}"
             )
 
         aqt.mw.taskman.run_on_main(
