@@ -72,10 +72,6 @@ class _AnkiHubDeckUpdater:
         if the last update process failed."""
         return self._import_results
 
-    def fetch_and_apply_pending_notes_actions_for_anking_deck(self) -> None:
-        """Fetches and applies pending notes actions for the Anking deck."""
-        self._fetch_and_apply_pending_notes_actions(ANKING_DECK_ID)
-
     def _update_decks(self, ah_dids: Collection[uuid.UUID]) -> None:
         """Fetches and applies updates for the given decks and their extensions."""
         LOGGER.info(f"Updating decks for {ah_dids=}...")
@@ -107,7 +103,7 @@ class _AnkiHubDeckUpdater:
             return False
 
         if ankihub_did == ANKING_DECK_ID:
-            self._fetch_and_apply_pending_notes_actions(ankihub_did)
+            self.fetch_and_apply_pending_notes_actions_for_deck(ankihub_did)
 
         return True
 
@@ -156,7 +152,9 @@ class _AnkiHubDeckUpdater:
             LOGGER.info(f"No new updates for {ankihub_did=}")
         return True
 
-    def _fetch_and_apply_pending_notes_actions(self, ankihub_did: uuid.UUID) -> None:
+    def fetch_and_apply_pending_notes_actions_for_deck(
+        self, ankihub_did: uuid.UUID
+    ) -> None:
         pending_notes_actions = self._client.get_pending_notes_actions_for_deck(
             ankihub_did
         )
