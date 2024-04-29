@@ -1,6 +1,7 @@
 """Modifies the Anki deck browser (aqt.deckbrowser)."""
 
 from concurrent.futures import Future
+from pathlib import Path
 from typing import Any, cast
 from uuid import UUID
 
@@ -10,6 +11,7 @@ from anki.hooks import wrap
 from aqt.gui_hooks import deck_browser_did_render, webview_did_receive_js_message
 from aqt.utils import tooltip
 from aqt.webview import AnkiWebView
+from jinja2 import Template
 
 from .. import LOGGER
 from ..feature_flags import add_feature_flags_update_callback, feature_flags
@@ -25,10 +27,13 @@ from .menu import AnkiHubLogin
 from .utils import ask_user
 from .webview import AnkiHubWebViewDialog
 
+FLASHCARD_SELECTOR_MODIFICATIONS_JS_PATH = (
+    Path(__file__).parent / "js/setup_flashcard_selector_modifications.js"
+)
 FLASHCARD_SELECTOR_OPEN_BUTTON_ID = "ankihub-flashcard-selector-open-button"
 FLASHCARD_SELECTOR_OPEN_PYCMD = "ankihub_flashcard_selector_open"
 
-FLASHCARD_SELCTOR_UNSUSPEND_FLASHCARDS_BUTTON_ID_PREFIX = "select-flashcards-button"
+FLASHCARD_SELCTOR_UNSUSPEND_BUTTON_ID_PREFIX = "select-flashcards-button"
 FLASHCARD_SELECTOR_FORM_DATA_DIV_ID_PREFIX = "unsuspend-cards-data"
 FLASHCARD_SELECTOR_SYNC_NOTES_ACTIONS_PYCMD = "ankihub_sync_notes_actions"
 
@@ -148,58 +153,15 @@ class FlashCardSelectorDialog(AnkiHubWebViewDialog):
         )
 
     def _on_successful_page_load(self) -> None:
-        self.web.eval(
-            f"""
-            setInterval(function() {{
-                // Notify python to sync notes actions after the notes action is created for
-                // the selected flashcards.
-                const unsuspendButtons = document.querySelectorAll(
-                    '[id^="{FLASHCARD_SELCTOR_UNSUSPEND_FLASHCARDS_BUTTON_ID_PREFIX}"]'
-                );
-                for (const unsuspendButton of unsuspendButtons) {{
-                    if (unsuspendButton && !unsuspendButton.appliedModifications) {{
-                        unsuspendButton.setAttribute("x-on:htmx:after-request", "ankihubHandleUnsuspendNotesResponse")
-                        htmx.process(unsuspendButton);
-
-                        unsuspendButton.appliedModifications = true;
-                        console.log("Added htmx:after-request attribute to unsuspend button.");
-
-                    }}
-                }}
-
-                // Add a hidden input to the form to disable the success notification. We are using a different
-                // notification with the flashcard selector dialog.
-                const unsuspendCardsDataDivs = document.querySelectorAll(
-                    '[id^="{FLASHCARD_SELECTOR_FORM_DATA_DIV_ID_PREFIX}"]'
-                );
-                for (const unsuspendCardDataDiv of unsuspendCardsDataDivs) {{
-                    if (unsuspendCardDataDiv && !unsuspendCardDataDiv.appliedModifications) {{
-                        const showNotificationInput = document.createElement("input");
-                        unsuspendCardDataDiv.appendChild(showNotificationInput);
-                        showNotificationInput.outerHTML = `
-                            <input type="hidden" name="show-success-notification" value="false">
-                        `
-                        unsuspendCardDataDiv.appliedModifications = true;
-                        console.log("Added hidden input to disable success notification.");
-                    }}
-                }}
-            }}, 100);
-
-            window.ankihubHandleUnsuspendNotesResponse = function(event) {{
-                if (event.detail.xhr.status === 201) {{
-                    // Extract deck id from the url of the page
-                    const uuidRegex = /[0-9a-f]{{8}}-[0-9a-f]{{4}}-[0-9a-f]{{4}}-[0-9a-f]{{4}}-[0-9a-f]{{12}}/;
-                    const deckId = uuidRegex.exec(window.location.href)[0];
-
-                    // Notify python to sync notes actions for the deck
-                    console.log(`Unsuspending notes for deckId=${{deckId}}`);
-                    pycmd(`{FLASHCARD_SELECTOR_SYNC_NOTES_ACTIONS_PYCMD} ${{deckId}}`);
-                }} else {{
-                    console.error("Request to creates notes action failed");
-                }}
-            }}
-            """
+        template_vars = {
+            "FLASHCARD_SELCTOR_UNSUSPEND_BUTTON_ID_PREFIX": FLASHCARD_SELCTOR_UNSUSPEND_BUTTON_ID_PREFIX,
+            "FLASHCARD_SELECTOR_FORM_DATA_DIV_ID_PREFIX": FLASHCARD_SELECTOR_FORM_DATA_DIV_ID_PREFIX,
+            "FLASHCARD_SELECTOR_SYNC_NOTES_ACTIONS_PYCMD": FLASHCARD_SELECTOR_SYNC_NOTES_ACTIONS_PYCMD,
+        }
+        js = Template(FLASHCARD_SELECTOR_MODIFICATIONS_JS_PATH.read_text()).render(
+            template_vars
         )
+        self.web.eval(js)
 
 
 def _setup_deck_delete_hook() -> None:
