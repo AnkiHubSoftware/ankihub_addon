@@ -5616,11 +5616,9 @@ class TestFlashCardSelector:
         with anki_session_with_addon_data.profile_loaded():
             mocker.patch.object(config, "token")
 
-            fetch_and_apply_pending_notes_actions_for_anking_deck_mock = (
-                mocker.patch.object(
-                    ah_deck_updater,
-                    "fetch_and_apply_pending_notes_actions_for_anking_deck",
-                )
+            fetch_and_apply_pending_notes_actions_for_deck = mocker.patch.object(
+                ah_deck_updater,
+                "fetch_and_apply_pending_notes_actions_for_deck",
             )
 
             # Mock the page so that it's loaded and we can run javascript on it
@@ -5628,10 +5626,12 @@ class TestFlashCardSelector:
 
             dialog = FlashCardSelectorDialog.display(aqt.mw)
 
-            dialog.web.eval(f"pycmd('{FLASHCARD_SELECTOR_SYNC_NOTES_ACTIONS_PYCMD}')")
+            dialog.web.eval(
+                f"pycmd('{FLASHCARD_SELECTOR_SYNC_NOTES_ACTIONS_PYCMD} {uuid.uuid4()}')"
+            )
 
             qtbot.wait_until(
-                lambda: fetch_and_apply_pending_notes_actions_for_anking_deck_mock.called
+                lambda: fetch_and_apply_pending_notes_actions_for_deck.called
             )
 
     def _mock_load_url_to_show_page(self, mocker: MockerFixture, body: str):
