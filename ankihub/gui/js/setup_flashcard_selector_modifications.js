@@ -14,23 +14,6 @@ setInterval(function () {
 
         }
     }
-
-    // Add a hidden input to the form to disable the success notification. We are using a different
-    // notification with the flashcard selector dialog.
-    const unsuspendCardsDataDivs = document.querySelectorAll(
-        '[id$="{{ FLASHCARD_SELECTOR_FORM_DATA_DIV_ID_SUFFIX }}"]'
-    );
-    for (const unsuspendCardDataDiv of unsuspendCardsDataDivs) {
-        if (unsuspendCardDataDiv && !unsuspendCardDataDiv.appliedModifications) {
-            const showNotificationInput = document.createElement("input");
-            unsuspendCardDataDiv.appendChild(showNotificationInput);
-            showNotificationInput.outerHTML = `
-                <input type="hidden" name="show-success-notification" value="false">
-            `
-            unsuspendCardDataDiv.appliedModifications = true;
-            console.log("Added hidden input to disable success notification.");
-        }
-    }
 }, 100);
 
 window.ankihubHandleUnsuspendNotesResponse = function (event) {
