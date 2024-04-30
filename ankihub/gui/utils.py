@@ -5,6 +5,7 @@ from typing import Any, Callable, Dict, List, Optional, Sequence, Tuple, Union
 
 import aqt
 from aqt.addons import check_and_prompt_for_updates
+from aqt.progress import ProgressDialog
 from aqt.qt import (
     QApplication,
     QDialog,
@@ -68,7 +69,7 @@ def choose_subset(
     parent: Any = None,
 ) -> Optional[List[str]]:
     if not parent:
-        parent = aqt.mw.app.activeWindow()
+        parent = active_window_or_mw()
 
     dialog = QDialog(parent)
     disable_help_button(dialog)
@@ -168,7 +169,7 @@ def choose_list(
 ) -> Optional[int]:
     # adapted from aqt.utils.chooseList
     if not parent:
-        parent = aqt.mw.app.activeWindow()
+        parent = active_window_or_mw()
     d = QDialog(parent)
     disable_help_button(d)
     d.setWindowModality(Qt.WindowModality.WindowModal)
@@ -380,7 +381,7 @@ def show_dialog(
     """Show a dialog with the given text and buttons.
     The callback is called with the index of the clicked button."""
     if not parent:
-        parent = aqt.mw.app.activeWindow() or aqt.mw
+        parent = active_window_or_mw()
 
     dialog = _Dialog(
         parent=parent,
@@ -421,7 +422,7 @@ def ask_user(
         buttons = [yes_button, no_button]
 
     if not parent:
-        parent = aqt.mw.app.activeWindow()
+        parent = active_window_or_mw()
 
     dialog = _Dialog(
         parent=parent,
@@ -565,3 +566,19 @@ def using_qt5() -> bool:
         return True
     else:
         return False  # pragma: no cover
+
+
+def active_window_or_mw() -> QWidget:
+    """The purpose of this function is to get a suitable parent widget for a dialog.
+    By default it returns the active window.
+    If there is no active window or if the active window is a ProgressDialog, it returns
+    the main window (aqt.mw) instead.
+
+    We don't want to use ProgressDialog as the parent because it will typically be closed shortly after
+    the dialog is opened, which will cause the dialog to be closed as well.
+    """
+    active_window = aqt.mw.app.activeWindow()
+    if isinstance(active_window, ProgressDialog) or active_window is None:
+        return aqt.mw
+    else:
+        return active_window
