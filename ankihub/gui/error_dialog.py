@@ -4,7 +4,6 @@ from traceback import format_exception
 from typing import Optional
 from urllib.parse import quote
 
-import aqt
 from aqt import utils
 from aqt.qt import (
     QDialog,
@@ -20,6 +19,8 @@ from aqt.qt import (
     qconnect,
 )
 
+from .utils import active_window_or_mw
+
 
 class ErrorDialog(QDialog):
     """Error dialog for errors related to the AnkiHub add-on."""
@@ -27,7 +28,7 @@ class ErrorDialog(QDialog):
     def __init__(
         self, exception: BaseException, sentry_event_id: Optional[str], parent=None
     ):
-        super().__init__(parent or aqt.mw.app.activeWindow() or aqt.mw)
+        super().__init__(parent or active_window_or_mw())
         self.setWindowTitle("AnkiHub add-on error")
         self.setMinimumHeight(400)
         self.setMinimumWidth(500)

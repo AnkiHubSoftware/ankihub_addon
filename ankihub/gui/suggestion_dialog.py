@@ -46,7 +46,12 @@ from ..main.suggestions import (
 )
 from ..settings import ANKING_DECK_ID, RATIONALE_FOR_CHANGE_MAX_LENGTH, config
 from .media_sync import media_sync
-from .utils import choose_ankihub_deck, show_error_dialog, show_tooltip
+from .utils import (
+    active_window_or_mw,
+    choose_ankihub_deck,
+    show_error_dialog,
+    show_tooltip,
+)
 
 
 class SourceType(Enum):
@@ -353,7 +358,7 @@ class SuggestionDialog(QDialog):
         parent: Optional[QWidget] = None,
     ) -> None:
         if parent is None:
-            parent = aqt.mw.app.activeWindow() or aqt.mw
+            parent = active_window_or_mw()
 
         super().__init__(parent)
         self._is_new_note_suggestion = is_new_note_suggestion
