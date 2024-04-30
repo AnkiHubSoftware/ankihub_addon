@@ -1,12 +1,17 @@
 """Modifies the Anki deck browser (aqt.deckbrowser)."""
 
+from concurrent.futures import Future
+from pathlib import Path
 from typing import Any, cast
+from uuid import UUID
 
 import aqt
 from anki.decks import DeckId
 from anki.hooks import wrap
 from aqt.gui_hooks import deck_browser_did_render, webview_did_receive_js_message
+from aqt.utils import tooltip
 from aqt.webview import AnkiWebView
+from jinja2 import Template
 
 from .. import LOGGER
 from ..feature_flags import add_feature_flags_update_callback, feature_flags
@@ -17,12 +22,20 @@ from ..settings import (
     url_flashcard_selector,
     url_flashcard_selector_embed,
 )
+from .deck_updater import ah_deck_updater
 from .menu import AnkiHubLogin
 from .utils import ask_user
 from .webview import AnkiHubWebViewDialog
 
+FLASHCARD_SELECTOR_MODIFICATIONS_JS_PATH = (
+    Path(__file__).parent / "js/setup_flashcard_selector_modifications.js"
+)
+FLASHCARD_SELECTOR_OPEN_BUTTON_ID = "ankihub-flashcard-selector-open-button"
 FLASHCARD_SELECTOR_OPEN_PYCMD = "ankihub_flashcard_selector_open"
-FLASHCARD_SELECTOR_BUTTON_ID = "ankihub-flashcard-selector-button"
+
+FLASHCARD_SELCTOR_UNSUSPEND_BUTTON_ID_SUFFIX = "select-flashcards-button"
+FLASHCARD_SELECTOR_FORM_DATA_DIV_ID_SUFFIX = "unsuspend-cards-data"
+FLASHCARD_SELECTOR_SYNC_NOTES_ACTIONS_PYCMD = "ankihub_sync_notes_actions"
 
 
 def setup() -> None:
@@ -62,9 +75,9 @@ def _maybe_add_flashcard_selector_button() -> None:
 
 def _js_add_flashcard_selector_button(anki_deck_id: DeckId) -> str:
     return f"""
-        if(!document.getElementById("{FLASHCARD_SELECTOR_BUTTON_ID}")) {{
+        if(!document.getElementById("{FLASHCARD_SELECTOR_OPEN_BUTTON_ID}")) {{
             var button = document.createElement("button");
-            button.id = "{FLASHCARD_SELECTOR_BUTTON_ID}";
+            button.id = "{FLASHCARD_SELECTOR_OPEN_BUTTON_ID}";
             button.innerHTML = "Select flashcards";
 
             button.addEventListener("click", function() {{
@@ -84,8 +97,29 @@ def _handle_flashcard_selector_py_commands(
         FlashCardSelectorDialog.display(aqt.mw)
         LOGGER.info("Opened flashcard selector dialog.")
         return (True, None)
+    elif message.startswith(FLASHCARD_SELECTOR_SYNC_NOTES_ACTIONS_PYCMD):
+        _, ah_did_str = message.split(" ")
+        aqt.mw.taskman.run_in_background(
+            lambda: ah_deck_updater.fetch_and_apply_pending_notes_actions_for_deck(
+                UUID(ah_did_str)
+            ),
+            on_done=_on_fetch_and_apply_pending_notes_actions_done,
+        )
+        return (True, None)
     else:
         return handled
+
+
+def _on_fetch_and_apply_pending_notes_actions_done(future: Future) -> None:
+    future.result()
+
+    LOGGER.info("Successfully fetched and applied pending notes actions.")
+    tooltip(
+        "Unsuspended flashcards.",
+        parent=(
+            FlashCardSelectorDialog.dialog if FlashCardSelectorDialog.dialog else aqt.mw
+        ),
+    )
 
 
 class FlashCardSelectorDialog(AnkiHubWebViewDialog):
@@ -94,8 +128,7 @@ class FlashCardSelectorDialog(AnkiHubWebViewDialog):
 
     def _setup_ui(self) -> None:
         self.setWindowTitle("AnkiHub | Flashcard Selector")
-        self.setMinimumHeight(800)
-        self.setMinimumWidth(900)
+        self.resize(1000, 800)
 
         super()._setup_ui()
 
@@ -117,6 +150,17 @@ class FlashCardSelectorDialog(AnkiHubWebViewDialog):
         LOGGER.info(
             "Prompted user to log in to AnkiHub, after failed authentication in flashcard selector."
         )
+
+    def _on_successful_page_load(self) -> None:
+        template_vars = {
+            "FLASHCARD_SELCTOR_UNSUSPEND_BUTTON_ID_SUFFIX": FLASHCARD_SELCTOR_UNSUSPEND_BUTTON_ID_SUFFIX,
+            "FLASHCARD_SELECTOR_FORM_DATA_DIV_ID_SUFFIX": FLASHCARD_SELECTOR_FORM_DATA_DIV_ID_SUFFIX,
+            "FLASHCARD_SELECTOR_SYNC_NOTES_ACTIONS_PYCMD": FLASHCARD_SELECTOR_SYNC_NOTES_ACTIONS_PYCMD,
+        }
+        js = Template(FLASHCARD_SELECTOR_MODIFICATIONS_JS_PATH.read_text()).render(
+            template_vars
+        )
+        self.web.eval(js)
 
 
 def _setup_deck_delete_hook() -> None:

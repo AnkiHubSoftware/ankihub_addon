@@ -146,7 +146,8 @@ from ankihub.gui.config_dialog import (
 )
 from ankihub.gui.deck_updater import _AnkiHubDeckUpdater, ah_deck_updater
 from ankihub.gui.deckbrowser import (
-    FLASHCARD_SELECTOR_BUTTON_ID,
+    FLASHCARD_SELECTOR_OPEN_BUTTON_ID,
+    FLASHCARD_SELECTOR_SYNC_NOTES_ACTIONS_PYCMD,
     FlashCardSelectorDialog,
 )
 from ankihub.gui.decks_dialog import DeckManagementDialog
@@ -5466,7 +5467,7 @@ class TestFlashCardSelector:
             qtbot.wait(500)
             with qtbot.wait_callback() as callback:
                 deckbrowser_web.evalWithCallback(
-                    f"document.getElementById('{FLASHCARD_SELECTOR_BUTTON_ID}') !== null",
+                    f"document.getElementById('{FLASHCARD_SELECTOR_OPEN_BUTTON_ID}') !== null",
                     callback,
                 )
             callback.assert_called_with(expected_button_exists)
@@ -5493,7 +5494,7 @@ class TestFlashCardSelector:
 
             qtbot.wait(500)
             deckbrowser_web.eval(
-                f"document.getElementById('{FLASHCARD_SELECTOR_BUTTON_ID}').click()",
+                f"document.getElementById('{FLASHCARD_SELECTOR_OPEN_BUTTON_ID}').click()",
             )
 
             def flashcard_selector_opened():
@@ -5527,7 +5528,7 @@ class TestFlashCardSelector:
 
             qtbot.wait(500)
             deckbrowser_web.eval(
-                f"document.getElementById('{FLASHCARD_SELECTOR_BUTTON_ID}').click()",
+                f"document.getElementById('{FLASHCARD_SELECTOR_OPEN_BUTTON_ID}').click()",
             )
 
             def flashcard_selector_opened():
@@ -5545,7 +5546,7 @@ class TestFlashCardSelector:
             qtbot.wait_until(lambda: not FlashCardSelectorDialog.dialog.isVisible())
 
             deckbrowser_web.eval(
-                f"document.getElementById('{FLASHCARD_SELECTOR_BUTTON_ID}').click()",
+                f"document.getElementById('{FLASHCARD_SELECTOR_OPEN_BUTTON_ID}').click()",
             )
 
             qtbot.wait_until(flashcard_selector_opened)
@@ -5571,24 +5572,12 @@ class TestFlashCardSelector:
         anki_session_with_addon_data: AnkiSession,
         qtbot: QtBot,
         mocker: MockerFixture,
-        set_feature_flag_state: SetFeatureFlagState,
     ):
-        set_feature_flag_state("show_flashcards_selector_button")
-
         entry_point.run()
         with anki_session_with_addon_data.profile_loaded():
             mocker.patch.object(config, "token")
 
-            original_load_url = aqt.webview.AnkiWebView.load_url
-
-            def new_load_url(self, url: QUrl, *args, **kwargs):
-                self = cast(AnkiWebView, self)
-                if "flashcard-selector" in url.toString():
-                    return self.stdHtml(body="Invalid token")
-                else:
-                    return original_load_url(self, url, *args, **kwargs)
-
-            mocker.patch("aqt.webview.AnkiWebView.load_url", new=new_load_url)
+            self._mock_load_url_to_show_page(mocker, body="Invalid token")
 
             dialog = FlashCardSelectorDialog.display(aqt.mw)
 
@@ -5615,6 +5604,49 @@ class TestFlashCardSelector:
                 url_flashcard_selector(ANKING_DECK_ID)
             )
             assert not dialog.isVisible()
+
+    @pytest.mark.sequential
+    def test_sync_notes_actions(
+        self,
+        anki_session_with_addon_data: AnkiSession,
+        qtbot: QtBot,
+        mocker: MockerFixture,
+    ):
+        entry_point.run()
+        with anki_session_with_addon_data.profile_loaded():
+            mocker.patch.object(config, "token")
+
+            fetch_and_apply_pending_notes_actions_for_deck = mocker.patch.object(
+                ah_deck_updater,
+                "fetch_and_apply_pending_notes_actions_for_deck",
+            )
+
+            # Mock the page so that it's loaded and we can run javascript on it
+            self._mock_load_url_to_show_page(mocker, body="")
+
+            dialog = FlashCardSelectorDialog.display(aqt.mw)
+
+            dialog.web.eval(
+                f"pycmd('{FLASHCARD_SELECTOR_SYNC_NOTES_ACTIONS_PYCMD} {uuid.uuid4()}')"
+            )
+
+            qtbot.wait_until(
+                lambda: fetch_and_apply_pending_notes_actions_for_deck.called
+            )
+
+    def _mock_load_url_to_show_page(self, mocker: MockerFixture, body: str):
+        original_load_url = aqt.webview.AnkiWebView.load_url
+
+        def new_load_url(self, url: QUrl, *args, **kwargs):
+            self = cast(AnkiWebView, self)
+            # Check if the URL is the flashcard selector page.
+            # This is necessary, because stdHtml relies on other load_url calls to load the page.
+            if "flashcard-selector" in url.toString():
+                return self.stdHtml(body)
+            else:
+                return original_load_url(self, url, *args, **kwargs)
+
+        mocker.patch("aqt.webview.AnkiWebView.load_url", new=new_load_url)
 
 
 def test_delete_ankihub_private_config_on_deckBrowser__delete_option(
