@@ -1,9 +1,11 @@
 from concurrent.futures import Future
 from functools import partial
-from typing import Callable, List
+from typing import Callable, List, Optional
 
 import aqt
 from anki.collection import OpChangesWithCount
+from anki.sync import SyncOutput
+from aqt.sync import sync_collection
 
 from ... import LOGGER
 from ...addon_ankihub_client import AddonAnkiHubClient as AnkiHubClient
@@ -12,14 +14,60 @@ from ...main.deck_unsubscribtion import uninstall_deck
 from ...main.review_data import send_review_data
 from ...settings import config
 from ..deck_updater import ah_deck_updater, show_tooltip_about_last_deck_updates_results
+from ..exceptions import FullSyncCancelled
 from .db_check import maybe_check_databases
 from .new_deck_subscriptions import check_and_install_new_deck_subscriptions
 from .utils import future_with_exception, future_with_result
 
 
+def ankiweb_sync_status() -> Optional[SyncOutput]:
+    if auth := aqt.mw.pm.sync_auth():
+        sync_status = aqt.mw.col.sync_status(auth)
+        return sync_status
+    return None
+
+
 def sync_with_ankihub(on_done: Callable[[Future], None]) -> None:
     """Uninstall decks the user is not subscribed to anymore, check for (and maybe install) new deck subscriptions,
-    then download updates to decks."""
+    then download updates to decks.
+
+    If a full AnkiWeb sync is already required, sync with AnkiWeb first.
+    """
+
+    def after_ankiweb_sync() -> None:
+        # Stop here if user cancelled full sync
+        sync_status = ankiweb_sync_status()
+        if sync_status and sync_status.required == sync_status.FULL_SYNC:
+            on_done(future_with_exception(FullSyncCancelled()))
+            return
+
+        try:
+            client = AnkiHubClient()
+            subscribed_decks = client.get_deck_subscriptions()
+
+            _uninstall_decks_the_user_is_not_longer_subscribed_to(
+                subscribed_decks=subscribed_decks
+            )
+            check_and_install_new_deck_subscriptions(
+                subscribed_decks=subscribed_decks,
+                on_done=lambda future: on_new_deck_subscriptions_done(
+                    future=future, subscribed_decks=subscribed_decks
+                ),
+            )
+        except Exception as e:
+            # Using run_on_main prevents exceptions which occur in the callback to be backpropagated to the caller,
+            # which is what we want.
+            aqt.mw.taskman.run_on_main(partial(on_done, future_with_exception(e)))
+
+    def on_collection_sync_finished() -> None:
+        aqt.gui_hooks.sync_did_finish()
+        after_ankiweb_sync()
+
+    sync_status = ankiweb_sync_status()
+    if sync_status and sync_status.required == sync_status.FULL_SYNC:
+        sync_collection(aqt.mw, on_done=on_collection_sync_finished)
+    else:
+        after_ankiweb_sync()
 
     def on_new_deck_subscriptions_done(
         future: Future, subscribed_decks: List[Deck]
@@ -56,24 +104,6 @@ def sync_with_ankihub(on_done: Callable[[Future], None]) -> None:
         )
 
         on_done(future_with_result(None))
-
-    try:
-        client = AnkiHubClient()
-        subscribed_decks = client.get_deck_subscriptions()
-
-        _uninstall_decks_the_user_is_not_longer_subscribed_to(
-            subscribed_decks=subscribed_decks
-        )
-        check_and_install_new_deck_subscriptions(
-            subscribed_decks=subscribed_decks,
-            on_done=lambda future: on_new_deck_subscriptions_done(
-                future=future, subscribed_decks=subscribed_decks
-            ),
-        )
-    except Exception as e:
-        # Using run_on_main prevents exceptions which occur in the callback to be backpropagated to the caller,
-        # which is what we want.
-        aqt.mw.taskman.run_on_main(partial(on_done, future_with_exception(e)))
 
 
 def _on_clear_unused_tags_done(future: Future) -> None:

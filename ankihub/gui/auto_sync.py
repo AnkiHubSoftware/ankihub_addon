@@ -9,6 +9,7 @@ from aqt import AnkiQt
 
 from .. import LOGGER
 from ..settings import config
+from .exceptions import FullSyncCancelled
 from .menu import AnkiHubLogin
 from .operations.ankihub_sync import sync_with_ankihub
 from .operations.utils import future_with_exception, future_with_result
@@ -94,11 +95,19 @@ def _on_ankiweb_sync(*args, **kwargs) -> None:
             AnkiHubLogin.display_login()
 
     def sync_with_ankiweb(future: Future) -> None:
-        # The original function should be called even if the sync with AnkiHub fails, so we run it
-        # this before future.result() (which can raise an exception)
-        original_sync_collection_and_media(*args, **kwargs, after_sync=new_after_sync)
-
-        future.result()
+        try:
+            future.result()
+        except FullSyncCancelled:
+            new_after_sync()
+            raise
+        except Exception:
+            original_sync_collection_and_media(
+                *args, **kwargs, after_sync=new_after_sync
+            )
+        else:
+            original_sync_collection_and_media(
+                *args, **kwargs, after_sync=new_after_sync
+            )
 
     try:
         _maybe_sync_with_ankihub(on_done=sync_with_ankiweb)
