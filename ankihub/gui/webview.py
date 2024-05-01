@@ -1,6 +1,7 @@
 from abc import abstractmethod
 from typing import Any, Optional, cast
 
+from anki.utils import is_mac
 from aqt.gui_hooks import theme_did_change
 from aqt.qt import (
     QColor,
@@ -83,7 +84,7 @@ class AnkiHubWebViewDialog(QDialog):
         self.button_layout.addSpacing(20)
 
         self.layout_ = QVBoxLayout()
-        self.layout_.setContentsMargins(0, 0, 0, 0)
+        self.layout_.setContentsMargins(0, 0, 0, 5)
         self.layout_.addWidget(self.web)
         self.layout_.addLayout(self.button_layout)
 
@@ -99,10 +100,21 @@ class AnkiHubWebViewDialog(QDialog):
             }
             QPushButton {
                 color: black;
-                background-color: #fcfcfc;
-                border-color: #ccc;
+                border-color: #cccccc;
             }
             """
+            + (
+                # On mac, the background color is already white, so we don't need to set it.
+                # Setting the background color to white on mac causes the dialog to loose its
+                # native look (rounded borders).
+                """
+                QPushButton {
+                    background-color: #fcfcfc;
+                }
+                """
+                if not is_mac
+                else ""
+            )
         )
 
     @abstractmethod

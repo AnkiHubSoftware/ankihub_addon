@@ -2,7 +2,7 @@ setInterval(function () {
     // Notify python to sync notes actions after the notes action is created for
     // the selected flashcards.
     const unsuspendButtons = document.querySelectorAll(
-        '[id$="{{ FLASHCARD_SELCTOR_UNSUSPEND_BUTTON_ID_SUFFIX}}"]'
+        '[id$="{{ FLASHCARD_SELCTOR_UNSUSPEND_BUTTON_ID_SUFFIX }}"]'
     );
     for (const unsuspendButton of unsuspendButtons) {
         if (unsuspendButton && !unsuspendButton.appliedModifications) {
@@ -12,23 +12,6 @@ setInterval(function () {
             unsuspendButton.appliedModifications = true;
             console.log("Added htmx:after-request attribute to unsuspend button.");
 
-        }
-    }
-
-    // Add a hidden input to the form to disable the success notification. We are using a different
-    // notification with the flashcard selector dialog.
-    const unsuspendCardsDataDivs = document.querySelectorAll(
-        '[id$="{{ FLASHCARD_SELECTOR_FORM_DATA_DIV_ID_SUFFIX }}"]'
-    );
-    for (const unsuspendCardDataDiv of unsuspendCardsDataDivs) {
-        if (unsuspendCardDataDiv && !unsuspendCardDataDiv.appliedModifications) {
-            const showNotificationInput = document.createElement("input");
-            unsuspendCardDataDiv.appendChild(showNotificationInput);
-            showNotificationInput.outerHTML = `
-                <input type="hidden" name="show-success-notification" value="false">
-            `
-            unsuspendCardDataDiv.appliedModifications = true;
-            console.log("Added hidden input to disable success notification.");
         }
     }
 }, 100);
