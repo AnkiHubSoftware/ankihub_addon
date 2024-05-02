@@ -18,6 +18,7 @@ from .gui.config_dialog import setup_config_dialog_manager
 from .gui.errors import setup_error_handler
 from .gui.media_sync import media_sync
 from .gui.menu import menu_state, refresh_ankihub_menu, setup_ankihub_menu
+from .gui.operations.ankihub_sync import setup_full_sync_patch
 from .main.note_deletion import handle_notes_deleted_from_webapp
 from .main.utils import modify_note_type_templates
 from .settings import (
@@ -154,6 +155,9 @@ def _general_setup():
 
     setup_auto_sync()
     LOGGER.info("Set up auto sync.")
+
+    setup_full_sync_patch()
+    LOGGER.info("Set up AnkiWeb full sync patch.")
 
     # Call setup_feature_flags_in_background last among the setup functions.
     # This is because other setup functions can add callbacks which react to the feature flags getting fetched.

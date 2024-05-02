@@ -3,7 +3,9 @@ from functools import partial
 from typing import Callable, List, Optional
 
 import aqt
+import aqt.sync
 from anki.collection import OpChangesWithCount
+from anki.hooks import wrap
 from anki.sync import SyncOutput
 from aqt.sync import sync_collection
 
@@ -27,6 +29,10 @@ def ankiweb_sync_status() -> Optional[SyncOutput]:
     return None
 
 
+def current_schema() -> int:
+    return aqt.mw.col.db.scalar("select scm from col")
+
+
 def sync_with_ankihub(on_done: Callable[[Future], None]) -> None:
     """Uninstall decks the user is not subscribed to anymore, check for (and maybe install) new deck subscriptions,
     then download updates to decks.
@@ -34,13 +40,56 @@ def sync_with_ankihub(on_done: Callable[[Future], None]) -> None:
     If a full AnkiWeb sync is already required, sync with AnkiWeb first.
     """
 
+    schema_after_ankiweb_sync: int = 0
+
+    def on_sync_done(future: Future) -> None:
+        if future.exception():
+            on_done(future_with_exception(future.exception()))
+            return
+
+        config.set_api_version_on_last_sync(API_VERSION)
+        col_schema_on_full_sync: Optional[int] = None
+        if schema_after_ankiweb_sync != current_schema():
+            col_schema_on_full_sync = current_schema()
+        config.set_col_schema_on_full_sync(col_schema_on_full_sync)
+        show_tooltip_about_last_deck_updates_results()
+        maybe_check_databases()
+
+        aqt.mw.taskman.run_in_background(
+            aqt.mw.col.tags.clear_unused_tags, on_done=_on_clear_unused_tags_done
+        )
+
+        aqt.mw.taskman.run_in_background(
+            send_review_data, on_done=_on_send_review_data_done
+        )
+
+        on_done(future_with_result(None))
+
+    def on_new_deck_subscriptions_done(
+        future: Future, subscribed_decks: List[Deck]
+    ) -> None:
+        if future.exception():
+            on_done(future_with_exception(future.exception()))
+            return
+
+        installed_ah_dids = config.deck_ids()
+        subscribed_ah_dids = [deck.ah_did for deck in subscribed_decks]
+        to_sync_ah_dids = set(installed_ah_dids).intersection(set(subscribed_ah_dids))
+
+        aqt.mw.taskman.with_progress(
+            task=lambda: ah_deck_updater.update_decks_and_media(to_sync_ah_dids),
+            immediate=True,
+            on_done=on_sync_done,
+        )
+
     def after_ankiweb_sync() -> None:
         # Stop here if user cancelled full sync
         sync_status = ankiweb_sync_status()
         if sync_status and sync_status.required == sync_status.FULL_SYNC:
             on_done(future_with_exception(FullSyncCancelled()))
             return
-
+        nonlocal schema_after_ankiweb_sync
+        schema_after_ankiweb_sync = current_schema()
         try:
             client = AnkiHubClient()
             subscribed_decks = client.get_deck_subscriptions()
@@ -68,42 +117,6 @@ def sync_with_ankihub(on_done: Callable[[Future], None]) -> None:
         sync_collection(aqt.mw, on_done=on_collection_sync_finished)
     else:
         after_ankiweb_sync()
-
-    def on_new_deck_subscriptions_done(
-        future: Future, subscribed_decks: List[Deck]
-    ) -> None:
-        if future.exception():
-            on_done(future_with_exception(future.exception()))
-            return
-
-        installed_ah_dids = config.deck_ids()
-        subscribed_ah_dids = [deck.ah_did for deck in subscribed_decks]
-        to_sync_ah_dids = set(installed_ah_dids).intersection(set(subscribed_ah_dids))
-
-        aqt.mw.taskman.with_progress(
-            task=lambda: ah_deck_updater.update_decks_and_media(to_sync_ah_dids),
-            immediate=True,
-            on_done=on_sync_done,
-        )
-
-    def on_sync_done(future: Future) -> None:
-        if future.exception():
-            on_done(future_with_exception(future.exception()))
-            return
-
-        config.set_api_version_on_last_sync(API_VERSION)
-        show_tooltip_about_last_deck_updates_results()
-        maybe_check_databases()
-
-        aqt.mw.taskman.run_in_background(
-            aqt.mw.col.tags.clear_unused_tags, on_done=_on_clear_unused_tags_done
-        )
-
-        aqt.mw.taskman.run_in_background(
-            send_review_data, on_done=_on_send_review_data_done
-        )
-
-        on_done(future_with_result(None))
 
 
 def _on_clear_unused_tags_done(future: Future) -> None:
@@ -136,3 +149,28 @@ def _uninstall_decks_the_user_is_not_longer_subscribed_to(
     to_uninstall = set(installed_ah_dids).difference(subscribed_ah_dids)
     for ah_did in to_uninstall:
         uninstall_deck(ah_did)
+
+
+def _upload_if_full_sync_triggered_by_ankihub(
+    mw: aqt.main.AnkiQt,
+    out: SyncOutput,
+    on_done: Callable[[], None],
+    _old: Callable[[aqt.main.AnkiQt, SyncOutput, Callable[[], None]], None],
+) -> None:
+    if config.col_schema_on_full_sync() == current_schema():
+        LOGGER.info(
+            f"Full sync triggered by AnkiHub (scm={current_schema}). Uploading changes."
+        )
+        server_usn = out.server_media_usn if mw.pm.media_syncing_enabled() else None
+        aqt.sync.full_upload(mw, server_usn, on_done)
+        config.set_col_schema_on_full_sync(None)
+    else:
+        _old(mw, out, on_done)
+
+
+def setup_full_sync_patch() -> None:
+    aqt.sync.full_sync = wrap(  # type: ignore
+        aqt.sync.full_sync,
+        _upload_if_full_sync_triggered_by_ankihub,
+        "around",
+    )

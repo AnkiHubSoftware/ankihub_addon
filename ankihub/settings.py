@@ -149,6 +149,9 @@ class PrivateConfig(DataClassJSONMixin):
     ui: UIConfig = dataclasses.field(default_factory=UIConfig)
     # used to determine which migrations to apply
     api_version_on_last_sync: Optional[float] = None
+    # the collection's schema modification time after an AnkiHub sync that triggers a full AnkiWeb sync.
+    # used to determine whether to skip the full sync dialog and choose "Upload" for the user automatically.
+    col_schema_on_full_sync: Optional[int] = None
 
 
 class _Config:
@@ -401,6 +404,13 @@ class _Config:
     def set_api_version_on_last_sync(self, api_version: float) -> None:
         self._private_config.api_version_on_last_sync = api_version
         self._update_private_config()
+
+    def set_col_schema_on_full_sync(self, col_schema: Optional[int]) -> None:
+        self._private_config.col_schema_on_full_sync = col_schema
+        self._update_private_config()
+
+    def col_schema_on_full_sync(self) -> Optional[int]:
+        return self._private_config.col_schema_on_full_sync
 
 
 config = _Config()
