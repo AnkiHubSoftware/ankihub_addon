@@ -30,7 +30,9 @@ def check_and_install_new_deck_subscriptions(
 
         confirmation_dialog = show_dialog(
             title="AnkiHub | Sync",
-            text=messages.deck_install_confirmation(decks),
+            text=messages.deck_install_confirmation(
+                decks, logged_to_ankiweb=aqt.mw.pm.sync_auth()
+            ),
             parent=aqt.mw,
             buttons=[
                 ("Skip", QDialogButtonBox.ButtonRole.RejectRole),

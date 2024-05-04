@@ -119,6 +119,7 @@ def _show_deck_import_summary_dialog(
         ankihub_deck_names=ankihub_deck_names,
         anki_deck_names=anki_deck_names,
         import_results=import_results,
+        logged_to_ankiweb=aqt.mw.pm.sync_auth(),
     )
 
     def on_button_clicked(button_index: int) -> None:
