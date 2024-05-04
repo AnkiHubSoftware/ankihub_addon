@@ -4421,6 +4421,44 @@ class TestSyncWithAnkiHub:
             # Assert that the future contains the exception and that it contains the expected message.
             assert future.exception().args[0] == exception_message
 
+    @pytest.mark.qt_no_exception_capture
+    def test_col_schema_on_full_sync_updated(
+        self,
+        anki_session_with_addon_data: AnkiSession,
+        install_sample_ah_deck: InstallSampleAHDeck,
+        mocker: MockerFixture,
+        mock_client_methods_called_during_ankihub_sync: None,
+        sync_with_ankihub: SyncWithAnkiHub,
+    ):
+        with anki_session_with_addon_data.profile_loaded():
+            mw = anki_session_with_addon_data.mw
+
+            anki_did, ah_did = install_sample_ah_deck()
+
+            deck = DeckFactory.create(ah_did=ah_did)
+            mocker.patch.object(
+                AnkiHubClient,
+                "get_deck_subscriptions",
+                return_value=[deck],
+            )
+            mocker.patch.object(AnkiHubClient, "get_deck_by_id", return_value=deck)
+
+            config.save_token("test_token")
+
+            sync_with_ankihub()
+            assert not config.col_schema_on_full_sync()
+
+            mocker.patch.object(
+                AnkiHubClient,
+                "get_deck_subscriptions",
+                return_value=[],
+            )
+
+            sync_with_ankihub()
+            assert config.col_schema_on_full_sync() == mw.col.db.scalar(
+                "select scm from col"
+            )
+
 
 def test_uninstalling_deck_removes_related_deck_extension_from_config(
     anki_session_with_addon_data: AnkiSession, install_ah_deck: InstallAHDeck
