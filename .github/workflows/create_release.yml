@@ -36,11 +36,6 @@ jobs:
             exit 1
           fi
 
-      - name: Setup git config
-        run: |
-          git config user.name "ankihub-addon-bot"
-          git config user.email "ankihub-addon-bot@noreply.github.com"
-
       - name: Setup Python
         uses: actions/setup-python@v4
         with:
@@ -63,6 +58,8 @@ jobs:
 
       - name: Commit version bump and create tag
         run: |
+          git config --global user.name gh
+          git config --global user.email "gh@users.noreply.github.com"
           git commit --allow-empty -m "Bump Version to ${{ steps.vars.outputs.version }}"
           git push origin main
           git tag ${{ steps.vars.outputs.version }}
