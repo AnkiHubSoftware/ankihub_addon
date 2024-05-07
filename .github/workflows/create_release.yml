@@ -14,11 +14,11 @@ jobs:
         with:
           submodules: recursive
           fetch-depth: 0
-          token: ${{ secrets.GH_BOT_ACCESS_TOKEN }}
+          token: ${{ secrets.WORKFLOW_GIT_ACCESS_TOKEN }}
 
       - name: Check status of the last run of the test workflow
         run: |
-          gh auth login --with-token <<< "${{ secrets.GH_BOT_ACCESS_TOKEN }}"
+          gh auth login --with-token <<< "${{ secrets.WORKFLOW_GIT_ACCESS_TOKEN }}"
 
           conclusion=$(gh run list \
             --workflow=ci.yml \
