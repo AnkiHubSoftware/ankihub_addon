@@ -40,7 +40,7 @@ def sync_with_ankihub(on_done: Callable[[Future], None]) -> None:
     If a full AnkiWeb sync is already required, sync with AnkiWeb first.
     """
 
-    schema_after_ankiweb_sync: int = 0
+    schema_before_ankihub_sync: int = 0
 
     def on_sync_done(future: Future) -> None:
         if future.exception():
@@ -49,7 +49,7 @@ def sync_with_ankihub(on_done: Callable[[Future], None]) -> None:
 
         config.set_api_version_on_last_sync(API_VERSION)
         col_schema_on_full_sync: Optional[int] = None
-        if schema_after_ankiweb_sync != _current_schema():
+        if schema_before_ankihub_sync != _current_schema():
             col_schema_on_full_sync = _current_schema()
         config.set_col_schema_on_full_sync(col_schema_on_full_sync)
         show_tooltip_about_last_deck_updates_results()
@@ -88,8 +88,8 @@ def sync_with_ankihub(on_done: Callable[[Future], None]) -> None:
         if sync_status and sync_status.required == sync_status.FULL_SYNC:
             on_done(future_with_exception(FullSyncCancelled()))
             return
-        nonlocal schema_after_ankiweb_sync
-        schema_after_ankiweb_sync = _current_schema()
+        nonlocal schema_before_ankihub_sync
+        schema_before_ankihub_sync = _current_schema()
         try:
             client = AnkiHubClient()
             subscribed_decks = client.get_deck_subscriptions()
