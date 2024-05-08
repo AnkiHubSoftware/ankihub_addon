@@ -22,14 +22,14 @@ from .new_deck_subscriptions import check_and_install_new_deck_subscriptions
 from .utils import future_with_exception, future_with_result
 
 
-def ankiweb_sync_status() -> Optional[SyncOutput]:
+def _ankiweb_sync_status() -> Optional[SyncOutput]:
     if auth := aqt.mw.pm.sync_auth():
         sync_status = aqt.mw.col.sync_status(auth)
         return sync_status
     return None
 
 
-def current_schema() -> int:
+def _current_schema() -> int:
     return aqt.mw.col.db.scalar("select scm from col")
 
 
@@ -49,8 +49,8 @@ def sync_with_ankihub(on_done: Callable[[Future], None]) -> None:
 
         config.set_api_version_on_last_sync(API_VERSION)
         col_schema_on_full_sync: Optional[int] = None
-        if schema_after_ankiweb_sync != current_schema():
-            col_schema_on_full_sync = current_schema()
+        if schema_after_ankiweb_sync != _current_schema():
+            col_schema_on_full_sync = _current_schema()
         config.set_col_schema_on_full_sync(col_schema_on_full_sync)
         show_tooltip_about_last_deck_updates_results()
         maybe_check_databases()
@@ -84,12 +84,12 @@ def sync_with_ankihub(on_done: Callable[[Future], None]) -> None:
 
     def after_ankiweb_sync() -> None:
         # Stop here if user cancelled full sync
-        sync_status = ankiweb_sync_status()
+        sync_status = _ankiweb_sync_status()
         if sync_status and sync_status.required == sync_status.FULL_SYNC:
             on_done(future_with_exception(FullSyncCancelled()))
             return
         nonlocal schema_after_ankiweb_sync
-        schema_after_ankiweb_sync = current_schema()
+        schema_after_ankiweb_sync = _current_schema()
         try:
             client = AnkiHubClient()
             subscribed_decks = client.get_deck_subscriptions()
@@ -112,7 +112,7 @@ def sync_with_ankihub(on_done: Callable[[Future], None]) -> None:
         aqt.gui_hooks.sync_did_finish()
         after_ankiweb_sync()
 
-    sync_status = ankiweb_sync_status()
+    sync_status = _ankiweb_sync_status()
     if sync_status and sync_status.required == sync_status.FULL_SYNC:
         sync_collection(aqt.mw, on_done=on_collection_sync_finished)
     else:
@@ -157,9 +157,9 @@ def _upload_if_full_sync_triggered_by_ankihub(
     on_done: Callable[[], None],
     _old: Callable[[aqt.main.AnkiQt, SyncOutput, Callable[[], None]], None],
 ) -> None:
-    if config.col_schema_on_full_sync() == current_schema():
+    if config.col_schema_on_full_sync() == _current_schema():
         LOGGER.info(
-            f"Full sync triggered by AnkiHub (scm={current_schema}). Uploading changes."
+            f"Full sync triggered by AnkiHub (scm={_current_schema()}). Uploading changes."
         )
         server_usn = out.server_media_usn if mw.pm.media_syncing_enabled() else None
         aqt.sync.full_upload(mw, server_usn, on_done)
