@@ -5662,6 +5662,8 @@ def test_delete_ankihub_private_config_on_deckBrowser__delete_option(
         mw = anki_session.mw
 
         anki_deck_id, ah_did = install_sample_ah_deck()
+        mw.deckBrowser.refresh()
+        qtbot.wait(500)
 
         mids = ankihub_db.note_types_for_ankihub_deck(ah_did)
         deck_uuid = config.get_deck_uuid_by_did(anki_deck_id)
@@ -5715,6 +5717,8 @@ def test_not_delete_ankihub_private_config_on_deckBrowser__delete_option(
         mw = anki_session.mw
 
         anki_deck_id, _ = install_sample_ah_deck()
+        mw.deckBrowser.refresh()
+        qtbot.wait(500)
 
         deck_uuid = config.get_deck_uuid_by_did(anki_deck_id)
 

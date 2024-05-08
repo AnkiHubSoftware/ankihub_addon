@@ -68,8 +68,7 @@ def _on_deck_selected(study_deck: StudyDeck) -> None:
 
     public = ask_user(
         "Would you like to make this deck public?<br><br>"
-        'If you chose "No" it will be private and only people with a link '
-        "will be able to see it on the AnkiHub website.",
+        'If you choose "No" your deck will be private and only available to users you invite.',
         show_cancel_button=True,
     )
     if public is None:
@@ -90,6 +89,7 @@ def _on_deck_selected(study_deck: StudyDeck) -> None:
         if add_subdeck_tags is None:
             return  # pragma: no cover
 
+    # TODO Remove this confirmation. We should have a single confirmation that includes all necessary info.
     confirm = ask_user(
         "Uploading the deck to AnkiHub requires modifying notes and note types in "
         f"<b>{deck_name}</b> and will require a full sync afterwards. Would you like to "
@@ -99,6 +99,7 @@ def _on_deck_selected(study_deck: StudyDeck) -> None:
     if not confirm:
         return  # pragma: no cover
 
+    # TODO let's get their confirmation about this in the first dialogue with a checkbox.
     should_upload_media = ask_user(
         "Do you want to upload media for this deck as well? "
         "This will take some extra time but it is required to display images "
