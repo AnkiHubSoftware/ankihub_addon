@@ -82,7 +82,7 @@ def sync_with_ankihub(on_done: Callable[[Future], None]) -> None:
             on_done=on_sync_done,
         )
 
-    def after_ankiweb_sync() -> None:
+    def after_potential_ankiweb_sync() -> None:
         # Stop here if user cancelled full sync
         sync_status = _ankiweb_sync_status()
         if sync_status and sync_status.required == sync_status.FULL_SYNC:
@@ -110,13 +110,13 @@ def sync_with_ankihub(on_done: Callable[[Future], None]) -> None:
 
     def on_collection_sync_finished() -> None:
         aqt.gui_hooks.sync_did_finish()
-        after_ankiweb_sync()
+        after_potential_ankiweb_sync()
 
     sync_status = _ankiweb_sync_status()
     if sync_status and sync_status.required == sync_status.FULL_SYNC:
         sync_collection(aqt.mw, on_done=on_collection_sync_finished)
     else:
-        after_ankiweb_sync()
+        after_potential_ankiweb_sync()
 
 
 def _on_clear_unused_tags_done(future: Future) -> None:
