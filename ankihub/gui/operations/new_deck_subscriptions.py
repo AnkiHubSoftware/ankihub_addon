@@ -73,12 +73,19 @@ def _on_button_clicked(
 
     # Download the new decks
     try:
-        ah_dids = [deck.ah_did for deck in decks]
-        download_and_install_decks(
-            ah_dids,
-            on_done=on_done,
-            recommended_deck_settings=recommended_deck_settings_cb.isChecked(),
-        )
+
+        def on_collection_sync_finished() -> None:
+            ah_dids = [deck.ah_did for deck in decks]
+            download_and_install_decks(
+                ah_dids,
+                on_done=on_done,
+                recommended_deck_settings=recommended_deck_settings_cb.isChecked(),
+            )
+
+        # Sync with AnkiWeb first to avoid data loss on the next AnkiWeb sync if deck installation triggers a full sync
+        from .ankihub_sync import sync_with_ankiweb
+
+        sync_with_ankiweb(on_collection_sync_finished)
     except Exception as e:
         on_done(future_with_exception(e))
 

@@ -38,6 +38,15 @@ def _current_schema() -> int:
     return aqt.mw.col.db.scalar("select scm from col")
 
 
+def sync_with_ankiweb(on_done: Callable[[], None]) -> None:
+    def on_collection_sync_finished() -> None:
+        aqt.gui_hooks.sync_did_finish()
+        on_done()
+
+    aqt.gui_hooks.sync_will_start()
+    sync_collection(aqt.mw, on_done=on_collection_sync_finished)
+
+
 def sync_with_ankihub(on_done: Callable[[Future], None]) -> None:
     """Uninstall decks the user is not subscribed to anymore, check for (and maybe install) new deck subscriptions,
     then download updates to decks.
@@ -112,13 +121,8 @@ def sync_with_ankihub(on_done: Callable[[Future], None]) -> None:
             # which is what we want.
             aqt.mw.taskman.run_on_main(partial(on_done, future_with_exception(e)))
 
-    def on_collection_sync_finished() -> None:
-        aqt.gui_hooks.sync_did_finish()
-        after_potential_ankiweb_sync()
-
     if _full_ankiweb_sync_required():
-        aqt.gui_hooks.sync_will_start()
-        sync_collection(aqt.mw, on_done=on_collection_sync_finished)
+        sync_with_ankiweb(after_potential_ankiweb_sync)
     else:
         after_potential_ankiweb_sync()
 
