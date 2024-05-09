@@ -29,6 +29,11 @@ def _ankiweb_sync_status() -> Optional[SyncOutput]:
     return None
 
 
+def _full_ankiweb_sync_required() -> bool:
+    sync_status = _ankiweb_sync_status()
+    return sync_status and sync_status.required == sync_status.FULL_SYNC
+
+
 def _current_schema() -> int:
     return aqt.mw.col.db.scalar("select scm from col")
 
@@ -84,8 +89,7 @@ def sync_with_ankihub(on_done: Callable[[Future], None]) -> None:
 
     def after_potential_ankiweb_sync() -> None:
         # Stop here if user cancelled full sync
-        sync_status = _ankiweb_sync_status()
-        if sync_status and sync_status.required == sync_status.FULL_SYNC:
+        if _full_ankiweb_sync_required():
             on_done(future_with_exception(FullSyncCancelled()))
             return
         nonlocal schema_before_ankihub_sync
@@ -112,8 +116,7 @@ def sync_with_ankihub(on_done: Callable[[Future], None]) -> None:
         aqt.gui_hooks.sync_did_finish()
         after_potential_ankiweb_sync()
 
-    sync_status = _ankiweb_sync_status()
-    if sync_status and sync_status.required == sync_status.FULL_SYNC:
+    if _full_ankiweb_sync_required():
         sync_collection(aqt.mw, on_done=on_collection_sync_finished)
     else:
         after_potential_ankiweb_sync()
