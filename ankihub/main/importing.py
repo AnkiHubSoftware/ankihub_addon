@@ -26,6 +26,7 @@ from ..settings import (
     TAG_FOR_INSTRUCTION_NOTES,
     BehaviorOnRemoteNoteDeleted,
     SuspendNewCardsOfExistingNotes,
+    config,
 )
 from .deck_options import set_ankihub_config_for_deck, set_recommended_preferences
 from .note_conversion import (
@@ -39,6 +40,7 @@ from .subdecks import build_subdecks_and_move_cards_to_them
 from .utils import (
     add_notes,
     change_note_types_of_notes,
+    collection_schema,
     create_deck_with_id,
     create_note_type_with_id,
     dids_of_notes,
@@ -46,6 +48,7 @@ from .utils import (
     is_tag_in_list,
     lowest_level_common_ancestor_did,
     modify_note_type_templates,
+    new_schema_to_do_full_upload_for_once,
     truncated_list,
 )
 
@@ -768,11 +771,14 @@ def _adjust_note_types_in_anki_db(
     # can be called when installing a deck for the first time and when synchronizing with AnkiHub
 
     LOGGER.info("Beginning adjusting note types...")
-
+    schema_before_modifications = collection_schema()
     _create_missing_note_types(remote_note_types)
     _rename_note_types(remote_note_types)
     _ensure_local_and_remote_fields_are_same(remote_note_types)
     modify_note_type_templates(remote_note_types.keys())
+    config.set_schema_to_do_full_upload_for_once(
+        new_schema_to_do_full_upload_for_once(schema_before_modifications)
+    )
 
     LOGGER.info("Adjusted note types.")
 

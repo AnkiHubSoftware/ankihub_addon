@@ -13,6 +13,7 @@ from ...addon_ankihub_client import AddonAnkiHubClient as AnkiHubClient
 from ...ankihub_client import API_VERSION, Deck
 from ...main.deck_unsubscribtion import uninstall_deck
 from ...main.review_data import send_review_data
+from ...main.utils import collection_schema, new_schema_to_do_full_upload_for_once
 from ...settings import config
 from ..deck_updater import ah_deck_updater, show_tooltip_about_last_deck_updates_results
 from ..exceptions import FullSyncCancelled
@@ -34,10 +35,6 @@ def _full_ankiweb_sync_required() -> bool:
     return sync_status and sync_status.required == sync_status.FULL_SYNC
 
 
-def _current_schema() -> int:
-    return aqt.mw.col.db.scalar("select scm from col")
-
-
 def sync_with_ankihub(on_done: Callable[[Future], None]) -> None:
     """Uninstall decks the user is not subscribed to anymore, check for (and maybe install) new deck subscriptions,
     then download updates to decks.
@@ -53,10 +50,10 @@ def sync_with_ankihub(on_done: Callable[[Future], None]) -> None:
             return
 
         config.set_api_version_on_last_sync(API_VERSION)
-        schema_to_do_full_upload_for_once: Optional[int] = None
-        if schema_before_ankihub_sync != _current_schema():
-            schema_to_do_full_upload_for_once = _current_schema()
-        config.set_schema_to_do_full_upload_for_once(schema_to_do_full_upload_for_once)
+        config.set_schema_to_do_full_upload_for_once(
+            new_schema_to_do_full_upload_for_once(schema_before_ankihub_sync)
+        )
+
         show_tooltip_about_last_deck_updates_results()
         maybe_check_databases()
 
@@ -93,7 +90,7 @@ def sync_with_ankihub(on_done: Callable[[Future], None]) -> None:
             on_done(future_with_exception(FullSyncCancelled()))
             return
         nonlocal schema_before_ankihub_sync
-        schema_before_ankihub_sync = _current_schema()
+        schema_before_ankihub_sync = collection_schema()
         try:
             client = AnkiHubClient()
             subscribed_decks = client.get_deck_subscriptions()
@@ -156,9 +153,9 @@ def _upload_if_full_sync_triggered_by_ankihub(
     on_done: Callable[[], None],
     _old: Callable[[aqt.main.AnkiQt, SyncOutput, Callable[[], None]], None],
 ) -> None:
-    if config.schema_to_do_full_upload_for_once() == _current_schema():
+    if config.schema_to_do_full_upload_for_once() == collection_schema():
         LOGGER.info(
-            f"Full sync triggered by AnkiHub (scm={_current_schema()}). Uploading changes."
+            f"Full sync triggered by AnkiHub (scm={collection_schema()}). Uploading changes."
         )
         server_usn = out.server_media_usn if mw.pm.media_syncing_enabled() else None
         aqt.sync.full_upload(mw, server_usn, on_done)
