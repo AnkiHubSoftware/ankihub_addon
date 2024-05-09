@@ -586,6 +586,7 @@ def active_window_or_mw() -> QWidget:
 
 def sync_with_ankiweb(on_done: Callable[[], None]) -> None:
     if not aqt.mw.pm.sync_auth():
+        on_done()
         return
 
     def on_collection_sync_finished() -> None:
