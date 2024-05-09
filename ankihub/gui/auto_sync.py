@@ -104,6 +104,7 @@ def _on_ankiweb_sync(*args, **kwargs) -> None:
             original_sync_collection_and_media(
                 *args, **kwargs, after_sync=new_after_sync
             )
+            raise
         else:
             original_sync_collection_and_media(
                 *args, **kwargs, after_sync=new_after_sync
