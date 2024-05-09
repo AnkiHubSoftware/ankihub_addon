@@ -4422,7 +4422,7 @@ class TestSyncWithAnkiHub:
             assert future.exception().args[0] == exception_message
 
     @pytest.mark.qt_no_exception_capture
-    def test_col_schema_on_full_sync_updated(
+    def test_schema_to_do_full_upload_for_once_updated(
         self,
         anki_session_with_addon_data: AnkiSession,
         install_sample_ah_deck: InstallSampleAHDeck,
@@ -4446,7 +4446,7 @@ class TestSyncWithAnkiHub:
             config.save_token("test_token")
 
             sync_with_ankihub()
-            assert not config.col_schema_on_full_sync()
+            assert not config.schema_to_do_full_upload_for_once()
 
             mocker.patch.object(
                 AnkiHubClient,
@@ -4455,7 +4455,7 @@ class TestSyncWithAnkiHub:
             )
 
             sync_with_ankihub()
-            assert config.col_schema_on_full_sync() == mw.col.db.scalar(
+            assert config.schema_to_do_full_upload_for_once() == mw.col.db.scalar(
                 "select scm from col"
             )
 

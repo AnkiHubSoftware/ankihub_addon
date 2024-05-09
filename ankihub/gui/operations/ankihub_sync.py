@@ -48,10 +48,10 @@ def sync_with_ankihub(on_done: Callable[[Future], None]) -> None:
             return
 
         config.set_api_version_on_last_sync(API_VERSION)
-        col_schema_on_full_sync: Optional[int] = None
+        schema_to_do_full_upload_for_once: Optional[int] = None
         if schema_before_ankihub_sync != _current_schema():
-            col_schema_on_full_sync = _current_schema()
-        config.set_col_schema_on_full_sync(col_schema_on_full_sync)
+            schema_to_do_full_upload_for_once = _current_schema()
+        config.set_schema_to_do_full_upload_for_once(schema_to_do_full_upload_for_once)
         show_tooltip_about_last_deck_updates_results()
         maybe_check_databases()
 
@@ -157,13 +157,13 @@ def _upload_if_full_sync_triggered_by_ankihub(
     on_done: Callable[[], None],
     _old: Callable[[aqt.main.AnkiQt, SyncOutput, Callable[[], None]], None],
 ) -> None:
-    if config.col_schema_on_full_sync() == _current_schema():
+    if config.schema_to_do_full_upload_for_once() == _current_schema():
         LOGGER.info(
             f"Full sync triggered by AnkiHub (scm={_current_schema()}). Uploading changes."
         )
         server_usn = out.server_media_usn if mw.pm.media_syncing_enabled() else None
         aqt.sync.full_upload(mw, server_usn, on_done)
-        config.set_col_schema_on_full_sync(None)
+        config.set_schema_to_do_full_upload_for_once(None)
     else:
         _old(mw, out, on_done)
 
