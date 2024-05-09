@@ -117,6 +117,7 @@ def sync_with_ankihub(on_done: Callable[[Future], None]) -> None:
         after_potential_ankiweb_sync()
 
     if _full_ankiweb_sync_required():
+        aqt.gui_hooks.sync_will_start()
         sync_collection(aqt.mw, on_done=on_collection_sync_finished)
     else:
         after_potential_ankiweb_sync()
