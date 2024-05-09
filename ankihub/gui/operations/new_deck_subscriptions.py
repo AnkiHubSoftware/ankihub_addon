@@ -9,7 +9,7 @@ from aqt.qt import QCheckBox, QDialogButtonBox
 from ...ankihub_client import Deck
 from ...settings import config
 from ..messages import messages
-from ..utils import show_dialog
+from ..utils import show_dialog, sync_with_ankiweb
 from .deck_installation import download_and_install_decks
 from .utils import future_with_exception, future_with_result
 
@@ -83,8 +83,6 @@ def _on_button_clicked(
             )
 
         # Sync with AnkiWeb first to avoid data loss on the next AnkiWeb sync if deck installation triggers a full sync
-        from .ankihub_sync import sync_with_ankiweb
-
         sync_with_ankiweb(on_collection_sync_finished)
     except Exception as e:
         on_done(future_with_exception(e))

@@ -7,7 +7,6 @@ import aqt.sync
 from anki.collection import OpChangesWithCount
 from anki.hooks import wrap
 from anki.sync import SyncOutput
-from aqt.sync import sync_collection
 
 from ... import LOGGER
 from ...addon_ankihub_client import AddonAnkiHubClient as AnkiHubClient
@@ -17,6 +16,7 @@ from ...main.review_data import send_review_data
 from ...settings import config
 from ..deck_updater import ah_deck_updater, show_tooltip_about_last_deck_updates_results
 from ..exceptions import FullSyncCancelled
+from ..utils import sync_with_ankiweb
 from .db_check import maybe_check_databases
 from .new_deck_subscriptions import check_and_install_new_deck_subscriptions
 from .utils import future_with_exception, future_with_result
@@ -36,15 +36,6 @@ def _full_ankiweb_sync_required() -> bool:
 
 def _current_schema() -> int:
     return aqt.mw.col.db.scalar("select scm from col")
-
-
-def sync_with_ankiweb(on_done: Callable[[], None]) -> None:
-    def on_collection_sync_finished() -> None:
-        aqt.gui_hooks.sync_did_finish()
-        on_done()
-
-    aqt.gui_hooks.sync_will_start()
-    sync_collection(aqt.mw, on_done=on_collection_sync_finished)
 
 
 def sync_with_ankihub(on_done: Callable[[Future], None]) -> None:

@@ -582,3 +582,12 @@ def active_window_or_mw() -> QWidget:
         return aqt.mw
     else:
         return active_window
+
+
+def sync_with_ankiweb(on_done: Callable[[], None]) -> None:
+    def on_collection_sync_finished() -> None:
+        aqt.gui_hooks.sync_did_finish()
+        on_done()
+
+    aqt.gui_hooks.sync_will_start()
+    aqt.sync.sync_collection(aqt.mw, on_done=on_collection_sync_finished)
