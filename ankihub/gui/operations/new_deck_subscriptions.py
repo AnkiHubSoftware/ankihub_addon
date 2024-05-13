@@ -28,7 +28,8 @@ def check_and_install_new_deck_subscriptions(
         recommended_deck_settings_cb = QCheckBox("Use recommended deck settings")
         recommended_deck_settings_cb.setChecked(True)
         recommended_deck_settings_cb.setToolTip(
-            "This will modify deck settings such as daily limits, display order, and set the learn ahead limit to 0. "
+            "This will modify deck settings such as daily limits, display order, "
+            "and set the learn ahead limit to 0.<br>"
             "Change these settings at any time in your deck options area."
         )
         recommended_deck_settings_cb.setIcon(
