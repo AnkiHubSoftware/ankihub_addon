@@ -1,23 +1,23 @@
 {% if ankihub_deck_names|length > 1 %}
-Decks successfully imported from AnkiHub!
+Your AnkiHub decks are ready to study!
 {% else %}
-Deck successfully imported from AnkiHub!
+Your AnkiHub deck is ready to study!
 {% endif %}
-{% for ankihub_deck_name, anki_deck_name, import_result in zip(ankihub_deck_names, anki_deck_names, import_results) %}
-<hr>
 <br>
-<b>{{ankihub_deck_name}}</b><br>
-<br>
-Added {{import_result.created_nids|length}} note(s).<br>
-Updated {{import_result.updated_nids|length}} note(s).<br>
-Skipped {{import_result.skipped_nids|length}} note(s).<br>
 
+{% if logged_to_ankiweb %}
+To access your decks on other devices, you’ll need to go to those devices and sync.
+If prompted, choose <b>Download from AnkiWeb</b>.
+{% endif %}
+
+{% for ankihub_deck_name, anki_deck_name, import_result in zip(ankihub_deck_names, anki_deck_names, import_results) %}
+<br>
 {% if ankihub_deck_name != anki_deck_name %}
-The imported notes are in the deck <b>{{anki_deck_name}}</b>.<br>
+The deck <b>{{ankihub_deck_name}}</b> was imported as <b>{{anki_deck_name}}</b>.<br>
 {% endif %}
 
 {% if import_result.skipped_nids %}
-Notes with the same ID as notes in another AnkiHub deck you have installed were skipped.<br>
+Notes in the deck <b>{{ankihub_deck_name}}</b> with the same ID as notes in another AnkiHub deck you have installed were skipped.<br>
 If you have any questions about this, see <a
     href='https://community.ankihub.net/t/draft-why-are-notes-skipped-after-subscribing-to-a-deck/934'>this forum
     topic</a> for details.

@@ -5,9 +5,10 @@ You have new AnkiHub decks to install:
     {% endfor %}
 </ul><br>
 
-To access these decks, click "Install."<br>
-Note that installing may add or update decks and notes in your collection.<br><br>
-
-Click "Skip" to continue the AnkiHub sync without installing these AnkiHub decks.<br><br>
-
-For more details, check <a href='https://community.ankihub.net/t/subscribing-to-a-deck/'>our documentation.</a><br>
+{% if logged_to_ankiweb %}
+⚠️ Please go to your other devices with Anki and sync before installing new deck(s).
+<br>
+Any unsynchronized reviews or changes on other devices may be lost during installation.
+{% else %}
+Would you like to install them now? (This could take several minutes.)
+{% endif %}
