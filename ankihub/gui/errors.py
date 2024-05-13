@@ -1,4 +1,5 @@
 """Error handling and reporting."""
+
 import dataclasses
 import os
 import re
@@ -330,16 +331,17 @@ def _maybe_handle_ankihub_http_error(error: AnkiHubHTTPError) -> bool:
         ):
             check_and_prompt_for_updates_on_main_window()
         return True
-    elif response.status_code == 403:
-        try:
-            response_data = response.json()
-        except JSONDecodeError:
-            return False
-        else:
-            error_message = response_data.get("detail")
-            if error_message:
-                show_error_dialog(error_message, title="Oh no!")
-                return True
+
+    try:
+        response_data = response.json()
+    except JSONDecodeError:
+        return False
+
+    error_message = response_data.get("detail")
+    if error_message:
+        LOGGER.info(f"AnkiHubRequestError was handled: {error_message}")
+        show_error_dialog(error_message, title="Oh no!")
+        return True
 
     return False
 
