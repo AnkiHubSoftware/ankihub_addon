@@ -1,5 +1,5 @@
+import functools
 from concurrent.futures import Future
-from functools import partial
 from typing import Callable, List, Optional
 
 import aqt
@@ -20,7 +20,7 @@ from ..exceptions import FullSyncCancelled
 from ..utils import sync_with_ankiweb
 from .db_check import maybe_check_databases
 from .new_deck_subscriptions import check_and_install_new_deck_subscriptions
-from .utils import future_with_exception, future_with_result
+from .utils import future_with_exception, future_with_result, pass_exceptions_to_on_done
 
 
 def _ankiweb_sync_status() -> Optional[SyncOutput]:
@@ -85,36 +85,32 @@ def sync_with_ankihub(on_done: Callable[[Future], None]) -> None:
             on_done=on_sync_done,
         )
 
-    def after_potential_ankiweb_sync() -> None:
+    @pass_exceptions_to_on_done
+    def after_potential_ankiweb_sync(on_done: Callable[[Future], None]) -> None:
         # Stop here if user cancelled full sync
         if _full_ankiweb_sync_required():
             on_done(future_with_exception(FullSyncCancelled()))
             return
-        try:
-            client = AnkiHubClient()
-            subscribed_decks = client.get_deck_subscriptions()
+        client = AnkiHubClient()
+        subscribed_decks = client.get_deck_subscriptions()
 
-            _uninstall_decks_the_user_is_not_longer_subscribed_to(
-                subscribed_decks=subscribed_decks
-            )
+        _uninstall_decks_the_user_is_not_longer_subscribed_to(
+            subscribed_decks=subscribed_decks
+        )
 
-            nonlocal schema_before_new_deck_installation
-            schema_before_new_deck_installation = collection_schema()
-            check_and_install_new_deck_subscriptions(
-                subscribed_decks=subscribed_decks,
-                on_done=lambda future: on_new_deck_subscriptions_done(
-                    future=future, subscribed_decks=subscribed_decks
-                ),
-            )
-        except Exception as e:
-            # Using run_on_main prevents exceptions which occur in the callback to be backpropagated to the caller,
-            # which is what we want.
-            aqt.mw.taskman.run_on_main(partial(on_done, future_with_exception(e)))
+        nonlocal schema_before_new_deck_installation
+        schema_before_new_deck_installation = collection_schema()
+        check_and_install_new_deck_subscriptions(
+            subscribed_decks=subscribed_decks,
+            on_done=lambda future: on_new_deck_subscriptions_done(
+                future=future, subscribed_decks=subscribed_decks
+            ),
+        )
 
     if _full_ankiweb_sync_required():
-        sync_with_ankiweb(after_potential_ankiweb_sync)
+        sync_with_ankiweb(functools.partial(after_potential_ankiweb_sync, on_done))
     else:
-        after_potential_ankiweb_sync()
+        after_potential_ankiweb_sync(on_done)
 
 
 def _on_clear_unused_tags_done(future: Future) -> None:
