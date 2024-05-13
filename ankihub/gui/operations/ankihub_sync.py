@@ -108,9 +108,11 @@ def sync_with_ankihub(on_done: Callable[[Future], None]) -> None:
         )
 
     if _full_ankiweb_sync_required():
-        sync_with_ankiweb(functools.partial(after_potential_ankiweb_sync, on_done))
+        sync_with_ankiweb(
+            functools.partial(after_potential_ankiweb_sync, on_done=on_done)
+        )
     else:
-        after_potential_ankiweb_sync(on_done)
+        after_potential_ankiweb_sync(on_done=on_done)
 
 
 def _on_clear_unused_tags_done(future: Future) -> None:
