@@ -42,7 +42,7 @@ def sync_with_ankihub(on_done: Callable[[Future], None]) -> None:
     If a full AnkiWeb sync is already required, sync with AnkiWeb first.
     """
 
-    schema_before_ankihub_sync: int = 0
+    schema_before_new_deck_installation: int = 0
 
     def on_sync_done(future: Future) -> None:
         if future.exception():
@@ -50,9 +50,6 @@ def sync_with_ankihub(on_done: Callable[[Future], None]) -> None:
             return
 
         config.set_api_version_on_last_sync(API_VERSION)
-        config.set_schema_to_do_full_upload_for_once(
-            new_schema_to_do_full_upload_for_once(schema_before_ankihub_sync)
-        )
 
         show_tooltip_about_last_deck_updates_results()
         maybe_check_databases()
@@ -74,6 +71,10 @@ def sync_with_ankihub(on_done: Callable[[Future], None]) -> None:
             on_done(future_with_exception(future.exception()))
             return
 
+        config.set_schema_to_do_full_upload_for_once(
+            new_schema_to_do_full_upload_for_once(schema_before_new_deck_installation)
+        )
+
         installed_ah_dids = config.deck_ids()
         subscribed_ah_dids = [deck.ah_did for deck in subscribed_decks]
         to_sync_ah_dids = set(installed_ah_dids).intersection(set(subscribed_ah_dids))
@@ -89,8 +90,6 @@ def sync_with_ankihub(on_done: Callable[[Future], None]) -> None:
         if _full_ankiweb_sync_required():
             on_done(future_with_exception(FullSyncCancelled()))
             return
-        nonlocal schema_before_ankihub_sync
-        schema_before_ankihub_sync = collection_schema()
         try:
             client = AnkiHubClient()
             subscribed_decks = client.get_deck_subscriptions()
@@ -98,6 +97,9 @@ def sync_with_ankihub(on_done: Callable[[Future], None]) -> None:
             _uninstall_decks_the_user_is_not_longer_subscribed_to(
                 subscribed_decks=subscribed_decks
             )
+
+            nonlocal schema_before_new_deck_installation
+            schema_before_new_deck_installation = collection_schema()
             check_and_install_new_deck_subscriptions(
                 subscribed_decks=subscribed_decks,
                 on_done=lambda future: on_new_deck_subscriptions_done(
