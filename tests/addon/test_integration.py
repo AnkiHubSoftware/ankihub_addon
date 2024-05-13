@@ -9,7 +9,7 @@ import uuid
 from concurrent.futures import Future
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
-from time import sleep
+from time import sleep, time
 from typing import (
     Any,
     Callable,
@@ -4448,6 +4448,16 @@ class TestSyncWithAnkiHub:
             sync_with_ankihub()
             assert not config.schema_to_do_full_upload_for_once()
 
+            updated_schema = int(time())
+
+            def side_effect(*args, **kwargs) -> None:
+                mw.col.db.execute("update col set scm = ?", updated_schema)
+                kwargs["on_done"](future_with_result(None))
+
+            check_and_install_new_deck_subscriptions_mock = mocker.patch(
+                "ankihub.gui.operations.ankihub_sync.check_and_install_new_deck_subscriptions"
+            )
+            check_and_install_new_deck_subscriptions_mock.side_effect = side_effect
             mocker.patch.object(
                 AnkiHubClient,
                 "get_deck_subscriptions",
@@ -4455,9 +4465,7 @@ class TestSyncWithAnkiHub:
             )
 
             sync_with_ankihub()
-            assert config.schema_to_do_full_upload_for_once() == mw.col.db.scalar(
-                "select scm from col"
-            )
+            assert config.schema_to_do_full_upload_for_once() == updated_schema
 
 
 def test_uninstalling_deck_removes_related_deck_extension_from_config(
