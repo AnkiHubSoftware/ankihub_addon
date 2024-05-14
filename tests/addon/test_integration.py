@@ -9,7 +9,7 @@ import uuid
 from concurrent.futures import Future
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
-from time import sleep
+from time import sleep, time
 from typing import (
     Any,
     Callable,
@@ -4420,6 +4420,52 @@ class TestSyncWithAnkiHub:
 
             # Assert that the future contains the exception and that it contains the expected message.
             assert future.exception().args[0] == exception_message
+
+    @pytest.mark.qt_no_exception_capture
+    def test_schema_to_do_full_upload_for_once_updated(
+        self,
+        anki_session_with_addon_data: AnkiSession,
+        install_sample_ah_deck: InstallSampleAHDeck,
+        mocker: MockerFixture,
+        mock_client_methods_called_during_ankihub_sync: None,
+        sync_with_ankihub: SyncWithAnkiHub,
+    ):
+        with anki_session_with_addon_data.profile_loaded():
+            mw = anki_session_with_addon_data.mw
+
+            anki_did, ah_did = install_sample_ah_deck()
+
+            deck = DeckFactory.create(ah_did=ah_did)
+            mocker.patch.object(
+                AnkiHubClient,
+                "get_deck_subscriptions",
+                return_value=[deck],
+            )
+            mocker.patch.object(AnkiHubClient, "get_deck_by_id", return_value=deck)
+
+            config.save_token("test_token")
+
+            sync_with_ankihub()
+            assert not config.schema_to_do_full_upload_for_once()
+
+            updated_schema = int(time())
+
+            def side_effect(*args, **kwargs) -> None:
+                mw.col.db.execute("update col set scm = ?", updated_schema)
+                kwargs["on_done"](future_with_result(None))
+
+            check_and_install_new_deck_subscriptions_mock = mocker.patch(
+                "ankihub.gui.operations.ankihub_sync.check_and_install_new_deck_subscriptions"
+            )
+            check_and_install_new_deck_subscriptions_mock.side_effect = side_effect
+            mocker.patch.object(
+                AnkiHubClient,
+                "get_deck_subscriptions",
+                return_value=[],
+            )
+
+            sync_with_ankihub()
+            assert config.schema_to_do_full_upload_for_once() == updated_schema
 
 
 def test_uninstalling_deck_removes_related_deck_extension_from_config(

@@ -231,7 +231,7 @@ def change_note_types_of_notes(nid_mid_pairs: List[Tuple[NoteId, NotetypeId]]) -
         source_note_type_id,
         target_note_type_id,
     ), note_ids in notes_grouped_by_type_change.items():
-        current_schema: int = aqt.mw.col.db.scalar("select scm from col")
+        current_schema = collection_schema()
         target_note_type = aqt.mw.col.models.get(NotetypeId(target_note_type_id))
         request = ChangeNotetypeRequest(
             note_ids=note_ids,
@@ -539,3 +539,14 @@ def is_tag_in_list(tag: str, tags: List[str]) -> bool:
     # Copied from anki.tags.TagManager.in_list in order to be able to use it without instantiating anki.tags.TagManager
     "True if TAG is in TAGS. Ignore case."
     return tag.lower() in [tag.lower() for tag in tags]
+
+
+def collection_schema() -> int:
+    return aqt.mw.col.db.scalar("select scm from col")
+
+
+def new_schema_to_do_full_upload_for_once(schema_before_op: int) -> Optional[int]:
+    schema_to_do_full_upload_for_once: Optional[int] = None
+    if schema_before_op != collection_schema():
+        schema_to_do_full_upload_for_once = collection_schema()
+    return schema_to_do_full_upload_for_once

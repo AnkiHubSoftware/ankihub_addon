@@ -1,42 +1,48 @@
+import functools
 from concurrent.futures import Future
-from functools import partial
-from typing import Callable, List
+from typing import Callable, List, Optional
 
 import aqt
+import aqt.sync
 from anki.collection import OpChangesWithCount
+from anki.hooks import wrap
+from anki.sync import SyncOutput
 
 from ... import LOGGER
 from ...addon_ankihub_client import AddonAnkiHubClient as AnkiHubClient
 from ...ankihub_client import API_VERSION, Deck
 from ...main.deck_unsubscribtion import uninstall_deck
 from ...main.review_data import send_review_data
+from ...main.utils import collection_schema, new_schema_to_do_full_upload_for_once
 from ...settings import config
 from ..deck_updater import ah_deck_updater, show_tooltip_about_last_deck_updates_results
+from ..exceptions import FullSyncCancelled
+from ..utils import sync_with_ankiweb
 from .db_check import maybe_check_databases
 from .new_deck_subscriptions import check_and_install_new_deck_subscriptions
-from .utils import future_with_exception, future_with_result
+from .utils import future_with_exception, future_with_result, pass_exceptions_to_on_done
+
+
+def _ankiweb_sync_status() -> Optional[SyncOutput]:
+    if auth := aqt.mw.pm.sync_auth():
+        sync_status = aqt.mw.col.sync_status(auth)
+        return sync_status
+    return None
+
+
+def _full_ankiweb_sync_required() -> bool:
+    sync_status = _ankiweb_sync_status()
+    return sync_status and sync_status.required == sync_status.FULL_SYNC
 
 
 def sync_with_ankihub(on_done: Callable[[Future], None]) -> None:
     """Uninstall decks the user is not subscribed to anymore, check for (and maybe install) new deck subscriptions,
-    then download updates to decks."""
+    then download updates to decks.
 
-    def on_new_deck_subscriptions_done(
-        future: Future, subscribed_decks: List[Deck]
-    ) -> None:
-        if future.exception():
-            on_done(future_with_exception(future.exception()))
-            return
+    If a full AnkiWeb sync is already required, sync with AnkiWeb first.
+    """
 
-        installed_ah_dids = config.deck_ids()
-        subscribed_ah_dids = [deck.ah_did for deck in subscribed_decks]
-        to_sync_ah_dids = set(installed_ah_dids).intersection(set(subscribed_ah_dids))
-
-        aqt.mw.taskman.with_progress(
-            task=lambda: ah_deck_updater.update_decks_and_media(to_sync_ah_dids),
-            immediate=True,
-            on_done=on_sync_done,
-        )
+    schema_before_new_deck_installation: int = 0
 
     def on_sync_done(future: Future) -> None:
         if future.exception():
@@ -44,6 +50,7 @@ def sync_with_ankihub(on_done: Callable[[Future], None]) -> None:
             return
 
         config.set_api_version_on_last_sync(API_VERSION)
+
         show_tooltip_about_last_deck_updates_results()
         maybe_check_databases()
 
@@ -57,23 +64,55 @@ def sync_with_ankihub(on_done: Callable[[Future], None]) -> None:
 
         on_done(future_with_result(None))
 
-    try:
+    def on_new_deck_subscriptions_done(
+        future: Future, subscribed_decks: List[Deck]
+    ) -> None:
+        if future.exception():
+            on_done(future_with_exception(future.exception()))
+            return
+
+        config.set_schema_to_do_full_upload_for_once(
+            new_schema_to_do_full_upload_for_once(schema_before_new_deck_installation)
+        )
+
+        installed_ah_dids = config.deck_ids()
+        subscribed_ah_dids = [deck.ah_did for deck in subscribed_decks]
+        to_sync_ah_dids = set(installed_ah_dids).intersection(set(subscribed_ah_dids))
+
+        aqt.mw.taskman.with_progress(
+            task=lambda: ah_deck_updater.update_decks_and_media(to_sync_ah_dids),
+            immediate=True,
+            on_done=on_sync_done,
+        )
+
+    @pass_exceptions_to_on_done
+    def after_potential_ankiweb_sync(on_done: Callable[[Future], None]) -> None:
+        # Stop here if user cancelled full sync
+        if _full_ankiweb_sync_required():
+            on_done(future_with_exception(FullSyncCancelled()))
+            return
         client = AnkiHubClient()
         subscribed_decks = client.get_deck_subscriptions()
 
         _uninstall_decks_the_user_is_not_longer_subscribed_to(
             subscribed_decks=subscribed_decks
         )
+
+        nonlocal schema_before_new_deck_installation
+        schema_before_new_deck_installation = collection_schema()
         check_and_install_new_deck_subscriptions(
             subscribed_decks=subscribed_decks,
             on_done=lambda future: on_new_deck_subscriptions_done(
                 future=future, subscribed_decks=subscribed_decks
             ),
         )
-    except Exception as e:
-        # Using run_on_main prevents exceptions which occur in the callback to be backpropagated to the caller,
-        # which is what we want.
-        aqt.mw.taskman.run_on_main(partial(on_done, future_with_exception(e)))
+
+    if _full_ankiweb_sync_required():
+        sync_with_ankiweb(
+            functools.partial(after_potential_ankiweb_sync, on_done=on_done)
+        )
+    else:
+        after_potential_ankiweb_sync(on_done=on_done)
 
 
 def _on_clear_unused_tags_done(future: Future) -> None:
@@ -106,3 +145,28 @@ def _uninstall_decks_the_user_is_not_longer_subscribed_to(
     to_uninstall = set(installed_ah_dids).difference(subscribed_ah_dids)
     for ah_did in to_uninstall:
         uninstall_deck(ah_did)
+
+
+def _upload_if_full_sync_triggered_by_ankihub(
+    mw: aqt.main.AnkiQt,
+    out: SyncOutput,
+    on_done: Callable[[], None],
+    _old: Callable[[aqt.main.AnkiQt, SyncOutput, Callable[[], None]], None],
+) -> None:
+    if config.schema_to_do_full_upload_for_once() == collection_schema():
+        LOGGER.info(
+            f"Full sync triggered by AnkiHub (scm={collection_schema()}). Uploading changes."
+        )
+        server_usn = out.server_media_usn if mw.pm.media_syncing_enabled() else None
+        aqt.sync.full_upload(mw, server_usn, on_done)
+        config.set_schema_to_do_full_upload_for_once(None)
+    else:
+        _old(mw, out, on_done)
+
+
+def setup_full_sync_patch() -> None:
+    aqt.sync.full_sync = wrap(  # type: ignore
+        aqt.sync.full_sync,
+        _upload_if_full_sync_triggered_by_ankihub,
+        "around",
+    )

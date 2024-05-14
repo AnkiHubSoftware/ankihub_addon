@@ -31,7 +31,7 @@ from sentry_sdk.integrations.threading import ThreadingIntegration
 from .. import LOGGER
 from ..addon_ankihub_client import AddonAnkiHubClient as AnkiHubClient
 from ..ankihub_client import AnkiHubHTTPError, AnkiHubRequestException
-from ..gui.exceptions import DeckDownloadAndInstallError
+from ..gui.exceptions import DeckDownloadAndInstallError, FullSyncCancelled
 from ..settings import (
     ADDON_VERSION,
     ANKI_VERSION,
@@ -237,6 +237,11 @@ def _try_handle_exception(
 
     if isinstance(exc_value, (DeckDownloadAndInstallError, AnkiHubRequestException)):
         exc_value = exc_value.original_exception
+
+    if isinstance(exc_value, FullSyncCancelled):
+        show_tooltip("AnkiHub sync cancelled")
+        LOGGER.info("FullSyncCancelled was handled.")
+        return True
 
     if isinstance(exc_value, AnkiHubHTTPError):
         if _maybe_handle_ankihub_http_error(exc_value):

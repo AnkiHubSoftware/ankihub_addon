@@ -19,3 +19,9 @@ class RemoteDeckNotFoundError(Exception):
     def __init__(self, ankihub_did: UUID):
         super().__init__(f"Deck {ankihub_did} not found on AnkiHub.")
         self.ankihub_did = ankihub_did
+
+
+class FullSyncCancelled(Exception):
+    """Raised when a full AnkiWeb sync is cancelled before an AnkiHub sync."""
+
+    pass

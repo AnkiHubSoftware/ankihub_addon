@@ -768,7 +768,6 @@ def _adjust_note_types_in_anki_db(
     # can be called when installing a deck for the first time and when synchronizing with AnkiHub
 
     LOGGER.info("Beginning adjusting note types...")
-
     _create_missing_note_types(remote_note_types)
     _rename_note_types(remote_note_types)
     _ensure_local_and_remote_fields_are_same(remote_note_types)
