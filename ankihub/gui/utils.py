@@ -310,6 +310,8 @@ class _Dialog(QDialog):
         self.main_layout.addStretch()
         self.main_layout.addWidget(self.button_box)
 
+        self.adjustSize()
+
     def _setup_button_box(self) -> QDialogButtonBox:
         button_box = QDialogButtonBox()
 
