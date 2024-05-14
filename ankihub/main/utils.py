@@ -546,7 +546,6 @@ def collection_schema() -> int:
 
 
 def new_schema_to_do_full_upload_for_once(schema_before_op: int) -> Optional[int]:
-    schema_to_do_full_upload_for_once: Optional[int] = None
     if schema_before_op != collection_schema():
-        schema_to_do_full_upload_for_once = collection_schema()
-    return schema_to_do_full_upload_for_once
+        return collection_schema()
+    return None
