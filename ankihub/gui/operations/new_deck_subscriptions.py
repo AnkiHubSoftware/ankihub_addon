@@ -62,6 +62,7 @@ def check_and_install_new_deck_subscriptions(
             confirmation_dialog_layout.count() - 2,
             recommended_deck_settings_cb,
         )
+        confirmation_dialog.adjustSize()
         confirmation_dialog.open()
 
         # This prevents the checkbox from being garbage collected too early
