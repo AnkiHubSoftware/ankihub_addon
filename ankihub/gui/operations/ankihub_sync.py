@@ -14,7 +14,7 @@ from ...addon_ankihub_client import AddonAnkiHubClient as AnkiHubClient
 from ...ankihub_client import API_VERSION, Deck
 from ...main.deck_unsubscribtion import uninstall_deck
 from ...main.review_data import send_review_data
-from ...main.utils import collection_schema, new_schema_to_do_full_upload_for_once
+from ...main.utils import collection_schema
 from ...settings import config
 from ..deck_updater import ah_deck_updater, show_tooltip_about_last_deck_updates_results
 from ..exceptions import FullSyncCancelled
@@ -27,6 +27,7 @@ from .utils import future_with_result, pass_exceptions_to_on_done
 @dataclass
 class _SyncState:
     schema_before_new_decks_installation: Optional[int] = None
+    schema_changed_during_deck_installion: Optional[bool] = False
 
 
 sync_state = _SyncState()
@@ -87,11 +88,13 @@ def _on_new_deck_subscriptions_done(
 ) -> None:
     future.result()
 
-    config.set_schema_to_do_full_upload_for_once(
-        new_schema_to_do_full_upload_for_once(
-            sync_state.schema_before_new_decks_installation
-        )
+    sync_state.schema_changed_during_deck_installion = (
+        sync_state.schema_before_new_decks_installation != collection_schema()
     )
+    if sync_state.schema_changed_during_deck_installion:
+        config.set_schema_to_do_full_upload_for_once(collection_schema())
+    else:
+        config.set_schema_to_do_full_upload_for_once(None)
 
     installed_ah_dids = config.deck_ids()
     subscribed_ah_dids = [deck.ah_did for deck in subscribed_decks]
@@ -121,7 +124,10 @@ def _on_sync_done(future: Future, on_done: Callable[[Future], None]) -> None:
         send_review_data, on_done=_on_send_review_data_done
     )
 
-    on_done(future_with_result(None))
+    if sync_state.schema_changed_during_deck_installion:
+        sync_with_ankiweb(on_done=partial(on_done, future=future_with_result(None)))
+    else:
+        on_done(future_with_result(None))
 
 
 def _on_clear_unused_tags_done(future: Future) -> None:
