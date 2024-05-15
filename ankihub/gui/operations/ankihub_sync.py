@@ -27,7 +27,6 @@ from .utils import future_with_result, pass_exceptions_to_on_done
 @dataclass
 class _SyncState:
     schema_before_new_decks_installation: Optional[int] = None
-    schema_changed_during_deck_installion: Optional[bool] = False
 
 
 sync_state = _SyncState()
@@ -88,10 +87,7 @@ def _on_new_deck_subscriptions_done(
 ) -> None:
     future.result()
 
-    sync_state.schema_changed_during_deck_installion = (
-        sync_state.schema_before_new_decks_installation != collection_schema()
-    )
-    if sync_state.schema_changed_during_deck_installion:
+    if sync_state.schema_before_new_decks_installation != collection_schema():
         config.set_schema_to_do_full_upload_for_once(collection_schema())
     else:
         config.set_schema_to_do_full_upload_for_once(None)
@@ -124,7 +120,9 @@ def _on_sync_done(future: Future, on_done: Callable[[Future], None]) -> None:
         send_review_data, on_done=_on_send_review_data_done
     )
 
-    if sync_state.schema_changed_during_deck_installion:
+    if config.schema_to_do_full_upload_for_once():
+        # Sync with AnkiWeb to resolve the pending full upload immediately.
+        # Otherwise, Anki's Sync button will be red, and clicking it will trigger a full upload.
         sync_with_ankiweb(on_done=partial(on_done, future=future_with_result(None)))
     else:
         on_done(future_with_result(None))
