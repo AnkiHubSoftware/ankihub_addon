@@ -543,9 +543,3 @@ def is_tag_in_list(tag: str, tags: List[str]) -> bool:
 
 def collection_schema() -> int:
     return aqt.mw.col.db.scalar("select scm from col")
-
-
-def new_schema_to_do_full_upload_for_once(schema_before_op: int) -> Optional[int]:
-    if schema_before_op != collection_schema():
-        return collection_schema()
-    return None

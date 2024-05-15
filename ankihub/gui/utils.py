@@ -4,6 +4,7 @@ from functools import partial
 from typing import Any, Callable, Dict, List, Optional, Sequence, Tuple, Union
 
 import aqt
+from aqt import sync
 from aqt.addons import check_and_prompt_for_updates
 from aqt.progress import ProgressDialog
 from aqt.qt import (
@@ -596,4 +597,4 @@ def sync_with_ankiweb(on_done: Callable[[], None]) -> None:
         on_done()
 
     aqt.gui_hooks.sync_will_start()
-    aqt.sync.sync_collection(aqt.mw, on_done=on_collection_sync_finished)
+    sync.sync_collection(aqt.mw, on_done=on_collection_sync_finished)
