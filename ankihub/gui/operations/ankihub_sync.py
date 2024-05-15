@@ -83,7 +83,7 @@ def _after_potential_ankiweb_sync(on_done: Callable[[Future], None]) -> None:
 
 @pass_exceptions_to_on_done
 def _on_new_deck_subscriptions_done(
-    future: Future, subscribed_decks: List[Deck], on_done: Callable[[Future], None]
+    future: Future, on_done: Callable[[Future], None], subscribed_decks: List[Deck]
 ) -> None:
     future.result()
 
