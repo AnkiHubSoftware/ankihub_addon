@@ -431,7 +431,7 @@ def sync_with_ankihub(qtbot: QtBot) -> SyncWithAnkiHub:
         with qtbot.wait_callback() as callback:
             ankihub_sync.sync_with_ankihub(on_done=callback)
 
-        future: Future = callback.args[0]
+        future: Future = callback.kwargs.get("future") or callback.args[0]
         future.result()  # raises exception if there is one
 
     return _sync_with_ankihub
