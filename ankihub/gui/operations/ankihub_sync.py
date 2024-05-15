@@ -52,13 +52,13 @@ def sync_with_ankihub(on_done: Callable[[Future], None]) -> None:
     If a full AnkiWeb sync is already required, sync with AnkiWeb first.
     """
     if _full_ankiweb_sync_required():
-        sync_with_ankiweb(partial(after_potential_ankiweb_sync, on_done=on_done))
+        sync_with_ankiweb(partial(_after_potential_ankiweb_sync, on_done=on_done))
     else:
-        after_potential_ankiweb_sync(on_done=on_done)
+        _after_potential_ankiweb_sync(on_done=on_done)
 
 
 @pass_exceptions_to_on_done
-def after_potential_ankiweb_sync(on_done: Callable[[Future], None]) -> None:
+def _after_potential_ankiweb_sync(on_done: Callable[[Future], None]) -> None:
     # Stop here if user cancelled full sync
     if _full_ankiweb_sync_required():
         raise FullSyncCancelled()
@@ -74,7 +74,7 @@ def after_potential_ankiweb_sync(on_done: Callable[[Future], None]) -> None:
     check_and_install_new_deck_subscriptions(
         subscribed_decks=subscribed_decks,
         on_done=partial(
-            on_new_deck_subscriptions_done,
+            _on_new_deck_subscriptions_done,
             subscribed_decks=subscribed_decks,
             on_done=on_done,
         ),
@@ -82,7 +82,7 @@ def after_potential_ankiweb_sync(on_done: Callable[[Future], None]) -> None:
 
 
 @pass_exceptions_to_on_done
-def on_new_deck_subscriptions_done(
+def _on_new_deck_subscriptions_done(
     future: Future, subscribed_decks: List[Deck], on_done: Callable[[Future], None]
 ) -> None:
     future.result()
@@ -100,12 +100,12 @@ def on_new_deck_subscriptions_done(
     aqt.mw.taskman.with_progress(
         task=lambda: ah_deck_updater.update_decks_and_media(to_sync_ah_dids),
         immediate=True,
-        on_done=partial(on_sync_done, on_done=on_done),
+        on_done=partial(_on_sync_done, on_done=on_done),
     )
 
 
 @pass_exceptions_to_on_done
-def on_sync_done(future: Future, on_done: Callable[[Future], None]) -> None:
+def _on_sync_done(future: Future, on_done: Callable[[Future], None]) -> None:
     future.result()
 
     config.set_api_version_on_last_sync(API_VERSION)
