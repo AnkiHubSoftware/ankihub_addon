@@ -170,8 +170,11 @@ def _upload_if_full_sync_triggered_by_ankihub(
         LOGGER.info(
             f"Full sync triggered by AnkiHub (scm={collection_schema()}). Uploading changes."
         )
-        server_usn = out.server_media_usn if mw.pm.media_syncing_enabled() else None
-        aqt.sync.full_upload(mw, server_usn, on_done)
+        if hasattr(out, "server_media_usn"):
+            server_usn = out.server_media_usn if mw.pm.media_syncing_enabled() else None
+            aqt.sync.full_upload(mw, server_usn, on_done)
+        else:
+            aqt.sync.full_upload(mw, on_done)  # type: ignore
         config.set_schema_to_do_full_upload_for_once(None)
     else:
         _old(mw, out, on_done)
