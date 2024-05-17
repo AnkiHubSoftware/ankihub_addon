@@ -201,7 +201,7 @@ def _setup_excepthook():
                     exc_info=e,
                 )
 
-    sys.excepthook = wrap(excepthook, "after")
+    sys.excepthook = wrap(excepthook, "before")
 
 
 def _maybe_report_exception_and_show_feedback_dialog(exception: BaseException) -> None:
