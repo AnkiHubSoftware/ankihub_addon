@@ -18,7 +18,6 @@ from typing import Any, Callable, Dict, Optional, Type
 import aqt
 import sentry_sdk
 from anki.errors import BackendIOError, DBError, SyncError
-from anki.hooks import wrap
 from anki.utils import checksum, is_win
 from aqt.utils import showInfo
 from requests import exceptions
@@ -193,25 +192,27 @@ def _setup_excepthook():
             if handled:
                 return
 
-            try:
-                _maybe_report_exception_and_show_feedback_dialog(exception=val)
-            except Exception as e:
-                LOGGER.warning(
-                    "There was an error while reporting the exception or showing the feedback dialog.",
-                    exc_info=e,
-                )
+            if _this_addon_mentioned_in_tb(tb):
+                try:
+                    _show_feedback_dialog_and_maybe_report_exception(exception=val)
+                except Exception as e:
+                    LOGGER.warning(
+                        "There was an error while reporting the exception or showing the feedback dialog.",
+                        exc_info=e,
+                    )
+            else:
+                original_excepthook(etype, val, tb)
 
-    sys.excepthook = wrap(excepthook, "before")
+    original_excepthook = sys.excepthook
+    sys.excepthook = excepthook
 
 
-def _maybe_report_exception_and_show_feedback_dialog(exception: BaseException) -> None:
+def _show_feedback_dialog_and_maybe_report_exception(exception: BaseException) -> None:
     sentry_event_id: Optional[str] = None
-    mentioned_in_tb = _this_addon_mentioned_in_tb(exception.__traceback__)
-    if _error_reporting_enabled() and mentioned_in_tb:
+    if _error_reporting_enabled():
         sentry_event_id = report_exception_and_upload_logs(exception=exception)
 
-    if mentioned_in_tb:
-        ErrorDialog(exception, sentry_event_id=sentry_event_id).exec()
+    ErrorDialog(exception, sentry_event_id=sentry_event_id).exec()
 
 
 def _try_handle_exception(
