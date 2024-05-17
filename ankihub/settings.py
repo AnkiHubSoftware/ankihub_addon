@@ -651,29 +651,26 @@ class DatadogLogHandler(logging.Handler):
         self.capacity: int = capacity
         self.send_interval: int = send_interval
         self.last_send_time: float = time.time()
-        self.buffer_lock: threading.Lock = threading.Lock()
-        self.flush_lock: threading.Lock = threading.Lock()
+        self.createLock()
         self.flush_thread: threading.Thread = threading.Thread(
             target=self._periodic_flush
         )
+        # Make the thread a daemon so that it doesn't prevent Anki from closing
+        self.flush_thread.daemon = True
         self.flush_thread.start()
 
     def emit(self, record: logging.LogRecord) -> None:
-        with self.buffer_lock:
+        with self.lock:
             self.buffer.append(record)
-            should_flush = len(self.buffer) >= self.capacity
-
-        if should_flush:
-            self.flush()
+            if len(self.buffer) >= self.capacity:
+                self.flush()
 
     def flush(self) -> None:
-        with self.buffer_lock:
+        with self.lock:
+            if not self.buffer:
+                return
             records_to_send: List[logging.LogRecord] = self.buffer
             self.buffer = []
-
-        with self.flush_lock:
-            if not records_to_send:
-                return
             self.last_send_time = time.time()
             threading.Thread(
                 target=self._send_logs_to_datadog, args=(records_to_send,)
@@ -682,8 +679,9 @@ class DatadogLogHandler(logging.Handler):
     def _periodic_flush(self) -> None:
         while True:
             time.sleep(self.send_interval)
-            if time.time() - self.last_send_time >= self.send_interval:
-                self.flush()
+            with self.lock:
+                if time.time() - self.last_send_time >= self.send_interval:
+                    self.flush()
 
     def _send_logs_to_datadog(self, records: List[logging.LogRecord]) -> None:
         body = [
