@@ -26,6 +26,7 @@ from anki.utils import point_version
 from aqt.utils import askUser, showInfo
 from mashumaro import field_options
 from mashumaro.mixins.json import DataClassJSONMixin
+from pythonjsonlogger import jsonlogger
 
 from . import LOGGER
 from .ankihub_client import (
@@ -596,9 +597,11 @@ def _file_handler() -> logging.Handler:
 
 
 def _formatter() -> logging.Formatter:
-    return logging.Formatter(
-        "%(levelname)s %(asctime)s %(module)s %(process)d %(thread)d %(message)s"
+    formatter = jsonlogger.JsonFormatter(
+        fmt="%(levelname)s %(asctime)s %(module)s %(process)d %(thread)d %(message)s",
+        datefmt="%Y-%m-%d %H:%M:%S",
     )
+    return formatter
 
 
 def setup_logger():
