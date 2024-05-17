@@ -650,7 +650,7 @@ def setup_datadog_handler():
 
 
 class DatadogLogHandler(logging.Handler):
-    def __init__(self, capacity: int = 100, send_interval: int = 60):
+    def __init__(self, capacity: int = 50, send_interval: int = 60 * 5):
         super().__init__()
         self.buffer: List[logging.LogRecord] = []
         self.capacity: int = capacity
