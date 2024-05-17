@@ -3,12 +3,15 @@ as well as some constants and code for setting up the profile folder and logger.
 """
 
 import dataclasses
+import gzip
 import json
 import logging
 import os
 import re
 import socket
 import sys
+import threading
+import time
 import uuid
 from dataclasses import dataclass
 from datetime import datetime
@@ -641,37 +644,77 @@ def setup_datadog_handler():
     LOGGER.addHandler(datadog_handler)
 
 
-def _send_log_to_datadog(log_record):
-    log_message = log_record.getMessage()
-    body = [
-        {
-            "ddsource": "anki_addon",
-            "ddtags": f"addon_version:{ADDON_VERSION},anki_version:{ANKI_VERSION}",
-            "hostname": socket.gethostname(),
-            "message": log_message,
-            "service": "ankihub_addon",
-        }
-    ]
-
-    headers = {
-        "Content-Type": "application/json",
-        "DD-API-KEY": "pub573b4cee7263687d0323a12cf5a30a52",
-    }
-
-    response = requests.post(
-        "https://http-intake.logs.datadoghq.com/api/v2/logs",
-        headers=headers,
-        data=json.dumps(body),
-    )
-
-    print(response.status_code)
-    print(response)
-
-
-# Custom log handler to send logs to Datadog
 class DatadogLogHandler(logging.Handler):
-    def emit(self, record):
-        _send_log_to_datadog(record)
+    def __init__(self, capacity: int = 100, send_interval: int = 60):
+        super().__init__()
+        self.buffer: List[logging.LogRecord] = []
+        self.capacity: int = capacity
+        self.send_interval: int = send_interval
+        self.last_send_time: float = time.time()
+        self.buffer_lock: threading.Lock = threading.Lock()
+        self.flush_lock: threading.Lock = threading.Lock()
+        self.flush_thread: threading.Thread = threading.Thread(
+            target=self._periodic_flush
+        )
+        self.flush_thread.start()
+
+    def emit(self, record: logging.LogRecord) -> None:
+        with self.buffer_lock:
+            self.buffer.append(record)
+            should_flush = len(self.buffer) >= self.capacity
+
+        if should_flush:
+            self.flush()
+
+    def flush(self) -> None:
+        with self.buffer_lock:
+            records_to_send: List[logging.LogRecord] = self.buffer
+            self.buffer = []
+
+        with self.flush_lock:
+            if not records_to_send:
+                return
+            self.last_send_time = time.time()
+            threading.Thread(
+                target=self._send_logs_to_datadog, args=(records_to_send,)
+            ).start()
+
+    def _periodic_flush(self) -> None:
+        while True:
+            time.sleep(self.send_interval)
+            if time.time() - self.last_send_time >= self.send_interval:
+                self.flush()
+
+    def _send_logs_to_datadog(self, records: List[logging.LogRecord]) -> None:
+        body = [
+            {
+                "ddsource": "anki_addon",
+                "ddtags": f"addon_version:{ADDON_VERSION},anki_version:{ANKI_VERSION}",
+                "hostname": socket.gethostname(),
+                "message": record.getMessage(),
+                "service": "ankihub_addon",
+            }
+            for record in records
+        ]
+
+        headers = {
+            "Content-Type": "application/json",
+            "Content-Encoding": "gzip",
+            "DD-API-KEY": "pub573b4cee7263687d0323a12cf5a30a52",
+        }
+
+        compressed_body = gzip.compress(json.dumps(body).encode())
+
+        response = requests.post(
+            "https://http-intake.logs.datadoghq.com/api/v2/logs",
+            headers=headers,
+            data=compressed_body,
+        )
+
+        if response.status_code != 202:
+            LOGGER.warning(
+                f"Failed to send logs to Datadog: {response.status_code} {response.text}"
+            )
 
 
 version_file = Path(__file__).parent / "VERSION"
