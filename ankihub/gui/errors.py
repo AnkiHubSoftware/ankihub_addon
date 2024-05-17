@@ -18,6 +18,7 @@ from typing import Any, Callable, Dict, Optional, Type
 import aqt
 import sentry_sdk
 from anki.errors import BackendIOError, DBError, SyncError
+from anki.hooks import wrap
 from anki.utils import checksum, is_win
 from aqt.utils import showInfo
 from requests import exceptions
@@ -200,7 +201,7 @@ def _setup_excepthook():
                     exc_info=e,
                 )
 
-    sys.excepthook = excepthook
+    sys.excepthook = wrap(excepthook, "after")
 
 
 def _maybe_report_exception_and_show_feedback_dialog(exception: BaseException) -> None:
