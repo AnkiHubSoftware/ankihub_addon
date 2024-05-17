@@ -691,6 +691,7 @@ class DatadogLogHandler(logging.Handler):
                 "hostname": socket.gethostname(),
                 "message": record.getMessage(),
                 "service": "ankihub_addon",
+                "username": config.user(),
             }
             for record in records
         ]
