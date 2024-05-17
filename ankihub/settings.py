@@ -7,6 +7,7 @@ import json
 import logging
 import os
 import re
+import socket
 import sys
 import uuid
 from dataclasses import dataclass
@@ -20,6 +21,7 @@ from shutil import copyfile, move, rmtree
 from typing import Any, Callable, Dict, List, Optional
 
 import aqt
+import requests
 from anki import buildinfo
 from anki.decks import DeckId
 from anki.utils import point_version
@@ -611,6 +613,7 @@ def setup_logger():
 
     setup_stdout_handler()
     setup_file_handler()
+    setup_datadog_handler()
 
 
 def setup_stdout_handler() -> None:
@@ -629,6 +632,46 @@ def setup_file_handler() -> None:
     )
     file_handler_.setFormatter(_formatter())
     LOGGER.addHandler(file_handler_)
+
+
+def setup_datadog_handler():
+    datadog_handler = DatadogLogHandler()
+    datadog_handler.setLevel(logging.INFO)
+    datadog_handler.setFormatter(_formatter())
+    LOGGER.addHandler(datadog_handler)
+
+
+def _send_log_to_datadog(log_record):
+    log_message = log_record.getMessage()
+    body = [
+        {
+            "ddsource": "anki_addon",
+            "ddtags": f"addon_version:{ADDON_VERSION},anki_version:{ANKI_VERSION}",
+            "hostname": socket.gethostname(),
+            "message": log_message,
+            "service": "ankihub_addon",
+        }
+    ]
+
+    headers = {
+        "Content-Type": "application/json",
+        "DD-API-KEY": "pub573b4cee7263687d0323a12cf5a30a52",
+    }
+
+    response = requests.post(
+        "https://http-intake.logs.datadoghq.com/api/v2/logs",
+        headers=headers,
+        data=json.dumps(body),
+    )
+
+    print(response.status_code)
+    print(response)
+
+
+# Custom log handler to send logs to Datadog
+class DatadogLogHandler(logging.Handler):
+    def emit(self, record):
+        _send_log_to_datadog(record)
 
 
 version_file = Path(__file__).parent / "VERSION"
