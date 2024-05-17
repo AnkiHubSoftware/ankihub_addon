@@ -601,12 +601,17 @@ def _file_handler() -> logging.Handler:
     )
 
 
-def _formatter() -> logging.Formatter:
-    formatter = jsonlogger.JsonFormatter(
+def _standard_formatter() -> logging.Formatter:
+    return logging.Formatter(
+        "%(levelname)s %(asctime)s %(module)s %(process)d %(thread)d %(message)s"
+    )
+
+
+def _json_formatter() -> logging.Formatter:
+    return jsonlogger.JsonFormatter(
         fmt="%(levelname)s %(asctime)s %(module)s %(process)d %(thread)d %(message)s",
         datefmt="%Y-%m-%d %H:%M:%S",
     )
-    return formatter
 
 
 def setup_logger():
@@ -622,7 +627,7 @@ def setup_logger():
 def setup_stdout_handler() -> None:
     stdout_handler_ = _stdout_handler()
     stdout_handler_.setLevel(logging.INFO)
-    stdout_handler_.setFormatter(_formatter())
+    stdout_handler_.setFormatter(_standard_formatter())
     LOGGER.addHandler(stdout_handler_)
 
 
@@ -633,14 +638,14 @@ def setup_file_handler() -> None:
         if config.public_config.get("debug_level_logs", False)
         else logging.INFO
     )
-    file_handler_.setFormatter(_formatter())
+    file_handler_.setFormatter(_standard_formatter())
     LOGGER.addHandler(file_handler_)
 
 
 def setup_datadog_handler():
     datadog_handler = DatadogLogHandler()
     datadog_handler.setLevel(logging.INFO)
-    datadog_handler.setFormatter(_formatter())
+    datadog_handler.setFormatter(_json_formatter())
     LOGGER.addHandler(datadog_handler)
 
 
