@@ -24,7 +24,7 @@ from aqt.qt import (
     pyqtSignal,
     qconnect,
 )
-from aqt.utils import show_info, showText
+from aqt.utils import show_info, showInfo, showText
 
 from .. import LOGGER
 from ..ankihub_client import (
@@ -45,6 +45,7 @@ from ..main.suggestions import (
     suggest_notes_in_bulk,
 )
 from ..settings import ANKING_DECK_ID, RATIONALE_FOR_CHANGE_MAX_LENGTH, config
+from .errors import report_exception_and_upload_logs
 from .media_sync import media_sync
 from .utils import (
     active_window_or_mw,
@@ -123,38 +124,73 @@ def _on_suggestion_dialog_for_single_suggestion_closed(
     if suggestion_meta is None:
         return
 
-    ah_nid = ankihub_db.ankihub_nid_for_anki_nid(note.id)
-    if ah_nid:
-        suggestion_result = suggest_note_update(
-            note=note,
-            change_type=suggestion_meta.change_type,
-            comment=_comment_with_source(suggestion_meta),
-            media_upload_cb=media_sync.start_media_upload,
-            auto_accept=suggestion_meta.auto_accept,
-        )
-        if suggestion_result == ChangeSuggestionResult.SUCCESS:
-            show_tooltip("Submitted suggestion to AnkiHub.", parent=parent)
-        elif suggestion_result == ChangeSuggestionResult.NO_CHANGES:
-            show_tooltip("No changes. Try syncing with AnkiHub first.", parent=parent)
-        elif suggestion_result == ChangeSuggestionResult.ANKIHUB_NOT_FOUND:
-            show_error_dialog(
-                "This note has been deleted from AnkiHub. No new suggestions can be made.",
-                title="Note has been deleted from AnkiHub.",
-                parent=parent,
+    try:
+        ah_nid = ankihub_db.ankihub_nid_for_anki_nid(note.id)
+        if ah_nid:
+            suggestion_result = suggest_note_update(
+                note=note,
+                change_type=suggestion_meta.change_type,
+                comment=_comment_with_source(suggestion_meta),
+                media_upload_cb=media_sync.start_media_upload,
+                auto_accept=suggestion_meta.auto_accept,
             )
+            if suggestion_result == ChangeSuggestionResult.SUCCESS:
+                show_tooltip("Submitted suggestion to AnkiHub.", parent=parent)
+            elif suggestion_result == ChangeSuggestionResult.NO_CHANGES:
+                show_tooltip(
+                    "No changes. Try syncing with AnkiHub first.", parent=parent
+                )
+            elif suggestion_result == ChangeSuggestionResult.ANKIHUB_NOT_FOUND:
+                show_error_dialog(
+                    "This note has been deleted from AnkiHub. No new suggestions can be made.",
+                    title="Note has been deleted from AnkiHub.",
+                    parent=parent,
+                )
+            else:
+                raise ValueError(  # pragma: no cover
+                    f"Unknown suggestion result: {suggestion_result}"
+                )
         else:
-            raise ValueError(  # pragma: no cover
-                f"Unknown suggestion result: {suggestion_result}"
+            suggest_new_note(
+                note=note,
+                ankihub_did=ah_did,
+                comment=suggestion_meta.comment,
+                media_upload_cb=media_sync.start_media_upload,
+                auto_accept=suggestion_meta.auto_accept,
             )
-    else:
-        suggest_new_note(
-            note=note,
-            ankihub_did=ah_did,
-            comment=suggestion_meta.comment,
-            media_upload_cb=media_sync.start_media_upload,
-            auto_accept=suggestion_meta.auto_accept,
-        )
-        show_tooltip("Submitted suggestion to AnkiHub.", parent=parent)
+            show_tooltip("Submitted suggestion to AnkiHub.", parent=parent)
+    except AnkiHubHTTPError as e:
+        if "suggestion" not in e.response.url:
+            raise e
+
+        if e.response.status_code == 400:
+            if non_field_errors := e.response.json().get("non_field_errors", None):
+                error_message = "\n".join(non_field_errors)
+            else:
+                error_message = pformat(e.response.json())
+                # these errors are not expected and should be reported
+                report_exception_and_upload_logs(e)
+            showInfo(
+                text=(
+                    "There are some problems with this suggestion:<br><br>"
+                    f"<b>{error_message}</b>"
+                ),
+                title="Problem with suggestion",
+            )
+            LOGGER.info(f"Can't submit suggestion due to: {pformat(error_message)}")
+        elif e.response.status_code == 403:
+            response_data = e.response.json()
+            error_message = response_data.get("detail")
+            if error_message:
+                show_error_dialog(
+                    error_message,
+                    parent=parent,
+                    title="Error submitting suggestion :(",
+                )
+            else:
+                raise e
+        else:
+            raise e
 
 
 def open_suggestion_dialog_for_bulk_suggestion(
