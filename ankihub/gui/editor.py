@@ -1,7 +1,6 @@
 """Modifies the Anki editor (aqt.editor) to add AnkiHub buttons and functionality."""
 
 import functools
-from pprint import pformat
 from typing import Any, List, Tuple, cast
 
 import anki
@@ -10,10 +9,9 @@ from anki.models import NoteType
 from aqt import gui_hooks
 from aqt.addcards import AddCards
 from aqt.editor import Editor
-from aqt.utils import openLink, showInfo, tooltip
+from aqt.utils import openLink, tooltip
 
-from .. import LOGGER, settings
-from ..ankihub_client import AnkiHubHTTPError
+from .. import settings
 from ..db import ankihub_db
 from ..db.models import AnkiHubNote
 from ..gui.menu import AnkiHubLogin
@@ -25,9 +23,7 @@ from ..settings import (
     url_view_note,
     url_view_note_history,
 )
-from .errors import report_exception_and_upload_logs
 from .suggestion_dialog import open_suggestion_dialog_for_single_suggestion
-from .utils import show_error_dialog
 
 ANKIHUB_BTN_ID_PREFIX = "ankihub-btn"
 SUGGESTION_BTN_ID = f"{ANKIHUB_BTN_ID_PREFIX}-suggestion"
@@ -65,40 +61,7 @@ def _on_suggestion_button_press(editor: Editor) -> None:
         AnkiHubLogin.display_login()
         return
 
-    try:
-        _on_suggestion_button_press_inner(editor)
-    except AnkiHubHTTPError as e:
-        if "suggestion" not in e.response.url:
-            raise e
-
-        if e.response.status_code == 400:
-            if non_field_errors := e.response.json().get("non_field_errors", None):
-                error_message = "\n".join(non_field_errors)
-            else:
-                error_message = pformat(e.response.json())
-                # these errors are not expected and should be reported
-                report_exception_and_upload_logs(e)
-            showInfo(
-                text=(
-                    "There are some problems with this suggestion:<br><br>"
-                    f"<b>{error_message}</b>"
-                ),
-                title="Problem with suggestion",
-            )
-            LOGGER.info(f"Can't submit suggestion due to: {pformat(error_message)}")
-        elif e.response.status_code == 403:
-            response_data = e.response.json()
-            error_message = response_data.get("detail")
-            if error_message:
-                show_error_dialog(
-                    error_message,
-                    parent=editor.parentWindow,
-                    title="Error submitting suggestion :(",
-                )
-            else:
-                raise e
-        else:
-            raise e
+    _on_suggestion_button_press_inner(editor)
 
 
 def _on_suggestion_button_press_inner(editor: Editor) -> None:
