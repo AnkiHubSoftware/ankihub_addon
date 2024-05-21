@@ -8,6 +8,7 @@ import aqt.sync
 from anki.collection import OpChangesWithCount
 from anki.hooks import wrap
 from anki.sync import SyncOutput
+from aqt.sync import get_sync_status
 
 from ... import LOGGER
 from ...addon_ankihub_client import AddonAnkiHubClient as AnkiHubClient
@@ -32,18 +33,6 @@ class _SyncState:
 sync_state = _SyncState()
 
 
-def _ankiweb_sync_status() -> Optional[SyncOutput]:
-    if auth := aqt.mw.pm.sync_auth():
-        sync_status = aqt.mw.col.sync_status(auth)
-        return sync_status
-    return None
-
-
-def _full_ankiweb_sync_required() -> bool:
-    sync_status = _ankiweb_sync_status()
-    return sync_status and sync_status.required == sync_status.FULL_SYNC
-
-
 @pass_exceptions_to_on_done
 def sync_with_ankihub(on_done: Callable[[Future], None]) -> None:
     """Uninstall decks the user is not subscribed to anymore, check for (and maybe install) new deck subscriptions,
@@ -51,18 +40,32 @@ def sync_with_ankihub(on_done: Callable[[Future], None]) -> None:
 
     If a full AnkiWeb sync is already required, sync with AnkiWeb first.
     """
-    if _full_ankiweb_sync_required():
-        sync_with_ankiweb(partial(_after_potential_ankiweb_sync, on_done=on_done))
-    else:
-        _after_potential_ankiweb_sync(on_done=on_done)
+
+    @pass_exceptions_to_on_done
+    def on_sync_status(out: SyncOutput, on_done: Callable[[Future], None]) -> None:
+        if out.required == out.FULL_SYNC:
+            sync_with_ankiweb(partial(_after_ankiweb_sync, on_done=on_done))
+        else:
+            _sync_with_ankihub_inner(on_done=on_done)
+
+    get_sync_status(aqt.mw, partial(on_sync_status, on_done=on_done))
 
 
 @pass_exceptions_to_on_done
-def _after_potential_ankiweb_sync(on_done: Callable[[Future], None]) -> None:
-    # Stop here if user cancelled full sync
-    if _full_ankiweb_sync_required():
-        raise FullSyncCancelled()
+def _after_ankiweb_sync(on_done: Callable[[Future], None]) -> None:
+    @pass_exceptions_to_on_done
+    def on_sync_status(out: SyncOutput, on_done: Callable[[Future], None]) -> None:
+        if out.required == out.FULL_SYNC:
+            # Stop here if user cancelled full sync
+            raise FullSyncCancelled()
 
+        _sync_with_ankihub_inner(on_done=on_done)
+
+    get_sync_status(aqt.mw, partial(on_sync_status, on_done=on_done))
+
+
+@pass_exceptions_to_on_done
+def _sync_with_ankihub_inner(on_done: Callable[[Future], None]) -> None:
     client = AnkiHubClient()
     subscribed_decks = client.get_deck_subscriptions()
 
