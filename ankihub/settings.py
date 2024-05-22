@@ -747,7 +747,7 @@ class DatadogLogHandler(logging.Handler):
             )
             return
 
-        if response.status_code != 202:
+        if response.status_code != 202:  # pragma: no cover
             LOGGER.warning(
                 f"Unexpected status code when sending logs to Datadog: {response.status_code} {response.text}"
             )
