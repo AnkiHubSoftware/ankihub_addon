@@ -676,7 +676,7 @@ class DatadogLogHandler(logging.Handler):
     def emit(self, record: logging.LogRecord) -> None:
         from .feature_flags import feature_flags
 
-        if not feature_flags.send_logs_to_datadog:
+        if not feature_flags.send_addon_logs_to_datadog:
             return
 
         with self.lock:
@@ -690,7 +690,7 @@ class DatadogLogHandler(logging.Handler):
         # as this leads to an error in the shutdown, because at this point no new threads can be created.
         from .feature_flags import feature_flags
 
-        if not feature_flags.send_logs_to_datadog:
+        if not feature_flags.send_addon_logs_to_datadog:
             return
 
         with self.lock:
