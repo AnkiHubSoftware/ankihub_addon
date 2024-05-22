@@ -2766,7 +2766,7 @@ class TestAnkiHubDBMigrations:
             assert ankihub_db.database_path != migration_test_db_path  # sanity check
 
 
-class TestDataDogLogHandler:
+class TestDatadogLogHandler:
     @pytest.mark.parametrize("send_logs_to_datadog_feature_flag", [True, False])
     def test_emit_and_flush(
         self, mocker: MockerFixture, send_logs_to_datadog_feature_flag: bool
@@ -2774,7 +2774,7 @@ class TestDataDogLogHandler:
         feature_flags.send_logs_to_datadog = send_logs_to_datadog_feature_flag
 
         # Mock the requests.post call to always return a response with status code 202
-        response = Response()
+        response = Mock()
         response.status_code = 202
         post_mock = mocker.patch("requests.post", return_value=response)
 
@@ -2810,3 +2810,60 @@ class TestDataDogLogHandler:
             assert len(handler.buffer) == 0
             handler.flush(record)
             post_mock.assert_not_called()
+
+    def test_periodic_flush(self, mocker):
+        feature_flags.send_logs_to_datadog = True
+
+        # Mock the requests.post call to always return a response with status code 202
+        response = Mock()
+        response.status_code = 202
+        post_mock = mocker.patch("requests.post", return_value=response)
+
+        # Create a DatadogLogHandler with a short flush interval and a LogRecord
+        handler = DatadogLogHandler(send_interval=0.01)
+        record = LogRecord(
+            name="test",
+            level=0,
+            pathname="",
+            lineno=0,
+            msg="test",
+            args=(),
+            exc_info=None,
+        )
+
+        # Call emit on the handler and wait for the periodic flush to happen
+        handler.emit(record)
+        time.sleep(0.3)
+
+        # Check that the buffer is empty and that requests.post was called once
+        assert len(handler.buffer) == 0
+        post_mock.assert_called_once()
+        assert post_mock.call_args[0] == (
+            "https://http-intake.logs.datadoghq.com/api/v2/logs",
+        )
+
+    def test_capacity_flush(self, mocker):
+        feature_flags.send_logs_to_datadog = True
+
+        # Create a DatadogLogHandler with a short flush interval and a LogRecord
+        handler = DatadogLogHandler(capacity=3)
+        record = LogRecord(
+            name="test",
+            level=0,
+            pathname="",
+            lineno=0,
+            msg="test",
+            args=(),
+            exc_info=None,
+        )
+
+        flush_mock = mocker.patch.object(handler, "flush")
+
+        # Call emit on the handler
+        handler.emit(record)
+        handler.emit(record)
+        handler.emit(record)
+
+        # Check that the buffer is full and that flush was called
+        assert len(handler.buffer) == 3
+        flush_mock.assert_called_once()
