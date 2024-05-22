@@ -59,6 +59,7 @@ from .test_integration import ImportAHNote
 # has to be set before importing ankihub
 os.environ["SKIP_INIT"] = "1"
 
+from ankihub import entry_point
 from ankihub.addon_ankihub_client import AddonAnkiHubClient
 from ankihub.ankihub_client import (
     AnkiHubClient,
@@ -2867,3 +2868,26 @@ class TestDatadogLogHandler:
         # Check that the buffer is full and that flush was called
         assert len(handler.buffer) == 3
         flush_mock.assert_called_once()
+
+    @pytest.mark.parametrize("addon_version", ["dev", "test_version"])
+    def test_handler_setup(
+        self, anki_session_with_addon_data: AnkiSession, addon_version: str
+    ):
+        from ankihub import settings
+        from ankihub.settings import LOGGER
+
+        settings.ADDON_VERSION = addon_version
+        entry_point.run()
+        with anki_session_with_addon_data.profile_loaded():
+            datadog_log_handler = next(
+                (
+                    handler
+                    for handler in LOGGER.handlers
+                    if isinstance(handler, DatadogLogHandler)
+                ),
+                None,
+            )
+            if addon_version == "dev":
+                assert datadog_log_handler is None
+            else:
+                assert datadog_log_handler

@@ -733,12 +733,15 @@ class DatadogLogHandler(logging.Handler):
                 headers=headers,
                 data=compressed_body,
             )
-        except (requests.exceptions.ConnectionError, requests.exceptions.Timeout) as e:
+        except (
+            requests.exceptions.ConnectionError,
+            requests.exceptions.Timeout,
+        ) as e:  # pragma: no cover
             LOGGER.warning(
                 f"Connection error or timeout when sending logs to Datadog: {e}"
             )
             return
-        except requests.exceptions.RequestException as e:
+        except requests.exceptions.RequestException as e:  # pragma: no cover
             LOGGER.error(
                 f"An unexpected error occurred when sending logs to Datadog: {e}"
             )
