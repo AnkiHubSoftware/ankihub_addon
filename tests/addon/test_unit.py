@@ -2792,6 +2792,8 @@ class TestDataDogLogHandler:
 
         # Call emit and flush on the handler and assert the behavior
         if send_logs_to_datadog_feature_flag:
+            handler.flush()
+
             handler.emit(record)
             assert len(handler.buffer) == 1
             assert handler.buffer[0] == record
