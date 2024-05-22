@@ -652,6 +652,13 @@ def setup_datadog_handler():
 
 
 class DatadogLogHandler(logging.Handler):
+    """
+    A custom logging handler that sends logs to Datadog.
+
+    This handler buffers log records and sends them to Datadog either when the buffer is full
+    or when a certain amount of time has passed since the last send operation.
+    """
+
     def __init__(self, capacity: int = 50, send_interval: int = 60 * 5):
         super().__init__()
         self.buffer: List[logging.LogRecord] = []
