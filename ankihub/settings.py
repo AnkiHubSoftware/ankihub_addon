@@ -667,6 +667,11 @@ class DatadogLogHandler(logging.Handler):
         self.flush_thread.start()
 
     def emit(self, record: logging.LogRecord) -> None:
+        from .feature_flags import feature_flags
+
+        if not feature_flags.send_logs_to_datadog:
+            return
+
         with self.lock:
             self.buffer.append(record)
             if len(self.buffer) >= self.capacity:
@@ -676,6 +681,11 @@ class DatadogLogHandler(logging.Handler):
         # flush is also called when the logging module shuts down when Anki is closing.
         # in_background=False is used to not create a new thread when the add-on is closing,
         # as this leads to an error in the shutdown, because at this point no new threads can be created.
+        from .feature_flags import feature_flags
+
+        if not feature_flags.send_logs_to_datadog:
+            return
+
         with self.lock:
             if not self.buffer:
                 return
