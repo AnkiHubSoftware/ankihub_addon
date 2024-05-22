@@ -6,6 +6,7 @@ import time
 import uuid
 from dataclasses import fields
 from datetime import datetime, timedelta
+from logging import LogRecord
 from pathlib import Path
 from textwrap import dedent
 from typing import Callable, Generator, List, Optional, Protocol, Tuple
@@ -31,6 +32,7 @@ from ankihub.ankihub_client.models import (  # type: ignore
 )
 from ankihub.gui import menu
 from ankihub.gui.config_dialog import setup_config_dialog_manager
+from ankihub.settings import DatadogLogHandler
 
 from ..factories import (
     DeckExtensionFactory,
@@ -2762,3 +2764,47 @@ class TestAnkiHubDBMigrations:
             assert table_definitions == expected_table_definitions
             assert index_definitions == expected_index_definitions
             assert ankihub_db.database_path != migration_test_db_path  # sanity check
+
+
+class TestDataDogLogHandler:
+    @pytest.mark.parametrize("send_logs_to_datadog_feature_flag", [True, False])
+    def test_emit_and_flush(
+        self, mocker: MockerFixture, send_logs_to_datadog_feature_flag: bool
+    ):
+        feature_flags.send_logs_to_datadog = send_logs_to_datadog_feature_flag
+
+        # Mock the requests.post call to always return a response with status code 202
+        response = Response()
+        response.status_code = 202
+        post_mock = mocker.patch("requests.post", return_value=response)
+
+        # Create a DatadogLogHandler and a LogRecord
+        handler = DatadogLogHandler()
+        record = LogRecord(
+            name="test",
+            level=0,
+            pathname="",
+            lineno=0,
+            msg="test",
+            args=(),
+            exc_info=None,
+        )
+
+        # Call emit and flush on the handler and assert the behavior
+        if send_logs_to_datadog_feature_flag:
+            handler.emit(record)
+            assert len(handler.buffer) == 1
+            assert handler.buffer[0] == record
+
+            handler.flush()
+            assert len(handler.buffer) == 0
+
+            post_mock.assert_called_once()
+            assert post_mock.call_args[0] == (
+                "https://http-intake.logs.datadoghq.com/api/v2/logs",
+            )
+        else:
+            handler.emit(record)
+            assert len(handler.buffer) == 0
+            handler.flush(record)
+            post_mock.assert_not_called()
