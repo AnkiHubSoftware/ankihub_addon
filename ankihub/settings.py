@@ -670,25 +670,31 @@ class DatadogLogHandler(logging.Handler):
         with self.lock:
             self.buffer.append(record)
             if len(self.buffer) >= self.capacity:
-                self.flush()
+                self.flush(in_background=True)
 
-    def flush(self) -> None:
+    def flush(self, in_background=False) -> None:
+        # flush is also called when the logging module shuts down when Anki is closing.
+        # in_background=False is used to not create a new thread when the add-on is closing,
+        # as this leads to an error in the shutdown, because at this point no new threads can be created.
         with self.lock:
             if not self.buffer:
                 return
             records_to_send: List[logging.LogRecord] = self.buffer
             self.buffer = []
             self.last_send_time = time.time()
-            threading.Thread(
-                target=self._send_logs_to_datadog, args=(records_to_send,)
-            ).start()
+            if in_background:
+                threading.Thread(
+                    target=self._send_logs_to_datadog, args=(records_to_send,)
+                ).start()
+            else:
+                self._send_logs_to_datadog(records_to_send)
 
     def _periodic_flush(self) -> None:
         while True:
             time.sleep(self.send_interval)
             with self.lock:
                 if time.time() - self.last_send_time >= self.send_interval:
-                    self.flush()
+                    self.flush(in_background=True)
 
     def _send_logs_to_datadog(self, records: List[logging.LogRecord]) -> None:
         body = [
