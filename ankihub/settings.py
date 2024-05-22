@@ -621,7 +621,9 @@ def setup_logger():
 
     setup_stdout_handler()
     setup_file_handler()
-    setup_datadog_handler()
+
+    if ADDON_VERSION != "dev":
+        setup_datadog_handler()
 
 
 def setup_stdout_handler() -> None:
