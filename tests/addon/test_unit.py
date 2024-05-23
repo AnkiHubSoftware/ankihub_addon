@@ -1,4 +1,5 @@
 import json
+import logging
 import os
 import sqlite3
 import tempfile
@@ -2874,15 +2875,15 @@ class TestDatadogLogHandler:
         self, anki_session_with_addon_data: AnkiSession, addon_version: str
     ):
         from ankihub import settings
-        from ankihub.settings import LOGGER
 
         settings.ADDON_VERSION = addon_version
         entry_point.run()
         with anki_session_with_addon_data.profile_loaded():
+            std_logger = logging.getLogger("ankihub")
             datadog_log_handler = next(
                 (
                     handler
-                    for handler in LOGGER.handlers
+                    for handler in std_logger.handlers
                     if isinstance(handler, DatadogLogHandler)
                 ),
                 None,
