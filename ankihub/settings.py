@@ -25,6 +25,7 @@ from typing import Any, Callable, Dict, List, Optional
 
 import aqt
 import requests
+import structlog
 from anki import buildinfo
 from anki.decks import DeckId
 from anki.utils import point_version
@@ -60,6 +61,8 @@ PROFILE_ID_FIELD_NAME = "ankihub_id"
 # Id of the AnKing Overhaul deck
 ANKING_DECK_ID = uuid.UUID("e77aedfe-a636-40e2-8169-2fce2673187e")
 TAG_FOR_INSTRUCTION_NOTES = "AnkiHub_Instructions"
+
+std_logger = logging.getLogger("ankihub")
 
 
 def _serialize_datetime(x: datetime) -> str:
@@ -614,9 +617,25 @@ def _json_formatter() -> logging.Formatter:
     )
 
 
+def _structlog_formatter(renderer) -> logging.Formatter:
+    from . import shared_processors
+
+    formatter = structlog.stdlib.ProcessorFormatter(
+        # These run ONLY on `logging` entries that do NOT originate within
+        # structlog.
+        foreign_pre_chain=shared_processors,
+        # These run on ALL entries after the pre_chain is done.
+        processors=[
+            # Remove _record & _from_structlog.
+            structlog.stdlib.ProcessorFormatter.remove_processors_meta,
+            renderer,
+        ],
+    )
+    return formatter
+
+
 def setup_logger():
     log_file_path().parent.mkdir(parents=True, exist_ok=True)
-    std_logger = logging.getLogger(LOGGER.name)
     std_logger.propagate = False
 
     setup_stdout_handler()
@@ -629,8 +648,12 @@ def setup_logger():
 def setup_stdout_handler() -> None:
     stdout_handler_ = _stdout_handler()
     stdout_handler_.setLevel(logging.INFO)
-    stdout_handler_.setFormatter(_standard_formatter())
-    LOGGER.addHandler(stdout_handler_)
+    stdout_handler_.setFormatter(
+        _structlog_formatter(
+            structlog.dev.ConsoleRenderer(),
+        )
+    )
+    std_logger.addHandler(stdout_handler_)
 
 
 def setup_file_handler() -> None:
@@ -640,15 +663,21 @@ def setup_file_handler() -> None:
         if config.public_config.get("debug_level_logs", False)
         else logging.INFO
     )
-    file_handler_.setFormatter(_standard_formatter())
-    LOGGER.addHandler(file_handler_)
+    file_handler_.setFormatter(
+        _structlog_formatter(
+            structlog.dev.ConsoleRenderer(colors=False),
+        )
+    )
+    std_logger.addHandler(file_handler_)
 
 
 def setup_datadog_handler():
     datadog_handler = DatadogLogHandler()
     datadog_handler.setLevel(logging.INFO)
-    datadog_handler.setFormatter(_json_formatter())
-    LOGGER.addHandler(datadog_handler)
+    datadog_handler.setFormatter(
+        _structlog_formatter(structlog.processors.JSONRenderer())
+    )
+    std_logger.addHandler(datadog_handler)
 
 
 class DatadogLogHandler(logging.Handler):
