@@ -616,8 +616,8 @@ def _json_formatter() -> logging.Formatter:
 
 def setup_logger():
     log_file_path().parent.mkdir(parents=True, exist_ok=True)
-    LOGGER.propagate = False
-    LOGGER.setLevel(logging.DEBUG)
+    std_logger = logging.getLogger(LOGGER.name)
+    std_logger.propagate = False
 
     setup_stdout_handler()
     setup_file_handler()
