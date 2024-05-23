@@ -3,11 +3,15 @@ as well as some constants and code for setting up the profile folder and logger.
 """
 
 import dataclasses
+import gzip
 import json
 import logging
 import os
 import re
+import socket
 import sys
+import threading
+import time
 import uuid
 from dataclasses import dataclass
 from datetime import datetime
@@ -20,12 +24,14 @@ from shutil import copyfile, move, rmtree
 from typing import Any, Callable, Dict, List, Optional
 
 import aqt
+import requests
 from anki import buildinfo
 from anki.decks import DeckId
 from anki.utils import point_version
 from aqt.utils import askUser, showInfo
 from mashumaro import field_options
 from mashumaro.mixins.json import DataClassJSONMixin
+from pythonjsonlogger import jsonlogger
 
 from . import LOGGER
 from .ankihub_client import (
@@ -595,9 +601,16 @@ def _file_handler() -> logging.Handler:
     )
 
 
-def _formatter() -> logging.Formatter:
+def _standard_formatter() -> logging.Formatter:
     return logging.Formatter(
         "%(levelname)s %(asctime)s %(module)s %(process)d %(thread)d %(message)s"
+    )
+
+
+def _json_formatter() -> logging.Formatter:
+    return jsonlogger.JsonFormatter(
+        fmt="%(levelname)s %(asctime)s %(module)s %(process)d %(thread)d %(message)s",
+        datefmt="%Y-%m-%d %H:%M:%S",
     )
 
 
@@ -609,11 +622,14 @@ def setup_logger():
     setup_stdout_handler()
     setup_file_handler()
 
+    if ADDON_VERSION != "dev":
+        setup_datadog_handler()
+
 
 def setup_stdout_handler() -> None:
     stdout_handler_ = _stdout_handler()
     stdout_handler_.setLevel(logging.INFO)
-    stdout_handler_.setFormatter(_formatter())
+    stdout_handler_.setFormatter(_standard_formatter())
     LOGGER.addHandler(stdout_handler_)
 
 
@@ -624,8 +640,124 @@ def setup_file_handler() -> None:
         if config.public_config.get("debug_level_logs", False)
         else logging.INFO
     )
-    file_handler_.setFormatter(_formatter())
+    file_handler_.setFormatter(_standard_formatter())
     LOGGER.addHandler(file_handler_)
+
+
+def setup_datadog_handler():
+    datadog_handler = DatadogLogHandler()
+    datadog_handler.setLevel(logging.INFO)
+    datadog_handler.setFormatter(_json_formatter())
+    LOGGER.addHandler(datadog_handler)
+
+
+class DatadogLogHandler(logging.Handler):
+    """
+    A custom logging handler that sends logs to Datadog.
+
+    This handler buffers log records and sends them to Datadog either when the buffer is full
+    or when a certain amount of time has passed since the last send operation.
+    """
+
+    def __init__(self, capacity: int = 50, send_interval: int = 60 * 5):
+        super().__init__()
+        self.buffer: List[logging.LogRecord] = []
+        self.capacity: int = capacity
+        self.send_interval: int = send_interval
+        self.last_send_time: float = time.time()
+        self.createLock()
+        self.flush_thread: threading.Thread = threading.Thread(
+            target=self._periodic_flush
+        )
+        # Make the thread a daemon so that it doesn't prevent Anki from closing
+        self.flush_thread.daemon = True
+        self.flush_thread.start()
+
+    def emit(self, record: logging.LogRecord) -> None:
+        from .feature_flags import feature_flags
+
+        if not feature_flags.send_addon_logs_to_datadog:
+            return
+
+        with self.lock:
+            self.buffer.append(record)
+            if len(self.buffer) >= self.capacity:
+                self.flush(in_background=True)
+
+    def flush(self, in_background=False) -> None:
+        # flush is also called when the logging module shuts down when Anki is closing.
+        # in_background=False is used to not create a new thread when the add-on is closing,
+        # as this leads to an error in the shutdown, because at this point no new threads can be created.
+        from .feature_flags import feature_flags
+
+        if not feature_flags.send_addon_logs_to_datadog:
+            return
+
+        with self.lock:
+            if not self.buffer:
+                return
+            records_to_send: List[logging.LogRecord] = self.buffer
+            self.buffer = []
+            self.last_send_time = time.time()
+            if in_background:
+                threading.Thread(
+                    target=self._send_logs_to_datadog, args=(records_to_send,)
+                ).start()
+            else:
+                self._send_logs_to_datadog(records_to_send)
+
+    def _periodic_flush(self) -> None:
+        while True:
+            time.sleep(self.send_interval)
+            with self.lock:
+                if time.time() - self.last_send_time >= self.send_interval:
+                    self.flush(in_background=True)
+
+    def _send_logs_to_datadog(self, records: List[logging.LogRecord]) -> None:
+        body = [
+            {
+                "ddsource": "anki_addon",
+                "ddtags": f"addon_version:{ADDON_VERSION},anki_version:{ANKI_VERSION}",
+                "hostname": socket.gethostname(),
+                "message": record.getMessage(),
+                "service": "ankihub_addon",
+                "username": config.user(),
+            }
+            for record in records
+        ]
+
+        headers = {
+            "Content-Type": "application/json",
+            "Content-Encoding": "gzip",
+            "DD-API-KEY": "pub573b4cee7263687d0323a12cf5a30a52",
+        }
+
+        compressed_body = gzip.compress(json.dumps(body).encode())
+
+        try:
+            response = requests.post(
+                "https://http-intake.logs.datadoghq.com/api/v2/logs",
+                headers=headers,
+                data=compressed_body,
+            )
+        except (
+            requests.exceptions.ConnectionError,
+            requests.exceptions.Timeout,
+        ) as e:  # pragma: no cover
+            LOGGER.warning(
+                f"Connection error or timeout when sending logs to Datadog: {e}"
+            )
+            return
+        except requests.exceptions.RequestException as e:  # pragma: no cover
+            LOGGER.error(
+                f"An unexpected error occurred when sending logs to Datadog: {e}"
+            )
+            return
+
+        if response.status_code != 202:  # pragma: no cover
+            LOGGER.warning(
+                f"Unexpected status code when sending logs to Datadog: {response.status_code} {response.text}"
+            )
 
 
 version_file = Path(__file__).parent / "VERSION"
