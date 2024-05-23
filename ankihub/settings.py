@@ -697,7 +697,7 @@ def setup_datadog_handler():
     datadog_handler = DatadogLogHandler()
     datadog_handler.setLevel(logging.INFO)
     datadog_handler.setFormatter(_json_formatter())
-    LOGGER.addHandler(datadog_handler)
+    STD_LOGGER.addHandler(datadog_handler)
 
 
 class DatadogLogHandler(logging.Handler):
