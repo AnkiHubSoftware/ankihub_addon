@@ -2787,7 +2787,7 @@ class TestDatadogLogHandler:
             level=0,
             pathname="",
             lineno=0,
-            msg="test",
+            msg='{"event": "test"}',
             args=(),
             exc_info=None,
         )
@@ -2828,7 +2828,7 @@ class TestDatadogLogHandler:
             level=0,
             pathname="",
             lineno=0,
-            msg="test",
+            msg='{"event": "test"}',
             args=(),
             exc_info=None,
         )
@@ -2854,7 +2854,7 @@ class TestDatadogLogHandler:
             level=0,
             pathname="",
             lineno=0,
-            msg="test",
+            msg='{"event": "test"}',
             args=(),
             exc_info=None,
         )
