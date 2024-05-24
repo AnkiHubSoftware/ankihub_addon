@@ -4,7 +4,6 @@ import json
 from copy import deepcopy
 from json import JSONDecodeError
 from pathlib import Path
-from pprint import pformat
 from typing import Dict, Optional
 
 import aqt
@@ -30,23 +29,26 @@ def logging_hook(response: Response, *args, **kwargs) -> Response:
     if "/login/" in endpoint:
         body_dict.pop("password")
 
-    headers_copy = deepcopy(response.request.headers)
-    if headers_copy.get("Authorization"):
-        headers_copy["Authorization"] = "<redacted>"
+    sanitized_headers = deepcopy(response.request.headers)
+    if sanitized_headers.get("Authorization"):
+        sanitized_headers["Authorization"] = "<redacted>"
 
     LOGGER.info(
-        f"request: {method} {endpoint}\nheaders={headers_copy}"
-        + (f"\ndata={pformat(body_dict)}" if body_dict else "")
+        "AnkiHubClient HTTP Transaction",
+        method=method,
+        endpoint=endpoint,
+        headers=sanitized_headers,
+        request_body=body_dict,
+        response_status=response.status_code,
     )
-    LOGGER.info(f"response: {response}")
     if response.status_code < 400:
         try:
-            LOGGER.debug(f"response content: {pformat(response.json())}")
+            LOGGER.debug("Response content", content=json.loads(response.text))
         except JSONDecodeError:
             # We don't want to log the content of the response if it's not JSON
             pass
     else:
-        LOGGER.info(f"response content: {response.text}")
+        LOGGER.info("Response content", content=response.text)
 
     return response
 
@@ -63,9 +65,9 @@ class AddonAnkiHubClient(AnkiHubClient):
             s3_bucket_url=config.s3_bucket_url,
             response_hooks=hooks if hooks is not None else DEFAULT_RESPONSE_HOOKS,
             get_token=lambda: config.token(),
-            local_media_dir_path_cb=lambda: Path(aqt.mw.col.media.dir())
-            if aqt.mw.col
-            else None,
+            local_media_dir_path_cb=lambda: (
+                Path(aqt.mw.col.media.dir()) if aqt.mw.col else None
+            ),
         )
 
     def upload_logs(self, file: Path, key: str) -> None:
