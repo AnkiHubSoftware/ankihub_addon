@@ -651,14 +651,14 @@ def setup_logger():
 
     STD_LOGGER.propagate = False
 
-    setup_stdout_handler()
-    setup_file_handler()
+    _setup_stdout_handler()
+    _setup_file_handler()
 
     if ADDON_VERSION != "dev":
-        setup_datadog_handler()
+        _setup_datadog_handler()
 
 
-def setup_stdout_handler() -> None:
+def _setup_stdout_handler() -> None:
     stdout_handler_ = _stdout_handler()
     stdout_handler_.setLevel(logging.INFO)
     stdout_handler_.setFormatter(
@@ -669,7 +669,7 @@ def setup_stdout_handler() -> None:
     STD_LOGGER.addHandler(stdout_handler_)
 
 
-def setup_file_handler() -> None:
+def _setup_file_handler() -> None:
     log_file_path().parent.mkdir(parents=True, exist_ok=True)
     file_handler_ = _file_handler()
     file_handler_.setLevel(
@@ -685,7 +685,7 @@ def setup_file_handler() -> None:
     STD_LOGGER.addHandler(file_handler_)
 
 
-def setup_datadog_handler():
+def _setup_datadog_handler():
     datadog_handler = DatadogLogHandler()
     datadog_handler.setLevel(logging.INFO)
     datadog_handler.setFormatter(
