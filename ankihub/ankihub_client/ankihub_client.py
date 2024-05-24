@@ -552,7 +552,7 @@ class AnkiHubClient:
                     executor.submit(self._download_media, media_path, media_remote_path)
                 )
 
-            downloaded_media = 0
+            downloaded_media_count = 0
             for future in as_completed(futures):
                 if self.should_stop_background_threads:
                     for future in futures:
@@ -560,13 +560,13 @@ class AnkiHubClient:
                     return
 
                 if future.result():
-                    downloaded_media += 1
+                    downloaded_media_count += 1
 
         LOGGER.info(
             "Downloaded media from AnkiHub.",
             ah_did=deck_id,
-            attempted=len(media_names),
-            downloaded=downloaded_media,
+            attempted_count=len(media_names),
+            downloaded_count=downloaded_media_count,
         )
 
     def _download_media(self, media_file_path: Path, media_remote_path: str) -> bool:
