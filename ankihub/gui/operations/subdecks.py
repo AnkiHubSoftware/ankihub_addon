@@ -7,6 +7,7 @@ from anki.notes import NoteId
 from aqt import dialogs
 from aqt.browser import Browser
 
+from ... import LOGGER
 from ...main.subdecks import build_subdecks_and_move_cards_to_them, flatten_deck
 from ...settings import config
 from ..utils import ask_user, tooltip
@@ -15,6 +16,10 @@ from ..utils import ask_user, tooltip
 def build_subdecks_and_move_cards_to_them_in_background(
     ankihub_did: uuid.UUID, nids: Optional[List[NoteId]] = None
 ) -> None:
+    LOGGER.info(
+        "Building subdecks and moving cards to them...", ankihub_did=ankihub_did
+    )
+
     aqt.mw.taskman.with_progress(
         label="Building subdecks and moving cards...",
         task=lambda: build_subdecks_and_move_cards_to_them(
@@ -67,10 +72,12 @@ def confirm_and_toggle_subdecks(ankihub_id: uuid.UUID) -> None:
     config.set_subdecks(ankihub_id, not using_subdecks)
 
 
-def _on_subdecks_updated(future: Future):
+def _on_subdecks_updated(future: Future[None]) -> None:
     future.result()
 
+    LOGGER.info("Subdecks updated.")
     tooltip("Subdecks updated.", parent=aqt.mw)
+
     aqt.mw.deckBrowser.refresh()
     browser: Optional[Browser] = dialogs._dialogs["Browser"][1]
     if browser is not None:

@@ -25,8 +25,11 @@ def create_collaborative_deck() -> None:
     When the upload is complete, shows a message to the user with a link to the deck on AnkiHub.
     """
 
+    LOGGER.info("Creating a new AnkiHub deck...")
+
     confirm = DeckCreationConfirmationDialog().run()
     if not confirm:
+        LOGGER.info("User didn't confirm the deck creation.")
         return
 
     LOGGER.info("Asking user to choose a deck to upload...")
@@ -48,7 +51,7 @@ def create_collaborative_deck() -> None:
 
 def _on_deck_selected(study_deck: StudyDeck) -> None:
     deck_name = study_deck.name
-    LOGGER.info(f"Chosen deck name: {study_deck.name}")
+    LOGGER.info("User selected a deck to upload.", deck_name=deck_name)
 
     if not deck_name:
         return

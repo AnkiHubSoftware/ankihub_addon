@@ -16,6 +16,8 @@ from ...utils import ask_user
 
 
 def check_anki_db():
+    LOGGER.info("Checking Anki database...")
+
     _check_missing_ankihub_nids()
 
     _check_ankihub_update_tags()
@@ -30,7 +32,10 @@ def _check_missing_ankihub_nids() -> None:
         LOGGER.info("No decks with missing ankihub_ids found.")
         return
 
-    LOGGER.info(f"Decks with missing ankihub_ids found: {ah_dids_with_missing_ah_nids}")
+    LOGGER.info(
+        "Decks with missing ankihub_ids found.",
+        ah_dids_with_missing_ah_nids=ah_dids_with_missing_ah_nids,
+    )
 
     deck_names = sorted(
         [config.deck_config(deck_id).name for deck_id in ah_dids_with_missing_ah_nids],

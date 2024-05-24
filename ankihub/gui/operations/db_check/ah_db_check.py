@@ -14,6 +14,8 @@ from ...utils import ask_user
 
 
 def check_ankihub_db(on_success: Optional[Callable[[], None]] = None) -> None:
+    LOGGER.info("Checking AnkiHub database...")
+
     _fetch_missing_note_types()
 
     if not _try_reinstall_decks_with_something_missing(on_success=on_success):
@@ -41,16 +43,16 @@ def _fetch_missing_note_types() -> None:
             continue
 
         LOGGER.info(
-            f"Missing note types found for deck {ah_did}: {mids_of_missing_note_types}"
+            "Missing note types found for deck.",
+            ah_did=ah_did,
+            mids_of_missing_note_types=mids_of_missing_note_types,
         )
 
         for mid in mids_of_missing_note_types:
             note_type = client.get_note_type(anki_note_type_id=mid)
             ankihub_db.upsert_note_type(ankihub_did=ah_did, note_type=note_type)
 
-        LOGGER.info(
-            f"Missing note types for deck {ah_did} have been fetched from AnkiHub."
-        )
+        LOGGER.info("Missing note types have been fetched from AnkiHub.", ah_did=ah_did)
 
 
 def _try_reinstall_decks_with_something_missing(
@@ -70,8 +72,11 @@ def _try_reinstall_decks_with_something_missing(
         LOGGER.info("No decks with something missing found.")
         return False
 
-    LOGGER.info(f"Decks with missing values found: {ah_dids_with_missing_values}")
-    LOGGER.info(f"Decks missing from config found: {ah_dids_missing_from_config}")
+    LOGGER.info(
+        "Decks with something missing found.",
+        ah_dids_with_missing_values=ah_dids_with_missing_values,
+        ah_dids_missing_from_config=ah_dids_missing_from_config,
+    )
 
     if ah_dids_missing_from_config:
         messsage_begin = "AnkiHub has detected that some decks have missing values in the database.<br><br>"
@@ -106,7 +111,8 @@ def _try_reinstall_decks_with_something_missing(
             except DeckDownloadAndInstallError as e:
                 if isinstance(e.original_exception, RemoteDeckNotFoundError):
                     LOGGER.info(
-                        f"Deck {e.ankihub_did} not found on AnkiHub anymore. Uninstalling it."
+                        "Deck not found on AnkiHub anymore. Uninstalling it.",
+                        ah_did=e.ankihub_did,
                     )
                     uninstall_deck(e.ankihub_did)
                 else:

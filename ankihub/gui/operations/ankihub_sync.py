@@ -40,12 +40,15 @@ def sync_with_ankihub(on_done: Callable[[Future], None]) -> None:
 
     If a full AnkiWeb sync is already required, sync with AnkiWeb first.
     """
+    LOGGER.info("Syncing with AnkiHub...")
 
     @pass_exceptions_to_on_done
     def on_sync_status(out: SyncOutput, on_done: Callable[[Future], None]) -> None:
         if out.required == out.FULL_SYNC:
+            LOGGER.info("Full sync required. Syncing with AnkiWeb first.")
             sync_with_ankiweb(partial(_after_ankiweb_sync, on_done=on_done))
         else:
+            LOGGER.info("No full sync required. Syncing with AnkiHub directly.")
             _sync_with_ankihub_inner(on_done=on_done)
 
     get_sync_status(aqt.mw, partial(on_sync_status, on_done=on_done))
@@ -57,6 +60,7 @@ def _after_ankiweb_sync(on_done: Callable[[Future], None]) -> None:
     def on_sync_status(out: SyncOutput, on_done: Callable[[Future], None]) -> None:
         if out.required == out.FULL_SYNC:
             # Stop here if user cancelled full sync
+            LOGGER.info("AnkiWeb full sync cancelled.")
             raise FullSyncCancelled()
 
         _sync_with_ankihub_inner(on_done=on_done)
@@ -92,8 +96,10 @@ def _on_new_deck_subscriptions_done(
 
     if sync_state.schema_before_new_decks_installation != collection_schema():
         config.set_schema_to_do_full_upload_for_once(collection_schema())
+        LOGGER.info("Full upload required after installation of decks.")
     else:
         config.set_schema_to_do_full_upload_for_once(None)
+        LOGGER.info("No full upload required after installation of decks.")
 
     installed_ah_dids = config.deck_ids()
     subscribed_ah_dids = [deck.ah_did for deck in subscribed_decks]
@@ -130,10 +136,12 @@ def _on_sync_done(future: Future, on_done: Callable[[Future], None]) -> None:
     else:
         on_done(future_with_result(None))
 
+    LOGGER.info("Sync with AnkiHub done.")
+
 
 def _on_clear_unused_tags_done(future: Future) -> None:
     changes: OpChangesWithCount = future.result()
-    LOGGER.info(f"Cleared {changes.count} unused tags.")
+    LOGGER.info("Cleared unused tags.", deleted_tags_amount=changes.count)
 
 
 def _on_send_review_data_done(future: Future) -> None:
@@ -146,11 +154,14 @@ def _on_send_review_data_done(future: Future) -> None:
     # This happens e.g. when the sync is triggered by the user closing Anki. Then the task for sending review data
     # starts and tries to access the collection, but it is already closed. We can ignore this error.
     if "CollectionNotOpen" in str(exception):  # pragma: no cover
-        LOGGER.warning(  # pragma: no cover
-            f"Failed to send review data because the collection is closed: {exception}"
+        LOGGER.warning(
+            "Failed to send review data because the collection is closed.",
+            exc_info=exception,
         )
     else:
-        LOGGER.error(f"Failed to send review data: {exception}")  # pragma: no cover
+        LOGGER.error(  # pragma: no cover
+            "Failed to send review data.", exc_info=exception
+        )
 
 
 def _uninstall_decks_the_user_is_not_longer_subscribed_to(
@@ -171,7 +182,8 @@ def _upload_if_full_sync_triggered_by_ankihub(
 ) -> None:
     if config.schema_to_do_full_upload_for_once() == collection_schema():
         LOGGER.info(
-            f"Full sync triggered by AnkiHub (scm={collection_schema()}). Uploading changes."
+            "Full sync triggered by AnkiHub. Uploading changes.",
+            collection_schema=collection_schema(),
         )
         if hasattr(out, "server_media_usn"):
             server_usn = out.server_media_usn if mw.pm.media_syncing_enabled() else None

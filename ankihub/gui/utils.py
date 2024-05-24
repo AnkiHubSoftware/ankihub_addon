@@ -29,6 +29,7 @@ from aqt.qt import (
 from aqt.theme import theme_manager
 from aqt.utils import disable_help_button, tooltip
 
+from .. import LOGGER
 from ..settings import config
 
 
@@ -588,6 +589,8 @@ def active_window_or_mw() -> QWidget:
 
 
 def sync_with_ankiweb(on_done: Callable[[], None]) -> None:
+    LOGGER.info("Syncing with AnkiWeb...")
+
     if not aqt.mw.pm.sync_auth():
         on_done()
         return
