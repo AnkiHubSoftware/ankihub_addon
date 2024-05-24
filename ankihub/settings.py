@@ -763,9 +763,9 @@ class DatadogLogHandler(logging.Handler):
                 "ddsource": "anki_addon",
                 "ddtags": f"addon_version:{ADDON_VERSION},anki_version:{ANKI_VERSION}",
                 "hostname": socket.gethostname(),
-                "message": record.getMessage(),
                 "service": "ankihub_addon",
                 "username": config.user(),
+                **json.loads(self.format(record)),
             }
             for record in records
         ]
