@@ -38,7 +38,12 @@ def create_ankihub_deck(
     private: bool,
     add_subdeck_tags: bool = False,
 ) -> DeckCreationResult:
-    LOGGER.info("Creating AnkiHub deck")
+    LOGGER.info(
+        "Creating AnkiHub deck...",
+        deck_name=deck_name,
+        private=private,
+        add_subdeck_tags=add_subdeck_tags,
+    )
 
     create_backup()
 
@@ -104,9 +109,7 @@ def _note_type_name_without_ankihub_modifications(name: str) -> str:
 def _change_note_types_of_notes(
     note_ids: typing.List[NoteId], note_type_mapping: dict
 ) -> None:
-    LOGGER.info(
-        f"Changing note types of notes according to mapping: {note_type_mapping}"
-    )
+    LOGGER.info("Changing note types of notes...", note_type_mapping=note_type_mapping)
     nid_mid_pairs = []
     for note_id in note_ids:
         note = aqt.mw.col.get_note(id=note_id)
@@ -120,13 +123,13 @@ def _change_note_types_of_notes(
 def _set_ankihub_id_fields_based_on_notes_data(notes_data: List[NoteInfo]) -> None:
     """Assign UUID to notes that have an AnkiHub ID field already."""
     updated_notes = []
-    LOGGER.info("Assigning AnkiHub IDs to notes.")
+    LOGGER.info("Assigning AnkiHub IDs to notes...")
     for note_data in notes_data:
         note = aqt.mw.col.get_note(id=NoteId(note_data.anki_nid))
         note[ANKIHUB_NOTE_TYPE_FIELD_NAME] = str(note_data.ah_nid)
         updated_notes.append(note)
     aqt.mw.col.update_notes(updated_notes)
-    LOGGER.info(f"Updated notes: {', '.join(map(str, [n.id for n in updated_notes]))}")
+    LOGGER.info("Updated notes.", updated_notes_count=len(updated_notes))
 
 
 def _upload_deck(
