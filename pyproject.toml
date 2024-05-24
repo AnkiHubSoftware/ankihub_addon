@@ -20,6 +20,7 @@ exclude = [
   'ankihub/lib/other/typing_extension',
   'ankihub/lib/tenacity',
   'ankihub/lib/peewee',
+  'ankihub/lib/structlog',
 ]
 
 no_strict_optional = true
@@ -29,15 +30,15 @@ module = 'ankihub.*'
 check_untyped_defs = true
 
 [[tool.mypy.overrides]]
-module = 'mashumaro.*'
-ignore_errors = true
-
-[[tool.mypy.overrides]]
-module = ['sentry_sdk.*', 'urllib3.*', 'tenacity.*', 'peewee.*']
-follow_imports = 'skip'
-
-[[tool.mypy.overrides]]
-module = 'ankihub.gui.ankiaddonconfig.*'
+module = [
+  'structlog.*',
+  'mashumaro.*',
+  'ankihub.gui.ankiaddonconfig.*',
+  'sentry_sdk.*',
+  'urllib3.*',
+  'tenacity.*',
+  'peewee.*',
+]
 ignore_errors = true
 
 [[tool.mypy.overrides]]

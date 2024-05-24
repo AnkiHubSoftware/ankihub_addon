@@ -1,5 +1,3 @@
-import logging
-import logging.config
 import os
 import pathlib
 import sys
@@ -11,7 +9,9 @@ lib_other = (pathlib.Path(__file__).parent / "lib/other").absolute()
 sys.path.insert(0, str(lib_other))
 
 
-LOGGER: logging.Logger = logging.getLogger("ankihub")
+import structlog
+
+LOGGER = structlog.stdlib.get_logger("ankihub")
 
 SKIP_INIT = os.getenv("SKIP_INIT", False)
 LOGGER.info(f"SKIP_INIT: {SKIP_INIT}")
