@@ -1,7 +1,6 @@
 """Import NoteInfo objects and note types into Anki and the AnkiHub database,
 create/update decks and note types in the Anki collection if necessary"""
 
-import textwrap
 import uuid
 from dataclasses import dataclass
 from enum import Enum
@@ -114,15 +113,16 @@ class AnkiHubImporter:
         subdecks_for_new_notes_only indicates whether only new notes should be moved into subdecks
         """
         LOGGER.info(
-            textwrap.dedent(
-                f"""
-                Importing ankihub deck {deck_name=} {is_first_import_of_deck=} {ankihub_did=} {anki_did=}
-                \tNotes: {pformat(truncated_list(notes, 2))}
-                \tProtected fields: {pformat(protected_fields)}
-                \tProtected tags: {pformat(protected_tags)}
-                \tSubdecks: {subdecks}, Subdecks for new notes only: {subdecks_for_new_notes_only}
-                """
-            ).strip("\n")
+            "Importing ankihub deck...",
+            deck_name=deck_name,
+            ankihub_did=ankihub_did,
+            anki_did=anki_did,
+            is_first_import_of_deck=is_first_import_of_deck,
+            notes_count=len(notes),
+            protected_fields=protected_fields,
+            protected_tags=protected_tags,
+            subdecks=subdecks,
+            subdecks_for_new_notes_only=subdecks_for_new_notes_only,
         )
 
         # Instance attributes are reset here so that the results returned are only for the current deck.
@@ -264,25 +264,19 @@ class AnkiHubImporter:
 
     def _log_note_import_summary(self) -> None:
         LOGGER.info(
-            f"Created {len(self._created_nids)} notes: {truncated_list(self._created_nids, limit=50)}"
-        )
-        LOGGER.info(
-            f"Updated {len(self._updated_nids)} notes: {truncated_list(self._updated_nids, limit=50)}"
-        )
-        LOGGER.info(
-            f"Deleted {len(self._deleted_nids)} notes: {truncated_list(self._deleted_nids, limit=50)}"
-        )
-        LOGGER.info(
-            textwrap.dedent(
-                f"""
-                Marked {len(self._marked_as_deleted_nids)} notes as deleted:
-                {truncated_list(self._marked_as_deleted_nids, limit=50)}
-                """
-            ).strip()
-        )
-        LOGGER.info(
-            f"Skippped {len(self._skipped_nids)} notes: "
-            f"{truncated_list(self._skipped_nids, limit=50)}"
+            "Note import summary",
+            created_notes_count=len(self._created_nids),
+            created_notes_truncated=truncated_list(self._created_nids, limit=3),
+            updated_notes_count=len(self._updated_nids),
+            updated_notes_truncated=truncated_list(self._updated_nids, limit=3),
+            deleted_notes_count=len(self._deleted_nids),
+            deleted_notes_truncated=truncated_list(self._deleted_nids, limit=3),
+            marked_as_deleted_notes_count=len(self._marked_as_deleted_nids),
+            marked_as_deleted_notes_truncated=truncated_list(
+                self._marked_as_deleted_nids, limit=3
+            ),
+            skipped_notes_count=len(self._skipped_nids),
+            skipped_notes_list=truncated_list(self._skipped_nids, limit=3),
         )
 
     def _prepare_notes(
@@ -397,9 +391,7 @@ class AnkiHubImporter:
 
         nids_to_delete = [note.id for note in notes]
         changes = aqt.mw.col.remove_notes(nids_to_delete)
-        LOGGER.info(
-            f"Deleted {changes.count} notes: {truncated_list(nids_to_delete, limit=50)}"
-        )
+        LOGGER.info("Deleted notes.", deleted_notes_count=changes.count)
         self._deleted_nids = nids_to_delete
 
     def _mark_notes_as_deleted(self, notes: Collection[Note]) -> None:
@@ -418,9 +410,7 @@ class AnkiHubImporter:
         nids = [note.id for note in notes]
         self._marked_as_deleted_nids = nids
 
-        LOGGER.info(
-            f"Marked {len(notes)} notes as deleted: {truncated_list(nids, limit=50)}"
-        )
+        LOGGER.info("Marked notes as deleted.", marked_as_deleted_notes_count=len(nids))
 
     def _suspend_cards(
         self,
@@ -445,7 +435,8 @@ class AnkiHubImporter:
         aqt.mw.col.update_cards(cards_to_suspend)
 
         LOGGER.info(
-            f"Suspended {len(cards_to_suspend)} cards: {truncated_list(cards_to_suspend, limit=50)}"
+            "Suspended cards.",
+            suspended_cards_count=len(cards_to_suspend),
         )
 
     def _create_notes_inner(
@@ -508,12 +499,13 @@ class AnkiHubImporter:
             cids = aqt.mw.col.find_cards(f'deck:"{aqt.mw.col.decks.name(created_did)}"')
             aqt.mw.col.set_deck(cids, common_ancestor_did)
             LOGGER.info(
-                f"Moved new cards to common ancestor deck {common_ancestor_did=}"
+                "Moved new cards to common ancestor deck.",
+                common_ancestor_did=common_ancestor_did,
             )
 
             if created_did != common_ancestor_did:
                 aqt.mw.col.decks.remove([created_did])
-                LOGGER.info(f"Removed created deck {created_did=}")
+                LOGGER.info("Removed created deck.", created_did=created_did)
 
             return common_ancestor_did
 
@@ -575,6 +567,7 @@ class AnkiHubImporter:
     ) -> Tuple[Note, NoteOperation]:
         """Gets or creates a note and prepares it for import into Anki DB. Returns the note and the operation that
         should be performed on it."""
+        LOGGER.debug("Preparing note...", anki_nid=note_data.anki_nid)
         try:
             note = aqt.mw.col.get_note(id=NoteId(note_data.anki_nid))
             note_exists = True
@@ -601,7 +594,7 @@ class AnkiHubImporter:
             else:
                 raise AssertionError("This should never happen.")  # pragma: no cover
 
-        LOGGER.debug(f"Prepared note: {note_data.anki_nid=} {operation=}")
+        LOGGER.debug("Prepared note.", anki_nid=note_data.anki_nid, operation=operation)
         return note, operation
 
     def _prepare_note_inner(
@@ -624,9 +617,6 @@ class AnkiHubImporter:
         to avoid flushing unnecessarily, which is better for performance.
         We also keep track of which notes were updated and return them in the AnkiHubImportResult.
         """
-
-        LOGGER.debug("Preparing note...")
-
         changed_guid = self._prepare_guid(note, note_data.guid)
 
         changed_ankihub_id_field = self._prepare_ankihub_id_field(
@@ -644,22 +634,27 @@ class AnkiHubImporter:
             changed_guid or changed_ankihub_id_field or changed_fields or changed_tags
         )
 
-        LOGGER.debug(f"Prepared note. {changed=}")
         return changed
 
     def _prepare_guid(self, note: Note, guid: str) -> bool:
         if note.guid == guid:
             return False
 
-        LOGGER.debug(f"Changing guid of note {note.id} from {note.guid} to {guid}")
+        LOGGER.debug(
+            "Changing guid of note.",
+            anki_nid=note.id,
+            new_guid=guid,
+            old_guid=note.guid,
+        )
         note.guid = guid
         return True
 
     def _prepare_ankihub_id_field(self, note: Note, ankihub_nid: str) -> bool:
         if note[settings.ANKIHUB_NOTE_TYPE_FIELD_NAME] != ankihub_nid:
             LOGGER.debug(
-                f"AnkiHub id of note {note.id} will be changed from {note[settings.ANKIHUB_NOTE_TYPE_FIELD_NAME]} "
-                f"to {ankihub_nid}",
+                "Changing AnkiHub id of note.",
+                anki_nid=note.id,
+                new_ankihub_id=ankihub_nid,
             )
             note[settings.ANKIHUB_NOTE_TYPE_FIELD_NAME] = ankihub_nid
             return True
@@ -685,20 +680,23 @@ class AnkiHubImporter:
             )
             if field.name in protected_fields_for_model:
                 LOGGER.debug(
-                    f"Field {field.name} is protected by the protected_fields for the model, skipping."
+                    "Field is protected by the protected_fields for the model, skipping.",
+                    field_name=field.name,
                 )
                 continue
 
             if field.name in fields_protected_by_tags:
-                LOGGER.debug(f"Field {field.name} is protected by a tag, skipping.")
+                LOGGER.debug(
+                    "Field is protected by a tag, skipping.", field_name=field.name
+                )
                 continue
 
             if note[field.name] != field.value:
                 LOGGER.debug(
-                    f'Field: "{field.name}" will be changed from:\n'
-                    f"{note[field.name]}\n"
-                    "to:\n"
-                    f"{field.value}"
+                    "Changing field of note.",
+                    anki_nid=note.id,
+                    field_name=field.name,
+                    field_value=field.value,
                 )
                 note[field.name] = field.value
                 changed = True
@@ -717,7 +715,10 @@ class AnkiHubImporter:
         )
         if set(prev_tags) != set(note.tags):
             LOGGER.debug(
-                f"Tags were changed from {prev_tags} to {note.tags}.",
+                "Tags were changed.",
+                anki_nid=note.id,
+                new_tags=note.tags,
+                old_tags=prev_tags,
             )
             changed = True
 
@@ -728,11 +729,11 @@ def _adjust_deck(deck_name: str, local_did: Optional[DeckId] = None) -> DeckId:
     unique_name = get_unique_ankihub_deck_name(deck_name)
     if local_did is None:
         local_did = DeckId(aqt.mw.col.decks.add_normal_deck_with_name(unique_name).id)
-        LOGGER.info(f"Created deck {local_did=}")
+        LOGGER.info("Created deck.", local_did=local_did)
     elif aqt.mw.col.decks.name_if_exists(local_did) is None:
         # The deck created here may be removed later.
         create_deck_with_id(unique_name, local_did)
-        LOGGER.info(f"Recreated deck {local_did=}")
+        LOGGER.info("Recreated deck.", local_did=local_did)
 
     return local_did
 
@@ -783,10 +784,9 @@ def _create_missing_note_types(
         mid for mid in remote_note_types.keys() if aqt.mw.col.models.get(mid) is None
     )
     for mid in missings_mids:
-        LOGGER.info(f"Missing note type {mid}")
         new_note_type = remote_note_types[mid]
         create_note_type_with_id(new_note_type, mid)
-        LOGGER.info(f"Created missing note type {mid}")
+        LOGGER.info("Created missing note type.", mid=mid)
 
 
 def _rename_note_types(remote_note_types: Dict[NotetypeId, NotetypeDict]) -> None:
@@ -796,7 +796,7 @@ def _rename_note_types(remote_note_types: Dict[NotetypeId, NotetypeDict]) -> Non
             local_note_type["name"] = remote_note_type["name"]
             aqt.mw.col.models.ensure_name_unique(local_note_type)
             aqt.mw.col.models.update_dict(local_note_type)
-            LOGGER.info(f"Renamed note type {mid=} to {local_note_type['name']}")
+            LOGGER.info("Renamed note type.", mid=mid, name=remote_note_type["name"])
 
 
 def _ensure_local_and_remote_fields_are_same(
@@ -813,26 +813,21 @@ def _ensure_local_and_remote_fields_are_same(
             remote_note_type["flds"]
         ):
             LOGGER.info(
-                f'Fields of local note type "{local_note_type["name"]}" differ from remote note type.\n'
-                f"local:\n{pformat(field_tuples(local_note_type['flds']))}\n"
-                f"remote:\n{pformat(field_tuples(remote_note_type['flds']))}"
+                "Fields of local note type differ from remote note type.",
+                local_note_type_name=local_note_type["name"],
+                local_fields=field_tuples(local_note_type["flds"]),
+                remote_fields=field_tuples(remote_note_type["flds"]),
             )
             note_types_with_field_conflicts.append((local_note_type, remote_note_type))
 
     for local_note_type, remote_note_type in note_types_with_field_conflicts:
-        LOGGER.info(f"Adjusting fields of {local_note_type['name']}...")
-
         local_note_type["flds"] = _adjust_field_ords(
             local_note_type["flds"], remote_note_type["flds"]
         )
-        LOGGER.info(
-            f"Fields after adjusting ords:\n{pformat(field_tuples(local_note_type['flds']))}"
-        )
-
         aqt.mw.col.models.update_dict(local_note_type)
         LOGGER.info(
-            f"Fields after updating the model:\n"
-            f"{pformat(field_tuples(aqt.mw.col.models.get(local_note_type['id'])['flds']))}"
+            "Fields after updating the note type",
+            fields=field_tuples(aqt.mw.col.models.get(local_note_type["id"])["flds"]),
         )
 
 
