@@ -1693,7 +1693,6 @@ class TestErrorHandling:
         display_login_mock = mocker.patch.object(AnkiHubLogin, "display_login")
 
         handled = _try_handle_exception(
-            exc_type=AnkiHubHTTPError,
             exc_value=AnkiHubHTTPError(response=Mock(status_code=401)),
             tb=None,
         )
@@ -1721,7 +1720,6 @@ class TestErrorHandling:
         response_mock.json = lambda: json.loads(response_content)  # type: ignore
 
         handled = _try_handle_exception(
-            exc_type=AnkiHubHTTPError,
             exc_value=AnkiHubHTTPError(response=response_mock),
             tb=None,
         )
@@ -1731,7 +1729,6 @@ class TestErrorHandling:
     def test_handle_ankihub_406(self, mocker: MockerFixture):
         ask_user_mock = mocker.patch("ankihub.gui.errors.ask_user", return_value=False)
         handled = _try_handle_exception(
-            exc_type=AnkiHubHTTPError,
             exc_value=AnkiHubHTTPError(
                 response=Mock(status_code=406, reason=OUTDATED_CLIENT_ERROR_REASON)
             ),
