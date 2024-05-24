@@ -650,6 +650,7 @@ def setup_logger():
     )
 
     STD_LOGGER.propagate = False
+    STD_LOGGER.setLevel(logging.DEBUG)
 
     _setup_stdout_handler()
     _setup_file_handler()
