@@ -95,7 +95,7 @@ def open_suggestion_dialog_for_single_suggestion(
 
     ah_did = _determine_ah_did_for_nids_to_be_suggested([note.id], parent)
     if not ah_did:
-        LOGGER.info(f"Suggestion cancelled. {note.id=}")
+        LOGGER.info("Suggestion cancelled.", note_id=note.id)
         return
 
     ah_nid = ankihub_db.ankihub_nid_for_anki_nid(note.id)
@@ -133,7 +133,7 @@ def _handle_suggestion_error(e: AnkiHubHTTPError, parent: QWidget) -> None:
             ),
             title="Problem with suggestion",
         )
-        LOGGER.info(f"Can't submit suggestion due to: {pformat(error_message)}")
+        LOGGER.info("Can't submit suggestion.", error_message=error_message)
     elif e.response.status_code == 403:
         response_data = e.response.json()
         error_message = response_data.get("detail")
@@ -342,8 +342,10 @@ def _on_suggest_notes_in_bulk_done(future: Future, parent: QWidget) -> None:
                 return
         raise e
 
-    LOGGER.info("Created note suggestions in bulk.")
-    LOGGER.info(f"errors_by_nid:\n{pformat(suggestions_result.errors_by_nid)}")
+    LOGGER.info(
+        "Created note suggestions in bulk.",
+        errors_by_nid=suggestions_result.errors_by_nid,
+    )
 
     msg_about_created_suggestions = (
         f"Submitted {suggestions_result.change_note_suggestions_count} change note suggestion(s).\n"
