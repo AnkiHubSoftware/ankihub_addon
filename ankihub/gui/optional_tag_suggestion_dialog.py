@@ -1,4 +1,5 @@
 """Dialog for suggesting optional tags for notes."""
+
 from concurrent.futures import Future
 from typing import List, Sequence
 
@@ -45,6 +46,8 @@ class OptionalTagsSuggestionDialog(QDialog):
         self._setup_ui()
         self._setup_tag_group_list()
         self._validate_tag_groups_and_update_ui()
+
+        LOGGER.info("OptionalTagsSuggestionDialog initialized.")
 
     def _setup_ui(self):
         self.setWindowTitle("Optional Tag Suggestions")
@@ -227,7 +230,9 @@ class OptionalTagsSuggestionDialog(QDialog):
                     item.setToolTip("\n".join(response.errors))
                 else:
                     LOGGER.debug(
-                        f"Unknown error for tag group {item.text()}, {response=}"
+                        "Unknown error for tag group",
+                        tag_group=response.tag_group_name,
+                        response=str(response),
                     )
                     item.setToolTip("Unknown error")
 
