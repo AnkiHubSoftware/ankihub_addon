@@ -32,7 +32,6 @@ from anki.utils import point_version
 from aqt.utils import askUser, showInfo
 from mashumaro import field_options
 from mashumaro.mixins.json import DataClassJSONMixin
-from pythonjsonlogger import jsonlogger
 from structlog.processors import CallsiteParameter
 from structlog.typing import Processor
 
@@ -640,13 +639,6 @@ def _structlog_formatter(renderer) -> logging.Formatter:
     return formatter
 
 
-def _json_formatter() -> logging.Formatter:
-    return jsonlogger.JsonFormatter(
-        fmt="%(levelname)s %(asctime)s %(module)s %(process)d %(thread)d %(message)s",
-        datefmt="%Y-%m-%d %H:%M:%S",
-    )
-
-
 def setup_logger():
     structlog.configure(
         processors=SHARED_LOG_PROCESSORS
@@ -696,7 +688,9 @@ def setup_file_handler() -> None:
 def setup_datadog_handler():
     datadog_handler = DatadogLogHandler()
     datadog_handler.setLevel(logging.INFO)
-    datadog_handler.setFormatter(_json_formatter())
+    datadog_handler.setFormatter(
+        _structlog_formatter(structlog.processors.JSONRenderer())
+    )
     STD_LOGGER.addHandler(datadog_handler)
 
 
