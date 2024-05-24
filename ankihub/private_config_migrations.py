@@ -90,8 +90,9 @@ def _remove_orphaned_deck_extensions(private_config_dict: Dict) -> None:
         if deck_extension["ah_did"] not in decks:
             del deck_extensions[deck_extension_id]
             LOGGER.info(
-                f"Removed deck extension config with {deck_extension_id=} for deck {deck_extension['ah_did']} "
-                "because the deck isn't in the config anymore."
+                "Removed deck extension config because the deck isn't in the config anymore.",
+                ah_did=deck_extension["ah_did"],
+                deck_extension_id=deck_extension_id,
             )
 
 
@@ -108,11 +109,11 @@ def _maybe_prompt_user_for_behavior_on_remote_note_deleted(
     if all(deck.get(field_name) is not None for deck in decks_dict.values()):
         return
 
-    LOGGER.info("Prompting user to configure behavior on remote note deleted.")
-
     for ah_did_str in decks_dict.keys():
         decks_dict[ah_did_str][
             field_name
         ] = BehaviorOnRemoteNoteDeleted.DELETE_IF_NO_REVIEWS.value
 
-    LOGGER.info("Configured behavior on remote note deleted.")
+    LOGGER.info(
+        f"Set {field_name} to {BehaviorOnRemoteNoteDeleted.DELETE_IF_NO_REVIEWS.value} for all decks."
+    )
