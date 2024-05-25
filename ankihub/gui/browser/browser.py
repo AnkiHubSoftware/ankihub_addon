@@ -585,7 +585,10 @@ def _remove_optional_tags_of_extension(extension_config: DeckExtensionConfig) ->
         regex=True,
         match_case=False,
     )
-    LOGGER.info(f"Removed optional tags for {extension_config.tag_group_name}")
+    LOGGER.info(
+        "Removed optional tags for optional tag group.",
+        tag_group_name=extension_config.tag_group_name,
+    )
 
 
 # custom columns
@@ -705,7 +708,7 @@ def _build_tag_tree_and_copy_ah_tag_items_to_ah_tree(
     try:
         browser.sidebar._tag_tree(root_tree_item)
     except (AttributeError, ValueError):
-        LOGGER.warning("AnkiHub: Could not build tag tree")
+        LOGGER.warning("Could not build tag tree.")
         return False
 
     # Move the AnkiHub tag items to the AnkiHub tree
@@ -719,7 +722,7 @@ def _build_tag_tree_and_copy_ah_tag_items_to_ah_tree(
     )
 
     if tag_tree is None:
-        LOGGER.warning("AnkiHub: Could not find tag tree")
+        LOGGER.warning("Could not find tag tree.")
         return False
 
     ankihub_tag_tree_items = [
@@ -746,7 +749,7 @@ def _build_tag_tree_and_copy_ah_tag_items_to_ah_tree(
     root_tree_item.children.remove(tag_tree)
     browser.sidebar._tag_tree(root_tree_item)
 
-    LOGGER.info("AnkiHub: Built tag tree and copied AnkiHub tag items to AnkiHub tree")
+    LOGGER.info("Built tag tree and copied AnkiHub tag items to AnkiHub tree.")
 
     return True
 

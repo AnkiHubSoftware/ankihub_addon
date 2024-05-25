@@ -49,11 +49,16 @@ class _AnkiHubDeckUpdater:
         Also updates deck extensions.
         Should be called from a background thread with a progress dialog to avoid blocking the UI.
         Returns the results of the imports of the updates."""
-        LOGGER.info(f"Updating decks and media for {ah_dids=} {start_media_sync=}...")
+        LOGGER.info(
+            "Updating decks and media...",
+            ah_dids=ah_dids,
+            start_media_sync=start_media_sync,
+        )
 
         self._import_results = None
 
         if not config.is_logged_in():
+            LOGGER.info("User is not logged in, can't update decks.")
             raise NotLoggedInError()
 
         self._import_results = []
@@ -64,7 +69,7 @@ class _AnkiHubDeckUpdater:
         if start_media_sync:
             aqt.mw.taskman.run_on_main(media_sync.start_media_download)
 
-        LOGGER.info("Finished updating decks")
+        LOGGER.info("Finished updating decks.")
         return self._import_results
 
     def last_deck_updates_results(self) -> Optional[List[AnkiHubImportResult]]:
@@ -74,7 +79,7 @@ class _AnkiHubDeckUpdater:
 
     def _update_decks(self, ah_dids: Collection[uuid.UUID]) -> None:
         """Fetches and applies updates for the given decks and their extensions."""
-        LOGGER.info(f"Updating decks for {ah_dids=}...")
+        LOGGER.info("Updating decks...", ah_dids=ah_dids)
 
         create_backup()
 
@@ -149,7 +154,7 @@ class _AnkiHubDeckUpdater:
 
             config.save_latest_deck_update(ankihub_did, deck_updates.latest_update)
         else:
-            LOGGER.info(f"No new updates for {ankihub_did=}")
+            LOGGER.info("No new updates for deck", ah_did=ankihub_did)
         return True
 
     def fetch_and_apply_pending_notes_actions_for_deck(
@@ -159,7 +164,9 @@ class _AnkiHubDeckUpdater:
             ankihub_did
         )
         if not pending_notes_actions:
-            LOGGER.info(f"No pending notes actions to apply for {ankihub_did=}")
+            LOGGER.info(
+                "No pending notes actions to apply for deck", ah_did=ankihub_did
+            )
             return
 
         for pending_note_action in pending_notes_actions:
@@ -188,12 +195,15 @@ class _AnkiHubDeckUpdater:
 
         def on_success(_) -> None:
             LOGGER.info(
-                f"Unsuspended {len(anki_cids)} cards for note ids: {truncated_list(ah_nids)}"
+                "Unsuspended cards",
+                anki_cids_count=len(anki_cids),
+                ah_nids_truncated=truncated_list(anki_nids),
             )
 
         def on_failure(exception: Exception) -> None:
             LOGGER.exception(  # pragma: no cover
-                f"Failed to unsuspend cards for {truncated_list(ah_nids)}: {exception}"
+                "Failed to unsuspend cards",
+                ah_nids_truncated=truncated_list(anki_nids),
             )
 
         aqt.mw.taskman.run_on_main(
@@ -208,7 +218,7 @@ class _AnkiHubDeckUpdater:
         if not (
             deck_extensions := self._client.get_deck_extensions_by_deck_id(ankihub_did)
         ):
-            LOGGER.info(f"No extensions to update for {ankihub_did=}")
+            LOGGER.info("No extensions to update for deck", ah_did=ankihub_did)
             return True
 
         for deck_extension in deck_extensions:
@@ -234,7 +244,7 @@ class _AnkiHubDeckUpdater:
                 continue
 
             if aqt.mw.progress.want_cancel():
-                LOGGER.debug("User cancelled extension update.")
+                LOGGER.info("User cancelled extension update.")
                 return False
 
             for customization in chunk.note_customizations:
@@ -245,7 +255,8 @@ class _AnkiHubDeckUpdater:
                     note = aqt.mw.col.get_note(anki_nid)
                 except NotFoundError:
                     LOGGER.warning(
-                        f"Tried to apply customization to note {customization.ankihub_nid} but note was not found"
+                        "Tried to apply customization to note but note was not found.",
+                        ah_nid=customization.ankihub_nid,
                     )
                     continue
                 else:
@@ -299,7 +310,8 @@ class _AnkiHubDeckUpdater:
                 )
             )
             LOGGER.info(
-                "Unable to get deck updates because the deck doesn't exist on AnkiHub."
+                "Unable to get deck updates because the deck doesn't exist on AnkiHub.",
+                ah_did=ankihub_did,
             )
             return True
         return False

@@ -34,8 +34,7 @@ from anki.decks import DeckId, FilteredDeckConfig
 from anki.errors import NotFoundError
 from anki.models import NotetypeDict, NotetypeId
 from anki.notes import Note, NoteId
-from anki.utils import point_version
-from aqt import AnkiQt, QMenu, dialogs, gui_hooks
+from aqt import AnkiQt, QMenu, dialogs
 from aqt.addcards import AddCards
 from aqt.addons import InstallOk
 from aqt.browser import Browser
@@ -124,11 +123,6 @@ from ankihub.ankihub_client.ankihub_client import (
 from ankihub.common_utils import local_media_names_from_html
 from ankihub.db import ankihub_db
 from ankihub.db.models import AnkiHubNote
-from ankihub.debug import (
-    _log_stack,
-    _setup_logging_for_db_begin,
-    _setup_logging_for_sync_collection_and_media,
-)
 from ankihub.gui import utils
 from ankihub.gui.auto_sync import (
     SYNC_RATE_LIMIT_SECONDS,
@@ -5314,52 +5308,6 @@ def test_check_and_prompt_for_updates_on_main_window(
     # when called.
     with anki_session.profile_loaded():
         utils.check_and_prompt_for_updates_on_main_window()
-
-
-# without this mark the test sometimes fails on cleanup
-@pytest.mark.qt_no_exception_capture
-class TestDebugModule:
-    def test_setup_logging_for_sync_collection_and_media(
-        self, anki_session: AnkiSession, mocker: MockerFixture
-    ):
-        # Test that the original AnkiQt._sync_collection_and_media method gets called
-        # despite the monkeypatching we do in debug.py.
-        with anki_session.profile_loaded():
-            mw = anki_session.mw
-
-            # Mock the AnkiWeb sync to do nothing
-            mocker.patch.object(aqt.sync, "sync_collection")
-            # ... and reload the main module so that the mock is used.
-            importlib.reload(aqt.main)
-
-            # Mock the sync_will_start hook so that we can check if it was called when the sync starts.
-            sync_will_start_mock = mocker.patch.object(gui_hooks, "sync_will_start")
-
-            _setup_logging_for_sync_collection_and_media()
-
-            mw._sync_collection_and_media(after_sync=lambda: None)
-
-            sync_will_start_mock.assert_called_once()
-
-    def test_setup_logging_for_db_begin(
-        self, anki_session: AnkiSession, mocker: MockerFixture
-    ):
-        with anki_session.profile_loaded():
-            mw = anki_session.mw
-
-            db_begin_mock = mocker.patch.object(mw.col._backend, "db_begin")
-
-            _setup_logging_for_db_begin()
-
-            if point_version() <= 66:
-                # `db.begin` was removed in newer Anki versions
-                mw.col.db.begin()  # type: ignore
-
-                db_begin_mock.assert_called_once()
-
-    def test_log_stack(self):
-        # Test that the _log_stack function does not throw an exception when called.
-        _log_stack("test")
 
 
 @pytest.mark.parametrize(

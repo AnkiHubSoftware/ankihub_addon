@@ -1,7 +1,6 @@
 """Code to be run on Anki start up."""
 
 import time
-from pprint import pformat
 
 import aqt
 from anki.errors import CardTypeError
@@ -9,7 +8,6 @@ from aqt.gui_hooks import profile_did_open, profile_will_close
 
 from . import LOGGER
 from .db import ankihub_db
-from .debug import setup as setup_debug
 from .feature_flags import setup_feature_flags_in_background
 from .gui import browser, deckbrowser, editor, progress, reviewer
 from .gui.addons import setup_addons
@@ -44,10 +42,13 @@ def run():
     setup_logger()
     LOGGER.info("Set up logger.")
 
-    LOGGER.info(f"{ADDON_VERSION=}")
-    LOGGER.info(f"{ANKI_VERSION=}")
-    LOGGER.info(f"AnkiHub app url: {config.app_url}")
-    LOGGER.info(f"S3 bucket url: {config.s3_bucket_url}")
+    LOGGER.info(
+        "Application and version info",
+        addon_version=ADDON_VERSION,
+        anki_version=ANKI_VERSION,
+        app_url=config.app_url,
+        s3_bucket_url=config.s3_bucket_url,
+    )
 
     profile_did_open.append(_on_profile_did_open)
     profile_will_close.append(_on_profile_will_close)
@@ -77,7 +78,9 @@ def _profile_setup() -> bool:
     """
     if not setup_profile_data_folder():
         return False
-    LOGGER.info(f"Set up profile data folder for the current profile: {aqt.mw.pm.name}")
+    LOGGER.info(
+        "Set up profile data folder for the current profile.", profile=aqt.mw.pm.name
+    )
 
     config.setup_private_config()
     LOGGER.info("Set up config for the current profile.")
@@ -118,9 +121,6 @@ def _general_setup():
     LOGGER.info("Set up error handler.")
 
     aqt.mw.addonManager.setWebExports(__name__, r"gui/web/.*")
-
-    setup_debug()
-    LOGGER.info("Set up debug.")
 
     setup_addons()
     LOGGER.info("Set up addons.")
@@ -170,8 +170,12 @@ def _general_setup():
 
 
 def _log_enabled_addons():
-    enabled_addons = [x for x in aqt.mw.addonManager.all_addon_meta() if x.enabled]
-    LOGGER.info(f"enabled addons:\n{pformat(enabled_addons)}")
+    enabled_addons = [
+        {"dir_name": x.dir_name, "human_version": x.human_version}
+        for x in aqt.mw.addonManager.all_addon_meta()
+        if x.enabled
+    ]
+    LOGGER.info("Enabled addons", enabled_addons=enabled_addons)
 
 
 def _trigger_addon_update_check():

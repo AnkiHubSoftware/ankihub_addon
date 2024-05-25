@@ -25,9 +25,9 @@ def rate_limited(seconds: float, on_done_arg_name: Optional[str] = None) -> Call
                     last_called[0] = time.monotonic()
                     return func(*args, **kwargs)
                 else:
-                    LOGGER.warning(f"Rate limited: {func.__name__}")
+                    LOGGER.warning("Rate limited a function.", func=func.__name__)
                     if on_done_arg_name and on_done_arg_name in kwargs:
-                        LOGGER.info(f"Calling {on_done_arg_name}.")
+                        LOGGER.info("Calling callback.", callback_name=on_done_arg_name)
                         on_done = kwargs[on_done_arg_name]
                         if on_done:
                             on_done()

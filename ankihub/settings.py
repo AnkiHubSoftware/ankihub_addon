@@ -13,13 +13,13 @@ import sys
 import threading
 import time
 import uuid
+from copy import deepcopy
 from dataclasses import dataclass
 from datetime import datetime
 from enum import Enum
 from json import JSONDecodeError
 from logging.handlers import RotatingFileHandler
 from pathlib import Path
-from pprint import pformat
 from shutil import copyfile, move, rmtree
 from typing import Any, Callable, Dict, List, Optional
 
@@ -238,8 +238,8 @@ class _Config:
 
         try:
             migrate_private_config(private_config_dict)
-        except Exception as e:
-            LOGGER.exception(f"Failed to migrate private config: {e}")
+        except Exception:
+            LOGGER.exception("Failed to migrate private config.")
 
         result = PrivateConfig.from_dict(private_config_dict)
         return result
@@ -340,7 +340,7 @@ class _Config:
         """Remove a deck. Also remove the deck extensions of the deck."""
         for deck_extension_id in config.deck_extensions_ids_for_ah_did(ankihub_did):
             config.remove_deck_extension(deck_extension_id)
-        LOGGER.info(f"Removed deck extensions for deck {ankihub_did}")
+        LOGGER.info("Removed deck extensions for deck", ah_did=ankihub_did)
 
         if self._private_config.decks.get(ankihub_did):
             self._private_config.decks.pop(ankihub_did)
@@ -349,10 +349,10 @@ class _Config:
             self.subscriptions_change_hook()
 
     def _log_private_config(self):
-        config_dict = dataclasses.asdict(self._private_config)
-        if config_dict["token"]:
-            config_dict["token"] = "REDACTED"
-        LOGGER.info(f"private config:\n{pformat(config_dict)}")
+        config_copy = deepcopy(self._private_config)
+        if config_copy.token:
+            config_copy.token = "REDACTED"
+        LOGGER.info("Private config", private_config=config_copy.to_dict())
 
     def set_home_deck(self, ankihub_did: uuid.UUID, anki_did: DeckId):
         self.deck_config(ankihub_did).anki_id = anki_did
@@ -426,7 +426,7 @@ class _Config:
     def remove_deck_extension(self, extension_id: int) -> None:
         self._private_config.deck_extensions.pop(extension_id)
         self._update_private_config()
-        LOGGER.info(f"Removed deck extension {extension_id}")
+        LOGGER.info("Removed deck extension.", extension_id=extension_id)
 
     def is_logged_in(self) -> bool:
         return bool(self.token())
@@ -451,7 +451,6 @@ def setup_profile_data_folder() -> bool:
     Returns False if the migration from the add-on version with no support for multiple Anki profiles
     needs yet to be done."""
     _assign_id_to_profile_if_not_exists()
-    LOGGER.info(f"Anki profile id: {get_anki_profile_id()}")
 
     if not _maybe_migrate_profile_data_from_old_location():
         return False
@@ -459,6 +458,8 @@ def setup_profile_data_folder() -> bool:
     _maybe_migrate_addon_data_from_old_location()
 
     profile_files_path().mkdir(parents=True, exist_ok=True)
+
+    LOGGER.info("Set up profile data folder.", anki_profile_id=get_anki_profile_id())
 
     return True
 
@@ -471,7 +472,7 @@ def _assign_id_to_profile_if_not_exists() -> None:
     new_profile_id = uuid.uuid4()
     _set_anki_profile_id(str(new_profile_id))
 
-    LOGGER.info(f"Assigned new id to Anki profile: {get_anki_profile_id()}")
+    LOGGER.info("Assigned new id to Anki profile.", anki_profile_id=new_profile_id)
 
 
 def get_anki_profile_id() -> str:
@@ -553,8 +554,8 @@ def _maybe_migrate_profile_data_from_old_location() -> bool:
 
             copyfile(file, profile_files_path() / file.name)
     except Exception as e:
-        LOGGER.error(
-            f"Failed to migrate profile data from user_files to profile folder: {e}"
+        LOGGER.exception(
+            "Failed to migrate profile data from user_files to profile folder."
         )
         # remove the profile folder to avoid a partial migration
         rmtree(profile_files_path())
@@ -594,7 +595,9 @@ def _maybe_migrate_addon_data_from_old_location() -> None:
         else:
             # Only move the folder if it's name is a uuid, otherwise it's not an add-on data folder
             move(file, ankihub_base_path() / file.name)
-            LOGGER.info(f"Migrated add-on data for profile {file.name}")
+            LOGGER.info(
+                "Migrated add-on data for profile.", profile_folder_name=file.name
+            )
 
 
 def ankihub_base_path() -> Path:
@@ -789,18 +792,20 @@ class DatadogLogHandler(logging.Handler):
             requests.exceptions.Timeout,
         ) as e:  # pragma: no cover
             LOGGER.warning(
-                f"Connection error or timeout when sending logs to Datadog: {e}"
+                "Connection error or timeout when sending logs to Datadog.", exc_info=e
             )
             return
-        except requests.exceptions.RequestException as e:  # pragma: no cover
-            LOGGER.error(
-                f"An unexpected error occurred when sending logs to Datadog: {e}"
+        except requests.exceptions.RequestException:  # pragma: no cover
+            LOGGER.exception(
+                "An unexpected error occurred when sending logs to Datadog"
             )
             return
 
         if response.status_code != 202:  # pragma: no cover
             LOGGER.warning(
-                f"Unexpected status code when sending logs to Datadog: {response.status_code} {response.text}"
+                "Unexpected status code when sending logs to Datadog.",
+                status_code=response.status_code,
+                response_text=response.text,
             )
 
 

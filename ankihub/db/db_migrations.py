@@ -10,7 +10,9 @@ from .models import AnkiHubNote, AnkiHubNoteType, DeckMedia, get_peewee_database
 def migrate_ankihub_db():
     """Migrate the AnkiHub DB to the latest schema version."""
 
-    LOGGER.info(f"AnkiHub DB schema version: {ankihub_db.schema_version()}")
+    LOGGER.info(
+        "AnkiHub DB schema version.", schema_version=ankihub_db.schema_version()
+    )
 
     peewee_db = get_peewee_database()
     schema_version = ankihub_db.schema_version()
@@ -32,7 +34,8 @@ def migrate_ankihub_db():
             peewee_db.execute_sql("ALTER TABLE notes ADD COLUMN tags TEXT")
             peewee_db.pragma("user_version", 3)
         LOGGER.info(
-            f"AnkiHub DB migrated to schema version {ankihub_db.schema_version()}"
+            "AnkiHub DB migrated to schema version",
+            schema_version=ankihub_db.schema_version(),
         )
 
     if schema_version < 4:
@@ -40,7 +43,8 @@ def migrate_ankihub_db():
             peewee_db.execute_sql("ALTER TABLE notes ADD COLUMN last_update_type TEXT")
             peewee_db.pragma("user_version", 4)
         LOGGER.info(
-            f"AnkiHub DB migrated to schema version {ankihub_db.schema_version()}"
+            "AnkiHub DB migrated to schema version",
+            schema_version=ankihub_db.schema_version(),
         )
 
     if schema_version < 5:
@@ -50,7 +54,8 @@ def migrate_ankihub_db():
             )
             peewee_db.pragma("user_version", 5)
         LOGGER.info(
-            f"AnkiHub DB migrated to schema version {ankihub_db.schema_version()}"
+            "AnkiHub DB migrated to schema version",
+            schema_version=ankihub_db.schema_version(),
         )
 
     if schema_version < 6:
@@ -92,7 +97,8 @@ def migrate_ankihub_db():
             peewee_db.pragma("user_version", 6)
 
         LOGGER.info(
-            f"AnkiHub DB migrated to schema version {ankihub_db.schema_version()}"
+            "AnkiHub DB migrated to schema version",
+            schema_version=ankihub_db.schema_version(),
         )
 
     if schema_version < 7:
@@ -102,7 +108,8 @@ def migrate_ankihub_db():
             peewee_db.pragma("user_version", 7)
 
         LOGGER.info(
-            f"AnkiHub DB migrated to schema version {ankihub_db.schema_version()}"
+            "AnkiHub DB migrated to schema version",
+            schema_version=ankihub_db.schema_version(),
         )
 
     if schema_version < 8:
@@ -111,7 +118,8 @@ def migrate_ankihub_db():
             peewee_db.pragma("user_version", 8)
 
         LOGGER.info(
-            f"AnkiHub DB migrated to schema version {ankihub_db.schema_version()}"
+            "AnkiHub DB migrated to schema version",
+            schema_version=ankihub_db.schema_version(),
         )
 
     if schema_version < 9:
@@ -120,7 +128,8 @@ def migrate_ankihub_db():
             peewee_db.pragma("user_version", 9)
 
         LOGGER.info(
-            f"AnkiHub DB migrated to schema version {ankihub_db.schema_version()}"
+            "AnkiHub DB migrated to schema version",
+            schema_version=ankihub_db.schema_version(),
         )
 
     if schema_version < 10:
@@ -144,7 +153,8 @@ def migrate_ankihub_db():
             peewee_db.pragma("user_version", 10)
 
         LOGGER.info(
-            f"AnkiHub DB migrated to schema version {ankihub_db.schema_version()}"
+            "AnkiHub DB migrated to schema version",
+            schema_version=ankihub_db.schema_version(),
         )
 
     if schema_version < 11:
@@ -171,7 +181,10 @@ def migrate_ankihub_db():
                     # All other changes in this migration will be rolled back in this case.
                     # This means we can just ignore the error here and continue with the migration.
                     LOGGER.warning(
-                        f"Failed to rename table {table_name} to {temp_table_name}: {e}"
+                        "Failed to rename table",
+                        table_name=table_name,
+                        temp_table_name=temp_table_name,
+                        exc_info=e,
                     )
 
                 # Create the new table using peewee
@@ -189,7 +202,8 @@ def migrate_ankihub_db():
             peewee_db.pragma("user_version", 11)
 
         LOGGER.info(
-            f"AnkiHub DB migrated to schema version {ankihub_db.schema_version()}"
+            "AnkiHub DB migrated to schema version",
+            schema_version=ankihub_db.schema_version(),
         )
 
 

@@ -6,6 +6,7 @@ from typing import Callable, List, Optional
 import aqt
 from aqt.qt import QCheckBox, QDialogButtonBox, QStyle
 
+from ... import LOGGER
 from ...ankihub_client import Deck
 from ...settings import config
 from ..messages import messages
@@ -19,6 +20,12 @@ def check_and_install_new_deck_subscriptions(
     subscribed_decks: List[Deck], on_done: Callable[[Future], None]
 ) -> None:
     """Check if there are any new deck subscriptions and install them if the user confirms."""
+
+    LOGGER.info(
+        "Checking and installing new deck subscriptions...",
+        subscribed_deck_ah_ids=[deck.ah_did for deck in subscribed_decks],
+    )
+
     # Check if there are any new subscriptions
     decks = _not_installed_ah_decks(subscribed_decks)
     if not decks:
@@ -78,6 +85,7 @@ def _on_button_clicked(
 ) -> None:
     if button_index != 1:
         # Skip
+        LOGGER.info("User skipped deck installation.")
         on_done(future_with_result(None))
         return
 

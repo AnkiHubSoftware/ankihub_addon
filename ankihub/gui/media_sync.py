@@ -66,6 +66,8 @@ class _AnkiHubMediaSync:
         on_success: Optional[Callable[[], None]] = None,
     ):
         """Upload the referenced media files to AnkiHub in the background."""
+        LOGGER.info("Starting media upload...")
+
         self._amount_uploads_in_progress += 1
         self.refresh_sync_status_text()
 
@@ -125,10 +127,14 @@ class _AnkiHubMediaSync:
             self._update_deck_media(ankihub_did=ah_did)
             missing_media_names = self._missing_media_for_ah_deck(ah_did)
             if not missing_media_names:
-                LOGGER.info(f"No missing media for {ah_did=}")
+                LOGGER.info("No missing media for deck.", ah_did=ah_did)
                 continue
 
-            LOGGER.info(f"Downloading {len(missing_media_names)} media for {ah_did=}")
+            LOGGER.info(
+                "Downloading media for deck...",
+                ah_did=ah_did,
+                missing_media_count=len(missing_media_names),
+            )
             self._client.download_media(missing_media_names, ah_did)
 
     def _update_deck_media(self, ankihub_did: uuid.UUID) -> None:
@@ -138,11 +144,11 @@ class _AnkiHubMediaSync:
         the function logs a warning and returns early without making any updates.
         """
         deck_config = config.deck_config(ankihub_did)
-        if deck_config is None:
+        if deck_config is None:  # pragma: no cover
             # This can happen if the deck gets deleted or the user switches the Anki
             # profile during the media sync.
-            LOGGER.warning(f"No deck config for {ankihub_did=}")  # pragma: no cover
-            return  # pragma: no cover
+            LOGGER.warning("No deck config for deck.", ah_did=ankihub_did)
+            return
 
         media_list: List[DeckMedia] = []
         latest_update: Optional[datetime] = None
@@ -180,7 +186,7 @@ class _AnkiHubMediaSync:
                 ankihub_did, latest_media_update=latest_update
             )
         else:
-            LOGGER.info(f"No new media updates for {ankihub_did=}")
+            LOGGER.info("No new media updates for deck.", ah_did=ankihub_did)
 
     def _missing_media_for_ah_deck(self, ah_did: uuid.UUID) -> List[str]:
         media_names = ankihub_db.downloadable_media_names_for_ankihub_deck(ah_did)

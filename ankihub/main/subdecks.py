@@ -4,6 +4,7 @@ Then there is code to create decks based on these tags and move cards to the cor
 It also contains code to flatten the subdecks of a deck and move all cards to the root deck in order to
 revert the changes made by moving cards to their subdecks.
 """
+
 import re
 import uuid
 from typing import Dict, Iterable, List, Optional
@@ -77,7 +78,7 @@ def build_subdecks_and_move_cards_to_them(
         try:
             if aqt.mw.col.decks.card_count(did, include_subdecks=True) == 0:
                 aqt.mw.col.decks.remove([did])
-                LOGGER.info(f"Removed empty subdeck with id {did}.")
+                LOGGER.info("Removed empty subdeck with id", did=did)
         except NotFoundError:
             # this can happen if a parent deck was deleted earlier in the loop
             pass
@@ -116,9 +117,7 @@ def _nid_to_destination_deck_name(
         result[nid] = deck_name
 
     if missing_nids:
-        LOGGER.warning(
-            f"_nid_to_destination_deck_name: The following notes were not found in the Anki database: {missing_nids}"
-        )
+        LOGGER.warning("Notes are not in the Anki database.", missing_nids=missing_nids)
 
     return result
 
@@ -167,7 +166,7 @@ def flatten_deck(ankihub_did: uuid.UUID) -> None:
         _, did = name_and_did
         try:
             aqt.mw.col.decks.remove([did])
-            LOGGER.info(f"Removed subdeck with id {did}.")
+            LOGGER.info("Removed subdeck.", did=did)
         except NotFoundError:
             # this can happen if a parent deck was deleted earlier in the loop
             pass
@@ -189,7 +188,11 @@ def add_subdeck_tags_to_notes(anki_deck_name: str, ankihub_deck_name: str) -> No
 
     assert "::" not in anki_deck_name, "Deck must be a top level deck."
 
-    LOGGER.info("Adding subdeck tags to notes.")
+    LOGGER.info(
+        "Adding subdeck tags to notes.",
+        anki_deck_name=anki_deck_name,
+        ankihub_deck_name=ankihub_deck_name,
+    )
 
     deck = aqt.mw.col.decks.by_name(anki_deck_name)
 

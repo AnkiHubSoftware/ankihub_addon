@@ -179,12 +179,13 @@ def _setup_excepthook():
         etype: Type[BaseException], val: BaseException, tb: Optional[TracebackType]
     ) -> Any:
         LOGGER.info(
-            f"This addon is mentioned in traceback: {_this_addon_mentioned_in_tb(tb)}",
+            "Excepthook",
+            addon_mentioned_in_traceback=_this_addon_mentioned_in_tb(tb),
         )
 
         handled = False
         try:
-            handled = _try_handle_exception(exc_type=etype, exc_value=val, tb=tb)
+            handled = _try_handle_exception(exc_value=val, tb=tb)
         except Exception as e:
             # catching all exceptions here prevents a potential exception loop
             LOGGER.exception("The exception handler threw an exception.", exc_info=e)
@@ -216,12 +217,10 @@ def _show_feedback_dialog_and_maybe_report_exception(exception: BaseException) -
 
 
 def _try_handle_exception(
-    exc_type: Type[BaseException], exc_value: BaseException, tb: Optional[TracebackType]
+    exc_value: BaseException, tb: Optional[TracebackType]
 ) -> bool:
     """Try to handle the exception. Return True if the exception was handled, False otherwise."""
-    LOGGER.info(
-        f"From _try_handle_exception:\n{''.join(traceback.format_exception(exc_type, value=exc_value, tb=tb))}"
-    )
+    LOGGER.info("Trying to handle exception...", exc_info=exc_value)
 
     if not addon_dir_path().exists():
         show_error_dialog(
@@ -308,7 +307,7 @@ def _try_handle_exception(
         exc_value, OSError
     ) and "Could not find a suitable TLS CA certificate bundle" in str(exc_value):
         showInfo("Please restart Anki.", title="AnkiHub")
-        LOGGER.warning("TLS CA certificate bundle error was handled", exc_value)
+        LOGGER.warning("TLS CA certificate bundle error was handled")
         return True
 
     return False
@@ -341,7 +340,7 @@ def _maybe_handle_ankihub_http_error(error: AnkiHubHTTPError) -> bool:
 
     error_message = response_data.get("detail")
     if error_message:
-        LOGGER.info(f"AnkiHubRequestError was handled: {error_message}")
+        LOGGER.info("AnkiHubRequestError was handled", error_message=error_message)
         show_error_dialog(error_message, title="Oh no!")
         return True
 
@@ -443,7 +442,7 @@ def _report_exception(
         try:
             scope.set_context("ankihub base files", _ankihub_base_path_context_dict())
         except Exception as e:
-            LOGGER.warning(f"Could not get ankihub base files context: {e}")
+            LOGGER.warning("Could not get ankihub base files context.", exc_info=e)
 
         for key, value in context.items():
             scope.set_context(key, value)

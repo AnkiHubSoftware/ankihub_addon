@@ -1,6 +1,6 @@
 """Feature flags are used to enable/disable features on the client side. The flags are fetched from the server."""
 
-from dataclasses import dataclass, fields
+from dataclasses import asdict, dataclass, fields
 from typing import Callable, List
 
 import aqt
@@ -47,7 +47,8 @@ def _setup_feature_flags() -> None:
         feature_flags_dict = AnkiHubClient().get_feature_flags()
     except (AnkiHubRequestException, AnkiHubHTTPError) as e:
         LOGGER.warning(
-            f"Failed to fetch feature flags from the server: {e}, using default values."
+            "Failed to fetch feature flags from the server, using default values.",
+            exc_info=e,
         )
         feature_flags_dict = {}
 
@@ -58,12 +59,14 @@ def _setup_feature_flags() -> None:
         except KeyError:
             setattr(feature_flags, field.name, field.default)
             LOGGER.warning(
-                f"No feature flag named {field.name} found, using default value: {field.default}."
+                "No such feature flag found, using default value",
+                feature_flag=field.name,
+                default_value=field.default,
             )
         else:
             setattr(feature_flags, field.name, value)
 
-    LOGGER.info(f"Feature flags: {feature_flags}")
+    LOGGER.info("Feature flags", feature_flags=asdict(feature_flags))
 
 
 def add_feature_flags_update_callback(callback: Callable[[], None]) -> None:

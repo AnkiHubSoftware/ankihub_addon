@@ -3,7 +3,6 @@ import csv
 import gzip
 import hashlib
 import json
-import logging
 import os
 import re
 import shutil
@@ -31,6 +30,7 @@ from typing import (
 from zipfile import ZipFile
 
 import requests
+import structlog
 from requests import PreparedRequest, Request, Response, Session
 from tenacity import (
     RetryError,
@@ -62,7 +62,7 @@ from .models import (
     note_info_for_upload,
 )
 
-LOGGER = logging.getLogger(__name__)
+LOGGER = structlog.stdlib.get_logger("ankihub")
 
 DEFAULT_APP_URL = "https://app.ankihub.net"
 DEFAULT_API_URL = f"{DEFAULT_APP_URL}/api"
@@ -468,6 +468,12 @@ class AnkiHubClient:
                         future.cancel()
                     return
 
+        LOGGER.info(
+            "Uploaded media to AnkiHub.",
+            ah_did=ah_did,
+            uploaded=len(media_paths),
+        )
+
     def _zip_and_upload_media_chunk(
         self,
         chunk: List[Path],
@@ -480,26 +486,27 @@ class AnkiHubClient:
             self.local_media_dir_path_cb()
             / f"{ah_did}_{chunk_number}_deck_assets_part.zip"
         )
-        LOGGER.info(f"Creating zipped media file [{zip_filepath.name}]")
+        LOGGER.debug("Creating zipped media file", zip_filepath=zip_filepath)
         with ZipFile(zip_filepath, "w") as media_zip:
             for media_path in chunk:
                 if media_path.is_file():
                     media_zip.write(media_path, arcname=media_path.name)
 
         # Upload to S3
-        LOGGER.info(f"Uploading file [{zip_filepath.name}] to S3")
+        LOGGER.debug("Uploading file to S3", zip_filepath=zip_filepath.name)
         self._upload_file_to_s3_with_reusable_presigned_url(
             s3_presigned_info=s3_presigned_info, filepath=zip_filepath
         )
-        LOGGER.info(f"Successfully uploaded [{zip_filepath.name}]")
+        LOGGER.debug("Successfully uploaded file to S3", zip_filepath=zip_filepath.name)
 
         # Remove the zip file from the local machine after the upload
-        LOGGER.info(f"Removing file [{zip_filepath.name}] from local files")
+        LOGGER.debug("Removing file from local files", zip_filepath=zip_filepath.name)
         try:
             os.remove(zip_filepath)
         except FileNotFoundError:
             LOGGER.warning(
-                f"Could not remove file [{zip_filepath.name}] from local files."
+                "Could not remove file from local files.",
+                zip_filepath=zip_filepath.name,
             )
 
     def _upload_file_to_s3_with_reusable_presigned_url(
@@ -545,17 +552,24 @@ class AnkiHubClient:
                     executor.submit(self._download_media, media_path, media_remote_path)
                 )
 
+            downloaded_media_count = 0
             for future in as_completed(futures):
                 if self.should_stop_background_threads:
                     for future in futures:
                         future.cancel()
                     return
 
-                future.result()
+                if future.result():
+                    downloaded_media_count += 1
 
-            LOGGER.info("Downloaded media from AnkiHub.")
+        LOGGER.info(
+            "Downloaded media from AnkiHub.",
+            ah_did=deck_id,
+            attempted_count=len(media_names),
+            downloaded_count=downloaded_media_count,
+        )
 
-    def _download_media(self, media_file_path: Path, media_remote_path: str):
+    def _download_media(self, media_file_path: Path, media_remote_path: str) -> bool:
         response = self._send_request("GET", API.S3, media_remote_path, stream=True)
         # Log and skip this iteration if the response is not 200 OK
         if response.ok:
@@ -571,11 +585,15 @@ class AnkiHubClient:
                         # Remove incomplete file if the download was interrupted
                         file.close()
                         media_file_path.unlink()
-                        return
+
+                return True
         else:
-            LOGGER.info(
-                f"Unable to download media file [{media_remote_path}]. Response status code: {response.status_code}"
+            LOGGER.warning(
+                "Unable to download media file.",
+                media_remote_path=media_remote_path,
+                status_code=response.status_code,
             )
+            return False
 
     def stop_background_threads(self) -> None:
         """Can be called to stop all background threads started by this client."""
@@ -1203,7 +1221,7 @@ class AnkiHubClient:
 
         data = response.json()
         message = data["message"]
-        LOGGER.debug(f"suggest_optional_tags response message: {message}")
+        LOGGER.debug("suggest_optional_tags response message", message=message)
 
     def get_feature_flags(self) -> Dict[str, bool]:
         """Returns a dict of feature flags to their status (enabled or disabled)."""

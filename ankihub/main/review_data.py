@@ -1,6 +1,6 @@
 import uuid
 from datetime import datetime, timedelta
-from typing import Optional, Tuple
+from typing import List, Optional, Tuple
 
 import aqt
 from anki import consts as anki_consts
@@ -15,8 +15,10 @@ from ..settings import config
 def send_review_data() -> None:
     """Send data about card reviews for each installed AnkiHub deck to the server.
     Data about decks that have not been reviewed yet will not be included."""
+    LOGGER.info("Sending review data to AnkiHub...")
+
     now = datetime.now()
-    card_review_data = []
+    card_review_data: List[CardReviewData] = []
     for ah_did in config.deck_ids():
         first_and_last_review_times = _get_first_and_last_review_datetime_for_ah_deck(
             ah_did
@@ -41,8 +43,6 @@ def send_review_data() -> None:
                 last_card_review_at=last_review_at,
             )
         )
-
-    LOGGER.info(f"Review data: {card_review_data}")
 
     client = AnkiHubClient()
     client.send_card_review_data(card_review_data)

@@ -37,6 +37,14 @@ def download_and_install_decks(
     behavior_on_remote_note_deleted: BehaviorOnRemoteNoteDeleted = BehaviorOnRemoteNoteDeleted.DELETE_IF_NO_REVIEWS,
 ) -> None:
     """Downloads and installs the given decks in the background."""
+
+    LOGGER.info(
+        "Downloading and installing decks...",
+        ankihub_dids=ankihub_dids,
+        recommended_deck_settings=recommended_deck_settings,
+        behavior_on_remote_note_deleted=behavior_on_remote_note_deleted,
+    )
+
     aqt.mw.taskman.with_progress(
         task=lambda: _fetch_deck_infos(ankihub_dids),
         on_done=partial(
@@ -71,15 +79,21 @@ def _on_deck_infos_fetched(
 
 
 @pass_exceptions_to_on_done
-def _on_install_done(future: Future, on_done: Callable[[Future], None]):
+def _on_install_done(
+    future: Future[List[AnkiHubImportResult]], on_done: Callable[[Future], None]
+):
     import_results: List[AnkiHubImportResult] = future.result()
+
+    LOGGER.info(
+        "Decks downloaded and installed.",
+        ah_dids=[r.ankihub_did for r in import_results],
+    )
 
     _cleanup_after_deck_install()
 
     # Reset the main window so that the decks are displayed
     aqt.mw.reset()
 
-    # Ask user if they want to enable subdecks
     for import_result in import_results:
         ah_did = import_result.ankihub_did
         if deck_contains_subdeck_tags(ah_did):
@@ -165,7 +179,7 @@ def _download_and_install_decks_inner(
                 )
             )
             LOGGER.warning(
-                f"Failed to download and install deck {deck.ah_did}.", exc_info=e
+                "Failed to download and install deck.", ah_did=deck.ah_did, exc_info=e
             )
 
     if exceptions:
@@ -248,7 +262,11 @@ def _install_deck(
 
     aqt.mw.taskman.run_on_main(media_sync.start_media_download)
 
-    LOGGER.info("Importing deck was succesful.")
+    LOGGER.info(
+        "Installing deck was succesful.",
+        ah_did=ankihub_did,
+        anki_did=import_result.anki_did,
+    )
 
     return import_result
 

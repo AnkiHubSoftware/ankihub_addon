@@ -5,7 +5,6 @@ import time
 from collections import defaultdict
 from concurrent.futures import Future
 from pathlib import Path
-from pprint import pformat
 from textwrap import dedent
 from typing import Any, Collection, Dict, Iterable, List, Optional, Sequence, Set, Tuple
 
@@ -42,7 +41,7 @@ def create_deck_with_id(deck_name: str, deck_id: DeckId) -> None:
     aqt.mw.col.db.execute(f"UPDATE cards SET did={deck_id} WHERE did={source_did};")
     aqt.mw.col.save()
 
-    LOGGER.info(f"Created deck {deck_name=} {deck_id=}")
+    LOGGER.info("Created deck.", deck_name=deck_name, deck_id=deck_id)
 
 
 def all_dids() -> Set[DeckId]:
@@ -165,7 +164,7 @@ def clear_empty_cards() -> None:
             return
         dialog = EmptyCardsDialog(aqt.mw, report)
         deleted_amount = dialog._delete_cards(keep_notes=True)
-        LOGGER.info(f"Deleted {deleted_amount} empty cards.")
+        LOGGER.info("Deleted empty cards.", deleted_amount=deleted_amount)
 
     aqt.mw.taskman.run_in_background(aqt.mw.col.get_empty_cards, on_done=on_done)
 
@@ -184,8 +183,9 @@ def create_note_type_with_id(note_type: NotetypeDict, mid: NotetypeId) -> None:
     aqt.mw.col.models._clear_cache()  # TODO check if this is necessary
     aqt.mw.col.save()
 
-    LOGGER.info(f"Created note type: {mid}")
-    LOGGER.info(f"Note type:\n {pformat(note_type_copy)}")
+    LOGGER.info(
+        "Created note type.", note_type_name=note_type["name"], note_type_id=mid
+    )
 
 
 def note_type_contains_field(
@@ -242,9 +242,11 @@ def change_note_types_of_notes(nid_mid_pairs: List[Tuple[NoteId, NotetypeId]]) -
         )
         aqt.mw.col.models.change_notetype_of_notes(request)
         LOGGER.debug(
-            f"Changed note type of {len(note_ids)} notes {source_note_type_id=} {target_note_type_id=}",
+            "Changed note type of notes.",
+            source_note_type_id=source_note_type_id,
+            target_note_type_id=target_note_type_id,
         )
-    LOGGER.info("Finished changing note types of notes.")
+    LOGGER.info("Changed note types of notes.")
 
 
 def mids_of_notes(nids: Sequence[NoteId]) -> Set[NotetypeId]:
@@ -289,7 +291,11 @@ ANKIHUB_TEMPLATE_SNIPPET_RE = (
 
 def modify_note_type(note_type: NotetypeDict) -> None:
     """Adds the AnkiHub ID Field to the Note Type and modifies the card templates."""
-    LOGGER.info(f"Modifying note type {note_type['name']}")
+    LOGGER.info(
+        "Modifying note type...",
+        note_type_name=note_type["name"],
+        note_type_id=note_type["id"],
+    )
 
     modify_fields(note_type)
 
@@ -310,7 +316,11 @@ def modify_fields(note_type: Dict) -> None:
     fields = note_type["flds"]
     field_names = [field["name"] for field in fields]
     if settings.ANKIHUB_NOTE_TYPE_FIELD_NAME in field_names:
-        LOGGER.info(f"{settings.ANKIHUB_NOTE_TYPE_FIELD_NAME} already exists.")
+        LOGGER.info(
+            "AnkiHub field already exists in note type.",
+            note_type_name=note_type["name"],
+            note_type_id=note_type["id"],
+        )
         return
     ankihub_field = aqt.mw.col.models.new_field(ANKIHUB_NOTE_TYPE_FIELD_NAME)
     # Put AnkiHub field last
@@ -414,7 +424,9 @@ def add_ankihub_end_comment_to_template(template: Dict) -> None:
             template[key].rstrip("\n ") + "\n\n" + ANKIHUB_TEMPLATE_END_COMMENT + "\n\n"
         )
         LOGGER.info(
-            f"Added ANKIHUB_TEMPLATE_END_COMMENT to template {template['name']} on side {key}"
+            "Added ANKIHUB_TEMPLATE_END_COMMENT to template.",
+            template=template["name"],
+            key=key,
         )
 
 
@@ -433,7 +445,11 @@ def undo_note_type_modification(note_type: Dict) -> None:
     """Removes the AnkiHub Field from the Note Type and modifies the template to
     remove the field.
     """
-    LOGGER.info(f"Undoing modification of note type {note_type['name']}")
+    LOGGER.info(
+        "Undoing modification of note type",
+        note_type_name=note_type["name"],
+        note_type_id=note_type["id"],
+    )
 
     undo_fields_modification(note_type)
 
@@ -467,7 +483,7 @@ def create_backup() -> None:
         if ANKI_INT_VERSION >= 50:
             # if there were no changes since the last backup, no backup is created
             created = _create_backup_with_retry_anki_50()
-            LOGGER.info(f"Backup successful. {created=}")
+            LOGGER.info("Backup successful.", created=created)
         else:
             aqt.mw.col.close(downgrade=False)
             aqt.mw.backup()  # type: ignore
@@ -493,7 +509,7 @@ def _create_backup_with_retry_anki_50() -> bool:
     try:
         created = _create_backup_anki_50()
     except Exception as exc:
-        LOGGER.info(f"Backup failed on the first attempt. {exc=}")
+        LOGGER.info("Backup failed on the first attempt.", exc_info=exc)
 
         # retry once
         LOGGER.info("Retrying backup...")

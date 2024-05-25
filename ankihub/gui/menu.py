@@ -219,6 +219,8 @@ class AnkiHubLogin(QWidget):
             cls._window.activateWindow()
             cls._window.raise_()
             cls._window.show()
+
+        LOGGER.info("Showed AnkiHub login dialog.")
         return cls._window
 
 
@@ -238,6 +240,7 @@ def _confirm_sign_out():
         return
 
     _sign_out_action()
+    LOGGER.info("User signed out of AnkiHub.")
 
 
 def _sign_out_action():
@@ -333,7 +336,7 @@ def _sync_with_ankihub_setup(parent: QMenu):
         try:
             q_action.setShortcut(QKeySequence(sync_hotkey))
         except Exception:
-            LOGGER.exception(f"Failed to set sync hotkey to {sync_hotkey}")
+            LOGGER.exception("Failed to set sync hotkey.", sync_hotkey=sync_hotkey)
     parent.addAction(q_action)
 
 
@@ -348,6 +351,8 @@ def _upload_deck_media_setup(parent: QMenu):
 
 
 def _upload_deck_media_action() -> None:
+    LOGGER.info("User clicked on 'Upload media for deck' menu item.")
+
     client = AnkiHubClient()
 
     # Fetch the ankihub deck ids of all decks the user owns
