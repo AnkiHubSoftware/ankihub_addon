@@ -661,6 +661,19 @@ def setup_logger():
     if ADDON_VERSION != "dev":
         _setup_datadog_handler()
 
+    _fix_runtime_error_on_shutdown()
+
+
+def _fix_runtime_error_on_shutdown() -> None:
+    # Fix 'RuntimeError: wrapped C/C++ object of type ErrorHandler has been deleted' on shutdown
+    # by making the sentry logger write to stdout instead of stderr.
+    # sys.stderr is overwritten by aqt.ErrorHandler to itself, which is deleted on shutdown.
+    # Without this, the logger would try to write to the deleted ErrorHandler object and raise an error.
+    sentry_logger = logging.getLogger("sentry_sdk.errors")
+    for handler in sentry_logger.handlers:
+        if isinstance(handler, logging.StreamHandler):
+            handler.setStream(sys.stdout)
+
 
 def _setup_stdout_handler() -> None:
     stdout_handler_ = _stdout_handler()
