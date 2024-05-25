@@ -721,11 +721,6 @@ class DatadogLogHandler(logging.Handler):
         self.flush_thread.start()
 
     def emit(self, record: logging.LogRecord) -> None:
-        from .feature_flags import feature_flags
-
-        if not feature_flags.send_addon_logs_to_datadog:
-            return
-
         with self.lock:
             self.buffer.append(record)
             if len(self.buffer) >= self.capacity:
@@ -738,6 +733,9 @@ class DatadogLogHandler(logging.Handler):
         from .feature_flags import feature_flags
 
         if not feature_flags.send_addon_logs_to_datadog:
+            with self.lock:
+                # Clear the buffer to prevent it from growing indefinitely.
+                self.buffer = []
             return
 
         with self.lock:
