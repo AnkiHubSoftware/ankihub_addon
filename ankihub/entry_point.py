@@ -1,5 +1,8 @@
 """Code to be run on Anki start up."""
 
+import json
+import pathlib
+import shutil
 import time
 
 import aqt
@@ -34,6 +37,23 @@ from .settings import (
 ATTEMPTED_GENERAL_SETUP = False
 
 
+def install_extension():
+    # Get the path to the extension's directory
+    extensions_dir = pathlib.Path(__file__).parent / "extensions"
+    hello_world = extensions_dir / "hello_world"
+    manifest_json = hello_world / "manifest.json"
+    # load the manifest file
+    with open(manifest_json) as f:
+        manifest = json.load(f)
+        print(manifest)
+    # get all the files in the extensions dir
+    for file in extensions_dir.iterdir():
+        if file.is_file():
+            # copy the file to the media directory
+            shutil.copy(file, aqt.mw.col.media.dir())
+    return
+
+
 def run():
     """Call this function in __init__.py when Anki starts."""
 
@@ -52,6 +72,7 @@ def run():
 
     profile_did_open.append(_on_profile_did_open)
     profile_will_close.append(_on_profile_will_close)
+    install_extension()
 
 
 def _on_profile_did_open():
