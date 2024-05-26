@@ -169,7 +169,8 @@ def _on_suggestion_dialog_for_single_suggestion_closed(
                 auto_accept=suggestion_meta.auto_accept,
             )
         except AnkiHubHTTPError as e:
-            return _handle_suggestion_error(e, parent)
+            _handle_suggestion_error(e, parent)
+            return
         if suggestion_result == ChangeSuggestionResult.SUCCESS:
             show_tooltip("Submitted suggestion to AnkiHub.", parent=parent)
         elif suggestion_result == ChangeSuggestionResult.NO_CHANGES:
