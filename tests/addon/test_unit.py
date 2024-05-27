@@ -2806,8 +2806,9 @@ class TestDatadogLogHandler:
             )
         else:
             handler.emit(record)
-            assert len(handler.buffer) == 0
+            assert len(handler.buffer) == 1
             handler.flush(record)
+            assert len(handler.buffer) == 0
             post_mock.assert_not_called()
 
     def test_periodic_flush(self, mocker):
