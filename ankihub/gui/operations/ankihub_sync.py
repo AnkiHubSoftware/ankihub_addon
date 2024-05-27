@@ -7,7 +7,7 @@ import aqt
 import aqt.sync
 from anki.collection import OpChangesWithCount
 from anki.hooks import wrap
-from anki.sync import SyncOutput
+from anki.sync import SyncOutput, SyncStatus
 from aqt.sync import get_sync_status
 
 from ... import LOGGER
@@ -43,7 +43,7 @@ def sync_with_ankihub(on_done: Callable[[Future], None]) -> None:
     LOGGER.info("Syncing with AnkiHub...")
 
     @pass_exceptions_to_on_done
-    def on_sync_status(out: SyncOutput, on_done: Callable[[Future], None]) -> None:
+    def on_sync_status(out: SyncStatus, on_done: Callable[[Future], None]) -> None:
         if out.required == out.FULL_SYNC:
             LOGGER.info("Full sync required. Syncing with AnkiWeb first.")
             sync_with_ankiweb(partial(_after_ankiweb_sync, on_done=on_done))
@@ -57,7 +57,7 @@ def sync_with_ankihub(on_done: Callable[[Future], None]) -> None:
 @pass_exceptions_to_on_done
 def _after_ankiweb_sync(on_done: Callable[[Future], None]) -> None:
     @pass_exceptions_to_on_done
-    def on_sync_status(out: SyncOutput, on_done: Callable[[Future], None]) -> None:
+    def on_sync_status(out: SyncStatus, on_done: Callable[[Future], None]) -> None:
         if out.required == out.FULL_SYNC:
             # Stop here if user cancelled full sync
             LOGGER.info("AnkiWeb full sync cancelled.")
