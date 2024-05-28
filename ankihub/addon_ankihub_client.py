@@ -20,6 +20,11 @@ def logging_hook(response: Response, *args, **kwargs) -> Response:
     method = response.request.method
     body = response.request.body
 
+    if method == "GET" and "s3" in endpoint and "deck_assets" in endpoint:
+        # Don't log the request for downloading deck assets, as this would result in a lot of noise,
+        # because each asset is downloaded separately.
+        return response
+
     body_dict: Optional[Dict] = None
     try:
         body_dict = json.loads(body) if body else None
