@@ -5,7 +5,7 @@ from concurrent.futures import Future
 from dataclasses import dataclass
 from enum import Enum
 from pprint import pformat
-from typing import Callable, Collection, List, Optional
+from typing import Callable, Collection, List, Optional, Set
 
 import aqt
 from anki.notes import Note, NoteId
@@ -246,6 +246,13 @@ def _on_suggestion_dialog_for_bulk_suggestion_closed(
         LOGGER.info("User cancelled bulk suggestion from suggestion dialog.")
         return
 
+    def media_upload_cb(media_names: Set[str], ankihub_did: uuid.UUID) -> None:
+        aqt.mw.taskman.run_on_main(
+            lambda: media_sync.start_media_upload(
+                media_names=media_names, ankihub_did=ankihub_did
+            )
+        )
+
     aqt.mw.taskman.with_progress(
         task=lambda: suggest_notes_in_bulk(
             ankihub_did=ah_did,
@@ -253,7 +260,7 @@ def _on_suggestion_dialog_for_bulk_suggestion_closed(
             auto_accept=suggestion_meta.auto_accept,
             change_type=suggestion_meta.change_type,
             comment=_comment_with_source(suggestion_meta),
-            media_upload_cb=media_sync.start_media_upload,
+            media_upload_cb=media_upload_cb,
         ),
         on_done=lambda future: _on_suggest_notes_in_bulk_done(future, parent),
         parent=parent,

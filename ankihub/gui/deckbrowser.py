@@ -64,7 +64,7 @@ def _maybe_add_flashcard_selector_button() -> None:
         return
 
     if not feature_flags.show_flashcards_selector_button:
-        LOGGER.info(
+        LOGGER.debug(
             "Feature flag to show flashcard selector button is disabled, not adding the button."
         )
         return
