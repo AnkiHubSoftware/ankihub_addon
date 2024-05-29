@@ -28,7 +28,7 @@ import requests
 import structlog
 from anki import buildinfo
 from anki.decks import DeckId
-from anki.utils import point_version
+from anki.utils import is_win, point_version
 from aqt.utils import askUser, showInfo
 from mashumaro import field_options
 from mashumaro.mixins.json import DataClassJSONMixin
@@ -680,7 +680,8 @@ def _setup_stdout_handler() -> None:
     stdout_handler_.setLevel(logging.INFO)
     stdout_handler_.setFormatter(
         _structlog_formatter(
-            structlog.dev.ConsoleRenderer(),
+            # Colors were causing issues on Windows, so we disable them there.
+            structlog.dev.ConsoleRenderer(colors=not is_win),
         )
     )
     STD_LOGGER.addHandler(stdout_handler_)
