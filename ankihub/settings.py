@@ -230,7 +230,6 @@ class _Config:
                 self._private_config = PrivateConfig()
 
         self._update_private_config()
-        self._log_private_config()
 
     def _load_private_config(self) -> PrivateConfig:
         with open(self._private_config_path) as f:
@@ -248,7 +247,7 @@ class _Config:
         with open(self._private_config_path, "w") as f:
             config_json = self._private_config.to_json()
             f.write(json.dumps(json.loads(config_json), indent=4, sort_keys=True))
-        self._log_private_config()
+        self.log_private_config(log_level=logging.DEBUG)
 
     def load_public_config(self) -> None:
         """For loading the public config from its file (after it has been changed)."""
@@ -348,11 +347,11 @@ class _Config:
         if self.subscriptions_change_hook:
             self.subscriptions_change_hook()
 
-    def _log_private_config(self):
+    def log_private_config(self, log_level=logging.INFO):
         config_copy = deepcopy(self._private_config)
         if config_copy.token:
             config_copy.token = "REDACTED"
-        LOGGER.info("Private config", private_config=config_copy.to_dict())
+        LOGGER.log(log_level, "Private config", private_config=config_copy.to_dict())
 
     def set_home_deck(self, ankihub_did: uuid.UUID, anki_did: DeckId):
         self.deck_config(ankihub_did).anki_id = anki_did

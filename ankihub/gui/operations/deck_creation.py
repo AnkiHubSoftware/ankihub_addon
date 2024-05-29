@@ -26,6 +26,7 @@ def create_collaborative_deck() -> None:
     """
 
     LOGGER.info("Creating a new AnkiHub deck...")
+    config.log_private_config()
 
     confirm = DeckCreationConfirmationDialog().run()
     if not confirm:
@@ -141,6 +142,9 @@ def _on_deck_selected(study_deck: StudyDeck) -> None:
             "Link to the deck on AnkiHub:<br>"
             f"<a href={deck_url}>{deck_url}</a>"
         )
+
+        LOGGER.info("Deck creation successful.", deck_name=deck_name)
+        config.log_private_config()
 
     def on_failure(exc: Exception) -> None:
         aqt.mw.progress.finish()

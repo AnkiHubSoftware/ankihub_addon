@@ -26,6 +26,7 @@ from aqt.studydeck import StudyDeck
 from aqt.theme import theme_manager
 from aqt.utils import openLink, showInfo, showText, tooltip
 
+from .. import LOGGER
 from ..addon_ankihub_client import AddonAnkiHubClient as AnkiHubClient
 from ..gui.operations.deck_creation import create_collaborative_deck
 from ..main.deck_unsubscribtion import unsubscribe_from_deck_and_uninstall
@@ -686,6 +687,9 @@ class DeckManagementDialog(QDialog):
 
     @classmethod
     def display_subscribe_window(cls):
+        LOGGER.info("Showing DeckManagementDialog")
+        config.log_private_config()
+
         if cls._window is None:
             cls._window = cls()
         else:
@@ -694,6 +698,10 @@ class DeckManagementDialog(QDialog):
             cls._window.raise_()
             cls._window.show()
         return cls._window
+
+    def closeEvent(self, event) -> None:
+        super().closeEvent(event)
+        config.log_private_config()
 
 
 class StudyDeckWithoutHelpButton(StudyDeck):
