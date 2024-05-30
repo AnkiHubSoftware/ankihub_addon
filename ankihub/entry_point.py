@@ -47,7 +47,7 @@ def install_extension():
         manifest = json.load(f)
         print(manifest)
     # get all the files in the extensions dir
-    for file in extensions_dir.iterdir():
+    for file in hello_world.iterdir():
         if file.is_file():
             # copy the file to the media directory
             shutil.copy(file, aqt.mw.col.media.dir())
@@ -72,7 +72,6 @@ def run():
 
     profile_did_open.append(_on_profile_did_open)
     profile_will_close.append(_on_profile_will_close)
-    install_extension()
 
 
 def _on_profile_did_open():
@@ -132,6 +131,8 @@ def _after_profile_setup():
     # just a temporary fix for notes that were already manually deleted on the webapp.
     # Later we should handle note deletion in the sync process.
     handle_notes_deleted_from_webapp()
+    
+    install_extension()
 
 
 def _general_setup():

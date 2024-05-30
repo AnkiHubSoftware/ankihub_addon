@@ -50,33 +50,13 @@ async function createButton() {
         console.log("Popup created");
 
         // Fetch the content for the popup
-        console.log("Fetching popup content from:", popupUrl);
-        const popupResponse = await fetch(popupUrl);
-        if (!popupResponse.ok) {
-            throw new Error(`HTTP error! status: ${popupResponse.status}`);
-        }
-        const popupContent = await popupResponse.text();
-        popup.innerHTML = popupContent;
-        console.log("Popup content fetched and set");
+        const iframe = document.createElement('iframe');
+        iframe.src = 'http://localhost:8000/ai/fdc31929-0cb0-4809-a502-1ee78ee24857/flashcard-selector-embed/';
+        iframe.style.width = '100%';
+        iframe.style.height = '100vh';
+        iframe.style.border = 'none';
+        document.body.appendChild(iframe);
 
-        // Append the button and popup to the body
-        document.body.appendChild(button);
-        document.body.appendChild(popup);
-        console.log("Button and popup appended to the body");
-
-        // Show/hide the popup when the button is clicked
-        button.addEventListener('click', () => {
-            popup.style.display = popup.style.display === 'none' ? 'block' : 'none';
-            console.log("Button clicked, popup visibility:", popup.style.display);
-        });
-
-        // Hide the popup when clicking outside of it
-        document.addEventListener('click', (event) => {
-            if (!popup.contains(event.target) && !button.contains(event.target)) {
-                popup.style.display = 'none';
-                console.log("Clicked outside, popup hidden");
-            }
-        });
     } catch (error) {
         console.error("Error creating button and popup:", error);
     }
