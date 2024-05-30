@@ -47,11 +47,15 @@ def install_extension():
         manifest = json.load(f)
         print(manifest)
     # get all the files in the extensions dir
-    for file in extensions_dir.iterdir():
+    for file in extensions_dir.rglob("*"):
         if file.is_file():
+            # check if the file already exists in the media directory
+            target_file = pathlib.Path(aqt.mw.col.media.dir()) / file.name
+            if target_file.exists():
+                # remove the existing file
+                target_file.unlink()
             # copy the file to the media directory
             shutil.copy(file, aqt.mw.col.media.dir())
-    return
 
 
 def run():
@@ -72,7 +76,6 @@ def run():
 
     profile_did_open.append(_on_profile_did_open)
     profile_will_close.append(_on_profile_will_close)
-    install_extension()
 
 
 def _on_profile_did_open():
@@ -117,6 +120,7 @@ def _profile_setup() -> bool:
 
 
 def _after_profile_setup():
+    install_extension()
     _log_enabled_addons()
 
     # This deletes broken notetypes with no fields or templates created by a previous version of the add-on.
