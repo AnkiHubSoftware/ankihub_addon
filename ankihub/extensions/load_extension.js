@@ -1,4 +1,3 @@
-// Function to fetch the manifest.json file and read its content
 async function fetchManifest() {
     try {
         console.log("Fetching manifest.json...");
@@ -14,76 +13,53 @@ async function fetchManifest() {
     }
 }
 
-// Function to create a button with the given icon and popup content
-async function createButton() {
+async function initExtension() {
     try {
-        console.log("createButton function called");
         const manifest = await fetchManifest();
         if (!manifest) return;
-
-        const popupUrl = manifest.action.default_popup;
-        const iconUrl = manifest.action.default_icon;
-        console.log("Popup URL:", popupUrl);
-        console.log("Icon URL:", iconUrl);
-
-        // Create the button element
-        const button = document.createElement('button');
-        button.style.backgroundImage = `url(${iconUrl})`;
-        button.style.width = '50px';
-        button.style.height = '50px';
-        button.style.backgroundSize = 'cover';
-        button.style.border = 'none';
-        button.style.cursor = 'pointer';
-        console.log("Button created");
-
-        // Create the popup element
-        const popup = document.createElement('div');
-        popup.style.display = 'none';
-        popup.style.position = 'absolute';
-        popup.style.top = '60px';
-        popup.style.left = '10px';
-        popup.style.border = '1px solid #ccc';
-        popup.style.backgroundColor = '#fff';
-        popup.style.boxShadow = '0 0 10px rgba(0, 0, 0, 0.1)';
-        popup.style.padding = '10px';
-        popup.style.zIndex = '1000';
-        console.log("Popup created");
-
-        // Fetch the content for the popup
-        console.log("Fetching popup content from:", popupUrl);
-        const popupResponse = await fetch(popupUrl);
-        if (!popupResponse.ok) {
-            throw new Error(`HTTP error! status: ${popupResponse.status}`);
-        }
-        const popupContent = await popupResponse.text();
-        popup.innerHTML = popupContent;
-        console.log("Popup content fetched and set");
-
-        // Append the button and popup to the body
-        document.body.appendChild(button);
-        document.body.appendChild(popup);
-        console.log("Button and popup appended to the body");
-
-        // Show/hide the popup when the button is clicked
-        button.addEventListener('click', () => {
-            popup.style.display = popup.style.display === 'none' ? 'block' : 'none';
-            console.log("Button clicked, popup visibility:", popup.style.display);
-        });
-
-        // Hide the popup when clicking outside of it
-        document.addEventListener('click', (event) => {
-            if (!popup.contains(event.target) && !button.contains(event.target)) {
-                popup.style.display = 'none';
-                console.log("Clicked outside, popup hidden");
+        const endpoint = manifest.action.default_popup;
+        const baseResponse = await fetch(endpoint, {
+            method: 'GET', // Specify the method if needed
+            headers: {
+              'Authorization': 'Token 51d64902dc720547edcf007fd1645a8c2128445e7fb0664529ac1f0471d62aae',
+              'Content-Type': 'application/json' // Include this if necessary
             }
+          });
+        if (!baseResponse.ok) {
+            throw new Error(`HTTP error! status: ${baseResponse.status}`);
+        }
+        const responseContent = await baseResponse.text();
+        // Parse the HTML returned by AnkiHub.
+        const parser = new DOMParser();
+        const doc = parser.parseFromString(responseContent, "text/html");
+        // Get hx-headers from the doc.body and add it to the main document body in the Anki webview.
+        const headers = doc.body.getAttribute('hx-headers');
+        document.body.setAttribute('hx-headers', headers);
+        // insert doc.body.innerHTML into the main document body
+        document.body.innerHTML += doc.body.innerHTML;
+        // TODO - Load the htmx.min.js file from the a local source such as the media folder if possible.
+        let scriptEle = document.createElement("script");
+        scriptEle.setAttribute("src", "https://unpkg.com/htmx.org@1.9.12")
+        scriptEle.setAttribute("type", "text/javascript");
+        scriptEle.setAttribute("async", true);
+        scriptEle.setAttribute("integrity", "sha384-ujb1lZYygJmzgSwoxRggbCHcjc0rB2XoQrxeTUQyRjrOnlCoYta87iKBWq3EsdM2")
+        scriptEle.setAttribute("crossorigin", "anonymous")
+        document.head.appendChild(scriptEle);
+        scriptEle.addEventListener("load", () => {
+            console.log("File loaded")
         });
+
+        scriptEle.addEventListener("error", (ev) => {
+            console.log("Error on loading file", ev);
+        });
+
     } catch (error) {
-        console.error("Error creating button and popup:", error);
+        console.error("Error initializing extension:", error);
     }
 }
 
 // Add the function to onShownHook
 onShownHook.push(() => {
     console.log("DOM fully loaded and parsed");
-    createButton();
+    initExtension();
 });
