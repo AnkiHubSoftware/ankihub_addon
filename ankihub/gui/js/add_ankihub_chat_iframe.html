@@ -1,0 +1,19 @@
+<script>
+    const flashcard_selector_url = (
+        "http://localhost:8000/ai/761ed78f-2a06-4d6d-bd64-ecfb11ebcc55/flashcard-selector-embed/"
+    )
+
+    const iframe = document.createElement("iframe");
+    iframe.id = "ankihub"
+    iframe.src = `http://localhost:8000/ai/embed_auth?next=${encodeURIComponent(flashcard_selector_url)}`
+    iframe.width = "100%"
+    iframe.height = "500px"
+
+    iframe.onload = function () {
+        const knox_token = "9c253b471e41a6a213fb52e3f72d4ac2c4d510f5fa7da1e0acb5b7bcb24c7ac4";
+        iframe.contentWindow.postMessage(knox_token, "http://localhost:8000");
+        console.log("Message sent to iframe");
+    }
+
+    document.body.appendChild(iframe)
+</script>
