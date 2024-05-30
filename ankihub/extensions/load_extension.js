@@ -55,6 +55,18 @@ async function initExtension() {
             console.log("Error on loading file", ev);
         });
 
+        let HTMXHeadersScript = document.createElement("script");
+        HTMXHeadersScript.textContent = `
+        document.body.addEventListener('htmx:configRequest', (event) => {
+            event.detail.headers['Authorization'] = 'Token ${token}';
+        })
+        `;
+        document.head.appendChild(HTMXHeadersScript);
+        HTMXHeadersScript.addEventListener("load", () => {
+            console.log("Headers script loaded")
+        });
+
+
     } catch (error) {
         console.error("Error initializing extension:", error);
     }
