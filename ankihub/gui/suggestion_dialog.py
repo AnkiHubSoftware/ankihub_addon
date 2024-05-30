@@ -126,13 +126,27 @@ def _handle_suggestion_error(e: AnkiHubHTTPError, parent: QWidget) -> None:
             error_message = pformat(e.response.json())
             # these errors are not expected and should be reported
             report_exception_and_upload_logs(e)
-        showInfo(
-            text=(
-                "There are some problems with this suggestion:<br><br>"
-                f"<b>{error_message}</b>"
-            ),
-            title="Problem with suggestion",
+        all_no_changes_errors = all(
+            ANKIHUB_NO_CHANGE_ERROR in error for error in non_field_errors
         )
+        if all_no_changes_errors:
+            showInfo(
+                text=(
+                    "No field or tag changes were detected. "
+                    "Please verify that the changes you made were not to a protected field and try again.<br><br>"
+                    "Learn more about protected fields "
+                    "<a href='https://community.ankihub.net/t/protecting-fields-and-tags/165604'>here</a>."
+                ),
+                title="Invalid suggestion",
+            )
+        else:
+            showInfo(
+                text=(
+                    "There are some problems with this suggestion:<br><br>"
+                    f"<b>{error_message}</b>"
+                ),
+                title="Problem with suggestion",
+            )
         LOGGER.info("Can't submit suggestion.", error_message=error_message)
     elif e.response.status_code == 403:
         response_data = e.response.json()
