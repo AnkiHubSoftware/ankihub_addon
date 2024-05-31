@@ -9,30 +9,31 @@
 
 <body>
 
-    <script>
-        // Replace this with your own app url
-        const appUrl = "http://localhost:8000"
+<script>
+    // Replace with your own token
+    const knox_token = "9c253b471e41a6a213fb52e3f72d4ac2c4d510f5fa7da1e0acb5b7bcb24c7ac4";
 
-        // Replace the deck id with your own deck id
-        const flashcard_selector_url = (
-            `${appUrl}/ai/761ed78f-2a06-4d6d-bd64-ecfb11ebcc55/flashcard-selector-embed/`
-        )
+    // Replace this with your own app url
+    const appUrl = "http://localhost:8000"
 
-        const iframe = document.createElement("iframe");
-        iframe.id = "ankihub"
-        iframe.src = `${appUrl}/ai/embed_auth?next=${encodeURIComponent(flashcard_selector_url)}`
-        iframe.width = "100%"
-        iframe.height = "500px"
+    // Replace the deck id with your own deck id
+    const flashcard_selector_url = (
+        `${appUrl}/ai/761ed78f-2a06-4d6d-bd64-ecfb11ebcc55/flashcard-selector-embed/`
+    )
 
-        iframe.onload = function () {
-            // Replace with your own token
-            const knox_token = "9c253b471e41a6a213fb52e3f72d4ac2c4d510f5fa7da1e0acb5b7bcb24c7ac4";
-            iframe.contentWindow.postMessage(knox_token, appUrl);
-            console.log("Message sent to iframe");
-        }
+    const iframe = document.createElement("iframe");
+    iframe.id = "ankihub"
+    iframe.src = `${appUrl}/ai/embed_auth?next=${encodeURIComponent(flashcard_selector_url)}`
+    iframe.width = "100%"
+    iframe.height = "500px"
 
-        document.body.appendChild(iframe)
-    </script>
+    iframe.onload = function () {
+        iframe.contentWindow.postMessage(knox_token, appUrl);
+        console.log("Message sent to iframe");
+    }
+
+    document.body.appendChild(iframe)
+</script>
 
 </body>
 
