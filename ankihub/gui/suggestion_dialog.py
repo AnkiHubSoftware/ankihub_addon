@@ -162,7 +162,7 @@ def _handle_suggestion_error(e: AnkiHubHTTPError, parent: QWidget) -> None:
             pixmap = icon.pixmap(QCheckBox().iconSize())
             icon_label.setPixmap(pixmap)
             icon_label.setToolTip(
-                "Protecting a field allows you to add anything you want to a field "
+                "Protecting a field allows you to add anything you want to a field\n"
                 "without it being overwritten via AnkiHub suggestions."
             )
             icon_label.setCursor(QCursor(Qt.CursorShape.PointingHandCursor))
