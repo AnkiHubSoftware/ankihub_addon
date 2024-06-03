@@ -12,13 +12,16 @@ from anki.notes import Note, NoteId
 from aqt.qt import (
     QCheckBox,
     QComboBox,
+    QCursor,
     QDialog,
     QDialogButtonBox,
     QGroupBox,
+    QHBoxLayout,
     QLabel,
     QLineEdit,
     QPlainTextEdit,
     QSpacerItem,
+    Qt,
     QVBoxLayout,
     QWidget,
     pyqtSignal,
@@ -50,8 +53,10 @@ from .media_sync import media_sync
 from .utils import (
     active_window_or_mw,
     choose_ankihub_deck,
+    show_dialog,
     show_error_dialog,
     show_tooltip,
+    tooltip_icon,
 )
 
 
@@ -126,13 +131,48 @@ def _handle_suggestion_error(e: AnkiHubHTTPError, parent: QWidget) -> None:
             error_message = pformat(e.response.json())
             # these errors are not expected and should be reported
             report_exception_and_upload_logs(e)
-        showInfo(
-            text=(
-                "There are some problems with this suggestion:<br><br>"
-                f"<b>{error_message}</b>"
-            ),
-            title="Problem with suggestion",
+        all_no_changes_errors = all(
+            ANKIHUB_NO_CHANGE_ERROR in error for error in non_field_errors
         )
+        if all_no_changes_errors:
+            dialog = show_dialog(
+                title="Invalid suggestion",
+                text=(
+                    "No field or tag changes were detected. "
+                    "Please verify that the changes you made were not to a protected field and try again.<br><br>"
+                ),
+                parent=parent,
+                open_dialog=False,
+            )
+            layout = dialog.content_layout
+            sublayout = QHBoxLayout()
+            subwidget = QWidget()
+            subwidget.setLayout(sublayout)
+            label = QLabel(
+                "(Learn more about protected fields "
+                "<a href='https://community.ankihub.net/t/protecting-fields-and-tags/165604'>here</a>.)"
+            )
+            sublayout.addWidget(label)
+            icon_label = QLabel("")
+            pixmap = tooltip_icon().pixmap(QCheckBox().iconSize())
+            icon_label.setPixmap(pixmap)
+            icon_label.setToolTip(
+                "Protecting a field allows you to add anything you want to a field\n"
+                "without it being overwritten via AnkiHub suggestions."
+            )
+            icon_label.setCursor(QCursor(Qt.CursorShape.PointingHandCursor))
+            sublayout.addWidget(icon_label)
+            layout.insertWidget(layout.count() - 1, subwidget)
+            dialog.adjustSize()
+            dialog.open()
+        else:
+            showInfo(
+                text=(
+                    "There are some problems with this suggestion:<br><br>"
+                    f"<b>{error_message}</b>"
+                ),
+                title="Problem with suggestion",
+            )
         LOGGER.info("Can't submit suggestion.", error_message=error_message)
     elif e.response.status_code == 403:
         response_data = e.response.json()
