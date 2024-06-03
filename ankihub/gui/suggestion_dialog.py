@@ -21,7 +21,6 @@ from aqt.qt import (
     QLineEdit,
     QPlainTextEdit,
     QSpacerItem,
-    QStyle,
     Qt,
     QVBoxLayout,
     QWidget,
@@ -57,6 +56,7 @@ from .utils import (
     show_dialog,
     show_error_dialog,
     show_tooltip,
+    tooltip_icon,
 )
 
 
@@ -154,12 +154,7 @@ def _handle_suggestion_error(e: AnkiHubHTTPError, parent: QWidget) -> None:
             )
             sublayout.addWidget(label)
             icon_label = QLabel("")
-            icon = (
-                QCheckBox()
-                .style()
-                .standardIcon(QStyle.StandardPixmap.SP_MessageBoxInformation)
-            )
-            pixmap = icon.pixmap(QCheckBox().iconSize())
+            pixmap = tooltip_icon().pixmap(QCheckBox().iconSize())
             icon_label.setPixmap(pixmap)
             icon_label.setToolTip(
                 "Protecting a field allows you to add anything you want to a field\n"
