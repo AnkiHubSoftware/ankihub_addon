@@ -338,7 +338,7 @@ def modify_fields(note_type: Dict) -> None:
 def modify_template(template: Dict) -> None:
     # the order is important here, the end comment must be added last
     template["afmt"] = _template_side_with_view_on_ankihub_snippet(template["afmt"])
-    add_ankihub_end_comment_to_template(template)
+    _add_ankihub_end_comment_to_template(template)
 
 
 def _template_side_with_view_on_ankihub_snippet(template_side: str) -> str:
@@ -421,7 +421,7 @@ def _template_side_with_view_on_ankihub_snippet(template_side: str) -> str:
         )
 
 
-def add_ankihub_end_comment_to_template(template: Dict) -> None:
+def _add_ankihub_end_comment_to_template(template: Dict) -> None:
     """Add the AnkiHub end comment to the template if it is not already present.
     The purpose of the AnkiHub end comment is to allow users to add their own content below it without it being
     overwritten when the note type is updated."""
