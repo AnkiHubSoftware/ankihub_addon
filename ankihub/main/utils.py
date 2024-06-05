@@ -441,16 +441,22 @@ def _add_ankihub_end_comment_to_template(template: Dict) -> None:
 
 
 def note_type_with_updated_templates(
-    old_note_type: NotetypeDict, new_note_type: NotetypeDict
+    old_note_type: NotetypeDict, new_note_type: NotetypeDict, use_new_templates: bool
 ) -> NotetypeDict:
     """Returns the new note type with modifications applied to the card templates.
-    The View on AnkiHub button is added to the back side of each template.
-    Contents below the AnkiHub end comments are migrated from the old templates to the new templates.
+    The new templates are used as the base if use_new_templates is True.
+
+    The modifications are as follows:
+    - The View on AnkiHub button is added to the back side of each template.
+    - Contents below the AnkiHub end comments are preserved when the template is updated.
 
     Args:
-        local_note_type (NotetypeDict): The contents below the AnkiHub end comments are migrated from this note type
-            to the new note type.
-        new_note_type (NotetypeDict): The note type to update.
+        old_note_type (NotetypeDict): The old note tpye. The contents below the AnkiHub end comments is preserved
+        when the template is updated.
+        new_note_type (NotetypeDict): The new note type.
+        use_new_templates (bool): If True, the templates from the new_note_type are used as the base for
+            the updated templates, otherwise the old templates are used. Then this function just refreshes
+            the modifications or adds them if they are not present.
 
     Returns:
         NotetypeDict: The updated note type.
@@ -465,26 +471,45 @@ def note_type_with_updated_templates(
                 new_template_side=new_template[template_side_name],
                 old_template_side=old_template[template_side_name],
                 template_side_name=template_side_name,
+                use_new_template=use_new_templates,
             )
 
     return updated_note_type
 
 
 def _updated_template_side(
-    new_template_side: str, old_template_side: str, template_side_name: str
+    new_template_side: str,
+    old_template_side: str,
+    template_side_name: str,
+    use_new_template: bool,
 ) -> str:
+    """
+    Args:
+        template_side_name (str): The name of the template side ("qfmt" or "afmt").
+        use_new_template (bool): If True, the new template side is used as the base for
+            the updated template side, otherwise the old template side is used.
 
-    # Remove end comment and content below it from the new content.
-    # This prevents duplicate end comments if the end comment is already present in the new template
-    # for some reason.
-    result = re.sub(ANKIHUB_END_COMMENT_PATTERN, "", new_template_side)
-
-    if template_side_name == "afmt":
-        result = _template_side_with_view_on_ankihub_snippet(result)
-
+    Returns:
+        str: The updated template side with the AnkiHub modifications applied.
+    """
     m = re.search(ANKIHUB_END_COMMENT_PATTERN, old_template_side)
     html_to_migrate = m.group("html_to_migrate") if m else ""
 
+    # Choose the base for the result
+    if use_new_template:
+        result = new_template_side
+    else:
+        result = old_template_side
+
+    # Remove end comment and content below it from the template side.
+    # It will be added back below.
+    result = re.sub(ANKIHUB_END_COMMENT_PATTERN, "", result)
+
+    if template_side_name == "afmt":
+        # The view on AnkiHub button is added to the back side of the template.
+        result = _template_side_with_view_on_ankihub_snippet(result)
+
+    # Add the AnkiHub end comment and the content below it back to the template side.
     return (
         result.rstrip("\n ")
         + "\n\n"
