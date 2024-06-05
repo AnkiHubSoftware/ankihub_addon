@@ -18,8 +18,8 @@ import pytest
 from anki.decks import DeckId
 from anki.models import NotetypeDict
 from anki.notes import Note, NoteId
-from approvaltests.approvals import verify
-from approvaltests.namer import NamerFactory
+from approvaltests.approvals import verify  # type: ignore
+from approvaltests.namer import NamerFactory  # type: ignore
 from aqt.qt import QDialog, QDialogButtonBox, QLineEdit, QMenu, Qt, QTimer, QWidget
 from pytest import MonkeyPatch
 from pytest_anki import AnkiSession
