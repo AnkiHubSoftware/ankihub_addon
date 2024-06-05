@@ -218,6 +218,11 @@ class AnkiHubImporter:
         self._skipped_nids = [
             NoteId(note_data.anki_nid) for note_data in skipped_notes_data
         ]
+        LOGGER.info(
+            "Upserted notes into AnkiHub DB.",
+            upserted_notes_count=len(upserted_notes_data),
+            skipped_notes_count=len(skipped_notes_data),
+        )
 
         # Upsert notes into Anki DB, delete them or mark them as deleted
         _reset_note_types_of_notes_based_on_notes_data(upserted_notes_data)
@@ -228,6 +233,13 @@ class AnkiHubImporter:
             notes_to_delete,
             notes_without_changes,
         ) = self._prepare_notes(notes_data=upserted_notes_data)
+        LOGGER.info(
+            "Prepared notes for import.",
+            notes_to_create_count=len(notes_to_create_by_ah_nid),
+            notes_to_update_count=len(notes_to_update),
+            notes_to_delete_count=len(notes_to_delete),
+            notes_without_changes_count=len(notes_without_changes),
+        )
 
         cards_by_anki_nid_before_import = cards_by_anki_nid_dict(notes_to_update)
 
