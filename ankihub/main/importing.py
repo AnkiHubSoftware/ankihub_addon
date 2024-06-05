@@ -25,6 +25,7 @@ from ..settings import (
     TAG_FOR_INSTRUCTION_NOTES,
     BehaviorOnRemoteNoteDeleted,
     SuspendNewCardsOfExistingNotes,
+    is_anking_note_types_addon_installed,
 )
 from .deck_options import set_ankihub_config_for_deck, set_recommended_preferences
 from .note_conversion import (
@@ -779,6 +780,15 @@ def _adjust_note_types_in_anki_db(
 
 def _update_templates(remote_note_types: Dict[NotetypeId, NotetypeDict]) -> None:
     for mid, remote_note_type in remote_note_types.items():
+        if (
+            "anking" in remote_note_type["name"].lower()
+            and is_anking_note_types_addon_installed()
+        ):
+            # Don't update the templates of AnKing note types if the AnKing note types addon is installed.
+            # The AnKing note types addon will handle updating the templates, while preserving the
+            # user's customizations.
+            continue
+
         local_note_type = aqt.mw.col.models.get(mid)
         updated_note_type = note_type_with_updated_templates(
             old_note_type=local_note_type, new_note_type=remote_note_type

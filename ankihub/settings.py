@@ -879,3 +879,14 @@ class AnkiHubCommands(Enum):
 RATIONALE_FOR_CHANGE_MAX_LENGTH = 1024
 
 ANKI_VERSION_23_10_00 = 231000
+
+ANKING_NOTE_TYPES_ADDON_ANKIWEB_ID = 952691989
+ANKING_NOTE_TYPES_ADDON_MODULE_NAME = "anking_note_types"
+
+
+def is_anking_note_types_addon_installed():
+    addon_dir_names = [x.dir_name for x in aqt.mw.addonManager.all_addon_meta()]
+    return (
+        str(ANKING_NOTE_TYPES_ADDON_ANKIWEB_ID) in addon_dir_names
+        or ANKING_NOTE_TYPES_ADDON_MODULE_NAME in addon_dir_names
+    )
