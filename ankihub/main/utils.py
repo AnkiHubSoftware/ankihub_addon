@@ -440,16 +440,25 @@ def add_ankihub_end_comment_to_template(template: Dict) -> None:
         )
 
 
-def update_templates_of_note_type(new_note_type: NotetypeDict) -> None:
-    """Update the template of the note type in the collection to the templates of the new note type.
+def note_type_with_updated_templates(
+    old_note_type: NotetypeDict, new_note_type: NotetypeDict
+) -> NotetypeDict:
+    """Returns the new note type with modifications applied to the card templates.
     The View on AnkiHub button is added to the back side of each template.
     Contents below the AnkiHub end comments are migrated from the old templates to the new templates.
+
+    Args:
+        local_note_type (NotetypeDict): The contents below the AnkiHub end comments are migrated from this note type
+            to the new note type.
+        new_note_type (NotetypeDict): The note type to update.
+
+    Returns:
+        NotetypeDict: The updated note type.
     """
-    local_note_type = aqt.mw.col.models.get(new_note_type["id"])
-    new_note_type = copy.deepcopy(new_note_type)
+    updated_note_type = copy.deepcopy(new_note_type)
 
     for new_template, old_template in zip(
-        new_note_type["tmpls"], local_note_type["tmpls"]
+        updated_note_type["tmpls"], old_note_type["tmpls"]
     ):
         for template_side_name in ["qfmt", "afmt"]:
             new_template[template_side_name] = _updated_template_side(
@@ -458,7 +467,7 @@ def update_templates_of_note_type(new_note_type: NotetypeDict) -> None:
                 template_side_name=template_side_name,
             )
 
-    aqt.mw.col.models.update_dict(new_note_type)
+    return updated_note_type
 
 
 def _updated_template_side(
