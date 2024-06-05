@@ -18,6 +18,8 @@ import pytest
 from anki.decks import DeckId
 from anki.models import NotetypeDict
 from anki.notes import Note, NoteId
+from approvaltests.approvals import verify
+from approvaltests.namer import NamerFactory
 from aqt.qt import QDialog, QDialogButtonBox, QLineEdit, QMenu, Qt, QTimer, QWidget
 from pytest import MonkeyPatch
 from pytest_anki import AnkiSession
@@ -33,7 +35,7 @@ from ankihub.ankihub_client.models import (  # type: ignore
 )
 from ankihub.gui import menu
 from ankihub.gui.config_dialog import setup_config_dialog_manager
-from ankihub.settings import DatadogLogHandler
+from ankihub.settings import ANKIHUB_TEMPLATE_END_COMMENT, DatadogLogHandler
 
 from ..factories import (
     DeckExtensionFactory,
@@ -137,6 +139,7 @@ from ankihub.main.utils import (
     clear_empty_cards,
     lowest_level_common_ancestor_deck_name,
     mids_of_notes,
+    note_type_with_updated_templates,
     retain_nids_with_ah_note_type,
 )
 from ankihub.settings import ANKIWEB_ID, config, log_file_path
@@ -2890,3 +2893,60 @@ class TestDatadogLogHandler:
                 assert datadog_log_handler is None
             else:
                 assert datadog_log_handler
+
+
+class TestNoteTypeWithUpdatedTemplates:
+    def test_basic(self):
+        old_note_type_content = "old content"
+        old_note_type = {
+            "tmpls": [{"qfmt": old_note_type_content, "afmt": old_note_type_content}]
+        }
+
+        new_note_type_content = "new content"
+        new_note_type = {
+            "tmpls": [{"qfmt": new_note_type_content, "afmt": new_note_type_content}]
+        }
+
+        updated_note_type = note_type_with_updated_templates(
+            old_note_type=old_note_type, new_note_type=new_note_type
+        )
+        assert len(updated_note_type["tmpls"]) == 1
+        template = updated_note_type["tmpls"][0]
+
+        verify(
+            template["qfmt"],
+            options=NamerFactory.with_parameters("qfmt"),
+        )
+        verify(
+            template["afmt"],
+            options=NamerFactory.with_parameters("afmt"),
+        )
+
+    def test_with_migrating_content_from_old_note_type(self):
+        content_to_migrate = "content to migrate"
+        old_note_type_content = (
+            f"old content\n{ANKIHUB_TEMPLATE_END_COMMENT}\n{content_to_migrate}"
+        )
+        old_note_type = {
+            "tmpls": [{"qfmt": old_note_type_content, "afmt": old_note_type_content}]
+        }
+
+        new_note_type_content = "new content"
+        new_note_type = {
+            "tmpls": [{"qfmt": new_note_type_content, "afmt": new_note_type_content}]
+        }
+
+        updated_note_type = note_type_with_updated_templates(
+            old_note_type=old_note_type, new_note_type=new_note_type
+        )
+        assert len(updated_note_type["tmpls"]) == 1
+        template = updated_note_type["tmpls"][0]
+
+        verify(
+            template["qfmt"],
+            options=NamerFactory.with_parameters("qfmt"),
+        )
+        verify(
+            template["afmt"],
+            options=NamerFactory.with_parameters("afmt"),
+        )
