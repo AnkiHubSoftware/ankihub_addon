@@ -219,6 +219,11 @@ class AnkiHubImporter:
         self._skipped_nids = [
             NoteId(note_data.anki_nid) for note_data in skipped_notes_data
         ]
+        LOGGER.info(
+            "Upserted notes into AnkiHub DB.",
+            upserted_notes_count=len(upserted_notes_data),
+            skipped_notes_count=len(skipped_notes_data),
+        )
 
         # Upsert notes into Anki DB, delete them or mark them as deleted
         _reset_note_types_of_notes_based_on_notes_data(upserted_notes_data)
@@ -229,6 +234,13 @@ class AnkiHubImporter:
             notes_to_delete,
             notes_without_changes,
         ) = self._prepare_notes(notes_data=upserted_notes_data)
+        LOGGER.info(
+            "Prepared notes for import.",
+            notes_to_create_count=len(notes_to_create_by_ah_nid),
+            notes_to_update_count=len(notes_to_update),
+            notes_to_delete_count=len(notes_to_delete),
+            notes_without_changes_count=len(notes_without_changes),
+        )
 
         cards_by_anki_nid_before_import = cards_by_anki_nid_dict(notes_to_update)
 
@@ -568,7 +580,6 @@ class AnkiHubImporter:
     ) -> Tuple[Note, NoteOperation]:
         """Gets or creates a note and prepares it for import into Anki DB. Returns the note and the operation that
         should be performed on it."""
-        LOGGER.debug("Preparing note...", anki_nid=note_data.anki_nid)
         try:
             note = aqt.mw.col.get_note(id=NoteId(note_data.anki_nid))
             note_exists = True
@@ -595,7 +606,6 @@ class AnkiHubImporter:
             else:
                 raise AssertionError("This should never happen.")  # pragma: no cover
 
-        LOGGER.debug("Prepared note.", anki_nid=note_data.anki_nid, operation=operation)
         return note, operation
 
     def _prepare_note_inner(
@@ -641,22 +651,11 @@ class AnkiHubImporter:
         if note.guid == guid:
             return False
 
-        LOGGER.debug(
-            "Changing guid of note.",
-            anki_nid=note.id,
-            new_guid=guid,
-            old_guid=note.guid,
-        )
         note.guid = guid
         return True
 
     def _prepare_ankihub_id_field(self, note: Note, ankihub_nid: str) -> bool:
         if note[settings.ANKIHUB_NOTE_TYPE_FIELD_NAME] != ankihub_nid:
-            LOGGER.debug(
-                "Changing AnkiHub id of note.",
-                anki_nid=note.id,
-                new_ankihub_id=ankihub_nid,
-            )
             note[settings.ANKIHUB_NOTE_TYPE_FIELD_NAME] = ankihub_nid
             return True
         return False
@@ -668,9 +667,6 @@ class AnkiHubImporter:
         protected_fields: Dict[int, List[str]],
     ) -> bool:
         if is_tag_in_list(TAG_FOR_PROTECTING_ALL_FIELDS, note.tags):
-            LOGGER.debug(
-                "Skipping preparing fields because they are protected by a tag."
-            )
             return False
 
         changed = False
@@ -680,25 +676,12 @@ class AnkiHubImporter:
                 aqt.mw.col.models.get(note.mid)["id"], []
             )
             if field.name in protected_fields_for_model:
-                LOGGER.debug(
-                    "Field is protected by the protected_fields for the model, skipping.",
-                    field_name=field.name,
-                )
                 continue
 
             if field.name in fields_protected_by_tags:
-                LOGGER.debug(
-                    "Field is protected by a tag, skipping.", field_name=field.name
-                )
                 continue
 
             if note[field.name] != field.value:
-                LOGGER.debug(
-                    "Changing field of note.",
-                    anki_nid=note.id,
-                    field_name=field.name,
-                    field_value=field.value,
-                )
                 note[field.name] = field.value
                 changed = True
         return changed
@@ -715,12 +698,6 @@ class AnkiHubImporter:
             cur_tags=note.tags, incoming_tags=tags, protected_tags=protected_tags
         )
         if set(prev_tags) != set(note.tags):
-            LOGGER.debug(
-                "Tags were changed.",
-                anki_nid=note.id,
-                new_tags=note.tags,
-                old_tags=prev_tags,
-            )
             changed = True
 
         return changed

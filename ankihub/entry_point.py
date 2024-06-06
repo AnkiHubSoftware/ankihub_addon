@@ -46,6 +46,7 @@ def run():
         "Application and version info",
         addon_version=ADDON_VERSION,
         anki_version=ANKI_VERSION,
+        qt_version=aqt.QT_VERSION_STR,
         app_url=config.app_url,
         s3_bucket_url=config.s3_bucket_url,
     )
