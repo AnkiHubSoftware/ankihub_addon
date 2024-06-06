@@ -112,6 +112,12 @@ IMAGE_FILE_EXTENSIONS = [
 TIMEOUT_SECONDS = 20
 
 
+# Adapted from the default max_workers calculation in ThreadPoolExecutor.
+# By default, it uses min(32, os.cpu_count() + 4), but we want to use a lower number,
+# to avoid using too many resources.
+THREAD_POOL_MAX_WORKERS = min(32, (os.cpu_count() or 1) + 1)
+
+
 def _should_retry_for_response(response: Response) -> bool:
     """Return True if the request should be retried for the given Response, False otherwise."""
     result = response.status_code in RETRY_STATUS_CODES or (
@@ -447,7 +453,7 @@ class AnkiHubClient:
         )
 
         # Use ThreadPoolExecutor to zip & upload media files
-        with ThreadPoolExecutor() as executor:
+        with ThreadPoolExecutor(max_workers=THREAD_POOL_MAX_WORKERS) as executor:
             futures: List[Future] = []
             for chunk_number, chunk in enumerate(media_path_chunks):
                 futures.append(
@@ -534,7 +540,7 @@ class AnkiHubClient:
 
     def download_media(self, media_names: List[str], deck_id: uuid.UUID) -> None:
         deck_media_remote_dir = f"/deck_assets/{deck_id}/"
-        with ThreadPoolExecutor() as executor:
+        with ThreadPoolExecutor(max_workers=THREAD_POOL_MAX_WORKERS) as executor:
             media_dir_path = self.local_media_dir_path_cb()
             futures: List[Future] = []
             for media_name in media_names:
