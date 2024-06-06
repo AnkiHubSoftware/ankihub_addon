@@ -30,6 +30,13 @@ from ..settings import (
 if ANKI_INT_VERSION >= ANKI_VERSION_23_10_00:
     from anki.collection import AddNoteRequest
 
+# Pattern for the AnkiHub end comment in card templates.
+# The end comment is used to allow users to add their own content below it without it being overwritten
+# when the template is updated.
+ANKIHUB_END_COMMENT_PATTERN = re.compile(
+    rf"{ANKIHUB_TEMPLATE_END_COMMENT}(?P<html_to_migrate>[\w\W]*)"
+)
+
 # decks
 
 
@@ -330,12 +337,12 @@ def modify_fields(note_type: Dict) -> None:
 
 def modify_template(template: Dict) -> None:
     # the order is important here, the end comment must be added last
-    add_view_on_ankihub_snippet_to_template(template)
-    add_ankihub_end_comment_to_template(template)
+    template["afmt"] = _template_side_with_view_on_ankihub_snippet(template["afmt"])
+    _add_ankihub_end_comment_to_template(template)
 
 
-def add_view_on_ankihub_snippet_to_template(template: Dict) -> None:
-    """Adds a View on AnkiHub button/link to the template."""
+def _template_side_with_view_on_ankihub_snippet(template_side: str) -> str:
+    """Return template html with the AnkiHub view note snippet added to it."""
     snippet = dedent(
         f"""
         <!-- BEGIN {ANKIHUB_NOTE_TYPE_MODIFICATION_STRING} -->
@@ -403,18 +410,21 @@ def add_view_on_ankihub_snippet_to_template(template: Dict) -> None:
         f"<!-- END {ANKIHUB_NOTE_TYPE_MODIFICATION_STRING} -->"
     )
 
-    if not re.search(snippet_pattern, template["afmt"]):
-        template["afmt"] = template["afmt"].rstrip("\n ") + "\n\n" + snippet
+    if not re.search(snippet_pattern, template_side):
+        return template_side.rstrip("\n ") + "\n\n" + snippet
     else:
         # update existing snippet to make sure it is up to date
-        template["afmt"] = re.sub(
+        return re.sub(
             snippet_pattern,
             snippet,
-            template["afmt"],
+            template_side,
         )
 
 
-def add_ankihub_end_comment_to_template(template: Dict) -> None:
+def _add_ankihub_end_comment_to_template(template: Dict) -> None:
+    """Add the AnkiHub end comment to the template if it is not already present.
+    The purpose of the AnkiHub end comment is to allow users to add their own content below it without it being
+    overwritten when the note type is updated."""
     for key in ["qfmt", "afmt"]:
         cur_side = template[key]
         if re.search(ANKIHUB_TEMPLATE_END_COMMENT, cur_side):
@@ -428,6 +438,60 @@ def add_ankihub_end_comment_to_template(template: Dict) -> None:
             template=template["name"],
             key=key,
         )
+
+
+def note_type_with_updated_templates(
+    old_note_type: NotetypeDict, new_note_type: NotetypeDict
+) -> NotetypeDict:
+    """Returns the new note type with modifications applied to the card templates.
+    The View on AnkiHub button is added to the back side of each template.
+    Contents below the AnkiHub end comments are migrated from the old templates to the new templates.
+
+    Args:
+        local_note_type (NotetypeDict): The contents below the AnkiHub end comments are migrated from this note type
+            to the new note type.
+        new_note_type (NotetypeDict): The note type to update.
+
+    Returns:
+        NotetypeDict: The updated note type.
+    """
+    updated_note_type = copy.deepcopy(new_note_type)
+
+    for new_template, old_template in zip(
+        updated_note_type["tmpls"], old_note_type["tmpls"]
+    ):
+        for template_side_name in ["qfmt", "afmt"]:
+            new_template[template_side_name] = _updated_template_side(
+                new_template_side=new_template[template_side_name],
+                old_template_side=old_template[template_side_name],
+                template_side_name=template_side_name,
+            )
+
+    return updated_note_type
+
+
+def _updated_template_side(
+    new_template_side: str, old_template_side: str, template_side_name: str
+) -> str:
+
+    # Remove end comment and content below it from the new content.
+    # This prevents duplicate end comments if the end comment is already present in the new template
+    # for some reason.
+    result = re.sub(ANKIHUB_END_COMMENT_PATTERN, "", new_template_side)
+
+    if template_side_name == "afmt":
+        result = _template_side_with_view_on_ankihub_snippet(result)
+
+    m = re.search(ANKIHUB_END_COMMENT_PATTERN, old_template_side)
+    html_to_migrate = m.group("html_to_migrate") if m else ""
+
+    return (
+        result.rstrip("\n ")
+        + "\n\n"
+        + ANKIHUB_TEMPLATE_END_COMMENT
+        + "\n"
+        + html_to_migrate
+    )
 
 
 # ... undo modifications

@@ -200,6 +200,8 @@ from ankihub.main.utils import (
 )
 from ankihub.settings import (
     ANKIHUB_NOTE_TYPE_FIELD_NAME,
+    ANKIHUB_NOTE_TYPE_MODIFICATION_STRING,
+    ANKIHUB_TEMPLATE_END_COMMENT,
     ANKING_DECK_ID,
     AnkiHubCommands,
     BehaviorOnRemoteNoteDeleted,
@@ -1942,6 +1944,56 @@ class TestAnkiHubImporter:
             assert len(import_result.updated_nids) == 0
 
             assert_that_only_ankihub_sample_deck_info_in_database(ah_did=ah_did)
+
+    def test_note_type_templates_are_updated(
+        self,
+        anki_session_with_addon_data: AnkiSession,
+        ankihub_basic_note_type: NotetypeDict,
+        next_deterministic_uuid: Callable[[], uuid.UUID],
+        import_ah_note_type: ImportAHNoteType,
+    ):
+        with anki_session_with_addon_data.profile_loaded():
+            ah_did = next_deterministic_uuid()
+
+            # Set up the note type
+            ankihub_basic_note_type["tmpls"][0]["qfmt"] = "{{Front}}"
+            ankihub_basic_note_type["tmpls"][0]["qfmt"] = "{{Back}}"
+            import_ah_note_type(ah_did=ah_did, note_type=ankihub_basic_note_type)
+
+            # Import the note type again with updated templates
+            new_note_type = copy.deepcopy(ankihub_basic_note_type)
+
+            new_qfmt = "{{Front}} text added to qfmt"
+            new_note_type["tmpls"][0]["qfmt"] = new_qfmt
+
+            new_afmt = "{{Back}} text added to afmt"
+            new_note_type["tmpls"][0]["afmt"] = new_afmt
+
+            import_result = self._import_notes(
+                ah_notes=[],
+                note_types={new_note_type["id"]: new_note_type},
+                ah_did=ah_did,
+                is_first_import_of_deck=False,
+            )
+
+            # Check that the note type templates were updated
+            updated_note_type = aqt.mw.col.models.get(ankihub_basic_note_type["id"])
+
+            updated_qfmt = updated_note_type["tmpls"][0]["qfmt"]
+            assert new_qfmt in updated_qfmt
+            assert ANKIHUB_TEMPLATE_END_COMMENT in updated_qfmt
+
+            updated_afmt = updated_note_type["tmpls"][0]["afmt"]
+            assert new_afmt in updated_afmt
+            assert ANKIHUB_TEMPLATE_END_COMMENT in updated_afmt
+            # This is only on the back template (afmt)
+            assert ANKIHUB_NOTE_TYPE_MODIFICATION_STRING in updated_afmt
+
+            # Check that there were no unwanted changes
+            assert len(import_result.created_nids) == 0
+            assert len(import_result.updated_nids) == 0
+            assert len(import_result.marked_as_deleted_nids) == 0
+            assert len(import_result.deleted_nids) == 0
 
     def test_update_deck_with_subdecks(
         self,

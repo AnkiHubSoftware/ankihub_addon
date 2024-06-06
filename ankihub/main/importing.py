@@ -44,7 +44,7 @@ from .utils import (
     get_unique_ankihub_deck_name,
     is_tag_in_list,
     lowest_level_common_ancestor_did,
-    modify_note_type_templates,
+    note_type_with_updated_templates,
     truncated_list,
 )
 
@@ -749,9 +749,18 @@ def _adjust_note_types_in_anki_db(
     _create_missing_note_types(remote_note_types)
     _rename_note_types(remote_note_types)
     _ensure_local_and_remote_fields_are_same(remote_note_types)
-    modify_note_type_templates(remote_note_types.keys())
+    _update_templates(remote_note_types)
 
     LOGGER.info("Adjusted note types.")
+
+
+def _update_templates(remote_note_types: Dict[NotetypeId, NotetypeDict]) -> None:
+    for mid, remote_note_type in remote_note_types.items():
+        local_note_type = aqt.mw.col.models.get(mid)
+        updated_note_type = note_type_with_updated_templates(
+            old_note_type=local_note_type, new_note_type=remote_note_type
+        )
+        aqt.mw.col.models.update_dict(updated_note_type)
 
 
 def _create_missing_note_types(
