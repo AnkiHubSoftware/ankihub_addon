@@ -14,6 +14,8 @@ from ..settings import url_view_note
 VIEW_NOTE_PYCMD = "ankihub_view_note"
 VIEW_NOTE_BUTTON_ID = "ankihub-view-note-button"
 
+OPEN_BROWSER_PYCMD = "ankihub_open_browser"
+
 
 def setup():
     """Adds the "View on AnkiHub" button to the reviewer toolbar."""
@@ -90,5 +92,7 @@ def _on_js_message(handled: Tuple[bool, Any], message: str, context: Any) -> Any
         openLink(view_note_url)
 
         return (True, None)
+    elif message == OPEN_BROWSER_PYCMD:
+        aqt.dialogs.open("Browser", aqt.mw)
 
     return handled

@@ -17,20 +17,33 @@
     const appUrl = "http://localhost:8000"
 
     // Replace the deck id with your own deck id
-    const flashcard_selector_url = (
-        `${appUrl}/ai/761ed78f-2a06-4d6d-bd64-ecfb11ebcc55/flashcard-selector-embed/`
+    const targetUrl = (
+        `${appUrl}/ai/js-python-bride/`
     )
 
     const iframe = document.createElement("iframe");
     iframe.id = "ankihub"
-    iframe.src = `${appUrl}/ai/embed_auth?next=${encodeURIComponent(flashcard_selector_url)}`
+    iframe.src = `${appUrl}/ai/embed_auth?next=${encodeURIComponent(targetUrl)}`
     iframe.width = "100%"
     iframe.height = "500px"
+    iframe.style.border = "none"
+
+    // Hide scrollbar of iframe
+    iframe.style.overflow = "hidden"
+    iframe.scrolling = "no"
 
     iframe.onload = function () {
         iframe.contentWindow.postMessage(knox_token, appUrl);
         console.log("Message sent to iframe");
     }
+
+    window.addEventListener("message", function (event) {
+        if (event.origin === appUrl) {
+            const message = event.data;
+            console.log(`Message received from iframe: ${message}`);
+            pycmd(message)
+        }
+    });
 
     document.body.appendChild(iframe)
 </script>
