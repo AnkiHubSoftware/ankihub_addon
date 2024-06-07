@@ -461,20 +461,29 @@ def note_type_with_updated_templates(
     Returns:
         NotetypeDict: The updated note type.
     """
-    updated_note_type = copy.deepcopy(new_note_type)
 
+    updated_templates = []
     for new_template, old_template in zip(
-        updated_note_type["tmpls"], old_note_type["tmpls"]
+        new_note_type["tmpls"], old_note_type["tmpls"]
     ):
+        if use_new_templates:
+            updated_template = copy.deepcopy(new_template)
+        else:
+            updated_template = copy.deepcopy(old_template)
+
+        # Update template sides
         for template_side_name in ["qfmt", "afmt"]:
-            new_template[template_side_name] = _updated_template_side(
+            updated_template[template_side_name] = _updated_template_side(
                 new_template_side=new_template[template_side_name],
                 old_template_side=old_template[template_side_name],
                 template_side_name=template_side_name,
                 use_new_template=use_new_templates,
             )
+        updated_templates.append(updated_template)
 
-    return updated_note_type
+    result = copy.deepcopy(old_note_type)
+    result["tmpls"] = updated_templates
+    return result
 
 
 def _updated_template_side(

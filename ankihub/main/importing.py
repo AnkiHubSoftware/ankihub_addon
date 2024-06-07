@@ -750,19 +750,21 @@ def _adjust_note_types_in_anki_db(
     _create_missing_note_types(remote_note_types)
     _rename_note_types(remote_note_types)
     _ensure_local_and_remote_fields_are_same(remote_note_types)
-    _update_templates(remote_note_types)
+    _update_templates_and_css(remote_note_types)
 
     LOGGER.info("Adjusted note types.")
 
 
-def _update_templates(remote_note_types: Dict[NotetypeId, NotetypeDict]) -> None:
+def _update_templates_and_css(
+    remote_note_types: Dict[NotetypeId, NotetypeDict]
+) -> None:
     for mid, remote_note_type in remote_note_types.items():
         local_note_type = aqt.mw.col.models.get(mid)
 
-        # We don't use new templates of AnKing note types if the AnKing note types addon is installed.
+        # We don't use new templates and css of AnKing note types if the AnKing note types addon is installed.
         # The AnKing note types addon will handle updating the templates, while preserving the
         # user's customizations.
-        use_new_templates = not (
+        use_new_templates_and_css = not (
             "anking" in remote_note_type["name"].lower()
             and is_anking_note_types_addon_installed()
         )
@@ -770,8 +772,11 @@ def _update_templates(remote_note_types: Dict[NotetypeId, NotetypeDict]) -> None
         updated_note_type = note_type_with_updated_templates(
             old_note_type=local_note_type,
             new_note_type=remote_note_type,
-            use_new_templates=use_new_templates,
+            use_new_templates=use_new_templates_and_css,
         )
+        if use_new_templates_and_css:
+            updated_note_type["css"] = remote_note_type["css"]
+
         aqt.mw.col.models.update_dict(updated_note_type)
 
 
