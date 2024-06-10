@@ -1945,19 +1945,32 @@ class TestAnkiHubImporter:
 
             assert_that_only_ankihub_sample_deck_info_in_database(ah_did=ah_did)
 
-    def test_note_type_templates_are_updated(
+    @pytest.mark.parametrize(
+        "is_notes_types_addon_installed, expected_template_and_css_updated",
+        [
+            (False, True),
+            (True, False),
+        ],
+    )
+    def test_note_type_templates_and_css_are_updated(
         self,
         anki_session_with_addon_data: AnkiSession,
         ankihub_basic_note_type: NotetypeDict,
         next_deterministic_uuid: Callable[[], uuid.UUID],
         import_ah_note_type: ImportAHNoteType,
+        mocker: MockerFixture,
+        is_notes_types_addon_installed: bool,
+        expected_template_and_css_updated: bool,
     ):
         with anki_session_with_addon_data.profile_loaded():
             ah_did = next_deterministic_uuid()
 
             # Set up the note type
+            ankihub_basic_note_type["name"] = "AnKing Basic"
             ankihub_basic_note_type["tmpls"][0]["qfmt"] = "{{Front}}"
             ankihub_basic_note_type["tmpls"][0]["qfmt"] = "{{Back}}"
+            old_css = "old css"
+            ankihub_basic_note_type["css"] = old_css
             import_ah_note_type(ah_did=ah_did, note_type=ankihub_basic_note_type)
 
             # Import the note type again with updated templates
@@ -1969,6 +1982,15 @@ class TestAnkiHubImporter:
             new_afmt = "{{Back}} text added to afmt"
             new_note_type["tmpls"][0]["afmt"] = new_afmt
 
+            new_css = "new css"
+            new_note_type["css"] = new_css
+
+            if is_notes_types_addon_installed:
+                mocker.patch(
+                    "ankihub.main.importing.is_anking_note_types_addon_installed",
+                    return_value=True,
+                )
+
             import_result = self._import_notes(
                 ah_notes=[],
                 note_types={new_note_type["id"]: new_note_type},
@@ -1976,15 +1998,23 @@ class TestAnkiHubImporter:
                 is_first_import_of_deck=False,
             )
 
-            # Check that the note type templates were updated
+            # Check that the note type templates were updated if the AnKing note types addon is not installed
             updated_note_type = aqt.mw.col.models.get(ankihub_basic_note_type["id"])
 
             updated_qfmt = updated_note_type["tmpls"][0]["qfmt"]
-            assert new_qfmt in updated_qfmt
+            if expected_template_and_css_updated:
+                assert new_qfmt in updated_qfmt
+            else:
+                assert new_qfmt not in updated_qfmt
             assert ANKIHUB_TEMPLATE_END_COMMENT in updated_qfmt
 
             updated_afmt = updated_note_type["tmpls"][0]["afmt"]
-            assert new_afmt in updated_afmt
+            if expected_template_and_css_updated:
+                assert new_afmt in updated_afmt
+                assert updated_note_type["css"] == new_css
+            else:
+                assert new_afmt not in updated_afmt
+                assert updated_note_type["css"] == old_css
             assert ANKIHUB_TEMPLATE_END_COMMENT in updated_afmt
             # This is only on the back template (afmt)
             assert ANKIHUB_NOTE_TYPE_MODIFICATION_STRING in updated_afmt

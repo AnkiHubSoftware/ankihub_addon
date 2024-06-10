@@ -2896,7 +2896,8 @@ class TestDatadogLogHandler:
 
 
 class TestNoteTypeWithUpdatedTemplates:
-    def test_basic(self):
+    @pytest.mark.parametrize("use_new_templates", [True, False])
+    def test_basic(self, use_new_templates: bool):
         old_note_type_content = "old content"
         old_note_type = {
             "tmpls": [{"qfmt": old_note_type_content, "afmt": old_note_type_content}]
@@ -2908,21 +2909,24 @@ class TestNoteTypeWithUpdatedTemplates:
         }
 
         updated_note_type = note_type_with_updated_templates(
-            old_note_type=old_note_type, new_note_type=new_note_type
+            old_note_type=old_note_type,
+            new_note_type=new_note_type,
+            use_new_templates=use_new_templates,
         )
         assert len(updated_note_type["tmpls"]) == 1
         template = updated_note_type["tmpls"][0]
 
         verify(
             template["qfmt"],
-            options=NamerFactory.with_parameters("qfmt"),
+            options=NamerFactory.with_parameters("qfmt", use_new_templates),
         )
         verify(
             template["afmt"],
-            options=NamerFactory.with_parameters("afmt"),
+            options=NamerFactory.with_parameters("afmt", use_new_templates),
         )
 
-    def test_with_migrating_content_from_old_note_type(self):
+    @pytest.mark.parametrize("use_new_templates", [True, False])
+    def test_with_migrating_content_from_old_note_type(self, use_new_templates: bool):
         content_to_migrate = "content to migrate"
         old_note_type_content = (
             f"old content\n{ANKIHUB_TEMPLATE_END_COMMENT}\n{content_to_migrate}"
@@ -2937,16 +2941,18 @@ class TestNoteTypeWithUpdatedTemplates:
         }
 
         updated_note_type = note_type_with_updated_templates(
-            old_note_type=old_note_type, new_note_type=new_note_type
+            old_note_type=old_note_type,
+            new_note_type=new_note_type,
+            use_new_templates=use_new_templates,
         )
         assert len(updated_note_type["tmpls"]) == 1
         template = updated_note_type["tmpls"][0]
 
         verify(
             template["qfmt"],
-            options=NamerFactory.with_parameters("qfmt"),
+            options=NamerFactory.with_parameters("qfmt", use_new_templates),
         )
         verify(
             template["afmt"],
-            options=NamerFactory.with_parameters("afmt"),
+            options=NamerFactory.with_parameters("afmt", use_new_templates),
         )
