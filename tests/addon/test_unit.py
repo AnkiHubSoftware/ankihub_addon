@@ -589,7 +589,7 @@ class TestAnkiHubSignOut:
         with anki_session.profile_loaded():
             user_token = "random_token_382fasfkjep1flaksnioqwndjk&@*(%248)"
             # This means user is logged in
-            config._private_config.token = user_token
+            config.save_token(user_token)
 
             mw = anki_session.mw
             menu_state.ankihub_menu = QMenu("&AnkiHub", parent=aqt.mw)

@@ -1,5 +1,7 @@
 from typing import Dict
 
+import aqt
+
 from . import LOGGER
 
 
@@ -26,6 +28,7 @@ def migrate_private_config(private_config_dict: Dict) -> None:
     )
     _remove_orphaned_deck_extensions(private_config_dict)
     _maybe_prompt_user_for_behavior_on_remote_note_deleted(private_config_dict)
+    _move_credentials_to_profile_config(private_config_dict)
 
 
 def _maybe_reset_media_update_timestamps(private_config_dict: Dict) -> None:
@@ -117,3 +120,18 @@ def _maybe_prompt_user_for_behavior_on_remote_note_deleted(
     LOGGER.info(
         f"Set {field_name} to {BehaviorOnRemoteNoteDeleted.DELETE_IF_NO_REVIEWS.value} for all decks."
     )
+
+
+def _move_credentials_to_profile_config(
+    private_config_dict: Dict,
+) -> None:
+    """Move login credentials to Anki's profile config."""
+
+    token = private_config_dict.pop("token", None)
+    username = private_config_dict.pop("username", None)
+    if token:
+        # aqt.mw.pm.set_ankihub_token(token)
+        aqt.mw.pm.profile["ankiHubToken"] = token
+    if username:
+        # aqt.mw.pm.set_ankihub_username(username)
+        aqt.mw.pm.profile["ankiHubUsername"] = username
