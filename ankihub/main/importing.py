@@ -26,6 +26,7 @@ from ..settings import (
     BehaviorOnRemoteNoteDeleted,
     SuspendNewCardsOfExistingNotes,
     is_anking_note_types_addon_installed,
+    is_projektanki_note_types_addon_installed,
 )
 from .deck_options import set_ankihub_config_for_deck, set_recommended_preferences
 from .note_conversion import (
@@ -758,15 +759,27 @@ def _adjust_note_types_in_anki_db(
 def _update_templates_and_css(
     remote_note_types: Dict[NotetypeId, NotetypeDict]
 ) -> None:
+    anking_note_types_addon_installed = is_anking_note_types_addon_installed()
+    projekt_anki_note_types_addon_installed = (
+        is_projektanki_note_types_addon_installed()
+    )
+
     for mid, remote_note_type in remote_note_types.items():
         local_note_type = aqt.mw.col.models.get(mid)
 
         # We don't use new templates and css of AnKing note types if the AnKing note types addon is installed.
         # The AnKing note types addon will handle updating the templates, while preserving the
         # user's customizations.
+        # The same applies to ProjektAnki note types and the ProjektAnki note types addon.
         use_new_templates_and_css = not (
-            "anking" in remote_note_type["name"].lower()
-            and is_anking_note_types_addon_installed()
+            (
+                "anking" in remote_note_type["name"].lower()
+                and anking_note_types_addon_installed
+            )
+            or (
+                "projektanki" in remote_note_type["name"].lower()
+                and projekt_anki_note_types_addon_installed
+            )
         )
 
         updated_note_type = note_type_with_updated_templates(
