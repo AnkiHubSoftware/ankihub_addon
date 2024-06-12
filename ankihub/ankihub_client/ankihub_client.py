@@ -1282,7 +1282,7 @@ class ThreadLocalSession:
     def __init__(self):
         self.local = threading.local()
 
-    def get(self):
+    def get(self) -> Session:
         if not hasattr(self.local, "session"):
             self.local.session = Session()
         return self.local.session
