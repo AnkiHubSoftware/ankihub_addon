@@ -888,7 +888,7 @@ PROJEKTANKI_NOTE_TYPES_ADDON_MODULE_NAME = "projekt_anki_notetypes"
 
 
 def is_anking_note_types_addon_installed():
-    addon_dir_names = [x.dir_name for x in aqt.mw.addonManager.all_addon_meta()]
+    addon_dir_names = set(x.dir_name for x in aqt.mw.addonManager.all_addon_meta())
     return (
         str(ANKING_NOTE_TYPES_ADDON_ANKIWEB_ID) in addon_dir_names
         or ANKING_NOTE_TYPES_ADDON_MODULE_NAME in addon_dir_names
@@ -896,7 +896,7 @@ def is_anking_note_types_addon_installed():
 
 
 def is_projektanki_note_types_addon_installed():
-    addon_dir_names = [x.dir_name for x in aqt.mw.addonManager.all_addon_meta()]
+    addon_dir_names = set(x.dir_name for x in aqt.mw.addonManager.all_addon_meta())
     return (
         str(PROJEKTANKI_NOTE_TYPES_ADDON_ANKIWEB_ID) in addon_dir_names
         or PROJEKTANKI_NOTE_TYPES_ADDON_MODULE_NAME in addon_dir_names
