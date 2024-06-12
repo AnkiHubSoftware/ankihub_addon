@@ -48,7 +48,7 @@ def _maybe_rename_ankihub_deck_uuid_to_ah_did(private_config_dict: Dict) -> None
     # Rename the "ankihub_deck_uuid" key to "ah_did" in the deck extensions config.
     old_field_name = "ankihub_deck_uuid"
     new_field_name = "ah_did"
-    deck_extension_dict: Dict = private_config_dict["deck_extensions"]
+    deck_extension_dict: Dict = private_config_dict.get("deck_extensions", {})
     for deck_extension in deck_extension_dict.values():
         if old_field_name in deck_extension:
             deck_extension[new_field_name] = deck_extension.pop(old_field_name)
@@ -88,7 +88,7 @@ def _is_api_version_on_last_sync_below_threshold(
 def _remove_orphaned_deck_extensions(private_config_dict: Dict) -> None:
     """Remove deck extension configs for which the corresponding deck isn't in the config anymore."""
     decks = private_config_dict["decks"]
-    deck_extensions = private_config_dict["deck_extensions"]
+    deck_extensions: Dict = private_config_dict.get("deck_extensions", {})
     for deck_extension_id, deck_extension in list(deck_extensions.items()):
         if deck_extension["ah_did"] not in decks:
             del deck_extensions[deck_extension_id]
