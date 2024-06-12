@@ -7,6 +7,7 @@ import os
 import re
 import shutil
 import socket
+import threading
 import urllib.parse
 import uuid
 from concurrent.futures import Future, ThreadPoolExecutor, as_completed
@@ -183,6 +184,7 @@ class AnkiHubClient:
         self.get_token = get_token
         self.response_hooks = response_hooks
         self.should_stop_background_threads = False
+        self.thread_local_session = ThreadLocalSession()
 
     def _send_request(
         self,
@@ -271,12 +273,9 @@ class AnkiHubClient:
     def _send_request_with_retry_inner(
         self, request: PreparedRequest, stream=False, timeout: Optional[int] = None
     ) -> Response:
-        session = Session()
-        try:
-            response = session.send(request, stream=stream, timeout=timeout)
-        finally:
-            session.close()
-        return response
+        return self.thread_local_session.get().send(
+            request, stream=stream, timeout=timeout
+        )
 
     def login(self, credentials: dict) -> str:
         response = self._send_request("POST", API.ANKIHUB, "/login/", json=credentials)
@@ -1277,6 +1276,16 @@ class AnkiHubClient:
         )
         if response.status_code != 200:
             raise AnkiHubHTTPError(response)
+
+
+class ThreadLocalSession:
+    def __init__(self):
+        self.local = threading.local()
+
+    def get(self):
+        if not hasattr(self.local, "session"):
+            self.local.session = Session()
+        return self.local.session
 
 
 def _transform_notes_data(notes_data: List[Dict]) -> List[Dict]:
