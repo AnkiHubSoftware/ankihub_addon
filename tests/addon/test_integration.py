@@ -1946,10 +1946,19 @@ class TestAnkiHubImporter:
             assert_that_only_ankihub_sample_deck_info_in_database(ah_did=ah_did)
 
     @pytest.mark.parametrize(
-        "is_notes_types_addon_installed, expected_template_and_css_updated",
+        """note_type_name,
+        is_anking_notes_types_addon_installed,
+        is_projekt_anki_addon_installed,
+        expected_template_and_css_updated""",
         [
-            (False, True),
-            (True, False),
+            # Note types without anking or projektanki in the name are always updated
+            ("Basic", True, True, True),
+            # Note types with anking in the name are not updated if the AnKing note types addon is installed
+            ("AnKing Basic", False, False, True),
+            ("AnKing Basic", True, False, False),
+            # Note types with projektanki in the name are not updated if the ProjektAnki note types addon is installed
+            ("ProjektAnki Basic", False, False, True),
+            ("ProjektAnki Basic", False, True, False),
         ],
     )
     def test_note_type_templates_and_css_are_updated(
@@ -1959,14 +1968,16 @@ class TestAnkiHubImporter:
         next_deterministic_uuid: Callable[[], uuid.UUID],
         import_ah_note_type: ImportAHNoteType,
         mocker: MockerFixture,
-        is_notes_types_addon_installed: bool,
+        note_type_name: str,
+        is_anking_notes_types_addon_installed: bool,
+        is_projekt_anki_addon_installed: bool,
         expected_template_and_css_updated: bool,
     ):
         with anki_session_with_addon_data.profile_loaded():
             ah_did = next_deterministic_uuid()
 
             # Set up the note type
-            ankihub_basic_note_type["name"] = "AnKing Basic"
+            ankihub_basic_note_type["name"] = note_type_name
             ankihub_basic_note_type["tmpls"][0]["qfmt"] = "{{Front}}"
             ankihub_basic_note_type["tmpls"][0]["qfmt"] = "{{Back}}"
             old_css = "old css"
@@ -1985,9 +1996,15 @@ class TestAnkiHubImporter:
             new_css = "new css"
             new_note_type["css"] = new_css
 
-            if is_notes_types_addon_installed:
+            if is_anking_notes_types_addon_installed:
                 mocker.patch(
                     "ankihub.main.importing.is_anking_note_types_addon_installed",
+                    return_value=True,
+                )
+
+            if is_projekt_anki_addon_installed:
+                mocker.patch(
+                    "ankihub.main.importing.is_projektanki_note_types_addon_installed",
                     return_value=True,
                 )
 
