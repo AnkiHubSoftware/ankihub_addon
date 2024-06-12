@@ -1,5 +1,7 @@
 from typing import Dict
 
+import aqt
+
 from . import LOGGER
 
 
@@ -26,6 +28,7 @@ def migrate_private_config(private_config_dict: Dict) -> None:
     )
     _remove_orphaned_deck_extensions(private_config_dict)
     _maybe_prompt_user_for_behavior_on_remote_note_deleted(private_config_dict)
+    _move_credentials_to_profile_config(private_config_dict)
 
 
 def _maybe_reset_media_update_timestamps(private_config_dict: Dict) -> None:
@@ -45,7 +48,7 @@ def _maybe_rename_ankihub_deck_uuid_to_ah_did(private_config_dict: Dict) -> None
     # Rename the "ankihub_deck_uuid" key to "ah_did" in the deck extensions config.
     old_field_name = "ankihub_deck_uuid"
     new_field_name = "ah_did"
-    deck_extension_dict: Dict = private_config_dict["deck_extensions"]
+    deck_extension_dict: Dict = private_config_dict.get("deck_extensions", {})
     for deck_extension in deck_extension_dict.values():
         if old_field_name in deck_extension:
             deck_extension[new_field_name] = deck_extension.pop(old_field_name)
@@ -85,7 +88,7 @@ def _is_api_version_on_last_sync_below_threshold(
 def _remove_orphaned_deck_extensions(private_config_dict: Dict) -> None:
     """Remove deck extension configs for which the corresponding deck isn't in the config anymore."""
     decks = private_config_dict["decks"]
-    deck_extensions = private_config_dict["deck_extensions"]
+    deck_extensions: Dict = private_config_dict.get("deck_extensions", {})
     for deck_extension_id, deck_extension in list(deck_extensions.items()):
         if deck_extension["ah_did"] not in decks:
             del deck_extensions[deck_extension_id]
@@ -117,3 +120,18 @@ def _maybe_prompt_user_for_behavior_on_remote_note_deleted(
     LOGGER.info(
         f"Set {field_name} to {BehaviorOnRemoteNoteDeleted.DELETE_IF_NO_REVIEWS.value} for all decks."
     )
+
+
+def _move_credentials_to_profile_config(
+    private_config_dict: Dict,
+) -> None:
+    """Move login credentials to Anki's profile config."""
+
+    token = private_config_dict.pop("token", None)
+    username = private_config_dict.pop("user", None)
+    if token:
+        # aqt.mw.pm.set_ankihub_token(token)
+        aqt.mw.pm.profile["ankiHubToken"] = token
+    if username:
+        # aqt.mw.pm.set_ankihub_username(username)
+        aqt.mw.pm.profile["ankiHubUsername"] = username

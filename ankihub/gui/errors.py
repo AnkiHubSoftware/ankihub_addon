@@ -97,9 +97,7 @@ def upload_logs_in_background(
 
     LOGGER.info("Uploading logs...")
 
-    # many users use their email address as their username and may not want to share it on a forum
-    user_name = config.user() if not hide_username else checksum(config.user())[:5]
-    key = f"ankihub_addon_logs_{user_name}_{int(time.time())}.log"
+    key = f"ankihub_addon_logs_{_username_or_hash(hide_username=hide_username)}_{int(time.time())}.log"
 
     AddonQueryOp(
         parent=aqt.mw,
@@ -119,8 +117,7 @@ def upload_logs_and_data_in_background(
     LOGGER.info("Uploading data dir and logs...")
 
     # many users use their email address as their username and may not want to share it on a forum
-    user_name_hash = checksum(config.user())[:5]
-    key = f"ankihub_addon_debug_info_{user_name_hash}_{int(time.time())}.zip"
+    key = f"ankihub_addon_debug_info_{_username_or_hash(hide_username=True)}_{int(time.time())}.zip"
 
     AddonQueryOp(
         parent=aqt.mw,
@@ -129,6 +126,14 @@ def upload_logs_and_data_in_background(
     ).failure(_on_upload_logs_failure).without_collection().run_in_background()
 
     return key
+
+
+def _username_or_hash(hide_username: bool) -> str:
+    # Many users use their email address as their username and may not want to share it on a forum
+    if config.user():
+        return checksum(config.user())[:5] if hide_username else config.user()
+    else:
+        return "not_signed_in"
 
 
 def _upload_logs_and_data_in_background(key: str) -> str:

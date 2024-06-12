@@ -169,8 +169,6 @@ class UIConfig(DataClassJSONMixin):
 
 @dataclasses.dataclass
 class PrivateConfig(DataClassJSONMixin):
-    token: str = ""
-    user: str = ""
     decks: Dict[uuid.UUID, DeckConfig] = dataclasses.field(default_factory=dict)
     deck_extensions: Dict[int, DeckExtensionConfig] = dataclasses.field(
         default_factory=dict
@@ -254,14 +252,14 @@ class _Config:
         self.public_config = aqt.mw.addonManager.getConfig(ADDON_PATH.name)
 
     def save_token(self, token: str):
-        self._private_config.token = token
-        self._update_private_config()
+        # aqt.mw.pm.set_ankihub_token(token)
+        aqt.mw.pm.profile["ankiHubToken"] = token
         if self.token_change_hook:
             self.token_change_hook()
 
     def save_user_email(self, user_email: str):
-        self._private_config.user = user_email
-        self._update_private_config()
+        # aqt.mw.pm.set_ankihub_username(user_email)
+        aqt.mw.pm.profile["ankiHubUsername"] = user_email
 
     def save_latest_deck_update(
         self, ankihub_did: uuid.UUID, latest_update: Optional[datetime]
@@ -349,8 +347,6 @@ class _Config:
 
     def log_private_config(self, log_level=logging.INFO):
         config_copy = deepcopy(self._private_config)
-        if config_copy.token:
-            config_copy.token = "REDACTED"
         LOGGER.log(log_level, "Private config", private_config=config_copy.to_dict())
 
     def set_home_deck(self, ankihub_did: uuid.UUID, anki_did: DeckId):
@@ -373,10 +369,12 @@ class _Config:
         return self._private_config.decks.get(ankihub_did)
 
     def token(self) -> Optional[str]:
-        return self._private_config.token
+        # return aqt.mw.pm.ankihub_token()
+        return aqt.mw.pm.profile.get("ankiHubToken")
 
     def user(self) -> Optional[str]:
-        return self._private_config.user
+        # return aqt.mw.pm.ankihub_username()
+        return aqt.mw.pm.profile.get("ankiHubUsername")
 
     def ui_config(self) -> UIConfig:
         return self._private_config.ui

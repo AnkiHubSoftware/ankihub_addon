@@ -196,6 +196,7 @@ class AnkiHubLogin(QWidget):
 
         config.save_token(token)
         config.save_user_email(username_or_email)
+        LOGGER.info("User signed into AnkiHub.", user=username_or_email)
 
         tooltip("Signed into AnkiHub!", parent=aqt.mw)
         self.close()
