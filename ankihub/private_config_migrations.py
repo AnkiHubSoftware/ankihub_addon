@@ -128,7 +128,7 @@ def _move_credentials_to_profile_config(
     """Move login credentials to Anki's profile config."""
 
     token = private_config_dict.pop("token", None)
-    username = private_config_dict.pop("username", None)
+    username = private_config_dict.pop("user", None)
     if token:
         # aqt.mw.pm.set_ankihub_token(token)
         aqt.mw.pm.profile["ankiHubToken"] = token
