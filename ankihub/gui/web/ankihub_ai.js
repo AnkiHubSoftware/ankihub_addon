@@ -63,6 +63,8 @@ function setupIFrameToggleButton(iframe) {
     button.style.backgroundRepeat = "no-repeat";
     button.style.backgroundColor = "#4f46e5";
 
+    button.style.cursor = "pointer";
+
     button.onclick = function () {
         // Toggle iframe visibility and change button icon
         if (iframe.style.display === "none") {
