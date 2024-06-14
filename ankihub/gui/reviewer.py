@@ -17,6 +17,7 @@ from aqt.webview import WebContent
 from jinja2 import Template
 
 from ..db import ankihub_db
+from ..feature_flags import feature_flags
 from ..settings import ANKING_DECK_ID, config, url_view_note
 
 VIEW_NOTE_PYCMD = "ankihub_view_note"
@@ -95,6 +96,9 @@ def _add_ankihub_ai_js_to_reviewer_web_content(web_content: WebContent, context)
     """Injects the AnkiHub AI JavaScript into the reviewer web content."""
 
     if not isinstance(context, Reviewer):
+        return
+
+    if not feature_flags.chatbot:
         return
 
     reviewer: Reviewer = context
