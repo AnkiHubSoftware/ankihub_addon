@@ -1404,6 +1404,7 @@ class TestSuggestNotesInBulk:
             # Add a new note
             note_type = import_ah_note_type(ah_did=ah_did)
             new_note = add_anki_note(note_type=note_type)
+            new_note["Front"] = "front"
 
             ah_nid = next_deterministic_uuid()
             mocker.patch("uuid.uuid4", return_value=ah_nid)
@@ -1424,7 +1425,7 @@ class TestSuggestNotesInBulk:
                         ah_nid=ah_nid,
                         anki_nid=new_note.id,
                         fields=[
-                            Field(name="Front", order=0, value=""),
+                            Field(name="Front", order=0, value="front"),
                             Field(name="Back", order=1, value=""),
                         ],
                         tags=[],
