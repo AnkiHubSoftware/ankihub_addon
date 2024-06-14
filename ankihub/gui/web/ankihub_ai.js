@@ -10,7 +10,7 @@ function setup() {
 
 function setupIframe(token, appUrl, endpointPath) {
     const iframe = document.createElement("iframe");
-    iframe.id = "ankihub-ai"
+    iframe.id = "ankihub-ai-iframe"
 
     const targetUrl = `${appUrl}/${endpointPath}`
     iframe.src = `${appUrl}/ai/embed_auth/?next=${encodeURIComponent(targetUrl)}`
