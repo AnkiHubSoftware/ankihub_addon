@@ -394,6 +394,8 @@ def add_anki_note() -> AddAnkiNote:
             note_type = aqt.mw.col.models.by_name("Basic")
 
         note = aqt.mw.col.new_note(note_type)
+        note[note.keys()[0]] = "some text"
+
         aqt.mw.col.add_note(note, DeckId(anki_did))
         return note
 
