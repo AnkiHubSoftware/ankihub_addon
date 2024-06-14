@@ -1,23 +1,34 @@
 """Modifies Anki's reviewer UI (aqt.reviewer)."""
+
+from pathlib import Path
 from textwrap import dedent
 from typing import Any, Tuple
 
 import aqt
 from anki.cards import Card
-from aqt.gui_hooks import reviewer_did_show_question, webview_did_receive_js_message
-from aqt.reviewer import ReviewerBottomBar
+from aqt.gui_hooks import (
+    reviewer_did_show_question,
+    webview_did_receive_js_message,
+    webview_will_set_content,
+)
+from aqt.reviewer import Reviewer, ReviewerBottomBar
 from aqt.utils import openLink
+from aqt.webview import WebContent
+from jinja2 import Template
 
 from ..db import ankihub_db
-from ..settings import url_view_note
+from ..settings import ANKING_DECK_ID, config, url_view_note
 
 VIEW_NOTE_PYCMD = "ankihub_view_note"
 VIEW_NOTE_BUTTON_ID = "ankihub-view-note-button"
+
+ANKIHUB_AI_JS_PATH = Path(__file__).parent / "web/ankihub_ai.js"
 
 
 def setup():
     """Adds the "View on AnkiHub" button to the reviewer toolbar."""
     reviewer_did_show_question.append(_add_or_refresh_view_note_button)
+    webview_will_set_content.append(_add_ankihub_ai_js_to_reviewer_web_content)
     webview_did_receive_js_message.append(_on_js_message)
 
 
@@ -78,6 +89,27 @@ def _add_or_refresh_view_note_button(card: Card):
     )
 
     aqt.mw.reviewer.bottom.web.eval(js)
+
+
+def _add_ankihub_ai_js_to_reviewer_web_content(web_content: WebContent, context):
+    """Injects the AnkiHub AI JavaScript into the reviewer web content."""
+
+    if not isinstance(context, Reviewer):
+        return
+
+    reviewer: Reviewer = context
+    if not ankihub_db.ankihub_did_for_anki_nid(reviewer.card.nid) == ANKING_DECK_ID:
+        # Only show the AI chatbot for cards in the AnKing deck
+        return
+
+    template_vars = {
+        "KNOX_TOKEN": config.token(),
+        "APP_URL": config.app_url,
+        "ENDPOINT_PATH": "ai/chatbot",
+    }
+    js = Template(ANKIHUB_AI_JS_PATH.read_text()).render(template_vars)
+
+    web_content.body += f"<script>{js}</script>"
 
 
 def _on_js_message(handled: Tuple[bool, Any], message: str, context: Any) -> Any:
