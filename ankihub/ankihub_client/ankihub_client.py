@@ -7,6 +7,7 @@ import os
 import re
 import shutil
 import socket
+import threading
 import urllib.parse
 import uuid
 from concurrent.futures import Future, ThreadPoolExecutor, as_completed
@@ -112,6 +113,12 @@ IMAGE_FILE_EXTENSIONS = [
 TIMEOUT_SECONDS = 20
 
 
+# Adapted from the default max_workers calculation in ThreadPoolExecutor.
+# By default, it uses min(32, os.cpu_count() + 4), but we want to use a lower number,
+# to avoid using too many resources.
+THREAD_POOL_MAX_WORKERS = min(32, (os.cpu_count() or 1) + 1)
+
+
 def _should_retry_for_response(response: Response) -> bool:
     """Return True if the request should be retried for the given Response, False otherwise."""
     result = response.status_code in RETRY_STATUS_CODES or (
@@ -177,6 +184,7 @@ class AnkiHubClient:
         self.get_token = get_token
         self.response_hooks = response_hooks
         self.should_stop_background_threads = False
+        self.thread_local_session = ThreadLocalSession()
 
     def _send_request(
         self,
@@ -265,12 +273,9 @@ class AnkiHubClient:
     def _send_request_with_retry_inner(
         self, request: PreparedRequest, stream=False, timeout: Optional[int] = None
     ) -> Response:
-        session = Session()
-        try:
-            response = session.send(request, stream=stream, timeout=timeout)
-        finally:
-            session.close()
-        return response
+        return self.thread_local_session.get().send(
+            request, stream=stream, timeout=timeout
+        )
 
     def login(self, credentials: dict) -> str:
         response = self._send_request("POST", API.ANKIHUB, "/login/", json=credentials)
@@ -447,7 +452,7 @@ class AnkiHubClient:
         )
 
         # Use ThreadPoolExecutor to zip & upload media files
-        with ThreadPoolExecutor() as executor:
+        with ThreadPoolExecutor(max_workers=THREAD_POOL_MAX_WORKERS) as executor:
             futures: List[Future] = []
             for chunk_number, chunk in enumerate(media_path_chunks):
                 futures.append(
@@ -534,7 +539,7 @@ class AnkiHubClient:
 
     def download_media(self, media_names: List[str], deck_id: uuid.UUID) -> None:
         deck_media_remote_dir = f"/deck_assets/{deck_id}/"
-        with ThreadPoolExecutor() as executor:
+        with ThreadPoolExecutor(max_workers=THREAD_POOL_MAX_WORKERS) as executor:
             media_dir_path = self.local_media_dir_path_cb()
             futures: List[Future] = []
             for media_name in media_names:
@@ -1271,6 +1276,16 @@ class AnkiHubClient:
         )
         if response.status_code != 200:
             raise AnkiHubHTTPError(response)
+
+
+class ThreadLocalSession:
+    def __init__(self):
+        self.local = threading.local()
+
+    def get(self) -> Session:
+        if not hasattr(self.local, "session"):
+            self.local.session = Session()
+        return self.local.session
 
 
 def _transform_notes_data(notes_data: List[Dict]) -> List[Dict]:
