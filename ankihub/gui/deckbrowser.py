@@ -28,7 +28,7 @@ from .utils import ask_user
 from .webview import AnkiHubWebViewDialog
 
 FLASHCARD_SELECTOR_MODIFICATIONS_JS_PATH = (
-    Path(__file__).parent / "js/setup_flashcard_selector_modifications.js"
+    Path(__file__).parent / "web/setup_flashcard_selector_modifications.js"
 )
 FLASHCARD_SELECTOR_OPEN_BUTTON_ID = "ankihub-flashcard-selector-open-button"
 FLASHCARD_SELECTOR_OPEN_PYCMD = "ankihub_flashcard_selector_open"

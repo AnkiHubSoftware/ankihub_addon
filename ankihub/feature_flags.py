@@ -14,6 +14,7 @@ from .gui.operations import AddonQueryOp
 @dataclass
 class _FeatureFlags:
     show_flashcards_selector_button: bool = False
+    chatbot: bool = False
     send_addon_logs_to_datadog: bool = False
 
 

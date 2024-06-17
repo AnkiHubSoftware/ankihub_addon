@@ -1404,6 +1404,7 @@ class TestSuggestNotesInBulk:
             # Add a new note
             note_type = import_ah_note_type(ah_did=ah_did)
             new_note = add_anki_note(note_type=note_type)
+            new_note["Front"] = "front"
 
             ah_nid = next_deterministic_uuid()
             mocker.patch("uuid.uuid4", return_value=ah_nid)
@@ -1424,7 +1425,7 @@ class TestSuggestNotesInBulk:
                         ah_nid=ah_nid,
                         anki_nid=new_note.id,
                         fields=[
-                            Field(name="Front", order=0, value=""),
+                            Field(name="Front", order=0, value="front"),
                             Field(name="Back", order=1, value=""),
                         ],
                         tags=[],
@@ -5903,3 +5904,86 @@ class TestAHDBCheck:
             else:
                 # User didn't confirm, nothing to do
                 assert mocks["get_deck_by_id"].call_count == 0
+
+
+class TestAnkiHubAIInReviewer:
+    @pytest.mark.sequential
+    @pytest.mark.parametrize(
+        "feature_flag_active, for_anking_deck, expected_button_exists",
+        [
+            # The feature is only available for the AnKing deck and only if the feature flag is active
+            (True, True, True),
+            (True, False, False),
+            (False, True, False),
+        ],
+    )
+    def test_basic(
+        self,
+        anki_session_with_addon_data: AnkiSession,
+        import_ah_note: ImportAHNote,
+        install_ah_deck: InstallAHDeck,
+        qtbot: QtBot,
+        set_feature_flag_state: SetFeatureFlagState,
+        next_deterministic_uuid: Callable[[], uuid.UUID],
+        feature_flag_active: bool,
+        for_anking_deck: bool,
+        expected_button_exists: bool,
+    ):
+        set_feature_flag_state("chatbot", feature_flag_active)
+
+        entry_point.run()
+        with anki_session_with_addon_data.profile_loaded():
+            # Set up note to review
+            ah_did = ANKING_DECK_ID if for_anking_deck else next_deterministic_uuid()
+            install_ah_deck(ah_did=ah_did)
+
+            # ... Changes the deck setting so that there are unsuspend cards ready for review
+            config.set_suspend_new_cards_of_new_notes(ankihub_did=ah_did, suspend=False)
+            deck_config = config.deck_config(ah_did)
+            import_ah_note(
+                ah_did=ANKING_DECK_ID,
+                anki_did=deck_config.anki_id,
+            )
+
+            # Open reviewer
+            aqt.mw.col.decks.set_current(deck_config.anki_id)
+            aqt.mw.reviewer.show()
+            qtbot.wait(300)
+
+            assert not self._is_ankihub_ai_iframe_visible(qtbot)
+
+            ankihub_ai_button_exists = self._ankihub_ai_button_exist(qtbot)
+            assert ankihub_ai_button_exists == expected_button_exists
+            if not expected_button_exists:
+                return
+
+            # Click ankihub ai button
+            aqt.mw.reviewer.web.eval(
+                "document.getElementById('ankihub-ai-button').click()"
+            )
+            qtbot.wait(300)
+
+            assert self._is_ankihub_ai_iframe_visible(qtbot)
+
+    def _ankihub_ai_button_exist(self, qtbot) -> bool:
+        with qtbot.wait_callback() as callback:
+            aqt.mw.reviewer.web.evalWithCallback(
+                "document.getElementById('ankihub-ai-button')",
+                callback,
+            )
+        return callback.args[0] is not None
+
+    def _is_ankihub_ai_iframe_visible(self, qtbot: QtBot) -> bool:
+        with qtbot.wait_callback() as callback:
+            aqt.mw.reviewer.web.evalWithCallback(
+                "document.getElementById('ankihub-ai-iframe').style.display",
+                callback,
+            )
+
+        display_style = callback.args[0]
+        if display_style == "block":
+            return True
+        elif display_style in ("none", None):
+            return False
+        else:
+            raise ValueError(f"Unexpected display style: {display_style}")

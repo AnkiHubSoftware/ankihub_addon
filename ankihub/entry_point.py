@@ -1,6 +1,7 @@
 """Code to be run on Anki start up."""
 
 import time
+from pathlib import Path
 
 import aqt
 from anki.errors import CardTypeError
@@ -32,6 +33,8 @@ from .settings import (
 # We don't want to set them up multiple times when the profile is opened multiple times,
 # because that would cause multiple menu items, hooks, etc.
 ATTEMPTED_GENERAL_SETUP = False
+
+WEB_MEDIA_PATH = Path(__file__).parent / "gui/web/media"
 
 
 def run():
@@ -123,6 +126,8 @@ def _general_setup():
 
     aqt.mw.addonManager.setWebExports(__name__, r"gui/web/.*")
 
+    _copy_web_media_to_media_folder()
+
     setup_addons()
     LOGGER.info("Set up addons.")
 
@@ -168,6 +173,17 @@ def _general_setup():
     LOGGER.info(
         "Set up feature flag fetching (flags will be fetched in the background)."
     )
+
+
+def _copy_web_media_to_media_folder():
+    """Copy media files from the web folder to the media folder. Existing files with the same name
+    will be overwritten.
+    The media file names should start with '_' so that Anki doesn't remove them when checking for unused media.
+    """
+    for file in WEB_MEDIA_PATH.glob("*"):
+        file_name = file.name
+        file_path = Path(aqt.mw.col.media.dir()) / file_name
+        file_path.write_bytes(file.read_bytes())
 
 
 def _log_enabled_addons():
