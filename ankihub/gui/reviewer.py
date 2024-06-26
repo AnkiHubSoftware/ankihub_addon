@@ -107,10 +107,6 @@ def _add_ankihub_ai_js_to_reviewer_web_content(web_content: WebContent, context)
         return
 
     ah_nid = ankihub_db.ankihub_nid_for_anki_nid(context.card.nid)
-    if ah_nid is None:
-        # Only show the AI chatbot for AnkiHub notes
-        return
-
     template_vars = {
         "KNOX_TOKEN": config.token(),
         "APP_URL": config.app_url,
