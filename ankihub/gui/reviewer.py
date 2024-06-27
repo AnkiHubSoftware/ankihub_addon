@@ -109,11 +109,10 @@ def _add_ankihub_ai_js_to_reviewer_web_content(web_content: WebContent, context)
         # Only show the AI chatbot for cards in the AnKing deck
         return
 
-    ah_nid = ankihub_db.ankihub_nid_for_anki_nid(context.card.nid)
     template_vars = {
         "KNOX_TOKEN": config.token(),
         "APP_URL": config.app_url,
-        "ENDPOINT_PATH": f"ai/chatbot/{ah_nid}",
+        "ENDPOINT_PATH": "ai/chatbot",
     }
     js = Template(ANKIHUB_AI_JS_PATH.read_text()).render(template_vars)
 
@@ -124,7 +123,7 @@ def _notify_ankihub_ai_of_card_change(card: Card) -> None:
     if not feature_flags.chatbot:
         return
 
-    ah_nid = ankihub_db.ankihub_nid_for_anki_nid(aqt.mw.reviewer.card.nid)
+    ah_nid = ankihub_db.ankihub_nid_for_anki_nid(card.id)
     js = f"ankihubAI.cardChanged('{ah_nid}')"
     aqt.mw.reviewer.web.eval(js)
 
