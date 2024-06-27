@@ -127,7 +127,7 @@ def _notify_ankihub_ai_of_card_change(card: Card) -> None:
     if not feature_flags.chatbot:
         return
 
-    ah_nid = ankihub_db.ankihub_nid_for_anki_nid(card.id)
+    ah_nid = ankihub_db.ankihub_nid_for_anki_nid(card.nid)
     js = f"ankihubAI.cardChanged('{ah_nid}')"
     aqt.mw.reviewer.web.eval(js)
 
