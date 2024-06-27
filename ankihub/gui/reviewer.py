@@ -29,11 +29,14 @@ ANKIHUB_AI_JS_PATH = Path(__file__).parent / "web/ankihub_ai.js"
 def setup():
     """Adds the "View on AnkiHub" button to the reviewer toolbar."""
     reviewer_did_show_question.append(_add_or_refresh_view_note_button)
+
     webview_will_set_content.append(_add_ankihub_ai_js_to_reviewer_web_content)
+    reviewer_did_show_question.append(_notify_ankihub_ai_of_card_change)
+
     webview_did_receive_js_message.append(_on_js_message)
 
 
-def _add_or_refresh_view_note_button(card: Card):
+def _add_or_refresh_view_note_button(card: Card) -> None:
     """Adds the "View on AnkiHub" button to the reviewer toolbar if it doesn't exist yet,
     or refreshes it if it does exist already."""
 
@@ -106,15 +109,23 @@ def _add_ankihub_ai_js_to_reviewer_web_content(web_content: WebContent, context)
         # Only show the AI chatbot for cards in the AnKing deck
         return
 
-    ah_nid = ankihub_db.ankihub_nid_for_anki_nid(context.card.nid)
     template_vars = {
         "KNOX_TOKEN": config.token(),
         "APP_URL": config.app_url,
-        "ENDPOINT_PATH": f"ai/chatbot/{ah_nid}",
+        "ENDPOINT_PATH": "ai/chatbot",
     }
     js = Template(ANKIHUB_AI_JS_PATH.read_text()).render(template_vars)
 
     web_content.body += f"<script>{js}</script>"
+
+
+def _notify_ankihub_ai_of_card_change(card: Card) -> None:
+    if not feature_flags.chatbot:
+        return
+
+    ah_nid = ankihub_db.ankihub_nid_for_anki_nid(card.nid)
+    js = f"ankihubAI.cardChanged('{ah_nid}')"
+    aqt.mw.reviewer.web.eval(js)
 
 
 def _on_js_message(handled: Tuple[bool, Any], message: str, context: Any) -> Any:
