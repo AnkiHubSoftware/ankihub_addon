@@ -1,14 +1,14 @@
 
 class AnkiHubAI {
     constructor() {
-        this.knoxToken = "{{ KNOX_TOKEN }}";
         this.appUrl = "{{ APP_URL }}";
         this.endpointPath = "{{ ENDPOINT_PATH }}";
         this.embeddedAuthPath = "common/embedded-auth";
 
-        this.noteId = null;
-        this.noteIdICurrentlyLoaded = null;
+        this.noteIdOfReviewerCard = null; // The note ID for which the card is currently being reviewed.
+        this.noteIdOfChatbot = null; // The note ID for which the chatbot page is currently loaded.
         this.authenticated = false;
+        this.knoxToken = "{{ KNOX_TOKEN }}";
         this.iframeVisible = false;
 
         this.setup();
@@ -71,7 +71,7 @@ class AnkiHubAI {
     invalidateSessionAndPromptToLogin() {
         this.authenticated = false;
         this.knoxToken = null;
-        this.noteIdICurrentlyLoaded = null;
+        this.noteIdOfChatbot = null;
         pycmd("ankihub_ai_invalid_auth_token");
     }
 
@@ -90,7 +90,7 @@ class AnkiHubAI {
     }
 
     cardChanged(noteId) {
-        this.noteId = noteId;
+        this.noteIdOfReviewerCard = noteId;
 
         if (this.iframeVisible) {
             this.maybeUpdateIframeSrc();
@@ -102,13 +102,13 @@ class AnkiHubAI {
     }
 
     maybeUpdateIframeSrc() {
-        if (this.noteIdICurrentlyLoaded === this.noteId) {
+        if (this.noteIdOfChatbot === this.noteIdOfReviewerCard) {
             // No need to reload the iframe.
             // This prevents the iframe from reloading when the user reopens the chatbot on the same card.
             return;
         }
 
-        const targetUrl = `${this.appUrl}/${this.endpointPath}/${this.noteId}/`;
+        const targetUrl = `${this.appUrl}/${this.endpointPath}/${this.noteIdOfReviewerCard}/`;
         if (!this.authenticated) {
             this.iframe.src = `${this.appUrl}/${this.embeddedAuthPath}/?next=${encodeURIComponent(targetUrl)}`;
             this.authenticated = true;
@@ -116,7 +116,7 @@ class AnkiHubAI {
             this.iframe.src = targetUrl;
         }
 
-        this.noteIdICurrentlyLoaded = this.noteId;
+        this.noteIdOfChatbot = this.noteIdOfReviewerCard;
     }
 
     setButtonStyles(button) {
