@@ -4,6 +4,7 @@ class AnkiHubAI {
         this.knoxToken = "{{ KNOX_TOKEN }}";
         this.appUrl = "{{ APP_URL }}";
         this.endpointPath = "{{ ENDPOINT_PATH }}";
+        this.embeddedAuthPath = "common/embedded-auth";
 
         this.noteId = null;
         this.noteIdICurrentlyLoaded = null;
@@ -24,7 +25,7 @@ class AnkiHubAI {
         this.setIframeStyles(iframe);
 
         iframe.onload = () => {
-            if (iframe.src) {
+            if (iframe.src && iframe.src.includes(this.embeddedAuthPath)) {
                 iframe.contentWindow.postMessage(this.knoxToken, this.appUrl);
             }
         };
@@ -72,7 +73,7 @@ class AnkiHubAI {
 
         const targetUrl = `${this.appUrl}/${this.endpointPath}/${this.noteId}/`;
         if (!this.authenticated) {
-            this.iframe.src = `${this.appUrl}/common/embedded-auth/?next=${encodeURIComponent(targetUrl)}`;
+            this.iframe.src = `${this.appUrl}/${this.embeddedAuthPath}/?next=${encodeURIComponent(targetUrl)}`;
             this.authenticated = true;
         } else {
             this.iframe.src = targetUrl;
