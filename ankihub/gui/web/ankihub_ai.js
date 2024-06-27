@@ -57,8 +57,12 @@ class AnkiHubAI {
                 this.invalidateSessionAndPromptToLogin()
                 return;
             }
-            this.maybeUpdateIframeSrc();
-            this.toggleIframeVisibility();
+            if (!this.iframeVisible) {
+                this.maybeUpdateIframeSrc();
+                this.showIframe();
+            } else {
+                this.hideIframe();
+            }
         };
         document.body.appendChild(button);
         return button;
