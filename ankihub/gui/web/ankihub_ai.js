@@ -4,14 +4,41 @@ function setup() {
     const appUrl = "{{ APP_URL }}";
     const endpointPath = "{{ ENDPOINT_PATH }}";
 
+    let noteId = null;
+    let noteIdICurrentlyLoaded = null;
+    let authenticated = false;
+
     const iframe = setupIframe(knox_token, appUrl);
-    setupIFrameToggleButton(iframe, appUrl, endpointPath);
+    setupIFrameToggleButton(iframe);
+
+    window.ankihubCardChanged = function (ah_nid) {
+        noteId = ah_nid;
+        if (iframe.src) {
+            ankihubUpdateIframeSrc();
+        }
+    }
+
+    window.ankihubUpdateIframeSrc = function () {
+        if (noteIdICurrentlyLoaded === noteId) {
+            return
+        }
+
+        const targetUrl = `${appUrl}/${endpointPath}/${noteId}`;
+        if (!authenticated) {
+            iframe.src = `${appUrl}/common/embedded-auth/?next=${encodeURIComponent(targetUrl)}`
+            authenticated = true;
+        } else {
+            iframe.src = targetUrl;
+        }
+
+        noteIdICurrentlyLoaded = noteId;
+    }
+
 }
 
 function setupIframe(token, appUrl) {
     const iframe = document.createElement("iframe");
     iframe.id = "ankihub-ai-iframe"
-
 
     iframe.style.display = "none"
 
@@ -32,7 +59,9 @@ function setupIframe(token, appUrl) {
     iframe.scrolling = "no"
 
     iframe.onload = function () {
-        iframe.contentWindow.postMessage(token, appUrl);
+        if (iframe.src) {
+            iframe.contentWindow.postMessage(token, appUrl);
+        }
     }
 
     document.body.appendChild(iframe)
@@ -40,7 +69,7 @@ function setupIframe(token, appUrl) {
     return iframe;
 }
 
-function setupIFrameToggleButton(iframe, appUrl, endpointPath) {
+function setupIFrameToggleButton(iframe) {
     const button = document.createElement("button");
     button.id = "ankihub-ai-button";
 
@@ -63,14 +92,9 @@ function setupIFrameToggleButton(iframe, appUrl, endpointPath) {
 
     button.style.cursor = "pointer";
 
-    let iframeLoaded = false;
 
     button.onclick = function () {
-        if (!iframeLoaded) {
-            const targetUrl = `${appUrl}/${endpointPath}`
-            iframe.src = `${appUrl}/common/embedded-auth/?next=${encodeURIComponent(targetUrl)}`
-            iframeLoaded = true;
-        }
+        ankihubUpdateIframeSrc();
 
         // Toggle iframe visibility and change button icon
         if (iframe.style.display === "none") {
