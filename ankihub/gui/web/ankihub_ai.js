@@ -70,7 +70,7 @@ class AnkiHubAI {
             return;
         }
 
-        const targetUrl = `${this.appUrl}/${this.endpointPath}/${this.noteId}`;
+        const targetUrl = `${this.appUrl}/${this.endpointPath}/${this.noteId}/`;
         if (!this.authenticated) {
             this.iframe.src = `${this.appUrl}/common/embedded-auth/?next=${encodeURIComponent(targetUrl)}`;
             this.authenticated = true;
