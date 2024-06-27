@@ -4,16 +4,14 @@ function setup() {
     const appUrl = "{{ APP_URL }}";
     const endpointPath = "{{ ENDPOINT_PATH }}";
 
-    const iframe = setupIframe(knox_token, appUrl, endpointPath);
-    setupIFrameToggleButton(iframe);
+    const iframe = setupIframe(knox_token, appUrl);
+    setupIFrameToggleButton(iframe, appUrl, endpointPath);
 }
 
-function setupIframe(token, appUrl, endpointPath) {
+function setupIframe(token, appUrl) {
     const iframe = document.createElement("iframe");
     iframe.id = "ankihub-ai-iframe"
 
-    const targetUrl = `${appUrl}/${endpointPath}`
-    iframe.src = `${appUrl}/common/embedded-auth/?next=${encodeURIComponent(targetUrl)}`
 
     iframe.style.display = "none"
 
@@ -42,7 +40,7 @@ function setupIframe(token, appUrl, endpointPath) {
     return iframe;
 }
 
-function setupIFrameToggleButton(iframe) {
+function setupIFrameToggleButton(iframe, appUrl, endpointPath) {
     const button = document.createElement("button");
     button.id = "ankihub-ai-button";
 
@@ -65,7 +63,15 @@ function setupIFrameToggleButton(iframe) {
 
     button.style.cursor = "pointer";
 
+    let iframeLoaded = false;
+
     button.onclick = function () {
+        if (!iframeLoaded) {
+            const targetUrl = `${appUrl}/${endpointPath}`
+            iframe.src = `${appUrl}/common/embedded-auth/?next=${encodeURIComponent(targetUrl)}`
+            iframeLoaded = true;
+        }
+
         // Toggle iframe visibility and change button icon
         if (iframe.style.display === "none") {
             button.style.backgroundImage = "url('_chevron-down-solid.svg')";
