@@ -17,6 +17,21 @@ class AnkiHubAI {
     setup() {
         this.iframe = this.setupIframe();
         this.button = this.setupIFrameToggleButton();
+
+        this.setupMessageListener();
+    }
+
+    setupMessageListener() {
+        window.addEventListener("message", (event) => {
+            if (event.origin !== this.appUrl) {
+                return;
+            }
+
+            if (event.data === "Authentication failed") {
+                this.hideIframe();
+                this.invalidateSessionAndPromptToLogin();
+            }
+        });
     }
 
     setupIframe() {
@@ -38,22 +53,44 @@ class AnkiHubAI {
         button.id = "ankihub-ai-button";
         this.setButtonStyles(button)
         button.onclick = () => {
-            this.maybeUpdateIframeSrc();
-
-            if (!this.iframeVisible) {
-                button.style.backgroundImage = "url('_chevron-down-solid.svg')";
-                button.style.backgroundSize = "30%";
-                this.iframe.style.display = "block";
-                this.iframeVisible = true;
-            } else {
-                button.style.backgroundImage = "url('_robotking.png')";
-                button.style.backgroundSize = "cover";
-                this.iframe.style.display = "none";
-                this.iframeVisible = false;
+            if (!this.knoxToken) {
+                this.invalidateSessionAndPromptToLogin()
+                return;
             }
+            this.maybeUpdateIframeSrc();
+            this.toggleIframeVisibility();
         };
         document.body.appendChild(button);
         return button;
+    }
+
+    invalidateSessionAndPromptToLogin() {
+        this.authenticated = false;
+        this.knoxToken = null;
+        this.noteIdICurrentlyLoaded = null;
+        pycmd("ankihub_ai_invalid_auth_token");
+    }
+
+    toggleIframeVisibility() {
+        if (!this.iframeVisible) {
+            this.showIframe();
+        } else {
+            this.hideIframe();
+        }
+    }
+
+    showIframe() {
+        this.button.style.backgroundImage = "url('_chevron-down-solid.svg')";
+        this.button.style.backgroundSize = "30%";
+        this.iframe.style.display = "block";
+        this.iframeVisible = true;
+    }
+
+    hideIframe() {
+        this.button.style.backgroundImage = "url('_robotking.png')";
+        this.button.style.backgroundSize = "cover";
+        this.iframe.style.display = "none";
+        this.iframeVisible = false;
     }
 
     cardChanged(noteId) {
@@ -62,6 +99,10 @@ class AnkiHubAI {
         if (this.iframeVisible) {
             this.maybeUpdateIframeSrc();
         }
+    }
+
+    setToken(token) {
+        this.knoxToken = token;
     }
 
     maybeUpdateIframeSrc() {
