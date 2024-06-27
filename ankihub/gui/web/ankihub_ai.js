@@ -75,14 +75,6 @@ class AnkiHubAI {
         pycmd("ankihub_ai_invalid_auth_token");
     }
 
-    toggleIframeVisibility() {
-        if (!this.iframeVisible) {
-            this.showIframe();
-        } else {
-            this.hideIframe();
-        }
-    }
-
     showIframe() {
         this.button.style.backgroundImage = "url('_chevron-down-solid.svg')";
         this.button.style.backgroundSize = "30%";
