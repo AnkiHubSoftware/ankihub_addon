@@ -5965,6 +5965,63 @@ class TestAnkiHubAIInReviewer:
 
             assert self._is_ankihub_ai_iframe_visible(qtbot)
 
+    @pytest.mark.sequential
+    def test_login_dialog_is_opened_when_invalidateSessionAndPromptToLogin_called(
+        self,
+        anki_session_with_addon_data: AnkiSession,
+        qtbot: QtBot,
+        add_anki_note: AddAnkiNote,
+        mocker: MockerFixture,
+    ):
+        entry_point.run()
+
+        with anki_session_with_addon_data.profile_loaded():
+            add_anki_note()
+
+            aqt.mw.reviewer.show()
+
+            display_login_mock = mocker.patch(
+                "ankihub.gui.reviewer.AnkiHubLogin.display_login"
+            )
+            aqt.mw.reviewer.web.eval("ankihubAI.invalidateSessionAndPromptToLogin()")
+            qtbot.wait_until(lambda: display_login_mock.called)
+
+    @pytest.mark.sequential
+    @pytest.mark.parametrize("feature_flag_active", [True, False])
+    def test_ankihub_ai_token_is_set_when_token_is_saved(
+        self,
+        anki_session_with_addon_data: AnkiSession,
+        add_anki_note: AddAnkiNote,
+        qtbot: QtBot,
+        set_feature_flag_state: SetFeatureFlagState,
+        feature_flag_active: bool,
+    ):
+        set_feature_flag_state("chatbot", feature_flag_active)
+
+        entry_point.run()
+
+        with anki_session_with_addon_data.profile_loaded():
+            add_anki_note()
+
+            aqt.mw.reviewer.show()
+
+            test_token = "test_token"
+            config.save_token(test_token)
+
+            if feature_flag_active:
+                qtbot.wait_until(lambda: self._ankihubAI_token(qtbot) == test_token)
+            else:
+                qtbot.wait(400)
+                assert self._ankihubAI_token(qtbot) is None
+
+    def _ankihubAI_token(self, qtbot: QtBot) -> bool:
+        with qtbot.wait_callback() as callback:
+            aqt.mw.reviewer.web.evalWithCallback(
+                "ankihubAI.knoxToken",
+                callback,
+            )
+        return callback.args[0]
+
     def _ankihub_ai_button_exist(self, qtbot) -> bool:
         with qtbot.wait_callback() as callback:
             aqt.mw.reviewer.web.evalWithCallback(
