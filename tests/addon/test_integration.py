@@ -5933,20 +5933,12 @@ class TestAnkiHubAIInReviewer:
 
         entry_point.run()
         with anki_session_with_addon_data.profile_loaded():
-            # Set up note to review
             ah_did = ANKING_DECK_ID if for_anking_deck else next_deterministic_uuid()
-            install_ah_deck(ah_did=ah_did)
-
-            # ... Changes the deck setting so that there are unsuspend cards ready for review
-            config.set_suspend_new_cards_of_new_notes(ankihub_did=ah_did, suspend=False)
-            deck_config = config.deck_config(ah_did)
-            import_ah_note(
-                ah_did=ANKING_DECK_ID,
-                anki_did=deck_config.anki_id,
+            self._setup_note_for_review(
+                ah_did, install_ah_deck=install_ah_deck, import_ah_note=import_ah_note
             )
 
             # Open reviewer
-            aqt.mw.col.decks.set_current(deck_config.anki_id)
             aqt.mw.reviewer.show()
             qtbot.wait(300)
 
@@ -5970,13 +5962,16 @@ class TestAnkiHubAIInReviewer:
         self,
         anki_session_with_addon_data: AnkiSession,
         qtbot: QtBot,
-        add_anki_note: AddAnkiNote,
+        install_ah_deck: InstallAHDeck,
+        import_ah_note: ImportAHNote,
         mocker: MockerFixture,
+        set_feature_flag_state: SetFeatureFlagState,
     ):
+        set_feature_flag_state("chatbot", True)
         entry_point.run()
 
         with anki_session_with_addon_data.profile_loaded():
-            add_anki_note()
+            self._setup_note_for_review(ANKING_DECK_ID, install_ah_deck, import_ah_note)
 
             aqt.mw.reviewer.show()
 
@@ -5991,8 +5986,9 @@ class TestAnkiHubAIInReviewer:
     def test_ankihub_ai_token_is_set_when_token_is_saved(
         self,
         anki_session_with_addon_data: AnkiSession,
-        add_anki_note: AddAnkiNote,
         qtbot: QtBot,
+        install_ah_deck: InstallAHDeck,
+        import_ah_note: ImportAHNote,
         set_feature_flag_state: SetFeatureFlagState,
         feature_flag_active: bool,
     ):
@@ -6001,7 +5997,7 @@ class TestAnkiHubAIInReviewer:
         entry_point.run()
 
         with anki_session_with_addon_data.profile_loaded():
-            add_anki_note()
+            self._setup_note_for_review(ANKING_DECK_ID, install_ah_deck, import_ah_note)
 
             aqt.mw.reviewer.show()
 
@@ -6011,8 +6007,25 @@ class TestAnkiHubAIInReviewer:
             if feature_flag_active:
                 qtbot.wait_until(lambda: self._ankihubAI_token(qtbot) == test_token)
             else:
-                qtbot.wait(400)
+                qtbot.wait(300)
                 assert self._ankihubAI_token(qtbot) is None
+
+    def _setup_note_for_review(
+        self,
+        ah_did: uuid.UUID,
+        install_ah_deck: InstallAHDeck,
+        import_ah_note: ImportAHNote,
+    ) -> None:
+        install_ah_deck(ah_did=ah_did)
+
+        # Changes the deck setting so that there are unsuspend cards ready for review
+        config.set_suspend_new_cards_of_new_notes(ankihub_did=ah_did, suspend=False)
+        deck_config = config.deck_config(ah_did)
+        import_ah_note(
+            ah_did=ANKING_DECK_ID,
+            anki_did=deck_config.anki_id,
+        )
+        aqt.mw.col.decks.set_current(deck_config.anki_id)
 
     def _ankihubAI_token(self, qtbot: QtBot) -> bool:
         with qtbot.wait_callback() as callback:
