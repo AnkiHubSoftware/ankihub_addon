@@ -6022,7 +6022,7 @@ class TestAnkiHubAIInReviewer:
                 qtbot.wait_until(lambda: browser_did_search_mock.called)
 
                 search_context: SearchContext = browser_did_search_mock.call_args[0][0]
-                cids: List[CardId] = search_context.ids
+                cids = cast(List[CardId], search_context.ids)
                 nids = [aqt.mw.col.get_card(cid).nid for cid in cids]
 
                 assert set(nids) == set(expected_note_ids)
