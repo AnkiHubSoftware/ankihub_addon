@@ -37,10 +37,14 @@ from anki.notes import Note, NoteId
 from aqt import AnkiQt, QMenu, dialogs
 from aqt.addcards import AddCards
 from aqt.addons import InstallOk
-from aqt.browser import Browser
+from aqt.browser import Browser, SearchContext
 from aqt.browser.sidebar.item import SidebarItem
 from aqt.browser.sidebar.tree import SidebarTreeView
-from aqt.gui_hooks import browser_will_show_context_menu
+from aqt.gui_hooks import (
+    browser_did_search,
+    browser_will_show,
+    browser_will_show_context_menu,
+)
 from aqt.importing import AnkiPackageImporter
 from aqt.qt import QAction, Qt, QUrl
 from aqt.theme import theme_manager
@@ -159,6 +163,7 @@ from ankihub.gui.operations.new_deck_subscriptions import (
 )
 from ankihub.gui.operations.utils import future_with_result
 from ankihub.gui.optional_tag_suggestion_dialog import OptionalTagsSuggestionDialog
+from ankihub.gui.reviewer import OPEN_BROWSER_PYCMD
 from ankihub.gui.suggestion_dialog import SuggestionDialog
 from ankihub.main.deck_creation import create_ankihub_deck, modify_note_type
 from ankihub.main.deck_unsubscribtion import uninstall_deck
@@ -5980,6 +5985,47 @@ class TestAnkiHubAIInReviewer:
             )
             aqt.mw.reviewer.web.eval("ankihubAI.invalidateSessionAndPromptToLogin()")
             qtbot.wait_until(lambda: display_login_mock.called)
+
+    @pytest.mark.sequential
+    @pytest.mark.parametrize(
+        "message, expected_note_ids",
+        [
+            (OPEN_BROWSER_PYCMD, []),
+            (f'{OPEN_BROWSER_PYCMD} {{"noteIds": []}}', []),
+            (f'{OPEN_BROWSER_PYCMD} {{"noteIds": [1, 2]}}', [1, 2]),
+        ],
+    )
+    def test_open_browser_pycmd(
+        self,
+        anki_session_with_addon_data: AnkiSession,
+        qtbot: QtBot,
+        add_anki_note: AddAnkiNote,
+        message: str,
+        expected_note_ids: List[NoteId],
+    ):
+        entry_point.run()
+        with anki_session_with_addon_data.profile_loaded():
+            for note_id in range(1, 4):
+                add_anki_note(anki_nid=NoteId(note_id))
+
+            browser_will_show_mock = Mock()
+            browser_will_show.append(browser_will_show_mock)
+
+            browser_did_search_mock = Mock()
+            browser_did_search.append(browser_did_search_mock)
+
+            aqt.mw.reviewer.web.eval(f"pycmd('{message}')")
+
+            qtbot.wait_until(lambda: browser_will_show_mock.called)
+
+            if expected_note_ids:
+                qtbot.wait_until(lambda: browser_did_search_mock.called)
+
+                search_context: SearchContext = browser_did_search_mock.call_args[0][0]
+                cids = search_context.ids
+                nids = [aqt.mw.col.get_card(cid).nid for cid in cids]
+
+                assert set(nids) == set(expected_note_ids)
 
     @pytest.mark.sequential
     @pytest.mark.parametrize("feature_flag_active", [True, False])
