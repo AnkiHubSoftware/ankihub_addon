@@ -1,11 +1,13 @@
 """Modifies Anki's reviewer UI (aqt.reviewer)."""
 
+import json
 from pathlib import Path
 from textwrap import dedent
 from typing import Any, Tuple
 
 import aqt
 from anki.cards import Card
+from aqt.browser import Browser
 from aqt.gui_hooks import (
     reviewer_did_show_question,
     webview_did_receive_js_message,
@@ -25,7 +27,9 @@ VIEW_NOTE_PYCMD = "ankihub_view_note"
 VIEW_NOTE_BUTTON_ID = "ankihub-view-note-button"
 
 ANKIHUB_AI_JS_PATH = Path(__file__).parent / "web/ankihub_ai.js"
-ANKIHUB_AI_INVALID_AUTH_TOKEN = "ankihub_ai_invalid_auth_token"
+AI_INVALID_AUTH_TOKEN_PYCMD = "ankihub_ai_invalid_auth_token"
+
+OPEN_BROWSER_PYCMD = "ankihub_open_browser"
 
 
 def setup():
@@ -149,9 +153,25 @@ def _on_js_message(handled: Tuple[bool, Any], message: str, context: Any) -> Any
         openLink(view_note_url)
 
         return (True, None)
-    elif message == ANKIHUB_AI_INVALID_AUTH_TOKEN:
+    elif message == AI_INVALID_AUTH_TOKEN_PYCMD:
         assert isinstance(context, Reviewer)
         AnkiHubLogin.display_login()
+
+        return (True, None)
+    elif message.startswith(OPEN_BROWSER_PYCMD):
+        assert isinstance(context, Reviewer)
+
+        if " " in message:
+            _, args_json = message.split(" ", maxsplit=1)
+            args = json.loads(args_json)
+            note_ids = args.get("noteIds", [])
+        else:
+            note_ids = []
+
+        # Open the browser and search for the note IDs
+        browser: Browser = aqt.dialogs.open("Browser", aqt.mw)
+        search_string = f"nid:{' or nid:'.join(map(str, note_ids))}" if note_ids else ""
+        browser.search_for(search_string)
 
         return (True, None)
 
