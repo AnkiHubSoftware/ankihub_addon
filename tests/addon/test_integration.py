@@ -6004,7 +6004,7 @@ class TestAnkiHubAIInReviewer:
         qtbot: QtBot,
         import_ah_note: ImportAHNote,
         message: str,
-        expected_ah_nids: List[NoteId],
+        expected_ah_nids: List[uuid.UUID],
     ):
         entry_point.run()
         with anki_session_with_addon_data.profile_loaded():
