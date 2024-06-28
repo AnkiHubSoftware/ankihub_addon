@@ -131,7 +131,7 @@ def _notify_ankihub_ai_of_card_change(card: Card) -> None:
         return
 
     ah_nid = ankihub_db.ankihub_nid_for_anki_nid(card.nid)
-    js = f"ankihubAI.cardChanged('{ah_nid}')"
+    js = _wrap_with_ankihubAI_check(f"ankihubAI.cardChanged('{ah_nid}');")
     aqt.mw.reviewer.web.eval(js)
 
 
@@ -139,8 +139,13 @@ def _set_token_for_ankihub_ai_js() -> None:
     if not feature_flags.chatbot:
         return
 
-    js = f"ankihubAI.setToken('{config.token()}')"
+    js = _wrap_with_ankihubAI_check(f"ankihubAI.setToken('{config.token()}');")
     aqt.mw.reviewer.web.eval(js)
+
+
+def _wrap_with_ankihubAI_check(js: str) -> str:
+    """Wraps the given JavaScript code to only run if the AnkiHub AI object is defined."""
+    return f"if (typeof ankihubAI !== 'undefined') {{ {js} }}"
 
 
 def _on_js_message(handled: Tuple[bool, Any], message: str, context: Any) -> Any:
