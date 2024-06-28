@@ -3,7 +3,7 @@
 import json
 from pathlib import Path
 from textwrap import dedent
-from typing import Any, Tuple
+from typing import Any, List, Tuple
 
 import aqt
 from anki.cards import Card
@@ -167,14 +167,14 @@ def _on_js_message(handled: Tuple[bool, Any], message: str, context: Any) -> Any
         if " " in message:
             _, args_json = message.split(" ", maxsplit=1)
             args = json.loads(args_json)
-            note_ids = args.get("noteIds", [])
+            ah_nids: List[str] = args.get("noteIds", [])
         else:
-            note_ids = []
+            ah_nids = []
 
         browser: Browser = aqt.dialogs.open("Browser", aqt.mw)
 
-        if note_ids:
-            search_string = f"nid:{' or nid:'.join(map(str, note_ids))}"
+        if ah_nids:
+            search_string = f"ankihub_id:{' or ankihub_id:'.join(ah_nids)}"
             browser.search_for(search_string)
 
         return (True, None)

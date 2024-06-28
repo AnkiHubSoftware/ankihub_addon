@@ -5988,25 +5988,29 @@ class TestAnkiHubAIInReviewer:
 
     @pytest.mark.sequential
     @pytest.mark.parametrize(
-        "message, expected_note_ids",
+        "message, expected_ah_nids",
         [
             (OPEN_BROWSER_PYCMD, []),
             (f'{OPEN_BROWSER_PYCMD} {{"noteIds": []}}', []),
-            (f'{OPEN_BROWSER_PYCMD} {{"noteIds": [1, 2]}}', [1, 2]),
+            (
+                f'{OPEN_BROWSER_PYCMD} {{"noteIds": ["{uuid.UUID(int=1)}", "{uuid.UUID(int=2)}"]}}',
+                [uuid.UUID(int=1), uuid.UUID(int=2)],
+            ),
         ],
     )
     def test_open_browser_pycmd(
         self,
         anki_session_with_addon_data: AnkiSession,
         qtbot: QtBot,
-        add_anki_note: AddAnkiNote,
+        import_ah_note: ImportAHNote,
         message: str,
-        expected_note_ids: List[NoteId],
+        expected_ah_nids: List[NoteId],
     ):
         entry_point.run()
         with anki_session_with_addon_data.profile_loaded():
-            for note_id in range(1, 4):
-                add_anki_note(anki_nid=NoteId(note_id))
+            for ah_note_id_int in range(1, 4):
+                ah_nid = uuid.UUID(int=ah_note_id_int)
+                import_ah_note(ah_nid=ah_nid)
 
             browser_will_show_mock = Mock()
             browser_will_show.append(browser_will_show_mock)
@@ -6018,14 +6022,16 @@ class TestAnkiHubAIInReviewer:
 
             qtbot.wait_until(lambda: browser_will_show_mock.called)
 
-            if expected_note_ids:
+            if expected_ah_nids:
                 qtbot.wait_until(lambda: browser_did_search_mock.called)
 
                 search_context: SearchContext = browser_did_search_mock.call_args[0][0]
                 cids = cast(List[CardId], search_context.ids)
-                nids = [aqt.mw.col.get_card(cid).nid for cid in cids]
-
-                assert set(nids) == set(expected_note_ids)
+                anki_nids = [aqt.mw.col.get_card(cid).nid for cid in cids]
+                expected_anki_nids = ankihub_db.ankihub_nids_to_anki_nids(
+                    expected_ah_nids
+                ).values()
+                assert set(anki_nids) == set(expected_anki_nids)
 
     @pytest.mark.sequential
     @pytest.mark.parametrize("feature_flag_active", [True, False])
