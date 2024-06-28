@@ -31,6 +31,10 @@ class AnkiHubAI {
                 this.hideIframe();
                 this.invalidateSessionAndPromptToLogin();
             }
+
+            if (event.data.sendToPython) {
+                pycmd(event.data.message);
+            }
         });
     }
 
