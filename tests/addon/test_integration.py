@@ -28,7 +28,7 @@ from zipfile import ZipFile
 
 import aqt
 import pytest
-from anki.cards import Card
+from anki.cards import Card, CardId
 from anki.consts import QUEUE_TYPE_NEW, QUEUE_TYPE_SUSPENDED
 from anki.decks import DeckId, FilteredDeckConfig
 from anki.errors import NotFoundError
@@ -6022,7 +6022,7 @@ class TestAnkiHubAIInReviewer:
                 qtbot.wait_until(lambda: browser_did_search_mock.called)
 
                 search_context: SearchContext = browser_did_search_mock.call_args[0][0]
-                cids = search_context.ids
+                cids: List[CardId] = search_context.ids
                 nids = [aqt.mw.col.get_card(cid).nid for cid in cids]
 
                 assert set(nids) == set(expected_note_ids)
