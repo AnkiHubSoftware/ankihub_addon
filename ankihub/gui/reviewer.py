@@ -18,12 +18,14 @@ from jinja2 import Template
 
 from ..db import ankihub_db
 from ..feature_flags import feature_flags
+from ..gui.menu import AnkiHubLogin
 from ..settings import ANKING_DECK_ID, config, url_view_note
 
 VIEW_NOTE_PYCMD = "ankihub_view_note"
 VIEW_NOTE_BUTTON_ID = "ankihub-view-note-button"
 
 ANKIHUB_AI_JS_PATH = Path(__file__).parent / "web/ankihub_ai.js"
+ANKIHUB_AI_INVALID_AUTH_TOKEN = "ankihub_ai_invalid_auth_token"
 
 
 def setup():
@@ -32,6 +34,7 @@ def setup():
 
     webview_will_set_content.append(_add_ankihub_ai_js_to_reviewer_web_content)
     reviewer_did_show_question.append(_notify_ankihub_ai_of_card_change)
+    config.token_change_hook.append(_set_token_for_ankihub_ai_js)
 
     webview_did_receive_js_message.append(_on_js_message)
 
@@ -128,6 +131,14 @@ def _notify_ankihub_ai_of_card_change(card: Card) -> None:
     aqt.mw.reviewer.web.eval(js)
 
 
+def _set_token_for_ankihub_ai_js() -> None:
+    if not feature_flags.chatbot:
+        return
+
+    js = f"ankihubAI.setToken('{config.token()}')"
+    aqt.mw.reviewer.web.eval(js)
+
+
 def _on_js_message(handled: Tuple[bool, Any], message: str, context: Any) -> Any:
     """Handles the "View on AnkiHub" button click by opening the AnkiHub note in the browser."""
     if message == VIEW_NOTE_PYCMD:
@@ -136,6 +147,11 @@ def _on_js_message(handled: Tuple[bool, Any], message: str, context: Any) -> Any
         ankihub_nid = ankihub_db.ankihub_nid_for_anki_nid(anki_nid)
         view_note_url = f"{url_view_note()}{ankihub_nid}"
         openLink(view_note_url)
+
+        return (True, None)
+    elif message == ANKIHUB_AI_INVALID_AUTH_TOKEN:
+        assert isinstance(context, Reviewer)
+        AnkiHubLogin.display_login()
 
         return (True, None)
 

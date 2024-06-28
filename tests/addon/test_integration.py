@@ -5933,20 +5933,12 @@ class TestAnkiHubAIInReviewer:
 
         entry_point.run()
         with anki_session_with_addon_data.profile_loaded():
-            # Set up note to review
             ah_did = ANKING_DECK_ID if for_anking_deck else next_deterministic_uuid()
-            install_ah_deck(ah_did=ah_did)
-
-            # ... Changes the deck setting so that there are unsuspend cards ready for review
-            config.set_suspend_new_cards_of_new_notes(ankihub_did=ah_did, suspend=False)
-            deck_config = config.deck_config(ah_did)
-            import_ah_note(
-                ah_did=ANKING_DECK_ID,
-                anki_did=deck_config.anki_id,
+            self._setup_note_for_review(
+                ah_did, install_ah_deck=install_ah_deck, import_ah_note=import_ah_note
             )
 
             # Open reviewer
-            aqt.mw.col.decks.set_current(deck_config.anki_id)
             aqt.mw.reviewer.show()
             qtbot.wait(300)
 
@@ -5964,6 +5956,84 @@ class TestAnkiHubAIInReviewer:
             qtbot.wait(300)
 
             assert self._is_ankihub_ai_iframe_visible(qtbot)
+
+    @pytest.mark.sequential
+    def test_login_dialog_is_opened_when_invalidateSessionAndPromptToLogin_called(
+        self,
+        anki_session_with_addon_data: AnkiSession,
+        qtbot: QtBot,
+        install_ah_deck: InstallAHDeck,
+        import_ah_note: ImportAHNote,
+        mocker: MockerFixture,
+        set_feature_flag_state: SetFeatureFlagState,
+    ):
+        set_feature_flag_state("chatbot", True)
+        entry_point.run()
+
+        with anki_session_with_addon_data.profile_loaded():
+            self._setup_note_for_review(ANKING_DECK_ID, install_ah_deck, import_ah_note)
+
+            aqt.mw.reviewer.show()
+
+            display_login_mock = mocker.patch(
+                "ankihub.gui.reviewer.AnkiHubLogin.display_login"
+            )
+            aqt.mw.reviewer.web.eval("ankihubAI.invalidateSessionAndPromptToLogin()")
+            qtbot.wait_until(lambda: display_login_mock.called)
+
+    @pytest.mark.sequential
+    @pytest.mark.parametrize("feature_flag_active", [True, False])
+    def test_ankihub_ai_token_is_set_when_token_is_saved(
+        self,
+        anki_session_with_addon_data: AnkiSession,
+        qtbot: QtBot,
+        install_ah_deck: InstallAHDeck,
+        import_ah_note: ImportAHNote,
+        set_feature_flag_state: SetFeatureFlagState,
+        feature_flag_active: bool,
+    ):
+        set_feature_flag_state("chatbot", feature_flag_active)
+
+        entry_point.run()
+
+        with anki_session_with_addon_data.profile_loaded():
+            self._setup_note_for_review(ANKING_DECK_ID, install_ah_deck, import_ah_note)
+
+            aqt.mw.reviewer.show()
+
+            test_token = "test_token"
+            config.save_token(test_token)
+
+            if feature_flag_active:
+                qtbot.wait_until(lambda: self._ankihubAI_token(qtbot) == test_token)
+            else:
+                qtbot.wait(300)
+                assert self._ankihubAI_token(qtbot) is None
+
+    def _setup_note_for_review(
+        self,
+        ah_did: uuid.UUID,
+        install_ah_deck: InstallAHDeck,
+        import_ah_note: ImportAHNote,
+    ) -> None:
+        install_ah_deck(ah_did=ah_did)
+
+        # Changes the deck setting so that there are unsuspend cards ready for review
+        config.set_suspend_new_cards_of_new_notes(ankihub_did=ah_did, suspend=False)
+        deck_config = config.deck_config(ah_did)
+        import_ah_note(
+            ah_did=ANKING_DECK_ID,
+            anki_did=deck_config.anki_id,
+        )
+        aqt.mw.col.decks.set_current(deck_config.anki_id)
+
+    def _ankihubAI_token(self, qtbot: QtBot) -> bool:
+        with qtbot.wait_callback() as callback:
+            aqt.mw.reviewer.web.evalWithCallback(
+                "ankihubAI.knoxToken",
+                callback,
+            )
+        return callback.args[0]
 
     def _ankihub_ai_button_exist(self, qtbot) -> bool:
         with qtbot.wait_callback() as callback:

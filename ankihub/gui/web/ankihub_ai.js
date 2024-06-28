@@ -1,13 +1,14 @@
 
 class AnkiHubAI {
     constructor() {
-        this.knoxToken = "{{ KNOX_TOKEN }}";
         this.appUrl = "{{ APP_URL }}";
         this.endpointPath = "{{ ENDPOINT_PATH }}";
+        this.embeddedAuthPath = "common/embedded-auth";
 
-        this.noteId = null;
-        this.noteIdICurrentlyLoaded = null;
+        this.noteIdOfReviewerCard = null; // The note ID for which the card is currently being reviewed.
+        this.noteIdOfChatbot = null; // The note ID for which the chatbot page is currently loaded.
         this.authenticated = false;
+        this.knoxToken = "{{ KNOX_TOKEN }}";
         this.iframeVisible = false;
 
         this.setup();
@@ -16,6 +17,21 @@ class AnkiHubAI {
     setup() {
         this.iframe = this.setupIframe();
         this.button = this.setupIFrameToggleButton();
+
+        this.setupMessageListener();
+    }
+
+    setupMessageListener() {
+        window.addEventListener("message", (event) => {
+            if (event.origin !== this.appUrl) {
+                return;
+            }
+
+            if (event.data === "Authentication failed") {
+                this.hideIframe();
+                this.invalidateSessionAndPromptToLogin();
+            }
+        });
     }
 
     setupIframe() {
@@ -24,7 +40,7 @@ class AnkiHubAI {
         this.setIframeStyles(iframe);
 
         iframe.onload = () => {
-            if (iframe.src) {
+            if (iframe.src && iframe.src.includes(this.embeddedAuthPath)) {
                 iframe.contentWindow.postMessage(this.knoxToken, this.appUrl);
             }
         };
@@ -37,48 +53,70 @@ class AnkiHubAI {
         button.id = "ankihub-ai-button";
         this.setButtonStyles(button)
         button.onclick = () => {
-            this.maybeUpdateIframeSrc();
-
+            if (!this.knoxToken) {
+                this.invalidateSessionAndPromptToLogin()
+                return;
+            }
             if (!this.iframeVisible) {
-                button.style.backgroundImage = "url('_chevron-down-solid.svg')";
-                button.style.backgroundSize = "30%";
-                this.iframe.style.display = "block";
-                this.iframeVisible = true;
+                this.maybeUpdateIframeSrc();
+                this.showIframe();
             } else {
-                button.style.backgroundImage = "url('_robotking.png')";
-                button.style.backgroundSize = "cover";
-                this.iframe.style.display = "none";
-                this.iframeVisible = false;
+                this.hideIframe();
             }
         };
         document.body.appendChild(button);
         return button;
     }
 
+    invalidateSessionAndPromptToLogin() {
+        this.authenticated = false;
+        this.knoxToken = null;
+        this.noteIdOfChatbot = null;
+        pycmd("ankihub_ai_invalid_auth_token");
+    }
+
+    showIframe() {
+        this.button.style.backgroundImage = "url('_chevron-down-solid.svg')";
+        this.button.style.backgroundSize = "30%";
+        this.iframe.style.display = "block";
+        this.iframeVisible = true;
+    }
+
+    hideIframe() {
+        this.button.style.backgroundImage = "url('_robotking.png')";
+        this.button.style.backgroundSize = "cover";
+        this.iframe.style.display = "none";
+        this.iframeVisible = false;
+    }
+
     cardChanged(noteId) {
-        this.noteId = noteId;
+        this.noteIdOfReviewerCard = noteId;
 
         if (this.iframeVisible) {
             this.maybeUpdateIframeSrc();
         }
     }
 
+    setToken(token) {
+        this.knoxToken = token;
+    }
+
     maybeUpdateIframeSrc() {
-        if (this.noteIdICurrentlyLoaded === this.noteId) {
+        if (this.noteIdOfChatbot === this.noteIdOfReviewerCard) {
             // No need to reload the iframe.
             // This prevents the iframe from reloading when the user reopens the chatbot on the same card.
             return;
         }
 
-        const targetUrl = `${this.appUrl}/${this.endpointPath}/${this.noteId}/`;
+        const targetUrl = `${this.appUrl}/${this.endpointPath}/${this.noteIdOfReviewerCard}/`;
         if (!this.authenticated) {
-            this.iframe.src = `${this.appUrl}/common/embedded-auth/?next=${encodeURIComponent(targetUrl)}`;
+            this.iframe.src = `${this.appUrl}/${this.embeddedAuthPath}/?next=${encodeURIComponent(targetUrl)}`;
             this.authenticated = true;
         } else {
             this.iframe.src = targetUrl;
         }
 
-        this.noteIdICurrentlyLoaded = this.noteId;
+        this.noteIdOfChatbot = this.noteIdOfReviewerCard;
     }
 
     setButtonStyles(button) {

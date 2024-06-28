@@ -188,7 +188,7 @@ class _Config:
         self.public_config: Optional[Dict[str, Any]] = None
         self._private_config: Optional[PrivateConfig] = None
         self._private_config_path: Optional[Path] = None
-        self.token_change_hook: Optional[Callable[[], None]] = None
+        self.token_change_hook: List[Callable[[], None]] = []
         self.subscriptions_change_hook: Optional[Callable[[], None]] = None
         self.app_url: Optional[str] = None
         self.s3_bucket_url: Optional[str] = None
@@ -254,8 +254,8 @@ class _Config:
     def save_token(self, token: str):
         # aqt.mw.pm.set_ankihub_token(token)
         aqt.mw.pm.profile["ankiHubToken"] = token
-        if self.token_change_hook:
-            self.token_change_hook()
+        for func in self.token_change_hook:
+            func()
 
     def save_user_email(self, user_email: str):
         # aqt.mw.pm.set_ankihub_username(user_email)
