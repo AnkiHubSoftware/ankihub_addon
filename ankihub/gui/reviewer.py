@@ -159,8 +159,6 @@ def _on_js_message(handled: Tuple[bool, Any], message: str, context: Any) -> Any
 
         return (True, None)
     elif message.startswith(OPEN_BROWSER_PYCMD):
-        assert isinstance(context, Reviewer)
-
         if " " in message:
             _, args_json = message.split(" ", maxsplit=1)
             args = json.loads(args_json)
@@ -168,10 +166,11 @@ def _on_js_message(handled: Tuple[bool, Any], message: str, context: Any) -> Any
         else:
             note_ids = []
 
-        # Open the browser and search for the note IDs
         browser: Browser = aqt.dialogs.open("Browser", aqt.mw)
-        search_string = f"nid:{' or nid:'.join(map(str, note_ids))}" if note_ids else ""
-        browser.search_for(search_string)
+
+        if note_ids:
+            search_string = f"nid:{' or nid:'.join(map(str, note_ids))}"
+            browser.search_for(search_string)
 
         return (True, None)
 
