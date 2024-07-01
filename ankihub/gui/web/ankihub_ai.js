@@ -105,6 +105,13 @@ class AnkiHubAI {
         this.knoxToken = token;
     }
 
+    sendNoteSuspensionStates(noteSuspensionStates) {
+        const message = {
+            noteSuspensionStates: noteSuspensionStates
+        }
+        this.iframe.contentWindow.postMessage(message, this.appUrl);
+    }
+
     maybeUpdateIframeSrc() {
         if (this.noteIdOfChatbot === this.noteIdOfReviewerCard) {
             // No need to reload the iframe.
