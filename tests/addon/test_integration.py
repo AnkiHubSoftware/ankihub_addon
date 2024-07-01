@@ -164,6 +164,7 @@ from ankihub.gui.operations.new_deck_subscriptions import (
 from ankihub.gui.operations.utils import future_with_result
 from ankihub.gui.optional_tag_suggestion_dialog import OptionalTagsSuggestionDialog
 from ankihub.gui.reviewer import (
+    GET_NOTE_SUSPENSION_STATES_PYCMD,
     OPEN_BROWSER_PYCMD,
     SUSPEND_NOTES_PYCMD,
     UNSUSPEND_NOTES_PYCMD,
@@ -6085,6 +6086,63 @@ class TestAnkiHubAIInReviewer:
             assert set(anki_nids) == set(expected_anki_nids)
 
     @pytest.mark.sequential
+    @pytest.mark.parametrize(
+        "message, suspended_ah_nids, expected_note_suspension_states",
+        [
+            (
+                f'{GET_NOTE_SUSPENSION_STATES_PYCMD} {{"noteIds": ["{uuid.UUID(int=1)}", "{uuid.UUID(int=2)}"]}}',
+                [uuid.UUID(int=1)],
+                {
+                    f"{uuid.UUID(int=1)}": True,
+                    f"{uuid.UUID(int=2)}": False,
+                },
+            ),
+            # Test with AnkiHub note ids that don't exist
+            (
+                f'{GET_NOTE_SUSPENSION_STATES_PYCMD} {{"noteIds": ["{uuid.UUID(int=10)}", "{uuid.UUID(int=11)}"]}}',
+                [],
+                {},
+            ),
+        ],
+    )
+    def test_get_note_suspension_states_pycmd(
+        self,
+        anki_session_with_addon_data: AnkiSession,
+        qtbot: QtBot,
+        import_ah_note: ImportAHNote,
+        mocker: MockerFixture,
+        message: str,
+        suspended_ah_nids: List[uuid.UUID],
+        expected_note_suspension_states: Dict[str, bool],
+    ):
+        entry_point.run()
+        with anki_session_with_addon_data.profile_loaded():
+            # Setup notes
+            for ah_note_id_int in range(1, 3):
+                ah_nid = uuid.UUID(int=ah_note_id_int)
+                import_ah_note(ah_nid=ah_nid)
+
+            # Suspend selected notes
+            self._suspend_notes_by_ah_nids(suspended_ah_nids)
+
+            original_eval = aqt.mw.reviewer.web.eval
+            eval_mock = mocker.patch.object(aqt.mw.reviewer.web, "eval")
+
+            # Call the pycmd
+            original_eval(f"pycmd('{message}')")
+
+            qtbot.wait_until(
+                lambda: eval_mock.called
+                and eval_mock.call_args[0][0].startswith("ankihubAI")
+            )
+
+            # Assert that the correct result was sent to AnkiHub AI (using web.eval)
+            message = eval_mock.call_args[0][0]
+            m = re.match(r"ankihubAI.sendNoteSuspensionStates\((.+)\)", message)
+            note_suspension_states = json.loads(m.group(1))
+            assert note_suspension_states == expected_note_suspension_states
+
+    @pytest.mark.sequential
     @pytest.mark.parametrize("feature_flag_active", [True, False])
     def test_ankihub_ai_token_is_set_when_token_is_saved(
         self,
@@ -6112,6 +6170,17 @@ class TestAnkiHubAIInReviewer:
             else:
                 qtbot.wait(300)
                 assert self._ankihubAI_token(qtbot) is None
+
+    def _suspend_notes_by_ah_nids(self, ah_nids: List[uuid.UUID]):
+        """Suspend all cards of the given notes for the given AnkiHub note ids."""
+        for ah_nid in ah_nids:
+            anki_nid = ankihub_db.anki_nid_for_ankihub_nid(ah_nid)
+            note = aqt.mw.col.get_note(NoteId(anki_nid))
+            cards = []
+            for card in note.cards():
+                card.queue = QUEUE_TYPE_SUSPENDED
+                cards.append(card)
+            aqt.mw.col.update_cards(cards)
 
     def _setup_note_for_review(
         self,

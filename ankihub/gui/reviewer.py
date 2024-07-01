@@ -198,11 +198,10 @@ def _on_js_message(handled: Tuple[bool, Any], message: str, context: Any) -> Any
     elif message.startswith(GET_NOTE_SUSPENSION_STATES_PYCMD):
         kwargs = _parse_js_message_kwargs(message)
         ah_nids = kwargs.get("noteIds")
-        if ah_nids:
-            note_suspension_states = _get_note_suspension_states(ah_nids)
-            context.web.eval(
-                f"ankihubAI.sendNoteSuspensionStates({json.dumps(note_suspension_states)})"
-            )
+        note_suspension_states = _get_note_suspension_states(ah_nids)
+        context.web.eval(
+            f"ankihubAI.sendNoteSuspensionStates({json.dumps(note_suspension_states)})"
+        )
 
         return (True, None)
 
