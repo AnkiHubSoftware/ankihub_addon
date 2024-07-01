@@ -25,8 +25,8 @@ def suspend_notes(ah_nids: List[uuid.UUID]) -> None:
             ah_nids_truncated=truncated_list(anki_nids),
         )
 
-    def on_failure(exception: Exception) -> None:
-        LOGGER.exception(  # pragma: no cover
+    def on_failure(exception: Exception) -> None:  # pragma: no cover
+        LOGGER.exception(
             f"Failed to suspend notes: {exception}",
             ah_nids_truncated=truncated_list(anki_nids),
         )
@@ -55,8 +55,8 @@ def unsuspend_notes(ah_nids: List[uuid.UUID]) -> None:
             ah_nids_truncated=truncated_list(anki_nids),
         )
 
-    def on_failure(exception: Exception) -> None:
-        LOGGER.exception(  # pragma: no cover
+    def on_failure(exception: Exception) -> None:  # pragma: no cover
+        LOGGER.exception(
             f"Failed to unsuspend notes: {exception}",
             ah_nids_truncated=truncated_list(anki_nids),
         )
