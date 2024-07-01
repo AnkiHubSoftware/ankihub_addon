@@ -7,24 +7,20 @@ from typing import Collection, List, Optional
 
 import aqt
 from anki.errors import NotFoundError
-from anki.utils import ids2str
-from aqt.operations.scheduling import unsuspend_cards
 from aqt.utils import showInfo, tooltip
-from peewee import DQ
 
 from .. import LOGGER
 from ..addon_ankihub_client import AddonAnkiHubClient as AnkiHubClient
 from ..ankihub_client import AnkiHubHTTPError, DeckExtension
-from ..ankihub_client.models import NotesActionChoices, SuggestionType
+from ..ankihub_client.models import NotesActionChoices
 from ..db import ankihub_db
-from ..db.db import execute_list_query_in_chunks, flat
-from ..db.models import AnkiHubNote
 from ..main.importing import AnkiHubImporter, AnkiHubImportResult
 from ..main.note_conversion import is_tag_for_group
 from ..main.note_types import fetch_note_types_based_on_notes
-from ..main.utils import create_backup, truncated_list
+from ..main.utils import create_backup
 from ..settings import ANKING_DECK_ID, config
 from .media_sync import media_sync
+from .operations.scheduling import unsuspend_notes
 from .utils import deck_download_progress_cb, show_error_dialog
 
 
@@ -174,44 +170,7 @@ class _AnkiHubDeckUpdater:
                 raise NotImplementedError(  # pragma: no cover
                     f"Unsupported pending notes action: {pending_note_action.action}"
                 )
-            self._unsuspend_notes(ah_nids=pending_note_action.note_ids)
-
-    def _unsuspend_notes(self, ah_nids: List[uuid.UUID]) -> None:
-        anki_nids = execute_list_query_in_chunks(
-            lambda ah_nids: (
-                AnkiHubNote.select(AnkiHubNote.anki_note_id)
-                .filter(
-                    DQ(last_update_type__ne=SuggestionType.DELETE.value[0])
-                    | DQ(last_update_type__is=None),
-                    ankihub_note_id__in=ah_nids,
-                )
-                .objects(flat)
-            ),
-            ids=ah_nids,
-        )
-        anki_cids = aqt.mw.col.db.list(
-            f"SELECT id FROM cards WHERE nid IN {ids2str(anki_nids)}"
-        )
-
-        def on_success(_) -> None:
-            LOGGER.info(
-                "Unsuspended cards",
-                anki_cids_count=len(anki_cids),
-                ah_nids_truncated=truncated_list(anki_nids),
-            )
-
-        def on_failure(exception: Exception) -> None:
-            LOGGER.exception(  # pragma: no cover
-                "Failed to unsuspend cards",
-                ah_nids_truncated=truncated_list(anki_nids),
-            )
-
-        aqt.mw.taskman.run_on_main(
-            lambda: unsuspend_cards(parent=aqt.mw, card_ids=anki_cids)
-            .success(on_success)
-            .failure(on_failure)
-            .run_in_background()
-        )
+            unsuspend_notes(ah_nids=pending_note_action.note_ids)
 
     def _fetch_and_apply_deck_extension_updates(self, ankihub_did: uuid.UUID) -> bool:
         # returns True if the update was successful, False if the user cancelled it
