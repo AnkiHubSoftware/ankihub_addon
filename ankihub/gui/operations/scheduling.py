@@ -40,14 +40,14 @@ def _change_suspension_state_of_notes(ah_nids: List[uuid.UUID], suspend: bool) -
             "Changed suspension state notes of notes",
             suspend=suspend,
             anki_cids_count=len(anki_cids),
-            ah_nids_truncated=truncated_list(anki_nids),
+            ah_nids_truncated=truncated_list(ah_nids, 3),
         )
 
     def on_failure(exception: Exception) -> None:  # pragma: no cover
         LOGGER.exception(
             f"Failed to change suspension state of notes: {exception}",
             suspend=suspend,
-            ah_nids_truncated=truncated_list(anki_nids),
+            ah_nids_truncated=truncated_list(ah_nids, 3),
         )
         raise exception
 
