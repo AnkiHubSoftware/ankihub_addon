@@ -27,7 +27,7 @@ def _change_suspension_state_of_notes(ah_nids: List[uuid.UUID], suspend: bool) -
     anki_cids = aqt.mw.col.db.list(
         f"SELECT id FROM cards WHERE nid IN {ids2str(anki_nids)}"
     )
-    if not anki_cids:
+    if not anki_cids:  # pragma: no cover
         LOGGER.info(
             "No cards to change suspension state for",
             suspend=suspend,

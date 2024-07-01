@@ -163,7 +163,11 @@ from ankihub.gui.operations.new_deck_subscriptions import (
 )
 from ankihub.gui.operations.utils import future_with_result
 from ankihub.gui.optional_tag_suggestion_dialog import OptionalTagsSuggestionDialog
-from ankihub.gui.reviewer import OPEN_BROWSER_PYCMD
+from ankihub.gui.reviewer import (
+    OPEN_BROWSER_PYCMD,
+    SUSPEND_NOTES_PYCMD,
+    UNSUSPEND_NOTES_PYCMD,
+)
 from ankihub.gui.suggestion_dialog import SuggestionDialog
 from ankihub.main.deck_creation import create_ankihub_deck, modify_note_type
 from ankihub.main.deck_unsubscribtion import uninstall_deck
@@ -6032,6 +6036,53 @@ class TestAnkiHubAIInReviewer:
                     expected_ah_nids
                 ).values()
                 assert set(anki_nids) == set(expected_anki_nids)
+
+    @pytest.mark.sequential
+    @pytest.mark.parametrize(
+        "message, operation_name, expected_ah_nids",
+        [
+            (
+                f'{SUSPEND_NOTES_PYCMD} {{"noteIds": ["{uuid.UUID(int=1)}", "{uuid.UUID(int=2)}"]}}',
+                "suspend_cards",
+                [uuid.UUID(int=1), uuid.UUID(int=2)],
+            ),
+            (
+                f'{UNSUSPEND_NOTES_PYCMD} {{"noteIds": ["{uuid.UUID(int=1)}", "{uuid.UUID(int=2)}"]}}',
+                "unsuspend_cards",
+                [uuid.UUID(int=1), uuid.UUID(int=2)],
+            ),
+        ],
+    )
+    def test_suspend_notes_or_unsuspend_notes_pycmd(
+        self,
+        anki_session_with_addon_data: AnkiSession,
+        qtbot: QtBot,
+        import_ah_note: ImportAHNote,
+        message: str,
+        mocker: MockerFixture,
+        operation_name: str,
+        expected_ah_nids: List[uuid.UUID],
+    ):
+        entry_point.run()
+        with anki_session_with_addon_data.profile_loaded():
+            for ah_note_id_int in range(1, 4):
+                ah_nid = uuid.UUID(int=ah_note_id_int)
+                import_ah_note(ah_nid=ah_nid)
+
+            operation_mock = mocker.patch(
+                f"ankihub.gui.operations.scheduling.{operation_name}"
+            )
+
+            aqt.mw.reviewer.web.eval(f"pycmd('{message}')")
+
+            qtbot.wait_until(lambda: operation_mock.called)
+
+            cids: List[CardId] = operation_mock.call_args.kwargs["card_ids"]
+            anki_nids = [aqt.mw.col.get_card(cid).nid for cid in cids]
+            expected_anki_nids = ankihub_db.ankihub_nids_to_anki_nids(
+                expected_ah_nids
+            ).values()
+            assert set(anki_nids) == set(expected_anki_nids)
 
     @pytest.mark.sequential
     @pytest.mark.parametrize("feature_flag_active", [True, False])
