@@ -14,6 +14,7 @@ from aqt.gui_hooks import (
     webview_will_set_content,
 )
 from aqt.reviewer import Reviewer, ReviewerBottomBar
+from aqt.theme import theme_manager
 from aqt.utils import openLink
 from aqt.webview import WebContent
 from jinja2 import Template
@@ -120,10 +121,16 @@ def _add_ankihub_ai_js_to_reviewer_web_content(web_content: WebContent, context)
         "KNOX_TOKEN": config.token(),
         "APP_URL": config.app_url,
         "ENDPOINT_PATH": "ai/chatbot",
+        "THEME": _ankihub_theme(),
     }
     js = Template(ANKIHUB_AI_JS_PATH.read_text()).render(template_vars)
 
     web_content.body += f"<script>{js}</script>"
+
+
+def _ankihub_theme() -> str:
+    """Returns the theme that AnkiHub should use based on the current Anki theme."""
+    return "dark" if theme_manager.night_mode else "light"
 
 
 def _notify_ankihub_ai_of_card_change(card: Card) -> None:

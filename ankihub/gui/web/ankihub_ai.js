@@ -10,6 +10,7 @@ class AnkiHubAI {
         this.authenticated = false;
         this.knoxToken = "{{ KNOX_TOKEN }}";
         this.iframeVisible = false;
+        this.theme = "{{ THEME }}";
 
         this.setup();
     }
@@ -45,7 +46,11 @@ class AnkiHubAI {
 
         iframe.onload = () => {
             if (iframe.src && iframe.src.includes(this.embeddedAuthPath)) {
-                iframe.contentWindow.postMessage(this.knoxToken, this.appUrl);
+                const message = {
+                    token: this.knoxToken,
+                    theme: this.theme,
+                }
+                iframe.contentWindow.postMessage(message, this.appUrl);
             }
         };
         document.body.appendChild(iframe);
