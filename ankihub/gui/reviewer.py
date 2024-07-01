@@ -179,14 +179,16 @@ def _on_js_message(handled: Tuple[bool, Any], message: str, context: Any) -> Any
         return (True, None)
     elif message.startswith(SUSPEND_NOTES_PYCMD):
         kwargs = _parse_js_message_kwargs(message)
-        ah_nids = kwargs.get("noteIds", [])
-        suspend_notes(ah_nids)
+        ah_nids = kwargs.get("noteIds")
+        if ah_nids:
+            suspend_notes(ah_nids)
 
         return (True, None)
     elif message.startswith(UNSUSPEND_NOTES_PYCMD):
         kwargs = _parse_js_message_kwargs(message)
-        ah_nids = kwargs.get("noteIds", [])
-        unsuspend_notes(ah_nids)
+        ah_nids = kwargs.get("noteIds")
+        if ah_nids:
+            unsuspend_notes(ah_nids)
 
         return (True, None)
 
