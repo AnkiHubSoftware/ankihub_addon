@@ -17,6 +17,9 @@ def suspend_notes(ah_nids: List[uuid.UUID]) -> None:
     anki_cids = aqt.mw.col.db.list(
         f"SELECT id FROM cards WHERE nid IN {ids2str(anki_nids)}"
     )
+    if not anki_cids:
+        LOGGER.info("No cards to suspend", ah_nids_truncated=truncated_list(ah_nids, 3))
+        return
 
     def on_success(_) -> None:
         LOGGER.info(
@@ -47,6 +50,11 @@ def unsuspend_notes(ah_nids: List[uuid.UUID]) -> None:
     anki_cids = aqt.mw.col.db.list(
         f"SELECT id FROM cards WHERE nid IN {ids2str(anki_nids)}"
     )
+    if not anki_cids:
+        LOGGER.info(
+            "No cards to unsuspend", ah_nids_truncated=truncated_list(ah_nids, 3)
+        )
+        return
 
     def on_success(_) -> None:
         LOGGER.info(
