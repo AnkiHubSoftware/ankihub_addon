@@ -11,39 +11,16 @@ from ...main.utils import truncated_list
 
 
 def suspend_notes(ah_nids: List[uuid.UUID]) -> None:
-    anki_nids = [
-        nid for nid in ankihub_db.ankihub_nids_to_anki_nids(ah_nids).values() if nid
-    ]
-    anki_cids = aqt.mw.col.db.list(
-        f"SELECT id FROM cards WHERE nid IN {ids2str(anki_nids)}"
-    )
-    if not anki_cids:
-        LOGGER.info("No cards to suspend", ah_nids_truncated=truncated_list(ah_nids, 3))
-        return
-
-    def on_success(_) -> None:
-        LOGGER.info(
-            "Suspended notes",
-            anki_cids_count=len(anki_cids),
-            ah_nids_truncated=truncated_list(anki_nids),
-        )
-
-    def on_failure(exception: Exception) -> None:  # pragma: no cover
-        LOGGER.exception(
-            f"Failed to suspend notes: {exception}",
-            ah_nids_truncated=truncated_list(anki_nids),
-        )
-        raise exception
-
-    aqt.mw.taskman.run_on_main(
-        lambda: suspend_cards(parent=aqt.mw, card_ids=anki_cids)
-        .success(on_success)
-        .failure(on_failure)
-        .run_in_background()
-    )
+    """Suspend cards of notes in Anki based on their AnkiHub note IDs."""
+    _change_suspension_state_of_notes(ah_nids, suspend=True)
 
 
 def unsuspend_notes(ah_nids: List[uuid.UUID]) -> None:
+    """Unsuspend cards of notes in Anki based on their AnkiHub note IDs."""
+    _change_suspension_state_of_notes(ah_nids, suspend=False)
+
+
+def _change_suspension_state_of_notes(ah_nids: List[uuid.UUID], suspend: bool) -> None:
     anki_nids = [
         nid for nid in ankihub_db.ankihub_nids_to_anki_nids(ah_nids).values() if nid
     ]
@@ -52,26 +29,35 @@ def unsuspend_notes(ah_nids: List[uuid.UUID]) -> None:
     )
     if not anki_cids:
         LOGGER.info(
-            "No cards to unsuspend", ah_nids_truncated=truncated_list(ah_nids, 3)
+            "No cards to change suspension state for",
+            suspend=suspend,
+            ah_nids_truncated=truncated_list(ah_nids, 3),
         )
         return
 
     def on_success(_) -> None:
         LOGGER.info(
-            "Unsuspended notes",
+            "Changed suspension state notes of notes",
+            suspend=suspend,
             anki_cids_count=len(anki_cids),
             ah_nids_truncated=truncated_list(anki_nids),
         )
 
     def on_failure(exception: Exception) -> None:  # pragma: no cover
         LOGGER.exception(
-            f"Failed to unsuspend notes: {exception}",
+            f"Failed to change suspension state of notes: {exception}",
+            suspend=suspend,
             ah_nids_truncated=truncated_list(anki_nids),
         )
         raise exception
 
+    if suspend:
+        operation = suspend_cards
+    else:
+        operation = unsuspend_cards
+
     aqt.mw.taskman.run_on_main(
-        lambda: unsuspend_cards(parent=aqt.mw, card_ids=anki_cids)
+        lambda: operation(parent=aqt.mw, card_ids=anki_cids)
         .success(on_success)
         .failure(on_failure)
         .run_in_background()
