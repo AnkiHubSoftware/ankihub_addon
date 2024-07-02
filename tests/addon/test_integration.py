@@ -6045,6 +6045,7 @@ class TestAnkiHubAIInReviewer:
         with anki_session_with_addon_data.profile_loaded():
             self._setup_note_for_review(ANKING_DECK_ID, install_ah_deck, import_ah_note)
             aqt.mw.reviewer.show()
+            qtbot.wait(300)
 
             aqt.mw.reviewer.web.eval("ankihubAI.showIframe()")
             qtbot.wait(300)
