@@ -1,11 +1,13 @@
 """Modifies Anki's reviewer UI (aqt.reviewer)."""
 
+import json
 from pathlib import Path
 from textwrap import dedent
-from typing import Any, Tuple
+from typing import Any, List, Tuple
 
 import aqt
 from anki.cards import Card
+from aqt.browser import Browser
 from aqt.gui_hooks import (
     reviewer_did_show_question,
     webview_did_receive_js_message,
@@ -25,7 +27,9 @@ VIEW_NOTE_PYCMD = "ankihub_view_note"
 VIEW_NOTE_BUTTON_ID = "ankihub-view-note-button"
 
 ANKIHUB_AI_JS_PATH = Path(__file__).parent / "web/ankihub_ai.js"
-ANKIHUB_AI_INVALID_AUTH_TOKEN = "ankihub_ai_invalid_auth_token"
+AI_INVALID_AUTH_TOKEN_PYCMD = "ankihub_ai_invalid_auth_token"
+
+OPEN_BROWSER_PYCMD = "ankihub_open_browser"
 
 
 def setup():
@@ -116,6 +120,7 @@ def _add_ankihub_ai_js_to_reviewer_web_content(web_content: WebContent, context)
         "KNOX_TOKEN": config.token(),
         "APP_URL": config.app_url,
         "ENDPOINT_PATH": "ai/chatbot",
+        "QUERY_PARAMETERS": "is_on_anki=true",
     }
     js = Template(ANKIHUB_AI_JS_PATH.read_text()).render(template_vars)
 
@@ -127,7 +132,7 @@ def _notify_ankihub_ai_of_card_change(card: Card) -> None:
         return
 
     ah_nid = ankihub_db.ankihub_nid_for_anki_nid(card.nid)
-    js = f"ankihubAI.cardChanged('{ah_nid}')"
+    js = _wrap_with_ankihubAI_check(f"ankihubAI.cardChanged('{ah_nid}');")
     aqt.mw.reviewer.web.eval(js)
 
 
@@ -135,8 +140,13 @@ def _set_token_for_ankihub_ai_js() -> None:
     if not feature_flags.chatbot:
         return
 
-    js = f"ankihubAI.setToken('{config.token()}')"
+    js = _wrap_with_ankihubAI_check(f"ankihubAI.setToken('{config.token()}');")
     aqt.mw.reviewer.web.eval(js)
+
+
+def _wrap_with_ankihubAI_check(js: str) -> str:
+    """Wraps the given JavaScript code to only run if the AnkiHub AI object is defined."""
+    return f"if (typeof ankihubAI !== 'undefined') {{ {js} }}"
 
 
 def _on_js_message(handled: Tuple[bool, Any], message: str, context: Any) -> Any:
@@ -149,9 +159,24 @@ def _on_js_message(handled: Tuple[bool, Any], message: str, context: Any) -> Any
         openLink(view_note_url)
 
         return (True, None)
-    elif message == ANKIHUB_AI_INVALID_AUTH_TOKEN:
+    elif message == AI_INVALID_AUTH_TOKEN_PYCMD:
         assert isinstance(context, Reviewer)
         AnkiHubLogin.display_login()
+
+        return (True, None)
+    elif message.startswith(OPEN_BROWSER_PYCMD):
+        if " " in message:
+            _, args_json = message.split(" ", maxsplit=1)
+            args = json.loads(args_json)
+            ah_nids: List[str] = args.get("noteIds", [])
+        else:
+            ah_nids = []
+
+        browser: Browser = aqt.dialogs.open("Browser", aqt.mw)
+
+        if ah_nids:
+            search_string = f"ankihub_id:{' or ankihub_id:'.join(ah_nids)}"
+            browser.search_for(search_string)
 
         return (True, None)
 

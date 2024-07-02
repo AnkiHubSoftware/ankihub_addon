@@ -373,6 +373,7 @@ class AddAnkiNote(Protocol):
         self,
         note_type: Optional[NotetypeDict] = None,
         anki_did: Optional[DeckId] = None,
+        anki_nid: Optional[NoteId] = None,
     ) -> Note:
         ...
 
@@ -386,6 +387,7 @@ def add_anki_note() -> AddAnkiNote:
     def add_note_inner(
         note_type: Optional[NotetypeDict] = None,
         anki_did: Optional[DeckId] = None,
+        anki_nid: Optional[NoteId] = None,
     ) -> Note:
         if anki_did is None:
             anki_did = DeckId(1)
@@ -397,6 +399,14 @@ def add_anki_note() -> AddAnkiNote:
         note[note.keys()[0]] = "some text"
 
         aqt.mw.col.add_note(note, DeckId(anki_did))
+
+        if anki_nid:
+            aqt.mw.col.db.execute(
+                f"UPDATE notes SET id = {anki_nid} WHERE id = {note.id};"
+            )
+            aqt.mw.col.db.execute(
+                f"UPDATE cards SET nid = {anki_nid} WHERE nid = {note.id};"
+            )
         return note
 
     return add_note_inner

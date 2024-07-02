@@ -3,6 +3,7 @@ class AnkiHubAI {
     constructor() {
         this.appUrl = "{{ APP_URL }}";
         this.endpointPath = "{{ ENDPOINT_PATH }}";
+        this.queryParameters = "{{ QUERY_PARAMETERS }}"
         this.embeddedAuthPath = "common/embedded-auth";
 
         this.noteIdOfReviewerCard = null; // The note ID for which the card is currently being reviewed.
@@ -30,6 +31,10 @@ class AnkiHubAI {
             if (event.data === "Authentication failed") {
                 this.hideIframe();
                 this.invalidateSessionAndPromptToLogin();
+            }
+
+            if (event.data.sendToPython) {
+                pycmd(event.data.message);
             }
         });
     }
@@ -108,7 +113,7 @@ class AnkiHubAI {
             return;
         }
 
-        const targetUrl = `${this.appUrl}/${this.endpointPath}/${this.noteIdOfReviewerCard}/`;
+        const targetUrl = `${this.appUrl}/${this.endpointPath}/${this.noteIdOfReviewerCard}/?${this.queryParameters}`;
         if (!this.authenticated) {
             this.iframe.src = `${this.appUrl}/${this.embeddedAuthPath}/?next=${encodeURIComponent(targetUrl)}`;
             this.authenticated = true;
