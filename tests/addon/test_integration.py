@@ -163,7 +163,7 @@ from ankihub.gui.operations.new_deck_subscriptions import (
 )
 from ankihub.gui.operations.utils import future_with_result
 from ankihub.gui.optional_tag_suggestion_dialog import OptionalTagsSuggestionDialog
-from ankihub.gui.reviewer import CLOSE_ANKIHUB_AI_PYCMD, OPEN_BROWSER_PYCMD
+from ankihub.gui.reviewer import CLOSE_ANKIHUB_CHATBOT_PYCMD, OPEN_BROWSER_PYCMD
 from ankihub.gui.suggestion_dialog import SuggestionDialog
 from ankihub.main.deck_creation import create_ankihub_deck, modify_note_type
 from ankihub.main.deck_unsubscribtion import uninstall_deck
@@ -6054,7 +6054,7 @@ class TestAnkiHubAIInReviewer:
             qtbot.wait(100)
             assert self._ankihub_ai_is_visible(qtbot)
 
-            aqt.mw.reviewer.web.eval(f"pycmd('{CLOSE_ANKIHUB_AI_PYCMD}')")
+            aqt.mw.reviewer.web.eval(f"pycmd('{CLOSE_ANKIHUB_CHATBOT_PYCMD}')")
             qtbot.wait(100)
 
             # Assert that the chatbot UI was closed

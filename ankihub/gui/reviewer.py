@@ -30,7 +30,7 @@ ANKIHUB_AI_JS_PATH = Path(__file__).parent / "web/ankihub_ai.js"
 AI_INVALID_AUTH_TOKEN_PYCMD = "ankihub_ai_invalid_auth_token"
 
 OPEN_BROWSER_PYCMD = "ankihub_open_browser"
-CLOSE_ANKIHUB_AI_PYCMD = "ankihub_close_ai"
+CLOSE_ANKIHUB_CHATBOT_PYCMD = "ankihub_close_chatbot"
 
 
 def setup():
@@ -180,7 +180,7 @@ def _on_js_message(handled: Tuple[bool, Any], message: str, context: Any) -> Any
 
         return (True, None)
 
-    elif message == CLOSE_ANKIHUB_AI_PYCMD:
+    elif message == CLOSE_ANKIHUB_CHATBOT_PYCMD:
         assert isinstance(context, Reviewer), context
         js = _wrap_with_ankihubAI_check("ankihubAI.hideIframe();")
         context.web.eval(js)
