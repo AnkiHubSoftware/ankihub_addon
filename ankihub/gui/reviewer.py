@@ -20,6 +20,7 @@ from ..db import ankihub_db
 from ..feature_flags import feature_flags
 from ..gui.menu import AnkiHubLogin
 from ..settings import ANKING_DECK_ID, config, url_view_note
+from .utils import using_qt5
 
 VIEW_NOTE_PYCMD = "ankihub_view_note"
 VIEW_NOTE_BUTTON_ID = "ankihub-view-note-button"
@@ -32,9 +33,10 @@ def setup():
     """Adds the "View on AnkiHub" button to the reviewer toolbar."""
     reviewer_did_show_question.append(_add_or_refresh_view_note_button)
 
-    webview_will_set_content.append(_add_ankihub_ai_js_to_reviewer_web_content)
-    reviewer_did_show_question.append(_notify_ankihub_ai_of_card_change)
-    config.token_change_hook.append(_set_token_for_ankihub_ai_js)
+    if not using_qt5():
+        webview_will_set_content.append(_add_ankihub_ai_js_to_reviewer_web_content)
+        reviewer_did_show_question.append(_notify_ankihub_ai_of_card_change)
+        config.token_change_hook.append(_set_token_for_ankihub_ai_js)
 
     webview_did_receive_js_message.append(_on_js_message)
 
