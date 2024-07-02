@@ -5906,11 +5906,16 @@ class TestAHDBCheck:
                 assert mocks["get_deck_by_id"].call_count == 0
 
 
-class TestAnkiHubAIInReviewer:
-    pytestmark = pytest.mark.skipif(
-        utils.using_qt5(), reason="The AnkiHubAI feature is not avilable on Qt5"
-    )
+@pytest.fixture
+def mock_using_qt5_to_return_false(mocker: MockerFixture):
+    """Mock the using_qt5 function to return False."""
+    mocker.patch("ankihub.gui.reviewer.using_qt5", return_value=False)
 
+
+# The mock_using_qt5_to_return_false fixture is used to test the AnkiHub AI feature on Qt5,
+# even though the feature is disabled on Qt5. (In CI we are only running test on Qt5.)
+@pytest.mark.usefixtures("mock_using_qt5_to_return_false")
+class TestAnkiHubAIInReviewer:
     @pytest.mark.sequential
     @pytest.mark.parametrize(
         "feature_flag_active, for_anking_deck, expected_button_exists",
