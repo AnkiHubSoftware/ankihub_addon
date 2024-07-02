@@ -160,9 +160,7 @@ class AnkiHubAI {
 
         iframe.style.boxShadow = "10px 10px 40px 0px rgba(0, 0, 0, 0.25)"
 
-        // Hide scrollbar of iframe
         iframe.style.overflow = "hidden"
-        iframe.scrolling = "no"
     }
 
 }
