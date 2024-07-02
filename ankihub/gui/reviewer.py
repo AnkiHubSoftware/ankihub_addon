@@ -121,6 +121,7 @@ def _add_ankihub_ai_js_to_reviewer_web_content(web_content: WebContent, context)
         "KNOX_TOKEN": config.token(),
         "APP_URL": config.app_url,
         "ENDPOINT_PATH": "ai/chatbot",
+        "QUERY_PARAMETERS": "is_on_anki=true",
         "THEME": _ankihub_theme(),
     }
     js = Template(ANKIHUB_AI_JS_PATH.read_text()).render(template_vars)
