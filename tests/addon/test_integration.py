@@ -163,7 +163,7 @@ from ankihub.gui.operations.new_deck_subscriptions import (
 )
 from ankihub.gui.operations.utils import future_with_result
 from ankihub.gui.optional_tag_suggestion_dialog import OptionalTagsSuggestionDialog
-from ankihub.gui.reviewer import OPEN_BROWSER_PYCMD
+from ankihub.gui.reviewer import CLOSE_ANKIHUB_AI_PYCMD, OPEN_BROWSER_PYCMD
 from ankihub.gui.suggestion_dialog import SuggestionDialog
 from ankihub.main.deck_creation import create_ankihub_deck, modify_note_type
 from ankihub.main.deck_unsubscribtion import uninstall_deck
@@ -6034,6 +6034,29 @@ class TestAnkiHubAIInReviewer:
                 assert set(anki_nids) == set(expected_anki_nids)
 
     @pytest.mark.sequential
+    def test_close_ankihub_ai_pycmd(
+        self,
+        anki_session_with_addon_data: AnkiSession,
+        install_ah_deck: InstallAHDeck,
+        import_ah_note: ImportAHNote,
+        qtbot: QtBot,
+    ):
+        entry_point.run()
+        with anki_session_with_addon_data.profile_loaded():
+            self._setup_note_for_review(ANKING_DECK_ID, install_ah_deck, import_ah_note)
+            aqt.mw.reviewer.show()
+
+            aqt.mw.reviewer.web.eval("ankihubAI.showIframe()")
+            qtbot.wait(300)
+            assert self._ankihub_ai_is_visible(qtbot)
+
+            aqt.mw.reviewer.web.eval(f"pycmd('{CLOSE_ANKIHUB_AI_PYCMD}')")
+            qtbot.wait(300)
+
+            # Assert that the chatbot UI was closed
+            assert not self._ankihub_ai_is_visible(qtbot)
+
+    @pytest.mark.sequential
     @pytest.mark.parametrize("feature_flag_active", [True, False])
     def test_ankihub_ai_token_is_set_when_token_is_saved(
         self,
@@ -6078,6 +6101,14 @@ class TestAnkiHubAIInReviewer:
             anki_did=deck_config.anki_id,
         )
         aqt.mw.col.decks.set_current(deck_config.anki_id)
+
+    def _ankihub_ai_is_visible(self, qtbot: QtBot):
+        with qtbot.wait_callback() as callback:
+            aqt.mw.reviewer.web.evalWithCallback(
+                "ankihubAI.iframeVisible",
+                callback,
+            )
+        return callback.args[0]
 
     def _ankihubAI_token(self, qtbot: QtBot) -> bool:
         with qtbot.wait_callback() as callback:
