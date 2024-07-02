@@ -3,6 +3,7 @@ class AnkiHubAI {
     constructor() {
         this.appUrl = "{{ APP_URL }}";
         this.endpointPath = "{{ ENDPOINT_PATH }}";
+        this.queryParameters = "{{ QUERY_PARAMETERS }}"
         this.embeddedAuthPath = "common/embedded-auth";
 
         this.noteIdOfReviewerCard = null; // The note ID for which the card is currently being reviewed.
