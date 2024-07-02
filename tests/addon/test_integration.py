@@ -5907,6 +5907,10 @@ class TestAHDBCheck:
 
 
 class TestAnkiHubAIInReviewer:
+    pytestmark = pytest.mark.skipif(
+        utils.using_qt5(), reason="The AnkiHubAI feature is not avilable on Qt5"
+    )
+
     @pytest.mark.sequential
     @pytest.mark.parametrize(
         "feature_flag_active, for_anking_deck, expected_button_exists",
