@@ -6040,19 +6040,22 @@ class TestAnkiHubAIInReviewer:
         install_ah_deck: InstallAHDeck,
         import_ah_note: ImportAHNote,
         qtbot: QtBot,
+        set_feature_flag_state: SetFeatureFlagState,
     ):
+        set_feature_flag_state("chatbot", True)
         entry_point.run()
+
         with anki_session_with_addon_data.profile_loaded():
             self._setup_note_for_review(ANKING_DECK_ID, install_ah_deck, import_ah_note)
             aqt.mw.reviewer.show()
-            qtbot.wait(300)
+            qtbot.wait(100)
 
             aqt.mw.reviewer.web.eval("ankihubAI.showIframe()")
-            qtbot.wait(300)
+            qtbot.wait(100)
             assert self._ankihub_ai_is_visible(qtbot)
 
             aqt.mw.reviewer.web.eval(f"pycmd('{CLOSE_ANKIHUB_AI_PYCMD}')")
-            qtbot.wait(300)
+            qtbot.wait(100)
 
             # Assert that the chatbot UI was closed
             assert not self._ankihub_ai_is_visible(qtbot)
