@@ -36,7 +36,7 @@ SUSPEND_NOTES_PYCMD = "ankihub_suspend_notes"
 
 
 def setup():
-    """Adds the "View on AnkiHub" button to the reviewer toolbar."""
+    """Sets up the AnkiHub AI chatbot. Adds the "View on AnkiHub" button to the reviewer toolbar."""
     reviewer_did_show_question.append(_add_or_refresh_view_note_button)
 
     webview_will_set_content.append(_add_ankihub_ai_js_to_reviewer_web_content)
@@ -123,6 +123,7 @@ def _add_ankihub_ai_js_to_reviewer_web_content(web_content: WebContent, context)
         "KNOX_TOKEN": config.token(),
         "APP_URL": config.app_url,
         "ENDPOINT_PATH": "ai/chatbot",
+        "QUERY_PARAMETERS": "is_on_anki=true",
     }
     js = Template(ANKIHUB_AI_JS_PATH.read_text()).render(template_vars)
 

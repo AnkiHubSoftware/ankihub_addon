@@ -3,6 +3,7 @@ class AnkiHubAI {
     constructor() {
         this.appUrl = "{{ APP_URL }}";
         this.endpointPath = "{{ ENDPOINT_PATH }}";
+        this.queryParameters = "{{ QUERY_PARAMETERS }}"
         this.embeddedAuthPath = "common/embedded-auth";
 
         this.noteIdOfReviewerCard = null; // The note ID for which the card is currently being reviewed.
@@ -112,7 +113,7 @@ class AnkiHubAI {
             return;
         }
 
-        const targetUrl = `${this.appUrl}/${this.endpointPath}/${this.noteIdOfReviewerCard}/`;
+        const targetUrl = `${this.appUrl}/${this.endpointPath}/${this.noteIdOfReviewerCard}/?${this.queryParameters}`;
         if (!this.authenticated) {
             this.iframe.src = `${this.appUrl}/${this.embeddedAuthPath}/?next=${encodeURIComponent(targetUrl)}`;
             this.authenticated = true;
@@ -159,9 +160,7 @@ class AnkiHubAI {
 
         iframe.style.boxShadow = "10px 10px 40px 0px rgba(0, 0, 0, 0.25)"
 
-        // Hide scrollbar of iframe
         iframe.style.overflow = "hidden"
-        iframe.scrolling = "no"
     }
 
 }
