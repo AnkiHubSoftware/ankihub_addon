@@ -34,6 +34,7 @@ AI_INVALID_AUTH_TOKEN_PYCMD = "ankihub_ai_invalid_auth_token"
 OPEN_BROWSER_PYCMD = "ankihub_open_browser"
 UNSUSPEND_NOTES_PYCMD = "ankihub_unsuspend_notes"
 SUSPEND_NOTES_PYCMD = "ankihub_suspend_notes"
+CLOSE_ANKIHUB_CHATBOT_PYCMD = "ankihub_close_chatbot"
 
 
 def setup():
@@ -192,6 +193,10 @@ def _on_js_message(handled: Tuple[bool, Any], message: str, context: Any) -> Any
         ah_nids = kwargs.get("noteIds")
         if ah_nids:
             unsuspend_notes(ah_nids)
+    elif message == CLOSE_ANKIHUB_CHATBOT_PYCMD:
+        assert isinstance(context, Reviewer), context
+        js = _wrap_with_ankihubAI_check("ankihubAI.hideIframe();")
+        context.web.eval(js)
 
         return (True, None)
 
