@@ -380,7 +380,11 @@ class _AnkiHubDB:
                     AnkiHubNote.select(
                         AnkiHubNote.ankihub_note_id, AnkiHubNote.anki_note_id
                     )
-                    .filter(ankihub_note_id__in=ankihub_nids)
+                    .filter(
+                        DQ(last_update_type__ne=SuggestionType.DELETE.value[0])
+                        | DQ(last_update_type__is=None),
+                        ankihub_note_id__in=ankihub_nids,
+                    )
                     .tuples()
                 ),
                 ids=ankihub_nids,

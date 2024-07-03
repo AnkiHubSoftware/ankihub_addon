@@ -3,7 +3,7 @@
 import json
 from pathlib import Path
 from textwrap import dedent
-from typing import Any, List, Tuple
+from typing import Any, Dict, Tuple
 
 import aqt
 from anki.cards import Card
@@ -22,6 +22,7 @@ from ..db import ankihub_db
 from ..feature_flags import feature_flags
 from ..gui.menu import AnkiHubLogin
 from ..settings import ANKING_DECK_ID, config, url_view_note
+from .operations.scheduling import suspend_notes, unsuspend_notes
 from .utils import using_qt5
 
 VIEW_NOTE_PYCMD = "ankihub_view_note"
@@ -31,11 +32,13 @@ ANKIHUB_AI_JS_PATH = Path(__file__).parent / "web/ankihub_ai.js"
 AI_INVALID_AUTH_TOKEN_PYCMD = "ankihub_ai_invalid_auth_token"
 
 OPEN_BROWSER_PYCMD = "ankihub_open_browser"
+UNSUSPEND_NOTES_PYCMD = "ankihub_unsuspend_notes"
+SUSPEND_NOTES_PYCMD = "ankihub_suspend_notes"
 CLOSE_ANKIHUB_CHATBOT_PYCMD = "ankihub_close_chatbot"
 
 
 def setup():
-    """Adds the "View on AnkiHub" button to the reviewer toolbar."""
+    """Sets up the AnkiHub AI chatbot. Adds the "View on AnkiHub" button to the reviewer toolbar."""
     reviewer_did_show_question.append(_add_or_refresh_view_note_button)
 
     if not using_qt5():
@@ -168,12 +171,8 @@ def _on_js_message(handled: Tuple[bool, Any], message: str, context: Any) -> Any
 
         return (True, None)
     elif message.startswith(OPEN_BROWSER_PYCMD):
-        if " " in message:
-            _, args_json = message.split(" ", maxsplit=1)
-            args = json.loads(args_json)
-            ah_nids: List[str] = args.get("noteIds", [])
-        else:
-            ah_nids = []
+        kwargs = _parse_js_message_kwargs(message)
+        ah_nids = kwargs.get("noteIds", [])
 
         browser: Browser = aqt.dialogs.open("Browser", aqt.mw)
 
@@ -182,6 +181,18 @@ def _on_js_message(handled: Tuple[bool, Any], message: str, context: Any) -> Any
             browser.search_for(search_string)
 
         return (True, None)
+    elif message.startswith(SUSPEND_NOTES_PYCMD):
+        kwargs = _parse_js_message_kwargs(message)
+        ah_nids = kwargs.get("noteIds")
+        if ah_nids:
+            suspend_notes(ah_nids)
+
+        return (True, None)
+    elif message.startswith(UNSUSPEND_NOTES_PYCMD):
+        kwargs = _parse_js_message_kwargs(message)
+        ah_nids = kwargs.get("noteIds")
+        if ah_nids:
+            unsuspend_notes(ah_nids)
     elif message == CLOSE_ANKIHUB_CHATBOT_PYCMD:
         assert isinstance(context, Reviewer), context
         js = _wrap_with_ankihubAI_check("ankihubAI.hideIframe();")
@@ -190,3 +201,11 @@ def _on_js_message(handled: Tuple[bool, Any], message: str, context: Any) -> Any
         return (True, None)
 
     return handled
+
+
+def _parse_js_message_kwargs(message: str) -> Dict[str, Any]:
+    if " " in message:
+        _, kwargs_json = message.split(" ", maxsplit=1)
+        return json.loads(kwargs_json)
+    else:
+        return {}
