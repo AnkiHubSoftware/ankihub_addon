@@ -26,6 +26,7 @@ from ..feature_flags import feature_flags
 from ..gui.menu import AnkiHubLogin
 from ..settings import ANKING_DECK_ID, config, url_view_note
 from .operations.scheduling import suspend_notes, unsuspend_notes
+from .utils import using_qt5
 
 VIEW_NOTE_PYCMD = "ankihub_view_note"
 VIEW_NOTE_BUTTON_ID = "ankihub-view-note-button"
@@ -37,15 +38,17 @@ OPEN_BROWSER_PYCMD = "ankihub_open_browser"
 UNSUSPEND_NOTES_PYCMD = "ankihub_unsuspend_notes"
 SUSPEND_NOTES_PYCMD = "ankihub_suspend_notes"
 GET_NOTE_SUSPENSION_STATES_PYCMD = "ankihub_get_note_suspension_states"
+CLOSE_ANKIHUB_CHATBOT_PYCMD = "ankihub_close_chatbot"
 
 
 def setup():
-    """Adds the "View on AnkiHub" button to the reviewer toolbar."""
+    """Sets up the AnkiHub AI chatbot. Adds the "View on AnkiHub" button to the reviewer toolbar."""
     reviewer_did_show_question.append(_add_or_refresh_view_note_button)
 
-    webview_will_set_content.append(_add_ankihub_ai_js_to_reviewer_web_content)
-    reviewer_did_show_question.append(_notify_ankihub_ai_of_card_change)
-    config.token_change_hook.append(_set_token_for_ankihub_ai_js)
+    if not using_qt5():
+        webview_will_set_content.append(_add_ankihub_ai_js_to_reviewer_web_content)
+        reviewer_did_show_question.append(_notify_ankihub_ai_of_card_change)
+        config.token_change_hook.append(_set_token_for_ankihub_ai_js)
 
     webview_did_receive_js_message.append(_on_js_message)
 
@@ -127,6 +130,7 @@ def _add_ankihub_ai_js_to_reviewer_web_content(web_content: WebContent, context)
         "KNOX_TOKEN": config.token(),
         "APP_URL": config.app_url,
         "ENDPOINT_PATH": "ai/chatbot",
+        "QUERY_PARAMETERS": "is_on_anki=true",
     }
     js = Template(ANKIHUB_AI_JS_PATH.read_text()).render(template_vars)
 
@@ -193,6 +197,10 @@ def _on_js_message(handled: Tuple[bool, Any], message: str, context: Any) -> Any
         ah_nids = kwargs.get("noteIds")
         if ah_nids:
             unsuspend_notes(ah_nids)
+    elif message == CLOSE_ANKIHUB_CHATBOT_PYCMD:
+        assert isinstance(context, Reviewer), context
+        js = _wrap_with_ankihubAI_check("ankihubAI.hideIframe();")
+        context.web.eval(js)
 
         return (True, None)
     elif message.startswith(GET_NOTE_SUSPENSION_STATES_PYCMD):

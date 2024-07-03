@@ -164,6 +164,7 @@ from ankihub.gui.operations.new_deck_subscriptions import (
 from ankihub.gui.operations.utils import future_with_result
 from ankihub.gui.optional_tag_suggestion_dialog import OptionalTagsSuggestionDialog
 from ankihub.gui.reviewer import (
+    CLOSE_ANKIHUB_CHATBOT_PYCMD,
     GET_NOTE_SUSPENSION_STATES_PYCMD,
     OPEN_BROWSER_PYCMD,
     SUSPEND_NOTES_PYCMD,
@@ -5916,6 +5917,15 @@ class TestAHDBCheck:
                 assert mocks["get_deck_by_id"].call_count == 0
 
 
+@pytest.fixture
+def mock_using_qt5_to_return_false(mocker: MockerFixture):
+    """Mock the using_qt5 function to return False."""
+    mocker.patch("ankihub.gui.reviewer.using_qt5", return_value=False)
+
+
+# The mock_using_qt5_to_return_false fixture is used to test the AnkiHub AI feature on Qt5,
+# even though the feature is disabled on Qt5. (In CI we are only running test on Qt5.)
+@pytest.mark.usefixtures("mock_using_qt5_to_return_false")
 class TestAnkiHubAIInReviewer:
     @pytest.mark.sequential
     @pytest.mark.parametrize(
@@ -6143,6 +6153,33 @@ class TestAnkiHubAIInReviewer:
             assert note_suspension_states == expected_note_suspension_states
 
     @pytest.mark.sequential
+    def test_close_ankihub_ai_pycmd(
+        self,
+        anki_session_with_addon_data: AnkiSession,
+        install_ah_deck: InstallAHDeck,
+        import_ah_note: ImportAHNote,
+        qtbot: QtBot,
+        set_feature_flag_state: SetFeatureFlagState,
+    ):
+        set_feature_flag_state("chatbot", True)
+        entry_point.run()
+
+        with anki_session_with_addon_data.profile_loaded():
+            self._setup_note_for_review(ANKING_DECK_ID, install_ah_deck, import_ah_note)
+            aqt.mw.reviewer.show()
+            qtbot.wait(100)
+
+            aqt.mw.reviewer.web.eval("ankihubAI.showIframe()")
+            qtbot.wait(100)
+            assert self._ankihub_ai_is_visible(qtbot)
+
+            aqt.mw.reviewer.web.eval(f"pycmd('{CLOSE_ANKIHUB_CHATBOT_PYCMD}')")
+            qtbot.wait(100)
+
+            # Assert that the chatbot UI was closed
+            assert not self._ankihub_ai_is_visible(qtbot)
+
+    @pytest.mark.sequential
     @pytest.mark.parametrize("feature_flag_active", [True, False])
     def test_ankihub_ai_token_is_set_when_token_is_saved(
         self,
@@ -6198,6 +6235,14 @@ class TestAnkiHubAIInReviewer:
             anki_did=deck_config.anki_id,
         )
         aqt.mw.col.decks.set_current(deck_config.anki_id)
+
+    def _ankihub_ai_is_visible(self, qtbot: QtBot):
+        with qtbot.wait_callback() as callback:
+            aqt.mw.reviewer.web.evalWithCallback(
+                "ankihubAI.iframeVisible",
+                callback,
+            )
+        return callback.args[0]
 
     def _ankihubAI_token(self, qtbot: QtBot) -> bool:
         with qtbot.wait_callback() as callback:
