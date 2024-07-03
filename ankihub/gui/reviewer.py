@@ -224,7 +224,7 @@ def _parse_js_message_kwargs(message: str) -> Dict[str, Any]:
         return {}
 
 
-def _get_note_suspension_states(ah_nids: List[str]) -> Dict[uuid.UUID, bool]:
+def _get_note_suspension_states(ah_nids: List[str]) -> Dict[str, bool]:
     """Returns a mapping of AnkiHub note IDs (as strings) to whether they are suspended or not.
     A note is considered unsuspended if at least one of its cards is unsuspended.
     If the note is not found in Anki, it will be missing from the returned mapping."""
