@@ -9,6 +9,7 @@ import aqt
 from anki.cards import Card
 from aqt.browser import Browser
 from aqt.gui_hooks import (
+    reviewer_did_show_answer,
     reviewer_did_show_question,
     webview_did_receive_js_message,
     webview_will_set_content,
@@ -30,8 +31,9 @@ VIEW_NOTE_PYCMD = "ankihub_view_note"
 VIEW_NOTE_BUTTON_ID = "ankihub-view-note-button"
 
 ANKIHUB_AI_JS_PATH = Path(__file__).parent / "web/ankihub_ai.js"
-AI_INVALID_AUTH_TOKEN_PYCMD = "ankihub_ai_invalid_auth_token"
+REMOVE_ANKING_BUTTON_JS_PATH = Path(__file__).parent / "web/remove_anking_button.js"
 
+AI_INVALID_AUTH_TOKEN_PYCMD = "ankihub_ai_invalid_auth_token"
 OPEN_BROWSER_PYCMD = "ankihub_open_browser"
 UNSUSPEND_NOTES_PYCMD = "ankihub_unsuspend_notes"
 SUSPEND_NOTES_PYCMD = "ankihub_suspend_notes"
@@ -46,6 +48,8 @@ def setup():
         webview_will_set_content.append(_add_ankihub_ai_js_to_reviewer_web_content)
         reviewer_did_show_question.append(_notify_ankihub_ai_of_card_change)
         config.token_change_hook.append(_set_token_for_ankihub_ai_js)
+        reviewer_did_show_question.append(_remove_anking_button)
+        reviewer_did_show_answer.append(_remove_anking_button)
 
     webview_did_receive_js_message.append(_on_js_message)
 
@@ -146,6 +150,16 @@ def _notify_ankihub_ai_of_card_change(card: Card) -> None:
 
     ah_nid = ankihub_db.ankihub_nid_for_anki_nid(card.nid)
     js = _wrap_with_ankihubAI_check(f"ankihubAI.cardChanged('{ah_nid}');")
+    aqt.mw.reviewer.web.eval(js)
+
+
+def _remove_anking_button(_: Card) -> None:
+    """Removes the AnKing button (provided by the AnKing note types) from the webview if it exists.
+    This is necessary because it overlaps with the AnkiHub AI chatbot button."""
+    if not feature_flags.chatbot:
+        return
+
+    js = _wrap_with_ankihubAI_check(REMOVE_ANKING_BUTTON_JS_PATH.read_text())
     aqt.mw.reviewer.web.eval(js)
 
 
