@@ -5968,6 +5968,8 @@ class TestAnkiHubAIInReviewer:
             if not expected_button_exists:
                 return
 
+            qtbot.wait(300)
+
             # Click ankihub ai button
             aqt.mw.reviewer.web.eval(
                 "document.getElementById('ankihub-ai-button').click()"
