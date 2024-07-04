@@ -5961,7 +5961,7 @@ class TestAnkiHubAIInReviewer:
             aqt.mw.reviewer.show()
             qtbot.wait(300)
 
-            assert not self._is_ankihub_ai_iframe_visible(qtbot)
+            assert not self._ankihub_ai_is_visible(qtbot)
 
             ankihub_ai_button_exists = self._ankihub_ai_button_exist(qtbot)
             assert ankihub_ai_button_exists == expected_button_exists
@@ -5974,7 +5974,7 @@ class TestAnkiHubAIInReviewer:
             )
             qtbot.wait(300)
 
-            assert self._is_ankihub_ai_iframe_visible(qtbot)
+            assert self._ankihub_ai_is_visible(qtbot)
 
     @pytest.mark.sequential
     def test_login_dialog_is_opened_when_invalidateSessionAndPromptToLogin_called(
@@ -6190,18 +6190,3 @@ class TestAnkiHubAIInReviewer:
                 callback,
             )
         return callback.args[0] is not None
-
-    def _is_ankihub_ai_iframe_visible(self, qtbot: QtBot) -> bool:
-        with qtbot.wait_callback() as callback:
-            aqt.mw.reviewer.web.evalWithCallback(
-                "document.getElementById('ankihub-ai-iframe').style.display",
-                callback,
-            )
-
-        display_style = callback.args[0]
-        if display_style == "block":
-            return True
-        elif display_style in ("none", None):
-            return False
-        else:
-            raise ValueError(f"Unexpected display style: {display_style}")
