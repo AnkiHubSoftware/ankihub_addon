@@ -15,7 +15,7 @@ from aqt.gui_hooks import (
 )
 from aqt.reviewer import Reviewer, ReviewerBottomBar
 from aqt.theme import theme_manager
-from aqt.utils import openLink
+from aqt.utils import openLink, tooltip
 from aqt.webview import WebContent
 from jinja2 import Template
 
@@ -192,14 +192,20 @@ def _on_js_message(handled: Tuple[bool, Any], message: str, context: Any) -> Any
         kwargs = _parse_js_message_kwargs(message)
         ah_nids = kwargs.get("noteIds")
         if ah_nids:
-            suspend_notes(ah_nids)
+            suspend_notes(
+                ah_nids,
+                on_done=lambda: tooltip("AnkiHub: Note(s) suspended", parent=aqt.mw),
+            )
 
         return (True, None)
     elif message.startswith(UNSUSPEND_NOTES_PYCMD):
         kwargs = _parse_js_message_kwargs(message)
         ah_nids = kwargs.get("noteIds")
         if ah_nids:
-            unsuspend_notes(ah_nids)
+            unsuspend_notes(
+                ah_nids,
+                on_done=lambda: tooltip("AnkiHub: Note(s) unsuspended", parent=aqt.mw),
+            )
     elif message == CLOSE_ANKIHUB_CHATBOT_PYCMD:
         assert isinstance(context, Reviewer), context
         js = _wrap_with_ankihubAI_check("ankihubAI.hideIframe();")

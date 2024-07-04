@@ -1,5 +1,5 @@
 import uuid
-from typing import List
+from typing import Callable, List, Optional
 
 import aqt
 from anki.utils import ids2str
@@ -10,17 +10,23 @@ from ...db import ankihub_db
 from ...main.utils import truncated_list
 
 
-def suspend_notes(ah_nids: List[uuid.UUID]) -> None:
+def suspend_notes(
+    ah_nids: List[uuid.UUID], on_done: Optional[Callable[[], None]] = None
+) -> None:
     """Suspend cards of notes in Anki based on their AnkiHub note IDs."""
-    _change_suspension_state_of_notes(ah_nids, suspend=True)
+    _change_suspension_state_of_notes(ah_nids, suspend=True, on_done=on_done)
 
 
-def unsuspend_notes(ah_nids: List[uuid.UUID]) -> None:
+def unsuspend_notes(
+    ah_nids: List[uuid.UUID], on_done: Optional[Callable[[], None]] = None
+) -> None:
     """Unsuspend cards of notes in Anki based on their AnkiHub note IDs."""
-    _change_suspension_state_of_notes(ah_nids, suspend=False)
+    _change_suspension_state_of_notes(ah_nids, suspend=False, on_done=on_done)
 
 
-def _change_suspension_state_of_notes(ah_nids: List[uuid.UUID], suspend: bool) -> None:
+def _change_suspension_state_of_notes(
+    ah_nids: List[uuid.UUID], suspend: bool, on_done: Optional[Callable[[], None]]
+) -> None:
     anki_nids = [
         nid for nid in ankihub_db.ankihub_nids_to_anki_nids(ah_nids).values() if nid
     ]
@@ -42,6 +48,8 @@ def _change_suspension_state_of_notes(ah_nids: List[uuid.UUID], suspend: bool) -
             anki_cids_count=len(anki_cids),
             ah_nids_truncated=truncated_list(ah_nids, 3),
         )
+        if on_done:
+            on_done()
 
     def on_failure(exception: Exception) -> None:  # pragma: no cover
         LOGGER.exception(
