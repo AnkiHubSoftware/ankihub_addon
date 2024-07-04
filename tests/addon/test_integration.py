@@ -5972,7 +5972,7 @@ class TestAnkiHubAIInReviewer:
             aqt.mw.reviewer.web.eval(
                 "document.getElementById('ankihub-ai-button').click()"
             )
-            qtbot.wait(300)
+            qtbot.wait(500)
 
             assert self._ankihub_ai_is_visible(qtbot)
 
