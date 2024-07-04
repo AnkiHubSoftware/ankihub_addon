@@ -167,7 +167,7 @@ def _wrap_with_ankihubAI_check(js: str) -> str:
 
 
 def _on_js_message(handled: Tuple[bool, Any], message: str, context: Any) -> Any:
-    """Handles the "View on AnkiHub" button click by opening the AnkiHub note in the browser."""
+    """Handles messages sent from JavaScript code."""
     if message == VIEW_NOTE_PYCMD:
         assert isinstance(context, ReviewerBottomBar)
         anki_nid = context.reviewer.card.nid
