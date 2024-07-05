@@ -1,21 +1,25 @@
 """Modifies Anki's reviewer UI (aqt.reviewer)."""
 
 import json
+import uuid
 from pathlib import Path
 from textwrap import dedent
-from typing import Any, Dict, Tuple
+from typing import Any, Dict, List, Tuple
 
 import aqt
 from anki.cards import Card
+from anki.consts import QUEUE_TYPE_SUSPENDED
+from anki.utils import ids2str
 from aqt.browser import Browser
 from aqt.gui_hooks import (
+    reviewer_did_show_answer,
     reviewer_did_show_question,
     webview_did_receive_js_message,
     webview_will_set_content,
 )
 from aqt.reviewer import Reviewer, ReviewerBottomBar
 from aqt.theme import theme_manager
-from aqt.utils import openLink
+from aqt.utils import openLink, tooltip
 from aqt.webview import WebContent
 from jinja2 import Template
 
@@ -30,11 +34,13 @@ VIEW_NOTE_PYCMD = "ankihub_view_note"
 VIEW_NOTE_BUTTON_ID = "ankihub-view-note-button"
 
 ANKIHUB_AI_JS_PATH = Path(__file__).parent / "web/ankihub_ai.js"
-AI_INVALID_AUTH_TOKEN_PYCMD = "ankihub_ai_invalid_auth_token"
+REMOVE_ANKING_BUTTON_JS_PATH = Path(__file__).parent / "web/remove_anking_button.js"
 
+AI_INVALID_AUTH_TOKEN_PYCMD = "ankihub_ai_invalid_auth_token"
 OPEN_BROWSER_PYCMD = "ankihub_open_browser"
 UNSUSPEND_NOTES_PYCMD = "ankihub_unsuspend_notes"
 SUSPEND_NOTES_PYCMD = "ankihub_suspend_notes"
+GET_NOTE_SUSPENSION_STATES_PYCMD = "ankihub_get_note_suspension_states"
 CLOSE_ANKIHUB_CHATBOT_PYCMD = "ankihub_close_chatbot"
 
 
@@ -46,6 +52,8 @@ def setup():
         webview_will_set_content.append(_add_ankihub_ai_js_to_reviewer_web_content)
         reviewer_did_show_question.append(_notify_ankihub_ai_of_card_change)
         config.token_change_hook.append(_set_token_for_ankihub_ai_js)
+        reviewer_did_show_question.append(_remove_anking_button)
+        reviewer_did_show_answer.append(_remove_anking_button)
 
     webview_did_receive_js_message.append(_on_js_message)
 
@@ -149,6 +157,16 @@ def _notify_ankihub_ai_of_card_change(card: Card) -> None:
     aqt.mw.reviewer.web.eval(js)
 
 
+def _remove_anking_button(_: Card) -> None:
+    """Removes the AnKing button (provided by the AnKing note types) from the webview if it exists.
+    This is necessary because it overlaps with the AnkiHub AI chatbot button."""
+    if not feature_flags.chatbot:
+        return
+
+    js = _wrap_with_ankihubAI_check(REMOVE_ANKING_BUTTON_JS_PATH.read_text())
+    aqt.mw.reviewer.web.eval(js)
+
+
 def _set_token_for_ankihub_ai_js() -> None:
     if not feature_flags.chatbot:
         return
@@ -163,7 +181,7 @@ def _wrap_with_ankihubAI_check(js: str) -> str:
 
 
 def _on_js_message(handled: Tuple[bool, Any], message: str, context: Any) -> Any:
-    """Handles the "View on AnkiHub" button click by opening the AnkiHub note in the browser."""
+    """Handles messages sent from JavaScript code."""
     if message == VIEW_NOTE_PYCMD:
         assert isinstance(context, ReviewerBottomBar)
         anki_nid = context.reviewer.card.nid
@@ -192,18 +210,33 @@ def _on_js_message(handled: Tuple[bool, Any], message: str, context: Any) -> Any
         kwargs = _parse_js_message_kwargs(message)
         ah_nids = kwargs.get("noteIds")
         if ah_nids:
-            suspend_notes(ah_nids)
+            suspend_notes(
+                ah_nids,
+                on_done=lambda: tooltip("AnkiHub: Note(s) suspended", parent=aqt.mw),
+            )
 
         return (True, None)
     elif message.startswith(UNSUSPEND_NOTES_PYCMD):
         kwargs = _parse_js_message_kwargs(message)
         ah_nids = kwargs.get("noteIds")
         if ah_nids:
-            unsuspend_notes(ah_nids)
+            unsuspend_notes(
+                ah_nids,
+                on_done=lambda: tooltip("AnkiHub: Note(s) unsuspended", parent=aqt.mw),
+            )
     elif message == CLOSE_ANKIHUB_CHATBOT_PYCMD:
         assert isinstance(context, Reviewer), context
         js = _wrap_with_ankihubAI_check("ankihubAI.hideIframe();")
         context.web.eval(js)
+
+        return (True, None)
+    elif message.startswith(GET_NOTE_SUSPENSION_STATES_PYCMD):
+        kwargs = _parse_js_message_kwargs(message)
+        ah_nids = kwargs.get("noteIds")
+        note_suspension_states = _get_note_suspension_states(ah_nids)
+        context.web.eval(
+            f"ankihubAI.sendNoteSuspensionStates({json.dumps(note_suspension_states)})"
+        )
 
         return (True, None)
 
@@ -216,3 +249,32 @@ def _parse_js_message_kwargs(message: str) -> Dict[str, Any]:
         return json.loads(kwargs_json)
     else:
         return {}
+
+
+def _get_note_suspension_states(ah_nids: List[str]) -> Dict[str, bool]:
+    """Returns a mapping of AnkiHub note IDs (as strings) to whether they are suspended or not.
+    A note is considered unsuspended if at least one of its cards is unsuspended.
+    If the note is not found in Anki, it will be missing from the returned mapping."""
+    ah_nids_to_anki_nids = ankihub_db.ankihub_nids_to_anki_nids(
+        [uuid.UUID(ah_nid) for ah_nid in ah_nids]
+    )
+    ah_nids_to_anki_nids = {
+        ah_nid: anki_nid
+        for ah_nid, anki_nid in ah_nids_to_anki_nids.items()
+        if anki_nid
+    }
+    if not ah_nids_to_anki_nids:
+        return {}
+
+    unsuspended_anki_nids = set(
+        aqt.mw.col.db.list(
+            f"""
+            SELECT DISTINCT nid FROM cards
+            WHERE nid IN {ids2str(ah_nids_to_anki_nids.values())} AND queue != {QUEUE_TYPE_SUSPENDED}
+            """
+        )
+    )
+    return {
+        str(ah_nid): anki_nid not in unsuspended_anki_nids
+        for ah_nid, anki_nid in ah_nids_to_anki_nids.items()
+    }

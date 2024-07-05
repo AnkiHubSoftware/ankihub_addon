@@ -111,6 +111,13 @@ class AnkiHubAI {
         this.knoxToken = token;
     }
 
+    sendNoteSuspensionStates(noteSuspensionStates) {
+        const message = {
+            noteSuspensionStates: noteSuspensionStates
+        }
+        this.iframe.contentWindow.postMessage(message, this.appUrl);
+    }
+
     maybeUpdateIframeSrc() {
         if (this.noteIdOfChatbot === this.noteIdOfReviewerCard) {
             // No need to reload the iframe.
@@ -140,6 +147,8 @@ class AnkiHubAI {
 
         button.style.borderRadius = "100%";
         button.style.border = "none";
+
+        button.style.padding = "8px";
 
         button.style.backgroundImage = "url('_robotking.png')";
         button.style.backgroundSize = "cover";
