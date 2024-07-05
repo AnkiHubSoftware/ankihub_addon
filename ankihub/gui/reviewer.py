@@ -12,13 +12,14 @@ from anki.consts import QUEUE_TYPE_SUSPENDED
 from anki.utils import ids2str
 from aqt.browser import Browser
 from aqt.gui_hooks import (
+    reviewer_did_show_answer,
     reviewer_did_show_question,
     webview_did_receive_js_message,
     webview_will_set_content,
 )
 from aqt.reviewer import Reviewer, ReviewerBottomBar
 from aqt.theme import theme_manager
-from aqt.utils import openLink
+from aqt.utils import openLink, tooltip
 from aqt.webview import WebContent
 from jinja2 import Template
 
@@ -33,8 +34,9 @@ VIEW_NOTE_PYCMD = "ankihub_view_note"
 VIEW_NOTE_BUTTON_ID = "ankihub-view-note-button"
 
 ANKIHUB_AI_JS_PATH = Path(__file__).parent / "web/ankihub_ai.js"
-AI_INVALID_AUTH_TOKEN_PYCMD = "ankihub_ai_invalid_auth_token"
+REMOVE_ANKING_BUTTON_JS_PATH = Path(__file__).parent / "web/remove_anking_button.js"
 
+AI_INVALID_AUTH_TOKEN_PYCMD = "ankihub_ai_invalid_auth_token"
 OPEN_BROWSER_PYCMD = "ankihub_open_browser"
 UNSUSPEND_NOTES_PYCMD = "ankihub_unsuspend_notes"
 SUSPEND_NOTES_PYCMD = "ankihub_suspend_notes"
@@ -50,6 +52,8 @@ def setup():
         webview_will_set_content.append(_add_ankihub_ai_js_to_reviewer_web_content)
         reviewer_did_show_question.append(_notify_ankihub_ai_of_card_change)
         config.token_change_hook.append(_set_token_for_ankihub_ai_js)
+        reviewer_did_show_question.append(_remove_anking_button)
+        reviewer_did_show_answer.append(_remove_anking_button)
 
     webview_did_receive_js_message.append(_on_js_message)
 
@@ -153,6 +157,16 @@ def _notify_ankihub_ai_of_card_change(card: Card) -> None:
     aqt.mw.reviewer.web.eval(js)
 
 
+def _remove_anking_button(_: Card) -> None:
+    """Removes the AnKing button (provided by the AnKing note types) from the webview if it exists.
+    This is necessary because it overlaps with the AnkiHub AI chatbot button."""
+    if not feature_flags.chatbot:
+        return
+
+    js = _wrap_with_ankihubAI_check(REMOVE_ANKING_BUTTON_JS_PATH.read_text())
+    aqt.mw.reviewer.web.eval(js)
+
+
 def _set_token_for_ankihub_ai_js() -> None:
     if not feature_flags.chatbot:
         return
@@ -196,14 +210,20 @@ def _on_js_message(handled: Tuple[bool, Any], message: str, context: Any) -> Any
         kwargs = _parse_js_message_kwargs(message)
         ah_nids = kwargs.get("noteIds")
         if ah_nids:
-            suspend_notes(ah_nids)
+            suspend_notes(
+                ah_nids,
+                on_done=lambda: tooltip("AnkiHub: Note(s) suspended", parent=aqt.mw),
+            )
 
         return (True, None)
     elif message.startswith(UNSUSPEND_NOTES_PYCMD):
         kwargs = _parse_js_message_kwargs(message)
         ah_nids = kwargs.get("noteIds")
         if ah_nids:
-            unsuspend_notes(ah_nids)
+            unsuspend_notes(
+                ah_nids,
+                on_done=lambda: tooltip("AnkiHub: Note(s) unsuspended", parent=aqt.mw),
+            )
     elif message == CLOSE_ANKIHUB_CHATBOT_PYCMD:
         assert isinstance(context, Reviewer), context
         js = _wrap_with_ankihubAI_check("ankihubAI.hideIframe();")

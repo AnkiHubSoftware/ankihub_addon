@@ -148,6 +148,8 @@ class AnkiHubAI {
         button.style.borderRadius = "100%";
         button.style.border = "none";
 
+        button.style.padding = "8px";
+
         button.style.backgroundImage = "url('_robotking.png')";
         button.style.backgroundSize = "cover";
         button.style.backgroundPosition = "center";
