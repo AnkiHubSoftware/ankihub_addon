@@ -137,8 +137,8 @@ class AnkiHubAI {
     }
 
     setButtonStyles(button) {
-        button.style.width = "45px";
-        button.style.height = "45px";
+        button.style.width = "40px";
+        button.style.height = "40px";
 
         button.style.position = "fixed";
         button.style.bottom = "0px";
@@ -162,8 +162,12 @@ class AnkiHubAI {
     setIframeStyles(iframe) {
         iframe.style.display = "none"
 
-        iframe.style.width = "700px";
-        iframe.style.height = "70%";
+        iframe.style.width = "30%";
+        iframe.style.maxWidth = "700px";
+        iframe.style.minWidth = "430px";
+
+        iframe.style.height = "90%";
+        iframe.style.maxHeight = "1110px";
 
         iframe.style.position = "fixed"
         iframe.style.bottom = "85px"
