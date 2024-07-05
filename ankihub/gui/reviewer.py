@@ -1,12 +1,15 @@
 """Modifies Anki's reviewer UI (aqt.reviewer)."""
 
 import json
+import uuid
 from pathlib import Path
 from textwrap import dedent
-from typing import Any, Dict, Tuple
+from typing import Any, Dict, List, Tuple
 
 import aqt
 from anki.cards import Card
+from anki.consts import QUEUE_TYPE_SUSPENDED
+from anki.utils import ids2str
 from aqt.browser import Browser
 from aqt.gui_hooks import (
     reviewer_did_show_question,
@@ -35,6 +38,7 @@ AI_INVALID_AUTH_TOKEN_PYCMD = "ankihub_ai_invalid_auth_token"
 OPEN_BROWSER_PYCMD = "ankihub_open_browser"
 UNSUSPEND_NOTES_PYCMD = "ankihub_unsuspend_notes"
 SUSPEND_NOTES_PYCMD = "ankihub_suspend_notes"
+GET_NOTE_SUSPENSION_STATES_PYCMD = "ankihub_get_note_suspension_states"
 CLOSE_ANKIHUB_CHATBOT_PYCMD = "ankihub_close_chatbot"
 
 
@@ -163,7 +167,7 @@ def _wrap_with_ankihubAI_check(js: str) -> str:
 
 
 def _on_js_message(handled: Tuple[bool, Any], message: str, context: Any) -> Any:
-    """Handles the "View on AnkiHub" button click by opening the AnkiHub note in the browser."""
+    """Handles messages sent from JavaScript code."""
     if message == VIEW_NOTE_PYCMD:
         assert isinstance(context, ReviewerBottomBar)
         anki_nid = context.reviewer.card.nid
@@ -206,6 +210,15 @@ def _on_js_message(handled: Tuple[bool, Any], message: str, context: Any) -> Any
         context.web.eval(js)
 
         return (True, None)
+    elif message.startswith(GET_NOTE_SUSPENSION_STATES_PYCMD):
+        kwargs = _parse_js_message_kwargs(message)
+        ah_nids = kwargs.get("noteIds")
+        note_suspension_states = _get_note_suspension_states(ah_nids)
+        context.web.eval(
+            f"ankihubAI.sendNoteSuspensionStates({json.dumps(note_suspension_states)})"
+        )
+
+        return (True, None)
 
     return handled
 
@@ -216,3 +229,32 @@ def _parse_js_message_kwargs(message: str) -> Dict[str, Any]:
         return json.loads(kwargs_json)
     else:
         return {}
+
+
+def _get_note_suspension_states(ah_nids: List[str]) -> Dict[str, bool]:
+    """Returns a mapping of AnkiHub note IDs (as strings) to whether they are suspended or not.
+    A note is considered unsuspended if at least one of its cards is unsuspended.
+    If the note is not found in Anki, it will be missing from the returned mapping."""
+    ah_nids_to_anki_nids = ankihub_db.ankihub_nids_to_anki_nids(
+        [uuid.UUID(ah_nid) for ah_nid in ah_nids]
+    )
+    ah_nids_to_anki_nids = {
+        ah_nid: anki_nid
+        for ah_nid, anki_nid in ah_nids_to_anki_nids.items()
+        if anki_nid
+    }
+    if not ah_nids_to_anki_nids:
+        return {}
+
+    unsuspended_anki_nids = set(
+        aqt.mw.col.db.list(
+            f"""
+            SELECT DISTINCT nid FROM cards
+            WHERE nid IN {ids2str(ah_nids_to_anki_nids.values())} AND queue != {QUEUE_TYPE_SUSPENDED}
+            """
+        )
+    )
+    return {
+        str(ah_nid): anki_nid not in unsuspended_anki_nids
+        for ah_nid, anki_nid in ah_nids_to_anki_nids.items()
+    }
