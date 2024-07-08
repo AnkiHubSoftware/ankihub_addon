@@ -167,9 +167,9 @@ class AnkiHubAI {
     setIframeStyles(iframe, parentWindowHeight) {
         iframe.style.display = "none"
 
-        iframe.style.width = "30%";
+        iframe.style.width = "100%";
         iframe.style.maxWidth = "700px";
-        iframe.style.minWidth = "375px";
+        iframe.style.minWidth = "360px";
 
         iframe.style.height = "100%";
         iframe.style.maxHeight = `${parentWindowHeight-95}px`;
