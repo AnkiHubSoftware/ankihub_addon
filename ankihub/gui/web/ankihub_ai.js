@@ -21,6 +21,11 @@ class AnkiHubAI {
         this.button = this.setupIFrameToggleButton();
 
         this.setupMessageListener();
+        let updateIframeHeight = this.updateIframeHeight
+        let iframe = this.iframe
+        window.parent.addEventListener('resize', function() {
+            updateIframeHeight(iframe, window.parent.innerHeight)
+        });
     }
 
     setupMessageListener() {
@@ -43,7 +48,7 @@ class AnkiHubAI {
     setupIframe() {
         const iframe = document.createElement("iframe");
         iframe.id = "ankihub-ai-iframe";
-        this.setIframeStyles(iframe);
+        this.setIframeStyles(iframe, window.parent.innerHeight);
 
         iframe.onload = () => {
             if (iframe.src && iframe.src.includes(this.embeddedAuthPath)) {
@@ -159,15 +164,15 @@ class AnkiHubAI {
         button.style.cursor = "pointer";
     }
 
-    setIframeStyles(iframe) {
+    setIframeStyles(iframe, parentWindowHeight) {
         iframe.style.display = "none"
 
         iframe.style.width = "30%";
         iframe.style.maxWidth = "700px";
-        iframe.style.minWidth = "430px";
+        iframe.style.minWidth = "375px";
 
-        iframe.style.height = "90%";
-        iframe.style.maxHeight = "1110px";
+        iframe.style.height = "100%";
+        iframe.style.maxHeight = `${parentWindowHeight-95}px`;
 
         iframe.style.position = "fixed"
         iframe.style.bottom = "85px"
@@ -179,6 +184,11 @@ class AnkiHubAI {
         iframe.style.boxShadow = "10px 10px 40px 0px rgba(0, 0, 0, 0.25)"
 
         iframe.style.overflow = "hidden"
+    }
+
+    updateIframeHeight(iframe, parentWindowHeight) {
+        iframe.style.display = "block";
+        iframe.style.maxHeight = `${parentWindowHeight-95}px`;
     }
 
 }
