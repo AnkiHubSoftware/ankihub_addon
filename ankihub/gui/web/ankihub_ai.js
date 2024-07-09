@@ -25,8 +25,10 @@ class AnkiHubAI {
         let updateIframeWidth = this.updateIframeWidth
         let iframe = this.iframe
         window.parent.addEventListener('resize', function() {
-            updateIframeHeight(iframe, window.parent.innerHeight)
-            updateIframeWidth(iframe, window.parent.innerWidth)
+            if (iframe.style.display !== "none") {
+                updateIframeHeight(iframe, window.parent.innerHeight)
+                updateIframeWidth(iframe, window.parent.innerWidth)
+            }
         });
     }
 
@@ -189,12 +191,10 @@ class AnkiHubAI {
     }
 
     updateIframeHeight(iframe, parentWindowHeight) {
-        iframe.style.display = "block";
         iframe.style.maxHeight = `${parentWindowHeight-95}px`;
     }
 
     updateIframeWidth(iframe, parentWindowWidth) {
-        iframe.style.display = "block";
         iframe.style.width = `${parentWindowWidth-36}px`;
     }
 
