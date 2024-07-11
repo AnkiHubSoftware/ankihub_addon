@@ -26,9 +26,9 @@ from jinja2 import Template
 from ..db import ankihub_db
 from ..feature_flags import feature_flags
 from ..gui.menu import AnkiHubLogin
-from ..settings import ANKING_DECK_ID, config, url_view_note
+from ..settings import ANKING_DECK_ID, config, url_view_note, url_plans_page
 from .operations.scheduling import suspend_notes, unsuspend_notes
-from .utils import using_qt5
+from .utils import LinkButtonParam, show_dialog, using_qt5
 
 VIEW_NOTE_PYCMD = "ankihub_view_note"
 VIEW_NOTE_BUTTON_ID = "ankihub-view-note-button"
@@ -42,6 +42,7 @@ UNSUSPEND_NOTES_PYCMD = "ankihub_unsuspend_notes"
 SUSPEND_NOTES_PYCMD = "ankihub_suspend_notes"
 GET_NOTE_SUSPENSION_STATES_PYCMD = "ankihub_get_note_suspension_states"
 CLOSE_ANKIHUB_CHATBOT_PYCMD = "ankihub_close_chatbot"
+ANKIHUB_UPSELL = "ankihub_ai_upsell"
 
 
 def setup():
@@ -240,6 +241,13 @@ def _on_js_message(handled: Tuple[bool, Any], message: str, context: Any) -> Any
 
         return (True, None)
 
+    elif message == ANKIHUB_UPSELL:
+        show_dialog(
+            text="Upgrade your membership to <b>Premium</b> to access this feature 🌟",
+            title="Your trial has ended!",
+            buttons=[("Cancel", aqt.QDialogButtonBox.ButtonRole.RejectRole), LinkButtonParam("Upgrade", url_plans_page())],
+            default_button_idx=1,
+        )
     return handled
 
 

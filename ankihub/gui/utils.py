@@ -1,3 +1,4 @@
+from dataclasses import dataclass
 import inspect
 import uuid
 from functools import partial
@@ -27,10 +28,16 @@ from aqt.qt import (
     qconnect,
 )
 from aqt.theme import theme_manager
-from aqt.utils import disable_help_button, tooltip
+from aqt.utils import disable_help_button, tooltip, openLink
 
 from .. import LOGGER
 from ..settings import config
+
+
+@dataclass
+class LinkButtonParam:
+    text: str
+    url: str
 
 
 def show_error_dialog(message: str, title: str, *args, **kwargs) -> None:
@@ -327,6 +334,11 @@ class _Dialog(QDialog):
                 button = button_box.addButton(button)
             elif isinstance(button, tuple):
                 button = button_box.addButton(*button)
+            elif isinstance(button, LinkButtonParam):
+                custom_button = QPushButton(button.text)
+                custom_button.clicked.connect(lambda _, url=button.url: openLink(url))
+                button_box.addButton(custom_button, QDialogButtonBox.ButtonRole.ActionRole)
+                button = custom_button
 
             qconnect(
                 button.clicked,
