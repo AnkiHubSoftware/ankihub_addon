@@ -26,7 +26,7 @@ from jinja2 import Template
 from ..db import ankihub_db
 from ..feature_flags import feature_flags
 from ..gui.menu import AnkiHubLogin
-from ..settings import ANKING_DECK_ID, config, url_view_note, url_plans_page
+from ..settings import ANKING_DECK_ID, config, url_plans_page, url_view_note
 from .operations.scheduling import suspend_notes, unsuspend_notes
 from .utils import LinkButtonParam, show_dialog, using_qt5
 
@@ -245,7 +245,10 @@ def _on_js_message(handled: Tuple[bool, Any], message: str, context: Any) -> Any
         show_dialog(
             text="Upgrade your membership to <b>Premium</b> to access this feature 🌟",
             title="Your trial has ended!",
-            buttons=[("Cancel", aqt.QDialogButtonBox.ButtonRole.RejectRole), LinkButtonParam("Upgrade", url_plans_page())],
+            buttons=[
+                ("Cancel", aqt.QDialogButtonBox.ButtonRole.RejectRole),
+                LinkButtonParam("Upgrade", url_plans_page()),
+            ],
             default_button_idx=1,
         )
     return handled

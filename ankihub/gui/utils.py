@@ -1,6 +1,6 @@
-from dataclasses import dataclass
 import inspect
 import uuid
+from dataclasses import dataclass
 from functools import partial
 from typing import Any, Callable, Dict, List, Optional, Sequence, Tuple, Union
 
@@ -28,7 +28,7 @@ from aqt.qt import (
     qconnect,
 )
 from aqt.theme import theme_manager
-from aqt.utils import disable_help_button, tooltip, openLink
+from aqt.utils import disable_help_button, openLink, tooltip
 
 from .. import LOGGER
 from ..settings import config
@@ -337,7 +337,9 @@ class _Dialog(QDialog):
             elif isinstance(button, LinkButtonParam):
                 custom_button = QPushButton(button.text)
                 custom_button.clicked.connect(lambda _, url=button.url: openLink(url))
-                button_box.addButton(custom_button, QDialogButtonBox.ButtonRole.ActionRole)
+                button_box.addButton(
+                    custom_button, QDialogButtonBox.ButtonRole.ActionRole
+                )
                 button = custom_button
 
             qconnect(
