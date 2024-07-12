@@ -28,7 +28,7 @@ from ..feature_flags import feature_flags
 from ..gui.menu import AnkiHubLogin
 from ..settings import ANKING_DECK_ID, config, url_plans_page, url_view_note
 from .operations.scheduling import suspend_notes, unsuspend_notes
-from .utils import LinkButtonParam, show_dialog, using_qt5
+from .utils import show_dialog, using_qt5
 
 VIEW_NOTE_PYCMD = "ankihub_view_note"
 VIEW_NOTE_BUTTON_ID = "ankihub-view-note-button"
@@ -242,14 +242,20 @@ def _on_js_message(handled: Tuple[bool, Any], message: str, context: Any) -> Any
         return (True, None)
 
     elif message == ANKIHUB_UPSELL:
+
+        def on_button_clicked(button_index: int) -> None:
+            if button_index == 1:
+                openLink(url_plans_page())
+
         show_dialog(
             text="Upgrade your membership to <b>Premium</b> to access this feature 🌟",
             title="Your trial has ended!",
             buttons=[
                 ("Cancel", aqt.QDialogButtonBox.ButtonRole.RejectRole),
-                LinkButtonParam("Upgrade", url_plans_page()),
+                ("Upgrade", aqt.QDialogButtonBox.ButtonRole.ActionRole),
             ],
             default_button_idx=1,
+            callback=on_button_clicked,
         )
     return handled
 
