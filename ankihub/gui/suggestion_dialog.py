@@ -226,14 +226,17 @@ def _on_suggestion_dialog_for_single_suggestion_closed(
                 f"Unknown suggestion result: {suggestion_result}"
             )
     else:
-        suggest_new_note(
-            note=note,
-            ankihub_did=ah_did,
-            comment=suggestion_meta.comment,
-            media_upload_cb=media_sync.start_media_upload,
-            auto_accept=suggestion_meta.auto_accept,
-        )
-        show_tooltip("Submitted suggestion to AnkiHub.", parent=parent)
+        try:
+            suggest_new_note(
+                note=note,
+                ankihub_did=ah_did,
+                comment=suggestion_meta.comment,
+                media_upload_cb=media_sync.start_media_upload,
+                auto_accept=suggestion_meta.auto_accept,
+            )
+            show_tooltip("Submitted suggestion to AnkiHub.", parent=parent)
+        except AnkiHubHTTPError as e:
+            _handle_suggestion_error(e, parent)
 
 
 def open_suggestion_dialog_for_bulk_suggestion(
