@@ -62,6 +62,7 @@ PROFILE_ID_FIELD_NAME = "ankihub_id"
 # Id of the AnKing Overhaul deck
 ANKING_DECK_ID = uuid.UUID("e77aedfe-a636-40e2-8169-2fce2673187e")
 TAG_FOR_INSTRUCTION_NOTES = "AnkiHub_Instructions"
+MH_DB_FILE = Path(__file__).parent / "resources/_mh.db"
 
 # Only used for configuring the logger, a structlog logger is used for logging.
 STD_LOGGER = logging.getLogger("ankihub")
@@ -847,6 +848,7 @@ url_plans_page = lambda: f"{config.app_url}/memberships/plans/"  # noqa: E731
 
 ANKIHUB_NOTE_TYPE_FIELD_NAME = "ankihub_id"
 ANKIHUB_NOTE_TYPE_MODIFICATION_STRING = "ANKIHUB MODFICATIONS"
+ANKIHUB_MH_NOTE_TYPE_MODIFICATION_STRING = "ANKIHUB MCGRAW HILL MODFICATIONS"
 ANKIHUB_TEMPLATE_END_COMMENT = (
     "<!--\n"
     "ANKIHUB_END\n"
