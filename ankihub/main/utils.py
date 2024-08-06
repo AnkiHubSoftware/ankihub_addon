@@ -2,6 +2,7 @@ import copy
 import hashlib
 import re
 import time
+import uuid
 from collections import defaultdict
 from concurrent.futures import Future
 from pathlib import Path
@@ -21,9 +22,11 @@ from ..db import ankihub_db
 from ..settings import (
     ANKI_INT_VERSION,
     ANKI_VERSION_23_10_00,
+    ANKIHUB_MH_NOTE_TYPE_MODIFICATION_STRING,
     ANKIHUB_NOTE_TYPE_FIELD_NAME,
     ANKIHUB_NOTE_TYPE_MODIFICATION_STRING,
     ANKIHUB_TEMPLATE_END_COMMENT,
+    ANKING_DECK_ID,
     url_view_note,
 )
 
@@ -294,6 +297,11 @@ ANKIHUB_TEMPLATE_SNIPPET_RE = (
     r"[\w\W]*"
     f"<!-- END {ANKIHUB_NOTE_TYPE_MODIFICATION_STRING} -->"
 )
+ANKIHUB_MH_TEMPLATE_SNIPPET_RE = (
+    f"<!-- BEGIN {ANKIHUB_MH_NOTE_TYPE_MODIFICATION_STRING} -->"
+    r"[\w\W]*"
+    f"<!-- END {ANKIHUB_MH_NOTE_TYPE_MODIFICATION_STRING} -->"
+)
 
 
 def modify_note_type(note_type: NotetypeDict) -> None:
@@ -337,6 +345,7 @@ def modify_fields(note_type: Dict) -> None:
 
 def modify_template(template: Dict) -> None:
     # the order is important here, the end comment must be added last
+    template["qfmt"] = _template_side_with_mh_snippet(template["qfmt"])
     template["afmt"] = _template_side_with_view_on_ankihub_snippet(template["afmt"])
     _add_ankihub_end_comment_to_template(template)
 
@@ -421,6 +430,47 @@ def _template_side_with_view_on_ankihub_snippet(template_side: str) -> str:
         )
 
 
+def _template_side_with_mh_snippet(template_side: str) -> str:
+    """Return template html with the McGraw Hill snippet added to it."""
+    # TODO: local files
+    snippet = dedent(
+        f"""
+        <!-- BEGIN {ANKIHUB_MH_NOTE_TYPE_MODIFICATION_STRING} -->
+        <script src="https://cdnjs.cloudflare.com/ajax/libs/sql.js/1.11.0/sql-wasm.js"
+        integrity="sha512-tz0jOZaOg9RtWWB6AdxSkINQwIs7S5obj1Dlml9KewZLPTblTWCux5eLtnexBb8kbLUo5crPmjsi8/vI17Vw0w=="
+        crossorigin="anonymous" referrerpolicy="no-referrer"></script>
+        <script>
+            (async () => {{
+                const sqlPromise = initSqlJs({{
+                    locateFile: file => `https://cdnjs.cloudflare.com/ajax/libs/sql.js/1.11.0/sql-wasm.wasm`
+                }});
+                const dataPromise = fetch("_mh.db").then(res => res.arrayBuffer());
+                const [SQL, buf] = await Promise.all([sqlPromise, dataPromise])
+                const db = new SQL.Database(new Uint8Array(buf));
+                console.log(db.exec('SELECT * FROM notes'));
+            }})();
+        </script>
+        <!-- END {ANKIHUB_MH_NOTE_TYPE_MODIFICATION_STRING} -->
+        """
+    ).strip("\n")
+
+    snippet_pattern = (
+        f"<!-- BEGIN {ANKIHUB_MH_NOTE_TYPE_MODIFICATION_STRING} -->"
+        r"[\w\W]*"
+        f"<!-- END {ANKIHUB_MH_NOTE_TYPE_MODIFICATION_STRING} -->"
+    )
+
+    if not re.search(snippet_pattern, template_side):
+        return template_side.rstrip("\n ") + "\n\n" + snippet
+    else:
+        # update existing snippet to make sure it is up to date
+        return re.sub(
+            snippet_pattern,
+            snippet,
+            template_side,
+        )
+
+
 def _add_ankihub_end_comment_to_template(template: Dict) -> None:
     """Add the AnkiHub end comment to the template if it is not already present.
     The purpose of the AnkiHub end comment is to allow users to add their own content below it without it being
@@ -441,7 +491,10 @@ def _add_ankihub_end_comment_to_template(template: Dict) -> None:
 
 
 def note_type_with_updated_templates(
-    old_note_type: NotetypeDict, new_note_type: NotetypeDict, use_new_templates: bool
+    ankihub_did: uuid.UUID,
+    old_note_type: NotetypeDict,
+    new_note_type: NotetypeDict,
+    use_new_templates: bool,
 ) -> NotetypeDict:
     """Returns the new note type with modifications applied to the card templates.
     The new templates are used as the base if use_new_templates is True.
@@ -474,6 +527,7 @@ def note_type_with_updated_templates(
         # Update template sides
         for template_side_name in ["qfmt", "afmt"]:
             updated_template[template_side_name] = _updated_template_side(
+                ankihub_did=ankihub_did,
                 new_template_side=new_template[template_side_name],
                 old_template_side=old_template[template_side_name],
                 template_side_name=template_side_name,
@@ -487,6 +541,7 @@ def note_type_with_updated_templates(
 
 
 def _updated_template_side(
+    ankihub_did: uuid.UUID,
     new_template_side: str,
     old_template_side: str,
     template_side_name: str,
@@ -513,6 +568,10 @@ def _updated_template_side(
     # Remove end comment and content below it from the template side.
     # It will be added back below.
     result = re.sub(ANKIHUB_END_COMMENT_PATTERN, "", result)
+
+    if template_side_name == "qfmt" and ankihub_did == ANKING_DECK_ID:
+        # TODO: restrict to premium users
+        result = _template_side_with_mh_snippet(result)
 
     if template_side_name == "afmt":
         # The view on AnkiHub button is added to the back side of the template.
@@ -569,6 +628,11 @@ def undo_template_modification(template: Dict) -> None:
         r"\n{0,2}" + ANKIHUB_TEMPLATE_SNIPPET_RE,
         "",
         template["afmt"],
+    )
+    template["qfmt"] = re.sub(
+        r"\n{0,2}" + ANKIHUB_MH_TEMPLATE_SNIPPET_RE,
+        "",
+        template["qfmt"],
     )
 
 

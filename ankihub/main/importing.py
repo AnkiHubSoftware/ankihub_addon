@@ -22,6 +22,7 @@ from ..ankihub_client import Field, NoteInfo
 from ..ankihub_client.models import SuggestionType
 from ..db import ankihub_db
 from ..settings import (
+    MH_DB_FILE,
     TAG_FOR_INSTRUCTION_NOTES,
     BehaviorOnRemoteNoteDeleted,
     SuspendNewCardsOfExistingNotes,
@@ -143,6 +144,7 @@ class AnkiHubImporter:
             ankihub_db.remove_deck(ankihub_did)
 
         self._import_note_types(note_types=note_types)
+        self._add_mh_assets()
 
         dids = self._import_notes(
             notes_data=notes,
@@ -185,7 +187,7 @@ class AnkiHubImporter:
 
     def _import_note_types(self, note_types: Dict[NotetypeId, NotetypeDict]) -> None:
         self._import_note_types_into_ankihub_db(note_types=note_types)
-        _adjust_note_types_in_anki_db(note_types)
+        _adjust_note_types_in_anki_db(self._ankihub_did, note_types)
 
     def _import_note_types_into_ankihub_db(
         self, note_types: Dict[NotetypeId, NotetypeDict]
@@ -703,6 +705,10 @@ class AnkiHubImporter:
 
         return changed
 
+    def _add_mh_assets(self) -> None:
+        # TODO: restrict to premium users
+        aqt.mw.col.media.add_file(MH_DB_FILE)
+
 
 def _adjust_deck(deck_name: str, local_did: Optional[DeckId] = None) -> DeckId:
     unique_name = get_unique_ankihub_deck_name(deck_name)
@@ -743,7 +749,7 @@ def _updated_tags(
 
 
 def _adjust_note_types_in_anki_db(
-    remote_note_types: Dict[NotetypeId, NotetypeDict]
+    ankihub_did: uuid.UUID, remote_note_types: Dict[NotetypeId, NotetypeDict]
 ) -> None:
     # can be called when installing a deck for the first time and when synchronizing with AnkiHub
 
@@ -751,13 +757,13 @@ def _adjust_note_types_in_anki_db(
     _create_missing_note_types(remote_note_types)
     _rename_note_types(remote_note_types)
     _ensure_local_and_remote_fields_are_same(remote_note_types)
-    _update_templates_and_css(remote_note_types)
+    _update_templates_and_css(ankihub_did, remote_note_types)
 
     LOGGER.info("Adjusted note types.")
 
 
 def _update_templates_and_css(
-    remote_note_types: Dict[NotetypeId, NotetypeDict]
+    ankihub_did: uuid.UUID, remote_note_types: Dict[NotetypeId, NotetypeDict]
 ) -> None:
     anking_note_types_addon_installed = is_anking_note_types_addon_installed()
     projekt_anki_note_types_addon_installed = (
@@ -783,6 +789,7 @@ def _update_templates_and_css(
         )
 
         updated_note_type = note_type_with_updated_templates(
+            ankihub_did=ankihub_did,
             old_note_type=local_note_type,
             new_note_type=remote_note_type,
             use_new_templates=use_new_templates_and_css,
