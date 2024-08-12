@@ -289,10 +289,10 @@ class AnkiHubClient:
         return token
 
     def signout(self) -> None:
-        self.token = None
         response = self._send_request("POST", API.ANKIHUB, "/logout/")
         if response.status_code not in [204, 401]:
             raise AnkiHubHTTPError(response)
+        self.token = None
 
     def upload_deck(
         self,
