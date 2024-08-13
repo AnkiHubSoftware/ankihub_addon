@@ -436,10 +436,12 @@ def _template_side_with_mh_snippet(template_side: str) -> str:
     snippet = dedent(
         f"""
         <!-- BEGIN {ANKIHUB_MH_NOTE_TYPE_MODIFICATION_STRING} -->
+        {{{{#{ANKIHUB_NOTE_TYPE_FIELD_NAME}}}}}
         <script src="_sql-wasm.js"
         crossorigin="anonymous" referrerpolicy="no-referrer"></script>
         <script>
             (async () => {{
+                const ankihubID = `{{{{{ANKIHUB_NOTE_TYPE_FIELD_NAME}}}}}`;
                 const sqlPromise = initSqlJs({{
                     locateFile: file => "_sql-wasm.wasm"
                 }});
@@ -449,6 +451,7 @@ def _template_side_with_mh_snippet(template_side: str) -> str:
                 console.log(db.exec('SELECT * FROM notes'));
             }})();
         </script>
+        {{{{/{ANKIHUB_NOTE_TYPE_FIELD_NAME}}}}}
         <!-- END {ANKIHUB_MH_NOTE_TYPE_MODIFICATION_STRING} -->
         """
     ).strip("\n")
