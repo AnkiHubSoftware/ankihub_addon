@@ -22,7 +22,7 @@ from ..ankihub_client import Field, NoteInfo
 from ..ankihub_client.models import SuggestionType
 from ..db import ankihub_db
 from ..settings import (
-    MH_DB_FILE,
+    RESOURCES_DIR,
     TAG_FOR_INSTRUCTION_NOTES,
     BehaviorOnRemoteNoteDeleted,
     SuspendNewCardsOfExistingNotes,
@@ -707,7 +707,9 @@ class AnkiHubImporter:
 
     def _add_mh_assets(self) -> None:
         # TODO: restrict to premium users
-        aqt.mw.col.media.add_file(MH_DB_FILE)
+        aqt.mw.col.media.add_file(RESOURCES_DIR / "_mh.db")
+        aqt.mw.col.media.add_file(RESOURCES_DIR / "_sql-wasm.js")
+        aqt.mw.col.media.add_file(RESOURCES_DIR / "_sql-wasm.wasm")
 
 
 def _adjust_deck(deck_name: str, local_did: Optional[DeckId] = None) -> DeckId:

@@ -51,6 +51,7 @@ from .private_config_migrations import migrate_private_config
 from .public_config_migrations import migrate_public_config
 
 ADDON_PATH = Path(__file__).parent.absolute()
+RESOURCES_DIR = Path(__file__).parent / "resources"
 
 ANKIHUB_DB_FILENAME = "ankihub.db"
 PRIVATE_CONFIG_FILENAME = ".private_config.json"
@@ -62,7 +63,6 @@ PROFILE_ID_FIELD_NAME = "ankihub_id"
 # Id of the AnKing Overhaul deck
 ANKING_DECK_ID = uuid.UUID("e77aedfe-a636-40e2-8169-2fce2673187e")
 TAG_FOR_INSTRUCTION_NOTES = "AnkiHub_Instructions"
-MH_DB_FILE = Path(__file__).parent / "resources/_mh.db"
 
 # Only used for configuring the logger, a structlog logger is used for logging.
 STD_LOGGER = logging.getLogger("ankihub")

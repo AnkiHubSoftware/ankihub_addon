@@ -436,13 +436,12 @@ def _template_side_with_mh_snippet(template_side: str) -> str:
     snippet = dedent(
         f"""
         <!-- BEGIN {ANKIHUB_MH_NOTE_TYPE_MODIFICATION_STRING} -->
-        <script src="https://cdnjs.cloudflare.com/ajax/libs/sql.js/1.11.0/sql-wasm.js"
-        integrity="sha512-tz0jOZaOg9RtWWB6AdxSkINQwIs7S5obj1Dlml9KewZLPTblTWCux5eLtnexBb8kbLUo5crPmjsi8/vI17Vw0w=="
+        <script src="_sql-wasm.js"
         crossorigin="anonymous" referrerpolicy="no-referrer"></script>
         <script>
             (async () => {{
                 const sqlPromise = initSqlJs({{
-                    locateFile: file => `https://cdnjs.cloudflare.com/ajax/libs/sql.js/1.11.0/sql-wasm.wasm`
+                    locateFile: file => "_sql-wasm.wasm"
                 }});
                 const dataPromise = fetch("_mh.db").then(res => res.arrayBuffer());
                 const [SQL, buf] = await Promise.all([sqlPromise, dataPromise])
