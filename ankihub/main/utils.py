@@ -437,8 +437,7 @@ def _template_side_with_mh_snippet(template_side: str) -> str:
         f"""
         <!-- BEGIN {ANKIHUB_MH_NOTE_TYPE_MODIFICATION_STRING} -->
         {{{{#{ANKIHUB_NOTE_TYPE_FIELD_NAME}}}}}
-        <script src="_sql-wasm.js"
-        crossorigin="anonymous" referrerpolicy="no-referrer"></script>
+        <script src="_sql-wasm.js"></script>
         <script>
             (async () => {{
                 const ankihubID = `{{{{{ANKIHUB_NOTE_TYPE_FIELD_NAME}}}}}`;
