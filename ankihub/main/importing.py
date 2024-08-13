@@ -22,6 +22,7 @@ from ..ankihub_client import Field, NoteInfo
 from ..ankihub_client.models import SuggestionType
 from ..db import ankihub_db
 from ..settings import (
+    ANKING_DECK_ID,
     RESOURCES_DIR,
     TAG_FOR_INSTRUCTION_NOTES,
     BehaviorOnRemoteNoteDeleted,
@@ -144,7 +145,8 @@ class AnkiHubImporter:
             ankihub_db.remove_deck(ankihub_did)
 
         self._import_note_types(note_types=note_types)
-        self._add_mh_assets()
+        if ankihub_did == ANKING_DECK_ID:
+            self._add_mh_assets()
 
         dids = self._import_notes(
             notes_data=notes,
