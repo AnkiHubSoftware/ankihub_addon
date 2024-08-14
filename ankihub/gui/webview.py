@@ -141,11 +141,12 @@ class AnkiHubWebViewDialog(QDialog):
         qconnect(self.web.loadFinished, self._on_web_load_finished)
 
     def _on_web_load_finished(self, ok: bool) -> None:
+        self._handle_auth_failure_if_needed()
+
         if not ok:
             LOGGER.error("Failed to load page.")  # pragma: no cover
             return  # pragma: no cover
 
-        self._handle_auth_failure_if_needed()
         self._adjust_web_styling()
         self._on_successful_page_load()
 
