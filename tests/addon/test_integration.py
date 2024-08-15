@@ -152,6 +152,12 @@ from ankihub.gui.decks_dialog import DeckManagementDialog
 from ankihub.gui.editor import SUGGESTION_BTN_ID
 from ankihub.gui.errors import upload_logs_and_data_in_background
 from ankihub.gui.exceptions import DeckDownloadAndInstallError, RemoteDeckNotFoundError
+from ankihub.gui.js_message_handling import (
+    GET_NOTE_SUSPENSION_STATES_PYCMD,
+    OPEN_BROWSER_PYCMD,
+    SUSPEND_NOTES_PYCMD,
+    UNSUSPEND_NOTES_PYCMD,
+)
 from ankihub.gui.media_sync import media_sync
 from ankihub.gui.menu import AnkiHubLogin, menu_state
 from ankihub.gui.operations import ankihub_sync
@@ -163,13 +169,7 @@ from ankihub.gui.operations.new_deck_subscriptions import (
 )
 from ankihub.gui.operations.utils import future_with_result
 from ankihub.gui.optional_tag_suggestion_dialog import OptionalTagsSuggestionDialog
-from ankihub.gui.reviewer import (
-    CLOSE_ANKIHUB_CHATBOT_PYCMD,
-    GET_NOTE_SUSPENSION_STATES_PYCMD,
-    OPEN_BROWSER_PYCMD,
-    SUSPEND_NOTES_PYCMD,
-    UNSUSPEND_NOTES_PYCMD,
-)
+from ankihub.gui.reviewer import CLOSE_ANKIHUB_CHATBOT_PYCMD
 from ankihub.gui.suggestion_dialog import SuggestionDialog
 from ankihub.main.deck_creation import create_ankihub_deck, modify_note_type
 from ankihub.main.deck_unsubscribtion import uninstall_deck
