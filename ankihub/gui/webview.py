@@ -27,7 +27,7 @@ from .utils import using_qt5
 
 class AlwaysOnTopOfParentDialog(QDialog):
     """A dialog that is always on top of its parent window. This is useful on MacOS, where we had issues
-    with dialogs hding behind the parent window."""
+    with dialogs hiding behind the parent window."""
 
     def __init__(self, parent: QWidget = None) -> None:
         super().__init__(parent)
