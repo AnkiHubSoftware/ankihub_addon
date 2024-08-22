@@ -69,11 +69,23 @@ def _maybe_add_flashcard_selector_button() -> None:
 def _js_add_flashcard_selector_button(anki_deck_id: DeckId) -> str:
     return f"""
         if(!document.getElementById("{FLASHCARD_SELECTOR_OPEN_BUTTON_ID}")) {{
-            var button = document.createElement("button");
+            const button = document.createElement("button");
             button.id = "{FLASHCARD_SELECTOR_OPEN_BUTTON_ID}";
-            button.innerHTML = "Select flashcards";
 
-            button.style = "position: absolute; bottom: 30px; right: 50px; z-index: 1000;";
+            button.style = `
+                position: absolute;
+                bottom: 0px;
+                right: 25px;
+                z-index: 1000;
+                width: 50px;
+                height: 50px;
+                background-image: url('robot_icon.svg');
+                background-size: cover;
+                border-radius: 100%;
+                border: none;
+                outline: none;
+                cursor: pointer;
+            `
 
             button.addEventListener("click", function() {{
               pycmd("{FLASHCARD_SELECTOR_OPEN_PYCMD}");
