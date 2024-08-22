@@ -1,22 +1,19 @@
-
 if (!document.getElementById("{{ FLASHCARD_SELECTOR_OPEN_BUTTON_ID }}")) {
     const button = document.createElement("button");
     button.id = "{{ FLASHCARD_SELECTOR_OPEN_BUTTON_ID }}";
 
-    button.style = `
-        position: absolute;
-        bottom: 0px;
-        right: 25px;
-        z-index: 1000;
-        width: 50px;
-        height: 50px;
-        background-image: url('robot_icon.svg');
-        background-size: cover;
-        border-radius: 100%;
-        border: none;
-        outline: none;
-        cursor: pointer;
-    `
+    button.style.position = "absolute";
+    button.style.bottom = "0px";
+    button.style.right = "25px";
+    button.style.zIndex = "1000";
+    button.style.width = "50px";
+    button.style.height = "50px";
+    button.style.backgroundImage = "url('robot_icon.svg')";
+    button.style.backgroundSize = "cover";
+    button.style.borderRadius = "100%";
+    button.style.border = "none";
+    button.style.outline = "none";
+    button.style.cursor = "pointer";
 
     button.addEventListener("click", function () {
         pycmd("{{ FLASHCARD_SELECTOR_OPEN_PYCMD }}");
@@ -25,22 +22,35 @@ if (!document.getElementById("{{ FLASHCARD_SELECTOR_OPEN_BUTTON_ID }}")) {
     document.body.appendChild(button);
 
     const tooltip = document.createElement("div");
-    tooltip.textContent = "Find relveant flashcards with AI";
-    tooltip.style = `
-        position: absolute;
-        bottom: 0px;
-        right: 120px;
-        z-index: 1000;
-        width: 200px;
-        height: 50px;
-        background-color: #333;
-        color: white;
-        border-radius: 5px;
-        text-align: center;
-        padding: 10px;
-        font-size: 12px;
-        display: none;
-    `
+    tooltip.innerHTML = "Find relevant<br>flashcards with AI";
+
+    const tooltipBackgroundColor = "#d1d5db";
+    const tooltipColor = "black";
+
+    tooltip.style.position = "absolute";
+    tooltip.style.bottom = "2px";
+    tooltip.style.right = "110px";
+    tooltip.style.zIndex = "1000";
+    tooltip.style.backgroundColor = tooltipBackgroundColor;
+    tooltip.style.fontSize = "medium";
+    tooltip.style.color = tooltipColor;
+    tooltip.style.borderRadius = "5px";
+    tooltip.style.textAlign = "center";
+    tooltip.style.padding = "10px";
+    tooltip.style.display = "none";
+
+    const tooltipArrow = document.createElement("div");
+    tooltipArrow.style.position = "absolute";
+    tooltipArrow.style.top = "50%";
+    tooltipArrow.style.right = "-6px";
+    tooltipArrow.style.marginTop = "-4px";
+    tooltipArrow.style.width = "0";
+    tooltipArrow.style.height = "0";
+    tooltipArrow.style.borderLeft = `6px solid ${tooltipBackgroundColor}`;
+    tooltipArrow.style.borderTop = "6px solid transparent";
+    tooltipArrow.style.borderBottom = "6px solid transparent";
+
+    tooltip.appendChild(tooltipArrow);
 
     button.addEventListener("mouseover", function () {
         tooltip.style.display = "block";
