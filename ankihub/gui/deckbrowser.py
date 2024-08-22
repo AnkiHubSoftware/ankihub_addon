@@ -8,7 +8,7 @@ from uuid import UUID
 import aqt
 from anki.decks import DeckId
 from anki.hooks import wrap
-from aqt.gui_hooks import deck_browser_did_render, webview_did_receive_js_message
+from aqt.gui_hooks import overview_did_refresh, webview_did_receive_js_message
 from aqt.utils import tooltip
 from aqt.webview import AnkiWebView
 from jinja2 import Template
@@ -33,7 +33,7 @@ FLASHCARD_SELECTOR_MODIFICATIONS_JS_PATH = (
 FLASHCARD_SELECTOR_OPEN_BUTTON_ID = "ankihub-flashcard-selector-open-button"
 FLASHCARD_SELECTOR_OPEN_PYCMD = "ankihub_flashcard_selector_open"
 
-FLASHCARD_SELCTOR_UNSUSPEND_BUTTON_ID_SUFFIX = "select-flashcards-button"
+FLASHCARD_SELECTOR_UNSUSPEND_BUTTON_ID_SUFFIX = "select-flashcards-button"
 FLASHCARD_SELECTOR_FORM_DATA_DIV_ID_SUFFIX = "unsuspend-cards-data"
 FLASHCARD_SELECTOR_SYNC_NOTES_ACTIONS_PYCMD = "ankihub_sync_notes_actions"
 
@@ -45,7 +45,7 @@ def setup() -> None:
 
 def _setup_flashcard_selector_button() -> None:
     """Add a button to the deck browser that opens the flashcard selector dialog."""
-    deck_browser_did_render.append(
+    overview_did_refresh.append(
         lambda *args, **kwargs: _maybe_add_flashcard_selector_button()
     )
     # We need to call this here, because the deck browser is already rendered at this point
@@ -69,8 +69,9 @@ def _maybe_add_flashcard_selector_button() -> None:
         )
         return
 
-    deck_browser_web: AnkiWebView = aqt.mw.deckBrowser.web
-    deck_browser_web.eval(_js_add_flashcard_selector_button(deck_config.anki_id))
+    overview_web: AnkiWebView = aqt.mw.overview.web
+    if aqt.mw.state == "overview":
+        overview_web.eval(_js_add_flashcard_selector_button(deck_config.anki_id))
 
 
 def _js_add_flashcard_selector_button(anki_deck_id: DeckId) -> str:
@@ -80,12 +81,13 @@ def _js_add_flashcard_selector_button(anki_deck_id: DeckId) -> str:
             button.id = "{FLASHCARD_SELECTOR_OPEN_BUTTON_ID}";
             button.innerHTML = "Select flashcards";
 
+            button.style = "position: absolute; bottom: 30px; right: 50px; z-index: 1000;";
+
             button.addEventListener("click", function() {{
               pycmd("{FLASHCARD_SELECTOR_OPEN_PYCMD}");
             }});
 
-            var deckElement = document.querySelector(".deck[id='{anki_deck_id}']");
-            deckElement.appendChild(button);
+            document.body.appendChild(button);
         }}
     """
 
@@ -153,7 +155,7 @@ class FlashCardSelectorDialog(AnkiHubWebViewDialog):
 
     def _on_successful_page_load(self) -> None:
         template_vars = {
-            "FLASHCARD_SELCTOR_UNSUSPEND_BUTTON_ID_SUFFIX": FLASHCARD_SELCTOR_UNSUSPEND_BUTTON_ID_SUFFIX,
+            "FLASHCARD_SELECTOR_UNSUSPEND_BUTTON_ID_SUFFIX": FLASHCARD_SELECTOR_UNSUSPEND_BUTTON_ID_SUFFIX,
             "FLASHCARD_SELECTOR_FORM_DATA_DIV_ID_SUFFIX": FLASHCARD_SELECTOR_FORM_DATA_DIV_ID_SUFFIX,
             "FLASHCARD_SELECTOR_SYNC_NOTES_ACTIONS_PYCMD": FLASHCARD_SELECTOR_SYNC_NOTES_ACTIONS_PYCMD,
         }
