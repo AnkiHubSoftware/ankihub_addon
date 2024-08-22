@@ -5564,7 +5564,7 @@ class TestFlashCardSelector:
 
         entry_point.run()
         with anki_session_with_addon_data.profile_loaded():
-            anki_did = 1
+            anki_did = DeckId(1)
             install_ah_deck(ah_did=deck_id, anki_did=anki_did)
             aqt.mw.deckBrowser.set_current_deck(anki_did)
 
@@ -5593,7 +5593,7 @@ class TestFlashCardSelector:
         with anki_session_with_addon_data.profile_loaded():
             mocker.patch.object(config, "token")
 
-            anki_did = 1
+            anki_did = DeckId(1)
             install_ah_deck(ah_did=ANKING_DECK_ID, anki_did=anki_did)
             aqt.mw.deckBrowser.set_current_deck(anki_did)
 
@@ -5630,7 +5630,7 @@ class TestFlashCardSelector:
         with anki_session_with_addon_data.profile_loaded():
             mocker.patch.object(config, "token")
 
-            anki_did = 1
+            anki_did = DeckId(1)
             install_ah_deck(ah_did=ANKING_DECK_ID, anki_did=anki_did)
             aqt.mw.deckBrowser.set_current_deck(anki_did)
 
