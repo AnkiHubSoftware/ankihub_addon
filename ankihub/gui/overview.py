@@ -6,7 +6,6 @@ from typing import Any, cast
 from uuid import UUID
 
 import aqt
-from anki.decks import DeckId
 from aqt.gui_hooks import overview_did_refresh, webview_did_receive_js_message
 from aqt.utils import tooltip
 from aqt.webview import AnkiWebView
@@ -24,6 +23,9 @@ from .deck_updater import ah_deck_updater
 from .menu import AnkiHubLogin
 from .webview import AnkiHubWebViewDialog
 
+ADD_FLASHCARD_SELECTOR_BUTTON_JS_PATH = (
+    Path(__file__).parent / "web/add_flashcard_selector_button.js"
+)
 FLASHCARD_SELECTOR_MODIFICATIONS_JS_PATH = (
     Path(__file__).parent / "web/setup_flashcard_selector_modifications.js"
 )
@@ -52,7 +54,7 @@ def setup() -> None:
 
 def _maybe_add_flashcard_selector_button() -> None:
     """Add the flashcard selector button to the Anking deck if it exists."""
-    if not (deck_config := config.deck_config(ANKING_DECK_ID)):
+    if not config.deck_config(ANKING_DECK_ID):
         return
 
     if not feature_flags.show_flashcards_selector_button:
@@ -63,37 +65,13 @@ def _maybe_add_flashcard_selector_button() -> None:
 
     overview_web: AnkiWebView = aqt.mw.overview.web
     if aqt.mw.state == "overview":
-        overview_web.eval(_js_add_flashcard_selector_button(deck_config.anki_id))
-
-
-def _js_add_flashcard_selector_button(anki_deck_id: DeckId) -> str:
-    return f"""
-        if(!document.getElementById("{FLASHCARD_SELECTOR_OPEN_BUTTON_ID}")) {{
-            const button = document.createElement("button");
-            button.id = "{FLASHCARD_SELECTOR_OPEN_BUTTON_ID}";
-
-            button.style = `
-                position: absolute;
-                bottom: 0px;
-                right: 25px;
-                z-index: 1000;
-                width: 50px;
-                height: 50px;
-                background-image: url('robot_icon.svg');
-                background-size: cover;
-                border-radius: 100%;
-                border: none;
-                outline: none;
-                cursor: pointer;
-            `
-
-            button.addEventListener("click", function() {{
-              pycmd("{FLASHCARD_SELECTOR_OPEN_PYCMD}");
-            }});
-
-            document.body.appendChild(button);
-        }}
-    """
+        js = Template(ADD_FLASHCARD_SELECTOR_BUTTON_JS_PATH.read_text()).render(
+            {
+                "FLASHCARD_SELECTOR_OPEN_BUTTON_ID": FLASHCARD_SELECTOR_OPEN_BUTTON_ID,
+                "FLASHCARD_SELECTOR_OPEN_PYCMD": FLASHCARD_SELECTOR_OPEN_PYCMD,
+            }
+        )
+        overview_web.eval(js)
 
 
 def _handle_flashcard_selector_py_commands(
@@ -158,12 +136,11 @@ class FlashCardSelectorDialog(AnkiHubWebViewDialog):
         )
 
     def _on_successful_page_load(self) -> None:
-        template_vars = {
-            "FLASHCARD_SELECTOR_UNSUSPEND_BUTTON_ID_SUFFIX": FLASHCARD_SELECTOR_UNSUSPEND_BUTTON_ID_SUFFIX,
-            "FLASHCARD_SELECTOR_FORM_DATA_DIV_ID_SUFFIX": FLASHCARD_SELECTOR_FORM_DATA_DIV_ID_SUFFIX,
-            "FLASHCARD_SELECTOR_SYNC_NOTES_ACTIONS_PYCMD": FLASHCARD_SELECTOR_SYNC_NOTES_ACTIONS_PYCMD,
-        }
         js = Template(FLASHCARD_SELECTOR_MODIFICATIONS_JS_PATH.read_text()).render(
-            template_vars
+            {
+                "FLASHCARD_SELECTOR_UNSUSPEND_BUTTON_ID_SUFFIX": FLASHCARD_SELECTOR_UNSUSPEND_BUTTON_ID_SUFFIX,
+                "FLASHCARD_SELECTOR_FORM_DATA_DIV_ID_SUFFIX": FLASHCARD_SELECTOR_FORM_DATA_DIV_ID_SUFFIX,
+                "FLASHCARD_SELECTOR_SYNC_NOTES_ACTIONS_PYCMD": FLASHCARD_SELECTOR_SYNC_NOTES_ACTIONS_PYCMD,
+            }
         )
         self.web.eval(js)
