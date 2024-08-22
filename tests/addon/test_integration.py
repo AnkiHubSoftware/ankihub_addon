@@ -5564,14 +5564,15 @@ class TestFlashCardSelector:
 
         entry_point.run()
         with anki_session_with_addon_data.profile_loaded():
-            install_ah_deck(ah_did=deck_id)
-
-            deckbrowser_web: AnkiWebView = aqt.mw.deckBrowser.web
-            aqt.mw.deckBrowser.refresh()
+            anki_did = 1
+            install_ah_deck(ah_did=deck_id, anki_did=anki_did)
+            aqt.mw.deckBrowser.set_current_deck(anki_did)
 
             qtbot.wait(500)
+
+            overview_web: AnkiWebView = aqt.mw.overview.web
             with qtbot.wait_callback() as callback:
-                deckbrowser_web.evalWithCallback(
+                overview_web.evalWithCallback(
                     f"document.getElementById('{FLASHCARD_SELECTOR_OPEN_BUTTON_ID}') !== null",
                     callback,
                 )
@@ -5592,13 +5593,16 @@ class TestFlashCardSelector:
         with anki_session_with_addon_data.profile_loaded():
             mocker.patch.object(config, "token")
 
-            install_ah_deck(ah_did=ANKING_DECK_ID)
-
-            deckbrowser_web: AnkiWebView = aqt.mw.deckBrowser.web
-            aqt.mw.deckBrowser.refresh()
+            anki_did = 1
+            install_ah_deck(ah_did=ANKING_DECK_ID, anki_did=anki_did)
+            aqt.mw.deckBrowser.set_current_deck(anki_did)
 
             qtbot.wait(500)
-            deckbrowser_web.eval(
+
+            mocker.patch.object(AnkiWebView, "load_url")
+
+            overview_web: AnkiWebView = aqt.mw.overview.web
+            overview_web.eval(
                 f"document.getElementById('{FLASHCARD_SELECTOR_OPEN_BUTTON_ID}').click()",
             )
 
@@ -5626,13 +5630,16 @@ class TestFlashCardSelector:
         with anki_session_with_addon_data.profile_loaded():
             mocker.patch.object(config, "token")
 
-            install_ah_deck(ah_did=ANKING_DECK_ID)
-
-            deckbrowser_web: AnkiWebView = aqt.mw.deckBrowser.web
-            aqt.mw.deckBrowser.refresh()
+            anki_did = 1
+            install_ah_deck(ah_did=ANKING_DECK_ID, anki_did=anki_did)
+            aqt.mw.deckBrowser.set_current_deck(anki_did)
 
             qtbot.wait(500)
-            deckbrowser_web.eval(
+
+            mocker.patch.object(AnkiWebView, "load_url")
+
+            overview_web: AnkiWebView = aqt.mw.overview.web
+            overview_web.eval(
                 f"document.getElementById('{FLASHCARD_SELECTOR_OPEN_BUTTON_ID}').click()",
             )
 
@@ -5650,7 +5657,7 @@ class TestFlashCardSelector:
 
             qtbot.wait_until(lambda: not FlashCardSelectorDialog.dialog.isVisible())
 
-            deckbrowser_web.eval(
+            overview_web.eval(
                 f"document.getElementById('{FLASHCARD_SELECTOR_OPEN_BUTTON_ID}').click()",
             )
 
