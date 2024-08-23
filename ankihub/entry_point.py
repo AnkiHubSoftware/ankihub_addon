@@ -104,6 +104,9 @@ def _profile_setup() -> bool:
         refresh_ankihub_menu()
         LOGGER.info("Refreshed AnkiHub menu.")
 
+    _copy_web_media_to_media_folder()
+    LOGGER.info("Copied web media to media folder.")
+
     return True
 
 
@@ -133,8 +136,6 @@ def _general_setup():
     LOGGER.info("Set up error handler.")
 
     aqt.mw.addonManager.setWebExports(__name__, r"gui/web/.*")
-
-    _copy_web_media_to_media_folder()
 
     setup_addons()
     LOGGER.info("Set up addons.")
