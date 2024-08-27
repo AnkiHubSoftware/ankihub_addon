@@ -8,7 +8,10 @@ if (!document.getElementById("{{ FLASHCARD_SELECTOR_OPEN_BUTTON_ID }}")) {
     button.style.zIndex = "1000";
     button.style.width = "50px";
     button.style.height = "50px";
-    button.style.backgroundImage = "url('_robot_icon.svg')";
+    button.style.boxSizing = "content-box";
+    button.style.padding = "8px 10px 8px 10px";
+    button.style.margin = "0px 4px 0px 4px";
+    button.style.backgroundImage = "url('/_robot_icon.svg')";
     button.style.backgroundSize = "cover";
     button.style.borderRadius = "100%";
     button.style.border = "none";

@@ -53,8 +53,18 @@ def setup() -> None:
 
 
 def _maybe_add_flashcard_selector_button() -> None:
-    """Add the flashcard selector button to the Anking deck if it exists."""
+    """Add the flashcard selector button to the Anking deck overview."""
+
+    if not aqt.mw.state == "overview":
+        return
+
     if not config.deck_config(ANKING_DECK_ID):
+        return
+
+    # Only add the button if the currently open deck overview is for the Anking deck or a child of it
+    if aqt.mw.col.decks.current()["id"] not in aqt.mw.col.decks.deck_and_child_ids(
+        config.deck_config(ANKING_DECK_ID).anki_id
+    ):
         return
 
     if not feature_flags.show_flashcards_selector_button:
@@ -64,14 +74,13 @@ def _maybe_add_flashcard_selector_button() -> None:
         return
 
     overview_web: AnkiWebView = aqt.mw.overview.web
-    if aqt.mw.state == "overview":
-        js = Template(ADD_FLASHCARD_SELECTOR_BUTTON_JS_PATH.read_text()).render(
-            {
-                "FLASHCARD_SELECTOR_OPEN_BUTTON_ID": FLASHCARD_SELECTOR_OPEN_BUTTON_ID,
-                "FLASHCARD_SELECTOR_OPEN_PYCMD": FLASHCARD_SELECTOR_OPEN_PYCMD,
-            }
-        )
-        overview_web.eval(js)
+    js = Template(ADD_FLASHCARD_SELECTOR_BUTTON_JS_PATH.read_text()).render(
+        {
+            "FLASHCARD_SELECTOR_OPEN_BUTTON_ID": FLASHCARD_SELECTOR_OPEN_BUTTON_ID,
+            "FLASHCARD_SELECTOR_OPEN_PYCMD": FLASHCARD_SELECTOR_OPEN_PYCMD,
+        }
+    )
+    overview_web.eval(js)
 
 
 def _handle_flashcard_selector_py_commands(
