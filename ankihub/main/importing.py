@@ -710,8 +710,8 @@ class AnkiHubImporter:
     def _add_mh_assets(self) -> None:
         # TODO: restrict to premium users
         aqt.mw.col.media.add_file(RESOURCES_DIR / "_mh.db")
-        aqt.mw.col.media.add_file(RESOURCES_DIR / "_sql-wasm.js")
         aqt.mw.col.media.add_file(RESOURCES_DIR / "_sql-wasm.wasm")
+        aqt.mw.col.media.add_file(RESOURCES_DIR / "_worker.sql-wasm.js")
 
 
 def _adjust_deck(deck_name: str, local_did: Optional[DeckId] = None) -> DeckId:

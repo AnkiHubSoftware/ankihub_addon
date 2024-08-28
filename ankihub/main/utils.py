@@ -432,22 +432,35 @@ def _template_side_with_view_on_ankihub_snippet(template_side: str) -> str:
 
 def _template_side_with_mh_snippet(template_side: str) -> str:
     """Return template html with the McGraw Hill snippet added to it."""
-    # TODO: local files
     snippet = dedent(
         f"""
         <!-- BEGIN {ANKIHUB_MH_NOTE_TYPE_MODIFICATION_STRING} -->
         {{{{#{ANKIHUB_NOTE_TYPE_FIELD_NAME}}}}}
-        <script src="_sql-wasm.js"></script>
         <script>
             (async () => {{
-                const ankihubID = `{{{{{ANKIHUB_NOTE_TYPE_FIELD_NAME}}}}}`;
-                const sqlPromise = initSqlJs({{
-                    locateFile: file => "_sql-wasm.wasm"
-                }});
-                const dataPromise = fetch("_mh.db").then(res => res.arrayBuffer());
-                const [SQL, buf] = await Promise.all([sqlPromise, dataPromise])
-                const db = new SQL.Database(new Uint8Array(buf));
-                console.log(db.exec('SELECT * FROM notes'));
+                try {{
+                    const ankihubID = `{{{{{ANKIHUB_NOTE_TYPE_FIELD_NAME}}}}}`;
+                    const worker = new Worker("_worker.sql-wasm.js");
+                    // Dummy reference to make sure the file is included in exports
+                    //var sqlModuleReady = initSqlJs({{
+                    //    locateFile: file => "_sql-wasm.wasm"
+                    //}});
+                    const buffer = await fetch("_mh.db").then(res => res.arrayBuffer());
+                    worker.postMessage({{ action: 'open', buffer: buffer }});
+                    worker.onmessage = function (event) {{
+                        const results = event.data.results;
+                        if (!results) {{
+                            alert(event.data.error);
+                            return;
+                        }}
+                        for (let i = 0; i < results.length; i++) {{
+                            alert(results[i].values);
+                        }}
+                    }}
+                    worker.postMessage({{ action: 'exec', sql: 'select * from notes limit 2' }});
+                }} catch(error) {{
+                    alert(error);
+                }}
             }})();
         </script>
         {{{{/{ANKIHUB_NOTE_TYPE_FIELD_NAME}}}}}
