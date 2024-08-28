@@ -842,7 +842,7 @@ url_flashcard_selector = (
     lambda deck_id: f"{config.app_url}/ai/{deck_id}/flashcard-selector"
 )  # noqa: E731
 url_flashcard_selector_embed = (
-    lambda deck_id: f"{config.app_url}/ai/{deck_id}/flashcard-selector-embed"
+    lambda deck_id: f"{config.app_url}/ai/{deck_id}/flashcard-selector-embed?is_on_anki=true"
 )  # noqa: E731
 url_plans_page = lambda: f"{config.app_url}/memberships/plans/"  # noqa: E731
 

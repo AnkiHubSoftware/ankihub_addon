@@ -1,0 +1,133 @@
+"""Handles messages sent from JavaScript code which are useful in multiple places
+(instead of being specific to a single module)."""
+import json
+import uuid
+from typing import Any, Dict, List, Tuple
+
+import aqt
+from anki.consts import QUEUE_TYPE_SUSPENDED
+from anki.utils import ids2str
+from aqt.browser import Browser
+from aqt.gui_hooks import webview_did_receive_js_message
+from aqt.utils import openLink, tooltip
+
+from ..db import ankihub_db
+from ..settings import url_plans_page, url_view_note
+from .operations.scheduling import suspend_notes, unsuspend_notes
+from .utils import show_dialog
+
+VIEW_NOTE_PYCMD = "ankihub_view_note"
+VIEW_NOTE_BUTTON_ID = "ankihub-view-note-button"
+
+OPEN_BROWSER_PYCMD = "ankihub_open_browser"
+UNSUSPEND_NOTES_PYCMD = "ankihub_unsuspend_notes"
+SUSPEND_NOTES_PYCMD = "ankihub_suspend_notes"
+GET_NOTE_SUSPENSION_STATES_PYCMD = "ankihub_get_note_suspension_states"
+ANKIHUB_UPSELL = "ankihub_ai_upsell"
+
+
+def setup():
+    webview_did_receive_js_message.append(_on_js_message)
+
+
+def _on_js_message(handled: Tuple[bool, Any], message: str, context: Any) -> Any:
+    """Handles messages sent from JavaScript code."""
+    if message == VIEW_NOTE_PYCMD:
+        anki_nid = context.reviewer.card.nid
+        ankihub_nid = ankihub_db.ankihub_nid_for_anki_nid(anki_nid)
+        view_note_url = f"{url_view_note()}{ankihub_nid}"
+        openLink(view_note_url)
+
+        return (True, None)
+    elif message.startswith(OPEN_BROWSER_PYCMD):
+        kwargs = _parse_js_message_kwargs(message)
+        ah_nids = kwargs.get("noteIds", [])
+
+        browser: Browser = aqt.dialogs.open("Browser", aqt.mw)
+
+        if ah_nids:
+            search_string = f"ankihub_id:{' or ankihub_id:'.join(ah_nids)}"
+            browser.search_for(search_string)
+
+        return (True, None)
+    elif message.startswith(SUSPEND_NOTES_PYCMD):
+        kwargs = _parse_js_message_kwargs(message)
+        ah_nids = kwargs.get("noteIds")
+        if ah_nids:
+            suspend_notes(
+                ah_nids,
+                on_done=lambda: tooltip("AnkiHub: Note(s) suspended", parent=aqt.mw),
+            )
+
+        return (True, None)
+    elif message.startswith(UNSUSPEND_NOTES_PYCMD):
+        kwargs = _parse_js_message_kwargs(message)
+        ah_nids = kwargs.get("noteIds")
+        if ah_nids:
+            unsuspend_notes(
+                ah_nids,
+                on_done=lambda: tooltip("AnkiHub: Note(s) unsuspended", parent=aqt.mw),
+            )
+    elif message.startswith(GET_NOTE_SUSPENSION_STATES_PYCMD):
+        kwargs = _parse_js_message_kwargs(message)
+        ah_nids = kwargs.get("noteIds")
+        note_suspension_states = _get_note_suspension_states(ah_nids)
+        context.web.eval(
+            f"ankihubAI.sendNoteSuspensionStates({json.dumps(note_suspension_states)})"
+        )
+
+        return (True, None)
+    elif message == ANKIHUB_UPSELL:
+
+        def on_button_clicked(button_index: int) -> None:
+            if button_index == 1:
+                openLink(url_plans_page())
+
+        show_dialog(
+            text="Upgrade your membership to <b>Premium</b> to access this feature 🌟",
+            title="Your trial has ended!",
+            buttons=[
+                ("Cancel", aqt.QDialogButtonBox.ButtonRole.RejectRole),
+                ("Upgrade", aqt.QDialogButtonBox.ButtonRole.ActionRole),
+            ],
+            default_button_idx=1,
+            callback=on_button_clicked,
+        )
+    return handled
+
+
+def _parse_js_message_kwargs(message: str) -> Dict[str, Any]:
+    if " " in message:
+        _, kwargs_json = message.split(" ", maxsplit=1)
+        return json.loads(kwargs_json)
+    else:
+        return {}
+
+
+def _get_note_suspension_states(ah_nids: List[str]) -> Dict[str, bool]:
+    """Returns a mapping of AnkiHub note IDs (as strings) to whether they are suspended or not.
+    A note is considered unsuspended if at least one of its cards is unsuspended.
+    If the note is not found in Anki, it will be missing from the returned mapping."""
+    ah_nids_to_anki_nids = ankihub_db.ankihub_nids_to_anki_nids(
+        [uuid.UUID(ah_nid) for ah_nid in ah_nids]
+    )
+    ah_nids_to_anki_nids = {
+        ah_nid: anki_nid
+        for ah_nid, anki_nid in ah_nids_to_anki_nids.items()
+        if anki_nid
+    }
+    if not ah_nids_to_anki_nids:
+        return {}
+
+    unsuspended_anki_nids = set(
+        aqt.mw.col.db.list(
+            f"""
+            SELECT DISTINCT nid FROM cards
+            WHERE nid IN {ids2str(ah_nids_to_anki_nids.values())} AND queue != {QUEUE_TYPE_SUSPENDED}
+            """
+        )
+    )
+    return {
+        str(ah_nid): anki_nid not in unsuspended_anki_nids
+        for ah_nid, anki_nid in ah_nids_to_anki_nids.items()
+    }
