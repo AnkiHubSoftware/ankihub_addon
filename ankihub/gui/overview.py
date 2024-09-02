@@ -58,12 +58,15 @@ def _maybe_add_flashcard_selector_button() -> None:
     if not aqt.mw.state == "overview":
         return
 
-    if not config.deck_config(ANKING_DECK_ID):
-        return
-
     # Only add the button if the currently open deck overview is for the Anking deck or a child of it
-    if aqt.mw.col.decks.current()["id"] not in aqt.mw.col.decks.deck_and_child_ids(
-        config.deck_config(ANKING_DECK_ID).anki_id
+    anking_deck_config = config.deck_config(ANKING_DECK_ID)
+    if (
+        not anking_deck_config
+        or not aqt.mw.col.decks.have(anking_deck_config.anki_id)
+        or (
+            aqt.mw.col.decks.current()["id"]
+            not in aqt.mw.col.decks.deck_and_child_ids(anking_deck_config.anki_id)
+        )
     ):
         return
 
