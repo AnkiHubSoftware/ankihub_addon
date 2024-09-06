@@ -60,7 +60,7 @@ PRIVATE_CONFIG_FILENAME = ".private_config.json"
 PROFILE_ID_FIELD_NAME = "ankihub_id"
 
 # Id of the AnKing Overhaul deck
-ANKING_DECK_ID = uuid.UUID("e77aedfe-a636-40e2-8169-2fce2673187e")
+ANKING_DECK_ID = uuid.UUID("86652268-45a8-4832-bde1-8d9c48e9acc4")
 TAG_FOR_INSTRUCTION_NOTES = "AnkiHub_Instructions"
 
 # Only used for configuring the logger, a structlog logger is used for logging.
