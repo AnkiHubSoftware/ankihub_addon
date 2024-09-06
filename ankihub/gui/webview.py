@@ -4,13 +4,17 @@ from typing import Any, Optional, cast
 from anki.utils import is_mac
 from aqt.gui_hooks import theme_did_change
 from aqt.qt import (
+    QCloseEvent,
     QColor,
     QDialog,
+    QEvent,
     QHBoxLayout,
+    QObject,
     QPushButton,
     QUrl,
     QVBoxLayout,
     QWebEngineUrlRequestInterceptor,
+    QWidget,
     qconnect,
 )
 from aqt.utils import openLink
@@ -21,7 +25,28 @@ from ..settings import config
 from .utils import using_qt5
 
 
-class AnkiHubWebViewDialog(QDialog):
+class AlwaysOnTopOfParentDialog(QDialog):
+    """A dialog that is always on top of its parent window. This is useful on MacOS, where we had issues
+    with dialogs hiding behind the parent window."""
+
+    def __init__(self, parent: QWidget = None) -> None:
+        super().__init__(parent)
+        if parent:
+            parent.installEventFilter(self)
+
+    def eventFilter(self, watched: QObject, event: QEvent) -> bool:
+        if watched == self.parent() and event.type() == QEvent.Type.WindowActivate:
+            self.raise_()
+            self.activateWindow()
+        return super().eventFilter(watched, event)
+
+    def closeEvent(self, event: QCloseEvent) -> None:
+        if self.parent():
+            self.parent().removeEventFilter(self)
+        super().closeEvent(event)
+
+
+class AnkiHubWebViewDialog(AlwaysOnTopOfParentDialog):
     """A dialog that displays a web view. The purpose is to show an AnkiHub web app page.
     This class handles setting up the web view, loading the page, styling and authentication.
     """
@@ -141,11 +166,12 @@ class AnkiHubWebViewDialog(QDialog):
         qconnect(self.web.loadFinished, self._on_web_load_finished)
 
     def _on_web_load_finished(self, ok: bool) -> None:
+        self._handle_auth_failure_if_needed()
+
         if not ok:
             LOGGER.error("Failed to load page.")  # pragma: no cover
             return  # pragma: no cover
 
-        self._handle_auth_failure_if_needed()
         self._adjust_web_styling()
         self._on_successful_page_load()
 

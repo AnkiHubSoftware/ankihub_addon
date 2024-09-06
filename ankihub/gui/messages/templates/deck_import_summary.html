@@ -8,20 +8,21 @@ Your AnkiHub deck is ready to study!
 {% if logged_to_ankiweb %}
 To access your decks on other devices, you’ll need to go to those devices and sync.
 If prompted, choose <b>Download from AnkiWeb</b>.
+<br>
 {% endif %}
-<br>
+
 {% for ankihub_deck_name, anki_deck_name, import_result in zip(ankihub_deck_names, anki_deck_names, import_results) %}
-<br>
 {% if ankihub_deck_name != anki_deck_name %}
 The deck <b>{{ankihub_deck_name}}</b> was imported as <b>{{anki_deck_name}}</b>.<br>
+<br>
 {% endif %}
 
 {% if import_result.skipped_nids %}
-<br>
 Notes in the deck <b>{{ankihub_deck_name}}</b> with the same ID as notes in another AnkiHub deck you have installed were skipped.<br>
 If you have any questions about this, see <a
     href='https://community.ankihub.net/t/draft-why-are-notes-skipped-after-subscribing-to-a-deck/934'>this forum
     topic</a> for details.
+<br>
 {% endif %}
 
 {% endfor %}

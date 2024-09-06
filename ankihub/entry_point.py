@@ -10,7 +10,15 @@ from aqt.gui_hooks import profile_did_open, profile_will_close
 from . import LOGGER
 from .db import ankihub_db
 from .feature_flags import setup_feature_flags_in_background
-from .gui import browser, deckbrowser, editor, progress, reviewer
+from .gui import (
+    browser,
+    deckbrowser,
+    editor,
+    js_message_handling,
+    overview,
+    progress,
+    reviewer,
+)
 from .gui.addons import setup_addons
 from .gui.auto_sync import setup_auto_sync
 from .gui.config_dialog import setup_config_dialog_manager
@@ -96,6 +104,9 @@ def _profile_setup() -> bool:
         refresh_ankihub_menu()
         LOGGER.info("Refreshed AnkiHub menu.")
 
+    _copy_web_media_to_media_folder()
+    LOGGER.info("Copied web media to media folder.")
+
     return True
 
 
@@ -126,10 +137,11 @@ def _general_setup():
 
     aqt.mw.addonManager.setWebExports(__name__, r"gui/web/.*")
 
-    _copy_web_media_to_media_folder()
-
     setup_addons()
     LOGGER.info("Set up addons.")
+
+    js_message_handling.setup()
+    LOGGER.info("Set up JavaScript message handling.")
 
     setup_config_dialog_manager()
     LOGGER.info("Set up config.")
@@ -151,6 +163,9 @@ def _general_setup():
 
     deckbrowser.setup()
     LOGGER.info("Set up deck browser")
+
+    overview.setup()
+    LOGGER.info("Set up deck overview")
 
     _trigger_addon_update_check()
     LOGGER.info("Triggered add-on update check.")

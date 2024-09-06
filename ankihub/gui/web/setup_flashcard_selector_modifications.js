@@ -2,7 +2,7 @@ setInterval(function () {
     // Notify python to sync notes actions after the notes action is created for
     // the selected flashcards.
     const unsuspendButtons = document.querySelectorAll(
-        '[id$="{{ FLASHCARD_SELCTOR_UNSUSPEND_BUTTON_ID_SUFFIX }}"]'
+        '[id$="{{ FLASHCARD_SELECTOR_UNSUSPEND_BUTTON_ID_SUFFIX }}"]'
     );
     for (const unsuspendButton of unsuspendButtons) {
         if (unsuspendButton && !unsuspendButton.appliedModifications) {
