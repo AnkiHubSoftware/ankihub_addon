@@ -84,6 +84,10 @@ class AnkiHubWebViewDialog(AlwaysOnTopOfParentDialog):
         self.web.page().profile().setUrlRequestInterceptor(self.interceptor)
         self.web.page().setBackgroundColor(QColor("white"))
 
+        # Set the context to self so that self gets passed as context to the webview_did_receive_js_message hook
+        # when a pycmd is called from the web view.
+        self.web.set_bridge_command(func=self.web.defaultOnBridgeCmd, context=self)
+
         # Set the background color of the web view back to white when Anki's theme changes it to dark
         theme_did_change.append(
             lambda: self.web.page().setBackgroundColor(QColor("white"))
