@@ -152,6 +152,7 @@ from ankihub.gui.js_message_handling import (
     OPEN_BROWSER_PYCMD,
     SUSPEND_NOTES_PYCMD,
     UNSUSPEND_NOTES_PYCMD,
+    _post_message_to_ankihub_js,
 )
 from ankihub.gui.media_sync import media_sync
 from ankihub.gui.menu import AnkiHubLogin, menu_state
@@ -6139,6 +6140,12 @@ class TestAnkiHubAIInReviewer:
             # Suspend selected notes
             self._suspend_notes_by_ah_nids(suspended_ah_nids)
 
+            original_post_message_to_ankihub_js = _post_message_to_ankihub_js
+            post_message_to_ankihub_js_mock = mocker.patch(
+                "ankihub.gui.js_message_handling._post_message_to_ankihub_js",
+                side_effect=original_post_message_to_ankihub_js,
+            )
+
             original_eval = aqt.mw.reviewer.web.eval
             eval_mock = mocker.patch.object(aqt.mw.reviewer.web, "eval")
 
@@ -6147,14 +6154,17 @@ class TestAnkiHubAIInReviewer:
 
             qtbot.wait_until(
                 lambda: eval_mock.called
-                and eval_mock.call_args[0][0].startswith("ankihubAI")
+                and "noteSuspensionStates" in eval_mock.call_args[0][0]
             )
 
-            # Assert that the correct result was sent to AnkiHub AI (using web.eval)
-            message = eval_mock.call_args[0][0]
-            m = re.match(r"ankihubAI.sendNoteSuspensionStates\((.+)\)", message)
-            note_suspension_states = json.loads(m.group(1))
-            assert note_suspension_states == expected_note_suspension_states
+            # Assert that the correct result was sent
+            assert post_message_to_ankihub_js_mock.called
+            note_suspension_states = post_message_to_ankihub_js_mock.call_args.kwargs[
+                "message"
+            ]
+            assert note_suspension_states == {
+                "noteSuspensionStates": expected_note_suspension_states
+            }
 
     @pytest.mark.sequential
     def test_close_ankihub_ai_pycmd(
