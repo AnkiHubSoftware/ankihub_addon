@@ -1,5 +1,6 @@
 """Handles messages sent from JavaScript code which are useful in multiple places
 (instead of being specific to a single module)."""
+
 import json
 import uuid
 from pathlib import Path
@@ -57,7 +58,7 @@ def _on_js_message(handled: Tuple[bool, Any], message: str, context: Any) -> Any
             anki_nids = [
                 anki_nid for anki_nid in ah_nids_to_anki_nids.values() if anki_nid
             ]
-            search_string = f"nid:{' OR nid:'.join(map(str, anki_nids))}"
+            search_string = f"nid:{','.join(map(str, anki_nids))}"
             browser.search_for(search_string)
 
         return (True, None)
