@@ -2,6 +2,7 @@
 (instead of being specific to a single module)."""
 import json
 import uuid
+from pathlib import Path
 from typing import Any, Dict, List, Tuple
 
 import aqt
@@ -10,9 +11,11 @@ from anki.utils import ids2str
 from aqt.browser import Browser
 from aqt.gui_hooks import webview_did_receive_js_message
 from aqt.utils import openLink, tooltip
+from aqt.webview import AnkiWebView
+from jinja2 import Template
 
 from ..db import ankihub_db
-from ..settings import url_plans_page, url_view_note
+from ..settings import config, url_plans_page, url_view_note
 from .operations.scheduling import suspend_notes, unsuspend_notes
 from .utils import show_dialog
 
@@ -24,6 +27,10 @@ UNSUSPEND_NOTES_PYCMD = "ankihub_unsuspend_notes"
 SUSPEND_NOTES_PYCMD = "ankihub_suspend_notes"
 GET_NOTE_SUSPENSION_STATES_PYCMD = "ankihub_get_note_suspension_states"
 ANKIHUB_UPSELL = "ankihub_ai_upsell"
+
+POST_MESSAGE_TO_ANKIHUB_JS_PATH = (
+    Path(__file__).parent / "web/post_message_to_ankihub_js.js"
+)
 
 
 def setup():
@@ -72,10 +79,10 @@ def _on_js_message(handled: Tuple[bool, Any], message: str, context: Any) -> Any
         kwargs = _parse_js_message_kwargs(message)
         ah_nids = kwargs.get("noteIds")
         note_suspension_states = _get_note_suspension_states(ah_nids)
-        context.web.eval(
-            f"ankihubAI.sendNoteSuspensionStates({json.dumps(note_suspension_states)})"
+        _post_message_to_ankihub_js(
+            message={"noteSuspensionStates": note_suspension_states},
+            web=context.web,
         )
-
         return (True, None)
     elif message == ANKIHUB_UPSELL:
 
@@ -102,6 +109,16 @@ def _parse_js_message_kwargs(message: str) -> Dict[str, Any]:
         return json.loads(kwargs_json)
     else:
         return {}
+
+
+def _post_message_to_ankihub_js(message, web: AnkiWebView) -> None:
+    """Posts a message to a message listener on an AnkiHub web page."""
+    args = {
+        "MESSAGE_JSON": json.dumps(message),
+        "APP_URL": config.app_url,
+    }
+    js = Template(POST_MESSAGE_TO_ANKIHUB_JS_PATH.read_text()).render(args)
+    web.eval(js)
 
 
 def _get_note_suspension_states(ah_nids: List[str]) -> Dict[str, bool]:

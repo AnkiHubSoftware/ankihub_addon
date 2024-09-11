@@ -49,10 +49,11 @@ jobs:
           pytest ./tests/addon -n 1 -m performance --cov-report=xml --cov-append
 
       - name: Upload coverage
-        uses: actions/upload-artifact@v2
+        uses: actions/upload-artifact@v4
         with:
           name: coverage_addon_${{ matrix.anki_package_version }}
           path: .coverage
+          include-hidden-files: true
 
 
   test-client:
@@ -106,10 +107,11 @@ jobs:
             --splits 2 --group ${{ matrix.group }} --durations-path=tests/.test_durations
 
       - name: Upload coverage
-        uses: actions/upload-artifact@v2
+        uses: actions/upload-artifact@v4
         with:
           name: coverage_client_${{ matrix.group }}
           path: .coverage
+          include-hidden-files: true
 
 
   coverage-and-static-checks:
@@ -129,11 +131,11 @@ jobs:
           install_qt: false
 
       - name: Download all artifacts
-        uses: actions/download-artifact@v2
+        uses: actions/download-artifact@v4
 
       - name: Run coverage
         run: |
-          coverage combine coverage*/.coverage*
+          coverage combine coverage_*/.coverage
           coverage html --fail-under=76
 
       - name: Install smokeshow
@@ -164,7 +166,7 @@ jobs:
           GOOGLE_API_KEY: ${{ secrets.GOOGLE_API_KEY }}
 
       - name: Archive .ankiaddon
-        uses: actions/upload-artifact@v3
+        uses: actions/upload-artifact@v4
         with:
           name: ankihub_addon_${{ github.sha }}
           path: ankihub.ankiaddon
