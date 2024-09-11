@@ -53,6 +53,7 @@ jobs:
         with:
           name: coverage_addon_${{ matrix.anki_package_version }}
           path: coverage.xml
+          include-hidden-files: true
 
 
   test-client:
