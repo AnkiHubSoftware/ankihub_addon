@@ -53,7 +53,11 @@ def _on_js_message(handled: Tuple[bool, Any], message: str, context: Any) -> Any
         browser: Browser = aqt.dialogs.open("Browser", aqt.mw)
 
         if ah_nids:
-            search_string = f"ankihub_id:{' or ankihub_id:'.join(ah_nids)}"
+            ah_nids_to_anki_nids = ankihub_db.ankihub_nids_to_anki_nids(ah_nids)
+            anki_nids = [
+                anki_nid for anki_nid in ah_nids_to_anki_nids.values() if anki_nid
+            ]
+            search_string = f"nid:{' OR nid:'.join(map(str, anki_nids))}"
             browser.search_for(search_string)
 
         return (True, None)
