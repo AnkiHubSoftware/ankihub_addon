@@ -26,14 +26,9 @@ from .webview import AnkiHubWebViewDialog
 ADD_FLASHCARD_SELECTOR_BUTTON_JS_PATH = (
     Path(__file__).parent / "web/add_flashcard_selector_button.js"
 )
-FLASHCARD_SELECTOR_MODIFICATIONS_JS_PATH = (
-    Path(__file__).parent / "web/setup_flashcard_selector_modifications.js"
-)
 FLASHCARD_SELECTOR_OPEN_BUTTON_ID = "ankihub-flashcard-selector-open-button"
 FLASHCARD_SELECTOR_OPEN_PYCMD = "ankihub_flashcard_selector_open"
 
-FLASHCARD_SELECTOR_UNSUSPEND_BUTTON_ID_SUFFIX = "select-flashcards-button"
-FLASHCARD_SELECTOR_FORM_DATA_DIV_ID_SUFFIX = "unsuspend-cards-data"
 FLASHCARD_SELECTOR_SYNC_NOTES_ACTIONS_PYCMD = "ankihub_sync_notes_actions"
 
 
@@ -146,13 +141,3 @@ class FlashCardSelectorDialog(AnkiHubWebViewDialog):
         LOGGER.info(
             "Prompted user to log in to AnkiHub, after failed authentication in flashcard selector."
         )
-
-    def _on_successful_page_load(self) -> None:
-        js = Template(FLASHCARD_SELECTOR_MODIFICATIONS_JS_PATH.read_text()).render(
-            {
-                "FLASHCARD_SELECTOR_UNSUSPEND_BUTTON_ID_SUFFIX": FLASHCARD_SELECTOR_UNSUSPEND_BUTTON_ID_SUFFIX,
-                "FLASHCARD_SELECTOR_FORM_DATA_DIV_ID_SUFFIX": FLASHCARD_SELECTOR_FORM_DATA_DIV_ID_SUFFIX,
-                "FLASHCARD_SELECTOR_SYNC_NOTES_ACTIONS_PYCMD": FLASHCARD_SELECTOR_SYNC_NOTES_ACTIONS_PYCMD,
-            }
-        )
-        self.web.eval(js)
