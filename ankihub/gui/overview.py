@@ -20,6 +20,7 @@ from ..settings import (
     url_flashcard_selector_embed,
 )
 from .deck_updater import ah_deck_updater
+from .js_message_handling import parse_js_message_kwargs
 from .menu import AnkiHubLogin
 from .webview import AnkiHubWebViewDialog
 
@@ -89,10 +90,12 @@ def _handle_flashcard_selector_py_commands(
         LOGGER.info("Opened flashcard selector dialog.")
         return (True, None)
     elif message.startswith(FLASHCARD_SELECTOR_SYNC_NOTES_ACTIONS_PYCMD):
-        _, ah_did_str = message.split(" ")
+        kwargs = parse_js_message_kwargs(message)
+        deck_id = UUID(kwargs.get("deckId"))
+
         aqt.mw.taskman.run_in_background(
             lambda: ah_deck_updater.fetch_and_apply_pending_notes_actions_for_deck(
-                UUID(ah_did_str)
+                deck_id
             ),
             on_done=_on_fetch_and_apply_pending_notes_actions_done,
         )
