@@ -52,7 +52,7 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: coverage_addon_${{ matrix.anki_package_version }}
-          path: .coverage
+          path: coverage.xml
 
 
   test-client:
@@ -110,6 +110,7 @@ jobs:
         with:
           name: coverage_client_${{ matrix.group }}
           path: .coverage
+          include-hidden-files: true
 
 
   coverage-and-static-checks:
@@ -133,7 +134,7 @@ jobs:
 
       - name: Run coverage
         run: |
-          coverage combine coverage*/.coverage*
+          coverage combine coverage_*/.coverage
           coverage html --fail-under=76
 
       - name: Install smokeshow
