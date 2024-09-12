@@ -1,5 +1,8 @@
 """Code to be run on Anki start up."""
 
+import json
+import pathlib
+import shutil
 import time
 from pathlib import Path
 
@@ -43,6 +46,27 @@ from .settings import (
 ATTEMPTED_GENERAL_SETUP = False
 
 WEB_MEDIA_PATH = Path(__file__).parent / "gui/web/media"
+
+
+def install_extension():
+    # Get the path to the extension's directory
+    extensions_dir = pathlib.Path(__file__).parent / "extensions"
+    hello_world = extensions_dir / "hello_world"
+    manifest_json = hello_world / "manifest.json"
+    # load the manifest file
+    with open(manifest_json) as f:
+        manifest = json.load(f)
+        print(manifest)
+    # get all the files in the extensions dir
+    for file in extensions_dir.rglob("*"):
+        if file.is_file():
+            # check if the file already exists in the media directory
+            target_file = pathlib.Path(aqt.mw.col.media.dir()) / file.name
+            if target_file.exists():
+                # remove the existing file
+                target_file.unlink()
+            # copy the file to the media directory
+            shutil.copy(file, aqt.mw.col.media.dir())
 
 
 def run():
@@ -111,6 +135,7 @@ def _profile_setup() -> bool:
 
 
 def _after_profile_setup():
+    install_extension()
     _log_enabled_addons()
 
     # This deletes broken notetypes with no fields or templates created by a previous version of the add-on.
