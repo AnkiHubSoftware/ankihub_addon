@@ -5739,9 +5739,9 @@ class TestFlashCardSelector:
 
             dialog = FlashCardSelectorDialog.display(aqt.mw)
 
-            dialog.web.eval(
-                f"pycmd('{FLASHCARD_SELECTOR_SYNC_NOTES_ACTIONS_PYCMD} {uuid.uuid4()}')"
-            )
+            args = {"deckId": str(uuid.uuid4())}
+            js = f"pycmd('{FLASHCARD_SELECTOR_SYNC_NOTES_ACTIONS_PYCMD} {json.dumps(args)}')"
+            dialog.web.eval(js)
 
             qtbot.wait_until(
                 lambda: fetch_and_apply_pending_notes_actions_for_deck.called

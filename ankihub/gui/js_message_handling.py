@@ -1,5 +1,6 @@
 """Handles messages sent from JavaScript code which are useful in multiple places
 (instead of being specific to a single module)."""
+
 import json
 import uuid
 from pathlib import Path
@@ -47,18 +48,22 @@ def _on_js_message(handled: Tuple[bool, Any], message: str, context: Any) -> Any
 
         return (True, None)
     elif message.startswith(OPEN_BROWSER_PYCMD):
-        kwargs = _parse_js_message_kwargs(message)
+        kwargs = parse_js_message_kwargs(message)
         ah_nids = kwargs.get("noteIds", [])
 
         browser: Browser = aqt.dialogs.open("Browser", aqt.mw)
 
         if ah_nids:
-            search_string = f"ankihub_id:{' or ankihub_id:'.join(ah_nids)}"
+            ah_nids_to_anki_nids = ankihub_db.ankihub_nids_to_anki_nids(ah_nids)
+            anki_nids = [
+                anki_nid for anki_nid in ah_nids_to_anki_nids.values() if anki_nid
+            ]
+            search_string = f"nid:{','.join(map(str, anki_nids))}"
             browser.search_for(search_string)
 
         return (True, None)
     elif message.startswith(SUSPEND_NOTES_PYCMD):
-        kwargs = _parse_js_message_kwargs(message)
+        kwargs = parse_js_message_kwargs(message)
         ah_nids = kwargs.get("noteIds")
         if ah_nids:
             suspend_notes(
@@ -68,7 +73,7 @@ def _on_js_message(handled: Tuple[bool, Any], message: str, context: Any) -> Any
 
         return (True, None)
     elif message.startswith(UNSUSPEND_NOTES_PYCMD):
-        kwargs = _parse_js_message_kwargs(message)
+        kwargs = parse_js_message_kwargs(message)
         ah_nids = kwargs.get("noteIds")
         if ah_nids:
             unsuspend_notes(
@@ -76,7 +81,7 @@ def _on_js_message(handled: Tuple[bool, Any], message: str, context: Any) -> Any
                 on_done=lambda: tooltip("AnkiHub: Note(s) unsuspended", parent=aqt.mw),
             )
     elif message.startswith(GET_NOTE_SUSPENSION_STATES_PYCMD):
-        kwargs = _parse_js_message_kwargs(message)
+        kwargs = parse_js_message_kwargs(message)
         ah_nids = kwargs.get("noteIds")
         note_suspension_states = _get_note_suspension_states(ah_nids)
         _post_message_to_ankihub_js(
@@ -103,7 +108,7 @@ def _on_js_message(handled: Tuple[bool, Any], message: str, context: Any) -> Any
     return handled
 
 
-def _parse_js_message_kwargs(message: str) -> Dict[str, Any]:
+def parse_js_message_kwargs(message: str) -> Dict[str, Any]:
     if " " in message:
         _, kwargs_json = message.split(" ", maxsplit=1)
         return json.loads(kwargs_json)

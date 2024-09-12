@@ -1,6 +1,7 @@
 """Modifies the Anki deck overview screen (aqt.overview)."""
 
 from concurrent.futures import Future
+from functools import partial
 from pathlib import Path
 from typing import Any, cast
 from uuid import UUID
@@ -20,21 +21,20 @@ from ..settings import (
     url_flashcard_selector_embed,
 )
 from .deck_updater import ah_deck_updater
+from .js_message_handling import parse_js_message_kwargs
 from .menu import AnkiHubLogin
 from .webview import AnkiHubWebViewDialog
 
 ADD_FLASHCARD_SELECTOR_BUTTON_JS_PATH = (
     Path(__file__).parent / "web/add_flashcard_selector_button.js"
 )
-FLASHCARD_SELECTOR_MODIFICATIONS_JS_PATH = (
-    Path(__file__).parent / "web/setup_flashcard_selector_modifications.js"
-)
 FLASHCARD_SELECTOR_OPEN_BUTTON_ID = "ankihub-flashcard-selector-open-button"
 FLASHCARD_SELECTOR_OPEN_PYCMD = "ankihub_flashcard_selector_open"
 
-FLASHCARD_SELECTOR_UNSUSPEND_BUTTON_ID_SUFFIX = "select-flashcards-button"
-FLASHCARD_SELECTOR_FORM_DATA_DIV_ID_SUFFIX = "unsuspend-cards-data"
 FLASHCARD_SELECTOR_SYNC_NOTES_ACTIONS_PYCMD = "ankihub_sync_notes_actions"
+
+# Event name dispatched when the suspension state filter should be refreshed
+REFRESH_SUSPENSION_FILTER_EVENT_NAME = "refresh-suspension-state-filter"
 
 
 def setup() -> None:
@@ -94,19 +94,25 @@ def _handle_flashcard_selector_py_commands(
         LOGGER.info("Opened flashcard selector dialog.")
         return (True, None)
     elif message.startswith(FLASHCARD_SELECTOR_SYNC_NOTES_ACTIONS_PYCMD):
-        _, ah_did_str = message.split(" ")
+        kwargs = parse_js_message_kwargs(message)
+        deck_id = UUID(kwargs.get("deckId"))
+
         aqt.mw.taskman.run_in_background(
             lambda: ah_deck_updater.fetch_and_apply_pending_notes_actions_for_deck(
-                UUID(ah_did_str)
+                deck_id
             ),
-            on_done=_on_fetch_and_apply_pending_notes_actions_done,
+            on_done=partial(
+                _on_fetch_and_apply_pending_notes_actions_done, web=context.web
+            ),
         )
         return (True, None)
     else:
         return handled
 
 
-def _on_fetch_and_apply_pending_notes_actions_done(future: Future) -> None:
+def _on_fetch_and_apply_pending_notes_actions_done(
+    future: Future, web: AnkiWebView
+) -> None:
     future.result()
 
     LOGGER.info("Successfully fetched and applied pending notes actions.")
@@ -115,6 +121,10 @@ def _on_fetch_and_apply_pending_notes_actions_done(future: Future) -> None:
         parent=(
             FlashCardSelectorDialog.dialog if FlashCardSelectorDialog.dialog else aqt.mw
         ),
+    )
+
+    web.eval(
+        f"window.dispatchEvent(new Event('{REFRESH_SUSPENSION_FILTER_EVENT_NAME}'))"
     )
 
 
@@ -146,13 +156,3 @@ class FlashCardSelectorDialog(AnkiHubWebViewDialog):
         LOGGER.info(
             "Prompted user to log in to AnkiHub, after failed authentication in flashcard selector."
         )
-
-    def _on_successful_page_load(self) -> None:
-        js = Template(FLASHCARD_SELECTOR_MODIFICATIONS_JS_PATH.read_text()).render(
-            {
-                "FLASHCARD_SELECTOR_UNSUSPEND_BUTTON_ID_SUFFIX": FLASHCARD_SELECTOR_UNSUSPEND_BUTTON_ID_SUFFIX,
-                "FLASHCARD_SELECTOR_FORM_DATA_DIV_ID_SUFFIX": FLASHCARD_SELECTOR_FORM_DATA_DIV_ID_SUFFIX,
-                "FLASHCARD_SELECTOR_SYNC_NOTES_ACTIONS_PYCMD": FLASHCARD_SELECTOR_SYNC_NOTES_ACTIONS_PYCMD,
-            }
-        )
-        self.web.eval(js)
