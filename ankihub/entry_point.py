@@ -67,7 +67,7 @@ def run():
     )
 
     if ANKI_INT_VERSION >= ANKI_VERSION_24_06_00:
-        # Starting from Anki 2.1.46 AnkiQt.maybe_auto_sync_on_open_close is called before
+        # Starting from Anki 24.06 AnkiQt.maybe_auto_sync_on_open_close is called before
         # the profile_did_open hook. (Both are called in AnkiQt.loadProfile)
         # We need to call _on_profile_did_open before maybe_auto_sync_on_open_close, so we do this.
         AnkiQt.maybe_auto_sync_on_open_close = wrap(
