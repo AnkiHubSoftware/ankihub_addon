@@ -80,8 +80,17 @@ def run():
         s3_bucket_url=config.s3_bucket_url,
     )
 
+    _setup_updates_to_profile_state()
     _setup_on_profile_did_open()
     profile_will_close.append(_on_profile_will_close)
+
+
+def _setup_updates_to_profile_state() -> None:
+    def on_profile_did_open():
+        assign_id_to_profile_if_not_exists()
+        _profile_state.previous_profile_id = get_anki_profile_id()
+
+    profile_did_open.append(on_profile_did_open)
 
 
 def _setup_on_profile_did_open() -> None:
@@ -108,13 +117,6 @@ def _setup_on_profile_did_open() -> None:
         new=maybe_call_on_profile_did_open,
         pos="before",
     )
-
-    # Set up updates to _profile_state.previous_profile_id
-    def on_profile_did_open():
-        assign_id_to_profile_if_not_exists()
-        _profile_state.previous_profile_id = get_anki_profile_id()
-
-    profile_did_open.append(on_profile_did_open)
 
 
 def _on_profile_did_open():
