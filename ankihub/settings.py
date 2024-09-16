@@ -449,7 +449,7 @@ def setup_profile_data_folder() -> bool:
     """Sets up the profile data folder for the currently open Anki profile.
     Returns False if the migration from the add-on version with no support for multiple Anki profiles
     needs yet to be done."""
-    _assign_id_to_profile_if_not_exists()
+    assign_id_to_profile_if_not_exists()
 
     if not _maybe_migrate_profile_data_from_old_location():
         return False
@@ -463,7 +463,7 @@ def setup_profile_data_folder() -> bool:
     return True
 
 
-def _assign_id_to_profile_if_not_exists() -> None:
+def assign_id_to_profile_if_not_exists() -> None:
     """Assigns an id to the currently open profile if it doesn't have one."""
     if aqt.mw.pm.profile.get("ankihub_id") is not None:
         return

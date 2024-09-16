@@ -1,7 +1,9 @@
 """Code to be run on Anki start up."""
 
 import time
+from dataclasses import dataclass
 from pathlib import Path
+from typing import Optional
 
 import aqt
 from anki.errors import CardTypeError
@@ -36,7 +38,9 @@ from .settings import (
     ANKI_VERSION,
     ANKI_VERSION_24_06_00,
     ankihub_db_path,
+    assign_id_to_profile_if_not_exists,
     config,
+    get_anki_profile_id,
     setup_logger,
     setup_profile_data_folder,
 )
@@ -49,6 +53,14 @@ CALL_ON_PROFILE_DID_OPEN_ON_MAYBE_AUTO_SYNC = ANKI_INT_VERSION >= ANKI_VERSION_2
 ATTEMPTED_GENERAL_SETUP = False
 
 WEB_MEDIA_PATH = Path(__file__).parent / "gui/web/media"
+
+
+@dataclass
+class ProfileState:
+    previous_profile_id: Optional[str] = None
+
+
+_profile_state = ProfileState()
 
 
 def run():
@@ -68,19 +80,41 @@ def run():
         s3_bucket_url=config.s3_bucket_url,
     )
 
-    if CALL_ON_PROFILE_DID_OPEN_ON_MAYBE_AUTO_SYNC:
-        # Starting from Anki 24.06 AnkiQt.maybe_auto_sync_on_open_close is called before
-        # the profile_did_open hook. (Both are called in AnkiQt.loadProfile)
-        # We need to call _on_profile_did_open before maybe_auto_sync_on_open_close, so we do this.
-        AnkiQt.maybe_auto_sync_on_open_close = wrap(  # type: ignore
-            old=AnkiQt.maybe_auto_sync_on_open_close,
-            new=lambda *args, **kwargs: _on_profile_did_open,
-            pos="before",
-        )
-    else:
-        profile_did_open.append(_on_profile_did_open)
-
+    _setup_on_profile_did_open()
     profile_will_close.append(_on_profile_will_close)
+
+
+def _setup_on_profile_did_open() -> None:
+    """Makes sure that _on_profile_did_open gets called after the profile is loaded and before
+    maybe_auto_sync_on_open_close is called."""
+
+    if not CALL_ON_PROFILE_DID_OPEN_ON_MAYBE_AUTO_SYNC:
+        profile_did_open.append(_on_profile_did_open)
+        return
+
+    # Starting from Anki 24.06 AnkiQt.maybe_auto_sync_on_open_close is called before
+    # the profile_did_open hook. (Both are called in AnkiQt.loadProfile)
+    # We need to call _on_profile_did_open before maybe_auto_sync_on_open_close, so we do this.
+    def maybe_call_on_profile_did_open(*args, **kwargs) -> None:
+        LOGGER.info("maybe_auto_sync_on_open_close called.")
+
+        assign_id_to_profile_if_not_exists()
+        if get_anki_profile_id() != _profile_state.previous_profile_id:
+            LOGGER.info("Calling _on_profile_did_open.")
+            _on_profile_did_open()
+
+    AnkiQt.maybe_auto_sync_on_open_close = wrap(  # type: ignore
+        old=AnkiQt.maybe_auto_sync_on_open_close,
+        new=maybe_call_on_profile_did_open,
+        pos="before",
+    )
+
+    # Set up updates to _profile_state.previous_profile_id
+    def on_profile_did_open():
+        assign_id_to_profile_if_not_exists()
+        _profile_state.previous_profile_id = get_anki_profile_id()
+
+    profile_did_open.append(on_profile_did_open)
 
 
 def _on_profile_did_open():
