@@ -41,6 +41,8 @@ from .settings import (
     setup_profile_data_folder,
 )
 
+CALL_ON_PROFILE_DID_OPEN_ON_MAYBE_AUTO_SYNC = ANKI_INT_VERSION >= ANKI_VERSION_24_06_00
+
 # The general setup should be only once, because it sets up menu items, hooks, etc.
 # We don't want to set them up multiple times when the profile is opened multiple times,
 # because that would cause multiple menu items, hooks, etc.
@@ -66,7 +68,7 @@ def run():
         s3_bucket_url=config.s3_bucket_url,
     )
 
-    if ANKI_INT_VERSION >= ANKI_VERSION_24_06_00:
+    if CALL_ON_PROFILE_DID_OPEN_ON_MAYBE_AUTO_SYNC:
         # Starting from Anki 24.06 AnkiQt.maybe_auto_sync_on_open_close is called before
         # the profile_did_open hook. (Both are called in AnkiQt.loadProfile)
         # We need to call _on_profile_did_open before maybe_auto_sync_on_open_close, so we do this.
