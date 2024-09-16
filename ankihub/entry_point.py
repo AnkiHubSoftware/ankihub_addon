@@ -5,7 +5,9 @@ from pathlib import Path
 
 import aqt
 from anki.errors import CardTypeError
+from anki.hooks import wrap
 from aqt.gui_hooks import profile_did_open, profile_will_close
+from aqt.main import AnkiQt
 
 from . import LOGGER
 from .db import ankihub_db
@@ -30,7 +32,9 @@ from .main.note_deletion import handle_notes_deleted_from_webapp
 from .main.utils import modify_note_type_templates
 from .settings import (
     ADDON_VERSION,
+    ANKI_INT_VERSION,
     ANKI_VERSION,
+    ANKI_VERSION_24_06_00,
     ankihub_db_path,
     config,
     setup_logger,
@@ -62,7 +66,18 @@ def run():
         s3_bucket_url=config.s3_bucket_url,
     )
 
-    profile_did_open.append(_on_profile_did_open)
+    if ANKI_INT_VERSION >= ANKI_VERSION_24_06_00:
+        # Starting from Anki 2.1.46 AnkiQt.maybe_auto_sync_on_open_close is called before
+        # the profile_did_open hook. (Both are called in AnkiQt.loadProfile)
+        # We need to call _on_profile_did_open before maybe_auto_sync_on_open_close, so we do this.
+        AnkiQt.maybe_auto_sync_on_open_close = wrap(
+            old=AnkiQt.maybe_auto_sync_on_open_close,
+            new=lambda *args, **kwargs: _on_profile_did_open,
+            pos="before",
+        )
+    else:
+        profile_did_open.append(_on_profile_did_open)
+
     profile_will_close.append(_on_profile_will_close)
 
 
