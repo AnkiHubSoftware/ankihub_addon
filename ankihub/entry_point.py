@@ -70,7 +70,7 @@ def run():
         # Starting from Anki 24.06 AnkiQt.maybe_auto_sync_on_open_close is called before
         # the profile_did_open hook. (Both are called in AnkiQt.loadProfile)
         # We need to call _on_profile_did_open before maybe_auto_sync_on_open_close, so we do this.
-        AnkiQt.maybe_auto_sync_on_open_close = wrap(
+        AnkiQt.maybe_auto_sync_on_open_close = wrap(  # type: ignore
             old=AnkiQt.maybe_auto_sync_on_open_close,
             new=lambda *args, **kwargs: _on_profile_did_open,
             pos="before",
