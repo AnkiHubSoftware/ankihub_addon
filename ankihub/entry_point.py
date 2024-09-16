@@ -1,5 +1,6 @@
 """Code to be run on Anki start up."""
 
+import re
 import time
 from dataclasses import dataclass
 from pathlib import Path
@@ -34,9 +35,7 @@ from .main.note_deletion import handle_notes_deleted_from_webapp
 from .main.utils import modify_note_type_templates
 from .settings import (
     ADDON_VERSION,
-    ANKI_INT_VERSION,
     ANKI_VERSION,
-    ANKI_VERSION_24_06_00,
     ankihub_db_path,
     assign_id_to_profile_if_not_exists,
     config,
@@ -45,7 +44,7 @@ from .settings import (
     setup_profile_data_folder,
 )
 
-CALL_ON_PROFILE_DID_OPEN_ON_MAYBE_AUTO_SYNC = ANKI_INT_VERSION >= ANKI_VERSION_24_06_00
+CALL_ON_PROFILE_DID_OPEN_ON_MAYBE_AUTO_SYNC = bool(re.match(r"24\.06\.", ANKI_VERSION))
 
 # The general setup should be only once, because it sets up menu items, hooks, etc.
 # We don't want to set them up multiple times when the profile is opened multiple times,
