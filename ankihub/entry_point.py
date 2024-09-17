@@ -90,7 +90,18 @@ def _setup_on_profile_did_open() -> None:
         nonlocal profile_is_opening
         if profile_is_opening:
             LOGGER.info("Calling _on_profile_did_open.")
-            _on_profile_did_open()
+            try:
+                _on_profile_did_open()
+            except Exception as e:  # pragma: no cover
+                # Raise the exception without disrupting the calling code.
+                exception = e
+
+                def raise_exception() -> None:
+                    raise exception
+
+                aqt.mw.taskman.run_in_background(
+                    raise_exception, on_done=lambda future: future.result()
+                )
 
         profile_is_opening = not profile_is_opening
 
