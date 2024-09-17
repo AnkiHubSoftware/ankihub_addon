@@ -519,13 +519,30 @@ def create_new_note_suggestion(
     return create_new_note_suggestion_inner
 
 
-def test_entry_point(anki_session_with_addon_data: AnkiSession, qtbot: QtBot):
-    entry_point.run()
-    with anki_session_with_addon_data.profile_loaded():
-        qtbot.wait(1000)
+class TestEntryPoint:
+    def test_entry_point(self, anki_session_with_addon_data: AnkiSession, qtbot: QtBot):
+        entry_point.run()
+        with anki_session_with_addon_data.profile_loaded():
+            qtbot.wait(1000)
 
-    # this test is just to make sure the entry point doesn't crash
-    # and that the add-on doesn't crash on Anki startup
+        # this test is just to make sure the entry point doesn't crash
+        # and that the add-on doesn't crash on Anki startup
+
+    def test_on_profile_did_open_called_on_maybe_auto_sync(self, mocker: MockerFixture):
+        # When CALL_ON_PROFILE_DID_OPEN_ON_MAYBE_AUTO_SYNC is True, _on_profile_did_open should be called
+        # when maybe_auto_sync_on_open_close is called.
+        # (It should not be called when the profile is getting closed. We are not checking this in this test.)
+        mocker.patch(
+            "ankihub.entry_point.CALL_ON_PROFILE_DID_OPEN_ON_MAYBE_AUTO_SYNC", True
+        )
+
+        on_profile_did_open_mock = mocker.patch(
+            "ankihub.entry_point._on_profile_did_open"
+        )
+        entry_point.run()
+        aqt.mw.maybe_auto_sync_on_open_close(Mock())
+
+        on_profile_did_open_mock.assert_called_once()
 
 
 # The JS in the webviews is flaky if not run in sequential mode

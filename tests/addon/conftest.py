@@ -132,3 +132,15 @@ def anki_session_with_addon_before_profile_support(
         )
 
     yield anki_session
+
+
+@pytest.fixture(autouse=True)
+def set_call_on_profile_did_open_on_maybe_auto_sync_to_false(monkeypatch):
+    # Anki calls maybe_auto_sync_on_open_close in AnkiQt.loadProfile.
+    # However, when running tests, pytest-anki AnkiSession.profile_loaded does not
+    # call maybe_auto_sync_on_open_close.
+    # Because of this, we need to set CALL_ON_PROFILE_DID_OPEN_ON_MAYBE_AUTO_SYNC to False.
+    # Then _on_profile_did_open is called, because AnkiSession.profile_loaded calls profile_did_open.
+    monkeypatch.setattr(
+        "ankihub.entry_point.CALL_ON_PROFILE_DID_OPEN_ON_MAYBE_AUTO_SYNC", False
+    )

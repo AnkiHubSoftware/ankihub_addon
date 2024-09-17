@@ -1,11 +1,14 @@
 """Code to be run on Anki start up."""
 
+import re
 import time
 from pathlib import Path
 
 import aqt
 from anki.errors import CardTypeError
+from anki.hooks import wrap
 from aqt.gui_hooks import profile_did_open, profile_will_close
+from aqt.main import AnkiQt
 
 from . import LOGGER
 from .db import ankihub_db
@@ -37,6 +40,8 @@ from .settings import (
     setup_profile_data_folder,
 )
 
+CALL_ON_PROFILE_DID_OPEN_ON_MAYBE_AUTO_SYNC = bool(re.match(r"24\.06\.", ANKI_VERSION))
+
 # The general setup should be only once, because it sets up menu items, hooks, etc.
 # We don't want to set them up multiple times when the profile is opened multiple times,
 # because that would cause multiple menu items, hooks, etc.
@@ -62,8 +67,49 @@ def run():
         s3_bucket_url=config.s3_bucket_url,
     )
 
-    profile_did_open.append(_on_profile_did_open)
+    _setup_on_profile_did_open()
     profile_will_close.append(_on_profile_will_close)
+
+
+def _setup_on_profile_did_open() -> None:
+    """Makes sure that _on_profile_did_open gets called after the profile is loaded and before
+    maybe_auto_sync_on_open_close is called."""
+
+    if not CALL_ON_PROFILE_DID_OPEN_ON_MAYBE_AUTO_SYNC:
+        profile_did_open.append(_on_profile_did_open)
+        return
+
+    profile_is_opening = True
+
+    # Starting from Anki 24.06 AnkiQt.maybe_auto_sync_on_open_close is called before
+    # the profile_did_open hook. (Both are called in AnkiQt.loadProfile)
+    # We need to call _on_profile_did_open before maybe_auto_sync_on_open_close, so we do this.
+    def maybe_call_on_profile_did_open(*args, **kwargs) -> None:
+        LOGGER.info("maybe_auto_sync_on_open_close called.")
+
+        nonlocal profile_is_opening
+        if profile_is_opening:
+            LOGGER.info("Calling _on_profile_did_open.")
+            try:
+                _on_profile_did_open()
+            except Exception as e:  # pragma: no cover
+                # Raise the exception without disrupting the calling code.
+                exception = e
+
+                def raise_exception() -> None:
+                    raise exception
+
+                aqt.mw.taskman.run_in_background(
+                    raise_exception, on_done=lambda future: future.result()
+                )
+
+        profile_is_opening = not profile_is_opening
+
+    AnkiQt.maybe_auto_sync_on_open_close = wrap(  # type: ignore
+        old=AnkiQt.maybe_auto_sync_on_open_close,
+        new=maybe_call_on_profile_did_open,
+        pos="before",
+    )
 
 
 def _on_profile_did_open():
