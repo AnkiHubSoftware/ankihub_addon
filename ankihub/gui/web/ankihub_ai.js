@@ -225,9 +225,12 @@ class AnkiHubAI {
     setButtonStyles(button) {
         button.style.width = "40px";
         button.style.height = "40px";
+        button.style.boxSizing = "content-box";
+        button.style.padding = "8px 10px 8px 10px";
+        button.style.margin = "0px 4px 0px 4px";
 
         button.style.position = "fixed";
-        button.style.bottom = "0px";
+        button.style.bottom = "13px";
         button.style.right = "15px";
         button.style.zIndex = "9999";
 
