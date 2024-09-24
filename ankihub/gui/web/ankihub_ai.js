@@ -88,9 +88,11 @@ class AnkiHubAI {
         document.body.appendChild(button);
 
         const tooltip = document.createElement("div");
+        tooltip.id = "ankihub-ai-tooltip";
         tooltip.innerHTML = "Learn more about this flashcard topic<br>or explore related cards.";
 
         const tooltipArrow = document.createElement("div");
+        tooltipArrow.id = "ankihub-ai-tooltip-arrow";
         tooltip.appendChild(tooltipArrow);
 
         this.setTooltipAndTooltipArrowStyles(tooltip, tooltipArrow);
@@ -111,16 +113,11 @@ class AnkiHubAI {
     }
 
     setTooltipAndTooltipArrowStyles(tooltip, tooltipArrow) {
-        const tooltipBackgroundColor = "#d1d5db";
-        const tooltipColor = "black";
-
         tooltip.style.position = "absolute";
         tooltip.style.bottom = "13px";
         tooltip.style.right = "98px";
         tooltip.style.zIndex = "1000";
-        tooltip.style.backgroundColor = tooltipBackgroundColor;
         tooltip.style.fontSize = "medium";
-        tooltip.style.color = tooltipColor;
         tooltip.style.borderRadius = "5px";
         tooltip.style.textAlign = "center";
         tooltip.style.padding = "10px";
@@ -132,9 +129,38 @@ class AnkiHubAI {
         tooltipArrow.style.marginTop = "-4px";
         tooltipArrow.style.width = "0";
         tooltipArrow.style.height = "0";
-        tooltipArrow.style.borderLeft = `6px solid ${tooltipBackgroundColor}`;
+        tooltipArrow.style.borderLeft = "6px solid";
         tooltipArrow.style.borderTop = "6px solid transparent";
         tooltipArrow.style.borderBottom = "6px solid transparent";
+
+        const style = document.createElement("style");
+        style.innerHTML = `
+            :root {
+                --neutral-200: #e5e5e5;
+                --neutral-800: #1f2937;
+            }
+
+            #ankihub-ai-tooltip {
+                background-color: var(--neutral-800);
+                color: white;
+            }
+
+            .night-mode #ankihub-ai-tooltip {
+                background-color: var(--neutral-200);
+                color: black;
+            }
+
+            #ankihub-ai-tooltip-arrow {
+                border-color: var(--neutral-800);
+                color: var(--neutral-800);
+            }
+
+            .night-mode #ankihub-ai-tooltip-arrow {
+                border-color: var(--neutral-200);
+                color: var(--neutral-200);
+            }
+        `;
+        document.head.appendChild(style);
     }
 
     showTooltip() {
