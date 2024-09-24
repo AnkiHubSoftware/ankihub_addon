@@ -18,7 +18,7 @@ class AnkiHubAI {
 
     setup() {
         this.iframe = this.setupIframe();
-        this.button = this.setupIFrameToggleButton();
+        [this.button, this.tooltip] = this.setupIFrameToggleButton();
 
         this.setupMessageListener();
         let updateIframeHeight = this.updateIframeHeight
@@ -79,8 +79,10 @@ class AnkiHubAI {
             if (!this.iframeVisible) {
                 this.maybeUpdateIframeSrc();
                 this.showIframe();
+                this.hideTooltip();
             } else {
                 this.hideIframe();
+                this.showTooltip();
             }
         };
         document.body.appendChild(button);
@@ -93,8 +95,10 @@ class AnkiHubAI {
 
         this.setTooltipAndTooltipArrowStyles(tooltip, tooltipArrow);
 
-        button.addEventListener("mouseover", function () {
-            tooltip.style.display = "block";
+        button.addEventListener("mouseover", () => {
+            if (this.iframe.style.display === "none") {
+                tooltip.style.display = "block";
+            }
         });
 
         button.addEventListener("mouseout", function () {
@@ -103,7 +107,7 @@ class AnkiHubAI {
 
         document.body.appendChild(tooltip);
 
-        return button;
+        return [button, tooltip];
     }
 
     setTooltipAndTooltipArrowStyles(tooltip, tooltipArrow) {
@@ -133,6 +137,13 @@ class AnkiHubAI {
         tooltipArrow.style.borderBottom = "6px solid transparent";
     }
 
+    showTooltip() {
+        this.tooltip.style.display = "block";
+    }
+
+    hideTooltip() {
+        this.tooltip.style.display = "none";
+    }
 
     invalidateSessionAndPromptToLogin() {
         this.authenticated = false;
