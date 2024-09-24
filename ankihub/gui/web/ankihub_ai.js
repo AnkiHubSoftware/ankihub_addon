@@ -24,7 +24,7 @@ class AnkiHubAI {
         let updateIframeHeight = this.updateIframeHeight
         let updateIframeWidth = this.updateIframeWidth
         let iframe = this.iframe
-        window.parent.addEventListener('resize', function() {
+        window.parent.addEventListener('resize', function () {
             if (iframe.style.display !== "none") {
                 updateIframeHeight(iframe, window.parent.innerHeight)
                 updateIframeWidth(iframe, window.parent.innerWidth)
@@ -84,8 +84,55 @@ class AnkiHubAI {
             }
         };
         document.body.appendChild(button);
+
+        const tooltip = document.createElement("div");
+        tooltip.innerHTML = "Learn more about this flashcard topic<br>or explore related cards.";
+
+        const tooltipArrow = document.createElement("div");
+        tooltip.appendChild(tooltipArrow);
+
+        this.setTooltipAndTooltipArrowStyles(tooltip, tooltipArrow);
+
+        button.addEventListener("mouseover", function () {
+            tooltip.style.display = "block";
+        });
+
+        button.addEventListener("mouseout", function () {
+            tooltip.style.display = "none";
+        });
+
+        document.body.appendChild(tooltip);
+
         return button;
     }
+
+    setTooltipAndTooltipArrowStyles(tooltip, tooltipArrow) {
+        const tooltipBackgroundColor = "#d1d5db";
+        const tooltipColor = "black";
+
+        tooltip.style.position = "absolute";
+        tooltip.style.bottom = "13px";
+        tooltip.style.right = "98px";
+        tooltip.style.zIndex = "1000";
+        tooltip.style.backgroundColor = tooltipBackgroundColor;
+        tooltip.style.fontSize = "medium";
+        tooltip.style.color = tooltipColor;
+        tooltip.style.borderRadius = "5px";
+        tooltip.style.textAlign = "center";
+        tooltip.style.padding = "10px";
+        tooltip.style.display = "none";
+
+        tooltipArrow.style.position = "absolute";
+        tooltipArrow.style.top = "50%";
+        tooltipArrow.style.right = "-6px";
+        tooltipArrow.style.marginTop = "-4px";
+        tooltipArrow.style.width = "0";
+        tooltipArrow.style.height = "0";
+        tooltipArrow.style.borderLeft = `6px solid ${tooltipBackgroundColor}`;
+        tooltipArrow.style.borderTop = "6px solid transparent";
+        tooltipArrow.style.borderBottom = "6px solid transparent";
+    }
+
 
     invalidateSessionAndPromptToLogin() {
         this.authenticated = false;
@@ -102,7 +149,7 @@ class AnkiHubAI {
     }
 
     hideIframe() {
-        this.button.style.backgroundImage = "url('_robotking.png')";
+        this.button.style.backgroundImage = "url('/_robot_icon.svg')";
         this.button.style.backgroundSize = "cover";
         this.iframe.style.display = "none";
         this.iframeVisible = false;
@@ -150,9 +197,7 @@ class AnkiHubAI {
         button.style.borderRadius = "100%";
         button.style.border = "none";
 
-        button.style.padding = "8px";
-
-        button.style.backgroundImage = "url('_robotking.png')";
+        button.style.backgroundImage = "url('/_robot_icon.svg')";
         button.style.backgroundSize = "cover";
         button.style.backgroundPosition = "center";
         button.style.backgroundRepeat = "no-repeat";
@@ -169,7 +214,7 @@ class AnkiHubAI {
         iframe.style.minWidth = "360px";
 
         iframe.style.height = "100%";
-        iframe.style.maxHeight = `${parentWindowHeight-95}px`;
+        iframe.style.maxHeight = `${parentWindowHeight - 95}px`;
 
         iframe.style.position = "fixed"
         iframe.style.bottom = "85px"
@@ -184,11 +229,11 @@ class AnkiHubAI {
     }
 
     updateIframeHeight(iframe, parentWindowHeight) {
-        iframe.style.maxHeight = `${parentWindowHeight-95}px`;
+        iframe.style.maxHeight = `${parentWindowHeight - 95}px`;
     }
 
     updateIframeWidth(iframe, parentWindowWidth) {
-        iframe.style.width = `${parentWindowWidth-36}px`;
+        iframe.style.width = `${parentWindowWidth - 36}px`;
     }
 
 }
