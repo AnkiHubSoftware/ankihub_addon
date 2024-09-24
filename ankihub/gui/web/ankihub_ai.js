@@ -89,7 +89,7 @@ class AnkiHubAI {
 
         const tooltip = document.createElement("div");
         tooltip.id = "ankihub-ai-tooltip";
-        tooltip.innerHTML = "Learn more about this flashcard topic<br>or explore related cards.";
+        tooltip.innerHTML = "Learn more about this flashcard<br>topic or explore related cards.";
 
         const tooltipArrow = document.createElement("div");
         tooltipArrow.id = "ankihub-ai-tooltip-arrow";
