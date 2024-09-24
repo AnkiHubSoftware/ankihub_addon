@@ -115,7 +115,7 @@ class AnkiHubAI {
     setTooltipAndTooltipArrowStyles(tooltip, tooltipArrow) {
         tooltip.style.position = "absolute";
         tooltip.style.bottom = "13px";
-        tooltip.style.right = "98px";
+        tooltip.style.right = "93px";
         tooltip.style.zIndex = "1000";
         tooltip.style.fontSize = "medium";
         tooltip.style.borderRadius = "5px";
