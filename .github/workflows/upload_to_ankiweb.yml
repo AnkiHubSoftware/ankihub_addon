@@ -37,7 +37,7 @@ jobs:
       - name: Install dependencies
         run: |
           python -m pip install git+https://github.com/nateshmbhat/webbot.git@333f51840cd5a1fcde0b014bd6ab401d51e62860
-          python -m pip install webdriver_manager==4.0.0
+          python -m pip install webdriver_manager==4.0.2
           python -m pip uninstall -y selenium
           python -m pip install selenium==3.141.0
           python -m pip uninstall -y urllib3
