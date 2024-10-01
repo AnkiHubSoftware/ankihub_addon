@@ -5558,11 +5558,11 @@ class TestConfigDialog:
 class TestFlashCardSelector:
     @pytest.mark.sequential
     @pytest.mark.parametrize(
-        "deck_id, feature_flag_active, expected_button_exists",
+        "is_anking_deck, feature_flag_active, expected_button_exists",
         [
-            (config.anking_deck_id, True, True),
-            (config.anking_deck_id, False, False),
-            (uuid.uuid4(), True, False),
+            (True, True, True),
+            (True, False, False),
+            (False, True, False),
         ],
     )
     def test_flashcard_selector_button_exists_for_anking_deck(
@@ -5570,7 +5570,7 @@ class TestFlashCardSelector:
         anki_session_with_addon_data: AnkiSession,
         install_ah_deck: InstallAHDeck,
         qtbot: QtBot,
-        deck_id: uuid.UUID,
+        is_anking_deck: bool,
         set_feature_flag_state: SetFeatureFlagState,
         feature_flag_active: bool,
         expected_button_exists: bool,
@@ -5582,7 +5582,10 @@ class TestFlashCardSelector:
         entry_point.run()
         with anki_session_with_addon_data.profile_loaded():
             anki_did = DeckId(1)
-            install_ah_deck(ah_did=deck_id, anki_did=anki_did)
+            install_ah_deck(
+                ah_did=config.anking_deck_id if is_anking_deck else uuid.uuid4(),
+                anki_did=anki_did,
+            )
             aqt.mw.deckBrowser.set_current_deck(anki_did)
 
             qtbot.wait(500)
