@@ -59,10 +59,6 @@ PRIVATE_CONFIG_FILENAME = ".private_config.json"
 # (profile configs are stored by Anki in prefs21.db in the anki base directory)
 PROFILE_ID_FIELD_NAME = "ankihub_id"
 
-# Id of the AnKing Overhaul deck
-ANKING_DECK_ID = uuid.UUID(
-    os.environ.get("ANKING_DECK_ID", "e77aedfe-a636-40e2-8169-2fce2673187e")
-)
 TAG_FOR_INSTRUCTION_NOTES = "AnkiHub_Instructions"
 
 # Only used for configuring the logger, a structlog logger is used for logging.
@@ -138,7 +134,7 @@ class DeckConfig(DataClassJSONMixin):
 
     @staticmethod
     def suspend_new_cards_of_new_notes_default(ah_did: uuid.UUID) -> bool:
-        result = ah_did == ANKING_DECK_ID
+        result = ah_did == config.anking_deck_id
         return result
 
     @staticmethod
@@ -194,8 +190,9 @@ class _Config:
         self.subscriptions_change_hook: Optional[Callable[[], None]] = None
         self.app_url: Optional[str] = None
         self.s3_bucket_url: Optional[str] = None
+        self.anking_deck_id: Optional[uuid.UUID] = None
 
-    def setup_public_config_and_urls(self):
+    def setup_public_config_and_other_settings(self):
         migrate_public_config()
         self.load_public_config()
 
@@ -203,10 +200,12 @@ class _Config:
             self.app_url = STAGING_APP_URL
             self.api_url = STAGING_API_URL
             self.s3_bucket_url = STAGING_S3_BUCKET_URL
+            self.anking_deck_id = uuid.UUID("86652268-45a8-4832-bde1-8d9c48e9acc4")
         else:
             self.app_url = DEFAULT_APP_URL
             self.api_url = DEFAULT_API_URL
             self.s3_bucket_url = DEFAULT_S3_BUCKET_URL
+            self.anking_deck_id = uuid.UUID("e77aedfe-a636-40e2-8169-2fce2673187e")
 
         # Override urls with environment variables if they are set.
         if app_url_from_env_var := os.getenv("ANKIHUB_APP_URL"):
@@ -215,6 +214,9 @@ class _Config:
 
         if s3_url_from_env_var := os.getenv("S3_BUCKET_URL"):
             self.s3_bucket_url = s3_url_from_env_var
+
+        if anking_deck_id_from_env_var := os.getenv("ANKING_DECK_ID"):
+            self.anking_deck_id = uuid.UUID(anking_deck_id_from_env_var)
 
     def setup_private_config(self):
         # requires the profile setup to be completed unlike self.setup_pbulic_config

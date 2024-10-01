@@ -94,7 +94,7 @@ def anki_session_with_addon_data(
         # Change the ankihub base path to a temporary folder to isolate the tests
         os.environ["ANKIHUB_BASE_PATH"] = tmpdir
 
-        config.setup_public_config_and_urls()
+        config.setup_public_config_and_other_settings()
         setup_logger()
 
         mock_all_feature_flags_to_default_values()

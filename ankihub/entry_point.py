@@ -53,7 +53,7 @@ WEB_MEDIA_PATH = Path(__file__).parent / "gui/web/media"
 def run():
     """Call this function in __init__.py when Anki starts."""
 
-    config.setup_public_config_and_urls()
+    config.setup_public_config_and_other_settings()
 
     setup_logger()
     LOGGER.info("Set up logger.")

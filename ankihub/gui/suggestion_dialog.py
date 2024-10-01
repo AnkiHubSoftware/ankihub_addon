@@ -47,7 +47,7 @@ from ..main.suggestions import (
     suggest_note_update,
     suggest_notes_in_bulk,
 )
-from ..settings import ANKING_DECK_ID, RATIONALE_FOR_CHANGE_MAX_LENGTH, config
+from ..settings import RATIONALE_FOR_CHANGE_MAX_LENGTH, config
 from .errors import report_exception_and_upload_logs
 from .media_sync import media_sync
 from .utils import (
@@ -106,7 +106,7 @@ def open_suggestion_dialog_for_single_suggestion(
     ah_nid = ankihub_db.ankihub_nid_for_anki_nid(note.id)
     SuggestionDialog(
         is_new_note_suggestion=ah_nid is None,
-        is_for_anking_deck=ah_did == ANKING_DECK_ID,
+        is_for_anking_deck=ah_did == config.anking_deck_id,
         can_submit_without_review=_can_submit_without_review(ah_did=ah_did),
         added_new_media=_added_new_media(note),
         callback=lambda suggestion_meta: _on_suggestion_dialog_for_single_suggestion_closed(
@@ -263,7 +263,7 @@ def open_suggestion_dialog_for_bulk_suggestion(
 
     SuggestionDialog(
         is_new_note_suggestion=False,
-        is_for_anking_deck=ah_did == ANKING_DECK_ID,
+        is_for_anking_deck=ah_did == config.anking_deck_id,
         can_submit_without_review=_can_submit_without_review(ah_did=ah_did),
         # We currently have a limit of 500 notes per bulk suggestion, so we don't have to worry
         # about performance here.
