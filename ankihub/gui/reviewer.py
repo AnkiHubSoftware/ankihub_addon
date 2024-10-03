@@ -20,7 +20,7 @@ from jinja2 import Template
 from ..db import ankihub_db
 from ..feature_flags import feature_flags
 from ..gui.menu import AnkiHubLogin
-from ..settings import ANKING_DECK_ID, config
+from ..settings import config
 from .js_message_handling import VIEW_NOTE_PYCMD
 from .utils import using_qt5
 
@@ -116,7 +116,10 @@ def _add_ankihub_ai_js_to_reviewer_web_content(web_content: WebContent, context)
         return
 
     reviewer: Reviewer = context
-    if not ankihub_db.ankihub_did_for_anki_nid(reviewer.card.nid) == ANKING_DECK_ID:
+    if (
+        not ankihub_db.ankihub_did_for_anki_nid(reviewer.card.nid)
+        == config.anking_deck_id
+    ):
         # Only show the AI chatbot for cards in the AnKing deck
         return
 

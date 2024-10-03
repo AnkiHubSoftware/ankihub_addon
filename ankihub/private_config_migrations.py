@@ -62,12 +62,12 @@ def _maybe_set_suspend_new_cards_of_new_notes_to_true_for_anking_deck(
 ) -> None:
     """Set suspend_new_cards_of_new_notes to True in the DeckConfig of the AnKing deck if the field
     doesn't exist yet."""
-    from .settings import ANKING_DECK_ID
+    from .settings import config
 
     field_name = "suspend_new_cards_of_new_notes"
     decks = private_config_dict["decks"]
     for ah_did, deck in decks.items():
-        if ah_did == ANKING_DECK_ID and deck.get(field_name) is None:
+        if ah_did == config.anking_deck_id and deck.get(field_name) is None:
             deck[field_name] = True
             LOGGER.info(
                 f"Set {field_name} to True for the previously installed AnKing deck."

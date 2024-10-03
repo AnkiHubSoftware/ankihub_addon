@@ -14,12 +14,7 @@ from jinja2 import Template
 
 from .. import LOGGER
 from ..feature_flags import add_feature_flags_update_callback, feature_flags
-from ..settings import (
-    ANKING_DECK_ID,
-    config,
-    url_flashcard_selector,
-    url_flashcard_selector_embed,
-)
+from ..settings import config, url_flashcard_selector, url_flashcard_selector_embed
 from .deck_updater import ah_deck_updater
 from .js_message_handling import parse_js_message_kwargs
 from .menu import AnkiHubLogin
@@ -59,7 +54,7 @@ def _maybe_add_flashcard_selector_button() -> None:
         return
 
     # Only add the button if the currently open deck overview is for the Anking deck or a child of it
-    anking_deck_config = config.deck_config(ANKING_DECK_ID)
+    anking_deck_config = config.deck_config(config.anking_deck_id)
     if (
         not anking_deck_config
         or not aqt.mw.col.decks.have(anking_deck_config.anki_id)
@@ -139,10 +134,10 @@ class FlashCardSelectorDialog(AnkiHubWebViewDialog):
         super()._setup_ui()
 
     def _get_embed_url(self) -> str:
-        return url_flashcard_selector_embed(ANKING_DECK_ID)
+        return url_flashcard_selector_embed(config.anking_deck_id)
 
     def _get_non_embed_url(self) -> str:
-        return url_flashcard_selector(ANKING_DECK_ID)
+        return url_flashcard_selector(config.anking_deck_id)
 
     @classmethod
     def _handle_auth_failure(cls) -> None:

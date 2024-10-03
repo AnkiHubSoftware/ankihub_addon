@@ -214,7 +214,6 @@ from ankihub.settings import (
     ANKIHUB_NOTE_TYPE_FIELD_NAME,
     ANKIHUB_NOTE_TYPE_MODIFICATION_STRING,
     ANKIHUB_TEMPLATE_END_COMMENT,
-    ANKING_DECK_ID,
     AnkiHubCommands,
     BehaviorOnRemoteNoteDeleted,
     DeckConfig,
@@ -4476,7 +4475,7 @@ class TestSyncWithAnkiHub:
         with anki_session_with_addon_data.profile_loaded():
             # Setup deck with a note that has a suspended card
             ah_did = install_ah_deck(
-                ah_did=ANKING_DECK_ID if is_for_anking_deck else None
+                ah_did=config.anking_deck_id if is_for_anking_deck else None
             )
             note_info = import_ah_note(
                 ah_did=ah_did,
@@ -5559,11 +5558,11 @@ class TestConfigDialog:
 class TestFlashCardSelector:
     @pytest.mark.sequential
     @pytest.mark.parametrize(
-        "deck_id, feature_flag_active, expected_button_exists",
+        "is_anking_deck, feature_flag_active, expected_button_exists",
         [
-            (ANKING_DECK_ID, True, True),
-            (ANKING_DECK_ID, False, False),
-            (uuid.uuid4(), True, False),
+            (True, True, True),
+            (True, False, False),
+            (False, True, False),
         ],
     )
     def test_flashcard_selector_button_exists_for_anking_deck(
@@ -5571,7 +5570,7 @@ class TestFlashCardSelector:
         anki_session_with_addon_data: AnkiSession,
         install_ah_deck: InstallAHDeck,
         qtbot: QtBot,
-        deck_id: uuid.UUID,
+        is_anking_deck: bool,
         set_feature_flag_state: SetFeatureFlagState,
         feature_flag_active: bool,
         expected_button_exists: bool,
@@ -5583,7 +5582,10 @@ class TestFlashCardSelector:
         entry_point.run()
         with anki_session_with_addon_data.profile_loaded():
             anki_did = DeckId(1)
-            install_ah_deck(ah_did=deck_id, anki_did=anki_did)
+            install_ah_deck(
+                ah_did=config.anking_deck_id if is_anking_deck else uuid.uuid4(),
+                anki_did=anki_did,
+            )
             aqt.mw.deckBrowser.set_current_deck(anki_did)
 
             qtbot.wait(500)
@@ -5612,7 +5614,7 @@ class TestFlashCardSelector:
             mocker.patch.object(config, "token")
 
             anki_did = DeckId(1)
-            install_ah_deck(ah_did=ANKING_DECK_ID, anki_did=anki_did)
+            install_ah_deck(ah_did=config.anking_deck_id, anki_did=anki_did)
             aqt.mw.deckBrowser.set_current_deck(anki_did)
 
             qtbot.wait(500)
@@ -5649,7 +5651,7 @@ class TestFlashCardSelector:
             mocker.patch.object(config, "token")
 
             anki_did = DeckId(1)
-            install_ah_deck(ah_did=ANKING_DECK_ID, anki_did=anki_did)
+            install_ah_deck(ah_did=config.anking_deck_id, anki_did=anki_did)
             aqt.mw.deckBrowser.set_current_deck(anki_did)
 
             qtbot.wait(500)
@@ -5731,7 +5733,7 @@ class TestFlashCardSelector:
             dialog.view_in_web_browser_button.click()
 
             openLink_mock.assert_called_once_with(
-                url_flashcard_selector(ANKING_DECK_ID)
+                url_flashcard_selector(config.anking_deck_id)
             )
             assert not dialog.isVisible()
 
@@ -5978,7 +5980,9 @@ class TestAnkiHubAIInReviewer:
 
         entry_point.run()
         with anki_session_with_addon_data.profile_loaded():
-            ah_did = ANKING_DECK_ID if for_anking_deck else next_deterministic_uuid()
+            ah_did = (
+                config.anking_deck_id if for_anking_deck else next_deterministic_uuid()
+            )
             self._setup_note_for_review(
                 ah_did, install_ah_deck=install_ah_deck, import_ah_note=import_ah_note
             )
@@ -6013,7 +6017,9 @@ class TestAnkiHubAIInReviewer:
         entry_point.run()
 
         with anki_session_with_addon_data.profile_loaded():
-            self._setup_note_for_review(ANKING_DECK_ID, install_ah_deck, import_ah_note)
+            self._setup_note_for_review(
+                config.anking_deck_id, install_ah_deck, import_ah_note
+            )
 
             aqt.mw.reviewer.show()
 
@@ -6196,7 +6202,9 @@ class TestAnkiHubAIInReviewer:
         entry_point.run()
 
         with anki_session_with_addon_data.profile_loaded():
-            self._setup_note_for_review(ANKING_DECK_ID, install_ah_deck, import_ah_note)
+            self._setup_note_for_review(
+                config.anking_deck_id, install_ah_deck, import_ah_note
+            )
             aqt.mw.reviewer.show()
             qtbot.wait(100)
 
@@ -6226,7 +6234,9 @@ class TestAnkiHubAIInReviewer:
         entry_point.run()
 
         with anki_session_with_addon_data.profile_loaded():
-            self._setup_note_for_review(ANKING_DECK_ID, install_ah_deck, import_ah_note)
+            self._setup_note_for_review(
+                config.anking_deck_id, install_ah_deck, import_ah_note
+            )
 
             aqt.mw.reviewer.show()
 
@@ -6262,7 +6272,7 @@ class TestAnkiHubAIInReviewer:
         config.set_suspend_new_cards_of_new_notes(ankihub_did=ah_did, suspend=False)
         deck_config = config.deck_config(ah_did)
         import_ah_note(
-            ah_did=ANKING_DECK_ID,
+            ah_did=config.anking_deck_id,
             anki_did=deck_config.anki_id,
         )
         aqt.mw.col.decks.set_current(deck_config.anki_id)

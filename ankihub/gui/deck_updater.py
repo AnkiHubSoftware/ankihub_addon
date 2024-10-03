@@ -18,7 +18,7 @@ from ..main.importing import AnkiHubImporter, AnkiHubImportResult
 from ..main.note_conversion import is_tag_for_group
 from ..main.note_types import fetch_note_types_based_on_notes
 from ..main.utils import create_backup
-from ..settings import ANKING_DECK_ID, config
+from ..settings import config
 from .media_sync import media_sync
 from .operations.scheduling import unsuspend_notes
 from .utils import deck_download_progress_cb, show_error_dialog
@@ -103,7 +103,7 @@ class _AnkiHubDeckUpdater:
         if not result:
             return False
 
-        if ankihub_did == ANKING_DECK_ID:
+        if ankihub_did == config.anking_deck_id:
             self.fetch_and_apply_pending_notes_actions_for_deck(ankihub_did)
 
         return True
