@@ -438,6 +438,7 @@ def install_ah_deck(
         ah_deck_name: Optional[str] = None,
         anki_did: Optional[DeckId] = None,
         anki_deck_name: Optional[str] = None,
+        has_note_embeddings: bool = False,
     ) -> uuid.UUID:
         if not ah_did:
             ah_did = next_deterministic_uuid()
@@ -455,6 +456,7 @@ def install_ah_deck(
             anki_did=anki_did,
             user_relation=UserDeckRelation.SUBSCRIBER,
             behavior_on_remote_note_deleted=BehaviorOnRemoteNoteDeleted.NEVER_DELETE,
+            has_note_embeddings=has_note_embeddings,
         )
 
         # Create deck by importing a note for it

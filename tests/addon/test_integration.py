@@ -4362,6 +4362,7 @@ class TestDeckUpdater:
             deck = DeckFactory.create(
                 ah_did=ah_did,
                 user_relation=current_relation,
+                has_note_embeddings=True,
             )
             config.update_deck(deck)
 
@@ -4382,6 +4383,7 @@ class TestDeckUpdater:
 
             # Assert that the deck config was updated with the incoming relation
             assert config.deck_config(ah_did).user_relation == incoming_relation
+            assert config.deck_config(ah_did).has_note_embeddings is True
 
 
 class TestSyncWithAnkiHub:
@@ -5558,7 +5560,7 @@ class TestConfigDialog:
 class TestFlashCardSelector:
     @pytest.mark.sequential
     @pytest.mark.parametrize(
-        "is_anking_deck, feature_flag_active, expected_button_exists",
+        "has_note_embeddings, feature_flag_active, expected_button_exists",
         [
             (True, True, True),
             (True, False, False),
@@ -5570,7 +5572,7 @@ class TestFlashCardSelector:
         anki_session_with_addon_data: AnkiSession,
         install_ah_deck: InstallAHDeck,
         qtbot: QtBot,
-        is_anking_deck: bool,
+        has_note_embeddings: bool,
         set_feature_flag_state: SetFeatureFlagState,
         feature_flag_active: bool,
         expected_button_exists: bool,
@@ -5583,8 +5585,9 @@ class TestFlashCardSelector:
         with anki_session_with_addon_data.profile_loaded():
             anki_did = DeckId(1)
             install_ah_deck(
-                ah_did=config.anking_deck_id if is_anking_deck else uuid.uuid4(),
+                ah_did=config.anking_deck_id if has_note_embeddings else uuid.uuid4(),
                 anki_did=anki_did,
+                has_note_embeddings=has_note_embeddings,
             )
             aqt.mw.deckBrowser.set_current_deck(anki_did)
 
@@ -5614,7 +5617,11 @@ class TestFlashCardSelector:
             mocker.patch.object(config, "token")
 
             anki_did = DeckId(1)
-            install_ah_deck(ah_did=config.anking_deck_id, anki_did=anki_did)
+            install_ah_deck(
+                ah_did=config.anking_deck_id,
+                anki_did=anki_did,
+                has_note_embeddings=True,
+            )
             aqt.mw.deckBrowser.set_current_deck(anki_did)
 
             qtbot.wait(500)
@@ -5956,7 +5963,7 @@ def mock_using_qt5_to_return_false(mocker: MockerFixture):
 class TestAnkiHubAIInReviewer:
     @pytest.mark.sequential
     @pytest.mark.parametrize(
-        "feature_flag_active, for_anking_deck, expected_button_exists",
+        "feature_flag_active, has_note_embeddings, expected_button_exists",
         [
             # The feature is only available for the AnKing deck and only if the feature flag is active
             (True, True, True),
@@ -5973,7 +5980,7 @@ class TestAnkiHubAIInReviewer:
         set_feature_flag_state: SetFeatureFlagState,
         next_deterministic_uuid: Callable[[], uuid.UUID],
         feature_flag_active: bool,
-        for_anking_deck: bool,
+        has_note_embeddings: bool,
         expected_button_exists: bool,
     ):
         set_feature_flag_state("chatbot", feature_flag_active)
@@ -5981,10 +5988,15 @@ class TestAnkiHubAIInReviewer:
         entry_point.run()
         with anki_session_with_addon_data.profile_loaded():
             ah_did = (
-                config.anking_deck_id if for_anking_deck else next_deterministic_uuid()
+                config.anking_deck_id
+                if has_note_embeddings
+                else next_deterministic_uuid()
             )
             self._setup_note_for_review(
-                ah_did, install_ah_deck=install_ah_deck, import_ah_note=import_ah_note
+                ah_did,
+                install_ah_deck=install_ah_deck,
+                import_ah_note=import_ah_note,
+                has_note_embeddings=has_note_embeddings,
             )
 
             # Open reviewer
@@ -6265,8 +6277,9 @@ class TestAnkiHubAIInReviewer:
         ah_did: uuid.UUID,
         install_ah_deck: InstallAHDeck,
         import_ah_note: ImportAHNote,
+        has_note_embeddings: bool = False,
     ) -> None:
-        install_ah_deck(ah_did=ah_did)
+        install_ah_deck(ah_did=ah_did, has_note_embeddings=has_note_embeddings)
 
         # Changes the deck setting so that there are unsuspend cards ready for review
         config.set_suspend_new_cards_of_new_notes(ankihub_did=ah_did, suspend=False)

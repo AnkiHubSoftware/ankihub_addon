@@ -117,6 +117,7 @@ class Deck(DataClassJSONMixinWithConfig):
             deserialize=lambda s: UserDeckRelation(s),
         )
     )
+    has_note_embeddings: bool
 
     @property
     def is_user_relation_owner_or_maintainer(self):
