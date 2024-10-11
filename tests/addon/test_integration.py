@@ -1255,6 +1255,7 @@ def test_get_deck_by_id(
         "csv_notes_filename": "test.csv",
         "media_upload_finished": False,
         "user_relation": "subscriber",
+        "has_note_embeddings": False,
     }
 
     requests_mock.get(f"{config.api_url}/decks/{ah_did}/", json=expected_data)
@@ -1267,6 +1268,7 @@ def test_get_deck_by_id(
         csv_notes_filename="test.csv",
         media_upload_finished=False,
         user_relation=UserDeckRelation.SUBSCRIBER,
+        has_note_embeddings=False,
     )
 
     # test get deck by id unauthenticated
@@ -2673,6 +2675,7 @@ def test_unsubscribe_from_deck(
                         "csv_notes_filename": "",
                         "media_upload_finished": True,
                         "user_relation": "subscriber",
+                        "has_note_embeddings": False,
                     }
                 }
             ],
