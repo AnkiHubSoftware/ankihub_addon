@@ -5570,7 +5570,7 @@ class TestFlashCardSelector:
             (False, True, False),
         ],
     )
-    def test_flashcard_selector_button_exists_for_anking_deck(
+    def test_flashcard_selector_button_exists_for_deck_with_note_embeddings(
         self,
         anki_session_with_addon_data: AnkiSession,
         install_ah_deck: InstallAHDeck,
@@ -5588,7 +5588,6 @@ class TestFlashCardSelector:
         with anki_session_with_addon_data.profile_loaded():
             anki_did = DeckId(1)
             install_ah_deck(
-                ah_did=config.anking_deck_id if has_note_embeddings else uuid.uuid4(),
                 anki_did=anki_did,
                 has_note_embeddings=has_note_embeddings,
             )
@@ -5621,7 +5620,6 @@ class TestFlashCardSelector:
 
             anki_did = DeckId(1)
             install_ah_deck(
-                ah_did=config.anking_deck_id,
                 anki_did=anki_did,
                 has_note_embeddings=True,
             )
@@ -5661,7 +5659,7 @@ class TestFlashCardSelector:
             mocker.patch.object(config, "token")
 
             anki_did = DeckId(1)
-            install_ah_deck(ah_did=config.anking_deck_id, anki_did=anki_did)
+            install_ah_deck(anki_did=anki_did, has_note_embeddings=True)
             aqt.mw.deckBrowser.set_current_deck(anki_did)
 
             qtbot.wait(500)
@@ -5981,7 +5979,6 @@ class TestAnkiHubAIInReviewer:
         install_ah_deck: InstallAHDeck,
         qtbot: QtBot,
         set_feature_flag_state: SetFeatureFlagState,
-        next_deterministic_uuid: Callable[[], uuid.UUID],
         feature_flag_active: bool,
         has_note_embeddings: bool,
         expected_button_exists: bool,
@@ -5990,13 +5987,7 @@ class TestAnkiHubAIInReviewer:
 
         entry_point.run()
         with anki_session_with_addon_data.profile_loaded():
-            ah_did = (
-                config.anking_deck_id
-                if has_note_embeddings
-                else next_deterministic_uuid()
-            )
             self._setup_note_for_review(
-                ah_did,
                 install_ah_deck=install_ah_deck,
                 import_ah_note=import_ah_note,
                 has_note_embeddings=has_note_embeddings,
@@ -6033,7 +6024,9 @@ class TestAnkiHubAIInReviewer:
 
         with anki_session_with_addon_data.profile_loaded():
             self._setup_note_for_review(
-                config.anking_deck_id, install_ah_deck, import_ah_note
+                install_ah_deck,
+                import_ah_note,
+                has_note_embeddings=True,
             )
 
             aqt.mw.reviewer.show()
@@ -6218,7 +6211,9 @@ class TestAnkiHubAIInReviewer:
 
         with anki_session_with_addon_data.profile_loaded():
             self._setup_note_for_review(
-                config.anking_deck_id, install_ah_deck, import_ah_note
+                install_ah_deck,
+                import_ah_note,
+                has_note_embeddings=True,
             )
             aqt.mw.reviewer.show()
             qtbot.wait(100)
@@ -6250,7 +6245,9 @@ class TestAnkiHubAIInReviewer:
 
         with anki_session_with_addon_data.profile_loaded():
             self._setup_note_for_review(
-                config.anking_deck_id, install_ah_deck, import_ah_note
+                install_ah_deck,
+                import_ah_note,
+                has_note_embeddings=True,
             )
 
             aqt.mw.reviewer.show()
@@ -6277,18 +6274,18 @@ class TestAnkiHubAIInReviewer:
 
     def _setup_note_for_review(
         self,
-        ah_did: uuid.UUID,
         install_ah_deck: InstallAHDeck,
         import_ah_note: ImportAHNote,
         has_note_embeddings: bool = False,
     ) -> None:
+        ah_did = uuid.uuid4()
         install_ah_deck(ah_did=ah_did, has_note_embeddings=has_note_embeddings)
 
         # Changes the deck setting so that there are unsuspend cards ready for review
         config.set_suspend_new_cards_of_new_notes(ankihub_did=ah_did, suspend=False)
         deck_config = config.deck_config(ah_did)
         import_ah_note(
-            ah_did=config.anking_deck_id,
+            ah_did=ah_did,
             anki_did=deck_config.anki_id,
         )
         aqt.mw.col.decks.set_current(deck_config.anki_id)

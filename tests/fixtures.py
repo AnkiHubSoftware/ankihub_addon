@@ -419,6 +419,7 @@ class InstallAHDeck(Protocol):
         ah_deck_name: Optional[str] = None,
         anki_did: Optional[DeckId] = None,
         anki_deck_name: Optional[str] = None,
+        has_note_embeddings: bool = False,
     ) -> uuid.UUID:
         ...
 
