@@ -376,6 +376,13 @@ class _Config:
     def deck_config(self, ankihub_did: uuid.UUID) -> Optional[DeckConfig]:
         return self._private_config.decks.get(ankihub_did)
 
+    def deck_config_by_anki_did(self, anki_did: DeckId) -> Optional[DeckConfig]:
+        decks = self._private_config.decks
+        return next(
+            (deck for deck in decks.values() if deck.anki_id == anki_did),
+            None,
+        )
+
     def token(self) -> Optional[str]:
         # return aqt.mw.pm.ankihub_token()
         return aqt.mw.pm.profile.get("ankiHubToken")

@@ -7,6 +7,7 @@ from typing import Any, cast
 from uuid import UUID
 
 import aqt
+from anki.decks import DeckId
 from aqt.gui_hooks import overview_did_refresh, webview_did_receive_js_message
 from aqt.utils import tooltip
 from aqt.webview import AnkiWebView
@@ -53,8 +54,7 @@ def _maybe_add_flashcard_selector_button() -> None:
     if not aqt.mw.state == "overview":
         return
 
-    deck_config = config.deck_config(aqt.mw.col.decks.current()["id"])
-    if not deck_config or not deck_config.has_note_embeddings:
+    if not _deck_or_ancestor_has_note_embeddings(aqt.mw.col.decks.current()["id"]):
         return
 
     if not feature_flags.show_flashcards_selector_button:
@@ -71,6 +71,15 @@ def _maybe_add_flashcard_selector_button() -> None:
         }
     )
     overview_web.eval(js)
+
+
+def _deck_or_ancestor_has_note_embeddings(anki_did: DeckId) -> bool:
+    anki_dids = [anki_did] + [deck["id"] for deck in aqt.mw.col.decks.parents(anki_did)]
+    return any(
+        (deck_config := config.deck_config_by_anki_did(anki_did))
+        and deck_config.has_note_embeddings
+        for anki_did in anki_dids
+    )
 
 
 def _handle_flashcard_selector_py_commands(
