@@ -5731,9 +5731,13 @@ class TestFlashCardSelector:
         self,
         anki_session_with_addon_data: AnkiSession,
         qtbot: QtBot,
+        next_deterministic_uuid: Callable[[], uuid.UUID],
     ):
         with anki_session_with_addon_data.profile_loaded():
-            dialog = FlashCardSelectorDialog.display(aqt.mw)
+            dialog = FlashCardSelectorDialog.display_for_ah_did(
+                ah_did=next_deterministic_uuid(),
+                parent=aqt.mw,
+            )
 
             def auth_failure_was_handled() -> bool:
                 return not dialog and AnkiHubLogin._window.isVisible()
@@ -5746,6 +5750,7 @@ class TestFlashCardSelector:
         anki_session_with_addon_data: AnkiSession,
         qtbot: QtBot,
         mocker: MockerFixture,
+        next_deterministic_uuid: Callable[[], uuid.UUID],
     ):
         entry_point.run()
         with anki_session_with_addon_data.profile_loaded():
@@ -5753,7 +5758,10 @@ class TestFlashCardSelector:
 
             self._mock_load_url_to_show_page(mocker, body="Invalid token")
 
-            dialog = FlashCardSelectorDialog.display(aqt.mw)
+            dialog = FlashCardSelectorDialog.display_for_ah_did(
+                ah_did=next_deterministic_uuid(),
+                parent=aqt.mw,
+            )
 
             def auth_failure_was_handled() -> bool:
                 return not dialog.isVisible() and AnkiHubLogin._window.isVisible()
@@ -5764,19 +5772,22 @@ class TestFlashCardSelector:
         self,
         anki_session_with_addon_data: AnkiSession,
         mocker: MockerFixture,
+        next_deterministic_uuid: Callable[[], uuid.UUID],
     ):
         with anki_session_with_addon_data.profile_loaded():
             mocker.patch.object(config, "token")
 
-            dialog = FlashCardSelectorDialog.display(aqt.mw)
+            ah_did = next_deterministic_uuid()
+            dialog = FlashCardSelectorDialog.display_for_ah_did(
+                ah_did=ah_did,
+                parent=aqt.mw,
+            )
 
             openLink_mock = mocker.patch("ankihub.gui.webview.openLink")
 
             dialog.view_in_web_browser_button.click()
 
-            openLink_mock.assert_called_once_with(
-                url_flashcard_selector(config.anking_deck_id)
-            )
+            openLink_mock.assert_called_once_with(url_flashcard_selector(ah_did))
             assert not dialog.isVisible()
 
     @pytest.mark.sequential
@@ -5785,6 +5796,7 @@ class TestFlashCardSelector:
         anki_session_with_addon_data: AnkiSession,
         qtbot: QtBot,
         mocker: MockerFixture,
+        next_deterministic_uuid: Callable[[], uuid.UUID],
     ):
         entry_point.run()
         with anki_session_with_addon_data.profile_loaded():
@@ -5798,10 +5810,14 @@ class TestFlashCardSelector:
             # Mock the page so that it's loaded and we can run javascript on it
             self._mock_load_url_to_show_page(mocker, body="")
 
-            dialog = FlashCardSelectorDialog.display(aqt.mw)
+            ah_did = next_deterministic_uuid()
+            dialog = FlashCardSelectorDialog.display_for_ah_did(
+                ah_did=next_deterministic_uuid(),
+                parent=aqt.mw,
+            )
 
-            args = {"deckId": str(uuid.uuid4())}
-            js = f"pycmd('{FLASHCARD_SELECTOR_SYNC_NOTES_ACTIONS_PYCMD} {json.dumps(args)}')"
+            kwargs = {"deckId": str(ah_did)}
+            js = f"pycmd('{FLASHCARD_SELECTOR_SYNC_NOTES_ACTIONS_PYCMD} {json.dumps(kwargs)}')"
             dialog.web.eval(js)
 
             qtbot.wait_until(
