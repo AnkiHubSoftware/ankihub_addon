@@ -92,6 +92,7 @@ from ..fixtures import (
     MockSuggestionDialog,
     SetFeatureFlagState,
     add_basic_anki_note_to_deck,
+    create_anki_deck,
     create_or_get_ah_version_of_note_type,
     record_review,
     record_review_for_anki_nid,
@@ -5602,6 +5603,39 @@ class TestFlashCardSelector:
                     callback,
                 )
             callback.assert_called_with(expected_button_exists)
+
+    @pytest.mark.sequential
+    def test_flashcard_selector_button_exists_for_subdeck_of_deck_with_note_embeddings(
+        self,
+        anki_session_with_addon_data: AnkiSession,
+        install_ah_deck: InstallAHDeck,
+        qtbot: QtBot,
+        set_feature_flag_state: SetFeatureFlagState,
+    ):
+        set_feature_flag_state("show_flashcards_selector_button", is_active=True)
+
+        entry_point.run()
+        with anki_session_with_addon_data.profile_loaded():
+            anki_did = DeckId(1)
+            deck_name = "test deck"
+            install_ah_deck(
+                anki_did=anki_did,
+                anki_deck_name=deck_name,
+                has_note_embeddings=True,
+            )
+            subdeck_anki_id = create_anki_deck(deck_name=f"{deck_name}::subdeck")
+
+            aqt.mw.deckBrowser.set_current_deck(subdeck_anki_id)
+
+            qtbot.wait(500)
+
+            overview_web: AnkiWebView = aqt.mw.overview.web
+            with qtbot.wait_callback() as callback:
+                overview_web.evalWithCallback(
+                    f"document.getElementById('{FLASHCARD_SELECTOR_OPEN_BUTTON_ID}') !== null",
+                    callback,
+                )
+            callback.assert_called_with(True)
 
     @pytest.mark.sequential
     def test_clicking_button_opens_flashcard_selector_dialog(
