@@ -131,6 +131,7 @@ class DeckConfig(DataClassJSONMixin):
     suspend_new_cards_of_existing_notes: SuspendNewCardsOfExistingNotes = (
         SuspendNewCardsOfExistingNotes.IF_SIBLINGS_SUSPENDED
     )
+    has_note_embeddings: bool = False
 
     @staticmethod
     def suspend_new_cards_of_new_notes_default(ah_did: uuid.UUID) -> bool:
@@ -308,6 +309,7 @@ class _Config:
         behavior_on_remote_note_deleted: BehaviorOnRemoteNoteDeleted,
         latest_udpate: Optional[datetime] = None,
         subdecks_enabled: bool = False,
+        has_note_embeddings: bool = False,
     ) -> None:
         """Add deck to the list of installed decks."""
         self._private_config.decks[ankihub_did] = DeckConfig(
@@ -319,6 +321,7 @@ class _Config:
                 ankihub_did
             ),
             behavior_on_remote_note_deleted=behavior_on_remote_note_deleted,
+            has_note_embeddings=has_note_embeddings,
         )
         # remove duplicates
         self.save_latest_deck_update(ankihub_did, latest_udpate)
@@ -334,6 +337,7 @@ class _Config:
         # Only these fields are needed for the deck config
         deck_config.name = deck.name
         deck_config.user_relation = deck.user_relation
+        deck_config.has_note_embeddings = deck.has_note_embeddings
 
         self._update_private_config()
 
@@ -371,6 +375,13 @@ class _Config:
 
     def deck_config(self, ankihub_did: uuid.UUID) -> Optional[DeckConfig]:
         return self._private_config.decks.get(ankihub_did)
+
+    def deck_config_by_anki_did(self, anki_did: DeckId) -> Optional[DeckConfig]:
+        decks = self._private_config.decks
+        return next(
+            (deck for deck in decks.values() if deck.anki_id == anki_did),
+            None,
+        )
 
     def token(self) -> Optional[str]:
         # return aqt.mw.pm.ankihub_token()

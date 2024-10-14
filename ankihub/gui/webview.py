@@ -1,5 +1,5 @@
 from abc import abstractmethod
-from typing import Any, Optional, cast
+from typing import Any
 
 from anki.utils import is_mac
 from aqt.gui_hooks import theme_did_change
@@ -51,30 +51,22 @@ class AnkiHubWebViewDialog(AlwaysOnTopOfParentDialog):
     This class handles setting up the web view, loading the page, styling and authentication.
     """
 
-    dialog: Optional["AnkiHubWebViewDialog"] = None
-
     def __init__(self, parent: Any) -> None:
         super().__init__(parent)
         self._setup_ui()
 
-    @classmethod
-    def display(cls, parent: Any) -> "Optional[AnkiHubWebViewDialog]":
-        """Display the dialog. If the dialog is already open, the existing dialog is activated and shown."""
+    def display(self) -> bool:
+        """Display the dialog. Return True if the initialization was successful, False otherwise."""
         if not config.token():
-            cls._handle_auth_failure()
-            return None
+            self._handle_auth_failure()
+            return False
 
-        if cls.dialog is None:
-            cls.dialog = cls(parent)
-        else:
-            cls.dialog = cast(AnkiHubWebViewDialog, cls.dialog)
+        self._load_page()
+        self.activateWindow()
+        self.raise_()
+        self.show()
 
-        cls.dialog._load_page()
-        cls.dialog.activateWindow()
-        cls.dialog.raise_()
-        cls.dialog.show()
-
-        return cls.dialog
+        return True
 
     def _setup_ui(self) -> None:
         self.web = AnkiWebView(parent=self)
@@ -156,9 +148,8 @@ class AnkiHubWebViewDialog(AlwaysOnTopOfParentDialog):
         """Return the URL to load in the default browser."""
         ...  # pragma: no cover
 
-    @classmethod
     @abstractmethod
-    def _handle_auth_failure(cls) -> None:
+    def _handle_auth_failure(self) -> None:
         """Handle an authentication failure, e.g. prompt the user to log in."""
         ...  # pragma: no cover
 

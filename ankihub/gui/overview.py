@@ -1,9 +1,11 @@
 """Modifies the Anki deck overview screen (aqt.overview)."""
 
+import json
+import uuid
 from concurrent.futures import Future
 from functools import partial
 from pathlib import Path
-from typing import Any, cast
+from typing import Any, Optional
 from uuid import UUID
 
 import aqt
@@ -18,6 +20,7 @@ from ..settings import config, url_flashcard_selector, url_flashcard_selector_em
 from .deck_updater import ah_deck_updater
 from .js_message_handling import parse_js_message_kwargs
 from .menu import AnkiHubLogin
+from .utils import get_ah_did_of_deck_or_ancestor_deck
 from .webview import AnkiHubWebViewDialog
 
 ADD_FLASHCARD_SELECTOR_BUTTON_JS_PATH = (
@@ -53,15 +56,10 @@ def _maybe_add_flashcard_selector_button() -> None:
     if not aqt.mw.state == "overview":
         return
 
-    # Only add the button if the currently open deck overview is for the Anking deck or a child of it
-    anking_deck_config = config.deck_config(config.anking_deck_id)
+    ah_did = get_ah_did_of_deck_or_ancestor_deck(aqt.mw.col.decks.current()["id"])
     if (
-        not anking_deck_config
-        or not aqt.mw.col.decks.have(anking_deck_config.anki_id)
-        or (
-            aqt.mw.col.decks.current()["id"]
-            not in aqt.mw.col.decks.deck_and_child_ids(anking_deck_config.anki_id)
-        )
+        not config.deck_config(ah_did)
+        or not config.deck_config(ah_did).has_note_embeddings
     ):
         return
 
@@ -72,10 +70,11 @@ def _maybe_add_flashcard_selector_button() -> None:
         return
 
     overview_web: AnkiWebView = aqt.mw.overview.web
+    kwargs_json = json.dumps({"deck_id": str(ah_did)}).replace('"', '\\"')
     js = Template(ADD_FLASHCARD_SELECTOR_BUTTON_JS_PATH.read_text()).render(
         {
             "FLASHCARD_SELECTOR_OPEN_BUTTON_ID": FLASHCARD_SELECTOR_OPEN_BUTTON_ID,
-            "FLASHCARD_SELECTOR_OPEN_PYCMD": FLASHCARD_SELECTOR_OPEN_PYCMD,
+            "FLASHCARD_SELECTOR_OPEN_PYCMD": f"{FLASHCARD_SELECTOR_OPEN_PYCMD} {kwargs_json}",
         }
     )
     overview_web.eval(js)
@@ -84,8 +83,12 @@ def _maybe_add_flashcard_selector_button() -> None:
 def _handle_flashcard_selector_py_commands(
     handled: tuple[bool, Any], message: str, context: Any
 ) -> tuple[bool, Any]:
-    if message == FLASHCARD_SELECTOR_OPEN_PYCMD:
-        FlashCardSelectorDialog.display(aqt.mw)
+    if message.startswith(FLASHCARD_SELECTOR_OPEN_PYCMD):
+        kwargs = parse_js_message_kwargs(message)
+        ah_did = UUID(kwargs.get("deck_id"))
+
+        FlashCardSelectorDialog.display_for_ah_did(ah_did=ah_did, parent=aqt.mw)
+
         LOGGER.info("Opened flashcard selector dialog.")
         return (True, None)
     elif message.startswith(FLASHCARD_SELECTOR_SYNC_NOTES_ACTIONS_PYCMD):
@@ -124,8 +127,32 @@ def _on_fetch_and_apply_pending_notes_actions_done(
 
 
 class FlashCardSelectorDialog(AnkiHubWebViewDialog):
-    def __init__(self, parent: Any) -> None:
+
+    dialog: Optional["FlashCardSelectorDialog"] = None
+
+    def __init__(self, ah_did: uuid.UUID, parent) -> None:
         super().__init__(parent)
+
+        self.ah_did = ah_did
+
+    @classmethod
+    def display_for_ah_did(
+        cls, ah_did: uuid.UUID, parent: Any
+    ) -> "FlashCardSelectorDialog":
+        """Display the flashcard selector dialog for the given deck.
+        Reuses the dialog if it is already open for the same deck.
+        Otherwise, closes the existing dialog and opens a new one."""
+        if cls.dialog and cls.dialog.ah_did != ah_did:
+            cls.dialog.close()
+            cls.dialog = None
+
+        if not cls.dialog:
+            cls.dialog = cls(ah_did=ah_did, parent=parent)
+
+        if not cls.dialog.display():
+            cls.dialog = None
+
+        return cls.dialog
 
     def _setup_ui(self) -> None:
         self.setWindowTitle("AnkiHub | Flashcard Selector")
@@ -134,18 +161,15 @@ class FlashCardSelectorDialog(AnkiHubWebViewDialog):
         super()._setup_ui()
 
     def _get_embed_url(self) -> str:
-        return url_flashcard_selector_embed(config.anking_deck_id)
+        return url_flashcard_selector_embed(self.ah_did)
 
     def _get_non_embed_url(self) -> str:
-        return url_flashcard_selector(config.anking_deck_id)
+        return url_flashcard_selector(self.ah_did)
 
-    @classmethod
-    def _handle_auth_failure(cls) -> None:
+    def _handle_auth_failure(self) -> None:
         # Close the flashcard selector dialog and prompt them to log in,
         # then they can open the dialog again
-        if cls.dialog:
-            cls.dialog = cast(FlashCardSelectorDialog, cls.dialog)
-            cls.dialog.close()
+        self.close()
 
         AnkiHubLogin.display_login()
         LOGGER.info(

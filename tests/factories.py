@@ -70,6 +70,7 @@ class DeckFactory(BaseFactory[Deck]):
     csv_notes_filename = "test.csv"
     media_upload_finished = False
     user_relation = UserDeckRelation.SUBSCRIBER
+    has_note_embeddings = False
 
 
 class DeckMediaFactory(BaseFactory[DeckMedia]):

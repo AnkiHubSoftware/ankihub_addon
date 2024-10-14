@@ -4,6 +4,7 @@ from functools import partial
 from typing import Any, Callable, Dict, List, Optional, Sequence, Tuple, Union
 
 import aqt
+from anki.decks import DeckId
 from aqt import sync
 from aqt.addons import check_and_prompt_for_updates
 from aqt.progress import ProgressDialog
@@ -601,3 +602,15 @@ def sync_with_ankiweb(on_done: Callable[[], None]) -> None:
 
     aqt.gui_hooks.sync_will_start()
     sync.sync_collection(aqt.mw, on_done=on_collection_sync_finished)
+
+
+def get_ah_did_of_deck_or_ancestor_deck(anki_did: DeckId) -> Optional[uuid.UUID]:
+    anki_dids = [anki_did] + [deck["id"] for deck in aqt.mw.col.decks.parents(anki_did)]
+    return next(
+        (
+            ah_did
+            for anki_did in anki_dids
+            if (ah_did := config.get_deck_uuid_by_did(anki_did))
+        ),
+        None,
+    )

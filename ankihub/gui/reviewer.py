@@ -116,11 +116,11 @@ def _add_ankihub_ai_js_to_reviewer_web_content(web_content: WebContent, context)
         return
 
     reviewer: Reviewer = context
-    if (
-        not ankihub_db.ankihub_did_for_anki_nid(reviewer.card.nid)
-        == config.anking_deck_id
-    ):
-        # Only show the AI chatbot for cards in the AnKing deck
+    deck_config = config.deck_config(
+        ankihub_db.ankihub_did_for_anki_nid(reviewer.card.nid)
+    )
+    should_show_chatbot_button = deck_config and deck_config.has_note_embeddings
+    if not should_show_chatbot_button:
         return
 
     template_vars = {
