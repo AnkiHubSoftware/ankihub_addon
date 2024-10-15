@@ -123,7 +123,7 @@ def _add_ankihub_ai_js_to_reviewer_web_content(web_content: WebContent, context)
     ah_did_of_deck = get_ah_did_of_deck_or_ancestor_deck(
         aqt.mw.col.decks.current()["id"]
     )
-    ah_dids = (set([ah_did_of_note, ah_did_of_deck]) | ah_dids_of_note_type) - {None}
+    ah_dids = {ah_did_of_note, ah_did_of_deck, *ah_dids_of_note_type} - {None}
     if not any(
         (
             (deck_config := config.deck_config(ah_did))
