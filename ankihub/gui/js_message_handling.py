@@ -28,6 +28,7 @@ UNSUSPEND_NOTES_PYCMD = "ankihub_unsuspend_notes"
 SUSPEND_NOTES_PYCMD = "ankihub_suspend_notes"
 GET_NOTE_SUSPENSION_STATES_PYCMD = "ankihub_get_note_suspension_states"
 ANKIHUB_UPSELL = "ankihub_ai_upsell"
+COPY_TO_CLIPBOARD_PYCMD = "ankihub_copy_to_clipboard"
 
 POST_MESSAGE_TO_ANKIHUB_JS_PATH = (
     Path(__file__).parent / "web/post_message_to_ankihub_js.js"
@@ -105,6 +106,14 @@ def _on_js_message(handled: Tuple[bool, Any], message: str, context: Any) -> Any
             default_button_idx=1,
             callback=on_button_clicked,
         )
+    elif message.startswith(COPY_TO_CLIPBOARD_PYCMD):
+        kwargs = parse_js_message_kwargs(message)
+        content = kwargs.get("content")
+        if content:
+            aqt.mw.app.clipboard().setText(content)
+
+        return (True, None)
+
     return handled
 
 
