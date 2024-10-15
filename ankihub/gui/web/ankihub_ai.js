@@ -6,10 +6,7 @@ class AnkiHubAI {
         this.queryParameters = "{{ QUERY_PARAMETERS }}"
         this.embeddedAuthPath = "common/embedded-auth";
 
-        // The note ID for which the card is currently being reviewed.
-        // An empty string means that the card has no AnkiHub note ID.
-        this.noteIdOfReviewerCard = null;
-
+        this.noteIdOfReviewerCard = null; // The note ID for which the card is currently being reviewed.
         this.noteIdOfChatbot = null; // The note ID for which the chatbot page is currently loaded.
         this.authenticated = false;
         this.knoxToken = "{{ KNOX_TOKEN }}";
@@ -214,10 +211,7 @@ class AnkiHubAI {
             return;
         }
 
-        const targetUrl = this.noteIdOfReviewerCard !== ""
-            ? `${this.appUrl}/${this.endpointPath}/${this.noteIdOfReviewerCard}/?${this.queryParameters}`
-            : `${this.appUrl}/${this.endpointPath}/?${this.queryParameters}`;
-
+        const targetUrl = `${this.appUrl}/${this.endpointPath}/${this.noteIdOfReviewerCard}/?${this.queryParameters}`;
         if (!this.authenticated) {
             this.iframe.src = `${this.appUrl}/${this.embeddedAuthPath}/?next=${encodeURIComponent(targetUrl)}`;
             this.authenticated = true;

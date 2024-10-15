@@ -155,8 +155,7 @@ def _notify_ankihub_ai_of_card_change(card: Card) -> None:
         return
 
     ah_nid = ankihub_db.ankihub_nid_for_anki_nid(card.nid)
-    ah_nid_str = str(ah_nid) if ah_nid else ""
-    js = _wrap_with_ankihubAI_check(f"ankihubAI.cardChanged('{ah_nid_str}');")
+    js = _wrap_with_ankihubAI_check(f"ankihubAI.cardChanged('{ah_nid}');")
     aqt.mw.reviewer.web.eval(js)
 
 
