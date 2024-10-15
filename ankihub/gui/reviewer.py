@@ -116,11 +116,14 @@ def _add_ankihub_ai_js_to_reviewer_web_content(web_content: WebContent, context)
         return
 
     reviewer: Reviewer = context
-    deck_config = config.deck_config(
-        ankihub_db.ankihub_did_for_anki_nid(reviewer.card.nid)
-    )
-    should_show_chatbot_button = deck_config and deck_config.has_note_embeddings
-    if not should_show_chatbot_button:
+    ah_dids = ankihub_db.ankihub_dids_for_note_type(reviewer.card.note().mid)
+    if not any(
+        (
+            (deck_config := config.deck_config(ah_did))
+            and deck_config.has_note_embeddings
+        )
+        for ah_did in ah_dids
+    ):
         return
 
     template_vars = {
@@ -145,7 +148,8 @@ def _notify_ankihub_ai_of_card_change(card: Card) -> None:
         return
 
     ah_nid = ankihub_db.ankihub_nid_for_anki_nid(card.nid)
-    js = _wrap_with_ankihubAI_check(f"ankihubAI.cardChanged('{ah_nid}');")
+    ah_nid_str = str(ah_nid) if ah_nid else ""
+    js = _wrap_with_ankihubAI_check(f"ankihubAI.cardChanged('{ah_nid_str}');")
     aqt.mw.reviewer.web.eval(js)
 
 
