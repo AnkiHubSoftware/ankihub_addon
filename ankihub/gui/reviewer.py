@@ -22,7 +22,7 @@ from ..feature_flags import feature_flags
 from ..gui.menu import AnkiHubLogin
 from ..settings import config
 from .js_message_handling import VIEW_NOTE_PYCMD
-from .utils import using_qt5
+from .utils import get_ah_did_of_deck_or_ancestor_deck, using_qt5
 
 VIEW_NOTE_BUTTON_ID = "ankihub-view-note-button"
 
@@ -116,11 +116,21 @@ def _add_ankihub_ai_js_to_reviewer_web_content(web_content: WebContent, context)
         return
 
     reviewer: Reviewer = context
-    deck_config = config.deck_config(
-        ankihub_db.ankihub_did_for_anki_nid(reviewer.card.nid)
+    ah_did_of_note = ankihub_db.ankihub_did_for_anki_nid(reviewer.card.nid)
+    ah_dids_of_note_type = ankihub_db.ankihub_dids_for_note_type(
+        reviewer.card.note().mid
     )
-    should_show_chatbot_button = deck_config and deck_config.has_note_embeddings
-    if not should_show_chatbot_button:
+    ah_did_of_deck = get_ah_did_of_deck_or_ancestor_deck(
+        aqt.mw.col.decks.current()["id"]
+    )
+    ah_dids = {ah_did_of_note, ah_did_of_deck, *ah_dids_of_note_type} - {None}
+    if not any(
+        (
+            (deck_config := config.deck_config(ah_did))
+            and deck_config.has_note_embeddings
+        )
+        for ah_did in ah_dids
+    ):
         return
 
     template_vars = {
