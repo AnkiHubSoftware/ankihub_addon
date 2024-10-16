@@ -1415,11 +1415,10 @@ class TestAnkiHubDBRemoveDeck:
             )
             is None
         )
-        assert (
+        assert not (
             ankihub_db.ankihub_dids_for_note_type(
                 anki_note_type_id=ankihub_basic_note_type["id"]
             )
-            is None
         )
 
         assert ankihub_db.downloadable_media_names_for_ankihub_deck(ah_did) == set()
