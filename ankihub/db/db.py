@@ -591,14 +591,13 @@ class _AnkiHubDB:
 
     def ankihub_dids_for_note_type(
         self, anki_note_type_id: NotetypeId
-    ) -> Optional[Set[uuid.UUID]]:
+    ) -> Set[uuid.UUID]:
         """Returns the AnkiHub deck ids that use the given note type."""
-        result = set(
+        return set(
             AnkiHubNoteType.select(AnkiHubNoteType.ankihub_deck_id)
             .filter(anki_note_type_id=anki_note_type_id)
             .objects(flat)
         )
-        return result if result else None
 
     def _note_type_field_names(
         self, ankihub_did: uuid.UUID, anki_note_type_id: NotetypeId
