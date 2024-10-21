@@ -12,7 +12,7 @@ from aqt.main import AnkiQt
 
 from . import LOGGER
 from .db import ankihub_db
-from .feature_flags import setup_feature_flags_in_background
+from .feature_flags import update_feature_flags_in_background
 from .gui import (
     browser,
     deckbrowser,
@@ -230,7 +230,10 @@ def _general_setup():
     # This is because other setup functions can add callbacks which react to the feature flags getting fetched.
     # If this function is called earlier, the feature flags might be fetched before the callbacks are added,
     # which would cause the callbacks to not be called.
-    setup_feature_flags_in_background()
+    update_feature_flags_in_background()
+
+    config.token_change_hook.append(update_feature_flags_in_background)
+
     LOGGER.info(
         "Set up feature flag fetching (flags will be fetched in the background)."
     )

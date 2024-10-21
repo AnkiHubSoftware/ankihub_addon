@@ -25,7 +25,7 @@ feature_flags = _FeatureFlags()
 _feature_flags_update_callbacks: List[Callable[[], None]] = []
 
 
-def setup_feature_flags_in_background() -> None:
+def update_feature_flags_in_background() -> None:
     def on_done(_: None) -> None:
         LOGGER.info("Set up feature flags.")
 
