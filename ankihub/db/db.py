@@ -351,7 +351,7 @@ class _AnkiHubDB:
     def anki_nids_for_ankihub_deck(self, ankihub_did: uuid.UUID) -> List[NoteId]:
         return (
             AnkiHubNote.select(AnkiHubNote.anki_note_id)
-            .filter(ankihub_deck_id=ankihub_did)
+            .filter(NOTE_NOT_DELETED_CONDITION, ankihub_deck_id=ankihub_did)
             .objects(flat)
         )
 
@@ -361,7 +361,7 @@ class _AnkiHubDB:
     def ankihub_did_for_anki_nid(self, anki_nid: NoteId) -> Optional[uuid.UUID]:
         return (
             AnkiHubNote.select(AnkiHubNote.ankihub_deck_id)
-            .filter(anki_note_id=anki_nid)
+            .filter(NOTE_NOT_DELETED_CONDITION, anki_note_id=anki_nid)
             .scalar()
         )
 
@@ -371,7 +371,7 @@ class _AnkiHubDB:
         return execute_list_query_in_chunks(
             lambda anki_nids: (
                 AnkiHubNote.select(AnkiHubNote.ankihub_deck_id)
-                .filter(anki_note_id__in=anki_nids)
+                .filter(NOTE_NOT_DELETED_CONDITION, anki_note_id__in=anki_nids)
                 .distinct()
                 .objects(flat)
             ),
@@ -399,7 +399,7 @@ class _AnkiHubDB:
     def ankihub_nid_for_anki_nid(self, anki_note_id: NoteId) -> Optional[uuid.UUID]:
         return (
             AnkiHubNote.select(AnkiHubNote.ankihub_note_id)
-            .filter(anki_note_id=anki_note_id)
+            .filter(NOTE_NOT_DELETED_CONDITION, anki_note_id=anki_note_id)
             .scalar()
         )
 
@@ -428,7 +428,7 @@ class _AnkiHubDB:
     def anki_nid_for_ankihub_nid(self, ankihub_id: uuid.UUID) -> Optional[NoteId]:
         return (
             AnkiHubNote.select(AnkiHubNote.anki_note_id)
-            .filter(ankihub_note_id=ankihub_id)
+            .filter(NOTE_NOT_DELETED_CONDITION, ankihub_note_id=ankihub_id)
             .scalar()
         )
 
@@ -458,7 +458,10 @@ class _AnkiHubDB:
         return (
             AnkiHubNote.select(AnkiHubNote.ankihub_deck_id)
             .distinct()
-            .filter(DQ(guid__is=None) | DQ(fields__is=None) | DQ(tags__is=None))
+            .filter(
+                NOTE_NOT_DELETED_CONDITION,
+                DQ(guid__is=None) | DQ(fields__is=None) | DQ(tags__is=None),
+            )
             .objects(flat)
         )
 
