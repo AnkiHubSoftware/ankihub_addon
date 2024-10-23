@@ -385,18 +385,12 @@ class _AnkiHubDB:
                     AnkiHubNote.select(
                         AnkiHubNote.anki_note_id, AnkiHubNote.ankihub_deck_id
                     )
-                    .filter(anki_note_id__in=anki_nids)
+                    .filter(NOTE_NOT_DELETED_CONDITION, anki_note_id__in=anki_nids)
                     .tuples()
                 ),
                 ids=list(anki_nids),
             )
         )
-
-    def are_ankihub_notes(self, anki_nids: List[NoteId]) -> bool:
-        notes_count = execute_count_query_in_chunks(
-            lambda nids: AnkiHubNote.filter(anki_note_id__in=nids).count(), anki_nids
-        )
-        return notes_count == len(set(anki_nids))
 
     def ankihub_nid_for_anki_nid(self, anki_note_id: NoteId) -> Optional[uuid.UUID]:
         return (
