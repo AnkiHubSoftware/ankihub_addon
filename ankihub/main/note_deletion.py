@@ -3,7 +3,6 @@ This is a temporary solution for selected notes from the AnKing deck."""
 
 import json
 import uuid
-from pathlib import Path
 from typing import List
 
 import aqt
@@ -12,14 +11,12 @@ from anki.utils import ids2str
 from .. import LOGGER
 from ..db import ankihub_db
 from ..main.utils import is_tag_in_list
-from ..settings import ANKIHUB_NOTE_TYPE_FIELD_NAME
+from ..settings import ANKIHUB_NOTE_TYPE_FIELD_NAME, RESOURCES_DIR
 
 # tag for notes which were deleted from the webapp
 TAG_FOR_DELETED_NOTES = "AnkiHub_Deleted"
 
-DELETED_NOTES_FILE = (
-    Path(__file__).parent.parent / "resources/deleted_notes_from_anking_deck.json"
-)
+DELETED_NOTES_FILE = RESOURCES_DIR / "deleted_notes_from_anking_deck.json"
 
 
 def handle_notes_deleted_from_webapp() -> None:

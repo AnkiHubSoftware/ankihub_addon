@@ -51,6 +51,7 @@ from .private_config_migrations import migrate_private_config
 from .public_config_migrations import migrate_public_config
 
 ADDON_PATH = Path(__file__).parent.absolute()
+RESOURCES_DIR = Path(__file__).parent / "resources"
 
 ANKIHUB_DB_FILENAME = "ankihub.db"
 PRIVATE_CONFIG_FILENAME = ".private_config.json"
@@ -862,6 +863,7 @@ url_plans_page = lambda: f"{config.app_url}/memberships/plans/"  # noqa: E731
 
 ANKIHUB_NOTE_TYPE_FIELD_NAME = "ankihub_id"
 ANKIHUB_NOTE_TYPE_MODIFICATION_STRING = "ANKIHUB MODFICATIONS"
+ANKIHUB_MH_NOTE_TYPE_MODIFICATION_STRING = "ANKIHUB MCGRAW HILL MODFICATIONS"
 ANKIHUB_TEMPLATE_END_COMMENT = (
     "<!--\n"
     "ANKIHUB_END\n"
