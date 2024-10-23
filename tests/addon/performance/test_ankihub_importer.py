@@ -41,7 +41,7 @@ def import_anking_notes(
     def import_anking_notes_inner(
         anking_notes_data: List[NoteInfo],
     ) -> None:
-        first_import = ah_did not in ankihub_db.ankihub_deck_ids()
+        first_import = ah_did not in ankihub_db.ankihub_dids()
         importer = AnkiHubImporter()
         importer.import_ankihub_deck(
             ankihub_did=ah_did,

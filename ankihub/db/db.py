@@ -443,9 +443,6 @@ class _AnkiHubDB:
             ).execute()
             DeckMedia.delete().where(DeckMedia.ankihub_deck_id == ankihub_did).execute()
 
-    def ankihub_deck_ids(self) -> List[uuid.UUID]:
-        return AnkiHubNote.select(AnkiHubNote.ankihub_deck_id).distinct().objects(flat)
-
     def last_sync(self, ankihub_note_id: uuid.UUID) -> Optional[int]:
         return (
             AnkiHubNote.select(AnkiHubNote.mod)
