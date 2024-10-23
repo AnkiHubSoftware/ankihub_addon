@@ -500,6 +500,7 @@ class _AnkiHubDB:
     def media_names_for_ankihub_deck(self, ah_did: uuid.UUID) -> Set[str]:
         """Returns the names of all media files which are referenced on notes in the given deck."""
         notes = AnkiHubNote.select(AnkiHubNote.fields).filter(
+            NOTE_NOT_DELETED_CONDITION,
             (DQ(fields__ilike="%<img%") | DQ(fields__ilike="%[sound:%")),
             ankihub_deck_id=ah_did,
         )
