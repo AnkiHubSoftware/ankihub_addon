@@ -7,8 +7,7 @@ from anki.utils import ids2str
 from aqt.utils import showInfo
 
 from .... import LOGGER
-from ....ankihub_client.models import SuggestionType
-from ....db import ankihub_db, flat
+from ....db import NOTE_NOT_DELETED_CONDITION, ankihub_db, flat
 from ....db.models import AnkiHubNote
 from ....main.reset_local_changes import reset_local_changes_to_notes
 from ....settings import ANKIHUB_NOTE_TYPE_FIELD_NAME, config
@@ -97,8 +96,8 @@ def _decks_with_missing_ankihub_nids() -> List[uuid.UUID]:
             nids = (
                 AnkiHubNote.select(AnkiHubNote.anki_note_id)
                 .filter(
+                    NOTE_NOT_DELETED_CONDITION,
                     ankihub_deck_id=ah_did,
-                    last_update_type__ne=SuggestionType.DELETE.value[0],
                 )
                 .objects(flat)
             )
