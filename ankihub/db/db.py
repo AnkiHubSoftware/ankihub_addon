@@ -27,6 +27,7 @@ from typing import (
     Set,
     Tuple,
     TypeVar,
+    cast,
 )
 
 import aqt
@@ -62,6 +63,10 @@ DEFAULT_CHUNK_SIZE = 30_000
 
 # Timeout duration for the write lock. We use a timeout to make sure that deadlocks don't occur.
 WRITE_LOCK_TIMEOUT_SECONDS = 10
+
+NOTE_NOT_DELETED_CONDITION = DQ(last_update_type__is=None) | DQ(
+    last_update_type__ne=SuggestionType.DELETE.value[0]
+)
 
 
 class _AnkiHubDB:
@@ -191,8 +196,7 @@ class _AnkiHubDB:
             execute_list_query_in_chunks(
                 lambda anki_nids: AnkiHubNote.select(AnkiHubNote.anki_note_id)
                 .filter(
-                    DQ(last_update_type__is=None)
-                    | DQ(last_update_type__ne=SuggestionType.DELETE.value[0]),
+                    NOTE_NOT_DELETED_CONDITION,
                     ankihub_deck_id__ne=ankihub_did,
                     anki_note_id__in=anki_nids,
                 )
@@ -289,22 +293,52 @@ class _AnkiHubDB:
             ankihub_did=note.ankihub_deck_id, anki_note_type_id=note.anki_note_type_id
         )
 
+        return self._build_note_info(note, {note.anki_note_type_id: field_names})
+
+    def notes_data_for_anki_nids(self, anki_nids: Sequence[NoteId]) -> List[NoteInfo]:
+        notes = execute_list_query_in_chunks(
+            lambda anki_nids: (
+                AnkiHubNote.select().filter(
+                    NOTE_NOT_DELETED_CONDITION,
+                    anki_note_id__in=anki_nids,
+                )
+            ),
+            ids=list(anki_nids),
+        )
+
+        field_names_by_mid: Dict[NotetypeId, List[str]] = {}
+        for note in notes:
+            if note.anki_note_type_id not in field_names_by_mid:
+                field_names_by_mid[
+                    note.anki_note_type_id
+                ] = self._note_type_field_names(
+                    ankihub_did=cast(uuid.UUID, note.ankihub_deck_id),
+                    anki_note_type_id=cast(NotetypeId, note.anki_note_type_id),
+                )
+
+        return [self._build_note_info(note, field_names_by_mid) for note in notes]
+
+    def _build_note_info(
+        self, note: AnkiHubNote, field_names_by_mid: Dict[NotetypeId, List[str]]
+    ) -> NoteInfo:
         return NoteInfo(
-            ah_nid=note.ankihub_note_id,
-            anki_nid=note.anki_note_id,
-            mid=note.anki_note_type_id,
-            tags=aqt.mw.col.tags.split(note.tags),
+            ah_nid=cast(uuid.UUID, note.ankihub_note_id),
+            anki_nid=cast(int, note.anki_note_id),
+            mid=cast(int, note.anki_note_type_id),
+            tags=aqt.mw.col.tags.split(cast(str, note.tags)),
             fields=[
                 Field(
-                    name=field_names[i],
+                    name=field_names_by_mid[cast(NotetypeId, note.anki_note_type_id)][
+                        i
+                    ],
                     value=value,
                     order=i,
                 )
-                for i, value in enumerate(split_fields(note.fields))
+                for i, value in enumerate(split_fields(cast(str, note.fields)))
             ],
-            guid=note.guid,
+            guid=cast(str, note.guid),
             last_update_type=(
-                suggestion_type_from_str(note.last_update_type)
+                suggestion_type_from_str(cast(str, note.last_update_type))
                 if note.last_update_type
                 else None
             ),
@@ -381,8 +415,7 @@ class _AnkiHubDB:
                         AnkiHubNote.ankihub_note_id, AnkiHubNote.anki_note_id
                     )
                     .filter(
-                        DQ(last_update_type__ne=SuggestionType.DELETE.value[0])
-                        | DQ(last_update_type__is=None),
+                        NOTE_NOT_DELETED_CONDITION,
                         ankihub_note_id__in=ankihub_nids,
                     )
                     .tuples()
