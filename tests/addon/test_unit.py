@@ -1285,55 +1285,6 @@ class TestAnkiHubDBAnkiHubNidsToAnkiIds:
         }
 
 
-class TestAnkiHubDBAreAnkiHubNotes:
-    def test_with_one_ankihub_note(
-        self,
-        anki_session_with_addon_data: AnkiSession,
-        ankihub_db: _AnkiHubDB,
-        import_ah_note: ImportAHNote,
-    ):
-        with anki_session_with_addon_data.profile_loaded():
-            note_info = import_ah_note()
-            assert ankihub_db.are_ankihub_notes(anki_nids=[NoteId(note_info.anki_nid)])
-
-    def test_with_multiple_ankihub_notes(
-        self,
-        anki_session_with_addon_data: AnkiSession,
-        ankihub_db: _AnkiHubDB,
-        import_ah_note: ImportAHNote,
-    ):
-        with anki_session_with_addon_data.profile_loaded():
-            note_info_1 = import_ah_note()
-            note_info_2 = import_ah_note()
-            assert ankihub_db.are_ankihub_notes(
-                anki_nids=[NoteId(note_info_1.anki_nid), NoteId(note_info_2.anki_nid)]
-            )
-
-    def test_with_one_non_ankihub_note(
-        self,
-        anki_session_with_addon_data: AnkiSession,
-        ankihub_db: _AnkiHubDB,
-        add_anki_note: AddAnkiNote,
-    ):
-        with anki_session_with_addon_data.profile_loaded():
-            anki_note = add_anki_note()
-            assert not ankihub_db.are_ankihub_notes(anki_nids=[anki_note.id])
-
-    def test_with_mixed_notes(
-        self,
-        anki_session_with_addon_data: AnkiSession,
-        ankihub_db: _AnkiHubDB,
-        import_ah_note: ImportAHNote,
-        add_anki_note: AddAnkiNote,
-    ):
-        with anki_session_with_addon_data.profile_loaded():
-            anki_note = add_anki_note()
-            note_info = import_ah_note()
-            assert not ankihub_db.are_ankihub_notes(
-                anki_nids=[anki_note.id, NoteId(note_info.anki_nid)]
-            )
-
-
 class TestAnkiHubDBRemoveNotes:
     def test_remove_notes(
         self,

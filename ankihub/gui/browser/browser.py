@@ -330,14 +330,15 @@ def _on_bulk_notes_suggest_action(
 
 
 def _on_reset_local_changes_action(browser: Browser, nids: Sequence[NoteId]) -> None:
-    if not ankihub_db.are_ankihub_notes(list(nids)):
+    anki_nid_to_ah_did = ankihub_db.anki_nid_to_ah_did_dict(anki_nids=nids)
+    ankihub_dids = set(anki_nid_to_ah_did.values())
+
+    if len(ankihub_dids) == 0:
         showInfo(
-            "Please only select notes with AnkiHub ids to reset local changes.",
+            "Please select notes from an AnkiHub deck to reset local changes.",
             parent=browser,
         )
         return
-
-    ankihub_dids = ankihub_db.ankihub_dids_for_anki_nids(nids)
 
     if len(ankihub_dids) > 1:
         showInfo(
@@ -347,6 +348,7 @@ def _on_reset_local_changes_action(browser: Browser, nids: Sequence[NoteId]) -> 
         return
 
     ankihub_did = list(ankihub_dids)[0]
+    filtered_nids = list(anki_nid_to_ah_did.keys())
 
     def on_done(future: Future) -> None:
         future.result()  # raise exception if there was one
@@ -355,7 +357,7 @@ def _on_reset_local_changes_action(browser: Browser, nids: Sequence[NoteId]) -> 
         tooltip("Reset local changes for selected notes.", parent=browser)
 
     aqt.mw.taskman.with_progress(
-        task=lambda: reset_local_changes_to_notes(nids, ah_did=ankihub_did),
+        task=lambda: reset_local_changes_to_notes(filtered_nids, ah_did=ankihub_did),
         on_done=on_done,
         label="Resetting local changes...",
         parent=browser,
@@ -368,14 +370,12 @@ def _on_suggest_optional_tags_action(browser: Browser) -> None:
     if not nids:
         return
 
-    if not ankihub_db.are_ankihub_notes(list(nids)):
-        showInfo(
-            "Please only select notes from an AnkiHub deck to suggest optional tags.",
-            parent=browser,
-        )
-        return
+    anki_nid_to_ah_did = ankihub_db.anki_nid_to_ah_did_dict(anki_nids=nids)
+    ankihub_dids = set(anki_nid_to_ah_did.values())
 
-    ankihub_dids = ankihub_db.ankihub_dids_for_anki_nids(nids)
+    if len(ankihub_dids) == 0:
+        print("Please select notes from an AnkiHub deck to suggest optional tags.")
+        return
 
     if len(ankihub_dids) > 1:
         showInfo(
@@ -384,7 +384,8 @@ def _on_suggest_optional_tags_action(browser: Browser) -> None:
         )
         return
 
-    OptionalTagsSuggestionDialog(parent=browser, nids=nids).exec()
+    filtered_nids = list(anki_nid_to_ah_did.keys())
+    OptionalTagsSuggestionDialog(parent=browser, nids=filtered_nids).exec()
 
 
 # AnkiHub menu

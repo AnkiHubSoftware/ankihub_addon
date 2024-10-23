@@ -10,10 +10,9 @@ import aqt
 from anki.notes import NoteId
 from anki.utils import ids2str
 from aqt.browser import Browser, ItemId
-from peewee import DQ
 
-from ...ankihub_client import SuggestionType, suggestion_type_from_str
-from ...db import execute_list_query_in_chunks, flat
+from ...ankihub_client import suggestion_type_from_str
+from ...db import NOTE_NOT_DELETED_CONDITION, execute_list_query_in_chunks, flat
 from ...db.models import AnkiHubNote
 
 
@@ -94,10 +93,7 @@ class ModifiedAfterSyncSearchNode(CustomSearchNode):
                 lambda nids: (
                     AnkiHubNote.select(AnkiHubNote.anki_note_id, AnkiHubNote.mod)
                     .filter(
-                        (
-                            DQ(last_update_type__is=None)
-                            | DQ(last_update_type__ne=SuggestionType.DELETE.value[0])
-                        ),
+                        NOTE_NOT_DELETED_CONDITION,
                         anki_note_id__in=nids,
                     )
                     .tuples()

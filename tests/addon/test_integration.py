@@ -979,7 +979,7 @@ class TestDownloadAndInstallDecks:
             assert aqt.mw.col.get_note(NoteId(notes_data[0].anki_nid)) is not None
 
             # ... in the AnkiHub database
-            ankihub_db.ankihub_deck_ids() == [deck.ah_did]
+            ankihub_db.ankihub_dids() == [deck.ah_did]
             assert ankihub_db.note_data(NoteId(notes_data[0].anki_nid)) == notes_data[0]
 
             # ... in the config
@@ -2487,7 +2487,7 @@ class TestAnkiHubImporter:
 
 
 def assert_that_only_ankihub_sample_deck_info_in_database(ah_did: uuid.UUID):
-    assert ankihub_db.ankihub_deck_ids() == [ah_did]
+    assert ankihub_db.ankihub_dids() == [ah_did]
     assert len(ankihub_db.anki_nids_for_ankihub_deck(ah_did)) == 3
 
 
@@ -4126,7 +4126,7 @@ def test_profile_swap(
         install_sample_ah_deck()
 
         # the database should contain the imported deck
-        assert len(ankihub_db.ankihub_deck_ids()) == 1
+        assert len(ankihub_db.ankihub_dids()) == 1
         # the config should contain the deck subscription
         assert len(config.deck_ids()) == 1
 
@@ -4140,7 +4140,7 @@ def test_profile_swap(
     with anki_session.profile_loaded():
         assert profile_files_path() == ankihub_base_path() / str(PROFILE_2_ID)
         # the database should be empty
-        assert len(ankihub_db.ankihub_deck_ids()) == 0
+        assert len(ankihub_db.ankihub_dids()) == 0
         # the config should not conatin any deck subscriptions
         assert len(config.deck_ids()) == 0
 
@@ -4149,7 +4149,7 @@ def test_profile_swap(
     with anki_session.profile_loaded():
         assert profile_files_path() == ankihub_base_path() / str(PROFILE_1_ID)
         # the database should contain the imported deck
-        assert len(ankihub_db.ankihub_deck_ids()) == 1
+        assert len(ankihub_db.ankihub_dids()) == 1
         # the config should contain the deck subscription
         assert len(config.deck_ids()) == 1
 
@@ -4431,9 +4431,7 @@ class TestSyncWithAnkiHub:
             # Assert that the deck was uninstalled if the user is not subscribed to it,
             # else assert that it was not uninstalled
             assert config.deck_ids() == ([ah_did] if subscribed_to_deck else [])
-            assert ankihub_db.ankihub_deck_ids() == (
-                [ah_did] if subscribed_to_deck else []
-            )
+            assert ankihub_db.ankihub_dids() == ([ah_did] if subscribed_to_deck else [])
 
             mids = [
                 mw.col.get_note(nid).mid for nid in mw.col.find_notes(f"did:{anki_did}")
@@ -5996,7 +5994,7 @@ class TestAHDBCheck:
                 assert config.deck_ids() == [ah_did]
             elif user_confirms and not deck_exists_on_ankihub:
                 # The deck could't be installed because it doesn't exist, was uninstalled completely
-                assert ankihub_db.ankihub_deck_ids() == []
+                assert ankihub_db.ankihub_dids() == []
             else:
                 # User didn't confirm, nothing to do
                 assert mocks["get_deck_by_id"].call_count == 0
