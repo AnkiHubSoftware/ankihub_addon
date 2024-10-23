@@ -281,10 +281,14 @@ class _AnkiHubDB:
         # It's possible that an AnkiHub nid does not exists after calling insert_or_update_notes_data
         # with a NoteInfo that has the AnkkiHub nid if a note with the same Anki nid already exists
         # in the AnkiHub DB but in different deck.
-        return AnkiHubNote.filter(ankihub_note_id=ankihub_nid).exists()
+        return AnkiHubNote.filter(
+            NOTE_NOT_DELETED_CONDITION, ankihub_note_id=ankihub_nid
+        ).exists()
 
     def note_data(self, anki_note_id: int) -> Optional[NoteInfo]:
-        note = AnkiHubNote.filter(anki_note_id=anki_note_id).get_or_none()
+        note = AnkiHubNote.filter(
+            NOTE_NOT_DELETED_CONDITION, anki_note_id=anki_note_id
+        ).get_or_none()
 
         if not note:
             return None
