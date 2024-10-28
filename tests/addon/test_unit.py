@@ -2912,63 +2912,67 @@ class TestNoteTypeWithUpdatedTemplates:
         )
 
 
-def test_get_daily_review_data_since_last_sync(mocker):
-    last_sync = datetime.now() - timedelta(days=2)
-    yesterday = datetime.now() - timedelta(days=1)
-    mock_rows = [
-        (int(datetime.timestamp(last_sync) * 1000) + 1000, 1, 30),
-        (int(datetime.timestamp(last_sync) * 1000) + 2000, 2, 40),
-        (int(datetime.timestamp(yesterday) * 1000) - 1000, 3, 50),
-        (int(datetime.timestamp(yesterday) * 1000) - 500, 4, 60),
-    ]
+def test_get_daily_review_data_since_last_sync(mocker, anki_session_with_addon_data):
+    with anki_session_with_addon_data.profile_loaded():
+        last_sync = datetime.now() - timedelta(days=2)
+        yesterday = datetime.now() - timedelta(days=1)
+        mock_rows = [
+            (int(datetime.timestamp(last_sync) * 1000) + 1000, 1, 30),
+            (int(datetime.timestamp(last_sync) * 1000) + 2000, 2, 40),
+            (int(datetime.timestamp(yesterday) * 1000) - 1000, 3, 50),
+            (int(datetime.timestamp(yesterday) * 1000) - 500, 4, 60),
+        ]
 
-    mocker.patch("ankihub.main.review_data.aqt.mw.col.db.all", return_value=mock_rows)
-    mock_ms_timestamp_to_datetime = mocker.patch(
-        "ankihub.main.review_data._ms_timestamp_to_datetime"
-    )
-    mock_ms_timestamp_to_datetime.side_effect = lambda ts: datetime.fromtimestamp(
-        ts / 1000
-    )
+        mocker.patch(
+            "ankihub.main.review_data.aqt.mw.col.db.all", return_value=mock_rows
+        )
+        mock_ms_timestamp_to_datetime = mocker.patch(
+            "ankihub.main.review_data._ms_timestamp_to_datetime"
+        )
+        mock_ms_timestamp_to_datetime.side_effect = lambda ts: datetime.fromtimestamp(
+            ts / 1000
+        )
 
-    result = get_daily_review_data_since_last_sync(last_sync)
+        result = get_daily_review_data_since_last_sync(last_sync)
 
-    expected_data = [
-        DailyCardReviewSummaryData(
-            total_cards_studied=2,
-            total_time_reviewing=70,
-            total_cards_marked_as_again=1,
-            total_cards_marked_as_hard=1,
-            total_cards_marked_as_good=0,
-            total_cards_marked_as_easy=0,
-            review_session_date=(last_sync + timedelta(seconds=1)).date(),
-        ),
-        DailyCardReviewSummaryData(
-            total_cards_studied=2,
-            total_time_reviewing=110,
-            total_cards_marked_as_again=0,
-            total_cards_marked_as_hard=0,
-            total_cards_marked_as_good=1,
-            total_cards_marked_as_easy=1,
-            review_session_date=(yesterday - timedelta(seconds=1)).date(),
-        ),
-    ]
+        expected_data = [
+            DailyCardReviewSummaryData(
+                total_cards_studied=2,
+                total_time_reviewing=70,
+                total_cards_marked_as_again=1,
+                total_cards_marked_as_hard=1,
+                total_cards_marked_as_good=0,
+                total_cards_marked_as_easy=0,
+                review_session_date=(last_sync + timedelta(seconds=1)).date(),
+            ),
+            DailyCardReviewSummaryData(
+                total_cards_studied=2,
+                total_time_reviewing=110,
+                total_cards_marked_as_again=0,
+                total_cards_marked_as_hard=0,
+                total_cards_marked_as_good=1,
+                total_cards_marked_as_easy=1,
+                review_session_date=(yesterday - timedelta(seconds=1)).date(),
+            ),
+        ]
 
-    assert len(result) == len(expected_data)
-    for res, exp in zip(result, expected_data):
-        assert res.total_cards_studied == exp.total_cards_studied
-        assert res.total_time_reviewing == exp.total_time_reviewing
-        assert res.total_cards_marked_as_again == exp.total_cards_marked_as_again
-        assert res.total_cards_marked_as_hard == exp.total_cards_marked_as_hard
-        assert res.total_cards_marked_as_good == exp.total_cards_marked_as_good
-        assert res.total_cards_marked_as_easy == exp.total_cards_marked_as_easy
-        assert res.review_session_date == exp.review_session_date
+        assert len(result) == len(expected_data)
+        for res, exp in zip(result, expected_data):
+            assert res.total_cards_studied == exp.total_cards_studied
+            assert res.total_time_reviewing == exp.total_time_reviewing
+            assert res.total_cards_marked_as_again == exp.total_cards_marked_as_again
+            assert res.total_cards_marked_as_hard == exp.total_cards_marked_as_hard
+            assert res.total_cards_marked_as_good == exp.total_cards_marked_as_good
+            assert res.total_cards_marked_as_easy == exp.total_cards_marked_as_easy
+            assert res.review_session_date == exp.review_session_date
 
 
-def test_get_daily_review_data_no_reviews(mocker):
-    last_sync = datetime.now() - timedelta(days=2)
-    mocker.patch("ankihub.main.review_data.aqt.mw.col.db.all", return_value=[])
-    mocker.patch("ankihub.main.review_data._ms_timestamp_to_datetime")
+def test_get_daily_review_data_no_reviews(mocker, anki_session_with_addon_data):
+    with anki_session_with_addon_data.profile_loaded():
+        last_sync = datetime.now() - timedelta(days=2)
+        mocker.patch("ankihub.main.review_data.aqt.mw.col.db.all", return_value=[])
+        mocker.patch("ankihub.main.review_data._ms_timestamp_to_datetime")
 
-    result = get_daily_review_data_since_last_sync(last_sync)
+        result = get_daily_review_data_since_last_sync(last_sync)
 
-    assert result == []
+        assert result == []

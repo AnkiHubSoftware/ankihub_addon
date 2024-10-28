@@ -136,7 +136,7 @@ def get_daily_review_data_since_last_sync(
         daily_reviews[review_date].append((review_ease, review_time))
 
     daily_card_review_data = []
-    for key, item in daily_reviews:
+    for key, item in daily_reviews.items():
         total_cards_studied = len(item)
         total_time_reviewing = sum(time for _, time in item)
         total_cards_marked_as_again = sum(1 for ease, _ in item if ease == 1)
