@@ -15,6 +15,7 @@ from anki.notes import NoteId
 
 from .. import LOGGER
 from ..db import ankihub_db
+from ..db.db import NOTE_NOT_DELETED_CONDITION
 from ..db.models import AnkiHubNote
 from ..settings import config
 from .utils import (
@@ -29,6 +30,7 @@ SUBDECK_TAG = "AnkiHub_Subdeck"
 def deck_contains_subdeck_tags(ah_did: uuid.UUID) -> bool:
     """Return whether the given deck contains any notes which have subdeck tags in the AnkiHub database."""
     return AnkiHubNote.filter(
+        NOTE_NOT_DELETED_CONDITION,
         ankihub_deck_id=ah_did,
         tags__ilike=f"%{SUBDECK_TAG}::%::%",
     ).exists()

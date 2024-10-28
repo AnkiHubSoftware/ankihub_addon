@@ -4,7 +4,7 @@ from typing import Callable, List, Optional
 
 from .... import LOGGER
 from ....addon_ankihub_client import AddonAnkiHubClient as AnkiHubClient
-from ....db import ankihub_db, flat
+from ....db import NOTE_NOT_DELETED_CONDITION, ankihub_db, flat
 from ....db.models import AnkiHubNote
 from ....main.deck_unsubscribtion import uninstall_deck
 from ....settings import config
@@ -27,11 +27,11 @@ def _fetch_missing_note_types() -> None:
     This is necessary because in a previous version of the add-on, note types were not saved in the database.
     """
     client = AnkiHubClient()
-    for ah_did in ankihub_db.ankihub_deck_ids():
+    for ah_did in ankihub_db.ankihub_dids():
         mids_of_notes_of_deck = (
             AnkiHubNote.select(AnkiHubNote.anki_note_type_id)
             .distinct()
-            .filter(ankihub_deck_id=ah_did)
+            .filter(NOTE_NOT_DELETED_CONDITION, ankihub_deck_id=ah_did)
             .objects(flat)
         )
         mids_of_missing_note_types = [
@@ -129,6 +129,6 @@ def _try_reinstall_decks_with_something_missing(
 
 
 def _decks_missing_from_config() -> List[uuid.UUID]:
-    ah_dids_from_ankihub_db = ankihub_db.ankihub_deck_ids()
+    ah_dids_from_ankihub_db = ankihub_db.ankihub_dids()
     ah_dids_from_config = config.deck_ids()
     return list(set(ah_dids_from_ankihub_db) - set(ah_dids_from_config))

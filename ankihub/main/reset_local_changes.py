@@ -1,6 +1,7 @@
 """Code for resetting notes to the state they have in the AnkiHub database.
 (This is the state that the notes had on AnkiHub when the add-on synced with AnkiHub last time.)
 """
+
 import uuid
 from typing import Sequence
 
@@ -24,11 +25,7 @@ def reset_local_changes_to_notes(
     protected_fields = client.get_protected_fields(ah_did=ah_did)
     protected_tags = client.get_protected_tags(ah_did=ah_did)
 
-    notes_data = [
-        note_data
-        for nid in nids
-        if (note_data := ankihub_db.note_data(nid)) is not None
-    ]
+    notes_data = ankihub_db.notes_data_for_anki_nids(nids)
     note_types = {
         mid: ankihub_db.note_type_dict(ankihub_did=ah_did, note_type_id=mid)
         for mid in ankihub_db.note_types_for_ankihub_deck(ah_did)
