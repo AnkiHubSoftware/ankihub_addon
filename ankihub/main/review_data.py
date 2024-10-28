@@ -1,7 +1,6 @@
 import uuid
 from collections import defaultdict
-from dataclasses import dataclass
-from datetime import date, datetime, timedelta
+from datetime import datetime, timedelta
 from typing import List, Optional, Tuple
 
 import aqt
@@ -10,6 +9,7 @@ from anki import consts as anki_consts
 from .. import LOGGER
 from ..addon_ankihub_client import AddonAnkiHubClient as AnkiHubClient
 from ..ankihub_client import CardReviewData
+from ..ankihub_client.models import DailyCardReviewSummaryData
 from ..db import ankihub_db
 from ..settings import config
 
@@ -93,17 +93,6 @@ def _get_first_and_last_review_datetime_for_ah_deck(
 
 def _ms_timestamp_to_datetime(timestamp: int) -> datetime:
     return datetime.fromtimestamp(timestamp / 1000)
-
-
-@dataclass
-class DailyCardReviewSummaryData:
-    review_session_date: date
-    total_cards_studied: int = 0
-    total_time_reviewing: int = 0
-    total_cards_marked_as_again: int = 0
-    total_cards_marked_as_hard: int = 0
-    total_cards_marked_as_good: int = 0
-    total_cards_marked_as_easy: int = 0
 
 
 def get_daily_review_data_since_last_sync(

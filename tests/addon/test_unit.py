@@ -31,14 +31,12 @@ from requests_mock import Mocker
 from ankihub.ankihub_client.ankihub_client import DEFAULT_API_URL
 from ankihub.ankihub_client.models import (  # type: ignore
     CardReviewData,
+    DailyCardReviewSummaryData,
     UserDeckExtensionRelation,
 )
 from ankihub.gui import menu
 from ankihub.gui.config_dialog import setup_config_dialog_manager
-from ankihub.main.review_data import (
-    DailyCardReviewSummaryData,
-    get_daily_review_data_since_last_sync,
-)
+from ankihub.main.review_data import get_daily_review_data_since_last_sync
 from ankihub.settings import ANKIHUB_TEMPLATE_END_COMMENT, DatadogLogHandler
 
 from ..factories import (
