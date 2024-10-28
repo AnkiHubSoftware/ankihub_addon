@@ -12,6 +12,7 @@ except ImportError:
 ANKIHUB_PRESET_NAME = "AnkiHub"
 DECK_CONFIG: Dict[str, Any] = {
     "steps": [15, 1440],
+    "fsrs_steps": [15],
     "new_order": anki.consts.NEW_CARDS_DUE,
     "new_gather_priority": deck_config_pb2.DeckConfig.Config.NewCardGatherPriority.NEW_CARD_GATHER_PRIORITY_LOWEST_POSITION,  # noqa: E501
     "new_sort_order": deck_config_pb2.DeckConfig.Config.NewCardSortOrder.NEW_CARD_SORT_ORDER_NO_SORT,
@@ -79,7 +80,12 @@ def _create_deck_preset_if_not_exists() -> DeckConfigDict:
         aqt.mw.col.decks.restore_to_default(conf)
     else:
         conf = aqt.mw.col.decks.add_config(ANKIHUB_PRESET_NAME)
+    fsrs_enabled = aqt.mw.col.get_config("fsrs")
     for option, value in DECK_CONFIG.items():
+        if (fsrs_enabled and f"fsrs_{option}" in DECK_CONFIG) or (
+            not fsrs_enabled and option.startswith("fsrs_")
+        ):
+            continue
         option_paths = CONFIG_NAME_TO_DECK_OPTIONS_PATH[option]
         for path in option_paths:
             deep_set(conf, path, value)
