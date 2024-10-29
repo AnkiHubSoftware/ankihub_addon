@@ -5,7 +5,7 @@ import dataclasses
 import uuid
 from abc import ABC
 from dataclasses import dataclass
-from datetime import datetime
+from datetime import date, datetime
 from enum import Enum
 from typing import Any, Dict, List, Optional, Sequence, Set
 
@@ -320,6 +320,17 @@ class CardReviewData(DataClassJSONMixinWithConfig):
             deserialize=lambda x: datetime.strptime(x, ANKIHUB_DATETIME_FORMAT_STR)
         ),
     )
+
+
+@dataclass
+class DailyCardReviewSummaryData(DataClassJSONMixinWithConfig):
+    review_session_date: date
+    total_cards_studied: int = 0
+    total_time_reviewing: int = 0
+    total_cards_marked_as_again: int = 0
+    total_cards_marked_as_hard: int = 0
+    total_cards_marked_as_good: int = 0
+    total_cards_marked_as_easy: int = 0
 
 
 # Media related functions

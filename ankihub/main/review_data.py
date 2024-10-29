@@ -1,4 +1,5 @@
 import uuid
+from collections import defaultdict
 from datetime import datetime, timedelta
 from typing import List, Optional, Tuple
 
@@ -8,6 +9,7 @@ from anki import consts as anki_consts
 from .. import LOGGER
 from ..addon_ankihub_client import AddonAnkiHubClient as AnkiHubClient
 from ..ankihub_client import CardReviewData
+from ..ankihub_client.models import DailyCardReviewSummaryData
 from ..db import ankihub_db
 from ..settings import config
 
@@ -91,3 +93,56 @@ def _get_first_and_last_review_datetime_for_ah_deck(
 
 def _ms_timestamp_to_datetime(timestamp: int) -> datetime:
     return datetime.fromtimestamp(timestamp / 1000)
+
+
+def get_daily_review_data_since_last_sync(
+    last_sync: datetime,
+) -> List[DailyCardReviewSummaryData]:
+    """Filter revlog entries between the date of the last sync and the end of yesterday
+    group by days, and compile the data."""
+    end_of_yesterday = datetime.now().replace(
+        hour=0, minute=0, second=0, microsecond=0
+    ) - timedelta(microseconds=1)
+    timestamp_last_sync_ms = int(datetime.timestamp(last_sync) * 1000)
+    timestamp_end_of_yesterday = int(datetime.timestamp(end_of_yesterday) * 1000)
+    rows = aqt.mw.col.db.all(
+        """
+        SELECT r.id, r.ease, r.time
+        FROM revlog as r
+        JOIN cards as c ON r.cid = c.id
+        WHERE r.id BETWEEN ? AND ?
+        """,
+        timestamp_last_sync_ms,
+        timestamp_end_of_yesterday,
+    )
+
+    daily_reviews = defaultdict(list)
+
+    for row in rows:
+        review_timestamp = int(row[0])
+        review_ease = int(row[1])
+        review_time = int(row[2])
+        review_date = _ms_timestamp_to_datetime(review_timestamp).date()
+        daily_reviews[review_date].append((review_ease, review_time))
+
+    daily_card_review_data = []
+    for key, item in daily_reviews.items():
+        total_cards_studied = len(item)
+        total_time_reviewing = sum(time for _, time in item)
+        total_cards_marked_as_again = sum(1 for ease, _ in item if ease == 1)
+        total_cards_marked_as_hard = sum(1 for ease, _ in item if ease == 2)
+        total_cards_marked_as_good = sum(1 for ease, _ in item if ease == 3)
+        total_cards_marked_as_easy = sum(1 for ease, _ in item if ease == 4)
+
+        daily_card_review_data.append(
+            DailyCardReviewSummaryData(
+                total_cards_studied=total_cards_studied,
+                total_time_reviewing=total_time_reviewing,
+                total_cards_marked_as_again=total_cards_marked_as_again,
+                total_cards_marked_as_hard=total_cards_marked_as_hard,
+                total_cards_marked_as_good=total_cards_marked_as_good,
+                total_cards_marked_as_easy=total_cards_marked_as_easy,
+                review_session_date=key,
+            )
+        )
+    return daily_card_review_data
