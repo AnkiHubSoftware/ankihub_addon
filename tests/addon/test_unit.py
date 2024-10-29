@@ -2935,7 +2935,7 @@ def test_get_daily_review_data_since_last_sync(mocker, anki_session_with_addon_d
                 total_cards_marked_as_hard=1,
                 total_cards_marked_as_good=0,
                 total_cards_marked_as_easy=0,
-                review_session_date=(last_sync + timedelta(seconds=1)).date(),
+                review_session_date=(last_sync).date(),
             ),
             DailyCardReviewSummaryData(
                 total_cards_studied=2,
@@ -2944,7 +2944,7 @@ def test_get_daily_review_data_since_last_sync(mocker, anki_session_with_addon_d
                 total_cards_marked_as_hard=0,
                 total_cards_marked_as_good=1,
                 total_cards_marked_as_easy=1,
-                review_session_date=(yesterday - timedelta(seconds=1)).date(),
+                review_session_date=(yesterday).date(),
             ),
         ]
 
