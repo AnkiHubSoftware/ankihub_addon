@@ -8,7 +8,7 @@ import tempfile
 import uuid
 import zipfile
 from copy import deepcopy
-from datetime import datetime, timedelta, timezone
+from datetime import date, datetime, timedelta, timezone
 from pathlib import Path
 from typing import Callable, Generator, List, Optional, cast
 from unittest.mock import Mock
@@ -52,6 +52,7 @@ from ankihub.ankihub_client import (
 from ankihub.ankihub_client.models import (
     ANKIHUB_DATETIME_FORMAT_STR,
     CardReviewData,
+    DailyCardReviewSummary,
     DeckUpdates,
     NotesActionChoices,
     UserDeckExtensionRelation,
@@ -1781,6 +1782,21 @@ class TestSendCardReviewData:
         )
 
         authorized_client_for_user_test1.send_card_review_data([card_review_data])
+
+
+@pytest.mark.vcr()
+class TestSendDailyCardReviewSummaries:
+    def test_basic(
+        self,
+        authorized_client_for_user_test1: AnkiHubClient,
+    ) -> None:
+        daily_card_review_summaries = [
+            DailyCardReviewSummary(review_session_date=date.today())
+        ]
+
+        authorized_client_for_user_test1.send_daily_card_review_summaries(
+            daily_card_review_summaries
+        )
 
 
 @pytest.mark.vcr
