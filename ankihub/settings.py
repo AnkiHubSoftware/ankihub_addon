@@ -179,6 +179,7 @@ class PrivateConfig(DataClassJSONMixin):
     # used to determine whether to skip the full sync dialog
     # and choose "Upload" for the user automatically on next sync.
     schema_to_do_full_upload_for_once: Optional[int] = None
+    last_summary_sent_date: Optional[datetime] = None
 
 
 class _Config:
@@ -276,6 +277,10 @@ class _Config:
         self, ankihub_did: uuid.UUID, latest_media_update: Optional[datetime]
     ):
         self.deck_config(ankihub_did).latest_media_update = latest_media_update
+        self._update_private_config()
+
+    def save_last_summary_sent_date(self, last_summary_sent_date: Optional[datetime]):
+        self._private_config.last_summary_sent_date = last_summary_sent_date
         self._update_private_config()
 
     def set_subdecks(self, ankihub_did: uuid.UUID, subdecks: bool):
@@ -400,6 +405,9 @@ class _Config:
 
     def deck_extension_ids(self) -> List[int]:
         return list(self._private_config.deck_extensions.keys())
+
+    def get_last_summary_sent_date(self) -> Optional[datetime]:
+        return self._private_config.last_summary_sent_date
 
     def create_or_update_deck_extension_config(self, extension: DeckExtension) -> None:
         latest_update = (
@@ -758,7 +766,7 @@ class DatadogLogHandler(logging.Handler):
         # as this leads to an error in the shutdown, because at this point no new threads can be created.
         from .feature_flags import feature_flags
 
-        if not feature_flags.send_addon_logs_to_datadog:
+        if not feature_flags.get("send_addon_logs_to_datadog", False):
             with self.lock:
                 # Clear the buffer to prevent it from growing indefinitely.
                 self.buffer = []
