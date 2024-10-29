@@ -1,6 +1,6 @@
 interactions:
 - request:
-    body: '{"username": "test1", "password": "asdf"}'
+    body: '{"username": "test2", "password": "asdf"}'
     headers:
       Accept:
       - application/json; version=18.0
@@ -12,7 +12,7 @@ interactions:
     uri: http://localhost:8000/api/login/
   response:
     body:
-      string: '{"expiry":"2024-11-26T14:56:39.026958Z","token":"98b3a1ea6e551cfbc3be2aaf8322262a52dfe9ff12fba43b41ab18d93ad53ae2"}'
+      string: '{"expiry":"2024-11-26T15:16:25.847552Z","token":"5e3154d0e5c434ede0ad64ed883a5b3d5aa5f7f8b579ba2f152fb1936ed855b3"}'
     headers:
       Allow:
       - POST, OPTIONS
@@ -25,20 +25,20 @@ interactions:
       Cross-Origin-Opener-Policy:
       - unsafe-none
       Date:
-      - Tue, 29 Oct 2024 14:56:39 GMT
+      - Tue, 29 Oct 2024 15:16:25 GMT
       Referrer-Policy:
       - same-origin
       Server:
       - WSGIServer/0.2 CPython/3.12.3
       Server-Timing:
-      - TimerPanel_utime;dur=247.85699999999977;desc="User CPU time", TimerPanel_stime;dur=139.52399999999977;desc="System
-        CPU time", TimerPanel_total;dur=387.3809999999995;desc="Total CPU time", TimerPanel_total_time;dur=322.69483400159515;desc="Elapsed
-        time", SQLPanel_sql_time;dur=7.795634999638423;desc="SQL 16 queries", CachePanel_total_time;dur=0;desc="Cache
-        0 Calls"
+      - TimerPanel_utime;dur=249.29999999999808;desc="User CPU time", TimerPanel_stime;dur=68.25200000000109;desc="System
+        CPU time", TimerPanel_total;dur=317.55199999999917;desc="Total CPU time",
+        TimerPanel_total_time;dur=141.17046300088987;desc="Elapsed time", SQLPanel_sql_time;dur=5.47573899893905;desc="SQL
+        16 queries", CachePanel_total_time;dur=0;desc="Cache 0 Calls"
       Set-Cookie:
-      - csrftoken=dLPd0WlnUlx7SxlNVEqhd2l9oqONo2DR; expires=Tue, 28 Oct 2025 14:56:39
+      - csrftoken=N0Q4VpcP5LL8DSvVqTB4pKjm1xt2c0cY; expires=Tue, 28 Oct 2025 15:16:25
         GMT; HttpOnly; Max-Age=31449600; Path=/; SameSite=Lax
-      - sessionid=7b355u25if93f8wel7nbb4frrem9qjvp; expires=Tue, 05 Nov 2024 14:56:39
+      - sessionid=siw34qpk8rk96a3wm949hvqlhw98fl4n; expires=Tue, 05 Nov 2024 15:16:25
         GMT; HttpOnly; Max-Age=604800; Path=/; SameSite=Lax
       Vary:
       - Accept, Cookie, Accept-Language, origin
@@ -47,7 +47,7 @@ interactions:
       X-Frame-Options:
       - DENY
       djdt-store-id:
-      - e374674c79b441f09f9074c7fe1f2046
+      - 81bc68f3c3394e55bba3a714d43ff136
     status:
       code: 200
       message: OK
@@ -59,7 +59,7 @@ interactions:
       Accept:
       - application/json; version=18.0
       Authorization:
-      - Token 98b3a1ea6e551cfbc3be2aaf8322262a52dfe9ff12fba43b41ab18d93ad53ae2
+      - Token 5e3154d0e5c434ede0ad64ed883a5b3d5aa5f7f8b579ba2f152fb1936ed855b3
       Content-Length:
       - '223'
       Content-Type:
@@ -81,15 +81,15 @@ interactions:
       Cross-Origin-Opener-Policy:
       - unsafe-none
       Date:
-      - Tue, 29 Oct 2024 14:56:39 GMT
+      - Tue, 29 Oct 2024 15:16:25 GMT
       Referrer-Policy:
       - same-origin
       Server:
       - WSGIServer/0.2 CPython/3.12.3
       Server-Timing:
-      - TimerPanel_utime;dur=62.96799999999969;desc="User CPU time", TimerPanel_stime;dur=2.1849999999998815;desc="System
-        CPU time", TimerPanel_total;dur=65.15299999999957;desc="Total CPU time", TimerPanel_total_time;dur=72.02545699874463;desc="Elapsed
-        time", SQLPanel_sql_time;dur=2.175153000280261;desc="SQL 6 queries", CachePanel_total_time;dur=0.10115800068888348;desc="Cache
+      - TimerPanel_utime;dur=48.7720000000067;desc="User CPU time", TimerPanel_stime;dur=0.7520000000020843;desc="System
+        CPU time", TimerPanel_total;dur=49.52400000000878;desc="Total CPU time", TimerPanel_total_time;dur=55.45866099964769;desc="Elapsed
+        time", SQLPanel_sql_time;dur=2.0222920011292445;desc="SQL 5 queries", CachePanel_total_time;dur=0.0406359995395178;desc="Cache
         2 Calls"
       Vary:
       - Accept, Accept-Language, Cookie, origin
@@ -98,7 +98,7 @@ interactions:
       X-Frame-Options:
       - DENY
       djdt-store-id:
-      - abef50c7e6584bd195b496fa030bd23f
+      - 61d28095c1594533955b9a34fac66467
     status:
       code: 201
       message: Created

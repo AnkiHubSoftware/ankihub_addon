@@ -1788,13 +1788,13 @@ class TestSendCardReviewData:
 class TestSendDailyCardReviewSummaries:
     def test_basic(
         self,
-        authorized_client_for_user_test1: AnkiHubClient,
+        authorized_client_for_user_test2: AnkiHubClient,
     ) -> None:
         daily_card_review_summaries = [
             DailyCardReviewSummary(review_session_date=date.today())
         ]
 
-        authorized_client_for_user_test1.send_daily_card_review_summaries(
+        authorized_client_for_user_test2.send_daily_card_review_summaries(
             daily_card_review_summaries
         )
 
