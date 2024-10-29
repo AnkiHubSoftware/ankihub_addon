@@ -2725,7 +2725,7 @@ class TestDatadogLogHandler:
     def test_emit_and_flush(
         self, mocker: MockerFixture, send_logs_to_datadog_feature_flag: bool
     ):
-        feature_flags.send_addon_logs_to_datadog = send_logs_to_datadog_feature_flag
+        feature_flags["send_addon_logs_to_datadog"] = send_logs_to_datadog_feature_flag
 
         # Mock the requests.post call to always return a response with status code 202
         response = Mock()
@@ -2767,7 +2767,7 @@ class TestDatadogLogHandler:
             post_mock.assert_not_called()
 
     def test_periodic_flush(self, mocker):
-        feature_flags.send_addon_logs_to_datadog = True
+        feature_flags["send_addon_logs_to_datadog"] = True
 
         # Mock the requests.post call to always return a response with status code 202
         response = Mock()
@@ -2798,7 +2798,7 @@ class TestDatadogLogHandler:
         )
 
     def test_capacity_flush(self, mocker):
-        feature_flags.send_addon_logs_to_datadog = True
+        feature_flags["send_addon_logs_to_datadog"] = True
 
         # Create a DatadogLogHandler with a short flush interval and a LogRecord
         handler = DatadogLogHandler(capacity=3)

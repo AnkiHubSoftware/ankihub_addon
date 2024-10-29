@@ -112,7 +112,7 @@ def _add_ankihub_ai_js_to_reviewer_web_content(web_content: WebContent, context)
     if not isinstance(context, Reviewer):
         return
 
-    if not feature_flags.chatbot:
+    if not feature_flags.get("chatbot", False):
         return
 
     reviewer: Reviewer = context
@@ -151,7 +151,7 @@ def _ankihub_theme() -> str:
 
 
 def _notify_ankihub_ai_of_card_change(card: Card) -> None:
-    if not feature_flags.chatbot:
+    if not feature_flags.get("chatbot", False):
         return
 
     ah_nid = ankihub_db.ankihub_nid_for_anki_nid(card.nid)
@@ -162,7 +162,7 @@ def _notify_ankihub_ai_of_card_change(card: Card) -> None:
 def _remove_anking_button(_: Card) -> None:
     """Removes the AnKing button (provided by the AnKing note types) from the webview if it exists.
     This is necessary because it overlaps with the AnkiHub AI chatbot button."""
-    if not feature_flags.chatbot:
+    if not feature_flags.get("chatbot", False):
         return
 
     js = _wrap_with_ankihubAI_check(REMOVE_ANKING_BUTTON_JS_PATH.read_text())
@@ -170,7 +170,7 @@ def _remove_anking_button(_: Card) -> None:
 
 
 def _set_token_for_ankihub_ai_js() -> None:
-    if not feature_flags.chatbot:
+    if not feature_flags.get("chatbot", False):
         return
 
     js = _wrap_with_ankihubAI_check(f"ankihubAI.setToken('{config.token()}');")
